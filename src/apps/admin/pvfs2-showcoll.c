@@ -19,7 +19,8 @@
 
 static char storage_space[PATH_MAX] = "/tmp/pvfs2-test-space";
 static char collection[PATH_MAX];
-static int verbose = 0, got_collection = 0, print_keyvals = 0;
+static int verbose = 0, got_collection = 0, print_keyvals = 0, got_dspace_handle = 0;
+TROVE_handle dspace_handle;
 
 static int parse_args(int argc,
 		      char **argv);
@@ -27,6 +28,8 @@ static int print_collections(void);
 static int print_dspaces(TROVE_coll_id coll_id,
 			 TROVE_handle root_handle,
 			 int no_root_handle);
+static int print_dspace(TROVE_coll_id coll_id,
+			TROVE_handle handle);
 static int print_dspace_keyvals(TROVE_coll_id coll_id,
 				TROVE_handle handle,
 				TROVE_ds_type type);
@@ -151,7 +154,8 @@ int main(int argc, char **argv)
 		root_handle);
     }
 
-    ret = print_dspaces(coll_id, root_handle, no_root_handle);
+    if (got_dspace_handle) ret = print_dspace(coll_id, dspace_handle);
+    else                   ret = print_dspaces(coll_id, root_handle, no_root_handle);
 
     trove_finalize();
 
@@ -162,7 +166,7 @@ static int parse_args(int argc, char **argv)
 {
     int c;
 
-    while ((c = getopt(argc, argv, "s:c:kv")) != EOF) {
+    while ((c = getopt(argc, argv, "s:c:d:kvh")) != EOF) {
 	switch (c) {
 	    case 's':
 		strncpy(storage_space, optarg, PATH_MAX);
@@ -174,19 +178,26 @@ static int parse_args(int argc, char **argv)
 	    case 'k':
 		print_keyvals = 1;
 		break;
+	    case 'd':
+		/* TODO: USE BIGGER VALUE */
+		got_dspace_handle = 1;
+		dspace_handle = strtol(optarg, NULL, 16);
 	    case 'v':
 		verbose = 1;
 		break;
 	    case '?':
 	    default:
 		fprintf(stderr, "%s: error: unrecognized option '%c'.\n", argv[0], c);
+	    case 'h':
 		fprintf(stderr,
-			"usage: %s [-s storage_space] [-c collection_name] [-v] [-k]\n",
-			argv[0]);
+			"usage: pvfs2-showcoll [-s storage_space] [-c collection_name] [-d dspace_handle] [-v] [-k] [-h]\n");
 		fprintf(stderr, "\tdefault storage space is '/tmp/pvfs2-test-space'.\n");
 		fprintf(stderr, "\t'-v' turns on verbose output.\n");
 		fprintf(stderr, "\t'-k' prints data in keyval spaces.\n");
+		fprintf(stderr, "\t'-d' prints data for a single dspace only, given a handle (in hex).\n");
+		fprintf(stderr, "\t'-h' prints this message.\n");
 		fprintf(stderr, "\n\tWithout a collection name, a list of collections will be printed.\n");
+		if (c == 'h') exit(0);
 		return -1;
 	}
     }
@@ -222,31 +233,42 @@ static int print_dspaces(TROVE_coll_id coll_id,
 
 	if (count > 0) {
 	    int i;
-	    TROVE_ds_attributes_s ds_attr;
-
 	    for (i = 0; i < count; i++) {
-		ret = trove_dspace_getattr(coll_id,
-					   harray[i],
-					   &ds_attr,
-					   0 /* flags */,
-					   NULL /* user ptr */,
-					   &op_id);
-		while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &opcount, NULL, NULL, &state);
-		if (ret != 1) return -1;
-		
-		fprintf(stdout,
-			"\t0x%08Lx (dspace_getattr output: type = %s, b_size = %Ld, k_size = %Ld)\n",
-			harray[i],
-			type_to_string(ds_attr.type),
-			ds_attr.b_size,
-			ds_attr.k_size);
-
-		if (print_keyvals) {
-		    ret = print_dspace_keyvals(coll_id, harray[i], ds_attr.type);
-		    if (ret != 0) return -1;
-		}
+		ret = print_dspace(coll_id, harray[i]);
 	    }
 	}
+    }
+
+    return 0;
+}
+
+static int print_dspace(TROVE_coll_id coll_id,
+			TROVE_handle handle)
+{
+    int ret, opcount;
+    TROVE_ds_attributes_s ds_attr;
+    TROVE_op_id op_id;
+    TROVE_ds_state state;
+
+    ret = trove_dspace_getattr(coll_id,
+			       handle,
+			       &ds_attr,
+			       0 /* flags */,
+			       NULL /* user ptr */,
+			       &op_id);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &opcount, NULL, NULL, &state);
+    if (ret != 1) return -1;
+		
+    fprintf(stdout,
+	    "\t0x%08Lx (dspace_getattr output: type = %s, b_size = %Ld, k_size = %Ld)\n",
+	    handle,
+	    type_to_string(ds_attr.type),
+	    ds_attr.b_size,
+	    ds_attr.k_size);
+
+    if (print_keyvals) {
+	ret = print_dspace_keyvals(coll_id, handle, ds_attr.type);
+	if (ret != 0) return -1;
     }
 
     return 0;
@@ -353,7 +375,7 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 
     if (!strncmp(key_p->buffer, "metadata", 9) && val_p->read_sz == sizeof(struct PVFS_object_attr)) {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) -- interpreted as PVFS_object_attr = ",
+		"\t\t'%s' (%d): '%s' (%d) as PVFS_object_attr = ",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		(char *) val_p->buffer,
@@ -362,7 +384,7 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
     }
     else if (!strncmp(key_p->buffer, "datafile_handles", 17) && val_p->read_sz % sizeof(PVFS_handle) == 0) {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) -- interpreted as handles = ",
+		"\t\t'%s' (%d): '%s' (%d) as handles = ",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		(char *) val_p->buffer,
@@ -371,7 +393,7 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
     }
     else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "dir_ent", 8)) {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) -- interpreted as a handle = 0x%08Lx\n",
+		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08Lx\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		(char *) val_p->buffer,
@@ -380,7 +402,7 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
     }
     else if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8) {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) -- interpreted as a handle = 0x%08Lx\n",
+		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08Lx\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		(char *) val_p->buffer,
