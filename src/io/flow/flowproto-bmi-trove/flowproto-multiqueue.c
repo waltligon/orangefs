@@ -114,7 +114,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
 static int bmi_send_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
-		         PVFS_error error_code);
+		         PVFS_error error_code,
+			 int initial_call_flag);
 /* the above function is a special case; we need to look at a return
  * value when we invoke it directly, so we use the following function
  * to trigger it from a callback
@@ -123,7 +124,7 @@ static void bmi_send_callback_wrapper(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code)
 {
-    bmi_send_callback_fn(user_ptr, actual_size, error_code);
+    bmi_send_callback_fn(user_ptr, actual_size, error_code, 0);
     return;
 };
 static void trove_read_callback_fn(void *user_ptr,
@@ -337,11 +338,10 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	flow_data->initial_posts = BUFFERS_PER_FLOW;
 	for(i=0; i<BUFFERS_PER_FLOW; i++)
 	{
-	    /* TODO: need to stop if we hit an error along the way? */
 	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
 		"flowproto-multiqueue forcing bmi_send_callback_fn.\n");
 
-	    bmi_send_callback_fn(&(flow_data->prealloc_array[i]), 0, 0);
+	    bmi_send_callback_fn(&(flow_data->prealloc_array[i]), 0, 0, 1);
 	}
     }
     else if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
@@ -645,7 +645,7 @@ static void trove_read_callback_fn(void *user_ptr,
 	{
 	    gen_mutex_unlock(&flow_data->flow_mutex);
 	    /* immediate completion; trigger callback ourselves */
-	    ret = bmi_send_callback_fn(q_item, q_item->buffer_used, 0);
+	    ret = bmi_send_callback_fn(q_item, q_item->buffer_used, 0, 0);
 	    /* if that callback finished the flow, then return now */
 	    if(ret == 1)
 		return;
@@ -666,7 +666,8 @@ static void trove_read_callback_fn(void *user_ptr,
  */
 static int bmi_send_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
-		         PVFS_error error_code)
+		         PVFS_error error_code,
+			 int initial_call_flag)
 {
     struct fp_queue_item* q_item = user_ptr;
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
@@ -677,12 +678,29 @@ static int bmi_send_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
     void* tmp_user_ptr = NULL;
 
+    if(flow_data->parent->error_code != 0 && initial_call_flag)
+    {
+	/* cleanup path already triggered, don't do anything more */
+	return(1);
+    }
+
     gen_mutex_lock(&flow_data->flow_mutex);
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
 	"flowproto-multiqueue bmi_send_callback_fn.\n");
 
     q_item->posted_id = 0;
+
+    if(flow_data->parent->error_code != 0 && initial_call_flag)
+    {
+	/* cleanup path already triggered, don't do anything more */
+	/* TODO: there is a race here; flow_mutex may be freed already? */
+	/* TODO: similar race may appear from callbacks which directly call
+	 * other callbacks; dropping mutex in the process.  Need to fix.
+	 */
+	gen_mutex_unlock(&flow_data->flow_mutex);
+	return(1);
+    }
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
