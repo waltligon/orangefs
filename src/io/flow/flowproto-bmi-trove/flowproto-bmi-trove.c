@@ -755,9 +755,13 @@ gen_mutex_lock(&(PRIVATE_FLOW(flow_d)->mutex));
     /* clean up before returning if the flow completed */
     if (flow_d->state & FLOW_FINISH_MASK)
     {
+	gen_mutex_unlock(&(PRIVATE_FLOW(flow_d)->mutex));
 	release_flow(flow_d);
     }
-gen_mutex_unlock(&(PRIVATE_FLOW(flow_d)->mutex));
+    else
+    {
+	gen_mutex_unlock(&(PRIVATE_FLOW(flow_d)->mutex));
+    }
 
     return (0);
 }
@@ -1156,6 +1160,19 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 	    flow_d->file_req_offset);
     }
 
+    /* set boundaries on file datatype based on mem datatype or aggregate size */
+    if(flow_d->aggregate_size)
+    {
+	PINT_REQUEST_STATE_SET_FINAL(flow_data->dup_file_req_state,
+	    flow_d->aggregate_size+flow_d->file_req_offset);
+    }
+    else
+    {
+	PINT_REQUEST_STATE_SET_FINAL(flow_data->dup_file_req_state,
+	    flow_d->file_req_offset +
+	    PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
+    }
+
     return (0);
 }
 #endif
@@ -1315,6 +1332,7 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 	PINT_REQUEST_STATE_SET_TARGET(flow_d->file_req_state,
 	    flow_d->file_req_offset);
 
+    /* set boundaries on file datatype based on mem datatype or aggregate size */
     if(flow_d->aggregate_size)
     {
 	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
@@ -1325,25 +1343,6 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
 	    flow_d->file_req_offset +
 	    PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
-    }
-
-    /* if no memory datatype was given, then we must use the aggregate
-     * size field to set a boundary on the file datatype 
-     */
-    if(!flow_d->mem_req)
-    {
-	assert(flow_d->aggregate_size > -1); /* sanity check */
-	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
-	    (flow_d->file_req_offset + flow_d->aggregate_size));
-    }
-    else
-    {
-	/* we still set a boundary on the file datatype for convenience,
-	 * so that we can check its state to know when to stop
-	 */
-	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
-	    (PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req) + 
-	    flow_d->file_req_offset));
     }
     
     /* the rest of the buffer setup varies depending on the endpoints */

@@ -22,7 +22,7 @@ int main(int argc,char **argv)
 	int name_sz;
 	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
-	int io_size = 1024 * 1024;
+	int io_size = 1024*1024;
 	int* io_buffer = NULL;
 	int i;
 	int errors;
@@ -165,15 +165,8 @@ int main(int argc,char **argv)
 	buffer = io_buffer;
 	buffer_size = io_size*sizeof(int);
 
-	/* TODO: use something simpler for the file datatype once 
-	 * the file datatype is implicitly tiled
-	 */
-	ret = PVFS_Request_contiguous(io_size*sizeof(int), PVFS_BYTE, &(file_req));
-	if(ret < 0)
-	{
-		fprintf(stderr, "Error: PVFS_Request_contiguous() failure.\n");
-		return(-1);
-	}
+	/* file datatype is tiled, so we can get away with a trivial type here */
+	file_req = PVFS_BYTE;
 
 	ret = PVFS_Request_contiguous(io_size*sizeof(int), PVFS_BYTE, &(mem_req));
 	if(ret < 0)
