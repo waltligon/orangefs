@@ -64,7 +64,10 @@ static int signal_recvd_flag;
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 /* Prototypes */
-
+static int initialize_interfaces(PINT_server_status_code *server_level_init);
+static int initialize_signal_handlers();
+static int initialize_server_state(PINT_server_status_code *server_level_init,
+                                   PINT_server_op *s_op, job_status_s *job_status_structs[]);
 static int server_init(void);
 static int server_shutdown(PINT_server_status_code level,
 			   int ret,
@@ -73,6 +76,176 @@ static void *sig_handler(int sig);
 int PINT_server_cp_bmi_unexp(PINT_server_op * s_op,
 			     job_status_s * ret);
 void PINT_server_get_bmi_unexp_err(int ret);
+
+
+/*
+  Initializes the bmi, flow, trove, and job interfaces.
+  returns < 0 on error and sets the passed in server status code
+  to the appropriate value for proper server shutdown.
+*/
+static int initialize_interfaces(PINT_server_status_code *server_level_init)
+{
+    int ret = 0, i = 0;
+    char *method_name = NULL;
+
+    /* initialize BMI Interface (bmi.c) */
+    ret = BMI_initialize("bmi_tcp", user_opts->host_id, BMI_INIT_SERVER);
+    if (ret < 0)
+    {
+	gossip_err("BMI_initialize Failed: %s\n", strerror(-ret));
+	*server_level_init = SHUTDOWN_GOSSIP_INTERFACE;
+	goto interface_init_failed;
+    }
+    gossip_debug(SERVER_DEBUG, "BMI Init Complete\n");
+
+    /* initialize the flow interface */
+    ret = PINT_flow_initialize("flowproto_bmi_trove", 0);
+    if (ret < 0)
+    {
+	gossip_err("Flow_initialize Failed: %s\n", strerror(-ret));
+	*server_level_init = SHUTDOWN_BMI_INTERFACE;
+	goto interface_init_failed;
+    }
+    gossip_debug(SERVER_DEBUG, "Flow Init Complete\n");
+
+    /* initialize Trove Interface */
+    ret = trove_initialize(user_opts->storage_path, 0, &method_name, 0);
+    if (ret < 0)
+    {
+	gossip_err("Trove Init Failed: %s\n", strerror(-ret));
+	*server_level_init = SHUTDOWN_FLOW_INTERFACE;
+	goto interface_init_failed;
+    }
+
+    /* Uses filesystems in config file. */
+    for (i = 0; i < user_opts->number_filesystems; i++)
+    {
+	ret = trove_collection_lookup(user_opts->file_systems[i]->file_system_name,
+				      &(user_opts->file_systems[i]->coll_id), NULL, NULL);
+	if (ret < 0)
+	{
+	    gossip_lerr("Error initializing filesystem %s\n",
+                        user_opts->file_systems[i]->file_system_name);
+	    goto interface_init_failed;
+	}
+    }
+    gossip_debug(SERVER_DEBUG, "Storage Init Complete\n");
+    gossip_debug(SERVER_DEBUG, "%d filesystems initialized\n", i);
+
+    /* initialize Job Interface */
+    ret = job_initialize(0);
+    if (ret < 0)
+    {
+	gossip_err("Error initializing job interface: %s\n", strerror(-ret));
+	*server_level_init = SHUTDOWN_STORAGE_INTERFACE;
+	goto interface_init_failed;
+    }
+    gossip_debug(SERVER_DEBUG, "Job Init Complete\n");
+    
+  interface_init_failed:
+    return ret;
+}
+
+
+/* Registers signal handlers. returns < 0 on error. */
+static int initialize_signal_handlers()
+{
+    int ret = 1;
+
+    /* Register Signals */
+    signal(SIGHUP, (void *) sig_handler);
+    signal(SIGILL, (void *) sig_handler);
+#if 0
+/* #ifdef USE_SIGACTION */
+    act.sa_handler = (void *) sig_handler;
+    act.sa_mask = 0;
+    act.sa_flags = 0;
+    if (sigaction(SIGHUP, &act, NULL) < 0)
+    {
+	gossip_err("Error Registering Signal SIGHUP.\nProgram Terminating.\n");
+	goto sh_init_failed;
+    }
+    if (sigaction(SIGSEGV, &act, NULL) < 0)
+    {
+	gossip_err("Error Registering Signal SIGSEGV.\nProgram Terminating.\n");
+	goto sh_init_failed;
+    }
+    if (sigaction(SIGPIPE, &act, NULL) < 0)
+    {
+	gossip_err("Error Registering Signal SIGPIPE.\nProgram Terminating.\n");
+	goto sh_init_failed;
+    }
+/* #else */
+    signal(SIGSEGV, (void *) sig_handler);
+    signal(SIGPIPE, (void *) sig_handler);
+#endif
+    ret = 0;
+
+  sh_init_failed:
+    return ret;
+}
+
+
+/*
+  Initializes the server interfaces, state machine, req scheduler,
+  posts the bmi unexpected buffers, and registers signal handlers.
+  returns < 0 on error and sets the passed in server status code
+  to the appropriate value for proper server shutdown.
+*/
+static int initialize_server_state(PINT_server_status_code *server_level_init,
+                                   PINT_server_op *s_op, job_status_s *job_status_structs[])
+{
+    int ret = 0, i = 0;
+
+    /* initialize the bmi, flow, trove and job interfaces */
+    ret = initialize_interfaces(server_level_init);
+    if (ret < 0)
+    {
+	gossip_err("Error: Could not initialize server interfaces; aborting.\n");
+	goto state_init_failed;
+    }
+
+    /* initialize Server State Machine */
+    ret = PINT_state_machine_init();	/* state_machine.c:68 */
+    if (ret < 0)
+    {
+	gossip_err("Error initializing state_machine interface: %s\n", strerror(-ret));
+	*server_level_init = SHUTDOWN_HIGH_LEVEL_INTERFACE;
+	goto state_init_failed;
+    }
+    gossip_debug(SERVER_DEBUG, "State Machine Init Complete\n");
+
+    /* initialize Server Request Scheduler */
+    ret = PINT_req_sched_initialize();
+    if (ret < 0)
+    {
+	gossip_err("Error initializing Request Scheduler interface: %s\n", strerror(-ret));
+	*server_level_init = STATE_MACHINE_HALT;
+	goto state_init_failed;
+    }
+    gossip_debug(SERVER_DEBUG, "Request Scheduler Init Complete\n");
+
+    /* Below, we initially post BMI unexpected msg buffers =) */
+    for (i = 0; i < user_opts->initial_unexpected_requests; i++)
+    {
+        /* ARE THESE SUPPOSED TO BE UNINITIALIZED??? -N.M. */
+	ret = PINT_server_cp_bmi_unexp(s_op, &((*job_status_structs)[0]));
+	if (ret < 0)
+	{
+	    PINT_server_get_bmi_unexp_err(ret);
+	    *server_level_init = CHECK_DEPS_QUEUE;
+	    goto state_init_failed;
+	}
+    }	/* End of BMI Unexpected Requests rof */
+    gossip_debug(SERVER_DEBUG, "All BMI_unexp Posted\n");
+
+    *server_level_init = UNEXPECTED_BMI_FAILURE;
+
+    ret = initialize_signal_handlers();
+
+  state_init_failed:
+    return ret;
+}
 
 
 int main(int argc,
@@ -104,8 +277,6 @@ int main(int argc,
     job_status_s job_status_structs[MAX_JOBS];
 
     /* Insert Temp Trove Stuff Here */
-
-    char *method_name = NULL;
 
 #ifdef DEBUG
     int Temp_Check_Out_Debug = 10;
@@ -157,122 +328,12 @@ int main(int argc,
 	goto server_shutdown;
     }
 
-    /* initialize BMI Interface */
-    ret = BMI_initialize("bmi_tcp", user_opts->host_id, BMI_INIT_SERVER);	/* bmi.c */
+    ret = initialize_server_state(&server_level_init,s_op,&job_status_structs);
     if (ret < 0)
     {
-	gossip_err("BMI_initialize Failed: %s\n", strerror(-ret));
-	server_level_init = SHUTDOWN_GOSSIP_INTERFACE;
+	gossip_err("Error: Could not initialize server; aborting.\n");
 	goto server_shutdown;
     }
-    gossip_debug(SERVER_DEBUG, "BMI Init Complete\n");
-
-    /* initialize the flow interface */
-    ret = PINT_flow_initialize("flowproto_bmi_trove", 0);
-    if (ret < 0)
-    {
-	gossip_err("Flow_initialize Failed: %s\n", strerror(-ret));
-	server_level_init = SHUTDOWN_BMI_INTERFACE;
-	goto server_shutdown;
-    }
-    gossip_debug(SERVER_DEBUG, "Flow Init Complete\n");
-
-    /* initialize Trove Interface */
-    ret = trove_initialize(user_opts->storage_path, 0, &method_name, 0);
-    if (ret < 0)
-    {
-	gossip_err("Trove Init Failed: %s\n", strerror(-ret));
-	server_level_init = SHUTDOWN_FLOW_INTERFACE;
-	goto server_shutdown;
-    }
-
-    /* Uses filesystems in config file. */
-    for (i = 0; i < user_opts->number_filesystems; i++)
-    {
-	ret = trove_collection_lookup(user_opts->file_systems[i]->file_system_name,
-				      &(user_opts->file_systems[i]->coll_id), NULL, NULL);
-	if (ret < 0)
-	{
-	    gossip_lerr("Error initializing filesystem %s\n", user_opts->file_systems[i]->file_system_name);
-	    goto server_shutdown;
-	}
-    }
-    gossip_debug(SERVER_DEBUG, "Storage Init Complete\n");
-    gossip_debug(SERVER_DEBUG, "%d filesystems initialized\n", i);
-
-    /* initialize Job Interface */
-    ret = job_initialize(0);
-    if (ret < 0)
-    {
-	gossip_err("Error initializing job interface: %s\n", strerror(-ret));
-	server_level_init = SHUTDOWN_STORAGE_INTERFACE;
-	goto server_shutdown;
-    }
-    gossip_debug(SERVER_DEBUG, "Job Init Complete\n");
-
-    /* initialize Server State Machine */
-    ret = PINT_state_machine_init();	/* state_machine.c:68 */
-    if (ret < 0)
-    {
-	gossip_err("Error initializing state_machine interface: %s\n", strerror(-ret));
-	server_level_init = SHUTDOWN_HIGH_LEVEL_INTERFACE;
-	goto server_shutdown;
-    }
-    gossip_debug(SERVER_DEBUG, "State Machine Init Complete\n");
-
-    /* initialize Server Request Scheduler */
-    ret = PINT_req_sched_initialize();
-    if (ret < 0)
-    {
-	gossip_err("Error initializing Request Scheduler interface: %s\n", strerror(-ret));
-	server_level_init = STATE_MACHINE_HALT;
-	goto server_shutdown;
-    }
-    gossip_debug(SERVER_DEBUG, "Request Scheduler Init Complete\n");
-
-    /* Below, we initially post BMI unexpected msg buffers =) */
-    for (i = 0; i < user_opts->initial_unexpected_requests; i++)
-    {
-	ret = PINT_server_cp_bmi_unexp(s_op, &job_status_structs[0]);
-	if (ret < 0)
-	{
-	    PINT_server_get_bmi_unexp_err(ret);
-	    server_level_init = CHECK_DEPS_QUEUE;
-	    goto server_shutdown;
-	}
-    }	/* End of BMI Unexpected Requests rof */
-    gossip_debug(SERVER_DEBUG, "All BMI_unexp Posted\n");
-
-    server_level_init = UNEXPECTED_BMI_FAILURE;
-
-    /* Register Signals */
-    signal(SIGHUP, (void *) sig_handler);
-    signal(SIGILL, (void *) sig_handler);
-#if 0
-/* #ifdef USE_SIGACTION */
-    act.sa_handler = (void *) sig_handler;
-    act.sa_mask = 0;
-    act.sa_flags = 0;
-    if (sigaction(SIGHUP, &act, NULL) < 0)
-    {
-	gossip_err("Error Registering Signal SIGHUP.\nProgram Terminating.\n");
-	goto server_shutdown;
-    }
-    if (sigaction(SIGSEGV, &act, NULL) < 0)
-    {
-	gossip_err("Error Registering Signal SIGSEGV.\nProgram Terminating.\n");
-	goto server_shutdown;
-    }
-    if (sigaction(SIGPIPE, &act, NULL) < 0)
-    {
-	gossip_err("Error Registering Signal SIGPIPE.\nProgram Terminating.\n");
-	goto server_shutdown;
-    }
-/* #else */
-    signal(SIGSEGV, (void *) sig_handler);
-    signal(SIGPIPE, (void *) sig_handler);
-#endif
-
     server_level_init = UNEXPECTED_POSTINIT_FAILURE;
 
     /* The do work forever loop. */
@@ -304,18 +365,15 @@ int main(int argc,
 		    goto server_shutdown;
 		}
 #endif
-
 		ret = PINT_state_machine_initialize_unexpected(s_op, &job_status_structs[i]);
 		postBMIFlag = 1;
-
 	    }
 	    else
 	    {
-		ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
-	    }
-	    while (ret == 1)
-	    {
-		ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
+                do
+                {
+                    ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
+                } while (ret == 1);
 	    }
 
 	    if (ret < 0)
@@ -325,7 +383,7 @@ int main(int argc,
 		ret = 1;
 		goto server_shutdown;
 		/* if ret < 0 oh no... job mechanism died */
-		/* TODO: fix taht */
+		/* TODO: fix this */
 	    }
 	    if (postBMIFlag)
 	    {
@@ -342,9 +400,7 @@ int main(int argc,
 		    exit(-1);
 		}
 	    }
-
 	}
-
     }
     server_level_init = UNEXPECTED_LOOP_END;
 
@@ -363,8 +419,6 @@ int main(int argc,
 
 static int server_init(void)
 {
-
-    /*int ret = -1; */
 #ifdef DEBUG
     char logname[] = "/tmp/pvfs_server.log";
     int logfd;
@@ -395,7 +449,8 @@ static int server_init(void)
     gossip_ldebug(SERVER_DEBUG, "Log Init\n");
     gossip_enable_file("/tmp/pvfsServer.log", "a");
 #else
-    gossip_debug(SERVER_DEBUG, "Logging was skipped b/c DEBUG Flag set\nOutput will be displayed onscreen\n");
+    gossip_debug(SERVER_DEBUG, "Logging was skipped b/c DEBUG Flag set\n"
+                 "Output will be displayed onscreen\n");
 #endif
 
     return (0);
