@@ -101,8 +101,18 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 	resp->pvfs_dirent_outcount = ack_p->u.readdir.pvfs_dirent_count;
 	if ( 0 < ack_p->u.readdir.pvfs_dirent_count)
 	{
-	    memcpy(resp->dirent_array, ack_p->u.readdir.pvfs_dirent_array,
+	    resp->dirent_array = malloc(sizeof(PVFS_dirent) * ack_p->u.readdir.pvfs_dirent_count);
+	    if (resp->dirent_array != NULL)
+	    {
+		memcpy(resp->dirent_array, ack_p->u.readdir.pvfs_dirent_array,
 		    sizeof(PVFS_dirent) * ack_p->u.readdir.pvfs_dirent_count);
+	    }
+	    else
+	    {
+		ret = (-ENOMEM);
+		failure = RECV_REQ_FAILURE;
+		goto return_error;
+	    }
 	}
 
         PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);

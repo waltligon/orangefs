@@ -47,7 +47,7 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
     } failure = NONE_FAILURE;
 
     /* lookup meta file */
-    attr_mask = ATTR_BASIC | ATTR_META;
+    attr_mask = ATTR_BASIC | ATTR_DIR;
 
     ret = PINT_do_lookup(req->entry_name, req->parent_refn, attr_mask,
 			    req->credentials, &entry);
@@ -83,6 +83,8 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
     }
 
     /* send remove message to the meta file */
+
+    gossip_ldebug(CLIENT_DEBUG,"Going to rmdir handle %d\n",pinode_ptr->pinode_ref.handle);
 
     max_msg_sz = sizeof(struct PVFS_server_resp_s);
     req_p.op = PVFS_SERV_RMDIR;
@@ -184,12 +186,18 @@ return_error:
     switch(failure)
     {
 	case RECV_REQ_FAILURE:
+	    gossip_ldebug(CLIENT_DEBUG,"RECV_REQ_FAILURE\n");
 	    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 	case SEND_REQ_FAILURE:
+	    gossip_ldebug(CLIENT_DEBUG,"SEND_REQ_FAILURE\n");
 	case SERVER_LOOKUP_FAILURE:
+	    gossip_ldebug(CLIENT_DEBUG,"SERVER_LOOKUP_FAILURE\n");
 	case GET_PINODE_FAILURE:
+	    gossip_ldebug(CLIENT_DEBUG,"GET_PINODE_FAILURE\n");
 	case REMOVE_CACHE_FAILURE:
+	    gossip_ldebug(CLIENT_DEBUG,"REMOVE_CACHE_FAILURE\n");
 	case NONE_FAILURE:
+	    gossip_ldebug(CLIENT_DEBUG,"NONE_FAILURE\n");
     }
 
     return(ret);
