@@ -305,7 +305,7 @@ static int gm_do_work(int wait_time);
 static void delayed_token_sweep(void);
 static int receive_cycle(int timeout);
 void alarm_callback(void *context);
-static int high_recv_handler(gm_recv_event_t * poll_event,
+static int recv_event_handler(gm_recv_event_t * poll_event,
 			     int fast);
 static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
 			     unsigned int node_id,
@@ -787,7 +787,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
     /* make sure it's not too big */
     if (size > GM_MODE_REND_LIMIT)
     {
-	return (-EINVAL);
+	return (-EMSGSIZE);
     }
 
     if (!(buffer_flag & BMI_PRE_ALLOC))
@@ -2014,35 +2014,31 @@ static int receive_cycle(int timeout)
 	     * gm_blocking_receive() never seems to sleep (in GM 1.5.1)
 	     * if I have an alarm set.
 	     */
+	    /* TODO: this should be fixed now; try the other call */
 	    poll_event = gm_blocking_receive_no_spin(local_port);
 	}
 	else
 	{
 	    poll_event = gm_receive(local_port);
 	}
+
 	switch (gm_ntohc(poll_event->recv.type))
 	{
-	case GM_FAST_HIGH_PEER_RECV_EVENT:
-	case GM_FAST_HIGH_RECV_EVENT:
-	    handled_events++;
-	    ret = high_recv_handler(poll_event, 1);
-	    break;
-	case GM_HIGH_PEER_RECV_EVENT:
-	case GM_HIGH_RECV_EVENT:
-	    handled_events++;
-	    ret = high_recv_handler(poll_event, 0);
-	    break;
-	case GM_NO_RECV_EVENT:
-#if 0
-	    gossip_lerr("Error: no recv event!\n");
-#endif
-	    /* fall through */
-
-	default:
-	    handled_events++;
-	    gm_unknown(local_port, poll_event);
-	    ret = 0;
-	    break;
+	    case GM_FAST_HIGH_PEER_RECV_EVENT:
+	    case GM_FAST_HIGH_RECV_EVENT:
+		handled_events++;
+		ret = recv_event_handler(poll_event, 1);
+		break;
+	    case GM_HIGH_PEER_RECV_EVENT:
+	    case GM_HIGH_RECV_EVENT:
+		handled_events++;
+		ret = recv_event_handler(poll_event, 0);
+		break;
+	    default:
+		handled_events++;
+		gm_unknown(local_port, poll_event);
+		ret = 0;
+		break;
 	}
     } while (((timeout > 0 && !global_timeout_flag && ret == 0) ||
 	      (timeout == 0 && gm_receive_pending(local_port) && ret == 0)) &&
@@ -2142,13 +2138,13 @@ static int immed_recv_handler(bmi_size_t actual_size,
 }
 
 
-/* high_recv_handler()
+/* recv_event_handler()
  * 
  * handles low priority receive events as detected by gm_do_work()
  *
  * returns 0 on success, -errno on failure
  */
-static int high_recv_handler(gm_recv_event_t * poll_event,
+static int recv_event_handler(gm_recv_event_t * poll_event,
 			     int fast)
 {
     struct ctrl_msg *my_ctrl = NULL;
@@ -2164,7 +2160,7 @@ static int high_recv_handler(gm_recv_event_t * poll_event,
     struct gm_addr *gm_addr_data = NULL;
     gm_remote_ptr_t remote_ptr = 0;
 
-    gossip_ldebug(BMI_DEBUG_GM, "high_recv_handler() called.\n");
+    gossip_ldebug(BMI_DEBUG_GM, "recv_event_handler() called.\n");
     /* what are the possibilities here? 
      * 1) recv ctrl_ack for a send that we initiated
      * 2) recv ctrl_req from someone who wishes to send to us
