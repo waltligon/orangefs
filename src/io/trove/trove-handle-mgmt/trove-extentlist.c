@@ -339,7 +339,7 @@ static void extent_show(struct avlnode *n,
  *  nonzero			time to move on
  */
 int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist, 
-			    TROVE_handle_count cutoff) 
+			    uint64_t cutoff) 
 {
     return( (elist->num_handles > cutoff) );
 }

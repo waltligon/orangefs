@@ -37,7 +37,7 @@ TROVE_handle trove_ledger_handle_alloc(struct handle_ledger *hl);
 TROVE_handle trove_ledger_handle_alloc_from_range(struct handle_ledger *hl, TROVE_extent *extent);
 int trove_ledger_handle_free(struct handle_ledger *hl, TROVE_handle handle);
 void trove_handle_ledger_set_threshold(struct handle_ledger *hl,
-					TROVE_handle_count nhandles);
+					uint64_t nhandles);
 
 
 /*

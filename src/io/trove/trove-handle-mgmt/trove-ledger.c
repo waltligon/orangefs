@@ -27,7 +27,7 @@ struct handle_ledger {
     TROVE_handle free_list_handle;
     TROVE_handle recently_freed_list_handle;
     TROVE_handle overflow_list_handle;
-    TROVE_handle_count cutoff;	/* when to start trying to reuse handles */
+    uint64_t cutoff;	/* when to start trying to reuse handles */
 };
 
 /* Functions used only internally:
@@ -449,7 +449,7 @@ inline int trove_handle_remove(struct handle_ledger *hl, TROVE_handle handle)
  *                 value based upon this number
  */
 inline void trove_handle_ledger_set_threshold(struct handle_ledger *hl,
-					    TROVE_handle_count nhandles)
+					    uint64_t nhandles)
 {
     hl->cutoff = (nhandles/4)+1;
 }
