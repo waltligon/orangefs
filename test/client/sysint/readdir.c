@@ -118,7 +118,8 @@ int main(int argc,char **argv)
 	printf("Returned %d dirents\n",resp_readdir->pvfs_dirent_outcount);
 	for(i = 0;i < resp_readdir->pvfs_dirent_outcount;i++)
 	{
-		printf("name:%s\n",resp_readdir->dirent_array[i].d_name);
+		printf("name:%s\t%d\n",resp_readdir->dirent_array[i].d_name,
+				resp_readdir->dirent_array[i].handle);
 	}
 
 	/*close it down*/
