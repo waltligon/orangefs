@@ -61,7 +61,7 @@ FLEX = flex
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean tests distclean docs docsclean cscope codecheck statecomp coverage
+.PHONY: all clean tests distclean docs docsclean cscope codecheck statecomp
 
 ################################################################
 # Find project subdirectories
@@ -155,7 +155,7 @@ include $(patsubst %, %/module.mk, $(MODULES))
 ################################################################
 # Derived file lists
 
-# NOTES: At this point, the subdirectorie makefile includes have informed
+# NOTES: At this point, the subdirectory makefile includes have informed
 #    us what the source files are.  Now we want to generate some
 #    other lists (such as objects, executables, and dependency files)
 #    by manipulating the lists of source files
@@ -280,9 +280,6 @@ cscope:
 # rule for running code check
 codecheck:
 	find $(srcdir) -iname "*.[ch]" | xargs -n 1 $(srcdir)/maint/pvfs2codecheck.pl
-
-coverage:
-	find $(srcdir) -iname "*.[ch]" | xargs -n 1 -- gcov -f -b
 
 # target for building documentation
 docs: $(DOCSPS) $(DOCSPDF)

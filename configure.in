@@ -33,6 +33,11 @@ CFLAGS="$CFLAGS -DNDEBUG -O3",
 CFLAGS="$CFLAGS -g"
 )
 
+AC_ARG_ENABLE(profiling,
+[  --enable-profiling              Enable profiling (using gprof).],
+CFLAGS="$CFLAGS -pg -fprofile-arcs",
+)
+
 AC_ARG_ENABLE(coverage,
 [  --enable-coverage               Enable coverage analysis (disables optimizations).],
 CFLAGS="$CFLAGS -fprofile-arcs -ftest-coverage -O0",
