@@ -121,6 +121,8 @@ correctness/performance testing
 - more pts tests
 - profiling code paths
 - eliminate memory leaks
+- handle server or client failures in a reasonable way (log and exit instead
+  of segfault, perhaps)
 
 system management utilities
 ====================================================================
