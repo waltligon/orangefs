@@ -68,24 +68,6 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
 		     bmi_context_id context_id);
-#if 0
-int BMI_gm_wait(bmi_op_id_t id,
-		int *outcount,
-		bmi_error_code_t * error_code,
-		bmi_size_t * actual_size,
-		void **user_ptr);
-int BMI_gm_waitsome(int incount,
-		    bmi_op_id_t * id_array,
-		    int *outcount,
-		    int *index_array,
-		    bmi_error_code_t * error_code_array,
-		    bmi_size_t * actual_size_array,
-		    void **user_ptr_array);
-int BMI_gm_waitunexpected(int incount,
-			  int *outcount,
-			  struct method_unexpected_info *info);
-#endif
-
 int BMI_gm_test(bmi_op_id_t id,
 		int *outcount,
 		bmi_error_code_t * error_code,
@@ -349,24 +331,6 @@ static void initiate_send_immed(method_op_p mop);
 static void initiate_put_announcement(method_op_p mop);
 static void send_data_buffer(method_op_p mop);
 static void prepare_for_recv(method_op_p mop);
-static int gm_generic_testwait(bmi_op_id_t id,
-			       int *outcount,
-			       bmi_error_code_t * error_code,
-			       bmi_size_t * actual_size,
-			       void **user_ptr,
-			       int wait_time);
-static int gm_generic_testwaitsome(int incount,
-				   bmi_op_id_t * id_array,
-				   int *outcount,
-				   int *index_array,
-				   bmi_error_code_t * error_code_array,
-				   bmi_size_t * actual_size_array,
-				   void **user_ptr_array,
-				   int wait_time);
-static int gm_generic_testwaitunexpected(int incount,
-					 int *outcount,
-					 struct method_unexpected_info *info,
-					 int wait_time);
 
 /*************************************************************************
  * Visible Interface 
@@ -1073,28 +1037,20 @@ int BMI_gm_test(bmi_op_id_t id,
 		int max_idle_time_ms,
 		bmi_context_id context_id)
 {
-    return (gm_generic_testwait(id, outcount, error_code,
-				actual_size, user_ptr, 0));
+    int ret = -1;
+
+    /* do some ``real work'' here */
+    ret = gm_do_work(max_idle_time_ms*1000);
+    if (ret < 0)
+    {
+	return (ret);
+    }
+
+    ret = test_done(id, outcount, error_code, actual_size, user_ptr);
+
+    return (ret);
 }
 
-#if 0
-/* BMI_gm_wait()
- * 
- * Checks to see if a particular message has completed.  Will block
- * briefly even if there is nothing to do initially.
- *
- * returns 0 on success, -errno on failure
- */
-int BMI_gm_wait(bmi_op_id_t id,
-		int *outcount,
-		bmi_error_code_t * error_code,
-		bmi_size_t * actual_size,
-		void **user_ptr)
-{
-    return (gm_generic_testwait(id, outcount, error_code, actual_size, user_ptr,
-				GM_WAIT_METRIC));
-}
-#endif
 
 /* BMI_gm_testsome()
  * 
@@ -1112,33 +1068,21 @@ int BMI_gm_testsome(int incount,
 		    int max_idle_time_ms,
 		    bmi_context_id context_id)
 {
-    return (gm_generic_testwaitsome(incount, id_array, outcount,
-				    index_array, error_code_array,
-				    actual_size_array, user_ptr_array, 0));
+    int ret = -1;
+
+    /* do some ``real work'' here */
+    ret = gm_do_work(max_idle_time_ms*1000);
+    if (ret < 0)
+    {
+	return (ret);
+    }
+
+    ret = test_done_some(incount, id_array, outcount, index_array,
+			 error_code_array, actual_size_array, user_ptr_array);
+
+    return (ret);
 }
 
-#if 0
-/* BMI_gm_waitsome()
- * 
- * Checks to see if any messages from the specified list have completed.
- * Will block briefly even if there is initially nothing to do.
- *
- * returns 0 on success, -errno on failure
- */
-int BMI_gm_waitsome(int incount,
-		    bmi_op_id_t * id_array,
-		    int *outcount,
-		    int *index_array,
-		    bmi_error_code_t * error_code_array,
-		    bmi_size_t * actual_size_array,
-		    void **user_ptr_array)
-{
-    return (gm_generic_testwaitsome(incount, id_array, outcount,
-				    index_array, error_code_array,
-				    actual_size_array, user_ptr_array,
-				    GM_WAIT_METRIC));
-}
-#endif
 
 /* BMI_gm_testunexpected()
  * 
@@ -1151,25 +1095,23 @@ int BMI_gm_testunexpected(int incount,
 			  struct method_unexpected_info *info,
 			  int max_idle_time_ms)
 {
-    return (gm_generic_testwaitunexpected(incount, outcount, info, 0));
+    int ret = -1;
+
+    /* do some ``real work'' here */
+    ret = gm_do_work(max_idle_time_ms*1000);
+    if (ret < 0)
+    {
+	return (ret);
+    }
+
+    /* check again now that we have done some work to see if any
+     * unexpected messages completed 
+     */
+    ret = test_done_unexpected(incount, outcount, info);
+
+    return (ret);
 }
 
-#if 0
-/* BMI_gm_waitunexpected()
- * 
- * Checks to see if any unexpected messages have completed.  Will block
- * briefly even if there is initially nothing to do.
- *
- * returns 0 on success, -errno on failure
- */
-int BMI_gm_waitunexpected(int incount,
-			  int *outcount,
-			  struct method_unexpected_info *info)
-{
-    return (gm_generic_testwaitunexpected(incount, outcount, info,
-					  GM_WAIT_METRIC));
-}
-#endif
 
 /* BMI_gm_open_context()
  *
@@ -2859,94 +2801,6 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
     }
     return (ret);
 
-}
-
-
-/* gm_generic_testwait()
- * 
- * Checks to see if a particular message has completed.
- *
- * returns 0 on success, -errno on failure
- */
-static int gm_generic_testwait(bmi_op_id_t id,
-			       int *outcount,
-			       bmi_error_code_t * error_code,
-			       bmi_size_t * actual_size,
-			       void **user_ptr,
-			       int wait_time)
-{
-    int ret = -1;
-
-    /* do some ``real work'' here */
-    ret = gm_do_work(wait_time);
-    if (ret < 0)
-    {
-	return (ret);
-    }
-
-    ret = test_done(id, outcount, error_code, actual_size, user_ptr);
-
-    return (ret);
-
-}
-
-
-/* gm_generic_testwaitsome()
- * 
- * Checks to see if any messages from the specified list have completed.
- *
- * returns 0 on success, -errno on failure
- */
-static int gm_generic_testwaitsome(int incount,
-				   bmi_op_id_t * id_array,
-				   int *outcount,
-				   int *index_array,
-				   bmi_error_code_t * error_code_array,
-				   bmi_size_t * actual_size_array,
-				   void **user_ptr_array,
-				   int wait_time)
-{
-    int ret = -1;
-
-    /* do some ``real work'' here */
-    ret = gm_do_work(wait_time);
-    if (ret < 0)
-    {
-	return (ret);
-    }
-
-    ret = test_done_some(incount, id_array, outcount, index_array,
-			 error_code_array, actual_size_array, user_ptr_array);
-
-    return (ret);
-}
-
-/* gm_generic_testwaitunexpected()
- * 
- * Checks to see if any unexpected messages have completed.
- *
- * returns 0 on success, -errno on failure
- */
-static int gm_generic_testwaitunexpected(int incount,
-					 int *outcount,
-					 struct method_unexpected_info *info,
-					 int wait_time)
-{
-    int ret = -1;
-
-    /* do some ``real work'' here */
-    ret = gm_do_work(wait_time);
-    if (ret < 0)
-    {
-	return (ret);
-    }
-
-    /* check again now that we have done some work to see if any
-     * unexpected messages completed 
-     */
-    ret = test_done_unexpected(incount, outcount, info);
-
-    return (ret);
 }
 
 /*
