@@ -50,6 +50,16 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
 		     bmi_context_id context_id);
+int BMI_gm_post_send_list(bmi_op_id_t * id,
+    method_addr_p dest,
+    void **buffer_list,
+    bmi_size_t * size_list,
+    int list_count,
+    bmi_size_t total_size,
+    bmi_flag_t buffer_flag,
+    bmi_msg_tag_t tag,
+    void *user_ptr,
+    bmi_context_id context_id);
 int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       method_addr_p dest,
 			       void *buffer,
@@ -118,7 +128,7 @@ struct bmi_method_ops bmi_gm_ops = {
     BMI_gm_testcontext,
     BMI_gm_testunexpected,
     BMI_gm_method_addr_lookup,
-    NULL,
+    BMI_gm_post_send_list,
     NULL,
     NULL,
     BMI_gm_open_context,
@@ -793,6 +803,93 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 					    tag, GM_MODE_REND,
 					    buffer_status, user_ptr, context_id));
     }
+}
+
+/* BMI_gm_post_send_list()
+ *
+ * same as post_send, except that it sends from an array of
+ * possibly non contiguous buffers
+ *
+ * returns 0 on success, 1 on immediate successful completion,
+ * -errno on failure
+ */
+int BMI_gm_post_send_list(bmi_op_id_t * id,
+    method_addr_p dest,
+    void **buffer_list,
+    bmi_size_t * size_list,
+    int list_count,
+    bmi_size_t total_size,
+    bmi_flag_t buffer_flag,
+    bmi_msg_tag_t tag,
+    void *user_ptr,
+    bmi_context_id context_id)
+{
+    bmi_flag_t buffer_status = GM_BUF_USER_ALLOC;
+    void *new_buffer = NULL;
+    void *copy_buffer = NULL;
+    struct ctrl_msg *new_ctrl_msg = NULL;
+    bmi_size_t buffer_size = 0;
+    int i;
+
+    gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_send_list called.\n");
+
+    /* TODO: think about this some.  For now this is going to be
+     * lame because we aren't going to take advantage of
+     * having buffers pinned in advance...
+     */
+    buffer_status = GM_BUF_METH_REG;
+
+    /* clear id immediately for safety */
+    *id = 0;
+
+    /* make sure it's not too big */
+    if (total_size > GM_MODE_REND_LIMIT)
+    {
+	return (-EMSGSIZE);
+    }
+
+    if (total_size <= GM_IMMED_LENGTH)
+    {
+	/* pad enough room for a ctrl structure */
+	buffer_size = sizeof(struct ctrl_msg) + total_size;
+
+	/* create a new buffer and copy */
+	new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
+							 long) buffer_size);
+	if (!new_buffer)
+	{
+	    gossip_lerr("Error: gm_dma_malloc failure.\n");
+	    return (-ENOMEM);
+	}
+
+	copy_buffer = new_buffer;
+	for(i=0; i<list_count; i++)
+	{
+	    memcpy(copy_buffer, buffer_list[i], size_list[i]);
+	    copy_buffer = (void*)((long)copy_buffer + (long)size_list[i]);
+	}
+
+	/* Immediate mode stuff */
+	new_ctrl_msg = (struct ctrl_msg *) (new_buffer + total_size);
+	new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
+	new_ctrl_msg->u.immed.actual_size = total_size;
+	new_ctrl_msg->u.immed.msg_tag = tag;
+	return (gm_post_send_build_op(id, dest, new_buffer, total_size,
+					    tag,
+					    GM_MODE_IMMED,
+					    buffer_status, user_ptr, context_id));
+    }
+    else
+    {
+	return(-ENOSYS);
+#if 0
+	/* 3 way rendezvous mode */
+	return (gm_post_send_build_op(id, dest, buffer, size,
+					    tag, GM_MODE_REND,
+					    buffer_status, user_ptr, context_id));
+#endif
+    }
+
 }
 
 
