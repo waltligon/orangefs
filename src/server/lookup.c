@@ -301,7 +301,7 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
       else
 	//if(strlen(s_op->req->u.lookup_path.path)) // there is something there
 	s_op->key.buffer = s_op->req->u.lookup_path.path;
-      s_op->key.buffer_sz = strlen (s_op->key.buffer);
+      s_op->key.buffer_sz = strlen (s_op->key.buffer)+1;
       s_op->req->u.lookup_path.path += strlen (s_op->key.buffer) + 1;
       s_op->strsize -= strlen (s_op->key.buffer) + 1;
     }
@@ -338,6 +338,7 @@ static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
     gossip_ldebug(SERVER_DEBUG,"Send BMI\n");
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) 
 	+ (s_op->resp->u.lookup_path.count * (sizeof(PVFS_handle)+sizeof(PVFS_object_attr)));
+    printf("Sop %lld\n",*(PVFS_handle *)s_op->val.buffer);
     if (ret->error_code == 0)
     {
 	job_post_ret = PINT_encode(s_op->resp,
@@ -346,15 +347,15 @@ static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
 		s_op->addr,
 		s_op->enc_type);
     }
-    assert(job_post_ret == 0);
-    if(ret->error_code == 0)
-	assert(s_op->encoded.buffer_list[0] != NULL);
     else
     {
-	/* We have failed somewhere... However, we still need to send what we have */
-	s_op->encoded.buffer_list[0] = s_op->resp;
-	s_op->encoded.total_size = sizeof(struct PVFS_server_resp_s);
+	/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
+	s_op->resp->op = PVFS_SERV_NOOP;
+	PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+	/* set it back */
+	((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = PVFS_SERV_GETCONFIG;
     }
+    assert(job_post_ret == 0);
 
     /* Post message */
     job_post_ret = job_bmi_send(s_op->addr,
