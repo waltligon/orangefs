@@ -1295,7 +1295,8 @@ int BMI_addr_lookup(bmi_addr_t * new_addr,
     /* make sure one was successful */
     if (!meth_addr)
     {
-	gossip_lerr("Error: could not resolve id_string!\n");
+	gossip_err("Error: could not resolve id_string!\n");
+	gossip_lerr("Error: no BMI methods could resolve: %s\n", id_string);
 	gen_mutex_unlock(&interface_mutex);
 	return (-ENOPROTOOPT);
     }

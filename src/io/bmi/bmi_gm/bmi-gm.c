@@ -633,6 +633,7 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
     if (!gm_string)
     {
 	/* the string doesn't even have our info */
+	gossip_lerr("Error: NULL id_string.\n");
 	return (NULL);
     }
 
@@ -649,6 +650,7 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
     new_addr = alloc_gm_method_addr();
     if (!new_addr)
     {
+	gossip_lerr("Error: unable to allocate GM method address.\n");
 	free(gm_string);
 	return (NULL);
     }
@@ -676,6 +678,8 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
 	gm_data->node_id = gm_host_name_to_node_id(local_port, gm_string);
 	if (gm_data->node_id == GM_NO_SUCH_NODE_ID)
 	{
+	    gossip_lerr("Error: gm_host_name_to_node_id() failure for: %s.\n",
+		gm_string);
 	    dealloc_method_addr(new_addr);
 	    free(gm_string);
 	    return (NULL);
