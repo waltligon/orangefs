@@ -19,6 +19,8 @@
 #include <server-config.h>
 #include <memory-cache.h>
 
+/* NOTE: THIS CODE IS CURRENTLY UNUSED */
+
 enum
 {
 	PVFS2_DEBUG_SERVER = 32 /* This should come from server.h */
@@ -57,3 +59,4 @@ void PINT_checkin_trove_buffer(
 	free(buffer->buffer);
 	free(buffer);
 }
+
