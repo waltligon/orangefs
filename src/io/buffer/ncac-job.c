@@ -11,8 +11,6 @@
 
 #include "ncac-trove.h"
 
-extern struct cache_stack global_cache_stack;
-
 /* internal functions */
 static inline struct extent *find_extent(NCAC_req_t *ncac_req,
                        unsigned long index);

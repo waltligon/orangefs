@@ -233,7 +233,6 @@ struct extent {
 
 
 extern NCAC_dev_t NCAC_dev;
-extern NCAC_req_t  *NCAC_req_list;
 
 
 int cache_init(NCAC_info_t *info);

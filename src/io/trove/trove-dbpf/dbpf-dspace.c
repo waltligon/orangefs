@@ -38,7 +38,7 @@ extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
 #endif
 
-static int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
+int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 
 static inline void organize_post_op_statistics(
     enum dbpf_op_type op_type, TROVE_op_id op_id)
