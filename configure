@@ -1076,41 +1076,44 @@ EOF
 fi
 
 
-echo $ac_n "checking whether version of Berkeley DB is new enough""... $ac_c" 1>&6
-echo "configure:1081: checking whether version of Berkeley DB is new enough" >&5
-	cat > conftest.$ac_ext <<EOF
-#line 1083 "configure"
+
+echo $ac_n "checking for four-parameter DB stat""... $ac_c" 1>&6
+echo "configure:1082: checking for four-parameter DB stat" >&5
+cat > conftest.$ac_ext <<EOF
+#line 1084 "configure"
 #include "confdefs.h"
 
-	#include <db.h>
-	
+#include <db.h>
+
 int main() {
 
-	#if DB_VERSION_MAJOR < 4
-		#error "DB_VERSION_MAJOR < 4; need newer Berkeley DB implementation"
-	#endif
-	
+int ret;
+DB *db;
+u_int32_t flags;
+
+ret = db->stat(db, NULL, NULL, flags);
+
 ; return 0; }
 EOF
-if { (eval echo configure:1096: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1099: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   echo "$ac_t""yes" 1>&6
+cat >> confdefs.h <<\EOF
+#define HAVE_UNKNOWN_PARAMETER_TO_DB_STAT 1
+EOF
+
 else
   echo "configure: failed program was:" >&5
   cat conftest.$ac_ext >&5
   rm -rf conftest*
   echo "$ac_t""no" 1>&6
-		{ echo "configure: error: Need newer (4.x.x or later) version of Berkeley DB.
- try: http://www.sleepycat.com/download/index.shtml
- or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm)" 1>&2; exit 1; }
-	
 fi
 rm -f conftest*
 
 echo $ac_n "checking for txnid parameter to DB open function""... $ac_c" 1>&6
-echo "configure:1112: checking for txnid parameter to DB open function" >&5
+echo "configure:1115: checking for txnid parameter to DB open function" >&5
 cat > conftest.$ac_ext <<EOF
-#line 1114 "configure"
+#line 1117 "configure"
 #include "confdefs.h"
 
 #include <db.h>
@@ -1130,7 +1133,7 @@ ret = db->open(db, txnid, file, database, type, flags, mode);
 
 ; return 0; }
 EOF
-if { (eval echo configure:1134: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1137: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   echo "$ac_t""yes" 1>&6
 cat >> confdefs.h <<\EOF

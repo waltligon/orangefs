@@ -3,6 +3,9 @@
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
 
+/* Define if DB stat function takes extra parameter */
+#undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+
 /* Define if DB open function takes a txnid parameter */
 #undef HAVE_TXNID_PARAMETER_TO_DB_OPEN
 

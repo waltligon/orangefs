@@ -37,19 +37,34 @@ AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
 
 dnl See if we have a new enough version of Berkeley DB; needed for
 dnl    compilation of trove-dbpf component
-AC_MSG_CHECKING(whether version of Berkeley DB is new enough)
-	AC_TRY_COMPILE([
-	#include <db.h>
-	], [
-	#if DB_VERSION_MAJOR < 4
-		#error "DB_VERSION_MAJOR < 4; need newer Berkeley DB implementation"
-	#endif
-	], AC_MSG_RESULT(yes),
-	AC_MSG_RESULT(no)
-		AC_MSG_ERROR(Need newer (4.x.x or later) version of Berkeley DB.
- try: http://www.sleepycat.com/download/index.shtml
- or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm))
-	)
+dnl AC_MSG_CHECKING(whether version of Berkeley DB is new enough)
+dnl	AC_TRY_COMPILE([
+dnl	#include <db.h>
+dnl	], [
+dnl	#if DB_VERSION_MAJOR < 4
+dnl		#error "DB_VERSION_MAJOR < 4; need newer Berkeley DB implementation"
+dnl	#endif
+dnl	], AC_MSG_RESULT(yes),
+dnl	AC_MSG_RESULT(no)
+dnl		AC_MSG_ERROR(Need newer (4.x.x or later) version of Berkeley DB.
+dnl try: http://www.sleepycat.com/download/index.shtml
+dnl or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm))
+dnl	)
+
+dnl Test to check for unknown third parameter to DB stat (four parameters total)
+AC_MSG_CHECKING(for four-parameter DB stat)
+AC_TRY_COMPILE([
+#include <db.h>
+], [
+int ret;
+DB *db;
+u_int32_t flags;
+
+ret = db->stat(db, NULL, NULL, flags);
+], AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_UNKNOWN_PARAMETER_TO_DB_STAT, 1,
+Define if DB stat function takes extra parameter),
+AC_MSG_RESULT(no))
 
 dnl Test to check for txnid parameter to DB open (DB4.1+)
 AC_MSG_CHECKING(for txnid parameter to DB open function)
