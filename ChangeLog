@@ -3,8 +3,8 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.1.2pre1
-===============
+pvfs2-0.1.2
+===========
 - BMI IB module:
     - fix bug resulting in mixed-up connections
     - clean up incoming message processing
@@ -69,8 +69,6 @@ pvfs2-0.1.2pre1
   operations based on the pvfs2-client-core (called
   pvfs2-threaded-client-core)
 - mostly consolidated credential generation to one place
-- added the ability to dynamically add/remove mount points/file system
-  information to the client sysint
 - modified the kernel mount and initialization to use the dynamic mount
   system, where a server and file system name is specific on the mount
   command line (no more hard coded coll_id and root_handle!)
@@ -80,6 +78,7 @@ pvfs2-0.1.2pre1
   when in fact it did
 - added full support for dynamic vfs mount (which breaks the old way of
   mounting, but is more convenient and makes more sense)
+- Better documentation for building MPICH2+ROMIO+PVFS2
 
 
 pvfs2-0.1.1
