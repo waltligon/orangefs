@@ -14,6 +14,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
+#include <sys/poll.h>
+#include <assert.h>
 
 #include "pvfs2-types.h"
 #include "gossip.h"
@@ -116,13 +118,117 @@ void PINT_dev_finalize(void)
  * on failure
  */
 int PINT_dev_test_unexpected(
-	int intcount,
+	int incount,
 	int* outcount,
 	struct PINT_dev_unexp_info* info_array,
 	int max_idle_time)
 {
-    gossip_lerr("Error: function not implemented.\n");
-    return(-(PVFS_ENOSYS|PVFS_ERROR_DEV));
+    /* TODO: this function is inefficient, both in terms of buffer 
+     * usage and system calls. fix later... */
+    int ret = -1;
+    struct pollfd pfd;
+    int avail = -1;
+    int32_t *magic;
+    int64_t *tag;
+    void* buffer;
+
+    /* prepare to read max upcall size, plus magic nr and tag */
+    int read_size = sizeof(int32_t) + sizeof(int64_t) + pdev_max_upsize;
+    
+    *outcount = 0;
+
+    pfd.fd = pdev_fd;
+    pfd.revents = 0;
+    pfd.events = POLLIN;
+
+    do{
+	/* see if there is anything available on the device */
+	do
+	{
+	    avail = poll(&pfd, 1, max_idle_time);
+	} while(avail < 0 && errno == EINTR);
+
+	if(avail < 0)
+	{
+	    /* TODO: clean up better */
+	    switch(errno)
+	    {
+		case EBADF:
+		    return(-(PVFS_EBADF|PVFS_ERROR_DEV));
+		case ENOMEM:
+		    return(-(PVFS_ENOMEM|PVFS_ERROR_DEV));
+		case EFAULT:
+		    return(-(PVFS_EFAULT|PVFS_ERROR_DEV));
+		default:
+		    return(-(PVFS_EIO|PVFS_ERROR_DEV));
+	    }
+	}
+
+	/* set idle time to zero; we don't want to block on 
+	 * subsequent iterations 
+	 */
+	max_idle_time = 0;
+
+	/* device is emptied */
+	if(avail == 0)
+	{
+	    if(*outcount > 0)
+		return(1);
+	    else
+		return(0);
+	}
+
+	/* prepare to read max upcall size, plus magic nr and tag */
+	buffer = malloc(read_size);
+	if(buffer == NULL)
+	{
+	    /* TODO: clean up better */
+	    return(-(PVFS_ENOMEM|PVFS_ERROR_DEV));
+	}
+
+	ret = read(pdev_fd, buffer, read_size); 
+	if(ret < 0)
+	{
+	    /* TODO: clean up better */
+	    return(-(PVFS_EIO|PVFS_ERROR_DEV));
+	}
+	/* make sure a payload is present */
+	if(ret < (sizeof(int32_t)+sizeof(int64_t)+1))
+	{
+	    /* TODO: cleanup better */
+	    gossip_err("Error: got short message from device.\n");
+	    return(-(PVFS_EIO|PVFS_ERROR_DEV));
+	}
+	if(ret == 0)
+	{   
+	    /* odd.  assume we are done and return */
+	    free(buffer);
+	    if(*outcount > 0)
+		return(1);
+	    else
+		return(0);
+	}
+	
+	magic = (int32_t*)buffer;
+	tag = (int64_t*)((unsigned long)buffer + sizeof(int32_t));
+
+	assert(*magic == pdev_magic);
+
+	info_array[*outcount].size = ret - sizeof(int32_t) - sizeof(int64_t);
+	/* shift buffer up so caller doesn't see header info */
+	info_array[*outcount].buffer = (void*)((unsigned long)buffer + 
+	    sizeof(int32_t) + sizeof(int64_t));
+	info_array[*outcount].tag = *tag;
+
+	(*outcount)++;
+
+	/* keep going until we fill up the outcount or the device empties */
+    }while((*outcount < incount) && avail);
+
+    if(*outcount > 0)
+	return(1);
+    else
+	return(0);
 }
 
 /* PINT_dev_release_unexpected()
@@ -134,8 +240,18 @@ int PINT_dev_test_unexpected(
 int PINT_dev_release_unexpected(
 	struct PINT_dev_unexp_info* info)
 {
-    gossip_lerr("Error: function not implemented.\n");
-    return(-(PVFS_ENOSYS|PVFS_ERROR_DEV));
+    void* buffer = NULL;
+
+    /* index backwards header size off of the buffer before freeing it */
+    buffer = (void*)((unsigned long)info->buffer - sizeof(int32_t) - 
+	sizeof(int64_t));
+
+    free(buffer);
+
+    /* safety */
+    memset(info, 0, sizeof(struct PINT_dev_unexp_info));
+
+    return(0);
 }
 
 /* PINT_dev_write()
