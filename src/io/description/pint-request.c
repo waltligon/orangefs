@@ -740,7 +740,7 @@ int PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 	if(node == NULL)
 		return -1;
   
-	gossip_debug(REQUEST_DEBUG,"commit node %x\n", node);
+	gossip_debug(REQUEST_DEBUG,"commit node %p\n", node);
 
 	/* this node was previously committed */
 	if (node->committed)

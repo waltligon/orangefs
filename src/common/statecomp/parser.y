@@ -69,8 +69,8 @@ void yyerror(char *);
 
 %type <c> identifier return_code
 
-%type <s> state_decl_list .state_decl_list. state_decl,
-	  state_def state_def_list .state_def_list.,
+%type <s> state_decl_list .state_decl_list. state_decl
+	  state_def state_def_list .state_def_list.
 	  transition transition_list state_machine target
 
 %start state_machine

@@ -114,7 +114,7 @@ static struct options* parse_args(int argc, char* argv[])
     extern char* optarg;
     extern int optind, opterr, optopt;
     char flags[] = "m:";
-    char one_opt = ' ';
+    int one_opt = 0;
     int len = 0;
 
     struct options* tmp_opts = NULL;
