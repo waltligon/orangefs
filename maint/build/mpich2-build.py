@@ -13,15 +13,26 @@ def get_build_MPICH2():
 		os.remove('mpich2-beta.tar.gz')
 	if os.path.exists('mpich2-src'):
 		os.remove('mpich2-src')
-# Get MPICH2 and extract it
+
+	# get MPICH2 and extract it
 	if os.system('wget -q --passive-ftp ftp://ftp.mcs.anl.gov/pub/mpi/mpich2-beta.tar.gz'):
 		print "Failed to download mpich2; Exiting..."
 		sys.exit(1)
-	os.system('tar -xzvf mpich2-beta.tar.gz >tarout')
+	if os.system('tar -xzvf mpich2-beta.tar.gz >tarout'):
+		print "Failed to untar mpich2; Exiting..."
+		sys.exit(1)
+
+	# find the release name
 	os.system('ln -s `head -n1 tarout` mpich2-src')
+
+	# see if there are any patches available for this mpich release
+	if os.system('wget -q http://www.parl.clemson.edu/~pcarns/patches/`head -n1 tarout`/pvfs2.patch') == 0:
+		if os.system('patch -s -p1 -d mpich2-src < pvfs2.patch'):
+			print "Failed to patch mpich2; Exiting..."
+			sys.exit(1)
 	os.remove('tarout')
 
-# Set the necessary variables for compiling with PVFS2 support and install it
+	# set the necessary variables for compiling with PVFS2 support and install it
 	OLD_CFLAGS = os.getenv("CFLAGS")
 	OLD_LDFLAGS = os.getenv("LDFLAGS")
 	OLD_LIBS = os.getenv("LIBS")
@@ -50,10 +61,13 @@ def get_build_MPICH2():
 		print "See " + rootdir + "mpich-make-install.log for details."
 		sys.exit(1)
 	
-# UNset variables not needed anymore
-	os.environ['CFLAGS']=OLD_CFLAGS
-	os.environ['LDFLAGS']=OLD_LDFLAGS
-	os.environ['LIBS']=OLD_LIBS
+	# UNset variables not needed anymore
+	if OLD_CFLAGS:
+		os.environ['CFLAGS']=OLD_CFLAGS
+	if OLD_LDFLAGS:
+		os.environ['LDFLAGS']=OLD_LDFLAGS
+	if OLD_LIBS:
+		os.environ['LIBS']=OLD_LIBS
 
 	return
 
