@@ -19,6 +19,7 @@ enum {
 
 static inline int path_lookup(
     TROVE_coll_id coll_id,
+    /*TROVE_context_id context_id, FIXME: Hacked for now...uses 0*/
     char *path,
     TROVE_handle *out_handle_p)
 {
@@ -29,6 +30,7 @@ static inline int path_lookup(
     TROVE_handle handle, parent_handle;
     TROVE_ds_attributes_s s_attr;
     char dir[PATH_SIZE];
+    TROVE_context_id context_id = 0; /* FIXME: Hacked for now */
 
     char root_handle_string[] = ROOT_HANDLE_STRING;
 
@@ -37,8 +39,10 @@ static inline int path_lookup(
     key.buffer_sz = strlen(root_handle_string) + 1;
     val.buffer = &handle;
     val.buffer_sz = sizeof(handle);
-    ret = trove_collection_geteattr(coll_id, &key, &val, 0, NULL, &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    ret = trove_collection_geteattr(
+        coll_id, &key, &val, 0, NULL, context_id, &op_id);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, context_id, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "collection geteattr (for root handle) failed.\n");
 	return -1;
@@ -65,8 +69,11 @@ static inline int path_lookup(
 	key.buffer_sz = strlen(dir) + 1; /* including terminator...maybe we shouldn't do that? */
 	val.buffer = &handle;
 	val.buffer_sz = sizeof(handle);
-	ret = trove_keyval_read(coll_id, parent_handle, &key, &val, 0, NULL, NULL, &op_id);
-	while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+	ret = trove_keyval_read(
+            coll_id, parent_handle, &key, &val, 0,
+            NULL, NULL, context_id, &op_id);
+	while (ret == 0) ret = trove_dspace_test(
+            coll_id, op_id, context_id, &count, NULL, NULL, &state);
 	if (ret < 0) {
 	    fprintf(stderr, "keyval read failed.\n");
 	    return -1;
@@ -77,8 +84,10 @@ static inline int path_lookup(
 	}
 
 	/* TODO: verify that this is in fact a directory! */
-	ret = trove_dspace_getattr(coll_id, handle, &s_attr, 0, NULL, &op_id);
-	while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+	ret = trove_dspace_getattr(
+            coll_id, handle, &s_attr, 0, NULL, context_id, &op_id);
+	while (ret == 0) ret = trove_dspace_test(
+            coll_id, op_id, context_id, &count, NULL, NULL, &state);
 	if (ret < 0) return -1;
 	if (state != 0) return -1;
 	

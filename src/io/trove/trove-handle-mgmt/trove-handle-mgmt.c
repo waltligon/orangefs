@@ -48,6 +48,7 @@ static int hash_fsid_compare(void *key, struct qlist_head *link);
  * returns 0 on success; -1 otherwise
  */
 static int trove_check_handle_ranges(TROVE_coll_id coll_id,
+                                     TROVE_context_id context_id,
                                      struct llist *extent_list,
                                      struct handle_ledger *ledger)
 {
@@ -64,11 +65,12 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
         while(count > 0)
         {
             ret = trove_dspace_iterate_handles(coll_id,&pos,handles,
-                                               &count,0,NULL,NULL,&op_id);
+                                               &count,0,NULL,NULL,
+                                               context_id,&op_id);
             while(ret == 0)
             {
-                ret = trove_dspace_test(coll_id,op_id,&op_count,NULL,
-                                        NULL,&state);
+                ret = trove_dspace_test(coll_id,op_id,context_id,
+                                        &op_count,NULL,NULL,&state);
             }
 
             if (ret != 1)
@@ -245,6 +247,7 @@ int trove_handle_mgmt_initialize()
 }
 
 int trove_set_handle_ranges(TROVE_coll_id coll_id,
+                            TROVE_context_id context_id,
                             char *handle_range_str)
 {
     int ret = -1;
@@ -271,8 +274,8 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
 			ledger->ledger);
 		if (ret != 0) return ret;
 
-                ret = trove_check_handle_ranges(coll_id,extent_list, 
-			ledger->ledger);
+                ret = trove_check_handle_ranges(
+                    coll_id,context_id,extent_list,ledger->ledger);
 		if (ret != 0) return ret;
             }
             PINT_release_extent_list(extent_list);

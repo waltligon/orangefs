@@ -29,6 +29,7 @@ int main(int argc, char **argv)
     char root_handle_string[] = ROOT_HANDLE_STRING;
     TROVE_extent cur_extent;
     TROVE_handle_extent_array extent_array;
+    TROVE_context_id trove_context = -1;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -55,6 +56,13 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "initialized failed second time.\n");
 	    return -1;
 	}
+    }
+
+    ret = trove_open_context(&trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr, "trove_open_context failed\n");
+        return -1;
     }
 
     /* try to look up collection used to store file system */
@@ -100,8 +108,10 @@ int main(int argc, char **argv)
 			      NULL,
 			      (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
 			      NULL,
+                              trove_context,
 			      &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "dspace create (for root dir) failed.\n");
 	return -1;
@@ -114,8 +124,10 @@ int main(int argc, char **argv)
     key.buffer_sz = strlen(root_handle_string) + 1;
     val.buffer = &root_handle;
     val.buffer_sz = sizeof(root_handle);
-    ret = trove_collection_seteattr(coll_id, &key, &val, 0, NULL, &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    ret = trove_collection_seteattr(coll_id, &key, &val,
+                                    0, NULL, trove_context, &op_id);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "collection seteattr (for root handle) failed.\n");
 	return -1;
@@ -128,6 +140,7 @@ int main(int argc, char **argv)
 	   (int) coll_id,
 	   root_handle_string);
 
+    trove_close_context(trove_context);
     trove_finalize();
 
     return 0;

@@ -29,6 +29,7 @@
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
 static FLOW_context_id global_flow_context = -1;
+static TROVE_context_id global_trove_context = -1;
 
 /* queues of pending jobs */
 static job_desc_q_p completion_queue_array[JOB_MAX_CONTEXTS] = {NULL};
@@ -160,12 +161,21 @@ int job_initialize(int flags)
 	BMI_close_context(global_bmi_context);
 	return(ret);
     }
+    /* ditto for trove */
+    ret = trove_open_context(&global_trove_context);
+    if (ret < 0)
+    {
+	BMI_close_context(global_bmi_context);
+	PINT_flow_close_context(global_flow_context);
+        return ret;
+    }
 
     ret = setup_queues();
     if (ret < 0)
     {
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
+        trove_close_context(global_trove_context);
 	return (ret);
     }
 
@@ -176,6 +186,7 @@ int job_initialize(int flags)
     {
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
+        trove_close_context(global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -185,6 +196,7 @@ int job_initialize(int flags)
 	pthread_cancel(bmi_thread_id);
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
+        trove_close_context(global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -195,6 +207,7 @@ int job_initialize(int flags)
 	pthread_cancel(flow_thread_id);
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
+        trove_close_context(global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -206,6 +219,7 @@ int job_initialize(int flags)
 	pthread_cancel(trove_thread_id);
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
+        trove_close_context(global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -233,6 +247,7 @@ int job_finalize(void)
 
     BMI_close_context(global_bmi_context);
     PINT_flow_close_context(global_flow_context);
+    trove_close_context(global_trove_context);
 
     teardown_queues();
 
@@ -1069,7 +1084,8 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 
     ret = trove_bstream_write_at(coll_id, handle, buffer,
 				 &jd->u.trove.actual_size, offset, flags,
-				 jd->u.trove.vtag, jd, &(jd->u.trove.id));
+				 jd->u.trove.vtag, jd, global_trove_context,
+				 &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1151,7 +1167,8 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 
     ret = trove_bstream_read_at(coll_id, handle, buffer,
 				&jd->u.trove.actual_size, offset, flags,
-				jd->u.trove.vtag, jd, &(jd->u.trove.id));
+				jd->u.trove.vtag, jd, global_trove_context,
+				&(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1221,7 +1238,8 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
-    ret = trove_bstream_flush(coll_id, handle, flags, jd, &(jd->u.trove.id));
+    ret = trove_bstream_flush(coll_id, handle, flags, jd,
+			      global_trove_context, &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1295,7 +1313,8 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     jd->context_id = context_id;
 
     ret = trove_keyval_read(coll_id, handle, key_p, val_p, flags,
-			    jd->u.trove.vtag, jd, &(jd->u.trove.id));
+			    jd->u.trove.vtag, jd, global_trove_context,
+			    &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1375,7 +1394,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 
     ret = trove_keyval_read_list(coll_id, handle, key_array,
 				 val_array, count, flags, jd->u.trove.vtag, jd,
-				 &(jd->u.trove.id));
+				 global_trove_context, &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1453,7 +1472,8 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd->context_id = context_id;
 
     ret = trove_keyval_write(coll_id, handle, key_p, val_p, flags,
-			     jd->u.trove.vtag, jd, &(jd->u.trove.id));
+			     jd->u.trove.vtag, jd, global_trove_context,
+			     &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1522,7 +1542,8 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
-    ret = trove_keyval_flush(coll_id, handle, flags, jd, &(jd->u.trove.id));
+    ret = trove_keyval_flush(coll_id, handle, flags, jd,
+                             global_trove_context, &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1597,7 +1618,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 
     ret = trove_dspace_getattr(coll_id,
 			       handle, &(jd->u.trove.attr), 0 /* flags */ ,
-			       jd, &(jd->u.trove.id));
+			       jd, global_trove_context, &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1672,7 +1693,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     jd->context_id = context_id;
 
     ret = trove_dspace_setattr(coll_id, handle, ds_attr_p, 0 /* flags */ ,
-			       jd, &(jd->u.trove.id));
+			       jd, global_trove_context, &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1787,7 +1808,8 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     jd->context_id = context_id;
 
     ret = trove_keyval_remove(coll_id, handle, key_p, flags,
-			      jd->u.trove.vtag, jd, &(jd->u.trove.id));
+			      jd->u.trove.vtag, jd, 
+			      global_trove_context, &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1890,7 +1912,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     ret = trove_keyval_iterate(coll_id, handle,
 			       &(jd->u.trove.position), key_array, val_array,
 			       &(jd->u.trove.count), flags, jd->u.trove.vtag,
-			       jd, &(jd->u.trove.id));
+			       jd, global_trove_context, &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -1995,7 +2017,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 			      &(jd->u.trove.handle),
 			      type,
 			      hint, TROVE_SYNC /* flags -- sync for now */ ,
-			      jd, &(jd->u.trove.id));
+			      jd, global_trove_context, &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -2069,7 +2091,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 
     ret = trove_dspace_remove(coll_id,
 			      handle, TROVE_SYNC /* flags -- sync for now */ ,
-			      jd, &(jd->u.trove.id));
+			      jd, global_trove_context, &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -2307,7 +2329,8 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     jd->context_id = context_id;
 
     ret = trove_collection_seteattr(coll_id, key_p, val_p, flags,
-				    jd, &(jd->u.trove.id));
+				    jd, global_trove_context,
+				    &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -2381,7 +2404,8 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     jd->context_id = context_id;
 
     ret = trove_collection_geteattr(coll_id, key_p, val_p, flags,
-				    jd, &(jd->u.trove.id));
+				    jd, global_trove_context,
+				    &(jd->u.trove.id));
 
     if (ret < 0)
     {
@@ -3505,7 +3529,8 @@ static int do_one_work_cycle_trove(int *num_completed)
 	stat_trove_id_array, &count, &query_offset, &tmp_coll_id)) == 0)
     {
 	gen_mutex_unlock(&trove_mutex);
-	ret = trove_dspace_testsome(tmp_coll_id, stat_trove_id_array,
+	ret = trove_dspace_testsome(tmp_coll_id, global_trove_context,
+				    stat_trove_id_array,
 				    &count, stat_trove_index_array,
 				    stat_trove_vtag_array,
 				    stat_trove_user_ptr_array,

@@ -14,6 +14,8 @@
 #include "trove-types.h"
 #include "trove-proto.h"
 
+#define TROVE_MAX_CONTEXTS 16
+
 enum { 
     TROVE_ITERATE_START = (INT_MAX - 1),
     TROVE_ITERATE_END   = (INT_MAX - 2)

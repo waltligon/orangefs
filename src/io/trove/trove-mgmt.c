@@ -124,6 +124,23 @@ int trove_finalize(void)
     else return 1;
 }
 
+int trove_open_context(TROVE_context_id *context_id)
+{
+    int ret = -1;
+
+    if (context_id)
+    {
+        *context_id = 0;
+        ret = 0;
+    }
+    return ret;
+}
+
+int trove_close_context(TROVE_context_id context_id)
+{
+    return 0;
+}
+
 int trove_storage_create(char *stoname,
 			 void *user_ptr,
 			 TROVE_op_id *out_op_id_p)

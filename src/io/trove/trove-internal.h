@@ -29,6 +29,7 @@ struct TROVE_bstream_ops
 			   TROVE_ds_flags flags,
 			   TROVE_vtag_s *out_vtag, 
 			   void *user_ptr,
+			   TROVE_context_id context_id,
 			   TROVE_op_id *out_op_id_p);
     
     int (*bstream_write_at)(
@@ -40,6 +41,7 @@ struct TROVE_bstream_ops
 			    TROVE_ds_flags flags,
 			    TROVE_vtag_s *inout_vtag,
 			    void *user_ptr,
+			    TROVE_context_id context_id,
 			    TROVE_op_id *out_op_id_p);
     
     int (*bstream_resize)(
@@ -49,6 +51,7 @@ struct TROVE_bstream_ops
 			  TROVE_ds_flags flags,
 			  TROVE_vtag_s *vtag,
 			  void *user_ptr,
+			  TROVE_context_id context_id,
 			  TROVE_op_id *out_op_id_p);
     
     int (*bstream_validate)(
@@ -57,6 +60,7 @@ struct TROVE_bstream_ops
 			    TROVE_ds_flags flags,
 			    TROVE_vtag_s *vtag,
 			    void *user_ptr,
+			    TROVE_context_id context_id,
 			    TROVE_op_id *out_op_id_p);
     
     int (*bstream_read_list)(
@@ -72,6 +76,7 @@ struct TROVE_bstream_ops
 			     TROVE_ds_flags flags, 
 			     TROVE_vtag_s *out_vtag,
 			     void *user_ptr,
+			     TROVE_context_id context_id,
 			     TROVE_op_id *out_op_id_p);
     
     int (*bstream_write_list)(
@@ -87,6 +92,7 @@ struct TROVE_bstream_ops
 			      TROVE_ds_flags flags, 
 			      TROVE_vtag_s *inout_vtag,
 			      void *user_ptr,
+			      TROVE_context_id context_id,
 			      TROVE_op_id *out_op_id_p);
 
      int (*bstream_flush)(
@@ -94,6 +100,7 @@ struct TROVE_bstream_ops
 			TROVE_handle handle,
 			TROVE_ds_flags flags,
 			void *user_ptr,
+			TROVE_context_id context_id,
 			TROVE_op_id *out_op_id_p);
 };
 
@@ -107,6 +114,7 @@ struct TROVE_keyval_ops
 		       TROVE_ds_flags flags,
 		       TROVE_vtag_s *out_vtag, 
 		       void *user_ptr,
+		       TROVE_context_id context_id,
 		       TROVE_op_id *out_op_id_p);
     
     int (*keyval_write)(
@@ -117,6 +125,7 @@ struct TROVE_keyval_ops
 			TROVE_ds_flags flags,
 			TROVE_vtag_s *inout_vtag,
 			void *user_ptr,
+			TROVE_context_id context_id,
 			TROVE_op_id *out_op_id_p);
     
     int (*keyval_remove)(
@@ -126,6 +135,7 @@ struct TROVE_keyval_ops
 			 TROVE_ds_flags flags,
 			 TROVE_vtag_s *inout_vtag,
 			 void *user_ptr,
+			 TROVE_context_id context_id,
 			 TROVE_op_id *out_op_id_p);
     
     int (*keyval_validate)(
@@ -134,6 +144,7 @@ struct TROVE_keyval_ops
 			   TROVE_ds_flags flags,
 			   TROVE_vtag_s *inout_vtag,
 			   void* user_ptr,
+			   TROVE_context_id context_id,
 			   TROVE_op_id *out_op_id_p);
     
     int (*keyval_iterate)(
@@ -146,6 +157,7 @@ struct TROVE_keyval_ops
 			  TROVE_ds_flags flags,
 			  TROVE_vtag_s *inout_vtag,
 			  void *user_ptr,
+			  TROVE_context_id context_id,
 			  TROVE_op_id *out_op_id_p);
     
     int (*keyval_iterate_keys)(
@@ -157,6 +169,7 @@ struct TROVE_keyval_ops
 			       TROVE_ds_flags flags,
 			       TROVE_vtag_s *vtag,
 			       void *user_ptr,
+			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p);
     
     int (*keyval_read_list)(
@@ -168,6 +181,7 @@ struct TROVE_keyval_ops
 			    TROVE_ds_flags flags,
 			    TROVE_vtag_s *out_vtag,
 			    void *user_ptr,
+			    TROVE_context_id context_id,
 			    TROVE_op_id *out_op_id_p);
     
     int (*keyval_write_list)(
@@ -179,12 +193,14 @@ struct TROVE_keyval_ops
 			     TROVE_ds_flags flags,
 			     TROVE_vtag_s *inout_vtag,
 			     void *user_ptr,
+			     TROVE_context_id context_id,
 			     TROVE_op_id *out_op_id_p);
     int (*keyval_flush)(
 			TROVE_coll_id coll_id,
 			TROVE_handle handle,
 			TROVE_ds_flags flags,
 			void *user_ptr,
+			TROVE_context_id context_id,
 			TROVE_op_id *out_op_id_p);
 };
 
@@ -198,6 +214,7 @@ struct TROVE_dspace_ops
 			 TROVE_keyval_s *hint, /* TODO: figure out what this is! */
 			 TROVE_ds_flags flags,
 			 void *user_ptr,
+			 TROVE_context_id context_id,
 			 TROVE_op_id *out_op_id_p);
     
     int (*dspace_remove)(
@@ -205,6 +222,7 @@ struct TROVE_dspace_ops
 			 TROVE_handle handle,
 			 TROVE_ds_flags flags,
 			 void *user_ptr,
+			 TROVE_context_id context_id,
 			 TROVE_op_id *out_op_id_p);
 
     int (*dspace_iterate_handles)(
@@ -215,6 +233,7 @@ struct TROVE_dspace_ops
 		 		  TROVE_ds_flags flags,
 				  TROVE_vtag_s *vtag,
 				  void *user_ptr,
+				  TROVE_context_id context_id,
 				  TROVE_op_id *out_op_id_p);
 
     int (*dspace_verify)(
@@ -223,6 +242,7 @@ struct TROVE_dspace_ops
 			 TROVE_ds_type *type, /* TODO: define types! */
 			 TROVE_ds_flags flags,
 			 void *user_ptr,
+			 TROVE_context_id context_id,
 			 TROVE_op_id *out_op_id_p);
     
     int (*dspace_getattr)(
@@ -231,6 +251,7 @@ struct TROVE_dspace_ops
 			  TROVE_ds_attributes_s *ds_attr_p,
 			  TROVE_ds_flags flags,
 			  void *user_ptr,
+			  TROVE_context_id context_id,
 			  TROVE_op_id *out_op_id_p);
     
     int (*dspace_setattr)(
@@ -239,11 +260,13 @@ struct TROVE_dspace_ops
 			  TROVE_ds_attributes_s *ds_attr_p, 
 			  TROVE_ds_flags flags,
 			  void *user_ptr,
+			  TROVE_context_id context_id,
 			  TROVE_op_id *out_op_id_p);
     
     int (*dspace_test)(
 		       TROVE_coll_id coll_id,
 		       TROVE_op_id ds_id,
+		       TROVE_context_id context_id,
 		       int *out_count_p,
 		       TROVE_vtag_s *vtag,
 		       void **returned_user_ptr_p,
@@ -252,6 +275,7 @@ struct TROVE_dspace_ops
     int (*dspace_testsome)(
 			   TROVE_coll_id coll_id,
 			   TROVE_op_id *ds_id_array,
+			   TROVE_context_id context_id,
 			   int *inout_count_p,
 			   int *out_index_array,
 			   TROVE_vtag_s *vtag_array,
@@ -311,11 +335,13 @@ struct TROVE_mgmt_ops
     /* Note: setinfo and getinfo always return immediately */
     int (*collection_setinfo)(
 			      TROVE_coll_id coll_id,
+			      TROVE_context_id context_id,
 			      int option,
 			      void *parameter);
     
     int (*collection_getinfo)(
 			      TROVE_coll_id coll_id,
+			      TROVE_context_id context_id,
 			      int option,
 			      void *parameter);
     
@@ -325,6 +351,7 @@ struct TROVE_mgmt_ops
 			       TROVE_keyval_s *val_p,
 			       TROVE_ds_flags flags,
 			       void *user_ptr,
+			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p);
     
     int (*collection_geteattr)(
@@ -333,6 +360,7 @@ struct TROVE_mgmt_ops
 			       TROVE_keyval_s *val_p,
 			       TROVE_ds_flags flags,
 			       void *user_ptr,
+			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p);
 };
 

@@ -34,6 +34,7 @@ int main(int argc, char **argv)
     char *method_name;
     char path_name[PATH_SIZE];
     TROVE_ds_attributes_s s_attr;
+    TROVE_context_id trove_context = -1;
 
     TROVE_handle ls_handle[KEYVAL_ARRAY_LEN];
     char ls_name[KEYVAL_ARRAY_LEN][PATH_SIZE];
@@ -48,6 +49,13 @@ int main(int argc, char **argv)
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;
+    }
+
+    ret = trove_open_context(&trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr, "trove_open_context failed\n");
+        return -1;
     }
 
     /* try to look up collection used to store file system */
@@ -74,8 +82,10 @@ int main(int argc, char **argv)
 			       &s_attr,
 			       0 /* flags */,
 			       NULL,
+                               trove_context,
 			       &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) return -1;
 
     if (s_attr.type != TROVE_TEST_DIR) {
@@ -108,10 +118,12 @@ int main(int argc, char **argv)
 				      0,
 				      NULL,
 				      NULL, 
+                                      trove_context,
 				      &op_id);
 	if (it_ret == -1) return -1;
 
-	while (it_ret == 0) it_ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+	while (it_ret == 0) it_ret = trove_dspace_test(
+            coll_id, op_id, trove_context, &count, NULL, NULL, &state);
 	if (it_ret < 0) return -1;
 	
 	if (num_processed == 0) return 0;
@@ -124,10 +136,12 @@ int main(int argc, char **argv)
 					  &ds_attr,
 					  0 /* flags */,
 					  NULL,
+                                          trove_context,
 					  &op_id);
 	    if (ga_ret == -1) return -1;
 	    count = 1;
-	    while (ga_ret == 0) ga_ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+	    while (ga_ret == 0) ga_ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL, &state);
 
 	    printf("%s/%s (handle = %Ld, uid = %d, gid = %d, perm = %o, type = %d, b_size = %d, k_size = %d)\n",
 		   path_name,
@@ -143,6 +157,9 @@ int main(int argc, char **argv)
 
 	}
     }
+
+    trove_close_context(trove_context);
+    trove_finalize();
     
     return 0;
 }

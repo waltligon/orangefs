@@ -281,6 +281,7 @@ struct dbpf_op {
     int (*svc_fn)(struct dbpf_op *op);
     void *user_ptr;
     TROVE_ds_flags flags;
+    TROVE_context_id context_id;
     union {
 	/* all the op types go in here; structs are all
 	 * defined just below the prototypes for the functions.

@@ -19,6 +19,7 @@ int trove_handle_mgmt_initialize(void);
 
 int trove_set_handle_ranges(
     TROVE_coll_id coll_id,
+    TROVE_context_id context_id,
     char *handle_range_str);
 
 /* returns a valid TROVE_handle on success; 0 otherwise */

@@ -32,6 +32,7 @@ int main(int argc, char ** argv)
     TROVE_handle parent_handle, file_handle;
     TROVE_ds_attributes_s s_attr;
     TROVE_keyval_s key, val;
+    TROVE_context_id trove_context = -1;
 
     TROVE_extent cur_extent;
     TROVE_handle_extent_array extent_array;
@@ -47,6 +48,14 @@ int main(int argc, char ** argv)
 	fprintf(stderr, "initialize failed.\n");
 	return -1;
     }
+
+    ret = trove_open_context(&trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr, "trove_open_context failed\n");
+        return -1;
+    }
+
     ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
     if (ret < 0) {
 	fprintf(stderr, "collection lookup failed.\n");
@@ -79,10 +88,12 @@ int main(int argc, char ** argv)
 			      NULL,
 			      0 /* flags */,
 			      NULL,
+                              trove_context,
 			      &op_id);
     if (ret < 0) return -1;
 
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0 ) {
 	fprintf(stderr, "dspace create (for %s) failed.\n", dir_name);
 	return -1;
@@ -103,20 +114,25 @@ int main(int argc, char ** argv)
 			       &s_attr,
 			       TROVE_SYNC,
 			       NULL,
+                               trove_context,
 			       &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) return -1;    /* add new file name/handle pair to parent directory */
 
     key.buffer = dir_name;
     key.buffer_sz = strlen(dir_name) + 1;
     val.buffer = &file_handle;
     val.buffer_sz = sizeof(file_handle);
-    ret = trove_keyval_write(coll_id, parent_handle, &key, &val, 0, NULL, NULL, &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    ret = trove_keyval_write(coll_id, parent_handle, &key, &val,
+                             0, NULL, NULL, trove_context, &op_id);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "keyval write failed.\n");
 	return -1;
     }
+    trove_close_context(trove_context);
     trove_finalize();
 
     printf("created directory %s (handle = %d)\n", dir_name, (int) file_handle);

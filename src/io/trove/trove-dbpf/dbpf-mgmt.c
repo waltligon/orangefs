@@ -45,6 +45,7 @@ static int dbpf_mkpath(char *pathname, mode_t mode);
 /* dbpf_collection_getinfo()
  */
 static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
+				   TROVE_context_id context_id,
 				   int option,
 				   void *parameter)
 {
@@ -54,6 +55,7 @@ static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
 /* dbpf_collection_setinfo()
  */
 static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
+				   TROVE_context_id context_id,
 				   int option,
 				   void *parameter)
 {
@@ -62,7 +64,8 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
     switch(option)
     {
         case TROVE_COLLECTION_HANDLE_RANGES:
-            ret = trove_set_handle_ranges(coll_id,(char *)parameter);
+            ret = trove_set_handle_ranges(coll_id, context_id,
+                                          (char *)parameter);
             break;
     }
     return ret;
@@ -75,6 +78,7 @@ static int dbpf_collection_seteattr(TROVE_coll_id coll_id,
 				    TROVE_keyval_s *val_p,
 				    TROVE_ds_flags flags,
 				    void *user_ptr,
+				    TROVE_context_id context_id,
 				    TROVE_op_id *out_op_id_p)
 {
     int ret;
@@ -119,6 +123,7 @@ static int dbpf_collection_geteattr(TROVE_coll_id coll_id,
 				    TROVE_keyval_s *val_p,
 				    TROVE_ds_flags flags,
 				    void *user_ptr,
+				    TROVE_context_id context_id,
 				    TROVE_op_id *out_op_id_p)
 {
     int ret;

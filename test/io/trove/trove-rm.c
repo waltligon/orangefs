@@ -32,6 +32,7 @@ int main(int argc, char **argv)
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
     TROVE_ds_attributes_s s_attr;
+    TROVE_context_id trove_context = -1;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -43,6 +44,13 @@ int main(int argc, char **argv)
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;
+    }
+
+    ret = trove_open_context(&trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr, "trove_open_context failed\n");
+        return -1;
     }
 
     /* try to look up collection used to store file system */
@@ -81,8 +89,10 @@ int main(int argc, char **argv)
     val.buffer_sz = sizeof(TROVE_handle);
 
     /* it would be smart to verify that this is a directory first... */
-    ret = trove_keyval_read(coll_id, parent_handle, &key, &val, 0, NULL, NULL, &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    ret = trove_keyval_read(coll_id, parent_handle, &key, &val,
+                            0, NULL, NULL, trove_context, &op_id);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if ( ret < 0 || state == -1) {
 	    fprintf(stderr, "read failed for key %s\n", file_name);
 	    return -1;
@@ -93,8 +103,10 @@ int main(int argc, char **argv)
 			       &s_attr,
 			       0 /* flags */,
 			       NULL,
+                               trove_context,
 			       &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) return -1;
 
     if (s_attr.type != TROVE_TEST_FILE) {
@@ -109,8 +121,10 @@ int main(int argc, char **argv)
     key.buffer = file_name;
     key.buffer_sz = strlen(file_name)+1;
 
-    ret = trove_keyval_remove(coll_id, parent_handle, &key, 0, NULL, NULL, &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    ret = trove_keyval_remove(coll_id, parent_handle, &key,
+                              0, NULL, NULL, trove_context, &op_id);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0 ) {
 	    fprintf(stderr, "removal failed for %s\n", file_name);
 	    return -1;
@@ -122,13 +136,16 @@ int main(int argc, char **argv)
 			      file_handle,
 			      TROVE_SYNC,
 			      NULL,
+                              trove_context,
 			      &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "dspace remove failed.\n");
 	return -1;
     }
 
+    trove_close_context(trove_context);
     trove_finalize();
     printf("file %s removed (file handle = %d, parent handle = %d).\n",
 	   file_name, 

@@ -43,6 +43,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 			      TROVE_keyval_s *hint, /* TODO: What is this? */
 			      TROVE_ds_flags flags,
 			      void *user_ptr,
+			      TROVE_context_id context_id,
 			      TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -225,6 +226,7 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 			      TROVE_handle handle,
 			      TROVE_ds_flags flags,
 			      void *user_ptr,
+			      TROVE_context_id context_id,
 			      TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -348,6 +350,7 @@ int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
                                 TROVE_ds_flags flags,
                                 TROVE_vtag_s *vtag,
                                 void *user_ptr,
+			        TROVE_context_id context_id,
                                 TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -539,6 +542,7 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
 			      TROVE_ds_type *type_p,
 			      TROVE_ds_flags flags,
 			      void *user_ptr,
+			      TROVE_context_id context_id,
 			      TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -637,6 +641,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 			       TROVE_ds_attributes_s *ds_attr_p,
 			       TROVE_ds_flags flags,
 			       void *user_ptr,
+			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -672,6 +677,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 			       TROVE_ds_attributes_s *ds_attr_p,
 			       TROVE_ds_flags flags,
 			       void *user_ptr,
+			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -892,6 +898,7 @@ return_error:
  */
 static int dbpf_dspace_test(TROVE_coll_id coll_id,
 			    TROVE_op_id id,
+                            TROVE_context_id context_id,
 			    int *out_count_p,
 			    TROVE_vtag_s *vtag,
 			    void **returned_user_ptr_p,
@@ -971,6 +978,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 static int dbpf_dspace_testsome(
 				TROVE_coll_id coll_id,
 				TROVE_op_id *ds_id_array,
+			        TROVE_context_id context_id,
 				int *inout_count_p,
 				int *out_index_array,
 				TROVE_vtag_s *vtag_array,
@@ -983,6 +991,7 @@ static int dbpf_dspace_testsome(
     for (i=0; i < *inout_count_p; i++) {
 	ret = dbpf_dspace_test(coll_id,
 			       ds_id_array[i],
+			       context_id,
 			       &tmp_count,
 			       &vtag_array[i], /* TODO: this doesn't seem right! */
 			       (returned_user_ptr_array != NULL) ?  &returned_user_ptr_array[out_count] : NULL,

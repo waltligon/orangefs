@@ -43,6 +43,7 @@ int main(int argc, char **argv)
     char *buf;
     TROVE_extent cur_extent;
     TROVE_handle_extent_array extent_array;
+    TROVE_context_id trove_context = -1;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -59,6 +60,13 @@ int main(int argc, char **argv)
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;
+    }
+
+    ret = trove_open_context(&trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr, "trove_open_context failed\n");
+        return -1;
     }
 
     /* try to look up collection used to store file system */
@@ -99,8 +107,10 @@ int main(int argc, char **argv)
 			      NULL,
 			      0 /* flags */,
 			      NULL,
+                              trove_context,
 			      &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "dspace create failed.\n");
 	return -1;
@@ -121,8 +131,10 @@ int main(int argc, char **argv)
 			       &s_attr,
 			       0 /* flags */,
 			       NULL,
+                               trove_context,
 			       &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) return -1;
 
     /* add new file name/handle pair to parent directory */
@@ -131,9 +143,11 @@ int main(int argc, char **argv)
     val.buffer = &file_handle;
     val.buffer_sz = sizeof(file_handle);
 
-    ret = trove_keyval_write(coll_id, parent_handle, &key, &val, 0, NULL, NULL, &op_id);
+    ret = trove_keyval_write(coll_id, parent_handle, &key, &val,
+                             0, NULL, NULL, trove_context, &op_id);
     count = 1;
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "keyval write failed.\n");
 	return -1;
@@ -160,13 +174,16 @@ int main(int argc, char **argv)
 				 0, /* flags */
 				 NULL, /* vtag */
 				 NULL, /* user ptr */
+                                 trove_context,
 				 &op_id);
     count = 1;
-    while ( ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while ( ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0 ) {
 	fprintf(stderr, "bstream write failed.\n");
 	return -1;
     }
+    trove_close_context(trove_context);
     trove_finalize();
 
 #if 0

@@ -36,6 +36,7 @@ static int dbpf_keyval_read(
 			    TROVE_ds_flags flags,
 			    TROVE_vtag_s *vtag, 
 			    void *user_ptr,
+			    TROVE_context_id context_id,
 			    TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -155,6 +156,7 @@ static int dbpf_keyval_write(
 			     TROVE_ds_flags flags,
 			     TROVE_vtag_s *vtag,
 			     void *user_ptr,
+			     TROVE_context_id context_id,
 			     TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -259,6 +261,7 @@ static int dbpf_keyval_remove(
 			      TROVE_ds_flags flags,
 			      TROVE_vtag_s *vtag,
 			      void *user_ptr,
+			      TROVE_context_id context_id,
 			      TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -343,6 +346,7 @@ static int dbpf_keyval_validate(
 				TROVE_ds_flags flags,
 				TROVE_vtag_s *vtag,
 				void* user_ptr,
+			        TROVE_context_id context_id,
 				TROVE_op_id *out_op_id_p)
 {
     return -TROVE_ENOSYS;
@@ -359,6 +363,7 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
 			       TROVE_ds_flags flags,
 			       TROVE_vtag_s *vtag,
 			       void *user_ptr,
+			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -596,6 +601,7 @@ static int dbpf_keyval_iterate_keys(
 				    TROVE_ds_flags flags,
 				    TROVE_vtag_s *vtag,
 				    void *user_ptr,
+			            TROVE_context_id context_id,
 				    TROVE_op_id *out_op_id_p)
 {
     return -TROVE_ENOSYS;
@@ -610,6 +616,7 @@ static int dbpf_keyval_read_list(
 				 TROVE_ds_flags flags,
 				 TROVE_vtag_s *vtag,
 				 void *user_ptr,
+			         TROVE_context_id context_id,
 				 TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -728,6 +735,7 @@ static int dbpf_keyval_write_list(
 				  TROVE_ds_flags flags,
 				  TROVE_vtag_s *vtag,
 				  void *user_ptr,
+			          TROVE_context_id context_id,
 				  TROVE_op_id *out_op_id_p)
 {
     return -TROVE_ENOSYS;
@@ -738,6 +746,7 @@ static int dbpf_keyval_flush(
 			    TROVE_handle handle,
 			    TROVE_ds_flags flags,
 			    void *user_ptr,
+			    TROVE_context_id context_id,
 			    TROVE_op_id *out_op_id_p)
 {
     struct dbpf_collection *coll_p;

@@ -103,6 +103,9 @@ static int flowproto_bmi_trove_id = -1;
 /* bmi context */
 static bmi_context_id global_bmi_context = -1;
 
+/* trove context */
+static TROVE_context_id global_trove_context = -1;
+
 /* array of bmi ops in flight; filled in when needed to call
  * testcontext() 
  */
@@ -282,7 +285,15 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
     ret = BMI_open_context(&global_bmi_context);
     if(ret < 0)
     {
+	BMI_close_context(global_bmi_context);
 	return(ret);
+    }
+
+    /* get a TROVE context */
+    ret = trove_open_context(&global_trove_context);
+    if (ret < 0)
+    {
+        return(ret);
     }
 
     /* setup our queues to track low level operations */
@@ -290,6 +301,7 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
     if (!trove_inflight_queue)
     {
 	BMI_close_context(global_bmi_context);
+        trove_close_context(global_trove_context);
 	return (-ENOMEM);
     }
 
@@ -315,6 +327,7 @@ int flowproto_bmi_trove_finalize(void)
     trove_id_queue_cleanup(trove_inflight_queue);
 
     BMI_close_context(global_bmi_context);
+    trove_close_context(global_trove_context);
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "flowproto_bmi_trove shut down.\n");
     return (0);
@@ -534,9 +547,11 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
                 }
             }
 
-	    ret = trove_dspace_testsome(tmp_coll_id, trove_op_array,
-					&trove_count, trove_index_array, NULL,
-					trove_usrptr_array, trove_error_code_array);
+	    ret = trove_dspace_testsome(tmp_coll_id, global_trove_context,
+					trove_op_array, &trove_count,
+					trove_index_array, NULL,
+					trove_usrptr_array, 
+					trove_error_code_array);
 	    if (ret < 0)
 	    {
 		/* TODO: cleanup properly */
@@ -1624,7 +1639,8 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 				       flow_data->trove_size_list,
 				       flow_data->trove_list_count,
 				       &(flow_data->drain_buffer_stepsize), 0,
-				       NULL, flow_d, &(flow_data->trove_id));
+				       NULL, flow_d, global_trove_context,
+				       &(flow_data->trove_id));
 	if (ret == 1)
 	{
 	    /* handle immediate completion */
@@ -1807,7 +1823,8 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 				      flow_data->trove_size_list,
 				      flow_data->trove_list_count,
 				      &(flow_data->fill_buffer_stepsize), 0,
-				      NULL, flow_d, &(flow_data->trove_id));
+				      NULL, flow_d, global_trove_context,
+				      &(flow_data->trove_id));
 	if (ret == 1)
 	{
 	    /* handle immediate completion */

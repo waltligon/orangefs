@@ -38,6 +38,7 @@ int pvfs2_mkspace(
     static char root_handle_string[PATH_MAX] = "root_handle";
     PVFS_handle_extent cur_extent;
     PVFS_handle_extent_array extent_array;
+    TROVE_context_id trove_context;
 
     if (verbose)
     {
@@ -46,6 +47,13 @@ int pvfs2_mkspace(
         fprintf(stderr,"Collection ID: %d\n",coll_id);
         fprintf(stderr,"Root Handle  : %d\n",root_handle);
         fprintf(stderr,"Handle Ranges: %s\n",handle_ranges);
+    }
+
+    ret = trove_open_context(&trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr,"trove_open_context() failure.\n");
+        return -1;
     }
 
     new_root_handle = (PVFS_handle)root_handle;
@@ -134,6 +142,7 @@ int pvfs2_mkspace(
     /* we have a three-step process for starting trove:
      * initialize, collection_lookup, collection_setinfo */
     ret = trove_collection_setinfo(coll_id,
+                                   trove_context,
                                    TROVE_COLLECTION_HANDLE_RANGES,
                                    handle_ranges);
     if (ret < 0)
@@ -164,12 +173,13 @@ int pvfs2_mkspace(
             NULL,
             (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
             NULL,
+            trove_context,
             &op_id);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id, op_id, &count,
-                                    NULL, NULL, &state);
+            ret = trove_dspace_test(coll_id, op_id, trove_context,
+                                    &count, NULL, NULL, &state);
         }
         if (ret != 1 && state != 0)
         {
@@ -191,11 +201,11 @@ int pvfs2_mkspace(
         key.buffer_sz = strlen(root_handle_string) + 1;
         val.buffer = &new_root_handle;
         val.buffer_sz = sizeof(new_root_handle);
-        ret = trove_collection_seteattr(coll_id, &key,
-                                        &val, 0, NULL, &op_id);
+        ret = trove_collection_seteattr(coll_id, &key, &val, 0, 
+                                        NULL, trove_context, &op_id);
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id, op_id,
+            ret = trove_dspace_test(coll_id, op_id, trove_context,
                                     &count, NULL, NULL, &state);
         }
         if (ret < 0)
@@ -227,10 +237,11 @@ int pvfs2_mkspace(
                                  TROVE_SYNC,
                                  0 /* vtag */,
                                  NULL /* user ptr */,
+                                 trove_context,
                                  &op_id);
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id, op_id,
+            ret = trove_dspace_test(coll_id, op_id, trove_context,
                                     &count, NULL, NULL, &state);
         }
         if (ret < 0)
@@ -255,10 +266,11 @@ int pvfs2_mkspace(
                                   NULL,
                                   TROVE_SYNC,
                                   NULL,
+                                  trove_context,
                                   &op_id);
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id, op_id,
+            ret = trove_dspace_test(coll_id, op_id, trove_context,
                                     &count, NULL, NULL, &state);
         }
         if (ret != 1 && state != 0)
@@ -285,10 +297,11 @@ int pvfs2_mkspace(
                                  TROVE_SYNC,
                                  0 /* vtag */,
                                  NULL /* user ptr */,
+                                 trove_context,
                                  &op_id);
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id, op_id,
+            ret = trove_dspace_test(coll_id, op_id, trove_context,
                                     &count, NULL, NULL, &state);
         }
         if (ret < 0)
@@ -304,6 +317,7 @@ int pvfs2_mkspace(
         }
     }
 
+    trove_close_context(trove_context);
     trove_finalize();
 
     if (verbose)

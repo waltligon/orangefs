@@ -48,6 +48,7 @@ int main(int argc, char **argv)
 	TROVE_handle file_handle;
 	bmi_context_id context;
 	FLOW_context_id flow_context;
+	TROVE_context_id trove_context;
 
 
 	/*************************************************************/
@@ -92,6 +93,13 @@ int main(int argc, char **argv)
 	if (ret < 0) {
 	    fprintf(stderr, "initialize failed.\n");
 	    return -1;
+	}
+
+	ret = trove_open_context(&trove_context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "trove_open_context() failure.\n");
+		return(-1);
 	}
 
 	while(1)
@@ -167,8 +175,8 @@ int main(int argc, char **argv)
 		}
 		file_handle = req->handle;
 
-		ret = trove_dspace_getattr(coll_id, file_handle, &s_attr, 0 /* flags */, NULL, &op_id);
-		while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+		ret = trove_dspace_getattr(coll_id, file_handle, &s_attr, 0 /* flags */, NULL, trove_context, &op_id);
+		while (ret == 0) ret = trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL, &state);
 		if (ret < 0 && req->op == WIRE_HARNESS_READ) {
 		    ack.error_code = ENOENT;
 		}
@@ -280,6 +288,9 @@ int main(int argc, char **argv)
 	/* shut down BMI */
 	BMI_close_context(context);
 	BMI_finalize();
+
+        trove_close_context(trove_context);
+        trove_finalize();
 
 	gossip_disable();
 	return(0);

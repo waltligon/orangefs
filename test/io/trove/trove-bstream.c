@@ -35,6 +35,7 @@ int main(int argc, char ** argv )
     char *method_name;
     TROVE_extent cur_extent;
     TROVE_handle_extent_array extent_array;
+    TROVE_context_id trove_context = -1;
 
     struct teststruct foo = { 8, 8, 0, NULL };
     struct teststruct bar;
@@ -46,6 +47,13 @@ int main(int argc, char ** argv )
     if (ret < 0 ) {
 	fprintf(stderr, "initialize failed\n");
 	return -1;
+    }
+
+    ret = trove_open_context(&trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr, "trove_open_context failed\n");
+        return -1;
     }
 
     ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
@@ -70,8 +78,10 @@ int main(int argc, char ** argv )
 			      NULL,
 			      TROVE_SYNC /* flags */,
 			      NULL,
+                              trove_context,
 			      &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "dspace create failed.\n");
 	return -1;
@@ -83,16 +93,20 @@ int main(int argc, char ** argv )
     buffsz = sizeof(foo);
     ret = trove_bstream_write_at(coll_id, file_handle, 
 				 &foo, &buffsz,
-				 0, 0, NULL, NULL, &op_id);
-    while ( ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+				 0, 0, NULL, NULL,
+                                 trove_context, &op_id);
+    while ( ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0 ) {
 	fprintf(stderr, "bstream write failed.\n");
 	return -1;
     }
     ret = trove_bstream_write_at(coll_id, file_handle,
 				 foo.string, &buffsz,
-				 buffsz, 0, NULL, NULL, &op_id);
-    while ( ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+				 buffsz, 0, NULL, NULL,
+                                 trove_context, &op_id);
+    while ( ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0 ) {
 	fprintf(stderr, "bstream write failed.\n");
 	return -1;
@@ -101,8 +115,10 @@ int main(int argc, char ** argv )
     buffsz = sizeof(bar);
     ret = trove_bstream_read_at(coll_id, file_handle,
 				&bar, &buffsz,
-				0, 0, NULL, NULL, &op_id);
-    while ( ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+				0, 0, NULL, NULL,
+                                trove_context, &op_id);
+    while ( ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0 ) {
 	fprintf(stderr, "bstream read failed.\n");
 	return -1;
@@ -110,13 +126,16 @@ int main(int argc, char ** argv )
     bar.string = malloc(bar.size + 1);
     ret = trove_bstream_read_at(coll_id, file_handle, 
 				bar.string, &buffsz,
-				buffsz, 0, NULL, NULL, &op_id);
-    while ( ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+				buffsz, 0, NULL, NULL,
+                                trove_context, &op_id);
+    while ( ret == 0) ret = trove_dspace_test(
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
     if (ret < 0 ) {
 	fprintf(stderr, "bstream write failed.\n");
 	return -1;
     }
 
+    trove_close_context(trove_context);
     trove_finalize(); 
     return 0;
 }		

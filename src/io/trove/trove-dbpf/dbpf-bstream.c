@@ -43,6 +43,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 				       TROVE_ds_flags flags, 
 				       TROVE_vtag_s *vtag,
 				       void *user_ptr,
+				       TROVE_context_id context_id,
 				       TROVE_op_id *out_op_id_p,
 				       int opcode);
 static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p);
@@ -62,6 +63,7 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
 				TROVE_ds_flags flags,
 				TROVE_vtag_s *vtag, 
 				void *user_ptr,
+				TROVE_context_id context_id,
 				TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -159,6 +161,7 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
 				 TROVE_ds_flags flags,
 				 TROVE_vtag_s *vtag,
 				 void *user_ptr,
+				 TROVE_context_id context_id,
 				 TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -255,6 +258,7 @@ static int dbpf_bstream_flush(
 				TROVE_handle handle,
 				TROVE_ds_flags flags,
 				void *user_ptr,
+				TROVE_context_id context_id,
 				TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
@@ -328,6 +332,7 @@ static int dbpf_bstream_resize(
 			       TROVE_ds_flags flags,
 			       TROVE_vtag_s *vtag,
 			       void *user_ptr,
+			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p)
 {
     return -TROVE_ENOSYS;
@@ -341,6 +346,7 @@ static int dbpf_bstream_validate(
 			       	 TROVE_ds_flags flags,
 				 TROVE_vtag_s *vtag,
 				 void *user_ptr,
+				 TROVE_context_id context_id,
 				 TROVE_op_id *out_op_id_p)
 {
     return -TROVE_ENOSYS;
@@ -361,6 +367,7 @@ static int dbpf_bstream_read_list(TROVE_coll_id coll_id,
 				  TROVE_ds_flags flags, 
 				  TROVE_vtag_s *vtag,
 				  void *user_ptr,
+				  TROVE_context_id context_id,
 				  TROVE_op_id *out_op_id_p)
 {
     return dbpf_bstream_rw_list(coll_id,
@@ -375,6 +382,7 @@ static int dbpf_bstream_read_list(TROVE_coll_id coll_id,
 				flags, 
 				vtag,
 				user_ptr,
+				context_id,
 				out_op_id_p,
 				LIO_READ);
 }
@@ -393,6 +401,7 @@ static int dbpf_bstream_write_list(TROVE_coll_id coll_id,
 				   TROVE_ds_flags flags, 
 				   TROVE_vtag_s *vtag,
 				   void *user_ptr,
+				   TROVE_context_id context_id,
 				   TROVE_op_id *out_op_id_p)
 {
     return dbpf_bstream_rw_list(coll_id,
@@ -407,6 +416,7 @@ static int dbpf_bstream_write_list(TROVE_coll_id coll_id,
 				flags, 
 				vtag,
 				user_ptr,
+				context_id,
 				out_op_id_p,
 				LIO_WRITE);
 }
@@ -429,6 +439,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 				       TROVE_ds_flags flags, 
 				       TROVE_vtag_s *vtag,
 				       void *user_ptr,
+				       TROVE_context_id context_id,
 				       TROVE_op_id *out_op_id_p,
 				       int opcode)
 {

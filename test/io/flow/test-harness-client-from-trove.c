@@ -32,7 +32,8 @@ char storage_space[] = "/tmp/trove-test-space";
 char file_system[] = "fs-foo";
 TROVE_handle requested_file_handle = 9999;
 
-int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
+int path_lookup(TROVE_coll_id coll_id, TROVE_context_id trove_context,
+                char *path, TROVE_handle *out_handle_p);
 
 int main(int argc, char **argv)	
 {
@@ -57,6 +58,7 @@ int main(int argc, char **argv)
 	PVFS_size tmp_size;
 	bmi_context_id context;
 	FLOW_context_id flow_context;
+        TROVE_context_id trove_context;
         TROVE_extent cur_extent;
         TROVE_handle_extent_array extent_array;
 	
@@ -103,6 +105,12 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	ret = trove_open_context(&trove_context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "trove_open_context() failure.\n");
+		return(-1);
+	}
 
 	/* initialize the flow interface */
 	ret = PINT_flow_initialize("flowproto_bmi_trove", 0);
@@ -165,7 +173,7 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	ret = path_lookup(coll_id, "/", &parent_handle);
+	ret = path_lookup(coll_id, trove_context, "/", &parent_handle);
 	if (ret < 0 ) {
 		return -1;
 	}
@@ -182,9 +190,10 @@ int main(int argc, char **argv)
 				  NULL,
 				  TROVE_SYNC,
 				  NULL,
+                                  trove_context,
 				  &t_op_id);
-	while (ret == 0) ret = trove_dspace_test(coll_id, t_op_id, &count, NULL, 
-		NULL, &state);
+	while (ret == 0) ret = trove_dspace_test(
+            coll_id, t_op_id, trove_context, &count, NULL, NULL, &state);
 	if (ret < 0) {
 		fprintf(stderr, "HEY: dspace create failed, I hope because it already existed\n");
 	}
@@ -194,9 +203,9 @@ int main(int argc, char **argv)
 	 */
 	tmp_size = TEST_SIZE;
 	ret = trove_bstream_write_at(coll_id, file_handle, mybuffer,
-		&tmp_size, 0, 0, NULL, NULL, &t_op_id);
-	while(ret == 0) ret = trove_dspace_test(coll_id, t_op_id, &count,
-		NULL, NULL, &state);
+		&tmp_size, 0, 0, NULL, NULL, trove_context, &t_op_id);
+	while(ret == 0) ret = trove_dspace_test(
+            coll_id, t_op_id, trove_context, &count, NULL, NULL, &state);
 	
 	if(ret < 0) {
 		fprintf(stderr, "bstream write failed.\n");
@@ -298,6 +307,7 @@ int main(int argc, char **argv)
 	BMI_close_context(context);
 	BMI_finalize();
 
+        trove_close_context(trove_context);
 	trove_finalize();
 
 	free(mybuffer);
@@ -356,7 +366,8 @@ static double Wtime(void)
 	return((double)t.tv_sec + (double)t.tv_usec / 1000000);
 }
 	
-int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p)
+int path_lookup(TROVE_coll_id coll_id, TROVE_context_id trove_context,
+                char *path, TROVE_handle *out_handle_p)
 {
     int ret, count;
     TROVE_ds_state state;
@@ -371,8 +382,10 @@ int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p)
     key.buffer_sz = strlen(root_handle_string) + 1;
     val.buffer = &handle;
     val.buffer_sz = sizeof(handle);
-    ret = trove_collection_geteattr(coll_id, &key, &val, 0, NULL, &op_id);
-    while (ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    ret = trove_collection_geteattr(coll_id, &key, &val, 0,
+                                    NULL, trove_context, &op_id);
+    while (ret == 0) trove_dspace_test(coll_id, op_id, trove_context,
+                                       &count, NULL, NULL, &state);
     if (ret < 0) {
         fprintf(stderr, "collection geteattr (for root handle) failed.\n");
         return -1;
