@@ -28,21 +28,8 @@ PINT_state_machine_s io_req_s =
 	io_init_state_machine
 };
 
-/* Ok, here begins the state machine representation */
-
-/* All states must appear within the parameter list to the declared machine
- *
- * Correspondingly, there are two end products, the first of which is success
- * (job_post_ret = 0).  This is denoted in the first state.  
- *
- * There is also a default value.  All states should have a default next state
- * just so that there is no unexpected behaviour.  
- *
- * The termination of each state should be with a call to a non-blocking job
- * interface function.  The value returned from this call should be passed back
- * to the higher level callers.  
- *
- * 
+/* This is the state machine for file system I/O operations (both
+ * read and write)
  */
 
 %%
@@ -109,8 +96,8 @@ void io_init_state_machine(void)
  * Returns:  int
  *
  * Synopsis: This function sets up the buffers in preparation for any
- *           operations that require them.  Also runs the operation through
- *           the request scheduler for consistency.
+ *           operations that require them.  Also runs the operation 
+ *           through the request scheduler for consistency.
  *           
  */
 static int io_init(state_action_struct *s_op, job_status_s *ret)
@@ -118,15 +105,6 @@ static int io_init(state_action_struct *s_op, job_status_s *ret)
 	int job_post_ret;
 	
 	gossip_ldebug(SERVER_DEBUG, "IO: io_init() executed.\n");
-	/* Here, any prep work should be done including calls to allocate memory, 
-		including using the cache mechanism
-	 */
-
-
-	/* Note that this call is non-blocking and the return value will be
-		handled by the server deamon and correspondingly the state-machine 
-		NOTE: THIS SHOULD BE DONE BY ALL REQUESTS
-	 */
 
 	/* post a scheduler job */
 	job_post_ret = job_req_sched_post(s_op->req,
@@ -134,11 +112,6 @@ static int io_init(state_action_struct *s_op, job_status_s *ret)
 												 ret,
 												 &(s_op->scheduled_id));
 
-	/* This return value will denote completion of the non-blocking interface call
-	   This DOES NOT denote the actual success of the operation.  In other words,
-		job_post_ret can be 1 signifying that a job completed, but it completed in
-		failure, and that value is denoted in ret->error_code
-	*/
 	return(job_post_ret);
 }
 
@@ -148,16 +121,16 @@ static int io_init(state_action_struct *s_op, job_status_s *ret)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      Memory is allocated, and we are ready to do what we are going
- *           to do.
+ * Pre:      Memory is allocated, and we are ready to do what we are 
+ *           going to do.
  *
  * Post:     Some type of work has been done!
  *            
  * Returns:  int
  *
- * Synopsis: This function should make a call that will perform an operation
- *           be it to Trove, BMI, server_config, etc.  But, the operation is
- *           non-blocking.
+ * Synopsis: This function should make a call that will perform an 
+ *           operation be it to Trove, BMI, server_config, etc.  
+ *           But, the operation is non-blocking.
  *           
  */
 static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
@@ -214,10 +187,11 @@ static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
  *
  * Returns:  int
  *
- * Synopsis: Free the job from the scheduler to allow next job to proceed.
- *           Once we reach this point, we assume all communication has ceased
- *           with the client with respect to this operation, so we must tell 
- *           the scheduler to proceed with the next operation on our handle!
+ * Synopsis: Free the job from the scheduler to allow next job to 
+ *           proceed.  Once we reach this point, we assume all 
+ *           communication has ceased with the client with respect 
+ *           to this operation, so we must tell the scheduler to 
+ *           proceed with the next operation on our handle!
  */
 static int io_release(state_action_struct *s_op, job_status_s *ret)
 {
