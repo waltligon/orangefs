@@ -2781,7 +2781,14 @@ static int receive_cycle(int timeout)
     global_timeout_flag = 0;
     do
     {
-	poll_event = gm_receive(local_port);
+        if(timeout > 0)
+        {
+	    poll_event = gm_blocking_receive(local_port);
+        }
+        else
+        {
+            poll_event = gm_receive(local_port);
+        }
 
 	switch (gm_ntohc(poll_event->recv.type))
 	{
