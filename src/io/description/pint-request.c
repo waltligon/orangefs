@@ -191,13 +191,25 @@ int PINT_Process_request(PINT_Request_state *req,
 			/* don't need to call distribute */
 			if (*start_offset <= contig_offset + contig_size)
 			{
-				/* this contig chunk will exceed the target start offset */
 				retval = *start_offset - contig_offset;
+				/* this contig chunk will exceed the target start offset */
+				if (retval < 0)
+				{
+					gossip_debug(REQUEST_DEBUG, "\texiting seek midway\n");
+					retval = 0; /* keeps loop going */
+				}
+				else
+				{
+					gossip_debug(REQUEST_DEBUG,
+							"\tchunk exceeds target offset rv:%d\n", retval);
+				}
 			}
 			else
 			{
 				/* need to skip this whole block */
 				retval = contig_size;
+				gossip_debug(REQUEST_DEBUG,
+						"\tskipping whole block rv:%d\n", retval);
 			}
 		}
 		else
@@ -218,7 +230,7 @@ int PINT_Process_request(PINT_Request_state *req,
 				/* now starting processing for real */
 				seeking = 0;
 				gossip_debug(REQUEST_DEBUG,
-						"\texiting seek because distribute indiates done\n");
+						"\texiting seek because distribute indicates done\n");
 				continue;
 			}
 			else
