@@ -99,9 +99,9 @@ do {                                                           \
 #define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
 
 #define MAX_DEV_REQ_UPSIZE (sizeof(int32_t) +   \
-sizeof(int64_t) + sizeof(pvfs2_upcall_t))
+sizeof(uint64_t) + sizeof(pvfs2_upcall_t))
 #define MAX_DEV_REQ_DOWNSIZE (sizeof(int32_t) + \
-sizeof(int64_t) + sizeof(pvfs2_downcall_t))
+sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 
 #define BITS_PER_LONG_DIV_8 (BITS_PER_LONG >> 3)
 
@@ -179,7 +179,7 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 typedef struct
 {
     int op_state;
-    int64_t tag;
+    uint64_t tag;
 
     pvfs2_upcall_t upcall;
     pvfs2_downcall_t downcall;

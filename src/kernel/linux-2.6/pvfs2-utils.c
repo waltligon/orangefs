@@ -953,8 +953,8 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
     new_op->upcall.type = PVFS2_VFS_OP_CANCEL;
     new_op->upcall.req.cancel.op_tag = tag;
 
-    pvfs2_print("Attempting PVFS2 operation cancellation of tag %lu\n",
-                new_op->upcall.req.cancel.op_tag);
+    pvfs2_print("Attempting PVFS2 operation cancellation of tag %Lu\n",
+                Lu(new_op->upcall.req.cancel.op_tag));
 
     service_cancellation_operation(new_op);
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);

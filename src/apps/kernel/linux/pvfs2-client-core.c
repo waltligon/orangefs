@@ -1080,7 +1080,7 @@ static int service_operation_cancellation(vfs_request_t *vfs_request)
       operation currently in progress and issue a cancellation on it
     */
     ret = cancel_op_in_progress(
-        vfs_request->in_upcall.req.cancel.op_tag);
+        (PVFS_id_gen_t)vfs_request->in_upcall.req.cancel.op_tag);
 
     if (ret == -PVFS_ECANCEL)
     {

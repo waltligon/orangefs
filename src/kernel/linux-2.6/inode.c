@@ -259,7 +259,8 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 
     pvfs2_print("pvfs2_setattr: called on %s\n", dentry->d_name.name);
 
-    if (inode_change_ok(inode, iattr) == 0)
+    ret = inode_change_ok(inode, iattr);
+    if (ret == 0)
     {
         ret = inode_setattr(inode, iattr);
         pvfs2_print("pvfs2_setattr: inode_setattr returned %d\n", ret);
@@ -269,12 +270,6 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
             ret = pvfs2_inode_setattr(inode, iattr);
         }
     }
-    else
-    {
-        pvfs2_error("pvfs2_setattr: inode_change_ok failed "
-                    "with %d\n", ret);
-    }
-
     pvfs2_print("pvfs2_setattr: returning %d\n", ret);
     return ret;
 }

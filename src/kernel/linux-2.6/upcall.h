@@ -110,7 +110,7 @@ typedef struct
 
 typedef struct
 {
-    unsigned long op_tag;
+    uint64_t op_tag;
 } pvfs2_op_cancel_t;
 
 typedef struct

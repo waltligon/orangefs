@@ -176,7 +176,7 @@ static void __exit pvfs2_exit(void)
 static int hash_func(void *key, int table_size)
 {
     int tmp = 0;
-    int64_t *real_tag = (int64_t *)key;
+    uint64_t *real_tag = (uint64_t *)key;
     tmp += (int)(*real_tag);
     tmp = (tmp % table_size);
     return tmp;
@@ -184,7 +184,7 @@ static int hash_func(void *key, int table_size)
 
 static int hash_compare(void *key, struct qhash_head *link)
 {
-    int64_t *real_tag = (int64_t *)key;
+    uint64_t *real_tag = (uint64_t *)key;
     pvfs2_kernel_op_t *op = qhash_entry(
         link, pvfs2_kernel_op_t, list);
 

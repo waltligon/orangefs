@@ -157,8 +157,8 @@ static ssize_t pvfs2_devreq_read(
         {
             copy_to_user(buf, &magic, sizeof(int32_t));
             copy_to_user(buf + sizeof(int32_t),
-                         &cur_op->tag, sizeof(int64_t));
-            copy_to_user(buf + sizeof(int32_t) + sizeof(int64_t),
+                         &cur_op->tag, sizeof(uint64_t));
+            copy_to_user(buf + sizeof(int32_t) + sizeof(uint64_t),
                          &cur_op->upcall, sizeof(pvfs2_upcall_t));
         }
         else
@@ -194,7 +194,7 @@ static ssize_t pvfs2_devreq_writev(
     int num_remaining = max_downsize;
     int payload_size = 0;
     int32_t magic = 0;
-    int64_t tag = 0;
+    uint64_t tag = 0;
 
     buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!buffer)
@@ -221,8 +221,8 @@ static ssize_t pvfs2_devreq_writev(
     magic = *((int32_t *)ptr);
     ptr += sizeof(int32_t);
 
-    tag = *((int64_t *)ptr);
-    ptr += sizeof(int64_t);
+    tag = *((uint64_t *)ptr);
+    ptr += sizeof(uint64_t);
 
     /* lookup (and remove) the op based on the tag */
     hash_link = qhash_search_and_remove(htable_ops_in_progress, &(tag));
@@ -232,7 +232,7 @@ static ssize_t pvfs2_devreq_writev(
 	if (op)
 	{
 	    /* cut off magic and tag from payload size */
-	    payload_size -= (sizeof(int32_t) + sizeof(int64_t));
+	    payload_size -= (sizeof(int32_t) + sizeof(uint64_t));
 	    if (payload_size <= sizeof(pvfs2_downcall_t))
 	    {
 		/* copy the passed in downcall into the op */
@@ -325,7 +325,7 @@ static ssize_t pvfs2_devreq_writev(
     else
     {
         /* ignore downcalls that we're not interested in */
-	pvfs2_print("WARNING: No one's waiting for tag %Ld\n", Ld(tag));
+	pvfs2_print("WARNING: No one's waiting for tag %Lu\n", Lu(tag));
     }
     kmem_cache_free(dev_req_cache, buffer);
 

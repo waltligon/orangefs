@@ -209,7 +209,7 @@ int PINT_dev_test_unexpected(
     int ret = -1, avail = -1, i = 0;
     struct pollfd pfd;
     int32_t *magic = NULL;
-    int64_t *tag = NULL;
+    uint64_t *tag = NULL;
     void *buffer = NULL;
 
     /* prepare to read max upcall size (magic nr and tag included) */
@@ -306,7 +306,7 @@ int PINT_dev_test_unexpected(
         }
 
         /* make sure a payload is present */
-        if (ret < (sizeof(int32_t) + sizeof(int64_t) + 1))
+        if (ret < (sizeof(int32_t) + sizeof(uint64_t) + 1))
         {
             gossip_err("Error: short message from device "
                        "(got %d bytes).\n", ret);
@@ -316,14 +316,16 @@ int PINT_dev_test_unexpected(
         }
 
         magic = (int32_t*)buffer;
-        tag = (int64_t*)((unsigned long)buffer + sizeof(int32_t));
+        tag = (uint64_t*)((unsigned long)buffer + sizeof(int32_t));
 
         assert(*magic == pdev_magic);
 
-        info_array[*outcount].size = ret - sizeof(int32_t) - sizeof(int64_t);
+        info_array[*outcount].size =
+            (ret - sizeof(int32_t) - sizeof(uint64_t));
+
         /* shift buffer up so caller doesn't see header info */
-        info_array[*outcount].buffer = (void*)((unsigned long)buffer + 
-            sizeof(int32_t) + sizeof(int64_t));
+        info_array[*outcount].buffer = (void*)
+            ((unsigned long)buffer + sizeof(int32_t) + sizeof(uint64_t));
         info_array[*outcount].tag = *tag;
 
         (*outcount)++;
@@ -368,7 +370,7 @@ int PINT_dev_release_unexpected(
     {
         /* index backwards header size off of the buffer before freeing */
         buffer = (void*)((unsigned long)info->buffer - sizeof(int32_t) - 
-                         sizeof(int64_t));
+                         sizeof(uint64_t));
         free(buffer);
 
         ret = 0;
@@ -415,7 +417,7 @@ int PINT_dev_write_list(
     io_array[0].iov_base = &pdev_magic;
     io_array[0].iov_len = sizeof(int32_t);
     io_array[1].iov_base = &tag;
-    io_array[1].iov_len = sizeof(int64_t);
+    io_array[1].iov_len = sizeof(uint64_t);
 
     for (i=0; i<list_count; i++)
     {
