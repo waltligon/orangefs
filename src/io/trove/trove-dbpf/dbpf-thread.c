@@ -23,7 +23,7 @@
 extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
-extern gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
+extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 #ifdef __PVFS2_TROVE_THREADED__
 pthread_cond_t dbpf_op_cond = PTHREAD_COND_INITIALIZER;
@@ -81,10 +81,12 @@ int dbpf_do_one_work_cycle(int *out_count)
     dbpf_queued_op_t *cur_op = NULL;
     gen_mutex_t *context_mutex = NULL;
     TROVE_context_id cur_ctx_id = -1;
+#endif
 
     assert(out_count);
     *out_count = 0;
 
+#ifdef __PVFS2_TROVE_THREADED__
     do
     {
         /* grab next op from queue and mark it as in service */
@@ -122,7 +124,7 @@ int dbpf_do_one_work_cycle(int *out_count)
 
             cur_ctx_id = cur_op->op.context_id;
             context_mutex =
-                &dbpf_completion_queue_array_mutex[cur_ctx_id];
+                dbpf_completion_queue_array_mutex[cur_ctx_id];
             assert(context_mutex);
 
             /*
@@ -151,6 +153,7 @@ int dbpf_do_one_work_cycle(int *out_count)
 
     } while(--max_num_ops_to_service);
 #endif
+
     return 0;
 }
 

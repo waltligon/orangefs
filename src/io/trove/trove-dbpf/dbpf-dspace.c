@@ -33,7 +33,7 @@ extern pthread_cond_t dbpf_op_cond;
 #endif
 
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
-extern gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
+extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 
 #define DBPF_FSTAT fstat
@@ -928,7 +928,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 
     assert(dbpf_completion_queue_array[context_id]);
 
-    context_mutex = &dbpf_completion_queue_array_mutex[context_id];
+    context_mutex = dbpf_completion_queue_array_mutex[context_id];
     assert(context_mutex);
 
     *out_count_p = 0;
