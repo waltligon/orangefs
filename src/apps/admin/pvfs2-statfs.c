@@ -43,6 +43,8 @@ int main(int argc, char **argv)
     PVFS_sysresp_statfs resp_statfs;
     int i;
     PVFS_credentials creds;
+    struct PVFS_mgmt_server_stat* stat_array = NULL;
+    int outcount, overflow_flag;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -94,6 +96,7 @@ int main(int argc, char **argv)
     creds.uid = getuid();
     creds.gid = getgid();
 
+    /* gather normal statfs statistics from system interface */
     ret = PVFS_sys_statfs(cur_fs, creds, &resp_statfs);
     if(ret < 0)
     {
@@ -101,18 +104,57 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    printf("Aggregate statistics:\n");
-    printf("---------------------\n");
-    printf("number of servers: %d\n", resp_statfs.server_count);
-    printf("fs_id: %d\n", (int)resp_statfs.statfs_buf.fs_id);
-    printf("bytes available: %Ld\n", 
+    printf("\naggregate statistics:\n");
+    printf("---------------------------------------\n\n");
+    printf("\tfs_id: %d\n", (int)resp_statfs.statfs_buf.fs_id);
+    printf("\tnumber of servers: %d\n", resp_statfs.server_count);
+    printf("\tbytes available: %16Ld\n", 
 	(long long)resp_statfs.statfs_buf.bytes_available);
-    printf("bytes total: %Ld\n", 
+    printf("\tbytes total:     %16Ld\n", 
 	(long long)resp_statfs.statfs_buf.bytes_total);
     printf("\n");
 
-    PVFS_util_free_pvfstab(&mnt);
-    PVFS_sys_finalize();
+    /* now call management functions to determine per-server statistics */
+    stat_array = (struct PVFS_mgmt_server_stat*)malloc(resp_statfs.server_count
+	* sizeof(struct PVFS_mgmt_server_stat));
+    if(!stat_array)
+    {
+	perror("malloc");
+	return(-1);
+    }
+
+    ret = PVFS_mgmt_statfs_all(cur_fs, creds, resp_statfs.server_count,
+	&outcount, &overflow_flag, stat_array);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_statfs_all()", ret);
+	return(-1);
+    }
+
+    /* sanity check */
+    if(overflow_flag || outcount != resp_statfs.server_count)
+    {
+	fprintf(stderr, "Error: PVFS_mgmt_statfs_all() returned bad results.\n");
+	return(-1);
+    }
+
+    printf("\nindividual server statistics:\n");
+    printf("---------------------------------------\n\n");
+
+    for(i=0; i<outcount; i++)
+    {
+	printf("server: %s\n", stat_array[i].bmi_address);
+	printf("\tbytes available: %16Ld\n", (long long)stat_array[i].bytes_available);
+	printf("\tbytes total:     %16Ld\n", (long long)stat_array[i].bytes_total);
+	if(stat_array[i].flags & (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER))
+	    printf("\tmode: serving both metadata and I/O data\n");
+	else if(stat_array[i].flags & PVFS_MGMT_IO_SERVER)
+	    printf("\tmode: serving only I/O data\n");
+	else if(stat_array[i].flags & PVFS_MGMT_META_SERVER)
+	    printf("\tmode: serving only metadata\n");
+	
+	printf("\n");
+    }
 
     return(ret);
 }
