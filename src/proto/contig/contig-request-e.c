@@ -163,7 +163,7 @@ int do_encode_req(
 	return (0);
 
     case PVFS_SERV_CREATE:
-        size = sizeof(struct PVFS_server_req) + sizeof(int)
+        size = sizeof(struct PVFS_server_req) + sizeof(uint32_t)
             + PINT_ENC_GENERIC_HEADER_SIZE;
 
         /*
@@ -187,9 +187,9 @@ int do_encode_req(
                PINT_ENC_GENERIC_HEADER_SIZE);
         enc_msg = (void *)((char *)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
         memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
-        *((int *)((char *)enc_msg + sizeof(struct PVFS_server_req))) =
+        *((uint32_t *)((char *)enc_msg + sizeof(struct PVFS_server_req))) =
             request->u.create.handle_extent_array.extent_count;
-        memcpy(enc_msg + sizeof(struct PVFS_server_req) + sizeof(int),
+        memcpy(enc_msg + sizeof(struct PVFS_server_req) + sizeof(uint32_t),
                request->u.create.handle_extent_array.extent_array,
                (request->u.create.handle_extent_array.extent_count *
                 sizeof(PVFS_handle_extent)));
@@ -198,7 +198,7 @@ int do_encode_req(
 
     case PVFS_SERV_MKDIR:
 	size = sizeof(struct PVFS_server_req) +
-            sizeof(struct PVFS_object_attr) + sizeof(int) +
+            sizeof(struct PVFS_object_attr) + sizeof(uint32_t) +
 	    PINT_ENC_GENERIC_HEADER_SIZE;
 
 
@@ -236,9 +236,9 @@ int do_encode_req(
 	    PINT_ENC_GENERIC_HEADER_SIZE);
 	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
-        *((int *)((char *)enc_msg + sizeof(struct PVFS_server_req))) =
+        *((uint32_t *)((char *)enc_msg + sizeof(struct PVFS_server_req))) =
             request->u.mkdir.handle_extent_array.extent_count;
-        memcpy(enc_msg + sizeof(struct PVFS_server_req) + sizeof(int),
+        memcpy(enc_msg + sizeof(struct PVFS_server_req) + sizeof(uint32_t),
                request->u.mkdir.handle_extent_array.extent_array,
                (request->u.mkdir.handle_extent_array.extent_count *
                 sizeof(PVFS_handle_extent)));
@@ -247,7 +247,7 @@ int do_encode_req(
 	if (request->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE)
 	{
 	    /* handles */
-	    memcpy((enc_msg + sizeof(struct PVFS_server_req) + sizeof(int) +
+	    memcpy((enc_msg + sizeof(struct PVFS_server_req) + sizeof(uint32_t) +
                    (request->u.mkdir.handle_extent_array.extent_count *
                     sizeof(PVFS_handle_extent))),
 		   request->u.mkdir.attr.u.meta.dfile_array,
