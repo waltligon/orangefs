@@ -114,6 +114,13 @@ void *dbpf_thread_function(void *ptr)
                 wait_time.tv_sec++;
             }
 
+            /*
+              the only time this interface lock is locked is
+              in dbpf_thread_finalize above.  if that's the
+              case, we want to make sure to not be in a timed
+              wait.  we'll be cancelled and shouldn't return
+              while waiting for this lock.
+            */
             gen_mutex_lock(dbpf_interface_lock);
             gen_mutex_lock(dbpf_op_incoming_cond_mutex);
             ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,

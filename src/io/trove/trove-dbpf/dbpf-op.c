@@ -36,6 +36,7 @@ void dbpf_queued_op_init(
 
     INIT_QLIST_HEAD(&q_op_p->link);
     gen_mutex_init(&q_op_p->mutex);
+    q_op_p->state         = 0;
     q_op_p->op.type       = type;
     q_op_p->op.state      = OP_NOT_QUEUED;
     q_op_p->op.handle     = handle;
