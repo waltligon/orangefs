@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
@@ -46,6 +47,7 @@ int PINT_bucket_initialize(void)
         PINT_fsid_config_cache_table =
             qhash_init(hash_fsid_compare,hash_fsid,67);
     }
+    srand((unsigned int)time(NULL));
     return (PINT_fsid_config_cache_table ? 0 : -ENOMEM);
 }
 
@@ -152,7 +154,7 @@ int PINT_handle_load_mapping(
 
 /* PINT_bucket_get_next_meta()
  *
- * returns the bmi address of the next server
+ * returns the bmi address of a random server
  * that should be used to store a new piece of metadata.  This
  * function is responsible for fairly distributing the metadata
  * storage responsibility to all servers.
@@ -170,7 +172,7 @@ int PINT_bucket_get_next_meta(
     bmi_addr_t *meta_addr,
     PVFS_handle_extent_array *meta_handle_extent_array)
 {
-    int ret = -EINVAL;
+    int ret = -EINVAL, jitter = 0, num_meta_servers = 0;
     char *meta_server_bmi_str = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
@@ -188,19 +190,25 @@ int PINT_bucket_get_next_meta(
             assert(cur_config_cache->fs);
             assert(cur_config_cache->meta_server_cursor);
 
-            cur_mapping =
-                PINT_llist_head(cur_config_cache->meta_server_cursor);
-            if (!cur_mapping)
+            num_meta_servers = PINT_llist_count(
+                cur_config_cache->fs->meta_handle_ranges);
+
+            jitter = (rand() % num_meta_servers);
+            while(jitter-- > -1)
             {
-                cur_config_cache->meta_server_cursor =
-                    cur_config_cache->fs->meta_handle_ranges;
                 cur_mapping =
                     PINT_llist_head(cur_config_cache->meta_server_cursor);
-                assert(cur_mapping);
+                if (!cur_mapping)
+                {
+                    cur_config_cache->meta_server_cursor =
+                        cur_config_cache->fs->meta_handle_ranges;
+                    cur_mapping =
+                        PINT_llist_head(cur_config_cache->meta_server_cursor);
+                    assert(cur_mapping);
+                }
+                cur_config_cache->meta_server_cursor =
+                    PINT_llist_next(cur_config_cache->meta_server_cursor);
             }
-            cur_config_cache->meta_server_cursor =
-                PINT_llist_next(cur_config_cache->meta_server_cursor);
-
             meta_server_bmi_str = PINT_config_get_host_addr_ptr(
                 config,cur_mapping->alias_mapping->host_alias);
 
