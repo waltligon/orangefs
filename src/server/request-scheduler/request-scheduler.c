@@ -186,6 +186,8 @@ int PINT_req_sched_finalize(
  * returns 0 on success, -errno on failure
  * NOTE: a handle value of 0 and a return value of 0 indicates
  * that the request does not operate on any particular handle
+ * NOTE: a return value of 1 indicates that we can let this operation pass
+ * through without any scheduling
  *
  * TODO: we need to fix this function and all of its callers if we 
  * define something besides "0" to represent an invalid handle value
@@ -269,7 +271,7 @@ int PINT_req_sched_target_handle(
 	*fs_id = req->u.flush.fs_id;
 	return (0);
     case PVFS_SERV_MGMT_NOOP:
-	return (0);
+	return (1);
     case PVFS_SERV_MGMT_PERF_MON:
 	return (0);
     case PVFS_SERV_MGMT_EVENT_MON:
@@ -332,6 +334,11 @@ int PINT_req_sched_post(
     if (ret < 0)
     {
 	return (ret);
+    }
+    if(ret == 1)
+    {
+        *out_id = 0;
+        return(1);
     }
 
     /* NOTE: handle == 0 is a special case, the request isn't
@@ -722,6 +729,14 @@ int PINT_req_sched_release(
      * need to fill in the out_id
      */
     *out_id = 0;
+
+    if(in_completed_id == 0)
+    {
+        /* the scheduler let this operation pass through; no infrastructure
+         * to clean up
+         */
+        return(1);
+    }
 
     /* retrieve the element directly from the id */
     tmp_element = id_gen_fast_lookup(in_completed_id);
