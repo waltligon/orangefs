@@ -790,7 +790,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
       being serviced immediately.  We'll check progress in the 
       aio_progress_notification callback method
     */
-    aiocb_p = (struct aiocb *) malloc(AIOCB_ARRAY_SZ*sizeof(struct aiocb));
+    aiocb_p = (struct aiocb *)malloc(AIOCB_ARRAY_SZ*sizeof(struct aiocb));
     if (aiocb_p == NULL)
     {
         dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, handle);

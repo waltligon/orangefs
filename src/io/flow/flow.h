@@ -123,7 +123,7 @@ struct flow_descriptor
 	/***********************************************************/
     /* fields reserved strictly for internal use */
 
-    gen_mutex_t flow_mutex;
+    gen_mutex_t *flow_mutex;
     int flowproto_id;		/* identifies which protocol owns this */
     void *flow_protocol_data;	/* used by flow protocols */
     /* called upon completion before callback */

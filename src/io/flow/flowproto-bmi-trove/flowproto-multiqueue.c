@@ -120,17 +120,17 @@ static inline void bmi_send_callback_wrapper(void *user_ptr,
 {
     struct fp_private_data* flow_data = 
 	PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
-    gen_mutex_lock(&flow_data->parent->flow_mutex);
+    gen_mutex_lock(flow_data->parent->flow_mutex);
 
     bmi_send_callback_fn(user_ptr, actual_size, error_code, 0);
     if(flow_data->parent->state == FLOW_COMPLETE)
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
 	FLOW_CLEANUP(flow_data);
     }
     else
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
     }
     return;
 };
@@ -140,16 +140,16 @@ static inline void bmi_recv_callback_wrapper(void *user_ptr,
 {
     struct fp_private_data* flow_data = 
 	PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
-    gen_mutex_lock(&flow_data->parent->flow_mutex);
+    gen_mutex_lock(flow_data->parent->flow_mutex);
     bmi_recv_callback_fn(user_ptr, actual_size, error_code);
     if(flow_data->parent->state == FLOW_COMPLETE)
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
 	FLOW_CLEANUP(flow_data);
     }
     else
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
     }
     return;
 };
@@ -159,16 +159,16 @@ static inline void trove_read_callback_wrapper(void *user_ptr,
     struct fp_private_data* flow_data = 
 	PRIVATE_FLOW(((struct
 	result_chain_entry*)user_ptr)->q_item->parent);
-    gen_mutex_lock(&flow_data->parent->flow_mutex);
+    gen_mutex_lock(flow_data->parent->flow_mutex);
     trove_read_callback_fn(user_ptr, error_code);
     if(flow_data->parent->state == FLOW_COMPLETE)
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
 	FLOW_CLEANUP(flow_data);
     }
     else
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
     }
     return;
 };
@@ -178,16 +178,16 @@ static inline void trove_write_callback_wrapper(void *user_ptr,
     struct fp_private_data* flow_data = 
 	PRIVATE_FLOW(((struct
 	result_chain_entry*)user_ptr)->q_item->parent);
-    gen_mutex_lock(&flow_data->parent->flow_mutex);
+    gen_mutex_lock(flow_data->parent->flow_mutex);
     trove_write_callback_fn(user_ptr, error_code);
     if(flow_data->parent->state == FLOW_COMPLETE)
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
 	FLOW_CLEANUP(flow_data);
     }
     else
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
     }
     return;
 };
@@ -209,16 +209,16 @@ static inline void mem_to_bmi_callback_wrapper(void *user_ptr,
 {
     struct fp_private_data* flow_data = 
 	PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
-    gen_mutex_lock(&flow_data->parent->flow_mutex);
+    gen_mutex_lock(flow_data->parent->flow_mutex);
     mem_to_bmi_callback_fn(user_ptr, actual_size, error_code);
     if(flow_data->parent->state == FLOW_COMPLETE)
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
 	FLOW_CLEANUP(flow_data);
     }
     else
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
     }
     return;
 };
@@ -228,16 +228,16 @@ static inline void bmi_to_mem_callback_wrapper(void *user_ptr,
 {
     struct fp_private_data* flow_data = 
 	PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
-    gen_mutex_lock(&flow_data->parent->flow_mutex);
+    gen_mutex_lock(flow_data->parent->flow_mutex);
     bmi_to_mem_callback_fn(user_ptr, actual_size, error_code);
     if(flow_data->parent->state == FLOW_COMPLETE)
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
 	FLOW_CLEANUP(flow_data);
     }
     else
     {
-	gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	gen_mutex_unlock(flow_data->parent->flow_mutex);
     }
     return;
 };
@@ -427,16 +427,16 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	    qlist_add_tail(&flow_data->prealloc_array[i].list_link,
 		&flow_data->empty_list);
 	}
-	gen_mutex_lock(&flow_data->parent->flow_mutex);
+	gen_mutex_lock(flow_data->parent->flow_mutex);
 	bmi_to_mem_callback_fn(&(flow_data->prealloc_array[0]), 0, 0);
 	if(flow_data->parent->state == FLOW_COMPLETE)
 	{
-	    gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	    gen_mutex_unlock(flow_data->parent->flow_mutex);
 	    FLOW_CLEANUP(flow_data);
 	}
 	else
 	{
-	    gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	    gen_mutex_unlock(flow_data->parent->flow_mutex);
 	}
     }
     else if(flow_d->src.endpoint_id == MEM_ENDPOINT &&
@@ -453,16 +453,16 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	    qlist_add_tail(&flow_data->prealloc_array[i].list_link,
 		&flow_data->empty_list);
 	}
-	gen_mutex_lock(&flow_data->parent->flow_mutex);
+	gen_mutex_lock(flow_data->parent->flow_mutex);
 	mem_to_bmi_callback_fn(&(flow_data->prealloc_array[0]), 0, 0);
 	if(flow_data->parent->state == FLOW_COMPLETE)
 	{
-	    gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	    gen_mutex_unlock(flow_data->parent->flow_mutex);
 	    FLOW_CLEANUP(flow_data);
 	}
 	else
 	{
-	    gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	    gen_mutex_unlock(flow_data->parent->flow_mutex);
 	}
     }
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -470,7 +470,7 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	flow_d->dest.endpoint_id == BMI_ENDPOINT)
     {
 	flow_data->initial_posts = BUFFERS_PER_FLOW;
-	gen_mutex_lock(&flow_data->parent->flow_mutex);
+	gen_mutex_lock(flow_data->parent->flow_mutex);
 	for(i=0; i<BUFFERS_PER_FLOW; i++)
 	{
 	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
@@ -480,12 +480,12 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	}
 	if(flow_data->parent->state == FLOW_COMPLETE)
 	{
-	    gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	    gen_mutex_unlock(flow_data->parent->flow_mutex);
 	    FLOW_CLEANUP(flow_data);
 	}
 	else
 	{
-	    gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	    gen_mutex_unlock(flow_data->parent->flow_mutex);
 	}
     }
     else if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
@@ -505,16 +505,16 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	    &flow_data->prealloc_array[0];
 	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
 	    "flowproto-multiqueue forcing trove_write_callback_fn.\n");
-	gen_mutex_lock(&flow_data->parent->flow_mutex);
+	gen_mutex_lock(flow_data->parent->flow_mutex);
 	trove_write_callback_fn(&(flow_data->prealloc_array[0].result_chain), 0);
 	if(flow_data->parent->state == FLOW_COMPLETE)
 	{
-	    gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	    gen_mutex_unlock(flow_data->parent->flow_mutex);
 	    FLOW_CLEANUP(flow_data);
 	}
 	else
 	{
-	    gen_mutex_unlock(&flow_data->parent->flow_mutex);
+	    gen_mutex_unlock(flow_data->parent->flow_mutex);
 	}
     }
 #endif
