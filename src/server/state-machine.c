@@ -85,11 +85,17 @@ PINT_state_machine_s *PINT_server_op_table[PVFS_MAX_SERVER_OP+1] = {NULL};
 int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
 					     job_status_s *ret)
 {
-    PINT_decode(s_op->unexp_bmi_buff.buffer,
+    int retval = -1;
+
+    retval = PINT_decode(s_op->unexp_bmi_buff.buffer,
 		PINT_ENCODE_REQ,
 		&s_op->decoded,
 		s_op->unexp_bmi_buff.addr,
 		s_op->unexp_bmi_buff.size);
+    if(retval < 0)
+    {
+	return(retval);
+    }
 
     s_op->req  = (struct PVFS_server_req *) s_op->decoded.buffer;
     assert(s_op->req != NULL);
