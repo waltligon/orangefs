@@ -161,8 +161,6 @@ int PVFS_sys_setattr(
           other than the common set since it's likely something
           changed in the attr obj that caused this setattr
         */
-        fprintf(stderr,"CHANGING ATTR MASK FROM %d to %d\n",
-                pinode_ptr->attr.mask, PVFS_ATTR_COMMON_ALL);
         pinode_ptr->attr.mask = PVFS_ATTR_COMMON_ALL;
         PINT_pcache_set_valid(pinode_ptr);
         phelper_release_pinode(pinode_ptr);
