@@ -161,7 +161,7 @@ int main(int argc, char **argv)
     /* loop for every, grabbing stats at regular intervals */
     while(1)
     {
-	ret = PVFS_mgmt_perf_mon_list(creds, perf_matrix, &end_time_ms,
+	ret = PVFS_mgmt_perf_mon_list(cur_fs, creds, perf_matrix, &end_time_ms,
 	    addr_array, next_id_array, io_server_count, HISTORY);
 	if(ret < 0)
 	{

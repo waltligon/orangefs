@@ -60,6 +60,7 @@ machine pvfs2_client_mgmt_event_mon_list_sm(
 %%
 
 int PVFS_mgmt_event_mon_list(
+    PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     struct PVFS_mgmt_event** event_matrix,
     PVFS_id_gen_t* addr_array,
@@ -86,6 +87,7 @@ int PVFS_mgmt_event_mon_list(
 
     sm_p->cred_p = &credentials;
 
+    sm_p->u.event_mon_list.fs_id = fs_id;
     sm_p->u.event_mon_list.event_matrix = event_matrix;
     sm_p->u.event_mon_list.server_count = server_count;
     sm_p->u.event_mon_list.event_count = event_count;
@@ -153,7 +155,7 @@ static int mgmt_event_mon_list_setup_msgpair(PINT_client_sm *sm_p,
 	    *sm_p->cred_p,
 	    sm_p->u.event_mon_list.event_count);
 
-	msg_p->fs_id = 0;
+	msg_p->fs_id = sm_p->u.event_mon_list.fs_id;
 	msg_p->handle = PVFS_HANDLE_NULL;
 	msg_p->comp_fn = event_mon_list_comp_fn;
 	msg_p->svr_addr = sm_p->u.event_mon_list.addr_array[i];

@@ -100,6 +100,7 @@ int PVFS_mgmt_get_server_array(
     int* inout_count_p);
 
 int PVFS_mgmt_noop(
+    PVFS_fs_id,
     PVFS_credentials credentials,
     PVFS_id_gen_t addr);
 
@@ -139,6 +140,7 @@ int PVFS_mgmt_statfs_all(
     int* inout_count_p);
 
 int PVFS_mgmt_perf_mon_list(
+    PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     struct PVFS_mgmt_perf_stat** perf_matrix,
     uint64_t* end_time_ms,
@@ -148,6 +150,7 @@ int PVFS_mgmt_perf_mon_list(
     int history_count);
 
 int PVFS_mgmt_event_mon_list(
+    PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     struct PVFS_mgmt_event** event_matrix,
     PVFS_id_gen_t* addr_array,

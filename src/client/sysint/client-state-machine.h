@@ -217,6 +217,7 @@ struct PINT_client_mgmt_statfs_list_sm
 
 struct PINT_client_mgmt_perf_mon_list_sm
 {
+    PVFS_fs_id fs_id;
     struct PVFS_mgmt_perf_stat** perf_matrix;
     uint64_t* end_time_ms;
     int server_count; 
@@ -227,6 +228,7 @@ struct PINT_client_mgmt_perf_mon_list_sm
 
 struct PINT_client_mgmt_event_mon_list_sm
 {
+    PVFS_fs_id fs_id;
     struct PVFS_mgmt_event** event_matrix;
     int server_count; 
     int event_count; 

@@ -246,7 +246,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     for(i=0; i<count; i++)
     {
 	printf("   %s ", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(creds, addr_array[i]);
+	ret = PVFS_mgmt_noop(fsid, creds, addr_array[i]);
 	if(ret == 0)
 	{
 	    printf("Ok\n");
@@ -285,7 +285,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     for(i=0; i<count; i++)
     {
 	printf("   %s ", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(creds, addr_array[i]);
+	ret = PVFS_mgmt_noop(fsid, creds, addr_array[i]);
 	if(ret == 0)
 	{
 	    printf("Ok\n");

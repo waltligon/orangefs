@@ -143,7 +143,7 @@ int main(int argc, char **argv)
     }
 
     /* grap current events */
-    ret = PVFS_mgmt_event_mon_list(creds, event_matrix, addr_array, 
+    ret = PVFS_mgmt_event_mon_list(cur_fs, creds, event_matrix, addr_array, 
 	io_server_count, EVENT_DEPTH);
     if(ret < 0)
     {
