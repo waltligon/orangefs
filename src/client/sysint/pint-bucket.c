@@ -85,6 +85,7 @@ int PINT_bucket_finalize(void)
         }
     }
     qhash_finalize(PINT_fsid_config_cache_table);
+    PINT_fsid_config_cache_table = 0;  /* so future initialize happens */
     return(0);
 }
 
