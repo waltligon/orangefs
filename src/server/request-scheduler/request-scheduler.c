@@ -705,9 +705,6 @@ static int handle_from_request(struct PVFS_server_req_s*
 			*handle = req->u.rmdirent.parent_handle;
 			return(0);
 			break;
-		case PVFS_SERV_ALLOCATE:
-			return(-EINVAL);
-			break;
 		case PVFS_SERV_TRUNCATE:
 			*handle = req->u.truncate.handle;
 			return(0);

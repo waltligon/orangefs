@@ -18,7 +18,7 @@
 #endif
 
 
-#define MAX_MSGS 11
+#define MAX_MSGS 10
 
 #define RET_CHECK(__name) if(ret != 0) {printf(__name);printf("ret=%d\n",ret);exit(-1);}
 
@@ -135,23 +135,6 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
                         printf("PVFS_servreq_truncate->fs_id = %d\n",(int) my_req->u.truncate.fs_id );
 			arrow(direction);
                         printf("PVFS_servreq_truncate->size = %d\n", (int)my_req->u.truncate.size );
-			arrow(direction);
-                        printf("======================================\n");
-                        break;
-
-                case PVFS_SERV_ALLOCATE: // not really defined
-			arrow(direction);
-                        printf("PVFS_SERV_ALLOCATE structure:\n");
-			arrow(direction);
-                        printf("op = %d \n",(int) my_req->op);
-			arrow(direction);
-                        printf("rsize = %d\n",(int) my_req->rsize);
-			arrow(direction);
-                        printf("credentials.uid = %d\n",(int) my_req->credentials.uid);
-			arrow(direction);
-                        printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
-			arrow(direction);
-                        printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
 			arrow(direction);
                         printf("======================================\n");
                         break;
@@ -476,14 +459,6 @@ int main(int argc, char **argv)
 	break;
 
 	case 7:
-        request->op = PVFS_SERV_ALLOCATE;
-	request->rsize = 666;
-	request->credentials.uid = 420;
-	request->credentials.gid = 420;
-	request->credentials.perms = 420;
-	break;
-
-	case 8:
 	request->op = PVFS_SERV_LOOKUP_PATH;
 	request->rsize = 666;
 	request->credentials.uid = 420;
@@ -495,7 +470,7 @@ int main(int argc, char **argv)
         request->u.lookup_path.attrmask = 33333;
 	break;
 
-	case 9:
+	case 8:
         request->op = PVFS_SERV_CREATEDIRENT;
 	request->rsize = 666;
 	request->credentials.uid = 420;
@@ -507,7 +482,7 @@ int main(int argc, char **argv)
         request->u.crdirent.fs_id = 333333;
 	break;
 
-	case 10:
+	case 9:
         request->op = PVFS_SERV_RMDIRENT;
 	request->rsize = 666;
 	request->credentials.uid = 420;

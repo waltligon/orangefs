@@ -124,7 +124,6 @@ int do_decode_req(
 	case PVFS_SERV_GETATTR:
 	case PVFS_SERV_REMOVE:
 	case PVFS_SERV_TRUNCATE:
-	case PVFS_SERV_ALLOCATE:
 	case PVFS_SERV_GETCONFIG:
 	    return(0);
 	default:

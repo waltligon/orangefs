@@ -326,7 +326,6 @@ int do_encode_req(
 	case PVFS_SERV_GETATTR:
 	case PVFS_SERV_REMOVE:
 	case PVFS_SERV_TRUNCATE:
-	case PVFS_SERV_ALLOCATE:
 	    size = sizeof( struct PVFS_server_req_s ) + header_size;
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)size, 
 		BMI_SEND ) ;

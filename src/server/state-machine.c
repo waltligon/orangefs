@@ -64,40 +64,9 @@ extern PINT_state_machine_s io;
 extern PINT_state_machine_s remove_;
 extern PINT_state_machine_s rmdirent;
 
-/* DALE - fill in the rest of these please - WBL */
-PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
-{
-    NULL,              /* invalid          */
-    NULL,              /* noop             */
-    &create,           /* create           */
-    &remove_,          /* remove           */
-    &io,               /* io               */
-    NULL,              /* 5                */
-    NULL,              /* batch            */ 
-    &get_attr,         /* get attrib       */
-    &set_attr,         /* set attrib       */
-    NULL,              /* geteattr         */
-    NULL,              /* 10               */
-    &lookup,           /* lookup           */
-    NULL,              /* getdist ????     */
-    &crdirent,         /* createdir ent    */
-    &rmdirent,         /* rmdirent         */
-    NULL,              /* 15               */
-    NULL,              /* allocate         */
-    NULL,              /* truncate         */
-    &mkdir_,           /* mkdir            */
-    NULL,              /* rmdir            */
-    &readdir_,	       /* readdir - 20     */
-    NULL,              /* statfs           */
-    NULL,              /* iostatfs         */
-    &get_config,       /* get config       */
-    /*                                     */
-    /* NULL's continue for a while...      */
-    /*                                     */
-    NULL               /* extension !99!   */
-};
-
-
+/* table of state machines, indexed based on PVFS_server_op enumeration */
+/* NOTE: this table is initialized at run time in PINT_state_machine_init() */
+PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] = {NULL};
 
 /* 
  * Function: PINT_state_machine_initialize_unexpected(s_op,ret)
@@ -167,6 +136,22 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
 int PINT_state_machine_init(void)
 {
     int i;
+
+    /* fill in indexes for each supported request type */
+    PINT_server_op_table[PVFS_SERV_INVALID] = NULL;
+    PINT_server_op_table[PVFS_SERV_CREATE] = &create;
+    PINT_server_op_table[PVFS_SERV_REMOVE] = &remove_;
+    PINT_server_op_table[PVFS_SERV_IO] = &io;
+    PINT_server_op_table[PVFS_SERV_GETATTR] = &get_attr;
+    PINT_server_op_table[PVFS_SERV_SETATTR] = &set_attr;
+    PINT_server_op_table[PVFS_SERV_LOOKUP_PATH] = &lookup;
+    PINT_server_op_table[PVFS_SERV_CREATEDIRENT] = &crdirent;
+    PINT_server_op_table[PVFS_SERV_RMDIRENT] = &rmdirent;
+    PINT_server_op_table[PVFS_SERV_MKDIR] = &mkdir_;
+    PINT_server_op_table[PVFS_SERV_READDIR] = &readdir_;
+    PINT_server_op_table[PVFS_SERV_GETCONFIG] = &get_config;
+
+    /* initialize each state machine */
     for (i = 0 ; i < SERVER_OP_TABLE_SIZE; i++)
     {
 	if(PINT_server_op_table[i] && PINT_server_op_table[i]->init_fun)
