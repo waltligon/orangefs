@@ -13,6 +13,8 @@ int initialize_sysint()
     ret = parse_pvfstab(NULL,&pvfs_helper.mnt);
     if (ret > -1)
     {
+        gossip_disable();
+
         /* init the system interface */
         ret = PVFS_sys_initialize(pvfs_helper.mnt,
                                   &pvfs_helper.resp_init);
