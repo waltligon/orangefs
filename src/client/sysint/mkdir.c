@@ -196,6 +196,8 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	goto return_error;
     }
 
+    ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
     if (ack_p->status < 0 )
     {
 	/* this could fail for many reasons, EEXISTS will probbably be the
