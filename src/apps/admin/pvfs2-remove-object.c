@@ -200,17 +200,6 @@ int main(int argc, char **argv)
         }
     }
 
-    if (user_opts->remove_object_only)
-    {
-        fprintf(stderr,"Attempting to remove object %Lu,%d\n",
-                Lu(ref.handle), ref.fs_id);
-    }
-    else
-    {
-        fprintf(stderr,"Attempting to remove dirent %s under %Lu,%d\n",
-                user_opts->dirent_name, Lu(ref.handle), ref.fs_id);
-    }
-
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
@@ -222,6 +211,9 @@ int main(int argc, char **argv)
 
     if (user_opts->remove_object_only)
     {
+        fprintf(stderr,"Attempting to remove object %Lu,%d\n",
+                Lu(ref.handle), ref.fs_id);
+
         ret = PVFS_mgmt_remove_object(ref, &credentials);
         if (ret)
         {
@@ -230,13 +222,18 @@ int main(int argc, char **argv)
     }
     else
     {
-        ret = PVFS_mgmt_remove_dirent(ref, user_opts->dirent_name,
-                                      &credentials);
+        fprintf(stderr,"Attempting to remove dirent \"%s\" under %Lu,%d"
+                "\n", user_opts->dirent_name, Lu(ref.handle), ref.fs_id);
+
+        ret = PVFS_mgmt_remove_dirent(
+            ref, user_opts->dirent_name, &credentials);
         if (ret)
         {
             PVFS_perror("PVFS_mgmt_remove_dirent", ret);
         }
     }
+
+    free(user_opts);
     return ret;
 }
 
@@ -248,4 +245,3 @@ int main(int argc, char **argv)
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-
