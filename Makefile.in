@@ -244,9 +244,7 @@ endif
 # enable IB if configure requested it
 
 ifdef BUILD_IB
-    # Hack out TCP since its select() on the listening socket gets in
-    # the way and makes all IB operations very slow.
-    CFLAGS := $(filter-out -D__STATIC_METHOD_BMI_TCP__, $(CFLAGS))
+    # other settings in bmi_ib/module.mk.in
     CFLAGS += -D__STATIC_METHOD_BMI_IB__
     IBLIBS := -L@IB_HOME@/lib \
 	     -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
