@@ -112,6 +112,7 @@ struct PINT_client_remove_sm {
     PVFS_handle                  *datafile_handles;
     PINT_client_sm_msgpair_state *msgpair;        /* for datafile remove */
     int                           stored_error_code;
+    int				  retry_count;
 };
 
 /* PINT_client_create_sm */
