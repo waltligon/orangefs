@@ -22,6 +22,12 @@ int gui_comm_stats_retrieve(struct PVFS_mgmt_server_stat **svr_stat,
 			    int *svr_stat_ct);
 
 /* communication interface builds list of file systems as well */
+enum {
+    GUI_FSLIST_MNTPT = 0,
+    GUI_FSLIST_SERVER,
+    GUI_FSLIST_FSNAME,
+    GUI_FSLIST_FSID
+};
 extern GtkListStore *gui_comm_fslist;
 
 /* data preparation interface */

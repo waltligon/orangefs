@@ -26,28 +26,40 @@ void gui_fsview_popup(void)
     gtk_tree_view_append_column(GTK_TREE_VIEW(fsview), col);
     renderer = gtk_cell_renderer_text_new();
     gtk_tree_view_column_pack_start(col, renderer, TRUE);
-    gtk_tree_view_column_add_attribute(col, renderer, "text", 0);
+    gtk_tree_view_column_add_attribute(col,
+				       renderer,
+				       "text",
+				       GUI_FSLIST_MNTPT);
 
     col = gtk_tree_view_column_new();
     gtk_tree_view_column_set_title(col, "Contact Server");
     gtk_tree_view_append_column(GTK_TREE_VIEW(fsview), col);
     renderer = gtk_cell_renderer_text_new();
     gtk_tree_view_column_pack_start(col, renderer, TRUE);
-    gtk_tree_view_column_add_attribute(col, renderer, "text", 1);
+    gtk_tree_view_column_add_attribute(col,
+				       renderer,
+				       "text",
+				       GUI_FSLIST_SERVER);
 
     col = gtk_tree_view_column_new();
     gtk_tree_view_column_set_title(col, "File System Name");
     gtk_tree_view_append_column(GTK_TREE_VIEW(fsview), col);
     renderer = gtk_cell_renderer_text_new();
     gtk_tree_view_column_pack_start(col, renderer, TRUE);
-    gtk_tree_view_column_add_attribute(col, renderer, "text", 2);
+    gtk_tree_view_column_add_attribute(col,
+				       renderer,
+				       "text",
+				       GUI_FSLIST_FSNAME);
 
     col = gtk_tree_view_column_new();
     gtk_tree_view_column_set_title(col, "FSID");
     gtk_tree_view_append_column(GTK_TREE_VIEW(fsview), col);
     renderer = gtk_cell_renderer_text_new();
     gtk_tree_view_column_pack_start(col, renderer, TRUE);
-    gtk_tree_view_column_add_attribute(col, renderer, "text", 3);
+    gtk_tree_view_column_add_attribute(col,
+				       renderer,
+				       "text",
+				       GUI_FSLIST_FSID);
 
     gtk_tree_view_set_model(GTK_TREE_VIEW(fsview),
 			    GTK_TREE_MODEL(gui_comm_fslist));
@@ -59,7 +71,7 @@ void gui_fsview_popup(void)
     gtk_tree_selection_set_mode(selection, GTK_SELECTION_BROWSE);
 
     /* drop the view in a container and go to town */
-    dialog = gtk_dialog_new_with_buttons("File System Select",
+    dialog = gtk_dialog_new_with_buttons("Select File System",
 					 GTK_WINDOW_TOPLEVEL,
 					 GTK_DIALOG_DESTROY_WITH_PARENT,
 					 GTK_STOCK_OK,
@@ -102,17 +114,18 @@ static void gui_fsview_response(GtkDialog *dialog,
 						&model /* output */,
 						&iter))
 	    {
-		gchar *svr, *fs;
+		gchar *server, *fsname;
 		gint fsid;
 
 		gtk_tree_model_get(model, &iter,
-				   1, &svr,
-				   2, &fs,
-				   3, &fsid,
+				   GUI_FSLIST_SERVER, &server,
+				   GUI_FSLIST_FSNAME, &fsname,
+				   GUI_FSLIST_FSID, &fsid,
 				   -1);
 
-		gui_comm_set_active_fs(svr, fs, fsid);
-		g_free(svr);
+		gui_comm_set_active_fs(server, fsname, fsid);
+		g_free(server);
+		g_free(fsname);
 	    }
 
 	    /* fall through to destroy */

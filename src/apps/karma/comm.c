@@ -75,16 +75,27 @@ int gui_comm_setup(void)
 
 	gtk_list_store_set(gui_comm_fslist,
 			   &iter,
-			   0, mnt.ptab_array[i].mnt_dir,
-			   1, msgbuf,
-			   2, mnt.ptab_array[i].pvfs_fs_name,
-			   3, (gint) cur_fs_id,
+			   GUI_FSLIST_MNTPT, mnt.ptab_array[i].mnt_dir,
+			   GUI_FSLIST_SERVER, msgbuf,
+			   GUI_FSLIST_FSNAME, mnt.ptab_array[i].pvfs_fs_name,
+			   GUI_FSLIST_FSID, (gint) resp_init.fsid_list[0],
 			   -1);
     }
 
     creds.uid = getuid();
     creds.gid = getgid();
 
+    /* print message indicating what file system we are monitoring */
+    snprintf(msgbuf,
+	     128,
+	     "monitoring %s by default.",
+	     mnt.ptab_array[0].pvfs_config_server);
+    gui_message_new(msgbuf);
+
+    /* prepare config server name for passing to
+     * gui_comm_set_active_fs() - this is the only time that it isn't
+     * quite in the right format.
+     */
     for (j=strlen(mnt.ptab_array[0].pvfs_config_server); j > 0; j--)
     {
 	if (mnt.ptab_array[0].pvfs_config_server[j] == '/') break;
