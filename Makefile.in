@@ -101,16 +101,6 @@ CFLAGS += -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include
   # add all module directories into include path
 CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 
-  # add GM path into include path
-ifdef BUILD_GM
-	CFLAGS += -I @GM_HOME@/include
-	# TODO: later on we will want the ability to modify this at configure
-	# time
-	CFLAGS += -DENABLE_GM_REGISTER
-	LDFLAGS += -L @GM_HOME@/lib
-	LIBS += -lgm
-endif
-
 ################################################################
 # Setup component specific flags
 
@@ -120,6 +110,20 @@ SERVERLIBS = @LIBS@ -ldb -lrt -lpthread
 # the client libraries are not threaded (at the moment at least)
 #    and therefore can disable locking in the I/O subsystems
 LIBCFLAGS = -D__GEN_NULL_LOCKING__
+
+################################################################
+# enable GM if configure detected it
+
+ifdef BUILD_GM
+	CFLAGS += -I @GM_HOME@/include
+	CFLAGS += -D__STATIC_METHOD_BMI_GM__
+	# TODO: later on we will want the ability to modify this at configure
+	# time
+	CFLAGS += -DENABLE_GM_REGISTER
+	LDFLAGS += -L @GM_HOME@/lib
+	LIBS += -lgm
+	SERVERLIBS += -lgm
+endif
 
 #################################################################
 # Starter variables 

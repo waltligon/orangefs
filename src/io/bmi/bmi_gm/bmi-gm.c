@@ -6,6 +6,10 @@
 
 /* GM implementation of a BMI method */
 
+/* TODO: implement contexts */
+/* TODO: implement max idle time */
+/* TODO: implement test context */
+
 #include<errno.h>
 #include<string.h>
 #include<unistd.h>
@@ -20,7 +24,7 @@
 #include "quicklist.h"
 #include "bmi-gm-regcache.h"
 #include "bmi-gm-bufferpool.h"
-#include<config.h>
+#include "pvfs2-config.h"
 
 #include<gm.h>
 
@@ -42,17 +46,18 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     method_addr_p dest,
 		     void *buffer,
 		     bmi_size_t size,
-		     bmi_size_t expected_size,
 		     bmi_flag_t buffer_flag,
 		     bmi_msg_tag_t tag,
-		     void *user_ptr);
+		     void *user_ptr,
+		     bmi_context_id context_id);
 int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       method_addr_p dest,
 			       void *buffer,
 			       bmi_size_t size,
 			       bmi_flag_t buffer_flag,
 			       bmi_msg_tag_t tag,
-			       void *user_ptr);
+			       void *user_ptr,
+			       bmi_context_id context_id);
 int BMI_gm_post_recv(bmi_op_id_t * id,
 		     method_addr_p src,
 		     void *buffer,
@@ -60,7 +65,9 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     bmi_size_t * actual_size,
 		     bmi_flag_t buffer_flag,
 		     bmi_msg_tag_t tag,
-		     void *user_ptr);
+		     void *user_ptr,
+		     bmi_context_id context_id);
+#if 0
 int BMI_gm_wait(bmi_op_id_t id,
 		int *outcount,
 		bmi_error_code_t * error_code,
@@ -76,21 +83,28 @@ int BMI_gm_waitsome(int incount,
 int BMI_gm_waitunexpected(int incount,
 			  int *outcount,
 			  struct method_unexpected_info *info);
+#endif
+
 int BMI_gm_test(bmi_op_id_t id,
 		int *outcount,
 		bmi_error_code_t * error_code,
 		bmi_size_t * actual_size,
-		void **user_ptr);
+		void **user_ptr,
+		int max_idle_time_ms,
+		bmi_context_id context_id);
 int BMI_gm_testsome(int incount,
 		    bmi_op_id_t * id_array,
 		    int *outcount,
 		    int *index_array,
 		    bmi_error_code_t * error_code_array,
 		    bmi_size_t * actual_size_array,
-		    void **user_ptr_array);
+		    void **user_ptr_array,
+		    int max_idle_time_ms,
+		    bmi_context_id context_id);
 int BMI_gm_testunexpected(int incount,
 			  int *outcount,
-			  struct method_unexpected_info *info);
+			  struct method_unexpected_info *info,
+			  int max_idle_time_ms);
 method_addr_p BMI_gm_method_addr_lookup(const char *id_string);
 char BMI_gm_method_name[] = "bmi_gm";
 
@@ -106,13 +120,13 @@ struct bmi_method_ops bmi_gm_ops = {
     BMI_gm_post_send,
     BMI_gm_post_sendunexpected,
     BMI_gm_post_recv,
-    BMI_gm_wait,
-    BMI_gm_waitsome,
-    BMI_gm_waitunexpected,
     BMI_gm_test,
     BMI_gm_testsome,
+    NULL,
     BMI_gm_testunexpected,
     BMI_gm_method_addr_lookup,
+    NULL,
+    NULL,
     NULL,
     NULL,
     NULL
@@ -753,15 +767,17 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     method_addr_p dest,
 		     void *buffer,
 		     bmi_size_t size,
-		     bmi_size_t expected_size,
 		     bmi_flag_t buffer_flag,
 		     bmi_msg_tag_t tag,
-		     void *user_ptr)
+		     void *user_ptr,
+		     bmi_context_id context_id)
 {
     bmi_flag_t buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
     struct ctrl_msg *new_ctrl_msg = NULL;
     bmi_size_t buffer_size = 0;
+    /* TODO: fix this */
+    bmi_size_t expected_size = size;
 
     gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_send called.\n");
 
@@ -840,7 +856,8 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       bmi_size_t size,
 			       bmi_flag_t buffer_flag,
 			       bmi_msg_tag_t tag,
-			       void *user_ptr)
+			       void *user_ptr,
+			       bmi_context_id context_id)
 {
     bmi_flag_t buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
@@ -908,7 +925,8 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     bmi_size_t * actual_size,
 		     bmi_flag_t buffer_flag,
 		     bmi_msg_tag_t tag,
-		     void *user_ptr)
+		     void *user_ptr,
+		     bmi_context_id context_id)
 {
     bmi_flag_t mode = 0;
     method_op_p query_op = NULL;
@@ -1070,12 +1088,15 @@ int BMI_gm_test(bmi_op_id_t id,
 		int *outcount,
 		bmi_error_code_t * error_code,
 		bmi_size_t * actual_size,
-		void **user_ptr)
+		void **user_ptr,
+		int max_idle_time_ms,
+		bmi_context_id context_id)
 {
     return (gm_generic_testwait(id, outcount, error_code,
 				actual_size, user_ptr, 0));
 }
 
+#if 0
 /* BMI_gm_wait()
  * 
  * Checks to see if a particular message has completed.  Will block
@@ -1092,6 +1113,7 @@ int BMI_gm_wait(bmi_op_id_t id,
     return (gm_generic_testwait(id, outcount, error_code, actual_size, user_ptr,
 				GM_WAIT_METRIC));
 }
+#endif
 
 /* BMI_gm_testsome()
  * 
@@ -1105,14 +1127,16 @@ int BMI_gm_testsome(int incount,
 		    int *index_array,
 		    bmi_error_code_t * error_code_array,
 		    bmi_size_t * actual_size_array,
-		    void **user_ptr_array)
+		    void **user_ptr_array,
+		    int max_idle_time_ms,
+		    bmi_context_id context_id)
 {
     return (gm_generic_testwaitsome(incount, id_array, outcount,
 				    index_array, error_code_array,
 				    actual_size_array, user_ptr_array, 0));
 }
 
-
+#if 0
 /* BMI_gm_waitsome()
  * 
  * Checks to see if any messages from the specified list have completed.
@@ -1133,6 +1157,7 @@ int BMI_gm_waitsome(int incount,
 				    actual_size_array, user_ptr_array,
 				    GM_WAIT_METRIC));
 }
+#endif
 
 /* BMI_gm_testunexpected()
  * 
@@ -1142,11 +1167,13 @@ int BMI_gm_waitsome(int incount,
  */
 int BMI_gm_testunexpected(int incount,
 			  int *outcount,
-			  struct method_unexpected_info *info)
+			  struct method_unexpected_info *info,
+			  int max_idle_time_ms)
 {
     return (gm_generic_testwaitunexpected(incount, outcount, info, 0));
 }
 
+#if 0
 /* BMI_gm_waitunexpected()
  * 
  * Checks to see if any unexpected messages have completed.  Will block
@@ -1161,7 +1188,7 @@ int BMI_gm_waitunexpected(int incount,
     return (gm_generic_testwaitunexpected(incount, outcount, info,
 					  GM_WAIT_METRIC));
 }
-
+#endif
 
 /******************************************************************
  * Internal support functions
