@@ -45,7 +45,8 @@ enum PVFS_server_op
     PVFS_SERV_PERF_UPDATE = 18,  /* not a real protocol request */
     PVFS_SERV_MGMT_PERF_MON = 19,
     PVFS_SERV_MGMT_ITERATE_HANDLES = 20,
-    PVFS_SERV_MGMT_DSPACE_INFO_LIST = 21
+    PVFS_SERV_MGMT_DSPACE_INFO_LIST = 21,
+    PVFS_SERV_MGMT_EVENT_MON = 22
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
      * if you add a new operation to this list
      */
@@ -57,7 +58,7 @@ enum PVFS_server_op
      * PVFS_SERV_EXTENSION
      */
 };
-#define PVFS_MAX_SERVER_OP 21
+#define PVFS_MAX_SERVER_OP 22
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
@@ -84,8 +85,11 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_DIRENT_COUNT       64
 /* max number of perf metrics returned by mgmt perf mon op */
 #define PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT 16
+/* max number of events returned by mgmt event mon op */
+#define PVFS_REQ_LIMIT_MGMT_EVENT_MON_COUNT 2048
 /* max number of handles returned by mgmt iterate handles op */
 #define PVFS_REQ_LIMIT_MGMT_ITERATE_HANDLES_COUNT 1024
+/* max number of dspace info structs returned by mgmt dpsace info op */
 #define PVFS_REQ_LIMIT_MGMT_DSPACE_INFO_LIST_COUNT 1024
 
 /* create *********************************************************/
@@ -660,6 +664,30 @@ struct PVFS_servresp_mgmt_dspace_info_list
     int32_t dspace_info_count;
 };
 
+/* mgmt_event_mon **************************************/
+/* - returns event logging data */
+
+struct PVFS_servreq_mgmt_event_mon
+{
+    uint32_t event_count;
+};
+
+#define PINT_SERVREQ_MGMT_EVENT_MON(__req,	\
+					__creds,\
+					__event_count)\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_MGMT_EVENT_MON;\
+    (__req).credentials = (__creds);		\
+    (__req).u.mgmt_event_mon.event_count = (__event_count); \
+} while (0)
+
+struct PVFS_servresp_mgmt_event_mon
+{
+    struct PVFS_mgmt_event* event_array;
+    uint32_t event_count;
+};
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -692,6 +720,7 @@ struct PVFS_server_req
 	struct PVFS_servreq_mgmt_perf_mon mgmt_perf_mon;
 	struct PVFS_servreq_mgmt_iterate_handles mgmt_iterate_handles;
 	struct PVFS_servreq_mgmt_dspace_info_list mgmt_dspace_info_list;
+	struct PVFS_servreq_mgmt_event_mon mgmt_event_mon;
     }
     u;
 };
@@ -718,6 +747,7 @@ struct PVFS_server_resp
 	struct PVFS_servresp_mgmt_perf_mon mgmt_perf_mon;
 	struct PVFS_servresp_mgmt_iterate_handles mgmt_iterate_handles;
 	struct PVFS_servresp_mgmt_dspace_info_list mgmt_dspace_info_list;
+	struct PVFS_servresp_mgmt_event_mon mgmt_event_mon;
     }
     u;
 };

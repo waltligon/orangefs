@@ -72,6 +72,12 @@ int do_decode_resp(
 	    (struct PVFS_mgmt_perf_stat*)(target_msg->buffer +
 					  sizeof(struct PVFS_server_resp));
 	return(0);
+    case PVFS_SERV_MGMT_EVENT_MON:
+	((struct PVFS_server_resp *) target_msg->buffer)->u.mgmt_event_mon.
+	    event_array = 
+	    (struct PVFS_mgmt_event*)(target_msg->buffer +
+					  sizeof(struct PVFS_server_resp));
+	return(0);
     case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	((struct PVFS_server_resp *) target_msg->buffer)->u.mgmt_iterate_handles.
 	    handle_array = 

@@ -9,6 +9,7 @@
 
 #include "pint-event.h"
 #include "pvfs2-types.h"
+#include "pvfs2-mgmt.h"
 #include "gossip.h"
 
 /* variables that provide runtime control over which events are recorded */
@@ -16,20 +17,8 @@ int PINT_event_on = 0;
 int32_t PINT_event_api_mask = 0;
 int32_t PINT_event_op_mask = 0;
 
-/* represents an individual measurement */
-struct PINT_ts_datapoint
-{
-    int32_t api;
-    int32_t operation;
-    int64_t value;
-    PVFS_id_gen_t id;
-    int8_t flags;
-    int64_t tv_sec;
-    int64_t tv_usec;
-};
-
 /* global data structures for storing measurements */
-static struct PINT_ts_datapoint* ts_ring = NULL;
+static struct PVFS_mgmt_event* ts_ring = NULL;
 static int ts_head = 0;
 static int ts_tail = 0;
 static int ts_ring_size = 0;
@@ -50,8 +39,8 @@ int PINT_event_initialize(int ring_size)
 	return(-PVFS_EINVAL);
 
     /* allocate a ring buffer for time stamped events */
-    ts_ring = (struct PINT_ts_datapoint*)malloc(ring_size
-	*sizeof(struct PINT_ts_datapoint));
+    ts_ring = (struct PVFS_mgmt_event*)malloc(ring_size
+	*sizeof(struct PVFS_mgmt_event));
     if(!ts_ring)
 	return(-PVFS_ENOMEM);
 

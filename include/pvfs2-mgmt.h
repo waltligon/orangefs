@@ -45,6 +45,18 @@ struct PVFS_mgmt_dspace_info
     PVFS_handle dirdata_handle; /* directory data handle (if applicable) */
 };
 
+/* individual datapoint from event monitoring */
+struct PVFS_mgmt_event
+{
+    int32_t api;
+    int32_t operation;
+    int64_t value;
+    PVFS_id_gen_t id;
+    int8_t flags;
+    int32_t tv_sec;
+    int32_t tv_usec;
+};
+
 /* values which may be or'd together in the flags field above */
 enum
 {

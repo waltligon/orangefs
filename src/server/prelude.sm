@@ -267,6 +267,7 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	case PVFS_SERV_FLUSH:
 	case PVFS_SERV_MGMT_NOOP:
 	case PVFS_SERV_MGMT_PERF_MON:
+	case PVFS_SERV_MGMT_EVENT_MON:
 	case PVFS_SERV_STATFS:
 	case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	case PVFS_SERV_MGMT_DSPACE_INFO_LIST:

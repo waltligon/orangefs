@@ -47,6 +47,9 @@ int do_encode_req(
     if(request->op == PVFS_SERV_MGMT_PERF_MON)
 	assert(request->u.mgmt_perf_mon.count
 	    <= PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT);
+    if(request->op == PVFS_SERV_MGMT_EVENT_MON)
+	assert(request->u.mgmt_event_mon.event_count
+	    <= PVFS_REQ_LIMIT_MGMT_EVENT_MON_COUNT);
 
     switch (request->op)
     {
@@ -457,6 +460,7 @@ int do_encode_req(
 	/*these structures are all self contained (no pointers that need to be packed) */
     case PVFS_SERV_MGMT_ITERATE_HANDLES:
     case PVFS_SERV_MGMT_PERF_MON:
+    case PVFS_SERV_MGMT_EVENT_MON:
     case PVFS_SERV_READDIR:
     case PVFS_SERV_GETATTR:
     case PVFS_SERV_REMOVE:
