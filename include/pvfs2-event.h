@@ -42,10 +42,8 @@ enum PVFS_event_bmi_op
 };
 enum PVFS_event_trove_op
 {
-    PVFS_EVENT_TROVE_READ =       (1 << 0),
-    PVFS_EVENT_TROVE_WRITE =      (1 << 1),
-    PVFS_EVENT_TROVE_READ_LIST =  (1 << 2),
-    PVFS_EVENT_TROVE_WRITE_LIST = (1 << 3)
+    PVFS_EVENT_TROVE_READ_LIST =  (1 << 0),
+    PVFS_EVENT_TROVE_WRITE_LIST = (1 << 1)
 };
 
 #endif /* __PVFS2_EVENT_H */

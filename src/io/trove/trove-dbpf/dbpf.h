@@ -16,6 +16,14 @@ extern "C" {
 #include "trove.h"
 #include "gen-locks.h"
 
+#define DBPF_EVENT_START(__op, __id) \
+ PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id, \
+ PVFS_EVENT_FLAG_START)
+
+#define DBPF_EVENT_END(__op, __id) \
+ PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id, \
+ PVFS_EVENT_FLAG_END)
+
 #define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)	\
     do {							\
         snprintf(__buf, __path_max, "/%s", __stoname);		\

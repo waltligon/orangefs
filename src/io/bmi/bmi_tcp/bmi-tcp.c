@@ -26,8 +26,8 @@
 #include "id-generator.h"
 #include "pint-event.h"
 
-#define BMI_EVENT_START(__op, __size, __id) \
- PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, __size, __id, \
+#define BMI_EVENT_START(__op, __id) \
+ PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, 0, __id, \
  PVFS_EVENT_FLAG_START)
 
 #define BMI_EVENT_END(__op, __size, __id) \
@@ -696,7 +696,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 				      &size, 1, buffer_type, my_header,
 				      user_ptr, context_id);
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, 0, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, *id);
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, size, *id);
 
@@ -740,7 +740,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				      &size, 1, buffer_type, my_header,
 				      user_ptr, context_id);
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, 0, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, *id);
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, size, *id);
 
@@ -790,7 +790,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 				user_ptr, context_id);
 
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_RECV, 0, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_RECV, *id);
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *actual_size, *id);
 
@@ -1053,7 +1053,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 				      size_list, list_count, buffer_type,
 				      my_header, user_ptr, context_id);
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, 0, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, *id);
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, *id);
 
@@ -1093,7 +1093,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 				context_id);
 
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_RECV, 0, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_RECV, *id);
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *total_actual_size, *id);
 
@@ -1140,7 +1140,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				      size_list, list_count, buffer_type,
 				      my_header, user_ptr, context_id);
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, 0, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, *id);
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, *id);
 

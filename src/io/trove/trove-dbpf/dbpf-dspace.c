@@ -14,6 +14,7 @@
 #include <assert.h>
 
 #include "gossip.h"
+#include "pint-event.h"
 #include "trove.h"
 #include "trove-internal.h"
 #include "trove-ledger.h"
@@ -1014,6 +1015,18 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 	if (returned_user_ptr_p != NULL)
         {
 	    *returned_user_ptr_p = cur_op->op.user_ptr;
+	}
+	/* catch ops that we log */
+	switch(cur_op->op.type)
+	{
+	    case BSTREAM_READ_LIST:
+		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+	        break;
+	    case BSTREAM_WRITE_LIST:
+		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+		break;
+	    default:
+		break;
 	}
 	dbpf_queued_op_free(cur_op);
 

@@ -20,6 +20,7 @@
 #include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-bstream.h"
+#include "pint-event.h"
 
 #define DBPF_OPEN open
 #define DBPF_WRITE write
@@ -681,6 +682,8 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     int ret, fd;
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
+    enum dbpf_op_type tmp_type;
+    int event_type;
 #ifdef __PVFS2_TROVE_AIO_THREADED__
     struct dbpf_op *op_p = NULL;
     int i, aiocb_inuse_count;
@@ -695,9 +698,20 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL) return -TROVE_ENOMEM;
 
+    if(opcode == LIO_READ)
+    {
+	tmp_type = BSTREAM_READ_LIST;
+	event_type = PVFS_EVENT_TROVE_READ_LIST;
+    }
+    else
+    {
+	tmp_type = BSTREAM_WRITE_LIST;
+	event_type = PVFS_EVENT_TROVE_WRITE_LIST;
+    }
+
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
-			BSTREAM_WRITE_LIST,
+			tmp_type,
 			handle,
 			coll_p,
 #ifdef __PVFS2_TROVE_AIO_THREADED__
@@ -748,6 +762,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 #ifndef __PVFS2_TROVE_AIO_THREADED__
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    DBPF_EVENT_START(event_type, *out_op_id_p);
 
 #else
     op_p = &q_op_p->op;
@@ -843,6 +858,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     /* assign a proper operation id here */
     id_gen_fast_register(&q_op_p->op.id, q_op_p);
     *out_op_id_p = q_op_p->op.id;
+    DBPF_EVENT_START(event_type, *out_op_id_p);
 #endif
 
     return 0;

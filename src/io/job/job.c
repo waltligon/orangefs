@@ -26,8 +26,8 @@
 #include "id-generator.h"
 #include "pint-event.h"
 
-#define JOB_EVENT_START(__op, __size, __id) \
- PINT_event_timestamp(PVFS_EVENT_API_JOB, __op, __size, __id, \
+#define JOB_EVENT_START(__op, __id) \
+ PINT_event_timestamp(PVFS_EVENT_API_JOB, __op, 0, __id, \
  PVFS_EVENT_FLAG_START)
 
 #define JOB_EVENT_END(__op, __size, __id) \
@@ -1175,7 +1175,7 @@ int job_flow(flow_descriptor * flow_d,
 	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->actual_size = flow_d->total_transfered;
 	dealloc_job_desc(jd);
-        JOB_EVENT_START(PVFS_EVENT_FLOW, 0, 0);
+        JOB_EVENT_START(PVFS_EVENT_FLOW, 0);
         JOB_EVENT_END(PVFS_EVENT_FLOW, flow_d->total_transfered, 0);
 	return (1);
     }
@@ -1189,7 +1189,7 @@ int job_flow(flow_descriptor * flow_d,
 #endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&flow_mutex);
 
-    JOB_EVENT_START(PVFS_EVENT_FLOW, 0, *id);
+    JOB_EVENT_START(PVFS_EVENT_FLOW, *id);
 
     return (0);
 }
