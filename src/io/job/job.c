@@ -22,7 +22,6 @@
 #include "trove.h"
 #include "gossip.h"
 #include "request-scheduler.h"
-#include "trove-id-queue.h"
 #include "pint-dev.h"
 #include "id-generator.h"
 
