@@ -68,6 +68,7 @@ int main(int argc, char **argv)
     }
 
     signal(SIGHUP,  client_sig_handler);
+    signal(SIGINT,  client_sig_handler);
     signal(SIGPIPE, client_sig_handler);
     signal(SIGILL,  client_sig_handler);
     signal(SIGTERM, client_sig_handler);
@@ -76,12 +77,21 @@ int main(int argc, char **argv)
     return monitor_pvfs2_client(&opts);
 }
 
-
 static void client_sig_handler(int signum)
 {
     kill(0, signum);
+    switch (signum)
+    {
+	case SIGPIPE:
+	case SIGILL:
+	case SIGSEGV:
+	    exit(1);
+	case SIGHUP:
+	case SIGINT:
+	case SIGTERM:
+	    exit(0);
+    }
 }
-
 
 static int verify_pvfs2_client_path(options_t *opts)
 {
@@ -100,7 +110,6 @@ static int verify_pvfs2_client_path(options_t *opts)
     }
     return ret;
 }
-
 
 static int monitor_pvfs2_client(options_t *opts)
 {
