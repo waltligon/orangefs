@@ -5,9 +5,89 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.6.2pre1
 ===============
-- Updated documentation for dist-simple-stripe.c and modified
+- updated documentation for dist-simple-stripe.c and modified
   the basic distribution to use a single data file object.
--
+- fixed error reporting in pvfs2-server that didn't understand pvfs2
+  specific error codes
+- extend request scheduler to allow operations to pass through without
+  being scheduled (and allow the noop operations to work like this)
+- disable the (unused) device interface on server builds, reducing
+  server run-time threads by one
+- bmi optimizations: avoid polling in test calls if operations are
+  complete, or no operations are complete but there are unexpected
+  operations ready to be serviced
+- extended the pvfs2-mkspace tool to be able to work with data and
+  meta handle ranges separately (also extended the internal interfaces
+  as necessary for this functionality)
+- fixed bug in mkspace that could create the root directory dirent
+  object in a non-meta handle range
+- added client side attribute type checking that avoids contacting
+  servers if we've determined that the operation we're about to
+  perform cannot be performed on an object of the type we were told to
+  work on.  e.g., a readdir operation will not be issued to the server
+  if the getattr reports that the object we want to readdir on is not
+  a directory.  most sysint operations now have this checking in place
+- fixed crash bug on the server crdirent operation if passed a
+  non-directory object type
+- fixed race condition triggered when pvfs2-server is getting many
+  more incoming operations than it has posted unexpected msgs for
+- increase the default number of posted unexpected msgs by the server
+- properly re-integrate and simplify the usage of the mmap-ra-cache,
+  which wasn't working properly after the pvfs2-client-core re-write
+- fixed crash bug on the server due to an unexpected error code coming
+  out of pthread_cond_timedwait inside of job test calls
+- modify configure script to append date and time information to non
+  release builds (for more fine grained version information if needed)
+- fixed acache usage in sysint create/mkdir/symlink operations
+- open-cache remove now syncs (if necessary) after the remove, rather
+  than just before
+- removed duplicate 'open_cache' debugging keyword definition
+- allowed client side logging (via PVFS2_DEBUGMASK/PVFS2_DEBUGFILE env
+  variables) to append to the specified logfile, rather than
+  truncating it if it already exists
+- fixed bug in device test method that didn't properly adjust the
+  outcount on failure; also added the number of bytes read on a failed
+  (short) read
+- started adding debugging code for printing out server side response
+  structures (only getattr is currently implemented)
+- kernel changes: added some debugging and simplified the
+  handle_io_error macro.  also added translation of non-errno pvfs2
+  error codes (should it get one) to avoid returning entirely
+  incorrect error codes in some cases; avoid allowing -PVFS_ECANCEL to
+  be passed down to the kernel code from the pvfs2-client-core.  use
+  i_size_read to update file position on opens for append.  remove old
+  code that manually updated the inode's file size on writes
+- replaced debugging mask of cancelled i/o operations from io to
+  cancel
+- simplified pvfs2-statfs by retrieving all server statistics in one
+  call, rather than separate ones for meta and data servers; also
+  fixed reporting of server duties (previously all servers were
+  reported as serving both meta and i/o data)
+- added a start banner to pvfs2-client-core if client debugging is
+  enabled.  this allows easier visual inspection of restarts in logs
+- fixed bug when copying credentials to first make sure that they're
+  valid in all sysint/mgmt calls
+- added both server and client side (mgmt) operations to remove
+  arbitrary pvfs2 objects and directory entries without prejudice
+- added a 'pvfs2-remove-object' tool that can remove pvfs2 objects and
+  directory entries (use is not generally encouraged)
+- fixed pvfs2-fs-dump crash bugs when it fails to find some objects it
+  was expecting to see
+- adjusted the time that pav allows for copying binaries out to remote
+  machines
+- fixed bug bmi_tcp potential send deadlock under heavy loads
+- added a mgmt method that allows parameter sets on single servers
+  (rather than the previous one that allowed only all servers)
+- extended pvfs2-set-debugmask program to have the ability to set the
+  debug mask on a single server (rather than all) via cmdline options
+- replaced TroveSyncMode configuration option with separate
+  TroveSyncMeta and TroveSyncData options.  the default values are yes
+  for both
+- updated pvfs2-genconfig to reflect TroveSync* config option changes
+- implemented understanding of the data sync mode option in the flow
+  interface via the setinfo method
+- modified pvfs2-server to pass data sync mode option to the flow
+  implementation via setinfo on a per fs basis
 
 
 pvfs2-0.6.1
