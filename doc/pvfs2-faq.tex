@@ -601,6 +601,39 @@ If you're looking for a quick suggestion for a local file system type
 to use, we suggest ext3 with ``journal data writeback'' option as a
 reasonable choice.
 
+\subsection{My app still runs more slowly than I would like.  What can I do?}
+\label{sec:tuning}
+
+If you ask the mailing list for help with performance, someone will probably
+ask you one or more of the following questions:
+
+\begin{itemize}
+
+\item Are you running servers and clients on the same nodes?  We support this
+      configuration -- sometimes it is required given space or budget
+      constraints.  You will not, however, see the best performance out of this
+      configuration.  See Section~\ref{sec:howmany-servers}. 
+
+\item Have you benchmarked your network?  A tool like netpipe or ttcp can help
+      diagnose point-to-point issues.  PVFS2 will tax your bisection bandwidth,
+      so if ppossible, run simultaneous instances of these network benchmarks
+      on multiple machine pairs and see if performance suffers.  One user
+      realized the cluster had a hub (not a switch, a hub) connecting all the
+      nodes.  Needless to say, performance was pretty bad. 
+
+\item Have you examined buffer sizes?  On linux, the settings /proc can make a
+      big difference in TCP performance.  Set
+      \texttt{/proc/sys/net/core/rmem\_default} and
+      \texttt{/proc/sys/net/core/wmem\_default} 
+
+\end{itemize}
+
+Tuning applications can be quite a challenge.  You have disks, networks,
+operating systems, PVFS2, the application, and sometimes MPI.  We are
+working on a document to better guide the tuning of systems for
+IO-intensive workloads.
+
+
 %
 % REDUNDANCY
 %
