@@ -5,41 +5,31 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include <pint-sysint.h>
+#include "pint-sysint.h"
+#include "str-utils.h"
 
 int main(int argc, char* argv[])
 {
-	char* path = "/test/some/dir/misc/stuff/file.txt";
-	char *segment = NULL;
-	int num_segments = 10,i, ret=0;
+	char path[] = "/test/some/dir/misc/stuff/file.txt";
+	char segment[MAX_SEGMENT_LEN] = {0};
+	int num_segments = 0,i, ret=0;
 
 	gossip_enable_stderr();
 	gossip_set_debug_mask(1,CLIENT_DEBUG);
 
 	printf("path = %s\n",path);
-#if 0
+
+        num_segments = PINT_string_count_segments(path);
+
 	for(i= 0; i < num_segments; i++)
 	{
-		ret = get_next_path(path,&segment,25);
+		ret = PINT_get_path_element(path,i,segment,MAX_SEGMENT_LEN);
 		if (ret < 0)
 		{
 			printf("errcode = %d\n",ret);
 			continue;
 		}
 		printf("segment = %s\n",segment);
-		free(segment);
-	}
-#endif
-	for(i= 0; i < num_segments; i++)
-	{
-		ret = get_path_element(path,&segment,i);
-		if (ret < 0)
-		{
-			printf("errcode = %d\n",ret);
-			continue;
-		}
-		printf("segment = %s\n",segment);
-		free(segment);
 	}
 
 	gossip_disable();

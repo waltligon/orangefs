@@ -7,6 +7,15 @@
 #ifndef __STR_UTILS_H
 #define __STR_UTILS_H
 
+/* should be in a limits.h like file */
+#define MAX_SEGMENT_LEN   128
+#define MAX_PATH_LEN      512
+
+int PINT_get_path_element(
+    char *pathname,
+    int segment_num,
+    char *out_segment,
+    int out_max_len);
 int PINT_string_count_segments(
     char *pathname);
 int PINT_get_base_dir(

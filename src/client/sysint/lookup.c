@@ -3,8 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
-/* Lookup Function Implementation */
 #include <malloc.h>
 #include <assert.h>
 #include <string.h>
@@ -84,7 +82,8 @@ int PVFS_sys_lookup(
     struct PINT_decoded_msg decoded;
 
     pinode *pinode_ptr = NULL;
-    char *segment = NULL, *path = NULL;
+    char *path = NULL;
+    char segment[MAX_SEGMENT_LEN] = {0};
     bmi_addr_t serv_addr;
     int total_segments = 0, num_segments_remaining = 0;
     PVFS_pinode_reference entry, parent;
@@ -154,7 +153,6 @@ int PVFS_sys_lookup(
     /* send server messages here */
     while(num_segments_remaining > 0)
     {
-
 	name_sz = strlen(path) + 1;
 	req_p.op     = PVFS_SERV_LOOKUP_PATH;
 	req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
@@ -216,12 +214,10 @@ int PVFS_sys_lookup(
 
 	for(i = 0; i < ack_p->u.lookup_path.count; i++)
 	{
-
 	    entry.handle = ack_p->u.lookup_path.handle_array[i];
 	    entry.fs_id = fs_id;
 
-	    //segment = path_element(i);
-	    ret = get_path_element(path, &segment, i);
+            ret = PINT_get_path_element(path, i, segment, MAX_SEGMENT_LEN);
 	    if (ret < 0)
 	    {
 		failure = RECV_REQ_FAILURE;
@@ -289,8 +285,6 @@ int PVFS_sys_lookup(
 		failure = CHECK_PERMS_FAILURE;
 		goto return_error;
 	    }
-	    if(segment != NULL)
-		free(segment);
 	    PINT_pcache_insert_rls(pinode_ptr);
 	}
 
@@ -336,8 +330,6 @@ return_error:
 		PINT_pcache_pinode_alloc(&pinode_ptr); 	
 	case PCACHE_ALLOC_FAILURE:
 	case DCACHE_INSERT_FAILURE:
-	    if (segment != NULL)
-		free(segment);
 	case RECV_REQ_FAILURE:
 	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 		&encoded_resp, op_tag);

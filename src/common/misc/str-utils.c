@@ -392,6 +392,95 @@ int PINT_parse_handle_ranges(char *range, int *first, int *last, int *status)
 }
 
 /*
+ * PINT_get_path_element:  gets the specified segment in the
+ * provided path.
+ *
+ * pathname   :  string containing a valid pathname
+ * segment_num:  the desired segment number in the path
+ * out_segment:  where the segment will be stored on success
+ * out_max_len:  max num bytes to store in out_segment
+ *
+ * returns:
+ *  0 : if the segment was found and copied
+ *  -1: if an invalid segment was specified
+ *
+ * Example inputs and outputs/return values:
+ *
+ * pathname: /mnt/pvfs2/foo, segment_num: 0
+ *     out_segment: mnt, returns 0
+ * pathname: /mnt/pvfs2/foo, segment_num: 2
+ *     out_segment: foo, returns 0
+ * pathname: /mnt/pvfs2/foo, segment_num: 5
+ *     out_segment: undefined, returns -1
+ */
+int PINT_get_path_element(
+    char *pathname,
+    int segment_num,
+    char *out_segment,
+    int out_max_len)
+{
+    int count = -1;
+    char *segp = (char *)0;
+    void *segstate;
+    char local_pathname[MAX_PATH_LEN] = {0};
+
+    strncpy(local_pathname,pathname,MAX_PATH_LEN);
+
+    while(!PINT_string_next_segment(local_pathname,&segp,&segstate))
+    {
+        if (++count == segment_num)
+        {
+            strncpy(out_segment,segp,(size_t)out_max_len);
+            break;
+        }
+    }
+    return ((count == segment_num) ? 0 : -1);
+}
+
+/* get_next_path
+ *
+ * gets remaining path given number of path segments to skip
+ *
+ * returns 0 on success, -errno on failure
+ */
+int get_next_path(char *path, char **newpath, int skip)
+{
+    int pathlen=0, i=0, num_slashes_seen=0;
+    int delimiter1=0;
+
+    pathlen = strlen(path) + 1;
+
+    /* find our starting point in the old path, it could be past multiple 
+     * segments*/
+    for(i =0; i < pathlen; i++)
+    {
+	if (path[i] == '/')
+	{
+	    num_slashes_seen++;
+	    if (num_slashes_seen > skip)
+	    {
+		break;
+	    }
+	}
+    }
+
+    delimiter1 = i;
+    if (pathlen - delimiter1 < 1)
+    {
+        return (-EINVAL);
+    }
+
+    *newpath = malloc(pathlen - delimiter1);
+    if (*newpath == NULL)
+    {
+        return (-ENOMEM);
+    }
+    memcpy(*newpath, &path[delimiter1], pathlen - delimiter1 );
+    /* *newpath[pathlen - delimiter1 -1 ] = '\0';*/
+    return(0);
+}
+
+/*
  * Local variables:
  *  c-indent-level: 4
  *  c-basic-offset: 4
