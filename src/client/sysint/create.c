@@ -94,6 +94,15 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	    goto return_error;
 	}
 
+	/* also make sure that the parent is a directory */
+	if(parent_ptr->attr.objtype != PVFS_TYPE_DIRECTORY)
+	{
+	    phelper_release_pinode(parent_ptr);
+	    ret = (-ENOTDIR);
+	    failure = PCACHE_LOOKUP_FAILURE;
+	    goto return_error;
+	}
+
 	/* we're done with the parent pinode pointer */
         phelper_release_pinode(parent_ptr);
 
