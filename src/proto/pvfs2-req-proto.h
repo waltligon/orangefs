@@ -607,6 +607,21 @@ struct PVFS_servreq_mgmt_iterate_handles
     PVFS_ds_position position;
 };
 
+#define PINT_SERVREQ_MGMT_ITERATE_HANDLES_FILL(__req,	\
+					__creds,\
+					__fs_id,\
+					__handle_count,\
+					__position)\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_MGMT_ITERATE_HANDLES;\
+    (__req).credentials = (__creds);		\
+    (__req).u.mgmt_iterate_handles.fs_id = (__fs_id); \
+    (__req).u.mgmt_iterate_handles.handle_count = (__handle_count); \
+    (__req).u.mgmt_iterate_handles.position = (__position); \
+} while (0)
+
+
 struct PVFS_servresp_mgmt_iterate_handles
 {
     PVFS_ds_position position;

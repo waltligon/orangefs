@@ -207,6 +207,7 @@ struct PINT_client_mgmt_perf_mon_list_sm
 
 struct PINT_client_mgmt_iterate_handles_list_sm
 {
+    PVFS_fs_id fs_id;
     int server_count; 
     PVFS_id_gen_t* addr_array;
     PVFS_handle** handle_matrix;
