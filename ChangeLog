@@ -7,8 +7,13 @@ pvfs2-0.0.7pre2
 ===============
 - re-worked architecture of metadata storage (generic dspace attrs are
   used instead of a separate keyval/data pair)
-- added a trove-dbpf attribute cache layer for caching generic attributes
-  and keyval/data pairs that are user configurable
+- added a server-side (trove-dbpf) attribute write-through caching layer
+  for caching generic attributes and keyval/data pairs that are user
+  configurable
+- added a readahead data cache specifically for vfs mmap-read and
+  execution, improving their performance greatly (running, editing,
+  compiling, etc on a pvfs2 volume is now much more responsive)
+- fix size reporting using 'du' through the vfs interface
 
 
 pvfs2-0.0.6

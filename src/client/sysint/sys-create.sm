@@ -246,11 +246,10 @@ int PVFS_sys_create(
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0)
     {
-	gossip_debug(CLIENT_DEBUG, "PVFS_sys_create calling "
+        gossip_debug(CLIENT_DEBUG, "PVFS_sys_create calling "
                      "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
+        ret = PINT_client_state_machine_test();
     }
-
     assert(ret == 0);
 
     gossip_debug(CLIENT_DEBUG, "PVFS_sys_create completed\n");
