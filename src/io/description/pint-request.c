@@ -285,7 +285,8 @@ int PINT_Process_request(PINT_Request_state *req,
 				/* that was last item in sequence chain */
 				req->cur[req->lvl].rq = req->cur[req->lvl].rqbase;
 				/* go to next element in block of level above */
-				gossip_debug(REQUEST_DEBUG,"\tgoing to next element in block of level above\n");
+				gossip_debug(REQUEST_DEBUG,
+						"\tgoing to next element in block of level above\n");
 				req->cur[req->lvl].el++;
 				if (req->cur[req->lvl].el >= req->cur[req->lvl].maxel)
 				{
@@ -521,7 +522,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 			(*segs)++;
 		}
 		/* this is used by client code */
-		if (PINT_IS_CKSIZE(mode) && *segs < segmax)
+		if (PINT_IS_CLIENT(mode) && *segs < segmax)
 		{
 			offset_array[*segs] = offset_array[*segs - 1] + sz;
 		}

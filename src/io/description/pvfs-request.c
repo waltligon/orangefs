@@ -4,8 +4,11 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.7 2003-07-02 18:29:16 walt Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.8 2003-07-02 20:00:44 walt Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.7  2003/07/02 18:29:16  walt
+// added refcount to requests, developed code for freeing requests
+//
 // Revision 1.6  2003/07/01 22:15:21  neill
 // Code didn't compile before this...I don't know if this is correct.
 //
@@ -422,18 +425,21 @@ int PVFS_Request_free(PVFS_Request *req)
 	{
 		/* if refcount is 0 then it has already been freed */
 		/* if less than 0 it should not be freed */
+		/* can't be sure if this is users's variable or not */
 		return PVFS_SUCCESS;
 	}
 	PINT_REQUEST_REFDEC(*req);
 	if ((*req)->refcount > 0)
 	{
 		/* not ready to free this yet */
+		*req = NULL;
 		return PVFS_SUCCESS;
 	}
 	if ((*req)->committed)
 	{
 		/* these are contiguous and have no external refs */
 		free(*req);
+		*req = NULL;
 		return PVFS_SUCCESS;
 	}
 	/* this deals with the sreq chain */
@@ -450,6 +456,7 @@ int PVFS_Request_free(PVFS_Request *req)
 	/* now deal with the main struct */
 	PVFS_Request_free(&((*req)->ereq));
 	free(*req);
+	*req = NULL;
 	return PVFS_SUCCESS;
 }
 
