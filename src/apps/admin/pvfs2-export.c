@@ -14,6 +14,7 @@
 #include <sys/time.h>
 
 #include "pvfs2.h"
+#include "str-utils.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -92,7 +93,7 @@ int main(int argc, char **argv)
     }
 
     /* get the absolute path on the pvfs2 file system */
-    if (PVFS_util_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
+    if (PINT_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
     {
         if (pvfs_path[0] != '/')
         {

@@ -36,6 +36,15 @@ int PINT_get_next_path(
 int PINT_split_string_list(
     char ***tokens,
     const char *comma_list);
+int PINT_remove_base_dir(
+    char *pathname,
+    char *out_dir,
+    int out_max_len);
+int PINT_remove_dir_prefix(
+    const char *pathname,
+    const char *prefix,
+    char *out_path,
+    int out_max_len);
 
 #ifndef HAVE_STRNLEN
 size_t strnlen(const char *s, size_t limit);

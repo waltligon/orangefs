@@ -45,7 +45,7 @@ int PVFS_sys_getparent(
         return ret;
     }
 
-    if (PVFS_util_remove_base_dir(entry_name,file_buf,PVFS_SEGMENT_MAX))
+    if (PINT_remove_base_dir(entry_name,file_buf,PVFS_SEGMENT_MAX))
     {
 	gossip_err("invalid filename: %s\n", entry_name);
 	return ret;

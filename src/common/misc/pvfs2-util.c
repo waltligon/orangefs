@@ -30,6 +30,12 @@
 #include <mntent.h>
 #endif
 
+/* Define min macro with pvfs2 prefix */
+#ifndef PVFS_util_min
+#define PVFS_util_min(x1,x2) ((x1) > (x2))? (x2):(x1)
+#endif
+
+
 #define PVFS2_MAX_INVALID_MNTENTS                     256
 #define PVFS2_MAX_TABFILES                              8
 #define PVFS2_DYNAMIC_TAB_INDEX  (PVFS2_MAX_TABFILES - 1)
@@ -709,7 +715,7 @@ int PVFS_util_resolve(
     {
         for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
         {
-            ret = PVFS_util_remove_dir_prefix(
+            ret = PINT_remove_dir_prefix(
                 local_path, s_stat_tab_array[i].mntent_array[j].mnt_dir,
                 out_fs_path, out_fs_path_max);
             if(ret == 0)
@@ -733,7 +739,7 @@ int PVFS_util_resolve(
     for(j = 0; j < s_stat_tab_array[
             PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
     {
-        ret = PVFS_util_remove_dir_prefix(
+        ret = PINT_remove_dir_prefix(
             local_path, s_stat_tab_array[
                 PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
             out_fs_path, out_fs_path_max);
@@ -840,230 +846,6 @@ int PVFS_util_init_defaults(void)
             tab->tabfile_name);
         return(-PVFS_ENODEV);
     }
-}
-
-/* PVFS_util_lookup_parent()
- *
- * given a pathname and an fsid, looks up the handle of the parent
- * directory
- *
- * returns 0 on success, -errno on failure
- */
-int PVFS_util_lookup_parent(
-    char *filename,
-    PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
-    PVFS_handle * handle)
-{
-    char buf[PVFS_SEGMENT_MAX] = { 0 };
-    PVFS_sysresp_lookup resp_look;
-    int ret = -1;
-
-    memset(&resp_look, 0, sizeof(PVFS_sysresp_lookup));
-
-    if (PINT_get_base_dir(filename, buf, PVFS_SEGMENT_MAX))
-    {
-        if (filename[0] != '/')
-        {
-            gossip_err("Invalid dirname (no leading '/')\n");
-        }
-        gossip_err("cannot get parent directory of %s\n", filename);
-        /* TODO: use defined name for this */
-        *handle = 0;
-        return (-EINVAL);
-    }
-
-    ret = PVFS_sys_lookup(fs_id, buf, credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
-    if (ret < 0)
-    {
-        gossip_err("Lookup failed on %s\n", buf);
-        /* TODO: use defined name for this */
-        *handle = 0;
-        return (ret);
-    }
-    *handle = resp_look.ref.handle;
-    return (0);
-}
-
-
-/* PVFS_util_remove_base_dir()
- *
- * Get absolute path minus the base dir
- *
- * Parameters:
- * pathname     - pointer to directory string
- * out_base_dir - pointer to out dir string
- * max_out_len  - max length of out_base_dir buffer
- *
- * All incoming arguments must be valid and non-zero
- *
- * Returns 0 on success; -1 if args are invalid
- *
- * Example inputs and outputs/return values:
- *
- * pathname: /tmp/foo     - out_base_dir: foo       - returns  0
- * pathname: /tmp/foo/bar - out_base_dir: bar       - returns  0
- *
- *
- * invalid pathname input examples:
- * pathname: /            - out_base_dir: undefined - returns -1
- * pathname: NULL         - out_base_dir: undefined - returns -1
- * pathname: foo          - out_base_dir: undefined - returns -1
- *
- */
-int PVFS_util_remove_base_dir(
-    char *pathname,
-    char *out_dir,
-    int out_max_len)
-{
-    int ret = -1, len = 0;
-    char *start, *end, *end_ref;
-
-    if (pathname && out_dir && out_max_len)
-    {
-        if ((strcmp(pathname, "/") == 0) || (pathname[0] != '/'))
-        {
-            return ret;
-        }
-
-        start = pathname;
-        end = (char *) (pathname + strlen(pathname));
-        end_ref = end;
-
-        while (end && (end > start) && (*(--end) != '/'));
-
-        len = end_ref - ++end;
-        if (len < out_max_len)
-        {
-            memcpy(out_dir, end, len);
-            out_dir[len] = '\0';
-            ret = 0;
-        }
-    }
-    return ret;
-}
-
-/* PVFS_util_remove_dir_prefix()
- *
- * Strips prefix directory out of the path, output includes beginning
- * slash
- *
- * Parameters:
- * pathname     - pointer to directory string (absolute)
- * prefix       - pointer to prefix dir string (absolute)
- * out_path     - pointer to output dir string
- * max_out_len  - max length of out_base_dir buffer
- *
- * All incoming arguments must be valid and non-zero
- *
- * Returns 0 on success; -errno on failure
- *
- * Example inputs and outputs/return values:
- *
- * pathname: /mnt/pvfs2/foo, prefix: /mnt/pvfs2
- *     out_path: /foo, returns 0
- * pathname: /mnt/pvfs2/foo, prefix: /mnt/pvfs2/
- *     out_path: /foo, returns 0
- * pathname: /mnt/pvfs2/foo/bar, prefix: /mnt/pvfs2
- *     out_path: /foo/bar, returns 0
- * pathname: /mnt/pvfs2/foo/bar, prefix: /
- *     out_path: /mnt/pvfs2/foo/bar, returns 0
- *
- * invalid pathname input examples:
- * pathname: /mnt/foo/bar, prefix: /mnt/pvfs2
- *     out_path: undefined, returns -ENOENT
- * pathname: /mnt/pvfs2fake/foo/bar, prefix: /mnt/pvfs2
- *     out_path: undefined, returns -ENOENT
- * pathname: /mnt/foo/bar, prefix: mnt/pvfs2
- *     out_path: undefined, returns -EINVAL
- * pathname: mnt/foo/bar, prefix: /mnt/pvfs2
- *     out_path: undefined, returns -EINVAL
- * out_max_len not large enough for buffer, returns -ENAMETOOLONG
- */
-int PVFS_util_remove_dir_prefix(
-    const char *pathname,
-    const char *prefix,
-    char *out_path,
-    int out_max_len)
-{
-    int ret = -EINVAL;
-    int prefix_len, pathname_len;
-    int cut_index;
-
-    if (!pathname || !prefix || !out_path || !out_max_len)
-    {
-        return (-EINVAL);
-    }
-
-    /* make sure we are given absolute paths */
-    if ((pathname[0] != '/') || (prefix[0] != '/'))
-    {
-        return ret;
-    }
-
-    while (pathname[1] == '/')
-        pathname++;
-
-    prefix_len = strlen(prefix);
-    pathname_len = strlen(pathname);
-
-    /* account for trailing slashes on prefix */
-    while (prefix[prefix_len - 1] == '/')
-    {
-        prefix_len--;
-    }
-
-    /* if prefix_len is now zero, then prefix must have been root
-     * directory; return copy of entire pathname
-     */
-    if (prefix_len == 0)
-    {
-        cut_index = 0;
-    }
-    else
-    {
-
-        /* make sure prefix would fit in pathname */
-        if (prefix_len > (pathname_len + 1))
-            return (-ENOENT);
-
-        /* see if we can find prefix at beginning of path */
-        if (strncmp(prefix, pathname, prefix_len) == 0)
-        {
-            /* apparent match; see if next element is a slash */
-            if ((pathname[prefix_len] != '/') &&
-                (pathname[prefix_len] != '\0'))
-                return (-ENOENT);
-
-            /* this was indeed a match */
-            /* in the case of no trailing slash cut_index will point to the end
-             * of "prefix" (NULL).   */
-            cut_index = prefix_len;
-        }
-        else
-        {
-            return (-ENOENT);
-        }
-    }
-
-    /* if we hit this point, then we were successful */
-
-    /* is the buffer large enough? */
-    if ((1 + strlen(&(pathname[cut_index]))) > out_max_len)
-        return (-ENAMETOOLONG);
-
-    /* try to handle the case of no trailing slash */
-    if (pathname[cut_index] == '\0')
-    {
-        out_path[0] = '/';
-        out_path[1] = '\0';
-    }
-    else
-        /* copy out appropriate part of pathname */
-        strcpy(out_path, &(pathname[cut_index]));
-
-    return (0);
 }
 
 /*********************/

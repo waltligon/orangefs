@@ -16,6 +16,7 @@
 
 #include "pvfs2.h"
 #include "str-utils.h"
+#include "pint-sysint-utils.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -139,7 +140,7 @@ int main(int argc, char **argv)
     else
     {
         /* get the absolute path on the pvfs2 file system */
-        if (PVFS_util_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
+        if (PINT_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
         {
             if (pvfs_path[0] != '/')
             {
@@ -152,9 +153,9 @@ int main(int argc, char **argv)
             goto main_out;
         }
 
-        ret = PVFS_util_lookup_parent(pvfs_path, cur_fs, &credentials, 
-                                      &parent_ref.handle);
-        if(ret < 0)
+        ret = PINT_lookup_parent(pvfs_path, cur_fs, &credentials, 
+                                 &parent_ref.handle);
+        if (ret < 0)
         {
             PVFS_perror("PVFS_util_lookup_parent", ret);
             ret = -1;

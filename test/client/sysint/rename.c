@@ -11,6 +11,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-util.h"
 #include "str-utils.h"
+#include "pint-sysint-utils.h"
 
 int main(int argc,char **argv)
 {
@@ -47,7 +48,7 @@ int main(int argc,char **argv)
 	return (-1);
     }
 
-    if (PVFS_util_remove_base_dir(old_filename, old_buf, PVFS_SEGMENT_MAX))
+    if (PINT_remove_base_dir(old_filename, old_buf, PVFS_SEGMENT_MAX))
     {
         if (old_filename[0] != '/')
         {
@@ -59,7 +60,7 @@ int main(int argc,char **argv)
     }
     printf("Old filename is %s\n", old_buf);
 
-    if (PVFS_util_remove_base_dir(new_filename, new_buf, PVFS_SEGMENT_MAX))
+    if (PINT_remove_base_dir(new_filename, new_buf, PVFS_SEGMENT_MAX))
     {
         if (new_filename[0] != '/')
         {
@@ -74,8 +75,8 @@ int main(int argc,char **argv)
     PVFS_util_gen_credentials(&credentials);
 
     old_entry = old_buf;
-    ret = PVFS_util_lookup_parent(old_filename, cur_fs, &credentials,
-                                  &old_parent_refn.handle);
+    ret = PINT_lookup_parent(old_filename, cur_fs, &credentials,
+                             &old_parent_refn.handle);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_lookup_parent", ret);
@@ -83,8 +84,8 @@ int main(int argc,char **argv)
     }
     old_parent_refn.fs_id = cur_fs;
     new_entry = new_buf;
-    ret = PVFS_util_lookup_parent(new_filename, cur_fs, &credentials,
-	&new_parent_refn.handle);
+    ret = PINT_lookup_parent(new_filename, cur_fs, &credentials,
+                             &new_parent_refn.handle);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_lookup_parent", ret);
@@ -101,7 +102,8 @@ int main(int argc,char **argv)
     }
 
     printf("===================================\n");
-    printf("file named %s has been renamed to %s\n", old_filename,  new_filename);
+    printf("file named %s has been renamed to %s\n",
+           old_filename,  new_filename);
 
     //close it down
     ret = PVFS_sys_finalize();

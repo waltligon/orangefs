@@ -16,6 +16,7 @@
 #include "client.h"
 #include "pvfs2-util.h"
 #include "str-utils.h"
+#include "pint-sysint-utils.h"
 
 static double Wtime(void)
 {
@@ -84,7 +85,7 @@ int main(int argc, char **argv)
 	return (-1);
     }
 
-    if (PVFS_util_remove_base_dir(basename,str_buf,256))
+    if (PINT_remove_base_dir(basename,str_buf,256))
     {
         if (basename[0] != '/')
         {
@@ -102,13 +103,12 @@ int main(int argc, char **argv)
     attr.owner = credentials.uid;
     attr.group = credentials.gid;
     attr.perms = 1877;
-    attr.atime = attr.ctime = attr.mtime = 
-	time(NULL);
+    attr.atime = attr.ctime = attr.mtime = time(NULL);
     attr.dfile_count = max_dfiles;
     attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
 
-    ret = PVFS_util_lookup_parent(basename, cur_fs, &credentials, 
-                                  &parent_refn.handle);
+    ret = PINT_lookup_parent(basename, cur_fs, &credentials, 
+                             &parent_refn.handle);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_lookup_parent", ret);

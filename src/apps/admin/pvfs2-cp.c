@@ -8,8 +8,6 @@
  * 	copy a file from a unix or PVFS2 file system to a unix or PVFS2 file
  * 	system.  Should replace pvfs2-import and pvfs2-export.
  */
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -24,6 +22,7 @@
 
 #include "pvfs2.h"
 #include "str-utils.h"
+#include "pint-sysint-utils.h"
 
 /* optional parameters, filled in by parse_args() */
 struct options
@@ -461,8 +460,8 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	    
 	    /*parent_ref.fs_id = obj->pvfs2.fs_id; */
 
-	    if(PVFS_util_remove_base_dir(obj->pvfs2.pvfs2_path,str_buf, 
-			    PVFS_NAME_MAX))
+	    if (PINT_remove_base_dir(obj->pvfs2.pvfs2_path,str_buf, 
+                                     PVFS_NAME_MAX))
 	    {
 		if(obj->pvfs2.pvfs2_path[0] != '/')
 		{
@@ -472,8 +471,9 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 			"creation on %s\n", obj->pvfs2.user_path);
 		return(-1);
 	    }
-	    ret = PVFS_util_lookup_parent(obj->pvfs2.pvfs2_path, 
-		    obj->pvfs2.fs_id, credentials, &parent_ref.handle);
+	    ret = PINT_lookup_parent(obj->pvfs2.pvfs2_path, 
+                                     obj->pvfs2.fs_id, credentials,
+                                     &parent_ref.handle);
 	    if (ret < 0)
 	    {
 		PVFS_perror("PVFS_util_lookup_parent", ret);
