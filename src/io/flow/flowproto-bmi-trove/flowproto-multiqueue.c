@@ -25,6 +25,31 @@
 #define BUFFER_SIZE (256*1024)
 #define MAX_REGIONS 16
 
+#define FLOW_CLEANUP(__flow_data)				\
+do{								\
+    struct flow_descriptor* __flow_d = (__flow_data)->parent;	\
+    cleanup_buffers(__flow_data);				\
+    __flow_d = (__flow_data)->parent;				\
+    free(__flow_data);						\
+    __flow_d->release(__flow_d);				\
+    __flow_d->callback(__flow_d);				\
+}while(0)
+
+#define ERROR_CLEANUP(__f)					\
+do{								\
+    if((__f)->parent->state == FLOW_COMPLETE)			\
+    {								\
+	gen_mutex_unlock(&(__f)->flow_mutex);			\
+	FLOW_CLEANUP(__f);					\
+	return;							\
+    }								\
+    else							\
+    {								\
+	gen_mutex_unlock(&(__f)->flow_mutex);			\
+	return;							\
+    }								\
+}while(0)
+
 struct result_chain_entry
 {
     void* buffer_offset;
@@ -67,6 +92,7 @@ struct fp_private_data
     gen_mutex_t flow_mutex;
     void* tmp_buffer_list[MAX_REGIONS];
     void* intermediate;
+    int cleanup_pending_count;
 
     struct qlist_head src_list;
     struct qlist_head dest_list;
@@ -110,6 +136,8 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code);
 static void cleanup_buffers(struct fp_private_data* flow_data);
+static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
+    q_item, struct fp_private_data* flow_data);
 
 
 /* interface prototypes */
@@ -354,14 +382,13 @@ static void bmi_recv_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
     void* tmp_buffer;
 
-    /* TODO: error handling */
-    if(error_code != 0)
-    {
-	PVFS_perror_gossip("bmi_recv_callback_fn error_code", error_code);
-	assert(0);
-    }
-
     gen_mutex_lock(&flow_data->flow_mutex);
+
+    if(error_code != 0 || flow_data->parent->error_code != 0)
+    {
+	handle_io_error(error_code, q_item, flow_data);
+	ERROR_CLEANUP(flow_data);
+    }
 
     /* remove from current queue */
     qlist_del(&q_item->list_link);
@@ -386,8 +413,11 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	    &q_item->posted_id);
 	result_tmp = result_tmp->next;
 
-	/* TODO: error handling */
-	assert(ret >= 0);
+	if(ret < 0)
+	{
+	    handle_io_error(ret, q_item, flow_data);
+	    ERROR_CLEANUP(flow_data);
+	}
 
 	if(ret == 1)
 	{
@@ -476,8 +506,11 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	    &q_item->bmi_callback,
 	    global_bmi_context);
 	
-	/* TODO: error handling */
-	assert(ret >= 0);
+	if(ret < 0)
+	{
+	    handle_io_error(ret, q_item, flow_data);
+	    ERROR_CLEANUP(flow_data);
+	}
 
 	if(ret == 1)
 	{
@@ -510,14 +543,14 @@ static void trove_read_callback_fn(void *user_ptr,
     int done = 0;
     struct qlist_head* tmp_link;
 
-    /* TODO: error handling */
-    if(error_code != 0)
+    gen_mutex_lock(&flow_data->flow_mutex);
+
+    if(error_code != 0 || flow_data->parent->error_code != 0)
     {
-	PVFS_perror_gossip("bmi_recv_callback_fn error_code", error_code);
-	assert(0);
+	handle_io_error(error_code, q_item, flow_data);
+	ERROR_CLEANUP(flow_data);
     }
 
-    gen_mutex_lock(&flow_data->flow_mutex);
     /* don't do anything until the last read completes */
     if(q_item->result_chain_count > 1)
     {
@@ -570,10 +603,13 @@ static void trove_read_callback_fn(void *user_ptr,
 	{
 	    ret = 0;
 	    done = 1;
+	}	
+
+	if(ret < 0)
+	{
+	    handle_io_error(ret, q_item, flow_data);
+	    ERROR_CLEANUP(flow_data);
 	}
-	
-	/* TODO: error handling */
-	assert(ret >= 0);
 
 	if(ret == 1)
 	{
@@ -609,14 +645,27 @@ static int bmi_send_callback_fn(void *user_ptr,
     struct result_chain_entry* old_result_tmp;
     void* tmp_buffer;
     PVFS_size bytes_processed = 0;
-    struct flow_descriptor* flow_d;
-
-    /* TODO: error handling */
-    assert(error_code == 0);
-
-    PINT_perf_count(PINT_PERF_READ, actual_size, PINT_PERF_ADD);
 
     gen_mutex_lock(&flow_data->flow_mutex);
+
+    if(error_code != 0 || flow_data->parent->error_code != 0)
+    {
+	handle_io_error(error_code, q_item, flow_data);
+	if(flow_data->parent->state == FLOW_COMPLETE)
+	{
+	    gen_mutex_unlock(&flow_data->flow_mutex);
+	    FLOW_CLEANUP(flow_data);
+	    return(1);
+	}
+	else
+	{
+	    gen_mutex_unlock(&flow_data->flow_mutex);
+	    FLOW_CLEANUP(flow_data);
+	    return(0);
+	}
+    }
+
+    PINT_perf_count(PINT_PERF_READ, actual_size, PINT_PERF_ADD);
 
     flow_data->parent->total_transfered += actual_size;
 
@@ -636,11 +685,7 @@ static int bmi_send_callback_fn(void *user_ptr,
     {
 	q_item->parent->state = FLOW_COMPLETE;
 	gen_mutex_unlock(&flow_data->flow_mutex);
-	cleanup_buffers(flow_data);
-	flow_d = flow_data->parent;
-	free(flow_data);
-	flow_d->release(flow_d);
-	flow_d->callback(flow_d);
+	FLOW_CLEANUP(flow_data);
 	return(1);
     }
 
@@ -745,8 +790,22 @@ static int bmi_send_callback_fn(void *user_ptr,
 	    &q_item->posted_id);
 	result_tmp = result_tmp->next;
 
-	/* TODO: error handling */
-	assert(ret >= 0);
+	if(ret < 0)
+	{
+	    handle_io_error(ret, q_item, flow_data);
+	    if(flow_data->parent->state == FLOW_COMPLETE)
+	    {
+		gen_mutex_unlock(&flow_data->flow_mutex);
+		FLOW_CLEANUP(flow_data);
+		return(1);
+	    }
+	    else
+	    {
+		gen_mutex_unlock(&flow_data->flow_mutex);
+		FLOW_CLEANUP(flow_data);
+		return(0);
+	    }
+	}
 
 	if(ret == 1)
 	{
@@ -778,12 +837,14 @@ static void trove_write_callback_fn(void *user_ptr,
     struct result_chain_entry* old_result_tmp;
     void* tmp_buffer;
     PVFS_size bytes_processed = 0;
-    struct flow_descriptor* flow_d;
-
-    /* TODO: error handling */
-    assert(error_code == 0);
 
     gen_mutex_lock(&flow_data->flow_mutex);
+
+    if(error_code != 0 || flow_data->parent->error_code != 0)
+    {
+	handle_io_error(error_code, q_item, flow_data);
+	ERROR_CLEANUP(flow_data);
+    }
 
     /* don't do anything until the last write completes */
     if(q_item->result_chain_count > 1)
@@ -812,11 +873,7 @@ static void trove_write_callback_fn(void *user_ptr,
     {
 	q_item->parent->state = FLOW_COMPLETE;
 	gen_mutex_unlock(&flow_data->flow_mutex);
-	cleanup_buffers(flow_data);
-	flow_d = flow_data->parent;
-	free(flow_data);
-	flow_d->release(flow_d);
-	flow_d->callback(flow_d);
+	FLOW_CLEANUP(flow_data);
 	return;
     }
 
@@ -909,8 +966,11 @@ static void trove_write_callback_fn(void *user_ptr,
 	    &q_item->bmi_callback,
 	    global_bmi_context);
 	
-	/* TODO: error handling */
-	assert(ret >= 0);
+	if(ret < 0)
+	{
+	    handle_io_error(ret, q_item, flow_data);
+	    ERROR_CLEANUP(flow_data);
+	}
 
 	if(ret == 1)
 	{
@@ -1009,17 +1069,15 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
     char *src_ptr, *dest_ptr;
     enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
-    struct flow_descriptor* flow_d;
-
-    /* TODO: error handling */
-    if(error_code != 0)
-    {
-	PVFS_perror_gossip("bmi_recv_callback_fn error_code", error_code);
-	assert(0);
-    }
 
     gen_mutex_lock(&flow_data->flow_mutex);
     
+    if(error_code != 0 || flow_data->parent->error_code != 0)
+    {
+	handle_io_error(error_code, q_item, flow_data);
+	ERROR_CLEANUP(flow_data);
+    }
+
     flow_data->parent->total_transfered += actual_size;
 
     /* are we done? */
@@ -1027,11 +1085,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     {
 	q_item->parent->state = FLOW_COMPLETE;
 	gen_mutex_unlock(&flow_data->flow_mutex);
-	cleanup_buffers(flow_data);
-	flow_d = flow_data->parent;
-	free(flow_data);
-	flow_d->release(flow_d);
-	flow_d->callback(flow_d);
+	FLOW_CLEANUP(flow_data);
 	return;
     }
 
@@ -1120,11 +1174,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	{	
 	    q_item->parent->state = FLOW_COMPLETE;
 	    gen_mutex_unlock(&flow_data->flow_mutex);
-	    cleanup_buffers(flow_data);
-	    flow_d = flow_data->parent;
-	    free(flow_data);
-	    flow_d->release(flow_d);
-	    flow_d->callback(flow_d);
+	    FLOW_CLEANUP(flow_data);
 	    return;
 	}
 
@@ -1147,8 +1197,12 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	q_item->parent->tag,
 	&q_item->bmi_callback,
 	global_bmi_context);
-    /* TODO: error handling */
-    assert(ret >= 0);
+
+    if(ret < 0)
+    {
+	handle_io_error(ret, q_item, flow_data);
+	ERROR_CLEANUP(flow_data);
+    }
 
     gen_mutex_unlock(&flow_data->flow_mutex);
 
@@ -1185,17 +1239,15 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
     char *src_ptr, *dest_ptr;
     PVFS_size region_size;
-    struct flow_descriptor* flow_d;
-
-    /* TODO: error handling */
-    if(error_code != 0)
-    {
-	PVFS_perror_gossip("bmi_recv_callback_fn error_code", error_code);
-	assert(0);
-    }
 
     gen_mutex_lock(&flow_data->flow_mutex);
-    
+      
+    if(error_code != 0 || flow_data->parent->error_code != 0)
+    {
+	handle_io_error(error_code, q_item, flow_data);
+	ERROR_CLEANUP(flow_data);
+    }
+  
     flow_data->parent->total_transfered += actual_size;
 
     /* if this is the result of a receive into an intermediate buffer,
@@ -1250,11 +1302,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     {
 	q_item->parent->state = FLOW_COMPLETE;
 	gen_mutex_unlock(&flow_data->flow_mutex);
-	cleanup_buffers(flow_data);
-	flow_d = flow_data->parent;
-	free(flow_data);
-	flow_d->release(flow_d);
-	flow_d->callback(flow_d);
+	FLOW_CLEANUP(flow_data);
 	return;
     }
 
@@ -1318,11 +1366,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 	{	
 	    q_item->parent->state = FLOW_COMPLETE;
 	    gen_mutex_unlock(&flow_data->flow_mutex);
-	    cleanup_buffers(flow_data);
-	    flow_d = flow_data->parent;
-	    free(flow_data);
-	    flow_d->release(flow_d);
-	    flow_d->callback(flow_d);
+	    FLOW_CLEANUP(flow_data);
 	    return;
 	}
     }
@@ -1338,8 +1382,12 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 	q_item->parent->tag,
 	&q_item->bmi_callback,
 	global_bmi_context);
-    /* TODO: error handling */
-    assert(ret >= 0);
+
+    if(ret < 0)
+    {
+	handle_io_error(ret, q_item, flow_data);
+	ERROR_CLEANUP(flow_data);
+    }
 
     gen_mutex_unlock(&flow_data->flow_mutex);
 
@@ -1348,6 +1396,64 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 	bmi_to_mem_callback_fn(q_item, tmp_actual_size, 0);
     }
 
+    return;
+}
+
+
+/* handle_io_error()
+ * 
+ * called any time a BMI or Trove error code is detected, responsible for
+ * safely cleaning up the associated flow
+ *
+ * NOTE: this function should always be called while holding the flow mutex!
+ *
+ * no return value
+ */
+static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
+    q_item, struct fp_private_data* flow_data)
+{
+    struct qlist_head* tmp_link;
+
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
+	"flowproto-multiqueue error cleanup path.\n");
+
+    /* is this the first error registered for this particular flow? */
+    if(flow_data->parent->error_code == 0)
+    {
+	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+	    "flowproto-multiqueue first failure.\n");
+	flow_data->parent->error_code = error_code;
+	qlist_del(&q_item->list_link);
+	flow_data->cleanup_pending_count = 0;
+
+	/* TODO: remember to count chains with multiple trove ops per queue
+	 * entry 
+	 */
+
+	/* count how many other operations are pending on this flow */
+	qlist_for_each(tmp_link, &flow_data->dest_list)
+	{
+	    q_item = qlist_entry(tmp_link, struct fp_queue_item,
+		list_link);
+	    flow_data->cleanup_pending_count++;
+	}
+	qlist_for_each(tmp_link, &flow_data->src_list)
+	{
+	    q_item = qlist_entry(tmp_link, struct fp_queue_item,
+		list_link);
+	    flow_data->cleanup_pending_count++;
+	}
+
+	gossip_err(
+	    "Error: flow protocol assertion, leaving %d operations stranded.\n", 
+	    flow_data->cleanup_pending_count);
+
+	/* TODO: finish filling this in */
+	assert(0);
+    }
+    
+    /* TODO: finish filling this in */
+    assert(0);
     return;
 }
 
