@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <client.h>
 #include <string.h>
+#include <time.h>
+#include <assert.h>
+
 #include "helper.h"
 
 void print_entry_attr(
@@ -15,7 +18,11 @@ void print_entry_attr(
 {
     char buf[128] = {0};
 
-    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t0 DATE TIME %s\n",
+    struct tm *time = gmtime((time_t *)&attr->ctime);
+    assert(time);
+
+    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t0 "
+             "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
              ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
              ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
              ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
@@ -28,6 +35,11 @@ void print_entry_attr(
              ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
              attr->owner,
              attr->group,
+             (time->tm_year + 1900),
+             (time->tm_mon + 1),
+             time->tm_mday,
+             (time->tm_hour + 1),
+             (time->tm_min + 1),
              entry_name);
     printf("%s",buf);
 }
