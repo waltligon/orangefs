@@ -223,11 +223,14 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
     }
 
     /* Post message */
-    job_post_ret = job_bmi_send(s_op->addr,
-	    s_op->encoded.buffer_list[0],
+    job_post_ret = job_bmi_send_list(
+	    s_op->addr,
+	    s_op->encoded.buffer_list,
+	    s_op->encoded.size_list,
+	    s_op->encoded.list_count,
 	    s_op->encoded.total_size,
 	    s_op->tag,
-	    0,
+	    s_op->encoded.buffer_flag,
 	    0,
 	    s_op,
 	    ret,
@@ -289,7 +292,7 @@ static int getattr_cleanup(state_action_struct *s_op, job_status_s *ret)
 
     if(s_op->resp)
     {
-	free(s_op->resp);
+	/*free(s_op->resp);*/
     }
 
     if(s_op->req)

@@ -360,7 +360,6 @@ int main(int argc,
 
 	for (i = 0; i < out_count; i++)
 	{
-	    printf("S_op %xh\n",s_op);
 	    s_op = (PINT_server_op *) completed_job_pointers[i];
 	    if (s_op->op == BMI_UNEXP)
 	    {
@@ -580,7 +579,7 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
     int ret;
     char *mem_calc_ptr;
 
-    serv_op = (PINT_server_op *) malloc(sizeof(PINT_server_op)+sizeof(void *));
+    serv_op = (PINT_server_op *) malloc(sizeof(PINT_server_op) + ENCODED_HEADER_SIZE);
     if (!serv_op)
     {
 	return (-1);
@@ -590,7 +589,6 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
     serv_op->op = BMI_UNEXP;
 
     mem_calc_ptr = (char *) serv_op;
-    serv_op->encoded.buffer_list = (void *)mem_calc_ptr+sizeof(PINT_server_op);
 
     serv_op->unexp_bmi_buff = (struct BMI_unexpected_info *)
 	    malloc(sizeof(struct BMI_unexpected_info));

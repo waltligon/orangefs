@@ -355,18 +355,12 @@ static int setattr_cleanup(state_action_struct *s_op, job_status_s *ret)
 
     if(s_op->resp)
     {
-	BMI_memfree(s_op->addr,
-		s_op->resp,
-		sizeof(struct PVFS_server_resp_s),
-		BMI_SEND_BUFFER);
+	free(s_op->resp);
     }
 
     if(s_op->req)
     {
-	BMI_memfree(s_op->addr,
-		s_op->req,
-		sizeof(struct PVFS_server_resp_s),
-		BMI_SEND_BUFFER);
+	free(s_op->req);
     }
 
     free(s_op->unexp_bmi_buff);

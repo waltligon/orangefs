@@ -502,38 +502,33 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
     s_op->resp->status = ret->error_code;
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
-    /* Set the ack IF it was created */
     if(ret->error_code == 0) 
     {
 	s_op->resp->u.generic.handle = s_op->req->u.crdirent.new_handle;
+    }
 
-	/* Encode the message */
-	job_post_ret = PINT_encode(s_op->resp,
-		PINT_ENCODE_RESP,
-		&(s_op->encoded),
-		s_op->addr,
-		s_op->enc_type);
-    }
-    else
-    {
-	/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
-	s_op->resp->op = PVFS_SERV_NOOP;
-	PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-	/* set it back */
-	((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
-    }
-    gossip_ldebug(SERVER_DEBUG,"jpr: %d\n",job_post_ret);
+    /* Encode the message */
+    job_post_ret = PINT_encode(s_op->resp,
+	    PINT_ENCODE_RESP,
+	    &(s_op->encoded),
+	    s_op->addr,
+	    s_op->enc_type);
+
     assert(job_post_ret == 0);
 
-    job_post_ret = job_bmi_send(s_op->addr,
-	    s_op->encoded.buffer_list[0],
+    job_post_ret = job_bmi_send_list(
+	    s_op->addr,
+	    s_op->encoded.buffer_list,
+	    s_op->encoded.size_list,
+	    s_op->encoded.list_count,
 	    s_op->encoded.total_size,
 	    s_op->tag,
-	    0,
+	    s_op->encoded.buffer_flag,
 	    0,
 	    s_op, 
 	    ret, 
 	    &i);
+
     return(job_post_ret);
 }
 
@@ -558,6 +553,7 @@ static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *
     int job_post_ret=0;
     job_id_t i;
 
+    gossip_ldebug(SERVER_DEBUG,"Release Fxn for crdirent\n");
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
 	    s_op,
 	    ret,

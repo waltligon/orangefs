@@ -259,8 +259,6 @@ static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
     int job_post_ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG,"Kvsend -- %d\n",ret->error_code);
-    gossip_debug(SERVER_DEBUG,"Kvsend -- %d\n",ret->count);
     if((s_op->resp->status = ret->error_code) < 0)
     {
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
@@ -274,25 +272,25 @@ static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
     s_op->resp->u.readdir.pvfs_dirent_count = ret->count;
 
-    if(ret->error_code == 0)
-	job_post_ret = PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-    else
-    {
-	/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
-	s_op->resp->op = PVFS_SERV_NOOP;
-	PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-	/* set it back */
-	((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
-    }
-    assert(s_op->encoded.list_count == 1);
-    job_post_ret = job_bmi_send(s_op->addr,
-	    s_op->encoded.buffer_list[0],
+    job_post_ret = PINT_encode(
+	    s_op->resp,
+	    PINT_ENCODE_RESP,
+	    &(s_op->encoded),
+	    s_op->addr,
+	    s_op->enc_type);
+
+    /* Post message */
+    job_post_ret = job_bmi_send_list(
+	    s_op->addr,
+	    s_op->encoded.buffer_list,
+	    s_op->encoded.size_list,
+	    s_op->encoded.list_count,
 	    s_op->encoded.total_size,
 	    s_op->tag,
+	    s_op->encoded.buffer_flag,
 	    0,
-	    0,
-	    s_op, 
-	    ret, 
+	    s_op,
+	    ret,
 	    &i);
 
     return(job_post_ret);

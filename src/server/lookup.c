@@ -17,6 +17,11 @@
 
 #define LOOKUP_BUFF_SZ 5
 
+enum 
+{
+    ENO_METADATA = 200
+};
+
 static int lookup_init(state_action_struct *s_op, job_status_s *ret);
 static int lookup_cleanup(state_action_struct *s_op, job_status_s *ret);
 static int lookup_check_params(state_action_struct *s_op, job_status_s *ret);
@@ -58,6 +63,7 @@ machine lookup(init, key_val, dir_space, check_params, send, release, cleanup)
     {
 	run lookup_check_params;
 	success => dir_space;
+	ENO_METADATA => send;
 	default => send;
     }
 
@@ -135,6 +141,7 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
     int memory_sz;
     int key_a_sz,val_a_sz,key_a0_sz,val_a0_sz,handle_array_sz,attr_array_sz;
 
+    gossip_ldebug(SERVER_DEBUG,"Lookup_Init\n");
 
     /* Set up the response size */
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
@@ -237,6 +244,8 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 	    ret,
 	    &(s_op->scheduled_id));
 
+    gossip_ldebug(SERVER_DEBUG,"/Lookup_Init\n");
+
     return(job_post_ret);
 
 }
@@ -272,66 +281,90 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 
   int k;
   char *end_of_path;
-  int meta_data_flag, directory_handle_flag, root_dir_flag;	/*used to tell us that we have the data*/
+  int meta_data_flag, directory_handle_flag;	/*used to tell us that we have the data*/
 
-  meta_data_flag = directory_handle_flag = root_dir_flag = 0;
+  gossip_ldebug(SERVER_DEBUG,"Check Perms\n");
+  meta_data_flag = directory_handle_flag = 0;
 
   if (s_op->resp->u.lookup_path.count == -1)
   {
       s_op->resp->u.lookup_path.count++;
-      root_dir_flag = 1;
+      s_op->req->u.lookup_path.starting_handle =
+	  *((PVFS_handle *) s_op->val_a[0].buffer);
   }
-  for (k = 0; k < ret->count; k++)
-  {
-      switch (((char *) (s_op->key_a[k].buffer))[0])
-      {
-	  case 'm':
-	      memcpy (&(s_op->resp->u.lookup_path.
-		       attr_array[s_op->resp->u.lookup_path.count]),
-		      s_op->val_a[0].buffer, s_op->val_a[0].buffer_sz);
-	      meta_data_flag = 1;
-	      s_op->resp->rsize += sizeof(PVFS_object_attr);
-	      break;
-	  case 'd':
-	      s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.
-		  count] =
-		  s_op->req->u.lookup_path.starting_handle;
-	      s_op->req->u.lookup_path.starting_handle =
-		  *((PVFS_handle *) s_op->val_a[0].buffer), directory_handle_flag =
-		  1;
-	      s_op->resp->rsize += sizeof(PVFS_handle);
-	      break;
-	  default:
-	      gossip_lerr ("Handle of unknown type found\n");
-
-      }
-  }
-  /* We don't want to increment again the first time.  Overwrite these values */
-  if (directory_handle_flag && meta_data_flag && !root_dir_flag)
-  {
-      s_op->resp->u.lookup_path.count++;
-      // CHECK PERMISSIONS HERE on attr_array[count-1];
-  }
+  /* We are not in the root dir space.  We need to save this information */
   else
   {
-      if (!directory_handle_flag)
+      if(!ret->count)
       {
-	  gossip_lerr ("Did not get directory handle\n");
-	  /* This means that this is a terminal file.  Which means we need to
-	     send what we have, i.e. this objects attribs.  Hopefully we have them.
-	     So we increment the count to say we have these attribs (if we do)
-	     and run with it.
+	  /* Here, we had a handle out of the parent directory.  We need to
+	     add this in and then encode our message.  We have no more information
+	     and the client must hash on this to get more info
 	   */
-	  if(meta_data_flag)
-	    s_op->resp->u.lookup_path.count++;
-	  /* TODO: Now jump to send if we have the attribs!! */
+	  s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.count] 
+	      = *(PVFS_handle *) s_op->val.buffer;
+	  s_op->resp->u.lookup_path.count++;
+	  s_op->resp->rsize += sizeof(PVFS_handle);
+	  ret->error_code = ENO_METADATA;
+	  return(1);
       }
-      if(!meta_data_flag)
+
+      for (k = 0; k < ret->count; k++)
       {
-	  /* TODO: Why don't we have them?? */
-	  gossip_lerr ("Did not get metadata.\n Damn.");
+	  switch (((char *) (s_op->key_a[k].buffer))[0])
+	  {
+	      case 'm':
+		  memcpy (&(s_op->resp->u.lookup_path.
+			      attr_array[s_op->resp->u.lookup_path.count]),
+			  s_op->val_a[0].buffer, s_op->val_a[0].buffer_sz);
+		  meta_data_flag = 1;
+		  s_op->resp->rsize += sizeof(PVFS_object_attr);
+		  break;
+	      case 'd':
+		  s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.
+		      count] =
+		      s_op->req->u.lookup_path.starting_handle;
+		  s_op->req->u.lookup_path.starting_handle =
+		      *((PVFS_handle *) s_op->val_a[0].buffer), directory_handle_flag =
+		      1;
+		  s_op->resp->rsize += sizeof(PVFS_handle);
+		  break;
+	      default:
+		  gossip_lerr ("Handle of unknown type found\n");
+
+	  }
       }
-      gossip_lerr ("We did not get both... fix it\n");
+      if (directory_handle_flag && meta_data_flag)
+      {
+	  s_op->resp->u.lookup_path.count++;
+	  // CHECK PERMISSIONS HERE on attr_array[count-1];
+      }
+      else
+      {
+	  if (!directory_handle_flag)
+	  {
+	      gossip_lerr ("Did not get directory handle\n");
+	      /* This means that this is a file and not a directory
+		 So we increment the count to say we have 
+		 these attribs and run with it.
+	       */
+	      if(meta_data_flag)
+	      {
+		  s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.
+		      count] = *(PVFS_handle *) s_op->val.buffer;
+		  s_op->resp->u.lookup_path.count++;
+		  s_op->resp->rsize += sizeof(PVFS_handle);
+		  ret->error_code = ENO_METADATA;
+		  /* Now jump to send!! */
+		  return(1);
+	      }
+	  }
+	  if(!meta_data_flag)
+	  {
+	      /* TODO: Why don't we have them?? */
+	      gossip_lerr ("Did not get metadata.\n");
+	  }
+      }
   }
   /* TODO: Better way of doing this??? */
   if (s_op->strsize)
@@ -383,6 +416,10 @@ static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret)
 
     gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space %lld\n",
                   s_op->req->u.lookup_path.starting_handle);
+    gossip_ldebug(SERVER_DEBUG,"Trying to find %s of length %d in %lld\n",
+		    (char *)s_op->key.buffer,
+		    s_op->key.buffer_sz,
+		    s_op->req->u.lookup_path.starting_handle);
 
     job_post_ret = job_trove_keyval_read(
 	    s_op->req->u.lookup_path.fs_id,
@@ -422,10 +459,16 @@ static int lookup_key_val(state_action_struct *s_op, job_status_s *ret)
     job_id_t i;
     PVFS_vtag_s bs;
 
-    if(s_op->resp->u.lookup_path.count > 0)
-	s_op->req->u.lookup_path.starting_handle = ret->handle;
+    if(s_op->resp->u.lookup_path.count != -1)
+	s_op->req->u.lookup_path.starting_handle = *(PVFS_handle *)s_op->val.buffer;
 
     gossip_ldebug(SERVER_DEBUG,"Lookup: K/V Iterate %lld\n",s_op->req->u.lookup_path.starting_handle);
+
+    gossip_ldebug(SERVER_DEBUG,"Sizes: %d,%d,%d,%d\n",
+	    s_op->key_a[0].buffer_sz,
+	    s_op->key_a[1].buffer_sz,
+	    s_op->val_a[0].buffer_sz,
+	    s_op->val_a[1].buffer_sz);
 
     job_post_ret = job_trove_keyval_iterate(
 	    s_op->req->u.lookup_path.fs_id,
@@ -467,6 +510,7 @@ static int lookup_release_job(state_action_struct *s_op, job_status_s *ret)
     int job_post_ret=0;
     job_id_t i;
 
+    gossip_ldebug(SERVER_DEBUG,"Release\n");
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
 	    s_op,
 	    ret,
@@ -512,16 +556,18 @@ static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
     assert(job_post_ret == 0);
 
     /* Post message */
-    job_post_ret = job_bmi_send(s_op->addr,
-	    s_op->encoded.buffer_list[0],
+    job_post_ret = job_bmi_send_list(
+	    s_op->addr,
+	    s_op->encoded.buffer_list,
+	    s_op->encoded.size_list,
+	    s_op->encoded.list_count,
 	    s_op->encoded.total_size,
 	    s_op->tag,
+	    s_op->encoded.buffer_flag,
 	    0,
-	    0,
-	    s_op,
-	    ret,
+	    s_op, 
+	    ret, 
 	    &i);
-
 
     return(job_post_ret);
 
@@ -546,6 +592,8 @@ static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
 static int lookup_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
+
+    gossip_ldebug(SERVER_DEBUG,"Cleanup\n");
 
     if(s_op->key_a)
     {

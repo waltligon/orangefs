@@ -13,8 +13,6 @@
 
 static int getconfig_cleanup(state_action_struct *s_op, job_status_s *ret);
 static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret);
-static int getconfig_build_bmi_good_msg(state_action_struct *s_op, job_status_s *ret);
-static int getconfig_build_bmi_error(state_action_struct *s_op, job_status_s *ret);
 static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret);
 static int getconfig_init(state_action_struct *s_op, job_status_s *ret);
 void getconfig_init_state_machine(void);
@@ -30,25 +28,18 @@ PINT_state_machine_s getconfig_req_s =
 
 %%
 
-machine get_config(init, trove, good_msg, bmi_send, cleanup, error_msg)
+machine get_config(init, trove, bmi_send, cleanup)
 {
 	state init
 	{
 		run getconfig_init;
 		success => trove;
-		default => error_msg;
+		default => bmi_send;
 	}
 
 	state trove
 	{
 		run getconfig_job_trove;
-		success => good_msg;
-		default => error_msg;
-	}
-
-	state good_msg
-	{
-		run getconfig_build_bmi_good_msg;
 		default => bmi_send;
 	}
 
@@ -62,12 +53,6 @@ machine get_config(init, trove, good_msg, bmi_send, cleanup, error_msg)
 	{
 		run getconfig_cleanup;
 		default => init;
-	}
-
-	state error_msg
-	{
-		run getconfig_build_bmi_error;
-		default => bmi_send;
 	}
 
 }
@@ -196,68 +181,6 @@ static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret)
 }
 
 /*
- * Function: getconfig_build_bmi_error
- *
- * Params:   server_op *b, 
- *           job_status_s *ret
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  void
- *
- * Synopsis: Build a bmi message containing
- *           an error while processing the request
- *           
- */
-
-static int getconfig_build_bmi_error(state_action_struct *s_op, job_status_s *ret)
-{
-
-    s_op->resp->status = ret->error_code;
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
-    /* Set it to a noop for an error so we don't encode all the stuff we don't need to */
-    s_op->resp->op = PVFS_SERV_NOOP;
-    PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-    /* set it back */
-    ((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = PVFS_SERV_GETCONFIG;
-
-    return(1);
-
-}
-
-/*
- * Function: getconfig_build_bmi_good_msg
- *
- * Params:   server_op *b, 
- *           job_status_s *ret
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  void
- *
- * Synopsis: Build a bmi message containing
- *           the data the client requested
- *           
- */
-
-static int getconfig_build_bmi_good_msg(state_action_struct *s_op, job_status_s *ret)
-{
-
-    int jpret;
-
-    s_op->resp->status = ret->error_code;
-    s_op->resp->u.getconfig.root_handle = *((TROVE_handle *)s_op->val.buffer);
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + s_op->strsize;
-    jpret = PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-    return(1);
-
-}
-
-/*
  * Function: getconfig_job_bmi_send
  *
  * Params:   server_op *b, 
@@ -280,23 +203,38 @@ static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
     int job_post_ret;
     job_id_t i;
 
-    assert(s_op->encoded.list_count == 1);
-    if(s_op->encoded.list_count == 1)
+    s_op->resp->status = ret->error_code;
+    if(!ret->error_code)
     {
-	job_post_ret = job_bmi_send(s_op->addr,
-		s_op->encoded.buffer_list[0],
-		s_op->encoded.total_size,
-		s_op->tag,
-		0,
-		0,
-		s_op,
-		ret,
-		&i);
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + s_op->strsize;
+	s_op->resp->u.getconfig.root_handle = *((TROVE_handle *)s_op->val.buffer);
     }
-    else {
-	/* Send list! */
-	job_post_ret = -1;
+    else
+    {
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
     }
+    
+    job_post_ret = PINT_encode(
+	    s_op->resp,
+	    PINT_ENCODE_RESP,
+	    &(s_op->encoded),
+	    s_op->addr,
+	    s_op->enc_type);
+
+    assert(job_post_ret == 0);
+
+    job_post_ret = job_bmi_send_list(
+	    s_op->addr,
+	    s_op->encoded.buffer_list,
+	    s_op->encoded.size_list,
+	    s_op->encoded.list_count,
+	    s_op->encoded.total_size,
+	    s_op->tag,
+	    s_op->encoded.buffer_flag,
+	    0,
+	    s_op,
+	    ret,
+	    &i);
 
     return(job_post_ret);
 
@@ -316,13 +254,11 @@ static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
  *
  * Synopsis: cleans up string memory
  *           response structure
- *           TODO: should it clean up server_op?
  */
 
 static int getconfig_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 
-    /* TODO: Free I/O Struct! */
     if (s_op->resp)
     {
 	free(s_op->resp);
