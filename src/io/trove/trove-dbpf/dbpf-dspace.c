@@ -66,13 +66,21 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     if (!extent_array || (extent_array->extent_count < 1))
+    {
 	return -TROVE_EINVAL;
+    }
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -91,7 +99,9 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         malloc(extent_array->extent_count * sizeof(TROVE_extent));
 
     if (q_op_p->op.u.d_create.extent_array.extent_array == NULL)
+    {
         return -TROVE_ENOMEM;
+    }
 
     memcpy(q_op_p->op.u.d_create.extent_array.extent_array,
            extent_array->extent_array,
@@ -703,10 +713,16 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     }
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -743,10 +759,16 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     dbpf_attr_cache_remove(handle);
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -870,7 +892,6 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     /* get an fd for the bstream so we can check size */
     ret = dbpf_bstream_fdcache_try_get(
         op_p->coll_p->coll_id, op_p->handle, 0, &fd);
-
     switch (ret)
     {
         case DBPF_BSTREAM_FDCACHE_ERROR:
@@ -887,16 +908,18 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	    return 0;
 	case DBPF_BSTREAM_FDCACHE_SUCCESS:
 	    ret = DBPF_FSTAT(fd, &b_stat);
-	    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id,
-                                     op_p->handle);
+            dbpf_bstream_fdcache_put(
+                op_p->coll_p->coll_id, op_p->handle);
 	    if (ret < 0)
             {
                 goto return_error;
             }
 	    b_size = (TROVE_size) b_stat.st_size;
-	    /* drop through */
 	    break;
-        }
+        default:
+            assert(0);
+            break;
+    }
 
     ret = dbpf_keyval_dbcache_try_get(
         op_p->coll_p->coll_id, op_p->handle, 0, &kdb_p);
