@@ -14,6 +14,7 @@
 #include "gossip.h"
 #include "pint-dev.h"
 #include "job.h"
+#include "pcache.h"
 
 #include "client.h"
 
@@ -526,6 +527,14 @@ int main(int argc, char **argv)
         fprintf(stderr, "Cannot initialize system interface\n");
         return 1;
     }
+
+    /*
+      set extraordinarily long pcache timeout value (ms) so
+      that the attributes of files can be cached for a long
+      time; the system interface calls are responsible for
+      flushing the pcache when appropriate.
+    */
+    PINT_pcache_set_timeout(600000);
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
     if(ret < 0)

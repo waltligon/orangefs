@@ -139,9 +139,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 	gossip_ldebug(CLIENT_DEBUG,"Error initializing pinode cache\n");
 	goto return_error;	
     }
-
-    /* FIXME: get this value from config file? */
-    PINT_pcache_set_timeout(60000);
+    PINT_pcache_set_timeout(PINT_PCACHE_TIMEOUT * 1000);
 
     /* Initialize the directory cache */
     ret = PINT_dcache_initialize();
@@ -151,9 +149,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 	gossip_ldebug(CLIENT_DEBUG,"Error initializing directory cache\n");
 	goto return_error;	
     }	
-
-    /* FIXME: get this value from config file? */
-    PINT_dcache_set_timeout(60000);
+    PINT_dcache_set_timeout(PINT_DCACHE_TIMEOUT * 1000);
 
     /* Get configuration parameters from server */
     ret = PINT_server_get_config(&g_server_config,mntent_list);

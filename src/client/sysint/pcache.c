@@ -136,11 +136,7 @@ void PINT_pcache_pinode_dealloc(pinode *pnode)
 		gossip_ldebug(PCACHE_DEBUG, "\t%Ld\n",
                               pnode->attr.u.meta.dfile_array[i]);
             }
-
-	    if(pnode->attr.u.meta.dfile_array != NULL)
-            {
-		free(pnode->attr.u.meta.dfile_array);
-            }
+            PINT_pcache_object_attr_deep_free(&pnode->attr);
 	}
 	free(pnode);
     }
@@ -789,6 +785,24 @@ int PINT_pcache_object_attr_deep_copy(
         ret = 0;
     }
     return ret;
+}
+
+/* free any internally allocated members; NOT passed in attr pointer */
+void PINT_pcache_object_attr_deep_free(PVFS_object_attr *attr)
+{
+    if (attr)
+    {
+        if (attr->mask & PVFS_ATTR_META_DFILES)
+        {
+            free(attr->u.meta.dfile_array);
+        }
+        if (attr->mask & PVFS_ATTR_META_DIST)
+        {
+            /* FIXME: memory leak */
+            gossip_lerr("WARNING: need to free old dist, "
+                        "but I don't know how.\n");
+        }
+    }
 }
 
 /*

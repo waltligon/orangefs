@@ -80,6 +80,8 @@ void PINT_pcache_set_timeout(int max_timeout_ms);
 int PINT_pcache_object_attr_deep_copy(
     PVFS_object_attr *dest,
     PVFS_object_attr *src);
+void PINT_pcache_object_attr_deep_free(
+    PVFS_object_attr *attr);
 int PINT_pcache_retrieve_datafile_attrs(
     PVFS_object_attr meta_attr,
     PVFS_fs_id fs_id,
