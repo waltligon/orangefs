@@ -9,25 +9,26 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #include "pvfs2-server.h"
 
 static int statfs_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int statfs_fake(PINT_server_op *s_op, job_status_s* js_p);
+static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p);
 
 %%
 
-machine pvfs2_statfs_sm(prelude, fake, final_response, cleanup)
+machine pvfs2_statfs_sm(prelude, do_statfs, final_response, cleanup)
 {
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		default => fake;
+		default => do_statfs;
 	}
 
-	state fake
+	state do_statfs
 	{
-		run statfs_fake;
+		run statfs_do_statfs;
 		default => final_response;
 	}
 
@@ -46,14 +47,41 @@ machine pvfs2_statfs_sm(prelude, fake, final_response, cleanup)
 
 %%
 
-/* statfs_fake()
+/* statfs_do_statfs()
  *
- * just sets an error code- this isn't implemented yet
+ * issue the trove call to retrieve fs statistics
  */
-static int statfs_fake(PINT_server_op *s_op, job_status_s* js_p)
+static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("fake");
-    js_p->error_code = -PVFS_ENOSYS;
+    PINT_STATE_DEBUG("do_statfs");
+    int ret = -1;
+    TROVE_context_id tmp_context;
+
+    /* we need a context to be able to make the getinfo call */
+    ret = trove_open_context(s_op->req->u.statfs.fs_id, &tmp_context);
+    if(ret < 0)
+    {
+	js_p->error_code = ret;
+	return(1);
+    }
+
+    ret = trove_collection_getinfo(s_op->req->u.statfs.fs_id, tmp_context,
+	PVFS_COLLECTION_STATFS, &(s_op->resp.u.statfs.stat));
+
+    /* close context regardless of whether getinfo was successful */
+    trove_close_context(s_op->req->u.statfs.fs_id, tmp_context);
+    
+    /* note, getinfo should always return immediately, no testing needed */
+    assert(ret != 0);
+    if(ret != 1)
+    {
+	js_p->error_code = ret;
+    }
+    else
+    {
+	js_p->error_code = 0;
+    }
+
     return(1);
 }
 

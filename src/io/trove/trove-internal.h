@@ -353,7 +353,7 @@ struct TROVE_mgmt_ops
     int (*collection_getinfo)(
 			      TROVE_coll_id coll_id,
 			      TROVE_context_id context_id,
-			      int option,
+			      TROVE_coll_getinfo_options opt,
 			      void *parameter);
     
     int (*collection_seteattr)(

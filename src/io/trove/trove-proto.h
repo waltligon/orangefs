@@ -349,7 +349,7 @@ int trove_collection_seteattr(
 int trove_collection_getinfo(
 			     TROVE_coll_id coll_id,
 			     TROVE_context_id context_id,
-			     int option,
+			     TROVE_coll_getinfo_options opt,
 			     void *parameter);
 
 int trove_collection_setinfo(

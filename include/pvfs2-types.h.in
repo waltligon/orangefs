@@ -111,6 +111,16 @@ typedef enum PVFS_ds_type_e PVFS_ds_type;
 #define PVFS_ATTR_SYS_ALL_NOSIZE PVFS_ATTR_COMMON_ALL
 #define PVFS_ATTR_SYS_ALL_SETABLE (PVFS_ATTR_COMMON_ALL-PVFS_ATTR_COMMON_TYPE)
 
+/* statfs information */
+struct PVFS_statfs_s
+{
+    PVFS_fs_id fs_id;
+    PVFS_size bytes_available;
+    PVFS_size bytes_total;
+    /* TODO: need more fields here eventually */
+};
+typedef struct PVFS_statfs_s PVFS_statfs;
+
 /* pinode reference (uniquely refers to a single pinode) */
 struct PVFS_pinode_reference_s
 {

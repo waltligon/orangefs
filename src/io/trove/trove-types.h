@@ -28,6 +28,8 @@ typedef PVFS_ds_attributes         TROVE_ds_attributes_s;
 typedef PVFS_ds_storedattr         TROVE_ds_storedattr_s;
 typedef PVFS_error                 TROVE_ds_state;
 typedef PVFS_context_id            TROVE_context_id;
+typedef PVFS_statfs		   TROVE_statfs;
+typedef PVFS_coll_getinfo_options  TROVE_coll_getinfo_options;
 
 #define TROVE_HANDLE_NULL          PVFS_HANDLE_NULL
 

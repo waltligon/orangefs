@@ -18,6 +18,7 @@
 #include <malloc.h>
 #include <errno.h>
 #include <limits.h>
+#include <sys/vfs.h>
 
 #include "trove.h"
 #include "trove-internal.h"
@@ -50,10 +51,46 @@ static int dbpf_mkpath(char *pathname, mode_t mode);
  */
 static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
 				   TROVE_context_id context_id,
-				   int option,
+				   TROVE_coll_getinfo_options opt,
 				   void *parameter)
 {
-    return -1;
+    struct dbpf_collection *coll_p;
+    struct dbpf_storage *sto_p;
+    int ret = -1;
+
+    sto_p = my_storage_p;
+    /* TODO: use trove error code */
+    if (sto_p == NULL) return -1;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    /* TODO: use trove error code */
+    if (coll_p == NULL) return -1;
+
+    switch(opt)
+    {
+	case PVFS_COLLECTION_STATFS:
+	    {
+		TROVE_statfs* tmp_trove_statfs = (TROVE_statfs*)parameter;
+		struct statfs tmp_statfs;
+		char path_name[PATH_MAX];
+
+		DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, sto_p->name);
+		ret = statfs(path_name, &tmp_statfs);
+		if(ret < 0)
+		{
+		    /* TODO: use trove error code */
+		    return(ret);
+		}
+		tmp_trove_statfs->fs_id = coll_id;
+		tmp_trove_statfs->bytes_available = 
+		    tmp_statfs.f_bsize * tmp_statfs.f_bfree;
+		tmp_trove_statfs->bytes_total = 
+		    tmp_statfs.f_bsize * tmp_statfs.f_blocks;
+		return(1);
+	    }
+	    break;
+    }
+    return(-TROVE_ENOSYS);
 }
 
 /* dbpf_collection_setinfo()

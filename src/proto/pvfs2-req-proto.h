@@ -434,7 +434,7 @@ struct PVFS_servreq_statfs
 
 struct PVFS_servresp_statfs
 {
-    /* TODO: fill this in */
+    PVFS_statfs stat;
 };
 
 /* io **********************************************************/

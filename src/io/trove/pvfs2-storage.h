@@ -13,6 +13,13 @@
  * Types and structures specific to the storage interface
  */
 
+/* getinfo options */
+enum PVFS_coll_getinfo_options_e
+{
+    PVFS_COLLECTION_STATFS = 1
+};
+typedef enum PVFS_coll_getinfo_options_e PVFS_coll_getinfo_options;
+
 /* key/value descriptors */
 struct PVFS_ds_keyval_s
 {
