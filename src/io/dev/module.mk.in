@@ -1,5 +1,0 @@
-DIR := src/io/dev
-LIBSRC += \
-	$(DIR)/pint-dev.c
-SERVERSRC += \
-	$(DIR)/pint-dev.c 

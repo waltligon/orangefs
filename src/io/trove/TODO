@@ -1,6 +1,0 @@
-- testsome should take an array of coll_ids to make life easier on the
-  upper layers.
-- even better, test and testsome shouldn't need coll_ids at all; we
-  should make the upper level code handle working across multiple
-  colllections.
-
