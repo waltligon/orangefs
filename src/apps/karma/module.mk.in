@@ -8,4 +8,5 @@ KARMASRC += \
     $(DIR)/prep.c \
     $(DIR)/fsview.c \
     $(DIR)/details.c \
+    $(DIR)/units.c \
     $(DIR)/status.c

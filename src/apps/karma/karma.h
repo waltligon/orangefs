@@ -45,12 +45,12 @@ void gui_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
 		      int svr_stat_ct,
 		      struct gui_graph_data **out_graph_data);
 
-/* details page interface */
+/* details page interface (details.c) */
 GtkWidget *gui_details_setup(void);
 void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
 			int server_stat_ct);
 
-/* status page interface */
+/* status page interface (status.c) */
 GtkWidget *gui_status_setup(void);
 
 enum {
@@ -72,5 +72,10 @@ enum {
 void gui_status_graph_update(int graph_id,
 			     struct gui_graph_data *graph_data);
 
-/* file system view/selection interface */
+/* file system view/selection interface (fsview.c) */
 void gui_fsview_popup(void);
+
+/* unit conversion functions (units.c) */
+char *gui_units_time(uint64_t time_sec, float *divisor);
+char *gui_units_size(PVFS_size size_bytes, float *divisor);
+char *gui_units_count(uint64_t count, float *divisor);
