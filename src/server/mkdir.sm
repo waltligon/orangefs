@@ -16,6 +16,10 @@ static int mkdir_create(
     PINT_server_op *s_op, job_status_s* js_p);
 static int mkdir_setattrib(
     PINT_server_op *s_op, job_status_s* js_p);
+static int mkdir_create_dirdata_dspace(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int mkdir_write_dirdata_handle(
+    PINT_server_op *s_op, job_status_s* js_p);
 static int mkdir_cleanup(
     PINT_server_op *s_op, job_status_s* js_p);
 static int mkdir_error(
@@ -29,6 +33,8 @@ machine pvfs2_mkdir_sm(
     prelude,
     create,
     set_attrib,
+    create_dirdata_dspace,
+    write_dirdata_handle,
     final_response,
     err_msg,
     cleanup)
@@ -50,6 +56,20 @@ machine pvfs2_mkdir_sm(
     state set_attrib
     {
         run mkdir_setattrib;
+        success => create_dirdata_dspace;
+        default => err_msg;
+    }
+
+    state create_dirdata_dspace
+    {
+        run mkdir_create_dirdata_dspace;
+        success => write_dirdata_handle;
+        default => err_msg;
+    }
+
+    state write_dirdata_handle
+    {
+        run mkdir_write_dirdata_handle;
         success => final_response;
         default => err_msg;
     }
@@ -85,9 +105,10 @@ machine pvfs2_mkdir_sm(
  *
  * Synopsis: 
  *
- * NOTE: returned handle will pop out in js_p->handle (the job status struct).
+ * NOTE: returned handle will pop out in js_p->handle (the job status
+ * struct).
  */
-static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p)
+static int mkdir_create(PINT_server_op *s_op, job_status_s *js_p)
 {
 
     int ret;
@@ -98,27 +119,20 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p)
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "\ttrying to dspace create on "
-        "fs_id %d | handle-range[0]: %Lu-%Lu\n",
+        "fs_id %d\n\thandle-range[0]: %Lu-%Lu\n",
         s_op->req->u.mkdir.fs_id,
         Lu(s_op->req->u.mkdir.handle_extent_array.extent_array[0].first),
         Lu(s_op->req->u.mkdir.handle_extent_array.extent_array[0].last));
 
     ret = job_trove_dspace_create(
-        s_op->req->u.mkdir.fs_id,
-        &s_op->req->u.mkdir.handle_extent_array,
-        PVFS_TYPE_DIRECTORY,
-        NULL,
+        s_op->req->u.mkdir.fs_id, &s_op->req->u.mkdir.handle_extent_array,
+        PVFS_TYPE_DIRECTORY, NULL,
         PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.mkdir.fs_id),
-        s_op,
-        0,
-        js_p,
-        &i,
+            user_opts, s_op->req->u.mkdir.fs_id), s_op, 0, js_p, &i,
         server_job_context);
 
     return(ret);
 }
-
 
 /*
  * Function: mkdir_setattrib
@@ -131,7 +145,7 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p)
  * Synopsis: 
  *           
  */
-static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
+static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = -1;
     job_id_t j_id;
@@ -141,8 +155,11 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
 
     PINT_STATE_DEBUG("setattrib");
 
-    /* save the handle from the create in the response */
+    /* save the handle from the mkdir in the response */
     s_op->resp.u.mkdir.handle = js_p->handle;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, " new directory has handle %Lu\n",
+                 Lu(js_p->handle));
 
     a_p = &(s_op->req->u.mkdir.attr);
     gossip_debug(GOSSIP_SERVER_DEBUG, "  attrs to write = (owner = %d, "
@@ -162,6 +179,96 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
     return(ret);
 }
 
+static int mkdir_create_dirdata_dspace(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret = -PVFS_ENOMEM;
+    job_id_t i;
+    PVFS_handle_extent_array extent_array;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    PINT_STATE_DEBUG("create_dirdata_dspace");
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, "  creating dspace (coll_id = %d)\n",
+        s_op->req->u.mkdir.fs_id);
+
+    /* find our meta handle range for this create */
+    ret = PINT_config_get_meta_handle_extent_array(
+        user_opts, s_op->req->u.mkdir.fs_id, &extent_array);
+    assert(ret == 0);
+    assert(extent_array.extent_count > 0);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  new dirdata handle should "
+                 "be in range starting with %Lu-%Lu\n",
+                 Lu(extent_array.extent_array[0].first),
+                 Lu(extent_array.extent_array[0].last));
+
+    ret = job_trove_dspace_create(
+        s_op->req->u.mkdir.fs_id, &extent_array, PVFS_TYPE_DIRDATA, NULL,
+        PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.mkdir.fs_id), s_op, 0, js_p, &i,
+        server_job_context);
+
+    free(extent_array.extent_array);
+    extent_array.extent_array = NULL;
+
+    return ret;
+}
+
+static int mkdir_write_dirdata_handle(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    PINT_STATE_DEBUG("write_dirdata_handle");
+
+    if (js_p->error_code)
+    {
+        return 1;
+    }
+    js_p->error_code = 0;
+
+
+    s_op->u.mkdir.dirent_handle = js_p->handle;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, " new dirdata has handle %Lu\n",
+                 Lu(s_op->u.mkdir.dirent_handle));
+
+    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+
+    s_op->val.buffer = &s_op->u.mkdir.dirent_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, "  writing dirdata handle (%Lu) "
+        "into parent directory keyval space (%Lu)\n",
+        Lu(s_op->u.mkdir.dirent_handle),
+        Lu(s_op->resp.u.mkdir.handle));
+
+    ret = job_trove_keyval_write(
+        s_op->req->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
+        &s_op->key, &s_op->val, PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.mkdir.fs_id),
+        NULL, s_op, 0, js_p, &i, server_job_context);
+
+    return ret;
+}
+
+static int mkdir_error(PINT_server_op *s_op, job_status_s *js_p)
+{
+    PINT_STATE_DEBUG("error");
+    s_op->resp.u.mkdir.handle = 0;
+
+    if (js_p->error_code > -1)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+    }
+    return 1;
+}
 
 /*
  * Function: mkdir_cleanup
@@ -174,20 +281,10 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
  * Synopsis: free memory and return
  *           
  */
-static int mkdir_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int mkdir_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("cleanup");
-
     return(server_state_machine_complete(s_op));
-}
-
-/* TODO: fix comment block */
-static int mkdir_error(PINT_server_op *s_op, job_status_s* js_p)
-{
-    PINT_STATE_DEBUG("error");
-    s_op->resp.u.mkdir.handle = 0;
-    js_p->error_code = -1;
-    return(1);
 }
 
 /*
@@ -199,4 +296,3 @@ static int mkdir_error(PINT_server_op *s_op, job_status_s* js_p)
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
-

@@ -219,6 +219,10 @@ struct PINT_server_truncate_op {
     PVFS_offset size;	    /* new size of datafile */
 };
 
+struct PINT_server_mkdir_op
+{
+    PVFS_handle dirent_handle;
+};
 
     
 /* This structure is passed into the void *ptr 
@@ -278,19 +282,20 @@ typedef struct PINT_server_op
     {
 	/* request-specific scratch spaces for use during processing */
 	struct PINT_server_getconfig_op getconfig;
-	struct PINT_server_lookup_op    lookup;
-	struct PINT_server_crdirent_op  crdirent;
-	struct PINT_server_readdir_op   readdir;
-	struct PINT_server_remove_op    remove;
-	struct PINT_server_chdirent_op  chdirent;
-	struct PINT_server_rmdirent_op  rmdirent;
-	struct PINT_server_io_op	io;
-	struct PINT_server_flush_op	flush;
-	struct PINT_server_truncate_op  truncate;
+	struct PINT_server_lookup_op lookup;
+	struct PINT_server_crdirent_op crdirent;
+	struct PINT_server_readdir_op readdir;
+	struct PINT_server_remove_op remove;
+	struct PINT_server_chdirent_op chdirent;
+	struct PINT_server_rmdirent_op rmdirent;
+	struct PINT_server_io_op io;
+	struct PINT_server_flush_op flush;
+	struct PINT_server_truncate_op truncate;
+	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
-
     } u;
+
 } PINT_server_op;
 
 /* PINT_STATE_DEBUG()
