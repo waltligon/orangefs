@@ -148,7 +148,7 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
     /* attr_array */
     attr_array_sz = LOOKUP_BUFF_SZ*sizeof(PVFS_object_attr) + sizeof(PVFS_datafile_attr);
 
-    memory_sz = key_a_sz+val_a_sz+key_a0_sz+val_a0_sz+handle_array_sz+attr_array_sz;
+    memory_sz = key_a_sz+val_a_sz+2*(key_a0_sz+val_a0_sz)+handle_array_sz+attr_array_sz;
 
     /* Allocate space for attributes, handles, and path segments */
     big_memory_buffer = malloc(memory_sz);
