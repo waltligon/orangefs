@@ -79,6 +79,7 @@ struct fp_private_data
     void* tmp_buffer_list[MAX_REGIONS];
     void* intermediate;
     int cleanup_pending_count;
+    int req_proc_done;
 
     struct qlist_head src_list;
     struct qlist_head dest_list;
@@ -894,6 +895,16 @@ static int bmi_send_callback_fn(void *user_ptr,
 	q_item->parent->state = FLOW_COMPLETE;
 	return(1);
     }
+ 
+    /* if we have finished request processing then there is no need to try
+     * to continue
+     */
+    if(flow_data->req_proc_done)
+    {
+	if(q_item->buffer)
+	    qlist_del(&q_item->list_link);
+	return(0);
+    }
 
     if(q_item->buffer)
     {
@@ -910,7 +921,7 @@ static int bmi_send_callback_fn(void *user_ptr,
 	assert(q_item->buffer);
 	q_item->bmi_callback.fn = bmi_send_callback_wrapper;
     }
-    
+
     /* add to src queue */
     qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 
@@ -960,6 +971,8 @@ static int bmi_send_callback_fn(void *user_ptr,
     if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
     {
 	q_item->last = 1;
+	assert(flow_data->req_proc_done == 0);
+	flow_data->req_proc_done = 1;
 	/* special case, we never have a "last" operation when there
 	 * is no work to do, trigger manually
 	 */
