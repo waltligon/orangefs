@@ -10,8 +10,6 @@ ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \
 	$(DIR)/pvfs2-showcoll.c \
 
-ADMINLIBS := -ldb -lrt -lpthread
-
 ADMINTOOLS := $(patsubst %.c, %, $(ADMINSRC))
 ADMINTOOLS_SERVER := $(patsubst %.c, %, $(ADMINSRC_SERVER))
 
@@ -28,7 +26,7 @@ endif
 $(ADMINTOOLS): %: %.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@
+	@$(LD) $< $(LDFLAGS) $(LIBS) -o $@
 else
-	$(LD) $< $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@
+	$(LD) $< $(LDFLAGS) $(LIBS) -o $@
 endif
