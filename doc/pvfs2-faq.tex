@@ -532,17 +532,18 @@ Linux 2.4.x kernel module will not even compile!  We have
 compatibility code that can mend the differences in place, but we have
 to be able to detect that you're running such a system.  Our configure
 script tries hard to determine which version you're running and
-matches it against a know list.  If you suspect you need this fix and
+matches it against a known list.  If you suspect you need this fix and
 our script does not properly detect it, please send mail to the
-mailing list and include the contents of you /etc/redhat-release file.
+mailing list and include the contents of your /etc/redhat-release
+file.
 
 In addition, some Redhat versions ship with an NPTL (threading
 library) implementation that PVFS2 is not compatible with.  We cannot
 explain why the errors we're seeing are occuring, as they appear to be
-in glibc and the threading library.  In short, we disable the use of
-the NPTL on these few Redhat systems.  It should be noted that we are
-fully compatible with other distributions that ship NPTL libraries
-(such as Gentoo and Debian/unstable).
+in glibc and the threading library itself.  In short, we disable the
+use of the NPTL on these few Redhat systems.  It should be noted that
+we are fully compatible with other distributions that ship NPTL
+libraries (such as Gentoo and Debian/unstable).
 
 %
 % REDUNDANCY
