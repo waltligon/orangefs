@@ -1,3 +1,9 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
 /* Modified May 2002 by Phil Carns for use with BMI GM method */
 
 /*************************************************************************
@@ -10,7 +16,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#include <bmi-gm-regcache.h>
+#include "bmi-gm-regcache.h"
 
 #if !defined(__linux__) && !defined(__APPLE__)
 /* loic: at least on 64bits archs, it is important that sbrk
@@ -25,17 +31,27 @@ void *sbrk();
 
 void *bmi_gm_sbrk(int inc)
 {
-	if (inc < 0)
-	{
-		long oldp = (long)sbrk(0);
-		bmi_gm_clear_interval((unsigned long)(oldp+inc), -inc);
-	}
-	return sbrk(inc);
+    if (inc < 0)
+    {
+	long oldp = (long) sbrk(0);
+	bmi_gm_clear_interval((unsigned long) (oldp + inc), -inc);
+    }
+    return sbrk(inc);
 }
 
 
-int bmi_gm_munmap(void *start, size_t length)
+int bmi_gm_munmap(void *start,
+		  size_t length)
 {
-  bmi_gm_clear_interval((unsigned long)start, length);
-  return munmap(start, length);
+    bmi_gm_clear_interval((unsigned long) start, length);
+    return munmap(start, length);
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sw=4 noexpandtab
+ */

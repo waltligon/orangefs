@@ -20,9 +20,9 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include <bmi-method-support.h>
-#include <op-list.h>
-#include <gossip.h>
+#include "bmi-method-support.h"
+#include "op-list.h"
+#include "gossip.h"
 
 
 /***************************************************************
@@ -30,7 +30,8 @@
  */
 
 static void gossip_print_op(method_op_p print_op);
-static int op_list_cmp_key(struct op_list_search_key* my_key, method_op_p my_op);
+static int op_list_cmp_key(struct op_list_search_key *my_key,
+			   method_op_p my_op);
 
 /***************************************************************
  * Visible functions
@@ -45,13 +46,14 @@ static int op_list_cmp_key(struct op_list_search_key* my_key, method_op_p my_op)
  */
 void op_list_dump(op_list_p olp)
 {
-	op_list_p tmp_entry = NULL;
+    op_list_p tmp_entry = NULL;
 
-	gossip_err("op_list_dump():\n");
-	qlist_for_each(tmp_entry, olp)
-	{
-		gossip_print_op(qlist_entry(tmp_entry, struct method_op, op_list_entry));
-	}
+    gossip_err("op_list_dump():\n");
+    qlist_for_each(tmp_entry, olp)
+    {
+	gossip_print_op(qlist_entry(tmp_entry, struct method_op,
+				    op_list_entry));
+    }
 }
 
 
@@ -64,13 +66,13 @@ void op_list_dump(op_list_p olp)
  */
 int op_list_count(op_list_p olp)
 {
-	int count = 0;
-	op_list_p tmp_entry = NULL;
-	qlist_for_each(tmp_entry, olp)
-	{
-		count++;
-	}
-	return(count);
+    int count = 0;
+    op_list_p tmp_entry = NULL;
+    qlist_for_each(tmp_entry, olp)
+    {
+	count++;
+    }
+    return (count);
 }
 
 
@@ -83,15 +85,15 @@ int op_list_count(op_list_p olp)
  */
 op_list_p op_list_new(void)
 {
-	struct qlist_head* tmp_op_list = NULL;
+    struct qlist_head *tmp_op_list = NULL;
 
-	tmp_op_list = (struct qlist_head*)malloc(sizeof(struct qlist_head));
-	if(tmp_op_list)
-	{
-		INIT_QLIST_HEAD(tmp_op_list);
-	}
+    tmp_op_list = (struct qlist_head *) malloc(sizeof(struct qlist_head));
+    if (tmp_op_list)
+    {
+	INIT_QLIST_HEAD(tmp_op_list);
+    }
 
-	return(tmp_op_list);
+    return (tmp_op_list);
 }
 
 /*
@@ -101,13 +103,14 @@ op_list_p op_list_new(void)
  *
  * returns 0 on success, -1 on failure
  */
-void op_list_add(op_list_p olp, method_op_p oip)
+void op_list_add(op_list_p olp,
+		 method_op_p oip)
 {
-	/* note we are adding to tail:
-	 * most modules will want to preserve FIFO ordering when searching
-	 * through op_lists for work to do.
-	 */
-	qlist_add_tail(&(oip->op_list_entry), olp);
+    /* note we are adding to tail:
+     * most modules will want to preserve FIFO ordering when searching
+     * through op_lists for work to do.
+     */
+    qlist_add_tail(&(oip->op_list_entry), olp);
 }
 
 /*
@@ -119,18 +122,18 @@ void op_list_add(op_list_p olp, method_op_p oip)
  */
 void op_list_cleanup(op_list_p olp)
 {
-	op_list_p iterator = NULL;
-	op_list_p scratch = NULL;
-	method_op_p tmp_method_op = NULL;
+    op_list_p iterator = NULL;
+    op_list_p scratch = NULL;
+    method_op_p tmp_method_op = NULL;
 
-	qlist_for_each_safe(iterator, scratch, olp)
-	{
-		tmp_method_op = qlist_entry(iterator, struct method_op, 
-			op_list_entry); 
-		dealloc_method_op(tmp_method_op);
-	}
-	free(olp);
-	olp = NULL;
+    qlist_for_each_safe(iterator, scratch, olp)
+    {
+	tmp_method_op = qlist_entry(iterator, struct method_op,
+				    op_list_entry);
+	dealloc_method_op(tmp_method_op);
+    }
+    free(olp);
+    olp = NULL;
 }
 
 /* op_list_empty()
@@ -141,7 +144,7 @@ void op_list_cleanup(op_list_p olp)
  */
 int op_list_empty(op_list_p olp)
 {
-	return(qlist_empty(olp));
+    return (qlist_empty(olp));
 }
 
 
@@ -155,8 +158,8 @@ int op_list_empty(op_list_p olp)
  */
 void op_list_remove(method_op_p oip)
 {
-	qlist_del(&(oip->op_list_entry));
-}             
+    qlist_del(&(oip->op_list_entry));
+}
 
 
 /* op_list_search()
@@ -166,19 +169,19 @@ void op_list_remove(method_op_p oip)
  *
  * returns pointer to operation on success, NULL on failure.
  */
-method_op_p op_list_search(op_list_p olp, struct op_list_search_key*
-	key)
+method_op_p op_list_search(op_list_p olp,
+			   struct op_list_search_key *key)
 {
-	op_list_p tmp_entry = NULL;
-	qlist_for_each(tmp_entry, olp)
+    op_list_p tmp_entry = NULL;
+    qlist_for_each(tmp_entry, olp)
+    {
+	if (!(op_list_cmp_key(key, qlist_entry(tmp_entry, struct method_op,
+					       op_list_entry))))
 	{
-		if(!(op_list_cmp_key(key, qlist_entry(tmp_entry, struct method_op, 
-			op_list_entry))))
-		{
-			return(qlist_entry(tmp_entry, struct method_op, op_list_entry));
-		}
+	    return (qlist_entry(tmp_entry, struct method_op, op_list_entry));
 	}
-	return(NULL);
+    }
+    return (NULL);
 }
 
 
@@ -188,62 +191,60 @@ method_op_p op_list_search(op_list_p olp, struct op_list_search_key*
  *
  * returns 0 on success, -errno on failure
  */
-int op_list_search_array(
-	int incount, 
-	bmi_op_id_t* id_array, 
-	int* outcount, 
-	int* index_array,
-	bmi_error_code_t* error_code_array, 
-	bmi_size_t* actual_size_array,
-	void** user_ptr_array,
-	op_list_p olp)
+int op_list_search_array(int incount,
+			 bmi_op_id_t * id_array,
+			 int *outcount,
+			 int *index_array,
+			 bmi_error_code_t * error_code_array,
+			 bmi_size_t * actual_size_array,
+			 void **user_ptr_array,
+			 op_list_p olp)
 {
-	op_list_p tmp_link = NULL;
-	struct method_op* tmp_op = NULL;
-	int i=0, search_count=0;
+    op_list_p tmp_link = NULL;
+    struct method_op *tmp_op = NULL;
+    int i = 0, search_count = 0;
 
-	/* safety */
-	*outcount = 0;
+    /* safety */
+    *outcount = 0;
 
-	/* count how many entries are really in the array */
-	for(i=0; i<incount; i++)
+    /* count how many entries are really in the array */
+    for (i = 0; i < incount; i++)
+    {
+	if (id_array[i])
 	{
-		if(id_array[i])
-		{
-			search_count++;
-		}
+	    search_count++;
 	}
+    }
 
-	/* make sure there is something to find */
-	if(!search_count)
-		return(0);
-	
-	qlist_for_each(tmp_link, olp)
+    /* make sure there is something to find */
+    if (!search_count)
+	return (0);
+
+    qlist_for_each(tmp_link, olp)
+    {
+	tmp_op = qlist_entry(tmp_link, struct method_op, op_list_entry);
+	/* for each entry, see if it is in the search array */
+	for (i = 0; i < incount; i++)
 	{
-		tmp_op = qlist_entry(tmp_link, struct method_op,
-			op_list_entry);
-		/* for each entry, see if it is in the search array */
-		for(i=0; i<incount; i++)
-		{
-			if(id_array[i] == tmp_op->op_id)
-			{
-				index_array[*outcount] = i;
-				error_code_array[*outcount] = tmp_op->error_code;
-				actual_size_array[*outcount] = tmp_op->actual_size;
-				if(user_ptr_array)
-					user_ptr_array[*outcount] = tmp_op->user_ptr;
-				(*outcount)++;
-				break;
-			}
-		}
-		/* quit early if we have already found everything */
-		if(*outcount == search_count)
-		{
-			return(0);
-		}
+	    if (id_array[i] == tmp_op->op_id)
+	    {
+		index_array[*outcount] = i;
+		error_code_array[*outcount] = tmp_op->error_code;
+		actual_size_array[*outcount] = tmp_op->actual_size;
+		if (user_ptr_array)
+		    user_ptr_array[*outcount] = tmp_op->user_ptr;
+		(*outcount)++;
+		break;
+	    }
 	}
+	/* quit early if we have already found everything */
+	if (*outcount == search_count)
+	{
+	    return (0);
+	}
+    }
 
-	return(0);
+    return (0);
 }
 
 /* op_list_shownext()
@@ -254,11 +255,11 @@ int op_list_search_array(
  */
 method_op_p op_list_shownext(op_list_p olp)
 {
-	if(olp->next == olp)
-	{
-		return(NULL);
-	}
-	return(qlist_entry(olp->next, struct method_op, op_list_entry));
+    if (olp->next == olp)
+    {
+	return (NULL);
+    }
+    return (qlist_entry(olp->next, struct method_op, op_list_entry));
 }
 
 /****************************************************************
@@ -273,53 +274,62 @@ method_op_p op_list_shownext(op_list_p olp)
  *
  * returns 0 if match is found, 1 otherwise
  */
-static int op_list_cmp_key(struct op_list_search_key* my_key, method_op_p my_op){
+static int op_list_cmp_key(struct op_list_search_key *my_key,
+			   method_op_p my_op)
+{
 
-	if(my_key->method_addr_yes && (my_key->method_addr != my_op->addr))
-	{
-		return(1);
-	}
-	if(my_key->actual_size_yes && (my_key->actual_size != my_op->actual_size))
-	{
-		return(1);
-	}
-	if(my_key->expected_size_yes && (my_key->expected_size != my_op->expected_size))
-	{
-		return(1);
-	}
-	if(my_key->msg_tag_yes && (my_key->msg_tag != my_op->msg_tag))
-	{
-		return(1);
-	}
-	if(my_key->op_id_yes && (my_key->op_id != my_op->op_id))
-	{
-		return(1);
-	}
-	if(my_key->mode_mask_yes && !(my_key->mode_mask & my_op->mode))
-	{
-		return(1);
-	}
-	return(0);
+    if (my_key->method_addr_yes && (my_key->method_addr != my_op->addr))
+    {
+	return (1);
+    }
+    if (my_key->actual_size_yes && (my_key->actual_size != my_op->actual_size))
+    {
+	return (1);
+    }
+    if (my_key->expected_size_yes
+	&& (my_key->expected_size != my_op->expected_size))
+    {
+	return (1);
+    }
+    if (my_key->msg_tag_yes && (my_key->msg_tag != my_op->msg_tag))
+    {
+	return (1);
+    }
+    if (my_key->op_id_yes && (my_key->op_id != my_op->op_id))
+    {
+	return (1);
+    }
+    if (my_key->mode_mask_yes && !(my_key->mode_mask & my_op->mode))
+    {
+	return (1);
+    }
+    return (0);
 }
 
 
 static void gossip_print_op(method_op_p print_op)
 {
 
-	gossip_err("Operation:\n------------\n");
-	gossip_err("  op_id: %ld\n", (long)print_op->op_id);
-	gossip_err("  send_recv: %d\n", (int)print_op->send_recv);
-	gossip_err("  msg_tag: %d\n", (int)print_op->msg_tag);
-	gossip_err("  error_code: %d\n", (int)print_op->error_code);
-	gossip_err("  amt_complete: %ld\n", (long)print_op->amt_complete);
-	gossip_err("  buffer: %p\n", print_op->buffer);
-	gossip_err("  actual size: %ld\n",
-		(long)print_op->actual_size);
-	gossip_err("  expected size: %ld\n",
-		(long)print_op->expected_size);
-	gossip_err("  addr: %p\n", print_op->addr);
-	gossip_err("  mode: %d\n", (int)print_op->mode);
+    gossip_err("Operation:\n------------\n");
+    gossip_err("  op_id: %ld\n", (long) print_op->op_id);
+    gossip_err("  send_recv: %d\n", (int) print_op->send_recv);
+    gossip_err("  msg_tag: %d\n", (int) print_op->msg_tag);
+    gossip_err("  error_code: %d\n", (int) print_op->error_code);
+    gossip_err("  amt_complete: %ld\n", (long) print_op->amt_complete);
+    gossip_err("  buffer: %p\n", print_op->buffer);
+    gossip_err("  actual size: %ld\n", (long) print_op->actual_size);
+    gossip_err("  expected size: %ld\n", (long) print_op->expected_size);
+    gossip_err("  addr: %p\n", print_op->addr);
+    gossip_err("  mode: %d\n", (int) print_op->mode);
 
-	return;
+    return;
 }
 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sw=4 noexpandtab
+ */

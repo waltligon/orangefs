@@ -15,9 +15,9 @@
 #include <errno.h>
 #include <string.h>
 
-#include <reference-list.h>
-#include <gossip.h>
-#include <id-generator.h>
+#include "reference-list.h"
+#include "gossip.h"
+#include "id-generator.h"
 
 
 /***************************************************************
@@ -33,15 +33,15 @@
  */
 ref_list_p ref_list_new(void)
 {
-	
-	ref_list_p tmp_list = NULL;
 
-	tmp_list = (ref_list_p)malloc(sizeof(struct qlist_head));
-	if(tmp_list)
-	{
-		INIT_QLIST_HEAD(tmp_list);
-	}
-	return(tmp_list);
+    ref_list_p tmp_list = NULL;
+
+    tmp_list = (ref_list_p) malloc(sizeof(struct qlist_head));
+    if (tmp_list)
+    {
+	INIT_QLIST_HEAD(tmp_list);
+    }
+    return (tmp_list);
 }
 
 /*
@@ -51,9 +51,10 @@ ref_list_p ref_list_new(void)
  *
  * no return value
  */
-void ref_list_add(ref_list_p rlp, ref_st_p rsp)
+void ref_list_add(ref_list_p rlp,
+		  ref_st_p rsp)
 {
-	qlist_add(&(rsp->list_link), rlp);
+    qlist_add(&(rsp->list_link), rlp);
 }
 
 /*
@@ -64,18 +65,20 @@ void ref_list_add(ref_list_p rlp, ref_st_p rsp)
  *
  * returns a pointer to the structure on success, a NULL on failure.
  */
-ref_st_p ref_list_search_addr(ref_list_p rlp, bmi_addr_t my_addr)
+ref_st_p ref_list_search_addr(ref_list_p rlp,
+			      bmi_addr_t my_addr)
 {
-	ref_list_p tmp_link = NULL;
-	ref_st_p tmp_entry = NULL;
+    ref_list_p tmp_link = NULL;
+    ref_st_p tmp_entry = NULL;
 
-	qlist_for_each(tmp_link, rlp)
-	{
-		tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
-		if(tmp_entry->bmi_addr == my_addr)
-			return(tmp_entry);
-	}
-	return(NULL);
+    qlist_for_each(tmp_link, rlp)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct ref_st,
+				list_link);
+	if (tmp_entry->bmi_addr == my_addr)
+	    return (tmp_entry);
+    }
+    return (NULL);
 }
 
 
@@ -87,17 +90,19 @@ ref_st_p ref_list_search_addr(ref_list_p rlp, bmi_addr_t my_addr)
  *
  * returns a pointer to the structure on success, NULL on failure.
  */
-ref_st_p ref_list_search_method_addr(ref_list_p rlp, method_addr_p map){
-	ref_list_p tmp_link = NULL;
-	ref_st_p tmp_entry = NULL;
+ref_st_p ref_list_search_method_addr(ref_list_p rlp,
+				     method_addr_p map)
+{
+    ref_list_p tmp_link = NULL;
+    ref_st_p tmp_entry = NULL;
 
-	qlist_for_each(tmp_link, rlp)
-	{
-		tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
-		if(tmp_entry->method_addr == map)
-			return(tmp_entry);
-	}
-	return(NULL);
+    qlist_for_each(tmp_link, rlp)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
+	if (tmp_entry->method_addr == map)
+	    return (tmp_entry);
+    }
+    return (NULL);
 }
 
 /*
@@ -108,18 +113,20 @@ ref_st_p ref_list_search_method_addr(ref_list_p rlp, method_addr_p map){
  *
  * returns a pointer to the structure on success, a NULL on failure.
  */
-ref_st_p ref_list_search_str(ref_list_p rlp, const char* idstring)
+ref_st_p ref_list_search_str(ref_list_p rlp,
+			     const char *idstring)
 {
-	ref_list_p tmp_link = NULL;
-	ref_st_p tmp_entry = NULL;
+    ref_list_p tmp_link = NULL;
+    ref_st_p tmp_entry = NULL;
 
-	qlist_for_each(tmp_link, rlp)
-	{
-		tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
-		if(!strcmp(tmp_entry->id_string, idstring))
-			return(tmp_entry);
-	}
-	return(NULL);
+    qlist_for_each(tmp_link, rlp)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct ref_st,
+				list_link);
+	if (!strcmp(tmp_entry->id_string, idstring))
+	    return (tmp_entry);
+    }
+    return (NULL);
 }
 
 /*
@@ -129,22 +136,23 @@ ref_st_p ref_list_search_str(ref_list_p rlp, const char* idstring)
  *
  * returns a pointer to the structure on success, a NULL on failure.
  */
-ref_st_p ref_list_rem(ref_list_p rlp, bmi_addr_t my_addr)
+ref_st_p ref_list_rem(ref_list_p rlp,
+		      bmi_addr_t my_addr)
 {
-	ref_list_p tmp_link = NULL;
-	ref_list_p scratch = NULL;
-	ref_st_p tmp_entry = NULL;
+    ref_list_p tmp_link = NULL;
+    ref_list_p scratch = NULL;
+    ref_st_p tmp_entry = NULL;
 
-	qlist_for_each_safe(tmp_link, scratch, rlp)
+    qlist_for_each_safe(tmp_link, scratch, rlp)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
+	if (tmp_entry->bmi_addr == my_addr)
 	{
-		tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
-		if(tmp_entry->bmi_addr == my_addr)
-		{
-			qlist_del(&tmp_entry->list_link);
-			return(tmp_entry);
-		}
+	    qlist_del(&tmp_entry->list_link);
+	    return (tmp_entry);
 	}
-	return(NULL);
+    }
+    return (NULL);
 }
 
 
@@ -158,18 +166,19 @@ ref_st_p ref_list_rem(ref_list_p rlp, bmi_addr_t my_addr)
  */
 void ref_list_cleanup(ref_list_p rlp)
 {
-	ref_list_p tmp_link = NULL;
-	ref_list_p scratch = NULL;
-	ref_st_p tmp_entry = NULL;
+    ref_list_p tmp_link = NULL;
+    ref_list_p scratch = NULL;
+    ref_st_p tmp_entry = NULL;
 
-	qlist_for_each_safe(tmp_link, scratch, rlp)
-	{
-		tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
-		free(tmp_entry);
-	}
+    qlist_for_each_safe(tmp_link, scratch, rlp)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct ref_st,
+				list_link);
+	free(tmp_entry);
+    }
 
-	free(rlp);
-	return;
+    free(rlp);
+    return;
 }
 
 /*
@@ -179,28 +188,30 @@ void ref_list_cleanup(ref_list_p rlp)
  *
  * returns a pointer to the new structure on success, NULL on failure.
  */
-ref_st_p alloc_ref_st(void){
+ref_st_p alloc_ref_st(void)
+{
 
-	int ssize = sizeof(struct ref_st);
-	ref_st_p new_ref = NULL;
-	int ret = -1;
+    int ssize = sizeof(struct ref_st);
+    ref_st_p new_ref = NULL;
+    int ret = -1;
 
-	new_ref = (ref_st_p)malloc(ssize);
-	if(!new_ref){
-		return(NULL);
-	}
-	
-	memset(new_ref, 0, ssize);
+    new_ref = (ref_st_p) malloc(ssize);
+    if (!new_ref)
+    {
+	return (NULL);
+    }
 
-	/* we can go ahead and set the bmi_addr here */
-	ret = id_gen_fast_register(&(new_ref->bmi_addr), new_ref);
-	if(ret < 0)
-	{
-		dealloc_ref_st(new_ref);
-		return(NULL);
-	}
+    memset(new_ref, 0, ssize);
 
-	return(new_ref);
+    /* we can go ahead and set the bmi_addr here */
+    ret = id_gen_fast_register(&(new_ref->bmi_addr), new_ref);
+    if (ret < 0)
+    {
+	dealloc_ref_st(new_ref);
+	return (NULL);
+    }
+
+    return (new_ref);
 }
 
 /*
@@ -211,20 +222,33 @@ ref_st_p alloc_ref_st(void){
  *
  * returns 0 on success, -1 on failure
  */
-void dealloc_ref_st(ref_st_p deadref){
+void dealloc_ref_st(ref_st_p deadref)
+{
 
-	if(!deadref){
-		return;
-	}
+    if (!deadref)
+    {
+	return;
+    }
 
-	if(deadref->id_string){
-		free(deadref->id_string);
-	}
+    if (deadref->id_string)
+    {
+	free(deadref->id_string);
+    }
 
-	if(deadref->method_addr){
-		deadref->interface->BMI_meth_set_info(BMI_DROP_ADDR, deadref->method_addr);
-	}
+    if (deadref->method_addr)
+    {
+	deadref->interface->BMI_meth_set_info(BMI_DROP_ADDR,
+					      deadref->method_addr);
+    }
 
-	free(deadref);
-}                                   
+    free(deadref);
+}
 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sw=4 noexpandtab
+ */

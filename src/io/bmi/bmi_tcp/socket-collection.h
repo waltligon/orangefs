@@ -18,28 +18,43 @@
 #ifndef __SOCKET_COLLECTION_H
 #define __SOCKET_COLLECTION_H
 
-#include <bmi-method-support.h>
-#include <bmi-tcp-addressing.h>
-#include <quicklist.h>
+#include "bmi-method-support.h"
+#include "bmi-tcp-addressing.h"
+#include "quicklist.h"
 
-typedef struct qlist_head* socket_collection_p;
+typedef struct qlist_head *socket_collection_p;
 
-enum{
-	SC_READ_BIT = 1,
-	SC_WRITE_BIT = 2,
-	SC_ERROR_BIT = 4
+enum
+{
+    SC_READ_BIT = 1,
+    SC_WRITE_BIT = 2,
+    SC_ERROR_BIT = 4
 };
 
 socket_collection_p socket_collection_init(bmi_sock_t new_server_socket);
-void socket_collection_add(socket_collection_p scp, method_addr_p map);
-void socket_collection_remove(socket_collection_p scp, method_addr_p map);
-void socket_collection_add_write_bit(socket_collection_p scp, 
-	method_addr_p map);
-void socket_collection_remove_write_bit(socket_collection_p scp, 
-	method_addr_p map);
+void socket_collection_add(socket_collection_p scp,
+			   method_addr_p map);
+void socket_collection_remove(socket_collection_p scp,
+			      method_addr_p map);
+void socket_collection_add_write_bit(socket_collection_p scp,
+				     method_addr_p map);
+void socket_collection_remove_write_bit(socket_collection_p scp,
+					method_addr_p map);
 void socket_collection_finalize(socket_collection_p scp);
-int socket_collection_testglobal(socket_collection_p scp, int incount, 
-	int* outcount, method_addr_p* maps, bmi_flag_t* status, int
-	poll_timeout);
+int socket_collection_testglobal(socket_collection_p scp,
+				 int incount,
+				 int *outcount,
+				 method_addr_p * maps,
+				 bmi_flag_t * status,
+				 int poll_timeout);
 
 #endif /* __SOCKET_COLLECTION_H */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sw=4 noexpandtab
+ */

@@ -35,24 +35,57 @@
 #include <stdio.h>
 
 int new_sock(void);
-int bind_sock(int, int);
-int connect_sock(int, char *, int);
-int init_sock(struct sockaddr *, char *, int);
-int brecv(int s, void *buf, int len);
-int nbrecv(int s, void *buf, int len);
-int bsend(int s, void *buf, int len);
-int bsendv(int s, const struct iovec *vec, int cnt);
-int nbsend(int s, void *buf, int len);
-int get_sockopt(int s, int optname);
-int set_tcpopt(int s, int optname, int val);
-int set_sockopt(int s, int optname, int size);
-int set_socktime(int s, int optname, int size);
-int sockio_dump_sockaddr(struct sockaddr_in *ptr, FILE *fp);
-int brecv_timeout(int s, void *buf, int len, int timeout);
-int connect_timeout(int s, struct sockaddr *saddrp, int len, int time_secs);
-int nbpeek(int s, int len);
+int bind_sock(int,
+	      int);
+int connect_sock(int,
+		 char *,
+		 int);
+int init_sock(struct sockaddr *,
+	      char *,
+	      int);
+int brecv(int s,
+	  void *buf,
+	  int len);
+int nbrecv(int s,
+	   void *buf,
+	   int len);
+int bsend(int s,
+	  void *buf,
+	  int len);
+int bsendv(int s,
+	   const struct iovec *vec,
+	   int cnt);
+int nbsend(int s,
+	   void *buf,
+	   int len);
+int get_sockopt(int s,
+		int optname);
+int set_tcpopt(int s,
+	       int optname,
+	       int val);
+int set_sockopt(int s,
+		int optname,
+		int size);
+int set_socktime(int s,
+		 int optname,
+		 int size);
+int sockio_dump_sockaddr(struct sockaddr_in *ptr,
+			 FILE * fp);
+int brecv_timeout(int s,
+		  void *buf,
+		  int len,
+		  int timeout);
+int connect_timeout(int s,
+		    struct sockaddr *saddrp,
+		    int len,
+		    int time_secs);
+int nbpeek(int s,
+	   int len);
 #ifdef __USE_SENDFILE__
-int nbsendfile(int s, int f, int off, int len);
+int nbsendfile(int s,
+	       int f,
+	       int off,
+	       int len);
 #endif
 
 #define GET_RECVBUFSIZE(s) get_sockopt(s, SO_RCVBUF)
@@ -91,3 +124,12 @@ do { \
 
 
 #endif
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sw=4 noexpandtab
+ */

@@ -6,21 +6,34 @@
 
 /* GM memory registration cache; based on MPICH-GM device code */
 
-#include<gossip.h>
+#include "gossip.h"
 
 #include<gm.h>
 
 #ifndef __BMI_GM_REGCACHE_H
 #define __BMI_GM_REGCACHE_H
 
-int bmi_gm_regcache_init(struct gm_port* current_port);
+int bmi_gm_regcache_init(struct gm_port *current_port);
 void bmi_gm_regcache_finalize(void);
-void bmi_gm_regcache_deregister(void* addr, unsigned int pages);
+void bmi_gm_regcache_deregister(void *addr,
+				unsigned int pages);
 void bmi_gm_regcache_garbage_collector(unsigned int required);
-int bmi_gm_regcache_register(void * addr, unsigned int pages);
-unsigned long bmi_gm_use_interval(unsigned long start, unsigned int
-	length);
-void bmi_gm_unuse_interval(unsigned long start, unsigned int length);
-void bmi_gm_clear_interval(unsigned long start, unsigned int length);
+int bmi_gm_regcache_register(void *addr,
+			     unsigned int pages);
+unsigned long bmi_gm_use_interval(unsigned long start,
+				  unsigned int length);
+void bmi_gm_unuse_interval(unsigned long start,
+			   unsigned int length);
+void bmi_gm_clear_interval(unsigned long start,
+			   unsigned int length);
 
 #endif /* __BMI_GM_REGCACHE_H */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sw=4 noexpandtab
+ */

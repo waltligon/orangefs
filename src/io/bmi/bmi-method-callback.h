@@ -11,8 +11,17 @@
 #ifndef __BMI_METHOD_CALLBACK_H
 #define __BMI_METHOD_CALLBACK_H
 
-#include <bmi-method-support.h>
+#include "bmi-method-support.h"
 
 int bmi_method_addr_reg_callback(method_addr_p map);
 
 #endif /* __BMI_METHOD_CALLBACK_H */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sw=4 noexpandtab
+ */
