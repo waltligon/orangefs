@@ -13,6 +13,7 @@
 
 /* client side config file / option management */
 int PVFS_util_parse_pvfstab(
+    const char* tabfile, 
     pvfs_mntlist * mnt);
 void PVFS_util_free_pvfstab(
     pvfs_mntlist * e_p);

@@ -36,7 +36,7 @@ int main(int argc,char **argv)
     old_filename = argv[1];
     new_filename = argv[2];
 
-    if (PVFS_util_parse_pvfstab(&mnt))
+    if (PVFS_util_parse_pvfstab(NULL, &mnt))
     {
         printf("Failed to parse pvfstab\n");
         return ret;

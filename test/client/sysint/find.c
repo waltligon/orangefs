@@ -209,7 +209,7 @@ int main(int argc, char **argv)
 
   start_find:
 
-    if (PVFS_util_parse_pvfstab(&mnt))
+    if (PVFS_util_parse_pvfstab(NULL, &mnt))
     {
         fprintf(stderr,"Error parsing pvfstab!\n");
         return 1;

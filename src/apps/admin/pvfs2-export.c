@@ -80,7 +80,7 @@ int main(int argc, char **argv)
     }
 
     /* look at pvfstab */
-    if(PVFS_util_parse_pvfstab(&mnt))
+    if(PVFS_util_parse_pvfstab(NULL, &mnt))
     {
         fprintf(stderr, "Error: failed to parse pvfstab.\n");
 	close(dest_fd);

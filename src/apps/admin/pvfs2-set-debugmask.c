@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     PVFS_credentials creds;
 
     /* look at pvfstab */
-    if(PVFS_util_parse_pvfstab(&mnt))
+    if(PVFS_util_parse_pvfstab(NULL, &mnt))
     {
         fprintf(stderr, "Error: failed to parse pvfstab.\n");
         return(-1);

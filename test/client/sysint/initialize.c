@@ -18,7 +18,7 @@ int main(int argc,char **argv)
 	pvfs_mntlist mnt = {0,NULL};
 
 	/* Parse PVFStab */
-	ret = PVFS_util_parse_pvfstab(&mnt);
+	ret = PVFS_util_parse_pvfstab(NULL, &mnt);
 	if (ret < 0)
 	{
 		printf("Parsing error\n");

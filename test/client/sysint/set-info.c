@@ -36,7 +36,7 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    ret = PVFS_util_parse_pvfstab(&mnt);
+    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
     if (ret < 0)
     {
         fprintf(stderr, "Failed to parse pvfstab!\n");

@@ -53,7 +53,7 @@ int main(int argc,char **argv)
 
 	printf("creating a file named %s\n", filename);
 
-	ret = PVFS_util_parse_pvfstab(&mnt);
+	ret = PVFS_util_parse_pvfstab(NULL, &mnt);
 	if (ret < 0)
 	{
 		printf("Parsing error\n");

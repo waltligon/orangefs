@@ -49,7 +49,7 @@ int main(int argc,char **argv)
     credentials.uid = getuid();
     credentials.gid = getgid();
 
-    ret = PVFS_util_parse_pvfstab(&mnt);
+    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
     if (ret < 0)
     {
         printf("Parsing error\n");

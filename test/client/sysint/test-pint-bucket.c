@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     PVFS_handle_extent_array data_handle_extent_array[
         NUM_DATA_SERVERS_TO_QUERY];
 
-    if (PVFS_util_parse_pvfstab(&mnt))
+    if (PVFS_util_parse_pvfstab(NULL, &mnt))
     {
         fprintf(stderr, "PVFS_util_parse_pvfstab failure.\n");
         return(-1);

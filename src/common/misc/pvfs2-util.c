@@ -38,18 +38,21 @@ static int parse_encoding_string(
  * parses either the file pointed to by the PVFS2TAB_FILE env variable,
  * or /etc/fstab, or /etc/pvfs2tab or ./pvfs2tab to extract pvfs2 mount 
  * entries.
+ * 
+ * NOTE: if tabfile argument is given at runtime to specify which tabfile to
+ * use, then that will be the _only_ file searched for pvfs2 entries.
  *
  * example entry:
  * tcp://localhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 defaults 0 0
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
+int PVFS_util_parse_pvfstab(const char* tabfile, pvfs_mntlist* pvfstab_p)
 {
     FILE* mnt_fp = NULL;
     int file_count = 4;
-    char* file_list[4] = {NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab"};
-    char* targetfile = NULL;
+    const char* file_list[4] = {NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab"};
+    const char* targetfile = NULL;
     struct mntent* tmp_ent;
     int i;
     int slashcount = 0;
@@ -61,8 +64,20 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
     /* safety */
     pvfstab_p->ptab_count = 0;
 
-    /* first check for environment variable override */
-    file_list[0] = getenv("PVFS2TAB_FILE");
+    if(tabfile != NULL)
+    {
+	/* caller wants us to look in a specific location for the tabfile */
+	file_list[0] = tabfile;
+	file_count = 1;
+    }
+    else
+    {
+	/* search the system and env vars for tab files */
+
+	/* first check for environment variable override */
+	file_list[0] = getenv("PVFS2TAB_FILE");
+	file_count = 4;
+    }
 
     /* scan our prioritized list of tab files in order, stop when we find
      * one that has at least one pvfs2 entry
@@ -86,7 +101,12 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
 
     if (!targetfile)
     {
-	gossip_lerr("Error: could not find any pvfs2 tabfile entries.\n");
+	gossip_err("Error: could not find any pvfs2 tabfile entries.\n");
+	gossip_err("Error: tried the following tabfiles:\n");
+	for(i=0; i<file_count; i++)
+	{
+	    gossip_err("       %s\n", file_list[i]);
+	}
 	return(-PVFS_ENOENT);
     }
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Using pvfs2 tab file: %s\n", targetfile);

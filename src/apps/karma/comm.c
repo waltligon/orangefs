@@ -85,7 +85,7 @@ int gui_comm_setup(void)
 
 
     /* PVFS2 init */
-    if (PVFS_util_parse_pvfstab(&mnt))
+    if (PVFS_util_parse_pvfstab(NULL, &mnt))
     {
 	return -1;
     }

@@ -38,7 +38,7 @@ static int test_system_init(int nullCase)
 
     memset(&pvfs_helper, 0, sizeof(pvfs_helper));
 
-    ret = PVFS_util_parse_pvfstab(&pvfs_helper.mnt);
+    ret = PVFS_util_parse_pvfstab(NULL, &pvfs_helper.mnt);
     if (ret > -1)
     {
 	/* init the system interface */

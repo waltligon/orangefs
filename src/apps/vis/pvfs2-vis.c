@@ -95,7 +95,7 @@ int pvfs2_vis_start(char* path, int update_interval)
     }
 
     /* look at pvfstab */
-    ret = PVFS_util_parse_pvfstab(&mnt);
+    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
     if(ret < 0)
     {
         return(ret);

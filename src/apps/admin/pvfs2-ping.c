@@ -63,7 +63,7 @@ int main(int argc, char **argv)
     printf("\n(1) Searching for %s in pvfstab...\n",
            user_opts->fs_path_real);
 
-    ret = PVFS_util_parse_pvfstab(&mnt);
+    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_util_parse_pvfstab", ret);

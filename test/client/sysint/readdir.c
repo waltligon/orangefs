@@ -40,7 +40,7 @@ int main(int argc,char **argv)
     printf("no more than %d dirents should be returned per "
            "iteration\n", max_dirents_returned);
 
-    ret = PVFS_util_parse_pvfstab(&mnt);
+    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
     if (ret < 0)
     {
         printf("Parsing error\n");
