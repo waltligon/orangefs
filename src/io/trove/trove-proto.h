@@ -120,6 +120,12 @@ int trove_bstream_write_list(TROVE_coll_id coll_id,
 			     void *user_ptr,
 			     TROVE_op_id *out_op_id_p);
 
+int trove_bstream_flush(TROVE_coll_id coll_id,
+			TROVE_handle handle,
+			TROVE_ds_flags flags,
+			void *user_ptr,
+			TROVE_op_id *out_op_id_p);
+
 int trove_keyval_read(
 		      TROVE_coll_id coll_id,
 		      TROVE_handle handle,
@@ -202,6 +208,11 @@ int trove_keyval_write_list(
 			    void *user_ptr,
 			    TROVE_op_id *out_op_id_p);
 
+int trove_keyval_flush(TROVE_coll_id coll_id,
+			TROVE_handle handle,
+			TROVE_ds_flags flags,
+			void *user_ptr,
+			TROVE_op_id *out_op_id_p);
 
 int trove_dspace_create(TROVE_coll_id coll_id,
 			TROVE_handle_extent_array *handle_extent_array,

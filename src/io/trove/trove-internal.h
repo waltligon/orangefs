@@ -86,6 +86,13 @@ struct TROVE_bstream_ops
 			      TROVE_vtag_s *inout_vtag,
 			      void *user_ptr,
 			      TROVE_op_id *out_op_id_p);
+
+     int (*bstream_flush)(
+			TROVE_coll_id coll_id,
+			TROVE_handle handle,
+			TROVE_ds_flags flags,
+			void *user_ptr,
+			TROVE_op_id *out_op_id_p);
 };
 
 struct TROVE_keyval_ops
@@ -171,6 +178,12 @@ struct TROVE_keyval_ops
 			     TROVE_vtag_s *inout_vtag,
 			     void *user_ptr,
 			     TROVE_op_id *out_op_id_p);
+    int (*keyval_flush)(
+			TROVE_coll_id coll_id,
+			TROVE_handle handle,
+			TROVE_ds_flags flags,
+			void *user_ptr,
+			TROVE_op_id *out_op_id_p);
 };
 
 struct TROVE_dspace_ops

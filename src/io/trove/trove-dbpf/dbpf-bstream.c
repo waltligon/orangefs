@@ -46,6 +46,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p);
+static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p);
 
 /* Functions */
 
@@ -243,6 +244,73 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
     return 1;
     
  return_error:
+    if (got_fd) dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    return -1;
+}
+
+static int dbpf_bstream_flush(
+				TROVE_coll_id coll_id,
+				TROVE_handle handle,
+				TROVE_ds_flags flags,
+				void *user_ptr,
+				TROVE_op_id *out_op_id_p)
+{
+    struct dbpf_queued_op *q_op_p;
+    struct dbpf_collection *coll_p;
+    
+    /* find the collection */
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL) return -1;
+    
+    /* grab a queued op structure */
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL) return -1;
+    
+    /* initialize all the common members */
+    dbpf_queued_op_init(
+			q_op_p,
+			BSTREAM_FLUSH,
+			handle,
+			coll_p,
+			dbpf_bstream_flush_op_svc,
+			user_ptr,
+			flags);
+    
+    /* initialize the op-specific members */
+    /* there are none for flush */
+   
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    
+    return 0;
+}
+/* dbpf_bstream_flush_op_svc
+ * returns 1 on completion, -1 on error, 0 on not done
+ */
+static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
+{
+    int ret, fd, got_fd = 0;
+
+    /* grab the FD (also increments a reference count) */
+    /* TODO: CONSIDER PUTTING COLL_ID IN THE OP INSTEAD OF THE PTR */
+    ret = dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &fd);
+    switch (ret) {
+	case DBPF_BSTREAM_FDCACHE_ERROR:
+	    goto return_error;
+	case DBPF_BSTREAM_FDCACHE_BUSY:
+	    return 0;
+	case DBPF_BSTREAM_FDCACHE_SUCCESS:
+	    got_fd = 1;
+	    /* drop through */
+    }
+
+    ret = DBPF_SYNC(fd);
+    if ( ret != 0) {
+	goto return_error;
+    }
+    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    return 1;
+
+return_error:
     if (got_fd) dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
     return -1;
 }
@@ -581,7 +649,8 @@ struct TROVE_bstream_ops dbpf_bstream_ops =
     dbpf_bstream_resize,
     dbpf_bstream_validate,
     dbpf_bstream_read_list,
-    dbpf_bstream_write_list
+    dbpf_bstream_write_list,
+    dbpf_bstream_flush
 };
 
 

@@ -26,6 +26,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p);
+static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p);
 
 static int dbpf_keyval_read(
 			    TROVE_coll_id coll_id,
@@ -700,6 +701,72 @@ static int dbpf_keyval_write_list(
     return -1;
 }
 
+static int dbpf_keyval_flush(
+			    TROVE_coll_id coll_id,
+			    TROVE_handle handle,
+			    TROVE_ds_flags flags,
+			    void *user_ptr,
+			    TROVE_op_id *out_op_id_p)
+{
+    struct dbpf_collection *coll_p;
+    struct dbpf_queued_op *q_op_p;
+    
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL) return -1;
+
+    /* grab a queued op structure */
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL) return -1;
+
+    /* initialize all the common members */
+    dbpf_queued_op_init(
+			q_op_p,
+			KEYVAL_FLUSH,
+			handle,
+			coll_p,
+			dbpf_keyval_flush_op_svc,
+			user_ptr,
+			flags);
+
+    /* initialize the op-specific members */
+    /* there are no op-specific members for sync */
+
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    return 0;
+}
+
+/* dbpf_keyval_flush_op_svc()
+ *
+ * service a queued keyval flush operation
+ */
+static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
+{
+    int ret, got_db = 0;
+    DB *db_p;
+
+    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
+    switch (ret) {
+	case DBPF_KEYVAL_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_KEYVAL_DBCACHE_BUSY:
+	    return 0;
+	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    got_db = 1;
+	    /* drop through */
+    }
+    if ( (ret = db_p->sync(db_p, 0)) != 0) {
+	goto return_error;
+    }
+	
+    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    return 1;
+
+ return_error:
+    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    return -1;
+}    
+
 struct TROVE_keyval_ops dbpf_keyval_ops =
 {
     dbpf_keyval_read,
@@ -709,7 +776,8 @@ struct TROVE_keyval_ops dbpf_keyval_ops =
     dbpf_keyval_iterate,
     dbpf_keyval_iterate_keys,
     dbpf_keyval_read_list,
-    dbpf_keyval_write_list
+    dbpf_keyval_write_list,
+    dbpf_keyval_flush
 };
 
 
