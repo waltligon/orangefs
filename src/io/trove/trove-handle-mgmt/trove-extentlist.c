@@ -351,10 +351,12 @@ int extentlist_handle_remove(struct TROVE_handle_extentlist *elist,
 	}
 	if (key_handle == handle) {
 	    old_e->first = key_handle + 1;
+	    old_e->last  = last_handle;
 	    avlinsert(&(elist->index), old_e);
 	}
 	else if (old_e->last == handle) {
-	    old_e->last = last_handle - 1;
+	    old_e->first = key_handle;
+	    old_e->last  = last_handle - 1;
 	    avlinsert(&(elist->index), old_e);
 	}
 	else {
