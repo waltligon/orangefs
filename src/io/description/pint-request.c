@@ -388,6 +388,9 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 	gossip_debug(REQUEST_DEBUG,
 			"\t\tof %lld sz %lld ix %d sm %d by %lld bm %lld\n",
 			offset, size, *segs, segmax, *bytes, bytemax);
+	gossip_debug(REQUEST_DEBUG,
+			"\t\tfsz %lld exfl %d\n",
+			rfdata->fsize, rfdata->extend_flag);
 	orig_offset = offset;
 	orig_size = size;
 	*eof_flag = 0;
@@ -410,27 +413,6 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 				(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, loff);
 		/* find how much of requested region remains after loff */
       sz = size - diff;
-		/* check for append - can't we check check flag below? */
-      if (poff+sz > rfdata->fsize && rfdata->extend_flag)
-      {
-         /* update the file size info */
-			gossip_debug(REQUEST_DEBUG,"\t\tfile being extended\n");
-			rfdata->fsize = poff + sz;
-      }
-		/* stop at end of file - only in SERVER mode? */
-		if (poff+sz > rfdata->fsize)
-		{
-			/* hit end of file */
-			gossip_debug(REQUEST_DEBUG,"\t\thit end of file\n");
-			*eof_flag = 1;
-			sz = rfdata->fsize - poff;
-			if (sz <= 0)
-			{
-				/* not even any more bytes before EOF */
-				gossip_debug(REQUEST_DEBUG,"\t\tend of file and no more bytes\n");
-				break;
-			}
-		}
 		/* find how much data after loff/poff is on this server */
       fraglen = (*rfdata->dist->methods->contiguous_length)
 				(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, poff);
@@ -441,11 +423,39 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 			gossip_debug(REQUEST_DEBUG,"\t\tfrag extends beyond strip\n");
 			sz = fraglen;
 		}
+		/* check to see if exceeds bytemax */
 		if (*bytes + sz > bytemax)
 		{
 			/* contiguous segment extends beyond byte limit */
 			gossip_debug(REQUEST_DEBUG,"\t\tsegment exceeds byte limit\n");
 			sz = bytemax - *bytes;
+		}
+		/* check to se if exceeds end of file */
+		if (poff+sz > rfdata->fsize)
+		{
+			/* check for append */
+			if (rfdata->extend_flag)
+			{
+         	/* update the file size info */
+				gossip_debug(REQUEST_DEBUG,"\t\tfile being extended\n");
+				rfdata->fsize = poff + sz;
+			}
+			else
+			{
+				/* hit end of file */
+				gossip_debug(REQUEST_DEBUG,
+						"\t\thit end of file: po %lld sz %lld fsz %lld\n",
+						poff, sz, rfdata->fsize);
+				*eof_flag = 1;
+				sz = rfdata->fsize - poff;
+				if (sz <= 0)
+				{
+					/* not even any more bytes before EOF */
+					gossip_debug(REQUEST_DEBUG,
+							"\t\tend of file and no more bytes\n");
+					break;
+				}
+			}
 		}
 		/* add a segment entry */
 		gossip_debug(REQUEST_DEBUG,"\t\tadd a segment\n");
@@ -507,8 +517,9 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 		}
    }
 	gossip_debug(REQUEST_DEBUG,"\t\tfinished\n");
-	gossip_debug(REQUEST_DEBUG,"\t\t\tof %lld sz %lld sg %d sm %d by %lld bm %lld",
-			offset, size, *segs, segmax, *bytes, bytemax);
+	gossip_debug(REQUEST_DEBUG,
+			"\t\t\tof %lld sz %lld sg %d sm %d by %lld bm %lld eof %d",
+			offset, size, *segs, segmax, *bytes, bytemax, *eof_flag);
 	if (loff >= orig_offset + orig_size)
 	{
 		gossip_debug(REQUEST_DEBUG," (rv) %lld\n", orig_size);
