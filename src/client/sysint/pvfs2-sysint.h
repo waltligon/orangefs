@@ -191,16 +191,6 @@ struct PVFS_sysresp_mkdir_s {
 };
 typedef struct PVFS_sysresp_mkdir_s PVFS_sysresp_mkdir;
 
-/* rmdir */
-struct PVFS_sysreq_rmdir_s {
-	PVFS_string entry_name; /* single segment */
-	pinode_reference parent_refn;
-	PVFS_credentials credentials;
-};
-typedef struct PVFS_sysreq_rmdir_s PVFS_sysreq_rmdir;
-
-/* no data returned in rmdir response */
-
 /* create */
 struct PVFS_sysreq_create_s {
 	PVFS_string entry_name; /* single path segment */
@@ -420,7 +410,6 @@ struct PVFS_system_req_s {
 		PVFS_sysreq_getattr getattr;
 		PVFS_sysreq_setattr setattr;
 		PVFS_sysreq_mkdir mkdir;
-		PVFS_sysreq_rmdir rmdir;
 		PVFS_sysreq_create create;
 		PVFS_sysreq_remove remove;
 		PVFS_sysreq_rename rename;
@@ -495,7 +484,6 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp);
 int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp);
 int PVFS_sys_setattr(PVFS_sysreq_setattr *req);
 int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp);
-int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req);
 int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp);
 int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp);
 int PVFS_sys_remove(PVFS_sysreq_remove *req);

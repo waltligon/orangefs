@@ -200,9 +200,6 @@ void debug_print_type(void* thing, int type)
 			case PVFS_SERV_MKDIR:
 				gossip_ldebug(CLIENT_DEBUG,"mkdir request\n");
 				break;
-			case PVFS_SERV_RMDIR:
-				gossip_ldebug(CLIENT_DEBUG,"rmdir request\n");
-				break;
 			case PVFS_SERV_RMDIRENT:
 				gossip_ldebug(CLIENT_DEBUG,"rmdirent request\n");
 				break;
@@ -221,9 +218,6 @@ void debug_print_type(void* thing, int type)
 				break;
 			case PVFS_SERV_MKDIR:
 				gossip_ldebug(CLIENT_DEBUG,"mkdir response\n");
-				break;
-			case PVFS_SERV_RMDIR:
-				gossip_ldebug(CLIENT_DEBUG,"rmdir response\n");
 				break;
 			case PVFS_SERV_READDIR:
 				gossip_ldebug(CLIENT_DEBUG,"readdir response\n");

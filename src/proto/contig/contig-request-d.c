@@ -124,7 +124,7 @@ int do_decode_req(
 		return(ret);
 	    }
 	    return(0);
-	case PVFS_SERV_RMDIR: /*these structures are all self contained (no pointers that need to be packed) */
+	/*these structures are all self contained (no pointers that need to be packed) */
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_READDIR:
 	case PVFS_SERV_GETATTR:

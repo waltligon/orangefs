@@ -732,10 +732,6 @@ static int handle_from_request(struct PVFS_server_req_s*
 		case PVFS_SERV_MKDIR:
 			return(0);
 			break;
-		case PVFS_SERV_RMDIR:
-			*handle = req->u.rmdir.handle;
-			return(0);
-			break;
 		case PVFS_SERV_READDIR:
 			*handle = req->u.readdir.handle;
 			return(0);

@@ -126,7 +126,7 @@ static int removereq_alloc(void *pjob,void *preq,bmi_addr_t server,
 	/* Set up the request for remove */
 	(*serv_req)->op = PVFS_SERV_REMOVE;	
 	(*serv_req)->u.remove.handle = req->handle;
-	(*serv_req)->u.rmdir.fs_id = req->fs_id;
+	(*serv_req)->u.remove.fs_id = req->fs_id;
 	(*serv_req)->rsize = size;
 	(*serv_req)->credentials = credentials;
 

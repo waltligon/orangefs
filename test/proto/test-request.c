@@ -48,27 +48,6 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
         printf("struct address = %d\n", (int)my_req );
         switch(my_req->op)
         {
-		case PVFS_SERV_RMDIR:
-			arrow(direction);
-                        printf("PVFS_SERV_RMDIR structure:\n"); 
-			arrow(direction);
-                        printf("op = %d \n", (int)my_req->op);
-			arrow(direction);
-                        printf("rsize = %d\n", (int)my_req->rsize);
-			arrow(direction);
-                        printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
-			arrow(direction);
-                        printf("credentials.gid = %d\n",(int) my_req->credentials.gid);
-			arrow(direction);
-                        printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
-			arrow(direction);
-                        printf("PVFS_servreq_rmdir->fs_id = %d\n", (int)my_req->u.rmdir.fs_id );
-			arrow(direction);
-                        printf("PVFS_servreq_rmdir->handle = %d\n",(int) my_req->u.rmdir.handle );
-			arrow(direction);
-                        printf("======================================\n");
-                        break;
-
                 case PVFS_SERV_READDIR:
 			arrow(direction);
                         printf("PVFS_SERV_READDIR structure:\n");
@@ -473,16 +452,6 @@ int main(int argc, char **argv)
 	request->u.create.handle_mask = 11111;
 	request->u.create.fs_id = 11111;
 	request->u.create.object_type = 11111;
-	break;
-
-	case 2:
-        request->op = PVFS_SERV_RMDIR;
-	request->rsize = 666;
-	request->credentials.uid = 420;
-	request->credentials.gid = 420;
-	request->credentials.perms = 420;
-        request->u.rmdir.fs_id = 11111;
-        request->u.rmdir.handle = 22222;
 	break;
 
 	case 3:

@@ -42,7 +42,7 @@ typedef enum {
 	PVFS_SERV_ALLOCATE = 16,
 	PVFS_SERV_TRUNCATE = 17,
 	PVFS_SERV_MKDIR = 18,
-	PVFS_SERV_RMDIR = 19,
+	/* REMOVE takes care of datafiles, metafiles, and directories */
 	PVFS_SERV_READDIR = 20,
 	PVFS_SERV_STATFS = 21,
 	PVFS_SERV_IOSTATFS = 22,
@@ -217,13 +217,6 @@ struct PVFS_servresp_mkdir_s {
 };
 typedef struct PVFS_servresp_mkdir_s PVFS_servresp_mkdir;
 
-/* Rmdir */
-struct PVFS_servreq_rmdir_s {
-	PVFS_handle handle; /* Handle of directory to remove */
-	PVFS_fs_id fs_id;	  /* File system identifier of directory to remove */
-};
-typedef struct PVFS_servreq_rmdir_s PVFS_servreq_rmdir;
-
 /* Createdirent */
 struct PVFS_servreq_createdirent_s {
 	PVFS_string name;	/* name of entry to create */ 
@@ -390,7 +383,6 @@ struct PVFS_server_req_s {
 		PVFS_servreq_getattr getattr;
 		PVFS_servreq_setattr setattr;
 		PVFS_servreq_mkdir mkdir;
-		PVFS_servreq_rmdir rmdir;
 		PVFS_servreq_readdir readdir;
 		PVFS_servreq_statfs statfs;
 		PVFS_servreq_geteattr geteattr;

@@ -46,7 +46,6 @@ int do_encode_resp(
 	case PVFS_SERV_NOOP:
 	case PVFS_SERV_SETATTR:
 	case PVFS_SERV_REMOVE:
-	case PVFS_SERV_RMDIR:
 	case PVFS_SERV_CREATEDIRENT:
 	case PVFS_SERV_WRITE_COMPLETION:
 	    /* 

@@ -8,7 +8,6 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/lookup.c\
 	$(DIR)/get-info.c\
 	$(DIR)/mkdir.c\
-	$(DIR)/rmdir.c\
 	$(DIR)/remove.c\
 	$(DIR)/find.c \
 	$(DIR)/path-test.c\

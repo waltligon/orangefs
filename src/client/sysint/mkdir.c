@@ -268,11 +268,11 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	    gossip_ldebug(CLIENT_DEBUG,"CRDIRENT_MSG_FAILURE\n");
 
 	    /* rollback mkdir message */
-	    req_p.op = PVFS_SERV_RMDIR;
+	    req_p.op = PVFS_SERV_REMOVE;
 	    req_p.rsize = sizeof(struct PVFS_server_req_s);
 	    req_p.credentials = req->credentials;
-	    req_p.u.rmdir.handle = entry.handle;
-	    req_p.u.rmdir.fs_id = entry.fs_id;
+	    req_p.u.remove.handle = entry.handle;
+	    req_p.u.remove.fs_id = entry.fs_id;
 
 	    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 	    op_tag = get_next_session_tag();

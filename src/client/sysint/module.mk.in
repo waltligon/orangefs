@@ -13,7 +13,6 @@ LIBSRC += \
 	$(DIR)/server-send-req.c \
 	$(DIR)/readdir.c \
 	$(DIR)/remove.c \
-	$(DIR)/rmdir.c \
 	$(DIR)/setattr.c \
 	$(DIR)/sysint-utils.c \
 	$(DIR)/pint-bucket.c \

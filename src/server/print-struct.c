@@ -109,11 +109,6 @@ void display_pvfs_structure(void *s,int r)
 				dump_attribs(p->u.mkdir.attr);
 				printf("Attrmask: %Xh\n",p->u.mkdir.attrmask);
 				break;
-			case PVFS_SERV_RMDIR:
-				printf("Remove Dir Req\n");
-				printf("Handle: %Ld\n",p->u.rmdir.handle);
-				printf("FSid: %d\n",p->u.rmdir.fs_id);
-				break;
 			case PVFS_SERV_CREATEDIRENT:
 				printf("Create Dirent Req\n");
 				printf("Name: %s\n",p->u.crdirent.name);
@@ -201,7 +196,6 @@ void display_pvfs_structure(void *s,int r)
 			case PVFS_SERV_IO:
 			case PVFS_SERV_BATCH:
 			case PVFS_SERV_SETATTR:
-			case PVFS_SERV_RMDIR:
 			case PVFS_SERV_CREATEDIRENT:
 				printf("Shouldn't have a response\n");
 				break;

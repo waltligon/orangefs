@@ -335,7 +335,7 @@ int do_encode_req(
 	    /* set accurate rsize */
 	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;
 	    return (0);
-	case PVFS_SERV_RMDIR: /*these structures are all self contained (no pointers that need to be packed) */
+	/*these structures are all self contained (no pointers that need to be packed) */
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_READDIR:
 	case PVFS_SERV_GETATTR:

@@ -210,7 +210,6 @@ static int handle_setattr_op(PINT_job_t* pending_request, PINT_job_t* response);
 static int handle_mkdir_op(PINT_job_t* pending_request, PINT_job_t* response);
 static int handle_crdirent_op(PINT_job_t* pending_request, PINT_job_t* 
 	response);
-static int handle_rmdir_op(PINT_job_t* pending_request, PINT_job_t* response);
 static int handle_rmdirent_op(PINT_job_t* pending_request, 
 	PINT_job_t* response);
 static int handle_readdir_op(PINT_job_t* pending_request, PINT_job_t* response);
@@ -1215,9 +1214,6 @@ static int dummy_complete_job_testwait(PINT_job_t* job_to_test)
 		case PVFS_SERV_CREATEDIRENT:
 			ret = handle_crdirent_op(job_pending, job_foo);
 			break;
-		case PVFS_SERV_RMDIR:
-			ret = handle_rmdir_op(job_pending, NULL);
-			break;
 		case PVFS_SERV_RMDIRENT:
 			ret = handle_rmdirent_op(job_pending, job_foo);
 			break;
@@ -1562,30 +1558,6 @@ static int handle_crdirent_op(PINT_job_t* pending_request, PINT_job_t* response)
 	}
 
 	return(0);
-}
-
-/* handle_rmdir_op()
- *
- * responds to rmdir requests 
- *
- * returns 0 on success, -errno on failure
- */
-static int handle_rmdir_op(PINT_job_t* pending_request, PINT_job_t* response)
-{
-	struct PVFS_server_req_s* serv_req = pending_request->u.bmi_d.buffer;
-	struct dummy_dir *dum_dir = NULL; 
-	PVFS_handle req_handle = serv_req->u.rmdir.handle & 127;
-	int ret = -1;
-
-	/* add to list of directories */
-	dum_dir = llist_search(dummy_dir_list, &req_handle, cmp_dir_filehandle);
-	if(!dum_dir)
-	{
-		return(ret);
-	}
-
-	return(0);
-
 }
 
 /* handle_rmdirent_op()
