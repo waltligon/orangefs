@@ -28,7 +28,7 @@ GOSSIP_MMAP_RCACHE_DEBUG | GOSSIP_LOOKUP_DEBUG |                  \
 GOSSIP_REMOVE_DEBUG | GOSSIP_GETATTR_DEBUG | GOSSIP_READDIR_DEBUG|\
 GOSSIP_IO_DEBUG | GOSSIP_DBPF_OPEN_CACHE_DEBUG |                  \
 GOSSIP_PERMISSIONS_DEBUG | GOSSIP_CANCEL_DEBUG |                  \
-GOSSIP_MSGPAIR_DEBUG)
+GOSSIP_MSGPAIR_DEBUG | GOSSIP_CLIENTCORE_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -58,6 +58,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "permissions", GOSSIP_PERMISSIONS_DEBUG }, 
     { "cancel", GOSSIP_CANCEL_DEBUG },
     { "msgpair", GOSSIP_MSGPAIR_DEBUG },
+    { "clientcore", GOSSIP_CLIENTCORE_DEBUG },
     { "verbose",  (__DEBUG_ALL & ~GOSSIP_REQ_SCHED_DEBUG)},
     { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }

@@ -894,7 +894,7 @@ static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
         op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_DB, &tmp_ref);
     if (ret < 0)
     {
-        error = ret;
+        error = -trove_errno_to_trove_error(ret);
         goto return_error;
     }
     else

@@ -237,7 +237,8 @@ static int cancel_op_in_progress(PVFS_id_gen_t tag)
     struct qlist_head *hash_link = NULL;
     vfs_request_t *vfs_request = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "cancel_op_in_progress called\n");
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                 "cancel_op_in_progress called\n");
 
     hash_link = qhash_search(
         s_ops_in_progress_table, (void *)(&tag));
@@ -251,7 +252,7 @@ static int cancel_op_in_progress(PVFS_id_gen_t tag)
         /* for now, cancellation is ONLY supported on I/O operations */
         assert(vfs_request->in_upcall.type == PVFS2_VFS_OP_FILE_IO);
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "cancelling I/O req %p "
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "cancelling I/O req %p "
                      "from tag %Ld\n", vfs_request, Ld(tag));
 
         ret = PINT_client_io_cancel(vfs_request->op_id);
@@ -267,7 +268,7 @@ static int cancel_op_in_progress(PVFS_id_gen_t tag)
     }
     else
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "op in progress cannot "
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "op in progress cannot "
                      "be found (tag = %Ld)\n", Ld(tag));
     }
     return ret;
@@ -281,7 +282,7 @@ static int is_op_in_progress(vfs_request_t *vfs_request)
 
     assert(vfs_request);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "is_op_in_progress called on "
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "is_op_in_progress called on "
                  "tag %Ld\n", Ld(vfs_request->info.tag));
 
     hash_link = qhash_search(
@@ -368,7 +369,7 @@ static int post_lookup_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_CLIENTCORE_DEBUG,
         "Got a lookup request for %s (fsid %d | parent %Lu)\n",
         vfs_request->in_upcall.req.lookup.d_name,
         vfs_request->in_upcall.req.lookup.parent_refn.fs_id,
@@ -386,7 +387,7 @@ static int post_lookup_request(vfs_request_t *vfs_request)
     if (ret < 0)
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG,
+            GOSSIP_CLIENTCORE_DEBUG,
             "Posting of lookup failed: %s on fsid %d (ret=%d)!\n",
             vfs_request->in_upcall.req.lookup.d_name,
             vfs_request->in_upcall.req.lookup.parent_refn.fs_id, ret);
@@ -399,7 +400,7 @@ static int post_create_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_CLIENTCORE_DEBUG,
         "Got a create request for %s (fsid %d | parent %Lu)\n",
         vfs_request->in_upcall.req.create.d_name,
         vfs_request->in_upcall.req.create.parent_refn.fs_id,
@@ -425,7 +426,7 @@ static int post_symlink_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_CLIENTCORE_DEBUG,
         "Got a symlink request from %s (fsid %d | parent %Lu) to %s\n",
         vfs_request->in_upcall.req.sym.entry_name,
         vfs_request->in_upcall.req.sym.parent_refn.fs_id,
@@ -453,7 +454,7 @@ static int post_getattr_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_CLIENTCORE_DEBUG,
         "got a getattr request for fsid %d | handle %Lu\n",
         vfs_request->in_upcall.req.getattr.refn.fs_id,
         Lu(vfs_request->in_upcall.req.getattr.refn.handle));
@@ -477,7 +478,7 @@ static int post_setattr_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_CLIENTCORE_DEBUG,
         "got a setattr request for fsid %d | handle %Lu\n",
         vfs_request->in_upcall.req.setattr.refn.fs_id,
         Lu(vfs_request->in_upcall.req.setattr.refn.handle));
@@ -500,7 +501,7 @@ static int post_remove_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_CLIENTCORE_DEBUG,
         "Got a remove request for %s under fsid %d and "
         "handle %Lu\n", vfs_request->in_upcall.req.remove.d_name,
         vfs_request->in_upcall.req.remove.parent_refn.fs_id,
@@ -524,7 +525,7 @@ static int post_mkdir_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_CLIENTCORE_DEBUG,
         "Got a mkdir request for %s (fsid %d | parent %Lu)\n",
         vfs_request->in_upcall.req.mkdir.d_name,
         vfs_request->in_upcall.req.mkdir.parent_refn.fs_id,
@@ -550,7 +551,7 @@ static int post_readdir_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Got a readdir request for fsid %d | "
+        GOSSIP_CLIENTCORE_DEBUG, "Got a readdir request for fsid %d | "
         "parent %Lu (token is %d)\n",
         vfs_request->in_upcall.req.readdir.refn.fs_id,
         Lu(vfs_request->in_upcall.req.readdir.refn.handle),
@@ -576,7 +577,7 @@ static int post_rename_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_CLIENTCORE_DEBUG,
         "Got a rename request for %s under fsid %d and "
         "handle %Lu to be %s under fsid %d and handle %Lu\n",
         vfs_request->in_upcall.req.rename.d_old_name,
@@ -606,7 +607,7 @@ static int post_truncate_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Got a truncate request for %Lu under "
+        GOSSIP_CLIENTCORE_DEBUG, "Got a truncate request for %Lu under "
         "fsid %d to be size %Ld\n",
         Lu(vfs_request->in_upcall.req.truncate.refn.handle),
         vfs_request->in_upcall.req.truncate.refn.fs_id,
@@ -646,7 +647,7 @@ do {                                                                  \
         goto fail_downcall;                                           \
     }                                                                 \
                                                                       \
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "Using %s Point %s\n",          \
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Using %s Point %s\n",      \
                  (mount ? "Mount" : "Unmount"), mntent.mnt_dir);      \
                                                                       \
     if (mount)                                                        \
@@ -680,7 +681,7 @@ do {                                                                  \
     }                                                                 \
                                                                       \
     gossip_debug(                                                     \
-        GOSSIP_CLIENT_DEBUG, "Got Configuration Server: %s "          \
+        GOSSIP_CLIENTCORE_DEBUG, "Got Configuration Server: %s "      \
         "(len=%d)\n", mntent.pvfs_config_server,                      \
         (int)strlen(mntent.pvfs_config_server));                      \
                                                                       \
@@ -692,7 +693,7 @@ do {                                                                  \
     }                                                                 \
                                                                       \
     gossip_debug(                                                     \
-        GOSSIP_CLIENT_DEBUG, "Got FS Name: %s (len=%d)\n",            \
+        GOSSIP_CLIENTCORE_DEBUG, "Got FS Name: %s (len=%d)\n",        \
         mntent.pvfs_fs_name, (int)strlen(mntent.pvfs_fs_name));       \
                                                                       \
     mntent.encoding = ENCODING_DEFAULT;                               \
@@ -721,7 +722,7 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
     memset(&mntent, 0, sizeof(struct PVFS_sys_mntent));
         
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_CLIENTCORE_DEBUG,
         "Got an fs mount request via host %s\n",
         vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
 
@@ -754,8 +755,8 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
             if (BMI_set_info(
                     tmp_addr, BMI_FORCEFUL_CANCEL_MODE, NULL) == 0)
             {
-                gossip_debug(GOSSIP_CLIENT_DEBUG, "BMI forceful cancel "
-                             "mode enabled\n");
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "BMI forceful "
+                             "cancel mode enabled\n");
             }
         }
         reset_acache_timeout();
@@ -772,7 +773,7 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
             goto fail_downcall;
         }
             
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                      "FS mount got root handle %Lu on fs id %d\n",
                      Lu(root_handle), mntent.fs_id);
 
@@ -805,7 +806,7 @@ static int service_fs_umount_request(vfs_request_t *vfs_request)
     memset(&mntent, 0, sizeof(struct PVFS_sys_mntent));
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_CLIENTCORE_DEBUG,
         "Got an fs umount request via host %s\n",
         vfs_request->in_upcall.req.fs_umount.pvfs2_config_server);
 
@@ -826,7 +827,7 @@ static int service_fs_umount_request(vfs_request_t *vfs_request)
     }
     else
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "FS umount ok\n");
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "FS umount ok\n");
 
         reset_acache_timeout();
 
@@ -845,7 +846,7 @@ static int service_statfs_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Got a statfs request for fsid %d\n",
+        GOSSIP_CLIENTCORE_DEBUG, "Got a statfs request for fsid %d\n",
         vfs_request->in_upcall.req.statfs.fs_id);
 
     ret = PVFS_sys_statfs(
@@ -1271,7 +1272,7 @@ static inline void package_downcall_members(
                         PVFS_HANDLE_NULL)
                     {
                         gossip_debug(
-                            GOSSIP_CLIENT_DEBUG, "Overwriting error "
+                            GOSSIP_CLIENTCORE_DEBUG, "Overwriting error "
                             "code -PVFS_EEXIST with -PVFS_EACCES "
                             "(create)\n");
 
@@ -1280,7 +1281,7 @@ static inline void package_downcall_members(
                     else
                     {
                         gossip_debug(
-                            GOSSIP_CLIENT_DEBUG, "Overwriting error "
+                            GOSSIP_CLIENTCORE_DEBUG, "Overwriting error "
                             "code -PVFS_EEXIST with 0 (create)\n");
 
                         *error_code = 0;
@@ -1316,7 +1317,7 @@ static inline void package_downcall_members(
                         PVFS_HANDLE_NULL)
                     {
                         gossip_debug(
-                            GOSSIP_CLIENT_DEBUG, "Overwriting error "
+                            GOSSIP_CLIENTCORE_DEBUG, "Overwriting error "
                             "code -PVFS_EEXIST with -PVFS_EACCES "
                             "(symlink)\n");
 
@@ -1325,7 +1326,7 @@ static inline void package_downcall_members(
                     else
                     {
                         gossip_debug(
-                            GOSSIP_CLIENT_DEBUG, "Overwriting error "
+                            GOSSIP_CLIENTCORE_DEBUG, "Overwriting error "
                             "code -PVFS_EEXIST with 0 (symlink)\n");
 
                         *error_code = 0;
@@ -1513,7 +1514,7 @@ static inline int repost_unexp_vfs_request(
     }
     else
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "[*] reposted unexpected "
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "[*] reposted unexpected "
                      "request [%p] due to %s\n", vfs_request,
                      completion_handle_desc);
     }
@@ -1535,7 +1536,7 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
     }
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Got dev request message: "
+        GOSSIP_CLIENTCORE_DEBUG, "Got dev request message: "
         "size: %d, tag: %Ld, payload: %p, op_type: %d\n",
         vfs_request->info.size, Ld(vfs_request->info.tag),
         vfs_request->info.buffer, vfs_request->in_upcall.type);
@@ -1556,7 +1557,7 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
         (vfs_request->in_upcall.type != PVFS2_VFS_OP_FS_MOUNT))
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "Got an upcall operation of "
+            GOSSIP_CLIENTCORE_DEBUG, "Got an upcall operation of "
             "type %x before mounting.  ignoring.\n",
             vfs_request->in_upcall.type);
         /*
@@ -1567,9 +1568,8 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
         goto repost_op;
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "[0] handling new unexp vfs_request %p\n",
-                 vfs_request);
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                 "[0] handling new unexp vfs_request %p\n", vfs_request);
 
     /*
       make sure the operation is not currently in progress.  if it is,
@@ -1578,8 +1578,8 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
     */
     if (is_op_in_progress(vfs_request))
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, " Ignoring upcall of type %x "
-                     "that's already in progress (tag=%Ld)\n",
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, " Ignoring upcall of type "
+                     "%x that's already in progress (tag=%Ld)\n",
                      vfs_request->in_upcall.type,
                      Ld(vfs_request->info.tag));
 
@@ -1721,7 +1721,8 @@ int process_vfs_requests(void)
     int size_list[MAX_LIST_SIZE];
     int list_size = 0, total_size = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "process_vfs_requests called\n");
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                 "process_vfs_requests called\n");
 
     /* allocate and post all of our initial unexpected vfs requests */
     for(i = 0; i < MAX_NUM_OPS; i++)
@@ -1788,8 +1789,8 @@ int process_vfs_requests(void)
             }
             else
             {
-                gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_sys_testsome "
-                             "returned completed vfs_request %p\n",
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
+                             " returned completed vfs_request %p\n",
                              vfs_request);
                 /*
                   if this is not a dev unexp msg, it's a non-blocking
@@ -1834,8 +1835,8 @@ int process_vfs_requests(void)
                         &vfs_request->op_id, &vfs_request->jstat,
                         s_client_dev_context);
 
-                    gossip_debug(GOSSIP_CLIENT_DEBUG, "downcall write "
-                                 "returned %d\n", ret);
+                    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "downcall "
+                                 "write returned %d\n", ret);
 
                     if (ret < 0)
                     {
@@ -1846,8 +1847,9 @@ int process_vfs_requests(void)
                 }
                 else
                 {
-                    gossip_debug(GOSSIP_CLIENT_DEBUG, "skipping downcall "
-                                 "write due to previous cancellation\n");
+                    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "skipping "
+                                 "downcall write due to previous "
+                                 "cancellation\n");
 
                     ret = repost_unexp_vfs_request(
                         vfs_request, "cancellation");
@@ -1865,7 +1867,8 @@ int process_vfs_requests(void)
         }
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "process_vfs_requests returning\n");
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                 "process_vfs_requests returning\n");
     return 0;
 }
 
@@ -1915,14 +1918,14 @@ int main(int argc, char **argv)
     start_time = time(NULL);
     local_time = localtime(&start_time);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,  "\n\n**************************"
-                 "*************************\n");
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,  "\n\n***********************"
+                 "****************************\n");
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  " %s starting at %.4d-%.2d-%.2d %.2d:%.2d\n",
                  argv[0], (local_time->tm_year + 1900),
                  local_time->tm_mon, local_time->tm_mday,
                  local_time->tm_hour, local_time->tm_min);
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "***************************************************\n");
 
 #ifdef USE_MMAP_RA_CACHE
@@ -2008,14 +2011,15 @@ int main(int argc, char **argv)
     PINT_dev_finalize();
     PINT_dev_put_mapped_region(&s_io_desc);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "calling PVFS_sys_finalize()\n");
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                 "calling PVFS_sys_finalize()\n");
     if (PVFS_sys_finalize())
     {
         gossip_err("Failed to finalize PVFS\n");
         return 1;
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s terminating\n", argv[0]);
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s terminating\n", argv[0]);
     return 0;
 }
 
@@ -2108,8 +2112,8 @@ static void reset_acache_timeout(void)
         if (max_acache_timeout_ms != s_opts.acache_timeout)
         {
             gossip_debug(
-                GOSSIP_CLIENT_DEBUG, "Resetting acache timeout to %d "
-                "milliseconds\n (based on new dynamic configuration "
+                GOSSIP_CLIENTCORE_DEBUG, "Resetting acache timeout to %d"
+                " milliseconds\n (based on new dynamic configuration "
                 "handle recycle time value)\n", max_acache_timeout_ms);
 
             PINT_acache_set_timeout(max_acache_timeout_ms);
@@ -2118,8 +2122,8 @@ static void reset_acache_timeout(void)
     }
     else
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "All file systems unmounted. Not "
-                     "resetting the acache.\n");
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "All file systems "
+                     "unmounted. Not resetting the acache.\n");
     }
 }
 

@@ -398,9 +398,11 @@ static int remove_crdirent_comp_fn(
 static int remove_check_error_code(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_REMOVE_DEBUG,
-                 "remove_check_error_code got %d\n", js_p->error_code);
+    char buf[64] = {0};
 
+    PVFS_strerror_r(js_p->error_code, buf, 64);
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "remove_check_error_code got %s "
+                 "(%d)\n", buf, js_p->error_code);
     /*
       separate error codes which are ok to return to the caller at
       this point without trying to undo what we've done and retry the

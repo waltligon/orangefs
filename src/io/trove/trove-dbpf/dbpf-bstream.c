@@ -437,7 +437,6 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
     int ret, error, got_fd = 0;
     struct open_cache_ref tmp_ref;
 
-    /* grab the FD (also increments a reference count) */
     ret = dbpf_open_cache_get(
         op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_FD, &tmp_ref);
     if(ret < 0)
