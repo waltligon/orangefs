@@ -3,9 +3,39 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.0.8pre1
+pvfs2-0.0.8pre2
 ===============
-- 
+- many alpha platform improvements, including configure check passes,
+  compilation fixes, and vfs fixes (alignment/overflow bugs)
+- pvfs2-genconfig quiet mode improvements
+- removed extraneous sample server configuration files from source tree
+  (can now be generated at compile time)
+- kernel mmap/readahead cache improvements and bug fixes
+- improved pvfs2-server signal handling, error reporting, and handling
+- added a configure/compile time option for allowing function backtraces
+  on critical errors (see ./configure --help) and backtrace documentation
+  for analyzing what they mean (see doc/coding/)
+- properly implement the rmdir operation through the kernel interface
+- improved dbpf-attr-cache error handling and serious bug fixes (race
+  condition and potential memory corruption fixes)
+- race condition fixes on the trove dbpf-thread code, job thread manage,
+  and job desc queueing code
+- a complete re-write of client side system interface lookup operation
+  that now handles path components such as '.' and '..' and allows better
+  absolute and relative recursive symlink resolution, including a new
+  client debugging keyword/level specific to the lookup operation
+- added a symlink test to the pts test suite
+- added some test shell scripts to the test/client/sysint directory,
+  mostly useful for stressing the new lookup operation
+- kernel and client side i/o path improvements that now gracefully handle
+  errors such as the case of i/o happening on a file that is removed by
+  another process
+- implemented a previously unimplemented kernel method (inode:getattr) and
+  now issue a setattr call on successful writes
+- pvfs2-client command line parsing bug fix (no longer crashes on invalid
+  args)
+- improvements to several test programs (in test/client/sysint)
+- removed several files and function that are no longer needed
 
 
 pvfs2-0.0.7
