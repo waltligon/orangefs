@@ -22,6 +22,8 @@ snprintf(fname, max_len, (slash ? "/%s%dr%d" : "%s%dr%d"),\
           f, i, r);                                       \
 } while (0);
 
+#define RELATIVE_SYMLINK_NAME "rl"
+#define ABSOLUTE_SYMLINK_NAME "al"
 
 int build_nested_path(int levels, char *format, int rank, int test_symlinks)
 {
@@ -37,7 +39,8 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
     PVFS_pinode_reference root_refn, parent_refn, base_refn;
     PVFS_pinode_reference *newdir_refns = NULL;
     PVFS_pinode_reference *lookup_refns = NULL;
-    PVFS_pinode_reference *symlink_refns = NULL;
+    PVFS_pinode_reference *rsymlink_refns = NULL;
+    PVFS_pinode_reference *asymlink_refns = NULL;
     char **absolute_paths = NULL;
 
     if (levels && format)
@@ -124,6 +127,7 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
             GENERATE_FILENAME(cur_filename, 64, format, i, rank, 1);
             strncat(tmp_buf, cur_filename, PVFS_NAME_MAX);
             absolute_paths[i] = strdup(tmp_buf);
+            fprintf(stderr," ABSOLUTE_PATH is %s\n", absolute_paths[i]);
             if (strlen(absolute_paths[i]) > PVFS_NAME_MAX)
             {
                 fprintf(stderr," Generated pathname is too long to "
@@ -138,7 +142,7 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
         for(i = 0; i < levels; i++)
         {
             GENERATE_FILENAME(cur_filename, 64, format, i, rank, 0);
-            fprintf(stderr,"Looking up path %d [RELATIVE] ... ", i);
+            fprintf(stderr,"Looking up path %d [RELATIVE] \t\t... ", i);
 #if 0
             fprintf(stderr,
                     " - Looking up relative path %s under %Lu, %d\n",
@@ -164,7 +168,7 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
             lookup_refns[i] = lookup_resp.pinode_refn;
 
             /* then do an absolute path lookup */
-            fprintf(stderr,"Looking up path %d [ABSOLUTE] ... ", i);
+            fprintf(stderr,"Looking up path %d [ABSOLUTE] \t\t... ", i);
 #if 0
             fprintf(stderr," - Looking up absolute path:\n%s\n",
                     absolute_paths[i]);
@@ -210,25 +214,45 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
       generate both relative and absolute symlinks for
       most of the nested directories created
     */
-    symlink_refns = (PVFS_pinode_reference *)malloc(
+    rsymlink_refns = (PVFS_pinode_reference *)malloc(
+        (levels * sizeof(PVFS_pinode_reference)));
+    asymlink_refns = (PVFS_pinode_reference *)malloc(
         (levels * sizeof(PVFS_pinode_reference)));
     for(i = 0; i < levels; i++)
     {
         parent_refn = ((i == 0) ? base_refn : lookup_refns[i - 1]);
         GENERATE_FILENAME(cur_filename, 64, format, i, rank, 0);
-        fprintf(stderr, "Generating relative symlink 'testlink' "
-                "in %Lu,%d to point at %s\n", Lu(parent_refn.handle),
+        fprintf(stderr, "Generating relative symlink %s "
+                "in %Lu,%d to point at %s\n", RELATIVE_SYMLINK_NAME,
+                Lu(parent_refn.handle),
                 parent_refn.fs_id, cur_filename);
-        ret = PVFS_sys_symlink("testlink", parent_refn, cur_filename,
-                               attr, credentials, &symlink_resp);
+        ret = PVFS_sys_symlink(
+            RELATIVE_SYMLINK_NAME, parent_refn, cur_filename,
+            attr, credentials, &symlink_resp);
         if (ret < 0)
         {
             PVFS_perror("Failed to create symlink ", ret);
             goto symlink_cleanup;
         }
 
-        /* stash the newly created symlink references created */
-        symlink_refns[i] = symlink_resp.pinode_refn;
+        /* stash the newly created relative symlink references created */
+        rsymlink_refns[i] = symlink_resp.pinode_refn;
+
+        fprintf(stderr, "Generating absolute symlink %s "
+                "in %Lu,%d to point at %s\n", ABSOLUTE_SYMLINK_NAME,
+                Lu(parent_refn.handle),
+                parent_refn.fs_id, absolute_paths[i]);
+        ret = PVFS_sys_symlink(
+            ABSOLUTE_SYMLINK_NAME, parent_refn, absolute_paths[i],
+            attr, credentials, &symlink_resp);
+        if (ret < 0)
+        {
+            PVFS_perror("Failed to create symlink ", ret);
+            goto symlink_cleanup;
+        }
+
+        /* stash the newly created absolute symlink references created */
+        asymlink_refns[i] = symlink_resp.pinode_refn;
     }
 
     for(i = 0; i < levels; i++)
@@ -239,14 +263,15 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
         */
         if (i > 0)
         {
-            snprintf(tmp_buf, PVFS_NAME_MAX, "%s/testlink",
-                     absolute_paths[i - 1]);
+            snprintf(tmp_buf, PVFS_NAME_MAX, "%s/%s",
+                     absolute_paths[i - 1], RELATIVE_SYMLINK_NAME);
             /*
               a lookup on tmp_buf should resolve exactly
-              to symlink_refns[i] if not followed, and
+              to rsymlink_refns[i] if not followed, and
               lookup_refns[i] if followed.  make sure!
             */
-            fprintf(stderr,"Looking up symlink %d [UNFOLLOWED] ... ", i);
+            fprintf(stderr,"Looking up rsymlink %d [UNFOLLOWED] "
+                    "\t\t... ", i);
             ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
                                   credentials, &lookup_resp,
                                   PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -257,14 +282,14 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
             }
 
             if ((lookup_resp.pinode_refn.handle !=
-                 symlink_refns[i].handle) ||
+                 rsymlink_refns[i].handle) ||
                 (lookup_resp.pinode_refn.fs_id !=
-                 symlink_refns[i].fs_id))
+                 rsymlink_refns[i].fs_id))
             {
                 fprintf(stderr,"\nSymlink %s resolved to %Lu "
                         "but should have resolved to %Lu\n", tmp_buf,
                         Lu(lookup_resp.pinode_refn.handle),
-                        Lu(symlink_refns[i].handle));
+                        Lu(rsymlink_refns[i].handle));
                 goto symlink_cleanup;
             }
             else
@@ -272,7 +297,70 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
                 fprintf(stderr,"OK\n");
             }
 
-            fprintf(stderr,"Looking up symlink %d [  FOLLOWED] ... ", i);
+            fprintf(stderr,"Looking up rsymlink %d [  FOLLOWED] "
+                    "\t\t... ", i);
+            ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
+                                  credentials, &lookup_resp,
+                                  PVFS2_LOOKUP_LINK_FOLLOW);
+            if (ret < 0)
+            {
+                fprintf(stderr,"\nPVFS_sys_lookup failed\n");
+                goto symlink_cleanup;
+            }
+
+            if ((lookup_resp.pinode_refn.handle !=
+                 lookup_refns[i].handle) ||
+                (lookup_resp.pinode_refn.fs_id !=
+                 lookup_refns[i].fs_id))
+            {
+                fprintf(stderr,"\nSymlink %s resolved to %Lu "
+                        "but should have resolved to %Lu\n", tmp_buf,
+                        Lu(lookup_resp.pinode_refn.handle),
+                        Lu(lookup_refns[i].handle));
+                goto symlink_cleanup;
+            }
+            else
+            {
+                fprintf(stderr,"OK\n");
+            }
+
+
+            snprintf(tmp_buf, PVFS_NAME_MAX, "%s/%s",
+                     absolute_paths[i - 1], ABSOLUTE_SYMLINK_NAME);
+            /*
+              a lookup on tmp_buf should resolve exactly
+              to asymlink_refns[i] if not followed, and
+              lookup_refns[i] if followed.  make sure!
+            */
+            fprintf(stderr,"Looking up asymlink %d [UNFOLLOWED] "
+                    "\t\t... ", i);
+            ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
+                                  credentials, &lookup_resp,
+                                  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+            if (ret < 0)
+            {
+                fprintf(stderr,"\nPVFS_sys_lookup failed\n");
+                goto symlink_cleanup;
+            }
+
+            if ((lookup_resp.pinode_refn.handle !=
+                 asymlink_refns[i].handle) ||
+                (lookup_resp.pinode_refn.fs_id !=
+                 asymlink_refns[i].fs_id))
+            {
+                fprintf(stderr,"\nSymlink %s resolved to %Lu "
+                        "but should have resolved to %Lu\n", tmp_buf,
+                        Lu(lookup_resp.pinode_refn.handle),
+                        Lu(asymlink_refns[i].handle));
+                goto symlink_cleanup;
+            }
+            else
+            {
+                fprintf(stderr,"OK\n");
+            }
+
+            fprintf(stderr,"Looking up asymlink %d [  FOLLOWED] "
+                    "\t\t... ", i);
             ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
                                   credentials, &lookup_resp,
                                   PVFS2_LOOKUP_LINK_FOLLOW);
@@ -301,11 +389,13 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
     }
 
   symlink_cleanup:
-    /* free all generated symlinks */
-
-    if (symlink_refns)
+    if (rsymlink_refns)
     {
-        free(symlink_refns);
+        free(rsymlink_refns);
+    }
+    if (asymlink_refns)
+    {
+        free(asymlink_refns);
     }
 
   cleanup:
@@ -321,7 +411,7 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
                 break;
             }
             GENERATE_FILENAME(cur_filename, 64, format, i, rank, 0);
-            fprintf(stderr,"Removing path %s under %Lu,%d ... ",
+            fprintf(stderr,"Removing path %s under %Lu,%d \t\t... ",
                     cur_filename, Lu(parent_refn.handle),
                     parent_refn.fs_id);
             ret = PVFS_sys_remove(cur_filename, parent_refn, credentials);
@@ -333,9 +423,22 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
 
             if (test_symlinks)
             {
-                fprintf(stderr,"Removing testlink under %Lu,%d ... ",
-                        Lu(parent_refn.handle), parent_refn.fs_id);
-                ret = PVFS_sys_remove("testlink", parent_refn, credentials);
+                fprintf(stderr,"Removing rlink %s under %Lu,%d \t\t... ",
+                        RELATIVE_SYMLINK_NAME, Lu(parent_refn.handle),
+                        parent_refn.fs_id);
+                ret = PVFS_sys_remove(RELATIVE_SYMLINK_NAME,
+                                      parent_refn, credentials);
+                fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));
+                if (ret)
+                {
+                    PVFS_perror("\nPath removal status: ", ret);
+                }
+
+                fprintf(stderr,"Removing alink %s under %Lu,%d \t\t... ",
+                        ABSOLUTE_SYMLINK_NAME, Lu(parent_refn.handle),
+                        parent_refn.fs_id);
+                ret = PVFS_sys_remove(ABSOLUTE_SYMLINK_NAME,
+                                      parent_refn, credentials);
                 fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));
                 if (ret)
                 {
@@ -366,8 +469,6 @@ int test_path_lookup(MPI_Comm *comm, int rank, char *buf, void *params)
     int ret = -1;
     char *format_prefix1 = "pt-0";
     char *format_prefix2 = "st0";
-    char *format_prefix3 = "pt-1";
-    char *format_prefix4 = "st1";
 
     if (!pvfs_helper.initialized && initialize_sysint())
     {
@@ -382,21 +483,7 @@ int test_path_lookup(MPI_Comm *comm, int rank, char *buf, void *params)
         goto error_exit;
     }
 
-    ret = build_nested_path(5, format_prefix2, rank, 1);
-    if (ret)
-    {
-        fprintf(stderr,"(1) Failed to build nested path\n");
-        goto error_exit;
-    }
-
-    ret = build_nested_path(13, format_prefix3, rank, 0);
-    if (ret)
-    {
-        fprintf(stderr,"(2) Failed to build nested path\n");
-        goto error_exit;
-    }
-
-    ret = build_nested_path(13, format_prefix4, rank, 1);
+    ret = build_nested_path(13, format_prefix2, rank, 1);
     if (ret)
     {
         fprintf(stderr,"(2) Failed to build nested path\n");
