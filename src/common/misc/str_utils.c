@@ -312,6 +312,10 @@ int PINT_remove_dir_prefix(char *pathname, char* prefix, char *out_path,
 	    /* this was indeed a match */
 	    cut_index = prefix_len;
 	}
+	else
+	{
+	    return(-ENOENT);
+	}
     }
 
     /* if we hit this point, then we were successful */
