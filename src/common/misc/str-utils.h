@@ -8,7 +8,6 @@
 #define __STR_UTILS_H
 
 #include "pvfs2-types.h"
-#include "pvfs2-storage.h"
 #include "pvfs2-config.h"
 
 int PINT_get_path_element(
