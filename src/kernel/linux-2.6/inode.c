@@ -103,7 +103,7 @@ static int pvfs2_direct_IO(
 
     pvfs2_print("pvfs2: pvfs2_direct_IO called\n");
     return blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov,
-			      offset, nr_segs, pvfs2_get_blocks);
+			      offset, nr_segs, pvfs2_get_blocks, NULL);
 }
 
 struct address_space_operations pvfs2_aops = {
