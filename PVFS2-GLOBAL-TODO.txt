@@ -135,6 +135,9 @@ code cleanup:
 - use TROVE_HANDLE_NULL in more places instead of "0"
 - come up with more named values like TROVE_HANDLE_NULL to use in 
   other parts of the code
+- try to clean up flow / I/O path some, in particular so we don't have
+  to do so much mallocing to set up from client side
+  - maybe do things like embed file_data struct in flow desc.
 
 fault tolerance:
 =====================================================================
