@@ -1219,6 +1219,18 @@ void PINT_release_pvfstab(void)
         free(s_stat_tab_array[i].mntent_array);
     }
     s_stat_tab_count = 0;
+
+    for (j = 0; j < s_stat_tab_array[
+             PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+    {
+        free_mntent(&s_stat_tab_array[
+                        PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j]);
+    }
+    if (s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array)
+    {
+        free(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array);
+    }
+
     gen_mutex_unlock(&s_stat_tab_mutex);
     return;
 }
