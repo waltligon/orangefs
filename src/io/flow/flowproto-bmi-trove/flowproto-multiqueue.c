@@ -1509,13 +1509,20 @@ static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
 	    /* impossible condition */
 	    assert(0);
 	}
-
-	/* TODO: finish filling this in */
-	assert(0);
+    }
+    else
+    {
+	/* one of the previous cancels came through */
+	flow_data->cleanup_pending_count--;
     }
     
-    /* TODO: finish filling this in */
-    assert(0);
+    if(flow_data->cleanup_pending_count == 0)
+    {
+	/* we are finished, make sure error is marked and state is set */
+	assert(flow_data->parent->error_code);
+	flow_data->parent->state = FLOW_COMPLETE;
+    }
+
     return;
 }
 
