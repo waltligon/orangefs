@@ -324,8 +324,9 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 	else if (resp_p->status != 0) {
 	    /* no comp_fn specified and status non-zero */
 	    gossip_debug(CLIENT_DEBUG,
-			 "notice: msgpairarray_complete: error status (%d) from server %d\n",
-			 resp_p->status,
+			 "notice: msgpairarray_complete: error %s (%d) from server %d\n",
+			 strerror(PVFS_ERROR_TO_ERRNO(-resp_p->status)),
+			     resp_p->status,
 			 i);
 	    /* save a non-zero status to return if we see one */
 	    js_p->error_code = resp_p->status;
