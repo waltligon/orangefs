@@ -434,6 +434,62 @@ int PVFS_util_remove_dir_prefix(
     return (0);
 }
 
+/* help out lazy humans:
+ * size		size of file in 2431251234123412 format
+ * out_str      nicely formatted number, like "3.4M"
+ *                  (caller must allocate this string)
+ * max_out_len  maximum lenght of "out_str"
+ */
+#define KILOBYTE                1024
+#define MEGABYTE   (1024 * KILOBYTE)
+#define GIGABYTE   (1024 * MEGABYTE)
+/*
+#define TERABYTE   (1024 * GIGABYTE)
+#define PETABYTE   (1024 * TERABYTE)
+#define  EXABYTE   (1024 * PETABYTE)
+#define ZETTABYTE  (1024 *  EXABYTE)
+#define YOTTABYTE (1024 * ZETTABYTE)
+*/
+#define NUM_SIZES                  3
+
+PVFS_size PINT_s_size_table[NUM_SIZES] =
+    { /*YOTTABYTE, ZETTABYTE, EXABYTE, PETABYTE,
+        TERABYTE,*/ GIGABYTE, MEGABYTE, KILOBYTE };
+char *PINT_s_str_size_table[NUM_SIZES] =
+    { /*"Y", "Z", "E", "P","T",*/ "G", "M", "K" };
+
+
+void PVFS_util_make_size_human_readable(
+    PVFS_size size,
+    char *out_str,
+    int max_out_len)
+{
+    int i = 0;
+    PVFS_size tmp = 0;
+
+    if (out_str)
+    {
+        for(i = 0; i < NUM_SIZES; i++)
+        {
+            tmp = size;
+            if ((PVFS_size)(tmp / PINT_s_size_table[i]) > 0)
+            {
+                tmp = (PVFS_size)(tmp / PINT_s_size_table[i]);
+                break;
+            }
+        }
+        if (i == NUM_SIZES)
+        {
+            snprintf(out_str,16, "%Ld", size);
+        }
+        else
+        {
+            snprintf(out_str,max_out_len,"%Ld%s",
+                     tmp,PINT_s_str_size_table[i]);
+        }
+    }
+}
+
 /* parse_flowproto_string()
  *
  * looks in the mount options string for a flowprotocol specifier and 

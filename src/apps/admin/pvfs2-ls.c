@@ -25,23 +25,6 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define KILOBYTE                1024
-#define MEGABYTE   (1024 * KILOBYTE)
-#define GIGABYTE   (1024 * MEGABYTE)
-/*
-#define TERABYTE   (1024 * GIGABYTE)
-#define PETABYTE   (1024 * TERABYTE)
-#define  EXABYTE   (1024 * PETABYTE)
-#define ZETTABYTE  (1024 *  EXABYTE)
-#define YOTTABYTE (1024 * ZETTABYTE)
-*/
-#define NUM_SIZES                  3
-
-static PVFS_size s_size_table[NUM_SIZES] =
-    { /*YOTTABYTE, ZETTABYTE, EXABYTE, PETABYTE,
-        TERABYTE,*/ GIGABYTE, MEGABYTE, KILOBYTE };
-static char *s_str_size_table[NUM_SIZES] =
-    { /*"Y", "Z", "E", "P","T",*/ "G", "M", "K" };
 
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations
@@ -225,36 +208,6 @@ int main(int argc, char **argv)
     return(ret);
 }
 
-static inline void make_size_human_readable(
-    PVFS_size size,
-    char *out_str,
-    int max_out_len)
-{
-    int i = 0;
-    PVFS_size tmp = 0;
-
-    if (out_str)
-    {
-        for(i = 0; i < NUM_SIZES; i++)
-        {
-            tmp = size;
-            if ((PVFS_size)(tmp / s_size_table[i]) > 0)
-            {
-                tmp = (PVFS_size)(tmp / s_size_table[i]);
-                break;
-            }
-        }
-        if (i == NUM_SIZES)
-        {
-            snprintf(out_str,16, "%Ld", size);
-        }
-        else
-        {
-            snprintf(out_str,max_out_len,"%Ld%s",
-                     tmp,s_str_size_table[i]);
-        }
-    }
-}
 
 /*
   build a string of a specified length that's either
@@ -345,7 +298,7 @@ void print_entry_attr(
 
     if (opts->list_human_readable)
     {
-        make_size_human_readable(size,scratch_size,16);
+        PVFS_util_make_size_human_readable(size,scratch_size,16);
     }
     else
     {

@@ -33,6 +33,12 @@ int PVFS_util_remove_dir_prefix(
     char *out_path,
     int out_max_len);
 
+/* help out lazy humans */
+void PVFS_util_make_size_human_readable(
+    PVFS_size size,
+    char *out_str,
+    int max_out_len);
+
 /* generic attribute conversion */
 static inline int PVFS_util_object_to_sys_attr_mask(int obj_mask)
 {

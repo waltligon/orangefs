@@ -26,10 +26,13 @@ struct options
 {
     char* mnt_point;
     int mnt_point_set;
+    int human_readable;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
+
+#define SCRATCH_LEN 16
 
 int main(int argc, char **argv)
 {
@@ -47,6 +50,8 @@ int main(int argc, char **argv)
     int outcount;
     PVFS_id_gen_t* addr_array;
     int server_type;
+    char scratch_size[SCRATCH_LEN] = {0};
+    char scratch_total[SCRATCH_LEN] = {0};
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -115,10 +120,21 @@ int main(int argc, char **argv)
 	(long long unsigned)resp_statfs.statfs_buf.handles_available_count);
     printf("\thandles total (meta and I/O):           %Lu\n",
 	(long long unsigned)resp_statfs.statfs_buf.handles_total_count);
-    printf("\tbytes available:                        %Ld\n", 
-	(long long)resp_statfs.statfs_buf.bytes_available);
-    printf("\tbytes total:                            %Ld\n", 
-	(long long)resp_statfs.statfs_buf.bytes_total);
+    if (user_opts->human_readable) {
+	PVFS_util_make_size_human_readable(
+		(long long)resp_statfs.statfs_buf.bytes_available,
+		scratch_size, SCRATCH_LEN);
+	PVFS_util_make_size_human_readable(
+		(long long)resp_statfs.statfs_buf.bytes_total,
+		scratch_total, SCRATCH_LEN);
+	printf("\tbytes available:                        %s\n", scratch_size);
+	printf("\tbytes total:                            %s\n", scratch_size); 
+    } else {
+	printf("\tbytes available:                        %Ld\n", 
+	    (long long)resp_statfs.statfs_buf.bytes_available);
+	printf("\tbytes total:                            %Ld\n", 
+	    (long long)resp_statfs.statfs_buf.bytes_total);
+    }
     printf("\nNOTE: The aggregate total and available statistics are calculated based\n");
     printf("on an algorithm that assumes data will be distributed evenly; thus\n");
     printf("the free space is equal to the smallest I/O server capacity\n");
@@ -184,8 +200,19 @@ int main(int argc, char **argv)
 	    printf("server: %s\n", stat_array[i].bmi_address);
 	    printf("\thandles available: %Lu\n", (long long unsigned)stat_array[i].handles_available_count);
 	    printf("\thandles total:     %Lu\n", (long long unsigned)stat_array[i].handles_total_count);
-	    printf("\tbytes available:   %Ld\n", (long long)stat_array[i].bytes_available);
-	    printf("\tbytes total:       %Ld\n", (long long)stat_array[i].bytes_total);
+	    if (user_opts->human_readable) { 
+		PVFS_util_make_size_human_readable(
+			(long long)stat_array[i].bytes_available,
+			scratch_size, SCRATCH_LEN);
+		PVFS_util_make_size_human_readable(
+			(long long)stat_array[i].bytes_total,
+			scratch_total, SCRATCH_LEN);
+		printf("\tbytes available:   %s\n", scratch_size);
+		printf("\tbytes total:       %s\n", scratch_total);
+	    } else {
+		printf("\tbytes available:   %Ld\n", (long long)stat_array[i].bytes_available);
+		printf("\tbytes total:       %Ld\n", (long long)stat_array[i].bytes_total);
+	    }
 	    if(stat_array[i].server_type & (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER))
 		printf("\tmode: serving both metadata and I/O data\n");
 	    else if(stat_array[i].server_type & PVFS_MGMT_IO_SERVER)
@@ -214,7 +241,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "vm:";
+    char flags[] = "hvm:";
     int one_opt = 0;
     int len = 0;
 
@@ -235,6 +262,9 @@ static struct options* parse_args(int argc, char* argv[])
             case('v'):
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
+	    case('h'):
+		tmp_opts->human_readable = 1;
+		break;
 	    case('m'):
 		len = strlen(optarg)+1;
 		tmp_opts->mnt_point = (char*)malloc(len+1);
