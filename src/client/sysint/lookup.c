@@ -123,8 +123,8 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     }
 
     /* Get  the total number of segments */
-    get_no_of_segments(req->name, &num_segments_remaining); /* TODO: USE STRING LIB CALLS */
-    total_segments = num_segments_remaining;
+    total_segments = num_segments_remaining =
+        PINT_string_count_segments(req->name);
 
     /* make sure we're asking for something reasonable */
     if (num_segments_remaining < 1)

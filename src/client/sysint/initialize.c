@@ -277,6 +277,8 @@ static int server_get_config(pvfs_mntlist mntent_list)
             continue;
         }
 
+
+
 /* 	fsinfo_p->meta_serv_count = ack_p->u.getconfig.meta_server_count; */
 /* 	fsinfo_p->io_serv_count   = ack_p->u.getconfig.io_server_count; */
 /* 	fsinfo_p->maskbits        = ack_p->u.getconfig.maskbits; */
@@ -461,7 +463,6 @@ static int server_parse_config(PVFS_servresp_getconfig *response)
     }
     return ret;
 }
-
 
 /*
  * Local variables:

@@ -278,26 +278,6 @@ int get_next_session_tag(void)
 }
 
 
-/* get_no_of_segments
- *
- * calculates the number of segments in the path
- *
- * returns nothing
- */
-void get_no_of_segments(char *path,int *num)
-{
-    char *s = path;
-    int len = strlen(path);
-    int pos = 0;
-    *num = 0;
-
-    for(pos = 0;pos < len;pos++) 
-    {
-	if (s[pos] == '/' && (pos + 1) < len) 
-	    (*num)++;
-    }
-}
-
 /* get_path_element
  *
  * gets the specified segment in the provided path.
