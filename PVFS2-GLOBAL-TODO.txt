@@ -138,6 +138,8 @@ code cleanup:
 - try to clean up flow / I/O path some, in particular so we don't have
   to do so much mallocing to set up from client side
   - maybe do things like embed file_data struct in flow desc.
+- make permission checking in prelude.sm neater, maybe assert on 
+  unkown op types so we don't forget to add new ones here
 
 fault tolerance:
 =====================================================================
