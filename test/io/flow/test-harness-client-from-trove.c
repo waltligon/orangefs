@@ -158,7 +158,7 @@ int main(int argc, char **argv)
 			NULL,
 			NULL,
 			&t_op_id);
-	while (ret == 0) trove_dspace_test(coll_id, t_op_id, &count, NULL, 
+	while (ret == 0) ret = trove_dspace_test(coll_id, t_op_id, &count, NULL, 
 		NULL, &state);
 	if (ret < 0) {
 		fprintf(stderr, "HEY: dspace create failed, I hope because it already existed\n");
