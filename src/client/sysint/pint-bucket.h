@@ -38,12 +38,24 @@ int PINT_bucket_get_next_io(
     int num_servers,
     bmi_addr_t *io_addr_array);
 
-int PINT_bucket_get_physical_io(
+int PINT_bucket_get_physical(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     int incount,
     int* outcount,
-    bmi_addr_t *io_addr_array);
+    bmi_addr_t *addr_array,
+    int server_type);
+
+#define PINT_BUCKET_META 1
+#define PINT_BUCKET_IO 2
+#define PINT_BUCKET_ALL (PINT_BUCKET_META|PINT_BUCKET_IO)
+
+#define PINT_bucket_get_physical_meta(x1,x2,x3,x4,x5) \
+    PINT_bucket_get_physical(x1,x2,x3,x4,x5,PINT_BUCKET_META);
+#define PINT_bucket_get_physical_io(x1,x2,x3,x4,x5) \
+    PINT_bucket_get_physical(x1,x2,x3,x4,x5,PINT_BUCKET_IO);
+#define PINT_bucket_get_physical_all(x1,x2,x3,x4,x5) \
+    PINT_bucket_get_physical(x1,x2,x3,x4,x5,PINT_BUCKET_ALL);
 
 int PINT_bucket_map_to_server(
     bmi_addr_t *server_addr,

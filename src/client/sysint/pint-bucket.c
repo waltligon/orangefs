@@ -281,26 +281,27 @@ int PINT_bucket_get_next_io(
 }
 
 
-/* PINT_bucket_get_physical_io()
+/* PINT_bucket_get_physical()
  *
- * returns the BMI addresses of all of the I/O servers for a given file
- * system (up to incount servers), without any duplicates (ie, I/O servers 
- * with multiple handle ranges show up just once)
+ * returns the BMI addresses of all of the specified types of servers 
+ * for a given file system (up to incount servers), without any duplicates 
+ * (ie, servers with multiple handle ranges show up just once)
  *
- * NOTE: get_num_io() can be used to get an upper bound on the number
- * of I/O servers in the file system to use for the incount argument
+ * NOTE: get_num_io() and get_num_meta() can be used to get an upper bound 
+ * on the number of servers in the file system to use for the incount argument
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_physical_io(
+int PINT_bucket_get_physical(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     int incount,
     int* outcount,
-    bmi_addr_t *io_addr_array)
+    bmi_addr_t *addr_array,
+    int server_type)
 {
     int ret = -EINVAL;
-    char *data_server_bmi_str = (char *)0;
+    char *server_bmi_str = (char *)0;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
@@ -311,61 +312,76 @@ int PINT_bucket_get_physical_io(
 
     *outcount = 0;
 
-    if (config && incount && io_addr_array)
+    if (!(config && incount && addr_array && server_type))
     {
-        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
-        if (hash_link)
-        {
-            cur_config_cache =
-                qlist_entry(hash_link, struct config_fs_cache_s,
-                            hash_link);
-            assert(cur_config_cache);
-            assert(cur_config_cache->fs);
+	return(-EINVAL);
+    }
 
-	    /* start at beginning of handle range list */
-            tmp_server = cur_config_cache->fs->data_handle_ranges;
+    hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+    if (hash_link)
+    {
+	cur_config_cache =
+	    qlist_entry(hash_link, struct config_fs_cache_s,
+			hash_link);
+	assert(cur_config_cache);
+	assert(cur_config_cache->fs);
+
+	while(server_type)
+	{
+	    if(server_type & PINT_BUCKET_IO)
+	    {
+		tmp_server = cur_config_cache->fs->data_handle_ranges;
+		server_type -= PINT_BUCKET_IO;
+	    }
+	    else if(server_type & PINT_BUCKET_META)
+	    {
+		tmp_server = cur_config_cache->fs->meta_handle_ranges;
+		server_type -= PINT_BUCKET_META;
+	    }
+	    else
+	    {
+		return(-EINVAL);
+	    }
 	    assert(tmp_server);
 
-            while(*outcount < incount)
-            {
-                cur_mapping =
-                    llist_head(tmp_server);
-                if (!cur_mapping)
-                {
+	    while(*outcount < incount)
+	    {
+		cur_mapping =
+		    llist_head(tmp_server);
+		if (!cur_mapping)
+		{
 		    /* we hit the end of the list */
 		    break;
-                }
+		}
 		tmp_server = llist_next(tmp_server);
 
-                data_server_bmi_str = PINT_server_config_get_host_addr_ptr(
-                    config,cur_mapping->alias_mapping->host_alias);
+		server_bmi_str = PINT_server_config_get_host_addr_ptr(
+		    config,cur_mapping->alias_mapping->host_alias);
 
-                ret = BMI_addr_lookup(&tmp_bmi_addr,data_server_bmi_str);
-                if (ret < 0)
-                {
+		ret = BMI_addr_lookup(&tmp_bmi_addr,server_bmi_str);
+		if (ret < 0)
+		{
 		    return(ret);
-                }
+		}
 
 		/* see if we have already listed this BMI address */
 		dup_flag = 0;
 		for(i=0; i<*outcount; i++)
 		{
-		    if(io_addr_array[i] == tmp_bmi_addr)
+		    if(addr_array[i] == tmp_bmi_addr)
 			dup_flag = 1;
 		}
 		
 		if(!dup_flag)
 		{
-		    io_addr_array[*outcount] = tmp_bmi_addr;
+		    addr_array[*outcount] = tmp_bmi_addr;
 		    (*outcount)++;
 		}
-            }
-        }
+	    }
+	}
     }
     return 0;
 }
-
-
 
 
 /* PINT_bucket_map_to_server()
