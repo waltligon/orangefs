@@ -22,6 +22,30 @@ pvfs2-0.1.2pre1
     - install kernel module if configured
     - simplify dependency generator script, add .po
 - BMI: initialize needed methods dynamically, not at startup
+- add ability to force use of alternative pvfs2tab file at run time
+- general cleanup of API used for system interface initialization,
+  including tabfile parsing
+- added reserved value for fsid type to indicate uninitialized value
+- BMI and flow interfaces now accept NULL list of modules to initialize
+  defaults, BMI interprets this by delaying init of modules until
+  needed, flow interface interprets by initializing all possible modules
+- new api functions for resolving local file system paths
+- added ability to dynamically add and remove file systems from the
+  system interface at run time
+- fix request scheduler bug that was leading to odd behavior under heavy
+  I/O load
+- added some scripts started by Wes Emeneker to automated the steps
+  needed to download and build ROMIO with PVFS2 support
+- re-enable compilation of Jiesheng's caching flow protocol
+- added new automated nightly test scripts started by Wes Emeneker into 
+  test/automated subdir
+- started running automated tests on Adenine cluster at Clemson 
+  as a nightly cron job
+- isolated a request processing corner case with a test program
+- renamed PVFS_pinode_reference -> PVFS_object_ref to cleanup the system
+  interface a little further
+- added some first stubs for hooks to specify distribution parameters at
+  runtime
 
 
 pvfs2-0.1.1
