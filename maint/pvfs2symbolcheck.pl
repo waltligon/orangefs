@@ -2,7 +2,7 @@
 
 # run this like so:
 # nm /path/to/libpvfs//libpvfs2.a | ./maint/pvfs2symbolcheck.pl
-@prefixes = ("PVFS", "PINT", "trove", "dbpf", "BMI", "flow", "flowproto");
+@prefixes = ("gossip", "job", "PVFS", "PINT", "trove", "dbpf", "BMI", "flow", "flowproto");
 
 $file_name = "<unknown>";
 $badsyms = 0;
