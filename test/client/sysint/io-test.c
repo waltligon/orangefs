@@ -192,7 +192,6 @@ int main(int argc,char **argv)
 	 * once reading back actually works */
 	memset(io_buffer, 0, io_size*sizeof(int));
 
-#if 0
 	/* verify */
 	printf("IO-TEST: performing read on handle: %ld, fs: %d\n",
 		(long)pinode_refn.handle, (int)pinode_refn.fs_id);
@@ -260,7 +259,6 @@ int main(int argc,char **argv)
 	{
 	    printf("0x%08Lx\n", dfile_array[i]);
 	}
-#endif
 
 	/**************************************************************
 	 * shut down pending interfaces
