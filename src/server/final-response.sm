@@ -18,11 +18,17 @@
  * - sends a response to the client
  */
 
-/* TODO: document pre and post conditions (what server_op fields do we
- * require, and which ones do we modify?
+/* PRECONDITIONS:
+ * - the s_op->resp struct must be filled in with the response that
+ *   needs to be sent (not yet encoded)
+ * - if the operation has been scheduled, then the scheduled id must be
+ *   stored in s_op->scheduled_id
  */
 
-/* TODO: remember to check error code from release at top of send_resp? */
+/* TODO: document pre and post conditions (what server_op fields do we
+ * require, and which ones do we modify?)
+ */
+
 
 static int final_response_release(PINT_server_op *s_op, job_status_s *js_p);
 static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p);
@@ -56,18 +62,73 @@ nested machine pvfs2_final_response_sm(release, send_resp)
  */
 static int final_response_release(PINT_server_op *s_op, job_status_s *js_p)
 {
-    js_p->error_code = 0;
-    return(1);
+    int ret = -1;
+    job_id_t tmp_id;
+
+    gossip_debug(SERVER_DEBUG, "(%p) final_response state: release\n", s_op);
+
+    /* catch cases in which the operation has not been scheduled */
+    if(!s_op->scheduled_id)
+    {
+	js_p->error_code = 0;
+	return(1);
+    }
+
+    ret = job_req_sched_release(s_op->scheduled_id,
+	s_op,
+	js_p,
+	&tmp_id,
+	PINT_server_job_context);
+
+    return(ret);
 }
 
 /* final_response_send_resp()
  *
- * sends a response to the client
+ * encodes and sends a response to the client
  */
 static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
-    js_p->error_code = 0;
-    return(1);
+    int ret = -1;
+    job_id_t tmp_id;
+    
+    if(js_p->error_code != 0)
+    {
+	gossip_lerr("Error: req_sched_release() failure; continuing...\n");
+    }
+
+    /* encode message */
+    ret = PINT_encode(s_op->resp,
+	PINT_ENCODE_RESP,
+	&(s_op->encoded),
+	s_op->addr,
+	s_op->decoded.enc_type);
+    if(ret < 0)
+    {
+	gossip_lerr("Error: PINT_encode() failure.\n");
+	/* TODO: probably should dump contents of response to give 
+	 * some clues as to what went wrong
+	 */
+	js_p->error_code = ret;
+	return(1);
+    }
+
+    /* send the response */
+    ret = job_bmi_send_list(
+	s_op->addr,
+	s_op->encoded.buffer_list,
+	s_op->encoded.size_list,
+	s_op->encoded.list_count,
+	s_op->encoded.total_size,
+	s_op->tag,
+	s_op->encoded.buffer_type,
+	0,
+	s_op,
+	js_p,
+	&tmp_id,
+	PINT_server_job_context);
+
+    return(ret);
 }
 
 
