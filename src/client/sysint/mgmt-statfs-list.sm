@@ -25,8 +25,9 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
                                           job_status_s *js_p);
 static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
                                     job_status_s *js_p);
-static int statfs_list_comp_fn(
-    void* v_p, struct PVFS_server_resp* resp_p, int i);
+static int statfs_list_comp_fn(void *v_p,
+			       struct PVFS_server_resp *resp_p,
+			       int index);
 
 %%
 
@@ -145,6 +146,9 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
     return error;
 }
 
+
+/* mgmt_statfs_list_setup_msgpair()
+ */
 static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
                                           job_status_s *js_p)
 {
@@ -173,6 +177,8 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
+/* mgmt_statfs_list_cleanup
+ */
 static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
                                     job_status_s *js_p)
 {
@@ -182,6 +188,8 @@ static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
     return 0;
 }
 
+/* statfs_list_comp_fn
+ */
 static int statfs_list_comp_fn(void *v_p,
 			       struct PVFS_server_resp *resp_p,
 			       int i)
