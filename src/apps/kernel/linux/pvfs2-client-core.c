@@ -64,7 +64,7 @@
   developer and allows clean shutdown for valgrind debugging or
   getting core dumps.  this is NOT a supported run mode
 */
-#define STANDALONE_RUN_MODE
+/* #define STANDALONE_RUN_MODE */
 
 /*
   uncomment for timing of individual operation information to be
