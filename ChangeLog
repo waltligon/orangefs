@@ -9,6 +9,7 @@ pvfs2-1.1.0pre1
 - build: hide karma details in its module.mk
 - build: remove duplicate commands used for QUIET_COMPILE
 - build: fix test configure library detection
+- build: simplify karma and vis some more
 -
 
 

@@ -138,8 +138,6 @@ LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LDFLAGS += -L lib 
 LIBS += -lpvfs2 @LIBS@ 
-VISCFLAGS = @VISCFLAGS@
-VISLIBS = @VISLIBS@ -lSDL_ttf
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 REDHAT_RELEASE = @REDHAT_RELEASE@
 # for Solaris:
@@ -222,12 +220,6 @@ SERVERLIBS = -lrt -lpthread -lpvfs2-server @LIBS@ @DB_LIB@
 LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
 LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__
 LIBS += @THREAD_LIB@
-
-# VISCFLAGS/VISLIBS: special build flags for vis tools
-# configure has already filled in special graphics flags, we just tack
-# on the PVFS2 stuff here
-VISCFLAGS += $(CFLAGS)
-VISLIBS += $(LIBS)
 
 ################################################################
 # enable GM if configure detected it
@@ -328,12 +320,9 @@ LIBRARIES_STATIC = lib/libpvfs2.a
 LIBRARIES += $(LIBRARIES_STATIC)
 endif
 
-# KARMA is the karma gui, if we are building it
-ifdef BUILD_KARMA
-	KARMA := src/apps/karma/karma
-endif
-# default rule builds server, library, and applications
-all: $(SERVER) $(KARMA) $(LIBRARIES) admintools kernapps
+################################################################
+# Default target forward pointer, to avoid other targets in make stubs
+all::
 
 ################################################################
 # Makefile includes
@@ -399,17 +388,14 @@ VISOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISSRC)))
 VISS := $(patsubst %.c,%, $(filter %.c, $(VISSRC)))
 # VISDEPENDS is a list of dependency files for visualization programs
 VISDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISSRC)))
-
-# KARMAOBJS, KARMADEPENDS for the karma gui (requires gtk2.0)
-ifdef BUILD_KARMA
-	KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
-	KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
-endif
-
 # VISMISCOBJS is a list of misc. vis objects not in the above categories
 VISMISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISMISCSRC)))
 # VISMISCDEPENDS is a list of dependency files for vis misc. objects
 VISMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISMISCSRC)))
+
+# KARMAOBJS, KARMADEPENDS for the karma gui (requires gtk2.0)
+KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
+KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
 
 # DOCSPDF, DOCSPS, and DOCSHTML are lists of documentation files generated 
 #   from latex
@@ -426,13 +412,9 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(PRIVATEDEPENDS) $(KERNAPPDEPENDS))
-ifdef BUILD_VIS
-DEPENDS += $(VISDEPENDS) $(VISMISCDEPENDS)
-endif
-ifdef BUILD_KARMA
-DEPENDS += $(KARMADEPENDS)
-endif
+DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) \
+    $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(PRIVATEDEPENDS) \
+    $(KERNAPPDEPENDS) $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS))
 
 # CLEANFILES is a list of generated files that need to be removed at
 #    "make clean" time.  This is just for special case files that aren't
@@ -450,18 +432,14 @@ CLEANFILES +=\
 ####################################################################
 # Rules and dependencies
 
+# default rule builds server, library, and applications
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools kernapps $(VISS) $(KARMA)
+
 # target for building admin tools
 admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 
 # target for building kernel driver userland programs
 kernapps: $(KERNAPPS)
-
-# target for building vis program executables
-vis: $(VISS)
-ifdef BUILD_VIS
-# add vis programs to default rule
-all: vis
-endif
 
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
@@ -541,42 +519,20 @@ lib/libpvfs2-server.a: $(SERVEROBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)ar rcs $@ $(SERVEROBJS)
 
-# rule for building vis objects
-$(VISOBJS): %.o: %.c
-ifdef BUILD_VIS
-	$(Q) "  CC		$@"
-	$(E)$(CC) $(VISCFLAGS) $< -c -o $@
-else
-	@echo Error: libraries needed by vis tools not detected.
-	@false
-endif
-
 # rule for building karma gui and its objects
-ifdef BUILD_KARMA
 $(KARMA): $(KARMAOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
-	$(E)$(LD) $(KARMAOBJS) -o $@ $(LDFLAGS) $(LIBS) $(call modldflags,$<)
-endif
-
-# rule for building vis misc. objects
-$(VISMISCOBJS): %.o: %.c
-ifdef BUILD_VIS
-	$(Q) "  CC		$@"
-	$(E)$(CC) $(VISCFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	@echo Error: libraries needed by vis tools not detected.
-	@false
-endif
+	$(E)$(LD) -o $@ $(LDFLAGS) $(KARMAOBJS) $(LIBS) $(call modldflags,$<)
 
 # rule for building vis executables from object files
 $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
-	$(E)$(LD) $^ $(LDFLAGS) $(VISLIBS) -o $@
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(VISMISCOBJS) $(LIBS) $(call modldflags,$<)
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
 	$(Q) "  LD		$@"
-	$(E)$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+	$(E)$(LD) -o $@ $(LDFLAGS) $< $(LIBS) $(call modldflags,$<)
 
 # rule for building server objects
 %-server.o: %.c
@@ -717,11 +673,6 @@ endif
 .PHONY: nodep
 nodep:; @:
 
-# rule for generating dependency files for vis code
-$(VISDEPENDS) $(VISMISCDEPENDS): %.d: %.c
-	$(Q) "  DEP		$@"
-	$(E)$(srcdir)/maint/depend.sh `dirname $*` $(VISCFLAGS) $(call modcflags,$<) $< > $@
-
 # default rule for generating dependency files
 %.d: %.c
 	$(Q) "  DEP		$@"
@@ -751,7 +702,7 @@ endif
 # config files in the server build directory with good defaults for
 # debugging
 ifndef DIST_RELEASE
-all: src/server/simple.conf src/server/server.conf-localhost
+all:: src/server/simple.conf src/server/server.conf-localhost
 endif
 src/server/simple.conf src/server/server.conf-localhost: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
@@ -762,7 +713,7 @@ src/server/simple.conf src/server/server.conf-localhost: src/apps/admin/pvfs2-ge
 
 # whether this is a distribution tarball or not, drop some config files
 # into the "examples" subdir of the build dir
-all: examples/fs.conf examples/server.conf-localhost
+all:: examples/fs.conf examples/server.conf-localhost
 examples/fs.conf examples/server.conf-localhost: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
 	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \

@@ -1,3 +1,5 @@
+ifdef BUILD_KARMA
+
 DIR := src/apps/karma
 
 KARMASRC += \
@@ -13,9 +15,13 @@ KARMASRC += \
     $(DIR)/traffic.c \
     $(DIR)/units.c
 
+KARMA := $(DIR)/karma
+
 # add GTK include dirs and libs
 MODCFLAGS_$(DIR) := @GTKCFLAGS@
 MODLDFLAGS_$(DIR) := @GTKLIBS@
 
 # gtk-2.0 has many bad prototypes
 MODCFLAGS_$(DIR) += -Wno-strict-prototypes
+
+endif  # BUILD_KARMA
