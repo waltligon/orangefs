@@ -4,7 +4,7 @@ SHELL = @SHELL@
 INSTALL = @INSTALL@
 
 .SUFFIXES:
-.PHONY: all clean tests distclean docs docsclean
+.PHONY: all clean tests distclean docs docsclean cscope
 
 # main source subdirectories
 #
@@ -126,6 +126,10 @@ lib/libpvfs2.a: $(LIBOBJS)
 
 $(TESTS): %: %.o $(LIBRARIES)
 
+cscope:
+	find $(srcdir) -iname "*.[ch]" > $(srcdir)/cscope.files
+	cscope -beq -i $(srcdir)/cscope.files
+
 docs: $(DOCSPS) $(DOCSPDF)
 
 docsclean: 
@@ -142,10 +146,14 @@ distclean: clean
 
 # we don't want to include dependencies in the makefile if we are just
 # running make clean or make distclean
+#
+# NOTE: there should be a way to combine these lines...
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(MAKECMDGOALS),distclean)
 ifneq ($(MAKECMDGOALS),docs)
+ifneq ($(MAKECMDGOALS),cscope)
 -include $(DEPENDS)
+endif
 endif
 endif
 endif
