@@ -1574,6 +1574,7 @@ static int split_string_list(char ***tokens,
     while ((holder = index(holder, ',')))
     {
 	tokencount++;
+	holder++;
     }
 
     /* allocate pointers for each */

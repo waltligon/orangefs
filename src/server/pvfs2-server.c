@@ -468,7 +468,8 @@ static int server_initialize_subsystems(
 		 server_config.host_id);
 
     /* initialize BMI */
-    ret = BMI_initialize("bmi_tcp", server_config.host_id, BMI_INIT_SERVER);
+    ret = BMI_initialize(server_config.bmi_modules, 
+	server_config.host_id, BMI_INIT_SERVER);
     if (ret < 0)
     {
 	gossip_err("BMI_initialize Failed: %s\n", strerror(-ret));

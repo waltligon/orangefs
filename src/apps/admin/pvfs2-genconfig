@@ -127,9 +127,10 @@ sub tcp_parse_hostlist
 
 sub emit_defaults
 {
-    my($target,$num_unexp);
+    my($target,$num_unexp,$bmi_module);
     $target = $_[0];
     $num_unexp = $_[1];
+    $bmi_module = $_[2];
 
     # remove quotes from logfile if any
     if ($logfile =~ /\".*\"/)
@@ -141,6 +142,7 @@ sub emit_defaults
     print $target "\tUnexpectedRequests $num_unexp\n";
     print $target "\tLogFile $logfile\n";
     print $target "\tEventLogging none\n";
+    print $target "\tBMIModules $bmi_module\n";
     print $target "</Defaults>\n";
 }
 
@@ -334,6 +336,8 @@ for($i=0; $i <= $#union_aliases; $i++)
     @union_bmi[$i] = "tcp://@union_aliases[$i]:$port";
 }
 
+$bmi_module = "bmi_tcp";
+
 ###################################
 # end of tcp specific section
 
@@ -391,7 +395,7 @@ if ($using_stdout == 1)
     print "\n";
 }
 
-emit_defaults($output_target, $num_unexp_reqs);
+emit_defaults($output_target, $num_unexp_reqs, $bmi_module);
 emit_aliases($output_target, $num_nodes);
 emit_filesystem($output_target, "pvfs2-fs", 9, 1048576);
 

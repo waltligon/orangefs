@@ -44,6 +44,7 @@ static DOTCONF_CB(get_event_logging_list);
 static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(get_range_list);
+static DOTCONF_CB(get_bmi_module_list);
 
 /* internal helper functions */
 static int is_valid_alias(char *str);
@@ -108,6 +109,7 @@ static const configoption_t options[] =
     {"LogFile",ARG_STR, get_logfile,NULL,CTX_ALL},
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,CTX_ALL},
     {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
+    {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,CTX_ALL},
     LAST_OPTION
 };
 
@@ -196,6 +198,13 @@ int PINT_parse_config(
         gossip_err("Configuration file error. No storage path specified.\n");
         return 1;
     }
+
+    if (!config_s->bmi_modules)
+    {
+	gossip_err("Configuration file error. No BMI modules specified.\n");
+	return 1;
+    }
+
     return 0;
 }
 
@@ -466,6 +475,37 @@ DOTCONF_CB(get_event_logging_list)
     return NULL;
 }
 
+DOTCONF_CB(get_bmi_module_list)
+{
+    int i = 0, len = 0;
+    char buf[512] = {0};
+    char *ptr = buf;
+
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        gossip_lerr("BMIModules Tag can only be in a "
+                    "Defaults or Global block");
+        return NULL;
+    }
+
+    if (config_s->bmi_modules != NULL)
+    {
+        len = strlen(config_s->bmi_modules);
+        strncpy(ptr,config_s->bmi_modules,len);
+        ptr += (len * sizeof(char));
+        free(config_s->bmi_modules);
+    }
+    for(i = 0; i < cmd->arg_count; i++)
+    {
+        strncat(ptr, cmd->data.list[i], 512 - len);
+        len += strlen(cmd->data.list[i]);
+    }
+    config_s->bmi_modules = strdup(buf);
+    return NULL;
+}
+
+
 DOTCONF_CB(get_root_handle)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -718,6 +758,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             free(config_s->event_logging);
             config_s->event_logging = NULL;
+        }
+
+        if (config_s->bmi_modules)
+        {
+            free(config_s->bmi_modules);
+            config_s->bmi_modules = NULL;
         }
 
         /* free all filesystem objects */
@@ -1448,7 +1494,7 @@ int PINT_config_is_valid_configuration(
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     
-    if (config_s && config_s->logfile && config_s->event_logging)
+    if (config_s && config_s->logfile && config_s->event_logging && config_s->bmi_modules)
     {
         cur = config_s->file_systems;
         while(cur)
