@@ -23,8 +23,6 @@
  *
  * SHORT TERM
  * TODO: document that this isn't thread safe
- * TODO: add some gossip calls for logging, in particular announce
- *  error (inconsistent state machine) if test calls fail
  */
 
 #include <errno.h>
