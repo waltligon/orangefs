@@ -33,10 +33,17 @@ typedef struct PINT_client_sm_s {
     PINT_state_array_values *current_state; /* xxx */
     PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
 
+#if 0
+    int op; /* NOTE: THIS IS A HACK AND IS NOT REALLY NEEDED BY CLIENT. */
+#endif
+
     /* CLIENT SM VALUES */
     int op_complete; /* used to indicate that the operation as a 
 		      * whole is finished.
 		      */
+    job_status_s status; /* used to hold final job status so client
+			  * can determine what finally happened
+			  */
     int comp_ct; /* used to keep up with completion of multiple
 		  * jobs for some some states; typically set and
 		  * then decremented to zero as jobs complete */
@@ -58,7 +65,9 @@ typedef struct PINT_client_sm_s {
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_client_sm
+#if 0
 #define PINT_OP_STATE_TABLE PINT_server_op_table
+#endif
 
 #include "state-machine.h"
 

@@ -7,6 +7,8 @@
 #ifndef __STATE_MACHINE_FNS_H
 #define __STATE_MACHINE_FNS_H
 
+#include "gossip.h"
+
 /* STATE-MACHINE-FNS.H
  *
  * This file implements a small collection of functions used when
@@ -20,7 +22,9 @@
  * before it can be included.
  *
  * The structure holding the table of PINT_OP_STATE structures also needs to
- * be declared; its name should be #defined as PINT_OP_STATE_TABLE.
+ * be declared; its name should be #defined as PINT_OP_STATE_TABLE.  If you
+ * don't define this, you don't get the extern or the _locate function
+ * (currently client might not need them?).
  *
  * A good example of this is the pvfs2-server.h in the src/server directory,
  * which includes state-machine.h at the bottom, and server-state-machine.c,
@@ -30,18 +34,25 @@
 #ifndef __STATE_MACHINE_H
 #error "state-machine.h must be included before state-machine-fns.h is included."
 #endif
+
+#if 0
 #ifndef PINT_OP_STATE_TABLE
 #error "PINT_OP_STATE_TABLE must be defined before state-machine-fns.h is included."
+#endif
 #endif
 
 /* Prototypes for functions defined in here */
 static inline int PINT_state_machine_halt(void);
 static inline int PINT_state_machine_next(PINT_OP_STATE *,job_status_s *r);
+#ifdef PINT_OP_STATE_TABLE
 static PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *);
+#endif
 static inline PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s);
 static inline void PINT_push_state(PINT_OP_STATE *s, PINT_state_array_values *p);
 
+#ifdef PINT_OP_STATE_TABLE
 extern PINT_state_machine *PINT_OP_STATE_TABLE[];
+#endif
 
 /* Function: PINT_state_machine_halt(void)
    Params: None
@@ -129,6 +140,7 @@ static inline int PINT_state_machine_next(PINT_OP_STATE *s,
     return retval;
 }
 
+#ifdef PINT_OP_STATE_TABLE
 /* Function: PINT_state_machine_locate(void)
    Params:  
    Returns:  Pointer to the start of the state machine indicated by
@@ -154,6 +166,7 @@ static PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *s_op)
     gossip_err("State machine not found for operation %d\n",s_op->op);
     return NULL;
 }
+#endif
 
 static inline PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s)
 {
