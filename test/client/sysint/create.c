@@ -18,7 +18,6 @@ int main(int argc, char **argv)
     PVFS_sysresp_create resp_create;
     char* entry_name;
     PVFS_pinode_reference parent_refn;
-    uint32_t attrmask;
     PVFS_object_attr attr;
     PVFS_credentials credentials;
 
@@ -62,7 +61,7 @@ int main(int argc, char **argv)
     cur_fs = resp_init.fsid_list[0];
 
     entry_name = str_buf;
-    attrmask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID |
+    attr.mask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID |
 	 	PVFS_ATTR_SYS_PERM);
     attr.owner = 100;
     attr.group = 100;
@@ -70,7 +69,6 @@ int main(int argc, char **argv)
     credentials.uid = 100;
     credentials.gid = 100;
     credentials.perms = 1877;
-    attr.u.meta.nr_datafiles = 4;
     parent_refn.handle =
         lookup_parent_handle(filename,cur_fs);
     parent_refn.fs_id = cur_fs;
@@ -80,7 +78,7 @@ int main(int argc, char **argv)
      */
     attr.u.meta.dist = NULL;
 
-    ret = PVFS_sys_create(entry_name, parent_refn, attrmask, attr,
+    ret = PVFS_sys_create(entry_name, parent_refn, attr,
                 credentials, &resp_create);
     if (ret < 0)
     {

@@ -242,7 +242,6 @@ int PVFS_sys_lookup(
 	    /* Fill the pinode */
 	    pinode_ptr->pinode_ref.handle = entry.handle;
 	    pinode_ptr->pinode_ref.fs_id = entry.fs_id;
-	    pinode_ptr->mask = req_p.u.lookup_path.attrmask;
 
 	    if ((i+1 == ack_p->u.lookup_path.count) && 
 		((ack_p->rsize % sizeof(struct PVFS_server_resp_s)) == 0))
@@ -256,6 +255,10 @@ int PVFS_sys_lookup(
 	    else
 	    {
 		pinode_ptr->attr = ack_p->u.lookup_path.attr_array[i];
+		/* filter to make sure the server didn't return 
+		 * attributes that we aren't handling here 
+		 */
+		pinode_ptr->attr.mask &= PVFS_ATTR_COMMON_ALL;
 	    }
 
 	    /* Check permissions for path */

@@ -34,7 +34,7 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	int ret = -1, ioserv_count = 0;
 	pinode *pinode_ptr = NULL, *item_ptr = NULL;
 	bmi_addr_t serv_addr;	/* PVFS address type structure */
-	int name_sz = 0, attr_mask = 0;
+	int name_sz = 0;
 	PVFS_pinode_reference entry;
 	int items_found = 0, i = 0;
 	struct PINT_decoded_msg decoded;
@@ -60,9 +60,8 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	}
 
 	/* get the pinode for the thing we're deleting */
-	attr_mask = PVFS_ATTR_COMMON_ALL;
 	ret = phelper_get_pinode(entry, &pinode_ptr,
-			attr_mask, credentials );
+			PVFS_ATTR_COMMON_ALL, credentials );
 	if (ret < 0)
 	{
 	    failure = GET_PINODE_FAILURE;
@@ -75,14 +74,13 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	 */
 	if(pinode_ptr->attr.objtype == PVFS_TYPE_METAFILE)
 	{
-	    if((pinode_ptr->mask & PVFS_ATTR_META_ALL) !=
+	    if((pinode_ptr->attr.mask & PVFS_ATTR_META_ALL) !=
 		PVFS_ATTR_META_ALL)
 	    {
 		phelper_release_pinode(pinode_ptr);
 		/* meta attributes aren't there- try again */
-		attr_mask |= PVFS_ATTR_META_ALL;
 		ret = phelper_get_pinode(entry, &pinode_ptr,
-		    attr_mask, credentials);
+		    (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_ALL), credentials);
 		if(ret < 0)
 		{
 		    failure = GET_PINODE_FAILURE;

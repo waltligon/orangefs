@@ -19,7 +19,6 @@ int main(int argc,char **argv)
     PVFS_sysresp_mkdir resp_mkdir;
     char* entry_name;
     PVFS_pinode_reference parent_refn;
-    uint32_t attrmask;
     PVFS_object_attr attr;
     PVFS_credentials credentials;
 
@@ -66,7 +65,7 @@ int main(int argc,char **argv)
     parent_refn.handle =
         lookup_parent_handle(dirname,cur_fs);
     parent_refn.fs_id = cur_fs;
-    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+    attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
@@ -75,7 +74,7 @@ int main(int argc,char **argv)
     credentials.uid = 100;
     credentials.gid = 100;
 
-    ret = PVFS_sys_mkdir(entry_name, parent_refn, attrmask, attr, 
+    ret = PVFS_sys_mkdir(entry_name, parent_refn, attr, 
 			credentials, &resp_mkdir);
     if (ret < 0)
     {

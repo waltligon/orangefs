@@ -55,7 +55,6 @@ typedef struct
                                     uniquely identify a pinode */
     gen_mutex_t *pinode_mutex;        /* mutex lock */
     struct PVFS_object_attr attr;   /* attributes of PVFS object */
-    uint32_t mask;                       /* attribute mask */
     PVFS_size size;                           /* PVFS object size */
     struct timeval tstamp;  /* timestamp for consistency */
     int size_flag;	    /*flag so we know if the size is valid*/

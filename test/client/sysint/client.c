@@ -38,7 +38,6 @@ int main(int argc,char **argv)
 	PVFS_credentials credentials;
 	char* entry_name;
 	PVFS_pinode_reference parent_refn;
-	uint32_t attrmask;
 	PVFS_object_attr attr;
 	PVFS_pinode_reference pinode_refn;
 	PVFS_ds_position token;
@@ -113,7 +112,7 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	memcpy(entry_name,filename,strlen(filename) + 1);
-	attrmask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID | 
+	attr.mask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID | 
 		PVFS_ATTR_SYS_PERM);
 	attr.owner = 100;
 	attr.group = 100;
@@ -122,8 +121,6 @@ int main(int argc,char **argv)
 	credentials.uid = 100;
 	credentials.gid = 100;
 	credentials.perms = 1877;
-
-	attr.u.meta.nr_datafiles = 4;
 
 	parent_refn.handle = resp_look.pinode_refn.handle;
 	parent_refn.fs_id = fs_id;
@@ -142,7 +139,7 @@ int main(int argc,char **argv)
 	attr.u.meta.dist = NULL;
 
 	// call create 
-	ret = PVFS_sys_create(entry_name, parent_refn, attrmask, attr,
+	ret = PVFS_sys_create(entry_name, parent_refn, attr,
 				credentials, resp_create);
 	if (ret < 0)
 	{

@@ -312,7 +312,7 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
 			arrow(direction);
                         printf("PVFS_servreq_setattr.fs_id = %d\n", (int)my_req->u.setattr.fs_id );
 			arrow(direction);
-                        printf("PVFS_servreq_setattr.attrmask = %d\n",(int) my_req->u.setattr.attrmask );
+                        printf("PVFS_servreq_setattr.attr.mask = %d\n",(int) my_req->u.setattr.attr.mask );
 			arrow(direction);
                         printf("PVFS_servreq_setattr.attr.owner = %d\n", (int)my_req->u.setattr.attr.owner );
 			arrow(direction);

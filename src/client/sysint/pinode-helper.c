@@ -50,7 +50,7 @@ int phelper_get_pinode(PVFS_pinode_reference pref, pinode **pinode_ptr,
 	{
 		/* Pinode does exist */
 
-		if (((*pinode_ptr)->mask & attrmask) != attrmask)
+		if (((*pinode_ptr)->attr.mask & attrmask) != attrmask)
 		{ 
 			/* All the requested values are not contained in the pinode 
 			 * hence need to be fetched 
@@ -131,7 +131,7 @@ int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
 	(*pinode_ptr)->pinode_ref.handle = pref.handle;
 	(*pinode_ptr)->pinode_ref.fs_id = pref.fs_id;
 
-	ret = phelper_fill_attr(*pinode_ptr,resp.attr,mask);
+	ret = phelper_fill_attr(*pinode_ptr,resp.attr);
 	if (ret < 0)
 	{
 		return(ret);
@@ -460,28 +460,28 @@ static int check_pinode_match(pinode *pnode,pinode *pinode_ptr)
  *
  * returns 0 on success, -errno on error
  */
-int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
+int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr)
 {
 	PVFS_size df_array_size = attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
 
 	/* set common attributes if needed */
-	if(mask & PVFS_ATTR_COMMON_UID)
+	if(attr.mask & PVFS_ATTR_COMMON_UID)
 		ptr->attr.owner = attr.owner;
-	if(mask & PVFS_ATTR_COMMON_GID)
+	if(attr.mask & PVFS_ATTR_COMMON_GID)
 		ptr->attr.group = attr.group;
-	if(mask & PVFS_ATTR_COMMON_PERM)
+	if(attr.mask & PVFS_ATTR_COMMON_PERM)
 		ptr->attr.perms = attr.perms;
-	if(mask & PVFS_ATTR_COMMON_ATIME)
+	if(attr.mask & PVFS_ATTR_COMMON_ATIME)
 		ptr->attr.atime = attr.atime;
-	if(mask & PVFS_ATTR_COMMON_CTIME)
+	if(attr.mask & PVFS_ATTR_COMMON_CTIME)
 		ptr->attr.ctime = attr.ctime;
-	if(mask & PVFS_ATTR_COMMON_MTIME)
+	if(attr.mask & PVFS_ATTR_COMMON_MTIME)
 		ptr->attr.mtime = attr.mtime;
-	if(mask & PVFS_ATTR_COMMON_TYPE)
+	if(attr.mask & PVFS_ATTR_COMMON_TYPE)
 		ptr->attr.objtype = attr.objtype;
 
 	/* set distribution if needed */
-	if ((mask & PVFS_ATTR_META_DIST) &&
+	if ((attr.mask & PVFS_ATTR_META_DIST) &&
             (attr.u.meta.nr_datafiles > 0))
 	{
 		if(ptr->attr.u.meta.dfh)
@@ -496,7 +496,7 @@ int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
 	}
 
 	/* set datafile array if needed */
-	if ((mask & PVFS_ATTR_META_DFILES) &&
+	if ((attr.mask & PVFS_ATTR_META_DFILES) &&
             (attr.u.meta.dist_size > 0))
 	{
 		gossip_lerr("WARNING: packing distribution to memcpy it.\n");
@@ -514,9 +514,10 @@ int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
 		PINT_Dist_decode(ptr->attr.u.meta.dist, NULL);
 	}
 
-	ptr->mask |= mask;
+	/* add mask to existing values */
+	ptr->attr.mask |= attr.mask;
 
-	assert(!(mask & PVFS_ATTR_DATA_ALL));
+	assert(!(attr.mask & PVFS_ATTR_DATA_ALL));
 	
 	return(0);
 }

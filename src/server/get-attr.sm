@@ -300,6 +300,9 @@ static int getattr_read_metafile_datafile_handles(PINT_server_op *s_op, job_stat
     /* should be more than one datafile. */
     assert(nr_datafiles > 0);
 
+    /* add mask value to indicate the data file array is filled */
+    s_op->resp->u.getattr.attr.mask |= PVFS_ATTR_META_DFILES;
+
     /* NOTE: ALLOCATING MEMORY HERE */
     s_op->resp->u.getattr.attr.u.meta.dfh = malloc(nr_datafiles * sizeof(PVFS_handle));
     if(!s_op->resp->u.getattr.attr.u.meta.dfh)
@@ -347,6 +350,9 @@ static int getattr_read_metafile_distribution(PINT_server_op *s_op, job_status_s
 
     /* should be some distribution information. */
     assert(s_op->resp->u.getattr.attr.u.meta.dist_size > 0);
+
+    /* add mask value to indicate the distribution is filled */
+    s_op->resp->u.getattr.attr.mask |= PVFS_ATTR_META_DIST;
 
     /* NOTE: allocating memory here, free'd in last state */
     s_op->resp->u.getattr.attr.u.meta.dist =

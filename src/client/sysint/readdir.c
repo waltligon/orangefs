@@ -33,7 +33,6 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
 	int ret = -1;
 	pinode *pinode_ptr = NULL;
 	bmi_addr_t serv_addr;	/* PVFS address type structure */
-	uint32_t attr_mask;
 	struct PINT_decoded_msg decoded;
 	void* encoded_resp;
 	PVFS_msg_tag_t op_tag;
@@ -50,9 +49,8 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
 	
 	/* Revalidate directory handle */
 	/* Get the directory pinode */
-	attr_mask = PVFS_ATTR_COMMON_ALL;
 	ret = phelper_get_pinode(pinode_refn,&pinode_ptr,
-			attr_mask, credentials);
+			PVFS_ATTR_COMMON_ALL, credentials);
 	if (ret < 0)
 	{
 	    failure = GET_PINODE_FAILURE;

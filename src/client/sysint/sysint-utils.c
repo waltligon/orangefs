@@ -144,7 +144,8 @@ int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
         pinode_ptr->pinode_ref.handle = ack_p->u.lookup_path.handle_array[0];
         pinode_ptr->pinode_ref.fs_id = parent.fs_id;
         pinode_ptr->attr = ack_p->u.lookup_path.attr_array[0];
-	pinode_ptr->mask = PVFS_ATTR_COMMON_ALL;
+	/* filter to make sure we set a reasonable mask here */
+	pinode_ptr->attr.mask &= PVFS_ATTR_COMMON_ALL;
 
         /* Add to the pinode list */
         ret = PINT_pcache_insert(pinode_ptr);

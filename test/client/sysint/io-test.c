@@ -29,7 +29,6 @@ int main(int argc,char **argv)
 	PVFS_credentials credentials;
 	char* entry_name;
 	PVFS_pinode_reference parent_refn;
-	uint32_t attrmask;
 	PVFS_object_attr attr;
 	PVFS_pinode_reference pinode_refn;
 	PVFS_Request io_req;
@@ -125,13 +124,13 @@ int main(int argc,char **argv)
 
 		/* create new file */
 
-		/* TODO: I'm not setting the attribute mask... not real sure
-		 * what's supposed to happen there */
 		attr.owner = 100;
 		attr.group = 100;
 		attr.perms = PVFS_U_WRITE|PVFS_U_READ;
-		attr.u.meta.nr_datafiles = 1;
-		attr.u.meta.dist = NULL;
+		attr.atime = 0;
+		attr.mtime = 0;
+		attr.ctime = 0;
+		attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
 		parent_refn.handle = resp_lk.pinode_refn.handle;
 		parent_refn.fs_id = fs_id;
 		entry_name = &(filename[1]); /* leave off slash */
@@ -139,7 +138,7 @@ int main(int argc,char **argv)
 		credentials.gid = 100;
 		credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
-		ret = PVFS_sys_create(entry_name, parent_refn, attrmask, attr, 
+		ret = PVFS_sys_create(entry_name, parent_refn, attr, 
 					credentials, &resp_cr);
 		if(ret < 0)
 		{

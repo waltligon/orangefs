@@ -195,7 +195,6 @@ struct PVFS_servreq_setattr_s
     PVFS_handle handle;
     PVFS_fs_id fs_id;
     PVFS_object_attr attr;
-    uint32_t attrmask;
     PVFS_attr_extended extended;
 };
 typedef struct PVFS_servreq_setattr_s PVFS_servreq_setattr;
@@ -228,7 +227,6 @@ struct PVFS_servreq_mkdir_s
     PVFS_handle requested_handle;
     PVFS_fs_id fs_id;
     PVFS_object_attr attr;
-    uint32_t attrmask;
 };
 typedef struct PVFS_servreq_mkdir_s PVFS_servreq_mkdir;
 

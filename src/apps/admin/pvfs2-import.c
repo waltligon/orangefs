@@ -56,7 +56,6 @@ int main(int argc, char **argv)
     PVFS_size displacement = 0;
     char* entry_name;
     PVFS_pinode_reference parent_refn;
-    uint32_t attrmask;
     PVFS_object_attr attr;
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
@@ -145,17 +144,16 @@ int main(int argc, char **argv)
     printf("Warning: overriding ownership and permissions to match prototype file system.\n");
 
     entry_name = str_buf;
-    attrmask = (PVFS_ATTR_SYS_ALL_NOSIZE);
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
     attr.atime = time(NULL);
     attr.mtime = attr.atime;
     attr.ctime = attr.atime;
+    attr.mask = (PVFS_ATTR_SYS_ALL_NOSIZE);
     credentials.uid = 100;
     credentials.gid = 100;
     credentials.perms = 1877;
-    attr.u.meta.nr_datafiles = user_opts->num_datafiles;
     parent_refn.handle =
         lookup_parent_handle(pvfs_path,cur_fs);
     parent_refn.fs_id = cur_fs;
@@ -180,7 +178,7 @@ int main(int argc, char **argv)
 	    user_opts->strip_size;
     }
 
-    ret = PVFS_sys_create(entry_name, parent_refn, attrmask, attr, credentials,
+    ret = PVFS_sys_create(entry_name, parent_refn, attr, credentials,
 			    &resp_create);
     if (ret < 0)
     {
@@ -321,6 +319,9 @@ static struct options* parse_args(int argc, char* argv[])
 		}
 		break;
 	    case('n'):
+		gossip_lerr("Error: num datafiles option not supported.\n");
+		free(tmp_opts);
+		return(NULL);
 		ret = sscanf(optarg, "%d", &tmp_opts->num_datafiles);
 		if(ret < 1){
 		    free(tmp_opts);

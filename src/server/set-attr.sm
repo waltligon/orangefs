@@ -323,6 +323,9 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
     s_op->val.buffer    = &s_op->req->u.setattr.attr;
     s_op->val.buffer_sz = sizeof(struct PVFS_object_attr);
 
+    /* filter out anything besides common attributes before writing */
+    s_op->req->u.setattr.attr.mask &= PVFS_ATTR_COMMON_ALL;
+
     gossip_debug(SERVER_DEBUG,
 		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
 		 s_op->req->u.setattr.fs_id,

@@ -27,9 +27,6 @@
  * TODO: Yuck.  We have a lot of assumptions in here about what
  * the attributes look like and what masks are set in the pinode
  * cache- needs to be updated eventually...
- * TODO: Code also assumes it can use the mask passed in by the
- * caller directly at the request level.  Probably should convert
- * the values instead.
  * 
  * returns 0 on success, -errno on failure
  */

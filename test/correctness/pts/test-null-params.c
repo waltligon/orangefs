@@ -189,7 +189,7 @@ static int test_mkdir(int nullCase){
 //   req_mkdir.parent_refn.handle = parent;
    req_mkdir.parent_refn.handle = resp_lookup->attr->meta->dfh
    req_mkdir.parent_refn.fs_id = fs_id; 
-   req_mkdir.attrmask = ATTR_BASIC;
+   req_mkdir.attr.mask = ATTR_BASIC;
    req_mkdir.attr.owner = 100;
    req_mkdir.attr.group = 100;
    req_mkdir.attr.perms = 1877;

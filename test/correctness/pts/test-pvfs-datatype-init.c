@@ -10,7 +10,6 @@ extern pvfs_helper_t pvfs_helper;
 int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
 {
     int ret = -1, i = 0, num_test_files_ok;
-    uint32_t attrmask;
     PVFS_object_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
@@ -69,16 +68,14 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
             }
 
 
-            attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+            attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
             attr.owner = 100;
             attr.group = 100;
             attr.perms = 1877;
             attr.objtype = PVFS_TYPE_METAFILE;
-            attr.u.meta.dist = NULL;
-            attr.u.meta.nr_datafiles = 1;
 
             ret = PVFS_sys_create(&(filename[1]),resp_lk.pinode_refn,
-                                  attrmask, attr, credentials, &resp_cr);
+                                  attr, credentials, &resp_cr);
             if ((ret < 0) || (!resp_cr.pinode_refn.handle))
             {
                 debug_printf("Error: PVFS_sys_create() failure.\n");

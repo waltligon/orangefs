@@ -106,7 +106,7 @@ int main(int argc, char **argv)	{
 	my_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 	my_req->u.getattr.handle = user_opts->bucket;
 	my_req->u.getattr.fs_id = FS_COLL_ID;
-	my_req->u.setattr.attrmask = PVFS_ATTR_COMMON_ALL;
+	my_req->u.getattr.attrmask = PVFS_ATTR_COMMON_ALL;
 
 	printf("Sending GETATTR for Handle %lld\n",(long long)user_opts->bucket);
 	display_pvfs_structure(my_req,1);

@@ -32,7 +32,7 @@ static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
  * returns 0 on success, -errno on failure
  */
 int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
-                uint32_t attrmask, PVFS_object_attr attr,
+                PVFS_object_attr attr,
                 PVFS_credentials credentials, PVFS_sysresp_create *resp)
 {
 	struct PVFS_server_req_s req_p;			/* server request */
@@ -125,27 +125,25 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	}
 
 	/* how many data files do we need to create? */
-	io_serv_count = attr.u.meta.nr_datafiles;
-
-	/* if the user passed in -1, we're going to assume that's the default
-	 * and create one datafile per server */
-	if (io_serv_count == -1)
+	/* get default value from system */
+	ret = PINT_bucket_get_num_io(parent_refn.fs_id, &io_serv_count);
+	if(ret < 0)
 	{
-	    PINT_bucket_get_num_io( parent_refn.fs_id, &io_serv_count);
+	    failure = DCACHE_LOOKUP_FAILURE;
+	    goto return_error;
 	}
+
+	/* right now, there is no way to request a certain number of 
+	 * data files- just go with the system default. 
+	 */
+	PINT_bucket_get_num_io( parent_refn.fs_id, &io_serv_count);
 
 	gossip_ldebug(CLIENT_DEBUG,"number of data files to create = %d\n",io_serv_count);
 
-	/* if the user passed in a NULL pointer for the distribution, we
-	 * need to get the default distribution for them
+	/* also no way to pass in distribution right now- just go 
+	 * with the system default. 
 	 */
-
-	if (attr.u.meta.dist == NULL)
-	{
-	    attr.u.meta.dist =
-		PVFS_Dist_create("simple_stripe");
-	    //PINT_Dist_dump(attr.u.meta.dist);
-	}
+	attr.u.meta.dist = PVFS_Dist_create("simple_stripe");
 
 	/* Determine the initial metaserver for new file */
 	ret = PINT_bucket_get_next_meta(&g_server_config,
@@ -365,7 +363,6 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 			+ io_serv_count*sizeof(PVFS_handle);
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = parent_refn.fs_id;
-	req_p.u.setattr.attrmask = attrmask;
 
 	/* TODO: figure out how we're storing the distribution for the file
 	 * does this go in the attributes, or the eattr?
@@ -392,7 +389,11 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 
 	/* set the type of the object */
 	req_p.u.setattr.attr.objtype = PVFS_TYPE_METAFILE;
-	req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_TYPE;
+	/* we want to set whatever fields the caller specified, 
+	 * plus the object type and the array of datafiles.
+	 */
+	req_p.u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
+	req_p.u.setattr.attr.mask |= PVFS_ATTR_META_DFILES;
 
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
@@ -440,12 +441,10 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	/* Fill up the pinode */
 	pinode_ptr->pinode_ref.handle = entry.handle;
 	pinode_ptr->pinode_ref.fs_id = parent_refn.fs_id;
-	pinode_ptr->mask = attrmask;
-	/* Allocate the handle array */
 	pinode_ptr->attr = req_p.u.setattr.attr;
 	/* set the object type */
 	pinode_ptr->attr.objtype = PVFS_TYPE_METAFILE;
-	pinode_ptr->mask |= PVFS_ATTR_COMMON_TYPE;
+	pinode_ptr->attr.mask |= PVFS_ATTR_COMMON_TYPE;
 
 	/* Fill in the timestamps */
 
@@ -600,6 +599,7 @@ static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
 	new->atime = old.atime;
 	new->mtime = old.mtime;
 	new->ctime = old.ctime;
+	new->mask = old.mask;
 	new->objtype = PVFS_TYPE_METAFILE;
 
 	/* Fill in the metafile attributes */

@@ -73,14 +73,13 @@ int create_dir(PVFS_pinode_reference parent_refn, char *name,
                PVFS_pinode_reference *out_refn)
 {
     int ret = -1;
-    uint32_t attrmask;
     PVFS_object_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_mkdir resp_mkdir;
 
     memset(&resp_mkdir, 0, sizeof(resp_mkdir));
 
-    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+    attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
@@ -90,7 +89,7 @@ int create_dir(PVFS_pinode_reference parent_refn, char *name,
     credentials.gid = 100;
     credentials.perms = 1877;
 
-    ret = PVFS_sys_mkdir(name, parent_refn, attrmask,
+    ret = PVFS_sys_mkdir(name, parent_refn,
                          attr, credentials, &resp_mkdir);
     if (ret < 0)
     {

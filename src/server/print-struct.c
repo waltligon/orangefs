@@ -52,6 +52,7 @@ void dump_attribs(PVFS_object_attr a)
    printf("\tMtime: %lld\n",(long long)a.mtime);
    printf("\tCtime: %lld\n",(long long)a.ctime);
    printf("\tType: %d\n",a.objtype);
+   printf("\tMask: %d\n",(int)a.mask);
 }
 
 void display_pvfs_structure(void *s,int r)
@@ -105,7 +106,6 @@ void display_pvfs_structure(void *s,int r)
 				printf("FSid: %d\n",p->u.mkdir.fs_id);
 				printf("Attribs:\n");
 				dump_attribs(p->u.mkdir.attr);
-				printf("Attrmask: %Xh\n",p->u.mkdir.attrmask);
 				break;
 			case PVFS_SERV_CREATEDIRENT:
 				printf("Create Dirent Req\n");

@@ -114,7 +114,7 @@ int main(int argc, char **argv)	{
 	my_req->u.setattr.attr.ctime = time(NULL);
 	my_req->u.setattr.attr.mtime = time(NULL);
 	my_req->u.setattr.attr.objtype = 1;
-	my_req->u.setattr.attrmask = PVFS_ATTR_COMMON_ALL; 
+	my_req->u.setattr.attr.mask = PVFS_ATTR_COMMON_ALL; 
 
 	printf("Sending SETATTR for Handle %lld\n",(long long)user_opts->bucket);
 	display_pvfs_structure(my_req,1);

@@ -83,20 +83,20 @@ typedef struct PVFS_object_eattr PVFS_object_eattr;
  */
 struct PVFS_object_attr
 {
-    /* bitfield? */
     PVFS_uid owner;
     PVFS_gid group;
     PVFS_permissions perms;
     PVFS_time atime;
     PVFS_time mtime;
     PVFS_time ctime;
+    uint32_t mask;     /* indicates which fields are currently valid */
     PVFS_ds_type objtype;	/* Type of PVFS Filesystem object */
     union
     {
 	PVFS_metafile_attr meta;
 	PVFS_datafile_attr data;
 	PVFS_directory_attr dir;
-	PVFS_symlink_attr sym;	/* ??? */
+	PVFS_symlink_attr sym;
     }
     u;
 };

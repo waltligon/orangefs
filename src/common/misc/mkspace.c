@@ -11,6 +11,7 @@
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "pvfs2-attr.h"
 #include "trove.h"
@@ -200,7 +201,11 @@ int pvfs2_mkspace(
         attr.owner    = 100;
         attr.group    = 100;
         attr.perms    = 0777;
+	attr.atime    = time(NULL);
+	attr.ctime    = time(NULL);
+	attr.mtime    = time(NULL);
         attr.objtype  = PVFS_TYPE_DIRECTORY;
+	attr.mask     = PVFS_ATTR_COMMON_ALL;
 
         key.buffer    = metastring;
         key.buffer_sz = strlen(metastring) + 1;

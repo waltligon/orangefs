@@ -20,7 +20,6 @@ int create_file(PVFS_fs_id fs_id,
 		char *filename)
 {
     int ret;
-    uint32_t attrmask;
     PVFS_object_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
@@ -39,25 +38,23 @@ int create_file(PVFS_fs_id fs_id,
     }
 
 /*     attrmask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID | PVFS_ATTR_SYS_PERM); */
-    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+    attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
     attr.objtype = PVFS_TYPE_METAFILE;
-    attr.u.meta.nr_datafiles = 4;
-    attr.u.meta.dist = NULL;
 
     memset(&resp_create,0,sizeof(resp_create));
     ret = PVFS_sys_create(filename, resp_look.pinode_refn,
-                          attrmask, attr, credentials, &resp_create);
+                          attr, credentials, &resp_create);
     if (ret < 0)
     {
 	printf("create failed with errcode = %d\n", ret);
 	return (-1);
     }
 
-    ret = PVFS_sys_getattr(resp_create.pinode_refn, attrmask,
+    ret = PVFS_sys_getattr(resp_create.pinode_refn, attr.mask,
                            credentials, &resp_getattr);
     if (ret < 0)
     {
