@@ -51,14 +51,19 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     }
 
     /* make sure BMI knows how to handle this method, else fail quietly */
-    for (i=0; i<mntent->num_pvfs_config_servers; i++) {
+    for(i = 0; i < mntent->num_pvfs_config_servers; i++)
+    {
         ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
         if (ret == 0)
+        {
             break;
+        }
     }
-    if (i == mntent->num_pvfs_config_servers) {
-        gossip_err("%s: Failed to initialize any appropriate BMI methods.\n",
-          __func__);
+
+    if (i == mntent->num_pvfs_config_servers)
+    {
+        gossip_err("%s: Failed to initialize any appropriate "
+                   "BMI methods.\n", __func__);
         goto error_exit;
     }
     mntent->the_pvfs_config_server = mntent->pvfs_config_servers[i];
