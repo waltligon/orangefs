@@ -145,24 +145,6 @@ struct PVFS_sysresp_getparent_s
 };
 typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
 
-/* PVFS system response structure
- */
-struct PVFS_system_resp_s
-{
-    int32_t resp_tag;		/* Tag to group reqs+acks */
-    union
-    {
-	PVFS_sysresp_lookup lookup;
-	PVFS_sysresp_getattr getattr;
-	PVFS_sysresp_mkdir mkdir;
-	PVFS_sysresp_create create;
-	PVFS_sysresp_symlink symlink;
-	PVFS_sysresp_readlink readlink;
-	PVFS_sysresp_io io;
-	PVFS_sysresp_readdir readdir;
-    } u;
-};
-
 /*declarations*/
 
 /* PVFS System Request Prototypes
