@@ -76,6 +76,19 @@ int PVFS_util_remove_dir_prefix(
     char *out_path,
     int out_max_len);
 
+/*
+ * Split a pathname into a directory and a filename.    The substring
+ * following the last "/" is designated as the filename.  If non-null
+ * is passed as the directory or filename, the field will be filled with the
+ * corresponding value up to the designated parameter size.  See pvfs2-util.c
+ * for further documentation.
+ */
+int PVFS_util_split_pathname( const char *path,
+                              char *directory,
+                              int max_dir_len,
+                              char *filename,
+                              int max_filename_len);
+
 /* help out lazy humans */
 void PVFS_util_make_size_human_readable(
     PVFS_size size,

@@ -31,8 +31,6 @@ struct options
     char** filenames;
 };
 
-static int split_pathname( const char* path, char** directory, char** filename);
-
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 
@@ -63,8 +61,8 @@ int main(int argc, char **argv)
     {
         int rc;
         char* working_file = user_opts->filenames[i];
-        char* directory;
-        char* filename;
+        char directory[PVFS_NAME_MAX];
+        char filename[PVFS_SEGMENT_MAX];
 
         char pvfs_path[PVFS_NAME_MAX] = {0};
         PVFS_fs_id cur_fs;
@@ -73,7 +71,11 @@ int main(int argc, char **argv)
         PVFS_object_ref parent_ref;
 
         /* Translate path into pvfs2 relative path */
-        rc = split_pathname(working_file, &directory, &filename);
+        rc = PVFS_util_split_pathname(working_file,
+                                      directory,
+                                      PVFS_NAME_MAX,
+                                      filename,
+                                      PVFS_SEGMENT_MAX);
         if (0 != rc)
         {
             fprintf(stderr, "Unknown path format: %s\n", working_file);
@@ -125,56 +127,6 @@ int main(int argc, char **argv)
     return ret;
 }
 
-
-/**
- * Split a pathname into a directory and a filename.  If non-null
- * is passed as the directory or filename, the field will be allocated and
- * filled with the correct value
- */
-static int split_pathname( const char *path,
-                           char **directory,
-                           char **filename )
-{
-    /* Split path into a directory and filename */
-    int path_length = strlen(path);
-    if ('/' == path[0])
-    {
-        int i;
-        for (i = path_length - 1; i >= 0; --i)
-        {
-            if ( '/' == path[i] )
-            {
-                /* parse the directory */
-                if (0 != directory)
-                {
-                    *directory = malloc(i + 1);
-                    if (0 != directory)
-                    {
-                        strncpy(*directory, path, i);
-                        (*directory)[i] = '\0';
-                    }
-                }
-                /* parse the filename */
-                if (0 != filename)
-                {
-                    *filename = malloc(path_length - i + 1);
-                    if (0 != filename)
-                    {
-                        strncpy(*filename, path + i + 1, path_length - i);
-                        (*filename)[path_length - i] = '\0';
-                    }
-                }
-                break;
-            }
-        }
-    }
-    else
-    {
-        fprintf(stderr, "Error: Not an absolute path: %s\n", path);
-        return -1;
-    }
-    return 0;
-}
 
 /* parse_args()
  *

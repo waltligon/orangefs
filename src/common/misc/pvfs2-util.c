@@ -30,6 +30,12 @@
 #include <mntent.h>
 #endif
 
+/* Define min macro with pvfs2 prefix */
+#ifndef PVFS_util_min
+#define PVFS_util_min(x1,x2) ((x1) > (x2))? (x2):(x1)
+#endif
+
+
 #define PVFS2_MAX_INVALID_MNTENTS                     256
 #define PVFS2_MAX_TABFILES                              8
 #define PVFS2_DYNAMIC_TAB_INDEX  (PVFS2_MAX_TABFILES - 1)
@@ -924,7 +930,7 @@ int PVFS_util_remove_base_dir(
     {
         if ((strcmp(pathname, "/") == 0) || (pathname[0] != '/'))
         {
-            return ret;
+            return -ENOTDIR;
         }
 
         start = pathname;
@@ -1064,6 +1070,73 @@ int PVFS_util_remove_dir_prefix(
         strcpy(out_path, &(pathname[cut_index]));
 
     return (0);
+}
+
+/**
+ *
+ * PVFS_util_split_pathname
+ *
+ * Split a pathname into a directory and a filename.    The substring
+ * following the last "/" is designated the filename.  If non-null
+ * is passed as the directory or filename, the field will be filled with the
+ * corresponding value up to the designated parameter size
+ *
+ * Parameters:
+ * path     - pointer to directory and filename (absolute)
+ * directory - pre-allocated memory to store directory or NULL
+ * max_dir_len - the maximum length of directory (usually PVFS_NAME_MAX)
+ * filename - pre-allocated memory to store filename or NULL
+ * max_filename_len  - the maximum length of the filename (usually
+ *                     PVFS_SEGMENT_MAX)
+ *
+ * Returns 0 on success; -errno on failure
+ *
+ * Example inputs and outputs/return values:
+ *
+ * path: /mnt/pvfs2/foo, directory: /mnt/pvfs2 filename: foo returns 0
+ * pathname: /mnt/pvfs2/foo/, directory: /mnt/pvfs2/foo filename: \0 returns 0
+ *
+ */
+int PVFS_util_split_pathname( const char *path,
+                              char *directory,
+                              int max_dir_len,
+                              char *filename,
+                              int max_filename_len)
+{
+    /* Split path into a directory and filename */
+    int path_length = strlen(path);
+    if ('/' == path[0])
+    {
+        int i;
+        for (i = path_length - 1; i >= 0; --i)
+        {
+            if ( '/' == path[i] )
+            {
+                /* parse the directory */
+                if (0 != directory)
+                {
+                    int dir_len = PVFS_util_min(i + 1, max_dir_len);
+                    strncpy(directory, path, dir_len - 1);
+                    directory[dir_len - 1] = '\0';
+                }
+                /* parse the filename */
+                if (0 != filename)
+                {
+                    int fname_len = PVFS_util_min(path_length - i + 1,
+                                                  max_filename_len);
+                    strncpy(filename, path + i + 1, fname_len - 1);
+                    filename[fname_len - 1] = '\0';
+                }
+                break;
+            }
+        }
+    }
+    else
+    {
+        fprintf(stderr, "Error: Not an absolute path: %s\n", path);
+        return -ENOTDIR;
+    }
+    return 0;
 }
 
 #define KILOBYTE                1024
