@@ -37,7 +37,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 {
 	struct PVFS_server_req req_p;			/* server request */
 	struct PVFS_server_resp *ack_p = NULL;	/* server response */
-	int ret = -1, name_sz = 0, io_serv_count = 0, i = 0;
+	int ret = -1, io_serv_count = 0, i = 0;
 	int attr_mask, last_handle_created = 0;
 	pinode *parent_ptr = NULL, *pinode_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2,*bmi_addr_list = NULL;
@@ -70,6 +70,10 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	if (resp==NULL)
 	{
 	    return -EINVAL;
+	}
+	if((strlen(entry_name) + 1) > PVFS_REQ_LIMIT_PATH_NAME_BYTES) 
+	{
+	    return -ENAMETOOLONG;
 	}
 
 	gossip_ldebug(CLIENT_DEBUG,"creating file named %s\n", entry_name);
@@ -143,6 +147,12 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	 * data files- just go with the system default. 
 	 */
 	PINT_bucket_get_num_io( parent_refn.fs_id, &io_serv_count);
+	/* but make sure we don't exceed the request protocol limit */
+	if(io_serv_count > PVFS_REQ_LIMIT_DFILE_COUNT)
+	{
+	    io_serv_count = PVFS_REQ_LIMIT_DFILE_COUNT;
+	    gossip_ldebug(CLIENT_DEBUG, "Warning: reducing number of data files to PVFS_REQ_LIMIT_DFILE_COUNT.\n");
+	}
 
 	gossip_ldebug(CLIENT_DEBUG,"number of data files to create = %d\n",io_serv_count);
 
@@ -217,8 +227,6 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	}
 
 	/* send crdirent to associate a name with the meta file we just made */
-
-	name_sz = strlen(entry_name) + 1; /*include null terminator*/
 	req_p.op = PVFS_SERV_CREATEDIRENT;
 
 	/* credentials come from credentials and are set in the previous

@@ -50,6 +50,8 @@ int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
 	void* encoded_resp;
 	PVFS_msg_tag_t op_tag;
         bmi_size_t max_msg_sz = 0;
+	int i = 0;
+	char* tmpstr = NULL;
 
         /*Q: should I combine these into one since there's not much
          * cleanup going on for each case?
@@ -67,6 +69,18 @@ int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
 	    return -ENOENT;
 
         name_sz = strlen(name) + 1; /*include the null terminator*/
+
+	/* check length of path and number of segments */
+	i=1;
+	tmpstr = name;
+	while((tmpstr = index(tmpstr, '/')))
+	{
+	    tmpstr++;
+	    i++;
+	}
+	if(name_sz > PVFS_REQ_LIMIT_PATH_NAME_BYTES ||
+	    i > PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT)
+	    return(-ENAMETOOLONG);
 
         req_p.op = PVFS_SERV_LOOKUP_PATH;
         req_p.credentials = cred;

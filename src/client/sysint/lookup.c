@@ -82,6 +82,7 @@ int PVFS_sys_ref_lookup(
     bmi_addr_t serv_addr;
     int total_segments = 0, num_segments_remaining = 0;
     PVFS_pinode_reference entry;
+    char* tmpstr = NULL;
 
     enum {
 	NONE_FAILURE = 0,
@@ -99,6 +100,22 @@ int PVFS_sys_ref_lookup(
     if(relative_pathname == NULL)
     {
 	ret = -EINVAL;
+	failure = NONE_FAILURE;
+	goto return_error;
+    }
+
+    /* check length of path and number of segments */
+    i=1;
+    tmpstr = relative_pathname;
+    while((tmpstr = index(tmpstr, '/')))
+    {
+	tmpstr++;
+	i++;
+    }
+    if((strlen(relative_pathname) +1) > PVFS_REQ_LIMIT_PATH_NAME_BYTES ||
+	i > PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT)
+    {
+	ret = -ENAMETOOLONG;
 	failure = NONE_FAILURE;
 	goto return_error;
     }

@@ -52,13 +52,17 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
     int ret = -1;
     pinode *new_parent_p = NULL, *old_entry_p = NULL;
     bmi_addr_t serv_addr;	/* PVFS address type structure */
-    int name_sz = 0;
     uint32_t attr_mask;
     PVFS_pinode_reference old_entry_refn;
     struct PINT_decoded_msg decoded;
     bmi_size_t max_msg_sz;
     void* encoded_resp;
     PVFS_msg_tag_t op_tag;
+
+    if((strlen(new_entry) + 1) > PVFS_REQ_LIMIT_PATH_NAME_BYTES) 
+    {
+	return -ENAMETOOLONG;
+    }
 
     attr_mask = PVFS_ATTR_COMMON_ALL;
 
@@ -119,7 +123,6 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
 	goto return_error;
     }
 
-    name_sz = strlen(new_entry) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_CREATEDIRENT;
     req_p.credentials = credentials;
 
@@ -169,8 +172,6 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
     /* the following arguments are the same from the last server msg:
      * req_p.credentials
      */
-
-    name_sz = strlen(old_entry) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_RMDIRENT;
 
     req_p.u.rmdirent.entry = old_entry;

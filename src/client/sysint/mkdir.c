@@ -37,7 +37,6 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     int ret = -1;
     pinode *pinode_ptr = NULL, *parent_ptr = NULL;
     bmi_addr_t serv_addr1, serv_addr2;	/* PVFS address type structure */
-    int name_sz = 0;
     PVFS_pinode_reference entry;
     int attr_mask;
     struct PINT_decoded_msg decoded;
@@ -57,6 +56,10 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 	PCACHE_INSERT2_FAILURE,
     } failure = NONE_FAILURE;
 	
+    if((strlen(entry_name) + 1) > PVFS_REQ_LIMIT_PATH_NAME_BYTES)
+    {
+	return -ENAMETOOLONG;
+    }
 
     /* get the pinode of the parent so we can check permissions */
     attr_mask = PVFS_ATTR_COMMON_ALL;
@@ -182,7 +185,6 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     /* remove leading slashes from name; this isn't a complete fix. */
     while (*entry_name == '/') entry_name++;
 
-    name_sz = strlen(entry_name) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_CREATEDIRENT;
 
     /* credentials come from credentials and are set in the previous
