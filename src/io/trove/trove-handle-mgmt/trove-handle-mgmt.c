@@ -100,7 +100,7 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                         /* gossip or log the invalid handle */
                         printf("handle %Ld is invalid (out of bounds)\n",
                                handles[i]);
-                        break;
+                        return -1;
                     }
 		    /* remove handle from trove-handle-mgmt */
 		    ret = trove_handle_remove(ledger, handles[i]);
