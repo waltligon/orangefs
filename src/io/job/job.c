@@ -1078,11 +1078,10 @@ int job_req_sched_release(job_id_t in_completed_id,
                           job_id_t * out_id,
                           job_context_id context_id)
 {
-    /* this function is a little odd.  We need to
-     * do is retrieve the job desc that we queued up in the
-     * inprogress queue to match the release properly 
+    /* this function is a little odd.  We need to do is retrieve the
+     * job desc that we queued up in the inprogress queue to match the
+     * release properly
      */
-
     struct job_desc *match_jd = NULL;
     struct job_desc *jd = NULL;
     int ret = -1;
@@ -1097,6 +1096,11 @@ int job_req_sched_release(job_id_t in_completed_id,
     jd->status_user_tag = status_user_tag;
 
     match_jd = id_gen_safe_lookup(in_completed_id);
+    if (!match_jd)
+    {
+        /* id has been released or was not registered */
+        return 0;
+    }
 
     ret = PINT_req_sched_release(match_jd->u.req_sched.id, jd,
                                  &(jd->u.req_sched.id));

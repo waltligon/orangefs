@@ -1227,10 +1227,11 @@ static inline int process_context_recv(
 
     if (cur_ctx->msg->recv_status.error_code || cur_ctx->msg->op_status)
     {
-        gossip_err("  error %d with status %d related to response "
-                   "from context %p; not submitting flow.\n",
-                   cur_ctx->msg->recv_status.error_code,
-                   cur_ctx->msg->op_status, cur_ctx);
+        gossip_debug(
+            GOSSIP_IO_DEBUG, "  error %d with status %d related "
+            "to response from context %p; not submitting flow.\n",
+            cur_ctx->msg->recv_status.error_code,
+            cur_ctx->msg->op_status, cur_ctx);
 
         if (cur_ctx->msg->recv_status.error_code)
         {
