@@ -4,7 +4,8 @@ TEST_SYSINT_DIR := test/client/sysint
 TEST_REALSYSINT_DIR := src/client/unix-io
 
 TEST_SYSINT_DIR_SRC += \
-	$(DIR)/client.c
+	$(DIR)/client.c\
+	$(DIR)/test-pint-bucket.c
 
 MISCSRC += \
 	$(DIR)/job.c \
