@@ -34,7 +34,11 @@ int main(int argc, char **argv)
 	}
 
 	ret = read(fd, buffer, buf_size);
-	printf("read returned: %d\n", ret);
+	if(ret < 0)
+	{
+		perror("read");
+		return(-1);
+	};
 
 	pos = lseek(fd, 0, SEEK_CUR);
 	printf("lseek returned: %d\n", (int)pos);

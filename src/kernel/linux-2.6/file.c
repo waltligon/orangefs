@@ -109,14 +109,17 @@ static ssize_t pvfs2_file_read(
 	    *offset = original_offset;
 	    return(ret);
 	}
+
+	printk("status: %d\n", new_op->downcall.status);
 	
 	if(new_op->downcall.status != 0)
 	{
 	    pvfs_bufmap_put(desc);
+	    ret = new_op->downcall.status;
 	    op_release(new_op);
 	    *offset = original_offset;
 	    pvfs2_error("pvfs2: error: read downcall status.\n");
-	    return(new_op->downcall.status);
+	    return(ret);
 	}
 
 	/* copy data out to application */
