@@ -50,7 +50,7 @@ int do_decode_req(
 	case PVFS_SERV_GETCONFIG:
 	    /* update the pointer to fs_name string */
 	    char_ptr += sizeof( struct PVFS_server_req_s );
-	    dec_msg->u.getconfig.fs_name = char_ptr;
+/* 	    dec_msg->u.getconfig.fs_name = char_ptr; */
 	    return(0);
 
 	case PVFS_SERV_LOOKUP_PATH:

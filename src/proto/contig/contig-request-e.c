@@ -45,18 +45,18 @@ int do_encode_req(
     switch( request->op )
     {
 	case PVFS_SERV_GETCONFIG:
-
 	    /* just assert on the fs_name being non-NULL; returning EINVAL is
 	     * the right thing to do for cases where the user could have given
 	     * us a bad value or a syscall returned something, but at this point
 	     * if we get a bad string it's just a bug in our code.
 	     */
-	    assert(request->u.getconfig.fs_name != NULL);
+/* 	    assert(request->u.getconfig.fs_name != NULL); */
 
-	    name_sz = strlen(request->u.getconfig.fs_name) + 1; /* include NULL terminator in size */
-	    size    = sizeof(struct PVFS_server_req_s) +
-		header_size + name_sz;
-	    enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t)size, 
+/* 	    name_sz = strlen(request->u.getconfig.fs_name) + 1; /\* include NULL terminator in size *\/ */
+/* 	    size    = sizeof(struct PVFS_server_req_s) + */
+/* 		header_size + name_sz; */
+            size = sizeof(struct PVFS_server_req_s) + header_size;
+	    enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t)size,
 		BMI_SEND_BUFFER);
 
 	    /* here the right thing to do is to return the error code. */
@@ -71,10 +71,10 @@ int do_encode_req(
 
 	    memcpy(enc_msg, request, sizeof(struct PVFS_server_req_s));
 	    /* note: we know the size of the string from above, so we can just memcpy. */
-	    memcpy(enc_msg + sizeof(struct PVFS_server_req_s), request->u.getconfig.fs_name, name_sz);
+/* 	    memcpy(enc_msg + sizeof(struct PVFS_server_req_s), request->u.getconfig.fs_name, name_sz); */
 
 	    /* put NULLs in all pointers going across wire */
-	    ((struct PVFS_server_req_s *)enc_msg)->u.getconfig.fs_name = NULL;
+/* 	    ((struct PVFS_server_req_s *)enc_msg)->u.getconfig.fs_name = NULL; */
 
 	    /* set accurate rsize */
 	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;

@@ -252,24 +252,22 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	    goto return_error;
 	}
 
-
 	/* Set up the request for getconfig */
 	name_sz = strlen(mntent_p->service_name) + 1;
 
-	req_p->op                      = PVFS_SERV_GETCONFIG;
-	req_p->rsize                   = sizeof(struct PVFS_server_req_s) + name_sz;
-	req_p->credentials             = creds;
-
-	req_p->u.getconfig.fs_name     = mntent_p->service_name;
+	req_p->op = PVFS_SERV_GETCONFIG;
+	req_p->rsize = sizeof(struct PVFS_server_req_s) + name_sz;
+	req_p->credentials = creds;
 	req_p->u.getconfig.max_strsize = MAX_STRING_SIZE;
 
 	gossip_ldebug(CLIENT_DEBUG,"asked for fs name = %s\n",
-                      req_p->u.getconfig.fs_name);
+                      mntent_p->service_name);
 
 	/* send the request and receive an acknowledgment */
 	ret = PINT_send_req(serv_addr, req_p, max_msg_sz,
 	    &decoded, &encoded_resp, op_tag);
 	if (ret < 0) {
+            gossip_ldebug(CLIENT_DEBUG,"PINT_send_req failed\n");
 	    goto return_error;
 	}
 
@@ -277,9 +275,6 @@ static int server_get_config(pvfs_mntlist mntent_list)
 
 	/* Use data from response to update global tables */
 	fsinfo_p = &server_config.fs_info[i];
-
-	fsinfo_p->fh_root         = ack_p->u.getconfig.root_handle;
-	fsinfo_p->fsid            = ack_p->u.getconfig.fs_id;
 
         if (server_parse_config(&(ack_p->u.getconfig)))
         {
@@ -292,127 +287,9 @@ static int server_get_config(pvfs_mntlist mntent_list)
             continue;
         }
 
-/* 	fsinfo_p->meta_serv_count = ack_p->u.getconfig.meta_server_count; */
-/* 	fsinfo_p->io_serv_count   = ack_p->u.getconfig.io_server_count; */
-/* 	fsinfo_p->maskbits        = ack_p->u.getconfig.maskbits; */
-
-
-/* 	/\* Copy the client mount point *\/ */
-/* 	name_sz = strlen(mntent_p->local_mnt_dir) + 1; */
-/* 	fsinfo_p->local_mnt_dir = (PVFS_string) malloc(name_sz); */
-/* 	if (fsinfo_p->local_mnt_dir == NULL) { */
-/* 	    return -1; */
-/* 	} */
-/* 	memcpy(fsinfo_p->local_mnt_dir, mntent_p->local_mnt_dir, name_sz); */
-
-/* 	metalen = strlen(ack_p->u.getconfig.meta_server_mapping); */
-/* 	iolen   = strlen(ack_p->u.getconfig.io_server_mapping); */
-
-/* 	gossip_ldebug(CLIENT_DEBUG,"server %d config reply:\n\tmeta = %s\n\tio = %s\n", */
-/* 	       i, */
-/* 	       ack_p->u.getconfig.meta_server_mapping, */
-/* 	       ack_p->u.getconfig.io_server_mapping); */
-
-/* 	/\*gossip_ldebug(CLIENT_DEBUG,"maskbits = %ld \nfh_root = %ld\nfsid = %ld\n",fsinfo_p->maskbits, fsinfo_p->fh_root, fsinfo_p->fsid);*\/ */
-
-/* 	/\* How to get the size of metaserver list in ack? *\/ */
-/* 	/\* NOTE: PVFS_string == char *, SO I HAVE DOUBTS ABOUT THIS LINE!!! -- ROB *\/ */
-/* 	fsinfo_p->meta_serv_array = (PVFS_string *) malloc(fsinfo_p->meta_serv_count * sizeof(PVFS_string)); */
-/* 	if (fsinfo_p->meta_serv_array == NULL) */
-/* 	{ */
-/* 	    ret = -ENOMEM; */
-/* 	    goto return_error; */
-/* 	} */
-/* 	fsinfo_p->bucket_array = (bucket_info *) malloc(fsinfo_p->meta_serv_count * sizeof(bucket_info)); */
-/* 	if (fsinfo_p->bucket_array == NULL) */
-/* 	{ */
-/* 	    ret = -ENOMEM; */
-/* 	    goto return_error; */
-/* 	} */
-/* 	/\* Copy the metaservers from ack to config info *\/ */
-/* 	parse_p = ack_p->u.getconfig.meta_server_mapping; */
-/* 	gossip_ldebug(CLIENT_DEBUG," = %lld\n", fsinfo_p->fh_root); */
-/* 	gossip_ldebug(CLIENT_DEBUG,"meta server count = %d\n", fsinfo_p->meta_serv_count); */
-/* 	for (j=0; j < fsinfo_p->meta_serv_count; j++) */
-/* 	{ */
-/* 	    len = 0; */
-
-/* 	    /\* find next ";" terminator (or end of string) *\/ */
-/* 	    while (parse_p[len] != ';' && parse_p[len] != '\0') len++; */
-
-/* #if 0 */
-/* 	    /\* skip "pvfs-" *\/ */
-/* 	    assert(len > 5); */
-/* 	    if (!strncmp(parse_p, "pvfs-", 5)) { */
-/* 		parse_p += 5; */
-/* 		len -= 5; */
-/* 	    } */
-/* 	    else { */
-/* 		goto return_error; */
-/* 	    } */
-/* #endif */
-/* 	    /\* allocate space for entry *\/ */
-/* 	    fsinfo_p->meta_serv_array[j] = (PVFS_string) malloc(len + 1); */
-/* 	    if (fsinfo_p->meta_serv_array[j] == NULL) { */
-/* 		goto return_error; */
-/* 	    } */
-
-/* 	    /\* copy entry *\/ */
-/* 	    memcpy(fsinfo_p->meta_serv_array[j], parse_p, len); */
-/* 	    fsinfo_p->meta_serv_array[j][len] = '\0'; */
-/* 	    gossip_ldebug(CLIENT_DEBUG,"\tmeta server[%d] = %s\n", j, fsinfo_p->meta_serv_array[j]); */
-
-/* 	    if (parse_p[len] == '\0') break; */
-/* 	    else parse_p += len + 1; */
-/* 	} */
-
-/* 	/\* repeat for i/o servers *\/ */
-/* 	fsinfo_p->io_serv_array = (PVFS_string *) malloc(fsinfo_p->io_serv_count * sizeof(PVFS_string)); */
-/* 	if (fsinfo_p->io_serv_array == NULL) */
-/* 	{ */
-/* 	    ret = -ENOMEM; */
-/* 	    goto return_error; */
-/* 	} */
-/* 	fsinfo_p->io_bucket_array = (bucket_info *) malloc(fsinfo_p->io_serv_count * sizeof(bucket_info)); */
-/* 	if (fsinfo_p->io_bucket_array == NULL) */
-/* 	{ */
-/* 	    ret = -ENOMEM; */
-/* 	    goto return_error; */
-/* 	} */
-/* 	parse_p = ack_p->u.getconfig.io_server_mapping; */
-/* 	gossip_ldebug(CLIENT_DEBUG,"io server count = %d\n", fsinfo_p->io_serv_count); */
-/* 	for (j=0; j < fsinfo_p->io_serv_count; j++) */
-/* 	{ */
-/* 	    len = 0; */
-
-/* 	    /\* find next ";" terminator (or end of string) *\/ */
-/* 	    while (parse_p[len] != ';' && parse_p[len] != '\0') len++; */
-
-/* #if 0 */
-/* 	    /\* skip "pvfs-" *\/ */
-/* 	    assert(len > 5); */
-/* 	    if (!strncmp(parse_p, "pvfs-", 5)) { */
-/* 		parse_p += 5; */
-/* 		len -= 5; */
-/* 	    } */
-/* 	    else { */
-/* 		goto return_error; */
-/* 	    } */
-/* #endif */
-/* 	    /\* allocate space for entry *\/ */
-/* 	    fsinfo_p->io_serv_array[j] = (PVFS_string) malloc(len + 1); */
-/* 	    if (fsinfo_p->io_serv_array[j] == NULL) { */
-/* 		goto return_error; */
-/* 	    } */
-
-/* 	    /\* copy entry *\/ */
-/* 	    memcpy(fsinfo_p->io_serv_array[j], parse_p, len); */
-/* 	    fsinfo_p->io_serv_array[j][len] = '\0'; */
-/* 	    gossip_ldebug(CLIENT_DEBUG,"\tio server[%d] = %s\n", j, fsinfo_p->io_serv_array[j]); */
-
-/* 	    if (parse_p[len] == '\0') break; */
-/* 	    else parse_p += len + 1; */
-/* 	} */
+        /* FIXME: hacked in for backward compatibility */
+	fsinfo_p->fh_root         = g_server_config.root_handle;
+	fsinfo_p->fsid            = 9;
 
 	/* let go of any resources consumed by PINT_send_req() */
 	PINT_release_req(serv_addr, req_p, max_msg_sz, &decoded,

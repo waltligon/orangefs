@@ -98,8 +98,6 @@ int main(int argc, char **argv)	{
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
 	}
-	server_req->u.getconfig.fs_name = (PVFS_string)BMI_memalloc(server_addr,
-		strlen(DEFAULT_FILESYSTEM_NAME),BMI_SEND_BUFFER);
 
 	/* setup create request */
 	server_req->op = PVFS_SERV_GETCONFIG;
@@ -107,10 +105,8 @@ int main(int argc, char **argv)	{
 	server_req->credentials.gid = 0;
 	/* TODO: fill below fields in with the correct values */
 	server_req->credentials.perms = U_WRITE | U_READ;
-        server_req->u.getconfig.fs_name = strdup(DEFAULT_FILESYSTEM_NAME);
 	server_req->u.getconfig.max_strsize = 8192;
-	server_req->rsize = sizeof(struct PVFS_server_req_s) +
-            strlen(server_req->u.getconfig.fs_name);
+	server_req->rsize = sizeof(struct PVFS_server_req_s);
 
 	display_pvfs_structure(server_req,1);
 	ret = PINT_encode(server_req,PINT_ENCODE_REQ,&encoded_msg,server_addr,0);
@@ -203,7 +199,6 @@ int main(int argc, char **argv)	{
 	}
 
 	/* free up memory buffers */
-        free(server_req->u.getconfig.fs_name);
 	BMI_memfree(server_addr, server_req, sizeof(struct PVFS_server_req_s), 
 		BMI_SEND_BUFFER);
 	BMI_memfree(server_addr, server_resp, sizeof(struct PVFS_server_resp_s)+8192, 

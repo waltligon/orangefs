@@ -219,7 +219,6 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
 			arrow(direction);
                         printf("PVFS_servreq_getconfig.max_strsize = %d\n", (int)my_req->u.getconfig.max_strsize );
 			arrow(direction);
-                        printf("PVFS_servreq_getconfig.fs_name = %s\n", my_req->u.getconfig.fs_name );
 			arrow(direction);
                         printf("======================================\n");
                         break;
@@ -441,7 +440,6 @@ int main(int argc, char **argv)
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
 	request->u.getconfig.max_strsize = 666;
-	request->u.getconfig.fs_name = somechars;
 	break;
 
 	// simple ops

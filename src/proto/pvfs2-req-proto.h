@@ -266,14 +266,11 @@ typedef struct PVFS_servresp_readdir_s PVFS_servresp_readdir;
 
 /* Getconfig */
 struct PVFS_servreq_getconfig_s {
-	PVFS_string	fs_name;	 /* Name of file system to get config info for */
 	PVFS_count32 max_strsize;/* Expected size of string */ 
 };
 typedef struct PVFS_servreq_getconfig_s PVFS_servreq_getconfig;
 
 struct PVFS_servresp_getconfig_s {
-	PVFS_fs_id fs_id;                  /* Filesystem identifier */
-	PVFS_handle root_handle;           /* Root handle for the file system */
 	PVFS_count32 fs_config_buflen;     /* length of fs configuration file contents */
 	PVFS_string fs_config_buf;         /* fs configuration file contents */
 	PVFS_count32 server_config_buflen; /* length of fs configuration file contents */
