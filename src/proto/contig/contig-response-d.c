@@ -49,7 +49,7 @@ DECODE_RESP_HEAD(do_decode_resp)
 			return 0;
 
 		case PVFS_SERV_READDIR:
-			((struct PVFS_server_resp *)target_msg->buffer)->u.readdir.pvfs_dirent_array =
+			((struct PVFS_server_resp *)target_msg->buffer)->u.readdir.dirent_array =
 					(PVFS_dirent *)(target_msg->buffer+sizeof(struct PVFS_server_resp));
 			return 0;
 

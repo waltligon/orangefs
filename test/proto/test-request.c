@@ -68,7 +68,7 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("PVFS_servreq_readdir->token = %d\n",(int) my_req->u.readdir.token );
 			arrow(direction);
-                        printf("PVFS_servreq_readdir->pvfs_dirent_count = %d\n",(int) my_req->u.readdir.pvfs_dirent_count );
+                        printf("PVFS_servreq_readdir->dirent_count = %d\n",(int) my_req->u.readdir.dirent_count );
 			arrow(direction);
                         printf("======================================\n");
                         break;
@@ -423,7 +423,7 @@ int main(int argc, char **argv)
         request->u.readdir.handle = 11111;
         request->u.readdir.fs_id = 22222;
         request->u.readdir.token = 33333;
-        request->u.readdir.pvfs_dirent_count = 44444 ;
+        request->u.readdir.dirent_count = 44444 ;
 	break;
 
 	case 4:

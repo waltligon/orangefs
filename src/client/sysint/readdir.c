@@ -77,7 +77,7 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
 	req_p.u.readdir.handle = pinode_refn.handle;
 	req_p.u.readdir.fs_id = pinode_refn.fs_id;
 	req_p.u.readdir.token = token;
-	req_p.u.readdir.pvfs_dirent_count = pvfs_dirent_incount;
+	req_p.u.readdir.dirent_count = pvfs_dirent_incount;
 
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op)
 			+ pvfs_dirent_incount * sizeof(PVFS_dirent);
@@ -105,14 +105,14 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
 
 	/*pass everything the server replied with back to the calling function*/
 	resp->token = ack_p->u.readdir.token;
-	resp->pvfs_dirent_outcount = ack_p->u.readdir.pvfs_dirent_count;
-	if ( 0 < ack_p->u.readdir.pvfs_dirent_count)
+	resp->pvfs_dirent_outcount = ack_p->u.readdir.dirent_count;
+	if ( 0 < ack_p->u.readdir.dirent_count)
 	{
-	    resp->dirent_array = malloc(sizeof(PVFS_dirent) * ack_p->u.readdir.pvfs_dirent_count);
+	    resp->dirent_array = malloc(sizeof(PVFS_dirent) * ack_p->u.readdir.dirent_count);
 	    if (resp->dirent_array != NULL)
 	    {
-		memcpy(resp->dirent_array, ack_p->u.readdir.pvfs_dirent_array,
-		    sizeof(PVFS_dirent) * ack_p->u.readdir.pvfs_dirent_count);
+		memcpy(resp->dirent_array, ack_p->u.readdir.dirent_array,
+		    sizeof(PVFS_dirent) * ack_p->u.readdir.dirent_count);
 	    }
 	    else
 	    {

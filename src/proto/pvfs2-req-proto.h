@@ -167,23 +167,25 @@ struct PVFS_servresp_rmdirent
     PVFS_handle entry_handle;	    /* handle of removed entry */
 };
 
+/* readdir *****************************************************/
+/* - reads entries from a directory */
 
-/* Readdir */
 struct PVFS_servreq_readdir
 {
-    PVFS_handle handle;		/* Handle of directory to read entries from */
-    PVFS_fs_id fs_id;		/* Filesystem identifier of directory's FS */
-    PVFS_ds_position token;	/* Opaque type to show current position in dir */
-    uint32_t pvfs_dirent_count;	/* count of no of dirents client 
-					   wants to read */
+    PVFS_handle handle;		    /* handle of dir object */
+    PVFS_fs_id fs_id;		    /* file system */
+    PVFS_ds_position token;	    /* dir offset */
+    uint32_t dirent_count;	    /* desired # of entries */
 };
 
 struct PVFS_servresp_readdir
 {
-    PVFS_ds_position token;
-    uint32_t pvfs_dirent_count;
-    PVFS_dirent *pvfs_dirent_array;
+    PVFS_ds_position token;	    /* new dir offset */
+    /* array of directory entries */
+    PVFS_dirent *dirent_array;
+    uint32_t dirent_count;	    /* # of entries retrieved */
 };
+
 
 /* Getconfig */
 struct PVFS_servreq_getconfig

@@ -128,7 +128,7 @@ void display_pvfs_structure(void *s,int r)
 				printf("Handle: %Ld\n",p->u.readdir.handle);
 				printf("FSid: %d\n",p->u.readdir.fs_id);
 				printf("Token: %d\n",(int)p->u.readdir.token);
-				printf("Dir Ents: %d\n",p->u.readdir.pvfs_dirent_count);
+				printf("Dir Ents: %d\n",p->u.readdir.dirent_count);
 				break;
 			default:
 				printf("Invalid Request\n");
@@ -178,10 +178,10 @@ void display_pvfs_structure(void *s,int r)
 			case PVFS_SERV_READDIR:
 				printf("Read dir\n");
 				printf("Token: %d\n",(int)p->u.readdir.token);
-				printf("Count: %d\n",p->u.readdir.pvfs_dirent_count);
-				while(i++<p->u.readdir.pvfs_dirent_count)
+				printf("Count: %d\n",p->u.readdir.dirent_count);
+				while(i++<p->u.readdir.dirent_count)
 				{
-					printf("%s\t%Ld\n",p->u.readdir.pvfs_dirent_array[i-1].d_name,p->u.readdir.pvfs_dirent_array[i-1].handle);
+					printf("%s\t%Ld\n",p->u.readdir.dirent_array[i-1].d_name,p->u.readdir.dirent_array[i-1].handle);
 				}
 				break;
 

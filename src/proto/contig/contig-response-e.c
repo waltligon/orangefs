@@ -228,12 +228,12 @@ int do_encode_resp(
 		target_msg->list_count = 1;
 
 	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
-	    target_msg->size_list[1] = response->u.readdir.pvfs_dirent_count 
+	    target_msg->size_list[1] = response->u.readdir.dirent_count 
 		* sizeof(PVFS_dirent);
 	    target_msg->total_size = target_msg->size_list[0] + target_msg->size_list[1];
 
 	    target_msg->buffer_list[0] = response;
-	    target_msg->buffer_list[1] = response->u.readdir.pvfs_dirent_array;
+	    target_msg->buffer_list[1] = response->u.readdir.dirent_array;
 
 #if 0
 	    target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest,
@@ -243,9 +243,9 @@ int do_encode_resp(
 	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp));
 	    respbuf += sizeof(struct PVFS_server_resp);
 
-	    for (i=0; i < response->u.readdir.pvfs_dirent_count; i++)
+	    for (i=0; i < response->u.readdir.dirent_count; i++)
 	    {
-		memcpy(respbuf, &(response->u.readdir.pvfs_dirent_array[i]), sizeof(PVFS_dirent));
+		memcpy(respbuf, &(response->u.readdir.dirent_array[i]), sizeof(PVFS_dirent));
 		respbuf += sizeof(PVFS_dirent);
 	    }
 #endif

@@ -130,7 +130,7 @@ void readdir_init_state_machine(void)
  *
  * Returns:  int
  *
- * Synopsis: Allocate Memory for readdir.pvfs_dirent_count
+ * Synopsis: Allocate Memory for readdir.dirent_count
  *           
  */
 static int readdir_init(PINT_server_op *s_op, job_status_s *ret)
@@ -308,8 +308,8 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
      * - 2 * dirent_count keyval structures to pass to iterate function
      * - dirent_count dirent structures to hold the results
      */
-    kv_array_size = s_op->req->u.readdir.pvfs_dirent_count * sizeof(TROVE_keyval_s);
-    memory_size = 2 * kv_array_size + s_op->req->u.readdir.pvfs_dirent_count * sizeof(PVFS_dirent);
+    kv_array_size = s_op->req->u.readdir.dirent_count * sizeof(TROVE_keyval_s);
+    memory_size = 2 * kv_array_size + s_op->req->u.readdir.dirent_count * sizeof(PVFS_dirent);
 
     memory_buffer = malloc(memory_size);
     assert(memory_buffer != NULL);
@@ -321,15 +321,15 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
     s_op->val_a = (TROVE_keyval_s *) memory_buffer;
     memory_buffer += kv_array_size;
 
-    s_op->resp->u.readdir.pvfs_dirent_array = (PVFS_dirent *) memory_buffer;
+    s_op->resp->u.readdir.dirent_array = (PVFS_dirent *) memory_buffer;
 
     /* fill in values into all keyval structures prior to iterate call */
-    for (j = 0; j < s_op->req->u.readdir.pvfs_dirent_count; j++)
+    for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
     {
-	s_op->key_a[j].buffer    = s_op->resp->u.readdir.pvfs_dirent_array[j].d_name;
+	s_op->key_a[j].buffer    = s_op->resp->u.readdir.dirent_array[j].d_name;
 	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
 
-	s_op->val_a[j].buffer    = &(s_op->resp->u.readdir.pvfs_dirent_array[j].handle);
+	s_op->val_a[j].buffer    = &(s_op->resp->u.readdir.dirent_array[j].handle);
 	s_op->val_a[j].buffer_sz = sizeof(PVFS_handle);
     }
 
@@ -338,14 +338,14 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
 		 s_op->req->u.readdir.fs_id,
 		 s_op->u.readdir.dirent_handle,
 		 (long long)s_op->req->u.readdir.token,
-		 s_op->req->u.readdir.pvfs_dirent_count);
+		 s_op->req->u.readdir.dirent_count);
 
     job_post_ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,
 					    s_op->u.readdir.dirent_handle,
 					    s_op->req->u.readdir.token,
 					    s_op->key_a,
 					    s_op->val_a,
-					    s_op->req->u.readdir.pvfs_dirent_count,
+					    s_op->req->u.readdir.dirent_count,
 					    0,
 					    NULL,
 					    s_op,
@@ -390,11 +390,11 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 		     ret->error_code);
 
 	s_op->resp->status = 0;
-	s_op->resp->u.readdir.pvfs_dirent_count = 0;
+	s_op->resp->u.readdir.dirent_count = 0;
     }
     else {
 	s_op->resp->status = 0;
-	s_op->resp->u.readdir.pvfs_dirent_count = ret->count;
+	s_op->resp->u.readdir.dirent_count = ret->count;
     }
 
     encode_ret = PINT_encode(s_op->resp,
