@@ -34,10 +34,10 @@ DECODE_RESP_HEAD(do_decode_resp)
 			return 0;
 		case PVFS_SERV_LOOKUP_PATH:
 			((struct PVFS_server_resp_s *)target_msg->buffer)->u.lookup_path.handle_array = 
-							(PVFS_handle *) ((char*)input_buffer + 
+							(PVFS_handle *) ((char*)target_msg->buffer + 
 							  sizeof(struct PVFS_server_resp_s));
 			((struct PVFS_server_resp_s *)target_msg->buffer)->u.lookup_path.attr_array = 
-						(PVFS_object_attr *) ((char*)input_buffer 
+						(PVFS_object_attr *) ((char*)target_msg->buffer 
 						+ sizeof(struct PVFS_server_resp_s) + 
 						sizeof(PVFS_handle)*response->u.lookup_path.count);
 			return 0;
