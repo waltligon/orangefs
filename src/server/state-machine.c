@@ -65,6 +65,7 @@ extern PINT_state_machine_s setattr_req_s;
 extern PINT_state_machine_s create_req_s;
 extern PINT_state_machine_s crdirent_req_s;
 extern PINT_state_machine_s mkdir_req_s;
+extern PINT_state_machine_s readdir_req_s;
 
 PINT_state_machine_s *PINT_state_array[SERVER_REQ_ARRAY_SIZE] =
 {
@@ -73,22 +74,22 @@ PINT_state_machine_s *PINT_state_array[SERVER_REQ_ARRAY_SIZE] =
 	&create_req_s,
 	NULL,
 	NULL,
-	NULL, /* 5 */
+	NULL,					  /* 5 */
 	NULL,
 	&getattr_req_s,
 	&setattr_req_s,
 	NULL,
-	NULL, /* 10 */
+	NULL,					 /* 10 */
 	NULL,
 	NULL,
 	&crdirent_req_s,
 	NULL,
-	NULL, /* 15 */
+	NULL,					 /* 15 */
 	NULL,
 	NULL,
 	&mkdir_req_s,
 	NULL,
-	NULL, /* 20 */
+	&readdir_req_s, 	 /* 20 */
 	NULL,
 	NULL,
 	&getconfig_req_s,
