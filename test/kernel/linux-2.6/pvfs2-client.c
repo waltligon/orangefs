@@ -184,7 +184,7 @@ static int service_getattr_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    uint32_t attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+    uint32_t attrmask = PVFS_ATTR_SYS_ALL;
     PVFS_sysresp_getattr response;
 
     if (init_response && in_upcall && out_downcall)
