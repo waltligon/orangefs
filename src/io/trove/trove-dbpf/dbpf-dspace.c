@@ -196,6 +196,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     DB *db_p;
     DBC *dbc_p;
     DBT key, data;
+    db_recno_t recno;
     struct dbpf_dspace_attr attr;
 
     db_p = op_p->coll_p->ds_db;
@@ -207,56 +208,114 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
     if (ret != 0) goto return_error;
 
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-
     /* we have two choices here: 'seek' to a specific key by either a:
      * specifying a key or b: using record numbers in the db.  record numbers
      * will serialize multiple modification requests. We are going with record
      * numbers for now. i don't know if that's a problem, but it is something
      * to keep in mind if at some point simultaneous modifications to pvfs
-     * perform badly.   -- robl */
+     * perform badly.   -- robl
+     *
+     * not sure this is the best thing to be doing, but ok for now... -- rob
+     */
+
+    if (*op_p->u.d_iterate_handles.position_p == SI_START_POSITION) {
+	/* an uninitialized cursor will start reading at the beginning
+	 * of the database (first record) when used with DB_NEXT, so
+	 * we don't need to position with DB_FIRST.
+	 */
+	printf("si_start_pos detected\n");
 
 #if 0
-    key.data  = op_p->u.d_iterate_handles.handle_array;
-#endif
-    key.size  = key.ulen = sizeof(TROVE_handle);
-    data.data = &attr;
-    data.size = data.ulen = sizeof(attr);
+	memset(&key, 0, sizeof(key));
+	key.data = &op_p->u.d_iterate_handles.handle_array[0];
+	key.size = key.ulen = sizeof(TROVE_handle);
+	key.flags |= DB_DBT_USERMEM;
 
-    /* copy position into key.data */
-    *(TROVE_ds_position *)key.data = *(op_p->u.k_iterate.position_p);
-    /* TODO: WHAT SHOULD THE SIZE REALLY BE??? */
-    key.flags |= DB_DBT_USERMEM;
+	memset(&data, 0, sizeof(data));
+	data.data = &attr;
+	data.size = data.ulen = sizeof(attr);
+	data.flags |= DB_DBT_USERMEM;
+
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_FIRST);
+	if (ret == DB_NOTFOUND) goto return_ok;
+	else if (ret != 0) {
+	    printf("c_get failed on iteration %d\n", i);
+	    goto return_error;
+	}
+	i++;
+#endif
+    }
+    else {
+	/* we need to position the cursor before we can read new entries.
+	 * we will go ahead and read the first entry as well, so that we
+	 * can use the same loop below to read the remainder in this or
+	 * the above case.
+	 */
+
+	/* set position */
+	recno = *op_p->u.d_iterate_handles.position_p;
+	memset(&key, 0, sizeof(key));
+	key.data  = &recno;
+	key.size  = key.ulen = sizeof(recno);
+	key.flags |= DB_DBT_USERMEM;
+
+	memset(&data, 0, sizeof(data));
+	data.data = &attr;
+	data.size = data.ulen = sizeof(attr);
+	data.flags |= DB_DBT_USERMEM;
+
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
+	if (ret == DB_NOTFOUND) goto return_ok;
+	if (ret != 0) goto return_error;
+
+	/* read current to get current key */
+	memset(&key, 0, sizeof(key));
+	key.data  = &op_p->u.d_iterate_handles.handle_array[0];
+	key.size  = key.ulen = sizeof(TROVE_handle);
+	key.flags |= DB_DBT_USERMEM;
+
+	memset(&data, 0, sizeof(data));
+	data.data = &attr;
+	data.size = data.ulen = sizeof(attr);
+	data.flags |= DB_DBT_USERMEM;
+
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_CURRENT);
+	if (ret == DB_NOTFOUND) goto return_ok;
+	if (ret != 0) goto return_error;
+    }
+
+    /* read more handles until we run out of handles or space in buffer */
+    for (/* i init'd at top of fn */; i < *op_p->u.d_iterate_handles.count_p; i++) {
+	memset(&key, 0, sizeof(key));
+	key.data = &op_p->u.d_iterate_handles.handle_array[i];
+	key.size = key.ulen = sizeof(TROVE_handle);
+	key.flags |= DB_DBT_USERMEM;
+
+	memset(&data, 0, sizeof(data));
+	data.data = &attr;
+	data.size = data.ulen = sizeof(attr);
+	data.flags |= DB_DBT_USERMEM;
+	    
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
+	if (ret == DB_NOTFOUND) goto return_ok;
+	else if (ret != 0) {
+	    printf("c_get failed on iteration %d\n", i);
+	    goto return_error;
+	}
+    }
+
+    /* get the record number to return.
+     *
+     * note: key field is ignored by c_get in this case
+     */
+    memset(&data, 0, sizeof(data));
+    data.data = &recno;
+    data.size = data.ulen = sizeof(recno);
     data.flags |= DB_DBT_USERMEM;
 
-    /* position the cursor and grab the first key/value pair */
-    ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
-    if (ret == DB_NOTFOUND) {
-	/* no more pairs: tell caller how many we processed */
-	*op_p->u.d_iterate_handles.count_p = 0;
-    }
-    else if (ret != 0) goto return_error;
-    else {
-	for (i=1; i < *(op_p->u.k_iterate.count); i++) {
-	    key.data = &op_p->u.d_iterate_handles.handle_array[i];
-	    key.size = key.ulen = sizeof(TROVE_handle);
-	    key.flags |= DB_DBT_USERMEM;
-	    /* just throwing the data away at the moment */
-	    data.data = &attr;
-	    data.size = data.ulen = sizeof(attr);
-	    data.flags |= DB_DBT_USERMEM;
-	    
-	    ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-	    if (ret == DB_NOTFOUND) {
-		/* no more pairs: tell caller how many we processed */
-		*op_p->u.d_iterate_handles.count_p = i; 
-	    }
-	    else if (ret != 0) goto return_error;
-	}
+    ret = dbc_p->c_get(dbc_p, NULL, &data, DB_GET_RECNO);
 
-	*(op_p->u.d_iterate_handles.position_p) += i;
-    }
+    *(op_p->u.d_iterate_handles.position_p) = recno;
 
     /* 'position' is the record we will read next time through */
     /* XXX: right now, 'posistion' gets set to garbage when we hit the end.
@@ -266,17 +325,20 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
      * consistent) if posistion always pointed to the 'next' place to access,
      * even if that's one place past the end of the database ... or maybe i'm
      * putting too much weight on 'posistion's value at the end */
-    /* free the cursor */
-    ret = dbc_p->c_close(dbc_p);
-    if (ret != 0) goto return_error;
 
+return_ok:
+    *op_p->u.d_iterate_handles.count_p = i;
     op_p->state = OP_COMPLETED;
+
+    ret = dbc_p->c_close(dbc_p);
+    if (ret != 0) return -1;
     return 1;
 
- return_error:
-    fprintf(stderr, "dbpf_keyval_iterate_op_svc: %s\n", db_strerror(ret));
-    *(op_p->u.d_iterate_handles.count_p) = i; 
+return_error:
+    fprintf(stderr, "dbpf_dspace_iterate_handles_op_svc: %s\n", db_strerror(ret));
+    *op_p->u.d_iterate_handles.count_p = i; 
     op_p->state = OP_COMPLETED;
+    dbc_p->c_close(dbc_p); /* don't check error -- we're returning an error anyway. */
 
     return -1;
 }

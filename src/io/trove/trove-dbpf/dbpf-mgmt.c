@@ -374,7 +374,7 @@ static int dbpf_collection_create(
 	return -1;
     }
     
-    printf("directories created.\n");
+    printf("subdirectories for storing bstreams and keyvals created.\n");
     return 1;
 }
 
@@ -618,13 +618,14 @@ static int dbpf_db_create(
 	return -1;
     }
     
-
+#if 0
     if ((ret = db_p->put(db_p, NULL, &key, &data, 0)) == 0)
 	printf("db: %s: key stored.\n", (char *)key.data);
     else {
 	db_p->err(db_p, ret, "DB->put");
 	return -1;
     }
+#endif
 
     if ((ret = db_p->close(db_p, 0)) != 0) {
 	fprintf(stderr, "dbpf_storage_create: %s\n",
