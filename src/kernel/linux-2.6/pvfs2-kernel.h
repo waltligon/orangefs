@@ -101,6 +101,7 @@ typedef struct
     PVFS_ds_position readdir_token;
     char *link_target;
     struct inode vfs_inode;
+    sector_t last_failed_block_index_read;
 } pvfs2_inode_t;
 
 /* per superblock private pvfs2 info */

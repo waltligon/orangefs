@@ -32,20 +32,8 @@ void kill_device_owner(void)
 {
     if (device_owner)
     {
-        pvfs2_print("**************************************\n");
-        pvfs2_print("Killing pvfs2 daemon with pid %d\n",
-                    device_owner->pid);
-        pvfs2_print("**************************************\n");
         force_sig(SIGKILL, device_owner);
     }
-#ifdef PVFS2_KERNEL_DEBUG
-    else
-    {
-        pvfs2_print("**************************************\n");
-        pvfs2_print("PID %d no longer exists\n", device_owner->pid);
-        pvfs2_print("**************************************\n");
-    }
-#endif
 }
 
 static int pvfs2_devreq_open(

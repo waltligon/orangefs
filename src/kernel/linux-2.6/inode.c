@@ -47,6 +47,8 @@ static int pvfs2_get_blocks(
     ssize_t bytes_read = 0;
     void *page_data = NULL;
     struct page *page = NULL;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+
     /*
       FIXME:
       We're faking our inode block size to be PAGE_CACHE_SIZE
@@ -61,6 +63,29 @@ static int pvfs2_get_blocks(
     pvfs2_print("pvfs2: pvfs2_get_blocks called for lblock %d "
                 "(create flag is %s)\n", (int)lblock,
                 (create ? "set" : "clear"));
+
+    /*
+      this is a quick workaround for the case when a sequence
+      of sequential blocks are needed to be read, but the
+      operation that issued it was cancelled by a signal.
+      if we detect a sequential pattern of failures, don't
+      even bother issuing the upcall since that's way more
+      expensive to do and it will also fail due to the signal
+      raised.
+
+      the first failure will have the failed block as lblock-1,
+      but the mpage code (the caller) tries twice in a row, so the
+      second time, the failed block index will be == to lblock.
+    */
+    if ((pvfs2_inode->last_failed_block_index_read > 0) &&
+        ((pvfs2_inode->last_failed_block_index_read == (lblock - 1)) ||
+         (pvfs2_inode->last_failed_block_index_read == lblock)))
+    {
+        pvfs2_print("pvfs2: skipping get_block on index %d due "
+                    "to previous failure.\n", (int)lblock);
+        pvfs2_inode->last_failed_block_index_read = lblock;
+        return -EIO;
+    }
 
     page = bh_result->b_page;
     page_data = kmap(page);
@@ -97,6 +122,7 @@ static int pvfs2_get_blocks(
         {
             pvfs2_error("pvfs_get_blocks: failed to read page block %d\n",
                         (int)page->index);
+            pvfs2_inode->last_failed_block_index_read = page->index;
         }
         else
         {
@@ -104,6 +130,7 @@ static int pvfs2_get_blocks(
                         "cur_block is %d | max_block is %d\n",
                         (int)bytes_read, (int)blockptr_offset,
                         (int)page->index, (int)max_block);
+            pvfs2_inode->last_failed_block_index_read = 0;
         }
     }
 
@@ -198,7 +225,7 @@ static int pvfs2_prepare_write(
     unsigned to)
 {
     pvfs2_print("pvfs2: pvfs2_prepare_write called\n");
-    return nobh_prepare_write(page, from, to, pvfs2_get_block);
+    return block_prepare_write(page, from, to, pvfs2_get_block);
 }
 
 static int pvfs2_set_page_dirty(struct page *page)
@@ -209,26 +236,15 @@ static int pvfs2_set_page_dirty(struct page *page)
     return 0;
 }
 
-static int pvfs2_commit_write(
-    struct file *file,
-    struct page *page,
-    unsigned offset,
-    unsigned to)
-{
-    struct inode *inode = page->mapping->host;
-
-    /* FIXME: inode->i_blkbits != PAGE_CACHE_SHIFT */
-    loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
-
-    pvfs2_print("pvfs2: pvfs2_commit_write called\n");
-
-    if (pos > inode->i_size)
-    {
-        i_size_write(inode, pos);
-    }
-    set_page_dirty(page);
-    return 0;
-}
+/* static int pvfs2_commit_write( */
+/*     struct file *file, */
+/*     struct page *page, */
+/*     unsigned offset, */
+/*     unsigned to) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_commit_write called\n"); */
+/*     return 0; */
+/* } */
 
 static sector_t pvfs2_bmap(
     struct address_space *mapping,
@@ -276,9 +292,8 @@ struct address_space_operations pvfs2_address_operations =
     .readpages = pvfs2_readpages,
     .writepage = pvfs2_writepage,
     .writepages = pvfs2_writepages,
-/*     .sync_page = pvfs2_sync_page, */
     .prepare_write = pvfs2_prepare_write,
-    .commit_write = pvfs2_commit_write,
+    .commit_write = generic_commit_write,
     .set_page_dirty = pvfs2_set_page_dirty,
     .bmap = pvfs2_bmap,
     .invalidatepage = pvfs2_invalidatepage,
