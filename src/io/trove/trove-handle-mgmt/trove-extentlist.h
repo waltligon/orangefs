@@ -30,6 +30,7 @@ struct TROVE_handle_extent {
 };
 
 #define AVLDATUM struct TROVE_handle_extent *
+#define AVLKEY_TYPE TROVE_handle
 #define AVLKEY(p) p->first
 /* the 'AVLALTKEY' is a hack to make searching for the extent->last member
  * easier. we get away with it only because we force extents to be

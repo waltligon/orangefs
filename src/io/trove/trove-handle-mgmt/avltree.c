@@ -435,7 +435,7 @@ avlfindlowest(struct avlnode *target, struct avlnode **n, enum AVLRES *res)
  *                AVLKEY value provided by the caller.
  */
 enum AVLRES
-avlremove(struct avlnode **n, int key)
+avlremove(struct avlnode **n, AVLKEY_TYPE key)
 {
 	enum AVLRES tmp = BALANCE;
 
@@ -494,7 +494,7 @@ avlremove(struct avlnode **n, int key)
  *    NULL        The item could not be found.
  */
 AVLDATUM *
-avlaccess(struct avlnode *n, int key)
+avlaccess(struct avlnode *n, AVLKEY_TYPE key)
 {
         if (!n) {
                 return NULL;
@@ -526,7 +526,7 @@ avlaccess(struct avlnode *n, int key)
  *    NULL        The item could not be found.
  */
 AVLDATUM *
-avlaltaccess(struct avlnode *n, int key)
+avlaltaccess(struct avlnode *n, AVLKEY_TYPE key)
 {
         if (!n) {
                 return NULL;

@@ -351,7 +351,6 @@ static void extent_count(struct avlnode *n,
 			int depth)
 {
     struct TROVE_handle_extent *e = (struct TROVE_handle_extent *)(n->d);
-    gossip_err("lb: %Lu ub: %Lu\n", e->first, e->last);
     g_counter += (e->last - e->first + 1);
 }
 

@@ -9,6 +9,10 @@
 #error AVLDATUM undefined!
 #endif
 
+#ifndef AVLKEY_TYPE
+#error AVLKEY_TYPE undefined
+#endif
+
 #ifndef AVLKEY
 #error AVLKEY undefined!
 #endif
@@ -103,7 +107,7 @@ avlinsert(struct avlnode **n, AVLDATUM d);
  *                AVLKEY value provided by the caller.
  */
 enum AVLRES
-avlremove(struct avlnode **n, int key);
+avlremove(struct avlnode **n, AVLKEY_TYPE key);
 
 /*
  *  avlaccess: retrieve the datum corresponding to a given AVLKEY.
@@ -122,7 +126,7 @@ avlremove(struct avlnode **n, int key);
  *    NULL        The item could not be found.
  */
 AVLDATUM *
-avlaccess(struct avlnode *n, int key);
+avlaccess(struct avlnode *n, AVLKEY_TYPE key);
 
 #ifdef AVLALTKEY
 /*
@@ -142,7 +146,7 @@ avlaccess(struct avlnode *n, int key);
  *    NULL        The item could not be found.
  */
 AVLDATUM *
-avlaltaccess(struct avlnode *n, int key);
+avlaltaccess(struct avlnode *n, AVLKEY_TYPE key);
 #endif
 
 /*
