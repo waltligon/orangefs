@@ -1907,13 +1907,16 @@ int main(int argc, char **argv)
 
     start_time = time(NULL);
     local_time = localtime(&start_time);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,  "\n\n**************************"
+                 "*************************\n");
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "***************************************************\n"
-                 " %s starting at %.4d-%.2d-%.2d %.2d:%.2d\n"
-                 "***************************************************\n",
+                 " %s starting at %.4d-%.2d-%.2d %.2d:%.2d\n",
                  argv[0], (local_time->tm_year + 1900),
                  local_time->tm_mon, local_time->tm_mday,
                  local_time->tm_hour, local_time->tm_min);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "***************************************************\n");
 
 #ifdef USE_MMAP_RA_CACHE
     pvfs2_mmap_ra_cache_initialize();
