@@ -81,6 +81,10 @@ int directory_walk(PVFS_sysresp_init *init_response,
     if (base_dir)
     {
         strncpy(full_path,base_dir,MAX_TEST_PATH_LEN);
+        if (strlen(base_dir) > 1)
+        {
+            strcat(full_path,"/");
+        }
         strncat(full_path,start_dir,MAX_TEST_PATH_LEN);
         lk_request.name = full_path;
     }
