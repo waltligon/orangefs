@@ -120,7 +120,7 @@ struct PINT_client_create_sm {
     PVFS_handle_extent_array     *io_handle_extent_array;
     PVFS_handle                  metafile_handle;
     PVFS_handle                  *datafile_handles;
-    PVFS_Dist                    *dist;
+    PINT_dist                    *dist;
     int                           stored_error_code;
     int                          retry_count;
 };
@@ -153,7 +153,7 @@ struct PINT_client_getattr_sm {
     uint32_t              attrmask;       /* input parameter */
     int                   datafile_count; /* from object attribs */
     PVFS_handle          *datafile_handles;
-    PVFS_Dist            *dist_p;
+    PINT_dist            *dist_p;
     uint32_t              dist_size;
     PVFS_size            *size_array;     /* from datafile attribs */
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
@@ -184,7 +184,7 @@ struct PINT_client_io_sm {
     int                   datafile_count;
     PVFS_handle          *datafile_handles;
     int			 *datafile_index_array;
-    PVFS_Dist            *dist_p;
+    PINT_dist            *dist_p;
     uint32_t              dist_size;
 
     /* data regarding flows */

@@ -396,7 +396,7 @@ int PINT_acache_object_attr_deep_copy(
 
 	    if ((dest->mask & PVFS_ATTR_META_DIST))
             {
-                PVFS_Dist_free(dest->u.meta.dist);
+                PVFS_dist_free(dest->u.meta.dist);
             }
             dest->u.meta.dist = PVFS_Dist_copy(src->u.meta.dist);
             if (dest->u.meta.dist == NULL)
@@ -456,7 +456,7 @@ void PINT_acache_object_attr_deep_free(PVFS_object_attr *attr)
             {
                 if (attr->u.meta.dist)
                 {
-                    PVFS_Dist_free(attr->u.meta.dist);
+                    PVFS_dist_free(attr->u.meta.dist);
                 }
             }
         }

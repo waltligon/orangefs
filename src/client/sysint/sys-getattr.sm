@@ -685,7 +685,7 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             if ((amask & PVFS_ATTR_META_DIST) &&
                 (sm_p->u.getattr.dist_p != NULL))
             {
-                PVFS_Dist_free(sm_p->u.getattr.dist_p);
+                PVFS_dist_free(sm_p->u.getattr.dist_p);
             }
         }
 
