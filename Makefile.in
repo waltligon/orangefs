@@ -385,7 +385,7 @@ else
 endif
 
 # rule for building MPI executables from object files
-$(MPITESTS): %: %.o $(LIBRARIES)
+$(MPITESTS): %: %.o $(MPIMISCOBJS) $(LIBRARIES)
 ifdef QUIET_COMPILE
 	@echo "  MPILD		$@"
 	@$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
