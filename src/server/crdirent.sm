@@ -30,8 +30,6 @@ enum {
     ERROR_BADNAME = 4
 };
 
-/* TODO: need error transition from prelude */
-
 %%
 
 machine pvfs2_crdirent_sm(prelude,
@@ -50,7 +48,8 @@ machine pvfs2_crdirent_sm(prelude,
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		default => validate;
+		success => validate;
+		default => final_response;
 	}
 
 	state validate

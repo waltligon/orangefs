@@ -66,8 +66,6 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op, job_status_s* j
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
-/* TODO: need error transition out of prelude state */
-
 %%
 
 machine pvfs2_remove_sm(prelude,
@@ -84,7 +82,8 @@ machine pvfs2_remove_sm(prelude,
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		default => read_object_metadata;
+		success => read_object_metadata;
+		default => final_response;
 	}
 
 	state read_object_metadata

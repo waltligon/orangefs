@@ -33,8 +33,6 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p);
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
-/* TODO: need error transition out of prelude state */
-
 %%
 
 machine pvfs2_lookup_sm(prelude,
@@ -50,7 +48,8 @@ machine pvfs2_lookup_sm(prelude,
     state prelude
 	{
 	    jump pvfs2_prelude_sm;
-	    default => init;
+	    success => init;
+	    default => final_response;
 	}
 
     state init

@@ -18,8 +18,6 @@ static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p);
 
 extern job_context_id PINT_server_job_context;
 
-/* TODO: need error transition from prelude */
-
 %%
 
 machine pvfs2_create_sm(prelude, create2, setup_resp, final_response, cleanup)
@@ -27,7 +25,8 @@ machine pvfs2_create_sm(prelude, create2, setup_resp, final_response, cleanup)
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		default => create2;
+		success => create2;
+		default => final_response;
 	}
 
 	state create2

@@ -19,8 +19,6 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s* js_p);
 
 extern job_context_id PINT_server_job_context;
 
-/* TODO: need error transition from prelude */
-
 %%
 
 machine pvfs2_get_config_sm(prelude, init, final_response, cleanup)
@@ -28,7 +26,8 @@ machine pvfs2_get_config_sm(prelude, init, final_response, cleanup)
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		default => init;
+		success => init;
+		default => final_response;
 	}
 
 	state init

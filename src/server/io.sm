@@ -32,8 +32,6 @@ extern job_context_id PINT_server_job_context;
  * read and write)
  */
 
-/* TODO: need an error transition from prelude */
-
 %%
 
 machine pvfs2_io_sm(prelude, get_size, send_positive_ack, send_negative_ack, 
@@ -42,7 +40,8 @@ machine pvfs2_io_sm(prelude, get_size, send_positive_ack, send_negative_ack,
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		default => get_size;
+		success => get_size;
+		default => send_negative_ack;
 	}
 
 	state get_size

@@ -33,7 +33,7 @@ machine pvfs2_mkdir_sm(prelude,
 	{
 		jump pvfs2_prelude_sm;
 		success => create;
-		default => err_msg;
+		default => final_response;
 	}
 
 	state create
