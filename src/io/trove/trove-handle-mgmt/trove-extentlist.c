@@ -241,7 +241,7 @@ static int extentlist_coalesce_extent(struct avlnode **n,
  * deleted altogether
  *
  */
-int64_t extentlist_get_and_dec_extent(struct TROVE_handle_extentlist *elist)
+TROVE_handle extentlist_get_and_dec_extent(struct TROVE_handle_extentlist *elist)
 {
     /* get the extent from the index 
      * pull a handle out of the extent

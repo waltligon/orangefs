@@ -143,7 +143,9 @@ static int trove_map_handle_ranges( struct llist *extent_list,
 	    if (ret != 0)
 		break;
 
-	    total_handles += cur_extent->last - cur_extent->first;
+	    /* if, for example, you had a 'first' of 5 and a 'last' of 5, the
+	     * difference is 0, but there is one handle */
+	    total_handles += (cur_extent->last - cur_extent->first + 1);
             cur = llist_next(cur);
         }
 	trove_handle_ledger_set_threshold(ledger, total_handles);
