@@ -1194,9 +1194,18 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     }
     else
     {
+	/* go ahead and return if there is nothing to do */
 	if(q_item->result_chain.result.bytes == 0)
 	{	
+	    q_item->parent->state = FLOW_COMPLETE;
 	    gen_mutex_unlock(&flow_data->flow_mutex);
+	    gen_mutex_lock(&completion_mutex);
+	    qlist_add_tail(&(flow_data->list_link), 
+		&completion_queue);
+#ifdef __PVFS2_JOB_THREADED__
+	    pthread_cond_signal(&completion_cond);
+#endif
+	    gen_mutex_unlock(&completion_mutex);
 	    return;
 	}
 
@@ -1387,9 +1396,18 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 		q_item->buffer);
 	}
 
+	/* go ahead and return if there is nothing to do */
 	if(q_item->result_chain.result.bytes == 0)
 	{	
+	    q_item->parent->state = FLOW_COMPLETE;
 	    gen_mutex_unlock(&flow_data->flow_mutex);
+	    gen_mutex_lock(&completion_mutex);
+	    qlist_add_tail(&(flow_data->list_link), 
+		&completion_queue);
+#ifdef __PVFS2_JOB_THREADED__
+	    pthread_cond_signal(&completion_cond);
+#endif
+	    gen_mutex_unlock(&completion_mutex);
 	    return;
 	}
     }
