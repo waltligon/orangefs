@@ -123,7 +123,7 @@ int dbpf_bstream_fdcache_try_remove(TROVE_coll_id coll_id,
 	gen_mutex_unlock(&bstream_fd_cache[i].mutex);
     }
 
-    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name, coll_id, Lu(handle));
 #if 0
     gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
@@ -219,7 +219,7 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 
     /* have a lock on an entry */
 
-    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name, coll_id, Lu(handle));
 #if 0
     gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif

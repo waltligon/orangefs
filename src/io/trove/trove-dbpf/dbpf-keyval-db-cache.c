@@ -114,7 +114,7 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 			   PATH_MAX,
 			   my_storage_p->name,
 			   coll_id,
-			   handle);
+			   Lu(handle));
 #if 0
     gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
@@ -212,7 +212,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 
     /* have lock on an entry, open/create */
 
-    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
+    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name, coll_id, Lu(handle));
 #if 0
     gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
