@@ -106,6 +106,7 @@ int main(int argc,char **argv)
 
 
 	/* call readdir */
+        memset(resp_readdir,0,sizeof(PVFS_sysresp_readdir));
 	ret = PVFS_sys_readdir(req_readdir,resp_readdir);
 	if (ret < 0)
 	{
@@ -129,8 +130,8 @@ int main(int argc,char **argv)
 		printf("finalizing sysint failed with errcode = %d\n", ret);
 		return (-1);
 	}
-
-	free(resp_readdir->dirent_array); /*allocated by the system interface*/
+        if (resp_readdir->pvfs_dirent_outcount)
+            free(resp_readdir->dirent_array); /*allocated by the system interface*/
 	free(req_readdir);		/* allocated by us */
 	free(resp_readdir);		/* allocated by us */
 
