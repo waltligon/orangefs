@@ -25,6 +25,7 @@ struct PVFS_mgmt_server_stat
 /* performance monitoring statistics */
 struct PVFS_mgmt_perf_stat
 {
+    int32_t valid_flag;	    /* is this entry valid? */
     uint32_t id;	    /* timestep id */
     uint64_t start_time_ms; /* start time of perf set, ms since epoch */
     int64_t write;	    /* bytes written */
@@ -51,6 +52,10 @@ int PVFS_mgmt_get_server_array(
     int server_type,
     PVFS_id_gen_t* addr_array,
     int* inout_count_p);
+
+int PVFS_mgmt_noop(
+    PVFS_credentials credentials,
+    PVFS_id_gen_t addr);
 
 const char* PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,
@@ -85,9 +90,13 @@ int PVFS_mgmt_statfs_all(
     struct PVFS_mgmt_server_stat* stat_array,
     int* inout_count_p);
 
-int PVFS_mgmt_noop(
+int PVFS_mgmt_perf_mon_list(
     PVFS_credentials credentials,
-    PVFS_id_gen_t addr);
+    struct PVFS_mgmt_perf_stat** perf_matrix,
+    PVFS_id_gen_t* addr_array,
+    uint32_t* next_id_array,
+    int server_count,
+    int history_count);
 
 #endif /* __PVFS2_MGMT_H */
 

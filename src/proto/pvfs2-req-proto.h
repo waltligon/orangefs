@@ -569,13 +569,27 @@ do {						\
 struct PVFS_servreq_mgmt_perf_mon
 {
     uint32_t next_id;  /* next time stamp id we want to retrieve */
+    uint32_t count;    /* how many measurements we want */
 };
+
+#define PINT_SERVREQ_MGMT_PERF_MON_FILL(__req,	\
+					__creds,\
+					__next_id,\
+					__count)\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_MGMT_PERF_MON;	\
+    (__req).credentials = (__creds);		\
+    (__req).u.mgmt_perf_mon.next_id = (__next_id); \
+    (__req).u.mgmt_perf_mon.count = (__count);	\
+} while (0)
 
 struct PVFS_servresp_mgmt_perf_mon
 {
     struct PVFS_mgmt_perf_stat* perf_array;	/* array of statistics */
     uint32_t perf_array_count;		/* size of above array */
     uint64_t end_time_ms;		/* end time for final array entry */
+    uint64_t cur_time_ms;		/* current time according to svr */
 };
 
 /* server request *********************************************/
