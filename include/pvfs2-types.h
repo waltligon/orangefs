@@ -4,8 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-/* PVFS Types
- */
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
@@ -20,13 +18,11 @@ typedef uint32_t PVFS_bitfield;
 typedef int32_t PVFS_flag;
 typedef int32_t PVFS_count32;
 typedef int64_t PVFS_count64;
-typedef uint64_t PVFS_volume_id;
 typedef uint64_t PVFS_flow_id;
 typedef int64_t PVFS_handle;
 typedef int16_t PVFS_type;
 typedef int32_t PVFS_fs_id;
 typedef int32_t PVFS_error;
-typedef int32_t PVFS_magic;
 typedef uint32_t PVFS_uid;
 typedef uint32_t PVFS_gid;
 typedef uint32_t PVFS_permissions;
@@ -36,8 +32,6 @@ typedef int32_t PVFS_msg_tag_t;
 typedef int32_t PVFS_context_id;
 
 #define PVFS_NAME_MAX    256	/* Max length of PVFS filename */
-#define PVFS_TOKEN_START 0	/* Token value for readdir */
-#define PVFS_TOKEN_END   1
 #define MAX_STRING_SIZE  1000
 
 /* Pinode Number */
