@@ -300,8 +300,8 @@ int PVFS_isys_rename(
     sm_p->u.rename.stored_error_code = 0;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under %Lu on "
-        "fs %d) to %s (under %Lu on fs %d)\n", old_entry,
+        GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under [%Lu,%d]\n\t"
+        "to %s (under [%Lu,%d])\n", old_entry,
         Lu(old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
         Lu(new_parent_ref.handle), new_parent_ref.fs_id);
 
@@ -366,6 +366,9 @@ static int rename_lookups_comp_fn(
 
     assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
     assert((index > -1) && (index < 2));
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup[%d] got response %d\n",
+                 index, resp_p->status);
 
     if (resp_p->status != 0)
     {
@@ -501,7 +504,9 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
         PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "rename: posting lookup req %d\n",i);
+                     "rename: posting lookup[%d] (%Ld,%d)\n",
+                     i, Lu(sm_p->u.rename.parent_refns[i].handle),
+                     sm_p->u.rename.parent_refns[i].fs_id);
 
         PINT_SERVREQ_LOOKUP_PATH_FILL(
             msg_p->req,

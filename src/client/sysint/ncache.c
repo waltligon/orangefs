@@ -42,13 +42,10 @@ typedef struct
 #define STATUS_UNUSED 0
 #define STATUS_USED 1
 
-/* change this to 0 to disable directory caching
- * all calls return success, but lookups will not succeed,
- * inserts/removes won't actually change anything if the cache
- * is disabled
- */
-#define ENABLE_NCACHE 1
+/* uncomment to enable ncache */
+/* #define ENABLE_NCACHE 1 */
 
+#if ENABLE_NCACHE
 static void ncache_remove_dentry(int item);
 static void ncache_rotate_dentry(int item);
 static int ncache_get_lru(void);
@@ -61,6 +58,8 @@ static int ncache_add_dentry(
     PVFS_object_ref entry);
 
 static ncache *cache = NULL;
+#endif
+
 static int s_pint_ncache_timeout_ms = PINT_NCACHE_TIMEOUT_MS;
 
 /* compare
@@ -203,6 +202,7 @@ int PINT_ncache_lookup(
  *
  * no return value
  */
+#if ENABLE_NCACHE
 static void ncache_rotate_dentry(int item)
 {
     int prev = 0, next = 0, new_bottom;
@@ -240,6 +240,7 @@ static void ncache_rotate_dentry(int item)
         }
     }
 }
+#endif
 
 /* ncache_insert
  *
@@ -434,6 +435,7 @@ void PINT_ncache_set_timeout(int max_timeout_ms)
  *
  * returns 0 on success, -PVFS_errno on failure
  */
+#if ENABLE_NCACHE
 static int ncache_add_dentry(
     char *name,
     int abs_resolved,
@@ -582,6 +584,7 @@ static int ncache_update_dentry_timestamp(ncache_entry* entry)
     }
     return ret;
 }
+#endif /* ENABLE_NCACHE */
 
 /*
  * Local variables:

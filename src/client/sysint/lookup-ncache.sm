@@ -60,8 +60,9 @@ static int lookup_ncache_lookup(
 
 %%
 
-nested machine pvfs2_client_lookup_ncache_sm(lookup,
-					     xfer_msgpair)
+nested machine pvfs2_client_lookup_ncache_sm(
+    lookup,
+    xfer_msgpair)
 {
     state lookup
     {
@@ -91,6 +92,9 @@ static int lookup_ncache_lookup(PINT_client_sm *sm_p,
 
     parent_ref.fs_id = sm_p->msgpair.fs_id;
     parent_ref.handle = sm_p->msgpair.handle;
+
+    assert(parent_ref.handle != PVFS_HANDLE_NULL);
+    assert(parent_ref.fs_id != PVFS_FS_ID_NULL);
 
     ret = PINT_ncache_lookup(
         sm_p->u.lookup.orig_pathname, 0 /* sm_p->u.lookup.follow_link */,
