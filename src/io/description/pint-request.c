@@ -226,14 +226,17 @@ int PINT_Process_request(PINT_Request_state *req,
 			}
 			*eof_flag = (rfdata->fsize <= bytes_processed);
 		}
-		else
+		else /* not logical skip or seeking */
 		{
 			/* we process the whole thing at once */
 			retval = PINT_Distribute(contig_offset, contig_size, rfdata,
 					&bytes_processed, *bytemax, &segs_processed, *segmax,
 					offset_array, size_array, eof_flag, mode);
 		}
-		req->buf_offset += retval;
+		if (PINT_IS_CLIENT(mode))
+		{
+			req->buf_offset += retval;
+		}
 		/* see if we processed all of the bytes expected */
 		if (retval != contig_size)
 		{
