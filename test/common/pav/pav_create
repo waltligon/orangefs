@@ -173,10 +173,16 @@ sub create_pvfs2tab {
 	return (1);
     }
 
-    # string looks like this:
-    # tcp://localhost:3334/pvfs2-fs /mnt/pvfs pvfs2 default 0 0
+    # maybe change the encoding
+    my $mntopts = "defaults";
+    if (defined($href->{'ENCODING'})) {
+	$mntopts = "encoding=" . $href->{'ENCODING'};
+    }
 
-    $pvfstab = $protocol . "://" . $metas[0] . ":" . $href->{'PVFSPORT'} . "/pvfs2-fs " .  $href->{'MOUNTPOINT'} .  " pvfs2 default 0 0";
+    # string looks like this:
+    # tcp://localhost:3334/pvfs2-fs /mnt/pvfs pvfs2 defaults 0 0
+
+    $pvfstab = $protocol . "://" . $metas[0] . ":" . $href->{'PVFSPORT'} . "/pvfs2-fs " .  $href->{'MOUNTPOINT'} .  " pvfs2 $mntopts 0 0";
     
     print FH "$pvfstab\n";
     

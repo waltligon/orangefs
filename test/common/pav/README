@@ -53,6 +53,8 @@ STORAGE="</path/to/storage_adir>" Usually set to $WORKINGDIR/data
 SERVERLOG="</path/to/logdir>" Usually set to $WORKINGDIR/log
 
 MOUNTPOINT="</path/to/pvfs_virtual_mountpoint>" 
+ENCODING="{direct|le_bfield|xdr}" Adds "encoding=" mount option, usually not
+                                  set.
 
 
 BINDIR="</path/to/dir/containing/binaries>" Usually $WORKINGDIR/bin
