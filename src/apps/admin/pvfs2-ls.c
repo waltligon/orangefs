@@ -75,6 +75,33 @@ static void print_entry_attr(
     PVFS_sys_attr *attr,
     struct options *opts);
 
+#define print_dot_and_dot_dot_info_if_required(refn)        \
+do {                                                        \
+    if (opts->list_all && !opts->list_almost_all) {         \
+        /*                                                  \
+          we have to fake access to the .. handle           \
+          since our sysint lookup doesn't return that       \
+          kind of intermediate information.  we can get     \
+          this value, by manually resolving it with lookups \
+          on base dirs, but I'm not sure it's worth it      \
+        */                                                  \
+        if (opts->list_inode && !opts->list_long) {         \
+            printf("%Lu .\n",Lu(refn.handle));              \
+            printf("%Lu .. (faked)\n",Lu(refn.handle));     \
+        }                                                   \
+        else if (opts->list_long) {                         \
+            print_entry(".", refn.handle,                   \
+                        refn.fs_id, opts);                  \
+            print_entry(".. (faked)", refn.handle,          \
+                        refn.fs_id, opts);                  \
+        }                                                   \
+        else {                                              \
+            printf(".\n");                                  \
+            printf("..\n");                                 \
+        }                                                   \
+    }                                                       \
+} while(0)
+
 
 int main(int argc, char **argv)
 {
@@ -449,7 +476,6 @@ int do_list(
     PVFS_pinode_reference pinode_refn;
     PVFS_ds_position token;
 
-
     name = start;
     fs_id = init_response->fsid_list[0];
     credentials.uid = 0;
@@ -481,10 +507,18 @@ int do_list(
              (opts->list_directory)))
         {
             char segment[128] = {0};
+            PVFS_sysresp_getparent getparent_resp;
             PVFS_util_remove_base_dir(name, segment, 128);
             if (strcmp(segment,"") == 0)
             {
                 snprintf(segment,128,"/");
+            }
+
+            if (PVFS_sys_getparent(pinode_refn.fs_id, name,
+                                   credentials, &getparent_resp) == 0)
+            {
+                print_dot_and_dot_dot_info_if_required(
+                    getparent_resp.parent_refn);
             }
 
             if (opts->list_long)
@@ -519,33 +553,7 @@ int do_list(
               the list_all option prints files starting with .;
               the almost_all option skips the '.', '..' printing
             */
-            if (opts->list_all && !opts->list_almost_all)
-            {
-                /*
-                  we have to fake access to the .. handle
-                  since our sysint lookup doesn't return that
-                  kind of intermediate information.  we can get
-                  this value, by manually resolving it with lookups
-                  on base dirs, but I'm not sure it's worth it
-                */
-                if (opts->list_inode && !opts->list_long)
-                {
-                    printf("%Lu .\n",Lu(pinode_refn.handle));
-                    printf("%Lu .. (faked)\n",Lu(pinode_refn.handle));
-                }
-                else if (opts->list_long)
-                {
-                    print_entry(".", pinode_refn.handle,
-                                pinode_refn.fs_id, opts);
-                    print_entry(".. (faked)", pinode_refn.handle,
-                                pinode_refn.fs_id, opts);
-                }
-                else
-                {
-                    printf(".\n");
-                    printf("..\n");
-                }
-            }
+            print_dot_and_dot_dot_info_if_required(pinode_refn);
             printed_dot_info = 1;
         }
 
