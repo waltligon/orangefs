@@ -7,8 +7,6 @@
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
-#include "pvfs2-config.h"
-
 #ifdef __KERNEL__
 #ifndef __WORDSIZE
 #include <asm/types.h>
