@@ -47,6 +47,7 @@ typedef enum {
 	PVFS_SERV_STATFS = 21,
 	PVFS_SERV_IOSTATFS = 22,
 	PVFS_SERV_GETCONFIG = 23,
+	PVFS_SERV_WRITE_COMPLETION = 24,
 	PVFS_SERV_EXTENSION = 99,
 } PVFS_server_op;
 
@@ -364,6 +365,16 @@ struct PVFS_servresp_io_s
 };
 typedef struct PVFS_servresp_io_s PVFS_servresp_io;
 
+/* PVFS write completion response (there is no req for this one,
+ * it is sent from server to client after completing a write) 
+ */
+struct PVFS_servresp_write_completion_s 
+{
+	PVFS_size total_completed;
+};
+typedef struct PVFS_servresp_write_completion_s
+	PVFS_servresp_write_completion;
+
 /* PVFS Server Request
  *
  */
@@ -415,6 +426,7 @@ struct PVFS_server_resp_s {
 		PVFS_servresp_extension extension;
 		PVFS_servresp_generic generic;
 		PVFS_servresp_io io;
+		PVFS_servresp_write_completion write_completion;
 	} u;
 };
 

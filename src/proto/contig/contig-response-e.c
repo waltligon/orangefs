@@ -54,6 +54,7 @@ int do_encode_resp(
 	case PVFS_SERV_REMOVE:
 	case PVFS_SERV_RMDIR:
 	case PVFS_SERV_CREATEDIRENT:
+	case PVFS_SERV_WRITE_COMPLETION:
 	    /* 
 	     *	There is an int64_t here...
 	     *	but handled correctly so far!

@@ -55,10 +55,11 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     int* error_code_array = NULL;
     flow_descriptor** flow_array = NULL;
     int i;
-    int partial_flag = 0;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
     int target_handle_count = 0;
     PVFS_handle* target_handle_array = NULL;
+    int total_errors;
+
     struct PINT_Request_state* req_state = NULL;
     PINT_Request_file_data tmp_file_data;
     PVFS_count32 segmax = 1;
@@ -146,13 +147,26 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	}
 
 	/* did we find that any data belongs to this handle? */
-	gossip_lerr("KLUDGE: only allowing I/O to first data handle.\n");
+	/* TODO: change this to support multiple handles */
+#if 0
+	if(bytemax)
+	{
+	    target_handle_array[target_handle_count] =
+		pinode_ptr->attr.u.meta.dfh[i]; 
+	    target_handle_count++;
+	}
+#else
 	if(bytemax && i == 0)
 	{
 	    target_handle_array[target_handle_count] =
 		pinode_ptr->attr.u.meta.dfh[i]; 
 	    target_handle_count++;
 	}
+	else
+	{
+	    gossip_lerr("KLUDGE: only allowing I/O to first data handle.\n");
+	}
+#endif
     }
     PINT_Free_request_state(req_state);
     req_state = NULL;
@@ -172,6 +186,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     /* stuff for both request array and flow array */
     error_code_array = (int*)malloc(target_handle_count *
 	sizeof(int));
+    memset(error_code_array, 0, (target_handle_count*sizeof(int)));
 
     /* stuff for running flows */
     file_data_array = (PINT_Request_file_data*)malloc(
@@ -210,8 +225,13 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	req_array[i].u.io.handle = target_handle_array[i];
 	req_array[i].u.io.fs_id = req->pinode_refn.fs_id;
 	req_array[i].u.io.iod_num = i;
+	/* TODO: change this to support multiple handles */
+#if 0
 	req_array[i].u.io.iod_count =
 	    pinode_ptr->attr.u.meta.nr_datafiles;
+#else
+	req_array[i].u.io.iod_count = 1;
+#endif
 	req_array[i].u.io.io_req = req->io_req;
 	req_array[i].u.io.io_dist = HACK_io_dist;
 	if(type == PVFS_SYS_IO_READ)
@@ -230,19 +250,18 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	error_code_array,
 	target_handle_count,
 	op_tag);
-    if(ret < 0 && ret != -EIO)
+    if(ret < 0)
     {
 	goto out;
     }
 
-    /* If EIO, then at least one of the I/O req/resp exchanges
-     * failed.  We will continue and carry I/O out with whoever we
-     * can, though.
-     */
-    if(ret == -EIO)
+    /* set an error code for each negative ack that we received */
+    for(i=0; i<target_handle_count; i++)
     {
-	partial_flag = 1;
-	gossip_ldebug(CLIENT_DEBUG, "Warning: one or more I/O requests failed.\n");
+	tmp_resp = (struct
+	    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
+	if(!(error_code_array[i]) && tmp_resp->status)
+	    error_code_array[i] = tmp_resp->status;
     }
 
     /* setup a flow for each I/O server that gave us a positive
@@ -252,7 +271,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     {
 	tmp_resp = (struct
 	    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
-	if(!(error_code_array[i]) && !(tmp_resp->status))
+	if(!(error_code_array[i]))
 	{
 	    flow_array[i] = PINT_flow_alloc();
 	    if(!flow_array[i])
@@ -265,9 +284,13 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 		tmp_resp->u.io.bstream_size;
 	    flow_array[i]->file_data->dist = HACK_io_dist;
 	    flow_array[i]->file_data->iod_num = i;
+	    /* TODO: change this to support multiple handles */
+#if 0
 	    flow_array[i]->file_data->iod_count =
 		pinode_ptr->attr.u.meta.nr_datafiles;
-
+#else
+	    flow_array[i]->file_data->iod_count = 1;
+#endif
 	    flow_array[i]->request = req->io_req;
 	    flow_array[i]->flags = 0;
 	    flow_array[i]->tag = op_tag;
@@ -306,26 +329,72 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	goto out;
     }
 
-    /* now we need to take stock of how many operations (if any)
-     * failed, and report how much total data was transferred
+    /* if this was a write operation, then we need to wait for a
+     * final ack from the data servers indicating the status of
+     * the operation
      */
+    if(type == PVFS_SYS_IO_WRITE)
+    {
+	/* wait for all of the final acks */
+	ret = PINT_recv_ack_array(
+	    addr_array,
+	    PINT_get_encoded_generic_ack_sz(0,
+		PVFS_SERV_WRITE_COMPLETION),
+	    resp_encoded_array,
+	    resp_decoded_array,
+	    error_code_array,
+	    target_handle_count,
+	    op_tag);
+	if(ret < 0)
+	{
+	    goto out;
+	}
+
+	/* set an error code for each negative ack that we received */
+	for(i=0; i<target_handle_count; i++)
+	{
+	    tmp_resp = (struct
+		PVFS_server_resp_s*)resp_decoded_array[i].buffer;
+	    if(!(error_code_array[i]) && tmp_resp->status)
+		error_code_array[i] = tmp_resp->status;
+	}
+    }
+
+    /* default to reporting no errors, until we check our error
+     * code array
+     */
+    ret = 0;
     resp->total_completed = 0;
+
+    /* find out how many errors we hit */
     for(i=0; i<target_handle_count; i++)
     {
-	if(error_code_array[i] || flow_array[i]->error_code)
+	tmp_resp = (struct
+	    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
+	if(error_code_array[i])
 	{
-	    /* we suffered at least one failure that is specific
-	     * to a particular server
-	     */
+	    total_errors ++;
 	    ret = -EIO;
 	}
 	else
 	{
-	    resp->total_completed +=
-		flow_array[i]->total_transfered;
+	    if(type == PVFS_SYS_IO_WRITE)
+	    {
+		resp->total_completed +=
+		    tmp_resp->u.write_completion.total_completed;
+	    }
+	    else
+	    {
+		resp->total_completed +=
+		    flow_array[i]->total_transfered;
+	    }
 	}
     }
-
+    gossip_ldebug(CLIENT_DEBUG, 
+	"%d servers contacted.\n", target_handle_count);
+    gossip_ldebug(CLIENT_DEBUG,
+	"%d servers experienced errors.\n", total_errors);
+       
     /* drop through and pass out return value, successful cases go
      * through here also
      */

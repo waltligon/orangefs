@@ -6,6 +6,7 @@
 
 #include <client.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
@@ -156,9 +157,9 @@ int main(int argc,char **argv)
 	req_io.credentials.gid = 100;
 	req_io.credentials.perms = U_WRITE|U_READ;
 	req_io.buffer = io_buffer;
-	req_io.buffer_size = io_size;
+	req_io.buffer_size = io_size*sizeof(int);
 
-	ret = PVFS_Request_contiguous(io_size, PVFS_BYTE, &(req_io.io_req));
+	ret = PVFS_Request_contiguous(io_size*sizeof(int), PVFS_BYTE, &(req_io.io_req));
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_Request_contiguous() failure.\n");
@@ -176,9 +177,9 @@ int main(int argc,char **argv)
 
 	/* uncomment and try out the readback-and-verify stuff that follows
 	 * once reading back actually works */
-#if 0
-	memset(req_io.buffer, 0, io_size);
-	memset(io_buffer, 0, io_size);
+	memset(io_buffer, 0, io_size*sizeof(int));
+
+	sleep(5);
 
 	/* verify */
 	printf("IO-TEST: performing read on handle: %ld, fs: %d\n",
@@ -190,15 +191,29 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	printf("IO-TEST: read %d bytes.\n", (int)resp_io.total_completed);
-	for(i=0; i<(int)resp_io.total_completed; i++) {
-		if (i != ((int*)(req_io.buffer))[i] )
-			/*
-			fprintf(stder, "error: element %d differs: should be %d, is %d\n", i, i, req_io.buffer[i]); */
-			errors++;
+	if((io_size*sizeof(int)) != resp_io.total_completed)
+	{
+		fprintf(stderr, "Error: SHORT READ! skipping verification...\n");
 	}
-	if (errors != 0 ) fprintf(stderr, "ERROR: found %d errors\n", errors);
-#endif
-
+	else
+	{
+		errors = 0;
+		for(i=0; i<io_size; i++) {
+			if (i != io_buffer[i] )
+			{
+				fprintf(stderr, "error: element %d differs: should be %d, is %d\n", i, i, io_buffer[i]); 
+				errors++;
+			}
+		}
+		if (errors != 0 )
+		{
+			fprintf(stderr, "ERROR: found %d errors\n", errors);
+		}
+		else
+		{
+			printf("IO-TEST: no errors found.\n");
+		}
+	}
 
 	/**************************************************************
 	 * shut down pending interfaces

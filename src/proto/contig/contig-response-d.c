@@ -78,6 +78,7 @@ DECODE_RESP_HEAD(do_decode_resp)
 		case PVFS_SERV_MKDIR:
 		case PVFS_SERV_RMDIRENT:
 		case PVFS_SERV_IO:
+		case PVFS_SERV_WRITE_COMPLETION:
 			return 0;
 		default:
 			return -1;
