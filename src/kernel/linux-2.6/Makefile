@@ -1,0 +1,22 @@
+ifneq ($(KERNELRELEASE),)
+
+
+PVFS2_SRC_DIR=$(PWD)/../../../
+
+EXTRA_CFLAGS=-I$(PVFS2_SRC_DIR)/src/io/description/ -I$(PVFS2_SRC_DIR)/src/io/dev/ -I$(PVFS2_SRC_DIR)/include/ -I$(PVFS2_SRC_DIR)/src/client/sysint/ -I$(PVFS2_SRC_DIR)/src/common/quicklist/ -I$(PVFS2_SRC_DIR)/src/common/quickhash/ -I$(PVFS2_SRC_DIR)/src/proto/
+
+# uncomment the following line for debugging output
+# EXTRA_CFLAGS="$CFLAGS -DPVFS2_KERNEL_DEBUG"
+
+obj-m += pvfs2.o
+
+pvfs2-objs := pvfs2.mod.o pvfs2-utils.o waitqueue.o devpvfs2-req.o devpvfs2-flow.o pvfs2-cache.o dcache.o file.o inode.o dir.o namei.o super.o pvfs2-mod.o
+
+else
+#KDIR	:= /lib/modules/$(shell uname -r)/build
+KDIR	:= /usr/src/linux-$(shell uname -r)
+PWD		:= $(shell pwd)
+
+default:
+	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
+endif
