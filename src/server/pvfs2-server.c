@@ -135,6 +135,7 @@ int main(int argc, char **argv)
     int ret = -1, debug_mask = 0;
     char *fs_conf = NULL, *server_conf = NULL;
     int siglevel = 0;
+    PINT_server_op* tmp_op = NULL;
 
 #ifdef WITH_MTRACE
     mtrace();
@@ -253,21 +254,31 @@ int main(int argc, char **argv)
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
     /* kick off performance update state machine */
-    ret = server_state_machine_start_noreq(PVFS_SERV_PERF_UPDATE);
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
+	&(tmp_op));
+    if(ret == 0)
+    {
+	ret = server_state_machine_start_noreq(tmp_op);
+    }
     if(ret < 0)
     {
-	gossip_lerr("Error: failed to start perf update "
-                    "state machine.\n");
+	PVFS_perror_gossip("Error: failed to start perf update "
+		    "state machine.\n", ret);
 	goto server_shutdown;
     }
 #endif
 
-    /* start timer to look for expired jobs */
-    ret = server_state_machine_start_noreq(PVFS_SERV_JOB_TIMER);
+    /* kick off timer for expired jobs */
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_JOB_TIMER,
+	&(tmp_op));
+    if(ret == 0)
+    {
+	ret = server_state_machine_start_noreq(tmp_op);
+    }
     if(ret < 0)
     {
-	gossip_lerr("Error: failed to start job timer "
-                    "state machine.\n");
+	PVFS_perror_gossip("Error: failed to start job timer "
+		    "state machine.\n", ret);
 	goto server_shutdown;
     }
 
@@ -1308,40 +1319,57 @@ static int server_state_machine_start(
     return ((s_op->current_state->state_action))(s_op,js_p);
 }
 
+/* server_state_machine_alloc_noreq()
+ * 
+ * allocates and initializes a server state machine that can later be 
+ * started with server_state_machine_start_noreq()
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int server_state_machine_alloc_noreq(enum PVFS_server_op op, PINT_server_op**
+    new_op)
+{
+    /* create a new op structure */
+    *new_op = (PINT_server_op*)malloc(sizeof(PINT_server_op));
+    if(!(*new_op))
+    {
+	return(-PVFS_ENOMEM);
+    }
+    memset(*new_op, 0, sizeof(PINT_server_op));
+    (*new_op)->op = op; 
+
+    /* find the state machine for this op type */
+    (*new_op)->current_state = PINT_state_machine_locate(*new_op);
+    if(!((*new_op)->current_state))
+    {
+	gossip_lerr("Error: failed to start state machine.\n");
+	free(*new_op);
+	return(-PVFS_ENOSYS);
+    }
+
+    return(0);
+}
+
 /* server_state_machine_start_noreq()
  * 
  * similar in purpose to server_state_machine_start(), except that it
  * kicks off a state machine instance without first receiving a 
  * client side request
  *
+ * PINT_server_op structure must have been previously allocated using
+ * server_state_machine_alloc_noreq().
+ *
  * returns 0 on success, -PVFS_error on failure
  */
-int server_state_machine_start_noreq(enum PVFS_server_op op)
+int server_state_machine_start_noreq(PINT_server_op* new_op)
 {
-    PINT_server_op* tmp_s_op;
     job_status_s tmp_status;
     int ret = -1;
 
-    /* create a new op structure */
-    tmp_s_op = (PINT_server_op*)malloc(sizeof(PINT_server_op));
-    if(!tmp_s_op)
-    {
-	return(-PVFS_ENOMEM);
-    }
-    memset(tmp_s_op, 0, sizeof(PINT_server_op));
-    tmp_s_op->op = op; 
-
-    /* find the state machine for this op type */
-    tmp_s_op->current_state = PINT_state_machine_locate(tmp_s_op);
-    if(!tmp_s_op->current_state)
-    {
-	gossip_lerr("Error: failed to start state machine.\n");
-	return(-PVFS_ENOSYS);
-    }
     tmp_status.error_code = 0;
 
     /* execute first state */
-    ret = tmp_s_op->current_state->state_action(tmp_s_op, 
+    ret = new_op->current_state->state_action(new_op, 
 	&tmp_status);
     if(ret < 0)
     {
@@ -1352,7 +1380,7 @@ int server_state_machine_start_noreq(enum PVFS_server_op op)
     /* continue as long as states are immediately completing */
     while(ret == 1)
     {
-	ret = PINT_state_machine_next(tmp_s_op, &tmp_status);
+	ret = PINT_state_machine_next(new_op, &tmp_status);
     };
     if (ret < 0)
     {

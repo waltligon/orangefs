@@ -360,7 +360,9 @@ struct server_configuration_s *get_server_config_struct(void);
 int server_state_machine_complete(PINT_server_op *s_op);
 
 /* starts state machines that are not associated with an incoming request */
-int server_state_machine_start_noreq(enum PVFS_server_op op);
+int server_state_machine_alloc_noreq(enum PVFS_server_op op, PINT_server_op**
+    new_op);
+int server_state_machine_start_noreq(PINT_server_op* new_op);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_server_op
