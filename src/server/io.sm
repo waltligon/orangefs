@@ -51,7 +51,7 @@ machine pvfs2_io_sm(prelude,
         default => send_negative_ack;
     }
 
-    state send_positive_ack 
+    state send_positive_ack
     {
         run io_send_ack;
         success => start_flow;

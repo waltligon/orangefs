@@ -1165,7 +1165,7 @@ static int server_state_machine_start(
     {
 	gossip_err("Error: server received a corrupt or unsupported "
                    "request message.\n");
-	return(retval);
+	return(ret);
     }
 
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
