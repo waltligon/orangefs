@@ -10,6 +10,7 @@ LOCALTESTSRC := \
 	$(DIR)/test-listio2.c \
 	$(DIR)/test-listio3.c \
 	$(DIR)/test-listio4.c \
+	$(DIR)/test-listio5.c \
 	$(DIR)/trove-import.c \
 	$(DIR)/trove-export.c \
 	$(DIR)/trove-touch.c \
