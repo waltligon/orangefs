@@ -433,7 +433,10 @@ int PINT_server_get_config(struct server_configuration_s *config,
     if (found_one_good)
 	return(0); 
     else
+    {
+	gossip_lerr("Error: no valid pvfs2tab entries found.\n");
 	return(-PVFS_ENOENT);
+    }
 }
 
 static int server_parse_config(struct server_configuration_s *config,
