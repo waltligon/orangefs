@@ -46,7 +46,6 @@ src/client/sysint/module.mk
 src/client/unix-io/module.mk
 src/proto/module.mk
 src/proto/contig/module.mk
-src/server/module.mk
 test/io/trove/module.mk
 test/common/quicklist/module.mk
 test/common/id-generator/module.mk

@@ -153,7 +153,7 @@ endif
 
 # build program needed to generate state machines source before 
 # generating source
-$(SRCFILES): src/common/statecomp/statecomp
+# $(SRCFILES): src/common/statecomp/statecomp
 
 # @ suppresses output from the depend shell script.
 %.d: %.c $(SRCFILES)
