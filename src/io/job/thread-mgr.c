@@ -109,6 +109,7 @@ static void *bmi_thread_function(void *ptr)
     while (1)
     {
 	gen_mutex_lock(&bmi_mutex);
+	pthread_testcancel();
 	if(bmi_unexp_count)
 	{
 	    incount = bmi_unexp_count;
