@@ -1236,8 +1236,8 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     {
 	/* error posting trove operation */
 	dealloc_job_desc(jd);
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
+
+	out_status_p->error_code = ret;
 	return (1);
     }
 
@@ -1316,8 +1316,8 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     {
 	/* error posting trove operation */
 	dealloc_job_desc(jd);
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
+
+	out_status_p->error_code = ret;
 	return (1);
     }
 
@@ -1394,8 +1394,8 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     {
 	/* error posting trove operation */
 	dealloc_job_desc(jd);
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
+
+	out_status_p->error_code = ret;
 	return (1);
     }
 
@@ -1660,8 +1660,8 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     {
 	/* error posting trove operation */
 	dealloc_job_desc(jd);
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
+
+	out_status_p->error_code = ret;
 	return (1);
     }
 
@@ -1763,8 +1763,8 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     {
 	/* error posting trove operation */
 	dealloc_job_desc(jd);
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
+
+	out_status_p->error_code = ret;
 	return (1);
     }
 

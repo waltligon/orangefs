@@ -216,10 +216,12 @@ static int remove_read_object_metadata(PINT_server_op *s_op,
  * Note: PVFS_ds_attributes structure is returned in the job_status_s (member ds_attr).
  */
 static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
-					     job_status_s* js_p)
+					     job_status_s *js_p)
 {
     int ret;
     job_id_t j_id;
+
+    js_p->error_code = 0;
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: fallback_to_dspace_getattr\n", s_op);
 
@@ -440,7 +442,7 @@ static int remove_send_response(PINT_server_op *s_op,
     /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp.status = js_p->error_code;
 
-    if(js_p->error_code == 0) 
+    if (js_p->error_code == 0) 
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  successfully removed dspace 0x%08Lx\n",

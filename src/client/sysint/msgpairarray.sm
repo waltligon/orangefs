@@ -275,8 +275,9 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 
 	/* check status of response */
 	if (resp_p->status != 0) {
-	    gossip_err("error: msgpairarray_complete: status error\n");
-	    assert(0); /* placeholder */
+	    gossip_debug(CLIENT_DEBUG,
+			 "notice: msgpairarray_complete: status error (%d)\n",
+			 resp_p->status);
 	}
 	
 	/* call completion function to perform operation-specific

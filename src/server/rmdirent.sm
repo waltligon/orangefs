@@ -217,15 +217,15 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
-					 s_op->u.rmdirent.dirdata_handle,
-					 &s_op->key,
-					 &s_op->val,
-					 0,
-					 NULL,
-					 s_op,
-					 js_p,
-					 &j_id,
-					 PINT_server_job_context);
+				s_op->u.rmdirent.dirdata_handle,
+				&s_op->key,
+				&s_op->val,
+				0,
+				NULL,
+				s_op,
+				js_p,
+				&j_id,
+				PINT_server_job_context);
     return ret;
 }
 
@@ -294,7 +294,7 @@ static int rmdirent_send_bmi(PINT_server_op *s_op,
     }
     else {
 	gossip_debug(SERVER_DEBUG,
-		     "  sending error response\n");
+		     "  sending error response (%d)\n", js_p->error_code);
     }
 
     /* Encode the message */

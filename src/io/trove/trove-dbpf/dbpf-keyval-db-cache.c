@@ -260,8 +260,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 #if 0
 	    perror("dpbf_keyval_dbcache_get");
 #endif
-	    gossip_err("warning: unreliable error value\n");
-	    error = -TROVE_EPERM;
+	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
     }
 

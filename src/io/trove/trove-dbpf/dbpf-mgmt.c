@@ -40,7 +40,6 @@ struct dbpf_storage *my_storage_p = NULL;
 static struct dbpf_storage *dbpf_storage_lookup(char *stoname, int *err_p);
 static int dbpf_db_create(char *dbname);
 static DB *dbpf_db_open(char *dbname, int *err_p);
-static int dbpf_db_error_convert(int db_error);
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
 /* dbpf_collection_getinfo()
@@ -914,41 +913,6 @@ static int dbpf_db_create(char *dbname)
     return 0;
 }
 
-/* dbpf_db_error_convert()
- *
- * Converts a DB error into a trove error code.
- *
- * NOTE: we should generalize the "errno" part of this, make it its
- * own call, and call that function within here.  Probably needs to
- * be defined outside this file though.
- */
-static int dbpf_db_error_convert(int db_error)
-{
-    if (db_error > 0) {
-	/* errno value returned from db */
-	switch (db_error) {
-	    case ENOENT:
-		return TROVE_ENOENT;
-	    case ENOMEM:
-		return TROVE_ENOMEM;
-	    case EPERM:
-		return TROVE_EPERM;
-	    case EINVAL:
-	    default:
-		return TROVE_EINVAL;
-	}
-    }
-    else if (db_error < 0) {
-	/* special error value from db */
-	switch (db_error) {
-	    case DB_NOTFOUND:
-		return TROVE_ENOENT;
-	    default:
-		return TROVE_EINVAL;
-	}
-    }
-    else return 0;
-}
 
 /* dbpf_db_open()
  *
@@ -965,7 +929,7 @@ static DB *dbpf_db_open(char *dbname,
     DB *db_p;
 
     if ((ret = db_create(&db_p, NULL, 0)) != 0) {
-	*error_p = dbpf_db_error_convert(ret);
+	*error_p = dbpf_db_error_to_trove_error(ret);
 	return NULL;
     }
 
@@ -975,7 +939,7 @@ static DB *dbpf_db_open(char *dbname,
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
     if ((ret = db_p->set_flags(db_p, DB_RECNUM)) != 0) {
 	    db_p->err(db_p, ret, "%s: set_flags", dbname);
-	    *error_p = dbpf_db_error_convert(ret);
+	    *error_p = dbpf_db_error_to_trove_error(ret);
 	    return NULL;
     }
     if ((ret = db_p->open(db_p,
@@ -988,7 +952,7 @@ static DB *dbpf_db_open(char *dbname,
                           0,
                           0)) != 0)
     {
-	*error_p = dbpf_db_error_convert(ret);
+	*error_p = dbpf_db_error_to_trove_error(ret);
 	return NULL;
     }
 

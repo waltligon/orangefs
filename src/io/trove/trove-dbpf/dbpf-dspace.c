@@ -221,10 +221,10 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -1;
+    if (coll_p == NULL) return -TROVE_EINVAL;
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -1;
+    if (q_op_p == NULL) return -TROVE_ENOMEM;
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -285,7 +285,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    goto return_error;
 	case 0:
 #if 0
-	    printf("removed dataspace with handle %Ld\n", op_p->handle);
+	    printf("removed dataspace with handle 0x%08Lx\n", op_p->handle);
 #endif
 	    /* drop through */
 	    break;
@@ -300,22 +300,22 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	}
     }
 
-    /* remove keyval db if it exists */
+    /* remove keyval db if it exists
+     *
+     * NOTE: this is not a fatal error; this might have never been created.
+     */
     ret = dbpf_keyval_dbcache_try_remove(op_p->coll_p->coll_id, op_p->handle);
     if (ret == -TROVE_EBUSY) assert(0);
-    else if (ret < 0) {
-	error = ret;
-	goto return_error;
-    }
 
-    /* remove bstream file if it exists */
+    /* remove bstream file if it exists
+     *
+     * NOTE: this is not a fatal error; this might have never been created.
+     */
     ret = dbpf_bstream_fdcache_try_remove(op_p->coll_p->coll_id, op_p->handle);
     switch (ret) {
-	case DBPF_BSTREAM_FDCACHE_ERROR:
-	    error = -1;
-	    goto return_error;
 	case DBPF_BSTREAM_FDCACHE_BUSY:
 	    assert(0);
+	case DBPF_BSTREAM_FDCACHE_ERROR:
 	case DBPF_BSTREAM_FDCACHE_SUCCESS:
 	    break;
     }
@@ -793,16 +793,16 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	    break;
     }
 
-    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &kdb_p);
-    switch (ret) {
-	case DBPF_BSTREAM_FDCACHE_ERROR:
-	    /* TODO: HOW DO WE TELL A REAL ERROR FROM A "HAVEN'T CREATED YET" ERROR? */
-	    /* b_size is already set to zero */
-	    break;
-	case DBPF_BSTREAM_FDCACHE_BUSY:
-	    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id); /* release the dspace dbcache entry */
-	    return 0; /* try again later */
-	case DBPF_BSTREAM_FDCACHE_SUCCESS:
+    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id,
+				      op_p->handle,
+				      0,
+				      &kdb_p);
+    if (ret == -TROVE_EBUSY) {
+	/* release the dspace dbcache entry */
+	dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+	return 0; /* try again later */
+    }
+    else if (ret == 0) {
 	    ret = kdb_p->stat(kdb_p,
                               &k_stat_p,
 #ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
@@ -817,7 +817,14 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	    }
 	    else goto return_error;
 	    /* drop through */
-	    break;
+    }
+    else {
+	/* TODO: HOW DO WE TELL A REAL ERROR FROM A "HAVEN'T
+	 * CREATED YET" ERROR?
+	 */
+
+	/* b_size is already set to zero */
+	/* drop through */
     }
 
     memset(&key, 0, sizeof(key));
@@ -914,9 +921,14 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
     if (ret != 0) {
 	/* operation is done and we are telling the caller;
 	 * ok to pull off queue now.
+	 *
+	 * returns error code from operation in region pointed
+	 * to by state_p.
 	 */
 	*out_count_p = 1;
-	*state_p = (ret == 1) ? 0 : -1; /* TODO: FIX THIS!!! */
+
+	*state_p = (ret == 1) ? 0 : ret;
+
 	if (returned_user_ptr_p != NULL) {
 	    *returned_user_ptr_p = q_op_p->op.user_ptr;
 	}
@@ -931,6 +943,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 	dbpf_queued_op_put(q_op_p, 0);
 #if 0
 	printf("dbpf_dspace_test returning no progress.\n");
+	sleep(1);
 #endif
 	return 0;
     }

@@ -16,14 +16,14 @@ struct errno_mapping {
 
 static struct errno_mapping trove_error_map[] =
 {
-    { EPERM           , TROVE_EPERM           },
-    { ENOENT          , TROVE_ENOENT          },
-    { EINTR           , TROVE_EINTR           },
-    { EIO             , TROVE_EIO             },
-    { ENXIO           , TROVE_ENXIO           },
-    { EBADF           , TROVE_EBADF           },
-    { EAGAIN          , TROVE_EAGAIN          },
-    { ENOMEM          , TROVE_ENOMEM          },
+    { EPERM, TROVE_EPERM },
+    { ENOENT, TROVE_ENOENT },
+    { EINTR, TROVE_EINTR },
+    { EIO, TROVE_EIO },
+    { ENXIO, TROVE_ENXIO },
+    { EBADF, TROVE_EBADF },
+    { EAGAIN, TROVE_EAGAIN },
+    { ENOMEM, TROVE_ENOMEM },
     { EFAULT          , TROVE_EFAULT          },
     { EBUSY           , TROVE_EBUSY           },
     { EEXIST          , TROVE_EEXIST          },
@@ -87,6 +87,7 @@ PVFS_error trove_errno_to_trove_error(int errno_value)
 	if (trove_error_map[i].errno_value == errno_value) {
 	    return trove_error_map[i].trove_value;
 	}
+	i++;
     }
     return 4242; /* just return some identifiable number */
 }

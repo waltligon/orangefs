@@ -114,8 +114,9 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 
     ret = db_p->get(db_p, NULL, &key, &data, 0);
     if (ret != 0) {
-	db_p->err(db_p, ret, "DB->get");
-	error = -1;
+	db_p->err(db_p, ret, "DB->get in dbpf_keyval_read_op_svc");
+	error = -dbpf_db_error_to_trove_error(ret);
+
 	goto return_error;
     }
 
@@ -128,7 +129,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
      */
     if (op_p->flags & TROVE_SYNC) {
 	if ((ret = db_p->sync(db_p, 0)) != 0) {
-	    error = -1;
+	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
     }
@@ -229,14 +230,14 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     ret = db_p->put(db_p, NULL, &key, &data, 0);
     if (ret != 0) {
 	db_p->err(db_p, ret, "DB->put");
-	error = -1;
+	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
 
     /* sync if requested by user */
     if (op_p->flags & TROVE_SYNC) {
 	if ((ret = db_p->sync(db_p, 0)) != 0) {
-	    error = -1;
+	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
     }
@@ -314,14 +315,14 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 
     if (ret != 0) {
 	db_p->err(db_p, ret, "DB->del");
-	error = -1;
+	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
 
     /* sync only if requested by user */
     if (op_p->flags & TROVE_SYNC) {
 	if ((ret = db_p->sync(db_p, 0)) != 0) {
-	    error = -1;
+	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
     }
@@ -449,7 +450,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
     /* get a cursor */
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
     if (ret != 0) {
-	error = -1;
+	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
 
@@ -490,7 +491,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
 	if (ret == DB_NOTFOUND) goto return_ok;
 	else if (ret != 0) {
-	    error = -1;
+	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
     }
@@ -510,7 +511,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
 	if (ret == DB_NOTFOUND) goto return_ok;
 	else if (ret != 0) {
-	    error = -1;
+	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
 
@@ -563,7 +564,7 @@ return_ok:
      */
     if (op_p->flags & TROVE_SYNC) {
 	if ((ret = db_p->sync(db_p, 0)) != 0) {
-	    error = -1;
+	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
     }
@@ -574,7 +575,7 @@ return_ok:
     /* free the cursor */
     ret = dbc_p->c_close(dbc_p);
     if (ret != 0) {
-	error = -1;
+	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
     return 1;
@@ -690,7 +691,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
 	ret = db_p->get(db_p, NULL, &key, &data, 0);
 	if (ret != 0) {
 	    db_p->err(db_p, ret, "DB->get");
-	    error = -1;
+	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
 
@@ -704,7 +705,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
      */
     if (op_p->flags & TROVE_SYNC) {
 	if ((ret = db_p->sync(db_p, 0)) != 0) {
-	    error = -1;
+	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
     }
@@ -789,7 +790,7 @@ static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
 	got_db = 1;
     }
     if ((ret = db_p->sync(db_p, 0)) != 0) {
-	error = -1;
+	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
 	

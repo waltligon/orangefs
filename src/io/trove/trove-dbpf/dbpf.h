@@ -308,6 +308,10 @@ void dbpf_collection_register(struct dbpf_collection *coll_p);
 struct dbpf_collection *dbpf_collection_find_registered(TROVE_coll_id coll_id);
 void dbpf_collection_clear_registered(void);
 
+/* function for mapping db errors to trove errors */
+PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
+
+
 #define DBPF_OPEN   open
 #define DBPF_WRITE  write
 #define DBPF_LSEEK  lseek

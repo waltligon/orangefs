@@ -10,7 +10,7 @@
 #include "trove.h"
 #include "trove-internal.h"
 
-PVFS_error trove_db_error_to_trove_error(int db_error_value)
+PVFS_error dbpf_db_error_to_trove_error(int db_error_value)
 {
     /* values greater than zero are errno values */
     if (db_error_value > 0) return trove_errno_to_trove_error(db_error_value);

@@ -395,6 +395,10 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     for (i=0; i < sm_p->u.remove.datafile_count; i++) {
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
+	gossip_debug(CLIENT_DEBUG,
+		     "  datafile_remove: removing handle 0x%08Lx\n",
+		     sm_p->u.remove.datafile_handles[i]);
+
 	PINT_SERVREQ_REMOVE_FILL(msg_p->req,
 				 *sm_p->cred_p,
 				 sm_p->u.remove.object_ref.fs_id,

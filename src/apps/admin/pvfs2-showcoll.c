@@ -125,7 +125,10 @@ int main(int argc, char **argv)
 				    0,
 				    NULL,
 				    &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+
+    while (ret == 0) {
+	ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    }
     if (ret != 1) {
 	if (verbose) fprintf(stderr,
 			     "%s: warning: collection geteattr (for root handle) failed; aborting!\n",
@@ -256,7 +259,9 @@ static int print_dspace(TROVE_coll_id coll_id,
 			       0 /* flags */,
 			       NULL /* user ptr */,
 			       &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &opcount, NULL, NULL, &state);
+    while (ret == 0) {
+	ret = trove_dspace_test(coll_id, op_id, &opcount, NULL, NULL, &state);
+    }
     if (ret != 1) return -1;
 		
     fprintf(stdout,
