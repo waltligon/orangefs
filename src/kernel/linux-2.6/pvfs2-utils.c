@@ -80,11 +80,14 @@ static inline int copy_attributes_to_inode(
         if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
             (attrs->mask & PVFS_ATTR_SYS_SIZE))
         {
-            inode->i_size = (off_t)attrs->size;
+            spin_lock(&inode->i_lock);
+            inode->i_size = (loff_t)attrs->size;
+            inode->i_bytes = (unsigned short)attrs->size;
 
             /* FIXME: inode->i_blksize != PAGE_CACHE_SIZE */
             inode->i_blocks = (unsigned long)
                 ((inode->i_size / PAGE_CACHE_SIZE) + 1);
+            spin_unlock(&inode->i_lock);
         }
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
                  (symname != NULL))

@@ -65,11 +65,11 @@ static int pvfs2_get_blocks(
     page_data = kmap(page);
 
     /*
-      make sure we're not looking for a page block past the
-      end of this file;
-
       NOTE: this unsafely *assumes* that the size stored in
       the inode is accurate.
+
+      make sure we're not looking for a page block past the
+      end of this file;
     */
     max_block = ((inode->i_size / blocksize) + 1);
     if (page->index < max_block)
@@ -78,7 +78,7 @@ static int pvfs2_get_blocks(
             (((loff_t)page->index) << blockbits);
 
         /*
-          NOTE: This is completely backwards.  we could be
+          NOTE: This is conceptually backwards.  we could be
           implementing the file_read as generic_file_read and
           doing the actual i/o here (via readpage).
 
@@ -94,7 +94,7 @@ static int pvfs2_get_blocks(
 
         if (bytes_read < 0)
         {
-            pvfs2_error("pvfs_get_blocks: failed to read page block %i\n",
+            pvfs2_error("pvfs_get_blocks: failed to read page block %d\n",
                         (int)page->index);
         }
         else
@@ -105,10 +105,6 @@ static int pvfs2_get_blocks(
                         (int)page->index, (int)max_block);
         }
     }
-    bh_result->b_data = page_data;
-    bh_result->b_size = blocksize;
-    bh_result->b_blocknr = lblock;
-    bh_result->b_bdev = inode->i_sb->s_bdev;
 
     /* only zero remaining unread portions of the page data */
     memset(page_data + bytes_read, 0, blocksize - bytes_read);
@@ -128,6 +124,13 @@ static int pvfs2_get_blocks(
         {
             ClearPageError(page);
         }
+
+        bh_result->b_data = page_data;
+        bh_result->b_size = blocksize;
+
+        map_bh(bh_result, inode->i_sb, lblock);
+        set_buffer_uptodate(bh_result);
+
         ret = 0;
     }
     return ret;
@@ -139,7 +142,7 @@ static int pvfs2_get_block(
     struct buffer_head *bh_result,
     int create)
 {
-/*     pvfs2_print("pvfs2: pvfs2_get_block called\n"); */
+    pvfs2_print("pvfs2: pvfs2_get_block called\n");
     return pvfs2_get_blocks(ip, lblock, 1, bh_result, create);
 }
 
@@ -222,9 +225,11 @@ struct address_space_operations pvfs2_aops =
     .writepages = pvfs2_writepages,
     .sync_page = block_sync_page,
     .prepare_write = pvfs2_prepare_write,
-    .commit_write = nobh_commit_write,
+    .commit_write = generic_commit_write,
     .bmap = pvfs2_bmap,
-    .direct_IO = pvfs2_direct_IO,
+/*     .invalidate = pvfs2_invalidatepage, */
+/*     .releasepage = pvfs2_releasepage, */
+    .direct_IO = pvfs2_direct_IO
 };
 
 static struct backing_dev_info pvfs2_backing_dev_info =
@@ -301,6 +306,7 @@ struct inode *pvfs2_get_custom_inode(
 	inode->i_gid = current->gid;
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 
+        inode->i_size = 0;
         inode->i_blksize = PAGE_CACHE_SIZE;
         inode->i_blkbits = PAGE_CACHE_SHIFT;
         inode->i_blocks = 1;
