@@ -486,11 +486,23 @@ int PINT_thread_mgr_bmi_cancel(PVFS_id_gen_t id, void* user_ptr)
     /* iterate down list of pending completions, to see if the caller is
      * trying to cancel one of them
      */
+#if 0
+    gossip_err("THREAD MGR trying to cancel op: %Lu, ptr: %p.\n",
+	Lu(id), user_ptr);
+#endif
     for(i=0; i<bmi_test_count; i++)
     {
-	if(stat_bmi_id_array[i] == id && stat_bmi_user_ptr_array ==
+#if 0
+	gossip_err("THREAD MGR bmi cancel scanning op: %Lu.\n", 
+	    Lu(stat_bmi_id_array[i]));
+#endif
+	if(stat_bmi_id_array[i] == id && stat_bmi_user_ptr_array[i] ==
 	    user_ptr)
 	{
+#if 0
+	    gossip_err("THREAD MGR bmi cancel SKIPPING op: %Lu.\n", 
+		Lu(stat_bmi_id_array[i]));
+#endif
 	    /* match; no steps needed to cancel, the op is already done */
 	    gen_mutex_unlock(&bmi_test_mutex);
 	    return(0);
@@ -610,9 +622,17 @@ int PINT_thread_mgr_trove_cancel(PVFS_id_gen_t id, PVFS_fs_id fs_id,
      */
     for(i=0; i<trove_test_count; i++)
     {
-	if(stat_trove_id_array[i] == id && stat_trove_user_ptr_array ==
+#if 0
+	gossip_err("THREAD MGR trove cancel scanning op: %Lu.\n", 
+	    Lu(stat_trove_id_array[i]));
+#endif
+	if(stat_trove_id_array[i] == id && stat_trove_user_ptr_array[i] ==
 	    user_ptr)
 	{
+#if 0
+	    gossip_err("THREAD MGR trove cancel SKIPPING op: %Lu.\n", 
+		Lu(stat_trove_id_array[i]));
+#endif
 	    /* match; no steps needed to cancel, the op is already done */
 	    gen_mutex_unlock(&trove_test_mutex);
 	    return(0);
