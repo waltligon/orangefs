@@ -15,6 +15,9 @@
 #include "pint-sysint.h"
 #include "bmi.h"
 #include "gossip.h"
+#include "dotconf.h"
+#include "trove.h"
+#include "server-config.h"
 
 /*
 FIXME:
@@ -26,6 +29,7 @@ working.  The ranges are NOT implemented at all.
 
 /* Configuration Management Data Structure */
 fsconfig_array server_config;
+extern struct server_configuration_s g_server_config;
 
 static char HACK_server_name[] = "tcp://localhost:3334";
 static PVFS_handle HACK_handle_mask = 0;
@@ -116,16 +120,15 @@ int PINT_bucket_get_next_meta(
 	PVFS_handle* handle_mask)
 {
 	int ret = -1;
-	
 #if 0
 	/* make sure that they asked for something sane */
-	if(fsid != HACK_fsid)
+	if (!PINT_server_config_is_valid_collection_id(
+                &g_server_config,(TROVE_coll_id)fsid))
 	{
-		gossip_lerr("PINT_bucket_get_next_meta() called for invalid fsid.\n");
+		gossip_lerr("PINT_bucket_get_next_meta() called with invalid fsid.\n");
 		return(-EINVAL);
 	}
 #endif
-
 	ret = BMI_addr_lookup(meta_addr, HACK_server_name);
 	if(ret < 0)
 	{
@@ -156,16 +159,16 @@ int PINT_bucket_get_next_io(
 {
 	int i = 0;
 	int ret = -1;
-	
+
 #if 0
 	/* make sure that they asked for something sane */
-	if(fsid != HACK_fsid)
+	if (!PINT_server_config_is_valid_collection_id(
+                &g_server_config,(TROVE_coll_id)fsid))
 	{
-		gossip_lerr("PINT_bucket_get_next_io() called for invalid fsid.\n");
+		gossip_lerr("PINT_bucket_get_next_io() called with invalid fsid.\n");
 		return(-EINVAL);
 	}
 #endif
-
 	/* NOTE: for now, we assume that if the caller asks for more servers
 	 * than we have available, we should just duplicate servers in the
 	 * list.  The caller can use get_num_io to find out how many servers
@@ -213,13 +216,13 @@ int PINT_bucket_map_to_server(
 
 #if 0
 	/* make sure that they asked for something sane */
-	if(fsid != HACK_fsid || bucket != HACK_bucket)
+	if (!PINT_server_config_is_valid_collection_id(
+                &g_server_config,(TROVE_coll_id)fsid))
 	{
-		gossip_lerr("PINT_bucket_map_to_server() called for invalid fsid.\n");
+		gossip_lerr("PINT_bucket_map_to_server() called with invalid fsid.\n");
 		return(-EINVAL);
 	}
 #endif
-
 	ret = BMI_addr_lookup(server_addr, HACK_server_name);
 	if(ret < 0)
 	{
@@ -295,14 +298,15 @@ int PINT_bucket_get_num_io(
 	PVFS_fs_id fsid,
 	int* num_io)
 {
-	
 #if 0
-	if(fsid != HACK_fsid)
+	/* make sure that they asked for something sane */
+	if (!PINT_server_config_is_valid_collection_id(
+                &g_server_config,(TROVE_coll_id)fsid))
 	{
+		gossip_lerr("PINT_bucket_get_num_io() called with invalid fsid.\n");
 		return(-EINVAL);
 	}
 #endif
-
 	*num_io = 1;
 
 	return(0);

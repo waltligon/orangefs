@@ -921,6 +921,38 @@ static int cache_config_files(int argc, char **argv)
 }
 
 /*
+  returns 1 if the specified coll_id is valid based on
+  the specified server_configuration struct; 0 otherwise
+*/
+int PINT_server_config_is_valid_collection_id(
+    struct server_configuration_s *config_s, TROVE_coll_id coll_id)
+{
+    int ret = 0;
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+
+    if (config_s)
+    {
+        cur = config_s->file_systems;
+        while(cur)
+        {
+            cur_fs = llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
+            if (cur_fs->coll_id == coll_id)
+            {
+                ret = 1;
+                break;
+            }
+            cur = llist_next(cur);
+        }
+    }
+    return ret;
+}
+
+/*
   vim:set ts=4:
   vim:set shiftwidth=4:
 */

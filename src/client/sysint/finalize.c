@@ -14,6 +14,7 @@
 #include "pint-bucket.h"
 
 extern fsconfig_array server_config;
+extern struct server_configuration_s g_server_config;
 extern gen_mutex_t *g_session_tag_mt_lock;
 
 /* PVFS_finalize
@@ -31,6 +32,8 @@ int PVFS_sys_finalize()
 	
     /* shut down bucket interface */
     PINT_bucket_finalize();
+
+    PINT_server_config_release(&g_server_config);
 	
     /* get rid of the mutex for the BMI session tag identifier */
     gen_mutex_lock(g_session_tag_mt_lock);

@@ -70,4 +70,7 @@ char *PINT_server_config_get_host_alias_ptr(struct server_configuration_s *confi
 char *PINT_server_config_get_handle_range_str(struct server_configuration_s *config_s,
                                               struct filesystem_configuration_s *fs);
 
+int PINT_server_config_is_valid_collection_id(
+    struct server_configuration_s *config_s, TROVE_coll_id coll_id);
+
 #endif  /* __SERVER_CONFIG_H */
