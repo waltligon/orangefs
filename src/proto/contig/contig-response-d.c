@@ -22,11 +22,10 @@ DECODE_RESP_HEAD(do_decode_resp)
 	memcpy(target_msg->buffer,response,response->rsize);
 	switch(response->op)
 	{
-		case PVFS_SERV_CREATE:
-			return 0;
+
 		case PVFS_SERV_GETCONFIG:
 			((struct PVFS_server_resp_s *)target_msg->buffer)->u.getconfig.meta_server_mapping 
-					= (char *)(target_msg->buffer 
+				= (char *)(target_msg->buffer 
 							+ sizeof(struct PVFS_server_resp_s));
 			((struct PVFS_server_resp_s *)target_msg->buffer)->u.getconfig.io_server_mapping 
 					= (char *)(target_msg->buffer 
@@ -43,8 +42,23 @@ DECODE_RESP_HEAD(do_decode_resp)
 						sizeof(PVFS_handle)*response->u.lookup_path.count);
 			return 0;
 
-		default:
+		case PVFS_SERV_READDIR:
+			((struct PVFS_server_resp_s *)target_msg->buffer)->u.readdir.pvfs_dirent_array =
+					(PVFS_dirent *)(target_msg->buffer+sizeof(struct PVFS_server_resp_s));
 			return 0;
+
+		case PVFS_SERV_CREATE:
+		case PVFS_SERV_NOOP:
+		case PVFS_SERV_SETATTR:
+		case PVFS_SERV_REMOVE:
+		case PVFS_SERV_RMDIR:
+		case PVFS_SERV_CREATEDIRENT:
+		case PVFS_SERV_MKDIR:
+		case PVFS_SERV_RMDIRENT:
+		case PVFS_SERV_GETATTR:
+			return 0;
+		default:
+			return -1;
 	}
 	return -1;
 }

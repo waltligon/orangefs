@@ -50,7 +50,6 @@ int do_encode_resp(
 	     *	we should not call it.
 	     * TODO: Are we still using Generic ACK? dw 07.01.03
 	     */
-				//free(target_msg->buffer_list);
 	case PVFS_SERV_NOOP:
 	case PVFS_SERV_SETATTR:
 	case PVFS_SERV_REMOVE:
