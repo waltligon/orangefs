@@ -22,16 +22,17 @@ int parse_args(int argc, char **argv);
 int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
 
 #define KEYVAL_ARRAY_LEN 10
+
 int main(int argc, char **argv)
 {
-    int ret, chunk, num_processed, count, i,j;
+    int ret, num_processed, count, i,j;
     TROVE_op_id op_id;
     TROVE_coll_id coll_id;
     TROVE_handle handle;
     TROVE_ds_state state;
     TROVE_keyval_s key[KEYVAL_ARRAY_LEN], val[KEYVAL_ARRAY_LEN];
     TROVE_ds_position pos = TROVE_ITERATE_START;
-    char *method_name, *dir_name;
+    char *method_name;
     char path_name[PATH_SIZE];
 
     TROVE_handle ls_handle[KEYVAL_ARRAY_LEN];
@@ -81,33 +82,31 @@ int main(int argc, char **argv)
 	    val[j].buffer = &ls_handle[j]; 
 	    val[j].buffer_sz = sizeof(ls_handle);
     }
-    num_processed = chunk = KEYVAL_ARRAY_LEN;
-    while ( num_processed == chunk) { 
-	    ret = trove_keyval_iterate(coll_id,
-				       handle,
-				       &pos,
-				       key,
-				       val,
-				       &num_processed,
-				       0,
-				       NULL,
-				       NULL, 
-				       &op_id);
-	    if (ret != -1) {
-		    do {
-			    ret=trove_dspace_test(coll_id, op_id, \
-					    &count, NULL, NULL, &state);
-		    } while (ret == 0);
-		    if (ret < 0) return -1; 
-		    /* we've got an array full of keyvals. 
-		     * do something with them */
-		    for(i = 0; i < num_processed; i++ ) {
-			    printf("%s (%Ld)\n", (char *) key[i].buffer, 
-					    *(TROVE_handle *) val[i].buffer);
-		    }
-	    }
-    }
 
+    for (;;) {
+	num_processed = KEYVAL_ARRAY_LEN;
+	ret = trove_keyval_iterate(coll_id,
+				   handle,
+				   &pos,
+				   key,
+				   val,
+				   &num_processed,
+				   0,
+				   NULL,
+				   NULL, 
+				   &op_id);
+	if (ret == -1) return -1;
+
+	while (ret != 1) ret=trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+	if (ret < 0) return -1; 
+	
+	if (num_processed == 0) return 0;
+	
+	for(i = 0; i < num_processed; i++ ) {
+	    printf("%s (%Ld)\n", (char *) key[i].buffer, *(TROVE_handle *) val[i].buffer);
+	}
+    }
+    
     return 0;
 }
 
@@ -169,4 +168,6 @@ int parse_args(int argc, char **argv)
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=4
  */

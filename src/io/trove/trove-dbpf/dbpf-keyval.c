@@ -346,7 +346,7 @@ static int dbpf_keyval_iterate(
     q_op_p->op.u.k_iterate.key_array  = key_array;
     q_op_p->op.u.k_iterate.val_array  = val_array;
     q_op_p->op.u.k_iterate.position_p = position_p;
-    q_op_p->op.u.k_iterate.count      = inout_count_p;
+    q_op_p->op.u.k_iterate.count_p    = inout_count_p;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
@@ -354,32 +354,56 @@ static int dbpf_keyval_iterate(
 }
 
 /* dbpf_keyval_iterate_op_svc()
+ *
+ * Operation:
+ *
+ * If position is TROVE_ITERATE_START, we set the position to the
+ * start of the database (keyval space) and read, returning the
+ * position of the last read keyval.
+ *
+ * If position is TROVE_ITERATE_END, then we hit the end previously,
+ * so we just return that we are done and that there are 0 things read.
+ *
+ * Otherwise we read and return the position of the last read keyval.
+ *
+ * In all cases we read using DB_NEXT.  This is ok because it behaves like
+ * DB_FIRST (read the first record) when called with an uninitialized
+ * cursor (so we just don't initialize the cursor in the TROVE_ITERATE_START
+ * case).
+ *
  */
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 {
     int ret, i=0;
+    db_recno_t recno;
     DB *db_p;
     DBC *dbc_p;
     DBT key, data;
+
+    /* if they passed in that they are at the end, return 0.
+     *
+     * this seems silly maybe, but it makes while (count) loops
+     * work right.
+     */
+    if (*op_p->u.k_iterate.position_p == TROVE_ITERATE_END) {
+	*op_p->u.k_iterate.count_p = 0;
+	return 1;
+    }
 
     ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 1, &db_p);
     switch (ret) {
 	case DBPF_KEYVAL_DBCACHE_ERROR:
 	    goto return_error;
 	case DBPF_KEYVAL_DBCACHE_BUSY:
-	    return 0;
+	    return 0; /* try again later */
 	case DBPF_KEYVAL_DBCACHE_SUCCESS:
 	    /* drop through */
     }
-
-    /* grab out key/value pairs */
 
     /* get a cursor */
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
     if (ret != 0) goto return_error;
 
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
 
     /* we have two choices here: 'seek' to a specific key by either a:
      * specifying a key or b: using record numbers in the db.  record numbers
@@ -388,61 +412,103 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
      * to keep in mind if at some point simultaneous modifications to pvfs
      * perform badly.   -- robl */
 
-    key.data = op_p->u.k_iterate.key_array[0].buffer;
-    key.size = key.ulen = op_p->u.k_iterate.key_array[0].buffer_sz;
-    data.data = op_p->u.k_iterate.val_array[0].buffer;
-    data.size = data.ulen = op_p->u.k_iterate.val_array[0].buffer_sz;
+    if (*op_p->u.k_iterate.position_p != TROVE_ITERATE_START) {
+	/* need to position cursor before reading.  note that this will
+	 * actually position the cursor over the last thing that was read
+	 * on the last call, so we don't need to return what we get back.
+	 */
 
-    *(TROVE_ds_position *)key.data = *(op_p->u.k_iterate.position_p);
-    key.flags |= DB_DBT_USERMEM;
-    data.flags |= DB_DBT_USERMEM;
-
-    /* position the cursor and grab the first key/value pair */
-    ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
-    if (ret == DB_NOTFOUND) {
-	/* no more pairs: tell caller how many we processed */
-	*(op_p->u.k_iterate.count)=0; 
-    }
-    else if (ret != 0) goto return_error;
-    else {
-	for (i=1; i < *(op_p->u.k_iterate.count); i++) {
-	    key.data = op_p->u.k_iterate.key_array[i].buffer;
-	    key.size = key.ulen = op_p->u.k_iterate.key_array[i].buffer_sz;
-	    key.flags |= DB_DBT_USERMEM;
-	    data.data = op_p->u.k_iterate.val_array[i].buffer;
-	    data.size = data.ulen = op_p->u.k_iterate.val_array[i].buffer_sz;
-	    data.flags |= DB_DBT_USERMEM;
-	    
-	    ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-	    if (ret == DB_NOTFOUND) {
-		/* no more pairs: tell caller how many we processed */
-		*(op_p->u.k_iterate.count)=i; 
-	    }
-	    else if (ret != 0) goto return_error;
+	/* here we make sure that the key is big enough to hold the
+	 * position that we need to pass in.
+	 */
+	memset(&key, 0, sizeof(key));
+	if (sizeof(recno) < op_p->u.k_iterate.key_array[0].buffer_sz) {
+	    key.data = op_p->u.k_iterate.key_array[0].buffer;
+	    key.size = key.ulen = op_p->u.k_iterate.key_array[0].buffer_sz;
 	}
+	else {
+	    key.data = &recno;
+	    key.size = key.ulen = sizeof(recno);
+	}
+	*(TROVE_ds_position *) key.data = *op_p->u.k_iterate.position_p;
+	key.flags |= DB_DBT_USERMEM;
 
-	*(op_p->u.k_iterate.position_p) += i;
+	memset(&data, 0, sizeof(data));
+	data.data = op_p->u.k_iterate.val_array[0].buffer;
+	data.size = data.ulen = op_p->u.k_iterate.val_array[0].buffer_sz;
+	data.flags |= DB_DBT_USERMEM;
+
+	/* position the cursor and grab the first key/value pair */
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
+	if (ret == DB_NOTFOUND) goto return_ok;
+	else if (ret != 0) goto return_error;
     }
 
-    /* 'position' is the record we will read next time through */
-    /* XXX: right now, 'posistion' gets set to garbage when we hit the end.
-     * well, not exactly 'garbage', but it gets incremented here even in the
-     * end-of-database case ( come in, ask for one, read zero (hit end):
-     * position still gets incremented ).  It might be helpful (or at least
-     * consistent) if posistion always pointed to the 'next' place to access,
-     * even if that's one place past the end of the database ... or maybe i'm
-     * putting too much weight on 'posistion's value at the end */
+    for (i=0; i < *op_p->u.k_iterate.count_p; i++)
+    {
+	memset(&key, 0, sizeof(key));
+	key.data = op_p->u.k_iterate.key_array[i].buffer;
+	key.size = key.ulen = op_p->u.k_iterate.key_array[i].buffer_sz;
+	key.flags |= DB_DBT_USERMEM;
 
+	memset(&data, 0, sizeof(data));
+	data.data = op_p->u.k_iterate.val_array[i].buffer;
+	data.size = data.ulen = op_p->u.k_iterate.val_array[i].buffer_sz;
+	data.flags |= DB_DBT_USERMEM;
+	
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
+	if (ret == DB_NOTFOUND) goto return_ok;
+	else if (ret != 0) goto return_error;
+    }
+    
+return_ok:
+    if (ret == DB_NOTFOUND) {
+	*op_p->u.k_iterate.position_p = TROVE_ITERATE_END;
+    }
+    else {
+	char buf[64];
+	/* get the record number to return.
+	 *
+	 * note: key field is ignored by c_get in this case.  sort of.
+	 * i'm not actually sure what they mean by "ignored", because
+	 * it sure seems to matter what you put in there...
+	 *
+	 * TODO: FIGURE OUT WHAT IS GOING ON W/KEY AND TRY TO AVOID USING
+	 * ANY MEMORY.
+	 */
+	memset(&key, 0, sizeof(key));
+	key.data  = buf;
+	key.size  = key.ulen = 64;
+	key.dlen  = 64;
+	key.doff  = 0;
+	key.flags |= DB_DBT_USERMEM | DB_DBT_PARTIAL;
+
+	memset(&data, 0, sizeof(data));
+	data.data = &recno;
+	data.size = data.ulen = sizeof(recno);
+	data.flags |= DB_DBT_USERMEM;
+
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
+	if (ret == DB_NOTFOUND) printf("iterate -- notfound\n");
+	else if (ret != 0) printf("iterate -- some other failure @ recno\n");
+
+	*op_p->u.k_iterate.position_p = recno;
+    }
+    /* 'position' points us to the record we just read, or is set to END */
+
+    *op_p->u.k_iterate.count_p = i;
+
+    /* give up the db reference */
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
 
     /* free the cursor */
     ret = dbc_p->c_close(dbc_p);
     if (ret != 0) goto return_error;
     return 1;
-
- return_error:
+    
+return_error:
     fprintf(stderr, "dbpf_keyval_iterate_op_svc: %s\n", db_strerror(ret));
-    *(op_p->u.k_iterate.count)=i; 
+    *op_p->u.k_iterate.count_p = i;
     return -1;
 }
 

@@ -251,8 +251,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 	printf("handle at recno = %Ld\n", dummy_handle);
     }
 
-    /* read more handles until we run out of handles or space in buffer */
-    for (/* i init'd at top of fn */; i < *op_p->u.d_iterate_handles.count_p; i++) {
+    /* read handles until we run out of handles or space in buffer */
+    for (i = 0; i < *op_p->u.d_iterate_handles.count_p; i++) {
 	memset(&key, 0, sizeof(key));
 	key.data = &op_p->u.d_iterate_handles.handle_array[i];
 	key.size = key.ulen = sizeof(TROVE_handle);
@@ -298,7 +298,7 @@ return_ok:
 
 	*op_p->u.d_iterate_handles.position_p = recno;
     }
-    /* 'position' is the record we will read next time through */
+    /* 'position' points us to the record we just read, or is set to END */
 
     *op_p->u.d_iterate_handles.count_p = i;
 

@@ -120,7 +120,7 @@ struct dbpf_keyval_iterate_op {
     TROVE_keyval_s *key_array;
     TROVE_keyval_s *val_array;
     TROVE_ds_position *position_p;
-    int *count;
+    int *count_p;
     /* vtag? */
 };
 
