@@ -16,6 +16,7 @@ my @opt_ioservers = ();
 my @opt_metaservers = ();
 my $opt_logfile = '';
 my $opt_storage = '';
+my $opt_trovesync = '1';
 my $opt_quiet = '';
 my $opt_logging = '';
 
@@ -218,7 +219,12 @@ sub emit_filesystem
 
     print $target "\t<StorageHints>\n";
     print $target "\t\tHandleRecycleTimeoutSecs $handle_recycle_timeout_seconds\n";
-    print $target "\t\tTroveSyncMode sync\n";
+    if ($opt_trovesync == 1) {
+	    print $target "\t\tTroveSyncMode sync\n";
+    } else {
+	    print $target "\t\tTroveSyncMode nosync\n";
+    }
+
     print $target "\t\tAttrCacheKeywords datafile_handles,metafile_dist\n";
     print $target "\t\tAttrCacheKeywords dir_ent, symlink_target\n";
     print $target "\t\tAttrCacheSize 1031\n";
@@ -268,6 +274,7 @@ sub usage
     print "     --logfile     <STRING>         logfile location\n";
     print "     --logging     <STRING>         debugging mask for log messages.\n";
     print "     --storage     <STRING>         storage space location\n";
+    print "     --notrovesync                  sync metadata only upon request\n";
     print "     --quiet                        run silently\n\n";
 
     print "The two arguments specify the names of the configuration files\n";
@@ -456,6 +463,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
 	   'storage=s'     => \$opt_storage,
 	   'help'          => \$show_help,
 	   'quiet!'        => \$opt_quiet,
+	   'trovesync!'   => \$opt_trovesync,
 	   '-'		   => \$using_stdout);
 
 if($show_help) {
