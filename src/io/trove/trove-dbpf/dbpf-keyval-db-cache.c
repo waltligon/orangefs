@@ -25,7 +25,7 @@
  */
 
 enum {
-    DBCACHE_ENTRIES = 4
+    DBCACHE_ENTRIES = 16
 };
 
 struct keyval_dbcache_entry {
