@@ -8,6 +8,7 @@
 #define __PINT_PERF_COUNTER_H
 
 #include "pvfs2-types.h"
+#include "pvfs2-mgmt.h"
 
 #define PINT_PERF_HISTORY_SIZE 8
 
@@ -33,6 +34,12 @@ void PINT_perf_count(enum PINT_perf_count_keys key,
     enum PINT_perf_ops op);
 
 void PINT_perf_rollover(void);
+
+void PINT_perf_retrieve(
+    uint32_t* next_id,
+    struct PVFS_mgmt_perf_stat* perf_array,
+    int count,
+    uint64_t* end_time_ms);
 
 #endif /* __PINT_PERF_COUNTER_H */
 

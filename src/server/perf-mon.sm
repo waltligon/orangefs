@@ -9,8 +9,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/time.h>
 
 #include "pvfs2-server.h"
+#include "pint-perf-counter.h"
 
 static int perf_mon_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int perf_mon_do_work(PINT_server_op *s_op, job_status_s* js_p);
@@ -54,6 +56,10 @@ machine pvfs2_perf_mon_sm(prelude, do_work, final_response, cleanup)
 static int perf_mon_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
     PINT_STATE_DEBUG("cleanup");
+
+    if(s_op->resp.u.mgmt_perf_mon.perf_array)
+	free(s_op->resp.u.mgmt_perf_mon.perf_array);
+
     return(server_state_machine_complete(s_op));
 }
 
@@ -63,11 +69,36 @@ static int perf_mon_cleanup(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int perf_mon_do_work(PINT_server_op *s_op, job_status_s* js_p)
 {
+    struct timeval tv;
+
     PINT_STATE_DEBUG("do_work");
 
-    /* TODO: fill this in */
+    /* allocate memory to hold statistics */
+    s_op->resp.u.mgmt_perf_mon.perf_array 
+	= (struct PVFS_mgmt_perf_stat*)malloc(s_op->req->u.mgmt_perf_mon.count *
+	sizeof(struct PVFS_mgmt_perf_stat));
+    if(!s_op->resp.u.mgmt_perf_mon.perf_array)
+    {
+	js_p->error_code = -PVFS_ENOMEM;
+	return(1);
+    }
 
-    js_p->error_code = -PVFS_ENOSYS;
+    /* fill in some of the response */
+    gettimeofday(&tv, NULL);
+    s_op->resp.u.mgmt_perf_mon.cur_time_ms = tv.tv_sec*1000 + 
+	tv.tv_usec/1000;
+    s_op->resp.u.mgmt_perf_mon.suggested_next_id 
+	= s_op->req->u.mgmt_perf_mon.next_id;
+    s_op->resp.u.mgmt_perf_mon.perf_array_count
+	= s_op->req->u.mgmt_perf_mon.count;
+
+    /* get statistics */
+    PINT_perf_retrieve(&s_op->resp.u.mgmt_perf_mon.suggested_next_id,
+	s_op->resp.u.mgmt_perf_mon.perf_array,
+	s_op->resp.u.mgmt_perf_mon.perf_array_count,
+	&s_op->resp.u.mgmt_perf_mon.end_time_ms);
+
+    js_p->error_code = 0;
     return(1);
 }
 

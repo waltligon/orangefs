@@ -588,6 +588,7 @@ struct PVFS_servresp_mgmt_perf_mon
 {
     struct PVFS_mgmt_perf_stat* perf_array;	/* array of statistics */
     uint32_t perf_array_count;		/* size of above array */
+    uint32_t suggested_next_id;		/* next id to pick up from this point */
     uint64_t end_time_ms;		/* end time for final array entry */
     uint64_t cur_time_ms;		/* current time according to svr */
 };

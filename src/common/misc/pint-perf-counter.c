@@ -127,6 +127,61 @@ void PINT_perf_rollover(void)
     return;
 }
 
+/* PINT_perf_retrieve()
+ *
+ * fills in an array of performance statistics, beginning with next_id
+ * (which is updated before the call returns).  
+ *
+ * no return value
+ */
+void PINT_perf_retrieve(
+    uint32_t* next_id,
+    struct PVFS_mgmt_perf_stat* perf_array,
+    int count,
+    uint64_t* end_time_ms)
+{
+    int tmp_tail;
+    int tmp_index = 0;
+
+    tmp_tail = perf_count_tail;
+
+    /* find out how to pick up at the lowest id not less that the requested 
+     * next id
+     */
+    while(perf_count_id[tmp_tail] < *next_id && tmp_tail != perf_count_head)
+    {
+	tmp_tail = (tmp_tail+1)%PINT_PERF_HISTORY_SIZE;
+    }
+
+    /* fill in as many valid perf stat entries as we can */
+    while(tmp_tail != perf_count_head && tmp_index < count)
+    {
+	perf_array[tmp_index].valid_flag = 1;
+	perf_array[tmp_index].id = perf_count_id[tmp_tail];
+	perf_array[tmp_index].start_time_ms 
+	    = perf_count_start_times_ms[tmp_tail];
+	perf_array[tmp_index].write 
+	    = perf_count_matrix[PINT_PERF_WRITE][tmp_tail];
+	perf_array[tmp_index].read 
+	    = perf_count_matrix[PINT_PERF_READ][tmp_tail];
+
+	tmp_tail = (tmp_tail+1)%PINT_PERF_HISTORY_SIZE;
+	tmp_index++;
+    }
+
+    /* mark the rest as invalid */
+    while(tmp_index < count)
+    {
+	perf_array[tmp_index].valid_flag = 0;
+	tmp_index++;
+    }
+
+    /* update next_id to what the client should ask for next */
+    *next_id = perf_count_id[tmp_tail];
+    *end_time_ms = perf_count_start_times_ms[tmp_tail];
+    return;
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4
