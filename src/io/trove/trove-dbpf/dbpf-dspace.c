@@ -226,6 +226,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 	if ((ret = db_p->sync(db_p, 0)) != 0)
         {
             gossip_err("error in dspace create (db_p->sync failed).\n");
+            trove_handle_free(op_p->coll_p->coll_id, new_handle);
 	    goto return_error;
 	}
     }
@@ -356,7 +357,6 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     return 1;
 
 return_error:
-    trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
     if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return error;
 }
