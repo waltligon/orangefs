@@ -455,7 +455,6 @@ int PINT_bucket_get_server_name(
     PVFS_fs_id fsid)
 {
     int ret = -EINVAL;
-    int len = 0;
     struct llist *cur = NULL;
     struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
     struct qlist_head *hash_link = NULL;
@@ -487,11 +486,8 @@ int PINT_bucket_get_server_name(
             if (PINT_handle_in_extent_list(
                     cur_host_extent_table->extent_list, handle))
             {
-                len = strlen(cur_host_extent_table->bmi_address) + 1;
-                len = ((len < max_server_name_len) ? len :
-                       max_server_name_len);
-                memcpy(server_name,cur_host_extent_table->bmi_address,len);
-                server_name[len-1] = '\0';
+                strncpy(server_name,cur_host_extent_table->bmi_address,
+                        max_server_name_len);
                 ret = 0;
                 break;
             }
@@ -594,9 +590,15 @@ static void free_host_extent_table(void *ptr)
     assert(cur_host_extent_table->bmi_address);
     assert(cur_host_extent_table->extent_list);
 
-    free(cur_host_extent_table->bmi_address);
+    /*
+      NOTE: cur_host_extent_table->bmi_address is a ptr
+      into a g_server_config->host_aliases object.
+      it is properly freed by PINT_server_config_release
+    */
+    cur_host_extent_table->bmi_address = (char *)0;
     llist_free(cur_host_extent_table->extent_list,
                free_extent_list);
+    free(cur_host_extent_table);
 }
 
 #endif
