@@ -17,6 +17,8 @@
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "pint-sysint-utils.h"
+#include "server-config.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -98,7 +100,15 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    cur_fs = resp_init.fsid_list[mnt_index];
+    cur_fs = PINT_config_get_fs_id_by_fs_name(
+        PINT_get_server_config_struct(),
+        mnt.ptab_array[mnt_index].pvfs_fs_name);
+    if (cur_fs == (PVFS_fs_id)0)
+    {
+	fprintf(stderr, "Failure: could not get fs configuration "
+                "for %s.\n", mnt.ptab_array[mnt_index].pvfs_fs_name);
+	return(-1);
+    }
 
     creds.uid = getuid();
     creds.gid = getgid();
