@@ -31,4 +31,6 @@ doc/pvfs2-guide.ps
 Documentation of interest to developers can be found in doc/design and 
 doc/coding, although it may not be in sync with the current code.
 
+Project contributions are listed in the AUTHORS and CREDITS files.
+
 -PVFS2 Development Team

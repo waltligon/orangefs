@@ -5,6 +5,7 @@ Pete Wyckoff <pw@osc.edu>
 -- Infiniband support
    little endian encoding/decoding
    IA64/Alpha clean compilation fixes
+   extensive testing
 
 Jiesheng Wu <wujs@mcs.anl.gov>
 -- buffer cache development (in progress)
@@ -12,10 +13,19 @@ Jiesheng Wu <wujs@mcs.anl.gov>
 Nathan Poznick <poznick@conwaycorp.net>
 -- extensive testing and suggestions (linux vfs interface)
    various pvfs2-client related patches (noted in cvs logs)
+   authored the pvfs2-chown admin utility program
+   detailed bug reporting and analysis
 
 Murali Vilayannur <vilayann@mcs.anl.gov>
 -- testing and development
+   initial linux 2.4.x prototype (before 2.6.x merge)
+   initial 64-bit operation tag implementation
 
+Sven Marnach <sven@pvs.informatik.uni-heidelberg.de>
+-- fixed makefile LD selection and html docs target
+
+Philipp Sadleder <philipp@sadleder.de>
+-- reported a problem with large username handling in pvfs2-ls
 
 Other contributors
 ==================
