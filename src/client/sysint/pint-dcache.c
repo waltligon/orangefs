@@ -538,7 +538,7 @@ static int dcache_update_dentry_timestamp(dcache_entry* entry)
         entry->tstamp_valid.tv_sec +=
             (int)(s_pint_dcache_timeout_ms / 1000);
         entry->tstamp_valid.tv_usec +=
-            (int)(s_pint_dcache_timeout_ms % 1000);
+            (int)((s_pint_dcache_timeout_ms % 1000) * 1000);
     }
     return ret;
 }
