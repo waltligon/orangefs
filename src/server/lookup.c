@@ -429,7 +429,8 @@ static int lookup_send_response(PINT_server_op *s_op,
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_send_response\n");
 
-    if (ret->error_code != 0) {
+    if (ret->error_code != 0 && ret->error_code != STATE_NOMORESEGS && ret->error_code != STATE_ENOTDIR)
+    {
 	/* as mentioned in lookup_read_directory_entry, on error seg_nr
 	 * is one too large.
 	 */
