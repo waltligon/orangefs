@@ -2028,8 +2028,10 @@ int job_test(
 	ret = completion_query(id, out_count_p, returned_user_ptr_p, 
 		out_status_p);
 	/* return here on error or completion */
-	if(ret < 0 || (*out_count_p > 0))
+	if(ret < 0)
 		return(ret);
+	if(ret == 0 && (*out_count_p > 0))
+		return(1);
 
 	/* bail out if timeout is zero */
 	if(!timeout_ms)
@@ -2083,8 +2085,10 @@ int job_test(
 			ret = completion_query(id, out_count_p, returned_user_ptr_p, 
 				out_status_p);
 			/* return here on error or completion */
-			if(ret < 0 || (*out_count_p > 0))
+			if(ret < 0)
 				return(ret);
+			if(ret == 0 && (*out_count_p > 0))
+				return(1);
 		}
 
 #else /* __PVFS2_JOB_THREADED__ */
@@ -2101,8 +2105,10 @@ int job_test(
 			ret = completion_query(id, out_count_p, returned_user_ptr_p, 
 				out_status_p);
 			/* return here on error or completion */
-			if(ret < 0 || (*out_count_p > 0))
+			if(ret < 0)
 				return(ret);
+			if(ret == 0 && (*out_count_p > 0))
+				return(1);
 		}
 
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -2196,11 +2202,17 @@ int job_testsome(
 		&returned_user_ptr_array[total_completed], 
 		&out_status_array_p[total_completed]);
 	/* return here on error or completion */
-	if(ret < 0 || (*inout_count_p == original_count))
+	if(ret < 0)
 	{
 		free(tmp_id_array);
 		return(ret);
 	}
+	if(ret == 0 && (*inout_count_p == original_count))
+	{
+		free(tmp_id_array);
+		return(1);
+	}
+
 	/* bail out if timeout is zero */
 	if(!timeout_ms)
 	{
@@ -2268,11 +2280,17 @@ int job_testsome(
 				&returned_user_ptr_array[total_completed], 
 				&out_status_array_p[total_completed]);
 			/* return here on error or completion */
-			if(ret < 0 || 
-				((*inout_count_p + total_completed) == original_count))
+			if(ret < 0)
 			{
 				free(tmp_id_array);
 				return(ret);
+			}
+			if(ret == 0 && 
+				(*inout_count_p + total_completed == original_count))
+			{
+				*inout_count_p = original_count;
+				free(tmp_id_array);
+				return(1);
 			}
 
 			total_completed += *inout_count_p;
@@ -2298,11 +2316,17 @@ int job_testsome(
 				&returned_user_ptr_array[total_completed], 
 				&out_status_array_p[total_completed]);
 			/* return here on error or completion */
-			if(ret < 0 || 
-				((*inout_count_p + total_completed) == original_count))
+			if(ret < 0)
 			{
 				free(tmp_id_array);
 				return(ret);
+			}
+			if(ret == 0 && 
+				(*inout_count_p + total_completed == original_count))
+			{
+				*inout_count_p = original_count;
+				free(tmp_id_array);
+				return(1);
 			}
 
 			total_completed += *inout_count_p;
@@ -2328,10 +2352,13 @@ int job_testsome(
 
 	} while(timeout_remaining > 0);
 
-	/* fall through, nothing done, time is used up */
+	/* fall through, not everything is done, time is used up */
 	*inout_count_p = total_completed;
 	free(tmp_id_array);
-	return(0);
+	if(total_completed > 0)
+		return(1);
+	else
+		return(0);
 }
 
 /* job_testworld()
@@ -2394,10 +2421,11 @@ int job_testworld(
 		returned_user_ptr_array,
 		out_status_array_p);
 	/* return here on error or completion */
-	if(ret < 0 || (*inout_count_p) > 0 )
-	{
+	if(ret < 0)
 		return(ret);
-	}
+	if(ret == 0 && (*inout_count_p > 0))
+		return(1);
+
 	/* bail out if timeout is zero */
 	if(!timeout_ms)
 	{
@@ -2459,10 +2487,10 @@ int job_testworld(
 				returned_user_ptr_array,
 				out_status_array_p);
 			/* return here on error or completion */
-			if(ret < 0 || (*inout_count_p) > 0 )
-			{
+			if(ret < 0)
 				return(ret);
-			}
+			if(ret == 0 && (*inout_count_p > 0))
+				return(1);
 
 			*inout_count_p = original_count;
 		}
@@ -2484,10 +2512,10 @@ int job_testworld(
 				returned_user_ptr_array,
 				out_status_array_p);
 			/* return here on error or completion */
-			if(ret < 0 || (*inout_count_p) > 0 )
-			{
+			if(ret < 0)
 				return(ret);
-			}
+			if(ret == 0 && (*inout_count_p > 0))
+				return(1);
 
 			*inout_count_p = original_count;
 		}
