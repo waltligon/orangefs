@@ -5,7 +5,6 @@
  */
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -57,9 +56,22 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 
     PINT_STATE_DEBUG("work");
 
-    assert(0);
+    switch(s_op->req->u.mgmt_setparam.param)
+    {
+	case PVFS_SERV_PARAM_GOSSIP_MASK:
+	    gossip_set_debug_mask(1, (int)s_op->req->u.mgmt_setparam.value);
+	    js_p->error_code = 0;
+	    return(1);
+	case PVFS_SERV_PARAM_INVALID:
+	    gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",
+		(int)s_op->req->u.mgmt_setparam.param);
+	    js_p->error_code = -PVFS_ENOSYS;
+	    return(1);
+    }
 
-    js_p->error_code = 0;
+    gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",
+	(int)s_op->req->u.mgmt_setparam.param);
+    js_p->error_code = -PVFS_ENOSYS;
     return(1);
 }
 
