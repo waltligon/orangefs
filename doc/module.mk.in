@@ -2,6 +2,7 @@ DIR := doc
 DOCSRC +=\
 	$(DIR)/pvfs2-quickstart.tex \
 	$(DIR)/pvfs2-guide.tex \
+	$(DIR)/pvfs2-faq.tex \
 	$(DIR)/pvfs2-status.tex
 
 # some extra dependency information

@@ -26,7 +26,28 @@ use Cwd;
 use Getopt::Long;
 use File::Basename;
 
-GetOptions("o=s" => \$outputpath, "i=s" => \$inputpath) || die "GetOptions: $!";
+
+sub process_latex
+{
+	my($input,$do_html);
+	$input = $_[0];
+	$do_html = $_[1];
+	my $latex2html_cmd = "latex2html -split 0 -show_section_numbers -nonavigation";
+
+	if ($do_html)
+	{
+		system "latex $input";  # latex2html needs the .aux file
+		system "$latex2html_cmd $input";
+	} else {
+		system "latex $infile";
+		system "latex $infile"; # once more to get figures correct
+		system "latex $infile"; # sometimes it takes a third pass
+	}
+}
+
+GetOptions("o=s" => \$outputpath, 
+           "i=s" => \$inputpath,
+	   "html" => \$make_html) || die "GetOptions: $!";
 
 if (!defined($outputpath) || !defined($inputpath)) {
     die "usage: pvfs2latexwrapper.pl -o <outputfile> -i <inputfile>\n";
@@ -47,6 +68,7 @@ chdir "$startdir";
 chdir "$outdir";
 $outdir   = cwd();
 
+print "outdir = $outdir indir = $indir\n";
 if ($outdir ne $indir) {
     my @info = ();
 
@@ -70,10 +92,7 @@ if ($outdir ne $indir) {
     }
     close FILE;
 
-
-    system "latex $infile";
-    system "latex $infile"; # once more to get figures correct
-    system "latex $infile"; # and sometimes it takes a *third* pass
+    process_latex($infile, $make_html);
 
     # Note: leaving the "figs" link there; helps in ps/pdf build.
     # unlink $infile, "figs";
@@ -84,7 +103,5 @@ if ($outdir ne $indir) {
     }
 }
 else {
-    system "latex $infile";
-    system "latex $infile"; # once more to get figures correct
-    system "latex $infile"; # and sometimes it takes a *third* pass
+    process_latex($infile, $make_html);
 }
