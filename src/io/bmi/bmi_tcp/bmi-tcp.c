@@ -1282,7 +1282,7 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
 	/* NOTE: this may place other operations beside this one into
 	 * EINTR error state 
 	 */
-	tcp_forget_addr(query_op->addr, 0, bmi_tcp_errno_to_pvfs(-EINTR));
+	tcp_forget_addr(query_op->addr, 0, -BMI_ECANCEL);
 	gen_mutex_unlock(&interface_mutex);
 	return(0);
     }
@@ -1292,7 +1292,7 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
      */
 
     /* mark op as canceled, move to completion queue */
-    query_op->error_code = bmi_tcp_errno_to_pvfs(-EINTR);
+    query_op->error_code = -BMI_ECANCEL;
     if(query_op->send_recv == BMI_SEND)
     {
 	BMI_socket_collection_remove_write_bit(tcp_socket_collection_p,

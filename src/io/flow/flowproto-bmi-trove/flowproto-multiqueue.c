@@ -373,7 +373,7 @@ int fp_multiqueue_cancel(flow_descriptor * flow_d)
     if(flow_d->state != FLOW_COMPLETE)
     {
 	assert(flow_d->state == FLOW_TRANSMITTING);
-	handle_io_error(-PVFS_EINTR, NULL, flow_data);
+	handle_io_error(-PVFS_ECANCEL, NULL, flow_data);
     }
     gen_mutex_unlock(flow_data->parent->flow_mutex);
 
