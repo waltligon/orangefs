@@ -392,6 +392,11 @@ static int io_send_completion_ack(PINT_server_op *s_op,
 		return(1);
 	}
 
+	/* release encoding of the first ack that we sent */
+	PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
+	/* zero size for safety */
+	s_op->encoded.total_size = 0;
+
 	/* fill in response -- status field is the only generic one we should have to set */
 	s_op->resp.status = js_p->error_code;
 	s_op->resp.u.write_completion.total_completed = s_op->u.io.flow_d->total_transfered;
