@@ -16,10 +16,48 @@
 #include <pvfs2-request.h>
 #include <pint-request.h>
 
+#include <debug.h>
+
 #define SEGMAX 16
 #define BYTEMAX (1024*1024)
 
-int main(int argc, char **argv)
+PVFS_offset exp1_offset[] =
+{
+		0
+};
+PVFS_offset exp1_size[] =
+{
+		1048576
+};
+PINT_Request_result exp[] =
+{{
+	   offset_array : &exp1_offset[0],
+	   size_array : &exp1_size[0],
+	   segmax : SEGMAX,
+	   segs : 1,
+	   bytes : 1048576
+}, {
+	   offset_array : &exp1_offset[0],
+	   size_array : &exp1_size[0],
+	   segmax : SEGMAX,
+	   segs : 1,
+	   bytes : 1048576
+}, {
+	   offset_array : &exp1_offset[0],
+	   size_array : &exp1_size[0],
+	   segmax : SEGMAX,
+	   segs : 1,
+	   bytes : 1048576
+}, {
+	   offset_array : &exp1_offset[0],
+	   size_array : &exp1_size[0],
+	   segmax : SEGMAX,
+	   segs : 1,
+	   bytes : 1048576
+}};
+
+
+int request_debug()
 {
 	int i;
 	PINT_Request *r;
@@ -126,8 +164,13 @@ int main(int argc, char **argv)
 	seg1.bytes = 0;
 
    /* Turn on debugging */
-	/* gossip_enable_stderr(); */
-	/* gossip_set_debug_mask(1,REQUEST_DEBUG); */
+	if (gossipflag)
+	{
+		gossip_enable_stderr();
+		gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG);
+	}
+
+	i = 0;
 
 	printf("\n************************************\n");
 	printf("Four requests in SERVER mode 4 each contiguous servers 0-3 of 4\n");
@@ -153,20 +196,12 @@ int main(int argc, char **argv)
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n",seg1.segs,Ld(seg1.bytes));
-			if(seg1.segs == 0)
-			{
-				fprintf(stderr, "  IEEE! no results to report.\n");
-			}
-			for(i=0; i<seg1.segs; i++)
-			{
-				printf("  segment %d: offset: %d size: %d\n",
-					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
-			}
+			prtseg(&seg1,"Results obtained");
+			prtseg(&exp[i],"Results expected");
+			cmpseg(&seg1,&exp[i]);
 		}
 
-
+		i++;
 
 	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0); 
 	
@@ -178,7 +213,6 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** first request done.\n");
-		printf("Result should be:\t0\t1048576\n");
 	}
 
 	printf("\n************************************\n");
@@ -202,18 +236,12 @@ int main(int argc, char **argv)
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
-			if(seg1.segs == 0)
-			{
-				fprintf(stderr, "  IEEE! no results to report.\n");
-			}
-			for(i=0; i<seg1.segs; i++)
-			{
-				printf("  segment %d: offset: %d size: %d\n",
-					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
-			}
+			prtseg(&seg1,"Results obtained");
+			prtseg(&exp[i],"Results expected");
+			cmpseg(&seg1,&exp[i]);
 		}
+
+		i++;
 
 	} while(!PINT_REQUEST_DONE(rs2) && retval >= 0);
 	
@@ -225,7 +253,6 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs2))
 	{
 		printf("**** second request done.\n");
-		printf("Result should be:\t0\t1048576\n");
 	}
 
 	printf("\n************************************\n");
@@ -249,18 +276,12 @@ int main(int argc, char **argv)
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
-			if(seg1.segs == 0)
-			{
-				fprintf(stderr, "  IEEE! no results to report.\n");
-			}
-			for(i=0; i<seg1.segs; i++)
-			{
-				printf("  segment %d: offset: %d size: %d\n",
-					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
-			}
+			prtseg(&seg1,"Results obtained");
+			prtseg(&exp[i],"Results expected");
+			cmpseg(&seg1,&exp[i]);
 		}
+
+		i++;
 
 	} while(!PINT_REQUEST_DONE(rs3) && retval >= 0);
 	
@@ -272,7 +293,6 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs3))
 	{
 		printf("**** third request done.\n");
-		printf("Result should be:\t0\t1048576\n");
 	}
 
 
@@ -297,18 +317,12 @@ int main(int argc, char **argv)
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
-			if(seg1.segs == 0)
-			{
-				fprintf(stderr, "  IEEE! no results to report.\n");
-			}
-			for(i=0; i<seg1.segs; i++)
-			{
-				printf("  segment %d: offset: %d size: %d\n",
-					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
-			}
+			prtseg(&seg1,"Results obtained");
+			prtseg(&exp[i],"Results expected");
+			cmpseg(&seg1,&exp[i]);
 		}
+
+		i++;
 
 	} while(!PINT_REQUEST_DONE(rs4) && retval >= 0);
 	
@@ -320,7 +334,6 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs4))
 	{
 		printf("**** fourth request done.\n");
-		printf("Result should be:\t0\t1048576\n");
 	}
 
 

@@ -21,8 +21,6 @@
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
 
-extern int gossipflag;
-
 PVFS_offset exp1_offset[] =
 {
 	0,

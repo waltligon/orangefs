@@ -16,66 +16,106 @@
 #include <pvfs2-request.h>
 #include <pint-request.h>
 
+#include <debug.h>
+
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
 
-int result1 [] = {
-	65536, 65536,
-	196608, 65536,
-	327680, 65536,
-	458752, 65536,
-	589824, 65536,
-	720896, 65536,
-	851968, 65536,
-	983040, 65536,
-	1114112, 65536,
-	1245184, 65536,
-	1376256, 65536,
-	1507328, 65536,
-	1638400, 65536,
-	1769472, 65536,
-	1900544, 65536,
-	2031616, 65536,
-	-1
+PVFS_offset exp1_offset [] = {
+	65536,
+	196608,
+	327680,
+	458752,
+	589824,
+	720896,
+	851968,
+	983040,
+	1114112,
+	1245184,
+	1376256,
+	1507328,
+	1638400,
+	1769472,
+	1900544,
+	2031616,
+	2162688,
+	2293760,
+	2424832,
+	2555904,
+	2686976,
+	2818048,
+	2949120,
+	3080192,
+	3211264,
+	3342336,
+	3473408,
+	3604480,
+	3735552,
+	3866624,
+	3997696,
+	4128768,
+	4259840
 };
 
-int result2 [] = {
-	2162688, 65536,
-	2293760, 65536,
-	2424832, 65536,
-	2555904, 65536,
-	2686976, 65536,
-	2818048, 65536,
-	2949120, 65536,
-	3080192, 65536,
-	3211264, 65536,
-	3342336, 65536,
-	3473408, 65536,
-	3604480, 65536,
-	3735552, 65536,
-	3866624, 65536,
-	3997696, 65536,
-	4128768, 65536,
-	-1
+PVFS_size exp1_size [] = {
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536,
+	65536
 };
 
-int result3 [] = {
-	 4259840, 65536,
-	-1
-};
+PINT_Request_result exp[] =
+{{
+	  offset_array : &exp1_offset[0],
+	  size_array : &exp1_size[0],
+	  segmax : SEGMAX,
+	  segs : 16,
+	  bytes : 16*65536
+}, {
+	  offset_array : &exp1_offset[16],
+	  size_array : &exp1_size[16],
+	  segmax : SEGMAX,
+	  segs : 16,
+	  bytes : 16*65536
+}, {
+	  offset_array : &exp1_offset[32],
+	  size_array : &exp1_size[32],
+	  segmax : SEGMAX,
+	  segs : 1,
+	  bytes : 65536
+}};
 
-void prtres(int *result)
-{
-	int *p = result;
-	printf("Result should be:\n");
-	while (*p != -1)
-	{
-		printf("\t%d\t%d\n",*p, *(p+1));
-		p+=2;
-	}
-}
 
-int main(int argc, char **argv)
+int request_debug()
 {
 	int i;
 	PINT_Request *r;
@@ -150,8 +190,13 @@ int main(int argc, char **argv)
 	seg1.segs = 0;
 
    /* Turn on debugging */
-	/* gossip_enable_stderr(); */
-	/* gossip_set_debug_mask(1,REQUEST_DEBUG); */
+	if (gossipflag)
+	{
+		gossip_enable_stderr();
+		gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG);
+	}
+
+	i = 0;
 
 	printf("\n************************************\n");
 	printf("One request in CLIENT mode size 4390228 contiguous server 0 of 2\n");
@@ -171,20 +216,14 @@ int main(int argc, char **argv)
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
-			if(seg1.segs == 0)
-			{
-				fprintf(stderr, "  AAIIEEE! no results to report.\n");
-			}
-			for(i=0; i<seg1.segs; i++)
-			{
-				printf("  segment %d: offset: %d size: %d\n",
-					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
-			}
-		}
+			 prtseg(&seg1,"Results obtained");
+	       prtseg(&exp[i],"Results expected");
+	       cmpseg(&seg1,&exp[i]);
+	   }
 
-		if(PINT_REQUEST_DONE(rs1))
+      i++;
+
+		if(PINT_REQUEST_DONE(rs1) && i < 3)
 		{
 			fprintf(stderr, "  AAIIEEE! Why am I done?\n");
 		}
@@ -198,9 +237,6 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** first request done.\n");
-		prtres(result1);
-		prtres(result2);
-		prtres(result3);
 	}
 
 	return 0;
