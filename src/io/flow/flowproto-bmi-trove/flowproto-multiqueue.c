@@ -67,8 +67,6 @@ struct fp_private_data
 
     gen_mutex_t empty_mutex;
     struct qlist_head empty_list;
-
-    PVFS_size bytes_from_src;
 };
 #define PRIVATE_FLOW(target_flow)\
     ((struct fp_private_data*)(target_flow->flow_protocol_data))
@@ -417,8 +415,6 @@ static void bmi_recv_callback_fn(void *user_ptr,
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
     gen_mutex_unlock(&flow_data->dest_mutex);
 
-    flow_data->bytes_from_src += actual_size;
-
     result_tmp = &q_item->result_chain;
     do{
 	ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
@@ -452,7 +448,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
     gen_mutex_lock(&flow_data->src_mutex);
     gen_mutex_lock(&flow_data->empty_mutex);
 
-    if((flow_data->bytes_from_src < flow_data->parent->aggregate_size) 
+    if((!PINT_REQUEST_DONE(q_item->parent->file_req_state)) 
 	&& qlist_empty(&flow_data->src_list) 
 	&& !qlist_empty(&flow_data->empty_list))
     {
@@ -591,8 +587,6 @@ static void trove_read_callback_fn(void *user_ptr,
     }while(result_tmp);
     q_item->result_chain_count = 0;
 
-    flow_data->bytes_from_src += bytes_to_send;
-
     /* add to dest queue */
     gen_mutex_lock(&flow_data->dest_mutex);
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
@@ -684,7 +678,7 @@ static void bmi_send_callback_fn(void *user_ptr,
     }
 
     /* if there are no more reads to post, just return */
-    if(flow_data->bytes_from_src == flow_data->parent->aggregate_size)
+    if(PINT_REQUEST_DONE(flow_data->parent->file_req_state))
     {
 	return;
     }
@@ -843,7 +837,7 @@ static void trove_write_callback_fn(void *user_ptr,
     }
 
     /* if there are no more receives to post, just return */
-    if(flow_data->bytes_from_src == flow_data->parent->aggregate_size)
+    if(PINT_REQUEST_DONE(flow_data->parent->file_req_state))
     {
 	return;
     }
