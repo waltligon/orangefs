@@ -682,7 +682,7 @@ do {                                                                  \
     gossip_debug(                                                     \
         GOSSIP_CLIENT_DEBUG, "Got Configuration Server: %s "          \
         "(len=%d)\n", mntent.pvfs_config_server,                      \
-        strlen(mntent.pvfs_config_server));                           \
+        (int)strlen(mntent.pvfs_config_server));                      \
                                                                       \
     mntent.pvfs_fs_name = strdup(ptr);                                \
     if (!mntent.pvfs_config_server)                                   \
@@ -693,7 +693,7 @@ do {                                                                  \
                                                                       \
     gossip_debug(                                                     \
         GOSSIP_CLIENT_DEBUG, "Got FS Name: %s (len=%d)\n",            \
-        mntent.pvfs_fs_name, strlen(mntent.pvfs_fs_name));            \
+        mntent.pvfs_fs_name, (int)strlen(mntent.pvfs_fs_name));       \
                                                                       \
     mntent.encoding = ENCODING_DEFAULT;                               \
     mntent.flowproto = FLOWPROTO_DEFAULT;                             \
@@ -958,7 +958,7 @@ static int post_io_request(vfs_request_t *vfs_request)
                     " for %d bytes at offset %lu in cache\n",
                     Lu(vfs_request->in_upcall.req.io.refn.handle),
                     vfs_request->in_upcall.req.io.refn.fs_id,
-                    vfs_request->in_upcall.req.io.count,
+                    (int)vfs_request->in_upcall.req.io.count,
                     (unsigned long)vfs_request->in_upcall.req.io.offset);
 
                 val = pvfs2_mmap_ra_cache_get_block(

@@ -107,7 +107,7 @@ int PVFS_isys_truncate(
 
     if (size < 0)
     {
-        gossip_err("invalid size (negative) specified: %Ld\n", size);
+        gossip_err("invalid size (negative) specified: %Ld\n", Ld(size));
         return ret;
     }
 

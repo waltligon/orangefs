@@ -169,7 +169,7 @@ static int mgmt_create_dirent_setup_msgpair(
         "handle %Lu under parent %Lu,%d\n",
         sm_p->u.mgmt_create_dirent.entry,
         Lu(sm_p->u.mgmt_create_dirent.entry_handle),
-        Lu(sm_p->parent_ref.handle), Lu(sm_p->parent_ref.fs_id));
+        Lu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
