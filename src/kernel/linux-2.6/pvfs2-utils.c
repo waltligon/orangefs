@@ -101,7 +101,7 @@ static inline int copy_attributes_to_inode(
         }
         else
         {
-            inode->i_size = 0;
+            inode->i_size = PAGE_CACHE_SIZE;
         }
 
 	inode->i_uid = attrs->owner;
@@ -142,21 +142,25 @@ static inline int copy_attributes_to_inode(
 
         inode->i_mode |= perm_mode;
 
+        pvfs2_print("COPY TO ATTR TYPE IS: ");
 	switch (attrs->objtype)
 	{
 	case PVFS_TYPE_METAFILE:
+            pvfs2_print("METAFILE\n");
 	    inode->i_mode |= S_IFREG;
 	    inode->i_op = &pvfs2_file_inode_operations;
 	    inode->i_fop = &pvfs2_file_operations;
 	    ret = 0;
 	    break;
 	case PVFS_TYPE_DIRECTORY:
+            pvfs2_print("DIRECTORY\n");
 	    inode->i_mode |= S_IFDIR;
 	    inode->i_op = &pvfs2_dir_inode_operations;
 	    inode->i_fop = &pvfs2_dir_operations;
 	    ret = 0;
 	    break;
 	case PVFS_TYPE_SYMLINK:
+            pvfs2_print("SYMLINK\n");
 	    inode->i_mode |= S_IFLNK;
 	    inode->i_op = &pvfs2_symlink_inode_operations;
 	    inode->i_fop = NULL;

@@ -798,9 +798,6 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    gossip_enable_stderr();
-    gossip_set_debug_mask(0, CLIENT_DEBUG);
-
     PINT_pcache_set_timeout(PCACHE_TIMEOUT_MS);
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
@@ -939,7 +936,6 @@ int main(int argc, char **argv)
         gossip_err("Failed to finalize PVFS\n");
         return 1;
     }
-    gossip_disable();
     return 0;
 }
 
