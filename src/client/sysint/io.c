@@ -9,14 +9,14 @@
 #include <assert.h>
 #include <string.h>
 
-#include "pinode-helper.h"
-#include "pvfs2-sysint.h"
-#include "pint-sysint.h"
-#include "pvfs2-req-proto.h"
-#include "pvfs-distribution.h"
-#include "pint-servreq.h"
-#include "pint-bucket.h"
-#include "PINT-reqproto-encode.h"
+#include <pinode-helper.h>
+#include <pvfs2-sysint.h>
+#include <pint-sysint.h>
+#include <pvfs2-req-proto.h>
+#include <pvfs-distribution.h>
+#include <pint-servreq.h>
+#include <pint-bucket.h>
+#include <PINT-reqproto-encode.h>
 
 #define REQ_ENC_FORMAT 0
 

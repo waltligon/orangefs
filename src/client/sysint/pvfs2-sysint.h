@@ -18,6 +18,7 @@
 #include <llist.h>
 #include <gossip.h>
 #include <errno.h>
+#include <pvfs-request.h>
 
 /*#define NUM_SERVER 10*/
 
@@ -263,11 +264,14 @@ typedef struct PVFS_sysresp_readlink_s PVFS_sysresp_readlink;
 /* read/write */
 struct PVFS_sysreq_io_s {
 	pinode_reference pinode_refn;
+	PVFS_credentials credentials;
+	PVFS_Request io_req;
 };
 typedef struct PVFS_sysreq_io_s PVFS_sysreq_io;
 
 struct PVFS_sysresp_io_s {
 	pinode_reference pinode_refn;
+	PVFS_size total_completed;
 };
 typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 
