@@ -204,41 +204,45 @@ int trove_dspace_create(TROVE_coll_id coll_id,
 			TROVE_handle bitmask,
 			TROVE_ds_type type,
 			TROVE_keyval_s *hint,
+			TROVE_ds_flags flags,
 			void *user_ptr,
 			TROVE_op_id *out_op_id_p);
 
 int trove_dspace_remove(TROVE_coll_id coll_id,
 			TROVE_handle handle,
+			TROVE_ds_flags flags,
 			void *user_ptr,
 			TROVE_op_id *out_op_id_p);
 
-int trove_dspace_iterate_handles(
-			      TROVE_coll_id coll_id,
-			      TROVE_ds_position *position_p,
-			      TROVE_handle *handle_array,
-			      int *inout_count_p,
-			      TROVE_ds_flags flags,
-			      TROVE_vtag_s *vtag,
-			      void *user_ptr,
-			      TROVE_op_id *out_op_id_p);
+int trove_dspace_iterate_handles(TROVE_coll_id coll_id,
+				 TROVE_ds_position *position_p,
+				 TROVE_handle *handle_array,
+				 int *inout_count_p,
+				 TROVE_ds_flags flags,
+				 TROVE_vtag_s *vtag,
+				 void *user_ptr,
+				 TROVE_op_id *out_op_id_p);
 
 int trove_dspace_verify(TROVE_coll_id coll_id,
 			TROVE_handle handle,
 			TROVE_ds_type *type,
+			TROVE_ds_flags flags,
 			void *user_ptr,
 			TROVE_op_id *out_op_id_p);
 
 
 int trove_dspace_getattr(TROVE_coll_id coll_id,
 			 TROVE_handle handle,
-			 TROVE_ds_attributes_s *ds_attr_p, 
+			 TROVE_ds_attributes_s *ds_attr_p,
+			 TROVE_ds_flags flags,
 			 void *user_ptr,
 			 TROVE_op_id *out_op_id_p);
 
 
 int trove_dspace_setattr(TROVE_coll_id coll_id,
 			 TROVE_handle handle,
-			 TROVE_ds_attributes_s *ds_attr_p, 
+			 TROVE_ds_attributes_s *ds_attr_p,
+			 TROVE_ds_flags flags,
 			 void *user_ptr,
 			 TROVE_op_id *out_op_id_p);
 

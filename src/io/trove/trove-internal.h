@@ -181,12 +181,14 @@ struct TROVE_dspace_ops
 			 TROVE_handle bitmask,
 			 TROVE_ds_type type,
 			 TROVE_keyval_s *hint, /* TODO: figure out what this is! */
+			 TROVE_ds_flags flags,
 			 void *user_ptr,
 			 TROVE_op_id *out_op_id_p);
     
     int (*dspace_remove)(
 			 TROVE_coll_id coll_id,
 			 TROVE_handle handle,
+			 TROVE_ds_flags flags,
 			 void *user_ptr,
 			 TROVE_op_id *out_op_id_p);
 
@@ -204,13 +206,15 @@ struct TROVE_dspace_ops
 			 TROVE_coll_id coll_id,
 			 TROVE_handle handle,
 			 TROVE_ds_type *type, /* TODO: define types! */
+			 TROVE_ds_flags flags,
 			 void *user_ptr,
 			 TROVE_op_id *out_op_id_p);
     
     int (*dspace_getattr)(
 			  TROVE_coll_id coll_id,
 			  TROVE_handle handle,
-			  TROVE_ds_attributes_s *ds_attr_p, 
+			  TROVE_ds_attributes_s *ds_attr_p,
+			  TROVE_ds_flags flags,
 			  void *user_ptr,
 			  TROVE_op_id *out_op_id_p);
     
@@ -218,6 +222,7 @@ struct TROVE_dspace_ops
 			  TROVE_coll_id coll_id,
 			  TROVE_handle handle,
 			  TROVE_ds_attributes_s *ds_attr_p, 
+			  TROVE_ds_flags flags,
 			  void *user_ptr,
 			  TROVE_op_id *out_op_id_p);
     

@@ -153,12 +153,13 @@ int main(int argc, char **argv)
 	
 	file_handle = requested_file_handle;
 	ret = trove_dspace_create(coll_id,
-			&file_handle,
-			0xffffffff,
-			TROVE_TEST_BSTREAM,
-			NULL,
-			NULL,
-			&t_op_id);
+				  &file_handle,
+				  0xffffffff,
+				  TROVE_TEST_BSTREAM,
+				  NULL,
+				  TROVE_SYNC,
+				  NULL,
+				  &t_op_id);
 	while (ret == 0) ret = trove_dspace_test(coll_id, t_op_id, &count, NULL, 
 		NULL, &state);
 	if (ret < 0) {

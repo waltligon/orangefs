@@ -69,7 +69,12 @@ int main(int argc, char **argv)
     }
 
     /* TODO: verify that this is in fact a directory! */
-    ret = trove_dspace_getattr(coll_id, handle, &s_attr, NULL, &op_id);
+    ret = trove_dspace_getattr(coll_id,
+			       handle,
+			       &s_attr,
+			       0 /* flags */,
+			       NULL,
+			       &op_id);
     while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) return -1;
 
@@ -114,7 +119,12 @@ int main(int argc, char **argv)
 	for(i = 0; i < num_processed; i++ ) {
 	    TROVE_ds_attributes_s ds_attr;
 
-	    ga_ret = trove_dspace_getattr(coll_id, ls_handle[i], &ds_attr, NULL, &op_id);
+	    ga_ret = trove_dspace_getattr(coll_id,
+					  ls_handle[i],
+					  &ds_attr,
+					  0 /* flags */,
+					  NULL,
+					  &op_id);
 	    if (ga_ret == -1) return -1;
 	    count = 1;
 	    while (ga_ret == 0) ga_ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);

@@ -88,7 +88,12 @@ int main(int argc, char **argv)
 	    return -1;
     }
 
-    ret = trove_dspace_getattr(coll_id, file_handle, &s_attr, NULL, &op_id);
+    ret = trove_dspace_getattr(coll_id,
+			       file_handle,
+			       &s_attr,
+			       0 /* flags */,
+			       NULL,
+			       &op_id);
     while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) return -1;
 
@@ -114,9 +119,10 @@ int main(int argc, char **argv)
     /* the question: is it up to the caller to clean up the dspace if it removed the last entry?  no no no*/
     /* gar gar being dense:  the dspace gets removed.  */
     ret = trove_dspace_remove(coll_id, 
-		    file_handle,
-		    NULL,
-		    &op_id);
+			      file_handle,
+			      TROVE_SYNC,
+			      NULL,
+			      &op_id);
     while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "dspace remove failed.\n");

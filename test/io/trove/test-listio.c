@@ -12,7 +12,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
-#include <trove.h>
+#include <malloc.h>
+
+#include "trove.h"
 
 #define ROOT_HANDLE_STRING "root_handle"
 
@@ -101,6 +103,7 @@ int main(int argc, char **argv)
 				  0xffffffff,
 				  TROVE_TEST_FILE,
 				  NULL,
+				  0 /* flags */,
 				  NULL,
 				  &op_id);
 	while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);

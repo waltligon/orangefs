@@ -1097,6 +1097,7 @@ int job_trove_dspace_getattr(
 		coll_id, 
 		handle,
 		&(jd->u.trove.attr),
+		0 /* flags */,
 		jd,
 		&(jd->u.trove.id));
 	
@@ -1169,6 +1170,7 @@ int job_trove_dspace_setattr(
 		coll_id, 
 		handle,
 		ds_attr_p,
+		0 /* flags */,
 		jd,
 		&(jd->u.trove.id));
 	
@@ -1474,8 +1476,14 @@ int job_trove_dspace_create(
 	jd->job_user_ptr = user_ptr;
 	jd->u.trove.handle = handle;
 
-	ret = trove_dspace_create(coll_id, &(jd->u.trove.handle),
-		bitmask, type, hint, jd, &(jd->u.trove.id));
+	ret = trove_dspace_create(coll_id,
+				  &(jd->u.trove.handle),
+				  bitmask,
+				  type,
+				  hint,
+				  TROVE_SYNC /* flags -- sync for now*/,
+				  jd,
+				  &(jd->u.trove.id));
 	
 	if(ret < 0)
 	{

@@ -117,6 +117,7 @@ int main(int argc, char **argv)
 			      0xffffffff,
 			      TROVE_TEST_DIR,
 			      NULL,
+			      TROVE_SYNC,
 			      NULL,
 			      &op_id);
     while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);

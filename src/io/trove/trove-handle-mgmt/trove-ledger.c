@@ -215,7 +215,7 @@ static int handle_store_extentlist_exists(TROVE_coll_id coll_id,
 
     int ret, count;
 
-    ret = trove_dspace_verify(coll_id, bstream_handle, &type, NULL, &op_id);
+    ret = trove_dspace_verify(coll_id, bstream_handle, &type, 0, NULL, &op_id);
     while (ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if ( ret < 0 ) {
 	/* XXX: -1 could be a lot of different error conditions.  don't
@@ -256,6 +256,7 @@ static int handle_store_extentlist_create(TROVE_coll_id coll_id,
 			      0xffffffff,
 			      TROVE_TEST_BSTREAM,
 			      NULL,
+			      TROVE_SYNC,
 			      NULL,
 			      &op_id);
     while ( ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);

@@ -72,6 +72,7 @@ int main(int argc, char ** argv)
 			      0xffffffff,
 			      TROVE_TEST_DIR,
 			      NULL,
+			      0 /* flags */,
 			      NULL,
 			      &op_id);
     if (ret < 0) return -1;
@@ -92,7 +93,12 @@ int main(int argc, char ** argv)
     s_attr.ctime  = time(NULL);
     count = 1;
 
-    ret = trove_dspace_setattr(coll_id, file_handle, &s_attr, NULL, &op_id);
+    ret = trove_dspace_setattr(coll_id,
+			       file_handle,
+			       &s_attr,
+			       TROVE_SYNC,
+			       NULL,
+			       &op_id);
     while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) return -1;    /* add new file name/handle pair to parent directory */
 

@@ -74,7 +74,7 @@ static int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_hand
 	}
 
 	/* TODO: verify that this is in fact a directory! */
-	ret = trove_dspace_getattr(coll_id, handle, &s_attr, NULL, &op_id);
+	ret = trove_dspace_getattr(coll_id, handle, &s_attr, 0, NULL, &op_id);
 	while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
 	if (ret < 0) return -1;
 	if (state != 0) return -1;

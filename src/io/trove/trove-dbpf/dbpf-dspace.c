@@ -40,6 +40,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 			      TROVE_handle bitmask,
 			      TROVE_ds_type type,
 			      TROVE_keyval_s *hint, /* TODO: What is this? */
+			      TROVE_ds_flags flags,
 			      void *user_ptr,
 			      TROVE_op_id *out_op_id_p)
 {
@@ -59,11 +60,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_create_op_svc,
 			user_ptr,
-#if 1
-			TROVE_SYNC /* flags */);
-#else
-                        0 /* flags */);
-#endif
+			flags);
 
     /* no op-specific members here */
     q_op_p->op.u.d_create.out_handle_p = handle_p;
@@ -162,6 +159,7 @@ return_error:
  */
 static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 			      TROVE_handle handle,
+			      TROVE_ds_flags flags,
 			      void *user_ptr,
 			      TROVE_op_id *out_op_id_p)
 {
@@ -181,7 +179,7 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_remove_op_svc,
 			user_ptr,
-			TROVE_SYNC /* flags */);
+			flags);
 
     /* no op-specific members here */
 
@@ -452,6 +450,7 @@ return_error:
 static int dbpf_dspace_verify(TROVE_coll_id coll_id,
 			      TROVE_handle handle,
 			      TROVE_ds_type *type_p,
+			      TROVE_ds_flags flags,
 			      void *user_ptr,
 			      TROVE_op_id *out_op_id_p)
 {
@@ -471,7 +470,7 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_verify_op_svc,
 			user_ptr,
-			0 /* flags */);
+			flags);
 
     /* initialize op-specific members */
     q_op_p->op.u.d_verify.type_p = type_p;
@@ -544,7 +543,8 @@ return_error:
  */
 static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 			       TROVE_handle handle,
-			       TROVE_ds_attributes_s *ds_attr_p, 
+			       TROVE_ds_attributes_s *ds_attr_p,
+			       TROVE_ds_flags flags,
 			       void *user_ptr,
 			       TROVE_op_id *out_op_id_p)
 {
@@ -564,7 +564,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_getattr_op_svc,
 			user_ptr,
-			0 /* flags */);
+			flags);
 
     /* initialize op-specific members */
     q_op_p->op.u.d_getattr.attr_p = ds_attr_p;
@@ -578,7 +578,8 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
  */
 static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 			       TROVE_handle handle,
-			       TROVE_ds_attributes_s *ds_attr_p, 
+			       TROVE_ds_attributes_s *ds_attr_p,
+			       TROVE_ds_flags flags,
 			       void *user_ptr,
 			       TROVE_op_id *out_op_id_p)
 {
@@ -598,7 +599,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_setattr_op_svc,
 			user_ptr,
-			0 /* flags */);
+			flags);
 
     /* initialize op-specific members */
     q_op_p->op.u.d_setattr.attr_p = ds_attr_p;

@@ -67,7 +67,7 @@ void dbpf_collection_clear_registered(void)
 
 	/* TODO: WHAT OTHER RESOURCES DOES THIS NEED TO FREE? */
     if ((ret = free_ptr->coll_attr_db->sync(free_ptr->coll_attr_db, 0)) != 0) {
-	return -1;
+	return;
     }
     if ((ret = free_ptr->coll_attr_db->close(free_ptr->coll_attr_db, 0)) != 0) {
 	fprintf(stderr, "dbpf_finalize: %s\n",
@@ -75,7 +75,7 @@ void dbpf_collection_clear_registered(void)
     }
 
     if ((ret = free_ptr->ds_db->sync(free_ptr->ds_db, 0)) != 0) {
-	return -1;
+	return;
     }
     if ((ret = free_ptr->ds_db->close(free_ptr->ds_db, 0)) != 0) {
 	fprintf(stderr, "dbpf_finalize: %s\n",

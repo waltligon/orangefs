@@ -17,20 +17,6 @@ if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
 else AC_MSG_RESULT(yes)
 fi
 
-dnl Check for utilities that we need during the build process
-AC_PROG_INSTALL
-AC_PROG_CC
-AC_PROG_CPP
-AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
-AC_CHECK_PROG(HAVE_FIND, find, yes, no)
-AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
-AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
-
-AC_ARG_WITH(efence,
-[  --with-efence                  Use electric fence for malloc debugging.],
-AC_CHECK_LIB(efence,malloc)
-)
-
 dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
 dnl    freeing with the mtrace tool
@@ -45,6 +31,25 @@ AC_ARG_ENABLE(fast,
 [  --enable-fast                   Disable optional debugging, enable optimizations.],
 CFLAGS="$CFLAGS -DNDEBUG -O3",
 CFLAGS="$CFLAGS -g"
+)
+
+AC_ARG_ENABLE(coverage,
+[  --enable-coverage               Enable coverage analysis (disables optimizations).],
+CFLAGS="$CFLAGS -fprofile-arcs -ftest-coverage -O0",
+)
+
+dnl Check for utilities that we need during the build process
+AC_PROG_INSTALL
+AC_PROG_CC
+AC_PROG_CPP
+AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
+AC_CHECK_PROG(HAVE_FIND, find, yes, no)
+AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
+AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
+
+AC_ARG_WITH(efence,
+[  --with-efence                  Use electric fence for malloc debugging.],
+AC_CHECK_LIB(efence,malloc)
 )
 
 dnl See if we have a new enough version of Berkeley DB; needed for

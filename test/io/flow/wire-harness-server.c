@@ -149,7 +149,7 @@ int main(int argc, char **argv)
 		}
 		file_handle = req->handle;
 
-		ret = trove_dspace_getattr(coll_id, file_handle, &s_attr, NULL, &op_id);
+		ret = trove_dspace_getattr(coll_id, file_handle, &s_attr, 0 /* flags */, NULL, &op_id);
 		while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
 		if (ret < 0 && req->op == WIRE_HARNESS_READ) {
 		    ack.error_code = ENOENT;
