@@ -452,6 +452,8 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 int PINT_serv_msgpairarray_resolve_addrs(int count, 
     PINT_client_sm_msgpair_state* msgarray);
 
+int PINT_client_bmi_cancel(job_id_t id);
+
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_client_sm
 #if 0

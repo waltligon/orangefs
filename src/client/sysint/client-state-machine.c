@@ -29,6 +29,7 @@ enum
 static job_id_t job_id_array[MAX_RETURNED_JOBS];
 static void *client_sm_p_array[MAX_RETURNED_JOBS];
 static job_status_s job_status_array[MAX_RETURNED_JOBS];
+static int job_count = 0;
 
 int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 				   int pvfs_sys_op)
@@ -142,13 +143,40 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
     return ret;
 }
 
+/* PINT_client_bmi_cancel()
+ *
+ * wrapper function for job_bmi_cancel that handles race conditions of jobs
+ * that have completed in the job_testcontext() loop but have not yet
+ * triggered a state transition
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_client_bmi_cancel(job_id_t id)
+{
+    int i;
+
+    /* TODO: this is not thread safe */
+    for(i=0; i<job_count; i++)
+    {
+	if(job_id_array[i] == id)
+	{
+	    /* job has already completed; do nothing */
+	    return(0);
+	}
+    }
+
+    return(job_bmi_cancel(id, pint_client_sm_context));
+}
+
+
 int PINT_client_state_machine_test(void)
 {
     int ret, i;
-    int job_count = MAX_RETURNED_JOBS;
-
     PINT_client_sm *sm_p;
+    
+    job_count = MAX_RETURNED_JOBS;
 
+    /* TODO: this isn't thread safe... */
     ret = job_testcontext(job_id_array,
 			  &job_count, /* in/out parameter */
 			  client_sm_p_array,

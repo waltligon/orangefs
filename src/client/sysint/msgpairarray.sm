@@ -316,17 +316,12 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
 	    if (msg_p->send_status.error_code != 0)
             {
-                PVFS_perror("Send failed; canceling recv",
+                PVFS_perror("Canceling recv due to send failure:",
                             msg_p->send_status.error_code);
 
-                ret = job_bmi_cancel(
-                    msg_p->recv_id, pint_client_sm_context);
-                if (ret)
-                {
-                    js_p->error_code = ret;
-                    PVFS_perror_gossip("Failed to job_bmi_cancel", ret);
-                    return 1;
-                }
+                ret = PINT_client_bmi_cancel(msg_p->recv_id);
+		/* this should not fail */
+		assert(ret == 0);
 
                 if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
                     (PVFS_ERROR_CLASS(-msg_p->send_status.error_code) ==
