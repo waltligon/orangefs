@@ -68,6 +68,7 @@ method_op_p alloc_method_op(bmi_size_t payload_size)
  */
 void dealloc_method_op(method_op_p op_p)
 {
+    id_gen_safe_unregister(op_p->op_id);
     free(op_p);
     op_p = NULL;
     return;

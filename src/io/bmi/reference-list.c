@@ -241,6 +241,8 @@ void dealloc_ref_st(ref_st_p deadref)
 					      deadref->method_addr);
     }
 
+    id_gen_safe_unregister(deadref->bmi_addr);
+
     free(deadref);
 }
 
