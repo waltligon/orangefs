@@ -24,6 +24,8 @@ PVFS_fs_id system_init(void)
 	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL}; /* use pvfstab in cwd */
 
+	memset(&resp_init, 0, sizeof(resp_init));
+
 	ret = parse_pvfstab(NULL, &mnt);
 	if (ret < 0)
 	{
@@ -54,6 +56,9 @@ PVFS_handle get_root(PVFS_fs_id fs_id)
 	PVFS_sysresp_lookup resp_look;
 	int ret = -1;
 
+	memset(&req_look, 0, sizeof(req_look));
+	memset(&req_look, 0, sizeof(resp_look));
+			
 	req_look.credentials.perms = 1877;
 	req_look.name = malloc(2);/*null terminator included*/
 	req_look.name[0] = '/';
@@ -107,7 +112,6 @@ PVFS_handle create_dir(PVFS_handle parent, PVFS_fs_id fs_id, char *name)
 		printf("mkdir failed\n");
 		return(-1);
 	}
-	free(req_mkdir.entry_name);
 	return (PVFS_handle)resp_mkdir.pinode_refn.handle;
 }
 
@@ -126,9 +130,9 @@ int test_dir_torture(MPI_Comm *comm, int rank,  char *buf, void *rawparams)
 {
 	int ret = -1;
 	PVFS_fs_id fs_id;
-	PVFS_handle root_handle, dir_handle;
+	PVFS_handle dir_handle;
 	generic_params *myparams = (generic_params *)rawparams;
-	int i, nerrs=0;
+	int i, depth, nerrs=0;
 	char name[PVFS_NAME_MAX];
 
 	fs_id = system_init();
@@ -138,12 +142,18 @@ int test_dir_torture(MPI_Comm *comm, int rank,  char *buf, void *rawparams)
 		return(ret);
 	}
 
-	root_handle = get_root(fs_id);
+	dir_handle = get_root(fs_id);
 
-	for (i=0; i<myparams->mode; i++) {
-		snprintf(name, PVFS_NAME_MAX, "%d-%d-testdir", i, rank);
-		dir_handle = create_dir(root_handle, fs_id, name);
-		if (dir_handle < 0) ++nerrs;
+	for (depth=0; depth<myparams->mode; depth++) {
+		/*
+		snprintf(name, PVFS_NAME_MAX, "depth-%d-%d", depth, rank);
+		dir_handle = create_dir(dir_handle, fs_id, name);
+		*/
+		for (i=0; i<myparams->mode; i++) {
+			snprintf(name, PVFS_NAME_MAX, "%d-%d-testdir", i, rank);
+			dir_handle = create_dir(dir_handle, fs_id, name);
+			if (dir_handle < 0) ++nerrs;
+		}
 	}
 
 	ret = PVFS_sys_finalize();
