@@ -21,8 +21,26 @@ static PVFS_offset logical_to_physical_offset (PVFS_Dist_params *dparam,
 static PVFS_offset physical_to_logical_offset (PVFS_Dist_params *dparam,
 		uint32_t iod_num, uint32_t iod_count, PVFS_offset physical_offset)
 {
+	PVFS_size strips_div = physical_offset / dparam->strip_size;
+	PVFS_size strips_mod = physical_offset % dparam->strip_size;
+	PVFS_offset acc = 0;
+
+	acc = (strips_div - 1) * dparam->strip_size * iod_count;
+	if(strips_mod)
+	{
+		acc += dparam->strip_size * iod_count;
+		acc += dparam->strip_size * iod_num;
+		acc += strips_mod;
+	}
+	else
+	{
+		acc += dparam->strip_size * (iod_num+1);
+	}
+	return(acc);
+#if 0
 	return ((((physical_offset / dparam->strip_size) * iod_count) + iod_num)
 			* dparam->strip_size) + (physical_offset % dparam->strip_size);
+#endif
 }
 
 static PVFS_offset next_mapped_offset (PVFS_Dist_params *dparam,
