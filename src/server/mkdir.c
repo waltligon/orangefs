@@ -126,6 +126,8 @@ static int mkdir_init(state_action_struct *s_op, job_status_s *ret)
 
     int job_post_ret;
 
+    gossip_debug(SERVER_DEBUG, "mkdir state: init\n");
+
     job_post_ret = job_req_sched_post(s_op->req,
 	    s_op,
 	    ret,
@@ -144,15 +146,16 @@ static int mkdir_init(state_action_struct *s_op, job_status_s *ret)
  * Returns:  int
  *
  * Synopsis: 
- *           
+ *
+ * NOTE: returned handle will pop out in ret->handle (the job status struct).
  */
-
-
 static int mkdir_create(state_action_struct *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
     job_id_t i;
+
+    gossip_debug(SERVER_DEBUG, "mkdir state: create\n");
 
     job_post_ret = job_trove_dspace_create(s_op->req->u.mkdir.fs_id,
 	    s_op->req->u.mkdir.bucket,
@@ -164,8 +167,8 @@ static int mkdir_create(state_action_struct *s_op, job_status_s *ret)
 	    &i);
 
     return(job_post_ret);
-
 }
+
 
 /*
  * Function: mkdir_setattrib
@@ -178,34 +181,51 @@ static int mkdir_create(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: 
  *           
  */
-
-
 static int mkdir_setattrib(state_action_struct *s_op, job_status_s *ret)
 {
-
+    PVFS_object_attr *a_p;
     int job_post_ret;
     job_id_t i;
 
+    gossip_debug(SERVER_DEBUG, "mkdir state: setattrib\n");
+
+    /* save the handle from the create in the response */
     s_op->resp->u.mkdir.handle = ret->handle;
 
-    s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-    s_op->val.buffer = &(s_op->req->u.mkdir.attr);
+    s_op->val.buffer    = &(s_op->req->u.mkdir.attr);
     s_op->val.buffer_sz = sizeof(PVFS_object_attr);
 
+    a_p = &(s_op->req->u.mkdir.attr);
+    gossip_debug(SERVER_DEBUG,
+		 "  attrs to write = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		 a_p->owner,
+		 a_p->group,
+		 a_p->perms,
+		 a_p->objtype);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.mkdir.fs_id,
+		 s_op->resp->u.mkdir.handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
+
     job_post_ret = job_trove_keyval_write(s_op->req->u.mkdir.fs_id,
-	    s_op->resp->u.mkdir.handle,
-	    &(s_op->key),
-	    &(s_op->val),
-	    TROVE_SYNC,
-	    NULL,
-	    s_op,
-	    ret,
-	    &i);
+					  s_op->resp->u.mkdir.handle,
+					  &(s_op->key),
+					  &(s_op->val),
+					  TROVE_SYNC,
+					  NULL,
+					  s_op,
+					  ret,
+					  &i);
 
     return(job_post_ret);
-
 }
 
 
@@ -229,6 +249,8 @@ static int mkdir_release(state_action_struct *s_op, job_status_s *ret)
 
     int job_post_ret=0;
     job_id_t i;
+
+    gossip_debug(SERVER_DEBUG, "mkdir state: release\n");
 
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
 	    s_op,
@@ -257,14 +279,16 @@ static int mkdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
     int job_post_ret;
     job_id_t i;
 
+    gossip_debug(SERVER_DEBUG, "mkdir state: send_bmi\n");
+
     s_op->resp->status = ret->error_code;
 
     /* Encode the message */
     job_post_ret = PINT_encode(s_op->resp,
-	    PINT_ENCODE_RESP,
-	    &(s_op->encoded),
-	    s_op->addr,
-	    s_op->enc_type);
+			       PINT_ENCODE_RESP,
+			       &(s_op->encoded),
+			       s_op->addr,
+			       s_op->enc_type);
 
     assert(job_post_ret == 0);
 
