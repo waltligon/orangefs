@@ -232,14 +232,16 @@ argument that tells it to create a new storage space if it does not already
 exist.
 
 \begin{verbatim}
-bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf -f
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
+	/etc/pvfs2-server.conf -f
 \end{verbatim}
 
 Once the above step is done, you can start the server in normal mode 
 as follows:
 
 \begin{verbatim}
-bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
+		/etc/pvfs2-server.conf
 \end{verbatim}
 
 All log messages will be directed to /tmp/pvfs2-server.log, unless you specified
@@ -248,10 +250,12 @@ pvfs2-server in the foreground and direct all messages to stderr, then
 you may run the server as follows:
 
 \begin{verbatim}
-bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf -d
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
+	/etc/pvfs2-server.conf -d
 \end{verbatim}
 
 \subsection{Client configuration}
+\label{subsec:client}
 
 There are two primary methods for accessing a PVFS2 file system.  The
 first is the native PVFS2 interface which is made available
@@ -285,7 +289,7 @@ pvfs-tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 pvfs 0 0
 \emph{TODO: something about kernel driver}
 
 \subsection{Testing your installation}
-
+\label{subsec:testing}
 PVFS2 currently includes the following tools for manipulating the file system
 using the native PVFS2 library: pvfs2-ping, pvfs2-import, pvfs2-ls, and pvfs2-export.  These tools check the health of the file system, import local files, 
 list the contents of directories, and export files, respectively.  Their usage 
@@ -375,11 +379,7 @@ bash-2.05b# diff /tmp/testfile-out /usr/lib/libc.a
 \label{sec:cluster}
 It is important to have in mind the roles that machines (a.k.a. nodes) will
 play in the PVFS system. There are three potential roles that a machine might
-play:
-
-    * metadata server
-    * I/O server
-    * client
+play: metadata server,  I/O server, or client. 
 
 A metadata server is a node that keeps up with metadata (such as permissions
 and time stamps) for the file system. An I/O server is a node that actually
@@ -388,8 +388,9 @@ write PVFS files. Your applications will typically be run on PVFS clients so
 that they can access the file system.
 
 A machine can fill one, two, or all of these roles simultaneously. Unlike
-PVFS-1, each role requires just the pvfs2-server binary, one cluster-wide
-config file, and one node-specific config file.
+PVFS-1, each role requires just the pvfs2-server binary.  It will consult the
+cluster-wide config file and the node-specific config file when it starts up to
+know what role pvfs2-server should perform on this machine.
 
 We currently support just one metadata server (this limit will be raised in the
 future).  There can be many I/O servers and clients. In this section we will
@@ -472,9 +473,6 @@ Writing 8 server config file(s)... Done.
 Configuration complete!
 \end{verbatim}
 
-
-\end{document}
-
 We have now made all the config files for an 8-node storage cluster:
 \begin{verbatim}
 root@cluster1:~# ls /etc/pvfs2/foo/
@@ -487,7 +485,8 @@ pvfs2-server.conf-cluster4
 
 Now get those 8 node-specific files (pvfs2-server.conf-clusterN) out to the
 nodes.  This is probably the most onerous part of pvfs2 setup, and it's
-something we will try to address in future releases, but for now, push them out by hand, renaming them to pvfs2-server.conf.  Here's one idea:
+something we will try to address in future releases, but for now, push them out
+by hand, renaming them to pvfs2-server.conf.  Here's one idea:
 
 \begin{verbatim}
 root@cluster1:~# for i in `seq 1 8`; do
@@ -495,4 +494,34 @@ root@cluster1:~# for i in `seq 1 8`; do
 > done
 \end{verbatim}
 
-\subsection{starting the server}
+\subsection{starting the servers}
+
+As with the single-machine case, you must run pvfs2-server with a special
+argument to create the storage space on all the nodes if it does not already
+exist.
+
+\begin{verbatim}
+root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
+	/etc/pvfs2-server.conf -f
+\end{verbatim}
+
+Then once the storage space is created, start the server for real:
+\begin{verbatim}
+root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
+	/etc/pvfs2-server.conf
+\end{verbatim}
+
+If you want to run the server in the foreground (e.g. for debugging), use the
+-d option.
+
+\subsection{Client configuration}
+
+Setting up a client for multiple servers is the same as setting up a client for a single server.  Refer to section \ref{subsec:client}.  
+
+\subsection {Testing your Installation}
+
+Testing a multiple-server pvfs2 installation is the same as testing a single-server pvfs2 installation.  Refer to section \ref{subsec:testing}
+
+
+
+\end{document}
