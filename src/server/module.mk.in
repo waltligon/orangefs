@@ -1,7 +1,7 @@
 DIR := src/server
 
 # automatically generated c files
-SERVERGENSRC := \
+SERVER_SMCGEN := \
 	$(DIR)/setparam.c \
 	$(DIR)/lookup.c \
 	$(DIR)/create.c \
@@ -28,9 +28,13 @@ SERVERGENSRC := \
 	$(DIR)/job-timer.c \
 	$(DIR)/proto-error.c
 
-# "normal" c files that should be added to server library
+
+# c files that should be added to server library
 SERVERSRC += \
-	$(SERVERGENSRC)
+	$(SERVER_SMCGEN)
+
+# track generate .c files that need to be removed during dist clean, etc. 
+SMCGEN += $(SERVER_SMCGEN)
 
 # server code that will be linked manually, not included in library
 MISCSRC += \

@@ -15,33 +15,35 @@ CSRC := \
 	$(DIR)/error-details.c \
 	$(DIR)/fs-add.c
 
-SMSRC := \
-	msgpairarray.sm \
-	getattr-acache.sm \
-        remove.sm \
-	lookup-ncache.sm \
-	sys-getattr.sm \
-	sys-setattr.sm \
-        sys-lookup.sm \
-	sys-truncate.sm \
-	sys-io.sm \
-	sys-create.sm \
-	sys-mkdir.sm \
-	sys-remove.sm \
-	sys-flush.sm \
-	sys-symlink.sm \
-	sys-readdir.sm \
-	sys-rename.sm \
-	mgmt-noop.sm \
-	mgmt-setparam-list.sm \
-	mgmt-statfs-list.sm \
-	mgmt-perf-mon-list.sm \
-	mgmt-event-mon-list.sm \
-	mgmt-iterate-handles-list.sm \
-	mgmt-get-dfile-array.sm \
-	client-job-timer.sm \
-	server-get-config.sm
+CLIENT_SMCGEN := \
+	$(DIR)/msgpairarray.c \
+	$(DIR)/getattr-acache.c \
+        $(DIR)/remove.c \
+	$(DIR)/lookup-ncache.c \
+	$(DIR)/sys-getattr.c \
+	$(DIR)/sys-setattr.c \
+        $(DIR)/sys-lookup.c \
+	$(DIR)/sys-truncate.c \
+	$(DIR)/sys-io.c \
+	$(DIR)/sys-create.c \
+	$(DIR)/sys-mkdir.c \
+	$(DIR)/sys-remove.c \
+	$(DIR)/sys-flush.c \
+	$(DIR)/sys-symlink.c \
+	$(DIR)/sys-readdir.c \
+	$(DIR)/sys-rename.c \
+	$(DIR)/mgmt-noop.c \
+	$(DIR)/mgmt-setparam-list.c \
+	$(DIR)/mgmt-statfs-list.c \
+	$(DIR)/mgmt-perf-mon-list.c \
+	$(DIR)/mgmt-event-mon-list.c \
+	$(DIR)/mgmt-iterate-handles-list.c \
+	$(DIR)/mgmt-get-dfile-array.c \
+	$(DIR)/client-job-timer.c \
+	$(DIR)/server-get-config.c
 
-SMCGEN := $(patsubst %.sm,$(DIR)/%.c,$(SMSRC))
+# track generated .c files that need to be removed during dist clean, etc.
+SMCGEN += $(CLIENT_SMCGEN)
 
-LIBSRC += $(CSRC) $(SMCGEN)
+# list of all .c files (generated or otherwise) that belong in library
+LIBSRC += $(CSRC) $(CLIENT_SMCGEN)

@@ -298,6 +298,8 @@ KERNAPPSRC :=
 CLEANFILES :=
 # files created by trove-autogen.pl
 TROVE_AUTOGEN_FILES :=
+# c files generated from state machines
+SMCGEN :=
 
 ################################################################
 # Top level (default) targets
@@ -767,7 +769,7 @@ clean::
 endif
 
 # builds a tarball of the source tree suitable for distribution
-dist: $(SERVERGENSRC) $(SMCGEN) $(TROVE_AUTOGEN_FILES) cleaner
+dist: $(SMCGEN) $(TROVE_AUTOGEN_FILES) cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
 
 # some stuff that is cleaned in both distclean and dist targets
@@ -786,7 +788,6 @@ cleaner: clean
 # _really_ clean the tree; should go back to pristine state
 distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
-	rm -f $(SERVERGENSRC)
 	rm -f $(SMCGEN)
 	rm -f $(TROVE_AUTOGEN_FILES)
 	rm -f Makefile pvfs2-config.h
