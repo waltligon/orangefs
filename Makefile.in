@@ -93,7 +93,7 @@ clean:
 
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;
-	rm -f $(SRCFILES)
+	rm -f $(SRCFILES) Makefile
 
 -include $(DEPENDS)
 
