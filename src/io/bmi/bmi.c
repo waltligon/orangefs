@@ -658,6 +658,7 @@ int BMI_test(bmi_op_id_t id,
     /* return 1 if anything completed */
     if (ret == 0 && *outcount == 1)
     {
+	gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "BMI_test completing: %Lu\n", Lu(id));
 	return (1);
     }
     return (ret);
@@ -962,6 +963,11 @@ int BMI_testcontext(int incount,
     /* return 1 if anything completed */
     if (ret == 0 && *outcount > 0)
     {
+	for(i=0; i<*outcount; i++)
+	{
+	    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, 
+		"BMI_testcontext completing: %Lu\n", Lu(out_id_array[i]));
+	}
 	return (1);
     }
     return (0);
@@ -1525,6 +1531,8 @@ int BMI_cancel(bmi_op_id_t id,
 {
     struct method_op *target_op = NULL;
     int ret = -1;
+
+    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "bmi canceling: %Lu\n", Lu(id));
 
     target_op = id_gen_fast_lookup(id);
     assert(target_op->op_id == id);
