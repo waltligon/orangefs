@@ -86,15 +86,10 @@ int main(int argc, char **argv)
 	}
 	if(ret != 1)
 	{
-		/* wait until the request has arrived */
-		do
-		{
-			/* exercise testworld() interface */
-			outcount = 1;
-			ret = job_testworld(&job_id, &outcount, NULL, &status1,
-			100);
-		} while(ret == 0 && outcount == 0);
-		if(ret < 0)
+		/* exercise testworld() interface, block indefinitely */
+		outcount = 1;
+		ret = job_testworld(&job_id, &outcount, NULL, &status1, -1);
+		if(ret < 0 || outcount == 0)
 		{	
 			fprintf(stderr, "job_testworld() failure.\n");
 			return(-1);

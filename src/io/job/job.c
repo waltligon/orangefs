@@ -104,11 +104,6 @@ static int do_one_work_cycle_trove(int* num_completed);
 static int do_one_test_cycle_req_sched(void);
 static void fill_status(struct job_desc* jd, void** returned_user_ptr_p, 
 	job_status_s* status);
-static int job_testworld_old(
-	job_id_t* out_id_array_p,
-	int* inout_count_p,
-	void** returned_user_ptr_array,
-	job_status_s* out_status_array_p);
 static int completion_query(
 	job_id_t id, 
 	int* out_count_p, 
@@ -1860,67 +1855,6 @@ int job_testsome(
 	return(0);
 }
 
-/* job_testworld_old()
- *
- * instantaneous check for completion of one or more of any currently
- * pending jobs
- *
- * TODO: remove this later
- * returns 0 on success, -errno on failure
- */
-static int job_testworld_old(
-	job_id_t* out_id_array_p,
-	int* inout_count_p,
-	void** returned_user_ptr_array,
-	job_status_s* out_status_array_p)
-{
-	struct job_desc* query = NULL;
-	int incount = *inout_count_p;
-	int ret;
-
-	/* use this as a chance to do a cheap test on the request
-	 * scheduler
-	 */
-	if((ret = do_one_test_cycle_req_sched()) < 0)
-	{
-		return(ret);
-	}
-
-	*inout_count_p = 0;
-
-	/* should be the same whether we have a thread or not; just pop items
-	 * off of the completion queue if available 
-	 */
-	gen_mutex_lock(&completion_mutex);
-		if(completion_error)
-		{
-			gen_mutex_unlock(&completion_mutex);
-			return(completion_error);
-		}
-		while(*inout_count_p < incount && (query =
-			job_desc_q_shownext(completion_queue)))
-		{
-			fill_status(query, &(returned_user_ptr_array[*inout_count_p]), 
-				&(out_status_array_p[*inout_count_p]));
-			out_id_array_p[*inout_count_p] = query->job_id;
-			job_desc_q_remove(query);
-			(*inout_count_p)++;
-			/* special case for request scheduler */
-			if(query->type == JOB_REQ_SCHED &&
-				query->u.req_sched.post_flag == 1)
-			{
-				/* hang onto desc until release time */
-				job_desc_q_add(req_sched_inprogress_queue, query);
-			}
-			else
-			{
-				dealloc_job_desc(query);
-			}
-		}
-	gen_mutex_unlock(&completion_mutex);
-	
-	return(0);
-}
 
 /* job_test_HACK()
  *
@@ -2486,7 +2420,7 @@ int job_waitsome(
 		returned_user_ptr_array, out_status_array_p));
 }
 
-/* job_testworld_HACK()
+/* job_testworld()
  *
  * check for completion of any jobs currently in progress.  Don't return
  * until either at least one job has completed or the timeout has
@@ -2494,7 +2428,7 @@ int job_waitsome(
  *
  * returns 0 on success, -errno on failure
  */
-int job_testworld_HACK(
+int job_testworld(
 	job_id_t* out_id_array_p,
 	int* inout_count_p,
 	void** returned_user_ptr_array,
@@ -2594,6 +2528,7 @@ int job_testworld_HACK(
 			/* nothing completed while we were waiting, trust that the
 			 * timedwait got the timing right
 			 */
+			*inout_count_p = 0;
 			return(0);
 		}	
 		else if(ret != 0 && ret != EINTR)
@@ -2660,122 +2595,9 @@ int job_testworld_HACK(
 	} while(timeout_remaining > 0);
 
 	/* fall through, nothing done, time is used up */
+	*inout_count_p  = 0;
+
 	return(0);
-}
-
-/* job_testworld()
- *
- * briefly blocking check for completion of one or more of any currently
- * pending jobs
- *
- * returns 0 on success, -errno on failure
- */
-int job_testworld(
-	job_id_t* out_id_array_p,
-	int* inout_count_p,
-	void** returned_user_ptr_array,
-	job_status_s* out_status_array_p,
-	int timeout_ms)
-{
-	int ret = -1;
-	int incount = *inout_count_p;
-	int completion_pending = 0;
-#ifdef __PVFS2_JOB_THREADED__
-	struct timeval now;
-	struct timespec timeout;
-#else
-	int num_completed;
-#endif /* __PVFS2_JOB_THREADED__ */
-
-	*inout_count_p = 0;
-	
-	/* use this as a chance to do a cheap test on the request
-	 * scheduler
-	 */
-	if((ret = do_one_test_cycle_req_sched()) < 0)
-	{
-		return(ret);
-	}
-
-
-	gen_mutex_lock(&completion_mutex);
-		if(completion_error)
-		{
-			gen_mutex_unlock(&completion_mutex);
-			return(completion_error);
-		}
-		completion_pending = !job_desc_q_empty(completion_queue);
-	gen_mutex_unlock(&completion_mutex);
-
-	if(completion_pending)
-	{
-		/* do a quick test first to see if any of the jobs are ready */
-		*inout_count_p = incount;
-		ret = job_testworld_old(out_id_array_p, inout_count_p,
-			returned_user_ptr_array, out_status_array_p);
-		if(ret < 0)
-		{
-			return(ret);
-		}
-		if(*inout_count_p > 0)
-		{
-			/* done */
-			return(0);
-		}
-	}
-
-#ifdef __PVFS2_JOB_THREADED__
-	/* wait for just a little while to see if anything shows up in the
-	 * completion queue
-	 */
-	ret = gettimeofday(&now, NULL);
-	if(ret < 0)
-	{
-		return(ret);
-	}
-	timeout.tv_sec = now.tv_sec;
-	timeout.tv_nsec = now.tv_usec * 1000 + thread_wait_timeout;
-	if(timeout.tv_nsec > 1000000000)
-	{
-		timeout.tv_nsec = timeout.tv_nsec - 1000000000;
-		timeout.tv_sec = timeout.tv_sec + 1;
-	}
-
-	gen_mutex_lock(&completion_mutex);
-	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
-		&timeout);
-	gen_mutex_unlock(&completion_mutex);
-	if(ret == ETIMEDOUT || ret == EINTR)
-	{
-		/* nothing completed while we were waiting */
-		return(0);
-	}
-	else if(ret != 0)
-	{
-		/* error */
-		return(-ret);
-	}
-
-	/* fall through to check completion queue again */
-
-#else
-	/* push on work for one round */
-	ret = do_one_work_cycle_all(&num_completed, 1);
-	if(ret < 0)
-	{
-		return(ret);
-	}
-	if(num_completed == 0)
-	{
-		/* don't bother checking completion queue again */
-		return(0);
-	}
-#endif /* __PVFS2_JOB_THREADED__ */
-
-	/* check again to see if any jobs finished */
-	*inout_count_p = incount;
-	return(job_testworld_old(out_id_array_p, inout_count_p,
-		returned_user_ptr_array, out_status_array_p));
 }
 
 
@@ -3606,6 +3428,7 @@ static int completion_query_world(
 {
 	struct job_desc* query;
 	int incount = *inout_count_p;
+	*inout_count_p = 0;
 
 	gen_mutex_lock(&completion_mutex);
 		if(completion_error)
