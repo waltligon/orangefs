@@ -13,6 +13,8 @@
 
 #include "bmi.h"
 
+#define ENCODED_HEADER_SIZE sizeof(int)
+
 /* structure to describe messages that have been encoded */
 struct PINT_encoded_msg
 {
@@ -115,6 +117,21 @@ void PINT_decode_release(
 			 int type
 			 );
 
+/* PINT_get_encoded_generic_ack_sz(int type, int op)
+ *
+ * frees all resources associated with a message that has been
+ * decoded
+ *
+ * returns size of encoded generic ack.
+ */
+int PINT_get_encoded_generic_ack_sz(
+			 int type,
+			 int op
+			 );
+
+
+#endif /* __PINT_REQUEST_ENCODE_H */
+
 /*
  * Local variables:
  *  c-indent-level: 4
@@ -123,6 +140,3 @@ void PINT_decode_release(
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-
-#endif /* __PINT_REQUEST_ENCODE_H */
-

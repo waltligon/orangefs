@@ -18,6 +18,7 @@ DECODE_RESP_HEAD(do_decode_resp);
 DECODE_REQ_HEAD(do_decode_req);
 DECODE_REL_HEAD(do_decode_rel);
 ENCODE_REL_HEAD(do_encode_rel);
+int do_encode_gen_ack_sz(int);
 void init_contig(void);
 
 PINT_encoding_functions_s contig_buffer_functions =
@@ -27,7 +28,8 @@ PINT_encoding_functions_s contig_buffer_functions =
 	do_decode_req,
 	do_decode_resp,
 	do_encode_rel,
-	do_decode_rel
+	do_decode_rel,
+	do_encode_gen_ack_sz
 };
 
 PINT_encoding_table_values_s contig_buffer_table =
@@ -37,6 +39,10 @@ PINT_encoding_table_values_s contig_buffer_table =
 	init_contig
 };
 
+int do_encode_gen_ack_sz(int op)
+{
+	return sizeof(struct PVFS_server_resp_s) + ENCODED_HEADER_SIZE;
+}
 
 void init_contig(void)
 {

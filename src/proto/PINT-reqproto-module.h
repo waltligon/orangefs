@@ -44,6 +44,7 @@ typedef struct PINT_encoding_functions
 	int (*decode_resp)(DEC_RESP_ARGS);
 	void (*encode_release)(ENC_REL_ARGS);
 	void (*decode_release)(DEC_REL_ARGS);
+	int (*encode_gen_ack_sz)(int);
 } PINT_encoding_functions_s;
 
 typedef struct PINT_encoding_table_values

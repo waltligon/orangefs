@@ -13,7 +13,6 @@
 #include "PINT-reqproto-encode.h"
 #include "PINT-reqproto-module.h"
 
-#define HEADER_SIZE sizeof(int)
 
 extern PINT_encoding_table_values_s contig_buffer_table;
 
@@ -61,13 +60,13 @@ int PINT_encode(
 	{
 	    ret =  PINT_encoding_table[type]->op->encode_req(input_buffer,
 							     target_msg,
-							     HEADER_SIZE);
+							     ENCODED_HEADER_SIZE);
 	}
 	else if(input_type == PINT_ENCODE_RESP)
 	{
 	    ret =  PINT_encoding_table[type]->op->encode_resp(input_buffer,
 							      target_msg,
-							      HEADER_SIZE);
+							      ENCODED_HEADER_SIZE);
 	}
     }
     if (ret != 0)
@@ -77,8 +76,8 @@ int PINT_encode(
     }
     *((int *)(target_msg->buffer_list[target_msg->list_count-1] 
 	      +target_msg->size_list[target_msg->list_count-1])) =type;
-    target_msg->size_list[target_msg->list_count-1] += HEADER_SIZE;
-    target_msg->total_size += HEADER_SIZE;
+    target_msg->size_list[target_msg->list_count-1] += ENCODED_HEADER_SIZE;
+    target_msg->total_size += ENCODED_HEADER_SIZE;
     return 0;
 }
 
@@ -167,6 +166,20 @@ void PINT_decode_release(
 						  input_type);
 }
 
+
+/* PINT_get_encoded_generic_ack_sz(int type, int op)
+ *
+ * frees all resources associated with a message that has been
+ * decoded
+ *
+ * returns size of encoded generic ack.
+ */
+int PINT_get_encoded_generic_ack_sz(
+				    int type,
+				    int op)
+{
+    return(PINT_encoding_table[type]->op->encode_gen_ack_sz(op));
+}
 /*
  * Local variables:
  *  c-indent-level: 4
