@@ -39,14 +39,15 @@ enum PVFS_server_op
  */
 };
 
-/* create
- *
- */
+/* create *********************************************************/
+/* - used to create new metafile and datafile objects */
+
 struct PVFS_servreq_create
 {
-    PVFS_handle requested_handle;	/* requested handle to create */
-    PVFS_fs_id fs_id;		/* Filesystem ID */
-    PVFS_ds_type object_type;		/* Type of PVFS object */
+    /* suggestion for what handle to allocate */
+    PVFS_handle requested_handle;
+    PVFS_fs_id fs_id;		    /* file system */
+    PVFS_ds_type object_type;	    /* type of object to create */
 };
 
 struct PVFS_servresp_create
