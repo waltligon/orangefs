@@ -14,7 +14,10 @@
 
 #define EXTENTLIST_SIZE 1024
 #define EXTENTLIST_TIMECHECK_FREQ 1
-#define EXTENTLIST_PURGATORY 1
+/* TODO: this has to (somehow) be much larger than the pcache timout. the
+ * problem is the clients set the pcache timeout 
+ * TODO: (2) have a real api (like the pcache) to set the timeout values */
+#define EXTENTLIST_PURGATORY 50
 
 enum {
     MIN_HANDLE = 0,
