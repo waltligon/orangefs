@@ -137,9 +137,23 @@ int main(int argc, char **argv)
         for(j = 0; j < user_opts->num_starts; j++)
         {
             memset(pvfs_path[j],0,PVFS_NAME_MAX);
-            ret = PVFS_util_remove_dir_prefix(
-                user_opts->start[j], mnt.ptab_array[i].mnt_dir,
-                pvfs_path[j], PVFS_NAME_MAX);
+
+            /*
+              if the cmdline specified path is an exact match on
+              a mnt.ptab entry, use '/' as the pvfs_path
+            */
+            if (strcmp(user_opts->start[j],
+                       mnt.ptab_array[i].mnt_dir) == 0)
+            {
+                strcpy(pvfs_path[j], "/");
+                ret = 0;
+            }
+            else
+            {
+                ret = PVFS_util_remove_dir_prefix(
+                    user_opts->start[j], mnt.ptab_array[i].mnt_dir,
+                    pvfs_path[j], PVFS_NAME_MAX);
+            }
             if (ret == 0)
             {
                 if ((mnt_index != -1) && (i != mnt_index))
