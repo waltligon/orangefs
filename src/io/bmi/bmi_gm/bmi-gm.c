@@ -257,6 +257,7 @@ struct gm_op
     gm_remote_ptr_t remote_ptr;
     void *tmp_xfer_buffer;
     uint8_t complete; /* indicates when operation is completed */
+    uint8_t list_flag; /* indicates this is a list operation */
 };
 
 /* the local port that we are communicating on */
@@ -286,6 +287,16 @@ static int gm_post_send_build_op(bmi_op_id_t * id,
     method_addr_p dest,
     void *buffer,
     bmi_size_t size,
+    bmi_msg_tag_t tag,
+    bmi_flag_t mode,
+    bmi_flag_t buffer_status,
+    void *user_ptr, bmi_context_id context_id);
+static int gm_post_send_build_op_list(bmi_op_id_t * id,
+    method_addr_p dest,
+    void ** buffer_list,
+    bmi_size_t* size_list,
+    int list_count,
+    bmi_size_t total_size,
     bmi_msg_tag_t tag,
     bmi_flag_t mode,
     bmi_flag_t buffer_status,
@@ -337,6 +348,7 @@ static void initiate_put_announcement(method_op_p mop);
 static void send_data_buffer(method_op_p mop);
 static void prepare_for_recv(method_op_p mop);
 static void setup_send_data_buffer(method_op_p mop);
+static void setup_send_data_buffer_list(method_op_p mop);
 
 /*************************************************************************
  * Visible Interface 
@@ -881,13 +893,9 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     }
     else
     {
-	return(-ENOSYS);
-#if 0
-	/* 3 way rendezvous mode */
-	return (gm_post_send_build_op(id, dest, buffer, size,
-					    tag, GM_MODE_REND,
-					    buffer_status, user_ptr, context_id));
-#endif
+	return(gm_post_send_build_op_list(id, dest, buffer_list, 
+	    size_list, list_count, total_size, tag, GM_MODE_REND, 
+	    buffer_status, user_ptr, context_id));
     }
 
 }
@@ -1418,6 +1426,59 @@ void dealloc_gm_method_op(method_op_p op_p)
 }
 
 
+/* gm_post_send_build_op_list()
+ *
+ * builds a method op structure for the specified send operation
+ *
+ * returns 0 on success, -errno on failure
+ */
+static int gm_post_send_build_op_list(bmi_op_id_t * id,
+    method_addr_p dest,
+    void ** buffer_list,
+    bmi_size_t* size_list,
+    int list_count,
+    bmi_size_t total_size,
+    bmi_msg_tag_t tag,
+    bmi_flag_t mode,
+    bmi_flag_t buffer_status,
+    void *user_ptr, bmi_context_id context_id)
+{
+    method_op_p new_method_op = NULL;
+    struct gm_op *gm_op_data = NULL;
+
+    gossip_ldebug(BMI_DEBUG_GM, "gm_post_send_build_op_list() called.\n");
+
+    /* we need an op structure to keep up with this send */
+    new_method_op = alloc_gm_method_op();
+    if (!new_method_op)
+    {
+	return (-ENOMEM);
+    }
+    *id = new_method_op->op_id;
+    new_method_op->user_ptr = user_ptr;
+    new_method_op->send_recv = BMI_OP_SEND;
+    new_method_op->addr = dest;
+    new_method_op->buffer = NULL;
+    new_method_op->actual_size = total_size;
+    /* TODO: is this right thing to do for send side? */
+    new_method_op->expected_size = 0;  
+    new_method_op->msg_tag = tag;
+    gossip_ldebug(BMI_DEBUG_GM, "Tag: %d.\n", (int) tag);
+    new_method_op->mode = mode;
+    new_method_op->context_id = context_id;
+
+    new_method_op->buffer_list = buffer_list;
+    new_method_op->size_list = size_list;
+    new_method_op->list_count = list_count;
+
+    gm_op_data = new_method_op->method_data;
+    gm_op_data->buffer_status = buffer_status;
+    gm_op_data->list_flag = 1;
+
+    return (gm_post_send_check_resource(new_method_op));
+}
+
+
 /* gm_post_send_build_op()
  *
  * builds a method op structure for the specified send operation
@@ -1909,6 +1970,7 @@ static int gm_do_work(int wait_time)
 static void delayed_token_sweep(void)
 {
     method_op_p query_op = NULL;
+    struct gm_op* gm_op_data = NULL;
 
     /* NOTE: the order is important here.  We try to push the
      * last steps of stalled messages first in order to preserve
@@ -1945,7 +2007,11 @@ static void delayed_token_sweep(void)
 		    op_list_shownext(op_list_array[IND_NEED_SEND_TOK_LOW]);
 		
 		op_list_remove(query_op);
-		setup_send_data_buffer(query_op);
+		gm_op_data = query_op->method_data;
+		if(gm_op_data->list_flag)
+		    setup_send_data_buffer_list(query_op);
+		else
+		    setup_send_data_buffer(query_op);
 		send_data_buffer(query_op);
 		return;
 #ifdef ENABLE_GM_BUFPOOL
@@ -2466,7 +2532,10 @@ static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
     }
 #endif /* ENABLE_GM_BUFPOOL */
 
-    setup_send_data_buffer(query_op);
+    if(gm_op_data->list_flag)
+	setup_send_data_buffer_list(query_op);
+    else
+	setup_send_data_buffer(query_op);
     send_data_buffer(query_op);
     return;
 }
@@ -2538,6 +2607,45 @@ static void setup_send_data_buffer(method_op_p mop)
 #endif /* ENABLE_GM_BUFPOOL */
 
     }
+
+    return;
+}
+
+
+/* setup_send_data_buffer_list()
+ *
+ * prepares a buffer to be sent (for list operations)
+ *
+ * no return value
+ */
+static void setup_send_data_buffer_list(method_op_p mop)
+{
+    struct gm_op *gm_op_data = mop->method_data;
+    int i;
+    void* copy_buffer;
+
+#ifdef ENABLE_GM_REGCACHE
+    /* we don't handle this yet */
+    assert(0);
+#endif /* ENABLE_GM_REGCACHE */
+#ifdef ENABLE_GM_REGISTER
+    /* we don't handle this yet */
+    assert(0);
+#endif /* ENABLE_GM_REGISTER */
+#ifdef ENABLE_GM_BUFCOPY
+    /* we don't handle this yet */
+    assert(0);
+#endif /* ENABLE_GM_BUFCOPY */
+#ifdef ENABLE_GM_BUFPOOL
+    gm_op_data->tmp_xfer_buffer = bmi_gm_bufferpool_get(io_pool);
+    copy_buffer = gm_op_data->tmp_xfer_buffer;
+    for(i=0; i<mop->list_count; i++)
+    {
+	memcpy(copy_buffer, mop->buffer_list[i], mop->size_list[i]);
+	copy_buffer = (void*)((long)copy_buffer + (long)mop->size_list[i]);
+    }
+    mop->buffer = gm_op_data->tmp_xfer_buffer;
+#endif /* ENABLE_GM_BUFPOOL */
 
     return;
 }
