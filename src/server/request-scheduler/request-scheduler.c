@@ -391,7 +391,7 @@ int PINT_req_sched_post(
 	}
     }
 
-    if(!readonly_flag)
+    if(!readonly_flag && !(in_request->flags & PVFS_SERVER_REQ_ADMIN_MODE))
     {
 	/* if this requests modifies the file system, we have to check
 	 * to see if we are in admin mode or about to enter admin mode

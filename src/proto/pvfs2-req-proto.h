@@ -597,10 +597,16 @@ struct PVFS_servresp_mgmt_perf_mon
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
+enum PVFS_server_req_flags
+{
+    PVFS_SERVER_REQ_ADMIN_MODE = 1
+};
+
 struct PVFS_server_req
 {
     enum PVFS_server_op op;
     PVFS_credentials credentials;
+    int32_t flags;
     union
     {
 	struct PVFS_servreq_create create;

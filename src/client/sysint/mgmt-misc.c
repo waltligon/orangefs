@@ -19,6 +19,7 @@
 #include "server-config.h"
 
 extern struct server_configuration_s g_server_config;
+extern int g_admin_mode;
 
 /* PVFS_mgmt_map_addr()
  *
@@ -178,6 +179,28 @@ int PVFS_mgmt_count_servers(
 {
     return(PINT_bucket_count_servers(&g_server_config,
 	fs_id, server_type, count));
+}
+
+/* PVFS_mgmt_toggle_admin_mode()
+ *
+ * turns on/off admin mode of system/mgmt interface; allows requests
+ * that modify the file system to take effect on servers that are in 
+ * admin mode.
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_mgmt_toggle_admin_mode(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    int on_flag)
+{
+    if(on_flag != 1 && on_flag != 0)
+    {	
+	return(-EINVAL);
+    }
+
+    g_admin_mode = on_flag;
+    return(0);
 }
 
 /*

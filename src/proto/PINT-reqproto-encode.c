@@ -19,6 +19,7 @@
 
 extern PINT_encoding_table_values_s contig_buffer_table;
 extern PINT_encoding_table_values_s le_bytefield_table;
+int g_admin_mode = 0;
 
 PINT_encoding_table_values_s *PINT_encoding_table[ENCODING_TABLE_SIZE] = {NULL};
 
@@ -81,6 +82,7 @@ int PINT_encode(
     int ret = -1;
     target_msg->dest = target_addr;
     target_msg->enc_type = enc_type;
+    struct PVFS_server_req* tmp_req;
 
     switch(enc_type)
     {
@@ -88,6 +90,11 @@ int PINT_encode(
 	case PINT_ENC_LE_BFIELD:
 	    if (input_type == PINT_ENCODE_REQ)
 	    {
+		/* overwrite flags on the way through */
+		tmp_req = input_buffer;
+		tmp_req->flags = 0;
+		if(g_admin_mode)
+		    tmp_req->flags += PVFS_SERVER_REQ_ADMIN_MODE;
 		ret =  PINT_encoding_table[enc_type]->op->encode_req(input_buffer,
 								 target_msg);
 	    }
