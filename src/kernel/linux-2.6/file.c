@@ -102,8 +102,7 @@ ssize_t pvfs2_inode_read(
         new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
         if (!new_op)
         {
-            pvfs2_error("pvfs2: ERROR -- pvfs2_inode_read "
-                        "kmem_cache_alloc failed!\n");
+            pvfs2_error("pvfs2_inode_read: kmem_cache_alloc failed!\n");
             return -ENOMEM;
         }
 
@@ -221,6 +220,10 @@ ssize_t pvfs2_file_read(
     size_t count,
     loff_t *offset)
 {
+    pvfs2_print("pvfs2: pvfs2_file_read called on %s\n",
+                (file && file->f_dentry && file->f_dentry->d_name.name ?
+                 (char *)file->f_dentry->d_name.name : "UNKNOWN"));
+
     return pvfs2_inode_read(
         file->f_dentry->d_inode, buf, count, offset, 1, 0);
 }
@@ -436,39 +439,38 @@ int pvfs2_fsync(
     return 0;
 }
 
+/*
+  NOTE: if .llseek is overriden, we must acquire lock as described in
+  Documentation/filesystems/Locking
+*/
 loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
 {
     int ret = -EINVAL;
-    struct inode *inode = file->f_dentry->d_inode;
-
+    struct inode *inode = (file->f_mapping->host ? file->f_mapping->host :
+                           file->f_dentry->d_inode);
     if (!inode)
     {
         pvfs2_error("pvfs2_file_llseek: invalid inode (NULL)\n");
         return ret;
     }
 
-    if (inode->i_size == 0)
-    {
-        /* revalidate the inode's file size */
-        ret = pvfs2_inode_getattr(inode);
-        if (ret)
-        {
-            pvfs2_make_bad_inode(inode);
-            return ret;
-        }
-    }
+/*     if (inode->i_size == 0) */
+/*     { */
+/*         /\* revalidate the inode's file size *\/ */
+/*         ret = pvfs2_inode_getattr(inode); */
+/*         if (ret) */
+/*         { */
+/*             pvfs2_make_bad_inode(inode); */
+/*             return ret; */
+/*         } */
+/*     } */
 
-    /*
-      NOTE: if .llseek is overriden, we must acquire lock as
-      described in Documentation/filesystems/Locking
-    */
-    pvfs2_print("pvfs2_file_llseek: int offset is %d| origin is %d\n",
-                (int)offset, origin);
-
-    pvfs2_print("pvfs2_file_llseek: inode thinks size is %lu\n",
+    pvfs2_print("pvfs2_file_llseek: int offset is %d | origin is %d | "
+                "inode size is %lu\n", (int)offset, origin,
                 (unsigned long)file->f_dentry->d_inode->i_size);
 
-    return generic_file_llseek(file, offset, origin);
+/*     return generic_file_llseek(file, offset, origin); */
+    return remote_llseek(file, offset, origin);
 }
 
 struct file_operations pvfs2_file_operations =
