@@ -31,26 +31,150 @@ struct options
     char** filenames;
 };
 
+static int split_pathname( const char* path, char** directory, char** filename);
+
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 
 int main(int argc, char **argv)
 {
     int ret = -1;
+    int i;
     struct options* user_opts = NULL;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
     if(!user_opts)
     {
-	fprintf(stderr, "Error: failed to parse "
-                "command line arguments.\n");
+	fprintf(stderr, "Error: failed to parse command line arguments.\n");
 	return(-1);
     }
 
-    return(ret);
+    /* Initialize the pvfs2 server */
+    ret = PVFS_util_init_defaults();
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return -1;
+    }
+
+    /* Remove each specified file */
+    for (i = 0; i < user_opts->num_files; ++i)
+    {
+        int rc;
+        char* working_file = user_opts->filenames[i];
+        char* directory;
+        char* filename;
+
+        char pvfs_path[PVFS_NAME_MAX] = {0};
+        PVFS_fs_id cur_fs;
+        PVFS_sysresp_lookup resp_lookup;
+        PVFS_credentials credentials;
+        PVFS_pinode_reference parent_ref;
+
+        /* Translate path into pvfs2 relative path */
+        rc = split_pathname(working_file, &directory, &filename);
+        if (0 != rc)
+        {
+            fprintf(stderr, "Unknown path format: %s\n", working_file);
+            ret = -1;
+            break;
+        }
+
+        rc = PVFS_util_resolve(directory,
+                               &cur_fs,
+                               pvfs_path,
+                               PVFS_NAME_MAX);
+        if (0 != rc)
+        {
+            PVFS_perror("PVFS_util_resolve", rc);
+            ret = -1;
+            break;
+        }
+
+        /* Lookup files directory */
+        credentials.uid = getuid();
+        credentials.gid = getuid();
+        memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
+        rc = PVFS_sys_lookup(cur_fs,
+                             pvfs_path,
+                             credentials,
+                             &resp_lookup,
+                             PVFS2_LOOKUP_LINK_NO_FOLLOW);
+        if (0 != rc)
+        {
+            PVFS_perror("PVFS_sys_lookup", rc);
+            ret = -1;
+            break;
+        }
+        
+        /* Remove file */
+        parent_ref = resp_lookup.pinode_refn;
+        rc = PVFS_sys_remove(filename, parent_ref, credentials);
+
+        if ( 0 != rc )
+        {
+            fprintf(stderr, "Error: An error occurred while removing %s\n",
+                    working_file);
+            PVFS_perror("PVFS_sys_remove", rc);
+            ret = -1;
+            break;
+        }
+    }
+    
+    return ret;
 }
 
+
+/**
+ * Split a pathname into a directory and a filename.  If non-null
+ * is passed as the directory or filename, the field will be allocated and
+ * filled with the correct value
+ */
+static int split_pathname( const char *path,
+                           char **directory,
+                           char **filename )
+{
+    /* Split path into a directory and filename */
+    int path_length = strlen(path);
+    if ('/' == path[0])
+    {
+        int i;
+        for (i = path_length - 1; i >= 0; --i)
+        {
+            if ( '/' == path[i] )
+            {
+                /* parse the directory */
+                if (0 != directory)
+                {
+                    *directory = malloc(i + 1);
+                    if (0 != directory)
+                    {
+                        strncpy(*directory, path, i);
+                        (*directory)[i] = '\0';
+                    }
+                }
+                /* parse the filename */
+                if (0 != filename)
+                {
+                    *filename = malloc(path_length - i + 1);
+                    if (0 != filename)
+                    {
+                        strncpy(*filename, path + i + 1, path_length - i);
+                        (*filename)[path_length - i] = '\0';
+                    }
+                }
+                break;
+            }
+        }
+    }
+    else
+    {
+        fprintf(stderr, "Error: Not an absolute path: %s\n", path);
+        return -1;
+    }
+    return 0;
+}
 
 /* parse_args()
  *
@@ -63,7 +187,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "vs:n:b:";
+    char flags[] = "rf?";
     int one_opt = 0;
 
     struct options* tmp_opts = NULL;
@@ -75,7 +199,7 @@ static struct options* parse_args(int argc, char* argv[])
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
-    /* fill in defaults (except for hostid) */
+    /* fill in defaults */
     tmp_opts->force = 0;
     tmp_opts->recursive = 0;
     tmp_opts->filenames = 0;
@@ -100,7 +224,19 @@ static struct options* parse_args(int argc, char* argv[])
 	}
     }
 
-    if(optind != (argc - 2))
+    if(optind < argc)
+    {
+        int i = 0;
+        tmp_opts->num_files = argc - optind;
+        tmp_opts->filenames = malloc((argc - optind) * sizeof(char*));
+        while (optind < argc)
+        {
+            tmp_opts->filenames[i] = argv[optind];
+            optind++;
+            i++;
+        }
+    }
+    else
     {
 	usage(argc, argv);
 	exit(EXIT_FAILURE);
