@@ -949,6 +949,7 @@ int main(int argc, char **argv)
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_init_defaults", ret);
+	return(-1);
     }
 
 #ifdef USE_MMAP_RA_CACHE
