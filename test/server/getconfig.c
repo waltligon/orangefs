@@ -175,6 +175,9 @@ int main(int argc, char **argv)	{
 		
 	/* look at the ack */
 	ret = PINT_decode(my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
+	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp_s)+8192, 
+		BMI_RECV_BUFFER);
+	my_ack = bar.buffer;
 	if(my_ack->op != PVFS_SERV_GETCONFIG)
 	{
 		printf("ERROR: received ack of wrong type (%d)\n", (int)my_ack->op);

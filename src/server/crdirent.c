@@ -134,7 +134,7 @@ STATE_FXN_HEAD(crdirent_init)
 
 	int job_post_ret;
 	job_id_t i;
-	gossip_debug(SERVER_DEBUG,"Got CrDirent for %s,%lld in %lld\n",s_op->req->u.crdirent.name,s_op->req->u.crdirent.new_handle,s_op->req->u.crdirent.parent_handle);
+	printf("Got CrDirent for %s,%lld in %lld\n",s_op->req->u.crdirent.name,s_op->req->u.crdirent.new_handle,s_op->req->u.crdirent.parent_handle);
 
 #if 0
 	s_op->key_a = (PVFS_ds_keyval_s *) malloc(2*sizeof(PVFS_ds_keyval_s));
@@ -191,7 +191,7 @@ STATE_FXN_HEAD(crdirent_gethandle)
 	job_id_t i;
 	PVFS_vtag_s bs;
 
-	gossip_debug(SERVER_DEBUG,"Get Handle Fxn for crdirent\n");
+	printf("Get Handle Fxn for crdirent\n");
 	
 	s_op->key.buffer = TROVE_COMMON_KEYS[DIR_ENT_KEY];
 	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]);
@@ -233,7 +233,7 @@ STATE_FXN_HEAD(crdirent_getattr)
 	job_id_t i;
 	PVFS_vtag_s bs;
 
-	gossip_debug(SERVER_DEBUG,"Get attr Fxn for crdirent\n");
+	printf("Get attr Fxn for crdirent\n");
 	job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
 													 s_op->req->u.crdirent.parent_handle,
 													 &(s_op->key),
@@ -269,7 +269,7 @@ STATE_FXN_HEAD(crdirent_check_perms)
 	int job_post_ret;
 	//job_id_t i;
 
-	gossip_debug(SERVER_DEBUG,"CheckPerms Fxn for crdirent\n");
+	printf("CheckPerms Fxn for crdirent\n");
 	job_post_ret = 1;  /* Just pretend it is good right now */
 	// IF THEY don't have permission, set ret->error_code to -ENOPERM!
 
@@ -296,7 +296,7 @@ STATE_FXN_HEAD(crdirent_create_dir_handle_ph2)
 	int job_post_ret;
 	job_id_t i;
 
-	gossip_debug(SERVER_DEBUG,"phase2 Fxn for crdirent\n");
+	printf("phase2 Fxn for crdirent\n");
 	s_op->key.buffer = TROVE_COMMON_KEYS[DIR_ENT_KEY];
 	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]);
 
@@ -336,8 +336,8 @@ STATE_FXN_HEAD(crdirent_create_dir_handle_ph1)
 	int job_post_ret;
 	job_id_t i;
 
-	gossip_debug(SERVER_DEBUG,"phase1 Fxn for crdirent\n");
-	gossip_debug(SERVER_DEBUG,"Creating Handle:  %d,%lld\n",s_op->req->u.crdirent.fs_id,\
+	printf("phase1 Fxn for crdirent\n");
+	printf("Creating Handle:  %d,%lld\n",s_op->req->u.crdirent.fs_id,\
 					 s_op->req->u.crdirent.parent_handle);
 	job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
 													   s_op->req->u.crdirent.parent_handle,
@@ -373,9 +373,10 @@ STATE_FXN_HEAD(crdirent_create)
 	PVFS_handle h;
 
 
-	gossip_debug(SERVER_DEBUG,"create Fxn for crdirent\n");
+	printf("create Fxn for crdirent\n");
 	h = *((PVFS_handle *)s_op->val.buffer);
 	
+	s_op->key.buffer = malloc(strlen(s_op->req->u.crdirent.name));
 	strcpy(s_op->key.buffer,s_op->req->u.crdirent.name);
 	s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
 
@@ -419,7 +420,7 @@ STATE_FXN_HEAD(crdirent_send_bmi)
 
 	s_op->resp->status = ret->error_code;
 
-	gossip_debug(SERVER_DEBUG,"send Fxn for crdirent\n");
+	printf("send Fxn for crdirent\n");
 	/* Set the ack IF it was created */
 	if(ret->error_code == 0) 
 		s_op->resp->u.generic.handle = s_op->req->u.crdirent.new_handle;
@@ -456,7 +457,7 @@ STATE_FXN_HEAD(crdirent_send_bmi)
 STATE_FXN_HEAD(crdirent_cleanup)
 {
 	
-	gossip_debug(SERVER_DEBUG,"clean Fxn for crdirent\n");
+	printf("clean Fxn for crdirent\n");
 	if(s_op->resp)
 	{
 		BMI_memfree(s_op->addr,

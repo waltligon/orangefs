@@ -166,7 +166,7 @@ STATE_FXN_HEAD(getattr_send_bmi)
 	job_id_t i;
 	PVFS_object_attr *foo = NULL;
 
-	if (s_op->val.buffer)
+	if (s_op->val.buffer && ret->error_code == 0)
 	{
 		foo = s_op->val.buffer;
 		memcpy(&(s_op->resp->u.getattr.attr),foo,sizeof(PVFS_object_attr));

@@ -177,6 +177,7 @@ int main(int argc, char **argv)	{
 	{
 		printf("ERROR: server returned status: %d\n",
 			(int)my_ack->status);
+		exit(0);
 	}
 	printf("==== Received ===\n");
 	display_pvfs_structure(my_ack,2);

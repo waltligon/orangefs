@@ -12,7 +12,7 @@
 #include <bmi.h>
 #include <gossip.h>
 #include <pvfs2-req-proto.h>
-#include <pack.h>
+#include <PINT-reqproto-encode.h>
 #include <print-struct.h>
 
 /**************************************************************
@@ -25,6 +25,8 @@
 struct options{
 	char* hostid;       /* host identifier */
 	char* method;       /* bmi method to use */
+	int bucket;
+	char* name;
 };
 
 
@@ -48,6 +50,8 @@ int main(int argc, char **argv)	{
 	int outcount = 0;
 	bmi_error_code_t error_code;
 	bmi_size_t actual_size;
+	struct PINT_encoded_msg foo;
+	struct PINT_decoded_msg bar;
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -92,17 +96,17 @@ int main(int argc, char **argv)	{
 	/* TODO: fill below fields in with the correct values */
 	my_req->credentials.perms = U_WRITE | U_READ;  
 	my_req->u.crdirent.name = "foo.c";
-	my_req->u.crdirent.new_handle = 1048575;
+	my_req->u.crdirent.new_handle = 1048574;
 	my_req->u.crdirent.parent_handle = 1048576;
 	my_req->u.crdirent.fs_id = 9;
 	my_req->rsize = sizeof(struct PVFS_server_req_s)+strlen(my_req->u.crdirent.name)+1;
 
 	display_pvfs_structure(my_req,1);
-	my_req = pack_pvfs_struct(my_req,1,server_addr,0);
+	my_req = PINT_encode(my_req,PINT_ENCODE_REQ,&foo,server_addr,0);
 
 	/* send the initial request on its way */
-	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req, 
-		my_req->rsize, BMI_PRE_ALLOC, 0, NULL);
+	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, foo.buffer_list[0], 
+		foo.size_list[0], BMI_PRE_ALLOC, 0, NULL);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -170,7 +174,7 @@ int main(int argc, char **argv)	{
 	printf("=======Response Received=====\n");
 	display_pvfs_structure(my_ack,2);
 	/* look at the ack */
-	if(my_ack->op != PVFS_SERV_CREATE)
+	if(my_ack->op != PVFS_SERV_CREATEDIRENT)
 	{
 		printf("ERROR: received ack of wrong type (%d)\n", (int)my_ack->op);
 	}
@@ -212,13 +216,14 @@ static struct options* parse_args(int argc, char* argv[]){
 	/* getopt stuff */
 	extern char* optarg;
 	extern int optind, opterr, optopt;
-	char flags[] = "h:m:";
+	char flags[] = "h:m:l:n";
 	char one_opt = ' ';
 
 	struct options* tmp_opts = NULL;
 	int len = -1;
 	char default_hostid[] = "tcp://localhost:3334";
 	char default_method[] = "bmi_tcp";
+	char default_name[] = "foo";
 
 	/* create storage for the command line options */
 	tmp_opts = (struct options*)malloc(sizeof(struct options));
@@ -228,6 +233,7 @@ static struct options* parse_args(int argc, char* argv[]){
 	memset(tmp_opts, 0, sizeof(struct options));
 	tmp_opts->hostid = (char*)malloc(strlen(default_hostid) + 1);
 	tmp_opts->method = (char*)malloc(strlen(default_method) + 1);
+	tmp_opts->name = (char*)malloc(strlen(default_name) + 1);
 	if(!tmp_opts->method || !tmp_opts->hostid)
 	{
 		goto parse_args_error;
@@ -240,6 +246,17 @@ static struct options* parse_args(int argc, char* argv[]){
 	/* look at command line arguments */
 	while((one_opt = getopt(argc, argv, flags)) != EOF){
 		switch(one_opt){
+			case('l'):
+				tmp_opts->bucket = atoi(optarg);
+				break;
+			case('n'):
+				len = (strlen(optarg)) + 1;
+				free(tmp_opts->name);
+				if((tmp_opts->name = (char*)malloc(len))==NULL){
+					goto parse_args_error;
+				}
+				memcpy(tmp_opts->name, optarg, len);
+				break;
 			case('h'):
 				len = (strlen(optarg)) + 1;
 				free(tmp_opts->hostid);

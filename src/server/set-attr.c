@@ -41,8 +41,7 @@ machine set_attr(init, cleanup, getobj_attrib, setobj_attrib, send_bmi)
 	state getobj_attrib
 	{
 		run setattr_getobj_attribs;
-		success => setobj_attrib;
-		default => send_bmi;
+		default => setobj_attrib;
 	}
 
 	state setobj_attrib
@@ -198,6 +197,10 @@ STATE_FXN_HEAD(setattr_setobj_attribs)
 		old_attr = s_op->val.buffer;
 	else
 		old_attr = (PVFS_object_attr *) malloc(sizeof(PVFS_object_attr));
+	
+	/* For now... overwrite the initial structure. */
+
+	memcpy(old_attr,&(s_op->req->u.setattr.attr),sizeof(PVFS_object_attr));
 
 	/* From here, we check the mask of the attributes. */
 
@@ -222,7 +225,6 @@ STATE_FXN_HEAD(setattr_setobj_attribs)
 
 	if(s_op->req->u.setattr.attrmask & ATTR_TYPE)
 		old_attr->objtype = s_op->req->u.setattr.attr.objtype;
-#endif
 
 	/* TODO: What to do about these unions, inc. the one with a ptr.
 	 *	TODO:	Also what about ATTR_SIZE?? 
@@ -239,6 +241,7 @@ STATE_FXN_HEAD(setattr_setobj_attribs)
 
 	if(s_op->req->u.setattr.attrmask & ATTR_SYM)
 		old_attr->u.sym = s_op->req->u.setattr.attr.u.sym;
+#endif
 
 
 	job_post_ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,

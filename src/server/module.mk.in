@@ -8,6 +8,7 @@ SERVERGENSRC := \
 	$(DIR)/set-attr.src.c \
 	$(DIR)/mkdir.src.c \
 	$(DIR)/get-attr.src.c \
+	$(DIR)/readdir.src.c \
 	$(DIR)/get-config.src.c 
 
 # "normal" c files
