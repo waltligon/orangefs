@@ -329,7 +329,7 @@ static ssize_t pvfs2_file_write(
 
     if (total_count)
     {
-        inode->i_atime = CURRENT_TIME;
+        update_atime(inode);
     }
     return(total_count);
 }
@@ -383,6 +383,7 @@ int pvfs2_file_release(
     pvfs2_print("pvfs2: pvfs2_file_release called on %s\n",
                 file->f_dentry->d_name.name);
 
+    update_atime(inode);
     if (S_ISDIR(inode->i_mode))
     {
 	return dcache_dir_close(inode, file);

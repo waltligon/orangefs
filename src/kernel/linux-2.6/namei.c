@@ -382,11 +382,6 @@ static int pvfs2_rename(
             goto error_exit;
         }
 
-        /*
-          FIXME:
-          at some point we need to get our set
-          attribute rules straight
-        */
         new_dentry->d_inode->i_ctime = CURRENT_TIME;
         if (are_directories)
         {
@@ -416,7 +411,8 @@ struct inode_operations pvfs2_dir_inode_operations =
     .rmdir = pvfs2_rmdir,
     .mknod = pvfs2_mknod,
     .rename = pvfs2_rename,
-    .setattr = pvfs2_setattr
+    .setattr = pvfs2_setattr,
+    .getattr = pvfs2_getattr
 };
 
 /*

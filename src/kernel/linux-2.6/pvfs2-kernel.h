@@ -213,6 +213,10 @@ int wait_for_matching_downcall(
 int pvfs2_setattr(
     struct dentry *dentry,
     struct iattr *iattr);
+int pvfs2_getattr(
+    struct vfsmount *mnt,
+    struct dentry *dentry,
+    struct kstat *kstat);
 
 /****************************
  * defined in namei.c

@@ -59,9 +59,12 @@ static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
     return ret;
 }
 
-struct inode_operations pvfs2_symlink_inode_operations = {
-    .readlink     = pvfs2_readlink,
-    .follow_link  = pvfs2_follow_link
+struct inode_operations pvfs2_symlink_inode_operations =
+{
+    .readlink = pvfs2_readlink,
+    .follow_link = pvfs2_follow_link,
+    .setattr = pvfs2_setattr,
+    .getattr = pvfs2_getattr
 /*     .setxattr    = pvfs2_setxattr, */
 /*     .getxattr    = pvfs2_getxattr, */
 /*     .listxattr   = pvfs2_listxattr, */

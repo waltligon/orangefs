@@ -122,9 +122,9 @@ static inline int copy_attributes_to_inode(
 
 	inode->i_uid = attrs->owner;
 	inode->i_gid = attrs->group;
-	inode->i_atime.tv_sec = (time_t) attrs->atime;
-	inode->i_mtime.tv_sec = (time_t) attrs->mtime;
-	inode->i_ctime.tv_sec = (time_t) attrs->ctime;
+	inode->i_atime.tv_sec = (time_t)attrs->atime;
+	inode->i_mtime.tv_sec = (time_t)attrs->mtime;
+	inode->i_ctime.tv_sec = (time_t)attrs->ctime;
 
         inode->i_mode = 0;
 

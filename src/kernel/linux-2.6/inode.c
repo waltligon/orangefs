@@ -257,6 +257,7 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     ret = inode_change_ok(inode, iattr);
     if (ret == 0)
     {
+        update_atime(inode);
         ret = pvfs2_inode_setattr(inode, iattr);
         if ((ret == 0) && (S_ISREG(inode->i_mode)))
         {
