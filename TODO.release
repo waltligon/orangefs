@@ -3,7 +3,7 @@ Stuff to do for the first friendly-user release:
 . mpich2 and pvfs2 cannot be built together
   XXX: more detailed error report
 
-. use fstab to describe pvfs2 volumes
+. use fstab to describe pvfs2 volumes?
 
 . make pvfs2-client stuff capable of mounting multiple file systems
 
@@ -27,8 +27,12 @@ Stuff to do for the first friendly-user release:
 
 . server log to a file and run in background
 
-. config file support for gossip mask levels
-
+. more config file options:
+  - default gossip mask (server)
+  - bmi module to use (client and server)
+  - encoding type to use (client)
+  - trove module to use (server)
+  - flowprotocol to use (client or server?)
 . implement server support for resize
 
 . memory datatype processing (for romio noncontiguous requests)
