@@ -1,13 +1,8 @@
 General (critical)
 -----------------------
 
-Implement a list i/o compatibility layer in top level bmi code.  If a
-module does not implement list functionality, then the behavior should
-be emulated somehow (naive approach is to just pack buffers).
-
 Implement unpost() function for cancelling operations: 
 http://www.beowulf-underground.org/pipermail/pvfs2-internal/2002-April/000060.html
-
 
 Add a hint that indicates when a bmi address is "ok to get rid of".
 This would set a bit on the address interally and allow us to do things
@@ -17,8 +12,8 @@ necessarily take any action right away.
 
 convert PVFS to new error code scheme 
 
-update GM module to level of TCP module (in particular at least need
-list operations support somewhere)
+make sure all control messages (TCP and GM) are network encoded somehow
+to work across different architectures
 
 General (portability)
 -----------------------
@@ -31,9 +26,6 @@ Try building with some different compilers (at least gcc 3.2).
 Replace void* type for memory regions with PVFS_byte or BMI_byte
 types.  Audit code to make sure that buffers are indexed like
 this: (type)((BMI_byte)buffer + offset)
-
-make sure all control messages (TCP and GM) are network encoded somehow
-to work across different architectures
 
 General (non critical)
 -----------------------
@@ -66,9 +58,6 @@ the top of each API call.
 Implement some fairness in BMI_waitunexpected and BMI_testunexpected.
 The current implementation would allow starvation if a faster module is
 busy enough.
-
-Clean up names of structs and struct typedefs?  Should there be some
-sort of convention here?  (this is really a global PVFS2 problem)
 
 Implement a mechanism for throttling the amount of eager or unexpected
 messages that a method is allowed to receive at a time.  Right now one
@@ -108,6 +97,10 @@ turn off sigpipe (we will just catch errors at system call time)
 
 Do something better than the "enqueue_operation" function - it's
 list of arguments has gotten out of hand, I think...
+
+also clean up use of tcp_msg_header structure- this is also cluttering the
+code, especially when considering what needs to be done to support 
+network encoding of the header.
 
 Audit code and check for EINTR on _all_ system calls.  This was burning
 me on a poll() call recently.
