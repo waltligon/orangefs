@@ -11,6 +11,7 @@
 #include <string.h>
 #include <pvfs2-attr.h>
 #include <job-consist.h>
+#include <assert.h>
 
 static int setattr_init(state_action_struct *s_op, job_status_s *ret);
 static int setattr_cleanup(state_action_struct *s_op, job_status_s *ret);
@@ -286,24 +287,56 @@ static int setattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
     int job_post_ret=0;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG,"Writing trove values\n");
     /* Prepare the message */
 
     s_op->resp->u.generic.handle = s_op->req->u.setattr.handle;
     s_op->resp->status = ret->error_code;
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
+    job_post_ret = PINT_encode(s_op->resp,
+	    PINT_ENCODE_RESP,
+	    &(s_op->encoded),
+	    s_op->addr,
+	    s_op->enc_type);
+
+    assert(job_post_ret == 0);
+    
     /* Post message */
 
-    job_post_ret = job_bmi_send(s_op->addr,
-	    s_op->resp,
-	    s_op->resp->rsize,
+#ifdef PVFS2_SERVER_DEBUG_BMI
+
+    job_post_ret = job_bmi_send_list(
+	    s_op->addr,
+	    s_op->encoded.buffer_list,
+	    s_op->encoded.size_list,
+	    s_op->encoded.list_count,
+	    s_op->encoded.total_size,
 	    s_op->tag,
+	    s_op->encoded.buffer_flag,
 	    0,
+	    s_op, 
+	    ret, 
+	    &i);
+
+#else
+
+    job_post_ret = job_bmi_send(
+	    s_op->addr,
+	    s_op->encoded.buffer_list[0],
+	    s_op->encoded.total_size,
+	    s_op->tag,
+#ifdef PVFS2_SERVER_DEBUG_BMI
+	    s_op->encoded.buffer_flag,
+#else
+	    0,
+#endif
 	    0,
 	    s_op,
 	    ret,
 	    &i);
+
+#endif
+
 
     return(job_post_ret);
 

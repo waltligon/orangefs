@@ -516,6 +516,8 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
     assert(job_post_ret == 0);
 
+#ifndef PVFS2_SERVER_DEBUG_BMI
+
     job_post_ret = job_bmi_send_list(
 	    s_op->addr,
 	    s_op->encoded.buffer_list,
@@ -528,6 +530,25 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	    s_op, 
 	    ret, 
 	    &i);
+
+#else
+
+    job_post_ret = job_bmi_send(
+	    s_op->addr,
+	    s_op->encoded.buffer_list[0],
+	    s_op->encoded.total_size,
+	    s_op->tag,
+#ifdef PVFS2_SERVER_DEBUG_BMI
+	    s_op->encoded.buffer_flag,
+#else
+	    0,
+#endif
+	    0,
+	    s_op,
+	    ret,
+	    &i);
+
+#endif
 
     return(job_post_ret);
 }
@@ -591,6 +612,8 @@ static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret)
     {
 	free(s_op->req);
     }
+
+    BMI_memfree(s_op->addr,s_op->unexp_bmi_buff->buffer,s_op->unexp_bmi_buff->size,BMI_RECV_BUFFER);
 
     free(s_op->unexp_bmi_buff);
 

@@ -201,28 +201,17 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
     s_op->resp->status = ret->error_code;
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
-    if (s_op->val.buffer && ret->error_code == 0)
-    {
-	job_post_ret = PINT_encode(s_op->resp,
-		PINT_ENCODE_RESP,
-		&(s_op->encoded),
-		s_op->addr,
-		s_op->enc_type);
-    }
+    job_post_ret = PINT_encode(s_op->resp,
+	    PINT_ENCODE_RESP,
+	    &(s_op->encoded),
+	    s_op->addr,
+	    s_op->enc_type);
+
     assert(job_post_ret == 0);
-    if(ret->error_code == 0)
-	assert(s_op->encoded.buffer_list[0] != NULL);
-    else
-    {
-	/* We have failed somewhere... However, we still need to send what we have */
-	/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
-	s_op->resp->op = PVFS_SERV_NOOP;
-	PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-	/* set it back */
-	((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
-    }
 
     /* Post message */
+#ifndef PVFS2_SERVER_DEBUG_BMI
+
     job_post_ret = job_bmi_send_list(
 	    s_op->addr,
 	    s_op->encoded.buffer_list,
@@ -232,9 +221,24 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	    s_op->tag,
 	    s_op->encoded.buffer_flag,
 	    0,
+	    s_op, 
+	    ret, 
+	    &i);
+
+#else
+
+    job_post_ret = job_bmi_send(
+	    s_op->addr,
+	    s_op->encoded.buffer_list[0],
+	    s_op->encoded.total_size,
+	    s_op->tag,
+	    s_op->encoded.buffer_flag,
+	    0,
 	    s_op,
 	    ret,
 	    &i);
+
+#endif
 
     return(job_post_ret);
 

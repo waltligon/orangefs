@@ -260,15 +260,44 @@ static int mkdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
     s_op->resp->status = ret->error_code;
 
-    job_post_ret = job_bmi_send(s_op->addr,
-	    s_op->resp,
-	    sizeof(struct PVFS_server_resp_s),
+    /* Encode the message */
+    job_post_ret = PINT_encode(s_op->resp,
+	    PINT_ENCODE_RESP,
+	    &(s_op->encoded),
+	    s_op->addr,
+	    s_op->enc_type);
+
+    assert(job_post_ret == 0);
+
+#ifndef PVFS2_SERVER_DEBUG_BMI
+
+    job_post_ret = job_bmi_send_list(
+	    s_op->addr,
+	    s_op->encoded.buffer_list,
+	    s_op->encoded.size_list,
+	    s_op->encoded.list_count,
+	    s_op->encoded.total_size,
 	    s_op->tag,
-	    0,
+	    s_op->encoded.buffer_flag,
 	    0,
 	    s_op, 
 	    ret, 
 	    &i);
+
+#else
+
+    job_post_ret = job_bmi_send(
+	    s_op->addr,
+	    s_op->encoded.buffer_list[0],
+	    s_op->encoded.total_size,
+	    s_op->tag,
+	    s_op->encoded.buffer_flag,
+	    0,
+	    s_op,
+	    ret,
+	    &i);
+
+#endif
 
     return(job_post_ret);
 

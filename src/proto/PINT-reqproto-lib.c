@@ -74,10 +74,9 @@ int PINT_encode(
 	target_msg->type = -EINVAL;
 	return -EINVAL;
     }
-    *((int *)(target_msg->buffer_list[target_msg->list_count-1] 
-	      +target_msg->size_list[target_msg->list_count-1])) =type;
-    target_msg->size_list[target_msg->list_count-1] += ENCODED_HEADER_SIZE;
-    target_msg->total_size += ENCODED_HEADER_SIZE;
+    /*(int *)(target_msg->buffer_list[target_msg->list_count])=type;*/
+    /*target_msg->size_list[target_msg->list_count-1] += ENCODED_HEADER_SIZE;*/
+    /*target_msg->total_size += ENCODED_HEADER_SIZE;*/
     return 0;
 }
 
@@ -111,9 +110,13 @@ int PINT_decode(
 		)
 {
     int type;
+    type = 0;
+    /*
     type = *((int *)(input_buffer+size-sizeof(int)));
     if (type_ptr)
 	*type_ptr = type;
+    */
+    
     if(type > -1 && type < ENCODING_TABLE_SIZE-1)
     {
 	if (input_type == PINT_DECODE_REQ)

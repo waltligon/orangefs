@@ -544,15 +544,13 @@ static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
     gossip_ldebug(SERVER_DEBUG,"Send BMI\n");
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) 
 	+ (s_op->resp->u.lookup_path.count * (sizeof(PVFS_handle)+sizeof(PVFS_object_attr)));
-    /*if (ret->error_code == 0)
-    {
-    */
-	job_post_ret = PINT_encode(s_op->resp,
-		PINT_ENCODE_RESP,
-		&(s_op->encoded),
-		s_op->addr,
-		s_op->enc_type);
-    /*}*/
+
+    job_post_ret = PINT_encode(s_op->resp,
+	    PINT_ENCODE_RESP,
+	    &(s_op->encoded),
+	    s_op->addr,
+	    s_op->enc_type);
+
     assert(job_post_ret == 0);
 
     /* Post message */

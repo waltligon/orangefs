@@ -207,14 +207,17 @@ static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	gossip_err("Handle Created: %lld\n",ret->handle);
 	s_op->resp->u.create.handle = ret->handle;
 
-	/* Encode the message */
-	job_post_ret = PINT_encode(s_op->resp,
-		PINT_ENCODE_RESP,
-		&(s_op->encoded),
-		s_op->addr,
-		s_op->enc_type);
     }
+
+    /* Encode the message */
+    job_post_ret = PINT_encode(s_op->resp,
+	    PINT_ENCODE_RESP,
+	    &(s_op->encoded),
+	    s_op->addr,
+	    s_op->enc_type);
     assert(job_post_ret == 0);
+
+#ifndef PVFS2_SERVER_DEBUG_BMI
 
     job_post_ret = job_bmi_send_list(
 	    s_op->addr,
@@ -228,6 +231,22 @@ static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	    s_op, 
 	    ret, 
 	    &i);
+
+#else
+
+    job_post_ret = job_bmi_send(
+	    s_op->addr,
+	    s_op->encoded.buffer_list[0],
+	    s_op->encoded.total_size,
+	    s_op->tag,
+	    s_op->encoded.buffer_flag,
+	    0,
+	    s_op,
+	    ret,
+	    &i);
+
+#endif
+
 
     return(job_post_ret);
 
