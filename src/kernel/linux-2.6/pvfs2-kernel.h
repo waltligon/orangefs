@@ -162,13 +162,12 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 
 #define PVFS2_CACHE_ALLOC_FLAGS (SLAB_KERNEL)
 #define PVFS2_GFP_FLAGS (GFP_KERNEL)
+#define PVFS2_BUFMAP_GFP_FLAGS (GFP_KERNEL)
 
 #ifdef CONFIG_HIGHMEM
-#define PVFS2_BUFMAP_GFP_FLAGS (GFP_ATOMIC)
 #define pvfs2_kmap(page) kmap(page)
 #define pvfs2_kunmap(page) kunmap(page)
 #else
-#define PVFS2_BUFMAP_GFP_FLAGS (GFP_KERNEL)
 #define pvfs2_kmap(page) page_address(page)
 #define pvfs2_kunmap(page) do {} while(0)
 #endif /* CONFIG_HIGHMEM */

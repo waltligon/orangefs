@@ -26,6 +26,19 @@ extern spinlock_t pvfs2_superblocks_lock;
 
 static int open_access_count = 0;
 
+#define DUMP_DEVICE_ERROR()                                            \
+pvfs2_error("*****************************************************\n");\
+pvfs2_error("PVFS2 Device Error:  You cannot open the device file ");  \
+pvfs2_error("\n/dev/%s more than once.  Please make sure that\nthere " \
+            "are no ", PVFS2_REQDEVICE_NAME);                          \
+pvfs2_error("instances of a program using this device\ncurrently "     \
+            "running. (You must verify this!)\n");                     \
+pvfs2_error("For example, you can use the lsof program as follows:\n");\
+pvfs2_error("'lsof | grep %s' (run this as root)\n",                   \
+            PVFS2_REQDEVICE_NAME);                                     \
+pvfs2_error("  open_access_count = %d\n", open_access_count);          \
+pvfs2_error("*****************************************************\n")
+
 static int pvfs2_devreq_open(
     struct inode *inode,
     struct file *file)
@@ -59,17 +72,7 @@ static int pvfs2_devreq_open(
     }
     else
     {
-	pvfs2_error("*****************************************************\n");
-	pvfs2_error("PVFS2 Device Error:  You cannot open the device file ");
-	pvfs2_error("\n/dev/%s more than once.  Please make sure that\nthere "
-		    "are no ", PVFS2_REQDEVICE_NAME);
-	pvfs2_error("instances of a program using this device\ncurrently "
-		    "running. (You must verify this!)\n");
-	pvfs2_error("For example, you can use the lsof program as follows:\n");
-	pvfs2_error("'lsof | grep %s' (run this as root)\n",
-		    PVFS2_REQDEVICE_NAME);
-        pvfs2_error("  open_access_count = %d\n", open_access_count);
-	pvfs2_error("*****************************************************\n");
+        DUMP_DEVICE_ERROR();
     }
     up(&devreq_semaphore);
 
@@ -264,7 +267,8 @@ static ssize_t pvfs2_devreq_writev(
                 int timed_out = 0;
                 DECLARE_WAITQUEUE(wait_entry, current);
 
-                add_wait_queue(&op->io_completion_waitq, &wait_entry);
+                add_wait_queue_exclusive(
+                    &op->io_completion_waitq, &wait_entry);
                 wake_up_interruptible(&op->waitq);
 
                 while(1)

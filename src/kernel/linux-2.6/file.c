@@ -384,6 +384,7 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
 
     /* set the sequential readahead hint */
     vma->vm_flags |= VM_SEQ_READ;
+    vma->vm_flags &= VM_RAND_READ;
 
     /* have the kernel enforce readonly mmap support for us */
 #ifdef PVFS2_LINUX_KERNEL_2_4
