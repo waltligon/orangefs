@@ -16,6 +16,7 @@
 #else
 #include <stdint.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #endif /* __KERNEL__ */
 
 #ifndef INT32_MAX

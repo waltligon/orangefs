@@ -11,6 +11,7 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
+#include "pvfs2-util.h"
 
 enum
 {
@@ -533,10 +534,24 @@ static int crdirent_update_directory_attr(
     {
         tmp_attr_ptr->atime = s_op->req->u.crdirent.parent_atime;
     }
+
     if (s_op->req->u.crdirent.parent_mtime)
     {
+        /*
+          directory mtime is stored as a version, but converted to a
+          normal mtime on getattr; the mtime version is passed back on
+          readdir operations
+        */
+        gossip_debug(
+            GOSSIP_SERVER_DEBUG, "updating parent dir version "
+            "to %Lu\n\tmtime is %Lu\n",
+            Lu(s_op->req->u.crdirent.parent_mtime),
+            Lu(PVFS_util_mkversion_time(
+                   s_op->req->u.crdirent.parent_mtime)));
+
         tmp_attr_ptr->mtime = s_op->req->u.crdirent.parent_mtime;
     }
+
     if (s_op->req->u.crdirent.parent_ctime)
     {
         tmp_attr_ptr->ctime = s_op->req->u.crdirent.parent_ctime;
@@ -599,16 +614,8 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
         Lu(s_op->u.crdirent.dirent_handle));
 
     ret = job_trove_keyval_read(
-        s_op->u.crdirent.fs_id,
-        s_op->u.crdirent.dirent_handle,
-        &s_op->key,
-        &s_op->val,
-        0,
-        NULL,
-        s_op,
-        0,
-        js_p,
-        &i,
+        s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
+        &s_op->key, &s_op->val, 0, NULL, s_op, 0, js_p, &i,
         server_job_context);
 
     return ret;

@@ -1288,16 +1288,6 @@ void PINT_release_pvfstab(void)
     gen_mutex_unlock(&s_stat_tab_mutex);
 }
 
-PVFS_time PVFS_util_get_current_time(void)
-{
-    struct timeval t = {0,0};
-    PVFS_time current_time = 0;
-
-    gettimeofday(&t, NULL);
-    current_time = (PVFS_time)t.tv_sec;
-    return current_time;
-}
-
 /*
  * Local variables:
  *  c-indent-level: 4

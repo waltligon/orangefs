@@ -93,18 +93,16 @@ machine pvfs2_readdir_sm(
 static int readdir_verify_directory_metadata(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PVFS_object_attr *attr = NULL;
+    PVFS_object_attr *attr = &s_op->attr;
 
     PINT_STATE_DEBUG("verify_directory_metadata");
 
     js_p->error_code = 0;
 
-    attr = &s_op->attr;
-
     gossip_debug(GOSSIP_READDIR_DEBUG, " - attrs: owner=%d, group=%d, "
-                 "perms=%d\n\ttype=%d, mtime=%Ld\n", attr->owner,
+                 "perms=%d\n\ttype=%d, mtime=%Lu\n", attr->owner,
                  attr->group, attr->perms, attr->objtype,
-                 Ld(attr->mtime));
+                 Lu(attr->mtime));
 
     if (attr->objtype != PVFS_TYPE_DIRECTORY)
     {

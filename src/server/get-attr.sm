@@ -22,6 +22,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-types.h"
 #include "pvfs2-types-debug.h"
+#include "pvfs2-util.h"
 #include "pint-util.h"
 
 enum
@@ -57,19 +58,19 @@ static inline char *get_object_type(int objtype)
 }
 
 static int getattr_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_verify_attribs(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_read_symlink_target(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_read_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_read_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_setup_resp(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_setup_op(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -163,7 +164,7 @@ machine pvfs2_get_attr_sm(
  * function.  This mask can be augmented in some of the other states.
  */
 static int getattr_verify_attribs(
-    PINT_server_op *s_op, job_status_s* js_p)
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     PVFS_object_attr *resp_attr = NULL;
 
@@ -185,22 +186,46 @@ static int getattr_verify_attribs(
     resp_attr->group = s_op->attr.group;
     resp_attr->perms = s_op->attr.perms;
     resp_attr->atime = s_op->attr.atime;
-    resp_attr->mtime = s_op->attr.mtime;
+
+    resp_attr->mtime = PVFS_util_mkversion_time(s_op->attr.mtime);
+    if (resp_attr->mtime == 0)
+    {
+        /*
+          this is a compatibility hack to allow existing storage
+          spaces to be automagically converted to this versioned time
+          on-disk format slowly over time and doing the right thing in
+          the meantime
+        */
+        resp_attr->mtime = s_op->attr.mtime;
+
+        gossip_debug(GOSSIP_GETATTR_DEBUG, " No version found!  Using "
+                     "mtime %Lu\n", Lu(resp_attr->mtime));
+    }
+    else
+    {
+        gossip_debug(
+            GOSSIP_GETATTR_DEBUG, " VERSION is %Lu, mtime is %Lu\n",
+            s_op->attr.mtime, resp_attr->mtime);
+    }
+
     resp_attr->ctime = s_op->attr.ctime;
     resp_attr->mask = s_op->attr.mask;
     resp_attr->objtype = s_op->attr.objtype;
     resp_attr->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
     resp_attr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "+ attrs read from dspace: (owner = %d, group = %d, "
-                 "perms = %o, type = %d\n   atime = %Ld, mtime = %Ld, "
-                 "ctime = %Ld |\n   dfile_count = %d | dist_size = %d)\n",
-                 resp_attr->owner, resp_attr->group, resp_attr->perms,
-                 resp_attr->objtype, Ld(resp_attr->atime),
-                 Ld(resp_attr->mtime), Ld(resp_attr->ctime),
-                 (int)resp_attr->u.meta.dfile_count,
-                 (int)resp_attr->u.meta.dist_size);
+#if 0
+    gossip_debug(
+        GOSSIP_GETATTR_DEBUG,
+        "+  _DSPACE_ retrieved attrs: [owner = %d, group = %d\n\t"
+        "perms = %o, type = %d, atime = %Lu, mtime = %Lu\n\t"
+        "ctime = %Lu, dfile_count = %d, dist_size = %d]\n",
+        resp_attr->owner, resp_attr->group, resp_attr->perms,
+        resp_attr->objtype, Lu(resp_attr->atime),
+        Lu(resp_attr->mtime), Lu(resp_attr->ctime),
+        (int)resp_attr->u.meta.dfile_count,
+        (int)resp_attr->u.meta.dist_size);
+#endif
 
     /*
       weed out the attr mask of the response based on what the client
@@ -327,7 +352,7 @@ static int getattr_verify_attribs(
 }
 
 static int getattr_read_symlink_target(
-    PINT_server_op *s_op, job_status_s* js_p)
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret;
     job_id_t i;
@@ -373,7 +398,7 @@ static int getattr_read_symlink_target(
 
 
 static int getattr_read_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s* js_p)
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
     int dfile_count = 0;
@@ -462,7 +487,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
 }
 
 static int getattr_read_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s* js_p)
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
     job_id_t i;
@@ -523,23 +548,22 @@ static int getattr_read_metafile_distribution_if_required(
     return ret;
 }
 
-static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
+static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PVFS_object_attr *resp_attr = NULL;
+    PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
 
     PINT_STATE_DEBUG("setup_resp");
 
-    resp_attr = &s_op->resp.u.getattr.attr;
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "- returning retrieved attrs: (owner = %d, group = %d, "
-                 "perms = %o, type = %d\n  atime = %Ld, mtime = %Ld, "
-                 "ctime = %Ld |\n   dfile_count = %d | dist_size = %d)\n",
-                 resp_attr->owner, resp_attr->group, resp_attr->perms,
-                 resp_attr->objtype, Ld(resp_attr->atime),
-                 Ld(resp_attr->mtime), Ld(resp_attr->ctime),
-                 (int)resp_attr->u.meta.dfile_count,
-                 (int)resp_attr->u.meta.dist_size);
+    gossip_debug(
+        GOSSIP_GETATTR_DEBUG,
+        "- RETURNING retrieved attrs: [owner = %d, group = %d\n\t"
+        "perms = %o, type = %d, atime = %Lu, mtime = %Lu\n\t"
+        "ctime = %Lu, dfile_count = %d, dist_size = %d]\n",
+        resp_attr->owner, resp_attr->group, resp_attr->perms,
+        resp_attr->objtype, Lu(resp_attr->atime),
+        Lu(resp_attr->mtime), Lu(resp_attr->ctime),
+        (int)resp_attr->u.meta.dfile_count,
+        (int)resp_attr->u.meta.dist_size);
 
     if (resp_attr->objtype == PVFS_TYPE_METAFILE)
     {
@@ -608,7 +632,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     }
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,"@ End %s attributes: sending "
-                 "attr status %d (error code = %d)\n",
+                 "status %d (error = %d)\n",
                  get_object_type(resp_attr->objtype),
 		 s_op->resp.status, js_p->error_code);
 
@@ -621,7 +645,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     return 1;
 }
 
-static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int getattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("getattr_cleanup");
 
@@ -630,7 +654,7 @@ static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 }
 
 static int getattr_setup_op(
-    PINT_server_op *s_op, job_status_s* js_p)
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     s_op->u.getattr.handle = s_op->req->u.getattr.handle;
     s_op->u.getattr.fs_id = s_op->req->u.getattr.fs_id;

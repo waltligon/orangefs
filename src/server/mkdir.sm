@@ -11,21 +11,22 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
+#include "pvfs2-util.h"
 
 static int mkdir_create(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int mkdir_setattrib(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int mkdir_create_dirdata_dspace(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int mkdir_write_dirdata_handle(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int mkdir_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int mkdir_error(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int mkdir_prep_sm(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -114,7 +115,7 @@ machine pvfs2_mkdir_sm(
  * Function: mkdir_create
  *
  * Params:   server_op *s_op, 
- *           job_status_s* js_p
+ *           job_status_s *js_p
  *
  * Returns:  int
  *
@@ -130,12 +131,14 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s *js_p)
     job_id_t i;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "mkdir state: create\n");
+    PINT_STATE_DEBUG("create");
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dspace on coll_id %d\n",
+                 s_op->u.mkdir.fs_id);
 
     gossip_debug(
-        GOSSIP_SERVER_DEBUG, "\ttrying to dspace create on "
-        "fs_id %d\n\thandle-range[0]: %Lu-%Lu\n",
-        s_op->u.mkdir.fs_id,
+        GOSSIP_MKDIR_DEBUG, " directory handle will "
+        "be in starting hrange[0] %Lu-%Lu\n",
         Lu(s_op->u.mkdir.handle_extent_array.extent_array[0].first),
         Lu(s_op->u.mkdir.handle_extent_array.extent_array[0].last));
 
@@ -146,14 +149,14 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s *js_p)
             user_opts, s_op->u.mkdir.fs_id), s_op, 0, js_p, &i,
         server_job_context);
 
-    return(ret);
+    return ret;
 }
 
 /*
  * Function: mkdir_setattrib
  *
  * Params:   server_op *s_op, 
- *           job_status_s* js_p
+ *           job_status_s *js_p
  *
  * Returns:  int
  *
@@ -172,10 +175,14 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
     /* save the handle from the mkdir in the response */
     s_op->resp.u.mkdir.handle = js_p->handle;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, " new directory has handle %Lu\n",
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new directory has handle %Lu\n",
                  Lu(js_p->handle));
 
     ds_attr = (&s_op->ds_attr);
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " setting directory version to "
+                 "%Lu\n\tmtime is %Lu\n", Lu(ds_attr->mtime),
+                 Lu(PVFS_util_mkversion_time(ds_attr->mtime)));
 
     ret = job_trove_dspace_setattr(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
@@ -183,7 +190,7 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
             user_opts, s_op->u.mkdir.fs_id),
         s_op, 0, js_p, &j_id, server_job_context);
 
-    return(ret);
+    return ret;
 }
 
 static int mkdir_create_dirdata_dspace(
@@ -196,9 +203,8 @@ static int mkdir_create_dirdata_dspace(
 
     PINT_STATE_DEBUG("create_dirdata_dspace");
 
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG, "  creating dspace (coll_id = %d)\n",
-        s_op->u.mkdir.fs_id);
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dspace on coll_id %d\n",
+                 s_op->u.mkdir.fs_id);
 
     /* find our meta handle range for this create */
     ret = PINT_config_get_meta_handle_extent_array(
@@ -206,8 +212,8 @@ static int mkdir_create_dirdata_dspace(
     assert(ret == 0);
     assert(extent_array.extent_count > 0);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  new dirdata handle should "
-                 "be in range starting with %Lu-%Lu\n",
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " dirdata handle will "
+                 "be in starting hrange[0] %Lu-%Lu\n",
                  Lu(extent_array.extent_array[0].first),
                  Lu(extent_array.extent_array[0].last));
 
@@ -224,7 +230,7 @@ static int mkdir_create_dirdata_dspace(
 }
 
 static int mkdir_write_dirdata_handle(
-    PINT_server_op *s_op, job_status_s* js_p)
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
     job_id_t i;
@@ -241,7 +247,7 @@ static int mkdir_write_dirdata_handle(
 
     s_op->u.mkdir.dirent_handle = js_p->handle;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, " new dirdata has handle %Lu\n",
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new dirdata has handle %Lu\n",
                  Lu(s_op->u.mkdir.dirent_handle));
 
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
@@ -251,9 +257,8 @@ static int mkdir_write_dirdata_handle(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
-        GOSSIP_SERVER_DEBUG, "  writing dirdata handle (%Lu) "
-        "into parent directory keyval space (%Lu)\n",
-        Lu(s_op->u.mkdir.dirent_handle),
+        GOSSIP_MKDIR_DEBUG, "  writing dirdata handle (%Lu) "
+        "into parent dir (%Lu)\n", Lu(s_op->u.mkdir.dirent_handle),
         Lu(s_op->resp.u.mkdir.handle));
 
     ret = job_trove_keyval_write(
@@ -281,7 +286,7 @@ static int mkdir_error(PINT_server_op *s_op, job_status_s *js_p)
  * Function: mkdir_cleanup
  *
  * Params:   server_op *b, 
- *           job_status_s* js_p
+ *           job_status_s *js_p
  *
  * Returns:  int
  *
@@ -295,7 +300,7 @@ static int mkdir_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 }
 
 static int mkdir_prep_sm(
-    PINT_server_op *s_op, job_status_s* js_p)
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     PVFS_object_attr *a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
@@ -307,16 +312,23 @@ static int mkdir_prep_sm(
         s_op->req->u.mkdir.handle_extent_array;
 
     a_p = &(s_op->req->u.mkdir.attr);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  attrs to write = (owner = %d, "
-                 "group = %d, perms = %o, type = %d)\n",
-		 a_p->owner, a_p->group, a_p->perms, a_p->objtype);
+
+    if (a_p->objtype != PVFS_TYPE_DIRECTORY)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return 1;
+    }
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " attrs to write: [owner = %d, "
+                 "group = %d, perms = %o]\n", a_p->owner, a_p->group,
+                 a_p->perms);
 
     /* translate attrs to storage attr format */
     ds_attr = (&s_op->ds_attr);
     PVFS_object_attr_to_ds_attr(a_p, ds_attr);
 
     js_p->error_code = 0;
-    return(1);
+    return 1;
 }
 
 /*

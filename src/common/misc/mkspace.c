@@ -21,6 +21,7 @@
 #include "server-config.h"
 #include "str-utils.h"
 #include "extent-utils.h"
+#include "pvfs2-util.h"
 
 static char *dir_ent_string = "dir_ent";
 static char *root_handle_string = "root_handle";
@@ -300,7 +301,7 @@ int pvfs2_mkspace(
         key.buffer_sz = strlen(root_handle_string) + 1;
         val.buffer = &new_root_handle;
         val.buffer_sz = sizeof(new_root_handle);
-        ret = trove_collection_seteattr(coll_id, &key, &val, 0, 
+        ret = trove_collection_seteattr(coll_id, &key, &val, 0,
                                         NULL, trove_context, &op_id);
         while (ret == 0)
         {
@@ -321,8 +322,9 @@ int pvfs2_mkspace(
         attr.uid = getuid();
         attr.gid = getgid();
         attr.mode = 0777;
-	attr.atime = attr.ctime = attr.mtime = time(NULL);
         attr.type = PVFS_TYPE_DIRECTORY;
+	attr.atime = attr.ctime = PVFS_util_get_current_time();
+        attr.mtime = PVFS_util_mktime_version(attr.ctime);
 
         ret = trove_dspace_setattr(
             coll_id, new_root_handle, &attr, TROVE_SYNC, NULL,
@@ -478,8 +480,9 @@ int pvfs2_mkspace(
         attr.uid = getuid();
         attr.gid = getgid();
         attr.mode = 0777;
-	attr.atime = attr.ctime = attr.mtime = time(NULL);
         attr.type = PVFS_TYPE_DIRECTORY;
+	attr.atime = attr.ctime = PVFS_util_get_current_time();
+        attr.mtime = PVFS_util_mktime_version(attr.ctime);
 
         ret = trove_dspace_setattr(
             coll_id, lost_and_found_handle, &attr, TROVE_SYNC, NULL,

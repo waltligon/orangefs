@@ -81,8 +81,6 @@ void PVFS_util_make_size_human_readable(
     int max_out_len,
     int use_si_units);
 
-PVFS_time PVFS_util_get_current_time(void);
-
 static inline int PVFS_util_object_to_sys_attr_mask(
     int obj_mask)
 {
@@ -152,6 +150,33 @@ static inline int PVFS2_translate_mode(int mode)
     }
     return ret;
 }
+
+#ifndef __KERNEL__
+static inline PVFS_time PVFS_util_get_current_time(void)
+{
+    struct timeval t = {0,0};
+    PVFS_time current_time = 0;
+
+    gettimeofday(&t, NULL);
+    current_time = (PVFS_time)t.tv_sec;
+    return current_time;
+}
+
+static inline PVFS_time PVFS_util_mktime_version(PVFS_time time)
+{
+    struct timeval t = {0,0};
+    PVFS_time version = (time << 32);
+
+    gettimeofday(&t, NULL);
+    version |= (PVFS_time)t.tv_usec;
+    return version;
+}
+
+static inline PVFS_time PVFS_util_mkversion_time(PVFS_time version)
+{
+    return (PVFS_time)(version >> 32);
+}
+#endif /* __KERNEL__ */
 
 #endif /* __PVFS2_UTIL_H */
 
