@@ -23,6 +23,7 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/test-pint-dcache.c \
 	$(DIR)/io-test.c \
 	$(DIR)/io-test-offset.c \
+	$(DIR)/initialize.c \
 	$(DIR)/getparent.c
 
 MISCSRC += \
