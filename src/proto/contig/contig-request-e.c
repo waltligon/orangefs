@@ -209,6 +209,10 @@ int do_encode_req(
 		    assert(request->u.setattr.attr.u.meta.dfh != NULL);
 		    size += request->u.setattr.attr.u.meta.nr_datafiles * sizeof( PVFS_handle );
 		}
+		if (request->u.setattr.attr.u.meta.dist != NULL)
+		{
+		    size += PINT_DIST_PACK_SIZE( request->u.setattr.attr.u.meta.dist );
+		}
 	    }
 
 	    /* TODO: come back and alloc the right spaces for 
@@ -232,12 +236,14 @@ int do_encode_req(
 	    {
 		memcpy( enc_msg, 
 			request->u.setattr.attr.u.meta.dfh, 
-			request->u.setattr.attr.u.meta.nr_datafiles * sizeof( PVFS_handle ) );
+			request->u.setattr.attr.u.meta.nr_datafiles * sizeof(PVFS_handle) );
 
-		/* make pointer NULL since we're sending it over the wire and don't want 
-		 * random memory referenced on the other side */
+		enc_msg += request->u.setattr.attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
+		/*pack distribution information now*/
 
-		/*((struct PVFS_server_req_s *)enc_msg)->u.setattr.attr.u.meta.dfh = NULL;*/
+		/* Q:we alloc'ed what the macro said the packed size was, is this enough?*/
+		PINT_Dist_encode(enc_msg, request->u.setattr.attr.u.meta.dist);
+		
 	    }
 	    return (0);
 	case PVFS_SERV_IO: 

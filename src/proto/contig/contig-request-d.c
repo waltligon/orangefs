@@ -82,6 +82,20 @@ int do_decode_req(
 	    if ( dec_msg->u.setattr.attr.objtype == ATTR_META )
 	    {
 		dec_msg->u.setattr.attr.u.meta.dfh = (PVFS_handle *)char_ptr;
+		/* move the pointer past the data files, we could have
+		 * distribution information, check the size to be sure
+		 */
+
+		char_ptr += dec_msg->u.setattr.attr.u.meta.nr_datafiles
+				* sizeof(PVFS_handle);
+		if (dec_msg->rsize > (sizeof(struct PVFS_server_req_s)
+		    + dec_msg->u.setattr.attr.u.meta.nr_datafiles 
+			* sizeof(PVFS_handle)))
+		{
+		    /* update the pointer, and decode */
+		    dec_msg->u.setattr.attr.u.meta.dist = (PVFS_Dist *)char_ptr;
+		    PINT_Dist_decode(dec_msg->u.setattr.attr.u.meta.dist, NULL);
+		}
 	    }
 	    target_msg->buffer = dec_msg;
 
