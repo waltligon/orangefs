@@ -80,10 +80,10 @@ void __PINT_event_default(enum PVFS_event_api api,
 #else
 #define PINT_event_timestamp(__api, __operation, __value, __id, __flags) \
     do { \
-	if(PINT_event_on && (PINT_event_api_mask & __api) && \
-	    (PINT_event_op_mask & __operation)){\
-	    __PINT_event_timestamp(__api, __operation, __value, __id, \
-	    __flags); }\
+	if(PINT_event_on && (PINT_event_api_mask & (__api)) && \
+	    ((PINT_event_op_mask & (__operation))||((__operation)==0))){\
+	    __PINT_event_timestamp((__api), (__operation), (__value), (__id), \
+	    (__flags)); }\
     } while(0)
 #endif
 

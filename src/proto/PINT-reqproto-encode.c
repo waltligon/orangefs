@@ -14,8 +14,28 @@
 #include "PINT-reqproto-encode.h"
 #include "PINT-reqproto-module.h"
 #include "bmi-byteswap.h"
+#include "pint-event.h"
+#include "id-generator.h"
 
 #define ENCODING_TABLE_SIZE 5
+
+/* macros for logging encode and decode events */
+#define ENCODE_EVENT_START(__enctype, __reqtype, __ptr) \
+do { \
+    PVFS_id_gen_t __tmp_id; \
+    id_gen_fast_register(&__tmp_id, (__ptr)); \
+    PINT_event_timestamp(__enctype, \
+    (int32_t)(__reqtype), 0, __tmp_id, \
+    PVFS_EVENT_FLAG_START); \
+} while(0)
+#define ENCODE_EVENT_STOP(__enctype, __reqtype, __ptr, __size) \
+do { \
+    PVFS_id_gen_t __tmp_id; \
+    id_gen_fast_register(&__tmp_id, (__ptr)); \
+    PINT_event_timestamp(__enctype, \
+    (int32_t)(__reqtype), (__size), __tmp_id, \
+    PVFS_EVENT_FLAG_END); \
+} while(0)
 
 extern PINT_encoding_table_values contig_buffer_table;
 extern PINT_encoding_table_values le_bytefield_table;
@@ -94,13 +114,22 @@ int PINT_encode(
 		tmp_req->flags = 0;
 		if(g_admin_mode)
 		    tmp_req->flags += PVFS_SERVER_REQ_ADMIN_MODE;
+		ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_REQ,
+		    tmp_req->op, tmp_req);
 		ret =  PINT_encoding_table[enc_type]->op->encode_req(input_buffer,
 								 target_msg);
+		ENCODE_EVENT_STOP(PVFS_EVENT_API_ENCODE_REQ,
+		    tmp_req->op, tmp_req, target_msg->total_size);
 	    }
 	    else if(input_type == PINT_ENCODE_RESP)
 	    {
+		struct PVFS_server_resp* tmp_resp = input_buffer;
+		ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_RESP,
+		    tmp_resp->op, tmp_resp);
 		ret =  PINT_encoding_table[enc_type]->op->encode_resp(input_buffer,
 								  target_msg);
+		ENCODE_EVENT_STOP(PVFS_EVENT_API_ENCODE_RESP,
+		    tmp_resp->op, tmp_resp, target_msg->total_size);
 	    }
 	    break;
 	default:
@@ -143,6 +172,7 @@ int PINT_decode(
     char* buffer_index = (char*)input_buffer + PINT_ENC_GENERIC_HEADER_SIZE;
     int size_index = (int)size - PINT_ENC_GENERIC_HEADER_SIZE;
     char* enc_type_ptr = (char*)input_buffer + 4;
+    int ret;
 
     /* compare the header of the incoming buffer against the precalculated
      * header associated with each module
@@ -153,19 +183,39 @@ int PINT_decode(
 	    PINT_encoding_table[i]->generic_header, 
 	    PINT_ENC_GENERIC_HEADER_SIZE)))
 	{
+	    struct PVFS_server_req* tmp_req;
+	    struct PVFS_server_req* tmp_resp;
 	    target_msg->enc_type = bmitoh32(*((int32_t*)enc_type_ptr));
 	    if(input_type == PINT_DECODE_REQ)
-		return(PINT_encoding_table[i]->op->decode_req(buffer_index,
+	    {
+		ENCODE_EVENT_START(PVFS_EVENT_API_DECODE_REQ,
+		    0, input_buffer);
+		ret = PINT_encoding_table[i]->op->decode_req(buffer_index,
 		    size_index,
 		    target_msg,
-		    target_addr));
+		    target_addr);
+		tmp_req = target_msg->buffer;
+		ENCODE_EVENT_STOP(PVFS_EVENT_API_DECODE_REQ,
+		    tmp_req->op, input_buffer, size);
+		return(ret);
+	    }
 	    else if(input_type == PINT_DECODE_RESP)
-		return(PINT_encoding_table[i]->op->decode_resp(buffer_index,
+	    {
+		ENCODE_EVENT_START(PVFS_EVENT_API_DECODE_RESP,
+		    0, input_buffer);
+		ret = PINT_encoding_table[i]->op->decode_resp(buffer_index,
 		    size_index,
 		    target_msg,
-		    target_addr));
+		    target_addr);
+		tmp_resp = target_msg->buffer;
+		ENCODE_EVENT_STOP(PVFS_EVENT_API_DECODE_RESP,
+		    tmp_resp->op, input_buffer, size);
+		return(ret);
+	    }
 	    else
+	    {
 		return(-EINVAL);
+	    }
 	}
     }
 
