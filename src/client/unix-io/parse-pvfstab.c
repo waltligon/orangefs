@@ -97,11 +97,13 @@ int parse_pvfstab(char *filename,pvfs_mntlist *pvfstab_p)
 		    if (end - start < 0)
 		    {
 			printf("end = %d\nstart = %d\n",end,start);
+			ret = -EINVAL;
 			goto metaaddr_failure;
 		    }
 		    pvfstab_p->ptab_p[index].meta_addr = malloc(end - start + 1);
 		    if(pvfstab_p->ptab_p[index].meta_addr == NULL)
 		    {
+			ret = -ENOMEM;
 			goto metaaddr_failure;
 		    }
 		    memcpy(pvfstab_p->ptab_p[index].meta_addr, &line[start], end-start);
@@ -120,11 +122,13 @@ int parse_pvfstab(char *filename,pvfs_mntlist *pvfstab_p)
 		    if (end - start < 0)
 		    {
 			printf("end = %d\nstart = %d\n",end,start);
+			ret = -EINVAL;
 			goto servmnt_failure;
 		    }
 		    pvfstab_p->ptab_p[index].service_name = malloc(end - start + 1);
 		    if(pvfstab_p->ptab_p[index].service_name == NULL)
 		    {
+			ret = -ENOMEM;
 			goto servmnt_failure;
 		    }
 		    memcpy(pvfstab_p->ptab_p[index].service_name, &line[start], end-start);
@@ -142,11 +146,13 @@ int parse_pvfstab(char *filename,pvfs_mntlist *pvfstab_p)
 		    if (end - start < 0)
 		    {
 			printf("end = %d\nstart = %d\n",end,start);
+			ret = -EINVAL;
 			goto localmnt_failure;
 		    }
 		    pvfstab_p->ptab_p[index].local_mnt_dir = malloc(end - start + 1);
 		    if(pvfstab_p->ptab_p[index].local_mnt_dir == NULL)
 		    {
+			ret = -ENOMEM;
 			goto localmnt_failure;
 		    }
 		    memcpy(pvfstab_p->ptab_p[index].local_mnt_dir, &line[start], end-start);
@@ -164,11 +170,13 @@ int parse_pvfstab(char *filename,pvfs_mntlist *pvfstab_p)
 		    if (end - start < 0)
 		    {
 			printf("end = %d\nstart = %d\n",end,start);
+			ret = -EINVAL;
 			goto fstype_failure;
 		    }
 		    pvfstab_p->ptab_p[index].fs_type = malloc(end - start + 1);
 		    if(pvfstab_p->ptab_p[index].fs_type == NULL)
 		    {
+			ret = -ENOMEM;
 			goto fstype_failure;
 		    }
 		    memcpy(pvfstab_p->ptab_p[index].fs_type, &line[start], end-start);
@@ -186,11 +194,13 @@ int parse_pvfstab(char *filename,pvfs_mntlist *pvfstab_p)
 		    if (end - start < 0)
 		    {
 			printf("end = %d\nstart = %d\n",end,start);
+			ret = -EINVAL;
 			goto opt1_failure;
 		    }
 		    pvfstab_p->ptab_p[index].opt1 = malloc(end - start + 1);
 		    if(pvfstab_p->ptab_p[index].opt1 == NULL)
 		    {
+			ret = -ENOMEM;
 			goto opt1_failure;
 		    }
 		    memcpy(pvfstab_p->ptab_p[index].opt1, &line[start], end-start);
@@ -208,11 +218,13 @@ int parse_pvfstab(char *filename,pvfs_mntlist *pvfstab_p)
 		    if (end - start < 0)
 		    {
 			printf("end = %d\nstart = %d\n",end,start);
+			ret = -EINVAL;
 			goto opt2_failure;
 		    }
 		    pvfstab_p->ptab_p[index].opt2 = malloc(end - start + 1);
 		    if(pvfstab_p->ptab_p[index].opt2 == NULL)
 		    {
+			ret = -ENOMEM;
 			goto opt2_failure;
 		    }
 		    memcpy(pvfstab_p->ptab_p[index].opt2, &line[start], end-start);
@@ -259,6 +271,7 @@ static int mntlist_new(int num_mnts,pvfs_mntlist *mntlist_ptr)
 	{
 		return(-ENOMEM);
 	}
+	memset(mntlist_ptr->ptab_p, 0, num_mnts*sizeof(pvfs_mntent));
 	/* Init the mutex lock */
 	/*mntlist_ptr->mt_lock = gen_mutex_build(); */
 
