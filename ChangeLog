@@ -46,6 +46,40 @@ pvfs2-0.1.2pre1
   interface a little further
 - added some first stubs for hooks to specify distribution parameters at
   runtime
+- added more specific server and client side debugging keywords
+- enhanced vfs error reporting
+- client sysint cleanups and error reporting improvements
+- server operation cleanups and error reporting improvements
+- bmi error code translation hooks to work properly with pvfs2 error codes
+- fixed mmap-ra-cache bug that didn't flush data at the right times
+- made the mmap readahead cache functionality a configure option
+  (enabled by default)
+- fixed vfs bug that caused multiple processes accessing the same file
+  trigger a SIGBUS on file close
+- enhanced vfs test pvfs2-shell-test.sh to test a tricky case of filling
+  and emptying the page cache repeatedly in a worst case scenario
+- start client sysint thread safety by making accesses to the global
+  configuration object serialized
+- reworked the vfs statfs method to not cause overflows on some kernels
+- re-introduced a client sysint lookup optimization to work with the
+  overhauled client lookup operation
+- fixed size reporting of symlinks in pvfs2-ls program
+- fixed vfs getattr calls for directories and symlinks
+- added an experimental testbed program for testing threaded client sysint
+  operations based on the pvfs2-client-core (called
+  pvfs2-threaded-client-core)
+- mostly consolidated credential generation to one place
+- added the ability to dynamically add/remove mount points/file system
+  information to the client sysint
+- modified the kernel mount and initialization to use the dynamic mount
+  system, where a server and file system name is specific on the mount
+  command line (no more hard coded coll_id and root_handle!)
+- fixed a particularly nasty vfs race bug that could crash the kernel
+  during writes
+- fixed a vfs bug that could cause a client to think a file did not exist
+  when in fact it did
+- added full support for dynamic vfs mount (which breaks the old way of
+  mounting, but is more convenient and makes more sense)
 
 
 pvfs2-0.1.1
