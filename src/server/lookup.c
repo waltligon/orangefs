@@ -243,72 +243,72 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 {
 
-    int job_post_ret = 1;
-    /*job_id_t i;*/
+  int job_post_ret = 1;
+  /*job_id_t i; */
 
-    int k;
-    char *end_of_path;
-    int meta_data_flag,directory_handle_flag; //used to tell us that we have the data
+  int k;
+  char *end_of_path;
+  int meta_data_flag, directory_handle_flag;	//used to tell us that we have the data
 
-    meta_data_flag=directory_handle_flag=0;
+  meta_data_flag = directory_handle_flag = 0;
 
-    if (s_op->resp->u.lookup_path.count == -1)
+  if (s_op->resp->u.lookup_path.count == -1)
     {
-	s_op->resp->u.lookup_path.count++;
+      s_op->resp->u.lookup_path.count++;
     }
-    else 
+  for (k = 0; k < ret->count; k++)
     {
-	for(k=0;k<ret->count;k++)
+      switch (((char *) (s_op->key_a[k].buffer))[0])
 	{
-	    switch(((char *)(s_op->key_a[k].buffer))[0])
-	    {
-		case 'm':
-		    memcpy(&(s_op->resp->u.lookup_path.attr_array[s_op->resp->u.lookup_path.count]),\
-			    s_op->val_a[0].buffer,\
-			    s_op->val_a[0].buffer_sz);
-		    meta_data_flag = 1;
-		    break;
-		case 'd':
-		    s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.count] = \
-			s_op->req->u.lookup_path.starting_handle;
-		    s_op->req->u.lookup_path.starting_handle = *((PVFS_handle *)s_op->val_a[0].buffer),
-		    directory_handle_flag = 1;
-		default:
-		    gossip_lerr("Handle of unknown type found\n");
+	case 'm':
+	  memcpy (&
+		  (s_op->resp->u.lookup_path.
+		   attr_array[s_op->resp->u.lookup_path.count]),
+		  s_op->val_a[0].buffer, s_op->val_a[0].buffer_sz);
+	  meta_data_flag = 1;
+	  break;
+	case 'd':
+	  s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.
+						 count] =
+	    s_op->req->u.lookup_path.starting_handle;
+	  s_op->req->u.lookup_path.starting_handle =
+	    *((PVFS_handle *) s_op->val_a[0].buffer), directory_handle_flag =
+	    1;
+	default:
+	  gossip_lerr ("Handle of unknown type found\n");
 
-	    }
-	}
-	if(directory_handle_flag && meta_data_flag)
-	{
-	    s_op->resp->u.lookup_path.count++;
-	    // CHECK PERMISSIONS HERE on attr_array[count-1];
-	}
-	else
-	{
-	    if(!directory_handle_flag)
-		gossip_lerr("Did not get directory handle\n");
-	    else
-		gossip_lerr("Did not get metadata\n");
-	    gossip_lerr("We did not get both... fix it\n");
 	}
     }
-    /* TODO: Better way of doing this??? */
-    if(s_op->strsize)
+  if (directory_handle_flag && meta_data_flag)
     {
-	end_of_path = index(s_op->req->u.lookup_path.path,'/');
-	if(end_of_path)
-	    end_of_path[0] = '\0';
-	else
-	    //if(strlen(s_op->req->u.lookup_path.path)) // there is something there
-	    s_op->key.buffer = s_op->req->u.lookup_path.path;
-	s_op->key.buffer_sz = strlen(s_op->key.buffer);
-	s_op->req->u.lookup_path.path+=strlen(s_op->key.buffer)+1;
-	s_op->strsize-=strlen(s_op->key.buffer)+1;
+      s_op->resp->u.lookup_path.count++;
+      // CHECK PERMISSIONS HERE on attr_array[count-1];
     }
-    gossip_ldebug(SERVER_DEBUG,"Looking up %s\n",(char *)s_op->key.buffer);
+  else
+    {
+      if (!directory_handle_flag)
+	gossip_lerr ("Did not get directory handle\n");
+      else
+	gossip_lerr ("Did not get metadata\n");
+      gossip_lerr ("We did not get both... fix it\n");
+    }
+  /* TODO: Better way of doing this??? */
+  if (s_op->strsize)
+    {
+      end_of_path = index (s_op->req->u.lookup_path.path, '/');
+      if (end_of_path)
+	end_of_path[0] = '\0';
+      else
+	//if(strlen(s_op->req->u.lookup_path.path)) // there is something there
+	s_op->key.buffer = s_op->req->u.lookup_path.path;
+      s_op->key.buffer_sz = strlen (s_op->key.buffer);
+      s_op->req->u.lookup_path.path += strlen (s_op->key.buffer) + 1;
+      s_op->strsize -= strlen (s_op->key.buffer) + 1;
+    }
+  gossip_ldebug (SERVER_DEBUG, "Looking up %s\n", (char *) s_op->key.buffer);
 
-    gossip_ldebug(SERVER_DEBUG,"check returning: %d\n",job_post_ret);
-    return(job_post_ret);
+  gossip_ldebug (SERVER_DEBUG, "check returning: %d\n", job_post_ret);
+  return (job_post_ret);
 
 }
 
@@ -392,7 +392,8 @@ static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret)
     job_id_t i;
     PVFS_vtag_s vtag;
 
-    gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space\n");
+    gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space
+%lld\n",s_op->req->u.lookup_path.starting_handle);
 
     job_post_ret = job_trove_keyval_read(
 	    s_op->req->u.lookup_path.fs_id,

@@ -439,7 +439,8 @@ static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
     job_id_t i;
     PVFS_handle h;
 
-    gossip_ldebug(SERVER_DEBUG,"create Fxn for crdirent\n");
+    gossip_ldebug(SERVER_DEBUG,"create Fxn for crdirent %lld\n",*(PVFS_handle
+*)s_op->val.buffer);
 
     /* Verify that we have all the information we need to store the pair */
     assert(s_op->req->u.crdirent.name != NULL && s_op->req->u.crdirent.new_handle != 0);
@@ -453,8 +454,9 @@ static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
     free(s_op->val.buffer);
 
     /* this is the name for the parent entry */
-    s_op->key.buffer = &(s_op->req->u.crdirent.name);
+    s_op->key.buffer = s_op->req->u.crdirent.name;
     s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
+    gossip_ldebug(SERVER_DEBUG,"Creating Entry for %s,%d,%lld\n",(char *)s_op->key.buffer,s_op->key.buffer_sz,h);
 
     /* this is the name for the new entry */
     s_op->val.buffer = &(s_op->req->u.crdirent.new_handle);
