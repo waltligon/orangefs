@@ -37,6 +37,17 @@
  */
 
 /*
+ * gen_mutex_init()
+ *
+ * initializes a previously declared mutex
+ *
+ * returns 0 on success, -1 and sets errno on failure.
+ */
+int gen_posix_mutex_init(pthread_mutex_t* mut){
+	return(pthread_mutex_init(mut, NULL));
+}
+
+/*
  * gen_mutex_lock()
  *
  * blocks until it obtains a mutex lock on the given mutex

@@ -66,6 +66,7 @@ int gen_posix_mutex_destroy(pthread_mutex_t* mut);
 	#define gen_mutex_trylock(m) gen_posix_mutex_trylock(m)
 	#define gen_mutex_build() gen_posix_mutex_build()
 	#define gen_mutex_destroy(m) gen_posix_mutex_destroy(m)
+	#define gen_mutex_init(m) gen_posix_mutex_init(m)
 #endif /* __GEN_POSIX_LOCKING__ */
 
 
@@ -76,6 +77,7 @@ int gen_posix_mutex_destroy(pthread_mutex_t* mut);
 	#define gen_mutex_lock(m) do{}while(0)
 	#define gen_mutex_unlock(m) do{}while(0)
 	#define gen_mutex_trylock(m) do{}while(0)
+	#define gen_mutex_init(m) do{}while(0)
 	#define gen_mutex_build() (int*)malloc(sizeof(int))
 	#define gen_mutex_destroy(m) free(m)
 #endif /* __GEN_NULL_LOCKING__ */
