@@ -9,11 +9,17 @@ AC_INIT(include/pvfs2-types.h)
 AC_CONFIG_HEADER(pvfs2-config.h)
 AC_CONFIG_AUX_DIR(maint/config)
 
+dnl
+dnl for test builds, insert the build date and time information into
+dnl into the version; for official releases, clear the PVFS2_PRE line
+dnl
 dnl PVFS2 versioning information
+BUILD_TIME=`date -u +"%F@%T"`
 PVFS2_MAJOR=0
 PVFS2_MINOR=6
 PVFS2_SUB=2
-PVFS2_PRE="pre1"
+dnl PVFS2_PRE=""
+PVFS2_PRE="pre1-$BUILD_TIME"
 
 AM_INIT_AUTOMAKE(pvfs2, $PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE)
 
@@ -595,39 +601,48 @@ AC_MSG_RESULT([***** Displaying PVFS2 Configuration Information *****])
 AC_MSG_RESULT([------------------------------------------------------])
 
 if test "x$BUILD_KARMA" = "x1" ; then
-   AC_MSG_RESULT([PVFS2 configured to build karma gui              : yes])
+   AC_MSG_RESULT([PVFS2 configured to build karma gui               : yes])
 else
-   AC_MSG_RESULT([PVFS2 configured to build karma gui              :  no])
+   AC_MSG_RESULT([PVFS2 configured to build karma gui               :  no])
 fi
 
 if test "x$ENABLE_COVERAGE" = "x1" ; then
-   AC_MSG_RESULT([PVFS2 configured to perform coverage analysis    : yes])
+   AC_MSG_RESULT([PVFS2 configured to perform coverage analysis     : yes])
 else
-   AC_MSG_RESULT([PVFS2 configured to perform coverage analysis    :  no])
+   AC_MSG_RESULT([PVFS2 configured to perform coverage analysis     :  no])
+fi
+
+if test "x$MISC_TROVE_FLAGS" = "x" ; then
+   AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       :  no])
+else
+   AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       : yes])
 fi
 
 if test "x$LINUX_KERNEL_SRC" = "x" ; then
-   AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module     :  no])
+   AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module      :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module     : yes])
+   AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module      : yes])
 fi
 
 if test "x$LINUX24_KERNEL_SRC" = "x" ; then
-   AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module     :  no])
+   AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module      :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module     : yes])
+   AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module      : yes])
 fi
 
 if test "x$MMAP_RA_CACHE" = "x" ; then
-   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache     :  no])
+   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache     : yes])
+   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      : yes])
 fi
 
 if test "x$THREAD_LIB" = "x" ; then
-   AC_MSG_RESULT([PVFS2 configured for a thread-safe client library:  no])
+   AC_MSG_RESULT([PVFS2 configured for a thread-safe client library :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for a thread-safe client library: yes])
+   AC_MSG_RESULT([PVFS2 configured for a thread-safe client library : yes])
 fi
+
+AC_MSG_RESULT()
+AC_MSG_RESULT([PVFS2 version string: $PVFS2_VERSION])
 
 AC_MSG_RESULT()
