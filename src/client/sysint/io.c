@@ -544,12 +544,12 @@ static int HACK_create(PVFS_handle* handle, PVFS_fs_id fsid)
 	return(-1);
     }
 
+    *handle = create_dec_ack->u.create.handle;
+
     /* release the decoded buffers */
     PINT_decode_release(&decoded1, PINT_ENCODE_RESP, 0);
 
     free(create_ack);
-
-    *handle = create_dec_ack->u.create.handle;
 
     return(0);
 }
