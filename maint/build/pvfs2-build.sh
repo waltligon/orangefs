@@ -7,6 +7,9 @@
 rootdir=/tmp/pvfs2-build-test
 tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
 cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs 
+# specify extra configure options here; for now we disable karma because
+# of all the gtk warnings
+configureopts=--disable-karma
 
 
 #
@@ -81,7 +84,7 @@ get_cvs || exit 1
 mkdir $builddir
 mkdir $installdir
 cd $builddir
-$srcdir/configure --prefix=$installdir 2>&1 > $rootdir/configure.log
+$srcdir/configure $configureopts --prefix=$installdir 2>&1 > $rootdir/configure.log
 
 if [ $? != 0 ] ; then
 	echo "Configure failed; see $rootdir/configure.log.  Aborting."
