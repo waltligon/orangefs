@@ -337,6 +337,10 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	flow_data->initial_posts = BUFFERS_PER_FLOW;
 	for(i=0; i<BUFFERS_PER_FLOW; i++)
 	{
+	    /* TODO: need to stop if we hit an error along the way? */
+	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+		"flowproto-multiqueue forcing bmi_send_callback_fn.\n");
+
 	    bmi_send_callback_fn(&(flow_data->prealloc_array[i]), 0, 0);
 	}
     }
@@ -355,6 +359,8 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 
 	flow_data->prealloc_array[0].result_chain.q_item = 
 	    &flow_data->prealloc_array[0];
+	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+	    "flowproto-multiqueue forcing trove_write_callback_fn.\n");
 	trove_write_callback_fn(&(flow_data->prealloc_array[0].result_chain), 0);
     }
 #endif
@@ -388,6 +394,9 @@ static void bmi_recv_callback_fn(void *user_ptr,
     void* tmp_user_ptr;
 
     gen_mutex_lock(&flow_data->flow_mutex);
+
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+	"flowproto-multiqueue bmi_recv_callback_fn.\n");
 
     q_item->posted_id = 0;
 
@@ -560,6 +569,9 @@ static void trove_read_callback_fn(void *user_ptr,
 
     gen_mutex_lock(&flow_data->flow_mutex);
 
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+	"flowproto-multiqueue trove_read_callback_fn.\n");
+
     result_tmp->posted_id = 0;
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
@@ -666,6 +678,9 @@ static int bmi_send_callback_fn(void *user_ptr,
     void* tmp_user_ptr = NULL;
 
     gen_mutex_lock(&flow_data->flow_mutex);
+
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+	"flowproto-multiqueue bmi_send_callback_fn.\n");
 
     q_item->posted_id = 0;
 
@@ -861,6 +876,9 @@ static void trove_write_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
 
     gen_mutex_lock(&flow_data->flow_mutex);
+
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+	"flowproto-multiqueue trove_write_callback_fn.\n");
 
     result_tmp->posted_id = 0;
 
@@ -1116,6 +1134,9 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 
     gen_mutex_lock(&flow_data->flow_mutex);
     
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+	"flowproto-multiqueue mem_to_bmi_callback_fn.\n");
+
     q_item->posted_id = 0;
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
@@ -1288,6 +1309,9 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 
     gen_mutex_lock(&flow_data->flow_mutex);
       
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+	"flowproto-multiqueue bmi_to_mem_callback_fn.\n");
+
     q_item->posted_id = 0;
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
@@ -1460,6 +1484,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
     q_item, struct fp_private_data* flow_data)
 {
+    int ret;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
 	"flowproto-multiqueue error cleanup path.\n");
@@ -1477,30 +1502,42 @@ static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
 	if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
 	    flow_data->parent->dest.endpoint_id == MEM_ENDPOINT)
 	{
-	    flow_data->cleanup_pending_count += 
-		cancel_pending_bmi(&flow_data->src_list);
+	    ret = cancel_pending_bmi(&flow_data->src_list);
+	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+		"flowproto-multiqueue canceling %d BMI ops.\n", ret);
+	    flow_data->cleanup_pending_count += ret;
 	}
 	else if(flow_data->parent->src.endpoint_id == MEM_ENDPOINT &&
 	    flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
 	{
-	    flow_data->cleanup_pending_count += 
-		cancel_pending_bmi(&flow_data->dest_list);
+	    ret = cancel_pending_bmi(&flow_data->dest_list);
+	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+		"flowproto-multiqueue canceling %d BMI ops.\n", ret);
+	    flow_data->cleanup_pending_count += ret;
 	}
 	else if(flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
 	    flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
 	{
-	    flow_data->cleanup_pending_count += 
-		cancel_pending_trove(&flow_data->src_list);
-	    flow_data->cleanup_pending_count += 
-		cancel_pending_bmi(&flow_data->dest_list);
+	    ret = cancel_pending_trove(&flow_data->src_list);
+	    flow_data->cleanup_pending_count += ret;
+	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+		"flowproto-multiqueue canceling %d Trove ops.\n", ret);
+	    ret = cancel_pending_bmi(&flow_data->dest_list);
+	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+		"flowproto-multiqueue canceling %d BMI ops.\n", ret);
+	    flow_data->cleanup_pending_count += ret;
 	}
 	else if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
 	    flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
 	{
-	    flow_data->cleanup_pending_count += 
-		cancel_pending_bmi(&flow_data->src_list);
-	    flow_data->cleanup_pending_count += 
-		cancel_pending_trove(&flow_data->dest_list);
+	    ret = cancel_pending_bmi(&flow_data->src_list);
+	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+		"flowproto-multiqueue canceling %d BMI ops.\n", ret);
+	    flow_data->cleanup_pending_count += ret;
+	    ret = cancel_pending_trove(&flow_data->dest_list);
+	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+		"flowproto-multiqueue canceling %d Trove ops.\n", ret);
+	    flow_data->cleanup_pending_count += ret;
 	}
 	else
 	{
