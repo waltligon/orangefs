@@ -4,9 +4,11 @@ TESTSRC += \
 	$(DIR)/test-bmi-client.c \
 	$(DIR)/test-bmi-client-gm.c \
 	$(DIR)/test-bmi-client-list.c \
+	$(DIR)/test-bmi-client-list-gm.c \
 	$(DIR)/test-bmi-server.c \
 	$(DIR)/test-bmi-server-gm.c \
-	$(DIR)/test-bmi-server-list.c
+	$(DIR)/test-bmi-server-list.c \
+	$(DIR)/test-bmi-server-list-gm.c
 
 LOCAL_MPIMISCSRC := \
 	$(DIR)/bench-mem.c \
