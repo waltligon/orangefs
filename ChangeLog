@@ -10,7 +10,8 @@ pvfs2-1.1.0pre1
 - build: remove duplicate commands used for QUIET_COMPILE
 - build: fix test configure library detection
 - build: simplify karma and vis some more
--
+- build: add tests for features of Berkeley DB 4.3.xx
+- trove: fix bugs introduced by new features of DB 4.3.xx
 
 
 pvfs2-1.0.1
