@@ -122,7 +122,7 @@ PVFS_handle create_dir(PVFS_handle parent,
  * returns 0 on success.
  *          -1 if some error happened.
  */
-PVFS_handle remove_file(PVFS_handle parent,
+int remove_file(PVFS_handle parent,
                        PVFS_fs_id fs_id,
                        char *name)
 {
@@ -158,7 +158,7 @@ PVFS_handle remove_file(PVFS_handle parent,
  * returns 0 on success.
  *          -1 if some error happened.
  */
-PVFS_handle remove_dir(PVFS_handle parent,
+int remove_dir(PVFS_handle parent,
                        PVFS_fs_id fs_id,
                        char *name)
 {
@@ -183,3 +183,42 @@ PVFS_handle remove_dir(PVFS_handle parent,
     }
     return 0;
 }
+
+/*
+ * simple helper to lookup a handle given a filename
+ *
+ * parent:   handle of parent directory
+ * fs_id:    fsid of filesystem on which parent dir exists
+ * name:     name of directory to create
+ *
+ * returns a handle to the new directory
+ *          -1 if some error happened
+ */
+PVFS_handle lookup_name(char *name,
+                       PVFS_fs_id fs_id)
+{
+    PVFS_sysreq_lookup req_lookup;
+    PVFS_sysresp_lookup resp_lookup;
+
+    int ret = -1;
+
+    memset(&req_lookup, 0, sizeof(req_lookup));
+    memset(&resp_lookup, 0, sizeof(req_lookup));
+
+
+    req_lookup.name = name;
+    req_lookup.fs_id = fs_id;
+    req_lookup.credentials.uid = 100;
+    req_lookup.credentials.gid = 100;
+    req_lookup.credentials.perms = U_WRITE|U_READ;
+
+    ret = PVFS_sys_lookup(&req_lookup,&resp_lookup);
+    if (ret < 0)
+    {
+       printf("Lookup failed with errcode = %d\n", ret);
+       return(-1);
+    }
+
+    return (PVFS_handle) resp_lookup.pinode_refn.handle;
+}
+

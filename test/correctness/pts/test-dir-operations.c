@@ -10,40 +10,9 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 
+extern pvfs_helper_t pvfs_helper;
 extern int parse_pvfstab(char *filename,
 			 pvfs_mntlist * pvfstab_p);
-
-/* 
- * helper function to initialize pvfs
- * doesn't take any parameters (relies heavily on some expected default information)
- *
- * returns: fs_id of a pvfs file system 
- * 	or -1 if error
- */
-static PVFS_fs_id system_init(void)
-{
-    PVFS_sysresp_init resp_init;
-    int ret = -1;
-    pvfs_mntlist mnt = { 0, NULL };	/* use pvfstab in cwd */
-
-    memset(&resp_init, 0, sizeof(resp_init));
-
-    ret = parse_pvfstab(NULL, &mnt);
-    if (ret < 0)
-    {
-	printf("Parsing error\n");
-	return -1;
-    }
-
-    ret = PVFS_sys_initialize(mnt, &resp_init);
-    if (ret < 0)
-    {
-	printf("PVFS_sys_initialize() failure. = %d\n", ret);
-	return (ret);
-    }
-
-    return resp_init.fsid_list[0];
-}
 
 /*
  * handle:  handle of parent directory
@@ -52,20 +21,20 @@ static PVFS_fs_id system_init(void)
  * rank:    rank in the mpi process group 
  */
 
-static int remove_dirs(PVFS_handle handle,
+static int remove_dirs(PVFS_handle parent_handle,
 			 PVFS_fs_id fs_id,
 			 int ndirs,
 			 int rank)
 {
-    int i;
+    int i, ret = -1;
     char name[PVFS_NAME_MAX];
     PVFS_handle dir_handle;
 
     for (i = 0; i < ndirs; i++)
     {
-	snprintf(name, PVFS_NAME_MAX, "rank%d-iter%d", rank, i);
-	dir_handle = create_dir(handle, fs_id, name);
-	if (dir_handle < 0)
+	snprintf(name, PVFS_NAME_MAX, "/rank%d-iter%d", rank, i);
+	ret = remove_dir(parent_handle, fs_id, name);
+	if (ret < 0)
 	{
 	    return -1;
 	}
@@ -174,39 +143,85 @@ int test_dir_operations(MPI_Comm * comm,
 		     void *rawparams)
 {
     int ret = -1;
-    PVFS_fs_id fs_id;
-    PVFS_handle root_handle;
+    PVFS_fs_id fs_id = 0;
+    PVFS_handle root_handle, dir_handle;
     generic_params *myparams = (generic_params *) rawparams;
     int nerrs = 0;
+    char name[PVFS_NAME_MAX];
 
-    fs_id = system_init();
-    if (fs_id < 0)
+    if (rank == 0)
     {
-	printf("System initialization error\n");
-	return (fs_id);
+	if (initialize_sysint() || (!pvfs_helper.initialized))
+	{
+	    printf("System initialization error\n");
+	    return (-1);
+	}
+	fs_id = pvfs_helper.resp_init.fsid_list[0];
+	printf("fs_id: %ld\n",fs_id );
     }
+
+    MPI_Bcast(&fs_id, 1, MPI_LONG_INT, 0, *comm );
+    printf("rank: %d  fs_id: %ld\n", rank, fs_id );
+
 
     root_handle = get_root(fs_id);
 
-    ret = create_dirs(root_handle, fs_id, myparams->mode, rank);
+    /* setup a dir in the root directory to do tests in (so the root dir is
+     * less cluttered)
+     *
+     */
+
+    memset(name,0,PVFS_NAME_MAX);
+    snprintf(name, PVFS_NAME_MAX, "dir_op_test");
+    if (rank == 0)
+    {
+	dir_handle = create_dir(root_handle, fs_id, name);
+	if (dir_handle < 0)
+	{
+	    return -1;
+	}
+    }
+    MPI_Barrier(*comm);
+    if (rank != 0)
+    {
+	/* for everyone that didn't create the dir entry, we should get the 
+	 * handle via lookup */
+	dir_handle = lookup_name(name, root_handle);
+	if (dir_handle < 0)
+	{
+	    return -1;
+	}
+    }
+
+    ret = create_dirs(dir_handle, fs_id, myparams->mode, rank);
     if (ret < 0)
     {
 	printf("creating directories failed with errcode = %d\n", ret);
 	return (-1);
     }
 
-    ret = read_dirs(root_handle, fs_id, myparams->mode, rank);
+    ret = read_dirs(dir_handle, fs_id, myparams->mode, rank);
     if (ret < 0)
     {
 	printf("reading directories failed with errcode = %d\n", ret);
 	return (-1);
     }
 
-    ret = remove_dirs(root_handle, fs_id, myparams->mode, rank);
+    ret = remove_dirs(dir_handle, fs_id, myparams->mode, rank);
     if (ret < 0)
     {
 	printf("removing directories failed with errcode = %d\n", ret);
 	return (-1);
+    }
+
+    if (rank == 0)
+    {
+	/* remove the test directory */
+	ret = remove_dir(root_handle, fs_id, name);
+	if (ret < 0)
+	{
+	    return -1;
+	}
     }
 
     ret = PVFS_sys_finalize();
