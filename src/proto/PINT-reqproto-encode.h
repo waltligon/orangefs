@@ -16,12 +16,12 @@
 /* structure to describe messages that have been encoded */
 struct PINT_encoded_msg
 {
-    bmi_addr_t dest;        /* host this is going to */
-    int buffer_type;	    /* buffer flag for BMI's use */
-    void** buffer_list;     /* list of buffers */
-    PVFS_size* size_list;   /* size of buffers */
-    int list_count;         /* number of buffers */
-    PVFS_size total_size;   /* aggregate size of encoding */
+    bmi_addr_t dest;			    /* host this is going to */
+    enum bmi_buffer_type buffer_type;	    /* buffer flag for BMI's use */
+    void** buffer_list;			    /* list of buffers */
+    PVFS_size* size_list;		    /* size of buffers */
+    int list_count;			    /* number of buffers */
+    PVFS_size total_size;		    /* aggregate size of encoding */
     int type;
 };
 
