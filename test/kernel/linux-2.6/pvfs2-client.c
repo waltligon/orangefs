@@ -94,26 +94,23 @@ static int service_create_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_create response;
     PVFS_pinode_reference parent_refn;
+    PVFS_sys_attr *attrs = NULL;
 
     if (init_response && in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_create));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-        attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-        attr.owner = 100;
-        attr.group = 100;
-        attr.perms = 511;
-	attr.atime = attr.mtime = attr.ctime = 
+        attrs = &in_upcall->req.create.attributes;
+	attrs->atime = attrs->mtime = attrs->ctime = 
 	    time(NULL);
 
-        credentials.uid = attr.owner;
-        credentials.gid = attr.group;
-        credentials.perms = attr.perms;
+        credentials.uid = attrs->owner;
+        credentials.gid = attrs->group;
+        credentials.perms = attrs->perms;
 
         parent_refn = in_upcall->req.create.parent_refn;
 
@@ -122,7 +119,7 @@ static int service_create_request(
                parent_refn.handle);
 
         ret = PVFS_sys_create(in_upcall->req.create.d_name, parent_refn,
-                              attr, credentials, &response);
+                              *attrs, credentials, &response);
         if (ret < 0)
         {
             fprintf(stderr,"Failed to create %s under %Ld on fsid %d!\n",

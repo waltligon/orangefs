@@ -91,6 +91,64 @@ static inline int copy_attributes_to_inode(
     return ret;
 }
 
+static inline int copy_attributes_from_inode(
+    struct inode *inode,
+    PVFS_sys_attr * attrs)
+{
+    int ret = -1;
+    int perm_mode = 0;
+
+    if (inode && attrs)
+    {
+        attrs->owner = inode->i_uid;
+        attrs->group = inode->i_gid;
+        attrs->atime = (PVFS_time)inode->i_atime.tv_sec;
+        attrs->mtime = (PVFS_time)inode->i_mtime.tv_sec;
+        attrs->ctime = (PVFS_time)inode->i_ctime.tv_sec;
+
+        perm_mode = inode->i_mode;
+
+        if (perm_mode & S_IXOTH)
+            attrs->perms |= PVFS_O_EXECUTE;
+        if (perm_mode & S_IWOTH)
+            attrs->perms |= PVFS_O_WRITE;
+        if (perm_mode & S_IROTH)
+            attrs->perms |= PVFS_O_READ;
+
+        if (perm_mode & S_IXGRP)
+            attrs->perms |= PVFS_G_EXECUTE;
+        if (perm_mode & S_IWGRP)
+            attrs->perms |= PVFS_G_WRITE;
+        if (perm_mode & S_IRGRP)
+            attrs->perms |= PVFS_G_READ;
+
+        if (perm_mode & S_IXUSR)
+            attrs->perms |= PVFS_U_EXECUTE;
+        if (perm_mode & S_IWUSR)
+            attrs->perms |= PVFS_U_WRITE;
+        if (perm_mode & S_IRUSR)
+            attrs->perms |= PVFS_U_READ;
+
+        if (perm_mode & S_IFREG)
+        {
+            attrs->objtype = PVFS_TYPE_METAFILE;
+        }
+        else if (perm_mode & S_IFDIR)
+        {
+            attrs->objtype = PVFS_TYPE_DIRECTORY;
+        }
+        else if (perm_mode & S_IFLNK)
+        {
+            attrs->objtype = PVFS_TYPE_SYMLINK;
+        }
+
+        attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
+
+        ret = 0;
+    }
+    return ret;
+}
+
 /*
   issues a pvfs2 getattr request and fills in the
   appropriate inode attributes if successful.
@@ -195,8 +253,7 @@ int pvfs2_inode_setattr(
     struct inode *inode,
     struct iattr *iattr)
 {
-    int ret = -1, perm_mode = 0;
-    PVFS_sys_attr *attrs = NULL;
+    int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
@@ -210,54 +267,8 @@ int pvfs2_inode_setattr(
 
 	new_op->upcall.type = PVFS2_VFS_OP_SETATTR;
         new_op->upcall.req.setattr.refn = pvfs2_inode->refn;
-
-        /* fill in all attributes that we're interested in */
-        attrs = &new_op->upcall.req.setattr.attributes;
-        memset(attrs, 0, sizeof(PVFS_sys_attr));
-
-        attrs->owner = inode->i_uid;
-        attrs->group = inode->i_gid;
-        attrs->atime = (PVFS_time)inode->i_atime.tv_sec;
-        attrs->mtime = (PVFS_time)inode->i_mtime.tv_sec;
-        attrs->ctime = (PVFS_time)inode->i_ctime.tv_sec;
-
-        perm_mode = inode->i_mode;
-
-        if (perm_mode & S_IXOTH)
-            attrs->perms |= PVFS_O_EXECUTE;
-        if (perm_mode & S_IWOTH)
-            attrs->perms |= PVFS_O_WRITE;
-        if (perm_mode & S_IROTH)
-            attrs->perms |= PVFS_O_READ;
-
-        if (perm_mode & S_IXGRP)
-            attrs->perms |= PVFS_G_EXECUTE;
-        if (perm_mode & S_IWGRP)
-            attrs->perms |= PVFS_G_WRITE;
-        if (perm_mode & S_IRGRP)
-            attrs->perms |= PVFS_G_READ;
-
-        if (perm_mode & S_IXUSR)
-            attrs->perms |= PVFS_U_EXECUTE;
-        if (perm_mode & S_IWUSR)
-            attrs->perms |= PVFS_U_WRITE;
-        if (perm_mode & S_IRUSR)
-            attrs->perms |= PVFS_U_READ;
-
-        if (perm_mode & S_IFREG)
-        {
-            attrs->objtype = PVFS_TYPE_METAFILE;
-        }
-        else if (perm_mode & S_IFDIR)
-        {
-            attrs->objtype = PVFS_TYPE_DIRECTORY;
-        }
-        else if (perm_mode & S_IFLNK)
-        {
-            attrs->objtype = PVFS_TYPE_SYMLINK;
-        }
-
-        attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
+        copy_attributes_from_inode(
+            inode, &new_op->upcall.req.setattr.attributes);
 
 	/* post req and wait for request to be serviced here */
 	add_op_to_request_list(new_op);
@@ -316,6 +327,8 @@ static inline struct inode *pvfs2_create_file(
 	    new_op->upcall.req.create.parent_refn.fs_id =
 		PVFS2_SB(dir->i_sb)->fs_id;
 	}
+        copy_attributes_from_inode(
+            inode, &new_op->upcall.req.create.attributes);
 	strncpy(new_op->upcall.req.create.d_name,
 		dentry->d_name.name, PVFS2_NAME_LEN);
 
