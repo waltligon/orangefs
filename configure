@@ -1148,6 +1148,7 @@ else
 fi
 rm -f conftest*
 
+install -d src/io src/common src/client test/common test/io test/client doc
 
 trap '' 1 2 15
 cat > confcache <<\EOF
@@ -1594,5 +1595,6 @@ EOF
 chmod +x $CONFIG_STATUS
 rm -fr confdefs* $ac_clean_files
 test "$no_create" = yes || ${CONFIG_SHELL-/bin/sh} $CONFIG_STATUS || exit 1
+
 
 
