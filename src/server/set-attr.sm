@@ -172,9 +172,11 @@ static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
     s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-    /* allocate temporary space for holding read attributes; freed in verify step. */
-    /* TODO: MOVE THIS INTO A SETATTR-SPECIFIC SCRATCH SPACE IN THE S_OP STRUCTURE */
-    s_op->val.buffer = (void *) malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
+    /*
+      use scratch attr object space when retrieving the
+      attr to avoid dynamic allocation
+    */
+    s_op->val.buffer = (void *)&s_op->u.setattr.attr;
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
@@ -212,7 +214,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
 
     gossip_debug(SERVER_DEBUG, "setattr state: verify_attribs\n");
 
-    a_p = (PVFS_object_attr *) s_op->val.buffer;
+    a_p = (PVFS_object_attr *)&s_op->u.setattr.attr;
 
     if (ret->error_code != 0) {
 	gossip_debug(SERVER_DEBUG,
@@ -234,14 +236,12 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
     /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
     if ((ret->error_code != 0 && s_op->req->u.setattr.attr.objtype == PVFS_TYPE_METAFILE) || a_p->objtype == PVFS_TYPE_METAFILE)
     {
-	free(s_op->val.buffer);
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a metafile\n",
 		     s_op->req->u.setattr.handle);
 	ret->error_code = STATE_METAFILE;
     }
     else {
-	free(s_op->val.buffer);
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to something other than a metafile\n",
 		     s_op->req->u.setattr.handle);
@@ -273,6 +273,8 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
     gossip_debug(SERVER_DEBUG, "setattr state: setobj_attribs\n");
 
     a_p = &s_op->req->u.setattr.attr;
+
+    /* FIXME: MAKE SURE TYPES MATCH HERE */
 
     gossip_debug(SERVER_DEBUG,
 		 "  attrs to write = (owner = %d, group = %d, perms = %o, type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
