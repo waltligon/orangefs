@@ -12,7 +12,7 @@ extern ssize_t pvfs2_inode_read(
     struct inode *inode,
     char *buf,
     size_t count,
-    loff_t * offset,
+    loff_t *offset,
     int copy_to_user,
     loff_t readahead_size);
 
@@ -36,7 +36,6 @@ static int pvfs2_get_blocks(
     void *page_data = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     /*
-      FIXME:
       We're faking our inode block size to be PAGE_CACHE_SIZE
       to play nicely with the page cache.
 
@@ -100,24 +99,25 @@ static int pvfs2_get_blocks(
         /*
           NOTE: This is conceptually backwards.  we could be
           implementing the file_read as generic_file_read and doing
-          the actual i/o here (via readpage).
+          the actual i/o here (via readpage).  There are *no* plans to
+          do this.
 
           The main reason it's not like that now is because of the
           mismatch of page cache size and the inode blocksize that
           we're using.  It's more efficient in the general case to use
-          the larger blocksize for reading/writing.  For now it seems
-          that this call can *only* handle reads of PAGE_CACHE_SIZE
-          blocks.
+          the larger blocksize (~4M rather than ~4K) for reading &
+          writing (via pvfs2_inode_read/pvfs2_file_write).  For now it
+          seems that this call can *only* handle reads of
+          PAGE_CACHE_SIZE blocks, which is terribly slow for us.
 
           set the readahead size to be the entire file size so that
-          subsequent calls have the opportunity to be cache hits; when
-          we're at the last block, we need to pass the special
-          readahead value to allow a cache flush to occur in userspace
+          subsequent calls have the opportunity to be userspace read
+          cache hits; any readahead data the client pulls in is flused
+          (both from userspace and the page cache) on vfs file close
         */
         bytes_read = pvfs2_inode_read(
             inode, page_data, blocksize, &blockptr_offset, 0,
-            (((blocksize + blockptr_offset) < inode->i_size) ?
-             inode->i_size : PVFS2_MMAP_RACACHE_FLUSH));
+            inode->i_size);
 
         if (bytes_read < 0)
         {

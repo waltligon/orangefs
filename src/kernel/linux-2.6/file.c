@@ -345,7 +345,7 @@ static ssize_t pvfs2_file_write(
     {
         update_atime(inode);
     }
-    return(total_count);
+    return total_count;
 }
 
 int pvfs2_ioctl(

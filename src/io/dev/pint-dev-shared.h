@@ -18,22 +18,21 @@
 #define PVFS_DEV_MAP                            4
 #define PVFS_DEV_REMOUNT_ALL                    5
 
-/* This is the number of discrete buffers we will break the mapped I/O 
+/* This is the number of discrete buffers we will break the mapped I/O
  * region into.  In some sense it governs the number of concurrent I/O
  * operations that we will allow
  */
 #define PVFS2_BUFMAP_DESC_COUNT    5
 
 /*
-  by default, we assume each description size is 4MB;
-  this value dictates the initial blocksize stored in
-  the superblock, but after the request device is
-  initialized, a subsequent statfs updates the superblock
-  blocksize to be the configured decsription size (gathered
+  by default, we assume each description size is 4MB; this value
+  dictates the initial blocksize stored in the superblock, but after
+  the request device is initialized, a subsequent statfs updates the
+  superblock blocksize to be the configured decsription size (gathered
   using pvfs_bufmap_size_query).
 
-  don't change this value without updating the shift value
-  below, or else we may break size reporting in the kernel
+  don't change this value without updating the shift value below, or
+  else we may break size reporting in the kernel
 */
 #define PVFS2_BUFMAP_DEFAULT_DESC_SIZE  (4 * (1024 * 1024))
 #define PVFS2_BUFMAP_DEFAULT_DESC_SHIFT 22 /* NOTE: 2^22 == 4MB */
@@ -45,13 +44,10 @@
 /* pvfs2-client-core can cache readahead data up to this size in bytes */
 #define PVFS2_MMAP_RACACHE_MAX_SIZE ((loff_t)(8 * (1024 * 1024)))
 
-/* tells the pvfs2-client-core to flush any cached readahead data */
-#define PVFS2_MMAP_RACACHE_FLUSH ((loff_t)-1)
-
 /* describes memory regions to map in the PVFS_DEV_MAP ioctl */
 struct PVFS_dev_map_desc
 {
-    void* ptr;
+    void *ptr;
     int size;
 };
 

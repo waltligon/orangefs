@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 #include "pint-dev-shared.h"
@@ -28,7 +27,7 @@ static DECLARE_WAIT_QUEUE_HEAD(bufmap_waitq);
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
+int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
 {
     int ret = -EINVAL;
     int i = 0;
@@ -38,7 +37,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 
     if (bufmap_init == 1)
     {
-	pvfs2_error("pvfs2: error: bufmap already initialized.\n");
+        pvfs2_error("pvfs2: error: bufmap already initialized.\n");
         ret = -EALREADY;
         goto init_failure;
     }
@@ -47,29 +46,29 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
      * work with
      */
     if (PAGE_ALIGN((unsigned long)user_desc->ptr) != 
-	(unsigned long)user_desc->ptr)
+        (unsigned long)user_desc->ptr)
     {
-	pvfs2_error("pvfs2: error: memory alignment (front).\n");
+        pvfs2_error("pvfs2: error: memory alignment (front).\n");
         goto init_failure;
     }
 
     if (PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->size)) != 
-	(unsigned long)(user_desc->ptr + user_desc->size))
+        (unsigned long)(user_desc->ptr + user_desc->size))
     {
-	pvfs2_error("pvfs2: error: memory alignment (back).\n");
+        pvfs2_error("pvfs2: error: memory alignment (back).\n");
         goto init_failure;
     }
 
     if (user_desc->size != PVFS2_BUFMAP_TOTAL_SIZE)
     {
-	pvfs2_error("pvfs2: error: user provided an oddly "
+        pvfs2_error("pvfs2: error: user provided an oddly "
                     "sized buffer...\n");
         goto init_failure;
     }
 
     if ((PVFS2_BUFMAP_DEFAULT_DESC_SIZE % PAGE_SIZE) != 0)
     {
-	pvfs2_error("pvfs2: error: bufmap size not page size "
+        pvfs2_error("pvfs2: error: bufmap size not page size "
                     "divisable.\n");
         goto init_failure;
     }
@@ -86,19 +85,19 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     /* map the pages */
     down_read(&current->mm->mmap_sem);
     ret = get_user_pages(
-	current,
-	current->mm,
-	(unsigned long)user_desc->ptr,
-	BUFMAP_PAGE_COUNT,
-	1,
-	0,
-	bufmap_page_array,
-	NULL);
+        current,
+        current->mm,
+        (unsigned long)user_desc->ptr,
+        BUFMAP_PAGE_COUNT,
+        1,
+        0,
+        bufmap_page_array,
+        NULL);
     up_read(&current->mm->mmap_sem);
 
     if (ret < 0)
     {
-	kfree(bufmap_page_array);
+        kfree(bufmap_page_array);
         goto init_failure;
     }
 
@@ -107,13 +106,13 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
      */
     if (ret != BUFMAP_PAGE_COUNT)
     {
-	pvfs2_error("pvfs2: error: asked for %d pages, only got %d.\n",
+        pvfs2_error("pvfs2: error: asked for %d pages, only got %d.\n",
                     (int)BUFMAP_PAGE_COUNT, ret);
-	for(i = 0; i < ret; i++)
-	{
-	    page_cache_release(bufmap_page_array[i]);
-	}
-	kfree(bufmap_page_array);
+        for(i = 0; i < ret; i++)
+        {
+            page_cache_release(bufmap_page_array[i]);
+        }
+        kfree(bufmap_page_array);
         ret = -ENOMEM;
         goto init_failure;
     }
@@ -133,11 +132,11 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     offset = 0;
     for(i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
     {
-	desc_array[i].page_array = &bufmap_page_array[offset];
-	desc_array[i].array_count = PAGES_PER_DESC;
-	desc_array[i].uaddr = user_desc->ptr +
-	    (i*PAGES_PER_DESC*PAGE_SIZE);
-	offset += PAGES_PER_DESC;
+        desc_array[i].page_array = &bufmap_page_array[offset];
+        desc_array[i].array_count = PAGES_PER_DESC;
+        desc_array[i].uaddr =
+            user_desc->ptr + (i*PAGES_PER_DESC*PAGE_SIZE);
+        offset += PAGES_PER_DESC;
     }
 
     /* clear any previously used buffer indices */
@@ -151,7 +150,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     bufmap_init = 1;
 
     pvfs2_print("pvfs2_bufmap_initialize: exiting normally\n");
-    return(0);
+    return 0;
 
   init_failure:
 
@@ -180,7 +179,7 @@ void pvfs_bufmap_finalize(void)
 
     for(i=0; i<BUFMAP_PAGE_COUNT; i++)
     {
-	page_cache_release(bufmap_page_array[i]);
+        page_cache_release(bufmap_page_array[i]);
     }
     kfree(bufmap_page_array);
 
@@ -197,7 +196,7 @@ void pvfs_bufmap_finalize(void)
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_get(int* buffer_index)
+int pvfs_bufmap_get(int *buffer_index)
 {
     int ret = -1, i = 0;
     DECLARE_WAITQUEUE(my_wait, current);
@@ -206,41 +205,41 @@ int pvfs_bufmap_get(int* buffer_index)
 
     while(1)
     {
-	set_current_state(TASK_INTERRUPTIBLE);
+        set_current_state(TASK_INTERRUPTIBLE);
 
-	/* check for available desc */
-	spin_lock(&buffer_index_lock);
-	for(i=0; i<PVFS2_BUFMAP_DESC_COUNT; i++)
-	{
-	    if(buffer_index_array[i] == 0)
-	    {
-		buffer_index_array[i] = 1;
-		*buffer_index = i;
-		ret = 0;
-		break;
-	    }
-	}
-	spin_unlock(&buffer_index_lock);
+        /* check for available desc */
+        spin_lock(&buffer_index_lock);
+        for(i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
+        {
+            if (buffer_index_array[i] == 0)
+            {
+                buffer_index_array[i] = 1;
+                *buffer_index = i;
+                ret = 0;
+                break;
+            }
+        }
+        spin_unlock(&buffer_index_lock);
 
-	/* if we acquired a buffer, then break out of while */
-	if(ret == 0)
-	{
-	    break;
-	}
+        /* if we acquired a buffer, then break out of while */
+        if (ret == 0)
+        {
+            break;
+        }
 
-	if(signal_pending(current))
-	{
-	    pvfs2_print("pvfs2: bufmap_get() interrupted.\n");
-	    ret = -EINTR;
-	    break;
-	}
-	schedule();
+        if (signal_pending(current))
+        {
+            pvfs2_print("pvfs2: bufmap_get() interrupted.\n");
+            ret = -EINTR;
+            break;
+        }
+        schedule();
     }
 
     set_current_state(TASK_RUNNING);
     remove_wait_queue(&bufmap_waitq, &my_wait);
 
-    return(ret);
+    return ret;
 }
 
 /* pvfs_bufmap_put()
@@ -266,74 +265,66 @@ void pvfs_bufmap_put(int buffer_index)
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_copy_to_user(void* to, int buffer_index, int size)
+int pvfs_bufmap_copy_to_user(void *to, int buffer_index, int size)
 {
-    int amt_copied = 0;
-    int amt_this = 0;
-    int index = 0;
-    void* offset = to;
-    void *from_kaddr = NULL;
-    struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
-    
+    int amt_copied = 0, amt_remaining = 0;
+    int cur_copy_size = 0, index = 0;
+    void *offset = to, *from_kaddr = NULL;
+    struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
+
     if (bufmap_init == 0)
     {
         pvfs2_print("pvfs2_bufmap_copy_to_user: not yet "
                     "initialized; returning\n");
-	return 1;
+        return 1;
     }
 
     while(amt_copied < size)
     {
-	if((size - amt_copied) > PAGE_SIZE)
-	    amt_this = PAGE_SIZE;
-	else
-	    amt_this = size - amt_copied;
+        amt_remaining = (size - amt_copied);
+        cur_copy_size =
+            ((amt_remaining > PAGE_SIZE) ? PAGE_SIZE : amt_remaining);
 
         from_kaddr = kmap(from->page_array[index]);
-	copy_to_user(offset, from_kaddr, amt_this);
+        copy_to_user(offset, from_kaddr, cur_copy_size);
         kunmap(from->page_array[index]);
 
-	offset += amt_this;
-	amt_copied += amt_this;
-	index++;
+        offset += cur_copy_size;
+        amt_copied += cur_copy_size;
+        index++;
     }
-
-    return(0);
+    return 0;
 }
 
-int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index, int size)
+int pvfs_bufmap_copy_to_kernel(void *to, int buffer_index, int size)
 {
-    int amt_copied = 0;
-    int amt_this = 0;
-    int index = 0;
-    void* offset = to;
-    void *from_kaddr = NULL;
-    struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
+    int amt_copied = 0, amt_remaining = 0;
+    int cur_copy_size = 0, index = 0;
+    void *offset = to, *from_kaddr = NULL;
+    struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
 
     if (bufmap_init == 0)
     {
         pvfs2_print("pvfs2_bufmap_copy_to_kernel: not yet "
                     "initialized; returning\n");
-	return 1;
+        return 1;
     }
 
     while(amt_copied < size)
     {
-	if((size - amt_copied) > PAGE_SIZE)
-	    amt_this = PAGE_SIZE;
-	else
-	    amt_this = size - amt_copied;
+        amt_remaining = (size - amt_copied);
+        cur_copy_size =
+            ((amt_remaining > PAGE_SIZE) ? PAGE_SIZE : amt_remaining);
 
         from_kaddr = kmap(from->page_array[index]);
-	memcpy(offset, from_kaddr, amt_this);
+        memcpy(offset, from_kaddr, cur_copy_size);
         kunmap(from->page_array[index]);
 
-	offset += amt_this;
-	amt_copied += amt_this;
-	index++;
+        offset += cur_copy_size;
+        amt_copied += cur_copy_size;
+        index++;
     }
-
-    return(0);
+    return 0;
 }
 
 /* pvfs_bufmap_copy_from_user()
@@ -342,39 +333,35 @@ int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index, int size)
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_copy_from_user(int buffer_index, void* from, int size)
+int pvfs_bufmap_copy_from_user(int buffer_index, void *from, int size)
 {
-    int amt_copied = 0;
-    int amt_this = 0;
-    int index = 0;
-    void* offset = from;
-    void *to_kaddr = NULL;
-    struct pvfs_bufmap_desc* to = &desc_array[buffer_index];
+    int amt_copied = 0, amt_remaining = 0;
+    int cur_copy_size = 0, index = 0;
+    void *offset = from, *to_kaddr = NULL;
+    struct pvfs_bufmap_desc *to = &desc_array[buffer_index];
 
     if (bufmap_init == 0)
     {
         pvfs2_print("pvfs2_bufmap_copy_from_user: not yet "
                     "initialized; returning\n");
-	return 1;
+        return 1;
     }
 
     while(amt_copied < size)
     {
-	if((size - amt_copied) > PAGE_SIZE)
-	    amt_this = PAGE_SIZE;
-	else
-	    amt_this = size - amt_copied;
+        amt_remaining = (size - amt_copied);
+        cur_copy_size =
+            ((amt_remaining > PAGE_SIZE) ? PAGE_SIZE : amt_remaining);
 
-	to_kaddr = kmap(to->page_array[index]);
-	copy_from_user(to_kaddr, offset, amt_this);
+        to_kaddr = kmap(to->page_array[index]);
+        copy_from_user(to_kaddr, offset, cur_copy_size);
         kunmap(to->page_array[index]);
 
-	offset += amt_this;
-	amt_copied += amt_this;
-	index++;
+        offset += cur_copy_size;
+        amt_copied += cur_copy_size;
+        index++;
     }
-
-    return(0);
+    return 0;
 }
 
 /*

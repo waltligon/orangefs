@@ -139,11 +139,10 @@ static ssize_t pvfs2_devreq_read(
     {
         spin_lock(&cur_op->lock);
 
-        /* FIXME: this is a sanity check and should be removed */
         if ((cur_op->op_state == PVFS2_VFS_STATE_INPROGR) ||
             (cur_op->op_state == PVFS2_VFS_STATE_SERVICED))
         {
-            pvfs2_error("WARNING: Current op already queued...skipping\n");
+            pvfs2_panic("WARNING: Current op already queued...skipping\n");
         }
         cur_op->op_state = PVFS2_VFS_STATE_INPROGR;
 
@@ -326,8 +325,7 @@ static ssize_t pvfs2_devreq_writev(
     else
     {
         /* ignore downcalls that we're not interested in */
-	pvfs2_print("WARNING: No one's waiting for the tag %Ld\n",
-                    Ld(tag));
+	pvfs2_print("WARNING: No one's waiting for tag %Ld\n", Ld(tag));
     }
     kmem_cache_free(dev_req_cache, buffer);
 

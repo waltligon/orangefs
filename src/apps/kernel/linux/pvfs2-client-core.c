@@ -940,13 +940,7 @@ static int post_io_request(vfs_request_t *vfs_request)
 #ifdef USE_MMAP_RA_CACHE
     void *buf = NULL;
 
-    if ((vfs_request->in_upcall.req.io.readahead_size ==
-         PVFS2_MMAP_RACACHE_FLUSH))
-    {
-        pvfs2_mmap_ra_cache_flush(
-            vfs_request->in_upcall.req.io.refn);
-    }
-    else if (vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ)
+    if (vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ)
     {
         /* check readahead cache for the read data being requested */
         if (vfs_request->in_upcall.req.io.count > 0)
@@ -971,8 +965,6 @@ static int post_io_request(vfs_request_t *vfs_request)
 
                 if (val == 0)
                 {
-                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                                 "mmapracache cache hit!\n");
                     goto mmap_ra_cache_hit;
                 }
                 free(vfs_request->io_tmp_buf);
