@@ -231,6 +231,52 @@ void job_close_context(job_context_id context_id)
     return;
 }
 
+/* job_reset_timeout()
+ *
+ * resets the timeout associated with a job that has already been posted but
+ * has not yet completed
+ *
+ * returns 0 on success, -PVFS_errno on failure
+ */
+int job_reset_timout(job_id_t id, int timeout_sec)
+{
+    struct job_desc* query = NULL;
+    int ret = -1;
+
+    /* lock completion queue to make sure that a concurrent test call
+     * doesn't pull the job out from under us somehow
+     */
+    gen_mutex_lock(&completion_mutex);
+
+    query = id_gen_safe_lookup(id);
+    if(!query)
+    {	
+	/* this id is not valid */
+	gen_mutex_unlock(&completion_mutex);
+	return(-PVFS_EINVAL);
+    }
+
+    if(query->type != JOB_BMI && query->type != JOB_FLOW)
+    {
+	/* trying to reset timeouts on a job that doesn't support the
+	 * concept 
+	 */
+	gen_mutex_unlock(&completion_mutex);
+	return(-PVFS_EINVAL);
+    }
+
+    /* pull the job out of the time mgr (thereby clearing old timer) */
+    job_time_mgr_rem(query);
+
+    /* put it back into the time mgr with new value */
+    ret = job_time_mgr_add(query, timeout_sec);
+
+    gen_mutex_unlock(&completion_mutex);
+
+    return(ret);
+}
+
+
 /* job_bmi_send()
  *
  * posts a job to send a BMI message
