@@ -38,6 +38,8 @@ struct options
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 
+static char *get_type_str(int type);
+
 int build_handlelist(PVFS_fs_id cur_fs,
 		     PVFS_BMI_addr_t *addr_array,
 		     int server_count,
@@ -796,9 +798,9 @@ static void print_root_entry(PVFS_handle handle,
     }
     else
     {
-	printf("file = <root>, handle = %Lu, type = %d, server = %d\n",
+	printf("File: <Root>\n  handle = %Lu, type = %s, server = %d\n",
 	       Lu(handle),
-	       PVFS_TYPE_DIRECTORY,
+	       get_type_str(PVFS_TYPE_DIRECTORY),
 	       server_idx);
     }
 }
@@ -852,18 +854,19 @@ static void print_entry(char *name,
     }
     else
     {
-	switch (objtype) {
+	switch (objtype)
+        {
 	    case PVFS_TYPE_DATAFILE:
-		printf("handle = %Lu, type = %d, server = %d\n",
+		printf("  handle = %Lu, type = %s, server = %d\n",
 		       Lu(handle),
-		       objtype,
+		       get_type_str(objtype),
 		       server_idx);
 		break;
 	    default:
-		printf("file = %s, handle = %Lu, type = %d, server = %d\n",
-		       name,
+		printf("File: %s\n  handle = %Lu, type = %s, server = %d\n",
+                       name,
 		       Lu(handle),
-		       objtype,
+		       get_type_str(objtype),
 		       server_idx);
 		break;
 	}
@@ -973,6 +976,39 @@ static void usage(int argc, char** argv)
     fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
 	argv[0]);
     return;
+}
+
+static char *get_type_str(int type)
+{
+    char *ret = "Unknown (<== ERROR)";
+    static char *type_strs[] =
+    {
+        "None", "Metafile", "Datafile",
+        "Directory", "Symlink", "DirData"
+    };
+
+    switch(type)
+    {
+        case PVFS_TYPE_NONE:
+            ret = type_strs[0];
+            break;
+        case PVFS_TYPE_METAFILE:
+            ret = type_strs[1];
+            break;
+        case PVFS_TYPE_DATAFILE:
+            ret = type_strs[2];
+            break;
+        case PVFS_TYPE_DIRECTORY:
+            ret = type_strs[3];
+            break;
+        case PVFS_TYPE_SYMLINK:
+            ret = type_strs[4];
+            break;
+        case PVFS_TYPE_DIRDATA:
+            ret = type_strs[5];
+            break;
+    }
+    return ret;
 }
 
 /*
