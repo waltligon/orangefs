@@ -15,10 +15,10 @@
 #include "gossip.h"
 
 /*pvfs2 functions we're calling (mostly gossip args)*/
-#include <pvfs2-debug.h>
+#include "pvfs2-debug.h"
 
 /* this is where all of the individual test prototypes are */
-#include <test-protos.h>
+#include "test-protos.h"
 
 /* yeah yeah, only one global...stores all config data (debug flag, mpi_id, etc */
 config pts_config;
