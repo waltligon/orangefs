@@ -123,7 +123,9 @@ distclean: clean
 # running make clean or make distclean
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(MAKECMDGOALS),distclean)
+ifneq ($(MAKECMDGOALS),docs)
 -include $(DEPENDS)
+endif
 endif
 endif
 
@@ -132,13 +134,14 @@ endif
 	@echo generating dependency file $@.
 	@$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@
 
+# TODO: this is all broken; I'm just commenting it out for now...
 # default rules for building documents in .tex format:
-%.dvi: %.tex
-	cd $(<D); latex $(<F); latex $(<F)
-
-%.ps: %.dvi
-	dvips -t letter $< -o $@
-
-%.pdf: %.tex
-	cd $(<D); pdflatex $(<F); pdflatex $(<F)
-
+#%.dvi: %.tex
+#	cd $(@D); latex $(srcdir)/doc/coding/$(<F); latex $(srcdir)/doc/coding/$(<F)
+#
+#%.ps: %.dvi
+#	dvips -t letter $< -o $@
+#
+#%.pdf: %.tex
+#	cd $(@D); pdflatex $(srcdir)/doc/coding/$(<F); pdflatex $(srcdir)/doc/coding/$(<F)
+#
