@@ -1,0 +1,68 @@
+srcdir = @srcdir@
+VPATH = $(srcdir)
+
+.SUFFIXES:
+.PHONY: all clean tests distclean
+
+# main source subdirectories
+#
+# To build up our MODULES line, we search the build tree for
+# the module.mk files that were created by configure.
+#
+MODULES := $(shell find . -iname "*.mk" | sed -e 's/^.\///;s/module.mk//')
+
+LD = gcc
+CFLAGS += -Wall -pipe -g -I $(srcdir)/include
+LDFLAGS += -L lib
+LIBS += -lpvfs2
+# add all module directories into include path
+CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
+
+
+#
+# SRCFILES is a list of source files that need to be generated
+# before we get going.  This is kind of a hack, and we should
+# try to find a better way to take care of it.
+#
+SRCFILES := src/io/trove/trove-autogen.c
+LIBRARIES := lib/libpvfs2.a
+TESTSRC :=
+LIBSRC  :=
+
+all: $(SRCFILES) $(LIBRARIES) tests
+# all: $(LIBRARIES) tests
+
+include $(patsubst %, %/module.mk, $(MODULES))
+
+LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
+DEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+
+TESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(TESTSRC)))
+TESTS := $(patsubst %.c,%, $(filter %.c, $(TESTSRC)))
+
+tests: $(TESTS)
+
+lib/libpvfs2.a: $(LIBOBJS)
+	install -d lib
+	ar rcs $@ $(LIBOBJS)
+
+# NEW DEFAULT RULE FOR BUILDING EXECUTABLES FROM .O FILES
+%: %.o $(LIBRARIES)
+	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) $< -c -o $@
+
+$(TESTS): %: %.o $(LIBRARIES)
+
+clean:
+	rm -f $(LIBOBJS) $(TESTOBJS) $(TESTS) $(LIBRARIES) \
+		$(DEPENDS) $(srcdir)/src/io/trove/trove-autogen.c
+
+distclean: clean
+	find . -name "module.mk" -exec rm \{\} \;
+
+-include $(patsubst %.o,%.d, $(LIBOBJS))
+
+%.d: %.c
+	$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@

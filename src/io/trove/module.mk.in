@@ -1,0 +1,9 @@
+DIR := src/io/trove
+LIBSRC += \
+	$(DIR)/trove-fs.c \
+	$(DIR)/trove-mgmt.c \
+	$(DIR)/trove-autogen.c
+
+$(DIR)/trove-autogen.c: $(DIR)/trove-proto.h maint/trove-autogen.pl
+	$(srcdir)/maint/trove-autogen.pl < $< > $(srcdir)/$@
+
