@@ -35,6 +35,7 @@ struct trove_desc
 	PVFS_ds_state state;
 	PVFS_handle handle;
 	PVFS_ds_position position;
+	PVFS_ds_attributes_s attr;
 	int count;
 };
 

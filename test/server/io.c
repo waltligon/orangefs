@@ -371,6 +371,9 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 	
+	printf("IO Ack: bstream_size: %d\n",
+		(int)io_dec_ack->u.io.bstream_size);
+
 	/**************************************************
 	 * remove request  
 	 */
