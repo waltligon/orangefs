@@ -33,10 +33,9 @@ gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
+int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
 {
     int ret = -PVFS_EINVAL;
-    struct filesystem_configuration_s* cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
 
     gen_mutex_lock(&mt_config);
@@ -44,12 +43,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
     /* get exclusive access to the (global) server config object */
     server_config = PINT_get_server_config_struct();
 
-    /*
-      free any existing configuration elements before retrieving new
-      configuration information
-    */
     PINT_config_release(server_config);
-    memset(server_config, 0, sizeof(struct server_configuration_s));
 
     /* get configuration parameters from server */
     ret = PINT_server_get_config(server_config, mntent);
@@ -73,19 +67,11 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
         goto error_exit;
     }
 
-    cur_fs = PINT_config_find_fs_name(server_config, mntent->pvfs_fs_name);
-    /* it should not be possible for this to fail after a successful
-     * call to PINT_server_get_config()
-     */
-    assert(cur_fs);
-
-    /* load the mapping of handles to servers */
-    ret = PINT_handle_load_mapping(server_config, cur_fs);
-    if (ret < 0)
-    {
-        PVFS_perror("PINT_handle_load_mapping failed", ret);
-        goto error_exit;
-    }
+    /*
+      reload all handle mappings as well as the interface with the new
+      configuration information
+    */
+    PINT_bucket_reinitialize(server_config);
 
     gen_mutex_unlock(&mt_config);
     PINT_put_server_config_struct(server_config);
@@ -107,7 +93,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_sys_fs_remove(struct PVFS_sys_mntent* mntent)
+int PVFS_sys_fs_remove(struct PVFS_sys_mntent *mntent)
 {
     int ret = -PVFS_EINVAL;
 

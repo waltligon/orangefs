@@ -276,6 +276,7 @@ static int server_parse_config(
         if (server_fd == -1)
         {
             close(fs_fd);
+            remove(fs_template);
             return ret;
         }
 

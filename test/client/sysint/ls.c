@@ -23,6 +23,7 @@ void print_entry_attr(
     char buf[128] = {0};
     PVFS_size computed_size = 0;
     time_t atime = (time_t)attr->atime;
+    char f_type = '-';
 
     struct tm *time = gmtime(&atime);
     assert(time);
@@ -37,9 +38,18 @@ void print_entry_attr(
         computed_size = (PVFS_size)strlen(attr->link_target);
     }
 
+    if (attr->objtype == PVFS_TYPE_DIRECTORY)
+    {
+        f_type =  'd';
+    }
+    else if (attr->objtype == PVFS_TYPE_SYMLINK)
+    {
+        f_type =  'l';
+    }
+
     snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%Ld "
              "%.4d-%.2d-%.2d %.2d:%.2d %s",
-             ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
+             f_type,
              ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
              ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
              ((attr->perms & PVFS_U_EXECUTE) ? 'x' : '-'),
@@ -81,10 +91,8 @@ void print_entry(
     PVFS_sysresp_getattr getattr_response;
 
     memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
-    memset(&credentials,0, sizeof(PVFS_credentials));
 
-    credentials.uid = 0;
-    credentials.gid = 0;
+    PVFS_util_gen_credentials(&credentials);
     
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
@@ -118,8 +126,8 @@ int do_list(
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
 
     name = start_dir;
-    credentials.uid = 0;
-    credentials.gid = 0;
+
+    PVFS_util_gen_credentials(&credentials);
 
     if (PVFS_sys_lookup(fs_id, name, credentials,
                         &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW))
@@ -132,8 +140,7 @@ int do_list(
     pinode_refn.handle = lk_response.ref.handle;
     pinode_refn.fs_id = fs_id;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
-    credentials.uid = 0;
-    credentials.gid = 0;
+    PVFS_util_gen_credentials(&credentials);
 
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                          credentials, &getattr_response) == 0)

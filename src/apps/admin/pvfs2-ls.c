@@ -270,6 +270,7 @@ void print_entry_attr(
     PVFS_size size = 0;
     char scratch_owner[16] = {0}, scratch_group[16] = {0};
     char scratch_size[16] = {0}, scratch_inode[16] = {0};
+    char f_type = '-';
 
     if (!opts->list_all && (entry_name[0] == '.'))
     {
@@ -336,10 +337,19 @@ void print_entry_attr(
     format_size_string(owner,8,&formatted_owner,0);
     format_size_string(group,8,&formatted_group,0);
 
+    if (attr->objtype == PVFS_TYPE_DIRECTORY)
+    {
+        f_type =  'd';
+    }
+    else if (attr->objtype == PVFS_TYPE_SYMLINK)
+    {
+        f_type =  'l';
+    }
+
     snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
              "%.4d-%.2d-%.2d %.2d:%.2d %s",
              inode,
-             ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
+             f_type,
              ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
              ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
              ((attr->perms & PVFS_U_EXECUTE) ? 'x' : '-'),

@@ -171,7 +171,7 @@ int PINT_parse_config(
     /* first read in the fs.conf defaults config file */
     config_s->configuration_context = GLOBAL_CONFIG;
     configfile = PINT_dotconf_create(config_s->fs_config_filename,
-                                options, NULL, CASE_INSENSITIVE);
+                                     options, NULL, CASE_INSENSITIVE);
     if (!configfile)
     {
         gossip_err("Error opening config file %s\n",
@@ -1025,10 +1025,18 @@ void PINT_config_release(struct server_configuration_s *config_s)
         }
 
         /* free all filesystem objects */
-        PINT_llist_free(config_s->file_systems,free_filesystem);
+        if (config_s->file_systems)
+        {
+            PINT_llist_free(config_s->file_systems,free_filesystem);
+            config_s->file_systems = NULL;
+        }
 
         /* free all host alias objects */
-        PINT_llist_free(config_s->host_aliases,free_host_alias);
+        if (config_s->host_aliases)
+        {
+            PINT_llist_free(config_s->host_aliases,free_host_alias);
+            config_s->host_aliases = NULL;
+        }
     }
 }
 

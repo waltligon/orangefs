@@ -399,9 +399,11 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             {
                 current_mnt = &(s_stat_tab_array[i].mntent_array[j]);
 
-                if ((current_mnt->fs_id == mntent->fs_id) &&
-                    (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
+                if (current_mnt->fs_id == mntent->fs_id)
                 {
+                    assert(strcmp(current_mnt->mnt_dir,
+                                  mntent->mnt_dir) == 0);
+
                     gossip_debug(
                         GOSSIP_CLIENT_DEBUG, "* Mount point %s already "
                         "exists [parsed]\n", current_mnt->mnt_dir);
@@ -419,9 +421,11 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             current_mnt = &(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].
                             mntent_array[j]);
 
-            if ((current_mnt->fs_id == mntent->fs_id) &&
-                (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
+            if (current_mnt->fs_id == mntent->fs_id)
             {
+                assert(strcmp(current_mnt->mnt_dir,
+                              mntent->mnt_dir) == 0);
+
                 gossip_debug(
                     GOSSIP_CLIENT_DEBUG, "* Mount point %s already "
                     "exists [dynamic]\n", current_mnt->mnt_dir);
@@ -521,9 +525,11 @@ int PVFS_util_remove_internal_mntent(
             for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
             {
                 current_mnt = &(s_stat_tab_array[i].mntent_array[j]);
-                if ((current_mnt->fs_id == mntent->fs_id) &&
-                    (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
+                if (current_mnt->fs_id == mntent->fs_id)
                 {
+                    assert(strcmp(current_mnt->mnt_dir,
+                                  mntent->mnt_dir) == 0);
+
                     found_index = i;
                     found = 1;
                     goto mntent_found;
@@ -538,9 +544,11 @@ int PVFS_util_remove_internal_mntent(
             current_mnt = &(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].
                             mntent_array[j]);
 
-            if ((current_mnt->fs_id == mntent->fs_id) &&
-                (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
+            if (current_mnt->fs_id == mntent->fs_id)
             {
+                assert(strcmp(current_mnt->mnt_dir,
+                              mntent->mnt_dir) == 0);
+
                 found_index = PVFS2_DYNAMIC_TAB_INDEX;
                 found = 1;
                 goto mntent_found;
@@ -584,9 +592,11 @@ int PVFS_util_remove_internal_mntent(
             {
                 current_mnt = &s_stat_tab_array[found_index].mntent_array[i];
 
-                if ((current_mnt->fs_id == mntent->fs_id) &&
-                    (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
+                if (current_mnt->fs_id == mntent->fs_id)
                 {
+                    assert(strcmp(current_mnt->mnt_dir,
+                                  mntent->mnt_dir) == 0);
+
                     PVFS_sys_free_mntent(current_mnt);
                     continue;
                 }

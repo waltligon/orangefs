@@ -46,7 +46,7 @@ int PINT_bucket_initialize(void)
     if (!PINT_fsid_config_cache_table)
     {
         PINT_fsid_config_cache_table =
-            qhash_init(hash_fsid_compare,hash_fsid,67);
+            qhash_init(hash_fsid_compare,hash_fsid,11);
     }
     srand((unsigned int)time(NULL));
     return (PINT_fsid_config_cache_table ? 0 : -PVFS_ENOMEM);
@@ -65,31 +65,72 @@ int PINT_bucket_finalize(void)
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
+    /* if we haven't been initialized yet, just return success */
+    if (!PINT_fsid_config_cache_table)
+    {
+        return 0;
+    }
+
     /*
-      this is an exhaustive and slow iterate.  speed this up
-      if 'finalize' is something that will be done frequently.
+      this is an exhaustive and slow iterate.  speed this up if
+      'finalize' is something that will be done frequently.
     */
     for (i = 0; i < PINT_fsid_config_cache_table->table_size; i++)
     {
-        hash_link = qhash_search(PINT_fsid_config_cache_table,&(i));
-        if (hash_link)
+        do
         {
-            cur_config_cache = qlist_entry(hash_link,
-					   struct config_fs_cache_s,
-					   hash_link);
-            assert(cur_config_cache);
-            assert(cur_config_cache->fs);
-            assert(cur_config_cache->bmi_host_extent_tables);
+            hash_link = qhash_search_and_remove_at_index(
+                PINT_fsid_config_cache_table, i);
+            if (hash_link)
+            {
+                cur_config_cache = qlist_entry(
+                    hash_link, struct config_fs_cache_s, hash_link);
 
-            /* fs object is freed by PINT_config_release */
-            cur_config_cache->fs = NULL;
-            PINT_llist_free(cur_config_cache->bmi_host_extent_tables,
-			    free_host_extent_table);
-        }
+                assert(cur_config_cache);
+                assert(cur_config_cache->fs);
+                assert(cur_config_cache->bmi_host_extent_tables);
+
+                /* fs object is freed by PINT_config_release */
+                cur_config_cache->fs = NULL;
+                PINT_llist_free(cur_config_cache->bmi_host_extent_tables,
+                                free_host_extent_table);
+            }
+        } while(hash_link);
     }
     qhash_finalize(PINT_fsid_config_cache_table);
     PINT_fsid_config_cache_table = NULL;
 
+    return 0;
+}
+
+int PINT_bucket_reinitialize(struct server_configuration_s *config)
+{
+    int ret = -PVFS_EINVAL;
+    PINT_llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+
+    PINT_bucket_finalize();
+
+    ret = PINT_bucket_initialize();
+    if (ret == 0)
+    {
+        cur = config->file_systems;
+        while(cur)
+        {
+            cur_fs = PINT_llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
+
+            ret = PINT_handle_load_mapping(config, cur_fs);
+            if (ret)
+            {
+                break;
+            }
+            cur = PINT_llist_next(cur);
+        }
+    }
     return 0;
 }
 
@@ -152,7 +193,6 @@ int PINT_handle_load_mapping(
     }
     return ret;
 }
-
 
 /* PINT_bucket_get_next_meta()
  *
@@ -647,7 +687,7 @@ int PINT_bucket_get_server_handle_count(
  * returns 0 on success, -errno on failure
  */
 int PINT_bucket_get_server_name(
-    char* server_name,
+    char *server_name,
     int max_server_name_len,
     PVFS_handle handle,
     PVFS_fs_id fsid)
@@ -909,6 +949,8 @@ static int hash_fsid(void *fsid, int table_size)
     unsigned long tmp = 0;
     PVFS_fs_id *real_fsid = (PVFS_fs_id *)fsid;
 
+    assert(PINT_fsid_config_cache_table);
+
     tmp += (*(real_fsid));
     tmp = tmp%table_size;
 
@@ -927,8 +969,10 @@ static int hash_fsid_compare(void *key, struct qlist_head *link)
     config_fs_cache_s *fs_info = NULL;
     PVFS_fs_id *real_fsid = (PVFS_fs_id *)key;
 
+    assert(PINT_fsid_config_cache_table);
+
     fs_info = qlist_entry(link, config_fs_cache_s, hash_link);
-    if((PVFS_fs_id)fs_info->fs->coll_id == *real_fsid)
+    if ((PVFS_fs_id)fs_info->fs->coll_id == *real_fsid)
     {
         return 1;
     }
