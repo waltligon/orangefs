@@ -108,7 +108,7 @@ sub parse_hostlist
     }
 
     $numinodes = 0;
-    for($i=0; $parse[$i] !~ /^$/;$i++) {
+    for($i=0; defined($parse[$i]) && $parse[$i] !~ /^$/;$i++) {
 	# expand parsed input that contains brackets
 	if ($parse[$i] =~ /{/) {
 	    @arrayline = split(/[{}, ]+/, $parse[$i]);
