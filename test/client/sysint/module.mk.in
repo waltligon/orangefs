@@ -15,7 +15,8 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/readdir.c\
 	$(DIR)/pcache-test.c\
 	$(DIR)/test-pint-bucket.c \
-	$(DIR)/test-pint-dcache.c
+	$(DIR)/test-pint-dcache.c \
+	$(DIR)/io-test.c
 
 MISCSRC += \
 	$(DIR)/job.c \
