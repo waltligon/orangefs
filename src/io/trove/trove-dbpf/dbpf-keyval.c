@@ -83,7 +83,7 @@ static int dbpf_keyval_read(
  */
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 {
-    int ret;
+    int ret, got_db = 0;
     DB *db_p;
     DBT key, data;
 
@@ -97,6 +97,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 	case DBPF_KEYVAL_DBCACHE_BUSY:
 	    return 0;
 	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    got_db = 1;
 	    /* drop through */
     }
 
@@ -121,7 +122,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     return 1;
 
  return_error:
-    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return -1;
 }
 
