@@ -12,6 +12,7 @@
 #include "ncache.h"
 #include "gen-locks.h"
 #include "pint-bucket.h"
+#include "pint-dist-utils.h"
 #include "dotconf.h"
 #include "trove.h"
 #include "server-config-mgr.h"
@@ -58,6 +59,8 @@ int PVFS_sys_finalize()
     BMI_finalize();
 
     PINT_encode_finalize();
+
+    PINT_dist_finalize();
 
     PINT_release_pvfstab();
 

@@ -36,6 +36,7 @@
 #include "mkspace.h"
 #include "server-config.h"
 #include "quicklist.h"
+#include "pint-dist-utils.h"
 #include "pint-perf-counter.h"
 #include "pint-event.h"
 #include "id-generator.h"
@@ -501,6 +502,7 @@ static int server_setup_process_environment(int background)
 /* server_initialize_subsystems()
  *
  * This:
+ * - initializes distribution subsystem
  * - initializes encoding/decoding subsystem
  * - initializes BMI
  * - initializes Trove
@@ -523,6 +525,16 @@ static int server_initialize_subsystems(
     struct filesystem_configuration_s *cur_fs;
     TROVE_context_id trove_context = -1;
 
+    /* Initialize distributions */
+    ret = PINT_dist_initialize();
+    if (ret < 0)
+    {
+        gossip_err("Error initializing distribution interface.\n");
+        return (ret);
+    }
+    *server_status_flag |= SERVER_DIST_INIT;
+
+    
     ret = PINT_encode_initialize();
     if (ret < 0)
     {

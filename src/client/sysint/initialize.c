@@ -15,6 +15,7 @@
 #include "ncache.h"
 #include "pint-bucket.h"
 #include "pvfs2-sysint.h"
+#include "pint-dist-utils.h"
 #include "pint-sysint-utils.h"
 #include "gen-locks.h"
 #include "pint-servreq.h"
@@ -42,7 +43,8 @@ typedef enum
     CLIENT_NCACHE_INIT     = (1 << 6),
     CLIENT_CONFIG_MGR_INIT = (1 << 7),
     CLIENT_REQ_SCHED_INIT  = (1 << 8),
-    CLIENT_JOB_TIME_MGR_INIT = (1 << 9)
+    CLIENT_JOB_TIME_MGR_INIT = (1 << 9),
+    CLIENT_DIST_INIT       = (1 << 10)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -86,6 +88,14 @@ int PVFS_sys_initialize(int default_debug_mask)
         gossip_enable_file(debug_file, "w");
     }
 
+    /* Initialize the distribution subsystem */
+    ret = PINT_dist_initialize();
+    if (ret < 0)
+    {
+        gossip_lerr("Error initializing distributions.\n");
+        goto error_exit;
+    }
+    
     /* initlialize the protocol encoder */
     ret = PINT_encode_initialize();
     if (ret < 0)
@@ -246,6 +256,11 @@ int PVFS_sys_initialize(int default_debug_mask)
     if (client_status_flag & CLIENT_ENCODER_INIT)
     {
         PINT_encode_finalize();
+    }
+
+    if (client_status_flag & CLIENT_DIST_INIT)
+    {
+        PINT_dist_finalize();
     }
 
     free(sm_p);

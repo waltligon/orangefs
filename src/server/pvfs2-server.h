@@ -76,6 +76,7 @@ typedef enum
     SERVER_PERF_COUNTER_INIT   = (1 << 13),
     SERVER_EVENT_INIT          = (1 << 14),
     SERVER_JOB_TIME_MGR_INIT   = (1 << 15),
+    SERVER_DIST_INIT           = (1 << 16),
 } PINT_server_status_flag;
 
 /* struct PINT_server_lookup_op

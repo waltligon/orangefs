@@ -132,6 +132,14 @@ static void decode_lebf(char **pptr, void* params)
     decode_PVFS_size(pptr, &dparam->strip_size);
 }
 
+static void registration_init(void* params)
+{
+    PINT_dist_register_param("simple_stripe", "strip_size",
+                             PVFS_simple_stripe_params, strip_size);
+
+}
+    
+
 static PVFS_simple_stripe_params simple_stripe_params = {
 	65536 /* stripe size */
 };
@@ -146,6 +154,7 @@ static PINT_dist_methods simple_stripe_methods = {
     PINT_dist_default_set_param,
     encode_lebf,
     decode_lebf,
+    registration_init
 };
 
 PINT_dist simple_stripe_dist = {

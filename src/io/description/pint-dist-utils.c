@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "pvfs2-dist-simple-stripe.h"
 #include "pint-dist-utils.h"
 
 /* Default distributions */
@@ -52,13 +53,19 @@ static PINT_dist_param_offset* PINT_get_param_offset(const char* dist_name,
 /* PINT_dist_initialize implementation */
 int PINT_dist_initialize(void)
 {
-    /* Register the basic distribution 
+    /* Register the basic distribution */
     PINT_register_distribution(&basic_dist);    
-    */
-    /* Register the simple stripe distribution
+    
+    /* Register the simple stripe distribution */
     PINT_register_distribution(&simple_stripe_dist);    
-    */
+    
     return 0;
+}
+
+/* PINT_dist_finalize implementation */
+void PINT_dist_finalize(void)
+{
+    /* Nothing yet */
 }
 
 /*  PINT_dist_default_get_num_dfiles implementation */
@@ -94,6 +101,17 @@ int PINT_dist_default_set_param(const char* dist_name, void* params,
         rc = -1;
     }
     return rc;
+}
+
+int PINT_dist_register_param_offset(const char* dist_name,
+                                    const char* param_name,
+                                    size_t offset,
+                                    size_t field_size)
+{
+    /*fprintf(stderr, "Attempting to reg: %s %s %u %u\n",
+            dist_name, param_name, offset, field_size);
+    */
+    return 0;
 }
 
 /*

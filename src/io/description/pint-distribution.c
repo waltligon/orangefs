@@ -15,27 +15,29 @@
 
 /* global size of dist table */
 #define PINT_DIST_TABLE_SZ 8
-static int PINT_Dist_count = 2; 
+static int PINT_Dist_count = 0; 
 
 /* compiled-in distributions */
 extern PINT_dist basic_dist;
 extern PINT_dist simple_stripe_dist;
 
 /* initial dist table - default dists */
-PINT_dist* PINT_Dist_table[PINT_DIST_TABLE_SZ] = {
-    &basic_dist,
-    &simple_stripe_dist,
-    NULL
-};
+PINT_dist* PINT_Dist_table[PINT_DIST_TABLE_SZ] = {0};
 
 /*
  * add a dist to dist table
  */
 int PINT_register_distribution(PINT_dist *d_p)
 {
-    if (PINT_Dist_count < PINT_DIST_TABLE_SZ)
+    if (0 != d_p &&
+        PINT_Dist_count < PINT_DIST_TABLE_SZ)
     {
+        /* Register dist */
         PINT_Dist_table[PINT_Dist_count++] = d_p;
+
+        /* Perform dist specific registration code */
+        d_p->methods->registration_init(d_p->params);
+        
         return (0);
     }
     return (-1);

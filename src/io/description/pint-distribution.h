@@ -60,6 +60,9 @@ typedef struct PINT_dist_methods_s {
     /* Restores parameters in lebf memory at pptr */
     void (*decode_lebf)(char **pptr, void* params);
 
+    /* Called when the distribution is registered */
+    void (*registration_init)(void* params);
+    
 } PINT_dist_methods;
 
 /* Internal representation of a PVFS2 Distribution */
