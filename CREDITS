@@ -34,6 +34,13 @@ Philipp Sadleder <philipp@sadleder.de>
 -- Updated documentation for dist-simple-stripe.c and modified
    the basic distribution to use a single data file object.
 
+David Beilloin <dbeilloi@mc.com>
+-- reported that temp configuration files on the client should be
+   created in /tmp (if possible) rather than the current directory
+   since pvfs2 programs may be run from slow file systems (such as
+   NFS)
+
+
 Other contributors
 ==================
 

@@ -209,13 +209,13 @@ static int server_parse_config(
     int fs_fd = 0, server_fd = 0;
     char fs_template_array[2][32] =
     {
-        "/tmp/.__pvfs_fs_configXXXXXX",
-        ".__pvfs_fs_configXXXXXX"
+        ".__pvfs_fs_configXXXXXX",
+        "/tmp/.__pvfs_fs_configXXXXXX"
     };
     char server_template_array[2][32] =
     {
-        "/tmp/.__pvfs_server_configXXXXXX",
-        ".__pvfs_server_configXXXXXX"
+        ".__pvfs_server_configXXXXXX",
+        "/tmp/.__pvfs_server_configXXXXXX"
     };
     char *fs_template = NULL;
     char *server_template = NULL;
