@@ -1,0 +1,11 @@
+DIR := src/apps/admin
+
+ADMINSRC := \
+	$(DIR)/pvfs2-mkspace.c
+
+ADMINLIBS := -ldb -lrt -lpthread
+
+ADMINTOOLS := $(patsubst %.c, %, $(ADMINSRC))
+
+$(ADMINTOOLS): %: %.o
+	$(LD) $< $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@
