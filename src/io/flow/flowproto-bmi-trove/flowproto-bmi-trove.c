@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <limits.h>
 
 #include "gossip.h"
 #include "trove-types.h"
@@ -954,6 +955,10 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
 static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
+    PVFS_boolean eof_flag = 0;
+    int32_t segmax = INT_MAX; 
+    int ret = -1;
+    PVFS_offset tmp_offset = flow_d->request_offset;
 
     /* set the buffer size to use for this flow */
     flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
@@ -996,6 +1001,31 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 		    BMI_RECV);
 	return (-ENOMEM);
     }
+
+    /* if a file datatype offset was specified, go ahead and skip ahead 
+     * before doing anything else
+     */
+    if(flow_d->request_offset)
+    {
+	ret = PINT_Process_request(flow_data->dup_req_state, flow_d->file_data,
+	    &segmax, NULL, NULL, &flow_data->dup_req_offset, 
+	    &tmp_offset, &eof_flag, PINT_CKSIZE_MODIFY_OFFSET);
+	if(ret < 0)
+	{
+	    BMI_memfree(flow_d->src.u.bmi.address,
+			flow_data->fill_buffer, flow_data->max_buffer_size,
+			BMI_RECV);
+	    BMI_memfree(flow_d->src.u.bmi.address,
+			flow_data->drain_buffer, flow_data->max_buffer_size,
+			BMI_RECV);
+	    PINT_Free_request_state(flow_data->dup_req_state);
+	    return (-EINVAL);
+	}
+	/* we should be able to skip ahead a full request_offset amount */
+	assert(tmp_offset == flow_d->request_offset);
+    }
+
+
     return (0);
 }
 
@@ -1126,6 +1156,9 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = NULL;
     int ret = -1;
+    PVFS_boolean eof_flag = 0;
+    int32_t segmax = INT_MAX; 
+    PVFS_offset tmp_offset = flow_d->request_offset;
 
     /* allocate the structure */
     flow_data = (struct bmi_trove_flow_data *) malloc(sizeof(struct
@@ -1137,6 +1170,24 @@ static int alloc_flow_data(flow_descriptor * flow_d)
     memset(flow_data, 0, sizeof(struct bmi_trove_flow_data));
     flow_d->flow_protocol_data = flow_data;
     flow_data->parent = flow_d;
+
+    /* if a file datatype offset was specified, go ahead and skip ahead 
+     * before doing anything else
+     */
+    if(flow_d->request_offset)
+    {
+	ret = PINT_Process_request(flow_d->request_state, flow_d->file_data,
+	    &segmax, NULL, NULL, &flow_d->current_req_offset, &tmp_offset,
+	    &eof_flag, PINT_CKSIZE_MODIFY_OFFSET);
+	if(ret < 0)
+	{
+	    free(flow_data);
+	    gossip_lerr("Error: bad offset.\n");
+	    return (-EINVAL);
+	}
+	/* we should have been able to skip ahead the full amount */
+	assert(tmp_offset == flow_d->request_offset);
+    }
 
     /* the rest of the buffer setup varies depending on the endpoints */
     if (flow_d->src.endpoint_id == BMI_ENDPOINT &&

@@ -92,7 +92,11 @@ struct flow_descriptor
     int flags;	/* optional flags */
     PVFS_msg_tag_t tag;		/* matching tag */
     void *user_ptr;		/* for use by caller */
+    /* TODO: maybe these two should be renamed to reflect that they 
+     * describe the file relative datatype?
+     */
     PINT_Request *request;	/* I/O request description */
+    PVFS_offset request_offset;	/* offset into the above description */
     /* information about the file that we are accessing */
     PINT_Request_file_data *file_data;
     /* can be used to force use of specific flow protocol */
