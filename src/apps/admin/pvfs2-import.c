@@ -51,8 +51,6 @@ int main(int argc, char **argv)
     void* buffer = NULL;
     int64_t total_written = 0;
     double time1, time2;
-    int32_t blocklength = 0;
-    PVFS_size displacement = 0;
     char* entry_name;
     PVFS_pinode_reference parent_refn;
     PVFS_sys_attr attr;
@@ -183,19 +181,8 @@ int main(int argc, char **argv)
     time1 = Wtime();
     while((current_size = read(src_fd, buffer, user_opts->buf_size)) > 0)
     {
-	/* setup I/O description */
 	buffer_size = current_size;
-	blocklength = current_size;
-	displacement = total_written;
-	/* TODO: use simpler datatype when tiling is working */
-	ret = PVFS_Request_indexed(1, &blocklength,
-	    &displacement, PVFS_BYTE, &file_req);
-	if(ret < 0)
-	{
-	    fprintf(stderr, "Error: PVFS_Request_indexed failure.\n");
-	    ret = -1;
-	    goto main_out;
-	}
+	file_req = PVFS_BYTE;
 
 	/* setup memory datatype */
 	ret = PVFS_Request_contiguous(current_size, PVFS_BYTE, &mem_req);
@@ -207,7 +194,7 @@ int main(int argc, char **argv)
 	}
 
 	/* write out the data */
-	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, mem_req, 
+	ret = PVFS_sys_write(pinode_refn, file_req, total_written, buffer, mem_req, 
 			    credentials, &resp_io);
 	if(ret < 0)
 	{
