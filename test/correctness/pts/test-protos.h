@@ -50,8 +50,8 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_PVFSDATATYPE_HVECTOR].test_name = str_malloc("test_pvfs_datatype_hvector");
    myconfig->testpool[TEST_DIR_TORTURE].test_func = (void *)test_dir_torture;
    myconfig->testpool[TEST_DIR_TORTURE].test_name = str_malloc("test_dir_torture");
-   myconfig->testpool[TEST_DIR_OPERATION].test_func = (void *)test_dir_operation;
-   myconfig->testpool[TEST_DIR_OPERATION].test_name = str_malloc("test_dir_operation");
+   myconfig->testpool[TEST_DIR_OPERATIONS].test_func = (void *)test_dir_operations;
+   myconfig->testpool[TEST_DIR_OPERATIONS].test_name = str_malloc("test_dir_operations");
 
    myconfig->testpool[TEST_LOOKUP_BENCH].test_func = (void *)test_lookup_bench;
    myconfig->testpool[TEST_LOOKUP_BENCH].test_name = str_malloc("test_lookup_bench");
