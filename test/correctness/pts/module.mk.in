@@ -31,7 +31,9 @@ TEST_PTS_MISC := \
 	$(DIR)/test-vector-start-final-offset.c\
 	$(DIR)/test-contiguous-datatype.c \
 	$(DIR)/test-explicit-offset.c \
-	$(DIR)/test-request-tiled.c
+	$(DIR)/test-request-tiled.c\
+	$(DIR)/test-mix.c \
+	$(DIR)/test-romio-noncontig-pattern2.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 

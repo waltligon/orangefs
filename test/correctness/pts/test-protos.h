@@ -33,6 +33,8 @@
 #include <test-contiguous-datatype.h>
 #include <test-explicit-offset.h>
 #include <test-request-tiled.h>
+#include <test-mix.h>
+#include <test-romio-noncontig-pattern2.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -60,7 +62,9 @@ enum test_types {
 	TEST_VECTOR_START_FINAL_OFFSET,
 	TEST_CONTIGUOUS_DATATYPE,
 	TEST_EXPLICIT_OFFSET,
-	TEST_REQUEST_TILED
+	TEST_REQUEST_TILED,
+	TEST_MIX,
+	TEST_ROMIO_NONCONTIG_PATTERN2
 };
 
 void setup_ptstests(config *myconfig) {
@@ -134,6 +138,10 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_EXPLICIT_OFFSET].test_name = str_malloc("test_explicit_offset");
    myconfig->testpool[TEST_REQUEST_TILED].test_func = (void *)test_request_tiled;
    myconfig->testpool[TEST_REQUEST_TILED].test_name = str_malloc("test_request_tiled");
+   myconfig->testpool[TEST_MIX].test_func = (void *)test_mix;
+   myconfig->testpool[TEST_MIX].test_name = str_malloc("test_mix");
+   myconfig->testpool[TEST_ROMIO_NONCONTIG_PATTERN2].test_func = (void *)test_romio_noncontig_pattern2;
+   myconfig->testpool[TEST_ROMIO_NONCONTIG_PATTERN2].test_name = str_malloc("test_romio_noncontig_pattern2");
 }
 
 #endif
