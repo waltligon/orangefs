@@ -426,7 +426,8 @@ clean: docsclean
 		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)  $(SERVER) $(MPIMISCOBJS)\
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
-		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a
+		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
+		src/server/pvfs2-server-server.o
 
 # _really_ clean the tree; should go back to pristine state
 distclean: clean
