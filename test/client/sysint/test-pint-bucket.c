@@ -64,8 +64,10 @@ int main(int argc, char **argv)
 
 	/* load up a mapping */
 	/* NOTE: this ignores the meta_mapping and io_mapping for now */
-	ret = PINT_bucket_load_mapping(meta_mapping, 1, io_mapping, 1,
-		handle_mask, fsid);
+/* FIXME: Commented out while transitioning to handle mappings... */
+/* 	ret = PINT_bucket_load_mapping(meta_mapping, 1, io_mapping, 1, */
+/* 		handle_mask, fsid); */
+/* FIXME: Commented out while transitioning to handle mappings... */
 	if(ret < 0)
 	{
 		fprintf(stderr, "PINT_bucket_load_mapping() failure.\n");

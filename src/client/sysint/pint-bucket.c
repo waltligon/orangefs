@@ -20,15 +20,9 @@
 #include "trove.h"
 #include "server-config.h"
 #include "llist.h"
+#include "quickhash.h"
 #include "extent-utils.h"
-
-/*
-FIXME:
-obsoleted by the range concept over bucket/mask concept.  This means that
-while this WAS a hacked interface for using the bucket/mask stuff, it's
-now a hacked interface for bucket ranges -- just to keep things sort of
-working.  The ranges are NOT implemented at all.
-*/
+#include "pint-bucket.h"
 
 /* Configuration Management Data Structure */
 fsconfig_array server_config;
@@ -36,17 +30,14 @@ extern struct server_configuration_s g_server_config;
 
 static char HACK_server_name[] = "tcp://localhost:3334";
 static PVFS_handle HACK_handle_mask = 0;
-static PVFS_fs_id HACK_fsid = 9;
 static PVFS_handle HACK_bucket = 0;
 
-/* TODO: NOTE: THIS IS NOT A FULL IMPLEMENTATION.  It is simply a stub that
- * can operate on a single server file system for testing purposes.
- */
+static struct qhash_table *s_fsid_config_cache_table = NULL;
 
-/* This is a prototype implementation of the bucket management component
- * of the system interface.  It is responsible for managing the list of meta
- * and i/o servers and mapping between buckets and servers.
- */
+/* these are based on code from src/server/request-scheduler.c */
+static int hash_fsid(void *fsid, int table_size);
+static int hash_fsid_compare(void *key, struct qlist_head *link);
+
 
 /* PINT_bucket_initialize()
  *
@@ -59,10 +50,23 @@ int PINT_bucket_initialize(void)
     int ret = -EINVAL;
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
-    char *cur_h_range = (char *)0;
-    struct llist *extent_list = NULL;
 
-    int i = 0;
+    if (!g_server_config.file_systems)
+    {
+        return ret;
+    }
+
+    s_fsid_config_cache_table = qhash_init(
+        hash_fsid_compare,hash_fsid,67);
+    if (!s_fsid_config_cache_table)
+    {
+        return (-ENOMEM);
+    }
+
+    /*
+      we can do this here...reserving the load_mapping
+      call for dynamic addition.  is this a problem?
+    */
     cur = g_server_config.file_systems;
     while(cur)
     {
@@ -71,20 +75,14 @@ int PINT_bucket_initialize(void)
         {
             break;
         }
-        cur_h_range = PINT_server_config_get_handle_range_str(
-            &g_server_config,cur_fs);
-        assert(cur_h_range);
-
-        /* extent_list = PINT_create_extent_list(cur_h_range); */
-        /* FIXME: this is all hacked atm */
-        /* if (do_something_cool(cur_fs,cur_h_range)) break; */
-        ret = 0;
-        gossip_lerr("Mapping handle range %s to file system %s\n",
-                    cur_h_range,cur_fs->file_system_name);
-
+        ret = PINT_handle_load_mapping(cur_fs);
+        if (ret)
+        {
+            return ret;
+        }
         cur = llist_next(cur);
     }
-    return ret;
+    return(0);
 }
 
 /* PINT_bucket_finalize()
@@ -96,41 +94,92 @@ int PINT_bucket_initialize(void)
  */
 int PINT_bucket_finalize(void)
 {
+	/* FIXME: iterate through hashtable and free each element */
+	gossip_lerr("Warning: PINT_bucket_finalize leaking memory.\n");
+	qhash_finalize(s_fsid_config_cache_table);
 	return(0);
 }
 
-/* PINT_bucket_load_mapping()
+/* PINT_handle_load_mapping()
  *
- * loads a new mapping of servers to buckets into the bucket interface.
+ * loads a new mapping of servers to handle into this interface.
  * This function may be called multiple times in order to add new file
- * systems at run time.
+ * system information at run time.
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_load_mapping(
-	char* meta_mapping,
-	int meta_count,
-	char* io_mapping,
-	int io_count, 
-	PVFS_handle handle_mask,
-	PVFS_fs_id fsid)
+int PINT_handle_load_mapping(struct filesystem_configuration_s *fs)
 {
-	/* ignore the actual mapping for now */
-	gossip_lerr("Warning: PINT_bucket_load_mapping() ignoring map and\n");
-	gossip_lerr("Warning:    using %s as the only server.\n",
-		HACK_server_name);
+    int ret = -EINVAL;
+    struct llist *cur = NULL;
+    struct host_handle_mapping_s *cur_mapping = NULL;
+    struct config_fs_cache_s *cur_config_fs_cache = NULL;
+    struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
 
-	if(meta_count != 1 || io_count != 1)
-	{
-		gossip_lerr("Error: PINT_bucket can only handle one server.\n");
-		return(-EINVAL);
-	}
+    if (fs)
+    {
+        cur_config_fs_cache = (struct config_fs_cache_s *)malloc(
+            sizeof(struct config_fs_cache_s));
+        assert(cur_config_fs_cache);
 
-	/* but stash the handle mask and fsid */
-	HACK_handle_mask = handle_mask;
-	HACK_fsid = fsid;
+        cur_config_fs_cache->fs = fs;
+        cur_config_fs_cache->bmi_host_extent_tables = llist_new();
+        assert(cur_config_fs_cache->bmi_host_extent_tables);
 
-	return(0);
+        cur = fs->handle_ranges;
+        while(cur)
+        {
+            cur_mapping = llist_head(cur);
+            if (!cur_mapping)
+            {
+                break;
+            }
+            assert(cur_mapping->host_alias);
+            assert(cur_mapping->handle_range);
+
+            cur_host_extent_table = (bmi_host_extent_table_s *)malloc(
+                sizeof(bmi_host_extent_table_s));
+            if (!cur_host_extent_table)
+            {
+                ret = -ENOMEM;
+                break;
+            }
+            cur_host_extent_table->bmi_address =
+                PINT_server_config_get_host_addr_ptr(
+                    &g_server_config,cur_mapping->host_alias);
+            assert(cur_host_extent_table->bmi_address);
+
+            cur_host_extent_table->extent_list =
+                PINT_create_extent_list(cur_mapping->handle_range);
+            if (!cur_host_extent_table->extent_list)
+            {
+                free(cur_host_extent_table);
+                ret = -ENOMEM;
+                break;
+            }
+            /*
+              add this host to extent list mapping to
+              config cache object's host extent table
+            */
+            ret = llist_add_to_tail(
+                cur_config_fs_cache->bmi_host_extent_tables,
+                cur_host_extent_table);
+            assert(ret == 0);
+
+            cur = llist_next(cur);
+        }
+
+        /*
+          add config cache object to the hash table
+          that maps fsid to a config_fs_cache_s
+        */
+        if (ret == 0)
+        {
+            qhash_add(s_fsid_config_cache_table,&(fs->coll_id),
+                      &(cur_config_fs_cache->hash_link));
+        }
+    }
+    return ret;
 }
 
 
@@ -299,21 +348,40 @@ int PINT_bucket_map_from_server(
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_num_meta(
-	PVFS_fs_id fsid,
-	int* num_meta)
+int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
 {
-	
-#if 0
-	if(fsid != HACK_fsid)
-	{
-		return(-EINVAL);
-	}
-#endif
+    int ret = -EINVAL;
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
 
-	*num_meta = 1;
+    /* make sure the specified fs_id is sane */
+    if (!PINT_server_config_is_valid_collection_id(
+            &g_server_config,(TROVE_coll_id)fsid))
+    {
+        gossip_lerr("PINT_bucket_get_num_meta() called with invalid fs_id.\n");
+        return(-EINVAL);
+    }
 
-	return(0);
+    cur = g_server_config.file_systems;
+    while(cur)
+    {
+        cur_fs = llist_head(cur);
+        if (!cur_fs)
+        {
+            break;
+        }
+        if (fsid == (PVFS_fs_id)cur_fs->coll_id)
+        {
+            if (cur_fs->meta_server_list)
+            {
+                *num_meta = llist_count(cur_fs->meta_server_list);
+                ret = 0;
+            }
+            break;
+        }
+        cur = llist_next(cur);
+    }
+    return ret;
 }
 
 /* PINT_bucket_get_num_io()
@@ -322,22 +390,40 @@ int PINT_bucket_get_num_meta(
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_num_io(
-	PVFS_fs_id fsid,
-	int* num_io)
+int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
 {
-#if 0
-	/* make sure that they asked for something sane */
-	if (!PINT_server_config_is_valid_collection_id(
-                &g_server_config,(TROVE_coll_id)fsid))
-	{
-		gossip_lerr("PINT_bucket_get_num_io() called with invalid fsid.\n");
-		return(-EINVAL);
-	}
-#endif
-	*num_io = 1;
+    int ret = -EINVAL;
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
 
-	return(0);
+    /* make sure the specified fs_id is sane */
+    if (!PINT_server_config_is_valid_collection_id(
+            &g_server_config,(TROVE_coll_id)fsid))
+    {
+        gossip_lerr("PINT_bucket_get_num_meta() called with invalid fs_id.\n");
+        return(-EINVAL);
+    }
+
+    cur = g_server_config.file_systems;
+    while(cur)
+    {
+        cur_fs = llist_head(cur);
+        if (!cur_fs)
+        {
+            break;
+        }
+        if (fsid == (PVFS_fs_id)cur_fs->coll_id)
+        {
+            if (cur_fs->data_server_list)
+            {
+                *num_io = llist_count(cur_fs->data_server_list);
+                ret = 0;
+            }
+            break;
+        }
+        cur = llist_next(cur);
+    }
+    return ret;
 }
 
 /* PINT_bucket_get_server_name()
@@ -350,25 +436,29 @@ int PINT_bucket_get_num_io(
 int PINT_bucket_get_server_name(
 	char* server_name,
 	int max_server_name_len,
-	PVFS_handle bucket,
+	PVFS_handle handle,
 	PVFS_fs_id fsid)
 {
-	
-#if 0
-	if(!server_name || bucket != HACK_bucket || fsid != HACK_fsid)
-	{
-		return(-EINVAL);
-	}
-#endif
+    int ret = -EINVAL;
 
-	if((strlen(HACK_server_name) + 1) > max_server_name_len)
-	{
-		return(-EOVERFLOW);
-	}
+    /* make sure the specified fs_id is sane */
+    if (!PINT_server_config_is_valid_collection_id(
+            &g_server_config,(TROVE_coll_id)fsid))
+    {
+        gossip_lerr("PINT_bucket_get_server_name() called with invalid fs_id.\n");
+        return(-EINVAL);
+    }
 
-	strcpy(server_name, HACK_server_name);
+    /*
+      hash from fsid to struct
+      
+    */
 
-	return(0);
+    memcpy(server_name,HACK_server_name,max_server_name_len);
+    server_name[max_server_name_len] = '\0';
+    ret = 0;
+
+    return ret;
 }
 
 /* PINT_bucket_get_root_handle()
@@ -383,29 +473,67 @@ int PINT_bucket_get_root_handle(
 	PVFS_handle *fh_root)
 {
     int ret = -EINVAL;
-    struct llist *cur = NULL;
-    struct filesystem_configuration_s *cur_fs = NULL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
 
     if (fh_root)
     {
-        cur = g_server_config.file_systems;
-        while(cur)
+        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        if (hash_link)
         {
-            cur_fs = llist_head(cur);
-            if (!cur_fs)
-            {
-                break;
-            }
-            if (fsid == (PVFS_fs_id)cur_fs->coll_id)
-            {
-                *fh_root = (PVFS_handle)cur_fs->root_handle;
-                ret = 0;
-                break;
-            }
-            cur = llist_next(cur);
+            cur_config_cache =
+                qlist_entry(hash_link, struct config_fs_cache_s,
+                            hash_link);
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
+
+            *fh_root = (PVFS_handle)cur_config_cache->fs->root_handle;
+            ret = 0;
         }
     }
     return ret;
+}
+
+/* hash_fsid()
+ *
+ * hash function for fsids added to table
+ *
+ * returns integer offset into table
+ */
+static int hash_fsid(void *fsid, int table_size)
+{
+    /* TODO: update this later with a better hash function,
+     * depending on what fsids look like, for now just modding
+     *
+     */
+    unsigned long tmp = 0;
+    PVFS_fs_id *real_fsid = (PVFS_fs_id *)fsid;
+
+    tmp += (*(real_fsid));
+    tmp = tmp%table_size;
+
+    return ((int)tmp);
+}
+
+/* hash_fsid_compare()
+ *
+ * performs a comparison of a hash table entro to a given key
+ * (used for searching)
+ *
+ * returns 1 if match found, 0 otherwise
+ */
+static int hash_fsid_compare(void *key, struct qlist_head *link)
+{
+    config_fs_cache_s *fs_info = NULL;
+    PVFS_fs_id *real_fsid = (PVFS_fs_id *)key;
+
+    fs_info = qlist_entry(link, config_fs_cache_s, hash_link);
+    if((PVFS_fs_id)fs_info->fs->coll_id == *real_fsid)
+    {
+        return(1);
+    }
+
+    return(0);
 }
 
 #endif

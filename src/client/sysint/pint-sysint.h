@@ -66,6 +66,24 @@ typedef struct {
     PVFS_handle bucket_end;
 } bucket_info;
 
+typedef struct bmi_host_extent_table_s
+{
+    char *bmi_address;
+
+    /* type is struct extent */
+    struct llist *extent_list;
+} bmi_host_extent_table_s;
+
+typedef struct config_fs_cache_s
+{
+    struct qlist_head hash_link;
+    struct filesystem_configuration_s *fs;
+
+    /* ptrs are type bmi_host_extent_table_s */
+    struct llist *bmi_host_extent_tables;
+} config_fs_cache_s;
+
+
 /* Server Config Parameters(per filesystem) */
 struct fsconfig_s {
     PVFS_handle fh_root;  /* root file system */

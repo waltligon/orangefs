@@ -7,8 +7,8 @@
 #ifndef __PINT_BUCKET_H
 #define __PINT_BUCKET_H
 
-#include <pvfs2-types.h>
-#include <bmi.h>
+#include "pvfs2-types.h"
+#include "bmi.h"
 
 /* This is the interface to the bucket management component of the
  * system interface.  It is responsible for managing the list of meta
@@ -19,13 +19,8 @@ int PINT_bucket_initialize(void);
 
 int PINT_bucket_finalize(void);
 
-int PINT_bucket_load_mapping(
-	char* meta_mapping,
-	int meta_count,
-	char* io_mapping,
-	int io_count, 
-	PVFS_handle handle_mask,
-	PVFS_fs_id fsid);
+int PINT_handle_load_mapping(
+    struct filesystem_configuration_s *fs);
 
 int PINT_bucket_get_next_meta(
 	PVFS_fs_id fsid,
