@@ -754,8 +754,17 @@ int PINT_req_sched_testsome(
     struct req_sched_element *tmp_element = NULL;
     int i;
     int incount = *inout_count_p;
+    struct timeval tv;
 
     *inout_count_p = 0;
+
+    /* if there are any pending timer events, go ahead and get the 
+     * current time so that we are ready if we run across one
+     */
+    if(!qlist_empty(&timer_queue))
+    {
+	gettimeofday(&tv, NULL);
+    }
 
     for (i = 0; i < incount; i++)
     {
@@ -789,6 +798,30 @@ int PINT_req_sched_testsome(
 	    gossip_debug(REQ_SCHED_DEBUG,
 			 "REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n",
 			 (long) tmp_element->handle, tmp_element);
+	}
+	else if(tmp_element->state == REQ_TIMING)
+	{
+	    /* timer event, see if we have hit time value yet */
+	    gettimeofday(&tv, NULL);
+	    if((tmp_element->tv.tv_sec < tv.tv_sec) ||
+		(tmp_element->tv.tv_sec == tv.tv_sec 
+		    && tmp_element->tv.tv_usec < tv.tv_usec))
+	    {
+		/* time to go */
+		qlist_del(&(tmp_element->list_link));
+		if (returned_user_ptr_array)
+		{
+		    returned_user_ptr_array[*inout_count_p] = 
+			tmp_element->user_ptr;
+		}
+		out_index_array[*inout_count_p] = i;
+		out_status_array[*inout_count_p] = 0;
+		(*inout_count_p)++;
+		gossip_debug(REQ_SCHED_DEBUG,
+			     "REQ SCHED TIMER SCHEDULING, queue_element: %p\n",
+			     tmp_element);
+		free(tmp_element);
+	    }
 	}
 	else
 	{

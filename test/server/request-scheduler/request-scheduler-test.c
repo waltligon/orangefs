@@ -27,6 +27,7 @@ int main(
     int count = 0;
     int status = 0;
     req_sched_id timer_id_array[2];
+    int tmp_index;
 
     /* setup some requests to test */
     req_array[0].op = PVFS_SERV_GETATTR;
@@ -237,10 +238,11 @@ int main(
 	return (-1);
     }
 
-    count = 0;
     do
     {
-	ret = PINT_req_sched_test(timer_id_array[0], &count, NULL, &status);
+	count = 1;
+	ret = PINT_req_sched_testsome(timer_id_array, &count, &tmp_index, 
+	    NULL, &status);
     } while (ret == 0 && count == 0);
 
     if (ret < 0 || status != 0)
