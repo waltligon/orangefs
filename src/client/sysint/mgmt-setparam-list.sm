@@ -238,10 +238,10 @@ static int root_check_comp_fn(void* v_p, struct PVFS_server_resp * resp_p,
 
     if(i < (sm_p->msgarray_count -1))
     {
-	/* just return invalid, we only compute the correct error
+	/* just return 0.  we only compute the correct error
 	 * code after the final response has been successfully received
 	 */
-	return(-PVFS_EINVAL);
+	return(0);
     }
 
     /* if we hit this point, it must be the last response.  Look at all of
