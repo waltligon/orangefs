@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup pvfs2linux
+ *
+ *  Linux VFS file operations.
+ */
+
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
@@ -24,6 +30,8 @@ do {                                              \
 } while(0)
 
 
+/** Called when a process requests to open a file.
+ */
 int pvfs2_file_open(
     struct inode *inode,
     struct file *file)
@@ -74,6 +82,9 @@ int pvfs2_file_open(
     return ret;
 }
 
+/** Read data from a specified offset in a file (referenced by inode).
+ *  Data may be placed either in a user or kernel buffer.
+ */
 ssize_t pvfs2_inode_read(
     struct inode *inode,
     char __user *buf,
@@ -211,6 +222,8 @@ ssize_t pvfs2_inode_read(
     return(total_count); 
 }
 
+/** Read data from a specified offset in a file into a user buffer.
+ */
 ssize_t pvfs2_file_read(
     struct file *file,
     char __user *buf,
@@ -225,6 +238,9 @@ ssize_t pvfs2_file_read(
         file->f_dentry->d_inode, buf, count, offset, 1, 0);
 }
 
+/** Write data from a contiguous user buffer into a file at a specified
+ *  offset.
+ */
 static ssize_t pvfs2_file_write(
     struct file *file,
     const char __user *buf,
@@ -356,6 +372,8 @@ static ssize_t pvfs2_file_write(
     return total_count;
 }
 
+/** Perform a miscellaneous operation on a file.
+ */
 int pvfs2_ioctl(
     struct inode *inode,
     struct file *file,
@@ -368,6 +386,8 @@ int pvfs2_ioctl(
     return ret;
 }
 
+/** Memory map a region of a file.
+ */
 static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
     struct inode *inode = file->f_dentry->d_inode;
@@ -404,10 +424,11 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
 #endif
 }
 
-/*
-  NOTE: gets called when all files are closed.  not when
-  each file is closed. (i.e. last reference to an opened file)
-*/
+/** Called to notify the module that there are no more references to
+ *  this file (i.e. no processes have it open).
+ *
+ *  \note Not called when each file is closed.
+ */
 int pvfs2_file_release(
     struct inode *inode,
     struct file *file)
@@ -436,6 +457,8 @@ int pvfs2_file_release(
     return 0;
 }
 
+/** Push all data for a specific file onto permanent storage.
+ */
 int pvfs2_fsync(
     struct file *file,
     struct dentry *dentry,
@@ -470,10 +493,11 @@ int pvfs2_fsync(
     return ret;
 }
 
-/*
-  NOTE: if .llseek is overriden, we must acquire lock as described in
-  Documentation/filesystems/Locking
-*/
+/** Change the file pointer position for an instance of an open file.
+ *
+ *  \note If .llseek is overriden, we must acquire lock as described in
+ *        Documentation/filesystems/Locking.
+ */
 loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
 {
     int ret = -EINVAL;
@@ -503,6 +527,7 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
     return generic_file_llseek(file, offset, origin);
 }
 
+/** PVFS2 implementation of VFS file operations */
 struct file_operations pvfs2_file_operations =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4

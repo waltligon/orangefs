@@ -25,25 +25,21 @@
 #include "pvfs2-debug.h"
 #include "pvfs2-types.h"
 
-/** Data region size */
-typedef PVFS_size bmi_size_t;
-/** User-specified message tag */
-typedef PVFS_msg_tag_t bmi_msg_tag_t;
-/** Context identifier */
-typedef PVFS_context_id bmi_context_id;
-/** Reference to ongoing network operation */
-typedef PVFS_id_gen_t bmi_op_id_t;
+typedef PVFS_size bmi_size_t;           /**< Data region size */
+typedef PVFS_msg_tag_t bmi_msg_tag_t;   /**< User-specified message tag */
+typedef PVFS_context_id bmi_context_id; /**< Context identifier */
+typedef PVFS_id_gen_t bmi_op_id_t;      /**< Reference to ongoing network op */
 
 /* TODO: not using a real type for this yet; need to specify what
  * error codes look like */
-typedef int32_t bmi_error_code_t;	/* error code information */
+typedef int32_t bmi_error_code_t; /**< error code information */
 
 #define BMI_MAX_ADDR_LEN PVFS_MAX_SERVER_ADDR_LEN
 
-/* BMI method initialization flags */
+/** BMI method initialization flags */
 enum
 {
-    BMI_INIT_SERVER = 1
+    BMI_INIT_SERVER = 1 /**< set up to listen for unexpected messages */
 };
 
 enum bmi_op_type
@@ -52,26 +48,26 @@ enum bmi_op_type
     BMI_RECV = 2
 };
 
-/* BMI memory buffer flags */
+/** BMI memory buffer flags */
 enum bmi_buffer_type
 {
     BMI_PRE_ALLOC = 1,
     BMI_EXT_ALLOC = 2
 };
 
-/* BMI get_info and set_info options */
+/** BMI get_info and set_info options */
 enum
 {
-    BMI_DROP_ADDR = 1,         /* ask a module to discard an address */
-    BMI_CHECK_INIT = 2,        /* see if a module is initialized */
-    BMI_CHECK_MAXSIZE = 3,     /* check the max msg size a module allows */
-    BMI_GET_METH_ADDR = 4,     /* kludge to return void* pointer to
-                                * underlying module address */
-    BMI_INC_ADDR_REF = 5,      /* increment address reference count */
-    BMI_DEC_ADDR_REF = 6,      /* decrement address reference count */
-    BMI_DROP_ADDR_QUERY = 7,   /* ask a module if it thinks an address
-                                * should be discarded */
-    BMI_FORCEFUL_CANCEL_MODE = 8, /* enables a more forcefule cancelation mode */
+    BMI_DROP_ADDR = 1,         /**< ask a module to discard an address */
+    BMI_CHECK_INIT = 2,        /**< see if a module is initialized */
+    BMI_CHECK_MAXSIZE = 3,     /**< check the max msg size a module allows */
+    BMI_GET_METH_ADDR = 4,     /**< kludge to return void* pointer to
+                                *   underlying module address */
+    BMI_INC_ADDR_REF = 5,      /**< increment address reference count */
+    BMI_DEC_ADDR_REF = 6,      /**< decrement address reference count */
+    BMI_DROP_ADDR_QUERY = 7,   /**< ask a module if it thinks an address
+                                *   should be discarded */
+    BMI_FORCEFUL_CANCEL_MODE = 8, /**< enables a more forceful cancel mode */
 };
 
 /* mappings from PVFS errors to BMI errors */
@@ -137,7 +133,7 @@ enum
 #define BMI_EMEDIUMTYPE     (PVFS_EMEDIUMTYPE | PVFS_ERROR_BMI)
 #define BMI_ECANCEL	    (PVFS_ECANCEL | PVFS_ERROR_BMI)
 
-/* default bmi error translation function */
+/** default bmi error translation function */
 int bmi_errno_to_pvfs(int error);
 
 #endif /* __BMI_TYPES_H */

@@ -4,6 +4,11 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup pvfs2linux
+ *
+ *  Definitions of downcalls used in Linux kernel module.
+ */
 
 /* TODO: we might want to try to avoid this inclusion  */
 #include "pvfs2-sysint.h"

@@ -4,6 +4,19 @@
  * See COPYING in top-level directory.
  */
 
+/** \defgroup pvfs2linux PVFS2 Linux kernel support
+ *
+ *  The PVFS2 Linux kernel support allows PVFS2 volumes to be mounted and
+ *  accessed through the Linux VFS (i.e. using standard I/O system calls).
+ *  This support is only needed on clients that wish to mount the file system.
+ *
+ * @{
+ */
+
+/** \file
+ *  Declarations and macros for the PVFS2 Linux kernel support.
+ */
+
 #ifndef __PVFS2KERNEL_H
 #define __PVFS2KERNEL_H
 
@@ -199,7 +212,7 @@ typedef struct
     struct list_head list;
 } pvfs2_kernel_op_t;
 
-/* per inode private pvfs2 info */
+/** per inode private pvfs2 info */
 typedef struct
 {
     PVFS_object_ref refn;
@@ -216,19 +229,18 @@ typedef struct
     sector_t last_failed_block_index_read;
 } pvfs2_inode_t;
 
-/*
-  these are the available mount options that we accept:
-
-  the intr option (if set) is inspired by the nfs intr option that
-  interrupts the operation in progress if a signal is received, and
-  ignores the signal otherwise (if not set).
-*/
+/** mount options.  only accepted mount options are listed.
+ */
 typedef struct
 {
+    /** intr option (if set) is inspired by the nfs intr option that
+     *  interrupts the operation in progress if a signal is received,
+     *  and ignores the signal otherwise (if not set).
+     */
     int intr;
 } pvfs2_mount_options_t;
 
-/* per superblock private pvfs2 info */
+/** per superblock private pvfs2 info */
 typedef struct
 {
     PVFS_handle root_handle;
@@ -242,10 +254,9 @@ typedef struct
     struct list_head list;
 } pvfs2_sb_info_t;
 
-/*
-  a temporary structure used only for sb mount time that groups the
-  mount time data provided along with a private superblock structure
-  that is allocated before a 'kernel' superblock is allocated.
+/** a temporary structure used only for sb mount time that groups the
+ *  mount time data provided along with a private superblock structure
+ *  that is allocated before a 'kernel' superblock is allocated.
 */
 typedef struct
 {
@@ -549,10 +560,9 @@ do {                                                         \
     }                                                        \
 } while(0)
 
-/*
-  tries to service the operation and will retry on timeout
-  failure up to num times (num MUST be a numeric lvalue).
-*/
+/** tries to service the operation and will retry on timeout
+ *  failure up to num times (num MUST be a numeric lvalue).
+ */
 #define service_operation_with_timeout_retry(op, method, num, intr)\
 do {                                                               \
     sigset_t orig_sigset;                                          \
@@ -582,16 +592,15 @@ do {                                                               \
      }                                                             \
 } while(0)
 
-/*
-  tries to service the operation and will retry on timeout
-  failure up to num times (num MUST be a numeric lvalue).
-
-  this allows us to know if we've reached the error_exit code path
-  from here or elsewhere
-
-  NOTE: used in namei.c:lookup, file.c:pvfs2_inode_read, and
-  file.c:pvfs2_file_write
-*/
+/** tries to service the operation and will retry on timeout
+ *  failure up to num times (num MUST be a numeric lvalue).
+ *
+ *  this allows us to know if we've reached the error_exit code path
+ *  from here or elsewhere
+ *
+ *  \note used in namei.c:lookup, file.c:pvfs2_inode_read, and
+ *  file.c:pvfs2_file_write
+ */
 #define service_error_exit_op_with_timeout_retry(op,meth,num,e,intr)\
 do {                                                                \
     sigset_t orig_sigset;                                           \
@@ -622,27 +631,26 @@ do {                                                                \
     }                                                               \
 } while(0)
 
-/*
-  by design, our vfs i/o errors need to be handled in one of two ways,
-  depending on where the error occured.
-
-  if the error happens in the waitqueue code because we either timed
-  out or a signal was raised while waiting, we need to cancel the
-  userspace i/o operation and free the op manually.  this is done to
-  avoid having the device start writing application data to our shared
-  bufmap pages without us expecting it.
-
-  if a pvfs2 sysint level error occured and i/o has been completed,
-  there is no need to cancel the operation, as the user has finished
-  using the bufmap page and so there is no danger in this case.  in
-  this case, we wake up the device normally so that it may free the
-  op, as normal.
-
-  this macro handles both of these cases, depending on which error
-  happened based on information known in context.  the only reason
-  this is a macro is because both read and write cases need the exact
-  same handling code.
-*/
+/** handles two possible error cases, depending on context.
+ *
+ *  by design, our vfs i/o errors need to be handled in one of two ways,
+ *  depending on where the error occured.
+ *
+ *  if the error happens in the waitqueue code because we either timed
+ *  out or a signal was raised while waiting, we need to cancel the
+ *  userspace i/o operation and free the op manually.  this is done to
+ *  avoid having the device start writing application data to our shared
+ *  bufmap pages without us expecting it.
+ *
+ *  if a pvfs2 sysint level error occured and i/o has been completed,
+ *  there is no need to cancel the operation, as the user has finished
+ *  using the bufmap page and so there is no danger in this case.  in
+ *  this case, we wake up the device normally so that it may free the
+ *  op, as normal.
+ *
+ *  \note the only reason this is a macro is because both read and write
+ *  cases need the exact same handling code.
+ */
 #define handle_io_error()                                 \
 do {                                                      \
     if (error_exit)                                       \
@@ -869,6 +877,8 @@ static inline ino_t parent_ino(struct dentry *dentry)
 
 
 #endif /* __PVFS2KERNEL_H */
+
+/* @} */
 
 /*
  * Local variables:

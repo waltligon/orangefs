@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup pvfs2linux
+ *
+ *  In-kernel waitqueue operations.
+ */
+
 #include "pvfs2-kernel.h"
 
 extern struct list_head pvfs2_request_list;
@@ -49,26 +55,23 @@ static inline void clean_up_interrupted_operation(
     spin_unlock(&op->lock);
 }
 
-/*
-  sleeps on waitqueue waiting for matching downcall for some amount of
-  time and then wakes up.
-
-  NOTE: when this call returns to the caller, the specified op will no
-  longer be on any list or htable.
-
-  return values and op status changes:
-
-  PVFS2_WAIT_ERROR
-    - an error occurred; op status unknown
-  PVFS2_WAIT_SUCCESS
-    - success; everything ok.  the op state will be marked as serviced
-  PVFS2_WAIT_TIMEOUT_REACHED
-    - timeout reached (before downcall recv'd) the caller has the
-      choice of either requeueing the op or failing the operation when
-      this occurs.  the op observes no state change.
-   PVFS2_WAIT_SIGNAL_RECVD
-    - sleep interrupted (signal recv'd) the op observes no state
-      change.
+/** sleeps on waitqueue waiting for matching downcall for some amount of
+ *    time and then wakes up.
+ *
+ *  \post when this call returns to the caller, the specified op will no
+ *        longer be on any list or htable.
+ *
+ *  \return values and op status changes:
+ *
+ *  \retval PVFS2_WAIT_ERROR an error occurred; op status unknown
+ *  \retval PVFS2_WAIT_SUCCESS success; everything ok.  the op state will
+ *          be marked as serviced
+ *  \retval PVFS2_WAIT_TIMEOUT_REACHED timeout reached (before downcall
+ *          recv'd) the caller has the choice of either requeueing the op
+ *          or failing the operation when this occurs.  the op observes no
+ *          state change.
+ *  \retval PVFS2_WAIT_SIGNAL_RECVD sleep interrupted (signal recv'd) the
+ *          op observes no state change.
 */
 int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
 {
@@ -122,13 +125,13 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
     return ret;
 }
 
-/*
-  similar to the wait above, however used in the special case of I/O
-  cancellations.  we need a special wait function because if this is
-  called we already know that a signal is pending in current and need
-  to service the cancellation upcall anyway.  the only way to exit
-  this is to either timeout or have the cancellation be serviced
-  properly.
+/** similar to wait_for_matching_downcall(), but used in the special case
+ *  of I/O cancellations.
+ *
+ *  \note we need a special wait function because if this is called we already
+ *        know that a signal is pending in current and need to service the
+ *        cancellation upcall anyway.  the only way to exit this is to either
+ *        timeout or have the cancellation be serviced properly.
 */
 int wait_for_cancellation_downcall(pvfs2_kernel_op_t * op)
 {
