@@ -33,6 +33,8 @@ server operations:
 
 general server functionality:
 ====================================================================
+- make sure server prints error message to stderr instead of to log file
+  if it fails during startup (such as if storage space doesn't exist)
 - attributes (permissions, etc.) on datafiles
 - defining "on disk" format for metadata
   - short term goal of using dspace attribs for storing pvfs2 object attribs
