@@ -150,7 +150,7 @@ static int readdir_init(state_action_struct *s_op, job_status_s *ret)
 	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
 
 	s_op->val_a[j].buffer = &(s_op->resp->u.readdir.pvfs_dirent_array[j].handle);
-	s_op->key_a[j].buffer_sz = handle_sz;
+	s_op->val_a[j].buffer_sz = handle_sz;
     }
     printf("%d\n",s_op->key_a);
 
