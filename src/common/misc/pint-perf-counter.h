@@ -29,9 +29,15 @@ int PINT_perf_initialize(void);
 
 void PINT_perf_finalize(void);
 
-void PINT_perf_count(enum PINT_perf_count_keys key, 
+void __PINT_perf_count(enum PINT_perf_count_keys key, 
     int64_t value,
     enum PINT_perf_ops op);
+
+#ifdef __PVFS2_DISABLE_PERF_COUNTERS__
+    #define PINT_perf_count(x,y,z) do{}while(0)
+#else
+    #define PINT_perf_count __PINT_perf_count
+#endif
 
 void PINT_perf_rollover(void);
 

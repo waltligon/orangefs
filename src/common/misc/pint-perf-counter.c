@@ -74,7 +74,7 @@ void PINT_perf_finalize(void)
  *
  * no return value
  */
-void PINT_perf_count(enum PINT_perf_count_keys key, 
+void __PINT_perf_count(enum PINT_perf_count_keys key, 
     int64_t value,
     enum PINT_perf_ops op)
 {
