@@ -11,7 +11,8 @@ TEST_IO_JOB_DIR_SRC := \
 	$(DIR)/trove-job-ls.c \
 	$(DIR)/trove-job-mkfs.c \
 	$(DIR)/trove-job-touch.c \
-	$(DIR)/job-dev-test.c 
+	$(DIR)/job-dev-test.c \
+	$(DIR)/thread-bench2.c
 
 MISCSRC += $(DIR)/job-help.c
 
