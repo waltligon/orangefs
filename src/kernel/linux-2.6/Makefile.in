@@ -6,6 +6,7 @@ here = src/kernel/linux-2.6
 top = ../../..
 
 absolute_src_dir = @SRC_ABSOLUTE_TOP@
+absolute_build_dir= @BUILD_ABSOLUTE_TOP@
 src_relative_top = @SRC_RELATIVE_TOP@
 ifeq "/" "$(shell echo ${src_relative_top} | cut -c 1)"
 # not actually relative (as if someone called /tmp/foo/configure
@@ -60,6 +61,7 @@ ifneq ($(KERNELRELEASE),)
 
 EXTRA_CFLAGS = \
     -I$(absolute_src_dir)/ \
+    -I$(absolute_build_dir)/ \
     -I$(absolute_src_dir)/include \
     -I$(absolute_src_dir)/src/io/dev \
     -I$(absolute_src_dir)/src/common/quickhash

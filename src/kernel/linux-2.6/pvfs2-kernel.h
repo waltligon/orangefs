@@ -860,8 +860,6 @@ static inline int dcache_dir_close(struct inode *inode, struct file *file)
 }
 #endif /* PVFS2_LINUX_KERNEL_2_4_MINOR_VER */
 
-#endif /* PVFS2_LINUX_KERNEL_2_4 */
-
 /* some 2.4 kernels backport a lot of stuff from 2.6, so we have to
  * feature-test instead of relying on kernel versions */
 #ifndef HAVE_I_SIZE_READ
@@ -885,6 +883,7 @@ static inline ino_t parent_ino(struct dentry *dentry)
 }
 #endif
 
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 #endif /* __PVFS2KERNEL_H */
 
