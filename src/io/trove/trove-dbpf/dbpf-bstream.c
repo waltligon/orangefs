@@ -376,6 +376,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.list_proc_state = LIST_PROC_INITIALIZED;
 
     /* get an FD so we can access the file; last parameter controls file creation */
+    /* TODO: MOVE THIS INTO THE OP_SVC FUNCTION AS ANOTHER STATE */
     ret = dbpf_bstream_fdcache_try_get(coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0, &fd);
     if (ret < 0) {
 	dbpf_queued_op_free(q_op_p);
@@ -435,7 +436,12 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	aiocb_p = (struct aiocb *) malloc(AIOCB_ARRAY_SZ*sizeof(struct aiocb));
 
 	if (aiocb_p == NULL) assert(0);
+
+	/* initialize, paying particular attention to set the opcode to NOP */
 	memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
+	for (i=0; i < AIOCB_ARRAY_SZ; i++) {
+	    aiocb_p[i].aio_lio_opcode = LIO_NOP;
+	}
 
 	op_p->u.b_rw_list.aiocb_array_count = AIOCB_ARRAY_SZ;
 	op_p->u.b_rw_list.aiocb_array       = aiocb_p;
@@ -446,7 +452,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	aiocb_p = op_p->u.b_rw_list.aiocb_array;
 
 	/* check to see how we're progressing on previous operations */
-	for (i=0; i < AIOCB_ARRAY_SZ; i++) {
+	for (i=0; i < op_p->u.b_rw_list.aiocb_array_count; i++) {
 	    if (aiocb_p[i].aio_lio_opcode == LIO_NOP) continue;
 
 	    ret = aio_error(&aiocb_p[i]); /* gets the "errno" value of the individual op */
@@ -503,7 +509,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	if (ret == 1) op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLCONVERTED;
 	
 	/* if we didn't use the entire array, mark the unused ones with LIO_NOPs */
-	for (i=aiocb_inuse_count; i < AIOCB_ARRAY_SZ; i++) {
+	for (i=aiocb_inuse_count; i < op_p->u.b_rw_list.aiocb_array_count; i++) {
 	    /* for simplicity just mark these as NOPs and we'll ignore them */
 	    aiocb_p[i].aio_lio_opcode = LIO_NOP;
 	}

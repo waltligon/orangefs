@@ -45,7 +45,7 @@ int dbpf_bstream_listio_convert(
 				TROVE_size *stream_size_array,
 				int stream_count,
 				struct aiocb *aiocb_array,
-				int *aiocb_count,
+				int *aiocb_count_p,
 				struct bstream_listio_state *lio_state
 				)
 {
@@ -77,7 +77,7 @@ int dbpf_bstream_listio_convert(
 
     /* _POSIX_AIO_LISTIO_MAX */
 
-    while (act < *aiocb_count && 
+    while (act < *aiocb_count_p && 
 	   mct < mem_count) /* don't need to check sct too; see assumptions */
     {
 	/* fill in all values that are independent of which region is smaller */
@@ -126,7 +126,7 @@ int dbpf_bstream_listio_convert(
 	cur_aiocb_ptr = &aiocb_array[++act];
     }
 
-    *aiocb_count = act;
+    *aiocb_count_p = act; /* return the number actually used */
     
     if (mct < mem_count) {
 	/* haven't processed all of list regions */

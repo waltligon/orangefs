@@ -164,6 +164,8 @@ enum {
  *
  * list_proc_state is used to retain the status of processing on the list
  * arrays.
+ *
+ * aiocb_array_count - size of the aiocb_array (nothing to do with # of things in progress)
  */
 struct dbpf_bstream_rw_list_op {
     int fd, list_proc_state, opcode;
