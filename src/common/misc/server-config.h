@@ -106,9 +106,10 @@ int PINT_config_has_fs_config_info(
     struct server_configuration_s *config_s,
     char *fs_name);
 
-/* NOTE: this function is defined in mkspace.c now */
+#ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(
     struct server_configuration_s *config);
+#endif
 
 /*
  * Local variables:
