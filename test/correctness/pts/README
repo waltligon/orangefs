@@ -135,6 +135,8 @@ add the test_simple_mkdir test from above:
   myconfig->testpool[TEST_SIMPLE_MKDIR].test_param_init = (void *)test_simple_mkdir_param_init;
   myconfig->testpool[TEST_SIMPLE_MKDIR].test_name = str_malloc("test_simple_mkdir");
 
+'test_name' should be the 'test name' part of your config file entry
+
 If your test does not require a custom parameter parser, simply leave
 out the line defining what test_param_init points to (you will get the
 default param parser).
