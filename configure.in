@@ -49,5 +49,6 @@ test/common/gen-locks/module.mk
 test/io/bmi/module.mk
 test/io/description/module.mk
 test/io/flow/module.mk
+test/io/job/module.mk
 )
 

@@ -1,0 +1,23 @@
+DIR := test/io/job
+
+LOCALTESTSRC := \
+	$(DIR)/job-client-example.c \
+	$(DIR)/job-client-multi-example.c \
+	$(DIR)/job-flow-server.c \
+	$(DIR)/job-server-example.c \
+	$(DIR)/req-sched-job-test.c \
+	$(DIR)/trove-job-create-toy.c \
+	$(DIR)/trove-job-io.c \
+	$(DIR)/trove-job-ls.c \
+	$(DIR)/trove-job-mkfs.c \
+	$(DIR)/trove-job-touch.c 
+
+MISCSRC += $(DIR)/job-help.c
+
+TESTSRC += $(LOCALTESTSRC)
+
+LOCALLIBS := -ldb -lrt -lpthread
+LOCALTESTS := $(patsubst %.c,%, $(LOCALTESTSRC))
+$(LOCALTESTS): %: %.o $(DIR)/job-help.o
+	$(LD) $< $(DIR)/job-help.o $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
+

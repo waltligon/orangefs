@@ -41,6 +41,7 @@ LIBRARIES := lib/libpvfs2.a
 TESTSRC :=
 LIBSRC :=
 SERVERSRC :=
+MISCSRC := 
 
 all: $(LIBRARIES) tests tmp_server_objs
 
@@ -56,9 +57,16 @@ TESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(TESTSRC)))
 SERVEROBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERSRC)))
 SERVERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERSRC)))
 
+# MISC objs don't belong in the client library, or the server, nor
+# are they test programs.  This is where you can put other random
+# things that need to be built, such as helper objects for test
+# programs
+MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
+MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
+
 # we don't really care if the dependencies are sorted; 
 # this is just a trick to remove duplicate entries
-DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS))
+DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS))
 
 tests: $(TESTS)
 
@@ -88,8 +96,8 @@ lib/libpvfs2.a: $(LIBOBJS)
 $(TESTS): %: %.o $(LIBRARIES)
 
 clean:
-	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(TESTS) $(LIBRARIES) \
-		$(DEPENDS)
+	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
+		$(LIBRARIES) $(DEPENDS) 
 
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;
