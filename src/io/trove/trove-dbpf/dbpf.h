@@ -54,10 +54,13 @@ struct dbpf_storage {
  * To clarify, it is a TROVE_ds_attributes_s that is stored for the
  * setattr/getattr operations, which is defined way up in pvfs2-storage.h.
  * So there are two "attribute" structures for the moment...
+ *
+ * For now we're going to stick one inside the other...
  */
 struct dbpf_dspace_attr {
     TROVE_coll_id coll_id;
     TROVE_ds_type type;
+    TROVE_ds_attributes_s ext;
 };
 
 /* struct dbpf_collection

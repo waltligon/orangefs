@@ -28,12 +28,12 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 
 /* TODO: should this have a ds_attributes with it? */
 int dbpf_dspace_create(TROVE_coll_id coll_id,
-			      TROVE_handle *handle_p,
-			      TROVE_handle bitmask,
-			      TROVE_ds_type type,
-			      TROVE_keyval_s *hint, /* TODO: What is this? */
-			      void *user_ptr,
-			      TROVE_op_id *out_op_id_p)
+		       TROVE_handle *handle_p,
+		       TROVE_handle bitmask,
+		       TROVE_ds_type type,
+		       TROVE_keyval_s *hint, /* TODO: What is this? */
+		       void *user_ptr,
+		       TROVE_op_id *out_op_id_p)
 {
     int ret;
     struct dbpf_collection *coll_p;
@@ -45,13 +45,6 @@ int dbpf_dspace_create(TROVE_coll_id coll_id,
     coll_p = my_coll_p;
     if (coll_p == NULL) return -1;
 
-#if 0
-    /* need a better handle generation routine than this... */
-    /* a free list would make a certain amount of sense; perhaps
-     * with ranges?
-     */
-    new_handle = (*handle_p & bitmask) | (dbpf_last_handle & (~bitmask));
-#endif
     /* TODO: REDO BUCKETS!!!! */
     new_handle = trove_handle_get(coll_p->free_handles, *handle_p, bitmask);
     
@@ -59,6 +52,10 @@ int dbpf_dspace_create(TROVE_coll_id coll_id,
     
     attr.coll_id = coll_id;
     attr.type = type;
+    attr.ext.uid = -1;
+    attr.ext.gid = -1;
+    attr.ext.mode = 0;
+    attr.ext.ctime = time(NULL);
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
     key.data = &new_handle;
@@ -372,6 +369,8 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 
 static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 {
+    
+    
     return -1;
 }
 

@@ -440,7 +440,8 @@ static int dbpf_collection_lookup(
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
 {
-    int ret, slen;
+    int ret;
+    size_t slen;
     struct dbpf_storage *sto_p;
     struct dbpf_collection *coll_p;
     struct dbpf_collection_db_entry db_data;
@@ -537,7 +538,7 @@ static int dbpf_collection_lookup(
  */
 static struct dbpf_storage *dbpf_storage_lookup(char *stoname)
 {
-    int slen;
+    size_t slen;
     struct dbpf_storage *sto_p;
 
     if (my_storage_p != NULL) return my_storage_p;
@@ -590,7 +591,7 @@ static int dbpf_db_create(
     /* set up create string */
     time(&cur_time);
     tm_p = localtime(&cur_time);
-    strftime(datastring, 64, "%c", tm_p);
+    strftime(datastring, 64, "%Y-%m-%d", tm_p);
 
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
