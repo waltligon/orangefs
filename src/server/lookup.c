@@ -13,7 +13,6 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
-#include "job-consist.h"
 
 /* TODO: DO WE NEED THESE TO BE HERE?  WHAT'S THE RIGHT WAY TO DO THIS? */
 enum 

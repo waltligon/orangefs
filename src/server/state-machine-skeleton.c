@@ -10,7 +10,6 @@
 #include <pvfs2-server.h>
 #include <string.h>
 #include <pvfs2-attr.h>
-#include <job-consist.h>
 #include <assert.h>
 
 static int request_init(PINT_server_op *s_op, job_status_s *ret);

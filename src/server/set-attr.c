@@ -11,7 +11,6 @@
 #include <assert.h>
 
 #include "pvfs2-attr.h"
-#include "job-consist.h"
 
 enum {
     STATE_METAFILE = 7,

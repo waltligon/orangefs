@@ -10,7 +10,6 @@
 #include <pvfs2-server.h>
 #include <string.h>
 #include <pvfs2-attr.h>
-#include <job-consist.h>
 #include <assert.h>
 #include <pvfs-distribution.h>
 #include <pvfs-request.h>

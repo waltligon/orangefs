@@ -12,7 +12,6 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
-#include "job-consist.h"
 
 static int crdirent_init(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_read_directory_entry_handle(PINT_server_op *s_op, job_status_s *ret);

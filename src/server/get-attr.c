@@ -29,7 +29,6 @@ My TODO list for this SM:
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
-#include "job-consist.h"
 
 enum {
     STATE_METAFILE = 7,
