@@ -12,6 +12,3 @@ $(DIR)/scanner.c: $(DIR)/scanner.l
 	$(Q) "  FLEX		$@"
 	$(E)$(FLEX) -o$@ $<
 
-# This directory generates C files in the _build_, not the source location,
-# so needs an extra include to find the real source dir.
-MODCFLAGS_$(DIR) := -I$(srcdir)/$(DIR)
