@@ -307,7 +307,9 @@ int pvfs2_file_release(
     struct inode *inode,
     struct file *file)
 {
-    pvfs2_print("pvfs2: pvfs2_file_release called\n");
+    pvfs2_print("pvfs2: pvfs2_file_release called on %s\n",
+                file->f_dentry->d_name.name);
+
     if (S_ISDIR(inode->i_mode))
     {
 	return dcache_dir_close(inode, file);

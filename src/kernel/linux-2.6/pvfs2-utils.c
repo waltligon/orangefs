@@ -450,7 +450,7 @@ int pvfs2_inode_setattr(
           on setattr success, if the file has changed in
           size, truncate it now
         */
-        if (ret == 0)
+        if ((ret == 0) && (S_ISREG(inode->i_mode)))
         {
             if (iattr && (iattr->ia_valid & ATTR_SIZE) &&
                 (iattr->ia_size != inode->i_size))

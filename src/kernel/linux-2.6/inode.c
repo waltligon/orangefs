@@ -31,10 +31,6 @@ extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 
-/*
-  FIXME:
-  we're completely ignoring the create argument for now
-*/
 static int pvfs2_get_blocks(
     struct inode *inode,
     sector_t lblock,
@@ -76,6 +72,10 @@ static int pvfs2_get_blocks(
       the first failure will have the failed block as lblock-1,
       but the mpage code (the caller) tries twice in a row, so the
       second time, the failed block index will be == to lblock.
+
+      NOTE: the easiest way to test this is to run a program
+      from a pvfs2 volume and ctrl-c it before it's fully
+      read into memory.
     */
     if ((pvfs2_inode->last_failed_block_index_read > 0) &&
         ((pvfs2_inode->last_failed_block_index_read == (lblock - 1)) ||
