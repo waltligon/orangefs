@@ -169,6 +169,9 @@ static void lebf_initialize(void)
 		resp.u.mgmt_event_mon.event_count = 0;
 		respsize = extra_size_PVFS_servresp_mgmt_event_mon;
 		break;
+	    case PVFS_SERV_PROTO_ERROR:
+		/* nothing special */
+		break;
 	}
 	/* since these take the max size when mallocing in the encode,
 	 * give them a huge number, then later fix it. */
@@ -300,6 +303,7 @@ static int lebf_encode_req(
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
+	case PVFS_SERV_PROTO_ERROR:
 	    /* nothing else */
 	    break;
 
@@ -381,6 +385,7 @@ static int lebf_encode_resp(
         case PVFS_SERV_TRUNCATE:
         case PVFS_SERV_FLUSH:
         case PVFS_SERV_MGMT_NOOP:
+	case PVFS_SERV_PROTO_ERROR:
 	    /* nothing else */
 	    break;
 
@@ -469,6 +474,7 @@ static int lebf_decode_req(
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_JOB_TIMER:
+	case PVFS_SERV_PROTO_ERROR:
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, req->op);
 	    ret = -EPROTO;
 	    goto out;
@@ -535,6 +541,7 @@ static int lebf_decode_resp(
         case PVFS_SERV_TRUNCATE:
         case PVFS_SERV_FLUSH:
         case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_PROTO_ERROR:
 	    /* nothing else */
 	    break;
 
@@ -639,6 +646,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_WRITE_COMPLETION:
 	    case PVFS_SERV_PERF_UPDATE:
 	    case PVFS_SERV_JOB_TIMER:
+	    case PVFS_SERV_PROTO_ERROR:
 		gossip_lerr("%s: invalid request operation %d.\n",
 		  __func__, req->op);
 		break;
@@ -695,6 +703,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_NOOP:
 	    case PVFS_SERV_STATFS:
 	    case PVFS_SERV_WRITE_COMPLETION:
+	    case PVFS_SERV_PROTO_ERROR:
 		/* nothing to free */
 		break;
 

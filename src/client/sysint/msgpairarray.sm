@@ -448,7 +448,8 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 	    continue;
 	}
 
-	ret = PINT_serv_decode_resp(msg_p->encoded_resp_p,
+	ret = PINT_serv_decode_resp(msg_p->fs_id,
+				    msg_p->encoded_resp_p,
 				    &decoded_resp,
 				    &msg_p->svr_addr,
 				    msg_p->recv_status.actual_size,

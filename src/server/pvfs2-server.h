@@ -284,6 +284,9 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 	case PVFS_SERV_JOB_TIMER:
 	    ret_ptr = "job_timer";
 	    break;
+	case PVFS_SERV_PROTO_ERROR:
+	    ret_ptr = "proto_error";
+	    break;
     }
     return(ret_ptr);
 }
@@ -321,6 +324,7 @@ extern struct PINT_state_machine_s pvfs2_noop_sm;
 extern struct PINT_state_machine_s pvfs2_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_perf_update_sm;
 extern struct PINT_state_machine_s pvfs2_job_timer_sm;
+extern struct PINT_state_machine_s pvfs2_proto_error_sm;
 extern struct PINT_state_machine_s pvfs2_perf_mon_sm;
 extern struct PINT_state_machine_s pvfs2_event_mon_sm;
 extern struct PINT_state_machine_s pvfs2_iterate_handles_sm;

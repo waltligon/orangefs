@@ -705,6 +705,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
         gossip_debug(GOSSIP_IO_DEBUG, "  matched response from %d.\n", i);
 
         ret = PINT_serv_decode_resp(
+	    msg_p->fs_id,
             msg_p->encoded_resp_p, &decoded_resp, &msg_p->svr_addr,
             msg_p->recv_status.actual_size, &resp_p);
         if (ret != 0)
@@ -1070,6 +1071,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                          * msgpair; it's the same address.
                          */
                         ret = PINT_serv_decode_resp(
+			    msg_p->fs_id,
                             iosm_p->ackarray[i].encoded_resp_p,
                             &decoded_resp,
                             &msg_p->svr_addr,

@@ -1,0 +1,109 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "pvfs2-server.h"
+
+static int proto_error_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p);
+
+%%
+
+machine pvfs2_proto_error_sm(init, cleanup)
+{
+	state init
+	{
+		run proto_error_init;
+		default => cleanup;
+	}
+
+	state cleanup
+	{
+		run proto_error_cleanup;
+		default => terminate;
+	}
+}
+
+%%
+
+/* proto_error_init()
+ *
+ * encode and send a response indicating a protocol error
+ */
+static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
+{
+    int ret;
+    job_id_t tmp_id;
+
+    PINT_STATE_DEBUG("init");
+
+    BMI_set_info(s_op->addr, BMI_INC_ADDR_REF, NULL);
+
+    s_op->resp.op = PVFS_SERV_PROTO_ERROR;
+    s_op->resp.status = -PVFS_EPROTO;
+
+    /* encode message */
+    ret = PINT_encode(&s_op->resp,
+		      PINT_ENCODE_RESP,
+		      &(s_op->encoded),
+		      s_op->addr,
+		      ENCODING_DEFAULT);
+    if (ret < 0)
+    {
+	gossip_lerr("Error: PINT_encode() failure.\n");
+	/* TODO: probably should dump contents of response to give 
+	 * some clues as to what went wrong
+	 */
+	js_p->error_code = ret;
+	return 1;
+    }
+
+    /* send the response */
+    ret = job_bmi_send_list(s_op->addr,
+			    s_op->encoded.buffer_list,
+			    s_op->encoded.size_list,
+			    s_op->encoded.list_count,
+			    s_op->encoded.total_size,
+			    s_op->tag,
+			    s_op->encoded.buffer_type,
+			    0,
+			    s_op,
+			    0,
+			    js_p,
+			    &tmp_id,
+			    server_job_context,
+			    PVFS2_SERVER_RESPONSE_TIMEOUT);
+
+    return ret;
+}
+
+/* proto_error_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static int proto_error_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+{
+    PINT_STATE_DEBUG("cleanup");
+    return(server_state_machine_complete(s_op));
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */
+

@@ -50,6 +50,7 @@ int do_encode_resp(
     case PVFS_SERV_TRUNCATE:
     case PVFS_SERV_MGMT_NOOP:
     case PVFS_SERV_STATFS:
+    case PVFS_SERV_PROTO_ERROR:
 	/* 
 	 *  There is an int64_t here...
 	 *  but handled correctly so far!

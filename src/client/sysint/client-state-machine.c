@@ -18,6 +18,7 @@
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
+#include "pvfs2-util.h"
 
 job_context_id pint_client_sm_context;
 
@@ -180,18 +181,44 @@ int PINT_client_state_machine_test(void)
     return 0;
 }
 
-int PINT_serv_decode_resp(void *encoded_resp_p,
+int PINT_serv_decode_resp(PVFS_fs_id fs_id,
+			  void *encoded_resp_p,
 			  struct PINT_decoded_msg *decoded_resp_p,
 			  PVFS_BMI_addr_t *svr_addr_p,
 			  int actual_resp_sz,
 			  struct PVFS_server_resp **resp_out_pp)
 {
+    const char* server_string;
+    int server_type;
+    PVFS_credentials creds;
+
     int ret = PINT_decode(encoded_resp_p, PINT_DECODE_RESP,
                           decoded_resp_p, /* holds data on decoded resp */
                           *svr_addr_p, actual_resp_sz);
     if (ret > -1)
     {
         *resp_out_pp = (struct PVFS_server_resp *)decoded_resp_p->buffer;
+	if((*resp_out_pp)->op == PVFS_SERV_PROTO_ERROR)
+	{
+	    gossip_err("Error: server does not seem to understand the protocol "
+	    "that this client is using.\n");
+	    gossip_err("   Please check server logs for more information.\n");
+	    if(fs_id != PVFS_FS_ID_NULL)
+	    {
+		PVFS_util_gen_credentials(&creds);
+		server_string = PVFS_mgmt_map_addr(fs_id,
+						   creds,
+						   *svr_addr_p,
+						   &server_type);
+		gossip_err("   Server: %s.\n", server_string);
+	    }
+	    else
+	    {
+		gossip_err("   Server: unknown; probably an error contacting "
+		"server listed in pvfs2tab file.\n");
+	    }
+	    return(-EPROTONOSUPPORT);
+	}
     }
     return ret;
 }

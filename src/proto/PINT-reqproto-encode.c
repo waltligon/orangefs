@@ -249,7 +249,7 @@ int PINT_decode(
 	"that the version is\n   consistent.\n");
     }
 
-    return(-PVFS_EPROTO);
+    return(-PVFS_EPROTONOSUPPORT);
 }
 	
 /* PINT_encode_release()

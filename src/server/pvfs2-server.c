@@ -1189,13 +1189,24 @@ static int server_state_machine_start(
                       &s_op->decoded,
                       s_op->unexp_bmi_buff.addr,
                       s_op->unexp_bmi_buff.size);
-    if (ret < 0)
+    assert(ret <= 0);
+    s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
+    if(ret == -PVFS_EPROTONOSUPPORT)
+    {
+	/* we have a protocol mismatch of some sort; try to trigger a
+	 * response that gives a helpful error on client side even though we
+	 * can't interpret what the client was asking for
+	 */
+	s_op->op = PVFS_SERV_PROTO_ERROR;
+    }
+    else if(ret == 0)
+    {
+	s_op->op = s_op->req->op;
+    }
+    else
     {
 	return(ret);
     }
-
-    s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
-    assert(s_op->req != NULL);
 
     /* start by setting a timestamp on the beginning of this state machine */
     id_gen_fast_register(&tmp_id, s_op);
@@ -1207,7 +1218,6 @@ static int server_state_machine_start(
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
     s_op->tag  = s_op->unexp_bmi_buff.tag;
-    s_op->op   = s_op->req->op;
     s_op->current_state = PINT_state_machine_locate(s_op);
 
     if (!s_op->current_state)
@@ -1218,7 +1228,7 @@ static int server_state_machine_start(
 	return(-PVFS_ENOSYS);
     }
 
-    s_op->resp.op = s_op->req->op;
+    s_op->resp.op = s_op->op;
 
     return ((s_op->current_state->state_action))(s_op,js_p);
 }
@@ -1309,6 +1319,7 @@ static void server_state_table_initialize(void)
     PINT_server_op_table[PVFS_SERV_STATFS]	  = &pvfs2_statfs_sm;
     PINT_server_op_table[PVFS_SERV_PERF_UPDATE]	  = &pvfs2_perf_update_sm;
     PINT_server_op_table[PVFS_SERV_JOB_TIMER]	  = &pvfs2_job_timer_sm;
+    PINT_server_op_table[PVFS_SERV_PROTO_ERROR]	  = &pvfs2_proto_error_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_PERF_MON] = &pvfs2_perf_mon_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_EVENT_MON] = &pvfs2_event_mon_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_ITERATE_HANDLES] 

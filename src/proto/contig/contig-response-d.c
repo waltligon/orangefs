@@ -137,6 +137,7 @@ int do_decode_resp(
     case PVFS_SERV_TRUNCATE:
     case PVFS_SERV_MGMT_NOOP:
     case PVFS_SERV_STATFS:
+    case PVFS_SERV_PROTO_ERROR:
 	return 0;
 
     /* invalid response types: */

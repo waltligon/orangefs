@@ -430,7 +430,8 @@ int PINT_serv_prepare_msgpair(PVFS_object_ref object_ref,
 			      int *max_resp_sz_out_p,
 			      PVFS_msg_tag_t *session_tag_out_p);
 
-int PINT_serv_decode_resp(void *encoded_resp_p,
+int PINT_serv_decode_resp(PVFS_fs_id fs_id,
+			  void *encoded_resp_p,
 			  struct PINT_decoded_msg *decoded_resp_p,
 			  PVFS_BMI_addr_t *svr_addr_p,
 			  int actual_resp_sz,
