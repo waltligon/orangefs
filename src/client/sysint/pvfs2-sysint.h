@@ -17,9 +17,6 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
-#if 0
-#include "llist.h"
-#endif
 #include "pvfs-request.h"
 
 /* TODO: note that this should be a derived value eventually.  For
@@ -27,8 +24,6 @@
  * TROVE_ITERATE_START in trove.h
  */
 #define PVFS2_READDIR_START (INT_MAX-1)
-
-/*#define NUM_SERVER 10*/
 
 /* IO server stats */
 struct PVFS_io_stat_s {
@@ -214,24 +209,6 @@ struct PVFS_sysresp_getparent_s {
 };
 typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
 
-#if 0
-/* is this relevant to anything? */
-
-/* PVFS system request structure
- */
-struct PVFS_system_req_s {
-	int32_t req_tag; /* Tag to group reqs+acks */
-	int32_t verno;	  /* Version number */
-	union {
-		PVFS_sysreq_mkdir mkdir;
-		PVFS_sysreq_remove remove;
-		PVFS_sysreq_rename rename;
-		PVFS_sysreq_readdir readdir;
-	} u;
-};
-
-#endif
-
 /* PVFS system response structure
  */
 struct PVFS_system_resp_s {
@@ -256,12 +233,6 @@ struct PVFS_system_resp_s {
 };
 
 /*declarations*/
-
-/*struct metaserv_table
-{
-	char **table_p;
-	int number;
-};*/
 
 /* an enumeration that controls what type of operation is performed in
  * PVFS_sys_io()
