@@ -32,6 +32,8 @@ functions.
   way to determine if an eager send matches an eager or rend.
   receive.
 
+convert to new error code scheme 
+
 General (portability)
 -----------------------
 
@@ -56,9 +58,6 @@ functions, so that they are more clever about multiplexing between
 multiple modules and splitting up the max_idle_time (right now
 each module is called once with 1/n idle time)
 
-come up with some decent defaults for BMI timeouts and give them
-symbolic names to use throughout the pvfs2 code
-
 we can probably redo op_list_search as a simpler function - I'm not sure
 we need so much flexibility any more, so maybe we can skip passing
 a whole key into search.
@@ -69,19 +68,6 @@ expected size, etc.
 
 Document what stuff in the method_op structure must be filled in by
 methods for correct BMI operation, and what is just there for convenience
-
-consider using a special return value from testsome and waitsome to
-indicate if any ops completed in error.  That way if zero is returned,
-there is no need to check status of every op.
-- UPDATE: actually we should make sure the semantics of this match
-  trove as well - not settled yet.
-
-Audit code to verify that if errors happen at post_send() or
-post_recv() time that they get propigated out at test() time.
-Otherwise we may lose error code information.
-
-Clean up hash table used in bmi_tcp method and apply it to the
-bmi_gm method also.
 
 Optimize the locking, etc. so that we are more efficient in multi
 threaded environments.  For now we just grab one massive lock at
@@ -119,13 +105,6 @@ space on socket before calling to avoid handling partical
 completion of list stuff on nonblocking socket (maybe use blocking
 readv or writev if buffers big enough, would avoid nasty cleanup
 and probably not really block)
-
-Do something about extra mallocs at beginning of post_send and
-post_recv.
-
-Look over places where error_code is set; try to pass more information
-out when system calls fail.  This is really blocking on the
-definition of a consistent PVFS2 error scheme, though.
 
 There are more oportunities for immediate completion on receives
 (specifically, look at the end of tcp_post_recv_rend() when we add to the
