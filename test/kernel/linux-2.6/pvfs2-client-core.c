@@ -44,7 +44,7 @@
   may be some inconsistencies, but this will be cleaned
   up as the system interface is changed in time.
 */
-#define PCACHE_TIMEOUT_MS 6000000
+#define PCACHE_TIMEOUT_MS 1/*6000000*/
 
 static int service_lookup_request(
     PVFS_sysresp_init *init_response,
@@ -132,7 +132,6 @@ static int service_create_request(
         if (ret < 0)
         {
             /*
-              FIXME:
               if the create failed because the file already exists,
               do a (hopefully (d)cached) lookup here and return the
               pinode_reference along with success.
@@ -141,6 +140,30 @@ static int service_create_request(
               before the pvfs2-client crashes; we want to report
               success on resume to the vfs that retried the operation.
             */
+            if (ret == -PVFS_EEXIST)
+            {
+                PVFS_sysresp_lookup lk_response;
+                memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
+
+                ret = PVFS_sys_ref_lookup(parent_refn.fs_id,
+                                          in_upcall->req.create.d_name,
+                                          parent_refn,
+                                          in_upcall->credentials,
+                                          &lk_response);
+                if (ret != 0)
+                {
+                    gossip_err("lookup on existing file failed; "
+                               "aborting create\n");
+                    goto create_failure;
+                }
+                else
+                {
+                    /* copy out the looked up pinode reference */
+                    response.pinode_refn = lk_response.pinode_refn;
+                    goto create_lookup_success;
+                }
+            }
+          create_failure:
             gossip_err("Failed to create %s under %Lu on fsid %d!\n",
                        in_upcall->req.create.d_name,
                        parent_refn.handle,parent_refn.fs_id);
@@ -154,6 +177,7 @@ static int service_create_request(
         }
         else
         {
+          create_lookup_success:
             out_downcall->type = PVFS2_VFS_OP_CREATE;
             out_downcall->status = 0;
             out_downcall->resp.create.refn = response.pinode_refn;

@@ -379,14 +379,13 @@ struct inode *pvfs2_get_custom_inode(
 	inode->i_mode = mode;
 	inode->i_mapping->a_ops = &pvfs2_address_operations;
 	inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
-	inode->i_uid = current->uid;
-	inode->i_gid = current->gid;
+	inode->i_uid = current->fsuid;
+	inode->i_gid = current->fsgid;
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-
         inode->i_size = 0;
         inode->i_blksize = PAGE_CACHE_SIZE;
         inode->i_blkbits = PAGE_CACHE_SHIFT;
-        inode->i_blocks = 1;
+        inode->i_blocks = 0;
 
         if (mode & S_IFREG)
         {

@@ -1,4 +1,3 @@
-
 /*
  * (C) 2001 Clemson University and The University of Chicago
  *

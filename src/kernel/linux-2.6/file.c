@@ -179,7 +179,8 @@ static ssize_t pvfs2_file_write(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
     pvfs2_print("pvfs2: pvfs2_file_write called on %s\n",
-		file->f_dentry->d_name.name);
+		(file && file->f_dentry && file->f_dentry->d_name.name ?
+                 file->f_dentry->d_name.name : "UNKNOWN"));
     
     new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
     if (!new_op)

@@ -524,8 +524,11 @@ static int create_crdirent_failure(PINT_client_sm *sm_p,
 {
     gossip_debug(CLIENT_DEBUG, "create state: crdirent_failure\n");
 
-    /* FIXME: EEXISTS? Cleanup? */
-
+    if (js_p->error_code == -PVFS_EEXIST)
+    {
+        gossip_debug(CLIENT_DEBUG, "crdirent failed: "
+                     "dirent already exists!\n");
+    }
     return 1;
 }
 

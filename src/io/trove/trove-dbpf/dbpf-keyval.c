@@ -117,7 +117,9 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 
     ret = db_p->get(db_p, NULL, &key, &data, 0);
     if (ret != 0) {
-	db_p->err(db_p, ret, "DB->get in dbpf_keyval_read_op_svc");
+        gossip_debug(TROVE_DEBUG,
+                     "warning: keyval read error (get() failed)\n");
+/* 	db_p->err(db_p, ret, "DB->get in dbpf_keyval_read_op_svc"); */
 	error = -dbpf_db_error_to_trove_error(ret);
 
 	goto return_error;

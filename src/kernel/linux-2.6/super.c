@@ -206,7 +206,6 @@ int pvfs2_fill_sb(
     sb->s_magic = PVFS2_MAGIC;
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
-    sb->s_bdev = MKDEV(0,0);
 
     sb->s_blocksize = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
     shift_val = ((sizeof(sb->s_blocksize_bits) * 8) - 1);
@@ -265,7 +264,7 @@ struct super_block *pvfs2_get_sb(
     const char *devname,
     void *data)
 {
-    return get_sb_single(fst, flags, data, pvfs2_fill_sb);
+    return get_sb_nodev(fst, flags, data, pvfs2_fill_sb);
 }
 
 void pvfs2_kill_sb(
