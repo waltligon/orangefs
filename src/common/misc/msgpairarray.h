@@ -69,6 +69,15 @@ typedef struct PINT_sm_msgpair_state_s
 
 } PINT_sm_msgpair_state;
 
+/* used to pass in parameters that apply to every entry in a msgpair array */
+typedef struct PINT_sm_msgpair_params_s
+{   
+    int job_timeout;
+    int retry_delay;
+    int retry_limit;
+    job_context_id job_context;
+} PINT_sm_msgpair_params;
+
 #endif /* __MSGPAIRARRAY_H */
 
 /*

@@ -41,8 +41,6 @@
 #include "pint-servreq.h"
 #include "PINT-reqproto-encode.h"
 
-extern job_context_id pint_client_sm_context;
-
 enum
 {
     MSGPAIRS_COMPLETE = 190,
@@ -254,8 +252,8 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 			   i,
 			   &msg_p->recv_status,
 			   &msg_p->recv_id,
-			   pint_client_sm_context,
-			   PVFS2_CLIENT_JOB_TIMEOUT);
+			   sm_p->msgarray_params.job_context,
+			   sm_p->msgarray_params.job_timeout);
 	if (ret == 0)
 	{
 	    /* perform a quick test to see if the recv failed before posting
@@ -264,7 +262,8 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 	     * response
 	     */
 	    ret = job_test(msg_p->recv_id, &tmp, NULL,
-			   &msg_p->recv_status, 0, pint_client_sm_context);
+			   &msg_p->recv_status, 0,
+			   sm_p->msgarray_params.job_context);
 	}
 
 	if ((ret < 0) || (ret == 1))
@@ -316,8 +315,8 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 				sm_p->msgarray_count+i,
 				&msg_p->send_status,
 				&msg_p->send_id,
-				pint_client_sm_context,
-				PVFS2_CLIENT_JOB_TIMEOUT);
+				sm_p->msgarray_params.job_context,
+				sm_p->msgarray_params.job_timeout);
 
  	if ((ret < 0) ||
             ((ret == 1) && (msg_p->send_status.error_code != 0)))
@@ -381,8 +380,9 @@ static int msgpairarray_post_retry(PARENT_SM *sm_p,
                  "(%p) msgpairarray state: post_retry\n", sm_p);
 
     return job_req_sched_post_timer(
-        PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
-        pint_client_sm_context);
+	sm_p->msgarray_params.retry_limit,
+        sm_p, 0, js_p, &tmp_id,
+	sm_p->msgarray_params.job_context);
 }
 
 static int msgpairarray_complete(PARENT_SM *sm_p,
@@ -472,7 +472,7 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
             if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
                 (PVFS_ERROR_CLASS(-msg_p->op_status) ==
                  PVFS_ERROR_BMI) &&
-                (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
+                (msg_p->retry_count < sm_p->msgarray_params.retry_limit))
             {
                 msg_p->retry_count++;
 

@@ -371,6 +371,7 @@ typedef struct PINT_client_sm
      */
     int msgarray_count;
     PINT_sm_msgpair_state *msgarray;
+    PINT_sm_msgpair_params msgarray_params;
 
     /*
       internal pvfs_object references; used in conjunction with the
