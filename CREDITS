@@ -41,6 +41,7 @@ David Beilloin <dbeilloi@mc.com>
    NFS)
 -- reported memory leak in pvfs2-rm admin tool
 -- contributed resource reclamation on some failure cases
+-- contributed strip size to pvfs2-cp
 
 
 Other contributors

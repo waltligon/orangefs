@@ -75,7 +75,7 @@ static double Wtime(void);
 static void print_timings( double time, int64_t total);
 static int resolve_filename(file_object *obj, char *filename);
 static int generic_open(file_object *obj, PVFS_credentials *credentials, 
-	int nr_datafiles, char *srcname, int open_type);
+	int nr_datafiles, int strip_size, char *srcname, int open_type);
 static size_t generic_read(file_object *src, char *buffer, 
 	int64_t offset, size_t count, PVFS_credentials *credentials);
 static size_t generic_write(file_object *dest, char *buffer, 
@@ -144,14 +144,14 @@ int main (int argc, char ** argv)
 
     PVFS_util_gen_credentials(&credentials);
 
-    ret = generic_open(&src, &credentials, 0, NULL, OPEN_SRC);
+    ret = generic_open(&src, &credentials, 0, 0, NULL, OPEN_SRC);
     if (ret < 0)
     {
 	fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
 	goto main_out;
     }
 
-    ret = generic_open(&dest, &credentials, user_opts->num_datafiles,
+    ret = generic_open(&dest, &credentials, user_opts->num_datafiles, user_opts->strip_size,
                        user_opts->srcfile, OPEN_DEST);
 
     if (ret < 0)
@@ -289,11 +289,11 @@ static void usage(int argc, char** argv)
     fprintf(stderr, 
 	"Usage: %s ARGS src_file dest_file\n", argv[0]);
     fprintf(stderr, "Where ARGS is one or more of"
-	"\n-s <strip_size>\t\tsize of access to PVFS2 volume"
+	"\n-s <strip_size>\t\t\tsize of access to PVFS2 volume"
 	"\n-n <num_datafiles>\t\tnumber of PVFS2 datafiles to use"
 	"\n-b <buffer_size>\t\thow much data to read/write at once"
-	"\n-t \t\t\t print some timing information\n"
-	"\n-v \t\t\t print version number and exit\n");
+	"\n-t\t\t\t\tprint some timing information"
+	"\n-v\t\t\t\tprint version number and exit\n");
     return;
 }
 
@@ -405,13 +405,14 @@ static int resolve_filename(file_object *obj, char *filename)
  */
 
 static int generic_open(file_object *obj, PVFS_credentials *credentials,
-                        int nr_datafiles, char *srcname, int open_type)
+                        int nr_datafiles, int strip_size, char *srcname, int open_type)
 {
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_getattr resp_getattr;
     PVFS_sysresp_create resp_create;
     PVFS_object_ref parent_ref;
+    PVFS_sys_dist   *new_dist;
     int ret = -1;
     char *entry_name;		    /* name of the pvfs2 file */
     char str_buf[PVFS_NAME_MAX];    /* basename of pvfs2 file */
@@ -608,9 +609,22 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
                 stat(srcname, &stat_buf);
 		make_attribs(&(obj->pvfs2.attr), credentials, nr_datafiles,
                              (int)stat_buf.st_mode);
+                if (strip_size){
+                    new_dist = PVFS_sys_dist_lookup("simple_stripe");
+                    ret = PVFS_sys_dist_setparam(new_dist, "strip_size", &strip_size);
+                    if (ret < 0)
+                    {
+                       PVFS_perror("PVFS_sys_dist_setparam", ret); 
+		       return -1; 
+                    }
+                }
+                else {
+                    new_dist=NULL;
+                }
+            
 		ret = PVFS_sys_create(entry_name, parent_ref, 
                                       obj->pvfs2.attr, credentials,
-                                      NULL, &resp_create);
+                                      new_dist, &resp_create);
 		if (ret < 0)
 		{
 		    PVFS_perror("PVFS_sys_create", ret); 

@@ -14,6 +14,8 @@ pvfs2-1.1.0pre1
 - trove: fix bugs introduced by new features of DB 4.3.xx
 - docs: added doxygen configuration file and doxygen-style docs
   to many source files
+- pvfs2-cp: can pass strip size as a parameter (thanks David Beilloin
+  <dbeilloi@mc.com>)
 
 
 pvfs2-1.0.1
