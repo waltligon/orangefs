@@ -605,8 +605,14 @@ int PVFS_util_remove_internal_mntent(
         }
         else
         {
-            /* special case: we're removing the last mnt entry here */
-            free_mntent(&s_stat_tab_array[found_index].mntent_array[j]);
+            /*
+              special case: we're removing the last mnt entry in the
+              array here.  since this is the case, we also free the
+              array since we know it's now empty.
+            */
+            free_mntent(&s_stat_tab_array[found_index].mntent_array[0]);
+            free(s_stat_tab_array[found_index].mntent_array);
+            s_stat_tab_array[found_index].mntent_array = NULL;
             s_stat_tab_array[found_index].mntent_count = 0;
             ret = 0;
         }
