@@ -159,13 +159,16 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "statfs_list state: mgmt_statfs_list_setup_msgpair\n");
 
-    for(i=0; i<sm_p->msgarray_count; i++)
+    js_p->error_code = 0;
+
+    for(i = 0; i<sm_p->msgarray_count; i++)
     {
 	msg_p = &sm_p->msgarray[i];
 
-	PINT_SERVREQ_STATFS_FILL(msg_p->req,
-				 *sm_p->cred_p,
-				 sm_p->u.statfs_list.fs_id);
+	PINT_SERVREQ_STATFS_FILL(
+            msg_p->req,
+            *sm_p->cred_p,
+            sm_p->u.statfs_list.fs_id);
 
 	msg_p->fs_id = sm_p->u.statfs_list.fs_id;
 	msg_p->handle = PVFS_HANDLE_NULL;
@@ -173,9 +176,6 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
 	msg_p->comp_fn = statfs_list_comp_fn;
 	msg_p->svr_addr = sm_p->u.statfs_list.addr_array[i];
     }
-
-    /* immediate return: next state jumps to msgpairarray machine */
-    js_p->error_code = 0;
     return 1;
 }
 
@@ -215,6 +215,7 @@ static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
 	free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
 
     sm_p->error_code  = error;
@@ -259,8 +260,9 @@ static int statfs_list_comp_fn(void *v_p,
 
         if (ret)
         {
-            PVFS_perror_gossip("PINT_cached_config_get_server_handle_count failed ",
-                        ret);
+            PVFS_perror_gossip(
+                "PINT_cached_config_get_server_handle_count failed ",
+                ret);
             return ret;
         }
 	assert(sm_stat->handles_total_count >=

@@ -615,8 +615,8 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
         if (!sm_p->acache_hit)
         {
             int release_required = 1;
-            PINT_pinode *pinode =
-                PINT_acache_lookup(sm_p->u.getattr.object_ref);
+            PINT_pinode *pinode = PINT_acache_lookup(
+                sm_p->u.getattr.object_ref);
             if (!pinode)
             {
                 pinode = PINT_acache_pinode_alloc();

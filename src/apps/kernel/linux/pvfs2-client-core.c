@@ -229,10 +229,8 @@ static int cancel_op_in_progress(PVFS_id_gen_t tag)
             hash_link, vfs_request_t, hash_link);
         assert(vfs_request);
         assert(vfs_request->info.tag == tag);
-        /*
-          for now, cancellation is ONLY support on I/O operations,
-          so assert that this is an I/O operation
-        */
+
+        /* for now, cancellation is ONLY supported on I/O operations */
         assert(vfs_request->in_upcall.type == PVFS2_VFS_OP_FILE_IO);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, "cancelling I/O req %p "
@@ -1313,8 +1311,6 @@ static inline void package_downcall_members(
                         (size_t)vfs_request->response.io.total_completed;
                 }
 #else
-                assert(vfs_request->io_tmp_buf == NULL);
-
                 PVFS_Request_free(&vfs_request->mem_req);
                 PVFS_Request_free(&vfs_request->file_req);
 

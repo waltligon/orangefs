@@ -1045,6 +1045,23 @@ static int io_cleanup(PINT_client_sm *sm_p,
 
     CLEAN_PRIVATE_MEMBERS(sm_p);
 
+    if (sm_p->acache_hit)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "Invalidating cached attribute size\n");
+
+        sm_p->acache_hit = 0;
+        sm_p->pinode->attr.mask &=
+            ~(PVFS_ATTR_DATA_SIZE | PVFS_ATTR_DATA_ALL);
+        PINT_acache_set_valid(sm_p->pinode);
+        PINT_acache_release(sm_p->pinode);
+        sm_p->pinode = NULL;
+    }
+    else
+    {
+        PINT_acache_object_attr_deep_free(&sm_p->acache_attr);
+    }
+
     sm_p->error_code = js_p->error_code;
 
     if (sm_p->error_code)
@@ -1203,7 +1220,7 @@ static inline int build_context_flow(
     cur_ctx->flow_desc.file_data.fsize = resp->u.io.bstream_size;
     cur_ctx->flow_desc.file_data.dist = attr->u.meta.dist;
     cur_ctx->flow_desc.file_data.server_nr = cur_ctx->server_nr;
-    cur_ctx->flow_desc.file_data.server_ct = sm_p->u.io.datafile_count;
+    cur_ctx->flow_desc.file_data.server_ct = attr->u.meta.dfile_count;
 
     cur_ctx->flow_desc.file_req = sm_p->u.io.file_req;
     cur_ctx->flow_desc.file_req_offset = sm_p->u.io.file_req_offset;
