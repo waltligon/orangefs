@@ -2208,19 +2208,10 @@ int job_testsome(job_id_t * id_array,
     /* check before we do anything else to see if the job that we
      * want is in the completion queue
      */
-    if (returned_user_ptr_array)
-    {
-	ret = completion_query_some(tmp_id_array,
-				    inout_count_p, out_index_array,
-				    returned_user_ptr_array,
-				    out_status_array_p);
-    }
-    else
-    {
-	ret = completion_query_some(tmp_id_array,
-				    inout_count_p, out_index_array, NULL,
-				    out_status_array_p);
-    }
+    ret = completion_query_some(tmp_id_array,
+				inout_count_p, out_index_array,
+				returned_user_ptr_array,
+				out_status_array_p);
 
     /* return here on error or completion */
     if (ret < 0)
@@ -2294,8 +2285,7 @@ int job_testsome(job_id_t * id_array,
 	}
 	else
 	{
-	    /* check queue now to see of the op we want is done */
-	    if (returned_user_ptr_array)
+	    if(returned_user_ptr_array)
 	    {
 		ret = completion_query_some(tmp_id_array,
 					    inout_count_p,
@@ -2346,7 +2336,7 @@ int job_testsome(job_id_t * id_array,
 	if (num_completed > 0)
 	{
 	    /* check queue now to see of the op we want is done */
-	    if (returned_user_ptr_array)
+	    if(returned_user_ptr_array)
 	    {
 		ret = completion_query_some(tmp_id_array,
 					    inout_count_p,
@@ -2365,6 +2355,7 @@ int job_testsome(job_id_t * id_array,
 					    &out_status_array_p
 					    [total_completed]);
 	    }
+	    
 	    /* return here on error or completion */
 	    if (ret < 0)
 	    {
@@ -3338,9 +3329,11 @@ static int completion_query_some(job_id_t * id_array,
 				 void **returned_user_ptr_array,
 				 job_status_s * out_status_array_p)
 {
-    int ret = -1;
     int i;
     struct job_desc *tmp_desc;
+    int incount = *inout_count_p;
+
+    *inout_count_p = 0;
 
     gen_mutex_lock(&completion_mutex);
     if (completion_error)
@@ -3348,43 +3341,40 @@ static int completion_query_some(job_id_t * id_array,
 	gen_mutex_unlock(&completion_mutex);
 	return (completion_error);
     }
-    ret = job_desc_q_search_multi(completion_queue, id_array,
-				  inout_count_p, out_index_array);
-    if (ret < 0)
-    {
-	gen_mutex_unlock(&completion_mutex);
-	return (ret);
-    }
 
-    for (i = 0; i < (*inout_count_p); i++)
+    for(i=0; i<incount; i++)
     {
-	tmp_desc = id_gen_fast_lookup(id_array[out_index_array[i]]);
-	if (returned_user_ptr_array)
+	tmp_desc = id_gen_fast_lookup(id_array[i]);
+	if(tmp_desc && tmp_desc->completed_flag)
 	{
-	    fill_status(tmp_desc, &(returned_user_ptr_array[i]),
-			&(out_status_array_p[i]));
-	}
-	else
-	{
-	    fill_status(tmp_desc, NULL, &(out_status_array_p[i]));
-	}
-	job_desc_q_remove(tmp_desc);
-	if (tmp_desc->type == JOB_REQ_SCHED &&
-	    tmp_desc->u.req_sched.post_flag == 1)
-	{
-	    /* hang onto desc until release time */
-	    job_desc_q_add(req_sched_inprogress_queue, tmp_desc);
-	}
-	else
-	{
-	    dealloc_job_desc(tmp_desc);
+	    if(returned_user_ptr_array)
+	    {
+		fill_status(tmp_desc,
+		    &(returned_user_ptr_array[*inout_count_p]),
+		    &(out_status_array_p[*inout_count_p]));
+	    }
+	    else
+	    {
+		fill_status(tmp_desc, NULL,
+		    &(out_status_array_p[*inout_count_p]));
+	    }
+	    job_desc_q_remove(tmp_desc);
+	    if (tmp_desc->type == JOB_REQ_SCHED &&
+		tmp_desc->u.req_sched.post_flag == 1)
+	    {
+		/* hang onto desc until release time */
+		job_desc_q_add(req_sched_inprogress_queue, tmp_desc);
+	    }
+	    else
+	    {
+		dealloc_job_desc(tmp_desc);
+	    }
+	    out_index_array[*inout_count_p] = i;
+	    (*inout_count_p)++;
 	}
     }
     gen_mutex_unlock(&completion_mutex);
-
-    return (0);
-
-
+    return(0);
 }
 
 /* TODO: fill in comment */

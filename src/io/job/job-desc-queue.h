@@ -101,12 +101,6 @@ void job_desc_q_add(job_desc_q_p jdqp,
 void job_desc_q_remove(struct job_desc *desc);
 int job_desc_q_empty(job_desc_q_p jdqp);
 struct job_desc *job_desc_q_shownext(job_desc_q_p jdqp);
-struct job_desc *job_desc_q_search(job_desc_q_p jdqp,
-				   job_id_t id);
-int job_desc_q_search_multi(job_desc_q_p jdqp,
-			    job_id_t * id_array,
-			    int *inout_count_p,
-			    int *index_array);
 void job_desc_q_dump(job_desc_q_p jdqp);
 
 #endif /* __JOB_DESC_QUEUE_H */
