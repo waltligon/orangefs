@@ -35,9 +35,10 @@ int main(int argc,char **argv)
 	PVFS_handle lk_handle;
 	PVFS_handle lk_fsid;
 
-	if (argc > 1)
+	if (argc != 2)
 	{
 		printf("USAGE: %s /path/to/lookup\n", argv[0]);
+                return 1;
 	}
 	name_sz = strlen(argv[1]) + 1; /*include null terminator*/
 	filename = malloc(name_sz);
