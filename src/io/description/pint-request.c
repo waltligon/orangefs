@@ -754,7 +754,7 @@ PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 	if(node == NULL)
 		return NULL;
   
-	gossip_debug(REQUEST_DEBUG,"commit node %p\n", node);
+	gossip_debug(REQUEST_DEBUG,"%s: commit node %p\n", __func__, node);
 
 	/* catches any previously packed structures */
 	if (node->committed == -1)
