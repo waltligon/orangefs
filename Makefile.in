@@ -923,7 +923,7 @@ install:: install_doc
 	install -d $(prefix)/bin
 	install -m 755 $(ADMINTOOLS) $(prefix)/bin
 	install -m 755 $(ADMINTOOLS_SERVER) $(prefix)/bin
-	install -m 755 src/apps/admin/pvfs2-genconfig $(prefix)/bin
+	install -m 755 src/apps/admin/pvfs2-config $(prefix)/bin
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(prefix)/bin
 
