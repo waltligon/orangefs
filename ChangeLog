@@ -3,25 +3,55 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.6.3pre1
-===============
-- added abilitity to negate log categories in PVFS_debug_eventlog_to_mask
+pvfs2-0.6.3
+===========
+- added ability to negate log categories in
+  PVFS_debug_eventlog_to_mask
 - added pvfs2-fsck
 - updated pvfs2-quickstart to better discuss client configuration
-- added optional epoll() based socket management component (enable with
-  configure option --enable-epoll on linux 2.6 systems)
+- added optional epoll() based socket management component (enable
+  with configure option --enable-epoll on linux 2.6 systems)
 - fixed configure bug that dropped default CFLAGS in some cases
 - adjusted trove id generation to make it easier to log trove events
-- fixed Makefile.in bug that caused pvfs2-server.c dependency information to
-  be lost
+- fixed Makefile.in bug that caused pvfs2-server.c dependency
+  information to be lost
 - rewrote both threaded and nonthreaded versions of all job_testXXX()
   functions
-  - fixed condition variable usage to avoid signaling races that could lead to
-    unecessary wait times
+  - fixed condition variable usage to avoid signaling races that could
+    lead to unecessary wait times
   - simplified code path
   - removed superfluous calls to gettimeofday()
 - adjustment of condition variable usage in trove-dbpf to avoid races
-  similar to those found in job_testXXX() 
+  similar to those found in job_testXXX()
+- applied vim formatting patch to use spaces instead of tabs
+- fixed pvfs2-server permission check to allow users of the same group
+  to have access to other group members attributes (for listing)
+- fixed incorrect/invalid error codes and error handling
+- fixed pvfs2-server crash bug due to io state machine potentially
+  freeing a reqsched id that was never posted
+- added mgmt methods PVFS_{i}mgmt_get_dirdata_handle for retrieving
+  the internal dirdata handle of a specified 'parent' object (if any)
+- fixed pvfs2-server crash bug (race) in trove that could return an
+  object on queue addition that has already been serviced
+- extended server side mkdir state machine to create the internal
+  dirdata dspace when creating the directory (rather than waiting for
+  crdirent to create it if it doesn't already exist)
+- added mgmt methods PVFS_{i}mgmt_create_dirent mgmt for creating
+  directory entries at a low level
+- fixed request scheduler's acceptance of the mgmt-remove-* operations
+  while in admin mode (since these can be used in admin mode)
+- extended mkspace (and thus pvfs2-mkspace program) to initalize a
+  lost+found directory after the root directory is made
+- kernel changes:
+  - fixed credential usage bug that resulted in (seemingly random)
+    permission problems when using the file system as multiple users
+  - fixed a bug that appeared as data corruption due to mapped memory
+    pages in use being swapped out under heavy memory load under 2.4.x
+    kernels (and containing incorrect data on future accesses)
+  - remove slab poison flag from debug allocators, as some kernels
+    complain about how it was used
+  - do not use kmap/kunmap calls if not configured for HIGHMEM, as
+    some configurations cannot resolve these symbols
 
 
 pvfs2-0.6.2
