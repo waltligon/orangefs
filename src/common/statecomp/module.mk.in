@@ -1,7 +1,6 @@
 DIR := src/common/statecomp
 
 $(DIR)/scanner.o: $(DIR)/scanner.c
-	echo USING ROBS RULE
 	$(CC) $(CFLAGS) -I src/common/statecomp -c $< -o $@
 
 $(DIR)/statecomp: $(DIR)/statecomp.o $(DIR)/parser.o $(DIR)/scanner.o $(DIR)/symbol.o $(DIR)/emalloc.o $(DIR)/codegen.o $(DIR)/stringtbl.o
