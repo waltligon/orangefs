@@ -214,7 +214,10 @@ Consider forcing an ack after streaming data rather than just
 measuring time on one side.
 
 Try removing tcp option calls to see if they impact performance 
-(could all benches- especially latency).
+(could all benches- especially latency). -- too many system calls
+
+Also modify sockio code to not try calling send/recv until it hits EWOULDBLOCK,
+instead maybe stop short after first short operation
 
 Remember to look at the recv mode option to mpich-gm:
 	./mpirun.ch_gm --recv-mode polling -np 4 foo.x
