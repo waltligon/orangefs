@@ -38,6 +38,8 @@ static PVFS_handle test_handles[NUM_TEST_HANDLES] =
     1048525
 };
 
+extern job_context_id PVFS_sys_job_context;
+
 /* this is a test program that exercises the bucket interface and
  * demonstrates how to use it.
  */
@@ -45,7 +47,6 @@ int main(int argc, char **argv)
 {
     int i = 0, j = 0, k = 0, num_file_systems = 0;
     pvfs_mntlist mnt = {0,NULL};
-    job_context_id PVFS_sys_job_context = -1;
     struct server_configuration_s server_config;
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
