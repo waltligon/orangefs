@@ -23,7 +23,7 @@ int do_encode_req(
 		  )
 {
     void* enc_msg;
-    int size = 0, name_sz = 0, i = 0;
+    bmi_size_t size = 0, name_sz = 0;
 
     /* all the messages that we build in this function are one contig. block */
     /* TODO: USE ONE MALLOC() INSTEAD OF TWO */
@@ -237,17 +237,19 @@ int do_encode_req(
 	    size = sizeof( struct PVFS_server_req_s ) + sizeof( struct PVFS_object_attr );
 
 	    /* if we're mkdir'ing a meta file, we need to alloc space for the attributes */
-	    if ( request->u.setattr.attr.objtype == ATTR_META )
+	    if(request->u.setattr.attr.objtype == ATTR_META)
 	    {
 				/* negative datafiles? wtf ... */
-		assert (request->u.setattr.attr.u.meta.nr_datafiles < 0);
+		assert(request->u.setattr.attr.u.meta.nr_datafiles >= 0);
+		assert(request->u.setattr.attr.u.meta.dfh != NULL);
+		printf("%d more bytes needed for handles\n", request->u.setattr.attr.u.meta.nr_datafiles * sizeof(PVFS_handle));
 		size += request->u.setattr.attr.u.meta.nr_datafiles * sizeof( PVFS_handle );
 	    }
 
 	    /* TODO: come back and alloc the right spaces for 
 	     * distributions and eattribs cause they're going to change */
 
-	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER );
+	    enc_msg = BMI_memalloc( target_msg->dest, size + header_size, BMI_SEND_BUFFER );
 	    if (enc_msg == NULL)
 	    {
 		return (-ENOMEM);
@@ -258,18 +260,19 @@ int do_encode_req(
 	    target_msg->total_size = size;
 
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+	    enc_msg += sizeof( struct PVFS_server_req_s );
 
 	    /* throw handles at the end for metadata files */
 	    if ( request->u.setattr.attr.objtype == ATTR_META )
 	    {
-		memcpy( enc_msg + sizeof(struct PVFS_server_req_s), 
+		memcpy( enc_msg, 
 			request->u.setattr.attr.u.meta.dfh, 
 			request->u.setattr.attr.u.meta.nr_datafiles * sizeof( PVFS_handle ) );
 
 		/* make pointer NULL since we're sending it over the wire and don't want 
 		 * random memory referenced on the other side */
 
-		((struct PVFS_server_req_s *)enc_msg)->u.setattr.attr.u.meta.dfh = NULL;
+		/*((struct PVFS_server_req_s *)enc_msg)->u.setattr.attr.u.meta.dfh = NULL;*/
 	    }
 	    return (0);
 
