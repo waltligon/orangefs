@@ -12,7 +12,10 @@ TEST_PTS_MISC := \
 	$(DIR)/test-pvfs-datatype-hvector.c \
 	$(DIR)/test-lookup-bench.c \
 	$(DIR)/test-dir-operations.c \
-	$(DIR)/test-dir-torture.c
+	$(DIR)/test-dir-torture.c \
+	$(DIR)/test-null-params.c \
+	$(DIR)/pvfs-restart-server.c \
+	$(DIR)/pvfs-stop-server.c 
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 

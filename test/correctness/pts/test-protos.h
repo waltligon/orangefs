@@ -14,16 +14,22 @@
 #include <test-pvfs-datatype-contig.h>
 #include <test-pvfs-datatype-vector.h>
 #include <test-pvfs-datatype-hvector.h>
+#include <test-null-params.h>
+#include <pvfs-restart-server.h>
+#include <pvfs-stop-server.h>
 
 enum test_types { 
-    TEST_CREATE,
-        TEST_PVFSDATATYPE_INIT,
-        TEST_PVFSDATATYPE_CONTIG,
-        TEST_PVFSDATATYPE_VECTOR,
-        TEST_PVFSDATATYPE_HVECTOR,
+   TEST_CREATE,
+   TEST_PVFSDATATYPE_INIT,
+   TEST_PVFSDATATYPE_CONTIG,
+   TEST_PVFSDATATYPE_VECTOR,
+   TEST_PVFSDATATYPE_HVECTOR,
 	TEST_DIR_TORTURE,
 	TEST_DIR_OPERATIONS,
-	TEST_LOOKUP_BENCH
+	TEST_LOOKUP_BENCH,
+   TEST_NULL_PARAMS,
+	PVFS_RESTART_SERVER,
+	PVFS_STOP_SERVER
 };
 
 void setup_ptstests(config *myconfig) {
@@ -55,6 +61,12 @@ void setup_ptstests(config *myconfig) {
 
    myconfig->testpool[TEST_LOOKUP_BENCH].test_func = (void *)test_lookup_bench;
    myconfig->testpool[TEST_LOOKUP_BENCH].test_name = str_malloc("test_lookup_bench");
+   myconfig->testpool[TEST_NULL_PARAMS].test_func = (void *)test_null_params;
+   myconfig->testpool[TEST_NULL_PARAMS].test_name = str_malloc("test_null_params");
+   myconfig->testpool[PVFS_RESTART_SERVER].test_func = (void *)pvfs_restart_server;
+   myconfig->testpool[PVFS_RESTART_SERVER].test_name = str_malloc("pvfs_restart_server");
+   myconfig->testpool[PVFS_STOP_SERVER].test_func = (void *)pvfs_stop_server;
+   myconfig->testpool[PVFS_STOP_SERVER].test_name = str_malloc("pvfs_stop_server");
 }
 
 #endif
