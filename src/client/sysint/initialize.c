@@ -23,6 +23,8 @@
 #include "trove.h"
 #include "server-config-mgr.h"
 #include "client-state-machine.h"
+#include "request-scheduler.h"
+#include "job-time-mgr.h"
 
 job_context_id PVFS_sys_job_context = -1;
 
@@ -38,7 +40,9 @@ typedef enum
     CLIENT_JOB_CTX_INIT    = (1 << 4),
     CLIENT_ACACHE_INIT     = (1 << 5),
     CLIENT_NCACHE_INIT     = (1 << 6),
-    CLIENT_CONFIG_MGR_INIT = (1 << 7)
+    CLIENT_CONFIG_MGR_INIT = (1 << 7),
+    CLIENT_REQ_SCHED_INIT  = (1 << 8),
+    CLIENT_JOB_TIME_MGR_INIT = (1 << 9)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -101,6 +105,24 @@ int PVFS_sys_initialize(int default_debug_mask)
         goto error_exit;
     }
     client_status_flag |= CLIENT_FLOW_INIT;
+
+    /* initialize the request scheduler (used mainly for timers) */
+    ret = PINT_req_sched_initialize();
+    if (ret < 0)
+    {
+        gossip_lerr("Req sched initialize failure.\n");
+        goto error_exit;
+    }
+    client_status_flag |= CLIENT_REQ_SCHED_INIT;
+
+    /* initialize the job timeout mgr */
+    ret = job_time_mgr_init();
+    if (ret < 0)
+    {
+        gossip_lerr("Job time mgr initialize failure.\n");
+        goto error_exit;
+    }
+    client_status_flag |= CLIENT_JOB_TIME_MGR_INIT;
 
     /* initialize the job interface and the job context */
     ret = job_initialize(0);
@@ -176,6 +198,11 @@ int PVFS_sys_initialize(int default_debug_mask)
         PINT_acache_finalize();
     }
 
+    if (client_status_flag & CLIENT_JOB_TIME_MGR_INIT)
+    {
+        job_time_mgr_finalize();
+    }
+
     if (client_status_flag & CLIENT_JOB_CTX_INIT)
     {
         job_close_context(PVFS_sys_job_context);
@@ -189,6 +216,11 @@ int PVFS_sys_initialize(int default_debug_mask)
     if (client_status_flag & CLIENT_FLOW_INIT)
     {
         PINT_flow_finalize();
+    }
+
+    if (client_status_flag & CLIENT_REQ_SCHED_INIT)
+    {
+        PINT_req_sched_finalize();
     }
 
     if (client_status_flag & CLIENT_BMI_INIT)

@@ -17,6 +17,8 @@
 #include "server-config-mgr.h"
 #include "PINT-reqproto-encode.h"
 #include "client-state-machine.h"
+#include "request-scheduler.h"
+#include "job-time-mgr.h"
 
 extern job_context_id PVFS_sys_job_context;
 
@@ -45,10 +47,13 @@ int PVFS_sys_finalize()
     gen_mutex_destroy(g_session_tag_mt_lock);
 
     /* finalize the I/O interfaces */
+    job_time_mgr_finalize();
     job_close_context(PVFS_sys_job_context);
     job_finalize();
 
     PINT_flow_finalize();
+
+    PINT_req_sched_finalize();
 
     BMI_finalize();
 
