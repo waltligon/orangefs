@@ -37,6 +37,7 @@ struct result_chain_entry
 /* fp_queue_item describes an individual buffer being used within the flow */
 struct fp_queue_item
 {
+    PVFS_id_gen_t posted_id;
     int last;
     int seq;
     void* buffer;
@@ -347,7 +348,6 @@ static void bmi_recv_callback_fn(void *user_ptr,
     struct fp_queue_item* q_item = user_ptr;
     int ret;
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
-    PVFS_id_gen_t tmp_id;
     PVFS_size tmp_actual_size;
     struct result_chain_entry* result_tmp;
     struct result_chain_entry* old_result_tmp;
@@ -383,7 +383,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	    NULL,
 	    &q_item->trove_callback,
 	    global_trove_context,
-	    &tmp_id);
+	    &q_item->posted_id);
 	result_tmp = result_tmp->next;
 
 	/* TODO: error handling */
@@ -466,7 +466,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	flow_data->total_bytes_processed += bytes_processed;
 
 	/* TODO: what if we recv less than expected? */
-	ret = BMI_post_recv(&tmp_id,
+	ret = BMI_post_recv(&q_item->posted_id,
 	    q_item->parent->src.u.bmi.address,
 	    q_item->buffer,
 	    BUFFER_SIZE,
@@ -507,7 +507,6 @@ static void trove_read_callback_fn(void *user_ptr,
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
     struct result_chain_entry* result_tmp;
     struct result_chain_entry* old_result_tmp;
-    PVFS_id_gen_t tmp_id;
     int done = 0;
     struct qlist_head* tmp_link;
 
@@ -555,7 +554,7 @@ static void trove_read_callback_fn(void *user_ptr,
 	{
 	    flow_data->dest_pending++;
             assert(q_item->buffer_used);
-	    ret = BMI_post_send(&tmp_id,
+	    ret = BMI_post_send(&q_item->posted_id,
 		q_item->parent->dest.u.bmi.address,
 		q_item->buffer,
 		q_item->buffer_used,
@@ -610,7 +609,6 @@ static int bmi_send_callback_fn(void *user_ptr,
     struct result_chain_entry* old_result_tmp;
     void* tmp_buffer;
     PVFS_size bytes_processed = 0;
-    PVFS_id_gen_t tmp_id;
     struct flow_descriptor* flow_d;
 
     /* TODO: error handling */
@@ -744,7 +742,7 @@ static int bmi_send_callback_fn(void *user_ptr,
 	    NULL,
 	    &q_item->trove_callback,
 	    global_trove_context,
-	    &tmp_id);
+	    &q_item->posted_id);
 	result_tmp = result_tmp->next;
 
 	/* TODO: error handling */
@@ -772,7 +770,6 @@ static int bmi_send_callback_fn(void *user_ptr,
 static void trove_write_callback_fn(void *user_ptr,
 		           PVFS_error error_code)
 {
-    PVFS_id_gen_t tmp_id;
     PVFS_size tmp_actual_size;
     struct fp_queue_item* q_item = user_ptr;
     int ret;
@@ -902,7 +899,7 @@ static void trove_write_callback_fn(void *user_ptr,
 	}
 
 	/* TODO: what if we recv less than expected? */
-	ret = BMI_post_recv(&tmp_id,
+	ret = BMI_post_recv(&q_item->posted_id,
 	    q_item->parent->src.u.bmi.address,
 	    q_item->buffer,
 	    BUFFER_SIZE,
@@ -1009,7 +1006,6 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     int ret;
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
     int i;
-    PVFS_id_gen_t tmp_id;
     PVFS_size bytes_processed = 0;
     char *src_ptr, *dest_ptr;
     enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
@@ -1141,7 +1137,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	}
     }
 
-    ret = BMI_post_send_list(&tmp_id,
+    ret = BMI_post_send_list(&q_item->posted_id,
 	q_item->parent->dest.u.bmi.address,
 	(const void**)flow_data->tmp_buffer_list,
 	q_item->result_chain.result.size_array,
@@ -1181,7 +1177,6 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     int ret;
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
     int i;
-    PVFS_id_gen_t tmp_id;
     PVFS_size tmp_actual_size;
     PVFS_size* size_array;
     int segs;
@@ -1332,7 +1327,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 	}
     }
 
-    ret = BMI_post_recv_list(&tmp_id,
+    ret = BMI_post_recv_list(&q_item->posted_id,
 	q_item->parent->src.u.bmi.address,
 	flow_data->tmp_buffer_list,
 	size_array,
