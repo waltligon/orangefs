@@ -188,7 +188,6 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     if (i < DBCACHE_ENTRIES)
     {
 	/* found cached DB */
-	fprintf(stderr, "dbcache: found cached db at index %d\n", i);
 #if 0
 	gossip_debug(TROVE_DEBUG, "dbcache: found cached db at index %d\n", i);
 #endif
