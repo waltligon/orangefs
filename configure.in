@@ -535,7 +535,8 @@ fi
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in src/apps src/io src/common src/client src/kernel test/common \
-	test/io test/client doc test/correctness/pts test/kernel ; do
+	test/io test/client doc test/correctness/pts test/kernel \
+	src/apps/kernel; do
 	install -d $d;
 done
 
