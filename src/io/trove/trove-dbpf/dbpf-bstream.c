@@ -28,20 +28,20 @@
 
 /* Internal prototypes */
 static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
-				       TROVE_handle handle,
-				       char **mem_offset_array, 
-				       TROVE_size *mem_size_array,
-				       int mem_count,
-				       TROVE_offset *stream_offset_array, 
-				       TROVE_size *stream_size_array,
-				       int stream_count,
-				       TROVE_size *out_size_p,
-				       TROVE_ds_flags flags, 
-				       TROVE_vtag_s *vtag,
-				       void *user_ptr,
-				       TROVE_context_id context_id,
-				       TROVE_op_id *out_op_id_p,
-				       int opcode);
+                                       TROVE_handle handle,
+                                       char **mem_offset_array, 
+                                       TROVE_size *mem_size_array,
+                                       int mem_count,
+                                       TROVE_offset *stream_offset_array, 
+                                       TROVE_size *stream_size_array,
+                                       int stream_count,
+                                       TROVE_size *out_size_p,
+                                       TROVE_ds_flags flags, 
+                                       TROVE_vtag_s *vtag,
+                                       void *user_ptr,
+                                       TROVE_context_id context_id,
+                                       TROVE_op_id *out_op_id_p,
+                                       int opcode);
 static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p);
 #ifndef __PVFS2_TROVE_AIO_THREADED__
@@ -131,7 +131,7 @@ static void aio_progress_notification(sigval_t sig)
         DBPF_AIO_SYNC_IF_NECESSARY(
             op_p, op_p->u.b_rw_list.fd, ret, error_code);
 
-	dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
+        dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
         op_p->u.b_rw_list.fd = -1;
 
         /* this is a macro defined in dbpf-thread.h */
@@ -208,15 +208,15 @@ static void aio_progress_notification(sigval_t sig)
 #endif /* __PVFS2_TROVE_AIO_THREADED__ */
 
 static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
-				TROVE_handle handle,
-				void *buffer,
-				TROVE_size *inout_size_p,
-				TROVE_offset offset,
-				TROVE_ds_flags flags,
-				TROVE_vtag_s *vtag, 
-				void *user_ptr,
-				TROVE_context_id context_id,
-				TROVE_op_id *out_op_id_p)
+                                TROVE_handle handle,
+                                void *buffer,
+                                TROVE_size *inout_size_p,
+                                TROVE_offset offset,
+                                TROVE_ds_flags flags,
+                                TROVE_vtag_s *vtag, 
+                                void *user_ptr,
+                                TROVE_context_id context_id,
+                                TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
@@ -234,12 +234,12 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
     
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
-			BSTREAM_READ_AT,
-			handle,
-			coll_p,
-			dbpf_bstream_read_at_op_svc,
-			user_ptr,
-			flags,
+                        BSTREAM_READ_AT,
+                        handle,
+                        coll_p,
+                        dbpf_bstream_read_at_op_svc,
+                        user_ptr,
+                        flags,
                         context_id);
 
     /* initialize the op-specific members */
@@ -262,13 +262,13 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
     struct open_cache_ref tmp_ref;
 
     ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
-	op_p->handle,
-	0,
-	DBPF_OPEN_FD,
-	&tmp_ref);
+        op_p->handle,
+        0,
+        DBPF_OPEN_FD,
+        &tmp_ref);
     if(ret < 0)
     {
-	goto return_error;
+        goto return_error;
     }
     got_fd = 1;
 
@@ -297,22 +297,22 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
  return_error:
     if (got_fd)
     {
-	dbpf_open_cache_put(&tmp_ref);
+        dbpf_open_cache_put(&tmp_ref);
     }
     /* TODO: shouldn't this return a real error code? */
     return -1;
 }
 
 static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
-				 TROVE_handle handle,
-				 void *buffer,
-				 TROVE_size *inout_size_p,
-				 TROVE_offset offset,
-				 TROVE_ds_flags flags,
-				 TROVE_vtag_s *vtag,
-				 void *user_ptr,
-				 TROVE_context_id context_id,
-				 TROVE_op_id *out_op_id_p)
+                                 TROVE_handle handle,
+                                 void *buffer,
+                                 TROVE_size *inout_size_p,
+                                 TROVE_offset offset,
+                                 TROVE_ds_flags flags,
+                                 TROVE_vtag_s *vtag,
+                                 void *user_ptr,
+                                 TROVE_context_id context_id,
+                                 TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
@@ -331,12 +331,12 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
     
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
-			BSTREAM_WRITE_AT,
-			handle,
-			coll_p,
-			dbpf_bstream_write_at_op_svc,
-			user_ptr,
-			flags,
+                        BSTREAM_WRITE_AT,
+                        handle,
+                        coll_p,
+                        dbpf_bstream_write_at_op_svc,
+                        user_ptr,
+                        flags,
                         context_id);
 
     /* initialize the op-specific members */
@@ -356,7 +356,7 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
 
     /* grab the FD (also increments a reference count) */
     ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
-	op_p->handle, 1, DBPF_OPEN_FD, &tmp_ref);
+        op_p->handle, 1, DBPF_OPEN_FD, &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
@@ -388,7 +388,7 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
  return_error:
     if (got_fd)
     {
-	dbpf_open_cache_put(&tmp_ref);
+        dbpf_open_cache_put(&tmp_ref);
     }
     /* TODO: shouldn't this return a real error code? */
     return -1;
@@ -417,12 +417,12 @@ static int dbpf_bstream_flush(TROVE_coll_id coll_id,
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
-			BSTREAM_FLUSH,
-			handle,
-			coll_p,
-			dbpf_bstream_flush_op_svc,
-			user_ptr,
-			flags,
+                        BSTREAM_FLUSH,
+                        handle,
+                        coll_p,
+                        dbpf_bstream_flush_op_svc,
+                        user_ptr,
+                        flags,
                         context_id);
     
     /* initialize the op-specific members */
@@ -444,16 +444,16 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
         op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_FD, &tmp_ref);
     if(ret < 0)
     {
-	error = -trove_errno_to_trove_error(ret);
-	goto return_error;
+        error = -trove_errno_to_trove_error(ret);
+        goto return_error;
     }
     got_fd = 1;
 
     ret = DBPF_SYNC(tmp_ref.fd);
     if (ret != 0)
     {
-	error = -trove_errno_to_trove_error(errno);
-	goto return_error;
+        error = -trove_errno_to_trove_error(errno);
+        goto return_error;
     }
     dbpf_open_cache_put(&tmp_ref);
     return 1;
@@ -461,19 +461,19 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
 return_error:
     if (got_fd)
     {
-	dbpf_open_cache_put(&tmp_ref);
+        dbpf_open_cache_put(&tmp_ref);
     }
     return error;
 }
 
 static int dbpf_bstream_resize(TROVE_coll_id coll_id,
-			       TROVE_handle handle,
-			       TROVE_size *inout_size_p,
-			       TROVE_ds_flags flags,
-			       TROVE_vtag_s *vtag,
-			       void *user_ptr,
-			       TROVE_context_id context_id,
-			       TROVE_op_id *out_op_id_p)
+                               TROVE_handle handle,
+                               TROVE_size *inout_size_p,
+                               TROVE_ds_flags flags,
+                               TROVE_vtag_s *vtag,
+                               void *user_ptr,
+                               TROVE_context_id context_id,
+                               TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
@@ -491,12 +491,12 @@ static int dbpf_bstream_resize(TROVE_coll_id coll_id,
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
-			BSTREAM_RESIZE,
-			handle,
-			coll_p,
-			dbpf_bstream_resize_op_svc,
-			user_ptr,
-			flags,
+                        BSTREAM_RESIZE,
+                        handle,
+                        coll_p,
+                        dbpf_bstream_resize_op_svc,
+                        user_ptr,
+                        flags,
                         context_id);
     
     /* initialize the op-specific members */
@@ -521,16 +521,16 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
         op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_FD, &tmp_ref);
     if(ret < 0)
     {
-	error = -trove_errno_to_trove_error(ret);
-	goto return_error;
+        error = -trove_errno_to_trove_error(ret);
+        goto return_error;
     }
     got_fd = 1;
 
     ret = DBPF_RESIZE(tmp_ref.fd, op_p->u.b_resize.size);
     if ( ret != 0)
     {
-	error = -trove_errno_to_trove_error(errno);
-	goto return_error;
+        error = -trove_errno_to_trove_error(errno);
+        goto return_error;
     }
     dbpf_open_cache_put(&tmp_ref);
 
@@ -543,84 +543,84 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
 return_error:
     if (got_fd)
     {
-	dbpf_open_cache_put(&tmp_ref);
+        dbpf_open_cache_put(&tmp_ref);
     }
     return error;
 }
 
 static int dbpf_bstream_validate(TROVE_coll_id coll_id,
-				 TROVE_handle handle,
-			       	 TROVE_ds_flags flags,
-				 TROVE_vtag_s *vtag,
-				 void *user_ptr,
-				 TROVE_context_id context_id,
-				 TROVE_op_id *out_op_id_p)
+                                 TROVE_handle handle,
+                                 TROVE_ds_flags flags,
+                                 TROVE_vtag_s *vtag,
+                                 void *user_ptr,
+                                 TROVE_context_id context_id,
+                                 TROVE_op_id *out_op_id_p)
 {
     return -TROVE_ENOSYS;
 }
 
 static int dbpf_bstream_read_list(TROVE_coll_id coll_id,
-				  TROVE_handle handle,
-				  char **mem_offset_array, 
-				  TROVE_size *mem_size_array,
-				  int mem_count,
-				  TROVE_offset *stream_offset_array, 
-				  TROVE_size *stream_size_array,
-				  int stream_count,
-				  TROVE_size *out_size_p,
-				  TROVE_ds_flags flags, 
-				  TROVE_vtag_s *vtag,
-				  void *user_ptr,
-				  TROVE_context_id context_id,
-				  TROVE_op_id *out_op_id_p)
+                                  TROVE_handle handle,
+                                  char **mem_offset_array, 
+                                  TROVE_size *mem_size_array,
+                                  int mem_count,
+                                  TROVE_offset *stream_offset_array, 
+                                  TROVE_size *stream_size_array,
+                                  int stream_count,
+                                  TROVE_size *out_size_p,
+                                  TROVE_ds_flags flags, 
+                                  TROVE_vtag_s *vtag,
+                                  void *user_ptr,
+                                  TROVE_context_id context_id,
+                                  TROVE_op_id *out_op_id_p)
 {
     return dbpf_bstream_rw_list(coll_id,
-				handle,
-				mem_offset_array, 
-				mem_size_array,
-				mem_count,
-				stream_offset_array, 
-				stream_size_array,
-				stream_count,
-				out_size_p,
-				flags, 
-				vtag,
-				user_ptr,
-				context_id,
-				out_op_id_p,
-				LIO_READ);
+                                handle,
+                                mem_offset_array, 
+                                mem_size_array,
+                                mem_count,
+                                stream_offset_array, 
+                                stream_size_array,
+                                stream_count,
+                                out_size_p,
+                                flags, 
+                                vtag,
+                                user_ptr,
+                                context_id,
+                                out_op_id_p,
+                                LIO_READ);
 }
 
 static int dbpf_bstream_write_list(TROVE_coll_id coll_id,
-				   TROVE_handle handle,
-				   char **mem_offset_array, 
-				   TROVE_size *mem_size_array,
-				   int mem_count,
-				   TROVE_offset *stream_offset_array, 
-				   TROVE_size *stream_size_array,
-				   int stream_count,
-				   TROVE_size *out_size_p,
-				   TROVE_ds_flags flags, 
-				   TROVE_vtag_s *vtag,
-				   void *user_ptr,
-				   TROVE_context_id context_id,
-				   TROVE_op_id *out_op_id_p)
+                                   TROVE_handle handle,
+                                   char **mem_offset_array, 
+                                   TROVE_size *mem_size_array,
+                                   int mem_count,
+                                   TROVE_offset *stream_offset_array, 
+                                   TROVE_size *stream_size_array,
+                                   int stream_count,
+                                   TROVE_size *out_size_p,
+                                   TROVE_ds_flags flags, 
+                                   TROVE_vtag_s *vtag,
+                                   void *user_ptr,
+                                   TROVE_context_id context_id,
+                                   TROVE_op_id *out_op_id_p)
 {
     return dbpf_bstream_rw_list(coll_id,
-				handle,
-				mem_offset_array, 
-				mem_size_array,
-				mem_count,
-				stream_offset_array, 
-				stream_size_array,
-				stream_count,
-				out_size_p,
-				flags, 
-				vtag,
-				user_ptr,
-				context_id,
-				out_op_id_p,
-				LIO_WRITE);
+                                handle,
+                                mem_offset_array, 
+                                mem_size_array,
+                                mem_count,
+                                stream_offset_array, 
+                                stream_size_array,
+                                stream_count,
+                                out_size_p,
+                                flags, 
+                                vtag,
+                                user_ptr,
+                                context_id,
+                                out_op_id_p,
+                                LIO_WRITE);
 }
 
 /* dbpf_bstream_rw_list()
@@ -630,20 +630,20 @@ static int dbpf_bstream_write_list(TROVE_coll_id coll_id,
  * opcode parameter should be LIO_READ or LIO_WRITE
  */
 static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
-				       TROVE_handle handle,
-				       char **mem_offset_array, 
-				       TROVE_size *mem_size_array,
-				       int mem_count,
-				       TROVE_offset *stream_offset_array, 
-				       TROVE_size *stream_size_array,
-				       int stream_count,
-				       TROVE_size *out_size_p,
-				       TROVE_ds_flags flags, 
-				       TROVE_vtag_s *vtag,
-				       void *user_ptr,
-				       TROVE_context_id context_id,
-				       TROVE_op_id *out_op_id_p,
-				       int opcode)
+                                       TROVE_handle handle,
+                                       char **mem_offset_array, 
+                                       TROVE_size *mem_size_array,
+                                       int mem_count,
+                                       TROVE_offset *stream_offset_array, 
+                                       TROVE_size *stream_size_array,
+                                       int stream_count,
+                                       TROVE_size *out_size_p,
+                                       TROVE_ds_flags flags, 
+                                       TROVE_vtag_s *vtag,
+                                       void *user_ptr,
+                                       TROVE_context_id context_id,
+                                       TROVE_op_id *out_op_id_p,
+                                       int opcode)
 {
     int ret;
     dbpf_queued_op_t *q_op_p;
@@ -669,27 +669,27 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 
     if (opcode == LIO_READ)
     {
-	tmp_type = BSTREAM_READ_LIST;
-	event_type = PVFS_EVENT_TROVE_READ_LIST;
+        tmp_type = BSTREAM_READ_LIST;
+        event_type = PVFS_EVENT_TROVE_READ_LIST;
     }
     else
     {
-	tmp_type = BSTREAM_WRITE_LIST;
-	event_type = PVFS_EVENT_TROVE_WRITE_LIST;
+        tmp_type = BSTREAM_WRITE_LIST;
+        event_type = PVFS_EVENT_TROVE_WRITE_LIST;
     }
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
-			tmp_type,
-			handle,
-			coll_p,
+                        tmp_type,
+                        handle,
+                        coll_p,
 #ifdef __PVFS2_TROVE_AIO_THREADED__
                         NULL,
 #else
-			dbpf_bstream_rw_list_op_svc,
+                        dbpf_bstream_rw_list_op_svc,
 #endif
-			user_ptr,
-			flags,
+                        user_ptr,
+                        flags,
                         context_id);
 
     DBPF_EVENT_START(event_type, q_op_p->op.id);
@@ -722,11 +722,11 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     */
     ret = dbpf_open_cache_get(
         coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0, DBPF_OPEN_FD,
-	&q_op_p->op.u.b_rw_list.open_ref);
+        &q_op_p->op.u.b_rw_list.open_ref);
     if (ret < 0)
     {
-	dbpf_queued_op_free(q_op_p);
-	gossip_ldebug(GOSSIP_TROVE_DEBUG,
+        dbpf_queued_op_free(q_op_p);
+        gossip_ldebug(GOSSIP_TROVE_DEBUG,
                       "warning: useless error value\n");
         return -trove_errno_to_trove_error(ret);
     }
@@ -758,7 +758,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     aiocb_p = (struct aiocb *)malloc(AIOCB_ARRAY_SZ*sizeof(struct aiocb));
     if (aiocb_p == NULL)
     {
-	dbpf_open_cache_put(&q_op_p->op.u.b_rw_list.open_ref);
+        dbpf_open_cache_put(&q_op_p->op.u.b_rw_list.open_ref);
         return -TROVE_ENOMEM;
     }
 
@@ -835,7 +835,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     if (ret != 0)
     {
         gossip_lerr("lio_listio() returned %d\n", ret);
-	dbpf_open_cache_put(&q_op_p->op.u.b_rw_list.open_ref);
+        dbpf_open_cache_put(&q_op_p->op.u.b_rw_list.open_ref);
         return -trove_errno_to_trove_error(errno);
     }
     gossip_debug(GOSSIP_TROVE_DEBUG, " +++ lio_listio posted %p "
@@ -892,75 +892,75 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 
     if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_INITIALIZED)
     {
-	/* first call; need to allocate aiocb array and ptr array */
-	aiocb_p = (struct aiocb *)malloc(
+        /* first call; need to allocate aiocb array and ptr array */
+        aiocb_p = (struct aiocb *)malloc(
             AIOCB_ARRAY_SZ*sizeof(struct aiocb));
 
-	if (aiocb_p == NULL)
+        if (aiocb_p == NULL)
         {
-	    return -TROVE_ENOMEM;
-	}
+            return -TROVE_ENOMEM;
+        }
 
-	/* initialize, paying particular attention to set the opcode
-	 * to NOP.
-	 *
-	 * Also, it appears to be important to do all this SIGEV_NONE
-	 * stuff, although some man pages seem to indicate that it is
-	 * not.
-	 */
-	memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
-	for (i=0; i < AIOCB_ARRAY_SZ; i++)
+        /* initialize, paying particular attention to set the opcode
+         * to NOP.
+         *
+         * Also, it appears to be important to do all this SIGEV_NONE
+         * stuff, although some man pages seem to indicate that it is
+         * not.
+         */
+        memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
+        for (i=0; i < AIOCB_ARRAY_SZ; i++)
         {
-	    aiocb_p[i].aio_lio_opcode            = LIO_NOP;
-	    aiocb_p[i].aio_sigevent.sigev_notify = SIGEV_NONE;
-	}
+            aiocb_p[i].aio_lio_opcode            = LIO_NOP;
+            aiocb_p[i].aio_sigevent.sigev_notify = SIGEV_NONE;
+        }
 
-	op_p->u.b_rw_list.aiocb_array_count  = AIOCB_ARRAY_SZ;
-	op_p->u.b_rw_list.aiocb_array        = aiocb_p;
-	op_p->u.b_rw_list.list_proc_state    = LIST_PROC_INPROGRESS;
-	op_p->u.b_rw_list.sigev.sigev_notify = SIGEV_NONE;
+        op_p->u.b_rw_list.aiocb_array_count  = AIOCB_ARRAY_SZ;
+        op_p->u.b_rw_list.aiocb_array        = aiocb_p;
+        op_p->u.b_rw_list.list_proc_state    = LIST_PROC_INPROGRESS;
+        op_p->u.b_rw_list.sigev.sigev_notify = SIGEV_NONE;
     }
     else
     {
-	/* operations potentially in progress */
-	aiocb_p = op_p->u.b_rw_list.aiocb_array;
+        /* operations potentially in progress */
+        aiocb_p = op_p->u.b_rw_list.aiocb_array;
 
-	/* check to see how we're progressing on previous operations */
-	for (i=0; i < op_p->u.b_rw_list.aiocb_array_count; i++)
+        /* check to see how we're progressing on previous operations */
+        for (i=0; i < op_p->u.b_rw_list.aiocb_array_count; i++)
         {
-	    if (aiocb_p[i].aio_lio_opcode == LIO_NOP)
+            if (aiocb_p[i].aio_lio_opcode == LIO_NOP)
             {
                 continue;
             }
 
             /* gets the "errno" value of the individual op */
-	    ret = aio_error(&aiocb_p[i]);
-	    if (ret == 0)
+            ret = aio_error(&aiocb_p[i]);
+            if (ret == 0)
             {
-		/*
+                /*
                   this particular operation completed w/out error.
                   gets the return value of the individual op
                 */
-		ret = aio_return(&aiocb_p[i]);
+                ret = aio_return(&aiocb_p[i]);
 
-		/* mark as a NOP so we ignore it from now on */
-		aiocb_p[i].aio_lio_opcode = LIO_NOP;
-	    }
-	    else if (ret != EINPROGRESS)
+                /* mark as a NOP so we ignore it from now on */
+                aiocb_p[i].aio_lio_opcode = LIO_NOP;
+            }
+            else if (ret != EINPROGRESS)
             {
-		gossip_debug(GOSSIP_TROVE_DEBUG, "error %d (%s) from "
+                gossip_debug(GOSSIP_TROVE_DEBUG, "error %d (%s) from "
                              "aio_error/aio_return on block %d; "
                              "skipping\n", ret, strerror(ret), i);
 
                 ret = -trove_errno_to_trove_error(ret);
                 goto final_aio_cleanup;
-	    }
-	    else
+            }
+            else
             {
-		/* otherwise the operation is still in progress; skip it */
-		op_in_progress_count++;
-	    }
-	}
+                /* otherwise the operation is still in progress; skip it */
+                op_in_progress_count++;
+            }
+        }
     }
 
     /* if we're not done with the last set of operations, break out */
@@ -970,23 +970,23 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
     }
     else if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLPOSTED)
     {
-	/* we've posted everything, and it all completed */
+        /* we've posted everything, and it all completed */
         ret = 1;
 
       final_aio_cleanup:
-	dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
+        dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
         op_p->u.b_rw_list.fd = -1;
 
-	return ret;
+        return ret;
     }
     else
     {
-	/*
+        /*
           no operations currently in progress; convert and post some
           more
         */
-	aiocb_inuse_count = op_p->u.b_rw_list.aiocb_array_count;
-	ret = dbpf_bstream_listio_convert(
+        aiocb_inuse_count = op_p->u.b_rw_list.aiocb_array_count;
+        ret = dbpf_bstream_listio_convert(
             op_p->u.b_rw_list.fd,
             op_p->u.b_rw_list.opcode,
             op_p->u.b_rw_list.mem_offset_array,
@@ -999,40 +999,40 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
             &aiocb_inuse_count,
             &op_p->u.b_rw_list.lio_state);
 
-	if (ret == 1)
+        if (ret == 1)
         {
             op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLCONVERTED;
         }
-	
-	/*
+        
+        /*
           if we didn't use the entire array, mark the unused ones with
           LIO_NOPs
         */
-	for (i = aiocb_inuse_count;
+        for (i = aiocb_inuse_count;
              i < op_p->u.b_rw_list.aiocb_array_count; i++)
         {
-	    /* just mark these as NOPs and we'll ignore them */
-	    aiocb_p[i].aio_lio_opcode = LIO_NOP;
-	}
-
-	for (i=0; i < aiocb_inuse_count; i++)
-        {
-	    aiocb_ptr_array[i] = &aiocb_p[i];
-	}
-
-	ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
-                         aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
-	if (ret != 0)
-        {
-	    gossip_lerr("lio_listio() returned %d\n", ret);
-	    return -trove_errno_to_trove_error(errno);
-	}
-
-	if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLCONVERTED)
-        {
-	    op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLPOSTED;
+            /* just mark these as NOPs and we'll ignore them */
+            aiocb_p[i].aio_lio_opcode = LIO_NOP;
         }
-	return 0;
+
+        for (i=0; i < aiocb_inuse_count; i++)
+        {
+            aiocb_ptr_array[i] = &aiocb_p[i];
+        }
+
+        ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
+                         aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
+        if (ret != 0)
+        {
+            gossip_lerr("lio_listio() returned %d\n", ret);
+            return -trove_errno_to_trove_error(errno);
+        }
+
+        if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLCONVERTED)
+        {
+            op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLPOSTED;
+        }
+        return 0;
     }
 }
 #endif
