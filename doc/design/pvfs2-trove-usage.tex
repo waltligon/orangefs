@@ -1,0 +1,118 @@
+\documentclass[10pt]{article} % FORMAT CHANGE
+\usepackage[dvips]{graphicx}
+\usepackage{times}
+
+\graphicspath{{./}{figs/}} 
+
+%
+% GET THE MARGINS RIGHT, THE UGLY WAY
+%
+% \topmargin 0.2in
+% \textwidth 6.5in
+% \textheight 8.75in
+% \columnsep 0.25in
+% \oddsidemargin 0.0in
+% \evensidemargin 0.0in
+% \headsep 0.0in
+% \headheight 0.0in
+
+\pagestyle{plain}
+
+\addtolength{\hoffset}{-2cm}
+\addtolength{\textwidth}{4cm}
+
+\addtolength{\voffset}{-1.5cm}
+\addtolength{\textheight}{3cm}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{11pt}
+
+\title{Trove and PVFS2}
+\author{PVFS Development Team}
+% \date{December 2000}
+
+\begin{document}
+
+\maketitle
+
+\section{Motivation and Goals}
+
+The purpose of this document is to describe the use of Trove in PVFS2.
+
+PVFS2 deals with four basic types of objects:
+\begin{itemize}
+\item directories
+\item metafiles
+\item datafiles
+\item symlinks
+\end{itemize}
+
+We will discuss how Trove is used to store these objects in the upcoming
+sections.  Additionally we will cover how PVFS2 bootstraps from the Trove
+perspective; that is, how it obtains a ``root handle'' and so on.
+
+\section{Current Implementation (03/17/2003)}
+
+This section describes the implementation as of the date above.  Eventually,
+when the implementation catches up with the long term plan, this entire
+section will disappear.
+
+\subsection{PVFS2 Objects}
+
+Directories are made up of two dataspaces.  The first one has the attributes
+in the keyval space and a pointer to a second dataspace (TODO: WHAT IS THE
+KEY?).  The second one holds the directory entries, with keys being short
+names of files in the directories and values of the corresponding handle
+(TODO: VERIFY!).
+
+Metafiles are made up of a single dataspace.  All attributes (from the PVFS2
+perspective) are stored as keyvals (TODO: FLESH OUT DESCRIPTION).  A fixed
+size keyval is used for the fixed size data, while a second keyval is used for
+things that are of variable size (TODO: ENUMERATE LIST).
+
+Datafiles are made up of a single Trove dataspace.  Currently there are no
+attributes stored for datafiles, and all data is stored in the bstream.
+
+Symlinks are not currently implemented, but the intention is to use a keyval
+to hold the target of the link.
+
+\subsection{Bootstrapping}
+
+WHERE DO WE GET THE ROOT HANDLE?
+
+WHAT ELSE?
+
+\section{Long Term Plan}
+
+This section describes the (probably moving) target for how we will use Trove
+to store PVFS2 objects.  Eventually, as we progress, this will start to
+describe interesting things such as storing small files in the metafile...
+
+\subsection{PVFS2 Objects}
+
+The biggest overall change is the move to using dataspace attributes for
+storing basic metadata for PVFS2 objects.
+
+Directories are made up of a single dataspace.  Dataspace attributes are used
+to store basic metadata.  Keyvals in the dataspace are used to store the
+directory entries in (short name, handle) format as before.
+
+Metafiles are made up of a single dataspace.  Basic metadata is stored in the
+dataspace attributes as with directories.  The keyval space is used to store
+additional attributes, including the list of datafile handles (TODO: WHAT
+ELSE?).
+
+Datafiles are made up of a single Trove dataspace, with basic metadata stored
+in the dataspace attributes and data stored in the bstream (TODO: WHAT KEY?).
+
+Symlinks are made up of a single Trove dataspace with basic metadata (if any?)
+stored in the dataspace attributes and target stored as a keyval (TODO: WHAT KEY?).
+
+\subsection{Bootstrapping}
+
+WHERE DO WE GET THE ROOT HANDLE?
+
+WHAT ELSE?
+
+\end{document}
+

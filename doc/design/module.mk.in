@@ -1,6 +1,7 @@
 DIR := doc/design
 DOCSRC +=\
 	$(DIR)/bmi-design.tex\
+	$(DIR)/pvfs2-trove-usage.tex\
 	$(DIR)/concepts.tex\
 	$(DIR)/distributions.tex\
 	$(DIR)/flow-design.tex\
