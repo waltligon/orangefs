@@ -348,6 +348,11 @@ int PINT_pcache_pinode_alloc(pinode **pnode)
  */
 void PINT_pcache_pinode_dealloc(pinode *pnode)
 {
+	if (pnode->attr.objype == ATTR_META)
+	{
+		if(pnode->attr.u.meta.nr_datafiles > 0)
+			free(pnode->attr.u.meta->dfh);
+	}
 	if (pnode != NULL)
 		free(pnode);
 }
