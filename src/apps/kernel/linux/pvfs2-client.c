@@ -178,7 +178,6 @@ static int monitor_pvfs2_client(options_t *opts)
                     {
                         break;
                     }
-                    sleep(1);
                     continue;
                 }
 
@@ -207,6 +206,8 @@ static int monitor_pvfs2_client(options_t *opts)
         }
         else
         {
+            sleep(1);
+
             if (opts->verbose)
             {
                 printf("About to exec %s\n",opts->path);

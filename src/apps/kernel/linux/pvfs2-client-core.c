@@ -58,6 +58,14 @@
 #define PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS 10
 
 /*
+  uncomment if you want to run this application stand-alone
+  (i.e. without the pvfs2-client wrapper).  this is only useful as a
+  developer and allows clean shutdown for valgrind debugging or
+  getting core dumps.  this is NOT a supported run mode
+*/
+/* #define STANDALONE_RUN_MODE */
+
+/*
   this client core *requires* pthreads now, regardless of if the pvfs2
   system interface has threading enabled or not.  we need it for async
   remounts on restart to retrieve our dynamic mount information (if
@@ -155,10 +163,12 @@ do {                                                          \
     vfs_request->was_handled_inline = 1;                      \
 } while(0)
 
+#ifdef STANDALONE_RUN_MODE
 static void client_core_sig_handler(int signum)
 {
     s_client_is_processing = 0;
 }
+#endif
 
 static int hash_key(void *key, int table_size)
 {
@@ -1695,17 +1705,20 @@ int process_vfs_requests(void)
 int main(int argc, char **argv)
 {
     int ret = 0, i = 0;
-/*    struct rlimit lim = {0,0}; */
+
+#ifndef STANDALONE_RUN_MODE
+    struct rlimit lim = {0,0};
 
     /* set rlimit to prevent core files */
-/*     ret = setrlimit(RLIMIT_CORE, &lim); */
-/*     if (ret < 0) */
-/*     { */
-/* 	fprintf(stderr, "setrlimit system call failed (%d); " */
-/*                 "continuing", ret); */
-/*     } */
-
+    ret = setrlimit(RLIMIT_CORE, &lim);
+    if (ret < 0)
+    {
+	fprintf(stderr, "setrlimit system call failed (%d); "
+                "continuing", ret);
+    }
+#else
     signal(SIGINT, client_core_sig_handler);
+#endif
 
     /*
       initialize pvfs system interface
