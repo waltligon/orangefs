@@ -406,11 +406,19 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 		     creds,
 		     &getattr_resp);
 
-    assert(getattr_resp.attr.objtype == PVFS_TYPE_DIRECTORY);
+    if (getattr_resp.attr.objtype != PVFS_TYPE_DIRECTORY)
+    {
+	fprintf(stderr, "Cannot traverse object at "
+                "%Lu,%d (Not a Valid Directory)\n",
+                Lu(pref.handle), pref.fs_id);
+        return -1;
+    }
 
     if (handlelist_find_handle(pref.handle, &server_idx) < 0)
     {
-	assert(0);
+        printf("Handle %Lu appears to be missing; skipping!\n",
+               Lu(pref.handle));
+        return -1;
     }
 
     print_root_entry(pref.handle,
