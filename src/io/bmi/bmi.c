@@ -467,6 +467,11 @@ int BMI_test(bmi_op_id_t id, int* outcount, bmi_error_code_t* error_code,
 	ret = active_method_table[target_op->addr->method_type]->BMI_meth_test(id,
 		outcount, error_code, actual_size, user_ptr, max_idle_time_ms);
 	gen_mutex_unlock(&interface_mutex);
+	/* return 1 if anything completed */
+	if(ret == 0 && *outcount == 1)
+	{
+		return(1);
+	}
 	return(ret);
 }
 
@@ -502,6 +507,11 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 	}
 
 	gen_mutex_unlock(&interface_mutex);
+	/* return 1 if anything completed */
+	if(ret == 0 && *outcount > 0)
+	{
+		return(1);
+	}
 	return(0);
 }
 
@@ -602,6 +612,11 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 	}
 	
 	gen_mutex_unlock(&interface_mutex);
+	/* return 1 if anything completed */
+	if(ret == 0 && *outcount > 0)
+	{
+		return(1);
+	}
 	return(0);
 }
 #endif /* __BMI_SINGLE_METHOD__ */
@@ -675,6 +690,11 @@ int BMI_testunexpected(int incount, int* outcount, struct
 		info_array[i].addr = tmp_ref->bmi_addr;
 	}
 	gen_mutex_unlock(&interface_mutex);
+	/* return 1 if anything completed */
+	if(ret == 0 && *outcount > 0)
+	{
+		return(1);
+	}
 	return(0);
 }
 
