@@ -15,7 +15,7 @@
 #include "job.h"
 #include "pvfs2-types.h"
 #include "trove-types.h"
-#include "request-scheduler.h"
+#include "src/server/request-scheduler/request-scheduler.h"
 #include "thread-mgr.h"
 #include "pvfs2-event.h"
 

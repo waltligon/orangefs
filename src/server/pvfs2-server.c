@@ -30,7 +30,7 @@
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
 #include "PINT-reqproto-encode.h"
-#include "request-scheduler.h"
+#include "src/server/request-scheduler/request-scheduler.h"
 #include "pvfs2-server.h"
 #include "state-machine-fns.h"
 #include "mkspace.h"

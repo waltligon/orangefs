@@ -18,7 +18,7 @@
 #include "server-config-mgr.h"
 #include "PINT-reqproto-encode.h"
 #include "client-state-machine.h"
-#include "request-scheduler.h"
+#include "src/server/request-scheduler/request-scheduler.h"
 #include "job-time-mgr.h"
 
 extern job_context_id PVFS_sys_job_context;

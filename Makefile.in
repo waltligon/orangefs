@@ -123,9 +123,7 @@ INCLUDES := \
     src/io/buffer \
     src/io/job \
     src/io/dev \
-    src/proto \
-    src/server \
-    src/server/request-scheduler
+    src/proto
 
 #################################################################
 # Setup global flags

@@ -23,7 +23,7 @@
 #include "client-state-machine.h"
 #define PARENT_SM PINT_client_sm
 #elif defined(__PVFS2_SERVER__)
-#include "pvfs2-server.h"
+#include "src/server/pvfs2-server.h"
 #define PARENT_SM PINT_server_op 
 #else
 /* this condition is only included for dependency building step; will not
@@ -31,7 +31,7 @@
  */
 #define __SM_CHECK_DEP
 #include "client-state-machine.h"
-#include "pvfs2-server.h"
+#include "src/server/pvfs2-server.h"
 #endif
 #include "msgpairarray.h"
 #include "pvfs2-debug.h"
