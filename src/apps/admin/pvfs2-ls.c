@@ -591,7 +591,7 @@ static struct options* parse_args(int argc, char* argv[])
     static struct option long_opts[] =
     {
         {"help",0,0,0},
-        {"human_readable",0,0,0},
+        {"human-readable",0,0,0},
         {"version",0,0,0},
         {"numeric-uid-gid",0,0,0},
         {"directory",0,0,0},
