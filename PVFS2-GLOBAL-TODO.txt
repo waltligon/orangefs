@@ -77,7 +77,7 @@ error codes:
 
 I/O path:
 ====================================================================
-- optimizing short reads and writes (packing data into req/ack messages)
+- optimizing small reads and writes (packing data into req/ack messages)
 - GM support in BMI and flow
 - threads in trove?
 - general optimizations (lock granularity, immediate completion, etc.)
