@@ -73,7 +73,7 @@ int main(int argc, char **argv)
     }
     memset(tally_array, 0, MAX_TALLY*sizeof(struct tally));
 
-    printf("# (api_op) (ave) (min) (max)\n");
+    printf("# (api_op) (count) (ave) (min) (max)\n");
 
     /* pull in all of the data */
     while(fgets(tmp_buf, 512, infile))
@@ -125,9 +125,10 @@ int main(int argc, char **argv)
     /* print out results */
     for(i=0; i<tally_count; i++)
     {
-	printf("%d_%d\t%f\t%f\t%f\n",
+	printf("%d_%d\t%d\t%f\t%f\t%f\n",
 	    tally_array[i].api,
 	    tally_array[i].op,
+	    tally_array[i].count,
 	    (tally_array[i].sum / (float)tally_array[i].count),
 	    tally_array[i].min,
 	    tally_array[i].max);
