@@ -3,8 +3,8 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.0.7pre2
-===============
+pvfs2-0.0.7
+===========
 - re-worked architecture of metadata storage (generic dspace attrs are
   used instead of a separate keyval/data pair)
 - added a server-side (trove-dbpf) attribute write-through caching layer
@@ -28,6 +28,9 @@ pvfs2-0.0.7pre2
 - various error msg cleanups (in several components)
 - mutex locking improvements, allowing support for NPTL thread
   implementations and also improving performance for some operations
+- fixed a bug in client side lookup that can cause nested entries across
+  multiple meta servers to work incorrectly (does not affect kernel
+  interface)
 
 
 pvfs2-0.0.6
