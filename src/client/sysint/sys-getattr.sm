@@ -402,7 +402,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                              attr->u.meta.dist_size);
 
 		/* here we make a copy of the distribution information. */
-		sm_p->u.getattr.dist_p = PVFS_Dist_copy(attr->u.meta.dist);
+		sm_p->u.getattr.dist_p = PINT_dist_copy(attr->u.meta.dist);
 		if (sm_p->u.getattr.dist_p == NULL) {
 		    assert(0);
 		    return -PVFS_ENOMEM;
@@ -618,7 +618,7 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
                 (sm_p->acache_hit &&
                  !(sm_p->pinode->attr.mask & PVFS_ATTR_DATA_SIZE)))
             {
-                ret = PINT_Dist_lookup(sm_p->u.getattr.dist_p);
+                ret = PINT_dist_lookup(sm_p->u.getattr.dist_p);
                 if (ret < 0)
                 {
                     assert(0);
@@ -685,7 +685,7 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             if ((amask & PVFS_ATTR_META_DIST) &&
                 (sm_p->u.getattr.dist_p != NULL))
             {
-                PVFS_dist_free(sm_p->u.getattr.dist_p);
+                PINT_dist_free(sm_p->u.getattr.dist_p);
             }
         }
 

@@ -15,6 +15,7 @@
 #include "str-utils.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
+#include "pint-distribution.h"
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
 
@@ -271,13 +272,13 @@ int PVFS_sys_create(
     if (NULL != dist)
     {
         assert(dist->name);
-        sm_p->u.create.dist = PVFS_dist_create(dist->name);
+        sm_p->u.create.dist = PINT_dist_create(dist->name);
         assert(sm_p->u.create.dist);
         sm_p->u.create.dist->params = dist->params;
     }
     else
     {
-        sm_p->u.create.dist = PVFS_dist_create("simple_stripe");
+        sm_p->u.create.dist = PINT_dist_create("simple_stripe");
         assert(sm_p->u.create.dist);
     }
     
@@ -964,7 +965,7 @@ static int create_cleanup(PINT_client_sm *sm_p,
 
     if (sm_p->u.create.dist)
     {
-        PVFS_dist_free(sm_p->u.create.dist);
+        PINT_dist_free(sm_p->u.create.dist);
     }
 
     if (sm_p->msgarray != &(sm_p->msgpair))

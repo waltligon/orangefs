@@ -411,7 +411,7 @@ int do_encode_req(
             {
                 assert(request->u.setattr.attr.u.meta.dist != NULL);
                 
-                PINT_Dist_encode(enc_msg, request->u.setattr.attr.u.meta.dist);
+                PINT_dist_encode(enc_msg, request->u.setattr.attr.u.meta.dist);
             }
 	}
         else if (request->u.setattr.attr.objtype == PVFS_TYPE_SYMLINK)
@@ -482,7 +482,7 @@ int do_encode_req(
 	    return (ret);
 	}
 	/* pack the distribution */
-	PINT_Dist_encode(encode_io_dist, request->u.io.io_dist);
+	PINT_dist_encode(encode_io_dist, request->u.io.io_dist);
 	return (0);
 
 	/*these structures are all self contained (no pointers that need to be packed) */

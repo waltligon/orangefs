@@ -21,7 +21,7 @@
 #include "PINT-reqproto-encode.h"
 #include "PINT-reqproto-module.h"
 #include "src/io/description/pint-request.h"  /* for PINT_Request */
-#include "src/io/description/pint-distribution.h"  /* for PINT_Dist_lookup */
+#include "src/io/description/pint-distribution.h"  /* for PINT_dist_lookup */
 
 /* defined later */
 PINT_encoding_table_values le_bytefield_table;
@@ -64,7 +64,7 @@ static void lebf_initialize(void)
      */
     memset(&tmp_dist, 0, sizeof(tmp_dist));
     tmp_dist.dist_name = strdup(PVFS_DIST_BASIC_NAME);
-    if (PINT_Dist_lookup(&tmp_dist)) {
+    if (PINT_dist_lookup(&tmp_dist)) {
 	gossip_err("%s: dist %s does not exist?!?\n",
 	  __func__, tmp_dist.dist_name);
 	exit(1);

@@ -437,7 +437,7 @@ static int setattr_write_metafile_distribution_if_required(
     s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.meta.dist_size;
 
     /* TODO: figure out if we need a different packing mechanism here */
-    PINT_Dist_encode(NULL, s_op->req->u.setattr.attr.u.meta.dist);    
+    PINT_dist_encode(NULL, s_op->req->u.setattr.attr.u.meta.dist);    
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  writing distribution (coll_id "

@@ -107,7 +107,7 @@ int do_decode_resp(
             }
             if (decoded_response->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
             {
-                PINT_Dist_decode(decoded_response->u.getattr.attr.u.meta.dist,
+                PINT_dist_decode(decoded_response->u.getattr.attr.u.meta.dist,
                                  NULL);
             }
 	}

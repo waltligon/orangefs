@@ -11,7 +11,6 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
-#include "pvfs-distribution.h"
 #include "pvfs2-request.h"
 #include "pint-distribution.h"
 #include "pint-request.h"

@@ -564,7 +564,7 @@ int PINT_bucket_map_to_server(
     return (!ret ? BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
 }
 
-/** PINT_bucker_get_num_dfiles
+/** PINT_bucker_get_num_dfiles()
  *
  * Return the number of dfiles to use for files with this combination of
  * fs id, distribution, and attributes.  If the distribution and attributes
@@ -575,15 +575,32 @@ int PINT_bucket_get_num_dfiles(PVFS_fs_id fsid,
                                PVFS_sys_attr attr,
                                int* num_dfiles)
 {
-    int ret = -PVFS_EINVAL;
+    int num_dfiles_req;
+    int num_servers_req;
+    int ret;
+
+    /* Get the user's dfile count request (it may be ignored by dist) */
     if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
-        *num_dfiles = attr.dfile_count;
-        ret = 0;
+        num_dfiles_req = attr.dfile_count;
     }
     else
     {
-        ret = PINT_bucket_get_num_io(fsid, num_dfiles);
+        num_dfiles_req = 0;
+    }
+
+    /* Get the number of available servers */
+    ret = PINT_bucket_get_num_io(fsid, &num_servers_req);
+    if (0 == ret)
+    {
+        /* Let the distribution determine the number of dfiles to use */
+        *num_dfiles = dist->methods->get_num_dfiles(dist->params,
+                                                    num_servers_req,
+                                                    num_dfiles_req);
+    }
+    else
+    {
+        ret = -PVFS_EINVAL;
     }
     return ret;
 }

@@ -372,7 +372,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
         sm_p->u.io.datafile_count = attr->u.meta.dfile_count;
     }
 
-    ret = PINT_Dist_lookup(iosm_p->dist_p);
+    ret = PINT_dist_lookup(iosm_p->dist_p);
     assert(ret == 0);
 
     if (!target_datafile_array)

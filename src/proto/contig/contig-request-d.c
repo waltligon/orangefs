@@ -117,7 +117,7 @@ int do_decode_req(
             if (dec_msg->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
             {
                 dec_msg->u.setattr.attr.u.meta.dist = (PINT_dist *) char_ptr;
-                PINT_Dist_decode(dec_msg->u.setattr.attr.u.meta.dist, NULL);
+                PINT_dist_decode(dec_msg->u.setattr.attr.u.meta.dist, NULL);
             }
 	}
         else if (dec_msg->u.setattr.attr.objtype == PVFS_TYPE_SYMLINK)
@@ -150,8 +150,8 @@ int do_decode_req(
 	    free(dec_msg);
 	    return (ret);
 	}
-	PINT_Dist_decode(dec_msg->u.io.io_dist, NULL);
-	ret = PINT_Dist_lookup(dec_msg->u.io.io_dist);
+	PINT_dist_decode(dec_msg->u.io.io_dist, NULL);
+	ret = PINT_dist_lookup(dec_msg->u.io.io_dist);
 	if (ret < 0)
 	{
 	    free(dec_msg);

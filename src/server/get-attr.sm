@@ -541,7 +541,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
         if (resp_attr->mask & PVFS_ATTR_META_DIST)
         {
             assert(resp_attr->u.meta.dist);
-            PINT_Dist_decode(resp_attr->u.meta.dist, NULL);
+            PINT_dist_decode(resp_attr->u.meta.dist, NULL);
             gossip_debug(GOSSIP_GETATTR_DEBUG,
                          "  also returning dist size of %d\n",
                          resp_attr->u.meta.dist_size);

@@ -9,7 +9,7 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
-#include "pvfs-distribution.h"
+#include "pint-distribution.h"
 
 /* attributes specific to metadata objects */
 struct PVFS_metafile_attr_s
@@ -25,10 +25,10 @@ struct PVFS_metafile_attr_s
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_metafile_attr_dist(pptr,x) do { \
-    encode_PVFS_Dist(pptr, &(x)->dist); \
+    encode_PINT_dist(pptr, &(x)->dist); \
 } while (0)
 #define decode_PVFS_metafile_attr_dist(pptr,x) do { \
-    decode_PVFS_Dist(pptr, &(x)->dist); \
+    decode_PINT_dist(pptr, &(x)->dist); \
     (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist); \
 } while (0)
 #define encode_PVFS_metafile_attr_dfiles(pptr,x) do { int dfiles_i; \

@@ -140,7 +140,7 @@ int do_encode_resp(
                     pack_dest +=
                         (response->u.getattr.attr.u.meta.dfile_count
                          * sizeof(PVFS_handle));
-                    PINT_Dist_encode(pack_dest,
+                    PINT_dist_encode(pack_dest,
                                      response->u.getattr.attr.u.meta.dist);
                 }
             }

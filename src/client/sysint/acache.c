@@ -12,6 +12,7 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
+#include "pint-distribution.h"
 #include "pint-sysint-utils.h"
 #include "gen-locks.h"
 #include "acache.h"
@@ -396,9 +397,9 @@ int PINT_acache_object_attr_deep_copy(
 
 	    if ((dest->mask & PVFS_ATTR_META_DIST))
             {
-                PVFS_dist_free(dest->u.meta.dist);
+                PINT_dist_free(dest->u.meta.dist);
             }
-            dest->u.meta.dist = PVFS_Dist_copy(src->u.meta.dist);
+            dest->u.meta.dist = PINT_dist_copy(src->u.meta.dist);
             if (dest->u.meta.dist == NULL)
             {
                 return -ENOMEM;
@@ -456,7 +457,7 @@ void PINT_acache_object_attr_deep_free(PVFS_object_attr *attr)
             {
                 if (attr->u.meta.dist)
                 {
-                    PVFS_dist_free(attr->u.meta.dist);
+                    PINT_dist_free(attr->u.meta.dist);
                 }
             }
         }

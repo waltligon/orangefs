@@ -10,7 +10,7 @@
 #include "pvfs2-config.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
-#include "pvfs-distribution.h"
+#include "pint-distribution.h"
 #include "pvfs2-request.h"
 #include "pvfs2-mgmt.h"
 
@@ -679,7 +679,7 @@ struct PVFS_servreq_io
     encode_enum(pptr, &(x)->flow_type); \
     encode_uint32_t(pptr, &(x)->server_nr); \
     encode_uint32_t(pptr, &(x)->server_ct); \
-    encode_PVFS_Dist(pptr, &(x)->io_dist); \
+    encode_PINT_dist(pptr, &(x)->io_dist); \
     { \
     /* XXX: This linearizes into a fresh buffer, encodes, then throws
      * it away; later fix the structure so that it is easier to
@@ -706,7 +706,7 @@ struct PVFS_servreq_io
     decode_enum(pptr, &(x)->flow_type); \
     decode_uint32_t(pptr, &(x)->server_nr); \
     decode_uint32_t(pptr, &(x)->server_ct); \
-    decode_PVFS_Dist(pptr, &(x)->io_dist); \
+    decode_PINT_dist(pptr, &(x)->io_dist); \
     decode_int32_t(pptr, &numreq); \
     (x)->file_req = decode_malloc((numreq + 1) * sizeof(*(x)->file_req)); \
     (x)->file_req->num_nested_req = numreq; \
