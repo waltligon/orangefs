@@ -127,7 +127,6 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
             GENERATE_FILENAME(cur_filename, 64, format, i, rank, 1);
             strncat(tmp_buf, cur_filename, PVFS_NAME_MAX);
             absolute_paths[i] = strdup(tmp_buf);
-            fprintf(stderr," ABSOLUTE_PATH is %s\n", absolute_paths[i]);
             if (strlen(absolute_paths[i]) > PVFS_NAME_MAX)
             {
                 fprintf(stderr," Generated pathname is too long to "
@@ -323,7 +322,6 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
             {
                 fprintf(stderr,"OK\n");
             }
-
 
             snprintf(tmp_buf, PVFS_NAME_MAX, "%s/%s",
                      absolute_paths[i - 1], ABSOLUTE_SYMLINK_NAME);
