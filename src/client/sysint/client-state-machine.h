@@ -199,6 +199,7 @@ struct PINT_client_readdir_sm {
 typedef struct
 {
     char                         *seg_name;
+    char                         *seg_remaining;
     PVFS_object_attr             seg_attr;
     PVFS_pinode_reference        seg_starting_refn;
     PVFS_pinode_reference        seg_resolved_refn;

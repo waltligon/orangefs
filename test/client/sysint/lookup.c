@@ -21,7 +21,6 @@ int main(int argc,char **argv)
 {
     int ret = -1;
     int follow_link = PVFS2_LOOKUP_LINK_NO_FOLLOW;
-    PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_lookup resp_lk;
     PVFS_fs_id fs_id;
     PVFS_credentials credentials;
@@ -53,6 +52,7 @@ int main(int argc,char **argv)
 	PVFS_perror("PVFS_util_init_defaults", ret);
 	return (-1);
     }
+
     ret = PVFS_util_get_default_fsid(&fs_id);
     if (ret < 0)
     {
@@ -60,9 +60,6 @@ int main(int argc,char **argv)
 	return (-1);
     }
 
-    printf("--lookup--\n"); 
-    printf("ROOT Handle: %Lu\n", Lu(resp_look.pinode_refn.handle));
-	
     memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials,
