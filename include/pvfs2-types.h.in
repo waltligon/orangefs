@@ -43,6 +43,22 @@ typedef uint32_t PVFS_gid;
 typedef int64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 
+/* contiguous range of handles */
+struct PVFS_handle_extent_s
+{
+    PVFS_handle first;
+    PVFS_handle last;
+};
+typedef struct PVFS_handle_extent_s PVFS_handle_extent;
+
+/* an array of contiguous ranges of handles */
+struct PVFS_handle_extent_array_s
+{
+    uint32_t extent_count;
+    PVFS_handle_extent *extent_array;
+};
+typedef struct PVFS_handle_extent_array_s PVFS_handle_extent_array;
+
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL ((PVFS_handle)0) /* invalid object handle */
 #define PVFS_OP_NULL ((id_gen_t)0)        /* invalid op id for I/O subsystems */

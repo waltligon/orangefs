@@ -8,7 +8,11 @@
 #define __SERVER_CONFIG_H
 
 #include "llist.h"
+#include "pvfs2-types.h"
+
+#ifdef __PVFS2_TROVE_SUPPORT__
 #include "trove.h"
+#endif
 
 enum 
 {

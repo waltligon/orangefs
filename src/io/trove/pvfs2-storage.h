@@ -29,24 +29,8 @@ struct PVFS_ds_keyval_s
     /* size of data read into buffer (only valid after a read) */
     int32_t read_sz;
 };
+
 typedef struct PVFS_ds_keyval_s PVFS_ds_keyval;
-
-/* contiguous range of handles */
-struct PVFS_handle_extent_s
-{
-    PVFS_handle first;
-    PVFS_handle last;
-};
-typedef struct PVFS_handle_extent_s PVFS_handle_extent;
-
-/* an array of contiguous ranges of handles */
-struct PVFS_handle_extent_array_s
-{
-    uint32_t extent_count;
-    PVFS_handle_extent *extent_array;
-};
-typedef struct PVFS_handle_extent_array_s PVFS_handle_extent_array;
-
 
 /* vtag; contents not yet defined */
 struct PVFS_vtag_s
