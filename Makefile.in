@@ -768,6 +768,24 @@ else
  --quiet src/server/simple.conf src/server/server.conf
 endif
 
+# whether this is a distribution tarball or not, drop some config files
+# into the "examples" subdir of the build dir
+all: examples/fs.conf examples/server.conf-localhost
+examples/fs.conf examples/server.conf-localhost: src/apps/admin/pvfs2-genconfig
+ifdef QUIET_COMPILE
+	@echo "  GENCONFIG     $@"
+	@$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
+ --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
+ --storage /tmp/pvfs2-test-space \
+ --quiet examples/fs.conf examples/server.conf
+else
+	$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
+ --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
+ --storage /tmp/pvfs2-test-space \
+ --quiet examples/fs.conf examples/server.conf
+endif
+
+
 install_doc:
 	install -d $(mandir)/man1
 	install -d $(mandir)/man5
