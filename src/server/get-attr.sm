@@ -52,7 +52,6 @@ machine pvfs2_get_attr_sm(prelude,
                           setup_resp,
                           final_response,
                           verify_attribs,
-                          read_datafile_size,
                           read_symlink_target,
                           read_metafile_datafile_handles_if_required,
                           read_metafile_distribution_if_required)

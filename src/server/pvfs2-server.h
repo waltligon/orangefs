@@ -149,11 +149,8 @@ typedef struct PINT_server_op
      *
      * the ds_attr is used by the prelude sm only; don't use it -- the
      * object_attr is prepared for other sm's, so use it instead.
-     * similarly, the ds_datafile_attr is used internally only for
-     * getting the size of a bstream (used in get-attr.sm).
      */
     PVFS_ds_attributes ds_attr;
-    PVFS_ds_attributes ds_datafile_attr;
     PVFS_object_attr attr;
 
     bmi_addr_t addr;   /* address of client that contacted us */

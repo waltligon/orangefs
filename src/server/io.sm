@@ -16,7 +16,6 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 
-static int io_get_size(PINT_server_op *s_op, job_status_s* js_p);
 static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p);
 static int io_send_completion_ack(PINT_server_op *s_op, 
 	job_status_s* js_p);
@@ -33,19 +32,12 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-machine pvfs2_io_sm(prelude, get_size, send_positive_ack, send_negative_ack, 
+machine pvfs2_io_sm(prelude, send_positive_ack, send_negative_ack, 
 	start_flow, cleanup, release, send_completion_ack)
 {
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		success => get_size;
-		default => send_negative_ack;
-	}
-
-	state get_size
-	{
-		run io_get_size;
 		success => send_positive_ack;
 		default => send_negative_ack;
 	}
@@ -92,44 +84,6 @@ machine pvfs2_io_sm(prelude, get_size, send_positive_ack, send_negative_ack,
 
 
 /*
- * Function: io_get_size()
- *
- * Params:   server_op *s_op, 
- *           job_status_s* js_p
- *
- * Pre:      operation has been scheduled.
- *
- * Post:     attributes have been retrieved for the trove object
- *
- * Returns:  int
- *
- * Synopsis: performs a trove getattr operation, for the sole
- *           purpose of finding out the size of the bstream that we 
- *           intend to operate on 
- *           
- */
-static int io_get_size(PINT_server_op *s_op, job_status_s* js_p)
-{
-	int err = -1;
-	job_id_t tmp_id;
-	
-	PINT_STATE_DEBUG("get_size");
-
-	err = job_trove_dspace_getattr(
-		s_op->req->u.io.fs_id,
-		s_op->req->u.io.handle,
-		s_op,
-                &(s_op->ds_datafile_attr),
-		0, 
-		js_p,
-		&tmp_id,
-		server_job_context);
-	
-	return(err);
-}
-
-
-/*
  * Function: io_send_ack()
  *
  * Params:   server_op *s_op, 
@@ -159,7 +113,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
 	 * failed to get the size, or failed for permission reasons
 	 */
 	s_op->resp.status = js_p->error_code;
-	s_op->resp.u.io.bstream_size = s_op->ds_datafile_attr.b_size;
+	s_op->resp.u.io.bstream_size = s_op->ds_attr.b_size;
 
 	err = PINT_encode(
 		&s_op->resp, 
