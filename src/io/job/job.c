@@ -3937,10 +3937,15 @@ static void do_one_work_cycle_all(int idle_time_ms)
     int total_pending_count = bmi_pending_count + bmi_unexp_pending_count
 	+ flow_pending_count + dev_unexp_pending_count + trove_pending_count;
 
-    if(bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
+    if (bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
+    {
 	PINT_thread_mgr_bmi_push(idle_time_ms);
-    if(dev_unexp_pending_count)
+        idle_time_ms = 0;
+    }
+    if (dev_unexp_pending_count)
+    {
 	PINT_thread_mgr_dev_push(idle_time_ms);
+    }
 #ifdef __PVFS2_TROVE_SUPPORT__
     if(trove_pending_count || flow_pending_count)
 	PINT_thread_mgr_trove_push(idle_time_ms);
