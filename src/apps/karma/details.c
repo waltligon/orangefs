@@ -8,34 +8,22 @@
 
 #define GUI_DETAILS_ENABLE_SORTING
 
-/* values used for column names; don't mess with these indescriminately */
-enum {
-    GUI_DETAILS_NAME = 0,
-    GUI_DETAILS_RAM_TOT,
-    GUI_DETAILS_RAM_AVAIL,
-    GUI_DETAILS_UPTIME,
-    GUI_DETAILS_HANDLES_TOT,
-    GUI_DETAILS_HANDLES_AVAIL,
-    GUI_DETAILS_SPACE_TOT,
-    GUI_DETAILS_SPACE_AVAIL,
-    GUI_DETAILS_TYPE
-};
-
-char *column_name[] = { "Server Address (BMI)",
-			"Total RAM",
-			"Available RAM",
-			"Uptime",
-			"Total Handles",
-			"Available Handles",
-			"Total Space",
-			"Available Space",
-			"Type of Service" };
-
 static int gui_details_initialized    = 0;
 static GtkListStore *gui_details_list = NULL;
 static GtkWidget *gui_details_view    = NULL;
 
 static GtkTreeViewColumn *gui_details_col[GUI_DETAILS_TYPE + 1];
+
+/* THESE MUST MATCH WITH ENUM IN KARMA.H! */
+static char *gui_details_column_name[] = { "Server Address (BMI)",
+					   "Total RAM",
+					   "Available RAM",
+					   "Uptime",
+					   "Total Handles",
+					   "Available Handles",
+					   "Total Space",
+					   "Available Space",
+					   "Type of Service" };
 
 #ifdef GUI_DETAILS_ENABLE_SORTING
 static gint gui_details_float_string_compare(GtkTreeModel *model,
@@ -109,7 +97,7 @@ GtkWidget *gui_details_view_new(GtkListStore **list_p,
 	GtkCellRenderer *renderer;
 	
 	col[i] = gtk_tree_view_column_new();
-	gtk_tree_view_column_set_title(col[i], column_name[i]);
+	gtk_tree_view_column_set_title(col[i], gui_details_column_name[i]);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(list_view), col[i]);
 
 	renderer = gtk_cell_renderer_text_new();
@@ -158,6 +146,11 @@ GtkWidget *gui_details_view_new(GtkListStore **list_p,
     return list_view;
 }
 
+/* gui_details_update()
+ *
+ * Now just a wrapper for gui_details_view_fill(), used for 
+ * setting up the details page.
+ */
 void gui_details_update(struct PVFS_mgmt_server_stat *s_stat,
 			int s_stat_ct)
 {
@@ -232,38 +225,38 @@ void gui_details_view_fill(GtkWidget *view,
 
     /* update column titles */
     snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
-	     column_name[GUI_DETAILS_RAM_TOT], rt_units);
-    gtk_tree_view_column_set_title(gui_details_col[GUI_DETAILS_RAM_TOT],
+	     gui_details_column_name[GUI_DETAILS_RAM_TOT], rt_units);
+    gtk_tree_view_column_set_title(col[GUI_DETAILS_RAM_TOT],
 				   titlebuf);
 
     snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
-	     column_name[GUI_DETAILS_RAM_AVAIL], ra_units);
-    gtk_tree_view_column_set_title(gui_details_col[GUI_DETAILS_RAM_AVAIL],
+	     gui_details_column_name[GUI_DETAILS_RAM_AVAIL], ra_units);
+    gtk_tree_view_column_set_title(col[GUI_DETAILS_RAM_AVAIL],
 				   titlebuf);
 
     snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
-	     column_name[GUI_DETAILS_UPTIME], up_units);
-    gtk_tree_view_column_set_title(gui_details_col[GUI_DETAILS_UPTIME],
+	     gui_details_column_name[GUI_DETAILS_UPTIME], up_units);
+    gtk_tree_view_column_set_title(col[GUI_DETAILS_UPTIME],
 				   titlebuf);
 
     snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
-	     column_name[GUI_DETAILS_HANDLES_TOT], ht_units);
-    gtk_tree_view_column_set_title(gui_details_col[GUI_DETAILS_HANDLES_TOT],
+	     gui_details_column_name[GUI_DETAILS_HANDLES_TOT], ht_units);
+    gtk_tree_view_column_set_title(col[GUI_DETAILS_HANDLES_TOT],
 				   titlebuf);
 
     snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
-	     column_name[GUI_DETAILS_HANDLES_AVAIL], ha_units);
-    gtk_tree_view_column_set_title(gui_details_col[GUI_DETAILS_HANDLES_AVAIL],
+	     gui_details_column_name[GUI_DETAILS_HANDLES_AVAIL], ha_units);
+    gtk_tree_view_column_set_title(col[GUI_DETAILS_HANDLES_AVAIL],
 				   titlebuf);
 
     snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
-	     column_name[GUI_DETAILS_SPACE_TOT], bt_units);
-    gtk_tree_view_column_set_title(gui_details_col[GUI_DETAILS_SPACE_TOT],
+	     gui_details_column_name[GUI_DETAILS_SPACE_TOT], bt_units);
+    gtk_tree_view_column_set_title(col[GUI_DETAILS_SPACE_TOT],
 				   titlebuf);
 
     snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
-	     column_name[GUI_DETAILS_SPACE_AVAIL], ba_units);
-    gtk_tree_view_column_set_title(gui_details_col[GUI_DETAILS_SPACE_AVAIL],
+	     gui_details_column_name[GUI_DETAILS_SPACE_AVAIL], ba_units);
+    gtk_tree_view_column_set_title(col[GUI_DETAILS_SPACE_AVAIL],
 				   titlebuf);
 
     /* update table of data */
@@ -276,19 +269,38 @@ void gui_details_view_fill(GtkWidget *view,
     /* just clear out the list and then refill it */
     gtk_list_store_clear(list);
 
-    for (i=0; i < s_stat_ct; i++) {
-	gui_details_view_insert(list,
-				&s_stat[i],
-				rt_div,
-				ra_div,
-				up_div,
-				ht_div,
-				ha_div,
-				bt_div,
-				ba_div);
+    if (server_list == NULL) {
+	for (i=0; i < s_stat_ct; i++) {
+	    gui_details_view_insert(list,
+				    &s_stat[i],
+				    rt_div,
+				    ra_div,
+				    up_div,
+				    ht_div,
+				    ha_div,
+				    bt_div,
+				    ba_div);
+	}
+    }
+    else {
+	i = 0;
+	while (server_list[i] >= 0) {
+	    assert(server_list[i] < s_stat_ct);
+
+	    gui_details_view_insert(list,
+				    &s_stat[server_list[i]],
+				    rt_div,
+				    ra_div,
+				    up_div,
+				    ht_div,
+				    ha_div,
+				    bt_div,
+				    ba_div);
+	    i++;
+	}
     }
 
-    /* reattach model to view */
+    /* reattach model to view; remove our reference */
     gtk_tree_view_set_model(GTK_TREE_VIEW(view), model);
     g_object_unref(model);
 }

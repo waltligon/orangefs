@@ -73,6 +73,7 @@ static gint gui_status_graph_button_press_callback(GtkWidget *drawing_area,
 						   gpointer graph_state_ptr);
 
 static void gui_status_server_popup(struct PVFS_mgmt_server_stat *svr_stat,
+				    int svr_stat_ct,
 				    int svr_index);
 
 /* gui_status_setup()
@@ -549,16 +550,19 @@ static gint gui_status_graph_button_press_callback(GtkWidget *drawing_area,
     /* if # of servers just changed, just ignore the click for now */
     if (svr_stat_ct != g_state->nr_bars) return 0;
 
-    gui_status_server_popup(svr_stat, i);
+    gui_status_server_popup(svr_stat, svr_stat_ct, i);
 
     return 0;
 }
 
 static void gui_status_server_popup(struct PVFS_mgmt_server_stat *svr_stat,
+				    int svr_stat_ct,
 				    int svr_index)
 {
-    GtkWidget *dialog, *label, *frame, *table;
-    char buf[64];
+    GtkWidget *dialog, *view;
+    GtkListStore *list;
+    GtkTreeViewColumn *col[GUI_DETAILS_TYPE+1];
+    int svr_list[2];
 
     dialog = gtk_dialog_new_with_buttons("Server Details",
 					 GTK_WINDOW(main_window),
@@ -571,36 +575,25 @@ static void gui_status_server_popup(struct PVFS_mgmt_server_stat *svr_stat,
 			     G_CALLBACK(gtk_widget_destroy),
 			     GTK_OBJECT(dialog));
 
-    /* format data for presentation */
-    frame = gtk_frame_new(svr_stat[svr_index].bmi_address);
-    gtk_frame_set_label_align(GTK_FRAME(frame), 0.0, 0.0);
-    
-    table = gtk_table_new(2, 5, 1);
-    gtk_container_add(GTK_CONTAINER(frame), table);
+    /* create contents of popup */
+    view = gui_details_view_new(&list, col, 0);
 
-    label = gtk_label_new("Space Available/Total:");
-    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
-    gtk_table_attach_defaults(GTK_TABLE(table), label, 0, 1, 0, 1);
-   
-    label = gtk_label_new("Memory Available/Total:");
-    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
-    gtk_table_attach_defaults(GTK_TABLE(table), label, 0, 1, 1, 2);
+    svr_list[0] = svr_index;
+    svr_list[1] = -1;
 
-    label = gtk_label_new("Handles Available/Total:");
-    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
-    gtk_table_attach_defaults(GTK_TABLE(table), label, 0, 1, 2, 3);
+    gui_details_view_fill(view,
+			  list,
+			  col,
+			  svr_stat,
+			  svr_stat_ct,
+			  svr_list);
 
-    label = gtk_label_new("Uptime:");
-    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
-    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 3, 4,
-		     0, GTK_FILL|GTK_EXPAND, 0, 0);
+    /* unref list so it will be freed when view is destroyed */
+    g_object_unref(list);
 
-    label = gtk_label_new("Server Type:");
-    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
-    gtk_table_attach_defaults(GTK_TABLE(table), label, 0, 1, 4, 5);
-
+    /* drop contents into popup; display */
     gtk_container_add(GTK_CONTAINER(GTK_DIALOG(dialog)->vbox),
-		      frame);
+		      view);
     gtk_widget_show_all(dialog);
 
     return;

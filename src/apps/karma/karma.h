@@ -1,3 +1,7 @@
+#ifndef KARMA_H
+#define KARMA_H
+
+
 #include <gtk/gtk.h>
 
 #include "pvfs2.h"
@@ -94,6 +98,19 @@ GtkWidget *gui_details_setup(void);
 void gui_details_update(struct PVFS_mgmt_server_stat *s_stat,
 			int s_stat_ct);
 
+/* values used for details column names; don't mess with indescriminately */
+enum {
+    GUI_DETAILS_NAME = 0,
+    GUI_DETAILS_RAM_TOT,
+    GUI_DETAILS_RAM_AVAIL,
+    GUI_DETAILS_UPTIME,
+    GUI_DETAILS_HANDLES_TOT,
+    GUI_DETAILS_HANDLES_AVAIL,
+    GUI_DETAILS_SPACE_TOT,
+    GUI_DETAILS_SPACE_AVAIL,
+    GUI_DETAILS_TYPE
+};
+
 /* details view functions (details.c) - more generic */
 void gui_details_view_fill(GtkWidget *view,
 			   GtkListStore *list,
@@ -136,3 +153,4 @@ char *gui_units_size(PVFS_size size_bytes, float *divisor);
 char *gui_units_count(uint64_t count, float *divisor);
 char *gui_units_ops(PVFS_size ops, float *divisor);
 
+#endif /* KARMA_H */
