@@ -184,7 +184,7 @@ void print_entry_attr(
     char *owner = empty_str, *group = empty_str;
     char *inode = empty_str;
     time_t atime = (time_t)attr->atime;
-    struct tm *time = gmtime(&atime);
+    struct tm *time = localtime(&atime);
     PVFS_size size = 0;
     char scratch_owner[16] = {0}, scratch_group[16] = {0};
     char scratch_size[16] = {0}, scratch_inode[16] = {0};
@@ -287,10 +287,10 @@ void print_entry_attr(
              formatted_group,
              formatted_size,
              (time->tm_year + 1900),
-             (time->tm_mon + 1),
+             (time->tm_mon),
              time->tm_mday,
-             (time->tm_hour + 1),
-             (time->tm_min + 1),
+             (time->tm_hour),
+             (time->tm_min),
              entry_name);
 
     if (formatted_size)
