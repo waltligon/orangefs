@@ -738,7 +738,7 @@ static void buffer_teardown_bmi_to_mem(flow_descriptor* flow_d)
 	if(flow_data->intermediate_buffer)
 	{
 		BMI_memfree(flow_d->src.u.bmi.address,
-			flow_data->intermediate_buffer, DEFAULT_BUFFER_SIZE,
+			flow_data->intermediate_buffer, flow_data->max_buffer_size,
 			BMI_RECV_BUFFER);
 	}
 
@@ -753,7 +753,16 @@ static void buffer_teardown_bmi_to_mem(flow_descriptor* flow_d)
  */
 static void buffer_teardown_mem_to_bmi(flow_descriptor* flow_d)
 {
-	/* nothing to do here */
+	struct bmi_trove_flow_data* flow_data = PRIVATE_FLOW(flow_d);
+
+	/* destroy any intermediate buffers */
+	if(flow_data->intermediate_buffer)
+	{
+		BMI_memfree(flow_d->dest.u.bmi.address,
+			flow_data->intermediate_buffer, flow_data->max_buffer_size,
+			BMI_SEND_BUFFER);
+	}
+
 	return;
 }
 
