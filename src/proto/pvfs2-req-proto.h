@@ -221,46 +221,47 @@ struct PVFS_servreq_truncate
  * returned in generic server response structure
  */
 
+/* io **********************************************************/
+/* - performs a read or write operation */
 
-/* supported I/O operation types */
 enum PVFS_servreq_io_type
 {
     PVFS_IO_READ = 1,
-    PVFS_IO_WRITE
+    PVFS_IO_WRITE = 2
 };
 
-/* PVFS I/O request */
 struct PVFS_servreq_io
 {
-    PVFS_handle handle;		/* handle to operate on */
-    PVFS_fs_id fs_id;		/* file system id */
-    enum PVFS_servreq_io_type io_type;	/* type of I/O operation */
-    enum PVFS_flowproto_type flow_type;	/* type of flow protocol */
+    PVFS_handle handle;		    /* target datafile */
+    PVFS_fs_id fs_id;		    /* file system */
+    /* type of I/O operation to perform */
+    enum PVFS_servreq_io_type io_type;
+    /* type of flow protocol to use for I/O transfer */
+    enum PVFS_flowproto_type flow_type;
     /* relative number of this I/O server in distribution */
     uint32_t iod_num;
     /* total number of I/O servers involved in distribution */
     uint32_t iod_count;
-    PVFS_Dist *io_dist;		/* physical distribution */
-    PVFS_Request io_req;	/* datatype pattern */
+    /* distribution */
+    PVFS_Dist *io_dist;
+    /* I/O request description */
+    PVFS_Request io_req;
 };
 
-/* PVFS I/O response */
 struct PVFS_servresp_io
 {
-    PVFS_size bstream_size;
+    PVFS_size bstream_size;	    /* size of datafile */
 };
 
-/* PVFS write completion response (there is no req for this one,
- * it is sent from server to client after completing a write) 
- */
+/* write operations require a second response to announce completion */
 struct PVFS_servresp_write_completion
 {
-    PVFS_size total_completed;
+    PVFS_size total_completed;	    /* amount of data transfered */
 };
 
-/* PVFS Server Request
- *
- */
+/* server request *********************************************/
+/* - generic request with union of all op specific structs */
+
 struct PVFS_server_req
 {
     enum PVFS_server_op op;
@@ -284,6 +285,8 @@ struct PVFS_server_req
     u;
 };
 
+/* server response *********************************************/
+/* - generic response with union of all op specific structs */
 struct PVFS_server_resp
 {
     enum PVFS_server_op op;
