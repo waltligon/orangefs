@@ -1045,6 +1045,7 @@ int BMI_tcp_testcontext(int incount,
 	    BMI_EVENT_END(PVFS_EVENT_BMI_SEND, query_op->actual_size, query_op->op_id);
 	else
 	    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, query_op->actual_size, query_op->op_id);
+
 	dealloc_tcp_method_op(query_op);
 	(*outcount)++;
     }
@@ -1648,7 +1649,6 @@ static int enqueue_operation(op_list_p target_list,
 			     bmi_context_id context_id)
 {
     method_op_p new_method_op = NULL;
-    int bit_added = 0;
     struct tcp_op *tcp_op_data = NULL;
     struct tcp_addr* tcp_addr_data = NULL;
     int i;
@@ -1757,7 +1757,6 @@ static int enqueue_operation(op_list_p target_list,
     if(send_recv == BMI_SEND)
     {
         BMI_socket_collection_add_write_bit(tcp_socket_collection_p, map);
-        bit_added = 1;
     }
 
     /* keep up with the operation */
