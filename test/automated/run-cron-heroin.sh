@@ -27,7 +27,7 @@ echo "=======================" >> /tmp/test_out.txt
 echo " " >> /tmp/test_out.txt
 
 
-./single-node-kernel-test.sh -k /home/pvfs2/linux-2.6.3/ -r $HOME/testing/$DATE/work/ 2>&1 >> /tmp/test_out.txt
+./single-node-kernel-test.sh -k /home/pvfs2/linux-2.6.3/ -r $HOME/testing/$DATE/work/ >> /tmp/test_out.txt 2>&1 
 if [ $? -ne 0 ] ; then
     subject="PVFS2 kernel test: FAIL"
 else
