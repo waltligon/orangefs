@@ -116,7 +116,7 @@ static int create_create(PINT_server_op *s_op, job_status_s *ret)
     job_id_t i;
 
     job_post_ret = job_trove_dspace_create(s_op->req->u.create.fs_id,
-	    s_op->req->u.create.requested_handle,
+	    &s_op->req->u.create.handle_extent_array,
 	    s_op->req->u.create.object_type,
 	    NULL,
 	    s_op,
@@ -125,7 +125,6 @@ static int create_create(PINT_server_op *s_op, job_status_s *ret)
 	    PINT_server_job_context);
 
     return(job_post_ret);
-
 }
 
 
