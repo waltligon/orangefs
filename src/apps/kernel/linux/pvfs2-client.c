@@ -25,6 +25,8 @@
 
 #define MAX_DEV_INIT_FAILURES 10
 
+#define DEFAULT_ACACHE_TIMEOUT_STR "5"
+
 typedef struct
 {
     int verbose;
@@ -335,14 +337,16 @@ static void parse_args(int argc, char **argv, options_t *opts)
 
     if (!opts->path)
     {
-        /* Since they didn't specify a specific path, we're going
-         * to let execlp() sort things out later */
-      opts->path = PVFS2_CLIENT_CORE_NAME;
+        /*
+          since they didn't specify a specific path, we're going to
+          let execlp() sort things out later
+        */
+        opts->path = PVFS2_CLIENT_CORE_NAME;
     }
 
     if (!opts->acache_timeout)
     {
-        opts->acache_timeout = "0";
+        opts->acache_timeout = DEFAULT_ACACHE_TIMEOUT_STR;
     }
 }
 
