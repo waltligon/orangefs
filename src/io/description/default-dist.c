@@ -16,25 +16,25 @@
 /* in this distribution all data is stored on a single server */
 
 static PVFS_offset logical_to_physical_offset (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset logical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset logical_offset)
 {
 	return logical_offset;
 }
 
 static PVFS_offset physical_to_logical_offset (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset physical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset physical_offset)
 {
 	return physical_offset;
 }
 
 static PVFS_offset next_mapped_offset (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset logical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset logical_offset)
 {
 	return logical_offset;
 }
 
 static PVFS_size contiguous_length (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset physical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset physical_offset)
 {
 	return CONTIGBLOCKSZ;
 }
@@ -42,20 +42,20 @@ static PVFS_size contiguous_length (PVFS_Dist_params *dparam,
 #if 0
 /* this is old stuff that will probably be removed shortly - WBL */
 static PVFS_size server_number (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset logical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset logical_offset)
 {
 	return 0;
 }
 
 static PVFS_size contiguous_size (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset logical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset logical_offset)
 {
 	return CONTIGBLOCKSZ;
 }
 #endif
 
 static PVFS_size logical_file_size (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_count, PVFS_size *psizes)
+		uint32_t iod_count, PVFS_size *psizes)
 {
 	if (!psizes)
 		return -1;

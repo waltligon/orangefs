@@ -62,7 +62,7 @@ struct PVFS_metafile_attr_s
     /* array of datafile handles */
     PVFS_handle *dfh;
     /* Number of datafiles */
-    PVFS_count32 nr_datafiles;
+    uint32_t nr_datafiles;
     /* size of the distribution info */
     PVFS_size dist_size;
 };

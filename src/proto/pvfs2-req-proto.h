@@ -57,7 +57,7 @@ PVFS_server_op;
 /* Metaserver status structure */
 struct PVFS_mserv_stat_s
 {
-    PVFS_count32 filetotal;
+    uint32_t filetotal;
     /* What else do we need here ??? */
 };
 typedef struct PVFS_mserv_stat_s PVFS_mserv_stat;
@@ -69,8 +69,8 @@ struct PVFS_ioserv_stat_s
     PVFS_size blksize;		/* filesystem block size */
     int64_t blkfree;	/* number of free blocks */
     int64_t blktotal;	/* total no. of blocks available */
-    PVFS_count32 filetotal;	/* Max no. of files */
-    PVFS_count32 filefree;	/* no. of free files */
+    uint32_t filetotal;	/* Max no. of files */
+    uint32_t filefree;	/* no. of free files */
 };
 typedef struct PVFS_ioserv_stat_s PVFS_ioserv_stat;
 
@@ -137,7 +137,7 @@ typedef struct PVFS_servreq_remove_s PVFS_servreq_remove;
 struct PVFS_servreq_batch_s
 {
     /* list of other requests; need semantics */
-    PVFS_count32 rcount;
+    uint32_t rcount;
     /*void *req[rcount];This should be an array of ptrs that are 
        ptrs to structs */
 };
@@ -146,7 +146,7 @@ typedef struct PVFS_servreq_batch_s PVFS_servreq_batch;
 struct PVFS_servresp_batch_s
 {
     /* list of other requests; need semantics */
-    PVFS_count32 rcount;
+    uint32_t rcount;
     /*void *req[rcount];This should be an array of ptrs that are 
        ptrs to structs */
 };
@@ -218,7 +218,7 @@ struct PVFS_servresp_lookup_path_s
     PVFS_handle *handle_array;	/* ordered array of handles(1 for each 
 				   element in path successfully traversed */
     PVFS_object_attr *attr_array;	/* array of object attributes */
-    PVFS_count32 count;		/*      count of number of handles returned */
+    uint32_t count;		/*      count of number of handles returned */
 };
 typedef struct PVFS_servresp_lookup_path_s PVFS_servresp_lookup_path;
 
@@ -278,7 +278,7 @@ struct PVFS_servreq_readdir_s
     PVFS_handle handle;		/* Handle of directory to read entries from */
     PVFS_fs_id fs_id;		/* Filesystem identifier of directory's FS */
     PVFS_token token;		/* Opaque type to show current position in dir */
-    PVFS_count32 pvfs_dirent_count;	/* count of no of dirents client 
+    uint32_t pvfs_dirent_count;	/* count of no of dirents client 
 					   wants to read */
 };
 typedef struct PVFS_servreq_readdir_s PVFS_servreq_readdir;
@@ -286,7 +286,7 @@ typedef struct PVFS_servreq_readdir_s PVFS_servreq_readdir;
 struct PVFS_servresp_readdir_s
 {
     PVFS_token token;
-    PVFS_count32 pvfs_dirent_count;
+    uint32_t pvfs_dirent_count;
     PVFS_dirent *pvfs_dirent_array;
 };
 typedef struct PVFS_servresp_readdir_s PVFS_servresp_readdir;
@@ -294,15 +294,15 @@ typedef struct PVFS_servresp_readdir_s PVFS_servresp_readdir;
 /* Getconfig */
 struct PVFS_servreq_getconfig_s
 {
-    PVFS_count32 max_strsize;	/* Expected size of string */
+    uint32_t max_strsize;	/* Expected size of string */
 };
 typedef struct PVFS_servreq_getconfig_s PVFS_servreq_getconfig;
 
 struct PVFS_servresp_getconfig_s
 {
-    PVFS_count32 fs_config_buflen;	/* length of fs configuration file contents */
+    uint32_t fs_config_buflen;	/* length of fs configuration file contents */
     char* fs_config_buf;	/* fs configuration file contents */
-    PVFS_count32 server_config_buflen;	/* length of fs configuration file contents */
+    uint32_t server_config_buflen;	/* length of fs configuration file contents */
     char* server_config_buf;	/* fs configuration file contents */
 };
 typedef struct PVFS_servresp_getconfig_s PVFS_servresp_getconfig;
@@ -376,9 +376,9 @@ struct PVFS_servreq_io_s
     enum PVFS_servreq_io_type io_type;	/* type of I/O operation */
     enum PVFS_flowproto_type flow_type;	/* type of flow protocol */
     /* relative number of this I/O server in distribution */
-    PVFS_count32 iod_num;
+    uint32_t iod_num;
     /* total number of I/O servers involved in distribution */
-    PVFS_count32 iod_count;
+    uint32_t iod_count;
     PVFS_Dist *io_dist;		/* physical distribution */
     PVFS_Request io_req;	/* datatype pattern */
 };

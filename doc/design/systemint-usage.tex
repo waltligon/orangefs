@@ -450,7 +450,7 @@ dist & PVFS\_Distribution & distribution parameters for file \\
 \hline
 dfh & PVFS\_Handle* & array of datafile handles \\
 \hline
-nr\_datafiles & PVFS\_count32 & number of datafiles \\
+nr\_datafiles & uint32\_t & number of datafiles \\
 \hline
 \end{tabular}
 \caption{PVFS\_metafile\_attr}\label{tab:metaattr}
@@ -1003,7 +1003,7 @@ iostat & PVFS\_io\_stat & statistics - I/O server \\
 Field & Type & Description \\
 \hline
 \hline
-filetotal & PVFS\_count32 & total number of metafiles on server \\
+filetotal & uint32\_t & total number of metafiles on server \\
 \hline
 \end{tabular}
 \caption{PVFS\_meta\_stat}\label{tab:metastat}
@@ -1017,13 +1017,13 @@ Field & Type & Description \\
 \hline
 blksize & PVFS\_size & file system block size \\
 \hline
-blkfree & PVFS\_count32 & number of file blocks \\
+blkfree & uint32\_t & number of file blocks \\
 \hline
-blktotal & PVFS\_count32 & total number of blocks available \\
+blktotal & uint32\_t & total number of blocks available \\
 \hline 
-filetotal & PVFS\_count32 & total number of files \\
+filetotal & uint32\_t & total number of files \\
 \hline 
-filefree & PVFS\_count32 & number of free files \\
+filefree & uint32\_t & number of free files \\
 \hline
 \end{tabular}
 \caption{PVFS\_io\_stat}\label{tab:iostat}
@@ -1084,7 +1084,7 @@ read \\
 \hline
 token & PVFS\_token & opaque type indicating current position in directory \\
 \hline
-pvfs\_dirent\_incount & PVFS\_count32 & number of directory entries to
+pvfs\_dirent\_incount & uint32\_t & number of directory entries to
 be read \\
 \hline
 \hline

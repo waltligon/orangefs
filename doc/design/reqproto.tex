@@ -189,10 +189,10 @@ root\_handle & PVFS\_handle & root handle for the file system\\
 \hline
 maskbits & PVFS\_handle & number of most significant bits representing buckets\\
 \hline
-meta\_server\_count & PVFS\_count32 & number of meta servers in the file
+meta\_server\_count & uint32\_t & number of meta servers in the file
 system\\
 \hline
-io\_server\_count & PVFS\_count32 & number of I/O servers in the file
+io\_server\_count & uint32\_t & number of I/O servers in the file
 system\\
 \hline
 meta\_server\_mapping & PVFS\_string & textual representation of
@@ -287,7 +287,7 @@ handle\_array & PVFS\_handle* & ordered array of handles for path segments (as l
 attr\_array & PVFS\_object\_attr* & ordered array of attributes
 associated with each segment\\
 \hline 
-count & PVFS\_count32 & number of handles that were successfully
+count & uint32\_t & number of handles that were successfully
 returned\\
 \hline
 \end{tabular}
@@ -418,7 +418,7 @@ table \ref{tab:dist})\\
 dfh & PVFS\_handle* & array of data file handles associated with
 the logical file\\
 \hline
-nr\_datafiles & PVFS\_count32 & number of datafiles associated
+nr\_datafiles & uint32\_t & number of datafiles associated
 with the logical file\\
 \hline
 \end{tabular}
@@ -525,7 +525,7 @@ Field & Type & Description \\
 \hline
 base & int32\_t & base node for start of striping\\
 \hline
-pcount & PVFS\_count32 & number of I/O servers\\
+pcount & uint32\_t & number of I/O servers\\
 \hline
 ssize & PVFS\_size & stripe size\\
 \hline
@@ -637,7 +637,7 @@ fs\_id & PVFS\_fs\_id & fs id of file system containing directory\\
 token & PVFS\_token & opaque token used to represent current position in
 directory\\
 \hline
-pvfs\_dirent\_count & PVFS\_count32 & count of the number of dirent
+pvfs\_dirent\_count & uint32\_t & count of the number of dirent
 structures that the client is\\
  & & willing to read\\
 \hline
@@ -654,7 +654,7 @@ Field & Type & Description \\
 token & PVFS\_token & updated opaque token from server for current
 directory offset\\
 \hline
-pvfs\_dirent\_count & PVFS\_count32 & count of the number of directory
+pvfs\_dirent\_count & uint32\_t & count of the number of directory
 entries returned by the server\\
  & & in this response\\
 \hline
@@ -804,7 +804,7 @@ u & union & union of mserv\_stat and ioserv\_stat (see tables
 \hline
 Field & Type & Description \\
 \hline
-filetotal & PVFS\_count32 & number of files present\\
+filetotal & uint32\_t & number of files present\\
 \hline
 \end{tabular}
 \caption{struct PVFS\_mserv\_stat\_s \label{tab:mservstat}}

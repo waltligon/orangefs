@@ -46,7 +46,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
     PVFS_handle *data_files = NULL;
     PVFS_Dist *dist = NULL;
     PVFS_size total_filesize;
-    PVFS_count32 num_data_servers;
+    int num_data_servers;
     int i;
 
 	enum {

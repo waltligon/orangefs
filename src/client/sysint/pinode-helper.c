@@ -525,7 +525,7 @@ int modify_pinode(pinode *node,PVFS_object_attr attr,uint32_t mask)
  */
 static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
 {
-	PVFS_count32 num_files = attr.u.meta.nr_datafiles;
+	int num_files = attr.u.meta.nr_datafiles;
 	PVFS_size size = num_files * sizeof(PVFS_handle);
 
 	ptr->attr = attr;

@@ -68,7 +68,7 @@ a request.
 
 \begin{verbatim}
    	PVFS_offset logical_to_physical_offset (PVFS_Dist_parm *dparm,
-        		PVFS_count32 iod_num, PVFS_count32 iod_count,
+        		uint32_t iod_num, uint32_t iod_count,
          	PVFS_offset logical_offset);
 \end{verbatim}
 
@@ -79,7 +79,7 @@ the current PVFS server.
 
 \begin{verbatim}
    	PVFS_offset physical_to_logical_offset (PVFS_Dist_parm *dparm,
-         	PVFS_count32 iod_num, PVFS_count32 iod_count,
+         	uint32_t iod_num, uint32_t iod_count,
          	PVFS_offset physical_offset);
 \end{verbatim}
 
@@ -89,7 +89,7 @@ assumed to be on the current PVFS server.
 
 \begin{verbatim}
    	PVFS_offset next_mapped_offset (PVFS_Dist_parm *dparm,
-         	PVFS_count32 iod_num, PVFS_count32 iod_count,
+         	uint32_t iod_num, uint32_t iod_count,
          	PVFS_offset logical_offset);
 \end{verbatim}
 
@@ -99,7 +99,7 @@ PVFS server.  Returns a logical offset.
 
 \begin{verbatim}
    	PVFS_size contiguous_length (PVFS_Dist_parm *dparm,
-         	PVFS_count32 iod_num, PVFS_count32 iod_count,
+         	uint32_t iod_num, uint32_t iod_count,
          	PVFS_offset physical_offset);
 \end{verbatim}
 
@@ -115,8 +115,8 @@ PVFS distribution processing pseudo code:
    PVFS_size size;          // size of requested data
    int req_type;            // type of read A_READ or A_WRITE
    PVFS_Dist_parm *d_p;     // point to file distribution parameter structure
-	PVFS_count32 iod_num;    // number of iods data distributed on
-	PVFS_count32 iod_count;  // ordinal number this iod
+	uint32_t iod_num;    // number of iods data distributed on
+	uint32_t iod_count;  // ordinal number this iod
 	PVFS_distribution *dist; // distribution methods
 
 	// LOCALS
@@ -178,16 +178,16 @@ method entries are registration functions are defined as follows:
    	char *dist_name;
    	int param_size;
    	PVFS_offset (*logical_to_physical_offset) (PVFS_Dist_parm *dparm,
-        		PVFS_count32 iod_num, PVFS_count32 iod_count,
+        		uint32_t iod_num, uint32_t iod_count,
          	PVFS_offset logical_offset);
    	PVFS_offset (*physical_to_logical_offset) (PVFS_Dist_parm *dparm,
-         	PVFS_count32 iod_num, PVFS_count32 iod_count,
+         	uint32_t iod_num, uint32_t iod_count,
          	PVFS_offset physical_offset);
    	PVFS_offset (*next_mapped_offset) (PVFS_Dist_parm *dparm,
-         	PVFS_count32 iod_num, PVFS_count32 iod_count,
+         	uint32_t iod_num, uint32_t iod_count,
          	PVFS_offset logical_offset);
    	PVFS_size (*contiguous_length) (PVFS_Dist_parm *dparm,
-         	PVFS_count32 iod_num, PVFS_count32 iod_count,
+         	uint32_t iod_num, uint32_t iod_count,
          	PVFS_offset physical_offset);
 	};
 

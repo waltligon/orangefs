@@ -61,7 +61,7 @@ typedef struct flist_node flist_node;
 struct pvfs_fd_manage {
 	llist_p *fd_list;		 /* Free list for fds */
 	fdesc *fdesc_p;		 /* Array of ptrs for Fdesc structures */
-	PVFS_count32 nr_fds;  /* Number of files open */
+	int nr_fds;  /* Number of files open */
 	gen_mutex_t *fd_lock; /* Mutex Lock */
 };
 typedef struct pvfs_fd_manage pfd_manage;

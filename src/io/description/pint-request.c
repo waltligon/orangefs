@@ -23,7 +23,7 @@
 /* in the request */
 
 int PINT_Process_request(PINT_Request_state *req,
-	PINT_Request_file_data *rfdata, PVFS_count32 *segmax,
+	PINT_Request_file_data *rfdata, int32_t *segmax,
 	PVFS_offset *offset_array, PVFS_size *size_array,
 	PVFS_offset *start_offset, PVFS_size *bytemax,
 	PVFS_boolean *eof_flag, int mode)
@@ -35,7 +35,7 @@ int PINT_Process_request(PINT_Request_state *req,
 	PVFS_size    contig_size;   /* temp for size of a contig region */
 	PVFS_size    retval;        /* return value from calls to distribute */
 	PVFS_size    bytes_processed;
-	PVFS_count32 segs_processed;
+	int32_t segs_processed;
 	gossip_debug(REQUEST_DEBUG,"PINT_Process_request\n");
 	/* do very basic error checking here */
 	if (!req)
@@ -308,7 +308,7 @@ int PINT_Process_request(PINT_Request_state *req,
 struct PINT_Request_state *PINT_New_request_state (PINT_Request *request)
 {
 	struct PINT_Request_state *req;
-	PVFS_count32 rqdepth;
+	int32_t rqdepth;
 	gossip_debug(REQUEST_DEBUG,"PINT_New_req\n");
 	if (!(req = (struct PINT_Request_state *)malloc(sizeof(struct PINT_Request_state))))
 	{
@@ -373,7 +373,7 @@ void PINT_Free_request_state (PINT_Request_state *req)
  */
 PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 		PINT_Request_file_data *rfdata, PVFS_size *bytes, PVFS_size bytemax,
-		PVFS_count32 *segs, PVFS_count32 segmax, PVFS_offset *offset_array,
+		int32_t *segs, int32_t segmax, PVFS_offset *offset_array,
 		PVFS_size *size_array, PVFS_boolean *eof_flag, int mode)
 {
 	PVFS_offset orig_offset;
@@ -564,10 +564,10 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
  * to the contiguous memory region
  */
 int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
-		PVFS_count32 *index)
+		int32_t *index)
 {
-	PVFS_count32 start_index = *index;
-	PVFS_count32 child_index;
+	int32_t start_index = *index;
+	int32_t child_index;
 
 	/* Leaf Node? */
 	if(node == NULL)

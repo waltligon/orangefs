@@ -28,7 +28,7 @@ main(int argc, char **argv)
 	PINT_Request_state *reqs;
 	PVFS_Dist_parm *dparm;
 	PINT_Request_file_data rfdata;
-	PVFS_count32 segmax;
+	int32_t segmax;
 	PVFS_offset *offset_array;
 	PVFS_size *size_array;
 	PVFS_offset offset;

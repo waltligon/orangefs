@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 
 	/* PVFS_Process_request arguments */
 	int retval;
-	PVFS_count32 segmax;
+	int32_t segmax;
 	PVFS_offset *offset_array;
 	PVFS_size *size_array;
 	PVFS_offset offset;

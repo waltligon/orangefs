@@ -84,7 +84,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 
     struct PINT_Request_state* req_state = NULL;
     PINT_Request_file_data tmp_file_data;
-    PVFS_count32 segmax = 1;
+    int32_t segmax = 1;
     PVFS_size bytemax = 1;
     PVFS_offset offset = 0;
     PVFS_boolean eof_flag = 0;

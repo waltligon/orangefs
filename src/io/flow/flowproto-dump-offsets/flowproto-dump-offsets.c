@@ -356,7 +356,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
     PVFS_size size_array[MAX_REGIONS];
     PVFS_boolean eof_flag;
     PVFS_size bytemax;
-    PVFS_count32 segmax;
+    int32_t segmax;
     int i;
 
     flow_d->total_transfered = 0;
@@ -420,7 +420,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
     PVFS_size size_array[MAX_REGIONS];
     PVFS_boolean eof_flag;
     PVFS_size bytemax;
-    PVFS_count32 segmax;
+    int32_t segmax;
     int i;
 
     flow_d->total_transfered = 0;
@@ -484,7 +484,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
     PVFS_size size_array[MAX_REGIONS];
     PVFS_boolean eof_flag;
     PVFS_size bytemax;
-    PVFS_count32 segmax;
+    int32_t segmax;
     int i;
 
     flow_d->total_transfered = 0;
@@ -547,7 +547,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
     PVFS_size size_array[MAX_REGIONS];
     PVFS_boolean eof_flag;
     PVFS_size bytemax;
-    PVFS_count32 segmax;
+    int32_t segmax;
     int i;
 
     flow_d->total_transfered = 0;

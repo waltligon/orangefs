@@ -4,8 +4,11 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.3 2003-03-26 15:25:58 walt Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.4 2003-06-02 19:55:41 pcarns Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.3  2003/03/26 15:25:58  walt
+// added a couple of comments
+//
 // Revision 1.2  2003/01/15 19:36:45  walt
 // fixed some warnings - changed order of args for request commit
 //
@@ -95,13 +98,13 @@ PVFS_Request PVFS_PACKED = &PINT_PACKED;
 
 /* int PVFS_Request_extent(PVFS_Request request, PVFS_size *extent); */
 
-int PVFS_Request_contiguous(PVFS_count32 count, PVFS_Request oldreq,
+int PVFS_Request_contiguous(int32_t count, PVFS_Request oldreq,
 		PVFS_Request *newreq) 
 {
 	return PVFS_Request_hvector(1, count, 0, oldreq, newreq);
 }
 
-int PVFS_Request_vector(PVFS_count32 count, PVFS_count32 blocklength,
+int PVFS_Request_vector(int32_t count, int32_t blocklength,
 		PVFS_offset stride, PVFS_Request oldreq, PVFS_Request *newreq)
 {
 	int64_t extent;
@@ -112,8 +115,8 @@ int PVFS_Request_vector(PVFS_count32 count, PVFS_count32 blocklength,
 			oldreq,newreq);
 }
 
-static int PINT_subreq(PVFS_offset offset, PVFS_count32 bsize,
-		PVFS_size stride, PVFS_count32 count, PVFS_Request oldreq,
+static int PINT_subreq(PVFS_offset offset, int32_t bsize,
+		PVFS_size stride, int32_t count, PVFS_Request oldreq,
 		PVFS_size oldext, PVFS_Request *newreq)
 {
 	if (oldreq == NULL)
@@ -139,7 +142,7 @@ static int PINT_subreq(PVFS_offset offset, PVFS_count32 bsize,
 	return PVFS_SUCCESS;
 }
 
-int PVFS_Request_hvector(PVFS_count32 count, PVFS_count32 blocklength,
+int PVFS_Request_hvector(int32_t count, int32_t blocklength,
 		PVFS_size stride, PVFS_Request oldreq, PVFS_Request *newreq)
 {
 	PVFS_size oldext;
@@ -157,7 +160,7 @@ int PVFS_Request_hvector(PVFS_count32 count, PVFS_count32 blocklength,
 	return PVFS_SUCCESS;
 }
 
-int PVFS_Request_indexed(PVFS_count32 count, PVFS_count32 *blocklengths,
+int PVFS_Request_indexed(int32_t count, int32_t *blocklengths,
 		PVFS_size *displacements, PVFS_Request oldreq, PVFS_Request *newreq)
 {
 	PINT_Request *dt;
@@ -201,7 +204,7 @@ int PVFS_Request_indexed(PVFS_count32 count, PVFS_count32 *blocklengths,
 	return PVFS_SUCCESS;
 }
 
-int PVFS_Request_hindexed(PVFS_count32 count, PVFS_count32 *blocklengths,
+int PVFS_Request_hindexed(int32_t count, int32_t *blocklengths,
 		PVFS_size *displacements, PVFS_Request oldreq, PVFS_Request *newreq)
 {
 	PINT_Request *dt;
@@ -245,7 +248,7 @@ int PVFS_Request_hindexed(PVFS_count32 count, PVFS_count32 *blocklengths,
 	return PVFS_SUCCESS;
 }
 
-int PVFS_Request_struct(PVFS_count32 count, PVFS_count32 *blocklengths,
+int PVFS_Request_struct(int32_t count, int32_t *blocklengths,
 		PVFS_size *displacements, PVFS_Request *oldreqs, PVFS_Request *newreq)
 {
 	PINT_Request *dt;

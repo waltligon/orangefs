@@ -69,16 +69,16 @@ typedef enum {
 struct PVFS_io_stat_s {
 	/*PVFS_volume_id vid;*/
 	PVFS_size blksize;
-	PVFS_count32 blkfree;
-	PVFS_count32 blktotal;
-	PVFS_count32 filetotal;
-	PVFS_count32 filefree;
+	uint32_t blkfree;
+	uint32_t blktotal;
+	uint32_t filetotal;
+	uint32_t filefree;
 };
 typedef struct PVFS_io_stat_s PVFS_io_stat;
 
 /* Meta server stats */
 struct PVFS_meta_stat_s {
-	PVFS_count32 filetotal;
+	uint32_t filetotal;
 };
 typedef struct PVFS_meta_stat_s PVFS_meta_stat;
 
@@ -133,7 +133,7 @@ typedef struct pvfs_mntlist_s pvfs_mntlist;
 
 /* response from init */
 struct PVFS_sysresp_init_s {
-	PVFS_count32 nr_fsid; /*Number of fs_id's that we're returning*/
+	int nr_fsid; /*Number of fs_id's that we're returning*/
 	PVFS_fs_id *fsid_list; 
 };
 typedef struct PVFS_sysresp_init_s PVFS_sysresp_init;
@@ -350,7 +350,7 @@ typedef struct PVFS_sysresp_config_s PVFS_sysresp_config;
 struct PVFS_sysreq_readdir_s {
 	pinode_reference pinode_refn;
 	PVFS_token token;
-	PVFS_count32 pvfs_dirent_incount;
+	int pvfs_dirent_incount;
 	PVFS_credentials credentials;
 	
 };
@@ -358,7 +358,7 @@ typedef struct PVFS_sysreq_readdir_s PVFS_sysreq_readdir;
 
 struct PVFS_sysresp_readdir_s {
 	PVFS_token token;  
-	PVFS_count32 pvfs_dirent_outcount;
+	int pvfs_dirent_outcount;
 	PVFS_dirent *dirent_array;
 };
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;

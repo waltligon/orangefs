@@ -39,7 +39,6 @@ typedef uint32_t PVFS_permissions;
 
 
 /* these types are scheduled for removal or modification... */
-typedef int32_t PVFS_count32;
 typedef int16_t PVFS_type;
 typedef int64_t PVFS_token;
 

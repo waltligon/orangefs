@@ -12,22 +12,22 @@
 
 typedef struct PINT_Request *PVFS_Request;
 
-int PVFS_Request_contiguous(PVFS_count32 count, PVFS_Request oldreq,
+int PVFS_Request_contiguous(int32_t count, PVFS_Request oldreq,
 		      PVFS_Request *newreq);
 
-int PVFS_Request_vector(PVFS_count32 count, PVFS_count32 blocklength,
+int PVFS_Request_vector(int32_t count, int32_t blocklength,
 		PVFS_size stride, PVFS_Request oldreq, PVFS_Request *newreq);
 
-int PVFS_Request_hvector(PVFS_count32 count, PVFS_count32 blocklength,
+int PVFS_Request_hvector(int32_t count, int32_t blocklength,
 		PVFS_size stride, PVFS_Request oldreq, PVFS_Request *newreq);
 
-int PVFS_Request_indexed(PVFS_count32 count, PVFS_count32 *blocklengths,
+int PVFS_Request_indexed(int32_t count, int32_t *blocklengths,
 		      PVFS_size *displacements, PVFS_Request oldreq, PVFS_Request *newreq);
 
-int PVFS_Request_hindexed(PVFS_count32 count, PVFS_count32 *blocklengths,
+int PVFS_Request_hindexed(int32_t count, int32_t *blocklengths,
 		PVFS_size *displacements, PVFS_Request oldreq, PVFS_Request *newreq);
 
-int PVFS_Request_struct(PVFS_count32 count, PVFS_count32 *blocklengths,
+int PVFS_Request_struct(int32_t count, int32_t *blocklengths,
 		PVFS_size *displacements, PVFS_Request *oldreqs, PVFS_Request *newreq);
 
 int PVFS_Address(void* location, PVFS_offset *address);

@@ -25,19 +25,19 @@ typedef void PVFS_Dist_params;
 
 typedef struct PVFS_Dist_methods {
 	PVFS_offset (*logical_to_physical_offset) (PVFS_Dist_params *dparam,
-			PVFS_count32 iod_num, PVFS_count32 iod_count,
+			uint32_t iod_num, uint32_t iod_count,
 			PVFS_offset logical_offset);
 	PVFS_offset (*physical_to_logical_offset) (PVFS_Dist_params *dparam,
-			PVFS_count32 iod_num, PVFS_count32 iod_count,
+			uint32_t iod_num, uint32_t iod_count,
 			PVFS_offset physical_offset);
 	PVFS_offset (*next_mapped_offset) (PVFS_Dist_params *dparam,
-			PVFS_count32 iod_num, PVFS_count32 iod_count,
+			uint32_t iod_num, uint32_t iod_count,
 			PVFS_offset logical_offset);
 	PVFS_size (*contiguous_length) (PVFS_Dist_params *dparam,
-			PVFS_count32 iod_num, PVFS_count32 iod_count,
+			uint32_t iod_num, uint32_t iod_count,
 			PVFS_offset physical_offset);
 	PVFS_size (*logical_file_size) (PVFS_Dist_params *dparam,
-			PVFS_count32 iod_count, PVFS_size *psizes);
+			uint32_t iod_count, PVFS_size *psizes);
 	void (*encode) (PVFS_Dist_params *dparam, void *buffer);
 	void (*decode) (PVFS_Dist_params *dparam, void *buffer);
 } PVFS_Dist_methods;

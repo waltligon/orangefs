@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     void* buffer = NULL;
     int64_t total_written = 0;
     double time1, time2;
-    PVFS_count32 blocklength = 0;
+    int32_t blocklength = 0;
     PVFS_size displacement = 0;
 
     gossip_enable_stderr();

@@ -1360,7 +1360,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
     PVFS_boolean eof_flag = 0;
     char *tmp_offset;
     PVFS_size actual_size = 0;
-    PVFS_count32 segmax = 0;
+    int32_t segmax = 0;
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "service_bmi_to_trove() called.\n");
 

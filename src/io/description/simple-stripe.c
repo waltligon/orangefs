@@ -12,21 +12,21 @@
 #include <simple-stripe.h>
 
 static PVFS_offset logical_to_physical_offset (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset logical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset logical_offset)
 {
 	return (((logical_offset / dparam->strip_size) / iod_count)
 			* dparam->strip_size) + (logical_offset % dparam->strip_size);
 }
 
 static PVFS_offset physical_to_logical_offset (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset physical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset physical_offset)
 {
 	return ((((physical_offset / dparam->strip_size) * iod_count) + iod_num)
 			* dparam->strip_size) + (physical_offset % dparam->strip_size);
 }
 
 static PVFS_offset next_mapped_offset (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset logical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset logical_offset)
 {
 	PVFS_offset diff; /* distance of loff from beginning of strip in this stripe */
 	PVFS_size   stripe_size; /* not to be confused with strip size */
@@ -48,7 +48,7 @@ static PVFS_offset next_mapped_offset (PVFS_Dist_params *dparam,
 }
 
 static PVFS_size contiguous_length (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset physical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset physical_offset)
 {
 	return dparam->strip_size - (physical_offset % dparam->strip_size);
 }
@@ -56,20 +56,20 @@ static PVFS_size contiguous_length (PVFS_Dist_params *dparam,
 #if 0
 /* this is old stuff that will probably be removed shortly - WBL */
 static PVFS_size server_number (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset logical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset logical_offset)
 {
 	return (logical_offset / dparam->strip_size) % iod_count;
 }
 
 static PVFS_size contiguous_size (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset logical_offset)
+		uint32_t iod_num, uint32_t iod_count, PVFS_offset logical_offset)
 {
 	return dparam->strip_size - (logical_offset % dparam->strip_size);
 }
 #endif
 
 static PVFS_size logical_file_size (PVFS_Dist_params *dparam,
-		PVFS_count32 iod_count, PVFS_size *psizes)
+		uint32_t iod_count, PVFS_size *psizes)
 {
 	/* take the max of the max offset on each server */
 	PVFS_size max;

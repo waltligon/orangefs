@@ -31,14 +31,14 @@ int main(int argc, char **argv)
 
 	/* PVFS_Process_request arguments */
 	int retval;
-	PVFS_count32 segmax;
+	int32_t segmax;
 	PVFS_offset *offset_array;
 	PVFS_size *size_array;
 	PVFS_offset offset;
 	PVFS_size bytemax;
 	PVFS_boolean eof_flag;
 
-	PVFS_count32 blocklength = 10*1024*1024; /* 10M */
+	int32_t blocklength = 10*1024*1024; /* 10M */
 
 	/* set up two requests */
 	PVFS_size displacement = 0;  /* first at offset zero */

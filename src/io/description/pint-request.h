@@ -20,32 +20,32 @@
 
 typedef struct PINT_Request {
 	PVFS_offset  offset;        /* offset from start of last set of elements */
-	PVFS_count32 num_ereqs;     /* number of ereqs in a block */
-	PVFS_count32 num_blocks;    /* number of blocks */
+	int32_t num_ereqs;     /* number of ereqs in a block */
+	int32_t num_blocks;    /* number of blocks */
 	PVFS_size    stride;        /* stride between blocks in bytes */
 	PVFS_offset  ub;            /* upper bound of the type in bytes */
 	PVFS_offset  lb;            /* lower bound of the type in bytes */
 	PVFS_size    aggregate_size; /* amount of aggregate data in bytes */
-	PVFS_count32 num_contig_chunks; /* number of contiguous data chunks */
-	PVFS_count32 depth;    	    /* number of levels of nesting */
-	PVFS_count32 num_nested_req;/* number of requests nested under this one */
-	PVFS_count32 committed;     /* indicates if request has been commited */
+	int32_t num_contig_chunks; /* number of contiguous data chunks */
+	int32_t depth;    	    /* number of levels of nesting */
+	int32_t num_nested_req;/* number of requests nested under this one */
+	int32_t committed;     /* indicates if request has been commited */
 	struct PINT_Request *ereq;  /* element type */
 	struct PINT_Request *sreq;  /* sequence type */
 } PINT_Request;
 
 typedef struct PINT_reqstack {
-	PVFS_count32 el;           /* number of element being processed */
-	PVFS_count32 maxel;        /* total number of these elements to process */
+	int32_t el;           /* number of element being processed */
+	int32_t maxel;        /* total number of these elements to process */
 	PINT_Request *rq;    		/* pointer to request structure */
 	PINT_Request *rqbase; 		/* pointer to first request is sequence chain */
-	PVFS_count32 blk;          /* number of block being processed */
+	int32_t blk;          /* number of block being processed */
 	PVFS_offset  chunk_offset; /* offset of beginning of current contiguous chunk */
 } PINT_reqstack;           
           
 typedef struct PINT_Request_state { 
 	struct PINT_reqstack *cur; /* request element chain stack */
-	PVFS_count32 lvl;          /* level in element chain */
+	int32_t lvl;          /* level in element chain */
 	PVFS_size    bytes;        /* bytes in current contiguous chunk processed */
 	PVFS_offset  buf_offset;   /* byte offset in user buffer */
 	PVFS_offset  last_offset;	/* last offset in previous call to process */
@@ -53,8 +53,8 @@ typedef struct PINT_Request_state {
 
 typedef struct PINT_Request_file_data {
 	PVFS_size    fsize;			/* actual size of local storage object */
-	PVFS_count32 iod_num;		/* ordinal number of THIS server for this file */
-	PVFS_count32 iod_count;		/* number of servers for this file */
+	uint32_t iod_num;		/* ordinal number of THIS server for this file */
+	uint32_t iod_count;		/* number of servers for this file */
 	PVFS_Dist    *dist;			/* dist struct for the file */
 	PVFS_boolean extend_flag;	/* if zero, file will not be extended */
 } PINT_Request_file_data;
@@ -65,7 +65,7 @@ void PINT_Free_request_state (PINT_Request_state *req);
 
 /* generate offset length pairs from request and dist */
 int PINT_Process_request(PINT_Request_state *req,
-		PINT_Request_file_data *rfdata, PVFS_count32 *segmax,
+		PINT_Request_file_data *rfdata, int32_t *segmax,
 		PVFS_offset *offset_array, PVFS_size *size_array,
 		PVFS_offset *start_offset, PVFS_size *bytemax,
 		PVFS_boolean *eof_flag, int mode);
@@ -73,12 +73,12 @@ int PINT_Process_request(PINT_Request_state *req,
 /* internal function */
 PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 		PINT_Request_file_data *rfdata, PVFS_size *bytes, PVFS_size bytemax,
-		PVFS_count32 *segs, PVFS_count32 segmax, PVFS_offset *offset_array,
+		int32_t *segs, int32_t segmax, PVFS_offset *offset_array,
 		PVFS_size *size_array, PVFS_boolean *eof_flag, int mode);
 
 /* pack request from node into a contiguous buffer pointed to by region */
 int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
-		      PVFS_count32 *index);
+		      int32_t *index);
 
 /* encode packed request in place for sending over wire */
 int PINT_Request_encode(struct PINT_Request *req);
