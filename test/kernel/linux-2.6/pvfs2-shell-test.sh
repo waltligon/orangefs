@@ -6,6 +6,20 @@
 # This script focuses on making sure that basic shell
 # programs work correctly on top of pvfs2.
 #
+# run this test like this:
+#
+# sh pvfs2-shell-test.sh /pvfs/mntpoint
+#
+
+#####################################
+# runtime options
+#####################################
+
+# comment out to disable categories of tests
+ENABLE_DIRECTORY_TESTS=1
+ENABLE_IO_TESTS=1
+ENABLE_COMPILE_TESTS=1
+ENABLE_PERMISSION_TESTS=1
 
 
 #####################################
@@ -81,6 +95,52 @@ generate_hello_world_code()
     echo "$DATE: Hello World source code written"
 }
 
+generate_mmap_read_code()
+{
+    OUTFILE=$1
+
+    rm -f $OUTFILE
+
+    DATE=`date`
+    echo "$DATE: Generating mmap.c source code (an mmap read test)"
+
+    cat >> $OUTFILE <<EOF
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
+int main(int argc, char **argv) {
+    int ret = -1, fd = -1; void *start = NULL;
+    struct stat statbuf; char *ptr = NULL, *end = NULL;
+    memset(&statbuf, 0, sizeof(statbuf));
+    if (stat(argv[1],&statbuf) == 0) {
+        if ((fd = open(argv[1], O_RDONLY)) != -1) {
+            start = mmap(NULL, statbuf.st_size, PROT_READ,
+                         MAP_PRIVATE, fd, 0);
+            if (start != MAP_FAILED) {
+                fprintf(stderr,"MMAP Read content length is %d "
+                        "\n\n", (int)statbuf.st_size);
+                end = (char *)(start + statbuf.st_size);
+                for(ptr = (char *)start; ptr != end; ptr++)
+                    if (ptr)
+                        printf("%x ",*ptr);
+                printf("\n");
+                ret = munmap(start, statbuf.st_size);
+            }
+            close(fd);
+        }
+    }
+    return ret;
+}
+EOF
+
+    DATE=`date`
+    echo "$DATE: MMAP Read source code written"
+}
+
 stat_file()
 {
     WORDS=$1
@@ -97,16 +157,19 @@ stat_file()
     echo "$DATE: Finished"
 }
 
-check_file_permissions()
+check_entry_permissions()
 {
-    FILE=$1
+    ENTRY=$1
     PERM=$2
 
-    echo "  - Verifying that file permission is now $PERM"
-    OUTPUT=`stat $FILE | head -n 4 | tail -n 1 | awk '{print \$2}' | grep $PERM`
+#    echo "  - Verifying that entry permission is now $PERM"
+    OUTPUT=`stat $ENTRY | head -n 4 | tail -n 1 | awk '{print \$2}' | grep $PERM`
+
     if test "x$OUTPUT" = "x"; then
-        echo "Permission check Failed; Test Aborting"
+        echo "Permission check: FAILED.  Test Aborting."
         exit 1
+    else
+        echo "Permission check: OK $OUTPUT"
     fi
     return 0
 }
@@ -145,6 +208,10 @@ directory_test1()
 
     remove_testdir $PVFS2_TESTDIR
 
+    echo ""
+    echo "******************************************"
+    echo "* PASSED DIRECTORY TEST 1"
+    echo "******************************************"
     return 0
 }
 
@@ -203,6 +270,10 @@ directory_test2()
 
     remove_testdir $PVFS2_TESTDIR
 
+    echo ""
+    echo "******************************************"
+    echo "* PASSED DIRECTORY TEST 2"
+    echo "******************************************"
     return 0
 }
 
@@ -280,6 +351,10 @@ directory_test3()
 
     remove_testdir $PVFS2_TESTDIR
 
+    echo ""
+    echo "******************************************"
+    echo "* PASSED DIRECTORY TEST 3"
+    echo "******************************************"
     return 0
 }
 
@@ -315,7 +390,7 @@ permission_test1()
     for f in $TEST_PERMISSIONS; do
         echo "Changing permission of test file to $f"
         chmod $f $TESTFILE
-        check_file_permissions $TESTFILE $f
+        check_entry_permissions $TESTFILE $f
     done
     DATE=`date`
     echo "$DATE: Finished"
@@ -325,8 +400,58 @@ permission_test1()
 
     remove_testdir $PVFS2_TESTDIR
 
+    echo ""
+    echo "******************************************"
+    echo "* PASSED PERMISSION TEST 1"
+    echo "******************************************"
     return 0
 }
+
+# create a dir
+# create a dir in that dir
+# change permissions of that dir to each of TEST_PERMISSIONS[] and verify
+# rm -rf the dir(s)
+permission_test2()
+{
+    echo ""
+    echo "******************************************"
+    echo "* RUNNING PERMISSION TEST 2"
+    echo "******************************************"
+
+    setup_testdir $PVFS2_TESTDIR
+
+    TESTDIR=$PVFS2_TESTDIR/perm-testdir
+
+    echo "Creating test dir $TESTDIR"
+    touch $TESTDIR
+
+    if ! test -f $TESTDIR; then
+        echo "Failed to create test file $TESTDIR"
+        return 1
+    fi
+
+    DATE=`date`
+    echo "$DATE: Modifying permissions of test dir"
+    for f in $TEST_PERMISSIONS; do
+        echo "Changing permission of test dir to $f"
+        chmod $f $TESTDIR
+        check_entry_permissions $TESTDIR $f
+    done
+    DATE=`date`
+    echo "$DATE: Finished"
+
+    echo "Removing testdir"
+    rm -f $TESTDIR
+
+    remove_testdir $PVFS2_TESTDIR
+
+    echo ""
+    echo "******************************************"
+    echo "* PASSED PERMISSION TEST 2"
+    echo "******************************************"
+    return 0
+}
+
 
 #####################################
 # simple i/o test functions
@@ -367,6 +492,10 @@ io_test1()
 
     remove_testdir $PVFS2_TESTDIR
 
+    echo ""
+    echo "******************************************"
+    echo "* PASSED I/O TEST 1"
+    echo "******************************************"
     return 0
 }
 
@@ -405,6 +534,10 @@ io_test2()
 
     remove_testdir $PVFS2_TESTDIR
 
+    echo ""
+    echo "******************************************"
+    echo "* PASSED I/O TEST 2"
+    echo "******************************************"
     return 0
 }
 
@@ -463,6 +596,78 @@ compile_test1()
 
     remove_testdir $PVFS2_TESTDIR
 
+    echo ""
+    echo "******************************************"
+    echo "* PASSED COMPILE TEST 1"
+    echo "******************************************"
+    return 0
+}
+
+# generate an mmap read c program
+# run gcc on the file
+# make sure the file exists and is executable
+# generate a 4MB test binary file to mmap read
+# execute the program on the test file to make sure the output is good
+# remove the source, test, and binary files by removing the test dir
+compile_test2()
+{
+    echo ""
+    echo "******************************************"
+    echo "* RUNNING COMPILE TEST 2"
+    echo "******************************************"
+
+    setup_testdir $PVFS2_TESTDIR
+
+    MMAP_READ_SOURCE="$PVFS2_TESTDIR/__mmap_read.c"
+    MMAP_READ_BINARY="$PVFS2_TESTDIR/__mmap_read"
+    MMAP_READ_BINARY_DATA="$PVFS2_TESTDIR/__mmap_read_data"
+
+    echo "Removing temporary files (if they exist)"
+    rm -rf $MMAP_READ_SOURCE $MMAP_READ_BINARY $MMAP_READ_BINARY_DATA
+
+    generate_mmap_read_code $MMAP_READ_SOURCE
+
+    stat_file "Doing stat on generated source code" $MMAP_READ_SOURCE
+
+    DATE=`date`
+    echo "$DATE: Compiling source code"
+
+    OUTPUT=`gcc $MMAP_READ_SOURCE -o $MMAP_READ_BINARY`
+    if ! test "x$OUTPUT" = "x"; then
+        echo "Clean Compilation Failed"
+        echo $OUTPUT
+        return 1
+    fi
+
+    if ! test -x "$MMAP_READ_BINARY"; then
+        echo "Binary file not created!"
+        echo $OUTPUT
+        return 1
+    fi
+
+    DATE=`date`
+    echo "$DATE: Compilation finished"
+
+    stat_file "Doing stat on generated binary" $MMAP_READ_BINARY
+
+    if ! test -c /dev/urandom; then
+        echo "Skipping test because /dev/urandom does not "
+        echo " exist or is not a character file!"
+        return 1
+    fi
+
+    CMD="dd if=/dev/urandom of=$MMAP_READ_BINARY_DATA bs=4194304 count=1"
+    timestamp "Generating random 4MB file in 1 4MB block" "$CMD"
+
+    CMD="$MMAP_READ_BINARY $MMAP_READ_BINARY_DATA"
+    timestamp "Executing MMAP Read Program on random data file" "$CMD" /dev/null
+
+    remove_testdir $PVFS2_TESTDIR
+
+    echo ""
+    echo "******************************************"
+    echo "* PASSED COMPILE TEST 2"
+    echo "******************************************"
     return 0
 }
 
@@ -495,16 +700,36 @@ fi
 # start running tests here
 #####################################
 
-directory_test1
+if ! test -z "$ENABLE_DIRECTORY_TESTS"; then
+    directory_test1
 
-directory_test2
+    directory_test2
 
-directory_test3
+    directory_test3
+fi
 
-io_test1
 
-io_test2
+if ! test -z "$ENABLE_IO_TESTS"; then
+    io_test1
 
-compile_test1
+    io_test2
+fi
 
-permission_test1
+if ! test -z "$ENABLE_COMPILE_TESTS"; then
+    compile_test1
+
+    compile_test2
+fi
+
+if ! test -z "$ENABLE_PERMISSION_TESTS"; then
+    permission_test1
+
+    permission_test2
+fi
+
+
+# if the script hasn't aborted at this point, we've passed everything
+echo ""
+echo "****************************************************"
+echo "* pvfs2-shell-test.sh completed all configured tests"
+echo "****************************************************"
