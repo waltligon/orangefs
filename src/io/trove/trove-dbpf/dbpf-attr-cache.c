@@ -80,7 +80,7 @@ int dbpf_attr_cache_do_initialize(void)
                 *end = '\0';
                 s_cacheable_keyword_array[num_keywords++] = start;
 
-                gossip_debug(TROVE_DEBUG, "Got cacheable "
+                gossip_debug(DBPF_ATTRCACHE_DEBUG, "Got cacheable "
                              "attribute keyword %s\n",start);
 
                 start = ++end;
@@ -139,7 +139,8 @@ int dbpf_attr_cache_initialize(
         assert(s_dbpf_attr_mutex);
 
         ret = (s_key_to_attr_table ? 0 : -1);
-        gossip_debug(TROVE_DEBUG, "dbpf_attr_cache_initialized\n");
+        gossip_debug(DBPF_ATTRCACHE_DEBUG,
+                     "dbpf_attr_cache_initialized\n");
     }
 
   return_error:
@@ -177,7 +178,7 @@ int dbpf_attr_cache_finalize(void)
         gen_mutex_unlock(s_dbpf_attr_mutex);
         gen_mutex_destroy(s_dbpf_attr_mutex);
         s_dbpf_attr_mutex = NULL;
-        gossip_debug(TROVE_DEBUG, "dbpf_attr_cache_finalized\n");
+        gossip_debug(DBPF_ATTRCACHE_DEBUG, "dbpf_attr_cache_finalized\n");
     }
 
     if (s_cacheable_keywords)
@@ -207,15 +208,16 @@ TROVE_ds_attributes *dbpf_attr_cache_lookup(TROVE_handle key)
                 hash_link, dbpf_attr_cache_elem_t, hash_link);
             assert(cache_elem);
             attr = &(cache_elem->attr);
-            gossip_debug(TROVE_DEBUG, "dbpf_attr_cache_lookup: cache "
-                         "hit on %Lu\n", Lu(key));
+            gossip_debug(
+                DBPF_ATTRCACHE_DEBUG, "dbpf_attr_cache_lookup: cache "
+                "hit on %Lu\n", Lu(key));
         }
         gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return attr;
 }
 
-dbpf_attr_cache_elem_t *dbpf_cache_elem_lookup(TROVE_handle key)
+dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key)
 {
     struct qlist_head *hash_link = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
@@ -229,15 +231,16 @@ dbpf_attr_cache_elem_t *dbpf_cache_elem_lookup(TROVE_handle key)
             cache_elem = qhash_entry(
                 hash_link, dbpf_attr_cache_elem_t, hash_link);
             assert(cache_elem);
-            gossip_debug(TROVE_DEBUG, "dbpf_cache_elem_lookup: cache "
-                         "elem matching %Lu returned\n", Lu(key));
+            gossip_debug(
+                DBPF_ATTRCACHE_DEBUG, "dbpf_cache_elem_lookup: cache "
+                "elem matching %Lu returned\n", Lu(key));
         }
         gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return cache_elem;
 }
 
-dbpf_keyval_pair_cache_elem_t *dbpf_cache_elem_get_data_based_on_key(
+dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
     dbpf_attr_cache_elem_t *cached_elem, char *key)
 {
     int i = 0;
@@ -251,11 +254,12 @@ dbpf_keyval_pair_cache_elem_t *dbpf_cache_elem_get_data_based_on_key(
             if ((strcmp(cached_elem->keyval_pairs[i].key, key) == 0) &&
                 (cached_elem->keyval_pairs[i].data != NULL))
             {
-                gossip_debug(TROVE_DEBUG, "Returning data %p based on "
-                             "key %Lu and key_str %s (data_sz=%d)\n",
-                             cached_elem->keyval_pairs[i].data,
-                             Lu(cached_elem->key), key,
-                             cached_elem->keyval_pairs[i].data_sz);
+                gossip_debug(
+                    DBPF_ATTRCACHE_DEBUG, "Returning data %p based on "
+                    "key %Lu and key_str %s (data_sz=%d)\n",
+                    cached_elem->keyval_pairs[i].data,
+                    Lu(cached_elem->key), key,
+                    cached_elem->keyval_pairs[i].data_sz);
                 gen_mutex_unlock(s_dbpf_attr_mutex);
                 return &cached_elem->keyval_pairs[i];
             }
@@ -265,13 +269,13 @@ dbpf_keyval_pair_cache_elem_t *dbpf_cache_elem_get_data_based_on_key(
     return NULL;
 }
 
-int dbpf_cache_elem_set_data_based_on_key(
+int dbpf_attr_cache_elem_set_data_based_on_key(
     TROVE_handle key, char *key_str, void *data, int data_sz)
 {
     int ret = - 1, i = 0;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
 
-    cache_elem = dbpf_cache_elem_lookup(key);
+    cache_elem = dbpf_attr_cache_elem_lookup(key);
     if (cache_elem && key_str && cache_elem->num_keyval_pairs)
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
@@ -284,22 +288,71 @@ int dbpf_cache_elem_set_data_based_on_key(
         {
             if (strcmp(cache_elem->keyval_pairs[i].key, key_str) == 0)
             {
-                gossip_debug(TROVE_DEBUG, "Setting data %p based on key "
-                             "%Lu and key_str %s (data_sz=%d)\n", data,
-                             Lu(key), key_str, data_sz);
+                gossip_debug(
+                    DBPF_ATTRCACHE_DEBUG, "Setting data %p based on key "
+                    "%Lu and key_str %s (data_sz=%d)\n", data,
+                    Lu(key), key_str, data_sz);
 
                 if (cache_elem->keyval_pairs[i].data)
                 {
                     free(cache_elem->keyval_pairs[i].data);
                 }
-                cache_elem->keyval_pairs[i].data = (void *)
-                    malloc(data_sz);
+                cache_elem->keyval_pairs[i].data = malloc(data_sz);
                 assert(cache_elem->keyval_pairs[i].data);
                 memcpy(cache_elem->keyval_pairs[i].data, data, data_sz);
                 cache_elem->keyval_pairs[i].data_sz = data_sz;
                 ret = 0;
                 break;
             }
+        }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
+    }
+    return ret;
+}
+
+int dbpf_attr_cache_keyval_pair_update_cached_data(
+    dbpf_attr_cache_elem_t *cached_elem,
+    dbpf_keyval_pair_cache_elem_t *keyval_pair,
+    void *src_data, int src_data_sz)
+{
+    int ret = -1;
+
+    if (DBPF_ATTR_CACHE_INITIALIZED() && (keyval_pair && src_data))
+    {
+        gen_mutex_lock(s_dbpf_attr_mutex);
+        if (cached_elem && keyval_pair)
+        {
+            if (keyval_pair->data)
+            {
+                free(keyval_pair->data);
+            }
+            keyval_pair->data = malloc(src_data_sz);
+            assert(keyval_pair->data);
+            memcpy(keyval_pair->data, src_data, src_data_sz);
+            keyval_pair->data_sz = src_data_sz;
+            ret = 0;
+        }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
+    }
+    return ret;
+}
+
+int dbpf_attr_cache_keyval_pair_fetch_cached_data(
+    dbpf_attr_cache_elem_t *cached_elem,
+    dbpf_keyval_pair_cache_elem_t *keyval_pair,
+    void *target_data, int *target_data_sz)
+{
+    int ret = -1;
+
+    if (DBPF_ATTR_CACHE_INITIALIZED() &&
+        (keyval_pair && target_data && target_data_sz))
+    {
+        gen_mutex_lock(s_dbpf_attr_mutex);
+        if (cached_elem && keyval_pair)
+        {
+            memcpy(target_data, keyval_pair->data, keyval_pair->data_sz);
+            *target_data_sz = keyval_pair->data_sz;
+            ret = 0;
         }
         gen_mutex_unlock(s_dbpf_attr_mutex);
     }
@@ -356,9 +409,9 @@ int dbpf_attr_cache_insert(
                 qhash_add(
                     s_key_to_attr_table,&(key),&(cache_elem->hash_link));
                 gossip_debug(
-                    TROVE_DEBUG, "dbpf_attr_cache_insert: inserting "
-                    "%Lu (k_size is %Lu | b_size is %Lu)\n",
-                    Lu(key),
+                    DBPF_ATTRCACHE_DEBUG,
+                    "dbpf_attr_cache_insert: inserting %Lu "
+                    "(k_size is %Lu | b_size is %Lu)\n", Lu(key),
                     Lu(cache_elem->attr.k_size),
                     Lu(cache_elem->attr.b_size));
             }
@@ -384,8 +437,8 @@ int dbpf_attr_cache_remove(TROVE_handle key)
             cache_elem = qhash_entry(
                 hash_link, dbpf_attr_cache_elem_t, hash_link);
 
-            gossip_debug(TROVE_DEBUG, "dbpf_attr_cache_remove: removing "
-                         "%Lu\n", Lu(key));
+            gossip_debug(DBPF_ATTRCACHE_DEBUG, "dbpf_attr_cache_remove: "
+                         "removing %Lu\n", Lu(key));
 
             /* free any keyval data cached as well */
             if (s_cacheable_keywords)

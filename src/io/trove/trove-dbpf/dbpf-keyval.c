@@ -44,26 +44,21 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
 
-    gossip_debug(TROVE_DEBUG, "*** Trove KeyVal Read of %s\n",
-                 (char *)key_p->buffer);
+    gossip_debug(DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Read "
+                 "of %s\n", (char *)key_p->buffer);
 
-    cache_elem = dbpf_cache_elem_lookup(handle);
+    cache_elem = dbpf_attr_cache_elem_lookup(handle);
     if (cache_elem)
     {
-        dbpf_keyval_pair_cache_elem_t *data =
-            dbpf_cache_elem_get_data_based_on_key(
+        dbpf_keyval_pair_cache_elem_t *keyval_pair =
+            dbpf_attr_cache_elem_get_data_based_on_key(
                 cache_elem, key_p->buffer);
-        if (data)
+        if (keyval_pair)
         {
-            gossip_debug(TROVE_DEBUG, "fast path keyval cache hit "
-                         "(data_sz=%d)\n",data->data_sz);
-            /*
-              copy out data here into appropriate place and
-              return 1 for immed completion
-            */
-            memcpy(val_p->buffer, data->data, data->data_sz);
-            val_p->buffer_sz = data->data_sz;
-            val_p->read_sz = data->data_sz;
+            dbpf_attr_cache_keyval_pair_fetch_cached_data(
+                cache_elem, keyval_pair, val_p->buffer,
+                &val_p->buffer_sz);
+            val_p->read_sz = val_p->buffer_sz;
             return 1;
         }
     }
@@ -156,19 +151,19 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     assert(op_p->u.k_read.val.buffer_sz == op_p->u.k_read.val.read_sz);
 
     /* cache this data in the attr cache if we can */
-    if (dbpf_cache_elem_set_data_based_on_key(
+    if (dbpf_attr_cache_elem_set_data_based_on_key(
             op_p->handle, op_p->u.k_read.key.buffer,
             op_p->u.k_read.val.buffer, op_p->u.k_read.val.buffer_sz))
     {
         gossip_debug(
-            TROVE_DEBUG,"** CANNOT cache data retrieved (key is %s)\n",
-            (char *)op_p->u.k_read.key.buffer);
+            DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
+            "(key is %s)\n", (char *)op_p->u.k_read.key.buffer);
     }
     else
     {
         gossip_debug(
-            TROVE_DEBUG,"*** cached keyval data retrieved (key is %s)\n",
-            (char *)op_p->u.k_read.key.buffer);
+            DBPF_ATTRCACHE_DEBUG,"*** cached keyval data retrieved "
+            "(key is %s)\n", (char *)op_p->u.k_read.key.buffer);
     }
 
     if (op_p->flags & TROVE_SYNC)
@@ -193,8 +188,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     return error;
 }
 
-static int dbpf_keyval_write(
-			     TROVE_coll_id coll_id,
+static int dbpf_keyval_write(TROVE_coll_id coll_id,
 			     TROVE_handle handle,
 			     TROVE_keyval_s *key_p,
 			     TROVE_keyval_s *val_p,
@@ -248,6 +242,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     int error, ret, got_db = 0;
     DB *db_p = NULL;
     DBT key, data;
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
 
     ret = dbpf_keyval_dbcache_try_get(
         op_p->coll_p->coll_id, op_p->handle, 1, &db_p);
@@ -280,6 +275,27 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 	db_p->err(db_p, ret, "DB->put");
 	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
+    }
+
+    /*
+      now that the data is written to disk, update
+      the cache if it's an attr  keyval we manage
+    */
+    gossip_debug(DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Write "
+                 "of %s\n", (char *)op_p->u.k_write.key.buffer);
+
+    cache_elem = dbpf_attr_cache_elem_lookup(op_p->handle);
+    if (cache_elem)
+    {
+        dbpf_keyval_pair_cache_elem_t *keyval_pair =
+            dbpf_attr_cache_elem_get_data_based_on_key(
+                cache_elem, op_p->u.k_write.key.buffer);
+        if (keyval_pair)
+        {
+            dbpf_attr_cache_keyval_pair_update_cached_data(
+                cache_elem, keyval_pair, data.data, data.size);
+            return 1;
+        }
     }
 
     /* sync if requested by user */

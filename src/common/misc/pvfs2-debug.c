@@ -22,7 +22,8 @@ typedef struct
 #define __DEBUG_ALL                                             \
 (TROVE_DEBUG | BMI_DEBUG_ALL | SERVER_DEBUG | CLIENT_DEBUG |    \
 JOB_DEBUG | REQUEST_DEBUG | REQ_SCHED_DEBUG | FLOW_PROTO_DEBUG |\
-FLOW_DEBUG | NCACHE_DEBUG | ACACHE_DEBUG | DIST_DEBUG)
+FLOW_DEBUG | NCACHE_DEBUG | ACACHE_DEBUG | DIST_DEBUG | \
+DBPF_ATTRCACHE_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -40,6 +41,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "ncache", NCACHE_DEBUG },
     { "acache", ACACHE_DEBUG },
     { "distribution", DIST_DEBUG },
+    { "dbpfattrcache", DBPF_ATTRCACHE_DEBUG },
     { "verbose",  (__DEBUG_ALL & ~REQ_SCHED_DEBUG) },
     { "none", 0x00000000 },
     { "all",  __DEBUG_ALL }
@@ -58,8 +60,8 @@ int PVFS_debug_eventlog_to_mask(char *event_logging)
     char *ptr = NULL;
     int mask = 0, i = 0, num_entries = 0;
 
-    num_entries = (sizeof(s_keyword_mask_map) / sizeof(__keyword_mask_t));
-
+    num_entries = (int)(sizeof(s_keyword_mask_map) /
+                        sizeof(__keyword_mask_t));
     if (event_logging)
     {
         for(i = 0; i < num_entries; i++)
@@ -87,8 +89,8 @@ int PVFS_debug_eventlog_to_mask(char *event_logging)
 */
 char *PVFS_debug_get_next_debug_keyword(int position)
 {
-    int num_entries = (sizeof(s_keyword_mask_map) /
-                       sizeof(__keyword_mask_t));
+    int num_entries = (int)(sizeof(s_keyword_mask_map) /
+                            sizeof(__keyword_mask_t));
 
     return (((position > -1) && (position < num_entries)) ?
             s_keyword_mask_map[position].keyword : NULL);

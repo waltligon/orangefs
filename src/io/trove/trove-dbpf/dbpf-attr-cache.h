@@ -65,18 +65,33 @@ int dbpf_attr_cache_initialize(
 TROVE_ds_attributes *dbpf_attr_cache_lookup(TROVE_handle key);
 
 /* returns the cached element object on success; NULL on failure */
-dbpf_attr_cache_elem_t *dbpf_cache_elem_lookup(TROVE_handle key);
+dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key);
 
 /*
   given a cached elem and a keyval key, return associated
   data if cached; NULL otherwise
 */
-dbpf_keyval_pair_cache_elem_t *dbpf_cache_elem_get_data_based_on_key(
+dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
     dbpf_attr_cache_elem_t *cached_elem, char *key);
 
 /* map data to key_str, based on specified handle attr cache entry */ 
-int dbpf_cache_elem_set_data_based_on_key(
+int dbpf_attr_cache_elem_set_data_based_on_key(
     TROVE_handle key, char *key_str, void *data, int data_sz);
+
+/* do an atomic update of the data in the cache for this keyval */
+int dbpf_attr_cache_keyval_pair_update_cached_data(
+    dbpf_attr_cache_elem_t *cached_elem,
+    dbpf_keyval_pair_cache_elem_t *keyval_pair,
+    void *src_data, int src_data_sz);
+/*
+  do an atomic copy of the cached data into the provided
+  buffer; assumes target buffer is large enough to store all
+  data.  the size of the data is stored in target_data_sz.
+*/
+int dbpf_attr_cache_keyval_pair_fetch_cached_data(
+    dbpf_attr_cache_elem_t *cached_elem,
+    dbpf_keyval_pair_cache_elem_t *keyval_pair,
+    void *target_data, int *target_data_sz);
 
 
 int dbpf_attr_cache_insert(TROVE_handle key, TROVE_ds_attributes *attr);
