@@ -89,10 +89,11 @@ $(TESTS): %: %.o $(LIBRARIES)
 
 clean:
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(TESTS) $(LIBRARIES) \
-		$(DEPENDS) src/io/trove/trove-autogen.c
+		$(DEPENDS)
 
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;
+	rm -f $(SRCFILES)
 
 -include $(DEPENDS)
 
