@@ -346,7 +346,7 @@ void usage(void)
 		  printf(" -h       print this help\n");
 }
 
-void handle_error(int errcode, char *msg)
+void handle_error(int errcode, char *str)
 {
 		  char msg[MPI_MAX_ERROR_STRING];
 		  int resultlen;
