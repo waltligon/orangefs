@@ -44,7 +44,7 @@
   may be some inconsistencies, but this will be cleaned
   up as the system interface is changed in time.
 */
-#define PCACHE_TIMEOUT_MS 1/*6000000*/
+#define PCACHE_TIMEOUT_MS 6000000
 
 static int service_lookup_request(
     PVFS_sysresp_init *init_response,

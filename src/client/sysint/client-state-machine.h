@@ -113,7 +113,7 @@ struct PINT_client_mkdir_sm {
 
 /* PINT_client_symlink_sm */
 struct PINT_client_symlink_sm {
-    PVFS_pinode_reference        parent_ref;     /* input parameter */
+    PVFS_pinode_reference        parent_ref;      /* input parameter */
     char                         *link_name;      /* input parameter */
     char                         *link_target;    /* input parameter */
     PVFS_sysresp_symlink         *sym_resp;       /* in/out parameter*/

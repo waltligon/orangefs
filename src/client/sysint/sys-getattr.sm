@@ -353,8 +353,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     }
 
     /* special case for when users ask for dfile count */
-    if(attr->objtype == PVFS_TYPE_METAFILE && (sm_p->u.getattr.attrmask & 
-	PVFS_ATTR_SYS_DFILE_COUNT))
+    if ((attr->objtype == PVFS_TYPE_METAFILE) &&
+        (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_DFILE_COUNT))
     {
 	sm_p->u.getattr.getattr_resp_p->attr.dfile_count = 
 	    attr->u.meta.dfile_count;
@@ -739,8 +739,19 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             }
             pinode->refn = sm_p->u.getattr.object_ref;
 
-            if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
+            if (sm_p->pcache_attr.objtype == PVFS_TYPE_SYMLINK)
             {
+                sm_p->pcache_attr.mask &=
+                    (PVFS_ATTR_SYMLNK_ALL | PVFS_ATTR_COMMON_ALL);
+            }
+            else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
+            {
+                /*
+                  this special case size caching in metafiles does
+                  not apply at all to symlinks, so special case
+                  symlinks above
+                */
+
                 pinode->size = s_attr_p->size;
                 /*
                   update the attr mask in the src object so that
