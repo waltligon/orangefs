@@ -33,7 +33,8 @@ foreach $file (@files)
 		    /^  RANLIB/ ||
 		    /^  LD/ ||
 		    /^  BISON/ ||
-		    /^  FLEX/)
+		    /^  FLEX/ ||
+		    /^  GEN/)
 		{
 			$last_cmd = $_;
 			$have_last_cmd = 1;
