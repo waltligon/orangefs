@@ -69,7 +69,8 @@ int PVFS_sys_setattr(
 	/* Lookup the entry...may or may not exist in the cache */
 
 	pinode_ptr = PINT_pcache_lookup(entry);
-	if (PINT_pcache_pinode_status(pinode_ptr) != PINODE_STATUS_VALID)
+	if ((pinode_ptr == NULL) ||
+            (PINT_pcache_pinode_status(pinode_ptr) != PINODE_STATUS_VALID))
 	{
 		pinode_was_in_cache = 0;
 
