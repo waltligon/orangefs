@@ -138,10 +138,8 @@ int main(int argc, char **argv)
 
     cur_fs = resp_init.fsid_list[mnt_index];
 
-    printf("Warning: overriding ownership and permissions to match prototype file system.\n");
-
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
     lk_fs_id = cur_fs;
 
     /* TODO: this is awkward- the remove_base_dir() function

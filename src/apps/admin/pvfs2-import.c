@@ -141,18 +141,16 @@ int main(int argc, char **argv)
 
     cur_fs = resp_init.fsid_list[mnt_index];
 
-    printf("Warning: overriding ownership and permissions to match prototype file system.\n");
-
     entry_name = str_buf;
-    attr.owner = 100;
-    attr.group = 100;
-    attr.perms = 1877;
+    attr.owner = getuid(); 
+    attr.group = getgid();
+    attr.perms = PVFS_U_WRITE|PVFS_U_READ;
     attr.atime = time(NULL);
     attr.mtime = attr.atime;
     attr.ctime = attr.atime;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
     parent_refn.handle =
         lookup_parent_handle(pvfs_path,cur_fs);
     parent_refn.fs_id = cur_fs;
