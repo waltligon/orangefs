@@ -15,6 +15,7 @@
 #include <string.h>
 #include <limits.h>
 
+#include "gossip.h"
 #include "trove.h"
 #include "trove-internal.h"
 #include "dbpf.h"
@@ -72,8 +73,10 @@ void dbpf_keyval_dbcache_finalize(void)
 
 /* dbpf_keyval_dbcache_try_remove()
  *
- * Returns one of DBPF_KEYVAL_DBCACHE_ERROR, DBPF_KEYVAL_DBCACHE_BUSY,
- * DBPF_KEYVAL_DBCACHE_SUCCESS.
+ * Returns 0 on success, or one of -TROVE_EBUSY, -TROVE_ENOENT,
+ * or -TROVE_EPERM (for now).
+ *
+ * TODO: DO A BETTER JOB OF MAPPING ERRORS.
  */
 int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 				   TROVE_handle handle)
@@ -94,7 +97,7 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 
 	if (keyval_db_cache[i].ref_ct > 0) {
 	    gen_mutex_unlock(&keyval_db_cache[i].mutex);
-	    return DBPF_KEYVAL_DBCACHE_BUSY;
+	    return -TROVE_EBUSY;
 	}
 
 	/* close it */
@@ -107,15 +110,27 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 	gen_mutex_unlock(&keyval_db_cache[i].mutex);
     }
 
-    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
+    DBPF_GET_KEYVAL_DBNAME(filename,
+			   PATH_MAX,
+			   my_storage_p->name,
+			   coll_id,
+			   handle);
 #if 0
     printf("file name = %s\n", filename);
 #endif
 
     ret = DBPF_UNLINK(filename);
-    if (ret != 0 && errno != ENOENT) return DBPF_KEYVAL_DBCACHE_ERROR;
+    if (ret != 0) {
+	switch (errno) {
+	    case ENOENT:
+		return -TROVE_ENOENT;
+	    default:
+		gossip_err("warning: unreliable error value\n");
+		return -TROVE_EPERM;
+	}
+    }
 
-    return DBPF_KEYVAL_DBCACHE_SUCCESS;
+    return 0;
 }
 
 /* dbpf_keyval_dbcache_try_get()
@@ -124,8 +139,9 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
  * references to the same db, so this will never return BUSY.  That might
  * change at some later time.
  *
- * Returns one of DBPF_KEYVAL_DBCACHE_ERROR, DBPF_KEYVAL_DBCACHE_BUSY,
- * DBPF_KEYVAL_DBCACHE_SUCCESS.
+ * Returns 0 on success, or one of -TROVE_ENOENT, -TROVE_EBUSY, -TROVE_PERM.
+ *
+ * TODO: DO A BETTER JOB OF MAPPING ERROR VALUES!
  *
  * create_flag - 0 = don't create if doesn't exist; non-zero = create.
  */
@@ -134,7 +150,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 				int create_flag,
 				DB **db_pp)
 {
-    int i, ret;
+    int i, ret, error;
     char filename[PATH_MAX];
     DB *db_p;
 
@@ -154,7 +170,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	keyval_db_cache[i].ref_ct++;
 	*db_pp = keyval_db_cache[i].db_p;
 	gen_mutex_unlock(&keyval_db_cache[i].mutex);
-	return DBPF_KEYVAL_DBCACHE_SUCCESS;
+	return 0;
     }
 
     /* no cached db; open it */
@@ -236,10 +252,16 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 			 0644);
 	if (ret != 0) assert(0);
     }
+    else if (ret == ENOENT) {
+	error = -TROVE_ENOENT;
+	goto return_error;
+    }
     else if (ret != 0) {
 #if 0
 	    perror("dpbf_keyval_dbcache_get");
 #endif
+	    gossip_err("warning: unreliable error value\n");
+	    error = -TROVE_EPERM;
 	    goto return_error;
     }
 
@@ -248,11 +270,11 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     keyval_db_cache[i].handle  = handle;
     *db_pp = db_p;
     gen_mutex_unlock(&keyval_db_cache[i].mutex);
-    return DBPF_KEYVAL_DBCACHE_SUCCESS;
+    return 0;
 
 return_error:
     gen_mutex_unlock(&keyval_db_cache[i].mutex);
-    return DBPF_KEYVAL_DBCACHE_ERROR;
+    return error;
 }
 
 /* dbpf_keyval_dbcache_put()
@@ -289,8 +311,6 @@ void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
 #endif
     gen_mutex_unlock(&keyval_db_cache[i].mutex);
 }
-
-
 
 /*
  * Local variables:

@@ -259,10 +259,10 @@ static int msgpair_complete(PINT_client_sm *sm_p,
 	assert(0); /* placeholder */
     }
 
-    /* check status of response */
+    /* check status of response -- let errors pass though. */
     if (resp_p->status != 0) {
-	gossip_err("error: msgpair_complete: status error\n");
-	assert(0); /* placeholder */
+	gossip_err("notice: msgpair_complete: response status non-zero (%d)\n",
+		   resp_p->status);
     }
 
     /* call completion function to perform operation-specific

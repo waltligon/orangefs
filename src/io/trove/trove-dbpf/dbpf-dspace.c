@@ -49,12 +49,13 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -1;
+    if (coll_p == NULL) return -TROVE_EINVAL;
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -1;
+    if (q_op_p == NULL) return -TROVE_ENOMEM;
 
-    if (!extent_array || (extent_array->extent_count < 1)) return -1;
+    if (!extent_array || (extent_array->extent_count < 1))
+	return -TROVE_EINVAL;
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -73,7 +74,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         malloc(extent_array->extent_count * sizeof(TROVE_extent));
 
     if (q_op_p->op.u.d_create.extent_array.extent_array == NULL)
-        return -1;
+        return -TROVE_ENOMEM;
 
     memcpy(q_op_p->op.u.d_create.extent_array.extent_array,
            extent_array->extent_array,
@@ -245,7 +246,7 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
  */
 static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 {
-    int ret, got_db = 0;
+    int error, ret, got_db = 0;
     DBT key;
     DB *db_p;
 
@@ -253,6 +254,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
     switch (ret) {
 	case DBPF_DSPACE_DBCACHE_ERROR:
+	    error = -1;
 	    goto return_error;
 	case DBPF_DSPACE_DBCACHE_BUSY:
 	    return 0; /* try again later */
@@ -275,9 +277,11 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     switch (ret) {
 	case DB_NOTFOUND:
 	    printf("tried to remove non-existant dataspace\n");
+	    error = -TROVE_ENOENT;
 	    goto return_error;
 	default:
 	    db_p->err(db_p, ret, "dbpf_dspace_remove");
+	    error = -1;
 	    goto return_error;
 	case 0:
 #if 0
@@ -291,25 +295,24 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     if (op_p->flags & TROVE_SYNC) {
 	if ( (ret = db_p->sync(db_p, 0)) != 0) {
 	    db_p->err(db_p, ret, "dbpf_dspace_remove");
+	    error = -1;
 	    goto return_error;
 	}
     }
 
     /* remove keyval db if it exists */
     ret = dbpf_keyval_dbcache_try_remove(op_p->coll_p->coll_id, op_p->handle);
-    switch (ret) {
-	case DBPF_KEYVAL_DBCACHE_ERROR:
-	    goto return_error;
-	case DBPF_KEYVAL_DBCACHE_BUSY:
-	    assert(0);
-	case DBPF_KEYVAL_DBCACHE_SUCCESS:
-	    break;
+    if (ret == -TROVE_EBUSY) assert(0);
+    else if (ret < 0) {
+	error = ret;
+	goto return_error;
     }
 
     /* remove bstream file if it exists */
     ret = dbpf_bstream_fdcache_try_remove(op_p->coll_p->coll_id, op_p->handle);
     switch (ret) {
 	case DBPF_BSTREAM_FDCACHE_ERROR:
+	    error = -1;
 	    goto return_error;
 	case DBPF_BSTREAM_FDCACHE_BUSY:
 	    assert(0);
@@ -325,7 +328,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 return_error:
     trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
     if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
-    return -1;
+    return error;
 }
 
 int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
@@ -341,10 +344,10 @@ int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -1;
+    if (coll_p == NULL) return -TROVE_EINVAL;
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -1;
+    if (q_op_p == NULL) return -TROVE_ENOMEM;
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -532,10 +535,10 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -1;
+    if (coll_p == NULL) return -TROVE_EINVAL;
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -1;
+    if (q_op_p == NULL) return -TROVE_ENOMEM;
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -556,7 +559,7 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
 
 static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
 {
-    int ret, got_db = 0;
+    int error, ret, got_db = 0;
     DB *db_p;
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
@@ -564,6 +567,7 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
     switch (ret) {
 	case DBPF_DSPACE_DBCACHE_ERROR:
+	    error = -1;
 	    goto return_error;
 	case DBPF_DSPACE_DBCACHE_BUSY:
 	    return 0; /* try again later */
@@ -588,9 +592,11 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
     }
     else if (ret == DB_NOTFOUND) {
 	/* no error in access, but object does not exist */
+	error = -TROVE_ENOENT;
 	goto return_error;
     }
     else {	/* error in accessing database */
+	error = -1;
 	goto return_error;
     }
 
@@ -600,6 +606,7 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
     /* sync if requested (unusual but supported in semantics) */
     if (op_p->flags & TROVE_SYNC) {
 	if ((ret = db_p->sync(db_p, 0)) != 0) {
+	    error = -1;
 	    goto return_error;
 	}
     }
@@ -609,7 +616,7 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
 
 return_error:
     if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
-    return -1;
+    return error;
 }
 
 
@@ -626,10 +633,10 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -1;
+    if (coll_p == NULL) return -TROVE_EINVAL;
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -1;
+    if (q_op_p == NULL) return -TROVE_ENOMEM;
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -661,10 +668,10 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -1;
+    if (coll_p == NULL) return -TROVE_EINVAL;
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -1;
+    if (q_op_p == NULL) return -TROVE_ENOMEM;
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
