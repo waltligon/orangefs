@@ -102,34 +102,55 @@ static int readdir_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
-	job_id_t i;
 	int j;
+	int key_a_sz, val_a_sz, dirent_buff_sz;
+	int handle_sz;
+	char *big_memory_buffer,*check_buffer;
+
 	gossip_ldebug(SERVER_DEBUG,"Init\n");
 
 	/**** 
 	  We need to malloc key and val space for dirents and handles.
-	  Also malloc a space for the structures to refer to the handle.
 	 ****/
-	s_op->key_a = malloc(sizeof(TROVE_keyval_s)*s_op->req->u.readdir.pvfs_dirent_count);
-	s_op->val_a = malloc(sizeof(TROVE_keyval_s)*s_op->req->u.readdir.pvfs_dirent_count);
-	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_handle)));
+	key_a_sz = sizeof(TROVE_keyval_s)*s_op->req->u.readdir.pvfs_dirent_count;
+	val_a_sz = sizeof(TROVE_keyval_s)*s_op->req->u.readdir.pvfs_dirent_count;
+	s_op->val.buffer_sz = sizeof(PVFS_handle);
+	dirent_buff_sz = s_op->req->u.readdir.pvfs_dirent_count*sizeof(PVFS_dirent);
+
+	handle_sz = sizeof(PVFS_handle);
+
+	big_memory_buffer = (char *) malloc(key_a_sz+val_a_sz+s_op->val.buffer_sz+dirent_buff_sz);
+	check_buffer = big_memory_buffer;
+
+	s_op->key_a = (TROVE_keyval_s *) big_memory_buffer;
+	big_memory_buffer+=key_a_sz;
+
+	s_op->val_a = (TROVE_keyval_s *) big_memory_buffer;
+	big_memory_buffer+=val_a_sz;
+
+	s_op->val.buffer = (void *) big_memory_buffer;
+	big_memory_buffer+=s_op->val.buffer_sz;
+
+	s_op->resp->u.readdir.pvfs_dirent_array = (PVFS_dirent *) big_memory_buffer;
+	big_memory_buffer+=dirent_buff_sz;
+
+	assert(big_memory_buffer - check_buffer ==  key_a_sz + val_a_sz + s_op->val.buffer_sz + dirent_buff_sz);
+
 	for(j=0;j<s_op->req->u.readdir.pvfs_dirent_count;j++)
 	{
-		s_op->key_a[j].buffer = (char *) malloc((s_op->key_a[j].buffer_sz = PVFS_NAME_MAX+1));
-		s_op->val_a[j].buffer = (PVFS_handle *) malloc((s_op->val_a[j].buffer_sz = sizeof(PVFS_handle)));
-	}
-	s_op->resp->u.readdir.pvfs_dirent_array = (PVFS_dirent *)
-		malloc(s_op->req->u.readdir.pvfs_dirent_count*sizeof(PVFS_dirent));
+		s_op->key_a[j].buffer = &(s_op->resp->u.readdir.pvfs_dirent_array[j].d_name);
+		s_op->key_a[j].buffer_sz = PVFS_NAME_MAX+1;
 
-#if 0
+		s_op->val_a[j].buffer = &(s_op->resp->u.readdir.pvfs_dirent_array[j].handle);
+		s_op->key_a[j].buffer_sz = handle_sz;
+	}
+
 	job_post_ret = job_req_sched_post(s_op->req,
 												 s_op,
 												 ret,
 												 &(s_op->scheduled_id));
 
 	return(job_post_ret);
-#endif
-	return 1;
 	
 }
 
@@ -155,8 +176,6 @@ static int readdir_kvread(state_action_struct *s_op, job_status_s *ret)
 	gossip_ldebug(SERVER_DEBUG,"Kvread\n");
 	s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
 	s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
-
-	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_handle)));
 
 	job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
 													 s_op->req->u.crdirent.parent_handle,
@@ -193,7 +212,6 @@ static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret)
 	PVFS_vtag_s vtag;
 
 	h = *((PVFS_handle *)s_op->val.buffer);
-	gossip_ldebug(SERVER_DEBUG,"Dammit\n");
 	job_post_ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,
 				      								 h,
 				      								 s_op->req->u.readdir.token,
@@ -230,21 +248,21 @@ static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
 	int job_post_ret;
 	job_id_t i;
-	//char *dirent_c, *handle_c;
-	int j;
 
 	s_op->resp->status = ret->error_code;
 
 	s_op->resp->u.readdir.pvfs_dirent_count = ret->count;
 
-	for(j=0;j<ret->count;j++)
+	if(ret->error_code == 0)
+ 		job_post_ret = PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+	else
 	{
-		memcpy(&(s_op->resp->u.readdir.pvfs_dirent_array[j].d_name),s_op->key_a[j].buffer,PVFS_NAME_MAX+1);
-		memcpy(&(s_op->resp->u.readdir.pvfs_dirent_array[j].handle),s_op->val_a[j].buffer,sizeof(PVFS_handle));
+		/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
+		s_op->resp->op = PVFS_SERV_NOOP;
+		PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+		/* set it back */
+		((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
 	}
-
- 	job_post_ret = PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-
 	gossip_ldebug(SERVER_DEBUG,"%d\n",s_op->encoded.list_count);
 	assert(s_op->encoded.list_count == 1);
 	job_post_ret = job_bmi_send(s_op->addr,
@@ -278,18 +296,12 @@ static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
 static int readdir_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
-	int j;
 
-	for(j=0;j<ret->count;j++)
-	{
-	free(s_op->key_a[j].buffer);
-	free(s_op->val_a[j].buffer);
-	}
+	if(s_op->key_a)
+		free(s_op->key_a);
 
-	free(s_op->val.buffer);
-
-	free(s_op->resp->u.readdir.pvfs_dirent_array);
-	free(s_op->resp);
+	if(s_op->resp)
+		free(s_op->resp);
 
 	free(s_op->req);
 

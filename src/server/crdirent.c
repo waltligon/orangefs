@@ -163,14 +163,12 @@ static int crdirent_init(state_action_struct *s_op, job_status_s *ret)
 	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 	
 	/* post a scheduler job */
-#if 0
 	job_post_ret = job_req_sched_post(s_op->req,
 												 s_op,
 												 ret,
 												 &(s_op->scheduled_id));
+	gossip_ldebug(SERVER_DEBUG,"jpr: %d\n",job_post_ret);
 	return(job_post_ret);
-#endif
-	return 1;
 }
 
 /*
@@ -487,6 +485,14 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 				s_op->addr,
 				s_op->enc_type);
 	}
+	else
+	{
+		/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
+		s_op->resp->op = PVFS_SERV_NOOP;
+		PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+		/* set it back */
+		((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
+	}
 	assert(job_post_ret == 0);
 
 	job_post_ret = job_bmi_send(s_op->addr,
@@ -522,13 +528,11 @@ static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *
 	int job_post_ret=0;
 	job_id_t i;
 
-#if 0
 	job_post_ret = job_req_sched_release(s_op->scheduled_id,
 													  s_op,
 													  ret,
 													  &i);
 	return job_post_ret;
-#endif 
 }
 
 /*

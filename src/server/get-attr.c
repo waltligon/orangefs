@@ -109,16 +109,14 @@ static int getattr_init(state_action_struct *s_op, job_status_s *ret)
 	s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
 	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
+	s_op->resp->op = s_op->req->op;
 
-#if 0
 	job_post_ret = job_req_sched_post(s_op->req,
 												 s_op,
 												 ret,
 												 &(s_op->scheduled_id));
 	
 	return(job_post_ret);
-#endif
-	return 1;
 	
 }
 
@@ -178,7 +176,7 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	/* This comes from the trove operation.  Note, this operation is still
 	 * valid even though the operation may have failed.
 	 */
-	s_op->resp->u.getattr.attr = *((PVFS_object_attr *)s_op->val.buffer);
+	memcpy(&(s_op->resp->u.getattr.attr),s_op->val.buffer,sizeof(PVFS_object_attr));
 
 	/* Prepare the message */
 	
@@ -198,8 +196,11 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	else
 	{
 		/* We have failed somewhere... However, we still need to send what we have */
-		s_op->encoded.buffer_list[0] = s_op->resp;
-		s_op->encoded.total_size = sizeof(struct PVFS_server_resp_s);
+		/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
+		s_op->resp->op = PVFS_SERV_NOOP;
+		PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+		/* set it back */
+		((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
 	}
 
 	/* Post message */
@@ -239,13 +240,11 @@ static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *r
 	int job_post_ret=0;
 	job_id_t i;
 
-#if 0
 	job_post_ret = job_req_sched_release(s_op->scheduled_id,
 													  s_op,
 													  ret,
 													  &i);
 	return job_post_ret;
-#endif
 	return 1;
 }
 

@@ -109,13 +109,10 @@ static int create_init(state_action_struct *s_op, job_status_s *ret)
 
 	int job_post_ret;
 
-	/* This did not work as of 2-20-03 dw */
-#if 0
 	job_post_ret = job_req_sched_post(s_op->req,
 												 s_op,
 												 ret,
 												 &(s_op->scheduled_id));
-#endif
 	job_post_ret = 1;
 	
 	return(job_post_ret);
@@ -236,14 +233,11 @@ static int create_release_posted_job(state_action_struct *s_op, job_status_s *re
 	int job_post_ret=0;
 	job_id_t i;
 
-#if 0
 	job_post_ret = job_req_sched_release(s_op->scheduled_id,
 													  s_op,
 													  ret,
 													  &i);
 	return job_post_ret;
-#endif
-	return 1;
 }
 
 
