@@ -149,8 +149,6 @@ sub emit_server_conf
     $node = $_[1];
     $storage = $_[2];
 
-    print "GOT NODE $node : STORAGE $storage\n";
-
     print $target "StorageSpace $storage\n";
     print $target "HostID \"$node\"\n";
 }
