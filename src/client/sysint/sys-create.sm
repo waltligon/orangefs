@@ -650,8 +650,8 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
         gossip_debug(
             GOSSIP_CLIENT_DEBUG,  "create: posting data file create "
             "req %d with extents %Lu-%Lu\n",i,
-            sm_p->u.create.io_handle_extent_array[i].extent_array[0].first,
-            sm_p->u.create.io_handle_extent_array[i].extent_array[0].last);
+            Lu(sm_p->u.create.io_handle_extent_array[i].extent_array[0].first),
+            Lu(sm_p->u.create.io_handle_extent_array[i].extent_array[0].last));
 
         /* fill in msgpair structure components */
         msg_p->fs_id = sm_p->parent_ref.fs_id;

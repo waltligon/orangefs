@@ -773,7 +773,7 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
             
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "FS mount got root handle %Lu on fs id %d\n",
-                     root_handle, mntent.fs_id);
+                     Lu(root_handle), mntent.fs_id);
 
         vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
         vfs_request->out_downcall.status = 0;

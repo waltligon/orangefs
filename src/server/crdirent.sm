@@ -318,8 +318,8 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  new handle should be in range "
                  "starting with %Lu-%Lu\n",
-                 extent_array.extent_array[0].first,
-                 extent_array.extent_array[0].last);
+                 Lu(extent_array.extent_array[0].first),
+                 Lu(extent_array.extent_array[0].last));
 
     ret = job_trove_dspace_create(
         s_op->u.crdirent.fs_id,

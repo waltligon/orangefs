@@ -197,7 +197,7 @@ int PVFS_isys_io(
     struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_io entered [%Lu]\n",
-                 ref.handle);
+                 Lu(ref.handle));
 
     if (resp_p == NULL)
     {

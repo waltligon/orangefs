@@ -726,7 +726,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
                      "path attr cache hit on %Lu\n (dfile_count=%d | "
                      "dist_size=%d | data_size=%Ld)\n", Lu(handle),
                      ds_attr_p->dfile_count, ds_attr_p->dist_size,
-                     ds_attr_p->b_size);
+                     Ld(ds_attr_p->b_size));
 
         UPDATE_PERF_METADATA_READ();
         return 1;
