@@ -249,8 +249,9 @@ elsif (@ARGV != 2)
     print "\nExample: 'perl ./pvfs2-genconfig /tmp/fs.conf /tmp/server.conf'\n";
     print " will generate a file called /tmp/fs.conf and server specific\n";
     print " files called /tmp/server.conf-host1, /tmp/server.conf-host2, etc.\n";
-    print "\nNOTE: If <fs.conf> is '-', output is directed to stdout\n";
-    print " No files are written in this mode.\n\n";
+    print "\nNOTE: If pvfs2-genconfig is executed with a single argument of\n";
+    print " \"-\", then all output is directed to stdout and no files are\n";
+    print " written.\n";
     exit;
 }
 else
