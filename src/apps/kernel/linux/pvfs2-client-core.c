@@ -85,6 +85,8 @@ typedef struct
 #ifdef USE_MMAP_RA_CACHE
     void *io_tmp_buf;
 #endif
+    PVFS_Request file_req;
+    PVFS_Request mem_req;
     void *io_kernel_mapped_buf;
 
     int was_handled_inline;
@@ -807,8 +809,6 @@ static int service_statfs_request(vfs_request_t *vfs_request)
 static int post_io_readahead_request(vfs_request_t *vfs_request)
 {
     int ret = -PVFS_EINVAL, val = 0;
-    PVFS_Request file_req = PVFS_BYTE;
-    PVFS_Request mem_req;
     void *buf = NULL;
 
     gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
@@ -860,13 +860,15 @@ static int post_io_readahead_request(vfs_request_t *vfs_request)
     /* make the full-blown readahead sized request */
     ret = PVFS_Request_contiguous(
         vfs_request->in_upcall.req.io.readahead_size,
-        PVFS_BYTE, &mem_req);
+        PVFS_BYTE, &vfs_request->mem_req);
 
     assert(ret == 0);
 
+    vfs_request->file_req = PVFS_BYTE;
+
     ret = PVFS_isys_io(
-        vfs_request->in_upcall.req.io.refn, file_req, 0,
-        vfs_request->io_tmp_buf, mem_req,
+        vfs_request->in_upcall.req.io.refn, vfs_request->file_req, 0,
+        vfs_request->io_tmp_buf, vfs_request->mem_req,
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.io,
         vfs_request->in_upcall.req.io.io_type,
@@ -905,8 +907,6 @@ static int post_io_readahead_request(vfs_request_t *vfs_request)
 static int post_io_request(vfs_request_t *vfs_request)
 {
     int ret = -PVFS_EINVAL;
-    PVFS_Request file_req = PVFS_BYTE;
-    PVFS_Request mem_req;
 
 #ifdef USE_MMAP_RA_CACHE
     if ((vfs_request->in_upcall.req.io.readahead_size ==
@@ -935,7 +935,7 @@ static int post_io_request(vfs_request_t *vfs_request)
 
     ret = PVFS_Request_contiguous(
         (int32_t)vfs_request->in_upcall.req.io.count,
-        PVFS_BYTE, &mem_req);
+        PVFS_BYTE, &vfs_request->mem_req);
     assert(ret == 0);
 
     assert((vfs_request->in_upcall.req.io.buf_index > -1) &&
@@ -947,10 +947,12 @@ static int post_io_request(vfs_request_t *vfs_request)
         &s_io_desc, vfs_request->in_upcall.req.io.buf_index);
     assert(vfs_request->io_kernel_mapped_buf);
 
+    vfs_request->file_req = PVFS_BYTE;
+
     ret = PVFS_isys_io(
-        vfs_request->in_upcall.req.io.refn, file_req,
+        vfs_request->in_upcall.req.io.refn, vfs_request->file_req,
         vfs_request->in_upcall.req.io.offset, 
-        vfs_request->io_kernel_mapped_buf, mem_req,
+        vfs_request->io_kernel_mapped_buf, vfs_request->mem_req,
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.io,
         vfs_request->in_upcall.req.io.io_type,
@@ -1235,17 +1237,28 @@ static inline void package_downcall_members(
                     free(vfs_request->io_tmp_buf);
                     vfs_request->io_tmp_buf = NULL;
 
+                    PVFS_Request_free(&vfs_request->mem_req);
+                    PVFS_Request_free(&vfs_request->file_req);
+
                     vfs_request->out_downcall.resp.io.amt_complete =
                         vfs_request->in_upcall.req.io.count;
                 }
                 else
                 {
                     assert(vfs_request->io_tmp_buf == NULL);
+
+                    PVFS_Request_free(&vfs_request->mem_req);
+                    PVFS_Request_free(&vfs_request->file_req);
+
                     vfs_request->out_downcall.resp.io.amt_complete =
                         (size_t)vfs_request->response.io.total_completed;
                 }
 #else
                 assert(vfs_request->io_tmp_buf == NULL);
+
+                PVFS_Request_free(&vfs_request->mem_req);
+                PVFS_Request_free(&vfs_request->file_req);
+
                 vfs_request->out_downcall.resp.io.amt_complete =
                     (size_t)vfs_request->response.io.total_completed;
 #endif

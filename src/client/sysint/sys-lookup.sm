@@ -1082,7 +1082,6 @@ static int lookup_segment_lookup_comp_fn(
 
     if (resp_p->status != 0)
     {
-        PINT_SERVRESP_LOOKUP_PATH_FREE(resp_p);
         return resp_p->status;
     }            
 
@@ -1140,7 +1139,6 @@ static int lookup_segment_lookup_comp_fn(
         sm_p->u.lookup.current_context].current_segment =
         current_seg_index + (i - 1);
 
-    PINT_SERVRESP_LOOKUP_PATH_FREE(resp_p);
     return 0;
 }
 
@@ -1160,9 +1158,8 @@ static int lookup_segment_getattr_comp_fn(
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, " getattr failed with code %d\n",
                      resp_p->status);
-        PINT_SERVRESP_GETATTR_FREE(resp_p);
         return resp_p->status;
-    }            
+    }
 
     cur_seg = GET_CURRENT_SEGMENT();
     assert(cur_seg);
@@ -1174,12 +1171,6 @@ static int lookup_segment_getattr_comp_fn(
     PINT_acache_object_attr_deep_copy(
         &(cur_seg->seg_attr),
         &(resp_p->u.getattr.attr));
-
-    /* TODO: FIX THIS! */ 
-    /* causes memory corruption (freeing a bad address) */
-#if 0
-    PINT_SERVRESP_GETATTR_FREE(resp_p);
-#endif
     return 0;
 }
 

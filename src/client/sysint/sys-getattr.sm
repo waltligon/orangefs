@@ -312,7 +312,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      */
     if (resp_p->status != 0)
     {
-        PINT_SERVRESP_GETATTR_FREE(resp_p);
 	return resp_p->status;
     }
 
@@ -364,10 +363,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                 strdup(attr->u.sym.target_path);
             if (!sm_p->u.getattr.getattr_resp_p->attr.link_target)
             {
-                if (!sm_p->acache_hit)
-                {
-                    PINT_SERVRESP_GETATTR_FREE(resp_p);
-                }
                 return -PVFS_ENOMEM;
             }
         }
@@ -400,7 +395,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     /* on cache hit, we can skip all of the copying below;  joy! */
     if (sm_p->acache_hit)
     {
-        PINT_SERVRESP_GETATTR_FREE(resp_p);
         return 0;
     }
 
@@ -453,8 +447,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		   attr->u.meta.dfile_array,
 		   attr->u.meta.dfile_count * sizeof(PVFS_handle));
 
-                PINT_SERVRESP_GETATTR_FREE(resp_p);
-
                 if (need_datafiles == 0)
                 {
                     /*
@@ -485,7 +477,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 	    gossip_err("error: getattr_object_getattr_comp_fn: "
                        "handle refers to invalid object type\n");
     }
-    PINT_SERVRESP_GETATTR_FREE(resp_p);
     return -PVFS_EINVAL;
 }
 
@@ -571,7 +562,6 @@ static int getattr_datafile_getattr_comp_fn(
 
     if (resp_p->status != 0)
     {
-        PINT_SERVRESP_GETATTR_FREE(resp_p);
 	return resp_p->status;
     }
 
@@ -590,7 +580,6 @@ static int getattr_datafile_getattr_comp_fn(
 
     sm_p->u.getattr.size_array[index] = resp_p->u.getattr.attr.u.data.size;
 
-    PINT_SERVRESP_GETATTR_FREE(resp_p);
     return 0;
 }
 
