@@ -4,6 +4,11 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *
+ *  Definitions of types used throughout PVFS2.
+ */
+
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
@@ -27,12 +32,14 @@
 /* empty stubs to turn off encoding definition generation */
 #include "pvfs2-encode-stubs.h"
 
-/* basic types used throughout code */
+/* Basic types used throughout the code. */
 typedef uint8_t PVFS_boolean;
 typedef int32_t PVFS_error;
 typedef int64_t PVFS_offset;
 typedef int64_t PVFS_size;
 typedef int64_t PVFS_id_gen_t;
+
+/** Opaque value representing a destination address. */
 typedef int64_t PVFS_BMI_addr_t;
 
 #define encode_PVFS_error encode_int32_t
@@ -44,9 +51,10 @@ typedef int64_t PVFS_BMI_addr_t;
 #define encode_PVFS_id_gen_t encode_int64_t
 #define decode_PVFS_id_gen_t decode_int64_t
 
-/* basic types used by communication subsystems */
+/* Basic types used by communication subsystems. */
 typedef int32_t PVFS_msg_tag_t;
 typedef int32_t PVFS_context_id;
+
 enum PVFS_flowproto_type
 {
     FLOWPROTO_BMI_TROVE = 1,
@@ -77,7 +85,14 @@ enum PVFS_encoding_type
 #define ENCODING_DEFAULT ENCODING_LE_BFIELD
 
 /* basic types used by storage subsystem */
+
+/** Unique identifier for an object on a PVFS2 file system. */
 typedef uint64_t PVFS_handle;
+
+/** Identifier for a specific PVFS2 file system; administrator
+ *  must guarantee that these are unique in the context of all
+ *  PVFS2 file systems reachable by a given client.
+ */
 typedef int32_t PVFS_fs_id;
 typedef int32_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
@@ -88,7 +103,7 @@ typedef int32_t PVFS_ds_flags;
 #define decode_PVFS_ds_position decode_int32_t
 #define encode_PVFS_ds_position encode_int32_t
 
-/* basic types used within metadata */
+/* Basic types used within metadata. */
 typedef uint32_t PVFS_uid;
 typedef uint32_t PVFS_gid;
 typedef uint64_t PVFS_time;
@@ -111,7 +126,7 @@ typedef struct
 endecode_fields_2(
     PVFS_handle_extent,
     PVFS_handle, first,
-    PVFS_handle, last)
+    PVFS_handle, last);
 
 /* an array of contiguous ranges of handles */
 typedef struct
@@ -122,7 +137,7 @@ typedef struct
 endecode_fields_0a(
     PVFS_handle_extent_array,
     uint32_t, extent_count,
-    PVFS_handle_extent, extent_array)
+    PVFS_handle_extent, extent_array);
 
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL     ((PVFS_handle)0)
@@ -143,7 +158,7 @@ endecode_fields_0a(
 #define PVFS_U_WRITE   (1 << 7)
 #define PVFS_U_READ    (1 << 8)
 
-/* object and attribute types */
+/** Object and attribute types. */
 typedef enum
 {
     PVFS_TYPE_NONE =              0,
@@ -153,6 +168,7 @@ typedef enum
     PVFS_TYPE_SYMLINK =     (1 << 3),
     PVFS_TYPE_DIRDATA =     (1 << 4)
 } PVFS_ds_type;
+
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
 
@@ -204,7 +220,7 @@ typedef enum
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_COMMON_ALL-PVFS_ATTR_COMMON_TYPE)
 
-/* statfs and misc server statistic information */
+/** statfs and misc. server statistic information. */
 typedef struct
 {
     PVFS_fs_id fs_id;
@@ -231,11 +247,10 @@ endecode_fields_11(
     uint64_t, load_15,
     uint64_t, uptime_seconds,
     uint64_t, handles_available_count,
-    uint64_t, handles_total_count)
+    uint64_t, handles_total_count);
 
-/*
-  object reference (uniquely refers to a single file, directory, or
-  symlink)
+/** object reference (uniquely refers to a single file, directory, or
+    symlink).
 */
 typedef struct
 {
@@ -243,7 +258,7 @@ typedef struct
     PVFS_fs_id fs_id;
 } PVFS_object_ref;
 
-/* credentials (stubbed for future authentication methods) */
+/** Credentials (stubbed for future authentication methods). */
 typedef struct
 {
     PVFS_uid uid;
@@ -252,7 +267,7 @@ typedef struct
 endecode_fields_2(
     PVFS_credentials,
     PVFS_uid, uid,
-    PVFS_gid, gid)
+    PVFS_gid, gid);
 
 /* max length of BMI style URI's for identifying servers */
 #define PVFS_MAX_SERVER_ADDR_LEN 256
@@ -261,6 +276,7 @@ endecode_fields_2(
 /* max len of individual path element */
 #define PVFS_SEGMENT_MAX         128
 
+/** Directory entry contents. */
 typedef struct
 {
     char d_name[PVFS_NAME_MAX + 1];
@@ -269,10 +285,10 @@ typedef struct
 endecode_fields_2(
     PVFS_dirent,
     here_string, d_name,
-    PVFS_handle, handle)
+    PVFS_handle, handle);
 
-/* these are predefined server parameters that can be manipulated
- * through the mgmt interface
+/** Predefined server parameters that can be manipulated at run-time
+ *  through the mgmt interface.
  */
 enum PVFS_server_param
 {
@@ -520,11 +536,9 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error)        \
 DECLARE_ERRNO_MAPPING()
 #define PVFS_ERROR_TO_ERRNO(__error) PVFS_get_errno_mapping(__error)
 
-/* PVFS2 error details
- *
- * These structures/calls are used when returning detailed lists of
- * errors from a particular call.  This is done, to report on specific
- * server failures.
+/** These structures/calls are used when returning detailed lists of
+ *  errors from a particular call.  This is done to report on specific,
+ *  per-server failures.
  */
 typedef struct
 {
@@ -544,10 +558,11 @@ typedef struct
 PVFS_error_details *PVFS_error_details_new(int count);
 void PVFS_error_details_free(PVFS_error_details *details);
 
-/* PVFS I/O operation types, used in both system and server interfaces */
+/** PVFS I/O operation types, used in both system and server interfaces.
+ */
 enum PVFS_io_type
 {
-    PVFS_IO_READ = 1,
+    PVFS_IO_READ  = 1,
     PVFS_IO_WRITE = 2
 };
 
