@@ -70,7 +70,7 @@
  * 1). If the user passes in "/" we return the root handle.
  *
  */
-int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
+int PVFS_sys_lookup(PVFS_fs_id fs_id, char* name, PVFS_credentials credentials, PVFS_sysresp_lookup *resp)
 {
     /* Initialization */   
     struct PVFS_server_req_s req_p;	 /* server request */
@@ -100,32 +100,32 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     } failure = NONE_FAILURE;
 
     /*print args to make sure we're sane*/
-    gossip_ldebug(CLIENT_DEBUG,"req->\n\tname: %s\n\tfs_id: %d\n\tcredentials:\n\t\tuid: %d\n\t\tgid: %d\n\t\tperms: %d\n",req->name,req->fs_id, req->credentials.uid, req->credentials.gid, req->credentials.perms);
+    gossip_ldebug(CLIENT_DEBUG,"req->\n\tname: %s\n\tfs_id: %d\n\tcredentials:\n\t\tuid: %d\n\t\tgid: %d\n\t\tperms: %d\n",name,fs_id, credentials.uid, credentials.gid, credentials.perms);
 
     /* NOTE: special case is that we're doing a lookup on the root handle (which
      * we got during the getconfig) so we want to check to see if we're looking
      * up "/"; if so, then get the root handle from the bucket table interface
      * and return
      */
-    parent.fs_id = req->fs_id;
+    parent.fs_id = fs_id;
 
-    ret = PINT_bucket_get_root_handle(req->fs_id,&parent.handle);
+    ret = PINT_bucket_get_root_handle(fs_id,&parent.handle);
     if (ret < 0)
     {
 	failure = GET_PARENT_FAILURE;
 	return(ret);
     }
 
-    if (!strcmp(req->name, "/"))
+    if (!strcmp(name, "/"))
     {
 	resp->pinode_refn.handle = parent.handle;
-	resp->pinode_refn.fs_id = req->fs_id;
+	resp->pinode_refn.fs_id = fs_id;
 	return(0);
     }
 
     /* Get  the total number of segments */
     total_segments = num_segments_remaining =
-        PINT_string_count_segments(req->name);
+        PINT_string_count_segments(name);
 
     /* make sure we're asking for something reasonable */
     if (num_segments_remaining < 1)
@@ -137,7 +137,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 
     /* do dcache lookups here to shorten the path as much as possible */
 
-    name_sz = strlen(req->name) + 1;
+    name_sz = strlen(name) + 1;
     path = (char *)malloc(name_sz);
     if (path == NULL)
     {
@@ -145,7 +145,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
         ret = -ENOMEM;
         goto return_error;
     }
-    memcpy(path, req->name, name_sz);
+    memcpy(path, name, name_sz);
 
     /* traverse the path as much as we can via the dcache */
 
@@ -156,7 +156,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	name_sz = strlen(path) + 1;
 	req_p.op     = PVFS_SERV_LOOKUP_PATH;
 	req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
-	req_p.credentials = req->credentials;
+	req_p.credentials = credentials;
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + num_segments_remaining * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
 	gossip_debug(CLIENT_DEBUG,
 		      "  expecting ack of %d bytes (%d segment(s))\n",
@@ -216,7 +216,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	{
 
 	    entry.handle = ack_p->u.lookup_path.handle_array[i];
-	    entry.fs_id = req->fs_id;
+	    entry.fs_id = fs_id;
 
 	    //segment = path_element(i);
 	    ret = get_path_element(path, &segment, i);
@@ -261,8 +261,8 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	    }
 
 	    /* Check permissions for path */
-	    ret = check_perms(pinode_ptr->attr,req->credentials.perms,
-				  req->credentials.uid, req->credentials.gid);
+	    ret = check_perms(pinode_ptr->attr,credentials.perms,
+				  credentials.uid, credentials.gid);
 	    if (ret < 0)
 	    {
 		failure = CHECK_PERMS_FAILURE;
@@ -306,7 +306,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	/*get rid of the old path*/
 
 	/* get the next chunk of the path to send */
-	ret = get_next_path(req->name,&path,total_segments - num_segments_remaining);
+	ret = get_next_path(name,&path,total_segments - num_segments_remaining);
 	if (ret < 0)
 	{
 	    failure = GET_NEXT_PATHSEG_FAILURE;

@@ -139,12 +139,6 @@ struct PVFS_sysresp_init_s {
 typedef struct PVFS_sysresp_init_s PVFS_sysresp_init;
 
 /* lookup (request and response) */
-struct PVFS_sysreq_lookup_s {
-	char* name;
-	PVFS_fs_id fs_id;
-	PVFS_credentials credentials;
-};
-typedef struct PVFS_sysreq_lookup_s PVFS_sysreq_lookup;
 
 struct PVFS_sysresp_lookup_s {
 	pinode_reference pinode_refn;
@@ -389,7 +383,6 @@ struct PVFS_system_req_s {
 	int32_t req_tag; /* Tag to group reqs+acks */
 	int32_t verno;	  /* Version number */
 	union {
-		PVFS_sysreq_lookup lookup;
 		PVFS_sysreq_getattr getattr;
 		PVFS_sysreq_setattr setattr;
 		PVFS_sysreq_mkdir mkdir;
@@ -460,7 +453,7 @@ enum PVFS_sys_io_type
  */
 int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp);
 int PVFS_sys_finalize(void);
-int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp);
+int PVFS_sys_lookup(PVFS_fs_id fs_id, char* name, PVFS_credentials credentials, PVFS_sysresp_lookup *resp);
 int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp);
 int PVFS_sys_setattr(PVFS_sysreq_setattr *req);
 int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp);

@@ -39,7 +39,6 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
-    PVFS_sysreq_lookup req_lookup;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysreq_io req_io;
     PVFS_sysresp_io resp_io;
@@ -53,6 +52,9 @@ int main(int argc, char **argv)
     double time1, time2;
     int32_t blocklength = 0;
     PVFS_size displacement = 0;
+    PVFS_fs_id lk_fs_id;
+    char* lk_name;
+    PVFS_credentials credentials;
 
     gossip_enable_stderr();
 
@@ -130,34 +132,33 @@ int main(int argc, char **argv)
 	goto main_out;
     }
 
-    memset(&req_lookup, 0, sizeof(PVFS_sysreq_lookup));
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 
     cur_fs = resp_init.fsid_list[mnt_index];
 
     printf("Warning: overriding ownership and permissions to match prototype file system.\n");
 
-    req_lookup.credentials.uid = 100;
-    req_lookup.credentials.gid = 100;
-    req_lookup.credentials.perms = 1877;
-    req_lookup.fs_id = cur_fs;
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 1877;
+    lk_fs_id = cur_fs;
 
     /* TODO: this is awkward- the remove_base_dir() function
      * doesn't leave an opening slash on the path (because it was
      * first written to help with sys_create() calls).  However,
      * in the sys_lookup() case, we need the opening slash.
      */
-    req_lookup.name = (char*)malloc(strlen(str_buf) + 2);
-    if(!req_lookup.name)
+    lk_name = (char*)malloc(strlen(str_buf) + 2);
+    if(!lk_name)
     {
 	perror("malloc()");
 	ret = -1;
 	goto main_out;
     }
-    req_lookup.name[0] = '/';
-    strcpy(&(req_lookup.name[1]), str_buf);
+    lk_name[0] = '/';
+    strcpy(&(lk_name[1]), str_buf);
 
-    ret = PVFS_sys_lookup(&req_lookup, &resp_lookup);
+    ret = PVFS_sys_lookup(lk_fs_id, lk_name, credentials, &resp_lookup);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_lookup", ret);
@@ -175,7 +176,7 @@ int main(int argc, char **argv)
     }
 
     req_io.pinode_refn = resp_lookup.pinode_refn;
-    req_io.credentials = req_lookup.credentials;
+    req_io.credentials = credentials;
     req_io.buffer = buffer;
     req_io.buffer_size = user_opts->buf_size;
     blocklength = user_opts->buf_size;
