@@ -154,8 +154,10 @@ void pvfs_bufmap_finalize(void)
 {
     int i;
 
+    pvfs2_print("pvfs2_bufmap_finalize: called\n");
     if(!bufmap_init)
     {
+        pvfs2_print("pvfs2_bufmap_finalize: not yet initialized; returning\n");
 	return;
     }
 
@@ -168,6 +170,7 @@ void pvfs_bufmap_finalize(void)
 
     bufmap_init = 0;
 
+    pvfs2_print("pvfs2_bufmap_finalize: exited normally\n");
     return;
 }
 

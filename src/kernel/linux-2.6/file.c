@@ -49,11 +49,11 @@ ssize_t pvfs2_inode_read(
     loff_t *offset,
     int copy_to_user)
 {
+    int ret = -1;
     size_t each_count = 0;
     size_t total_count = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     struct pvfs_bufmap_desc* desc;
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     char* current_buf = buf;
     loff_t original_offset = *offset;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
@@ -96,8 +96,7 @@ ssize_t pvfs2_inode_read(
 	new_op->upcall.req.io.count = each_count;
 	new_op->upcall.req.io.offset = *offset;
 
-        service_operation_with_timeout_retry(
-            new_op, "pvfs2_inode_read", retries);
+        service_operation(new_op, "pvfs2_inode_read");
 
 	if(new_op->downcall.status != 0)
 	{
