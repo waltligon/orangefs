@@ -44,7 +44,7 @@ int do_encode_resp(
     case PVFS_SERV_IO:
     case PVFS_SERV_SETATTR:
     case PVFS_SERV_REMOVE:
-    case PVFS_SERV_CREATEDIRENT:
+    case PVFS_SERV_CRDIRENT:
     case PVFS_SERV_WRITE_COMPLETION:
     case PVFS_SERV_MGMT_SETPARAM:
     case PVFS_SERV_TRUNCATE:

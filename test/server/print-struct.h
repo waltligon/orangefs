@@ -79,7 +79,7 @@ static inline void display_pvfs_structure(
 	    printf("Attribs:\n");
 	    dump_attribs(p->u.mkdir.attr);
 	    break;
-	case PVFS_SERV_CREATEDIRENT:
+	case PVFS_SERV_CRDIRENT:
 	    printf("Create Dirent Req\n");
 	    printf("Name: %s\n", p->u.crdirent.name);
 	    printf("New Handle: %Ld\n", p->u.crdirent.new_handle);
@@ -163,7 +163,7 @@ static inline void display_pvfs_structure(
 	case PVFS_SERV_REMOVE:
 	case PVFS_SERV_IO:
 	case PVFS_SERV_SETATTR:
-	case PVFS_SERV_CREATEDIRENT:
+	case PVFS_SERV_CRDIRENT:
 	    printf("Shouldn't have a response\n");
 	    break;
 	default:

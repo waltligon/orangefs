@@ -121,7 +121,7 @@ int do_decode_resp(
     case PVFS_SERV_CREATE:
     case PVFS_SERV_SETATTR:
     case PVFS_SERV_REMOVE:
-    case PVFS_SERV_CREATEDIRENT:
+    case PVFS_SERV_CRDIRENT:
     case PVFS_SERV_MKDIR:
     case PVFS_SERV_RMDIRENT:
     case PVFS_SERV_IO:

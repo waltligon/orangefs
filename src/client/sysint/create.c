@@ -244,7 +244,7 @@ int PVFS_sys_create_old(
 	}
 
 	/* send crdirent to associate a name with the meta file we just made */
-	req_p.op = PVFS_SERV_CREATEDIRENT;
+	req_p.op = PVFS_SERV_CRDIRENT;
 
 	/* credentials come from credentials and are set in the previous
 	 * create request.  so we don't have to set those again.

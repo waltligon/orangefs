@@ -104,7 +104,7 @@ int do_encode_req(
 	((struct PVFS_server_req *) enc_msg)->u.lookup_path.path = NULL;
 	return (0);
 
-    case PVFS_SERV_CREATEDIRENT:
+    case PVFS_SERV_CRDIRENT:
 	assert(request->u.crdirent.name != NULL);
 
 	name_sz = strlen(request->u.crdirent.name) + 1;	/* include NULL terminator in size */

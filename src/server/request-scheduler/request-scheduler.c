@@ -242,7 +242,7 @@ int PINT_req_sched_target_handle(
 	*fs_id = req->u.lookup_path.fs_id;
 	return (0);
 	break;
-    case PVFS_SERV_CREATEDIRENT:
+    case PVFS_SERV_CRDIRENT:
 	*readonly_flag = 0;
 	*handle = req->u.crdirent.parent_handle;
 	*fs_id = req->u.crdirent.fs_id;

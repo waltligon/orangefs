@@ -135,7 +135,7 @@ int PVFS_sys_rename(
 	goto return_error;
     }
 
-    req_p.op = PVFS_SERV_CREATEDIRENT;
+    req_p.op = PVFS_SERV_CRDIRENT;
     req_p.credentials = credentials;
 
     req_p.u.crdirent.name = new_entry;

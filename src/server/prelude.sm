@@ -227,7 +227,7 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	    break;
 
 	/* things that need write permissions */
-	case PVFS_SERV_CREATEDIRENT:
+	case PVFS_SERV_CRDIRENT:
 	case PVFS_SERV_RMDIRENT:
 	    /* TODO: figure out something cleaner looking than using 
 	     * PVFS_U_WRITE here to indicate we need write access; its 

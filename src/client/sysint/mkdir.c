@@ -202,7 +202,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     /* remove leading slashes from name; this isn't a complete fix. */
     while (*entry_name == '/') entry_name++;
 
-    req_p.op = PVFS_SERV_CREATEDIRENT;
+    req_p.op = PVFS_SERV_CRDIRENT;
 
     /* credentials come from credentials and are set in the previous
      * create request.  so we don't have to set those again.

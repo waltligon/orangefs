@@ -178,9 +178,9 @@ void print_request(struct PVFS_server_req *my_req, int direction)
                         printf("======================================\n");
                         break;
 
-		case PVFS_SERV_CREATEDIRENT:
+		case PVFS_SERV_CRDIRENT:
 			arrow(direction);
-                        printf("PVFS_SERV_CREATEDIRENT structure:\n");
+                        printf("PVFS_SERV_CRDIRENT structure:\n");
 			arrow(direction);
                         printf("op = %d \n", (int)my_req->op);
 			arrow(direction);
@@ -422,7 +422,7 @@ int main(int argc, char **argv)
 	break;
 
 	case 8:
-        request->op = PVFS_SERV_CREATEDIRENT;
+        request->op = PVFS_SERV_CRDIRENT;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
         request->u.crdirent.name = somechars;

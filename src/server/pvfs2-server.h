@@ -209,8 +209,8 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 	case PVFS_SERV_LOOKUP_PATH:
 	    ret_ptr = "lookup_path";
 	    break;
-	case PVFS_SERV_CREATEDIRENT:
-	    ret_ptr = "createdirent";
+	case PVFS_SERV_CRDIRENT:
+	    ret_ptr = "crdirent";
 	    break;
 	case PVFS_SERV_RMDIRENT:
 	    ret_ptr = "rmdirent";

@@ -192,7 +192,7 @@ void debug_print_type(void* thing, int type)
 	    case PVFS_SERV_CREATE:
 		gossip_ldebug(CLIENT_DEBUG,"create request\n");
 		break;
-	    case PVFS_SERV_CREATEDIRENT:
+	    case PVFS_SERV_CRDIRENT:
 		gossip_ldebug(CLIENT_DEBUG,"create dirent request\n");
 		break;
 	    case PVFS_SERV_REMOVE:
@@ -244,7 +244,7 @@ void debug_print_type(void* thing, int type)
 	    case PVFS_SERV_CREATE:
 		gossip_ldebug(CLIENT_DEBUG,"create response\n");
 		break;
-	    case PVFS_SERV_CREATEDIRENT:
+	    case PVFS_SERV_CRDIRENT:
 		gossip_ldebug(CLIENT_DEBUG,"create dirent response\n");
 		break;
 	    case PVFS_SERV_REMOVE:

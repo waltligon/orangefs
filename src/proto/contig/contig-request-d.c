@@ -56,7 +56,7 @@ int do_decode_req(
 	dec_msg->u.lookup_path.path = char_ptr;
 	return (0);
 
-    case PVFS_SERV_CREATEDIRENT:
+    case PVFS_SERV_CRDIRENT:
 	char_ptr += sizeof(struct PVFS_server_req);
 	dec_msg->u.crdirent.name = char_ptr;
 	return (0);

@@ -957,7 +957,7 @@ static void server_state_table_initialize(void)
     PINT_server_op_table[PVFS_SERV_GETATTR]       = &pvfs2_get_attr_sm;
     PINT_server_op_table[PVFS_SERV_SETATTR]       = &pvfs2_set_attr_sm;
     PINT_server_op_table[PVFS_SERV_LOOKUP_PATH]   = &pvfs2_lookup_sm;
-    PINT_server_op_table[PVFS_SERV_CREATEDIRENT]  = &pvfs2_crdirent_sm;
+    PINT_server_op_table[PVFS_SERV_CRDIRENT]      = &pvfs2_crdirent_sm;
     PINT_server_op_table[PVFS_SERV_RMDIRENT]      = &pvfs2_rmdirent_sm;
     PINT_server_op_table[PVFS_SERV_MKDIR]         = &pvfs2_mkdir_sm;
     PINT_server_op_table[PVFS_SERV_READDIR]       = &pvfs2_readdir_sm;

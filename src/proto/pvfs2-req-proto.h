@@ -31,7 +31,7 @@ enum PVFS_server_op
     PVFS_SERV_GETATTR = 4,
     PVFS_SERV_SETATTR = 5,
     PVFS_SERV_LOOKUP_PATH = 6,
-    PVFS_SERV_CREATEDIRENT = 7,
+    PVFS_SERV_CRDIRENT = 7,
     PVFS_SERV_RMDIRENT = 8,
     PVFS_SERV_TRUNCATE = 9,
     PVFS_SERV_MKDIR = 10,
@@ -304,7 +304,7 @@ struct PVFS_servresp_mkdir
 /* create dirent ***********************************************/
 /* - creates a new entry within an existing directory */
 
-struct PVFS_servreq_createdirent
+struct PVFS_servreq_crdirent
 {
     char *name;			    /* name of new entry */
     PVFS_handle new_handle;	    /* handle of new entry */
@@ -312,21 +312,21 @@ struct PVFS_servreq_createdirent
     PVFS_fs_id fs_id;		    /* file system */
 };
 
-#define PINT_SERVREQ_CREATEDIRENT_FILL(__req,           \
-                                       __creds,         \
-                                       __name,          \
-                                       __new_handle,    \
-                                       __parent_handle, \
-                                       __fs_id)         \
-do {                                                    \
-    memset(&(__req), 0, sizeof(__req));                 \
-    (__req).op = PVFS_SERV_CREATEDIRENT;                \
-    (__req).credentials = (__creds);                    \
-    (__req).u.crdirent.name = (__name);                 \
-    (__req).u.crdirent.new_handle = (__new_handle);     \
-    (__req).u.crdirent.parent_handle =                  \
-       (__parent_handle);                               \
-    (__req).u.crdirent.fs_id = (__fs_id);               \
+#define PINT_SERVREQ_CRDIRENT_FILL(__req,           \
+                                   __creds,         \
+                                   __name,          \
+                                   __new_handle,    \
+                                   __parent_handle, \
+                                   __fs_id)         \
+do {                                                \
+    memset(&(__req), 0, sizeof(__req));             \
+    (__req).op = PVFS_SERV_CRDIRENT;                \
+    (__req).credentials = (__creds);                \
+    (__req).u.crdirent.name = (__name);             \
+    (__req).u.crdirent.new_handle = (__new_handle); \
+    (__req).u.crdirent.parent_handle =              \
+       (__parent_handle);                           \
+    (__req).u.crdirent.fs_id = (__fs_id);           \
 } while (0)
 
 /* NOTE: no response structure; all necessary response info is 
@@ -683,7 +683,7 @@ struct PVFS_server_req
 	struct PVFS_servreq_mkdir mkdir;
 	struct PVFS_servreq_readdir readdir;
 	struct PVFS_servreq_lookup_path lookup_path;
-	struct PVFS_servreq_createdirent crdirent;
+	struct PVFS_servreq_crdirent crdirent;
 	struct PVFS_servreq_rmdirent rmdirent;
 	struct PVFS_servreq_truncate truncate;
 	struct PVFS_servreq_flush flush;
