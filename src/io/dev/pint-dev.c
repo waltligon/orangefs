@@ -87,10 +87,6 @@ int PINT_dev_initialize(
 	return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
     }
 
-    /* TODO: these are temporary */
-    printf("magic: %u\n", (unsigned)pdev_magic);
-    printf("max: %u\n", (unsigned)pdev_max_upsize);
-
     return(0);
 }
 

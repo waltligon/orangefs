@@ -15,6 +15,7 @@
 #include <linux/fs.h>
 #include <linux/major.h>
 #include <linux/smp_lock.h>
+#include <linux/poll.h>
 #include <asm/uaccess.h>
 
 #include "pint-dev-shared.h"
@@ -30,6 +31,7 @@ ssize_t	pdev_write(struct file *, const char *, size_t, loff_t *);
 int	pdev_open(struct inode *, struct file *);
 int	pdev_release(struct inode *, struct file *);
 int	pdev_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
+unsigned int pdev_poll(struct file *my_file, struct poll_table_struct *wait);
 static int __init pdev_init(void);
 static void __exit pdev_exit(void);
 
@@ -37,11 +39,15 @@ static struct file_operations pdev_fops = {
     read:		pdev_read,
     write:		pdev_write,
     open:		pdev_open,
-    release:	pdev_release,
+    release:	   	pdev_release,
     ioctl:		pdev_ioctl,
+    poll:		pdev_poll,
 };
 
 static int pdev_major = 0;
+/* note: just picking these arbitrarily for testing */
+int32_t pdev_magic = 1234;
+int32_t pdev_max_upsize = 1024;
 
 static int __init pdev_init(void)
 {
@@ -103,19 +109,15 @@ int pdev_ioctl(struct inode *inode,
 		  unsigned int command, 
 		  unsigned long arg)
 {
-    /* note: just picking these arbitrarily for testing */
-    int32_t magic = 1234;
-    int32_t max_size = 1024;
-
     printk("pdev: pdev_ioctl()\n");
 
     switch(command)
     {
 	case(PVFS_DEV_GET_MAGIC):
-	    copy_to_user((void*)arg, &magic, sizeof(int32_t)); 
+	    copy_to_user((void*)arg, &pdev_magic, sizeof(int32_t)); 
 	    return(0);
 	case(PVFS_DEV_GET_MAX_UPSIZE):
-	    copy_to_user((void*)arg, &max_size, sizeof(int32_t)); 
+	    copy_to_user((void*)arg, &pdev_max_upsize, sizeof(int32_t)); 
 	    return(0);
 	default:
 	    return(-ENOSYS);
@@ -124,11 +126,27 @@ int pdev_ioctl(struct inode *inode,
     return(-ENOSYS);
 } 
 
-ssize_t	pdev_read(struct file *filp, char * buf, 
-		 size_t size, loff_t *offp)
+ssize_t	pdev_read(struct file *filp, char * buf, size_t size, loff_t *offp)
 {
-    printk("pdev: pdev_read()\n");
-    return(-ENOSYS);
+    char test_string[] = "Hello world.";
+    int64_t test_tag = 5;
+    void* tmp_buf = buf;
+
+    if(size < (strlen(test_string) + 1 + sizeof(int32_t) + sizeof(int64_t)))
+    {
+	return(-EMSGSIZE);
+    }
+
+    /* copy out magic number */
+    copy_to_user(tmp_buf, &pdev_magic, sizeof(int32_t));
+    tmp_buf = (void*)((unsigned long)tmp_buf + sizeof(int32_t));
+    /* copy out tag */
+    copy_to_user(tmp_buf, &test_tag, sizeof(int64_t));
+    tmp_buf = (void*)((unsigned long)tmp_buf + sizeof(int64_t));
+    /* copy out message payload */
+    copy_to_user(tmp_buf, test_string, (strlen(test_string) + 1));
+
+    return(strlen(test_string) + 1 + sizeof(int32_t) + sizeof(int64_t));
 }
 
 ssize_t	pdev_write(struct file *filp, const char *buf, 
@@ -136,6 +154,13 @@ ssize_t	pdev_write(struct file *filp, const char *buf,
 {
     printk("pdev: pdev_write()\n");
     return(-ENOSYS);
+}
+
+unsigned int pdev_poll(struct file *my_file, struct 
+    poll_table_struct *wait){
+
+    /* the test module is always ready for IO ... */
+    return(POLLOUT|POLLWRNORM|POLLIN|POLLRDNORM);
 }
 
 module_init(pdev_init);

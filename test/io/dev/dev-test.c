@@ -5,6 +5,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "gossip.h"
 #include "pint-dev.h"
@@ -12,6 +13,8 @@
 int main(int argc, char **argv)	
 {
     int ret = 1;
+    int outcount = 0;
+    struct PINT_dev_unexp_info unexp_array[2];
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
     if(ret < 0)
@@ -19,6 +22,38 @@ int main(int argc, char **argv)
 	PVFS_perror("PINT_dev_initialize", ret);
 	return(-1);
     }
+
+    /* try reading out a single unexpected message */
+    ret = PINT_dev_test_unexpected(1, &outcount, unexp_array, 5);
+    if(ret != 1 || outcount != 1)
+    {
+	fprintf(stderr, "Error: PINT_dev_testunexpected().\n");
+	return(-1);
+    }
+
+    printf("Got message: size: %d, tag: %d, payload: %s\n", 
+	unexp_array[0].size, (int)unexp_array[0].tag, 
+	(char*)unexp_array[0].buffer);
+
+    PINT_dev_release_unexpected(unexp_array);
+
+    /* try reading out two messages */
+    ret = PINT_dev_test_unexpected(2, &outcount, unexp_array, 5);
+    if(ret != 1 || outcount != 2)
+    {
+	fprintf(stderr, "Error: PINT_dev_testunexpected().\n");
+	return(-1);
+    }
+
+    printf("Got message: size: %d, tag: %d, payload: %s\n", 
+	unexp_array[0].size, (int)unexp_array[0].tag, 
+	(char*)unexp_array[0].buffer);
+    printf("Got message: size: %d, tag: %d, payload: %s\n", 
+	unexp_array[1].size, (int)unexp_array[0].tag, 
+	(char*)unexp_array[1].buffer);
+
+    PINT_dev_release_unexpected(&unexp_array[0]);
+    PINT_dev_release_unexpected(&unexp_array[1]);
 
     PINT_dev_finalize();
 
