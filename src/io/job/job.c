@@ -22,9 +22,7 @@
 #include "trove.h"
 #include "gossip.h"
 #include "request-scheduler.h"
-
-/* TODO: this is temporary */
-static PVFS_fs_id HACK_global_fsid = -1;
+#include "trove-id-queue.h"
 
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
@@ -36,7 +34,7 @@ static int completion_error = 0;
 static job_desc_q_p bmi_unexp_queue = NULL;
 static int bmi_unexp_pending_count = 0;
 static int bmi_pending_count = 0;
-static job_desc_q_p trove_queue = NULL;
+static trove_id_queue_p trove_inflight_queue = NULL;
 static int trove_pending_count = 0;
 static int flow_pending_count = 0;
 /* mutex locks for each queue */
@@ -889,8 +887,6 @@ int job_trove_bstream_write_at(PVFS_coll_id coll_id,
     int ret = -1;
     struct job_desc *jd = NULL;
 
-    HACK_global_fsid = coll_id;
-
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
      */
@@ -932,7 +928,12 @@ int job_trove_bstream_write_at(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -967,8 +968,6 @@ int job_trove_bstream_read_at(PVFS_coll_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-
-    HACK_global_fsid = coll_id;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1011,7 +1010,12 @@ int job_trove_bstream_read_at(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1045,8 +1049,6 @@ int job_trove_keyval_read(PVFS_coll_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-
-    HACK_global_fsid = coll_id;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1086,7 +1088,12 @@ int job_trove_keyval_read(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1121,8 +1128,6 @@ int job_trove_keyval_read_list(PVFS_coll_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-
-    HACK_global_fsid = coll_id;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1163,7 +1168,12 @@ int job_trove_keyval_read_list(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1197,8 +1207,6 @@ int job_trove_keyval_write(PVFS_coll_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-
-    HACK_global_fsid = coll_id;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1238,7 +1246,12 @@ int job_trove_keyval_write(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1308,7 +1321,12 @@ int job_trove_dspace_getattr(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1377,7 +1395,12 @@ int job_trove_dspace_setattr(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1451,8 +1474,6 @@ int job_trove_keyval_remove(PVFS_coll_id coll_id,
     int ret = -1;
     struct job_desc *jd = NULL;
 
-    HACK_global_fsid = coll_id;
-
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
      */
@@ -1491,7 +1512,12 @@ int job_trove_keyval_remove(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1547,8 +1573,6 @@ int job_trove_keyval_iterate(PVFS_coll_id coll_id,
     int ret = -1;
     struct job_desc *jd = NULL;
 
-    HACK_global_fsid = coll_id;
-
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
      */
@@ -1593,7 +1617,12 @@ int job_trove_keyval_iterate(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1649,8 +1678,6 @@ int job_trove_dspace_create(PVFS_coll_id coll_id,
     int ret = -1;
     struct job_desc *jd = NULL;
 
-    HACK_global_fsid = coll_id;
-
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
      */
@@ -1692,7 +1719,12 @@ int job_trove_dspace_create(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1722,8 +1754,6 @@ int job_trove_dspace_remove(PVFS_coll_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
-
-    HACK_global_fsid = coll_id;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1762,7 +1792,12 @@ int job_trove_dspace_remove(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1811,8 +1846,6 @@ int job_trove_fs_create(char *collname,
     int ret = -1;
     struct job_desc *jd = NULL;
 
-    HACK_global_fsid = new_coll_id;
-
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
      */
@@ -1848,7 +1881,12 @@ int job_trove_fs_create(char *collname,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, new_coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1923,24 +1961,14 @@ int job_trove_fs_lookup(char *collname,
 	/* immediate completion */
 	out_status_p->error_code = 0;
 	out_status_p->coll_id = jd->u.trove.fsid;
-	HACK_global_fsid = jd->u.trove.fsid;
 	dealloc_job_desc(jd);
 	return (ret);
     }
 
-    /* if we fall through to this point, the job did not
-     * immediately complete and we must queue up to test later
-     */
-    gen_mutex_lock(&trove_mutex);
-    *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
-    trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
-    gen_mutex_unlock(&trove_mutex);
+    /* there is no way we can test on this if we don't know the coll_id */
+    gossip_lerr("Error: trove_collection_lookup() returned 0 ???\n");
 
-    return (0);
+    return (-EINVAL);
 }
 
 /* job_trove_fs_set_eattr()
@@ -1965,8 +1993,6 @@ int job_trove_fs_seteattr(PVFS_coll_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-
-    HACK_global_fsid = coll_id;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2004,7 +2030,12 @@ int job_trove_fs_seteattr(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -2036,8 +2067,6 @@ int job_trove_fs_geteattr(PVFS_coll_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-
-    HACK_global_fsid = coll_id;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2075,7 +2104,12 @@ int job_trove_fs_geteattr(PVFS_coll_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    job_desc_q_add(trove_queue, jd);
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -2751,9 +2785,9 @@ static int setup_queues(void)
 {
 
     bmi_unexp_queue = job_desc_q_new();
-    trove_queue = job_desc_q_new();
+    trove_inflight_queue = trove_id_queue_new();
 
-    if (!bmi_unexp_queue || !trove_queue)
+    if (!bmi_unexp_queue || !trove_inflight_queue)
     {
 	/* cleanup any that were initialized */
 	teardown_queues();
@@ -2773,8 +2807,8 @@ static void teardown_queues(void)
 
     if (bmi_unexp_queue)
 	job_desc_q_cleanup(bmi_unexp_queue);
-    if (trove_queue)
-	job_desc_q_cleanup(trove_queue);
+    if (trove_inflight_queue)
+	trove_id_queue_cleanup(trove_inflight_queue);
 
     return;
 }
@@ -3077,69 +3111,69 @@ static int do_one_work_cycle_flow(int *num_completed)
 static int do_one_work_cycle_trove(int *num_completed)
 {
     struct job_desc *tmp_desc = NULL;
-    int offset = 0;
     int count = 0;
     int ret = -1;
     int i = 0;
+    int query_offset = 0;
+    PVFS_coll_id tmp_coll_id;
 
-    /* zero out first entry to use as a sentinal */
-    stat_trove_id_array[0] = 0;
-    /* collect the set of trove operations to test on */
+    *num_completed = 0;
+
+    count = job_work_metric;
+    query_offset = 0;
     gen_mutex_lock(&trove_mutex);
-    /* keep pulling entries until we wrap around */
-    while ((offset < job_work_metric) &&
-	   (tmp_desc = job_desc_q_shownext(trove_queue)) &&
-	   (tmp_desc->u.trove.id != stat_trove_id_array[0]))
+    while((ret = trove_id_queue_query(trove_inflight_queue,
+	stat_trove_id_array, &count, &query_offset, &tmp_coll_id)) == 0)
     {
-	/* remove the job; we will add it back to the end of the queue */
-	job_desc_q_remove(tmp_desc);
-	stat_trove_id_array[offset] = tmp_desc->u.trove.id;
-	offset++;
-	job_desc_q_add(trove_queue, tmp_desc);
+	gen_mutex_unlock(&trove_mutex);
+	ret = trove_dspace_testsome(tmp_coll_id, stat_trove_id_array,
+				    &count, stat_trove_index_array,
+				    stat_trove_vtag_array,
+				    stat_trove_user_ptr_array,
+				    stat_trove_ds_state_array);
+
+	if (ret < 0)
+	{
+	    /* critical failure */
+	    /* TODO: can I clean up anything else here? */
+	    gossip_lerr("Error: critical trove failure.\n");
+	    return (ret);
+	}
+
+	for (i = 0; i < count; i++)
+	{
+	    /* remove the operation from the pending trove queue */
+	    tmp_desc = (struct job_desc *) stat_trove_user_ptr_array[i];
+	    gen_mutex_lock(&trove_mutex);
+	    trove_pending_count--;
+	    trove_id_queue_del(trove_inflight_queue,
+		stat_trove_id_array[stat_trove_index_array[i]], 
+		tmp_coll_id);
+	    gen_mutex_unlock(&trove_mutex);
+	    /* set appropriate fields and store in completed queue */
+	    tmp_desc->u.trove.state = stat_trove_ds_state_array[i];
+	    /* TODO: I don't really know how to handle vtags here */
+	    /* I think these are filled in from pointers passed in
+	     * earlier?  Why have it in the test functions?
+	     */
+    #if 0
+	    tmp_desc->u.trove.vtag = stat_trove_vtag_array[i];
+    #endif
+	    gen_mutex_lock(&completion_mutex);
+	    /* set completed flag while holding queue lock */
+	    tmp_desc->completed_flag = 1;
+	    job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+		tmp_desc);
+	    gen_mutex_unlock(&completion_mutex);
+	}
+	
+	*num_completed += count;
+	count = job_work_metric;
+	gen_mutex_lock(&trove_mutex);
     }
     gen_mutex_unlock(&trove_mutex);
-    count = offset;
+    assert(ret == -EAGAIN);
 
-    ret = trove_dspace_testsome(HACK_global_fsid, stat_trove_id_array,
-				&count, stat_trove_index_array,
-				stat_trove_vtag_array,
-				stat_trove_user_ptr_array,
-				stat_trove_ds_state_array);
-
-    if (ret < 0)
-    {
-	/* critical failure */
-	/* TODO: can I clean up anything else here? */
-	gossip_lerr("Error: critical trove failure.\n");
-	return (ret);
-    }
-
-    for (i = 0; i < count; i++)
-    {
-	/* remove the operation from the pending trove queue */
-	tmp_desc = (struct job_desc *) stat_trove_user_ptr_array[i];
-	gen_mutex_lock(&trove_mutex);
-	job_desc_q_remove(tmp_desc);
-	trove_pending_count--;
-	gen_mutex_unlock(&trove_mutex);
-	/* set appropriate fields and store in completed queue */
-	tmp_desc->u.trove.state = stat_trove_ds_state_array[i];
-	/* TODO: I don't really know how to handle vtags here */
-	/* I think these are filled in from pointers passed in
-	 * earlier?  Why have it in the test functions?
-	 */
-#if 0
-	tmp_desc->u.trove.vtag = stat_trove_vtag_array[i];
-#endif
-	gen_mutex_lock(&completion_mutex);
-	/* set completed flag while holding queue lock */
-	tmp_desc->completed_flag = 1;
-	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
-	    tmp_desc);
-	gen_mutex_unlock(&completion_mutex);
-    }
-
-    *num_completed = count;
     return (0);
 }
 
