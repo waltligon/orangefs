@@ -166,7 +166,7 @@ int BMI_initialize(const char *method_list,
 	}
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: initializing method: %s\n",
+	    gossip_err("Error: initializing method: %s\n",
 			requested_methods[i]);
 	    active_method_table[i] = NULL;
 	    goto bmi_initialize_failure;

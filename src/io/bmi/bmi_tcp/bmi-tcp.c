@@ -385,7 +385,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 	if (ret < 0)
 	{
 	    tmp_errno = ret;
-	    gossip_lerr("Error: tcp_server_init() failure.\n");
+	    gossip_err("Error: tcp_server_init() failure.\n");
 	    goto initialize_failure;
 	}
     }
@@ -1436,7 +1436,7 @@ static int tcp_server_init(void)
     if (BMI_sockio_bind_sock(tcp_addr_data->socket, tcp_addr_data->port) < 0)
     {
 	tmp_errno = errno;
-	gossip_lerr("Error: BMI_sockio_bind_sock: %s\n", strerror(tmp_errno));
+	gossip_err("Error: BMI_sockio_bind_sock: %s\n", strerror(tmp_errno));
 	return (-tmp_errno);
     }
 
@@ -1444,7 +1444,7 @@ static int tcp_server_init(void)
     if (listen(tcp_addr_data->socket, TCP_BACKLOG) != 0)
     {
 	tmp_errno = errno;
-	gossip_lerr("Error: listen: %s\n", strerror(tmp_errno));
+	gossip_err("Error: listen: %s\n", strerror(tmp_errno));
 	return (-tmp_errno);
     }
 
