@@ -143,13 +143,13 @@ int main(int argc, char **argv)
 	/* see if the first two i/o requests are ready */
 	/* test out of order, to make sure that works */
 	ret = PINT_req_sched_test(io_id_array[1], &count, NULL, &status); 
-	if(ret != 0 || count != 1 || status != 0)
+	if(ret != 1 || count != 1 || status != 0)
 	{
 		fprintf(stderr, "Error: test of 2nd io request failed.\n");
 		return(-1);
 	}
 	ret = PINT_req_sched_test(io_id_array[0], &count, NULL, &status); 
-	if(ret != 0 || count != 1 || status != 0)
+	if(ret != 1 || count != 1 || status != 0)
 	{
 		fprintf(stderr, "Error: test of 2nd io request failed.\n");
 		return(-1);
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
 
 	/* now the 4th request should be ready to go */
 	ret = PINT_req_sched_test(id_array[3], &count, NULL, &status); 
-	if(ret != 0 || count != 1 || status != 0)
+	if(ret != 1 || count != 1 || status != 0)
 	{
 		fprintf(stderr, "Error: test of 4th request failed.\n");
 		return(-1);
