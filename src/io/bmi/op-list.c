@@ -47,6 +47,7 @@ void op_list_dump(op_list_p olp)
 {
 	op_list_p tmp_entry = NULL;
 
+	gossip_err("op_list_dump():\n");
 	qlist_for_each(tmp_entry, olp)
 	{
 		gossip_print_op(qlist_entry(tmp_entry, struct method_op, op_list_entry));
@@ -304,22 +305,20 @@ static int op_list_cmp_key(struct op_list_search_key* my_key, method_op_p my_op)
 static void gossip_print_op(method_op_p print_op)
 {
 
-	gossip_debug(BMI_DEBUG_OP_LIST, "Operation:\n------------\n");
-	gossip_debug(BMI_DEBUG_OP_LIST, "op_id: %ld\n", (long)print_op->op_id);
-	gossip_debug(BMI_DEBUG_OP_LIST, "send_recv: %d\n", (int)print_op->send_recv);
-	gossip_debug(BMI_DEBUG_OP_LIST, "msg_tag: %d\n", (int)print_op->msg_tag);
-	gossip_debug(BMI_DEBUG_OP_LIST, "error_code: %d\n", (int)print_op->error_code);
-	gossip_debug(BMI_DEBUG_OP_LIST, "amt_complete: %ld\n", (long)print_op->amt_complete);
-	gossip_debug(BMI_DEBUG_OP_LIST, "buffer: %p\n", print_op->buffer);
-	gossip_debug(BMI_DEBUG_OP_LIST, "actual size: %ld\n",
+	gossip_err("Operation:\n------------\n");
+	gossip_err("  op_id: %ld\n", (long)print_op->op_id);
+	gossip_err("  send_recv: %d\n", (int)print_op->send_recv);
+	gossip_err("  msg_tag: %d\n", (int)print_op->msg_tag);
+	gossip_err("  error_code: %d\n", (int)print_op->error_code);
+	gossip_err("  amt_complete: %ld\n", (long)print_op->amt_complete);
+	gossip_err("  buffer: %p\n", print_op->buffer);
+	gossip_err("  actual size: %ld\n",
 		(long)print_op->actual_size);
-	gossip_debug(BMI_DEBUG_OP_LIST, "expected size: %ld\n",
+	gossip_err("  expected size: %ld\n",
 		(long)print_op->expected_size);
-	gossip_debug(BMI_DEBUG_OP_LIST, "addr: %p\n", print_op->addr);
-	gossip_debug(BMI_DEBUG_OP_LIST, "mode: %d\n", (int)print_op->mode);
-	gossip_debug(BMI_DEBUG_OP_LIST, "\n");
+	gossip_err("  addr: %p\n", print_op->addr);
+	gossip_err("  mode: %d\n", (int)print_op->mode);
 
 	return;
-
 }
 
