@@ -28,7 +28,6 @@ int do_encode_req(
     bmi_size_t size = 0, name_sz = 0;
     PINT_Request *encode_file_req = NULL;
     PVFS_Dist *encode_io_dist = NULL;
-    int commit_index = 0;
     int ret = -1;
 
     /* all the messages that we build in this function are one contig. block */
@@ -379,9 +378,7 @@ int do_encode_req(
 	    (PVFS_Dist *) ((char *) (encode_file_req) +
 			   PINT_REQUEST_PACK_SIZE(request->u.io.file_req));
 	/* pack the I/O description */
-	commit_index = 0;
-	ret = PINT_Request_commit(encode_file_req, request->u.io.file_req,
-				  &commit_index);
+	ret = PINT_Request_commit(encode_file_req, request->u.io.file_req);
 	if (ret < 0)
 	{
 	    BMI_memfree(target_msg->dest, enc_msg, size, BMI_SEND);
