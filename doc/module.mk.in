@@ -1,5 +1,6 @@
 DIR := doc
 DOCSRC +=\
 	$(DIR)/pvfs2-quickstart.tex \
+	$(DIR)/pvfs2-guide.tex \
 	$(DIR)/pvfs2-status.tex
 

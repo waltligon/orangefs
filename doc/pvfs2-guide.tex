@@ -1,0 +1,56 @@
+\documentclass[11pt]{article}
+\usepackage[dvips]{graphicx}
+\usepackage{times}
+
+%
+% GET THE MARGINS RIGHT, THE UGLY WAY
+%
+\topmargin 0.2in
+\textwidth 6.5in
+\textheight 8.75in
+\columnsep 0.25in
+\oddsidemargin 0.0in
+\evensidemargin 0.0in
+\headsep 0.0in
+\headheight 0.0in
+
+
+% \addtolength{\hoffset}{-2cm}
+% \addtolength{\textwidth}{4cm}
+%
+% \addtolength{\voffset}{-1.5cm}
+% \addtolength{\textheight}{3cm}
+%
+
+\title{Parallel Virtual File System, Version 2}
+\author{PVFS2 Development Team}
+\date{September, 2003}
+
+\pagestyle{plain}
+\begin{document}
+
+\maketitle
+
+\newpage
+
+\setcounter{tocdepth}{2}
+\tableofcontents
+
+%
+% These two give us paragraphs with space between, which personally I
+% think is the right way to have things.
+%
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{11pt}
+
+\newpage
+\input{intro.tex}
+
+\newpage
+\input{basics.tex}
+
+\newpage
+\input{code-tree.tex}
+
+\end{document}
+

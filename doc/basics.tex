@@ -1,0 +1,208 @@
+\section{The basics of PVFS2}
+
+PVFS2 is a parallel file system.  This means that it is designed for parallel
+applications sharing data across many clients in a coordinated manner.  To do
+this with high performance, many servers are used to provide multiple paths to
+data.  Parallel file systems are a subset of distributed file systems, which
+are more generally file systems that provide shared access to distributed
+data, but don't necessarily have this focus on performance or parallel access.
+
+There are lots of things that PVFS2 is \emph{not} designed for.  In some cases
+it will coincidentally perform well for some arbitrary task that we weren't
+targeting.  In other cases it will perform very poorly.  If faced with the
+option of making the system better for some other task (e.g. executing off
+the file system, shared mmapping of files, storing mail in mbox format) at the
+expense of parallel I/O performance, we will always ruthlessly ignore
+performance for these other tasks.
+
+PVFS2 uses an \emph{intelligent server} architecture.  By this we mean that
+servers do more than simply provide clients with blocks of data from disks,
+instead talking in higher-level abstractions such as files and directories.
+An alternative architecture is \emph{shared storage}, where storage devices
+(usually accessed at a block granularity) are directly addressed by clients.
+The intelligent server approach allows for clever algorithms that could not be
+applied were block-level accesses the only mechanism clients had to interact
+with the system because more appropriate remote operations can be provided
+that serve as building blocks for these algorithms.
+
+In this section we discuss the components of the system, how clients and
+servers interact with each other, consistency semantics, and how the file
+system state is kept consistent without the use of locks.  In many cases we
+will compare the new system with the original PVFS, for those who are may
+already be familiar with that architecture.
+
+\subsection{Servers}
+
+In PVFS1 there were two types of server processes, \emph{mgrs} that served
+metadata and \emph{iods} that served data.  For any given PVFS1 file system
+there was exactly one active mgr serving metadata and potentially many
+\emph{iods} serving data for that file system.  Since mgrs and iods are just
+UNIX processes, some users found it convenient to run both a mgr and an iod on
+the same node to conserve hardware resources.
+
+In PVFS2 there is exactly one type of server process, the \emph{pvfs2-server}.
+This is also a UNIX process, so one could run more than one of these on the
+same node if desired (although we will not discuss this here).  A
+configuration file tells each pvfs2-server what its role will be as part of
+the parallel file system.  There are two possible roles, metadata server and
+data server, and any given pvfs2-server can fill one or both of these roles.
+
+PVFS2 servers store data for the parallel file system locally.  The current
+implementation of this storage relies on UNIX files to hold file data and a
+Berkeley DB database to hold things like metadata.  The specifics of this
+storage are hidden under an API that we call Trove.
+
+\subsection{Networks}
+
+PVFS2 has the capability to support an arbitrary number of different network
+types through an abstraction known as the Buffered Messaging Interface (BMI).
+At this time BMI implementations exist for TCP/IP, InfiniBand, and Myricom's
+GM.
+
+\subsection{Interfaces}
+
+At this time there are exactly two low-level I/O interfaces that clients
+commonly use to access parallel file systems.  The first of these is the UNIX
+API as presented by the client operating system.  The second is the MPI-IO
+interface.
+
+In PVFS1 we provide access through the operating system by providing a
+loadable module that exports VFS operations out into user space, where a
+client-side UNIX process, the \emph{pvfsd}, handles interactions with servers.
+A more efficient in-kernel version called \emph{kpvfsd} was later provided as
+well.
+
+PVFS2 uses a similar approach to the original PVFS1 approach for access
+through the OS.  A loadable kernel module exports functions out to user-space
+where a UNIX process, the \emph{pvfs2-client}, handles interactions with
+servers.  We have returned to this model (from the in-kernel kpvfsd model)
+because it is not clear that we will have ready access to all networking APIs
+from within the kernel.
+
+The second API is the MPI-IO interface.  We leverage the ROMIO MPI-IO
+implementation for PVFS2 MPI-IO support, just as we did for PVFS1.  ROMIO
+links directly to a low-level PVFS2 API for access, so it avoids moving data
+through the OS and does not communicate with pvfs2-client.
+
+\subsection{Client-server interactions}
+
+At start-up clients contact any one of the pvfs2-servers and obtain
+configuration information about the file system.  Once this data has been
+obtained, the client is ready to operate on PVFS2 files.
+
+The process of initiating access to a file on PVFS2 is similar to the process
+that occurs for NFS; the file name is resolved into an opaque reference, or
+\emph{handle}, through a lookup operation.  Given a handle to some file, any
+client can attempt to then access any region of that file (permission checks
+could fail).  If a handle becomes invalid, the server will reply at the time
+of attempted access that the handle is no longer valid.
+
+Handles are nothing particularly special.  We can look up a handle on one
+process, pass it to another via an MPI message, and use it at the new process
+to reference the same file.  This gives us the ability to make the
+\texttt{MPI\_File\_open} call happen with a single lookup the the file system
+and a broadcast.
+
+There's no state held on the servers about ``open'' files.  There's not even a
+concept of an open file in PVFS2.  So this lookup is all that happens at open
+time.  This has a number of other benefits.  For one thing, there's no shared
+state to be lost if a client or server disappears.  Also, there's nothing to
+do when a file is ``closed'' either, except perhaps ask the servers to push
+data to disk.  In an MPI program this can be done by a single process as well.
+
+Of course if you are accessing PVFS2 through the OS, \texttt{open} and
+\texttt{close} still exist and work the way you would expect, as does
+\texttt{lseek}, although obviously PVFS2 servers don't keep up with file
+positions either.  All this information is kept locally by the client.
+
+There are a few disadvantages to this.  One that we will undoubtedly hear
+about more than once is that the UNIX behavior of unlinked open files.
+Usually with local file systems if the file was previously opened, then it can
+still be accessed.  Certain programs rely on this behavior for correct
+operation.  In PVFS2 we don't know if someone has the file open, so if a file
+is unlinked, it is gone gone gone.  Perhaps we will come up with a clever way
+to support this or adapt the NFS approach (renaming the file to an odd name),
+but this is a very low priority.
+
+\subsection{Consistency from the client point of view}
+
+We've discussed in a number of venues the opportunities that are made
+available when true POSIX semantics are given up.  Truthfully very few file
+systems actually support POSIX; ext3 file systems don't enforce atomic writes
+across block boundaries without special flags, and NFS file systems don't even
+come close.  Never the less, many people claim POSIX semantics, and many
+groups ask for them without knowing the costs associated.
+
+PVFS2 does not provide POSIX semantics.
+
+PVFS2 does provide guarantees of atomicity of writes to nonoverlapping
+regions, even noncontiguous nonoverlapping regions.  This is to say that if
+your parallel application doesn't write to the same bytes, then you will get
+what you expect on subsequent reads.
+
+This is enough to provide all the non-atomic mode semantics for MPI-IO.  The
+atomic mode of MPI-IO will need support at a higher level.  This will probably
+be done with enhancements to ROMIO rather than forcing more complicated
+infrastructure into the file system.  There are good reasons to do this at the
+MPI-IO layer rather than in the file system, but that is outside the context
+of this document.
+
+Caching of the directory hierarchy is permitted in PVFS2 for a configurable
+duration.  This allows for some optimizations at the cost of windows of time
+during which the file system view might look different from one node than from
+another.  The cache time value may be set to zero to avoid this behavior;
+however, we believe that users will not find this necessary.
+
+\subsection{File system consistency}
+
+One of the more complicated issues in building a distributed file system of
+any kind is maintaining consistent file system state in the presence of
+concurrent operations, especially ones that modify the directory hierarchy.
+
+Traditionally distributed file systems provide a locking infrastructure that
+is used to guarantee that clients can perform certain operations atomically,
+such as creating or removing files.  Unfortunately these locking systems tend
+to add additional latency to the system and are often \emph{extremely}
+complicated due to optimizations and the need to cleanly handle faults.
+
+We have seen no evidence either from the parallel I/O community or the
+distributed shared memory community that these locking systems will work well
+at the scales of clusters that we are seeing deployed now, and we are not in
+the business of pushing the envelope on locking algorithms and
+implementations, so we're not using a locking subsystem.
+
+Instead we force all operations that modify the file system hierarchy to be
+performed in a manner that results in an atomic change to the file system
+view.  Clients perform sequences of steps (called \emph{server requests}) that
+result in what we tend to think of as atomic operations at the file system
+level.  An example might help clarify this.  Here are the steps necessary to
+create a new file in PVFS2:
+\begin{itemize}
+\item create a directory entry for the new file
+\item create a metadata object for the new file
+\item point the directory entry to the metadata object
+\item create a set of data objects to hold data for the new file
+\item point the metadata at the data objects
+\end{itemize}
+Performing those steps in that particular order results in file system states
+where a directory entry exists for a file that is not really ready to be
+accessed.  If we carefully order the operations:
+\begin{enumerate}
+\item create the data objects to hold data for the new file
+\item create a metadata object for the new file
+\item point the metadata at the data objects
+\item create a directory entry for the new file pointing to the metadata
+      object
+\end{enumerate}
+we create a sequence of states that always leave the file system
+directory hierarchy in a consistent state.  The file is either there (and
+ready to be accessed) or it isn't.  All PVFS2 operations are performed in this
+manner.
+
+This approach brings with it a certain degree of complexity of its own; if
+that process were to fail somewhere in the middle, or if the directory entry
+turned out to already exist when we got to the final step, there would be a
+great deal of cleanup that must occur.  This is a problem that can be
+surmounted, however, and because none of those objects are referenced by
+anyone else we can clean them up without concern for what other processes
+might be up to -- they never made it into the directory hierarchy.
