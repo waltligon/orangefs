@@ -106,7 +106,7 @@ do {                                                        \
 
 int main(int argc, char **argv)
 {
-    int ret = -1, i = 0, j = 0;
+    int ret = -1, i = 0;
     char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
     PVFS_fs_id fs_id_array[MAX_NUM_PATHS] = {0};
     const PVFS_util_tab* tab;
@@ -152,19 +152,19 @@ int main(int argc, char **argv)
 	user_opts->num_starts = 1;
     }
 
-    for(j = 0; j < user_opts->num_starts; j++)
+    for(i = 0; i < user_opts->num_starts; i++)
     {
-	ret = PVFS_util_resolve(user_opts->start[j],
-	    &fs_id_array[j], pvfs_path[j], PVFS_NAME_MAX);
-	if(ret == 0 && pvfs_path[j][0] == '\0')
+	ret = PVFS_util_resolve(user_opts->start[i],
+	    &fs_id_array[i], pvfs_path[i], PVFS_NAME_MAX);
+	if(ret == 0 && pvfs_path[i][0] == '\0')
 	{
-	    strcpy(pvfs_path[j], "/");
+	    strcpy(pvfs_path[i], "/");
 	}
 
 	if(ret < 0)
 	{
 	    fprintf(stderr, "Error: could not find file system for %s in "
-	    "pvfstab\n", user_opts->start[j]);
+	    "pvfstab\n", user_opts->start[i]);
 	    return(-1);
 	}
     }
