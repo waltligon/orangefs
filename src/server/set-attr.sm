@@ -55,9 +55,9 @@ machine pvfs2_set_attr_sm(
     {
         run setattr_verify_attribs;
         STATE_METAFILE => write_metafile_datafile_handles_if_required;
-        STATE_SYMLINK  => write_symlink_target_if_required;
-        success        => setobj_attrib;
-        default        => final_response;
+        STATE_SYMLINK => write_symlink_target_if_required;
+        success => setobj_attrib;
+        default => final_response;
     }
 
     state write_metafile_datafile_handles_if_required
@@ -102,9 +102,10 @@ machine pvfs2_set_attr_sm(
 
 %%
 
-static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
+static int setattr_verify_attribs(
+    PINT_server_op *s_op, job_status_s* js_p)
 {
-    PVFS_object_attr *a_p, *req_a_p;
+    PVFS_object_attr *a_p = NULL, *req_a_p = NULL;
 
     PINT_STATE_DEBUG("verify_attribs");
 
@@ -330,14 +331,13 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     ret = job_trove_dspace_setattr(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
-        ds_attr, PINT_config_get_trove_sync_mode(
+        ds_attr, PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.setattr.fs_id),
         s_op, 0 /* status tag */, js_p, &j_id,
         server_job_context);
 
     return ret;
 }
-
 
 static int setattr_write_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p)
@@ -395,7 +395,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
-        PINT_config_get_trove_sync_mode(
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
@@ -452,7 +452,7 @@ static int setattr_write_metafile_distribution_if_required(
         s_op->req->u.setattr.handle,
         &(s_op->key),
         &(s_op->val),
-        PINT_config_get_trove_sync_mode(
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL,
         s_op,
@@ -511,7 +511,7 @@ static int setattr_write_symlink_target_if_required(
         s_op->req->u.setattr.handle,
         &(s_op->key),
         &(s_op->val),
-        PINT_config_get_trove_sync_mode(
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL,
         s_op,

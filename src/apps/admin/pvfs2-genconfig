@@ -220,9 +220,11 @@ sub emit_filesystem
     print $target "\t<StorageHints>\n";
     print $target "\t\tHandleRecycleTimeoutSecs $handle_recycle_timeout_seconds\n";
     if ($opt_trovesync == 1) {
-	    print $target "\t\tTroveSyncMode sync\n";
+	    print $target "\t\tTroveSyncMeta yes\n";
+	    print $target "\t\tTroveSyncData yes\n";
     } else {
-	    print $target "\t\tTroveSyncMode nosync\n";
+	    print $target "\t\tTroveSyncMeta no\n";
+	    print $target "\t\tTroveSyncData no\n";
     }
 
     print $target "\t\tAttrCacheKeywords datafile_handles,metafile_dist\n";

@@ -128,19 +128,13 @@ static void aio_progress_notification(sigval_t sig)
         gossip_debug(GOSSIP_TROVE_DEBUG, " aio_progress_notification: "
                      "op completed\n");
 
-        if (op_p->flags & TROVE_SYNC)
-        {
-            if ((ret = DBPF_SYNC(op_p->u.b_rw_list.fd)) != 0)
-            {
-                error_code = -trove_errno_to_trove_error(ret);
-            }
-        }
+        DBPF_AIO_SYNC_IF_NECESSARY(
+            op_p, op_p->u.b_rw_list.fd, ret, error_code);
 
         /* this is a macro defined in dbpf-thread.h */
         move_op_to_completion_queue(
             cur_op, error_code,
             ((error_code == ECANCELED) ? OP_CANCELED : OP_COMPLETED));
-        return;
     }
     else
     {
@@ -288,13 +282,7 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
     
-    if (op_p->flags & TROVE_SYNC)
-    {
-	if ((ret = DBPF_SYNC(tmp_ref.fd)) != 0)
-        {
-	    goto return_error;
-	}
-    }
+    DBPF_ERROR_SYNC_IF_NECESSARY(op_p, tmp_ref.fd);
 
     dbpf_open_cache_put(&tmp_ref);
 
@@ -385,13 +373,8 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-    if (op_p->flags & TROVE_SYNC)
-    {
-	if ((ret = DBPF_SYNC(tmp_ref.fd)) != 0)
-        {
-	    goto return_error;
-	}
-    }
+    DBPF_ERROR_SYNC_IF_NECESSARY(op_p, tmp_ref.fd);
+
     dbpf_open_cache_put(&tmp_ref);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "wrote %d bytes.\n", ret);
@@ -988,6 +971,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         ret = 1;
 
       final_aio_cleanup:
+
 	return ret;
     }
     else

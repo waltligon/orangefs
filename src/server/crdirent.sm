@@ -326,7 +326,7 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
         &extent_array,
         PVFS_TYPE_DIRDATA,
         NULL,
-        PINT_config_get_trove_sync_mode(
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->u.crdirent.fs_id),
         s_op,
         0,
@@ -391,7 +391,7 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
         s_op->u.crdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        PINT_config_get_trove_sync_mode(
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->u.crdirent.fs_id),
         NULL,
         s_op,
@@ -455,7 +455,7 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
         s_op->u.crdirent.dirent_handle,
         &s_op->key,
         &s_op->val,
-        PINT_config_get_trove_sync_mode(
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->u.crdirent.fs_id),
         NULL,
         s_op,

@@ -74,6 +74,12 @@ enum flow_state
     FLOW_COMPLETE = 4,
 };
 
+/* supported setinfo types */
+enum flow_setinfo_option
+{
+    FLOWPROTO_DATA_SYNC_MODE = 1
+};
+
 /* supported getinfo types */
 enum flow_getinfo_option
 {
@@ -140,29 +146,35 @@ typedef struct flow_descriptor flow_descriptor;
  * flow interface functions
  */
 
-
-int PINT_flow_initialize(const char *flowproto_list,
-			 int flags);
+int PINT_flow_initialize(
+    const char *flowproto_list,
+    int flags);
 
 int PINT_flow_finalize(void);
 
 flow_descriptor *PINT_flow_alloc(void);
 
-void PINT_flow_reset(flow_descriptor * flow_d);
+void PINT_flow_reset(
+    flow_descriptor *flow_d);
 
-void PINT_flow_free(flow_descriptor * flow_d);
+void PINT_flow_free(
+    flow_descriptor *flow_d);
 
-int PINT_flow_post(flow_descriptor * flow_d);
+int PINT_flow_post(
+    flow_descriptor *flow_d);
 
-int PINT_flow_cancel(flow_descriptor * flow_d);
+int PINT_flow_cancel(
+    flow_descriptor *flow_d);
 
-int PINT_flow_setinfo(flow_descriptor * flow_d,
-		      int option,
-		      void *parameter);
+int PINT_flow_setinfo(
+    flow_descriptor *flow_d,
+    int option,
+    void *parameter);
 
-int PINT_flow_getinfo(flow_descriptor * flow_d,
-		      enum flow_getinfo_option opt,
-		      void *parameter);
+int PINT_flow_getinfo(
+    flow_descriptor *flow_d,
+    enum flow_getinfo_option opt,
+    void *parameter);
 
 #endif /* __FLOW_H */
 

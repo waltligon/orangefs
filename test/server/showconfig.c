@@ -115,9 +115,12 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
                 Lu(fs->root_handle));
         fprintf(stderr,"Handle Recycle Timeout: %d seconds\n",
                 (int)fs->handle_recycle_timeout_sec.tv_sec);
-        fprintf(stderr,"Trove Sync Mode       : %s\n",
-                ((fs->trove_sync_mode == TROVE_SYNC) ?
-                 "sync" : "nosync"));
+        fprintf(stderr,"Trove Sync Meta       : %s\n",
+                ((fs->trove_sync_meta == TROVE_SYNC) ?
+                 "yes" : "no"));
+        fprintf(stderr,"Trove Sync Data       : %s\n",
+                ((fs->trove_sync_data == TROVE_SYNC) ?
+                 "yes" : "no"));
         fprintf(stderr,"Flow Protocol         : ");
         switch(fs->flowproto)
         {

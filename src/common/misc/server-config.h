@@ -75,7 +75,8 @@ typedef struct filesystem_configuration_s
     char *attr_cache_keywords;
     int attr_cache_size;
     int attr_cache_max_num_elems;
-    int trove_sync_mode;
+    int trove_sync_meta;
+    int trove_sync_data;
 
 } filesystem_configuration_s;
 
@@ -162,9 +163,14 @@ int PINT_config_trim_filesystems_except(
     PVFS_fs_id fs_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-int PINT_config_pvfs2_mkspace(struct server_configuration_s *config);
-int PINT_config_pvfs2_rmspace(struct server_configuration_s *config);
-int PINT_config_get_trove_sync_mode(
+int PINT_config_pvfs2_mkspace(
+    struct server_configuration_s *config);
+int PINT_config_pvfs2_rmspace(
+    struct server_configuration_s *config);
+int PINT_config_get_trove_sync_meta(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id);
+int PINT_config_get_trove_sync_data(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
 #endif

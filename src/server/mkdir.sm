@@ -12,60 +12,65 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 
-static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p);
-static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p);
-static int mkdir_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int mkdir_error(PINT_server_op *s_op, job_status_s* js_p);
+static int mkdir_create(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int mkdir_setattrib(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int mkdir_cleanup(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int mkdir_error(
+    PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-machine pvfs2_mkdir_sm(prelude,
-		       create,
-		       set_attrib,
-		       final_response,
-		       err_msg,
-		       cleanup)
+machine pvfs2_mkdir_sm(
+    prelude,
+    create,
+    set_attrib,
+    final_response,
+    err_msg,
+    cleanup)
 {
-	state prelude
-	{
-		jump pvfs2_prelude_sm;
-		success => create;
-		default => final_response;
-	}
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => create;
+        default => final_response;
+    }
 
-	state create
-	{
-		run mkdir_create;
-		success => set_attrib;
-		default => err_msg;
-	}
+    state create
+    {
+        run mkdir_create;
+        success => set_attrib;
+        default => err_msg;
+    }
 
-	state set_attrib
-	{
-		run mkdir_setattrib;
-		success => final_response;
-		default => err_msg;
-	}
-	
-	state final_response
-	{
-		jump pvfs2_final_response_sm;
-		default => cleanup;
-	}
+    state set_attrib
+    {
+        run mkdir_setattrib;
+        success => final_response;
+        default => err_msg;
+    }
 
-	state err_msg 
-	{
-	    run mkdir_error;
-	    default => final_response;
-	}
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
 
-	state cleanup
-	{
-		run mkdir_cleanup;
-		default => terminate;
-	}
+    state err_msg 
+    {
+        run mkdir_error;
+        default => final_response;
+    }
+
+    state cleanup
+    {
+        run mkdir_cleanup;
+        default => terminate;
+    }
 }
 
 %%
@@ -103,7 +108,7 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p)
         &s_op->req->u.mkdir.handle_extent_array,
         PVFS_TYPE_DIRECTORY,
         NULL,
-        PINT_config_get_trove_sync_mode(
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.mkdir.fs_id),
         s_op,
         0,
@@ -150,7 +155,7 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
 
     ret = job_trove_dspace_setattr(
         s_op->req->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
-        ds_attr, PINT_config_get_trove_sync_mode(
+        ds_attr, PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.mkdir.fs_id),
         s_op, 0, js_p, &j_id, server_job_context);
 

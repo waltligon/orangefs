@@ -12,22 +12,30 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 
-static int create_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int create_create(PINT_server_op *s_op, job_status_s* js_p);
-static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p);
+static int create_cleanup(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int create_create(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int create_setup_resp(
+    PINT_server_op *s_op, job_status_s* js_p);
 
 %%
 
-machine pvfs2_create_sm(prelude, create2, setup_resp, final_response, cleanup)
+machine pvfs2_create_sm(
+    prelude,
+    create,
+    setup_resp,
+    final_response,
+    cleanup)
 {
     state prelude
     {
         jump pvfs2_prelude_sm;
-        success => create2;
+        success => create;
         default => final_response;
     }
 
-    state create2
+    state create
     {
         run create_create;
         default => setup_resp;
@@ -82,7 +90,7 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
         &s_op->req->u.create.handle_extent_array,
         s_op->req->u.create.object_type,
         NULL,
-        PINT_config_get_trove_sync_mode(
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.create.fs_id),
         s_op,
         0,

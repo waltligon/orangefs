@@ -235,7 +235,7 @@ static int chdirent_change_directory_entry(PINT_server_op *s_op,
         s_op->u.chdirent.dirdata_handle,
         &s_op->key,
         &s_op->val,
-        PINT_config_get_trove_sync_mode(
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.crdirent.fs_id),
         NULL,
         s_op,

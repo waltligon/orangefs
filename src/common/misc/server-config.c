@@ -52,7 +52,8 @@ static DOTCONF_CB(get_handle_recycle_timeout_seconds);
 static DOTCONF_CB(get_attr_cache_keywords_list);
 static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
-static DOTCONF_CB(get_trove_sync_mode);
+static DOTCONF_CB(get_trove_sync_meta);
+static DOTCONF_CB(get_trove_sync_data);
 
 /* internal helper functions */
 static int is_valid_alias(char *str);
@@ -91,7 +92,6 @@ static int build_extent_array(
 static int is_root_handle_in_my_range(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
-static int trove_sync_mode_to_enum(char *sync_mode);
 #endif
 
 static struct server_configuration_s *config_s = NULL;
@@ -128,7 +128,8 @@ static const configoption_t options[] =
     {"AttrCacheKeywords",ARG_LIST, get_attr_cache_keywords_list,NULL,CTX_ALL},
     {"AttrCacheSize",ARG_INT, get_attr_cache_size, NULL,CTX_ALL},
     {"AttrCacheMaxNumElems",ARG_INT,get_attr_cache_max_num_elems,NULL,CTX_ALL},
-    {"TroveSyncMode",ARG_STR, get_trove_sync_mode, NULL, CTX_ALL},
+    {"TroveSyncMeta",ARG_STR, get_trove_sync_meta, NULL, CTX_ALL},
+    {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, CTX_ALL},
     LAST_OPTION
 };
 
@@ -346,7 +347,8 @@ DOTCONF_CB(enter_filesystem_context)
     /* fill any fs defaults here */
     fs_conf->flowproto = FLOWPROTO_DEFAULT;
     fs_conf->encoding = ENCODING_DEFAULT;
-    fs_conf->trove_sync_mode = TROVE_SYNC;
+    fs_conf->trove_sync_meta = TROVE_SYNC;
+    fs_conf->trove_sync_data = TROVE_SYNC;
 
     if (!config_s->file_systems)
     {
@@ -731,13 +733,13 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
     return NULL;
 }
 
-DOTCONF_CB(get_trove_sync_mode)
+DOTCONF_CB(get_trove_sync_meta)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
 
     if (config_s->configuration_context != STORAGEHINTS_CONFIG)
     {
-        gossip_err("TroveSyncMode Tag can only be in a "
+        gossip_err("TroveSyncMeta Tag can only be in a "
                    "StorageHints block");
         return NULL;
     }
@@ -746,21 +748,41 @@ DOTCONF_CB(get_trove_sync_mode)
         PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
-#ifdef __PVFS2_TROVE_SUPPORT__
 #ifndef HAVE_DB_DIRTY_READ
-    fs_conf->trove_sync_mode = trove_sync_mode_to_enum(cmd->data.str);
-    if (fs_conf->trove_sync_mode != TROVE_SYNC)
+    fs_conf->trove_sync_meta = ((strcasecmp(cmd->data.str, "yes") == 0) ?
+                                TROVE_SYNC : 0);
+    if (fs_conf->trove_sync_meta != TROVE_SYNC)
     {
-        gossip_err("Forcing TroveSyncMode to be sync instead of %s\n",
+        gossip_err("Forcing TroveSyncMeta to be yes instead of %s\n",
                    cmd->data.str);
         gossip_err("Non-sync mode is NOT supported without "
                    "DB_DIRTY_READ support\n");
-        fs_conf->trove_sync_mode = TROVE_SYNC;
+        fs_conf->trove_sync_meta = TROVE_SYNC;
     }
 #else
-    fs_conf->trove_sync_mode = trove_sync_mode_to_enum(cmd->data.str);
+    fs_conf->trove_sync_meta = ((strcasecmp(cmd->data.str, "yes") == 0) ?
+                                TROVE_SYNC : 0);
 #endif
-#endif
+    return NULL;
+}
+
+DOTCONF_CB(get_trove_sync_data)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
+    {
+        gossip_err("TroveSyncData Tag can only be in a "
+                   "StorageHints block");
+        return NULL;
+    }
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    fs_conf->trove_sync_data = ((strcasecmp(cmd->data.str, "yes") == 0) ?
+                                TROVE_SYNC : 0);
     return NULL;
 }
 
@@ -1363,7 +1385,8 @@ static void copy_filesystem(
         dest_fs->attr_cache_size = src_fs->attr_cache_size;
         dest_fs->attr_cache_max_num_elems =
             src_fs->attr_cache_max_num_elems;
-        dest_fs->trove_sync_mode = src_fs->trove_sync_mode;
+        dest_fs->trove_sync_meta = src_fs->trove_sync_meta;
+        dest_fs->trove_sync_data = src_fs->trove_sync_data;
     }
 }
 
@@ -2346,33 +2369,10 @@ int PINT_config_pvfs2_rmspace(
 }
 
 /*
-  given a string, return a trove operation flag.
-
-  valid mappings and return values:
-  sync = 1 (TROVE_SYNC)
-  nosync = 0
-
-  returns TROVE_SYNC if input string is unrecognized.
+  returns the metadata sync mode (storage hint) for the specified
+  fs_id if valid; TROVE_SYNC otherwise
 */
-static int trove_sync_mode_to_enum(char *sync_mode)
-{
-    int ret = TROVE_SYNC;
-
-    if (sync_mode)
-    {
-        if (strcasecmp(sync_mode, "nosync") == 0)
-        {
-            ret = 0;
-        }
-    }
-    return ret;
-}
-
-/*
-  returns the sync mode for the specified fs_id if valid; TROVE_SYNC
-  otherwise
-*/
-int PINT_config_get_trove_sync_mode(
+int PINT_config_get_trove_sync_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id)
 {
@@ -2382,7 +2382,24 @@ int PINT_config_get_trove_sync_mode(
     {
         fs_conf = PINT_config_find_fs_id(config_s, fs_id);
     }
-    return (fs_conf ? fs_conf->trove_sync_mode : TROVE_SYNC);
+    return (fs_conf ? fs_conf->trove_sync_meta : TROVE_SYNC);
+}
+
+/*
+  returns the data sync mode (storage hint) for the specified
+  fs_id if valid; TROVE_SYNC otherwise
+*/
+int PINT_config_get_trove_sync_data(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config)
+    {
+        fs_conf = PINT_config_find_fs_id(config_s, fs_id);
+    }
+    return (fs_conf ? fs_conf->trove_sync_data : TROVE_SYNC);
 }
 
 #endif

@@ -576,6 +576,7 @@ static int server_initialize_subsystems(
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
     TROVE_context_id trove_context = -1;
+    char buf[16] = {0};
 
     /* Initialize distributions */
     ret = PINT_dist_initialize();
@@ -641,6 +642,17 @@ static int server_initialize_subsystems(
         return(ret);
     }
 
+    /* initialize the flow interface */
+    ret = PINT_flow_initialize(server_config.flow_modules, 0);
+
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Error: PINT_flow_initialize", ret);
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_FLOW_INIT;
+
     cur = server_config.file_systems;
     while(cur)
     {
@@ -657,10 +669,9 @@ static int server_initialize_subsystems(
             return(ret);
         }
 
-        ret = trove_collection_lookup(cur_fs->file_system_name,
-                                      &(cur_fs->coll_id),
-                                      NULL,
-                                      NULL);
+        ret = trove_collection_lookup(
+            cur_fs->file_system_name, &(cur_fs->coll_id), NULL, NULL);
+
         if (ret < 0)
         {
             gossip_lerr("Error initializing filesystem %s\n",
@@ -778,10 +789,20 @@ static int server_initialize_subsystems(
                 GOSSIP_SERVER_DEBUG, "File system %s using handles: %s\n",
                 cur_fs->file_system_name, cur_merged_handle_range);
 
-            gossip_debug(GOSSIP_SERVER_DEBUG, "Sync mode for %s is %s\n",
-                         cur_fs->file_system_name,
-                         ((cur_fs->trove_sync_mode == TROVE_SYNC) ?
-                          "sync" : "nosync"));
+            gossip_debug(GOSSIP_SERVER_DEBUG, "Sync on metadata update "
+                         "for %s: %s\n", cur_fs->file_system_name,
+                         ((cur_fs->trove_sync_meta == TROVE_SYNC) ?
+                          "yes" : "no"));
+
+            gossip_debug(GOSSIP_SERVER_DEBUG, "Sync on I/O data update "
+                         "for %s: %s\n", cur_fs->file_system_name,
+                         ((cur_fs->trove_sync_data == TROVE_SYNC) ?
+                          "yes" : "no"));
+
+            /* format and pass sync mode to the flow implementation */
+            snprintf(buf, 16, "%d,%d", cur_fs->coll_id,
+                     cur_fs->trove_sync_data);
+            PINT_flow_setinfo(NULL, FLOWPROTO_DATA_SYNC_MODE, buf);
 
             trove_close_context(cur_fs->coll_id, trove_context);
             free(cur_merged_handle_range);
@@ -796,16 +817,6 @@ static int server_initialize_subsystems(
                  "Storage Init Complete (%s)\n", SERVER_STORAGE_MODE);
     gossip_debug(GOSSIP_SERVER_DEBUG, "%d filesystem(s) initialized\n",
                  PINT_llist_count(server_config.file_systems));
-
-    /* initialize the flow interface */
-    ret = PINT_flow_initialize(server_config.flow_modules, 0);
-    if (ret < 0)
-    {
-        PVFS_perror_gossip("Error: PINT_flow_initialize", ret);
-        return ret;
-    }
-
-    *server_status_flag |= SERVER_FLOW_INIT;
 
     ret = job_time_mgr_init();
     if(ret < 0)
@@ -1424,12 +1435,6 @@ int server_state_machine_complete(PINT_server_op *s_op)
     return 0;
 }
 
-/* NOTE: used externally */
-struct server_configuration_s *get_server_config_struct(void)
-{
-    return &server_config;
-}
-
 /* init_req_table()
  *
  * used to initialize static table of server request types
@@ -1554,6 +1559,11 @@ static void init_req_table(void)
         }
     }
     #undef OP_CASE
+}
+
+struct server_configuration_s *get_server_config_struct(void)
+{
+    return &server_config;
 }
 
 /*

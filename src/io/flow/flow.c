@@ -48,8 +48,9 @@ static void flow_release(flow_descriptor * flow_d);
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_initialize(const char *flowproto_list,
-			 int flags)
+int PINT_flow_initialize(
+    const char *flowproto_list,
+    int flags)
 {
     int ret = -1;
     int i = 0;
@@ -119,17 +120,15 @@ int PINT_flow_initialize(const char *flowproto_list,
     }
 
     /* create table to keep up with active flow protocols */
-    active_flowproto_table =
-	(struct flowproto_ops **) malloc(active_flowproto_count *
-					 sizeof(struct flowproto_ops *));
+    active_flowproto_table = (struct flowproto_ops **)
+        malloc((active_flowproto_count * sizeof(struct flowproto_ops *)));
     if (!active_flowproto_table)
     {
 	ret = -ENOMEM;
 	goto PINT_flow_initialize_failure;
     }
-    memset(active_flowproto_table, 0, active_flowproto_count * sizeof(struct
-								      flowproto_ops
-								      *));
+    memset(active_flowproto_table, 0,
+           (active_flowproto_count * sizeof(struct flowproto_ops *)));
 
     /* find the interface for each requested method and load it into the
      * active table.
@@ -430,28 +429,44 @@ int PINT_flow_cancel(flow_descriptor * flow_d)
     }
     else
     {
-	ret = -PVFS_ENOSYS;
+	ret = -ENOSYS;
     }
     
     gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
-
 /* PINT_flow_setinfo()
  * 
- * Used to pass along hints or configuration info to the flow interface
+ * Used to pass along hints or configuration info to the flow
+ * interface
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_setinfo(flow_descriptor * flow_d,
+int PINT_flow_setinfo(flow_descriptor *flow_d,
 		      int option,
 		      void *parameter)
 {
+    int ret = -ENOSYS, i = 0;
+
     gen_mutex_lock(&interface_mutex);
-    gossip_lerr("function not implemented.\n");
+    if (flow_d)
+    {
+        ret = active_flowproto_table[
+            flow_d->flowproto_id]->flowproto_setinfo(
+                flow_d, option, parameter);
+    }
+    else
+    {
+        for(i = 0; i < active_flowproto_count; i++)
+        {
+            ret = active_flowproto_table[i]->flowproto_setinfo(
+                flow_d, option, parameter);
+        }
+    }
     gen_mutex_unlock(&interface_mutex);
-    return (-ENOSYS);
+
+    return -ENOSYS;
 }
 
 
@@ -461,7 +476,7 @@ int PINT_flow_setinfo(flow_descriptor * flow_d,
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_getinfo(flow_descriptor * flow_d,
+int PINT_flow_getinfo(flow_descriptor *flow_d,
 		      enum flow_getinfo_option opt,
 		      void *parameter)
 {
@@ -496,15 +511,18 @@ int PINT_flow_getinfo(flow_descriptor * flow_d,
  *
  * no return value
  */
-static void flow_release(flow_descriptor * flow_d)
+static void flow_release(flow_descriptor *flow_d)
 {
     /* let go of the request processing states */
     if (flow_d->file_req_state)
+    {
 	PINT_Free_request_state(flow_d->file_req_state);
-    if (flow_d->mem_req_state)
-	PINT_Free_request_state(flow_d->mem_req_state);
+    }
 
-    return;
+    if (flow_d->mem_req_state)
+    {
+	PINT_Free_request_state(flow_d->mem_req_state);
+    }
 }
 
 /*

@@ -395,6 +395,40 @@ void dbpf_error_report(const char *errpfx, char *msg);
 #define DBPF_RESIZE ftruncate
 #define DBPF_FSTAT  fstat
 
+#define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret, error)\
+do {                                                           \
+    if (dbpf_op_ptr->flags & TROVE_SYNC)                       \
+    {                                                          \
+	if ((ret = DBPF_SYNC(fd)) != 0)                        \
+        {                                                      \
+            gossip_err("aio fd [%d] sync failed: %s\n",fd,     \
+                       db_strerror(ret));                      \
+	    error = -trove_errno_to_trove_error(ret);          \
+	}                                                      \
+        gossip_debug(                                          \
+          GOSSIP_TROVE_DEBUG,"aio fd [%d] sync called "        \
+          "servicing op type %s\n", fd,                        \
+          dbpf_op_type_to_str(dbpf_op_ptr->type));             \
+    }                                                          \
+} while(0)
+
+#define DBPF_ERROR_SYNC_IF_NECESSARY(dbpf_op_ptr, fd)\
+do {                                                 \
+    if (dbpf_op_ptr->flags & TROVE_SYNC)             \
+    {                                                \
+	if ((ret = DBPF_SYNC(fd)) != 0)              \
+        {                                            \
+            gossip_err("fd [%d] sync failed: %s\n",  \
+                       fd, db_strerror(ret));        \
+            goto return_error;                       \
+	}                                            \
+        gossip_debug(                                \
+          GOSSIP_TROVE_DEBUG,"fd [%d] sync called "  \
+          "servicing op type %s\n", fd,              \
+          dbpf_op_type_to_str(dbpf_op_ptr->type));   \
+    }                                                \
+} while(0)
+
 #define DBPF_DB_SYNC_IF_NECESSARY(dbpf_op_ptr, db_ptr) \
 do {                                                   \
     if (dbpf_op_ptr->flags & TROVE_SYNC)               \
