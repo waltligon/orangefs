@@ -268,15 +268,15 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
     s_op->val_a = (TROVE_keyval_s *) memory_buffer;
     memory_buffer += kv_array_size;
 
-    s_op->resp->u.readdir.dirent_array = (PVFS_dirent *) memory_buffer;
+    s_op->resp.u.readdir.dirent_array = (PVFS_dirent *) memory_buffer;
 
     /* fill in values into all keyval structures prior to iterate call */
     for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
     {
-	s_op->key_a[j].buffer    = s_op->resp->u.readdir.dirent_array[j].d_name;
+	s_op->key_a[j].buffer    = s_op->resp.u.readdir.dirent_array[j].d_name;
 	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
 
-	s_op->val_a[j].buffer    = &(s_op->resp->u.readdir.dirent_array[j].handle);
+	s_op->val_a[j].buffer    = &(s_op->resp.u.readdir.dirent_array[j].handle);
 	s_op->val_a[j].buffer_sz = sizeof(PVFS_handle);
     }
 
@@ -327,7 +327,7 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
 	gossip_debug(SERVER_DEBUG,
 		     "  handle didn't refer to a directory\n");
 
-	s_op->resp->status = -PVFS_EINVAL;
+	s_op->resp.status = -PVFS_EINVAL;
     }
     else if (js_p->error_code != 0) {
 	/* for now let's assume this is an "empty" directory */
@@ -336,15 +336,15 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
 		     "  error code = %d; assuming empty directory\n",
 		     js_p->error_code);
 
-	s_op->resp->status = 0;
-	s_op->resp->u.readdir.dirent_count = 0;
+	s_op->resp.status = 0;
+	s_op->resp.u.readdir.dirent_count = 0;
     }
     else {
-	s_op->resp->status = 0;
-	s_op->resp->u.readdir.dirent_count = js_p->count;
+	s_op->resp.status = 0;
+	s_op->resp.u.readdir.dirent_count = js_p->count;
     }
 
-    encode_ret = PINT_encode(s_op->resp,
+    encode_ret = PINT_encode(&s_op->resp,
 			     PINT_ENCODE_RESP,
 			     &(s_op->encoded),
 			     s_op->addr,
@@ -424,7 +424,6 @@ static int readdir_cleanup(PINT_server_op *s_op,
 
     /* free encoded, original responses */
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP);
-    free(s_op->resp);
 
     /* free dynamically allocated space */
     if (s_op->key_a) free(s_op->key_a);

@@ -98,7 +98,7 @@ static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p)
     }
 
     /* encode message */
-    ret = PINT_encode(s_op->resp,
+    ret = PINT_encode(&s_op->resp,
 	PINT_ENCODE_RESP,
 	&(s_op->encoded),
 	s_op->addr,

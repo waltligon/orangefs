@@ -158,11 +158,11 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
 	 * starting the I/O transfer, or else report an error if we
 	 * failed to get the size, or failed for permission reasons
 	 */
-	s_op->resp->status = js_p->error_code;
-	s_op->resp->u.io.bstream_size = js_p->ds_attr.b_size;
+	s_op->resp.status = js_p->error_code;
+	s_op->resp.u.io.bstream_size = js_p->ds_attr.b_size;
 
 	err = PINT_encode(
-		s_op->resp, 
+		&s_op->resp, 
 		PINT_ENCODE_RESP, 
 		&(s_op->encoded),
 		s_op->addr,
@@ -244,7 +244,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
 	 * that we sent in the previous state, other details come from
 	 * request
 	 */
-	s_op->u.io.flow_d->file_data->fsize = s_op->resp->u.io.bstream_size;
+	s_op->u.io.flow_d->file_data->fsize = s_op->resp.u.io.bstream_size;
 	s_op->u.io.flow_d->file_data->dist = s_op->req->u.io.io_dist;
 	s_op->u.io.flow_d->file_data->iod_num = s_op->req->u.io.iod_num;
 	s_op->u.io.flow_d->file_data->iod_count = s_op->req->u.io.iod_count;
@@ -369,12 +369,6 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 		PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 	}
 
-	/* let go of our non-encoded response buffer */
-	if(s_op->resp)
-	{
-		free(s_op->resp);
-	}
-
 	/* let go of our decoded request buffer */
 	if(s_op->decoded.buffer)
 	{
@@ -431,11 +425,11 @@ static int io_send_completion_ack(PINT_server_op *s_op,
 	}
 
 	/* fill in response -- status field is the only generic one we should have to set */
-	s_op->resp->status = js_p->error_code;
-	s_op->resp->u.write_completion.total_completed = s_op->u.io.flow_d->total_transfered;
+	s_op->resp.status = js_p->error_code;
+	s_op->resp.u.write_completion.total_completed = s_op->u.io.flow_d->total_transfered;
 
 	err = PINT_encode(
-		s_op->resp, 
+		&s_op->resp, 
 		PINT_ENCODE_RESP, 
 		&(s_op->encoded),
 		s_op->addr,

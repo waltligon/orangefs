@@ -137,10 +137,8 @@ typedef struct PINT_server_op
     bmi_addr_t addr; /* set in initialize_unexpected */
     bmi_msg_tag_t tag; /* set in initialize_unexpected */
     struct PVFS_server_req *req; /* req == decoded.buffer after initialize_unexpected */
-    struct PVFS_server_resp *resp; /* resp space allocated, memset(0) in initialize_unexpected
-				      *
-                                      * note: resp->op == req->op after initialize_unexpected also!
-				      */
+    /* note: resp.op == req->op after initialize_unexpected */
+    struct PVFS_server_resp resp; 
     struct BMI_unexpected_info unexp_bmi_buff;
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;

@@ -119,7 +119,7 @@ static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
     s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
     /* TODO: READ INTO A TEMPORARY BUFFER AND THEN EXTRACT JUST WHAT THEY WANT */
-    s_op->val.buffer    = &s_op->resp->u.getattr.attr;
+    s_op->val.buffer    = &s_op->resp.u.getattr.attr;
     s_op->val.buffer_sz = sizeof(PVFS_object_attr);
 
     gossip_debug(SERVER_DEBUG,
@@ -153,10 +153,10 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     gossip_debug(SERVER_DEBUG, "getattr state: verify_attribs\n");
 
     /* attributes were read into s_op->val.buffer in previous state,
-     * which was pointing to s_op->resp->u.getattr.attr;
+     * which was pointing to s_op->resp.u.getattr.attr;
      */
     a_p = (PVFS_object_attr *) s_op->val.buffer;
-    a_p = &s_op->resp->u.getattr.attr;
+    a_p = &s_op->resp.u.getattr.attr;
 
     if (js_p->error_code != 0)
     {
@@ -178,7 +178,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
     if ((js_p->error_code != 0 &&
-         s_op->resp->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) ||
+         s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_METAFILE) ||
         a_p->objtype == PVFS_TYPE_METAFILE)
     {
 	gossip_debug(SERVER_DEBUG,
@@ -186,14 +186,14 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 		     s_op->req->u.getattr.handle);
 	js_p->error_code = STATE_METAFILE;
 
-        if (s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+        if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
         {
             /* save # of datafiles so we know the size for reading later */
-            s_op->resp->u.getattr.attr.u.meta.dfile_count =
+            s_op->resp.u.getattr.attr.u.meta.dfile_count =
                 a_p->u.meta.dfile_count;
 
             /* TODO: put in real error handling for this condition: */
-            assert(s_op->resp->u.getattr.attr.u.meta.dfile_count 
+            assert(s_op->resp.u.getattr.attr.u.meta.dfile_count 
                    < PVFS_REQ_LIMIT_DFILE_COUNT);
             /* TODO: keep distribution size in here too */
         }
@@ -232,7 +232,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
         js_p->error_code = 0;
         return 1;
     }
-    dfile_count = s_op->resp->u.getattr.attr.u.meta.dfile_count;
+    dfile_count = s_op->resp.u.getattr.attr.u.meta.dfile_count;
 
     s_op->key.buffer    = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
@@ -241,17 +241,17 @@ static int getattr_read_metafile_datafile_handles_if_required(
     assert(dfile_count > 0);
 
     /* add mask value to indicate the data file array is filled */
-    s_op->resp->u.getattr.attr.mask |= PVFS_ATTR_META_DFILES;
+    s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DFILES;
 
     /* NOTE: ALLOCATING MEMORY HERE */
-    s_op->resp->u.getattr.attr.u.meta.dfile_array = malloc(dfile_count * sizeof(PVFS_handle));
-    if(!s_op->resp->u.getattr.attr.u.meta.dfile_array)
+    s_op->resp.u.getattr.attr.u.meta.dfile_array = malloc(dfile_count * sizeof(PVFS_handle));
+    if(!s_op->resp.u.getattr.attr.u.meta.dfile_array)
     {
 	js_p->error_code = -PVFS_ENOMEM;
 	return(1);
     }
 
-    s_op->val.buffer    = s_op->resp->u.getattr.attr.u.meta.dfile_array;
+    s_op->val.buffer    = s_op->resp.u.getattr.attr.u.meta.dfile_array;
     s_op->val.buffer_sz = dfile_count * sizeof(PVFS_handle);
 
     gossip_debug(SERVER_DEBUG,
@@ -297,22 +297,22 @@ static int getattr_read_metafile_distribution_if_required(
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
 
     /* should be some distribution information. */
-    assert(s_op->resp->u.getattr.attr.u.meta.dist_size > 0);
+    assert(s_op->resp.u.getattr.attr.u.meta.dist_size > 0);
 
     /* add mask value to indicate the distribution is filled */
-    s_op->resp->u.getattr.attr.mask |= PVFS_ATTR_META_DIST;
+    s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DIST;
 
     /* NOTE: allocating memory here, free'd in last state */
-    s_op->resp->u.getattr.attr.u.meta.dist =
-	malloc(s_op->resp->u.getattr.attr.u.meta.dist_size);
-    if(!s_op->resp->u.getattr.attr.u.meta.dist)
+    s_op->resp.u.getattr.attr.u.meta.dist =
+	malloc(s_op->resp.u.getattr.attr.u.meta.dist_size);
+    if(!s_op->resp.u.getattr.attr.u.meta.dist)
     {
 	js_p->error_code = -PVFS_ENOMEM;
 	return(1);
     }
 
-    s_op->val.buffer    = s_op->resp->u.getattr.attr.u.meta.dist;
-    s_op->val.buffer_sz = s_op->resp->u.getattr.attr.u.meta.dist_size;
+    s_op->val.buffer    = s_op->resp.u.getattr.attr.u.meta.dist;
+    s_op->val.buffer_sz = s_op->resp.u.getattr.attr.u.meta.dist_size;
 
     ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
 					 s_op->req->u.getattr.handle,
@@ -347,7 +347,7 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
 
     gossip_debug(SERVER_DEBUG, "getattr state: send_bmi\n");
 
-    a_p = &s_op->resp->u.getattr.attr;
+    a_p = &s_op->resp.u.getattr.attr;
     
     /* TODO: figure out if we need a different packing mechanism here */
     if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
@@ -373,7 +373,7 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
       fill in response -- status field is the only generic
       one we should have to set
     */
-    s_op->resp->status = js_p->error_code;
+    s_op->resp.status = js_p->error_code;
 
     if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
         (a_p->mask & PVFS_ATTR_META_DFILES))
@@ -385,9 +385,9 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
 
     gossip_debug(SERVER_DEBUG,
 		 "  sending status %d\n",
-		 s_op->resp->status);
+		 s_op->resp.status);
 
-    ret = PINT_encode(s_op->resp,
+    ret = PINT_encode(&s_op->resp,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
@@ -495,17 +495,14 @@ static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
       if this is a metafile, we may have allocated space
       for the datafile handles; free that.
     */
-    if (s_op->resp->u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
+    if (s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
     {
-        if (s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
-            free(s_op->resp->u.getattr.attr.u.meta.dfile_array);
+        if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+            free(s_op->resp.u.getattr.attr.u.meta.dfile_array);
 
-        if (s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
-            free(s_op->resp->u.getattr.attr.u.meta.dist);
+        if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DIST)
+            free(s_op->resp.u.getattr.attr.u.meta.dist);
     }
-
-    /* free response */
-    free(s_op->resp);
 
     /* free server operation structure */
     free(s_op);

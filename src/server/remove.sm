@@ -438,7 +438,7 @@ static int remove_send_response(PINT_server_op *s_op,
     gossip_debug(SERVER_DEBUG, "(%p) remove state: send_response\n", s_op);
 
     /* fill in response -- status field is the only generic one we should have to set */
-    s_op->resp->status = js_p->error_code;
+    s_op->resp.status = js_p->error_code;
 
     if(js_p->error_code == 0) 
     {
@@ -453,7 +453,7 @@ static int remove_send_response(PINT_server_op *s_op,
     }
 
     /* Encode the message */
-    ret = PINT_encode(s_op->resp,
+    ret = PINT_encode(&s_op->resp,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
@@ -515,7 +515,6 @@ static int remove_cleanup(PINT_server_op *s_op,
 
     /* free encoded, original responses */
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP);
-    free(s_op->resp);
 
     /* free server operation structure */
     free(s_op);

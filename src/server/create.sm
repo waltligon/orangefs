@@ -119,18 +119,18 @@ static int create_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
     job_id_t i;
 
     /* fill in response -- status field is the only generic one we should have to set */
-    s_op->resp->status = js_p->error_code;
+    s_op->resp.status = js_p->error_code;
 
     /* Set the handle IF it was created */
     if(js_p->error_code == 0) 
     {
 	gossip_err("Handle Created: %lld\n",js_p->handle);
-	s_op->resp->u.create.handle = js_p->handle;
+	s_op->resp.u.create.handle = js_p->handle;
 
     }
 
     /* Encode the message */
-    ret = PINT_encode(s_op->resp,
+    ret = PINT_encode(&s_op->resp,
 	    PINT_ENCODE_RESP,
 	    &(s_op->encoded),
 	    s_op->addr,
@@ -227,11 +227,6 @@ static int create_cleanup(PINT_server_op *s_op, job_status_s* js_p)
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP);
 
     PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
-
-    if(s_op->resp)
-    {
-	free(s_op->resp);
-    }
 
     free(s_op);
 

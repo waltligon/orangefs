@@ -142,7 +142,7 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
     gossip_debug(SERVER_DEBUG, "mkdir state: setattrib\n");
 
     /* save the handle from the create in the response */
-    s_op->resp->u.mkdir.handle = js_p->handle;
+    s_op->resp.u.mkdir.handle = js_p->handle;
 
     s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
@@ -161,14 +161,14 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
     gossip_debug(SERVER_DEBUG,
 		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
 		 s_op->req->u.mkdir.fs_id,
-		 s_op->resp->u.mkdir.handle,
+		 s_op->resp.u.mkdir.handle,
 		 (char *) s_op->key.buffer,
 		 s_op->key.buffer_sz,
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(s_op->req->u.mkdir.fs_id,
-					  s_op->resp->u.mkdir.handle,
+					  s_op->resp.u.mkdir.handle,
 					  &(s_op->key),
 					  &(s_op->val),
 					  TROVE_SYNC,
@@ -236,10 +236,10 @@ static int mkdir_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
     gossip_debug(SERVER_DEBUG, "mkdir state: send_bmi\n");
 
     /* fill in response -- status field is the only generic one we should have to set */
-    s_op->resp->status = js_p->error_code;
+    s_op->resp.status = js_p->error_code;
 
     /* Encode the message */
-    ret = PINT_encode(s_op->resp,
+    ret = PINT_encode(&s_op->resp,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
@@ -303,12 +303,7 @@ static int mkdir_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP);
     PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
-    
-    if(s_op->resp)
-    {
-	free(s_op->resp);
-    }
-	
+   	
     free(s_op);
 
     return(0);
@@ -318,7 +313,7 @@ static int mkdir_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 /* TODO: fix comment block */
 static int mkdir_error(PINT_server_op *s_op, job_status_s* js_p)
 {
-    s_op->resp->u.mkdir.handle = 0;
+    s_op->resp.u.mkdir.handle = 0;
     js_p->error_code = -1;
     return(1);
 }

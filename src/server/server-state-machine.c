@@ -71,19 +71,7 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
 	return(-1);
     }
 
-    /* allocate and zero memory for (unencoded) response */
-    s_op->resp = (struct PVFS_server_resp *)
-	malloc(sizeof(struct PVFS_server_resp));
-
-    if (!s_op->resp)
-    {
-	gossip_err("Out of Memory");
-	ret->error_code = 1;
-	return(-PVFS_ENOMEM);
-    }
-    memset(s_op->resp, 0, sizeof(struct PVFS_server_resp));
-
-    s_op->resp->op = s_op->req->op;
+    s_op->resp.op = s_op->req->op;
 
     return ((s_op->current_state->state_action))(s_op,ret);
 }
