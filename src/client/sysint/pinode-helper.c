@@ -10,10 +10,9 @@
 #include "pvfs2-sysint.h"
 #include "pint-servreq.h"
 
-#if 0
-static int check_pinode_match(pinode *pnode,pinode *pinode_ptr);
-static int update_pinode(pinode *pnode,pinode *pinode_ptr);
-#endif
+static int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
+		PVFS_pinode_reference pref,PVFS_credentials credentials);
+
 
 /* phelper_get_pinode
  *
@@ -100,7 +99,7 @@ int phelper_release_pinode(pinode *pinode_ptr)
  *
  * returns 0 on success, -errno on failure
  */
-int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
+static int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
                            PVFS_pinode_reference pref,
                            PVFS_credentials credentials)
 {
@@ -147,250 +146,6 @@ int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
 	return(0);
 }
 
-#if 0
-
-/* phelper_validate_pinode
- *
- * consistency check for the pinode content using timeouts
- *
- * returns 0 on success, -errno on failure
- */
-int phelper_validate_pinode(pinode *pnode,int flags,uint32_t mask,\
-		PVFS_credentials credentials)
-{
-	struct timeval cur_time; /* Current time */
-	int ret = 0;
-	pinode *pinode_ptr = NULL;
-	int tstamp = 0;
-
-	/* Get current time */
-	ret = gettimeofday(&cur_time,NULL);
-	if (ret < 0)
-	{
-		return(ret);
-	}
-
-	/* Does the handle need to be validated? */
-	if (flags & HANDLE_VALIDATE)
-	{
-		/* If size to be revalidated, fetch distribution */
-		if (flags & SIZE_VALIDATE)
-			mask |= ATTR_META;
-
-		/* Check for handle expiry using the handle timestamp value */
-		ret = check_handle_expiry(cur_time,pnode->tstamp_handle);
-		if (ret < 0)
-		{
-			/* Handle could have changed, need to verify this */
-			/* Server getattr request */
-			/* Allocate a pinode */
-			ret = PINT_pcache_pinode_alloc(&pinode_ptr);
-			if (ret < 0)
-			{
-				ret = -ENOMEM;
-				return(ret);
-			}
-			ret = phelper_refresh_pinode(mask,pinode_ptr,pnode->pinode_ref,
-					credentials);
-			if (ret < 0)
-			{
-				/* Free the memory allocated for pinode */
-				PINT_pcache_pinode_dealloc(pinode_ptr);
-				return(ret);
-			}
-
-			/* Check if most attributes(maybe a few select attributes)
-			 * match with those earlier for the PVFS object 
-			 */
-			ret = check_pinode_match(pnode,pinode_ptr);
-			if (ret < 0)
-			{
-				/* No match */
-				/* Handle-file relationship has probably changed, need
-				 * to redo lookup
-				 */
-				/* Free the memory allocated for pinode */
-				PINT_pcache_pinode_dealloc(pinode_ptr);
-				return(ret); /* handle info has changed */
-			}
-			else 
-			{
-				/* Match */
-				/* Update the original pinode with new values 
-				 * and also update both the timestamps.
-				 */
-				tstamp = HANDLE_TSTAMP + ATTR_TSTAMP;
-				ret = update_pinode(pnode,pinode_ptr,tstamp);
-				if (ret < 0)
-				{
-					return(ret);
-				}
-				/* Free the memory allocated for pinode */
-				PINT_pcache_pinode_dealloc(pinode_ptr);
-				/* Safe to use the pinode values */
-				return(0); 
-			}
-
-		}
-	}
-
-	/* Do the attributes need to be validated? */
-	if (flags & ATTR_VALIDATE)
-	{
-		/* If size to be revalidated, fetch distribution */
-		if (flags & SIZE_VALIDATE)
-			mask |= ATTR_META;
-
-		/* Check for attribute expiry using timestamp value */
-		ret = check_attribute_expiry(cur_time,pnode->tstamp_attr);
-		if (ret < 0)
-		{
-			/* Attributes may have become inconsistent, so fill up
-			 * pinode again
-			 */
-			/* Allocate a pinode */
-			ret = PINT_pcache_pinode_alloc(&pinode_ptr);
-			if (ret < 0)
-			{
-				ret = -ENOMEM;
-				return(ret);
-			}
-			/* makes a server getattr request */
-			ret = phelper_refresh_pinode(mask,pinode_ptr,pnode->pinode_ref,
-					credentials);
-			if (ret < 0)
-			{
-				/* Free the memory allocated for pinode */
-				PINT_pcache_pinode_dealloc(pinode_ptr);
-				return(-1);
-			}
-			else
-			{
-				/* Update the original pinode with new values 
-				 * and also update the attribute timestamp.
-				 */
-				tstamp = ATTR_TSTAMP;
-				ret = update_pinode(pnode,pinode_ptr,tstamp);
-				if (ret < 0)
-				{
-					return(ret);
-				}
-				/* Free the memory allocated for pinode */
-				PINT_pcache_pinode_dealloc(pinode_ptr);
-				return(0);
-			}
-		}
-	}
-
-	/* Does the size need to be revalidated? */
-	if (flags & SIZE_VALIDATE)
-	{
-		/* Check for size expiry using timestamp value */
-		ret = check_size_expiry(cur_time,pnode->tstamp_size);
-		if (ret < 0)
-		{
-			/* Use the distribution to determine the I/O servers */
-
-			/* Send a getattr request to each I/O server requesting
-		 	 *  size
-		 	 */
-
-			/* Pass all the sizes to the distribution function that
-		 	 * will calculate logical size 
-		 	 */
-
-			/* Update the pinode and its timestamp*/
-
-		}
-	}
-
-	/* Pinode need not be updated. So return success */
-	return(0);
-}
-
-#endif
-
-#if 0
-/* check_handle_expiry
- *
- * check to determine if handle is stale based on timeout value
- *
- * returns 0 on success, -1 on failure
- */
-static int check_handle_expiry(struct timeval t1,struct timeval t2)
-{
-	/* Does handle timestamp exceed the current time?
-	 * If yes, handle is valid. If no, handle is stale.
-	 */
-	if (t2.tv_sec > t1.tv_sec || (t2.tv_sec == t1.tv_sec &&\
-				t2.tv_usec > t1.tv_usec))
-			return(0);
-
-	/* Handle is stale */
-	return(-1);
-}
-
-/* check_attribute_expiry
- *
- * check to determine if attributes are stale based on timeout value
- *
- * returns 0 on success, -1 on failure
- */
-static int check_attribute_expiry(struct timeval t1,struct timeval t2)
-{
-	/* Does attribute timestamp exceed the current time?
-	 * If yes, attributes are valid. If no, attributes are stale.
-	 */
-	if (t2.tv_sec > t1.tv_sec || (t2.tv_sec == t1.tv_sec &&\
-				t2.tv_usec > t1.tv_usec))
-			return(0);
-
-	/* Attributes are stale */
-	return(-1);
-}
-
-/* check_size_expiry
- *
- * check to determine if cached size is stale based on timeout value
- *
- * returns 0 on success, -1 on failure
- */
-static int check_size_expiry(struct timeval t1,struct timeval t2)
-{
-	/* Does size timestamp exceed the current time?
-	 * If yes, size is valid. If no, size is stale.
-	 */
-	if (t2.tv_sec > t1.tv_sec || (t2.tv_sec == t1.tv_sec &&\
-				t2.tv_usec > t1.tv_usec))
-			return(0);
-
-	/* Size is stale */
-	return(-1);
-}
-
-/* update_pinode
- *
- * updates a pinode with values from another pinode
- *
- * returns 0 on success, -1 on failure
- */
-static int update_pinode(pinode *pnode,pinode *pinode_ptr)
-{
-	int ret = 0;
-
-	/* Update the pinode */
-	pnode->attr = pinode_ptr->attr;
-
-	/* Fill in pinode with timestamps */
-	ret = phelper_fill_timestamps(pnode);
-	if (ret < 0)
-	{	
-		return(-1);
-	}
-	
-	return(0);
-}
-#endif
 
 /* phelper_fill_timestamps
  *
@@ -430,27 +185,6 @@ int phelper_fill_timestamps(pinode *pnode)
 	return(0);
 }
 
-#if 0
-/* check_pinode_match
- *
- * compares two pinodes to check if they are the same
- *
- * returns 0 on success, -errno on failure
- */
-static int check_pinode_match(pinode *pnode,pinode *pinode_ptr)
-{
-	/* TODO: Should the object name also be compared? */
-	/*if (!memcmp(&pnode->attr,&pinode_ptr->attr,sizeof(PVFS_object_attr)))
-	 */
-	if (pnode->attr.owner == pinode_ptr->attr.owner &&\
-		 pnode->attr.group == pinode_ptr->attr.group &&\
-		 pnode->attr.objtype == pinode_ptr->attr.objtype &&\
-		 pnode->attr.perms == pinode_ptr->attr.perms)
-		return(0);
-	else 
-		return(-1);
-}
-#endif
 
 /* phelper_fill_attr
  *
