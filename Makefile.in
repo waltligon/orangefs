@@ -189,6 +189,9 @@ MPITESTSRC :=
 # MPIMISCSRC is a collection of sources that must be built into
 #    object form using MPI
 MPIMISCSRC :=
+# MPIIOTESTSRC is the source for test programs that must be compiled 
+#	with MPI-IO
+MPIIOTESTSRC :=
 # files generated as part of the build that should be deleted on "make clean"
 CLEANFILES :=
 
@@ -261,6 +264,14 @@ MPITESTS := $(patsubst %.c,%, $(filter %.c, $(MPITESTSRC)))
 # TESTDEPENDS is a list of dependency files for MPI test programs
 MPITESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPITESTSRC)))
 
+# MPIIOTESTOBJS is a list of MPI-IO test program objects
+MPIIOTESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPIIOTESTSRC)))
+# MPIIOTESTS is a list of MPI-IO test program executables
+MPIIOTESTS := $(patsubst %.c,%, $(filter %.c, $(MPIIOTESTSRC)))
+# MPIIOTESTDEPENDS is a list of dependency files for MPI-IO test programs
+MPIIOTESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIIOTESTSRC)))
+
+
 
 # DOCSPDF and DOCSPS are lists of documentation files generated from
 #    latex
@@ -309,6 +320,9 @@ ifdef BUILD_MPI
 # add MPI programs to default rule
 all: mpitests
 endif
+
+# target for building MPI-IO test programs 
+mpiiotests: $(MPIIOTESTS)
 
 # note: this will look better if you use two tabs instead of spaces between
 # SHORT_NAME and the object
@@ -369,6 +383,21 @@ else
 	@false
 endif
 
+# rule for building MPI-IO objects
+$(MPIIOTESTOBJS): %.o: %.c
+ifdef BUILD_MPI
+ifdef QUIET_COMPILE
+	@echo "  MPICC		$@"
+	@$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+else
+	$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+endif
+else
+	@echo Error: You must specify --with-mpi=dir at configure time 
+	@echo   in order to enable compilation of MPI programs.
+	@false
+endif
+
 # rule for building MPI misc. objects
 $(MPIMISCOBJS): %.o: %.c
 ifdef BUILD_MPI
@@ -392,6 +421,16 @@ ifdef QUIET_COMPILE
 else
 	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
 endif
+# rule for building MPI-IO executables from object files
+# note: add a $(MPIMISCOBJS) prereq if we build multi-object tests someday
+$(MPIIOTESTS): %: %.o $(LIBRARIES)
+ifdef QUIET_COMPILE
+	@echo "  MPILD		$@"
+	@$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+else
+	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+endif
+
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
@@ -457,7 +496,7 @@ clean: docsclean
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-		src/server/pvfs2-server-server.o
+		src/server/pvfs2-server-server.o $(MPIIOTESTS)
 
 # _really_ clean the tree; should go back to pristine state
 distclean: clean
