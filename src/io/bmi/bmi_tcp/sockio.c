@@ -245,57 +245,6 @@ int bsend(int s,
     return (len - comp);
 }
 
-/* blocking vector send */
-int bsendv(int s,
-	   const struct iovec *vec,
-	   int cnt)
-{
-    int tot, comp, ret, oldfl;
-#ifdef BSENDV_NO_WRITEV
-    struct iovec *cur = (struct iovec *) vec;
-    char *buf;
-#else
-#endif
-
-    oldfl = fcntl(s, F_GETFL, 0);
-    if (oldfl & O_NONBLOCK)
-	fcntl(s, F_SETFL, oldfl & (~O_NONBLOCK));
-
-#ifdef BSENDV_NO_WRITEV
-    for (tot = 0; cnt--; cur++)
-    {
-	buf = (char *) cur->iov_base;
-	comp = cur->iov_len;
-	while (comp)
-	{
-	  bsendv_restart:
-	    if ((ret = send(s, buf, comp, 0)) < 0)
-	    {
-		if (errno == EINTR)
-		    goto bsendv_restart;
-		return (-1);
-	    }
-	    comp -= ret;
-	    buf += ret;
-	}
-	tot += cur->iov_len;
-    }
-    return (tot);
-#else
-
-    for (comp = 0, tot = 0; comp < cnt; comp++)
-	tot += vec[comp].iov_len;
-
-    if ((ret = writev(s, vec, cnt)) < 0)
-    {
-      bsendv_restart:
-	if (errno == EINTR)
-	    goto bsendv_restart;
-	return (-1);
-    }
-    return (ret);
-#endif
-}
 
 /* nonblocking send */
 /* should always return 0 when nothing gets done! */

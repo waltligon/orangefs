@@ -52,9 +52,6 @@ int nbrecv(int s,
 int bsend(int s,
 	  void *buf,
 	  int len);
-int bsendv(int s,
-	   const struct iovec *vec,
-	   int cnt);
 int nbsend(int s,
 	   void *buf,
 	   int len);
