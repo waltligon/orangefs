@@ -26,7 +26,7 @@
 
 enum
 {
-    DBCACHE_ENTRIES = 512
+    DBCACHE_ENTRIES = 16
 };
 
 struct keyval_dbcache_entry
@@ -298,22 +298,32 @@ void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
 {
     int i;
 
-    for (i=0; i < DBCACHE_ENTRIES; i++) {
+    for (i=0; i < DBCACHE_ENTRIES; i++)
+    {
 	gen_mutex_lock(&keyval_db_cache[i].mutex);
-	if (keyval_db_cache[i].ref_ct  >= 0 &&
-	    keyval_db_cache[i].coll_id == coll_id &&
-	    keyval_db_cache[i].handle  == handle) break;
-	else gen_mutex_unlock(&keyval_db_cache[i].mutex);
+	if ((keyval_db_cache[i].ref_ct >= 0) &&
+	    (keyval_db_cache[i].coll_id == coll_id) &&
+	    (keyval_db_cache[i].handle  == handle))
+        {
+            break;
+        }
+	else
+        {
+            gen_mutex_unlock(&keyval_db_cache[i].mutex);
+        }
     }
-    if (i == DBCACHE_ENTRIES) {
-	gossip_debug(TROVE_DEBUG, "warning: no matching entry for dbcache_put op\n");
-	return;
+    if (i == DBCACHE_ENTRIES)
+    {
+	gossip_debug(TROVE_DEBUG, "warning: no matching entry "
+                     "for dbcache_put op\n");
+ 	return;
     }
 
     keyval_db_cache[i].ref_ct--;
 
 #ifdef DBCACHE_DONT_CACHE
-    if (keyval_db_cache[i].ref_ct == 0) {
+    if (keyval_db_cache[i].ref_ct == 0)
+    {
     	int ret;
 
 	ret = keyval_db_cache[i].db_p->close(db_p, 0);

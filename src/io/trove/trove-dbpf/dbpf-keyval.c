@@ -173,8 +173,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 	}
     }
 
-    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id,
-			    op_p->handle);
+    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;
 
  return_error:
@@ -277,7 +276,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 
     /*
       now that the data is written to disk, update
-      the cache if it's an attr  keyval we manage
+      the cache if it's an attr keyval we manage
     */
     gossip_debug(DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Write "
                  "of %s\n", (char *)op_p->u.k_write.key.buffer);
@@ -292,7 +291,6 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
         {
             dbpf_attr_cache_keyval_pair_update_cached_data(
                 cache_elem, keyval_pair, data.data, data.size);
-            return 1;
         }
     }
 
@@ -707,8 +705,7 @@ return_error:
     return error;
 }
 
-static int dbpf_keyval_iterate_keys(
-				    TROVE_coll_id coll_id,
+static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
 				    TROVE_handle handle,
 				    TROVE_ds_position *position_p,
 				    TROVE_keyval_s *key_array,
@@ -722,8 +719,7 @@ static int dbpf_keyval_iterate_keys(
     return -TROVE_ENOSYS;
 }
 
-static int dbpf_keyval_read_list(
-				 TROVE_coll_id coll_id,
+static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
 				 TROVE_handle handle,
 				 TROVE_keyval_s *key_array,
 				 TROVE_keyval_s *val_array,
@@ -839,8 +835,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
     return error;
 }
 
-static int dbpf_keyval_write_list(
-				  TROVE_coll_id coll_id,
+static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
 				  TROVE_handle handle,
 				  TROVE_keyval_s *key_array,
 				  TROVE_keyval_s *val_array,
@@ -854,13 +849,12 @@ static int dbpf_keyval_write_list(
     return -TROVE_ENOSYS;
 }
 
-static int dbpf_keyval_flush(
-			    TROVE_coll_id coll_id,
-			    TROVE_handle handle,
-			    TROVE_ds_flags flags,
-			    void *user_ptr,
-			    TROVE_context_id context_id,
-			    TROVE_op_id *out_op_id_p)
+static int dbpf_keyval_flush(TROVE_coll_id coll_id,
+                             TROVE_handle handle,
+                             TROVE_ds_flags flags,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p)
 {
     struct dbpf_collection *coll_p;
     dbpf_queued_op_t *q_op_p;

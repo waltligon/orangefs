@@ -123,7 +123,6 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
 	    got_db = 1;
-	    /* drop through */
 	    break;
     }
 
@@ -240,7 +239,10 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     return 1;
 
 return_error:
-    if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    if (got_db)
+    {
+        dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    }
     return -1;
 }
 
@@ -566,7 +568,10 @@ return_ok:
 return_error:
     gossip_err("dbpf_dspace_iterate_handles_op_svc: %s\n", db_strerror(ret));
     *op_p->u.d_iterate_handles.count_p = i; 
-    if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    if (got_db)
+    {
+        dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    }
     return -1;
 }
 
@@ -615,7 +620,8 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
     TROVE_ds_storedattr_s s_attr;
 
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
-    switch (ret) {
+    switch (ret)
+    {
 	case DBPF_DSPACE_DBCACHE_ERROR:
 	    error = -1;
 	    goto return_error;
@@ -623,7 +629,7 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
 	    got_db = 1;
-	    /* drop through */
+            break;
     }
 
     memset(&key, 0, sizeof(key));
@@ -665,7 +671,10 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
     return 1; /* done */
 
 return_error:
-    if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    if (got_db)
+    {
+        dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    }
     return error;
 }
 
@@ -782,7 +791,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 	case DBPF_DSPACE_DBCACHE_BUSY:
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
-	    /* drop through */
+            got_db = 1;
 	    break;
     }
 
@@ -855,7 +864,6 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
             return 0; /* try again later */
         case DBPF_DSPACE_DBCACHE_SUCCESS:
             got_db = 1;
-            /* drop through */
             break;
     }
 
@@ -892,7 +900,6 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 
     ret = dbpf_keyval_dbcache_try_get(
         op_p->coll_p->coll_id, op_p->handle, 0, &kdb_p);
-
     if (ret == -TROVE_EBUSY)
     {
         /* release the dspace dbcache entry */
@@ -908,8 +915,6 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 #endif
                           0);
 
-        dbpf_keyval_dbcache_put(
-            op_p->coll_p->coll_id, op_p->handle);
         if (ret == 0)
         {
             k_size = (TROVE_size) k_stat_p->bt_ndata;
@@ -929,6 +934,9 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         /* b_size is already set to zero */
         /* drop through */
     }
+
+    dbpf_keyval_dbcache_put(
+        op_p->coll_p->coll_id, op_p->handle);
 
     memset(&key, 0, sizeof(key));
     key.data = &op_p->handle;
