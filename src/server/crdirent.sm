@@ -20,47 +20,31 @@ static int crdirent_write_directory_entry(
     PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_check_exist_directory_entry(
     PINT_server_op *s_op, job_status_s* js_p);
-static int crdirent_handle_eexist(
-    PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_create_dirdata_dspace(
     PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_write_dirdata_handle(
     PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_cleanup(
     PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_set_error_code(
+    PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
-enum
-{
-    ERROR_BADNAME = 4
-};
-
 %%
 
-machine pvfs2_crdirent_sm(prelude,
-			  validate,
-			  read_directory_entry_handle,
-			  write_directory_entry,
-			  cleanup,
-			  create_dirdata_dspace,
-			  write_dirdata_handle,
-			  check_exist_directory_entry,
-			  handle_eexist,
-			  final_response)
+nested machine pvfs2_check_entry_not_exist(validate,
+    read_directory_entry_handle, 
+    create_dirdata_dspace,
+    write_dirdata_handle,
+    check_exist_directory_entry,
+    set_error_code)
 {
-	state prelude
-	{
-		jump pvfs2_prelude_sm;
-		success => validate;
-		default => final_response;
-	}
-
 	state validate
 	{
 		run crdirent_validate;
-		ERROR_BADNAME => final_response;
-		default => read_directory_entry_handle;
+		success => read_directory_entry_handle;
+		default => return;
 	}
 	
 	state read_directory_entry_handle
@@ -73,33 +57,52 @@ machine pvfs2_crdirent_sm(prelude,
 	state check_exist_directory_entry
 	{
 		run crdirent_check_exist_directory_entry;
-		success => handle_eexist;
-		default => write_directory_entry;
+		default => set_error_code;
 	}
 
-	state handle_eexist
+	state set_error_code
 	{
-		run crdirent_handle_eexist;
+		run crdirent_set_error_code;
+		default => return;
+	}
+	
+	state create_dirdata_dspace
+	{
+		run crdirent_create_dirdata_dspace;
+		success => write_dirdata_handle;
+		default => return;
+	}
+
+	state write_dirdata_handle
+	{
+		run crdirent_write_dirdata_handle;
+		default => return;
+	}
+}
+
+machine pvfs2_crdirent_sm(prelude,
+			  check_not_exist,
+			  write_directory_entry,
+			  cleanup,
+			  final_response)
+{
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
+		success => check_not_exist;
+		default => final_response;
+	}
+
+	state check_not_exist
+	{
+		jump pvfs2_check_entry_not_exist;
+		success => write_directory_entry;
 		default => final_response;
 	}
 
 	state write_directory_entry
 	{
 		run crdirent_write_directory_entry;
-		default => final_response;
-	}
-
-	state create_dirdata_dspace
-	{
-		run crdirent_create_dirdata_dspace;
-		success => write_dirdata_handle;
-		default => final_response;
-	}
-
-	state write_dirdata_handle
-	{
-		run crdirent_write_dirdata_handle;
-		success => write_directory_entry;
 		default => final_response;
 	}
 
@@ -165,7 +168,7 @@ static int crdirent_validate(PINT_server_op *s_op,
                         "character (value = 0x%x) in name; sending "
                         "error response.\n", (int) *ptr);
 	}
-	js_p->error_code = ERROR_BADNAME;
+	js_p->error_code = -PVFS_ENOENT;
 	s_op->scheduled_id = 0;
 	return 1;
     }
@@ -481,32 +484,6 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
     return ret;
 }
 
-/*
- * Function: crdirent_handle_eexist
- *
- * Params:   server_op *s_op, 
- *           job_status_s* js_p
- *
- * Pre: crdirent_check_exist_directory entry has returned with
- * successful return code (js_p->error_code == 0)
- *
- * Post: sets an appropriate return value (-EEXIST?) to send back to
- * the client
- *
- * Returns:  int
- *
- * Synopsis: this state doesn't do anything except set the error code
- */
-static int crdirent_handle_eexist(PINT_server_op *s_op,
-					  job_status_s* js_p)
-{
-    PINT_STATE_DEBUG("handle_eexist");
-
-    js_p->error_code = -PVFS_EEXIST;
-    return(1);
-}
-
-
 /* crdirent_cleanup()
  *
  * cleans up any resources that were allocated and exits the state machine
@@ -516,6 +493,31 @@ static int crdirent_cleanup(PINT_server_op *s_op,
 {
     PINT_STATE_DEBUG("cleanup");
     return(server_state_machine_complete(s_op));
+}
+
+/* crdirent_set_error_code()
+ *
+ * used to interpret return value from trove operation that checks the
+ * existance of a directory entry
+ */
+static int crdirent_set_error_code(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    /* the test to make sure that a file doesn't exist should be
+     * "successful" if the entry was not found.
+     */
+    switch(js_p->error_code)
+    {
+	case -TROVE_ENOENT:
+	    js_p->error_code = 0;
+	    break;
+	case 0:
+	    js_p->error_code = -PVFS_EEXIST;
+	    break;
+	default:
+	    break;
+    }
+    return(1);
 }
 
 /*
