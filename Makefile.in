@@ -385,8 +385,13 @@ else
 endif
 
 # rule for building MPI executables from object files
-# $(MPITESTS): %: %.o $(LIBRARIES)
-#	$(MPICC) $(LDFLAGS) $< $(LIBS) -o $@
+$(MPITESTS): %: %.o $(LIBRARIES)
+ifdef QUIET_COMPILE
+	@echo "  MPILD		$@"
+	@$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+else
+	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+endif
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)

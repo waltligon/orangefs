@@ -355,6 +355,7 @@ test/io/flow/module.mk
 test/io/job/module.mk
 test/io/dev/module.mk
 test/client/sysint/module.mk
+test/client/mpi-io/module.mk
 test/proto/module.mk
 test/server/module.mk
 test/server/request-scheduler/module.mk
