@@ -7,7 +7,7 @@
 #ifndef __PVFS_DISTRIBUTION_H
 #define __PVFS_DISTRIBUTION_H
 
-#include <pvfs2-types.h>
+#include "pvfs2-types.h"
 
 /* this struct is used to define a distribution to PVFS */
 
