@@ -261,8 +261,26 @@ int pvfs_bufmap_size_query(void)
 int pvfs_bufmap_copy_to_user(void* to, struct pvfs_bufmap_desc* from,
     int size)
 {
-    pvfs2_error("pvfs2: error: function not implemented.\n");
-    return(-ENOSYS);
+    int amt_copied = 0;
+    int amt_this = 0;
+    int index = 0;
+    void* offset = to;
+
+    while(amt_copied < size)
+    {
+	if((size - amt_copied) > PAGE_SIZE)
+	    amt_this = PAGE_SIZE;
+	else
+	    amt_this = size - amt_copied;
+	
+	copy_to_user(offset, from->kaddr_array[index], amt_this);
+
+	offset += amt_this;
+	amt_copied += amt_this;
+	index++;
+    }
+
+    return(0);
 }
 
 /* pvfs2_bufmap_copy_from_user()
@@ -274,8 +292,26 @@ int pvfs_bufmap_copy_to_user(void* to, struct pvfs_bufmap_desc* from,
 int pvfs_bufmap_copy_from_user(struct pvfs_bufmap_desc* to, void* from,
     int size)
 {
-    pvfs2_error("pvfs2: error: function not implemented.\n");
-    return(-ENOSYS);
+    int amt_copied = 0;
+    int amt_this = 0;
+    int index = 0;
+    void* offset = to;
+
+    while(amt_copied < size)
+    {
+	if((size - amt_copied) > PAGE_SIZE)
+	    amt_this = PAGE_SIZE;
+	else
+	    amt_this = size - amt_copied;
+	
+	copy_from_user(to->kaddr_array[index], offset, amt_this);
+
+	offset += amt_this;
+	amt_copied += amt_this;
+	index++;
+    }
+
+    return(0);
 }
 
 
