@@ -240,6 +240,8 @@ struct PINT_server_truncate_op
 
 struct PINT_server_mkdir_op
 {
+    PVFS_fs_id fs_id;
+    PVFS_handle_extent_array handle_extent_array;
     PVFS_handle dirent_handle;
 };
 
@@ -369,6 +371,7 @@ extern struct PINT_state_machine_s pvfs2_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;
 extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
 extern struct PINT_state_machine_s pvfs2_remove_work_sm;
+extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

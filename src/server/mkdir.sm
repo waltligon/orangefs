@@ -24,28 +24,16 @@ static int mkdir_cleanup(
     PINT_server_op *s_op, job_status_s* js_p);
 static int mkdir_error(
     PINT_server_op *s_op, job_status_s* js_p);
+static int mkdir_prep_sm(
+    PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-machine pvfs2_mkdir_sm(
-    prelude,
-    create,
-    set_attrib,
-    create_dirdata_dspace,
-    write_dirdata_handle,
-    final_response,
-    err_msg,
-    cleanup)
+nested machine pvfs2_mkdir_work_sm(create, set_attrib,
+create_dirdata_dspace, write_dirdata_handle, err_msg)
 {
-    state prelude
-    {
-        jump pvfs2_prelude_sm;
-        success => create;
-        default => final_response;
-    }
-
     state create
     {
         run mkdir_create;
@@ -70,20 +58,47 @@ machine pvfs2_mkdir_sm(
     state write_dirdata_handle
     {
         run mkdir_write_dirdata_handle;
-        success => final_response;
+        success => return;
         default => err_msg;
+    }
+
+    state err_msg 
+    {
+        run mkdir_error;
+        default => return;
+    }
+}
+
+machine pvfs2_mkdir_sm(
+    prelude,
+    prep_sm,
+    work,
+    final_response,
+    cleanup)
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => prep_sm;
+        default => final_response;
+    }
+
+    state prep_sm
+    {
+        run mkdir_prep_sm;
+        default => work;
+    }
+
+    state work
+    {
+        jump pvfs2_mkdir_work_sm;
+        default => final_response;
     }
 
     state final_response
     {
         jump pvfs2_final_response_sm;
         default => cleanup;
-    }
-
-    state err_msg 
-    {
-        run mkdir_error;
-        default => final_response;
     }
 
     state cleanup
@@ -120,15 +135,15 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s *js_p)
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "\ttrying to dspace create on "
         "fs_id %d\n\thandle-range[0]: %Lu-%Lu\n",
-        s_op->req->u.mkdir.fs_id,
-        Lu(s_op->req->u.mkdir.handle_extent_array.extent_array[0].first),
-        Lu(s_op->req->u.mkdir.handle_extent_array.extent_array[0].last));
+        s_op->u.mkdir.fs_id,
+        Lu(s_op->u.mkdir.handle_extent_array.extent_array[0].first),
+        Lu(s_op->u.mkdir.handle_extent_array.extent_array[0].last));
 
     ret = job_trove_dspace_create(
-        s_op->req->u.mkdir.fs_id, &s_op->req->u.mkdir.handle_extent_array,
+        s_op->u.mkdir.fs_id, &s_op->u.mkdir.handle_extent_array,
         PVFS_TYPE_DIRECTORY, NULL,
         PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.mkdir.fs_id), s_op, 0, js_p, &i,
+            user_opts, s_op->u.mkdir.fs_id), s_op, 0, js_p, &i,
         server_job_context);
 
     return(ret);
@@ -149,7 +164,6 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = -1;
     job_id_t j_id;
-    PVFS_object_attr *a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
@@ -161,19 +175,12 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
     gossip_debug(GOSSIP_SERVER_DEBUG, " new directory has handle %Lu\n",
                  Lu(js_p->handle));
 
-    a_p = &(s_op->req->u.mkdir.attr);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  attrs to write = (owner = %d, "
-                 "group = %d, perms = %o, type = %d)\n",
-		 a_p->owner, a_p->group, a_p->perms, a_p->objtype);
-
-    /* finally, translate attrs to storage attr format */
     ds_attr = (&s_op->ds_attr);
-    PVFS_object_attr_to_ds_attr(a_p, ds_attr);
 
     ret = job_trove_dspace_setattr(
-        s_op->req->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
+        s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
         ds_attr, PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.mkdir.fs_id),
+            user_opts, s_op->u.mkdir.fs_id),
         s_op, 0, js_p, &j_id, server_job_context);
 
     return(ret);
@@ -191,11 +198,11 @@ static int mkdir_create_dirdata_dspace(
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  creating dspace (coll_id = %d)\n",
-        s_op->req->u.mkdir.fs_id);
+        s_op->u.mkdir.fs_id);
 
     /* find our meta handle range for this create */
     ret = PINT_config_get_meta_handle_extent_array(
-        user_opts, s_op->req->u.mkdir.fs_id, &extent_array);
+        user_opts, s_op->u.mkdir.fs_id, &extent_array);
     assert(ret == 0);
     assert(extent_array.extent_count > 0);
 
@@ -205,9 +212,9 @@ static int mkdir_create_dirdata_dspace(
                  Lu(extent_array.extent_array[0].last));
 
     ret = job_trove_dspace_create(
-        s_op->req->u.mkdir.fs_id, &extent_array, PVFS_TYPE_DIRDATA, NULL,
+        s_op->u.mkdir.fs_id, &extent_array, PVFS_TYPE_DIRDATA, NULL,
         PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.mkdir.fs_id), s_op, 0, js_p, &i,
+            user_opts, s_op->u.mkdir.fs_id), s_op, 0, js_p, &i,
         server_job_context);
 
     free(extent_array.extent_array);
@@ -250,9 +257,9 @@ static int mkdir_write_dirdata_handle(
         Lu(s_op->resp.u.mkdir.handle));
 
     ret = job_trove_keyval_write(
-        s_op->req->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
+        s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
         &s_op->key, &s_op->val, PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.mkdir.fs_id),
+            user_opts, s_op->u.mkdir.fs_id),
         NULL, s_op, 0, js_p, &i, server_job_context);
 
     return ret;
@@ -285,6 +292,31 @@ static int mkdir_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("cleanup");
     return(server_state_machine_complete(s_op));
+}
+
+static int mkdir_prep_sm(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    PVFS_object_attr *a_p = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+
+    PINT_STATE_DEBUG("prep_sm");
+
+    s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
+    s_op->u.mkdir.handle_extent_array =
+        s_op->req->u.mkdir.handle_extent_array;
+
+    a_p = &(s_op->req->u.mkdir.attr);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  attrs to write = (owner = %d, "
+                 "group = %d, perms = %o, type = %d)\n",
+		 a_p->owner, a_p->group, a_p->perms, a_p->objtype);
+
+    /* translate attrs to storage attr format */
+    ds_attr = (&s_op->ds_attr);
+    PVFS_object_attr_to_ds_attr(a_p, ds_attr);
+
+    js_p->error_code = 0;
+    return(1);
 }
 
 /*
