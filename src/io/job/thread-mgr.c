@@ -13,23 +13,83 @@
 #include "gen-locks.h"
 #include "gossip.h"
 #include "bmi.h"
+#include "trove.h"
 
 #define THREAD_MGR_TEST_COUNT 5
 #define THREAD_MGR_TEST_TIMEOUT 10
 
 /* TODO: organize this stuff better */
 static void *bmi_thread_function(void *ptr);
+static void *trove_thread_function(void *ptr);
 static pthread_t bmi_thread_id;
+static pthread_t trove_thread_id;
 static struct BMI_unexpected_info stat_bmi_unexp_array[THREAD_MGR_TEST_COUNT];
 static bmi_op_id_t stat_bmi_id_array[THREAD_MGR_TEST_COUNT];
 static bmi_error_code_t stat_bmi_error_code_array[THREAD_MGR_TEST_COUNT];
 static bmi_size_t stat_bmi_actual_size_array[THREAD_MGR_TEST_COUNT];
 static void *stat_bmi_user_ptr_array[THREAD_MGR_TEST_COUNT];
+static TROVE_op_id stat_trove_id_array[THREAD_MGR_TEST_COUNT];
+static void *stat_trove_user_ptr_array[THREAD_MGR_TEST_COUNT];
+static TROVE_ds_state stat_trove_error_code_array[THREAD_MGR_TEST_COUNT];
 static gen_mutex_t bmi_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t trove_mutex = GEN_MUTEX_INITIALIZER;
 static int bmi_unexp_count = 0;
 static void (*bmi_unexp_fn)(struct BMI_unexpected_info* unexp);
 static bmi_context_id global_bmi_context = -1;
+static TROVE_context_id global_trove_context = -1;
 static int bmi_thread_ref_count = 0;
+static int trove_thread_ref_count = 0;
+static PVFS_fs_id HACK_fs_id = 9; /* TODO: fix later */
+
+/* trove_thread_function()
+ *
+ * function executed by the thread in charge of trove
+ */
+static void *trove_thread_function(void *ptr)
+{
+    int ret = -1;
+    int count;
+    int i=0;
+    struct PINT_thread_mgr_trove_callback *tmp_callback;
+
+    /* TODO: fix the locking */
+
+    while (1)
+    {
+	gen_mutex_lock(&trove_mutex);
+
+	count = THREAD_MGR_TEST_COUNT;
+	ret = trove_dspace_testcontext(HACK_fs_id,
+	    stat_trove_id_array,
+	    &count,
+	    stat_trove_error_code_array,
+	    stat_trove_user_ptr_array,
+	    THREAD_MGR_TEST_TIMEOUT,
+	    global_trove_context);
+	if(ret < 0)
+	{
+	    /* critical error */
+	    /* TODO: how to handle this */
+	    assert(0);
+	    gossip_lerr("Error: critical Trove failure.\n");
+	}
+
+	for(i=0; i<count; i++)
+	{
+	    /* execute a callback function for each completed BMI operation */
+	    tmp_callback = 
+		(struct PINT_thread_mgr_trove_callback*)stat_trove_user_ptr_array[i];
+	    /* sanity check */
+	    assert(tmp_callback != NULL);
+	    assert(tmp_callback->fn != NULL);
+	    tmp_callback->fn(tmp_callback->data, stat_trove_error_code_array[i]);
+	}
+
+	gen_mutex_unlock(&trove_mutex);
+    }
+    return (NULL);
+}
+
 
 /* bmi_thread_function()
  *
@@ -121,6 +181,50 @@ static void *bmi_thread_function(void *ptr)
 }
 
 
+/* PINT_thread_mgr_trove_start()
+ *
+ * starts a trove mgmt thread, if not already running
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_thread_mgr_trove_start(void)
+{
+    int ret = -1;
+
+    gen_mutex_lock(&trove_mutex);
+    if(trove_thread_ref_count > 0)
+    {
+	/* nothing to do, thread is already started.  Just increment 
+	 * reference count and return
+	 */
+	trove_thread_ref_count++;
+	gen_mutex_unlock(&trove_mutex);
+	return(0);
+    }
+
+    /* if we reach this point, then we have to start the thread ourselves */
+    ret = trove_open_context(HACK_fs_id, &global_trove_context);
+    if(ret < 0)
+    {
+	gen_mutex_unlock(&trove_mutex);
+	return(ret);
+    }
+
+    ret = pthread_create(&trove_thread_id, NULL, trove_thread_function, NULL);
+    if(ret != 0)
+    {
+	BMI_close_context(global_trove_context);
+	gen_mutex_unlock(&trove_mutex);
+	/* TODO: convert error code */
+	return(-ret);
+    }
+    trove_thread_ref_count++;
+
+    gen_mutex_unlock(&trove_mutex);
+    return(0);
+}
+
+
 /* PINT_thread_mgr_bmi_start()
  *
  * starts a BMI mgmt thread, if not already running
@@ -164,6 +268,28 @@ int PINT_thread_mgr_bmi_start(void)
     return(0);
 }
 
+/* PINT_thread_mgr_trove_stop()
+ *
+ * stops a Trove mgmt thread
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_thread_mgr_trove_stop(void)
+{
+    gen_mutex_lock(&trove_mutex);
+    trove_thread_ref_count--;
+    if(trove_thread_ref_count <= 0)
+    {
+	assert(trove_thread_ref_count == 0); /* sanity check */
+	pthread_cancel(trove_thread_id);
+	trove_close_context(HACK_fs_id, global_trove_context);
+    }
+    gen_mutex_unlock(&trove_mutex);
+
+    return(0);
+}
+
+
 /* PINT_thread_mgr_bmi_stop()
  *
  * stops a BMI mgmt thread, if not already running
@@ -183,6 +309,26 @@ int PINT_thread_mgr_bmi_stop(void)
     gen_mutex_unlock(&bmi_mutex);
 
     return(0);
+}
+
+/* PINT_thread_mgr_trove_getcontext()
+ *
+ * retrieves the context that the current trove thread is using
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_thread_mgr_trove_getcontext(PVFS_context_id *context)
+{
+    gen_mutex_lock(&trove_mutex);
+    if(trove_thread_ref_count > 0)
+    {
+	*context = global_trove_context;
+	gen_mutex_unlock(&trove_mutex);
+	return(0);
+    }
+    gen_mutex_unlock(&trove_mutex);
+
+    return(-PVFS_EINVAL);
 }
 
 /* PINT_thread_mgr_bmi_getcontext()

@@ -10,6 +10,8 @@
 #include "pvfs2-types.h"
 #include "bmi.h"
 
+/* bmi thread */
+
 struct PINT_thread_mgr_bmi_callback
 {
     void (*fn)(void* data, PVFS_size actual_size, PVFS_error error_code);
@@ -21,6 +23,18 @@ int PINT_thread_mgr_bmi_stop(void);
 int PINT_thread_mgr_bmi_getcontext(PVFS_context_id *context);
 int PINT_thread_mgr_bmi_unexp_handler(
     void (*fn)(struct BMI_unexpected_info* unexp));
+
+/* trove thread */
+
+struct PINT_thread_mgr_trove_callback
+{
+    void (*fn)(void* data, PVFS_error error_code);
+    void* data;
+};
+
+int PINT_thread_mgr_trove_start(void);
+int PINT_thread_mgr_trove_stop(void);
+int PINT_thread_mgr_trove_getcontext(PVFS_context_id *context);
 
 #endif /* __THREAD_MGR_H */
 
