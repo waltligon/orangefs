@@ -40,10 +40,10 @@ int main(
     PVFS_Request mem_req;
     void *buffer;
     int buffer_size;
-    int32_t len_array1[64];
-    int32_t len_array2[64];
-    PVFS_offset off_array1[64];
-    PVFS_offset off_array2[64];
+    int32_t len_array1[17];
+    int32_t len_array2[17];
+    PVFS_offset off_array1[17];
+    PVFS_offset off_array2[17];
 
     if (argc != 2)
     {
@@ -167,7 +167,7 @@ int main(
     off_array1[0] = 0;
     off_array1[0] += (unsigned int)io_buffer;
     off_array2[0] = 327552;
-    for(i=0; i<64; i++)
+    for(i=0; i<17; i++)
     {
 	off_array1[i] = off_array1[0] + i*8;
 	off_array2[i] = off_array2[0] + i*8;
@@ -175,9 +175,10 @@ int main(
 	len_array2[i] = 4;
     }
 
- PVFS_Request_hindexed(64, len_array1,
+/* this works fine with 16 entries */
+ PVFS_Request_hindexed(17, len_array1,
                      off_array1, PVFS_BYTE, &mem_req);
- PVFS_Request_hindexed(64, len_array2,
+ PVFS_Request_hindexed(17, len_array2,
                      off_array2, PVFS_BYTE, &file_req);
 
     ret = PVFS_sys_write(pinode_refn, file_req, 0, PVFS_BOTTOM, mem_req,
