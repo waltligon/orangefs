@@ -115,12 +115,28 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
     switch(option)
     {
         case TROVE_COLLECTION_HANDLE_RANGES:
-            ret = trove_set_handle_ranges(coll_id, context_id,
-                                          (char *)parameter);
+            ret = trove_set_handle_ranges(
+                coll_id, context_id, (char *)parameter);
             break;
 	case TROVE_COLLECTION_HANDLE_TIMEOUT:
-	    ret = trove_set_handle_timeout(coll_id, context_id, 
-		    (struct timeval *) parameter);
+	    ret = trove_set_handle_timeout(
+                coll_id, context_id, (struct timeval *)parameter);
+	    break;
+	case TROVE_COLLECTION_ATTR_CACHE_KEYWORDS:
+            ret = dbpf_attr_cache_set_keywords((char *)parameter);
+	    break;
+	case TROVE_COLLECTION_ATTR_CACHE_SIZE:
+            ret = dbpf_attr_cache_set_size(*((int *)parameter));
+	    break;
+	case TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS:
+            ret = dbpf_attr_cache_set_max_num_elems(*((int *)parameter));
+	    break;
+	case TROVE_COLLECTION_ATTR_CACHE_INITIALIZE:
+            /*
+              finally, initialize the dbpf_attr_cache.
+              finalize is done at trove_finalize time
+            */
+            ret = dbpf_attr_cache_do_initialize();
 	    break;
     }
     return ret;
@@ -245,7 +261,6 @@ static int dbpf_initialize(char *stoname,
     dbpf_dspace_dbcache_initialize();
     dbpf_bstream_fdcache_initialize();
     dbpf_keyval_dbcache_initialize();
-    dbpf_attr_cache_initialize(511, 8192);
 
     return dbpf_thread_initialize();
 }

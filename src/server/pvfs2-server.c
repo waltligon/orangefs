@@ -264,6 +264,8 @@ int main(int argc, char **argv)
 	    if (s_op->op == BMI_UNEXPECTED_OP)
 	    {
 		unexpected_msg = 1;
+                memset(&server_job_status_array[i], 0,
+                       sizeof(job_status_s));
 		ret = server_state_machine_start(
                     s_op, &server_job_status_array[i]);
 		if(ret < 0)
@@ -579,9 +581,10 @@ static int server_initialize_subsystems(
             }
 
             /* add configured merged handle range for this host/fs */
-            ret = trove_collection_setinfo(cur_fs->coll_id, trove_context,
-					   TROVE_COLLECTION_HANDLE_RANGES,
-					   (void *)cur_merged_handle_range);
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_COLLECTION_HANDLE_RANGES,
+                (void *)cur_merged_handle_range);
             if (ret < 0)
             {
                 gossip_lerr("Error adding handle range %s to "
@@ -597,14 +600,58 @@ static int server_initialize_subsystems(
             trove_close_context(cur_fs->coll_id, trove_context);
             free(cur_merged_handle_range);
         }
-	ret = trove_collection_setinfo(cur_fs->coll_id, trove_context, 
-				    TROVE_COLLECTION_HANDLE_TIMEOUT,
-				    &(server_config.handle_purgatory));
+
+        /*
+          set storage hints if any.  if any of these fail, we
+          can't error out since they're just hints.  thus, we
+          complain in logging and continue.
+        */
+	ret = trove_collection_setinfo(
+            cur_fs->coll_id, trove_context, 
+            TROVE_COLLECTION_HANDLE_TIMEOUT,
+            (void *)&cur_fs->handle_purgatory);
 	if (ret < 0)
 	{
 	    gossip_lerr("Error setting handle timeout\n");
-	    return ret;
 	}
+
+        if (cur_fs->attr_cache_keywords &&
+            cur_fs->attr_cache_size &&
+            cur_fs->attr_cache_max_num_elems)
+        {
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context, 
+                TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
+                (void *)cur_fs->attr_cache_keywords);
+            if (ret < 0)
+            {
+                gossip_lerr("Error setting attr cache keywords\n");
+            }
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context, 
+                TROVE_COLLECTION_ATTR_CACHE_SIZE,
+                (void *)&cur_fs->attr_cache_size);
+            if (ret < 0)
+            {
+                gossip_lerr("Error setting attr cache size\n");
+            }
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context, 
+                TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
+                (void *)&cur_fs->attr_cache_max_num_elems);
+            if (ret < 0)
+            {
+                gossip_lerr("Error setting attr cache max num elems\n");
+            }
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context, 
+                TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
+                (void *)0);
+            if (ret < 0)
+            {
+                gossip_lerr("Error initializing the attr cache\n");
+            }
+        }
 
         cur = PINT_llist_next(cur);
     }
