@@ -206,11 +206,10 @@ int do_encode_resp(
 
 	case PVFS_SERV_LOOKUP_PATH:
 	    assert(response->u.lookup_path.handle_array != NULL);
-	    /* TODO: this one is really special; it relies on
-	     * rsize being set _on the way in_, and also does not
-	     * have header_size tacked onto it (!?)
-	     */
-	    assert(response->rsize > 0);
+
+	    /* this one doesn't have header_size tacked onto it (!?) */
+	    response->rsize = sizeof(struct PVFS_server_resp_s) +
+		response->u.lookup_path.count * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
 
 	    /* We need to lookout for the fact that we may not have the attributes for
 	       a single segment within the path. In this case we will only have a handle
