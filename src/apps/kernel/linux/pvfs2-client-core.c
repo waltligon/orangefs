@@ -2002,6 +2002,7 @@ int main(int argc, char **argv)
     PINT_dev_finalize();
     PINT_dev_put_mapped_region(&s_io_desc);
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "calling PVFS_sys_finalize()\n");
     if (PVFS_sys_finalize())
     {
         gossip_err("Failed to finalize PVFS\n");

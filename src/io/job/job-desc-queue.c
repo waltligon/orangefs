@@ -61,7 +61,6 @@ void dealloc_job_desc(struct job_desc *jd)
 {
     id_gen_safe_unregister(jd->job_id);
     free(jd);
-    return;
 }
 
 /* job_desc_q_new()

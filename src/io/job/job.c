@@ -3631,11 +3631,14 @@ static void teardown_queues(void)
 {
 
     if (bmi_unexp_queue)
+    {
         job_desc_q_cleanup(bmi_unexp_queue);
-    if (dev_unexp_queue)
-        job_desc_q_cleanup(dev_unexp_queue);
+    }
 
-    return;
+    if (dev_unexp_queue)
+    {
+        job_desc_q_cleanup(dev_unexp_queue);
+    }
 }
 
 /* trove_thread_mgr_callback()

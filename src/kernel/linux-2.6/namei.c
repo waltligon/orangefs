@@ -37,8 +37,14 @@ static int pvfs2_create(
     inode = pvfs2_create_entry(
         dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE, &ret);
 
-    pvfs2_print("pvfs2_create: returning %d\n", (inode ? 0 : ret));
-    return (inode ? 0 : ret);
+    if (inode)
+    {
+        dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+        ret = 0;
+    }
+
+    pvfs2_print("pvfs2_create: returning %d\n", ret);
+    return ret;
 }
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -228,6 +234,7 @@ static int pvfs2_unlink(
     {
         inode->i_nlink--;
         inode->i_ctime = dir->i_ctime;
+        dir->i_mtime = dir->i_ctime = CURRENT_TIME;
     }
     return ret;
 }
@@ -245,20 +252,13 @@ static int pvfs2_symlink(
     inode = pvfs2_create_entry(
         dir, dentry, symname, mode, PVFS2_VFS_OP_SYMLINK, &ret);
 
-    return (inode ? 0 : ret);
+    if (inode)
+    {
+        dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+        ret = 0;
+    }
+    return ret;
 }
-
-#if 0
-static int pvfs2_mknod(
-    struct inode *dir,
-    struct dentry *dentry,
-    int mode,
-    dev_t rdev)
-{
-    pvfs2_print("pvfs2_mknod: called\n");
-    return 0;
-}
-#endif
 
 static int pvfs2_mkdir(
     struct inode *dir,
@@ -274,6 +274,7 @@ static int pvfs2_mkdir(
     if (inode)
     {
 	dir->i_nlink++;
+        dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	ret = 0;
     }
     return ret;
@@ -286,18 +287,12 @@ static int pvfs2_rmdir(
     int ret = -ENOTEMPTY;
     struct inode *inode = dentry->d_inode;
 
-    /* FIXME: is this necessary? */
-    if (!d_unhashed(dentry))
-    {
-	return -EBUSY;
-    }
-
     ret = pvfs2_unlink(dir, dentry);
     if (ret == 0)
     {
         dentry->d_inode->i_nlink--;
         inode->i_size = 0;
-        dir->i_nlink--;
+	dir->i_nlink--;
         dir->i_mtime = dir->i_ctime = CURRENT_TIME;
     }
     return ret;

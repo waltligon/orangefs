@@ -760,9 +760,11 @@ struct inode *pvfs2_create_entry(
         switch (op_type)
         {
             case PVFS2_VFS_OP_CREATE:
-                return pvfs2_create_file(dir, dentry, mode, error_code);
+                return pvfs2_create_file(
+                    dir, dentry, mode, error_code);
             case PVFS2_VFS_OP_MKDIR:
-                return pvfs2_create_dir(dir, dentry, mode, error_code);
+                return pvfs2_create_dir(
+                    dir, dentry, mode, error_code);
             case PVFS2_VFS_OP_SYMLINK:
                 return pvfs2_create_symlink(
                     dir, dentry, symname, mode, error_code);
