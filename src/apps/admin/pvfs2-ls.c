@@ -215,7 +215,6 @@ main_out:
     return(ret);
 }
 
-
 static inline void make_size_human_readable(
     PVFS_size size,
     char *out_str,
@@ -258,16 +257,17 @@ static inline void format_size_string(char *src_str,
                                       int right_justified)
 {
     int len = 0;
-    int spaces_size_allowed = num_spaces_total;
+    int spaces_size_allowed = 0;
     char *buf = NULL, *start = NULL, *src_start = NULL;
 
     assert(src_str);
+    len = strlen(src_str);
+
+    spaces_size_allowed = (num_spaces_total ? num_spaces_total : len);
     buf = (char *)malloc(spaces_size_allowed);
     assert(buf);
 
     memset(buf,0,spaces_size_allowed);
-
-    len = strlen(src_str);
 
     if ((len > 0) && (len < spaces_size_allowed))
     {
@@ -288,6 +288,10 @@ static inline void format_size_string(char *src_str,
         {
             *start++ = *src_start++;
         }
+        *out_str_p = strdup(buf);
+    }
+    else if (len == 0)
+    {
         *out_str_p = strdup(buf);
     }
     free(buf);
@@ -339,70 +343,54 @@ void print_entry_attr(
     }
     format_size_string(scratch_size,11,&formatted_size,1);
 
+    if (!opts->list_no_owner)
+    {
+        owner = scratch_owner;
+    }
+    if (!opts->list_no_group)
+    {
+        group = scratch_group;
+    }
     if (!opts->list_numeric_uid_gid)
     {
         if (!opts->list_no_owner)
         {
             pwd = getpwuid((uid_t)attr->owner);
             owner = (pwd ? pwd->pw_name : scratch_owner);
-            format_size_string(owner,8,&formatted_owner,0);
         }
 
         if (!opts->list_no_group)
         {
             grp = getgrgid((gid_t)attr->group);
             group = (grp ? grp->gr_name : scratch_group);
-            format_size_string(group,8,&formatted_group,0);
         }
+    }
 
-        snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
-                 "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
-                 inode,
-                 ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
-                 ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
-                 ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
-                 ((attr->perms & PVFS_U_EXECUTE) ? 'x' : '-'),
-                 ((attr->perms & PVFS_G_READ) ? 'r' : '-'),
-                 ((attr->perms & PVFS_G_WRITE) ? 'w' : '-'),
-                 ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-'),
-                 ((attr->perms & PVFS_O_READ) ? 'r' : '-'),
-                 ((attr->perms & PVFS_O_WRITE) ? 'w' : '-'),
-                 ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
-                 formatted_owner,
-                 formatted_group,
-                 formatted_size,
-                 (time->tm_year + 1900),
-                 (time->tm_mon + 1),
-                 time->tm_mday,
-                 (time->tm_hour + 1),
-                 (time->tm_min + 1),
-                 entry_name);
-    }
-    else
-    {
-        snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%s "
-                 "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
-                 inode,
-                 ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
-                 ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
-                 ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
-                 ((attr->perms & PVFS_U_EXECUTE) ? 'x' : '-'),
-                 ((attr->perms & PVFS_G_READ) ? 'r' : '-'),
-                 ((attr->perms & PVFS_G_WRITE) ? 'w' : '-'),
-                 ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-'),
-                 ((attr->perms & PVFS_O_READ) ? 'r' : '-'),
-                 ((attr->perms & PVFS_O_WRITE) ? 'w' : '-'),
-                 ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
-                 attr->owner,
-                 attr->group,
-                 formatted_size,
-                 (time->tm_year + 1900),
-                 (time->tm_mon + 1),
-                 time->tm_mday,
-                 (time->tm_hour + 1),
-                 (time->tm_min + 1),
-                 entry_name);
-    }
+    format_size_string(owner,8,&formatted_owner,0);
+    format_size_string(group,8,&formatted_group,0);
+
+    snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
+             "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
+             inode,
+             ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
+             ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
+             ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
+             ((attr->perms & PVFS_U_EXECUTE) ? 'x' : '-'),
+             ((attr->perms & PVFS_G_READ) ? 'r' : '-'),
+             ((attr->perms & PVFS_G_WRITE) ? 'w' : '-'),
+             ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-'),
+             ((attr->perms & PVFS_O_READ) ? 'r' : '-'),
+             ((attr->perms & PVFS_O_WRITE) ? 'w' : '-'),
+             ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
+             formatted_owner,
+             formatted_group,
+             formatted_size,
+             (time->tm_year + 1900),
+             (time->tm_mon + 1),
+             time->tm_mday,
+             (time->tm_hour + 1),
+             (time->tm_min + 1),
+             entry_name);
 
     if (formatted_size)
     {
