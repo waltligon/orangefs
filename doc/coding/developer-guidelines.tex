@@ -121,44 +121,6 @@ The next time you login to the system, it will alias the vi command
 to either vimx of vim if they are available.  Otherwise the vi command will simply
 start the original vi editor.
 
-\subsubsection{Settings}
-
-\label{sec:vi_env}
-Vi (or vim in this case) supports several options and settings that can be enabled or
-disabled as needed.  You can see a list of these by typing ``:options'' in
-vi.  These can also be controlled by way of environment variables or
-configuration files so that you can keep your settings without having to
-redo them each time that you start vi.  There are several settings that
-we recommend for consistency in the PARL lab.  The easiest way to set
-these is to edit your login configuration to set the appropriate
-environment variable everytime you login to a workstation.  This example
-illustrates how to do this if you use the tcsh shell.  Add the following
-line to your ~/.cshrc file:
-
-\begin{verbatim}
-setenv EXINIT 'set wm=8 sw=3 ai ts=3 ruler backspace=1'
-\end{verbatim}
-
-This tells vi to do the following things on startup:
-\begin{itemize}
-\item Set the wrap margin to 8.  This defines where vi will begin word
-wrapping (counting from the right margin).
-\item Set the shift width to 3.  This defines how far vi will indent
-when using the autoindent feature.
-\item Turn on autoindentation.  This feature attempts to automatically
-indent new lines based on the code context.
-\item Set the tab size to 3.  
-\item Turn on the ruler.  This displays the current cursor position at
-the bottom of the screen.
-\item Set the backspace option.  This allows backspace to delete
-indentation inserted by the autoindent feature.
-\end{itemize}
-
-The autoindentation and tab size options are the most important settings
-of those listed above.  They help to make sure that your code format looks the
-same when viewed by other developers in the lab.  See section
-\ref{sec:indent} for more information.
-
 \subsubsection{Syntax highlighting}
 
 Syntax highlighting is an editor feature that uses various colors to
@@ -644,18 +606,6 @@ helpful to provide a brief description of what is contained in the
 each source file.  This should just be a few summary lines below the
 copyright information.
 
-\subsubsection{Tab sizes}
-
-The tab size in your editor should be set to 3 (See section
-\ref{sec:editors} for more information about how to do this).  Do not
-use settings that cause all of your tabs to be converted into spaces.
-Keep in mind when printing and using other text processing tools that
-they will generally use a tab size of 8.  This can cause problems when
-trying to print your code effectively.  Luckily there are tools such as
-{\tt enscript} and {\tt atp} that allow you to generate printable output
-and specify the tab size.  Check your man pages to see which is
-installed on your system.
-
 \subsubsection{Commenting}
 \label{sec:comments}
 
@@ -894,32 +844,6 @@ and
 void dealloc_foo(struct foo*);
 \end{verbatim}
 
-\subsubsection{Enumeration}
-
-Compiler directives (such as \#define) are often used in places where
-enumeration would be more appropriate.  Enumerations have two
-advantages.  The first is that they let the compiler do type checking
-more easily on the values.  Secondly, they allow you group together
-related values.  For example:
-
-\begin{verbatim}
-/* possible message states */
-enum
-{
-   PVFS_INITIAL = 1,
-   PVFS_INPROGRESS = 2,
-   PVFS_DONE = 4,
-   PVFS_ERROR = 8
-};
-
-rather than:
-
-#define PVFS_INITAL 1
-#define PVFS_INPROGRESS 2
-#define PVFS_DONE 4
-#define PVFS_ERROR 8
-\end{verbatim}
-
 \subsubsection{Keeping up with work in progress}
 
 There are often questionable issues, or even issues that you don't have
@@ -1150,13 +1074,6 @@ issues here:
 
 %=======================================================================
 
-\section{Java Programming}
-
-\emph{I have no idea...}
-
-
-%=======================================================================
-
 \section{Specific PVFS issues}
 
 \subsection{Copyright information}
@@ -1207,11 +1124,6 @@ and {\tt METH\_tcp\_recv}.
 listed above as well.  This naming convention is for both functions and
 global variables.
 \end{itemize}
-
-\subsection{Request encoding}
-
-\emph{I don't know anything about this, but we need to reach a consensus
-on whether to use XDR format or not}
 
 \subsection{Error logging with Gossip}
 
@@ -1290,114 +1202,6 @@ becomes more tedious when building larger software projects.  The
 problem is that you must store the error value somewhere when passing
 the error back through multiple abstraction layers.  This tends to cause
 confusion in large projects.
-
-\subsubsection{PVFS error handling}
-
-In PVFS we advocate handling error values in a manner similar to that of
-the Linux kernel.  By that we mean that most functions should have an
-integer return value.  Functions should return 0 if successful, or
-return a negative number that encodes the error value if an error
-occurs.  This is the general case; some common exceptions will be listed
-shortly.
-
-When you wish to return an error code, there are three ways to obtian
-this value, depending on what portion of your code actual failed:
-
-\begin{itemize}
-\item System call failure:  If a system call fails within your function,
-then you can simply return the negative value if the errno code that the
-system call set.  For example:
-\begin{verbatim}
-int ret = -1;
-ret = read(my_fd, my_buffer, my_count);
-if(ret < 0)
-{
-   return(-errno);
-}
-\end{verbatim}
-
-Make sure to save the value of errno in a temporary location if you make
-another system call before you return the error code.  Errno is
-overwritten with each system call.  Example:
-
-\begin{verbatim}
-int ret = -1;
-int tmp_error = 0;
-ret = read(my_fd, my_buffer, my_count);
-if(ret < 0)
-{
-   tmp_error = errno;
-   printf("Oh no! Something bad happened!\n");
-   return(-tmp_error);
-}
-\end{verbatim}
-
-
-\item Failure of another PVFS function:  If you call another PVFS
-function from within yours and it fails, then the other PVFS function
-should have already encoded the error value and you can simply return
-it.  For example:
-\begin{verbatim}
-int ret = -1;
-ret = PINT_do_pvfs_stuff();
-if(ret < 0)
-{
-   return(ret);
-}
-\end{verbatim}
-
-\item Failure of your own code:  If your own code reaches an error
-state, then you need to pick an error value to return.  You can choose
-from the list of predefined error codes that can be found in {\tt
-/usr/include/asm/errno.h}.  Be sure to negate these error values,
-because they are all positive by default.
-\begin{verbatim}
-if( something bad happens )
-{
-   return(-EINVAL);
-}
-\end{verbatim}
-
-\end{itemize}
-
-When you wish to actually print out the string representation of the
-error, you might find it useful to use the {\tt strerror()} function.
-\begin{verbatim}
-int ret = -1;
-ret = PINT_do_pvfs_stuff();
-if (ret < 0)
-{
-   printf("%s\n", strerror(-ret));
-}
-\end{verbatim}
-
-The examples listed above are the most common, but you may wish to use
-other types of return values as well.  Functions that allocate data
-structures usually return pointers.  In this case, error should be
-indicated by returning {\tt NULL}, and the caller will simply assume
-that a memory error has occurred.  
-
-There are also cases where functions may wish to return more information
-coded as a positive return value.  This is acceptable as well.
-Functions which count items may return a positive integer count on
-success, or a negative errno value on failure, for example.
-
-\subsection{Statistics gathering}
-
-We need to make an effor to provide hooks for gathering statistics at
-various levels of the file system.  
-
-\emph{This needs work. Don't log everything, (maybe counts, avg, variance, min, max?),
-need an interface for this- maybe a special file that can be read from
-servers similar to /proc interface}
-
-\subsection{Server design stuff}
-
-\emph{cover watchdog processes, good initialization steps.  Um, I
-probably shouldn't be the one writing this part.}
-
 \end{document}
-
-
 
 
