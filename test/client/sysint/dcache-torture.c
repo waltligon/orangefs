@@ -5,23 +5,21 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
-#include <pint-dcache.h>
-#include <gossip.h>
+#include "pvfs2.h"
+#include "pint-dcache.h"
+#include "gossip.h"
 
 #define ENTRIES_TO_ADD 255
-
-void gen_rand_str(int len, char** gen_str);
 
 int main(int argc, char **argv)	
 {
     int ret = -1;
     int found_flag, i;
-
     PVFS_pinode_reference test_ref;
-
-    char* new_filename[ENTRIES_TO_ADD];
+    char new_filename[ENTRIES_TO_ADD][PVFS_NAME_MAX];
 
     PVFS_pinode_reference root_ref = {100,0};
 
@@ -32,42 +30,51 @@ int main(int argc, char **argv)
     ret = PINT_dcache_initialize();
     if(ret < 0)
     {
-	fprintf(stderr, "dcache_initialize() failure.\n");
+	gossip_err("dcache_initialize() failure.\n");
 	return(-1);
     }
 
+    PINT_dcache_set_timeout(5000);
+
     for(i = 0; i < ENTRIES_TO_ADD; i++)
     {
-	gen_rand_str( 10, &new_filename[i]);
+        snprintf(new_filename[i],PVFS_NAME_MAX,"dcache_testnameXXXXXX");
+        mkstemp(new_filename[i]);
 	test_ref.handle = i;
 	test_ref.fs_id = 0;
-	ret = PINT_dcache_insert( new_filename[i], test_ref,
-				  root_ref);
-	if(ret < 0)
+	ret = PINT_dcache_insert(new_filename[i], test_ref, root_ref);
+	if (ret < 0)
 	{
-	    fprintf(stderr, "Error: failed to insert entry.\n");
+	    gossip_err("Error: failed to insert entry.\n");
 	    return(-1);
 	}
     }
+
+    gossip_debug(DCACHE_DEBUG, "Attempted insertion of %d dcache "
+                 "elements\n", ENTRIES_TO_ADD);
 
     for(i = 0; i < ENTRIES_TO_ADD; i++)
     {
 	ret = PINT_dcache_lookup(new_filename[i], root_ref, &test_ref);
-	if (ret < 0 && ret != -PVFS_ENOENT)
+	if ((ret < 0) && (ret != -PVFS_ENOENT))
 	{
-	    fprintf(stderr, "dcache_lookup() failure.\n");
+	    gossip_err("dcache_lookup() failure.\n");
 	    return(-1);
 	}
 
-	if (i >= ENTRIES_TO_ADD - PINT_DCACHE_MAX_ENTRIES)
+	if (i >= (ENTRIES_TO_ADD - PINT_DCACHE_MAX_ENTRIES))
 	{
-	    if (ret == -PVFS_ENOENT) {
-		fprintf(stderr, "Failure: lookup didn't find an entry.\n");
+	    if (ret == -PVFS_ENOENT)
+            {
+		gossip_err("Failure: lookup didn't find an entry %d.\n",i);
+                break;
 	    }
 	    /*should have a valid handle*/
-	    else if(test_ref.handle != i)
+	    else if (test_ref.handle != (PVFS_handle)i)
 	    {
-		fprintf(stderr, "Failure: lookup returned %lld when it should have returned %d.\n", test_ref.handle, i);
+		gossip_err("Failure: lookup returned %Ld when it should "
+                           "have returned %d.\n", test_ref.handle, i);
+                break;
 	    }
 	}
 	else
@@ -75,76 +82,56 @@ int main(int argc, char **argv)
 	    /*these should be cache misses*/
 	    if (ret == 0)
 	    {
-		fprintf(stderr, "Failure: lookup returned %lld when it shouldn't have returned a handle.\n", test_ref.handle);
+		gossip_err("Failure: lookup returned %Ld when it "
+                           "shouldn't have returned a handle.\n",
+                           test_ref.handle);
+                break;
 	    }
 	}
     }
 
-    /*remove all entries */
-    for(i = 0; i < ENTRIES_TO_ADD;i++)
+    if (i == ENTRIES_TO_ADD)
     {
-	ret = PINT_dcache_remove(new_filename[i], root_ref,
-				 &found_flag);
-	if(ret < 0)
+        gossip_debug(DCACHE_DEBUG, "All expected lookups were ok\n");
+    }
+
+    /*remove all entries */
+    for(i = 0; i < ENTRIES_TO_ADD; i++)
+    {
+	ret = PINT_dcache_remove(new_filename[i], root_ref, &found_flag);
+	if (ret < 0)
 	{
-	    fprintf(stderr, "Error: dcache_remove() failure.\n");
+	    gossip_err("Error: dcache_remove() failure.\n");
 	    return(-1);
 	}
 
-	if(!found_flag)
+	if (!found_flag)
 	{
-	    if (i >= ENTRIES_TO_ADD - PINT_DCACHE_MAX_ENTRIES)
+	    if (i >= (ENTRIES_TO_ADD - PINT_DCACHE_MAX_ENTRIES))
 	    {
-				/*should have a valid handle*/
-		fprintf(stderr, "Error: dcache_remove() didn't find %d when it was supposed to.\n", i);
+                /*should have a valid handle*/
+		gossip_err("Error: dcache_remove() didn't find %d when "
+                           "it was supposed to.\n", i);
 	    }
 	}
 	else
 	{
-	    if (i < ENTRIES_TO_ADD - PINT_DCACHE_MAX_ENTRIES)
+	    if (i < (ENTRIES_TO_ADD - PINT_DCACHE_MAX_ENTRIES))
 	    {
-				/*shouldn't have a valid handle*/
-		fprintf(stderr, "Error: dcache_remove() found %d when it wasn't supposed to.\n", i);
+                /*shouldn't have a valid handle*/
+		gossip_err("Error: dcache_remove() found %d when it "
+                           "wasn't supposed to.\n", i);
 	    }
 	}
     }
 
-    /* finalize the cache */
     ret = PINT_dcache_finalize();
-    if(ret < 0)
+    if (ret < 0)
     {
-	fprintf(stderr, "dcache_finalize() failure.\n");
+	gossip_err("dcache_finalize() failure.\n");
 	return(-1);
     }
-
-    /*free all the random filenames */
-    for(i = 0; i < ENTRIES_TO_ADD;i++)
-    {
-	free(new_filename[i]);
-    }
-
     return(0);
-}
-
-/* generate random filenames cause ddd sucks and doesn't like taking cmd line
- * arguments (and remove doesn't work yet so I can't cleanup the crap I already
- * created)
- */
-void gen_rand_str(int len, char** gen_str)
-{
-    static char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
-    int i;
-    struct timeval poop;
-    int newchar = 0;
-    gettimeofday(&poop, NULL);
-
-    *gen_str = malloc(len + 1);
-    for(i = 0; i < len; i++)
-    {
-	newchar = ((1+(rand() % 26)) + poop.tv_usec) % 26;
-	(*gen_str)[i] = alphabet[newchar];
-    }
-    (*gen_str)[len] = '\0';
 }
 
 /*

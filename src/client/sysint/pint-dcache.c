@@ -6,8 +6,8 @@
 
 /* PVFS directory cache implementation */
 
-#include <pint-dcache.h>
 #include <assert.h>
+#include "pint-dcache.h"
 
 /* Dcache Entry */
 struct dcache_entry_s {
@@ -46,24 +46,75 @@ typedef struct dcache_s dcache;
  */
 #define ENABLE_DCACHE 1
 
+/* static internal helper methods */
 static void dcache_remove_dentry(int item);
 static void dcache_rotate_dentry(int item);
 static int dcache_update_dentry_timestamp(dcache_entry* entry); 
-static int check_dentry_expiry(struct timeval t2);
-static int dcache_add_dentry(char *name,
-	PVFS_pinode_reference parent, PVFS_pinode_reference entry);
 static int dcache_get_lru(void);
-static int compare(struct dcache_t element,char *name, PVFS_pinode_reference refn);
+static int dcache_add_dentry(
+    char *name,
+    PVFS_pinode_reference parent,
+    PVFS_pinode_reference entry);
 
-/* The PVFS Dcache */
-static dcache* cache = NULL;
+/* static globals required for dcache operation */
+static dcache *cache = NULL;
+static int s_pint_dcache_timeout_ms = (PINT_DCACHE_TIMEOUT * 1000);
+
+
+/* compare
+ *
+ * compares a dcache entry to the search key
+ *
+ * returns 1 on an equal comparison (match), 0 otherwise
+ */
+static inline int compare(
+    struct dcache_t element,
+    char *name,
+    PVFS_pinode_reference refn)
+{
+    int ret = 0;
+
+    if ((element.dentry.parent.handle == refn.handle) &&
+        (element.dentry.parent.fs_id == refn.fs_id))
+    {
+        int len1 = strlen(name);
+        int len2 = strlen(element.dentry.name);
+        int len = ((len1 < len2) ? len1 : len2);
+        ret = (strncmp(name,element.dentry.name,len) == 0);
+    }
+    return ret;
+}
+
+/* check_dentry_expiry
+ *
+ * need to validate the dentry against the timestamp
+ *
+ * returns 0 if dentry timestamp is valid, -1 if dentry is expired
+ */
+static inline int check_dentry_expiry(struct timeval time_stamp)
+{
+    int ret = 0;
+    struct timeval cur_time;
+
+    ret = gettimeofday(&cur_time,NULL);
+    if (ret == 0)
+    {
+        /* Does the timestamp exceed the current time? 
+         * If yes, dentry is valid. If no, it is stale.
+         */
+        ret = (((time_stamp.tv_sec > cur_time.tv_sec) ||
+                (time_stamp.tv_sec == cur_time.tv_sec &&
+                 time_stamp.tv_usec > cur_time.tv_usec)) ? 0 : -1);
+    }
+    return ret;
+}
 
 /* dcache_lookup
  *
  * search PVFS directory cache for specific entry
  *
- * returns 0 on success, -pvfs_errno on failure, -PVFS_ENOENT if entry is
- * not present.
+ * returns 0 on success, -pvfs_errno on failure,
+ * -PVFS_ENOENT if entry is not present.
  */
 int PINT_dcache_lookup(
     char *name,
@@ -76,19 +127,16 @@ int PINT_dcache_lookup(
 
     assert(name != NULL);
 
-    /* Grab a mutex */
     gen_mutex_lock(cache->mt_lock);
 
     /* No match found */
     entry->handle = PINT_DCACHE_HANDLE_INVALID;	
 
-    /* Search the cache */
     for(i = cache->top; i != BAD_LINK; i = cache->element[i].next)
     {
 	if (compare(cache->element[i],name,parent))
 	{
 	    /* match found; check to see if it is still valid */
-	    gossip_ldebug(DCACHE_DEBUG, "dcache match; checking timestamp.\n");
 	    ret = check_dentry_expiry(cache->element[i].dentry.tstamp_valid);
 	    if (ret < 0)
 	    {
@@ -105,13 +153,20 @@ int PINT_dcache_lookup(
 		return -PVFS_ENOENT;
 	    }
 
-	    /*update links so that this dentry is at the top of our list*/
+	    /*
+              update links so that this dentry is at the top of our list;
+              update the time stamp on the dcache entry
+            */
 	    dcache_rotate_dentry(i);
-
-	    /* TODO: should we extend the timeout period here? */
+            ret = dcache_update_dentry_timestamp(
+                &cache->element[i].dentry);
+            if (ret < 0)
+            {
+                gen_mutex_unlock(cache->mt_lock);
+                return -PVFS_ENOENT;
+            }
 	    entry->handle = cache->element[i].dentry.entry.handle;
 	    entry->fs_id = cache->element[i].dentry.entry.fs_id;	
-	    gossip_ldebug(DCACHE_DEBUG, "dcache entry valid.\n");
 	    gen_mutex_unlock(cache->mt_lock);
 	    return 0;
 	}
@@ -140,7 +195,6 @@ static void dcache_rotate_dentry(int item)
 	if(cache->top != item)
 	{
 	    /*only move links if there's more than one thing in the list*/
-
 	    if (cache->bottom == item)
 	    {
 		new_bottom = cache->element[cache->bottom].prev;
@@ -182,10 +236,8 @@ int PINT_dcache_insert(
 	int i = 0, index = 0, ret = 0;
 	unsigned char entry_found = 0;
 	
-	/* Grab a mutex */
 	gen_mutex_lock(cache->mt_lock);
 
-	/* Search the cache */
 	for (i = cache->top; i != BAD_LINK; i = cache->element[i].next)
 	{
 		if (compare(cache->element[i],name,parent))
@@ -207,19 +259,17 @@ int PINT_dcache_insert(
 		/* We move the dentry to the top of the list, update its
 		 * timestamp and return 
 		 */
-		gossip_ldebug(DCACHE_DEBUG, "dache inserting entry already present; timestamp update.\n");
+		gossip_ldebug(DCACHE_DEBUG, "dache inserting entry "
+                              "already present; timestamp update.\n");
 		dcache_rotate_dentry(index);
 		ret = dcache_update_dentry_timestamp(
 			&cache->element[index].dentry); 
 		if (ret < 0)
 		{
-			/* Release the mutex */
 			gen_mutex_unlock(cache->mt_lock);
 			return(ret);
 		}
 	}
-
-	/* Release the mutex */
 	gen_mutex_unlock(cache->mt_lock);
 	
 	return(0);
@@ -243,33 +293,22 @@ int PINT_dcache_remove(
 	int i = 0;
 
 	if (name == NULL)
+        {
 		return(-EINVAL);
+        }
 
-	/* Grab the mutex */
-	gen_mutex_lock(cache->mt_lock);
-
-	/* No match found */
 	*item_found = 0;
 	
-	/* Search the cache */
+	gen_mutex_lock(cache->mt_lock);
 	for(i = cache->top; i != BAD_LINK; i = cache->element[i].next)
 	{
 		if (compare(cache->element[i],name,parent))
 		{
-			/* Remove the cache element */
 			dcache_remove_dentry(i);
 			*item_found = 1;
-			gossip_ldebug(DCACHE_DEBUG, "dcache removing entry (%lld).\n", parent.handle);
 			break;
 		}
 	}
-
-	if(*item_found == 0)
-	{
-		gossip_ldebug(DCACHE_DEBUG, "dcache found no entry to remove.\n");
-	}
-
-	/* Relase the mutex */
 	gen_mutex_unlock(cache->mt_lock);
 
 	return(0);
@@ -289,83 +328,74 @@ int PINT_dcache_flush(void)
 	return(-ENOSYS);
 }
 
-/* pint_dinitialize
+/* pint_dcache_initialize
  *
- * initiliaze the PVFS directory cache
+ * initialize the PVFS directory cache
  *
  * returns 0 on success, -1 on failure
  */
 int PINT_dcache_initialize(void)
 {
 #if ENABLE_DCACHE
-    int i = 0;	
+    int ret = -1, i = 0;
 
-    cache = (dcache*)malloc(sizeof(dcache));
-    if(cache == NULL)
+    if (cache == NULL)
     {
-	return(-ENOMEM);
-    }
+        cache = (dcache*)malloc(sizeof(dcache));
+        if (cache)
+        {
+            cache->mt_lock = gen_mutex_build();
+            cache->top = BAD_LINK;
+            cache->bottom = 0;
+            cache->count = 0;
 
-    /* Init the mutex lock */
-    cache->mt_lock = gen_mutex_build();
-    cache->top = BAD_LINK;
-    cache->bottom = 0;
-    cache->count = 0;
-
-    for(i = 0;i < PINT_DCACHE_MAX_ENTRIES; i++)
-    {
-	cache->element[i].prev = BAD_LINK;
-	cache->element[i].next = BAD_LINK;
-	cache->element[i].status = STATUS_UNUSED;
+            for(i = 0;i < PINT_DCACHE_MAX_ENTRIES; i++)
+            {
+                cache->element[i].prev = BAD_LINK;
+                cache->element[i].next = BAD_LINK;
+                cache->element[i].status = STATUS_UNUSED;
+            }
+        }
+        ret = (cache ? 0 : -ENOMEM);
     }
-    return(0);
+    return ret;
 #else
-    return(0);
+    return 0;
 #endif
 }
 
-/* pint_dfinalize
+/* pint_dcache_finalize
  *
  * close down the PVFS directory cache framework
  *
- * returns 0 on success, -1 on failure
+ * returns 0
  */
 int PINT_dcache_finalize(void)
 {
 #if ENABLE_DCACHE
 
-    if (cache != NULL)
+    if (cache)
     {
-	/* Destroy the mutex */
 	gen_mutex_destroy(cache->mt_lock);
 	free(cache);
+        cache = NULL;
     }
-
-    cache = NULL;
-
-    return(0);
+    return 0;
 #else
-    return(0);
+    return 0;
 #endif
 }
 
-/* compare
- *
- *	compares a dcache entry to the search key
- *
- * returns 0 on success, -errno on failure
- */
-static int compare(struct dcache_t element,char *name,PVFS_pinode_reference refn)
+int PINT_dcache_get_timeout(void)
 {
-    /* Does the cache entry match the search key? */
-    if (!strncmp(name,element.dentry.name,strlen(name)) &&
-	element.dentry.parent.handle == refn.handle
-	&& element.dentry.parent.fs_id == refn.fs_id) 
-    {
-	return(1);
-    }
-    return(0);
+    return s_pint_dcache_timeout_ms;
 }
+
+void PINT_dcache_set_timeout(int max_timeout_ms)
+{
+    s_pint_dcache_timeout_ms = max_timeout_ms;
+}
+
 
 /* dcache_add_dentry
  *
@@ -373,13 +403,14 @@ static int compare(struct dcache_t element,char *name,PVFS_pinode_reference refn
  *
  * returns 0 on success, -errno on failure
  */
-static int dcache_add_dentry(char *name, PVFS_pinode_reference parent,
-		PVFS_pinode_reference entry)
+static int dcache_add_dentry(
+    char *name,
+    PVFS_pinode_reference parent,
+    PVFS_pinode_reference entry)
 {
 	int new = 0, ret = 0;
 	int size = strlen(name) + 1; /* size includes null terminator*/
 
-	/* Get the free item */
 	new = dcache_get_lru();
 
 	/* Add the element to the cache */
@@ -439,35 +470,6 @@ static int dcache_get_lru(void)
     gossip_ldebug(DCACHE_DEBUG, "error getting least recently used dentry.\n");
     gossip_ldebug(DCACHE_DEBUG, "cache->count = %d max_entries = %d.\n", cache->count, PINT_DCACHE_MAX_ENTRIES);
     assert(0);
-}
-
-/* check_dentry_expiry
- *
- * need to validate the dentry against the timestamp
- *
- * returns 0 on success, -1 on failure
- */
-static int check_dentry_expiry(struct timeval t2)
-{
-    int ret = 0;
-    struct timeval cur_time;
-
-    ret = gettimeofday(&cur_time,NULL);
-    if (ret < 0)
-    {
-	return(ret);
-    }
-    /* Does the timestamp exceed the current time? 
-     * If yes, dentry is valid. If no, it is stale.
-     */
-    if (t2.tv_sec > cur_time.tv_sec || (t2.tv_sec == cur_time.tv_sec &&
-	t2.tv_usec > cur_time.tv_usec))
-    {
-	return(0);
-    }
-	
-    /* Dentry is stale */
-    return(-1);
 }
 
 /* dcache_remove_dentry
@@ -530,16 +532,15 @@ static int dcache_update_dentry_timestamp(dcache_entry* entry)
 {
     int ret = 0;
 
-    /* Update the timestamp */
     ret = gettimeofday(&entry->tstamp_valid,NULL);
-    if (ret < 0)
+    if (ret == 0)
     {
-	return(-1);
+        entry->tstamp_valid.tv_sec +=
+            (int)(s_pint_dcache_timeout_ms / 1000);
+        entry->tstamp_valid.tv_usec +=
+            (int)(s_pint_dcache_timeout_ms % 1000);
     }
-
-    entry->tstamp_valid.tv_sec += PINT_DCACHE_TIMEOUT;
-
-    return(0);
+    return ret;
 }
 
 /*

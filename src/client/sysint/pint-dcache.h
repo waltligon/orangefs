@@ -42,4 +42,8 @@ int PINT_dcache_initialize(void);
 
 int PINT_dcache_finalize(void);
 
+int PINT_dcache_get_timeout(void);
+
+void PINT_dcache_set_timeout(int max_timeout_ms);
+
 #endif 
