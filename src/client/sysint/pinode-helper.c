@@ -477,10 +477,11 @@ int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
 		ptr->attr.ctime = attr.ctime;
 	if(mask & PVFS_ATTR_COMMON_MTIME)
 		ptr->attr.mtime = attr.mtime;
+	if(mask & PVFS_ATTR_COMMON_TYPE)
+		ptr->attr.objtype = attr.objtype;
 
 	/* set distribution if needed */
 	if ((mask & PVFS_ATTR_META_DIST) &&
-            (attr.objtype == PVFS_TYPE_METAFILE) &&
             (attr.u.meta.nr_datafiles > 0))
 	{
 		if(ptr->attr.u.meta.dfh)
@@ -496,7 +497,6 @@ int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
 
 	/* set datafile array if needed */
 	if ((mask & PVFS_ATTR_META_DFILES) &&
-            (attr.objtype == PVFS_TYPE_DATAFILE) &&
             (attr.u.meta.dist_size > 0))
 	{
 		gossip_lerr("WARNING: packing distribution to memcpy it.\n");

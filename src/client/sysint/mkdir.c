@@ -124,6 +124,10 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     req_p.u.mkdir.attr = attr;
     req_p.u.mkdir.attrmask = attrmask;
 
+    /* set the object type */
+    req_p.u.mkdir.attrmask |= PVFS_ATTR_COMMON_TYPE;
+    req_p.u.mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;
+
     max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
     /* send the server request */
@@ -245,6 +249,10 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     pinode_ptr->pinode_ref.fs_id = parent_refn.fs_id;
     pinode_ptr->mask = attrmask;
     pinode_ptr->attr = attr;
+
+    /* set the object type */
+    pinode_ptr->mask |= PVFS_ATTR_COMMON_TYPE;
+    pinode_ptr->attr.objtype = PVFS_TYPE_DIRECTORY;
 
     /* Fill in the timestamps */
     ret = phelper_fill_timestamps(pinode_ptr);

@@ -66,26 +66,27 @@ typedef enum PVFS_ds_type_e PVFS_ds_type;
 #define PVFS_ATTR_COMMON_ATIME	(1 << 3)
 #define PVFS_ATTR_COMMON_CTIME	(1 << 4)
 #define PVFS_ATTR_COMMON_MTIME	(1 << 5)
-#define PVFS_ATTR_COMMON_ALL	0x003f
+#define PVFS_ATTR_COMMON_TYPE	(1 << 6)
+#define PVFS_ATTR_COMMON_ALL	0x007f
 
 /* internal attribute masks for metadata objects */
-#define PVFS_ATTR_META_DIST	(1 << 6)
-#define PVFS_ATTR_META_DFILES	(1 << 7)
-#define PVFS_ATTR_META_ALL	0x00c0 
+#define PVFS_ATTR_META_DIST	(1 << 7)
+#define PVFS_ATTR_META_DFILES	(1 << 8)
+#define PVFS_ATTR_META_ALL	0x0180 
 
 /* internal attribute masks for datafile objects */
-#define PVFS_ATTR_DATA_SIZE	(1 << 8)
-#define PVFS_ATTR_DATA_ALL	0x0100
+#define PVFS_ATTR_DATA_SIZE	(1 << 9)
+#define PVFS_ATTR_DATA_ALL	0x0200
 
 /* attribute masks used by system interface callers */
-#define PVFS_ATTR_SYS_SIZE	(1 << 9)
+#define PVFS_ATTR_SYS_SIZE	(1 << 10)
 #define PVFS_ATTR_SYS_UID	PVFS_ATTR_COMMON_UID
 #define PVFS_ATTR_SYS_GID	PVFS_ATTR_COMMON_GID
 #define PVFS_ATTR_SYS_PERM	PVFS_ATTR_COMMON_PERM
 #define PVFS_ATTR_SYS_ATIME	PVFS_ATTR_COMMON_ATIME
 #define PVFS_ATTR_SYS_CTIME	PVFS_ATTR_COMMON_CTIME
 #define PVFS_ATTR_SYS_MTIME	PVFS_ATTR_COMMON_MTIME
-#define PVFS_ATTR_SYS_ALL_NOSIZE PVFS_ATTR_COMMON_ALL
+#define PVFS_ATTR_SYS_ALL_NOSIZE (PVFS_ATTR_COMMON_ALL-PVFS_ATTR_COMMON_TYPE)
 #define PVFS_ATTR_SYS_ALL	(PVFS_ATTR_SYS_ALL|PVFS_ATTR_SYS_SIZE)
 
 /* pinode reference (uniquely refers to a single pinode) */

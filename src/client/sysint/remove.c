@@ -80,7 +80,7 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	    {
 		phelper_release_pinode(pinode_ptr);
 		/* meta attributes aren't there- try again */
-		attr_mask += PVFS_ATTR_META_ALL;
+		attr_mask |= PVFS_ATTR_META_ALL;
 		ret = phelper_get_pinode(entry, &pinode_ptr,
 		    attr_mask, credentials);
 		if(ret < 0)

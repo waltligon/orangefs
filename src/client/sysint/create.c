@@ -381,6 +381,10 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	gossip_ldebug(CLIENT_DEBUG,"\t\tdatafile handle: %lld\n",
 		req_p.u.setattr.attr.u.meta.dfh[i]);
 
+	/* set the type of the object */
+	req_p.u.setattr.attr.objtype = PVFS_TYPE_METAFILE;
+	req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_TYPE;
+
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
 	op_tag = get_next_session_tag();
@@ -430,6 +434,10 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	pinode_ptr->mask = attrmask;
 	/* Allocate the handle array */
 	pinode_ptr->attr = req_p.u.setattr.attr;
+	/* set the object type */
+	pinode_ptr->attr.objtype = PVFS_TYPE_METAFILE;
+	pinode_ptr->mask |= PVFS_ATTR_COMMON_TYPE;
+
 	/* Fill in the timestamps */
 
 	ret = phelper_fill_timestamps(pinode_ptr);
