@@ -758,7 +758,7 @@ do                                                \
 static inline int pvfs2_internal_revalidate(
     struct inode *inode)
 {
-    int ret = 0;
+    int ret = -EINVAL;
     if (inode)
     {
         ret = ((pvfs2_inode_getattr(inode) == 0) ? 1 : 0);

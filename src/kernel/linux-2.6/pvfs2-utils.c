@@ -195,7 +195,7 @@ static inline int copy_attributes_to_inode(
                 ret = 0;
                 break;
             default:
-                pvfs2_error("pvfs2: copy_attributes_to_inode: got invalid "
+                pvfs2_error("pvfs2:copy_attributes_to_inode: got invalid "
                             "attribute type %d\n", attrs->objtype);
         }
     }
@@ -325,8 +325,7 @@ static inline int copy_attributes_from_inode(
   issues a pvfs2 getattr request and fills in the appropriate inode
   attributes if successful.  returns 0 on success; -errno otherwise
 */
-int pvfs2_inode_getattr(
-    struct inode *inode)
+int pvfs2_inode_getattr(struct inode *inode)
 {
     int ret = -EINVAL, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -387,6 +386,8 @@ int pvfs2_inode_getattr(
             {
                 pvfs2_error("pvfs2_inode_getattr: failed to copy "
                             "attributes\n");
+                ret = -ENOENT;
+                goto copy_attr_failure;
             }
         }
 
@@ -394,6 +395,7 @@ int pvfs2_inode_getattr(
         ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
         translate_error_if_wait_failed(ret, 0, 0);
 
+      copy_attr_failure:
         pvfs2_print("Getattr on handle %Lu, fsid %d\n  (inode ct = %d) "
                     "returned %d (error_exit = %d)\n",
                     pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id,

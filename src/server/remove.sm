@@ -300,22 +300,21 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
 static int remove_remove_dspace(PINT_server_op *s_op,
 				job_status_s* js_p)
 {
-    int ret;
+    int ret = -PVFS_EINVAL;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("remove_dspace");
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) remove: removing dspace "
+                 "object %Lu,%d\n", s_op, Lu(s_op->req->u.remove.handle),
+                 s_op->req->u.remove.fs_id);
+
     ret = job_trove_dspace_remove(
-        s_op->req->u.remove.fs_id,
-        s_op->req->u.remove.handle,
+        s_op->req->u.remove.fs_id, s_op->req->u.remove.handle,
         PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.remove.fs_id),
-        s_op,
-        0,
-        js_p,
-        &j_id,
-        server_job_context);
+            user_opts, s_op->req->u.remove.fs_id), s_op, 0, js_p,
+        &j_id, server_job_context);
 
     return ret;
 }

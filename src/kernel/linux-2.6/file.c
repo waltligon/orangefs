@@ -57,6 +57,10 @@ int pvfs2_file_open(
             {
                 file->f_pos = i_size_read(inode);
             }
+            else
+            {
+                pvfs2_make_bad_inode(inode);
+            }
         }
 
         /*

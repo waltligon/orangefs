@@ -896,7 +896,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 
     ret = dbpf_open_cache_attr_get(
         op_p->coll_p->coll_id, 0, &attr_ref);
-    if(ret < 0)
+    if (ret < 0)
     {
         error = ret;
         goto return_error;
@@ -906,14 +906,12 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     /* get an fd for the bstream so we can check size */
     ret = dbpf_open_cache_get(
         op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_FD, &tmp_ref);
-    if(ret < 0)
+    if (ret < 0)
     {
         /*
-          TODO:
-          how do we tell a real error from
-          'haven't yet created yet' error
+          FIXME: we can't tell when this error is an actual error or
+          excusable because we haven't created the keyval yet
         */
-        /* b_size is already set to zero */
     }
     else
     {
@@ -924,22 +922,22 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
             error = -TROVE_EBADF;
             goto return_error;
         }
-        b_size = (TROVE_size) b_stat.st_size;
+        b_size = (TROVE_size)b_stat.st_size;
     }
 
     ret = dbpf_open_cache_get(
         op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_DB, &tmp_ref);
+
     if (ret == 0)
     {
         ret = tmp_ref.db_p->stat(tmp_ref.db_p,
-                          &k_stat_p,
+                                 &k_stat_p,
 #ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
-                          NULL,
+                                 NULL,
 #endif
-                          0);
+                                 0);
 
-        dbpf_open_cache_put(
-            &tmp_ref);
+        dbpf_open_cache_put(&tmp_ref);
 
         if (ret == 0)
         {
@@ -949,18 +947,17 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         else
         {
             gossip_err("Error: unable to stat handle %Lu (%Lx).\n",
-                Lu(op_p->handle), Lu(op_p->handle));
+                       Lu(op_p->handle), Lu(op_p->handle));
             error = -TROVE_EIO;
             goto return_error;
         }
     }
     else
     {
-        /* TODO: HOW DO WE TELL A REAL ERROR FROM A "HAVEN'T
-         * CREATED YET" ERROR?
-         */
-        /* b_size is already set to zero */
-        /* drop through */
+        /*
+          FIXME: we can't tell when this error is an actual error or
+          excusable because we haven't created the keyval yet
+        */
     }
 
     memset(&key, 0, sizeof(key));

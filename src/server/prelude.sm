@@ -135,7 +135,7 @@ static int prelude_getattr_if_needed(
     if (target_handle == PVFS_HANDLE_NULL)
     {
         js_p->error_code = 0;
-        return(1);
+        return 1;
     }
 
     /* all other operations fall to this point and read basic

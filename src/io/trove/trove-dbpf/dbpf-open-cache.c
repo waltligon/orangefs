@@ -80,11 +80,12 @@ void dbpf_open_cache_initialize(void)
     /* run through preallocated cache elements to initialize
      * and put them on the free list
      */
-    if(OPEN_CACHE_SIZE == 0)
+    if (OPEN_CACHE_SIZE == 0)
     {
 	gossip_err("Warning: dbpf_open_cache disabled.\n");
     }
-    for(i=0; i<OPEN_CACHE_SIZE; i++)
+
+    for (i = 0; i < OPEN_CACHE_SIZE; i++)
     {
 	prealloc[i].fd = -1;
 	prealloc[i].db_p = NULL;
@@ -92,8 +93,6 @@ void dbpf_open_cache_initialize(void)
     }
 
     gen_mutex_unlock(&cache_mutex);
-
-    return;
 }
 
 void dbpf_open_cache_finalize(void)
@@ -108,12 +107,13 @@ void dbpf_open_cache_finalize(void)
     {
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
 	    queue_link);
-	if(tmp_entry->fd > -1)
+	if (tmp_entry->fd > -1)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
 	    tmp_entry->fd = -1;
 	}
-	if(tmp_entry->db_p)
+
+	if (tmp_entry->db_p)
 	{
 	    tmp_entry->db_p->close(tmp_entry->db_p, 0);
 	    tmp_entry->db_p = NULL;
@@ -124,12 +124,13 @@ void dbpf_open_cache_finalize(void)
     {
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
 	    queue_link);
-	if(tmp_entry->fd > -1)
+	if (tmp_entry->fd > -1)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
 	    tmp_entry->fd = -1;
 	}
-	if(tmp_entry->db_p)
+
+	if (tmp_entry->db_p)
 	{
 	    tmp_entry->db_p->close(tmp_entry->db_p, 0);
 	    tmp_entry->db_p = NULL;
@@ -141,7 +142,6 @@ void dbpf_open_cache_finalize(void)
     INIT_QLIST_HEAD(&used_list);
     INIT_QLIST_HEAD(&unused_list);
     gen_mutex_unlock(&cache_mutex);
-    return;
 }
 
 int dbpf_open_cache_get(
@@ -154,19 +154,23 @@ int dbpf_open_cache_get(
     struct qlist_head* tmp_link;
     struct open_cache_entry* tmp_entry = NULL;
     int found = 0;
-    int ret;
+    int ret = 0;
+
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "dbpf_open_cache_get: called\n");
 
     gen_mutex_lock(&cache_mutex);
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	"dbpf_open_cache_get: type: %d\n", (int)type);
-   
-    /* check the list of already opened objects first, reuse ref if possible */
+
+    /* check already opened objects first, reuse ref if possible */
     qlist_for_each(tmp_link, &used_list)
     {
-	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
-	    queue_link);
-	if(tmp_entry->handle == handle && tmp_entry->coll_id == coll_id)
+	tmp_entry = qlist_entry(
+            tmp_link, struct open_cache_entry, queue_link);
+	if ((tmp_entry->handle == handle) &&
+            (tmp_entry->coll_id == coll_id))
 	{
 	    found = 1;
 	    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
@@ -175,13 +179,14 @@ int dbpf_open_cache_get(
 	}
     }
 
-    if(!found)
+    if (!found)
     {
 	qlist_for_each(tmp_link, &unused_list)
 	{
-	    tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
-		queue_link);
-	    if(tmp_entry->handle == handle && tmp_entry->coll_id == coll_id)
+	    tmp_entry = qlist_entry(
+                tmp_link, struct open_cache_entry, queue_link);
+	    if ((tmp_entry->handle == handle) &&
+                (tmp_entry->coll_id == coll_id))
 	    {
 		found = 1;
 		gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
@@ -191,26 +196,26 @@ int dbpf_open_cache_get(
 	}
     }
 
-    /* found a match */
-    if(found)
+    if (found)
     {
-	if((type & DBPF_OPEN_FD) && (tmp_entry->fd < 0))
+	if ((type & DBPF_OPEN_FD) && (tmp_entry->fd < 0))
 	{
 	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, create_flag);
-	    if(ret < 0)
+	    if (ret < 0)
 	    {
 		gen_mutex_unlock(&cache_mutex);
-		return(ret);
+		return ret;
 	    }
 	}
 
-	if((type & DBPF_OPEN_DB) && (tmp_entry->db_p == NULL))
+	if ((type & DBPF_OPEN_DB) && (tmp_entry->db_p == NULL))
 	{
-	    ret = open_db(&(tmp_entry->db_p), coll_id, handle, create_flag);
-	    if(ret < 0)
+	    ret = open_db(&(tmp_entry->db_p), coll_id,
+                          handle, create_flag);
+	    if (ret < 0)
 	    {
 		gen_mutex_unlock(&cache_mutex);
-		return(ret);
+		return ret;
 	    }
 	}
 
@@ -218,28 +223,25 @@ int dbpf_open_cache_get(
 	out_ref->fd = tmp_entry->fd;
 	out_ref->internal = tmp_entry;
 	tmp_entry->ref_ct++;
-	/* remove the entry and place it at the used head (assuming it will be
-	 * referenced again soon) 
+
+	/* remove the entry and place it at the used head (assuming it
+	 * will be referenced again soon)
 	 */
-	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	    "dbpf_open_cache_get: moving to (or reordering in) used list.\n");
+	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "dbpf_open_cache_get: "
+                     "moving to (or reordering in) used list.\n");
 	qlist_del(&tmp_entry->queue_link);
 	qlist_add(&tmp_entry->queue_link, &used_list);
 
 	gen_mutex_unlock(&cache_mutex);
-	return(0);
+	return 0;
     }
 
 
-    /* if we fall through to this point, then the object was not found in
-     * the cache. 
+    /* if we fall through to this point, then the object was not found
+     * in the cache. In order of priority we will now try: free list,
+     * unused_list, and then bypass cache
      */
-    /* In order of priority we will now try: free list, unused_list, and 
-     * then bypass cache
-     */
-
-    /* anything in the free list? */
-    if(!qlist_empty(&free_list))
+    if (!qlist_empty(&free_list))
     {
 	tmp_link = free_list.next;
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
@@ -249,60 +251,63 @@ int dbpf_open_cache_get(
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: resetting entry from free list.\n");
     }
- 
+
     /* anything in unused list (still open, but ref_ct == 0)? */
-    if(!found && !qlist_empty(&unused_list))
+    if (!found && !qlist_empty(&unused_list))
     {
 	tmp_link = unused_list.next;
-	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
-	    queue_link);
+	tmp_entry = qlist_entry(
+            tmp_link, struct open_cache_entry, queue_link);
 	qlist_del(&tmp_entry->queue_link);
 	found = 1;
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: resetting entry from unused list.\n");
 
-	if(tmp_entry->fd > -1)
+	if (tmp_entry->fd > -1)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
 	    tmp_entry->fd = -1;
 	}
-	if(tmp_entry->db_p != NULL)
+	if (tmp_entry->db_p != NULL)
 	{
 	    tmp_entry->db_p->close(tmp_entry->db_p, 0);
 	    tmp_entry->db_p = NULL;
 	}
     }
    
-    if(found)
+    if (found)
     {
-	/* we have an entry to work with; fill it in and place in used list */
+	/* have an entry to work with; fill in and place in used list */
 	tmp_entry->ref_ct = 1;
 	tmp_entry->coll_id = coll_id;
 	tmp_entry->handle = handle;
 	tmp_entry->db_p = NULL;
 	tmp_entry->fd = -1;
-	if(type & DBPF_OPEN_FD)
+	if (type & DBPF_OPEN_FD)
 	{
 	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, create_flag);
-	    if(ret < 0)
+	    if (ret < 0)
 	    {
 		qlist_add(&tmp_entry->queue_link, &free_list);
 		gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-		    "dbpf_open_cache_get: could not open.\n");
+                             "dbpf_open_cache_get: could not open "
+                             "(ret=%d)\n", ret);
+
 		gen_mutex_unlock(&cache_mutex);
-		return(ret);
+		return ret;
 	    }
 	}
 
-	if(type & DBPF_OPEN_DB)
+	if (type & DBPF_OPEN_DB)
 	{
 	    /* need to open db */
-	    ret = open_db(&(tmp_entry->db_p), coll_id, handle, create_flag);
-	    if(ret < 0)
+	    ret = open_db(&(tmp_entry->db_p), coll_id,
+                          handle, create_flag);
+	    if (ret < 0)
 	    {
 		qlist_add(&tmp_entry->queue_link, &free_list);
 		gen_mutex_unlock(&cache_mutex);
-		return(ret);
+		return ret;
 	    }
 	}
 
@@ -313,42 +318,47 @@ int dbpf_open_cache_get(
 	    "dbpf_open_cache_get: moving to used list.\n");
 	qlist_add(&tmp_entry->queue_link, &used_list);
 	gen_mutex_unlock(&cache_mutex);
-	return(0);
+	return 0;
     }
 
-    /* if we reach this point the entry wasn't cached _and_ would could not
-     * create a new entry for it (cache exhausted).  In this case just open
-     * the file and hand out a reference that will not be cached
+    /* if we reach this point the entry wasn't cached _and_ would
+     * could not create a new entry for it (cache exhausted).  In this
+     * case just open the file and hand out a reference that will not
+     * be cached
      */
     out_ref->fd = -1;
     out_ref->db_p = NULL;
 
-    if(type & DBPF_OPEN_FD)
+    if (type & DBPF_OPEN_FD)
     {
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: missed cache entirely.\n");
 	ret = open_fd(&(out_ref->fd), coll_id, handle, create_flag);
-	if(ret < 0)
+	if (ret < 0)
 	{
 	    gen_mutex_unlock(&cache_mutex);
-	    return(ret);
+	    return ret;
 	}
     }
 
-    if(type & DBPF_OPEN_DB)
+    if (type & DBPF_OPEN_DB)
     {
 	/* need to open db */
 	ret = open_db(&(out_ref->db_p), coll_id, handle, create_flag);
-	if(ret < 0)
+	if (ret < 0)
 	{
 	    gen_mutex_unlock(&cache_mutex);
-	    return(ret);
+	    return ret;
 	}
     }
 
     out_ref->internal = NULL;
     gen_mutex_unlock(&cache_mutex);
-    return(0);
+
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "dbpf_open_cache_get: returning 0\n");
+
+    return 0;
 }
     
 void dbpf_open_cache_put(
@@ -415,6 +425,9 @@ int dbpf_open_cache_remove(
     DB* db_p = NULL;
     int tmp_error = 0;
 
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "dbpf_open_cache_remove: called\n");
+
     gen_mutex_lock(&cache_mutex);
 
     /* for error checking for now, let's make sure that this object is _not_
@@ -427,7 +440,8 @@ int dbpf_open_cache_remove(
     {
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
 	    queue_link);
-	if(tmp_entry->handle == handle && tmp_entry->coll_id == coll_id)
+	if ((tmp_entry->handle == handle) &&
+            (tmp_entry->coll_id == coll_id))
 	{
 	    assert(0);
 	}
@@ -438,7 +452,8 @@ int dbpf_open_cache_remove(
     {
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
 	    queue_link);
-	if(tmp_entry->handle == handle && tmp_entry->coll_id == coll_id)
+	if ((tmp_entry->handle == handle) &&
+            (tmp_entry->coll_id == coll_id))
 	{
 	    qlist_del(&tmp_entry->queue_link);
 	    found = 1;
@@ -446,16 +461,16 @@ int dbpf_open_cache_remove(
 	}
     }
 
-    if(found)
+    if (found)
     {
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_remove: unused entry.\n");
-	if(tmp_entry->fd > -1)
+	if (tmp_entry->fd > -1)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
 	    tmp_entry->fd = -1;
 	}
-	if(tmp_entry->db_p != NULL)
+	if (tmp_entry->db_p != NULL)
 	{
 	    tmp_entry->db_p->close(tmp_entry->db_p, 0);
 	    tmp_entry->db_p = NULL;
@@ -474,10 +489,13 @@ int dbpf_open_cache_remove(
                               my_storage_p->name, coll_id, Lu(handle));
 
     ret = DBPF_UNLINK(filename);
-    if (ret != 0 && errno != ENOENT)
+    if ((ret != 0) && (errno != ENOENT))
     {
-	tmp_error =  -trove_errno_to_trove_error(errno); 
+	tmp_error = -trove_errno_to_trove_error(errno); 
     }
+
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "Unlinked filename: "
+                 "(ret=%d, errno=%d)\n%s\n", ret, errno, filename);
 
     DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name,
                            coll_id, handle);
@@ -485,13 +503,20 @@ int dbpf_open_cache_remove(
     assert(ret == 0);
 
     ret = db_p->remove(db_p, filename, NULL, 0);
-    if (ret != 0 && ret != ENOENT)
+    if ((ret != 0) && (ret != ENOENT))
     {
 	tmp_error = -dbpf_db_error_to_trove_error(ret);
     }
 
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "Removed DB filename: "
+                 "(ret=%d)\n%s\n", ret, filename);
+
     gen_mutex_unlock(&cache_mutex);
-    return(tmp_error);
+
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "dbpf_open_cache_remove: returning %d\n", tmp_error);
+
+    return tmp_error;
 }
 
 static int open_fd(
@@ -501,6 +526,10 @@ static int open_fd(
     int create_flag)
 {
     char filename[PATH_MAX] = {0};
+
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "dbpf_open_cache open_fd: opening fd %Lu (%Lx).\n",
+                 Lu(handle), Lu(handle));
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
 			      my_storage_p->name, coll_id, Lu(handle));
@@ -523,8 +552,8 @@ static int open_db(
     char filename[PATH_MAX] = {0};
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	"dbpf_open_cache open_db: opening db %Lu (%Lx).\n",
-	Lu(handle), Lu(handle));
+                 "dbpf_open_cache open_db: opening db %Lu (%Lx).\n",
+                 Lu(handle), Lu(handle));
 
     /* special case; ds attrib database */
     if (handle == TROVE_HANDLE_NULL)
@@ -558,15 +587,18 @@ static int open_db(
     ret = internal_db_open(db_pp, filename, NULL,
                            DB_UNKNOWN, TROVE_DB_OPEN_FLAGS, 0);
 
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, " - internal_db_open "
+                 "returned %d\n", ret);
+
     if ((ret == ENOENT) && (create_flag != 0))
     {
-	gossip_debug(GOSSIP_TROVE_DEBUG, "About to create new DB "
-		     "file %s ... ", filename);
+	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "About to create "
+                     "new DB file %s ... ", filename);
 
         ret = internal_db_open(db_pp, filename, NULL, TROVE_DB_TYPE,
                                TROVE_DB_CREATE_FLAGS, TROVE_DB_MODE);
 
-	gossip_debug(GOSSIP_TROVE_DEBUG, "done\n");
+	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "done\n");
 
 	/* this can easily happen if the server is out of disk space */
 	if (ret)
