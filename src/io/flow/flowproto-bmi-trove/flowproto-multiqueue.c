@@ -19,7 +19,7 @@
 #include "trove.h"
 #include "thread-mgr.h"
     
-#define BUFFERS_PER_FLOW 6 
+#define BUFFERS_PER_FLOW 12
 #define BUFFER_SIZE (256*1024)
 #define MAX_REGIONS 16
 
