@@ -64,6 +64,7 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 	    break;
 	case PVFS_SYS_IO:
 	    sm_p->current_state = pvfs2_client_io_sm.state_machine + 1;
+	    break;
 	default:
 	    assert(0);
     }

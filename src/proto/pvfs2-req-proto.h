@@ -367,6 +367,32 @@ struct PVFS_servreq_io
     PVFS_offset io_req_offset;
 };
 
+#define PINT_SERVREQ_IO_FILL(__req,		\
+			     __creds,		\
+			     __fsid,		\
+			     __handle,		\
+			     __io_type,		\
+			     __flow_type,	\
+			     __datafile_nr,	\
+			     __datafile_ct,	\
+			     __io_dist,		\
+			     __io_req,		\
+			     __io_req_off)	\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op                 = PVFS_SERV_IO;	\
+    (__req).credentials        = (__creds);	\
+    (__req).u.io.fs_id         = (__fsid);	\
+    (__req).u.io.handle        = (__handle);	\
+    (__req).u.io.io_type       = (__io_type);	\
+    (__req).u.io.flow_type     = (__flow_type);	\
+    (__req).u.io.iod_num       = (__datafile_nr);	\
+    (__req).u.io.iod_count     = (__datafile_ct);	\
+    (__req).u.io.io_dist       = (__io_dist);	\
+    (__req).u.io.io_req        = (__io_req);	\
+    (__req).u.io.io_req_offset = (__io_req_off);	\
+} while (0)			     
+
 struct PVFS_servresp_io
 {
     PVFS_size bstream_size;	    /* size of datafile */

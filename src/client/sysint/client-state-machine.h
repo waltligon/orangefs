@@ -65,6 +65,19 @@ typedef struct PINT_client_sm_msgpair_state_s {
     PVFS_error op_status;
 } PINT_client_sm_msgpair_state;
 
+/* PINT_client_sm_recv_state_s
+ *
+ * This is used for extra receives, such as acknowledgements from
+ * servers at the end of write operations.
+ */
+typedef struct PINT_client_sm_recv_state_s {
+    int max_resp_sz;
+    void *encoded_resp_p;
+    job_id_t recv_id;
+    job_status_s recv_status;
+    PVFS_error op_status;
+} PINT_client_sm_recv_state;
+
 /* PINT_client_remove_sm */
 struct PINT_client_remove_sm {
     char                         *object_name;    /* input parameter */
@@ -90,6 +103,7 @@ struct PINT_client_getattr_sm {
 /* PINT_client_io_sm */
 struct PINT_client_io_sm {
     PVFS_pinode_reference object_ref;       /* input parameter */
+    enum PVFS_sys_io_type io_type;          /* input parameter */
     PVFS_Request          io_req;           /* input parameter */
     PVFS_offset           io_req_offset;    /* input parameter */
     void                 *buffer;           /* input parameter */

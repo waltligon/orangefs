@@ -97,7 +97,10 @@ machine pvfs2_get_attr_sm(prelude,
 %%
 
 
-/* getattr_verify_attribs
+/* getattr_verify_attribs()
+ *
+ * We initialize the attribute mask that will be returned in this function.
+ * This mask can be augmented in some of the other states.
  */
 static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
@@ -134,6 +137,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
                      s_op->attr.u.meta.dfile_count);
         gossip_debug(SERVER_DEBUG, " dspace has dist size of %d\n",
                      s_op->attr.u.meta.dist_size);
+	a_p->mask = PVFS_ATTR_COMMON_ALL;
 
         if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
         {
@@ -154,12 +158,14 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
                      "a datafile.\n", s_op->req->u.getattr.handle);
 
         js_p->error_code = STATE_DATAFILE;
+        a_p->mask = PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_DATA_ALL;
     }
     else if (a_p->objtype == PVFS_TYPE_DIRECTORY)
     {
 	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
                      "a directory. doing nothing special\n",
 		     s_op->req->u.getattr.handle);
+	a_p->mask = PVFS_ATTR_COMMON_ALL;
     }
     else if (a_p->objtype == PVFS_TYPE_DIRDATA)
     {
@@ -172,6 +178,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
                      "a symlink. doing nothing special\n",
 		     s_op->req->u.getattr.handle);
+	a_p->mask = PVFS_ATTR_COMMON_ALL;
     }
     else
     {
@@ -180,8 +187,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 		     s_op->req->u.getattr.handle);
 
         a_p->objtype = PVFS_TYPE_DATAFILE;
-        a_p->mask |= PVFS_ATTR_SYS_SIZE;
-        a_p->mask |= PVFS_ATTR_DATA_ALL;
+        a_p->mask = PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_DATA_ALL;
 
         js_p->error_code = STATE_DATAFILE;
     }
@@ -380,7 +386,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     }
 
     if ((a_p->objtype == PVFS_TYPE_DATAFILE) &&
-        (a_p->mask & PVFS_ATTR_SYS_SIZE))
+        (a_p->mask & PVFS_ATTR_DATA_SIZE))
     {
         if (js_p->error_code != 0)
         {
