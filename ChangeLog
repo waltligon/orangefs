@@ -5,6 +5,8 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.7.0pre1
 ===============
+- fsck: server handles bogus datafiles better
+- fsck: pvfs2-fsck is a little smarter about what it tries to salvage
 - ib: avoid unsignaled WQE pileup
 - ib: avoid polling cancelled connections (first stab toward true cancel)
 - ib: spin-block in test functions for better performance
