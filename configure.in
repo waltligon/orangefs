@@ -147,6 +147,7 @@ src/common/llist/module.mk
 src/common/statecomp/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
+src/io/bmi/bmi_gm/module.mk
 src/io/description/module.mk
 src/io/flow/module.mk
 src/io/flow/flowproto-bmi-trove/module.mk
