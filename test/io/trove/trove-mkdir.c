@@ -30,8 +30,9 @@ int main(int argc, char ** argv)
 	TROVE_coll_id coll_id;
 	TROVE_ds_state state;
 	TROVE_handle parent_handle, file_handle;
+#if 0
 	TROVE_keyval_s key, val;
-	
+#endif
 
 	ret = parse_args(argc, argv);
 	if ( ret < 0 ) { 

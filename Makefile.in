@@ -17,7 +17,7 @@ CC = @CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LD = gcc
-CFLAGS += -Wall -pipe -I $(srcdir)/include
+CFLAGS += -Wconversion -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include
 LDFLAGS += -L lib
 LIBS += -lpvfs2
 # add all module directories into include path
