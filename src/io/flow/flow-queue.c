@@ -109,31 +109,6 @@ struct flow_descriptor *flow_queue_shownext(flow_queue_p fqp)
     return (flow_d);
 }
 
-/* flow_queue_search()
- *
- * searches a queue for a particular flow (does _not_ lock queue)
- *
- * returns pointer to flow descriptor on success, NULL on failure
- */
-flow_descriptor *flow_queue_search(flow_queue_p fqp,
-				   flow_descriptor * flow_d)
-{
-    struct qlist_head *tmp_link = NULL;
-    flow_descriptor *tmp_flow = NULL;
-
-    qlist_for_each(tmp_link, fqp)
-    {
-	tmp_flow = qlist_entry(tmp_link, struct flow_descriptor,
-			       sched_queue_link);
-	if (tmp_flow == flow_d)
-	{
-	    return (flow_d);
-	}
-    }
-
-    return (NULL);
-}
-
 /*
  * Local variables:
  *  c-indent-level: 4

@@ -12,6 +12,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <string.h>
+#include <assert.h>
 
 #include "quicklist.h"
 #include "gossip.h"
@@ -51,9 +52,6 @@ static int split_string_list(char ***tokens,
 
 static int setup_flow_queues(void);
 static int teardown_flow_queues(void);
-
-static int flow_quick_test(flow_descriptor * flow_d,
-			   int *outcount);
 
 /* tunable parameters */
 enum
@@ -461,39 +459,6 @@ int PINT_flow_memfree(flow_descriptor * flow_d,
     return (-ENOSYS);
 }
 
-
-/* flow_quick_test()
- *
- * Instantaneous check for completion of a particular flow
- *
- * returns 0 on success, -errno on failure
- */
-static int flow_quick_test(flow_descriptor * flow_d,
-			   int *outcount)
-{
-    flow_descriptor *query = NULL;
-
-    gen_mutex_lock(&interface_mutex);
-    /* this _should_ be the same whether we have a thread or not; just do
-     * a quick run through of the completion queue - no work
-     */
-    query = flow_queue_search(completion_queue, flow_d);
-    if (query)
-    {
-	flow_queue_remove(query);
-	flow_release(query);
-	*outcount = 1;
-    }
-    else
-    {
-	*outcount = 0;
-    }
-
-    gen_mutex_unlock(&interface_mutex);
-    return (0);
-}
-
-
 /* PINT_flow_test()
  *
  * Check for completion of a particular flow; is allowed to do work or
@@ -508,41 +473,47 @@ int PINT_flow_test(flow_descriptor * flow_d,
     int ret = -1;
     int num_completed;
 
-    /* see if the particular flow is already finished before we do
-     * anything
-     */
-    ret = flow_quick_test(flow_d, outcount);
-    if (ret < 0)
-    {
-	return (ret);
-    }
-    if (*outcount == 1)
-    {
-	/* done */
-	return (1);
-    }
+    assert(flow_d != 0);
+
+    *outcount = 0;
 
     gen_mutex_lock(&interface_mutex);
+
+    if(flow_d->state & FLOW_FINISH_MASK)
+    {
+	flow_queue_remove(flow_d);
+	flow_release(flow_d);
+	*outcount = 1;
+	gen_mutex_unlock(&interface_mutex);
+	return(1);
+    }
+
     /* push on work for one round */
     ret = do_one_work_cycle(&num_completed, max_idle_time_ms);
-    gen_mutex_unlock(&interface_mutex);
 
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
     if (num_completed == 0)
     {
 	/* don't bother scanning the completion queue again */
+	gen_mutex_unlock(&interface_mutex);
 	return (0);
     }
 
-    /* check again to see if the flow finished */
-    ret = flow_quick_test(flow_d, outcount);
-    if (ret == 0 && *outcount == 1)
-	return (1);
-    else
-	return (ret);
+    if(flow_d->state & FLOW_FINISH_MASK)
+    {
+	flow_queue_remove(flow_d);
+	flow_release(flow_d);
+	*outcount = 1;
+	gen_mutex_unlock(&interface_mutex);
+	return(1);
+    }
+
+    gen_mutex_unlock(&interface_mutex);
+    return(0);
 }
 
 
