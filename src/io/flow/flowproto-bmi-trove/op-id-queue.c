@@ -120,6 +120,7 @@ void op_id_queue_del(op_id_queue_p queue, void* id_pointer, int type)
 	return;
 }
 
+
 /* op_id_queue_cleanup()
  *
  * releases an existing queue and any entries stored within it
@@ -128,13 +129,13 @@ void op_id_queue_del(op_id_queue_p queue, void* id_pointer, int type)
  */
 void op_id_queue_cleanup(op_id_queue_p queue)
 {
-	op_id_queue_p tmp_link = NULL;
+	op_id_queue_p iterator = NULL;
+	op_id_queue_p scratch = NULL;
 	struct op_id_entry* tmp_entry;
 
-	qlist_for_each(tmp_link, queue)
+	qlist_for_each_safe(iterator, scratch, queue)
 	{
-		tmp_entry = qlist_entry(tmp_link, struct op_id_entry, queue_link);
-		qlist_del(tmp_link);
+		tmp_entry = qlist_entry(iterator, struct op_id_entry, queue_link);
 		free(tmp_entry);
 	}
 
@@ -142,6 +143,7 @@ void op_id_queue_cleanup(op_id_queue_p queue)
 	queue = NULL;
 	return;
 }
+
 
 /* op_id_queue_query()
  *
