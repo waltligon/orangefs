@@ -629,6 +629,7 @@ static int dbpf_collection_remove(char *collname,
                 if (unlink(tmp_path) != 0)
                 {
                     perror("failure removing bstream entry");
+                    closedir(current_dir);
                     goto collection_remove_failure;
                 }
             }
@@ -665,6 +666,7 @@ static int dbpf_collection_remove(char *collname,
                 if (unlink(tmp_path) != 0)
                 {
                     perror("failure removing keyval entry");
+                    closedir(current_dir);
                     goto collection_remove_failure;
                 }
             }
