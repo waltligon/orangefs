@@ -55,36 +55,18 @@ struct PVFS_servresp_create
     PVFS_handle handle;
 };
 
-/* remove
- *
- */
+/* remove *****************************************************/
+/* - used to remove an existing metafile or datafile object */
+
 struct PVFS_servreq_remove
 {
-    PVFS_handle handle;
-    PVFS_fs_id fs_id;
+    PVFS_handle handle;		    /* handle of object to remove */
+    PVFS_fs_id fs_id;		    /* file system */
 };
 
-/*no data returned for remove*/
-
-/* batch
- * A series of operations to perform.  Abort all operations following a
- * failed one.
+/* NOTE: no response structure; all necessary response info is 
+ * returned in generic server response structure
  */
-struct PVFS_servreq_batch
-{
-    /* list of other requests; need semantics */
-    uint32_t rcount;
-    /*void *req[rcount];This should be an array of ptrs that are 
-       ptrs to structs */
-};
-
-struct PVFS_servresp_batch
-{
-    /* list of other requests; need semantics */
-    uint32_t rcount;
-    /*void *req[rcount];This should be an array of ptrs that are 
-       ptrs to structs */
-};
 
 /* getattr
  *
@@ -314,7 +296,6 @@ struct PVFS_server_req
 	struct PVFS_servreq_create create;
 	struct PVFS_servreq_remove remove;
 	struct PVFS_servreq_io io;
-	struct PVFS_servreq_batch batch;
 	struct PVFS_servreq_getattr getattr;
 	struct PVFS_servreq_setattr setattr;
 	struct PVFS_servreq_mkdir mkdir;
@@ -340,7 +321,6 @@ struct PVFS_server_resp
     union
     {
 	struct PVFS_servresp_create create;
-	struct PVFS_servresp_batch batch;
 	struct PVFS_servresp_getattr getattr;
 	struct PVFS_servresp_mkdir mkdir;
 	struct PVFS_servresp_readdir readdir;
