@@ -38,5 +38,5 @@ void PINT_free_object_attr(PVFS_object_attr *attr);
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

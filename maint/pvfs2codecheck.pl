@@ -32,7 +32,7 @@ foreach $file (@files) {
 	if (/c-indent-level: 4/) {
 	    $has_emacs_c_indent_level++;
 	}
-	if (/vim: ts=8 sts=4 sw=4 noexpandtab/) {
+	if (/vim: ts=8 sts=4 sw=4 expandtab/) {
 	    $has_vim_formatting++;
 	}
 	if (/See COPYING in top-level directory/) {

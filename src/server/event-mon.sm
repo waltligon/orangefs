@@ -101,6 +101,6 @@ static int event_mon_do_work(PINT_server_op *s_op, job_status_s* js_p)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
 

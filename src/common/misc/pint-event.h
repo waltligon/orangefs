@@ -95,6 +95,6 @@ void __PINT_event_default(enum PVFS_event_api api,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */
 

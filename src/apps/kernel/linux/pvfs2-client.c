@@ -333,5 +333,5 @@ static void parse_args(int argc, char **argv, options_t *opts)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

@@ -160,5 +160,5 @@ void PINT_release_extent_list(PINT_llist *extent_list)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

@@ -15,11 +15,11 @@ foreach $file (@files) {
 
     while (<INFD>) {
 	if (/vim: /) {
-	    if (/vim: ts=8 sts=4 sw=4 noexpandtab/) {
+	    if (/vim: ts=8 sts=4 sw=4 expandtab/) {
 		print OUTFD $_;
 	    }
 	    else {
-		print OUTFD " * vim: ts=8 sts=4 sw=4 noexpandtab\n";
+		print OUTFD " * vim: ts=8 sts=4 sw=4 expandtab\n";
 		$modified = 1;
 	    }
 	}

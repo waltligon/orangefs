@@ -754,5 +754,5 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

@@ -601,5 +601,5 @@ static int internal_db_open(DB **db, char *name, char *subdb,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

@@ -73,6 +73,6 @@ PINT_llist_p PINT_llist_next(
  *  c-basic-offset: 3
  *  tab-width: 3
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  * End:
  */

@@ -256,5 +256,5 @@ static void gossip_print_op(method_op_p print_op)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

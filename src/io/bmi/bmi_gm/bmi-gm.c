@@ -3701,5 +3701,5 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

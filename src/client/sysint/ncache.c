@@ -557,5 +557,5 @@ static int ncache_update_dentry_timestamp(ncache_entry* entry)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

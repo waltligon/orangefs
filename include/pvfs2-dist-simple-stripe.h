@@ -27,5 +27,5 @@ typedef struct PVFS_simple_stripe_params_s PVFS_simple_stripe_params;
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

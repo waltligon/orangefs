@@ -100,5 +100,5 @@ PINT_dist basic_dist = {
  *  c-basic-offset: 4
  * End:
  *
- * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */

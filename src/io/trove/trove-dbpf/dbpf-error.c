@@ -45,5 +45,5 @@ PVFS_error dbpf_db_error_to_trove_error(int db_error_value)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

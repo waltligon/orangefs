@@ -211,6 +211,6 @@ static int check_fs_id(PVFS_fs_id fs_id)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
 

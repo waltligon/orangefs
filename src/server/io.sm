@@ -422,5 +422,5 @@ static int io_send_completion_ack(
  *  c-basic-offset: 4
  * End:
  *
- * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */

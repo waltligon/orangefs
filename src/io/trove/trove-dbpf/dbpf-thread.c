@@ -211,5 +211,5 @@ int dbpf_do_one_work_cycle(int *out_count)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

@@ -292,5 +292,5 @@ static int statfs_list_comp_fn(void *v_p,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */

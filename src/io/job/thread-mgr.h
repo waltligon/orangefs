@@ -62,5 +62,5 @@ void PINT_thread_mgr_dev_push(int max_idle_time);
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */

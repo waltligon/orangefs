@@ -346,7 +346,7 @@ int server_state_machine_start_noreq(PINT_server_op* new_op);
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */
 
 #endif /* __SM_CHECK_DEP */ 

@@ -383,5 +383,5 @@ int pvfs_bufmap_copy_from_user(int buffer_index, void* from, int size)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 expandtab
  */
