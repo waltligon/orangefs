@@ -26,6 +26,7 @@ struct options
 {
     char* fs_path_hack;
     char* fs_path_real;
+    char* mnt_point;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -407,8 +408,9 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "v";
+    char flags[] = "vm:";
     int one_opt = 0;
+    int len;
 
     struct options* tmp_opts = NULL;
     int ret = -1;
@@ -428,13 +430,34 @@ static struct options* parse_args(int argc, char* argv[])
             case('v'):
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
+	    case('m'):
+		/* taken from pvfs2-statfs.c */
+		len = strlen(optarg)+1;
+		tmp_opts->mnt_point = (char*)malloc(len+1);
+		if(!tmp_opts->mnt_point)
+		{
+		    free(tmp_opts);
+		    return(NULL);
+		}
+		memset(tmp_opts->mnt_point, 0, len+1);
+		ret = sscanf(optarg, "%s", tmp_opts->mnt_point);
+		if(ret < 1){
+		    free(tmp_opts);
+		    return(NULL);
+		}
+		/* TODO: dirty hack... fix later.  The remove_dir_prefix()
+		 * function expects some trailing segments or at least
+		 * a slash off of the mount point
+		 */
+		strcat(tmp_opts->mnt_point, "/");
+		break;
 	    case('?'):
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
 	}
     }
 
-    if(optind != (argc - 1))
+    if(optind != (argc ))
     {
 	usage(argc, argv);
 	exit(EXIT_FAILURE);
@@ -486,9 +509,9 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "%s version %s\n\n", argv[0], PVFS2_VERSION);
-    fprintf(stderr, "Usage  : %s file_system_path\n",
+    fprintf(stderr, "Usage  : %s -m file_system_path\n",
 	argv[0]);
-    fprintf(stderr, "Example: %s /mnt/pvfs2\n",
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
 	argv[0]);
 
     return;

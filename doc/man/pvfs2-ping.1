@@ -5,8 +5,8 @@
 .SH NAME
 pvfs2-ping \- Check if all servers in a PVFS2 volume are running
 .SH SYNOPSIS
-.B pvfs2-ping
-.I MOUNTPOINT
+.B pvfs2-ping 
+.I -m MOUNTPOINT
 
 .SH DESCRIPTION
 Check if all servers in the PVFS2 volume at
@@ -38,6 +38,11 @@ is the same on all servers
 Root Handle Check
 .RS
 Makes sure that only one server owns the file system's root handle
+
+.SH OPTIONS
+.IP -m
+Display information about the volume and servers at 
+.I mount_point
 
 .SH ENVIRONMENT
 .IP PVFS2TAB_FILE
