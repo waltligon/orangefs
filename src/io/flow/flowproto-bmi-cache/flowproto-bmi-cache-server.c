@@ -296,8 +296,8 @@ int fp_bmi_cache_post(flow_descriptor * flow_d)
 	fprintf(stderr, "src.endpoint:%d, desc.endpoint:%d\n", flow_d->src.endpoint_id, flow_d->dest.endpoint_id);
 
 	assert( (flow_d->src.endpoint_id == BMI_ENDPOINT && 
-		flow_d->dest.endpoint_id == CACHE_ENDPOINT) ||
-		(flow_d->src.endpoint_id == CACHE_ENDPOINT &&
+		flow_d->dest.endpoint_id == TROVE_ENDPOINT) ||
+		(flow_d->src.endpoint_id == TROVE_ENDPOINT &&
 		flow_d->dest.endpoint_id == BMI_ENDPOINT) );
 
 	/* TODO: seems not right here. coll_id --> trove_context id */
@@ -370,7 +370,7 @@ int fp_bmi_cache_post(flow_descriptor * flow_d)
 	 * are driven by callbacks.
 	 */
 
-	if( flow_d->src.endpoint_id == CACHE_ENDPOINT &&
+	if( flow_d->src.endpoint_id == TROVE_ENDPOINT &&
 		flow_d->dest.endpoint_id == BMI_ENDPOINT )
 	{
 		/* CACHE --> BMI flow: read from cache, then send to the 
@@ -413,7 +413,7 @@ int fp_bmi_cache_post(flow_descriptor * flow_d)
 
 	}
 	else if( flow_d->src.endpoint_id == BMI_ENDPOINT &&
-			 flow_d->dest.endpoint_id == CACHE_ENDPOINT )
+			 flow_d->dest.endpoint_id == TROVE_ENDPOINT )
 	{
 		/* BMI--->CACHE flow: (1) init requests; (2) check progress;
 		 * later all progress checks are driven by callbacks;
