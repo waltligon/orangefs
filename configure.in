@@ -21,6 +21,22 @@ dnl if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
 dnl else AC_MSG_RESULT(yes)
 dnl fi
 
+dnl NOTE: for now, if we're running on linux-gnu and we find
+dnl glibc version 2.3.2, we assume the aio callbacks work.
+dnl this should really check for 2.3.2 or later -- probably in
+dnl more portable format as well.
+MISC_TROVE_FLAGS=""
+if test x$host_os = xlinux-gnu; then
+   AC_MSG_CHECKING(glibc version for working aio callbacks)
+   GLIBC_VERSION=`/lib/libc.so.6  | head -n 1 | sed s/,//g | awk '{print $7}'`
+   if test x$GLIBC_VERSION = x2.3.2; then
+      MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+      AC_SUBST(MISC_TROVE_FLAGS)
+      AC_MSG_RESULT(yes)
+   else AC_MSG_RESULT(no)
+   fi
+fi
+
 dnl Check byte ordering
 AC_C_BIGENDIAN
 

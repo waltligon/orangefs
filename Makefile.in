@@ -113,7 +113,7 @@ CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 
 # the server will use a threaded job library 
 SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
--D__PVFS2_TROVE_THREADED__ -D__PVFS2_TROVE_AIO_THREADED__ \
+-D__PVFS2_TROVE_THREADED__ @MISC_TROVE_FLAGS@ \
 -D__PVFS2_TROVE_SUPPORT__
 SERVERLIBS = @LIBS@ -ldb -lrt -lpthread -lpvfs2-server
 # the client libraries are not threaded (at the moment at least)
