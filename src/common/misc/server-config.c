@@ -45,6 +45,7 @@ static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
+static DOTCONF_CB(get_flow_module_list);
 
 /* internal helper functions */
 static int is_valid_alias(char *str);
@@ -110,6 +111,7 @@ static const configoption_t options[] =
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,CTX_ALL},
     {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
     {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,CTX_ALL},
+    {"FlowModules",ARG_LIST, get_flow_module_list,NULL,CTX_ALL},
     LAST_OPTION
 };
 
@@ -202,6 +204,12 @@ int PINT_parse_config(
     if (!config_s->bmi_modules)
     {
 	gossip_err("Configuration file error. No BMI modules specified.\n");
+	return 1;
+    }
+
+    if (!config_s->flow_modules)
+    {
+	gossip_err("Configuration file error. No Flow modules specified.\n");
 	return 1;
     }
 
@@ -474,6 +482,37 @@ DOTCONF_CB(get_event_logging_list)
     config_s->event_logging = strdup(buf);
     return NULL;
 }
+
+DOTCONF_CB(get_flow_module_list)
+{
+    int i = 0, len = 0;
+    char buf[512] = {0};
+    char *ptr = buf;
+
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        gossip_lerr("FlowModules Tag can only be in a "
+                    "Defaults or Global block");
+        return NULL;
+    }
+
+    if (config_s->flow_modules != NULL)
+    {
+        len = strlen(config_s->flow_modules);
+        strncpy(ptr,config_s->flow_modules,len);
+        ptr += (len * sizeof(char));
+        free(config_s->flow_modules);
+    }
+    for(i = 0; i < cmd->arg_count; i++)
+    {
+        strncat(ptr, cmd->data.list[i], 512 - len);
+        len += strlen(cmd->data.list[i]);
+    }
+    config_s->flow_modules = strdup(buf);
+    return NULL;
+}
+
 
 DOTCONF_CB(get_bmi_module_list)
 {

@@ -63,6 +63,7 @@ typedef struct server_configuration_s
     char *logfile;
     char *event_logging;
     char *bmi_modules;              /* BMI modules */
+    char *flow_modules;             /* Flow modules */
     int  configuration_context;
     struct llist *host_aliases;     /* ptrs are type host_alias_s               */
     struct llist *file_systems;     /* ptrs are type filesystem_configuration_s */
