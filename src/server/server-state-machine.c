@@ -66,6 +66,7 @@ int PINT_state_machine_start(PINT_server_op *s_op, job_status_s *ret)
     return ((s_op->current_state->state_action))(s_op,ret);
 }
 
+
 /* PINT_state_machine_complete()
  *
  * function to be called at the completion of state machine execution;
@@ -88,6 +89,7 @@ int PINT_state_machine_complete(PINT_server_op *s_op)
 
     return(0);
 }
+
 
 /* PINT_state_table_initialize()
  *
@@ -115,12 +117,6 @@ int PINT_state_table_initialize(void)
 
     return(0);
 }
-
-
-
-
-
-
 
 /*
  * Local variables:
