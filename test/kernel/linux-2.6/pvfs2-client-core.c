@@ -542,8 +542,8 @@ static int service_rename_request(
         old_parent_refn = in_upcall->req.rename.old_parent_refn;
         new_parent_refn = in_upcall->req.rename.new_parent_refn;
 
-        fprintf(
-            stderr,
+        gossip_debug(
+            CLIENT_DEBUG,
             "Got a rename request for %s under fsid %d and "
             "handle %Lu to be %s under fsid %d and handle %Lu\n",
             in_upcall->req.rename.d_old_name,
