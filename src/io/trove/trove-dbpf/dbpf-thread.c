@@ -52,7 +52,7 @@ int dbpf_thread_finalize(void)
 
 void *dbpf_thread_function(void *ptr)
 {
-    gossip_debug(TROVE_DEBUG, "thread function started\n");
+    gossip_debug(TROVE_DEBUG, "dbpf_thread_function started\n");
 
 #ifdef __PVFS2_TROVE_THREADED__
     do
@@ -61,7 +61,7 @@ void *dbpf_thread_function(void *ptr)
     } while(dbpf_thread_running);
 #endif
 
-    gossip_debug(TROVE_DEBUG, "thread function ending\n");
+    gossip_debug(TROVE_DEBUG, "dbpf_thread_function ending\n");
     return ptr;
 }
 

@@ -33,6 +33,8 @@
 int dbpf_method_id = -1;
 char dbpf_method_name[] = "dbpf";
 
+extern int dbpf_thread_initialize(void);
+
 /* Globals */
 
 struct dbpf_storage *my_storage_p = NULL;

@@ -67,9 +67,6 @@ int trove_initialize(char *stoname,
     mtrace();
 #endif
 
-    gossip_enable_stderr();
-    gossip_set_debug_mask(1, TROVE_DEBUG);
-
     /* initialize the handle management interface */
     ret = trove_handle_mgmt_initialize();
     if ( ret == -1 ) {
@@ -123,8 +120,6 @@ int trove_finalize(void)
     ret = mgmt_method_table[0]->finalize();
 
     ret = trove_handle_mgmt_finalize();
-
-    gossip_disable();
 
     gen_mutex_unlock(&trove_init_mutex);
 
