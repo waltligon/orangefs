@@ -8,7 +8,8 @@ pvfs2-0.1.0
 - initial support for logging traces with both MPE and Pablo libraries
 - fix some warnings on x86-64
 - work around older Berkeley-DB versions w/o support for DB_DIRTY_READ
-- implementation of cancel() in BMI, Trove, Flow, and thread mgmt interfaces
+- implementation of cancel() in BMI, Trove, Flow, and thread mgmt
+  interfaces
 - graceful recovery from I/O errors within flows
 - updated perf interface to return metadata access statistics
 - various bmi_tcp optimizations (cut down on system calls)
@@ -17,8 +18,43 @@ pvfs2-0.1.0
 - improved cleanup from messaging errors in client libraries
 - added ability to report partial errors with details from mgmt interface
 - revisited locking approach in jobs, flows, and bmi_gm
-- new config file option to control default Trove sync behavior
-- graceful shutdown when server gets ctrl-c
+- new config file option to control default Trove sync behavior (metadata)
+- pvfs2-genconfig update to generate default sync'd metadata sync mode
+- added experimental metadata mode (nosync, instead of sync) for allowing
+  unsync'd operations to occur that reads from dirty memory (written but
+  non-committed data) to help enhance performance 
+- graceful shutdown when server gets ctrl-c (SIGINT)
+- pvfs2-ls output bugfixes and better error reporting
+- handle allocator fix to no longer return invalid handles if no valid
+  ranges have been registered
+- improved server version reporting and exit path (using --version/-v)
+- vfs kernel module warning removal (code without proper locks held)
+- fixed vfs bug that assigned incorrect link counts on new entries
+- fixed vfs bug that used uninitialized data structures when compiled
+  without kernel debugging support
+- fixed vfs bug that didn't properly initialize root inode's handle/fs_id
+- fixed vfs bug that failed to adjust file position on files opened for
+  append
+- fixed vfs bug that didn't properly rebuild attributes of files that
+  could cause erroneous type changes in the vfs
+- fixed vfs bug that could not remove directories with more than 32
+  entries in them
+- fixed potential vfs race regarding op queueing with a lock re-ordering
+- improved error reporting of error codes from pvfs2 through the vfs
+- improved error reporting and detection in the configuration parser
+- optimized server flush operation to only flush either metadata or data,
+  depending on the object being worked on
+- test/server/showconfig output improvements
+- properly clean up meta and data handles during sys_create if the
+  crdirent step fails
+- make pvfs2-import check if the target file exists before attempting to
+  create it
+- pvfs2-fs-dump output improvements (made more readable)
+- added test/kernel/linux-2.6/pvfs2-shell-test.sh that is useful for
+  running some simple vfs tests on a mounted pvfs2 volume
+- added configure option to allow the karma gui to not be built
+- fixed a bug that would not allow sysint initialization if the user does
+  not have write permission in the current directory
 
 
 pvfs2-0.0.9
