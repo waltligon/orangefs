@@ -17,8 +17,11 @@
 #include "flowproto-support.h"
 #include "gen-locks.h"
 #include "bmi.h"
-#include "trove.h"
 #include "thread-mgr.h"
+
+#include "trove.h"
+#include "ncac-interface.h"
+#include "internal.h"
     
 #define BUFFER_SIZE (256*1024)
 #define MAX_REGIONS 16
@@ -40,11 +43,11 @@
 #define MUTEX_FLAG	1
 
  	
-/* Noted by wuj: The flowproto-bmi-cache design has several
- * significant differences with the great template "bmi-trove" design
- * in handling buffers. These difference are reflected in the
- * data structure added and/or changed in fp_queue_item and it related
- * structures. 
+/* Noted by wuj: The flowproto-bmi-cache design has significant 
+ * differences from the template "bmi-trove" design in handling 
+ * buffers. These difference are reflected in the
+ * data structure added and/or changed in fp_queue_item and other
+ * related structures. 
  */ 
 
 struct pint_req_entry
@@ -56,7 +59,8 @@ struct pint_req_entry
 
 struct cache_req_entry
 {
-	int req_id;			/* cache request id */
+	cache_request_t request;  /* cache request handle */
+	int 	errval;		/* error code */
 	int mem_cnt;			/* how many buffers */
 
 	/* buffer size array, array space provided by the cache */
@@ -169,9 +173,7 @@ static int  bmi_cache_progress_check(struct flow_descriptor *flow_d,
 
 static int bmi_cache_check_cache_req(struct fp_queue_item *q_item); 
 static int bmi_cache_release_cache_src(struct fp_queue_item *q_item);
-static int bmi_cache_init_cache_req(struct fp_queue_item *qitem, 
-				int op, 
-				int *req_id); 
+static int bmi_cache_init_cache_req(struct fp_queue_item *qitem, int op);
 
 
 /* interface prototypes */
@@ -448,7 +450,6 @@ int  bmi_cache_request_init(struct fp_private_data *flow_data, int direction)
 	struct fp_queue_item *new_qitem = NULL;
 	struct pint_req_entry* pint_req = NULL;
 	PVFS_size bytes_processed = 0;
-	int req_id;
 
 	int ret;
 
@@ -504,13 +505,12 @@ int  bmi_cache_request_init(struct fp_private_data *flow_data, int direction)
 		assert(ret >= 0);
 
 		/* submit the cache request */
-		ret = bmi_cache_init_cache_req(new_qitem, direction, &req_id);
+		ret = bmi_cache_init_cache_req(new_qitem, direction);
 
 		/* TODO: error handling */
 		assert(ret >= 0);
 
 		new_qitem->int_state = INT_REQ_PROCESSING;
-		new_qitem->cache_req.req_id = req_id;
 
 		/* immediate completion on the cache request */
 		if ( ret == 1 ) 
@@ -539,7 +539,7 @@ int  bmi_cache_request_init(struct fp_private_data *flow_data, int direction)
  *	 (1) mutex_flag is on.
  *	    -- this is called in the first time for the flow progress.
  *	 (2) mutex_flag is off
- *	    -- this is called in other callbacks which holds mutex.
+ *	    -- this is called in other callbacks which hold mutex.
  *	wait_flag: 
 	 (1) non-blocking; (2) blocking	
  *	direction:
@@ -886,8 +886,6 @@ static void cache_read_callback_fn(void *user_ptr,
 	return;
 };
 
-
-
 /* bmi_send_callback_fn()
  *
  * function to be called upon completion of a BMI send operation
@@ -965,21 +963,103 @@ static void bmi_send_callback_fn(void *user_ptr,
 
 	return;
 }
-	
 
 static int bmi_cache_check_cache_req(struct fp_queue_item *qitem) 
 {
-	return 1;
+	cache_reply_t reply;
+	int flag = 0;
+	int ret = -1;
+		
+	ret = cache_req_test( &(qitem->cache_req.request), &flag, &reply, NULL);
+	if ( ret < 0 ) 
+	{
+		PVFS_perror_gossip("bmi_cache_check_cache_req: "
+                        "error_code", ret);
+		return ret;
+	}
+
+	/* a request is finished. */
+	if ( flag )
+	{
+		qitem->cache_req.mem_cnt = reply.count;
+		qitem->cache_req.moff_list = (PVFS_offset **)reply.cbuf_offset_array;
+		qitem->cache_req.msize_list = reply.cbuf_size_array;
+		qitem->cache_req.errval = reply.errval;
+
+		return 1;
+	}
+	return 0;
 }
 
 static int bmi_cache_release_cache_src(struct fp_queue_item *qitem)
 {
-	return 1;
+	int ret;
+	
+	ret = cache_req_done( &(qitem->cache_req.request) );	
+	if ( ret < 0 ) 
+	{
+		PVFS_perror_gossip("bmi_cache_release_cache_src: "
+                        "error_code", ret);
+		return ret;
+	}
+	
+	return 0;
 }
 
-static int bmi_cache_init_cache_req(struct fp_queue_item *qitem, 
-				int op, 
-				int *req_id) 
+static int bmi_cache_init_cache_req(struct fp_queue_item *qitem, int op )
 {
-	return 0;
+	int ret = 0;
+	cache_read_desc_t desc1;
+	cache_write_desc_t desc2;
+	cache_reply_t reply;
+
+	if ( op == BMI_TO_CACHE )  /* write */
+	{
+		desc2.coll_id = qitem->parent->dest.u.trove.coll_id;
+		desc2.handle = qitem->parent->dest.u.trove.handle;
+		desc2.context_id = global_trove_context;
+
+		/* TODO: if we use intemediate buffer, change here */
+		desc2.buffer = NULL;
+		desc2.len = 0;
+		
+		desc2.stream_array_count  = qitem->pint_req.result.segs; 
+		desc2.stream_offset_array = qitem->pint_req.result.offset_array;
+		desc2.stream_size_array = qitem->pint_req.result.size_array;
+
+		ret = cache_write_post( &desc2, 
+					&qitem->cache_req.request, 
+					&reply,
+					NULL );
+		if ( ret < 0 ) 
+		{
+			PVFS_perror_gossip("bmi_cache_init_cache_req: "
+                                     "error_code", ret);
+		}
+	}
+	else /* read */
+	{
+		desc1.coll_id = qitem->parent->dest.u.trove.coll_id;
+		desc1.handle = qitem->parent->dest.u.trove.handle;
+		desc1.context_id = global_trove_context;
+
+		/* TODO: if we use intemediate buffer, change here */
+		desc1.buffer = NULL;
+		desc1.len = 0;
+		
+		desc1.stream_array_count  = qitem->pint_req.result.segs; 
+		desc1.stream_offset_array = qitem->pint_req.result.offset_array;
+		desc1.stream_size_array = qitem->pint_req.result.size_array;
+
+		ret = cache_read_post( &desc1, 
+					&qitem->cache_req.request, 
+					&reply,
+					NULL );
+		if ( ret < 0 ) 
+		{
+			PVFS_perror_gossip("bmi_cache_init_cache_req: "
+                                     "error_code", ret);
+		}
+	}
+	return ret;
 }
