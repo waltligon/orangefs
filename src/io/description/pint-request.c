@@ -401,7 +401,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 	/* make sure loff is still within requested region */
    while ((diff = loff - offset) < size)
    {
-		gossip_debug(REQUEST_DEBUG,"\t\tbegin iteration\n");
+		gossip_debug(REQUEST_DEBUG,"\t\tbegin iteration loff: %lld\n", loff);
 		/* find physical offset for this loff */
       poff = (*rfdata->dist->methods->logical_to_physical_offset)
 				(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, loff);
@@ -490,16 +490,16 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
       loff  += sz;
       size  -= loff - offset;
       offset = loff;
+		/* find next logical offset on this server */
+      loff = (*rfdata->dist->methods->next_mapped_offset)
+				(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, offset);
+		gossip_debug(REQUEST_DEBUG,"\t\tend iteration\n");
 		/* see if we are finished */
 		if (*bytes >= bytemax || (mode != PINT_CKSIZE && (*segs > segmax)))
 		{
 			gossip_debug(REQUEST_DEBUG,"\t\tdone with segments or bytes\n");
 			break;
 		}
-		/* find next logical offset on this server */
-      loff = (*rfdata->dist->methods->next_mapped_offset)
-				(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, offset);
-		gossip_debug(REQUEST_DEBUG,"\t\tend iteration\n");
    }
 	gossip_debug(REQUEST_DEBUG,"\t\tfinished\n");
 	gossip_debug(REQUEST_DEBUG,"\t\t\tof %lld sz %lld sg %d sm %d by %lld bm %lld",
