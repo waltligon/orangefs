@@ -20,6 +20,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
+#include <libgen.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
@@ -73,7 +74,7 @@ static double Wtime(void);
 static void print_timings( double time, int64_t total);
 static int resolve_filename(file_object *obj, char *filename);
 static int generic_open(file_object *obj, PVFS_credentials *credentials, 
-	int nr_datafiles, int open_type);
+	int nr_datafiles, char *srcname, int open_type);
 static size_t generic_read(file_object *src, char *buffer, 
 	int64_t offset, size_t count, PVFS_credentials *credentials);
 static size_t generic_write(file_object *dest, char *buffer, 
@@ -93,15 +94,6 @@ int main (int argc, char ** argv)
     int64_t ret;
     PVFS_credentials credentials;
 
-	/* . read command line arguments
-	 * . initialize pvfs2
-	 * . translate user-provided paths into pvfs2-specific paths
-	 * . get a handle for src
-	 * . get a handle for dest
-	 * while still data
-	 * . read from src
-	 * . write to dest
-	 */
     user_opts = parse_args(argc, argv);
     if (!user_opts)
     {
@@ -123,14 +115,16 @@ int main (int argc, char ** argv)
 
     PVFS_util_gen_credentials(&credentials);
 
-    ret = generic_open(&src, &credentials, 0, OPEN_SRC );
+    ret = generic_open(&src, &credentials, 0, NULL, OPEN_SRC );
     if (ret < 0)
     {
 	fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
 	goto main_out;
     }
 
-    ret = generic_open(&dest, &credentials, user_opts->num_datafiles, OPEN_DEST);
+    ret = generic_open(&dest, &credentials, user_opts->num_datafiles,
+	    user_opts->srcfile, OPEN_DEST);
+
     if (ret < 0)
     {
 	fprintf(stderr, "Could not open %s\n", user_opts->destfile);
@@ -175,6 +169,7 @@ main_out:
     generic_cleanup(&src);
     generic_cleanup(&dest);
     PVFS_sys_finalize();
+    free(user_opts);
     return(ret);
 }
 
@@ -368,29 +363,53 @@ static int resolve_filename(file_object *obj, char *filename)
 
 /* generic_open:
  *  given a file_object, perform the apropriate open calls.  
- *  the 'open_type' flag tells us if we can create the file if it does not
- *  exist: if it is the source, then no.  If it is the destination, then we
- *  will.
+ *  . the 'open_type' flag tells us if we can create the file if it does not
+ *    exist: if it is the source, then no.  If it is the destination, then we
+ *    will.  
+ *  . If we are creating the file, nr_datafiles gives us the number of
+ *    datafiles to use for the new file.
+ *  . If 'srcname' is given, and the file is a directory, we will create a
+ *    new file with the basename of srcname in the specified directory 
  */
 
 static int generic_open(file_object *obj, PVFS_credentials *credentials,
-	int nr_datafiles, int open_type)
+	int nr_datafiles, char *srcname, int open_type)
 {
+    struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_create resp_create;
     PVFS_object_ref parent_ref;
     int ret = -1;
     char *entry_name;		    /* name of the pvfs2 file */
-    char basename[PVFS_NAME_MAX];   /* basename of pvfs2 file */
+    char str_buf[PVFS_NAME_MAX];    /* basename of pvfs2 file */
+
 
     if (obj->fs_type == UNIX_FILE)
     {
+	stat(obj->ufs.path, &stat_buf);
 	if (open_type == OPEN_SRC)
 	{
+	    if (S_ISDIR(stat_buf.st_mode)) 
+	    {
+		fprintf(stderr, "Source cannot be a directory\n");
+		return(-1);
+	    }
 	    obj->ufs.fd = open(obj->ufs.path, O_RDONLY);
 	}
 	else
 	{
+	    if (S_ISDIR(stat_buf.st_mode))
+	    {
+		if (srcname != NULL)
+		    strncat(obj->ufs.path, basename(srcname), NAME_MAX);
+		else
+		{
+		    fprintf(stderr, 
+			    "cannot find name for destination. giving up\n");
+		    return(-1);
+		}
+	    }
+
 	    obj->ufs.fd = open(obj->ufs.path, 
 		    O_WRONLY|O_CREAT|O_LARGEFILE, 0777);
 	}
@@ -403,29 +422,91 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
     }
     else
     {
+	entry_name = str_buf;
 	/* it's a PVFS2 file */
-	parent_ref.fs_id = obj->pvfs2.fs_id;
-
-	if(PVFS_util_remove_base_dir(obj->pvfs2.pvfs2_path,basename, 
-			PVFS_NAME_MAX))
+	if (strcmp(obj->pvfs2.pvfs2_path, "/") == 0)
 	{
-	    if(obj->pvfs2.pvfs2_path[0] != '/')
+	    /* special case: PVFS2 root file system, so stuff the end of
+	     * srcfile onto pvfs2_path */
+	    char *segp = NULL, *prev_segp = NULL;
+	    void *segstate = NULL;
+	    
+	    /* can only perform this special case if we know srcname */
+	    if (srcname == NULL)
 	    {
-		fprintf(stderr, "Error: poorly formatted path.\n");
+		fprintf(stderr, "unable to guess filename in toplevel PVFS2\n");
+		return -1;
 	    }
-	    fprintf(stderr, "Error: cannot retrieve entry name for "
-		    "creation on %s\n", obj->pvfs2.pvfs2_path);
-	    return(-1);
+
+	    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
+	    ret = PVFS_sys_lookup(obj->pvfs2.fs_id, obj->pvfs2.pvfs2_path,
+		    credentials, &resp_lookup, PVFS2_LOOKUP_LINK_FOLLOW);
+	    if (ret < 0)
+	    {
+		PVFS_perror("PVFS_sys_lookup", ret);
+		return (-1);
+	    }
+	    parent_ref.handle = resp_lookup.ref.handle;
+	    parent_ref.fs_id = resp_lookup.ref.fs_id;
+
+	    while (!PINT_string_next_segment(srcname, &segp, &segstate))
+	    {
+		prev_segp = segp;
+	    }
+	    entry_name = prev_segp; /* see... points to basename of srcname */
 	}
-	ret = PVFS_util_lookup_parent(obj->pvfs2.pvfs2_path, 
-		obj->pvfs2.fs_id, credentials, &parent_ref.handle);
-	if (ret < 0)
+	else /* given either a pvfs2 directory or a pvfs2 file */
 	{
-	    PVFS_perror("PVFS_util_lookup_parent", ret);
-	    return (-1);
+	    /* get the absolute path on the pvfs2 file system */
+	    
+	    /*parent_ref.fs_id = obj->pvfs2.fs_id; */
+
+	    if(PVFS_util_remove_base_dir(obj->pvfs2.pvfs2_path,str_buf, 
+			    PVFS_NAME_MAX))
+	    {
+		if(obj->pvfs2.pvfs2_path[0] != '/')
+		{
+		    fprintf(stderr, "Error: poorly formatted path.\n");
+		}
+		fprintf(stderr, "Error: cannot retrieve entry name for "
+			"creation on %s\n", obj->pvfs2.user_path);
+		return(-1);
+	    }
+	    ret = PVFS_util_lookup_parent(obj->pvfs2.pvfs2_path, 
+		    obj->pvfs2.fs_id, credentials, &parent_ref.handle);
+	    if (ret < 0)
+	    {
+		PVFS_perror("PVFS_util_lookup_parent", ret);
+		return (-1);
+	    }
+	    else /* parent lookup succeeded. if the pvfs2 path is just a
+		    directory, use basename of src for the new file */
+	    {
+		int len = strlen(obj->pvfs2.pvfs2_path);
+		if (obj->pvfs2.pvfs2_path[len - 1] == '/')
+		{
+		    char *segp = NULL, *prev_segp = NULL;
+		    void *segstate = NULL;
+
+		    if (srcname == NULL)
+		    {
+			fprintf(stderr, "unable to guess filename\n");
+			return(-1);
+		    }
+		    while (!PINT_string_next_segment(srcname, 
+				&segp, &segstate))
+		    {
+			prev_segp = segp;
+		    }
+		    strncat(obj->pvfs2.pvfs2_path, prev_segp, PVFS_NAME_MAX);
+		    entry_name = prev_segp;
+		}
+		parent_ref.fs_id = obj->pvfs2.fs_id;
+	    }
 	}
+
 	memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-	ret = PVFS_sys_ref_lookup(parent_ref.fs_id, basename,
+	ret = PVFS_sys_ref_lookup(parent_ref.fs_id, entry_name,
 		parent_ref, credentials, &resp_lookup, 
 		PVFS2_LOOKUP_LINK_NO_FOLLOW);
 	/* at this point, we have looked up the file in the parent directory.
@@ -452,13 +533,13 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	{
 	    if (ret == 0)
 	    {
-		fprintf(stderr, "Target file %s already exists\n", basename);
+		fprintf(stderr, "Target file %s already exists\n", entry_name);
 		return (-1);
 	    } 
 	    else 
 	    { 
 		make_attribs(&(obj->pvfs2.attr), credentials, nr_datafiles);
-		ret = PVFS_sys_create(basename, parent_ref, 
+		ret = PVFS_sys_create(entry_name, parent_ref, 
 			obj->pvfs2.attr, credentials, NULL, &resp_create);
 		if (ret < 0)
 		{
