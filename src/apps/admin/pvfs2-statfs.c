@@ -208,8 +208,8 @@ int main(int argc, char **argv)
                            Ld(stat_array[i].bytes_total));
                 }
 
-                if (stat_array[i].server_type &
-                    (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER))
+                if ((stat_array[i].server_type & PVFS_MGMT_IO_SERVER) &&
+                    (stat_array[i].server_type & PVFS_MGMT_META_SERVER))
                 {
                     printf("\tmode: serving both metadata and I/O data\n");
                 }

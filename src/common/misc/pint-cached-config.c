@@ -468,17 +468,17 @@ int PINT_cached_config_count_servers(
     ret = cache_server_array(config, fsid);
     if (ret == 0)
     {
-        if (server_type == PINT_BUCKET_META)
+        if (server_type == PINT_SERVER_TYPE_META)
         {
             *count = cur_config_cache->meta_server_count;
             ret = 0;
         }
-        else if (server_type == PINT_BUCKET_IO)
+        else if (server_type == PINT_SERVER_TYPE_IO)
         {
             *count = cur_config_cache->io_server_count;
             ret = 0;
         }
-        else if (server_type == (PINT_BUCKET_META|PINT_BUCKET_IO))
+        else if (server_type == PINT_SERVER_TYPE_ALL)
         {
             *count = cur_config_cache->server_count;
             ret = 0;
@@ -533,7 +533,7 @@ int PINT_cached_config_get_server_array(
     /* at this point, we should have the data that we need cached up,
      * just copy out
      */
-    if (server_type == PINT_BUCKET_META)
+    if (server_type == PINT_SERVER_TYPE_META)
     {
         if (*inout_count_p < cur_config_cache->meta_server_count)
         {
@@ -548,7 +548,7 @@ int PINT_cached_config_get_server_array(
         *inout_count_p = cur_config_cache->meta_server_count;
         return 0;
     }
-    else if (server_type == PINT_BUCKET_IO)
+    else if (server_type == PINT_SERVER_TYPE_IO)
     {
         if (*inout_count_p < cur_config_cache->io_server_count)
         {
@@ -563,7 +563,7 @@ int PINT_cached_config_get_server_array(
         *inout_count_p = cur_config_cache->io_server_count;
         return 0;
     }
-    else if (server_type == (PINT_BUCKET_META | PINT_BUCKET_IO))
+    else if (server_type == PINT_SERVER_TYPE_ALL)
     {
         if (*inout_count_p < cur_config_cache->server_count)
         {
@@ -948,12 +948,12 @@ static int cache_server_array(
             if (i == 0)
             {
                 tmp_server = cur_config_cache->fs->meta_handle_ranges;
-                current = PINT_BUCKET_META;
+                current = PINT_SERVER_TYPE_META;
             }
             else
             {
                 tmp_server = cur_config_cache->fs->data_handle_ranges;
-                current = PINT_BUCKET_IO;
+                current = PINT_SERVER_TYPE_IO;
             }
             while ((cur_mapping = PINT_llist_head(tmp_server)))
             {
@@ -1001,14 +1001,14 @@ static int cache_server_array(
         for(i = 0; i < cur_config_cache->server_count; i++)
         {
             if (cur_config_cache->server_array[i].server_type &
-                PINT_BUCKET_META)
+                PINT_SERVER_TYPE_META)
             {
                 cur_config_cache->meta_server_array[array_index] = 
                     cur_config_cache->server_array[i];
                 array_index++;
             }
             if (cur_config_cache->server_array[i].server_type &
-                PINT_BUCKET_IO)
+                PINT_SERVER_TYPE_IO)
             {
                 cur_config_cache->io_server_array[array_index2] = 
                     cur_config_cache->server_array[i];

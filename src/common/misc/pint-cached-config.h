@@ -15,10 +15,16 @@
 #include "trove.h"
 #include "server-config.h"
 
-/* This is the interface to the cached_config management component of the
- * system interface.  It is responsible for managing the list of meta
- * and data servers and mapping between handle ranges and servers.
+#define PINT_SERVER_TYPE_IO                            PVFS_MGMT_IO_SERVER
+#define PINT_SERVER_TYPE_META                        PVFS_MGMT_META_SERVER
+#define PINT_SERVER_TYPE_ALL   (PINT_SERVER_TYPE_META|PINT_SERVER_TYPE_IO)
+
+/* This is the interface to the cached_config management component of
+ * the system interface.  It is responsible for caching information
+ * gathered from the various server configurations and providing an
+ * interface that allows fast access to that information.
  */
+
 int PINT_cached_config_initialize(void);
 
 int PINT_cached_config_finalize(void);
@@ -39,10 +45,6 @@ int PINT_cached_config_get_next_io(
     int num_servers,
     PVFS_BMI_addr_t *io_addr_array,
     PVFS_handle_extent_array *io_handle_extent_array);
-
-#define PINT_BUCKET_IO PVFS_MGMT_IO_SERVER
-#define PINT_BUCKET_META PVFS_MGMT_META_SERVER
-#define PINT_BUCKET_ALL (PINT_BUCKET_META|PINT_BUCKET_IO)
 
 const char *PINT_cached_config_map_addr(
     struct server_configuration_s *config,
