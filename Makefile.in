@@ -473,7 +473,10 @@ install:
 
 	install -d $(prefix)/bin
 	install -m 755 $(ADMINTOOLS) $(prefix)/bin
-	install -m 755 $(TESTS)  $(prefix)/bin
 
 	install -d $(prefix)/sbin
 	install -m 755 $(SERVER) $(prefix)/sbin
+
+install_tests: 
+	install -d $(prefix)/bin
+	install -m 755 $(TESTS)  $(prefix)/bin
