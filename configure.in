@@ -38,6 +38,8 @@ src/io/description/module.mk
 src/io/flow/module.mk
 src/io/flow/flowproto-bmi-trove/module.mk
 src/io/flow/flowproto-template/module.mk
+src/proto/module.mk
+src/server/request-scheduler/module.mk
 test/io/trove/module.mk
 test/common/quicklist/module.mk
 test/common/id-generator/module.mk
