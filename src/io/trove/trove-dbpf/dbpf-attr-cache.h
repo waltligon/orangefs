@@ -79,11 +79,10 @@ int dbpf_attr_cache_ds_attr_pair_update_cached_data(
     TROVE_ds_attributes *src_ds_attr);
 /*
   do an atomic copy of the cached attributes into the provided
-  target_ds_attr object
+  target_ds_attr object based on the specified key
 */
 int dbpf_attr_cache_ds_attr_pair_fetch_cached_data(
-    dbpf_attr_cache_elem_t *cached_elem,
-    TROVE_ds_attributes *target_ds_attr);
+    TROVE_handle key, TROVE_ds_attributes *target_ds_attr);
 
 int dbpf_attr_cache_insert(TROVE_handle key, TROVE_ds_attributes *attr);
 int dbpf_attr_cache_remove(TROVE_handle key);

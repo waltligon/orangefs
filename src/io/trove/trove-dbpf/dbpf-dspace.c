@@ -682,14 +682,11 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
-    dbpf_attr_cache_elem_t *cache_elem = NULL;
 
-    cache_elem = dbpf_attr_cache_elem_lookup(handle);
-    if (cache_elem)
+    /* fast path cache hit; skips queueing */
+    if (dbpf_attr_cache_ds_attr_pair_fetch_cached_data(
+            handle, ds_attr_p) == 0)
     {
-        /* fast path cache hit; skips queueing */
-        dbpf_attr_cache_ds_attr_pair_fetch_cached_data(
-            cache_elem, ds_attr_p);
         gossip_debug(TROVE_DEBUG, "fast path attr cache hit on %Lu"
                      "(dfile_count=%d | dist_size=%d)\n", Lu(handle),
                      ds_attr_p->dfile_count, ds_attr_p->dist_size);
