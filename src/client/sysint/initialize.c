@@ -361,6 +361,10 @@ static char* build_flow_module_list(pvfs_mntlist* mntlist)
 	    case FLOWPROTO_BMI_CACHE:
 		next_mod = "flowproto_bmi_cache";
 		break;
+	    case FLOWPROTO_MULTIQUEUE:
+		assert(0); /* don't use this on client right now */
+		next_mod = "flowproto_multiqueue";
+		break;
 	}
 
 	/* see if we have already found this module */
