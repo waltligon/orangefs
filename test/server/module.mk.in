@@ -20,6 +20,7 @@ test/server/io: test/server/io.o
 # this is rather gross, but it *does* avoid copying code around
 SHOWCONFIG_OBJ := test/server/showconfig.o \
 	src/common/misc/server-config.o \
-	src/common/dotconf/dotconf.o
+	src/common/dotconf/dotconf.o \
+	src/common/misc/mkspace.o
 test/server/showconfig: $(SHOWCONFIG_OBJ)
-	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
+	$(LD) $^ $(LDFLAGS) $(LIBS) -ldb -lrt -lpthread -o $@

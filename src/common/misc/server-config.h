@@ -87,4 +87,7 @@ int PINT_server_config_has_fs_config_info(
     struct server_configuration_s *config_s,
     char *fs_name);
 
+int PINT_server_config_pvfs2_mkspace(
+    struct server_configuration_s *config);
+
 #endif  /* __SERVER_CONFIG_H */

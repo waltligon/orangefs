@@ -163,7 +163,7 @@ int pvfs2_mkspace(
         if (verbose)
         {
             fprintf(stderr,"info: created root directory with handle "
-                    "0x%x.\n",new_root_handle);
+                    "0x%x.\n",(int)new_root_handle);
         }
 
         /*

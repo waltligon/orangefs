@@ -31,14 +31,12 @@
 
 #include "pvfs2-server.h"
 #include "state-machine.h"
+#include "mkspace.h"
 #include "server-config.h"
-
 #include "quicklist.h"
 
-job_context_id PINT_server_job_context = -1;
-
 /* Internal Globals */
-
+job_context_id PINT_server_job_context = -1;
 
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_code server_level_init;
@@ -47,23 +45,33 @@ static PINT_server_status_code server_level_init;
 static struct server_configuration_s user_opts;
 
 /* A flag to stop the main loop from processing and handle the signal 
-	after all threads complete and are no longer blocking */
+   after all threads complete and are no longer blocking */
 static int signal_recvd_flag;
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 /* Prototypes */
-static int initialize_interfaces(PINT_server_status_code *server_level_init);
+static int initialize_interfaces(
+    PINT_server_status_code *server_level_init);
+
 static int initialize_signal_handlers(void);
-static int initialize_server_state(PINT_server_status_code *server_level_init,
-                                   PINT_server_op *s_op, 
-				   job_status_s *job_status_structs);
+
+static int initialize_server_state(
+    PINT_server_status_code *server_level_init,
+    PINT_server_op *s_op, 
+    job_status_s *job_status_structs);
+
 static int server_init(void);
-static int server_shutdown(PINT_server_status_code level,
-			   int ret,
-			   int sig);
+
+static int server_shutdown(
+    PINT_server_status_code level,
+    int ret,
+    int sig);
+
 static void *sig_handler(int sig);
+
 static int initialize_new_server_op(job_status_s * ret);
+
 
 /*
   Initializes the bmi, flow, trove, and job interfaces.
@@ -105,6 +113,21 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     if (ret < 0)
     {
 	gossip_err("Trove Init Failed: %s\n", strerror(-ret));
+
+        if (ret == -1)
+        {
+            fprintf(stderr,"\n*****************************\n");
+            fprintf(stderr,"Invalid Storage Space: %s\n\n",
+                    user_opts.storage_path);
+            fprintf(stderr,"Storage initialization failed.  The most "
+                    "common reason\nfor this is that the storage space "
+                    "has not yet been\ncreated or is located on a "
+                    "partition that has no yet\nbeen mounted.  "
+                    "If you'd like to create the storage space,\n"
+                    "re-run this program with a -f appended to the end "
+                    "of\nthe command line.\n");
+            fprintf(stderr,"\n*****************************\n");
+        }
 	*server_level_init = SHUTDOWN_FLOW_INTERFACE;
 	goto interface_init_failed;
     }
@@ -233,7 +256,8 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
     ret = initialize_interfaces(server_level_init);
     if (ret < 0)
     {
-	gossip_err("Error: Could not initialize server interfaces; aborting.\n");
+	gossip_err("Error: Could not initialize server interfaces; "
+                   "aborting.\n");
 	goto state_init_failed;
     }
 
@@ -280,10 +304,8 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
 }
 
 
-int main(int argc,
-	 char **argv)
+int main(int argc, char **argv)
 {
-
     /* Used to check completion of interface initializations */
     int ret = 1;
 
@@ -308,14 +330,10 @@ int main(int argc,
     /* Status Structures used in job_wait_world */
     job_status_s job_status_structs[MAX_JOBS];
 
-    /* Insert Temp Trove Stuff Here */
-
 #ifdef DEBUG
     int Temp_Check_Out_Debug = 10;
     int Temp_Jobs_Complete_Debug = 0;
 #endif
-
-    /* Begin Main */
 
     /* Passed to server shutdown function */
     server_level_init = STATUS_UNKNOWN;
@@ -341,7 +359,6 @@ int main(int argc,
      *      Read configuration options...
      * function located in server_config.c
      */
-
     if (PINT_server_config(&user_opts, argc, argv))
     {
 	gossip_err("Error: Could not read configuration; aborting.\n");
@@ -353,6 +370,12 @@ int main(int argc,
     {
 	gossip_err("Error: Invalid configuration; aborting.\n");
 	goto server_shutdown;
+    }
+
+    /* check if we need to create a storage space and exit */
+    if ((argc == 4) && (strcmp(argv[3],"-f") == 0))
+    {
+        return PINT_server_config_pvfs2_mkspace(&user_opts);
     }
 
     /* perform initial steps to run as a server  */

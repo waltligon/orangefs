@@ -17,6 +17,7 @@
 #include "job.h"
 #include "gossip.h"
 #include "extent-utils.h"
+#include "mkspace.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_storage_space);
@@ -48,6 +49,10 @@ static int is_valid_filesystem_configuration(
 static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
+static int is_root_handle_in_my_range(
+    struct server_configuration_s *config_s,
+    struct filesystem_configuration_s *fs);
+
 
 static struct server_configuration_s *config_s = NULL;
 
@@ -683,6 +688,68 @@ static int is_populated_filesystem_configuration(
              fs->handle_ranges && fs->root_handle) ? 1 : 0);
 }
 
+static int is_root_handle_in_my_range(
+    struct server_configuration_s *config,
+    struct filesystem_configuration_s *fs)
+{
+    int ret = 0;
+    struct llist *cur = NULL;
+    struct llist *extent_list = NULL;
+    char *cur_host_id = (char *)0;
+    host_handle_mapping_s *cur_h_mapping = NULL;
+
+    if (config && is_populated_filesystem_configuration(fs))
+    {
+        /*
+          check if the root handle is within one of the
+          specified host's handle ranges for this fs
+        */
+        cur = fs->handle_ranges;
+        while(cur)
+        {
+            cur_h_mapping = llist_head(cur);
+            if (!cur_h_mapping)
+            {
+                break;
+            }
+            assert(cur_h_mapping->host_alias);
+            assert(cur_h_mapping->handle_range);
+
+            cur_host_id = PINT_server_config_get_host_addr_ptr(
+                config,cur_h_mapping->host_alias);
+            if (!cur_host_id)
+            {
+                gossip_err("Invalid host ID for alias %s.\n",
+                           cur_h_mapping->host_alias);
+                break;
+            }
+
+            /* only check if this is *our* range */
+            if (strcmp(config->host_id,cur_host_id) == 0)
+            {
+                extent_list = PINT_create_extent_list(
+                    cur_h_mapping->handle_range);
+                if (!extent_list)
+                {
+                    gossip_err("Failed to create extent list.\n");
+                    break;
+                }
+
+                ret = PINT_handle_in_extent_list(
+                    extent_list,fs->root_handle);
+                PINT_release_extent_list(extent_list);
+                if (ret == 1)
+                {
+                    break;
+                }
+            }
+            cur = llist_next(cur);
+        }
+    }
+    return ret;
+}
+
+
 static int is_valid_filesystem_configuration(
     struct filesystem_configuration_s *fs)
 {
@@ -1141,6 +1208,62 @@ int PINT_server_config_has_fs_config_info(
     return ret;
 }
 
+/*
+  create a storage space based on configuration settings object
+  with the particular host settings local to the caller
+*/
+int PINT_server_config_pvfs2_mkspace(struct server_configuration_s *config)
+{
+    int ret = 1;
+    int root_handle = 0;
+    struct llist *cur = NULL;
+    char *cur_handle_range = (char *)0;
+    filesystem_configuration_s *cur_fs = NULL;
+
+    if (config)
+    {
+        cur = config->file_systems;
+        while(cur)
+        {
+            cur_fs = llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
+
+            cur_handle_range = PINT_server_config_get_handle_range_str(
+                config,cur_fs);
+            if (!cur_handle_range)
+            {
+                gossip_err("Invalid configuration handle range\n");
+                break;
+            }
+
+            /* check if root handle is in our handle range */
+            if (is_root_handle_in_my_range(config,cur_fs))
+            {
+                /*
+                  if it is, we're responsible for creating
+                  it on disk when creating the stroage space
+                */
+                root_handle = cur_fs->root_handle;
+            }
+
+            fprintf(stderr,"\n*****************************\n");
+            fprintf(stderr,"Creating new storage space\n");
+            ret = pvfs2_mkspace(config->storage_path,
+                                cur_fs->file_system_name,
+                                cur_fs->coll_id,
+                                root_handle,
+                                cur_handle_range,
+                                1);
+            fprintf(stderr,"\n*****************************\n");
+
+            cur = llist_next(cur);
+        }
+    }
+    return ret;
+}
 
 /*
   vim:set ts=4:
