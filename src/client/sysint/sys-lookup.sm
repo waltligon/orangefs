@@ -495,8 +495,8 @@ int PVFS_isys_ref_lookup(
                              relative_pathname, parent);
     if (ret != 0)
     {
-        gossip_err("PVFS_sys_ref_lookup failed to init context "
-                   "(path = %s)\n", relative_pathname);
+        gossip_err("%s: failed to init context (path = %s)\n",
+                   __func__, relative_pathname);
 
         PVFS_util_release_credentials(sm_p->cred_p);
         free(sm_p);
