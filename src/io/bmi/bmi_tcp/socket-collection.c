@@ -223,6 +223,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     int num_handled = 0;
     int i = 0;
     char* tmp_host = NULL;
+    int old_errno = -1;
 
     if ((incount < 1) || !(outcount) || !(maps) || !(status))
     {
@@ -308,6 +309,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     {
 	ret = poll(big_poll_fds, num_to_poll, poll_timeout);
     } while (ret < 0 && errno == EINTR);
+    old_errno = errno;
     gen_mutex_lock(external_mutex);
 
     /* look for poll error */
@@ -316,7 +318,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	gen_mutex_unlock(external_mutex);
 	gen_mutex_unlock(&big_poll_mutex);
 	gen_mutex_lock(external_mutex);
-	return (-errno);
+	return (-old_errno);
     }
 
     /* short out if nothing is ready */
