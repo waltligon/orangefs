@@ -22,18 +22,18 @@
 int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                                 job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_sm_common_parent_getattr_setup_msgpair\n");
 
+    js_p->error_code = 0;
+
     memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
 
-    /* parameter range checks */
     assert(sm_p->parent_ref.fs_id != 0);
     assert(sm_p->parent_ref.handle != 0);
 
-    /* fill in getattr request */
     PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
 			      *sm_p->cred_p,
 			      sm_p->parent_ref.fs_id,
@@ -48,13 +48,11 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
 				    sm_p->msgpair.handle,
 				    sm_p->msgpair.fs_id);
-    if (ret != 0)
+    if (ret)
     {
-	gossip_err("Error: failure mapping to server.\n");
-        return -PVFS_EADDRNOTAVAIL;
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
     }
-
-    js_p->error_code = 0;
     return 1;
 }
 
@@ -69,18 +67,18 @@ int PINT_sm_common_parent_getattr_failure(PINT_client_sm *sm_p,
 int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                                 job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_sm_common_object_getattr_setup_msgpair\n");
 
+    js_p->error_code = 0;
+
     memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
 
-    /* parameter range checks */
     assert(sm_p->object_ref.fs_id != 0);
     assert(sm_p->object_ref.handle != 0);
 
-    /* fill in getattr request */
     PINT_SERVREQ_GETATTR_FILL(
         sm_p->msgpair.req,
         *sm_p->cred_p,
@@ -96,13 +94,11 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
 				    sm_p->msgpair.handle,
 				    sm_p->msgpair.fs_id);
-    if (ret != 0)
+    if (ret)
     {
-	gossip_err("Error: failure mapping to server.\n");
-        return -PVFS_EADDRNOTAVAIL;
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
     }
-
-    js_p->error_code = 0;
     return 1;
 }
 

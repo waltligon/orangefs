@@ -187,10 +187,6 @@ struct PINT_client_io_sm {
 
 /* PINT_client_flush_sm */
 struct PINT_client_flush_sm {
-    PVFS_pinode_reference	object_ref; /* input parameter */
-    int				datafile_count; /* from attribs */
-    PVFS_handle			*datafile_handles;
-    PINT_client_sm_msgpair_state *msgpair; /* used in datafile flush */
 };
 
 /* PINT_client_readdir_sm */
