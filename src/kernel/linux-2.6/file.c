@@ -41,6 +41,7 @@ int pvfs2_file_open(
 {
     pvfs2_print("pvfs2: pvfs2_file_open called on %s (inode is %d)\n",
 		file->f_dentry->d_name.name, (int)inode->i_ino);
+
     if (S_ISDIR(inode->i_mode))
     {
 	return dcache_dir_open(inode, file);

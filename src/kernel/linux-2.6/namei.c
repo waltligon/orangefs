@@ -30,16 +30,10 @@ static int pvfs2_create(
     int mode,
     struct nameidata *nd)
 {
-    int ret = -1;
     struct inode *inode =
 	pvfs2_create_entry(dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE);
 
-    if (inode)
-    {
-        inode->i_nlink++;
-        ret = 0;
-    }
-    return ret;
+    return (inode ? 0 : -EINVAL);
 }
 
 struct dentry *pvfs2_lookup(
