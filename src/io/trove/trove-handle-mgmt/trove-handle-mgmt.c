@@ -81,8 +81,10 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
             ret = 0;
 
             /* look for special case of a blank fs */
-            if ((count == 1) && (handles[i] == 0))
+            if ((count == 1) && (handles[0] == 0))
             {
+                /* gossip or log something */
+                printf("* Trove: Assuming a blank filesystem\n");
                 return ret;
             }
 
