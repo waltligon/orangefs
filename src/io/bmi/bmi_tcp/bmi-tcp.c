@@ -567,6 +567,7 @@ int BMI_tcp_memfree(void *buffer,
     if (buffer)
     {
 	free(buffer);
+        buffer = NULL;
     }
 
     return (0);

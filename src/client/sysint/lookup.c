@@ -174,7 +174,7 @@ int PVFS_sys_ref_lookup(
 	op_tag = get_next_session_tag();
 
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
-	    &decoded, &encoded_resp, op_tag);
+                            &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
 	    failure = SEND_REQ_FAILURE;
@@ -283,11 +283,13 @@ int PVFS_sys_ref_lookup(
 	    PINT_pcache_insert_rls(pinode_ptr);
 	}
 
-	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
-	    &encoded_resp, op_tag);
-
-	if (path != NULL)
+	PINT_release_req(serv_addr, &req_p, max_msg_sz,
+                         &decoded, &encoded_resp, op_tag);
+	if (path)
+        {
 	    free(path);
+            path = NULL;
+        }
 
 	if (num_segments_remaining == 0)
 	{
@@ -319,7 +321,6 @@ return_error:
 
     switch(failure)
     {
-	case GET_NEXT_PATHSEG_FAILURE:
 	case CHECK_PERMS_FAILURE:
 	    if (pinode_ptr != NULL)
 		PINT_pcache_pinode_alloc(&pinode_ptr); 	
@@ -328,9 +329,11 @@ return_error:
 	case RECV_REQ_FAILURE:
 	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 		&encoded_resp, op_tag);
+	case GET_NEXT_PATHSEG_FAILURE:
+            /* request has already been freed at this point */
 	case SEND_REQ_FAILURE:
 	case MAP_TO_SERVER_FAILURE:
-	    if(path != NULL)
+	    if(path)
 		free(path);
 	case GET_PARENT_FAILURE:
 	case NONE_FAILURE:

@@ -17,7 +17,10 @@ void do_decode_rel(
     enum PINT_encode_msg_type input_type)
 {
     if (msg->buffer)
+    {
 	free(msg->buffer);
+        msg->buffer = NULL;
+    }
 }
 
 /*
