@@ -135,13 +135,19 @@ dnl special measures to accomodate those hacked kernels.  However, we do not
 dnl need to take these workarounds if someone is building a stock kernel.org
 dnl kernel.  
 
+dnl was the configure option passed in?
 set_redhat24=0
+dnl what was the configure option set to?
 use_redhat24=0
 
 AC_ARG_ENABLE([redhat24],
 [  --enable-redhat24 Enable workaround for building against redhat 2.4 kernel], 
-    if test "$enableval" = no ; then use_redhat24=0; fi
     set_redhat24=1
+    if test "$enableval" = no ; then 
+    	use_redhat24=0
+    else
+        use_redhat24=1 
+    fi
 )
 
 dnl We check for the following redhat tags, as they all have similarly
@@ -176,7 +182,7 @@ if test -f /etc/redhat-release; then
     for a kernel.org (unmondified) kernel, then re-run
     configure with the --disable-redhat24 option.])
        fi
-       if test "$use_redhat24_workaround" = 1 ; then
+       if test "$use_redhat24" = 1 ; then
            REDHAT_RELEASE="-DREDHAT_RELEASE_9"
        fi
     else
