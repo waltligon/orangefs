@@ -42,6 +42,14 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     PVFS_object_attr* attr_p,
     PVFS_sysreq_io* req,
     enum PVFS_sys_io_type type);
+static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
+    struct PVFS_server_req_s* req_array,
+    bmi_size_t max_resp_size,
+    void** resp_encoded_array,
+    struct PINT_decoded_msg* resp_decoded_array,
+    flow_descriptor** flow_array,
+    int* error_code_array,
+    int array_size);
 
 /* PVFS_sys_io()
  *
@@ -259,6 +267,17 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	}
     }
 
+    /* release resources that were used while running the I/O */
+    io_release_req_ack_flow_array(
+	addr_array,
+	req_array,
+	PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO),
+	resp_encoded_array,
+	resp_decoded_array,
+	flow_array,
+	error_code_array,
+	target_handle_count);
+
     /****************************************************************/
 
     /* if this was a write operation, then we need to wait for a
@@ -290,7 +309,20 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 		PVFS_server_resp_s*)resp_decoded_array[i].buffer;
 	    if(!(error_code_array[i]) && tmp_resp->status)
 		error_code_array[i] = tmp_resp->status;
+	    if(!(error_code_array[i]) && !(tmp_resp->status))
+		resp->total_completed +=
+		    tmp_resp->u.write_completion.total_completed;
 	}
+
+	/* release resources */
+	PINT_release_ack_array(
+	    addr_array,
+	    PINT_get_encoded_generic_ack_sz(0,
+		PVFS_SERV_WRITE_COMPLETION),
+	    resp_encoded_array,
+	    resp_decoded_array,
+	    error_code_array,
+	    target_handle_count);
     }
 
     /* default to reporting no errors, until we check our error
@@ -309,15 +341,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    gossip_lerr("Error: EIO.\n");
 	    ret = -EIO;
 	}
-	else
-	{
-	    if(type == PVFS_SYS_IO_WRITE)
-	    {
-		resp->total_completed +=
-		    tmp_resp->u.write_completion.total_completed;
-	    }
-	}
     }
+
     gossip_ldebug(CLIENT_DEBUG, 
 	"%d servers contacted.\n", target_handle_count);
     gossip_ldebug(CLIENT_DEBUG,
@@ -341,15 +366,7 @@ sys_io_out:
     if(target_handle_array)
 	free(target_handle_array);
     if(flow_array)
-    {
-	for(i=0; i<target_handle_count; i++)
-	{
-	    if(flow_array[i])
-		PINT_flow_free(flow_array[i]);
-	}
 	free(flow_array);
-    }
-
     if(req_state)
 	PINT_Free_request_state(req_state);
 
@@ -735,6 +752,45 @@ array_out:
 	free(file_data_array);
 
     return(ret);
+}
+
+
+/* io_release_req_ack_flow_array()
+ *
+ * releases the resources used by io_req_ack_flow_array()
+ *
+ * no return value
+ */
+static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
+    struct PVFS_server_req_s* req_array,
+    bmi_size_t max_resp_size,
+    void** resp_encoded_array,
+    struct PINT_decoded_msg* resp_decoded_array,
+    flow_descriptor** flow_array,
+    int* error_code_array,
+    int array_size)
+{
+    int i;
+
+    for(i=0; i<array_size; i++)
+    {
+	if(resp_decoded_array[i].buffer)
+	{
+	    PINT_decode_release(&(resp_decoded_array[i]),
+		PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	}
+	if(resp_encoded_array[i])
+	{
+	    BMI_memfree(addr_array[i], resp_encoded_array[i],
+		max_resp_size, BMI_RECV_BUFFER);
+	}
+	if(flow_array[i])
+	{
+	    PINT_flow_free(flow_array[i]);
+	}
+    }
+
+    return;
 }
 
 
