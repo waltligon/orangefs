@@ -103,9 +103,13 @@ machine crdirent(init, get_handle, get_attrib, check_perms, create, send, cleanu
  *
  * Params:   void
  *
- * Returns:  PINT_state_array_values*
+ * Pre:      None
  *
- * Synopsis: Set up the state machine for set_attrib. 
+ * Post:     None
+ *
+ * Returns:  void
+ *
+ * Synopsis: Set up the state machine for crdirent. 
  *           
  */
 
@@ -122,6 +126,10 @@ void crdirent_init_state_machine(void)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      a properly formatted request structure.
+ *
+ * Post:     scheduled.
+ *
  * Returns:  int
  *
  * Synopsis: 
@@ -134,25 +142,7 @@ STATE_FXN_HEAD(crdirent_init)
 
 	int job_post_ret;
 	job_id_t i;
-	printf("Got CrDirent for %s,%lld in %lld\n",s_op->req->u.crdirent.name,s_op->req->u.crdirent.new_handle,s_op->req->u.crdirent.parent_handle);
-
-#if 0
-	s_op->key_a = (PVFS_ds_keyval_s *) malloc(2*sizeof(PVFS_ds_keyval_s));
-	s_op->val_a = (PVFS_ds_keyval_s *) malloc(2*sizeof(PVFS_ds_keyval_s));
-
-	s_op->key_a[0].buffer_sz = s_op->key_a[1].buffer_sz = \
-	atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]) > atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]) ? \
-	atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]) : atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]);
-
-	s_op->val_a[0].buffer_sz = s_op->val_a[1].buffer_sz = \
-	PVFS_NAME_MAX+1 > sizeof(PVFS_object_attr) ? \
-	PVFS_NAME_MAX+1 : sizeof(PVFS_object_attr);
-
-	s_op->key_a[0].buffer = malloc(s_op->key_a[0].buffer_sz);
-	s_op->key_a[1].buffer = malloc(s_op->key_a[1].buffer_sz);
-	s_op->val_a[0].buffer = malloc(s_op->val_a[0].buffer_sz);
-	s_op->val_a[1].buffer = malloc(s_op->val_a[1].buffer_sz);
-#endif
+	gossip_ldebug(SERVER_DEBUG,"Got CrDirent for %s,%lld in %lld\n",s_op->req->u.crdirent.name,s_op->req->u.crdirent.new_handle,s_op->req->u.crdirent.parent_handle);
 
 	s_op->key.buffer = TROVE_COMMON_KEYS[METADATA_KEY];
 	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]);
@@ -177,6 +167,10 @@ STATE_FXN_HEAD(crdirent_init)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      
+ *
+ * Post:     
+ *
  * Returns:  int
  *
  * Synopsis: Get the directory entry handle
@@ -191,7 +185,7 @@ STATE_FXN_HEAD(crdirent_gethandle)
 	job_id_t i;
 	PVFS_vtag_s bs;
 
-	printf("Get Handle Fxn for crdirent\n");
+	gossip_ldebug(SERVER_DEBUG,"Get Handle Fxn for crdirent\n");
 	
 	s_op->key.buffer = TROVE_COMMON_KEYS[DIR_ENT_KEY];
 	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]);
@@ -218,6 +212,10 @@ STATE_FXN_HEAD(crdirent_gethandle)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      
+ *
+ * Post:     
+ *
  * Returns:  int
  *
  * Synopsis: Ok... here is what we have... Two Values, one of which is the handle,
@@ -233,7 +231,7 @@ STATE_FXN_HEAD(crdirent_getattr)
 	job_id_t i;
 	PVFS_vtag_s bs;
 
-	printf("Get attr Fxn for crdirent\n");
+	gossip_ldebug(SERVER_DEBUG,"Get attr Fxn for crdirent\n");
 	job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
 													 s_op->req->u.crdirent.parent_handle,
 													 &(s_op->key),
@@ -256,6 +254,10 @@ STATE_FXN_HEAD(crdirent_getattr)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      
+ *
+ * Post:     
+ *
  * Returns:  int
  *
  * Synopsis: 
@@ -269,7 +271,7 @@ STATE_FXN_HEAD(crdirent_check_perms)
 	int job_post_ret;
 	//job_id_t i;
 
-	printf("CheckPerms Fxn for crdirent\n");
+	gossip_ldebug(SERVER_DEBUG,"CheckPerms Fxn for crdirent\n");
 	job_post_ret = 1;  /* Just pretend it is good right now */
 	// IF THEY don't have permission, set ret->error_code to -ENOPERM!
 
@@ -282,6 +284,10 @@ STATE_FXN_HEAD(crdirent_check_perms)
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
+ *
+ * Pre:      
+ *
+ * Post:     
  *
  * Returns:  int
  *
@@ -296,7 +302,7 @@ STATE_FXN_HEAD(crdirent_create_dir_handle_ph2)
 	int job_post_ret;
 	job_id_t i;
 
-	printf("phase2 Fxn for crdirent\n");
+	gossip_ldebug(SERVER_DEBUG,"phase2 Fxn for crdirent\n");
 	s_op->key.buffer = TROVE_COMMON_KEYS[DIR_ENT_KEY];
 	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]);
 
@@ -323,6 +329,10 @@ STATE_FXN_HEAD(crdirent_create_dir_handle_ph2)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      
+ *
+ * Post:     
+ *
  * Returns:  int
  *
  * Synopsis: 
@@ -336,8 +346,8 @@ STATE_FXN_HEAD(crdirent_create_dir_handle_ph1)
 	int job_post_ret;
 	job_id_t i;
 
-	printf("phase1 Fxn for crdirent\n");
-	printf("Creating Handle:  %d,%lld\n",s_op->req->u.crdirent.fs_id,\
+	gossip_ldebug(SERVER_DEBUG,"phase1 Fxn for crdirent\n");
+	gossip_ldebug(SERVER_DEBUG,"Creating Handle:  %d,%lld\n",s_op->req->u.crdirent.fs_id,\
 					 s_op->req->u.crdirent.parent_handle);
 	job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
 													   s_op->req->u.crdirent.parent_handle,
@@ -358,6 +368,10 @@ STATE_FXN_HEAD(crdirent_create_dir_handle_ph1)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      
+ *
+ * Post:     
+ *
  * Returns:  int
  *
  * Synopsis: 
@@ -373,7 +387,7 @@ STATE_FXN_HEAD(crdirent_create)
 	PVFS_handle h;
 
 
-	printf("create Fxn for crdirent\n");
+	gossip_ldebug(SERVER_DEBUG,"create Fxn for crdirent\n");
 	h = *((PVFS_handle *)s_op->val.buffer);
 	
 	s_op->key.buffer = malloc(strlen(s_op->req->u.crdirent.name));
@@ -405,6 +419,10 @@ STATE_FXN_HEAD(crdirent_create)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      
+ *
+ * Post:     
+ *
  * Returns:  int
  *
  * Synopsis: 
@@ -420,7 +438,7 @@ STATE_FXN_HEAD(crdirent_send_bmi)
 
 	s_op->resp->status = ret->error_code;
 
-	printf("send Fxn for crdirent\n");
+	gossip_ldebug(SERVER_DEBUG,"send Fxn for crdirent\n");
 	/* Set the ack IF it was created */
 	if(ret->error_code == 0) 
 		s_op->resp->u.generic.handle = s_op->req->u.crdirent.new_handle;
@@ -447,6 +465,10 @@ STATE_FXN_HEAD(crdirent_send_bmi)
  * Params:   server_op *b, 
  *           job_status_s *ret
  *
+ * Pre:      
+ *
+ * Post:     
+ *
  * Returns:  int
  *
  * Synopsis: free memory and return
@@ -457,7 +479,7 @@ STATE_FXN_HEAD(crdirent_send_bmi)
 STATE_FXN_HEAD(crdirent_cleanup)
 {
 	
-	printf("clean Fxn for crdirent\n");
+	gossip_ldebug(SERVER_DEBUG,"clean Fxn for crdirent\n");
 	if(s_op->resp)
 	{
 		BMI_memfree(s_op->addr,

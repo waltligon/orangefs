@@ -66,6 +66,7 @@ extern PINT_state_machine_s create_req_s;
 extern PINT_state_machine_s crdirent_req_s;
 extern PINT_state_machine_s mkdir_req_s;
 extern PINT_state_machine_s readdir_req_s;
+extern PINT_state_machine_s lookup_req_s;
 
 PINT_state_machine_s *PINT_state_array[SERVER_REQ_ARRAY_SIZE] =
 {
@@ -80,7 +81,7 @@ PINT_state_machine_s *PINT_state_array[SERVER_REQ_ARRAY_SIZE] =
 	&setattr_req_s,
 	NULL,
 	NULL,					 /* 10 */
-	NULL,
+	&lookup_req_s,
 	NULL,
 	&crdirent_req_s,
 	NULL,

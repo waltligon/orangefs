@@ -18,7 +18,6 @@
 #include <pvfs2-debug.h>
 #include <pvfs2-storage.h>
 #include <PINT-reqproto-encode.h>
-#include <pvfs2-server.h>
 #include <pack.h>
 
 #define set_fun(i,j,k) do {\
@@ -37,6 +36,16 @@
 
 #define STATE_FXN_RET(__name) return(__name);
 
+typedef struct PINT_server_op handler_structure;
+
+union PINT_state_array_values
+{
+	int retVal;
+	int (*handler)(handler_structure*,job_status_s*);
+	union PINT_state_array_values *index;
+};
+
+typedef union PINT_state_array_values PINT_state_array_values;
 
 enum {
 	JMP_NOT_READY = 99,
@@ -65,10 +74,11 @@ typedef struct PINT_state_machine_s
 
 int PINT_state_machine_init(void);
 int PINT_state_machine_halt(void);
-int PINT_state_machine_next(PINT_server_op *server_op,job_status_s *r);
-PINT_state_array_values *PINT_state_machine_locate(PINT_server_op *op);
-int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op, job_status_s *ret);
+int PINT_state_machine_next(handler_structure*,job_status_s *r);
+PINT_state_array_values *PINT_state_machine_locate(handler_structure*);
+int PINT_state_machine_initialize_unexpected(handler_structure*, job_status_s *ret);
 
+#include <pvfs2-server.h>
 
 
 #endif /* __PVFS_SERVER_STATE */

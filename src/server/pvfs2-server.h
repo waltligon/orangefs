@@ -33,19 +33,13 @@ typedef struct PINT_server_op
 	PVFS_ds_keyval_s *val_a;
 	bmi_addr_t addr;
 	bmi_msg_tag_t tag;
-	union PINT_state_array_values
-	{
-		int retVal;
-		int (*handler)(struct PINT_server_op *s_op,job_status_s *r);
-		union PINT_state_array_values *index;
-	} location;
+	PINT_state_array_values location;
 	struct PVFS_server_req_s *req;
 	struct PVFS_server_resp_s *resp;
 	struct unexpected_info *unexp_bmi_buff;
 	struct PINT_encoded_msg encoded;
 } PINT_server_op;
 
-typedef union PINT_state_array_values PINT_state_array_values;
 
 /* Globals for Server Interface */
 

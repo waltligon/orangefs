@@ -22,7 +22,6 @@ STATE_FXN_HEAD(lookup_send_bmi);
 STATE_FXN_HEAD(lookup_dir_space);
 STATE_FXN_HEAD(lookup_key_val);
 void lookup_init_state_machine(void);
-//static void get_no_of_segments(char *path,int *num);
 
 extern char *TROVE_COMMON_KEYS[KEYVAL_ARRAY_SIZE];
 
@@ -30,52 +29,52 @@ static char path_delim[] = "/";
 
 PINT_state_machine_s lookup_req_s = 
 {
-    NULL,
-    "lookup",
-    lookup_init_state_machine
+	NULL,
+	"lookup",
+	lookup_init_state_machine
 };
 
 %%
 
 machine lookup(init, dir_space, key_val, check_perms, send, cleanup)
 {
-    state init
+	state init
 	{
-	    run lookup_init;
-	    default => key_val;
+		run lookup_init;
+		default => key_val;
 	}
 
-    state check_perms
+	state check_perms
 	{
-	    run lookup_check_perms;
-	    success => dir_space;
-	    default => send;
+		run lookup_check_perms;
+		success => dir_space;
+		default => send;
 	}
 
-    state key_val
+	state key_val
 	{
-	    run lookup_key_val;
-	    success => check_perms;
-	    default => send;
+		run lookup_key_val;
+		success => check_perms;
+		default => send;
 	}
 
-    state dir_space
+	state dir_space
 	{
-	    run lookup_dir_space;
-	    success => key_val;
-	    default => send;
+		run lookup_dir_space;
+		success => key_val;
+		default => send;
 	}
 
-    state send
+	state send
 	{
-	    run lookup_send_bmi;
-	    default => cleanup;
+		run lookup_send_bmi;
+		default => cleanup;
 	}
 
-    state cleanup
+	state cleanup
 	{
-	    run lookup_cleanup;
-	    default => init;
+		run lookup_cleanup;
+		default => init;
 	}
 }
 
@@ -94,9 +93,9 @@ machine lookup(init, dir_space, key_val, check_perms, send, cleanup)
 
 void lookup_init_state_machine(void)
 {
-	
-    lookup_req_s.state_machine = lookup;
-	
+
+	lookup_req_s.state_machine = lookup;
+
 }
 
 /*
@@ -115,73 +114,72 @@ void lookup_init_state_machine(void)
 STATE_FXN_HEAD(lookup_init)
 {
 
-    int job_post_ret;
-    job_id_t i;
+	int job_post_ret;
+	job_id_t i;
 
-    /* Allocate space for attributes, handles, and path segments */
-    s_op->key_a = (PVFS_ds_keyval_s *) malloc(3*sizeof(PVFS_ds_keyval_s));
-    s_op->val_a = (PVFS_ds_keyval_s *) malloc(3*sizeof(PVFS_ds_keyval_s));
+	/* Allocate space for attributes, handles, and path segments */
+	s_op->key_a = (PVFS_ds_keyval_s *) malloc(3*sizeof(PVFS_ds_keyval_s));
+	s_op->val_a = (PVFS_ds_keyval_s *) malloc(3*sizeof(PVFS_ds_keyval_s));
 
-    s_op->key_a[0].buffer_sz = s_op->key_a[1].buffer_sz = \
-	atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]) > atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]) ? \
-	atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]) : atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]);
+	s_op->key_a[0].buffer_sz = s_op->key_a[1].buffer_sz = \
+		atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]) > atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]) ? \
+		atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]) : atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]);
 
-    s_op->val_a[0].buffer_sz = s_op->val_a[1].buffer_sz = \
-	sizeof(PVFS_handle) > sizeof(PVFS_object_attr) ? \
-	sizeof(PVFS_handle) : sizeof(PVFS_object_attr);
+	s_op->val_a[0].buffer_sz = s_op->val_a[1].buffer_sz = \
+		sizeof(PVFS_handle) > sizeof(PVFS_object_attr) ? \
+		sizeof(PVFS_handle) : sizeof(PVFS_object_attr);
 
-    s_op->key_a[0].buffer = malloc(s_op->key_a[0].buffer_sz);
-    s_op->key_a[1].buffer = malloc(s_op->key_a[1].buffer_sz);
-    s_op->val_a[0].buffer = malloc(s_op->val_a[0].buffer_sz);
-    s_op->val_a[1].buffer = malloc(s_op->val_a[1].buffer_sz);
+	s_op->key_a[0].buffer = malloc(s_op->key_a[0].buffer_sz);
+	s_op->key_a[1].buffer = malloc(s_op->key_a[1].buffer_sz);
+	s_op->val_a[0].buffer = malloc(s_op->val_a[0].buffer_sz);
+	s_op->val_a[1].buffer = malloc(s_op->val_a[1].buffer_sz);
 
-    //s_op->key_a[2].buffer = malloc((s_op->key_a[2].buffer_sz = (PVFS_NAME_MAX+1)*sizeof(char)));
-    //s_op->val_a[2].buffer = malloc((s_op->val_a[2].buffer_sz = sizeof(PVFS_handle)));
-
-    s_op->resp->u.lookup_path.handle_array = (PVFS_handle *) BMI_memalloc(s_op->addr,
-									  LOOKUP_BUFF_SZ*sizeof(PVFS_handle),
-									  BMI_SEND_BUFFER);
-    s_op->resp->u.lookup_path.attr_array = \
-	(PVFS_object_attr *) BMI_memalloc(s_op->addr,
-					  LOOKUP_BUFF_SZ*sizeof(PVFS_object_attr)+\
-					  sizeof(PVFS_datafile_attr),
-					  BMI_SEND_BUFFER);
+	s_op->resp->u.lookup_path.handle_array = (PVFS_handle *) BMI_memalloc(s_op->addr,
+			LOOKUP_BUFF_SZ*sizeof(PVFS_handle),
+			BMI_SEND_BUFFER);
+	s_op->resp->u.lookup_path.attr_array = \
+		(PVFS_object_attr *) BMI_memalloc(s_op->addr,
+													 LOOKUP_BUFF_SZ*sizeof(PVFS_object_attr)+\
+													 sizeof(PVFS_datafile_attr),
+													 BMI_SEND_BUFFER);
 #if 0
-    if(s_op->resp)
-    {
-	BMI_memfree(s_op->addr,
-		    s_op->resp,
-		    sizeof(struct PVFS_server_resp_s),
-		    BMI_SEND_BUFFER);
-    }
+	if(s_op->resp)
+	{
+		BMI_memfree(s_op->addr,
+				s_op->resp,
+				sizeof(struct PVFS_server_resp_s),
+				BMI_SEND_BUFFER);
+	}
 
 
-    s_op->resp = BMI_memalloc(s_op->addr,
-			      sizeof(struct PVFS_server_resp_s)+\             // Response Structure
-			      (LOOKUP_BUFFER_SZ*sizeof(PVFS_handle))+\      // Max Number of Handles / Req
-			      (LOOKUP_BUFFER_SZ*sizeof(PVFS_object_attr))+\ // Max Number of Attr Structs
-			      sizeof(PVFS_datafile_attr),                   // If d/f, need the extra attrib
-			      BMI_SEND_BUFFER);
+	s_op->resp = BMI_memalloc(s_op->addr,
+			sizeof(struct PVFS_server_resp_s)+\             // Response Structure
+			(LOOKUP_BUFFER_SZ*sizeof(PVFS_handle))+\      // Max Number of Handles / Req
+			(LOOKUP_BUFFER_SZ*sizeof(PVFS_object_attr))+\ // Max Number of Attr Structs
+			sizeof(PVFS_datafile_attr),                   // If d/f, need the extra attrib
+			BMI_SEND_BUFFER);
 #endif 
 
-    s_op->resp->u.lookup_path.count = -1;
+	s_op->resp->u.lookup_path.count = -1;
 
-    /* Set up the key val iterate pair.  When we go into a nice loop to find handles,
-       it will help the state machine if the value of the handle we are looking for
-       is stored in the same place.  So, lets use the starting handle...
-    */
-    s_op->val.buffer = &(s_op->req->u.lookup_path.starting_handle);
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
+	/* 
+		Set up the key val iterate pair.  When we go into a nice loop to find handles,
+		it will help the state machine if the value of the handle we are looking for
+		is stored in the same place.  So, lets use the starting handle...
+	 */
+	s_op->val.buffer = &(s_op->req->u.lookup_path.starting_handle);
+	s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-    job_post_ret = job_check_consistency(s_op->op,
-					 s_op->req->u.lookup_path.fs_id,
-					 s_op->req->u.lookup_path.starting_handle,
-					 s_op,
-					 ret,
-					 &i);
+	job_post_ret = job_check_consistency(s_op->op,
+			s_op->req->u.lookup_path.fs_id,
+			s_op->req->u.lookup_path.starting_handle,
+			s_op,
+			ret,
+			&i);
 
-    STATE_FXN_RET(job_post_ret);
-	
+	gossip_ldebug(SERVER_DEBUG,"Init returning: %d\n",job_post_ret);
+	STATE_FXN_RET(job_post_ret);
+
 }
 
 /*
@@ -203,65 +201,66 @@ STATE_FXN_HEAD(lookup_init)
 STATE_FXN_HEAD(lookup_check_perms)
 {
 
-    int job_post_ret;
-    job_id_t i;
-    int k;
-    int meta_data_flag,directory_handle_flag; // used to tell us that we have the data
+	int job_post_ret;
+	job_id_t i;
+	int k;
+	int meta_data_flag,directory_handle_flag; //used to tell us that we have the data
 
-    meta_data_flag=directory_handle_flag=0;
+	meta_data_flag=directory_handle_flag=0;
 
-    if (s_op->resp->u.lookup_path.count == -1)
-    {
-	s_op->resp->u.lookup_path.count++;
-    }
-    else 
-    {
-	for(k=0;k<ret->count;k++)
+	if (s_op->resp->u.lookup_path.count == -1)
 	{
-	    switch(((char *)(s_op->key_a[k].buffer))[0])
-	    {
-		case 'm':
-		    memcpy(&(s_op->resp->u.lookup_path.attr_array[s_op->resp->u.lookup_path.count]),\
-			   s_op->val_a[0].buffer,\
-			   s_op->val_a[0].buffer_sz);
-		    meta_data_flag = 1;
-		    break;
-		case 'd':
-		    s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.count] = \
-			s_op->req->u.lookup_path.starting_handle;
-		    s_op->req->u.lookup_path.starting_handle = *((PVFS_handle *)s_op->val_a[0].buffer),
-			directory_handle_flag = 1;
-		default:
-		    gossip_lerr("Handle of unknown type found\n");
+		s_op->resp->u.lookup_path.count++;
+	}
+	else 
+	{
+		for(k=0;k<ret->count;k++)
+		{
+			switch(((char *)(s_op->key_a[k].buffer))[0])
+			{
+				case 'm':
+					memcpy(&(s_op->resp->u.lookup_path.attr_array[s_op->resp->u.lookup_path.count]),\
+							s_op->val_a[0].buffer,\
+							s_op->val_a[0].buffer_sz);
+					meta_data_flag = 1;
+					break;
+				case 'd':
+					s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.count] = \
+						s_op->req->u.lookup_path.starting_handle;
+					s_op->req->u.lookup_path.starting_handle = *((PVFS_handle *)s_op->val_a[0].buffer),
+					directory_handle_flag = 1;
+				default:
+					gossip_lerr("Handle of unknown type found\n");
 
-	    }
+			}
+		}
+		if(directory_handle_flag && meta_data_flag)
+		{
+			s_op->resp->u.lookup_path.count++;
+			// CHECK PERMISSIONS HERE on attr_array[count-1];
+		}
+		else
+		{
+			if(!directory_handle_flag)
+				gossip_lerr("Did not get directory handle\n");
+			else
+				gossip_lerr("Did not get metadata\n");
+			gossip_lerr("We did not get both... fix it\n");
+		}
 	}
-	if(directory_handle_flag && meta_data_flag)
+	if(s_op->req->u.lookup_path.path)
 	{
-	    s_op->resp->u.lookup_path.count++;
-	    // CHECK PERMISSIONS HERE on attr_array[count-1];
+		s_op->key.buffer = strtok(s_op->req->u.lookup_path.path,path_delim);
+		if(!(s_op->key.buffer_sz = strlen(s_op->key.buffer)))
+		{
+			s_op->key.buffer = strtok(s_op->req->u.lookup_path.path,path_delim);
+			s_op->key.buffer_sz = strlen(s_op->key_a[2].buffer);
+		}
 	}
-	else
-	{
-	    if(!directory_handle_flag)
-		gossip_lerr("Did not get directory handle\n");
-	    else
-		gossip_lerr("Did not get metadata\n");
-	    gossip_lerr("We did not get both... fix it\n");
-	}
-    }
-    if(s_op->req->u.lookup_path.path)
-    {
-	s_op->key.buffer = strtok(s_op->req->u.lookup_path.path,path_delim);
-	if(!(s_op->key.buffer_sz = strlen(s_op->key.buffer)))
-	{
-	    s_op->key.buffer = strtok(s_op->req->u.lookup_path.path,path_delim);
-	    s_op->key.buffer_sz = strlen(s_op->key_a[2].buffer);
-	}
-    }
 
-    STATE_FXN_RET(job_post_ret);
-	
+	gossip_ldebug(SERVER_DEBUG,"check returning: %d\n",job_post_ret);
+	STATE_FXN_RET(job_post_ret);
+
 }
 
 /*
@@ -280,11 +279,12 @@ STATE_FXN_HEAD(lookup_check_perms)
 STATE_FXN_HEAD(lookup_send_bmi)
 {
 
-    int job_post_ret;
-    job_id_t i;
-	
-    STATE_FXN_RET(job_post_ret);
-	
+	int job_post_ret;
+	job_id_t i;
+
+	gossip_ldebug(SERVER_DEBUG,"Send BMI\n");
+	STATE_FXN_RET(job_post_ret);
+
 }
 
 /*
@@ -303,12 +303,13 @@ STATE_FXN_HEAD(lookup_send_bmi)
 STATE_FXN_HEAD(lookup_dir_space)
 {
 
-    int job_post_ret;
-    job_id_t i;
+	int job_post_ret;
+	job_id_t i;
 
+	gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space\n");
 	
-    STATE_FXN_RET(job_post_ret);
-	
+	STATE_FXN_RET(job_post_ret);
+
 }
 
 /*
@@ -327,24 +328,24 @@ STATE_FXN_HEAD(lookup_dir_space)
 STATE_FXN_HEAD(lookup_key_val)
 {
 
-    int job_post_ret;
-    job_id_t i;
-    PVFS_vtag_s bs;
+	int job_post_ret;
+	job_id_t i;
+	PVFS_vtag_s bs;
 
-    job_post_ret = job_trove_keyval_iterate(s_op->req->u.lookup_path.fs_id,
-					    s_op->req->u.lookup_path.starting_handle,
-					    1,
-					    s_op->key_a,
-					    s_op->val_a,
-					    2,
-					    0,
-					    bs,
-					    s_op,
-					    ret,
-					    &i);
-														 
-    STATE_FXN_RET(job_post_ret);
-	
+	job_post_ret = job_trove_keyval_iterate(s_op->req->u.lookup_path.fs_id,
+			s_op->req->u.lookup_path.starting_handle,
+			1,
+			s_op->key_a,
+			s_op->val_a,
+			2,
+			0,
+			bs,
+			s_op,
+			ret,
+			&i);
+
+	STATE_FXN_RET(job_post_ret);
+
 }
 
 
@@ -364,80 +365,68 @@ STATE_FXN_HEAD(lookup_key_val)
 STATE_FXN_HEAD(lookup_cleanup)
 {
 
-    if(s_op->key_a)
-    {
-	if(s_op->key_a[0].buffer)
-	    free(s_op->key_a[0].buffer);
-	if(s_op->key_a[1].buffer)
-	    free(s_op->key_a[1].buffer);
-	if(s_op->key_a[2].buffer)
-	    free(s_op->key_a[2].buffer);
-	free(s_op->key_a);
-    }
+	if(s_op->key_a)
+	{
+		if(s_op->key_a[0].buffer)
+			free(s_op->key_a[0].buffer);
+		if(s_op->key_a[1].buffer)
+			free(s_op->key_a[1].buffer);
+		if(s_op->key_a[2].buffer)
+			free(s_op->key_a[2].buffer);
+		free(s_op->key_a);
+	}
 
-    if(s_op->val_a)
-    {
-	if(s_op->val_a[0].buffer)
-	    free(s_op->val_a[0].buffer);
-	if(s_op->val_a[1].buffer)
-	    free(s_op->val_a[1].buffer);
-	if(s_op->val_a[2].buffer)
-	    free(s_op->val_a[2].buffer);
-	free(s_op->val_a);
-    }
+	if(s_op->val_a)
+	{
+		if(s_op->val_a[0].buffer)
+			free(s_op->val_a[0].buffer);
+		if(s_op->val_a[1].buffer)
+			free(s_op->val_a[1].buffer);
+		if(s_op->val_a[2].buffer)
+			free(s_op->val_a[2].buffer);
+		free(s_op->val_a);
+	}
 
-    if(s_op->resp->u.lookup_path.handle_array)
-    {
-	BMI_memfree(s_op->addr,
-		    s_op->resp->u.lookup_path.handle_array,
-		    LOOKUP_BUFF_SZ * sizeof(PVFS_handle),
-		    BMI_SEND_BUFFER);
-    }
-    if(s_op->resp->u.lookup_path.attr_array)
-    {
-	BMI_memfree(s_op->addr,
-		    s_op->resp->u.lookup_path.attr_array,
-		    LOOKUP_BUFF_SZ * sizeof(PVFS_object_attr),
-		    BMI_SEND_BUFFER);
-    }
+	if(s_op->resp->u.lookup_path.handle_array)
+	{
+		free(s_op->resp->u.lookup_path.handle_array);
+	}
+	if(s_op->resp->u.lookup_path.attr_array)
+	{
+		free(s_op->resp->u.lookup_path.attr_array);
+	}
 
-    if(s_op->resp)
-    {
-	BMI_memfree(s_op->addr,
-		    s_op->resp,
-		    sizeof(struct PVFS_server_resp_s),
-		    BMI_SEND_BUFFER);
-    }
+	if(s_op->resp)
+	{
+		free(s_op->resp);
+	}
 
-    if(s_op->req)
-    {
-	BMI_memfree(s_op->addr,
-		    s_op->req,
-		    sizeof(struct PVFS_server_resp_s),
-		    BMI_SEND_BUFFER);
-    }
+	if(s_op->req)
+	{
+		free(s_op->req);
+	}
 
-    free(s_op->unexp_bmi_buff);
+	free(s_op->unexp_bmi_buff);
 
-    free(s_op);
+	free(s_op);
 
-    STATE_FXN_RET(0);
-	
+	STATE_FXN_RET(0);
+
 }
 
 
 #if 0
 static void get_no_of_segments(char *path,int *num)
 {
-    char *s = path;
-    int len = strlen(path);
-    int pos = 0;
+	char *s = path;
+	int len = strlen(path);
+	int pos = 0;
 
-    for(pos = 0;pos < len;pos++)
-    {
-	if (s[pos] == '/' && (pos + 1) < len)
-	    (*num)++;
-    }
+	for(pos = 0;pos < len;pos++)
+	{
+		if (s[pos] == '/' && (pos + 1) < len)
+			(*num)++;
+	}
 }
 #endif
 

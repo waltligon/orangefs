@@ -291,7 +291,7 @@ DOTCONF_CB(end_io_server_config)
 {
 
 	config_s->configuration_context = GLOBALCONFIG;
-	printf("Exiting IO Server Config\n");
+	gossip_ldebug(SERVER_DEBUG,"Exiting IO Server Config\n");
 	return NULL;
 
 }
@@ -313,7 +313,7 @@ DOTCONF_CB(start_io_server_config)
 {
 
 	config_s->configuration_context = IOSERVERCONFIG;
-	printf("Entering IO Server Config\n");
+	gossip_ldebug(SERVER_DEBUG,"Entering IO Server Config\n");
 	return NULL;
 
 }

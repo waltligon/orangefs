@@ -3,12 +3,15 @@
  *
  * See COPYING in top-level directory.
  */
-#include <string.h>
 
-#include "state-machine.h"
-#include "server-config.h"
-#include "pvfs2-server.h"
-#include "pvfs2-attr.h"
+
+#include <state-machine.h>
+#include <server-config.h>
+#include <pvfs2-server.h>
+#include <string.h>
+#include <pvfs2-attr.h>
+#include <trove.h>
+#include <assert.h>
 
 STATE_FXN_HEAD(readdir_init);
 STATE_FXN_HEAD(readdir_cleanup);
@@ -90,7 +93,7 @@ void readdir_init_state_machine(void)
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Allocate Memory for readdir.pvfs_dirent_count
  *           
  */
 
@@ -98,20 +101,33 @@ void readdir_init_state_machine(void)
 STATE_FXN_HEAD(readdir_init)
 {
 
-	int job_post_ret = 0;
+	int job_post_ret;
 	job_id_t i;
+	int j;
+	gossip_ldebug(SERVER_DEBUG,"Init\n");
 
-#if 0
-	job_post_ret = job_trove_dspace_readdir(s_op->req->u.readdir.fs_id,
-						s_op->req->u.readdir.bucket,
-						s_op->req->u.readdir.handle_mask,
-						s_op->req->u.readdir.object_type,
-						NULL,
-						s_op,
-						ret,
-						&i);
-#endif
-	
+	/**** 
+	  We need to malloc key and val space for dirents and handles.
+	  Also malloc a space for the structures to refer to the handle.
+	 ****/
+	s_op->key_a = malloc(sizeof(TROVE_keyval_s)*s_op->req->u.readdir.pvfs_dirent_count);
+	s_op->val_a = malloc(sizeof(TROVE_keyval_s)*s_op->req->u.readdir.pvfs_dirent_count);
+	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_handle)));
+	for(j=0;j<s_op->req->u.readdir.pvfs_dirent_count;j++)
+	{
+		s_op->key_a[j].buffer = (char *) malloc((s_op->key_a[j].buffer_sz = PVFS_NAME_MAX+1));
+		s_op->val_a[j].buffer = (PVFS_handle *) malloc((s_op->val_a[j].buffer_sz = sizeof(PVFS_handle)));
+	}
+	s_op->resp->u.readdir.pvfs_dirent_array = (PVFS_dirent *)
+		malloc(s_op->req->u.readdir.pvfs_dirent_count*sizeof(PVFS_dirent));
+
+	job_post_ret = job_check_consistency(s_op->op,
+												 	 s_op->req->u.readdir.fs_id,
+													 s_op->req->u.readdir.handle,
+													 s_op,
+													 ret,
+													 &i);
+
 	STATE_FXN_RET(job_post_ret);
 	
 }
@@ -131,7 +147,27 @@ STATE_FXN_HEAD(readdir_init)
 STATE_FXN_HEAD(readdir_kvread)
 {
 
-	STATE_FXN_RET(-1);
+	int job_post_ret;
+	job_id_t i;
+	PVFS_vtag_s vtag;
+
+	gossip_ldebug(SERVER_DEBUG,"Kvread\n");
+	s_op->key.buffer = TROVE_COMMON_KEYS[DIR_ENT_KEY];
+	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]);
+
+	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_handle)));
+
+	job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
+													 s_op->req->u.crdirent.parent_handle,
+													 &(s_op->key),
+													 &(s_op->val),
+													 0,
+													 vtag,
+													 s_op,
+													 ret,
+													 &i);
+
+	STATE_FXN_RET(job_post_ret);
 
 }
 
@@ -150,7 +186,27 @@ STATE_FXN_HEAD(readdir_kvread)
 STATE_FXN_HEAD(readdir_get_kvspace)
 {
 
-	STATE_FXN_RET(-1);
+	int job_post_ret;
+	job_id_t i;
+	PVFS_handle h;
+	PVFS_vtag_s vtag;
+
+	h = *((PVFS_handle *)s_op->val.buffer);
+	gossip_ldebug(SERVER_DEBUG,"Dammit\n");
+	job_post_ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,
+				      								 h,
+				      								 s_op->req->u.readdir.token,
+				      								 s_op->key_a,
+				      								 s_op->val_a,
+				      								 s_op->req->u.readdir.pvfs_dirent_count,
+														 0,
+				      								 vtag,
+				      								 s_op,
+				      								 ret, 
+				      								 &i);
+
+
+	STATE_FXN_RET(job_post_ret);
 
 }
 
@@ -163,7 +219,7 @@ STATE_FXN_HEAD(readdir_get_kvspace)
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Assembles the directory space entries... and ships them off 
  *           
  */
 
@@ -173,12 +229,26 @@ STATE_FXN_HEAD(readdir_send_bmi)
 
 	int job_post_ret;
 	job_id_t i;
+	//char *dirent_c, *handle_c;
+	int j;
 
 	s_op->resp->status = ret->error_code;
-	
+
+	s_op->resp->u.readdir.pvfs_dirent_count = ret->count;
+
+	for(j=0;j<ret->count;j++)
+	{
+		memcpy(&(s_op->resp->u.readdir.pvfs_dirent_array[j].d_name),s_op->key_a[j].buffer,PVFS_NAME_MAX+1);
+		memcpy(&(s_op->resp->u.readdir.pvfs_dirent_array[j].handle),s_op->val_a[j].buffer,sizeof(PVFS_handle));
+	}
+
+ 	job_post_ret = PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+
+	gossip_ldebug(SERVER_DEBUG,"%d\n",s_op->encoded.list_count);
+	assert(s_op->encoded.list_count == 1);
 	job_post_ret = job_bmi_send(s_op->addr,
-										 s_op->resp,
-										 sizeof(struct PVFS_server_resp_s),
+										 s_op->encoded.buffer_list[0],
+										 s_op->encoded.total_size,
 										 s_op->tag,
 										 0,
 										 0,
@@ -207,22 +277,20 @@ STATE_FXN_HEAD(readdir_send_bmi)
 
 STATE_FXN_HEAD(readdir_cleanup)
 {
+	int j;
 
-	if(s_op->resp)
+	for(j=0;j<ret->count;j++)
 	{
-		BMI_memfree(s_op->addr,
-				      s_op->resp,
-						sizeof(struct PVFS_server_resp_s),
-						BMI_SEND_BUFFER);
+	free(s_op->key_a[j].buffer);
+	free(s_op->val_a[j].buffer);
 	}
 
-	if(s_op->req)
-	{
-		BMI_memfree(s_op->addr,
-				      s_op->req,
-						sizeof(struct PVFS_server_resp_s),
-						BMI_SEND_BUFFER);
-	}
+	free(s_op->val.buffer);
+
+	free(s_op->resp->u.readdir.pvfs_dirent_array);
+	free(s_op->resp);
+
+	free(s_op->req);
 
 	free(s_op->unexp_bmi_buff);
 
@@ -231,12 +299,3 @@ STATE_FXN_HEAD(readdir_cleanup)
 	STATE_FXN_RET(0);
 	
 }
-
-/*
- * Local variables:
- *  c-indent-level: 4
- *  c-basic-offset: 4
- * End:
- *
- * vim: ts=8 sts=4 sw=4 noexpandtab
- */

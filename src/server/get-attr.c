@@ -11,6 +11,7 @@
 #include <string.h>
 #include <pvfs2-attr.h>
 #include <job-consist.h>
+#include <assert.h>
 
 STATE_FXN_HEAD(getattr_init);
 STATE_FXN_HEAD(getattr_cleanup);
@@ -164,28 +165,38 @@ STATE_FXN_HEAD(getattr_send_bmi)
 	
 	int job_post_ret=0;
 	job_id_t i;
-	PVFS_object_attr *foo = NULL;
+	void *a[1];
+
+	s_op->encoded.buffer_list = &a;
+
+	s_op->resp->u.getattr.attr = *((PVFS_object_attr *)s_op->val.buffer);
 
 	if (s_op->val.buffer && ret->error_code == 0)
 	{
-		foo = s_op->val.buffer;
-		memcpy(&(s_op->resp->u.getattr.attr),foo,sizeof(PVFS_object_attr));
-		gossip_debug(SERVER_DEBUG,"Copying\n");
-		//s_op->resp->u.getattr.attr = *(foo);
+		job_post_ret = PINT_encode(s_op->resp,
+											PINT_ENCODE_RESP,
+											&(s_op->encoded),
+											s_op->addr,
+											s_op->enc_type);
+	}
+	assert(job_post_ret == 0);
+	if(ret->error_code == 0)
+		assert(s_op->encoded.buffer_list != NULL);
+	else
+	{
+		s_op->encoded.buffer_list[0] = s_op->resp;
+		s_op->encoded.total_size = sizeof(struct PVFS_server_resp_s);
 	}
 
 	/* Prepare the message */
 	
 	s_op->resp->status = ret->error_code;
 
-	/* Will need to add in the Metafile stuff!!! */
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
-
 	/* Post message */
 
 	job_post_ret = job_bmi_send(s_op->addr,
-										 s_op->resp,
-										 s_op->resp->rsize,
+										 s_op->encoded.buffer_list[0],
+										 s_op->encoded.total_size,
 										 s_op->tag,
 										 0,
 										 0,

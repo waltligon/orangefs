@@ -43,7 +43,7 @@ void *pack_pvfs_struct(void *p,int type,bmi_addr_t q,int z)
 				return(myBuff);
 				break;
 			default:
-				printf("Packing Req Op: %d Not Supported\n",r->op);
+				gossip_ldebug(SERVER_DEBUG,"Packing Req Op: %d Not Supported\n",r->op);
 				return p;
 		}
 	}
@@ -72,7 +72,7 @@ void *pack_pvfs_struct(void *p,int type,bmi_addr_t q,int z)
 				return(myBuff);
 				break;
 			default:
-				printf("Packing Resp Op: %d Not Supported\n",r->op);
+				gossip_ldebug(SERVER_DEBUG,"Packing Resp Op: %d Not Supported\n",r->op);
 				return p;
 				break;
 		}
@@ -94,7 +94,7 @@ void *unpack_pvfs_struct(void *p,int type,int q,int z)
 				r->u.getconfig.fs_name = (char*)r + sizeof(struct PVFS_server_req_s);
 				break;
 			default:
-				printf("Unpacking Req Op: %d Not Supported\n",r->op);
+				gossip_ldebug(SERVER_DEBUG,"Unpacking Req Op: %d Not Supported\n",r->op);
 				return p;
 		}
 		return p;
@@ -111,7 +111,7 @@ void *unpack_pvfs_struct(void *p,int type,int q,int z)
 				return r;
 				break;
 			default:
-				printf("Unpacking Resp Op: %d Not Supported\n",r->op);
+				gossip_ldebug(SERVER_DEBUG,"Unpacking Resp Op: %d Not Supported\n",r->op);
 				return p;
 			break;
 		}

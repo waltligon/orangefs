@@ -28,11 +28,17 @@ PINT_state_machine_s create_req_s =
 
 %%
 
-machine create(init, send, cleanup)
+machine create(init, create, send, cleanup)
 {
 	state init
 	{
 		run create_init;
+		default => create;
+	}
+
+	state create
+	{
+		run create_create;
 		default => send;
 	}
 
@@ -87,7 +93,37 @@ STATE_FXN_HEAD(create_init)
 
 	int job_post_ret;
 	job_id_t i;
-	printf("Dspace CR\n");
+
+	job_post_ret = job_check_consistency(s_op->op,
+													 s_op->req->u.create.fs_id,
+													 s_op->req->u.create.bucket,
+													 s_op,
+													 ret,
+													 &i);
+	
+	STATE_FXN_RET(job_post_ret);
+	
+}
+
+
+/*
+ * Function: create_create
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *ret
+ *
+ * Returns:  int
+ *
+ * Synopsis: 
+ *           
+ */
+
+
+STATE_FXN_HEAD(create_create)
+{
+
+	int job_post_ret;
+	job_id_t i;
 
 	job_post_ret = job_trove_dspace_create(s_op->req->u.create.fs_id,
 														s_op->req->u.create.bucket,

@@ -65,6 +65,7 @@
 
 static int server_level_init;
 static struct server_configuration_s *user_opts;
+static int SIGNAL_RECVD;
 
 
 /* Prototypes */
@@ -99,6 +100,7 @@ int main(int argc, char **argv) {
 
 	TROVE_coll_id coll_id;
 
+	SIGNAL_RECVD = 0;
 	server_level_init = 0; /* Used for shutdown function */
 
 	gossip_enable_stderr();
@@ -244,6 +246,8 @@ int main(int argc, char **argv) {
 	gossip_debug(SERVER_DEBUG,"All BMI_unexp Posted\n");
 
 	/* Register Signals */
+	signal(SIGHUP, (void *)sig_handler);
+	signal(SIGILL, (void *)sig_handler);
 #if 0
 //#ifdef USE_SIGACTION
 	act.sa_handler = (void *)sig_handler;
@@ -265,7 +269,6 @@ int main(int argc, char **argv) {
 		server_shutdown(server_level_init,ret,0);
 	}
 //#else
-	signal(SIGHUP, (void *)sig_handler);
 	signal(SIGSEGV, (void *)sig_handler);
 	signal(SIGPIPE, (void *)sig_handler);
 #endif
@@ -273,6 +276,10 @@ int main(int argc, char **argv) {
 	while(1)   /* The do work forever loop. */
 	{
 		out_count = MAX_JOBS;
+		if (SIGNAL_RECVD != 0)
+		{
+			server_shutdown(server_level_init,SIGNAL_RECVD,0);
+		}
       ret = job_waitworld(job_id_array,&out_count,my_user_ptrs,status_jobs);
 		if(ret < 0)
 		{
@@ -344,7 +351,7 @@ doWorkUnexp:
 static int server_init(void) {
 
 	/*int ret = -1;*/
-#ifndef DEBUG
+#ifdef DEBUG
 	char logname[] = "/tmp/pvfs_server.log";
 	int logfd;
 #endif
@@ -370,7 +377,7 @@ static int server_init(void) {
     * 
     * NOTE: Will not run if DEBUG is set 
 	 */
-#ifndef DEBUG  
+#ifdef DEBUG  
 	gossip_ldebug(SERVER_DEBUG,"Log Init\n");
 	gossip_enable_file("/tmp/pvfsServer.log","a");
 #else
@@ -400,7 +407,7 @@ static int server_shutdown(int level,int ret,int siglevel) {
 			PINT_state_machine_halt();
 		case 6:
 			/* Turn off High Level Interface */
-         //job_finalize();
+			job_finalize();
 		case 5:
 			/* Turn off Storage IFace */
 			trove_finalize();
@@ -438,7 +445,7 @@ static int server_shutdown(int level,int ret,int siglevel) {
 static void *sig_handler(int sig) 
 {
 	gossip_debug(SERVER_DEBUG,"Got Signal %d... Level...%d\n",sig,server_level_init);
-	server_shutdown(server_level_init,0,0);
+	SIGNAL_RECVD=sig;
 #if 0
 	if(sig == SIGSEGV)
 	{
