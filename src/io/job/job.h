@@ -29,12 +29,12 @@ typedef struct job_status
     int error_code;		/* returned by all operations */
     PVFS_size actual_size;	/* read_at, write_at, resize, bmi_recv */
     PVFS_vtag *vtag;		/* most trove operations */
-    PVFS_ds_position position;	/* iterate, iterate_keys */
+    PVFS_ds_position position;	/* iterate, iterate_keys, iterate_handles */
     PVFS_handle handle;		/* dspace_create */
     PVFS_ds_attributes ds_attr;	/* getattr */
     PVFS_ds_type type;		/* dspace_verify */
     PVFS_fs_id coll_id;		/* fs_lookup */
-    int count;			/* keyval_iterate */
+    int count;			/* keyval_iterate, iterate_handles */
 }
 job_status_s;
 
