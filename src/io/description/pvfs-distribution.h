@@ -18,24 +18,29 @@ struct PVFS_Dist_params_s {
 typedef struct PVFS_Dist_params PVFS_Dist_params;
 
 typedef struct {
-	PVFS_offset (*logical_to_physical_offset) (PVFS_Dist_params *dparam,
-			uint32_t server_nr, uint32_t server_ct,
-			PVFS_offset logical_offset);
-	PVFS_offset (*physical_to_logical_offset) (PVFS_Dist_params *dparam,
-			uint32_t server_nr, uint32_t server_ct,
-			PVFS_offset physical_offset);
-	PVFS_offset (*next_mapped_offset) (PVFS_Dist_params *dparam,
-			uint32_t server_nr, uint32_t server_ct,
-			PVFS_offset logical_offset);
-	PVFS_size (*contiguous_length) (PVFS_Dist_params *dparam,
-			uint32_t server_nr, uint32_t server_ct,
-			PVFS_offset physical_offset);
-	PVFS_size (*logical_file_size) (PVFS_Dist_params *dparam,
-			uint32_t server_ct, PVFS_size *psizes);
-	void (*encode) (PVFS_Dist_params *dparam, void *buffer);
-	void (*decode) (PVFS_Dist_params *dparam, void *buffer);
-	void (*encode_lebf) (char **pptr, PVFS_Dist_params *dparam);
-	void (*decode_lebf) (char **pptr, PVFS_Dist_params *dparam);
+	PVFS_offset (*logical_to_physical_offset)(void* params,
+                                                  uint32_t server_nr,
+                                                  uint32_t server_ct,
+                                                  PVFS_offset logical_offset);
+	PVFS_offset (*physical_to_logical_offset)(void* params,
+                                                  uint32_t server_nr,
+                                                  uint32_t server_ct,
+                                                  PVFS_offset physical_offset);
+	PVFS_offset (*next_mapped_offset)(void* params,
+                                          uint32_t server_nr,
+                                          uint32_t server_ct,
+                                          PVFS_offset logical_offset);
+	PVFS_size (*contiguous_length)(void* params,
+                                       uint32_t server_nr,
+                                       uint32_t server_ct,
+                                       PVFS_offset physical_offset);
+	PVFS_size (*logical_file_size)(void* params,
+                                       uint32_t server_ct,
+                                       PVFS_size *psizes);
+	void (*encode)(void* params, void *buffer);
+	void (*decode)(void* params, void *buffer);
+	void (*encode_lebf)(char **pptr, void* params);
+	void (*decode_lebf)(char **pptr, void* params);
 } PVFS_Dist_methods;
 
 /* this struct is used to define a distribution to PVFS */
@@ -43,9 +48,10 @@ typedef struct PVFS_Dist {
 	char *dist_name;
 	int32_t name_size;
 	int32_t param_size; 
-	PVFS_Dist_params *params;
+	void *params;
 	PVFS_Dist_methods *methods;
 } PVFS_Dist;
+
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_Dist(pptr,x) do { PVFS_Dist *px = *(x); \
     encode_string(pptr, &px->dist_name); \

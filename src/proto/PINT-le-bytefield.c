@@ -62,7 +62,7 @@ static void lebf_initialize(void)
      * for encoding to work properly.
      */
     memset(&tmp_dist, 0, sizeof(tmp_dist));
-    tmp_dist.dist_name = strdup("default_dist");
+    tmp_dist.dist_name = strdup("simple_stripe");
     if (PINT_Dist_lookup(&tmp_dist)) {
 	gossip_err("%s: dist %s does not exist?!?\n",
 	  __func__, tmp_dist.dist_name);
