@@ -144,6 +144,11 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	tmp_file_data.iod_count = pinode_ptr->attr.u.meta.nr_datafiles;
 	tmp_file_data.extend_flag = 1;
 
+	bytemax = 1;
+	segmax = 1;
+	offset = 0;
+	eof_flag = 0;
+
 	ret = PINT_Process_request(req_state, &tmp_file_data,
 	    &segmax, NULL, NULL, &offset, &bytemax, &eof_flag,
 	    PINT_CKSIZE);
