@@ -3804,7 +3804,9 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
 {
     method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
+    method_op_p tmp_op;
     struct gm_op *gm_op_data = query_op->method_data;
+    struct op_list_search_key key;
 
     assert(query_op);
 
@@ -3815,12 +3817,50 @@ int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
 
     gen_mutex_lock(&interface_mutex);
 
+    gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+        "BMI_gm_cancel: send_recv: %d, complete: %d, mode: %d\n",
+        query_op->send_recv, gm_op_data->complete, query_op->mode);
+
     /* easy case: is the operation already completed? */
     if(gm_op_data->complete)
     {
         /* do nothing */
 	gen_mutex_unlock(&interface_mutex);
 	return(0);
+    }
+
+    /* next easiest case; if it is a send that is blocking on resources and
+     * therefore hasn't transmitted anything yet */
+    if(query_op->send_recv == BMI_SEND)
+    {
+        /* must run queue to find out */
+        memset(&key, 0, sizeof(struct op_list_search_key));
+        key.op_id = query_op->op_id;
+        key.op_id_yes = 1;
+
+        tmp_op = op_list_search(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], &key);
+        if(tmp_op)
+        {
+            assert(tmp_op == query_op);
+            op_list_remove(query_op);
+            query_op->error_code = -PVFS_ECANCEL;
+            op_list_add(completion_array[query_op->context_id], query_op);
+            gm_op_data->complete = 1;
+	    gen_mutex_unlock(&interface_mutex);
+            return(0);
+        }
+    }
+
+    /* if we fall to here working on an immediate send, then it must be in
+     * progress already.  GM will make sure the op completes (in error or
+     * otherwise) on its own, so there isn't anything to do here but wait for 
+     * it to finish by natural methods
+     */
+    if(query_op->send_recv == BMI_SEND && 
+        (query_op->mode == GM_MODE_IMMED || query_op->mode == GM_MODE_UNEXP))
+    {
+	gen_mutex_unlock(&interface_mutex);
+        return(0);
     }
 
     /* TODO: implement the rest of this; based on the op type we have to look
