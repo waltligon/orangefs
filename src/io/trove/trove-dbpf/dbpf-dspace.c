@@ -211,13 +211,13 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     if (ret == 0)
     {
 	gossip_debug(TROVE_DEBUG, "handle already exists...\n");
-	return -1;
+	return -TROVE_EEXIST;
     }
     if (ret != DB_NOTFOUND)
     {
 	gossip_err("error in dspace create (db_p->get failed).\n");
         trove_handle_free(op_p->coll_p->coll_id, new_handle);
-	return -1;
+	return -TROVE_EIO;
     }
     
     memset(&data, 0, sizeof(data));
@@ -253,7 +253,7 @@ return_error:
     {
         dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     }
-    return -1;
+    return -TROVE_EINVAL;
 }
 
 /* dbpf_dspace_remove()
