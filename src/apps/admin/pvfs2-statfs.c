@@ -208,8 +208,8 @@ int main(int argc, char **argv)
 		PVFS_util_make_size_human_readable(
 			(long long)stat_array[i].ram_free_bytes,
 			scratch_total, SCRATCH_LEN);
-		printf("\tRAM available    : %s\n", scratch_size);
-		printf("\tRAM total        : %s\n", scratch_total);
+		printf("\tRAM total        : %s\n", scratch_size);
+		printf("\tRAM free         : %s\n", scratch_total);
                 printf("\tuptime           : %d hours, %.2d minutes\n",
                        (int)((stat_array[i].uptime_seconds / 60) / 60),
                        (int)((stat_array[i].uptime_seconds / 60) % 60));
