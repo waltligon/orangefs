@@ -44,7 +44,7 @@
 
 /* This array is used for common key-val pairs for trove =) */
 
-PINT_server_trove_keys_s Trove_Common_Keys[3] = {"root_handle",12,"metadata",9,"dir_ent",8};
+PINT_server_trove_keys_s Trove_Common_Keys[3] = {{"root_handle",12},{"metadata",9},{"dir_ent",8}};
 
 #define ENCODE_TYPE 0
 
@@ -112,6 +112,7 @@ PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
  *           respective init function.
  * 			 
  */
+
 int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_status_s *ret)
 {
 	struct PINT_decoded_msg decoded_message;
@@ -124,11 +125,36 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 					&(s_op->enc_type));
 
 	s_op->req  = (struct PVFS_server_req_s *) decoded_message.buffer;
-	assert(s_op->req != 0);
+	assert(s_op->req != NULL);
+
 	s_op->addr = s_op->unexp_bmi_buff->addr;
 	s_op->tag  = s_op->unexp_bmi_buff->tag;
 	s_op->op   = s_op->req->op;
 	s_op->current_state = PINT_state_machine_locate(s_op);
+
+	/* What is happening here!!! 
+		Right now, we are pointing to the pointer of the first state.... 
+		We need to follow that pointer down one. By dereferencing this pointer, we are where we 
+		
+		-- More explanation:  Ok, so in gdb, without this line of code below, there is a pointer
+		   that is to ST_init which itself is that generated array.  So it looks like what has 
+			happened is there is another layer of pointers... but I will find out once I fix this 
+			request scheduler problem
+		
+	   should be! TODO: WHY IS THIS NOW NECESSARY????  dw*/
+
+	/********************************************************************************/
+	/******************************   WARNING  **************************************/
+	/******************* Ugly code to handle an issue below *************************/
+	/********************************************************************************/
+
+	s_op->current_state = (PINT_state_array_values *) *((PINT_state_array_values **)s_op->current_state);
+
+	/********************************************************************************/
+	/****************************** /WARNING ****************************************/
+	/********************************************************************************/
+
+
 	if(!s_op->current_state)
 	{
 		gossip_err("System not init for function\n");
@@ -148,7 +174,7 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 
 	s_op->resp->op = s_op->req->op;
 
-	return((s_op->current_state->state_action)(s_op,ret));
+	return(((s_op->current_state->state_action))(s_op,ret));
 
 }
 
@@ -165,8 +191,15 @@ int PINT_state_machine_init(void)
 
 	int i;
 	for (i = 0 ; i < SERVER_OP_TABLE_SIZE; i++)
+	{
 		if(PINT_server_op_table[i])
+		{
 			(PINT_server_op_table[i]->init_fun)();
+			printf("i: %d\n",i);
+		}
+		else
+			printf("Failed on i:%d\n",i);
+	}
 	return(0);
 	
 }
