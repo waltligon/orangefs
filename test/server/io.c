@@ -70,13 +70,9 @@ int main(int argc, char **argv)	{
 	void* memory_buffer = NULL;
 	PINT_Request_file_data file_data;
 	flow_descriptor* flow_d = NULL;
-	/* TODO: put this back when the server can handle remove operations
-	 */
-#if 0
 	struct PVFS_server_resp_s* remove_dec_ack;
 	struct PINT_encoded_msg encoded3;
 	struct PINT_decoded_msg decoded3;
-#endif
 
 	/**************************************************
 	 * general setup 
@@ -276,7 +272,7 @@ int main(int argc, char **argv)	{
 	 * io request  
 	 */
 
-	/* setup create request */
+	/* request */
 	my_req.op = PVFS_SERV_IO;
 	my_req.rsize = sizeof(struct PVFS_server_req_s);
 	my_req.credentials.uid = 0;
@@ -470,9 +466,6 @@ int main(int argc, char **argv)	{
 	 * remove request  
 	 */
 
-	/* TODO: put this back when the server can handle remove operations
-	 */
-#if 0
 	my_req.op = PVFS_SERV_REMOVE;
 	my_req.rsize = sizeof(struct PVFS_server_req_s);
 	my_req.credentials.uid = 0;
@@ -596,7 +589,6 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
-#endif
 	/**************************************************
 	 * general cleanup  
 	 */
@@ -604,11 +596,7 @@ int main(int argc, char **argv)	{
 	/* release the decoded buffers */
 	PINT_decode_release(&decoded1, PINT_ENCODE_RESP, 0);
 	PINT_decode_release(&decoded2, PINT_ENCODE_RESP, 0);
-	/* TODO: put this back when the server can handle remove operations
-	 */
-#if 0
 	PINT_decode_release(&decoded3, PINT_ENCODE_RESP, 0);
-#endif
 
 	/* shutdown the local interface */
 	ret = BMI_finalize();
