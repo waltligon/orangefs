@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 #include "pvfs2-sysint.h"
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 #include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"

@@ -10,7 +10,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "bmi.h"
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 
 /* TODO: if we add any more small mgmt functions, they should probably all 
  * be put together in one generic .c file...

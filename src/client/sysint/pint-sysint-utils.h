@@ -4,10 +4,10 @@
  * See COPYING in top-level directory.
  */
 
-/* This file contains the declarations for the PVFS system interface
- */
-#ifndef __PINT_SYSINT_H
-#define __PINT_SYSINT_H
+/* internal helper functions used by the system interface */
+
+#ifndef __PINT_SYSINT_UTILS_H
+#define __PINT_SYSINT_UTILS_H
 
 #include <stdio.h>
 #include <string.h>

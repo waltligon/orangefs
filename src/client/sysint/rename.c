@@ -10,7 +10,7 @@
 
 #include "pinode-helper.h"
 #include "pvfs2-sysint.h"
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 #include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"

@@ -7,7 +7,7 @@
 /* System Interface Finalize Implementation */
 #include <malloc.h>
 
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 #include "pcache.h"
 #include "pint-dcache.h"
 #include "gen-locks.h"

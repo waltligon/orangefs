@@ -14,7 +14,7 @@ CSRC := \
 	$(DIR)/remove.c \
 	$(DIR)/rename.c \
 	$(DIR)/setattr.c \
-	$(DIR)/sysint-utils.c \
+	$(DIR)/pint-sysint-utils.c \
 	$(DIR)/pint-bucket.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \

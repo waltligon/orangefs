@@ -8,7 +8,7 @@
 #ifndef _PINT_DCACHE_H
 #define _PINT_DCACHE_H
 
-#include <pint-sysint.h>
+#include <pint-sysint-utils.h>
 
 /* number of entries allowed in the cache */
 #define PINT_DCACHE_MAX_ENTRIES 512

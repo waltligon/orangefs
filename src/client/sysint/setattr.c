@@ -16,7 +16,7 @@
 #include "pinode-helper.h"
 #include "pvfs2-sysint.h"
 #include "pinode-helper.h"
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"

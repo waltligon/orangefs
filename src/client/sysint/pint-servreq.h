@@ -9,7 +9,7 @@
 
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-sysint.h"
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 #include "pvfs2-req-proto.h"
 
 int PINT_send_req_array(bmi_addr_t* addr_array,

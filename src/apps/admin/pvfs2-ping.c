@@ -24,7 +24,7 @@
 #include "server-config.h"
 #include "quicklist.h"
 #include "quickhash.h"
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 extern struct server_configuration_s g_server_config;
 extern struct qhash_table *PINT_fsid_config_cache_table;
 

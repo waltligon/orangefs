@@ -1,6 +1,6 @@
 #include <time.h>
 
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
 

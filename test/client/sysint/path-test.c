@@ -5,7 +5,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 #include "str-utils.h"
 
 int main(int argc, char* argv[])

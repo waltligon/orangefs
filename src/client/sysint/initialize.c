@@ -15,7 +15,7 @@
 #include "pint-bucket.h"
 #include "pint-dcache.h"
 #include "pvfs2-sysint.h"
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 #include "gen-locks.h"
 #include "pint-servreq.h"
 #include "PINT-reqproto-encode.h"

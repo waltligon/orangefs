@@ -5,7 +5,7 @@
  */
 
 #include <pvfs2-sysint.h>
-#include <pint-sysint.h>
+#include <pint-sysint-utils.h>
 
 void print_mount_entry(pvfs_mntent *mount);
 void print_mount_list(pvfs_mntlist *mnt_list);

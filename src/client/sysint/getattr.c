@@ -11,7 +11,7 @@
 
 #include "pinode-helper.h"
 #include "pvfs2-sysint.h"
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 #include "pvfs2-req-proto.h"
 #include "pvfs-distribution.h"
 #include "pint-servreq.h"

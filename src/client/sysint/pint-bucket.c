@@ -10,7 +10,7 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
-#include "pint-sysint.h"
+#include "pint-sysint-utils.h"
 #include "bmi.h"
 #include "gossip.h"
 #include "dotconf.h"
