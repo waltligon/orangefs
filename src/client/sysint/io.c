@@ -242,6 +242,23 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	goto sys_io_out;
     }
 
+    resp->total_completed = 0;
+
+    /* if this was a read, tally up the total I/O size based on
+     * results of the flows
+     */
+    if(type == PVFS_SYS_IO_READ)
+    {
+	for(i=0; i<target_handle_count; i++)
+	{
+	    if(!error_code_array[i])
+	    {
+		resp->total_completed +=
+		    flow_array[i]->total_transfered;
+	    }
+	}
+    }
+
     /****************************************************************/
 
     /* if this was a write operation, then we need to wait for a
@@ -280,7 +297,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
      * code array
      */
     ret = 0;
-    resp->total_completed = 0;
 
     /* find out how many errors we hit */
     for(i=0; i<target_handle_count; i++)
@@ -299,11 +315,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    {
 		resp->total_completed +=
 		    tmp_resp->u.write_completion.total_completed;
-	    }
-	    else
-	    {
-		resp->total_completed +=
-		    flow_array[i]->total_transfered;
 	    }
 	}
     }
