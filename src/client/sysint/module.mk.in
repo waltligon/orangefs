@@ -22,7 +22,7 @@ LIBSRC += \
 	$(DIR)/sys-remove.c \
 	$(DIR)/sys-getattr.c \
 	$(DIR)/sys-io.c \
-	$(DIR)/flush.c \
+	$(DIR)/sys-flush.c \
 	$(DIR)/msgpair.c \
 	$(DIR)/msgpairarray.c \
 	$(DIR)/lookup-dcache.c \
