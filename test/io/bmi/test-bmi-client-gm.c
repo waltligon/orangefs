@@ -62,7 +62,7 @@ int main(int argc, char **argv)	{
 
 	/* set debugging stuff */
 	gossip_enable_stderr();
-	gossip_set_debug_mask(0, BMI_DEBUG_ALL);
+	gossip_set_debug_mask(0, GOSSIP_BMI_DEBUG_ALL);
 
 	/* initialize local interface */
 	ret = BMI_initialize("bmi_gm", NULL, 0);
@@ -354,7 +354,6 @@ static struct options* parse_args(int argc, char* argv[]){
 
 	/* getopt stuff */
 	extern char* optarg;
-	extern int optind, opterr, optopt;
 	char flags[] = "h:r:s:c:";
 	int one_opt = 0;
 
