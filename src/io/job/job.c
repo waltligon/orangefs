@@ -70,8 +70,10 @@ static void *bmi_thread_function(void *ptr);
 static pthread_t bmi_thread_id;
 static void *flow_thread_function(void *ptr);
 static pthread_t flow_thread_id;
+#ifdef __PVFS2_TROVE_SUPPORT__
 static void *trove_thread_function(void *ptr);
 static pthread_t trove_thread_id;
+#endif
 static void *dev_thread_function(void* ptr);
 static pthread_t dev_thread_id;
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -92,11 +94,13 @@ static void *stat_bmi_user_ptr_array[job_work_metric];
 
 static flow_descriptor *stat_flow_array[job_work_metric];
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 static TROVE_op_id stat_trove_id_array[job_work_metric];
 static int stat_trove_index_array[job_work_metric];
 static PVFS_vtag stat_trove_vtag_array[job_work_metric];
 static void *stat_trove_user_ptr_array[job_work_metric];
 static PVFS_error stat_trove_ds_state_array[job_work_metric];
+#endif
 
 static struct PINT_dev_unexp_info stat_dev_unexp_array[job_work_metric];
 
@@ -112,7 +116,9 @@ static int do_one_work_cycle_bmi_unexp(int *num_completed,
 				       int wait_flag);
 static int do_one_work_cycle_flow(int *num_completed);
 static int do_one_work_cycle_dev_unexp(int *num_completed);
+#ifdef __PVFS2_TROVE_SUPPORT__
 static int do_one_work_cycle_trove(int *num_completed);
+#endif
 static int do_one_test_cycle_req_sched(void);
 static void fill_status(struct job_desc *jd,
 			void **returned_user_ptr_p,
@@ -161,6 +167,8 @@ int job_initialize(int flags)
 	BMI_close_context(global_bmi_context);
 	return(ret);
     }
+
+#ifdef __PVFS2_TROVE_SUPPORT__
     /* ditto for trove */
     ret = trove_open_context(/*FIXME: HACK*/9,&global_trove_context);
     if (ret < 0)
@@ -169,6 +177,7 @@ int job_initialize(int flags)
 	PINT_flow_close_context(global_flow_context);
         return ret;
     }
+#endif
 
     ret = setup_queues();
     if (ret < 0)
@@ -200,6 +209,7 @@ int job_initialize(int flags)
 	teardown_queues();
 	return (-ret);
     }
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = pthread_create(&trove_thread_id, NULL, trove_thread_function, NULL);
     if (ret != 0)
     {
@@ -211,12 +221,15 @@ int job_initialize(int flags)
 	teardown_queues();
 	return (-ret);
     }
+#endif
     ret = pthread_create(&dev_thread_id, NULL, dev_thread_function, NULL);
     if (ret != 0)
     {
 	pthread_cancel(bmi_thread_id);
 	pthread_cancel(flow_thread_id);
+#ifdef __PVFS2_TROVE_SUPPORT__
 	pthread_cancel(trove_thread_id);
+#endif
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
         trove_close_context(/*FIXME: HACK*/9,global_trove_context);
@@ -241,13 +254,17 @@ int job_finalize(void)
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cancel(bmi_thread_id);
     pthread_cancel(flow_thread_id);
+#ifdef __PVFS2_TROVE_SUPPORT__
     pthread_cancel(trove_thread_id);
+#endif
     pthread_cancel(dev_thread_id);
 #endif /* __PVFS2_JOB_THREADED__ */
 
     BMI_close_context(global_bmi_context);
     PINT_flow_close_context(global_flow_context);
+#ifdef __PVFS2_TROVE_SUPPORT__
     trove_close_context(/*FIXME: HACK*/9,global_trove_context);
+#endif
 
     teardown_queues();
 
@@ -1082,10 +1099,15 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_write_at(coll_id, handle, buffer,
 				 &jd->u.trove.actual_size, offset, flags,
 				 jd->u.trove.vtag, jd, global_trove_context,
 				 &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -1165,10 +1187,15 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_read_at(coll_id, handle, buffer,
 				&jd->u.trove.actual_size, offset, flags,
 				jd->u.trove.vtag, jd, global_trove_context,
 				&(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -1239,8 +1266,13 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_flush(coll_id, handle, flags, jd,
 			      global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -1313,9 +1345,14 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read(coll_id, handle, key_p, val_p, flags,
 			    jd->u.trove.vtag, jd, global_trove_context,
 			    &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -1393,9 +1430,14 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read_list(coll_id, handle, key_array,
 				 val_array, count, flags, jd->u.trove.vtag, jd,
 				 global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -1472,9 +1514,14 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_write(coll_id, handle, key_p, val_p, flags,
 			     jd->u.trove.vtag, jd, global_trove_context,
 			     &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -1543,8 +1590,13 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_flush(coll_id, handle, flags, jd,
                              global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -1617,9 +1669,14 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr(coll_id,
 			       handle, &(jd->u.trove.attr), 0 /* flags */ ,
 			       jd, global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -1693,8 +1750,13 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_setattr(coll_id, handle, ds_attr_p, 0 /* flags */ ,
 			       jd, global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -1808,9 +1870,14 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_remove(coll_id, handle, key_p, flags,
 			      jd->u.trove.vtag, jd, 
 			      global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -1910,10 +1977,15 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     jd->u.trove.count = count;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate(coll_id, handle,
 			       &(jd->u.trove.position), key_array, val_array,
 			       &(jd->u.trove.count), flags, jd->u.trove.vtag,
 			       jd, global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -2013,12 +2085,17 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     jd->u.trove.handle = 0;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_create(coll_id,
                               handle_extent_array,
 			      &(jd->u.trove.handle),
 			      type,
 			      hint, TROVE_SYNC /* flags -- sync for now */ ,
 			      jd, global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -2090,9 +2167,14 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_remove(coll_id,
 			      handle, TROVE_SYNC /* flags -- sync for now */ ,
 			      jd, global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -2181,7 +2263,12 @@ int job_trove_fs_create(char *collname,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_create(collname, new_coll_id, jd, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -2268,8 +2355,13 @@ int job_trove_fs_lookup(char *collname,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_lookup(collname, &(jd->u.trove.fsid), jd,
 				  &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -2329,9 +2421,14 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_seteattr(coll_id, key_p, val_p, flags,
 				    jd, global_trove_context,
 				    &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -2404,9 +2501,14 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_geteattr(coll_id, key_p, val_p, flags,
 				    jd, global_trove_context,
 				    &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
 
     if (ret < 0)
     {
@@ -3235,6 +3337,7 @@ static int do_one_work_cycle_all(int *num_completed,
 	}
     }
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     /* trove operations */
     if (trove_pending_flag)
     {
@@ -3243,6 +3346,7 @@ static int do_one_work_cycle_all(int *num_completed,
 	    return (ret);
 	}
     }
+#endif
 
     /* flow operations */
     if (flow_pending_flag)
@@ -3505,6 +3609,7 @@ static int do_one_work_cycle_flow(int *num_completed)
     return (0);
 }
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 /* do_one_work_cycle_trove()
  *
  * performs one job work cycle, just on pending trove operations 
@@ -3581,6 +3686,7 @@ static int do_one_work_cycle_trove(int *num_completed)
 
     return (0);
 }
+#endif
 
 /* fill_status()
  *
@@ -3790,6 +3896,7 @@ static void *flow_thread_function(void *ptr)
     return (NULL);
 }
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 /* trove_thread_function()
  *
  * function executed by the thread in charge of trove
@@ -3846,6 +3953,7 @@ static void *trove_thread_function(void *ptr)
 
     return (NULL);
 }
+#endif
 
 /* dev_thread_function()
  *
