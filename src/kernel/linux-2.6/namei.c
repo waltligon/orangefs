@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup pvfs2linux
+ *
+ *  Linux VFS namei operations.
+ */
+
 #include "pvfs2-kernel.h"
 
 extern struct list_head pvfs2_request_list;
@@ -12,10 +18,8 @@ extern wait_queue_head_t pvfs2_request_list_waitq;
 
 extern struct dentry_operations pvfs2_dentry_operations;
 
-/*
-  called with a negative dentry, so we need to hook it up with a newly
-  allocated inode
-*/
+/** Get a newly allocated inode to go with a negative dentry.
+ */
 #ifdef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_create(
     struct inode *dir,
@@ -47,6 +51,9 @@ static int pvfs2_create(
     return ret;
 }
 
+/** Attempt to resolve an object name (dentry->d_name), parent handle, and
+ *  fsid into a handle for the object.
+ */
 #ifdef PVFS2_LINUX_KERNEL_2_4
 struct dentry *pvfs2_lookup(
     struct inode *dir,
@@ -395,6 +402,7 @@ static int pvfs2_rename(
     return ret;
 }
 
+/** PVFS2 implementation of VFS inode operations for directories */
 struct inode_operations pvfs2_dir_inode_operations =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4

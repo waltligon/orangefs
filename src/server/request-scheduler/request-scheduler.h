@@ -4,20 +4,28 @@
  * See COPYING in top-level directory.
  */
 
+/** \defgroup reqsched Request scheduler
+ *
+ *  The request scheduler maintains structures that track ongoing and
+ *  incoming requests for the purposes of maintaining consistency and
+ *  server-side scheduling for performance.
+ *
+ * @{
+ */
+
+/** \file
+ *  Declarations for the request scheduler.
+ */
+
 #ifndef __REQUEST_SCHEDULER_H
 #define __REQUEST_SCHEDULER_H
 
 #include "pvfs2-req-proto.h"
 
-/* this file contains the API for doing server side scheduling at
- * the request level.  
- */
-
 typedef PVFS_id_gen_t req_sched_id;
 typedef int req_sched_error_code;
 
 /* setup and teardown */
-
 int PINT_req_sched_initialize(
     void);
 
@@ -25,7 +33,6 @@ int PINT_req_sched_finalize(
     void);
 
 /* retrieving information about incoming requests */
-
 int PINT_req_sched_target_handle(struct PVFS_server_req *req,
 				 int req_index,
 				 PVFS_handle * handle,
@@ -33,7 +40,6 @@ int PINT_req_sched_target_handle(struct PVFS_server_req *req,
 				 int* readonly_flag);
 
 /* scheduler submission */
-
 int PINT_req_sched_post(struct PVFS_server_req *in_request,
 			int req_index,
 			void *in_user_ptr,
@@ -51,7 +57,6 @@ int PINT_req_sched_post_timer(int msecs,
 			      req_sched_id * out_id);
 
 /* testing for completion */
-
 int PINT_req_sched_test(req_sched_id in_id,
 			int *out_count_p,
 			void **returned_user_ptr_p,
@@ -71,6 +76,8 @@ int PINT_req_sched_testworld(int *inout_count_p,
 enum PVFS_server_mode PINT_req_sched_get_mode(void);
 
 #endif /* __REQUEST_SCHEDULER_H */
+
+/* @} */
 
 /*
  * Local variables:

@@ -28,6 +28,14 @@ extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 
 
+/** Read page-sized blocks from file.  This code is only used in the mmap
+ *  path.
+ *
+ *  \note Current implementation ignores max_blocks parameter and always
+ *        reads exactly one block.  Because the only time this function
+ *        seems to be called is from pvfs2_get_block(), this appears to be
+ *        ok.
+ */
 static int pvfs2_get_blocks(
     struct inode *inode,
     sector_t lblock,
@@ -41,6 +49,13 @@ static int pvfs2_get_blocks(
     struct page *page = NULL;
     void *page_data = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+
+    /* check assumption before continuing */
+    if (max_blocks != 1) {
+	pvfs2_error("pvfs2_get_blocks called with invalid max_blocks (%lu)\n",
+		    max_blocks);
+    }
+
     /*
       We're faking our inode block size to be PAGE_CACHE_SIZE
       to play nicely with the page cache.
@@ -121,6 +136,10 @@ static int pvfs2_get_blocks(
           cache hits; any readahead data the client pulls in is
           flushed (both from userspace and the page cache) on vfs file
           close
+
+	  ALSO NOTE: This call actually only reads one PAGE_CACHE_SIZE
+	  block (blocksize), even though we might have been asked to
+	  read more than that. -- RobR
         */
         bytes_read = pvfs2_inode_read(
             inode, page_data, blocksize, &blockptr_offset, 0,
@@ -185,6 +204,8 @@ static int pvfs2_get_blocks(
     return ret;
 }
 
+/** Passes request for a block on to pvfs2_get_blocks()
+ */
 static int pvfs2_get_block(
     struct inode *ip,
     get_block_block_type lblock,
@@ -196,6 +217,8 @@ static int pvfs2_get_block(
     return pvfs2_get_blocks(ip, lblock, 1, bh_result, create);
 }
 
+/** Passes request for a page on to pvfs2_get_block()
+ */
 static int pvfs2_readpage(
     struct file *file,
     struct page *page)
@@ -239,6 +262,7 @@ struct backing_dev_info pvfs2_backing_dev_info =
 };
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
+/** PVFS2 implementation of address space operations */
 struct address_space_operations pvfs2_address_operations =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -251,6 +275,8 @@ struct address_space_operations pvfs2_address_operations =
 #endif
 };
 
+/** Change size of an object referenced by inode
+ */
 void pvfs2_truncate(struct inode *inode)
 {
     pvfs2_print("pvfs2: pvfs2_truncate called on inode %d "
@@ -259,6 +285,8 @@ void pvfs2_truncate(struct inode *inode)
     pvfs2_truncate_inode(inode, inode->i_size);
 }
 
+/** Change attributes of an object referenced by dentry.
+ */
 int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 {
     int ret = -EINVAL;
@@ -282,6 +310,8 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 }
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
+/** Linux 2.4 only equivalent of getattr
+ */
 int pvfs2_revalidate(struct dentry *dentry)
 {
     int ret = 0;
@@ -298,6 +328,8 @@ int pvfs2_revalidate(struct dentry *dentry)
     return ret;
 }
 #else
+/** Obtain attributes of an object given a dentry
+ */
 int pvfs2_getattr(
     struct vfsmount *mnt,
     struct dentry *dentry,
@@ -322,7 +354,7 @@ int pvfs2_getattr(
 }
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
-/** PVFS2 implementation of VFS inode operations */
+/** PVFS2 implementation of VFS inode operations for files */
 struct inode_operations pvfs2_file_inode_operations =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -336,6 +368,9 @@ struct inode_operations pvfs2_file_inode_operations =
 #endif
 };
 
+/** Allocates a Linux inode structure with additional PVFS2-specific
+ *  private data (I think -- RobR).
+ */
 struct inode *pvfs2_get_custom_inode(
     struct super_block *sb,
     int mode,

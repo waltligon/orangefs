@@ -4,14 +4,14 @@
  * See COPYING in top-level directory.
  */
 
-/* this file contains an implementation of the server side request
- * scheduler.  
- */
-
-/* NOTE: this is a prototype.  It simply hashes on the handle
- * value in the request and builds a linked list for each handle.
- * Only the request at the head of each list is allowed to
- * proceed.
+/** \file
+ *  \ingroup reqsched
+ *
+ *  An implementation of the server side request scheduler API.  
+ *
+ *  \note this is a prototype.  It simply hashes on the handle
+ *  value in the request and builds a linked list for each handle.
+ *  Only the request at the head of each list is allowed to proceed.
  */
 
 /* LONG TERM
@@ -33,22 +33,22 @@
 #include "gossip.h"
 #include "id-generator.h"
 
-/* element states */
+/** request states */
 enum req_sched_states
 {
-    /* request is queued up, cannot be processed yet */
+    /** request is queued up, cannot be processed yet */
     REQ_QUEUED,
-    /* request is being processed */
+    /** request is being processed */
     REQ_SCHEDULED,
-    /* request could be processed, but caller has not asked for it
+    /** request could be processed, but caller has not asked for it
      * yet 
      */
     REQ_READY_TO_SCHEDULE,
-    /* for timer events */
+    /** for timer events */
     REQ_TIMING,
 };
 
-/* linked lists to be stored at each hash table element */
+/** linked lists to be stored at each hash table element */
 struct req_sched_list
 {
     struct qlist_head hash_link;
@@ -56,7 +56,7 @@ struct req_sched_list
     PVFS_handle handle;
 };
 
-/* linked list elements; one for each request in the scheduler */
+/** linked list elements; one for each request in the scheduler */
 struct req_sched_element
 {
     struct qlist_head list_link;	/* ties it to a queue */
@@ -100,9 +100,7 @@ static int sched_count = 0;
 /* mode of the scheduler */
 static enum PVFS_server_mode current_mode = PVFS_SERVER_NORMAL_MODE;
 
-/* PINT_req_sched_get_mode()
- *
- * returns current mode of server
+/** returns current mode of server
  */
 enum PVFS_server_mode PINT_req_sched_get_mode(void)
 {
@@ -111,11 +109,10 @@ enum PVFS_server_mode PINT_req_sched_get_mode(void)
 
 /* setup and teardown */
 
-/* PINT_req_sched_initialize()
+/** Initializes the request scheduler.  Must be called before any other
+ *  request scheduler routines.
  *
- * intitializes the request scheduler
- *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure
  */
 int PINT_req_sched_initialize(
     void)
@@ -130,11 +127,9 @@ int PINT_req_sched_initialize(
     return (0);
 }
 
-/* PINT_req_sched_finalize()
+/** Tears down the request scheduler and its data structures 
  *
- * tears down the request scheduler and its data structures 
- *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure
  */
 int PINT_req_sched_finalize(
     void)
@@ -179,18 +174,18 @@ int PINT_req_sched_finalize(
     return (0);
 }
 
-/* PINT_req_sched_target_handle()
+/** Finds the handle that the given request will operate on
  *
- * finds the handle that the given request will operate on
+ *  \return 0 on success, -errno on failure
  *
- * returns 0 on success, -errno on failure
- * NOTE: a handle value of 0 and a return value of 0 indicates
- * that the request does not operate on any particular handle
- * NOTE: a return value of 1 indicates that we can let this operation pass
- * through without any scheduling
+ *  \note a handle value of 0 and a return value of 0 indicates
+ *  that the request does not operate on any particular handle
  *
- * TODO: we need to fix this function and all of its callers if we 
- * define something besides "0" to represent an invalid handle value
+ *  \note a return value of 1 indicates that we can let this operation pass
+ *  through without any scheduling
+ *
+ *  \todo we need to fix this function and all of its callers if we 
+ *  define something besides "0" to represent an invalid handle value
  */
 int PINT_req_sched_target_handle(
     struct PVFS_server_req *req,
@@ -316,12 +311,10 @@ int PINT_req_sched_target_handle(
 
 /* scheduler submission */
 
-/* PINT_req_sched_post()
+/** Posts an incoming request to the scheduler
  *
- * posts an incoming request to the scheduler
- *
- * returns 1 if request should proceed immediately, 0 if the
- * caller should check back later, and -errno on failure
+ *  \return 1 if request should proceed immediately, 0 if the
+ *  request will be scheduled later, and -errno on failure
  */
 int PINT_req_sched_post(
     struct PVFS_server_req *in_request,
@@ -476,7 +469,7 @@ int PINT_req_sched_post(
 	tmp_element->state = REQ_SCHEDULED;
     else
     {
-	/* ok, we can we immediately return to allow concurrent I/O?
+	/* ok, can we immediately return to allow concurrent I/O?
 	 * only when the following conditions are met:
 	 * - the current request is for I/O
 	 * - head of queue is a scheduled I/O operation
@@ -527,13 +520,11 @@ int PINT_req_sched_post(
 }
 
 
-/* PINT_req_sched_post_timer()
+/** posts a timer - will complete like a normal request at approximately 
+ *  the interval specified
  *
- * posts a timer- will complete like a normal request at approximately 
- * the interval specified
- *
- * return 1 on immediate completion, 0 if caller should test later,
- * -errno on failure
+ *  \return 1 on immediate completion, 0 if caller should test later,
+ *  -errno on failure
  */
 int PINT_req_sched_post_timer(
     int msecs,
@@ -607,12 +598,10 @@ int PINT_req_sched_post_timer(
 }
 
 
-/* PINT_req_sched_unpost()
+/** Removes a request from the scheduler before it has even been
+ *  scheduled
  *
- * removes a request from the scheduler before it has even been
- * scheduled
- *
- * returns 0 on success, -errno on failure 
+ *  \return 0 on success, -errno on failure 
  */
 int PINT_req_sched_unpost(
     req_sched_id in_id,
@@ -722,13 +711,11 @@ int PINT_req_sched_unpost(
     return (0);
 }
 
-/* PINT_req_sched_release()
+/** releases a completed request from the scheduler, potentially
+ *  allowing other requests to proceed 
  *
- * releases a completed request from the scheduler, potentially
- * allowing other requests to proceed 
- *
- * returns 1 on immediate successful completion, 0 to test later,
- * -errno on failure
+ *  \return 1 on immediate successful completion, 0 to test later,
+ *  -errno on failure
  */
 int PINT_req_sched_release(
     req_sched_id in_completed_id,
@@ -843,11 +830,9 @@ int PINT_req_sched_release(
 
 /* testing for completion */
 
-/* PINT_req_sched_test()
+/** Tests for completion of a single scheduler operation
  *
- * tests for completion of a single scheduler operation
- *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure
  */
 int PINT_req_sched_test(
     req_sched_id in_id,
@@ -935,6 +920,8 @@ int PINT_req_sched_test(
     return (-ENOSYS);
 }
 
+/** Tests for completion of one or more of a set of scheduler operations.
+ */
 int PINT_req_sched_testsome(
     req_sched_id * in_id_array,
     int *inout_count_p,
@@ -1033,6 +1020,8 @@ int PINT_req_sched_testsome(
 	return (0);
 }
 
+/** Tests for completion of any scheduler request.
+ */
 int PINT_req_sched_testworld(
     int *inout_count_p,
     req_sched_id * out_id_array,
