@@ -156,7 +156,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     error = sm_p->error_code;
 
     /* flush pcache entry, if any */
-    if (sm_p->pcache_hit)
+    if (sm_p->pcache_hit && (io_type == PVFS_IO_WRITE))
     {
         PINT_pcache_invalidate(pinode_ref);
         sm_p->pcache_hit = 0;

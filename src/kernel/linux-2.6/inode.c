@@ -125,9 +125,7 @@ static struct backing_dev_info pvfs2_backing_dev_info = {
 };
 
 
-static int pvfs2_setattr(
-    struct dentry *dentry,
-    struct iattr *iattr)
+int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 {
     int ret = -EINVAL;
     struct inode *inode = dentry->d_inode;
