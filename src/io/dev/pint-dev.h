@@ -13,9 +13,9 @@
 /* describes unexpected messages coming out of the device */
 struct PINT_dev_unexp_info
 {
-	void* buffer;
-	int size;
-	PVFS_id_gen_t tag;
+    void *buffer;
+    int size;
+    PVFS_id_gen_t tag;
 };
 
 /* types of memory buffers accepted in the write calls */
@@ -25,43 +25,48 @@ enum PINT_dev_buffer_type
     PINT_DEV_EXT_ALLOC = 2
 };
 
-int PINT_dev_initialize(const char* dev_name,
-			int flags);
+int PINT_dev_initialize(
+    const char* dev_name,
+    int flags);
 
-void PINT_dev_finalize(void);
+int PINT_dev_get_mapped_region(
+    struct PVFS_dev_map_desc *desc,
+    int size);
 
-int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc,
-			       int size);
+void PINT_dev_put_mapped_region(
+    struct PVFS_dev_map_desc *desc);
 
-void PINT_dev_put_mapped_region(struct PVFS_dev_map_desc *desc);
+void *PINT_dev_get_mapped_buffer(
+    struct PVFS_dev_map_desc *desc,
+    int buffer_index);
 
-void *PINT_dev_get_mapped_buffer(struct PVFS_dev_map_desc *desc,
-				 int buffer_index);
+int PINT_dev_test_unexpected(
+    int incount,
+    int *outcount,
+    struct PINT_dev_unexp_info *info_array,
+    int max_idle_time);
 
-int PINT_dev_test_unexpected(int incount,
-			     int* outcount,
-			     struct PINT_dev_unexp_info* info_array,
-			     int max_idle_time);
+int PINT_dev_release_unexpected(
+    struct PINT_dev_unexp_info* info);
 
-int PINT_dev_release_unexpected(struct PINT_dev_unexp_info* info);
+int PINT_dev_write_list(
+    void **buffer_list,
+    int *size_list,
+    int list_count,
+    int total_size,
+    enum PINT_dev_buffer_type buffer_type,
+    PVFS_id_gen_t tag);
 
-int PINT_dev_write_list(void **buffer_list,
-			int* size_list,
-			int list_count,
-			int total_size,
-			enum PINT_dev_buffer_type buffer_type,
-			PVFS_id_gen_t tag);
+int PINT_dev_write(
+    void *buffer,
+    int size,
+    enum PINT_dev_buffer_type buffer_type,
+    PVFS_id_gen_t tag);
 
 int PINT_dev_remount(void);
-
-int PINT_dev_write(void *buffer,
-		   int size,
-		   enum PINT_dev_buffer_type buffer_type,
-		   PVFS_id_gen_t tag);
-
-void* PINT_dev_memalloc(int size);
-
+void *PINT_dev_memalloc(int size);
 void PINT_dev_memfree(void* buffer, int size);
+void PINT_dev_finalize(void);
 
 #endif /* __PINT_DEV_H */
 

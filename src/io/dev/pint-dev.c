@@ -22,6 +22,7 @@
 #include "pvfs2-types.h"
 #include "gossip.h"
 #include "pint-dev.h"
+#include "src/io/bmi/bmi-byteswap.h"
 
 static int setup_dev_entry(const char* dev_name);
 static int parse_devices(const char* targetfile, const char* devname, 
@@ -201,13 +202,11 @@ int PINT_dev_test_unexpected(
         struct PINT_dev_unexp_info* info_array,
         int max_idle_time)
 {
-    int ret = -1;
+    int ret = -1, avail = -1, i = 0;
     struct pollfd pfd;
-    int avail = -1;
-    int32_t *magic;
-    int64_t *tag;
-    void* buffer = NULL;
-    int i;
+    int32_t *magic = NULL;
+    int64_t *tag = NULL;
+    void *buffer = NULL;
 
     /* prepare to read max upcall size (magic nr and tag included) */
     int read_size = pdev_max_upsize;
@@ -311,11 +310,7 @@ int PINT_dev_test_unexpected(
         }
         
         magic = (int32_t*)buffer;
-#if (WORDS_BIGENDIAN == 1)
-        tag = (int64_t*)((unsigned long)buffer);
-#else
         tag = (int64_t*)((unsigned long)buffer + sizeof(int32_t));
-#endif
 
         assert(*magic == pdev_magic);
 

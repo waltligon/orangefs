@@ -195,9 +195,7 @@ static ssize_t pvfs2_devreq_writev(
     int num_remaining = max_downsize;
     int payload_size = 0;
     int32_t magic = 0;
-    /* FIXME: tags are a hack for now (we only looks at 32 bit tags) */
-    int64_t _tag = 0;
-    unsigned long tag = 0;
+    int64_t tag = 0;
 
     buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!buffer)
@@ -221,12 +219,11 @@ static ssize_t pvfs2_devreq_writev(
     }
 
     ptr = buffer;
-    magic = *((int32_t *) ptr);
+    magic = *((int32_t *)ptr);
     ptr += sizeof(int32_t);
 
-    _tag = *((int64_t *) ptr);
+    tag = *((int64_t *)ptr);
     ptr += sizeof(int64_t);
-    tag = (unsigned long) _tag;	/* a hack for now */
 
     /* lookup (and remove) the op based on the tag */
     hash_link = qhash_search_and_remove(htable_ops_in_progress, &(tag));
@@ -329,7 +326,8 @@ static ssize_t pvfs2_devreq_writev(
     else
     {
         /* ignore downcalls that we're not interested in */
-	pvfs2_print("WARNING: No one's waiting for the tag %lu\n", tag);
+	pvfs2_print("WARNING: No one's waiting for the tag %Ld\n",
+                    Ld(tag));
     }
     kmem_cache_free(dev_req_cache, buffer);
 

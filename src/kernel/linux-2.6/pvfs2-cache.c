@@ -9,7 +9,8 @@
 /* a cache for pvfs2 upcall/downcall operations */
 static kmem_cache_t *op_cache = NULL;
 
-static atomic_t next_tag_value;
+static int64_t next_tag_value;
+static spinlock_t next_tag_value_lock = SPIN_LOCK_UNLOCKED;
 
 /* a cache for device (/dev/pvfs2-req) communication */
 extern kmem_cache_t *dev_req_cache;
@@ -59,7 +60,9 @@ void op_cache_initialize(void)
     }
 
     /* initialize our atomic tag counter */
-    atomic_set(&next_tag_value, 100);
+    spin_lock(&next_tag_value_lock);
+    next_tag_value = 100;
+    spin_unlock(&next_tag_value_lock);
 }
 
 void op_cache_finalize(void)
@@ -77,8 +80,9 @@ pvfs2_kernel_op_t *op_alloc(void)
     new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (new_op)
     {
-        new_op->tag = (unsigned long)atomic_read(&next_tag_value);
-        atomic_inc(&next_tag_value);
+        spin_lock(&next_tag_value_lock);
+        new_op->tag = next_tag_value++;
+        spin_unlock(&next_tag_value_lock);
     }
     else
     {

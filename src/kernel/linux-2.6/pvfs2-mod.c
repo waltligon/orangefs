@@ -151,13 +151,7 @@ static void __exit pvfs2_exit(void)
 	    if (hash_link)
 	    {
 		cur_op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
-                if (cur_op->upcall.type != PVFS2_VFS_OP_INVALID)
-                {
-                    pvfs2_print("Freeing op in progress of "
-                                "request type %d\n",
-                                cur_op->upcall.type);
-                    op_release(cur_op);
-                }
+                op_release(cur_op);
 	    }
 	} while (hash_link);
     }
@@ -180,24 +174,20 @@ static void __exit pvfs2_exit(void)
 
 static int hash_func(void *key, int table_size)
 {
-    unsigned long tmp = 0;
-    unsigned long *real_tag = (unsigned long *)key;
-    tmp += (*(real_tag));
-    tmp = tmp % table_size;
-    return ((int) tmp);
+    int tmp = 0;
+    int64_t *real_tag = (int64_t *)key;
+    tmp += (int)(*real_tag);
+    tmp = (tmp % table_size);
+    return tmp;
 }
 
 static int hash_compare(void *key, struct qhash_head *link)
 {
-    unsigned long *real_tag = (unsigned long *)key;
-    pvfs2_kernel_op_t *op =
-        qhash_entry(link, pvfs2_kernel_op_t, list);
+    int64_t *real_tag = (int64_t *)key;
+    pvfs2_kernel_op_t *op = qhash_entry(
+        link, pvfs2_kernel_op_t, list);
 
-    if (op->tag == *real_tag)
-    {
-	return (1);
-    }
-    return (0);
+    return (op->tag == *real_tag);
 }
 
 module_init(pvfs2_init);
