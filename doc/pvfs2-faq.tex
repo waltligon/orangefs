@@ -141,7 +141,7 @@ store metadata; the clients will handle the rest.
 \subsection{Can PVFS2 servers listen on two interfaces (multihome)}
 
 PVFS2 servers currently listen on one interface at a time.  Multihome support,
-wehre a PVFS2 server can accept connections from several network interfaces,
+where a PVFS2 server can accept connections from several network interfaces,
 would be helpful in many situations.  We will implement this feature at some
 point, but not in the next few releases.
 
@@ -243,7 +243,7 @@ client to the server and back again.  Without client-side caching, there
 is no sane way to speed this up.
 
 To improve benchmark performance, specify a bigger block size.   PVFS2
-has several more agressive optimizations that can be turned on, but
+has several more aggressive optimizations that can be turned on, but
 those optimizations require that applications accessing PVFS2 can cope
 with out-of-sync caches.  
 
@@ -282,8 +282,8 @@ for PVFS2, at which point we will be playing on a level field, so to speak.  If
 you insist on benchmarking PVFS2 and NFS in a single-client test, there are
 some adjustments you can make.
 
-The easiest way to improve PVFS2 performance is to increase the blocksize of
-each access.  Large blocksizes help all file systems, but for PVFS2 they make a
+The easiest way to improve PVFS2 performance is to increase the block size of
+each access.  Large block sizes help all file systems, but for PVFS2 they make a
 much larger difference in performance than they do for other file systems.  
 
 If the \texttt{TroveSyncMode} option is set to \texttt{nosync} in your PVFS2
@@ -481,7 +481,7 @@ feature in place.
 %
 \section{Helping Out}
 
-This section covers ways one could contibute to the PVFS2 project.
+This section covers ways one could contribute to the PVFS2 project.
 
 \subsection{How can I contribute to the PVFS2 project?}
 \label{sec:contributing}
