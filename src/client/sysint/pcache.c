@@ -215,9 +215,12 @@ void PINT_pcache_set_valid(PINT_pinode *pinode)
 /* tries to release the pinode, based on the specified refn */
 void PINT_pcache_invalidate(PVFS_pinode_reference refn)
 {
-    pcache_debug("PINT_pcache_invalidate entered\n");
+    PINT_pinode *pinode = NULL;
+
     assert(s_pcache_initialized);
-    PINT_pinode *pinode = PINT_pcache_lookup(refn);
+    pinode = PINT_pcache_lookup(refn);
+
+    pcache_debug("PINT_pcache_invalidate entered\n");
 
     if (pinode)
     {
