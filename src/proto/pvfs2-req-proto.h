@@ -48,13 +48,14 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_DSPACE_INFO_LIST = 22,
     PVFS_SERV_MGMT_EVENT_MON = 23,
     PVFS_SERV_MGMT_REMOVE_OBJECT = 24,
-    PVFS_SERV_JOB_TIMER = 25,    /* not a real protocol request */
-    PVFS_SERV_PROTO_ERROR = 26
+    PVFS_SERV_MGMT_REMOVE_DIRENT = 25,
+    PVFS_SERV_JOB_TIMER = 26,    /* not a real protocol request */
+    PVFS_SERV_PROTO_ERROR = 27
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define
      * (below) if you add a new operation to this list
      */
 };
-#define PVFS_MAX_SERVER_OP 26
+#define PVFS_MAX_SERVER_OP 27
 
 /* a private internal type */
 typedef struct
@@ -202,8 +203,39 @@ do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
     (__req).op = PVFS_SERV_MGMT_REMOVE_OBJECT;        \
     (__req).credentials = (__creds);                  \
-    (__req).u.remove.fs_id = (__fsid);                \
-    (__req).u.remove.handle = (__handle);             \
+    (__req).u.mgmt_remove_object.fs_id = (__fsid);    \
+    (__req).u.mgmt_remove_object.handle = (__handle); \
+} while (0)
+
+/* mgmt_remove_dirent */
+/* - used to remove an existing dirent under the specified parent ref */
+
+struct PVFS_servreq_mgmt_remove_dirent
+{
+    PVFS_handle handle;
+    PVFS_fs_id fs_id;
+    char *entry;
+};
+endecode_fields_3_struct(
+    PVFS_servreq_mgmt_remove_dirent,
+    PVFS_handle, handle,
+    PVFS_fs_id, fs_id,
+    string, entry)
+#define extra_size_PVFS_servreq_mgmt_remove_dirent \
+  roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
+
+#define PINT_SERVREQ_MGMT_REMOVE_DIRENT_FILL(__req,   \
+                                             __creds, \
+                                             __fsid,  \
+                                             __handle,\
+                                             __entry) \
+do {                                                  \
+    memset(&(__req), 0, sizeof(__req));               \
+    (__req).op = PVFS_SERV_MGMT_REMOVE_DIRENT;        \
+    (__req).credentials = (__creds);                  \
+    (__req).u.mgmt_remove_dirent.fs_id = (__fsid);    \
+    (__req).u.mgmt_remove_dirent.handle = (__handle); \
+    (__req).u.mgmt_remove_dirent.entry = (__entry);   \
 } while (0)
 
 /* flush
@@ -1039,6 +1071,7 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_dspace_info_list mgmt_dspace_info_list;
         struct PVFS_servreq_mgmt_event_mon mgmt_event_mon;
         struct PVFS_servreq_mgmt_remove_object mgmt_remove_object;
+        struct PVFS_servreq_mgmt_remove_dirent mgmt_remove_dirent;
     }
     u;
 };

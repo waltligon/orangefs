@@ -191,9 +191,11 @@ static __req_resp_type_desc_t s_req_resp_type_map[
     { PVFS_SERV_MGMT_DSPACE_INFO_LIST,
       "PVFS_SERV_MGMT_DSPACE_INFO_LIST" },
     { PVFS_SERV_MGMT_EVENT_MON, "PVFS_SERV_MGMT_EVENT_MON" },
+    { PVFS_SERV_MGMT_REMOVE_OBJECT, "PVFS_SERV_MGMT_REMOVE_OBJECT" },
+    { PVFS_SERV_MGMT_REMOVE_DIRENT, "PVFS_SERV_MGMT_REMOVE_DIRENT" },
     { PVFS_SERV_JOB_TIMER, "PVFS_SERV_JOB_TIMER" },
     { PVFS_SERV_PROTO_ERROR, "PVFS_SERV_PROTO_ERROR" },
-};    
+};
 
 static void PINT_gossip_err_server_resp(
     struct PVFS_server_resp *resp)
