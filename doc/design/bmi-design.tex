@@ -31,6 +31,19 @@
 
 \begin{itemize}
 \item maybe change method nomenclature to module
+\item no longer do size mathing
+\item test/wait nomenclature and semantics
+\end{itemize}
+
+Stuff from discussions with Pete:
+
+\begin{itemize}
+\item give a strict definition for ``completion''.  we do local
+completion in MPI sense (completion means safe to reuse buffer).
+User can build barrier to get non local completion.
+\item encourage preposting and discuss why
+\item discuss a little bit how flows fit in, what real purpose of
+bmi is
 \end{itemize}
 
 \section{Introduction}
