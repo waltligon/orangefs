@@ -97,7 +97,12 @@ static inline int copy_attributes_to_inode(
             inode->i_blocks = (unsigned long)(rounded_up_size / 512);
             spin_unlock(&inode->i_lock);
 
-            i_size_write(inode, inode_size);
+            /*
+              NOTE: make sure all the places we're called from have
+              the inode->i_sem lock.  we're fine in 99% of the cases
+              since we're mostly called from a lookup.
+            */
+            inode->i_size = inode_size;
         }
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
                  (symname != NULL))

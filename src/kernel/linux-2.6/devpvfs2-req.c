@@ -384,7 +384,8 @@ static int pvfs2_devreq_ioctl(
     return -ENOSYS;
 }
 
-struct file_operations pvfs2_devreq_file_operations = {
+struct file_operations pvfs2_devreq_file_operations =
+{
     .read = pvfs2_devreq_read,
     .writev = pvfs2_devreq_writev,
     .open = pvfs2_devreq_open,
