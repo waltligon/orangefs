@@ -381,7 +381,7 @@ int pvfs2_getattr(
     else
     {
         /* assume an I/O error and flag inode as bad */
-        make_bad_inode(inode);
+        pvfs2_make_bad_inode(inode);
     }
     return ret;
 }

@@ -41,14 +41,9 @@ static void op_cache_ctor(
 	spin_lock_init(&op->lock);
 	init_waitqueue_head(&op->waitq);
 
-        op->io_completed = 0;
         init_waitqueue_head(&op->io_completion_waitq);
 
-	op->upcall.type = PVFS2_VFS_OP_INVALID;
-	op->downcall.type = PVFS2_VFS_OP_INVALID;
-        op->downcall.status = -1;
-
-	op->op_state = PVFS2_VFS_STATE_UNKNOWN;
+        pvfs2_op_initialize(op);
 
         op->tag = (unsigned long)atomic_read(&next_tag_value);
         atomic_inc(&next_tag_value);
@@ -71,7 +66,7 @@ void op_cache_initialize(void)
 				 op_cache_ctor, NULL);
     if (!op_cache)
     {
-	panic("Cannot create pvfs2_op_cache");
+	panic("Cannot create pvfs2_op_cache\n");
     }
 
     /* initialize our atomic tag counter */
@@ -83,20 +78,18 @@ void op_cache_finalize(void)
     if (kmem_cache_destroy(op_cache) != 0)
     {
 #ifdef PVFS2_KERNEL_DEBUG
-	panic("Failed to destroy pvfs2_op_cache");
+	panic("Failed to destroy pvfs2_op_cache\n");
 #else
-        pvfs2_error("Failed to destroy pvfs2_op_cache");
+        pvfs2_error("Failed to destroy pvfs2_op_cache\n");
 #endif
     }
 }
 
 void op_release(void *op)
 {
-/*     pvfs2_kernel_op_t *pvfs2_op = (pvfs2_kernel_op_t *) op; */
+    pvfs2_kernel_op_t *pvfs2_op = (pvfs2_kernel_op_t *)op;
 
-    /* need to free specific upcall/downcall fields here (if any) */
-/*     pvfs2_print("Freeing OP with tag %lu\n", pvfs2_op->tag); */
-
+    pvfs2_op_initialize(pvfs2_op);
     kmem_cache_free(op_cache, op);
 }
 
@@ -125,7 +118,7 @@ void dev_req_cache_initialize(void)
 				      dev_req_cache_ctor, NULL);
     if (!dev_req_cache)
     {
-	panic("Cannot create pvfs2_dev_req_cache");
+	panic("Cannot create pvfs2_dev_req_cache\n");
     }
 }
 
@@ -134,9 +127,9 @@ void dev_req_cache_finalize(void)
     if (kmem_cache_destroy(dev_req_cache) != 0)
     {
 #ifdef PVFS2_KERNEL_DEBUG
-	panic("Failed to destroy pvfs2_dev_req_cache");
+	panic("Failed to destroy pvfs2_dev_req_cache\n");
 #else
-	pvfs2_error("Failed to destroy pvfs2_dev_req_cache");
+	pvfs2_error("Failed to destroy pvfs2_dev_req_cache\n");
 #endif
     }
 }
@@ -194,7 +187,7 @@ void pvfs2_inode_cache_initialize(void)
                                           pvfs2_inode_cache_dtor);
     if (!pvfs2_inode_cache)
     {
-	panic("Cannot create pvfs2_inode_cache");
+	panic("Cannot create pvfs2_inode_cache\n");
     }
 }
 
@@ -203,9 +196,9 @@ void pvfs2_inode_cache_finalize(void)
     if (kmem_cache_destroy(pvfs2_inode_cache) != 0)
     {
 #ifdef PVFS2_KERNEL_DEBUG
-	panic("Failed to destroy pvfs2_inode_cache");
+	panic("Failed to destroy pvfs2_inode_cache\n");
 #else
-	pvfs2_error("Failed to destroy pvfs2_inode_cache");
+	pvfs2_error("Failed to destroy pvfs2_inode_cache\n");
 #endif
     }
 }

@@ -424,7 +424,7 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
         ret = pvfs2_inode_getattr(inode);
         if (ret)
         {
-            make_bad_inode(inode);
+            pvfs2_make_bad_inode(inode);
             return ret;
         }
     }

@@ -55,10 +55,13 @@ static struct inode *pvfs2_alloc_inode(
 static void pvfs2_destroy_inode(
     struct inode *inode)
 {
-    /* free pvfs2 specific (private) inode data */
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+
     pvfs2_print("pvfs2_destroy_inode: destroying inode %d\n",
                 (int)inode->i_ino);
-    kmem_cache_free(pvfs2_inode_cache, PVFS2_I(inode));
+
+    pvfs2_inode_initialize(pvfs2_inode);
+    kmem_cache_free(pvfs2_inode_cache, pvfs2_inode);
 }
 
 static void pvfs2_read_inode(
@@ -66,8 +69,8 @@ static void pvfs2_read_inode(
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2: pvfs2_read_inode called (inode = %d | "
-                "ct = %d)\n", (int)inode->i_ino,
+    pvfs2_print("pvfs2: pvfs2_read_inode called (inode = %lu | "
+                "ct = %d)\n", inode->i_ino,
                 (int)atomic_read(&inode->i_count));
 
     /*
@@ -90,7 +93,7 @@ static void pvfs2_read_inode(
     if (pvfs2_inode_getattr(inode) != 0)
     {
         /* assume an I/O error and flag inode as bad */
-        make_bad_inode(inode);
+        pvfs2_make_bad_inode(inode);
     }
 }
 

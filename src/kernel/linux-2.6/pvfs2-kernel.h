@@ -394,6 +394,12 @@ int pvfs2_kernel_error_code_convert(
 void pvfs2_inode_initialize(
     pvfs2_inode_t *pvfs2_inode);
 
+void pvfs2_op_initialize(
+    pvfs2_kernel_op_t *op);
+
+void pvfs2_make_bad_inode(
+    struct inode *inode);
+
 #endif /* __PVFS2KERNEL_H */
 
 /*

@@ -16,6 +16,7 @@
 #include "pvfs2-bufmap.h"
 
 extern kmem_cache_t *op_cache;
+extern kmem_cache_t *pvfs2_inode_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
@@ -942,6 +943,24 @@ void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
     pvfs2_inode->link_target = NULL;
     pvfs2_inode->last_failed_block_index_read = 0;
     pvfs2_inode->readdir_token_adjustment = 0;
+}
+
+void pvfs2_op_initialize(pvfs2_kernel_op_t *op)
+{
+    op->io_completed = 0;
+
+    op->upcall.type = PVFS2_VFS_OP_INVALID;
+    op->downcall.type = PVFS2_VFS_OP_INVALID;
+    op->downcall.status = -1;
+
+    op->op_state = PVFS2_VFS_STATE_UNKNOWN;
+    op->tag = 0;
+}
+
+void pvfs2_make_bad_inode(struct inode *inode)
+{
+    pvfs2_print("*** making bad inode %lu\n", inode->i_ino);
+    make_bad_inode(inode);
 }
 
 /*
