@@ -6,10 +6,13 @@
 
 /* TCP/IP implementation of a BMI method */
 
-#include<errno.h>
-#include<string.h>
-#include<unistd.h>
-#include<fcntl.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/poll.h>
+#include <netinet/tcp.h>
+#include <assert.h>
 
 #include "bmi-method-support.h"
 #include "bmi-method-callback.h"
@@ -18,9 +21,6 @@
 #include "op-list.h"
 #include "gossip.h"
 #include "sockio.h"
-#include<sys/poll.h>
-#include<netinet/tcp.h>
-#include "quickhash.h"
 
 /* function prototypes */
 int BMI_tcp_initialize(method_addr_p listen_addr,
@@ -116,11 +116,19 @@ struct tcp_msg_header
     bmi_size_t size;		/* length of trailing message */
 };
 
+/* enumerate states that we care about */
+enum bmi_tcp_state
+{
+    BMI_TCP_INPROGRESS,
+    BMI_TCP_BUFFERING,
+    BMI_TCP_COMPLETE
+};
+
 /* tcp private portion of operation structure */
 struct tcp_op
 {
     struct tcp_msg_header env;	/* envelope for this message */
-    int tcp_op_state;
+    enum bmi_tcp_state tcp_op_state;
     /* these two fields are used as place holders for the buffer
      * list and size list when we really don't have lists (regular
      * BMI_send or BMI_recv operations); it allows us to use
@@ -128,11 +136,6 @@ struct tcp_op
      */
     void *buffer_list_stub;
     bmi_size_t size_list_stub;
-};
-enum
-{
-    BMI_TCP_INPROGRESS = 1,
-    BMI_TCP_BUFFERING = 2
 };
 
 /* internal utility functions */
@@ -160,18 +163,6 @@ static int tcp_shutdown_addr(method_addr_p map);
 static int test_done_unexpected(int incount,
 				int *outcount,
 				struct method_unexpected_info *info);
-static int test_done_some(int incount,
-			  bmi_op_id_t * id_array,
-			  int *outcount,
-			  int *index_array,
-			  bmi_error_code_t * error_code_array,
-			  bmi_size_t * actual_size_array,
-			  void **user_ptr_array);
-static int test_done(bmi_op_id_t id,
-		     int *outcount,
-		     bmi_error_code_t * error_code,
-		     bmi_size_t * actual_size,
-		     void **user_ptr);
 static int tcp_do_work(int max_idle_time);
 static int tcp_do_work_error(method_addr_p map);
 static int tcp_do_work_recv(method_addr_p map);
@@ -192,10 +183,6 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				     struct tcp_msg_header my_header,
 				     void *user_ptr,
 				     int list_stub_flag);
-static int hash_op_id(void *id,
-		      int table_size);
-static int hash_op_id_compare(void *key,
-			      struct qlist_head *link);
 static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 method_addr_p src,
 				 void **buffer_list,
@@ -282,9 +269,6 @@ enum
     TCP_MODE_UNEXP_LIMIT = 16384	/* 16K */
 };
 
-/* hash table for completed operations */
-struct qhash_table *completion_hash = NULL;
-
 /*************************************************************************
  * Visible Interface 
  */
@@ -349,14 +333,6 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 	}
     }
 
-    /* setup hash table for completed operations */
-    completion_hash = qhash_init(hash_op_id_compare, hash_op_id, 1021);
-    if (!completion_hash)
-    {
-	tmp_errno = -ENOMEM;
-	goto initialize_failure;
-    }
-
     /* set up the socket collection */
     if (tcp_method_params.method_flags & BMI_INIT_SERVER)
     {
@@ -386,10 +362,6 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 	{
 	    op_list_cleanup(op_list_array[i]);
 	}
-    }
-    if (completion_hash)
-    {
-	qhash_finalize(completion_hash);
     }
     if (tcp_socket_collection_p)
     {
@@ -424,11 +396,6 @@ int BMI_tcp_finalize(void)
 	    op_list_cleanup(op_list_array[i]);
 	    op_list_array[i] = NULL;
 	}
-    }
-
-    if (completion_hash)
-    {
-	qhash_finalize(completion_hash);
     }
 
     /* get rid of socket collection */
@@ -759,6 +726,9 @@ int BMI_tcp_test(bmi_op_id_t id,
 		 int max_idle_time)
 {
     int ret = -1;
+    method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
+
+    assert(query_op != NULL);
 
     /* do some ``real work'' here */
     ret = tcp_do_work(max_idle_time);
@@ -767,9 +737,21 @@ int BMI_tcp_test(bmi_op_id_t id,
 	return (ret);
     }
 
-    ret = test_done(id, outcount, error_code, actual_size, user_ptr);
+    if(((struct tcp_op*)(query_op->method_data))->tcp_op_state ==
+	BMI_TCP_COMPLETE)
+    {
+	op_list_remove(query_op);
+	if (user_ptr != NULL)
+	{
+	    (*user_ptr) = query_op->user_ptr;
+	}
+	(*error_code) = query_op->error_code;
+	(*actual_size) = query_op->actual_size;
+	dealloc_tcp_method_op(query_op);
+	(*outcount)++;
+    }
 
-    return (ret);
+    return (0);
 }
 
 /* BMI_tcp_testsome()
@@ -788,6 +770,8 @@ int BMI_tcp_testsome(int incount,
 		     int max_idle_time)
 {
     int ret = -1;
+    method_op_p query_op = NULL;
+    int i;
 
     /* do some ``real work'' here */
     ret = tcp_do_work(max_idle_time);
@@ -796,10 +780,33 @@ int BMI_tcp_testsome(int incount,
 	return (ret);
     }
 
-    ret = test_done_some(incount, id_array, outcount, index_array,
-			 error_code_array, actual_size_array, user_ptr_array);
+    for(i=0; i<incount; i++)
+    {
+	if(id_array[i])
+	{
+	    /* NOTE: this depends on the user passing in valid id's;
+	     * otherwise we segfault.  
+	     */
+	    query_op = (method_op_p)id_gen_fast_lookup(id_array[i]);
+	    if(((struct tcp_op*)(query_op->method_data))->tcp_op_state ==
+		BMI_TCP_COMPLETE)
+	    {
+		/* this one's done; pop it out */
+		op_list_remove(query_op);
+		error_code_array[*outcount] = query_op->error_code;
+		actual_size_array[*outcount] = query_op->actual_size;
+		index_array[*outcount] = i;
+		if (user_ptr_array != NULL)
+		{
+		    user_ptr_array[*outcount] = query_op->user_ptr;
+		}
+		dealloc_tcp_method_op(query_op);
+		(*outcount)++;
+	    }
+	}
+    }
 
-    return (ret);
+    return(0);
 }
 
 
@@ -1641,9 +1648,9 @@ static int tcp_cleanse_addr(method_addr_p map)
 		}
 		else
 		{
+		    ((struct tcp_op*)(query_op->method_data))->tcp_op_state = 
+			BMI_TCP_COMPLETE;
 		    op_list_add(op_list_array[IND_COMPLETE], query_op);
-		    qhash_add(completion_hash, &(query_op->op_id),
-			      &(query_op->hash_link));
 		}
 	    }
 	}
@@ -1711,110 +1718,6 @@ static int test_done_unexpected(int incount,
     }
     return (0);
 };
-
-
-/* test_done()
- * 
- * nonblocking check to see if a certain operation has
- * completed.  
- *
- * returns 0 on success, -errno on failure
- */
-static int test_done(bmi_op_id_t id,
-		     int *outcount,
-		     bmi_error_code_t * error_code,
-		     bmi_size_t * actual_size,
-		     void **user_ptr)
-{
-    method_op_p query_op = NULL;
-    struct qlist_head *hash_link;
-
-    *outcount = 0;
-
-    hash_link = qhash_search(completion_hash, &(id));
-    if (hash_link)
-    {
-	query_op = qlist_entry(hash_link, struct method_op,
-			       hash_link);
-    }
-    else
-    {
-	query_op = NULL;
-    }
-
-    if (query_op)
-    {
-	op_list_remove(query_op);
-	qlist_del(&(query_op->hash_link));
-	if (user_ptr != NULL)
-	{
-	    (*user_ptr) = query_op->user_ptr;
-	}
-	(*error_code) = query_op->error_code;
-	(*actual_size) = query_op->actual_size;
-	dealloc_tcp_method_op(query_op);
-	(*outcount)++;
-    }
-
-    return (0);
-}
-
-
-/* test_done_some()
- * 
- * nonblocking check to see if a certain set of operations have
- * completed.  Indicates which ones completed using the index array.
- *
- * returns 0 on success, -errno on failure
- */
-static int test_done_some(int incount,
-			  bmi_op_id_t * id_array,
-			  int *outcount,
-			  int *index_array,
-			  bmi_error_code_t * error_code_array,
-			  bmi_size_t * actual_size_array,
-			  void **user_ptr_array)
-{
-    method_op_p query_op = NULL;
-    int i = 0;
-    struct qlist_head *hash_link;
-
-    *outcount = 0;
-
-    for (i = 0; i < incount; i++)
-    {
-	if (id_array[i])
-	{
-	    hash_link = qhash_search(completion_hash, &(id_array[i]));
-	    if (hash_link)
-	    {
-		query_op = qlist_entry(hash_link, struct method_op,
-				       hash_link);
-	    }
-	    else
-	    {
-		query_op = NULL;
-	    }
-
-	    if (query_op)
-	    {
-		op_list_remove(query_op);
-		qlist_del(&(query_op->hash_link));
-		error_code_array[*outcount] = query_op->error_code;
-		actual_size_array[*outcount] = query_op->actual_size;
-		index_array[*outcount] = i;
-		if (user_ptr_array != NULL)
-		{
-		    user_ptr_array[*outcount] = query_op->user_ptr;
-		}
-		dealloc_tcp_method_op(query_op);
-		(*outcount)++;
-	    }
-	}
-    }
-
-    return (0);
-}
 
 
 /* tcp_do_work()
@@ -2281,9 +2184,9 @@ static int work_on_send_op(method_op_p my_method_op,
 	socket_collection_remove_write_bit(tcp_socket_collection_p,
 					   my_method_op->addr);
 	op_list_remove(my_method_op);
+	((struct tcp_op*)(my_method_op->method_data))->tcp_op_state = 
+	    BMI_TCP_COMPLETE;
 	op_list_add(op_list_array[IND_COMPLETE], my_method_op);
-	qhash_add(completion_hash, &(my_method_op->op_id),
-		  &(my_method_op->hash_link));
 	*blocked_flag = 0;
     }
     else
@@ -2372,9 +2275,9 @@ static int work_on_recv_op(method_op_p my_method_op)
 	    }
 	    else
 	    {
+		((struct tcp_op*)(my_method_op->method_data))->tcp_op_state = 
+		    BMI_TCP_COMPLETE;
 		op_list_add(op_list_array[IND_COMPLETE], my_method_op);
-		qhash_add(completion_hash, &(my_method_op->op_id),
-			  &(my_method_op->hash_link));
 	    }
 	}
     }
@@ -2650,49 +2553,6 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 			    list_stub_flag, my_header.size, 0);
 
     return (ret);
-}
-
-
-/* hash_op_id()
- *
- * hashes on an operation id for use in a quickhash table
- *
- * returns index into table
- */
-static int hash_op_id(void *id,
-		      int table_size)
-{
-    /* TODO: this needs to be updated to do the right thing on 64
-     * bit architectures as well.  Right now it assumes it only
-     * needs to look at 32 bits of the id.
-     */
-    uint32_t key = 0;
-    bmi_op_id_t *real_id = id;
-    key += (*(real_id));
-    return (((key >> 3) * (uint32_t) 2654435761U) % (uint32_t) table_size);
-}
-
-/* hash_op_id_compare()
- *
- * performs a comparison of a hash table entry to a given key
- * (used for searching)
- *
- * returns 1 if match found, 0 otherwise
- */
-static int hash_op_id_compare(void *key,
-			      struct qlist_head *link)
-{
-    struct method_op *my_op;
-    bmi_op_id_t *real_id = key;
-
-    my_op = qlist_entry(link, struct method_op,
-			hash_link);
-    if (my_op->op_id == *real_id)
-    {
-	return (1);
-    }
-
-    return (0);
 }
 
 /*
