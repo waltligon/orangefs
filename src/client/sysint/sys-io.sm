@@ -352,7 +352,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
             js_p->error_code = -PVFS_EISDIR;
             return 1;
         default:
-            js_p->error_code = -PVFS_EIO;
+            js_p->error_code = -PVFS_EBADF;
             return 1;
     }
 
@@ -631,7 +631,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
         if (ret != 0)
         {
             gossip_lerr("pint_encode failed\n");
-            js_p->error_code = -PVFS_EIO;
+            js_p->error_code = ret;
             return 1;
         }
 
@@ -677,7 +677,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             assert(ret != 1);
 
             gossip_lerr("post of receive failed (ret = %d)\n", ret);
-            js_p->error_code = -PVFS_EIO;
+            js_p->error_code = ret;
             return 1;
         }
 
@@ -701,7 +701,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
         if (ret < 0)
         {
             gossip_lerr("post of send failed\n");
-            js_p->error_code = -PVFS_EIO;
+            js_p->error_code = ret;
             return 1;
         }
         else if (ret == 1)
@@ -852,7 +852,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 
             if (msg_p->op_status)
             {
-                js_p->error_code = -PVFS_EIO;
+                js_p->error_code = msg_p->op_status;
                 return 1;
             }
 
