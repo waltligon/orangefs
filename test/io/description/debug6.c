@@ -69,7 +69,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "results of PINT_Process_request(PINT_CLIENT):\n");
 		fprintf(stderr, "req proc offset: %d\n",
 				(int)PINT_REQUEST_STATE_OFFSET(rs1));
-		fprintf(stderr, "total size: %d\n", (int)seg1.bytes);
+		printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
 		for(i=0; i<seg1.segs; i++)
 		{
 			fprintf(stderr, "  segment %d: offset: %d size: %d\n",
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_OFFSET(rs1) == -1)
+	if(PINT_REQUEST_STATE_DONE(rs1))
 	{
 		fprintf(stderr, "AAAIIIEEEEE!  Why am I done?\n");
 	}

@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request(PINT_SERVER):\n");
-			printf("total size: %d\n", (int)seg1.bytes);
+			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
 			for(i=0; i<seg1.segs; i++)
 			{
 				printf("  segment %d: offset: %d size: %d\n",
@@ -96,14 +96,14 @@ int main(int argc, char **argv)
 			}
 		}
 
-	} while(PINT_REQUEST_STATE_OFFSET(rs1) != -1 && retval >= 0);
+	} while(!PINT_REQUEST_STATE_DONE(rs1) && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_OFFSET(rs1) == -1)
+	if(PINT_REQUEST_STATE_DONE(rs1))
 	{
 		printf("**** first request done.\n");
 	}
@@ -121,7 +121,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request(PINT_CLIENT):\n");
-			printf("total size: %d\n", (int)seg1.bytes);
+			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
 			for(i=0; i<seg1.segs; i++)
 			{
 				printf("  segment %d: offset: %d size: %d\n",
@@ -129,14 +129,14 @@ int main(int argc, char **argv)
 			}
 		}
 
-	} while(PINT_REQUEST_STATE_OFFSET(rs2) != -1 && retval >= 0);
+	} while(!PINT_REQUEST_STATE_DONE(rs2) && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_OFFSET(rs2) == -1)
+	if(PINT_REQUEST_STATE_OFFSET(rs2))
 	{
 		printf("**** second request done.\n");
 	}

@@ -11,7 +11,7 @@
 #include <pvfs2-debug.h>
 
 #include <pvfs-distribution.h>
-#include <pvfs2-request.h>
+#include <pvfs-request.h>
 #include <pint-request.h>
 
 #include <simple-stripe.h>
@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 	int retval;
 
 	/* set up request */
-	PVFS_Request_vector(10, 1024, 10*1024, PVFS_BYTE, &r1);
+	PVFS_Request_vector(20, 1024, 10*1024, PVFS_BYTE, &r1);
 
 	/* set up request state */
 	rs1 = PINT_New_request_state(r1);
@@ -58,21 +58,9 @@ int main(int argc, char **argv)
 	 gossip_set_debug_mask(1,REQUEST_DEBUG); /**/
 
 	/* skipping logical bytes */
-	/*seg1.bytemax = (3 * 1024) + 512;*/
-
 	PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512);
+	PINT_REQUEST_STATE_SET_FINAL(rs1,(6 * 1024) + 512);
 	
-	/* this test not needed */
-	if(PINT_REQUEST_STATE_OFFSET(rs1) == -1)
-	{
-	    printf("bytes: %d\n", (int)seg1.bytes);
-	    printf("CRAP, we hit state == -1\n");
-	    return(-1);
-	}
-
-	/* need to reset bytemax before we contrinue */
-	/*seg1.bytemax = BYTEMAX;*/
-
 	printf("\n************************************\n");
 	do
 	{

@@ -116,6 +116,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request():\n");
+			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
 			if(seg1.segs == 0)
 			{
 				fprintf(stderr, "  AAIIEEE! no results to report.\n");
@@ -127,19 +128,18 @@ int main(int argc, char **argv)
 			}
 		}
 
-		if(PINT_REQUEST_STATE_OFFSET(rs1) != -1 &&
-				seg1.bytemax != BYTEMAX && seg1.segmax != SEGMAX)
+		if(!PINT_REQUEST_DONE(rs1, &seg1))
 		{
 			fprintf(stderr, "  AAIIEEE! Why am I done?\n");
 		}
-	} while(PINT_REQUEST_STATE_OFFSET(rs1) != -1 && retval >= 0);
+	} while(!PINT_REQUEST_STATE_DONE(rs1) && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_OFFSET(rs1) == -1)
+	if(PINT_REQUEST_STATE_DONE(rs1))
 	{
 		printf("**** first request done.\n");
 	}
