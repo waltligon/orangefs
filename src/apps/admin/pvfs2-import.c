@@ -30,15 +30,19 @@ int main(int argc, char **argv)
 {
     int ret = -1;
     char str_buf[PVFS_NAME_MAX] = {0};
+    char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     PVFS_sysreq_create req_create;
     PVFS_sysresp_create resp_create;
     struct options* user_opts = NULL;
+    int i = 0;
+    int mnt_index = -1;
 
     gossip_enable_stderr();
 
+    /* look at command line arguments */
     user_opts = parse_args(argc, argv);
     if(!user_opts)
     {
@@ -46,10 +50,25 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    /* look at pvfstab */
     if (parse_pvfstab(DEFAULT_TAB, &mnt))
     {
         fprintf(stderr, "Error: failed to parse pvfstab %s.\n", DEFAULT_TAB);
         return ret;
+    }
+
+    /* see if the destination resides on any of the file systems
+     * listed in the pvfstab; find the pvfs fs relative path
+     */
+    for(i=0; i<mnt.nr_entry; i++)
+    {
+	ret = PINT_remove_dir_prefix(user_opts->destfile,
+	    mnt.ptab_p[i].local_mnt_dir, pvfs_path, PVFS_NAME_MAX);
+	if(ret == 0)
+	{
+	    mnt_index = i;
+	    break;
+	}
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
@@ -71,15 +90,21 @@ int main(int argc, char **argv)
         return(-1);
     }
 
+    /* TODO: reformat this, print it somewhere else */
+    printf("Dest file: %s maps to PVFS2 file: %s.\n", 
+	user_opts->destfile, pvfs_path);
+    printf("   on server: %s file system: %s.\n",
+	mnt.ptab_p[mnt_index].meta_addr, mnt.ptab_p[mnt_index].service_name);
+
     /* get the absolute path on the pvfs2 file system */
-    if (PINT_remove_base_dir(user_opts->destfile,str_buf,PVFS_NAME_MAX))
+    if (PINT_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
     {
-        if (user_opts->destfile[0] != '/')
+        if (pvfs_path[0] != '/')
         {
-            printf("You forgot the leading '/'\n");
+            fprintf(stderr, "Error: poorly formatted path.\n");
         }
         fprintf(stderr, "Error: cannot retrieve entry name for creation on %s\n",
-               user_opts->destfile);
+               pvfs_path);
 	PVFS_sys_finalize();
         return(-1);
     }
@@ -101,7 +126,7 @@ int main(int argc, char **argv)
     req_create.credentials.perms = 1877;
     req_create.attr.u.meta.nr_datafiles = -1;
     req_create.parent_refn.handle =
-        lookup_parent_handle(user_opts->destfile,cur_fs);
+        lookup_parent_handle(pvfs_path,cur_fs);
     req_create.parent_refn.fs_id = cur_fs;
 
     /* Fill in the dist -- NULL means the system interface used the 
@@ -121,7 +146,7 @@ int main(int argc, char **argv)
 	{
 	    fprintf(stderr, 
 		"Warning: PVFS_sys_create() returned a non PVFS2 error code:\n");
-	    fprintf(stderr, "Error: PVFS_sys_initialize: %s.\n", 
+	    fprintf(stderr, "Error: PVFS_sys_create: %s.\n", 
 		strerror(-ret));
 	}
 	PVFS_sys_finalize();
@@ -141,7 +166,7 @@ int main(int argc, char **argv)
 	else
 	{
 	    fprintf(stderr, 
-		"Warning: PVFS_sys_initialize() returned a non PVFS2 error code:\n");
+		"Warning: PVFS_sys_finalize() returned a non PVFS2 error code:\n");
 	    fprintf(stderr, "Error: PVFS_sys_finalize: %s.\n", 
 		strerror(-ret));
 	}
