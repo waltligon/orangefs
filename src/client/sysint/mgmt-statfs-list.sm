@@ -26,23 +26,23 @@ extern job_context_id pint_client_sm_context;
 extern struct server_configuration_s g_server_config;
 
 /* state function prototypes */
-static int mgmt_statfs_all_setup_msgpair(PINT_client_sm *sm_p,
+static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p);
-static int mgmt_statfs_all_cleanup(PINT_client_sm *sm_p,
+static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
 			  job_status_s *js_p);
-static int statfs_all_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
+static int statfs_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
     int i);
 
 %%
 
-machine pvfs2_client_mgmt_statfs_all_sm(
+machine pvfs2_client_mgmt_statfs_list_sm(
     setup_msgpair,
     xfer_msgpair,
     cleanup)
 {
 
     state setup_msgpair {
-	run mgmt_statfs_all_setup_msgpair;
+	run mgmt_statfs_list_setup_msgpair;
 	success => xfer_msgpair;
 	default => cleanup;
     }
@@ -53,28 +53,27 @@ machine pvfs2_client_mgmt_statfs_all_sm(
     }
 
     state cleanup {
-	run mgmt_statfs_all_cleanup;
+	run mgmt_statfs_list_cleanup;
 	default => setup_msgpair;
     }
 }
 
 %%
 
-int PVFS_mgmt_statfs_all(
+int PVFS_mgmt_statfs_list(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
-    int incount,
-    int* outcount,
-    int* overflow_flag,
-    struct PVFS_mgmt_server_stat* stat_array)
+    struct PVFS_mgmt_server_stat* stat_array,
+    PVFS_id_gen_t* addr_array,
+    int count)
 {
     int ret;
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_all entered\n");
+    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_list entered\n");
 
-    if(incount < 1 || !stat_array)
+    if(count < 1 || !stat_array || !addr_array)
     {
 	return(-PVFS_EINVAL);
     }
@@ -87,20 +86,19 @@ int PVFS_mgmt_statfs_all(
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
-    sm_p->u.statfs_all.fs_id = fs_id;
-    sm_p->u.statfs_all.stat_array = stat_array;
-    sm_p->u.statfs_all.incount = incount;
-    sm_p->u.statfs_all.outcount = outcount;
-    sm_p->u.statfs_all.overflow_flag = overflow_flag;
+    sm_p->u.statfs_list.fs_id = fs_id;
+    sm_p->u.statfs_list.stat_array = stat_array;
+    sm_p->u.statfs_list.count = count;
+    sm_p->u.statfs_list.addr_array = addr_array;
 
     /* safety */
-    memset(sm_p->u.statfs_all.stat_array, 0, incount*sizeof(struct PVFS_mgmt_server_stat));
+    memset(sm_p->u.statfs_list.stat_array, 0, count*sizeof(struct PVFS_mgmt_server_stat));
 
     gossip_debug(CLIENT_DEBUG,
-		 "PVFS_mgmt_statfs_all calling PINT_client_state_machine_post()\n");
+		 "PVFS_mgmt_statfs_list calling PINT_client_state_machine_post()\n");
 
     /* do something to kick off processing */
-    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_STATFS_ALL);
+    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_STATFS_LIST);
     if(ret < 0)
     {
 	/* this should not fail under normal conditions */
@@ -112,7 +110,7 @@ int PVFS_mgmt_statfs_all(
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0) {
 	gossip_debug(CLIENT_DEBUG,
-		     "PVFS_mgmt_statfs_all calling PINT_client_state_machine_test()\n");
+		     "PVFS_mgmt_statfs_list calling PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
     if(ret < 0)
@@ -121,7 +119,7 @@ int PVFS_mgmt_statfs_all(
 	return(ret);
     }
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_all completed\n");
+    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_list completed\n");
 
     /* save our return value */
     error = sm_p->error_code;
@@ -131,60 +129,20 @@ int PVFS_mgmt_statfs_all(
     return error;
 }
 
-static int mgmt_statfs_all_setup_msgpair(PINT_client_sm *sm_p,
+static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    int ret = -1;
-    int num_phys_servers = 0;
-    struct PINT_bucket_server_info* info_array;
     int i;
     PINT_client_sm_msgpair_state *msg_p;
 
-    gossip_debug(CLIENT_DEBUG, "statfs_all state: mgmt_statfs_all_setup_msgpair\n");
-
-    /* the first thing we have to do is find out how many physical servers
-     * are present, and build and array of addresses to reach them
-     */
-    ret = PINT_collect_physical_server_info(sm_p->u.statfs_all.fs_id,
-	&num_phys_servers, &info_array);
-    if(ret < 0)
-    {
-	js_p->error_code = ret;
-	return(1);
-    }
-
-    gossip_debug(CLIENT_DEBUG,
-	"PVFS_mgmt_statfs_all found %d servers.\n", num_phys_servers);
-
-    if(num_phys_servers <= sm_p->u.statfs_all.incount)
-    {
-	*sm_p->u.statfs_all.outcount = num_phys_servers;
-	*sm_p->u.statfs_all.overflow_flag = 0;
-    }
-    else
-    {
-	*sm_p->u.statfs_all.outcount = sm_p->u.statfs_all.incount;
-	*sm_p->u.statfs_all.overflow_flag = 1;
-    }
-    
-    /* go ahead and fill in the information that is available locally */
-    for(i=0; i < *sm_p->u.statfs_all.outcount; i++)
-    {
-	sm_p->u.statfs_all.stat_array[i].fs_id = sm_p->u.statfs_all.fs_id;
-	sm_p->u.statfs_all.stat_array[i].bmi_address = info_array[i].addr_string;
-	if(info_array[i].server_type & PINT_BUCKET_META)
-	    sm_p->u.statfs_all.stat_array[i].flags += PVFS_MGMT_META_SERVER;
-	if(info_array[i].server_type & PINT_BUCKET_IO)
-	    sm_p->u.statfs_all.stat_array[i].flags += PVFS_MGMT_IO_SERVER;
-    }
+    gossip_debug(CLIENT_DEBUG, "statfs_list state: mgmt_statfs_list_setup_msgpair\n");
 
     /* allocate memory for msgpair array */
-    sm_p->msgarray_count = *sm_p->u.statfs_all.outcount;
+    sm_p->msgarray_count = sm_p->u.statfs_list.count;
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
-    malloc((*sm_p->u.statfs_all.outcount)*sizeof(PINT_client_sm_msgpair_state));
+    malloc((sm_p->msgarray_count)*sizeof(PINT_client_sm_msgpair_state));
     if(!sm_p->msgarray)
     {
-	free(info_array);
 	js_p->error_code = -PVFS_ENOMEM;
 	return(1);
     }
@@ -196,22 +154,20 @@ static int mgmt_statfs_all_setup_msgpair(PINT_client_sm *sm_p,
 
 	PINT_SERVREQ_STATFS_FILL(msg_p->req,
 	    *sm_p->cred_p,
-	    sm_p->u.statfs_all.fs_id);
+	    sm_p->u.statfs_list.fs_id);
 
-	msg_p->fs_id = sm_p->u.statfs_all.fs_id;
+	msg_p->fs_id = sm_p->u.statfs_list.fs_id;
 	msg_p->handle = PVFS_HANDLE_NULL;
-	msg_p->comp_fn = statfs_all_comp_fn;
-	msg_p->svr_addr = info_array[i].addr;
+	msg_p->comp_fn = statfs_list_comp_fn;
+	msg_p->svr_addr = sm_p->u.statfs_list.addr_array[i];
     }
-
-    free(info_array);
 
     /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;
     return(1);
 }
 
-static int mgmt_statfs_all_cleanup(PINT_client_sm *sm_p,
+static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
 			  job_status_s *js_p)
 {
     if(sm_p->msgarray)
@@ -223,7 +179,7 @@ static int mgmt_statfs_all_cleanup(PINT_client_sm *sm_p,
     return(0);
 }
 
-static int statfs_all_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
+static int statfs_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
     int i)
 {
     int j = 0;
@@ -234,10 +190,17 @@ static int statfs_all_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
      */
     if(sm_p->msgarray[i].op_status == 0)
     {
-	sm_p->u.statfs_all.stat_array[i].bytes_available = 
+	sm_p->u.statfs_list.stat_array[i].bytes_available = 
 	    resp_p->u.statfs.stat.bytes_available;
-	sm_p->u.statfs_all.stat_array[i].bytes_total = 
+	sm_p->u.statfs_list.stat_array[i].bytes_total = 
 	    resp_p->u.statfs.stat.bytes_total;
+	sm_p->u.statfs_list.stat_array[i].fs_id = sm_p->u.statfs_list.fs_id;
+	sm_p->u.statfs_list.stat_array[i].bmi_address = 
+	    PVFS_mgmt_map_addr(sm_p->u.statfs_list.fs_id, 
+	    *sm_p->cred_p, sm_p->msgarray[i].svr_addr, 
+	    &sm_p->u.statfs_list.stat_array[i].server_type);
+	/* the above should always succeed in this case */
+	assert(sm_p->u.statfs_list.stat_array[i].bmi_address);
     }
  
     /* if this is the last response, check all of the status values and 
