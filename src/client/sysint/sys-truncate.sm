@@ -66,7 +66,7 @@ machine pvfs2_client_truncate_sm(truncate_getattr_setup_msgpair,
 
     state truncate_datafile_xfer_msgpairarray
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => cleanup;
         default => truncate_datafile_failure;
     }

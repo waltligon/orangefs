@@ -108,7 +108,7 @@ machine pvfs2_client_symlink_sm(
 
     state dspace_create_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => symlink_setattr_setup_msgpair;
         default => dspace_create_failure;
     }
@@ -128,7 +128,7 @@ machine pvfs2_client_symlink_sm(
 
     state symlink_setattr_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => crdirent_setup_msgpair;
         default => symlink_setattr_failure;
     }
@@ -148,7 +148,7 @@ machine pvfs2_client_symlink_sm(
 
     state crdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => cleanup;
         default => crdirent_failure;
     }
@@ -168,7 +168,7 @@ machine pvfs2_client_symlink_sm(
 
     state delete_handle_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         default => cleanup;
     }
 

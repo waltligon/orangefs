@@ -38,7 +38,7 @@ machine pvfs2_client_mgmt_iterate_handles_list_sm(
 
     state xfer_msgpair
     {
-	jump pvfs2_client_msgpairarray_sm;
+	jump pvfs2_msgpairarray_sm;
 	default => cleanup;
     }
 

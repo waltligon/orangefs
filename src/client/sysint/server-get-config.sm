@@ -54,7 +54,7 @@ machine pvfs2_server_get_config_sm(
 
     state xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         default => cleanup;
     }
 

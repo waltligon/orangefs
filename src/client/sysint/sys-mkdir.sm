@@ -99,7 +99,7 @@ machine pvfs2_client_mkdir_sm(
 
     state mkdir_msg_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => mkdir_crdirent_setup_msgpair;
         default => mkdir_msg_failure;
     }
@@ -119,7 +119,7 @@ machine pvfs2_client_mkdir_sm(
 
     state mkdir_crdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => cleanup;
         default => mkdir_crdirent_failure;
     }
@@ -139,7 +139,7 @@ machine pvfs2_client_mkdir_sm(
 
     state delete_handle_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         default => cleanup;
     }
 

@@ -23,7 +23,7 @@
  *   them in the appropriate place for the state machine jumping to this one
  *   (e.g. copies object handle out in the remove case)
  *
- * This state machine in turns jumps to the pvfs2_client_msgpairarray_sm 
+ * This state machine in turns jumps to the pvfs2_msgpairarray_sm 
  * to perform messaging, if necessary.
  *
  * NOTE: the comp_fn can cause a non-zero error_code to be passed back up from
@@ -71,7 +71,7 @@ nested machine pvfs2_client_lookup_ncache_sm(lookup,
 
     state xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         default => return;
     }
 }

@@ -105,7 +105,7 @@ machine pvfs2_client_rename_sm(
 
     state rename_lookups_xfer_msgpair_array
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => rename_crdirent_setup_msgpair;
         RENAME_CHDIRENT => rename_chdirent_setup_msgpair;
         default => rename_lookups_failure;
@@ -126,7 +126,7 @@ machine pvfs2_client_rename_sm(
 
     state rename_crdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => rename_rmdirent_setup_msgpair;
         default => rename_crdirent_retry_or_fail;
     }
@@ -153,7 +153,7 @@ machine pvfs2_client_rename_sm(
 
     state rename_rmdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => rename_check_for_remove;
         default => rename_rmdirent_retry_or_fail;
     }
@@ -207,7 +207,7 @@ machine pvfs2_client_rename_sm(
 
     state rename_chdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => rename_rmdirent_setup_msgpair;
         default => rename_chdirent_failure;
     }

@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  */
 
-/* pvfs2_client_msgpairarray_sm
+/* pvfs2_msgpairarray_sm
  *
  * The purpose of this state machine is to prepare, send, and
  * receive a collection of request/response pairs (msgpairs).
@@ -65,7 +65,7 @@ static int count_incomplete_msgs(
 
 %%
 
-nested machine pvfs2_client_msgpairarray_sm(init,
+nested machine pvfs2_msgpairarray_sm(init,
                                             post,
                                             post_retry,
 					    complete,

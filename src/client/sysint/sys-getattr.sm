@@ -100,7 +100,7 @@ machine pvfs2_client_getattr_sm(
 
     state datafile_getattr_xfer_msgpairarray
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => cleanup;
         default => datafile_getattr_failure;
     }

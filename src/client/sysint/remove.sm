@@ -109,7 +109,7 @@ nested machine pvfs2_client_remove_helper_sm(
 
     state check_dir_contents_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => object_remove_setup_msgpair;
         default => remove_helper_cleanup;
     }
@@ -123,7 +123,7 @@ nested machine pvfs2_client_remove_helper_sm(
 
     state datafile_remove_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => object_remove_setup_msgpair;
         default => datafile_remove_failure;
     }
@@ -143,7 +143,7 @@ nested machine pvfs2_client_remove_helper_sm(
 
     state object_remove_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => remove_helper_cleanup;
         MSGPAIR_RETURN_SUCCESS => remove_helper_cleanup;
         default => object_remove_failure;

@@ -66,7 +66,7 @@ machine pvfs2_client_flush_sm(flush_getattr_setup_msgpair,
 
     state flush_datafile_xfer_msgpairarray
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => cleanup;
         default => flush_datafile_flush_failure;
     }

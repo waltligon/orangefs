@@ -16,8 +16,8 @@
 #include "job.h"
 #include "trove.h"
 #include "gossip.h"
-
 #include "PINT-reqproto-encode.h"
+#include "msgpairarray.h"
 
 
 extern job_context_id server_job_context;
@@ -189,6 +189,10 @@ typedef struct PINT_server_op
     /* encoded request and response structures */
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
+
+    /* state information for msgpairarray nested state machine */
+    int msgarray_count;
+    PINT_sm_msgpair_state *msgarray;
 
     union
     {

@@ -120,7 +120,7 @@ machine pvfs2_client_create_sm(
 
     state dspace_create_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => datafiles_setup_msgpair_array;
         default => dspace_create_failure;
     }
@@ -140,7 +140,7 @@ machine pvfs2_client_create_sm(
 
     state datafiles_xfer_msgpair_array
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => create_setattr_setup_msgpair;
         default => datafiles_failure;
     }
@@ -160,7 +160,7 @@ machine pvfs2_client_create_sm(
 
     state create_setattr_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => crdirent_setup_msgpair;
         default => create_setattr_failure;
     }
@@ -180,7 +180,7 @@ machine pvfs2_client_create_sm(
 
     state crdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         success => cleanup;
         default => crdirent_failure;
     }
@@ -200,7 +200,7 @@ machine pvfs2_client_create_sm(
 
     state delete_handles_xfer_msgpair_array
     {
-        jump pvfs2_client_msgpairarray_sm;
+        jump pvfs2_msgpairarray_sm;
         default => cleanup;
     }
 
