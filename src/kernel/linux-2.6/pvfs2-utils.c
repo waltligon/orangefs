@@ -58,7 +58,7 @@ static inline int copy_attributes_to_inode(
     int ret = -1;
     int perm_mode = 0;
     pvfs2_inode_t *pvfs2_inode = NULL;
-    loff_t inode_size = 0;
+    loff_t inode_size = 0, rounded_up_size = 0;
 
     if (inode && attrs)
     {
@@ -73,25 +73,26 @@ static inline int copy_attributes_to_inode(
 
           For now, we're setting the block count to
           be the proper number assuming the block size
-          is PAGE_CACHE_SIZE.
-          blkbits is wrong too.
+          is 512 bytes, and the size is rounded up
+          to the nearest 4K.  This is apparently
+          required to get proper size reports from
+          the 'du' shell utility.
         */
         inode->i_blksize =  pvfs_bufmap_size_query();
-/*         inode->i_blksize = PAGE_CACHE_SIZE; */
-        inode->i_blkbits = PAGE_CACHE_SHIFT;
+        inode->i_blkbits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
 
         if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
             (attrs->mask & PVFS_ATTR_SYS_SIZE))
         {
-            spin_lock(&inode->i_lock);
-            inode->i_bytes = (unsigned short)attrs->size;
+            inode_size = (loff_t)attrs->size;
+            rounded_up_size =
+                (inode_size + (4096 - (inode_size % 4096)));
 
-            /* FIXME: inode->i_blksize != PAGE_CACHE_SIZE */
-            inode->i_blocks = (unsigned long)
-                ((inode_size / PAGE_CACHE_SIZE) + 1);
+            spin_lock(&inode->i_lock);
+            inode->i_bytes = inode_size;
+            inode->i_blocks = (unsigned long)(rounded_up_size / 512);
             spin_unlock(&inode->i_lock);
 
-            inode_size = (loff_t)attrs->size;
             i_size_write(inode, inode_size);
         }
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
@@ -101,6 +102,11 @@ static inline int copy_attributes_to_inode(
         }
         else
         {
+            spin_lock(&inode->i_lock);
+            inode->i_bytes = PAGE_CACHE_SIZE;
+            inode->i_blocks = (unsigned long)(PAGE_CACHE_SIZE / 512);
+            spin_unlock(&inode->i_lock);
+
             inode->i_size = PAGE_CACHE_SIZE;
         }
 

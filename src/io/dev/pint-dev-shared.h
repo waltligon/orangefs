@@ -30,8 +30,12 @@
   initialized, a subsequent statfs updates the superblock
   blocksize to be the configured decsription size (gathered
   using pvfs_bufmap_size_query).
+
+  don't change this value without updating the shift value
+  below, or else we may break size reporting in the kernel
 */
 #define PVFS2_BUFMAP_DEFAULT_DESC_SIZE  (4 * (1024 * 1024))
+#define PVFS2_BUFMAP_DEFAULT_DESC_SHIFT 22 /* NOTE: 2^22 == 4MB */
 
 /* size of mapped buffer region to use for I/O transfers (in bytes) */
 #define PVFS2_BUFMAP_TOTAL_SIZE \
