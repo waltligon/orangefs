@@ -33,12 +33,21 @@ int PVFS_util_parse_pvfstab(
     pvfs_mntlist * pvfstab_p)
 {
     FILE *tab;
+    char * pvfstab_env;
     char line[PARSER_MAX_LINE_LENGTH];
     int index = 0, ret = 0, lines = 0;
     size_t linelen = 0;
     int i = 0, start = 0, end = 0, num_slashes_seen = 0;
 
-    if (filename == NULL)
+    if ( (pvfstab_env = getenv("PVFS2TAB_FILE")) != NULL) 
+    {
+	tab = fopen(pvfstab_env, "rb");
+	if (tab == NULL)
+	{
+	    return (-1);
+	}
+    } 
+    else if (filename == NULL)
     {
 	/* if we didn't get a filename, just look in the current dir for
 	 * a file named "pvfstab"
