@@ -42,7 +42,7 @@
 #error "Cannot use pcache without functioning mutex locking"
 #endif
 
-struct qhash_table *s_pcache_htable = NULL;
+static struct qhash_table *s_pcache_htable = NULL;
 static gen_mutex_t *s_pcache_htable_mutex = NULL;
 
 static int s_pcache_initialized = 0;

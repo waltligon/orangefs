@@ -333,14 +333,17 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     */
     if (attr->objtype == PVFS_TYPE_SYMLINK)
     {
-        assert(attr->u.sym.target_path_len > 0);
-        assert(attr->u.sym.target_path);
-
-        sm_p->u.getattr.getattr_resp_p->attr.link_target =
-            strdup(attr->u.sym.target_path);
-        if (!sm_p->u.getattr.getattr_resp_p->attr.link_target)
+        if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
         {
-            return -PVFS_ENOMEM;
+            assert(attr->u.sym.target_path_len > 0);
+            assert(attr->u.sym.target_path);
+
+            sm_p->u.getattr.getattr_resp_p->attr.link_target =
+                strdup(attr->u.sym.target_path);
+            if (!sm_p->u.getattr.getattr_resp_p->attr.link_target)
+            {
+                return -PVFS_ENOMEM;
+            }
         }
     }
 
