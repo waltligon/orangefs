@@ -167,7 +167,7 @@ sub emit_filesystem
 
     # divide handle range space equally among servers ((2^32)-1 for now)
     my($total_num_handles_available, $start, $end, $i, $step, $num_ranges);
-    $num_ranges = $#meta_bmi + $#meta_io + 2;
+    $num_ranges = $#meta_bmi + $#io_bmi + 2;
     $total_num_handles_available = 4294967295;
 
     # since meta and data handle ranges must be split, increment
