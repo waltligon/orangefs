@@ -33,14 +33,20 @@
 
 extern job_context_id pint_client_sm_context;
 
+enum {
+    MSGPAIRS_COMPLETE = 1
+};
+
 static int msgpairarray_post(PINT_client_sm *sm_p, job_status_s *js_p);
 static int msgpairarray_complete(PINT_client_sm *sm_p, job_status_s *js_p);
+static int msgpairarray_completion_fn(PINT_client_sm *sm_p, job_status_s *js_p);
 static int msgpairarray_error(PINT_client_sm *sm_p, job_status_s *js_p);
 
 %%
 
 nested machine pvfs2_client_msgpairarray_sm(post,
 					    complete,
+					    completion_fn,
 					    error)
 {
     state post {
@@ -51,6 +57,12 @@ nested machine pvfs2_client_msgpairarray_sm(post,
 
     state complete {
 	run msgpairarray_complete;
+	success => complete;
+	MSGPAIRS_COMPLETE => completion_fn;
+	default => return;
+    }
+    state completion_fn {
+	run msgpairarray_completion_fn;
 	default => return;
     }
     
@@ -221,18 +233,14 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 static int msgpairarray_complete(PINT_client_sm *sm_p,
 				 job_status_s *js_p)
 {
-    int ret, i;
+    int i;
     int matched_job = 0;
-    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
-    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
-
-    PINT_client_sm_msgpair_state *msg_p; /* for convenience */
 
     gossip_debug(CLIENT_DEBUG, "msgpairarray state: complete\n");
 
     /* match operation with something in the msgpair array */
     for (i=0; i < sm_p->msgarray_count; i++) {
-	msg_p = &sm_p->msgarray[i];
+	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
 	if (msg_p->recv_id == js_p->id) {
 	    matched_job = 1;
@@ -251,21 +259,34 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
     }
     assert(matched_job == 1); /* sanity check */
 
-    /* we know status of operation is 0, or we wouldn't be in this state. */
-
     /* decrement comp_ct until all operations have completed.
      *
      * recall we're using the comp_ct in the first array element...
      */
-    if (--sm_p->msgarray[0].comp_ct > 0) return 0;
-    assert(msg_p->comp_ct == 0); /* sanity check */
+    if (--sm_p->msgarray[0].comp_ct > 0) {
+	return 0;
+    }
+    else {
+	assert(sm_p->msgarray[0].comp_ct == 0); /* sanity check */
+	js_p->error_code = MSGPAIRS_COMPLETE;
+	gossip_debug(CLIENT_DEBUG, "  msgpairarray: all operations complete\n");
 
-    /*** we have completed all the operations; now process results ***/
+	return 1;
+    }
+}
 
-    gossip_debug(CLIENT_DEBUG, "  msgpairarray: all operations complete\n");
+static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
+				      job_status_s *js_p)
+{
+    int ret, i;
+    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
+    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
+
+    /* clear error code; we explicitly set it to non-zero to get to this state  */
+    js_p->error_code = 0;
 
     for (i=0; i < sm_p->msgarray_count; i++) {
-	msg_p = &sm_p->msgarray[i];
+	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
 	/* decode; resp_p will point to response */
 	ret = PINT_serv_decode_resp(msg_p->encoded_resp_p,
