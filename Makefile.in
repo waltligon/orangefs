@@ -494,7 +494,7 @@ docsclean:
 	rm -f $(DOCSPS) $(DOCSPDF) $(DOCSCRUFT)
 
 # top rule for cleaning up tree
-clean: docsclean
+clean: 
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
 		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) $(MPIMISCOBJS)\
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
@@ -519,7 +519,7 @@ cleaner: clean
 
 	
 # _really_ clean the tree; should go back to pristine state
-distclean: cleaner
+distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
 	rm -f $(SERVERGENSRC)
 	rm -f $(SMCGEN)
