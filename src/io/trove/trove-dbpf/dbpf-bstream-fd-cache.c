@@ -188,7 +188,6 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
     return DBPF_BSTREAM_FDCACHE_SUCCESS;
 
  return_error:
-    assert(0);
     gen_mutex_unlock(&bstream_fd_cache[i].mutex);
     return DBPF_BSTREAM_FDCACHE_ERROR;
 }

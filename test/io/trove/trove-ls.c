@@ -119,14 +119,16 @@ int main(int argc, char **argv)
 	    count = 1;
 	    while (ga_ret == 0) ga_ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
 
-	    printf("%s/%s (handle = %Ld, uid = %d, gid = %d, perm = %o, type = %d)\n",
+	    printf("%s/%s (handle = %Ld, uid = %d, gid = %d, perm = %o, type = %d, b_size = %d, k_size = %d)\n",
 		   path_name,
 		   (char *) key[i].buffer,
 		   *(TROVE_handle *) val[i].buffer,
 		   (int) ds_attr.uid,
 		   (int) ds_attr.gid,
 		   ds_attr.mode,
-		   ds_attr.type);
+		   ds_attr.type,
+		   (int) ds_attr.b_size,
+		   (int) ds_attr.k_size);
 	}
     }
     

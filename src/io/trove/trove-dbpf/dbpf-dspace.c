@@ -18,6 +18,8 @@
 #include "trove-ledger.h"
 #include "dbpf.h"
 #include "dbpf-dspace.h"
+#include "dbpf-bstream.h"
+#include "dbpf-keyval.h"
 #include "dbpf-op-queue.h"
 
 /* TODO: move both of these into header file? */
@@ -544,11 +546,12 @@ return_error:
 
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 {
-    int ret;
+    int ret, fd;
     DB *db_p;
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
     TROVE_size b_size = 0, k_size = 0;
+    struct stat b_stat;
 
     /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
@@ -558,6 +561,24 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	case DBPF_DSPACE_DBCACHE_BUSY:
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
+	    /* drop through */
+    }
+
+    /* get an fd for the bstream so we can check size */
+    ret = dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &fd);
+    switch (ret) {
+	case DBPF_BSTREAM_FDCACHE_ERROR:
+	    /* TODO: HOW DO WE TELL A REAL ERROR FROM A "HAVEN'T CREATED YET" ERROR? */
+	    /* b_size is already set to zero */
+	    break;
+	case DBPF_BSTREAM_FDCACHE_BUSY:
+	    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id); /* release the dspace dbcache entry */
+	    return 0; /* try again later */
+	case DBPF_BSTREAM_FDCACHE_SUCCESS:
+	    ret = fstat(fd, &b_stat);
+	    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle); /* release the fd right away */
+	    if (ret < 0) goto return_error;
+	    b_size = (TROVE_size) b_stat.st_size;
 	    /* drop through */
     }
 

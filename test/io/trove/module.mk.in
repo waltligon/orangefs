@@ -7,6 +7,8 @@ LOCALTESTSRC := \
 	$(DIR)/trove-mkfs.c \
 	$(DIR)/trove-rm.c \
 	$(DIR)/test-listio.c \
+	$(DIR)/trove-import.c \
+	$(DIR)/trove-export.c \
 	$(DIR)/trove-touch.c
 
 TESTSRC += $(LOCALTESTSRC)
