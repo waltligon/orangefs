@@ -1428,10 +1428,16 @@ int server_state_machine_complete(PINT_server_op *s_op)
                          0, tmp_id, PVFS_EVENT_FLAG_END);
 
     /* release the decoding of the unexpected request */
-    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
+    if(ENCODING_IS_VALID(s_op->decoded.enc_type))
+    {
+        PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
+    }
 
     /* free the buffer that the unexpected request came in on */
-    free(s_op->unexp_bmi_buff.buffer);
+    if(s_op->unexp_bmi_buff.buffer)
+    {
+        free(s_op->unexp_bmi_buff.buffer);
+    }
 
     /* free the operation structure itself */
     free(s_op);
