@@ -19,9 +19,6 @@
 
 #define PINT_STATE_STACK_SIZE 3
 
-/* HACK!!! */
-typedef union PINT_state_array_values PINT_state_array_values;
-
 /* NOTE:
  * This structure holds everything that we need for the state of a
  * message pair.  We need arrays of these in some cases, so it's
@@ -57,8 +54,8 @@ struct PINT_client_remove_sm {
 typedef struct PINT_client_sm {
     /* STATE MACHINE VALUES */
     int stackptr; /* stack of contexts for nested state machines */
-    PINT_state_array_values *current_state; /* xxx */
-    PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
+    union PINT_state_array_values *current_state; /* xxx */
+    union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
 
 #if 0
     int op; /* NOTE: THIS IS A HACK AND IS NOT REALLY NEEDED BY CLIENT. */

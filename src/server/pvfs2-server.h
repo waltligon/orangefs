@@ -21,11 +21,6 @@
 
 #define PINT_STATE_STACK_SIZE 8  /* size of stack for nested state machines */
 
-#if 0
-/* HACK!!! */
-typedef union PINT_state_array_values PINT_state_array_values;
-#endif
-
 /* Some config values for the prototype pvfs2 server */
 enum
 {

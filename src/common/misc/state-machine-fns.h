@@ -43,12 +43,12 @@
 
 /* Prototypes for functions defined in here */
 static inline int PINT_state_machine_halt(void);
-static inline int PINT_state_machine_next(PINT_OP_STATE *,job_status_s *r);
+static inline int PINT_state_machine_next(struct PINT_OP_STATE *,job_status_s *r);
 #ifdef PINT_OP_STATE_TABLE
-static union PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *);
+static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_STATE *);
 #endif
-static inline union PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s);
-static inline void PINT_push_state(PINT_OP_STATE *s, union PINT_state_array_values *p);
+static inline union PINT_state_array_values *PINT_pop_state(struct PINT_OP_STATE *s);
+static inline void PINT_push_state(struct PINT_OP_STATE *s, union PINT_state_array_values *p);
 
 #ifdef PINT_OP_STATE_TABLE
 extern struct PINT_state_machine_s *PINT_OP_STATE_TABLE[];
@@ -72,7 +72,7 @@ static inline int PINT_state_machine_halt(void)
    call.  Calls that function.  Once that function is called, this one exits
    and we go back to pvfs2-server.c's while loop.
  */
-static inline int PINT_state_machine_next(PINT_OP_STATE *s, 
+static inline int PINT_state_machine_next(struct PINT_OP_STATE *s, 
 					  job_status_s *r)
 {
 
@@ -148,7 +148,7 @@ static inline int PINT_state_machine_next(PINT_OP_STATE *s,
    Synopsis: This function is used to start a state machines execution.
  */
 
-static union PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *s_op)
+static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_STATE *s_op)
 {
     /* check for valid inputs */
     if (!s_op || s_op->op < 0 || s_op->op > PVFS_MAX_SERVER_OP)
@@ -168,7 +168,7 @@ static union PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *s
 }
 #endif
 
-static inline union PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s)
+static inline union PINT_state_array_values *PINT_pop_state(struct PINT_OP_STATE *s)
 {
     if (s->stackptr <= 0)
     {
@@ -181,7 +181,7 @@ static inline union PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s)
     }
 }
 
-static inline void PINT_push_state(PINT_OP_STATE *s,
+static inline void PINT_push_state(struct PINT_OP_STATE *s,
 				   union PINT_state_array_values *p)
 {
     if (s->stackptr > PINT_STATE_STACK_SIZE)
