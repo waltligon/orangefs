@@ -2837,7 +2837,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     ret = tcp_sock_init(dest);
     if (ret < 0)
     {
-	gossip_lerr("Error: tcp_sock_init() failure.\n");
+	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "tcp_sock_init() failure.\n");
 	tcp_forget_addr(dest, 0, ret);
 	return (ret);
     }
