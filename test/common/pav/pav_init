@@ -26,8 +26,16 @@ exit(0);
 sub start_servers{
     my $href = shift;
 
-    my @nodes = (@{$href->{'IONODES'}}, @{$href->{'MGR'}});
+    my @nodes = ();
     my $rc = 0;
+
+    if ($href->{'UNIQEMETA'} ) {
+    	@nodes = (@{$href->{'IONODES'}}, @{$href->{'MGR'}});
+    } else  {  
+        # some subset of the io nodes will also be our meta servers
+    	@nodes = (@{$href->{'IONODES'}} )
+    }
+
 
     my $binary = $href->{'BINDIR'} . "/pvfs2-server";
     my $serverconf = $href->{'WORKINGDIR'} . "/pav.conf";
