@@ -21,9 +21,20 @@ extern "C" {
 #define LAST_HANDLE_STRING                                  "last_handle"
 #define ROOT_HANDLE_STRING                                  "root_handle"
 
-/* #define TROVE_DB_OPEN_FLAGS                                0 */
-#define TROVE_DB_OPEN_FLAGS      (DB_DIRTY_READ | DB_THREAD)
-#define TROVE_DB_CREATE_FLAGS          (DB_CREATE | DB_EXCL)
+#ifdef HAVE_DB_DIRTY_READ
+#define TROVE_DB_DIRTY_READ DB_DIRTY_READ
+#else
+#define TROVE_DB_DIRTY_READ             0
+#endif /* HAVE_DB_DIRTY_READ */
+
+#ifdef __PVFS2_TROVE_THREADED__
+#define TROVE_DB_THREAD DB_THREAD
+#else
+#define TROVE_DB_THREAD         0
+#endif /* __PVFS2_TROVE_THREADED__ */
+
+#define TROVE_DB_OPEN_FLAGS    (TROVE_DB_DIRTY_READ | TROVE_DB_THREAD)
+#define TROVE_DB_CREATE_FLAGS                    (DB_CREATE | DB_EXCL)
 
 /*
   for more efficient host filesystem accesses, we have

@@ -1320,7 +1320,6 @@ static int dbpf_dspace_test(
      * however, until we get a background thread working on things,
      * this code will do the trick and is a lot faster and shorter.
      */
-
     if (ret != 0)
     {
 	/* operation is done and we are telling the caller;
