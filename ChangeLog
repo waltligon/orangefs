@@ -7,6 +7,9 @@ pvfs2-0.1.1
 ===========
 - can now specify Trove sync behavior when setting up PVFS2 volumes w/ pav
 - add a new mpi-io test to exercise ROMIO's scalable operations
+- better detection of dead sockets in BMI TCP/IP module
+- bug fix to pvfs2tab file parsing
+- completely rewritten TCP/IP socket management 
 
 
 pvfs2-0.1.0
