@@ -54,7 +54,7 @@ static int internal_syslog_priority = LOG_USER;
 static int gossip_disable_stderr(void);
 static int gossip_disable_file(void);
 
-static int gossip_debug_fp(FILE *fp, const char *format, va_list ap);
+static int gossip_debug_fp(FILE *fp, const char *format, va_list ap, int ts);
 static int gossip_debug_syslog(
     const char *format,
     va_list ap);
@@ -279,10 +279,10 @@ int __gossip_debug(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-        ret = gossip_debug_fp(stderr, format, ap);
+        ret = gossip_debug_fp(stderr, format, ap, 1);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_fp(internal_log_file, format, ap);
+        ret = gossip_debug_fp(internal_log_file, format, ap, 1);
         break;
     case GOSSIP_SYSLOG:
         ret = gossip_debug_syslog(format, ap);
@@ -322,10 +322,10 @@ int gossip_err(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-        ret = gossip_debug_fp(stderr, format, ap);
+        ret = gossip_debug_fp(stderr, format, ap, 0);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_fp(internal_log_file, format, ap);
+        ret = gossip_debug_fp(internal_log_file, format, ap, 0);
         break;
     case GOSSIP_SYSLOG:
         ret = gossip_err_syslog(format, ap);
@@ -402,7 +402,7 @@ static int gossip_debug_syslog(
  *
  * returns 0 on success, -errno on failure
  */
-static int gossip_debug_fp(FILE *fp, const char *format, va_list ap)
+static int gossip_debug_fp(FILE *fp, const char *format, va_list ap, int ts)
 {
     char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;
     int bsize = sizeof(buffer);
@@ -410,12 +410,14 @@ static int gossip_debug_fp(FILE *fp, const char *format, va_list ap)
     struct timeval tv;
     time_t tp;
 
-    gettimeofday(&tv, 0);
-    tp = tv.tv_sec;
-    strftime(bptr, 2048, "[%H:%M:%S", localtime(&tp));
-    sprintf(bptr+9, ".%06ld] ", tv.tv_usec);
-    bptr += 18;
-    bsize -= 18;
+    if (ts) {
+        gettimeofday(&tv, 0);
+        tp = tv.tv_sec;
+        strftime(bptr, 2048, "[%H:%M:%S", localtime(&tp));
+        sprintf(bptr+9, ".%06ld] ", tv.tv_usec);
+        bptr += 18;
+        bsize -= 18;
+    }
 
     ret = vsnprintf(bptr, bsize, format, ap);
     if (ret < 0)
