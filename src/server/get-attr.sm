@@ -401,8 +401,8 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 
 
     gossip_debug(SERVER_DEBUG,
-		 "  sending attrs (owner = %d, group = %d, perms = %o,
-		 type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
+		 "  sending attrs (owner = %d, group = %d, perms = %o, "
+		 "type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
 		 a_p->owner,
 		 a_p->group,
 		 a_p->perms,
