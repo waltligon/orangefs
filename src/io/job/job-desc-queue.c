@@ -12,8 +12,8 @@
 #include <errno.h>
 #include <string.h>
 
-#include <job-desc-queue.h>
-#include <gossip.h>
+#include "job-desc-queue.h"
+#include "gossip.h"
 
 /***************************************************************
  * Visible functions
@@ -25,25 +25,25 @@
  *
  * returns pointer to structure on success, NULL on failure
  */
-struct job_desc* alloc_job_desc(int type)
+struct job_desc *alloc_job_desc(int type)
 {
-	struct job_desc* jd = NULL;
+    struct job_desc *jd = NULL;
 
-	jd = (struct job_desc*)malloc(sizeof(struct job_desc));
-	if(!jd)
-	{
-		return(NULL);
-	}
-	memset(jd, 0, sizeof(struct job_desc));
+    jd = (struct job_desc *) malloc(sizeof(struct job_desc));
+    if (!jd)
+    {
+	return (NULL);
+    }
+    memset(jd, 0, sizeof(struct job_desc));
 
-	if(id_gen_fast_register(&(jd->job_id), jd) < 0)
-	{
-		free(jd);
-		return(NULL);
-	}
-	
-	jd->type = type;
-	return(jd);
+    if (id_gen_fast_register(&(jd->job_id), jd) < 0)
+    {
+	free(jd);
+	return (NULL);
+    }
+
+    jd->type = type;
+    return (jd);
 };
 
 /* dealloc_job_desc()
@@ -52,10 +52,10 @@ struct job_desc* alloc_job_desc(int type)
  *
  * no return value
  */
-void dealloc_job_desc(struct job_desc* jd)
+void dealloc_job_desc(struct job_desc *jd)
 {
-	free(jd);
-	return;
+    free(jd);
+    return;
 }
 
 /* job_desc_q_new()
@@ -66,16 +66,15 @@ void dealloc_job_desc(struct job_desc* jd)
  */
 job_desc_q_p job_desc_q_new(void)
 {
-	struct qlist_head* tmp_job_desc_q = NULL;
+    struct qlist_head *tmp_job_desc_q = NULL;
 
-	tmp_job_desc_q = (struct qlist_head*)malloc(sizeof(struct
-		qlist_head));
-	if(tmp_job_desc_q)
-	{
-		INIT_QLIST_HEAD(tmp_job_desc_q);
-	}
+    tmp_job_desc_q = (struct qlist_head *) malloc(sizeof(struct qlist_head));
+    if (tmp_job_desc_q)
+    {
+	INIT_QLIST_HEAD(tmp_job_desc_q);
+    }
 
-	return(tmp_job_desc_q);
+    return (tmp_job_desc_q);
 }
 
 /* job_desc_q_cleanup()
@@ -86,21 +85,21 @@ job_desc_q_p job_desc_q_new(void)
  */
 void job_desc_q_cleanup(job_desc_q_p jdqp)
 {
-	struct job_desc* tmp_job_desc = NULL;
+    struct job_desc *tmp_job_desc = NULL;
 
-	do
+    do
+    {
+	tmp_job_desc = job_desc_q_shownext(jdqp);
+	if (tmp_job_desc)
 	{
-		tmp_job_desc = job_desc_q_shownext(jdqp);
-		if(tmp_job_desc)
-		{
-			job_desc_q_remove(tmp_job_desc);
-			free(tmp_job_desc);
-		}
-	} while(tmp_job_desc);
+	    job_desc_q_remove(tmp_job_desc);
+	    free(tmp_job_desc);
+	}
+    } while (tmp_job_desc);
 
-	free(jdqp);
-	jdqp = NULL;
-	return;
+    free(jdqp);
+    jdqp = NULL;
+    return;
 }
 
 /* job_desc_q_add()
@@ -109,11 +108,12 @@ void job_desc_q_cleanup(job_desc_q_p jdqp)
  *
  * no return value
  */
-void job_desc_q_add(job_desc_q_p jdqp, struct job_desc* desc)
+void job_desc_q_add(job_desc_q_p jdqp,
+		    struct job_desc *desc)
 {
-	/* note that we are adding to tail to preserve fifo order */
-	qlist_add_tail(&(desc->job_desc_q_link), jdqp);
-	return;
+    /* note that we are adding to tail to preserve fifo order */
+    qlist_add_tail(&(desc->job_desc_q_link), jdqp);
+    return;
 }
 
 /* job_desc_q_remove()
@@ -122,10 +122,10 @@ void job_desc_q_add(job_desc_q_p jdqp, struct job_desc* desc)
  *
  * no return value
  */
-void job_desc_q_remove(struct job_desc* desc)
+void job_desc_q_remove(struct job_desc *desc)
 {
-	qlist_del(&(desc->job_desc_q_link));
-	return;
+    qlist_del(&(desc->job_desc_q_link));
+    return;
 }
 
 /* job_desc_q_empty()
@@ -136,7 +136,7 @@ void job_desc_q_remove(struct job_desc* desc)
  */
 int job_desc_q_empty(job_desc_q_p jdqp)
 {
-	return(qlist_empty(jdqp));
+    return (qlist_empty(jdqp));
 }
 
 /* job_desc_q_shownext()
@@ -145,13 +145,13 @@ int job_desc_q_empty(job_desc_q_p jdqp)
  *
  * returns pointer to job desc on success, NULL on failure
  */
-struct job_desc* job_desc_q_shownext(job_desc_q_p jdqp)
+struct job_desc *job_desc_q_shownext(job_desc_q_p jdqp)
 {
-	if(jdqp->next == jdqp)
-	{
-		return(NULL);
-	}
-	return(qlist_entry(jdqp->next, struct job_desc, job_desc_q_link));
+    if (jdqp->next == jdqp)
+    {
+	return (NULL);
+    }
+    return (qlist_entry(jdqp->next, struct job_desc, job_desc_q_link));
 }
 
 /* job_desc_q_search()
@@ -160,22 +160,23 @@ struct job_desc* job_desc_q_shownext(job_desc_q_p jdqp)
  *
  * returns pointer to matching entry on success, NULL if not found
  */
-struct job_desc* job_desc_q_search(job_desc_q_p jdqp, job_id_t id)
+struct job_desc *job_desc_q_search(job_desc_q_p jdqp,
+				   job_id_t id)
 {
-	struct qlist_head* tmp_link = NULL;
-	struct job_desc* tmp_entry = NULL;
+    struct qlist_head *tmp_link = NULL;
+    struct job_desc *tmp_entry = NULL;
 
-	qlist_for_each(tmp_link, jdqp)
+    qlist_for_each(tmp_link, jdqp)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct job_desc,
+				job_desc_q_link);
+	if (tmp_entry->job_id == id)
 	{
-		tmp_entry = qlist_entry(tmp_link, struct job_desc,
-			job_desc_q_link);
-		if(tmp_entry->job_id == id)
-		{
-			return(tmp_entry);
-		}
+	    return (tmp_entry);
 	}
-	
-	return(NULL);
+    }
+
+    return (NULL);
 }
 
 /* job_desc_q_search_multi()
@@ -184,54 +185,55 @@ struct job_desc* job_desc_q_search(job_desc_q_p jdqp, job_id_t id)
  *
  * returns 0 on success, -errno on failure
  */
-int job_desc_q_search_multi(job_desc_q_p jdqp, job_id_t* id_array, int*
-	inout_count_p, int* index_array)
+int job_desc_q_search_multi(job_desc_q_p jdqp,
+			    job_id_t * id_array,
+			    int *inout_count_p,
+			    int *index_array)
 {
-	int num_real_descriptors = 0;
-	struct qlist_head* tmp_link = NULL;
-	struct job_desc* tmp_entry = NULL;
-	int i=0;
-	int incount = *inout_count_p;
+    int num_real_descriptors = 0;
+    struct qlist_head *tmp_link = NULL;
+    struct job_desc *tmp_entry = NULL;
+    int i = 0;
+    int incount = *inout_count_p;
 
-	*inout_count_p = 0;
-	/* quick check for null job descriptors */
-	for(i=0; i<incount; i++)
+    *inout_count_p = 0;
+    /* quick check for null job descriptors */
+    for (i = 0; i < incount; i++)
+    {
+	if (id_array[i] != 0)
 	{
-		if(id_array[i] != 0)
-		{
-			num_real_descriptors++;
-		}
+	    num_real_descriptors++;
 	}
-	if(num_real_descriptors == 0)
-	{
-		return(-EINVAL);
-	}
+    }
+    if (num_real_descriptors == 0)
+    {
+	return (-EINVAL);
+    }
 
-	/* iterate all the way through the queue */
-	qlist_for_each(tmp_link, jdqp)
+    /* iterate all the way through the queue */
+    qlist_for_each(tmp_link, jdqp)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct job_desc, job_desc_q_link);
+	/* for each queue entry, loop through the array of jobs we are
+	 * looking for
+	 */
+	for (i = 0; i < incount; i++)
 	{
-		tmp_entry = qlist_entry(tmp_link, struct job_desc,
-			job_desc_q_link);
-		/* for each queue entry, loop through the array of jobs we are
-		 * looking for
-		 */
-		for(i=0; i<incount; i++)
-		{
-			if(id_array[i] == tmp_entry->job_id)
-			{
-				index_array[*inout_count_p] = i;
-				(*inout_count_p)++;
-				break;
-			}
-		}
-		/* quit early if we have already found everything */
-		if(*inout_count_p == num_real_descriptors)
-		{
-			return(0);
-		}
+	    if (id_array[i] == tmp_entry->job_id)
+	    {
+		index_array[*inout_count_p] = i;
+		(*inout_count_p)++;
+		break;
+	    }
 	}
+	/* quit early if we have already found everything */
+	if (*inout_count_p == num_real_descriptors)
+	{
+	    return (0);
+	}
+    }
 
-	return(0);
+    return (0);
 }
 
 
@@ -243,39 +245,47 @@ int job_desc_q_search_multi(job_desc_q_p jdqp, job_id_t* id_array, int*
  */
 void job_desc_q_dump(job_desc_q_p jdqp)
 {
-	struct qlist_head* tmp_link = NULL;
-	struct job_desc* tmp_entry = NULL;
+    struct qlist_head *tmp_link = NULL;
+    struct job_desc *tmp_entry = NULL;
 
-	gossip_err("job_desc_q_dump():\n");
-	gossip_err("------------------\n");
+    gossip_err("job_desc_q_dump():\n");
+    gossip_err("------------------\n");
 
-	/* iterate all the way through the queue */
-	qlist_for_each(tmp_link, jdqp)
+    /* iterate all the way through the queue */
+    qlist_for_each(tmp_link, jdqp)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct job_desc,
+				job_desc_q_link);
+	gossip_err("  job id: %ld.\n", (long) tmp_entry->job_id);
+	switch (tmp_entry->type)
 	{
-		tmp_entry = qlist_entry(tmp_link, struct job_desc,
-			job_desc_q_link);
-		gossip_err("  job id: %ld.\n", (long)tmp_entry->job_id);
-		switch(tmp_entry->type)
-		{
-			case JOB_BMI:
-				gossip_err("    type: JOB_BMI.\n");
-				gossip_err("    bmi_id: %ld.\n",
-					(long)tmp_entry->u.bmi.id);
-				break;
-			case JOB_BMI_UNEXP:
-				gossip_err("    type: JOB_BMI_UNEXP.\n");
-				break;
-			case JOB_TROVE:
-				gossip_err("    type: JOB_TROVE.\n");
-				break;
-			case JOB_FLOW:
-				gossip_err("    type: JOB_FLOW.\n");
-				break;
-			case JOB_REQ_SCHED:
-				gossip_err("    type: JOB_REQ_SCHED.\n");
-				break;
-		}
+	case JOB_BMI:
+	    gossip_err("    type: JOB_BMI.\n");
+	    gossip_err("    bmi_id: %ld.\n", (long) tmp_entry->u.bmi.id);
+	    break;
+	case JOB_BMI_UNEXP:
+	    gossip_err("    type: JOB_BMI_UNEXP.\n");
+	    break;
+	case JOB_TROVE:
+	    gossip_err("    type: JOB_TROVE.\n");
+	    break;
+	case JOB_FLOW:
+	    gossip_err("    type: JOB_FLOW.\n");
+	    break;
+	case JOB_REQ_SCHED:
+	    gossip_err("    type: JOB_REQ_SCHED.\n");
+	    break;
 	}
+    }
 
-	return;
+    return;
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
