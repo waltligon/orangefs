@@ -165,6 +165,9 @@ static void lebf_initialize(
 static int lebf_encode_alloc_resp(
     struct PVFS_server_resp *response,
     struct PINT_encoded_msg *target_msg);
+static int lebf_encode_alloc_req(
+    struct PVFS_server_req* request,
+    struct PINT_encoded_msg* target_msg);
     
 
 static PINT_encoding_functions_s lebf_functions = {
@@ -268,26 +271,23 @@ static int lebf_encode_req(
     target_msg->list_count = 1;
     target_msg->buffer_type = BMI_PRE_ALLOC;
 
-    /* set size of buffer needed, although some requests may override this */
-    target_msg->size_list[0] = target_msg->total_size = 
-	max_size_array[request->op].max_req + PINT_ENC_GENERIC_HEADER_SIZE;
+    /* compute size and allocate a buffer */
+    ret = lebf_encode_alloc_req(request, target_msg);
+    if(ret < 0)
+    {
+	return(ret);
+    }
+
+    /* tack on generic header */
+    memcpy(target_msg->ptr_current, le_bytefield_table.generic_header,
+	PINT_ENC_GENERIC_HEADER_SIZE);
+    target_msg->ptr_current += PINT_ENC_GENERIC_HEADER_SIZE;
 
     switch(request->op)
     {
 	case PVFS_SERV_GETCONFIG:
-	    /* create a buffer */
-	    target_msg->buffer_list[0] = target_msg->ptr_current =  
-		BMI_memalloc(target_msg->dest, target_msg->total_size, BMI_SEND);
-	    if(!target_msg->buffer_list[0])
-		ret = -ENOMEM;
-
-	    /* encode */
-	    memcpy(target_msg->ptr_current, le_bytefield_table.generic_header,
-		PINT_ENC_GENERIC_HEADER_SIZE);
-	    target_msg->ptr_current += PINT_ENC_GENERIC_HEADER_SIZE;
 	    PINT_XENC_REQ_GEN(target_msg, request);
 	    PINT_XENC_REQ_GETCONFIG(target_msg, request);
-
 	    ret = 0;
 	    break;
 	default:
@@ -341,7 +341,6 @@ static int lebf_encode_resp(
     switch(response->op)
     {
 	case PVFS_SERV_GETCONFIG:
-	    /* encode */
 	    PINT_XENC_RESP_GEN(target_msg, response);
 	    PINT_XENC_RESP_GETCONFIG(target_msg, response);
 	    ret = 0;
@@ -534,6 +533,51 @@ static int lebf_encode_alloc_resp(
     target_msg->ptr_current = target_msg->buffer_list[0];
     return(0);
 }
+
+/* lebf_encode_alloc_req()
+ *
+ * internal function, calculates size needed for encoded version 
+ * of a request and allocates the buffer
+ *
+ * returns 0 on success, -errno on failure
+ */
+static int lebf_encode_alloc_req(
+    struct PVFS_server_req* request,
+    struct PINT_encoded_msg* target_msg)
+{
+    int PINT_XENC_MODE = PINT_CALC_SIZE;
+
+    target_msg->ptr_current = NULL;
+    target_msg->total_size = 0;
+
+    PINT_XENC_REQ_GEN(target_msg, request);
+
+    switch(request->op)
+    {
+	case PVFS_SERV_GETCONFIG:
+	    PINT_XENC_REQ_GETCONFIG(target_msg, request);
+	    target_msg->total_size = (int)(target_msg->ptr_current) + 
+		PINT_ENC_GENERIC_HEADER_SIZE;
+	    break;
+	default:
+	    gossip_lerr("Error: unsupported operation.\n");
+	    return(-ENOSYS);
+	    break;
+    }
+
+    target_msg->size_list[0] = target_msg->total_size;
+    target_msg->buffer_list[0] = 
+	BMI_memalloc(target_msg->dest, target_msg->total_size,
+	BMI_SEND);
+    if(!target_msg->buffer_list[0])
+    {
+	return(-ENOMEM);
+    }
+
+    target_msg->ptr_current = target_msg->buffer_list[0];
+    return(0);
+}
+
 
 /*
  * Local variables:
