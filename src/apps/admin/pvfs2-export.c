@@ -43,8 +43,6 @@ int main(int argc, char **argv)
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_io resp_io;
     struct options* user_opts = NULL;
-    int i = 0;
-    int mnt_index = -1;
     int dest_fd = -1;
     int current_size = 0;
     void* buffer = NULL;
@@ -88,29 +86,6 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* see if the destination resides on any of the file systems
-     * listed in the pvfstab; find the pvfs fs relative path
-     */
-    for(i=0; i<tab->mntent_count; i++)
-    {
-	ret = PVFS_util_remove_dir_prefix(user_opts->srcfile,
-	    tab->mntent_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
-	if(ret == 0)
-	{
-	    mnt_index = i;
-	    break;
-	}
-    }
-
-    if(mnt_index == -1)
-    {
-	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
-	    user_opts->srcfile);
-	close(dest_fd);
-	return(-1);
-
-    }
-
     memset(&resp_init, 0, sizeof(resp_init));
     ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
     if(ret < 0)
@@ -118,6 +93,16 @@ int main(int argc, char **argv)
 	PVFS_perror("PVFS_sys_initialize", ret);
 	close(dest_fd);
 	return(-1);
+    }
+
+    /* translate local path into pvfs2 relative path */
+    ret = PVFS_util_resolve(user_opts->srcfile,
+        &cur_fs, pvfs_path, PVFS_NAME_MAX);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_util_resolve", ret);
+	ret = -1;
+	goto main_out;
     }
 
     /* get the absolute path on the pvfs2 file system */
@@ -134,8 +119,6 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-
-    cur_fs = resp_init.fsid_list[mnt_index];
 
     credentials.uid = getuid();
     credentials.gid = getgid();
@@ -219,8 +202,7 @@ int main(int argc, char **argv)
     printf("********************************************************\n");
     printf("Source path (local): %s\n", user_opts->srcfile);
     printf("Source path (PVFS2 file system): %s\n", pvfs_path);
-    printf("File system name: %s\n", tab->mntent_array[mnt_index].pvfs_fs_name);
-    printf("Initial config server: %s\n", tab->mntent_array[mnt_index].pvfs_config_server);
+    printf("Source PVFS2 file system identifier: %d\n", (int)cur_fs);
     printf("********************************************************\n");
     printf("Bytes written: %Ld\n", Ld(total_written));
     printf("Elapsed time: %f seconds\n", (time2-time1));
