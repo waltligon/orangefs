@@ -416,20 +416,30 @@ static int lookup_send_response(PINT_server_op *s_op,
 
     if (ret->error_code != 0 && ret->error_code != STATE_NOMORESEGS && ret->error_code != STATE_ENOTDIR)
     {
+#if 0
 	/* as mentioned in lookup_read_directory_entry, on error seg_nr
 	 * is one too large.
 	 */
 	s_op->u.lookup.seg_nr--;
 	gossip_debug(SERVER_DEBUG,
 		     "  error occurred in lookup process; decrementing number of segments.\n");
+#endif 
+	/* TODO: think about this some more; I think the logic upstream is 
+	 * broken.  For now we should just call this a complete failure. -Phil
+	 */
+	s_op->resp->status = ret->error_code;
+	s_op->resp->u.lookup_path.handle_count = 0;
+	s_op->resp->u.lookup_path.attr_count = 0;
     }
+    else
+    {
+	/* fill in response -- status field is the only generic one we should have to set */
+	s_op->resp->status              = 0; /* ??? */
+	s_op->resp->u.lookup_path.handle_count = s_op->u.lookup.seg_nr; /* # actually completed */
+	/* TODO: this won't always be correct if we have multiple meta servers... */
+	s_op->resp->u.lookup_path.attr_count = s_op->u.lookup.seg_nr; /* # actually completed */
 
-    /* fill in response -- status field is the only generic one we should have to set */
-    s_op->resp->status              = 0; /* ??? */
-    s_op->resp->u.lookup_path.handle_count = s_op->u.lookup.seg_nr; /* # actually completed */
-    /* TODO: this won't always be correct if we have multiple meta servers... */
-    s_op->resp->u.lookup_path.attr_count = s_op->u.lookup.seg_nr; /* # actually completed */
-
+    }
     gossip_debug(SERVER_DEBUG,
 		 "  sending response with %d segment(s)\n",
 		 s_op->u.lookup.seg_nr);
