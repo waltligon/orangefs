@@ -971,8 +971,6 @@ void pvfs2_make_bad_inode(struct inode *inode)
           mount tables in the client
         */
         pvfs2_print("*** NOT making bad root inode %lu\n", inode->i_ino);
-        pvfs2_print("  --  attempting remount now --\n");
-        pvfs2_remount(inode->i_sb, NULL, PVFS2_SB(inode->i_sb)->data);
     }
     else
     {
