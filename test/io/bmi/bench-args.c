@@ -30,7 +30,7 @@ int bench_args(struct bench_options* user_opts, int argc, char** argv)
 	user_opts->flags = 0;
 	user_opts->method_name[0] = '\0';
 	user_opts->num_servers = 1;
-/* 	user_opts->list_io_factor = 1; */
+	user_opts->list_io_factor = 1;
 
 	/* look at command line arguments */
 	while((one_opt = getopt(argc, argv, flags)) != EOF){
