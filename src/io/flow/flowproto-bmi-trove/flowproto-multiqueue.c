@@ -328,7 +328,9 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
     /* process request */
     q_item->result.bytemax = actual_size;
+    q_item->result.bytes = 0;
     q_item->result.segmax = MAX_REGIONS;
+    q_item->result.segs = 0;
     ret = PINT_Process_request(q_item->parent->file_req_state,
 	q_item->parent->mem_req_state,
 	&q_item->parent->file_data,
