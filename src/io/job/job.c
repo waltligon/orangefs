@@ -32,9 +32,9 @@ static bmi_context_id global_bmi_context = -1;
 /* queues of pending jobs */
 static job_desc_q_p completion_queue = NULL;
 static int completion_error = 0;
-static job_desc_q_p bmi_queue = NULL;
 static job_desc_q_p bmi_unexp_queue = NULL;
 static int bmi_unexp_pending_count = 0;
+static int bmi_pending_count = 0;
 static job_desc_q_p trove_queue = NULL;
 static job_desc_q_p flow_queue = NULL;
 static job_desc_q_p req_sched_queue = NULL;
@@ -85,7 +85,6 @@ static bmi_error_code_t stat_bmi_error_code_array[job_work_metric];
 static bmi_size_t stat_bmi_actual_size_array[job_work_metric];
 static struct BMI_unexpected_info stat_bmi_unexp_array[job_work_metric];
 static void *stat_bmi_user_ptr_array[job_work_metric];
-static int stat_bmi_index_array[job_work_metric];
 
 static flow_descriptor *stat_flow_array[job_work_metric];
 static int stat_flow_index_array[job_work_metric];
@@ -279,7 +278,7 @@ int job_bmi_send(bmi_addr_t addr,
      */
     gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
-    job_desc_q_add(bmi_queue, jd);
+    bmi_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&bmi_cond);
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -364,7 +363,7 @@ int job_bmi_send_list(bmi_addr_t addr,
      */
     gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
-    job_desc_q_add(bmi_queue, jd);
+    bmi_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&bmi_cond);
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -434,7 +433,7 @@ int job_bmi_recv(bmi_addr_t addr,
      */
     gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
-    job_desc_q_add(bmi_queue, jd);
+    bmi_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&bmi_cond);
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -509,7 +508,7 @@ int job_bmi_recv_list(bmi_addr_t addr,
      */
     gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
-    job_desc_q_add(bmi_queue, jd);
+    bmi_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&bmi_cond);
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -2615,14 +2614,13 @@ static int setup_queues(void)
 {
 
     completion_queue = job_desc_q_new();
-    bmi_queue = job_desc_q_new();
     bmi_unexp_queue = job_desc_q_new();
     trove_queue = job_desc_q_new();
     flow_queue = job_desc_q_new();
     req_sched_queue = job_desc_q_new();
     req_sched_inprogress_queue = job_desc_q_new();
 
-    if (!completion_queue || !bmi_queue || !bmi_unexp_queue ||
+    if (!completion_queue || !bmi_unexp_queue ||
 	!trove_queue || !flow_queue || !req_sched_queue ||
 	!req_sched_inprogress_queue)
     {
@@ -2644,8 +2642,6 @@ static void teardown_queues(void)
 
     if (completion_queue)
 	job_desc_q_cleanup(completion_queue);
-    if (bmi_queue)
-	job_desc_q_cleanup(bmi_queue);
     if (bmi_unexp_queue)
 	job_desc_q_cleanup(bmi_unexp_queue);
     if (trove_queue)
@@ -2684,7 +2680,10 @@ static int do_one_work_cycle_all(int *num_completed,
      * pending
      */
     gen_mutex_lock(&bmi_mutex);
-    bmi_pending_flag = !job_desc_q_empty(bmi_queue);
+    if(bmi_pending_count > 0)
+	bmi_pending_flag = 1;
+    else
+	bmi_pending_flag = 0;
     if(bmi_unexp_pending_count > 0)
 	bmi_unexp_pending_flag = 1;
     else
@@ -2774,42 +2773,28 @@ static int do_one_work_cycle_bmi(int *num_completed,
 				 int wait_flag)
 {
     struct job_desc *tmp_desc = NULL;
-    int offset = 0;
     int incount, outcount;
     int ret = -1;
     int i = 0;
 
-    /* zero out the first entry to use as a sentinal */
-    stat_bmi_id_array[0] = 0;
-    /* collect the set of bmi operations to test on */
-    gen_mutex_lock(&bmi_mutex);
-    /* keep pulling entries until we wrap around */
-    while ((offset < job_work_metric) &&
-	   (tmp_desc = job_desc_q_shownext(bmi_queue)) &&
-	   (tmp_desc->u.bmi.id != stat_bmi_id_array[0]))
-    {
-	/* remove the job; we will add it back to the end of the queue */
-	job_desc_q_remove(tmp_desc);
-	stat_bmi_id_array[offset] = tmp_desc->u.bmi.id;
-	offset++;
-	job_desc_q_add(bmi_queue, tmp_desc);
-    }
-    gen_mutex_unlock(&bmi_mutex);
-    incount = offset;
+    if(bmi_pending_count > job_work_metric)
+	incount = job_work_metric;
+    else
+	incount = bmi_pending_count;
 
     if (wait_flag)
     {
 	/* nothing else going on, we can afford to wait */
-	ret = BMI_testsome(incount, stat_bmi_id_array, &outcount,
-			   stat_bmi_index_array, stat_bmi_error_code_array,
+	ret = BMI_testcontext(incount, stat_bmi_id_array, &outcount,
+			   stat_bmi_error_code_array,
 			   stat_bmi_actual_size_array, stat_bmi_user_ptr_array,
 			   10, global_bmi_context);
     }
     else
     {
 	/* just test */
-	ret = BMI_testsome(incount, stat_bmi_id_array, &outcount,
-			   stat_bmi_index_array, stat_bmi_error_code_array,
+	ret = BMI_testcontext(incount, stat_bmi_id_array, &outcount,
+			   stat_bmi_error_code_array,
 			   stat_bmi_actual_size_array, stat_bmi_user_ptr_array,
 			   0, global_bmi_context);
     }
@@ -2824,11 +2809,7 @@ static int do_one_work_cycle_bmi(int *num_completed,
 
     for (i = 0; i < outcount; i++)
     {
-	/* remove the operation from the pending bmi queue */
 	tmp_desc = (struct job_desc *) stat_bmi_user_ptr_array[i];
-	gen_mutex_lock(&bmi_mutex);
-	job_desc_q_remove(tmp_desc);
-	gen_mutex_unlock(&bmi_mutex);
 	/* set appropriate fields and store in completed queue */
 	tmp_desc->u.bmi.error_code = stat_bmi_error_code_array[i];
 	tmp_desc->u.bmi.actual_size = stat_bmi_actual_size_array[i];
@@ -3112,7 +3093,10 @@ static void *bmi_thread_function(void *foo)
     {
 	/* figure out what types of bmi jobs are pending */
 	gen_mutex_lock(&bmi_mutex);
-	bmi_pending_flag = !job_desc_q_empty(bmi_queue);
+	if(bmi_pending_count > 0)
+	    bmi_pending_flag = 1;
+	else
+	    bmi_pending_flag = 0;
 	if(bmi_unexp_pending_count > 0)
 	    bmi_unexp_pending_flag = 1;
 	else
