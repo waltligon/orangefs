@@ -170,7 +170,7 @@ static struct options* parse_args(int argc, char* argv[])
  */
 static int draw(void)
 {
-    int i;
+    int i,j;
     int ret = -1;
     SDL_Surface* screen;
     struct drawbar* read_bws;
@@ -178,9 +178,11 @@ static int draw(void)
     int channel_width = 0;
     int left_offset = 0;
     double bw;
-    double max_bw = 13.0;
+    double max_bw = 1.0;
     int stat_depth = pint_vis_shared.io_depth - 1;
     SDL_Rect scratch;
+    double** read_bw_matrix;
+    double** write_bw_matrix;
 
     ret = SDL_Init(SDL_INIT_VIDEO);
     if(ret < 0)
@@ -212,6 +214,27 @@ static int draw(void)
 	return(-1);
     }
     write_bws = &read_bws[pint_vis_shared.io_count];
+
+    /* allocate space to store calculated bandwidth figures */
+    read_bw_matrix = (double**)malloc(2*pint_vis_shared.io_count*sizeof(double*));
+    if(!read_bw_matrix)
+    {
+	perror("malloc");
+	SDL_Quit();
+	return(-1);
+    }
+    write_bw_matrix = &(read_bw_matrix[pint_vis_shared.io_count]);
+    for(i=0; i<pint_vis_shared.io_count; i++)
+    {
+	read_bw_matrix[i] = (double*)malloc(2*pint_vis_shared.io_depth*sizeof(double));
+	if(!read_bw_matrix[i])
+	{
+	    perror("malloc");
+	    SDL_Quit();
+	    return(-1);
+	}
+	write_bw_matrix[i] = &(read_bw_matrix[i][pint_vis_shared.io_depth]);
+    }
 
     /* compute width of each bar */
     channel_width = (screen->w - SIDE_BORDER*2) / (pint_vis_shared.io_count*3);
@@ -254,6 +277,30 @@ static int draw(void)
 	    return(0);
 	}
 
+	/* calculate bandwith for each time step and server */
+	for(i=0; i<pint_vis_shared.io_count; i++)
+	{
+	    for(j=0; j<pint_vis_shared.io_depth; j++)
+	    {
+		read_bw_matrix[i][j] = 
+		    ((double)pint_vis_shared.io_perf_matrix[i][j].read * 1000.0)/
+		    (double)(pint_vis_shared.io_end_time_ms_array[i] -
+		    pint_vis_shared.io_perf_matrix[i][j].start_time_ms);
+		read_bw_matrix[i][j] = read_bw_matrix[i][j] 
+		    / (double)(1024.0*1024.0);
+		if(read_bw_matrix[i][j] > max_bw)
+		    max_bw = read_bw_matrix[i][j] + .5;
+		write_bw_matrix[i][j] = 
+		    ((double)pint_vis_shared.io_perf_matrix[i][j].write * 1000.0)/
+		    (double)(pint_vis_shared.io_end_time_ms_array[i] -
+		    pint_vis_shared.io_perf_matrix[i][j].start_time_ms);
+		write_bw_matrix[i][j] = write_bw_matrix[i][j] 
+		    / (double)(1024.0*1024.0);
+		if(write_bw_matrix[i][j] > max_bw)
+		    max_bw = write_bw_matrix[i][j] + .5;
+	    }
+	}
+
 	for(i=0; i<pint_vis_shared.io_count; i++)
 	{
 	    S_LOCK();
@@ -273,10 +320,7 @@ static int draw(void)
 		0x0, 0x0, 0x0));
 
 	    /* compute height of each bar, and draw it */
-	    bw = ((double)pint_vis_shared.io_perf_matrix[i][stat_depth].read * 1000.0)/
-		(double)(pint_vis_shared.io_end_time_ms_array[i] -
-		pint_vis_shared.io_perf_matrix[i][stat_depth].start_time_ms);
-	    bw = bw / (double)(1024.0*1024.0);
+	    bw = read_bw_matrix[i][stat_depth];
 	    read_bws[i].bar.h = read_bws[i].full.h * (bw/max_bw);
 	    if(read_bws[i].bar.h > read_bws[i].full.h)
 		read_bws[i].bar.h = read_bws[i].full.h;
@@ -284,10 +328,7 @@ static int draw(void)
 	    SDL_FillRect(screen, &read_bws[i].bar,
 		SDL_MapRGB(screen->format, 0xcc, 0x0, 0x0));
 
-	    bw = ((double)pint_vis_shared.io_perf_matrix[i][stat_depth].write * 1000.0)/
-		(double)(pint_vis_shared.io_end_time_ms_array[i] -
-		pint_vis_shared.io_perf_matrix[i][stat_depth].start_time_ms);
-	    bw = bw / (double)(1024.0*1024.0);
+	    bw = write_bw_matrix[i][stat_depth];
 	    write_bws[i].bar.h = write_bws[i].full.h * (bw/max_bw);
 	    if(write_bws[i].bar.h > write_bws[i].full.h)
 		write_bws[i].bar.h = write_bws[i].full.h;
