@@ -170,11 +170,10 @@ AC_ARG_WITH(kernel24,
     if ! grep -q UTS_RELEASE..2\\.4\\. $withval/include/linux/version.h ; then
 	AC_MSG_ERROR(The kernel source tree does not appear to be 2.4)
     fi
-    k24_minor_ver=`echo $vers | cut -b 26- | sed -n 's/\"//p'`
-    orig_k24_minor_ver=$k24_minor_ver
-    tmp_k24_minor_ver=`echo $orig_k24_minor_ver | grep -`
+    k24_minor_ver=`echo $vers | cut -b 26- | sed -n 's/\"//p' | head -n 1`
+    tmp_k24_minor_ver=`echo $k24_minor_ver | grep \-`
     if ! test "x$tmp_k24_minor_ver" = "x"; then
-       tmp_k24_minor_ver=`echo $k24_minor_ver | sed -n 's/-/\n/p' | head -n 1`
+       tmp_k24_minor_ver=`echo $k24_minor_ver | cut -d- -f1`
        k24_minor_ver=$tmp_k24_minor_ver
     fi
     LINUX24_KERNEL_SRC="$withval" LINUX24_KERNEL_MINOR_VER="$k24_minor_ver"

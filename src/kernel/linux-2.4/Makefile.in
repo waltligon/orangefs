@@ -80,7 +80,7 @@ all: pvfs2.o
 
 pvfs2.o: $(objs)
 ifdef QUIET_COMPILE
-	@echo "  LD [M]    $(absolute_src_dir)/$(here)/$@"
+	@echo "  LD [M]  $(absolute_src_dir)/$(here)/$@"
 	@$(LD) -r -o $@ $^
 else
 	$(LD) -r -o $@ $^
@@ -88,7 +88,7 @@ endif
 
 $(objs):%.o: %.c
 ifdef QUIET_COMPILE
-	@echo "  CC [M]    $(absolute_src_dir)/$(here)/$@"
+	@echo "  CC [M]  $(absolute_src_dir)/$(here)/$@"
 	@$(CC) $(CFLAGS) -c $< -o $@
 else
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -99,7 +99,6 @@ $(deps):%.d: %.c
 
 $(preps):%.i: %.c
 ifdef QUIET_COMPILE
-	@echo "  PREP     $@"
 	@$(CC) $(CFLAGS) -E $< -o $@
 else
 	$(CC) $(CFLAGS) -E $< -o $@
