@@ -1,4 +1,4 @@
 DIR := test/io/description
 
-TESTSRC := \
+TESTSRC += \
 	$(DIR)/test-req1.c
