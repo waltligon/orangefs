@@ -784,21 +784,6 @@ static int buffer_setup_bmi_to_mem(flow_descriptor * flow_d)
     /* set the buffer size to use for this flow */
     flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
 
-#if 0
-    /* call req processing code to get first set of segments */
-    flow_data->bmi_total_size = flow_data->max_buffer_size;
-    flow_data->bmi_list_count = MAX_REGIONS;
-
-    gossip_ldebug(FLOW_PROTO_DEBUG, "req proc offset: %ld\n",
-		  (long) flow_d->current_req_offset);
-    ret = PINT_Process_request(flow_d->request_state,
-			       flow_d->file_data, &flow_data->bmi_list_count,
-			       flow_data->bmi_offset_list,
-			       flow_data->bmi_size_list,
-			       &flow_d->current_req_offset,
-			       &flow_data->bmi_total_size, &eof_flag,
-			       PINT_CLIENT);
-#endif
     flow_d->result.offset_array = flow_data->bmi_offset_list;
     flow_d->result.size_array = flow_data->bmi_size_list;
     flow_d->result.bytemax = flow_data->max_buffer_size;
@@ -893,21 +878,6 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
     /* set the buffer size to use for this flow */
     flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
 
-#if 0
-    /* call req processing code to get first set of segments */
-    flow_data->bmi_total_size = flow_data->max_buffer_size;
-    flow_data->bmi_list_count = MAX_REGIONS;
-
-    gossip_ldebug(FLOW_PROTO_DEBUG, "req proc offset: %ld\n",
-		  (long) flow_d->current_req_offset);
-    ret = PINT_Process_request(flow_d->request_state,
-			       flow_d->file_data, &flow_data->bmi_list_count,
-			       flow_data->bmi_offset_list,
-			       flow_data->bmi_size_list,
-			       &flow_d->current_req_offset,
-			       &flow_data->bmi_total_size, &eof_flag,
-			       PINT_CLIENT);
-#endif
     flow_d->result.offset_array = flow_data->bmi_offset_list;
     flow_d->result.size_array = flow_data->bmi_size_list;
     flow_d->result.bytemax = flow_data->max_buffer_size;
@@ -1158,15 +1128,7 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
     flow_d->result.segs = 0;
     ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
 	flow_d->file_data, &flow_d->result, PINT_SERVER);
-#if 0
-    ret = PINT_Process_request(flow_d->request_state,
-			       flow_d->file_data, &flow_data->trove_list_count,
-			       flow_data->trove_offset_list,
-			       flow_data->trove_size_list,
-			       &flow_d->current_req_offset,
-			       &flow_data->fill_buffer_stepsize, &eof_flag,
-			       PINT_SERVER);
-#endif
+
     if (ret < 0)
     {
 	return (ret);
@@ -1493,16 +1455,6 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	    flow_d->file_data, &flow_d->result, PINT_SERVER);
 	flow_data->trove_list_count = flow_d->result.segs;
 	flow_data->drain_buffer_stepsize = flow_d->result.bytes;
-#if 0
-	ret = PINT_Process_request(flow_d->request_state,
-				   flow_d->file_data,
-				   &flow_data->trove_list_count,
-				   flow_data->trove_offset_list,
-				   flow_data->trove_size_list,
-				   &flow_d->current_req_offset,
-				   &(flow_data->drain_buffer_stepsize),
-				   &eof_flag, PINT_SERVER);
-#endif
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: PINT_Process_request() failure.\n");
@@ -1511,16 +1463,6 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	    /* no ops in flight, so we can just kick out error here */
 	    return;
 	}
-#if 0
-	gossip_err("FOO1: current_req_offset: %d\n",
-		   (int) flow_d->current_req_offset);
-	gossip_err("FOO1: trove_list_count: %d\n",
-		   (int) flow_data->trove_list_count);
-	gossip_err("FOO1: trove_offset_list[0]: %d\n",
-		   (int) flow_data->trove_offset_list[0]);
-	gossip_err("FOO1: trove_size_list[0]: %d\n",
-		   (int) flow_data->trove_size_list[0]);
-#endif
 
 	if (flow_data->drain_buffer_stepsize != flow_data->drain_buffer_used)
 	{
@@ -1553,17 +1495,6 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 		flow_d->mem_req_state,
 		flow_d->file_data, &flow_d->result, PINT_CKSIZE_MODIFY_OFFSET);
 	    flow_data->bmi_total_size = flow_d->result.bytes;
-#if 0
-	    ret = PINT_Process_request(flow_data->dup_req_state,
-		flow_d->file_data,
-		&segmax,
-		NULL,
-		NULL,
-		&flow_data->dup_req_offset,
-		&flow_data->bmi_total_size,
-		&eof_flag,
-		PINT_CKSIZE_MODIFY_OFFSET);
-#endif
 	    if (ret < 0)
 	    {
 		/* TODO: do something */
@@ -1718,16 +1649,6 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	    ret  = PINT_Process_request(flow_d->io_req_state, 
 		flow_d->mem_req_state,
 		flow_d->file_data, &flow_d->result, PINT_SERVER);
-#if 0
-	    ret = PINT_Process_request(flow_d->request_state,
-				       flow_d->file_data,
-				       &flow_data->trove_list_count,
-				       flow_data->trove_offset_list,
-				       flow_data->trove_size_list,
-				       &flow_d->current_req_offset,
-				       &flow_data->fill_buffer_stepsize,
-				       &eof_flag, PINT_SERVER);
-#endif
 	    if (ret < 0)
 	    {
 		gossip_lerr("Error: PINT_Process_request() failure.\n");
@@ -2096,16 +2017,6 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 		ret  = PINT_Process_request(flow_d->io_req_state, 
 		    flow_d->mem_req_state,
 		    flow_d->file_data, &flow_d->result, PINT_CLIENT);
-#if 0
-		ret = PINT_Process_request(flow_d->request_state,
-					   flow_d->file_data,
-					   &flow_data->bmi_list_count,
-					   flow_data->bmi_offset_list,
-					   flow_data->bmi_size_list,
-					   &flow_d->current_req_offset,
-					   &flow_data->bmi_total_size,
-					   &eof_flag, PINT_CLIENT);
-#endif
 		if (ret < 0)
 		{
 		    flow_d->state = FLOW_DEST_ERROR;
@@ -2252,16 +2163,6 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 	flow_d->result.segs = 0;
 	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
 	    flow_d->file_data, &flow_d->result, PINT_SERVER);
-#if 0
-	ret = PINT_Process_request(flow_d->request_state,
-				   flow_d->file_data,
-				   &flow_data->trove_list_count,
-				   flow_data->trove_offset_list,
-				   flow_data->trove_size_list,
-				   &flow_d->current_req_offset,
-				   &(flow_data->fill_buffer_stepsize),
-				   &eof_flag, PINT_SERVER);
-#endif
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: unimplemented condition encountered.\n");
@@ -2484,16 +2385,6 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 	flow_d->result.eof_flag = 0;
 	flow_d->result.bytes = 0;
 	flow_d->result.segs = 0;
-#if 0
-	ret = PINT_Process_request(flow_d->request_state,
-				   flow_d->file_data,
-				   &flow_data->trove_list_count,
-				   flow_data->trove_offset_list,
-				   flow_data->trove_size_list,
-				   &flow_d->current_req_offset,
-				   &(flow_data->drain_buffer_stepsize),
-				   &eof_flag, PINT_SERVER);
-#endif
 	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
 	    flow_d->file_data, &flow_d->result, PINT_SERVER);
 	if (ret < 0)
@@ -2505,16 +2396,6 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 	}
 	flow_data->trove_list_count = flow_d->result.segs;
 	flow_data->drain_buffer_stepsize = flow_d->result.bytes;
-#if 0
-	gossip_err("FOO2: current_req_offset: %d\n",
-		   (int) flow_d->current_req_offset);
-	gossip_err("FOO2: trove_list_count: %d\n",
-		   (int) flow_data->trove_list_count);
-	gossip_err("FOO2: trove_offset_list[0]: %d\n",
-		   (int) flow_data->trove_offset_list[0]);
-	gossip_err("FOO2: trove_size_list[0]: %d\n",
-		   (int) flow_data->trove_size_list[0]);
-#endif
 
 	/* set the state so that the next service will cause a post */
 	flow_data->drain_buffer_state = BUF_READY_TO_DRAIN;
