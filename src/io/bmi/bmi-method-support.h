@@ -118,6 +118,7 @@ struct bmi_method_ops
 			      int,
 			      bmi_context_id);
     int (*BMI_meth_testcontext) (int,
+				bmi_op_id_t*,
 				int *,
 				bmi_error_code_t *,
 				bmi_size_t *,

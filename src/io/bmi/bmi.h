@@ -86,6 +86,7 @@ int BMI_testunexpected(int incount,
 		       int max_idle_time_ms);
 
 int BMI_testcontext(int incount,
+		    bmi_op_id_t* out_id_array,
 		    int *outcount,
 		    bmi_error_code_t * error_code_array,
 		    bmi_size_t * actual_size_array,

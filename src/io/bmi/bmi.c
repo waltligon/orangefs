@@ -905,6 +905,7 @@ int BMI_testunexpected(int incount,
  * returns 0 on success, -errno on failure
  */
 int BMI_testcontext(int incount,
+		    bmi_op_id_t* out_id_array,
 		    int *outcount,
 		    bmi_error_code_t * error_code_array,
 		    bmi_size_t * actual_size_array,
@@ -939,7 +940,9 @@ int BMI_testcontext(int incount,
 	{
 	    ret =
 		active_method_table[i]->
-		BMI_meth_testcontext((incount - position), &tmp_outcount,
+		BMI_meth_testcontext((incount - position), 
+					(&(out_id_array[position])),
+					&tmp_outcount,
 					(&(error_code_array[position])), 
 					(&(actual_size_array[position])),
 					(&(user_ptr_array[position])),
@@ -950,7 +953,9 @@ int BMI_testcontext(int incount,
 	{
 	    ret =
 		active_method_table[i]->
-		BMI_meth_testcontext((incount - position), &tmp_outcount,
+		BMI_meth_testcontext((incount - position), 
+					(&(out_id_array[position])),
+					&tmp_outcount,
 					(&(error_code_array[position])), 
 					(&(actual_size_array[position])),
 					NULL,

@@ -81,6 +81,14 @@ int BMI_tcp_testunexpected(int incount,
 			   int *outcount,
 			   struct method_unexpected_info *info,
 			   int max_idle_time_ms);
+int BMI_tcp_testcontext(int incount,
+		     bmi_op_id_t * out_id_array,
+		     int *outcount,
+		     bmi_error_code_t * error_code_array,
+		     bmi_size_t * actual_size_array,
+		     void **user_ptr_array,
+		     int max_idle_time_ms,
+		     bmi_context_id context_id);
 method_addr_p BMI_tcp_method_addr_lookup(const char *id_string);
 int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   method_addr_p dest,
@@ -219,7 +227,7 @@ struct bmi_method_ops bmi_tcp_ops = {
     BMI_tcp_post_recv,
     BMI_tcp_test,
     BMI_tcp_testsome,
-    NULL, /* testcontext */
+    BMI_tcp_testcontext,
     BMI_tcp_testunexpected,
     BMI_tcp_method_addr_lookup,
     BMI_tcp_post_send_list,
@@ -882,6 +890,7 @@ int BMI_tcp_testunexpected(int incount,
  * returns 0 on success, -errno on failure
  */
 int BMI_tcp_testcontext(int incount,
+		     bmi_op_id_t* out_id_array,
 		     int *outcount,
 		     bmi_error_code_t * error_code_array,
 		     bmi_size_t * actual_size_array,
@@ -910,6 +919,7 @@ int BMI_tcp_testcontext(int incount,
 	op_list_remove(query_op);
 	error_code_array[*outcount] = query_op->error_code;
 	actual_size_array[*outcount] = query_op->actual_size;
+	out_id_array[*outcount] = query_op->op_id;
 	if (user_ptr_array != NULL)
 	{
 	    user_ptr_array[*outcount] = query_op->user_ptr;
