@@ -38,8 +38,6 @@ DONE  - default gossip mask (server)
 DONE  - run in foreground/background
 DONE  - log file options
 
-. pick a license and apply it to all of the code
-
 . discontig in file support for ROMIO (Rob L.)
 
 . status document
