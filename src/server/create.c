@@ -46,15 +46,15 @@ PINT_state_machine_s create_req_s =
 
 %%
 
-machine create(init, create, send, release, cleanup)
+machine create(init, create2, send, release, cleanup)
 {
 	state init
 	{
 		run create_init;
-		default => create;
+		default => create2;
 	}
 
-	state create
+	state create2
 	{
 		run create_create;
 		default => send;

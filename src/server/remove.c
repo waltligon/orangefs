@@ -53,7 +53,7 @@ PINT_state_machine_s remove_req_s =
 
 %%
 
-machine remove(init, getattr, check_perms, remove, send, release, cleanup)
+machine remove(init, getattr, check_perms, remove2, send, release, cleanup)
 {
 	state init
 	{
@@ -65,17 +65,17 @@ machine remove(init, getattr, check_perms, remove, send, release, cleanup)
 	{
 		run remove_getattr;
 		success => check_perms;
-		default => remove;
+		default => remove2;
 	}
 
 	state check_perms
 	{
 		run remove_check_perms;
-		success => remove;
+		success => remove2;
 		default => send;
 	}
 
-	state remove
+	state remove2
 	{
 		run remove_remove;
 		default => send;
