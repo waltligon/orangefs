@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <malloc.h>
+#include <limits.h>
 
 #include <pvfs2-types.h>
 #include <pvfs2-attr.h>
@@ -19,6 +20,12 @@
 #include <gossip.h>
 #include <errno.h>
 #include <pvfs-request.h>
+
+/* TODO: note that this should be a derived value eventually.  For
+ * now it is hard coded to match the definition of
+ * TROVE_ITERATE_START in trove.h
+ */
+#define PVFS2_READDIR_START (INT_MAX-1)
 
 /*#define NUM_SERVER 10*/
 
