@@ -42,16 +42,16 @@ int main(int argc, char **argv)
 	rs1 = PINT_New_request_state(r1);
 
 	/* set up file data for first request */
-	rf1.iod_num = 0;
-	rf1.iod_count = 1;
-	rf1.fsize = 0;
+	rf1.iod_num = 1;
+	rf1.iod_count = 8;
+	rf1.fsize = 10000000;
 	rf1.dist = PVFS_Dist_create("simple_stripe");
 	rf1.extend_flag = 1;
 	PINT_Dist_lookup(rf1.dist);
 
    /* Turn on debugging */
-	/*gossip_enable_stderr(); /**/
-	/*gossip_set_debug_mask(1,REQUEST_DEBUG); /**/
+	gossip_enable_stderr(); /**/
+	gossip_set_debug_mask(1,REQUEST_DEBUG); /**/
 
 	offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
 	size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 	
 	retval = PINT_Process_request(rs1, &rf1, &segmax,
 		offset_array, size_array, &offset, &bytemax, 
-		&eof_flag, PINT_CKSIZE_MODIFY_OFFSET);
+		&eof_flag, PINT_CKSIZE_LOGICAL_SKIP); /**/
 
 	printf("\n************************************\n");
 	do
