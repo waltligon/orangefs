@@ -23,6 +23,9 @@ static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 static int split_string_list(char ***tokens,
 			     const char *comma_list);
 
+/* array to keep up with active contexts */
+static int context_array[BMI_MAX_CONTEXTS] = { 0 };
+
 #if !defined(__STATIC_METHOD_BMI_GM__) ||\
  !defined(__STATIC_METHOD_BMI_TCP__)
 /* define if there is only one active method */
@@ -405,12 +408,54 @@ int BMI_finalize(void)
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_open_context(bmi_context_id* context)
+int BMI_open_context(bmi_context_id* context_id)
 {
-    gossip_lerr("Warning: BMI_open_context() stub called.\n");
-    *context = 0;
-    return(0);
+    int context_index;
+    int i,j;
+    int ret = -1;
+
+    gen_mutex_lock(&interface_mutex);
+
+    /* find an unused context id */
+    for(context_index=0; context_index<BMI_MAX_CONTEXTS; context_index++)
+    {
+	if(context_array[context_index] == 0)
+	{
+	    break;
+	}
+    }
+
+    if(context_index >= BMI_MAX_CONTEXTS)
+    {
+	/* we don't have any more available! */
+	gen_mutex_unlock(&interface_mutex);
+	return(-EBUSY);
+    }
+
+    /* tell all of the modules about the new context */
+    for (i = 0; i < active_method_count; i++)
+    {
+	ret = active_method_table[i]->BMI_meth_open_context(context_index);
+	if(ret < 0)
+	{
+	    /* one of them failed; kill this context in the previous modules */
+	    for(j=(i-1); i>-1; i++)
+	    {
+		active_method_table[i]->BMI_meth_close_context(context_index);
+	    }
+	    goto out;
+	}
+    }
+
+    context_array[context_index] = 1;
+    *context_id = context_index;
+
+out:
+
+    gen_mutex_unlock(&interface_mutex);
+    return(ret);
 }
+
 
 /* BMI_close_context()
  *
@@ -418,9 +463,26 @@ int BMI_open_context(bmi_context_id* context)
  *
  * no return value
  */
-void BMI_close_context(bmi_context_id context)
+void BMI_close_context(bmi_context_id context_id)
 {
-    gossip_lerr("Warning: BMI_close_context() stub called.\n");
+    int i;
+
+    gen_mutex_lock(&interface_mutex);
+
+    if(!context_array[context_id])
+    {
+	gen_mutex_unlock(&interface_mutex);
+	return;
+    }
+
+    /* tell all of the modules to get rid of this context */
+    for (i = 0; i < active_method_count; i++)
+    {
+	active_method_table[i]->BMI_meth_close_context(context_id);
+    }
+    context_array[context_id] = 0;
+
+    gen_mutex_unlock(&interface_mutex);
     return;
 }
 

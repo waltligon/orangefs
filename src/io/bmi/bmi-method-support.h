@@ -14,6 +14,8 @@
 #include "quicklist.h"
 #include "bmi-types.h"
 
+#define BMI_MAX_CONTEXTS 16
+
 /********************************************************
  * method interfaces and data structures 
  */
@@ -151,6 +153,8 @@ struct bmi_method_ops
 					      bmi_msg_tag_t,
 					      void *,
 					      bmi_context_id);
+    int (*BMI_meth_open_context)(bmi_context_id);
+    void (*BMI_meth_close_context)(bmi_context_id);
 };
 
 

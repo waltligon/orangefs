@@ -113,6 +113,8 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_msg_tag_t tag,
 				     void *user_ptr,
 				     bmi_context_id context_id);
+int BMI_tcp_open_context(bmi_context_id context_id);
+void BMI_tcp_close_context(bmi_context_id context_id);
 
 char BMI_tcp_method_name[] = "bmi_tcp";
 
@@ -218,7 +220,9 @@ struct bmi_method_ops bmi_tcp_ops = {
     BMI_tcp_method_addr_lookup,
     BMI_tcp_post_send_list,
     BMI_tcp_post_recv_list,
-    BMI_tcp_post_sendunexpected_list
+    BMI_tcp_post_sendunexpected_list,
+    BMI_tcp_open_context,
+    BMI_tcp_close_context
 };
 
 /* module parameters */
@@ -982,6 +986,35 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				      size_list, list_count, buffer_flag,
 				      my_header, user_ptr, 0));
 }
+
+
+/* BMI_tcp_open_context()
+ *
+ * opens a new context with the specified context id
+ *
+ * returns 0 on success, -errno on failure
+ */
+int BMI_tcp_open_context(bmi_context_id context_id)
+{
+    /* TODO: implement */
+    gossip_lerr("Warning: BMI_tcp_open_context() stub called, context_id: %d.\n", (int)context_id);
+    return(0);
+}
+
+
+/* BMI_tcp_close_context()
+ *
+ * shuts down a context, previously opened with BMI_tcp_open_context()
+ *
+ * no return value
+ */
+void BMI_tcp_close_context(bmi_context_id context_id)
+{
+    /* TODO: implement */
+    gossip_lerr("Warning: BMI_tcp_close_context() stub called, context_id: %d.\n", (int)context_id);
+    return;
+}
+
 
 /* tcp_forget_addr()
  *

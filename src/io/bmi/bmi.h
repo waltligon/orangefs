@@ -30,9 +30,9 @@ int BMI_initialize(const char *method_list,
 
 int BMI_finalize(void);
 
-int BMI_open_context(bmi_context_id* context);
+int BMI_open_context(bmi_context_id* context_id);
 
-void BMI_close_context(bmi_context_id context);
+void BMI_close_context(bmi_context_id context_id);
 
 int BMI_post_send(bmi_op_id_t * id,
 		  bmi_addr_t dest,
