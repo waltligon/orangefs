@@ -42,17 +42,22 @@ struct PINT_server_lookup_op {
     void *segstate;
 
     PVFS_handle dirent_handle;
-    PVFS_object_attr base_attr; /* used to hold attributes of the base handle, which don't go in resp */
+    PVFS_object_attr base_attr; /* holds attributes of the base handle, which don't go in resp */
 };
 
 struct PINT_server_readdir_op {
-    PVFS_object_attr directory_attr; /* used to hold attributes of directory to read */
-    PVFS_handle dirent_handle; /* used to hold handle of dirdata dspace from which entries are read */
+    PVFS_object_attr directory_attr; /* holds attributes of directory to read */
+    PVFS_handle dirent_handle;       /* holds handle of dirdata dspace from which entries are read */
+};
+
+struct PINT_server_rmdirent_op {
+    PVFS_object_attr parent_attr;             /* holds attributes of directory from which entry will be removed */
+    PVFS_handle dirdata_handle, entry_handle; /* holds handle of dirdata object, removed entry */
 };
 
 struct PINT_server_crdirent_op {
-    PVFS_object_attr parent_attr; /* used to hold attributes of the parent directory */
-    PVFS_handle dirent_handle; /* used to hold handle of dirdata dspace that we'll write the dirent into */
+    PVFS_object_attr parent_attr; /* holds attributes of the parent directory */
+    PVFS_handle dirent_handle;    /* holds handle of dirdata dspace that we'll write the dirent into */
 };
 
 struct PINT_server_remove_op {
@@ -89,6 +94,7 @@ typedef struct PINT_server_op
 	struct PINT_server_crdirent_op crdirent;
 	struct PINT_server_readdir_op  readdir;
 	struct PINT_server_remove_op   remove;
+	struct PINT_server_rmdirent_op rmdirent;
     } u;
 } PINT_server_op;
 
