@@ -852,7 +852,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 
             if (msg_p->op_status)
             {
-		PVFS_perror_gossip("op_status", msg_p->op_status);
                 js_p->error_code = -PVFS_EIO;
                 return 1;
             }
