@@ -160,7 +160,7 @@ static int lebf_encode_req(
 
     /* set size of buffer needed, although some requests may override this */
     target_msg->size_list[0] = target_msg->total_size = 
-	max_size_array[request->op].max_req;
+	max_size_array[request->op].max_req + PINT_ENC_GENERIC_HEADER_SIZE;
 
     switch(request->op)
     {
@@ -172,6 +172,9 @@ static int lebf_encode_req(
 		ret = -ENOMEM;
 
 	    /* encode */
+	    memcpy(target_msg->ptr_current, le_bytefield_table.generic_header,
+		PINT_ENC_GENERIC_HEADER_SIZE);
+	    target_msg->ptr_current += PINT_ENC_GENERIC_HEADER_SIZE;
 	    PINT_XENC_REQ_GEN(target_msg, request);
 	    PINT_XENC_REQ_GETCONFIG(target_msg, request);
 

@@ -85,6 +85,7 @@ int PINT_encode(
     switch(enc_type)
     {
 	case PINT_ENC_DIRECT:
+	case PINT_ENC_LE_BFIELD:
 	    if (input_type == PINT_ENCODE_REQ)
 	    {
 		ret =  PINT_encoding_table[enc_type]->op->encode_req(input_buffer,
@@ -219,6 +220,7 @@ int PINT_encode_calc_max_size(
 
     switch(enc_type)
     {
+	case PINT_ENC_LE_BFIELD:
 	case PINT_ENC_DIRECT:
 	    ret = PINT_encoding_table[enc_type]->op->encode_calc_max_size
 		(input_type, op_type);
