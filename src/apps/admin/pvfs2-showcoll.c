@@ -13,8 +13,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 
-#include "pvfs2-storage.h"
-#include "pvfs2-attr.h"
+#include "pvfs2.h"
 #include "trove.h"
 
 static char storage_space[PATH_MAX] = "/tmp/pvfs2-test-space";

@@ -13,10 +13,9 @@
 #include <fcntl.h>
 #include <sys/time.h>
 #include <time.h>
+#include <stdlib.h>
 
-#include "pvfs2-sysint.h"
-#include "helper.h"
-#include "simple-stripe.h"
+#include "pvfs2.h"
 
 #define DEFAULT_TAB "/etc/pvfs2tab"
 

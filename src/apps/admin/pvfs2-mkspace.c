@@ -12,8 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "pvfs2-attr.h"
-#include "trove.h"
+#include "pvfs2.h"
 #include "mkspace.h"
 
 static int verbose = 0;

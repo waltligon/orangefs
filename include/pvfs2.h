@@ -39,6 +39,11 @@
  */
 #include "str-utils.h"
 
+/* included (from the test subtree) to get lookup_parent_handle(), same 
+ * basic problem as str-utils.h include listed above
+ */
+#include "helper.h"
+
 #endif /* __PVFS2_H */
 
 /*
