@@ -890,7 +890,7 @@ ROMIO patch.  The patch makes changes to the ROMIO configure scripts, so you'll 
 \begin{verbatim}
 prompt% tar xzf ~/src/mpich2-0.96p2.tar.gz     # unpack mpich2 source
 prompt% cd mpich2-0.96p2/src/mpi/romio         # change to ROMIO dir
-prompt% patch -p1 < ~/src/romio-<CORRECT_VERSION>.diff   #apply patch
+prompt% patch -p0 < ~/src/romio-<CORRECT_VERSION>.diff   #apply patch
 prompt% autoconf                               # create a new 'configure'
 prompt% cd ../../..                            # return to top of src
 prompt% 

@@ -3,18 +3,13 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.6.0pre1
-===============
-- 
-
-
 pvfs2-0.5.1
 ===========
-- added a pidfile option to pvfs2-server for init script integration
-- auto-tuned BMI timeout to poll during activity, sleep a bit otherwise
+- add a pidfile option to pvfs2-server for integration with init scripts
+- auto-tune BMI timeout to poll during activity, sleep a bit otherwise
 - pay attention to BMI timeouts in IB layer
 - fail quitely on unrecognized BMI method types in pvfs2tab
-- disabled TCP method for IB builds
+- disable TCP method for IB builds
 - added pvfs2-cp, which should have all of the functionaly of pvfs2-import 
   and pvfs2-export, but none of the bugs (!)
 - bug fixed to idle detection logic in job.c (non-threaded case)
@@ -46,7 +41,6 @@ pvfs2-0.5.1
     duplicate inodes with the same number in the vfs
   - fixed kernel create mode translation when creating new objects
 - kernel 2.4.x. support introduced (supports 2.4.19 and up)
-- allow pvfs2-client to restart on device open failure
 - updated quickstart with the following information:
   - gcc 2.96 or above is required (as gcc 2.95 generates buggy code)
   - how to use the kernel interface under 2.4.19 or above

@@ -721,7 +721,6 @@ cleaner: clean
 	rm -f src/kernel/linux-2.4/Makefile
 	rm -f maint/mpi-depend.sh
 	rm -f examples/pvfs2-server.rc
-	rm -f examples/fs.conf examples/server.conf-localhost
 	rm -rf autom4te*.cache
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
 	rm -f config.log config.status config.cache 

@@ -42,7 +42,6 @@ hsrc = \
 
 objs = $(csrc:.c=.o)
 othergen = pvfs2.o pvfs2.ko pvfs2.mod.c pvfs2.mod.o
-othergendir = .tmp_versions  # around 2.6.6 this is generated locally
 cmds = $(patsubst %,.%.cmd,$(objs) $(othergen))
 
 ifneq ($(KERNELRELEASE),)
@@ -92,7 +91,6 @@ ifdef QUIET_COMPILE
 	    fi ;\
 	done
 	@rm -f $(objs) $(othergen) $(cmds)
-	@rm -rf $(othergendir)
 else
 	for i in $(csrc) $(hsrc); do \
 	    if [[ -L $$i ]] ; then \
@@ -100,7 +98,6 @@ else
 	    fi ;\
 	done
 	rm -f $(objs) $(othergen) $(cmds)
-	rm -rf $(othergendir)
 endif
 
 endif
