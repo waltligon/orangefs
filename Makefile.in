@@ -1,52 +1,200 @@
+# Top level makefile for pvfs2
+
+###############################################################
+# LIST OF TARGETS WHICH MAY BE USED WHEN RUNNING MAKE:
+#
+# all        default rule; builds libs, server, and test programs
+# clean      cleans up files
+# distclean  _really_ cleans up; returns to pristine tree
+# docs       builds documentation in docs subdirectory
+# docsclean  cleans up documentation files
+# tests      builds test programs
+# statecomp  builds only the statecomp component
+# cscope      generates information for cscope utility
+# 
+# NOTE: you can also specify any single object or executable to
+#    build by providing its name (including the relative path) as the
+#    make target
+#
+
+###############################################################
+# General documentation
+#
+# This is a single makefile that runs the entire pvfs2 build
+# process.  There are no makefiles in subdirectories.  For a
+# general introduction to this approach, please read this document
+# by Peter Miller:
+#
+# http://www.tip.net.au/~millerp/rmch/recu-make-cons-harm.html
+#
+# Each subdirectory contains a module.mk file that gets included
+# when make is executed.  These module.mk files tell make about the
+# files in each subdirectory that must be built, including any
+# special case rules.  Make uses this information to generate a
+# sinle dependency graph and orchestrate the build process from this
+# top level directory.
+#
+# We categorize our source depending on what it will be used for.
+# For example, there are lists of source files for building the
+# server, building the library, building documentation, etc.
+#
+
+###############################################################
+# Generic makefile setup 
+
+# define a few generic variables that we need to use
 srcdir = @srcdir@
 VPATH = $(srcdir)
 SHELL = @SHELL@
 INSTALL = @INSTALL@
-
-.SUFFIXES:
-.PHONY: all clean tests distclean docs docsclean cscope
-
-# main source subdirectories
-#
-# To build up our MODULES line, we search the build tree for
-# the module.mk files that were created by configure.
-#
-MODULES := $(shell find . -iname "*.mk" | sed -e 's/^.\///;s/module.mk//')
-
-# TODO: fix this up later.  Maybe it should be LEX and YACC, but we
-# don't really support those...
+# TODO: should probably check for bison and flex in configure
 BISON = bison
 FLEX = flex
 
+# Eliminate all default suffixes.  We want explicit control.
+.SUFFIXES:
+
+# PHONEY targets are targets that do not result in the generation
+#    of a file that has the same name as the target.  Listing them
+#    here keeps make from accidentally doing too much work (see GNU
+#    make manual).
+.PHONY: all clean tests distclean docs docsclean cscope statecomp
+
+################################################################
+# Find project subdirectories
+
+# MODULES is a list of subdirectories that we wish to operate on.
+#    They are identified by the presence of module.mk files (makefile
+#    includes).
+MODULES := $(shell find . -iname "*.mk" | sed -e 's/^.\///;s/module.mk//')
+
+#################################################################
+# Setup global flags
+
+# These should all be self explanatory; they are standard flags
+# for compiling and linking unless otherwise noted
 CC = @CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LD = gcc
-CFLAGS +=\
- -D__STATIC_METHOD_BMI_TCP__\
- -D__STATIC_FLOWPROTO_TEMPLATE__\
- -D__STATIC_FLOWPROTO_BMI_TROVE__\
- -DUSE_BMI_MSGS=1\
- -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE\
- -I src/common/statecomp\
- -I .\
- -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include
-# TODO: add -Wconversion back into the flags later; it generates too many
-# warnings for us to just leave in there right now
 LDFLAGS += -L lib
 LIBS += -lpvfs2
-SERVERLIBS = -ldb -lrt -lpthread
-# here we differentiate cflags between some components
-LIBCFLAGS = -D__GEN_NULL_LOCKING__
-SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__
-# add all module directories into include path
+  # enable BMI TCP module
+CFLAGS += -D__STATIC_METHOD_BMI_TCP__
+  # enable Flow template protocol
+CFLAGS += -D__STATIC_FLOWPROTO_TEMPLATE__
+  # enable Flow BMI/Trove protocol
+CFLAGS += -D__STATIC_FLOWPROTO_BMI_TROVE__
+  # flags used by request encoding test harness
+CFLAGS += -DUSE_BMI_MSGS=1
+  # turn on large file support by default
+CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
+  # include current directory (for pvfs2-config.h)
+CFLAGS += -I .
+  # setup general warning levels and gcc options
+CFLAGS += -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include
+  # add all module directories into include path
 CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 
-#
+################################################################
+# Setup component specific flags
+
+# the server will use a threaded job library 
+SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__
+SERVERLIBS = -ldb -lrt -lpthread
+# the client libraries are not threaded (at the moment at least)
+#    and therefore can disable locking in the I/O subsystems
+LIBCFLAGS = -D__GEN_NULL_LOCKING__
+
+#################################################################
+# Starter variables 
+
+# NOTES: These variables are used to categorize the various source
+#    files.  We let the makefile includes append to them so that we
+#    gradually build up a list of source files without having to
+#    list them all at the top level.
+
+# TESTSRC is source code for test programs
+TESTSRC :=
+# LIBSRC is source code for libpvfs2
+LIBSRC :=
+# SERVERSRC is souce code for the pvfs2 server
+SERVERSRC :=
+# DOCSRC is source code for documentation
+DOCSRC :=
+# MISCSRC is a grab bag of other sources that must be built into
+#    object form (for example, shared test components)
+MISCSRC := 
+
+################################################################
+# Top level (default) targets
+
+# SERVER is the pvfs2 server
+SERVER := src/server/pvfs2-server
+# LIBRARIES is a list of the pvfs2 client libraries
+LIBRARIES := lib/libpvfs2.a
+# default rule builds server, library, and test programs
+all: $(SERVER) $(LIBRARIES) tests
+
+################################################################
+# Makefile includes
+
+# this is how we pull build information from all of the project
+#    subdirectories
+include $(patsubst %, %/module.mk, $(MODULES))
+
+################################################################
+# Derived file lists
+
+# NOTES: At this point, the subdirectorie makefile includes have informed
+#    us what the source files are.  Now we want to generate some
+#    other lists (such as objects, executables, and dependency files)
+#    by manipulating the lists of source files
+
+# LIBOBJS is a list of objects to put in the client lib
+LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
+# LIBDEPENDS is a list of dependency files for the client lib
+LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+
+# TESTOBJS is a list of test program objects
+TESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(TESTSRC)))
+# TESTS is a list of test program executables
+TESTS := $(patsubst %.c,%, $(filter %.c, $(TESTSRC)))
+# TESTDEPENDS is a list of dependency files for test programs
+TESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(TESTSRC)))
+
+# SERVEROBJS is a list of objects to put into the server
+SERVEROBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERSRC)))
+# SERVERDEPENDS is a list of dependency files for the server
+SERVERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERSRC)))
+
+# MISCOBJS is a list of misc. objects not in the above categories
+MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
+# MISCDEPENDS is a list of dependency files for misc. objects
+MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
+
+# DOCSPDF and DOCSPS are lists of documentation files generated from
+#    latex
+DOCSPDF := $(patsubst %.tex,%.pdf, $(filter %.tex,$(DOCSRC)))
+DOCSPS := $(patsubst %.tex,%.ps, $(filter %.tex,$(DOCSRC)))
+
+# DOCSCRUFT is a list of intermediate files generated by latex
+DOCSCRUFT := $(patsubst %.tex,%.aux, $(filter %.tex,$(DOCSRC)))
+DOCSCRUFT += $(patsubst %.tex,%.dvi, $(filter %.tex,$(DOCSRC)))
+DOCSCRUFT += $(patsubst %.tex,%.log, $(filter %.tex,$(DOCSRC)))
+DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
+
+# DEPENDS is a global list of all of our dependency files.  
+# NOTE: sort is just a trick to remove duplicates; the order
+#   doesn't matter at all.
+DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS))
+
 # CLEANFILES is a list of generated files that need to be removed at
-# "make clean" time.  This is just for special case files that aren't
-# cleaned up by our normal rules.
-#
+#    "make clean" time.  This is just for special case files that aren't
+#    cleaned up by our normal rules.
+# NOTE: This doesn't include automatically generated source code.
+#    Automatically generate source code is only removed during
+#    distclean
 CLEANFILES :=\
  src/common/statecomp/statecomp\
  src/common/statecomp/*.o \
@@ -54,105 +202,67 @@ CLEANFILES :=\
  src/common/statecomp/parser.c \
  src/common/statecomp/parser.h 
 
-LIBRARIES := lib/libpvfs2.a
-TESTSRC :=
-LIBSRC :=
-SERVERSRC :=
-MISCSRC := 
-DOCSRC :=
-SERVER := src/server/pvfs2-server
+####################################################################
+# Rules and dependencies
 
-all: $(LIBRARIES) tests $(SERVER)
-
-include $(patsubst %, %/module.mk, $(MODULES))
-
-LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
-LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
-
-TESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(TESTSRC)))
-TESTS := $(patsubst %.c,%, $(filter %.c, $(TESTSRC)))
-TESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(TESTSRC)))
-
-SERVEROBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERSRC)))
-SERVERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERSRC)))
-
-# MISC objs don't belong in the client library, or the server, nor
-# are they test programs.  This is where you can put other random
-# things that need to be built, such as helper objects for test
-# programs
-MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
-MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
-
-DOCSPDF := $(patsubst %.tex,%.pdf, $(filter %.tex,$(DOCSRC)))
-DOCSPS := $(patsubst %.tex,%.ps, $(filter %.tex,$(DOCSRC)))
-# find all of the intermediate files that latex creates
-DOCSCRUFT := $(patsubst %.tex,%.aux, $(filter %.tex,$(DOCSRC)))
-DOCSCRUFT += $(patsubst %.tex,%.dvi, $(filter %.tex,$(DOCSRC)))
-DOCSCRUFT += $(patsubst %.tex,%.log, $(filter %.tex,$(DOCSRC)))
-DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
-
-#
-# SRCFILES is a list of source files that need to be generated
-# before we get going.  This is kind of a hack, and we should
-# try to find a better way to take care of it.
-#
-SRCFILES :=\
- src/io/trove/trove-autogen.c \
- $(SERVERGENSRC)
-
-# we don't really care if the dependencies are sorted; 
-# this is just a trick to remove duplicate entries
-DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS))
-
+# target for building the test program executables
 tests: $(TESTS)
 
+# rule for building the pvfs2 server
 $(SERVER): $(SERVEROBJS)
 	$(LD) $(LDFLAGS) $(SERVERLIBS) $^ -o $@
 
+# rule for building the pvfs2 library
 lib/libpvfs2.a: $(LIBOBJS)
 	$(INSTALL) -d lib
 	ar rcs $@ $(LIBOBJS)
 
-# NEW DEFAULT RULE FOR BUILDING EXECUTABLES FROM .O FILES
+# default rule for building executables from object files
 %: %.o $(LIBRARIES)
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-#
-# NOTE: NOT SURE IF IT IS IMPORTANT FOR THIS RULE TO BE
-# FIRST OR NOT...SHOULD LEARN THE MATCHING RULES BETTER.
-#
+# rule for building server objects
 %-server.o: %.c
 	$(CC) $(SERVERCFLAGS) $(CFLAGS) $< -c -o $@
 
+# default rule for building objects 
 %.o: %.c
 	$(CC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
 
+# all test programs depend on the pvfs2 library
 $(TESTS): %: %.o $(LIBRARIES)
 
+# target for building _just_ the statecomp tool
 statecomp: src/common/statecomp/statecomp
 	
+# rule for generating cscope information
 cscope:
 	find $(srcdir) -iname "*.[ch]" > $(srcdir)/cscope.files
 	( cd $(srcdir); cscope -be -i $(srcdir)/cscope.files )
 
+# target for building documentation
 docs: $(DOCSPS) $(DOCSPDF)
 
+# rule for cleaning up documentation
 docsclean: 
 	rm -f $(DOCSPS) $(DOCSPDF) $(DOCSCRUFT)
 
+# top rule for cleaning up tree
 clean: docsclean
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
 		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)  $(SERVER)
 
+# _really_ clean the tree; should go back to pristine state
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;
-	rm -f $(SRCFILES) Makefile
-	rm -f config.log config.status pvfs2-config.h
+	rm -f Makefile config.log config.status pvfs2-config.h
+	rm -f src/io/trove/autogen.c
+	rm -f $(SERVERGENSRC)
 
-# we don't want to include dependencies in the makefile if we are just
-# running make clean or make distclean
-#
-# NOTE: there should be a way to combine these lines...
+# this is where we include all of our automatic dependencies.
+# NOTE: we wrap this in ifneq's in order to prevent the
+#    dependencies from being generated for special targets that don't 
+#    require them
 ifneq ($(MAKECMDGOALS),statecomp)
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(MAKECMDGOALS),distclean)
@@ -165,23 +275,17 @@ endif
 endif
 endif
 
-# build program needed to generate state machines source before 
-# generating source
-# $(SRCFILES): src/common/statecomp/statecomp
-
-# @ suppresses output from the depend shell script.
+# default rule for generating dependency files
 %.d: %.c
 	@echo generating dependency file $@.
 	@$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@
 
-# TODO: these documentation rules are broken for out of tree builds
 # default rules for building documents in .tex format:
+# TODO: these documentation rules are broken for out of tree builds
 %.dvi: %.tex
 	cd $(@D); latex $(<F); latex $(<F)
-
 %.ps: %.dvi
 	cd $(@D); dvips -t letter $(<F) -o $(@F)
-
 %.pdf: %.dvi
 	cd $(@D); dvipdf $(<F) $(@F)
 
