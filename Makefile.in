@@ -13,8 +13,7 @@
 # statecomp  builds only the statecomp component
 # cscope     generates information for cscope utility
 # codecheck  checks source code for nonconformance to our std.
-# mpitests   builds test programs that use mpi (PLEASE SET THE
-#            "MPICC" ENVIRONMENT VARIABLE BEFORE BUILDING)
+# mpitests   builds test programs that use mpi
 # 
 # NOTE: you can also specify any single object or executable to
 #    build by providing its name (including the relative path) as the
@@ -55,6 +54,8 @@ INSTALL = @INSTALL@
 BISON = bison
 FLEX = flex
 BUILD_GM = @BUILD_GM@
+BUILD_MPI = @BUILD_MPI@
+MPICC = @MPICC@
 
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
@@ -124,6 +125,7 @@ ifdef BUILD_GM
 	LIBS += -lgm
 	SERVERLIBS += -lgm
 endif
+
 
 #################################################################
 # Starter variables 
@@ -236,6 +238,9 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
 DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS)) 
+ifdef BUILD_MPI
+DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
+endif
 
 # CLEANFILES is a list of generated files that need to be removed at
 #    "make clean" time.  This is just for special case files that aren't
@@ -261,6 +266,10 @@ tests: $(TESTS)
 
 # target for building MPI test program executables
 mpitests: $(MPITESTS)
+ifdef BUILD_MPI
+# add MPI programs to default rule
+all: mpitests
+endif
 
 # rule for building the pvfs2 server
 $(SERVER): $(SERVEROBJS)
@@ -273,11 +282,23 @@ lib/libpvfs2.a: $(LIBOBJS)
 
 # rule for building MPI objects
 $(MPITESTOBJS): %.o: %.c
+ifdef BUILD_MPI
 	$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+else
+	@echo Error: You must specify --with-mpi=dir at configure time 
+	@echo   in order to enable compilation of MPI programs.
+	@false
+endif
 
 # rule for building MPI misc. objects
 $(MPIMISCOBJS): %.o: %.c
+ifdef BUILD_MPI
 	$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+else
+	@echo Error: You must specify --with-mpi=dir at configure time 
+	@echo   in order to enable compilation of MPI programs.
+	@false
+endif
 
 # rule for building MPI executables from object files
 # $(MPITESTS): %: %.o $(LIBRARIES)
@@ -349,17 +370,13 @@ endif
 endif
 endif
 
-ifeq ($(MAKECMDGOALS),mpitests)
--include $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
-endif
-
 # rule for generating dependency files for MPI code
 $(MPITESTDEPENDS): %.d: %.c
 	@echo generating dependency file $@.
-	@$(srcdir)/maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
+	@sh $(srcdir)/maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
 $(MPIMISCDEPENDS): %.d: %.c
 	@echo generating dependency file $@.
-	@$(srcdir)/maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
+	@sh $(srcdir)/maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c

@@ -109,8 +109,8 @@ Define if DB open function takes a txnid parameter),
 AC_MSG_RESULT(no))
 
 dnl configure options for GM install path
-AC_ARG_WITH(gm,--with-gm=<dir>           Location of the GM binary tree
-(default=/opt/gm),GM_HOME="$withval",GM_HOME="/opt/gm")
+AC_ARG_WITH(gm,[  --with-gm=<dir>          Location of the GM installation (default=/opt/gm)],
+    GM_HOME="$withval",GM_HOME="/opt/gm")
 
 AC_SUBST(GM_HOME)
 
@@ -124,6 +124,30 @@ AC_CHECK_HEADER(gm.h,
 CPPFLAGS="$CPPFLAGS_OLD"
 
 AC_SUBST(BUILD_GM)
+
+AC_ARG_WITH(mpi, 
+[  --with-mpi=<dir>         Location of the MPI installation],
+    if test x$withval = xyes; then
+	AC_MSG_ERROR(--with-mpi must be given a pathname)
+    else
+	MPICC="${withval}/bin/mpicc"
+	BUILD_MPI="1"
+    fi
+)
+
+if test x$BUILD_MPI = x1; then
+    AC_MSG_CHECKING(whether the mpicc compiler works)
+    saveCC="$CC"
+    CC="$MPICC"
+    AC_TRY_COMPILE([#include <mpi.h>], [int ret = MPI_Init(0, (void*)0)],
+	AC_MSG_RESULT(yes),
+	AC_MSG_RESULT(no)
+	AC_MSG_ERROR($CC doesn't appear to be a valid MPI compiler)
+    )
+    CC="$saveCC"
+    AC_SUBST(MPICC)
+    AC_SUBST(BUILD_MPI)
+fi
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
@@ -179,6 +203,7 @@ test/correctness/pts/module.mk
 doc/coding/module.mk
 doc/design/module.mk
 doc/random/module.mk
+maint/mpi-depend.sh
 )
 
 
