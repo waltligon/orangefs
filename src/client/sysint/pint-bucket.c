@@ -28,7 +28,7 @@
 */
 #define MAX_BMI_ADDR_LEN  512
 
-static struct qhash_table *s_fsid_config_cache_table = NULL;
+struct qhash_table *PINT_fsid_config_cache_table = NULL;
 
 /* these are based on code from src/server/request-scheduler.c */
 static int hash_fsid(void *fsid, int table_size);
@@ -45,10 +45,10 @@ static void free_host_extent_table(void *ptr);
  */
 int PINT_bucket_initialize(void)
 {
-    s_fsid_config_cache_table =
+    PINT_fsid_config_cache_table =
         qhash_init(hash_fsid_compare,hash_fsid,67);
 
-    return (s_fsid_config_cache_table ? 0 : -ENOMEM);
+    return (PINT_fsid_config_cache_table ? 0 : -ENOMEM);
 }
 
 /* PINT_bucket_finalize()
@@ -68,9 +68,9 @@ int PINT_bucket_finalize(void)
       this is an exhaustive and slow iterate.  speed this up
       if 'finalize' is something that will be done frequently.
     */
-    for (i = 0; i < s_fsid_config_cache_table->table_size; i++)
+    for (i = 0; i < PINT_fsid_config_cache_table->table_size; i++)
     {
-        hash_link = qhash_search(s_fsid_config_cache_table,&(i));
+        hash_link = qhash_search(PINT_fsid_config_cache_table,&(i));
         if (hash_link)
         {
             cur_config_cache =
@@ -86,7 +86,7 @@ int PINT_bucket_finalize(void)
                        free_host_extent_table);
         }
     }
-    qhash_finalize(s_fsid_config_cache_table);
+    qhash_finalize(PINT_fsid_config_cache_table);
     return(0);
 }
 
@@ -142,7 +142,7 @@ int PINT_handle_load_mapping(
             cur_config_fs_cache->data_server_cursor =
                 cur_config_fs_cache->fs->data_handle_ranges;
 
-            qhash_add(s_fsid_config_cache_table,
+            qhash_add(PINT_fsid_config_cache_table,
                       &(cur_config_fs_cache->fs->coll_id),
                       &(cur_config_fs_cache->hash_link));
         }
@@ -179,7 +179,7 @@ int PINT_bucket_get_next_meta(
 
     if (config && meta_addr && meta_handle_extent_array)
     {
-        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
         if (hash_link)
         {
             cur_config_cache =
@@ -239,7 +239,7 @@ int PINT_bucket_get_next_io(
 
     if (config && num_servers && io_addr_array)
     {
-        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
         if (hash_link)
         {
             cur_config_cache =
@@ -317,7 +317,7 @@ int PINT_bucket_get_physical(
 	return(-EINVAL);
     }
 
-    hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
     if (hash_link)
     {
 	cur_config_cache =
@@ -419,7 +419,7 @@ int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
 
     if (num_meta)
     {
-        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
         if (hash_link)
         {
             cur_config_cache =
@@ -451,7 +451,7 @@ int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
 
     if (num_io)
     {
-        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
         if (hash_link)
         {
             cur_config_cache =
@@ -487,9 +487,9 @@ int PINT_bucket_get_server_name(
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    assert(s_fsid_config_cache_table);
+    assert(PINT_fsid_config_cache_table);
 
-    hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
     if (hash_link)
     {
         cur_config_cache =
@@ -541,7 +541,7 @@ int PINT_bucket_get_root_handle(
 
     if (fh_root)
     {
-        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
         if (hash_link)
         {
             cur_config_cache =

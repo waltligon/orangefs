@@ -18,6 +18,16 @@
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 
+/* we are going to break some API boundaries here to get to the information
+ * that we need
+ */
+#include "server-config.h"
+#include "quicklist.h"
+#include "quickhash.h"
+#include "pint-sysint.h"
+extern struct server_configuration_s g_server_config;
+extern struct qhash_table *PINT_fsid_config_cache_table;
+
 #define DEFAULT_TAB "/etc/pvfs2tab"
 
 struct options
@@ -28,6 +38,8 @@ struct options
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 static void print_mntent(struct pvfs_mntent_s* entry);
+static int print_config(struct server_configuration_s* conf,
+    PVFS_fs_id fsid);
 
 int main(int argc, char **argv)
 {
@@ -107,11 +119,83 @@ int main(int argc, char **argv)
 
     cur_fs = resp_init.fsid_list[mnt_index];
 
+    ret = print_config(&g_server_config, cur_fs);
+    if(ret < 0)
+    {
+	PVFS_perror("print_config", ret);
+	fprintf(stderr, "Failure: could not print configuration.\n");
+	return(-1);
+    }
+
+
     PVFS_sys_finalize();
 
     return(ret);
 }
 
+
+/* print_config()
+ *
+ * prints out config file information
+ *
+ * returns -PVFS_error on failure, 0 on success
+ */
+static int print_config(struct server_configuration_s* conf,
+    PVFS_fs_id fsid)
+{
+    struct qlist_head* hash_link = NULL;
+    char* server_bmi_str = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    struct llist* tmp_server = NULL;
+    struct host_handle_mapping_s *cur_mapping = NULL;
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
+    if(!hash_link)
+    {
+	fprintf(stderr, "Failure: could not find fsid %d in configuration.\n",
+	    (int)fsid);
+	return(-PVFS_EINVAL);
+    }
+
+    cur_config_cache =
+	qlist_entry(hash_link, struct config_fs_cache_s,
+		    hash_link);
+    tmp_server = cur_config_cache->fs->meta_handle_ranges;
+    if(!tmp_server)
+    {
+	fprintf(stderr, "Failure: could not find meta servers in configuration.\n");
+	return(-PVFS_EINVAL);
+    }
+
+    printf("\n   meta servers (duplicates are Ok):\n");
+    while((cur_mapping = llist_head(tmp_server)))
+    {
+	tmp_server = llist_next(tmp_server);
+
+	server_bmi_str = PINT_config_get_host_addr_ptr(
+	    conf,cur_mapping->alias_mapping->host_alias);
+	printf("   %s\n", server_bmi_str);
+    }
+
+    tmp_server = cur_config_cache->fs->data_handle_ranges;
+    if(!tmp_server)
+    {
+	fprintf(stderr, "Failure: could not find data servers in configuration.\n");
+	return(-PVFS_EINVAL);
+    }
+
+    printf("\n   data servers (duplicates are Ok):\n");
+    while((cur_mapping = llist_head(tmp_server)))
+    {
+	tmp_server = llist_next(tmp_server);
+
+	server_bmi_str = PINT_config_get_host_addr_ptr(
+	    conf,cur_mapping->alias_mapping->host_alias);
+	printf("   %s\n", server_bmi_str);
+    }
+
+    return(0);
+}
 
 /* print_mntent()
  *
@@ -121,9 +205,10 @@ int main(int argc, char **argv)
  */
 static void print_mntent(struct pvfs_mntent_s* entry)
 {
-    printf("   Initial server: %s\n", entry->meta_addr);
+    printf("\n   Initial server: %s\n", entry->meta_addr);
     printf("   Storage name: %s\n", entry->service_name);
     printf("   Local mount point: %s\n", entry->local_mnt_dir);
+    return;
 }
 
 /* parse_args()
