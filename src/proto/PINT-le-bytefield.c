@@ -100,6 +100,35 @@ do{								    \
 #define PINT_XENC_PVFS_GID	    PINT_XENC_UINT32
 #define PINT_XENC_PVFS_TIME	    PINT_XENC_INT64
 #define PINT_XENC_PVFS_PERMISSIONS  PINT_XENC_UINT32
+#define PINT_XENC_PVFS_DS_TYPE	    PINT_XENC_ENUM
+
+/* TODO: fill these in */
+#define PINT_XENC_PVFS_DIST	    do{}while(0)	    
+#define PINT_XENC_PVFS_DFILES	    do{}while(0)
+
+#define PINT_XENC_PVFS_OBJ_ATTR(msg_p,attr_p)			    \
+do{								    \
+    PINT_XENC_PVFS_UID(msg_p,&((attr_p)->owner));		    \
+    PINT_XENC_PVFS_GID(msg_p,&((attr_p)->group));		    \
+    PINT_XENC_PVFS_PERMISSIONS(msg_p,&((attr_p)->perms));	    \
+    PINT_XENC_PVFS_TIME(msg_p,&((attr_p)->atime));		    \
+    PINT_XENC_PVFS_TIME(msg_p,&((attr_p)->mtime));		    \
+    PINT_XENC_PVFS_TIME(msg_p,&((attr_p)->ctime));		    \
+    PINT_XENC_UINT32(msg_p,&((attr_p)->mask));			    \
+    PINT_XENC_PVFS_DS_TYPE(msg_p,&((attr_p)->objtype));		    \
+    if(attr_p->mask & PVFS_ATTR_META_DIST){			    \
+    }								    \
+    if(attr_p->mask & PVFS_ATTR_META_DFILES){			    \
+    }								    \
+    if(attr_p->mask & PVFS_ATTR_DATA_SIZE){			    \
+	PINT_XENC_PVFS_SIZE(msg_p,&((attr_p)->u.data.size));	    \
+    }								    \
+    if(attr_p->mask & PVFS_ATTR_SYMLNK_TARGET){			    \
+	PINT_XENC_UINT32(msg_p,&((attr_p)->u.sym.target_path_len)); \
+	PINT_XENC_STRING(msg_p,(attr_p)->u.sym.target_path,	    \
+	    (attr_p)->u.sym.target_path_len);			    \
+    }								    \
+}while(0)
 
 /************************************************************
  * macros for transforming specific structures
@@ -134,6 +163,19 @@ do{							    \
 	(resp)->u.getconfig.server_config_buf_size);	    \
 }while(0)
 
+/* operates on a getattr request */
+#define PINT_XENC_REQ_GETATTR(msg_p,req)		    \
+do{							    \
+    PINT_XENC_PVFS_HANDLE(msg_p,&((req)->u.getattr.handle)); \
+    PINT_XENC_PVFS_FS_ID(msg_p,&((req)->u.getattr.fs_id)); \
+    PINT_XENC_UINT32(msg_p,&((req)->u.getattr.attrmask));  \
+}while(0);
+
+/* operates on a getattr reponse */
+#define PINT_XENC_RESP_GETATTR(msg_p,resp)		    \
+do{							    \
+    PINT_XENC_PVFS_OBJ_ATTR(msg_p,&((resp)->u.getattr.attr)); \
+}while(0);
 
 static int lebf_encode_req(
     struct PVFS_server_req *request,
