@@ -861,7 +861,7 @@ echo "configure:861: checking glibc version for working aio callbacks" >&5
     libc=`echo /lib/libc.so.* | sed 1q`
     if test x$libc != x ; then
 	if test -x $libc ; then
-	    vers=`$libc | sed 's/.*version \(.*\),.*/\1/; q'`
+	    vers=`$libc 2> /dev/null | sed 's/.*version \(.*\),.*/\1/; q'`
             if test x$vers = x; then
                vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
             fi
@@ -2407,8 +2407,8 @@ done
 
 echo $ac_n "checking for SDL""... $ac_c" 1>&6
 echo "configure:2410: checking for SDL" >&5
-SDL_CONFIG=`which sdl-config`
-if test -x $SDL_CONFIG; then
+SDL_CONFIG=`which sdl-config 2> /dev/null`
+if ! test -z $SDL_CONFIG && test -x $SDL_CONFIG; then
    echo "$ac_t""yes" 1>&6
    SDL_VERSION=`sdl-config --version`
    VISCFLAGS=`sdl-config --cflags`

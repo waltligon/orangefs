@@ -45,7 +45,7 @@ if test x$host_os = xlinux-gnu; then
     libc=`echo /lib/libc.so.* | sed 1q`
     if test x$libc != x ; then
 	if test -x $libc ; then
-	    vers=`$libc | sed 's/.*version \(.*\),.*/\1/; q'`
+	    vers=`$libc 2> /dev/null | sed 's/.*version \(.*\),.*/\1/; q'`
             if test x$vers = x; then
                vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
             fi
@@ -329,8 +329,8 @@ CFLAGS="$CFLAGS -DGOSSIP_ENABLE_BACKTRACE"
 dnl --
 dnl Check for SDL
 AC_MSG_CHECKING([for SDL])
-SDL_CONFIG=`which sdl-config`
-if test -x $SDL_CONFIG; then
+SDL_CONFIG=`which sdl-config 2> /dev/null`
+if ! test -z $SDL_CONFIG && test -x $SDL_CONFIG; then
    AC_MSG_RESULT(yes)
    SDL_VERSION=`sdl-config --version`
    VISCFLAGS=`sdl-config --cflags`
