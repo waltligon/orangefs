@@ -447,16 +447,20 @@ int trove_handle_mgmt_finalize()
     */
     for (i = 0; i < s_fsid_to_ledger_table->table_size; i++)
     {
-        hash_link = qhash_search(s_fsid_to_ledger_table,&(i));
-        if (hash_link)
+        do
         {
-            ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
-            assert(ledger);
-            assert(ledger->ledger);
+            hash_link =
+                qhash_search_at_index(s_fsid_to_ledger_table, i);
+            if (hash_link)
+            {
+                ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+                assert(ledger);
+                assert(ledger->ledger);
 
-            trove_handle_ledger_free(ledger->ledger);
-            free(ledger);
-        }
+                trove_handle_ledger_free(ledger->ledger);
+                free(ledger);
+            }
+        } while(hash_link);
     }
     qhash_finalize(s_fsid_to_ledger_table);
     s_fsid_to_ledger_table = NULL;
