@@ -844,11 +844,12 @@ int PINT_Request_decode(struct PINT_Request *req)
 		return -1;
 	for (r = 0; r <= PINT_REQUEST_NEST_SIZE(req); r++)
 	{
-		if (req[r].ereq == (PINT_Request *) -1)
+		/* type must match the encoding type in encode_PVFS_Request */
+		if ((u_int32_t)(intptr_t) req[r].ereq == (u_int32_t) -1)
 			req[r].ereq = 0;
 		else
 			req[r].ereq = &req[0] + (unsigned long) req[r].ereq;
-		if (req[r].sreq == (PINT_Request *) -1)
+		if ((u_int32_t)(intptr_t) req[r].sreq == (u_int32_t) -1)
 			req[r].sreq = 0;
 		else
 			req[r].sreq = &req[0] + (unsigned long) req[r].sreq;
