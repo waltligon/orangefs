@@ -977,8 +977,8 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
  */
 static int dbpf_dspace_testsome(
 				TROVE_coll_id coll_id,
-				TROVE_op_id *ds_id_array,
 			        TROVE_context_id context_id,
+				TROVE_op_id *ds_id_array,
 				int *inout_count_p,
 				int *out_index_array,
 				TROVE_vtag_s *vtag_array,
