@@ -49,6 +49,7 @@ int dbpf_thread_initialize(void)
         dbpf_thread_running = ((ret == 0) ? 1 : 0);
     }
 #endif
+    gossip_debug(TROVE_DEBUG, "dbpf_thread_initialize: initialized\n");
     return ret;
 }
 
@@ -60,12 +61,13 @@ int dbpf_thread_finalize(void)
     dbpf_thread_running = 0;
     usleep(100);
     ret = pthread_cancel(dbpf_thread);
+    gen_mutex_unlock(dbpf_interface_lock);
     pthread_cond_destroy(&dbpf_op_completed_cond);
     pthread_cond_destroy(&dbpf_op_incoming_cond);
     gen_mutex_destroy(dbpf_op_incoming_cond_mutex);
-    gen_mutex_unlock(dbpf_interface_lock);
     gen_mutex_destroy(dbpf_interface_lock);
 #endif
+    gossip_debug(TROVE_DEBUG, "dbpf_thread_finalize: finalized\n");
     return ret;
 }
 
@@ -139,7 +141,6 @@ void *dbpf_thread_function(void *ptr)
     return ptr;
 }
 
-
 int dbpf_do_one_work_cycle(int *out_count)
 {
 #ifdef __PVFS2_TROVE_THREADED__
@@ -201,8 +202,6 @@ int dbpf_do_one_work_cycle(int *out_count)
 
     return 0;
 }
-
-
 
 /*
  * Local variables:
