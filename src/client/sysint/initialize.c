@@ -38,7 +38,8 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
 	gen_mutex_t mt_config;
 	
 	/* Initialize BMI */
-	ret = BMI_initialize("/parl/rharish/pvfs2/src/io/bmi/bmi_tcp/bmi_tcp_mod.so",NULL,0);
+	/*TODO: change this so it parses the bmi module from the pvfstab file*/
+	ret = BMI_initialize("bmi_tcp",NULL,0);
 	if (ret < 0)
 	{
 		printf("BMI initialize failure\n");

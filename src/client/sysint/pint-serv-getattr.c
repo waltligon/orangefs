@@ -7,8 +7,12 @@
 /* Get attribute server request processing implementation */
 
 #include <pint-servreq.h>
+#include <PINT-reqproto-encode.h>
+#define REQ_ENC_FORMAT 0
+#define MAX_DATAFILES 10
 
-extern PVFS_msg_tag_t get_next_session_tag();
+extern PVFS_msg_tag_t get_next_session_tag(void);
+extern void debug_print_type(void* thing, int type);
 
 static int getattrreq_alloc(void *pjob,void *preq,bmi_addr_t server,
 		PVFS_credentials credentials,int *sz);
@@ -24,11 +28,27 @@ int pint_serv_getattr(struct PVFS_server_req_s **req_job,\
 		struct PVFS_server_resp_s **ack_job,void *req,PVFS_credentials\
 		credentials,bmi_addr_t *serv_arg)
 {
-	int ret = -1,req_size = 0, ack_size = 0;
+	int ret = -1,req_size = 0;
    bmi_addr_t server_addr = *serv_arg;		 /*PVFS address type structure*/ 
 	job_status_s status1;
 	PVFS_servreq_getattr *arg = (PVFS_servreq_getattr *)req;
 	PVFS_msg_tag_t bmi_connection_id = get_next_session_tag();
+	struct PINT_encoded_msg encoded;
+        struct PINT_decoded_msg decoded;
+        int max_resp_size = 0;
+        void * wire_resp = NULL;
+
+	/* figure out how big the response is going to be */
+
+	if (arg->attrmask == ATTR_META)
+	{
+		max_resp_size = sizeof(struct PVFS_server_resp_s) + \
+			(MAX_DATAFILES * sizeof( PVFS_handle ) );
+	}
+	else
+	{
+		max_resp_size = sizeof(struct PVFS_server_resp_s);
+	}
 
 	/* Create and fill jobs for request and response */
 
@@ -42,9 +62,17 @@ int pint_serv_getattr(struct PVFS_server_req_s **req_job,\
 		goto job_fill_failure;
 	}
 
+	/* encode to the on-the-wire format */
+	ret = PINT_encode(req_job, PINT_ENCODE_REQ, &encoded, server_addr, \
+			REQ_ENC_FORMAT);
+	if (ret < 0)
+	{
+		goto enc_failure;
+	}
+
 	/* Post a blocking send job */
-	ret = job_bmi_send_blocking(server_addr,(*req_job),req_size,
-			bmi_connection_id,BMI_PRE_ALLOC,1,&status1);
+	ret = job_bmi_send_blocking(server_addr,encoded.buffer_list[0],
+			encoded.size_list[0],bmi_connection_id,BMI_PRE_ALLOC,1,&status1);
 	if (ret < 0)
 	{
 		goto send_failure;
@@ -58,17 +86,26 @@ int pint_serv_getattr(struct PVFS_server_req_s **req_job,\
 			goto send_failure;
 		}
 	}
+	debug_print_type(encoded.buffer_list[0], 0);
+	printf(" sent\n");
 
-	/* Response job */
-	ret = getattrack_alloc((void *)ack_job,arg,server_addr,&ack_size);
-	if (ret < 0)
+	wire_resp = (void*)BMI_memalloc(server_addr, (bmi_size_t) max_resp_size, BMI_RECV_BUFFER);
+	if (!wire_resp)
 	{
 		ret = -ENOMEM;
 		goto send_failure;
 	}
 
+	/* Response job */
+	/*ret = getattrack_alloc((void *)ack_job,arg,server_addr,&ack_size);
+	if (ret < 0)
+	{
+		ret = -ENOMEM;
+		goto send_failure;
+	}*/
+
 	/* Post a blocking receive job */
-	ret = job_bmi_recv_blocking(server_addr,(*ack_job),ack_size,
+	ret = job_bmi_recv_blocking(server_addr,wire_resp,(bmi_size_t) max_resp_size,
 			bmi_connection_id,BMI_PRE_ALLOC,&status1);
 	if (ret < 0)
 	{
@@ -77,30 +114,69 @@ int pint_serv_getattr(struct PVFS_server_req_s **req_job,\
 	else if (ret == 1)
 	{
 		/* Check status */
-		if (status1.error_code != 0 || status1.actual_size != ack_size)
+		if (status1.error_code != 0 || status1.actual_size != max_resp_size)
 		{
 			ret = -EINVAL;
 			goto recv_failure;
 		}
 	}
-	/* Check server error status */
-	if ((*ack_job)->status != 0)
+
+	/* decode msg from wire format here */
+	ret = PINT_decode(      wire_resp,
+				PINT_ENCODE_REQ,
+ 				&decoded,
+				server_addr,
+				status1.actual_size,
+				NULL);
+	if (ret < 0)
 	{
-		ret = (*ack_job)->status;
+		ret = (-EINVAL);
+		goto dec_failure;
+	}
+
+	debug_print_type(decoded.buffer, 1);
+	printf(" recv'd\n");
+
+	/* Check server error status */
+	if (((struct PVFS_server_resp_s *)decoded.buffer)->status != 0)
+	{
+		ret = ((struct PVFS_server_resp_s *)decoded.buffer)->status;
 		goto recv_failure;
 	}
 
+	/* cleanup some craplets of memory that are lying around*/
+
+	/*must call release for the decode at some point*/
+	(*ack_job) = (struct PVFS_server_resp_s **)&decoded.buffer;
+
+	/* release leftovers from the encoded send buffer */
+	PINT_encode_release(    &encoded,
+				PINT_ENCODE_REQ,
+				0);
+
+	/* also don't need the on-the-wire response anymore */
+	sysjob_free(server_addr,wire_resp,(bmi_size_t)max_resp_size,BMI_RECV_BUFFER,NULL);
+
   	return(0); 
 
+dec_failure:
+	PINT_decode_release(    &decoded,
+				PINT_ENCODE_REQ,
+				0);
+
 recv_failure:
-		sysjob_free(server_addr,(*ack_job),ack_size,BMI_RECV_BUFFER,NULL);
+		sysjob_free(server_addr,wire_resp,(bmi_size_t)max_resp_size,BMI_RECV_BUFFER,NULL);
 
 send_failure:
-		sysjob_free(server_addr,(*req_job),req_size,BMI_SEND_BUFFER,NULL);
+	PINT_encode_release(    &encoded,
+				PINT_ENCODE_REQ,
+				0);
+
+enc_failure:
+		sysjob_free(server_addr,(*req_job),(bmi_size_t)req_size,BMI_SEND_BUFFER,NULL);
 
 job_fill_failure:
 		return(ret);
-
 }	  
 
 /* getattrreq_alloc()
@@ -119,7 +195,7 @@ static int getattrreq_alloc(void *pjob,void *preq,bmi_addr_t server,
 	/* Fill up the job structure */
 	size = sizeof(struct PVFS_server_req_s); 
 	/* Alloc memory for request structure */
-	*serv_req = BMI_memalloc(server,size,BMI_SEND_BUFFER);
+	*serv_req = BMI_memalloc(server,(bmi_size_t)size,BMI_SEND_BUFFER);
 	if (!serv_req)
 	{
 		return(-ENOMEM);
@@ -157,7 +233,7 @@ static int getattrack_alloc(void *pjob,void *preq,bmi_addr_t server,
 	/* Fill up the job structure */
 	size = sizeof(struct PVFS_server_resp_s); 
 	/* Alloc memory for request structure */
-	*serv_resp = BMI_memalloc(server,size,BMI_RECV_BUFFER);
+	*serv_resp = BMI_memalloc(server,(bmi_size_t)size,BMI_RECV_BUFFER);
 	if (!(*serv_resp))
 	{
 		return(-ENOMEM);

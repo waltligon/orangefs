@@ -10,6 +10,48 @@
 int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock;
 
+void debug_print_type(void* thing, int type)
+{
+	if (type ==0)
+	{
+		struct PVFS_server_req_s * req = thing;
+		switch( req->op )
+		{
+			case PVFS_SERV_SETATTR:
+				printf("setattr request");
+				break;
+			case PVFS_SERV_GETCONFIG:
+				printf("getconfig request");
+				break;
+			case PVFS_SERV_GETATTR:
+				printf("getattr request");
+				break;
+			default:
+				printf("unknown request = %d", req->op);
+				break;
+		}
+	}
+	else
+	{
+		struct PVFS_server_resp_s * resp = thing;
+		switch( resp->op )
+		{
+			case PVFS_SERV_SETATTR:
+				printf("setattr request");
+				break;
+			case PVFS_SERV_GETCONFIG:
+				printf("getconfig reply");
+				break;
+			case PVFS_SERV_GETATTR:
+				printf("getattr reply");
+				break;
+			default:
+				printf("unknown reply = %d", resp->op);
+				break;
+		}
+	}
+}
+
 int get_next_session_tag()
 {
         int ret = 0;
