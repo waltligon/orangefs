@@ -396,9 +396,11 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
     a_p = &s_op->resp->u.getattr.attr;
     
     /* TODO: figure out if we need a different packing mechanism here */
-    gossip_err("KLUDGE: reading distribution on disk in network encoded format.\n");
-    PINT_Dist_decode(a_p->u.meta.dist, NULL);    
-
+    if (a_p->objtype == PVFS_TYPE_METAFILE)
+    {
+        gossip_err("KLUDGE: reading distribution on disk in network encoded format.\n");
+        PINT_Dist_decode(a_p->u.meta.dist, NULL);
+    }
 
     gossip_debug(SERVER_DEBUG,
 		 "  sending attrs (owner = %d, group = %d, perms = %o, "
