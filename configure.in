@@ -159,7 +159,6 @@ src/server/module.mk
 src/server/request-scheduler/module.mk
 src/client/sysint/module.mk
 src/client/unix-io/module.mk
-src/proto/module.mk
 src/proto/contig/module.mk
 test/io/trove/module.mk
 test/common/quicklist/module.mk
