@@ -13,13 +13,8 @@
 
 typedef struct
 {
-    PVFS_size amt_read;
-} pvfs2_read_response_t;
-
-typedef struct
-{
-    int stuff;
-} pvfs2_write_response_t;
+    PVFS_size amt_complete;
+} pvfs2_io_response_t;
 
 typedef struct
 {
@@ -67,8 +62,7 @@ typedef struct
 
     union
     {
-	pvfs2_read_response_t read;
-	pvfs2_write_response_t write;
+	pvfs2_io_response_t io;
 	pvfs2_lookup_response_t lookup;
 	pvfs2_create_response_t create;
 	pvfs2_getattr_response_t getattr;

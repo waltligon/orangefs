@@ -16,15 +16,8 @@ typedef struct
     size_t count;
     loff_t offset;
     PVFS_pinode_reference refn;
-} pvfs2_read_request_t;
-
-typedef struct
-{
-    char *buf;
-    size_t count;
-    loff_t *offset;
-    PVFS_pinode_reference refn;
-} pvfs2_write_request_t;
+    enum PVFS_sys_io_type io_type;
+} pvfs2_io_request_t;
 
 typedef struct
 {
@@ -76,8 +69,7 @@ typedef struct
 
     union
     {
-	pvfs2_read_request_t read;
-	pvfs2_write_request_t write;
+	pvfs2_io_request_t io;
 	pvfs2_lookup_request_t lookup;
 	pvfs2_create_request_t create;
 	pvfs2_getattr_request_t getattr;

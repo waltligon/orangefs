@@ -144,7 +144,7 @@ static int service_create_request(
     return ret;
 }
 
-static int service_read_request(
+static int service_io_request(
     PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
@@ -165,28 +165,27 @@ static int service_read_request(
 	credentials.gid = 100;
 	credentials.perms = 511;
 
-	displacement = in_upcall->req.read.offset;
-	blocklength = in_upcall->req.read.count;
+	displacement = in_upcall->req.io.offset;
+	blocklength = in_upcall->req.io.count;
 
 	ret = PVFS_Request_indexed(1, &blocklength, &displacement,
 	    PVFS_BYTE, &io_req);
 	assert(ret == 0);
 
-	ret = PVFS_sys_io(in_upcall->req.read.refn, io_req, 0, 
-	    in_upcall->req.read.buf, in_upcall->req.read.count, credentials, 
-	    &response, PVFS_SYS_IO_READ);
+	ret = PVFS_sys_io(in_upcall->req.io.refn, io_req, 0, 
+	    in_upcall->req.io.buf, in_upcall->req.io.count, credentials, 
+	    &response, in_upcall->req.io.io_type);
 	if(ret < 0)
 	{
-	    /* we need to send a blank response */
-	    out_downcall->type = PVFS2_VFS_OP_FILE_READ;
-	    /* TODO: what should this be set to? other examples do -1... */
+	    /* report an error */
+	    out_downcall->type = PVFS2_VFS_OP_FILE_IO;
 	    out_downcall->status = ret;
 	}
 	else
 	{
-	    out_downcall->type = PVFS2_VFS_OP_FILE_READ;
+	    out_downcall->type = PVFS2_VFS_OP_FILE_IO;
 	    out_downcall->status = 0;
-	    out_downcall->resp.read.amt_read = response.total_completed;
+	    out_downcall->resp.io.amt_complete = response.total_completed;
 	    ret = 0;
 	}
     }
@@ -648,11 +647,8 @@ int main(int argc, char **argv)
 	    case PVFS2_VFS_OP_READDIR:
 		service_readdir_request(&init_response,&upcall,&downcall);
 		break;
-	    case PVFS2_VFS_OP_FILE_READ:
-		service_read_request(&init_response, &upcall, &downcall);
-		break;
-	    case PVFS2_VFS_OP_FILE_WRITE:
-		/* do a file write */
+	    case PVFS2_VFS_OP_FILE_IO:
+		service_io_request(&init_response, &upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_INVALID:
 	    default:
