@@ -55,8 +55,17 @@ int main(int argc, char **argv)	{
 	struct PINT_encoded_msg foo;
 	struct PINT_decoded_msg bar;
 	struct PVFS_server_req_s my_req;
-	struct PVFS_server_resp_s my_ack;
 	struct PVFS_server_resp_s* dec_ack;
+	void* my_ack;
+	int my_ack_size = sizeof(struct PVFS_server_resp_s) + 4;
+
+	/* TODO: how do I know how big to make this?
+	 * Dale is adding a function to tell me, need to remember to use it
+	 * later
+	 */
+	my_ack = malloc(my_ack_size);
+	if(!my_ack)
+		return(-errno);
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -139,8 +148,8 @@ int main(int argc, char **argv)	{
 	}
 
 	/* post a recv for the server acknowledgement */
-	ret = BMI_post_recv(&(client_ops[0]), server_addr, &my_ack, 
-		sizeof(struct PVFS_server_resp_s), &actual_size, BMI_EXT_ALLOC, 0, 
+	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
+		my_ack_size, &actual_size, BMI_EXT_ALLOC, 0, 
 		NULL);
 	if(ret < 0)
 	{
@@ -167,7 +176,7 @@ int main(int argc, char **argv)	{
 	}
 	else
 	{
-		if(actual_size != sizeof(struct PVFS_server_resp_s))
+		if(actual_size != my_ack_size)
 		{
 			printf("Short recv.\n");
 			return(-1);
@@ -175,7 +184,7 @@ int main(int argc, char **argv)	{
 	}
 		
 	/* look at the ack */
-	ret = PINT_decode(&my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
+	ret = PINT_decode(my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
 	if(ret < 0)
 	{
 		fprintf(stderr, "PINT_decode() failure.\n");
