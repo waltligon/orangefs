@@ -14,12 +14,12 @@ dnl for test builds, insert the build date and time information into
 dnl into the version; for official releases, clear the PVFS2_PRE line
 dnl
 dnl PVFS2 versioning information
-BUILD_TIME=`date -u +"%F@%T"`
+CONFIGURE_TIME=`date -u +"%F@%T"`
 PVFS2_MAJOR=0
-PVFS2_MINOR=7
-PVFS2_SUB=0
+PVFS2_MINOR=6
+PVFS2_SUB=4
 dnl PVFS2_PRE=""
-PVFS2_PRE="pre1-$BUILD_TIME"
+PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
 AM_INIT_AUTOMAKE(pvfs2, $PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE)
 

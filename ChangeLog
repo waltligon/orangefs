@@ -3,14 +3,40 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.7.0pre1
+pvfs2-0.6.4pre1
 ===============
-- added a pvfs2-config tool to help user programs compiling with pvfs2
-- new PAV option (COMPUTENODES_LAST) that controls whether compute nodes are
-  chosen first or last out of the total set of nodes available
+- added a pvfs2-config tool to help when compiling against pvfs2
+- new PAV option (COMPUTENODES_LAST) that controls whether compute
+  nodes are chosen first or last out of the total set of nodes
+  available
 - fix locking bug introduced in 0.6.3 that shows up when trove is used
   without aio callbacks
 - explicitly name invalid msg tag value (0)
+- modified pvfs2-ls to show the mtime (rather than atime) in long
+  listings
+- updated set-info test program to update mtime (rather than atime)
+- fixed possible flow mutex memory leak
+- changed PVFS_time from an int64_t to a uint64_t
+- fixed a pvfs2-fsck compile time warning
+- fixed bug in sys-remove that erroneously tried to back out of the
+  remove even on error codes that are acceptable to return
+- moved to fully 64 bit unsigned gossip masks (for some more possible
+  debugging levels)
+- fixed bug in shared-state-machine getattr method that could allow
+  attributes to come out of the acache with incorrect types/fields
+- fixed bug in crdirent msgpair setups for create/mkdir/symlink (used
+  incorrect handles in mappings)
+- modified mgmt setparam call to take uint64_t parameters instead of
+  int64_t
+- kernel changes:
+  - fixed bug that allowed a file removed on one client to still
+    appear on another with bad attributes
+  - fixed dentry revalidation to never return that a dentry is valid
+    if's negative
+  - fixed directory inode's mtime and ctime changes on updates
+  - fixed directory link counts for some changes
+  - simplify atime/mtime/ctime conversion to sys_attr (and vice versa)
+    to and from inode's time fields
 
 
 pvfs2-0.6.3
