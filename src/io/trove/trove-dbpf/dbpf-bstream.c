@@ -33,8 +33,6 @@
 #ifdef __PVFS2_TROVE_AIO_THREADED__
 #include "dbpf-thread.h"
 
-#define AIO_DBPF_SIGNAL_MAGIC  0x0000FF0E
-
 extern pthread_cond_t dbpf_op_cond;
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
@@ -167,7 +165,9 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 				       int opcode);
 static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p);
+#ifndef __PVFS2_TROVE_AIO_THREADED__
 static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p);
+#endif
 static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p);
 
 /* Functions */
@@ -591,7 +591,11 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 			BSTREAM_WRITE_LIST,
 			handle,
 			coll_p,
+#ifdef __PVFS2_TROVE_AIO_THREADED__
+                        NULL,
+#else
 			dbpf_bstream_rw_list_op_svc,
+#endif
 			user_ptr,
 			flags,
                         context_id);
@@ -756,6 +760,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
  *   - otherwise convert some more elements and post them.
  * 
  */
+#ifndef __PVFS2_TROVE_AIO_THREADED__
 static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 {
     int ret, i, aiocb_inuse_count, op_in_progress_count = 0;
@@ -878,6 +883,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	return 0;
     }
 }
+#endif
 
 struct TROVE_bstream_ops dbpf_bstream_ops =
 {
