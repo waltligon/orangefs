@@ -236,11 +236,11 @@ static inline void make_size_human_readable(
         }
         if (i == NUM_SIZES)
         {
-            snprintf(out_str,16, "%Lu", size);
+            snprintf(out_str,16, "%Ld", size);
         }
         else
         {
-            snprintf(out_str,max_out_len,"%Lu%s",
+            snprintf(out_str,max_out_len,"%Ld%s",
                      tmp,s_str_size_table[i]);
         }
     }
