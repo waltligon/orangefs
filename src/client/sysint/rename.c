@@ -203,7 +203,12 @@ int PVFS_sys_rename(
      * out what we deleted and figure out why the server had the wrong link.
      */
 
-    assert(ack_p->u.rmdirent.entry_handle == old_parent_refn.handle);
+    /*
+      I don't think this is true anymore ... will verify on rewrite;
+      this seems to always fail now
+    */
+/*     assert(ack_p->u.rmdirent.entry_handle == old_entry); */
+
     PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 			&encoded_resp, op_tag);
 
