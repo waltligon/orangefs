@@ -3738,12 +3738,12 @@ static void bmi_thread_mgr_unexp_handler(
             job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
                            tmp_desc);
         }
-        gen_mutex_unlock(&completion_mutex);
 
 #ifdef __PVFS2_JOB_THREADED__
         /* wake up anyone waiting for completion */
         pthread_cond_signal(&completion_cond);
 #endif
+        gen_mutex_unlock(&completion_mutex);
     }
     else
     {
@@ -3781,12 +3781,12 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
             job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
                            tmp_desc);
         }
-        gen_mutex_unlock(&completion_mutex);
 
 #ifdef __PVFS2_JOB_THREADED__
         /* wake up anyone waiting for completion */
         pthread_cond_signal(&completion_cond);
 #endif
+        gen_mutex_unlock(&completion_mutex);
     }
     else
     {
@@ -4121,7 +4121,6 @@ static void flow_callback(flow_descriptor* flow_d)
                    tmp_desc);
     /* set completed flag while holding queue lock */
     tmp_desc->completed_flag = 1;
-    gen_mutex_unlock(&completion_mutex);
 
     flow_pending_count--;
 
@@ -4129,6 +4128,7 @@ static void flow_callback(flow_descriptor* flow_d)
     /* wake up anyone waiting for completion */
     pthread_cond_signal(&completion_cond);
 #endif
+    gen_mutex_unlock(&completion_mutex);
 
     return;
 }
