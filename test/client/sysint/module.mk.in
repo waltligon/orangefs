@@ -27,4 +27,5 @@ TESTSRC += \
 	$(DIR)/initialize.c \
 	$(DIR)/initialize-dyn.c \
 	$(DIR)/getparent.c \
-	$(DIR)/io-bug.c
+	$(DIR)/io-bug.c \
+	$(DIR)/test-create-scale.c
