@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
 	if(ret < 0)
 	{
 		gossip_err("Flow_initialize Failed: %s\n",strerror(-ret));
-		server_shutdown(server_level_init,user_opts,ret,0);
+		server_shutdown(server_level_init,ret,0);
 	}
 
 	server_level_init++;

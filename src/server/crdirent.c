@@ -11,19 +11,21 @@
 #include <string.h>
 #include <pvfs2-attr.h>
 #include <job-consist.h>
+#include <assert.h>
 
-STATE_FXN_HEAD(crdirent_init);
-STATE_FXN_HEAD(crdirent_gethandle);
-STATE_FXN_HEAD(crdirent_getattr);
-STATE_FXN_HEAD(crdirent_check_perms);
-STATE_FXN_HEAD(crdirent_create);
-STATE_FXN_HEAD(crdirent_create_dir_handle_ph1);
-STATE_FXN_HEAD(crdirent_create_dir_handle_ph2);
-STATE_FXN_HEAD(crdirent_send_bmi);
-STATE_FXN_HEAD(crdirent_cleanup);
+static int crdirent_init(state_action_struct *s_op, job_status_s *ret);
+static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret);
+static int crdirent_getattr(state_action_struct *s_op, job_status_s *ret);
+static int crdirent_check_perms(state_action_struct *s_op, job_status_s *ret);
+static int crdirent_create(state_action_struct *s_op, job_status_s *ret);
+static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_s *ret);
+static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_s *ret);
+static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret);
+static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *ret);
 void crdirent_init_state_machine(void);
 
-extern char *TROVE_COMMON_KEYS[KEYVAL_ARRAY_SIZE];
+extern PINT_server_trove_keys_s *Trove_Common_Keys;
 
 PINT_state_machine_s crdirent_req_s = 
 {
@@ -34,33 +36,12 @@ PINT_state_machine_s crdirent_req_s =
 
 %%
 
-machine crdirent(init, get_handle, get_attrib, check_perms, create, send, cleanup, create_handle1, create_handle2)
+machine crdirent(init, get_handle, get_attrib, check_perms, create, send, cleanup, create_handle1, create_handle2,release)
 {
 	state init
 	{
 		run crdirent_init;
 		default => get_attrib;
-	}
-
-	state create_handle2
-	{
-		run crdirent_create_dir_handle_ph2;
-		success => create;
-		default => send;
-	}
-
-	state create_handle1
-	{
-		run crdirent_create_dir_handle_ph1;
-		success => create_handle2;
-		default => send;
-	}
-
-	state get_handle
-	{
-		run crdirent_gethandle;
-		success => create;
-		default => create_handle1;
 	}
 
 	state get_attrib
@@ -77,15 +58,42 @@ machine crdirent(init, get_handle, get_attrib, check_perms, create, send, cleanu
 		default => send;
 	}
 	
+	state get_handle
+	{
+		run crdirent_gethandle;
+		success => create;
+		default => create_handle1;
+	}
+
 	state create
 	{
 		run crdirent_create;
 		default => send;
 	}
 
+	state create_handle1
+	{
+		run crdirent_create_dir_handle_ph1;
+		success => create_handle2;
+		default => send;
+	}
+
+	state create_handle2
+	{
+		run crdirent_create_dir_handle_ph2;
+		success => create;
+		default => send;
+	}
+
 	state send
 	{
 		run crdirent_send_bmi;
+		default => release;
+	}
+
+	state release
+	{
+		run crdirent_release_posted_job;
 		default => cleanup;
 	}
 
@@ -128,35 +136,39 @@ void crdirent_init_state_machine(void)
  *
  * Pre:      a properly formatted request structure.
  *
- * Post:     scheduled.
- *
+ * Post:     s_op->scheduled_id filled in.
+ *            
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: This function sets up the buffers in preparation for
+ *           the trove operation to get the attribute structure
+ *           used in check permissions.  Also runs the operation through
+ *           the request scheduler for consistency.
  *           
  */
 
 
-STATE_FXN_HEAD(crdirent_init)
+static int crdirent_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
-	job_id_t i;
-	gossip_ldebug(SERVER_DEBUG,"Got CrDirent for %s,%lld in %lld\n",s_op->req->u.crdirent.name,s_op->req->u.crdirent.new_handle,s_op->req->u.crdirent.parent_handle);
+	gossip_ldebug(SERVER_DEBUG,
+			"Got CrDirent for %s,%lld in %lld\n",
+			s_op->req->u.crdirent.name,
+			s_op->req->u.crdirent.new_handle,
+			s_op->req->u.crdirent.parent_handle);
 
-	s_op->key.buffer = TROVE_COMMON_KEYS[METADATA_KEY];
-	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]);
+	s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
+	s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
 	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 	
-	job_post_ret = job_check_consistency(s_op->op,
-													 s_op->req->u.crdirent.fs_id,
-													 s_op->req->u.crdirent.new_handle,
-													 s_op,
-												 	 ret,
-													 &i);
+	job_post_ret = job_req_sched_post(s_op->req,
+												 s_op,
+												 ret,
+												 &(s_op->scheduled_id));
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -167,18 +179,18 @@ STATE_FXN_HEAD(crdirent_init)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      
+ * Pre:      s_op->u.crdirent.parent_handle is handle of directory
  *
- * Post:     
+ * Post:     s_op->val.buffer is the directory entry k/v space OR NULL if first entry
  *
  * Returns:  int
  *
- * Synopsis: Get the directory entry handle
+ * Synopsis: Get the directory entry handle for the directory entry k/v space
  *           
  */
 
 
-STATE_FXN_HEAD(crdirent_gethandle)
+static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -187,10 +199,16 @@ STATE_FXN_HEAD(crdirent_gethandle)
 
 	gossip_ldebug(SERVER_DEBUG,"Get Handle Fxn for crdirent\n");
 	
-	s_op->key.buffer = TROVE_COMMON_KEYS[DIR_ENT_KEY];
-	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]);
+	s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+	s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
+	/* 
+	 * We do not need to do this... the buffer is plenty big from the 
+	 *	attributes fetch... just reuse it and throw the old data away
+	 */
+#if 0
 	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_handle)));
+#endif
 	
 	job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
 													 	 s_op->req->u.crdirent.parent_handle,
@@ -201,8 +219,9 @@ STATE_FXN_HEAD(crdirent_gethandle)
 													 	 s_op,
 													 	 ret,
 													 	 &i);
+	s_op->encoded.buffer_list = s_op->encoded.buffer_list[0];
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -212,19 +231,21 @@ STATE_FXN_HEAD(crdirent_gethandle)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      
+ * Pre:      s_op->val.buffer is big enough to hold sizeof(PVFS_object_attr)
+ *           s_op->u.crdirent.parent_handle is the correct directory entry.
  *
- * Post:     
+ * Post:     s_op->val.buffer contains the object attribs for directory used
+ *                     in check permissions.
  *
  * Returns:  int
  *
- * Synopsis: Ok... here is what we have... Two Values, one of which is the handle,
- *           The other is the metadata... yay... at this stage, insert a new key and rock!
+ * Synopsis: We need to retrieve the Attribute structure so we can make sure
+ *           that the credentials are valid.
  *           
  */
 
 
-STATE_FXN_HEAD(crdirent_getattr)
+static int crdirent_getattr(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -243,7 +264,7 @@ STATE_FXN_HEAD(crdirent_getattr)
 													 &i);
 
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -254,18 +275,20 @@ STATE_FXN_HEAD(crdirent_getattr)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      
+ * Pre:      s_op->val.buffer is a valid PVFS_object_attr structure
  *
- * Post:     
+ * Post:     User has permission to perform operation
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: This should use a global function that verifies that the user
+ *           has the necessary permissions to perform the operation it wants
+ *           to do.
  *           
  */
 
 
-STATE_FXN_HEAD(crdirent_check_perms)
+static int crdirent_check_perms(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -275,7 +298,7 @@ STATE_FXN_HEAD(crdirent_check_perms)
 	job_post_ret = 1;  /* Just pretend it is good right now */
 	// IF THEY don't have permission, set ret->error_code to -ENOPERM!
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -285,26 +308,26 @@ STATE_FXN_HEAD(crdirent_check_perms)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      
+ * Pre:      ret->handle is the new directory entry k/v space
  *
- * Post:     
+ * Post:     ret->handle is stored in the original k/v space for the parent handle.
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: We are storing the newly created k/v space for future directory entries.
  *           
  */
 
 
-STATE_FXN_HEAD(crdirent_create_dir_handle_ph2)
+static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
 	job_id_t i;
 
 	gossip_ldebug(SERVER_DEBUG,"phase2 Fxn for crdirent\n");
-	s_op->key.buffer = TROVE_COMMON_KEYS[DIR_ENT_KEY];
-	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]);
+	s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+	s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
 	s_op->val.buffer = &(ret->handle);
 	s_op->val.buffer_sz = sizeof(PVFS_handle);
@@ -319,7 +342,7 @@ STATE_FXN_HEAD(crdirent_create_dir_handle_ph2)
 													  ret,
 													  &i);
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -329,18 +352,21 @@ STATE_FXN_HEAD(crdirent_create_dir_handle_ph2)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      
+ * Pre:      ret->handle = NULL
+ *           ret->error_code < 0
  *
- * Post:     
+ * Post:     ret->handle contains a new handle for a k/v space
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: If we execute this function, this directory does not have any entries
+ *           in it.  So we need to create a key val space for these entries.  This is 
+ *           the first part, and we store it in part two.
  *           
  */
 
 
-STATE_FXN_HEAD(crdirent_create_dir_handle_ph1)
+static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -358,7 +384,7 @@ STATE_FXN_HEAD(crdirent_create_dir_handle_ph1)
 													   ret,
 													   &i);
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -368,18 +394,21 @@ STATE_FXN_HEAD(crdirent_create_dir_handle_ph1)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      
+ * Pre:      ret->handle is the directory entry k/v space
+ *           s_op->u.crdirent.name != NULL
+ *           s_op->u.crdirent.new_handle != NULL
  *
- * Post:     
+ * Post:     key/val pair stored
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: We are now ready to store the name/handle pair in the k/v space for
+ *           directory handles.
  *           
  */
 
 
-STATE_FXN_HEAD(crdirent_create)
+static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -390,8 +419,7 @@ STATE_FXN_HEAD(crdirent_create)
 	gossip_ldebug(SERVER_DEBUG,"create Fxn for crdirent\n");
 	h = *((PVFS_handle *)s_op->val.buffer);
 	
-	s_op->key.buffer = malloc(strlen(s_op->req->u.crdirent.name));
-	strcpy(s_op->key.buffer,s_op->req->u.crdirent.name);
+	s_op->key.buffer = &(s_op->req->u.crdirent.name);
 	s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
 
 	s_op->val.buffer = &(s_op->req->u.crdirent.new_handle);
@@ -408,7 +436,7 @@ STATE_FXN_HEAD(crdirent_create)
 													  ret,
 													  &i);
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -419,33 +447,47 @@ STATE_FXN_HEAD(crdirent_create)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      
+ * Pre:      NONE
  *
- * Post:     
+ * Post:     BMI_message sent.
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: This function is abstract because we really don't know where we failed
+ *           or if we succeeded in our mission.  It sets the error_code, and here, 
+ *           it is just an acknowledgement.
  *           
  */
 
 
-STATE_FXN_HEAD(crdirent_send_bmi)
+static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
+	int job_post_ret=0;
 	job_id_t i;
+	void *a[1];
 
 	s_op->resp->status = ret->error_code;
+	s_op->encoded.buffer_list = a[0];
 
 	gossip_ldebug(SERVER_DEBUG,"send Fxn for crdirent\n");
 	/* Set the ack IF it was created */
 	if(ret->error_code == 0) 
+	{
 		s_op->resp->u.generic.handle = s_op->req->u.crdirent.new_handle;
-	
+
+		/* Encode the message */
+		job_post_ret = PINT_encode(s_op->resp,
+				PINT_ENCODE_RESP,
+				&(s_op->encoded),
+				s_op->addr,
+				s_op->enc_type);
+	}
+	assert(job_post_ret == 0);
+
 	job_post_ret = job_bmi_send(s_op->addr,
-										 s_op->resp,
-										 sizeof(struct PVFS_server_resp_s),
+										 s_op->encoded.buffer_list[0],
+										 s_op->encoded.total_size,
 										 s_op->tag,
 										 0,
 										 0,
@@ -453,11 +495,40 @@ STATE_FXN_HEAD(crdirent_send_bmi)
 										 ret, 
 										 &i);
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
+/*
+ * Function: crdirent_release_posted_job
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *ret
+ *
+ * Pre:      We are done!
+ *
+ * Post:     We need to let the next operation go.
+ *
+ * Returns:  int
+ *
+ * Synopsis: Free the job from the scheduler to allow next job to proceed.
+ *           
+ */
 
+
+static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+{
+
+	int job_post_ret=0;
+	job_id_t i;
+
+	job_post_ret = job_req_sched_release(s_op->scheduled_id,
+													  s_op,
+													  ret,
+													  &i);
+
+	return job_post_ret;
+}
 
 /*
  * Function: crdirent_cleanup
@@ -465,9 +536,9 @@ STATE_FXN_HEAD(crdirent_send_bmi)
  * Params:   server_op *b, 
  *           job_status_s *ret
  *
- * Pre:      
+ * Pre:      NONE
  *
- * Post:     
+ * Post:     everything is free!
  *
  * Returns:  int
  *
@@ -476,30 +547,32 @@ STATE_FXN_HEAD(crdirent_send_bmi)
  */
 
 
-STATE_FXN_HEAD(crdirent_cleanup)
+static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 	
 	gossip_ldebug(SERVER_DEBUG,"clean Fxn for crdirent\n");
+
+/* TODO: FREE Encoded message! */
+	
+	if(s_op->val.buffer)
+	{
+		free(s_op->val.buffer);
+	}
+
 	if(s_op->resp)
 	{
-		BMI_memfree(s_op->addr,
-				      s_op->resp,
-						sizeof(struct PVFS_server_resp_s),
-						BMI_SEND_BUFFER);
+		free(s_op->resp);
 	}
 
 	if(s_op->req)
 	{
-		BMI_memfree(s_op->addr,
-				      s_op->req,
-						sizeof(struct PVFS_server_resp_s),
-						BMI_SEND_BUFFER);
+		free(s_op->req);
 	}
 
 	free(s_op->unexp_bmi_buff);
 
 	free(s_op);
 
-	STATE_FXN_RET(0);
+	return(0);
 	
 }

@@ -11,14 +11,14 @@
 #include <string.h>
 #include <pvfs2-attr.h>
 
-STATE_FXN_HEAD(mkdir_init);
-STATE_FXN_HEAD(mkdir_cleanup);
-STATE_FXN_HEAD(mkdir_mkdir);
-STATE_FXN_HEAD(mkdir_send_bmi);
-STATE_FXN_HEAD(mkdir_setattrib);
+static int mkdir_init(state_action_struct *s_op, job_status_s *ret);
+static int mkdir_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int mkdir_mkdir(state_action_struct *s_op, job_status_s *ret);
+static int mkdir_send_bmi(state_action_struct *s_op, job_status_s *ret);
+static int mkdir_setattrib(state_action_struct *s_op, job_status_s *ret);
 void mkdir_init_state_machine(void);
 
-extern char *TROVE_COMMON_KEYS[KEYVAL_ARRAY_SIZE];
+extern PINT_server_trove_keys_s *Trove_Common_Keys;
 
 PINT_state_machine_s mkdir_req_s = 
 {
@@ -90,7 +90,7 @@ void mkdir_init_state_machine(void)
  */
 
 
-STATE_FXN_HEAD(mkdir_init)
+static int mkdir_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -105,7 +105,7 @@ STATE_FXN_HEAD(mkdir_init)
 													 	ret,
 													 	&i);
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -122,7 +122,7 @@ STATE_FXN_HEAD(mkdir_init)
  */
 
 
-STATE_FXN_HEAD(mkdir_setattrib)
+static int mkdir_setattrib(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -131,8 +131,8 @@ STATE_FXN_HEAD(mkdir_setattrib)
 
 	s_op->resp->u.mkdir.handle = ret->handle;
 
-	s_op->key.buffer = TROVE_COMMON_KEYS[METADATA_KEY];
-	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]);
+	s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
+	s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
 	s_op->val.buffer = &(s_op->req->u.mkdir.attr);
 	s_op->val.buffer_sz = sizeof(PVFS_object_attr);
@@ -147,7 +147,7 @@ STATE_FXN_HEAD(mkdir_setattrib)
 													  ret,
 													  &i);
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -165,7 +165,7 @@ STATE_FXN_HEAD(mkdir_setattrib)
  */
 
 
-STATE_FXN_HEAD(mkdir_send_bmi)
+static int mkdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -187,7 +187,7 @@ STATE_FXN_HEAD(mkdir_send_bmi)
 										 ret, 
 										 &i);
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -206,7 +206,7 @@ STATE_FXN_HEAD(mkdir_send_bmi)
  */
 
 
-STATE_FXN_HEAD(mkdir_cleanup)
+static int mkdir_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 
 	if(s_op->resp)
@@ -229,6 +229,6 @@ STATE_FXN_HEAD(mkdir_cleanup)
 
 	free(s_op);
 
-	STATE_FXN_RET(0);
+	return(0);
 	
 }

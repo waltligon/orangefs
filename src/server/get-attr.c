@@ -13,13 +13,13 @@
 #include <job-consist.h>
 #include <assert.h>
 
-STATE_FXN_HEAD(getattr_init);
-STATE_FXN_HEAD(getattr_cleanup);
-STATE_FXN_HEAD(getattr_getobj_attribs);
-STATE_FXN_HEAD(getattr_send_bmi);
+static int getattr_init(state_action_struct *s_op, job_status_s *ret);
+static int getattr_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int getattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret);
+static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret);
 void getattr_init_state_machine(void);
 
-extern char *TROVE_COMMON_KEYS[KEYVAL_ARRAY_SIZE];
+extern PINT_server_trove_keys_s *Trove_Common_Keys;
 
 PINT_state_machine_s getattr_req_s = 
 {
@@ -91,14 +91,14 @@ void getattr_init_state_machine(void)
  */
 
 
-STATE_FXN_HEAD(getattr_init)
+static int getattr_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
 	job_id_t i;
 
-	s_op->key.buffer = TROVE_COMMON_KEYS[METADATA_KEY];
-	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]);
+	s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
+	s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
 	s_op->val.buffer = (void *) malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 
@@ -109,7 +109,7 @@ STATE_FXN_HEAD(getattr_init)
 													 ret,
 													 &i);
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -127,7 +127,7 @@ STATE_FXN_HEAD(getattr_init)
  *           
  */
 
-STATE_FXN_HEAD(getattr_getobj_attribs)
+static int getattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret=0;
@@ -144,7 +144,7 @@ STATE_FXN_HEAD(getattr_getobj_attribs)
 													 ret,
 													 &i);
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -160,16 +160,20 @@ STATE_FXN_HEAD(getattr_getobj_attribs)
  *           
  */
 
-STATE_FXN_HEAD(getattr_send_bmi)
+static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 	
 	int job_post_ret=0;
 	job_id_t i;
 	void *a[1];
 
-	s_op->encoded.buffer_list = &a;
+	s_op->encoded.buffer_list = a[0];
 
 	s_op->resp->u.getattr.attr = *((PVFS_object_attr *)s_op->val.buffer);
+
+	/* Prepare the message */
+	
+	s_op->resp->status = ret->error_code;
 
 	if (s_op->val.buffer && ret->error_code == 0)
 	{
@@ -188,10 +192,6 @@ STATE_FXN_HEAD(getattr_send_bmi)
 		s_op->encoded.total_size = sizeof(struct PVFS_server_resp_s);
 	}
 
-	/* Prepare the message */
-	
-	s_op->resp->status = ret->error_code;
-
 	/* Post message */
 
 	job_post_ret = job_bmi_send(s_op->addr,
@@ -204,7 +204,7 @@ STATE_FXN_HEAD(getattr_send_bmi)
 										 ret,
 										 &i);
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -221,7 +221,7 @@ STATE_FXN_HEAD(getattr_send_bmi)
  */
 
 
-STATE_FXN_HEAD(getattr_cleanup)
+static int getattr_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 	
 	if(s_op->resp)
@@ -244,6 +244,6 @@ STATE_FXN_HEAD(getattr_cleanup)
 
 	free(s_op);
 
-	STATE_FXN_RET(0);
+	return(0);
 	
 }

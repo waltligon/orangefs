@@ -44,7 +44,7 @@
 
 /* This array is used for common key-val pairs for trove =) */
 
-char *TROVE_COMMON_KEYS[6] = {"root_handle","12","metadata","9","dir_ent","8"};
+PINT_server_trove_keys_s Trove_Common_Keys[3] = {"root_handle",12,"metadata",9,"dir_ent",8};
 
 #define ENCODE_TYPE 0
 
@@ -164,7 +164,7 @@ int PINT_state_machine_init(void)
 {
 
 	int i;
-	for (in = 0 ; i < SERVER_OP_TABLE_SIZE; i++)
+	for (i = 0 ; i < SERVER_OP_TABLE_SIZE; i++)
 		if(PINT_server_op_table[i])
 			(PINT_server_op_table[i]->init_fun)();
 	return(0);

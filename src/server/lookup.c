@@ -15,15 +15,15 @@
 
 #define LOOKUP_BUFF_SZ 5
 
-STATE_FXN_HEAD(lookup_init);
-STATE_FXN_HEAD(lookup_cleanup);
-STATE_FXN_HEAD(lookup_check_perms);
-STATE_FXN_HEAD(lookup_send_bmi);
-STATE_FXN_HEAD(lookup_dir_space);
-STATE_FXN_HEAD(lookup_key_val);
+static int lookup_init(state_action_struct *s_op, job_status_s *ret);
+static int lookup_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int lookup_check_params(state_action_struct *s_op, job_status_s *ret);
+static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret);
+static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret);
+static int lookup_key_val(state_action_struct *s_op, job_status_s *ret);
 void lookup_init_state_machine(void);
 
-extern char *TROVE_COMMON_KEYS[KEYVAL_ARRAY_SIZE];
+extern PINT_server_trove_keys_s *Trove_Common_Keys;
 
 static char path_delim[] = "/";
 
@@ -36,7 +36,7 @@ PINT_state_machine_s lookup_req_s =
 
 %%
 
-machine lookup(init, dir_space, key_val, check_perms, send, cleanup)
+machine lookup(init, dir_space, key_val, check_params, send, cleanup)
 {
 	state init
 	{
@@ -44,9 +44,9 @@ machine lookup(init, dir_space, key_val, check_perms, send, cleanup)
 		default => key_val;
 	}
 
-	state check_perms
+	state check_params
 	{
-		run lookup_check_perms;
+		run lookup_check_params;
 		success => dir_space;
 		default => send;
 	}
@@ -54,7 +54,7 @@ machine lookup(init, dir_space, key_val, check_perms, send, cleanup)
 	state key_val
 	{
 		run lookup_key_val;
-		success => check_perms;
+		success => check_params;
 		default => send;
 	}
 
@@ -111,7 +111,7 @@ void lookup_init_state_machine(void)
  */
 
 
-STATE_FXN_HEAD(lookup_init)
+static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -122,8 +122,8 @@ STATE_FXN_HEAD(lookup_init)
 	s_op->val_a = (PVFS_ds_keyval_s *) malloc(3*sizeof(PVFS_ds_keyval_s));
 
 	s_op->key_a[0].buffer_sz = s_op->key_a[1].buffer_sz = \
-		atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]) > atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]) ? \
-		atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]) : atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]);
+		Trove_Common_Keys[DIR_ENT_KEY].size > Trove_Common_Keys[METADATA_KEY].size ? \
+		Trove_Common_Keys[DIR_ENT_KEY].size : Trove_Common_Keys[METADATA_KEY].size;
 
 	s_op->val_a[0].buffer_sz = s_op->val_a[1].buffer_sz = \
 		sizeof(PVFS_handle) > sizeof(PVFS_object_attr) ? \
@@ -178,12 +178,12 @@ STATE_FXN_HEAD(lookup_init)
 			&i);
 
 	gossip_ldebug(SERVER_DEBUG,"Init returning: %d\n",job_post_ret);
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
 /*
- * Function: lookup_check_perms
+ * Function: lookup_check_params
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -198,7 +198,7 @@ STATE_FXN_HEAD(lookup_init)
  */
 
 
-STATE_FXN_HEAD(lookup_check_perms)
+static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -259,7 +259,7 @@ STATE_FXN_HEAD(lookup_check_perms)
 	}
 
 	gossip_ldebug(SERVER_DEBUG,"check returning: %d\n",job_post_ret);
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -276,14 +276,14 @@ STATE_FXN_HEAD(lookup_check_perms)
  */
 
 
-STATE_FXN_HEAD(lookup_send_bmi)
+static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
 	job_id_t i;
 
 	gossip_ldebug(SERVER_DEBUG,"Send BMI\n");
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -300,7 +300,7 @@ STATE_FXN_HEAD(lookup_send_bmi)
  */
 
 
-STATE_FXN_HEAD(lookup_dir_space)
+static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -308,7 +308,7 @@ STATE_FXN_HEAD(lookup_dir_space)
 
 	gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space\n");
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -325,7 +325,7 @@ STATE_FXN_HEAD(lookup_dir_space)
  */
 
 
-STATE_FXN_HEAD(lookup_key_val)
+static int lookup_key_val(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -344,7 +344,7 @@ STATE_FXN_HEAD(lookup_key_val)
 			ret,
 			&i);
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -362,7 +362,7 @@ STATE_FXN_HEAD(lookup_key_val)
  */
 
 
-STATE_FXN_HEAD(lookup_cleanup)
+static int lookup_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 
 	if(s_op->key_a)
@@ -410,7 +410,7 @@ STATE_FXN_HEAD(lookup_cleanup)
 
 	free(s_op);
 
-	STATE_FXN_RET(0);
+	return(0);
 
 }
 

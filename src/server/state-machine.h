@@ -11,6 +11,7 @@
 #define __PVFS_SERVER_STATE
 
 #include <pvfs2-req-proto.h>
+#include <trove.h>
 #include <job.h>
 #include <bmi.h>
 #include <errno.h>
@@ -19,10 +20,6 @@
 #include <pvfs2-storage.h>
 #include <PINT-reqproto-encode.h>
 #include <pack.h>
-
-#define STATE_FXN_HEAD(__name)	int __name(state_action_struct *s_op, job_status_s *ret)
-
-#define STATE_FXN_RET(__name) return(__name);
 
 typedef struct PINT_server_op state_action_struct;
 
@@ -45,10 +42,16 @@ enum {
 
 enum {
 	ROOT_HANDLE_KEY = 0,
-	METADATA_KEY = 2,
-	DIR_ENT_KEY = 4,
+	METADATA_KEY = 1,
+	DIR_ENT_KEY = 2,
 	KEYVAL_ARRAY_SIZE = 6
 };
+
+typedef struct PINT_server_trove_keys
+{
+	char *key;
+	int size;
+} PINT_server_trove_keys_s;
 
 typedef struct PINT_state_machine_s
 {

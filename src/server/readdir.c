@@ -13,14 +13,14 @@
 #include <trove.h>
 #include <assert.h>
 
-STATE_FXN_HEAD(readdir_init);
-STATE_FXN_HEAD(readdir_cleanup);
-STATE_FXN_HEAD(readdir_kvread);
-STATE_FXN_HEAD(readdir_get_kvspace);
-STATE_FXN_HEAD(readdir_send_bmi);
+static int readdir_init(state_action_struct *s_op, job_status_s *ret);
+static int readdir_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int readdir_kvread(state_action_struct *s_op, job_status_s *ret);
+static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret);
+static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret);
 void readdir_init_state_machine(void);
 
-extern char *TROVE_COMMON_KEYS[KEYVAL_ARRAY_SIZE];
+extern PINT_server_trove_keys_s *Trove_Common_Keys;
 
 PINT_state_machine_s readdir_req_s = 
 {
@@ -98,7 +98,7 @@ void readdir_init_state_machine(void)
  */
 
 
-STATE_FXN_HEAD(readdir_init)
+static int readdir_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -128,7 +128,7 @@ STATE_FXN_HEAD(readdir_init)
 													 ret,
 													 &i);
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -144,7 +144,7 @@ STATE_FXN_HEAD(readdir_init)
  *           
  */
 
-STATE_FXN_HEAD(readdir_kvread)
+static int readdir_kvread(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -152,8 +152,8 @@ STATE_FXN_HEAD(readdir_kvread)
 	PVFS_vtag_s vtag;
 
 	gossip_ldebug(SERVER_DEBUG,"Kvread\n");
-	s_op->key.buffer = TROVE_COMMON_KEYS[DIR_ENT_KEY];
-	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[DIR_ENT_KEY+1]);
+	s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+	s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
 	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_handle)));
 
@@ -167,7 +167,7 @@ STATE_FXN_HEAD(readdir_kvread)
 													 ret,
 													 &i);
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -183,7 +183,7 @@ STATE_FXN_HEAD(readdir_kvread)
  *           
  */
 
-STATE_FXN_HEAD(readdir_get_kvspace)
+static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -206,7 +206,7 @@ STATE_FXN_HEAD(readdir_get_kvspace)
 				      								 &i);
 
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -224,7 +224,7 @@ STATE_FXN_HEAD(readdir_get_kvspace)
  */
 
 
-STATE_FXN_HEAD(readdir_send_bmi)
+static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -256,7 +256,7 @@ STATE_FXN_HEAD(readdir_send_bmi)
 										 ret, 
 										 &i);
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -275,7 +275,7 @@ STATE_FXN_HEAD(readdir_send_bmi)
  */
 
 
-STATE_FXN_HEAD(readdir_cleanup)
+static int readdir_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 	int j;
 
@@ -296,6 +296,6 @@ STATE_FXN_HEAD(readdir_cleanup)
 
 	free(s_op);
 
-	STATE_FXN_RET(0);
+	return(0);
 	
 }

@@ -1,4 +1,5 @@
 #include <state-machine.h>
+#include <trove.h>
 #include <server-config.h>
 #include <pvfs2-server.h>
 #include <string.h>

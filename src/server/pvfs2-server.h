@@ -27,6 +27,7 @@ typedef struct PINT_server_op
 	int op;
 	int strsize;
 	int enc_type;
+	job_id_t scheduled_id;
 	PVFS_ds_keyval_s key;
 	PVFS_ds_keyval_s val;
 	PVFS_ds_keyval_s *key_a;

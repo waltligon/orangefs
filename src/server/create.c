@@ -10,14 +10,13 @@
 #include <pvfs2-server.h>
 #include <string.h>
 #include <pvfs2-attr.h>
+#include <assert.h>
 
-STATE_FXN_HEAD(create_init);
-STATE_FXN_HEAD(create_cleanup);
-STATE_FXN_HEAD(create_create);
-STATE_FXN_HEAD(create_send_bmi);
+static int create_init(state_action_struct *s_op, job_status_s *ret);
+static int create_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int create_create(state_action_struct *s_op, job_status_s *ret);
+static int create_send_bmi(state_action_struct *s_op, job_status_s *ret);
 void create_init_state_machine(void);
-
-extern char *TROVE_COMMON_KEYS[KEYVAL_ARRAY_SIZE];
 
 PINT_state_machine_s create_req_s = 
 {
@@ -64,7 +63,7 @@ machine create(init, create, send, cleanup)
  *
  * Returns:  PINT_state_array_values*
  *
- * Synopsis: Set up the state machine for set_attrib. 
+ * Synopsis: Set up the state machine for create. 
  *           
  */
 
@@ -88,20 +87,18 @@ void create_init_state_machine(void)
  */
 
 
-STATE_FXN_HEAD(create_init)
+static int create_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
 	job_id_t i;
 
-	job_post_ret = job_check_consistency(s_op->op,
-													 s_op->req->u.create.fs_id,
-													 s_op->req->u.create.bucket,
-													 s_op,
-													 ret,
-													 &i);
+	job_post_ret = job_req_sched_post(s_op->req,
+												 s_op,
+												 ret,
+												 &(s_op->scheduled_id));
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -119,7 +116,7 @@ STATE_FXN_HEAD(create_init)
  */
 
 
-STATE_FXN_HEAD(create_create)
+static int create_create(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -134,7 +131,7 @@ STATE_FXN_HEAD(create_create)
 													 	ret,
 													 	&i);
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -152,7 +149,7 @@ STATE_FXN_HEAD(create_create)
  */
 
 
-STATE_FXN_HEAD(create_send_bmi)
+static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
@@ -174,7 +171,7 @@ STATE_FXN_HEAD(create_send_bmi)
 										 ret, 
 										 &i);
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -193,7 +190,7 @@ STATE_FXN_HEAD(create_send_bmi)
  */
 
 
-STATE_FXN_HEAD(create_cleanup)
+static int create_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 
 	if(s_op->resp)
@@ -216,6 +213,6 @@ STATE_FXN_HEAD(create_cleanup)
 
 	free(s_op);
 
-	STATE_FXN_RET(0);
+	return(0);
 	
 }

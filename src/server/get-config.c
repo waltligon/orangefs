@@ -11,12 +11,12 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 
-STATE_FXN_HEAD(getconfig_cleanup);
-STATE_FXN_HEAD(getconfig_job_bmi_send);
-STATE_FXN_HEAD(getconfig_build_bmi_good_msg);
-STATE_FXN_HEAD(getconfig_build_bmi_error);
-STATE_FXN_HEAD(getconfig_job_trove);
-STATE_FXN_HEAD(getconfig_init);
+static int getconfig_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret);
+static int getconfig_build_bmi_good_msg(state_action_struct *s_op, job_status_s *ret);
+static int getconfig_build_bmi_error(state_action_struct *s_op, job_status_s *ret);
+static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret);
+static int getconfig_init(state_action_struct *s_op, job_status_s *ret);
 void getconfig_init_state_machine(void);
 
 PINT_state_machine_s getconfig_req_s = 
@@ -104,7 +104,7 @@ void getconfig_init_state_machine(void)
  *           
  */
 
-STATE_FXN_HEAD(getconfig_init)
+static int getconfig_init(state_action_struct *s_op, job_status_s *ret)
 	{
 
 	//PINT_server_op *s_op = (PINT_server_op *) b;
@@ -137,7 +137,7 @@ STATE_FXN_HEAD(getconfig_init)
 
 	/* TODO: what to do with unexpected info struct ? */
 
-	STATE_FXN_RET(err);
+	return(err);
 
 	}
 
@@ -154,7 +154,7 @@ STATE_FXN_HEAD(getconfig_init)
  *           
  */
 
-STATE_FXN_HEAD(getconfig_job_trove)
+static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret)
 	{
 	//PINT_server_op *s_op = (PINT_server_op *) b;
 	int job_post_ret;
@@ -162,7 +162,7 @@ STATE_FXN_HEAD(getconfig_job_trove)
 
 	job_post_ret = job_trove_fs_lookup(s_op->req->u.getconfig.fs_name,s_op,ret,&i);
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 	}
 
@@ -179,7 +179,7 @@ STATE_FXN_HEAD(getconfig_job_trove)
  *           
  */
 
-STATE_FXN_HEAD(getconfig_build_bmi_error)
+static int getconfig_build_bmi_error(state_action_struct *s_op, job_status_s *ret)
 	{
 
 	s_op->resp->status = ret->error_code;
@@ -190,7 +190,7 @@ STATE_FXN_HEAD(getconfig_build_bmi_error)
 	//if(s_op->resp->u.getconfig.meta_list)
 		/* BMI FREE */
 
-	STATE_FXN_RET(1);
+	return(1);
 
 	}
 
@@ -207,7 +207,7 @@ STATE_FXN_HEAD(getconfig_build_bmi_error)
  *           
  */
 
-STATE_FXN_HEAD(getconfig_build_bmi_good_msg)
+static int getconfig_build_bmi_good_msg(state_action_struct *s_op, job_status_s *ret)
 	{
 	//PINT_server_op *s_op = (PINT_server_op *) b;
 	int jpret;
@@ -218,7 +218,7 @@ STATE_FXN_HEAD(getconfig_build_bmi_good_msg)
 	s_op->resp->u.getconfig.fs_id = ret->coll_id;
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + s_op->strsize;
 	jpret = PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-	STATE_FXN_RET(1);
+	return(1);
 
 	}
 
@@ -235,7 +235,7 @@ STATE_FXN_HEAD(getconfig_build_bmi_good_msg)
  *           
  */
 
-STATE_FXN_HEAD(getconfig_job_bmi_send)
+static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
 	{
 	int job_post_ret;
 	job_id_t i;
@@ -258,7 +258,7 @@ STATE_FXN_HEAD(getconfig_job_bmi_send)
 		job_post_ret = -1;
 	}
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 	}
 
@@ -275,7 +275,7 @@ STATE_FXN_HEAD(getconfig_job_bmi_send)
  *           TODO: should it clean up server_op?
  */
 
-STATE_FXN_HEAD(getconfig_cleanup)
+static int getconfig_cleanup(state_action_struct *s_op, job_status_s *ret)
 	{
 	//PINT_server_op *s_op = (PINT_server_op *) b;
 	gossip_ldebug(SERVER_DEBUG,"Completed GetConfig\n");
@@ -298,7 +298,7 @@ STATE_FXN_HEAD(getconfig_cleanup)
 
 	free(s_op);
 
-	STATE_FXN_RET(0);
+	return(0);
 
 	}
 

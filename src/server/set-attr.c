@@ -12,14 +12,14 @@
 #include <pvfs2-attr.h>
 #include <job-consist.h>
 
-STATE_FXN_HEAD(setattr_init);
-STATE_FXN_HEAD(setattr_cleanup);
-STATE_FXN_HEAD(setattr_getobj_attribs);
-STATE_FXN_HEAD(setattr_setobj_attribs);
-STATE_FXN_HEAD(setattr_send_bmi);
+static int setattr_init(state_action_struct *s_op, job_status_s *ret);
+static int setattr_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int setattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret);
+static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret);
+static int setattr_send_bmi(state_action_struct *s_op, job_status_s *ret);
 void setattr_init_state_machine(void);
 
-extern char *TROVE_COMMON_KEYS[KEYVAL_ARRAY_SIZE];
+extern PINT_server_trove_keys_s *Trove_Common_Keys;
 
 PINT_state_machine_s setattr_req_s = 
 {
@@ -97,14 +97,14 @@ void setattr_init_state_machine(void)
  */
 
 
-STATE_FXN_HEAD(setattr_init)
+static int setattr_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
 	job_id_t i;
 
-	s_op->key.buffer = TROVE_COMMON_KEYS[METADATA_KEY];
-	s_op->key.buffer_sz = atoi(TROVE_COMMON_KEYS[METADATA_KEY+1]);
+	s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
+	s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
 	s_op->val.buffer = (void *) malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 	
@@ -115,7 +115,7 @@ STATE_FXN_HEAD(setattr_init)
 													 ret,
 													 &i);
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 	
 }
 
@@ -133,7 +133,7 @@ STATE_FXN_HEAD(setattr_init)
  *           
  */
 
-STATE_FXN_HEAD(setattr_getobj_attribs)
+static int setattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret=0;
@@ -151,7 +151,7 @@ STATE_FXN_HEAD(setattr_getobj_attribs)
 	if (s_op->req->u.setattr.attrmask & ATTR_TYPE)
 	{
 		gossip_debug(SERVER_DEBUG,"Returning 1\n");
-		STATE_FXN_RET(1);
+		return(1);
 	}
 	else
 		{
@@ -169,7 +169,7 @@ STATE_FXN_HEAD(setattr_getobj_attribs)
 		}
 #endif
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -185,7 +185,7 @@ STATE_FXN_HEAD(setattr_getobj_attribs)
  *           
  */
 
-STATE_FXN_HEAD(setattr_setobj_attribs)
+static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
 {
 
 	PVFS_object_attr *old_attr;
@@ -254,7 +254,7 @@ STATE_FXN_HEAD(setattr_setobj_attribs)
 													 ret,
 													 &i);
 	
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -270,7 +270,7 @@ STATE_FXN_HEAD(setattr_setobj_attribs)
  *           
  */
 
-STATE_FXN_HEAD(setattr_send_bmi)
+static int setattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 	
 	int job_post_ret=0;
@@ -294,7 +294,7 @@ STATE_FXN_HEAD(setattr_send_bmi)
 										 ret,
 										 &i);
 
-	STATE_FXN_RET(job_post_ret);
+	return(job_post_ret);
 
 }
 
@@ -311,7 +311,7 @@ STATE_FXN_HEAD(setattr_send_bmi)
  */
 
 
-STATE_FXN_HEAD(setattr_cleanup)
+static int setattr_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 	
 	if(s_op->resp)
@@ -334,6 +334,6 @@ STATE_FXN_HEAD(setattr_cleanup)
 
 	free(s_op);
 
-	STATE_FXN_RET(0);
+	return(0);
 	
 }
