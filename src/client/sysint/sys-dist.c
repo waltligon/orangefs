@@ -56,7 +56,7 @@ PVFS_sys_dist* PVFS_sys_dist_lookup(const char* dist_name)
 /**
  * Free resources associated with this distribution
  */
-int PVFS_sys_dist_free(PVFS_sys_dist* dist)
+PVFS_error PVFS_sys_dist_free(PVFS_sys_dist* dist)
 {
     if (0 != dist)
     {
@@ -70,12 +70,12 @@ int PVFS_sys_dist_free(PVFS_sys_dist* dist)
 /**
  * Set the named distribution parameter with the given value
  */
-int PVFS_sys_dist_setparam(
+PVFS_error PVFS_sys_dist_setparam(
     PVFS_sys_dist* dist,
     const char* param,
     void* value)
 {
-    int rc = -PVFS_EINVAL;
+    PVFS_error rc = -PVFS_EINVAL;
     if (0 != dist)
     {
         /* Construct a dummy dist to lookup the registered dist */

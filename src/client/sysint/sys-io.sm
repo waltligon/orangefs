@@ -179,7 +179,7 @@ machine pvfs2_client_io_sm(
 
 %%
 
-int PVFS_isys_io(
+PVFS_error PVFS_isys_io(
     PVFS_object_ref ref,
     PVFS_Request file_req,
     PVFS_offset file_req_offset,
@@ -191,7 +191,7 @@ int PVFS_isys_io(
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
     struct filesystem_configuration_s* cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
@@ -261,7 +261,7 @@ int PVFS_isys_io(
         sm_p, PVFS_SYS_IO, op_id, user_ptr);
 }
 
-int PVFS_sys_io(
+PVFS_error PVFS_sys_io(
     PVFS_object_ref ref,
     PVFS_Request file_req,
     PVFS_offset file_req_offset,
@@ -271,8 +271,7 @@ int PVFS_sys_io(
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type)
 {
-    int ret = -PVFS_EINVAL;
-    PVFS_error error;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_io entered\n");

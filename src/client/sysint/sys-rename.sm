@@ -233,7 +233,7 @@ machine pvfs2_client_rename_sm(
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_isys_rename(
+PVFS_error PVFS_isys_rename(
     char *old_entry,
     PVFS_object_ref old_parent_ref,
     char *new_entry,
@@ -242,7 +242,7 @@ int PVFS_isys_rename(
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_rename entered\n");
@@ -309,15 +309,14 @@ int PVFS_isys_rename(
         sm_p, PVFS_SYS_RENAME, op_id, user_ptr);
 }
 
-int PVFS_sys_rename(
+PVFS_error PVFS_sys_rename(
     char *old_entry,
     PVFS_object_ref old_parent_ref,
     char *new_entry,
     PVFS_object_ref new_parent_ref,
     PVFS_credentials *credentials)
 {
-    int ret = -PVFS_EINVAL;
-    PVFS_error error;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename entered\n");

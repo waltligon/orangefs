@@ -184,7 +184,7 @@ machine pvfs2_client_symlink_sm(
 
 %%
 
-int PVFS_isys_symlink(
+PVFS_error PVFS_isys_symlink(
     char *entry_name,
     PVFS_object_ref parent_ref,
     char *target,
@@ -194,7 +194,7 @@ int PVFS_isys_symlink(
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_symlink entered\n");
@@ -251,7 +251,7 @@ int PVFS_isys_symlink(
         sm_p, PVFS_SYS_SYMLINK, op_id, user_ptr);
 }
 
-int PVFS_sys_symlink(
+PVFS_error PVFS_sys_symlink(
     char *entry_name,
     PVFS_object_ref parent_ref,
     char *target,
@@ -259,8 +259,7 @@ int PVFS_sys_symlink(
     PVFS_credentials *credentials,
     PVFS_sysresp_symlink *resp)
 {
-    int ret = -PVFS_EINVAL;
-    PVFS_error error;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_symlink entered\n");

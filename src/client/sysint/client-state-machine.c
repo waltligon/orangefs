@@ -48,7 +48,7 @@ do {                                                                 \
 #define CLIENT_SM_ASSERT_INITIALIZED()  \
 do { assert(got_context); } while(0)
 
-static int add_sm_to_completion_list(PINT_client_sm *sm_p)
+static PVFS_error add_sm_to_completion_list(PINT_client_sm *sm_p)
 {
     gen_mutex_lock(&s_completion_list_mutex);
     assert(s_completion_list_index < MAX_RETURNED_JOBS);
@@ -82,7 +82,7 @@ static int conditional_remove_sm_if_in_completion_list(
     return found;
 }
 
-static int completion_list_retrieve_completed(
+static PVFS_error completion_list_retrieve_completed(
     PVFS_sys_op_id *op_id_array,
     void **user_ptr_array,
     int *error_code_array,
@@ -195,13 +195,13 @@ static inline int cancelled_io_jobs_are_pending(PINT_client_sm *sm_p)
   you need to call PVFS_sys_release on your own when the operation
   completes.
 */
-int PINT_client_state_machine_post(
+PVFS_error PINT_client_state_machine_post(
     PINT_client_sm *sm_p,
     int pvfs_sys_op,
     PVFS_sys_op_id *op_id,
     void *user_ptr /* in */)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     job_status_s js;
 
 #if 0
@@ -368,13 +368,13 @@ int PINT_client_state_machine_post(
     return ret;
 }
 
-int PINT_sys_dev_unexp(
+PVFS_error PINT_sys_dev_unexp(
     struct PINT_dev_unexp_info *info,
     job_status_s *jstat,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     job_id_t id;
     PINT_client_sm *sm_p = NULL;
 
@@ -419,9 +419,10 @@ int PINT_sys_dev_unexp(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_client_io_cancel(PVFS_sys_op_id id)
+PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
 {
-    int ret = -PVFS_EINVAL, i = 0;
+    int i = 0;
+    PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_client_io_cancel called\n");
@@ -529,11 +530,12 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
     return ret;
 }
 
-int PINT_client_state_machine_test(
+PVFS_error PINT_client_state_machine_test(
     PVFS_sys_op_id op_id,
     int *error_code)
 {
-    int ret = -PVFS_EINVAL, i = 0, job_count = 0;
+    int i = 0, job_count = 0;
+    PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p, *tmp_sm_p = NULL;
     job_id_t job_id_array[MAX_RETURNED_JOBS];
     job_status_s job_status_array[MAX_RETURNED_JOBS];
@@ -624,15 +626,15 @@ int PINT_client_state_machine_test(
     return 0;
 }
 
-int PINT_client_state_machine_testsome(
+PVFS_error PINT_client_state_machine_testsome(
     PVFS_sys_op_id *op_id_array,
     int *op_count, /* in/out */
     void **user_ptr_array,
     int *error_code_array,
     int timeout_ms)
 {
-    int ret = -PVFS_EINVAL, i = 0;
-    int limit = 0, job_count = 0;
+    PVFS_error ret = -PVFS_EINVAL;
+    int i = 0, limit = 0, job_count = 0;
     PINT_client_sm *sm_p = NULL;
     job_id_t job_id_array[MAX_RETURNED_JOBS];
     job_status_s job_status_array[MAX_RETURNED_JOBS];
@@ -733,13 +735,13 @@ int PINT_client_state_machine_testsome(
         op_id_array, user_ptr_array, error_code_array, limit, op_count);
 }
 
-int PINT_client_wait_internal(
+PVFS_error PINT_client_wait_internal(
     PVFS_sys_op_id op_id,
     const char *in_op_str,
     int *out_error,
     const char *in_class_str)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
     if (in_op_str && out_error && in_class_str)

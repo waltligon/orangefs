@@ -216,7 +216,7 @@ machine pvfs2_client_create_sm(
 
 %%
 
-int PVFS_isys_create(
+PVFS_error PVFS_isys_create(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
@@ -226,8 +226,8 @@ int PVFS_isys_create(
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
-    int ret = -PVFS_EINVAL;
-    int num_dfiles_req;
+    int num_dfiles_req = 0;
+    PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_create entered\n");
@@ -337,7 +337,7 @@ int PVFS_isys_create(
         sm_p, PVFS_SYS_CREATE, op_id, user_ptr);
 }
 
-int PVFS_sys_create(
+PVFS_error PVFS_sys_create(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
@@ -345,8 +345,7 @@ int PVFS_sys_create(
     PVFS_sys_dist *dist,
     PVFS_sysresp_create *resp)
 {
-    int ret = -PVFS_EINVAL;
-    PVFS_error error;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
