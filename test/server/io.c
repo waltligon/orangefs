@@ -8,6 +8,7 @@
 #include <gossip.h>
 #include <pvfs2-req-proto.h>
 #include <print-struct.h>
+#include <PINT-reqproto-encode.h>
 
 
 /* TODO: update this as we go
@@ -45,14 +46,17 @@ static struct options* parse_args(int argc, char* argv[]);
 int main(int argc, char **argv)	{
 
 	struct options* user_opts = NULL;
-	struct PVFS_server_req_s* my_req = NULL;
-	struct PVFS_server_resp_s* my_ack = NULL;
 	int ret = -1;
 	bmi_addr_t server_addr;
 	bmi_op_id_t client_ops[2];
 	int outcount = 0;
 	bmi_error_code_t error_code;
 	bmi_size_t actual_size;
+	struct PINT_encoded_msg foo;
+	struct PINT_decoded_msg bar;
+	struct PVFS_server_req_s my_req;
+	struct PVFS_server_resp_s my_ack;
+	struct PVFS_server_resp_s* dec_ack;
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -80,35 +84,32 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
-	/* allocate a buffer for the initial request and ack */
-	my_req = (struct PVFS_server_req_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_req_s), BMI_SEND_BUFFER);
-	my_ack = (struct PVFS_server_resp_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_resp_s)+4, BMI_RECV_BUFFER);
-	if(!my_req || !my_ack){
-		fprintf(stderr, "BMI_memalloc failed.\n");
-		return(-1);
-	}
-
 	/* setup create request */
-	my_req->op = PVFS_SERV_IO;
-	my_req->rsize = sizeof(struct PVFS_server_req_s);
-	my_req->credentials.uid = 0;
-	my_req->credentials.gid = 0;
-	my_req->credentials.perms = U_WRITE | U_READ;  
+	my_req.op = PVFS_SERV_IO;
+	my_req.rsize = sizeof(struct PVFS_server_req_s);
+	my_req.credentials.uid = 0;
+	my_req.credentials.gid = 0;
+	my_req.credentials.perms = U_WRITE | U_READ;  
 
 	/* io specific fields */
 	/* TODO: need more stuff here */
-	my_req->u.io.fs_id = 9;
-	my_req->u.io.handle = user_opts->bucket;
+	my_req.u.io.fs_id = 9;
+	my_req.u.io.handle = user_opts->bucket;
+
+	ret = PINT_encode(&my_req,PINT_ENCODE_REQ,&foo,server_addr,0);
+	if(ret < 0)
+	{
+		fprintf(stderr, "PINT_encode failure.\n");
+		return(-1);
+	}
 
 #if 0
 	display_pvfs_structure(my_req,1);
 #endif
 
 	/* send the initial request on its way */
-	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req, 
-		sizeof(struct PVFS_server_req_s), BMI_PRE_ALLOC, 0, NULL);
+	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr,
+		foo.buffer_list[0], foo.total_size, BMI_PRE_ALLOC, 0, NULL);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -138,8 +139,8 @@ int main(int argc, char **argv)	{
 	}
 
 	/* post a recv for the server acknowledgement */
-	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
-		sizeof(struct PVFS_server_resp_s)+4, &actual_size, BMI_PRE_ALLOC, 0, 
+	ret = BMI_post_recv(&(client_ops[0]), server_addr, &my_ack, 
+		sizeof(struct PVFS_server_resp_s), &actual_size, BMI_EXT_ALLOC, 0, 
 		NULL);
 	if(ret < 0)
 	{
@@ -174,21 +175,27 @@ int main(int argc, char **argv)	{
 	}
 		
 	/* look at the ack */
-	if(my_ack->op != PVFS_SERV_IO)
+	ret = PINT_decode(&my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
+	if(ret < 0)
 	{
-		printf("ERROR: received ack of wrong type (%d)\n", (int)my_ack->op);
-	}
-	if(my_ack->status != 0)
-	{
-		printf("ERROR: server returned status: %d\n",
-			(int)my_ack->status);
+		fprintf(stderr, "PINT_decode() failure.\n");
+		return(-1);
 	}
 
-	/* free up memory buffers */
-	BMI_memfree(server_addr, my_req, sizeof(struct PVFS_server_req_s), 
+	printf("Act size: %d\n",(int)actual_size);
+	dec_ack = bar.buffer;
+	if(dec_ack->op != PVFS_SERV_IO)
+	{
+		printf("ERROR: received ack of wrong type (%d)\n", (int)dec_ack->op);
+	}
+	if(dec_ack->status != 0)
+	{
+		printf("ERROR: server returned status: %d\n",
+			(int)dec_ack->status);
+	}
+
+	BMI_memfree(server_addr, foo.buffer_list[0], foo.total_size,
 		BMI_SEND_BUFFER);
-	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp_s), 
-		BMI_RECV_BUFFER);
 
 	/* shutdown the local interface */
 	ret = BMI_finalize();

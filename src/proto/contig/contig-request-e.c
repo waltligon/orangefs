@@ -234,7 +234,23 @@ int do_encode_req(
 		/*((struct PVFS_server_req_s *)enc_msg)->u.setattr.attr.u.meta.dfh = NULL;*/
 	    }
 	    return (0);
+	case PVFS_SERV_IO: 
+	    /* TODO: this one is a work in progress.
+	     * for now it works like the self contained operations
+	     * listed below, but it will get more complex later
+	     */
+	    size = sizeof( struct PVFS_server_req_s );
+	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER ) ;
+	    if (enc_msg == NULL)
+	    {
+		return (-ENOMEM);
+	    }
+	    target_msg->buffer_list[0] = enc_msg;
+	    target_msg->size_list[0] = size;
+	    target_msg->total_size = size;
+	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
+	    return (0);
 	case PVFS_SERV_RMDIR: /*these structures are all self contained (no pointers that need to be packed) */
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_READDIR:
@@ -256,7 +272,7 @@ int do_encode_req(
 
 	    return (0);
 
-	case PVFS_SERV_IO: /*haven't been implemented yet*/
+	/*haven't been implemented yet*/
 	case PVFS_SERV_IOSTATFS:
 	case PVFS_SERV_GETDIST:
 	case PVFS_SERV_REVLOOKUP:
