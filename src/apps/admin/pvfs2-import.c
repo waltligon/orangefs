@@ -150,7 +150,7 @@ int main(int argc, char **argv)
     attr.atime = time(NULL);
     attr.mtime = attr.atime;
     attr.ctime = attr.atime;
-    attr.mask = (PVFS_ATTR_SYS_ALL_NOSIZE);
+    attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     credentials.uid = 100;
     credentials.gid = 100;
     credentials.perms = 1877;

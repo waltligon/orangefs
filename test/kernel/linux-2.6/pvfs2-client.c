@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "gossip.h"
 #include "pint-dev.h"
@@ -98,11 +99,12 @@ static int service_create_request(
         memset(&response,0,sizeof(PVFS_sysresp_create));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-        attr.mask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID |
-                     PVFS_ATTR_SYS_PERM);
+        attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
         attr.owner = 100;
         attr.group = 100;
         attr.perms = 511;
+	attr.atime = attr.mtime = attr.ctime = 
+	    time(NULL);
 
         credentials.uid = attr.owner;
         credentials.gid = attr.group;
@@ -250,11 +252,12 @@ static int service_mkdir_request(
         memset(&response,0,sizeof(PVFS_sysresp_mkdir));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-        attr.mask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID |
-                     PVFS_ATTR_SYS_PERM);
         attr.owner = 100;
         attr.group = 100;
         attr.perms = 511;
+	attr.atime = attr.mtime = attr.ctime = 
+	    time(NULL);
+	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
         credentials.uid = attr.owner;
         credentials.gid = attr.group;

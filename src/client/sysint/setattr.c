@@ -53,8 +53,9 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 
 	/* but make sure the caller didn't set invalid mask bits */
 	/* in particular, note that you can't set size here */
-	if((attr.mask & ~PVFS_ATTR_SYS_ALL_NOSIZE) != 0)
+	if((attr.mask & ~PVFS_ATTR_SYS_ALL_SETABLE) != 0)
 	{
+	    gossip_lerr("Error: PVFS_sys_setattr(): attempted to set invalid attributes.\n");
 	    return(-EINVAL);
 	}
 

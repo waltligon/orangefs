@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+#include <time.h>
 #include <sys/time.h>
 #include <stdio.h>
 #include <string.h>
@@ -115,11 +116,12 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	memcpy(entry_name,filename,strlen(filename) + 1);
-	attr.mask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID | 
-		PVFS_ATTR_SYS_PERM);
+	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 	attr.owner = 100;
 	attr.group = 100;
 	attr.perms = 1877;
+	attr.atime = attr.mtime = attr.ctime =
+	    time(NULL);
 
 	credentials.uid = 100;
 	credentials.gid = 100;

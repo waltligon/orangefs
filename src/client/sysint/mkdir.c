@@ -55,6 +55,12 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 	PCACHE_INSERT2_FAILURE,
     } failure = NONE_FAILURE;
 	
+    if((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
+    {
+	gossip_lerr("Error: PVFS_sys_mkdir(): failed to specify manditory attribute fields.\n");
+	return(-EINVAL);
+    }
+
     if((strlen(entry_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
     {
 	return -ENAMETOOLONG;

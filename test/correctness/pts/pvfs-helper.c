@@ -1,3 +1,5 @@
+#include <time.h>
+
 #include "pint-sysint.h"
 #include "pvfs-helper.h"
 
@@ -79,11 +81,12 @@ int create_dir(PVFS_pinode_reference parent_refn, char *name,
 
     memset(&resp_mkdir, 0, sizeof(resp_mkdir));
 
-    attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
     attr.owner = 100;
     attr.group = 100;
+    attr.atime = attr.mtime = attr.ctime = 
+	time(NULL);
     attr.perms = (PVFS_U_WRITE | PVFS_U_READ);
-    attr.objtype = PVFS_TYPE_DIRECTORY;
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
     credentials.uid = 100;
     credentials.gid = 100;

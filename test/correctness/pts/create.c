@@ -38,13 +38,11 @@ int create_file(PVFS_fs_id fs_id,
 	return (-1);
     }
 
-/*     attrmask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID | PVFS_ATTR_SYS_PERM); */
-    attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
-    attr.objtype = PVFS_TYPE_METAFILE;
 
     memset(&resp_create,0,sizeof(resp_create));
     ret = PVFS_sys_create(filename, resp_look.pinode_refn,

@@ -12,8 +12,9 @@
  * Last Updated: 6/26/2003
  */
 
-#include "client.h"
+#include <time.h>
 #include <sys/time.h>
+#include "client.h"
 #include "mpi.h"
 #include "pts.h"
 #include "pvfs-helper.h"
@@ -197,11 +198,12 @@ static int test_mkdir(int nullCase)
     }
 
     parent_refn = resp_lookup.pinode_refn;
-    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+    attrmask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
-    attr.objtype = PVFS_TYPE_DIRECTORY;
+    attr.atime = attr.mtime = attr.ctime = 
+	time(NULL);
     credentials.perms = 1877;
     credentials.uid = 100;
     credentials.gid = 100;

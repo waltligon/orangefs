@@ -8,6 +8,7 @@
  * on the read
  */
 
+#include <time.h>
 #include <client.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -134,10 +135,9 @@ int main(int argc,char **argv)
 		attr.owner = 100;
 		attr.group = 100;
 		attr.perms = PVFS_U_WRITE|PVFS_U_READ;
-		attr.atime = 0;
-		attr.mtime = 0;
-		attr.ctime = 0;
-		attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
+		attr.atime = attr.ctime = attr.mtime = 
+		    time(NULL);
+		attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 		parent_refn.handle = resp_lk.pinode_refn.handle;
 		parent_refn.fs_id = fs_id;
 		entry_name = &(filename[1]); /* leave off slash */

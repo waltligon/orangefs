@@ -33,6 +33,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     /* make sure that the caller asked for valid fields */
     if((attrmask & ~PVFS_ATTR_SYS_ALL) != 0)
     {
+	gossip_lerr("Error: PVFS_sys_getattr(): attempted to get invalid attributes.\n");
 	return(-EINVAL);
     }
 

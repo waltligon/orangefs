@@ -1,4 +1,5 @@
 #include "pvfs-helper.h"
+#include <time.h>
 #include <test-pvfs-datatype-init.h>
 #include <stdio.h>
 
@@ -68,11 +69,12 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
             }
 
 
-            attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
+            attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
             attr.owner = 100;
             attr.group = 100;
             attr.perms = 1877;
-            attr.objtype = PVFS_TYPE_METAFILE;
+	    attr.atime = attr.mtime = attr.ctime = 
+		time(NULL);
 
             ret = PVFS_sys_create(&(filename[1]),resp_lk.pinode_refn,
                                   attr, credentials, &resp_cr);

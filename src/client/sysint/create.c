@@ -62,6 +62,12 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	    PCACHE_INSERT2_FAILURE,
 	} failure = NONE_FAILURE;
 
+	if((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
+	{
+	    gossip_lerr("Error: PVFS_sys_create(): failed to specify manditory attribute fields.\n");
+	    return(-EINVAL);
+	}
+
 	/* make sure we recieved sane arguments */
 	if (resp==NULL)
 	{
