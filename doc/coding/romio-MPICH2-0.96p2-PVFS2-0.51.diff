@@ -1885,7 +1885,7 @@ diff -u -w -p -r1.11 -r1.12
 +    if (rank == fd->hints->ranklist[0]) {
      err = pvfs_ftruncate64(fd->fd_sys, size);
 +    }
-+    MPI_Bcast(&err, 1, MPI_INT, 0, fd->comm)
++    MPI_Bcast(&err, 1, MPI_INT, 0, fd->comm);
 +
      if (err == -1) {
  #ifdef MPICH2
