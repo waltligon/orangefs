@@ -111,7 +111,9 @@ static int handlelist_return_handle(struct handlelist *hl,
 
 static void handlelist_finalize(struct handlelist **hl);
 
+#if 0
 static void handlelist_print(struct handlelist *hl);
+#endif
 
 #endif
 

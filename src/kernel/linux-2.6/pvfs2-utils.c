@@ -129,8 +129,10 @@ static inline int copy_attributes_to_inode(
         inode->i_atime.tv_sec = (time_t)attrs->atime;
         inode->i_mtime.tv_sec = (time_t)attrs->mtime;
         inode->i_ctime.tv_sec = (time_t)attrs->ctime;
+        inode->i_atime.tv_nsec = 0;
+        inode->i_mtime.tv_nsec = 0;
+        inode->i_ctime.tv_nsec = 0;
 #endif
-
         inode->i_mode = 0;
 
         if (attrs->perms & PVFS_O_EXECUTE)
@@ -175,7 +177,7 @@ static inline int copy_attributes_to_inode(
                 inode->i_op = &pvfs2_symlink_inode_operations;
                 inode->i_fop = NULL;
 
-                /* copy the link target string to the inode private data */
+                /* copy link target to inode private data */
                 if (pvfs2_inode && symname)
                 {
                     if (pvfs2_inode->link_target)
@@ -247,59 +249,34 @@ static inline int copy_attributes_from_inode(
           to only copy the attributes out of the iattr object that we
           know are valid
         */
-        if (iattr && (iattr->ia_valid & ATTR_UID))
-            attrs->owner = iattr->ia_uid;
-        else
-            attrs->owner = inode->i_uid;
+        attrs->owner = ((iattr && (iattr->ia_valid & ATTR_UID)) ?
+                        iattr->ia_uid : inode->i_uid);
         attrs->mask |= PVFS_ATTR_SYS_UID;
 
-        if (iattr && (iattr->ia_valid & ATTR_GID))
-            attrs->group = iattr->ia_gid;
-        else
-            attrs->group = inode->i_gid;
+        attrs->group = ((iattr && (iattr->ia_valid & ATTR_GID)) ?
+                        iattr->ia_gid : inode->i_gid);
         attrs->mask |= PVFS_ATTR_SYS_GID;
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
-        if (iattr && (iattr->ia_valid & ATTR_ATIME))
-            attrs->atime = (PVFS_time)iattr->ia_atime;
-        else
-            attrs->atime = (PVFS_time)inode->i_atime;
+        attrs->atime =
+            ((iattr && (iattr->ia_valid & ATTR_ATIME)) ?
+             pvfs2_convert_time_field((void *)&iattr->ia_atime) :
+             pvfs2_convert_time_field((void *)&inode->i_atime));
         attrs->mask |= PVFS_ATTR_SYS_ATIME;
 
-        if (iattr && (iattr->ia_valid & ATTR_MTIME))
-            attrs->mtime = (PVFS_time)iattr->ia_mtime;
-        else
-            attrs->mtime = (PVFS_time)inode->i_mtime;
+        attrs->mtime =
+            ((iattr && (iattr->ia_valid & ATTR_MTIME)) ?
+             pvfs2_convert_time_field((void *)&iattr->ia_mtime) :
+             pvfs2_convert_time_field((void *)&inode->i_mtime));
         attrs->mask |= PVFS_ATTR_SYS_MTIME;
 
-        if (iattr && (iattr->ia_valid & ATTR_CTIME))
-            attrs->ctime = (PVFS_time)iattr->ia_ctime;
-        else
-            attrs->ctime = (PVFS_time)inode->i_ctime;
+        attrs->ctime =
+            ((iattr && (iattr->ia_valid & ATTR_CTIME)) ?
+             pvfs2_convert_time_field((void *)&iattr->ia_ctime) :
+             pvfs2_convert_time_field((void *)&inode->i_ctime));
         attrs->mask |= PVFS_ATTR_SYS_CTIME;
-#else
-        if (iattr && (iattr->ia_valid & ATTR_ATIME))
-            attrs->atime = (PVFS_time)iattr->ia_atime.tv_sec;
-        else
-            attrs->atime = (PVFS_time)inode->i_atime.tv_sec;
-        attrs->mask |= PVFS_ATTR_SYS_ATIME;
 
-        if (iattr && (iattr->ia_valid & ATTR_MTIME))
-            attrs->mtime = (PVFS_time)iattr->ia_mtime.tv_sec;
-        else
-            attrs->mtime = (PVFS_time)inode->i_mtime.tv_sec;
-        attrs->mask |= PVFS_ATTR_SYS_MTIME;
-
-        if (iattr && (iattr->ia_valid & ATTR_CTIME))
-            attrs->ctime = (PVFS_time)iattr->ia_ctime.tv_sec;
-        else
-            attrs->ctime = (PVFS_time)inode->i_ctime.tv_sec;
-        attrs->mask |= PVFS_ATTR_SYS_CTIME;
-#endif
-        if (iattr && (iattr->ia_valid & ATTR_SIZE))
-            attrs->size = iattr->ia_size;
-        else
-            attrs->size = inode->i_size;
+        attrs->size = ((iattr && (iattr->ia_valid & ATTR_SIZE)) ?
+                       iattr->ia_size : inode->i_size);
         attrs->mask |= PVFS_ATTR_SYS_SIZE;
 
         if (iattr && (iattr->ia_valid & ATTR_MODE))
@@ -1099,6 +1076,18 @@ void unmask_blocked_signals(sigset_t *orig_sigset)
     current->blocked = *orig_sigset;
     pvfs2_recalc_sigpending();
     spin_unlock_irqrestore(&pvfs2_current_signal_lock, irqflags);
+}
+
+PVFS_time pvfs2_convert_time_field(void *time_ptr)
+{
+    PVFS_time pvfs2_time;
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    pvfs2_time = (PVFS_time)(*time_ptr);
+#else
+    struct timespec *tspec = (struct timespec *)time_ptr;
+    pvfs2_time = (PVFS_time)((time_t)tspec->tv_sec);
+#endif
+    return pvfs2_time;
 }
 
 /*

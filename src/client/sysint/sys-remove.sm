@@ -38,7 +38,8 @@ enum
 {
     MSGPAIR_RETURN_SUCCESS = 1,
     RMDIRENT_RETRY,
-    CRDIRENT_RETRY
+    CRDIRENT_RETRY,
+    RETURN_STORED_ERROR_CODE,
 };
 
 static int remove_init(
@@ -52,6 +53,8 @@ static int remove_rmdirent_retry_or_fail(
 static int remove_crdirent_retry_or_fail(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_crdirent_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_check_error_code(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
@@ -74,6 +77,7 @@ machine pvfs2_client_remove_sm(
     init,
     cleanup,
     do_remove,
+    check_error_code,
     rmdirent_setup_msgpair,
     rmdirent_xfer_msgpair,
     rmdirent_retry_or_fail,
@@ -115,7 +119,14 @@ machine pvfs2_client_remove_sm(
     state do_remove
     {
         jump pvfs2_client_remove_helper_sm;
+        default => check_error_code;
+    }
+
+    state check_error_code
+    {
+        run remove_check_error_code;
         success => cleanup;
+        RETURN_STORED_ERROR_CODE => cleanup;
         default => crdirent_setup_msgpair;
     }
 
@@ -378,8 +389,30 @@ static int remove_crdirent_comp_fn(
     return resp_p->status;
 }
 
-static int remove_cleanup(PINT_client_sm *sm_p,
-			  job_status_s *js_p)
+static int remove_check_error_code(
+    PINT_client_sm *sm_p, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_REMOVE_DEBUG,
+                 "remove_check_error_code got %d\n", js_p->error_code);
+
+    /*
+      check for error codes which are ok to return to the caller at
+      this point without trying to undo what we've done and retry the
+      removal
+    */
+    switch(js_p->error_code)
+    {
+        case -PVFS_EINVAL:
+        case -PVFS_ENOMEM:
+        case -PVFS_ENOTEMPTY:
+            sm_p->u.remove.stored_error_code = js_p->error_code;
+            js_p->error_code = RETURN_STORED_ERROR_CODE;
+            break;
+    }
+    return 1;
+}
+
+static int remove_cleanup(PINT_client_sm *sm_p, job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: cleanup\n");
 

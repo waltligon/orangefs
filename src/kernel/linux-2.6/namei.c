@@ -39,7 +39,7 @@ static int pvfs2_create(
 
     if (inode)
     {
-        dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+        pvfs2_update_inode_time(dir);
         ret = 0;
     }
 
@@ -233,8 +233,7 @@ static int pvfs2_unlink(
     if (ret == 0)
     {
         inode->i_nlink--;
-        inode->i_ctime = dir->i_ctime;
-        dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+        pvfs2_update_inode_time(dir);
     }
     return ret;
 }
@@ -254,7 +253,7 @@ static int pvfs2_symlink(
 
     if (inode)
     {
-        dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+        pvfs2_update_inode_time(dir);
         ret = 0;
     }
     return ret;
@@ -274,7 +273,7 @@ static int pvfs2_mkdir(
     if (inode)
     {
 	dir->i_nlink++;
-        dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+        pvfs2_update_inode_time(dir);
 	ret = 0;
     }
     return ret;
@@ -290,10 +289,9 @@ static int pvfs2_rmdir(
     ret = pvfs2_unlink(dir, dentry);
     if (ret == 0)
     {
-        dentry->d_inode->i_nlink--;
-        inode->i_size = 0;
+        inode->i_nlink--;
 	dir->i_nlink--;
-        dir->i_mtime = dir->i_ctime = CURRENT_TIME;
+        pvfs2_update_inode_time(dir);
     }
     return ret;
 }

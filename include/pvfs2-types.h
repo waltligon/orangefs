@@ -90,7 +90,7 @@ typedef int32_t PVFS_ds_flags;
 /* basic types used within metadata */
 typedef uint32_t PVFS_uid;
 typedef uint32_t PVFS_gid;
-typedef int64_t PVFS_time;
+typedef uint64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 #define encode_PVFS_uid encode_uint32_t
 #define decode_PVFS_uid decode_uint32_t

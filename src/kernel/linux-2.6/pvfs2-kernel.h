@@ -415,6 +415,9 @@ int pvfs2_unmount_sb(
 int pvfs2_cancel_op_in_progress(
     unsigned long tag);
 
+PVFS_time pvfs2_convert_time_field(
+    void *time_ptr);
+
 /************************************
  * misc convenience macros
  ************************************/
@@ -694,6 +697,10 @@ do {                                                                 \
     spin_unlock(&pvfs2_superblocks_lock);                            \
 } while(0)
 
+#define pvfs2_update_inode_time(inode) \
+do { inode->i_mtime = inode->i_ctime = CURRENT_TIME; } while(0)
+
+
 #ifdef PVFS2_LINUX_KERNEL_2_4
 #define get_block_block_type long
 #define pvfs2_lock_inode(inode) do {} while(0)
@@ -710,11 +717,15 @@ do { ClearPageReserved(page); put_page(page); } while(0)
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
+    time_t cur_time = CURRENT_TIME;               \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
-    sys_attr.atime = (PVFS_time)CURRENT_TIME;     \
-    sys_attr.mtime = (PVFS_time)CURRENT_TIME;     \
-    sys_attr.ctime = (PVFS_time)CURRENT_TIME;     \
+    sys_attr.atime =                              \
+      pvfs2_convert_time_field((void *)&cur_time);\
+    sys_attr.mtime =                              \
+      pvfs2_convert_time_field((void *)&cur_time);\
+    sys_attr.ctime =                              \
+      pvfs2_convert_time_field((void *)&cur_time);\
     sys_attr.size = 0;                            \
     sys_attr.perms = PVFS2_translate_mode(mode);  \
     sys_attr.objtype = type;                      \
@@ -737,12 +748,15 @@ do                                                \
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
-    struct timespec tspec = CURRENT_TIME;         \
+    struct timespec cur_time = CURRENT_TIME;      \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
-    sys_attr.atime = (PVFS_time)tspec.tv_sec;     \
-    sys_attr.mtime = (PVFS_time)tspec.tv_sec;     \
-    sys_attr.ctime = (PVFS_time)tspec.tv_sec;     \
+    sys_attr.atime =                              \
+      pvfs2_convert_time_field((void *)&cur_time);\
+    sys_attr.mtime =                              \
+      pvfs2_convert_time_field((void *)&cur_time);\
+    sys_attr.ctime =                              \
+      pvfs2_convert_time_field((void *)&cur_time);\
     sys_attr.size = 0;                            \
     sys_attr.perms = PVFS2_translate_mode(mode);  \
     sys_attr.objtype = type;                      \
