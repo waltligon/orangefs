@@ -241,7 +241,7 @@ int main(int argc, char **argv)	{
 	fprintf(stderr, "Sending rendezvous size message.\n");
 	/* send the data payload on its way */
 	ret = BMI_post_send(&(client_ops[0]), server_addr, big_buffer, 
-		BIG_SIZE, BMI_PRE_ALLOC, 0, NULL, context);
+		BIG_SIZE, BMI_EXT_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -269,7 +269,7 @@ int main(int argc, char **argv)	{
 	fprintf(stderr, "Sending rendezvous size message (SHORT).\n");
 	/* send the data payload on its way */
 	ret = BMI_post_send(&(client_ops[0]), server_addr, big_buffer, 
-		BIG_SIZE-30, BMI_PRE_ALLOC, 0, NULL, context);
+		BIG_SIZE-30, BMI_EXT_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -297,7 +297,7 @@ int main(int argc, char **argv)	{
 	fprintf(stderr, "Sending rendezvous size message (VERY SHORT).\n");
 	/* send the data payload on its way */
 	ret = BMI_post_send(&(client_ops[0]), server_addr, big_buffer, 
-		300, BMI_PRE_ALLOC, 0, NULL, context);
+		300, BMI_EXT_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;

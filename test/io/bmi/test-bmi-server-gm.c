@@ -226,7 +226,7 @@ int main(int argc, char **argv)	{
 	fprintf(stderr, "Receiving rendezvous size message.\n");
 	/* post the recv */
 	ret = BMI_post_recv(&(server_ops[0]), client_addr, big_buffer,
-		BIG_SIZE, &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
+		BIG_SIZE, &actual_size, BMI_EXT_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_recv_failure.\n");
@@ -261,7 +261,7 @@ int main(int argc, char **argv)	{
 	fprintf(stderr, "Receiving rendezvous size message (SHORT).\n");
 	/* post the recv */
 	ret = BMI_post_recv(&(server_ops[0]), client_addr, big_buffer,
-		BIG_SIZE, &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
+		BIG_SIZE, &actual_size, BMI_EXT_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_recv_failure.\n");
@@ -297,7 +297,7 @@ int main(int argc, char **argv)	{
 	fprintf(stderr, "Receiving rendezvous size message (VERY SHORT).\n");
 	/* post the recv */
 	ret = BMI_post_recv(&(server_ops[0]), client_addr, big_buffer,
-		BIG_SIZE, &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
+		BIG_SIZE, &actual_size, BMI_EXT_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_recv_failure.\n");
