@@ -28,6 +28,20 @@ static int s_current_num_cache_elems = 0;
 #define DBPF_ATTR_CACHE_INITIALIZED() \
 (s_key_to_attr_table && s_dbpf_attr_mutex)
 
+/*
+  this is a check that needs to be made each
+  time the s_dbpf_attr_mutex is acquired.  it handles
+  the odd case of a caller waiting on a mutex and
+  acquiring it after a different caller finalized
+  the interface
+*/
+#define DBPF_ATTR_CACHE_ASSERT_OK(err)   \
+do {                                     \
+    if (!DBPF_ATTR_CACHE_INITIALIZED()) {\
+        return err;                      \
+    }                                    \
+} while(0)
+
 int dbpf_attr_cache_set_keywords(char *keywords)
 {
     assert(keywords);
@@ -185,6 +199,8 @@ int dbpf_attr_cache_finalize(void)
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(ret);
+
         for(i = 0; i < s_key_to_attr_table->table_size; i++)
         {
             do
@@ -206,7 +222,6 @@ int dbpf_attr_cache_finalize(void)
         qhash_finalize(s_key_to_attr_table);
         s_key_to_attr_table = NULL;
 
-        /* FIXME: race condition here */
         gen_mutex_unlock(s_dbpf_attr_mutex);
         gen_mutex_destroy(s_dbpf_attr_mutex);
         s_dbpf_attr_mutex = NULL;
@@ -239,6 +254,8 @@ dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key)
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(NULL);
+
         hash_link = qhash_search(s_key_to_attr_table,&(key));
         if (hash_link)
         {
@@ -265,6 +282,8 @@ int dbpf_attr_cache_ds_attr_update_cached_data(
     if (cache_elem && src_ds_attr)
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(ret);
+
         if (cache_elem && src_ds_attr)
         {
             memcpy(&cache_elem->attr, src_ds_attr,
@@ -289,6 +308,8 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
     if (cache_elem)
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(ret);
+
         if (cache_elem)
         {
             cache_elem->attr.b_size = b_size;
@@ -312,6 +333,8 @@ int dbpf_attr_cache_ds_attr_fetch_cached_data(
     if (DBPF_ATTR_CACHE_INITIALIZED() && target_ds_attr)
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(ret);
+
         hash_link = qhash_search(s_key_to_attr_table,&(key));
         if (hash_link)
         {
@@ -336,6 +359,8 @@ dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
         (cache_elem && key && cache_elem->num_keyval_pairs))
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(NULL);
+
         for(i = 0; i < cache_elem->num_keyval_pairs; i++)
         {
             if ((strcmp(cache_elem->keyval_pairs[i].key, key) == 0) &&
@@ -366,6 +391,8 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
     if (cache_elem && key_str && cache_elem->num_keyval_pairs)
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(ret);
+
         if (!cache_elem || !cache_elem->num_keyval_pairs)
         {
             gen_mutex_unlock(s_dbpf_attr_mutex);
@@ -407,6 +434,8 @@ int dbpf_attr_cache_keyval_pair_update_cached_data(
     if (DBPF_ATTR_CACHE_INITIALIZED() && (keyval_pair && src_data))
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(ret);
+
         if (cache_elem && keyval_pair)
         {
             if (keyval_pair->data)
@@ -435,6 +464,8 @@ int dbpf_attr_cache_keyval_pair_fetch_cached_data(
         (keyval_pair && target_data && target_data_sz))
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(ret);
+
         if (cache_elem && keyval_pair)
         {
             memcpy(target_data, keyval_pair->data, keyval_pair->data_sz);
@@ -457,6 +488,8 @@ int dbpf_attr_cache_insert(
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(ret);
+
         if ((s_current_num_cache_elems + 1) > s_max_num_cache_elems)
         {
             TROVE_handle sacrificial_lamb_key = TROVE_HANDLE_NULL;
@@ -501,6 +534,7 @@ int dbpf_attr_cache_insert(
                          Lu(sacrificial_lamb_key), Lu(key));
             dbpf_attr_cache_remove(sacrificial_lamb_key);
             gen_mutex_lock(s_dbpf_attr_mutex);
+            DBPF_ATTR_CACHE_ASSERT_OK(ret);
         }
 
         hash_link = qhash_search(s_key_to_attr_table,&(key));
@@ -563,6 +597,8 @@ int dbpf_attr_cache_remove(TROVE_handle key)
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        DBPF_ATTR_CACHE_ASSERT_OK(ret);
+
         hash_link = qhash_search_and_remove(s_key_to_attr_table,&(key));
         if (hash_link)
         {
