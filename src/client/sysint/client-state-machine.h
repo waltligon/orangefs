@@ -24,6 +24,14 @@
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
 
+/* jobs that send or receive request messages will timeout if they do not
+ * complete within PVFS2_CLIENT_JOB_TIMEOUT seconds; flows will timeout if
+ * they go for more than PVFS2_CLIENT_JOB_TIMEOUT seconds without moving any
+ * data.
+ */
+/* TODO: this should be configurable at runtime somehow */
+#define PVFS2_CLIENT_JOB_TIMEOUT 30
+
 /*
  * This structure holds everything that we need for the state of a
  * message pair.  We need arrays of these in some cases, so it's
