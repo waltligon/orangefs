@@ -1586,7 +1586,7 @@ static int split_string_list(char ***tokens,
 
     /* copy out all of the tokenized strings */
     holder = comma_list;
-    end = comma_list + strlen(comma_list) + 1;
+    end = comma_list + strlen(comma_list);
     for (i = 0; i < tokencount; i++)
     {
 	holder2 = index(holder, ',');
