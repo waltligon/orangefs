@@ -389,7 +389,14 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	return 1;
     }
 
-    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
+    /* TODO: VALIDATE THE HANDLE IN SOME WAY BEFORE DOING THIS? 
+     * IT'S DIFFICULT TO KNOW IF THE ERROR IS BECAUSE THE KEYVAL SPACE
+     * IS EMPTY OR BECAUSE OF SOME OTHER ERROR.
+     *
+     * FOR NOW JUST CREATE THE SPACE IF IT ISN'T THERE.  FIX LATER.
+     */
+
+    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 1, &db_p);
     switch (ret) {
 	case DBPF_KEYVAL_DBCACHE_ERROR:
 	    goto return_error;
