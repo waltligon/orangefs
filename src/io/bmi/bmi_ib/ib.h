@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.7 2004-09-29 20:29:45 pw Exp $
+ * $Id: ib.h,v 1.8 2004-11-19 18:06:07 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -94,15 +94,15 @@ typedef enum {
     SQ_CANCELLED,
 } sq_state_t;
 typedef enum {
-    RQ_EAGER_WAITING_USER_POST=1,
-    RQ_EAGER_WAITING_USER_TESTUNEXPECTED,
-    RQ_EAGER_WAITING_USER_TEST,
-    RQ_RTS_WAITING_USER_POST,
-    RQ_RTS_WAITING_CTS_BUFFER,
-    RQ_RTS_WAITING_DATA,
-    RQ_RTS_WAITING_USER_TEST,
-    RQ_WAITING_INCOMING,
-    RQ_CANCELLED,
+    RQ_EAGER_WAITING_USER_POST = 0x1,
+    RQ_EAGER_WAITING_USER_TESTUNEXPECTED = 0x2,
+    RQ_EAGER_WAITING_USER_TEST = 0x4,
+    RQ_RTS_WAITING_USER_POST = 0x8,
+    RQ_RTS_WAITING_CTS_BUFFER = 0x10,
+    RQ_RTS_WAITING_DATA = 0x20,
+    RQ_RTS_WAITING_USER_TEST = 0x40,
+    RQ_WAITING_INCOMING = 0x80,
+    RQ_CANCELLED = 0x100,
 } rq_state_t;
 typedef enum {
     MSG_EAGER_SEND=1,

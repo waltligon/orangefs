@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.14 2004-10-11 13:50:12 pw Exp $
+ * $Id: setup.c,v 1.15 2004-11-19 18:06:07 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -23,7 +23,9 @@
 #include <vapi.h>
 #include <vapi_common.h>  /* VAPI_event_(record|syndrome)_sym */
 #include <evapi.h>
+#ifdef HAVE_IB_WRAP_COMMON_H
 #include <wrap_common.h>  /* reinit_mosal externs */
+#endif
 #include <dlfcn.h>        /* look in mosal for syms */
 /* bmi ib private header */
 #include "ib.h"
@@ -728,19 +730,14 @@ async_event_handler(VAPI_hca_hndl_t nic_handle_in __attribute__((unused)),
 
 /*
  * Hack to work around fork in daemon mode which confuses kernel
- * state.  I wish they did not have an _init function.  It calls
- * into MOSAL_user_lib_init(), but there is no finalize equivalent.
+ * state.  I wish they did not have an _init constructor function in
+ * libmosal.so.  It calls into MOSAL_user_lib_init().
  * This just breaks its saved state and reinitializes.  (task->mm
  * changes due to fork after init, hash lookup on that fails.)
  *
  * Seems to work even in the case of a non-backgrounded server too,
  * fortunately.
- *
- * We have to do something different on the 2.6 mellanox distro,
- * but would prefer not to have two different PVFS2 versions, one
- * for 2.4 clients and one for 2.6, so try to guess which is which.
  */
-
 #ifndef VAPI_INVAL_SRQ_HNDL
 /* already declared in 2.6, so look for a 2.6-only tag to avoid */
 extern void MOSAL_user_lib_init(void);
@@ -750,18 +747,27 @@ extern int mosal_fd;
 static void
 reinit_mosal(void)
 {
-    t_lib_descriptor *desc;
-    int ret;
     void *dlh;
-    call_result_t (*_dev_mosal_init_lib)(t_lib_descriptor **pp_t_lib);
     int (*mosal_ioctl_close)(void);
 
     dlh = dlopen("libmosal.so", RTLD_LAZY);
     if (!dlh)
 	error("%s: cannot open libmosal shared library", __func__);
+
+#ifdef HAVE_IB_WRAP_COMMON_H
+    {
+    /*
+     * What's happening here is we probe the internals of the mosal library
+     * to get it to return a structure that has the current fd and state
+     * of the connection to /dev/mosal.  We close it, reset the state, and
+     * force it to reinitialize itself.  Icky, but effective.  Works only
+     * with older thca distributions that install the needed header.
+     */
+    call_result_t (*_dev_mosal_init_lib)(t_lib_descriptor **pp_t_lib);
     _dev_mosal_init_lib = dlsym(dlh, "_dev_mosal_init_lib");
     if (!dlerror()) {
-	ret = (*_dev_mosal_init_lib)(&desc);
+	t_lib_descriptor *desc;
+	int ret = (*_dev_mosal_init_lib)(&desc);
 	debug(2, "%s: mosal init ret %d, desc %p", __func__, ret, desc);
 	debug(2, "%s: desc->fd %d", __func__, desc->os_lib_desc_st.fd);
 	close(desc->os_lib_desc_st.fd);
@@ -769,37 +775,29 @@ reinit_mosal(void)
 	desc->state = 0;
 	mosal_fd = -1;
 	MOSAL_user_lib_init();
-#if 0
-	/* just for debugging, print out the same values again */
-	ret = _dev_mosal_init_lib(&desc);
-	debug(2, "%s: after close of state fd", __func__);
-	debug(2, "%s: mosal init ret %d, desc %p", __func__, ret, desc);
-	debug(2, "%s: desc->fd %d", __func__, desc->os_lib_desc_st.fd);
-#endif
-    } else {
-	/* Unfortunately this trick does not work.  Need to change
-	 * a static variable in the library to be allowed to reinit.
-	 * Read /dev/mosal open code to see if there's some other way
-	 * to get this process understood.  Can then close the new
-	 * socket and use the original library one maybe.
-	 *
-	 * Nope.  Library is convinced it is already initialized,
-	 * can't change its fd.  Must do the following things.
-	 */
-	mosal_ioctl_close = dlsym(dlh, "mosal_ioctl_close");
-	if (dlerror())
-	    error("%s: neither magic symbol found in libmosal", __func__);
-	(*mosal_ioctl_close)();
-	mosal_fd = -1;
-	MOSAL_user_lib_init();
+	return;
     }
-    /* XXX: note that you still need a separate application since header
-     * files are different.  VAPI_CQ_EMPTY is -213 on 2.6 version, which
-     * is not what 2.4-compiled check_cq() expects to hear back from
-     * VAPI_poll_cq.
-     *
-     * Or hack that in yet another wrapper that gets the value at runtime.
-     * Hope not too much else changed...
+    }
+#endif
+
+    /*
+     * Recent thca distros and the 2.6 openib tree do not seem to permit
+     * any way to "trick" the library as above, but there's no need for
+     * the hack now that they export a "finalize" function to undo the init.
+     */
+    mosal_ioctl_close = dlsym(dlh, "mosal_ioctl_close");
+    if (dlerror())
+	error("%s: magic symbol not found in libmosal", __func__);
+    (*mosal_ioctl_close)();
+    mosal_fd = -1;
+    MOSAL_user_lib_init();
+
+    /*
+     * Note that even with shared libraries you do not have protection
+     * against wandering headers.  The thca distributions have in the
+     * past been eager to change critical #defines like VAPI_CQ_EMPTY
+     * so libpvfs2.so is more or less tied to the vapi.h against which
+     * it was compiled.
      */
 }
 

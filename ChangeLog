@@ -5,7 +5,10 @@ PVFS2 Release ChangeLog
 
 pvfs2-1.0.1
 ===========
-- 
+- ib: add configure-time checks for mosal library variations
+- ib: flush send queue work requests periodically
+- ib: search receive queue for both eager and rts (D. Beilloin)
+-
 
 
 pvfs2-1.0.0

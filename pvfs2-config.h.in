@@ -82,3 +82,6 @@
 /* Define if sysinfo.h is present */
 #undef HAVE_SYSINFO
 
+/* Define if IB wrap_common.h exists. */
+#undef HAVE_IB_WRAP_COMMON_H
+

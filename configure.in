@@ -518,6 +518,10 @@ if test -n "$IB_HOME" ; then
     CPPFLAGS="$CPPFLAGS -I ${IB_HOME}/include"
     AC_CHECK_HEADER(vapi.h,, AC_MSG_ERROR([Header vapi.h not found.]))
     BUILD_IB=1
+    AC_CHECK_HEADER(wrap_common.h,
+	AC_DEFINE(HAVE_IB_WRAP_COMMON_H, 1, Define if IB wrap_common.h exists.),
+	,
+	[#include <vapi.h>])
     CPPFLAGS="$CPPFLAGS_OLD"
 fi
 AC_SUBST(IB_HOME)

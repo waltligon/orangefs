@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.14 2004-09-29 20:29:44 pw Exp $
+ * $Id: ib.c,v 1.15 2004-11-19 18:06:07 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <sys/time.h>
@@ -150,9 +150,10 @@ check_cq(void)
 
 	} else if (desc.opcode == VAPI_CQE_SQ_SEND_DATA) {
 
-	    /* XXX: debugging post_sr_ack queue filling up */
+	    /* periodic send queue flush, qp or qp_ack */
 	    ib_connection_t *c = ptr_from_int64(desc.id);
-	    debug(2, "%s: sr ack to %s send completed", __func__, c->peername);
+	    debug(2, "%s: sr (ack) to %s send completed", __func__,
+	      c->peername);
 
 	} else {
 	    const char *ops = VAPI_cqe_opcode_sym(desc.opcode);
@@ -338,14 +339,14 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
  * See if anything was preposted that matches this.
  */
 static ib_recv_t *
-find_matching_recv(rq_state_t state, const ib_connection_t *c,
+find_matching_recv(rq_state_t statemask, const ib_connection_t *c,
   bmi_msg_tag_t bmi_tag)
 {
     list_t *l;
 
     qlist_for_each(l, &recvq) {
 	ib_recv_t *rq = qlist_upcast(l);
-	if (rq->state == state && rq->c == c && rq->bmi_tag == bmi_tag)
+	if ((rq->state & statemask) && rq->c == c && rq->bmi_tag == bmi_tag)
 	    return rq;
     }
     return 0;
@@ -577,7 +578,8 @@ send_cts(ib_recv_t *rq)
 /*
  * Simplify VAPI interface to post sends.  Not RDMA, just SEND.
  * Called for an eager send, rts send, or cts send.  Local send
- * completion is ignored.
+ * completion is ignored, except rarely to clear the queue (see comments
+ * at post_sr_ack).
  */
 static void
 post_sr(const buf_head_t *bh, u_int32_t len)
@@ -586,15 +588,22 @@ post_sr(const buf_head_t *bh, u_int32_t len)
     VAPI_sr_desc_t sr;
     int ret;
     const ib_connection_t *c = bh->c;
+    static int num_sr = 0;
 
-    debug(2, "%s: %s bh %d len %u", __func__, c->peername, bh->num, len);
+    debug(2, "%s: %s bh %d len %u wr %d/%d", __func__, c->peername, bh->num,
+      len, num_sr, max_outstanding_wr);
     sg.addr = int64_from_ptr(bh->buf);
     sg.len = len;
     sg.lkey = c->eager_send_lkey;
 
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_SEND;
-    sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
+    sr.id = int64_from_ptr(c);  /* for error checking if send fails */
+    if (++num_sr + 100 == max_outstanding_wr) {
+	num_sr = 0;
+	sr.comp_type = VAPI_SIGNALED;
+    } else
+	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
     sr.sg_lst_p = &sg;
     sr.sg_lst_len = 1;
     ret = VAPI_post_sr(nic_handle, c->qp, &sr);
@@ -649,7 +658,7 @@ post_sr_ack(const ib_connection_t *c, const buf_head_t *bh)
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_SEND_WITH_IMM;
     sr.id = int64_from_ptr(c);  /* for error checking if send fails */
-    if (++num_sr_ack + 10 == max_outstanding_wr) {
+    if (++num_sr_ack + 100 == max_outstanding_wr) {
 	num_sr_ack = 0;
 	sr.comp_type = VAPI_SIGNALED;
     } else
@@ -957,10 +966,8 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
     check_cq();
 
     /* check to see if matching recv is in the queue */
-    rq = find_matching_recv(RQ_EAGER_WAITING_USER_POST, c, tag);
-    if (!rq)
-	rq = find_matching_recv(RQ_RTS_WAITING_USER_POST, c, tag);
-
+    rq = find_matching_recv(
+      RQ_EAGER_WAITING_USER_POST | RQ_RTS_WAITING_USER_POST, c, tag);
     if (rq) {
 	debug(2, "%s: rq %p matches %s", __func__, rq,
 	  rq_state_name(rq->state));
