@@ -455,6 +455,14 @@ do {						\
  * is contained in generic server request and response structures
  */
 
+#define PINT_SERVREQ_MGMT_NOOP_FILL(__req,	\
+				  __creds)	\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_MGMT_NOOP;		\
+    (__req).credentials = (__creds);		\
+} while (0)
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 

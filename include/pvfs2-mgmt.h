@@ -17,6 +17,10 @@ int PVFS_mgmt_setparam_all(
     enum PVFS_server_param param,
     int64_t value);
 
+int PVFS_mgmt_noop(
+    PVFS_credentials credentials,
+    char* host);
+
 #endif /* __PVFS2_MGMT_H */
 
 /*

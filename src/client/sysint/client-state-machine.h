@@ -207,7 +207,8 @@ enum {
     PVFS_SYS_GETATTR = 2,
     PVFS_SYS_IO      = 3,
     PVFS_SYS_FLUSH   = 4,
-    PVFS_MGMT_SETPARAM_ALL = 5
+    PVFS_MGMT_SETPARAM_ALL = 5,
+    PVFS_MGMT_NOOP   = 6
 };
 
 /* prototypes of helper functions */
@@ -249,6 +250,7 @@ extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_all_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_noop_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;
