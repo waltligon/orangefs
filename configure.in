@@ -368,11 +368,9 @@ AC_ARG_WITH(kernel,
     if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
     fi
-    # At least up through 2.6.3 need to write .__modpost.cmd; this might get
-    # fixed in the future.
-    if ! test -w $withval ; then
-       AC_MSG_ERROR(You must have write permissions to the kernel source tree.)
-    fi
+    # At least up through 2.6.3 needed to write .__modpost.cmd; this changed
+    # sometime between then and 2.6.10.   Now anybody can compile out-of-tree
+    # modules against a configured kernel tree
     LINUX_KERNEL_SRC="$withval"
     , LINUX_KERNEL_SRC="")
 
