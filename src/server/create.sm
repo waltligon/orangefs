@@ -12,22 +12,27 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 
-static int create_init(PINT_server_op *s_op, job_status_s *ret);
 static int create_cleanup(PINT_server_op *s_op, job_status_s *ret);
 static int create_create(PINT_server_op *s_op, job_status_s *ret);
 static int create_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
 static int create_send_bmi(PINT_server_op *s_op, job_status_s *ret);
-void create_init_state_machine(void);
+static int create_foo(PINT_server_op *s_op, job_status_s *ret);
 
 extern job_context_id PINT_server_job_context;
 
 %%
 
-machine pvfs2_create_sm(init, create2, send, release, cleanup)
+machine pvfs2_create_sm(foo, prelude, create2, send, release, cleanup)
 {
-	state init
+	state foo
 	{
-		run create_init;
+		run create_foo;
+		default => prelude;
+	}
+
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
 		default => create2;
 	}
 
@@ -52,45 +57,18 @@ machine pvfs2_create_sm(init, create2, send, release, cleanup)
 	state cleanup
 	{
 		run create_cleanup;
-		default => init;
+		default => prelude;
 	}
 }
 
 %%
 
-/*
- * Function: create_init
- *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
- *
- * Pre:      Valid request
- *
- * Post:     Job Scheduled
- *
- * Returns:  int
- *
- * Synopsis: Create is a relatively easy server operation.  We just need to 
- *           schedule the creation of the new dataspace.
- *           
- */
-
-
-static int create_init(PINT_server_op *s_op, job_status_s *ret)
+/* TODO: this is a hack! remove later. */
+static int create_foo(PINT_server_op *s_op, job_status_s *ret)
 {
-
-    int job_post_ret;
-
-    job_post_ret = job_req_sched_post(s_op->req,
-	    s_op,
-	    ret,
-	    &(s_op->scheduled_id),
-	    PINT_server_job_context);
-
-    return(job_post_ret);
-
+    ret->error_code = 0;
+    return(1);
 }
-
 
 /*
  * Function: create_create
