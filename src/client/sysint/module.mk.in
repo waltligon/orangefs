@@ -5,7 +5,6 @@ CSRC := \
 	$(DIR)/initialize.c \
 	$(DIR)/acache.c \
 	$(DIR)/ncache.c \
-	$(DIR)/server-send-req.c \
 	$(DIR)/pint-sysint-utils.c \
 	$(DIR)/pint-bucket.c \
 	$(DIR)/getparent.c \
