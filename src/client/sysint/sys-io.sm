@@ -140,14 +140,14 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     sm_p->u.io.io_type       = io_type;
     sm_p->u.io.io_req        = io_req;
     sm_p->u.io.io_req_offset = io_req_offset;
-    sm_p->u.io.buffer        = buffer;
     sm_p->u.io.io_resp_p     = resp_p;
+    sm_p->u.io.buffer_size   = buffer_size;
 
     /* TODO: this is a hack for now; I think that I am
      * doing something wrong...
      */
-    /* sm_p->u.io.buffer_size   = buffer_size; */
-    sm_p->u.io.buffer_size   = (void*)((char*)buffer_size -
+    /* sm_p->u.io.buffer        = buffer; */
+    sm_p->u.io.buffer   = (void*)((char*)buffer -
 	io_req_offset);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_IO);
