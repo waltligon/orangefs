@@ -43,13 +43,16 @@ int main(int argc, char **argv)
     int mnt_index = -1;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_sysresp_init resp_init;
-    int i;
+    int i,j;
     PVFS_credentials creds;
     int io_server_count;
     struct PVFS_mgmt_perf_stat** perf_matrix;
     uint64_t end_time_ms;
     uint32_t* next_id_array;
     PVFS_id_gen_t* addr_array;
+    int tmp_type;
+    uint64_t next_time;
+    float bw;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -155,6 +158,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    /* loop for every, grabbing stats at regular intervals */
     while(1)
     {
 	ret = PVFS_mgmt_perf_mon_list(creds, perf_matrix, &end_time_ms,
@@ -165,6 +169,78 @@ int main(int argc, char **argv)
 	    return(-1);
 	}
 
+	printf("\nPVFS2 I/O server bandwith statistics (MB/sec):\n");
+	printf("==================================================\n");
+	for(i=0; i<io_server_count; i++)
+	{
+	    printf("\nread:  %-30s ", PVFS_mgmt_map_addr(cur_fs, creds,
+		addr_array[i], &tmp_type));
+	    for(j=0; j<HISTORY; j++)
+	    {
+		/* only print valid measurements */
+		if(!perf_matrix[i][j].valid_flag)
+		    break;
+
+		/* shortcut if measurement is zero */
+		if(perf_matrix[i][j].read == 0)
+		{
+		    printf("       0.0 ");
+		    continue;
+		}
+
+		/* figure out what time interval to use */
+		if(j == (HISTORY-1) || !perf_matrix[i][j+1].valid_flag)
+		    next_time = end_time_ms;
+		else
+		    next_time = perf_matrix[i][j+1].start_time_ms;
+
+		/* bw calculation */
+		bw = (float)perf_matrix[i][j].read / (float)(1024*1024);
+		bw = bw / ((float)next_time 
+		    - (float)perf_matrix[i][j].start_time_ms);
+		bw = bw*1000.0;
+		printf("%10f ", bw);
+	    }
+
+	    printf("\nwrite: %-30s ", PVFS_mgmt_map_addr(cur_fs, creds,
+		addr_array[i], &tmp_type));
+	    for(j=0; j<HISTORY; j++)
+	    {
+		/* only print valid measurements */
+		if(!perf_matrix[i][j].valid_flag)
+		    break;
+
+		/* shortcut if measurement is zero */
+		if(perf_matrix[i][j].write == 0)
+		{
+		    printf("       0.0 ");
+		    continue;
+		}
+
+		/* figure out what time interval to use */
+		if(j == (HISTORY-1) || !perf_matrix[i][j+1].valid_flag)
+		    next_time = end_time_ms;
+		else
+		    next_time = perf_matrix[i][j+1].start_time_ms;
+
+		/* bw calculation */
+		bw = (float)perf_matrix[i][j].write / (float)(1024*1024);
+		bw = bw / ((float)next_time 
+		    - (float)perf_matrix[i][j].start_time_ms);
+		bw = bw*1000.0;
+		printf("%10f ", bw);
+	    }
+	    printf("\ntimestep:                             ");
+	    for(j=0; j<HISTORY; j++)
+	    {
+		if(!perf_matrix[i][j].valid_flag)
+		    break;
+
+		printf("%10u ", (unsigned)perf_matrix[i][j].id);
+	    }
+	    printf("\n");
+	}
+	fflush(stdout);
 	sleep(FREQUENCY);
     }
 
