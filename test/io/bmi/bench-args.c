@@ -18,7 +18,7 @@ int bench_args(struct bench_options* user_opts, int argc, char** argv)
 {
 	extern char* optarg;
 	extern int optind, opterr, optopt;
-	char flags[] = "pm:t:l:s:r";
+	char flags[] = "L:pm:t:l:s:r";
 	char one_opt = ' ';
 	int got_method = 0;
 
@@ -30,6 +30,7 @@ int bench_args(struct bench_options* user_opts, int argc, char** argv)
 	user_opts->flags = 0;
 	user_opts->method_name[0] = '\0';
 	user_opts->num_servers = 1;
+	user_opts->list_io_factor = 1;
 
 	/* look at command line arguments */
 	while((one_opt = getopt(argc, argv, flags)) != EOF){
@@ -42,6 +43,12 @@ int bench_args(struct bench_options* user_opts, int argc, char** argv)
 				break;
 			case('l'):
 				ret = sscanf(optarg, "%d", &user_opts->message_len);
+				if(ret < 1){
+					return -1;
+				}
+				break;
+			case('L'):
+				ret = sscanf(optarg, "%d", &user_opts->list_io_factor);
 				if(ret < 1){
 					return -1;
 				}
@@ -94,6 +101,7 @@ void bench_args_dump(struct bench_options* opts)
 	printf("total length: %d\n", opts->total_len);
 	printf("number of servers: %d\n", opts->num_servers);
 	printf("method name: %s\n", opts->method_name);
+	printf("count of each list io message: %d\n", opts->list_io_factor);
 
 	return;
 }
