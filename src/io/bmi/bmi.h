@@ -156,6 +156,8 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 void *user_ptr,
 				 bmi_context_id context_id);
 
+int BMI_cancel(bmi_op_id_t id, 
+	       bmi_context_id context_id);
 
 #endif /* __BMI_H */
 

@@ -1514,6 +1514,41 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 }
 
 
+/* BMI_cancel()
+ *
+ * attempts to cancel a pending operation that has not yet completed; caller
+ * must still test to gather error code after calling this function even if
+ * it returns 0
+ *
+ * returns 0 on success, -errno on failure
+ */
+int BMI_cancel(bmi_op_id_t id, 
+	       bmi_context_id context_id)
+{
+    struct method_op *target_op = NULL;
+    int ret = -1;
+
+    target_op = id_gen_fast_lookup(id);
+    if (target_op->op_id != id)
+    {
+	return (-EINVAL);
+    }
+
+    if(active_method_table[target_op->addr->method_type]->BMI_meth_cancel)
+    {
+	ret =
+	active_method_table[target_op->addr->method_type]->BMI_meth_cancel(id,
+	context_id);
+    }
+    else
+    {
+	gossip_err("Error: BMI_cancel() unimplemented for this module.\n");
+	ret = -ENOSYS;
+    }
+
+    return (ret);
+}
+
 /**************************************************************
  * method callback functions
  */

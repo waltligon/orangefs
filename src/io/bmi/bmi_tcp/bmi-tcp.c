@@ -275,7 +275,8 @@ struct bmi_method_ops bmi_tcp_ops = {
     BMI_tcp_post_recv_list,
     BMI_tcp_post_sendunexpected_list,
     BMI_tcp_open_context,
-    BMI_tcp_close_context
+    BMI_tcp_close_context,
+    NULL
 };
 
 /* module parameters */

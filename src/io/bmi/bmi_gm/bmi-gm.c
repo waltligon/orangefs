@@ -156,7 +156,8 @@ struct bmi_method_ops bmi_gm_ops = {
     BMI_gm_post_recv_list,
     BMI_gm_post_sendunexpected_list,
     BMI_gm_open_context,
-    BMI_gm_close_context
+    BMI_gm_close_context,
+    NULL
 };
 
 /* module parameters */

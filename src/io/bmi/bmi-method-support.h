@@ -154,6 +154,7 @@ struct bmi_method_ops
 					      bmi_context_id);
     int (*BMI_meth_open_context)(bmi_context_id);
     void (*BMI_meth_close_context)(bmi_context_id);
+    int (*BMI_meth_cancel)(bmi_op_id_t, bmi_context_id);
 };
 
 
