@@ -16,15 +16,61 @@ extern "C" {
 #include "trove.h"
 #include "gen-locks.h"
 
-#define TROVE_DIR "/tmp/trove/"
-#define STO_ATTRIB_DBNAME "/tmp/storage_attributes.db"
-#define COLLECTIONS_DBNAME "/tmp/collections.db"
-/* these four aren't supposed to be used alone. rather, glue them together with
- * TROVE_DIR and the collection id */
-#define COLL_ATTRIB_DBNAME "/collection_attributes.db"
-#define DS_ATTRIB_DBNAME "/dataspace_attributes.db"
-#define BSTREAM_DIRNAME "/bstreams"
-#define KEYVAL_DIRNAME "/keyvals"
+#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)	\
+    do {							\
+        snprintf(__buf, __path_max, "/%s", __stoname);		\
+    } while (0);
+
+#define STO_ATTRIB_DBNAME "storage_attributes.db"
+#define DBPF_GET_STO_ATTRIB_DBNAME(__buf, __path_max, __stoname)		\
+    do { 									\
+        snprintf(__buf, __path_max, "/%s/%s", __stoname, STO_ATTRIB_DBNAME);	\
+    } while (0);
+
+#define COLLECTIONS_DBNAME "collections.db"
+#define DBPF_GET_COLLECTIONS_DBNAME(__buf, __path_max, __stoname)		\
+    do { 									\
+        snprintf(__buf, __path_max, "/%s/%s", __stoname, COLLECTIONS_DBNAME);	\
+    } while (0);
+
+#define DBPF_GET_COLL_DIRNAME(__buf, __path_max, __stoname, __collid)	\
+    do {								\
+        snprintf(__buf, __path_max, "/%s/%08x", __stoname, __collid);   \
+    } while (0);
+
+#define COLL_ATTRIB_DBNAME "collection_attributes.db"
+#define DBPF_GET_COLL_ATTRIB_DBNAME(__buf, __path_max, __stoname, __collid)			\
+    do {											\
+        snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid, COLL_ATTRIB_DBNAME);	\
+    } while (0);
+
+#define DS_ATTRIB_DBNAME "dataspace_attributes.db"
+#define DBPF_GET_DS_ATTRIB_DBNAME(__buf, __path_max, __stoname, __collid)			\
+    do {											\
+        snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid, DS_ATTRIB_DBNAME);	\
+    } while (0);
+
+#define KEYVAL_DIRNAME "keyvals"
+#define DBPF_GET_KEYVAL_DIRNAME(__buf, __path_max, __stoname, __collid)				\
+    do {											\
+        snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid, KEYVAL_DIRNAME);	\
+    } while (0);
+
+#define BSTREAM_DIRNAME "bstreams"
+#define DBPF_GET_BSTREAM_DIRNAME(__buf, __path_max, __stoname, __collid)			\
+    do {											\
+        snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid, BSTREAM_DIRNAME);	\
+    } while (0);
+
+#define DBPF_GET_BSTREAM_FILENAME(__buf, __path_max, __stoname, __collid, __handle)				\
+    do {													\
+    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.bstream", __stoname, __collid, BSTREAM_DIRNAME, __handle);	\
+    } while (0);
+
+#define DBPF_GET_KEYVAL_DBNAME(__buf, __path_max, __stoname, __collid, __handle)				\
+    do {													\
+    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.keyval", __stoname, __collid, KEYVAL_DIRNAME, __handle);	\
+    } while (0);
 
 #define LAST_HANDLE_STRING "last_handle"
 #define ROOT_HANDLE_STRING "root_handle"
@@ -260,6 +306,8 @@ void dbpf_collection_clear_registered(void);
 #define DBPF_READ   read
 #define DBPF_CLOSE  close
 #define DBPF_UNLINK unlink
+
+extern struct dbpf_storage *my_storage_p;
 
 #if defined(__cplusplus)
 }

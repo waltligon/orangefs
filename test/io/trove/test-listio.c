@@ -35,7 +35,7 @@ enum {
     TROVE_TEST_BSTREAM = 3
 };
 
-char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
+char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
 char path_to_file[PATH_SIZE] = "/bar";
 TROVE_handle requested_file_handle = 4095;

@@ -108,7 +108,7 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 	gen_mutex_unlock(&keyval_db_cache[i].mutex);
     }
 
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.keyval", TROVE_DIR, coll_id, KEYVAL_DIRNAME, handle);
+    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
 #if 0
     printf("file name = %s\n", filename);
 #endif
@@ -196,7 +196,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 
     /* have lock on an entry, open/create */
 
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.keyval", TROVE_DIR, coll_id, KEYVAL_DIRNAME, handle);
+    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
 #if 0
     printf("file name = %s\n", filename);
 #endif

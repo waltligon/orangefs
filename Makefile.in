@@ -9,6 +9,7 @@
 # docs       builds documentation in docs subdirectory
 # docsclean  cleans up documentation files
 # tests      builds test programs
+# admintools builds admin tools
 # statecomp  builds only the statecomp component
 # cscope     generates information for cscope utility
 # codecheck  checks source code for nonconformance to our std.
@@ -61,7 +62,7 @@ FLEX = flex
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean tests distclean docs docsclean cscope codecheck statecomp
+.PHONY: all clean tests distclean docs docsclean cscope codecheck statecomp admintools
 
 ################################################################
 # Find project subdirectories
@@ -117,6 +118,8 @@ LIBCFLAGS = -D__GEN_NULL_LOCKING__
 #    gradually build up a list of source files without having to
 #    list them all at the top level.
 
+# ADMINSRC is source code for administrative programs
+ADMINSRC :=
 # TESTSRC is source code for test programs
 TESTSRC :=
 # LIBSRC is source code for libpvfs2
@@ -143,7 +146,7 @@ SERVER := src/server/pvfs2-server
 # LIBRARIES is a list of the pvfs2 client libraries
 LIBRARIES := lib/libpvfs2.a
 # default rule builds server, library, and test programs
-all: $(SERVER) $(LIBRARIES) tests
+all: $(SERVER) $(LIBRARIES) tests admintools
 
 ################################################################
 # Makefile includes
@@ -164,6 +167,14 @@ include $(patsubst %, %/module.mk, $(MODULES))
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+
+# ADMINOBJS is a list of admin program objects
+ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
+# ADMINTOOLS is a list of admin program executables
+# ADMINTOOLS := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC)))
+# ADMINTOOLS IS DEFINED IN THE MODULE.MK FILE!!!
+# ADMINDEPENDS is a list of dependency files for admin programs
+ADMINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC)))
 
 # TESTOBJS is a list of test program objects
 TESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(TESTSRC)))
@@ -227,6 +238,9 @@ CLEANFILES :=\
 ####################################################################
 # Rules and dependencies
 
+# target for building admin tools
+admintools: $(ADMINTOOLS)
+
 # target for building the test program executables
 tests: $(TESTS)
 
@@ -269,6 +283,8 @@ $(MPIMISCOBJS): %.o: %.c
 # all test programs depend on the pvfs2 library
 $(TESTS): %: %.o $(LIBRARIES)
 
+$(ADMINTOOLS): %: %.o $(LIBRARIES)
+
 # target for building _just_ the statecomp tool
 statecomp: src/common/statecomp/statecomp
 	
@@ -292,7 +308,8 @@ docsclean:
 clean: docsclean
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
 		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)  $(SERVER) $(MPIMISCOBJS)\
-		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
+		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
+		$(ADMINOBJS) $(ADMINTOOLS)
 
 # _really_ clean the tree; should go back to pristine state
 distclean: clean

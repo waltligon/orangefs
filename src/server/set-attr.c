@@ -4,14 +4,14 @@
  * See COPYING in top-level directory.
  */
 
-
 #include <state-machine.h>
 #include <pvfs2-server.h>
 #include <pvfs2-server.h>
 #include <string.h>
-#include <pvfs2-attr.h>
-#include <job-consist.h>
 #include <assert.h>
+
+#include "pvfs2-attr.h"
+#include "job-consist.h"
 
 static int setattr_init(state_action_struct *s_op, job_status_s *ret);
 static int setattr_cleanup(state_action_struct *s_op, job_status_s *ret);

@@ -28,8 +28,6 @@
 
 #define AIOCB_ARRAY_SZ 8
 
-extern struct dbpf_storage *my_storage_p;
-
 /* Internal prototypes */
 static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 				       TROVE_handle handle,

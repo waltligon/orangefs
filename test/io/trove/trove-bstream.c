@@ -12,7 +12,7 @@
 
 #include "trove-test.h"
 
-char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
+char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
 
 TROVE_handle requested_file_handle = 9999;

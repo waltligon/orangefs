@@ -135,7 +135,7 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 	if (i == DBCACHE_ENTRIES) assert(0);
     }
 
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, coll_id, DS_ATTRIB_DBNAME);
+    DBPF_GET_DS_ATTRIB_DBNAME(filename, PATH_MAX, my_storage_p->name, coll_id);
 #if 0
     printf("file name = %s\n", filename);
 #endif

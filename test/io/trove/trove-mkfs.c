@@ -12,9 +12,8 @@
 
 #include "trove-test.h"
 
-char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
+char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
-char admin_info[FS_SIZE] = "admin-foo";
 
 int parse_args(int argc, char **argv);
 
@@ -22,7 +21,7 @@ int main(int argc, char **argv)
 {
     int ret, count;
     TROVE_op_id op_id;
-    TROVE_coll_id coll_id, coll_id_admin;
+    TROVE_coll_id coll_id;
     TROVE_handle root_handle;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
@@ -64,12 +63,6 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    /* try to look up collection used to store admin information */
-    ret = trove_collection_lookup(admin_info, &coll_id_admin, NULL, &op_id);
-    if (ret != -1) {
-	    fprintf(stderr, "admin collection lookup succeeded before it should.\n");
-	    return -1;
-    }
     /* create the collection for the fs */
     /* Q: why do i get to pick the coll id?  so i can make it the same across nodes? */
     ret = trove_collection_create(file_system, FS_COLL_ID, NULL, &op_id);
@@ -78,15 +71,6 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-#if 0
-    /* create the collection for the admin data */
-    ret = trove_collection_create(admin_info, ADMIN_COLL_ID, NULL, &op_id);
-    if (ret < 0 ) {
-	    fprintf(stderr, "collection create (admin) failed.\n");
-	    return -1;
-    }
-#endif
-    
     /* lookup collection.  this is redundant because we just gave it a coll. id to use,
      * but it's a good test i guess...
      */
@@ -97,13 +81,6 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-#if 0
-    ret = trove_collection_lookup(admin_info, &coll_id_admin, NULL, &op_id);
-    if (ret < 0 ) {
-	    fprintf(stderr, "collection lookup (admin) failed.\n");
-	    return -1;
-    }
-#endif
 
     /* create a dataspace to hold the root directory */
     /* Q: what should the bitmask be? */

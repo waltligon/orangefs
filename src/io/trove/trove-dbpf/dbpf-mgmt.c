@@ -38,6 +38,7 @@ struct dbpf_storage *my_storage_p = NULL;
 static struct dbpf_storage *dbpf_storage_lookup(char *stoname);
 static int dbpf_db_create(char *dbname);
 static DB *dbpf_db_open(char *dbname);
+static int dbpf_mkpath(char *pathname, mode_t mode);
 
 /* dbpf_collection_getinfo()
  */
@@ -222,6 +223,7 @@ static int dbpf_finalize(void)
  *
  * Creates and initializes the databases needed for a dbpf storage
  * space.  This includes:
+ * - creating the path to the storage directory
  * - creating storage attribute database, propagating with create time
  * - creating collections database, filling in create time
  */
@@ -230,12 +232,21 @@ static int dbpf_storage_create(char *stoname,
 			       TROVE_op_id *out_op_id_p)
 {
     int ret;
+    char path_name[PATH_MAX];
 
-    ret = dbpf_db_create(COLLECTIONS_DBNAME);
+
+    DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, stoname);
+    ret = dbpf_mkpath(path_name, 0755);
     if (ret != 0) return -1;
-    ret = dbpf_db_create(STO_ATTRIB_DBNAME);
+
+    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
+    ret = dbpf_db_create(path_name);
     if (ret != 0) return -1;
     
+    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
+    ret = dbpf_db_create(path_name);
+    if (ret != 0) return -1;
+
     return 1;
 }
 
@@ -245,8 +256,12 @@ static int dbpf_storage_remove(char *stoname,
 			       void *user_ptr,
 			       TROVE_op_id *out_op_id_p)
 {
-    unlink(STO_ATTRIB_DBNAME);
-    unlink(COLLECTIONS_DBNAME);
+    char path_name[PATH_MAX];
+
+    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
+    unlink(path_name);
+    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
+    unlink(path_name);
 
     /* TODO: REMOVE ALL THE OTHER FILES!!! */
 #if 0
@@ -281,8 +296,6 @@ static int dbpf_collection_create(char *collname,
     sto_p = my_storage_p;
 
     if (sto_p == NULL) return -1;
-    
-    printf("storage region found.\n");
     
     /* TODO: we need to look through all storage regions to see
      * if the coll_id is previously used.
@@ -335,7 +348,7 @@ static int dbpf_collection_create(char *collname,
     /* Create both the base directory, if necessary, then the new collection
      * directory.
      */
-    snprintf(path_name, PATH_MAX, "/%s", TROVE_DIR);
+    DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, sto_p->name); /* see dbpf.h */
     ret = stat(path_name, &dirstat);
     if (ret < 0 && errno != ENOENT) {
 	perror("trove collection directory create");
@@ -349,8 +362,7 @@ static int dbpf_collection_create(char *collname,
 	}
     }
     
-    snprintf(path_name, PATH_MAX, "/%s/%08x", TROVE_DIR, new_coll_id);
-
+    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
 #if 0
     printf("dirname = %s\n", path_name);
 #endif
@@ -360,8 +372,7 @@ static int dbpf_collection_create(char *collname,
 	return -1;
     }
     
-    snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, new_coll_id, COLL_ATTRIB_DBNAME);
-
+    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     /* create collection attributes database, drop in last handle */
     ret = dbpf_db_create(path_name);
     if (ret != 0) return -1;
@@ -382,19 +393,19 @@ static int dbpf_collection_create(char *collname,
     if (ret != 0) return -1;
     
 
-    snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, new_coll_id, DS_ATTRIB_DBNAME);
+    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     /* create dataspace attributes database */
     ret = dbpf_db_create(path_name);
     if (ret != 0) return -1;
     
-    snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, new_coll_id, KEYVAL_DIRNAME);
+    DBPF_GET_KEYVAL_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     ret = mkdir(path_name, 0755);
     if (ret != 0) {
 	perror("keyval directory create");
 	return -1;
     }
     
-    snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, new_coll_id, BSTREAM_DIRNAME);
+    DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     ret = mkdir(path_name, 0755);
     if (ret != 0) {
 	perror("bstream directory create");
@@ -440,17 +451,17 @@ static int dbpf_collection_remove(char *collname,
 	    return -1;
     }
 
-    snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, db_data.coll_id, DS_ATTRIB_DBNAME);
+    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, db_data.coll_id);
     unlink(path_name);
 
-    snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, db_data.coll_id, COLL_ATTRIB_DBNAME);
+    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, db_data.coll_id);
     unlink(path_name);
     
     /* TODO: REMOVE ALL BSTREAM AND KEYVAL FILES */
-    snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, db_data.coll_id, BSTREAM_DIRNAME);
+    DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, db_data.coll_id);
     rmdir(path_name);
 
-    snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, db_data.coll_id, KEYVAL_DIRNAME);
+    DBPF_GET_KEYVAL_DIRNAME(path_name, PATH_MAX, sto_p->name, db_data.coll_id);
     rmdir(path_name);
 
 #if 0
@@ -545,12 +556,12 @@ static int dbpf_collection_lookup(char *collname,
     strncpy(coll_p->name, collname, slen);
 
     /* open collection attribute database */
-    snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, coll_p->coll_id, COLL_ATTRIB_DBNAME); 
+    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, coll_p->coll_id);
     coll_p->coll_attr_db = dbpf_db_open(path_name);
     if (coll_p->coll_attr_db == NULL) return -1;
     
     /* open dataspace database */
-    snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, coll_p->coll_id, DS_ATTRIB_DBNAME); 
+    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, coll_p->coll_id);
     coll_p->ds_db = dbpf_db_open(path_name);
     if (coll_p->ds_db == NULL) return -1;
 
@@ -584,6 +595,7 @@ static struct dbpf_storage *dbpf_storage_lookup(char *stoname)
 {
     size_t slen;
     struct dbpf_storage *sto_p;
+    char path_name[PATH_MAX];
 
     if (my_storage_p != NULL) return my_storage_p;
 
@@ -605,16 +617,70 @@ static struct dbpf_storage *dbpf_storage_lookup(char *stoname)
 
     /* TODO: make real names based on paths... */
     sto_p->refct = 0;
-    sto_p->sto_attr_db = dbpf_db_open(STO_ATTRIB_DBNAME);
+    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
+    sto_p->sto_attr_db = dbpf_db_open(path_name);
     if (sto_p->sto_attr_db == NULL) return NULL;
 
-    sto_p->coll_db = dbpf_db_open(COLLECTIONS_DBNAME);
+    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
+    sto_p->coll_db = dbpf_db_open(path_name);
     if (sto_p->coll_db == NULL) return NULL;
 
     my_storage_p = sto_p;
     return sto_p;
 }
 
+/* dbpf_mkpath()
+ */
+static int dbpf_mkpath(char *pathname, mode_t mode)
+{
+    int ret, len, pos = 0, nullpos = 0, killed_slash;
+    struct stat buf;
+
+    len = strlen(pathname);
+
+    /* insist on an absolute path */
+    if (pathname[0] != '/') return -1;
+    
+    while (pos < len) {
+	nullpos = pos;
+	killed_slash = 0;
+
+	while ((pathname[nullpos] != '\0') && (pathname[nullpos] != '/')) nullpos++;
+
+	/* NOTE: this could be made a little simpler, but it would be less
+	 * intuitive I think -- Rob
+	 */
+	if (nullpos <= pos + 1) {
+	    /* extra slash or trailing slash; ignore */
+	    nullpos++;
+	    pos = nullpos;
+	}
+	else {
+	    if (pathname[nullpos] == '/') {
+		killed_slash = 1;
+		pathname[nullpos] = 0;
+	    }
+
+	    /* TODO: FIX STRING BEFORE RETURNING IN ERROR CASES */
+
+	    ret = stat(pathname, &buf);
+	    if (ret == 0 && !S_ISDIR(buf.st_mode)) return -1;
+	    if (ret != 0) {
+		ret = mkdir(pathname, mode);
+		if (ret != 0) return -1;
+	    }
+	    
+	    if (killed_slash) {
+		pathname[nullpos] = '/';
+	    }
+
+	    nullpos++;
+	    pos = nullpos;
+	}
+    }
+
+    return 0;
+}
 
 /* dbpf_db_create()
  *
@@ -720,7 +786,6 @@ static DB *dbpf_db_open(char *dbname)
                           0,
                           0)) != 0)
     {
-	printf("open failed on database %s.\n", dbname);
 	return NULL;
     }
 

@@ -109,6 +109,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     ret = db_p->get(db_p, NULL, &key, &data, 0);
     if (ret != 0) {
 	db_p->err(db_p, ret, "DB->get");
+	printf("key = %s\n", op_p->u.k_read.key.buffer);
 	goto return_error;
     }
 

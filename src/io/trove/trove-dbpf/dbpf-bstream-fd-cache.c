@@ -122,9 +122,7 @@ int dbpf_bstream_fdcache_try_remove(TROVE_coll_id coll_id,
 	gen_mutex_unlock(&bstream_fd_cache[i].mutex);
     }
 
-    /* TODO: create the name of the bstream file more correctly */
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.bstream", 
-		    TROVE_DIR, coll_id, BSTREAM_DIRNAME, handle);
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
 #if 0
     printf("file name = %s\n", filename);
 #endif
@@ -220,9 +218,7 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 
     /* have a lock on an entry */
 
-    /* TODO: create the name of the bstream file more correctly */
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.bstream", 
-		    TROVE_DIR, coll_id, BSTREAM_DIRNAME, handle);
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
 #if 0
     printf("file name = %s\n", filename);
 #endif

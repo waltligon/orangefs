@@ -19,7 +19,7 @@
 #include <trove.h>
 #include "trove-test.h"
 
-char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
+char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
 char path_from_unix[PATH_SIZE];
 char path_to_file[PATH_SIZE];

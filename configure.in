@@ -115,6 +115,7 @@ install -d src/apps src/io src/common src/client test/common test/io test/client
 dnl output final version of top level makefile and subdirectory
 dnl    makefile includes
 AC_OUTPUT(Makefile
+src/apps/admin/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
 src/io/trove/trove-dbpf/module.mk
