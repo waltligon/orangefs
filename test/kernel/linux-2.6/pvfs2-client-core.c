@@ -24,6 +24,8 @@
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-util.h"
 
+#include "mmap-ra-cache.h"
+
 /*
   an arbitrary limit to the max number of items
   we can write into the device file as a response
@@ -237,6 +239,97 @@ static int service_symlink_request(
     return ret;
 }
 
+static int service_io_readahead_request(
+    struct PVFS_dev_map_desc *desc,
+    PVFS_sysresp_init *init_response,
+    pvfs2_upcall_t *in_upcall,
+    pvfs2_downcall_t *out_downcall)
+{
+    int ret = 1;
+    PVFS_sysresp_io response;
+    PVFS_Request file_req;
+    PVFS_Request mem_req;
+    void *buf = NULL, *tmp_buf = NULL;
+
+    if (desc && init_response && in_upcall && out_downcall)
+    {
+        memset(&response,0,sizeof(PVFS_sysresp_io));
+        memset(out_downcall,0,sizeof(pvfs2_downcall_t));
+
+	file_req = PVFS_BYTE;
+
+        assert((in_upcall->req.io.buf_index > -1) &&
+               (in_upcall->req.io.buf_index < PVFS2_BUFMAP_DESC_COUNT));
+
+        tmp_buf = malloc(in_upcall->req.io.readahead_size);
+        assert(tmp_buf);
+
+        if ((in_upcall->req.io.io_type == PVFS_IO_READ) &&
+            in_upcall->req.io.readahead_size)
+        {
+            /* check readahead cache first */
+            if (pvfs2_mmap_ra_cache_get_block(
+                    in_upcall->req.io.refn, in_upcall->req.io.offset,
+                    in_upcall->req.io.count, tmp_buf) == 0)
+            {
+                goto mmap_ra_cache_hit;
+            }
+
+            /* make the full-blown readahead sized request */
+            ret = PVFS_Request_contiguous(
+                in_upcall->req.io.readahead_size, PVFS_BYTE, &mem_req);
+        }
+        else
+        {
+            free(tmp_buf);
+            return ret;
+        }
+	assert(ret == 0);
+
+	ret = PVFS_sys_io(
+            in_upcall->req.io.refn, file_req, 0,
+	    tmp_buf, mem_req, in_upcall->credentials, &response,
+            in_upcall->req.io.io_type);
+	if (ret < 0)
+	{
+	    /* report an error */
+	    out_downcall->type = PVFS2_VFS_OP_FILE_IO;
+	    out_downcall->status = ret;
+	}
+	else
+	{
+            /*
+              now that we've read the data, insert it into
+              the mmap_ra_cache here
+            */
+            pvfs2_mmap_ra_cache_register(
+                in_upcall->req.io.refn, tmp_buf,
+                in_upcall->req.io.readahead_size);
+
+          mmap_ra_cache_hit:
+
+            out_downcall->type = PVFS2_VFS_OP_FILE_IO;
+            out_downcall->status = 0;
+            out_downcall->resp.io.amt_complete =
+                in_upcall->req.io.count;
+
+            /*
+              get a shared kernel/userspace buffer for
+              the I/O transfer
+            */
+            buf = PINT_dev_get_mapped_buffer(
+                desc, in_upcall->req.io.buf_index);
+            assert(buf);
+
+            /* copy cached data into the shared user/kernel space */
+            memcpy(buf, tmp_buf, in_upcall->req.io.count);
+            free(tmp_buf);
+	    ret = 0;
+	}
+    }
+    return(ret);
+}
+
 static int service_io_request(
     struct PVFS_dev_map_desc *desc,
     PVFS_sysresp_init *init_response,
@@ -251,6 +344,31 @@ static int service_io_request(
 
     if (desc && init_response && in_upcall && out_downcall)
     {
+        if ((uint32_t)in_upcall->req.io.readahead_size ==
+            PVFS2_MMAP_RACACHE_FLUSH)
+        {
+            gossip_debug(MMAP_RCACHE_DEBUG," Flushing CACHE\n");
+            /* check if we need to flush any cached data now */
+            pvfs2_mmap_ra_cache_flush(in_upcall->req.io.refn);
+        }
+        else if ((in_upcall->req.io.readahead_size > 0) &&
+                 (in_upcall->req.io.readahead_size <
+                  PVFS2_MMAP_RACACHE_MAX_SIZE))
+        {
+            /* check if we can do a readahead io operation */
+            ret = service_io_readahead_request(
+                desc, init_response, in_upcall, out_downcall);
+
+            /*
+              if the readahead request succeeds, return;
+              otherwise fallback to this normal servicing
+            */
+            if (ret == 0)
+            {
+                return ret;
+            }
+        }
+
         memset(&response,0,sizeof(PVFS_sysresp_io));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
@@ -804,6 +922,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    pvfs2_mmap_ra_cache_initialize();
+
     PINT_acache_set_timeout(ACACHE_TIMEOUT_MS);
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
@@ -936,6 +1056,8 @@ int main(int argc, char **argv)
     }
 
     job_close_context(context);
+
+    pvfs2_mmap_ra_cache_finalize();
 
     if (PVFS_sys_finalize())
     {

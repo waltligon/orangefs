@@ -24,7 +24,8 @@ extern ssize_t pvfs2_inode_read(
     char *buf,
     size_t count,
     loff_t * offset,
-    int copy_to_user);
+    int copy_to_user,
+    loff_t readahead_size);
 
 extern struct file_operations pvfs2_file_operations;
 extern struct inode_operations pvfs2_symlink_inode_operations;
@@ -114,9 +115,18 @@ static int pvfs2_get_blocks(
           the general case to use the larger blocksize for
           reading/writing.  For now it seems that this call
           can *only* handle reads of PAGE_CACHE_SIZE blocks.
+
+          set the readahead size to be the entire file size
+          so that subsequent calls have the opportunity to
+          be cache hits;
+          when we're at the last block, we need to pass the
+          special readahead value to allow a cache flush
+          to occur in userspace
         */
         bytes_read = pvfs2_inode_read(
-            inode, page_data, blocksize, &blockptr_offset, 0);
+            inode, page_data, blocksize, &blockptr_offset, 0,
+            (((blocksize + blockptr_offset) < inode->i_size) ?
+             inode->i_size : PVFS2_MMAP_RACACHE_FLUSH));
 
         if (bytes_read < 0)
         {

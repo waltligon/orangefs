@@ -59,7 +59,8 @@ ssize_t pvfs2_inode_read(
     char *buf,
     size_t count,
     loff_t *offset,
-    int copy_to_user)
+    int copy_to_user,
+    int readahead_size)
 {
     int ret = -1;
     size_t each_count = 0, amt_complete = 0;
@@ -82,6 +83,7 @@ ssize_t pvfs2_inode_read(
         }
 
         new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
+        new_op->upcall.req.io.readahead_size = readahead_size;
         new_op->upcall.req.io.io_type = PVFS_IO_READ;
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
@@ -186,8 +188,9 @@ ssize_t pvfs2_file_read(
     size_t count,
     loff_t *offset)
 {
+    /* NOTE: no read-ahead here for now */
     return pvfs2_inode_read(
-        file->f_dentry->d_inode, buf, count, offset, 1);
+        file->f_dentry->d_inode, buf, count, offset, 1, 0);
 }
 
 static ssize_t pvfs2_file_write(

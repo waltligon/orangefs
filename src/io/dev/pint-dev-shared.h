@@ -37,6 +37,11 @@
 #define PVFS2_BUFMAP_TOTAL_SIZE \
 (PVFS2_BUFMAP_DESC_COUNT * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)
 
+/* pvfs2-client-core can cache readahead data up to this size in bytes */
+#define PVFS2_MMAP_RACACHE_MAX_SIZE ((loff_t)(8 * (1024 * 1024)))
+
+/* tells the pvfs2-client-core to flush any cached readahead data */
+#define PVFS2_MMAP_RACACHE_FLUSH ((uint32_t)0xFFFFFFFF)
 
 /* describes memory regions to map in the PVFS_DEV_MAP ioctl */
 struct PVFS_dev_map_desc

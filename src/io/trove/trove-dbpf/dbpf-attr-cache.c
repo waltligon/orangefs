@@ -152,15 +152,24 @@ int dbpf_attr_cache_initialize(
         s_max_num_cache_elems = cache_max_num_elems;
         s_key_to_attr_table = qhash_init(
             hash_key_compare, hash_key, table_size);
+        if (!s_key_to_attr_table)
+        {
+            goto return_error;
+        }
 
         s_dbpf_attr_mutex = gen_mutex_build();
-        assert(s_dbpf_attr_mutex);
+        if (!s_dbpf_attr_mutex)
+        {
+            qhash_finalize(s_key_to_attr_table);
+            s_key_to_attr_table = NULL;
+            goto return_error;
+        }
 
         srand((unsigned int)time(NULL));
 
-        ret = (s_key_to_attr_table ? 0 : -1);
         gossip_debug(DBPF_ATTRCACHE_DEBUG,
                      "dbpf_attr_cache_initialized\n");
+        ret = 0;
     }
 
   return_error:
