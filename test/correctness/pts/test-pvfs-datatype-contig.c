@@ -27,7 +27,8 @@ int test_pvfs_datatype_contig(MPI_Comm *mycomm __unused, int myid, char *buf __u
 
     for(i = 0; i < TEST_PVFS_DATA_SIZE; i++)
     {
-        io_buffer[i] = (char)((i % 26) + 65);
+	int ti = (i % 26) + 65;
+        io_buffer[i] = (char) ti;
     }
 
     credentials.uid = getuid();

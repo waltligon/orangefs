@@ -585,7 +585,7 @@ static int test_read_beyond(void){
     }
     if((ret = PVFS_sys_getattr(resp_lk.pinode_refn, attrmask, credentials, &resp)) < 0)
 	return ret;
-    io_buffer = malloc(sizeof(char)*resp.attr.size+100);
+    io_buffer = malloc(sizeof(char)*(size_t)resp.attr.size+100);
 
     ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, req_mem, credentials, &resp_io);
     if(ret < 0){
@@ -640,7 +640,7 @@ static int test_write_beyond(void){
     }
     if((ret = PVFS_sys_getattr(resp_lk.pinode_refn, attrmask, credentials, &resp)) < 0)
 	return ret;
-    io_buffer = malloc(sizeof(char)*resp.attr.size+100);
+    io_buffer = malloc(sizeof(char)*(size_t)resp.attr.size+100);
 
     //req_io.size = resp_io.size + 100;
     oldsize = resp.attr.size +100;
