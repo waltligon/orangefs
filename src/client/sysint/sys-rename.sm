@@ -24,7 +24,8 @@ enum
 {
     RENAME_CHDIRENT = 130,
     RENAME_REMOVE_REQUIRED,
-    RENAME_CRDIRENT_RETRY
+    RENAME_CRDIRENT_RETRY,
+    RENAME_RMDIRENT_RETRY
 };
 
 static int rename_init(
@@ -53,6 +54,8 @@ static int rename_generic_timer(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int rename_crdirent_retry_or_fail(
     PINT_client_sm *sm_p, job_status_s *js_p);
+static int rename_rmdirent_retry_or_fail(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 static int rename_lookups_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -76,6 +79,8 @@ machine pvfs2_client_rename_sm(
     rename_crdirent_timer,
     rename_rmdirent_setup_msgpair,
     rename_rmdirent_xfer_msgpair,
+    rename_rmdirent_retry_or_fail,
+    rename_rmdirent_timer,
     rename_rmdirent_failure,
     rename_chdirent_setup_msgpair,
     rename_chdirent_xfer_msgpair,
@@ -143,14 +148,27 @@ machine pvfs2_client_rename_sm(
     {
         run rename_rmdirent_setup_msgpair;
         success => rename_rmdirent_xfer_msgpair;
-        default => rename_rmdirent_failure;
+        default => rename_rmdirent_retry_or_fail;
     }
 
     state rename_rmdirent_xfer_msgpair
     {
         jump pvfs2_client_msgpairarray_sm;
         success => rename_check_for_remove;
-        default => rename_rmdirent_failure;
+        default => rename_rmdirent_retry_or_fail;
+    }
+
+    state rename_rmdirent_retry_or_fail
+    {
+	run rename_rmdirent_retry_or_fail;
+	RENAME_RMDIRENT_RETRY => rename_rmdirent_timer;
+	default => rename_rmdirent_failure;
+    }
+
+    state rename_rmdirent_timer
+    {
+	run rename_generic_timer;
+	default => rename_rmdirent_setup_msgpair;
     }
 
     state rename_rmdirent_failure
@@ -818,6 +836,36 @@ static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
     return 1;
 }
 
+static int rename_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
+                                         job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename state: rmdirent_retry_or_fail\n");
+
+    /* try again (up to a point) if we get a comm. failure. */
+    if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
+	(sm_p->u.rename.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+    {
+	sm_p->u.rename.retry_count++;
+	js_p->error_code = RENAME_RMDIRENT_RETRY;
+	return(1);
+    }
+
+    if ((js_p->error_code == -PVFS_ENOENT) &&
+        (sm_p->u.rename.retry_count > 0))
+    {
+	/* tricky error case.  The rmdirent failed, but it wasn't our first
+	 * try.  Assume that a previous one was successful and we just
+	 * didn't get the response.  This particular case isn't as dangerous
+	 * in rename as it is in remove.  Just let it go without warning.
+	 */
+	js_p->error_code = 0;
+	return(1);
+    }
+
+    /* let other errors fall through to next state */
+    return 1;
+}
 
 
 /*
