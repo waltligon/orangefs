@@ -500,25 +500,6 @@ enum
     PVFS_DEV_UNEXPECTED            = 300
 };
 
-int PINT_serv_decode_resp(
-    PVFS_fs_id fs_id,
-    void *encoded_resp_p,
-    struct PINT_decoded_msg *decoded_resp_p,
-    PVFS_BMI_addr_t *svr_addr_p,
-    int actual_resp_sz,
-    struct PVFS_server_resp **resp_out_pp);
-
-int PINT_serv_free_msgpair_resources(
-    struct PINT_encoded_msg *encoded_req_p,
-    void *encoded_resp_p,
-    struct PINT_decoded_msg *decoded_resp_p,
-    PVFS_BMI_addr_t *svr_addr_p,
-    int max_resp_sz);
-
-int PINT_serv_msgpairarray_resolve_addrs(
-    int count, 
-    PINT_sm_msgpair_state* msgarray);
-
 int PINT_client_bmi_cancel(job_id_t id);
 
 int PINT_client_io_cancel(job_id_t id);
