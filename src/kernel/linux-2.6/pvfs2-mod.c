@@ -53,6 +53,7 @@ kmem_cache_t *pvfs2_inode_cache = NULL;
 
 /* synchronizes the request device file */
 struct semaphore devreq_semaphore;
+int devreq_device_registered = 0;
 
 /*
   blocks non-priority requests from being queued for servicing.  this
@@ -92,6 +93,8 @@ static int __init pvfs2_init(void)
 		    PVFS2_REQDEVICE_NAME, pvfs2_dev_major);
 	return pvfs2_dev_major;
     }
+    devreq_device_registered = 1;
+
     pvfs2_print("*** /dev/%s character device registered ***\n",
 		PVFS2_REQDEVICE_NAME);
     pvfs2_print("'mknod /dev/%s c %d 0'.\n", PVFS2_REQDEVICE_NAME,
@@ -116,25 +119,22 @@ static int __init pvfs2_init(void)
 
 static void __exit pvfs2_exit(void)
 {
-    int i;
+    int i = 0;
     pvfs2_kernel_op_t *cur_op = NULL;
     struct qhash_head *hash_link = NULL;
 
     pvfs2_print("pvfs2: pvfs2_exit called\n");
 
-    /* first unregister the pvfs2-req chrdev */
-    if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
-    {
-	pvfs2_print("Failed to unregister pvfs2 device /dev/%s\n",
-		    PVFS2_REQDEVICE_NAME);
-    }
-    pvfs2_print("Unregistered pvfs2 device /dev/%s\n",
-                PVFS2_REQDEVICE_NAME);
+    /*
+      give the blocking device read some time to return -EBADF since
+      the device is going away shortly and won't be available for
+      reading any longer
+    */
+    devreq_device_registered = 0;
 
-    /* then unregister the filesystem */
-    unregister_filesystem(&pvfs2_fs_type);
-
-    /* uninitialize global book keeping data structures */
+    set_current_state(TASK_INTERRUPTIBLE);
+    schedule_timeout(MSECS_TO_JIFFIES(150));
+    set_current_state(TASK_RUNNING);
 
     /* clear out all pending upcall op requests */
     spin_lock(&pvfs2_request_list_lock);
@@ -167,6 +167,16 @@ static void __exit pvfs2_exit(void)
     op_cache_finalize();
     dev_req_cache_finalize();
     pvfs2_inode_cache_finalize();
+
+    if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
+    {
+	pvfs2_print("Failed to unregister pvfs2 device /dev/%s\n",
+		    PVFS2_REQDEVICE_NAME);
+    }
+    pvfs2_print("Unregistered pvfs2 device /dev/%s\n",
+                PVFS2_REQDEVICE_NAME);
+
+    unregister_filesystem(&pvfs2_fs_type);
 }
 
 static int hash_func(void *key, int table_size)

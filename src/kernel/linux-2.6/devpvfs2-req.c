@@ -25,6 +25,7 @@ extern struct qhash_table *htable_ops_in_progress;
 extern struct file_system_type pvfs2_fs_type;
 extern struct semaphore devreq_semaphore;
 extern struct semaphore request_semaphore;
+extern int devreq_device_registered;
 
 /* defined in super.c */
 extern struct list_head pvfs2_superblocks;
@@ -115,7 +116,14 @@ static ssize_t pvfs2_devreq_read(
 
             if (!signal_pending(current))
             {
-                schedule();
+                schedule_timeout(MSECS_TO_JIFFIES(100));
+                if (devreq_device_registered == 0)
+                {
+                    set_current_state(TASK_RUNNING);
+                    remove_wait_queue(
+                        &pvfs2_request_list_waitq, &wait_entry);
+                    return -EBADF;
+                }
                 continue;
             }
 
