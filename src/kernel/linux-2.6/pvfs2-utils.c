@@ -135,17 +135,17 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
 
     attrs->mask |= PVFS_ATTR_SYS_PERM;
 
-    if (mode & S_IFREG)
+    if ((mode & S_IFMT) == S_IFREG)
     {
         attrs->objtype = PVFS_TYPE_METAFILE;
         attrs->mask |= PVFS_ATTR_SYS_TYPE;
     }
-    else if (mode & S_IFDIR)
+    else if ((mode & S_IFMT) == S_IFDIR)
     {
         attrs->objtype = PVFS_TYPE_DIRECTORY;
         attrs->mask |= PVFS_ATTR_SYS_TYPE;
     }
-    else if (mode & S_IFLNK)
+    else if ((mode & S_IFMT) == S_IFLNK)
     {
         attrs->objtype = PVFS_TYPE_SYMLINK;
         attrs->mask |= PVFS_ATTR_SYS_TYPE;
@@ -161,62 +161,49 @@ static inline int copy_attributes_from_inode(
 
     if (inode && attrs)
     {
-        if (iattr)
-        {
-            /*
-              if we got a non-NULL iattr structure, we need to be
-              careful to only copy the attributes out of the iattr
-              object that we know are valid
-            */
-            if (iattr->ia_valid & ATTR_UID)
-            {
-                attrs->owner = iattr->ia_uid;
-                attrs->mask |= PVFS_ATTR_SYS_UID;
-            }
-            if (iattr->ia_valid & ATTR_GID)
-            {
-                attrs->group = iattr->ia_gid;
-                attrs->mask |= PVFS_ATTR_SYS_GID;
-            }
-            if (iattr->ia_valid & ATTR_ATIME)
-            {
-                attrs->atime = (PVFS_time)iattr->ia_atime.tv_sec;
-                attrs->mask |= PVFS_ATTR_SYS_ATIME;
-            }
-            if (iattr->ia_valid & ATTR_MTIME)
-            {
-                attrs->mtime = (PVFS_time)iattr->ia_mtime.tv_sec;
-                attrs->mask |= PVFS_ATTR_SYS_MTIME;
-            }
-            if (iattr->ia_valid & ATTR_CTIME)
-            {
-                attrs->ctime = (PVFS_time)iattr->ia_ctime.tv_sec;
-                attrs->mask |= PVFS_ATTR_SYS_CTIME;
-            }
-            if (iattr->ia_valid & ATTR_MODE)
-            {
-                convert_attribute_mode_to_pvfs_sys_attr(
-                    iattr->ia_mode, attrs);
-
-                /* FIXME: MAJOR KLUDGE HERE */
-                pvfs2_error("FIXME: FAKING VALID ATTRS in "
-                            "(copy_attributes_from_inode)\n");
-                attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
-            }
-        }
+        /*
+          if we got a non-NULL iattr structure, we need to be
+          careful to only copy the attributes out of the iattr
+          object that we know are valid
+        */
+        if (iattr && (iattr->ia_valid & ATTR_UID))
+            attrs->owner = iattr->ia_uid;
         else
-        {
             attrs->owner = inode->i_uid;
-            attrs->group = inode->i_gid;
-            attrs->atime = (PVFS_time)inode->i_atime.tv_sec;
-            attrs->mtime = (PVFS_time)inode->i_mtime.tv_sec;
-            attrs->ctime = (PVFS_time)inode->i_ctime.tv_sec;
+        attrs->mask |= PVFS_ATTR_SYS_UID;
 
+        if (iattr && (iattr->ia_valid & ATTR_GID))
+            attrs->group = iattr->ia_gid;
+        else
+            attrs->group = inode->i_gid;
+        attrs->mask |= PVFS_ATTR_SYS_GID;
+
+        if (iattr && (iattr->ia_valid & ATTR_ATIME))
+            attrs->atime = (PVFS_time)iattr->ia_atime.tv_sec;
+        else
+            attrs->atime = (PVFS_time)inode->i_atime.tv_sec;
+        attrs->mask |= PVFS_ATTR_SYS_ATIME;
+
+        if (iattr && (iattr->ia_valid & ATTR_MTIME))
+            attrs->mtime = (PVFS_time)iattr->ia_mtime.tv_sec;
+        else
+            attrs->mtime = (PVFS_time)inode->i_mtime.tv_sec;
+        attrs->mask |= PVFS_ATTR_SYS_MTIME;
+
+        if (iattr && (iattr->ia_valid & ATTR_CTIME))
+            attrs->ctime = (PVFS_time)iattr->ia_ctime.tv_sec;
+        else
+            attrs->ctime = (PVFS_time)inode->i_ctime.tv_sec;
+        attrs->mask |= PVFS_ATTR_SYS_CTIME;
+
+        if (iattr && (iattr->ia_valid & ATTR_MODE))
+            convert_attribute_mode_to_pvfs_sys_attr(
+                iattr->ia_mode, attrs);
+        else
             convert_attribute_mode_to_pvfs_sys_attr(
                 inode->i_mode, attrs);
+        attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
-            attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
-        }
         ret = 0;
     }
     return ret;
@@ -353,17 +340,17 @@ int pvfs2_inode_setattr(
 	       For now, wait_for_matching_downcall just doesn't
 	       put anything on the invalidated list.
 	     */
-	    printk("pvfs2: pvfs2_inode_setattr -- wait failed. "
-		   "op invalidated (not really)\n");
+	    pvfs2_print("pvfs2: pvfs2_inode_setattr -- wait failed. "
+                        "op invalidated (not really)\n");
 	}
 
-        printk("Setattr Got PVFS2 status value of %d\n",
-               new_op->downcall.status);
+        pvfs2_print("Setattr Got PVFS2 status value of %d\n",
+                    new_op->downcall.status);
 
         ret = new_op->downcall.status;
 
 	/* when request is serviced properly, free req op struct */
-	printk("Op with tag %lu was serviced; freeing\n", new_op->tag);
+	pvfs2_print("Op with tag %lu was serviced; freeing\n", new_op->tag);
 	op_release(new_op);
     }
     return ret;
