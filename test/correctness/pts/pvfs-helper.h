@@ -28,6 +28,14 @@ typedef struct
     PVFS_sysresp_init resp_init;
 } pvfs_helper_t;
 
+/* these are some helper functions that are implemented in pvfs-helper.c */
+
+PVFS_handle create_dir(PVFS_handle parent,
+                       PVFS_fs_id fs_id,
+                       char *name);
+
+PVFS_handle get_root(PVFS_fs_id fs_id);
+
 int initialize_sysint(void);
 
 #endif /* __PVFS_HELPER_H */

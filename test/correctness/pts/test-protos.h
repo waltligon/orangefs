@@ -8,6 +8,7 @@
 /* include all test specific header files */
 #include <test-create.h>
 #include <test-dir-torture.h>
+#include <test-lookup-bench.h>
 #include <test-pvfs-datatype-init.h>
 #include <test-pvfs-datatype-contig.h>
 #include <test-pvfs-datatype-vector.h>
@@ -19,7 +20,8 @@ enum test_types {
         TEST_PVFSDATATYPE_CONTIG,
         TEST_PVFSDATATYPE_VECTOR,
         TEST_PVFSDATATYPE_HVECTOR,
-	TEST_DIR_TORTURE
+	TEST_DIR_TORTURE,
+	TEST_LOOKUP_BENCH
 };
 
 void setup_ptstests(config *myconfig) {
@@ -46,6 +48,9 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_PVFSDATATYPE_HVECTOR].test_name = str_malloc("test_pvfs_datatype_hvector");
    myconfig->testpool[TEST_DIR_TORTURE].test_func = (void *)test_dir_torture;
    myconfig->testpool[TEST_DIR_TORTURE].test_name = str_malloc("test_dir_torture");
+
+   myconfig->testpool[TEST_LOOKUP_BENCH].test_func = (void *)test_lookup_bench;
+   myconfig->testpool[TEST_LOOKUP_BENCH].test_name = str_malloc("test_lookup_bench");
 }
 
 #endif

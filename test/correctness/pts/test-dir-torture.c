@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include "mpi.h"
 #include "pts.h"
+#include "pvfs-helper.h"
 
 extern int parse_pvfstab(char *filename,
 			 pvfs_mntlist * pvfstab_p);
@@ -42,82 +43,6 @@ PVFS_fs_id system_init(void)
     }
 
     return resp_init.fsid_list[0];
-}
-
-/*
- * helper function to get the root handle
- * fs_id:   fsid of our file system
- *
- * returns:  handle to the root directory
- * 	-1 if a problem
- */
-
-PVFS_handle get_root(PVFS_fs_id fs_id)
-{
-    PVFS_sysreq_lookup req_look;
-    PVFS_sysresp_lookup resp_look;
-    int ret = -1;
-
-    memset(&req_look, 0, sizeof(req_look));
-    memset(&req_look, 0, sizeof(resp_look));
-
-    req_look.credentials.perms = 1877;
-    req_look.name = malloc(2);	/*null terminator included */
-    req_look.name[0] = '/';
-    req_look.name[1] = '\0';
-    req_look.fs_id = fs_id;
-    printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
-    ret = PVFS_sys_lookup(&req_look, &resp_look);
-    if (ret < 0)
-    {
-	printf("Lookup failed with errcode = %d\n", ret);
-	return (-1);
-    }
-    return (PVFS_handle) resp_look.pinode_refn.handle;
-}
-
-/*
- * simple helper to make a pvfs2 directory
- *
- * parent:   handle of parent directory
- * fs_id:    fsid of filesystem on which parent dir exists
- * name:     name of directory to create
- *
- * returns a handle to the new directory
- *          -1 if some error happened
- */
-PVFS_handle create_dir(PVFS_handle parent,
-		       PVFS_fs_id fs_id,
-		       char *name)
-{
-    PVFS_sysreq_mkdir req_mkdir;
-    PVFS_sysresp_mkdir resp_mkdir;
-
-    int ret = -1;
-
-    memset(&req_mkdir, 0, sizeof(req_mkdir));
-    memset(&resp_mkdir, 0, sizeof(req_mkdir));
-
-
-    req_mkdir.entry_name = name;
-    req_mkdir.parent_refn.handle = parent;
-    req_mkdir.parent_refn.fs_id = fs_id;
-    req_mkdir.attrmask = ATTR_BASIC;
-    req_mkdir.attr.owner = 100;
-    req_mkdir.attr.group = 100;
-    req_mkdir.attr.perms = 1877;
-    req_mkdir.attr.objtype = ATTR_DIR;
-    req_mkdir.credentials.perms = 1877;
-    req_mkdir.credentials.uid = 100;
-    req_mkdir.credentials.gid = 100;
-
-    ret = PVFS_sys_mkdir(&req_mkdir, &resp_mkdir);
-    if (ret < 0)
-    {
-	printf("mkdir failed\n");
-	return (-1);
-    }
-    return (PVFS_handle) resp_mkdir.pinode_refn.handle;
 }
 
 /*
