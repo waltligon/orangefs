@@ -156,7 +156,8 @@ int PVFS_mgmt_perf_mon_list(
     PVFS_BMI_addr_t *addr_array,
     uint32_t* next_id_array,
     int server_count,
-    int history_count);
+    int history_count,
+    PVFS_error_details *details);
 
 int PVFS_mgmt_event_mon_list(
     PVFS_fs_id fs_id,

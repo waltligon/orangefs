@@ -67,7 +67,7 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 			  int count,
 			  PVFS_error_details *details)
 {
-    int ret = -PVFS_EINVAL, i = 0;
+    int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
@@ -135,10 +135,10 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 
     error = sm_p->error_code;
 
+    /* store server-specific errors if requested and present */
     if ((error != 0) && (details != NULL))
     {
-	/* store server-specific errors in error details */
-	int errct = 0;
+	int i, errct = 0;
 
 	details->count_exceeded = 0;
 

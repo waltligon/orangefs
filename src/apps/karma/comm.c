@@ -371,8 +371,26 @@ static int gui_comm_perf_collect(void)
 				  internal_addrs,
 				  internal_perf_ids,
 				  internal_addr_ct,
-				  GUI_COMM_PERF_HISTORY);
-    if (ret != 0)
+				  GUI_COMM_PERF_HISTORY,
+				  internal_details);
+    if (ret == 0) return 0;
+    else if (ret == -PVFS_EDETAIL)
+    {
+	int i;
+
+	for (i=0; i < internal_details->count_used; i++)
+	{
+	    char msgbuf[64];
+
+	    snprintf(msgbuf,
+		     64,
+		     "Server not responding (need to map to addr!).\n");
+	    gui_message_new(msgbuf);
+	}
+
+	return 0;
+    }
+    else
     {
 	PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
 	return -1;
