@@ -63,7 +63,7 @@ static ssize_t pvfs2_file_read(
     }
 
     new_op->upcall.type = PVFS2_VFS_OP_FILE_READ;
-    /* TODO: how do I tell it what file I want to work on? */
+    new_op->upcall.req.read.refn = pvfs2_inode->refn;
 
     while(total_count < count)
     {
@@ -92,7 +92,6 @@ static ssize_t pvfs2_file_read(
 	new_op->upcall.req.read.buf = desc->uaddr;
 	new_op->upcall.req.read.count = each_count;
 	new_op->upcall.req.read.offset = *offset;
-	new_op->upcall.req.read.refn = pvfs2_inode->refn;
 
 	/* post req and wait for response */
 	add_op_to_request_list(new_op);
