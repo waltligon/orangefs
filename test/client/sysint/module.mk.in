@@ -20,8 +20,6 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/io-test.c
 
 MISCSRC += \
-	$(DIR)/job.c \
-	$(DIR)/parse-pvfstab.c \
 	$(DIR)/helper.c
 
 TESTSRC += $(TEST_SYSINT_DIR_SRC)
