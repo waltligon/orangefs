@@ -315,6 +315,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	    /* find next ";" terminator (or end of string) */
 	    while (parse_p[len] != ';' && parse_p[len] != '\0') len++;
 
+#if 0
 	    /* skip "pvfs-" */
 	    assert(len > 5);
 	    if (!strncmp(parse_p, "pvfs-", 5)) {
@@ -324,7 +325,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	    else {
 		goto return_error;
 	    }
-
+#endif
 	    /* allocate space for entry */
 	    fsinfo_p->meta_serv_array[j] = (PVFS_string) malloc(len + 1);
 	    if (fsinfo_p->meta_serv_array[j] == NULL) {
@@ -362,6 +363,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	    /* find next ";" terminator (or end of string) */
 	    while (parse_p[len] != ';' && parse_p[len] != '\0') len++;
 
+#if 0
 	    /* skip "pvfs-" */
 	    assert(len > 5);
 	    if (!strncmp(parse_p, "pvfs-", 5)) {
@@ -371,7 +373,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	    else {
 		goto return_error;
 	    }
-
+#endif
 	    /* allocate space for entry */
 	    fsinfo_p->io_serv_array[j] = (PVFS_string) malloc(len + 1);
 	    if (fsinfo_p->io_serv_array[j] == NULL) {
