@@ -13,8 +13,6 @@
 
 #include "bmi.h"
 
-#define ENCODED_HEADER_SIZE sizeof(int)
-
 /* structure to describe messages that have been encoded */
 struct PINT_encoded_msg
 {
