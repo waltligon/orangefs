@@ -11,7 +11,7 @@ extern FILE *out_file;
 
 void gen_init(void)
 {
-    fprintf(out_file,"\n#include <state-machine.h>\n");
+    return;
 }
 
 void gen_state_decl(char *state_name)
@@ -21,7 +21,7 @@ void gen_state_decl(char *state_name)
 
 void gen_machine(char *machine_name, char *first_state_name, char *init_name)
 {
-    fprintf(out_file, "\nPINT_state_machine_s %s =\n{\n\t", machine_name);
+    fprintf(out_file, "\nPINT_state_machine %s =\n{\n\t", machine_name);
     fprintf(out_file, "ST_%s,\n\t\"%s\",\n", first_state_name, machine_name);
     if (init_name)
     {

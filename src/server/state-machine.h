@@ -7,6 +7,7 @@
 #ifndef __STATE_MACHINE_H
 #define __STATE_MACHINE_H
 
+#include "job.h"
 #include "pvfs2-server.h"
 
 union PINT_state_array_values

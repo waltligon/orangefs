@@ -113,7 +113,13 @@ struct PINT_server_io_op {
  */
 typedef struct PINT_server_op
 {
+    /* STATE MACHINE VALUES */
     int op; /* op == req->op after initialize_unexpected */
+    int stackptr; /* stack of contexts for nested state machines */
+    PINT_state_array_values *current_state; /* initialized in initialize_unexpected */
+    PINT_state_array_values *state_stack[PINTSTACKSIZE]; 
+
+    /* SERVER-SPECIFIC VALUES */
     job_id_t scheduled_id; /* holds id from request scheduler so we can release it later */
 
     PVFS_ds_keyval key, val; /* generic structures used in most server operations */
@@ -122,9 +128,6 @@ typedef struct PINT_server_op
 
     bmi_addr_t addr; /* set in initialize_unexpected */
     bmi_msg_tag_t tag; /* set in initialize_unexpected */
-    PINT_state_array_values *current_state; /* initialized in initialize_unexpected */
-    PINT_state_array_values *state_stack[PINTSTACKSIZE]; 
-    int stackptr; /* stack of contexts for nested state machines */
     struct PVFS_server_req *req; /* req == decoded.buffer after initialize_unexpected */
     struct PVFS_server_resp *resp; /* resp space allocated, memset(0) in initialize_unexpected
 				      *
