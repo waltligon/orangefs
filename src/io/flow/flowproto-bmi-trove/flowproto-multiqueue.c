@@ -1055,6 +1055,15 @@ static void cleanup_buffers(struct fp_private_data* flow_data)
 		flow_data->intermediate, BUFFER_SIZE, BMI_SEND);
 	}
     }
+    else if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
+	flow_data->parent->dest.endpoint_id == MEM_ENDPOINT)
+    {
+	if(flow_data->intermediate)
+	{
+	    BMI_memfree(flow_data->parent->src.u.bmi.address,
+		flow_data->intermediate, BUFFER_SIZE, BMI_RECV);
+	}
+    }
 
     return;
 }
@@ -1138,17 +1147,18 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	    assert(flow_data->intermediate);
 	}
 
+	/* copy what we have so far into intermediate buffer */
+	for(i=0; i<q_item->result_chain.result.segs; i++)
+	{
+	    src_ptr = ((char*)q_item->parent->src.u.mem.buffer + 
+		q_item->result_chain.offset_list[i]);
+	    dest_ptr = ((char*)flow_data->intermediate + bytes_processed);
+	    memcpy(dest_ptr, src_ptr, q_item->result_chain.size_list[i]);
+	    bytes_processed += q_item->result_chain.size_list[i];
+	}
+
 	do
 	{
-	    /* copy what we have so far into intermediate buffer */
-	    for(i=0; i<q_item->result_chain.result.segs; i++)
-	    {
-		src_ptr = ((char*)q_item->parent->src.u.mem.buffer + 
-		    q_item->result_chain.offset_list[i]);
-		dest_ptr = ((char*)flow_data->intermediate + bytes_processed);
-		memcpy(dest_ptr, src_ptr, q_item->result_chain.size_list[i]);
-		bytes_processed += q_item->result_chain.size_list[i];
-	    }
 	    q_item->result_chain.result.bytemax = BUFFER_SIZE - bytes_processed;
 	    q_item->result_chain.result.bytes = 0;
 	    q_item->result_chain.result.segmax = MAX_REGIONS;
@@ -1162,6 +1172,16 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 		PINT_CLIENT);
 	    /* TODO: error handling */
 	    assert(ret >= 0);
+
+	    /* copy what we have so far into intermediate buffer */
+	    for(i=0; i<q_item->result_chain.result.segs; i++)
+	    {
+		src_ptr = ((char*)q_item->parent->src.u.mem.buffer + 
+		    q_item->result_chain.offset_list[i]);
+		dest_ptr = ((char*)flow_data->intermediate + bytes_processed);
+		memcpy(dest_ptr, src_ptr, q_item->result_chain.size_list[i]);
+		bytes_processed += q_item->result_chain.size_list[i];
+	    }
 	}while(bytes_processed < BUFFER_SIZE &&
 	    !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
@@ -1172,19 +1192,21 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	q_item->result_chain.result.segs = 1;
 	buffer_type = BMI_PRE_ALLOC;
     }
-
-    if(q_item->result_chain.result.bytes == 0)
-    {	
-	gen_mutex_unlock(&flow_data->flow_mutex);
-	return;
-    }
-
-    /* convert offsets to memory addresses */
-    for(i=0; i<q_item->result_chain.result.segs; i++)
+    else
     {
-	flow_data->tmp_buffer_list[i] = 
-	    (void*)(q_item->result_chain.result.offset_array[i] +
-	    q_item->buffer);
+	if(q_item->result_chain.result.bytes == 0)
+	{	
+	    gen_mutex_unlock(&flow_data->flow_mutex);
+	    return;
+	}
+
+	/* convert offsets to memory addresses */
+	for(i=0; i<q_item->result_chain.result.segs; i++)
+	{
+	    flow_data->tmp_buffer_list[i] = 
+		(void*)(q_item->result_chain.result.offset_array[i] +
+		q_item->buffer);
+	}
     }
 
     ret = BMI_post_send_list(&tmp_id,
@@ -1253,19 +1275,20 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     if(flow_data->tmp_buffer_list[0] == flow_data->intermediate &&
 	flow_data->intermediate != NULL)
     {
+	/* copy out what we have so far */
+	for(i=0; i<q_item->result_chain.result.segs; i++)
+	{
+	    region_size = q_item->result_chain.size_list[i];
+	    src_ptr = (char*)(flow_data->intermediate + 
+		bytes_processed);
+	    dest_ptr = (char*)(q_item->result_chain.offset_list[i]
+		+ q_item->parent->dest.u.mem.buffer);
+	    memcpy(dest_ptr, src_ptr, region_size);
+	    bytes_processed += region_size;
+	}
+
 	do
 	{
-	    /* copy out what we have so far */
-	    for(i=0; i<q_item->result_chain.result.segs; i++)
-	    {
-		region_size = q_item->result_chain.size_list[i];
-		src_ptr = (char*)(flow_data->intermediate + 
-		    bytes_processed);
-		dest_ptr = (char*)(q_item->result_chain.offset_list[i]
-		    + q_item->parent->dest.u.mem.buffer);
-		memcpy(dest_ptr, src_ptr, region_size);
-		bytes_processed += region_size;
-	    }
 	    q_item->result_chain.result.bytemax = BUFFER_SIZE - bytes_processed;
 	    q_item->result_chain.result.bytes = 0;
 	    q_item->result_chain.result.segmax = MAX_REGIONS;
@@ -1279,6 +1302,17 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 		PINT_CLIENT);
 	    /* TODO: error handling */
 	    assert(ret >= 0);
+	    /* copy out what we have so far */
+	    for(i=0; i<q_item->result_chain.result.segs; i++)
+	    {
+		region_size = q_item->result_chain.size_list[i];
+		src_ptr = (char*)(flow_data->intermediate + 
+		    bytes_processed);
+		dest_ptr = (char*)(q_item->result_chain.offset_list[i]
+		    + q_item->parent->dest.u.mem.buffer);
+		memcpy(dest_ptr, src_ptr, region_size);
+		bytes_processed += region_size;
+	    }
 	}while(bytes_processed < BUFFER_SIZE &&
 	    !PINT_REQUEST_DONE(q_item->parent->file_req_state));
     }
