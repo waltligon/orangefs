@@ -38,7 +38,6 @@ static int bmi_unexp_pending_count = 0;
 static int bmi_pending_count = 0;
 static job_desc_q_p trove_queue = NULL;
 static int flow_pending_count = 0;
-static job_desc_q_p req_sched_inprogress_queue = NULL;
 /* mutex locks for each queue */
 static gen_mutex_t completion_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t bmi_mutex = GEN_MUTEX_INITIALIZER;
@@ -46,9 +45,6 @@ static gen_mutex_t trove_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t flow_mutex = GEN_MUTEX_INITIALIZER;
 /* NOTE: all of the bmi queues and counts are protected by the same
  * mutex (bmi_mutex)
- */
-/* NOTE: the req_sched queue doesn't have a mutex, because it
- * does not have a work thread
  */
 
 #ifdef __PVFS2_JOB_THREADED__
@@ -690,8 +686,7 @@ int job_req_sched_post(struct PVFS_server_req_s *in_request,
 	/* immediate completion */
 	out_status_p->error_code = 0;
 	*id = jd->job_id;
-	/* store until a matching release comes through */
-	job_desc_q_add(req_sched_inprogress_queue, jd);
+	/* don't delete the job desc until a matching release comes through */
 	return (1);
     }
 
@@ -733,11 +728,11 @@ int job_req_sched_release(job_id_t in_completed_id,
     jd->job_user_ptr = user_ptr;
 
     match_jd = id_gen_fast_lookup(in_completed_id);
-    job_desc_q_remove(match_jd);
 
     ret = PINT_req_sched_release(match_jd->u.req_sched.id, jd,
 				 &(jd->u.req_sched.id));
 
+    /* delete the old req sched job desc; it is no longer needed */
     dealloc_job_desc(match_jd);
 
     /* NOTE: I am letting the return value propigate here, rather
@@ -2205,8 +2200,9 @@ job_test_complete:
     /* special case for request scheduler */
     if (query->type == JOB_REQ_SCHED && query->u.req_sched.post_flag == 1)
     {
-	/* hang onto desc until release time */
-	job_desc_q_add(req_sched_inprogress_queue, query);
+	/* in this case, _don't_ delete the job desc, we need it later
+	 * to release entry
+	 */
     }
     else
     {
@@ -2683,10 +2679,8 @@ static int setup_queues(void)
     completion_queue = job_desc_q_new();
     bmi_unexp_queue = job_desc_q_new();
     trove_queue = job_desc_q_new();
-    req_sched_inprogress_queue = job_desc_q_new();
 
-    if (!completion_queue || !bmi_unexp_queue ||
-	!trove_queue || !req_sched_inprogress_queue)
+    if (!completion_queue || !bmi_unexp_queue || !trove_queue)
     {
 	/* cleanup any that were initialized */
 	teardown_queues();
@@ -2710,8 +2704,6 @@ static void teardown_queues(void)
 	job_desc_q_cleanup(bmi_unexp_queue);
     if (trove_queue)
 	job_desc_q_cleanup(trove_queue);
-    if (req_sched_inprogress_queue)
-	job_desc_q_cleanup(req_sched_inprogress_queue);
 
     return;
 }
@@ -3414,8 +3406,10 @@ static int completion_query_some(job_id_t * id_array,
 	    if (tmp_desc->type == JOB_REQ_SCHED &&
 		tmp_desc->u.req_sched.post_flag == 1)
 	    {
-		/* hang onto desc until release time */
-		job_desc_q_add(req_sched_inprogress_queue, tmp_desc);
+		/* special case; don't delete job desc for req sched
+		 * jobs; we need to hang on to them for use when entry
+		 * is released
+		 */
 	    }
 	    else
 	    {
@@ -3463,8 +3457,10 @@ static int completion_query_world(job_id_t * out_id_array_p,
 	/* special case for request scheduler */
 	if (query->type == JOB_REQ_SCHED && query->u.req_sched.post_flag == 1)
 	{
-	    /* hang onto desc until release time */
-	    job_desc_q_add(req_sched_inprogress_queue, query);
+	    /* special case; don't delete job desc for req sched
+	     * jobs; we need to hang on to them for use when entry
+	     * is released
+	     */
 	}
 	else
 	{
