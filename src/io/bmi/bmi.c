@@ -71,6 +71,11 @@ static struct bmi_method_ops *bmi_static_methods[] = {
  * use, listen_addr is a comma separated list of addresses to listen on
  * for each method (if needed), and flags are initialization flags.
  *
+ * NOTE: if method_list is NULL, then all compiled in modules will be
+ * initialized
+ * TODO: eventually update this so that modules can be initialized on the
+ * fly as needed
+ *
  * returns 0 on success, -errno on failure
  */
 int BMI_initialize(const char *method_list,
@@ -83,18 +88,31 @@ int BMI_initialize(const char *method_list,
     method_addr_p new_addr = NULL;
     struct bmi_method_ops **tmp_method_ops = NULL;
 
-    if (((flags & BMI_INIT_SERVER) && (!listen_addr)) || !method_list)
+    if ((flags & BMI_INIT_SERVER) && ((!listen_addr) || (!method_list)))
     {
 	return (-EINVAL);
     }
 
-    /* separate out the method list */
-    active_method_count = split_string_list(&requested_methods, method_list);
-    if (active_method_count < 1)
+    if(method_list)
     {
-	gossip_lerr("Error: bad method list.\n");
-	ret = -EINVAL;
-	goto bmi_initialize_failure;
+	/* separate out the method list */
+	active_method_count = split_string_list(&requested_methods, method_list);
+	if (active_method_count < 1)
+	{
+	    gossip_lerr("Error: bad method list.\n");
+	    ret = -EINVAL;
+	    goto bmi_initialize_failure;
+	}
+    }
+    else
+    {
+	active_method_count = 0;
+	tmp_method_ops = bmi_static_methods;
+	while ((*tmp_method_ops) != NULL)
+	{
+	    tmp_method_ops++;
+	    active_method_count++;
+	}
     }
 
     /* create a table to keep up with the active methods */
@@ -109,27 +127,39 @@ int BMI_initialize(const char *method_list,
     memset(active_method_table, 0, active_method_count * sizeof(struct
 								bmi_method_ops
 								*));
-
+    
     /* find the interface for each requested method and load it into the
      * active table
      */
-    for (i = 0; i < active_method_count; i++)
+    if(method_list)
+    {
+	for (i = 0; i < active_method_count; i++)
+	{
+	    tmp_method_ops = bmi_static_methods;
+	    while ((*tmp_method_ops) != NULL &&
+		   strcmp((*tmp_method_ops)->method_name,
+			  requested_methods[i]) != 0)
+	    {
+		tmp_method_ops++;
+	    }
+	    if ((*tmp_method_ops) == NULL)
+	    {
+		gossip_lerr("Error: no method available for %s.\n",
+			    requested_methods[i]);
+		ret = -ENOPROTOOPT;
+		goto bmi_initialize_failure;
+	    }
+	    active_method_table[i] = (*tmp_method_ops);
+	}
+    }
+    else
     {
 	tmp_method_ops = bmi_static_methods;
-	while ((*tmp_method_ops) != NULL &&
-	       strcmp((*tmp_method_ops)->method_name,
-		      requested_methods[i]) != 0)
+	for(i=0; i<active_method_count; i++)
 	{
+	    active_method_table[i] = (*tmp_method_ops);
 	    tmp_method_ops++;
 	}
-	if ((*tmp_method_ops) == NULL)
-	{
-	    gossip_lerr("Error: no method available for %s.\n",
-			requested_methods[i]);
-	    ret = -ENOPROTOOPT;
-	    goto bmi_initialize_failure;
-	}
-	active_method_table[i] = (*tmp_method_ops);
     }
 
     /* make a new reference list */
