@@ -349,6 +349,7 @@ extern struct PINT_state_machine_s pvfs2_event_mon_sm;
 extern struct PINT_state_machine_s pvfs2_iterate_handles_sm;
 
 /* nested state machines */
+extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;
 extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
