@@ -12,6 +12,6 @@ $BODYTEXT = 'bgcolor="#b8b8b8" alink="#000000" vlink="#000000" link="#000000">
 
 <table cellspacing="0" cellpadding="1" align="center" width="70%">
 <tr>
-<td width="80%" valign="top">>';
+<td width="80%" valign="top"';
 
 1;
