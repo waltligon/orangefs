@@ -737,6 +737,7 @@ int job_flow(flow_descriptor* flow_d, void* user_ptr, job_status_s*
 	ret = PINT_flow_post(flow_d);
 	if(ret < 0)
 	{
+		dealloc_job_desc(jd);
 		return(ret);
 	}
 	if(ret == 1)
