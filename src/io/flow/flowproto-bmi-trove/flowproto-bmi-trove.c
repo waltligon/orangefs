@@ -982,7 +982,7 @@ static int buffer_setup_trove_to_bmi(flow_descriptor* flow_d)
 
 	/* call req processing code to get first set of segments to
 	 * read from disk */
-	flow_data->fill_buffer_used = flow_data->max_buffer_size;
+	flow_data->fill_buffer_used = 0;
 	flow_data->trove_list_count = MAX_REGIONS;
 
 	ret = PINT_Process_request(flow_d->request_state,
@@ -1453,6 +1453,7 @@ static void service_trove_to_bmi(flow_descriptor* flow_d)
 	PVFS_size tmp_used;
 	int ret = -1;
 	PVFS_boolean eof_flag = 0; /* TODO: use this right */
+	char* tmp_offset;
 
 	gossip_ldebug(FLOW_PROTO_DEBUG, "service_trove_to_bmi() called.\n");
 
@@ -1465,21 +1466,25 @@ static void service_trove_to_bmi(flow_descriptor* flow_d)
 		flow_data->fill_buffer = flow_data->drain_buffer;
 		flow_data->fill_buffer_used = 0;
 		flow_data->fill_buffer_state = BUF_READY_TO_FILL;
+		flow_data->fill_buffer_stepsize = 0;
+		flow_data->fill_buffer_offset = 0;
 		flow_data->drain_buffer = tmp_buffer;
 		flow_data->drain_buffer_used = tmp_used;
 		flow_data->drain_buffer_state = BUF_READY_TO_DRAIN;
+		flow_data->drain_buffer_stepsize = 0;
+		flow_data->drain_buffer_offset = 0;
 
 		/* call req processing code to get next set of segments to
 		 * read from disk */
-		flow_data->fill_buffer_used = flow_data->max_buffer_size;
 		flow_data->trove_list_count = MAX_REGIONS;
-
+		flow_data->fill_buffer_stepsize = flow_data->max_buffer_size;
 		if(flow_d->current_req_offset != -1)
 		{
 			ret = PINT_Process_request(flow_d->request_state,
 				flow_d->file_data, &flow_data->trove_list_count,
 				flow_data->trove_offset_list, flow_data->trove_size_list, 
-				&flow_d->current_req_offset, &flow_data->fill_buffer_used,
+				&flow_d->current_req_offset,
+				&flow_data->fill_buffer_stepsize,
 				&eof_flag, PINT_SERVER);
 			if(ret < 0)
 			{
@@ -1488,6 +1493,12 @@ static void service_trove_to_bmi(flow_descriptor* flow_d)
 				flow_d->error_code = ret;
 				/* no ops in flight, so we can just kick out error here */
 				return;
+			}
+
+			if(flow_data->fill_buffer_stepsize < flow_data->max_buffer_size
+				&& flow_d->current_req_offset != -1)
+			{
+				gossip_ldebug(FLOW_PROTO_DEBUG, "Warning: going into multistage mode for trove to bmi flow.\n");
 			}
 		}
 		else
@@ -1548,17 +1559,19 @@ static void service_trove_to_bmi(flow_descriptor* flow_d)
 		exit(-1);
 	}
 
-	flow_data->trove_total_size = flow_data->fill_buffer_used;
+	flow_data->trove_total_size = flow_data->fill_buffer_stepsize;
 	/* do we have trove work to post? */
 	if(flow_data->fill_buffer_state == BUF_READY_TO_FILL)
 	{
 		gossip_ldebug(FLOW_PROTO_DEBUG, "about to call trove_bstream_read_list().\n");
+		tmp_offset = flow_data->fill_buffer +
+			flow_data->fill_buffer_offset;
 		ret = trove_bstream_read_list(flow_d->src.u.trove.coll_id, 
-			flow_d->src.u.trove.handle, &(flow_data->fill_buffer),
-			&(flow_data->fill_buffer_used), 1,
+			flow_d->src.u.trove.handle, &(tmp_offset),
+			&(flow_data->trove_total_size), 1,
 			flow_data->trove_offset_list, flow_data->trove_size_list,
 			flow_data->trove_list_count,
-			&(flow_data->trove_total_size), 0, NULL, flow_d, 
+			&(flow_data->fill_buffer_stepsize), 0, NULL, flow_d, 
 			&(flow_data->trove_id));
 		if(ret == 1)
 		{
@@ -1887,6 +1900,8 @@ static void trove_completion_trove_to_bmi(PVFS_ds_state error_code,
 	flow_descriptor* flow_d)
 {
 	struct bmi_trove_flow_data* flow_data = PRIVATE_FLOW(flow_d);
+	PVFS_boolean eof_flag = 0;  /* TODO: use this right */
+	int ret = -1;
 	
 	if(error_code != 0)
 	{
@@ -1900,7 +1915,7 @@ static void trove_completion_trove_to_bmi(PVFS_ds_state error_code,
 	}
 
 	/* see if the read was short */
-	if(flow_data->trove_total_size != flow_data->fill_buffer_used)
+	if(flow_data->trove_total_size != flow_data->fill_buffer_stepsize)
 	{
 		/* TODO: need to handle this, make sure flow comes to a halt
 		 * afterwards (send 0 byte message eventually
@@ -1909,24 +1924,62 @@ static void trove_completion_trove_to_bmi(PVFS_ds_state error_code,
 		exit(-1);
 	}
 
-	flow_data->total_filled += flow_data->trove_total_size;
-	flow_data->fill_buffer_state = BUF_READY_TO_SWAP;
+	flow_data->total_filled += flow_data->fill_buffer_stepsize;
+	flow_data->fill_buffer_offset += flow_data->fill_buffer_stepsize;
+	flow_data->fill_buffer_used += flow_data->fill_buffer_stepsize;
 
-	/* set the overall state depending on what both sides are
-	 * doing */
-	if(flow_data->drain_buffer_state == BUF_READY_TO_SWAP)
+	/* if this was the last part of a multi stage read, then 
+	 * finish it as if it were a normal completion 
+	 */
+	if(flow_data->fill_buffer_offset == flow_data->max_buffer_size || 
+		flow_d->current_req_offset == -1)
 	{
-		flow_d->state = FLOW_SVC_READY;
-	}
-	else if(flow_data->drain_buffer_state == BUF_DRAINING)
-	{
-		flow_d->state = FLOW_TRANSMITTING;
+		flow_data->fill_buffer_state = BUF_READY_TO_SWAP;
+
+		/* set the overall state depending on what both sides are
+		 * doing */
+		if(flow_data->drain_buffer_state == BUF_READY_TO_SWAP)
+		{
+			flow_d->state = FLOW_SVC_READY;
+		}
+		else if(flow_data->drain_buffer_state == BUF_DRAINING)
+		{
+			flow_d->state = FLOW_TRANSMITTING;
+		}
+		else
+		{
+			/* TODO: clean up? */
+			gossip_lerr("Error: inconsistent state encountered.\n");
+			exit(-1);
+		}
 	}
 	else
 	{
-		/* TODO: clean up? */
-		gossip_lerr("Error: inconsistent state encountered.\n");
-		exit(-1);
+		/* more work to do before this buffer is fully filled */
+		/* find the next set of segments */
+		flow_data->trove_list_count = MAX_REGIONS;
+		flow_data->fill_buffer_stepsize = flow_data->max_buffer_size -
+			flow_data->fill_buffer_offset;
+
+		ret = PINT_Process_request(flow_d->request_state,
+			flow_d->file_data, &flow_data->trove_list_count,
+			flow_data->trove_offset_list, flow_data->trove_size_list, 
+			&flow_d->current_req_offset,
+			&(flow_data->fill_buffer_stepsize), &eof_flag, PINT_SERVER);
+		if(ret < 0)
+		{
+			gossip_lerr("Error: unimplemented condition encountered.\n");
+			flow_d->state = FLOW_ERROR;
+			flow_d->error_code = ret;
+			exit(-1);
+		}
+		
+		/* set the state so that the next service will cause a post */
+		flow_data->fill_buffer_state = BUF_READY_TO_FILL;
+		/* we can go into SVC_READY state regardless of the BMI buffer
+		 * state in this case
+		 */
+		flow_d->state = FLOW_SVC_READY;
 	}
 
 	return;
@@ -2125,8 +2178,8 @@ static void trove_completion_bmi_to_trove(PVFS_ds_state error_code,
 	flow_data->total_drained += flow_data->drain_buffer_stepsize;
 	flow_data->drain_buffer_offset += flow_data->drain_buffer_stepsize;
 
-	/* if this was the last part of a multi stage write, then clear the
-	 * flag and finish it as if it were a normal completion 
+	/* if this was the last part of a multi stage write, then 
+	 * finish it as if it were a normal completion 
 	 */
 	if(flow_data->drain_buffer_offset == flow_data->drain_buffer_used)
 	{
