@@ -139,6 +139,18 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    printf("\n(4) Verifying that fsid %ld is acceptable to all servers...\n",
+	(long)cur_fs);
+
+    ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_FSID_CHECK,
+	(int64_t)cur_fs);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_setparam_all", ret);
+	fprintf(stderr, "Failure: not all servers accepted fsid %ld\n", 
+	    (long)cur_fs);
+	return(-1);
+    }
 
     PVFS_sys_finalize();
 
@@ -169,8 +181,8 @@ static int noop_all_servers(struct server_configuration_s* conf,
     hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
     if(!hash_link)
     {
-	fprintf(stderr, "Failure: could not find fsid %d in configuration.\n",
-	    (int)fsid);
+	fprintf(stderr, "Failure: could not find fsid %ld in configuration.\n",
+	    (long)fsid);
 	return(-PVFS_EINVAL);
     }
 
@@ -253,8 +265,8 @@ static int print_config(struct server_configuration_s* conf,
     hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
     if(!hash_link)
     {
-	fprintf(stderr, "Failure: could not find fsid %d in configuration.\n",
-	    (int)fsid);
+	fprintf(stderr, "Failure: could not find fsid %ld in configuration.\n",
+	    (long)fsid);
 	return(-PVFS_EINVAL);
     }
 

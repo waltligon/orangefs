@@ -130,7 +130,8 @@ typedef struct PVFS_dirent_s PVFS_dirent;
 enum PVFS_server_param
 {
     PVFS_SERV_PARAM_INVALID = 0,
-    PVFS_SERV_PARAM_GOSSIP_MASK = 1  /* gossip debuggin on or off */
+    PVFS_SERV_PARAM_GOSSIP_MASK = 1,  /* gossip debuggin on or off */
+    PVFS_SERV_PARAM_FSID_CHECK = 2    /* verify that a specific fsid is ok */
 };
 
 /* PVFS2 errors

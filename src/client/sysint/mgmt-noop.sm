@@ -81,7 +81,7 @@ int PVFS_mgmt_noop(
 		 "PVFS_mgmt_noop calling PINT_client_state_machine_post()\n");
 
     /* do something to kick off processing */
-    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_SETPARAM_ALL);
+    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_NOOP);
     if(ret < 0)
     {
 	/* this should not fail under normal conditions */
