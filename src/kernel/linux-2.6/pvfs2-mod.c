@@ -51,6 +51,17 @@ kmem_cache_t *op_cache = NULL;
 kmem_cache_t *dev_req_cache = NULL;
 kmem_cache_t *pvfs2_inode_cache = NULL;
 
+/* synchronizes the request device file */
+struct semaphore devreq_semaphore;
+
+/*
+  blocks non-priority requests from being queued for servicing.  this
+  could be used for protecting the request list data structure, but
+  for now it's only being used to stall the op addition to the request
+  list
+*/
+struct semaphore request_semaphore;
+
 /* the size of the hash tables for ops in progress */
 static int hash_table_size = 509;
 module_param(hash_table_size, int, 0);
@@ -91,6 +102,8 @@ static int __init pvfs2_init(void)
     op_cache_initialize();
     dev_req_cache_initialize();
     pvfs2_inode_cache_initialize();
+    sema_init(&devreq_semaphore, 1);
+    sema_init(&request_semaphore, 1);
 
     htable_ops_in_progress =
 	qhash_init(hash_compare, hash_func, hash_table_size);

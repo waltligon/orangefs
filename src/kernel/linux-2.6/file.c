@@ -116,7 +116,6 @@ ssize_t pvfs2_inode_read(
 	    ret = new_op->downcall.status;
             kill_device_owner();
             op_release(new_op);
-	    pvfs_bufmap_put(buffer_index);
 	    *offset = original_offset;
 	    return(ret);
 	}
@@ -290,7 +289,6 @@ static ssize_t pvfs2_file_write(
 	    ret = new_op->downcall.status;
             kill_device_owner();
             op_release(new_op);
-	    pvfs_bufmap_put(buffer_index);
 	    *offset = original_offset;
 	    return(ret);
         }

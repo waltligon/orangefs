@@ -23,6 +23,8 @@ extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
 extern struct qhash_table *htable_ops_in_progress;
 extern struct file_system_type pvfs2_fs_type;
+extern struct semaphore devreq_semaphore;
+extern struct semaphore request_semaphore;
 
 /* defined in super.c */
 extern struct list_head pvfs2_superblocks;
@@ -49,7 +51,8 @@ static int pvfs2_devreq_open(
 {
     int ret = -EACCES;
 
-    spin_lock(&inode->i_lock);
+    down(&devreq_semaphore);
+    pvfs2_print("pvfs2_devreq_open: trying to open\n");
     if (open_access_count == 0)
     {
 	ret = generic_file_open(inode, file);
@@ -58,11 +61,11 @@ static int pvfs2_devreq_open(
 	    open_access_count++;
             device_owner = current;
 	}
-	spin_unlock(&inode->i_lock);
+        up(&devreq_semaphore);
     }
     else
     {
-	spin_unlock(&inode->i_lock);
+        up(&devreq_semaphore);
 	pvfs2_error("*****************************************************\n");
 	pvfs2_error("PVFS2 Device Error:  You cannot open the device file ");
 	pvfs2_error("\n/dev/%s more than once.  Please make sure that\nthere "
@@ -74,6 +77,7 @@ static int pvfs2_devreq_open(
 		    PVFS2_REQDEVICE_NAME);
 	pvfs2_error("*****************************************************\n");
     }
+    pvfs2_print("pvfs2_devreq_open: open complete (ret = %d)\n", ret);
     return ret;
 }
 
@@ -331,12 +335,16 @@ static ssize_t pvfs2_devreq_writev(
   NOTE: gets called when the last reference to this device is dropped.
   Using the open_access_count variable, we enforce a reference count
   on this file so that it can be opened by only one process at a time.
+  the devreq_semaphore is used to make sure all i/o has completed
+  before we cann pvfs_bufmap_finalize, and similar such tricky
+  situations
 */
 static int pvfs2_devreq_release(
     struct inode *inode,
     struct file *file)
 {
-    spin_lock(&inode->i_lock);
+    down(&devreq_semaphore);
+    pvfs2_print("pvfs2_devreq_release: trying to finalize\n");
     open_access_count--;
 
     pvfs_bufmap_finalize();
@@ -344,12 +352,13 @@ static int pvfs2_devreq_release(
     device_owner = NULL;
 
     /*
-      prune dcache here to get rid of entries
-      that may no longer exist on device re-open
+      prune dcache here to get rid of entries that may no longer exist
+      on device re-open
     */
     shrink_dcache_sb(inode->i_sb);
 
-    spin_unlock(&inode->i_lock);
+    up(&devreq_semaphore);
+    pvfs2_print("pvfs2_devreq_release: finalize complete\n");
 
     return 0;
 }
@@ -392,8 +401,14 @@ static int pvfs2_devreq_ioctl(
               remount all mounted pvfs2 volumes to regain the lost
               dynamic mount tables (if any) -- NOTE: this is done
               without keeping the superblock list locked due to the
-              upcall/downcall waiting.
+              upcall/downcall waiting.  also, the request semaphore is
+              used to ensure that no operations will be serviced until
+              all of the remounts are serviced (to avoid ops between
+              mounts to fail)
             */
+            down_interruptible(&request_semaphore);
+            pvfs2_print("pvfs2_devreq_ioctl: priority remount "
+                        "in progress\n");
             list_for_each(tmp, &pvfs2_superblocks) {
                 pvfs2_sb = list_entry(tmp, pvfs2_sb_info_t, list);
                 if (pvfs2_sb && (pvfs2_sb->sb))
@@ -409,6 +424,9 @@ static int pvfs2_devreq_ioctl(
                     }
                 }
             }
+            pvfs2_print("pvfs2_devreq_ioctl: priority remount "
+                        "complete\n");
+            up(&request_semaphore);
             return ret;
         }
         break;

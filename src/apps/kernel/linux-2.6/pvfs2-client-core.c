@@ -57,6 +57,7 @@
 */
 static pthread_t remount_thread;
 static pthread_mutex_t remount_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int remount_complete = 0;
 
 void *exec_remount(void *ptr)
 {
@@ -75,6 +76,7 @@ void *exec_remount(void *ptr)
         gossip_err("*** Failed to remount filesystems!\n");
     }
     pthread_mutex_unlock(&remount_mutex);
+    remount_complete = 1;
     return (void *)0;
 }
 
@@ -1258,7 +1260,7 @@ int main(int argc, char **argv)
         }
 
 	ret = job_dev_unexp(&info, NULL, 0, &jstat, &job_id, context);
-	if(ret == 0)
+	if (ret == 0)
 	{
 	    ret = job_test(job_id, &outcount, NULL, &jstat, -1, context);
             if (ret < 0)
@@ -1273,7 +1275,7 @@ int main(int argc, char **argv)
 	    return(-1);
 	}
 
-	if(jstat.error_code != 0)
+	if (jstat.error_code != 0)
 	{
 	    PVFS_perror("job error code", jstat.error_code);
 	    return(-1);
@@ -1297,6 +1299,19 @@ int main(int argc, char **argv)
 
 	list_size = 0;
 	total_size = 0;
+
+        if (!remount_complete && (upcall.type != PVFS2_VFS_OP_FS_MOUNT))
+        {
+            gossip_debug(
+                GOSSIP_CLIENT_DEBUG, "Got an upcall operation of type "
+                "%x before mounting.  ignoring.\n", upcall.type);
+            /*
+              if we don't have any mount information yet, just discard
+              the op, causing a kernel timeout/retry
+            */
+            PINT_dev_release_unexpected(&info);
+            continue;
+        }
 
 	switch(upcall.type)
 	{

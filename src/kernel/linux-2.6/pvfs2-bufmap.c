@@ -36,51 +36,57 @@ static DECLARE_WAIT_QUEUE_HEAD(bufmap_waitq);
  */
 int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 {
-    int ret = -1;
-    int i;
+    int ret = -EINVAL;
+    int i = 0;
     int offset = 0;
 
     pvfs2_print("pvfs2_bufmap_initialize: called\n");
 
-    if(bufmap_init == 1)
+    if (bufmap_init == 1)
     {
 	pvfs2_error("pvfs2: error: bufmap already initialized.\n");
-	return(-EALREADY);
+        ret = -EALREADY;
+        goto init_failure;
     }
 
-    /* sanity check alignment and size of buffer that caller wants 
-     * to work with
+    /* sanity check alignment and size of buffer that caller wants to
+     * work with
      */
-    if(PAGE_ALIGN((unsigned long)user_desc->ptr) != 
+    if (PAGE_ALIGN((unsigned long)user_desc->ptr) != 
 	(unsigned long)user_desc->ptr)
     {
 	pvfs2_error("pvfs2: error: memory alignment (front).\n");
-	return(-EINVAL);
+        goto init_failure;
     }
-    if(PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->size)) != 
+
+    if (PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->size)) != 
 	(unsigned long)(user_desc->ptr + user_desc->size))
     {
 	pvfs2_error("pvfs2: error: memory alignment (back).\n");
-	return(-EINVAL);
+        goto init_failure;
     }
-    if(user_desc->size != PVFS2_BUFMAP_TOTAL_SIZE)
+
+    if (user_desc->size != PVFS2_BUFMAP_TOTAL_SIZE)
     {
-	pvfs2_error("pvfs2: error: user provided an oddly sized buffer...\n");
-	return(-EINVAL);
+	pvfs2_error("pvfs2: error: user provided an oddly "
+                    "sized buffer...\n");
+        goto init_failure;
     }
-    if(PVFS2_BUFMAP_DEFAULT_DESC_SIZE%PAGE_SIZE != 0)
+
+    if ((PVFS2_BUFMAP_DEFAULT_DESC_SIZE % PAGE_SIZE) != 0)
     {
-	pvfs2_error("pvfs2: error: bufmap size not page size divisable.\n");
-	return(-EINVAL);
+	pvfs2_error("pvfs2: error: bufmap size not page size "
+                    "divisable.\n");
+        goto init_failure;
     }
 
     /* allocate storage to track our page mappings */
-    bufmap_page_array = 
-	(struct page**)kmalloc(BUFMAP_PAGE_COUNT*sizeof(struct page*),
-	PVFS2_BUFMAP_GFP_FLAGS);
-    if(!bufmap_page_array)
+    bufmap_page_array = (struct page**)kmalloc(
+        BUFMAP_PAGE_COUNT*sizeof(struct page*), PVFS2_BUFMAP_GFP_FLAGS);
+    if (!bufmap_page_array)
     {
-	return(-ENOMEM);
+        ret = -ENOMEM;
+        goto init_failure;
     }
 
     /* map the pages */
@@ -96,32 +102,33 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	NULL);
     up_read(&current->mm->mmap_sem);
 
-    if(ret < 0)
+    if (ret < 0)
     {
 	kfree(bufmap_page_array);
-	return(ret);
+        goto init_failure;
     }
 
-    /* in theory we could run with what we got, but I will just treat it
-     * as an error for simplicity's sake right now
+    /* in theory we could run with what we got, but I will just treat
+     * it as an error for simplicity's sake right now
      */
-    if(ret != BUFMAP_PAGE_COUNT)
+    if (ret != BUFMAP_PAGE_COUNT)
     {
 	pvfs2_error("pvfs2: error: asked for %d pages, only got %d.\n",
-	    (int)BUFMAP_PAGE_COUNT, ret);
+                    (int)BUFMAP_PAGE_COUNT, ret);
 	for(i = 0; i < ret; i++)
 	{
 	    page_cache_release(bufmap_page_array[i]);
 	}
 	kfree(bufmap_page_array);
-	return(-ENOMEM);
+        ret = -ENOMEM;
+        goto init_failure;
     }
 
     /*
-      ideally we want to get kernel space pointers for each page,
-      but we can't kmap that many pages at once if highmem is being
-      used.  so instead, we just kmap/kunmap the page address each
-      time the kaddr is needed.
+      ideally we want to get kernel space pointers for each page, but
+      we can't kmap that many pages at once if highmem is being used.
+      so instead, we just kmap/kunmap the page address each time the
+      kaddr is needed.
     */
     for(i = 0; i < BUFMAP_PAGE_COUNT; i++)
     {
@@ -143,6 +150,10 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 
     pvfs2_print("pvfs2_bufmap_initialize: exiting normally\n");
     return(0);
+
+  init_failure:
+
+    return ret;
 }
 
 /* pvfs_bufmap_finalize()
@@ -154,14 +165,15 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
  */
 void pvfs_bufmap_finalize(void)
 {
-    int i;
+    int i = 0;
 
     pvfs2_print("pvfs2_bufmap_finalize: called\n");
 
-    if(bufmap_init == 0)
+    if (bufmap_init == 0)
     {
-        pvfs2_print("pvfs2_bufmap_finalize: not yet initialized; returning\n");
-	return;
+        pvfs2_print("pvfs2_bufmap_finalize: not yet "
+                    "initialized; returning\n");
+        return;
     }
 
     for(i=0; i<BUFMAP_PAGE_COUNT; i++)
@@ -214,14 +226,12 @@ int pvfs_bufmap_get(int* buffer_index)
 	    break;
 	}
 
-	/* TODO: figure out which signals to look for */
 	if(signal_pending(current))
 	{
 	    pvfs2_print("pvfs2: bufmap_get() interrupted.\n");
 	    ret = -EINTR;
 	    break;
 	}
-
 	schedule();
     }
 
@@ -265,7 +275,7 @@ int pvfs_bufmap_copy_to_user(void* to, int buffer_index, int size)
     void *from_kaddr = NULL;
     struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
     
-    if(bufmap_init == 0)
+    if (bufmap_init == 0)
     {
         pvfs2_print("pvfs2_bufmap_copy_to_user: not yet "
                     "initialized; returning\n");
@@ -300,7 +310,7 @@ int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index, int size)
     void *from_kaddr = NULL;
     struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
 
-    if(bufmap_init == 0)
+    if (bufmap_init == 0)
     {
         pvfs2_print("pvfs2_bufmap_copy_to_kernel: not yet "
                     "initialized; returning\n");
@@ -341,7 +351,7 @@ int pvfs_bufmap_copy_from_user(int buffer_index, void* from, int size)
     void *to_kaddr = NULL;
     struct pvfs_bufmap_desc* to = &desc_array[buffer_index];
 
-    if(bufmap_init == 0)
+    if (bufmap_init == 0)
     {
         pvfs2_print("pvfs2_bufmap_copy_from_user: not yet "
                     "initialized; returning\n");

@@ -307,6 +307,8 @@ int pvfs2_unmount_sb(
 /************************************
  * misc convenience macros
  ************************************/
+extern struct semaphore request_semaphore;
+
 #define add_op_to_request_list(op)                           \
 do {                                                         \
     spin_lock(&op->lock);                                    \
@@ -317,6 +319,7 @@ do {                                                         \
     spin_unlock(&pvfs2_request_list_lock);                   \
                                                              \
     spin_unlock(&op->lock);                                  \
+                                                             \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
 
@@ -359,7 +362,9 @@ do {                                                         \
 do {                                                         \
     sigset_t orig_sigset;                                    \
     if (!intr) mask_blocked_signals(&orig_sigset);           \
+    down(&request_semaphore);                                \
     add_op_to_request_list(op);                              \
+    up(&request_semaphore);                                  \
     ret = wait_for_matching_downcall(new_op);                \
     if (!intr) unmask_blocked_signals(&orig_sigset);         \
     if (ret != PVFS2_WAIT_SUCCESS)                           \
@@ -400,7 +405,9 @@ do {                                                               \
     sigset_t orig_sigset;                                          \
     if (!intr) mask_blocked_signals(&orig_sigset);                 \
   wait_for_op:                                                     \
+    down(&request_semaphore);                                      \
     add_op_to_request_list(op);                                    \
+    up(&request_semaphore);                                        \
     ret = wait_for_matching_downcall(op);                          \
     if (!intr) unmask_blocked_signals(&orig_sigset);               \
     if (ret != PVFS2_WAIT_SUCCESS)                                 \
@@ -439,7 +446,9 @@ do {                                                                 \
     sigset_t orig_sigset;                                            \
     if (!intr) mask_blocked_signals(&orig_sigset);                   \
   wait_for_op:                                                       \
+    down(&request_semaphore);                                        \
     add_op_to_request_list(op);                                      \
+    up(&request_semaphore);                                          \
     ret = wait_for_matching_downcall(op);                            \
     if (!intr) unmask_blocked_signals(&orig_sigset);                 \
     if (ret != PVFS2_WAIT_SUCCESS)                                   \
@@ -500,7 +509,6 @@ do {                                                      \
         *offset = original_offset;                        \
         wake_up_device_for_return(new_op);                \
     }                                                     \
-    pvfs_bufmap_put(buffer_index);                        \
     *offset = original_offset;                            \
 } while(0)
 

@@ -162,8 +162,9 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 if (opts->verbose)
                 {
-                    printf("Child process with pid %d was killed by "
-                           "an uncaught signal %d\n", new_pid, WTERMSIG(ret));
+                    printf("Child process with pid %d was killed by an "
+                           "uncaught signal %d\n", new_pid,
+                           WTERMSIG(ret));
                 }
                 continue;
             }
