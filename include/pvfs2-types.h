@@ -138,6 +138,7 @@ endecode_fields_0a(PVFS_handle_extent_array,
 /* object and attribute types */
 enum PVFS_ds_type_e
 {
+    PVFS_TYPE_NONE =              0,
     PVFS_TYPE_METAFILE =    (1 << 0),
     PVFS_TYPE_DATAFILE =    (1 << 1),
     PVFS_TYPE_DIRECTORY =   (1 << 2),

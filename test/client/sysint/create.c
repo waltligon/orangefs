@@ -57,7 +57,6 @@ int main(int argc, char **argv)
                filename);
         return(-1);
     }
-    printf("File to be created is %s\n",str_buf);
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
 
@@ -80,6 +79,9 @@ int main(int argc, char **argv)
 	return(-1);
     }
     parent_refn.fs_id = cur_fs;
+
+    printf("File to be created is %s under parent %Lu\n",
+           str_buf, Lu(parent_refn.handle));
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
                           credentials, &resp_create);

@@ -78,6 +78,7 @@ int main(int argc,char **argv)
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
+		PVFS_perror("PVFS_perror says", ret);
 		return(-1);
 	}
 	// print the handle 
@@ -95,6 +96,7 @@ int main(int argc,char **argv)
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
+		PVFS_perror("PVFS_perror says", ret);
 		return(-1);
 	}
 	// print the handle 

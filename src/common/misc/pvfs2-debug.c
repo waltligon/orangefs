@@ -23,7 +23,7 @@ typedef struct
 (TROVE_DEBUG | BMI_DEBUG_ALL | SERVER_DEBUG | CLIENT_DEBUG |    \
 JOB_DEBUG | REQUEST_DEBUG | REQ_SCHED_DEBUG | FLOW_PROTO_DEBUG |\
 FLOW_DEBUG | NCACHE_DEBUG | ACACHE_DEBUG | DIST_DEBUG | \
-DBPF_ATTRCACHE_DEBUG | MMAP_RCACHE_DEBUG)
+DBPF_ATTRCACHE_DEBUG | MMAP_RCACHE_DEBUG | LOOKUP_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -43,6 +43,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "acache", ACACHE_DEBUG },
     { "distribution", DIST_DEBUG },
     { "dbpfattrcache", DBPF_ATTRCACHE_DEBUG },
+    { "lookup", LOOKUP_DEBUG },
     { "verbose",  (__DEBUG_ALL & ~REQ_SCHED_DEBUG) },
     { "none", 0x00000000 },
     { "all",  __DEBUG_ALL }

@@ -78,7 +78,7 @@ enum PVFS_server_op
 /* max count of segments allowed per path lookup (note that this governs 
  * the number of handles and attributes returned in lookup_path responses)
  */
-#define PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT 256
+#define PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT   40
 /* max count of datafiles associated with a logical file */
 #define PVFS_REQ_LIMIT_DFILE_COUNT        1024
 #define PVFS_REQ_LIMIT_DFILE_COUNT_IS_VALID(dfile_count) \

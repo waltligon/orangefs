@@ -35,6 +35,7 @@ enum
     BMI_DEBUG_IB =          (1 << 18),
     DBPF_ATTRCACHE_DEBUG =  (1 << 19),
     MMAP_RCACHE_DEBUG =     (1 << 20),
+    LOOKUP_DEBUG =          (1 << 21),
 
     BMI_DEBUG_ALL = BMI_DEBUG_TCP + BMI_DEBUG_CONTROL +
 	+ BMI_DEBUG_GM + BMI_DEBUG_OFFSETS + BMI_DEBUG_IB

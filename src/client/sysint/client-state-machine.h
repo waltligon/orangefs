@@ -21,6 +21,9 @@
 
 #define PINT_STATE_STACK_SIZE 3
 
+#define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
+#define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
+
 /* NOTE:
  * This structure holds everything that we need for the state of a
  * message pair.  We need arrays of these in some cases, so it's
@@ -197,24 +200,32 @@ struct PINT_client_readdir_sm {
     PVFS_sysresp_readdir          *readdir_resp;  /* in/out parameter*/
 };
 
+typedef struct
+{
+    char                         *seg_name;
+    PVFS_object_attr             seg_attr;
+    PVFS_pinode_reference        seg_starting_refn;
+    PVFS_pinode_reference        seg_resolved_refn;
+} PINT_client_lookup_sm_segment;
+
+typedef struct
+{
+    int                           total_segments;
+    int                           current_segment;
+    PINT_client_lookup_sm_segment segments[MAX_LOOKUP_SEGMENTS];
+    PVFS_pinode_reference         ctx_starting_refn;
+    PVFS_pinode_reference         ctx_resolved_refn;
+} PINT_client_lookup_sm_ctx;
+
 /* PINT_client_lookup_sm */
-struct PINT_client_lookup_sm {
+struct PINT_client_lookup_sm
+{
     char                         *orig_pathname;/* input parameter */
     PVFS_pinode_reference        starting_refn; /* input parameter */
     PVFS_sysresp_lookup          *lookup_resp;  /* in/out parameter*/
-    int                          follow_link;   /* input paramter */
-    int                          num_segments;
-    char                         *remaining_pathname;
-    PVFS_pinode_reference        remaining_starting_refn;
-    PVFS_error                   last_error;
-    int                          resolve_symlink;
-    PVFS_pinode_reference        symlink_refn;
-    int                          use_symlink_parent;
-    PVFS_pinode_reference        symlink_parent_refn;
-    PVFS_pinode_reference        symlink_previous_parent_refn;
-    PVFS_pinode_reference        tmp_remaining_refn;
-    char                         *post_link_segment;
-    int                          num_symlinks_followed;
+    int                          follow_link;   /* input parameter */
+    int                          current_context;
+    PINT_client_lookup_sm_ctx    contexts[MAX_LOOKUP_CONTEXTS];
 };
 
 /* PINT_client_rename_sm */
