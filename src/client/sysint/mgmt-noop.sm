@@ -54,8 +54,8 @@ machine pvfs2_client_mgmt_noop_sm(setup_msgpair,
 %%
 
 int PVFS_mgmt_noop(PVFS_fs_id fs_id,
-		   PVFS_credentials credentials,
-		   PVFS_BMI_addr_t addr)
+                   PVFS_credentials credentials,
+                   PVFS_BMI_addr_t addr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
@@ -80,23 +80,23 @@ int PVFS_mgmt_noop(PVFS_fs_id fs_id,
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_NOOP);
     if (ret < 0)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+        gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
         free(sm_p);
-	return ret;
+        return ret;
     }
 
     while (!sm_p->op_complete && (ret == 0))
     {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop calling "
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop calling "
                      "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
+        ret = PINT_client_state_machine_test();
     }
 
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+        gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
         free(sm_p);
-	return ret;
+        return ret;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop completed\n");
@@ -108,7 +108,7 @@ int PVFS_mgmt_noop(PVFS_fs_id fs_id,
 }
 
 static int mgmt_noop_setup_msgpair(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
+                                   job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "noop state: mgmt_noop_setup_msgpair\n");
@@ -120,7 +120,7 @@ static int mgmt_noop_setup_msgpair(PINT_client_sm *sm_p,
 }
 
 static int mgmt_noop_cleanup(PINT_client_sm *sm_p,
-			     job_status_s *js_p)
+                             job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "noop state: mgmt_noop_cleanup\n");
 
