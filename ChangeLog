@@ -3,12 +3,72 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.8.0pre1
-===============
+pvfs2-0.8.0
+===========
 - adjusted mask values for event logging to skip 0 mask
 - moved handle counting in statfs to server side so that it is
   done in parallel
 - replaced uniq() subroutine in PAV to avoid recursion
+- pvfs2-statfs cleanups and cast fixing
+- pvfs2-shell-test: replaced a directory test
+- add a clientcore_timing debug mask that only logs the operation
+  timings from the pvfs2-client-core
+- added some pts debugging
+- fixed bad assumption in getattr-acache that might have looked at the
+  wrong handle/fs_id during some operations (e.g. lookup)
+- removed potential latency on system startup by trying to store temp
+  config files in /tmp/ first rather than the current dir
+- make sure that our error routines strip any known class error bits
+  instead of deciding that they're unrecognized if set
+- improved trove error handling
+- improved pvfs2-server error handling
+- fixed crash bug in our config parser that tried to strdup strings
+  that might be NULL
+- pvfs2-types.h header file simplification and cleanups
+- extended buffer size of filename for use with mkstemp as it started
+  failing on ppc with misc unexpected characters
+- addition of a simple vfs test program that creates a file with a
+  hole in it and tries to read from that hole (this demonstrates a
+  currently known bug)
+- addition of the same test program using only the system interface
+- fixed some misc memory/resource leaks
+- fixed test program ls.c and admin program pvfs2-ls.c to not issue an
+  extra call to readdir on every run by fixing a slight logic bug
+- added a directory version that is passed back from the server to the
+  client on each successful readdir call and updated the client and
+  server response structures and encoder to accomodate this
+- ncache related:
+  - increased ncache timeout from 5 seconds to 30 seconds by default,
+    but keep it disabled by default (it's still experimental)
+  - cleaned up the ncache and make it useable by the
+    lookup/remove/create/mkdir/etc calls (if enabled)
+  - added a flag to the client sysint lookup sm that records if the
+    final object resolved was a followed symlink or not (regardless of
+    if it was followed or not)
+  - extended the ncache interface (lookup/insert/remove) to have the
+    ability to have multiple entries with the same name with different
+    handles based on some other tag (e.g. resolving a symlink object,
+    rather than what it points to).  this is also not in use at the
+    moment.  for now, no symlink objects will be inserted into the
+    ncache.
+  - added more ncache debugging
+  - added a fastpath return from client sysint lookup method on ncache
+    hit
+  - updated and extended all ncache test programs to work with the
+    changed API and fixed broken tests/verified that they still work
+- kernel related:
+  - fixed all warnings generated from compiling the pvfs2 kernel
+    module under 2.6.9 kernels
+  - removed write_inode method, as it was unused and probably won't be
+    used
+  - removed unused -v command option to pvfs2-ls
+  - added command option -V (and --verbose) which can detect version
+    differences in the directory being read and will report them if
+    this switch is enabled
+  - fixed misc compilation warnings on Opteron/AMD64 machines
+  - added directory version to readdir downcall (passed from
+    pvfs2-client-core)
+  - removed include of modversions.h directly from pvfs2-kernel.h
 
 
 pvfs2-0.7.0
