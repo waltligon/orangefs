@@ -22,11 +22,11 @@ int do_decode_req(
 		  bmi_addr_t target_addr
 		  )
 {
-    struct PVFS_server_req_s * request = input_buffer;
+    //struct PVFS_server_req_s * request = input_buffer;
     struct PVFS_server_req_s * dec_msg = NULL;
     char* char_ptr = (char *) input_buffer;
     int size = 0, i = 0;
-    switch(request->op)
+    switch(((struct PVFS_server_req_s *)char_ptr)->op)
     {
 	case PVFS_SERV_GETCONFIG:
 	    /*print_request( request );*/
@@ -51,13 +51,15 @@ int do_decode_req(
 
 	    target_msg->buffer = (void *) dec_msg;
 	    return(0);
+
 	case PVFS_SERV_LOOKUP_PATH:
 	    /*print_request( request );*/
 	    dec_msg = BMI_memalloc( target_addr, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
-	    if (!dec_msg)
+	    if (dec_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
+
 	    memcpy( dec_msg, char_ptr, sizeof( struct PVFS_server_req_s ) );
 	    char_ptr += sizeof(struct PVFS_server_req_s);
 	    size = strlen( char_ptr ) + 1;
@@ -68,114 +70,116 @@ int do_decode_req(
 		BMI_memfree( target_addr, dec_msg, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
 		return (-ENOMEM);
 	    }
+
 	    memcpy(dec_msg->u.lookup_path.path, char_ptr, size);
 	    target_msg->buffer = (void *) dec_msg;
 
 	    return(0);
+
 	case PVFS_SERV_CREATEDIRENT:
 	    /*print_request( request );*/
 	    dec_msg = BMI_memalloc( target_addr, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
-	    if (!dec_msg)
+	    if (dec_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
-	    memcpy( dec_msg, (struct PVFS_server_req_s*) request, sizeof( struct PVFS_server_req_s ) );
-	    char_ptr = ((char *)request + sizeof(struct PVFS_server_req_s));
-	    size = strlen( char_ptr );
-	    ((struct PVFS_server_req_s *)dec_msg)->u.crdirent.name = (char *)BMI_memalloc(target_addr, size + 1, BMI_RECV_BUFFER);
-	    if(!((struct PVFS_server_req_s *)dec_msg)->u.crdirent.name)
+
+	    memcpy( dec_msg, char_ptr, sizeof( struct PVFS_server_req_s ) );
+	    char_ptr += sizeof(struct PVFS_server_req_s);
+	    size = strlen( char_ptr ) + 1;
+
+	    dec_msg->u.crdirent.name = (char *)BMI_memalloc(target_addr, size, BMI_RECV_BUFFER);
+	    if(dec_msg->u.crdirent.name == NULL)
 	    {
 		BMI_memfree( target_addr, dec_msg, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
 		return (-ENOMEM);
 	    }
-	    strncpy(((struct PVFS_server_req_s *)dec_msg)->u.crdirent.name, char_ptr, size);
-	    strncpy(((char*)(((struct PVFS_server_req_s *)dec_msg)->u.crdirent.name) + size), "\0", 1);
+
+	    memcpy(dec_msg->u.crdirent.name, char_ptr, size);
 	    target_msg->buffer = dec_msg;
 
 	    return(0);
+
 	case PVFS_SERV_RMDIRENT:
 	    /*print_request( request );*/
 	    dec_msg = BMI_memalloc( target_addr, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
-	    if (!dec_msg)
+	    if (dec_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
-	    memcpy( dec_msg, (struct PVFS_server_req_s*) request, sizeof( struct PVFS_server_req_s ) );
-	    char_ptr = ((char *)request + sizeof(struct PVFS_server_req_s));
-	    size = strlen( char_ptr );
-	    ((struct PVFS_server_req_s *)dec_msg)->u.rmdirent.entry = (char *)BMI_memalloc(target_addr, size + 1, BMI_RECV_BUFFER);
-	    if(!((struct PVFS_server_req_s *)dec_msg)->u.rmdirent.entry)
+
+	    memcpy( dec_msg, char_ptr, sizeof( struct PVFS_server_req_s ) );
+	    char_ptr += sizeof(struct PVFS_server_req_s);
+	    size = strlen( char_ptr ) + 1;
+
+	    dec_msg->u.rmdirent.entry = (char *)BMI_memalloc(target_addr, size, BMI_RECV_BUFFER);
+	    if(dec_msg->u.rmdirent.entry == NULL)
 	    {
 		BMI_memfree( target_addr, dec_msg, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
 		return (-ENOMEM);
 	    }
-	    strncpy(((struct PVFS_server_req_s *)dec_msg)->u.rmdirent.entry, char_ptr, size);
-	    strncpy(((char*)(((struct PVFS_server_req_s *)dec_msg)->u.rmdirent.entry) + size), "\0", 1);
-	    target_msg->buffer = dec_msg;
 
+	    memcpy(dec_msg->u.rmdirent.entry, char_ptr, size);
+	    target_msg->buffer = dec_msg;
 	    return(0);
+
 	case PVFS_SERV_MKDIR:
 	    /*print_request( request );*/
 	    dec_msg = BMI_memalloc( target_addr, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
-	    if (!dec_msg)
+	    if (dec_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
-	    memcpy( dec_msg, (struct PVFS_server_req_s*) request, sizeof( struct PVFS_server_req_s ) );
 
-	    if ( ((struct PVFS_server_req_s *)dec_msg)->u.mkdir.attr.objtype == ATTR_META )
+	    memcpy( dec_msg, char_ptr, sizeof( struct PVFS_server_req_s ) );
+	    char_ptr += sizeof( struct PVFS_server_req_s );
+
+	    if ( dec_msg->u.mkdir.attr.objtype == ATTR_META )
 	    {
-		size = ( ((struct PVFS_server_req_s *)dec_msg)->u.mkdir.attr.u.meta.nr_datafiles) * sizeof(PVFS_handle);
-		((struct PVFS_server_req_s *)dec_msg)->u.mkdir.attr.u.meta.dfh = (PVFS_handle *)BMI_memalloc(target_addr, size, BMI_RECV_BUFFER);
-		if(!((struct PVFS_server_req_s *)dec_msg)->u.mkdir.attr.u.meta.dfh)
+		size = dec_msg->u.mkdir.attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
+		dec_msg->u.mkdir.attr.u.meta.dfh = (PVFS_handle *)BMI_memalloc(target_addr, size, BMI_RECV_BUFFER);
+		if(dec_msg->u.mkdir.attr.u.meta.dfh == NULL)
 		{
 		    BMI_memfree( target_addr, dec_msg, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
 		    return (-ENOMEM);
 		}
 				/* copy handles at the end of the struct into the new memory */
-		memcpy( ((struct PVFS_server_req_s *)dec_msg)->u.mkdir.attr.u.meta.dfh,
-			((char*)dec_msg + sizeof( struct PVFS_server_req_s ) ),
-			((struct PVFS_server_req_s *)dec_msg)->u.mkdir.attr.u.meta.nr_datafiles * sizeof( PVFS_handle ) );
+		memcpy( dec_msg->u.mkdir.attr.u.meta.dfh,
+			char_ptr ,
+			dec_msg->u.mkdir.attr.u.meta.nr_datafiles * sizeof( PVFS_handle ) );
 	    }
-	    target_msg->buffer = dec_msg;
 
+	    target_msg->buffer = dec_msg;
 	    return(0);
+
 	case PVFS_SERV_SETATTR:
 	    /*print_request( request );*/
-	    dec_msg = BMI_memalloc( target_addr,
-				    sizeof( struct PVFS_server_req_s ), 
-				    BMI_RECV_BUFFER );
-	    if (!dec_msg)
+	    dec_msg = BMI_memalloc( target_addr, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
+	    if (dec_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
-	    memcpy( dec_msg, 
-		    (struct PVFS_server_req_s*) request, 
-		    sizeof( struct PVFS_server_req_s ) );
+
+	    memcpy( dec_msg, char_ptr, sizeof( struct PVFS_server_req_s ) );
+	    char_ptr += sizeof(struct PVFS_server_req_s);
 
 	    if ( ((struct PVFS_server_req_s *)dec_msg)->u.setattr.attr.objtype == ATTR_META )
 	    {
-		PVFS_handle *myhandle = NULL;
-		PVFS_handle *handle_ptr = NULL;
-				/* probbably shouldn't call this 'size' since I'm putting the # of elements in here */
-		size = ( ((struct PVFS_server_req_s *)dec_msg)->u.setattr.attr.u.meta.nr_datafiles);
-		myhandle = (PVFS_handle *)BMI_memalloc(target_addr, size * sizeof(PVFS_handle), BMI_RECV_BUFFER);
-		if(!myhandle)
+		PVFS_handle *new_handle = NULL;
+		/* probbably shouldn't call this 'size' since I'm putting the # of elements in here */
+		size = dec_msg->u.setattr.attr.u.meta.nr_datafiles;
+
+		new_handle = (PVFS_handle *)BMI_memalloc(target_addr, size * sizeof(PVFS_handle), BMI_RECV_BUFFER);
+		if(new_handle == NULL)
 		{
 		    BMI_memfree( target_addr, dec_msg, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
 		    return (-ENOMEM);
 		}
-				/* copy handles at the end of the struct into the new memory */
-		handle_ptr = (PVFS_handle*)((char*)dec_msg + sizeof( struct PVFS_server_req_s ));
-		for(i = 0; i < size; i++)
-		{
-		    myhandle[i] = handle_ptr[i];
-		}
-				/*memcpy( myhandle,
-				  ((char*)dec_msg + sizeof( struct PVFS_server_req_s ) ),
-				  size * sizeof( PVFS_handle ) );*/
 
-		((struct PVFS_server_req_s *)dec_msg)->u.setattr.attr.u.meta.dfh = myhandle;
+		/* copy handles at the end of the struct into the new memory */
+		memcpy( new_handle, char_ptr, size * sizeof( PVFS_handle ) );
+		dec_msg->u.setattr.attr.u.meta.dfh = new_handle;
+
 	    }
 	    target_msg->buffer = dec_msg;
 
@@ -189,11 +193,11 @@ int do_decode_req(
 	case PVFS_SERV_TRUNCATE:
 	case PVFS_SERV_ALLOCATE:
 	    dec_msg = BMI_memalloc( target_addr, sizeof( struct PVFS_server_req_s ), BMI_RECV_BUFFER );
-	    if (!dec_msg)
+	    if (dec_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
-	    memcpy( dec_msg, (struct PVFS_server_req_s*) request, sizeof( struct PVFS_server_req_s ) );
+	    memcpy(dec_msg, char_ptr, sizeof(struct PVFS_server_req_s));
 	    target_msg->buffer = dec_msg;
 			
 	    return(0);
@@ -202,11 +206,9 @@ int do_decode_req(
 	case PVFS_SERV_GETDIST:
 	case PVFS_SERV_REVLOOKUP:
 	default:
-	    printf("Unpacking Req Op: %d Not Supported\n",request->op);
+	    printf("Unpacking Req Op: %d Not Supported\n", ((struct PVFS_server_req_s *)char_ptr)->op);
 	    return -1;
     }
-    /* should never get to this point */
-    return -1;
 }
 
 /*

@@ -86,7 +86,7 @@ int do_encode_req(
 	     * us a bad value or a syscall returned something, but at this point
 	     * if we get a bad string it's just a bug in our code.
 	     */
-	    assert(request->u.getconfig.fs_name != 0);
+	    assert(request->u.getconfig.fs_name != NULL);
 
 	    name_sz = strlen(request->u.getconfig.fs_name) + 1; /* include NULL terminator in size */
 	    size    = sizeof(struct PVFS_server_req_s) + name_sz;
@@ -114,25 +114,25 @@ int do_encode_req(
 	    /* END NEW VERSION */
 
 	case PVFS_SERV_LOOKUP_PATH:
-	    if (!request->u.lookup_path.path)
-	    {
-		return (-EINVAL);
-	    }
-	    name_sz = strlen( request->u.lookup_path.path );
-	    size = sizeof( struct PVFS_server_req_s ) + name_sz + 1;
+	    assert(request->u.lookup_path.path != NULL);
+
+	    name_sz = strlen( request->u.lookup_path.path ) + 1; /* include NULL terminator in size */
+	    size = sizeof( struct PVFS_server_req_s ) + name_sz;
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER );
-	    if (!enc_msg)
+
+	    if (enc_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
+	    /* TODO: CAN WE JUST TACK THE BUFFER LIST ONTO THE END OF THE BMI_memalloc? */
 	    target_msg->buffer_list[0] = enc_msg;
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
+
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
 	    /* copy a null terminated string to another */
-	    strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.lookup_path.path, (size_t)name_sz);
-	    strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ) + name_sz , "\0", 1 );
+	    memcpy(enc_msg + sizeof( struct PVFS_server_req_s ), request->u.lookup_path.path, name_sz);
 
 	    /* make pointer since we're sending it over the wire and don't want 
 	     * random memory referenced on the other side */
@@ -141,25 +141,25 @@ int do_encode_req(
 	    return (0);
 
 	case PVFS_SERV_CREATEDIRENT:
-	    if (!request->u.crdirent.name)
-	    {
-		return (-EINVAL);
-	    }
-	    name_sz = strlen( request->u.crdirent.name );
-	    size = sizeof( struct PVFS_server_req_s ) + name_sz + 1;
+	    assert(request->u.crdirent.name != NULL);
+
+	    name_sz = strlen( request->u.crdirent.name ) + 1; /* include NULL terminator in size */
+	    size = sizeof( struct PVFS_server_req_s ) + name_sz;
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER );
-	    if (!enc_msg)
+
+	    if (enc_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
+	    /* TODO: CAN WE JUST TACK THE BUFFER LIST ONTO THE END OF THE BMI_memalloc? */
 	    target_msg->buffer_list[0] = enc_msg;
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
+
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
 	    /* copy a null terminated string to another */
-	    strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.crdirent.name, (size_t)name_sz);
-	    strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ) + name_sz , "\0", 1 );
+	    memcpy(enc_msg + sizeof( struct PVFS_server_req_s ), request->u.crdirent.name, name_sz);
 
 	    /* make pointer since we're sending it over the wire and don't want 
 	     * random memory referenced on the other side */
@@ -168,25 +168,25 @@ int do_encode_req(
 	    return (0);
 
 	case PVFS_SERV_RMDIRENT:
-	    if (!request->u.rmdirent.entry)
-	    {
-		return (-EINVAL);
-	    }
-	    name_sz = strlen( request->u.rmdirent.entry );
-	    size = sizeof( struct PVFS_server_req_s ) + name_sz + 1;
+	    assert(request->u.rmdirent.entry != NULL);
+
+	    name_sz = strlen( request->u.rmdirent.entry ) + 1; /* include NULL terminator in size */
+	    size = sizeof( struct PVFS_server_req_s ) + name_sz;
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER );
-	    if (!enc_msg)
+
+	    if (enc_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
+	    /* TODO: CAN WE JUST TACK THE BUFFER LIST ONTO THE END OF THE BMI_memalloc? */
 	    target_msg->buffer_list[0] = enc_msg;
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
+
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
 	    /* copy a null terminated string to another */
-	    strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.rmdirent.entry, (size_t)name_sz);
-	    strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ) + name_sz , "\0", 1 );
+	    memcpy( enc_msg + sizeof( struct PVFS_server_req_s ), request->u.rmdirent.entry, name_sz);
 
 	    /* make pointer since we're sending it over the wire and don't want 
 	     * random memory referenced on the other side */
@@ -200,7 +200,7 @@ int do_encode_req(
 	    /* if we're mkdir'ing a meta file, we need to alloc space for the attributes */
 	    if ( request->u.mkdir.attr.objtype == ATTR_META )
 	    {
-		size += ((request->u.mkdir.attr.u.meta.nr_datafiles) * sizeof( PVFS_handle ));
+		size += request->u.mkdir.attr.u.meta.nr_datafiles * sizeof( PVFS_handle );
 	    }
 
 	    /* TODO: come back and alloc the right spaces for 
@@ -211,16 +211,18 @@ int do_encode_req(
 	    {
 		return (-ENOMEM);
 	    }
+	    /* TODO: CAN WE JUST TACK THE BUFFER LIST ONTO THE END OF THE BMI_memalloc? */
 	    target_msg->buffer_list[0] = enc_msg;
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
+
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
 	    /* throw handles at the end for metadata files */
 	    if ( request->u.mkdir.attr.objtype == ATTR_META )
 	    {
 				/* handles */
-		memcpy( ((char*)enc_msg + sizeof( struct PVFS_server_req_s )),
+		memcpy( enc_msg + sizeof( struct PVFS_server_req_s ),
 			request->u.mkdir.attr.u.meta.dfh, 
 			request->u.mkdir.attr.u.meta.nr_datafiles * sizeof( PVFS_handle ) );
 
@@ -238,38 +240,31 @@ int do_encode_req(
 	    if ( request->u.setattr.attr.objtype == ATTR_META )
 	    {
 				/* negative datafiles? wtf ... */
-		if (request->u.setattr.attr.u.meta.nr_datafiles < 0)
-		{
-		    return (-EINVAL);
-		}
-		size += ((request->u.setattr.attr.u.meta.nr_datafiles) * sizeof( PVFS_handle ));
+		assert (request->u.setattr.attr.u.meta.nr_datafiles < 0);
+		size += request->u.setattr.attr.u.meta.nr_datafiles * sizeof( PVFS_handle );
 	    }
 
 	    /* TODO: come back and alloc the right spaces for 
 	     * distributions and eattribs cause they're going to change */
 
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER );
-	    if (!enc_msg)
+	    if (enc_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
+
 	    target_msg->buffer_list[0] = enc_msg;
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
+
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
 	    /* throw handles at the end for metadata files */
 	    if ( request->u.setattr.attr.objtype == ATTR_META )
 	    {
-		PVFS_handle *h_ptr = (PVFS_handle*)((char*)enc_msg + sizeof(struct PVFS_server_req_s));
-				/* handles */
-		for(i = 0; i < request->u.setattr.attr.u.meta.nr_datafiles; i++)
-		{
-		    h_ptr[i] = request->u.setattr.attr.u.meta.dfh[i];
-		}
-		/*memcpy( ((char*)enc_msg + sizeof( struct PVFS_server_req_s ) ),
-		  request->u.setattr.attr.u.meta.dfh, 
-		  request->u.setattr.attr.u.meta.nr_datafiles * sizeof( PVFS_handle ) );*/
+		memcpy( enc_msg + sizeof(struct PVFS_server_req_s), 
+			request->u.setattr.attr.u.meta.dfh, 
+			request->u.setattr.attr.u.meta.nr_datafiles * sizeof( PVFS_handle ) );
 
 		/* make pointer NULL since we're sending it over the wire and don't want 
 		 * random memory referenced on the other side */
@@ -288,14 +283,15 @@ int do_encode_req(
 	case PVFS_SERV_ALLOCATE:
 	    size = sizeof( struct PVFS_server_req_s );
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER ) ;
-	    if (!enc_msg)
+	    if (enc_msg == NULL)
 	    {
 		return (-ENOMEM);
 	    }
-	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 	    target_msg->buffer_list[0] = enc_msg;
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
+	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+
 	    return (0);
 
 	case PVFS_SERV_IO: /*haven't been implemented yet*/
