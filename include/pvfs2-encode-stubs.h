@@ -31,6 +31,7 @@
 #define endecode_fields_2(n,t1,x1,t2,x2)
 #define endecode_fields_3(n,t1,x1,t2,x2,t3,x3)
 #define endecode_fields_5(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5)
+#define endecode_fields_8(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8)
 #define endecode_fields_1_struct(n,t1,x1)
 #define endecode_fields_2_struct(n,t1,x1,t2,x2)
 #define endecode_fields_3_struct(n,t1,x1,t2,x2,t3,x3)

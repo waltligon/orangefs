@@ -273,6 +273,14 @@ AC_CHECK_HEADER(gm.h,
 	)
 CPPFLAGS="$CPPFLAGS_OLD"
 
+dnl
+dnl look for sysinfo header
+dnl
+AC_CHECK_HEADER(sys/sysinfo.h,
+	AC_DEFINE(HAVE_SYSINFO, 1, Define if sysinfo.h is present)
+	)
+
+
 AC_SUBST(BUILD_GM)
 
 dnl configure options for IB install path

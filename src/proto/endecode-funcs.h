@@ -146,6 +146,28 @@ static inline void decode_##name(char **pptr, name *x) { \
     decode_##t5(pptr, &x->x5); \
 }
 
+#define endecode_fields_8(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8) \
+static inline void encode_##name(char **pptr, const name *x) { \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##t6(pptr, &x->x6); \
+    encode_##t7(pptr, &x->x7); \
+    encode_##t8(pptr, &x->x8); \
+} \
+static inline void decode_##name(char **pptr, name *x) { \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##t6(pptr, &x->x6); \
+    decode_##t7(pptr, &x->x7); \
+    decode_##t8(pptr, &x->x8); \
+}
+
 #define endecode_fields_1_struct(name, t1, x1) \
 static inline void encode_##name(char **pptr, const struct name *x) { \
     encode_##t1(pptr, &x->x1); \

@@ -14,6 +14,10 @@
 #include "pvfs2-server.h"
 #include "trove-handle-mgmt.h"
 
+#ifdef HAVE_SYSINFO
+#include <sys/sysinfo.h>
+#endif
+
 static int statfs_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p);
 
@@ -87,7 +91,24 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
     
     /* note, getinfo should always return immediately, no testing needed */
     assert(ret != 0);
-    if(ret != 1)
+
+#ifdef HAVE_SYSINFO
+    {
+        struct sysinfo system_metrics;
+        memset(&system_metrics, 0, sizeof(struct sysinfo));
+        if (sysinfo(&system_metrics) == 0)
+        {
+            s_op->resp.u.statfs.stat.ram_total_bytes = (uint64_t)
+                (system_metrics.totalram * system_metrics.mem_unit);
+            s_op->resp.u.statfs.stat.ram_free_bytes = (uint64_t)
+                (system_metrics.freeram * system_metrics.mem_unit);
+            s_op->resp.u.statfs.stat.uptime_seconds = (uint64_t)
+                system_metrics.uptime;
+        }
+    }
+#endif
+
+    if (ret != 1)
     {
 	js_p->error_code = ret;
     }

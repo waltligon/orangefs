@@ -18,6 +18,11 @@ struct PVFS_mgmt_server_stat
     PVFS_fs_id fs_id;
     PVFS_size bytes_available;
     PVFS_size bytes_total;
+#ifdef HAVE_SYSINFO
+    uint64_t ram_total_bytes;
+    uint64_t ram_free_bytes;
+    uint64_t uptime_seconds;
+#endif
     uint64_t handles_available_count;
     uint64_t handles_total_count;
     const char* bmi_address;

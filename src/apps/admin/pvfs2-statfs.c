@@ -198,28 +198,69 @@ int main(int argc, char **argv)
 	for(i=0; i<outcount; i++)
 	{
 	    printf("server: %s\n", stat_array[i].bmi_address);
-	    printf("\thandles available: %Lu\n", (long long unsigned)stat_array[i].handles_available_count);
-	    printf("\thandles total:     %Lu\n", (long long unsigned)stat_array[i].handles_total_count);
-	    if (user_opts->human_readable) { 
+
+#ifdef HAVE_SYSINFO
+	    if (user_opts->human_readable)
+            {
+		PVFS_util_make_size_human_readable(
+			(long long)stat_array[i].ram_total_bytes,
+			scratch_size, SCRATCH_LEN);
+		PVFS_util_make_size_human_readable(
+			(long long)stat_array[i].ram_free_bytes,
+			scratch_total, SCRATCH_LEN);
+		printf("\tRAM available    : %s\n", scratch_size);
+		printf("\tRAM total        : %s\n", scratch_total);
+                printf("\tuptime           : %d hours, %.2d minutes\n",
+                       (int)((stat_array[i].uptime_seconds / 60) / 60),
+                       (int)((stat_array[i].uptime_seconds / 60) % 60));
+	    }
+            else
+            {
+                printf("\tRAM bytes total  : %Lu\n",
+                       Lu(stat_array[i].ram_total_bytes));
+                printf("\tRAM bytes free   : %Lu\n",
+                       Lu(stat_array[i].ram_free_bytes));
+                printf("\tuptime (seconds) : %Lu\n",
+                       Lu(stat_array[i].uptime_seconds));
+            }
+#endif
+	    printf("\thandles available: %Lu\n",
+                   Lu(stat_array[i].handles_available_count));
+	    printf("\thandles total    : %Lu\n",
+                   Lu(stat_array[i].handles_total_count));
+
+	    if (user_opts->human_readable)
+            {
 		PVFS_util_make_size_human_readable(
 			(long long)stat_array[i].bytes_available,
 			scratch_size, SCRATCH_LEN);
 		PVFS_util_make_size_human_readable(
 			(long long)stat_array[i].bytes_total,
 			scratch_total, SCRATCH_LEN);
-		printf("\tbytes available:   %s\n", scratch_size);
-		printf("\tbytes total:       %s\n", scratch_total);
-	    } else {
-		printf("\tbytes available:   %Ld\n", (long long)stat_array[i].bytes_available);
-		printf("\tbytes total:       %Ld\n", (long long)stat_array[i].bytes_total);
+		printf("\tbytes available  : %s\n", scratch_size);
+		printf("\tbytes total      : %s\n", scratch_total);
 	    }
-	    if(stat_array[i].server_type & (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER))
+            else
+            {
+		printf("\tbytes available  : %Ld\n",
+                       Ld(stat_array[i].bytes_available));
+		printf("\tbytes total      : %Ld\n",
+                       Ld(stat_array[i].bytes_total));
+	    }
+
+	    if (stat_array[i].server_type &
+                (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER))
+            {
 		printf("\tmode: serving both metadata and I/O data\n");
+            }
 	    else if(stat_array[i].server_type & PVFS_MGMT_IO_SERVER)
+            {
 		printf("\tmode: serving only I/O data\n");
+            }
 	    else if(stat_array[i].server_type & PVFS_MGMT_META_SERVER)
+            {
 		printf("\tmode: serving only metadata\n");
-	    
+            }
 	    printf("\n");
 	}
 	free(addr_array);

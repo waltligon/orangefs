@@ -68,13 +68,16 @@ int PVFS_mgmt_statfs_list(
 
     gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_list entered\n");
 
-    if(count < 1 || !stat_array || !addr_array)
+    if (count < 1 || !stat_array || !addr_array)
     {
 	return(-PVFS_EINVAL);
     }
 
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
-    if (sm_p == NULL) return -PVFS_ENOMEM;
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
 
     memset(sm_p, 0, sizeof(*sm_p));
 
@@ -84,15 +87,14 @@ int PVFS_mgmt_statfs_list(
     sm_p->u.statfs_list.count = count;
     sm_p->u.statfs_list.addr_array = addr_array;
 
-    /* safety */
-    memset(sm_p->u.statfs_list.stat_array, 0, count*sizeof(struct PVFS_mgmt_server_stat));
+    memset(sm_p->u.statfs_list.stat_array, 0,
+           count*sizeof(struct PVFS_mgmt_server_stat));
 
-    gossip_debug(CLIENT_DEBUG,
-		 "PVFS_mgmt_statfs_list calling PINT_client_state_machine_post()\n");
+    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
+                 "PINT_client_state_machine_post()\n");
 
-    /* do something to kick off processing */
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_STATFS_LIST);
-    if(ret < 0)
+    if (ret < 0)
     {
 	/* this should not fail under normal conditions */
 	assert(0);
@@ -100,13 +102,14 @@ int PVFS_mgmt_statfs_list(
 	return(ret);
     }
 
-    /* while !done call progress function */
-    while (!sm_p->op_complete && ret == 0) {
-	gossip_debug(CLIENT_DEBUG,
-		     "PVFS_mgmt_statfs_list calling PINT_client_state_machine_test()\n");
+    while(!sm_p->op_complete && ret == 0)
+    {
+	gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
+                     "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-    if(ret < 0)
+
+    if (ret < 0)
     {
 	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
 	return(ret);
@@ -114,23 +117,21 @@ int PVFS_mgmt_statfs_list(
 
     gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_list completed\n");
 
-    /* save our return value */
     error = sm_p->error_code;
 
-    /* clean up after ourselves */
     free(sm_p);
     return error;
 }
 
 static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
-					job_status_s *js_p)
+                                          job_status_s *js_p)
 {
-    int i;
+    int i = 0;
     PINT_client_sm_msgpair_state *msg_p;
 
-    gossip_debug(CLIENT_DEBUG, "statfs_list state: mgmt_statfs_list_setup_msgpair\n");
+    gossip_debug(CLIENT_DEBUG,
+                 "statfs_list state: mgmt_statfs_list_setup_msgpair\n");
 
-    /* allocate memory for msgpair array */
     sm_p->msgarray_count = sm_p->u.statfs_list.count;
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
     malloc((sm_p->msgarray_count)*sizeof(PINT_client_sm_msgpair_state));
@@ -140,7 +141,6 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
 	return(1);
     }
 
-    /* setup msgpair array */
     for(i=0; i<sm_p->msgarray_count; i++)
     {
 	msg_p = &sm_p->msgarray[i];
@@ -161,10 +161,12 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
 }
 
 static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
-			  job_status_s *js_p)
+                                    job_status_s *js_p)
 {
-    if(sm_p->msgarray)
+    if (sm_p->msgarray)
+    {
 	free(sm_p->msgarray);
+    }
 
     sm_p->error_code = js_p->error_code;
     sm_p->op_complete = 1;
@@ -172,7 +174,9 @@ static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
     return(0);
 }
 
-static int statfs_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
+static int statfs_list_comp_fn(
+    void* v_p,
+    struct PVFS_server_resp* resp_p,
     int i)
 {
     int j = 0;
@@ -197,6 +201,13 @@ static int statfs_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
 	assert(sm_p->u.statfs_list.stat_array[i].bmi_address);
 	sm_p->u.statfs_list.stat_array[i].handles_available_count =
 	    resp_p->u.statfs.stat.handles_available_count;
+
+	sm_p->u.statfs_list.stat_array[i].ram_total_bytes =
+	    resp_p->u.statfs.stat.ram_total_bytes;
+	sm_p->u.statfs_list.stat_array[i].ram_free_bytes =
+	    resp_p->u.statfs.stat.ram_free_bytes;
+	sm_p->u.statfs_list.stat_array[i].uptime_seconds =
+	    resp_p->u.statfs.stat.uptime_seconds;
 
 	ret = PINT_bucket_get_server_handle_count(
 	    sm_p->u.statfs_list.stat_array[i].bmi_address,
