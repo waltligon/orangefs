@@ -790,7 +790,7 @@ static int buffer_setup_bmi_to_mem(flow_descriptor* flow_d)
 	/* did we provide enough segments to satisfy the amount of data
 	 * available < buffer size? 
 	 */
-	if(flow_d->current_req_offset != -1 &&
+	if(!eof_flag && flow_d->current_req_offset != -1 &&
 		flow_data->bmi_total_size != DEFAULT_BUFFER_SIZE)
 	{
 		/* We aren't at the end, but we didn't get what we asked
@@ -826,6 +826,12 @@ static int buffer_setup_bmi_to_mem(flow_descriptor* flow_d)
 	}
 	else
 	{
+		if(eof_flag)
+		{
+			gossip_lerr("TMP OUTPUT: Warning: detected EOF, hacking around bug.\n");
+			flow_d->current_req_offset = -1;
+		}
+
 		/* "normal" case */
 		for(i=0; i<flow_data->bmi_list_count; i++)
 		{
@@ -850,7 +856,7 @@ static int buffer_setup_mem_to_bmi(flow_descriptor* flow_d)
 {
 	struct bmi_trove_flow_data* flow_data = PRIVATE_FLOW(flow_d);
 	int ret = -1;
-	PVFS_boolean eof_flag = 0; /* TODO: is this doing anything here? */
+	PVFS_boolean eof_flag = 0; 
 	int i=0;
 
 	/* call req processing code to get first set of segments */
@@ -952,8 +958,7 @@ static int buffer_setup_trove_to_bmi(flow_descriptor* flow_d)
 {
 	struct bmi_trove_flow_data* flow_data = PRIVATE_FLOW(flow_d);
 	int ret = -1;
-	/* TODO: figure out how to use this right */
-	PVFS_boolean eof_flag = 0; /* TODO: is this doing anything here? */
+	PVFS_boolean eof_flag = 0; 
 
 	/* set the buffer size to use for this flow */
 	flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
@@ -984,15 +989,29 @@ static int buffer_setup_trove_to_bmi(flow_descriptor* flow_d)
 	 * read from disk */
 	flow_data->fill_buffer_used = 0;
 	flow_data->trove_list_count = MAX_REGIONS;
+	flow_data->fill_buffer_stepsize = flow_data->max_buffer_size;
 
 	ret = PINT_Process_request(flow_d->request_state,
 		flow_d->file_data, &flow_data->trove_list_count,
 		flow_data->trove_offset_list, flow_data->trove_size_list, 
-		&flow_d->current_req_offset, &flow_data->fill_buffer_used,
+		&flow_d->current_req_offset,
+		&flow_data->fill_buffer_stepsize,
 		&eof_flag, PINT_SERVER);
 	if(ret < 0)
 	{
 		return(ret);
+	}
+
+	if(eof_flag)
+	{
+		gossip_lerr("TMP OUTPUT: Warning: detected eof, hacking around bug.\n");
+		flow_d->current_req_offset = -1;
+	}
+
+	if(flow_data->fill_buffer_stepsize < flow_data->max_buffer_size
+		&& flow_d->current_req_offset != -1)
+	{
+		gossip_ldebug(FLOW_PROTO_DEBUG, "Warning: going into multistage mode for trove to bmi flow.\n");
 	}
 
 	return(0);
@@ -1269,7 +1288,7 @@ static void service_bmi_to_trove(flow_descriptor* flow_d)
 	void* tmp_buffer;
 	PVFS_size tmp_used;
 	int ret = -1;
-	PVFS_boolean eof_flag = 0; /* TODO: use this right */
+	PVFS_boolean eof_flag = 0; 
 	char* tmp_offset;
 	PVFS_size actual_size = 0;
 
@@ -1452,7 +1471,7 @@ static void service_trove_to_bmi(flow_descriptor* flow_d)
 	void* tmp_buffer;
 	PVFS_size tmp_used;
 	int ret = -1;
-	PVFS_boolean eof_flag = 0; /* TODO: use this right */
+	PVFS_boolean eof_flag = 0;
 	char* tmp_offset;
 
 	gossip_ldebug(FLOW_PROTO_DEBUG, "service_trove_to_bmi() called.\n");
@@ -1493,6 +1512,12 @@ static void service_trove_to_bmi(flow_descriptor* flow_d)
 				flow_d->error_code = ret;
 				/* no ops in flight, so we can just kick out error here */
 				return;
+			}
+
+			if(eof_flag)
+			{
+				gossip_lerr("TMP OUTPUT: Warning: detected EOF, hacking around bug.\n");
+				flow_d->current_req_offset = -1;
 			}
 
 			if(flow_data->fill_buffer_stepsize < flow_data->max_buffer_size
@@ -1752,7 +1777,7 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 	int i=0;
 	PVFS_size total_copied = 0;
 	PVFS_size region_size = 0;
-	PVFS_boolean eof_flag = 0; /* TODO: is this doing anything here? */
+	PVFS_boolean eof_flag = 0; 
 
 	gossip_ldebug(FLOW_PROTO_DEBUG, 
 		"bmi_completion_bmi_to_mem() handling error_code = %d\n", 
@@ -1819,6 +1844,12 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 		 */
 		if(total_copied < actual_size)
 		{
+			if(eof_flag || flow_d->current_req_offset == -1)
+			{
+				gossip_lerr("Error: Flow sent more data than could be handled?\n");
+				exit(-1);
+			}
+
 			do
 			{
 				flow_data->bmi_list_count = MAX_REGIONS;
@@ -1900,7 +1931,7 @@ static void trove_completion_trove_to_bmi(PVFS_ds_state error_code,
 	flow_descriptor* flow_d)
 {
 	struct bmi_trove_flow_data* flow_data = PRIVATE_FLOW(flow_d);
-	PVFS_boolean eof_flag = 0;  /* TODO: use this right */
+	PVFS_boolean eof_flag = 0;  
 	int ret = -1;
 	
 	if(error_code != 0)
@@ -1972,6 +2003,12 @@ static void trove_completion_trove_to_bmi(PVFS_ds_state error_code,
 			flow_d->state = FLOW_ERROR;
 			flow_d->error_code = ret;
 			exit(-1);
+		}
+
+		if(eof_flag)
+		{
+			gossip_lerr("TMP OUTPUT: Warning: detected EOF, hacking around bug.\n");
+			flow_d->current_req_offset = -1;
 		}
 		
 		/* set the state so that the next service will cause a post */
@@ -2074,13 +2111,14 @@ static int process_request_discard_regions(PINT_Request_state *req,
 	PVFS_size size_array[MAX_REGIONS];
 	PVFS_size left_to_process = *bytemax;
 	PVFS_size tmp_bytemax;
-	PVFS_boolean eof_flag;
+	PVFS_boolean eof_flag = 0;
 	int ret = -1;
 
 	/* loop until we have hit the stream point that we wanted or we have
 	 * it the end of the stream 
 	 */
-	while((left_to_process > 0) && ((*start_offset) != -1))
+	while((left_to_process > 0) && ((*start_offset) != -1) &&
+		!eof_flag)
 	{
 		segmax = MAX_REGIONS;
 		tmp_bytemax = left_to_process;
@@ -2153,7 +2191,7 @@ static void trove_completion_bmi_to_trove(PVFS_ds_state error_code,
 	flow_descriptor* flow_d)
 {
 	struct bmi_trove_flow_data* flow_data = PRIVATE_FLOW(flow_d);
-	PVFS_boolean eof_flag; /* TODO: use this right */
+	PVFS_boolean eof_flag; 
 	int ret;
 	
 	if(error_code != 0)

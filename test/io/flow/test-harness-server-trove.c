@@ -178,7 +178,7 @@ int main(int argc, char **argv)
 	file_data.fsize = TEST_SIZE; 
 	file_data.iod_num = 0;
 	file_data.iod_count = 1;
-	file_data.extend_flag = 0;
+	file_data.extend_flag = 1;
 	file_data.dist = PVFS_Dist_create("default_dist");
 	if(!file_data.dist)
 	{

@@ -195,6 +195,7 @@ int main(int argc, char **argv)
 		file_data.fsize = ack.dspace_size;
 		file_data.iod_num = 0;
 		file_data.iod_count = 1;
+		/* TODO: remember to set this to one if we were doing a write */
 		file_data.extend_flag = 0;
 		file_data.dist = io_dist;
 
