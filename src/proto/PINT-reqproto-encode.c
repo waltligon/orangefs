@@ -163,7 +163,7 @@ int PINT_decode(
 	}
     }
 
-    gossip_err("Error: poorly formated protocol message received.\n");
+    gossip_err("Error: poorly formatted protocol message received.\n");
     gossip_err("   total size of message: %d\n", (int)size);
     gossip_err("   encoding type: %d\n", 
 	(int)bmitoh32(*((int32_t*)enc_type_ptr)));
