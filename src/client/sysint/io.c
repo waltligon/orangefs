@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 
 #include <pinode-helper.h>
 #include <pvfs2-sysint.h>
@@ -59,8 +60,9 @@ static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
     int* error_code_array,
     int array_size);
 
-static int io_find_target_dfiles(PVFS_Request io_req, pinode* pinode_ptr, 
-    PVFS_handle* target_handle_array, int* target_handle_count);
+static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_offset, 
+    pinode* pinode_ptr, PVFS_handle* target_handle_array, 
+    int* target_handle_count);
 
 /* PVFS_sys_io()
  *
@@ -140,7 +142,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
      * contact everyone, just the servers that hold the parts of
      * the file that we are interested in.
      */
-    ret = io_find_target_dfiles(io_req, pinode_ptr, target_handle_array,
+    ret = io_find_target_dfiles(io_req, 0, pinode_ptr, target_handle_array,
 	&target_handle_count);
     if(ret < 0)
     {
@@ -393,8 +395,9 @@ sys_io_out:
  *
  * TODO: make this step more efficient 
  */
-static int io_find_target_dfiles(PVFS_Request io_req, pinode* pinode_ptr, 
-    PVFS_handle* target_handle_array, int* target_handle_count)
+static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_offset, 
+    pinode* pinode_ptr, PVFS_handle* target_handle_array, 
+    int* target_handle_count)
 {
     struct PINT_Request_state* req_state = NULL;
     PINT_Request_file_data tmp_file_data;
@@ -412,6 +415,7 @@ static int io_find_target_dfiles(PVFS_Request io_req, pinode* pinode_ptr,
     {
 	return(-ENOMEM);
     }
+
     for(i=0; i<pinode_ptr->attr.u.meta.dfile_count; i++)
     {
 	/* NOTE: we don't have to give an accurate file size here,
@@ -424,11 +428,32 @@ static int io_find_target_dfiles(PVFS_Request io_req, pinode* pinode_ptr,
 	tmp_file_data.iod_count = pinode_ptr->attr.u.meta.dfile_count;
 	tmp_file_data.extend_flag = 1;
 
+	/* if a file datatype offset was specified, go ahead and skip ahead 
+	 * before calculating
+	 */
+	offset = 0;
+	if(offset)
+	{
+	    segmax = INT_MAX;
+	    bytemax = io_offset;
+	    eof_flag = 0;
+	    ret = PINT_Process_request(req_state, &tmp_file_data,
+		&segmax, NULL, NULL, &offset, &bytemax,
+		&eof_flag, PINT_CKSIZE_MODIFY_OFFSET);
+	    if(ret < 0)
+	    {
+		PINT_Free_request_state(req_state);
+		return(ret);
+	    }
+	    if(offset == -1)
+	    {
+		continue;
+	    }
+	}
+
 	bytemax = 1;
 	segmax = 1;
-	offset = 0;
 	eof_flag = 0;
-
 	ret = PINT_Process_request(req_state, &tmp_file_data,
 	    &segmax, NULL, NULL, &offset, &bytemax, &eof_flag,
 	    PINT_CKSIZE);

@@ -1021,8 +1021,6 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 	    PINT_Free_request_state(flow_data->dup_req_state);
 	    return (-EINVAL);
 	}
-	/* we should be able to skip ahead a full request_offset amount */
-	assert(tmp_offset == flow_d->request_offset);
     }
 
 
@@ -1185,8 +1183,6 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 	    gossip_lerr("Error: bad offset.\n");
 	    return (-EINVAL);
 	}
-	/* we should have been able to skip ahead the full amount */
-	assert(tmp_offset == flow_d->request_offset);
     }
 
     /* the rest of the buffer setup varies depending on the endpoints */
