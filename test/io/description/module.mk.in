@@ -16,5 +16,6 @@ TESTSRC += \
 	$(DIR)/debug12.c\
 	$(DIR)/test-encode-basic.c\
 	$(DIR)/test-encode-complex-out.c\
-	$(DIR)/test-encode-complex-in.c
+	$(DIR)/test-encode-complex-in.c\
+	$(DIR)/test-romio-noncontig-pattern.c
 #	$(DIR)/test-req1.c\
