@@ -57,12 +57,12 @@ machine pvfs2_client_mgmt_statfs_list_sm(
 
 int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 			  PVFS_credentials credentials,
-			  struct PVFS_mgmt_server_stat* stat_array,
-			  PVFS_id_gen_t* addr_array,
+			  struct PVFS_mgmt_server_stat *stat_array,
+			  PVFS_id_gen_t *addr_array,
 			  int *error_array,
 			  int count)
 {
-    int ret;
+    int ret, i;
     PINT_client_sm *sm_p;
     PVFS_error error;
 
@@ -76,19 +76,30 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
-        return -PVFS_ENOMEM;
+	error = -PVFS_ENOMEM;
+	goto cleanup;
     }
 
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
-    sm_p->u.statfs_list.fs_id = fs_id;
+    sm_p->u.statfs_list.fs_id      = fs_id;
     sm_p->u.statfs_list.stat_array = stat_array;
-    sm_p->u.statfs_list.count = count;
+    sm_p->u.statfs_list.count      = count;
     sm_p->u.statfs_list.addr_array = addr_array;
 
     memset(sm_p->u.statfs_list.stat_array, 0,
-           count*sizeof(struct PVFS_mgmt_server_stat));
+           count * sizeof(struct PVFS_mgmt_server_stat));
+
+    /* allocate msgarray space here, so we have it when operation completes */
+    sm_p->msgarray_count = count;
+    sm_p->msgarray       = (PINT_client_sm_msgpair_state *)
+	malloc(count * sizeof(PINT_client_sm_msgpair_state));
+    if (sm_p->msgarray == NULL)
+    {
+	error = -PVFS_ENOMEM;
+	goto cleanup;
+    }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
                  "PINT_client_state_machine_post()\n");
@@ -97,9 +108,11 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
     if (ret < 0)
     {
 	/* this should not fail under normal conditions */
-	assert(0);
 	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-	return(ret);
+	assert(0);
+
+	error = ret;
+	goto cleanup;
     }
 
     while(!sm_p->op_complete && ret == 0)
@@ -112,14 +125,23 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
     if (ret < 0)
     {
 	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	return(ret);
+	error = ret;
+	goto cleanup;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list completed\n");
 
-    error = sm_p->error_code;
+    if (((error = sm_p->error_code) != 0) && (error_array != NULL)) {
+	/* store server-specific errors in error_array */
+	for (i=0; i < count; i++) {
+	    error_array[i] = sm_p->msgarray[i].op_status;
+	}
+	error = PVFS_EPARTIAL;
+    }
 
-    free(sm_p);
+ cleanup:
+    if (sm_p->msgarray != NULL) free(sm_p->msgarray);
+    if (sm_p != NULL) free(sm_p);
     return error;
 }
 
@@ -132,110 +154,94 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "statfs_list state: mgmt_statfs_list_setup_msgpair\n");
 
-    sm_p->msgarray_count = sm_p->u.statfs_list.count;
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)
-    malloc((sm_p->msgarray_count)*sizeof(PINT_client_sm_msgpair_state));
-    if(!sm_p->msgarray)
-    {
-	js_p->error_code = -PVFS_ENOMEM;
-	return(1);
-    }
-
     for(i=0; i<sm_p->msgarray_count; i++)
     {
 	msg_p = &sm_p->msgarray[i];
 
 	PINT_SERVREQ_STATFS_FILL(msg_p->req,
-	    *sm_p->cred_p,
-	    sm_p->u.statfs_list.fs_id);
+				 *sm_p->cred_p,
+				 sm_p->u.statfs_list.fs_id);
 
-	msg_p->fs_id = sm_p->u.statfs_list.fs_id;
-	msg_p->handle = PVFS_HANDLE_NULL;
-	msg_p->comp_fn = statfs_list_comp_fn;
+	msg_p->fs_id    = sm_p->u.statfs_list.fs_id;
+	msg_p->handle   = PVFS_HANDLE_NULL;
+	msg_p->comp_fn  = statfs_list_comp_fn;
 	msg_p->svr_addr = sm_p->u.statfs_list.addr_array[i];
     }
 
     /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;
-    return(1);
+    return 1;
 }
 
 static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
                                     job_status_s *js_p)
 {
-    if (sm_p->msgarray)
-    {
-	free(sm_p->msgarray);
-    }
-
-    sm_p->error_code = js_p->error_code;
+    sm_p->error_code  = js_p->error_code;
     sm_p->op_complete = 1;
 
-    return(0);
+    return 0;
 }
 
-static int statfs_list_comp_fn(
-    void* v_p,
-    struct PVFS_server_resp* resp_p,
-    int i)
+static int statfs_list_comp_fn(void *v_p,
+			       struct PVFS_server_resp *resp_p,
+			       int i)
 {
     int j = 0;
-    PINT_client_sm* sm_p = (PINT_client_sm*)v_p;
+    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
     int ret = -1;
 
     /* if this particular request was successful, then store the 
      * statfs information in an array to be returned to caller
      */
-    if(sm_p->msgarray[i].op_status == 0)
+    if (sm_p->msgarray[i].op_status == 0)
     {
-	sm_p->u.statfs_list.stat_array[i].bytes_available = 
-	    resp_p->u.statfs.stat.bytes_available;
-	sm_p->u.statfs_list.stat_array[i].bytes_total = 
-	    resp_p->u.statfs.stat.bytes_total;
-	sm_p->u.statfs_list.stat_array[i].fs_id = sm_p->u.statfs_list.fs_id;
-	sm_p->u.statfs_list.stat_array[i].bmi_address = 
-	    PVFS_mgmt_map_addr(sm_p->u.statfs_list.fs_id, 
-	    *sm_p->cred_p, sm_p->msgarray[i].svr_addr, 
-	    &sm_p->u.statfs_list.stat_array[i].server_type);
+	struct PVFS_mgmt_server_stat *sm_stat =
+	    &sm_p->u.statfs_list.stat_array[i];
+	PVFS_statfs *resp_stat = &resp_p->u.statfs.stat;
+
+	sm_stat->fs_id                   = resp_stat->fs_id;
+	sm_stat->bytes_available         = resp_stat->bytes_available;
+	sm_stat->bytes_total             = resp_stat->bytes_total;
+	sm_stat->ram_total_bytes         = resp_stat->ram_total_bytes;
+	sm_stat->ram_free_bytes          = resp_stat->ram_free_bytes;
+	sm_stat->uptime_seconds          = resp_stat->uptime_seconds;
+	sm_stat->handles_available_count = resp_stat->handles_available_count;
+
+	sm_stat->bmi_address = PVFS_mgmt_map_addr(sm_p->u.statfs_list.fs_id,
+						  *sm_p->cred_p,
+						  sm_p->msgarray[i].svr_addr, 
+						  &sm_stat->server_type);
+
 	/* the above should always succeed in this case */
-	assert(sm_p->u.statfs_list.stat_array[i].bmi_address);
-	sm_p->u.statfs_list.stat_array[i].handles_available_count =
-	    resp_p->u.statfs.stat.handles_available_count;
+	assert(sm_stat->bmi_address);
 
-	sm_p->u.statfs_list.stat_array[i].ram_total_bytes =
-	    resp_p->u.statfs.stat.ram_total_bytes;
-	sm_p->u.statfs_list.stat_array[i].ram_free_bytes =
-	    resp_p->u.statfs.stat.ram_free_bytes;
-	sm_p->u.statfs_list.stat_array[i].uptime_seconds =
-	    resp_p->u.statfs.stat.uptime_seconds;
-
-	ret = PINT_bucket_get_server_handle_count(
-	    sm_p->u.statfs_list.stat_array[i].bmi_address,
-	    sm_p->u.statfs_list.fs_id,
-	    &sm_p->u.statfs_list.stat_array[i].handles_total_count);
+	/* TODO: WHY NOT JUST COPY OUT OF THE RESPONSE??? */
+	ret = PINT_bucket_get_server_handle_count(sm_stat->bmi_address,
+						  sm_p->u.statfs_list.fs_id,
+						  &sm_stat->handles_total_count);
 	/* this call should never fail here either */
 	assert(ret == 0);
 
 	/* sanity check handle counts */
-	assert(sm_p->u.statfs_list.stat_array[i].handles_total_count >=
-	    sm_p->u.statfs_list.stat_array[i].handles_available_count);
+	assert(sm_stat->handles_total_count >=
+	       sm_stat->handles_available_count);
     }
  
     /* if this is the last response, check all of the status values and 
      * return error code if any requests failed 
      */
-    if(i == (sm_p->msgarray_count -1))
+    if (i == (sm_p->msgarray_count -1))
     {
-	for(j=0; j<sm_p->msgarray_count; j++)
+	for (j=0; j < sm_p->msgarray_count; j++)
 	{
-	    if(sm_p->msgarray[j].op_status != 0)
+	    if (sm_p->msgarray[j].op_status != 0)
 	    {
 		return(sm_p->msgarray[j].op_status);
 	    }
 	}
     }
    
-    return(0);
+    return 0;
 }
 
 /*
