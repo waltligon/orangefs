@@ -51,9 +51,6 @@ static inline int listio_convert_equal_mem_stream_count(
     TROVE_offset cur_stream_off;
     struct aiocb *cur_aiocb_ptr;
 
-    fprintf(stderr,"*** equal mem/stream count called with "
-            "mcount %d | scount %d\n",mem_count,stream_count);
-
     if (lio_state == NULL)
     {
 	mct             = 0;
@@ -242,7 +239,6 @@ static inline int listio_convert_weighted_mem_count(
 	    /* consume mem region and update stream region */
 	    cur_aiocb_ptr->aio_nbytes = cur_mem_size;
 
-	    /* update local copies of array values */
 	    cur_stream_size -= cur_mem_size;
 	    cur_stream_off  += cur_mem_size;
 
@@ -257,7 +253,6 @@ static inline int listio_convert_weighted_mem_count(
 	    /* consume stream region and update mem region */
 	    cur_aiocb_ptr->aio_nbytes = cur_stream_size;
 
-	    /* update local copies of array values */
 	    cur_mem_size -= cur_stream_size;
 	    cur_mem_off  += cur_stream_size;
 
