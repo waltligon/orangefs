@@ -426,12 +426,10 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
 		 job_id_t * id,
 		 job_context_id context_id)
 {
-
     /* post a bmi recv.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
      * for completion later, then queue up a job_desc structure.
      */
-
     int ret = -1;
     struct job_desc *jd = NULL;
     void* user_ptr_internal = NULL;
@@ -455,7 +453,6 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
 			&(jd->u.bmi.actual_size), buffer_type, tag, 
 			user_ptr_internal, 
 			global_bmi_context);
-
     if (ret < 0)
     {
 	/* error posting */

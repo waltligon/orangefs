@@ -175,11 +175,18 @@ static int msgpair_post(PINT_client_sm *sm_p,
 	gossip_err("msgpair_post: failure in job_bmi_recv\n");
 	assert(0);
     }
-    else if (ret == 1) {
-	/* it shouldn't be possible for the receive to complete before
-	 * we send the request.
-	 */
-	assert(0);
+    else if (ret == 1)
+    {
+        gossip_err("msgpair recv status error code is: %d\n",
+                   msg_p->recv_status.error_code);
+
+	/*
+          it shouldn't be possible for the receive to complete before
+          we send the request, but we need to report errors in posting
+          the recv if any occur
+        */
+        js_p->error_code = msg_p->recv_status.error_code;
+        return 1;
     }
     assert(ret == 0); /* return value range check */
 
