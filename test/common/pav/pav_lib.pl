@@ -262,14 +262,17 @@ sub read_configfile {
 	}
 	my $line = $_;
 
-	my ($key, $val) = split("=", $line);
-	$val =~ s/"//g;
+	# only split the key=val, not embedded '='s
+	my ($key, @val) = split("=", $line);
+	$val = join("=", @val);
 #	print "key: $key val: $val\n";
 
         if ($val =~ s/^`(.*)`$//) {
-           $val = `$1`;
-           chomp($val);
-        }
+            $val = `$1`;
+            chomp($val);
+        } else {
+	    $val =~ s/"//g;
+	}
 	
 	$href->{"$key"} = $val;
 
