@@ -30,7 +30,7 @@ int pvfs2_d_revalidate(
     }
     else if (inode)
     {
-	ret = ((pvfs2_inode_getattr(inode) == 0) ? 1 : 0);
+        ret = ((pvfs2_inode_getattr(inode) == 0) ? 1 : 0);
         if (ret == 0)
         {
             pvfs2_make_bad_inode(inode);
@@ -48,8 +48,8 @@ static int pvfs2_d_hash(
     struct qstr *hash)
 {
 /*     pvfs2_print("pvfs2: pvfs2_d_hash called " */
-/* 		"(name: %s | len: %d | hash: %d)\n", */
-/* 		hash->name, hash->len, hash->hash); */
+/*                 "(name: %s | len: %d | hash: %d)\n", */
+/*                 hash->name, hash->len, hash->hash); */
     return 0;
 }
 
@@ -59,12 +59,12 @@ static int pvfs2_d_compare(
     struct qstr *name)
 {
     pvfs2_print("pvfs2: pvfs2_d_compare called (name1: %s | name2: %s)\n",
-		d_name->name, name->name);
+                d_name->name, name->name);
 
     /* if we have a match, return 0 (normally called from __d_lookup) */
     return !((d_name->len == name->len) &&
-	     (d_name->hash == name->hash) &&
-	     (memcmp(d_name->name, name->name, d_name->len) == 0));
+             (d_name->hash == name->hash) &&
+             (memcmp(d_name->name, name->name, d_name->len) == 0));
 }
 
 struct dentry_operations pvfs2_dentry_operations =
