@@ -223,7 +223,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 		req_encoded_array[i].total_size,
 		op_tag,
 		req_encoded_array[i].buffer_flag,
-		0,
+		1,
 		NULL,
 		&(status_array[i]),
 		&(id_array[i]));

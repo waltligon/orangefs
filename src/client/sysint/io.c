@@ -21,6 +21,14 @@
 
 #define REQ_ENC_FORMAT 0
 
+/* TODO: remove anything with the word "HACK" in it later on; we
+ * are just kludging some stuff for now to be able to test I/O
+ * functionality 
+ */
+
+static int HACK_create(PVFS_handle* handle, PVFS_fs_id fsid);
+static int HACK_remove(PVFS_handle handle, PVFS_fs_id fsid);
+
 /* PVFS_sys_io()
  *
  * performs a read or write operation.  PVFS_sys_read() and
@@ -40,8 +48,12 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     struct PINT_decoded_msg* resp_decoded_array = NULL;
     int* error_code_array = NULL;
     int i;
-    PVFS_Dist* io_dist = NULL;
     int partial_flag = 0;
+
+    PVFS_handle HACK_foo;
+    PVFS_Dist* HACK_io_dist = NULL;
+    PVFS_handle* HACK_datafile_handles = &HACK_foo;
+    int HACK_num_datafiles = 1;
 
     /* find a pinode for the target file */
 
@@ -61,41 +73,49 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	return(-EACCES);
     }
 
-    gossip_lerr(
-	"WARNING: kludging distribution in PINT_sys_io().\n");
-    gossip_lerr(
-	"WARNING: kludging datafile handles in PINT_sys_io().\n");
-    if(!req->HACK_num_datafiles || !req->HACK_datafile_handles)
+    /****************************************************************/
+    /* TODO: this stuff is just a hack for now so that I can test
+     * the io function; we will need to remove this stuff later
+     */
+
+    gossip_err(
+	"WARNING: kludging distribution and datafile in PINT_sys_io().\n");
+
+    ret = HACK_create(&HACK_foo, req->pinode_refn.fs_id);
+    if(ret < 0)
     {
-	gossip_lerr("Error: didn't set hacked fields.\n");
-	return(-EINVAL);
+	/* don't bother cleaning up here; this isn't "real" code */
+	gossip_lerr("Error: HACK_create() failure, exiting.\n");
+	exit(-1);
     }
 
-    io_dist = PVFS_Dist_create("default_dist");
-    if(!io_dist)
+    HACK_io_dist = PVFS_Dist_create("default_dist");
+    if(!HACK_io_dist)
     {
 	gossip_lerr("Error: PVFS_Dist_create() failure.\n");
 	return(-EINVAL);
     }
-    ret = PINT_Dist_lookup(io_dist);
+    ret = PINT_Dist_lookup(HACK_io_dist);
     if(ret < 0)
     {
 	goto out;
     }
 
+    /****************************************************************/
+
     /* allocate storage for bookkeeping information */
     /* TODO: try to do something to avoid so many mallocs */
-    addr_array = (bmi_addr_t*)malloc(req->HACK_num_datafiles *
+    addr_array = (bmi_addr_t*)malloc(HACK_num_datafiles *
 	sizeof(bmi_addr_t));
     req_array = (struct PVFS_server_req_s*)
-	malloc(req->HACK_num_datafiles * 
+	malloc(HACK_num_datafiles * 
 	sizeof(struct PVFS_server_req_s));
-    resp_encoded_array = (void**)malloc(req->HACK_num_datafiles *
+    resp_encoded_array = (void**)malloc(HACK_num_datafiles *
 	sizeof(void*));
     resp_decoded_array = (struct PINT_decoded_msg*)
-	malloc(req->HACK_num_datafiles * 
+	malloc(HACK_num_datafiles * 
 	sizeof(struct PINT_decoded_msg));
-    error_code_array = (int*)malloc(req->HACK_num_datafiles *
+    error_code_array = (int*)malloc(HACK_num_datafiles *
 	sizeof(int));
 	
     if(!addr_array || !req_array || !resp_encoded_array ||
@@ -106,12 +126,12 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     }
 
     /* setup the I/O request to each data server */
-    for(i=0; i<req->HACK_num_datafiles; i++)
+    for(i=0; i<HACK_num_datafiles; i++)
     {
 	/* resolve the address of the server */
 	ret = PINT_bucket_map_to_server(
 	    &(addr_array[i]),
-	    req->HACK_datafile_handles[i],
+	    HACK_datafile_handles[i],
 	    req->pinode_refn.fs_id);
 	if(ret < 0)
 	{
@@ -122,12 +142,12 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	req_array[i].op = PVFS_SERV_IO;
 	req_array[i].rsize = sizeof(struct PVFS_server_req_s);
 	req_array[i].credentials = req->credentials;
-	req_array[i].u.io.handle = req->HACK_datafile_handles[i];
+	req_array[i].u.io.handle = HACK_datafile_handles[i];
 	req_array[i].u.io.fs_id = req->pinode_refn.fs_id;
 	req_array[i].u.io.iod_num = i;
-	req_array[i].u.io.iod_count = req->HACK_num_datafiles;
+	req_array[i].u.io.iod_count = HACK_num_datafiles;
 	req_array[i].u.io.io_req = req->io_req;
-	req_array[i].u.io.io_dist = io_dist;
+	req_array[i].u.io.io_dist = HACK_io_dist;
 	if(type == PVFS_SYS_IO_READ)
 	    req_array[i].u.io.io_type = PVFS_IO_READ;
 	if(type == PVFS_SYS_IO_WRITE)
@@ -142,7 +162,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	resp_encoded_array,
 	resp_decoded_array,
 	error_code_array,
-	req->HACK_num_datafiles);
+	HACK_num_datafiles);
 
     if(ret < 0 && ret != -EIO)
     {
@@ -180,8 +200,190 @@ out:
     if(error_code_array)
 	free(error_code_array);
 
+    /* TODO: this is just temporary too */
+    HACK_remove(HACK_foo, req->pinode_refn.fs_id);
+    
     return(ret);
 
+}
+
+/* TODO: remove these later */
+static int HACK_create(PVFS_handle* handle, PVFS_fs_id fsid)
+{
+
+    int ret = -1;
+    bmi_addr_t server_addr;
+    bmi_op_id_t client_ops[2];
+    int outcount = 0;
+    bmi_error_code_t error_code;
+    bmi_size_t actual_size;
+    struct PINT_encoded_msg encoded1;
+    struct PINT_decoded_msg decoded1;
+    struct PVFS_server_req_s my_req;
+    struct PVFS_server_resp_s* create_dec_ack;
+    int create_ack_size;
+    void *create_ack;
+
+    /* figure out how big of an ack to post */
+    create_ack_size = PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_CREATE);
+
+    /* create storage for all of the acks */
+    create_ack = malloc(create_ack_size);
+    if(!create_ack)
+	return(-errno);
+
+    ret = PINT_bucket_map_to_server(
+	&server_addr,
+	4095,
+	fsid);
+    if(ret < 0)
+    {
+	fprintf(stderr, "PINT_bucket_map_to_server() failure.\n");
+	return(-1);
+    }
+
+    /**************************************************
+    * create request (create a data file to operate on) 
+    */
+    my_req.op = PVFS_SERV_CREATE;
+    my_req.rsize = sizeof(struct PVFS_server_req_s);
+    my_req.credentials.uid = 100;
+    my_req.credentials.gid = 100;
+    my_req.credentials.perms = U_WRITE | U_READ;  
+
+    /* create specific fields */
+    my_req.u.create.bucket = 4095;
+    my_req.u.create.handle_mask = 0;
+    my_req.u.create.fs_id = fsid;
+    my_req.u.create.object_type = ATTR_DATA;
+
+    ret = PINT_encode(&my_req,PINT_ENCODE_REQ,&encoded1,server_addr,0);
+    if(ret < 0)
+    {
+	fprintf(stderr, "Error: PINT_encode failure.\n");
+	return(-1);
+    }
+
+    /* send the request on its way */
+    ret = BMI_post_sendunexpected_list(
+	&(client_ops[1]), 
+	encoded1.dest,
+	encoded1.buffer_list, 
+	encoded1.size_list,
+	encoded1.list_count,
+	encoded1.total_size, 
+	encoded1.buffer_flag, 
+	0, 
+	NULL);
+    if(ret < 0)
+    {
+	errno = -ret;
+	perror("BMI_post_send");
+	return(-1);
+    }
+    if(ret == 0)
+    {
+	/* turning this into a blocking call for testing :) */
+	/* check for completion of request */
+	do
+	{
+	    ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
+	    NULL, 10);
+	} while(ret == 0 && outcount == 0);
+
+	if(ret < 0 || error_code != 0)
+	{
+	    fprintf(stderr, "Error: request send failed.\n");
+	    if(ret<0)
+	    {
+		errno = -ret;
+		perror("BMI_test");
+	    }
+	    return(-1);
+	}
+    }
+
+    /* release the encoded message */
+    PINT_encode_release(&encoded1, PINT_ENCODE_REQ, 0);
+
+    /* post a recv for the server acknowledgement */
+    ret = BMI_post_recv(&(client_ops[0]), server_addr, create_ack, 
+	create_ack_size, &actual_size, BMI_EXT_ALLOC, 0, 
+	NULL);
+    if(ret < 0)
+    {
+	errno = -ret;
+	perror("BMI_post_recv");
+	return(-1);
+    }
+    if(ret == 0)
+    {
+	/* turning this into a blocking call for testing :) */
+	/* check for completion of ack recv */
+	do
+	{
+	    ret = BMI_test(client_ops[0], &outcount, &error_code,
+	    &actual_size, NULL, 10);
+	} while(ret == 0 && outcount == 0);
+
+	if(ret < 0 || error_code != 0)
+	{
+	    fprintf(stderr, "Error: ack recv.\n");
+	    fprintf(stderr, "   ret: %d, error code: %d\n",ret,error_code);
+	    return(-1);
+	}
+    }
+    else
+    {
+	if(actual_size != create_ack_size)
+	{
+	    printf("Error: short recv.\n");
+	    return(-1);
+	}
+    }
+
+    /* look at the ack */
+    ret = PINT_decode(
+	create_ack,
+	PINT_ENCODE_RESP,
+	&decoded1,
+	server_addr,
+	actual_size,
+	NULL);
+    if(ret < 0)
+    {
+	fprintf(stderr, "Error: PINT_decode() failure.\n");
+	return(-1);
+    }
+
+    create_dec_ack = decoded1.buffer;
+    if(create_dec_ack->op != PVFS_SERV_CREATE)
+    {
+	fprintf(stderr, "ERROR: received ack of wrong type (%d)\n", 
+	    (int)create_dec_ack->op);
+	return(-1);
+    }
+    if(create_dec_ack->status != 0)
+    {
+	fprintf(stderr, "ERROR: server returned status: %d\n",
+	    (int)create_dec_ack->status);
+	return(-1);
+    }
+
+    /* release the decoded buffers */
+    PINT_decode_release(&decoded1, PINT_ENCODE_RESP, 0);
+
+    free(create_ack);
+
+    *handle = create_dec_ack->u.create.handle;
+
+    return(0);
+}
+
+static int HACK_remove(PVFS_handle handle, PVFS_fs_id fsid)
+{
+
+    return(-ENOSYS);
 }
 
 /*
