@@ -197,11 +197,6 @@ struct method_params
     int method_flags;
     int method_id;
     method_addr_p listen_addr;
-    /* message size limits: */
-    bmi_size_t mode_immed_limit;
-    bmi_size_t mode_eager_limit;
-    bmi_size_t mode_rend_limit;
-    bmi_size_t mode_unexp_limit;
 };
 typedef struct method_params method_params_st, *method_params_p;
 

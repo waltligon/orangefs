@@ -332,10 +332,8 @@ enum
 /* Allowable sizes for each mode */
 enum
 {
-    TCP_MODE_IMMED_LIMIT = 0,
     TCP_MODE_EAGER_LIMIT = 16384,	/* 16K */
-    TCP_MODE_REND_LIMIT = 16777216,	/* 16M */
-    TCP_MODE_UNEXP_LIMIT = 16384	/* 16K */
+    TCP_MODE_REND_LIMIT = 16777216	/* 16M */
 };
 
 /*************************************************************************
@@ -373,10 +371,6 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
     /* zero out our parameter structure and fill it in */
     memset(&tcp_method_params, 0, sizeof(struct method_params));
     tcp_method_params.method_id = method_id;
-    tcp_method_params.mode_immed_limit = TCP_MODE_IMMED_LIMIT;
-    tcp_method_params.mode_eager_limit = TCP_MODE_EAGER_LIMIT;
-    tcp_method_params.mode_rend_limit = TCP_MODE_REND_LIMIT;
-    tcp_method_params.mode_unexp_limit = TCP_MODE_UNEXP_LIMIT;
     tcp_method_params.method_flags = init_flags;
 
     if (init_flags & BMI_INIT_SERVER)

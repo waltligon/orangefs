@@ -422,10 +422,6 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     /* zero out our parameter structure and fill it in */
     memset(&gm_method_params, 0, sizeof(struct method_params));
     gm_method_params.method_id = method_id;
-    gm_method_params.mode_immed_limit = GM_MODE_IMMED_LIMIT;
-    gm_method_params.mode_eager_limit = GM_MODE_REND_LIMIT;
-    gm_method_params.mode_rend_limit = GM_MODE_REND_LIMIT;
-    gm_method_params.mode_unexp_limit = GM_MODE_UNEXP_LIMIT;
     gm_method_params.method_flags = init_flags;
 
     gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Setting up GM operation lists.\n");
