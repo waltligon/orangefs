@@ -120,7 +120,7 @@ int main(int argc,char* argv[])
 
 	/* lookup element that was inserted */
 
-	ret = PINT_pcache_lookup(pinode2->pinode_ref, test_pinode);
+	ret = PINT_pcache_lookup(pinode2->pinode_ref, &test_pinode);
 	if (ret < 0)
 	{
 		printf("pcache lookup failed (#2) with errcode %d\n", ret);
