@@ -401,15 +401,18 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
 
                 if (current_mnt->fs_id == mntent->fs_id)
                 {
-                    assert(strcmp(current_mnt->mnt_dir,
-                                  mntent->mnt_dir) == 0);
+                    gossip_debug(
+                        GOSSIP_CLIENT_DEBUG, "* File system %d already "
+                        "mounted on %s already exists [parsed]\n",
+                        mntent->fs_id, current_mnt->mnt_dir);
 
                     gossip_debug(
-                        GOSSIP_CLIENT_DEBUG, "* Mount point %s already "
-                        "exists [parsed]\n", current_mnt->mnt_dir);
+                        GOSSIP_CLIENT_DEBUG, "Reporting success since we "
+                        "do not try to add dynamic mount entries\n"
+                        "  matching parsed entries\n");
 
                     gen_mutex_unlock(&s_stat_tab_mutex);
-                    return -PVFS_EEXIST;
+                    return 0;
                 }
             }
         }
@@ -423,12 +426,10 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
 
             if (current_mnt->fs_id == mntent->fs_id)
             {
-                assert(strcmp(current_mnt->mnt_dir,
-                              mntent->mnt_dir) == 0);
-
                 gossip_debug(
-                    GOSSIP_CLIENT_DEBUG, "* Mount point %s already "
-                    "exists [dynamic]\n", current_mnt->mnt_dir);
+                    GOSSIP_CLIENT_DEBUG, "* File system %d already "
+                    "mounted on %s already exists [dynamic]\n",
+                    mntent->fs_id, current_mnt->mnt_dir);
 
                 gen_mutex_unlock(&s_stat_tab_mutex);
                 return -PVFS_EEXIST;
@@ -527,9 +528,6 @@ int PVFS_util_remove_internal_mntent(
                 current_mnt = &(s_stat_tab_array[i].mntent_array[j]);
                 if (current_mnt->fs_id == mntent->fs_id)
                 {
-                    assert(strcmp(current_mnt->mnt_dir,
-                                  mntent->mnt_dir) == 0);
-
                     found_index = i;
                     found = 1;
                     goto mntent_found;
@@ -546,9 +544,6 @@ int PVFS_util_remove_internal_mntent(
 
             if (current_mnt->fs_id == mntent->fs_id)
             {
-                assert(strcmp(current_mnt->mnt_dir,
-                              mntent->mnt_dir) == 0);
-
                 found_index = PVFS2_DYNAMIC_TAB_INDEX;
                 found = 1;
                 goto mntent_found;
@@ -594,9 +589,6 @@ int PVFS_util_remove_internal_mntent(
 
                 if (current_mnt->fs_id == mntent->fs_id)
                 {
-                    assert(strcmp(current_mnt->mnt_dir,
-                                  mntent->mnt_dir) == 0);
-
                     PVFS_sys_free_mntent(current_mnt);
                     continue;
                 }

@@ -55,6 +55,12 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     }
 
     /*
+      reload all handle mappings as well as the interface with the new
+      configuration information
+    */
+    PINT_bucket_reinitialize(server_config);
+
+    /*
       add the mntent to the internal mount tables; it's okay if it's
       already there, as the return value will tell us and we can
       ignore it.  in short, if the mntent was from a pvfstab file, it
@@ -62,17 +68,11 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
       to be added properly.
     */
     ret = PVFS_util_add_dynamic_mntent(mntent);
-    if (ret && (ret != -PVFS_EEXIST))
+    if (ret)
     {
         PVFS_perror("PVFS_util_add_mnt failed", ret);
         goto error_exit;
     }
-
-    /*
-      reload all handle mappings as well as the interface with the new
-      configuration information
-    */
-    PINT_bucket_reinitialize(server_config);
 
     gen_mutex_unlock(&mt_config);
     PINT_put_server_config_struct(server_config);
