@@ -635,17 +635,6 @@ int BMI_tcp_set_info(int option,
 	    ret = 0;
 	}
 	break;
-    case BMI_INC_ADDR_REF:
-	tmp_addr = (method_addr_p) inout_parameter;
-	tmp_addr->ref_count++;
-	ret = 0;
-	break;
-    case BMI_DEC_ADDR_REF:
-	tmp_addr = (method_addr_p) inout_parameter;
-	tmp_addr->ref_count++;
-	assert(tmp_addr->ref_count >= 0);
-	ret = 0;
-	break;
     default:
 	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
                       "TCP hint %d not implemented.\n", option);

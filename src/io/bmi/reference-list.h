@@ -36,6 +36,7 @@ struct ref_st
 
     /* linked list entry */
     struct qlist_head list_link;
+    int ref_count;
 };
 
 typedef struct ref_st ref_st, *ref_st_p;
