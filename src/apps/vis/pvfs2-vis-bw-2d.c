@@ -20,6 +20,10 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
+#define TOP_BORDER 20
+#define BOTTOM_BORDER 60
+#define SIDE_BORDER 20
+
 struct options
 {
     char* mnt_point;
@@ -176,6 +180,7 @@ static int draw(void)
     double bw;
     double max_bw = 13.0;
     int stat_depth = pint_vis_shared.io_depth - 1;
+    SDL_Rect scratch;
 
     ret = SDL_Init(SDL_INIT_VIDEO);
     if(ret < 0)
@@ -209,9 +214,9 @@ static int draw(void)
     write_bws = &read_bws[pint_vis_shared.io_count];
 
     /* compute width of each bar */
-    channel_width = (screen->w - 30) / (pint_vis_shared.io_count*3);
-    if(channel_width > 30)
-	channel_width = 30;
+    channel_width = (screen->w - SIDE_BORDER*2) / (pint_vis_shared.io_count*3);
+    if(channel_width > SIDE_BORDER)
+	channel_width = SIDE_BORDER;
 
     left_offset = (screen->w - (channel_width*3))/2;
 
@@ -219,8 +224,8 @@ static int draw(void)
     for(i=0; i<pint_vis_shared.io_count; i++)
     {
 	read_bws[i].full.x = left_offset + i*3;
-	read_bws[i].full.y = 30;
-	read_bws[i].full.h = (screen->h-60);
+	read_bws[i].full.y = TOP_BORDER;
+	read_bws[i].full.h = (screen->h-(TOP_BORDER+BOTTOM_BORDER));
 	read_bws[i].full.w = channel_width;
 	read_bws[i].bar = read_bws[i].full;
 	read_bws[i].bar.h = 1;
@@ -253,11 +258,19 @@ static int draw(void)
 	{
 	    S_LOCK();
 
-	    /* fill in black background of each bar region */
-	    SDL_FillRect(screen, &read_bws[i].full, 
-		SDL_MapRGB(screen->format, 0x00, 0x00, 0x00));
-	    SDL_FillRect(screen, &write_bws[i].full, 
-		SDL_MapRGB(screen->format, 0x00, 0x00, 0x00));
+	    /* draw a border */
+	    scratch.h = screen->h - TOP_BORDER - BOTTOM_BORDER;
+	    scratch.w = screen->w - SIDE_BORDER*2;
+	    scratch.y = TOP_BORDER+2;
+	    scratch.x = SIDE_BORDER;
+	    SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
+		0xcc, 0xcc, 0xcc));
+	    scratch.h -= 4;
+	    scratch.w -= 4;
+	    scratch.x += 2;
+	    scratch.y += 2;
+	    SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
+		0x0, 0x0, 0x0));
 
 	    /* compute height of each bar, and draw it */
 	    bw = ((double)pint_vis_shared.io_perf_matrix[i][stat_depth].read * 1000.0)/
@@ -267,7 +280,7 @@ static int draw(void)
 	    read_bws[i].bar.h = read_bws[i].full.h * (bw/max_bw);
 	    if(read_bws[i].bar.h > read_bws[i].full.h)
 		read_bws[i].bar.h = read_bws[i].full.h;
-	    read_bws[i].bar.y = 30 + read_bws[i].full.h - read_bws[i].bar.h;
+	    read_bws[i].bar.y = TOP_BORDER + read_bws[i].full.h - read_bws[i].bar.h;
 	    SDL_FillRect(screen, &read_bws[i].bar,
 		SDL_MapRGB(screen->format, 0xcc, 0x0, 0x0));
 
@@ -278,7 +291,7 @@ static int draw(void)
 	    write_bws[i].bar.h = write_bws[i].full.h * (bw/max_bw);
 	    if(write_bws[i].bar.h > write_bws[i].full.h)
 		write_bws[i].bar.h = write_bws[i].full.h;
-	    write_bws[i].bar.y = 30 + write_bws[i].full.h - write_bws[i].bar.h;
+	    write_bws[i].bar.y = TOP_BORDER + write_bws[i].full.h - write_bws[i].bar.h;
 	    SDL_FillRect(screen, &write_bws[i].bar,
 		SDL_MapRGB(screen->format, 0x0, 0x0, 0xcc));
 
