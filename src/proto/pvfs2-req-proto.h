@@ -20,6 +20,8 @@
 
 #include <pvfs2-types.h>
 #include <pvfs2-attr.h>
+#include <pvfs-distribution.h>
+#include <pvfs-request.h>
 
 typedef enum {
 	PVFS_SERV_INVALID = 0,
@@ -333,15 +335,27 @@ struct PVFS_servresp_seteattr_s {
 };
 typedef struct PVFS_servresp_seteattr_s PVFS_servresp_seteattr;
 
-/*PVFS I/O request*/
-struct PVFS_servreq_io_s {
-	PVFS_handle handle;
-	PVFS_fs_id fs_id;
+/* supported I/O operation types */
+enum PVFS_servreq_io_type
+{
+	PVFS_IO_READ = 1,
+	PVFS_IO_WRITE
+};
+
+/* PVFS I/O request */
+struct PVFS_servreq_io_s 
+{
+	PVFS_handle handle;                 /* handle to operate on */
+	PVFS_fs_id fs_id;                   /* file system id */
+	enum PVFS_servreq_io_type io_type;  /* type of I/O operation */
+	PVFS_Dist* io_dist;                 /* physical distribution */
+	PVFS_Request* io_req;               /* datatype pattern */
 };
 typedef struct PVFS_servreq_io_s PVFS_servreq_io;
 
 /* PVFS I/O response */
-struct PVFS_servresp_io_s {
+struct PVFS_servresp_io_s 
+{
 	PVFS_size bstream_size;
 };
 typedef struct PVFS_servresp_io_s PVFS_servresp_io;
