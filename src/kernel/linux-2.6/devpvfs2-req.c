@@ -25,7 +25,6 @@ extern struct qhash_table *htable_ops_in_progress;
 extern struct file_system_type pvfs2_fs_type;
 extern struct semaphore devreq_semaphore;
 extern struct semaphore request_semaphore;
-extern int devreq_device_registered;
 
 /* defined in super.c */
 extern struct list_head pvfs2_superblocks;
@@ -54,9 +53,10 @@ static int pvfs2_devreq_open(
 {
     int ret = -EACCES;
 
-    down(&devreq_semaphore);
     pvfs2_print("pvfs2_devreq_open: trying to open\n");
-    if (open_access_count == 0)
+
+    down(&devreq_semaphore);
+    if ((open_access_count == 0) && try_module_get(pvfs2_fs_type.owner))
     {
 	ret = generic_file_open(inode, file);
 	if (ret == 0)
@@ -80,6 +80,7 @@ static int pvfs2_devreq_open(
 	pvfs2_error("*****************************************************\n");
     }
     up(&devreq_semaphore);
+
     pvfs2_print("pvfs2_devreq_open: open complete (ret = %d)\n", ret);
     return ret;
 }
@@ -119,13 +120,6 @@ static ssize_t pvfs2_devreq_read(
             if (!signal_pending(current))
             {
                 schedule();
-                if (devreq_device_registered == 0)
-                {
-                    set_current_state(TASK_RUNNING);
-                    remove_wait_queue(
-                        &pvfs2_request_list_waitq, &wait_entry);
-                    return -EBADF;
-                }
                 continue;
             }
 
@@ -353,13 +347,14 @@ static int pvfs2_devreq_release(
     struct inode *inode,
     struct file *file)
 {
-    down(&devreq_semaphore);
     pvfs2_print("pvfs2_devreq_release: trying to finalize\n");
-    open_access_count--;
 
+    down(&devreq_semaphore);
     pvfs_bufmap_finalize();
 
+    open_access_count--;
     device_owner = NULL;
+    module_put(pvfs2_fs_type.owner);
 
     /*
       prune dcache here to get rid of entries that may no longer exist
@@ -368,8 +363,8 @@ static int pvfs2_devreq_release(
     shrink_dcache_sb(inode->i_sb);
 
     up(&devreq_semaphore);
-    pvfs2_print("pvfs2_devreq_release: finalize complete\n");
 
+    pvfs2_print("pvfs2_devreq_release: finalize complete\n");
     return 0;
 }
 

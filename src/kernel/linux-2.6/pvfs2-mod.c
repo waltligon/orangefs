@@ -53,7 +53,6 @@ kmem_cache_t *pvfs2_inode_cache = NULL;
 
 /* synchronizes the request device file */
 struct semaphore devreq_semaphore;
-int devreq_device_registered = 0;
 
 /*
   blocks non-priority requests from being queued for servicing.  this
@@ -93,7 +92,6 @@ static int __init pvfs2_init(void)
 		    PVFS2_REQDEVICE_NAME, pvfs2_dev_major);
 	return pvfs2_dev_major;
     }
-    devreq_device_registered = 1;
 
     pvfs2_print("*** /dev/%s character device registered ***\n",
 		PVFS2_REQDEVICE_NAME);
@@ -124,16 +122,6 @@ static void __exit pvfs2_exit(void)
     struct qhash_head *hash_link = NULL;
 
     pvfs2_print("pvfs2: pvfs2_exit called\n");
-
-    /*
-      wake up the blocking device read (if any) and delay so it can
-      return -EBADF since the device is going away shortly and won't
-      be available for reading any longer.
-    */
-    devreq_device_registered = 0;
-    wake_up_interruptible(&pvfs2_request_list_waitq);
-    set_current_state(TASK_INTERRUPTIBLE);
-    schedule_timeout(MSECS_TO_JIFFIES(100));
 
     /* clear out all pending upcall op requests */
     spin_lock(&pvfs2_request_list_lock);
