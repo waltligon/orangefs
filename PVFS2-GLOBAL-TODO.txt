@@ -11,7 +11,6 @@ server operations:
   - eattrib (set/get)
   - truncate
   - statfs
-  - iostatfs?
   
 - unfinished:
   - general error handling
@@ -28,6 +27,11 @@ general server functionality:
 - better error handling when unsupported request received
 - making server run as background daemon
 - testing multiple meta servers
+- more config file options:
+  - bmi, trove, and flow methods
+  - encoding type
+  - etc.
+- memory datatype processing
 
 request scheduler:
 ====================================================================
@@ -45,6 +49,9 @@ system interface functionality:
   - way to pass in consistency semantics (timeout values, etc.)
   - state machine implementations for all functions
 
+- define how configuration info should be passed in
+  (how to do paths, fstab, url stuff, whatever)
+
 user interfaces:
 ====================================================================
 - ROMIO module
@@ -55,6 +62,7 @@ kernel/vfs interface
 - 2.4.x pvfs-kernel implementation
   - quick modification of existing pvfs-kernel and/or full rewrite
 - 2.6.x pvfs2-kernel implementation
+  - add ability to mount multiple file systems
   - properly handle vfs interruption cases (signals)
   - get fsid/root handle information at mount time
   - use /etc/fstab mount interface for volume info
@@ -77,6 +85,7 @@ performance tuning:
 - memory allocation cache
 - do some benchmarking of thread context switches to help decide
   how trove/job/flow interfaces should interact
+- figure out how to make i/o faster
 
 request encoding:
 ====================================================================
@@ -89,6 +98,7 @@ error codes:
 
 I/O path:
 ====================================================================
+- buffer cache on top of trove
 - optimizing small reads and writes (packing data into req/ack messages)
 - native GM flowprotocol
 - threads in trove?
@@ -120,6 +130,7 @@ system management utilities
   - etc.
 - end user documentation
 - better logging systems
+- more tools like pvfs2-ls, pvfs2-import, etc.
 
 documentation:
 ====================================================================

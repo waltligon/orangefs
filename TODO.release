@@ -1,44 +1,47 @@
 Stuff to do for the first friendly-user release:
+(all other todo items are in PVFS2-GLOBAL-TODO.txt)
+----------------------------------------------------------
 
-. mpich2 and pvfs2 cannot be built together
-  XXX: more detailed error report
+. pick a license and apply to all of the code (Phil start discussion)
 
-. use fstab to describe pvfs2 volumes?
-
-. make pvfs2-client stuff capable of mounting multiple file systems
-
-. handle more error cases in kernel module (ctrl-c, timeouts,
-  pvfs2-client death, etc.)
+. get rid of dependencies on -lrt and -lpthread for client side
+  components (Phil)
 
 . config file utility
 
-. more admin tools (pvfs2-ls, pvfs2-rm, pvfs2-statfs, etc.) that
-  follow model of pvfs2-import and pvfs2-export
+. quickstart guide
+
+. mpich2 and pvfs2 cannot be built together (Rob L.)
+
+. handle more error cases in kernel module (ctrl-c, timeouts,
+  pvfs2-client death, etc.) (Neill)
+
+. pvfs2-set-debugmask for runtime gossip settings, (Phil)
+
+. pvfs2-ls
 
 . pvfs2-ping
-
-. header cleanup, maybe library cleanup
+  - read pvfs2tab
+  - getconfig
+  - contact all servers
+    - make sure fsid is ok
+    - make sure root handle exists in exactly one place
 
 . a real 'make install'
-
-. figure out why io (through VFS and everything) is slow
-  XXX: probably part of this is just implementing sysint function
-  as state machine
 
 . server log to a file and run in background
 
 . more config file options:
   - default gossip mask (server)
-  - bmi module to use (client and server)
-  - encoding type to use (client)
-  - trove module to use (server)
-  - flowprotocol to use (client or server?)
-. implement server support for resize
-
-. memory datatype processing (for romio noncontiguous requests)
-
-. quickstart guide
-
-. implement statfs
+  - run in foreground/background
+  - log file options
 
 . pick a license and apply it to all of the code
+
+. discontig in file support for ROMIO (Rob L.)
+
+. status document
+  - good examples to look at in code
+  - stuff thats known to be broken
+  - stuff thats almost done, but not enabled
+  - open issues
