@@ -25,23 +25,20 @@ int main(int argc,char **argv)
 	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
 	PVFS_sysreq_remove *req_remove;
-	char *filename = NULL;
 	int ret = -1, name_sz = 0;
 	pvfs_mntlist mnt = {0,NULL};
 
 
-	if (argc > 1)
+	if (argc != 2)
 	{
-		name_sz = strlen(argv[1]) + 1; /*include null terminator*/
-		filename = malloc(name_sz);
-		memcpy(filename, argv[1], name_sz);
+		return 1;
 	}
 	else
 	{
 		printf("usage: %s file_to_remove\n", argv[0]);
 	}
 
-	printf("creating a file named %s\n", filename);
+	printf("creating a file named %s\n", argv[1]);
 
 	/* Parse PVFStab */
 	ret = parse_pvfstab(NULL,&mnt);
@@ -86,7 +83,7 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 
-	req_remove->entry_name = filename;
+	req_remove->entry_name = argv[1];
 	req_remove->parent_refn.handle = resp_look.pinode_refn.handle;
 	req_remove->parent_refn.fs_id = resp_look.pinode_refn.fs_id;
 	req_remove->credentials.uid = 100;
@@ -102,7 +99,7 @@ int main(int argc,char **argv)
 	}
 
 	printf("===================================");
-	printf("file named %s has been removed.", filename);
+	printf("file named %s has been removed.", argv[1]);
 
 	//close it down
 	ret = PVFS_sys_finalize();
@@ -112,6 +109,5 @@ int main(int argc,char **argv)
 		return (-1);
 	}
 
-	free(filename);
 	return(0);
 }
