@@ -40,27 +40,34 @@ do { \
 extern PINT_encoding_table_values le_bytefield_table;
 int g_admin_mode = 0;
 
-static PINT_encoding_table_values *PINT_encoding_table[ENCODING_TABLE_SIZE] = {NULL};
+static PINT_encoding_table_values *PINT_encoding_table[
+    ENCODING_TABLE_SIZE] = {NULL};
 
 /* PINT_encode_initialize()
  *
  * starts up the protocol encoding interface
  *
- * returns 0 on success, -errno on failure
+ * returns 0 on success, -PVFS_error on failure
  */
 int PINT_encode_initialize(void)
 {
+    int ret = -PVFS_EINVAL;
 
-    /* setup little endian bytefield encoding */
-    PINT_encoding_table[ENCODING_LE_BFIELD] = &le_bytefield_table;
-    le_bytefield_table.init_fun();
-    /* header prepended to all messages of this type */
-    *((int32_t*)&(le_bytefield_table.generic_header[0])) = 
-	htobmi32(PVFS_RELEASE_NR);
-    *((int32_t*)&(le_bytefield_table.generic_header[4])) = 
-	htobmi32(ENCODING_LE_BFIELD);
+    if (ENCODING_IS_SUPPORTED(ENCODING_LE_BFIELD))
+    {
+        /* setup little endian bytefield encoding */
+        PINT_encoding_table[ENCODING_LE_BFIELD] = &le_bytefield_table;
+        le_bytefield_table.init_fun();
 
-    return(0);
+        /* header prepended to all messages of this type */
+        *((int32_t*)&(le_bytefield_table.generic_header[0])) = 
+            htobmi32(PVFS_RELEASE_NR);
+        *((int32_t*)&(le_bytefield_table.generic_header[4])) = 
+            htobmi32(ENCODING_LE_BFIELD);
+
+        ret = 0;
+    }
+    return ret;
 }
 
 /* PINT_encode_finalize()
@@ -88,7 +95,7 @@ int PINT_encode(void* input_buffer,
 		PVFS_BMI_addr_t target_addr,
 		enum PVFS_encoding_type enc_type)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
     target_msg->dest = target_addr;
     target_msg->enc_type = enc_type;
 
@@ -104,18 +111,18 @@ int PINT_encode(void* input_buffer,
 		    tmp_req->flags += PVFS_SERVER_REQ_ADMIN_MODE;
 		ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_REQ,
 		    tmp_req->op, tmp_req);
-		ret =  PINT_encoding_table[enc_type]->op->encode_req(input_buffer,
-								 target_msg);
+		ret =  PINT_encoding_table[enc_type]->op->encode_req(
+                    input_buffer, target_msg);
 		ENCODE_EVENT_STOP(PVFS_EVENT_API_ENCODE_REQ,
 		    tmp_req->op, tmp_req, target_msg->total_size);
 	    }
-	    else if(input_type == PINT_ENCODE_RESP)
+	    else if (input_type == PINT_ENCODE_RESP)
 	    {
 		struct PVFS_server_resp* tmp_resp = input_buffer;
 		ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_RESP,
 		    tmp_resp->op, tmp_resp);
-		ret =  PINT_encoding_table[enc_type]->op->encode_resp(input_buffer,
-								  target_msg);
+		ret =  PINT_encoding_table[enc_type]->op->encode_resp(
+                    input_buffer, target_msg);
 		ENCODE_EVENT_STOP(PVFS_EVENT_API_ENCODE_RESP,
 		    tmp_resp->op, tmp_resp, target_msg->total_size);
 	    }
@@ -125,7 +132,6 @@ int PINT_encode(void* input_buffer,
 	    ret = -PVFS_EINVAL;
 	    break;
     }
-
     return(ret);
 }
 
@@ -247,10 +253,16 @@ int PINT_decode(void* input_buffer,
 void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
 			 enum PINT_encode_msg_type input_type)
 { 
-    PINT_encoding_table[input_buffer->enc_type]->op->encode_release(
-	input_buffer, input_type);
-
-    return;
+    if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
+    {
+        PINT_encoding_table[input_buffer->enc_type]->op->encode_release(
+            input_buffer, input_type);
+    }
+    else
+    {
+        gossip_err("PINT_encode_release: Encoder type %d is not "
+                   "supported.\n", input_buffer->enc_type);
+    }
 }
 
 /* PINT_decode_release()
@@ -263,8 +275,16 @@ void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
 void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
 			 enum PINT_encode_msg_type input_type)
 {
-    PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
-	input_buffer, input_type);
+    if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
+    {
+        PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
+            input_buffer, input_type);
+    }
+    else
+    {
+        gossip_err("PINT_decode_release: Encoder type %d is not "
+                   "supported.\n", input_buffer->enc_type);
+    }
 }
 
 
@@ -272,14 +292,14 @@ void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
  *
  * calculates maximum size of the encoded version of a protocol message.
  *
- * returns max size of encoded buffer on success, -errno on failure
+ * returns max size of encoded buffer on success, -PVFS_error on failure
  */
 int PINT_encode_calc_max_size(
     enum PINT_encode_msg_type input_type,
     enum PVFS_server_op op_type,
     enum PVFS_encoding_type enc_type)
 {    
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
 
     switch(enc_type)
     {
@@ -289,7 +309,6 @@ int PINT_encode_calc_max_size(
 	    break;
 	default:
 	    gossip_lerr("Error: encoding type not supported.\n");
-	    ret = -PVFS_EINVAL;
 	    break;
     }
 

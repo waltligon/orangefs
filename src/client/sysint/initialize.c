@@ -69,7 +69,7 @@ int PVFS_sys_initialize(int default_debug_mask)
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
     PINT_client_sm *sm_p = NULL;
 
-    sm_p = (PINT_client_sm*)malloc(sizeof(PINT_client_sm));
+    sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
     if(!sm_p)
     {
 	return(-PVFS_ENOMEM);
