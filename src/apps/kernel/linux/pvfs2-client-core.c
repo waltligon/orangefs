@@ -1082,9 +1082,11 @@ static int service_operation_cancellation(vfs_request_t *vfs_request)
     ret = cancel_op_in_progress(
         vfs_request->in_upcall.req.cancel.op_tag);
 
-    /* FIXME: scrub return value/downcall status here */
+    if (ret == -PVFS_ECANCEL)
+    {
+        ret = -PVFS_EINTR;
+    }
 
-    /* we need to send a blank success response */
     vfs_request->out_downcall.type = PVFS2_VFS_OP_CANCEL;
     vfs_request->out_downcall.status = ret;
 
