@@ -2783,7 +2783,7 @@ static int receive_cycle(int timeout)
     {
         if(timeout > 0)
         {
-	    poll_event = gm_blocking_receive(local_port);
+	    poll_event = gm_blocking_receive_no_spin(local_port);
         }
         else
         {
