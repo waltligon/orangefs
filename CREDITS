@@ -43,3 +43,8 @@ pvfs2 config files
 Mark Veltzer introduced us to the single makefile approach we now use in pvfs2
 
 Dan Nurmi started work on the PTS back when the P stood for pvfs-1
+
+The fonts used in the pvfs2 visualization tools (src/apps/vis) were
+created by Bitstream, Inc., and may be redistributed subject to the
+license which is embedded in the font files themselves.
+

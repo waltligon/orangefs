@@ -222,7 +222,7 @@ static int draw(void)
 	return(-1);
     }
 
-    font = TTF_OpenFont("ganymede.ttf", 16);
+    font = TTF_OpenFont("VeraBd.ttf", 16);
     if(!font)
     {
 	fprintf(stderr, "TTF_Openfont: %s\n", TTF_GetError());
