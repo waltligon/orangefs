@@ -335,7 +335,7 @@ static int handle_store_load(TROVE_coll_id coll_id,
 
     /* HACK -- NEED TO REPEAT CALL */
     for (;;) {
-	array_count = 3;
+	array_count = 256;
 	ret = trove_dspace_iterate_handles(coll_id,
 					   &pos,
 					   handle_array,
