@@ -12,9 +12,9 @@
 #define __PINT_DEV_SHARED_H
 
 /* supported ioctls */
-#define PVFS_DEV_GET_MAGIC 1
-#define PVFS_DEV_GET_MAX_UPSIZE 2
-#define PVFS_DEV_GET_MAX_DOWNSIZE 3
+#define PVFS_DEV_GET_MAGIC                      1
+#define PVFS_DEV_GET_MAX_UPSIZE                 2
+#define PVFS_DEV_GET_MAX_DOWNSIZE               3
 
 #endif /* __PINT_DEV_SHARED_H */
 
