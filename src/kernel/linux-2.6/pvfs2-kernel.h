@@ -715,7 +715,7 @@ do                                                \
 /************************************
  * misc convenience functions
  ************************************/
-static inline int pvfs2_translate_mode(int vfs_mode)
+static inline int pvfs2_translate_mode(int mode)
 {
     int ret = 0;
 
