@@ -38,14 +38,7 @@ int main(int argc, char **argv)
 	struct BMI_unexpected_info req_info;
 	job_id_t job_id;
 	int outcount;
-#if 0
-	/* used in undef'd flow code below */
-	struct flow_endpoint* src;
-	struct flow_endpoint* dest;
-	struct flow_io_desc* io_desc = NULL;
-	job_id_t job_id1 = 0;
-	int index = 5;
-#endif
+	job_id_t tmp_id;
 
 	/* set debugging level */
 	gossip_enable_stderr();
@@ -86,7 +79,6 @@ int main(int argc, char **argv)
 	}
 	if(ret != 1)
 	{
-		int foo;
 #if 0
 		/* exercise testworld() interface, block indefinitely */
 		outcount = 1;
@@ -134,14 +126,25 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	/* post a blocking BMI send job */
-	ret = job_bmi_send_blocking(req_info.addr, ack, 
-		sizeof(struct ack_foo), 0, BMI_PRE_ALLOC, 0, &status1);
+	/* send a message */
+	ret = job_bmi_send(req_info.addr, ack, sizeof(struct ack_foo),
+		0, BMI_PRE_ALLOC, 0, NULL, &status1, &tmp_id);
 	if(ret < 0)
 	{
-		fprintf(stderr, "job_bmi_send_blocking failure.\n");
+		fprintf(stderr, "job_bmi_send() failure.\n");
 		return(-1);
 	}
+	if(ret == 0)
+	{
+		int count = 0;
+		ret = job_test(tmp_id, &count, NULL, &status1, -1);
+		if(ret < 0)
+		{
+			fprintf(stderr, "job_test() failure.\n");
+			return(-1);
+		}
+	}
+
 
 	/* check status */
 	if(status1.error_code != 0)
@@ -149,62 +152,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "job failure.\n");
 		return(-1);
 	}
-#if 0
-	/* send the same thing using a flow */
-	src = PINT_endpoint_alloc();
-	dest = PINT_endpoint_alloc();
-	io_desc = (struct flow_io_desc*)malloc(sizeof(struct flow_io_desc));
-	if(!src || !dest || !io_desc)
-	{
-		fprintf(stderr, "Failed to alloc endpoints.\n");
-		return(-1);
-	}
-	dest->endpoint_id = BMI_ENDPOINT;
-	dest->u.bmi.address = req_info.addr;
-	src->endpoint_id = MEM_ENDPOINT;
-	src->u.mem.size = sizeof(struct ack_foo);
-	src->u.mem.buffer = ack;
-	io_desc->offset = 0;
-	io_desc->size = sizeof(struct ack_foo);
 
-	ret = job_flow(0, 0, src, dest, io_desc, NULL, 0, NULL, &status1,
-		&job_id1);
-	if(ret < 0)
-	{
-		fprintf(stderr, "job_flow() failure.\n");
-		return(-1);
-	}
-	if(ret != 1)
-	{
-		/* wait until job finishes */
-		do
-		{
-			outcount = 1;
-			ret = job_waitsome(&job_id1, &outcount, &index, NULL, &status1);
-		} while(ret == 0 && outcount == 0);
-		if(ret < 0)
-		{
-			fprintf(stderr, "job_wait() failure.\n");
-			errno = -ret;
-			perror("foo");
-			return(-1);
-		}
-	}
-
-	/* check index */
-	if(index != 0)
-	{
-		fprintf(stderr, "Bad index.\n");
-		return(-1);
-	}
-
-	/* check status */
-	if(status1.error_code != 0)
-	{
-		fprintf(stderr, "Bad status in flow.\n");
-		return(-1);
-	}
-#endif
 	BMI_memfree(req_info.addr, ack, sizeof(struct ack_foo), BMI_RECV_BUFFER);
 	free(req_info.buffer);
 
