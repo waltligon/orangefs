@@ -70,15 +70,14 @@ nested machine pvfs2_client_msgpairarray_sm(init,
     state complete
     {
         run msgpairarray_complete;
-        success => complete;
-        MSGPAIRS_RETRY => post_retry;
         MSGPAIRS_COMPLETE => completion_fn;
-        default => return;
+        default => complete;
     }
 
     state completion_fn
     {
         run msgpairarray_completion_fn;
+        MSGPAIRS_RETRY => post_retry;
         default => return;
     }
 }
@@ -113,11 +112,9 @@ static int msgpairarray_init(PINT_client_sm *sm_p,
 
         msg_p->encoded_resp_p = NULL;
         msg_p->retry_count = 0;
-        msg_p->recv_serviced = 0;
     }
     return 1;
 }
-
 
 /* msgpairarray_post()
  *
@@ -221,7 +218,8 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 			   PVFS2_CLIENT_JOB_TIMEOUT);
 	if (ret < 0)
         {
-	    gossip_lerr("post of receive failed\n");
+	    PVFS_perror("Post of receive failed", ret);
+
             js_p->error_code = ret;
             return 1;
 	}
@@ -229,6 +227,9 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
         {
 	    /* we can get this if we have lost connectivity to this server */
 	    assert(msg_p->recv_status.error_code != 0);
+
+	    PVFS_perror("Receive immediately failed",
+                        msg_p->recv_status.error_code);
 
 	    msg_p->recv_id = 0;
 	    msg_p->send_id = 0;
@@ -259,8 +260,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
                 (PVFS_ERROR_CLASS(-status.error_code) == PVFS_ERROR_BMI) &&
                 (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
             {
-                gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Reposting receive "
-                             "due to failure (%d)\n", ret);
+                PVFS_perror("*** Reposting receive", status.error_code);
 
                 msg_p->retry_count++;
                 goto post_msg_receive;
@@ -284,7 +284,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 				PVFS2_CLIENT_JOB_TIMEOUT);
 	if (ret < 0)
         {
-	    gossip_lerr("post of send failed; should cancel recv\n");
+	    PVFS_perror("Post of send failed; should cancel recv", ret);
 
 	    assert(msg_p->send_status.error_code != 0);
 
@@ -305,7 +305,9 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
 	    if (msg_p->send_status.error_code != 0)
             {
-		gossip_err("msgarray send failed; canceling recv\n");
+                PVFS_perror("Send failed; canceling recv",
+                            msg_p->send_status.error_code);
+
                 ret = job_bmi_cancel(
                     msg_p->recv_id, pint_client_sm_context);
                 if (ret)
@@ -351,7 +353,7 @@ static int msgpairarray_post_retry(PINT_client_sm *sm_p,
 
     /* delay here to stall before posting again */
     ret = job_req_sched_post_timer(
-        1000,
+        2000,
         sm_p,
         0,
         js_p,
@@ -380,30 +382,6 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 
 	/* save error, if any, in op_status */
 	msg_p->op_status = msg_p->recv_status.error_code;
-
-	if (msg_p->recv_status.error_code != 0)
-        {
-            if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
-                (PVFS_ERROR_CLASS(-msg_p->recv_status.error_code) ==
-                 PVFS_ERROR_BMI) &&
-                (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
-            {
-                msg_p->retry_count++;
-
-                gossip_err("*** msgarray recv failed -- retrying msgpair "
-                           "(count = %d)\n", msg_p->retry_count);
-
-                js_p->error_code = MSGPAIRS_RETRY;
-                return 1;
-            }
-
-            js_p->error_code = msg_p->recv_status.error_code;
-            return 1;
-	}
-        else
-        {
-            msg_p->recv_serviced = 1;
-        }
     }
     else
     {
@@ -415,33 +393,6 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 
 	/* save error, if any, in op_status */
 	msg_p->op_status = msg_p->send_status.error_code;
-
-	if ((msg_p->send_status.error_code == 0) &&
-            (msg_p->recv_serviced == 0))
-        {
-            sm_p->msgarray[0].comp_ct += 2;
-        }
-
-	if ((msg_p->send_status.error_code != 0) ||
-            (msg_p->recv_serviced == 0))
-        {
-            if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
-                ((PVFS_ERROR_CLASS(-msg_p->send_status.error_code) ==
-                  PVFS_ERROR_BMI) || (msg_p->recv_serviced == 0)) &&
-                (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
-            {
-                msg_p->retry_count++;
-
-                gossip_err("*** msgarray send failed -- retrying msgpair "
-                           "(count = %d)\n", msg_p->retry_count);
-
-                js_p->error_code = MSGPAIRS_RETRY;
-                return 1;
-            }
-
-            js_p->error_code = msg_p->send_status.error_code;
-            return 1;
-	}
     }
 
     /* decrement comp_ct until all operations have completed */
@@ -467,6 +418,9 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "msgpairarray state: "
+                 "completion_fn\n");
+
     for (i = 0; i < sm_p->msgarray_count; i++)
     {
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
@@ -474,6 +428,23 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 
 	if (msg_p->op_status != 0)
 	{
+            if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
+                (PVFS_ERROR_CLASS(-msg_p->op_status) ==
+                 PVFS_ERROR_BMI) &&
+                (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
+            {
+                msg_p->retry_count++;
+
+                gossip_err("*** msgarray send failed -- retrying msgpair "
+                           "(count = %d)\n", msg_p->retry_count);
+
+                /* FIXME: only redo the failed ones, not all */
+                sm_p->msgarray[0].comp_ct = 2 * sm_p->msgarray_count;
+
+                js_p->error_code = MSGPAIRS_RETRY;
+                return 1;
+            }
+
 	    PVFS_perror("msg pair did not complete; skipping comp_fn\n",
                         msg_p->op_status);
 	    js_p->error_code = msg_p->op_status;
