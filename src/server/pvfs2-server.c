@@ -132,7 +132,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 		       "re-run this program with a -f option.\n");
             gossip_err("\n*****************************\n");
         }
-	*server_level_init = SHUTDOWN_FLOW_INTERFACE;
+	*server_level_init = SHUTDOWN_BMI_INTERFACE;
 	goto interface_init_failed;
     }
 
@@ -216,7 +216,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     if (ret < 0)
     {
 	gossip_err("Flow_initialize Failed: %s\n", strerror(-ret));
-	*server_level_init = SHUTDOWN_BMI_INTERFACE;
+	*server_level_init = SHUTDOWN_FLOW_INTERFACE;
 	goto interface_init_failed;
     }
     gossip_debug(SERVER_DEBUG, "Flow Init Complete\n");
