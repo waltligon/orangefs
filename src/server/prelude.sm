@@ -36,7 +36,8 @@ nested machine pvfs2_prelude_sm(req_sched, perm_check)
     state req_sched
     {
 	run prelude_req_sched;
-	default => perm_check;
+	success => perm_check;
+	default => return;
     }
 
     state perm_check
@@ -55,8 +56,17 @@ nested machine pvfs2_prelude_sm(req_sched, perm_check)
  */
 static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
 {
+    int ret = -1;
 
-    return(1);
+    gossip_debug(SERVER_DEBUG, "(%p) prelude state: req_sched\n", s_op);
+
+    ret = job_req_sched_post(s_op->req,
+	s_op,
+	js_p,
+	&(s_op->scheduled_id),
+	PINT_server_job_context);
+
+    return(ret);
 }
 
 /* prelude_perm_check()
@@ -67,7 +77,10 @@ static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 {
+    gossip_debug(SERVER_DEBUG, "(%p) prelude state: perm_check\n", s_op);
+    gossip_debug(SERVER_DEBUG, "(%p) warning: not really checking permissions.\n", s_op);
 
+    js_p->error_code = 0;
     return(1);
 }
 
