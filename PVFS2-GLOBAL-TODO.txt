@@ -107,6 +107,9 @@ I/O path:
 - semantics of short read and write operations
 - bmi_tcp scalability and robustness
 - improve job thread layout
+- add functionality to the job interface that lets you submit a 
+  null job and have it pop out some specific amount of time later; to be
+  used by a state machine to periodically gather statistics
 
 I/O description:
 ====================================================================
