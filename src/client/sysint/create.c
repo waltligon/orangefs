@@ -375,7 +375,6 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 
 		/* store the new handle here */
 		df_handle_array[i] = ack_p->u.create.handle;
-		fprintf(stderr, "FOO: data handle: 0x%08Lx\n", df_handle_array[i]);
 
 		PINT_release_req(bmi_addr_list[i], &req_p, max_msg_sz, &decoded,
 		    &encoded_resp, op_tag);
