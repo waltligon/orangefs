@@ -669,8 +669,9 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 	    case '?':
 	    case 'h':
 	    default:
-		gossip_err("pvfs2-server: [-fh] <global_config_file> <server_config_file>\n\n"
+		gossip_err("pvfs2-server: [-hdf] <global_config_file> <server_config_file>\n\n"
 			   "\t-h will show this message\n"
+			   "\t-d will keep the server in the foreground\n"
 			   "\t-f will cause server to create file system storage and exit\n"
 			   );
 		return 1;
