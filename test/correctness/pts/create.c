@@ -40,6 +40,7 @@ int create_file(PVFS_fs_id fs_id, char *dirname, char *filename)
 		printf("Lookup failed with errcode = %d\n", ret);
 		return(-1);
 	}
+	free(req_look.name);
 
 	/* test create */
 	req_create = (PVFS_sysreq_create *)malloc(sizeof(PVFS_sysreq_create));
@@ -89,6 +90,7 @@ int create_file(PVFS_fs_id fs_id, char *dirname, char *filename)
 		printf("create failed with errcode = %d\n", ret);
 		return(-1);
 	}
+	free(req_create->entry_name);
 	free(req_create);
 	free(resp_create);
 	return 0;
@@ -118,8 +120,8 @@ int test_create(MPI_Comm *comm, int rank, char *buf, void *params)
 		return(ret);
 	}
 
-	for (i=0; i<1; i++) {
-		snprintf(name, PVFS_NAME_MAX, "%d-testfile", i);
+	for (i=0; i<myparams->mode; i++) {
+		snprintf(name, PVFS_NAME_MAX, "%d-%d-testfile", i, rank);
 		nerrs += create_file(resp_init.fsid_list[0],  myparams->path, name);
 	}
 
