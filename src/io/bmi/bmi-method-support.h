@@ -173,6 +173,7 @@ struct method_op
     bmi_size_t expected_size;	/* expected size of the transfer */
     method_addr_st *addr;	/* peer address involved in the communication */
     bmi_flag_t mode;		/* operation mode */
+    bmi_context_id context_id;  /* context */
     struct qlist_head op_list_entry;	/* op_list link */
     struct qlist_head hash_link;	/* hash table link */
     void *method_data;		/* for use by individual methods */

@@ -167,7 +167,8 @@ static int enqueue_operation(op_list_p target_list,
 			     void *user_ptr,
 			     int list_stub_flag,
 			     bmi_size_t actual_size,
-			     bmi_size_t expected_size);
+			     bmi_size_t expected_size,
+			     bmi_context_id context_id);
 static int tcp_cleanse_addr(method_addr_p map);
 static int tcp_shutdown_addr(method_addr_p map);
 static int tcp_do_work(int max_idle_time);
@@ -189,7 +190,8 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				     bmi_flag_t buffer_flag,
 				     struct tcp_msg_header my_header,
 				     void *user_ptr,
-				     int list_stub_flag);
+				     int list_stub_flag,
+				     bmi_context_id context_id);
 static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 method_addr_p src,
 				 void **buffer_list,
@@ -200,7 +202,8 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 bmi_flag_t buffer_flag,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
-				 int list_stub_flag);
+				 int list_stub_flag,
+				 bmi_context_id context_id);
 
 /* exported method interface */
 struct bmi_method_ops bmi_tcp_ops = {
@@ -231,19 +234,21 @@ static method_params_st tcp_method_params;
 /* op_list_array indices */
 enum
 {
-    NUM_INDICES = 6,
+    NUM_INDICES = 5,
     IND_SEND = 0,
     IND_RECV = 1,
     IND_RECV_INFLIGHT = 2,
     IND_RECV_EAGER_DONE_BUFFERING = 3,
-    IND_COMPLETE = 4,		/* MAKE SURE THESE COME LAST */
-    IND_COMPLETE_RECV_UNEXP = 5,	/* MAKE SURE THESE COME LAST */
+    IND_COMPLETE_RECV_UNEXP = 4,	/* MAKE THIS COMES LAST */
 };
 
 /* internal operation lists */
-static op_list_p op_list_array[7] = { NULL, NULL, NULL, NULL,
-    NULL, NULL, NULL
+static op_list_p op_list_array[6] = { NULL, NULL, NULL, NULL,
+    NULL, NULL
 };
+
+/* internal completion queues */
+static op_list_p completion_array[BMI_MAX_CONTEXTS] = { NULL };
 
 /* internal socket collection */
 static socket_collection_p tcp_socket_collection_p = NULL;
@@ -640,7 +645,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 
     return (BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_flag, my_header,
-				      user_ptr, 1));
+				      user_ptr, 1, context_id));
 }
 
 
@@ -676,7 +681,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 
     return (BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_flag, my_header,
-				      user_ptr, 1));
+				      user_ptr, 1, context_id));
 }
 
 
@@ -718,7 +723,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 
     ret = tcp_post_recv_generic(id, src, &buffer, &expected_size,
 				1, expected_size, actual_size, buffer_flag, tag,
-				user_ptr, 1);
+				user_ptr, 1, context_id);
 
     return (ret);
 }
@@ -753,6 +758,7 @@ int BMI_tcp_test(bmi_op_id_t id,
     if(((struct tcp_op*)(query_op->method_data))->tcp_op_state ==
 	BMI_TCP_COMPLETE)
     {
+	assert(query_op->context_id == context_id);
 	op_list_remove(query_op);
 	if (user_ptr != NULL)
 	{
@@ -805,6 +811,7 @@ int BMI_tcp_testsome(int incount,
 	    if(((struct tcp_op*)(query_op->method_data))->tcp_op_state ==
 		BMI_TCP_COMPLETE)
 	    {
+		assert(query_op->context_id == context_id);
 		/* this one's done; pop it out */
 		op_list_remove(query_op);
 		error_code_array[*outcount] = query_op->error_code;
@@ -910,7 +917,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 
     return (BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_flag,
-				      my_header, user_ptr, 0));
+				      my_header, user_ptr, 0, context_id));
 }
 
 /* BMI_tcp_post_recv_list()
@@ -943,7 +950,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
     ret = tcp_post_recv_generic(id, src, buffer_list, size_list,
 				list_count, total_expected_size,
 				total_actual_size, buffer_flag, tag, user_ptr,
-				0);
+				0, context_id);
 
     return (ret);
 }
@@ -984,7 +991,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 
     return (BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_flag,
-				      my_header, user_ptr, 0));
+				      my_header, user_ptr, 0, context_id));
 }
 
 
@@ -996,8 +1003,14 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
  */
 int BMI_tcp_open_context(bmi_context_id context_id)
 {
-    /* TODO: implement */
-    gossip_lerr("Warning: BMI_tcp_open_context() stub called, context_id: %d.\n", (int)context_id);
+
+    /* start a new queue for tracking completions in this context */
+    completion_array[context_id] = op_list_new();
+    if (!completion_array[context_id])
+    {
+	return(-ENOMEM);
+    }
+
     return(0);
 }
 
@@ -1010,8 +1023,10 @@ int BMI_tcp_open_context(bmi_context_id context_id)
  */
 void BMI_tcp_close_context(bmi_context_id context_id)
 {
-    /* TODO: implement */
-    gossip_lerr("Warning: BMI_tcp_close_context() stub called, context_id: %d.\n", (int)context_id);
+    
+    /* tear down completion queue for this context */
+    op_list_cleanup(completion_array[context_id]);
+
     return;
 }
 
@@ -1348,7 +1363,8 @@ static int enqueue_operation(op_list_p target_list,
 			     void *user_ptr,
 			     int list_stub_flag,
 			     bmi_size_t actual_size,
-			     bmi_size_t expected_size)
+			     bmi_size_t expected_size,
+			     bmi_context_id context_id)
 {
     method_op_p new_method_op = NULL;
     int bit_added = 0;
@@ -1379,6 +1395,7 @@ static int enqueue_operation(op_list_p target_list,
     new_method_op->msg_tag = header.tag;
     new_method_op->mode = header.mode;
     new_method_op->list_count = list_count;
+    new_method_op->context_id = context_id;
     if (amt_complete > size_list[0])
     {
 	/* we don't handle this yet */
@@ -1450,7 +1467,8 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 bmi_flag_t buffer_flag,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
-				 int list_stub_flag)
+				 int list_stub_flag,
+				 bmi_context_id context_id)
 {
     method_op_p query_op = NULL;
     int ret = -1;
@@ -1659,7 +1677,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 			    BMI_OP_RECV, src, buffer_list, size_list,
 			    list_count, 0, 0, 0, id, BMI_TCP_INPROGRESS,
 			    bogus_header, user_ptr, list_stub_flag, 0,
-			    expected_size);
+			    expected_size, context_id);
     /* just for safety; this field isn't valid to the caller anymore */
     (*actual_size) = 0;
     if (ret >= 0)
@@ -1694,8 +1712,8 @@ static int tcp_cleanse_addr(method_addr_p map)
     key.method_addr = map;
     key.method_addr_yes = 1;
 
-    /* NOTE: we know the completed queues are the last 2 indices! */
-    for (i = 0; i < (NUM_INDICES - 2); i++)
+    /* NOTE: we know the unexpected completed queue is the last index! */
+    for (i = 0; i < (NUM_INDICES - 1); i++)
     {
 	if (op_list_array[i])
 	{
@@ -1713,7 +1731,7 @@ static int tcp_cleanse_addr(method_addr_p map)
 		{
 		    ((struct tcp_op*)(query_op->method_data))->tcp_op_state = 
 			BMI_TCP_COMPLETE;
-		    op_list_add(op_list_array[IND_COMPLETE], query_op);
+		    op_list_add(completion_array[query_op->context_id], query_op);
 		}
 	    }
 	}
@@ -2207,7 +2225,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	op_list_remove(my_method_op);
 	((struct tcp_op*)(my_method_op->method_data))->tcp_op_state = 
 	    BMI_TCP_COMPLETE;
-	op_list_add(op_list_array[IND_COMPLETE], my_method_op);
+	op_list_add(completion_array[my_method_op->context_id], my_method_op);
 	*blocked_flag = 0;
     }
     else
@@ -2298,7 +2316,7 @@ static int work_on_recv_op(method_op_p my_method_op)
 	    {
 		((struct tcp_op*)(my_method_op->method_data))->tcp_op_state = 
 		    BMI_TCP_COMPLETE;
-		op_list_add(op_list_array[IND_COMPLETE], my_method_op);
+		op_list_add(completion_array[my_method_op->context_id], my_method_op);
 	    }
 	}
     }
@@ -2449,7 +2467,8 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				     bmi_flag_t buffer_flag,
 				     struct tcp_msg_header my_header,
 				     void *user_ptr,
-				     int list_stub_flag)
+				     int list_stub_flag,
+				     bmi_context_id context_id)
 {
     struct tcp_addr *tcp_addr_data = dest->method_data;
     method_op_p query_op = NULL;
@@ -2488,7 +2507,8 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	ret = enqueue_operation(op_list_array[IND_SEND], BMI_OP_SEND,
 				dest, buffer_list, size_list, list_count, 0, 0,
 				1, id, BMI_TCP_INPROGRESS, my_header, user_ptr,
-				list_stub_flag, my_header.size, 0);
+				list_stub_flag, my_header.size, 0,
+				context_id);
 	if (ret >= 0)
 	{
 	    /* go ahead and try to do some work while we are in this
@@ -2515,7 +2535,8 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	ret = enqueue_operation(op_list_array[IND_SEND], BMI_OP_SEND,
 				dest, buffer_list, size_list, list_count, 0, 0,
 				1, id, BMI_TCP_INPROGRESS, my_header, user_ptr,
-				list_stub_flag, my_header.size, 0);
+				list_stub_flag, my_header.size, 0,
+				context_id);
 	return (ret);
     }
 
@@ -2535,7 +2556,8 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	ret = enqueue_operation(op_list_array[IND_SEND], BMI_OP_SEND,
 				dest, buffer_list, size_list, list_count, 0,
 				ret, 1, id, BMI_TCP_INPROGRESS, my_header,
-				user_ptr, list_stub_flag, my_header.size, 0);
+				user_ptr, list_stub_flag,
+				my_header.size, 0, context_id);
 	return (ret);
     }
 
@@ -2571,7 +2593,8 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 			    dest, buffer_list, size_list, list_count,
 			    amt_complete, sizeof(struct tcp_msg_header), 1, id,
 			    BMI_TCP_INPROGRESS, my_header, user_ptr,
-			    list_stub_flag, my_header.size, 0);
+			    list_stub_flag, my_header.size, 0,
+			    context_id);
 
     return (ret);
 }
