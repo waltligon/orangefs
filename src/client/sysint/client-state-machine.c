@@ -659,6 +659,15 @@ int PINT_client_state_machine_testsome(
 
     job_count = MAX_RETURNED_JOBS;
     limit = *op_count;
+    *op_count = 0;
+
+    ret = completion_list_retrieve_completed(
+        op_id_array, user_ptr_array, error_code_array, limit, op_count);
+
+    if ((ret == 0) && (*op_count > 0))
+    {
+        return ret;
+    }
 
     ret = job_testcontext(job_id_array,
 			  &job_count, /* in/out parameter */
