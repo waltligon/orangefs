@@ -21,6 +21,7 @@ int initialize_sysint()
         if(ret > -1)
         {
             pvfs_helper.initialized = 1;
+            pvfs_helper.num_test_files = NUM_TEST_FILES;
             ret = 0;
         }
         else

@@ -15,6 +15,7 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
     PVFS_sysresp_lookup resp_lk;
     PVFS_sysreq_create req_cr;
     PVFS_sysresp_create resp_cr;
+    generic_params *args = (generic_params *)params;
     char filename[MAX_TEST_PATH_LEN];
 
     debug_printf("test_pvfs_datatype_init called\n");
@@ -23,6 +24,12 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
     {
         debug_printf("initialize_sysint failed\n");
         return ret;
+    }
+    if (args && args->mode)
+    {
+        pvfs_helper.num_test_files = args->mode;
+        debug_printf("test_pvfs_datatype_init mode is %d\n",
+                     args->mode);
     }
 
     /*
@@ -36,7 +43,7 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
       - lookup fails for *any* reason
       - create fails
     */
-    for(i = 0; i < NUM_TEST_FILES; i++)
+    for(i = 0; i < pvfs_helper.num_test_files; i++)
     {
         memset(filename,0,MAX_TEST_PATH_LEN);
         snprintf(filename,MAX_TEST_PATH_LEN,"%s%.5d\n",
@@ -102,5 +109,5 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
             num_test_files_ok++;
         }
     }
-    return ((num_test_files_ok == NUM_TEST_FILES) ? 0 : 1);
+    return ((num_test_files_ok == pvfs_helper.num_test_files) ? 0 : 1);
 }

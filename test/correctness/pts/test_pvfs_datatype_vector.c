@@ -41,7 +41,7 @@ int test_pvfs_datatype_vector(MPI_Comm *mycomm, int myid, char *buf, void *param
         io_buffer_out[i] = 0;
     }
 
-    for(i = 0; i < NUM_TEST_FILES; i++)
+    for(i = 0; i < pvfs_helper.num_test_files; i++)
     {
         memset(filename,0,MAX_TEST_PATH_LEN);
         snprintf(filename,MAX_TEST_PATH_LEN,"%s%.5d\n",
@@ -136,5 +136,5 @@ int test_pvfs_datatype_vector(MPI_Comm *mycomm, int myid, char *buf, void *param
     }
     free(io_buffer_in);
     free(io_buffer_out);
-    return ((num_ok == NUM_TEST_FILES) ? 0 : 1);
+    return ((num_ok == pvfs_helper.num_test_files) ? 0 : 1);
 }

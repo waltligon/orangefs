@@ -22,6 +22,7 @@
 typedef struct
 {
     int initialized;
+    int num_test_files;
     pvfs_mntlist mnt;
     PVFS_sysresp_init resp_init;
 } pvfs_helper_t;
