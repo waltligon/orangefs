@@ -68,10 +68,8 @@ int pvfs2_vis_stop(void)
 int pvfs2_vis_start(char* path, int update_interval)
 {
     PVFS_fs_id cur_fs;
-    const PVFS_util_tab* tab;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i,j;
-    PVFS_sysresp_init resp_init;
     PVFS_credentials creds;
     int ret = -1;
     int io_server_count = 0;
@@ -93,15 +91,7 @@ int pvfs2_vis_start(char* path, int update_interval)
 	return(-PVFS_ENOMEM);
     }
 
-    /* look at pvfstab */
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
-    {
-        return(-PVFS_ENOENT);
-    }
-
-    memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(*tab, 0, &resp_init);
+    ret = PVFS_util_init_defaults();
     if(ret < 0)
     {
 	return(ret);
