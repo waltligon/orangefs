@@ -21,19 +21,6 @@
  */
 typedef int32_t PVFS_coll_id;
 
-/* user defined types that may be associated with dataspaces */
-typedef int32_t PVFS_ds_type;
-
-/* PVFS object types; "other" is used for misc. stuff (e.g. directory dirent space) */
-enum
-{
-    PVFS_TYPE_METAFILE = 128,
-    PVFS_TYPE_DATAFILE = 256,
-    PVFS_TYPE_DIRECTORY = 512,
-    PVFS_TYPE_SYMLINK = 1024,
-    PVFS_TYPE_DIRDATA = 8192
-};
-
 /* unique identifiers associated with dataspace operations */
 typedef int64_t PVFS_ds_id;
 

@@ -38,15 +38,30 @@ typedef int64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 
 /* permission bits */
-#define PVFS_O_EXECUTE    (1 << 0)
-#define PVFS_O_WRITE      (1 << 1)
-#define PVFS_O_READ       (1 << 2)
-#define PVFS_G_EXECUTE    (1 << 3)
-#define PVFS_G_WRITE      (1 << 4)
-#define PVFS_G_READ       (1 << 5)
-#define PVFS_U_EXECUTE    (1 << 6)
-#define PVFS_U_WRITE      (1 << 7)
-#define PVFS_U_READ       (1 << 8)
+#define PVFS_O_EXECUTE	(1 << 0)
+#define PVFS_O_WRITE	(1 << 1)
+#define PVFS_O_READ	(1 << 2)
+#define PVFS_G_EXECUTE	(1 << 3)
+#define PVFS_G_WRITE	(1 << 4)
+#define PVFS_G_READ	(1 << 5)
+#define PVFS_U_EXECUTE	(1 << 6)
+#define PVFS_U_WRITE	(1 << 7)
+#define PVFS_U_READ	(1 << 8)
+
+/* object and attribute types */
+enum PVFS_ds_type_e
+{
+    PVFS_TYPE_METAFILE =    (1 << 0),
+    PVFS_TYPE_DATAFILE =    (1 << 1),
+    PVFS_TYPE_DIRECTORY =   (1 << 2),
+    PVFS_TYPE_SYMLINK =	    (1 << 3),
+    PVFS_TYPE_DIRDATA =	    (1 << 4)
+    /* WARNING: if you add new entries to this enumeration, please make
+     * certain that they do not collide with any of the explicit
+     * PVFS_ATTR_XXX defines listed below
+     */
+};
+typedef enum PVFS_ds_type_e PVFS_ds_type;
 
 /* pinode reference (uniquely refers to a single pinode) */
 typedef struct
