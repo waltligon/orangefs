@@ -28,7 +28,7 @@ endif
 # some of the test programs require the use of the pvfs2 server library;
 # we therefore need to find out what libraries the original pvfs2 build
 # used for server components
-SERVERLIBS := -lpvfs2-server -lpthread -lrt $(shell cat ${pvfs2_builddir}/.libs)
+SERVERLIBS = @SERVERLIBS@
 
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
@@ -77,11 +77,11 @@ INCLUDES := \
 CC = @CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@ 
 LD = gcc
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LDFLAGS += -L lib 
-LIBS += -lpvfs2 @LIBS@ 
 
 CFLAGS += -DUSE_BMI_MSGS
   # turn on large file support by default
@@ -100,8 +100,6 @@ GCC_CFLAGS := -Wall -Wstrict-prototypes -pipe
 
 ################################################################
 # Setup component specific flags
-
-LIBS += -lpthread
 
 # Use these same cflags for the mpi test codes.
 MPICFLAGS := $(CFLAGS)

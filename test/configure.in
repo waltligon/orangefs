@@ -121,6 +121,12 @@ AC_CHECK_LIB(pvfs2, PVFS_sys_create, ,
     AC_MSG_ERROR("could not find libpvfs2... must specify path to PVFS2 installation or build tree with --with-pvfs2 or --with-pvfs2-src ${LDFLAGS}"), -lpthread
     )
 
+dnl ask pvfs2-config to tell us what libraries to use for client and server
+dnl tests
+LIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --libs`
+SERVERLIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --serverlibs`
+AC_SUBST(SERVERLIBS)
+
 MPI_INTELC=
 MPI_GNUC=
 if test x$BUILD_MPI = x1; then

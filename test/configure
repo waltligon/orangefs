@@ -1312,22 +1312,26 @@ else
 fi
 
 
+LIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --libs`
+SERVERLIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --serverlibs`
+
+
 MPI_INTELC=
 MPI_GNUC=
 if test x$BUILD_MPI = x1; then
     echo $ac_n "checking whether the mpicc compiler works""... $ac_c" 1>&6
-echo "configure:1320: checking whether the mpicc compiler works" >&5
+echo "configure:1324: checking whether the mpicc compiler works" >&5
     saveCC="$CC"
     CC="$MPICC"
     cat > conftest.$ac_ext <<EOF
-#line 1324 "configure"
+#line 1328 "configure"
 #include "confdefs.h"
 #include <mpi.h>
 int main() {
 int ret = MPI_Init(0, (void*)0)
 ; return 0; }
 EOF
-if { (eval echo configure:1331: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1335: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   echo "$ac_t""yes" 1>&6
 else
@@ -1340,9 +1344,9 @@ else
 fi
 rm -f conftest*
             echo $ac_n "checking whether mpicc is an Intel compiler""... $ac_c" 1>&6
-echo "configure:1344: checking whether mpicc is an Intel compiler" >&5
+echo "configure:1348: checking whether mpicc is an Intel compiler" >&5
     cat > conftest.$ac_ext <<EOF
-#line 1346 "configure"
+#line 1350 "configure"
 #include "confdefs.h"
 
     #ifndef __ICC
@@ -1353,7 +1357,7 @@ int main() {
 
 ; return 0; }
 EOF
-if { (eval echo configure:1357: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1361: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   echo "$ac_t""yes" 1>&6
 	MPI_INTELC=1
@@ -1368,9 +1372,9 @@ fi
 rm -f conftest*
     if test x$MPI_INTELC = x; then
 	echo $ac_n "checking whether mpicc is a GNU compiler""... $ac_c" 1>&6
-echo "configure:1372: checking whether mpicc is a GNU compiler" >&5
+echo "configure:1376: checking whether mpicc is a GNU compiler" >&5
 	cat > conftest.$ac_ext <<EOF
-#line 1374 "configure"
+#line 1378 "configure"
 #include "confdefs.h"
 
 	#ifndef __GNUC__
@@ -1381,7 +1385,7 @@ int main() {
 
 ; return 0; }
 EOF
-if { (eval echo configure:1385: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:1389: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   echo "$ac_t""yes" 1>&6
 	    MPI_GNUC=1
@@ -1583,6 +1587,7 @@ s%@INTELC@%$INTELC%g
 s%@GNUC@%$GNUC%g
 s%@PVFS2_SRC_RELATIVE_TOP@%$PVFS2_SRC_RELATIVE_TOP%g
 s%@PVFS2_BUILD_RELATIVE_TOP@%$PVFS2_BUILD_RELATIVE_TOP%g
+s%@SERVERLIBS@%$SERVERLIBS%g
 s%@MPICC@%$MPICC%g
 s%@BUILD_MPI@%$BUILD_MPI%g
 s%@MPI_INTELC@%$MPI_INTELC%g
