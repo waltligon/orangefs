@@ -7,6 +7,8 @@
 #ifndef __PVFS_DIST_SIMPLE_STRIPE_H
 #define __PVFS_DIST_SIMPLE_STRIPE_H
 
+#include "pvfs2-types.h"
+
 /* Identifier to use when looking up this distribution */
 #define PVFS_DIST_SIMPLE_STRIPE_NAME "simple_stripe"
 #define PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE 14
