@@ -22,8 +22,9 @@
 
 /* Note: need to link in librt */
 
+#if 0
 static void aiocb_print(struct aiocb *ptr);
-
+#endif
 
 /* dbpf_bstream_listio_convert()
  *
@@ -146,6 +147,7 @@ int dbpf_bstream_listio_convert(
     else return 1;
 }
 
+#if 0
 static void aiocb_print(struct aiocb *ptr)
 {
     static char lio_write[]     = "LIO_WRITE";
@@ -169,6 +171,7 @@ static void aiocb_print(struct aiocb *ptr)
 	   opcode,
 	   sigev);
 }
+#endif
 
 /*
  * Local variables:
