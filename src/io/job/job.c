@@ -1199,7 +1199,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on failure
  */
 
-int job_trove_bstream_flush(PVFS_fs_id coll_id
+int job_trove_bstream_flush(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    PVFS_ds_flags flags,
 			    void *user_ptr,
@@ -1522,7 +1522,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 
-    ret = trove_keyval_flush(coll_id, handle, jd, &(jd->u.trove.id));
+    ret = trove_keyval_flush(coll_id, handle, flags, jd, &(jd->u.trove.id));
 
     if (ret < 0)
     {

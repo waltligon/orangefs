@@ -195,7 +195,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 			      job_context_id context_id);
 
 /* byte stream flush to storage */
-int job_trove_bstream_flush(PVFS_fs_id coll_id
+int job_trove_bstream_flush(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    PVFS_ds_flags flags,
 			    void *user_ptr,
