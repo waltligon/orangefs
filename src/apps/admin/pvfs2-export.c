@@ -7,15 +7,14 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/time.h>
 
-#include "pvfs2-sysint.h"
-#include "helper.h"
-#include "simple-stripe.h"
+#include "pvfs2.h"
 
 #define DEFAULT_TAB "/etc/pvfs2tab"
 
