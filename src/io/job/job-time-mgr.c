@@ -12,8 +12,10 @@
 #include "job-desc-queue.h"
 #include "job.h"
 #include "quicklist.h"
+#include "gen-locks.h"
 
 QLIST_HEAD(bucket_queue);
+static gen_mutex_t bucket_mutex = GEN_MUTEX_INITIALIZER;
 
 struct time_bucket
 {
@@ -48,6 +50,8 @@ int job_time_mgr_finalize(void)
     struct time_bucket* tmp_bucket = NULL;
     struct job_desc* jd = NULL;
 
+    gen_mutex_lock(&bucket_mutex);
+
     qlist_for_each_safe(iterator, scratch, &bucket_queue)
     {
 	tmp_bucket = qlist_entry(iterator, struct time_bucket, bucket_link);
@@ -62,6 +66,8 @@ int job_time_mgr_finalize(void)
 
 	free(tmp_bucket);
     }
+
+    gen_mutex_unlock(&bucket_mutex);
 
     return(0);
 }
@@ -91,6 +97,8 @@ int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
 
     /* round up to the second that this job should expire */
     expire_time_sec = tv.tv_sec = 1;
+
+    gen_mutex_lock(&bucket_mutex);
 
     /* look for a bucket matching the desired seconds value */
     qlist_for_each(tmp_link, &bucket_queue)
@@ -134,6 +142,8 @@ int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
     /* add the job descriptor onto the correct bucket */
     qlist_add_tail(&jd->job_time_link, &tmp_bucket->jd_queue);
 
+    gen_mutex_unlock(&bucket_mutex);
+
     return(0);
 }
 
@@ -153,6 +163,8 @@ int job_time_mgr_rem(struct job_desc* jd)
 	return(0);
     }
 
+    gen_mutex_lock(&bucket_mutex);
+
     qlist_del(&jd->job_time_link);
     tmp_bucket = (struct time_bucket*)jd->time_bucket;
 
@@ -164,6 +176,8 @@ int job_time_mgr_rem(struct job_desc* jd)
     }
 
     jd->time_bucket = NULL;
+
+    gen_mutex_unlock(&bucket_mutex);
 
     return(0);
 }
@@ -187,9 +201,12 @@ int job_time_mgr_expire(void)
 
     gettimeofday(&tv, NULL);
 
+    gen_mutex_lock(&bucket_mutex);
+
     qlist_for_each_safe(iterator, scratch, &bucket_queue)
     {
 	tmp_bucket = qlist_entry(iterator, struct time_bucket, bucket_link);
+	/* stop when we see the first bucket that has not expired */
 	if(tmp_bucket->expire_time_sec > tv.tv_sec)
 	{
 	    break;
@@ -226,6 +243,8 @@ int job_time_mgr_expire(void)
 
 	free(tmp_bucket);
     }
+
+    gen_mutex_unlock(&bucket_mutex);
 
     return(0);
 }
