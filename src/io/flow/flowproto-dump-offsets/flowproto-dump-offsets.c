@@ -12,7 +12,6 @@
 #include "flow.h"
 #include "flowproto-support.h"
 #include "quicklist.h"
-#include "op-id-queue.h"
 #include "pvfs-request.h"
 
 /**********************************************************
