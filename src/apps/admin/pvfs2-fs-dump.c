@@ -542,7 +542,9 @@ void verify_datafiles(PVFS_fs_id cur_fs,
 	ret = handlelist_find_handle(df_handles[i], &server_idx);
 	if (ret != 0)
 	{
-	    assert(0);
+            printf("Datafile Handle %Lu appears to be missing; "
+                   "skipping!\n", Lu(df_handles[i]));
+            continue;
 	}
 
 	print_entry(NULL,
