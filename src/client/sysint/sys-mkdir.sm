@@ -297,12 +297,7 @@ static int mkdir_crdirent_comp_fn(void *v_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_crdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-    return 0;
+    return resp_p->status;
 }
 
 static int mkdir_delete_handle_comp_fn(void *v_p,
@@ -312,12 +307,7 @@ static int mkdir_delete_handle_comp_fn(void *v_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_delete_handle_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_REMOVE);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-    return 0;
+    return resp_p->status;
 }
 
 static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
@@ -335,8 +325,7 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting mkdir req\n");
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
+    PINT_init_msgpair(sm_p, msg_p);
 
     server_config = PINT_get_server_config_struct(
         sm_p->parent_ref.fs_id);
@@ -362,15 +351,10 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.mkdir.sys_attr,
         PVFS_ATTR_SYS_ALL_NOSIZE);
 
-    /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_msg_comp_fn;
-
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
-
     return 1;
 }
 
@@ -396,13 +380,12 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting crdirent req\n");
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
-
     gossip_debug(GOSSIP_CLIENT_DEBUG, "hooking dirent %s (%Lu) under "
                  "parent handle %Lu\n", sm_p->u.mkdir.object_name,
                  Lu(sm_p->u.mkdir.metafile_handle),
                  Lu(sm_p->parent_ref.handle));
+
+    PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
@@ -412,24 +395,20 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->parent_ref.handle,
         sm_p->parent_ref.fs_id);
 
-    /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->u.mkdir.metafile_handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_crdirent_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                    sm_p->parent_ref.handle,
-                                    sm_p->parent_ref.fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, sm_p->parent_ref.handle,
+        sm_p->parent_ref.fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
-
     return 1;
 }
 
@@ -456,15 +435,12 @@ static int mkdir_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
+    PINT_init_msgpair(sm_p, msg_p);
 
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
+    ret = PINT_cached_config_map_to_server(
+        &metafile_server_addr, sm_p->u.mkdir.metafile_handle,
+        sm_p->parent_ref.fs_id);
 
-    ret = PINT_cached_config_map_to_server(&metafile_server_addr,
-                                    sm_p->u.mkdir.metafile_handle,
-                                    sm_p->parent_ref.fs_id);
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");

@@ -215,16 +215,12 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," setattr: posting setattr req\n");
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
-
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
-
     attr = (sm_p->acache_hit ?
             &sm_p->pinode->attr :
             &sm_p->acache_attr);
     assert(attr);
+
+    PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
@@ -239,13 +235,13 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
     {
         if (attr->mask & PVFS_ATTR_META_DFILES)
         {
-            /* fill in meta file specific attributes */
             msg_p->req.u.setattr.attr.u.meta.dfile_array =
                 attr->u.meta.dfile_array;
             msg_p->req.u.setattr.attr.u.meta.dfile_count =
                 attr->u.meta.dfile_count;
             msg_p->req.u.setattr.attr.mask |= PVFS_ATTR_META_DFILES;
         }
+
         if (attr->mask & PVFS_ATTR_META_DIST)
         {
             msg_p->req.u.setattr.attr.u.meta.dist =

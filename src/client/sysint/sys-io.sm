@@ -494,7 +494,6 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
             sm_p->u.io.file_req_offset,
             PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
 
-        /* fill in msgpair structure components */
         msg->fs_id = sm_p->object_ref.fs_id;
         msg->handle = cur_ctx->data_handle;
         msg->retry_flag = PVFS_MSGPAIR_NO_RETRY;
@@ -502,6 +501,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 
         ret = PINT_cached_config_map_to_server(
                &msg->svr_addr, msg->handle, msg->fs_id);
+
         if (ret)
         {
             gossip_err("Failed to map meta server address\n");

@@ -556,11 +556,7 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting crdirent req\n");
 
     assert(sm_p->msgarray);
-    if (sm_p->msgarray != &(sm_p->msgpair)) 
-	free(sm_p->msgarray);
-
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
+    PINT_init_msgpair(sm_p, msg_p);
 
     /*
       hook the 'old' handle up to the new parent with the 'new_entry'
@@ -575,25 +571,19 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.rename.parent_refns[1].handle,
         sm_p->u.rename.parent_refns[1].fs_id);
 
-    /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_crdirent_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                    msg_p->handle,
-                                    msg_p->fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-
-    /* let 'msgpairarray' handle the 'msgpair' case */
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
-
     return 1;
 }
 
@@ -610,8 +600,7 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting rmdirent req\n");
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
+    PINT_init_msgpair(sm_p, msg_p);
 
     /*
       in the normal case, the state machine will lead us
@@ -632,7 +621,6 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
         sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index]);
 
-    /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->u.rename.parent_refns[
         sm_p->u.rename.rmdirent_index].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[
@@ -640,21 +628,14 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_rmdirent_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                    msg_p->handle,
-                                    msg_p->fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    
-    /* let 'msgpairarray' handle the 'msgpair' case */
-    if (sm_p->msgarray != msg_p)
-	    free (sm_p->msgarray);
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
-
     return 1;
 }
 
@@ -701,8 +682,7 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting chdirent req\n");
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
+    PINT_init_msgpair(sm_p, msg_p);
 
     /*
       here, we're exhanging the existing dirent under the 'new' parent
@@ -717,35 +697,27 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.rename.refns[0].handle,
         sm_p->u.rename.entries[1]);
 
-    /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = rename_chdirent_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                    msg_p->handle,
-                                    msg_p->fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-    
-    if (sm_p->msgarray && (sm_p->msgarray != msg_p))
-    {
-        free (sm_p->msgarray);
-    }
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
-
     return 1;
 }
 
 static int rename_chdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: chdirent_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename state: chdirent_failure\n");
     return 1;
 }
 
@@ -791,9 +763,10 @@ static int rename_cleanup(PINT_client_sm *sm_p,
 
     sm_p->op_complete = 1;
 
-    if (sm_p->msgarray != &(sm_p->msgpair))
+    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
     {
 	free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
     return 0;
 }
@@ -806,12 +779,8 @@ static int rename_generic_timer(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: generic_timer\n");
 
     return job_req_sched_post_timer(
-	PVFS2_CLIENT_RETRY_DELAY,
-	sm_p,
-	0,
-	js_p,
-	&tmp_id,
-	pint_client_sm_context);
+	PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p,
+        &tmp_id, pint_client_sm_context);
 }
 
 static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
@@ -832,9 +801,9 @@ static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
     if ((js_p->error_code == -PVFS_EEXIST) &&
         (sm_p->u.rename.retry_count > 0))
     {
-	/* assume everything worked out ok and we got the right directory
-	 * entry back.  there was just a transient network problem along the
-	 * way
+	/* assume everything worked out ok and we got the right
+	 * directory entry back.  there was just a transient network
+	 * problem along the way
 	 */
 	js_p->error_code = 0;
 	return(1);
@@ -862,10 +831,11 @@ static int rename_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
     if ((js_p->error_code == -PVFS_ENOENT) &&
         (sm_p->u.rename.retry_count > 0))
     {
-	/* tricky error case.  The rmdirent failed, but it wasn't our first
-	 * try.  Assume that a previous one was successful and we just
-	 * didn't get the response.  This particular case isn't as dangerous
-	 * in rename as it is in remove.  Just let it go without warning.
+	/* tricky error case.  The rmdirent failed, but it wasn't our
+	 * first try.  Assume that a previous one was successful and
+	 * we just didn't get the response.  This particular case
+	 * isn't as dangerous in rename as it is in remove.  Just let
+	 * it go without warning.
 	 */
 	js_p->error_code = 0;
 	return(1);
@@ -874,7 +844,6 @@ static int rename_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
     /* let other errors fall through to next state */
     return 1;
 }
-
 
 /*
  * Local variables:

@@ -197,7 +197,6 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
                                      job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PVFS_BMI_addr_t server_addr;
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: "
@@ -205,21 +204,7 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    ret = PINT_cached_config_map_to_server(
-        &server_addr, sm_p->object_ref.handle,
-        sm_p->object_ref.fs_id);
-
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-        return 1;
-    }
-
     gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
-
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     gossip_debug(
         GOSSIP_READDIR_DEBUG, "%Lu|%d | token is %d | limit is %d\n",
@@ -227,6 +212,8 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->object_ref.fs_id,
         sm_p->u.readdir.pos_token,
         sm_p->u.readdir.dirent_limit);
+
+    PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_READDIR_FILL(
         msg_p->req,
@@ -236,15 +223,21 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.readdir.pos_token,
         sm_p->u.readdir.dirent_limit);
 
-    /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = readdir_msg_comp_fn;
-    msg_p->svr_addr = server_addr;
 
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, sm_p->object_ref.handle,
+        sm_p->object_ref.fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+        return 1;
+    }
     return 1;
 }
 

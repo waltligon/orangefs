@@ -24,6 +24,7 @@ ENABLE_EXECUTE_TESTS=1
 ENABLE_COMPILE_TESTS=1
 ENABLE_PERMISSION_TESTS=1
 ENABLE_SYMLINK_TESTS=1
+ENABLE_RENAME_TESTS=1
 
 #####################################
 # test constants here
@@ -1067,6 +1068,69 @@ symlink_test1()
 }
 
 #####################################
+# simple rename test functions
+#####################################
+
+rename_test1()
+{
+    echo ""
+    echo "******************************************"
+    echo "* RUNNING RENAME TEST 1"
+    echo "******************************************"
+
+    setup_testdir $PVFS2_TESTDIR
+
+    # create a test directory tree
+    mkdir $PVFS2_TESTDIR/a
+    mkdir $PVFS2_TESTDIR/a/b
+    mkdir $PVFS2_TESTDIR/a/b/c
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED RENAME TEST 1 [stage 1]"
+        echo "******************************************"
+        return 1
+    fi
+
+    # create some test files
+    touch $PVFS2_TESTDIR/a/file1
+    touch $PVFS2_TESTDIR/a/b/file2
+    touch $PVFS2_TESTDIR/a/b/c/file3
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED RENAME TEST 1 [stage 2]"
+        echo "******************************************"
+        return 1
+    fi
+
+    # dump original tree
+    #ls -alR $PVFS2_TESTDIR
+
+    # do some simple renames and make sure they pass
+    mv $PVFS2_TESTDIR/a/file1 $PVFS2_TESTDIR/a/b/renamed-file1
+    mv $PVFS2_TESTDIR/a/b/file2 $PVFS2_TESTDIR/a/renamed-file2
+    mv $PVFS2_TESTDIR/a/b/c $PVFS2_TESTDIR/a/b/c-renamed-dir
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED RENAME TEST 1 [stage 3]"
+        echo "******************************************"
+    fi
+
+    # dump modified tree
+    #ls -alR $PVFS2_TESTDIR
+
+    remove_testdir $PVFS2_TESTDIR
+
+    echo ""
+    echo "******************************************"
+    echo "* PASSED RENAME TEST 1"
+    echo "******************************************"
+    return 0
+}
+
+#####################################
 # script entry point
 #####################################
 
@@ -1143,6 +1207,12 @@ fi
 if ! test -z "$ENABLE_SYMLINK_TESTS"; then
 
     symlink_test1
+
+fi
+
+if ! test -z "$ENABLE_RENAME_TESTS"; then
+
+    rename_test1
 
 fi
 

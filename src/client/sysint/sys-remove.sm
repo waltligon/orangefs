@@ -252,6 +252,7 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     /* NOTE: we remove the dirent first because this gets the object
      * out of the system fastest.
@@ -261,40 +262,33 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    PINT_SERVREQ_RMDIRENT_FILL(sm_p->msgpair.req,
-			       *sm_p->cred_p,
-			       sm_p->parent_ref.fs_id,
-			       sm_p->parent_ref.handle,
-			       sm_p->u.remove.object_name);
+    PINT_init_msgpair(sm_p, msg_p);
+
+    PINT_SERVREQ_RMDIRENT_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->parent_ref.fs_id,
+        sm_p->parent_ref.handle,
+        sm_p->u.remove.object_name);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
                  "under %Lu,%d\n", sm_p->u.remove.object_name,
                  Lu(sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id);
 
-    sm_p->msgpair.fs_id   = sm_p->parent_ref.fs_id;
-    sm_p->msgpair.handle  = sm_p->parent_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
-    sm_p->msgpair.comp_fn = remove_rmdirent_comp_fn;
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->handle = sm_p->parent_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn = remove_rmdirent_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-        &sm_p->msgpair.svr_addr, sm_p->msgpair.handle,
-        sm_p->msgpair.fs_id);
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
 
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
-
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
-
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
     return 1;
 }
 
@@ -302,6 +296,7 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_setup_msgpair\n");
@@ -310,8 +305,10 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
+    PINT_init_msgpair(sm_p, msg_p);
+
     PINT_SERVREQ_CRDIRENT_FILL(
-        sm_p->msgpair.req,
+        msg_p->req,
         *sm_p->cred_p,
         sm_p->u.remove.object_name,
         sm_p->object_ref.handle,
@@ -325,29 +322,19 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
                  Lu(sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id);
 
-    sm_p->msgpair.fs_id = sm_p->parent_ref.fs_id;
-    sm_p->msgpair.handle = sm_p->object_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
-    sm_p->msgpair.comp_fn = remove_crdirent_comp_fn;
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn = remove_crdirent_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-        &sm_p->msgpair.svr_addr, sm_p->msgpair.handle,
-        sm_p->msgpair.fs_id);
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
 
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
-
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
     return 1;
 }
 

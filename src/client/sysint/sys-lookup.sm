@@ -620,9 +620,6 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
     cur_seg = GET_CURRENT_SEGMENT();
     assert(cur_seg);
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
-
     /*
       the pvfs2 lookup_path server operation has an optimization that
       allows several path components to be resolved at once.  this
@@ -637,6 +634,8 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
     */
     seg_to_lookup = (cur_seg->seg_remaining ? cur_seg->seg_remaining :
                      cur_seg->seg_name);
+
+    PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_LOOKUP_PATH_FILL(
         msg_p->req,
@@ -655,18 +654,14 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_segment_lookup_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                    msg_p->handle,
-                                    msg_p->fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-
-    /* let 'msgpairarray' handle the 'msgpair' case */
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
     return 1;
 }
 
@@ -737,14 +732,13 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
     js_p->error_code = 0;
 
     /*
-      do a getattr on the resolved handle of the current
-      segment in the current context
+      do a getattr on the resolved handle of the current segment in
+      the current context
     */
     cur_seg = GET_CURRENT_SEGMENT();
     assert(cur_seg);
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
+    PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_GETATTR_FILL(
         msg_p->req,
@@ -762,18 +756,14 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_segment_getattr_comp_fn;
 
-    if (PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                  msg_p->handle,
-                                  msg_p->fs_id) < 0)
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-
-    /* let 'msgpairarray' handle the 'msgpair' case */
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
-
     return 1;
 }
 

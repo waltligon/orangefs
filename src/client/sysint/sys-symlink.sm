@@ -383,8 +383,7 @@ static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting create req\n");
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
+    PINT_init_msgpair(sm_p, msg_p);
 
     server_config = PINT_get_server_config_struct(
         sm_p->parent_ref.fs_id);
@@ -395,7 +394,7 @@ static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
 
     PINT_put_server_config_struct(server_config);
 
-    if (ret < 0)
+    if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
@@ -409,14 +408,10 @@ static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
         PVFS_TYPE_SYMLINK,
         meta_handle_extent_array);
 
-    /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_create_comp_fn;
-
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
 
     return 1;
 }
@@ -432,7 +427,7 @@ static int symlink_dspace_create_failure(PINT_client_sm *sm_p,
 }
 
 static int symlink_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-					 job_status_s *js_p)
+                                          job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -444,11 +439,7 @@ static int symlink_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," symlink: posting crdirent req\n");
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
-
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
+    PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
@@ -458,24 +449,19 @@ static int symlink_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->parent_ref.handle,
         sm_p->parent_ref.fs_id);
 
-    /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->u.sym.symlink_handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_crdirent_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                    sm_p->parent_ref.handle,
-                                    sm_p->parent_ref.fs_id);
-    if (ret < 0)
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, sm_p->parent_ref.handle,
+        sm_p->parent_ref.fs_id);
+
+    if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
-    }
-
-    if (sm_p->msgarray != &(sm_p->msgpair))
-    {
-	free(sm_p->msgarray);
     }
     return 1;
 }
@@ -505,15 +491,7 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," symlink: posting setattr req\n");
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
-
-    if (sm_p->msgarray != &(sm_p->msgpair))
-    {
-	free(sm_p->msgarray);
-    }
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
+    PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
@@ -532,15 +510,14 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->req.u.setattr.attr.u.sym.target_path_len =
         strlen(sm_p->u.sym.link_target) + 1;
 
-    /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->u.sym.symlink_handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_setattr_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                    msg_p->handle,
-                                    msg_p->fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -550,7 +527,7 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
 }
 
 static int symlink_setattr_failure(PINT_client_sm *sm_p,
-                                  job_status_s *js_p)
+                                   job_status_s *js_p)
 {
     sm_p->u.sym.stored_error_code = js_p->error_code;
 
@@ -563,7 +540,6 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
                                                job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PVFS_BMI_addr_t metafile_server_addr;
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: "
@@ -571,25 +547,10 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
+                 "metafile handle %Lu\n", Lu(msg_p->handle));
 
-    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
-    {
-        free(sm_p->msgarray);
-    }
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
-
-    ret = PINT_cached_config_map_to_server(&metafile_server_addr,
-                                    sm_p->u.sym.symlink_handle,
-                                    sm_p->parent_ref.fs_id);
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-        return 1;
-    }
+    PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
@@ -601,10 +562,16 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->handle = sm_p->u.sym.symlink_handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_delete_handle_comp_fn;
-    msg_p->svr_addr = metafile_server_addr;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
-                 "metafile handle %Lu\n", Lu(msg_p->handle));
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, sm_p->u.sym.symlink_handle,
+        sm_p->parent_ref.fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+    }
     return 1;
 }
 
@@ -652,6 +619,7 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
     if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
     {
         free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
 
     sm_p->op_complete = 1;

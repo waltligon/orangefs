@@ -169,6 +169,7 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: getattr_setup_msgpair\n");
@@ -182,36 +183,28 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
                  Lu(sm_p->object_ref.handle),
                  sm_p->object_ref.fs_id);
 
+    PINT_init_msgpair(sm_p, msg_p);
+
     PINT_SERVREQ_GETATTR_FILL(
-        sm_p->msgpair.req,
+        msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
         PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_DFILES);
 
-    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
-    sm_p->msgpair.handle = sm_p->object_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
-    sm_p->msgpair.comp_fn = remove_getattr_comp_fn;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = remove_getattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-        &sm_p->msgpair.svr_addr, sm_p->msgpair.handle,
-        sm_p->msgpair.fs_id);
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
 
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
-
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
-
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
     return 1;
 }
 
@@ -314,8 +307,7 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
+    PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_READDIR_FILL(
         msg_p->req,
@@ -326,32 +318,22 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
         1);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing READDIR on %Lu,%d\n",
-                 Lu(sm_p->object_ref.handle),
-                 sm_p->object_ref.fs_id);
+                 Lu(sm_p->object_ref.handle), sm_p->object_ref.fs_id);
 
-    /* fill in msgpair structure components */
-    msg_p->fs_id   = sm_p->object_ref.fs_id;
-    msg_p->handle  = sm_p->object_ref.handle;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = remove_check_dir_contents_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                    msg_p->handle,
-                                    msg_p->fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle,
+        msg_p->fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
-
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
-
     return 1;
 }
 
@@ -424,41 +406,34 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
 					      job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: object_remove_setup_msgpair\n");
 
     js_p->error_code = 0;
 
+    PINT_init_msgpair(sm_p, msg_p);
+
     PINT_SERVREQ_REMOVE_FILL(
-        sm_p->msgpair.req,
+        msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle);
 
-    sm_p->msgpair.fs_id   = sm_p->object_ref.fs_id;
-    sm_p->msgpair.handle  = sm_p->object_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
-    sm_p->msgpair.comp_fn = NULL;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
 
     ret = PINT_cached_config_map_to_server(
-        &sm_p->msgpair.svr_addr, sm_p->msgpair.handle,
-        sm_p->msgpair.fs_id);
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
 
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
-
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-    }
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
-
     return 1;    
 }
 
