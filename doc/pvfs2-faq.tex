@@ -18,7 +18,7 @@
 
 \title{Frequently Asked Questions about PVFS2}
 \author{ PVFS2 Development Team }
-% \date{Last Updated: March 2004}
+% \date{Last Updated: July 2004}
 
 %
 % BEGINNING OF DOCUMENT
@@ -46,44 +46,81 @@ very large numbers of clients and servers.  The architecture is very modular,
 allowing for easy inclusion of new hardware support and new algorithms.  This
 makes PVFS2 a perfect research testbed as well.
 
-\subsection{What does the ``V'' in PVFS stand for?}
+\subsection{What does the ``V'' in PVFS2 stand for?}
 
 The ``V'' in PVFS stands for virtual.  This is a holdover from the original
 (PVFS1) project that built a parallel file system on top of local file
 systems, which we still do now.  It isn't meant to imply virtualization of
 storage, although that is sort of what the file system does.
 
-\subsection{Is PVFS an attempt to parallelize the UNIX VFS?}
+\subsection{Is PVFS2 an attempt to parallelize the *NIX VFS?}
 
-No; we're not even sure what that means.
+No, and we're not even sure what that means!  The design of PVFS2 does
+not depend on the design of the traditional *NIX Virtual Filesystem
+Switch (VFS) layer, although we provide a compatibility layer that
+allows access to the file system through it.
 
 \subsection{What architectures does PVFS2 support?}
 \label{sec:supported-architectures}
 
-The majority of PVFS2 is POSIX-compliant C code that runs in user space.  As
-such, much of PVFS2 could run on most available systems.
+The majority of PVFS2 is POSIX-compliant C code that runs in user
+space.  As such, much of PVFS2 can run on most available systems.
 
-However, the part of PVFS2 that hooks to the operating system on clients must
-be written specifically for the particular operating system.  This piece of
-PVFS2 has only been written for the Linux kernel, version 2.6.xx.
+The (optional) part of PVFS2 that hooks to the operating system on
+clients must be written specifically for the particular operating
+system and the requirements are described below.
 
-We encourage porting of this component of PVFS2 to other operating systems.
-At this time we have no plans for porting this component to operating systems
-other than Linux.
+\subsection{Does running PVFS2 require a particular kernel version?}
+
+You can run the userspace PVFS2 servers and administration tools on
+every major GNU/Linux distribution out of the box, and we intend to
+keep it that way.  However, the kernel module that allows client
+access to the PVFS2 system does depend on particular kernel versions
+because it builds against the running one (in the same manner as every
+other Linux module).  The kernel dependent PVFS2 client support has
+been written for Linux kernel versions 2.4.19 (and greater) and 2.6.0
+(and greater).
+
+\subsection{Does the PVFS2 client require a patched Linux kernel?}
+
+No.  The kernel module source included with PVFS2 is generally
+targetted toward the official ``Linus'' kernels (found at kernel.org).
+Patches for the PVFS2 kernel module code may be provided for major
+distributions that have modified their kernel to be incompatible with
+the officially released kernels.  The best place to find out more
+information about support for a kernel tied to a particular
+distribution is on the PVFS2-developers mailing list.
+
+\subsection{Can I build the PVFS2 kernel code directly into the kernel, rather than as a module?}
+
+No, this is currently not supported nor recommended.
 
 \subsection{Does PVFS2 work across heterogeneous architectures?}
 
-Yes.  The ``language'' that PVFS2 uses to talk between clients and servers is
-encoded in a architecture-independent format (little-endian with fixed byte
-length parameters).  This allows different PVFS2 components to interact
-seamlessly regardless of architecture.
+Yes.  The ``language'' that PVFS2 uses to talk between clients and
+servers is encoded in a architecture-independent format (little-endian
+with fixed byte length parameters).  This allows different PVFS2
+components to interact seamlessly regardless of architecture.
 
 \subsection{Does PVFS2 require any particular hardware?}
 
-Other than hardware supported by the Linux OS, no.  PVFS2 uses existing
-network infrastructure for communication and can currently operate over TCP,
-Myrinet, and InfiniBand.  Disk local to servers is used for PVFS2 storage, so
-no storage area network (SAN) is required either.
+Other than hardware supported by the Linux OS, no.  PVFS2 uses
+existing network infrastructure for communication and can currently
+operate over TCP, Myrinet, and InfiniBand.  Disk local to servers is
+used for PVFS2 storage, so no storage area network (SAN) is required
+either.
+
+\subsection{What specific hardware architectures are supported by the PVFS2 kernel module?}
+
+To our knowledge, PVFS2 has been verified to be working on x86/IA-32,
+IA-64, AMD64, PowerPC (ppc), and Alpha based GNU/Linux distributions.
+
+\subsection{Is there a MacOS X/Cygwin/Windows client for PVFS2?}
+
+At this time we have no plans for porting the code to operating
+systems other than Linux.  However, we do encourage porting efforts of
+PVFS2 to other operating systems, and will likely aid in the
+development.
 
 \subsection{What are the components of PVFS2 that I should know about?}
 
@@ -149,12 +186,18 @@ Absolutely!  Any PVFS2 server can store either metadata, data, or both.
 Simply allocate unique MetaHandleRanges for each server that you would like to
 store metadata; the clients will handle the rest.
 
-\subsection{Can PVFS2 servers listen on two interfaces (multihome)}
+\subsection{Does using multiple metadata servers reduce the chance of file system corruption during hardware failures?}
 
-PVFS2 servers currently listen on one interface at a time.  Multihome support,
-where a PVFS2 server can accept connections from several network interfaces,
-would be helpful in many situations.  We will implement this feature at some
-point, but not in the next few releases.
+Unfortnately, no.  While using multiple metadata servers distributes
+metadata, it does not replicate or store redundant information across
+these servers.
+
+\subsection{Can PVFS2 servers listen on two network interfaces simultaneously (i.e. multihome)?}
+
+PVFS2 servers currently listen on one interface at a time.  Multihome
+support, where a PVFS2 server can accept connections from several
+network interfaces, would be helpful in many situations.  We plan to
+implement this feature in the future.
 
 \subsection{How can I automount PVFS2 volumes?}
 
@@ -174,10 +217,6 @@ The entry in the automount config file should look like this:
 Note the backslash-escape of the colon before the port number.  Without that
 escape, the automounter will get confused and replace \texttt{'tcp://'} with
 \texttt{'tcp:///'}
-
-\subsection{Can I build the PVFS2 kernel support directly into the kernel, rather than as a module?}
-
-No.
 
 %
 % REPORTING PROBLEMS
@@ -207,6 +246,9 @@ often result in an immediate answer.
 
 If you still haven't found an answer, the next thing to do is to mail the
 mailing list and report your problem.
+
+If you enjoy using IRC, you can also join us on irc.freenode.net in
+the #pvfs2 channel.
 
 \subsection{How do I report a problem with PVFS2?}
 
@@ -251,7 +293,7 @@ superblock...'}
 
 First, make 100\% sure you typed the mount command correctly. As discussed in
 the PVFS2 quickstart, different mount commands are needed for linux-2.4 and
-linux-2.6.  A linux-2.6 mount command  will look like this: 
+linux-2.6.  A linux-2.6 mount command will look like this: 
 
 \begin{verbatim}
 prompt# mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2
@@ -262,10 +304,14 @@ Under linux-2.4, the mount command looks slightly different:
 prompt# mount -t pvfs2 pvfs2 /mnt/pvfs2 -o tcp://testhost:3334/pvfs2-fs
 \end{verbatim}
 
-This error could also mean a pvfs2-client process is not running, either
-because it was not started before the mount command, or died at some point. If
-you can reliably (or even intermittently) cause the pvfs2-client to exit
-abnormally, please send a report to the developers.
+This error could also mean a pvfs2-client process is not running,
+either because it was not started before the mount command, or was
+terminated at some point. If you can reliably (or even intermittently)
+cause the pvfs2-client to exit abnormally, please send a report to the
+developers.
+
+Finally, be sure there are no typos in your command line, as this is
+commonly the case!
 
 %
 % PERFORMANCE
