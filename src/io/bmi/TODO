@@ -8,6 +8,7 @@ be emulated somehow (naive approach is to just pack buffers).
 Implement unpost() function for cancelling operations: 
 http://www.beowulf-underground.org/pipermail/pvfs2-internal/2002-April/000060.html
 
+
 Add a hint that indicates when a bmi address is "ok to get rid of".
 This would set a bit on the address interally and allow us to do things
 like close sockets when we start running into resource limits.  This bit
