@@ -11,6 +11,7 @@
 # tests      builds test programs
 # statecomp  builds only the statecomp component
 # cscope      generates information for cscope utility
+# mpitests   builds test programs that use mpi
 # 
 # NOTE: you can also specify any single object or executable to
 #    build by providing its name (including the relative path) as the
@@ -125,6 +126,12 @@ DOCSRC :=
 # MISCSRC is a grab bag of other sources that must be built into
 #    object form (for example, shared test components)
 MISCSRC := 
+# MPITESTSRC is the source code for test programs that must be compiled
+#    with MPI
+MPITESTSRC :=
+# MPIMISCSRC is a collection of sources that must be built into
+#    object form using MPI
+MPIMISCSRC :=
 
 ################################################################
 # Top level (default) targets
@@ -173,6 +180,19 @@ MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
 # MISCDEPENDS is a list of dependency files for misc. objects
 MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
 
+# MPIMISCOBJS is a list of misc. MPI objects not in the above categories
+MPIMISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPIMISCSRC)))
+# MPIMISCDEPENDS is a list of dependency files for MPI misc. objects
+MPIMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIMISCSRC)))
+
+# MPITESTOBJS is a list of MPI test program objects
+MPITESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPITESTSRC)))
+# MPITESTS is a list of MPI test program executables
+MPITESTS := $(patsubst %.c,%, $(filter %.c, $(MPITESTSRC)))
+# TESTDEPENDS is a list of dependency files for MPI test programs
+MPITESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPITESTSRC)))
+
+
 # DOCSPDF and DOCSPS are lists of documentation files generated from
 #    latex
 DOCSPDF := $(patsubst %.tex,%.pdf, $(filter %.tex,$(DOCSRC)))
@@ -187,7 +207,7 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS))
+DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS)) 
 
 # CLEANFILES is a list of generated files that need to be removed at
 #    "make clean" time.  This is just for special case files that aren't
@@ -208,6 +228,9 @@ CLEANFILES :=\
 # target for building the test program executables
 tests: $(TESTS)
 
+# target for building MPI test program executables
+mpitests: $(MPITESTS)
+
 # rule for building the pvfs2 server
 $(SERVER): $(SERVEROBJS)
 	$(LD) $(LDFLAGS) $(SERVERLIBS) $^ -o $@
@@ -216,6 +239,18 @@ $(SERVER): $(SERVEROBJS)
 lib/libpvfs2.a: $(LIBOBJS)
 	$(INSTALL) -d lib
 	ar rcs $@ $(LIBOBJS)
+
+# rule for building MPI objects
+$(MPITESTOBJS): %.o: %.c
+	$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+
+# rule for building MPI misc. objects
+$(MPIMISCOBJS): %.o: %.c
+	$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+
+# rule for building MPI executables from object files
+# $(MPITESTS): %: %.o $(LIBRARIES)
+#	$(MPICC) $(LDFLAGS) $< $(LIBS) -o $@
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
@@ -250,7 +285,8 @@ docsclean:
 # top rule for cleaning up tree
 clean: docsclean
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
-		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)  $(SERVER)
+		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)  $(SERVER) $(MPIMISCOBJS)\
+		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
 
 # _really_ clean the tree; should go back to pristine state
 distclean: clean
@@ -274,6 +310,18 @@ endif
 endif
 endif
 endif
+
+ifeq ($(MAKECMDGOALS),mpitests)
+-include $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
+endif
+
+# rule for generating dependency files for MPI code
+$(MPITESTDEPENDS): %.d: %.c
+	@echo generating dependency file $@.
+	@$(srcdir)/maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
+$(MPIMISCDEPENDS): %.d: %.c
+	@echo generating dependency file $@.
+	@$(srcdir)/maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c

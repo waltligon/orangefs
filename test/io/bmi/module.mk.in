@@ -7,3 +7,22 @@ TESTSRC += \
 	$(DIR)/test-bmi-server.c \
 	$(DIR)/test-bmi-server-gm.c \
 	$(DIR)/test-bmi-server-list.c
+
+LOCAL_MPIMISCSRC := \
+	$(DIR)/bench-mem.c \
+	$(DIR)/bench-args.c \
+	$(DIR)/bench-initialize.c 
+
+LOCAL_MPITESTSRC += \
+	$(DIR)/driver-latency.c \
+	$(DIR)/driver-bw-multi.c \
+	$(DIR)/driver-simple.c
+
+MPIMISCSRC += $(LOCAL_MPIMISCSRC)
+
+MPITESTSRC += $(LOCAL_MPITESTSRC)
+
+LOCALMPITESTS := $(patsubst %.c,%, $(LOCAL_MPITESTSRC))
+LOCALMPIOBJS := $(patsubst %.c,%.o, $(LOCAL_MPIMISCSRC))
+$(LOCALMPITESTS): %: %.o $(LOCALMPIOBJS) lib/libpvfs2.a
+	$(MPICC) $^ $(LDFLAGS) $(LIBS) -o $@
