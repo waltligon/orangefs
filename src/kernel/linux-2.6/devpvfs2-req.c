@@ -423,8 +423,8 @@ static int pvfs2_devreq_release(
     device_owner = NULL;
 
     /*
-      prune dcache based to get rid of entries
-      that may no longer exist on re-open
+      prune dcache here to get rid of entries
+      that may no longer exist on device re-open
     */
     shrink_dcache_sb(inode->i_sb);
 
