@@ -25,12 +25,14 @@
 struct qhash_table *PINT_fsid_config_cache_table = NULL;
 
 /* these are based on code from src/server/request-scheduler.c */
-static int hash_fsid(void *fsid, int table_size);
-static int hash_fsid_compare(void *key, struct qlist_head *link);
+static int hash_fsid(
+    void *fsid, int table_size);
+static int hash_fsid_compare(
+    void *key, struct qlist_head *link);
 
 static void free_host_extent_table(void *ptr);
-static int cache_server_array(struct server_configuration_s *config,
-			      PVFS_fs_id fsid);
+static int cache_server_array(
+    struct server_configuration_s *config, PVFS_fs_id fsid);
 
 
 /* PINT_bucket_initialize()
@@ -47,19 +49,19 @@ int PINT_bucket_initialize(void)
             qhash_init(hash_fsid_compare,hash_fsid,67);
     }
     srand((unsigned int)time(NULL));
-    return (PINT_fsid_config_cache_table ? 0 : -ENOMEM);
+    return (PINT_fsid_config_cache_table ? 0 : -PVFS_ENOMEM);
 }
 
 /* PINT_bucket_finalize()
  *
- * shuts down the bucket interface and releases any resources associated
- * with it.
+ * shuts down the bucket interface and releases any resources
+ * associated with it.
  *
  * returns 0 on success, -errno on failure
  */
 int PINT_bucket_finalize(void)
 {
-    int i;
+    int i = 0;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
@@ -86,23 +88,24 @@ int PINT_bucket_finalize(void)
         }
     }
     qhash_finalize(PINT_fsid_config_cache_table);
-    PINT_fsid_config_cache_table = 0;  /* so future initialize happens */
+    PINT_fsid_config_cache_table = NULL;
 
     return 0;
 }
 
 /* PINT_handle_load_mapping()
  *
- * loads a new mapping of servers to handle into this interface.
- * This function may be called multiple times in order to add new file
+ * loads a new mapping of servers to handle into this interface.  This
+ * function may be called multiple times in order to add new file
  * system information at run time.
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_handle_load_mapping(struct server_configuration_s *config,
-			     struct filesystem_configuration_s *fs)
+int PINT_handle_load_mapping(
+    struct server_configuration_s *config,
+    struct filesystem_configuration_s *fs)
 {
-    int ret = -EINVAL;
+    int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct config_fs_cache_s *cur_config_fs_cache = NULL;
@@ -153,24 +156,25 @@ int PINT_handle_load_mapping(struct server_configuration_s *config,
 
 /* PINT_bucket_get_next_meta()
  *
- * returns the bmi address of a random server
- * that should be used to store a new piece of metadata.  This
- * function is responsible for fairly distributing the metadata
- * storage responsibility to all servers.
+ * returns the bmi address of a random server that should be used to
+ * store a new piece of metadata.  This function is responsible for
+ * fairly distributing the metadata storage responsibility to all
+ * servers.
  *
- * in addition, a handle range is returned as an array of extents
- * that match the meta handle range configured for the returned
- * meta server.  This array MUST NOT be freed by the caller, nor
- * cached for later use.
+ * in addition, a handle range is returned as an array of extents that
+ * match the meta handle range configured for the returned meta
+ * server.  This array MUST NOT be freed by the caller, nor cached for
+ * later use.
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_next_meta(struct server_configuration_s *config,
-			      PVFS_fs_id fsid,
-			      PVFS_BMI_addr_t *meta_addr,
-			      PVFS_handle_extent_array *ext_array)
+int PINT_bucket_get_next_meta(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    PVFS_BMI_addr_t *meta_addr,
+    PVFS_handle_extent_array *ext_array)
 {
-    int ret = -EINVAL, jitter = 0, num_meta_servers = 0;
+    int ret = -PVFS_EINVAL, jitter = 0, num_meta_servers = 0;
     char *meta_server_bmi_str = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
@@ -194,18 +198,18 @@ int PINT_bucket_get_next_meta(struct server_configuration_s *config,
             jitter = (rand() % num_meta_servers);
             while(jitter-- > -1)
             {
-                cur_mapping =
-                    PINT_llist_head(cur_config_cache->meta_server_cursor);
+                cur_mapping = PINT_llist_head(
+                    cur_config_cache->meta_server_cursor);
                 if (!cur_mapping)
                 {
                     cur_config_cache->meta_server_cursor =
                         cur_config_cache->fs->meta_handle_ranges;
-                    cur_mapping =
-                        PINT_llist_head(cur_config_cache->meta_server_cursor);
+                    cur_mapping = PINT_llist_head(
+                        cur_config_cache->meta_server_cursor);
                     assert(cur_mapping);
                 }
-                cur_config_cache->meta_server_cursor =
-                    PINT_llist_next(cur_config_cache->meta_server_cursor);
+                cur_config_cache->meta_server_cursor = PINT_llist_next(
+                    cur_config_cache->meta_server_cursor);
             }
             meta_server_bmi_str = PINT_config_get_host_addr_ptr(
                 config,cur_mapping->alias_mapping->host_alias);
@@ -223,20 +227,20 @@ int PINT_bucket_get_next_meta(struct server_configuration_s *config,
 
 /* PINT_bucket_get_next_io()
  *
- * returns the address of a set of servers that
- * should be used to store new pieces of file data.  This function is
- * responsible for evenly distributing the file data storage load to all
- * servers.
+ * returns the address of a set of servers that should be used to
+ * store new pieces of file data.  This function is responsible for
+ * evenly distributing the file data storage load to all servers.
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_next_io(struct server_configuration_s *config,
-			    PVFS_fs_id fsid,
-			    int num_servers,
-			    PVFS_BMI_addr_t *io_addr_array,
-			    PVFS_handle_extent_array *io_handle_extent_array)
+int PINT_bucket_get_next_io(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    int num_servers,
+    PVFS_BMI_addr_t *io_addr_array,
+    PVFS_handle_extent_array *io_handle_extent_array)
 {
-    int ret = -EINVAL, i = 0;
+    int ret = -PVFS_EINVAL, i = 0;
     char *data_server_bmi_str = (char *)0;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
@@ -257,16 +261,16 @@ int PINT_bucket_get_next_io(struct server_configuration_s *config,
             {
                 assert(cur_config_cache->data_server_cursor);
 
-                cur_mapping =
-                    PINT_llist_head(cur_config_cache->data_server_cursor);
+                cur_mapping = PINT_llist_head(
+                    cur_config_cache->data_server_cursor);
                 if (!cur_mapping)
                 {
                     cur_config_cache->data_server_cursor =
                         cur_config_cache->fs->data_handle_ranges;
                     continue;
                 }
-                cur_config_cache->data_server_cursor =
-                    PINT_llist_next(cur_config_cache->data_server_cursor);
+                cur_config_cache->data_server_cursor = PINT_llist_next(
+                    cur_config_cache->data_server_cursor);
 
                 data_server_bmi_str = PINT_config_get_host_addr_ptr(
                     config,cur_mapping->alias_mapping->host_alias);
@@ -295,27 +299,26 @@ int PINT_bucket_get_next_io(struct server_configuration_s *config,
 
 /* PINT_bucket_map_addr()
  *
- * takes an opaque server address and returns the server type and address
- * string for that server
+ * takes an opaque server address and returns the server type and
+ * address string for that server
  *
  * returns pointer to string on success, NULL on failure
  */
-const char* PINT_bucket_map_addr(struct server_configuration_s *config,
-				 PVFS_fs_id fsid, 
-				 PVFS_BMI_addr_t addr,
-				 int *server_type)
+const char* PINT_bucket_map_addr(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid, 
+    PVFS_BMI_addr_t addr,
+    int *server_type)
 {
-    int ret = -EINVAL;
+    int ret = -PVFS_EINVAL, i = 0;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    int i;
 
     if (!(config && server_type))
     {
 	return NULL;
     }
 
-    /* find the correct fs in our config information */
     hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
     if (!hash_link)
     {
@@ -338,7 +341,8 @@ const char* PINT_bucket_map_addr(struct server_configuration_s *config,
     {
 	if (cur_config_cache->fs->server_array[i].addr == addr)
 	{
-	    *server_type = cur_config_cache->fs->server_array[i].server_type;
+	    *server_type =
+                cur_config_cache->fs->server_array[i].server_type;
 	    return(cur_config_cache->fs->server_array[i].addr_string);
 	}
     }
@@ -347,7 +351,7 @@ const char* PINT_bucket_map_addr(struct server_configuration_s *config,
 
 /* PINT_bucket_count_servers()
  *
- * counts the number of phyical servers of the specified type
+ * counts the number of physical servers of the specified type
  *
  * returns 0 on success, -errno on failure
  */
@@ -356,87 +360,79 @@ int PINT_bucket_count_servers(struct server_configuration_s *config,
 			      int server_type,
 			      int *count)
 {
-    int ret = -EINVAL;
+    int ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (!(config && server_type))
-    {
-	return -PVFS_EINVAL;
-    }
-
-    /* find the correct fs in our config information */
-    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
-    if (!hash_link)
-    {
-	return -PVFS_EINVAL;
-    }
-    cur_config_cache = qlist_entry(hash_link,
-				   struct config_fs_cache_s,
-				   hash_link);
-    assert(cur_config_cache);
-    assert(cur_config_cache->fs);
-
-    ret = cache_server_array(config, fsid);
-    if (ret < 0)
+    if (!config || !server_type)
     {
 	return ret;
     }
 
-    if (server_type == PINT_BUCKET_META)
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if (!hash_link)
     {
-	*count = cur_config_cache->fs->meta_server_count;
-	return 0;
+	return ret;
     }
-    else if (server_type == PINT_BUCKET_IO)
+    cur_config_cache = qlist_entry(
+        hash_link, struct config_fs_cache_s, hash_link);
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+
+    ret = cache_server_array(config, fsid);
+    if (ret == 0)
     {
-	*count = cur_config_cache->fs->io_server_count;
-	return 0;
+        if (server_type == PINT_BUCKET_META)
+        {
+            *count = cur_config_cache->fs->meta_server_count;
+            ret = 0;
+        }
+        else if (server_type == PINT_BUCKET_IO)
+        {
+            *count = cur_config_cache->fs->io_server_count;
+            ret = 0;
+        }
+        else if (server_type == (PINT_BUCKET_META|PINT_BUCKET_IO))
+        {
+            *count = cur_config_cache->fs->server_count;
+            ret = 0;
+        }
     }
-    else if (server_type == (PINT_BUCKET_META|PINT_BUCKET_IO))
-    {
-	*count = cur_config_cache->fs->server_count;
-	return 0;
-    }
-    else
-    {
-	return -PVFS_EINVAL;
-    }
+    return ret;
 }
 
 /* PINT_bucket_get_server_array()
  *
  * fills in an array of addresses corresponding to each server of the
- * type specified by "server_type" (meta,io,or both).  If inout_count_p is
- * not large enough to accomodate array, then an error is returned.
+ * type specified by "server_type" (meta,io,or both).  If
+ * inout_count_p is not large enough to accomodate array, then an
+ * error is returned.
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_server_array(struct server_configuration_s *config,
-				 PVFS_fs_id fsid,
-				 int server_type,
-				 PVFS_BMI_addr_t *addr_array,
-				 int *inout_count_p)
+int PINT_bucket_get_server_array(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    int server_type,
+    PVFS_BMI_addr_t *addr_array,
+    int *inout_count_p)
 {
-    int ret = -PVFS_EINVAL;
+    int ret = -PVFS_EINVAL, i = 0;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    int i;
 
-    if (!(config && *inout_count_p && addr_array && server_type))
+    if (!config || !*inout_count_p || !addr_array || !server_type)
     {
-	return -PVFS_EINVAL;
+	return ret;
     }
 
-    /* find the correct fs in our config information */
     hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
     if (!hash_link)
     {
-	return -PVFS_EINVAL;
+	return ret;
     }
-    cur_config_cache = qlist_entry(hash_link,
-				   struct config_fs_cache_s,
-				   hash_link);
+    cur_config_cache = qlist_entry(
+        hash_link, struct config_fs_cache_s, hash_link);
     assert(cur_config_cache);
     assert(cur_config_cache->fs);
 
@@ -451,14 +447,15 @@ int PINT_bucket_get_server_array(struct server_configuration_s *config,
      */
     if (server_type == PINT_BUCKET_META)
     {
-	if(*inout_count_p < cur_config_cache->fs->meta_server_count)
+	if (*inout_count_p < cur_config_cache->fs->meta_server_count)
 	{
 	    return -PVFS_EMSGSIZE;
 	}
 
-	for(i=0; i<cur_config_cache->fs->meta_server_count; i++)
+	for(i = 0; i < cur_config_cache->fs->meta_server_count; i++)
 	{
-	    addr_array[i] = cur_config_cache->fs->meta_server_array[i].addr;
+	    addr_array[i] =
+                cur_config_cache->fs->meta_server_array[i].addr;
 	}
 
 	*inout_count_p = cur_config_cache->fs->meta_server_count;
@@ -466,37 +463,37 @@ int PINT_bucket_get_server_array(struct server_configuration_s *config,
     }
     else if (server_type == PINT_BUCKET_IO)
     {
-	if(*inout_count_p < cur_config_cache->fs->io_server_count)
+	if (*inout_count_p < cur_config_cache->fs->io_server_count)
 	{
 	    return -PVFS_EMSGSIZE;
 	}
 
-	for(i=0; i<cur_config_cache->fs->io_server_count; i++)
+	for(i = 0; i < cur_config_cache->fs->io_server_count; i++)
 	{
-	    addr_array[i] = cur_config_cache->fs->io_server_array[i].addr;
+	    addr_array[i] =
+                cur_config_cache->fs->io_server_array[i].addr;
 	}
 
 	*inout_count_p = cur_config_cache->fs->io_server_count;
 	return 0;
-
     }
     else if (server_type == (PINT_BUCKET_META | PINT_BUCKET_IO))
     {
-	if(*inout_count_p < cur_config_cache->fs->server_count)
+	if (*inout_count_p < cur_config_cache->fs->server_count)
 	{
 	    return -PVFS_EMSGSIZE;
 	}
 
-	for(i=0; i<cur_config_cache->fs->server_count; i++)
+	for(i = 0; i < cur_config_cache->fs->server_count; i++)
 	{
-	    addr_array[i] = cur_config_cache->fs->server_array[i].addr;
+	    addr_array[i] =
+                cur_config_cache->fs->server_array[i].addr;
 	}
 
 	*inout_count_p = cur_config_cache->fs->server_count;
 	return 0;
     }
-
-    return -PVFS_EINVAL;
+    return ret;
 }
 
 
@@ -506,17 +503,16 @@ int PINT_bucket_get_server_array(struct server_configuration_s *config,
  *
  * returns 0 on success to -errno on failure
  */
-int PINT_bucket_map_to_server(PVFS_BMI_addr_t *server_addr,
-			      PVFS_handle handle,
-			      PVFS_fs_id fsid)
+int PINT_bucket_map_to_server(
+    PVFS_BMI_addr_t *server_addr,
+    PVFS_handle handle,
+    PVFS_fs_id fsid)
 {
     int ret = -PVFS_EINVAL;
     char bmi_server_addr[PVFS_MAX_SERVER_ADDR_LEN] = {0};
 
-    ret = PINT_bucket_get_server_name(bmi_server_addr,
-                                      PVFS_MAX_SERVER_ADDR_LEN,
-				      handle,
-				      fsid);
+    ret = PINT_bucket_get_server_name(
+        bmi_server_addr, PVFS_MAX_SERVER_ADDR_LEN, handle, fsid);
 
     return (!ret ? BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
 }
@@ -546,8 +542,8 @@ int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
             assert(cur_config_cache->fs);
             assert(cur_config_cache->fs->meta_handle_ranges);
 
-            *num_meta =
-                PINT_llist_count(cur_config_cache->fs->meta_handle_ranges);
+            *num_meta = PINT_llist_count(
+                cur_config_cache->fs->meta_handle_ranges);
             ret = 0;
         }
     }
@@ -556,13 +552,14 @@ int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
 
 /* PINT_bucket_get_num_io()
  *
- * discovers the number of io servers available for a given file system
+ * discovers the number of io servers available for a given file
+ * system
  *
  * returns 0 on success, -errno on failure
  */
 int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
 {
-    int ret = -EINVAL;
+    int ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
@@ -578,7 +575,8 @@ int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
             assert(cur_config_cache->fs);
             assert(cur_config_cache->fs->data_handle_ranges);
 
-            *num_io = PINT_llist_count(cur_config_cache->fs->data_handle_ranges);
+            *num_io = PINT_llist_count(
+                cur_config_cache->fs->data_handle_ranges);
             ret = 0;
         }
     }
@@ -591,9 +589,10 @@ int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_bucket_get_server_handle_count(const char* server_addr_str,
-					PVFS_fs_id fs_id,
-					uint64_t* handle_count)
+int PINT_bucket_get_server_handle_count(
+    const char* server_addr_str,
+    PVFS_fs_id fs_id,
+    uint64_t* handle_count)
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
@@ -629,16 +628,14 @@ int PINT_bucket_get_server_handle_count(const char* server_addr_str,
 
 	    if (!strcmp(cur_host_extent_table->bmi_address, server_addr_str))
 	    {
-		PINT_extent_list_count_total(cur_host_extent_table->extent_list,
-		    &tmp_count);
+		PINT_extent_list_count_total(
+                    cur_host_extent_table->extent_list, &tmp_count);
 		*handle_count += tmp_count;
 	    }
             cur = PINT_llist_next(cur);
         }
-
 	return 0;
     }
-
     return ret;
 }
 
@@ -649,10 +646,11 @@ int PINT_bucket_get_server_handle_count(const char* server_addr_str,
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_server_name(char* server_name,
-				int max_server_name_len,
-				PVFS_handle handle,
-				PVFS_fs_id fsid)
+int PINT_bucket_get_server_name(
+    char* server_name,
+    int max_server_name_len,
+    PVFS_handle handle,
+    PVFS_fs_id fsid)
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
@@ -705,8 +703,9 @@ int PINT_bucket_get_server_name(char* server_name,
  * returns 0 on success -errno on failure
  *
  */
-int PINT_bucket_get_root_handle(PVFS_fs_id fsid,
-				PVFS_handle *fh_root)
+int PINT_bucket_get_root_handle(
+    PVFS_fs_id fsid,
+    PVFS_handle *fh_root)
 {
     int ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
@@ -717,9 +716,8 @@ int PINT_bucket_get_root_handle(PVFS_fs_id fsid,
         hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
         if (hash_link)
         {
-            cur_config_cache = qlist_entry(hash_link,
-					   struct config_fs_cache_s,
-					   hash_link);
+            cur_config_cache = qlist_entry(
+                hash_link, struct config_fs_cache_s, hash_link);
             assert(cur_config_cache);
             assert(cur_config_cache->fs);
 
@@ -733,7 +731,7 @@ int PINT_bucket_get_root_handle(PVFS_fs_id fsid,
 
 /* cache_server_array()
  *
- * verifies that the arrays of physical server addresses have been 
+ * verifies that the arrays of physical server addresses have been
  * cached in the configuration structs
  *
  * returns 0 on success, -errno on failure
@@ -741,8 +739,8 @@ int PINT_bucket_get_root_handle(PVFS_fs_id fsid,
 static int cache_server_array(struct server_configuration_s* config,
 			      PVFS_fs_id fsid)
 {
-    int ret = -PVFS_EINVAL, i, j;
-    char *server_bmi_str = (char *)0;
+    int ret = -PVFS_EINVAL, i = 0, j = 0;
+    char *server_bmi_str = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
@@ -754,18 +752,16 @@ static int cache_server_array(struct server_configuration_s* config,
 
     if (!config)
     {
-	return -PVFS_EINVAL;
+	return ret;
     }
 
-    /* find the correct fs in our config information */
     hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
     if (!hash_link)
     {
-	return -PVFS_EINVAL;
+	return ret;
     }
-    cur_config_cache = qlist_entry(hash_link,
-				   struct config_fs_cache_s,
-				   hash_link);
+    cur_config_cache = qlist_entry(
+        hash_link, struct config_fs_cache_s, hash_link);
     assert(cur_config_cache);
     assert(cur_config_cache->fs);
 
@@ -777,8 +773,8 @@ static int cache_server_array(struct server_configuration_s* config,
 	cur_config_cache->fs->meta_server_count = 0;
 	cur_config_cache->fs->io_server_count = 0;
 	
-	/* iterate through lists to come up with an upper bound for the 
-	 * size of the arrays that we need 
+	/* iterate through lists to come up with an upper bound for
+	 * the size of the arrays that we need
 	 */
 	tmp_server = cur_config_cache->fs->meta_handle_ranges;
 	while ((cur_mapping = PINT_llist_head(tmp_server)))
@@ -796,22 +792,26 @@ static int cache_server_array(struct server_configuration_s* config,
 	}
 	cur_config_cache->fs->meta_server_array = 
 	    (phys_server_desc_s*)malloc(
-	    cur_config_cache->fs->meta_server_count*sizeof(phys_server_desc_s));
+	    cur_config_cache->fs->meta_server_count*
+            sizeof(phys_server_desc_s));
 	cur_config_cache->fs->io_server_array = 
 	    (phys_server_desc_s*)malloc(
-	    cur_config_cache->fs->io_server_count*sizeof(phys_server_desc_s));
+	    cur_config_cache->fs->io_server_count*
+            sizeof(phys_server_desc_s));
 	cur_config_cache->fs->server_array = 
 	    (phys_server_desc_s*)malloc(
-	    cur_config_cache->fs->server_count*sizeof(phys_server_desc_s));
-	if (cur_config_cache->fs->meta_server_array == NULL 
-	    || cur_config_cache->fs->io_server_array == NULL
-	    || cur_config_cache->fs->server_array == NULL)
+	    cur_config_cache->fs->server_count*
+            sizeof(phys_server_desc_s));
+	if ((cur_config_cache->fs->meta_server_array == NULL) ||
+            (cur_config_cache->fs->io_server_array == NULL) ||
+            (cur_config_cache->fs->server_array == NULL))
 	{
 	    /* TODO: clean up nicer */
 	    return -PVFS_ENOMEM;
 	}
 	memset(cur_config_cache->fs->server_array, 0, 
-	    cur_config_cache->fs->server_count*sizeof(phys_server_desc_s));
+               cur_config_cache->fs->server_count*
+               sizeof(phys_server_desc_s));
 
 	/* reset counts until we find out how many physical servers are
 	 * actually present 
@@ -820,9 +820,9 @@ static int cache_server_array(struct server_configuration_s* config,
 	cur_config_cache->fs->meta_server_count = 0;
 	cur_config_cache->fs->io_server_count = 0;
 
-	for (i=0; i<2; i++)
+	for(i = 0; i < 2; i++)
 	{
-	    if (i==0)
+	    if (i == 0)
 	    {
 		tmp_server = cur_config_cache->fs->meta_handle_ranges;
 		current = PINT_BUCKET_META;
@@ -860,7 +860,7 @@ static int cache_server_array(struct server_configuration_s* config,
 		
 		if (!dup_flag)
 		{
-		    cur_config_cache->fs->server_array[array_index].addr 
+		    cur_config_cache->fs->server_array[array_index].addr
 			= tmp_bmi_addr;
 		    cur_config_cache->fs->server_array[array_index].addr_string 
 			= server_bmi_str;
@@ -875,7 +875,7 @@ static int cache_server_array(struct server_configuration_s* config,
 	/* now build meta and I/O arrays based on generic server list */
 	array_index = 0;
 	array_index2 = 0;
-	for (i=0; i < cur_config_cache->fs->server_count; i++)
+	for(i = 0; i < cur_config_cache->fs->server_count; i++)
 	{
 	    if(cur_config_cache->fs->server_array[i].server_type &
 		PINT_BUCKET_META)
@@ -895,7 +895,6 @@ static int cache_server_array(struct server_configuration_s* config,
 	cur_config_cache->fs->meta_server_count = array_index;
 	cur_config_cache->fs->io_server_count = array_index2;
     }
-
     return 0;
 }
 
@@ -907,10 +906,6 @@ static int cache_server_array(struct server_configuration_s* config,
  */
 static int hash_fsid(void *fsid, int table_size)
 {
-    /* TODO: update this later with a better hash function,
-     * depending on what fsids look like, for now just modding
-     *
-     */
     unsigned long tmp = 0;
     PVFS_fs_id *real_fsid = (PVFS_fs_id *)fsid;
 
@@ -922,8 +917,8 @@ static int hash_fsid(void *fsid, int table_size)
 
 /* hash_fsid_compare()
  *
- * performs a comparison of a hash table entro to a given key
- * (used for searching)
+ * performs a comparison of a hash table entro to a given key (used
+ * for searching)
  *
  * returns 1 if match found, 0 otherwise
  */
@@ -937,7 +932,6 @@ static int hash_fsid_compare(void *key, struct qlist_head *link)
     {
         return 1;
     }
-
     return 0;
 }
 
