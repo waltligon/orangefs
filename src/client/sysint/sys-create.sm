@@ -247,6 +247,12 @@ int PVFS_sys_create(
         return ret;
     }
 
+    if ((attr.mask & PVFS_ATTR_SYS_DFILE_COUNT) && (attr.dfile_count < 1))
+    {
+	gossip_err("Error: invalid number of datafiles (%d) specified in PVFS_sys_create().\n", (int)attr.dfile_count);
+	return(-PVFS_EINVAL);
+    }
+
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
