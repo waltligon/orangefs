@@ -4,6 +4,8 @@
  * See COPYING in top-level directory.
  */
 
+#include <unistd.h>
+
 #include "pvfs2-sysint.h"
 #include "pvfs2-req-proto.h"
 #include "pint-sysint.h"
@@ -23,7 +25,9 @@ int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock;
 struct server_configuration_s g_server_config;
 
-
+static int server_parse_config(
+    struct server_configuration_s *config,
+    PVFS_servresp_getconfig *response);
 
 /*
  * PINT_do_lookup looks up one dirent in a given parent directory
