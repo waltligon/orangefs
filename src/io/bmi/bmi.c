@@ -215,7 +215,8 @@ int BMI_initialize(const char *method_list,
 }
 
 /* the following is the old BMI_initialize() function that used dl to
- * pull in method modules dynamically.
+ * pull in method modules dynamically.  Just hanging around as an
+ * example...
  */
 #if 0
 /* BMI_initialize()
@@ -723,35 +724,18 @@ int BMI_testsome(int incount,
 		 int max_idle_time_ms,
 		 bmi_context_id context_id)
 {
-    gossip_lerr("Please implement me correctly.\n");
-    return(-ENOSYS);
-#if 0
-    /* this is not going to be pretty :( */
-
-    bmi_op_id_t sub_id_array[active_method_count][incount];
-    bmi_error_code_t sub_error_code_array[active_method_count][incount];
-    int sub_index_array[active_method_count][incount];
-    void *sub_user_ptr_array[active_method_count][incount];
-    bmi_size_t sub_actual_size_array[active_method_count][incount];
-    int place_holder[active_method_count][incount];
-    int sub_incount[active_method_count];
-    int sub_outcount = 0;
-    int i = 0;
-    int j = 0;
-    int mod_index = 0;
-    int final_index = 0;
-    struct method_op *target_op = NULL;
     int ret = -1;
     int idle_per_method = 0;
+    bmi_op_id_t* tmp_id_array;
+    int i,j;
+    struct method_op *query_op;
+    int need_to_test;
+    int tmp_outcount;
 
     if (max_idle_time_ms < 0)
 	return (-EINVAL);
 
-    gen_mutex_lock(&interface_mutex);
-
     *outcount = 0;
-
-    memset(sub_incount, 0, active_method_count * sizeof(int));
 
     /* TODO: do something more clever here */
     if (max_idle_time_ms)
@@ -761,73 +745,76 @@ int BMI_testsome(int incount,
 	    idle_per_method = 1;
     }
 
-    /* look at each op */
-    for (i = 0; i < incount; i++)
+    tmp_id_array = (bmi_op_id_t*)malloc(incount*sizeof(bmi_op_id_t));
+    if(!tmp_id_array)
+	return(-ENOMEM);
+
+    gen_mutex_lock(&interface_mutex);
+
+    /* iterate over each active method */
+    for(i=0; i<active_method_count; i++)
     {
-	if (id_array[i] != 0)
+	/* setup the tmp id array with only operations that match
+	 * that method
+	 */
+	memset(tmp_id_array, 0, incount*sizeof(bmi_op_id_t));
+	need_to_test = 0;
+	for(j=0; j<incount; j++)
 	{
-	    target_op = id_gen_fast_lookup(id_array[i]);
-	    mod_index = target_op->addr->method_type;
-	    if (mod_index >= active_method_count)
+	    if(id_array[j])
 	    {
-		gen_mutex_unlock(&interface_mutex);
-		return (-EINVAL);
+		query_op = (struct method_op*)id_gen_fast_lookup(id_array[j]);
+		if(query_op->addr->method_type == i)
+		{
+		    tmp_id_array[j] = id_array[j];
+		    need_to_test++;
+		}
 	    }
-
-	    sub_id_array[mod_index][sub_incount[mod_index]] = id_array[i];
-	    place_holder[mod_index][sub_incount[mod_index]] = i;
-	    (sub_incount[mod_index])++;
 	}
-    }
 
-    /* call testsome for each method which has ops in the array */
-    for (i = 0; i < active_method_count; i++)
-    {
-	if (sub_incount[i] > 0)
+	/* call testsome if we found any ops for this method */
+	if(need_to_test)
 	{
-	    ret = active_method_table[i]->BMI_meth_testsome(sub_incount[i],
-							    sub_id_array[i],
-							    &sub_outcount,
-							    sub_index_array[i],
-							    sub_error_code_array
-							    [i],
-							    sub_actual_size_array
-							    [i],
-							    sub_user_ptr_array
-							    [i],
-							    idle_per_method);
-	    if (ret < 0)
+	    tmp_outcount = 0;
+	    if(user_ptr_array)
+		ret = active_method_table[i]->BMI_meth_testsome(
+		    incount, tmp_id_array, &tmp_outcount, 
+		    &(index_array[*outcount]),
+		    &(error_code_array[*outcount]),
+		    &(actual_size_array[*outcount]),
+		    &(user_ptr_array[*outcount]),
+		    idle_per_method,
+		    context_id);
+	    else
+		ret = active_method_table[i]->BMI_meth_testsome(
+		    incount, tmp_id_array, &tmp_outcount, 
+		    &(index_array[*outcount]),
+		    &(error_code_array[*outcount]),
+		    &(actual_size_array[*outcount]),
+		    &(user_ptr_array[*outcount]),
+		    idle_per_method,
+		    context_id);
+	    if(ret < 0)
 	    {
-		/* can't recover from this */
+		/* can't recover from this... */
 		gossip_lerr("Error: critical BMI_testsome failure.\n");
 		gen_mutex_unlock(&interface_mutex);
-		return (ret);
+		free(tmp_id_array);
+		return(ret);
 	    }
-	    *outcount += sub_outcount;
-	    for (j = 0; j < sub_outcount; j++)
-	    {
-		/* setup our answer */
-		index_array[final_index] =
-		    place_holder[i][sub_index_array[i][j]];
-		error_code_array[final_index] = sub_error_code_array[i][j];
-		actual_size_array[final_index] = sub_actual_size_array[i][j];
-		if (user_ptr_array != NULL)
-		{
-		    user_ptr_array[final_index] = sub_user_ptr_array[i][j];
-		}
-		final_index++;
-	    }
+	    *outcount += tmp_outcount;
 	}
     }
 
+
     gen_mutex_unlock(&interface_mutex);
-    /* return 1 if anything completed */
-    if (ret == 0 && *outcount > 0)
-    {
-	return (1);
-    }
-    return (0);
-#endif
+
+    free(tmp_id_array);
+
+    if(ret == 0 && *outcount > 0)
+	return(1);
+    else
+	return(0);
 }
 #endif /* __BMI_SINGLE_METHOD__ */
 

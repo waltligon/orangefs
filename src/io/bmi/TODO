@@ -15,24 +15,10 @@ like close sockets when we start running into resource limits.  This bit
 would get cleared any time we use the address, and the hint doesn't
 necessarily take any action right away.
 
-Make sure that an overall pvfs2 error encoding scheme solidifies,
-and adopt it in the BMI code.  Right now the error handling in BMI
-is inconsisent and relies on using -errno for error codes even
-when it does do the right thing.
+convert PVFS to new error code scheme 
 
-Update GM module to level of TCP module.  The option to build it
-was removed from configure.in on Jan 3, 2002 because overall BMI
-changes needed to be made and we don't have the time or test
-platform to propigate the changes to GM at the moment.  So far,
-the changes needed to GM will be removal of expected_size field in
-sends and the addition of a timeout parameter to the wait
-functions.
-- note: when we remove the expected_size field in GM, we have to
-  be able to cancel rendezvous receives because there won't be any
-  way to determine if an eager send matches an eager or rend.
-  receive.
-
-convert to new error code scheme 
+update GM module to level of TCP module (in particular at least need
+list operations support somewhere)
 
 General (portability)
 -----------------------
@@ -45,10 +31,6 @@ Try building with some different compilers (at least gcc 3.2).
 Replace void* type for memory regions with PVFS_byte or BMI_byte
 types.  Audit code to make sure that buffers are indexed like
 this: (type)((BMI_byte)buffer + offset)
-
-Fix the linking of the gm module code; right now it requires that libgm.a
-be copied into the bmi/bmi_gm directory for it to work right.  It
-is also using gcc/ld specific linking flags.
 
 General (non critical)
 -----------------------
@@ -90,6 +72,9 @@ do I need to clean up things in the completion_array[] at finalize
 time?  applies to both GM and TCP modules, maybe to flow and job stuff
 as well - actually, should probably just call close_context from
 upper level before shutting down modules
+
+test out running BMI with multiple modules, in particular need to
+exercise BMI_testsome() and see if it is correct
 
 TCP module:
 -----------------------
