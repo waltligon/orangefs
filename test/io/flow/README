@@ -4,14 +4,12 @@ flow test programs:
 These programs are divided into two categories, client and server.  
 
 The server programs are:
-test-harness-server       (receives data into memory and discards)
 test-harness-server-trove (receives data and stores into trove)
 
 The client programs are:
 test-harness-client            (sends data from memory)
-test-harness-client-from-trove (sends data from trove)
 
-All four run on localhost.  Just start one of the two servers in one 
+All tests run on localhost.  Just start one of the two servers in one 
 terminal, then start one of the clients in the other terminal.  Both
 will exit after completing the flow transfer.
 
@@ -20,10 +18,6 @@ trove storage space at /tmp/pvfs2-test-space, and a file system
 named "pvfs2-fs".  These are the defaults in the pvfs2 development 
 tree, so simply creating a pvfs2 file system in advance is enough
 to prepare trove for running these tests.
-
-The following programs are broken at this time, please do not use:
-wire-harness-server
-wire-harness-client
 
 to use a different flow protocol:
 ============================
