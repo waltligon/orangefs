@@ -12,11 +12,11 @@
 #include <pvfs-distribution.h>
 
 /* compiled-in distributions */
-extern PVFS_Dist default_dist;
-extern PVFS_Dist simple_stripe_dist;
+extern struct PVFS_Dist default_dist;
+extern struct PVFS_Dist simple_stripe_dist;
 
 /* initial dist table - default dists */
-PVFS_Dist *PINT_Dist_table[PINT_DIST_TABLE_SZ] = {
+struct PVFS_Dist *PINT_Dist_table[PINT_DIST_TABLE_SZ] = {
 	&default_dist,
 	&simple_stripe_dist,
 	NULL
@@ -61,7 +61,7 @@ int PINT_unregister_distribution(char *dist_name)
  * pass in a dist with a valid name, looks up in dist table
  * if found, fills in the missing parts of the structure
  */
-int PINT_Dist_lookup(PVFS_Dist *dist)
+int PINT_Dist_lookup(struct PVFS_Dist *dist)
 {
 	int d;
 	if (!dist || !dist->dist_name)
@@ -89,7 +89,7 @@ int PINT_Dist_lookup(PVFS_Dist *dist)
  * if buffer is null, convert pointers to integers in dist
  * with no copy - dist is modified
  */
-void PINT_Dist_encode(void *buffer, PVFS_Dist *dist)
+void PINT_Dist_encode(void *buffer, struct PVFS_Dist *dist)
 {
 	PVFS_Dist* old_dist = dist;
 	
@@ -118,7 +118,7 @@ void PINT_Dist_encode(void *buffer, PVFS_Dist *dist)
  * if buffer is null, convert integers to pointers in dist
  * with no copy - dist is modified
  */
-void PINT_Dist_decode(PVFS_Dist *dist, void *buffer)
+void PINT_Dist_decode(struct PVFS_Dist *dist, void *buffer)
 {
 	if (!dist)
 		return;
@@ -133,4 +133,16 @@ void PINT_Dist_decode(PVFS_Dist *dist, void *buffer)
 	dist->params = (struct PVFS_Dist_params *)
 		((char *)(dist) + (int)(dist->params));
 	dist->methods = NULL;
+}
+
+void PINT_Dist_dump(PVFS_Dist *dist)
+{
+	fprintf(stderr,"******************************\n");
+	fprintf(stderr,"address\t\t%x\n", (unsigned int)dist);
+	fprintf(stderr,"dist_name\t%s\n", dist->dist_name);
+	fprintf(stderr,"name_size\t%d\n", dist->name_size);
+	fprintf(stderr,"param_size\t%d\n", dist->param_size);
+	fprintf(stderr,"params\t\t%x\n", (unsigned int)dist->params);
+	fprintf(stderr,"methods\t\t%x\n", (unsigned int)dist->methods);
+	fprintf(stderr,"******************************\n");
 }

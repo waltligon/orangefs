@@ -23,7 +23,7 @@ struct PVFS_Dist *PVFS_Dist_create(char *name);
 
 /******** macros for access to dist struct ***********/
 
-#define PINT_DIST_SIZE(distp)\
+#define PINT_DIST_PACK_SIZE(distp)\
 	((distp)->name_size + (distp)->param_size + sizeof(struct PVFS_Dist))
 
 #endif /* __PVFS_DISTRIBUTION_H */

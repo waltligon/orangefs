@@ -221,11 +221,15 @@ int PINT_Process_request(PINT_Request_state *req,
 			{
 				/* now starting processing for real */
 				seeking = 0;
+				gossip_debug(REQUEST_DEBUG,
+						"\texiting seek because distribute indiates done\n");
 				continue;
 			}
 			else
 			{
 				/* all we can do for now get outta here */
+				gossip_debug(REQUEST_DEBUG,
+						"\texiting distribute returned less than expected\n");
 				break;
 			}
 		}
@@ -277,7 +281,7 @@ int PINT_Process_request(PINT_Request_state *req,
 			break;
 		}
 	} /* this is the end of the while loop */
-	if (req->lvl < 0)
+	if (req->lvl < 0 || *eof_flag)
 	{
 		*start_offset = -1;
 	}
@@ -292,8 +296,8 @@ int PINT_Process_request(PINT_Request_state *req,
 	*segmax = segs_processed;
 	*bytemax = bytes_processed;
 	gossip_debug(REQUEST_DEBUG,"\tdone\n");
-	gossip_debug(REQUEST_DEBUG,"\t\tsm %d bm %lld so %lld bo %lld\n",*segmax,
-			*bytemax, *start_offset, req->buf_offset);
+	gossip_debug(REQUEST_DEBUG,"\t\tsm %d bm %lld so %lld bo %lld eof %d\n",
+			*segmax, *bytemax, *start_offset, req->buf_offset, *eof_flag);
 	if (mode == PINT_CKSIZE)
 	{
 		/* restore request state */
