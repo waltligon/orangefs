@@ -140,8 +140,7 @@ void PVFS_perror(char *text,
 #define PVFS_ERROR_SM     (4 << 7)	/* state machine specific error */
 #define PVFS_ERROR_SCHED  (5 << 7)
 #define PVFS_ERROR_CLIENT (6 << 7)
-#define PVFS_ERROR_FS     (7 << 7)	/* general file system semantics error (e.g. no such file) */
-#define PVFS_ERROR_DEV    (8 << 7)	/* device file interaction */
+#define PVFS_ERROR_DEV    (7 << 7)	/* device file interaction */
 
 /* PVFS_ERROR_TO_ERRNO - macro for mapping from a PVFS error value
  * to a local UNIX errno value

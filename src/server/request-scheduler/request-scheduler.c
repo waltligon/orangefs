@@ -159,11 +159,15 @@ int PINT_req_sched_finalize(
  * returns 0 on success, -errno on failure
  * NOTE: a handle value of 0 and a return value of 0 indicates
  * that the request does not operate on any particular handle
+ *
+ * TODO: we need to fix this function and all of its callers if we 
+ * define something besides "0" to represent an invalid handle value
  */
 int PINT_req_sched_target_handle(struct PVFS_server_req*
-	req, PVFS_handle* handle)
+	req, PVFS_handle* handle, PVFS_fs_id* fs_id)
 {
 	*handle = 0;
+	*fs_id = 0;
 
 	switch(req->op)
 	{
@@ -175,34 +179,42 @@ int PINT_req_sched_target_handle(struct PVFS_server_req*
 			break;
 		case PVFS_SERV_REMOVE:
 			*handle = req->u.remove.handle;
+			*fs_id = req->u.remove.fs_id;
 			return(0);
 			break;
 		case PVFS_SERV_IO:
 			*handle = req->u.io.handle;
+			*fs_id = req->u.io.fs_id;
 			return(0);
 			break;
 		case PVFS_SERV_GETATTR:
 			*handle = req->u.getattr.handle;
+			*fs_id = req->u.getattr.fs_id;
 			return(0);
 			break;
 		case PVFS_SERV_SETATTR:
 			*handle = req->u.setattr.handle;
+			*fs_id = req->u.setattr.fs_id;
 			return(0);
 			break;
 		case PVFS_SERV_LOOKUP_PATH:
 			*handle = req->u.lookup_path.starting_handle;
+			*fs_id = req->u.lookup_path.fs_id;
 			return(0);
 			break;
 		case PVFS_SERV_CREATEDIRENT:
 			*handle = req->u.crdirent.parent_handle;
+			*fs_id = req->u.crdirent.fs_id;
 			return(0);
 			break;
 		case PVFS_SERV_RMDIRENT:
 			*handle = req->u.rmdirent.parent_handle;
+			*fs_id = req->u.rmdirent.fs_id;
 			return(0);
 			break;
 		case PVFS_SERV_TRUNCATE:
 			*handle = req->u.truncate.handle;
+			*fs_id = req->u.truncate.fs_id;
 			return(0);
 			break;
 		case PVFS_SERV_MKDIR:
@@ -210,6 +222,7 @@ int PINT_req_sched_target_handle(struct PVFS_server_req*
 			break;
 		case PVFS_SERV_READDIR:
 			*handle = req->u.readdir.handle;
+			*fs_id = req->u.readdir.fs_id;
 			return(0);
 			break;
 		case PVFS_SERV_GETCONFIG:
@@ -243,9 +256,10 @@ int PINT_req_sched_post(
 	struct req_sched_element* tmp_element;
 	struct req_sched_list* tmp_list;
 	struct req_sched_element* next_element;
+	PVFS_fs_id fs_id;
 
 	/* find the handle */
-	ret = PINT_req_sched_target_handle(in_request, &handle);
+	ret = PINT_req_sched_target_handle(in_request, &handle, &fs_id);
 	if(ret < 0)
 	{
 		return(ret);
