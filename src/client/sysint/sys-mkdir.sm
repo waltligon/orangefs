@@ -201,6 +201,9 @@ int PVFS_isys_mkdir(
     sm_p->parent_ref = parent_ref;
     sm_p->ref_type = PVFS_TYPE_DIRECTORY;
 
+    /* set sm_p->object_ref for getattr/acache lookup */
+    sm_p->object_ref = parent_ref;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s "
                  "under parent handle %Lu on fs %d\n", object_name,
                  Lu(parent_ref.handle), parent_ref.fs_id);

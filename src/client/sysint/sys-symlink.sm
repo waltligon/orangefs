@@ -234,6 +234,9 @@ int PVFS_isys_symlink(
     sm_p->parent_ref = parent_ref;
     sm_p->ref_type = PVFS_TYPE_DIRECTORY;
 
+    /* set sm_p->object_ref for getattr/acache lookup */
+    sm_p->object_ref = parent_ref;
+
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Symlinking %s under parent handle %Lu "
         "on fs %d to %s\n", entry_name, Lu(parent_ref.handle),

@@ -362,13 +362,13 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     /* if this attr is in the dbpf attr cache, remove it */
     dbpf_attr_cache_remove(ref);
 
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
-
-    /* remove both bstream and keyval db if they exist.  Not a fatal error
-     * if this fails (may not have ever been created)
+    /* remove both bstream and keyval db if they exist.  Not a fatal
+     * error if this fails (may not have ever been created)
      */
     ret = dbpf_open_cache_remove(
         op_p->coll_p->coll_id, op_p->handle);
+
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
     /* return handle to free list */
     trove_handle_free(op_p->coll_p->coll_id,op_p->handle);

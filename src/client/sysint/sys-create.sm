@@ -273,6 +273,9 @@ int PVFS_isys_create(
     sm_p->parent_ref = parent_ref;
     sm_p->ref_type = PVFS_TYPE_DIRECTORY;
 
+    /* set sm_p->object_ref for getattr/acache lookup */
+    sm_p->object_ref = parent_ref;
+
     if (dist)
     {
         if (!dist->name)
