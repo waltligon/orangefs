@@ -270,7 +270,6 @@ struct PVFS_sysreq_io_s {
 typedef struct PVFS_sysreq_io_s PVFS_sysreq_io;
 
 struct PVFS_sysresp_io_s {
-	pinode_reference pinode_refn;
 	PVFS_size total_completed;
 };
 typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
