@@ -9,8 +9,8 @@
 
 #include <inttypes.h>
 
-#include <pvfs2-types.h>
-#include <pvfs2-req-proto.h>
+#include "pvfs2-types.h"
+#include "pvfs2-req-proto.h"
 
 #define WIRE_HARNESS_READ 1
 #define WIRE_HARNESS_WRITE 2
@@ -18,11 +18,11 @@
 /* request structure */
 struct wire_harness_req
 {
-	PVFS_fs_id fs_id;    /* file system or collection id */
-	PVFS_handle handle;  /* data space handle */
-	int op;              /* read or write */
-	int32_t file_req_size; /* how big is the trailing info? */
-	int32_t dist_size;
+    PVFS_fs_id fs_id;		/* file system or collection id */
+    PVFS_handle handle;		/* data space handle */
+    int op;			/* read or write */
+    int32_t file_req_size;	/* how big is the trailing info? */
+    int32_t dist_size;
 };
 /* NOTE: the I/O description and the distribution will be packed
  * immediatedly after the above struct in all requests
@@ -32,10 +32,19 @@ struct wire_harness_req
 /* ack structure */
 struct wire_harness_ack
 {
-    PVFS_handle handle; /* returned handle for writes to new files??? */
-	int32_t error_code;     /* 0 or -error */
-	PVFS_size dspace_size;  /* so both sides can handle EOF */
+    PVFS_handle handle;		/* returned handle for writes to new files??? */
+    int32_t error_code;		/* 0 or -error */
+    PVFS_size dspace_size;	/* so both sides can handle EOF */
 };
 
 
 #endif /* __WIRE_HARNESS_H */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
