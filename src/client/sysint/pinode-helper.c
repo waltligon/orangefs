@@ -400,6 +400,24 @@ static int check_attribute_expiry(struct timeval t1,struct timeval t2)
 	return(-1);
 }
 
+/* check_expiry
+ *
+ * check to determine if a cached value is stale based on timeout value
+ *
+ * returns 0 on success, -1 on failure
+ */
+static int check_expiry(struct timeval t1,struct timeval t2)
+{
+	/* Does size timestamp exceed the current time?
+	 * If yes, size is valid. If no, size is stale.
+	 */
+	if (t2.tv_sec > t1.tv_sec || (t2.tv_sec == t1.tv_sec && t2.tv_usec > t1.tv_usec))
+		return(0);
+
+	/* value is stale */
+	return(-1);
+}
+
 /* check_size_expiry
  *
  * check to determine if cached size is stale based on timeout value

@@ -20,6 +20,8 @@
 
 #define REQ_ENC_FORMAT 0
 
+static int check_expiry(struct timeval t1,struct timeval t2);
+
 /* PVFS_sys_getattr()
  *
  * obtain the attributes of a PVFS file
@@ -35,7 +37,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
    bmi_addr_t serv_addr;	            /* PVFS address type structure */ 
 	char *server = NULL;
 	int cflags = 0,vflags = 0;
-	PVFS_count32 count = 0;
+	//PVFS_count32 count = 0;
 	struct timeval cur_time;
 	PVFS_size *size_array = 0, logical_size = 0;
 	pinode *entry_pinode = NULL;
@@ -43,7 +45,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	pinode_reference entry;
 	struct PINT_decoded_msg decoded;
 	int max_msg_sz = 0;
-	PVFS_servreq_getattr req_args;
+	//PVFS_servreq_getattr req_args;
 
 	/* Let's check if size is to be fetched here, If so
 	 * somehow ensure that dist is returned as part of 
@@ -61,6 +63,109 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	cflags = HANDLE_VALIDATE + ATTR_VALIDATE;
 	if (cflags & ATTR_SIZE)
 		cflags += SIZE_VALIDATE;
+	/* can't use phelper_get_pinode here because pinode helper calls 
+	 * getattr();
+	 */
+
+	ret = PINT_pcache_pinode_alloc(&entry_pinode);
+        if (ret < 0)
+        {
+                ret = -ENOMEM;
+                goto pinode_get_failure;
+        }
+
+	ret = PINT_pcache_lookup(entry, entry_pinode);
+	if (ret < 0)
+        {
+                goto pinode_get_failure;
+        }
+
+	/* do we have a valid copy? 
+	 * if any of the attributes are stale, or absent then we need to 
+	 * retrive a fresh copy.
+	 */
+
+	if (entry_pinode->pinode_ref.handle != -1)
+	{
+		/* valid copy of pinode is in the cache, if its not expired,
+		 * use this copy to return attributes
+		 */
+		/* is the handle stale? */
+		ret = check_expiry(cur_time,entry_pinode->tstamp_handle);
+		if (ret == 1)
+		{
+			/* is the timestamp stale? */
+			ret = check_expiry(cur_time,entry_pinode->tstamp_attr);
+			if (ret == 1)
+			{
+				/* is the size stale? */
+				ret = check_expiry(cur_time,entry_pinode->tstamp_size);
+				if (ret == 1)
+				{
+					resp->attr = entry_pinode->attr;
+					PINT_pcache_pinode_dealloc(entry_pinode);
+					return (0);
+				}
+			}
+		}
+
+	}
+
+	/* done with this pointer, free the space */
+	PINT_pcache_pinode_dealloc(entry_pinode);
+
+	ret = config_bt_map_bucket_to_server(&server,entry.handle,entry.fs_id);
+        if (ret < 0)
+        {
+		goto map_server_failure;
+        }
+
+        ret = BMI_addr_lookup(&serv_addr,server);
+        if (ret < 0)
+        {
+		goto map_server_failure;
+        }
+
+	req_p = (struct PVFS_server_req_s *) malloc(sizeof(struct PVFS_server_req_s));
+        if (req_p == NULL) {
+                assert(0);
+        }
+
+	req_p->op = PVFS_SERV_GETATTR;
+        req_p->credentials = req->credentials;
+	req_p->rsize = sizeof(struct PVFS_server_req_s);
+	req_p->u.getattr.handle = entry.handle;
+	req_p->u.getattr.fs_id = entry.fs_id;
+	req_p->u.getattr.attrmask = req->attrmask;
+
+	/* Q: how much stuff are we getting back? */
+	max_msg_sz = sizeof(struct PVFS_server_resp_s);
+
+	/* Make a server getattr request */
+	ret = PINT_server_send_req(serv_addr, req_p, max_msg_sz, &decoded);
+	if (ret < 0)
+	{
+            goto send_req_failure;
+	}
+
+	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+	/*if (ack_p->status < 0 )
+        {
+            goto send_req_failure;
+            ret = ack_p->status;
+        }*/
+
+	resp->attr = ack_p->u.getattr.attr;
+	/* TODO: uncomment when extended attributes are defined */
+	/* resp->eattr = ack_p.u.getattr.eattr; */
+
+        /* the request isn't needed anymore, free it */
+        free(req_p);
+
+	/* do size calculations here? */
+
+#if 0
 	ret = phelper_get_pinode(entry,&entry_pinode,attr_mask,
 			vflags,cflags,req->credentials);
 	if (ret < 0)
@@ -159,6 +264,17 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		entry_pinode->tstamp_size.tv_usec = cur_time.tv_usec + size_to.tv_usec;
 	}/* if size is required */
 
+#endif
+
+	ret = gettimeofday(&cur_time,NULL);
+	if (ret < 0)
+	{
+		goto map_server_failure;
+	}
+	/* Set the size timestamp */
+	entry_pinode->tstamp_size.tv_sec = cur_time.tv_sec + size_to.tv_sec;
+	entry_pinode->tstamp_size.tv_usec = cur_time.tv_usec + size_to.tv_usec;
+
 	/* Add to cache  */
 	ret = PINT_pcache_insert(entry_pinode);
 	if (ret < 0)
@@ -166,23 +282,20 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		goto map_server_failure;
 	}
 
-	/* After fetching all values, pass on only the values of interest */
-	/* Fill in the response structure */
-	resp->attr = entry_pinode->attr; 
-	
 	/* Free memory allocated for name */
 	if (size_array)
 		free(size_array);
 
 	/* Free the jobs */	
-	if (ack_p)
-		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
-	if (req_p)
-		free(req_p);
+	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 
 	return(0);
 	
+send_req_failure:
+printf("send_req_failure\n");
+
 map_server_failure:
+printf("map_server_failure\n");
 	if (ack_p)
 		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 	if (req_p)
@@ -195,7 +308,20 @@ map_server_failure:
 		free(size_array);
 
 pinode_get_failure:
+printf("pinode_get_failure\n");
 
 	return(ret);
+}
+
+static int check_expiry(struct timeval t1,struct timeval t2)
+{
+        /* Does size timestamp exceed the current time?
+         * If yes, size is valid. If no, size is stale.
+         */
+        if (t2.tv_sec > t1.tv_sec || (t2.tv_sec == t1.tv_sec && t2.tv_usec > t1.tv_usec))
+                return(0);
+
+        /* value is stale */
+        return(-1);
 }
 

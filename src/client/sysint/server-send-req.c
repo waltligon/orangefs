@@ -69,6 +69,7 @@ int PINT_server_send_req(bmi_addr_t addr,
     }
     else if (ret == 0 && s_status.error_code != 0)
     {
+	printf("send failed\n");
 	ret = -EINVAL;
 	goto return_error;
     }
@@ -88,6 +89,7 @@ int PINT_server_send_req(bmi_addr_t addr,
     {
 	if (((ret == 0) && (r_status.error_code != 0)) || (r_status.actual_size > max_resp_size))
 	{
+	    printf("status code error failed\n");
 	    ret = -EINVAL;
 	    goto return_error;
 	}
@@ -112,6 +114,7 @@ int PINT_server_send_req(bmi_addr_t addr,
 		      NULL);
     if (ret < 0)
     {
+	printf("decode failed\n");
 	ret = (-EINVAL);
 	goto return_error;
     }
@@ -125,7 +128,7 @@ int PINT_server_send_req(bmi_addr_t addr,
 
     return 0;
  return_error:
-    return -1;
+    return ret;
 }
 
 /*

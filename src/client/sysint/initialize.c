@@ -182,6 +182,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
     PVFS_credentials creds;
     char *parse_p;
     struct PINT_decoded_msg decoded;
+    bmi_size_t max_msg_sz;
 
 
     enum {
@@ -197,13 +198,14 @@ static int server_get_config(pvfs_mntlist mntent_list)
 
     /* TODO: Fill up the credentials information */
 
+    /* TODO: IS THIS A REASONABLE MAXIMUM MESSAGE SIZE?  I HAVE NO IDEA */
+    max_msg_sz = sizeof(struct PVFS_server_resp_s) + 2 * MAX_STRING_SIZE;
+
     /* Process all entries in pvfstab */
     for (i = 0; i < mntent_list.nr_entry; i++) 
     {
 	pvfs_mntent *mntent_p = &mntent_list.ptab_p[i]; /* for convenience */
 	struct fsconfig_s *fsinfo_p;
-	/* TODO: IS THIS A REASONABLE MAXIMUM MESSAGE SIZE?  I HAVE NO IDEA */
-	bmi_size_t max_msg_sz = sizeof(struct PVFS_server_resp_s) + 2 * MAX_STRING_SIZE;
 
    	/* Obtain the metaserver to send the request */
 	ret = BMI_addr_lookup(&serv_addr, mntent_p->meta_addr);   

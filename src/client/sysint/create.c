@@ -75,7 +75,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 		{
 			entry.handle = -1;
 		}
-	}	
+	}
 	/* Do only if pinode reference exists */
 	if (entry.handle != PINT_DCACHE_HANDLE_INVALID)
 	{

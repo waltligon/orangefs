@@ -6,11 +6,21 @@
 
 /* Set Attribute Function Implementation */
 
-#include <pinode-helper.h>
-#include <pvfs2-sysint.h>
-#include <pint-sysint.h>
-#include <pint-servreq.h>
-#include <config-manage.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <malloc.h>
+#include <errno.h>
+#include <assert.h>
+#include <string.h>
+
+#include "pinode-helper.h"
+#include "pvfs2-sysint.h"
+#include "pint-sysint.h"
+#include "pint-servreq.h"
+#include "config-manage.h"
+#include "PINT-reqproto-encode.h"
+
+#define REQ_ENC_FORMAT 0
 
 /* PVFS_sys_setattr()
  *
@@ -20,21 +30,30 @@
  */
 int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 {
-	struct PVFS_server_req_s *req_job = NULL;		/* server request */
-	struct PVFS_server_resp_s *ack_job = NULL;	/* server response */
+	struct PVFS_server_req_s *req_p = NULL;	/* server request */
+	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
 	int ret = -1, flags = 0;
 	pinode *pinode_ptr = NULL, *item_ptr = NULL;
-	bmi_addr_t serv_addr;				/* PVFS address type structure */
+	bmi_addr_t serv_addr;		/* PVFS address type structure */
 	char *server = NULL;
 	PVFS_bitfield mask = req->attrmask;
 	pinode_reference entry;
 	PVFS_servreq_setattr req_args;
 	PVFS_size handlesize = 0;
+	bmi_size_t max_msg_sz = sizeof(struct PVFS_server_resp_s);
+	struct PINT_decoded_msg decoded;
+
+	req_p = (struct PVFS_server_req_s *) malloc(sizeof(struct PVFS_server_req_s));
+	if (req_p == NULL) {
+		assert(0);
+	}
 
 	/* Validate the handle */
 	/* If size to be fetched, distribution needs to be fetched
 	 * along with other desired metadata
 	 */
+
+	/*Q: does being able to set the size make any sense at all?*/
 	if ((mask & ATTR_SIZE) == ATTR_SIZE)
 		mask = mask | ATTR_META;
 
@@ -87,22 +106,49 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 		goto map_to_server_failure;
 	}
 
-	/* Fill in the parameters */
-	req_args.handle = entry.handle;
-	req_args.fs_id = entry.fs_id;
-	req_args.attrmask = mask;
-	req_args.attr = req->attr;
-	if (mask & ATTR_META)
+	/* Create the server request */
+	req_p->op = PVFS_SERV_SETATTR;
+	req_p->credentials = req->credentials;
+	if ((req->attr.objtype & ATTR_META) == ATTR_META)
 	{
 		handlesize = req->attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
 	}
+	else
+	{
+		handlesize = 0;
+	}
+	req_p->rsize = sizeof(struct PVFS_server_req_s) + handlesize;
+	req_p->u.setattr.handle = entry.handle;
+	req_p->u.setattr.fs_id = entry.fs_id;
+	req_p->u.setattr.attrmask = mask;
+	req_p->u.setattr.attr = req->attr;
+
 	/* Make a server setattr request */	
-	ret = pint_serv_setattr(&req_job,&ack_job,&req_args,req->credentials,\
-			handlesize,&serv_addr);
+	ret = PINT_server_send_req(serv_addr, req_p, max_msg_sz, &decoded);
 	if (ret < 0)
 	{
 		goto map_to_server_failure;
 	}
+
+	/* TODO: we get a generic response back from the server and its pretty
+	 * much empty.  we're not looking at any of the fields in here to
+	 * check for success/failure of the io operation, so we free the
+	 * structure immediately.
+	 */
+
+	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+	/* make sure the actual IO suceeded */
+	if (ack_p->status < 0 )
+	{
+	    goto pinode_remove_failure;
+	    ret = ack_p->status;
+	}
+
+	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+
+	/* the request isn't needed anymore, free it */
+	free(req_p);
 
 	/* Remove the pinode only if it is in the cache */
 	/* Note: Until an error returning scheme is decided
@@ -143,19 +189,32 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	return(0);
 
 pinode_remove_failure:
-	if (ack_job)
-		sysjob_free(serv_addr,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	if (req_job)
-		sysjob_free(serv_addr,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
+printf("pinode_remove_failure\n");
+	if (ack_p != NULL)
+		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	if (req_p != NULL)
+		free(req_p);
 
 map_to_server_failure:
-	if (server)
+printf("map_to_server_failure\n");
+	if (server != NULL)
 		free(server);
 
 pcache_lookup_failure:
+printf("pcache_lookup_failure\n");
 	PINT_pcache_pinode_dealloc(pinode_ptr);
 
 pinode_alloc_failure:
+printf("pinode_alloc_failure\n");
 
 	return(ret);
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
