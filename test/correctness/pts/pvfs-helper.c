@@ -111,3 +111,75 @@ PVFS_handle create_dir(PVFS_handle parent,
     }
     return (PVFS_handle) resp_mkdir.pinode_refn.handle;
 }
+
+/*
+ * simple helper to remove a pvfs2 file
+ *
+ * parent:   handle of parent directory
+ * fs_id:    fsid of filesystem on which parent dir exists
+ * name:     name of file to remove
+ *
+ * returns 0 on success.
+ *          -1 if some error happened.
+ */
+PVFS_handle remove_file(PVFS_handle parent,
+                       PVFS_fs_id fs_id,
+                       char *name)
+{
+    PVFS_sysreq_remove req_remove;
+
+    int ret = -1;
+
+    memset(&req_remove, 0, sizeof(PVFS_sysreq_remove));
+
+    req_remove.entry_name = name;
+    req_remove.parent_refn.handle = parent;
+    req_remove.parent_refn.fs_id = fs_id;
+    req_remove.credentials.perms = 1877;
+    req_remove.credentials.uid = 100;
+    req_remove.credentials.gid = 100;
+
+    ret = PVFS_sys_remove(&req_remove);
+    if (ret < 0)
+    {
+        printf("remove failed\n");
+        return ret;
+    }
+    return 0;
+}
+
+/*
+ * simple helper to remove a pvfs2 dir
+ *
+ * parent:   handle of parent directory
+ * fs_id:    fsid of filesystem on which parent dir exists
+ * name:     name of dir to remove
+ *
+ * returns 0 on success.
+ *          -1 if some error happened.
+ */
+PVFS_handle remove_dir(PVFS_handle parent,
+                       PVFS_fs_id fs_id,
+                       char *name)
+{
+    PVFS_sysreq_remove req_remove;
+
+    int ret = -1;
+
+    memset(&req_remove, 0, sizeof(PVFS_sysreq_remove));
+
+    req_remove.entry_name = name;
+    req_remove.parent_refn.handle = parent;
+    req_remove.parent_refn.fs_id = fs_id;
+    req_remove.credentials.perms = 1877;
+    req_remove.credentials.uid = 100;
+    req_remove.credentials.gid = 100;
+
+    ret = PVFS_sys_remove(&req_remove);
+    if (ret < 0)
+    {
+        printf("remove failed\n");
+        return ret;
+    }
+    return 0;
+}

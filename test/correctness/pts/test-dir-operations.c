@@ -1,0 +1,229 @@
+/*
+ * (C) 2002 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <client.h>
+#include <sys/time.h>
+#include "mpi.h"
+#include "pts.h"
+#include "pvfs-helper.h"
+
+extern int parse_pvfstab(char *filename,
+			 pvfs_mntlist * pvfstab_p);
+
+/* 
+ * helper function to initialize pvfs
+ * doesn't take any parameters (relies heavily on some expected default information)
+ *
+ * returns: fs_id of a pvfs file system 
+ * 	or -1 if error
+ */
+static PVFS_fs_id system_init(void)
+{
+    PVFS_sysresp_init resp_init;
+    int ret = -1;
+    pvfs_mntlist mnt = { 0, NULL };	/* use pvfstab in cwd */
+
+    memset(&resp_init, 0, sizeof(resp_init));
+
+    ret = parse_pvfstab(NULL, &mnt);
+    if (ret < 0)
+    {
+	printf("Parsing error\n");
+	return -1;
+    }
+
+    ret = PVFS_sys_initialize(mnt, &resp_init);
+    if (ret < 0)
+    {
+	printf("PVFS_sys_initialize() failure. = %d\n", ret);
+	return (ret);
+    }
+
+    return resp_init.fsid_list[0];
+}
+
+/*
+ * handle:  handle of parent directory
+ * fs_id:   our file system
+ * depth:   how many directories to make at this level
+ * rank:    rank in the mpi process group 
+ */
+
+static int remove_dirs(PVFS_handle handle,
+			 PVFS_fs_id fs_id,
+			 int ndirs,
+			 int rank)
+{
+    int i;
+    char name[PVFS_NAME_MAX];
+    PVFS_handle dir_handle;
+
+    for (i = 0; i < ndirs; i++)
+    {
+	snprintf(name, PVFS_NAME_MAX, "rank%d-iter%d", rank, i);
+	dir_handle = create_dir(handle, fs_id, name);
+	if (dir_handle < 0)
+	{
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+static int read_dirs(PVFS_handle handle,
+			 PVFS_fs_id fs_id,
+			 int ndirs,
+			 int rank)
+{
+    int i, iter, ret;
+
+    PVFS_sysreq_readdir req_readdir;
+    PVFS_sysresp_readdir resp_readdir;
+
+    memset(&resp_readdir,0,sizeof(PVFS_sysresp_readdir));
+    memset(&req_readdir,0,sizeof(PVFS_sysreq_readdir));
+
+    req_readdir.pinode_refn.handle = handle;
+    req_readdir.pinode_refn.fs_id = fs_id;
+    req_readdir.token = PVFS2_READDIR_START;
+    req_readdir.pvfs_dirent_incount = ndirs;
+
+    req_readdir.credentials.uid = 100;
+    req_readdir.credentials.gid = 100;
+    req_readdir.credentials.perms = 1877;
+
+    /* call readdir */
+    ret = PVFS_sys_readdir(&req_readdir,&resp_readdir);
+    if (ret < 0)
+    {
+	printf("readdir failed with errcode = %d\n", ret);
+	return(-1);
+    }
+
+    /* examine the results */
+
+    if (resp_readdir.pvfs_dirent_outcount != ndirs)
+    {
+	debug_printf("we were expecting %d directories, and recieved %d\n",ndirs, resp_readdir.pvfs_dirent_outcount);
+
+	free(resp_readdir.dirent_array);
+	return -1;
+    }
+
+    /* check each of our directories to ensure that they have sane names */
+
+    for (i = 0; i < ndirs; i++)
+    {
+	if (0 > sscanf(resp_readdir.dirent_array[i].d_name, "rank%d-iter%d", &rank, &iter))
+	{
+	    debug_printf("unable to read directory name iter: %d\n",i);
+	    free(resp_readdir.dirent_array);
+	    return -1;
+	}
+
+	if ( (iter > ndirs) || (iter < 0))
+	{
+	    debug_printf("invalid directory name %s\n",resp_readdir.dirent_array[i].d_name);
+	    free(resp_readdir.dirent_array);
+	    return -1;
+	}
+    }
+
+    free(resp_readdir.dirent_array);
+    return 0;
+}
+
+static int create_dirs(PVFS_handle handle,
+			 PVFS_fs_id fs_id,
+			 int ndirs,
+			 int rank)
+{
+    int i;
+    char name[PVFS_NAME_MAX];
+    PVFS_handle dir_handle;
+
+    for (i = 0; i < ndirs; i++)
+    {
+	snprintf(name, PVFS_NAME_MAX, "rank%d-iter%d", rank, i);
+	dir_handle = create_dir(handle, fs_id, name);
+	if (dir_handle < 0)
+	{
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+/*
+ * driver for the test
+ * comm:	special pts communicator
+ * rank:	rank among processes
+ * buf:		stuff data in here ( not used )
+ * rawparams:	our configuration information
+ *
+ * returns: 
+ * 	0:  	all went well
+ * 	nonzero: errors encountered making reading, or removing directories
+ */
+int test_dir_operations(MPI_Comm * comm,
+		     int rank,
+		     char *buf,
+		     void *rawparams)
+{
+    int ret = -1;
+    PVFS_fs_id fs_id;
+    PVFS_handle root_handle;
+    generic_params *myparams = (generic_params *) rawparams;
+    int nerrs = 0;
+
+    fs_id = system_init();
+    if (fs_id < 0)
+    {
+	printf("System initialization error\n");
+	return (fs_id);
+    }
+
+    root_handle = get_root(fs_id);
+
+    ret = create_dirs(root_handle, fs_id, myparams->mode, rank);
+    if (ret < 0)
+    {
+	printf("creating directories failed with errcode = %d\n", ret);
+	return (-1);
+    }
+
+    ret = read_dirs(root_handle, fs_id, myparams->mode, rank);
+    if (ret < 0)
+    {
+	printf("reading directories failed with errcode = %d\n", ret);
+	return (-1);
+    }
+
+    ret = remove_dirs(root_handle, fs_id, myparams->mode, rank);
+    if (ret < 0)
+    {
+	printf("removing directories failed with errcode = %d\n", ret);
+	return (-1);
+    }
+
+    ret = PVFS_sys_finalize();
+    if (ret < 0)
+    {
+	printf("finalizing sysint failed with errcode = %d\n", ret);
+	return (-1);
+    }
+
+    return -nerrs;
+}
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
