@@ -53,10 +53,10 @@
 } while (0)
 
 /* skip 4 bytes */
-#define encode_skip4(pptr) do { \
+#define encode_skip4(pptr,x) do { \
     *(pptr) += 4; \
 } while (0)
-#define decode_skip4(pptr) do { \
+#define decode_skip4(pptr,x) do { \
     *(pptr) += 4; \
 } while (0)
 
@@ -65,19 +65,19 @@
     u_int32_t len = strlen(*pbuf); \
     *(u_int32_t *) *(pptr) = htobmi32(len); \
     memcpy(*(pptr)+4, *pbuf, len+1); \
-    *(pptr) += roundup4(4 + len + 1); \
+    *(pptr) += roundup8(4 + len + 1); \
 } while (0)
 #define decode_string(pptr,pbuf) do { \
     u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr)); \
     *pbuf = *(pptr) + 4; \
-    *(pptr) += roundup4(4 + len + 1); \
+    *(pptr) += roundup8(4 + len + 1); \
 } while (0)
 /* odd variation, space exists in some structure, must copy-in string */
 #define encode_here_string(pptr,pbuf) encode_string(pptr,pbuf)
 #define decode_here_string(pptr,pbuf) do { \
     u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr)); \
     memcpy(pbuf, *(pptr) + 4, len + 1); \
-    *(pptr) += roundup4(4 + len + 1); \
+    *(pptr) += roundup8(4 + len + 1); \
 } while (0)
 
 /*

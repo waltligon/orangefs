@@ -352,10 +352,11 @@ struct PVFS_servreq_setattr
     PVFS_fs_id fs_id;      /* file system */
     PVFS_object_attr attr; /* new attributes */
 };
-endecode_fields_3_struct(
+endecode_fields_4_struct(
     PVFS_servreq_setattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
+    skip4,,
     PVFS_object_attr, attr)
 #define extra_size_PVFS_servreq_setattr \
     extra_size_PVFS_object_attr
@@ -837,7 +838,7 @@ struct PVFS_servreq_io
     (void) PINT_Request_commit(lin, (x)->file_req); \
     PINT_Request_encode(lin); /* packs the pointers */ \
     encode_int32_t(pptr, &(x)->file_req->num_nested_req); \
-    encode_skip4(pptr); \
+    encode_skip4(pptr,); \
     encode_PVFS_Request(pptr, lin); \
     decode_free(lin); \
     } \
@@ -853,7 +854,7 @@ struct PVFS_servreq_io
     decode_uint32_t(pptr, &(x)->server_ct); \
     decode_PINT_dist(pptr, &(x)->io_dist); \
     decode_int32_t(pptr, &numreq); \
-    decode_skip4(pptr); \
+    decode_skip4(pptr,); \
     (x)->file_req = decode_malloc((numreq + 1) * sizeof(*(x)->file_req)); \
     (x)->file_req->num_nested_req = numreq; \
     decode_PVFS_Request(pptr, (x)->file_req); \

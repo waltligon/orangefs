@@ -33,11 +33,13 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 } while (0)
 #define encode_PVFS_metafile_attr_dfiles(pptr,x) do { int dfiles_i; \
     encode_uint32_t(pptr, &(x)->dfile_count); \
+    encode_skip4(pptr,); \
     for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++) \
 	encode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]); \
 } while (0)
 #define decode_PVFS_metafile_attr_dfiles(pptr,x) do { int dfiles_i; \
     decode_uint32_t(pptr, &(x)->dfile_count); \
+    decode_skip4(pptr,); \
     (x)->dfile_array = decode_malloc((x)->dfile_count \
       * sizeof(*(x)->dfile_array)); \
     for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++) \
@@ -67,8 +69,9 @@ struct PVFS_symlink_attr_s
     char *target_path;
 };
 typedef struct PVFS_symlink_attr_s PVFS_symlink_attr;
-endecode_fields_2(PVFS_symlink_attr,
+endecode_fields_3(PVFS_symlink_attr,
   uint32_t, target_path_len,
+  skip4,,
   string, target_path)
 
 /* generic attributes; applies to all objects */
@@ -97,7 +100,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     encode_PVFS_uid(pptr, &(x)->owner); \
     encode_PVFS_gid(pptr, &(x)->group); \
     encode_PVFS_permissions(pptr, &(x)->perms); \
-    encode_skip4(pptr); \
+    encode_skip4(pptr,); \
     encode_PVFS_time(pptr, &(x)->atime); \
     encode_PVFS_time(pptr, &(x)->mtime); \
     encode_PVFS_time(pptr, &(x)->ctime); \
@@ -116,7 +119,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     decode_PVFS_uid(pptr, &(x)->owner); \
     decode_PVFS_gid(pptr, &(x)->group); \
     decode_PVFS_permissions(pptr, &(x)->perms); \
-    decode_skip4(pptr); \
+    decode_skip4(pptr,); \
     decode_PVFS_time(pptr, &(x)->atime); \
     decode_PVFS_time(pptr, &(x)->mtime); \
     decode_PVFS_time(pptr, &(x)->ctime); \
