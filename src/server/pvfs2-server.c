@@ -42,17 +42,18 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-/* this controls how many jobs we will test for per job_testcontext() call */
-/* NOTE: this is currently independent of the config file parameter that
- * governs how many unexpected BMI jobs are kept posted at any given time
+/* this controls how many jobs we will test for per job_testcontext()
+ * call. NOTE: this is currently independent of the config file
+ * parameter that governs how many unexpected BMI jobs are kept posted
+ * at any given time
  */
 #define PVFS_SERVER_TEST_COUNT 64
 
 /* Lookup table for determining what state machine to use when a
  * new request is received.
  */
-static struct PINT_state_machine_s *PINT_server_op_table[PVFS_MAX_SERVER_OP+1] =
-{NULL};
+static struct PINT_state_machine_s *PINT_server_op_table[
+    PVFS_MAX_SERVER_OP+1] = {NULL};
 
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_flag server_status_flag;
@@ -60,7 +61,7 @@ static PINT_server_status_flag server_status_flag;
 /* All parameters read in from the configuration file */
 static struct server_configuration_s server_config;
 
-/* A flag to stop the main loop from processing and handle the signal 
+/* A flag to stop the main loop from processing and handle the signal
  * after all threads complete and are no longer blocking.
  */
 static int signal_recvd_flag = 0;
@@ -82,9 +83,9 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {"symlink_target", 15}
 };
 
-/* These three are used continuously in our wait loop.  They could
- * be relatively large, so rather than allocate them on the stack,
- * we'll make them dynamically allocated globals.
+/* These three are used continuously in our wait loop.  They could be
+ * relatively large, so rather than allocate them on the stack, we'll
+ * make them dynamically allocated globals.
  */
 static job_id_t *server_job_id_array = NULL;
 static void **server_completed_job_p_array = NULL;
@@ -104,7 +105,6 @@ static int server_shutdown(
 static void server_sig_handler(int sig);
 static int server_post_unexpected_recv(job_status_s * js_p);
 static int server_parse_cmd_line_args(int argc, char **argv);
-
 static void server_state_table_initialize(void);
 static int server_state_machine_start(
     PINT_server_op *s_op, job_status_s *js_p);
@@ -113,8 +113,7 @@ static int server_state_machine_start_noreq(enum PVFS_server_op op);
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 #endif
 
-/* main()
- */
+
 int main(int argc, char **argv)
 {
     int ret = -1, debug_mask = 0;
@@ -130,16 +129,16 @@ int main(int argc, char **argv)
     /* Passed to server shutdown function */
     server_status_flag = SERVER_DEFAULT_INIT;
 
-    /* Enable the gossip interface to send out stderr and set an initial
-     * debug mask so that we can output errors at startup.
+    /* Enable the gossip interface to send out stderr and set an
+     * initial debug mask so that we can output errors at startup.
      */
     gossip_enable_stderr();
     gossip_set_debug_mask(1, SERVER_DEBUG);
 
     server_status_flag |= SERVER_GOSSIP_INIT;
 
-    /* Determine initial server configuration, looking at both command line
-     * arguments and the configuration file.
+    /* Determine initial server configuration, looking at both command
+     * line arguments and the configuration file.
      */
     if (server_parse_cmd_line_args(argc, argv) != 0)
     {
@@ -169,8 +168,8 @@ int main(int argc, char **argv)
 	goto server_shutdown;
     }
 
-    /* Reset the gossip debug mask based on configuration
-     * settings that we now have access to.
+    /* Reset the gossip debug mask based on configuration settings
+     * that we now have access to.
      */
     debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
     gossip_set_debug_mask(1, debug_mask);
@@ -219,7 +218,8 @@ int main(int argc, char **argv)
 	{
 	    free(server_job_status_array);
 	}
-	gossip_err("Error: failed to allocate arrays for tracking completed jobs.\n");
+	gossip_err("Error: failed to allocate arrays for "
+                   "tracking completed jobs.\n");
 	goto server_shutdown;
     }
     server_status_flag |= SERVER_JOB_OBJS_ALLOCATED;
@@ -237,7 +237,8 @@ int main(int argc, char **argv)
     ret = server_state_machine_start_noreq(PVFS_SERV_PERF_UPDATE);
     if(ret < 0)
     {
-	gossip_lerr("Error: failed to start perf update state machine.\n");
+	gossip_lerr("Error: failed to start perf update "
+                    "state machine.\n");
 	goto server_shutdown;
     }
 #endif
@@ -266,14 +267,18 @@ int main(int argc, char **argv)
 	    exit(-1);
 	}
 
-	/* Loop through the completed jobs and handle whatever comes next. */
+	/*
+          Loop through the completed jobs and handle whatever comes
+          next
+        */
 	for (i = 0; i < comp_ct; i++)
 	{
 	    int unexpected_msg = 0;
 	    PINT_server_op *s_op = server_completed_job_p_array[i];
 
-	    /* Completed jobs might be ongoing, or might be new (unexpected)
-	     * ones.  We handle the first step of either type here.
+	    /* Completed jobs might be ongoing, or might be new
+	     * (unexpected) ones.  We handle the first step of either
+	     * type here.
 	     */
 	    if (s_op->op == BMI_UNEXPECTED_OP)
 	    {
@@ -288,45 +293,50 @@ int main(int argc, char **argv)
                                "error code: %d.\n", (int)ret);
 		    free(s_op->unexp_bmi_buff.buffer);
 		    /* TODO: tell BMI to drop this address? */
-		    /* set return code to zero to allow server to continue 
+		    /* set return code to zero to allow server to continue
 		     * processing 
 		     */
 		    ret = 0;
 		}
 	    }
-	    else {
-		/* NOTE: PINT_state_machine_next() is a function that is
-		 * shared with the client-side state machine processing,
-		 * so it is defined in the src/common directory.
+	    else
+            {
+		/* NOTE: PINT_state_machine_next() is a function that
+		 * is shared with the client-side state machine
+		 * processing, so it is defined in the src/common
+		 * directory.
 		 */
-		ret = PINT_state_machine_next(s_op, &server_job_status_array[i]);
+		ret = PINT_state_machine_next(
+                    s_op, &server_job_status_array[i]);
 	    }
 
-	    /* Either of the above might have completed immediately (ret == 1).
-	     * While the job continues to complete immediately, we continue to
-	     * service it.
+	    /* Either of the above might have completed immediately
+	     * (ret == 1).  While the job continues to complete
+	     * immediately, we continue to service it.
 	     */
             while (ret == 1)
             {
-                ret = PINT_state_machine_next(s_op, &server_job_status_array[i]);
+                ret = PINT_state_machine_next(
+                    s_op, &server_job_status_array[i]);
             }
 
 	    if (ret < 0)
 	    {
 		gossip_lerr("Error: unhandled state machine processing "
-                            "error (most likely an unhandled job error).\n");
+                            "error (most likely an unhandled "
+                            "job error).\n");
 		/* TODO: handle this properly */
 		assert(0);
 	    }
 
 	    if (unexpected_msg)
 	    {
-		/* If this was a new (unexpected) job, we need to post a
-		 * replacement unexpected job so that we can continue to 
-		 * receive incoming requests.
+		/* If this was a new (unexpected) job, we need to post
+		 * a replacement unexpected job so that we can
+		 * continue to receive incoming requests.
 		 */
-
-		ret = server_post_unexpected_recv(&server_job_status_array[i]);
+		ret = server_post_unexpected_recv(
+                    &server_job_status_array[i]);
 		if (ret < 0)
 		{
 		    /* TODO: do something here, the return value was
@@ -338,13 +348,13 @@ int main(int argc, char **argv)
 		    exit(1);
 		}
 	    }
-	} /* ... for i < comp_ct */
+	}
     }
 
   server_shutdown:
     server_shutdown(server_status_flag, ret, siglevel);
-    return -1;	/* Should never get here */
-} /* end of main() */
+    return -1;
+}
 
 /* server_initialize()
  *
@@ -401,66 +411,55 @@ static int server_initialize(
 
     *server_status_flag |= SERVER_SIGNAL_HANDLER_INIT;
 
-    gossip_debug(SERVER_DEBUG, "Initialization completed successfully.\n");
+    gossip_debug(SERVER_DEBUG,
+                 "Initialization completed successfully.\n");
 
     return ret;
 }
 
-/* server_setup_process_environment()
- *
- * Handles:
- * - chdir() to / to prevent busy file systems
- * - setting known umask
- * - possibly backgrounding
- *   - fork(), setsid(), etc.
- *   - redirecting gossip output to file
- *
- * Returns 0 on success.
- */
 static int server_setup_process_environment(int background)
 {
+    pid_t new_pid = 0;
 
-    chdir("/");  /* avoid busy file systems */
-    umask(0077); /* let's have a deterministic umask too */
+    if (chdir("/"))
+    {
+        gossip_lerr("cannot change working directory to \"/\" "
+                    "(errno = %x). aborting.\n", errno);
+        exit(1);
+    }
 
-    if (background) {
-	int ret;
+    umask(0077);
 
-	/* become a daemon, redirect log to file */
-	ret = fork();
-	if (ret < 0) {
-	    exit(1); /* couldn't fork?!? */
+    if (background)
+    {
+	new_pid = fork();
+	if (new_pid < 0)
+        {
+	    gossip_lerr("error in fork() system call (errno = %x). "
+                        "aborting.\n", errno);
+	    exit(1);
 	}
+	else if (new_pid > 0)
+        {
+            /* parent goes away */
+            exit(0);
+        }
 
-	if (ret > 0) exit(0); /* parent goes away */
-
-	ret = setsid();
-	if (ret < 0) {
+	new_pid = setsid();
+	if (new_pid < 0)
+        {
+	    gossip_lerr("error in setsid() system call.  aborting.\n");
 	    exit(2);
 	}
-
-	/* NOTE: THIS IS NECESSARY UNTIL ALL LOGGING IN SERVER IS THROUGH
-	 * GOSSIP; OTHERWISE PRINTFS CAN END UP DUMPING DATA IN A SOCKET!
-	 */
-	freopen("/dev/null", "r", stdin);
-	freopen("/dev/null", "w", stdout);
-	freopen("/dev/null", "w", stderr);
+        assert(new_pid == getpid());
 
         assert(server_config.logfile != NULL);
-	ret = gossip_enable_file(server_config.logfile, "a");
-	if (ret < 0) {
+	if (gossip_enable_file(server_config.logfile, "a") < 0)
+        {
 	    gossip_lerr("error opening log file %s\n",
                         server_config.logfile);
-	    exit(3); /* couldn't open log! */
+	    exit(3);
 	}
-    }
-    else
-    {
-	/* stay in the foreground, direct log to stderr */
-
-	/* note: gossip has already been directed to stderr
-	 *       at this point; nothing to do?
-	 */
     }
     return 0;
 }
@@ -490,7 +489,6 @@ static int server_initialize_subsystems(
     struct filesystem_configuration_s *cur_fs;
     TROVE_context_id trove_context = -1;
 
-    /* intialize protocol encoder */
     ret = PINT_encode_initialize();
     if (ret < 0)
     {
@@ -504,7 +502,6 @@ static int server_initialize_subsystems(
 		 "Passing %s to BMI as listen address.\n",
 		 server_config.host_id);
 
-    /* initialize BMI */
     ret = BMI_initialize(server_config.bmi_modules, 
 	server_config.host_id, BMI_INIT_SERVER);
     if (ret < 0)
@@ -515,8 +512,8 @@ static int server_initialize_subsystems(
 
     *server_status_flag |= SERVER_BMI_INIT;
 
-    /* initialize Trove */
-    ret = trove_initialize(server_config.storage_path, 0, &method_name, 0);
+    ret = trove_initialize(server_config.storage_path,
+                           0, &method_name, 0);
     if (ret < 0)
     {
 	gossip_err("Trove Init Failed: %s\n", strerror(-ret));
@@ -571,8 +568,8 @@ static int server_initialize_subsystems(
                 &server_config, cur_fs);
 
         /*
-         * error out if we're not configured to house either a
-         * meta or data handle range at all.
+         * error out if we're not configured to house either a meta or
+         * data handle range at all.
 	 */
         if (!cur_merged_handle_range)
         {
@@ -586,7 +583,6 @@ static int server_initialize_subsystems(
         }
         else
         {
-            /* open a trove context for this collection id */
             ret = trove_open_context(cur_fs->coll_id, &trove_context);
             if (ret < 0)
             {
@@ -701,7 +697,8 @@ static int server_initialize_subsystems(
     ret = job_initialize(0);
     if (ret < 0)
     {
-	gossip_err("Error initializing job interface: %s\n", strerror(-ret));
+	gossip_err("Error initializing job interface: %s\n",
+                   strerror(-ret));
         return ret;
     }
 
@@ -716,7 +713,6 @@ static int server_initialize_subsystems(
 
     *server_status_flag |= SERVER_JOB_CTX_INIT;
 
-    /* initialize Server Request Scheduler */
     ret = PINT_req_sched_initialize();
     if (ret < 0)
     {
@@ -727,7 +723,6 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_REQ_SCHED_INIT;
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
-    /* initialize performanc monitoring */
     ret = PINT_perf_initialize();
     if(ret < 0)
     {
@@ -740,8 +735,6 @@ static int server_initialize_subsystems(
     return ret;
 }
 
-/* server_setup_signal_handlers()
- */
 static int server_setup_signal_handlers(void)
 {
     struct sigaction new_action;
@@ -814,10 +807,6 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
 }
 #endif
 
-/* server_shutdown()
- *
- * Tries to figure out what has been done so far and clean things up.
- */
 static int server_shutdown(
     PINT_server_status_flag status,
     int ret, int siglevel)
@@ -871,8 +860,6 @@ static int server_shutdown(
     exit((siglevel == 0) ? -ret : 0);
 }
 
-/* server_sig_handler()
- */
 static void server_sig_handler(int sig)
 {
     if (getpid() != server_controlling_pid)
@@ -882,8 +869,8 @@ static void server_sig_handler(int sig)
 
     if(sig != SIGSEGV)
     {
-	gossip_err("PVFS2 server: got signal: %d, server_status_flag: %d\n", 
-	    sig, (int)server_status_flag);
+	gossip_err("PVFS2 server: got signal: %d, server_status_flag: "
+                   "%d\n", sig, (int)server_status_flag);
     }
 
     /* short circuit non critical signals here */
@@ -898,7 +885,8 @@ static void server_sig_handler(int sig)
 	/* TODO: fix this, need to clean up server initialization
 	 * and shut down before we can handle this cleanly
 	 */
-	gossip_err("SIGHUP: pvfs2-server cannot restart; shutting down instead.\n");
+	gossip_err("SIGHUP: pvfs2-server cannot restart; "
+                   "shutting down instead.\n");
     }
 
     /* set the signal_recvd_flag on critical errors to cause the server to 
@@ -935,7 +923,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         {"rmfs",0,0,0},
         {"version",0,0,0},
         {0,0,0,0}
-   };
+    };
 
     while ((ret = getopt_long(argc, argv,"dfhrv",
                               long_opts, &option_index)) != -1)
@@ -1007,8 +995,6 @@ static int server_parse_cmd_line_args(int argc, char **argv)
  *
  * TODO:
  * - FIX RETURN VALUE TO BE MORE HELPFUL
- * - INVESTIGATE KEEPING A FIXED NUMBER OF PINT_SERVER_OPS AROUND TO AVOID
- *   MALLOC/FREE
  */
 static int server_post_unexpected_recv(job_status_s *js_p)
 {
@@ -1016,7 +1002,6 @@ static int server_post_unexpected_recv(job_status_s *js_p)
     job_id_t j_id;
     PINT_server_op *s_op;
 
-    /* allocate space for server operation structure, and memset() it to zero */
     s_op = (PINT_server_op *) malloc(sizeof(PINT_server_op));
     if (s_op == NULL)
     {
@@ -1191,10 +1176,6 @@ static void server_state_table_initialize(void)
     PINT_server_op_table[PVFS_SERV_MGMT_EVENT_MON] = &pvfs2_event_mon_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_ITERATE_HANDLES] 
 	= &pvfs2_iterate_handles_sm;
-#if 0
-    PINT_server_op_table[PVFS_SERV_MGMT_DSPACE_INFO_LIST] 
-    	= &pvfs2_dspace_info_list_sm;
-#endif
 }
 
 /* server_state_machine_complete()
@@ -1205,9 +1186,6 @@ static void server_state_table_initialize(void)
  * appropriate return value to make the state machine stop transitioning
  *
  * returns 0
- *
- * TODO: keep a pool of state structures, and just return this one to the
- *       pool here.
  */
 int server_state_machine_complete(PINT_server_op *s_op)
 {
@@ -1223,10 +1201,7 @@ int server_state_machine_complete(PINT_server_op *s_op)
     return 0;
 }
 
-/* get_server_config_struct()
- *
- * Note: used externally
- */
+/* NOTE: used externally */
 struct server_configuration_s *get_server_config_struct(void)
 {
     return &server_config;
