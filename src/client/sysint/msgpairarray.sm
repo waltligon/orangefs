@@ -39,20 +39,18 @@ enum {
 
 static int msgpairarray_post(PINT_client_sm *sm_p, job_status_s *js_p);
 static int msgpairarray_complete(PINT_client_sm *sm_p, job_status_s *js_p);
-static int msgpairarray_completion_fn(PINT_client_sm *sm_p, job_status_s *js_p);
-static int msgpairarray_error(PINT_client_sm *sm_p, job_status_s *js_p);
+static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
+				      job_status_s *js_p);
 
 %%
 
 nested machine pvfs2_client_msgpairarray_sm(post,
 					    complete,
-					    completion_fn,
-					    error)
+					    completion_fn)
 {
     state post {
 	run msgpairarray_post;
-	success => complete;
-	default => error;
+	default => complete;
     }
 
     state complete {
@@ -63,11 +61,6 @@ nested machine pvfs2_client_msgpairarray_sm(post,
     }
     state completion_fn {
 	run msgpairarray_completion_fn;
-	default => return;
-    }
-    
-    state error {
-	run msgpairarray_error;
 	default => return;
     }
 }
@@ -173,10 +166,17 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	    assert(0);
 	}
 	else if (ret == 1) {
-	    /* it shouldn't be possible for the receive to complete before
-	     * we send the request.
-	     */
-	    assert(0); /* sanity check */
+	    /* we can get this if we have lost connectivity to this server */
+	    sm_p->msgarray[0].comp_ct -= 2;
+
+	    assert(msg_p->recv_status.error_code != 0); /* sanity check */
+
+	    msg_p->recv_id = 0;
+	    msg_p->send_id = 0;
+
+	    /* mark send as bad too and don't post it */
+	    msg_p->send_status.error_code = PVFS_EIO; /* ??? */
+	    continue;
 	}
 	assert(ret == 0); /* return value range check */
 
@@ -195,8 +195,10 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 				&msg_p->send_id,
 				pint_client_sm_context);
 	if (ret < 0) {
-	    gossip_lerr("post of send failed\n");
-	    assert(0);
+	    gossip_lerr("post of send failed; should cancel recv\n");
+
+	    sm_p->msgarray[0].comp_ct--;
+
 	}
 	else if (ret == 1) {
 	    /* send completed immediately; decrement the completion counter */
@@ -206,8 +208,9 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	    /* 0 is the valid "completed job id" value, according to Phil */
 	    msg_p->send_id = 0;
 
-	    /* TODO: CHECK THE STATUS!!! */
-	    assert(msg_p->send_status.error_code == 0);
+	    if (msg_p->send_status.error_code != 0) {
+		gossip_err("msgarray bad send; should cancel recv\n");
+	    }
 
 	    /* decrement our count, since send is already done.
 	     *
@@ -229,18 +232,17 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 static int msgpairarray_complete(PINT_client_sm *sm_p,
 				 job_status_s *js_p)
 {
-    int matched_job = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "msgpairarray state: complete\n");
 
     /* match operation with something in the msgpair array */
     /* the first N tags are receives, the second N are sends */
-    assert(js_p->status_user_tag < (sm_p->msgarray_count*2));
+    assert(js_p->status_user_tag < sm_p->msgarray_count*2); /* sanity check */
+
     if(js_p->status_user_tag < sm_p->msgarray_count)
     {
 	PINT_client_sm_msgpair_state *msg_p = 
 	    &sm_p->msgarray[js_p->status_user_tag];
-	matched_job = 1;
 
 	msg_p->recv_id     = 0;
 	msg_p->recv_status = *js_p;
@@ -249,13 +251,14 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
     {
 	PINT_client_sm_msgpair_state *msg_p = 
 	    &sm_p->msgarray[js_p->status_user_tag - sm_p->msgarray_count];
-	matched_job = 1;
 
 	msg_p->send_id     = 0;
 	msg_p->send_status = *js_p;
-    }
 
-    assert(matched_job == 1); /* sanity check */
+	if (msg_p->send_status.error_code != 0) {
+	    gossip_err("msgarray bad send; should cancel recv\n");
+	}
+    }
 
     /* decrement comp_ct until all operations have completed.
      *
@@ -281,11 +284,21 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
     struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
     struct PVFS_server_resp *resp_p; /* response structure (decoded) */
 
-    /* clear error code; we explicitly set it to non-zero to get to this state  */
+    /* clear error code; we explicitly set it to non-zero to get to state  */
     js_p->error_code = 0;
 
     for (i=0; i < sm_p->msgarray_count; i++) {
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+
+	if (msg_p->send_status.error_code != 0 ||
+	    msg_p->recv_status.error_code != 0)
+	{
+	    js_p->error_code = msg_p->send_status.error_code;
+
+	    /* don't call comp fn on these -- RobR */
+	    gossip_err("msg pair did not complete; skipping comp_fn\n");
+	    continue;
+	}
 
 	/* decode; resp_p will point to response */
 	ret = PINT_serv_decode_resp(msg_p->encoded_resp_p,
@@ -360,15 +373,6 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
     return 1;
 }
     
-/* msgpairarray_error()
- */
-static int msgpairarray_error(PINT_client_sm *sm_p,
-			      job_status_s *js_p)
-{
-    assert(0); /* placeholder */
-    return 1;
-}
-
 /*
  * Local variables:
  *  mode: c
