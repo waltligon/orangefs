@@ -3120,7 +3120,9 @@ int job_test(job_id_t id,
      * this function for nearly a month. 
      */
     if (timeout_ms == -1)
+    {
         timeout_remaining = INT_MAX;
+    }
 
     /* use this as a chance to do a cheap test on the request
      * scheduler
@@ -3154,7 +3156,9 @@ int job_test(job_id_t id,
     {
         ret = gettimeofday(&start, NULL);
         if (ret < 0)
+        {
             return (ret);
+        }
 
 #ifdef __PVFS2_JOB_THREADED__
         /* figure out how long to wait */
@@ -3175,10 +3179,14 @@ int job_test(job_id_t id,
                                      &pthread_timeout);
         gen_mutex_unlock(&completion_mutex);
 #else
-        if(timeout_ms)
+        if (timeout_ms)
+        {
             do_one_work_cycle_all(10);
+        }
         else
+        {
             do_one_work_cycle_all(0);
+        }
         ret = 0;
 #endif
         if (ret == ETIMEDOUT)
@@ -3189,7 +3197,7 @@ int job_test(job_id_t id,
             *out_count_p = 0;
             return (0);
         }
-        else if (ret != 0 && ret != EINTR)
+        else if ((ret != 0) && (ret != EINTR) && (ret != EINVAL))
         {
             /* error */
             return (-ret);
@@ -3218,7 +3226,9 @@ int job_test(job_id_t id,
          */
         ret = gettimeofday(&end, NULL);
         if (ret < 0)
+        {
             return (ret);
+        }
 
         timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
             (end.tv_usec - start.tv_usec) / 1000;
@@ -3280,8 +3290,11 @@ int job_testsome(job_id_t * id_array,
     for (i = 0; i < original_count; i++)
     {
         if (id_array[i])
+        {
             real_id_count++;
+        }
     }
+
     if (!real_id_count)
     {
         gossip_lerr("job_testsome() called with nothing to do.\n");
@@ -3296,7 +3309,9 @@ int job_testsome(job_id_t * id_array,
      * this function for nearly a month. 
      */
     if (timeout_ms == -1)
+    {
         timeout_remaining = INT_MAX;
+    }
 
     /* use this as a chance to do a cheap test on the request
      * scheduler
@@ -3330,14 +3345,17 @@ int job_testsome(job_id_t * id_array,
         free(tmp_id_array);
         return (ret);
     }
-    if (ret == 0 && (*inout_count_p == real_id_count))
+
+    if ((ret == 0) && (*inout_count_p == real_id_count))
     {
         free(tmp_id_array);
         return (1);
     }
 
     for (i = 0; i < (*inout_count_p); i++)
+    {
         tmp_id_array[out_index_array[i]] = 0;
+    }
     total_completed += *inout_count_p;
     *inout_count_p = original_count;
 
@@ -3388,7 +3406,7 @@ int job_testsome(job_id_t * id_array,
             *inout_count_p = total_completed;
             return (0);
         }
-        else if (ret != 0 && ret != EINTR)
+        else if ((ret != 0) && (ret != EINTR) && (ret != EINVAL))
         {
             /* error */
             free(tmp_id_array);
@@ -3430,7 +3448,9 @@ int job_testsome(job_id_t * id_array,
             }
 
             for (i = 0; i < (*inout_count_p); i++)
+            {
                 tmp_id_array[out_index_array[i + total_completed]] = 0;
+            }
             total_completed += *inout_count_p;
             *inout_count_p = original_count;
         }
@@ -3453,10 +3473,8 @@ int job_testsome(job_id_t * id_array,
     /* fall through, not everything is done, time is used up */
     *inout_count_p = total_completed;
     free(tmp_id_array);
-    if (total_completed > 0)
-        return (1);
-    else
-        return (0);
+
+    return ((total_completed > 0) ? 1 : 0);
 }
 
 /* job_testcontext()
@@ -3554,10 +3572,14 @@ int job_testcontext(job_id_t * out_id_array_p,
                                      &pthread_timeout);
         gen_mutex_unlock(&completion_mutex);
 #else
-        if(timeout_ms)
+        if (timeout_ms)
+        {
             do_one_work_cycle_all(10);
+        }
         else
+        {
             do_one_work_cycle_all(0);
+        }
 
         ret = 0;
 #endif
