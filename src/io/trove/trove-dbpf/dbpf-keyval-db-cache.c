@@ -246,11 +246,11 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	/*
           if no such DB and create_flag is set, try to
           create the DB.  but first we have to create
-          all of the nested directories (buckets)
+          all of the bucket directories
         */
         int i = 0;
         char top_dir[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
-        for(i = 0; i < DBPF_KEYVAL_MAX_NEST_DEPTH; i++)
+        for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
         {
             DBPF_GET_KEYVAL_DIRNAME(
                 top_dir, (PATH_MAX - 9), my_storage_p->name, coll_id);

@@ -232,11 +232,11 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
     if (fd < 0 && errno == ENOENT && create_flag) {
         /*
           if we're creating the dataspace, make sure the
-          proper bstream nested directories exist
+          proper bstream bucket directories exist
         */
         int i = 0;
         char top_dir[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
-        for(i = 0; i < DBPF_BSTREAM_MAX_NEST_DEPTH; i++)
+        for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
         {
             DBPF_GET_BSTREAM_DIRNAME(
                 top_dir, (PATH_MAX - 9), my_storage_p->name, coll_id);
