@@ -2254,6 +2254,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
     struct tcp_op *tcp_op_data = NULL;
     int tmp_errno;
     int tmp;
+    bmi_size_t old_amt_complete = 0;
 
     *stall_flag = 1;
 
@@ -2279,13 +2280,23 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
 	}
 	else
 	{
-	    return (work_on_recv_op(active_method_op, stall_flag));
+	    old_amt_complete = active_method_op->amt_complete;
+	    ret = work_on_recv_op(active_method_op, stall_flag);
+	    if(ret == 0 && old_amt_complete ==
+		active_method_op->amt_complete && active_method_op->actual_size)
+	    {
+		gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Warning: bmi_tcp unable to recv any data reported by poll().\n");
+		gossip_debug(GOSSIP_BMI_DEBUG_TCP, "...dropping connection.\n");
+		tcp_forget_addr(map, 0, -EPIPE);
+	    }
+	    return(ret);
 	}
     }
 
     /* let's see if a the entire header is ready to be received.  If so
      * we will go ahead and pull it.  Otherwise, we will try again later.
      * It isn't worth the complication of reading only a partial message
+     a
      * header - we really want it atomically
      */
     ret = BMI_sockio_nbpeek(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
@@ -2293,6 +2304,13 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
     {
 	tcp_forget_addr(map, 0, -errno);
 	return (0);
+    }
+    if(ret == 0)
+    {
+	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Warning: bmi_tcp unable to recv any data reported by poll().\n");
+	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "...dropping connection.\n");
+	tcp_forget_addr(map, 0, -EPIPE);
+	return(0);
     }
     if (ret < TCP_ENC_HDR_SIZE)
     {
