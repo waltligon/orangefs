@@ -31,10 +31,10 @@ int new_sock(void);
 int bind_sock(int,
 	      int);
 int connect_sock(int,
-		 char *,
+		 const char *,
 		 int);
 int init_sock(struct sockaddr *,
-	      char *,
+	      const char *,
 	      int);
 int brecv(int s,
 	  void *buf,

@@ -57,7 +57,7 @@ int bind_sock(int sockd,
 }
 
 int connect_sock(int sockd,
-		 char *name,
+		 const char *name,
 		 int service)
 {
     struct sockaddr saddr;
@@ -75,7 +75,7 @@ int connect_sock(int sockd,
 }
 
 int init_sock(struct sockaddr *saddrp,
-	      char *name,
+	      const char *name,
 	      int service)
 {
     struct hostent *hep;
