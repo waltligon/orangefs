@@ -6,7 +6,28 @@ PVFS2 Release ChangeLog
 pvfs2-0.1.4pre1
 ===============
 - scrap msgpair.  use one-element msgpairarray instead.
-
+- bug fix to "make kmod" path handling
+- add ability to build kernel module and test programs to pvfs2-build.sh
+- added scripts (from Justin Luck) for nightly vfs testing
+- started nightly vfs testing (see pvfs2-testing mailing list)
+- implemented job cancel api
+- added job timeouts, and started using in both client & server
+- added ability to (manually) reconnect after transient failure in bmi_tcp
+- allow queueing of receives for failed bmi_tcp addresses that may get
+  reconnected
+- removal of some depricated client library code 
+- started using PVFS_ECANCEL rather than PVFS_EINTR for cancelled operations
+- added bmi address reference counting
+- allow server to discard anonymous bmi addresses after connection has been
+  closed (to conserve resources)
+- remove test subdirectory from distributed releases
+- cleanup of protocol version mismatch error messages, including a way to
+  propigate errors detected on server back to client
+- fix db cursor leak in trove
+- fix for busy spin condition in client library when retrying operations
+- various cleanups to error handling in msgpairarray code
+- added some shell script testing and bonnie++ testing to automated tests
+- fix pvfs2-ls handling of large usernames, reported by Philipp Sadleder
 
 pvfs2-0.1.3
 ===========
