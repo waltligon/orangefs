@@ -1,0 +1,4 @@
+DIR := src/io/flow/flowproto-bmi-trove
+LIBSRC += \
+	$(DIR)/flowproto-bmi-trove.c \
+	$(DIR)/op-id-queue.c

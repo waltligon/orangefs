@@ -1,0 +1,65 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
+/* This header contains information that is only relevant to flow
+ * protocols
+ */
+
+#ifndef __FLOWPROTO_SUPPORT_H
+#define __FLOWPROTO_SUPPORT_H
+
+#include <flow.h>
+
+/* flow protocol interface */
+struct flowproto_ops
+{
+	char* flowproto_name;
+	int (*flowproto_initialize)(
+		int flowproto_id);
+	int (*flowproto_finalize)(
+		void);
+	int (*flowproto_getinfo)(	
+		flow_descriptor* flow_d, 
+		int option, 
+		void* parameter);
+	int (*flowproto_setinfo)(
+		flow_descriptor* flow_d, 
+		int option, 
+		void* parameter);
+	void* (*flowproto_memalloc)(
+		flow_descriptor* flow_d, 
+		PVFS_size size, 
+		PVFS_bitfield send_recv_flag);
+	int (*flowproto_memfree)(
+		flow_descriptor* flow_d, 
+		void* buffer, 
+		PVFS_bitfield send_recv_flag);
+	int (*flowproto_announce_flow)(
+		flow_descriptor* flow_d);
+	int (*flowproto_check)(
+		flow_descriptor* flow_d, 
+		int* count);
+	int (*flowproto_checksome)(
+		flow_descriptor** flow_d_array, 
+		int* count, 
+		int* index_array);
+	int (*flowproto_checkworld)(
+		flow_descriptor** flow_d_array, 
+		int* count);
+	int (*flowproto_service)(
+		flow_descriptor* flow_d);
+};
+
+/* used to query protocols to determine which endpoint pairs are
+ * supported 
+ */
+struct flowproto_type_support
+{
+	int src_endpoint_id;
+	int dest_endpoint_id;
+};
+
+#endif /* __FLOWPROTO_SUPPORT_H */

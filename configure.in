@@ -35,6 +35,8 @@ src/common/llist/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/description/module.mk
+src/io/flow/module.mk
+src/io/flow/flowproto-bmi-trove/module.mk
 test/io/trove/module.mk
 test/common/quicklist/module.mk
 test/common/id-generator/module.mk
