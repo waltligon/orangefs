@@ -70,5 +70,4 @@ int PINT_state_machine_initialize_unexpected(state_action_struct*, job_status_s 
 
 #include <pvfs2-server.h>
 
-
 #endif /* __PVFS_SERVER_STATE */

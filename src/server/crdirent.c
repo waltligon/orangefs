@@ -604,11 +604,6 @@ static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret)
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
     PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
 
-    if(s_op->val.buffer)
-    {
-	free(s_op->val.buffer);
-    }
-
     if(s_op->resp)
     {
 	free(s_op->resp);
@@ -622,8 +617,6 @@ static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret)
 	    BMI_RECV_BUFFER
 	    );
     */
-
-    free(s_op->unexp_bmi_buff);
 
     free(s_op);
 

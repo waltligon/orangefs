@@ -432,9 +432,11 @@ static int io_cleanup(state_action_struct *s_op, job_status_s *ret)
 			s_op->enc_type);
 	}
 
-	free(s_op->unexp_bmi_buff);
-
 	free(s_op);
+
+#ifndef DO_NOT_DEBUG_SERVER_OPS
+    return(899);
+#endif
 
 	return(0);
 }

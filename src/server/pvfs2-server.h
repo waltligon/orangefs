@@ -51,7 +51,7 @@ typedef struct PINT_server_op
 	PINT_state_array_values *current_state;
 	struct PVFS_server_req_s *req;
 	struct PVFS_server_resp_s *resp;
-	struct BMI_unexpected_info *unexp_bmi_buff;
+	struct BMI_unexpected_info unexp_bmi_buff;
 	struct PINT_encoded_msg encoded;
 	struct PINT_decoded_msg decoded;
 	flow_descriptor* flow_d;

@@ -39,6 +39,9 @@ static int remove_release_posted_job(state_action_struct *s_op, job_status_s *re
 static int remove_send_bmi(state_action_struct *s_op, job_status_s *ret);
 void remove_init_state_machine(void);
 
+#ifndef DO_NOT_DEBUG_SERVER_OPS
+extern void delete_server_op(state_action_struct *s_op);
+#endif
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 PINT_state_machine_s remove_req_s = 
@@ -294,7 +297,7 @@ static int remove_send_bmi(state_action_struct *s_op, job_status_s *ret)
     /* Set the handle IF it was removed */
     if(ret->error_code == 0) 
     {
-	gossip_err("Handle Removed: %lld\n",ret->handle);
+	gossip_err("Handle Removed: %lld\n",s_op->req->u.remove.handle);
 	s_op->resp->u.generic.handle = ret->handle;
 
     }
@@ -414,8 +417,6 @@ static int remove_cleanup(state_action_struct *s_op, job_status_s *ret)
 	    );
 
     */
-    free(s_op->unexp_bmi_buff);
-
     free(s_op);
 
     return(0);

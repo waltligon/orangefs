@@ -318,8 +318,6 @@ static int create_cleanup(state_action_struct *s_op, job_status_s *ret)
 	    );
     */
 
-    free(s_op->unexp_bmi_buff);
-
     free(s_op);
 
     return(0);

@@ -76,7 +76,7 @@ PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
 	NULL,               /* 0 */
 	NULL,
 	&create_req_s,     /* create */
-	NULL,
+	&remove_req_s,     /* remove */
 	&io_req_s,         /* io */
 	NULL,					  /* 5 */
 	NULL,
@@ -118,17 +118,17 @@ PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
 int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_status_s *ret)
 {
 
-	PINT_decode(s_op->unexp_bmi_buff->buffer,
+	PINT_decode(s_op->unexp_bmi_buff.buffer,
 					PINT_ENCODE_REQ,
 					&s_op->decoded,
-					s_op->unexp_bmi_buff->addr,
-					s_op->unexp_bmi_buff->size,
+					s_op->unexp_bmi_buff.addr,
+					s_op->unexp_bmi_buff.size,
 					&(s_op->enc_type));
 	s_op->req  = (struct PVFS_server_req_s *) s_op->decoded.buffer;
 	assert(s_op->req != NULL);
 
-	s_op->addr = s_op->unexp_bmi_buff->addr;
-	s_op->tag  = s_op->unexp_bmi_buff->tag;
+	s_op->addr = s_op->unexp_bmi_buff.addr;
+	s_op->tag  = s_op->unexp_bmi_buff.tag;
 	s_op->op   = s_op->req->op;
 	s_op->current_state = PINT_state_machine_locate(s_op);
 

@@ -49,7 +49,11 @@
 #include <server-config.h>
 #include <pvfs2-server.h>
 
+#include <quicklist.h>
+#include <assert.h>
+
 /* Internal Globals */
+
 
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_code server_level_init;
@@ -77,7 +81,6 @@ static void *sig_handler(int sig);
 int PINT_server_cp_bmi_unexp(PINT_server_op * s_op,
 			     job_status_s * ret);
 void PINT_server_get_bmi_unexp_err(int ret);
-
 
 /*
   Initializes the bmi, flow, trove, and job interfaces.
@@ -142,7 +145,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 	goto interface_init_failed;
     }
     gossip_debug(SERVER_DEBUG, "Job Init Complete\n");
-    
+
   interface_init_failed:
     return ret;
 }
@@ -208,7 +211,7 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
     }
 
     /* initialize Server State Machine */
-    ret = PINT_state_machine_init();	/* state_machine.c:68 */
+    ret = PINT_state_machine_init();
     if (ret < 0)
     {
 	gossip_err("Error initializing state_machine interface: %s\n",
@@ -313,7 +316,8 @@ int main(int argc,
      *      Read configuration options...
      * function located in server_config.c
      */
-    user_opts = PINT_server_config(argc, argv);	/* server_config.c:53 */
+
+    user_opts = PINT_server_config(argc, argv);
     if (!user_opts)
     {
 	gossip_err("Error: Could not read configuration; aborting.\n");
@@ -358,6 +362,20 @@ int main(int argc,
 	for (i = 0; i < out_count; i++)
 	{
 	    s_op = (PINT_server_op *) completed_job_pointers[i];
+
+	    /* 
+	       There are two possibilities here.
+	       1.  The operation is a new request (Unexpected).  We will
+	           fall into the if() loop.
+
+	       2.  The operation was previously posted to the job
+	           interface.  We need to continue operation on this.
+		   We do not need to perform the additional unexpected 
+		   message overhead.
+	     */
+	    ret = 1;
+
+	    /* Case 1.  Unexpected message overhead.*/
 	    if (s_op->op == BMI_UNEXP)
 	    {
 		postBMIFlag = 1;
@@ -371,6 +389,24 @@ int main(int argc,
 		ret = PINT_state_machine_initialize_unexpected(s_op,
 			&job_status_structs[i]);
 	    }
+	    
+	    /* 
+	       Right here, both case 1 and case 2 merge.  
+	       
+	       If the operation was originally case 1, then ret reflects 
+	       the completion of the first state for the respective operation.
+	       NOTE: that ret can now be <= 0.
+
+	       Otherwise, ret has not been altered from the original 
+	       assignment of 1.  Therefore will will enter this loop and perform
+	       work on this request.
+	    */
+	       
+            while (ret == 1)
+            {
+                ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
+            }
+
 	    if (ret < 0)
 	    {
 		gossip_lerr("Error on job %d, Return Code: %d\n", i, ret);
@@ -380,11 +416,6 @@ int main(int argc,
 		/* if ret < 0 oh no... job mechanism died */
 		/* TODO: fix this */
 	    }
-
-            do
-            {
-                ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
-            } while (ret == 1);
 
 	    if (postBMIFlag) /* unexpected message */
 	    {
@@ -587,6 +618,7 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
 
     mem_calc_ptr = (char *) serv_op;
 
+#if 0
     serv_op->unexp_bmi_buff = (struct BMI_unexpected_info *)
 	    malloc(sizeof(struct BMI_unexpected_info));
     if (!serv_op->unexp_bmi_buff)
@@ -595,6 +627,7 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
 	serv_op = (PINT_server_op *)0;
 	return (-2);
     }
+#endif
 
     /* TODO:
      * Consider optimizations later, so that we don't have to
@@ -607,11 +640,10 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
      * in this part of the code.
      * -Phil
      */
-    ret = job_bmi_unexp(serv_op->unexp_bmi_buff, serv_op,
+    ret = job_bmi_unexp(&(serv_op->unexp_bmi_buff), serv_op,
 	    temp_stat, &jid, JOB_NO_IMMED_COMPLETE);
     if (ret < 0)
     {
-	free(serv_op->unexp_bmi_buff);
 	free(serv_op);
 	serv_op = (PINT_server_op *)0;
 	return (-4);
