@@ -5,17 +5,18 @@
  */
 
 /* this is a simple test harness that operates on top of the flow
- * interface 
+ * interface
  */
 
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
+
 #include <gossip.h>
 #include <flow.h>
+#include <flowproto-support.h>
 #include <pvfs-distribution.h>
-
 
 int TEST_SIZE=1024*1024*20; /* 20M */
 static int block_on_flow(flow_descriptor* flow_d);
@@ -25,11 +26,14 @@ int main(int argc, char **argv)
 {
 	int ret = -1;
 	int outcount = 0;
-	struct unexpected_info request_info;
 	void* mybuffer;
+	bmi_addr_t server_addr;
+	bmi_op_id_t op;
+	bmi_error_code_t error_code;
 	flow_descriptor* flow_d = NULL;
+	int i= 0;
+	bmi_size_t actual_size;
 	double time1, time2;
-	int i;
 	PINT_Request req1;
 	PINT_Request_file_data file_data;
 
@@ -38,10 +42,10 @@ int main(int argc, char **argv)
 
 	/* set debugging level */
 	gossip_enable_stderr();
-	gossip_set_debug_mask(0, FLOW_PROTO_DEBUG);
+	gossip_set_debug_mask(0, FLOW_PROTO_DEBUG|BMI_DEBUG_TCP);
 
 	/* start up BMI */
-	ret = BMI_initialize("bmi_tcp", "tcp://NULL:3335", BMI_INIT_SERVER);
+	ret = BMI_initialize("bmi_tcp", NULL, 0);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI init failure.\n");
@@ -56,18 +60,40 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	/* wait for an initial communication via BMI */
-	/* we don't give a crap about that message except that it tells us
-	 * where to find the client 
-	 */
-	do
+	/* send some random crap to the other side to start up communication*/
+	ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3335");
+	if(ret < 0)
 	{
-		ret = BMI_waitunexpected(1, &outcount, &request_info);
-	}while(ret == 0 && outcount == 0);
-	if(ret < 0 || request_info.error_code != 0)
-	{
-		fprintf(stderr, "waitunexpected failure.\n");
+		fprintf(stderr, "BMI lookup failure.\n");
 		return(-1);
+	}
+
+	ret = BMI_post_sendunexpected(&op, server_addr, &mybuffer, 1,
+		BMI_EXT_ALLOC, 0, NULL);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_post_sendunexpected failure.\n");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of request */
+		do
+		{
+			ret = BMI_wait(op, &outcount, &error_code, &actual_size, NULL);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Request send failed.\n");
+			if(ret<0)
+			{
+				errno = -ret;
+				perror("BMI_wait");
+			}
+			return(-1);
+		}
 	}
 
 	/******************************************************/
@@ -101,9 +127,11 @@ int main(int argc, char **argv)
 	ret = PINT_Dist_lookup(file_data.dist);
 	if(ret != 0)
 	{
-		fprintf(stderr, "Error: failed to lookup dist.\n");
+		fprintf(stderr, "Error: failed to
+		lookup dist.\n");
 		return(-1);
 	}
+
 
 	/******************************************************/
 	/* setup communicaton stuff */
@@ -115,7 +143,11 @@ int main(int argc, char **argv)
 		fprintf(stderr, "mem.\n");
 		return(-1);
 	}
-	memset(mybuffer, 0, TEST_SIZE);
+	/* mark it so that we can check correctness */
+	for(i=0; i<(TEST_SIZE/(sizeof(int))); i++)
+	{
+		((int*)mybuffer)[i] = i;
+	}
 
 	/* create a flow descriptor */
 	flow_d = PINT_flow_alloc();
@@ -132,14 +164,14 @@ int main(int argc, char **argv)
 	flow_d->user_ptr = NULL;
 
 	/* fill in flow details */
-	flow_d->dest.endpoint_id = MEM_ENDPOINT;
-	flow_d->dest.u.mem.size = TEST_SIZE;
-	flow_d->dest.u.mem.buffer = mybuffer;
-	flow_d->src.endpoint_id = BMI_ENDPOINT;
-	flow_d->src.u.bmi.address = request_info.addr;
+	flow_d->src.endpoint_id = MEM_ENDPOINT;
+	flow_d->src.u.mem.size = TEST_SIZE;
+	flow_d->src.u.mem.buffer = mybuffer;
+	flow_d->dest.endpoint_id = BMI_ENDPOINT;
+	flow_d->dest.u.bmi.address = server_addr;
 
 	/***************************************************
-	 * test bmi to memory (analogous to a client side read)
+	 * test memory to bmi (analogous to client side write)
 	 */
 
 	time1 = Wtime();
@@ -153,24 +185,8 @@ int main(int argc, char **argv)
 	/*******************************************************/
 	/* final cleanup and output */
 
-	if(time2 == time1)
-	{
-		printf("No time elapsed?\n");
-	}
-	else
-	{
-		printf("Server bw (recv): %f MB/sec\n",
-			((TEST_SIZE)/((time2-time1)*1000000.0)));
-	}
-
-	/* verify memory */
-	for(i=0; i<(TEST_SIZE/(sizeof(int))); i++)
-	{
-		if(((int*)mybuffer)[i] != i)
-		{
-			fprintf(stderr, "Failed Verification!!! (step 1)\n");
-		}
-	}
+	printf("Client bw (send): %f MB/sec\n",
+		((TEST_SIZE)/((time2-time1)*1000000.0)));
 
 	/* shut down flow interface */
 	ret = PINT_flow_finalize();
@@ -187,10 +203,12 @@ int main(int argc, char **argv)
 	return(0);
 }
 
+
 static int block_on_flow(flow_descriptor* flow_d)
 {
 	int ret = -1;
 	int count = 0;
+	int index = 5;
 
 	ret = PINT_flow_post(flow_d);
 	if(ret == 1)
@@ -205,7 +223,7 @@ static int block_on_flow(flow_descriptor* flow_d)
 
 	do
 	{
-		ret = PINT_flow_wait(flow_d, &count);
+		ret = PINT_flow_waitsome(1, &flow_d, &count, &index);
 	}while(ret == 0 && count == 0);
 	if(ret < 0)
 	{
@@ -217,6 +235,11 @@ static int block_on_flow(flow_descriptor* flow_d)
 		fprintf(stderr, "flow finished in error state: %d\n", flow_d->state);
 		return(-1);
 	}
+	if(index != 0)
+	{
+		fprintf(stderr, "bad index.\n");
+		return(-1);
+	}
 	return(0);
 }
 
@@ -225,6 +248,6 @@ static double Wtime(void)
 	struct timeval t;
 
 	gettimeofday(&t, NULL);
-	return((double)t.tv_sec + (double)(t.tv_usec) / 1000000);
+	return((double)t.tv_sec + (double)t.tv_usec / 1000000);
 }
 

@@ -1,7 +1,8 @@
 DIR := test/io/flow
 
 LOCALTESTSRC := \
-	$(DIR)/test-harness-server.c
+	$(DIR)/test-harness-server.c\
+	$(DIR)/test-harness-client.c
 
 TESTSRC += $(LOCALTESTSRC)
 
