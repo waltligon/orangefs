@@ -471,6 +471,8 @@ static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
                sm_p->u.getattr.object_ref.handle,
                sm_p->u.getattr.object_ref.fs_id);
 
+    assert(0);
+
     return 1;
 }
 

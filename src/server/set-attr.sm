@@ -269,11 +269,15 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
     /* filter out anything besides common attributes before writing */
     a_p->mask &= PVFS_ATTR_COMMON_ALL;
 
-    gossip_debug(SERVER_DEBUG, " request has dfile_count of %d | dspace has %d\n",
-                 s_op->req->u.setattr.attr.u.meta.dfile_count,
-                 s_op->attr.u.meta.dfile_count);
-    gossip_debug(SERVER_DEBUG, " writing count of %d to disk\n",
-                 dspace_a_p->u.meta.dfile_count);
+    if (a_p->mask & PVFS_ATTR_META_DFILES)
+    {
+        gossip_debug(SERVER_DEBUG, " request has dfile_count of %d | "
+                     "dspace has %d\n",
+                     s_op->req->u.setattr.attr.u.meta.dfile_count,
+                     s_op->attr.u.meta.dfile_count);
+        gossip_debug(SERVER_DEBUG, " writing count of %d to disk\n",
+                     dspace_a_p->u.meta.dfile_count);
+    }
 
     /*
       we have the attribs stored in the dspace, as well as the
