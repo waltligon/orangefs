@@ -9,8 +9,10 @@
 #include "pint-servreq.h"
 #include "config-manage.h"
 
+#if 0
 static int check_pinode_match(pinode *pnode,pinode *pinode_ptr);
 static int update_pinode(pinode *pnode,pinode *pinode_ptr);
+#endif
 static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr,\
 		PVFS_bitfield mask);
 
@@ -358,7 +360,6 @@ static int check_size_expiry(struct timeval t1,struct timeval t2)
 	/* Size is stale */
 	return(-1);
 }
-#endif
 
 /* update_pinode
  *
@@ -382,6 +383,7 @@ static int update_pinode(pinode *pnode,pinode *pinode_ptr)
 	
 	return(0);
 }
+#endif
 
 /* phelper_fill_timestamps
  *
@@ -421,6 +423,7 @@ int phelper_fill_timestamps(pinode *pnode)
 	return(0);
 }
 
+#if 0
 /* check_pinode_match
  *
  * compares two pinodes to check if they are the same
@@ -440,6 +443,7 @@ static int check_pinode_match(pinode *pnode,pinode *pinode_ptr)
 	else 
 		return(-1);
 }
+#endif
 
 /* modify_pinode
  *
