@@ -1,0 +1,37 @@
+NODEFILE=machines.pav
+IONCOUNT=2
+# only support one metaserver for now
+METACOUNT=1
+PROTOCOL=tcp
+UNIQUEMETA=1
+
+#
+# EVERYTHING SHOULD BE IN THIS DIRECTORY ON REMOTE NODES
+#
+WORKINGDIR="/sandbox/robl/pvfs"
+
+#
+# SERVER CONFIGURATION
+#
+
+# this has to be a port apropriate for the protocol
+PVFSPORT=3335
+STORAGE=$WORKINGDIR/storage
+SERVERLOG=$WORKINGDIR/log
+
+MOUNTPOINT="/pvfs-auto"
+
+BINDIR=$WORKINGDIR/bin
+
+RCMDPROG=ssh
+RCPPROG=scp
+
+#
+# LOCATION OF IMPORTANT BINARIES LOCALLY
+#
+PROGROOT=/homes/robl/projects/jazz/pav
+
+PVFS=/homes/robl/pvfs2
+SERVER=$PVFS/sbin/pvfs2-server
+PINGPROG=$PVFS/bin/pvfs2-ping
+GENCONFIG=$PVFS/bin/pvfs2-genconfig

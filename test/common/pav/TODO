@@ -1,0 +1,4 @@
+. Add a makefile
+. Add ability to put lib and binaries in different directories
+. Think about and clean up the 'resource test' functionality of pav, currently
+  disabled
