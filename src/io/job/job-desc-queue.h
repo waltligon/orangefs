@@ -105,6 +105,8 @@ struct job_desc
     u;
 
     struct qlist_head job_desc_q_link;	/* queue link */
+    struct qlist_head job_time_link;	/* queue link */
+    void* time_bucket;
 };
 
 typedef struct qlist_head *job_desc_q_p;
