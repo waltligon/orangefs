@@ -10,49 +10,10 @@
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "gen-locks.h"
+#include "pvfs2-event.h"
 
-/* TODO: put this somewhere else? read from config file? */
+/* TODO: put this value somewhere else? read from config file? */
 #define PINT_EVENT_DEFAULT_RING_SIZE 2000
-
-/* different API levels where we can log events */
-enum PINT_event_api
-{
-    PINT_EVENT_API_JOB =   (1 << 0),
-    PINT_EVENT_API_BMI =   (1 << 2),
-    PINT_EVENT_API_TROVE = (1 << 3)
-};
-
-/* what kind of event */
-enum PINT_event_flag
-{
-    PINT_EVENT_FLAG_NONE = 0,
-    PINT_EVENT_FLAG_START = 1,
-    PINT_EVENT_FLAG_END = 2,
-    PINT_EVENT_FLAG_INVALID = 3
-};
-
-/* what kind of operation, seperate list for each API */
-/* TODO: is there a better way to do this?  any point in registering these
- * at runtime rather than listing them all in a header here?
- */
-enum PINT_event_flow_op
-{
-    PINT_EVENT_FLOW = 1
-};
-enum PINT_event_bmi_op
-{
-    PINT_EVENT_BMI_SEND =      (1 << 0),
-    PINT_EVENT_BMI_RECV =      (1 << 1),
-    PINT_EVENT_BMI_SEND_LIST = (1 << 2),
-    PINT_EVENT_BMI_RECV_LIST = (1 << 3)
-};
-enum PINT_event_trove_op
-{
-    PINT_EVENT_TROVE_READ =       (1 << 0),
-    PINT_EVENT_TROVE_WRITE =      (1 << 1),
-    PINT_EVENT_TROVE_READ_LIST =  (1 << 2),
-    PINT_EVENT_TROVE_WRITE_LIST = (1 << 3)
-};
 
 /* variables that provide runtime control over which events are recorded */
 extern int PINT_event_on;
