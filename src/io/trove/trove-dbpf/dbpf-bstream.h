@@ -43,6 +43,9 @@ enum {
     DBPF_BSTREAM_FDCACHE_SUCCESS = 1
 };
 
+int dbpf_bstream_fdcache_try_remove(TROVE_coll_id coll_id,
+				    TROVE_handle handle);
+
 int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 				 TROVE_handle handle,
 				 int create_flag,
@@ -50,12 +53,6 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 
 void dbpf_bstream_fdcache_put(TROVE_coll_id coll_id,
 			      TROVE_handle handle);
-
-#define DBPF_OPEN open
-#define DBPF_WRITE write
-#define DBPF_LSEEK lseek
-#define DBPF_READ read
-#define DBPF_CLOSE close
 
 #if defined(__cplusplus)
 }

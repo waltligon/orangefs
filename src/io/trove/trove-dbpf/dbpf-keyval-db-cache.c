@@ -20,6 +20,9 @@
 #include "dbpf.h"
 #include "dbpf-keyval.h"
 
+/* NOTE: THIS IS ALMOST CERTAINLY BROKEN FOR MULTITHREADED APPS!!!
+ */
+
 enum {
     DBCACHE_ENTRIES = 16
 };
@@ -67,7 +70,56 @@ void dbpf_keyval_dbcache_finalize(void)
     }
 }
 
-/* dbpf_keyval_dbcache_get()
+/* dbpf_keyval_dbcache_try_remove()
+ *
+ * Returns one of DBPF_KEYVAL_DBCACHE_ERROR, DBPF_KEYVAL_DBCACHE_BUSY,
+ * DBPF_KEYVAL_DBCACHE_SUCCESS.
+ */
+int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
+				   TROVE_handle handle)
+{
+    int i, ret;
+    char filename[PATH_MAX];
+    DB *db_p;
+
+    for (i=0; i < DBCACHE_ENTRIES; i++) {
+	if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
+	    keyval_db_cache[i].ref_ct  >= 0 &&
+	    keyval_db_cache[i].coll_id == coll_id &&
+	    keyval_db_cache[i].handle  == handle) break;
+	else if (ret == 0) gen_mutex_unlock(&keyval_db_cache[i].mutex);
+    }
+
+    if (i < DBCACHE_ENTRIES) {
+	/* found cached DB */
+
+	if (keyval_db_cache[i].ref_ct > 0) {
+	    gen_mutex_unlock(&keyval_db_cache[i].mutex);
+	    return DBPF_KEYVAL_DBCACHE_BUSY;
+	}
+
+	/* close it */
+	ret = keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
+	if (ret != 0) {
+	    printf("db: close error\n");
+	}
+	keyval_db_cache[i].ref_ct = -1;
+	keyval_db_cache[i].db_p   = NULL;
+	gen_mutex_unlock(&keyval_db_cache[i].mutex);
+    }
+
+    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.keyval", TROVE_DIR, coll_id, KEYVAL_DIRNAME, handle);
+#if 0
+    printf("file name = %s\n", filename);
+#endif
+
+    ret = DBPF_UNLINK(filename);
+    if (ret != 0 && errno != ENOENT) return DBPF_KEYVAL_DBCACHE_ERROR;
+
+    return DBPF_KEYVAL_DBCACHE_SUCCESS;
+}
+
+/* dbpf_keyval_dbcache_try_get()
  *
  * Right now we don't place any kind of upper limit on the number of
  * references to the same db, so this will never return BUSY.  That might

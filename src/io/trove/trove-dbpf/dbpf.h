@@ -254,6 +254,12 @@ void dbpf_collection_register(struct dbpf_collection *coll_p);
 struct dbpf_collection *dbpf_collection_find_registered(TROVE_coll_id coll_id);
 void dbpf_collection_clear_registered(void);
 
+#define DBPF_OPEN   open
+#define DBPF_WRITE  write
+#define DBPF_LSEEK  lseek
+#define DBPF_READ   read
+#define DBPF_CLOSE  close
+#define DBPF_UNLINK unlink
 
 #if defined(__cplusplus)
 }

@@ -26,6 +26,9 @@ enum {
     DBPF_KEYVAL_DBCACHE_SUCCESS = 1
 };
 
+int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
+				   TROVE_handle handle);
+
 int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 				TROVE_handle handle,
 				int create_flag,

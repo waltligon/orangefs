@@ -242,6 +242,28 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	}
     }
 
+    /* remove keyval db if it exists */
+    ret = dbpf_keyval_dbcache_try_remove(op_p->coll_p->coll_id, op_p->handle);
+    switch (ret) {
+	case DBPF_KEYVAL_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_KEYVAL_DBCACHE_BUSY:
+	    assert(0);
+	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    break;
+    }
+
+    /* remove bstream file if it exists */
+    ret = dbpf_bstream_fdcache_try_remove(op_p->coll_p->coll_id, op_p->handle);
+    switch (ret) {
+	case DBPF_BSTREAM_FDCACHE_ERROR:
+	    goto return_error;
+	case DBPF_BSTREAM_FDCACHE_BUSY:
+	    assert(0);
+	case DBPF_BSTREAM_FDCACHE_SUCCESS:
+	    break;
+    }
+
     /* return handle to free list */
     trove_handle_free(op_p->coll_p->free_handles, op_p->handle);
     dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
