@@ -957,9 +957,20 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
     /* if the op is not completed, wait for up to max_idle_time_ms */
     if (state != OP_COMPLETED)
     {
+        struct timeval base;
         struct timespec wait_time;
-        wait_time.tv_sec = (max_idle_time_ms / 1000);
-        wait_time.tv_nsec = ((max_idle_time_ms % 1000) * 1000000);
+
+        /* compute how long to wait */
+        gettimeofday(&base, NULL);
+        wait_time.tv_sec = base.tv_sec +
+            (max_idle_time_ms / 1000);
+        wait_time.tv_nsec = base.tv_usec * 1000 + 
+            ((max_idle_time_ms % 1000) * 1000000);
+        if (wait_time.tv_nsec > 1000000000)
+        {
+            wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
+            wait_time.tv_sec++;
+        }
 
         gen_mutex_lock(context_mutex);
         ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
