@@ -80,7 +80,10 @@ static int final_response_release(PINT_server_op *s_op, job_status_s *js_p)
      * nested machine, now is the time to grab the error code if we
      * are going to use it
      */
-    s_op->resp.status = js_p->error_code;
+    /* NOTE: we filter out any subsystem mask and make sure that this
+     * shows up as a generic pvfs error on the client side
+     */
+    s_op->resp.status = -PVFS_ERROR_CODE(-js_p->error_code);
 
     /* catch cases in which the operation has not been scheduled */
     if(!s_op->scheduled_id)
