@@ -351,6 +351,7 @@ static void usage(int argc, char** argv)
 	"Usage: %s [-s strip_size] [-n num_datafiles] [-b buffer_size]\n",
 	argv[0]);
     fprintf(stderr, "   unix_source_file pvfs2_dest_file\n");
+    fprintf(stderr, "\n      Note: this utility reads /etc/pvfs2tab for file system configuration.\n");
     return;
 }
 
