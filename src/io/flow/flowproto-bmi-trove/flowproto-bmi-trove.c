@@ -838,12 +838,6 @@ static int buffer_setup_bmi_to_mem(flow_descriptor* flow_d)
 	}
 	else
 	{
-		if(eof_flag)
-		{
-			gossip_lerr("TMP OUTPUT: Warning: detected EOF, hacking around bug.\n");
-			flow_d->current_req_offset = -1;
-		}
-
 		/* "normal" case */
 		for(i=0; i<flow_data->bmi_list_count; i++)
 		{
@@ -1101,12 +1095,6 @@ static int buffer_setup_trove_to_bmi(flow_descriptor* flow_d)
 	if(ret < 0)
 	{
 		return(ret);
-	}
-
-	if(eof_flag)
-	{
-		gossip_lerr("TMP OUTPUT: Warning: detected eof, hacking around bug.\n");
-		flow_d->current_req_offset = -1;
 	}
 
 	if(flow_data->fill_buffer_stepsize < flow_data->max_buffer_size
@@ -1628,12 +1616,6 @@ static void service_trove_to_bmi(flow_descriptor* flow_d)
 				return;
 			}
 
-			if(eof_flag)
-			{
-				gossip_lerr("TMP OUTPUT: Warning: detected EOF, hacking around bug.\n");
-				flow_d->current_req_offset = -1;
-			}
-
 			if(flow_data->fill_buffer_stepsize < flow_data->max_buffer_size
 				&& flow_d->current_req_offset != -1)
 			{
@@ -2117,12 +2099,6 @@ static void trove_completion_trove_to_bmi(PVFS_ds_state error_code,
 			flow_d->state = FLOW_ERROR;
 			flow_d->error_code = ret;
 			exit(-1);
-		}
-
-		if(eof_flag)
-		{
-			gossip_lerr("TMP OUTPUT: Warning: detected EOF, hacking around bug.\n");
-			flow_d->current_req_offset = -1;
 		}
 		
 		/* set the state so that the next service will cause a post */
