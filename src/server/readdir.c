@@ -126,7 +126,7 @@ static int readdir_init(state_action_struct *s_op, job_status_s *ret)
 
     handle_sz = sizeof(PVFS_handle);
 
-    big_memory_buffer = (char *) malloc(key_a_sz+val_a_sz+s_op->val.buffer_sz+dirent_buff_sz);
+    big_memory_buffer = (char *) calloc(1,key_a_sz+val_a_sz+s_op->val.buffer_sz+dirent_buff_sz);
     check_buffer = big_memory_buffer;
 
     s_op->key_a = (TROVE_keyval_s *) big_memory_buffer;
