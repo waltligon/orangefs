@@ -411,7 +411,7 @@ directory_test4()
     if test $NUMDIRS -ne 102 ; then
         echo ""
         echo "******************************************"
-        echo "* FAILED DIRECTORY TEST 5 [stage 1]"
+        echo "* FAILED DIRECTORY TEST 4 [stage 1]"
         echo "******************************************"
         return 1
     fi
