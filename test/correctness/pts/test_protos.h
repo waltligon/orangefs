@@ -29,8 +29,8 @@ void setup_ptstests(config *myconfig) {
      format
      3.) test_name, must be set to a distinct test name string
    */
-   myconfig->testpool[TEST_CREATE].test_func = (void *)create_file;
-   myconfig->testpool[TEST_CREATE].test_name = str_malloc("create_file");
+   myconfig->testpool[TEST_CREATE].test_func = (void *)test_create;
+   myconfig->testpool[TEST_CREATE].test_name = str_malloc("test_create");
    myconfig->testpool[TEST_PVFSDATATYPE_INIT].test_func = (void *)test_pvfs_datatype_init;
    myconfig->testpool[TEST_PVFSDATATYPE_INIT].test_name = str_malloc("test_pvfs_datatype_init");
 
