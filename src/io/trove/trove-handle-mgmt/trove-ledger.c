@@ -13,8 +13,6 @@
 #include "trove-ledger.h"
 #include "trove.h"
 
-/* TODO: GET RID OF THIS INCLUDE!!! */
-
 /* struct handle_ledger
  *
  * Structure used internally for maintaining state.  Opaque pointers passed
