@@ -108,7 +108,6 @@ int PINT_state_machine_completion(PINT_server_op *s_op)
 
 int PINT_state_machine_init(void)
 {
-    int i;
 
     /* fill in indexes for each supported request type */
     PINT_server_op_table[PVFS_SERV_INVALID]      = NULL;
@@ -124,14 +123,6 @@ int PINT_state_machine_init(void)
     PINT_server_op_table[PVFS_SERV_READDIR]      = &pvfs2_readdir_sm;
     PINT_server_op_table[PVFS_SERV_GETCONFIG]    = &pvfs2_get_config_sm;
 
-    /* initialize each state machine */
-    for (i = 0 ; i <= PVFS_MAX_SERVER_OP; i++)
-    {
-	if(PINT_server_op_table[i] && PINT_server_op_table[i]->init_fun)
-	{
-	    (PINT_server_op_table[i]->init_fun)();
-	}
-    }
     return(0);
 }
 

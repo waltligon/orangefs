@@ -22,19 +22,11 @@ void gen_state_decl(char *state_name)
 }
 
 void gen_machine(char *machine_name,
-		 char *first_state_name,
-		 char *init_name)
+		 char *first_state_name)
 {
     fprintf(out_file, "\nstruct PINT_state_machine_s %s =\n{\n\t", machine_name);
-    fprintf(out_file, "ST_%s,\n\t\"%s\",\n", first_state_name, machine_name);
-    if (init_name)
-    {
-	fprintf(out_file, "\t%s\n};\n\n", init_name);
-    }
-    else
-    {
-	fprintf(out_file, "\tNULL\n};\n\n");
-    }
+    fprintf(out_file, "ST_%s,\n\t\"%s\"\n", first_state_name, machine_name);
+    fprintf(out_file, "};\n");
 }
 
 void gen_state_start(char *state_name)

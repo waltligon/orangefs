@@ -22,7 +22,7 @@ void gen_state_action(char *run_func, int flag);
 void gen_return_code(char *return_code);
 void gen_next_state(int flag, char *new_state);
 void gen_state_end(void);
-void gen_machine(char *machine_name, char *first_state_name, char *init_name);
+void gen_machine(char *machine_name, char *first_state_name);
 
 int yylex(void);
 void yyerror(char *);
@@ -67,7 +67,7 @@ void yyerror(char *);
 
 %type <i> .state_body. state_body state_action .NESTED. .EXTERN.
 
-%type <c> identifier return_code .init_func.
+%type <c> identifier return_code
 
 %type <s> state_decl_list .state_decl_list. state_decl,
 	  state_def state_def_list .state_def_list.,
@@ -81,8 +81,8 @@ state_machine	  : .NESTED. MACHINE identifier
 			{$$ = symenter($3);
 			 $$->type = TYPE_MACHINE;
 			 $$->flag = $1;}
-		     LPAREN .state_decl_list. RPAREN LBRACE .init_func.
-			{gen_machine($3, $6->name, $9);}
+		     LPAREN .state_decl_list. RPAREN LBRACE
+			{gen_machine($3, $6->name);}
 		    .state_def_list. RBRACE
 		  ;
 
@@ -90,12 +90,6 @@ state_machine	  : .NESTED. MACHINE identifier
 		     {$$ = SM_NONE;}
 		  | NESTED
 		     {$$ = SM_NESTED;}
-		  ;
-
-.init_func.	  : /* empty */
-		     {$$ = NULL;}
-		  | INIT ARROW identifier SEMICOLON
-		     {$$ = $3;}
 		  ;
 
 .state_decl_list. : /* empty */

@@ -56,7 +56,6 @@ struct PINT_state_machine_s
 {
     union PINT_state_array_values *state_machine;
     char *name;
-    void (*init_fun)(void);
 };
 
 enum {
