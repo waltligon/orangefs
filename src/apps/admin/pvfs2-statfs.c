@@ -48,7 +48,6 @@ int main(int argc, char **argv)
     PVFS_credentials creds;
     struct PVFS_mgmt_server_stat *stat_array = NULL;
     int outcount;
-    PVFS_BMI_addr_t *addr_array;
     int server_type;
     char scratch_size[SCRATCH_LEN] = {0};
     char scratch_total[SCRATCH_LEN] = {0};
@@ -129,131 +128,102 @@ int main(int argc, char **argv)
 	return -1;
     }
 
+    outcount = resp_statfs.server_count;
+    ret = PVFS_mgmt_statfs_all(
+        cur_fs, 
+        &creds,
+        stat_array,
+        &outcount,
+        NULL);
+        
     for (j=0; j<2; j++)
     {
 	if (j==0)
 	{
+	    printf("\nmeta server statistics:\n");
 	    server_type = PVFS_MGMT_META_SERVER;
 	}
 	else
 	{
-	    server_type = PVFS_MGMT_IO_SERVER;
-	}
-
-	ret = PVFS_mgmt_count_servers(
-            cur_fs, &creds, server_type, &outcount);
-	if (ret < 0)
-	{
-	    PVFS_perror("PVFS_mgmt_count_servers", ret);
-	    return -1;
-	}
-
-	addr_array = (PVFS_BMI_addr_t *)
-	    malloc(outcount * sizeof(PVFS_BMI_addr_t));
-	if (addr_array == NULL)
-	{
-	    perror("malloc");
-	    return -1;
-	}
-
-	ret = PVFS_mgmt_get_server_array(
-            cur_fs, &creds, server_type, addr_array, &outcount);
-	if (ret < 0)
-	{
-	    PVFS_perror("PVFS_mgmt_get_server_array", ret);
-	    return -1;
-	}
-
-	ret = PVFS_mgmt_statfs_list(
-            cur_fs, &creds, stat_array, addr_array, outcount, NULL);
-	if (ret < 0)
-	{
-	    PVFS_perror("PVFS_mgmt_statfs_list", ret);
-	    return -1;
-	}
-
-	if (j==0)
-	{
-	    printf("\nmeta server statistics:\n");
-	}
-	else
-	{
 	    printf("\nI/O server statistics:\n");
+	    server_type = PVFS_MGMT_IO_SERVER;
 	}
 
 	printf("---------------------------------------\n\n");
 
 	for(i=0; i < outcount; i++)
 	{
-	    printf("server: %s\n", stat_array[i].bmi_address);
+            if(stat_array[i].server_type & server_type)
+            {
+                printf("server: %s\n", stat_array[i].bmi_address);
 
-	    if (user_opts->human_readable)
-            {
-		PVFS_util_make_size_human_readable(
-			(long long)stat_array[i].ram_total_bytes,
-			scratch_size, SCRATCH_LEN,
-                        user_opts->use_si_units);
-		PVFS_util_make_size_human_readable(
-			(long long)stat_array[i].ram_free_bytes,
-			scratch_total, SCRATCH_LEN,
-                        user_opts->use_si_units);
-		printf("\tRAM total        : %s\n", scratch_size);
-		printf("\tRAM free         : %s\n", scratch_total);
-                printf("\tuptime           : %d hours, %.2d minutes\n",
-                       (int)((stat_array[i].uptime_seconds / 60) / 60),
-                       (int)((stat_array[i].uptime_seconds / 60) % 60));
-	    }
-            else
-            {
-                printf("\tRAM bytes total  : %Lu\n",
-                       Lu(stat_array[i].ram_total_bytes));
-                printf("\tRAM bytes free   : %Lu\n",
-                       Lu(stat_array[i].ram_free_bytes));
-                printf("\tuptime (seconds) : %Lu\n",
-                       Lu(stat_array[i].uptime_seconds));
-            }
-	    printf("\thandles available: %Lu\n",
-                   Lu(stat_array[i].handles_available_count));
-	    printf("\thandles total    : %Lu\n",
-                   Lu(stat_array[i].handles_total_count));
+                if (user_opts->human_readable)
+                {
+                    PVFS_util_make_size_human_readable(
+                            (long long)stat_array[i].ram_total_bytes,
+                            scratch_size, SCRATCH_LEN,
+                            user_opts->use_si_units);
+                    PVFS_util_make_size_human_readable(
+                            (long long)stat_array[i].ram_free_bytes,
+                            scratch_total, SCRATCH_LEN,
+                            user_opts->use_si_units);
+                    printf("\tRAM total        : %s\n", scratch_size);
+                    printf("\tRAM free         : %s\n", scratch_total);
+                    printf("\tuptime           : %d hours, %.2d minutes\n",
+                           (int)((stat_array[i].uptime_seconds / 60) / 60),
+                           (int)((stat_array[i].uptime_seconds / 60) % 60));
+                }
+                else
+                {
+                    printf("\tRAM bytes total  : %Lu\n",
+                           Lu(stat_array[i].ram_total_bytes));
+                    printf("\tRAM bytes free   : %Lu\n",
+                           Lu(stat_array[i].ram_free_bytes));
+                    printf("\tuptime (seconds) : %Lu\n",
+                           Lu(stat_array[i].uptime_seconds));
+                }
+                printf("\thandles available: %Lu\n",
+                       Lu(stat_array[i].handles_available_count));
+                printf("\thandles total    : %Lu\n",
+                       Lu(stat_array[i].handles_total_count));
 
-	    if (user_opts->human_readable)
-            {
-		PVFS_util_make_size_human_readable(
-			(long long)stat_array[i].bytes_available,
-			scratch_size, SCRATCH_LEN,
-                        user_opts->use_si_units);
-		PVFS_util_make_size_human_readable(
-			(long long)stat_array[i].bytes_total,
-			scratch_total, SCRATCH_LEN,
-                        user_opts->use_si_units);
-		printf("\tbytes available  : %s\n", scratch_size);
-		printf("\tbytes total      : %s\n", scratch_total);
-	    }
-            else
-            {
-		printf("\tbytes available  : %Ld\n",
-                       Ld(stat_array[i].bytes_available));
-		printf("\tbytes total      : %Ld\n",
-                       Ld(stat_array[i].bytes_total));
-	    }
+                if (user_opts->human_readable)
+                {
+                    PVFS_util_make_size_human_readable(
+                            (long long)stat_array[i].bytes_available,
+                            scratch_size, SCRATCH_LEN,
+                            user_opts->use_si_units);
+                    PVFS_util_make_size_human_readable(
+                            (long long)stat_array[i].bytes_total,
+                            scratch_total, SCRATCH_LEN,
+                            user_opts->use_si_units);
+                    printf("\tbytes available  : %s\n", scratch_size);
+                    printf("\tbytes total      : %s\n", scratch_total);
+                }
+                else
+                {
+                    printf("\tbytes available  : %Ld\n",
+                           Ld(stat_array[i].bytes_available));
+                    printf("\tbytes total      : %Ld\n",
+                           Ld(stat_array[i].bytes_total));
+                }
 
-	    if (stat_array[i].server_type &
-                (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER))
-            {
-		printf("\tmode: serving both metadata and I/O data\n");
+                if (stat_array[i].server_type &
+                    (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER))
+                {
+                    printf("\tmode: serving both metadata and I/O data\n");
+                }
+                else if(stat_array[i].server_type & PVFS_MGMT_IO_SERVER)
+                {
+                    printf("\tmode: serving only I/O data\n");
+                }
+                else if(stat_array[i].server_type & PVFS_MGMT_META_SERVER)
+                {
+                    printf("\tmode: serving only metadata\n");
+                }
+                printf("\n");
             }
-	    else if(stat_array[i].server_type & PVFS_MGMT_IO_SERVER)
-            {
-		printf("\tmode: serving only I/O data\n");
-            }
-	    else if(stat_array[i].server_type & PVFS_MGMT_META_SERVER)
-            {
-		printf("\tmode: serving only metadata\n");
-            }
-	    printf("\n");
 	}
-	free(addr_array);
     }
 
     free(stat_array);
