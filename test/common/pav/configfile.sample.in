@@ -55,5 +55,9 @@ SERVER=$BUILDDIR/server/pvfs2-server
 PINGPROG=$BUILDDIR/src/apps/admin/pvfs2-ping
 GENCONFIG=$SRCDIR/src/apps/admin/pvfs2-genconfig
 
-# this value only has to be set in heterogenous environments 
+# set this to 1 if the machines used by pav need the important pvfs2
+# binaries copied out to them.  set it to 0 if using, for example, NFS
+COPYBINS=1
+
+#this value only has to be set in heterogenous environments 
 #ENCODING="{direct|le_bfield|xdr}" 
