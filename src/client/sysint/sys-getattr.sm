@@ -149,7 +149,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_getattr entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_getattr entered\n");
 
     if (resp_p == NULL)
     {
@@ -197,7 +197,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
 static int getattr_check_parameters(PINT_client_sm *sm_p,
 				    job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "getattr state: getattr_check_parameters\n");
 
     assert(js_p->error_code == 0);
@@ -217,7 +217,7 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG, "(%p) getattr state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) getattr state: "
                  "getattr_setup_msgpair\n", sm_p);
 
     /*
@@ -270,8 +270,8 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 	assert(0); /* TODO: real error handling */
     }
 
-    gossip_debug(CLIENT_DEBUG, "attrmask being passed to server: ");
-    PINT_attrmask_print(CLIENT_DEBUG, attrmask);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "attrmask being passed to server: ");
+    PINT_attrmask_print(GOSSIP_CLIENT_DEBUG, attrmask);
 
     /* drop through and jump to getattr_acache state machine */
     return 1;
@@ -404,7 +404,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		assert(attr->mask & PVFS_ATTR_META_DIST);
 		assert(attr->u.meta.dist_size > 0);
 		
-		gossip_debug(CLIENT_DEBUG,
+		gossip_debug(GOSSIP_CLIENT_DEBUG,
                              "getattr_object_getattr_comp_fn: "
                              "copying %d bytes of dist.\n",
                              attr->u.meta.dist_size);
@@ -429,7 +429,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		assert(attr->mask & PVFS_ATTR_META_DFILES);
 		assert(attr->u.meta.dfile_count > 0);
 		
-		gossip_debug(CLIENT_DEBUG,
+		gossip_debug(GOSSIP_CLIENT_DEBUG,
 			     "getattr_object_getattr_comp_fn: %d datafiles.\n",
 			     attr->u.meta.dfile_count);
 		
@@ -490,7 +490,7 @@ static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
 					  job_status_s *js_p)
 {
     gossip_debug(
-        CLIENT_DEBUG,
+        GOSSIP_CLIENT_DEBUG,
         "(%p) getattr state: getattr_object_getattr_failure\n", sm_p);
 
     if ((js_p->error_code != -PVFS_ENOENT) &&
@@ -508,7 +508,7 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
     int i;
     int ret = -1;
 
-    gossip_debug(CLIENT_DEBUG, "(%p) getattr state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) getattr state: "
                  "getattr_datafile_getattr_setup_msgpairarray\n", sm_p);
 
     /* clear error field in job */
@@ -530,7 +530,7 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
     {
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
-	gossip_debug(CLIENT_DEBUG,
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		     "  datafile_getattr: getting size for handle %Lu\n", 
 		     Lu(sm_p->u.getattr.datafile_handles[i]));
 
@@ -582,7 +582,7 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
     assert(resp_p->u.getattr.attr.objtype == PVFS_TYPE_DATAFILE);
     assert(resp_p->u.getattr.attr.u.data.size >= 0);
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "datafile_getattr: size of datafile %d is %Ld\n",
 		 index,
 		 Ld(resp_p->u.getattr.attr.u.data.size));
@@ -594,7 +594,7 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
 static int getattr_datafile_getattr_failure(PINT_client_sm *sm_p,
 					    job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "(%p) getattr state: getattr_datafile_getattr_failure\n",
 		 sm_p);
     return 1;
@@ -607,7 +607,7 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
     uint32_t amask;
     PVFS_sys_attr *s_attr_p = &sm_p->u.getattr.getattr_resp_p->attr;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) getattr state: getattr_cleanup\n", sm_p);
 
     if (js_p->error_code == 0)
@@ -660,7 +660,7 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             s_attr_p->mask |= PVFS_ATTR_SYS_LNK_TARGET;
         }
 
-	PINT_attrmask_print(CLIENT_DEBUG, s_attr_p->mask);
+	PINT_attrmask_print(GOSSIP_CLIENT_DEBUG, s_attr_p->mask);
 
 	/* free all the memory we allocated, which could include:
 	 * - size array
@@ -668,10 +668,12 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 	 * - datafile handle array (if not from acache)
 	 * - distribution description (if not from acache)
 	 */
-	if (sm_p->u.getattr.size_array != NULL) {
+	if (sm_p->u.getattr.size_array != NULL)
+        {
 	    free(sm_p->u.getattr.size_array);
 	}
-	if (sm_p->msgarray != NULL) {
+	if (sm_p->msgarray != NULL)
+        {
 	    free(sm_p->msgarray);
 	}
 
@@ -684,11 +686,13 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
         if (!sm_p->acache_hit)
         {
             if ((amask & PVFS_ATTR_META_DFILES) &&
-                (sm_p->u.getattr.datafile_handles != NULL)) {
+                (sm_p->u.getattr.datafile_handles != NULL))
+            {
                 free(sm_p->u.getattr.datafile_handles);
             }
             if ((amask & PVFS_ATTR_META_DIST) &&
-                (sm_p->u.getattr.dist_p != NULL)) {
+                (sm_p->u.getattr.dist_p != NULL))
+            {
                 PVFS_Dist_free(sm_p->u.getattr.dist_p);
             }
         }

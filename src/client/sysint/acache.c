@@ -29,7 +29,7 @@
 
 
 #ifdef VERBOSE_ACACHE_DEBUG
-#define acache_debug(x) gossip_debug(ACACHE_DEBUG,x)
+#define acache_debug(x) gossip_debug(GOSSIP_ACACHE_DEBUG,x)
 #else
 #define acache_debug(...)
 #endif

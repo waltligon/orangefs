@@ -104,7 +104,7 @@ int PVFS_sys_readdir(
     PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_readdir entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir entered\n");
 
     /* parameter checking goes here.  assume everything from the user
      * is ok past this point.
@@ -135,7 +135,7 @@ int PVFS_sys_readdir(
     sm_p->parent_ref = pinode_refn;
     sm_p->u.readdir.object_ref = pinode_refn;
 
-    gossip_debug(CLIENT_DEBUG, "Doing readdir on parent handle "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing readdir on parent handle "
                  "%Lu on fs %d\n", Lu(pinode_refn.handle),
                  pinode_refn.fs_id);
 
@@ -145,13 +145,13 @@ int PVFS_sys_readdir(
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0)
     {
-	gossip_debug(CLIENT_DEBUG, "PVFS_sys_readdir calling "
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir calling "
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
     assert(ret == 0);
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_readdir completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir completed\n");
 
     /* save our return value */
     error = sm_p->error_code;
@@ -166,7 +166,7 @@ int PVFS_sys_readdir(
 static int readdir_init(PINT_client_sm *sm_p,
                         job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "readdir state: init\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: init\n");
 
     assert(js_p->error_code == 0);
 
@@ -182,7 +182,7 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     bmi_addr_t server_addr;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "readdir state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: "
                  "readdir_msg_setup_msgpair\n");
 
     /* clear error field in job */
@@ -198,12 +198,12 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         assert(0);
     }
 
-    gossip_debug(CLIENT_DEBUG," readdir: posting readdir req\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG," readdir: posting readdir req\n");
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
-    gossip_debug(CLIENT_DEBUG, "%Lu|%d | token is %d | limit is %d\n",
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%Lu|%d | token is %d | limit is %d\n",
                  Lu(sm_p->u.readdir.object_ref.handle),
                  sm_p->u.readdir.object_ref.fs_id,
                  sm_p->u.readdir.pos_token,
@@ -233,7 +233,7 @@ static int readdir_msg_comp_fn(void *v_p,
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
-    gossip_debug(CLIENT_DEBUG, "readdir_msg_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir_msg_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_READDIR);
 
@@ -263,7 +263,7 @@ static int readdir_msg_comp_fn(void *v_p,
         memcpy(sm_p->u.readdir.readdir_resp->dirent_array,
                resp_p->u.readdir.dirent_array, dirent_array_len);
     }
-    gossip_debug(CLIENT_DEBUG, "*** Got %d directory entries\n",
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Got %d directory entries\n",
                  sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount);
 
     return 0;
@@ -272,7 +272,7 @@ static int readdir_msg_comp_fn(void *v_p,
 static int readdir_msg_failure(PINT_client_sm *sm_p,
                                       job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "readdir state: readdir_msg_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: readdir_msg_failure\n");
 
     /* FIXME: do real error handling */
     js_p->error_code = -EINVAL;
@@ -283,7 +283,7 @@ static int readdir_msg_failure(PINT_client_sm *sm_p,
 static int readdir_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "readdir state: cleanup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: cleanup\n");
 
     sm_p->error_code = js_p->error_code;
 

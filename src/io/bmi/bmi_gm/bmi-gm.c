@@ -403,7 +403,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     int tmp_errno = 0;
     struct gm_addr *gm_addr_data = NULL;
 
-    gossip_ldebug(BMI_DEBUG_GM, "Initializing GM module.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Initializing GM module.\n");
 
     /* check args */
     if ((init_flags & BMI_INIT_SERVER) && !listen_addr)
@@ -426,7 +426,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     gm_method_params.mode_unexp_limit = GM_MODE_UNEXP_LIMIT;
     gm_method_params.method_flags = init_flags;
 
-    gossip_ldebug(BMI_DEBUG_GM, "Setting up GM operation lists.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Setting up GM operation lists.\n");
     /* set up the operation lists */
     for (i = 0; i < NUM_INDICES; i++)
     {
@@ -481,13 +481,13 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 	    ret = -EPROTO;
 	    goto gm_initialize_failure;
 	}
-	gossip_ldebug(BMI_DEBUG_GM, "Using port number %i.\n", i);
+	gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Using port number %i.\n", i);
     }
 
     rec_tokens = gm_num_receive_tokens(local_port);
     send_tokens = gm_num_send_tokens(local_port);
-    gossip_ldebug(BMI_DEBUG_GM, "Available recieve tokens: %u.\n", rec_tokens);
-    gossip_ldebug(BMI_DEBUG_GM, "Available send tokens: %u.\n", send_tokens);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Available recieve tokens: %u.\n", rec_tokens);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Available send tokens: %u.\n", send_tokens);
 
     /* we will use half of the send tokens for low priority, and half for
      * high priority */
@@ -541,14 +541,14 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     gm_get_host_name(local_port, gm_host_name);
     gm_get_node_id(local_port, &gm_host_id);
     min_message_size = gm_min_message_size(local_port);
-    gossip_ldebug(BMI_DEBUG_GM, "GM Interface host name: %s.\n", gm_host_name);
-    gossip_ldebug(BMI_DEBUG_GM, "GM Interface node id: %u.\n", gm_host_id);
-    gossip_ldebug(BMI_DEBUG_GM, "GM Interface min msg size: %u.\n",
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM Interface host name: %s.\n", gm_host_name);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM Interface node id: %u.\n", gm_host_id);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM Interface min msg size: %u.\n",
 		  min_message_size);
-    gossip_ldebug(BMI_DEBUG_GM, "GM immediate mode limit: %d.\n",
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM immediate mode limit: %d.\n",
 		  GM_MODE_IMMED_LIMIT);
 
-    gossip_ldebug(BMI_DEBUG_GM, "GM module successfully initialized.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM module successfully initialized.\n");
     gen_mutex_unlock(&interface_mutex);
     return (0);
 
@@ -620,7 +620,7 @@ int BMI_gm_finalize(void)
     /* shut down the gm system */
     gm_finalize();
     gen_mutex_unlock(&interface_mutex);
-    gossip_ldebug(BMI_DEBUG_GM, "GM module finalized.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "GM module finalized.\n");
     return (0);
 }
 
@@ -832,7 +832,7 @@ int BMI_gm_get_info(int option,
 	*((int *) inout_parameter) = GM_MODE_REND_LIMIT;
 	ret = 0;
     default:
-	gossip_ldebug(BMI_DEBUG_TCP, 
+	gossip_ldebug(GOSSIP_BMI_DEBUG_GM, 
 	    "BMI GM hint %d not implemented.\n", option);
 	ret = 0;
     break;
@@ -864,7 +864,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
     bmi_size_t buffer_size = 0;
     int ret = -1;
 
-    gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_send called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "BMI_gm_post_send called.\n");
 
     /* clear id immediately for safety */
     *id = 0;
@@ -959,7 +959,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     int i;
     int ret;
 
-    gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_send_list called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "BMI_gm_post_send_list called.\n");
 
     /* if there is only one buffer in the list, pass it on to the
      * normal post_send() function because it is more efficient in
@@ -1062,7 +1062,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     int i;
     int ret;
 
-    gossip_ldebug(BMI_DEBUG_GM, 
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, 
 	"BMI_gm_post_sendunexpected_list called.\n");
 
     /* if there is only one buffer in the list, pass it on to the
@@ -1149,7 +1149,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
     bmi_size_t buffer_size = 0;
     int ret;
 
-    gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_sendunexpected called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "BMI_gm_post_sendunexpected called.\n");
 
     /* clear id immediately for safety */
     *id = 0;
@@ -1224,7 +1224,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
     int ret = -1;
     int buffer_status = GM_BUF_USER_ALLOC;
 
-    gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_recv called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "BMI_gm_post_recv called.\n");
 
     /* what happens here ?
      * see if the operation is already in progress (IND_NEED_RECV_POST)
@@ -1399,7 +1399,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     void* copy_buffer;
     bmi_size_t copy_size, total_copied;
 
-    gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_recv_list called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "BMI_gm_post_recv_list called.\n");
 
     /* if there is only one buffer in the list, pass it on to the
      * normal post_recv() function because it is more efficient in
@@ -1919,7 +1919,7 @@ static int gm_post_send_build_op_list(bmi_op_id_t * id,
     method_op_p new_method_op = NULL;
     struct gm_op *gm_op_data = NULL;
 
-    gossip_ldebug(BMI_DEBUG_GM, "gm_post_send_build_op_list() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "gm_post_send_build_op_list() called.\n");
 
     /* we need an op structure to keep up with this send */
     new_method_op = alloc_gm_method_op();
@@ -1936,7 +1936,7 @@ static int gm_post_send_build_op_list(bmi_op_id_t * id,
     /* TODO: is this right thing to do for send side? */
     new_method_op->expected_size = 0;  
     new_method_op->msg_tag = tag;
-    gossip_ldebug(BMI_DEBUG_GM, "Tag: %d.\n", (int) tag);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Tag: %d.\n", (int) tag);
     new_method_op->mode = mode;
     new_method_op->context_id = context_id;
 
@@ -1970,7 +1970,7 @@ static int gm_post_send_build_op(bmi_op_id_t * id,
     method_op_p new_method_op = NULL;
     struct gm_op *gm_op_data = NULL;
 
-    gossip_ldebug(BMI_DEBUG_GM, "gm_post_send_build_op() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "gm_post_send_build_op() called.\n");
 
     /* we need an op structure to keep up with this send */
     new_method_op = alloc_gm_method_op();
@@ -1987,7 +1987,7 @@ static int gm_post_send_build_op(bmi_op_id_t * id,
     /* TODO: is this right thing to do for send side? */
     new_method_op->expected_size = 0;  
     new_method_op->msg_tag = tag;
-    gossip_ldebug(BMI_DEBUG_GM, "Tag: %d.\n", (int) tag);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Tag: %d.\n", (int) tag);
     new_method_op->mode = mode;
     new_method_op->context_id = context_id;
 
@@ -2008,7 +2008,7 @@ static int gm_post_send_check_resource(struct method_op* mop)
 {
     int ret = -1;
 
-    gossip_ldebug(BMI_DEBUG_GM, "gm_post_send_check_resource() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "gm_post_send_check_resource() called.\n");
 
     /* what do we want to do here? 
      * For now, try to send a control message and then bail out.  The
@@ -2035,7 +2035,7 @@ static int gm_post_send_check_resource(struct method_op* mop)
     }
     else
     {
-	gossip_ldebug(BMI_DEBUG_GM, "Proceeding with communication.\n");
+	gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Proceeding with communication.\n");
 	if (mop->mode == GM_MODE_REND)
 	{
 	    initiate_send_rend(mop);
@@ -2066,7 +2066,7 @@ static void initiate_send_immed(method_op_p mop)
     struct gm_addr *gm_addr_data = mop->addr->method_data;
     bmi_size_t true_msg_len = 0;
 
-    gossip_ldebug(BMI_DEBUG_GM, "Sending immediate msg.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Sending immediate msg.\n");
 
     true_msg_len = mop->actual_size + sizeof(struct ctrl_msg);
 
@@ -2105,7 +2105,7 @@ static void initiate_put_announcement(method_op_p mop)
     /* keep up with this buffer in the op structure */
     gm_op_data->freeable_ctrl_buffer = my_ctrl;
 
-    gossip_ldebug(BMI_DEBUG_GM, "Sending ctrl msg.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Sending ctrl msg.\n");
 
     /* send ctrl message */
     gm_send_with_callback(local_port, my_ctrl,
@@ -2145,7 +2145,7 @@ static void initiate_send_rend(method_op_p mop)
     /* keep up with this buffer in the op structure */
     gm_op_data->freeable_ctrl_buffer = my_ctrl;
 
-    gossip_ldebug(BMI_DEBUG_GM, "Sending ctrl msg.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Sending ctrl msg.\n");
 
     /* send ctrl message */
     gm_send_with_callback(local_port, my_ctrl,
@@ -2176,7 +2176,7 @@ static void ctrl_put_callback(struct gm_port *port,
     struct gm_op *gm_op_data = my_op->method_data;
     struct gm_addr *gm_addr_data = my_op->addr->method_data;
 
-    gossip_ldebug(BMI_DEBUG_GM, "ctrl_put_callback() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "ctrl_put_callback() called.\n");
 
     /* free up ctrl message buffer */
     bmi_gm_bufferpool_put(ctrl_send_pool, gm_op_data->freeable_ctrl_buffer);
@@ -2220,7 +2220,7 @@ static void ctrl_put_callback(struct gm_port *port,
     op_list_add(completion_array[my_op->context_id], my_op);
     gm_op_data->complete = 1;
 
-    gossip_ldebug(BMI_DEBUG_GM, "Finished ctrl_put_callback().\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Finished ctrl_put_callback().\n");
 
     return;
 }
@@ -2242,7 +2242,7 @@ static void immed_send_callback(struct gm_port *port,
     struct gm_op *gm_op_data = my_op->method_data;
     struct gm_addr *gm_addr_data = my_op->addr->method_data;
 
-    gossip_ldebug(BMI_DEBUG_GM, "immed_send_callback() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "immed_send_callback() called.\n");
 
     /* give back a send token */
     gm_free_send_token(local_port, GM_HIGH_PRIORITY);
@@ -2295,7 +2295,7 @@ static void immed_send_callback(struct gm_port *port,
     op_list_add(completion_array[my_op->context_id], my_op);
     gm_op_data->complete = 1;
 
-    gossip_ldebug(BMI_DEBUG_GM, "Finished immed_send_callback().\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Finished immed_send_callback().\n");
 
     return;
 }
@@ -2317,7 +2317,7 @@ static void ctrl_req_callback(struct gm_port *port,
     struct gm_op *gm_op_data = NULL;
     struct gm_addr *gm_addr_data = my_op->addr->method_data;
 
-    gossip_ldebug(BMI_DEBUG_GM, "ctrl_req_callback() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "ctrl_req_callback() called.\n");
 
     /* give back a send token */
     gm_free_send_token(local_port, GM_HIGH_PRIORITY);
@@ -2361,7 +2361,7 @@ static void ctrl_req_callback(struct gm_port *port,
      * to the next state.
      */
 
-    gossip_ldebug(BMI_DEBUG_GM, "Finished ctrl_req_callback.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Finished ctrl_req_callback.\n");
 
     /* etc. etc. */
     return;
@@ -2752,7 +2752,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
     bmi_size_t copy_size, total_copied;
     int i;
 
-    gossip_ldebug(BMI_DEBUG_GM, "recv_event_handler() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "recv_event_handler() called.\n");
     /* what are the possibilities here? 
      * 1) recv ctrl_ack for a send that we initiated
      * 2) recv ctrl_req from someone who wishes to send to us
@@ -2799,7 +2799,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
     }
 
-    gossip_ldebug(BMI_DEBUG_GM, "Ctrl_type: %d.\n", ctrl_copy.ctrl_type);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Ctrl_type: %d.\n", ctrl_copy.ctrl_type);
     switch(ctrl_copy.ctrl_type)
     {
 	case CTRL_ACK_TYPE:
@@ -2843,7 +2843,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    query_op = op_list_search(op_list_array[IND_NEED_CTRL_MATCH], &key);
 	    if (!query_op)
 	    {
-		gossip_ldebug(BMI_DEBUG_GM, "Doh! Using extra buffer.\n");
+		gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Doh! Using extra buffer.\n");
 		tmp_buffer = malloc(ctrl_copy.u.immed.actual_size);
 		if (!tmp_buffer)
 		{
@@ -3083,7 +3083,7 @@ static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
      */
     if (!op_list_empty(op_list_array[IND_NEED_SEND_TOK_LOW]))
     {
-	gossip_ldebug(BMI_DEBUG_GM, "Stalling behind stalled message.\n");
+	gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Stalling behind stalled message.\n");
 	op_list_add(op_list_array[IND_NEED_SEND_TOK_LOW], query_op);
 	return;
     }
@@ -3342,7 +3342,7 @@ static void prepare_for_recv(method_op_p mop)
     }
 
     /* send ctrl message */
-    gossip_ldebug(BMI_DEBUG_GM, "Sending ctrl ack.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Sending ctrl ack.\n");
     gm_send_with_callback(local_port, new_ctrl,
 				  GM_IMMED_SIZE, GM_CTRL_LENGTH,
 				  GM_HIGH_PRIORITY, gm_addr_data->node_id,
@@ -3411,7 +3411,7 @@ static void prepare_for_recv_list(method_op_p mop)
     }
 
     /* send ctrl message */
-    gossip_ldebug(BMI_DEBUG_GM, "Sending ctrl ack.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Sending ctrl ack.\n");
     gm_send_with_callback(local_port, new_ctrl,
 				  GM_IMMED_SIZE, GM_CTRL_LENGTH,
 				  GM_HIGH_PRIORITY, gm_addr_data->node_id,
@@ -3440,7 +3440,7 @@ static void ctrl_ack_callback(struct gm_port *port,
     struct gm_op *gm_op_data = NULL;
     struct gm_addr *gm_addr_data = my_op->addr->method_data;
 
-    gossip_ldebug(BMI_DEBUG_GM, "ctrl_ack_callback() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "ctrl_ack_callback() called.\n");
 
     /* give back a send token */
     gm_free_send_token(local_port, GM_HIGH_PRIORITY);
@@ -3584,7 +3584,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
     int ret = -1;
     struct op_list_search_key key;
 
-    gossip_ldebug(BMI_DEBUG_GM, "ctrl_req_handler_rend() called.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "ctrl_req_handler_rend() called.\n");
 
     /* someone wants to send a buffer in rendezvous mode 
      * - look to see if the matching receive has been posted

@@ -356,7 +356,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
     struct tcp_addr *tcp_addr_data = NULL;
     int i = 0;
 
-    gossip_ldebug(BMI_DEBUG_TCP, "Initializing TCP/IP module.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Initializing TCP/IP module.\n");
 
     /* check args */
     if ((init_flags & BMI_INIT_SERVER) && !listen_addr)
@@ -419,7 +419,8 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
     }
 
     gen_mutex_unlock(&interface_mutex);
-    gossip_ldebug(BMI_DEBUG_TCP, "TCP/IP module successfully initialized.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
+                  "TCP/IP module successfully initialized.\n");
     return (0);
 
   initialize_failure:
@@ -480,7 +481,7 @@ int BMI_tcp_finalize(void)
     /* NOTE: we are trusting the calling BMI layer to deallocate 
      * all of the method addresses (this will close any open sockets)
      */
-    gossip_ldebug(BMI_DEBUG_TCP, "TCP/IP module finalized.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "TCP/IP module finalized.\n");
     gen_mutex_unlock(&interface_mutex);
     return (0);
 }
@@ -633,7 +634,8 @@ int BMI_tcp_set_info(int option,
 	break;
 
     default:
-	gossip_ldebug(BMI_DEBUG_TCP, "TCP hint %d not implemented.\n", option);
+	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
+                      "TCP hint %d not implemented.\n", option);
 	ret = 0;
 	break;
     }
@@ -661,7 +663,8 @@ int BMI_tcp_get_info(int option,
 	return(0);
 	break;
     default:
-	gossip_ldebug(BMI_DEBUG_TCP, "TCP hint %d not implemented.\n", option);
+	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
+                      "TCP hint %d not implemented.\n", option);
 	gen_mutex_unlock(&interface_mutex);
 	return(0);
 	break;
@@ -1570,7 +1573,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     /* BMI_sockio_connect_sock will work with both ipaddr and hostname :) */
     if (tcp_addr_data->hostname)
     {
-	gossip_ldebug(BMI_DEBUG_TCP,
+	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
 		      "Connect: socket=%d, hostname=%s, port=%d\n",
 		      tcp_addr_data->socket, tcp_addr_data->hostname,
 		      tcp_addr_data->port);
@@ -1580,7 +1583,8 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     }
     else if (tcp_addr_data->ipaddr)
     {
-	gossip_ldebug(BMI_DEBUG_TCP, "Connect: socket=%d, ip=%s, port=%d\n",
+	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
+                      "Connect: socket=%d, ip=%s, port=%d\n",
 		      tcp_addr_data->socket, tcp_addr_data->ipaddr,
 		      tcp_addr_data->port);
 	ret = BMI_sockio_connect_sock(tcp_addr_data->socket,
@@ -2156,7 +2160,8 @@ static int handle_new_connection(method_addr_p map)
     {
 	return (-ENOMEM);
     }
-    gossip_ldebug(BMI_DEBUG_TCP, "Assigning socket %d to new method addr.\n",
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
+                  "Assigning socket %d to new method addr.\n",
 		  accepted_socket);
     tcp_addr_data = new_addr->method_data;
     tcp_addr_data->socket = accepted_socket;
@@ -2237,7 +2242,7 @@ static int tcp_do_work_recv(method_addr_p map)
 	return (0);
     }
 
-    gossip_ldebug(BMI_DEBUG_TCP, "Reading header for new op.\n");
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Reading header for new op.\n");
     /* NOTE: we only allow a blocking call here because we peeked to see
      * if this amount of data was ready above.  
      */
@@ -2271,9 +2276,9 @@ static int tcp_do_work_recv(method_addr_p map)
 	return(0);
     }
 
-    gossip_ldebug(BMI_DEBUG_TCP, "Received new message; mode: %d.\n",
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Received new message; mode: %d.\n",
 		  (int) new_header.mode);
-    gossip_ldebug(BMI_DEBUG_TCP, "tag: %d\n", (int) new_header.tag);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "tag: %d\n", (int) new_header.tag);
 
     if (new_header.mode == TCP_MODE_UNEXP)
     {
@@ -2485,7 +2490,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	ret = 0;
     }
 
-    gossip_ldebug(BMI_DEBUG_TCP, "Sent: %d bytes of data.\n", ret);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Sent: %d bytes of data.\n", ret);
     my_method_op->amt_complete += ret;
     assert(my_method_op->amt_complete <= my_method_op->actual_size);
 
@@ -2870,7 +2875,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	ret = 0;
     }
 
-    gossip_ldebug(BMI_DEBUG_TCP, "Sent: %d bytes of data.\n", ret);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Sent: %d bytes of data.\n", ret);
     amt_complete = ret;
     assert(amt_complete <= my_header.size);
     if (amt_complete == my_header.size)

@@ -14,32 +14,33 @@
 
 enum
 {
-    NO_DEBUG =                     0,
-    BMI_DEBUG_TCP =	    (1 << 0),
-    BMI_DEBUG_CONTROL =	    (1 << 1),
-    BMI_DEBUG_OFFSETS =	    (1 << 2),
-    BMI_DEBUG_GM =	    (1 << 3),
-    JOB_DEBUG =		    (1 << 4),
-    SERVER_DEBUG =	    (1 << 5),
-    STO_DEBUG_CTRL =	    (1 << 6),
-    STO_DEBUG_DEFAULT =	    (1 << 7),
-    FLOW_DEBUG =	    (1 << 8),
-    BMI_DEBUG_GM_MEM =	    (1 << 9),
-    REQUEST_DEBUG =	    (1 << 10),
-    FLOW_PROTO_DEBUG =	    (1 << 11),
-    NCACHE_DEBUG =	    (1 << 12),
-    CLIENT_DEBUG =	    (1 << 13),
-    REQ_SCHED_DEBUG =	    (1 << 14),
-    ACACHE_DEBUG =	    (1 << 15),
-    TROVE_DEBUG =           (1 << 16),
-    DIST_DEBUG =            (1 << 17),
-    BMI_DEBUG_IB =          (1 << 18),
-    DBPF_ATTRCACHE_DEBUG =  (1 << 19),
-    MMAP_RCACHE_DEBUG =     (1 << 20),
-    LOOKUP_DEBUG =          (1 << 21),
+    GOSSIP_NO_DEBUG =                     0,
+    GOSSIP_BMI_DEBUG_TCP =	    (1 << 0),
+    GOSSIP_BMI_DEBUG_CONTROL =	    (1 << 1),
+    GOSSIP_BMI_DEBUG_OFFSETS =	    (1 << 2),
+    GOSSIP_BMI_DEBUG_GM =	    (1 << 3),
+    GOSSIP_JOB_DEBUG =		    (1 << 4),
+    GOSSIP_SERVER_DEBUG =	    (1 << 5),
+    GOSSIP_STO_DEBUG_CTRL =	    (1 << 6),
+    GOSSIP_STO_DEBUG_DEFAULT =	    (1 << 7),
+    GOSSIP_FLOW_DEBUG =	    (1 << 8),
+    GOSSIP_BMI_DEBUG_GM_MEM =	    (1 << 9),
+    GOSSIP_REQUEST_DEBUG =	    (1 << 10),
+    GOSSIP_FLOW_PROTO_DEBUG =	    (1 << 11),
+    GOSSIP_NCACHE_DEBUG =	    (1 << 12),
+    GOSSIP_CLIENT_DEBUG =	    (1 << 13),
+    GOSSIP_REQ_SCHED_DEBUG =	    (1 << 14),
+    GOSSIP_ACACHE_DEBUG =	    (1 << 15),
+    GOSSIP_TROVE_DEBUG =           (1 << 16),
+    GOSSIP_DIST_DEBUG =            (1 << 17),
+    GOSSIP_BMI_DEBUG_IB =          (1 << 18),
+    GOSSIP_DBPF_ATTRCACHE_DEBUG =  (1 << 19),
+    GOSSIP_MMAP_RCACHE_DEBUG =     (1 << 20),
+    GOSSIP_LOOKUP_DEBUG =          (1 << 21),
 
-    BMI_DEBUG_ALL = BMI_DEBUG_TCP + BMI_DEBUG_CONTROL +
-	+ BMI_DEBUG_GM + BMI_DEBUG_OFFSETS + BMI_DEBUG_IB
+    GOSSIP_BMI_DEBUG_ALL = GOSSIP_BMI_DEBUG_TCP +
+    GOSSIP_BMI_DEBUG_CONTROL + GOSSIP_BMI_DEBUG_GM +
+    GOSSIP_BMI_DEBUG_OFFSETS + GOSSIP_BMI_DEBUG_IB
 };
 
 int PVFS_debug_eventlog_to_mask(

@@ -121,7 +121,7 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_ref,
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_truncate_new entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_truncate_new entered\n");
 
     /* do parameter checking here, then assume things are ok below.
      * assert()s are still ok of course :).
@@ -171,7 +171,7 @@ static int truncate_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -1;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 	    "(%p) truncate state: getattr_setup_msgpair\n",
 	    sm_p);
 
@@ -253,7 +253,7 @@ static int truncate_object_getattr_comp_fn(
 	    assert(r_attr_p->u.meta.dfile_count > 0);
 	    assert(r_attr_p->u.meta.dist_size > 0);
 
-	    gossip_debug(CLIENT_DEBUG,
+	    gossip_debug(GOSSIP_CLIENT_DEBUG,
 			 "truncate_object_getattr_comp_fn: %d datafiles.\n",
 			 r_attr_p->u.meta.dfile_count); 
 
@@ -315,7 +315,7 @@ static int truncate_object_getattr_failure(PINT_client_sm *sm_p,
                                            job_status_s *js_p)
 {
     gossip_debug(
-        CLIENT_DEBUG,
+        GOSSIP_CLIENT_DEBUG,
         "(%p) truncate state: object_getattr_failure\n", sm_p);
     return 1;
 }
@@ -331,7 +331,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     PVFS_offset new_dfile_size;
     PVFS_Dist *dist = NULL;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 	    "(%p) truncate state: datafile_setup_msgpairarray\n",
 	     sm_p);
 
@@ -357,7 +357,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     {
 	msg_p = &sm_p->msgarray[i];
 
-	gossip_debug(CLIENT_DEBUG,
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"  datafile_truncate: resizing %Ld\n",
 		Lu(sm_p->u.truncate.datafile_handles[i]));
 	new_dfile_size = 
@@ -394,7 +394,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 static int truncate_datafile_resize_failure(PINT_client_sm *sm_p,
 					    job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 	    "(%p) truncate state: datafile_resize_failure\n",
 	    sm_p);
     return 1;
@@ -405,7 +405,8 @@ static int truncate_datafile_resize_failure(PINT_client_sm *sm_p,
 static int truncate_cleanup(PINT_client_sm *sm_p,
 			    job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "(%p) truncate state: truncate_cleanup\n", sm_p);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) truncate state: "
+                 "truncate_cleanup\n", sm_p);
     if (js_p->error_code == 0) {
 	if(sm_p->msgarray != NULL) {
 	    free(sm_p->msgarray);

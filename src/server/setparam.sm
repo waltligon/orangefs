@@ -187,8 +187,8 @@ static int check_fs_id(PVFS_fs_id fs_id)
 	    return(ret);
 	}
 
-	gossip_debug(SERVER_DEBUG, "looking for fs_id: %ld, found %ld.\n",
-	    (long)fs_id, (long)tmp_coll);
+	gossip_debug(GOSSIP_SERVER_DEBUG, "looking for fs_id: %ld, "
+                     "found %ld.\n", (long)fs_id, (long)tmp_coll);
 
 	if(count > 0 && tmp_coll == fs_id)
 	{

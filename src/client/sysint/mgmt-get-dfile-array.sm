@@ -76,7 +76,7 @@ int PVFS_mgmt_get_dfile_array(
     int ret;
     PINT_client_sm *sm_p;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_get_dfile_array entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_get_dfile_array entered\n");
 
     /* do parameter checking here, then assume things are ok below.
      * assert()s are still ok of course :).
@@ -95,7 +95,7 @@ int PVFS_mgmt_get_dfile_array(
     sm_p->u.get_dfile_array.dfile_array = dfile_array;
     sm_p->u.get_dfile_array.dfile_count = dfile_count;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "PVFS_mgmt_get_dfile_array calling PINT_client_state_machine_post()\n");
 
     /* do something to kick off processing */
@@ -110,7 +110,7 @@ int PVFS_mgmt_get_dfile_array(
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0)
     {
-	gossip_debug(CLIENT_DEBUG,
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		     "PVFS_mgmt_get_dfile_array calling PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
@@ -121,7 +121,7 @@ int PVFS_mgmt_get_dfile_array(
 	return(ret);
     }
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_get_dfile_array completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_get_dfile_array completed\n");
 
     /* save our return value */
     ret = sm_p->error_code;
@@ -143,7 +143,7 @@ static int mgmt_get_dfile_array_getattr_setup_msgpair(
 {
     int ret = -1;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "mgmt_get_dfile_array state: getattr_setup_msgpair\n");
 
     /* parameter range checks */
@@ -240,7 +240,7 @@ static int mgmt_get_dfile_array_cleanup(
     PINT_client_sm * sm_p,
     job_status_s * js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "mgmt_get_dfile_array state: cleanup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_get_dfile_array state: cleanup\n");
 
     /* store enough information in the sm structure that the caller
      * can tell what happened.

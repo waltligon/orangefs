@@ -71,9 +71,9 @@ static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = -1;
 
-    gossip_debug(SERVER_DEBUG, 
-	"(%p) %s (prelude sm) state: req_sched\n", s_op,
-	PINT_map_server_op_to_string(s_op->req->op));
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
 
     /* this is a bit of a hack; if we are changing server mode we
      * must preserve the old mode value before calling req scheduler
@@ -108,9 +108,9 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
     job_id_t tmp_id;
     int readonly_flag;
 
-    gossip_debug(SERVER_DEBUG, 
-	"(%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
-	PINT_map_server_op_to_string(s_op->req->op));
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+                 "(%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
 
     /* first, run a request scheduler utility function that tells us
      * what handle this request will operate on
@@ -154,9 +154,9 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
     PVFS_object_attr *obj_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
-    gossip_debug(SERVER_DEBUG, 
-	"(%p) %s (prelude sm) state: perm_check\n", s_op,
-	PINT_map_server_op_to_string(s_op->req->op));
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+                 "(%p) %s (prelude sm) state: perm_check\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
 
     /*
       first we translate the dspace attributes into a more

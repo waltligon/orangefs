@@ -167,7 +167,7 @@ int PVFS_sys_initialize(
     if (ret < 0)
     {
 	init_fail = BMI_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,"BMI initialize failure\n");
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"BMI initialize failure\n");
 	goto return_error;
     }
     if (method_list)
@@ -181,7 +181,7 @@ int PVFS_sys_initialize(
     if (ret < 0)
     {
 	init_fail = FLOW_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,"Flow initialize failure.\n");
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Flow initialize failure.\n");
 	goto return_error;
     }
 
@@ -190,7 +190,7 @@ int PVFS_sys_initialize(
     if (ret < 0)
     {
 	init_fail = JOB_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,"Error initializing job interface: %s\n",strerror(-ret));
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error initializing job interface: %s\n",strerror(-ret));
 	goto return_error;
     }
 
@@ -198,7 +198,7 @@ int PVFS_sys_initialize(
     if(ret < 0)
     {
 	init_fail = JOB_CONTEXT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG, "job_open_context() failure.\n");
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG, "job_open_context() failure.\n");
 	goto return_error;
     }
 	
@@ -207,7 +207,7 @@ int PVFS_sys_initialize(
     if (ret < 0)
     {
 	init_fail = ACACHE_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,"Error initializing pinode cache\n");
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error initializing pinode cache\n");
 	goto return_error;	
     }
     PINT_acache_set_timeout(PINT_ACACHE_TIMEOUT * 1000);
@@ -217,7 +217,7 @@ int PVFS_sys_initialize(
     if (ret < 0)
     {
 	init_fail = NCACHE_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,"Error initializing directory cache\n");
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error initializing directory cache\n");
 	goto return_error;	
     }	
     PINT_ncache_set_timeout(PINT_NCACHE_TIMEOUT * 1000);
@@ -228,7 +228,7 @@ int PVFS_sys_initialize(
     if (ret < 0)
     {
 	init_fail = NCACHE_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,"Error in getting server "
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error in getting server "
                       "config parameters\n");
 	goto return_error;
     }
@@ -241,7 +241,7 @@ int PVFS_sys_initialize(
     if (!mt_config)
     {
 	init_fail = NCACHE_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,
                       "Failed to initialize mutex\n");
 	goto return_error;
     }
@@ -253,7 +253,7 @@ int PVFS_sys_initialize(
     if (ret < 0)
     {
 	init_fail = BUCKET_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,"Error in initializing "
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error in initializing "
                       "configuration management interface\n");
 	gen_mutex_unlock(mt_config);
 	goto return_error;
@@ -287,7 +287,8 @@ int PVFS_sys_initialize(
         if (PINT_handle_load_mapping(PINT_get_server_config_struct(), cur_fs))
         {
             init_fail = GET_CONFIG_INIT_FAIL;
-            gossip_ldebug(CLIENT_DEBUG,"Failed to load fs info into the "
+            gossip_ldebug(GOSSIP_CLIENT_DEBUG,
+                          "Failed to load fs info into the "
                           "PINT_handle interface.\n");
             gen_mutex_unlock(mt_config);
             goto return_error;

@@ -95,7 +95,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
     uint32_t trimmed_mask = 0;
     struct PVFS_server_resp fake_resp;
 
-    gossip_debug(CLIENT_DEBUG, "getattr_acache state: lookup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "getattr_acache state: lookup\n");
 
     /* check input parameters */
     assert(sm_p->pinode == NULL);
@@ -168,7 +168,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
             goto cache_miss;
 
           cache_hit:
-            gossip_debug(ACACHE_DEBUG, "acache: acache hit\n");
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit\n");
 
             /* build a fake response for completion */
             fake_resp.op = PVFS_SERV_GETATTR;
@@ -187,11 +187,11 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
             return 1;
         }
       cache_miss:
-        gossip_debug(ACACHE_DEBUG, "acache: invalid acache miss\n");
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalid acache miss\n");
         sm_p->acache_hit = 0;
         PINT_acache_release(sm_p->pinode);
     }
-    gossip_debug(ACACHE_DEBUG, "acache: clean acache miss\n");
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss\n");
     
     js_p->error_code = GETATTR_ACACHE_MISS;
     return 1;

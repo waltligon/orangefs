@@ -209,7 +209,7 @@ static int initialize_context(
     PINT_client_lookup_sm_ctx *ctx = NULL;
     PINT_client_lookup_sm_ctx *prev_ctx = NULL;
 
-    gossip_debug(LOOKUP_DEBUG, "initialize_context called\n");
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "initialize_context called\n");
 
     if (ctx_array && pathname && (current_ctx_index > -1))
     {
@@ -248,14 +248,15 @@ static int initialize_context(
             assert(cur_seg);
             memset(cur_seg, 0, sizeof(PINT_client_lookup_sm_segment));
 
-            gossip_debug(LOOKUP_DEBUG, " cur_seg_name[%d]: %s\n",
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, " cur_seg_name[%d]: %s\n",
                          cur_seg_index, cur_seg_name);
             if (strcmp(cur_seg_name,".") == 0)
             {
                 /* reset the count of consecutive dot dot segments */
                 num_consecutive_prev_ctx_dot_dots = 0;
 
-                gossip_debug(LOOKUP_DEBUG, " ignoring useless segment\n");
+                gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                             " ignoring useless segment\n");
                 continue;
             }
             else if (strcmp(cur_seg_name,"..") == 0)
@@ -273,7 +274,7 @@ static int initialize_context(
                     PINT_client_lookup_sm_segment *prev_ctx_prev_seg;
 
                     gossip_debug(
-                        LOOKUP_DEBUG, "  got a '..' segment that "
+                        GOSSIP_LOOKUP_DEBUG, "  got a '..' segment that "
                         "requires attention of the previous context\n");
 
                   init_next_prev_segment:
@@ -284,9 +285,9 @@ static int initialize_context(
                     */
                     if (prev_ctx_index < 0)
                     {
-                        gossip_debug(
-                            LOOKUP_DEBUG, "there are no more previous "
-                            "contexts available: failing lookup\n");
+                        gossip_debug(GOSSIP_LOOKUP_DEBUG, "there are no "
+                                     "more previous contexts available: "
+                                     "failing lookup\n");
                         return -PVFS_ENOENT;
                     }
 
@@ -296,7 +297,7 @@ static int initialize_context(
 
                     num_consecutive_prev_ctx_dot_dots++;
                     gossip_debug(
-                        LOOKUP_DEBUG, "num consecutive '..' "
+                        GOSSIP_LOOKUP_DEBUG, "num consecutive '..' "
                         "segments requiring the previous segment "
                         "is now %d\n", num_consecutive_prev_ctx_dot_dots);
 
@@ -320,7 +321,7 @@ static int initialize_context(
                             goto init_next_prev_segment;
                         }
                         gossip_debug(
-                            LOOKUP_DEBUG, "there are no more segments "
+                            GOSSIP_LOOKUP_DEBUG, "there are no more segments "
                             "in the previous context: failing lookup\n");
                         return -PVFS_ENOENT;
                     }
@@ -340,14 +341,14 @@ static int initialize_context(
                         prev_ctx_prev_seg->seg_starting_refn;
                     cur_seg_name = prev_ctx_prev_seg->seg_name;
                     gossip_debug(
-                        LOOKUP_DEBUG, "using previous segment: %s\n",
+                        GOSSIP_LOOKUP_DEBUG, "using previous segment: %s\n",
                         cur_seg_name);
 
                     cur_seg_index--;
                 }
                 else
                 {
-                    gossip_debug(LOOKUP_DEBUG, "  got a '..' segment\n");
+                    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  got a '..' segment\n");
                     cur_seg_index--;
                     continue;
                 }
@@ -380,13 +381,13 @@ static int initialize_context(
     /* DEBUGGING ONLY */
     {
         int i = 0;
-        gossip_debug(LOOKUP_DEBUG, "Processed context path is:\n");
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Processed context path is:\n");
         for(i = 0; i < cur_seg_index; i++)
         {
             assert(ctx->segments[i].seg_name);
-            gossip_debug(LOOKUP_DEBUG, "/%s", ctx->segments[i].seg_name);
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s", ctx->segments[i].seg_name);
         }
-        gossip_debug(LOOKUP_DEBUG, "\n");
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "\n");
     }
 #endif
 
@@ -403,7 +404,7 @@ static void finalize_context(
     int i = 0;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(LOOKUP_DEBUG, "finalize_context called\n");
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "finalize_context called\n");
 
     for(i = 0; i < MAX_LOOKUP_SEGMENTS; i++)
     {
@@ -412,7 +413,7 @@ static void finalize_context(
 
         if (cur_seg->seg_name)
         {
-            gossip_debug(LOOKUP_DEBUG, "Freeing segment %s\n",
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "Freeing segment %s\n",
                          cur_seg->seg_name);
             free(cur_seg->seg_name);
             cur_seg->seg_name = NULL;
@@ -436,7 +437,7 @@ int PVFS_sys_ref_lookup(
     PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
 
     if ((relative_pathname == NULL) || (resp == NULL))
     {
@@ -449,7 +450,7 @@ int PVFS_sys_ref_lookup(
         return -PVFS_ENOMEM;
     }
 
-    gossip_debug(CLIENT_DEBUG, "lookup got: %s (parent %Lu)\n",
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %Lu)\n",
                  relative_pathname, Lu(parent.handle));
 
     memset(sm_p, 0, sizeof(PINT_client_sm));
@@ -480,7 +481,7 @@ int PVFS_sys_ref_lookup(
     }
     assert(ret == 0);
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_ref_lookup completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup completed\n");
 
     error = sm_p->error_code;
 
@@ -536,7 +537,7 @@ int PVFS_sys_lookup(
 static int lookup_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "lookup state: lookup_init\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_init\n");
 
     assert(js_p->error_code == 0);
     return 1;
@@ -548,7 +549,7 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
     PINT_client_sm_msgpair_state *msg_p = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_lookup_setup_msgpair\n");
 
     js_p->error_code = 0;
@@ -594,7 +595,7 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
         cur_seg->seg_starting_refn.handle,
         PVFS_ATTR_COMMON_ALL);
 
-    gossip_debug(LOOKUP_DEBUG, "Looking up segment %s under handle %Lu\n",
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "Looking up segment %s under handle %Lu\n",
                  cur_seg->seg_name, Lu(cur_seg->seg_starting_refn.handle));
 
     /* fill in msgpair structure components */
@@ -615,7 +616,7 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
 static int lookup_segment_lookup_failure(PINT_client_sm *sm_p,
                                       job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_lookup_failure\n");
     return 1;
 }
@@ -625,7 +626,7 @@ static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
 {
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_verify_attr_present\n");
 
     cur_seg = GET_CURRENT_SEGMENT();
@@ -650,14 +651,14 @@ static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
         (cur_seg->seg_attr.objtype == PVFS_TYPE_SYMLINK))
     {
         /* if we don't have the attr, direct sm to fetch the attr */
-        gossip_debug(LOOKUP_DEBUG, " -- NO attrs for %s\n",
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, " -- NO attrs for %s\n",
                      cur_seg->seg_name);
 
         js_p->error_code = 1;
     }
     else
     {
-        gossip_debug(LOOKUP_DEBUG, " -- we have the attrs for %s\n",
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, " -- we have the attrs for %s\n",
                      cur_seg->seg_name);
 
         /* otherwise, continue to next state */
@@ -672,7 +673,7 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
     PINT_client_sm_msgpair_state *msg_p = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "lookup state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: "
                  "lookup_segment_getattr_setup_msgpair\n");
 
     js_p->error_code = 0;
@@ -694,7 +695,7 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
         cur_seg->seg_resolved_refn.handle,
         (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYMLNK_ALL));
 
-    gossip_debug(LOOKUP_DEBUG, "Doing GETATTR on resolved handle %Lu\n",
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "Doing GETATTR on resolved handle %Lu\n",
                  Lu(cur_seg->seg_resolved_refn.handle));
 
     msg_p->fs_id   = cur_seg->seg_resolved_refn.fs_id;
@@ -714,7 +715,7 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
 static int lookup_segment_getattr_failure(PINT_client_sm *sm_p,
                                           job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_getattr_failure\n");
     return 1;
 }
@@ -725,7 +726,7 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_check_attr_type\n");
 
     cur_seg = GET_CURRENT_SEGMENT();
@@ -753,8 +754,8 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
                 (sm_p->u.lookup.current_context == 0) &&
                 (sm_p->u.lookup.follow_link == PVFS2_LOOKUP_LINK_NO_FOLLOW))
             {
-                gossip_debug(LOOKUP_DEBUG, "** skipping final symlink "
-                             "resolution due to user request\n");
+                gossip_debug(GOSSIP_LOOKUP_DEBUG, "** skipping final "
+                             "symlink resolution due to user request\n");
                 js_p->error_code = LOOKUP_TYPE_LN_NO_FOLLOW;
             }
             else
@@ -772,7 +773,7 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
             }
             break;
         default:
-            gossip_debug(CLIENT_DEBUG, "cannot resolve object of "
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "cannot resolve object of "
                          "type %d\n", cur_seg->seg_attr.objtype);
             js_p->error_code = -PVFS_EINVAL;
     }
@@ -796,7 +797,7 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
       case.  the reason this is tricker is because the relative link
       may contain '.' and '..' characters (i.e. foo -> ../oldfoo)
     */
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_handle_relative_link\n");
 
     /* grab the current segment that has a relative link to be resolved */
@@ -847,7 +848,7 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
       new context and continuing along our completely linear state
       machine.
     */
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_handle_absolute_link\n");
 
     /* grab the current segment that has an absolute link to be resolved */
@@ -892,7 +893,7 @@ static int lookup_context_check_completion(PINT_client_sm *sm_p,
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_context_check_completion\n");
 
     cur_ctx = GET_CURRENT_CONTEXT();
@@ -984,7 +985,7 @@ static int lookup_cleanup(PINT_client_sm *sm_p,
 {
     int i = 0;
 
-    gossip_debug(CLIENT_DEBUG, "lookup state: lookup_cleanup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_cleanup\n");
 
     sm_p->error_code = js_p->error_code;
 
@@ -1007,7 +1008,7 @@ static int lookup_segment_lookup_comp_fn(
     PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "lookup_segment_lookup_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_segment_lookup_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
 
@@ -1057,13 +1058,13 @@ static int lookup_segment_getattr_comp_fn(
     PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "lookup_segment_getattr_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_segment_getattr_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
     if (resp_p->status != 0)
     {
-        gossip_debug(CLIENT_DEBUG, " getattr failed with code %d\n",
+        gossip_debug(GOSSIP_CLIENT_DEBUG, " getattr failed with code %d\n",
                      resp_p->status);
         return resp_p->status;
     }            

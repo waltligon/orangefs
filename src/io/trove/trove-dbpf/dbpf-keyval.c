@@ -44,7 +44,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
 
-    gossip_debug(DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Read "
+    gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Read "
                  "of %s\n", (char *)key_p->buffer);
 
     cache_elem = dbpf_attr_cache_elem_lookup(handle);
@@ -137,7 +137,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     ret = db_p->get(db_p, NULL, &key, &data, 0);
     if (ret != 0)
     {
-        gossip_debug(TROVE_DEBUG,
+        gossip_debug(GOSSIP_TROVE_DEBUG,
                      "warning: keyval read error (get() failed on "
                      "handle %Lu and key: %s)\n", Lu(op_p->handle),
                      (char *)key.data);
@@ -158,14 +158,15 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
           or if there is no associated cache_elem for this key
         */
         gossip_debug(
-            DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
+            GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
             "(key is %s)\n", (char *)op_p->u.k_read.key.buffer);
     }
     else
     {
         gossip_debug(
-            DBPF_ATTRCACHE_DEBUG,"*** cached keyval data retrieved "
-            "(key is %s)\n", (char *)op_p->u.k_read.key.buffer);
+            GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
+            "retrieved (key is %s)\n",
+            (char *)op_p->u.k_read.key.buffer);
     }
 
     if (op_p->flags & TROVE_SYNC)
@@ -282,7 +283,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
       now that the data is written to disk, update
       the cache if it's an attr keyval we manage
     */
-    gossip_debug(DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Write "
+    gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Write "
                  "of %s\n", (char *)op_p->u.k_write.key.buffer);
 
     cache_elem = dbpf_attr_cache_elem_lookup(op_p->handle);
@@ -660,12 +661,12 @@ return_ok:
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
 	if (ret == DB_NOTFOUND)
         {
-            gossip_debug(TROVE_DEBUG, "warning: keyval "
+            gossip_debug(GOSSIP_TROVE_DEBUG, "warning: keyval "
                          "iterate -- notfound\n");
         }
 	else if (ret != 0)
         {
-            gossip_debug(TROVE_DEBUG, "warning: keyval iterate "
+            gossip_debug(GOSSIP_TROVE_DEBUG, "warning: keyval iterate "
                          "-- some other failure @ recno\n");
         }
 	assert(recno != TROVE_ITERATE_START && recno != TROVE_ITERATE_END);

@@ -66,7 +66,7 @@ int PVFS_mgmt_statfs_list(
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_list entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list entered\n");
 
     if (count < 1 || !stat_array || !addr_array)
     {
@@ -90,7 +90,7 @@ int PVFS_mgmt_statfs_list(
     memset(sm_p->u.statfs_list.stat_array, 0,
            count*sizeof(struct PVFS_mgmt_server_stat));
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
                  "PINT_client_state_machine_post()\n");
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_STATFS_LIST);
@@ -104,7 +104,7 @@ int PVFS_mgmt_statfs_list(
 
     while(!sm_p->op_complete && ret == 0)
     {
-	gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
@@ -115,7 +115,7 @@ int PVFS_mgmt_statfs_list(
 	return(ret);
     }
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_list completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list completed\n");
 
     error = sm_p->error_code;
 
@@ -129,7 +129,7 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
     int i = 0;
     PINT_client_sm_msgpair_state *msg_p;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "statfs_list state: mgmt_statfs_list_setup_msgpair\n");
 
     sm_p->msgarray_count = sm_p->u.statfs_list.count;

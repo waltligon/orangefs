@@ -38,7 +38,7 @@ int main(int argc,char **argv)
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
-    if (PVFS_sys_initialize(mnt, NO_DEBUG, &resp_init))
+    if (PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &resp_init))
     {
         printf("Failed to initialize system interface\n");
         return ret;

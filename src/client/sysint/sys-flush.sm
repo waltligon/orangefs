@@ -23,25 +23,26 @@
  *
  * the input parameters are held in sm_p->u.flush
  *
- * we getattr on the passed-in handle.  if we are acting on a metafile object,
- * we will flush that metafile object and its associated datafiles, making use
- * of the sm_p->msgpairarray 
+ * we getattr on the passed-in handle.  if we are acting on a metafile
+ * object, we will flush that metafile object and its associated
+ * datafiles, making use of the sm_p->msgpairarray
  *
  *
  */
 
 extern job_context_id pint_client_sm_context;
 
-enum {
+enum
+{
     FLUSH_MUST_FLUSH_DATAFILE = 1
 };
 
 /* static function prototypes */
 static int flush_check_parameters(PINT_client_sm *sm_p,
-				    job_status_s *js_p);
+                                  job_status_s *js_p);
 
 static int flush_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
-						job_status_s *js_p);
+                                              job_status_s *js_p);
 
 static int flush_object_getattr_comp_fn(void *v_p,
 					struct PVFS_server_resp *resp_p,
@@ -54,20 +55,20 @@ static int flush_datafile_flush_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p);
 
 static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
-					    job_status_s *js_p);
+                                             job_status_s *js_p);
 
 static int flush_cleanup(PINT_client_sm *sm_p,
-			job_status_s *js_p);
+                         job_status_s *js_p);
 %%
 
 machine pvfs2_client_flush_sm(check_parameters,
-				object_getattr_setup_msgpair,
-				object_getattr_xfer_msgpair,
-				object_getattr_failure,
-				datafile_setup_msgpairarray,
-				datafile_xfer_msgpairarray,
-				datafile_flush_failure,
-				cleanup)
+                              object_getattr_setup_msgpair,
+                              object_getattr_xfer_msgpair,
+                              object_getattr_failure,
+                              datafile_setup_msgpairarray,
+                              datafile_xfer_msgpairarray,
+                              datafile_flush_failure,
+                              cleanup)
 {
     state check_parameters {
 	run flush_check_parameters;
@@ -132,7 +133,7 @@ int PVFS_sys_flush(PVFS_pinode_reference pinode_ref,
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_flush entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_flush entered\n");
 
     /* do parameter checking here, then assume things are ok below.
      * assert()s are still ok of course :).
@@ -181,7 +182,7 @@ static int flush_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -1;
 
-    gossip_debug(CLIENT_DEBUG, 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, 
 	    "(%p) flush state: getattr_setup_msgpair\n", 
 	    sm_p);
 
@@ -249,7 +250,7 @@ static int flush_object_getattr_comp_fn(void *v_p,
 	    assert(r_attr_p->mask & PVFS_ATTR_META_DFILES);
 	    assert(r_attr_p->u.meta.dfile_count > 0);
 	    
-	    gossip_debug(CLIENT_DEBUG,
+	    gossip_debug(GOSSIP_CLIENT_DEBUG,
 			 "flush_object_getattr_comp_fn: %d datafiles.\n",
 			 r_attr_p->u.meta.dfile_count); 
 	    /* save the datafile handles prior to freeing up the
@@ -295,7 +296,7 @@ static int flush_object_getattr_comp_fn(void *v_p,
 static int flush_object_getattr_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "(%p) flush state: object_getattr_failure\n",
 		 sm_p);
     assert(0);
@@ -316,7 +317,7 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     PINT_client_sm_msgpair_state *msg_p;
     int ret = -1;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 	    "(%p) flush state: datafile_setup_msgpairarray\n",
 	     sm_p);
 
@@ -338,7 +339,7 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     for (i=0; i< sm_p->u.flush.datafile_count; i++) {
 	msg_p = &sm_p->msgarray[i];
 
-	gossip_debug(CLIENT_DEBUG,
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"  datafile_flush: flushing %Lu\n",
 		Lu(sm_p->u.flush.datafile_handles[i]));
 	PINT_SERVREQ_FLUSH_FILL(msg_p->req,
@@ -355,7 +356,7 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     /* ... and also our flush request for the metafile handle */
     msg_p = &sm_p->msgarray[i];
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 	    "  datafile_flush: flushing %Lu\n",
 	    Lu(sm_p->u.flush.object_ref.handle));
     PINT_SERVREQ_FLUSH_FILL(msg_p->req,
@@ -383,7 +384,7 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 static int flush_datafile_flush_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "(%p) flush state: datafile_flush_failure\n",
 		 sm_p);
     return 1;
@@ -393,7 +394,8 @@ static int flush_datafile_flush_failure(PINT_client_sm *sm_p,
 static int flush_cleanup(PINT_client_sm *sm_p,
 			job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "(%p) flush state: flush_cleanup\n", sm_p);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "(%p) flush state: flush_cleanup\n", sm_p);
 
     if (js_p->error_code == 0) {
 	if (sm_p->msgarray != NULL) {

@@ -79,7 +79,7 @@ static void aio_progress_notification(sigval_t sig)
     assert(op_p);
 
     gossip_debug(
-        TROVE_DEBUG,"aio_progress_notification called "
+        GOSSIP_TROVE_DEBUG,"aio_progress_notification called "
         "with %p (handle %Lu)\n", sig.sival_ptr, Lu(op_p->handle));
 
     aiocb_p = op_p->u.b_rw_list.aiocb_array;
@@ -110,7 +110,8 @@ static void aio_progress_notification(sigval_t sig)
         {
             /* aio_return gets the return value of the individual op */
             ret = aio_return(&aiocb_p[i]);
-            gossip_debug(TROVE_DEBUG, "  aio_return() says %d\n", ret);
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "  aio_return() says %d\n", ret);
 
             /* WHAT DO WE DO WITH PARTIAL READ/WRITES??? */
 
@@ -125,7 +126,7 @@ static void aio_progress_notification(sigval_t sig)
 
     if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLPOSTED)
     {
-        gossip_debug(TROVE_DEBUG, " aio_progress_notification: "
+        gossip_debug(GOSSIP_TROVE_DEBUG, " aio_progress_notification: "
                      "op completed\n");
 
         /* TODO: HOW DO WE DO A SYNC IN HERE?  WE DON'T HAVE THE FD */
@@ -146,10 +147,10 @@ static void aio_progress_notification(sigval_t sig)
     }
     else
     {
-        gossip_debug(TROVE_DEBUG, "*** issuing more aio requests "
+        gossip_debug(GOSSIP_TROVE_DEBUG, "*** issuing more aio requests "
                      "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
-        /* no operations currently in progress; convert and post some more */
 
+        /* no operations currently in progress; convert and post some more */
         op_p->u.b_rw_list.aiocb_array_count  = AIOCB_ARRAY_SZ;
         op_p->u.b_rw_list.aiocb_array        = aiocb_p;
 
@@ -195,9 +196,6 @@ static void aio_progress_notification(sigval_t sig)
             aiocb_ptr_array[i] = &aiocb_p[i];
         }
 
-/*         gossip_debug(TROVE_DEBUG, "(2) calling lio_listio on q_op %p " */
-/*                      "w/count of %d (sigev is %p)\n", */
-/*                      cur_op,aiocb_inuse_count,&op_p->u.b_rw_list.sigev); */
         assert(cur_op == op_p->u.b_rw_list.sigev.sigev_value.sival_ptr);
 
         ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
@@ -215,8 +213,6 @@ static void aio_progress_notification(sigval_t sig)
 }
 #endif /* __PVFS2_TROVE_AIO_THREADED__ */
 
-/* dbpf_bstream_read_at()
- */
 static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
 				TROVE_handle handle,
 				void *buffer,
@@ -305,10 +301,10 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
     }
 
     dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
-    
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "read %d bytes.\n", ret);
+
     /* TODO: any way to return partial success? */
-    
-    gossip_debug(TROVE_DEBUG, "read %d bytes.\n", ret);
     return 1;
    
  return_error:
@@ -365,9 +361,6 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
     return 0;
 }
 
-/* dbpf_bstream_write_at_op_svc()
- *
- */
 static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
 {
     int ret, fd, got_fd = 0;
@@ -406,13 +399,11 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
 	    goto return_error;
 	}
     }
-
-    /* release the FD */
     dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
-    
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "wrote %d bytes.\n", ret);
+
     /* TODO: any way to return partial success? */
-    
-    gossip_debug(TROVE_DEBUG, "wrote %d bytes.\n", ret);
     return 1;
     
  return_error:
@@ -774,7 +765,8 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     if (ret < 0)
     {
 	dbpf_queued_op_free(q_op_p);
-	gossip_ldebug(SERVER_DEBUG, "warning: useless error value\n");
+	gossip_ldebug(GOSSIP_TROVE_DEBUG,
+                      "warning: useless error value\n");
 	return -1;
     }
     q_op_p->op.u.b_rw_list.fd = fd;
@@ -863,9 +855,6 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
         aiocb_ptr_array[i] = &aiocb_p[i];
     }
 
-/*     gossip_debug(TROVE_DEBUG, "(1) calling lio_listio on q_op %p " */
-/*                  "w/count of %d (sigev is %p)\n", */
-/*                  q_op_p,aiocb_inuse_count,&op_p->u.b_rw_list.sigev); */
     assert(q_op_p == op_p->u.b_rw_list.sigev.sigev_value.sival_ptr);
 
     if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLCONVERTED)
@@ -873,12 +862,10 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
         op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLPOSTED;
     }
 
-    /* update q_op structure's state */
     gen_mutex_lock(&q_op_p->mutex);
     q_op_p->op.state = OP_IN_SERVICE;
     gen_mutex_unlock(&q_op_p->mutex);
 
-    /* assign a proper operation id here */
     id_gen_fast_register(&q_op_p->op.id, q_op_p);
     *out_op_id_p = q_op_p->op.id;
     DBPF_EVENT_START(event_type, *out_op_id_p);
@@ -899,22 +886,25 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 
 /* dbpf_bstream_rw_list_op_svc()
  *
- * This function is used to service both read_list and write_list operations.
- * State maintained in the struct dbpf_op (pointed to by op_p) keeps up with
- * which type of operation this is via the "opcode" field in the b_rw_list member.
+ * This function is used to service both read_list and write_list
+ * operations.  State maintained in the struct dbpf_op (pointed to by
+ * op_p) keeps up with which type of operation this is via the
+ * "opcode" field in the b_rw_list member.
  *
- * NOTE: This method will NEVER be called if __PVFS2_TROVE_AIO_THREADED__ is
- * defined.  Instead, progress is monitored and pushed using
- * aio_progress_notification callback method.
+ * NOTE: This method will NEVER be called if
+ * __PVFS2_TROVE_AIO_THREADED__ is defined.  Instead, progress is
+ * monitored and pushed using aio_progress_notification callback
+ * method.
  *
  * Assumptions:
- * - FD has been retrieved from fdcache, is refct'd so it won't go away
+ * - FD has been retrieved from fdcache, is refct'd so it won't go
+ *   away
  * - lio_state in the op is valid
- * - opcode is set to LIO_READ or LIO_WRITE (corresponding to a read_list or
- *   write_list, respectively)
+ * - opcode is set to LIO_READ or LIO_WRITE (corresponding to a
+ *   read_list or write_list, respectively)
  *
- * This function is responsible for alloating and deallocating the space reserved
- * for the aiocb array.
+ * This function is responsible for alloating and deallocating the
+ * space reserved for the aiocb array.
  *
  * Outline:
  * - look to see if we have an aiocb array
@@ -926,7 +916,8 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
  *
  * - look to see if there are unfinished but posted operations
  *   - if there are, return 0
- *   - if not, and we are in the LIST_PROC_ALLPOSTED state, then we're done!
+ *   - if not, and we are in the LIST_PROC_ALLPOSTED state,
+ *     then we're done!
  *   - otherwise convert some more elements and post them.
  * 
  */
@@ -947,13 +938,16 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	    return -TROVE_ENOMEM;
 	}
 
-	/* initialize, paying particular attention to set the opcode to NOP.
+	/* initialize, paying particular attention to set the opcode
+	 * to NOP.
 	 *
-	 * Also, it appears to be important to do all this SIGEV_NONE stuff,
-	 * although some man pages seem to indicate that it is not.
+	 * Also, it appears to be important to do all this SIGEV_NONE
+	 * stuff, although some man pages seem to indicate that it is
+	 * not.
 	 */
 	memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
-	for (i=0; i < AIOCB_ARRAY_SZ; i++) {
+	for (i=0; i < AIOCB_ARRAY_SZ; i++)
+        {
 	    aiocb_p[i].aio_lio_opcode            = LIO_NOP;
 	    aiocb_p[i].aio_sigevent.sigev_notify = SIGEV_NONE;
 	}
@@ -963,31 +957,41 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	op_p->u.b_rw_list.list_proc_state    = LIST_PROC_INPROGRESS;
 	op_p->u.b_rw_list.sigev.sigev_notify = SIGEV_NONE;
     }
-    else {
+    else
+    {
 	/* operations potentially in progress */
 	aiocb_p = op_p->u.b_rw_list.aiocb_array;
 
 	/* check to see how we're progressing on previous operations */
-	for (i=0; i < op_p->u.b_rw_list.aiocb_array_count; i++) {
-	    if (aiocb_p[i].aio_lio_opcode == LIO_NOP) continue;
+	for (i=0; i < op_p->u.b_rw_list.aiocb_array_count; i++)
+        {
+	    if (aiocb_p[i].aio_lio_opcode == LIO_NOP)
+            {
+                continue;
+            }
 
-	    ret = aio_error(&aiocb_p[i]); /* gets the "errno" value of the individual op */
-	    if (ret == 0) {
-		/* this particular operation completed w/out error */
-
-		ret = aio_return(&aiocb_p[i]); /* gets the return value of the individual op */
-/* 		gossip_debug(TROVE_DEBUG, "   aio_return() says %d\n", ret); */
-		/* WHAT DO WE DO WITH PARTIAL READ/WRITES??? */
+            /* gets the "errno" value of the individual op */
+	    ret = aio_error(&aiocb_p[i]);
+	    if (ret == 0)
+            {
+		/*
+                  this particular operation completed w/out error.
+                  gets the return value of the individual op
+                */
+		ret = aio_return(&aiocb_p[i]);
 
 		/* mark as a NOP so we ignore it from now on */
 		aiocb_p[i].aio_lio_opcode = LIO_NOP;
 	    }
-	    else if (ret != EINPROGRESS) {
-		/* we got an error of some sort */
-		gossip_debug(TROVE_DEBUG, "error %d (%s) from aio_error/aio_return on block %d; skipping\n", ret, strerror(ret), i);
+	    else if (ret != EINPROGRESS)
+            {
+		gossip_debug(GOSSIP_TROVE_DEBUG, "error %d (%s) from "
+                             "aio_error/aio_return on block %d; "
+                             "skipping\n", ret, strerror(ret), i);
 		aiocb_p[i].aio_lio_opcode = LIO_NOP;
 	    }
-	    else {
+	    else
+            {
 		/* otherwise the operation is still in progress; skip it */
 		op_in_progress_count++;
 	    }
@@ -995,60 +999,75 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
     }
 
     /* if we're not done with the last set of operations, break out */
-    if (op_in_progress_count > 0) return 0;
-    else if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLPOSTED) {
-	/* we've posted everything, and it all completed, so we're done. */
-
-	/* free the aiocb array, release the FD, and mark the whole op as complete */
+    if (op_in_progress_count > 0) 
+    {
+        return 0;
+    }
+    else if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLPOSTED)
+    {
+	/*
+          we've posted everything, and it all completed, so we're
+          done.  free the aiocb array, release the FD, and mark the
+          whole op as complete
+        */
 	free(aiocb_p);
-
-	/* TODO: HOW DO WE DO A SYNC IN HERE?  WE DON'T HAVE THE FD */
 
 	dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
 	return 1;
     }
-    else {
-	/* no operations currently in progress; convert and post some more */
-
-	/* convert listio arguments into aiocb structures */
+    else
+    {
+	/*
+          no operations currently in progress; convert and post some
+          more
+        */
 	aiocb_inuse_count = op_p->u.b_rw_list.aiocb_array_count;
-	ret = dbpf_bstream_listio_convert(op_p->u.b_rw_list.fd,
-					  op_p->u.b_rw_list.opcode,
-					  op_p->u.b_rw_list.mem_offset_array,
-					  op_p->u.b_rw_list.mem_size_array,
-					  op_p->u.b_rw_list.mem_array_count,
-					  op_p->u.b_rw_list.stream_offset_array,
-					  op_p->u.b_rw_list.stream_size_array,
-					  op_p->u.b_rw_list.stream_array_count,
-					  aiocb_p,
-					  &aiocb_inuse_count,
-					  &op_p->u.b_rw_list.lio_state);
+	ret = dbpf_bstream_listio_convert(
+            op_p->u.b_rw_list.fd,
+            op_p->u.b_rw_list.opcode,
+            op_p->u.b_rw_list.mem_offset_array,
+            op_p->u.b_rw_list.mem_size_array,
+            op_p->u.b_rw_list.mem_array_count,
+            op_p->u.b_rw_list.stream_offset_array,
+            op_p->u.b_rw_list.stream_size_array,
+            op_p->u.b_rw_list.stream_array_count,
+            aiocb_p,
+            &aiocb_inuse_count,
+            &op_p->u.b_rw_list.lio_state);
+
+	if (ret == 1)
+        {
+            op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLCONVERTED;
+        }
 	
-	/* TODO: REMOVE THE ALLCONVERTED STATE ENTIRELY?  IS IT NEEDED? */
-	if (ret == 1) op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLCONVERTED;
-	
-	/* if we didn't use the entire array, mark the unused ones with LIO_NOPs */
-	for (i=aiocb_inuse_count; i < op_p->u.b_rw_list.aiocb_array_count; i++) {
-	    /* for simplicity just mark these as NOPs and we'll ignore them */
+	/*
+          if we didn't use the entire array, mark the unused ones with
+          LIO_NOPs
+        */
+	for (i = aiocb_inuse_count;
+             i < op_p->u.b_rw_list.aiocb_array_count; i++)
+        {
+	    /* just mark these as NOPs and we'll ignore them */
 	    aiocb_p[i].aio_lio_opcode = LIO_NOP;
 	}
 
-	for (i=0; i < aiocb_inuse_count; i++){
+	for (i=0; i < aiocb_inuse_count; i++)
+        {
 	    aiocb_ptr_array[i] = &aiocb_p[i];
 	}
 
-/* 	gossip_debug(TROVE_DEBUG, "calling lio_listio w/count of %d\n", aiocb_inuse_count); */
-
-	ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
-	if (ret != 0) {
+	ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
+                         aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
+	if (ret != 0)
+        {
 	    gossip_lerr("lio_listio() returned %d\n", ret);
 	    return -trove_errno_to_trove_error(errno);
 	}
 
-	/* TODO: JUST SET TO ALLPOSTED UP ABOVE? */
 	if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLCONVERTED)
+        {
 	    op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLPOSTED;
-
+        }
 	return 0;
     }
 }
@@ -1064,7 +1083,6 @@ struct TROVE_bstream_ops dbpf_bstream_ops =
     dbpf_bstream_write_list,
     dbpf_bstream_flush
 };
-
 
 /*
  * Local variables:

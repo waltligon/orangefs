@@ -53,7 +53,7 @@ int main(
 
     /* turn on gossip for the scheduler */
     gossip_enable_stderr();
-    gossip_set_debug_mask(1, REQ_SCHED_DEBUG);
+    gossip_set_debug_mask(1, GOSSIP_REQ_SCHED_DEBUG);
 
     /* initialize scheduler */
     ret = PINT_req_sched_initialize();

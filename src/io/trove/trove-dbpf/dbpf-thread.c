@@ -46,7 +46,7 @@ int dbpf_thread_initialize(void)
                              dbpf_thread_function, NULL);
         if (ret == 0)
         {
-            gossip_debug(TROVE_DEBUG,
+            gossip_debug(GOSSIP_TROVE_DEBUG,
                          "dbpf_thread_initialize: initialized\n");
         }
         else
@@ -55,12 +55,12 @@ int dbpf_thread_initialize(void)
             dbpf_op_incoming_cond_mutex = NULL;
             dbpf_thread_running = 0;
             gossip_debug(
-                TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
+                GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
         }
     }
     else
     {
-        gossip_debug(TROVE_DEBUG, "dbpf_thread_initialize: failed (2)\n");
+        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (2)\n");
     }
 #endif
     return ret;
@@ -77,7 +77,7 @@ int dbpf_thread_finalize(void)
     pthread_cond_destroy(&dbpf_op_incoming_cond);
     gen_mutex_destroy(dbpf_op_incoming_cond_mutex);
 #endif
-    gossip_debug(TROVE_DEBUG, "dbpf_thread_finalize: finalized\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_finalize: finalized\n");
     return ret;
 }
 
@@ -88,7 +88,7 @@ void *dbpf_thread_function(void *ptr)
     struct timeval base;
     struct timespec wait_time;
 
-    gossip_debug(TROVE_DEBUG, "dbpf_thread_function started\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function started\n");
 
     while(dbpf_thread_running)
     {
@@ -134,7 +134,7 @@ void *dbpf_thread_function(void *ptr)
         }
     }
 
-    gossip_debug(TROVE_DEBUG, "dbpf_thread_function ending\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function ending\n");
 #endif
     return ptr;
 }
@@ -190,8 +190,6 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
         else
         {
-/*             gossip_debug(TROVE_DEBUG, "op partially serviced; " */
-/*                          "re-queueing\n"); */
             dbpf_queued_op_queue(cur_op);
         }
 

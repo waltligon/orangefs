@@ -275,14 +275,14 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
             (a_p->objtype == PVFS_TYPE_METAFILE)  ||
             (a_p->objtype == PVFS_TYPE_SYMLINK)));
 
-    gossip_debug(SERVER_DEBUG, "  attrs = (owner = %d, group = %d, "
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  attrs = (owner = %d, group = %d, "
                  "perms = %o, type = %d)\n", a_p->owner, a_p->group,
 		 a_p->perms, a_p->objtype);
 
     /* if we hit a metafile, we are done */
     if (a_p->objtype == PVFS_TYPE_METAFILE)
     {
-	gossip_debug(SERVER_DEBUG, "  object is a metafile; halting "
+	gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a metafile; halting "
                      "lookup and sending response\n");
 	js_p->error_code = STATE_ENOTDIR;
 	return 1;
@@ -294,7 +294,7 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
     */
     if (a_p->objtype == PVFS_TYPE_SYMLINK)
     {
-	gossip_debug(SERVER_DEBUG, "  object is a symlink; halting "
+	gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a symlink; halting "
                      "lookup and sending response\n");
 	js_p->error_code = STATE_ENOTDIR;
 	return 1;
@@ -303,7 +303,7 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
     /* if we looked up all the segments, we are done */
     if (s_op->u.lookup.seg_nr == s_op->u.lookup.seg_ct)
     {
-	gossip_debug(SERVER_DEBUG, "  no more segments in path; "
+	gossip_debug(GOSSIP_SERVER_DEBUG, "  no more segments in path; "
                      "sending response\n");
 	js_p->error_code = STATE_NOMORESEGS;
 	return 1;
@@ -315,7 +315,7 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
                                    &s_op->u.lookup.segstate);
     assert(ret == 0);
 
-    gossip_debug(SERVER_DEBUG, "  object is a datafile; will be "
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a datafile; will be "
                  "looking for handle for segment %s in a bit\n",
 		 s_op->u.lookup.segp);
 
@@ -362,7 +362,7 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op,
             s_op->u.lookup.seg_nr-1];
     }
 
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  reading dirent handle value from handle 0x%Lx\n",
 		 Lu(handle));
 
@@ -409,7 +409,7 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
 
     PINT_STATE_DEBUG("read_directory_entry");
 
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  reading from dirent handle = 0x%Lx, segment = %s\n",
 		 Lu(s_op->u.lookup.dirent_handle),
 		 s_op->u.lookup.segp);
@@ -476,7 +476,7 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
         js_p->error_code = -PVFS_ENOENT;
     }
 
-    gossip_debug(SERVER_DEBUG, "  sending '%s' response with %d "
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  sending '%s' response with %d "
                  "handle(s) and %d attr(s)\n",
                  (js_p->error_code ? "error" : "success"),
                  s_op->resp.u.lookup_path.handle_count,

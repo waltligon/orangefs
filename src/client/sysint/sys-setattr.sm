@@ -102,7 +102,7 @@ int PVFS_sys_setattr(
     PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_setattr entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr entered\n");
 
     /*
       make sure the caller didn't set invalid mask bits;
@@ -127,7 +127,7 @@ int PVFS_sys_setattr(
     sm_p->u.setattr.refn = pinode_refn;
     sm_p->u.setattr.sys_attr = &attr;
 
-    gossip_debug(CLIENT_DEBUG, "Doing setattr on handle %Lu "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing setattr on handle %Lu "
                  "on fs %d\n", Lu(pinode_refn.handle),
                  pinode_refn.fs_id);
 
@@ -137,14 +137,14 @@ int PVFS_sys_setattr(
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0)
     {
-	gossip_debug(CLIENT_DEBUG, "PVFS_sys_setattr calling "
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr calling "
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
 
     assert(ret == 0);
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_setattr completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr completed\n");
 
     /* save our return value */
     error = sm_p->error_code;
@@ -159,7 +159,7 @@ int PVFS_sys_setattr(
 static int setattr_init(PINT_client_sm *sm_p,
                         job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "setattr state: init\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: init\n");
 
     assert(js_p->error_code == 0);
 
@@ -174,7 +174,7 @@ static int setattr_msg_comp_fn(void *v_p,
 {
 /*     PINT_client_sm *sm_p = (PINT_client_sm *) v_p; */
     
-    gossip_debug(CLIENT_DEBUG, "setattr_msg_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr_msg_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
 
@@ -194,13 +194,13 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
     PVFS_object_attr *attr = NULL;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "setattr state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: "
                  "setattr_msg_setup_msgpair\n");
 
     /* clear error field in job */
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG," setattr: posting setattr req\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG," setattr: posting setattr req\n");
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -263,14 +263,15 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
 static int setattr_msg_failure(PINT_client_sm *sm_p,
                                job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "setattr state: setattr_msg_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "setattr state: setattr_msg_failure\n");
     return 1;
 }
 
 static int setattr_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "setattr state: cleanup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: cleanup\n");
 
     sm_p->error_code = js_p->error_code;
 

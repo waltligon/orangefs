@@ -131,7 +131,7 @@ int PVFS_sys_mkdir(
     PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_mkdir entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir entered\n");
 
     /* parameter checking goes here.  assume everything from the user
      * is ok past this point.
@@ -166,7 +166,7 @@ int PVFS_sys_mkdir(
     sm_p->u.mkdir.sys_attr = &attr;
     sm_p->u.mkdir.mkdir_resp = resp;
 
-    gossip_debug(CLIENT_DEBUG, "Creating directory named %s under "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s under "
                  "parent handle %Lu on fs %d\n", object_name,
                  Lu(parent_refn.handle), parent_refn.fs_id);
 
@@ -176,13 +176,13 @@ int PVFS_sys_mkdir(
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0)
     {
-	gossip_debug(CLIENT_DEBUG, "PVFS_sys_mkdir calling "
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir calling "
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
     assert(ret == 0);
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_mkdir completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir completed\n");
 
     /* save our return value */
     error = sm_p->error_code;
@@ -197,7 +197,7 @@ int PVFS_sys_mkdir(
 static int mkdir_init(PINT_client_sm *sm_p,
                       job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "mkdir state: init\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: init\n");
 
     assert(js_p->error_code == 0);
 
@@ -220,7 +220,7 @@ static int mkdir_msg_comp_fn(void *v_p,
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
-    gossip_debug(CLIENT_DEBUG, "mkdir_msg_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_msg_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_MKDIR);
 
@@ -235,8 +235,9 @@ static int mkdir_msg_comp_fn(void *v_p,
     /* otherwise, just stash the newly created meta handle */
     sm_p->u.mkdir.metafile_handle = resp_p->u.mkdir.handle;
 
-    gossip_debug(CLIENT_DEBUG, "*** Got newly created dir handle %Lu\n",
-                 Lu(sm_p->u.mkdir.metafile_handle));
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "*** Got newly created dir handle %Lu\n",
+        Lu(sm_p->u.mkdir.metafile_handle));
 
     return 0;
 }
@@ -252,7 +253,7 @@ static int mkdir_crdirent_comp_fn(void *v_p,
 {
 /*     PINT_client_sm *sm_p = (PINT_client_sm *) v_p; */
     
-    gossip_debug(CLIENT_DEBUG, "mkdir_crdirent_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_crdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
 
@@ -273,12 +274,12 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "mkdir state: mkdir_msg_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_msg_setup_msgpair\n");
 
     /* clear error field in job */
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG," mkdir: posting mkdir req\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting mkdir req\n");
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -310,7 +311,7 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
 static int mkdir_msg_failure(PINT_client_sm *sm_p,
                              job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "mkdir state: mkdir_msg_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_msg_failure\n");
     return 1;
 }
 
@@ -320,12 +321,12 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     int ret = -1;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "mkdir state: crdirent_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: crdirent_setup_msgpair\n");
 
     /* clear error field in job */
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG," mkdir: posting crdirent req\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting crdirent req\n");
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -356,11 +357,11 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 static int mkdir_crdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "mkdir state: crdirent_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: crdirent_failure\n");
 
     if (js_p->error_code == -PVFS_EEXIST)
     {
-        gossip_debug(CLIENT_DEBUG, "mkdir crdirent failed: "
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir crdirent failed: "
                      "dirent already exists!\n");
     }
     return 1;
@@ -369,7 +370,7 @@ static int mkdir_crdirent_failure(PINT_client_sm *sm_p,
 static int mkdir_cleanup(PINT_client_sm *sm_p,
                          job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "mkdir state: cleanup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: cleanup\n");
 
     sm_p->error_code = js_p->error_code;
 

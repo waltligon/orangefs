@@ -44,7 +44,8 @@ static int test_system_init(int nullCase)
 	/* init the system interface */
 	if (nullCase == 2)
 	{
-	    ret = PVFS_sys_initialize(pvfs_helper.mnt, CLIENT_DEBUG, NULL);
+	    ret = PVFS_sys_initialize(pvfs_helper.mnt,
+                                      GOSSIP_CLIENT_DEBUG, NULL);
 	}
 	if (ret > -1)
 	{

@@ -266,8 +266,9 @@ static int dbpf_initialize(char *stoname,
     sto_p = dbpf_storage_lookup(stoname, &error);
     if (sto_p == NULL)
     {
-        gossip_debug(TROVE_DEBUG, "dbpf_initialize failure: storage "
-                     "lookup failed\n");
+        gossip_debug(
+            GOSSIP_TROVE_DEBUG, "dbpf_initialize failure: storage "
+            "lookup failed\n");
         return -1;
     }
     
@@ -381,7 +382,7 @@ static int dbpf_storage_remove(char *stoname,
     char path_name[PATH_MAX];
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
-    gossip_debug(TROVE_DEBUG, "Removing %s\n", path_name);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
 
     if (unlink(path_name) != 0)
     {
@@ -389,7 +390,7 @@ static int dbpf_storage_remove(char *stoname,
     }
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
-    gossip_debug(TROVE_DEBUG, "Removing %s\n", path_name);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
 
     if (unlink(path_name) != 0)
     {
@@ -403,7 +404,8 @@ static int dbpf_storage_remove(char *stoname,
         goto storage_remove_failure;
     }
 
-    gossip_debug(TROVE_DEBUG, "databases for storage space removed.\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG,
+                 "databases for storage space removed.\n");
     return 1;
 
   storage_remove_failure:
@@ -453,7 +455,7 @@ static int dbpf_collection_create(char *collname,
     ret = sto_p->coll_db->get(sto_p->coll_db, NULL, &key, &data, 0);
     if (ret != DB_NOTFOUND)
     {
-	gossip_debug(TROVE_DEBUG, "coll %s already exists with "
+	gossip_debug(GOSSIP_TROVE_DEBUG, "coll %s already exists with "
                      "coll_id %d, len = %d.\n",
                      collname, db_data.coll_id, data.size);
 	return -1;
@@ -546,7 +548,7 @@ static int dbpf_collection_create(char *collname,
     }
 
     gossip_debug(
-        TROVE_DEBUG, "wrote trove-dbpf version %s to "
+        GOSSIP_TROVE_DEBUG, "wrote trove-dbpf version %s to "
         "collection attribute database\n", TROVE_DBPF_VERSION_VALUE);
 
     /* store initial handle value */
@@ -682,10 +684,6 @@ static int dbpf_collection_remove(char *collname,
                 }
                 snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
                          current_dirent->d_name);
-#if 0
-                gossip_debug(TROVE_DEBUG, "Removing bstream entry %s\n",
-                             tmp_path);
-#endif
                 assert(current_dirent->d_type == DT_REG);
                 if (unlink(tmp_path) != 0)
                 {
@@ -718,11 +716,6 @@ static int dbpf_collection_remove(char *collname,
                 }
                 snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
                          current_dirent->d_name);
-
-#if 0
-                gossip_debug(TROVE_DEBUG, "Removing keyval entry %s\n",
-                             tmp_path);
-#endif
                 assert(current_dirent->d_type == DT_REG);
                 if (unlink(tmp_path) != 0)
                 {
@@ -888,12 +881,12 @@ return_ok:
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
 	if (ret == DB_NOTFOUND)
         {
-            gossip_debug(
-                TROVE_DEBUG, "warning: keyval iterate -- notfound\n");
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "warning: keyval iterate -- notfound\n");
         }
 	else if (ret != 0)
         {
-            gossip_debug(TROVE_DEBUG, "warning: keyval iterate -- "
+            gossip_debug(GOSSIP_TROVE_DEBUG, "warning: keyval iterate -- "
                          "some other failure @ recno\n");
         }
 
@@ -964,7 +957,7 @@ static int dbpf_collection_lookup(char *collname,
     {
 	/* really an error of some kind */
 	sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
-	gossip_debug(TROVE_DEBUG, "lookup got error\n");
+	gossip_debug(GOSSIP_TROVE_DEBUG, "lookup got error\n");
 	return -1;
     }
 
@@ -1034,7 +1027,7 @@ static int dbpf_collection_lookup(char *collname,
         return -1;
     }
 
-    gossip_debug(TROVE_DEBUG, "collection lookup: version is %s\n",
+    gossip_debug(GOSSIP_TROVE_DEBUG, "collection lookup: version is %s\n",
                  trove_dbpf_version);
 
     if (strcmp(trove_dbpf_version, TROVE_DBPF_VERSION_VALUE) != 0)
@@ -1218,9 +1211,13 @@ static int dbpf_db_create(char *dbname)
     }
     
 #if 0
-    /* store the time string -- removed because it is dirtying up the space */
+    /*
+      store the time string -- removed because it is dirtying up the
+      space
+    */
     if ((ret = db_p->put(db_p, NULL, &key, &data, 0)) == 0)
-	gossip_debug(TROVE_DEBUG, "db: %s: key stored.\n", (char *)key.data);
+	gossip_debug(GOSSIP_TROVE_DEBUG, "db: %s: key stored.\n",
+                     (char *)key.data);
     else {
 	db_p->err(db_p, ret, "DB->put");
 	return -1;

@@ -105,7 +105,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	ret = BMI_addr_lookup(&serv_addr, mntent_p->pvfs_config_server);
 	if (ret < 0)
 	{
-            gossip_ldebug(CLIENT_DEBUG,"Failed to resolve BMI "
+            gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Failed to resolve BMI "
                           "address %s\n",mntent_p->pvfs_config_server);
 	    continue;
 	}
@@ -117,7 +117,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	serv_req.op = PVFS_SERV_GETCONFIG;
 	serv_req.credentials = creds;
 
-	gossip_ldebug(CLIENT_DEBUG,"asked for fs name = %s\n",
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"asked for fs name = %s\n",
                       mntent_p->pvfs_fs_name);
 
 	/* send the request and receive an acknowledgment */
@@ -143,7 +143,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 
         if (server_parse_config(config,&(serv_resp->u.getconfig)))
         {
-            gossip_ldebug(CLIENT_DEBUG,"Failed to getconfig from host "
+            gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Failed to getconfig from host "
                           "%s\n",mntent_p->pvfs_config_server);
 
             /* let go of any resources consumed by PINT_send_req() */
@@ -167,7 +167,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
         cur_fs = PINT_config_find_fs_name(config, mntent_p->pvfs_fs_name);
         if (!cur_fs)
         {
-            gossip_ldebug(CLIENT_DEBUG,"Warning:  Cannot retrieve "
+            gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Warning:  Cannot retrieve "
                           "information about pvfstab entry %s\n",
                           mntent_p->pvfs_config_server);
 
@@ -176,7 +176,8 @@ int PINT_server_get_config(struct server_configuration_s *config,
               the config file for parsing and get a failure; make
               a note of that possibility here
             */
-            gossip_ldebug(CLIENT_DEBUG,"If you're sure that your pvfstab "
+            gossip_ldebug(GOSSIP_CLIENT_DEBUG,
+                          "If you're sure that your pvfstab "
                           "file contains valid information, please make "
                           "sure that you are not out of disk space\n");
             continue;

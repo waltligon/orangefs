@@ -25,12 +25,12 @@ static char *dir_ent_string = "dir_ent";
 static char *root_handle_string = "root_handle";
 
 
-#define mkspace_print(v, format, f...)       \
-do {                                         \
- if (v == PVFS2_MKSPACE_GOSSIP_VERBOSE)      \
-   gossip_debug(SERVER_DEBUG, format, ##f);  \
- else if (v == PVFS2_MKSPACE_STDERR_VERBOSE) \
-   fprintf(stderr,format, ##f);              \
+#define mkspace_print(v, format, f...)              \
+do {                                                \
+ if (v == PVFS2_MKSPACE_GOSSIP_VERBOSE)             \
+   gossip_debug(GOSSIP_SERVER_DEBUG, format, ##f);  \
+ else if (v == PVFS2_MKSPACE_STDERR_VERBOSE)        \
+   fprintf(stderr,format, ##f);                     \
 } while(0)
 
 
@@ -129,8 +129,8 @@ int pvfs2_mkspace(
 
     if (verbose)
     {
-        gossip_debug(
-            SERVER_DEBUG,"info: created collection '%s'.\n",collection);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "info: created collection '%s'.\n",collection);
     }
 
     ret = trove_open_context(coll_id, &trove_context);
@@ -365,10 +365,10 @@ int pvfs2_rmspace(
         ret = trove_storage_remove(storage_space, NULL, &op_id);
         if (verbose)
         {
-            gossip_debug(
-                SERVER_DEBUG, "PVFS2 Storage Space %s removed %s\n",
-                storage_space,
-                ((ret != -1) ? "successfully" : "with errors"));
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "PVFS2 Storage Space %s removed %s\n",
+                         storage_space,
+                         ((ret != -1) ? "successfully" : "with errors"));
         }
 
         /*

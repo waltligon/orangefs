@@ -245,7 +245,7 @@ int PVFS_sys_remove(char *object_name,
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_remove entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove entered\n");
 
     /* do parameter checking here, then assume things are ok below.
      * assert()s are still ok of course :).
@@ -262,27 +262,28 @@ int PVFS_sys_remove(char *object_name,
     sm_p->u.remove.parent_ref  = parent_ref;
     sm_p->u.remove.stored_error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG, "Trying to remove entry %s under %Lu,%d\n",
-                 object_name, Lu(parent_ref.handle), parent_ref.fs_id);
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "Trying to remove entry %s under %Lu,%d\n",
+        object_name, Lu(parent_ref.handle), parent_ref.fs_id);
 
-
-    gossip_debug(CLIENT_DEBUG,
-		 "PVFS_sys_remove calling PINT_client_state_machine_post()\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove calling "
+                 "PINT_client_state_machine_post()\n");
 
     /* do something to kick off processing */
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_REMOVE);
     assert(ret == 0);
 
     /* while !done call progress function */
-    while (!sm_p->op_complete && ret == 0) {
-	gossip_debug(CLIENT_DEBUG,
-		     "PVFS_sys_remove calling PINT_client_state_machine_test()\n");
+    while (!sm_p->op_complete && ret == 0)
+    {
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove calling "
+                     "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
 
     assert(ret == 0);
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_remove completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove completed\n");
 
     /* save our return value */
     error = (sm_p->u.remove.stored_error_code ?
@@ -303,12 +304,10 @@ int PVFS_sys_remove(char *object_name,
 
 /****************************************************************/
 
-/* remove_init()
- */
 static int remove_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "remove state: init\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: init\n");
 
     assert(js_p->error_code == 0); /* sanity check */
 
@@ -317,17 +316,14 @@ static int remove_init(PINT_client_sm *sm_p,
     return 1;
 }
 
-/* remove_getattr_post_msgpair()
- *
- */
 static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
     int ret = -1;
 
-    gossip_debug(CLIENT_DEBUG, "remove state: getattr_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: getattr_setup_msgpair\n");
 
-    /* parameter range checks */
     assert(sm_p->u.remove.object_ref.fs_id != 0);
     assert(sm_p->u.remove.object_ref.handle != 0);
 
@@ -398,9 +394,10 @@ static int remove_getattr_comp_fn(void *v_p,
 	    assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_META_DFILES);
 	    assert(resp_p->u.getattr.attr.u.meta.dfile_count > 0);
 	    
-	    gossip_debug(CLIENT_DEBUG,
-			 "remove_getattr_comp_fn: %d datafiles to remove too.\n",
-			 resp_p->u.getattr.attr.u.meta.dfile_count);
+	    gossip_debug(
+                GOSSIP_CLIENT_DEBUG,
+                "remove_getattr_comp_fn: %d datafiles to remove too.\n",
+                resp_p->u.getattr.attr.u.meta.dfile_count);
 
 	    /* save the datafile handles prior to freeing up the
 	     * buffers we used for messages.  we could keep them around
@@ -408,14 +405,16 @@ static int remove_getattr_comp_fn(void *v_p,
 	     * it is likely that this stuff will be stuck in the acache
 	     * anyway, so we'll be able to just reference it from there.
 	     */
-	    sm_p->u.remove.datafile_handles = (PVFS_handle *) malloc(resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle));
-	    if (sm_p->u.remove.datafile_handles == NULL) {
-		assert(0);
-	    }
-	    sm_p->u.remove.datafile_count = resp_p->u.getattr.attr.u.meta.dfile_count;
+	    sm_p->u.remove.datafile_handles = (PVFS_handle *)
+                malloc(resp_p->u.getattr.attr.u.meta.dfile_count *
+                       sizeof(PVFS_handle));
+            assert(sm_p->u.remove.datafile_handles);
+	    sm_p->u.remove.datafile_count =
+                resp_p->u.getattr.attr.u.meta.dfile_count;
 	    memcpy(sm_p->u.remove.datafile_handles,
 		   resp_p->u.getattr.attr.u.meta.dfile_array,
-		   resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle));
+		   resp_p->u.getattr.attr.u.meta.dfile_count *
+                   sizeof(PVFS_handle));
 
 	    return REMOVE_MUST_REMOVE_DATAFILES;
 	case PVFS_TYPE_DIRECTORY:
@@ -427,10 +426,9 @@ static int remove_getattr_comp_fn(void *v_p,
 	case PVFS_TYPE_DIRDATA:
 	    /* fall through */
 	default:
-	    gossip_err("error: remove_getattr_comp_fn: unhandled object type\n");
-	    assert(0);
-    } /* end of switch() */
-
+	    gossip_err("error: remove_getattr_comp_fn: unhandled "
+                       "object type\n");
+    }
     return -PVFS_EINVAL; /* should not get here */
 }
 
@@ -439,11 +437,12 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -1;
 
-    /* NOTE:  we remove the dirent first because this gets the
-     * object out of the system fastest.
+    /* NOTE: we remove the dirent first because this gets the object
+     * out of the system fastest.
      */
 
-    gossip_debug(CLIENT_DEBUG, "remove state: rmdirent_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: rmdirent_setup_msgpair\n");
 
     /* fill in rmdirent request */
     PINT_SERVREQ_RMDIRENT_FILL(sm_p->msgpair.req,
@@ -473,7 +472,8 @@ static int remove_check_dir_contents_comp_fn(
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 
-    gossip_debug(CLIENT_DEBUG, "remove_check_dir_contents_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove_check_dir_contents_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_READDIR);
 
@@ -484,7 +484,7 @@ static int remove_check_dir_contents_comp_fn(
 
     if (resp_p->u.readdir.dirent_count > 0)
     {
-        gossip_debug(CLIENT_DEBUG, "Directory is not empty\n");
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Directory is not empty\n");
         sm_p->u.remove.stored_error_code = -PVFS_ENOTEMPTY;
         resp_p->status = -PVFS_ENOTEMPTY;
         return resp_p->status;
@@ -499,7 +499,8 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG, "remove state: crdirent_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: crdirent_setup_msgpair\n");
 
     PINT_SERVREQ_CRDIRENT_FILL(sm_p->msgpair.req,
 			       *sm_p->cred_p,
@@ -530,7 +531,7 @@ static int remove_rmdirent_comp_fn(void *v_p,
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 
-    assert(resp_p->op == PVFS_SERV_RMDIRENT); /* sanity check */
+    assert(resp_p->op == PVFS_SERV_RMDIRENT);
 
     /* don't attempt to parse the response if there was an error */
     if (resp_p->status != 0) {
@@ -546,9 +547,10 @@ static int remove_rmdirent_comp_fn(void *v_p,
     sm_p->u.remove.object_ref.handle = resp_p->u.rmdirent.entry_handle;
     sm_p->u.remove.object_ref.fs_id  = sm_p->u.remove.parent_ref.fs_id;
 
-    gossip_debug(CLIENT_DEBUG,
-		 "  remove_rmdirent_comp_fn: metafile handle = 0x%08Lx\n",
-		 Lu(sm_p->u.remove.object_ref.handle));
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG,
+        "  remove_rmdirent_comp_fn: metafile handle = %Lu\n",
+        Lu(sm_p->u.remove.object_ref.handle));
 
     return 0;
 }
@@ -566,7 +568,7 @@ static int remove_crdirent_comp_fn(void *v_p,
 	return resp_p->status;
     }
 
-    gossip_debug(CLIENT_DEBUG, "  remove_crdirent_comp_fn: OK\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "  remove_crdirent_comp_fn: OK\n");
 
     return 0;
 }
@@ -579,7 +581,7 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG, "remove state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: "
                  "remove_check_dir_contents_setup_msgpair\n");
 
     msg_p = &sm_p->msgpair;
@@ -623,7 +625,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     /* clear error field in job */
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: datafile_remove_setup_msgpair\n");
 
     /* do parameter checking */
@@ -641,8 +643,8 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     {
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
-	gossip_debug(CLIENT_DEBUG,
-		     "  datafile_remove: removing handle 0x%08Lx\n",
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
+		     "  datafile_remove: removing handle %Lu\n",
 		     Lu(sm_p->u.remove.datafile_handles[i]));
 
 	PINT_SERVREQ_REMOVE_FILL(msg_p->req,
@@ -672,7 +674,8 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -1;
 
-    gossip_debug(CLIENT_DEBUG, "remove state: object_remove_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: object_remove_setup_msgpair\n");
 
     /* fill in remove request */
     PINT_SERVREQ_REMOVE_FILL(sm_p->msgpair.req,
@@ -701,7 +704,7 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
 static int remove_cleanup(PINT_client_sm *sm_p,
 			  job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "remove state: cleanup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: cleanup\n");
 
     /* store enough information in the sm structure that the caller
      * can tell what happened.
@@ -727,7 +730,7 @@ static int remove_cleanup(PINT_client_sm *sm_p,
 static int remove_getattr_failure(PINT_client_sm *sm_p,
 				  job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "remove state: getattr_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: getattr_failure\n");
 
     /* TODO: unpost operations that are still in progress, once we can. */
 
@@ -748,7 +751,7 @@ static int remove_getattr_failure(PINT_client_sm *sm_p,
 static int remove_check_dir_contents_failure(PINT_client_sm *sm_p,
                                              job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: remove_check_dir_contents_failure\n");
     return 1;
 }
@@ -756,28 +759,30 @@ static int remove_check_dir_contents_failure(PINT_client_sm *sm_p,
 static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
 					  job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "remove state: datafile_remove_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: datafile_remove_failure\n");
     return 1;
 }
 
 static int remove_rmdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "remove state: rmdirent_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: rmdirent_failure\n");
     return 1;
 }
 
 static int remove_crdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "remove state: crdirent_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: crdirent_failure\n");
     return 1;
 }
 
 static int remove_object_remove_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "remove state: object_remove_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: object_remove_failure\n");
     return 1;
 }
 

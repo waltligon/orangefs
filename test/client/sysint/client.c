@@ -37,7 +37,7 @@ int main(int argc,char **argv)
 	int ret = -1,i = 0;
 	pvfs_mntlist mnt = {0,NULL};
 	PVFS_fs_id fs_id;
-	char* name;
+	char* name = "/";
 	PVFS_credentials credentials;
 	char* entry_name;
 	PVFS_pinode_reference parent_refn;
@@ -53,23 +53,14 @@ int main(int argc,char **argv)
 
 	printf("creating a file named %s\n", filename);
 
-/*
-	if (argc > 1)
-	{
-		sscanf(argv[1], "%d", (int*)&cmd_handle);
-		printf("using handle %d\n",(int) cmd_handle);
-	}
-*/
-
-	/* Parse PVFStab */
 	ret = PVFS_util_parse_pvfstab(&mnt);
 	if (ret < 0)
 	{
 		printf("Parsing error\n");
 		return(-1);
 	}
-	/*Init the system interface*/
-	ret = PVFS_sys_initialize(mnt, NO_DEBUG, &resp_init);
+
+	ret = PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &resp_init);
 	if(ret < 0)
 	{
 		printf("PVFS_sys_initialize() failure. = %d\n", ret);
@@ -78,9 +69,6 @@ int main(int argc,char **argv)
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the root handle */
-	name = malloc(2);/*null terminator included*/
-	name[0] = '/';
-	name[1] = '\0';
 	fs_id = resp_init.fsid_list[0];
 	printf("looking up the root handle for fsid = %d\n", fs_id);
 	ret = PVFS_sys_lookup(fs_id, name, credentials,

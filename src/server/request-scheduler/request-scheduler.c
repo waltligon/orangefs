@@ -481,7 +481,7 @@ int PINT_req_sched_post(
 	{
 	    tmp_element->state = REQ_SCHEDULED;
 	    ret = 1;
-	    gossip_debug(REQ_SCHED_DEBUG,
+	    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 			 "REQ SCHED allowing concurrent I/O, handle: %ld\n",
 			 (long) handle);
 	}
@@ -496,13 +496,13 @@ int PINT_req_sched_post(
     tmp_element->list_head = tmp_list;
     qlist_add_tail(&(tmp_element->list_link), &(tmp_list->req_list));
 
-    gossip_debug(REQ_SCHED_DEBUG,
+    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		 "REQ SCHED POSTING, handle: %ld, queue_element: %p\n",
 		 (long) handle, tmp_element);
 
     if (ret == 1)
     {
-	gossip_debug(REQ_SCHED_DEBUG,
+	gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		     "REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n",
 		     (long) handle, tmp_element);
     }
@@ -584,7 +584,7 @@ int PINT_req_sched_post_timer(
 	qlist_add_tail(&tmp_element->list_link, &timer_queue);
     }
 
-    gossip_debug(REQ_SCHED_DEBUG,
+    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		 "REQ SCHED POSTING, queue_element: %p\n",
 		 tmp_element);
     return(0);
@@ -676,7 +676,7 @@ int PINT_req_sched_unpost(
 			if (next_element
 			    && next_element->req_ptr->op == PVFS_SERV_IO)
 			{
-			    gossip_debug(REQ_SCHED_DEBUG,
+			    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 					 "REQ SCHED allowing concurrent I/O, handle: %ld\n",
 					 (long) next_element->handle);
 			    next_element->state = REQ_READY_TO_SCHEDULE;
@@ -779,7 +779,7 @@ int PINT_req_sched_release(
 				    list_link);
 		    if (next_element && next_element->req_ptr->op == PVFS_SERV_IO)
 		    {
-			gossip_debug(REQ_SCHED_DEBUG,
+			gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 				     "REQ SCHED allowing concurrent I/O, handle: %ld\n",
 				     (long) next_element->handle);
 			next_element->state = REQ_READY_TO_SCHEDULE;
@@ -791,7 +791,7 @@ int PINT_req_sched_release(
 	sched_count--;
     }
 
-    gossip_debug(REQ_SCHED_DEBUG,
+    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		 "REQ SCHED RELEASING, handle: %ld, queue_element: %p\n",
 		 (long) tmp_element->handle, tmp_element);
 
@@ -856,7 +856,7 @@ int PINT_req_sched_test(
 	}
 	*out_count_p = 1;
 	*out_status = 0;
-	gossip_debug(REQ_SCHED_DEBUG,
+	gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		     "REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n",
 		     (long) tmp_element->handle, tmp_element);
 	/* if this is a mode change, then transition now */
@@ -883,7 +883,7 @@ int PINT_req_sched_test(
 	    }
 	    *out_count_p = 1;
 	    *out_status = 0;
-	    gossip_debug(REQ_SCHED_DEBUG,
+	    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 			 "REQ SCHED TIMER SCHEDULING, queue_element: %p\n",
 			 tmp_element);
 	    free(tmp_element);
@@ -954,7 +954,7 @@ int PINT_req_sched_testsome(
 	    out_index_array[*inout_count_p] = i;
 	    out_status_array[*inout_count_p] = 0;
 	    (*inout_count_p)++;
-	    gossip_debug(REQ_SCHED_DEBUG,
+	    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 			 "REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n",
 			 (long) tmp_element->handle, tmp_element);
 	    /* if this is a mode change, then transition now */
@@ -983,7 +983,7 @@ int PINT_req_sched_testsome(
 		out_index_array[*inout_count_p] = i;
 		out_status_array[*inout_count_p] = 0;
 		(*inout_count_p)++;
-		gossip_debug(REQ_SCHED_DEBUG,
+		gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 			     "REQ SCHED TIMER SCHEDULING, queue_element: %p\n",
 			     tmp_element);
 		free(tmp_element);
@@ -1038,7 +1038,7 @@ int PINT_req_sched_testworld(
 		}
 		out_status_array[*inout_count_p] = 0;
 		(*inout_count_p)++;
-		gossip_debug(REQ_SCHED_DEBUG,
+		gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 			     "REQ SCHED SCHEDULING, queue_element: %p\n",
 			     tmp_element);
 		free(tmp_element);
@@ -1062,7 +1062,7 @@ int PINT_req_sched_testworld(
 	out_status_array[*inout_count_p] = 0;
 	tmp_element->state = REQ_SCHEDULED;
 	(*inout_count_p)++;
-	gossip_debug(REQ_SCHED_DEBUG,
+	gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		     "REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n",
 		     (long) tmp_element->handle, tmp_element);
 	/* if this is a mode change, then transition now */

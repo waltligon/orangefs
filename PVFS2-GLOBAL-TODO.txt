@@ -152,7 +152,6 @@ code cleanup:
 - remove some of the stuff from the test subdir for "make dist" target
   - in particular, test/common (partial), test/io, test/proto, test/server
 - put in header file wrappers to make them work with c++
-- rename all gossip masks to GOSSIP_xxx
 - audit code to make sure that all error paths are handled when
   assertions are turned off
 - maybe make a checklist for each pvfs2 component to use as we clean 

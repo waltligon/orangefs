@@ -108,7 +108,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
 
     PINT_client_sm_msgpair_state *msg_p; /* for convenience */
 
-    gossip_debug(CLIENT_DEBUG, "msgpair state: post\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "msgpair state: post\n");
 
     /* we don't know what this is set to prior to this function,
      * so we reset it here.
@@ -203,7 +203,8 @@ static int msgpair_post(PINT_client_sm *sm_p,
     }
     else if (ret == 1) {
 	/* send completed immediately; decrement the completion counter */
-	gossip_debug(CLIENT_DEBUG, "  msgpair: send completed immediately.\n");
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "  msgpair: send completed immediately.\n");
 
 	/* 0 is the valid "completed job id" value, according to Phil */
 	msg_p->send_id = 0;
@@ -231,7 +232,7 @@ static int msgpair_complete(PINT_client_sm *sm_p,
 {
     PINT_client_sm_msgpair_state *msg_p = &sm_p->msgpair; /* for convenience */
 
-    gossip_debug(CLIENT_DEBUG, "msgpair state: complete\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "msgpair state: complete\n");
 
     /* we know status of operation is 0, or we wouldn't be in this state. */
 
@@ -250,7 +251,8 @@ static int msgpair_complete(PINT_client_sm *sm_p,
 
 	assert(msg_p->comp_ct == 0); /* sanity check */
 	msg_p->recv_status = *js_p; /* save recv status */
-	gossip_debug(CLIENT_DEBUG, "  msgpair: all operations complete\n");
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "  msgpair: all operations complete\n");
 
 	js_p->error_code = MSGPAIR_COMPLETE;
 	return 1;
@@ -266,9 +268,10 @@ static int msgpair_completion_fn(PINT_client_sm *sm_p,
 
     PINT_client_sm_msgpair_state *msg_p = &sm_p->msgpair; /* for convenience */
 
-    gossip_debug(CLIENT_DEBUG, "msgpair state: completion_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "msgpair state: completion_fn\n");
 
-    /* clear error code; was explicitly set to MSGPAIR_COMPLETE to get here. */
+    /* clear error code; was explicitly set to MSGPAIR_COMPLETE to get
+     * here. */
     js_p->error_code = 0;
 
     /* decode; resp_p will point to response */
@@ -286,11 +289,9 @@ static int msgpair_completion_fn(PINT_client_sm *sm_p,
     /* check status of response -- let errors pass though. */
     if (resp_p->status != 0)
     {
-	gossip_debug(CLIENT_DEBUG, "notice: msgpair_completion_fn: "
-                   "response status non-zero (%d)\n", resp_p->status);
-#if 0
-	PVFS_perror_gossip("msgpair_completion_fn", resp_p->status);
-#endif
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "notice: msgpair_completion_fn: "
+                     "response status non-zero (%d)\n", resp_p->status);
     }
 
     assert(resp_p->status <= 0); /* parameter range checking */

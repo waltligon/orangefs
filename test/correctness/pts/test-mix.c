@@ -88,13 +88,7 @@ int test_mx(void){
                                                                                                                                                        
    /* skip into the file datatype */
    PINT_REQUEST_STATE_SET_TARGET(rs1, 20);
-                                                                                                                                                       
    PINT_REQUEST_STATE_SET_TARGET(rs1p, 20);
-                                                                                                                                                       
-   /* Turn on debugging */
-   // gossip_enable_stderr();
-   // gossip_set_debug_mask(1,REQUEST_DEBUG);
-                                                                                                                                                       
    PINT_Dump_packed_request(r_packed);
                                                                                                                                                        
    /* skipping logical bytes */
@@ -239,7 +233,7 @@ int test_mx(void){
    }
                                                                                                                                                        
     gossip_enable_stderr();
-    gossip_set_debug_mask(1,REQUEST_DEBUG);
+    gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG);
                                                                                                                                                        
    PVFS_Request_free(&r1);
    PVFS_Request_free(&r1a);

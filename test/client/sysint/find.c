@@ -72,7 +72,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
     PVFS_ds_position token;
     int pvfs_dirent_incount;
 
-    gossip_debug(CLIENT_DEBUG, "DIRECTORY WALK CALLED WITH "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "DIRECTORY WALK CALLED WITH "
                  "base %s | %s\n",base_dir,start_dir);
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
@@ -126,18 +126,19 @@ int directory_walk(PVFS_sysresp_init *init_response,
 
         if (!rd_response.pvfs_dirent_outcount)
         {
-            gossip_debug(CLIENT_DEBUG,"No files found.\n");
+            gossip_debug(GOSSIP_CLIENT_DEBUG,"No files found.\n");
             return 0;
         }
 
-        gossip_debug(CLIENT_DEBUG, "%d files found.\n",
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "%d files found.\n",
                      rd_response.pvfs_dirent_outcount);
         for(i = 0; i < rd_response.pvfs_dirent_outcount; i++)
         {
             cur_file = rd_response.dirent_array[i].d_name;
             cur_handle = rd_response.dirent_array[i].handle;
 
-            gossip_debug(CLIENT_DEBUG,"Got handle 0x%08Lx\n",Lu(cur_handle));
+            gossip_debug(GOSSIP_CLIENT_DEBUG,"Got handle %Lu\n",
+                         Lu(cur_handle));
 
             is_dir = is_directory(cur_handle,
                                   init_response->fsid_list[0]);
@@ -215,7 +216,7 @@ int main(int argc, char **argv)
     }
 
     memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(mnt, NO_DEBUG, &init_response))
+    if (PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &init_response))
     {
         fprintf(stderr,"Cannot initialize system interface\n");
         return 1;

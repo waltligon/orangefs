@@ -185,7 +185,7 @@ int PVFS_sys_create(
     PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_create entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
 
     /* parameter checking goes here.  assume everything from the user
      * is ok past this point.
@@ -234,9 +234,10 @@ int PVFS_sys_create(
 	}
     }
 
-    gossip_debug(CLIENT_DEBUG, "Creating file named %s under parent handle "
-                 "%Lu on fs %d\n", object_name, Lu(parent_refn.handle),
-                 parent_refn.fs_id);
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "Creating file named %s under parent handle "
+        "%Lu on fs %d\n", object_name, Lu(parent_refn.handle),
+        parent_refn.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_CREATE);
     assert(ret == 0);
@@ -244,14 +245,14 @@ int PVFS_sys_create(
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0)
     {
-	gossip_debug(CLIENT_DEBUG, "PVFS_sys_create calling "
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create calling "
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
 
     assert(ret == 0);
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_create completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create completed\n");
 
     /* save our return value */
     error = sm_p->error_code;
@@ -266,7 +267,7 @@ int PVFS_sys_create(
 static int create_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "create state: init\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: init\n");
 
     assert(js_p->error_code == 0);
 
@@ -289,7 +290,7 @@ static int create_create_comp_fn(void *v_p,
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
-    gossip_debug(CLIENT_DEBUG, "create_create_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_create_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_CREATE);
 
@@ -304,8 +305,9 @@ static int create_create_comp_fn(void *v_p,
     /* otherwise, just stash the newly created meta handle */
     sm_p->u.create.metafile_handle = resp_p->u.create.handle;
 
-    gossip_debug(CLIENT_DEBUG, "*** Got newly created handle %Lu\n",
-                 Lu(sm_p->u.create.metafile_handle));
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "*** Got newly created handle %Lu\n",
+        Lu(sm_p->u.create.metafile_handle));
 
     return 0;
 }
@@ -316,7 +318,8 @@ static int create_datafiles_comp_fn(void *v_p,
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
-    gossip_debug(CLIENT_DEBUG, "create_datafiles_comp_fn[%d]\n",index);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create_datafiles_comp_fn[%d]\n",index);
 
     assert(resp_p->op == PVFS_SERV_CREATE);
 
@@ -347,7 +350,7 @@ static int create_datafiles_comp_fn(void *v_p,
     /* otherwise, just stash the newly created data file handle */
     sm_p->u.create.datafile_handles[index] = resp_p->u.create.handle;
 
-    gossip_debug(CLIENT_DEBUG, "Datafile handle %d is %Lu\n",
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Datafile handle %d is %Lu\n",
                  index, Lu(sm_p->u.create.datafile_handles[index]));
 
     return 0;
@@ -364,7 +367,7 @@ static int create_setattr_comp_fn(void *v_p,
 {
 /*     PINT_client_sm *sm_p = (PINT_client_sm *) v_p; */
     
-    gossip_debug(CLIENT_DEBUG, "create_setattr_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_setattr_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
 
@@ -390,7 +393,7 @@ static int create_crdirent_comp_fn(void *v_p,
 {
 /*     PINT_client_sm *sm_p = (PINT_client_sm *) v_p; */
     
-    gossip_debug(CLIENT_DEBUG, "create_crdirent_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_crdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
 
@@ -412,7 +415,7 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "create state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
 
     /* clear error field in job */
@@ -425,10 +428,10 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
                      "files to PVFS_REQ_LIMIT_DFILE_COUNT\n");
     }
 
-    gossip_ldebug(CLIENT_DEBUG, "Number of data files to create "
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Number of data files to create "
                   "is %d\n", sm_p->u.create.num_data_files);
 
-    gossip_debug(CLIENT_DEBUG," create: posting create req\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting create req\n");
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -459,7 +462,8 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
 static int create_dspace_create_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "create state: dspace_create_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create state: dspace_create_failure\n");
     return 1;
 }
 
@@ -468,7 +472,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 {
     int ret = -1, i = 0;
 
-    gossip_debug(CLIENT_DEBUG, "create state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "datafiles_setup_msgpair_array\n");
 
     /* clear error field in job */
@@ -522,7 +526,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     {
         PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
-        gossip_debug(CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "create: posting data file create req %d\n",i);
 
         PINT_SERVREQ_CREATE_FILL(msg_p->req,
@@ -544,7 +548,8 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 static int create_datafiles_failure(PINT_client_sm *sm_p,
                                     job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "create state: datafiles_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create state: datafiles_failure\n");
     return 1;
 }
 
@@ -553,12 +558,13 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
 {
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "create state: setattr_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create state: setattr_setup_msgpair\n");
 
     /* clear error field in job */
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG," create: posting setattr req\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting setattr req\n");
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -567,13 +573,14 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->u.create.dist = PVFS_Dist_create("simple_stripe");
     assert(sm_p->u.create.dist);
 
-    PINT_SERVREQ_SETATTR_FILL(msg_p->req,
-                              *sm_p->cred_p,
-                              sm_p->parent_ref.fs_id,
-                              sm_p->u.create.metafile_handle,
-                              PVFS_TYPE_METAFILE,
-                              *sm_p->u.create.sys_attr,
-                              (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_META_ALL));
+    PINT_SERVREQ_SETATTR_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->parent_ref.fs_id,
+        sm_p->u.create.metafile_handle,
+        PVFS_TYPE_METAFILE,
+        *sm_p->u.create.sys_attr,
+        (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_META_ALL));
 
     /* fill in meta file specific attributes */
     msg_p->req.u.setattr.attr.u.meta.dfile_array =
@@ -601,7 +608,8 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
 static int create_setattr_failure(PINT_client_sm *sm_p,
                                   job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "create state: setattr_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create state: setattr_failure\n");
     return 1;
 }
 
@@ -611,12 +619,13 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     int ret = -1;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "create state: crdirent_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "create state: crdirent_setup_msgpair\n");
 
     /* clear error field in job */
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG," create: posting crdirent req\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting crdirent req\n");
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -647,11 +656,11 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 static int create_crdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "create state: crdirent_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
 
     if (js_p->error_code == -PVFS_EEXIST)
     {
-        gossip_debug(CLIENT_DEBUG, "crdirent failed: "
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
                      "dirent already exists!\n");
     }
     return 1;
@@ -662,7 +671,7 @@ static int create_cleanup(PINT_client_sm *sm_p,
 {
     PVFS_pinode_reference metafile_ref;
 
-    gossip_debug(CLIENT_DEBUG, "create state: cleanup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
 
     sm_p->error_code = js_p->error_code;
 
@@ -702,7 +711,6 @@ static int create_cleanup(PINT_client_sm *sm_p,
 
     return 0;
 }
-
 
 /*
  * Local variables:

@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 
    /* Turn on debugging */
 	 gossip_enable_stderr();
-	 gossip_set_debug_mask(1,REQUEST_DEBUG); 
+	 gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG); 
 
 	/* skipping logical bytes */
 	// PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512);

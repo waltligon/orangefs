@@ -234,18 +234,18 @@ void trove_handle_ledger_get_statistics(struct handle_ledger *hl,
 
 void trove_handle_ledger_show(struct handle_ledger *hl) 
 {
-    gossip_debug(TROVE_DEBUG, "====== free list\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "====== free list\n");
     extentlist_show(&(hl->free_list));
-    gossip_debug(TROVE_DEBUG, "====== recently_freed list\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "====== recently_freed list\n");
     extentlist_show(&(hl->recently_freed_list));
-    gossip_debug(TROVE_DEBUG, "====== overflow list\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "====== overflow list\n");
     extentlist_show(&(hl->overflow_list));
 
-    gossip_debug(TROVE_DEBUG, "====== free list\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "====== free list\n");
     extentlist_stats(&(hl->free_list));
-    gossip_debug(TROVE_DEBUG, "====== recently_freed list\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "====== recently_freed list\n");
     extentlist_stats(&(hl->recently_freed_list));
-    gossip_debug(TROVE_DEBUG, "====== overflow list\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "====== overflow list\n");
     extentlist_stats(&(hl->overflow_list));
 }
 

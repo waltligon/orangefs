@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     PVFS_pinode_reference root_ref = {100,0};
 
     gossip_enable_stderr();
-    gossip_set_debug_mask(1, NCACHE_DEBUG);
+    gossip_set_debug_mask(1, GOSSIP_NCACHE_DEBUG);
 
     /* initialize the cache */
     ret = PINT_ncache_initialize();
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 	}
     }
 
-    gossip_debug(NCACHE_DEBUG, "Attempted insertion of %d ncache "
+    gossip_debug(GOSSIP_NCACHE_DEBUG, "Attempted insertion of %d ncache "
                  "elements\n", ENTRIES_TO_ADD);
 
     for(i = 0; i < ENTRIES_TO_ADD; i++)
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 
     if (i == ENTRIES_TO_ADD)
     {
-        gossip_debug(NCACHE_DEBUG, "All expected lookups were ok\n");
+        gossip_debug(GOSSIP_NCACHE_DEBUG, "All expected lookups were ok\n");
     }
 
     /*remove all entries */

@@ -45,7 +45,7 @@ do {                                     \
 int dbpf_attr_cache_set_keywords(char *keywords)
 {
     assert(keywords);
-    gossip_debug(DBPF_ATTRCACHE_DEBUG, "Setting dbpf_attr_cache "
+    gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Setting dbpf_attr_cache "
                  "keywords to:\n%s\n", keywords);
 
     if (s_cacheable_keywords)
@@ -99,7 +99,7 @@ int dbpf_attr_cache_do_initialize(void)
                 *end = '\0';
                 s_cacheable_keyword_array[num_keywords++] = start;
 
-                gossip_debug(DBPF_ATTRCACHE_DEBUG, "Got cacheable "
+                gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Got cacheable "
                              "attribute keyword %s\n",start);
 
                 start = ++end;
@@ -112,7 +112,7 @@ int dbpf_attr_cache_do_initialize(void)
         }
     }
 
-    gossip_debug(DBPF_ATTRCACHE_DEBUG, "There are %d cacheable "
+    gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "There are %d cacheable "
                  "keywords registered\n", num_keywords);
     ret = dbpf_attr_cache_initialize(
         s_cache_size, s_max_num_cache_elems,
@@ -181,13 +181,13 @@ int dbpf_attr_cache_initialize(
 
         srand((unsigned int)time(NULL));
 
-        gossip_debug(DBPF_ATTRCACHE_DEBUG,
+        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
                      "dbpf_attr_cache_initialize: initialized\n");
         ret = 0;
     }
     else
     {
-        gossip_debug(DBPF_ATTRCACHE_DEBUG,
+        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
                      "dbpf_attr_cache_initialize: already initialized\n");
         ret = 0;
     }
@@ -231,7 +231,8 @@ int dbpf_attr_cache_finalize(void)
         gen_mutex_unlock(s_dbpf_attr_mutex);
         gen_mutex_destroy(s_dbpf_attr_mutex);
         s_dbpf_attr_mutex = NULL;
-        gossip_debug(DBPF_ATTRCACHE_DEBUG, "dbpf_attr_cache_finalized\n");
+        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                     "dbpf_attr_cache_finalized\n");
     }
 
     if (s_cacheable_keywords)
@@ -269,7 +270,8 @@ dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key)
                 hash_link, dbpf_attr_cache_elem_t, hash_link);
             assert(cache_elem);
             gossip_debug(
-                DBPF_ATTRCACHE_DEBUG, "dbpf_cache_elem_lookup: cache "
+                GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                "dbpf_cache_elem_lookup: cache "
                 "elem matching %Lu returned (num_elems=%d)\n",
                 Lu(key), s_current_num_cache_elems);
         }
@@ -294,7 +296,7 @@ int dbpf_attr_cache_ds_attr_update_cached_data(
         {
             memcpy(&cache_elem->attr, src_ds_attr,
                    sizeof(TROVE_ds_attributes));
-            gossip_debug(DBPF_ATTRCACHE_DEBUG, "Updating "
+            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Updating "
                          "cached attributes for key %Lu\n",
                          Lu(key));
             ret = 0;
@@ -319,7 +321,7 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
         if (cache_elem)
         {
             cache_elem->attr.b_size = b_size;
-            gossip_debug(DBPF_ATTRCACHE_DEBUG, "Updating "
+            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Updating "
                          "cached b_size for key %Lu\n",
                          Lu(key));
             ret = 0;
@@ -373,8 +375,8 @@ dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
                 (cache_elem->keyval_pairs[i].data != NULL))
             {
                 gossip_debug(
-                    DBPF_ATTRCACHE_DEBUG, "Returning data %p based on "
-                    "key %Lu and key_str %s (data_sz=%d)\n",
+                    GOSSIP_DBPF_ATTRCACHE_DEBUG, "Returning data %p "
+                    "based on key %Lu and key_str %s (data_sz=%d)\n",
                     cache_elem->keyval_pairs[i].data,
                     Lu(cache_elem->key), key,
                     cache_elem->keyval_pairs[i].data_sz);
@@ -409,7 +411,8 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
             if (strcmp(cache_elem->keyval_pairs[i].key, key_str) == 0)
             {
                 gossip_debug(
-                    DBPF_ATTRCACHE_DEBUG, "Setting data %p based on key "
+                    GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                    "Setting data %p based on key "
                     "%Lu and key_str %s (data_sz=%d)\n", data,
                     Lu(key), key_str, data_sz);
 
@@ -535,9 +538,10 @@ int dbpf_attr_cache_insert(
             }
             assert(sacrificial_lamb_key != TROVE_HANDLE_NULL);
             gen_mutex_unlock(s_dbpf_attr_mutex);
-            gossip_debug(DBPF_ATTRCACHE_DEBUG, "*** Cache is full -- "
-                         "removing key %Lu to insert key %Lu\n",
-                         Lu(sacrificial_lamb_key), Lu(key));
+            gossip_debug(
+                GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Cache is full -- "
+                "removing key %Lu to insert key %Lu\n",
+                Lu(sacrificial_lamb_key), Lu(key));
             dbpf_attr_cache_remove(sacrificial_lamb_key);
             gen_mutex_lock(s_dbpf_attr_mutex);
             DBPF_ATTR_CACHE_ASSERT_OK(ret);
@@ -584,7 +588,7 @@ int dbpf_attr_cache_insert(
                     s_key_to_attr_table,&(key),&(cache_elem->hash_link));
                 s_current_num_cache_elems++;
                 gossip_debug(
-                    DBPF_ATTRCACHE_DEBUG,
+                    GOSSIP_DBPF_ATTRCACHE_DEBUG,
                     "dbpf_attr_cache_insert: inserting %Lu "
                     "(k_size is %Lu | b_size is %Lu)\n", Lu(key),
                     Lu(cache_elem->attr.k_size),
@@ -615,8 +619,9 @@ int dbpf_attr_cache_remove(TROVE_handle key)
                 hash_link, dbpf_attr_cache_elem_t, hash_link);
             assert(cache_elem);
 
-            gossip_debug(DBPF_ATTRCACHE_DEBUG, "dbpf_attr_cache_remove: "
-                         "removing %Lu\n", Lu(key));
+            gossip_debug(
+                GOSSIP_DBPF_ATTRCACHE_DEBUG, "dbpf_attr_cache_remove: "
+                "removing %Lu\n", Lu(key));
 
             /* free any keyval data cached as well */
             if (s_cacheable_keywords)

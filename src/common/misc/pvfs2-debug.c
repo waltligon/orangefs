@@ -19,33 +19,35 @@ typedef struct
 } __keyword_mask_t;
 
 
-#define __DEBUG_ALL                                             \
-(TROVE_DEBUG | BMI_DEBUG_ALL | SERVER_DEBUG | CLIENT_DEBUG |    \
-JOB_DEBUG | REQUEST_DEBUG | REQ_SCHED_DEBUG | FLOW_PROTO_DEBUG |\
-FLOW_DEBUG | NCACHE_DEBUG | ACACHE_DEBUG | DIST_DEBUG | \
-DBPF_ATTRCACHE_DEBUG | MMAP_RCACHE_DEBUG | LOOKUP_DEBUG)
+#define __DEBUG_ALL                                               \
+(GOSSIP_TROVE_DEBUG | GOSSIP_BMI_DEBUG_ALL | GOSSIP_SERVER_DEBUG |\
+GOSSIP_CLIENT_DEBUG | GOSSIP_JOB_DEBUG | GOSSIP_REQUEST_DEBUG |   \
+GOSSIP_REQ_SCHED_DEBUG | GOSSIP_FLOW_PROTO_DEBUG |                \
+GOSSIP_FLOW_DEBUG | GOSSIP_NCACHE_DEBUG | GOSSIP_ACACHE_DEBUG |   \
+GOSSIP_DIST_DEBUG | GOSSIP_DBPF_ATTRCACHE_DEBUG |                 \
+GOSSIP_MMAP_RCACHE_DEBUG | GOSSIP_LOOKUP_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
 {
-    { "storage", TROVE_DEBUG },
-    { "trove", TROVE_DEBUG },
-    { "network", BMI_DEBUG_ALL },
-    { "server", SERVER_DEBUG },
-    { "client", CLIENT_DEBUG },
-    { "job", JOB_DEBUG },
-    { "request", REQUEST_DEBUG },
-    { "reqsched", REQ_SCHED_DEBUG },
-    { "flowproto", FLOW_PROTO_DEBUG },
-    { "flow", FLOW_DEBUG },
-    { "ncache", NCACHE_DEBUG },
-    { "mmaprcache", MMAP_RCACHE_DEBUG },
-    { "acache", ACACHE_DEBUG },
-    { "distribution", DIST_DEBUG },
-    { "dbpfattrcache", DBPF_ATTRCACHE_DEBUG },
-    { "lookup", LOOKUP_DEBUG },
-    { "verbose",  (__DEBUG_ALL & ~REQ_SCHED_DEBUG) },
-    { "none", NO_DEBUG },
+    { "storage", GOSSIP_TROVE_DEBUG },
+    { "trove", GOSSIP_TROVE_DEBUG },
+    { "network", GOSSIP_BMI_DEBUG_ALL },
+    { "server", GOSSIP_SERVER_DEBUG },
+    { "client", GOSSIP_CLIENT_DEBUG },
+    { "job", GOSSIP_JOB_DEBUG },
+    { "request", GOSSIP_REQUEST_DEBUG },
+    { "reqsched", GOSSIP_REQ_SCHED_DEBUG },
+    { "flowproto", GOSSIP_FLOW_PROTO_DEBUG },
+    { "flow", GOSSIP_FLOW_DEBUG },
+    { "ncache", GOSSIP_NCACHE_DEBUG },
+    { "mmaprcache", GOSSIP_MMAP_RCACHE_DEBUG },
+    { "acache", GOSSIP_ACACHE_DEBUG },
+    { "distribution", GOSSIP_DIST_DEBUG },
+    { "dbpfattrcache", GOSSIP_DBPF_ATTRCACHE_DEBUG },
+    { "lookup", GOSSIP_LOOKUP_DEBUG },
+    { "verbose",  (__DEBUG_ALL & ~GOSSIP_REQ_SCHED_DEBUG) },
+    { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }
 };
 #undef __DEBUG_ALL

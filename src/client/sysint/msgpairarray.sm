@@ -98,7 +98,8 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 {
     int ret, i;
 
-    gossip_debug(CLIENT_DEBUG, "msgpairarray state: post (%d message(s))\n",
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "msgpairarray state: post (%d message(s))\n",
 		 sm_p->msgarray_count);
 
     assert(sm_p->msgarray_count > 0); /* sanity check */
@@ -199,7 +200,8 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	}
 	else if (ret == 1) {
 	    /* send completed immediately; decrement the completion counter */
-	    gossip_debug(CLIENT_DEBUG, "  msgpairarray: send completed immediately.\n");
+	    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                         "  msgpairarray: send completed immediately.\n");
 
 	    /* 0 is the valid "completed job id" value, according to Phil */
 	    msg_p->send_id = 0;
@@ -229,7 +231,7 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 {
     int matched_job = 0;
 
-    gossip_debug(CLIENT_DEBUG, "msgpairarray state: complete\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "msgpairarray state: complete\n");
 
     /* match operation with something in the msgpair array */
     /* the first N tags are receives, the second N are sends */
@@ -265,7 +267,8 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
     else {
 	assert(sm_p->msgarray[0].comp_ct == 0); /* sanity check */
 	js_p->error_code = MSGPAIRS_COMPLETE;
-	gossip_debug(CLIENT_DEBUG, "  msgpairarray: all operations complete\n");
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "  msgpairarray: all operations complete\n");
 
 	return 1;
     }
@@ -325,17 +328,18 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
             */
             if (js_p->error_code)
             {
-                gossip_debug(CLIENT_DEBUG, "Completion function %d "
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "Completion function %d "
                              "failed; aborting\n", i);
                 break;
             }
 	}
 	else if (resp_p->status != 0) {
 	    /* no comp_fn specified and status non-zero */
-	    gossip_debug(CLIENT_DEBUG,
-			 "notice: msgpairarray_complete: error %s (%d) from server %d\n",
-			 strerror(PVFS_ERROR_TO_ERRNO(-resp_p->status)),
-			     resp_p->status,
+	    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                         "notice: msgpairarray_complete: error %s (%d) "
+                         "from server %d\n",
+                         strerror(PVFS_ERROR_TO_ERRNO(-resp_p->status)),
+                         resp_p->status,
 			 i);
 	    /* save a non-zero status to return if we see one */
 	    js_p->error_code = resp_p->status;

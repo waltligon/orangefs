@@ -175,7 +175,7 @@ int PVFS_sys_rename(
     PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_rename entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename entered\n");
 
     /* parameter checking goes here.  assume everything from the user
      * is ok past this point.
@@ -225,10 +225,10 @@ int PVFS_sys_rename(
     sm_p->u.rename.rmdirent_index = 0;
 
     gossip_debug(
-        CLIENT_DEBUG, "Renaming file named %s (under %Lu on fs %d) to %s "
-        "(under %Lu on fs %d)\n", old_entry, Lu(old_parent_refn.handle),
-        old_parent_refn.fs_id, new_entry, Lu(new_parent_refn.handle),
-        new_parent_refn.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under %Lu on "
+        "fs %d) to %s (under %Lu on fs %d)\n", old_entry,
+        Lu(old_parent_refn.handle), old_parent_refn.fs_id, new_entry,
+        Lu(new_parent_refn.handle), new_parent_refn.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_RENAME);
     assert(ret == 0);
@@ -236,14 +236,14 @@ int PVFS_sys_rename(
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0)
     {
-	gossip_debug(CLIENT_DEBUG, "PVFS_sys_rename calling "
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename calling "
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
 
     assert(ret == 0);
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_rename completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename completed\n");
 
     /* save our return value */
     error = sm_p->error_code;
@@ -258,7 +258,7 @@ int PVFS_sys_rename(
 static int rename_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "rename state: init\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: init\n");
 
     assert(js_p->error_code == 0);
 
@@ -274,7 +274,7 @@ static int rename_lookups_comp_fn(
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
-    gossip_debug(CLIENT_DEBUG, "rename_lookups_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_lookups_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
     assert((index > -1) && (index < 2));
@@ -309,8 +309,9 @@ static int rename_lookups_comp_fn(
 
     if (index == 0)
     {
-        gossip_debug(CLIENT_DEBUG, "*** Looked up old handle %Lu\n",
-                     Lu(sm_p->u.rename.refns[index].handle));
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "*** Looked up old handle %Lu\n",
+            Lu(sm_p->u.rename.refns[index].handle));
     }
     else
     {
@@ -320,7 +321,7 @@ static int rename_lookups_comp_fn(
           if the new entry (i.e. target) was successfully looked
           up, we need to properly remove it here
         */
-        gossip_debug(CLIENT_DEBUG, "*** Removing existing file "
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Removing existing file "
                      "%s (existing handle is %Lu)\n",
                      sm_p->u.rename.entries[index],
                      Lu(sm_p->u.rename.refns[index].handle));
@@ -343,7 +344,7 @@ static int rename_get_attrs_comp_fn(
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
     gossip_debug(
-        CLIENT_DEBUG, "rename_get_attrs_comp_fn[%d]\n", index);
+        GOSSIP_CLIENT_DEBUG, "rename_get_attrs_comp_fn[%d]\n", index);
 
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
@@ -374,7 +375,7 @@ static int rename_get_attrs_comp_fn(
                 sm_p->cred_p->uid, sm_p->cred_p->gid))
         {
             gossip_debug(
-                CLIENT_DEBUG, " permission check failure "
+                GOSSIP_CLIENT_DEBUG, " permission check failure "
                 "against %s directory\n", (index ? "new" : "old"));
             return -PVFS_EPERM;
         }
@@ -388,7 +389,7 @@ static int rename_crdirent_comp_fn(void *v_p,
 {
 /*     PINT_client_sm *sm_p = (PINT_client_sm *) v_p; */
     
-    gossip_debug(CLIENT_DEBUG, "rename_crdirent_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_crdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
 
@@ -408,7 +409,7 @@ static int rename_rmdirent_comp_fn(void *v_p,
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
-    gossip_debug(CLIENT_DEBUG, "rename_rmdirent_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_rmdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_RMDIRENT);
 
@@ -435,7 +436,7 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
 {
     int i = 0;
 
-    gossip_debug(CLIENT_DEBUG, "rename state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
                  "rename_lookups_setup_msgpair_array\n");
 
     /* clear error field in job */
@@ -456,7 +457,8 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
     {
         PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
-        gossip_debug(CLIENT_DEBUG, "rename: posting lookup req %d\n",i);
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "rename: posting lookup req %d\n",i);
 
         PINT_SERVREQ_LOOKUP_PATH_FILL(
             msg_p->req,
@@ -485,7 +487,8 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
 static int rename_lookups_failure(PINT_client_sm *sm_p,
                                   job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "rename state: rename_lookups_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename state: rename_lookups_failure\n");
 
     /* free the allocated lookup msgs */
     free(sm_p->msgarray);
@@ -497,7 +500,7 @@ static int rename_get_attrs_setup_msgpair_array(
 {
     int i = 0;
 
-    gossip_debug(CLIENT_DEBUG, "rename state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
                  "rename_get_attrs_setup_msgpair_array\n");
 
     /*
@@ -540,7 +543,7 @@ static int rename_get_attrs_setup_msgpair_array(
                          sm_p->u.rename.parent_refns[i].handle);
 
         gossip_debug(
-            CLIENT_DEBUG, "rename: posting getattr req %d "
+            GOSSIP_CLIENT_DEBUG, "rename: posting getattr req %d "
             "(%Lu | %d)\n",i, Lu(current_handle), current_fs_id);
 
         PINT_SERVREQ_GETATTR_FILL(
@@ -569,19 +572,19 @@ static int rename_get_attrs_setup_msgpair_array(
 static int rename_get_attrs_failure(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "rename state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
                  "rename_get_attrs_failure\n");
 
     free(sm_p->msgarray);
 
     if (js_p->error_code == -PVFS_EPERM)
     {
-        gossip_debug(CLIENT_DEBUG, "crdirent failed: "
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
                      "permission denied!\n");
     }
     else if (js_p->error_code == -PVFS_EEXIST)
     {
-        gossip_debug(CLIENT_DEBUG, "crdirent failed: "
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
                      "dirent already exists!\n");
     }
     return 1;
@@ -592,13 +595,13 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 {
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "rename state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
                  "rename_crdirent_setup_msgpair\n");
 
     /* clear error field in job */
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG," rename: posting crdirent req\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting crdirent req\n");
 
     /* free the allocated getattr msgs */
     free(sm_p->msgarray);
@@ -637,11 +640,11 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 static int rename_crdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "rename state: crdirent_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: crdirent_failure\n");
 
     if (js_p->error_code == -PVFS_EEXIST)
     {
-        gossip_debug(CLIENT_DEBUG, "crdirent failed: "
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
                      "dirent already exists!\n");
     }
     return 1;
@@ -652,13 +655,13 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 {
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "rename state: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
                  "rename_rmdirent_setup_msgpair\n");
 
     /* clear error field in job */
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG," rename: posting rmdirent req\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting rmdirent req\n");
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -700,7 +703,7 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 static int rename_rmdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "rename state: rmdirent_failure\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: rmdirent_failure\n");
 
     /*
       in the normal case of failure (i.e. rmdirent_index == 0),
@@ -711,14 +714,15 @@ static int rename_rmdirent_failure(PINT_client_sm *sm_p,
     */
     if (sm_p->u.rename.rmdirent_index == 0)
     {
-        gossip_debug(CLIENT_DEBUG, "cleaning up new dirent because of "
-                     "previous failure.\n");
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "cleaning up new dirent because of "
+            "previous failure.\n");
         sm_p->u.rename.rmdirent_index++;
     }
     else
     {
-        gossip_debug(CLIENT_DEBUG, "failed to clean up created "
-                     "dirent!\n");
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "failed to clean up created dirent!\n");
     }
     return 1;
 }
@@ -726,7 +730,7 @@ static int rename_rmdirent_failure(PINT_client_sm *sm_p,
 static int rename_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "rename state: cleanup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: cleanup\n");
 
     sm_p->error_code = js_p->error_code;
 

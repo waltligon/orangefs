@@ -4,8 +4,11 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.14 2003-08-12 13:16:50 walt Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.15 2004-01-30 20:12:12 neill Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.14  2003/08/12 13:16:50  walt
+// reworked commited indicator and tweeked freeing code to get it working
+//
 // Revision 1.13  2003/08/08 15:10:13  walt
 // fixed bug in commit routine
 //
@@ -463,7 +466,7 @@ int PVFS_Request_free(PVFS_Request *req)
 		/* these are contiguous and have no external refs */
 		free(*req);
 		*req = NULL;
-		gossip_debug(REQUEST_DEBUG,"free packed request\n");
+		gossip_debug(GOSSIP_REQUEST_DEBUG,"free packed request\n");
 		return PVFS_SUCCESS;
 	}
 	/* this deals with the sreq chain */
@@ -475,14 +478,14 @@ int PVFS_Request_free(PVFS_Request *req)
 		/* this is a little awkward but it works */
 		reqp_next = reqp->sreq;
 		free(reqp);
-		gossip_debug(REQUEST_DEBUG,"free sreq linked request\n");
+		gossip_debug(GOSSIP_REQUEST_DEBUG,"free sreq linked request\n");
 		reqp = reqp_next;
 	}
 	/* now deal with the main struct */
 	PVFS_Request_free(&((*req)->ereq));
 	free(*req);
 	*req = NULL;
-	gossip_debug(REQUEST_DEBUG,"free unpacked request\n");
+	gossip_debug(GOSSIP_REQUEST_DEBUG,"free unpacked request\n");
 	return PVFS_SUCCESS;
 }
 

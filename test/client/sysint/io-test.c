@@ -87,7 +87,7 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	/* init the system interface */
-	ret = PVFS_sys_initialize(mnt, NO_DEBUG, &resp_init);
+	ret = PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &resp_init);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_sys_initialize() failure. = %d\n", ret);

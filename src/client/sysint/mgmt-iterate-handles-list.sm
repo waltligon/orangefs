@@ -73,9 +73,10 @@ int PVFS_mgmt_iterate_handles_list(
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_iterate_handles_list() entered.\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_mgmt_iterate_handles_list() entered.\n");
 
-    if(server_count < 1 || !handle_matrix || !position_array 
+    if (server_count < 1 || !handle_matrix || !position_array 
 	|| !handle_count_array || !addr_array)
     {
 	return(-PVFS_EINVAL);
@@ -94,11 +95,12 @@ int PVFS_mgmt_iterate_handles_list(
     sm_p->u.iterate_handles_list.handle_count_array = handle_count_array;
     sm_p->u.iterate_handles_list.position_array = position_array;
 
-    gossip_debug(CLIENT_DEBUG,
-		 "PVFS_mgmt_iterate_handles_list calling PINT_client_state_machine_post()\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_iterate_handles_list "
+                 "calling PINT_client_state_machine_post()\n");
 
     /* do something to kick off processing */
-    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_ITERATE_HANDLES_LIST);
+    ret = PINT_client_state_machine_post(
+        sm_p, PVFS_MGMT_ITERATE_HANDLES_LIST);
     if(ret < 0)
     {
 	/* this should not fail under normal conditions */
@@ -108,18 +110,21 @@ int PVFS_mgmt_iterate_handles_list(
     }
 
     /* while !done call progress function */
-    while (!sm_p->op_complete && ret == 0) {
-	gossip_debug(CLIENT_DEBUG,
-		     "PVFS_mgmt_iterate_handles_list calling PINT_client_state_machine_test()\n");
+    while (!sm_p->op_complete && ret == 0)
+    {
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_iterate_handles_list "
+                     "calling PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
+
     if(ret < 0)
     {
 	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
 	return(ret);
     }
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_iterate_handles_list completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_mgmt_iterate_handles_list completed\n");
 
     /* save our return value */
     error = sm_p->error_code;
@@ -137,7 +142,8 @@ static int mgmt_iterate_handles_list_setup_msgpair(
     int j;
     PINT_client_sm_msgpair_state *msg_p;
 
-    gossip_debug(CLIENT_DEBUG, "iterate_handles_list state: mgmt_iterate_handles_list_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "iterate_handles_list state: "
+                 "mgmt_iterate_handles_list_setup_msgpair\n");
 
     /* allocate memory for msgpair array */
     sm_p->msgarray_count = sm_p->u.iterate_handles_list.server_count;

@@ -276,8 +276,8 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
  *
  * no return value
  */
-#define PINT_STATE_DEBUG(fn_name)				\
-    gossip_debug(SERVER_DEBUG, "(%p) %s state: %s\n", s_op,	\
+#define PINT_STATE_DEBUG(fn_name)				  \
+    gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) %s state: %s\n", s_op,\
     PINT_map_server_op_to_string(s_op->op), fn_name);
 
 /* Globals for Server Interface */

@@ -140,7 +140,7 @@ int PINT_ncache_lookup(
 	    ret = check_dentry_expiry(cache->element[i].dentry.tstamp_valid);
 	    if (ret < 0)
 	    {
-		gossip_ldebug(NCACHE_DEBUG, "ncache entry expired.\n");
+		gossip_ldebug(GOSSIP_NCACHE_DEBUG, "ncache entry expired.\n");
 		/* Dentry is stale */
 		/* Remove the entry from the cache */
 		ncache_remove_dentry(i);
@@ -238,7 +238,7 @@ int PINT_ncache_insert(
 	
 	gen_mutex_lock(cache->mt_lock);
 
-        gossip_ldebug(NCACHE_DEBUG, "NCACHE: Inserting segment %s "
+        gossip_ldebug(GOSSIP_NCACHE_DEBUG, "NCACHE: Inserting segment %s "
                       "(%Lu|%d) under parent (%Lu|%d)\n", name,
                       Lu(entry.handle), entry.fs_id, Lu(parent.handle),
                       parent.fs_id);
@@ -264,7 +264,7 @@ int PINT_ncache_insert(
 		/* We move the dentry to the top of the list, update its
 		 * timestamp and return 
 		 */
-		gossip_ldebug(NCACHE_DEBUG, "dache inserting entry "
+		gossip_ldebug(GOSSIP_NCACHE_DEBUG, "dache inserting entry "
                               "already present; timestamp update.\n");
 		ncache_rotate_dentry(index);
 		ret = ncache_update_dentry_timestamp(
@@ -472,8 +472,11 @@ static int ncache_get_lru(void)
 	}
     }
 
-    gossip_ldebug(NCACHE_DEBUG, "error getting least recently used dentry.\n");
-    gossip_ldebug(NCACHE_DEBUG, "cache->count = %d max_entries = %d.\n", cache->count, PINT_NCACHE_MAX_ENTRIES);
+    gossip_ldebug(GOSSIP_NCACHE_DEBUG,
+                  "error getting least recently used dentry.\n");
+    gossip_ldebug(GOSSIP_NCACHE_DEBUG,
+                  "cache->count = %d max_entries = %d.\n",
+                  cache->count, PINT_NCACHE_MAX_ENTRIES);
     assert(0);
 }
 

@@ -89,7 +89,7 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
 	gossip_lerr("Error: could not find any pvfs2 tabfile entries.\n");
 	return(-PVFS_ENOENT);
     }
-    gossip_debug(CLIENT_DEBUG, "Using pvfs2 tab file: %s\n", targetfile);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Using pvfs2 tab file: %s\n", targetfile);
 
     /* allocate array of entries */
     pvfstab_p->ptab_array = (struct pvfs_mntent*)
@@ -603,7 +603,7 @@ static int parse_encoding_string(const char *cp, enum PVFS_encoding_type *et)
 	{ "xdr", ENCODING_XDR },
     };
 
-    gossip_debug(CLIENT_DEBUG, "%s: input is %s\n", __func__, cp);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: input is %s\n", __func__, cp);
     cp += strlen("encoding");
     for (; isspace(*cp); cp++) ;  /* optional spaces */
     if (*cp != '=') {

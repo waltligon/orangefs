@@ -88,10 +88,10 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p)
     int ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "mkdir state: create\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mkdir state: create\n");
 
     gossip_debug(
-        SERVER_DEBUG, "\ttrying to dspace create on "
+        GOSSIP_SERVER_DEBUG, "\ttrying to dspace create on "
         "fs_id %d | handle-range[0]: %Lu-%Lu\n",
         s_op->req->u.mkdir.fs_id,
         Lu(s_op->req->u.mkdir.handle_extent_array.extent_array[0].first),
@@ -136,7 +136,7 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
     s_op->resp.u.mkdir.handle = js_p->handle;
 
     a_p = &(s_op->req->u.mkdir.attr);
-    gossip_debug(SERVER_DEBUG, "  attrs to write = (owner = %d, "
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  attrs to write = (owner = %d, "
                  "group = %d, perms = %o, type = %d)\n",
 		 a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 

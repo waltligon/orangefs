@@ -30,18 +30,18 @@ enum
 };
 
 
-static int getattr_cleanup(PINT_server_op *s_op,
-                           job_status_s* js_p);
-static int getattr_verify_attribs(PINT_server_op *s_op,
-                                  job_status_s* js_p);
-static int getattr_read_symlink_target(PINT_server_op *s_op,
-                                       job_status_s* js_p);
+static int getattr_cleanup(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int getattr_verify_attribs(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int getattr_read_symlink_target(
+    PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_metafile_distribution_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
-static int getattr_setup_resp(PINT_server_op *s_op,
-                              job_status_s* js_p);
+static int getattr_setup_resp(
+    PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -58,53 +58,53 @@ machine pvfs2_get_attr_sm(prelude,
 {
 	state prelude
 	{
-		jump pvfs2_prelude_sm;
-		success => verify_attribs;
-		default => final_response;
+            jump pvfs2_prelude_sm;
+            success => verify_attribs;
+            default => final_response;
 	}
 
 	state verify_attribs
 	{
-		run getattr_verify_attribs;
-		STATE_SYMLINK => read_symlink_target;
-		STATE_METAFILE => read_metafile_datafile_handles_if_required;
-		default => setup_resp;
+            run getattr_verify_attribs;
+            STATE_SYMLINK => read_symlink_target;
+            STATE_METAFILE => read_metafile_datafile_handles_if_required;
+            default => setup_resp;
 	}
 
         state read_symlink_target
         {
-		run getattr_read_symlink_target;
-		default => setup_resp;
+            run getattr_read_symlink_target;
+            default => setup_resp;
         }
 
 	state read_metafile_datafile_handles_if_required
 	{
-		run getattr_read_metafile_datafile_handles_if_required;
-		default => read_metafile_distribution_if_required;
+            run getattr_read_metafile_datafile_handles_if_required;
+            default => read_metafile_distribution_if_required;
 	}
 
 	state read_metafile_distribution_if_required
 	{
-		run getattr_read_metafile_distribution_if_required;
-		default => setup_resp;
+            run getattr_read_metafile_distribution_if_required;
+            default => setup_resp;
 	}
 
 	state setup_resp
 	{
-		run getattr_setup_resp;
-		default => final_response;
+            run getattr_setup_resp;
+            default => final_response;
 	}
 
 	state final_response
 	{
-		jump pvfs2_final_response_sm;
-		default => cleanup;
+            jump pvfs2_final_response_sm;
+            default => cleanup;
 	}
 
 	state cleanup
 	{
-		run getattr_cleanup;
-		default => terminate;
+            run getattr_cleanup;
+            default => terminate;
 	}
 }
 
@@ -125,28 +125,29 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     s_op->resp.u.getattr.attr = s_op->attr;
     a_p = &s_op->resp.u.getattr.attr;
 
-    gossip_debug(SERVER_DEBUG,
-		 "  attrs read from dspace = (owner = %d, group = %d, "
-                 "perms = %o, type = %d, atime = %lld, mtime = %lld, "
-                 "ctime = %lld | dfile_count=%d | dist_size = %d)\n",
-		 a_p->owner,
-		 a_p->group,
-		 a_p->perms,
-		 a_p->objtype,
-		 (long long)a_p->atime,
-		 (long long)a_p->mtime,
-		 (long long)a_p->ctime,
-                 (int)a_p->u.meta.dfile_count,
-                 (int)a_p->u.meta.dist_size);
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG,
+        "  attrs read from dspace = (owner = %d, group = %d, "
+        "perms = %o, type = %d, atime = %lld, mtime = %lld, "
+        "ctime = %lld | dfile_count=%d | dist_size = %d)\n",
+        a_p->owner,
+        a_p->group,
+        a_p->perms,
+        a_p->objtype,
+        (long long)a_p->atime,
+        (long long)a_p->mtime,
+        (long long)a_p->ctime,
+        (int)a_p->u.meta.dfile_count,
+        (int)a_p->u.meta.dist_size);
 
-    gossip_debug(SERVER_DEBUG, "mask output from getattr: ");
-    PINT_attrmask_print(SERVER_DEBUG, s_op->attr.mask);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mask output from getattr: ");
+    PINT_attrmask_print(GOSSIP_SERVER_DEBUG, s_op->attr.mask);
 
     js_p->error_code = 0;
 
     if (a_p->objtype == PVFS_TYPE_METAFILE)
     {
-	gossip_debug(SERVER_DEBUG,
+	gossip_debug(GOSSIP_SERVER_DEBUG,
 		     "  handle %Lu refers to a metafile\n",
 		     Lu(s_op->req->u.getattr.handle));
 
@@ -154,8 +155,9 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
         if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
         {
-            gossip_debug(SERVER_DEBUG, " dspace has dfile_count of %d\n",
-                         s_op->attr.u.meta.dfile_count);
+            gossip_debug(
+                GOSSIP_SERVER_DEBUG, " dspace has dfile_count of %d\n",
+                s_op->attr.u.meta.dfile_count);
 
             /* copy over the dfile count for reading later */
             a_p->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
@@ -165,8 +167,9 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
         if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DIST)
         {
-            gossip_debug(SERVER_DEBUG, " dspace has dist size of %d\n",
-                         s_op->attr.u.meta.dist_size);
+            gossip_debug(
+                GOSSIP_SERVER_DEBUG, " dspace has dist size of %d\n",
+                s_op->attr.u.meta.dist_size);
 
             /* copy over the dist size for reading later */
             a_p->u.meta.dist_size = s_op->attr.u.meta.dist_size;
@@ -181,8 +184,9 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     }
     else if (a_p->objtype == PVFS_TYPE_DATAFILE)
     {
-	gossip_debug(SERVER_DEBUG, "  handle %Lu refers to "
-                     "a datafile.\n", Lu(s_op->req->u.getattr.handle));
+	gossip_debug(
+            GOSSIP_SERVER_DEBUG, "  handle %Lu refers to "
+            "a datafile.\n", Lu(s_op->req->u.getattr.handle));
 
         /*
           note: the prelude already retrieved the size for us,
@@ -193,23 +197,25 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     }
     else if (a_p->objtype == PVFS_TYPE_DIRECTORY)
     {
-	gossip_debug(SERVER_DEBUG, "  handle %Lu refers to "
-                     "a directory. doing nothing special\n",
-		     Lu(s_op->req->u.getattr.handle));
+	gossip_debug(
+            GOSSIP_SERVER_DEBUG, "  handle %Lu refers to "
+            "a directory. doing nothing special\n",
+            Lu(s_op->req->u.getattr.handle));
 	a_p->mask = PVFS_ATTR_COMMON_ALL;
     }
     else if (a_p->objtype == PVFS_TYPE_DIRDATA)
     {
-	gossip_debug(SERVER_DEBUG, "  handle %Lu refers to "
-                     "a dirdata object. doing nothing special\n",
-		     Lu(s_op->req->u.getattr.handle));
+	gossip_debug(
+            GOSSIP_SERVER_DEBUG, "  handle %Lu refers to "
+            "a dirdata object. doing nothing special\n",
+            Lu(s_op->req->u.getattr.handle));
         a_p->mask = PVFS_ATTR_COMMON_ALL;
     }
     else if (a_p->objtype == PVFS_TYPE_SYMLINK)
     {
-	gossip_debug(SERVER_DEBUG,
-                     "  handle %Lu refers to a symlink.\n",
-                     Lu(s_op->req->u.getattr.handle));
+	gossip_debug(
+            GOSSIP_SERVER_DEBUG, "  handle %Lu refers to a symlink.\n",
+            Lu(s_op->req->u.getattr.handle));
 
 	a_p->mask = PVFS_ATTR_COMMON_ALL;
 
@@ -217,9 +223,10 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     }
     else
     {
-	gossip_debug(SERVER_DEBUG, "  handle %Lu refers to something "
-                     "unknown -- assuming datafile!\n",
-                     Lu(s_op->req->u.getattr.handle));
+	gossip_debug(
+            GOSSIP_SERVER_DEBUG, "  handle %Lu refers to something "
+            "unknown -- assuming datafile!\n",
+            Lu(s_op->req->u.getattr.handle));
 
         a_p->objtype = PVFS_TYPE_DATAFILE;
         a_p->mask = PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_DATA_ALL;
@@ -227,7 +234,8 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     return 1;
 }
 
-static int getattr_read_symlink_target(PINT_server_op *s_op, job_status_s* js_p)
+static int getattr_read_symlink_target(
+    PINT_server_op *s_op, job_status_s* js_p)
 {
     int ret;
     job_id_t i;
@@ -237,7 +245,7 @@ static int getattr_read_symlink_target(PINT_server_op *s_op, job_status_s* js_p)
     /* if we don't need to fill in the symlink target, skip it */
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_SYMLNK_TARGET))
     {
-        gossip_debug(SERVER_DEBUG, "skipping symlink target read\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "skipping symlink target read\n");
         js_p->error_code = 0;
         return 1;
     }
@@ -277,8 +285,6 @@ static int getattr_read_symlink_target(PINT_server_op *s_op, job_status_s* js_p)
 }
 
 
-/* getattr_read_metafile_datafile_handles_if_required
- */
 static int getattr_read_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p)
 {
@@ -293,14 +299,14 @@ static int getattr_read_metafile_datafile_handles_if_required(
     /* if we don't need to fill in the dfiles, skip them */
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
     {
-        gossip_debug(SERVER_DEBUG, "skipping data handle read\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "skipping data handle read\n");
         js_p->error_code = 0;
         return 1;
     }
 
     dfile_count = s_op->attr.u.meta.dfile_count;
 
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
                  " request has dfile_count of %d | dspace has %d\n",
                  s_op->resp.u.getattr.attr.u.meta.dfile_count,
                  s_op->attr.u.meta.dfile_count);
@@ -321,7 +327,6 @@ static int getattr_read_metafile_datafile_handles_if_required(
     /* add mask value to indicate the data file array is filled */
     s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DFILES;
 
-    /* NOTE: ALLOCATING MEMORY HERE */
     s_op->resp.u.getattr.attr.u.meta.dfile_array =
         malloc(dfile_count * sizeof(PVFS_handle));
     if (!s_op->resp.u.getattr.attr.u.meta.dfile_array)
@@ -333,7 +338,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
     s_op->val.buffer    = s_op->resp.u.getattr.attr.u.meta.dfile_array;
     s_op->val.buffer_sz = (dfile_count * sizeof(PVFS_handle));
 
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  reading %d datafile handles (coll_id = 0x%x, "
                  "handle = %Lu, key = %s (%d), val_buf = %p (%d))\n",
 		 dfile_count,
@@ -360,8 +365,6 @@ static int getattr_read_metafile_datafile_handles_if_required(
     return ret;
 }
 
-/* getattr_read_metafile_distribution_if_required
- */
 static int getattr_read_metafile_distribution_if_required(
     PINT_server_op *s_op, job_status_s* js_p)
 {
@@ -373,7 +376,7 @@ static int getattr_read_metafile_distribution_if_required(
     /* if we don't need to fill in the distribution, skip it */
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DIST))
     {
-        gossip_debug(SERVER_DEBUG, "skipping data handle "
+        gossip_debug(GOSSIP_SERVER_DEBUG, "skipping data handle "
                      "distribution read\n");
         js_p->error_code = 0;
         return 1;
@@ -388,7 +391,6 @@ static int getattr_read_metafile_distribution_if_required(
     /* add mask value to indicate the distribution is filled */
     s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DIST;
 
-    /* NOTE: allocating memory here, free'd in last state */
     s_op->resp.u.getattr.attr.u.meta.dist =
 	malloc(s_op->resp.u.getattr.attr.u.meta.dist_size);
     if(!s_op->resp.u.getattr.attr.u.meta.dist)
@@ -416,11 +418,6 @@ static int getattr_read_metafile_distribution_if_required(
     return ret;
 }
 
-/* getattr_setup_resp()
- *
- * fills in the response structure based on results of previous 
- * operations
- */
 static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
     PVFS_object_attr *a_p;
@@ -429,35 +426,35 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 
     a_p = &s_op->resp.u.getattr.attr;
     
-    /* TODO: figure out if we need a different packing mechanism here */
     if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
         (a_p->mask & PVFS_ATTR_META_DIST))
     {
         PINT_Dist_decode(a_p->u.meta.dist, NULL);
     }
 
-    gossip_debug(SERVER_DEBUG,
-		 "  sending attrs (owner = %d, group = %d, perms = %o, "
-		 "type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
-		 a_p->owner,
-		 a_p->group,
-		 a_p->perms,
-		 a_p->objtype,
-		 (long long)a_p->atime,
-		 (long long)a_p->mtime,
-		 (long long)a_p->ctime);
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG,
+        "  sending attrs (owner = %d, group = %d, perms = %o, "
+        "type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
+        a_p->owner,
+        a_p->group,
+        a_p->perms,
+        a_p->objtype,
+        (long long)a_p->atime,
+        (long long)a_p->mtime,
+        (long long)a_p->ctime);
 
     if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
         (a_p->mask & PVFS_ATTR_META_DFILES))
     {
-	gossip_debug(SERVER_DEBUG,
+	gossip_debug(GOSSIP_SERVER_DEBUG,
 		     "  also returning %d datafile handles\n",
 		     a_p->u.meta.dfile_count);
     }
     if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
         (a_p->mask & PVFS_ATTR_META_DIST))
     {
-	gossip_debug(SERVER_DEBUG,
+	gossip_debug(GOSSIP_SERVER_DEBUG,
 		     "  also returning dist size of %d\n",
 		     a_p->u.meta.dist_size);
     }
@@ -474,7 +471,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
             /* assign properly retrieved size value to response */
             a_p->u.data.size = s_op->ds_attr.b_size;
 
-            gossip_debug(SERVER_DEBUG,
+            gossip_debug(GOSSIP_SERVER_DEBUG,
                          "  also returning data size of %Ld\n",
                          Ld(a_p->u.data.size));
         }
@@ -489,17 +486,18 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
         */
         a_p->u.sym.target_path_len = (strlen(a_p->u.sym.target_path) + 1);
 
-        gossip_debug(SERVER_DEBUG,
-                     "  also returning link target of %s (len %d)\n",
-                     a_p->u.sym.target_path, a_p->u.sym.target_path_len);
+        gossip_debug(
+            GOSSIP_SERVER_DEBUG,
+            "  also returning link target of %s (len %d)\n",
+            a_p->u.sym.target_path, a_p->u.sym.target_path_len);
     }
 
-    gossip_debug(SERVER_DEBUG,
-		 "  sending status %d\n",
+    gossip_debug(GOSSIP_SERVER_DEBUG,"  sending status %d\n",
 		 s_op->resp.status);
 
-    gossip_debug(SERVER_DEBUG, "returning attrmask ");
-    PINT_attrmask_print(SERVER_DEBUG, s_op->resp.u.getattr.attr.mask);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "returning attrmask ");
+    PINT_attrmask_print(GOSSIP_SERVER_DEBUG,
+                        s_op->resp.u.getattr.attr.mask);
 
     /* NOTE: we _intentionally_ preserve the error_code so that the 
      * following states can use it to set the status field in the
@@ -508,45 +506,30 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     return(1);
 }
 
-
-/*
- * Function: getattr_cleanup
- *
- * Params:   server_op *b, 
- *           job_status_s* js_p
- *
- * Pre:      Memory has been allocated
- *
- * Post:     All Allocated memory has been freed.
- *
- * Returns:  int
- *
- * Synopsis: free memory and return
- *           
- */
 static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
     PINT_STATE_DEBUG("getattr_cleanup");
 
-    /*
-      if this is a metafile, we may have allocated space
-      for the datafile handles; free that.
-    */
     if (s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
     {
         if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+        {
             free(s_op->resp.u.getattr.attr.u.meta.dfile_array);
+        }
 
         if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DIST)
+        {
             free(s_op->resp.u.getattr.attr.u.meta.dist);
+        }
     }
 
     if (s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_SYMLINK)
     {
         if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET)
+        {
             free(s_op->resp.u.getattr.attr.u.sym.target_path);
+        }
     }
-
     return(server_state_machine_complete(s_op));
 }
 

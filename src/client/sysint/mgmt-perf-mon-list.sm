@@ -69,7 +69,7 @@ int PVFS_mgmt_perf_mon_list(
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_perf_mon_list entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_perf_mon_list entered\n");
 
     if(server_count < 1 || history_count < 1 || !perf_matrix || !addr_array 
 	|| !end_time_ms_array)
@@ -91,8 +91,8 @@ int PVFS_mgmt_perf_mon_list(
     sm_p->u.perf_mon_list.next_id_array = next_id_array;
     sm_p->u.perf_mon_list.end_time_ms_array = end_time_ms_array;
 
-    gossip_debug(CLIENT_DEBUG,
-		 "PVFS_mgmt_perf_mon_list calling PINT_client_state_machine_post()\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_perf_mon_list "
+                 "calling PINT_client_state_machine_post()\n");
 
     /* do something to kick off processing */
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_PERF_MON_LIST);
@@ -106,8 +106,8 @@ int PVFS_mgmt_perf_mon_list(
 
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0) {
-	gossip_debug(CLIENT_DEBUG,
-		     "PVFS_mgmt_perf_mon_list calling PINT_client_state_machine_test()\n");
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_perf_mon_list "
+                     "calling PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
     if(ret < 0)
@@ -116,7 +116,7 @@ int PVFS_mgmt_perf_mon_list(
 	return(ret);
     }
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_perf_mon_list completed\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_perf_mon_list completed\n");
 
     /* save our return value */
     error = sm_p->error_code;
@@ -132,7 +132,8 @@ static int mgmt_perf_mon_list_setup_msgpair(PINT_client_sm *sm_p,
     int i;
     PINT_client_sm_msgpair_state *msg_p;
 
-    gossip_debug(CLIENT_DEBUG, "perf_mon_list state: mgmt_perf_mon_list_setup_msgpair\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "perf_mon_list state: "
+                 "mgmt_perf_mon_list_setup_msgpair\n");
 
     /* allocate memory for msgpair array */
     sm_p->msgarray_count = sm_p->u.perf_mon_list.server_count;

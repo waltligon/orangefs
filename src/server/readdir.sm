@@ -13,15 +13,21 @@
 #include "pvfs2-attr.h"
 #include "trove.h"
 
-enum {
+enum
+{
     STATE_ENOTDIR = 7
 };
 
-static int readdir_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int readdir_read_dirdata_handle(PINT_server_op *s_op, job_status_s* js_p);
-static int readdir_iterate_on_entries(PINT_server_op *s_op, job_status_s* js_p);
-static int readdir_verify_directory_metadata(PINT_server_op *s_op, job_status_s* js_p);
-static int readdir_setup_resp(PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_cleanup(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_read_dirdata_handle(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_iterate_on_entries(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_verify_directory_metadata(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_setup_resp(
+    PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -101,15 +107,18 @@ static int readdir_verify_directory_metadata(PINT_server_op *s_op,
 
     a_p = &s_op->attr;
 
-    gossip_debug(SERVER_DEBUG,
-		 "  attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
-		 a_p->owner,
-		 a_p->group,
-		 a_p->perms,
-		 a_p->objtype);
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG,
+        "  attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
+        a_p->owner,
+        a_p->group,
+        a_p->perms,
+        a_p->objtype);
 
-    if (a_p->objtype != PVFS_TYPE_DIRECTORY) {
-	gossip_debug(SERVER_DEBUG, "  object is not a directory; halting readdir and sending response\n");
+    if (a_p->objtype != PVFS_TYPE_DIRECTORY)
+    {
+	gossip_debug(GOSSIP_SERVER_DEBUG, "  object is not a "
+                     "directory; halting readdir and sending response\n");
 	js_p->error_code = STATE_ENOTDIR;
 	return 1;
     }
@@ -117,7 +126,6 @@ static int readdir_verify_directory_metadata(PINT_server_op *s_op,
     js_p->error_code = 0;
     return 1;
 }
-
 
 /*
  * Function: readdir_read_dirdata_handle
@@ -127,7 +135,8 @@ static int readdir_verify_directory_metadata(PINT_server_op *s_op,
  *
  * Returns:  int
  *
- * Synopsis: read the handle of the dirdata space from the directory's keyval space
+ * Synopsis: read the handle of the dirdata space from the directory's
+ * keyval space
  *           
  */
 static int readdir_read_dirdata_handle(PINT_server_op *s_op,
@@ -145,7 +154,7 @@ static int readdir_read_dirdata_handle(PINT_server_op *s_op,
     s_op->val.buffer    = &s_op->u.readdir.dirent_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  reading metadata (coll_id = 0x%x, handle = %Lu, "
                  "key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.readdir.fs_id,
@@ -209,8 +218,11 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
      * - 2 * dirent_count keyval structures to pass to iterate function
      * - dirent_count dirent structures to hold the results
      */
-    kv_array_size = s_op->req->u.readdir.dirent_count * sizeof(TROVE_keyval_s);
-    memory_size = 2 * kv_array_size + s_op->req->u.readdir.dirent_count * sizeof(PVFS_dirent);
+    kv_array_size = (s_op->req->u.readdir.dirent_count *
+                     sizeof(TROVE_keyval_s));
+    memory_size = (2 * kv_array_size +
+                   s_op->req->u.readdir.dirent_count *
+                   sizeof(PVFS_dirent));
 
     memory_buffer = malloc(memory_size);
     assert(memory_buffer != NULL);
@@ -227,20 +239,22 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
     /* fill in values into all keyval structures prior to iterate call */
     for (j = 0; j < s_op->req->u.readdir.dirent_count; j++)
     {
-	s_op->key_a[j].buffer    = s_op->resp.u.readdir.dirent_array[j].d_name;
+	s_op->key_a[j].buffer =
+            s_op->resp.u.readdir.dirent_array[j].d_name;
 	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
-
-	s_op->val_a[j].buffer    = &(s_op->resp.u.readdir.dirent_array[j].handle);
+	s_op->val_a[j].buffer =
+            &(s_op->resp.u.readdir.dirent_array[j].handle);
 	s_op->val_a[j].buffer_sz = sizeof(PVFS_handle);
     }
 
-    gossip_debug(SERVER_DEBUG,
-		 "  iterating over keyvals (coll_id = 0x%x, handle = "
-                 "%Lu, token = 0x%x, count = %d)\n",
-		 s_op->req->u.readdir.fs_id,
-		 Lu(s_op->u.readdir.dirent_handle),
-		 s_op->req->u.readdir.token,
-		 s_op->req->u.readdir.dirent_count);
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG,
+        "  iterating over keyvals (coll_id = 0x%x, handle = "
+        "%Lu, token = 0x%x, count = %d)\n",
+        s_op->req->u.readdir.fs_id,
+        Lu(s_op->u.readdir.dirent_handle),
+        s_op->req->u.readdir.token,
+        s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,
 				   s_op->u.readdir.dirent_handle,
@@ -258,11 +272,6 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
     return ret;
 }
 
-
-/* readdir_setup_resp()
- *
- * fills in the response structure based on results of earlier states
- */
 static int readdir_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
 
@@ -270,7 +279,7 @@ static int readdir_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 
     if (js_p->error_code == STATE_ENOTDIR) {
 
-	gossip_debug(SERVER_DEBUG,
+	gossip_debug(GOSSIP_SERVER_DEBUG,
 		     "  handle didn't refer to a directory\n");
 
 	js_p->error_code = -PVFS_EINVAL;
@@ -279,7 +288,7 @@ static int readdir_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     else if (js_p->error_code != 0) {
 	/* for now let's assume this is an "empty" directory */
 
-	gossip_debug(SERVER_DEBUG,
+	gossip_debug(GOSSIP_SERVER_DEBUG,
 		     "  error code = %d; assuming empty directory\n",
 		     js_p->error_code);
 

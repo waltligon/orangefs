@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 
     /* set debugging stuff */
     gossip_enable_stderr();
-    gossip_set_debug_mask(1, NCACHE_DEBUG);
+    gossip_set_debug_mask(1, GOSSIP_NCACHE_DEBUG);
 
 
     /* initialize the cache */

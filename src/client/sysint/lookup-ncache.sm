@@ -83,7 +83,7 @@ static int lookup_ncache_lookup(PINT_client_sm *sm_p,
     int ret;
     PVFS_pinode_reference parent_ref, object_ref;
 
-    gossip_debug(CLIENT_DEBUG, "lookup_ncache state: lookup\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_ncache state: lookup\n");
 
     assert(js_p->error_code == 0); /* sanity check */
 
@@ -105,15 +105,16 @@ static int lookup_ncache_lookup(PINT_client_sm *sm_p,
 	fake_resp.u.lookup_path.handle_count = 1;
 	fake_resp.u.lookup_path.attr_count   = 0;
 
-        gossip_debug(NCACHE_DEBUG, "*** ncache hit on %s (%Lu|%d)!\n",
-                     sm_p->msgpair.req.u.lookup_path.path,
-                     Lu(object_ref.handle), object_ref.fs_id);
+        gossip_debug(
+            GOSSIP_NCACHE_DEBUG, "*** ncache hit on %s (%Lu|%d)!\n",
+            sm_p->msgpair.req.u.lookup_path.path,
+            Lu(object_ref.handle), object_ref.fs_id);
 
         sm_p->ncache_hit = 1;
 	ret = sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
 	return 1;
     }
-    gossip_debug(NCACHE_DEBUG, "*** ncache clean miss on %s.\n",
+    gossip_debug(GOSSIP_NCACHE_DEBUG, "*** ncache clean miss on %s.\n",
                  sm_p->msgpair.req.u.lookup_path.path);
     js_p->error_code = LOOKUP_NCACHE_MISS;
     return 1;

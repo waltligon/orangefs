@@ -142,7 +142,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     if ((PINT_REQUEST_TOTAL_BYTES(mem_req) == 0) ||
         (PINT_REQUEST_TOTAL_BYTES(file_req) == 0))
     {
-	gossip_ldebug(CLIENT_DEBUG, "Warning: 0 byte I/O operation "
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Warning: 0 byte I/O operation "
                       "attempted.\n");
 	resp_p->total_completed = 0;
 	return(0);
@@ -201,7 +201,7 @@ static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     uint32_t attrmask;
     int ret = -1;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "(%p) io state: io_object_getattr_setup_msgpair\n",
 		 sm_p);
 
@@ -316,7 +316,7 @@ static int io_object_getattr_comp_fn(void *v_p,
         }
         sm_p->u.io.dist_size = r_attr_p->u.meta.dist_size;
 
-        gossip_debug(CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "io_object_getattr_comp_fn: %d datafiles.\n",
                      r_attr_p->u.meta.dfile_count);
 		
@@ -377,7 +377,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 
     struct PINT_client_io_sm *iosm_p = &sm_p->u.io; /* convenience */
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "(%p) io state: io_datafile_setup_msgpairs\n",
 		 sm_p);
 
@@ -417,7 +417,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 	return 1;
     }
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "  datafile_setup_msgpairs: %d datafiles might have data\n",
 		 target_datafile_count);
 
@@ -469,7 +469,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 	int orig_index;
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
-	gossip_debug(CLIENT_DEBUG,
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		     "  sending I/O request for 0x%08Lx\n",
 		     Lu(target_datafile_array[i]));
 
@@ -535,7 +535,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 {
     int ret, i;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "io_datafile_post_msgpairs state: post (%d message(s))\n",
 		 sm_p->msgarray_count);
 
@@ -645,7 +645,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 	}
 	else if (ret == 1) {
 	    /* send completed immediately; decrement the completion counter */
-	    gossip_debug(CLIENT_DEBUG,
+	    gossip_debug(GOSSIP_CLIENT_DEBUG,
 			 "  io_datafile_post_msgpairs: send completed immediately.\n");
 
 	    /* 0 is the valid "completed job id" value, according to Phil */
@@ -689,7 +689,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
     job_id_t tmp_id;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(CLIENT_DEBUG, "io state: datafile_complete\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "io state: datafile_complete\n");
 
     /* loads of sanity checks */
     assert(sm_p->msgarray_count == sm_p->u.io.datafile_count);
@@ -733,14 +733,14 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    sm_p->msgarray[0].comp_ct--;
 
 	    if (sm_p->msgarray[0].comp_ct == 0) {
-		gossip_debug(CLIENT_DEBUG,
+		gossip_debug(GOSSIP_CLIENT_DEBUG,
 			     "  all msgpairs complete.\n");
 	    }
 	}
     }
 
     if (matched_msgpair && recv_match == -1) {
-	gossip_debug(CLIENT_DEBUG, "  matched send to %d; continuing.\n", i);
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "  matched send to %d; continuing.\n", i);
 
 	/* matched a completed send; just return */
 	return 0;
@@ -757,7 +757,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
 	struct PVFS_server_resp *resp_p; /* response structure (decoded) */
 
-	gossip_debug(CLIENT_DEBUG, "  matched response from %d.\n", i);
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "  matched response from %d.\n", i);
 
 	ret = PINT_serv_decode_resp(msg_p->encoded_resp_p,
 				    &decoded_resp,
@@ -778,7 +778,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	if (msg_p->recv_status.error_code != 0 || msg_p->op_status != 0)
 	{
 	    PVFS_perror_gossip("io_datafile_complete_msgpairs", msg_p->recv_status.error_code);
-	    gossip_debug(CLIENT_DEBUG,
+	    gossip_debug(GOSSIP_CLIENT_DEBUG,
 			 "  error %d with status %d related to response from %d; not submitting flow.\n",
 			 msg_p->recv_status.error_code, msg_p->op_status, recv_match);
 	    /* TODO: handle the case of a zero error code, but a non-zero
@@ -799,7 +799,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    flow_descriptor *fl_p;
 	    struct PINT_client_io_sm *iosm_p = &sm_p->u.io;
 
-	    gossip_debug(CLIENT_DEBUG, "  building flow for %d.\n", recv_match);
+	    gossip_debug(GOSSIP_CLIENT_DEBUG, "  building flow for %d.\n", recv_match);
 
 	    /* find matching flow descriptor */
 	    fl_p = &sm_p->u.io.flow_array[recv_match];
@@ -817,7 +817,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    /* memory datatype */
 	    fl_p->mem_req         = iosm_p->mem_req;
 
-	    gossip_debug(CLIENT_DEBUG,
+	    gossip_debug(GOSSIP_CLIENT_DEBUG,
 			 "    bstream_size = %Ld, datafile_nr = %d, datafile_ct = %d, file_req_off = %Ld\n",
 			 Ld(fl_p->file_data.fsize),
 			 fl_p->file_data.server_nr,
@@ -865,7 +865,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 		fl_p->dest.endpoint_id   = BMI_ENDPOINT;
 		fl_p->dest.u.bmi.address = msg_p->svr_addr;
 
-		gossip_debug(CLIENT_DEBUG,
+		gossip_debug(GOSSIP_CLIENT_DEBUG,
 			     "  preposting write ack for %d.\n",
 			     recv_match);
 
@@ -918,7 +918,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    }
 	    else if (ret == 1) {
 		/* flow completed immediately; i guess this is possible... */
-		gossip_debug(CLIENT_DEBUG,
+		gossip_debug(GOSSIP_CLIENT_DEBUG,
 			     "  flow for %d completed immediately!\n",
 			     recv_match);
 		assert(iosm_p->flow_status_array[recv_match].error_code == 0);
@@ -926,7 +926,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    else {
 		assert(ret == 0); /* return value range check */
 
-		gossip_debug(CLIENT_DEBUG,
+		gossip_debug(GOSSIP_CLIENT_DEBUG,
 			     "  posted flow for %d.\n",
 			     recv_match);
 
@@ -944,7 +944,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
      * a flow or a write ack
      */
 
-    gossip_debug(CLIENT_DEBUG, "  trying to match to a flow or ack.\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "  trying to match to a flow or ack.\n");
 
     if(js_p->status_user_tag >= (sm_p->msgarray_count*2) &&
 	js_p->status_user_tag < (sm_p->msgarray_count*3))
@@ -955,7 +955,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	sm_p->u.io.flow_status_array[js_p->status_user_tag-(sm_p->msgarray_count*2)] 
 	    = *js_p;
 	sm_p->u.io.flow_comp_ct--;
-	gossip_debug(CLIENT_DEBUG,
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		     "  matched completed flow for %d\n",
 		     i);
 
@@ -971,7 +971,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	assert(sm_p->u.io.ackarray[i].recv_status.actual_size 
 	    <= sm_p->u.io.ackarray[i].max_resp_sz);
 	sm_p->u.io.ack_comp_ct--;
-	gossip_debug(CLIENT_DEBUG,
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		     "  matched completed ack for %d\n",
 		     i);
 
@@ -982,7 +982,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	sm_p->u.io.ack_comp_ct == 0 &&
 	sm_p->msgarray[0].comp_ct == 0)
     {
-	gossip_debug(CLIENT_DEBUG, "  all msgpairs, flows, ack completed.\n");
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "  all msgpairs, flows, ack completed.\n");
 
 	/* quit returning to this state! */
 	js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
@@ -997,7 +997,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 static int io_object_getattr_failure(PINT_client_sm *sm_p,
 				     job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "(%p) io state: io_object_getattr_failure\n",
 		 sm_p);
 
@@ -1019,7 +1019,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     int i, ret, error = 0, error_count = 0;
     PVFS_size total_size = 0;
 
-    gossip_debug(CLIENT_DEBUG,
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
 		 "(%p) io state: analyze_results\n",
 		 sm_p);
 
@@ -1046,7 +1046,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 
 	    if (msg_p->send_status.error_code != 0)
 	    {
-		gossip_debug(CLIENT_DEBUG,
+		gossip_debug(GOSSIP_CLIENT_DEBUG,
 			     "  error (%d) in msgpair send for %d.\n",
 			     msg_p->send_status.error_code,
 			     i);
@@ -1055,7 +1055,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 	    }
 	    else if (msg_p->recv_status.error_code != 0)
 	    {
-		gossip_debug(CLIENT_DEBUG,
+		gossip_debug(GOSSIP_CLIENT_DEBUG,
 			     "  error (%d) in msgpair recv for %d.\n",
 			     msg_p->recv_status.error_code,
 			     i);
@@ -1070,7 +1070,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 	    {
 		if (iosm_p->flow_status_array[i].error_code != 0)
 		{
-		    gossip_debug(CLIENT_DEBUG,
+		    gossip_debug(GOSSIP_CLIENT_DEBUG,
 				 "  error (%d) in flow for %d.\n",
 				 iosm_p->flow_status_array[i].error_code,
 				 i);
@@ -1084,7 +1084,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 		    /* size for reads is reported in the flow;
 		     * size for writes is reported in the final ack.
 		     */
-		    gossip_debug(CLIENT_DEBUG,
+		    gossip_debug(GOSSIP_CLIENT_DEBUG,
 				 "  %Ld bytes read from %d.\n",
 				 Ld(iosm_p->flow_array[i].total_transfered),
 				 i);
@@ -1093,7 +1093,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 		else if (iosm_p->io_type == PVFS_IO_WRITE) {
 		    if (iosm_p->ackarray[i].recv_status.error_code != 0)
 		    {
-			gossip_debug(CLIENT_DEBUG,
+			gossip_debug(GOSSIP_CLIENT_DEBUG,
 				     "  error (%d) in write ack for %d.\n",
 				     iosm_p->ackarray[i].recv_status.error_code,
 				     i);
@@ -1119,7 +1119,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 						    iosm_p->ackarray[i].recv_status.actual_size,
 						    &resp_p);
                         assert(ret == 0);
-			gossip_debug(CLIENT_DEBUG,
+			gossip_debug(GOSSIP_CLIENT_DEBUG,
 				     "  %Ld bytes written to %d.\n",
 				     Ld(resp_p->u.write_completion.total_completed),
 				     i);
@@ -1267,7 +1267,7 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
 	{
 	    assert(tmp_result.bytes > 0); /* parameter range checking */
 
-	    gossip_debug(CLIENT_DEBUG,
+	    gossip_debug(GOSSIP_CLIENT_DEBUG,
 			 "io_find_target_dfiles: datafile %d might have some data.\n",
 			 i);
 

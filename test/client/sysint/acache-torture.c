@@ -33,7 +33,7 @@ int main(int argc, char **argv)
     }
 
     gossip_enable_stderr();
-    gossip_set_debug_mask(1, ACACHE_DEBUG);
+    gossip_set_debug_mask(1, GOSSIP_ACACHE_DEBUG);
 
     /* initialize the cache */
     ret = PINT_acache_initialize();
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 
     if (i == entries_to_add)
     {
-        gossip_debug(ACACHE_DEBUG, "Added %d entries to acache\n", i);
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "Added %d entries to acache\n", i);
     }
 
     for(i = 0; i < entries_to_add; i++)
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
     }
 
     /* sleep to make sure all entries expired */
-    gossip_debug(ACACHE_DEBUG," Sleeping for %d seconds\n",timeout);
+    gossip_debug(GOSSIP_ACACHE_DEBUG," Sleeping for %d seconds\n",timeout);
     sleep(timeout);
 
     for(i = 0; i < entries_to_add; i++)
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
 
     if (i == entries_to_add)
     {
-        gossip_debug(ACACHE_DEBUG, "All expected lookups were ok\n");
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "All expected lookups were ok\n");
     }
 
     /* drop initial references */

@@ -182,7 +182,7 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
 
     a_p = &s_op->attr;
     
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  attrs read from keyval = (owner = %d, "
                  "group = %d, perms = %o, type = %d)\n",
 		 a_p->owner,
@@ -195,7 +195,7 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
 	js_p->error_code = STATE_TYPE_DIRECTORY;
 
 	gossip_debug(
-            SERVER_DEBUG, "  type is directory; removing "
+            GOSSIP_SERVER_DEBUG, "  type is directory; removing "
             "dirdata object before removing directory itself.\n");
     }
     else
@@ -227,7 +227,7 @@ static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
     s_op->val.buffer    = &s_op->u.remove.dirdata_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  trying to read dirdata handle (coll_id = 0x%x, "
                  "handle = %Lu, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.remove.fs_id,
@@ -265,7 +265,7 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
 
     PINT_STATE_DEBUG("remove_dirdata_dspace");
 
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  removing dirdata dspace %Lu\n",
 		 Lu(s_op->u.remove.dirdata_handle));
 

@@ -131,7 +131,7 @@ int main(int argc, char **argv)
      * initial debug mask so that we can output errors at startup.
      */
     gossip_enable_stderr();
-    gossip_set_debug_mask(1, SERVER_DEBUG);
+    gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
 
     server_status_flag |= SERVER_GOSSIP_INIT;
 
@@ -143,8 +143,8 @@ int main(int argc, char **argv)
 	goto server_shutdown;
     }
 
-    gossip_debug(SERVER_DEBUG, "PVFS2 Server version %s starting.\n",
-		 PVFS2_VERSION);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
 
     fs_conf = ((argc >= optind) ? argv[optind] : NULL);
     server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
      */
     debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
     gossip_set_debug_mask(1, debug_mask);
-    gossip_debug(SERVER_DEBUG,"Logging %s (mask %d)\n",
+    gossip_debug(GOSSIP_SERVER_DEBUG,"Logging %s (mask %d)\n",
                  server_config.event_logging, debug_mask);
 
     /* If we were directed to remove a collection, do so and then
@@ -409,7 +409,7 @@ static int server_initialize(
 
     *server_status_flag |= SERVER_SIGNAL_HANDLER_INIT;
 
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Initialization completed successfully.\n");
 
     /* finally, redirect gossip to specified target if backgrounded */
@@ -503,7 +503,7 @@ static int server_initialize_subsystems(
 
     *server_status_flag |= SERVER_ENCODER_INIT;
 
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "Passing %s to BMI as listen address.\n",
 		 server_config.host_id);
 
@@ -667,7 +667,7 @@ static int server_initialize_subsystems(
             }
 
 	    gossip_debug(
-                SERVER_DEBUG, "File system %s using handles: %s\n",
+                GOSSIP_SERVER_DEBUG, "File system %s using handles: %s\n",
                 cur_fs->file_system_name, cur_merged_handle_range);
 
             trove_close_context(cur_fs->coll_id, trove_context);
@@ -678,14 +678,17 @@ static int server_initialize_subsystems(
     }
 #ifdef __PVFS2_TROVE_THREADED__
 #ifdef __PVFS2_TROVE_AIO_THREADED__
-    gossip_debug(SERVER_DEBUG, "Storage Init Complete (aio-threaded)\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "Storage Init Complete (aio-threaded)\n");
 #else
-    gossip_debug(SERVER_DEBUG, "Storage Init Complete (threaded)\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "Storage Init Complete (threaded)\n");
 #endif
 #else
-    gossip_debug(SERVER_DEBUG, "Storage Init Complete (non-threaded)\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "Storage Init Complete (non-threaded)\n");
 #endif
-    gossip_debug(SERVER_DEBUG, "%d filesystem(s) initialized\n",
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%d filesystem(s) initialized\n",
                  PINT_llist_count(server_config.file_systems));
 
     /* initialize the flow interface */
@@ -822,31 +825,31 @@ static int server_shutdown(
 	exit(-1);
     }
 
-    gossip_debug(SERVER_DEBUG,
+    gossip_debug(GOSSIP_SERVER_DEBUG,
                  "*** normal server shutdown in progress ***\n");
 
     if (status & SERVER_STATE_MACHINE_INIT)
     {
-        gossip_debug(
-            SERVER_DEBUG, "* halting state machine processor ... ");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "* halting state machine processor ... ");
 	PINT_state_machine_halt();
-        gossip_debug(SERVER_DEBUG, "done.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
 
     if (status & SERVER_PERF_COUNTER_INIT)
     {
-        gossip_debug(
-            SERVER_DEBUG, "* halting performance interface   ... ");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "* halting performance interface   ... ");
 	PINT_perf_finalize();
-        gossip_debug(SERVER_DEBUG, "done.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
 
     if (status & SERVER_REQ_SCHED_INIT)
     {
-        gossip_debug(
-            SERVER_DEBUG, "* halting request scheduler       ... ");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "* halting request scheduler       ... ");
 	PINT_req_sched_finalize();
-        gossip_debug(SERVER_DEBUG, "done.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
 	
     if (status & SERVER_JOB_CTX_INIT)
@@ -856,47 +859,48 @@ static int server_shutdown(
 
     if (status & SERVER_JOB_INIT)
     {
-        gossip_debug(
-            SERVER_DEBUG, "* halting job interface           ... ");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "* halting job interface           ... ");
 	job_finalize();
-        gossip_debug(SERVER_DEBUG, "done.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
 
     if (status & SERVER_TROVE_INIT)
     {
-        gossip_debug(
-            SERVER_DEBUG, "* halting storage interface       ... ");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "* halting storage interface       ... ");
 	trove_finalize();
-        gossip_debug(SERVER_DEBUG, "done.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
 
     if (status & SERVER_FLOW_INIT)
     {
-        gossip_debug(
-            SERVER_DEBUG, "* halting flow interface          ... ");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "* halting flow interface          ... ");
 	PINT_flow_finalize();
-        gossip_debug(SERVER_DEBUG, "done.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
 
     if (status & SERVER_BMI_INIT)
     {
-        gossip_debug(
-            SERVER_DEBUG, "* halting bmi interface           ... ");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "* halting bmi interface           ... ");
 	BMI_finalize();
-        gossip_debug(SERVER_DEBUG, "done.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
 
     if (status & SERVER_ENCODER_INIT)
     {
-        gossip_debug(
-            SERVER_DEBUG, "* halting encoder interface       ... ");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "* halting encoder interface       ... ");
 	PINT_encode_finalize();
-        gossip_debug(SERVER_DEBUG, "done.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
 
     if (status & SERVER_GOSSIP_INIT)
     {
-        gossip_debug(SERVER_DEBUG, "* halting logging interface\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "* halting logging interface\n");
 	gossip_disable();
     }
 

@@ -60,7 +60,7 @@ static int service_lookup_request(
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
         gossip_debug(
-            CLIENT_DEBUG,
+            GOSSIP_CLIENT_DEBUG,
             "Got a lookup request for %s (fsid %d | parent %Lu)\n",
             in_upcall->req.lookup.d_name,
             in_upcall->req.lookup.parent_refn.fs_id,
@@ -76,11 +76,11 @@ static int service_lookup_request(
         if (ret < 0)
         {
             gossip_debug(
-                CLIENT_DEBUG,
+                GOSSIP_CLIENT_DEBUG,
                 "Failed to lookup %s (fsid %d | parent is %Lu)!\n",
                 in_upcall->req.lookup.d_name,
                 parent_refn.fs_id, Lu(parent_refn.handle));
-            gossip_debug(CLIENT_DEBUG,
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
                          "Lookup returned error code %d\n", ret);
 
             /* we need to send a blank response */
@@ -122,7 +122,7 @@ static int service_create_request(
         parent_refn = in_upcall->req.create.parent_refn;
 
         gossip_debug(
-            CLIENT_DEBUG,
+            GOSSIP_CLIENT_DEBUG,
             "Got a create request for %s (fsid %d | parent %Lu)\n",
             in_upcall->req.create.d_name,parent_refn.fs_id,
             Lu(parent_refn.handle));
@@ -211,7 +211,7 @@ static int service_symlink_request(
         parent_refn = in_upcall->req.sym.parent_refn;
 
         gossip_debug(
-            CLIENT_DEBUG,
+            GOSSIP_CLIENT_DEBUG,
             "Got a symlink request from %s (fsid %d | parent %Lu) to %s\n",
             in_upcall->req.sym.entry_name,parent_refn.fs_id,
             Lu(parent_refn.handle), in_upcall->req.sym.target);
@@ -442,7 +442,7 @@ static int service_getattr_request(
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
         gossip_debug(
-            CLIENT_DEBUG,
+            GOSSIP_CLIENT_DEBUG,
             "got a getattr request for fsid %d | handle %Lu\n",
             in_upcall->req.getattr.refn.fs_id,
             Lu(in_upcall->req.getattr.refn.handle));
@@ -503,7 +503,7 @@ static int service_setattr_request(
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
         gossip_debug(
-            CLIENT_DEBUG,
+            GOSSIP_CLIENT_DEBUG,
             "got a setattr request for fsid %d | handle %Lu\n",
             in_upcall->req.setattr.refn.fs_id,
             Lu(in_upcall->req.setattr.refn.handle));
@@ -547,7 +547,7 @@ static int service_remove_request(
         parent_refn = in_upcall->req.remove.parent_refn;
 
         gossip_debug(
-            CLIENT_DEBUG,
+            GOSSIP_CLIENT_DEBUG,
             "Got a remove request for %s under fsid %d and "
             "handle %Lu\n", in_upcall->req.remove.d_name,
             parent_refn.fs_id, Lu(parent_refn.handle));
@@ -599,7 +599,7 @@ static int service_mkdir_request(
         parent_refn = in_upcall->req.mkdir.parent_refn;
 
         gossip_debug(
-            CLIENT_DEBUG,
+            GOSSIP_CLIENT_DEBUG,
             "Got a mkdir request for %s (fsid %d | parent %Lu)\n",
             in_upcall->req.mkdir.d_name,parent_refn.fs_id,
             Lu(parent_refn.handle));
@@ -647,7 +647,7 @@ static int service_readdir_request(
         refn = in_upcall->req.readdir.refn;
 
         gossip_debug(
-            CLIENT_DEBUG,
+            GOSSIP_CLIENT_DEBUG,
             "Got a readdir request for fsid %d | parent %Lu "
             "(token is %d)\n", refn.fs_id, Lu(refn.handle),
             in_upcall->req.readdir.token);
@@ -720,7 +720,7 @@ static int service_rename_request(
         new_parent_refn = in_upcall->req.rename.new_parent_refn;
 
         gossip_debug(
-            CLIENT_DEBUG,
+            GOSSIP_CLIENT_DEBUG,
             "Got a rename request for %s under fsid %d and "
             "handle %Lu to be %s under fsid %d and handle %Lu\n",
             in_upcall->req.rename.d_old_name,
@@ -768,7 +768,7 @@ static int service_statfs_request(
         memset(&resp_statfs,0,sizeof(PVFS_sysresp_statfs));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-        gossip_debug(CLIENT_DEBUG, "Got a statfs request for fsid %d\n",
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Got a statfs request for fsid %d\n",
                      in_upcall->req.statfs.fs_id);
 
         ret = PVFS_sys_statfs(in_upcall->req.statfs.fs_id,
@@ -824,7 +824,7 @@ static int service_truncate_request(
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
         gossip_debug(
-            CLIENT_DEBUG,
+            GOSSIP_CLIENT_DEBUG,
             "Got a truncate request for %Lu under fsid %d to be "
             "size %Ld\n", Lu(in_upcall->req.truncate.refn.handle),
             in_upcall->req.truncate.refn.fs_id,
@@ -999,7 +999,7 @@ int main(int argc, char **argv)
 	    return(-1);
 	}
 
-        gossip_debug(CLIENT_DEBUG,
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "Got message: size: %d, tag: %d, payload: %p\n",
                      info.size, (int)info.tag, info.buffer);
 

@@ -1990,10 +1990,12 @@ int PINT_config_pvfs2_mkspace(
               for the first fs/collection we encounter, create
               the storage space if it doesn't exist.
             */
-            gossip_debug(SERVER_DEBUG,"\n*****************************\n");
-            gossip_debug(SERVER_DEBUG,"Creating new PVFS2 %s\n",
-                    (create_collection_only ? "collection" :
-                     "storage space"));
+            gossip_debug(
+                GOSSIP_SERVER_DEBUG,"\n*****************************\n");
+            gossip_debug(
+                GOSSIP_SERVER_DEBUG,"Creating new PVFS2 %s\n",
+                (create_collection_only ? "collection" :
+                 "storage space"));
             ret = pvfs2_mkspace(config->storage_path,
                                 cur_fs->file_system_name,
                                 cur_fs->coll_id,
@@ -2001,7 +2003,8 @@ int PINT_config_pvfs2_mkspace(
                                 cur_handle_range,
                                 create_collection_only,
                                 1);
-            gossip_debug(SERVER_DEBUG,"\n*****************************\n");
+            gossip_debug(
+                GOSSIP_SERVER_DEBUG,"\n*****************************\n");
 
             /*
               now that the storage space is created, set the
@@ -2045,16 +2048,19 @@ int PINT_config_pvfs2_rmspace(
             cur = PINT_llist_next(cur);
             remove_collection_only = (PINT_llist_head(cur) ? 1 : 0);
 
-            gossip_debug(SERVER_DEBUG,"\n*****************************\n");
-            gossip_debug(SERVER_DEBUG,"Removing existing PVFS2 %s\n",
-                    (remove_collection_only ? "collection" :
-                     "storage space"));
+            gossip_debug(
+                GOSSIP_SERVER_DEBUG,"\n*****************************\n");
+            gossip_debug(
+                GOSSIP_SERVER_DEBUG,"Removing existing PVFS2 %s\n",
+                (remove_collection_only ? "collection" :
+                 "storage space"));
             ret = pvfs2_rmspace(config->storage_path,
                                 cur_fs->file_system_name,
                                 cur_fs->coll_id,
                                 remove_collection_only,
                                 1);
-            gossip_debug(SERVER_DEBUG,"\n*****************************\n");
+            gossip_debug(
+                GOSSIP_SERVER_DEBUG,"\n*****************************\n");
         }
     }
     return ret;
