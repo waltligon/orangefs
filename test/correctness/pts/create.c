@@ -100,7 +100,7 @@ int test_create(MPI_Comm *comm, int rank, char *buf, void *params)
 	pvfs_mntlist mnt = {0,NULL};
 	generic_params *myparams = (generic_params *)params;
 	char name[PVFS_NAME_MAX];
-	int i;
+	int i, nerrs=0;
 
 	/* Parse PVFStab */
 	ret = parse_pvfstab(NULL,&mnt);
@@ -120,7 +120,7 @@ int test_create(MPI_Comm *comm, int rank, char *buf, void *params)
 
 	for (i=0; i<1; i++) {
 		snprintf(name, PVFS_NAME_MAX, "%d-testfile", i);
-		create_file(resp_init.fsid_list[0],  myparams->path, name);
+		nerrs += create_file(resp_init.fsid_list[0],  myparams->path, name);
 	}
 
 	//close it down
@@ -131,5 +131,5 @@ int test_create(MPI_Comm *comm, int rank, char *buf, void *params)
 		return (-1);
 	}
 
-	return(0);
+	return(nerrs);
 }
