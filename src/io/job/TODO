@@ -1,0 +1,33 @@
+
+general
+==========================================
+
+- switch to using trove_testsome() instead of trove_test() once it is
+  avaiable.
+
+- figure out what the deal is with trove_collection_lookup() returning
+  0 on immediate completion
+
+- figure out if vtag field should come from trove test() or if it
+  comes from the pointer passed in at post time
+
+- bring example programs back up to speed
+
+- get rid of HACK_global_fsid once we have resolved how the collection
+  id should interact with the trove interface
+
+- be sure to turn off mutex locks for non-threaded version
+
+- once unpost() is fully supported, attempt to unpost any pending
+  operations at finalize time
+
+- remember to verify that bmi and flow interfaces are initialized at
+  init time
+
+- look into possibility of hash table in place of completion queue
+
+- handle timeout / unpost situations
+
+- evaluate IBM pthreads implementation
+
+- add list support for BMI and trove

@@ -1,0 +1,84 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
+#ifndef __REQUEST_SCHEDULER_H
+#define __REQUEST_SCHEDULER_H
+
+#include <id-generator.h>
+#include <pvfs2-req-proto.h>
+
+/* this file contains the API for doing server side scheduling at
+ * the request level.  
+ */
+
+typedef id_gen_t req_sched_id;
+typedef int req_sched_error_code;
+
+/* setup and teardown */
+
+int PINT_req_sched_initialize(
+	void);
+
+int PINT_req_sched_finalize(
+	void);
+
+/* scheduler submission */
+
+int PINT_req_sched_post(
+	struct PVFS_server_req_s* in_request, 
+	void* in_user_ptr, 
+	req_sched_id* out_id);
+
+int PINT_req_sched_unpost(
+	req_sched_id in_id,
+	void** returned_user_ptr);
+
+int PINT_req_sched_release(
+	req_sched_id in_completed_id, 
+	void* in_user_ptr, 
+	req_sched_id* out_id);
+
+/* testing for completion */
+
+int PINT_req_sched_test(
+	req_sched_id in_id,
+	int* out_count_p,
+	void** returned_user_ptr_p,
+	req_sched_error_code* out_status);
+
+int PINT_req_sched_testsome(
+	req_sched_id* in_id_array,
+	int* inout_count_p,
+	int* out_index_array,
+	void** returned_user_ptr_array,
+	req_sched_error_code* out_status_array);
+
+int PINT_req_sched_testworld(
+	int* inout_count_p,
+	req_sched_id* out_id_array,
+	void** returned_user_ptr_array,
+	req_sched_error_code* out_status_array);
+
+int PINT_req_sched_wait(
+	req_sched_id in_id,
+	int* out_count_p,
+	void** returned_user_ptr_p,
+	req_sched_error_code* out_status);
+
+int PINT_req_sched_waitsome(
+	req_sched_id* in_id_array,
+	int* inout_count_p,
+	int* out_index_array,
+	void** returned_user_ptr_array,
+	req_sched_error_code* out_status_array);
+
+int PINT_req_sched_waitworld(
+	int* inout_count_p,
+	req_sched_id* out_id_array,
+	void** returned_user_ptr_array,
+	req_sched_error_code* out_status_array);
+
+#endif /* __REQUEST_SCHEDULER_H */

@@ -1,0 +1,131 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
+#ifndef __PVFS2_ATTR_H
+#define __PVFS2_ATTR_H
+
+/* This file contains declarations of the PVFS objects
+ *
+ * I think we want to keep extended attributes in a separate structure
+ * from PVFS_object_attr.  The reasoning for this is simple; they're
+ * extra stuff, and for many operations we won't want to require that
+ * the extended stuff get passed back and forth.
+ *
+ * Likewise for file distribution information; it would be silly to pass
+ * that information back on every stat call.  We simply don't need it
+ * unless we specifically ask for it.
+ */
+
+#include <pvfs2-types.h>
+#include <pint-distribution.h>
+
+/*#define ATTR_UID 1
+#define ATTR_GID 2
+#define ATTR_PERM 4
+#define ATTR_ATIME 8
+#define ATTR_CTIME 16
+#define ATTR_MTIME 32
+#define ATTR_TYPE 2048
+*/
+#define ATTR_BASIC 1
+#define ATTR_SIZE 64
+#define ATTR_META 128
+#define ATTR_DATA 256
+#define ATTR_DIR 512
+#define ATTR_SYM 1024
+/* PVFS filesystem objects */
+
+/* Various permission bits */
+#define O_EXECUTE		1
+#define O_WRITE 	 	2
+#define O_READ  		4
+#define G_EXECUTE 	8
+#define G_WRITE 		16	
+#define G_READ 		32		
+#define U_EXECUTE 	64	
+#define U_WRITE 		128	
+#define U_READ 		256	
+/*#define F_OK			512*/
+
+/*attributes*/
+/* MetaFile
+ *
+ */
+struct PVFS_metafile_attr_s {
+	/* distribution info */
+	//PVFS_dist dist;
+	//PVFS_Distribution dist;
+	/* array of datafile handles */
+	PVFS_handle *dfh;
+	/* Number of datafiles */
+	PVFS_count32 nr_datafiles;
+	/* Used by server to communicate size back to client
+	 * during getattr
+	 */
+};
+typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
+
+/* DataFile
+ *
+ */
+struct PVFS_datafile_attr_s {
+	/* May be used by I/O server to report size of datafile
+	 * to metaserver to help in total file size calculation 
+	 */
+	PVFS_size size;
+	PVFS_handle dfh;
+};
+typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
+
+/* Directory
+ *
+ */
+struct PVFS_directory_attr_s {
+	//PVFS_handle *dfh;
+};
+typedef struct PVFS_directory_attr_s PVFS_directory_attr;
+
+/* Symlink
+ *
+ */
+struct PVFS_symlink_attr_s {
+	/*PVFS_string target;*/
+};
+typedef struct PVFS_symlink_attr_s PVFS_symlink_attr;
+
+struct PVFS_object_eattr
+{
+
+};
+typedef struct PVFS_object_eattr PVFS_object_eattr;
+
+/* Attributes
+ */
+struct PVFS_object_attr {
+	/* bitfield? */
+	PVFS_uid owner;
+	PVFS_gid group;
+	PVFS_permissions perms;
+	PVFS_time atime;
+	PVFS_time mtime;
+	PVFS_time ctime;
+	int objtype; /* Type of PVFS Filesystem object */
+	union 
+	{
+		PVFS_metafile_attr meta;
+		PVFS_datafile_attr data;
+		PVFS_directory_attr dir;
+		PVFS_symlink_attr sym; /* ??? */
+	} u;
+};
+typedef struct PVFS_object_attr PVFS_object_attr;
+
+struct PVFS_attr_extended
+{
+
+};
+typedef struct PVFS_attr_extended PVFS_attr_extended;
+#endif /* __PVFS2_ATTR_H */
