@@ -91,59 +91,115 @@ static inline int copy_attributes_to_inode(
     return ret;
 }
 
+static inline void convert_attribute_mode_to_pvfs_sys_attr(
+    int mode,
+    PVFS_sys_attr *attrs)
+{
+    if (mode & S_IXOTH)
+        attrs->perms |= PVFS_O_EXECUTE;
+    if (mode & S_IWOTH)
+        attrs->perms |= PVFS_O_WRITE;
+    if (mode & S_IROTH)
+        attrs->perms |= PVFS_O_READ;
+
+    if (mode & S_IXGRP)
+        attrs->perms |= PVFS_G_EXECUTE;
+    if (mode & S_IWGRP)
+        attrs->perms |= PVFS_G_WRITE;
+    if (mode & S_IRGRP)
+        attrs->perms |= PVFS_G_READ;
+
+    if (mode & S_IXUSR)
+        attrs->perms |= PVFS_U_EXECUTE;
+    if (mode & S_IWUSR)
+        attrs->perms |= PVFS_U_WRITE;
+    if (mode & S_IRUSR)
+        attrs->perms |= PVFS_U_READ;
+
+    attrs->mask |= PVFS_ATTR_SYS_PERM;
+
+    if (mode & S_IFREG)
+    {
+        attrs->objtype = PVFS_TYPE_METAFILE;
+        attrs->mask |= PVFS_ATTR_SYS_TYPE;
+    }
+    else if (mode & S_IFDIR)
+    {
+        attrs->objtype = PVFS_TYPE_DIRECTORY;
+        attrs->mask |= PVFS_ATTR_SYS_TYPE;
+    }
+    else if (mode & S_IFLNK)
+    {
+        attrs->objtype = PVFS_TYPE_SYMLINK;
+        attrs->mask |= PVFS_ATTR_SYS_TYPE;
+    }
+}
+
 static inline int copy_attributes_from_inode(
     struct inode *inode,
-    PVFS_sys_attr * attrs)
+    PVFS_sys_attr * attrs,
+    struct iattr *iattr)
 {
     int ret = -1;
-    int perm_mode = 0;
 
     if (inode && attrs)
     {
-        attrs->owner = inode->i_uid;
-        attrs->group = inode->i_gid;
-        attrs->atime = (PVFS_time)inode->i_atime.tv_sec;
-        attrs->mtime = (PVFS_time)inode->i_mtime.tv_sec;
-        attrs->ctime = (PVFS_time)inode->i_ctime.tv_sec;
-
-        perm_mode = inode->i_mode;
-
-        if (perm_mode & S_IXOTH)
-            attrs->perms |= PVFS_O_EXECUTE;
-        if (perm_mode & S_IWOTH)
-            attrs->perms |= PVFS_O_WRITE;
-        if (perm_mode & S_IROTH)
-            attrs->perms |= PVFS_O_READ;
-
-        if (perm_mode & S_IXGRP)
-            attrs->perms |= PVFS_G_EXECUTE;
-        if (perm_mode & S_IWGRP)
-            attrs->perms |= PVFS_G_WRITE;
-        if (perm_mode & S_IRGRP)
-            attrs->perms |= PVFS_G_READ;
-
-        if (perm_mode & S_IXUSR)
-            attrs->perms |= PVFS_U_EXECUTE;
-        if (perm_mode & S_IWUSR)
-            attrs->perms |= PVFS_U_WRITE;
-        if (perm_mode & S_IRUSR)
-            attrs->perms |= PVFS_U_READ;
-
-        if (perm_mode & S_IFREG)
+        if (iattr)
         {
-            attrs->objtype = PVFS_TYPE_METAFILE;
-        }
-        else if (perm_mode & S_IFDIR)
-        {
-            attrs->objtype = PVFS_TYPE_DIRECTORY;
-        }
-        else if (perm_mode & S_IFLNK)
-        {
-            attrs->objtype = PVFS_TYPE_SYMLINK;
-        }
+            /*
+              if we got a non-NULL iattr structure, we need to be
+              careful to only copy the attributes out of the iattr
+              object that we know are valid
+            */
+            if (iattr->ia_valid & ATTR_UID)
+            {
+                attrs->owner = iattr->ia_uid;
+                attrs->mask |= PVFS_ATTR_SYS_UID;
+            }
+            if (iattr->ia_valid & ATTR_GID)
+            {
+                attrs->group = iattr->ia_gid;
+                attrs->mask |= PVFS_ATTR_SYS_GID;
+            }
+            if (iattr->ia_valid & ATTR_ATIME)
+            {
+                attrs->atime = (PVFS_time)iattr->ia_atime.tv_sec;
+                attrs->mask |= PVFS_ATTR_SYS_ATIME;
+            }
+            if (iattr->ia_valid & ATTR_MTIME)
+            {
+                attrs->mtime = (PVFS_time)iattr->ia_mtime.tv_sec;
+                attrs->mask |= PVFS_ATTR_SYS_MTIME;
+            }
+            if (iattr->ia_valid & ATTR_CTIME)
+            {
+                attrs->ctime = (PVFS_time)iattr->ia_ctime.tv_sec;
+                attrs->mask |= PVFS_ATTR_SYS_CTIME;
+            }
+            if (iattr->ia_valid & ATTR_MODE)
+            {
+                convert_attribute_mode_to_pvfs_sys_attr(
+                    iattr->ia_mode, attrs);
 
-        attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
+                /* FIXME: MAJOR KLUDGE HERE */
+                pvfs2_error("FIXME: FAKING VALID ATTRS in "
+                            "(copy_attributes_from_inode)\n");
+                attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
+            }
+        }
+        else
+        {
+            attrs->owner = inode->i_uid;
+            attrs->group = inode->i_gid;
+            attrs->atime = (PVFS_time)inode->i_atime.tv_sec;
+            attrs->mtime = (PVFS_time)inode->i_mtime.tv_sec;
+            attrs->ctime = (PVFS_time)inode->i_ctime.tv_sec;
 
+            convert_attribute_mode_to_pvfs_sys_attr(
+                inode->i_mode, attrs);
+
+            attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
+        }
         ret = 0;
     }
     return ret;
@@ -268,7 +324,7 @@ int pvfs2_inode_setattr(
 	new_op->upcall.type = PVFS2_VFS_OP_SETATTR;
         new_op->upcall.req.setattr.refn = pvfs2_inode->refn;
         copy_attributes_from_inode(
-            inode, &new_op->upcall.req.setattr.attributes);
+            inode, &new_op->upcall.req.setattr.attributes, iattr);
 
 	/* post req and wait for request to be serviced here */
 	add_op_to_request_list(new_op);
@@ -328,7 +384,7 @@ static inline struct inode *pvfs2_create_file(
 		PVFS2_SB(dir->i_sb)->fs_id;
 	}
         copy_attributes_from_inode(
-            inode, &new_op->upcall.req.create.attributes);
+            inode, &new_op->upcall.req.create.attributes, NULL);
 	strncpy(new_op->upcall.req.create.d_name,
 		dentry->d_name.name, PVFS2_NAME_LEN);
 
@@ -427,7 +483,7 @@ static inline struct inode *pvfs2_create_dir(
 		PVFS2_SB(dir->i_sb)->fs_id;
 	}
         copy_attributes_from_inode(
-            inode, &new_op->upcall.req.mkdir.attributes);
+            inode, &new_op->upcall.req.mkdir.attributes, NULL);
 	strncpy(new_op->upcall.req.mkdir.d_name,
 		dentry->d_name.name, PVFS2_NAME_LEN);
 

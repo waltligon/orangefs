@@ -128,11 +128,22 @@ static int pvfs2_setattr(
     struct dentry *dentry,
     struct iattr *iattr)
 {
+    int ret = -EINVAL;
     struct inode *inode = dentry->d_inode;
 
-    pvfs2_print("pvfs2: pvfs2_setattr called on %s\n", dentry->d_name.name);
+    pvfs2_print("pvfs2: pvfs2_setattr called on %s\n",
+                dentry->d_name.name);
 
-    return pvfs2_inode_setattr(inode, iattr);
+    ret = inode_change_ok(inode, iattr);
+    if (ret == 0)
+    {
+        ret = pvfs2_inode_setattr(inode, iattr);
+    }
+    else
+    {
+        pvfs2_error("pvfs2: inode_change_ok failed with %d\n",ret);
+    }
+    return ret;
 }
 
 struct inode_operations pvfs2_file_inode_operations = {
@@ -141,7 +152,7 @@ struct inode_operations pvfs2_file_inode_operations = {
 /*     .getxattr = pvfs2_getxattr, */
 /*     .listxattr = pvfs2_listxattr, */
 /*     .removexattr = pvfs2_removexattr, */
-/*     .permission = pvfs2_permission */
+/*     .permission = pvfs2_permission, */
     .setattr = pvfs2_setattr
 };
 
