@@ -63,11 +63,13 @@ int do_create_lookup(PVFS_pinode_reference parent_refn,
     {
 	snprintf(name, PVFS_NAME_MAX, "depth=%d-rank=%d-iter=%d", depth, rank, i);
 	snprintf(path, PVFS_NAME_MAX, "/%s", name);
-	create_dir(parent_refn, name, &out_refn);
-	if (out_refn.handle < 0)
+	if (create_dir(parent_refn, name, &out_refn) < 0)
 	{
-	    return -1;
+            printf("creation of %s failed; make sure it doesn't "
+                   "already exist!\n",path);
+            return -1;
 	}
+        dir_handle = out_refn.handle;
 	/* lookup the directory we just created */
 	before = MPI_Wtime();
 	lookup_handle = simple_lookup_name(path, fs_id);
@@ -85,6 +87,11 @@ int do_create_lookup(PVFS_pinode_reference parent_refn,
 	    min = current;
 	}
 	total++;
+        if (remove_file(parent_refn,name))
+        {
+            printf("failed to remove %s; test aborting\n",path);
+            return -1;
+        }
     }
     printf("ave lookup time: %f seconds\n",(running_total/total));
     printf("max lookup time: %f seconds\n",max);

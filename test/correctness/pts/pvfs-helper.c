@@ -82,12 +82,12 @@ int create_dir(PVFS_pinode_reference parent_refn, char *name,
     attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
     attr.owner = 100;
     attr.group = 100;
-    attr.perms = 1877;
+    attr.perms = (PVFS_U_WRITE | PVFS_U_READ);
     attr.objtype = PVFS_TYPE_DIRECTORY;
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
+    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
 
     ret = PVFS_sys_mkdir(name, parent_refn,
                          attr, credentials, &resp_mkdir);
@@ -98,6 +98,7 @@ int create_dir(PVFS_pinode_reference parent_refn, char *name,
     }
     if (out_refn)
     {
+        memset(out_refn, 0, sizeof(PVFS_pinode_reference));
         memcpy(out_refn, &resp_mkdir.pinode_refn,
                sizeof(PVFS_pinode_reference));
     }
