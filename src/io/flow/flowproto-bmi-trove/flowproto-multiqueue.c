@@ -140,6 +140,7 @@ static void cleanup_buffers(struct fp_private_data* flow_data);
 static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
     q_item, struct fp_private_data* flow_data);
 static int cancel_pending_bmi(struct qlist_head* list);
+static int cancel_pending_trove(struct qlist_head* list);
 
 
 /* interface prototypes */
@@ -1466,40 +1467,28 @@ static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
 	{
 	    flow_data->cleanup_pending_count += 
 		cancel_pending_bmi(&flow_data->src_list);
-
-	    /* TODO: fill this in */
 	}
 	else if(flow_data->parent->src.endpoint_id == MEM_ENDPOINT &&
 	    flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
 	{
 	    flow_data->cleanup_pending_count += 
 		cancel_pending_bmi(&flow_data->dest_list);
-
-	    /* TODO: fill this in */
 	}
 	else if(flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
 	    flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
 	{
 	    flow_data->cleanup_pending_count += 
+		cancel_pending_trove(&flow_data->src_list);
+	    flow_data->cleanup_pending_count += 
 		cancel_pending_bmi(&flow_data->dest_list);
-
-	    /* TODO: remember to count chains with multiple trove ops per 
-	     * queue entry, may need more than "posted_id" field to track
-	     * them all 
-	     */
-	    /* TODO: fill this in */
 	}
 	else if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
 	    flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
 	{
 	    flow_data->cleanup_pending_count += 
 		cancel_pending_bmi(&flow_data->src_list);
-
-	    /* TODO: remember to count chains with multiple trove ops per 
-	     * queue entry, may need more than "posted_id" field to track
-	     * them all 
-	     */
-	    /* TODO: fill this in */
+	    flow_data->cleanup_pending_count += 
+		cancel_pending_trove(&flow_data->dest_list);
 	}
 	else
 	{
@@ -1552,6 +1541,44 @@ static int cancel_pending_bmi(struct qlist_head* list)
 
     return (count);
 }
+
+/* cancel_pending_trove()
+ *
+ * cancels any pending trove operations on the given queue list
+ *
+ * returns the number of operations that were canceled 
+ */
+static int cancel_pending_trove(struct qlist_head* list)
+{
+    struct qlist_head* tmp_link;
+    struct fp_queue_item* q_item = NULL;
+    int count = 0;
+
+    /* run down the chain of pending operations */
+    qlist_for_each(tmp_link, list)
+    {
+	q_item = qlist_entry(tmp_link, struct fp_queue_item,
+	    list_link);
+#if 0
+	/* skip anything that is in the queue but not actually posted */
+	if(q_item->posted_id)
+	{
+	    count++;
+	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+		"flowprotocol cleanup: unposting BMI operation.\n");
+	    ret = PINT_thread_mgr_bmi_cancel(q_item->posted_id,
+		&q_item->bmi_callback);
+	    if(ret < 0)
+	    {
+		gossip_err("WARNING: BMI thread mgr cancel failed, proceeding anyway.\n");
+	    }
+	}
+#endif
+    }
+
+    return (count);
+}
+
 
 /*
  * Local variables:
