@@ -55,7 +55,6 @@ nested machine pvfs2_client_msgpair_sm(post,
 
     state complete {
 	run msgpair_complete;
-	success => return;
 	default => return;
     }
     
@@ -270,6 +269,9 @@ static int msgpair_complete(PINT_client_sm *sm_p,
 		   resp_p->status);
     }
 
+    assert(resp_p->status <= 0); /* parameter range checking */
+    msg_p->op_status = resp_p->status; /* save status value */
+
     /* call completion function to perform operation-specific
      * functions.  this call must not block!!!
      */
@@ -278,7 +280,6 @@ static int msgpair_complete(PINT_client_sm *sm_p,
 	js_p->error_code = msg_p->comp_fn(sm_p, resp_p);
     }
     else if (resp_p->status != 0) {
-	assert(resp_p->status <= 0); /* parameter range checking */
 	js_p->error_code = resp_p->status;
     }
     else if (ret != 0) {

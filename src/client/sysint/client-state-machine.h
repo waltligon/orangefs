@@ -57,6 +57,11 @@ typedef struct PINT_client_sm_msgpair_state_s {
     job_id_t send_id, recv_id;
     /* send_status, recv_status used for error handling etc. */
     job_status_s send_status, recv_status;
+
+    /* op_status is the code returned from the server, if the operation
+     * was actually processed (recv_status.error_code == 0)
+     */
+    PVFS_error op_status;
 } PINT_client_sm_msgpair_state;
 
 

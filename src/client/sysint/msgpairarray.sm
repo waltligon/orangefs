@@ -51,8 +51,7 @@ nested machine pvfs2_client_msgpairarray_sm(post,
 
     state complete {
 	run msgpairarray_complete;
-	success => return;
-	default => error;
+	default => return;
     }
     
     state error {
@@ -88,7 +87,10 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 {
     int ret, i;
 
-    gossip_debug(CLIENT_DEBUG, "msgpairarray state: post\n");
+    gossip_debug(CLIENT_DEBUG, "msgpairarray state: post (%d message(s))\n",
+		 sm_p->msgarray_count);
+
+    assert(sm_p->msgarray_count > 0); /* sanity check */
 
     /* we don't know what this is set to prior to this function,
      * so we reset it here.
@@ -273,12 +275,8 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 	    assert(0); /* placeholder */
 	}
 
-	/* check status of response */
-	if (resp_p->status != 0) {
-	    gossip_debug(CLIENT_DEBUG,
-			 "notice: msgpairarray_complete: status error (%d)\n",
-			 resp_p->status);
-	}
+	assert(resp_p->status <= 0); /* parameter range checking */
+	msg_p->op_status = resp_p->status; /* save status value */
 	
 	/* call completion function to perform operation-specific
 	 * functions.  this call must not block!!!
@@ -289,9 +287,26 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 	 *       each message (to handle different types of messages
 	 *       all in the same array).
 	 */
-	if (msg_p->comp_fn != NULL) ret = msg_p->comp_fn(sm_p, resp_p);
-	if (ret != 0) {
-	    assert(0); /* placeholder */
+	if (msg_p->comp_fn != NULL) {
+	    /* NOTE: this will result in only the last value being
+	     * returned.  this is fine; the comp_fn can do whatever
+	     * necessary to return the value that they're interested
+	     * in I think? -- Rob
+	     *
+	     * Q: should completion functions take an index value for the
+	     *    server number?
+	     *
+	     */
+	    js_p->error_code = msg_p->comp_fn(sm_p, resp_p);
+	}
+	else if (resp_p->status != 0) {
+	    /* no comp_fn specified and status non-zero */
+	    gossip_debug(CLIENT_DEBUG,
+			 "notice: msgpairarray_complete: error status (%d) from server %d\n",
+			 resp_p->status,
+			 i);
+	    /* save a non-zero status to return if we see one */
+	    js_p->error_code = resp_p->status;
 	}
 	
 	/* free all the resources that we used to send and receive. */
