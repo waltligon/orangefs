@@ -19,6 +19,25 @@ pvfs2-0.7.0pre1
 - add multihome support: servers can listen on multiple addresses (and
   BMI types), clients choose the first address from tabfile that works
 - bmi: poll adaptively based on recent usage
+- added trove-dbpf support for internally limiting the number of
+  simultaneous aio operations allowed in progress; default value is 16
+- increased mmap-ra-small buf size from 4K to 16K to avoid many small
+  allocations (causes slightly larger mem footprint of client-core)
+- adjusted client sysint setattr operation to work in a write-through
+  manner with the acache (when enabled)
+- fixed client sysint setattr to invalidate the acache entry (if any)
+- changed acache lookup to return the status (to avoid another acache
+  call that will always follow a successful lookup)
+- internal acache improvements, such as removal of duplicated code
+- updated acache-torture test program to match slightly new acache
+  interface
+- make sure mmap's requesting MAP_SHARED fail (mmap2 returns -EINVAL,
+  userspace mmap returns standard MMAP_FAILED value)
+- added compile time support for measuring roughly how long it takes
+  to process particular operations issued from the vfs
+- modified PINT_sys_testsome to return immediately without calling
+  testcontext if any ops are completed and ready to be returned right
+  away
 
 
 pvfs2-0.6.5
