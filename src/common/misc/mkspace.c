@@ -24,7 +24,13 @@
 
 static char *dir_ent_string = "dir_ent";
 static char *root_handle_string = "root_handle";
+static char *lost_and_found_string = "lost+found";
 
+static TROVE_handle s_used_handles[4] =
+{
+    TROVE_HANDLE_NULL, TROVE_HANDLE_NULL,
+    TROVE_HANDLE_NULL, TROVE_HANDLE_NULL
+};
 
 #define mkspace_print(v, format, f...)              \
 do {                                                \
@@ -34,6 +40,73 @@ do {                                                \
    fprintf(stderr,format, ##f);                     \
 } while(0)
 
+static int handle_is_excluded(
+    TROVE_handle handle, TROVE_handle *handles_to_exclude,
+    int num_handles_to_exclude)
+{
+    int excluded = 0;
+
+    while((num_handles_to_exclude - 1) > -1)
+    {
+        if (handle == handles_to_exclude[num_handles_to_exclude-1])
+        {
+            excluded = 1;
+            break;
+        }
+        num_handles_to_exclude--;
+    }
+    return excluded;
+}
+
+static void get_handle_extent_from_ranges(
+    char *handle_ranges, TROVE_handle_extent *out_extent,
+    TROVE_handle *handles_to_exclude, int num_handles_to_exclude)
+{
+    PINT_llist *cur = NULL;
+    TROVE_handle_extent *tmp_extent = NULL;
+    PINT_llist *extent_list = NULL;
+
+    if (handle_ranges && out_extent)
+    {
+        out_extent->first = TROVE_HANDLE_NULL;
+        out_extent->last = TROVE_HANDLE_NULL;
+
+        extent_list = PINT_create_extent_list(handle_ranges);
+        if (extent_list)
+        {
+            cur = extent_list;
+            while(cur)
+            {
+                tmp_extent = PINT_llist_head(cur);
+                if (!tmp_extent)
+                {
+                    break;
+                }
+
+                /*
+                  allow any handle range in this list that can allow
+                  at least the single handle allocation to pass.  a
+                  range of 1 is ok, so long as it's not the root
+                  handle that was previously allocated (i.e. in the
+                  specified excluded list
+                */
+                if (((tmp_extent->last - tmp_extent->first) > 0) ||
+                    ((tmp_extent->last > 0) &&
+                     (tmp_extent->last == tmp_extent->first) &&
+                     !handle_is_excluded(
+                         tmp_extent->last, handles_to_exclude,
+                         num_handles_to_exclude)))
+                {
+                    out_extent->first = tmp_extent->first;
+                    out_extent->last = tmp_extent->last;
+                    break;
+                }
+                cur = PINT_llist_next(cur);
+            }
+            PINT_release_extent_list(extent_list);
+        }
+    }
+}
 
 int pvfs2_mkspace(
     char *storage_space,
@@ -47,7 +120,6 @@ int pvfs2_mkspace(
 {
     int ret = - 1, count = 0;
     TROVE_op_id op_id;
-    TROVE_handle new_root_handle, ent_handle;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
     TROVE_ds_attributes_s attr;
@@ -56,6 +128,10 @@ int pvfs2_mkspace(
     TROVE_context_id trove_context = -1;
     char *method_name = NULL;
     char *merged_handle_ranges = NULL;
+    TROVE_handle new_root_handle = TROVE_HANDLE_NULL;
+    TROVE_handle root_dirdata_handle = TROVE_HANDLE_NULL;
+    TROVE_handle lost_and_found_handle = TROVE_HANDLE_NULL;
+    TROVE_handle lost_and_found_dirdata_handle = TROVE_HANDLE_NULL;
 
     mkspace_print(verbose,"Storage space: %s\n",storage_space);
     mkspace_print(verbose,"Collection   : %s\n",collection);
@@ -171,12 +247,18 @@ int pvfs2_mkspace(
         coll_id, trove_context, TROVE_COLLECTION_HANDLE_RANGES,
         merged_handle_ranges);
 
-    free(merged_handle_ranges);
     if (ret < 0)
     {
 	mkspace_print(verbose, "Error adding handle ranges\n");
+        free(merged_handle_ranges);
 	return -1;
     }
+
+    mkspace_print(verbose,"info: set handle ranges to %s\n",
+                  merged_handle_ranges);
+
+    free(merged_handle_ranges);
+ 
 
     /*
       if a root_handle is specified, 1) create a dataspace to hold the
@@ -211,6 +293,7 @@ int pvfs2_mkspace(
 
         mkspace_print(verbose,"info: created root directory "
                       "with handle %Lu.\n", Lu(new_root_handle));
+        s_used_handles[0] = new_root_handle;
 
         /* set collection attribute for root handle */
         key.buffer = root_handle_string;
@@ -221,9 +304,9 @@ int pvfs2_mkspace(
                                         NULL, trove_context, &op_id);
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id, op_id, trove_context,
-                                    &count, NULL, NULL, &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -247,9 +330,9 @@ int pvfs2_mkspace(
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id, op_id, trove_context,
-                                    &count, NULL, NULL, &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -259,7 +342,6 @@ int pvfs2_mkspace(
             return -1;
         }
 
-        cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
         /*
           create a dataspace to hold directory entries; if we have a
           meta handle range, use that one of those ranges (being
@@ -269,67 +351,40 @@ int pvfs2_mkspace(
           TROVE_HANDLE_NULL which tells the allocator to use any
           handle available
         */
+        cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
         if (meta_handle_ranges)
         {
-            PINT_llist *cur = NULL;
-            TROVE_handle_extent *tmp_extent = NULL;
-            PINT_llist *extent_list = PINT_create_extent_list(
-                meta_handle_ranges);
+            get_handle_extent_from_ranges(
+                meta_handle_ranges, &cur_extent, s_used_handles, 1);
 
-            cur = extent_list;
-            while(cur)
+            if ((cur_extent.first == TROVE_HANDLE_NULL) &&
+                (cur_extent.last == TROVE_HANDLE_NULL))
             {
-                tmp_extent = PINT_llist_head(cur);
-                if (!tmp_extent)
-                {
-                    break;
-                }
-
-                /*
-                  allow any handle range in this list that can allow
-                  at least the single handle allocation to pass.  a
-                  range of 1 is ok, so long as it's not the root
-                  handle that was previously allocated above
-                */
-                if (((tmp_extent->last - tmp_extent->first) > 0) ||
-                    ((tmp_extent->last > 0) &&
-                     (tmp_extent->last == tmp_extent->first) &&
-                     (tmp_extent->last != new_root_handle)))
-                {
-                    cur_extent.first = tmp_extent->first;
-                    cur_extent.last = tmp_extent->last;
-                    break;
-                }
-                cur = PINT_llist_next(cur);
+                gossip_err("No valid meta handle ranges available! "
+                           "Using a default\n");
             }
-            PINT_release_extent_list(extent_list);
-        }
-
-        if ((cur_extent.first == TROVE_HANDLE_NULL) &&
-            (cur_extent.last == TROVE_HANDLE_NULL))
-        {
-            gossip_err("No valid meta handle ranges available! "
-                       "Using a default\n");
-        }
-        else
-        {
-            mkspace_print(
-                verbose, "Using meta handle range %Lu-%Lu for dirent "
-                "dspace\n", Lu(cur_extent.first), Lu(cur_extent.last));
+            else
+            {
+                mkspace_print(
+                    verbose, "info: using meta handle range %Lu-%Lu for "
+                    "root dirent dspace\n", Lu(cur_extent.first),
+                    Lu(cur_extent.last));
+            }
         }
 
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
 
         ret = trove_dspace_create(
-            coll_id, &extent_array, &ent_handle, PVFS_TYPE_DIRDATA, NULL,
-            TROVE_SYNC, NULL, trove_context, &op_id);
+            coll_id, &extent_array, &root_dirdata_handle,
+            PVFS_TYPE_DIRDATA, NULL, TROVE_SYNC, NULL,
+            trove_context, &op_id);
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id, op_id, trove_context,
-                                    &count, NULL, NULL, &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if ((ret != 1) && (state != 0))
@@ -339,11 +394,12 @@ int pvfs2_mkspace(
         }
 
         mkspace_print(verbose, "info: created dspace for dirents "
-                      "with handle %Lu\n", Lu(ent_handle));
+                      "with handle %Lu\n", Lu(root_dirdata_handle));
+        s_used_handles[1] = root_dirdata_handle;
 
         key.buffer = dir_ent_string;
         key.buffer_sz = strlen(dir_ent_string) + 1;
-        val.buffer = &ent_handle;
+        val.buffer = &root_dirdata_handle;
         val.buffer_sz = sizeof(TROVE_handle);
 
         ret = trove_keyval_write(
@@ -352,9 +408,9 @@ int pvfs2_mkspace(
 
         while (ret == 0)
         {
-            ret = trove_dspace_test(coll_id, op_id, trove_context,
-                                    &count, NULL, NULL, &state,
-                                    TROVE_DEFAULT_TEST_TIMEOUT);
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
         if (ret < 0)
@@ -366,6 +422,186 @@ int pvfs2_mkspace(
 
         mkspace_print(
             verbose, "info: wrote attributes for root directory.\n");
+
+        /****************************************************
+          at this point we need to create and initialize the
+          lost+found directory as well
+        *****************************************************/
+        cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
+        if (meta_handle_ranges)
+        {
+            get_handle_extent_from_ranges(
+                meta_handle_ranges, &cur_extent, s_used_handles, 2);
+
+            if ((cur_extent.first == TROVE_HANDLE_NULL) &&
+                (cur_extent.last == TROVE_HANDLE_NULL))
+            {
+                gossip_err("No valid meta handle ranges available! "
+                           "Using a default\n");
+            }
+            else
+            {
+                mkspace_print(
+                    verbose, "info: using meta handle range %Lu-%Lu for "
+                    "lost+found directory dspace\n", Lu(cur_extent.first),
+                    Lu(cur_extent.last));
+            }
+        }
+        extent_array.extent_count = 1;
+        extent_array.extent_array = &cur_extent;
+
+        ret = trove_dspace_create(
+            coll_id, &extent_array, &lost_and_found_handle,
+            PVFS_TYPE_DIRECTORY, NULL, TROVE_SYNC, NULL,
+            trove_context, &op_id);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if ((ret != 1) && (state != 0))
+        {
+            mkspace_print(verbose,
+                          "dspace create (for lost+found dir) failed.\n");
+            return -1;
+        }
+
+        mkspace_print(verbose,"info: created lost+found directory "
+                      "with handle %Lu.\n", Lu(lost_and_found_handle));
+        s_used_handles[2] = lost_and_found_handle;
+
+        /* set lost+found directory dspace attributes */
+        memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
+        attr.uid = getuid();
+        attr.gid = getgid();
+        attr.mode = 0777;
+	attr.atime = attr.ctime = attr.mtime = time(NULL);
+        attr.type = PVFS_TYPE_DIRECTORY;
+
+        ret = trove_dspace_setattr(
+            coll_id, lost_and_found_handle, &attr, TROVE_SYNC, NULL,
+            trove_context, &op_id);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if (ret < 0)
+        {
+            gossip_err("error: dspace setattr for lost+found handle "
+                       "attributes failed; aborting!\n");
+            return -1;
+        }
+
+        /* create a dataspace to hold directory entries */
+        cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
+        if (meta_handle_ranges)
+        {
+            get_handle_extent_from_ranges(
+                meta_handle_ranges, &cur_extent, s_used_handles, 3);
+
+            if ((cur_extent.first == TROVE_HANDLE_NULL) &&
+                (cur_extent.last == TROVE_HANDLE_NULL))
+            {
+                gossip_err("No valid meta handle ranges available! "
+                           "Using a default\n");
+            }
+            else
+            {
+                mkspace_print(
+                    verbose, "info: using meta handle range %Lu-%Lu for "
+                    "lost+found dirent dspace\n", Lu(cur_extent.first),
+                    Lu(cur_extent.last));
+            }
+        }
+        extent_array.extent_count = 1;
+        extent_array.extent_array = &cur_extent;
+
+        ret = trove_dspace_create(
+            coll_id, &extent_array, &lost_and_found_dirdata_handle,
+            PVFS_TYPE_DIRDATA, NULL, TROVE_SYNC, NULL,
+            trove_context, &op_id);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if ((ret != 1) && (state != 0))
+        {
+            gossip_err("dspace create (for dirent storage) failed.\n");
+            return -1;
+        }
+
+        mkspace_print(
+            verbose, "info: created dspace for dirents "
+            "with handle %Lu\n", Lu(lost_and_found_dirdata_handle));
+        s_used_handles[3] = lost_and_found_dirdata_handle;
+
+        key.buffer = dir_ent_string;
+        key.buffer_sz = strlen(dir_ent_string) + 1;
+        val.buffer = &lost_and_found_dirdata_handle;
+        val.buffer_sz = sizeof(TROVE_handle);
+
+        ret = trove_keyval_write(
+            coll_id, lost_and_found_handle, &key, &val, TROVE_SYNC,
+            0, NULL, trove_context, &op_id);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if (ret < 0)
+        {
+            gossip_err("error: keyval write for handle used to store "
+                       "dirents failed; aborting!\n");
+            return -1;
+        }
+
+        mkspace_print(verbose, "info: wrote attributes for "
+                      "lost+found directory.\n");
+
+        /*
+          finally, crdirent the lost+found directory into the root
+          directory by writing the appropriate keyval info into the
+          root dirdata handle space
+        */
+        key.buffer = lost_and_found_string;
+        key.buffer_sz = strlen(lost_and_found_string) + 1;
+        val.buffer = &lost_and_found_handle;
+        val.buffer_sz = sizeof(TROVE_handle);
+
+        ret = trove_keyval_write(
+            coll_id, root_dirdata_handle, &key, &val, TROVE_SYNC, 0,
+            NULL, trove_context, &op_id);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if (ret < 0)
+        {
+            gossip_err("error: keyval write for handle used to store "
+                       "dirents failed; aborting!\n");
+            return -1;
+        }
+
+        mkspace_print(verbose, "info: adding lost+found directory to "
+                      "the root directory.\n");
     }
 
     if (trove_context != -1)
