@@ -163,6 +163,7 @@ int PINT_req_sched_post(
 	int ret = -1;
 	struct req_sched_element* tmp_element;
 	struct req_sched_list* tmp_list;
+	struct req_sched_element* next_element;
 
 	/* find the handle */
 	ret = handle_from_request(in_request, &handle);
@@ -227,8 +228,27 @@ int PINT_req_sched_post(
 		tmp_element->state = REQ_SCHEDULED;
 	else
 	{
-		/* TODO: handle concurrent I/O */
-		tmp_element->state = REQ_QUEUED;
+		/* if this is an I/O operation, AND the head of the list of
+		 * pending operations for this handle is also an I/O
+		 * operation, then we can go ahead and schedule (we allow
+		 * concurrent I/O for a handle)
+		 */
+		next_element = qlist_entry((tmp_list->req_list.next),
+			struct req_sched_element, list_link);
+		if(in_request->op == PVFS_SERV_IO &&
+			next_element->req_ptr->op == PVFS_SERV_IO)
+		{
+			tmp_element->state = REQ_SCHEDULED;
+			ret = 1;
+			gossip_debug(REQ_SCHED_DEBUG, 
+				"REQ SCHED allowing concurrent I/O, handle: %ld\n", 
+				(long)handle);
+		}
+		else
+		{
+			tmp_element->state = REQ_QUEUED;
+			ret = 0;
+		}
 	}
 
 	/* add this element to the list */
@@ -304,12 +324,34 @@ int PINT_req_sched_unpost(
 		 */
 		if(next_ready_flag)
 		{
-			/* TODO: handle concurrent I/O */
 			next_element =
 				qlist_entry((tmp_element->list_head->req_list.next),
 				struct req_sched_element, list_link);
-			next_element->state = REQ_READY_TO_SCHEDULE;
-			qlist_add_tail(&(next_element->ready_link), &ready_queue);
+			/* skip looking at the next request if it is already
+			 * ready to go 
+			 */
+			if(next_element->state != REQ_READY_TO_SCHEDULE)
+			{
+				next_element->state = REQ_READY_TO_SCHEDULE;
+				qlist_add_tail(&(next_element->ready_link), &ready_queue);
+				/* keep going as long as the operations are I/O requests;
+				 * we let these all go concurrently
+				 */
+				while(next_element && next_element->req_ptr->op == PVFS_SERV_IO)
+				{
+					next_element =
+						qlist_entry((tmp_element->list_head->req_list.next),
+						struct req_sched_element, list_link);
+					if(next_element && next_element->req_ptr->op == PVFS_SERV_IO)
+					{
+						gossip_debug(REQ_SCHED_DEBUG, 
+							"REQ SCHED allowing concurrent I/O, handle: %ld\n", 
+							(long)next_element->handle);
+						next_element->state = REQ_READY_TO_SCHEDULE;
+						qlist_add_tail(&(next_element->ready_link), &ready_queue);
+					}
+				}
+			}
 		}
 	}
 
@@ -367,11 +409,33 @@ int PINT_req_sched_release(
 		/* find the next request, change its state, and add it to
 		 * the queue of requests that are ready to be scheduled
 		 */
-		/* TODO: handle concurrent I/O */
 		next_element = qlist_entry((tmp_list->req_list.next),
 			struct req_sched_element, list_link);
-		next_element->state = REQ_READY_TO_SCHEDULE;
-		qlist_add_tail(&(next_element->ready_link), &ready_queue);
+		/* skip it if the top queue item is already ready for
+		 * scheduling 
+		 */
+		if(next_element->state != REQ_READY_TO_SCHEDULE)
+		{
+			next_element->state = REQ_READY_TO_SCHEDULE;
+			qlist_add_tail(&(next_element->ready_link), &ready_queue);
+			/* keep going as long as the operations are I/O requests;
+			 * we let these all go concurrently
+			 */
+			while(next_element && next_element->req_ptr->op == PVFS_SERV_IO)
+			{
+				next_element =
+					qlist_entry((tmp_element->list_head->req_list.next),
+					struct req_sched_element, list_link);
+				if(next_element && next_element->req_ptr->op == PVFS_SERV_IO)
+				{
+					gossip_debug(REQ_SCHED_DEBUG, 
+						"REQ SCHED allowing concurrent I/O, handle: %ld\n", 
+						(long)next_element->handle);
+					next_element->state = REQ_READY_TO_SCHEDULE;
+					qlist_add_tail(&(next_element->ready_link), &ready_queue);
+				}
+			}
+		}
 	}
 
 	gossip_debug(REQ_SCHED_DEBUG, 
