@@ -156,28 +156,31 @@ the purpose of these directories please see the PVFS2 users guide.
 
 \subsection{Server configuration}
 
-Since this is a single host configuration, we only have to configure one
-server daemon.  In the original PVFS, the metadata and I/O servers were 
-separated into two separate programs (mgr and iod).  PVFS2, however, has 
-only a single daemon called pvfs2-server which serves both roles.
+Since this is a single host configuration, we only have to configure
+one server daemon.  In the original PVFS, the metadata and I/O servers
+were separated into two separate programs (mgr and iod).  PVFS2,
+however, has only a single daemon called pvfs2-server which serves
+both roles.
 
-The most important part of server configuration is simply generating the 
-configuration files.  These can be created using the pvfs2-genconfig 
-script.  This is an interactive script which will ask several questions
-to determine your desired configuration.  Please pay particular attention
-to the listing of the metadata servers and I/O servers.  
-In this example we will use ``testhost'' for both.  
+The most important part of server configuration is simply generating
+the configuration files.  These can be created using the
+pvfs2-genconfig script.  This is an interactive script which will ask
+several questions to determine your desired configuration.  Please pay
+particular attention to the listing of the metadata servers and I/O
+servers.  In this example we will use ``testhost'' for both.
 
-The pvfs2-genconfig tool will generate two configuration files.  One is
-a file system configuration file that will be identical for all servers
-(if we had more than one).  The second is a server specific configuration
-file that will be different for each server.  The server specific files
-have the hostname of the server that they belong to appended to the
-file name.  This script should be excuted as root, so that we can place
-the configuration files in their default /etc/ locations. 
+The pvfs2-genconfig tool will generate two configuration files.  One
+is a file system configuration file that will be identical for all
+servers (if we had more than one).  The second is a server specific
+configuration file that will be different for each server.  The server
+specific files have the hostname of the server that they belong to
+appended to the file name.  This script should be excuted as root, so
+that we can place the configuration files in their default /etc/
+locations.
 
-In this simple configuration, we can accept the default options for every
-field.  We will use the hostname ``testhost'' rather than ``localhost'' however.
+In this simple configuration, we can accept the default options for
+every field.  We will use the hostname ``testhost'' rather than
+``localhost'' however.
 
 \begin{verbatim}
 root@testhost:~# /usr/bin/pvfs2-genconfig  \
@@ -265,10 +268,10 @@ bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
 \subsubsection{Automatic server startup and shutdown}
 \label{sec:rc}
 
-Like most other system services, PVFS2 may be started up automatically at 
-boot up time through the use of rc scripts.  We have provided one such
-script that is suitable for use on RedHat (or similar) rc systems.  The 
-following example demonstrates how to set this up:
+Like most other system services, PVFS2 may be started up automatically
+at boot up time through the use of rc scripts.  We have provided one
+such script that is suitable for use on RedHat (or similar) rc
+systems.  The following example demonstrates how to set this up:
 
 \begin{verbatim}
 bash-2.05b# cp /usr/src/pvfs2/examples/pvfs2-server.rc \
@@ -300,19 +303,19 @@ Stopping PVFS2 server:                                     [  OK  ]
 \label{subsec:client}
 
 There are two primary methods for accessing a PVFS2 file system.  The
-first is the native PVFS2 interface which is made available
-through {\tt libpvfs2}.  This also happens to be the same interface used by
+first is the native PVFS2 interface which is made available through
+{\tt libpvfs2}.  This also happens to be the same interface used by
 ROMIO if you configure your system to use MPI-IO.  The second method
 relies on a kernel module to provide standard Linux file system
 compatibility.  This interface allows the user to use existing
 binaries and system utilities on PVFS2 without recompiling.  We will
 cover how to configure both access methods here.
 
-We must create a mount point for the file system as well as
-an {\tt /etc/pvfs2tab} entry that will be used by
-the PVFS2 libraries to locate the file system.  The {\tt pvfs2tab} file is
-analogous to the {\tt /etc/fstab} file that most linux systems use to keep up
-with file system mount points.
+We must create a mount point for the file system as well as an {\tt
+/etc/pvfs2tab} entry that will be used by the PVFS2 libraries to
+locate the file system.  The {\tt pvfs2tab} file is analogous to the
+{\tt /etc/fstab} file that most linux systems use to keep up with file
+system mount points.
 
 \begin{verbatim}
 [root@testhost /root]# mkdir /mnt/pvfs2
@@ -330,11 +333,11 @@ tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 default 0 0
 \subsection{Testing your installation}
 \label{subsec:testing}
 PVFS2 currently includes (among others) the following tools for
-manipulating the file system using the native PVFS2 library: pvfs2-ping,
-pvfs2-import, pvfs2-ls, and pvfs2-export.  These tools check the health
-of the file system, import local files, list the contents of directories,
-and export files, respectively.  Their usage can best be summarized with
-the following examples:
+manipulating the file system using the native PVFS2 library:
+pvfs2-ping, pvfs2-import, pvfs2-ls, and pvfs2-export.  These tools
+check the health of the file system, import local files, list the
+contents of directories, and export files, respectively.  Their usage
+can best be summarized with the following examples:
 
 \begin{verbatim}
 bash-2.05b# ./pvfs2-ping -m /mnt/pvfs2
@@ -551,9 +554,10 @@ root@cluster1:~# for i in `seq 1 8`; do
 
 \subsection{Starting the servers}
 
-As with the single-machine case, you must run pvfs2-server with a special
-argument to create the storage space on all the nodes if it does not already
-exist.  Run the following command on every metadata or IO node in the cluster:
+As with the single-machine case, you must run pvfs2-server with a
+special argument to create the storage space on all the nodes if it
+does not already exist.  Run the following command on every metadata
+or IO node in the cluster:
 
 \begin{verbatim}
 root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
@@ -580,7 +584,9 @@ Setting up a client for multiple servers is the same as setting up a client for 
 
 \subsection {Testing your Installation}
 
-Testing a multiple-server pvfs2 installation is the same as testing a single-server pvfs2 installation.  Refer to section \ref{subsec:testing}
+Testing a multiple-server pvfs2 installation is the same as testing a
+single-server pvfs2 installation.  Refer to section
+\ref{subsec:testing}
 
 \section{Configuring the PVFS2 Linux VFS Interface}
 \label{sec:vfs-configure}
@@ -657,9 +663,9 @@ The basic steps are as follows:
 \begin{itemize}
 \item Create a mount point on the local filesystem
 \item Load the Kernel Module into the running kernel
-\item Mount your existing PVFS2 volume on the local filesystem
 \item Start the PVFS2 Server application
 \item Start the PVFS2 Client application
+\item Mount your existing PVFS2 volume on the local filesystem
 \item Issue VFS commands
 \end{itemize}
 
@@ -672,8 +678,10 @@ gil:~# mkdir /mnt/pvfs2
 \end{verbatim}
 
 Now load the kernel module into your running kernel.  You can do this
-by using the 'insmod' program.  You can then verify that the module
-was loaded properly using 'lsmod' as follows:
+by using the 'insmod' program, or modprobe if you've copied your
+module into the appropriate /lib/modules directory for your running
+kernel.  You can then verify that the module was loaded properly using
+'lsmod' as follows:
 
 \begin{verbatim}
 gil:~# insmod /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.ko
@@ -686,29 +694,10 @@ Note that the module size observed does NOT need to match that as
 shown above.  Also, you can use 'rmmod' to remove the PVFS2 module
 after it's been loaded.
 
-Now that the module is loaded, we can mount our PVFS2 file system (and
-verify that it's properly mounted) as follows:
-
-\begin{verbatim}
-gil:~# mount -t pvfs2 pvfs2 /mnt/pvfs2 -o coll_id=9,root_handle=1048576
-gil:~# mount
-/dev/hda3 on / type ext3 (rw,errors=remount-ro)
-proc on /proc type proc (rw)
-devpts on /dev/pts type devpts (rw,gid=5,mode=620)
-/dev/hda1 on /boot type ext2 (rw)
-pvfs2 on /mnt/pvfs2 type pvfs2 (rw)
-\end{verbatim}
-
-NOTE: The coll\_id and root\_handle options MUST be specified, and the
-ordering must match the above example.  These values can be read from
-your configuration files.  Also, you can use 'umount' to unmount the
-PVFS2 volume.
-
 At this point, we need to start the PVFS2 server and the PVFS2 client
-applications before any VFS operations will operate properly on the
-mounted PVFS2 volume.  See previous sections on how to properly start
-the PVFS2 server if you're unsure.  Starting the PVFS2 client is
-covered below.
+applications before trying to mount a PVFS2 volume.  See previous
+sections on how to properly start the PVFS2 server if you're unsure.
+Starting the PVFS2 client is covered below.
 
 The PVFS2 client application consists of two programs.
 pvfs2-client-core and pvfs2-client.  Do not run pvfs2-client-core by
@@ -731,9 +720,28 @@ client application running in the foreground.
 The -p argument is required unless the pvfs2-client-core is installed
 and can be found in your PATH.
 
-Now that the PVFS2 server and PVFS2 client applications are running,
-normal VFS operation can be issued on the command line.  An example is
-provided below:
+Now that the module is loaded, and the pvfs2-server and pvfs2-client
+programs are running, we can mount our PVFS2 file system (and verify
+that it's properly mounted) as follows:
+
+\begin{verbatim}
+gil:~# mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2
+gil:~# mount
+/dev/hda3 on / type ext3 (rw,errors=remount-ro)
+proc on /proc type proc (rw)
+devpts on /dev/pts type devpts (rw,gid=5,mode=620)
+/dev/hda1 on /boot type ext2 (rw)
+pvfs2 on /mnt/pvfs2 type pvfs2 (rw)
+\end{verbatim}
+
+NOTE: The device of the format tcp://testhost:3334/pvfs2-fs MUST be
+specified, as we need to know a valid running pvfs2-server and file
+system name to dynamically mount a pvfs2 volume.  These values can be
+read from your configuration files.  As a side note, you can use
+'umount' to unmount the PVFS2 volume when you're read.
+
+Now that a PVFS2 volume is mounted, normal VFS operation can be issued
+on the command line.  An example is provided below:
 
 \begin{verbatim}
 gil:/usr/src/pvfs2/src/kernel/linux-2.6# mkdir /mnt/pvfs2/newdir
