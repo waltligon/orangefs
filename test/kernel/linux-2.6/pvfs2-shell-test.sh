@@ -17,12 +17,13 @@
 
 # Fully comment out to disable categories of tests
 # DO NOT just set the value to be 0
+#
 ENABLE_DIRECTORY_TESTS=1
 ENABLE_IO_TESTS=1
 ENABLE_EXECUTE_TESTS=1
 ENABLE_COMPILE_TESTS=1
 ENABLE_PERMISSION_TESTS=1
-
+ENABLE_SYMLINK_TESTS=1
 
 #####################################
 # test constants here
@@ -886,6 +887,64 @@ compile_test2()
 }
 
 #####################################
+# simple symlink test functions
+#####################################
+
+symlink_test1()
+{
+    echo ""
+    echo "******************************************"
+    echo "* RUNNING SYMLINK TEST 1"
+    echo "******************************************"
+
+    setup_testdir $PVFS2_TESTDIR
+
+    # create a test directory tree
+    mkdir $PVFS2_TESTDIR/a
+    mkdir $PVFS2_TESTDIR/a/b
+    mkdir $PVFS2_TESTDIR/a/b/c
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED SYMLINK TEST 1 [stage 1]"
+        echo "******************************************"
+        return 1
+    fi
+
+    # setup a test link environment
+    ln -s $PVFS2_TESTDIR/a/b $PVFS2_TESTDIR/a/b-link1
+    ln -s b $PVFS2_TESTDIR/a/b-link2
+    ln -s $PVFS2_TESTDIR/a/b/c $PVFS2_TESTDIR/c
+    ln -s $PVFS2_TESTDIR/deadlink1 $PVFS2_TESTDIR/deadlink1
+    ln -s deadlink2 $PVFS2_TESTDIR/deadlink2
+
+    # run checks to be sure our links resolve properly
+    RET=`ls $PVFS2_TESTDIR/a/b $PVFS2_TESTDIR/a/b-link1 $PVFS2_TESTDIR/a/b-link2 | grep -c c`
+    if test $? -ne 0 || test $RET -ne 3 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED SYMLINK TEST 1 [stage 2]"
+        echo "******************************************"
+    fi
+
+    RET=`cat $PVFS2_TESTDIR/deadlink1 2>&1 | grep "Too many levels"`
+    if test $? -ne 0 && test "x$RET" != "x" ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED SYMLINK TEST 1 [stage 3]"
+        echo "******************************************"
+    fi
+
+    remove_testdir $PVFS2_TESTDIR
+
+    echo ""
+    echo "******************************************"
+    echo "* PASSED SYMLINK TEST 1"
+    echo "******************************************"
+    return 0
+}
+
+#####################################
 # script entry point
 #####################################
 
@@ -955,6 +1014,11 @@ if ! test -z "$ENABLE_PERMISSION_TESTS"; then
 
 fi
 
+if ! test -z "$ENABLE_SYMLINK_TESTS"; then
+
+    symlink_test1
+
+fi
 
 # if the script hasn't aborted at this point, we've passed everything
 echo ""
