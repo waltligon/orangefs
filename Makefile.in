@@ -295,6 +295,8 @@ VISMISCSRC :=
 KARMASRC :=
 # userland helper programs for kernel drivers
 KERNAPPSRC :=
+# MISCSRC are sources that don't fall into the other categories
+MISCSRC := 
 # files generated as part of the build that should be deleted on "make clean"
 CLEANFILES :=
 # files created by trove-autogen.pl
