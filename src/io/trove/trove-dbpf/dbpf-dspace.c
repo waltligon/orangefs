@@ -206,7 +206,9 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    db_p->err(db_p, ret, "dbpf_dspace_remove");
 	    goto return_error;
 	case 0:
+#if 0
 	    printf("removed dataspace with handle %Ld\n", op_p->handle);
+#endif
 	    /* drop through */
     }
 

@@ -14,11 +14,11 @@
 #include <time.h>
 #include <malloc.h>
 
-#include <trove.h>
-#include <trove-internal.h>
-#include <dbpf.h>
-#include <dbpf-op-queue.h>
-#include <dbpf-keyval.h>
+#include "trove.h"
+#include "trove-internal.h"
+#include "dbpf.h"
+#include "dbpf-op-queue.h"
+#include "dbpf-keyval.h"
 
 /* TODO: sync flag on all operations?  */
 
@@ -109,9 +109,8 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     data.ulen = op_p->u.k_read.val.buffer_sz;
     data.flags = DB_DBT_USERMEM;
 
-    if ((ret = db_p->get(db_p, NULL, &key, &data, 0)) == 0)
-	printf("db: key retrieved.\n");
-    else {
+    ret = db_p->get(db_p, NULL, &key, &data, 0);
+    if (ret != 0) {
 	db_p->err(db_p, ret, "DB->get");
 	goto return_error;
     }
@@ -205,9 +204,8 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     data.data = op_p->u.k_write.val.buffer;
     data.size = op_p->u.k_write.val.buffer_sz;
 
-    if ((ret = db_p->put(db_p, NULL, &key, &data, 0)) == 0)
-	printf("db: key stored.\n");
-    else {
+    ret = db_p->put(db_p, NULL, &key, &data, 0);
+    if (ret != 0) {
 	db_p->err(db_p, ret, "DB->put");
 	goto return_error;
     }
@@ -281,9 +279,9 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
     memset (&key, 0, sizeof(key));
     key.data = op_p->u.k_remove.key.buffer;
     key.size = op_p->u.k_remove.key.buffer_sz;
-    if ( (ret = db_p->del(db_p, NULL, &key, 0)) == 0) {
-	printf("db: key removed. \n");
-    } else {
+    ret = db_p->del(db_p, NULL, &key, 0);
+
+    if (ret != 0) {
 	db_p->err(db_p, ret, "DB->del");
 	goto return_error;
     }
@@ -489,8 +487,8 @@ return_ok:
 	data.flags |= DB_DBT_USERMEM;
 
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
-	if (ret == DB_NOTFOUND) printf("iterate -- notfound\n");
-	else if (ret != 0) printf("iterate -- some other failure @ recno\n");
+	if (ret == DB_NOTFOUND) printf("warning: keyval iterate -- notfound\n");
+	else if (ret != 0) printf("warning: keyval iterate -- some other failure @ recno\n");
 
 	*op_p->u.k_iterate.position_p = recno;
     }
@@ -573,5 +571,5 @@ struct TROVE_keyval_ops dbpf_keyval_ops =
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

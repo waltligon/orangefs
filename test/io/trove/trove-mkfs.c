@@ -16,8 +16,6 @@ char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
 char file_system[FS_SIZE] = "fs-foo";
 char admin_info[FS_SIZE] = "admin-foo";
 
-extern char *optarg;
-
 int parse_args(int argc, char **argv);
 
 int main(int argc, char **argv)
