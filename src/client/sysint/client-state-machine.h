@@ -35,6 +35,9 @@
 /* the maximum number of times to retry restartable client operations */
 #define PVFS2_CLIENT_RETRY_LIMIT  5
 
+/* the number of milliseconds to delay before retries */
+#define PVFS2_CLIENT_RETRY_DELAY  2000
+
 /*
  * This structure holds everything that we need for the state of a
  * message pair.  We need arrays of these in some cases, so it's
@@ -142,6 +145,8 @@ struct PINT_client_symlink_sm {
     PVFS_sysresp_symlink         *sym_resp;       /* in/out parameter*/
     PVFS_sys_attr                *sys_attr;       /* input parameter */
     PVFS_handle                  symlink_handle;
+    int                          stored_error_code;
+    int                          retry_count;
 };
 
 /* PINT_client_getattr_sm */
