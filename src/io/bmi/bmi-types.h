@@ -57,6 +57,7 @@ enum
     BMI_DEC_ADDR_REF = 6,      /* decrement address reference count */
     BMI_DROP_ADDR_QUERY = 7,   /* ask a module if it thinks an address
                                 * should be discarded */
+    BMI_FORCEFUL_CANCEL_MODE = 8, /* enables a more forcefule cancelation mode */
 };
 
 /* mappings from PVFS errors to BMI errors */

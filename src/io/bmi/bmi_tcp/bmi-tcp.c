@@ -336,6 +336,11 @@ enum
     TCP_MODE_REND_LIMIT = 16777216	/* 16M */
 };
 
+/* toggles cancel mode; for bmi_tcp this will result in socket being closed
+ * in all cancellation cases
+ */
+static int forceful_cancel_mode = 0;
+
 /*************************************************************************
  * Visible Interface 
  */
@@ -616,6 +621,10 @@ int BMI_tcp_set_info(int option,
     switch (option)
     {
 
+    case BMI_FORCEFUL_CANCEL_MODE:
+	forceful_cancel_mode = 1;
+	ret = 0;
+	break;
     case BMI_DROP_ADDR:
 	if (inout_parameter == NULL)
 	{
@@ -1287,6 +1296,9 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
     if(((struct tcp_op*)(query_op->method_data))->tcp_op_state ==
 	BMI_TCP_COMPLETE)
     {
+	/* only close socket in forceful cancel mode */
+	if(forceful_cancel_mode)
+	    tcp_forget_addr(query_op->addr, 0, -BMI_ECANCEL);
 	/* we are done! status will be collected during test */
 	gen_mutex_unlock(&interface_mutex);
 	return(0);
@@ -1295,7 +1307,8 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
     /* has the operation started moving data yet? */
     if(query_op->env_amt_complete)
     {
-	/* be pessimistic and kill the socket */
+	/* be pessimistic and kill the socket, even if not in forceful
+	 * cancel mode */
 	/* NOTE: this may place other operations beside this one into
 	 * EINTR error state 
 	 */
@@ -1318,8 +1331,10 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
     op_list_remove(query_op);
     ((struct tcp_op*)(query_op->method_data))->tcp_op_state = 
 	BMI_TCP_COMPLETE;
+    /* only close socket in forceful cancel mode */
+    if(forceful_cancel_mode)
+	tcp_forget_addr(query_op->addr, 0, -BMI_ECANCEL);
     op_list_add(completion_array[query_op->context_id], query_op);
-
     gen_mutex_unlock(&interface_mutex);
     return(0);
 }
