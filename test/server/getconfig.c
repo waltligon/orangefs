@@ -15,6 +15,10 @@
 #include <print-struct.h>
 #include <PINT-reqproto-encode.h>
 
+#define DEFAULT_FILESYSTEM_NAME               "fs-foo"
+#define DEFAULT_HOSTID          "tcp://localhost:3334"
+#define DEFAULT_METHOD                       "bmi_tcp"
+
 /**************************************************************
  * Data structures 
  */
@@ -40,16 +44,16 @@ static struct options* parse_args(int argc, char* argv[]);
 int main(int argc, char **argv)	{
 
 	struct options* user_opts = NULL;
-	struct PVFS_server_req_s* my_req = NULL;
-	struct PVFS_server_resp_s* my_ack = NULL;
+	struct PVFS_server_req_s *server_req = NULL;
+	struct PVFS_server_resp_s *server_resp = NULL;
 	int ret = -1;
 	bmi_addr_t server_addr;
 	bmi_op_id_t client_ops[2];
 	int outcount = 0;
 	bmi_error_code_t error_code;
 	bmi_size_t actual_size;
-	struct PINT_encoded_msg foo;
-	struct PINT_decoded_msg bar;
+	struct PINT_encoded_msg encoded_msg;
+	struct PINT_decoded_msg decoded_msg;
 	bmi_context_id context;
 
 	/* grab any command line options */
@@ -86,37 +90,36 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
-	/* allocate a buffer for the initial request and ack */
-	my_req = (struct PVFS_server_req_s*)BMI_memalloc(server_addr, 
+	server_req = (struct PVFS_server_req_s*)BMI_memalloc(server_addr, 
 		sizeof(struct PVFS_server_req_s), BMI_SEND_BUFFER);
-	my_ack = (struct PVFS_server_resp_s*)BMI_memalloc(server_addr, 
+	server_resp = (struct PVFS_server_resp_s*)BMI_memalloc(server_addr, 
 		sizeof(struct PVFS_server_resp_s)+8192, BMI_RECV_BUFFER);
-	if(!my_req || !my_ack){
+	if(!server_req || !server_resp){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
 	}
-	my_req->u.getconfig.fs_name = (PVFS_string) BMI_memalloc(server_addr,
-		strlen("fs-foo")+1,BMI_SEND_BUFFER);
+	server_req->u.getconfig.fs_name = (PVFS_string)BMI_memalloc(server_addr,
+		strlen(DEFAULT_FILESYSTEM_NAME),BMI_SEND_BUFFER);
 
 	/* setup create request */
-	my_req->op = PVFS_SERV_GETCONFIG;
-	my_req->credentials.uid = 0;
-	my_req->credentials.gid = 0;
+	server_req->op = PVFS_SERV_GETCONFIG;
+	server_req->credentials.uid = 0;
+	server_req->credentials.gid = 0;
 	/* TODO: fill below fields in with the correct values */
-	my_req->credentials.perms = U_WRITE | U_READ;  
-	strcpy(my_req->u.getconfig.fs_name,"fs-foo\0");
-	my_req->u.getconfig.max_strsize = 8192;
-	my_req->rsize = sizeof(struct PVFS_server_req_s)+
-							strlen(my_req->u.getconfig.fs_name)+1;
+	server_req->credentials.perms = U_WRITE | U_READ;
+        server_req->u.getconfig.fs_name = strdup(DEFAULT_FILESYSTEM_NAME);
+	server_req->u.getconfig.max_strsize = 8192;
+	server_req->rsize = sizeof(struct PVFS_server_req_s) +
+            strlen(server_req->u.getconfig.fs_name);
 
-	display_pvfs_structure(my_req,1);
-	ret = PINT_encode(my_req,PINT_ENCODE_REQ,&foo,server_addr,0);
-	printf("---\n\nfoo---\n");
-	display_pvfs_structure(foo.buffer_list[0],1);
+	display_pvfs_structure(server_req,1);
+	ret = PINT_encode(server_req,PINT_ENCODE_REQ,&encoded_msg,server_addr,0);
+	printf("---\n\nencoded_msg---\n");
+	display_pvfs_structure(encoded_msg.buffer_list[0],1);
 
 	/* send the initial request on its way */
-	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, foo.buffer_list[0], 
-		foo.total_size, BMI_PRE_ALLOC, 0, NULL, context);
+	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, encoded_msg.buffer_list[0], 
+		encoded_msg.total_size, BMI_PRE_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -146,7 +149,7 @@ int main(int argc, char **argv)	{
 	}
 
 	/* post a recv for the server acknowledgement */
-	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
+	ret = BMI_post_recv(&(client_ops[0]), server_addr, server_resp, 
 		sizeof(struct PVFS_server_resp_s)+8192, &actual_size, BMI_PRE_ALLOC, 0, 
 		NULL, context);
 	if(ret < 0)
@@ -180,29 +183,29 @@ int main(int argc, char **argv)	{
 			return(-1);
 		}
 	}
-		
-	/* look at the ack */
-	ret = PINT_decode(my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
-	printf("Act size: %d\n",(int)actual_size);
-	display_pvfs_structure(bar.buffer,0);
-	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp_s)+8192, 
+
+	ret = PINT_decode(server_resp,PINT_ENCODE_RESP,
+                          &decoded_msg,server_addr,actual_size,NULL);
+	printf("Decoded response size: %d\n",(int)actual_size);
+	display_pvfs_structure(decoded_msg.buffer,0);
+	BMI_memfree(server_addr, server_resp, sizeof(struct PVFS_server_resp_s)+8192, 
 		BMI_RECV_BUFFER);
-	my_ack = bar.buffer;
-	printf("Foo: %s\n",my_ack->u.getconfig.io_server_mapping);
-	if(my_ack->op != PVFS_SERV_GETCONFIG)
+	server_resp = decoded_msg.buffer;
+	if(server_resp->op != PVFS_SERV_GETCONFIG)
 	{
-		printf("ERROR: received ack of wrong type (%d)\n", (int)my_ack->op);
+		printf("ERROR: received ack of wrong type (%d)\n", (int)server_resp->op);
 	}
-	if(my_ack->status != 0)
+	if(server_resp->status != 0)
 	{
 		printf("ERROR: server returned status: %d\n",
-			(int)my_ack->status);
+			(int)server_resp->status);
 	}
 
 	/* free up memory buffers */
-	BMI_memfree(server_addr, my_req, sizeof(struct PVFS_server_req_s), 
+        free(server_req->u.getconfig.fs_name);
+	BMI_memfree(server_addr, server_req, sizeof(struct PVFS_server_req_s), 
 		BMI_SEND_BUFFER);
-	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp_s)+8192, 
+	BMI_memfree(server_addr, server_resp, sizeof(struct PVFS_server_resp_s)+8192, 
 		BMI_RECV_BUFFER);
 
 	/* shutdown the local interface */
@@ -220,7 +223,6 @@ int main(int argc, char **argv)	{
 	free(user_opts->hostid);
 	free(user_opts->method);
 	free(user_opts);
-
 	return(0);
 }
 
@@ -234,51 +236,34 @@ static struct options* parse_args(int argc, char* argv[]){
 	char one_opt = ' ';
 
 	struct options* tmp_opts = NULL;
-	int len = -1;
-	char default_hostid[] = "tcp://localhost:3334";
-	char default_method[] = "bmi_tcp";
 
-	/* create storage for the command line options */
 	tmp_opts = (struct options*)malloc(sizeof(struct options));
 	if(!tmp_opts){
 		goto parse_args_error;
 	}
 	memset(tmp_opts, 0, sizeof(struct options));
-	tmp_opts->hostid = (char*)malloc(strlen(default_hostid) + 1);
-	tmp_opts->method = (char*)malloc(strlen(default_method) + 1);
-	if(!tmp_opts->method || !tmp_opts->hostid)
+	tmp_opts->hostid = strdup(DEFAULT_HOSTID);
+	tmp_opts->method = strdup(DEFAULT_METHOD);
+	if (!tmp_opts->method || !tmp_opts->hostid)
 	{
 		goto parse_args_error;
 	}
-
-	/* fill in defaults */
-	memcpy(tmp_opts->hostid, default_hostid, strlen(default_hostid) + 1);
-	memcpy(tmp_opts->method, default_method, strlen(default_method) + 1);
 
 	/* look at command line arguments */
 	while((one_opt = getopt(argc, argv, flags)) != EOF){
 		switch(one_opt){
 			case('h'):
-				len = (strlen(optarg)) + 1;
 				free(tmp_opts->hostid);
-				if((tmp_opts->hostid = (char*)malloc(len))==NULL){
-					goto parse_args_error;
-				}
-				memcpy(tmp_opts->hostid, optarg, len);
+				tmp_opts->hostid = strdup(optarg);
 				break;
 			case('m'):
-				len = (strlen(optarg)) + 1;
 				free(tmp_opts->method);
-				if((tmp_opts->method = (char*)malloc(len))==NULL){
-					goto parse_args_error;
-				}
-				memcpy(tmp_opts->method, optarg, len);
+				tmp_opts->method = strdup(optarg);
 				break;
 			default:
 				break;
 		}
 	}
-
 	return(tmp_opts);
 
 parse_args_error:

@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "state-machine.h"
 #include "server-config.h"
@@ -54,7 +58,6 @@ machine get_config(init, trove, bmi_send, cleanup)
 		run getconfig_cleanup;
 		default => init;
 	}
-
 }
 
 %%
@@ -74,9 +77,7 @@ machine get_config(init, trove, bmi_send, cleanup)
 
 void getconfig_init_state_machine(void)
 {
-
     getconfig_req_s.state_machine = get_config;
-
 }
 
 /*
@@ -98,14 +99,15 @@ void getconfig_init_state_machine(void)
 
 static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
 {
+    int fd = 0, nread = 0;
     int job_post_ret = 1;
     char *meta_server, *data_server;
+    struct stat statbuf;
     struct llist *cur = NULL;
     struct server_configuration_s *user_opts;
     struct filesystem_configuration_s *cur_fs;
 
     user_opts = get_server_config_struct();
-
     assert(user_opts);
 
     cur = user_opts->file_systems;
@@ -116,6 +118,8 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
         {
             break;
         }
+        assert(cur_fs->file_system_name);
+
         if (strcmp(s_op->req->u.getconfig.fs_name,
                    cur_fs->file_system_name) == 0)
         {
@@ -130,44 +134,41 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
         return 1;
     }
 
-    s_op->resp->u.getconfig.meta_server_count = llist_count(cur_fs->meta_server_list);
-    s_op->resp->u.getconfig.io_server_count = llist_count(cur_fs->data_server_list);
-
-    /* FIXME: BEGIN HACK for backward getconfig compatibility */
-    gossip_lerr("KLUDGE: Faking meta and data server in getconfig response.\n");
-
-    assert(s_op->resp->u.getconfig.meta_server_count == 1);
-    assert(s_op->resp->u.getconfig.io_server_count == 1);
-
-    cur = user_opts->file_systems;
-    cur_fs = llist_head(cur);
-
     /*
-      this is a hack because we're only grabbing the top servers
-      here from the list instead of packing all of them.  Before 'fixing'
-      this, we need to decide if the getconfig as currently implemented
-      is worth preserving, or if it should be changed entirely.
-
-      (For example, buckets assignments can't be passed at all until
-      this is updated)
+      FIXME:
+      if we're sure we're going to send back a whole file,
+      maybe there's a better more reliable way to do this
     */
-    meta_server = (char *)llist_head(cur_fs->meta_server_list);
-    data_server = (char *)llist_head(cur_fs->data_server_list);
+    if (stat(user_opts->fs_config_filename,&statbuf) == -1)
+    {
+        ret->error_code = -98;
+        return 1;
+    }
 
-    /* get bmi-address for meta server alias */
-    meta_server = PINT_server_config_get_host_addr_ptr(user_opts,meta_server);
-    assert(meta_server);
- 
-    /* get bmi-address for io server alias */
-    data_server = PINT_server_config_get_host_addr_ptr(user_opts,data_server);
-    assert(data_server);
-
-    s_op->resp->u.getconfig.meta_server_mapping = meta_server;
-    s_op->resp->u.getconfig.io_server_mapping = data_server;
     s_op->resp->u.getconfig.fs_id = cur_fs->coll_id;
-    s_op->u.getconfig.strsize = strlen(meta_server);
-    s_op->u.getconfig.strsize += strlen(data_server);
-    /* FIXME: END HACK for backward getconfig compatibility */
+    s_op->resp->u.getconfig.config_buflen = (PVFS_count32)statbuf.st_size;
+    s_op->resp->u.getconfig.config_buf = (PVFS_string)malloc((int)statbuf.st_size);
+
+    if (!s_op->resp->u.getconfig.config_buf)
+    {
+        ret->error_code = -97;
+        return 1;
+    }
+
+    if ((fd = open(user_opts->fs_config_filename,O_RDONLY)) == -1)
+    {
+        ret->error_code = -96;
+        return 1;
+    }
+
+    nread = read(fd,s_op->resp->u.getconfig.config_buf,statbuf.st_size);
+    if (nread != statbuf.st_size)
+    {
+        close(fd);
+        ret->error_code = -95;
+        return 1;
+    }
+    close(fd);
 
     /* Set up the key/val pair for trove to get root handle */
     s_op->key.buffer = Trove_Common_Keys[ROOT_HANDLE_KEY].key;
@@ -196,7 +197,6 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
 
 static int getconfig_job_trove(PINT_server_op *s_op, job_status_s *ret)
 {
-
     int job_post_ret;
     job_id_t i;
 
@@ -210,9 +210,7 @@ static int getconfig_job_trove(PINT_server_op *s_op, job_status_s *ret)
 	    ret,
 	    &i);
 
-
     return(job_post_ret);
-
 }
 
 /*
@@ -234,7 +232,6 @@ static int getconfig_job_trove(PINT_server_op *s_op, job_status_s *ret)
 
 static int getconfig_job_bmi_send(PINT_server_op *s_op, job_status_s *ret)
 {
-
     int job_post_ret;
     job_id_t i;
 
@@ -253,7 +250,7 @@ static int getconfig_job_bmi_send(PINT_server_op *s_op, job_status_s *ret)
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 #endif
     }
-    
+
     job_post_ret = PINT_encode(
 	    s_op->resp,
 	    PINT_ENCODE_RESP,
@@ -277,7 +274,6 @@ static int getconfig_job_bmi_send(PINT_server_op *s_op, job_status_s *ret)
 	    &i);
 
     return(job_post_ret);
-
 }
 
 /*
@@ -309,6 +305,10 @@ static int getconfig_cleanup(PINT_server_op *s_op, job_status_s *ret)
 
     if (s_op->resp)
     {
+        if (s_op->resp->u.getconfig.config_buf)
+        {
+            free(s_op->resp->u.getconfig.config_buf);
+        }
 	free(s_op->resp);
     }
 
@@ -324,7 +324,6 @@ static int getconfig_cleanup(PINT_server_op *s_op, job_status_s *ret)
     free(s_op);
 
     return(0);
-
 }
 
 

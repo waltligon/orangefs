@@ -140,11 +140,11 @@ int main(int argc, char **argv)
 	response->op = PVFS_SERV_GETCONFIG;
 	response->u.getconfig.fs_id = 7;
 	response->u.getconfig.root_handle=9;
-	response->u.getconfig.maskbits = 0;
-	response->u.getconfig.meta_server_count=3;
-	response->u.getconfig.meta_server_mapping="tcp://foo1:3334,tcp://foo2:3334";
-	response->u.getconfig.io_server_count=3;
-	response->u.getconfig.io_server_mapping="tcp://bar1:3334,tcp://bar2:3334";
+/* 	response->u.getconfig.maskbits = 0; */
+/* 	response->u.getconfig.meta_server_count=3; */
+/* 	response->u.getconfig.meta_server_mapping="tcp://foo1:3334,tcp://foo2:3334"; */
+/* 	response->u.getconfig.io_server_count=3; */
+/* 	response->u.getconfig.io_server_mapping="tcp://bar1:3334,tcp://bar2:3334"; */
 
 #ifdef USE_BMI_MSGS
 	BMI_memfree(me,

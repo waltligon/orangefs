@@ -29,7 +29,6 @@ int do_encode_resp(
 	int header_size
 	)
 {
-    size_t strlen1, strlen2;
     int total_path_count = 0;
 
     /* TODO: CHECK RETURN VALUES */
@@ -152,26 +151,20 @@ int do_encode_resp(
 	    /* assert on all strings (at least for now) */
 	    if(response->status == 0)
 	    {
+                assert(response->u.getconfig.config_buf != NULL);
 
-		assert(response->u.getconfig.meta_server_mapping != NULL);
-		assert(response->u.getconfig.io_server_mapping != NULL);
-
-		target_msg->size_list   = malloc(3*sizeof(PVFS_size));
-		target_msg->buffer_list = malloc(3*sizeof(void *));
-		target_msg->list_count  = 3;
+		target_msg->size_list   = malloc(2*sizeof(PVFS_size));
+		target_msg->buffer_list = malloc(2*sizeof(void *));
+		target_msg->list_count  = 2;
 		target_msg->buffer_flag = BMI_EXT_ALLOC;
 
-		strlen1 = strlen(response->u.getconfig.meta_server_mapping)+1; /* include NULL terminator */
-		strlen2 = strlen(response->u.getconfig.io_server_mapping)+1;
-
 		target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s);
-		target_msg->size_list[1] = strlen1;
-		target_msg->size_list[2] = strlen2;
-		target_msg->total_size = target_msg->size_list[0] + strlen1 + strlen2;
+		target_msg->size_list[1] = response->u.getconfig.config_buflen;
+		target_msg->total_size = target_msg->size_list[0] +
+                    response->u.getconfig.config_buflen;
 
 		target_msg->buffer_list[0] = response;
-		target_msg->buffer_list[1] = response->u.getconfig.meta_server_mapping;
-		target_msg->buffer_list[2] = response->u.getconfig.io_server_mapping;
+		target_msg->buffer_list[1] = response->u.getconfig.config_buf;
 	    }
 	    else
 	    {
@@ -191,14 +184,6 @@ int do_encode_resp(
 	    /* set accurate rsize for encoded version */
 	    ((struct PVFS_server_resp_s*)(target_msg->buffer_list[0]))->rsize
 		= target_msg->total_size;
-	    /* we are sending a list now... so no need to do this anymore... yay. */
-#if 0
-	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp_s));
-	    respbuf += sizeof(struct PVFS_server_resp_s);
-	    memcpy(respbuf, response->u.getconfig.meta_server_mapping, strlen1);
-	    respbuf += strlen1;
-	    memcpy(respbuf, response->u.getconfig.io_server_mapping, strlen2);
-#endif
 	    return(0);
 
 	case PVFS_SERV_LOOKUP_PATH:

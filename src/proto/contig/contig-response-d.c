@@ -32,14 +32,9 @@ DECODE_RESP_HEAD(do_decode_resp)
 	{
 
 		case PVFS_SERV_GETCONFIG:
-			((struct PVFS_server_resp_s *)target_msg->buffer)->u.getconfig.meta_server_mapping 
-				= (char *)(target_msg->buffer 
-							+ sizeof(struct PVFS_server_resp_s));
-			((struct PVFS_server_resp_s *)target_msg->buffer)->u.getconfig.io_server_mapping 
-					= (char *)(target_msg->buffer 
-							+ sizeof(struct PVFS_server_resp_s)
-							+ strlen(((struct PVFS_server_resp_s *)target_msg->buffer)->u.getconfig.meta_server_mapping)+1);
-			return 0;
+                    ((struct PVFS_server_resp_s *)target_msg->buffer)->u.getconfig.config_buf
+                        = (char *)(target_msg->buffer + sizeof(struct PVFS_server_resp_s));
+                    return 0;
 		case PVFS_SERV_LOOKUP_PATH:
 			((struct PVFS_server_resp_s *)target_msg->buffer)->u.lookup_path.handle_array = 
 							(PVFS_handle *) ((char*)target_msg->buffer + 

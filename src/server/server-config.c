@@ -95,13 +95,17 @@ int PINT_server_config(struct server_configuration_s *config_obj,
     config_s->host_aliases = NULL;
     config_s->file_systems = NULL;
 
+    config_s->fs_config_filename = (argv[1] ? argv[1] : "fs.conf");
+    config_s->server_config_filename = (argv[2] ? argv[2] : "server.conf");
+
     /* first read in the fs.conf defaults config file */
     config_s->configuration_context = GLOBAL_CONFIG;
-    configfile = dotconf_create(argv[1] ? argv[1] : "fs.conf",
+    configfile = dotconf_create(config_s->fs_config_filename,
                                 options, NULL, CASE_INSENSITIVE);
     if (!configfile)
     {
-        gossip_err("Error opening config file\n");
+        gossip_err("Error opening config file %s\n",
+                   config_s->fs_config_filename);
         return 1;
     }
 
@@ -112,11 +116,12 @@ int PINT_server_config(struct server_configuration_s *config_obj,
 
     /* then read in the server.conf (host specific) config file */
     config_s->configuration_context = GLOBAL_CONFIG;
-    configfile = dotconf_create(argv[2] ? argv[2] : "server.conf",
+    configfile = dotconf_create(config_s->server_config_filename,
                                 options, NULL, CASE_INSENSITIVE);
     if (!configfile)
     {
-        gossip_err("Error opening config file\n");
+        gossip_err("Error opening config file: %s\n",
+                   config_s->server_config_filename);
         return 1;
     }
 

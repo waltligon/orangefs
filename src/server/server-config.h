@@ -35,8 +35,8 @@ typedef struct filesystem_configuration_s
 {
     TROVE_coll_id coll_id;
     char *file_system_name;
-    struct llist *meta_server_list; /* ptrs are type char* */
-    struct llist *data_server_list; /* ptrs are type char* */
+    struct llist *meta_server_list; /* ptrs are type char*                  */
+    struct llist *data_server_list; /* ptrs are type char*                  */
     struct llist *bucket_ranges;    /* ptrs are type host_bucket_mapping_s* */
 } filesystem_configuration_s;
 
@@ -44,6 +44,8 @@ typedef struct server_configuration_s
 {
     char *host_id;
     char *storage_path;
+    char *fs_config_filename;       /* the fs.conf config file name     */
+    char *server_config_filename;   /* the server.conf config file name */
     int  initial_unexpected_requests;
     int  configuration_context;
     struct llist *host_aliases;     /* ptrs are type host_alias_s               */

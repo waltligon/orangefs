@@ -272,14 +272,10 @@ struct PVFS_servreq_getconfig_s {
 typedef struct PVFS_servreq_getconfig_s PVFS_servreq_getconfig;
 
 struct PVFS_servresp_getconfig_s {
-	PVFS_fs_id fs_id;		/* Filesystem identifier */
-	PVFS_handle root_handle; /* Root handle for the file system */
-	PVFS_handle maskbits;	 /* number of most significant bits representing
-										 buckets */	
-	PVFS_count32 meta_server_count; /* No of metaservers in system */
-	PVFS_string meta_server_mapping; /* Ordered list of metaservers(BMI URL) */
-	PVFS_count32 io_server_count; /* No of I/O servers in system */
-	PVFS_string io_server_mapping;/* Ordered list of I/O servers(BMI URL) */
+	PVFS_fs_id fs_id;           /* Filesystem identifier */
+	PVFS_handle root_handle;    /* Root handle for the file system */
+	PVFS_count32 config_buflen; /* length of configuration file contents */
+	PVFS_string config_buf;     /* configuration file contents */
 };
 typedef struct PVFS_servresp_getconfig_s PVFS_servresp_getconfig;
 

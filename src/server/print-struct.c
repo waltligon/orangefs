@@ -174,13 +174,10 @@ void display_pvfs_structure(void *s,int r)
 				break;
 			case PVFS_SERV_GETCONFIG:
 				printf("Get Config Resp\n");
-				printf("FSid: %d\n",p->u.getconfig.fs_id);
+				printf("File system id: %d\n",p->u.getconfig.fs_id);
 				printf("Root Handle: %Ld\n",p->u.getconfig.root_handle);
-				printf("MaskBits: %Ld\n",p->u.getconfig.maskbits);
-				printf("MetaServer Count: %d\n",p->u.getconfig.meta_server_count);
-				printf("MetaServer Map: %s\n",p->u.getconfig.meta_server_mapping);
-				printf("IOServer Count: %d\n",p->u.getconfig.io_server_count);
-				printf("IOServer Map: %s\n",p->u.getconfig.io_server_mapping);
+				printf("Config buffer length: %Ld\n",p->u.getconfig.config_buflen);
+				printf("Config buffer: %s\n",p->u.getconfig.config_buf);
 				break;
 			case PVFS_SERV_READDIR:
 				printf("Read dir\n");
