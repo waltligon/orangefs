@@ -20,5 +20,5 @@ SERVERGENSRC := \
 
 # "normal" c files
 SERVERSRC += \
-	$(DIR)/pvfs2-server.c \
 	$(SERVERGENSRC)
+

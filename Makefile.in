@@ -114,7 +114,7 @@ CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 # the server will use a threaded job library 
 SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 -D__PVFS2_TROVE_THREADED__
-SERVERLIBS = @LIBS@ -ldb -lrt -lpthread
+SERVERLIBS = @LIBS@ -ldb -lrt -lpthread -lpvfs2-server
 # the client libraries are not threaded (at the moment at least)
 #    and therefore can disable locking in the I/O subsystems
 LIBCFLAGS = -D__GEN_NULL_LOCKING__
@@ -279,7 +279,7 @@ all: mpitests
 endif
 
 # rule for building the pvfs2 server
-$(SERVER): $(SERVEROBJS)
+$(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a 
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
 	@$(LD) $(LDFLAGS) $(SERVERLIBS) $^ -o $@
@@ -297,6 +297,18 @@ else
 	$(INSTALL) -d lib
 	ar rcs $@ $(LIBOBJS)
 endif
+
+# rule for building the pvfs2 server library
+lib/libpvfs2-server.a: $(SERVEROBJS)
+ifdef QUIET_COMPILE
+	@echo "  RANLIB	$@"
+	@$(INSTALL) -d lib
+	@ar rcs $@ $(SERVEROBJS)
+else
+	$(INSTALL) -d lib
+	ar rcs $@ $(SERVEROBJS)
+endif
+
 
 # rule for building MPI objects
 $(MPITESTOBJS): %.o: %.c
