@@ -23,13 +23,18 @@ static inline void init_cache_stack_list(void);
 
 unsigned long radix_get_value(const void *item);
 
+/* TODO: */
+static int extlog2(int extsize)
+{
+	return 15;
+}
+
 
 /* cache_init(): initiate cache. */
 
 int cache_init(NCAC_info_t *info)
 {
     int reqnum;
-    void *tmp;
 
     if ( info->max_req_num == -1 ) reqnum = MAX_DELT_REQ_NUM;
     else reqnum = info->max_req_num;
@@ -42,18 +47,15 @@ int cache_init(NCAC_info_t *info)
     memset( NCAC_dev.free_req_src, 0, reqnum*sizeof(struct NCAC_req) );
     init_free_req_list(reqnum);
 
-    NCAC_dev.extsize = 32768;
-    NCAC_dev.extlog2 = 15;
+    NCAC_dev.extsize = info->extsize;
+    NCAC_dev.extlog2 = extlog2(info->extsize);
 
     NCAC_dev.cachesize = info->cachesize;
-    //NCAC_dev.cachemem  = (char *) malloc(NCAC_dev.cachesize);
-
-    posix_memalign( &tmp, getpagesize(), NCAC_dev.cachesize);
-    if ( tmp == NULL ) {
-        fprintf(stderr, "cache_init: cannot allocate cache buffers.\n");
-        return -ENOMEM;
+    NCAC_dev.cachemem  = (char *) info->cachespace;
+    if ( !info->cachespace )
+    {
+         fprintf(stderr, "cache space is NULL\n");
     }
-    NCAC_dev.cachemem = tmp;
 
     /* we expect extcnt is a power of two number */
     NCAC_dev.extcnt = (NCAC_dev.cachesize/NCAC_dev.extsize);

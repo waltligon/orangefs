@@ -30,21 +30,25 @@ static inline int NCAC_rwjob_prepare_one_piece(PVFS_offset pos, PVFS_size size, 
 static inline struct NCAC_req * get_internal_req_lock( PVFS_fs_id fsid, PVFS_handle hndl)
 {
 
-    NCAC_req_t *req=NULL;
+	NCAC_req_t *req=NULL;
 	struct list_head *new;
 
-	list_lock(&NCAC_dev.req_list_lock); 
+	//list_lock(&NCAC_dev.req_list_lock); 
 
 	if ( list_empty(&NCAC_dev.free_req_list) ) return NULL;
 
 	new = NCAC_dev.free_req_list.next;
+	if ( !new ) {
+		fprintf(stderr, "there is no entry in the free req list\n");
+		return NULL;
+	}
 	list_del_init(new);
 
-	list_unlock(&NCAC_dev.req_list_lock); 
+	//list_unlock(&NCAC_dev.req_list_lock); 
 
 	req = list_entry(new->prev, NCAC_req_t, list);
 
-    return req;  
+	return req;  
 }
 
 

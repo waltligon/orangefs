@@ -21,6 +21,7 @@ struct NCAC_cache_info{
     int max_req_num;
     int extsize;
     int cachesize;
+    void *cachespace;
 };
 
 struct cache_stack {
