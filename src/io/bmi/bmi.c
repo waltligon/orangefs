@@ -27,11 +27,41 @@ static int split_string_list(char ***tokens,
 /* array to keep up with active contexts */
 static int context_array[BMI_MAX_CONTEXTS] = { 0 };
 
-#if !defined(__STATIC_METHOD_BMI_GM__) ||\
- !defined(__STATIC_METHOD_BMI_TCP__)
+#if defined(__STATIC_METHOD_BMI_TCP__) \
+  + defined(__STATIC_METHOD_BMI_GM__) \
+  + defined(__STATIC_METHOD_BMI_IB__) == 1
 /* define if there is only one active method */
 #define __BMI_SINGLE_METHOD__
 #endif
+
+/*
+ * Static list of defined BMI methods.  This must be done before
+ * initialize time, as it is necessary to parse the mntent list on
+ * the client before initializing BMI.
+ */
+#ifdef __STATIC_METHOD_BMI_TCP__
+extern struct bmi_method_ops bmi_tcp_ops;
+#endif /* __STATIC_METHOD_BMI_TCP__ */
+#ifdef __STATIC_METHOD_BMI_GM__
+extern struct bmi_method_ops bmi_gm_ops;
+#endif /* __STATIC_METHOD_BMI_GM__ */
+#ifdef __STATIC_METHOD_BMI_IB__
+extern struct bmi_method_ops bmi_ib_ops;
+#endif /* __STATIC_METHOD_BMI_IB__ */
+
+static struct bmi_method_ops *bmi_static_methods[] = {
+#ifdef __STATIC_METHOD_BMI_TCP__
+    &bmi_tcp_ops,
+#endif				/* __STATIC_METHOD_BMI_TCP__ */
+#ifdef __STATIC_METHOD_BMI_GM__
+    &bmi_gm_ops,
+#endif				/* __STATIC_METHOD_BMI_GM__ */
+#ifdef __STATIC_METHOD_BMI_IB__
+    &bmi_ib_ops,
+#endif				/* __STATIC_METHOD_BMI_IB__ */
+    NULL
+};
+
 
 /* BMI_initialize()
  * 
@@ -51,24 +81,6 @@ int BMI_initialize(const char *method_list,
     char **requested_methods = NULL;
     method_addr_p new_addr = NULL;
     struct bmi_method_ops **tmp_method_ops = NULL;
-
-    /* bring in the BMI methods that we need */
-#ifdef __STATIC_METHOD_BMI_GM__
-    extern struct bmi_method_ops bmi_gm_ops;
-#endif /* __STATIC_METHOD_BMI_GM__ */
-#ifdef __STATIC_METHOD_BMI_TCP__
-    extern struct bmi_method_ops bmi_tcp_ops;
-#endif /* __STATIC_METHOD_BMI_TCP__ */
-
-    static struct bmi_method_ops *static_methods[] = {
-#ifdef __STATIC_METHOD_BMI_GM__
-	&bmi_gm_ops,
-#endif				/* __STATIC_METHOD_BMI_GM__ */
-#ifdef __STATIC_METHOD_BMI_TCP__
-	&bmi_tcp_ops,
-#endif				/* __STATIC_METHOD_BMI_TCP__ */
-	NULL
-    };
 
     if (((flags & BMI_INIT_SERVER) && (!listen_addr)) || !method_list)
     {
@@ -104,7 +116,7 @@ int BMI_initialize(const char *method_list,
      */
     for (i = 0; i < active_method_count; i++)
     {
-	tmp_method_ops = static_methods;
+	tmp_method_ops = bmi_static_methods;
 	while ((*tmp_method_ops) != NULL &&
 	       strcmp((*tmp_method_ops)->method_name,
 		      requested_methods[i]) != 0)
@@ -1179,6 +1191,26 @@ int BMI_get_info(bmi_addr_t addr,
     return (0);
 }
 
+
+/*
+ * Quickly scan an address to figure out the method type.  Do not parse
+ * completely, just match on prefix.
+ *
+ * Returns a pointer to the method name, or null if not found.
+ */
+const char *
+BMI_method_from_scheme(const char *uri)
+{
+    struct bmi_method_ops **bo;
+
+    for (bo=bmi_static_methods; *bo; bo++) {
+	/* well-known that mapping is "x" -> "bmi_x" */
+	const char *name = (*bo)->method_name + 4;
+	if (!strncmp(uri, name, strlen(name)))
+	    return (*bo)->method_name;
+    }
+    return 0;
+}
 
 /*
  * BMI_addr_lookup()

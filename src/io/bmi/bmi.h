@@ -111,6 +111,8 @@ int BMI_get_info(bmi_addr_t addr,
 		 int option,
 		 void *inout_parameter);
 
+const char *BMI_method_from_scheme(const char *uri);
+
 int BMI_addr_lookup(bmi_addr_t * new_addr,
 		    const char *id_string);
 
