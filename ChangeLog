@@ -8,7 +8,20 @@ pvfs2-0.6.3pre1
 - added abilitity to negate log categories in PVFS_debug_eventlog_to_mask
 - added pvfs2-fsck
 - updated pvfs2-quickstart to better discuss client configuration
--
+- added optional epoll() based socket management component (enable with
+  configure option --enable-epoll on linux 2.6 systems)
+- fixed configure bug that dropped default CFLAGS in some cases
+- adjusted trove id generation to make it easier to log trove events
+- fixed Makefile.in bug that caused pvfs2-server.c dependency information to
+  be lost
+- rewrote both threaded and nonthreaded versions of all job_testXXX()
+  functions
+  - fixed condition variable usage to avoid signaling races that could lead to
+    unecessary wait times
+  - simplified code path
+  - removed superfluous calls to gettimeofday()
+- adjustment of condition variable usage in trove-dbpf to avoid races
+  similar to those found in job_testXXX() 
 
 
 pvfs2-0.6.2
