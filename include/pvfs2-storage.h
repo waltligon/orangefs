@@ -38,10 +38,6 @@ struct PVFS_vtag_s
 };
 typedef struct PVFS_vtag_s PVFS_vtag;
 
-
-/* unique identifiers associated with dataspace operations */
-typedef int64_t PVFS_ds_id;
-
 /* the state of completed operations */
 typedef int32_t PVFS_ds_state;
 

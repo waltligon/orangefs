@@ -83,7 +83,7 @@ static void *stat_bmi_user_ptr_array[job_work_metric];
 
 static flow_descriptor *stat_flow_array[job_work_metric];
 
-static PVFS_ds_id stat_trove_id_array[job_work_metric];
+static TROVE_op_id stat_trove_id_array[job_work_metric];
 static int stat_trove_index_array[job_work_metric];
 static PVFS_vtag stat_trove_vtag_array[job_work_metric];
 static void *stat_trove_user_ptr_array[job_work_metric];

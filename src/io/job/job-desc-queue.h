@@ -28,7 +28,7 @@ struct bmi_desc
 /* describes trove operations */
 struct trove_desc
 {
-    PVFS_ds_id id;
+    TROVE_op_id id;
     PVFS_size actual_size;
     PVFS_vtag *vtag;
     PVFS_fs_id fsid;

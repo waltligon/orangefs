@@ -11,12 +11,13 @@
 /* PVFS type mappings */
 #include <pvfs2-types.h>
 #include <pvfs2-storage.h>
+#include <id-generator.h>
 
 typedef PVFS_handle          TROVE_handle;
 typedef PVFS_size            TROVE_size;
 typedef PVFS_offset          TROVE_offset;
-typedef PVFS_ds_id           TROVE_op_id;
-typedef PVFS_fs_id         TROVE_coll_id;
+typedef id_gen_t             TROVE_op_id;
+typedef PVFS_fs_id           TROVE_coll_id;
 typedef PVFS_ds_type         TROVE_ds_type;
 typedef PVFS_vtag            TROVE_vtag_s;
 typedef PVFS_ds_flags        TROVE_ds_flags;

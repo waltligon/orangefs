@@ -113,7 +113,7 @@ static int bmi_pending_count = 0;
 
 /* array of trove ops in flight; filled in when needed to call testsome()
  * or waitsome() at the trove level. */
-static PVFS_ds_id *trove_op_array = NULL;
+static TROVE_op_id *trove_op_array = NULL;
 static int trove_op_array_len = 0;
 /* continuously updated list of trove ops in flight */
 static trove_id_queue_p trove_inflight_queue;
@@ -156,7 +156,7 @@ struct bmi_trove_flow_data
     /* id of current BMI operation */
     bmi_op_id_t bmi_id;
     /* ditto for trove */
-    PVFS_ds_id trove_id;
+    TROVE_op_id trove_id;
 
     /* the remaining fields are only used in double buffering
      * situations 
@@ -437,7 +437,7 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     flow_descriptor *active_flowd = NULL;
     struct bmi_trove_flow_data *flow_data = NULL;
     int incount = *count;
-    PVFS_ds_id *trove_op_array = NULL;
+    TROVE_op_id *trove_op_array = NULL;
     int split_idle_time_ms = max_idle_time_ms;
     int query_offset = 0;
     PVFS_fs_id tmp_coll_id;
@@ -459,7 +459,7 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
      */
 
     /* build arrays to use for checking for completion of low level ops */
-    trove_op_array = alloca(sizeof(PVFS_ds_id) * (trove_count));
+    trove_op_array = alloca(sizeof(TROVE_op_id) * (trove_count));
     if (!trove_op_array)
     {
 	return (-ENOMEM);
