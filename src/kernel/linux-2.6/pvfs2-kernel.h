@@ -9,6 +9,7 @@
 
 #include <linux/config.h>
 #include <linux/fs.h>
+#include <linux/types.h>
 
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
@@ -43,6 +44,20 @@ sizeof(int64_t) + sizeof(pvfs2_upcall_t))
 #define MAX_DEV_REQ_DOWNSIZE (sizeof(int32_t) + \
 sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 
+#define BITS_PER_LONG_DIV_8 (BITS_PER_LONG >> 3)
+
+#define MAX_ALIGNED_DEV_REQ_UPSIZE                  \
+(MAX_DEV_REQ_UPSIZE +                               \
+((((MAX_DEV_REQ_UPSIZE / (BITS_PER_LONG_DIV_8)) *   \
+   (BITS_PER_LONG_DIV_8)) +                         \
+    (BITS_PER_LONG_DIV_8)) - MAX_DEV_REQ_UPSIZE))
+#define MAX_ALIGNED_DEV_REQ_DOWNSIZE                \
+(MAX_DEV_REQ_DOWNSIZE +                             \
+((((MAX_DEV_REQ_DOWNSIZE / (BITS_PER_LONG_DIV_8)) * \
+   (BITS_PER_LONG_DIV_8)) +                         \
+    (BITS_PER_LONG_DIV_8)) - MAX_DEV_REQ_DOWNSIZE))
+
+
 /* borrowed from irda.h */
 #ifndef MSECS_TO_JIFFIES
 #define MSECS_TO_JIFFIES(ms) (((ms)*HZ+999)/1000)
@@ -73,11 +88,8 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
  ************************************/
 
 #if ((defined PVFS2_KERNEL_DEBUG) && (defined CONFIG_DEBUG_SLAB))
-/* #define PVFS2_CACHE_CREATE_FLAGS \ */
-/*         (SLAB_POISON | SLAB_RED_ZONE | SLAB_RECLAIM_ACCOUNT) */
 #define PVFS2_CACHE_CREATE_FLAGS (SLAB_POISON | SLAB_RED_ZONE)
 #else
-/* #define PVFS2_CACHE_CREATE_FLAGS (SLAB_RECLAIM_ACCOUNT) */
 #define PVFS2_CACHE_CREATE_FLAGS 0
 #endif /* ((defined PVFS2_KERNEL_DEBUG) && (defined CONFIG_DEBUG_SLAB)) */
 

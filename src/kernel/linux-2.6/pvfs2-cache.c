@@ -105,14 +105,14 @@ static void dev_req_cache_ctor(
 {
     if (flags & SLAB_CTOR_CONSTRUCTOR)
     {
-	memset(req, 0, sizeof(MAX_DEV_REQ_DOWNSIZE));
+	memset(req, 0, sizeof(MAX_ALIGNED_DEV_REQ_DOWNSIZE));
     }
 }
 
 void dev_req_cache_initialize(void)
 {
     dev_req_cache = kmem_cache_create("pvfs2_dev_req_cache",
-				      MAX_DEV_REQ_DOWNSIZE,
+				      MAX_ALIGNED_DEV_REQ_DOWNSIZE,
 				      0,
                                       PVFS2_CACHE_CREATE_FLAGS,
 				      dev_req_cache_ctor, NULL);

@@ -153,7 +153,7 @@ static ssize_t pvfs2_devreq_read(
         
         spin_unlock(&cur_op->lock);
 
-        len = MAX_DEV_REQ_UPSIZE;
+        len = MAX_ALIGNED_DEV_REQ_UPSIZE;
         if ((size_t) len <= count)
         {
             copy_to_user(buf, &magic, sizeof(int32_t));
@@ -215,7 +215,7 @@ static ssize_t pvfs2_devreq_read(
 
 	spin_unlock(&cur_op->lock);
 
-	len = MAX_DEV_REQ_UPSIZE;
+	len = MAX_ALIGNED_DEV_REQ_UPSIZE;
 	if ((size_t) len <= count)
 	{
 	    copy_to_user(buf, &magic, sizeof(int32_t));
@@ -260,7 +260,7 @@ static ssize_t pvfs2_devreq_writev(
     void *buffer = NULL;
     void *ptr = NULL;
     unsigned long i = 0;
-    static int max_downsize = MAX_DEV_REQ_DOWNSIZE;
+    static int max_downsize = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
     int num_remaining = max_downsize;
     int payload_size = 0;
     int32_t magic = 0;
@@ -440,10 +440,8 @@ static int pvfs2_devreq_ioctl(
     unsigned long arg)
 {
     static int32_t magic = PVFS2_DEVREQ_MAGIC;
-    static int32_t max_up_size =
-	sizeof(int32_t) + sizeof(int64_t) + sizeof(pvfs2_upcall_t);
-    static int32_t max_down_size =
-	sizeof(int32_t) + sizeof(int64_t) + sizeof(pvfs2_downcall_t);
+    static int32_t max_up_size = MAX_ALIGNED_DEV_REQ_UPSIZE;
+    static int32_t max_down_size = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
     struct PVFS_dev_map_desc user_desc;
 
     switch (command)
@@ -460,7 +458,7 @@ static int pvfs2_devreq_ioctl(
     case PVFS_DEV_MAP:
 	copy_from_user(&user_desc, (void *) arg, sizeof(struct
 	    PVFS_dev_map_desc));
-	return(pvfs_bufmap_initialize(&user_desc));
+	return pvfs_bufmap_initialize(&user_desc);
     default:
 	return -ENOSYS;
     }

@@ -158,11 +158,17 @@ static int pvfs2_statfs(
         buf->f_type = sb->s_magic;
         buf->f_bsize = sb->s_blocksize;
         buf->f_namelen = PVFS2_NAME_LEN;
-        buf->f_blocks = new_op->downcall.resp.statfs.blocks_total;
-        buf->f_bfree = new_op->downcall.resp.statfs.blocks_avail;
-        buf->f_bavail = new_op->downcall.resp.statfs.blocks_avail;
-        buf->f_files = new_op->downcall.resp.statfs.files_total;
-        buf->f_ffree = new_op->downcall.resp.statfs.files_avail;
+
+        buf->f_blocks = le32_to_cpu(
+            new_op->downcall.resp.statfs.blocks_total);
+        buf->f_bfree = le32_to_cpu(
+            new_op->downcall.resp.statfs.blocks_avail);
+        buf->f_bavail = le32_to_cpu(
+            new_op->downcall.resp.statfs.blocks_avail);
+        buf->f_files = le32_to_cpu(
+            new_op->downcall.resp.statfs.files_total);
+        buf->f_ffree = le32_to_cpu(
+            new_op->downcall.resp.statfs.files_avail);
 
         ret = new_op->downcall.status;
     }
