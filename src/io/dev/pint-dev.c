@@ -12,16 +12,21 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
+#include <sys/ioctl.h>
 
 #include "pvfs2-types.h"
 #include "gossip.h"
 #include "pint-dev.h"
+#include "pint-dev-shared.h"
 
 static int setup_dev_entry(const char* dev_name);
 static int parse_devices(const char* targetfile, const char* devname, 
     int* majornum);
 
 static int pdev_fd = -1;
+static int32_t pdev_magic;
+static int32_t pdev_max_upsize;
 
 /* PINT_dev_initialize()
  *
@@ -64,8 +69,25 @@ int PINT_dev_initialize(
 	}
     }
 
-    /* TODO: */
     /* run some ioctls to find out device parameters */
+    ret = ioctl(pdev_fd, PVFS_DEV_GET_MAGIC, &pdev_magic);
+    if(ret < 0)
+    {
+	gossip_err("Error: ioctl() failure.\n");
+	close(pdev_fd);
+	return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+    }
+    ret = ioctl(pdev_fd, PVFS_DEV_GET_MAX_UPSIZE, &pdev_max_upsize);
+    if(ret < 0)
+    {
+	gossip_err("Error: ioctl() failure.\n");
+	close(pdev_fd);
+	return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+    }
+
+    /* TODO: these are temporary */
+    printf("magic: %u\n", (unsigned)pdev_magic);
+    printf("max: %u\n", (unsigned)pdev_max_upsize);
 
     return(0);
 }

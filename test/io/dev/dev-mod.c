@@ -17,6 +17,8 @@
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
 
+#include "pint-dev-shared.h"
+
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("GPL");
 #endif
@@ -101,7 +103,24 @@ int pdev_ioctl(struct inode *inode,
 		  unsigned int command, 
 		  unsigned long arg)
 {
+    /* note: just picking these arbitrarily for testing */
+    int32_t magic = 1234;
+    int32_t max_size = 1024;
+
     printk("pdev: pdev_ioctl()\n");
+
+    switch(command)
+    {
+	case(PVFS_DEV_GET_MAGIC):
+	    copy_to_user((void*)arg, &magic, sizeof(int32_t)); 
+	    return(0);
+	case(PVFS_DEV_GET_MAX_UPSIZE):
+	    copy_to_user((void*)arg, &max_size, sizeof(int32_t)); 
+	    return(0);
+	default:
+	    return(-ENOSYS);
+    }
+
     return(-ENOSYS);
 } 
 
