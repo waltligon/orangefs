@@ -91,7 +91,7 @@ do {                                                      \
 /* do file and line number printouts w/ the GNU preprocessor */
 #define gossip_ldebug(mask, format, f...)                  \
 do {                                                       \
-    gossip_debug(mask, "%s line %d: " format, __FILE__, __LINE__, ##f); \
+    gossip_debug(mask, "%s: " format, __func__, ##f); \
 } while(0)
 
 #ifdef GOSSIP_ENABLE_BACKTRACE
