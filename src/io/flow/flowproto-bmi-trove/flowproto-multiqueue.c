@@ -481,6 +481,12 @@ static void trove_write_callback_fn(void *user_ptr,
 	return;
     }
 
+    /* if there are no more receives to post, just return */
+    if(flow_data->bytes_from_src == flow_data->parent->aggregate_size)
+    {
+	return;
+    }
+
     if(q_item->buffer)
     {
 	/* if this q_item has been used before, remove it from its 
