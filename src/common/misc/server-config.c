@@ -68,9 +68,12 @@ static char *get_handle_range_str(
 static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
     char *alias);
-static int alias_handle_exists_already(
+static struct host_handle_mapping_s *get_or_add_handle_mapping(
     struct llist *list,
     char *alias);
+static char *merge_handle_range_strs(
+    char *range1,
+    char *range2);
 
 static struct server_configuration_s *config_s = NULL;
 
@@ -500,7 +503,7 @@ DOTCONF_CB(get_alias_list)
 
 DOTCONF_CB(get_range_list)
 {
-    int i = 0;
+    int i = 0, is_new_handle_mapping = 0;
     struct filesystem_configuration_s *fs_conf = NULL;
     struct host_handle_mapping_s *handle_mapping = NULL;
     struct llist **handle_range_list = NULL;
@@ -536,31 +539,46 @@ DOTCONF_CB(get_range_list)
 
             if (is_valid_handle_range_description(cmd->data.list[i]))
             {
-                /*
-                  make sure this alias isn't listed more than once in this
-                  [Meta|Data]HandleRange block -- this is NOT legal, atm.
-                */
-                if (alias_handle_exists_already(*handle_range_list,
-                                                cmd->data.list[i]))
+                handle_mapping = get_or_add_handle_mapping(
+                    *handle_range_list, cmd->data.list[i-1]);
+                if (!handle_mapping)
                 {
-                    gossip_lerr("Error: Alias %s exists multiple times "
-                                "in this region;  that's not valid!\n",
-                                cmd->data.list[i]);
+                    gossip_lerr("Error: Alias %s allocation failed; "
+                                "aborting alias handle range addition!\n",
+                                cmd->data.list[i-1]);
                     return NULL;
                 }
 
-                handle_mapping = (host_handle_mapping_s *) 
-		    malloc(sizeof(host_handle_mapping_s));
-                assert(handle_mapping);
-                memset(handle_mapping,0,sizeof(host_handle_mapping_s));
+                if (!handle_mapping->alias_mapping)
+                {
+                    is_new_handle_mapping = 1;
+                    handle_mapping->alias_mapping =
+                        find_host_alias_ptr_by_alias(config_s,
+                                                     cmd->data.list[i-1]);
+                }
+                /* removeable sanity check */
+                assert(handle_mapping->alias_mapping ==
+                       find_host_alias_ptr_by_alias(config_s,
+                                                    cmd->data.list[i-1]));
+                if (!handle_mapping->handle_range)
+                {
+                    handle_mapping->handle_range =
+                        strdup(cmd->data.list[i]);
+                }
+                else
+                {
+                    char *new_handle_range = merge_handle_range_strs(
+                        handle_mapping->handle_range,
+                        cmd->data.list[i]);
+                    free(handle_mapping->handle_range);
+                    handle_mapping->handle_range = new_handle_range;
+                }
 
-                handle_mapping->alias_mapping =
-                    find_host_alias_ptr_by_alias(config_s,
-                                                 cmd->data.list[i-1]);
-                handle_mapping->handle_range = strdup(cmd->data.list[i]);
-
-                llist_add_to_tail(*handle_range_list,
-                                  (void *)handle_mapping);
+                if (is_new_handle_mapping)
+                {
+                    llist_add_to_tail(*handle_range_list,
+                                      (void *)handle_mapping);
+                }
             }
             else
             {
@@ -628,11 +646,11 @@ void PINT_server_config_release(struct server_configuration_s *config_s)
             config_s->server_config_buf = NULL;
         }
 
-        /* free all host alias objects */
-        llist_free(config_s->host_aliases,free_host_alias);
-
         /* free all filesystem objects */
         llist_free(config_s->file_systems,free_filesystem);
+
+        /* free all host alias objects */
+        llist_free(config_s->host_aliases,free_host_alias);
     }
 }
 
@@ -794,6 +812,7 @@ static void free_host_handle_mapping(void *ptr)
 
         free(h_mapping->handle_range);
         free(h_mapping);
+        h_mapping = NULL;
     }
 }
 
@@ -856,12 +875,12 @@ static host_alias_s *find_host_alias_ptr_by_alias(
     return ret;
 }
 
-static int alias_handle_exists_already(
+static struct host_handle_mapping_s *get_or_add_handle_mapping(
     struct llist *list,
     char *alias)
 {
-    int ret = 0;
     struct llist *cur = list;
+    struct host_handle_mapping_s *ret = NULL;
     struct host_handle_mapping_s *handle_mapping = NULL;
 
     while(cur)
@@ -878,14 +897,45 @@ static int alias_handle_exists_already(
         if (strcmp(handle_mapping->alias_mapping->host_alias,
                    alias) == 0)
         {
-            ret = 1;
+            ret = handle_mapping;
             break;
         }
         cur = llist_next(cur);
     }
+
+    if (!ret)
+    {
+        ret = (host_handle_mapping_s *)
+            malloc(sizeof(struct host_handle_mapping_s));
+        if (ret)
+        {
+            memset(ret,0,sizeof(struct host_handle_mapping_s));
+        }
+    }
     return ret;
 }
 
+static char *merge_handle_range_strs(
+    char *range1,
+    char *range2)
+{
+    char *merged_range = NULL;
+
+    if (range1 && range2)
+    {
+        int rlen1 = strlen(range1) * sizeof(char) + 1;
+        int rlen2 = strlen(range2) * sizeof(char) + 1;
+
+        /*
+          2 bytes bigger since we need a tz null and
+          space for the additionally inserted comma
+        */
+        merged_range = (char *)malloc(rlen1 + rlen2);
+        snprintf(merged_range, rlen1 + rlen2, "%s,%s",
+                 range1,range2);
+    }
+    return merged_range;
+}
 
 /*
  * Function: PINT_server_config_get_host_addr_ptr
@@ -1030,22 +1080,13 @@ char *PINT_server_config_get_merged_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs)
 {
+    char *merged_range = NULL;
     char *mrange = get_handle_range_str(config_s,fs,1);
     char *drange = get_handle_range_str(config_s,fs,0);
-    char *merged_range = NULL;
 
     if (mrange && drange)
     {
-        int mlen = strlen(mrange) * sizeof(char) + 1;
-        int dlen = strlen(drange) * sizeof(char) + 1;
-
-        /*
-          2 bytes bigger since we need a tz null and
-          space for the additionally inserted comma
-        */
-        merged_range = (char *)malloc(mlen + dlen);
-        snprintf(merged_range, mlen + dlen, "%s,%s",
-                 mrange,drange);
+        merged_range = merge_handle_range_strs(mrange,drange);
     }
     else if (mrange)
     {
