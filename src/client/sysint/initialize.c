@@ -419,7 +419,7 @@ static int server_parse_config(PVFS_servresp_getconfig *response)
     int fs_fd = 0, server_fd = 0;
     char fs_template[] = ".__pvfs_fs_configXXXXXX";
     char server_template[] = ".__pvfs_server_configXXXXXX";
-    char *args[2] = { fs_template, server_template };
+    char *args[3] = { fs_template, server_template, NULL };
 
     if (response)
     {
@@ -450,7 +450,7 @@ static int server_parse_config(PVFS_servresp_getconfig *response)
                       (response->server_config_buflen - 1)) ==
                 (response->server_config_buflen - 1))
             {
-                ret = PINT_server_config(&g_server_config,2,args);
+                ret = PINT_server_config(&g_server_config,3,args);
             }
         }
         close(fs_fd);
