@@ -20,5 +20,6 @@ KDIR	:= /usr/src/linux-$(shell uname -r)
 PWD		:= $(shell pwd)
 
 default:
+	touch $(PWD)/pvfs2.mod.c
 	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
 endif
