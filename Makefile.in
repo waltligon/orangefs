@@ -469,8 +469,8 @@ statecomp: src/common/statecomp/statecomp
 
 # rule for generating cscope information
 cscope:
-	find $(srcdir) -iname "*.[ch]" -o -iname "*.sm" -o \
-		-name pvfs2-types.h > $(srcdir)/cscope.files
+	find $(srcdir) -iname "*.[ch]" -o -iname "*.sm" \
+		 > $(srcdir)/cscope.files
 	( cd $(srcdir); cscope -be -i $(srcdir)/cscope.files )
 
 # build editor tags file over just the modules of interest
@@ -576,7 +576,7 @@ install:
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-mgmt.h $(prefix)/include
-	install -m 644 include/pvfs2-types.h $(prefix)/include
+	install -m 644 $(srcdir)include/pvfs2-types.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-util.h $(prefix)/include
 
 	install -d $(prefix)/lib
