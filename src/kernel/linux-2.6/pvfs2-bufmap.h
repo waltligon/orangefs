@@ -12,9 +12,9 @@
 /* used to describe mapped buffers */
 struct pvfs_bufmap_desc
 {
-    void* uaddr;		/* user space address pointer */
-    struct page** page_array;	/* array of mapped pages */
-    int array_count;		/* size of above arrays */
+    void *uaddr;                /* user space address pointer */
+    struct page **page_array;   /* array of mapped pages */
+    int array_count;            /* size of above arrays */
     struct list_head list_link;
 };
 
@@ -22,28 +22,28 @@ struct pvfs_bufmap_desc
 #define pvfs_bufmap_size_query() PVFS2_BUFMAP_DEFAULT_DESC_SIZE
 
 int pvfs_bufmap_initialize(
-    struct PVFS_dev_map_desc* user_desc);
+    struct PVFS_dev_map_desc *user_desc);
 
 void pvfs_bufmap_finalize(void);
 
 int pvfs_bufmap_get(
-    int* buffer_index);
+    int *buffer_index);
 
 void pvfs_bufmap_put(
     int buffer_index);
 
 int pvfs_bufmap_copy_from_user(
     int buffer_index,
-    void* from,
+    void __user *from,
     int size);
 
 int pvfs_bufmap_copy_to_user(
-    void* to,
+    void __user *to,
     int buffer_index,
     int size);
 
 int pvfs_bufmap_copy_to_kernel(
-    void* to,
+    void *to,
     int buffer_index,
     int size);
 

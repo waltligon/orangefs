@@ -80,6 +80,15 @@ do {                                                           \
 } while(0)
 #endif
 
+/*
+  this attempts to disable the annotations used by the 'sparse' kernel
+  source utility on systems that can't understand it by defining the
+  used annotations away
+*/
+#ifndef __user
+#define __user
+#endif
+
 #ifdef PVFS2_KERNEL_DEBUG
 #define MAX_SERVICE_WAIT_IN_SECONDS       30
 #else
@@ -114,7 +123,6 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 ((((MAX_DEV_REQ_DOWNSIZE / (BITS_PER_LONG_DIV_8)) * \
    (BITS_PER_LONG_DIV_8)) +                         \
     (BITS_PER_LONG_DIV_8)) - MAX_DEV_REQ_DOWNSIZE))
-
 
 /* borrowed from irda.h */
 #ifndef MSECS_TO_JIFFIES

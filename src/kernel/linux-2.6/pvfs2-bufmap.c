@@ -268,11 +268,12 @@ void pvfs_bufmap_put(int buffer_index)
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_copy_to_user(void *to, int buffer_index, int size)
+int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, int size)
 {
     int ret = 0, amt_copied = 0, amt_remaining = 0;
     int cur_copy_size = 0, index = 0;
-    void *offset = to, *from_kaddr = NULL;
+    void __user *offset = to;
+    void *from_kaddr = NULL;
     struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
 
     pvfs2_print("pvfs_bufmap_copy_to_user: to %p, from %p, index %d, "
@@ -308,7 +309,8 @@ int pvfs_bufmap_copy_to_user(void *to, int buffer_index, int size)
     return 0;
 }
 
-int pvfs_bufmap_copy_to_kernel(void *to, int buffer_index, int size)
+int pvfs_bufmap_copy_to_kernel(
+    void *to, int buffer_index, int size)
 {
     int amt_copied = 0, amt_remaining = 0;
     int cur_copy_size = 0, index = 0;
@@ -348,11 +350,13 @@ int pvfs_bufmap_copy_to_kernel(void *to, int buffer_index, int size)
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_copy_from_user(int buffer_index, void *from, int size)
+int pvfs_bufmap_copy_from_user(
+    int buffer_index, void __user *from, int size)
 {
     int ret = 0, amt_copied = 0, amt_remaining = 0;
     int cur_copy_size = 0, index = 0;
-    void *offset = from, *to_kaddr = NULL;
+    void __user *offset = from;
+    void *to_kaddr = NULL;
     struct pvfs_bufmap_desc *to = &desc_array[buffer_index];
 
     pvfs2_print("pvfs_bufmap_copy_from_user: from %p, index %d, "

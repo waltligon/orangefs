@@ -12,11 +12,11 @@
 #define __PINT_DEV_SHARED_H
 
 /* supported ioctls */
-#define PVFS_DEV_GET_MAGIC                      1
-#define PVFS_DEV_GET_MAX_UPSIZE                 2
-#define PVFS_DEV_GET_MAX_DOWNSIZE               3
-#define PVFS_DEV_MAP                            4
-#define PVFS_DEV_REMOUNT_ALL                    5
+#define PVFS_DEV_GET_MAGIC          (unsigned int)1
+#define PVFS_DEV_GET_MAX_UPSIZE     (unsigned int)2
+#define PVFS_DEV_GET_MAX_DOWNSIZE   (unsigned int)3
+#define PVFS_DEV_MAP                (unsigned int)4
+#define PVFS_DEV_REMOUNT_ALL        (unsigned int)5
 
 /* This is the number of discrete buffers we will break the mapped I/O
  * region into.  In some sense it governs the number of concurrent I/O

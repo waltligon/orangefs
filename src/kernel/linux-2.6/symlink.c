@@ -11,7 +11,8 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern struct dentry_operations pvfs2_dentry_operations;
 
-static int pvfs2_readlink(struct dentry *dentry, char *buffer, int buflen)
+static int pvfs2_readlink(
+    struct dentry *dentry, char __user *buffer, int buflen)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 

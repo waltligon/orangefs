@@ -82,9 +82,9 @@ static int pvfs2_devreq_open(
 
 static ssize_t pvfs2_devreq_read(
     struct file *file,
-    char *buf,
+    char __user *buf,
     size_t count,
-    loff_t * offset)
+    loff_t *offset)
 {
     int ret = 0, len = 0;
     pvfs2_kernel_op_t *cur_op = NULL;
@@ -416,22 +416,21 @@ static int pvfs2_devreq_ioctl(
     static int32_t max_down_size = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
     struct PVFS_dev_map_desc user_desc;
 
-    switch (command)
+    switch(command)
     {
         case PVFS_DEV_GET_MAGIC:
-            ret = copy_to_user((void *) arg, &magic, sizeof(int32_t));
-            return (ret ? -EIO : 0);
+            return ((put_user(magic, (int32_t __user *)arg) ==
+                     -EFAULT) ? -EIO : 0);
         case PVFS_DEV_GET_MAX_UPSIZE:
-            ret = copy_to_user((void *) arg, &max_up_size,
-                               sizeof(int32_t));
-            return (ret ? -EIO : 0);
+            return ((put_user(max_up_size, (int32_t __user *)arg) ==
+                     -EFAULT) ? -EIO : 0);
         case PVFS_DEV_GET_MAX_DOWNSIZE:
-            ret = copy_to_user((void *) arg, &max_down_size,
-                               sizeof(int32_t));
-            return (ret ? -EIO : 0);
+            return ((put_user(max_down_size, (int32_t __user *)arg) ==
+                     -EFAULT) ? -EIO : 0);
         case PVFS_DEV_MAP:
-            ret = copy_from_user(&user_desc, (void *) arg,
-                                 sizeof(struct PVFS_dev_map_desc));
+            ret = copy_from_user(
+                &user_desc, (struct PVFS_dev_map_desc __user *)arg,
+                sizeof(struct PVFS_dev_map_desc));
             return (ret ? -EIO : pvfs_bufmap_initialize(&user_desc));
         case PVFS_DEV_REMOUNT_ALL:
         {
