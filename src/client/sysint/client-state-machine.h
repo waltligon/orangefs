@@ -545,7 +545,7 @@ do {                                                           \
     memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));           \
     if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))\
     {                                                          \
-	free(sm_p->msgarray);                                  \
+        free(sm_p->msgarray);                                  \
         sm_p->msgarray = NULL;                                 \
     }                                                          \
     sm_p->msgarray = msg_p;                                    \

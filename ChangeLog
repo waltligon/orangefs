@@ -3,8 +3,8 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.6.1pre1
-===============
+pvfs2-0.6.1
+===========
 - misc. updates to msgpairarray and associated tools to allow for
   server side use
 - reorganization of server request parameters so that more (but not
@@ -47,6 +47,8 @@ pvfs2-0.6.1pre1
   dynamically as new mounts come and go
 - fixed a bug that allowed servers to create internal storage objects
   outside of the meta handle ranges in some circumstances
+- replace single element msgpair/array setup code where possible with
+  a macro
 
 
 pvfs2-0.6.0

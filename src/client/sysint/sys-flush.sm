@@ -29,13 +29,14 @@ static int flush_cleanup(
 
 %%
 
-machine pvfs2_client_flush_sm(flush_getattr_setup_msgpair,
-                              flush_getattr_xfer_msgpair,
-                              flush_getattr_failure,
-                              flush_datafile_setup_msgpairarray,
-                              flush_datafile_xfer_msgpairarray,
-                              flush_datafile_flush_failure,
-                              cleanup)
+machine pvfs2_client_flush_sm(
+    flush_getattr_setup_msgpair,
+    flush_getattr_xfer_msgpair,
+    flush_getattr_failure,
+    flush_datafile_setup_msgpairarray,
+    flush_datafile_xfer_msgpairarray,
+    flush_datafile_flush_failure,
+    cleanup)
 {
     state flush_getattr_setup_msgpair
     {
