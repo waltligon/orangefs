@@ -146,6 +146,12 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	offset += PAGES_PER_DESC;
     }
 
+    /* clear any previously used buffer indices */
+    for(i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
+    {
+        buffer_index_array[i] = 0;
+    }
+
     bufmap_init = 1;
 
     pvfs2_print("pvfs2_bufmap_initialize: exiting normally\n");
