@@ -2446,6 +2446,7 @@ ac_given_srcdir=$srcdir
 ac_given_INSTALL="$INSTALL"
 
 trap 'rm -fr `echo "Makefile
+module.mk
 src/apps/admin/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
@@ -2610,6 +2611,7 @@ EOF
 cat >> $CONFIG_STATUS <<EOF
 
 CONFIG_FILES=\${CONFIG_FILES-"Makefile
+module.mk
 src/apps/admin/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk

@@ -211,6 +211,8 @@ all: $(SERVER) $(LIBRARIES) tests admintools
 # this is how we pull build information from all of the project
 #    subdirectories
 include $(patsubst %, %/module.mk, $(MODULES))
+# make sure to catch top level module.mk as well
+include module.mk
 
 ################################################################
 # Derived file lists
@@ -567,13 +569,16 @@ endif
 %.pdf: %.dvi
 	( cd $(@D); dvipdf $(<F) $(@F) )
 
+ifndef DIST_RELEASE
 # rule for automatically generated source files
+# NOTE: this rule is disabled in release snapshots
 %.c: %.sm src/common/statecomp/statecomp
 ifdef QUIET_COMPILE
 	@echo "  SMC		$@"
 	@src/common/statecomp/statecomp $< $@
 else
 	src/common/statecomp/statecomp $< $@
+endif
 endif
 
 install:

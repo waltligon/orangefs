@@ -72,6 +72,9 @@ for f in `find . -name "*.toc"`; do rm -rf $f; done
 for f in `find . -name "*.aux"`; do rm -rf $f; done
 rm Makefile pvfs2-config.h
 
+# dump some special options into the top level module.mk.in
+echo "DIST_RELEASE = 1" >> module.mk.in
+
 # make sure the cleaned up directory exists
 cd /tmp
 if ! test -d "./$TARGETBASE"; then
