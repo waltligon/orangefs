@@ -49,15 +49,6 @@ struct PVFS_sys_mntent
     char *mnt_opts;		/* full option list */
 };
 
-/* results of parsing a pvfs2 tabfile, may contain more than one entry */
-struct PVFS_util_tab_s
-{
-    int mntent_count;                      /* number of mnt entries */
-    struct PVFS_sys_mntent *mntent_array;  /* mnt entries */
-    char tabfile_name[PVFS_NAME_MAX];      /* name of tabfile */
-};
-typedef struct PVFS_util_tab_s PVFS_util_tab;
-
 /* lookup (request and response) */
 struct PVFS_sysresp_lookup_s
 {

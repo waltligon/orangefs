@@ -11,6 +11,15 @@
 #ifndef __PVFS2_UTIL_H
 #define __PVFS2_UTIL_H
 
+/* results of parsing a pvfs2 tabfile, may contain more than one entry */
+struct PVFS_util_tab_s
+{
+    int mntent_count;                      /* number of mnt entries */
+    struct PVFS_sys_mntent *mntent_array;  /* mnt entries */
+    char tabfile_name[PVFS_NAME_MAX];      /* name of tabfile */
+};
+typedef struct PVFS_util_tab_s PVFS_util_tab;
+
 /* client side config file / option management */
 const PVFS_util_tab* PVFS_util_parse_pvfstab(
     const char* tabfile);
