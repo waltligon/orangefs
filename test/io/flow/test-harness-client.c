@@ -19,7 +19,7 @@
 #include <pvfs-distribution.h>
 #include <pvfs-request.h>
 
-int TEST_SIZE=1024*1024*1; /* 1M */
+int TEST_SIZE=1024*1024*20; /* 1M */
 static int block_on_flow(flow_descriptor* flow_d);
 static double Wtime(void);
 

@@ -27,7 +27,7 @@ int TEST_SIZE=1024*1024*20; /* 20M */
 static int block_on_flow(flow_descriptor* flow_d);
 static double Wtime(void);
 
-char storage_space[] = "/tmp/storage-space-foo";
+char storage_space[] = "/tmp/trove-test-space";
 char file_system[] = "fs-foo";
 TROVE_handle requested_file_handle = 9999;
 
@@ -268,10 +268,14 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	PINT_flow_free(flow_d);
+
 	/* shut down BMI */
 	BMI_finalize();
 
 	trove_finalize();
+
+	free(mybuffer);
 
 	gossip_disable();
 	return(0);

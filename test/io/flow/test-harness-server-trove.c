@@ -41,7 +41,7 @@ enum {
     TROVE_TEST_BSTREAM = 3
 };
 
-char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
+char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
 char path_to_file[PATH_SIZE] = "/bar";
 TROVE_handle requested_file_handle = 4095;
@@ -51,7 +51,6 @@ int main(int argc, char **argv)
 	int ret = -1;
 	int outcount = 0, count;
 	struct BMI_unexpected_info request_info;
-	void* mybuffer;
 	flow_descriptor* flow_d = NULL;
 	double time1, time2;
 	int i;
@@ -162,6 +161,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "waitunexpected failure.\n");
 		return(-1);
 	}
+	free(request_info.buffer);
 
 	/******************************************************/
 	/* setup request/dist stuff */
@@ -195,15 +195,6 @@ int main(int argc, char **argv)
 
 	/******************************************************/
 	/* setup communicaton stuff */
-
-	/* memory buffer to xfer */
-	mybuffer = (void*)malloc(TEST_SIZE);
-	if(!mybuffer)
-	{
-		fprintf(stderr, "mem.\n");
-		return(-1);
-	}
-	memset(mybuffer, 0, TEST_SIZE);
 
 	/* create a flow descriptor */
 	flow_d = PINT_flow_alloc();
@@ -278,6 +269,7 @@ int main(int argc, char **argv)
 	/*******************************************************/
 	/* final cleanup and output */
 
+	PINT_flow_free(flow_d);
 
 	/* shut down flow interface */
 	ret = PINT_flow_finalize();
