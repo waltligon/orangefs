@@ -5,7 +5,13 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.1.2pre1
 ===============
--
+- BMI IB module:
+    - fix bug resulting in mixed-up connections
+    - clean up incoming message processing
+    - refactor test and testcontext code
+    - simplify state machine
+- add shared and static libraries build options
+- honor PVFS2_DEBUGFILE environment variable in client
 
 
 pvfs2-0.1.1
