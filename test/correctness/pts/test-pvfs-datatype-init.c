@@ -10,7 +10,7 @@ extern pvfs_helper_t pvfs_helper;
 */
 int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
 {
-    int ret = -1, i = 0, num_test_files_ok;
+    int ret = -1, i = 0, num_test_files_ok = 0;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
