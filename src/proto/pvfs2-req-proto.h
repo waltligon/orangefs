@@ -633,6 +633,7 @@ struct PVFS_servreq_io
     struct PINT_Request *lin; \
     lin = decode_malloc(((x)->file_req->num_nested_req + 1) * sizeof(*lin)); \
     (void) PINT_Request_commit(lin, (x)->file_req); \
+    PINT_Request_encode(lin); /* packs the pointers */ \
     encode_int32_t(pptr, &(x)->file_req->num_nested_req); \
     encode_PVFS_Request(pptr, lin); \
     decode_free(lin); \
