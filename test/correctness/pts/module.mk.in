@@ -21,7 +21,8 @@ TEST_PTS_MISC := \
 	$(DIR)/test-uninitialized.c \
 	$(DIR)/test-finalized.c \
 	$(DIR)/test-misc.c \
-	$(DIR)/test-concurrent-meta.c
+	$(DIR)/test-concurrent-meta.c \
+	$(DIR)/test-request-indexed.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 
