@@ -52,9 +52,10 @@ int bsend(int s,
 int nbsend(int s,
 	   void *buf,
 	   int len);
-int nbsendv(int s,
+int nbvector(int s,
 	    struct iovec* vector,
-	    int count);
+	    int count,
+	    int recv_flag);
 int get_sockopt(int s,
 		int optname);
 int set_tcpopt(int s,

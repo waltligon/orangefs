@@ -238,9 +238,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
 				 bmi_context_id context_id);
-static int send_payload_progress(int s, void** buffer_list, bmi_size_t* 
+static int payload_progress(int s, void** buffer_list, bmi_size_t* 
     size_list, int list_count, bmi_size_t total_size, int* list_index, 
-    bmi_size_t* current_index_complete);
+    bmi_size_t* current_index_complete, enum bmi_op_type send_recv);
 
 /* exported method interface */
 struct bmi_method_ops bmi_tcp_ops = {
@@ -2298,16 +2298,17 @@ static int work_on_send_op(method_op_p my_method_op,
 
     if (my_method_op->actual_size != 0)
     {
-	ret = send_payload_progress(tcp_addr_data->socket,
+	ret = payload_progress(tcp_addr_data->socket,
 	    my_method_op->buffer_list,
 	    my_method_op->size_list,
 	    my_method_op->list_count,
 	    my_method_op->actual_size,
 	    &(my_method_op->list_index),
-	    &(my_method_op->cur_index_complete));
+	    &(my_method_op->cur_index_complete),
+	    BMI_SEND);
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: send_payload_progress: %s\n", strerror(-ret));
+	    gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
 	    tcp_forget_addr(my_method_op->addr, 0);
 	    return (0);
 	}
@@ -2665,12 +2666,12 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     if (my_header.size != 0)
     {
 	/* try to send some actual message data */
-	ret = send_payload_progress(tcp_addr_data->socket, buffer_list,
+	ret = payload_progress(tcp_addr_data->socket, buffer_list,
 	    size_list, list_count, my_header.size, &list_index,
-	    &cur_index_complete);
+	    &cur_index_complete, BMI_SEND);
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: send_payload_progress: %s\n", strerror(-ret));
+	    gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
 	    tcp_forget_addr(dest, 0);
 	    return (ret);
 	}
@@ -2699,15 +2700,15 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 }
 
 
-/* send_payload_progress()
+/* payload_progress()
  *
- * makes progress on sending data payload portion of a message; uses writev()
+ * makes progress on sending/recving data payload portion of a message
  *
  * returns amount completed on success, -errno on failure
  */
-static int send_payload_progress(int s, void** buffer_list, bmi_size_t* 
+static int payload_progress(int s, void** buffer_list, bmi_size_t* 
     size_list, int list_count, bmi_size_t total_size, int* list_index, 
-    bmi_size_t* current_index_complete)
+    bmi_size_t* current_index_complete, enum bmi_op_type send_recv)
 {
     int i;
     int count;
@@ -2736,7 +2737,14 @@ static int send_payload_progress(int s, void** buffer_list, bmi_size_t*
     count = list_count - *list_index;
 
     assert(count > 0);
-    ret = nbsendv(s, stat_io_vector, count);
+    if(send_recv == BMI_RECV)
+    {
+	ret = nbvector(s, stat_io_vector, count, 1);
+    }
+    else
+    {
+	ret = nbvector(s, stat_io_vector, count, 0);
+    }
 
     /* if error or nothing done, return now */
     if(ret <= 0)

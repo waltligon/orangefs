@@ -276,9 +276,10 @@ int nbsend(int s,
 }
 
 /* nonblocking vector send */
-int nbsendv(int s,
+int nbvector(int s,
 	    struct iovec* vector,
-	    int count)
+	    int count, 
+	    int recv_flag)
 {
     int oldfl, ret;
     oldfl = fcntl(s, F_GETFL, 0);
@@ -293,7 +294,14 @@ int nbsendv(int s,
     /* loop over if interrupted */
     do
     {
-	ret = writev(s, vector, count);
+	if(recv_flag)
+	{
+	    ret = readv(s, vector, count);
+	}
+	else
+	{
+	    ret = writev(s, vector, count);
+	}
     }while(ret == -1 && errno == EINTR);
 
     /* return zero if can't do any work at all */
