@@ -31,17 +31,17 @@ ENCODE_REQ_HEAD(do_encode_req)
 		case PVFS_SERV_GETCONFIG:
 			if (!request->u.getconfig.fs_name)
 			{
-				printf("invalid string passed\n");
+				/*printf("invalid string passed\n");*/
 				return (-EINVAL);
 			}
-			printf("geting string len\n");
+			/*printf("geting string len\n");*/
 			name_sz = strlen( request->u.getconfig.fs_name );
 			size = sizeof( struct PVFS_server_req_s ) + name_sz + 1;
-			printf("total space: %d str len: %d header: %d struct: %d\n", size, name_sz, header_size, sizeof(struct PVFS_server_req_s));
+			/*printf("total space: %d str len: %d header: %d struct: %d\n", size, name_sz, header_size, sizeof(struct PVFS_server_req_s));*/
 			enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t) (size + header_size), BMI_SEND_BUFFER );
 			if (!enc_msg)
 			{
-				printf("unable to malloc = %d bytes\n", size);
+				/*printf("unable to malloc = %d bytes\n", size);*/
 				return (-ENOMEM);
 			}
 			target_msg->buffer_list = (void*) malloc(sizeof(void *));
@@ -50,18 +50,18 @@ ENCODE_REQ_HEAD(do_encode_req)
 			target_msg->total_size = size;
 			memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
-			printf("copying strings now\n");
+			/*printf("copying strings now\n");*/
         		/* copy a null terminated string to another */
         		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.getconfig.fs_name, (size_t) name_sz);
-			printf("copying terminator\n");
+			/*printf("copying terminator\n");*/
         		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ) + name_sz , "\0", 1 );
 
 			/* make pointer since we're sending it over the wire and don't want 
 			 * random memory referenced on the other side */
 
-			printf("updating pointer\n");
+			/*printf("updating pointer\n");*/
 			((struct PVFS_server_req_s *)enc_msg)->u.getconfig.fs_name = NULL;
-			printf("done\n");
+			/*printf("done\n");*/
 			return (0);
 
 		case PVFS_SERV_LOOKUP_PATH:
