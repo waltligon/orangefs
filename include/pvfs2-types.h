@@ -388,7 +388,7 @@ enum PVFS_io_type {
  *
  * Here we choose 32-bit machines as the dominant type.  If a format
  * specifier and a parameter are mismatched, that machine will issue
- * a warning, while 64-bit machines will silenly perform the cast.
+ * a warning, while 64-bit machines will silently perform the cast.
  */
 #if (__WORDSIZE == 32)
 #  define Lu(x) (x)
