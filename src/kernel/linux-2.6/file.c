@@ -55,7 +55,7 @@ int pvfs2_file_open(
             ret = pvfs2_inode_getattr(inode);
             if (ret == 0)
             {
-                file->f_pos = inode->i_size;
+                file->f_pos = i_size_read(inode);
             }
         }
 
@@ -326,12 +326,6 @@ static ssize_t pvfs2_file_write(
         total_count += new_op->downcall.resp.io.amt_complete;
         amt_complete = new_op->downcall.resp.io.amt_complete;
 
-        /* adjust inode size if applicable */
-        if ((original_offset + amt_complete) > inode->i_size)
-        {
-            i_size_write(inode, (original_offset + amt_complete));
-        }
-
         /*
           tell the device file owner waiting on I/O that this read has
           completed and it can return now.  in this exact case, on
@@ -462,8 +456,8 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
         }
     }
 
-    pvfs2_print("pvfs2_file_llseek: int offset is %d | origin is %d | "
-                "inode size is %lu\n", (int)offset, origin,
+    pvfs2_print("pvfs2_file_llseek: offset is %ld | origin is %d | "
+                "inode size is %lu\n", (long)offset, origin,
                 (unsigned long)file->f_dentry->d_inode->i_size);
 
     return generic_file_llseek(file, offset, origin);
