@@ -12,10 +12,14 @@ AC_CONFIG_AUX_DIR(maint/config)
 dnl Checks for host type
 dnl Ensures we can compile on this OS
 AC_CANONICAL_HOST
-AC_MSG_CHECKING(whether we know how to compile for this OS)
-if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
-else AC_MSG_RESULT(yes)
-fi
+
+dnl NOTE: removing the linux-gnu host check for now; we may want to put it back
+dnl before releaseing any code, though...  -Phil
+dnl 
+dnl AC_MSG_CHECKING(whether we know how to compile for this OS)
+dnl if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
+dnl else AC_MSG_RESULT(yes)
+dnl fi
 
 dnl Check byte ordering
 AC_C_BIGENDIAN
