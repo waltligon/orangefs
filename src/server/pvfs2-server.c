@@ -773,6 +773,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 	    case '?':
 	    case 'h':
 	    default:
+          parse_cmd_line_args_failure:
 		gossip_err("pvfs2-server: [-hdf] <global_config_file> <server_config_file>\n\n"
 			   "\t-h will show this message\n"
 			   "\t-d will keep the server in the foreground\n"
@@ -781,6 +782,10 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 		return 1;
 		break;
 	}
+    }
+    if (optind < 2)
+    {
+        goto parse_cmd_line_args_failure;
     }
     return 0;
 }
