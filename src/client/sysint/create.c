@@ -383,8 +383,6 @@ gossip_ldebug(CLIENT_DEBUG,"\t\tnr_datafiles: %d\n",req_p.u.setattr.attr.u.meta.
 	    failure = SETATTR_FAILURE;
 	    goto return_error;
 	}
-
-	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 	PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
 	    &encoded_resp, op_tag);
 
