@@ -241,7 +241,7 @@ int test_create(MPI_Comm * comm,
 
     for (i = 0; i < myparams->mode; i++)
     {
-	snprintf(name, PVFS_NAME_MAX, "/%d-%d-testfile", i, rank);
+	snprintf(name, PVFS_NAME_MAX, "%d-%d-testfile", i, rank);
 	nerrs += create_file(resp_init.fsid_list[0], myparams->path, name);
     }
 
