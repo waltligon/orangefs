@@ -4,8 +4,11 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.2 2003-01-15 19:36:45 walt Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.3 2003-03-26 15:25:58 walt Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.2  2003/01/15 19:36:45  walt
+// fixed some warnings - changed order of args for request commit
+//
 // Revision 1.1  2003/01/10 18:37:29  pcarns
 // brought Walt's io description code over from the old pvfs2 tree
 //
@@ -146,6 +149,7 @@ int PVFS_Request_hvector(PVFS_count32 count, PVFS_count32 blocklength,
 	*newreq = (PINT_Request *)malloc(sizeof(struct PINT_Request));
 	(*newreq)->sreq = NULL;
 	PINT_subreq(0, blocklength, stride, count, oldreq, oldext, newreq);
+	/* calculate statistics like ub, lb, depth, etc. */
 	if (stride < 0)
 	{
 		(*newreq)->lb = (count - 1) * stride;
@@ -169,6 +173,7 @@ int PVFS_Request_indexed(PVFS_count32 count, PVFS_count32 *blocklengths,
 		(*newreq)->sreq = dt;
 		PINT_subreq(displacements[count]*oldext, blocklengths[count],
 				0, 1, oldreq, oldext, newreq);
+		/* calculate statistics like ub, lb, depth, etc. */
 		if ((*newreq)->sreq)
 		{
 			if ((*newreq)->lb > (*newreq)->sreq->lb)
@@ -183,7 +188,7 @@ int PVFS_Request_indexed(PVFS_count32 count, PVFS_count32 *blocklengths,
 						(*newreq)->sreq->num_contig_chunks;
 			if ((*newreq)->sreq)
 			{
-				/* contribution of ereq hnadled is subreq */
+				/* contribution of ereq handled in subreq */
 				(*newreq)->num_nested_req += (*newreq)->sreq->num_nested_req + 1;
 				/* this tries to deal with non-tree request graphs */
 				if ((*newreq)->ereq == (*newreq)->sreq->ereq)
@@ -212,6 +217,7 @@ int PVFS_Request_hindexed(PVFS_count32 count, PVFS_count32 *blocklengths,
 		(*newreq)->sreq = dt;
 		PINT_subreq(displacements[count], blocklengths[count], 0, 1,
 				oldreq, oldext, newreq);
+		/* calculate statistics like ub, lb, depth, etc. */
 		if ((*newreq)->sreq)
 		{
 			if ((*newreq)->lb > (*newreq)->sreq->lb)
@@ -226,7 +232,7 @@ int PVFS_Request_hindexed(PVFS_count32 count, PVFS_count32 *blocklengths,
 						(*newreq)->sreq->num_contig_chunks;
 			if ((*newreq)->sreq)
 			{
-				/* contribution of ereq hnadled is subreq */
+				/* contribution of ereq handled in subreq */
 				(*newreq)->num_nested_req += (*newreq)->sreq->num_nested_req + 1;
 				/* this tries to deal with non-tree request graphs */
 				if ((*newreq)->ereq == (*newreq)->sreq->ereq)
@@ -257,6 +263,7 @@ int PVFS_Request_struct(PVFS_count32 count, PVFS_count32 *blocklengths,
 		(*newreq)->sreq = dt;
 		PINT_subreq(displacements[count], blocklengths[count],
 				0, 1, oldreqs[count], oldext, newreq);
+		/* calculate statistics like ub, lb, depth, etc. */
 		if ((*newreq)->sreq)
 		{
 			if ((*newreq)->lb > (*newreq)->sreq->lb)
@@ -271,7 +278,7 @@ int PVFS_Request_struct(PVFS_count32 count, PVFS_count32 *blocklengths,
 						(*newreq)->sreq->num_contig_chunks;
 			if ((*newreq)->sreq)
 			{
-				/* contribution of ereq hnadled is subreq */
+				/* contribution of ereq handled in subreq */
 				(*newreq)->num_nested_req += (*newreq)->sreq->num_nested_req + 1;
 				/* this tries to deal with non-tree request graphs */
 				if ((*newreq)->ereq == (*newreq)->sreq->ereq)
