@@ -72,7 +72,6 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
     int old_event_on;
     int32_t old_api_mask;
     int32_t old_op_mask;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("work");
 
@@ -100,13 +99,7 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 	    ret = job_trove_dspace_verify(
                 s_op->req->u.mgmt_setparam.fs_id,
 		(PVFS_handle)s_op->req->u.mgmt_setparam.value,
-                PINT_config_get_trove_sync_meta(
-                    user_opts, s_op->req->u.mgmt_setparam.fs_id),
-		s_op,
-		0,
-		js_p,
-		&tmp_id,
-		server_job_context);
+                0, s_op, 0, js_p, &tmp_id, server_job_context);
 	    return(ret);
 	case PVFS_SERV_PARAM_EVENT_ON:
 	    ret = 0;
