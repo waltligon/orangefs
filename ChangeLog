@@ -1,0 +1,24 @@
+-----------------------
+PVFS2 Release ChangeLog
+-----------------------
+
+
+pvfs2-0.0.2
+===========
+- server side memory leaks almost entirely eliminated                         
+- configuration file options for specifying BMI and Flow modules              
+- job level thread management optimizations                                   
+- integration of a buffer cache into tree (not yet hooked up)                 
+- support for symlinks                                                        
+- support for vfs symlinks (can exist; can't be followed)                     
+- symlink attributes are now able to be added to the pcache                   
+- BMI infiniband driver merged in
+- new pvfstab format and parsing code
+- kernel module reports big block size on stat
+- job api changes to prevent client side race conditions
+- improved I/O path attribute caching
+
+
+pvfs2-0.0.1
+==========
+- limited initial public release

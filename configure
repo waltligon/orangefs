@@ -569,7 +569,7 @@ ac_configure=$ac_aux_dir/configure # This should be Cygnus configure.
 PVFS2_MAJOR=0
 PVFS2_MINOR=0
 PVFS2_SUB=2
-PVFS2_PRE="pre1"
+PVFS2_PRE=""
 
 am__api_version="1.4"
 # Find a good install program.  We prefer a C program (faster),
@@ -1655,16 +1655,16 @@ fi
 
 
 
-ac_safe=`echo ""$DB_PATH/lib/libdb.a"" | sed 'y%./+-%__p_%'`
-echo $ac_n "checking for "$DB_PATH/lib/libdb.a"""... $ac_c" 1>&6
-echo "configure:1661: checking for "$DB_PATH/lib/libdb.a"" >&5
+ac_safe=`echo ""$DB_PATH/lib/libdb.so"" | sed 'y%./+-%__p_%'`
+echo $ac_n "checking for "$DB_PATH/lib/libdb.so"""... $ac_c" 1>&6
+echo "configure:1661: checking for "$DB_PATH/lib/libdb.so"" >&5
 if eval "test \"`echo '$''{'ac_cv_file_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   if test "$cross_compiling" = yes; then
     { echo "configure: error: Cannot check for file existence when cross compiling" 1>&2; exit 1; }
 else
-  if test -r "$DB_PATH/lib/libdb.a"; then
+  if test -r "$DB_PATH/lib/libdb.so"; then
     eval "ac_cv_file_$ac_safe=yes"
   else
     eval "ac_cv_file_$ac_safe=no"
