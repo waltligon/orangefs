@@ -369,7 +369,6 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
 					arrow(direction);
                         		printf("PVFS_servreq_setattr.attr.u.data.size = %d\n", (int)my_req->u.setattr.attr.u.data.size );
 					arrow(direction);
-                        		printf("PVFS_servreq_setattr.attr.u.data.dfh = %d\n", (int) my_req->u.setattr.attr.u.data.dfh );
 					break;
 				case ATTR_DIR:
                         		printf("PVFS_servreq_setattr.attr.objtype = ATTR_DIR\n" );
@@ -609,7 +608,6 @@ int main(int argc, char **argv)
 		request->u.setattr.attr.u.meta.dfh = datafiles;
         //request->u.setattr.attr.objtype = ATTR_DATA;
 	//	request->u.setattr.attr.u.data.size = 100;
-	//	request->u.setattr.attr.u.data.dfh  = 123;
 
         // -
 	// - should test these structs, but they're undefined at present

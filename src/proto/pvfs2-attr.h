@@ -75,7 +75,6 @@ struct PVFS_datafile_attr_s {
 	 * to metaserver to help in total file size calculation 
 	 */
 	PVFS_size size;
-	PVFS_handle dfh;
 };
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
 

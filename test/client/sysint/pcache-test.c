@@ -56,7 +56,6 @@ int main(int argc,char* argv[])
 	pinode1->attr.atime = 1;
 	pinode1->attr.objtype = ATTR_META;
 	//pinode1->attr.u.meta = ;
-	//pinode1->attr.u.data = ;
 	pinode1->mask = ATTR_META;
 	pinode1->size = 1;
 	pinode1->tstamp.tv_sec = 111;
@@ -72,7 +71,6 @@ int main(int argc,char* argv[])
 	pinode2->attr.atime = 2;
 	pinode2->attr.objtype = ATTR_META;
 	//pinode2->attr.u.meta = ;
-	//pinode2->attr.u.data = ;
 	pinode2->mask = ATTR_META;
 	pinode2->size = 2;
 	pinode2->tstamp.tv_sec = 222;
@@ -88,7 +86,6 @@ int main(int argc,char* argv[])
 	pinode3->attr.atime = 3;
 	pinode3->attr.objtype = ATTR_META;
 	//pinode3->attr.u.meta = ;
-	//pinode3->attr.u.data = ;
 	pinode3->mask = ATTR_META;
 	pinode3->size = 3;
 	pinode3->tstamp.tv_sec = 333;
