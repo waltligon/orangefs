@@ -393,6 +393,8 @@ int pvfs2_kernel_error_code_convert(
 void *pvfs2_kernel_error_code_ptr_convert(
     int pvfs2_error_code);
 
+void pvfs2_inode_initialize(
+    pvfs2_inode_t *pvfs2_inode);
 
 #endif /* __PVFS2KERNEL_H */
 

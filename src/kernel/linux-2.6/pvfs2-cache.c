@@ -26,7 +26,6 @@ extern kmem_cache_t *pvfs2_inode_cache;
 extern int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
 
-
 static void op_cache_ctor(
     void *kernel_op,
     kmem_cache_t *cachep,
@@ -139,16 +138,13 @@ static void pvfs2_inode_cache_ctor(
     kmem_cache_t * cachep,
     unsigned long flags)
 {
-    pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *) new_pvfs2_inode;
+    pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *)new_pvfs2_inode;
 
     if (flags & SLAB_CTOR_CONSTRUCTOR)
     {
 	memset(pvfs2_inode, 0, sizeof(pvfs2_inode_t));
 
-	pvfs2_inode->refn.handle = 0;
-	pvfs2_inode->refn.fs_id = 0;
-        pvfs2_inode->link_target = NULL;
-        pvfs2_inode->last_failed_block_index_read = 0;
+        pvfs2_inode_initialize(pvfs2_inode);
 
 	/*
 	   inode_init_once is from inode.c;

@@ -59,6 +59,8 @@ static int pvfs2_readdir(
 
     pvfs2_print("pvfs2: pvfs2_readdir called on %s (pos = %d)\n",
 		dentry->d_name.name, (int)pos);
+    pvfs2_print("token adjustment is %d\n",
+                pvfs2_inode->readdir_token_adjustment);
 
     switch (pos)
     {

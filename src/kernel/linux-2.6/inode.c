@@ -373,10 +373,15 @@ int pvfs2_getattr(
     pvfs2_print("pvfs2: pvfs2_getattr called on %s\n",
                 dentry->d_name.name);
 
-    if (pvfs2_inode_getattr(inode) == 0)
+    ret = pvfs2_inode_getattr(inode);
+    if (ret == 0)
     {
         generic_fillattr(inode, kstat);
-        ret = 0;
+    }
+    else
+    {
+        /* assume an I/O error and flag inode as bad */
+        make_bad_inode(inode);
     }
     return ret;
 }

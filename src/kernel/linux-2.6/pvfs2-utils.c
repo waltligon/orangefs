@@ -337,12 +337,12 @@ static inline int copy_attributes_from_inode(
   issues a pvfs2 getattr request and fills in the
   appropriate inode attributes if successful.
 
-  returns 0 on success; -1 otherwise
+  returns 0 on success; -errno otherwise
 */
 int pvfs2_inode_getattr(
     struct inode *inode)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int ret = -EINVAL, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
@@ -351,7 +351,7 @@ int pvfs2_inode_getattr(
 	pvfs2_inode = PVFS2_I(inode);
 	if (!pvfs2_inode)
 	{
-	    return ret;
+ 	    return ret;
 	}
 
 	/*
@@ -385,6 +385,7 @@ int pvfs2_inode_getattr(
 	{
 	    pvfs2_error("pvfs2: pvfs2_inode_getattr -- "
                         "kmem_cache_alloc failed!\n");
+            ret = -ENOMEM;
 	    return ret;
 	}
 	new_op->upcall.type = PVFS2_VFS_OP_GETATTR;
@@ -410,7 +411,7 @@ int pvfs2_inode_getattr(
                             "to copy attributes\n");
             }
 	}
-        ret = new_op->downcall.status;
+        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
       error_exit:
         pvfs2_print(error_exit ? "*** warning: getattr error_exit\n" : "");
@@ -490,6 +491,9 @@ static inline struct inode *pvfs2_create_file(
 	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
+	    pvfs2_error("pvfs2: pvfs2_create_file -- "
+                        "kmem_cache_alloc failed!\n");
+            iput(inode);
             *error_code = -ENOMEM;
 	    return NULL;
 	}
@@ -588,6 +592,7 @@ static inline struct inode *pvfs2_create_dir(
 	{
 	    pvfs2_error("pvfs2: pvfs2_create_dir -- "
                         "kmem_cache_alloc failed!\n");
+            iput(inode);
             *error_code = -ENOMEM;
 	    return NULL;
 	}
@@ -685,6 +690,9 @@ static inline struct inode *pvfs2_create_symlink(
 	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
+	    pvfs2_error("pvfs2: pvfs2_create_symlink -- "
+                        "kmem_cache_alloc failed!\n");
+            iput(inode);
             *error_code = -ENOMEM;
 	    return NULL;
 	}
@@ -852,6 +860,9 @@ int pvfs2_remove_entry(
               in the middle of a readdir for this directory
             */
             parent->readdir_token_adjustment++;
+
+            pvfs2_print("token adjustment is %d\n",
+                        parent->readdir_token_adjustment);
         }
         ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
@@ -905,21 +916,39 @@ int pvfs2_truncate_inode(
 int pvfs2_kernel_error_code_convert(
     int pvfs2_error_code)
 {
-    int ret = 0;
+    int ret = pvfs2_error_code;
 
     switch(pvfs2_error_code)
     {
+        case -PVFS_EINVAL:
+            ret = -EINVAL;
+            break;
+        case -PVFS_ENOMEM:
+            ret = -ENOMEM;
+            break;
         case -PVFS_ENOTEMPTY:
             ret = -ENOTEMPTY;
             break;
         case -PVFS_ENOSPC:
             ret = -ENOSPC;
             break;
+        case 0:
+            ret = 0;
+            break;
         default:
             pvfs2_print("Got an unknown pvfs2 error code: %d\n",
                         pvfs2_error_code);
     }
     return ret;
+}
+
+void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
+{
+    pvfs2_inode->refn.handle = 0;
+    pvfs2_inode->refn.fs_id = 0;
+    pvfs2_inode->link_target = NULL;
+    pvfs2_inode->last_failed_block_index_read = 0;
+    pvfs2_inode->readdir_token_adjustment = 0;
 }
 
 /*

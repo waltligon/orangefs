@@ -31,6 +31,10 @@ int pvfs2_d_revalidate(
     else if (inode)
     {
 	ret = ((pvfs2_inode_getattr(inode) == 0) ? 1 : 0);
+        if (ret == 0)
+        {
+            make_bad_inode(inode);
+        }
     }
     return ret;
 }

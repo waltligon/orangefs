@@ -146,7 +146,7 @@ struct dentry *pvfs2_lookup(
     {
 	inode = iget(sb, pvfs2_handle_to_ino(
                          new_op->downcall.resp.lookup.refn.handle));
-	if (inode)
+	if (inode && !is_bad_inode(inode))
 	{
 	    found_pvfs2_inode = PVFS2_I(inode);
 
@@ -162,7 +162,10 @@ struct dentry *pvfs2_lookup(
 	}
 	else
 	{
-	    pvfs2_error("FIXME: Invalid pvfs2 private data\n");
+            if (inode)
+            {
+                iput(inode);
+            }
             op_release(new_op);
             return ERR_PTR(-EACCES);
 	}

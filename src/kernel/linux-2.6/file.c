@@ -391,17 +391,24 @@ int pvfs2_fsync(
 
 loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
 {
+    int ret = -EINVAL;
     struct inode *inode = file->f_dentry->d_inode;
 
-    /* revalidate inode to get the file size */
     if (!inode)
     {
         pvfs2_error("pvfs2_file_llseek: invalid inode (NULL)\n");
-        return -EINVAL;
+        return ret;
     }
-    if ((inode->i_size == 0) && pvfs2_inode_getattr(inode))
+
+    if (inode->i_size == 0)
     {
-        return -EINVAL;
+        /* revalidate the inode's file size */
+        ret = pvfs2_inode_getattr(inode);
+        if (ret)
+        {
+            make_bad_inode(inode);
+            return ret;
+        }
     }
 
     /*
