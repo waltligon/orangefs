@@ -38,6 +38,7 @@ struct PINT_decoded_msg
     enum PVFS_encoding_type enc_type;	    /* type of encoding that was used */
 
     /* fields below this comment are meant for internal use */
+    char* ptr_current;                      /* current encoding pointer */
     union	    /* used for storing decoded info rather than malloc */
     {
 	struct PVFS_server_req req;
