@@ -145,15 +145,15 @@ static inline int cancelled_io_jobs_are_pending(PINT_client_sm *sm_p)
       cancellations on the I/O operation are accounted for
     */
     assert(sm_p);
-    if (sm_p->u.io.total_cancellations_remaining > 0)
-    {
-        sm_p->u.io.total_cancellations_remaining--;
-    }
+    assert(sm_p->u.io.total_cancellations_remaining > 0);
 
-    gossip_debug(GOSSIP_IO_DEBUG,
-                 "cancelled_io_jobs_are_pending: %d remaining (op %s)\n",
-                 sm_p->u.io.total_cancellations_remaining,
-                 (sm_p->op_complete ? "complete" : "NOT complete"));
+    sm_p->u.io.total_cancellations_remaining--;
+
+    gossip_debug(
+        GOSSIP_IO_DEBUG, "(%p) cancelled_io_jobs_are_pending: %d "
+        "remaining (op %s)\n", sm_p,
+        sm_p->u.io.total_cancellations_remaining,
+        (sm_p->op_complete ? "complete" : "NOT complete"));
 
     return (sm_p->u.io.total_cancellations_remaining != 0);
 }
@@ -490,7 +490,8 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
             sm_p->u.io.total_cancellations_remaining++;
         }
     }
-    gossip_debug(GOSSIP_IO_DEBUG, "Total cancellations remaining: %d\n",
+    gossip_debug(GOSSIP_IO_DEBUG, "(%p) Total cancellations "
+                 "remaining: %d\n", sm_p,
                  sm_p->u.io.total_cancellations_remaining);
     return ret;
 }
