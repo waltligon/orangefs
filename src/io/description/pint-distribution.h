@@ -24,18 +24,18 @@ void cleanup_module(void);
 
 /* these functions can be called by a distribution module */
 
-int PVFS_register_distribution(struct PVFS_Dist *d_p);
+int PVFS_register_distribution(PINT_dist *d_p);
 int PVFS_unregister_distribution(char *dist_name);
 
 #endif
 
 /* fill in missing items in dist struct */
-int PINT_Dist_lookup(PVFS_Dist *dist);
+int PINT_Dist_lookup(PINT_dist *dist);
 
 /* pack dist struct for sending over wire */
-void PINT_Dist_encode(void *buffer, PVFS_Dist *dist);
+void PINT_Dist_encode(void *buffer, PINT_dist *dist);
 
 /* unpack dist struct after receiving from wire */
-void PINT_Dist_decode(PVFS_Dist *dist, void *buffer);
+void PINT_Dist_decode(PINT_dist *dist, void *buffer);
 
 #endif /* __PINT_DISTRIBUTION_H */

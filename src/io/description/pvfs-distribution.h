@@ -10,13 +10,6 @@
 #include "pvfs2-types.h"
 
 /* each particular distribution implementation will define this for itself */
-#ifndef DIST_MODULE
-struct PVFS_Dist_params_s {
-    /* empty */
-};
-#endif
-typedef struct PVFS_Dist_params PVFS_Dist_params;
-
 typedef struct {
 	PVFS_offset (*logical_to_physical_offset)(void* params,
                                                   uint32_t server_nr,
@@ -44,16 +37,16 @@ typedef struct {
 } PVFS_Dist_methods;
 
 /* this struct is used to define a distribution to PVFS */
-typedef struct PVFS_Dist {
+typedef struct PINT_dist_s {
 	char *dist_name;
 	int32_t name_size;
 	int32_t param_size; 
 	void *params;
 	PVFS_Dist_methods *methods;
-} PVFS_Dist;
+} PINT_dist;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-#define encode_PVFS_Dist(pptr,x) do { PVFS_Dist *px = *(x); \
+#define encode_PVFS_Dist(pptr,x) do { PINT_dist *px = *(x); \
     encode_string(pptr, &px->dist_name); \
     if (!px->methods) { \
 	gossip_err("%s: encode_PVFS_Dist: methods is null\n", __func__); \
@@ -61,8 +54,8 @@ typedef struct PVFS_Dist {
     } \
     (px->methods->encode_lebf) (pptr, px->params); \
 } while (0)
-#define decode_PVFS_Dist(pptr,x) do { PVFS_Dist tmp_dist; PVFS_Dist *px; \
-    extern int PINT_Dist_lookup(PVFS_Dist *dist); \
+#define decode_PVFS_Dist(pptr,x) do { PINT_dist tmp_dist; PINT_dist *px; \
+    extern int PINT_Dist_lookup(PINT_dist *dist); \
     decode_string(pptr, &tmp_dist.dist_name); \
     tmp_dist.params = 0; \
     tmp_dist.methods = 0; \
@@ -82,11 +75,11 @@ typedef struct PVFS_Dist {
 } while (0)
 #endif
 
-extern PVFS_Dist *PVFS_Dist_create(char *name);
-extern int PVFS_Dist_free(PVFS_Dist *dist);
-extern PVFS_Dist *PVFS_Dist_copy(const PVFS_Dist *dist);
-extern int PVFS_Dist_getparams(void *buf, const PVFS_Dist *dist);
-extern int PVFS_Dist_setparams(PVFS_Dist *dist, const void *buf);
+extern PINT_dist *PVFS_dist_create(const char *name);
+extern int PVFS_dist_free(PINT_dist *dist);
+extern PINT_dist *PVFS_Dist_copy(const PINT_dist *dist);
+extern int PINT_dist_getparams(void *buf, const PINT_dist *dist);
+extern int PINT_dist_setparams(PINT_dist *dist, const void *buf);
 
 /******** macros for access to dist struct ***********/
 

@@ -7,22 +7,22 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <pvfs-distribution.h>
-#include <pint-distribution.h>
+#include "pint-distribution.h"
+#include "pvfs-distribution.h"
 
 /*
  * Looks up a distribution and copies it into a contiguous memory region.
  * This is similar to PVFS_Dist_copy, but it copies from the static table,
  * not from another contiguous region.
  */
-PVFS_Dist *PVFS_Dist_create(char *name)
+PINT_dist *PVFS_dist_create(const char *name)
 {
-    PVFS_Dist old_dist;
-    PVFS_Dist *new_dist = 0;
+    PINT_dist old_dist;
+    PINT_dist *new_dist = 0;
 
     if (!name)
 	return 0;
-    old_dist.dist_name = name;
+    old_dist.dist_name = (char*)name;
     old_dist.params = 0;
     old_dist.methods = 0;
     if (PINT_Dist_lookup(&old_dist) == 0)
@@ -45,7 +45,7 @@ PVFS_Dist *PVFS_Dist_create(char *name)
     return new_dist;
 }
 
-int PVFS_Dist_free(PVFS_Dist *dist)
+int PVFS_dist_free(PINT_dist *dist)
 {
 	if (dist)
 	{
@@ -56,17 +56,17 @@ int PVFS_Dist_free(PVFS_Dist *dist)
 	return -1;
 }
 
-PVFS_Dist *PVFS_Dist_copy(const PVFS_Dist *dist)
+PINT_dist *PVFS_Dist_copy(const PINT_dist *dist)
 {
 	int dist_size;
-	PVFS_Dist *new_dist;
+	PINT_dist *new_dist;
 
 	if (!dist)
 	{
 		return NULL;
 	}
 	dist_size = PINT_DIST_PACK_SIZE(dist);
-	new_dist = (PVFS_Dist *)malloc(dist_size);
+	new_dist = (PINT_dist *)malloc(dist_size);
 	if (new_dist)
 	{
 		memcpy(new_dist, dist, dist_size);
@@ -79,7 +79,7 @@ PVFS_Dist *PVFS_Dist_copy(const PVFS_Dist *dist)
 	return (new_dist);
 }
 
-int PVFS_Dist_getparams(void *buf, const PVFS_Dist *dist)
+int PVFS_Dist_getparams(void *buf, const PINT_dist *dist)
 {
 	if (!dist || !buf)
 	{
@@ -89,7 +89,7 @@ int PVFS_Dist_getparams(void *buf, const PVFS_Dist *dist)
 	return 0;
 }
 
-int PVFS_Dist_setparams(PVFS_Dist *dist, const void *buf)
+int PVFS_Dist_setparams(PINT_dist *dist, const void *buf)
 {
 	if (!dist || !buf)
 	{

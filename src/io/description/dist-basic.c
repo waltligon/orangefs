@@ -88,7 +88,7 @@ static PVFS_Dist_methods basic_methods = {
     decode_lebf,
 };
 
-PVFS_Dist basic_dist = {
+PINT_dist basic_dist = {
     PVFS_DIST_BASIC_NAME,
     roundup8(PVFS_DIST_BASIC_NAME_SIZE), /* name size */
     0, /* param size */

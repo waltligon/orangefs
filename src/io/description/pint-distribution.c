@@ -8,17 +8,16 @@
 #include <stdio.h>
 #include <string.h>
 #include "pvfs2-types.h"
-#include "pint-distribution.h"
-#include "pvfs-distribution.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
+#include "pint-distribution.h"
 
 /* compiled-in distributions */
-extern struct PVFS_Dist basic_dist;
-extern struct PVFS_Dist simple_stripe_dist;
+extern PINT_dist basic_dist;
+extern PINT_dist simple_stripe_dist;
 
 /* initial dist table - default dists */
-struct PVFS_Dist *PINT_Dist_table[PINT_DIST_TABLE_SZ] = {
+PINT_dist* PINT_Dist_table[PINT_DIST_TABLE_SZ] = {
     &basic_dist,
     &simple_stripe_dist,
     NULL
@@ -29,14 +28,14 @@ int PINT_Dist_count = 2; /* global size of dist table */
 /*
  * add a dist to dist table
  */
-int PINT_register_distribution(struct PVFS_Dist *d_p)
+int PINT_register_distribution(PINT_dist *d_p)
 {
-	if (PINT_Dist_count < PINT_DIST_TABLE_SZ)
-	{
-		PINT_Dist_table[PINT_Dist_count++] = d_p;
-		return (0);
-	}
-	return (-1);
+    if (PINT_Dist_count < PINT_DIST_TABLE_SZ)
+    {
+        PINT_Dist_table[PINT_Dist_count++] = d_p;
+        return (0);
+    }
+    return (-1);
 }
 
 /*
@@ -44,26 +43,26 @@ int PINT_register_distribution(struct PVFS_Dist *d_p)
  */
 int PINT_unregister_distribution(char *dist_name)
 {
-	int d;
-   if (!dist_name)
-	      return -1;
-   for (d = 0; d < PINT_Dist_count && PINT_Dist_table[d]; d++)
-   {
-		if (!strncmp(dist_name, PINT_Dist_table[d]->dist_name,
-					PINT_DIST_NAME_SZ))
-		{
-			PINT_Dist_table[d]->dist_name[0] = 0; /* bad cheese here-WBL */
-			return (0);
-		}
-	}
-	return (-1);
+    int d;
+    if (!dist_name)
+        return -1;
+    for (d = 0; d < PINT_Dist_count && PINT_Dist_table[d]; d++)
+    {
+        if (!strncmp(dist_name, PINT_Dist_table[d]->dist_name,
+                     PINT_DIST_NAME_SZ))
+        {
+            PINT_Dist_table[d]->dist_name[0] = 0; /* bad cheese here-WBL */
+            return (0);
+        }
+    }
+    return (-1);
 }
 
 /*
  * pass in a dist with a valid name, looks up in dist table
  * if found, fills in the missing parts of the structure
  */
-int PINT_Dist_lookup(struct PVFS_Dist *dist)
+int PINT_Dist_lookup(PINT_dist *dist)
 {
 	int d;
 	if (!dist || !dist->dist_name)
@@ -91,26 +90,28 @@ int PINT_Dist_lookup(struct PVFS_Dist *dist)
  * if buffer is null, convert pointers to integers in dist
  * with no copy - dist is modified
  */
-void PINT_Dist_encode(void *buffer, struct PVFS_Dist *dist)
+void PINT_Dist_encode(void *buffer, PINT_dist *dist)
 {
-	PVFS_Dist* old_dist = dist;
+    PINT_dist* old_dist = dist;
 	
-	if (!dist)
-		return;
-	if (buffer)
-	{
-		memcpy(buffer, dist, PINT_DIST_PACK_SIZE(dist));
-		dist = buffer;
-		/* adjust pointers in new buffer */
-		dist->dist_name = ((char *)dist + ((char *)old_dist->dist_name -
-			(char *)old_dist));
-		dist->params = (struct PVFS_Dist_params *)
-			((char *)dist + ((char *)old_dist->params - (char *)old_dist));
-	}
-	/* convert pointers in dist to ints */
-	dist->dist_name = (void *) (dist->dist_name - (char *) dist);
-	dist->params = (void *) ((char *) dist->params - (char *) dist);
-	dist->methods = NULL;
+    if (!dist)
+        return;
+    
+    if (buffer)
+    {
+        memcpy(buffer, dist, PINT_DIST_PACK_SIZE(dist));
+        dist = buffer;
+        /* adjust pointers in new buffer */
+        dist->dist_name = ((char *)dist + ((char *)old_dist->dist_name -
+                                           (char *)old_dist));
+        dist->params = (struct PVFS_Dist_params *)
+            ((char *)dist + ((char *)old_dist->params - (char *)old_dist));
+    }
+    
+    /* convert pointers in dist to ints */
+    dist->dist_name = (void *) (dist->dist_name - (char *) dist);
+    dist->params = (void *) ((char *) dist->params - (char *) dist);
+    dist->methods = NULL;
 }
 
 /*
@@ -119,13 +120,13 @@ void PINT_Dist_encode(void *buffer, struct PVFS_Dist *dist)
  * if buffer is null, convert integers to pointers in dist
  * with no copy - dist is modified
  */
-void PINT_Dist_decode(struct PVFS_Dist *dist, void *buffer)
+void PINT_Dist_decode(PINT_dist *dist, void *buffer)
 {
 	if (!dist)
 		return;
 	if (buffer)
 	{
-		PVFS_Dist *d2 = (PVFS_Dist *)buffer;
+		PINT_dist *d2 = (PINT_dist *)buffer;
 		memcpy(dist, buffer, PINT_DIST_PACK_SIZE(d2));
 	}
 	/* convert ints in dist to pointers */
@@ -139,7 +140,7 @@ void PINT_Dist_decode(struct PVFS_Dist *dist, void *buffer)
 	}
 }
 
-void PINT_Dist_dump(PVFS_Dist *dist)
+void PINT_Dist_dump(PINT_dist *dist)
 {
 	gossip_debug(GOSSIP_DIST_DEBUG,"******************************\n");
 	gossip_debug(GOSSIP_DIST_DEBUG,"address\t\t%p\n", dist);

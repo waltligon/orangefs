@@ -159,7 +159,7 @@ static PVFS_Dist_methods simple_stripe_methods = {
     decode_lebf,
 };
 
-PVFS_Dist simple_stripe_dist = {
+PINT_dist simple_stripe_dist = {
     PVFS_DIST_SIMPLE_STRIPE_NAME,
     roundup8(PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE),   /* name size */
     roundup8(sizeof(PVFS_simple_stripe_params)), /* param size */
