@@ -8,7 +8,6 @@ LIBSRC += \
 	$(DIR)/initialize.c \
 	$(DIR)/lookup.c \
 	$(DIR)/mkdir.c \
-	$(DIR)/parse-pvfstab.c \
 	$(DIR)/pcache.c \
 	$(DIR)/pinode-helper.c \
 	$(DIR)/pint-dcache.c \
