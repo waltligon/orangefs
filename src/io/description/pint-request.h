@@ -72,6 +72,7 @@ typedef struct PINT_Request {
 	encode_int32_t(pptr, &(rp+i)->num_nested_req); \
 	encode_int32_t(pptr, &(rp+i)->committed); \
 	encode_int32_t(pptr, &(rp+i)->refcount); \
+	encode_skip4(pptr); \
 	/* These pointers have been encoded already, just write as ints */ \
 	encode_uint32_t(pptr, (u_int32_t*) &(rp+i)->ereq); \
 	encode_uint32_t(pptr, (u_int32_t*) &(rp+i)->sreq); \
@@ -91,6 +92,7 @@ typedef struct PINT_Request {
 	decode_int32_t(pptr, &(rp+i)->num_nested_req); \
 	decode_int32_t(pptr, &(rp+i)->committed); \
 	decode_int32_t(pptr, &(rp+i)->refcount); \
+	decode_skip4(pptr); \
 	/* put integer offsets into pointers, let PINT_Request_decode fix */ \
 	decode_uint32_t(pptr, (u_int32_t*) &(rp+i)->ereq); \
 	decode_uint32_t(pptr, (u_int32_t*) &(rp+i)->sreq); \
