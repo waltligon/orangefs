@@ -51,7 +51,6 @@ static int read_dirs(PVFS_pinode_reference refn,
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     /* call readdir */
     printf("Calling readdir with handle %Ld and fsid %d\n",refn.handle,refn.fs_id);

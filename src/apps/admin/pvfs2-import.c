@@ -153,7 +153,6 @@ int main(int argc, char **argv)
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
     parent_refn.handle =
         lookup_parent_handle(pvfs_path,cur_fs);
     parent_refn.fs_id = cur_fs;

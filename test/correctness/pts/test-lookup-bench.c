@@ -30,7 +30,6 @@ static PVFS_handle simple_lookup_name(char *name,
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
 
     ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup);
     if (ret < 0)

@@ -43,7 +43,6 @@ static int test_lookup(void)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
 
     ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup);
     return ret;
@@ -72,7 +71,6 @@ static int test_getattr(void)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
 
     if ((ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup)) < 0)
     {
@@ -121,7 +119,6 @@ static int test_mkdir(void)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
     if ((ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
@@ -135,7 +132,6 @@ static int test_mkdir(void)
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = 
 	time(NULL);
-    credentials.perms = 1877;
     credentials.uid = 100;
     credentials.gid = 100;
 
@@ -171,7 +167,6 @@ static int test_readdir(void)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
     if ((ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
@@ -184,7 +179,6 @@ static int test_readdir(void)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     ret =
 	PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,
@@ -212,7 +206,6 @@ static int test_create(void)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     fs_id = 9;
 
@@ -248,7 +241,6 @@ static int test_remove(void)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     fs_id = 9;
 
@@ -314,7 +306,6 @@ static int test_read(void)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     fs_id = 9;
@@ -355,7 +346,6 @@ static int test_write(void)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     fs_id = 9;

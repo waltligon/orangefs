@@ -41,7 +41,6 @@ static int test_meta_fields(int testcase){
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
     if ((ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
@@ -109,7 +108,6 @@ static int test_permissions(int testcase){
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -172,7 +170,6 @@ static int test_size_after_write(int testcase){
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -239,7 +236,6 @@ static int test_sparse_files(int testcase){
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -319,7 +315,6 @@ static int test_read_sparse_files(int testcase){
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -397,7 +392,6 @@ static int test_allcat(int testcase)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     if (initialize_sysint() < 0)
     {
@@ -467,7 +461,6 @@ static int test_truncat(int testcase)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     if (initialize_sysint() < 0)
     {
@@ -545,7 +538,6 @@ static int test_read_beyond(int testcase){
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     if (initialize_sysint() < 0)
     {
@@ -598,7 +590,6 @@ static int test_write_beyond(int testcase){
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     if (initialize_sysint() < 0)
     {
@@ -647,7 +638,6 @@ static int test_files_as_dirs(int testcase)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     if (initialize_sysint() < 0)
     {
@@ -712,7 +702,6 @@ static int test_get_set_attr_empty(int testcase)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
     if ((ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup)) < 0)
     {
         fprintf(stderr, "lookup failed which it should but keep going\n");
@@ -762,7 +751,6 @@ static int test_lookup_empty(int testcase)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
     ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup);
 
     return ret;
@@ -792,7 +780,6 @@ static int test_io_on_dir(int testcase)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
     if((ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup)) < 0)
     {
 	fprintf(stderr,"lookup failed\n");
@@ -832,7 +819,6 @@ static int test_remove_nonempty_dir(int testcase)
     
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     if (initialize_sysint() < 0)
     {
@@ -873,7 +859,6 @@ static int init_files(int testcase)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     if (initialize_sysint() < 0)
     {
@@ -910,7 +895,6 @@ static int init_files(int testcase)
 
     credentials.uid = 444;
     credentials.gid = 444;
-    credentials.perms = 1877;
 
     if (initialize_sysint() < 0)
     {

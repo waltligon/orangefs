@@ -34,7 +34,6 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
 
     /*
       verify that all test files exist.  it's okay if they

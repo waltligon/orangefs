@@ -142,7 +142,6 @@ int main(int argc, char **argv)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
     lk_fs_id = cur_fs;
 
     /* TODO: this is awkward- the remove_base_dir() function

@@ -32,7 +32,6 @@ int test_pvfs_datatype_contig(MPI_Comm *mycomm, int myid, char *buf, void *param
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
 
     for(i = 0; i < pvfs_helper.num_test_files; i++)
     {
