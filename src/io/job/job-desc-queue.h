@@ -36,6 +36,7 @@ struct trove_desc
     PVFS_handle handle;
     PVFS_ds_position position;
     PVFS_ds_attributes attr;
+    PVFS_ds_type type;
     int count;
 };
 

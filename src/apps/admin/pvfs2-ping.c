@@ -32,7 +32,8 @@ extern struct qhash_table *PINT_fsid_config_cache_table;
 
 struct options
 {
-    char* fs_path;
+    char* fs_path_hack;
+    char* fs_path_real;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -65,7 +66,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    printf("\n(1) Searching for %s in %s...\n", user_opts->fs_path,
+    printf("\n(1) Searching for %s in %s...\n", user_opts->fs_path_real,
 	DEFAULT_TAB);
 
     /* look at pvfstab */
@@ -82,7 +83,7 @@ int main(int argc, char **argv)
      */
     for(i=0; i<mnt.nr_entry; i++)
     {
-	ret = PVFS_util_remove_dir_prefix(user_opts->fs_path,
+	ret = PVFS_util_remove_dir_prefix(user_opts->fs_path_hack,
 	    mnt.ptab_p[i].local_mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
@@ -94,7 +95,7 @@ int main(int argc, char **argv)
     if(mnt_index == -1)
     {
 	fprintf(stderr, "Failure: could not find filesystem for %s in pvfstab %s\n", 
-	    user_opts->fs_path, DEFAULT_TAB);
+	    user_opts->fs_path_real, DEFAULT_TAB);
 	return(-1);
     }
 
@@ -203,6 +204,11 @@ int main(int argc, char **argv)
 
     PVFS_sys_finalize();
 
+    printf("=============================================================\n");
+
+    printf("\nThe PVFS filesystem at %s appears to be correctly configured.\n\n",
+	user_opts->fs_path_real);
+	
     return(ret);
 }
 
@@ -412,15 +418,19 @@ static struct options* parse_args(int argc, char* argv[])
 	exit(EXIT_FAILURE);
     }
 
-    tmp_opts->fs_path = (char*)malloc(strlen(argv[argc-1]) + 2);
-    if(!tmp_opts->fs_path)
+    /* get the path of the file system, this one has a trailing slash
+     * tacked on, see comment below for why 
+     */
+    tmp_opts->fs_path_hack = (char*)malloc(strlen(argv[argc-1]) + 2);
+    if(!tmp_opts->fs_path_hack)
     {
 	free(tmp_opts);
 	return(NULL);
     }
-    ret = sscanf(argv[argc-1], "%s", tmp_opts->fs_path);
+    ret = sscanf(argv[argc-1], "%s", tmp_opts->fs_path_hack);
     if(ret < 1)
     {
+	free(tmp_opts->fs_path_hack);
 	free(tmp_opts);
 	return(NULL);
     }
@@ -428,8 +438,25 @@ static struct options* parse_args(int argc, char* argv[])
      * function expects some trailing segments or at least a slash
      * off of the mount point
      */
-    strcat(tmp_opts->fs_path, "/");
+    strcat(tmp_opts->fs_path_hack, "/");
     
+    /* also preserve the real path, to use in print statements elsewhre */
+    tmp_opts->fs_path_real = (char*)malloc(strlen(argv[argc-1]) + 2);
+    if(!tmp_opts->fs_path_real)
+    {
+	free(tmp_opts->fs_path_hack);
+	free(tmp_opts);
+	return(NULL);
+    }
+    ret = sscanf(argv[argc-1], "%s", tmp_opts->fs_path_real);
+    if(ret < 1)
+    {
+	free(tmp_opts->fs_path_hack);
+	free(tmp_opts->fs_path_real);
+	free(tmp_opts);
+	return(NULL);
+    }
+ 
     return(tmp_opts);
 }
 

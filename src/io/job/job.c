@@ -2231,8 +2231,69 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 			    job_id_t * id,
 			    job_context_id context_id)
 {
-    gossip_lerr("Error: unimplemented.\n");
-    return (-ENOSYS);
+    /* post a dspace verify.  If it completes (or fails) immediately, then
+     * return and fill in the status structure.  If it needs to be tested
+     * for completion later, then queue up a job_desc structure.
+     */
+    int ret = -1;
+    struct job_desc *jd = NULL;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the BMI id and user ptr
+     */
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+	return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_dspace_verify(coll_id,
+			      handle, &jd->u.trove.type, 
+			      TROVE_SYNC /* flags -- sync for now */ ,
+			      jd, global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
+
+    if (ret < 0)
+    {
+	/* error posting trove operation */
+	dealloc_job_desc(jd);
+	/* TODO: handle this correctly */
+	out_status_p->error_code = -EINVAL;
+	return (1);
+    }
+
+    if (ret == 1)
+    {
+	/* immediate completion */
+	out_status_p->error_code = 0;
+	dealloc_job_desc(jd);
+	return (ret);
+    }
+
+    /* if we fall through to this point, the job did not
+     * immediately complete and we must queue up to test later
+     */
+    gen_mutex_lock(&trove_mutex);
+    *id = jd->job_id;
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
+    trove_pending_count++;
+#ifdef __PVFS2_JOB_THREADED__
+    pthread_cond_signal(&trove_cond);
+#endif /* __PVFS2_JOB_THREADED__ */
+    gen_mutex_unlock(&trove_mutex);
+
+    return (0);
 }
 
 /* job_trove_fs_create()
@@ -3737,6 +3798,7 @@ static void fill_status(struct job_desc *jd,
 	status->position = jd->u.trove.position;
 	status->count = jd->u.trove.count;
 	status->ds_attr = jd->u.trove.attr;
+	status->type = jd->u.trove.type;
 	break;
     case JOB_DEV_UNEXP:
 	status->error_code = 0;

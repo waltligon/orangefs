@@ -55,6 +55,9 @@ machine pvfs2_setparam_sm(prelude, work, final_response, cleanup)
  */
 static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 {
+    job_id_t tmp_id;
+    int ret = -1;
+
     PINT_STATE_DEBUG("work");
 
     switch(s_op->req->u.mgmt_setparam.param)
@@ -72,6 +75,14 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 	    js_p->error_code = 
 		check_fs_id((PVFS_fs_id)s_op->req->u.mgmt_setparam.value);
 	    return(1);
+	case PVFS_SERV_PARAM_ROOT_CHECK:
+	    ret = job_trove_dspace_verify(s_op->req->u.mgmt_setparam.fs_id,
+		(PVFS_handle)s_op->req->u.mgmt_setparam.value,
+		s_op,
+		js_p,
+		&tmp_id,
+		server_job_context);
+	    return(ret);
     }
 
     gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",

@@ -231,7 +231,7 @@ int main(int argc, char **argv)
 
 	    if (ret < 0)
 	    {
-		gossip_lerr("Error: unhandled state machine processing error.\n");
+		gossip_lerr("Error: unhandled state machine processing error (most likely an unhandled job error).\n");
 		/* TODO: handle this properly */
 		assert(0);
 	    }

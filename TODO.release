@@ -20,12 +20,7 @@ DONE . pvfs2-set-debugmask for runtime gossip settings, (Phil)
 
 NEEDS TESTING . pvfs2-ls
 
-. pvfs2-ping
-  - read pvfs2tab
-  - getconfig
-  - contact all servers
-    - make sure fsid is ok
-    - make sure root handle exists in exactly one place
+NEEDS TESTING . pvfs2-ping
 
 . a real 'make install'
   - how do we want to handle building and installing vfs stuff?
