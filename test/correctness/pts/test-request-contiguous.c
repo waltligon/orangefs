@@ -5,7 +5,9 @@
  */
 
 /* 
- * test-request_contiguous
+ * test-request_contiguous: simulates request processing on 4 seperate servers 
+ * that each  hold a portion of the file being accessed, for a contiguous read 
+ * or write.
  * Author: Michael Speth - testing code written by Phil C.
  * Date: 8/21/2003
  * Last Updated: 8/21/2003
