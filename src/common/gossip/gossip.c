@@ -213,6 +213,23 @@ int gossip_disable(
     return ret;
 }
 
+/* gossip_get_debug_mask()
+ *
+ * fills in args indicating whether debugging is on or off, and what the 
+ * mask level is
+ *
+ * returns 0 on success, -errno on failure
+ */
+int gossip_get_debug_mask(
+    int* debug_on,
+    int* mask)
+{
+    *debug_on = gossip_debug_on;
+    *mask = gossip_debug_mask;
+    return(0);
+}
+
+
 /* gossip_set_debug_mask()
  *
  * Determines whether debugging messages are turned on or off.  Also

@@ -545,9 +545,10 @@ do {						\
     (__req).u.mgmt_setparam.value = (__value);	\
 } while (0)
 
-/* NOTE: no response structure; all necessary response info is 
- * returned in generic server response structure
- */
+struct PVFS_servresp_mgmt_setparam
+{
+    int64_t old_value;
+};
 
 /* mgmt_noop ********************************************************/
 /* - does nothing except contact a server to see if it is responding
@@ -682,6 +683,7 @@ struct PVFS_server_resp
 	struct PVFS_servresp_io io;
 	struct PVFS_servresp_write_completion write_completion;
 	struct PVFS_servresp_statfs statfs;
+	struct PVFS_servresp_mgmt_setparam mgmt_setparam;
 	struct PVFS_servresp_mgmt_perf_mon mgmt_perf_mon;
 	struct PVFS_servresp_mgmt_iterate_handles mgmt_iterate_handles;
     }

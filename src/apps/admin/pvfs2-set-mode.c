@@ -96,7 +96,7 @@ int main(int argc, char **argv)
     creds.gid = getgid();
 
     ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_MODE,
-	user_opts->mode);
+	user_opts->mode, NULL);
 
     PVFS_util_free_pvfstab(&mnt);
     PVFS_sys_finalize();

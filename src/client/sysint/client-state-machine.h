@@ -185,6 +185,7 @@ struct PINT_client_mgmt_setparam_list_sm
     int64_t value;
     PVFS_id_gen_t* addr_array;
     int count;
+    int64_t* old_value_array;
 };
 
 struct PINT_client_mgmt_statfs_list_sm

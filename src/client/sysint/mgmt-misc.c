@@ -80,8 +80,7 @@ int PVFS_mgmt_statfs_all(
 	free(addr_array);
 	return(ret);
     }
-
-    /* issue setparam call */
+    
     ret = PVFS_mgmt_statfs_list(
 	fs_id,
 	credentials,
@@ -106,7 +105,8 @@ int PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     enum PVFS_server_param param,
-    int64_t value)
+    int64_t value,
+    int64_t* old_value_array)
 {
     PVFS_id_gen_t* addr_array = NULL;
     int count = 0;
@@ -140,6 +140,7 @@ int PVFS_mgmt_setparam_all(
 	param,
 	value,
 	addr_array,
+	old_value_array,
 	count);
 
     free(addr_array);

@@ -182,6 +182,7 @@ int main(int argc, char **argv)
 	PVFS_SERV_PARAM_MODE,
 	(int64_t)PVFS_SERVER_ADMIN_MODE,
 	addr_array,
+	NULL,
 	server_count);
     if(ret < 0)
     {
@@ -192,6 +193,7 @@ int main(int argc, char **argv)
 	    PVFS_SERV_PARAM_MODE,
 	    (int64_t)PVFS_SERVER_NORMAL_MODE,
 	    addr_array,
+	    NULL,
 	    server_count);
 	return(-1);
     }
@@ -216,6 +218,7 @@ int main(int argc, char **argv)
 		PVFS_SERV_PARAM_MODE,
 		(int64_t)PVFS_SERVER_NORMAL_MODE,
 		addr_array,
+		NULL,
 		server_count);
 	    return(-1);
 	}
@@ -248,6 +251,7 @@ int main(int argc, char **argv)
 	PVFS_SERV_PARAM_MODE,
 	(int64_t)PVFS_SERVER_NORMAL_MODE,
 	addr_array,
+	NULL,
 	server_count);
 
     PVFS_sys_finalize();

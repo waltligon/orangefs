@@ -140,7 +140,7 @@ int main(int argc, char **argv)
      * in error cases here 
      */
     ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_FSID_CHECK,
-	(int64_t)cur_fs);
+	(int64_t)cur_fs, NULL);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_setparam_all", ret);
@@ -167,7 +167,7 @@ int main(int argc, char **argv)
      * in error cases here 
      */
     ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_ROOT_CHECK,
-	(int64_t)resp_lookup.pinode_refn.handle);
+	(int64_t)resp_lookup.pinode_refn.handle, NULL);
 
     /* check for understood error values */
     if(ret == -PVFS_ENOENT)

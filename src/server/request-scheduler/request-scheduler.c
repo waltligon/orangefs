@@ -98,7 +98,16 @@ static int hash_handle_compare(
 /* count of how many items are known to the scheduler */
 static int sched_count = 0;
 /* mode of the scheduler */
-enum PVFS_server_mode current_mode = PVFS_SERVER_NORMAL_MODE;
+static enum PVFS_server_mode current_mode = PVFS_SERVER_NORMAL_MODE;
+
+/* PINT_req_sched_get_mode()
+ *
+ * returns current mode of server
+ */
+enum PVFS_server_mode PINT_req_sched_get_mode(void)
+{
+    return(current_mode);
+}
 
 /* setup and teardown */
 

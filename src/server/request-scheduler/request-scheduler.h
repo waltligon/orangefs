@@ -74,6 +74,8 @@ int PINT_req_sched_testworld(
     void **returned_user_ptr_array,
     req_sched_error_code * out_status_array);
 
+enum PVFS_server_mode PINT_req_sched_get_mode(void);
+
 #endif /* __REQUEST_SCHEDULER_H */
 
 /*

@@ -33,6 +33,8 @@ static int mgmt_setparam_list_cleanup(PINT_client_sm *sm_p,
 
 static int root_check_comp_fn(void* v_p, struct PVFS_server_resp * resp_p,
     int i);
+static int collect_old_values_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
+    int i);
 
 %%
 
@@ -67,6 +69,7 @@ int PVFS_mgmt_setparam_list(
     enum PVFS_server_param param,
     int64_t value,
     PVFS_id_gen_t* addr_array,
+    int64_t* old_value_array,
     int count)
 {
     int ret;
@@ -93,6 +96,11 @@ int PVFS_mgmt_setparam_list(
     sm_p->u.setparam_list.fs_id = fs_id;
     sm_p->u.setparam_list.addr_array = addr_array;
     sm_p->u.setparam_list.count = count;
+    sm_p->u.setparam_list.old_value_array = old_value_array;
+
+    /* safety */
+    if(old_value_array)
+	memset(old_value_array, 0, count*sizeof(int64_t));
 
     gossip_debug(CLIENT_DEBUG,
 		 "PVFS_mgmt_setparam_list calling PINT_client_state_machine_post()\n");
@@ -163,7 +171,7 @@ static int mgmt_setparam_list_setup_msgpair(PINT_client_sm *sm_p,
 	if(sm_p->u.setparam_list.param == PVFS_SERV_PARAM_ROOT_CHECK)
 	    msg_p->comp_fn = root_check_comp_fn;
 	else
-	    msg_p->comp_fn = NULL;
+	    msg_p->comp_fn = collect_old_values_comp_fn;
 	msg_p->svr_addr = sm_p->u.setparam_list.addr_array[i];
     }
 
@@ -184,6 +192,40 @@ static int mgmt_setparam_list_cleanup(PINT_client_sm *sm_p,
     return(0);
 }
 
+
+/* collect_old_values_comp_fn()
+ *
+ * completion function that assembles old values for parameters
+ * when appropriate
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int collect_old_values_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
+    int i)
+{
+    PINT_client_sm* sm_p = (PINT_client_sm*)v_p;
+    int j;
+
+    if(sm_p->msgarray[i].op_status == 0 && sm_p->u.setparam_list.old_value_array)
+	sm_p->u.setparam_list.old_value_array[i] = 
+	    resp_p->u.mgmt_setparam.old_value;
+ 
+    /* if this is the last response, check all of the status values and 
+     * return error code if any requests failed 
+     */
+    if(i == (sm_p->msgarray_count -1))
+    {
+	for(j=0; j<sm_p->msgarray_count; j++)
+	{
+	    if(sm_p->msgarray[j].op_status != 0)
+	    {
+		return(sm_p->msgarray[j].op_status);
+	    }
+	}
+    }
+
+    return(0);
+}
 
 /* root_check_comp_fn()
  *

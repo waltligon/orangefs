@@ -71,13 +71,15 @@ int PVFS_mgmt_setparam_list(
     enum PVFS_server_param param,
     int64_t value,
     PVFS_id_gen_t* addr_array,
+    int64_t* old_value_array,
     int count);
 
 int PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     enum PVFS_server_param param,
-    int64_t value);
+    int64_t value,
+    int64_t* old_value_array);
 
 int PVFS_mgmt_statfs_list(
     PVFS_fs_id fs_id,

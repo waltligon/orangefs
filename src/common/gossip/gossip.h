@@ -34,6 +34,9 @@ int gossip_disable(
 int gossip_set_debug_mask(
     int debug_on,
     int mask);
+int gossip_get_debug_mask(
+    int* debug_on,
+    int* mask);
 
 #ifdef GOSSIP_ENABLE_BACKTRACE
 void gossip_backtrace(void);
