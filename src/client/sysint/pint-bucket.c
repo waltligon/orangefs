@@ -126,15 +126,12 @@ int PINT_bucket_get_next_meta(
 	}
 #endif
 
-        /* obsoleted by the range concept over bucket/mask concept */
-        ret = 0;
-#if 0
-	ret = BMI_addr_lookup(meta_addr, server_config.fs_info[0].meta_serv_array[0]);
+	ret = BMI_addr_lookup(meta_addr, HACK_server_name);
 	if(ret < 0)
 	{
 		return(ret);
 	}
-#endif
+
 	*handle_mask = HACK_handle_mask;
 	*bucket = HACK_bucket;
 
@@ -169,16 +166,13 @@ int PINT_bucket_get_next_io(
 	}
 #endif
 
-        /* obsoleted by the range concept over bucket/mask concept */
-        ret = 0;
-#if 0
 	/* NOTE: for now, we assume that if the caller asks for more servers
 	 * than we have available, we should just duplicate servers in the
 	 * list.  The caller can use get_num_io to find out how many servers
 	 * there are if they want to match up.
 	 */
 	
-	ret = BMI_addr_lookup(&(io_addr_array[0]), server_config.fs_info[0].io_serv_array[0]);
+	ret = BMI_addr_lookup(&(io_addr_array[0]), HACK_server_name);
 	if(ret < 0)
 	{
 		return(ret);
@@ -191,7 +185,6 @@ int PINT_bucket_get_next_io(
 	{
 		io_addr_array[i] = io_addr_array[0];
 	}
-#endif
 
 	/* fill in the same bucket in every slot as well */
 	for(i=0; i<num_servers; i++)
@@ -227,14 +220,11 @@ int PINT_bucket_map_to_server(
 	}
 #endif
 
-        /* obsoleted by the range concept over bucket/mask concept */
-#if 0
-	ret = BMI_addr_lookup(server_addr, server_config.fs_info[0].io_serv_array[0]);
+	ret = BMI_addr_lookup(server_addr, HACK_server_name);
 	if(ret < 0)
 	{
 		return(ret);
 	}
-#endif
 	return(0);
 }
 
