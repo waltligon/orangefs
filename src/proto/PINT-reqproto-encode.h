@@ -44,8 +44,10 @@ struct PINT_decoded_msg
 /* types of messages we will encode or decode */
 enum PINT_encode_msg_type
 {
-	PINT_ENCODE_REQ,
-	PINT_ENCODE_RESP
+	PINT_ENCODE_REQ = 7,
+	PINT_DECODE_REQ = 7,
+	PINT_ENCODE_RESP = 13,
+	PINT_DECODE_RESP = 13
 };
 
 #define ENCODING_TABLE_SIZE 5
