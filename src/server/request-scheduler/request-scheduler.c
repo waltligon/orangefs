@@ -720,8 +720,8 @@ static int handle_from_request(struct PVFS_server_req*
 		case PVFS_SERV_GETCONFIG:
 			return(0);
 			break;
-		default:
-			return(-EINVAL);
+		case PVFS_SERV_WRITE_COMPLETION:
+			return(0);
 			break;
 	}
 
