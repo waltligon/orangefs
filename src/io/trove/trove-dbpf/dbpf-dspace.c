@@ -129,6 +129,9 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             */
             new_handle = cur_extent.first;
             trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
+#if 0
+            printf("new_handle was FORCED to be %Ld\n", new_handle);
+#endif
         }
         else if (cur_extent.first == 0)
         {
@@ -151,7 +154,8 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     }
 
 #if 0
-    printf("new_handle is %Ld (cur_extent is %Ld - %Ld)\n",
+    printf("[%d extents] -- new_handle is %Ld (cur_extent is %Ld - %Ld)\n",
+           op_p->u.d_create.extent_array.extent_count,
            new_handle, cur_extent.first, cur_extent.last);
 #endif
 
