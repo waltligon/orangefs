@@ -30,6 +30,8 @@ Sven Marnach <sven@pvs.informatik.uni-heidelberg.de>
 Philipp Sadleder <philipp@sadleder.de>
 -- reported a problem with large username handling in pvfs2-ls
    extended pvfs2-cp to truncate target files if they exist
+-- Updated documentation for dist-simple-stripe.c and modified
+   the basic distribution to use a single data file object.
 
 Other contributors
 ==================

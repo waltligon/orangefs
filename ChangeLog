@@ -5,7 +5,9 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.6.2pre1
 ===============
-- 
+- Updated documentation for dist-simple-stripe.c and modified
+  the basic distribution to use a single data file object.
+-
 
 
 pvfs2-0.6.1
