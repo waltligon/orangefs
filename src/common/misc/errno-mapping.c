@@ -22,10 +22,13 @@
  */
 void PVFS_perror(char* text, int retcode)
 {
-    if(PVFS_ERROR_CLASS(-retcode))
+    if(IS_PVFS_ERROR(-retcode))
     {
 	fprintf(stderr, "%s: %s\n", text,
 	strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
+	/* TODO: probably we should do something to print
+	 * out the class too?
+	 */
     }       
     else
     {

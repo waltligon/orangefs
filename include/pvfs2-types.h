@@ -143,8 +143,14 @@ enum PVFS_server_param
 void PVFS_perror(char *text,
 		 int retcode);
 
+/* special bit used to differentiate PVFS error codes from system
+ * errno values
+ */
+#define PVFS_ERROR_BIT    (1 << 30)
+#define IS_PVFS_ERROR(__error) ((__error)&(PVFS_ERROR_BIT))
+
 /* 7 bits are used for the error code */
-#define PVFS_ERROR_CODE(__error)  ((__error) &   (int32_t) 0x7f)
+#define PVFS_ERROR_CODE(__error) ((__error) & (int32_t) (0x7f|PVFS_ERROR_BIT))
 #define PVFS_ERROR_CLASS(__error) ((__error) & ~((int32_t) 0x7f))
 
 #define PVFS_ERROR_BMI    (1 << 7)	/* BMI-specific error (e.g. socket got closed ) */
@@ -159,66 +165,66 @@ void PVFS_perror(char *text,
  * to a local UNIX errno value
  */
 extern int32_t PINT_errno_mapping[];
-#define PVFS_ERROR_TO_ERRNO(__error) PINT_errno_mapping[PVFS_ERROR_CODE(__error)]
+#define PVFS_ERROR_TO_ERRNO(__error) PINT_errno_mapping[PVFS_ERROR_CODE((__error)& ~(PVFS_ERROR_BIT))]
 
 /* PVFS2 error codes, compliments of asm/errno.h */
-#define PVFS_EPERM		 1	/* Operation not permitted */
-#define PVFS_ENOENT		 2	/* No such file or directory */
-#define PVFS_EINTR		 3	/* Interrupted system call */
-#define PVFS_EIO		 4	/* I/O error */
-#define PVFS_ENXIO		 5	/* No such device or address */
-#define PVFS_EBADF		 6	/* Bad file number */
-#define PVFS_EAGAIN		 7	/* Try again */
-#define PVFS_ENOMEM		 8	/* Out of memory */
-#define PVFS_EFAULT		 9	/* Bad address */
-#define PVFS_EBUSY		10	/* Device or resource busy */
-#define PVFS_EEXIST		11	/* File exists */
-#define PVFS_ENODEV		12	/* No such device */
-#define PVFS_ENOTDIR		13	/* Not a directory */
-#define PVFS_EISDIR		14	/* Is a directory */
-#define PVFS_EINVAL		15	/* Invalid argument */
-#define PVFS_EMFILE		16	/* Too many open files */
-#define PVFS_EFBIG		17	/* File too large */
-#define PVFS_ENOSPC		18	/* No space left on device */
-#define PVFS_EROFS		19	/* Read-only file system */
-#define PVFS_EMLINK		20	/* Too many links */
-#define PVFS_EPIPE		21	/* Broken pipe */
-#define PVFS_EDEADLK		22	/* Resource deadlock would occur */
-#define PVFS_ENAMETOOLONG	23	/* File name too long */
-#define PVFS_ENOLCK		24	/* No record locks available */
-#define PVFS_ENOSYS		25	/* Function not implemented */
-#define PVFS_ENOTEMPTY	        26	/* Directory not empty */
-#define PVFS_ELOOP		27	/* Too many symbolic links encountered */
-#define PVFS_EWOULDBLOCK	28	/* Operation would block */
-#define PVFS_ENOMSG		29	/* No message of desired type */
-#define PVFS_EUNATCH		30	/* Protocol driver not attached */
-#define PVFS_EBADR		31	/* Invalid request descriptor */
-#define PVFS_EDEADLOCK	        32
-#define PVFS_ENODATA		33	/* No data available */
-#define PVFS_ETIME		34	/* Timer expired */
-#define PVFS_ENONET		35	/* Machine is not on the network */
-#define PVFS_EREMOTE		36	/* Object is remote */
-#define PVFS_ECOMM		37	/* Communication error on send */
-#define PVFS_EPROTO		38	/* Protocol error */
-#define PVFS_EBADMSG		39	/* Not a data message */
-#define PVFS_EOVERFLOW	        40	/* Value too large for defined data type */
-#define PVFS_ERESTART	        41	/* Interrupted system call should be restarted */
-#define PVFS_EMSGSIZE	        42	/* Message too long */
-#define PVFS_EPROTOTYPE	        43	/* Protocol wrong type for socket */
-#define PVFS_ENOPROTOOPT	44	/* Protocol not available */
-#define PVFS_EPROTONOSUPPORT	45	/* Protocol not supported */
-#define PVFS_EOPNOTSUPP	        46	/* Operation not supported on transport endpoint */
-#define PVFS_EADDRINUSE	        47	/* Address already in use */
-#define PVFS_EADDRNOTAVAIL	48	/* Cannot assign requested address */
-#define PVFS_ENETDOWN	        49	/* Network is down */
-#define PVFS_ENETUNREACH	50	/* Network is unreachable */
-#define PVFS_ENETRESET	        51	/* Network dropped connection because of reset */
-#define PVFS_ENOBUFS		52	/* No buffer space available */
-#define PVFS_ETIMEDOUT	        53	/* Connection timed out */
-#define PVFS_ECONNREFUSED	54	/* Connection refused */
-#define PVFS_EHOSTDOWN	        55	/* Host is down */
-#define PVFS_EHOSTUNREACH	56	/* No route to host */
-#define PVFS_EALREADY	        57	/* Operation already in progress */
+#define PVFS_EPERM		 (1|(PVFS_ERROR_BIT))	/* Operation not permitted */
+#define PVFS_ENOENT		 (2|(PVFS_ERROR_BIT))	/* No such file or directory */
+#define PVFS_EINTR		 (3|(PVFS_ERROR_BIT))	/* Interrupted system call */
+#define PVFS_EIO		 (4|(PVFS_ERROR_BIT))	/* I/O error */
+#define PVFS_ENXIO		 (5|(PVFS_ERROR_BIT))	/* No such device or address */
+#define PVFS_EBADF		 (6|(PVFS_ERROR_BIT))	/* Bad file number */
+#define PVFS_EAGAIN		 (7|(PVFS_ERROR_BIT))	/* Try again */
+#define PVFS_ENOMEM		 (8|(PVFS_ERROR_BIT))	/* Out of memory */
+#define PVFS_EFAULT		 (9|(PVFS_ERROR_BIT))	/* Bad address */
+#define PVFS_EBUSY		(10|(PVFS_ERROR_BIT))	/* Device or resource busy */
+#define PVFS_EEXIST		(11|(PVFS_ERROR_BIT))	/* File exists */
+#define PVFS_ENODEV		(12|(PVFS_ERROR_BIT))	/* No such device */
+#define PVFS_ENOTDIR		(13|(PVFS_ERROR_BIT))	/* Not a directory */
+#define PVFS_EISDIR		(14|(PVFS_ERROR_BIT))	/* Is a directory */
+#define PVFS_EINVAL		(15|(PVFS_ERROR_BIT))	/* Invalid argument */
+#define PVFS_EMFILE		(16|(PVFS_ERROR_BIT))	/* Too many open files */
+#define PVFS_EFBIG		(17|(PVFS_ERROR_BIT))	/* File too large */
+#define PVFS_ENOSPC		(18|(PVFS_ERROR_BIT))	/* No space left on device */
+#define PVFS_EROFS		(19|(PVFS_ERROR_BIT))	/* Read-only file system */
+#define PVFS_EMLINK		(20|(PVFS_ERROR_BIT))	/* Too many links */
+#define PVFS_EPIPE		(21|(PVFS_ERROR_BIT))	/* Broken pipe */
+#define PVFS_EDEADLK		(22|(PVFS_ERROR_BIT))	/* Resource deadlock would occur */
+#define PVFS_ENAMETOOLONG	(23|(PVFS_ERROR_BIT))	/* File name too long */
+#define PVFS_ENOLCK		(24|(PVFS_ERROR_BIT))	/* No record locks available */
+#define PVFS_ENOSYS		(25|(PVFS_ERROR_BIT))	/* Function not implemented */
+#define PVFS_ENOTEMPTY	        (26|(PVFS_ERROR_BIT))	/* Directory not empty */
+#define PVFS_ELOOP		(27|(PVFS_ERROR_BIT))	/* Too many symbolic links encountered */
+#define PVFS_EWOULDBLOCK	(28|(PVFS_ERROR_BIT))	/* Operation would block */
+#define PVFS_ENOMSG		(29|(PVFS_ERROR_BIT))	/* No message of desired type */
+#define PVFS_EUNATCH		(30|(PVFS_ERROR_BIT))	/* Protocol driver not attached */
+#define PVFS_EBADR		(31|(PVFS_ERROR_BIT))	/* Invalid request descriptor */
+#define PVFS_EDEADLOCK	        (32|(PVFS_ERROR_BIT))
+#define PVFS_ENODATA		(33|(PVFS_ERROR_BIT))	/* No data available */
+#define PVFS_ETIME		(34|(PVFS_ERROR_BIT))	/* Timer expired */
+#define PVFS_ENONET		(35|(PVFS_ERROR_BIT))	/* Machine is not on the network */
+#define PVFS_EREMOTE		(36|(PVFS_ERROR_BIT))	/* Object is remote */
+#define PVFS_ECOMM		(37|(PVFS_ERROR_BIT))	/* Communication error on send */
+#define PVFS_EPROTO		(38|(PVFS_ERROR_BIT))	/* Protocol error */
+#define PVFS_EBADMSG		(39|(PVFS_ERROR_BIT))	/* Not a data message */
+#define PVFS_EOVERFLOW	        (40|(PVFS_ERROR_BIT))	/* Value too large for defined data type */
+#define PVFS_ERESTART	        (41|(PVFS_ERROR_BIT))	/* Interrupted system call should be restarted */
+#define PVFS_EMSGSIZE	        (42|(PVFS_ERROR_BIT))	/* Message too long */
+#define PVFS_EPROTOTYPE	        (43|(PVFS_ERROR_BIT))	/* Protocol wrong type for socket */
+#define PVFS_ENOPROTOOPT	(44|(PVFS_ERROR_BIT))	/* Protocol not available */
+#define PVFS_EPROTONOSUPPORT	(45|(PVFS_ERROR_BIT))	/* Protocol not supported */
+#define PVFS_EOPNOTSUPP	        (46|(PVFS_ERROR_BIT))	/* Operation not supported on transport endpoint */
+#define PVFS_EADDRINUSE	        (47|(PVFS_ERROR_BIT))	/* Address already in use */
+#define PVFS_EADDRNOTAVAIL	(48|(PVFS_ERROR_BIT))	/* Cannot assign requested address */
+#define PVFS_ENETDOWN	        (49|(PVFS_ERROR_BIT))	/* Network is down */
+#define PVFS_ENETUNREACH	(50|(PVFS_ERROR_BIT))	/* Network is unreachable */
+#define PVFS_ENETRESET	        (51|(PVFS_ERROR_BIT))	/* Network dropped connection because of reset */
+#define PVFS_ENOBUFS		(52|(PVFS_ERROR_BIT))	/* No buffer space available */
+#define PVFS_ETIMEDOUT	        (53|(PVFS_ERROR_BIT))	/* Connection timed out */
+#define PVFS_ECONNREFUSED	(54|(PVFS_ERROR_BIT))	/* Connection refused */
+#define PVFS_EHOSTDOWN	        (55|(PVFS_ERROR_BIT))	/* Host is down */
+#define PVFS_EHOSTUNREACH	(56|(PVFS_ERROR_BIT))	/* No route to host */
+#define PVFS_EALREADY	        (57|(PVFS_ERROR_BIT))	/* Operation already in progress */
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERROR CODES!
  *
