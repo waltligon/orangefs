@@ -846,6 +846,7 @@ endif
 	( cd $(@D); dvipdf $(<F) $(@F) )
 %.html: %.tex
 	$(srcdir)/maint/pvfs2latexwrapper.pl -html -i $(basename $<).tex -o $@
+	$(srcdir)/maint/pvfs2htmlfixup.sh $(@D)/*/$(@F)
 
 ifndef DIST_RELEASE
 # rule for automatically generated source files
