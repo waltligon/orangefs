@@ -53,7 +53,7 @@ struct method_unexpected_info
  */
 struct bmi_method_ops
 {
-    char *method_name;
+    const char *method_name;
     int (*BMI_meth_initialize) (method_addr_p,
 				int,
 				int);
