@@ -352,14 +352,14 @@ static int dbpf_collection_create(char *collname,
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
 {
-    int ret, error;
+    int ret, error, i;
     TROVE_handle zero = 0;
     struct dbpf_storage *sto_p;
     struct dbpf_collection_db_entry db_data;
     DB *db_p;
     DBT key, data;
-    char path_name[PATH_MAX];
     struct stat dirstat;
+    char path_name[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
 
     sto_p = my_storage_p;
 
@@ -439,7 +439,7 @@ static int dbpf_collection_create(char *collname,
 	perror("base collection directory create");
 	return -1;
     }
-    
+
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     /* create collection attributes database, drop in last handle */
     ret = dbpf_db_create(path_name);
@@ -463,7 +463,6 @@ static int dbpf_collection_create(char *collname,
     ret = db_p->put(db_p, NULL, &key, &data, 0);
     if (ret != 0) return -1;
     
-
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     /* create dataspace attributes database */
     ret = dbpf_db_create(path_name);
@@ -475,12 +474,33 @@ static int dbpf_collection_create(char *collname,
 	perror("keyval directory create");
 	return -1;
     }
-    
+
+    /* create keyval bucket directories */
+    for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
+    {
+        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
+        if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
+        {
+            perror("keyval bucket directory create");
+            return -1;
+        }
+    }
+
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     ret = mkdir(path_name, 0755);
     if (ret != 0) {
 	perror("bstream directory create");
 	return -1;
+    }
+
+    for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
+    {
+        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
+        if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
+        {
+            perror("bstream bucket directory create");
+            return -1;
+        }
     }
 
 #if 0
