@@ -119,6 +119,14 @@ AC_ARG_ENABLE(perf-counters,
 fi]
 ,)
 
+dnl a mechanism to turn off disk I/O for testing/debugging
+AC_ARG_ENABLE(disk-io,
+[  --disable-disk-io       Disables pvfs2-server disk I/O (for testing)],
+[if test x$enableval = xno; then
+    CFLAGS="$CFLAGS -D__PVFS2_DISABLE_DISK_IO__"
+fi]
+,)
+
 AC_SUBST(QUIET_COMPILE)
 
 dnl Check for utilities that we need during the build process
