@@ -2,11 +2,12 @@ DIR := src/apps/admin
 
 ADMINSRC := \
 	$(DIR)/pvfs2-mkspace.c \
-	$(DIR)/pvfs2-showcoll.c
+	$(DIR)/pvfs2-showcoll.c \
+	$(DIR)/pvfs2-import.c
 
 ADMINLIBS := -ldb -lrt -lpthread
 
 ADMINTOOLS := $(patsubst %.c, %, $(ADMINSRC))
 
 $(ADMINTOOLS): %: %.o
-	$(LD) $< $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@
+	$(LD) $< $(TEST_SYSINT_DIR)/helper.o $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@
