@@ -71,14 +71,14 @@ static PVFS_offset next_mapped_offset (PVFS_Dist_params *dparam,
 {
 	PVFS_offset diff; /* distance of loff from beginning of strip in this stripe */
 	PVFS_size   stripe_size; /* not to be confused with strip size */
-	PVFS_offset iod_starting_offset; /* offset of strip from start of stripe */
+	PVFS_offset server_starting_offset; /* offset of strip from start of stripe */
 
-	iod_starting_offset = server_nr * dparam->strip_size;
+	server_starting_offset = server_nr * dparam->strip_size;
 	stripe_size = server_ct * dparam->strip_size;
-	diff = (logical_offset - iod_starting_offset) % stripe_size;
+	diff = (logical_offset - server_starting_offset) % stripe_size;
 	if (diff < 0 ) 
-		/* loff is before this strip - move to iod_so */
-		return iod_starting_offset;
+		/* loff is before this strip - move to server_so */
+		return server_starting_offset;
 	else 
 		if (diff >= dparam->strip_size) 
 			/* loff is after this strip - go to next strip */
