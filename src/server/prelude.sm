@@ -165,9 +165,10 @@ static int prelude_perm_check(
     PVFS_object_attr *obj_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(%p) %s (prelude sm) state: perm_check\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+    /* moved gossip server debug output to end of state, so we can report
+     * resulting status value.
+     */
+
     /*
       first we translate the dspace attributes into a more convenient
       server use-able format.  i.e. a PVFS_object_attr
@@ -270,6 +271,11 @@ static int prelude_perm_check(
         "error code to %d\n", PINT_map_server_op_to_string(s_op->req->op),
         js_p->error_code);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+        "(%p) %s (prelude sm) state: perm_check (status = %d)\n",
+	s_op,
+        PINT_map_server_op_to_string(s_op->req->op),
+	js_p->error_code);
     return 1;
 }
 
