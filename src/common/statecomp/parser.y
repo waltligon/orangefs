@@ -74,9 +74,13 @@ void yyerror(char *);
 	  state_def state_def_list .state_def_list.
 	  transition transition_list state_machine target 
 
-%start state_machine
+%start state_machine_list
 
 %%
+
+state_machine_list : state_machine 
+		  | state_machine state_machine_list
+		  ;
 
 state_machine	  : .NESTED. MACHINE identifier
 			{$$ = symenter($3);
