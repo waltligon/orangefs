@@ -133,11 +133,7 @@ machine pvfs2_crdirent_sm(prelude,
 /*
  * Function: crdirent_validate
  *
- * Synopsis: This function sets up the buffers in preparation for
- *           the trove operation to get the attribute structure
- *           used in check permissions.  Also runs the operation through
- *           the request scheduler for consistency.
- *
+ * Synopsis: verifies that entry name is valid
  */
 static int crdirent_validate(PINT_server_op *s_op,
 			 job_status_s* js_p)
@@ -149,7 +145,6 @@ static int crdirent_validate(PINT_server_op *s_op,
     /* verify input values -- some of this should be caught as
      * legitimate errors later! */
     assert(s_op->u.crdirent.name != NULL);
-    assert(s_op->u.crdirent.new_handle != 0);
     assert(s_op->u.crdirent.parent_handle != 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
