@@ -21,6 +21,11 @@ extern struct inode *pvfs2_get_custom_inode(
 
 extern kmem_cache_t *pvfs2_inode_cache;
 
+extern kmem_cache_t *op_cache;
+extern struct list_head pvfs2_request_list;
+extern spinlock_t pvfs2_request_list_lock;
+
+
 static struct inode *pvfs2_alloc_inode(
     struct super_block *sb)
 {
@@ -98,19 +103,66 @@ static void pvfs2_put_inode(
     }
 }
 
-/* information put here is reflected in the output of 'df' */
+/*
+  NOTE: information filled in here is typically
+  reflected in the output of 'df'
+*/
 static int pvfs2_statfs(
     struct super_block *sb,
     struct kstatfs *buf)
 {
-    sb->s_blocksize = pvfs_bufmap_size_query();
+    int ret = -1, retries = 5;
+    pvfs2_kernel_op_t *new_op = NULL;
 
-    buf->f_type = sb->s_magic;
-    buf->f_bsize = sb->s_blocksize;
-    buf->f_namelen = PVFS2_NAME_LEN;
-    buf->f_blocks = buf->f_bfree = buf->f_bavail = 1000000;
-    buf->f_files = buf->f_ffree = 100;
-    return 0;
+    pvfs2_print("pvfs2_: pvfs2_statfs called on sb %p "
+                "(fs_id is %d)\n", sb, (int)(PVFS2_SB(sb)->fs_id));
+
+    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+    if (!new_op)
+    {
+	pvfs2_error("pvfs2: pvfs2_statfs -- kmem_cache_alloc failed!\n");
+	return ret;
+    }
+    new_op->upcall.type = PVFS2_VFS_OP_STATFS;
+    new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->fs_id;
+
+    service_operation_with_timeout_retry(
+        new_op, "pvfs2_statfs", retries);
+
+    if (new_op->downcall.status > -1)
+    {
+        pvfs2_print("pvfs2_statfs got %lu blocks available | "
+                    "%lu blocks total\n",
+                    new_op->downcall.resp.statfs.blocks_avail,
+                    new_op->downcall.resp.statfs.blocks_total);
+
+        /*
+          re-assign superblock blocksize based on statfs blocksize:
+
+          NOTE: it seems okay that the superblock blocksize doesn't
+          match what we're using as the inode blocksize.  keep an
+          eye out to be sure.
+        */
+/*         sb->s_blocksize = pvfs_bufmap_size_query(); */
+        sb->s_blocksize = new_op->downcall.resp.statfs.block_size;
+
+        buf->f_type = sb->s_magic;
+        buf->f_bsize = sb->s_blocksize;
+        buf->f_namelen = PVFS2_NAME_LEN;
+        buf->f_blocks = new_op->downcall.resp.statfs.blocks_total;
+        buf->f_bfree = new_op->downcall.resp.statfs.blocks_avail;
+        buf->f_bavail = new_op->downcall.resp.statfs.blocks_avail;
+        buf->f_files = new_op->downcall.resp.statfs.files_total;
+        buf->f_ffree = new_op->downcall.resp.statfs.files_avail;
+
+        ret = new_op->downcall.status;
+    }
+
+  error_exit:
+    op_release(new_op);
+
+    pvfs2_print("pvfs2_statfs returning %d\n", ret);
+    return ret;
 }
 
 static int pvfs2_remount(
@@ -168,8 +220,9 @@ int pvfs2_fill_sb(
 
     if (!silent)
     {
-        pvfs2_print("pvfs2: pvfs2_fill_sb -- sb max bytes is %llu\n",
-                    (unsigned long long)sb->s_maxbytes);
+        pvfs2_print("pvfs2: pvfs2_fill_sb -- sb max bytes is %llu (%d)\n",
+                    (unsigned long long)sb->s_maxbytes,
+                    (int)sb->s_maxbytes);
     }
 
     /* alloc and initialize our root directory inode */

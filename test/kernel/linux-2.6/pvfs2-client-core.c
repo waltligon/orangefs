@@ -30,6 +30,9 @@
 
 #define MAX_NUM_UNEXPECTED 10
 
+/* the block size to report in statfs */
+#define STATFS_DEFAULT_BLOCKSIZE  1024
+
 /* size of mapped region to use for I/O transfers (in bytes) */
 #define MAPPED_REGION_SIZE (16*1024*1024)
 
@@ -578,6 +581,64 @@ static int service_rename_request(
     return ret;
 }
 
+static int service_statfs_request(
+    PVFS_sysresp_init *init_response,
+    pvfs2_upcall_t *in_upcall,
+    pvfs2_downcall_t *out_downcall)
+{
+    int ret = 1;
+    PVFS_sysresp_statfs resp_statfs;
+
+    if (init_response && in_upcall && out_downcall)
+    {
+        memset(&resp_statfs,0,sizeof(PVFS_sysresp_statfs));
+        memset(out_downcall,0,sizeof(pvfs2_downcall_t));
+
+        gossip_debug(CLIENT_DEBUG, "Got a statfs request for fsid %d\n",
+                     in_upcall->req.statfs.fs_id);
+
+        ret = PVFS_sys_statfs(in_upcall->req.statfs.fs_id,
+                              in_upcall->credentials,
+                              &resp_statfs);
+        if (ret < 0)
+        {
+            gossip_err("Failed to statfs fsid %d\n",
+                       in_upcall->req.statfs.fs_id);
+            gossip_err("Statfs returned error code %d\n",ret);
+
+            /* we need to send a blank response */
+            out_downcall->type = PVFS2_VFS_OP_STATFS;
+            out_downcall->status = -1;
+        }
+        else
+        {
+            out_downcall->type = PVFS2_VFS_OP_STATFS;
+            out_downcall->status = 0;
+            /*
+              can we get the real configured device blocksize?
+              should we use it if so?
+            */
+            out_downcall->resp.statfs.block_size =
+                STATFS_DEFAULT_BLOCKSIZE;
+            out_downcall->resp.statfs.blocks_total =
+                (resp_statfs.statfs_buf.bytes_total /
+                 out_downcall->resp.statfs.block_size);
+            out_downcall->resp.statfs.blocks_avail =
+                (resp_statfs.statfs_buf.bytes_available /
+                 out_downcall->resp.statfs.block_size);
+            /*
+              FIXME:
+              files_total should be the number of used handles and
+              files_avail should be the number of available handles
+            */
+            out_downcall->resp.statfs.files_total = 100;
+            out_downcall->resp.statfs.files_avail = 100;
+
+            ret = 0;
+        }
+    }
+    return ret;
+}
 
 int write_device_response(
     void *buffer_list,
@@ -763,6 +824,9 @@ int main(int argc, char **argv)
 		break;
 	    case PVFS2_VFS_OP_RENAME:
 		service_rename_request(&init_response, &upcall, &downcall);
+		break;
+	    case PVFS2_VFS_OP_STATFS:
+		service_statfs_request(&init_response, &upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_INVALID:
 	    default:

@@ -81,6 +81,11 @@ typedef struct
 
 typedef struct
 {
+    PVFS_fs_id fs_id;
+} pvfs2_statfs_request_t;
+
+typedef struct
+{
     int type;
     PVFS_credentials credentials;
 
@@ -96,6 +101,7 @@ typedef struct
 	pvfs2_mkdir_request_t mkdir;
 	pvfs2_readdir_request_t readdir;
 	pvfs2_rename_request_t rename;
+        pvfs2_statfs_request_t statfs;
     } req;
 } pvfs2_upcall_t;
 

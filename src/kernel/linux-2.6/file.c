@@ -322,6 +322,7 @@ int pvfs2_fsync(
     int datasync)
 {
     pvfs2_print("pvfs2: pvfs2_fsync called\n");
+
     return 0;
 }
 
@@ -331,8 +332,11 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
       NOTE: if .llseek is overriden, we must acquire lock as
       described in Documentation/filesystems/Locking
     */
-    pvfs2_print("pvfs2_file_llseek: offset is %llu | origin is %d\n",
-                (unsigned long long)offset, origin);
+    pvfs2_print("pvfs2_file_llseek: offset is %llu (%d)| origin is %d\n",
+                (unsigned long long)offset, (int)offset, origin);
+
+    pvfs2_print("pvfs2_file_llseek: inode thinks size is %lu\n",
+                (unsigned long)file->f_dentry->d_inode->i_size);
 
     return generic_file_llseek(file, offset, origin);
 }

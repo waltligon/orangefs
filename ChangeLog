@@ -6,6 +6,7 @@ pvfs2-0.0.3pre1
 ===========
 - vfs mmap and execution support (read-only)
 - vfs rename support
+- vfs statfs support
 
 pvfs2-0.0.2
 ===========

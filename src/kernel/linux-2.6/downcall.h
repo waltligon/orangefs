@@ -61,6 +61,21 @@ typedef struct
     PVFS_ds_position token;
 } pvfs2_readdir_response_t;
 
+/* the rename response is a blank downcall */
+typedef struct
+{
+} pvfs2_rename_response_t;
+
+typedef struct
+{
+    unsigned long block_size;
+    unsigned long blocks_total;
+    unsigned long blocks_avail;
+    unsigned long files_total;
+    unsigned long files_avail;
+} pvfs2_statfs_response_t;
+
+
 typedef struct
 {
     int type;
@@ -77,6 +92,8 @@ typedef struct
 /*      pvfs2_remove_response_t remove; */
 	pvfs2_mkdir_response_t mkdir;
 	pvfs2_readdir_response_t readdir;
+/*      pvfs2_rename_response_t rename; */
+	pvfs2_statfs_response_t statfs;
     } resp;
 } pvfs2_downcall_t;
 
