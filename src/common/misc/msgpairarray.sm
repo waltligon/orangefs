@@ -66,11 +66,12 @@ static int count_incomplete_msgs(
 
 %%
 
-nested machine pvfs2_msgpairarray_sm(init,
-                                            post,
-                                            post_retry,
-					    complete,
-					    completion_fn)
+nested machine pvfs2_msgpairarray_sm(
+    init,
+    post,
+    post_retry,
+    complete,
+    completion_fn)
 {
     state init
     {
@@ -402,7 +403,7 @@ static int msgpairarray_post_retry(PARENT_SM *sm_p,
                  "(%p) msgpairarray state: post_retry\n", sm_p);
 
     return job_req_sched_post_timer(
-	sm_p->msgarray_params.retry_limit,
+	sm_p->msgarray_params.retry_delay,
         sm_p, 0, js_p, &tmp_id,
 	sm_p->msgarray_params.job_context);
 }
