@@ -651,7 +651,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 {
     int opt;
 
-    while ((opt = getopt(argc, argv,"f")) != EOF) {
+    while ((opt = getopt(argc, argv,"fh")) != EOF) {
 	switch (opt) {
 	    case 'f':
 		server_create_storage_space = 1;
@@ -659,7 +659,8 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 	    case '?':
 	    case 'h':
 	    default:
-		gossip_err("pvfs2-server: [-f] <global_config_file> <server_config_file>\n\n"
+		gossip_err("pvfs2-server: [-fh] <global_config_file> <server_config_file>\n\n"
+			   "\t-h will show this message\n"
 			   "\t-f will cause server to create file system storage and exit\n"
 			   );
 		return 1;
