@@ -22,15 +22,6 @@ void getconfig_init_state_machine(void);
 
 extern job_context_id PINT_server_job_context;
 
-#if 0
-PINT_state_machine_s getconfig_req_s = 
-{
-	NULL,
-	"getconfig",
-	getconfig_init_state_machine
-};
-#endif
-
 %%
 
 machine get_config(init, bmi_send, cleanup)

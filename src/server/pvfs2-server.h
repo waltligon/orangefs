@@ -7,6 +7,14 @@
 #ifndef __PVFS2_SERVER_H
 #define __PVFS2_SERVER_H
 
+#include "pvfs2-debug.h"
+#include "pvfs2-storage.h"
+#include "job.h"
+#include "trove.h"
+#include "gossip.h"
+
+#include "PINT-reqproto-encode.h"
+
 #define PINTSTACKSIZE 8  /* size of stack for nested state machines */
 
 typedef union PINT_state_array_values PINT_state_array_values;

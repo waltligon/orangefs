@@ -4,24 +4,8 @@
  * See COPYING in top-level directory.
  */
 
-#include <errno.h>
 #include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/vfs.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <signal.h>
 #include <assert.h>
-
-#include "bmi.h"
-#include "gossip.h"
-#include "job.h"
-#include "pvfs2-debug.h"
-#include "pvfs2-storage.h"
-#include "PINT-reqproto-encode.h"
 
 #include "state-machine.h"
 #include "pvfs2-server.h"
@@ -41,21 +25,21 @@
  * debugging time. dw
 */
 
-extern PINT_state_machine_s get_config;
-extern PINT_state_machine_s get_attr;
-extern PINT_state_machine_s set_attr;
-extern PINT_state_machine_s create;
-extern PINT_state_machine_s crdirent;
-extern PINT_state_machine_s mkdir_;
-extern PINT_state_machine_s readdir_;
-extern PINT_state_machine_s lookup;
-extern PINT_state_machine_s io;
-extern PINT_state_machine_s remove_;
-extern PINT_state_machine_s rmdirent;
+extern PINT_state_machine get_config;
+extern PINT_state_machine get_attr;
+extern PINT_state_machine set_attr;
+extern PINT_state_machine create;
+extern PINT_state_machine crdirent;
+extern PINT_state_machine mkdir_;
+extern PINT_state_machine readdir_;
+extern PINT_state_machine lookup;
+extern PINT_state_machine io;
+extern PINT_state_machine remove_;
+extern PINT_state_machine rmdirent;
 
 /* table of state machines, indexed based on PVFS_server_op enumeration */
 /* NOTE: this table is initialized at run time in PINT_state_machine_init() */
-PINT_state_machine_s *PINT_server_op_table[PVFS_MAX_SERVER_OP+1] = {NULL};
+PINT_state_machine *PINT_server_op_table[PVFS_MAX_SERVER_OP+1] = {NULL};
 
 /* 
  * Function: PINT_state_machine_initialize_unexpected(s_op,ret)
@@ -110,7 +94,7 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
     {
 	gossip_err("Out of Memory");
 	ret->error_code = 1;
-	return(-ENOMEM);
+	return(-PVFS_ENOMEM);
     }
     memset(s_op->resp, 0, sizeof(struct PVFS_server_resp));
 
@@ -223,7 +207,11 @@ int PINT_state_machine_next(PINT_server_op *s,job_status_s *r)
     {
 	PINT_push_state(s, NULL);
 	s->current_state += 1; /* skip state flag */
-	s->current_state = s->current_state->nested_machine->state_machine;
+
+	/* NOTE: nested_machine is defined as a void * to eliminate a nasty
+	 * cross-structure dependency that I couldn't handle any more.  -- Rob
+	 */
+	s->current_state = ((PINT_state_machine *) s->current_state->nested_machine)->state_machine;
     }
 
     /* skip over the flag so we can execute the next state action */

@@ -30,16 +30,6 @@ void setattr_init_state_machine(void);
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
-#if 0
-PINT_state_machine_s setattr_req_s = 
-{
-	NULL,
-	"setattr",
-	setattr_init_state_machine
-};
-#endif
-
-
 %%
 
 machine set_attr(init,

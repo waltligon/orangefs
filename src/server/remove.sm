@@ -74,15 +74,6 @@ void remove_init_state_machine(void);
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
-#if 0
-PINT_state_machine_s remove_req_s = 
-{
-	NULL,
-	"remove",	
-	remove_init_state_machine
-};
-#endif
-
 %%
 
 machine remove_(init,
@@ -297,7 +288,7 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op,
     if (ret->error_code != 0) {
 	gossip_debug(SERVER_DEBUG,
 		     "  previous dspace getattr had an error; data is useless\n");
-	ret->error_code = -EINVAL;
+	ret->error_code = -PVFS_EINVAL;
     }
     else {
 	PVFS_ds_attributes *a_p = &ret->ds_attr;

@@ -25,15 +25,6 @@ void mkdir_init_state_machine(void);
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
-#if 0
-PINT_state_machine_s mkdir_req_s = 
-{
-	NULL,
-	"mkdir",
-	mkdir_init_state_machine
-};
-#endif
-
 %%
 
 machine mkdir_(init, create, set_attrib, release, send, err_msg, critical_error, cleanup)

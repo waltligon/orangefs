@@ -29,15 +29,6 @@ void io_init_state_machine(void);
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
-#if 0
-PINT_state_machine_s io_req_s = 
-{
-	NULL,
-	"io",
-	io_init_state_machine
-};
-#endif
-
 /****************************************************************
  * This is the state machine for file system I/O operations (both
  * read and write)
@@ -292,7 +283,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 	if(!s_op->u.io.flow_d)
 	{
 		/* critical error, jump to next error state */
-		ret->error_code = -ENOMEM;
+		ret->error_code = -PVFS_ENOMEM;
 		return(1);
 	}
 
@@ -301,7 +292,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 	if(!s_op->u.io.flow_d->file_data)
 	{
 		/* critical error, jump to next error state */
-		ret->error_code = -ENOMEM;
+		ret->error_code = -PVFS_ENOMEM;
 		return(1);
 	}
 
@@ -348,7 +339,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 	{
 		/* critical error; jump out of state */
 		gossip_lerr("Server: IO SM: unknown IO type requested.\n");
-		ret->error_code = -EINVAL;
+		ret->error_code = -PVFS_EINVAL;
 		return(1);
 	}
 

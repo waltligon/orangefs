@@ -8,6 +8,7 @@
 #include <stddef.h>
 #include <assert.h>
 #include <stdio.h>
+#include <malloc.h>
 
 #include "state-machine.h"
 #include "server-config.h"
@@ -34,15 +35,6 @@ void lookup_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
-
-#if 0
-PINT_state_machine_s lookup_req_s = 
-{
-    NULL,
-    "lookup",
-    lookup_init_state_machine
-};
-#endif
 
 %%
 
@@ -160,7 +152,7 @@ static int lookup_init(PINT_server_op *s_op,
 	PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT) {
 	gossip_err("  invalid path %s (bad segment count); sending error response\n",
 		   s_op->req->u.lookup_path.path);
-	ret->error_code = ENOTDIR;
+	ret->error_code = -PVFS_ENOTDIR;
     }
 
     /* allocate memory

@@ -31,15 +31,6 @@ void readdir_init_state_machine(void);
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
-#if 0
-PINT_state_machine_s readdir_req_s = 
-{
-	NULL,
-	"readdir_",
-	readdir_init_state_machine
-};
-#endif
-
 %%
 
 machine readdir_(init,
@@ -383,7 +374,7 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 	gossip_debug(SERVER_DEBUG,
 		     "  handle didn't refer to a directory\n");
 
-	s_op->resp->status = -EINVAL;
+	s_op->resp->status = -PVFS_EINVAL;
     }
     else if (ret->error_code != 0) {
 	/* for now let's assume this is an "empty" directory */
