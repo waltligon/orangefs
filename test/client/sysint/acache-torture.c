@@ -50,7 +50,7 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode1 = PINT_acache_lookup(tmp);
+        pinode1 = PINT_acache_lookup(tmp, NULL);
         assert(pinode1 == NULL);
 
         pinode1 = PINT_acache_pinode_alloc();
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode2 = PINT_acache_lookup(tmp);
+        pinode2 = PINT_acache_lookup(tmp, NULL);
         assert(pinode2);
 
         if (PINT_acache_pinode_status(pinode2) != PINODE_STATUS_VALID)
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode2 = PINT_acache_lookup(tmp);
+        pinode2 = PINT_acache_lookup(tmp, NULL);
         assert(pinode2);
 
         if (PINT_acache_pinode_status(pinode2) == PINODE_STATUS_VALID)
@@ -112,7 +112,7 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode2 = PINT_acache_lookup(tmp);
+        pinode2 = PINT_acache_lookup(tmp, NULL);
         assert(pinode2);
 
         if (PINT_acache_pinode_status(pinode2) != PINODE_STATUS_VALID)
