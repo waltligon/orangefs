@@ -120,17 +120,16 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 
         if (ret == -1)
         {
-            fprintf(stderr,"\n*****************************\n");
-            fprintf(stderr,"Invalid Storage Space: %s\n\n",
-                    user_opts.storage_path);
-            fprintf(stderr,"Storage initialization failed.  The most "
-                    "common reason\nfor this is that the storage space "
-                    "has not yet been\ncreated or is located on a "
-                    "partition that has not yet\nbeen mounted.  "
-                    "If you'd like to create the storage space,\n"
-                    "re-run this program with a -f appended to the end "
-                    "of\nthe command line.\n");
-            fprintf(stderr,"\n*****************************\n");
+            gossip_err("\n*****************************\n");
+            gossip_err("Invalid Storage Space: %s\n\n",
+		       user_opts.storage_path);
+            gossip_err("Storage initialization failed.  The most "
+		       "common reason\nfor this is that the storage space "
+		       "has not yet been\ncreated or is located on a "
+		       "partition that has not yet\nbeen mounted.  "
+		       "If you'd like to create the storage space,\n"
+		       "re-run this program with a -f option.\n");
+            gossip_err("\n*****************************\n");
         }
 	*server_level_init = SHUTDOWN_FLOW_INTERFACE;
 	goto interface_init_failed;

@@ -37,9 +37,10 @@ char dbpf_method_name[] = "dbpf";
 struct dbpf_storage *my_storage_p = NULL;
 
 /* Internally used only */
-static struct dbpf_storage *dbpf_storage_lookup(char *stoname);
+static struct dbpf_storage *dbpf_storage_lookup(char *stoname, int *err_p);
 static int dbpf_db_create(char *dbname);
-static DB *dbpf_db_open(char *dbname);
+static DB *dbpf_db_open(char *dbname, int *err_p);
+static int dbpf_db_error_convert(int db_error);
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
 /* dbpf_collection_getinfo()
@@ -161,10 +162,11 @@ static int dbpf_initialize(char *stoname,
 			   char **method_name_p,
 			   int method_id)
 {
+    int error;
     char *new_method_name;
     struct dbpf_storage *sto_p;
     
-    sto_p = dbpf_storage_lookup(stoname);
+    sto_p = dbpf_storage_lookup(stoname, &error);
     if (sto_p == NULL) return -1;
     
     my_storage_p = sto_p;
@@ -292,7 +294,7 @@ static int dbpf_collection_create(char *collname,
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
 {
-    int ret;
+    int ret, error;
     TROVE_handle zero = 0;
     struct dbpf_storage *sto_p;
     struct dbpf_collection_db_entry db_data;
@@ -388,7 +390,10 @@ static int dbpf_collection_create(char *collname,
     /* Note: somewhat inefficient, but we don't create collections
      * often enough to matter
      */
-    db_p = dbpf_db_open(path_name);
+    db_p = dbpf_db_open(path_name, &error);
+    if (db_p == NULL) {
+	return -error;
+    }
     
     /* store initial handle value */
     memset(&key, 0, sizeof(key));
@@ -638,7 +643,7 @@ static int dbpf_collection_lookup(char *collname,
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
 {
-    int ret;
+    int ret, error;
     size_t slen;
     struct dbpf_storage *sto_p;
     struct dbpf_collection *coll_p;
@@ -704,13 +709,13 @@ static int dbpf_collection_lookup(char *collname,
 
     /* open collection attribute database */
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, coll_p->coll_id);
-    coll_p->coll_attr_db = dbpf_db_open(path_name);
-    if (coll_p->coll_attr_db == NULL) return -1;
+    coll_p->coll_attr_db = dbpf_db_open(path_name, &error);
+    if (coll_p->coll_attr_db == NULL) return -error;
     
     /* open dataspace database */
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, coll_p->coll_id);
-    coll_p->ds_db = dbpf_db_open(path_name);
-    if (coll_p->ds_db == NULL) return -1;
+    coll_p->ds_db = dbpf_db_open(path_name, &error);
+    if (coll_p->ds_db == NULL) return -error;
 
     dbpf_collection_register(coll_p);
 
@@ -735,7 +740,8 @@ static int dbpf_collection_lookup(char *collname,
  * structure will be found by following the link from the dbpf_coll
  * structure associated with that collection.
  */
-static struct dbpf_storage *dbpf_storage_lookup(char *stoname)
+static struct dbpf_storage *dbpf_storage_lookup(char *stoname,
+						int *error_p)
 {
     size_t slen;
     struct dbpf_storage *sto_p;
@@ -748,13 +754,17 @@ static struct dbpf_storage *dbpf_storage_lookup(char *stoname)
      */
 
     sto_p = (struct dbpf_storage *) malloc(sizeof(struct dbpf_storage));
-    if (sto_p == NULL) return NULL;
+    if (sto_p == NULL) {
+	*error_p = TROVE_ENOMEM;
+	return NULL;
+    }
 
     /* TODO: could do one malloc and some pointer math */
     slen = strlen(stoname)+1;
     sto_p->name = (char *) malloc(slen);
     if (sto_p->name == NULL) {
 	free(sto_p);
+	*error_p = TROVE_ENOMEM;
 	return NULL;
     }
     strncpy(sto_p->name, stoname, slen);
@@ -762,12 +772,18 @@ static struct dbpf_storage *dbpf_storage_lookup(char *stoname)
     /* TODO: make real names based on paths... */
     sto_p->refct = 0;
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
-    sto_p->sto_attr_db = dbpf_db_open(path_name);
-    if (sto_p->sto_attr_db == NULL) return NULL;
+    sto_p->sto_attr_db = dbpf_db_open(path_name, error_p);
+    if (sto_p->sto_attr_db == NULL) {
+	/* dbpf_db_open will have filled in error */
+	return NULL;
+    }
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
-    sto_p->coll_db = dbpf_db_open(path_name);
-    if (sto_p->coll_db == NULL) return NULL;
+    sto_p->coll_db = dbpf_db_open(path_name, error_p);
+    if (sto_p->coll_db == NULL) {
+	/* dbpf_db_open will have filled in error */
+	return NULL;
+    }
 
     my_storage_p = sto_p;
     return sto_p;
@@ -898,17 +914,58 @@ static int dbpf_db_create(char *dbname)
     return 0;
 }
 
+/* dbpf_db_error_convert()
+ *
+ * Converts a DB error into a trove error code.
+ *
+ * NOTE: we should generalize the "errno" part of this, make it its
+ * own call, and call that function within here.  Probably needs to
+ * be defined outside this file though.
+ */
+static int dbpf_db_error_convert(int db_error)
+{
+    if (db_error > 0) {
+	/* errno value returned from db */
+	switch (db_error) {
+	    case ENOENT:
+		return TROVE_ENOENT;
+	    case ENOMEM:
+		return TROVE_ENOMEM;
+	    case EPERM:
+		return TROVE_EPERM;
+	    case EINVAL:
+	    default:
+		return TROVE_EINVAL;
+	}
+    }
+    else if (db_error < 0) {
+	/* special error value from db */
+	switch (db_error) {
+	    case DB_NOTFOUND:
+		return TROVE_ENOENT;
+	    default:
+		return TROVE_EINVAL;
+	}
+    }
+    else return 0;
+}
+
 /* dbpf_db_open()
  *
  * Internal function for opening the databases that are used to store
  * basic information on a storage region.
+ *
+ * Returns NULL on error, passing a trove error type back in the
+ * integer pointed to by error_p.
  */
-static DB *dbpf_db_open(char *dbname)
+static DB *dbpf_db_open(char *dbname,
+			int *error_p)
 {
     int ret;
     DB *db_p;
 
     if ((ret = db_create(&db_p, NULL, 0)) != 0) {
+	*error_p = dbpf_db_error_convert(ret);
 	return NULL;
     }
 
@@ -916,8 +973,9 @@ static DB *dbpf_db_open(char *dbname)
     db_p->set_errpfx(db_p, "xxx");
 
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
-    if (( ret =  db_p->set_flags(db_p, DB_RECNUM)) ) {
+    if ((ret = db_p->set_flags(db_p, DB_RECNUM)) != 0) {
 	    db_p->err(db_p, ret, "%s: set_flags", dbname);
+	    *error_p = dbpf_db_error_convert(ret);
 	    return NULL;
     }
     if ((ret = db_p->open(db_p,
@@ -930,6 +988,7 @@ static DB *dbpf_db_open(char *dbname)
                           0,
                           0)) != 0)
     {
+	*error_p = dbpf_db_error_convert(ret);
 	return NULL;
     }
 
