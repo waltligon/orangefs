@@ -669,15 +669,8 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
     {
 	new_addr->local_addr = 1;
     }
-    else
+    else if(local_port != NULL)
     {
-	if(local_port == NULL)
-	{
-	    gossip_lerr("Error: attempting bad GM hostname lookup?\n");
-	    dealloc_method_addr(new_addr);
-	    free(gm_string);
-	    return(NULL);
-	}
 	gm_data->node_id = gm_host_name_to_node_id(local_port, gm_string);
 	if (gm_data->node_id == GM_NO_SUCH_NODE_ID)
 	{
