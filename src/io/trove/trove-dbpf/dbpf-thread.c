@@ -28,7 +28,6 @@ extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 #ifdef __PVFS2_TROVE_THREADED__
 pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
 pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
-static gen_mutex_t *dbpf_interface_lock = NULL;
 static gen_mutex_t *dbpf_op_incoming_cond_mutex = NULL;
 static pthread_t dbpf_thread;
 static int dbpf_thread_running = 0;
@@ -40,30 +39,21 @@ int dbpf_thread_initialize(void)
 #ifdef __PVFS2_TROVE_THREADED__
     ret = -1;
     dbpf_op_incoming_cond_mutex = gen_mutex_build();
-    dbpf_interface_lock = gen_mutex_build();
     if (dbpf_op_incoming_cond_mutex)
     {
-        if (dbpf_interface_lock)
+        dbpf_thread_running = 1;
+        ret = pthread_create(&dbpf_thread, NULL,
+                             dbpf_thread_function, NULL);
+        if (ret == 0)
         {
-            dbpf_thread_running = 1;
-            ret = pthread_create(&dbpf_thread, NULL,
-                                 dbpf_thread_function, NULL);
-            if (ret == 0)
-            {
-                dbpf_thread_running = 1;
-                gossip_debug(TROVE_DEBUG,
-                             "dbpf_thread_initialize: initialized\n");
-            }
-            else
-            {
-                gen_mutex_destroy(dbpf_interface_lock);
-                dbpf_interface_lock = NULL;
-            }
+            gossip_debug(TROVE_DEBUG,
+                         "dbpf_thread_initialize: initialized\n");
         }
         else
         {
             gen_mutex_destroy(dbpf_op_incoming_cond_mutex);
             dbpf_op_incoming_cond_mutex = NULL;
+            dbpf_thread_running = 0;
             gossip_debug(
                 TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
         }
@@ -80,15 +70,12 @@ int dbpf_thread_finalize(void)
 {
     int ret = 0;
 #ifdef __PVFS2_TROVE_THREADED__
-    gen_mutex_lock(dbpf_interface_lock);
     dbpf_thread_running = 0;
-    usleep(100);
-    ret = pthread_cancel(dbpf_thread);
-    gen_mutex_unlock(dbpf_interface_lock);
+    ret = pthread_join(dbpf_thread, NULL);
+
     pthread_cond_destroy(&dbpf_op_completed_cond);
     pthread_cond_destroy(&dbpf_op_incoming_cond);
     gen_mutex_destroy(dbpf_op_incoming_cond_mutex);
-    gen_mutex_destroy(dbpf_interface_lock);
 #endif
     gossip_debug(TROVE_DEBUG, "dbpf_thread_finalize: finalized\n");
     return ret;
@@ -139,23 +126,11 @@ void *dbpf_thread_function(void *ptr)
                 wait_time.tv_sec++;
             }
 
-            /*
-              the only time this interface lock is locked is
-              in dbpf_thread_finalize above.  if that's the
-              case, we want to make sure to not be in a timed
-              wait.  we'll be cancelled and shouldn't return
-              while waiting for this lock.  If the lock is
-              acquired, test for cancellation.
-            */
-            gen_mutex_lock(dbpf_interface_lock);
-            pthread_testcancel();
-
             gen_mutex_lock(dbpf_op_incoming_cond_mutex);
             ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
                                          dbpf_op_incoming_cond_mutex,
                                          &wait_time);
             gen_mutex_unlock(dbpf_op_incoming_cond_mutex);
-            gen_mutex_unlock(dbpf_interface_lock);
         }
     }
 
