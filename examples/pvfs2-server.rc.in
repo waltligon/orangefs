@@ -58,13 +58,13 @@ fi
 case "$1" in
   start)
 	echo -n "Starting PVFS2 server: "
-	daemon ${PVFS2SERVER} ${PVFS2_FS_CONF} ${PVFS2_SERVER_CONF}
+	daemon ${PVFS2SERVER} --pidfile /var/run/pvfs2.pid ${PVFS2_FS_CONF} ${PVFS2_SERVER_CONF}
 	echo
 	touch /var/lock/subsys/pvfs2-server
 	;;
   stop)
 	echo -n "Stopping PVFS2 server: "
-	killproc pvfs2-server
+	kill `cat /var/run/pvfs2.pid`
 	echo
 	rm -f /var/lock/subsys/pvfs2-server
 	;;
