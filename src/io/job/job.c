@@ -131,6 +131,7 @@ int job_initialize(int flags)
     /* this should never fail if the thread startup succeeded */
     assert(ret == 0);
 
+#ifdef __PVFS2_CLIENT__
     ret = PINT_thread_mgr_dev_start();
     if (ret != 0)
     {
@@ -138,13 +139,16 @@ int job_initialize(int flags)
 	teardown_queues();
 	return(-ret);
     }
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = PINT_thread_mgr_trove_start();
     if(ret != 0)
     {
 	PINT_thread_mgr_bmi_stop();
+#ifdef __PVFS2_CLIENT__
 	PINT_thread_mgr_dev_stop();
+#endif
 	teardown_queues();
 	return (-ret);
     }
@@ -165,7 +169,9 @@ int job_initialize(int flags)
 int job_finalize(void)
 {
     PINT_thread_mgr_bmi_stop();
+#ifdef __PVFS2_CLIENT__
     PINT_thread_mgr_dev_stop();
+#endif
 #ifdef __PVFS2_TROVE_SUPPORT__
     PINT_thread_mgr_trove_stop();
 #endif
@@ -779,6 +785,10 @@ int job_dev_unexp(
     struct job_desc *jd = NULL;
     int outcount = 0;
 
+#ifndef __PVFS2_CLIENT__
+    return(-PVFS_ENOSYS);
+#endif
+
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the user ptr etc.
      */
@@ -848,12 +858,16 @@ int job_dev_write(void* buffer,
     job_id_t * id,
     job_context_id context_id)
 {
+    int ret = -1;
+
     /* NOTE: This function will _always_ immediately complete for now.  
      * It is really just in the job interface for completeness, in case we 
      * decide later to make the function asynchronous
      */
 
-    int ret = -1;
+#ifndef __PVFS2_CLIENT__
+    return(-PVFS_ENOSYS);
+#endif
 
     ret = PINT_dev_write(buffer, size, buffer_type, tag);
     if(ret < 0)
@@ -890,12 +904,16 @@ int job_dev_write_list(void** buffer_list,
     job_id_t* id,
     job_context_id context_id)
 {
+    int ret = -1;
+
     /* NOTE: This function will _always_ immediately complete for now.  
      * It is really just in the job interface for completeness, in case we 
      * decide later to make the function asynchronous
      */
 
-    int ret = -1;
+#ifndef __PVFS2_CLIENT__
+    return(-PVFS_ENOSYS);
+#endif
 
     ret = PINT_dev_write_list(buffer_list, size_list, list_count,
 	total_size, buffer_type, tag);
