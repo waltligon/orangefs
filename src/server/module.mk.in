@@ -21,7 +21,3 @@ SERVERSRC += \
 	$(DIR)/pvfs2-server.c \
 	$(DIR)/server-state-machine.c \
 	$(SERVERGENSRC)
-
-# added to the library so that test programs will work
-LIBSRC += \
-	$(DIR)/print-struct.c
