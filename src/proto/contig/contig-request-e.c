@@ -211,7 +211,12 @@ int do_encode_req(
 		}
 		if (request->u.setattr.attr.u.meta.dist != NULL)
 		{
-		    size += PINT_DIST_PACK_SIZE( request->u.setattr.attr.u.meta.dist );
+		    /* fill in the dist size in the attributes
+		     * while we are at it
+		     */
+		    request->u.setattr.attr.u.meta.dist_size =
+			PINT_DIST_PACK_SIZE( request->u.setattr.attr.u.meta.dist );
+		    size += request->u.setattr.attr.u.meta.dist_size;
 		}
 	    }
 
