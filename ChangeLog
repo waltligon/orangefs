@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-1.0.1
+===========
+- 
+
+
 pvfs2-1.0.0
 ===========
 - disabled mmap readahead cache by default; allow configure option to

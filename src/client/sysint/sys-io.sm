@@ -1295,7 +1295,6 @@ static int io_analyze_size_results(
                               &sm_p->pinode->attr :
                               &sm_p->acache_attr);
     PVFS_size zero_fill_size = 0;
-    PINT_client_io_ctx *cur_ctx = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_analyze"
                  "size_results\n", sm_p);
@@ -1320,21 +1319,15 @@ static int io_analyze_size_results(
     gossip_debug(GOSSIP_IO_DEBUG, " *** computed logical size of %Ld\n",
                  Ld(sm_p->u.io.size));
 
-    /* for this, we can use any context */
-    cur_ctx = &sm_p->u.io.contexts[0];
-    assert(cur_ctx);
-
     zero_fill_size = PVFS_util_min(
-        (sm_p->u.io.size - cur_ctx->flow_desc.file_req_offset -
+        (sm_p->u.io.size - sm_p->u.io.file_req_offset -
          sm_p->u.io.total_size),
         (PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req) -
          sm_p->u.io.total_size));
 
-    if ((cur_ctx->flow_desc.file_req_offset +
-              zero_fill_size) > sm_p->u.io.size)
+    if ((sm_p->u.io.file_req_offset + zero_fill_size) > sm_p->u.io.size)
     {
-        zero_fill_size = sm_p->u.io.size -
-            cur_ctx->flow_desc.file_req_offset;
+        zero_fill_size = (sm_p->u.io.size - sm_p->u.io.file_req_offset);
     }
 
     if (zero_fill_size > -1)
@@ -1343,8 +1336,8 @@ static int io_analyze_size_results(
                      "at offset %Ld\n", Ld(zero_fill_size),
                      Ld(sm_p->u.io.total_size));
 
-        memset((char *)(cur_ctx->flow_desc.dest.u.mem.buffer +
-                        sm_p->u.io.total_size), 0, zero_fill_size);
+        memset((char *)(sm_p->u.io.buffer + sm_p->u.io.total_size),
+               0, zero_fill_size);
 
         sm_p->u.io.total_size += zero_fill_size;
     }
