@@ -46,7 +46,6 @@ static int pvfs2_readdir(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-    /* pick up from where we left off */
     pos = (PVFS_ds_position)file->f_pos;
 
     pvfs2_print("pvfs2: pvfs2_readdir called on %s (pos = %d)\n",
@@ -155,7 +154,6 @@ static int pvfs2_readdir(
         }
 
       error_exit:
-	/* when request is serviced properly, free req op struct */
 	op_release(new_op);
 	break;
     }

@@ -205,6 +205,7 @@ static int pvfs2_unlink(
     ret = pvfs2_remove_entry(dir, dentry);
     if (ret == 0)
     {
+        inode->i_nlink--;
         inode->i_ctime = dir->i_ctime;
     }
     return ret;
@@ -263,6 +264,8 @@ static int pvfs2_rmdir(
 {
     int ret = -ENOTEMPTY;
     struct inode *inode = dentry->d_inode;
+
+    dentry->d_inode->i_nlink--;
 
     ret = pvfs2_unlink(dir, dentry);
     if (ret == 0)
