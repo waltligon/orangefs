@@ -20,6 +20,14 @@
 /* uncomment the following for vebose pcache debugging */
 /* #define VERBOSE_PCACHE_DEBUG */
 
+/*
+  uncomment the following for an experimental pinode
+  cleanup mechanism for trying to bound the number of
+  pinod entries in the pcache at any given time
+*/
+/* #define PINT_PCACHE_AUTO_CLEANUP */
+
+
 #ifdef VERBOSE_PCACHE_DEBUG
 #define pcache_debug(x) gossip_debug(PCACHE_DEBUG,x)
 #else
@@ -49,6 +57,10 @@ static void pinode_free(PINT_pinode *pinode);
 static int pinode_status(PINT_pinode *pinode);
 static void pinode_update_timestamp(PINT_pinode **pinode);
 static void pinode_invalidate(PINT_pinode *pinode);
+
+#ifdef PINT_PCACHE_AUTO_CLEANUP
+static void reclaim_pinode_entries(void);
+#endif
 
 
 /*
@@ -166,6 +178,18 @@ PINT_pinode *PINT_pcache_lookup(PVFS_pinode_reference refn)
 
 PINT_pinode *PINT_pcache_pinode_alloc()
 {
+#ifdef PINT_PCACHE_AUTO_CLEANUP
+    /*
+      PINT_PCACHE_NUM_FLUSH_ENTRIES is a soft limit that triggers
+      an attempt to reclaim any expired or invalidated entries
+      that currently reside in the pcache.
+    */
+    if (s_pcache_allocated_entries &&
+        (s_pcache_allocated_entries % PINT_PCACHE_NUM_FLUSH_ENTRIES) == 0)
+    {
+        reclaim_pinode_entries();
+    }
+#endif
     return pinode_alloc();
 }
 
@@ -193,7 +217,7 @@ void PINT_pcache_set_valid(PINT_pinode *pinode)
         /*
           if it's hashed, that probably means the caller got a
           valid pinode entry from a lookup but called us anyway;
-          otherwise, add the pinode the mru htable
+          otherwise, add the pinode the htable
         */
         if (pinode->flag == PINODE_INTERNAL_FLAG_UNHASHED)
         {
@@ -429,7 +453,7 @@ static int pinode_hash_refn_compare(void *key, struct qlist_head *link)
     return(0);
 }
 
-/* never call this; PINT_pcache_initialize sets up the pinode pool */
+/* never call this directly; internal use only */
 static PINT_pinode *pinode_alloc()
 {
     PINT_pinode *pinode = NULL;
@@ -456,7 +480,7 @@ static PINT_pinode *pinode_alloc()
     return pinode;
 }
 
-/* never call this; PINT_pcache_finalize frees the pinode pool */
+/* never call this directly; internal use only */
 static void pinode_free(PINT_pinode *pinode)
 {
     if (pinode)
@@ -473,9 +497,8 @@ static void pinode_free(PINT_pinode *pinode)
 }
 
 /*
-  atomically invalidate the pinode status flag and move the
-  pinode to the free list.  removes pinode from mru htable
-  if hashed.
+  atomically invalidate the pinode status flag and free the
+  pinode.  removes pinode from htable if hashed.
 */
 static void pinode_invalidate(PINT_pinode *pinode)
 {
@@ -568,6 +591,49 @@ static void pinode_update_timestamp(PINT_pinode **pinode)
         assert(0);
     }
 }
+
+#ifdef PINT_PCACHE_AUTO_CLEANUP
+/*
+  attempts to reclaim up to PINT_PCACHE_NUM_FLUSH_ENTRIES
+  stale pinode entries; may not reclaim any.
+*/
+static void reclaim_pinode_entries()
+{
+    PINT_pinode *pinode = NULL;
+    struct qlist_head *link = NULL, *tmp = NULL;
+    int i = 0, num_reclaimed = 0;
+
+    pcache_debug("reclaim_pinode_entries entered\n");
+    if (s_pcache_htable_mutex && s_pcache_htable)
+    {
+        gen_mutex_lock(s_pcache_htable_mutex);
+        for(i = 0; i < s_pcache_htable->table_size; i++)
+        {
+            qhash_for_each_safe(link, tmp, &(s_pcache_htable->array[i]))
+            {
+                pinode = qlist_entry(link, PINT_pinode, link);
+                assert(pinode);
+
+                if (pinode_status(pinode) != PINODE_STATUS_VALID)
+                {
+                    pinode_invalidate(pinode);
+                    if (num_reclaimed++ == PINT_PCACHE_NUM_FLUSH_ENTRIES)
+                    {
+                        goto reclaim_exit;
+                    }
+                }
+            }
+        }
+      reclaim_exit:
+        gen_mutex_unlock(s_pcache_htable_mutex);
+    }
+    fprintf(stderr,"reclaim_pinode_entries reclaimed %d entries\n",
+            num_reclaimed);
+    fprintf(stderr,"Total allocated is %d\n",
+            s_pcache_allocated_entries);
+    pcache_debug("reclaim_pinode_entries exited\n");
+}
+#endif /* PINT_PCACHE_AUTO_CLEANUP */
 
 /*
  * Local variables:

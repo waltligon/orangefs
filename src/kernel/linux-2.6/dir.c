@@ -10,9 +10,7 @@
 #include <linux/fs.h>
 #include <linux/pagemap.h>
 #include "pvfs2-kernel.h"
-
-/* FIXME: NEED PVFS2_READDIR_START defined in pvfs2-sysint.h */
-#define PVFS2_READDIR_START (INT_MAX-1)
+#include "pvfs2-sysint.h"
 
 extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;

@@ -118,7 +118,7 @@ static int service_create_request(
             /*
               FIXME:
               if the create failed because the file already exists,
-              do a (hopefully cached) lookup here and return the
+              do a (hopefully (d)cached) lookup here and return the
               pinode_reference along with success.
 
               this is useful for the case where the file was created

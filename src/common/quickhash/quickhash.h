@@ -16,7 +16,7 @@
 #define qhash_add_tail             list_add_tail
 #define qhash_del                  list_del
 #define qhash_for_each             list_for_each
-#define qhash_for_each             list_for_each_safe
+#define qhash_for_each_safe        list_for_each_safe
 
 #define qhash_lock_init(lock_ptr)  spin_lock_init(lock_ptr)
 #define qhash_lock(lock_ptr)       spin_lock(lock_ptr)

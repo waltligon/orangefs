@@ -47,13 +47,23 @@
   make sure it stays in the pinode cache.  on expiration, the ref count
   is dropped.  these internal ref counts are separate from the user
   influenced ref counts (i.e. lookup, invalidate, release)
+
+
+  if you define PINT_PCACHE_AUTO_CLEANUP, the following applies:
+  since the number of pinodes in existance at any time is unbounded,
+  if the internal allocator sees that a multiple of
+  PINT_PCACHE_NUM_FLUSH_ENTRIES pinodes exist, we secretly try to
+  reclaim up to PINT_PCACHE_NUM_FLUSH_ENTRIES by scanning the htable
+  of used pinodes and freeing any expired, invalid, or pinodes that
+  are no longer being referenced.  If none meet these requirements,
+  nothing is reclaimed.  The important thing is that we've tried.
+  this 'feature' is mostly untested and may not be beneficial.
 */
 
 #define PINT_PCACHE_TIMEOUT                                        5
-#define PINT_PCACHE_NUM_ENTRIES                                   16
+#define PINT_PCACHE_NUM_ENTRIES                                 1024
 #define PINT_PCACHE_NUM_FLUSH_ENTRIES  (PINT_PCACHE_NUM_ENTRIES / 4)
-/* #define PINT_PCACHE_MAX_ENTRIES      512 */
-#define PINT_PCACHE_HTABLE_SIZE                                  127
+#define PINT_PCACHE_HTABLE_SIZE                                  511
 
 enum
 {
