@@ -115,7 +115,6 @@ int main(int argc, char **argv)
 
     process_name = argv[0];
 
-    /* look at command line arguments */
     user_opts = parse_args(argc, argv);
     if (!user_opts)
     {
@@ -124,11 +123,15 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* look at pvfstab */
     if (PVFS_util_parse_pvfstab(&mnt))
     {
         fprintf(stderr, "Error: failed to parse pvfstab.\n");
         return(-1);
+    }
+
+    for(i = 0; i < MAX_NUM_PATHS; i++)
+    {
+        memset(pvfs_path[i],0,PVFS_NAME_MAX);
     }
 
     /* see if the destination resides on any of the file systems
@@ -146,8 +149,6 @@ int main(int argc, char **argv)
 
         for(j = 0; j < user_opts->num_starts; j++)
         {
-            memset(pvfs_path[j],0,PVFS_NAME_MAX);
-
             /*
               if the cmdline specified path is an exact match on
               a mnt.ptab entry, use '/' as the pvfs_path

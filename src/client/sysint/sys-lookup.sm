@@ -467,7 +467,8 @@ int PVFS_sys_ref_lookup(
                              relative_pathname, parent);
     if (ret != 0)
     {
-        gossip_err("PVFS_sys_ref_lookup failed to init context\n");
+        gossip_err("PVFS_sys_ref_lookup failed to init context "
+                   "(path = %s)\n", relative_pathname);
         free(sm_p);
         return ret;
     }
