@@ -131,7 +131,7 @@ int pvfs2_mmap_ra_cache_get_block(
                 hash_link, mmap_ra_cache_elem_t, hash_link);
             assert(cache_elem);
 
-            if ((cache_elem->data_sz > (offset + len)) &
+            if ((cache_elem->data_sz > (offset + len)) &&
                 (cache_elem->data_invalid == 0))
             {
                 gossip_debug(

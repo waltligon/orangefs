@@ -13,6 +13,9 @@ and as a freely available production-level tool for the cluster community.
 
 See the top level COPYING file for license information.
 
+NOTE: The pvfs2 kernel modules for 2.4.x and 2.6.x are released under
+the terms of the GNU General Public License.
+
 Information about building and installing PVFS2 can be found in:
 doc/pvfs2-quickstart.pdf
 doc/pvfs2-quickstart.ps

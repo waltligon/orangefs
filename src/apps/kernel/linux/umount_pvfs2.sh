@@ -2,7 +2,7 @@
 
 umount /tmp/mnt
 killall -TERM pvfs2-client
-sleep 1
+sleep 2
 rmmod pvfs2
 
 

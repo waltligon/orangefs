@@ -6,8 +6,14 @@ if [ "`echo $PATH | grep -c /usr/src/modtools/sbin`" = "0" ]; then
 fi
 
 if [ "`lsmod | grep -c pvfs2`" = "0" ]; then
-   echo "Loading the pvfs2 module"
-   insmod ../../../../src/kernel/linux-2.6/pvfs2.ko $1
+
+   if test "x`uname -r | cut -b 1-3`" = "x2.4"; then
+	echo "Loading the 2.4.x pvfs2 module"
+	insmod ../../../../src/kernel/linux-2.4/pvfs2.o $1
+   else
+   	echo "Loading the 2.6.x pvfs2 module"
+   	insmod ../../../../src/kernel/linux-2.6/pvfs2.ko $1
+   fi
 fi
 
 CUR_DEV="pvfs2-flow"
@@ -28,9 +34,14 @@ echo "Starting pvfs2-client"
 ./pvfs2-client -p ./pvfs2-client-core
 
 if [ "`mount | grep -c pvfs2`" = "0" ]; then
-   echo "Mounting pvfs2 on /tmp/mnt"
-#   mount -t pvfs2 pvfs2 /tmp/mnt -o coll_id=9,root_handle=1048576
-    mount -t pvfs2 tcp://lain.mcs.anl.gov:3334/pvfs2-fs /tmp/mnt
+
+   if test "x`uname -r | cut -b 1-3`" = "x2.4"; then
+   	echo "Mounting 2.4.x pvfs2 on /tmp/mnt"
+	mount -t pvfs2 pvfs2 /tmp/mnt -o tcp://lain.mcs.anl.gov:3334/pvfs2-fs
+   else
+   	echo "Mounting 2.6.x pvfs2 on /tmp/mnt"
+    	mount -t pvfs2 tcp://lain.mcs.anl.gov:3334/pvfs2-fs /tmp/mnt
+   fi
 else
    echo "Uh...I think pvfs2 is already mounted."
 fi

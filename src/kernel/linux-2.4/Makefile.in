@@ -5,6 +5,7 @@ here = src/kernel/linux-2.4
 there = src/kernel/linux-2.6
 top  = ../../..
 
+k24_minor_ver = @LINUX24_KERNEL_MINOR_VER@
 absolute_src_dir = @SRC_ABSOLUTE_TOP@
 src_relative_top = @SRC_RELATIVE_TOP@
 ifeq "/" "$(shell echo ${src_relative_top} | cut -c 1)"
@@ -52,8 +53,9 @@ EXTRA_CFLAGS = \
     -I$(absolute_src_dir)/src/io/dev \
     -I$(absolute_src_dir)/src/common/quickhash
 
+EXTRA_CFLAGS += -DPVFS2_LINUX_KERNEL_2_4_MINOR_VER=${k24_minor_ver}
 EXTRA_CFLAGS += @MMAP_RA_CACHE@ -DPVFS2_LINUX_KERNEL_2_4
-#EXTRA_CFLAGS = -DPVFS2_KERNEL_DEBUG
+#EXTRA_CFLAGS += -DPVFS2_KERNEL_DEBUG
 
 KDIR = @LINUX24_KERNEL_SRC@
 HPATH = $(KDIR)/include

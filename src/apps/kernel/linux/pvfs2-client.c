@@ -15,12 +15,15 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include "pvfs2-types.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
 
 #define PVFS2_CLIENT_CORE_NAME  "pvfs2-client-core"
+
+#define MAX_DEV_INIT_FAILURES 10
 
 typedef struct
 {
@@ -119,6 +122,7 @@ static int monitor_pvfs2_client(options_t *opts)
 {
     int ret = 1, fd = 0;
     pid_t new_pid = 0, wpid = 0;
+    int dev_init_failures = 0;
 
     assert(opts);
 
@@ -148,6 +152,31 @@ static int monitor_pvfs2_client(options_t *opts)
                            "value %d\n", new_pid, (int)WEXITSTATUS(ret));
                 }
 
+                if (WEXITSTATUS(ret) == (unsigned char)-PVFS_EDEVINIT)
+                {
+                    /*
+                      it's likely that the device was not released yet
+                      by the client core process, even though it was
+                      terminated.  in this case, sleep for a bit and
+                      try again up to MAX_DEV_INIT_FAILURES
+                      consecutive times.
+
+                      this can happen after signaled termination,
+                      particularly on 2.4.x kernels. it seems the
+                      client-core sometimes doesn't release the device
+                      quickly enough.  while inelegant, this sleep is
+                      a temporary measure since we plan to remove the
+                      signaled termination of the client-core all
+                      together in the future.
+                    */
+                    if (++dev_init_failures == MAX_DEV_INIT_FAILURES)
+                    {
+                        break;
+                    }
+                    sleep(1);
+                    continue;
+                }
+
                 if ((opts->path[0] != '/') && (opts->path [0] != '.'))
                 {
                     printf("*** The pvfs2-client-core has exited ***\n");
@@ -155,11 +184,13 @@ static int monitor_pvfs2_client(options_t *opts)
                            "configured PATH, please specify the\n full "
                            "path name (instead of \"%s\")\n",opts->path);
                 }
-                    break;
+                break;
             }
 
             if (WIFSIGNALED(ret))
             {
+                dev_init_failures = 0;
+
                 if (opts->verbose)
                 {
                     printf("Child process with pid %d was killed by an "

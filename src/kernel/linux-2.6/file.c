@@ -43,7 +43,6 @@ int pvfs2_file_open(
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 #endif
 
-    pvfs2_lock_kernel();
     if (S_ISDIR(inode->i_mode))
     {
         ret = dcache_dir_open(inode, file);
@@ -70,7 +69,6 @@ int pvfs2_file_open(
         */
         ret = generic_file_open(inode, file);
     }
-    pvfs2_unlock_kernel();
 
     pvfs2_print("pvfs2_file_open returning normally: %d\n", ret);
     return ret;

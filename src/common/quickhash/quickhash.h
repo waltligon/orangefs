@@ -46,14 +46,8 @@ struct qhash_table
 {
     struct qhash_head *array;
     int table_size;
-    int (
-    *compare) (
-    void *key,
-    struct qhash_head * link);
-    int (
-    *hash) (
-    void *key,
-    int table_size);
+    int (*compare) (void *key, struct qhash_head * link);
+    int (*hash) (void *key, int table_size);
 
 #ifdef __KERNEL__
     spinlock_t lock;
@@ -173,6 +167,7 @@ static inline struct qhash_head *qhash_search(
     {
 	if (table->compare(key, tmp_link))
 	{
+            qhash_unlock(&table->lock);
 	    return (tmp_link);
 	}
     }
@@ -197,6 +192,7 @@ static inline struct qhash_head *qhash_search_at_index(
     qhash_lock(&table->lock);
     qhash_for_each(tmp_link, &(table->array[index]))
     {
+        qhash_unlock(&table->lock);
         return (tmp_link);
     }
     qhash_unlock(&table->lock);

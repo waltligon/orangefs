@@ -170,8 +170,9 @@ AC_ARG_WITH(kernel24,
     if ! grep -q UTS_RELEASE..2\\.4\\. $withval/include/linux/version.h ; then
 	AC_MSG_ERROR(The kernel source tree does not appear to be 2.4)
     fi
-    LINUX24_KERNEL_SRC="$withval"
-    , LINUX24_KERNEL_SRC="")
+    k24_minor_ver=`echo $vers | cut -b 26- | sed -n 's/\"//p'`
+    LINUX24_KERNEL_SRC="$withval" LINUX24_KERNEL_MINOR_VER="$k24_minor_ver"
+    , LINUX24_KERNEL_SRC="" LINUX24_KERNEL_MINOR_VER="")
 
 dnl PAV configuration needs absolute location of source and build.
 dnl Linux-2.6 module needs absolute location of source, and uses the
@@ -182,6 +183,7 @@ SRC_ABSOLUTE_TOP=`cd $srcdir ; pwd`
 
 AC_SUBST(LINUX_KERNEL_SRC)
 AC_SUBST(LINUX24_KERNEL_SRC)
+AC_SUBST(LINUX24_KERNEL_MINOR_VER)
 AC_SUBST(BUILD_ABSOLUTE_TOP)
 AC_SUBST(SRC_RELATIVE_TOP)
 AC_SUBST(SRC_ABSOLUTE_TOP)

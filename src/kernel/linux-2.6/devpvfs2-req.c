@@ -57,12 +57,20 @@ static int pvfs2_devreq_open(
         if (ret == 0)
         {
 #ifdef PVFS2_LINUX_KERNEL_2_4
-            MOD_INC_USE_COUNT;
+/*             MOD_INC_USE_COUNT; */
 #else
             ret = (try_module_get(pvfs2_fs_type.owner) ? 0 : 1);
 #endif
-            open_access_count++;
-            device_owner = current;
+            if (ret == 0)
+            {
+                open_access_count++;
+                device_owner = current;
+            }
+            else
+            {
+                pvfs2_panic("PVFS2 Device Error: Cannot obtain reference "
+                            "for device file\n");
+            }
         }
     }
     else
@@ -340,7 +348,7 @@ static ssize_t pvfs2_devreq_writev(
   Using the open_access_count variable, we enforce a reference count
   on this file so that it can be opened by only one process at a time.
   the devreq_semaphore is used to make sure all i/o has completed
-  before we cann pvfs_bufmap_finalize, and similar such tricky
+  before we call pvfs_bufmap_finalize, and similar such tricky
   situations
 */
 static int pvfs2_devreq_release(
@@ -349,14 +357,14 @@ static int pvfs2_devreq_release(
 {
     pvfs2_print("pvfs2_devreq_release: trying to finalize\n");
 
-    down(&devreq_semaphore);
+    down_interruptible(&devreq_semaphore);
     pvfs_bufmap_finalize();
 
     open_access_count--;
     device_owner = NULL;
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
-    MOD_DEC_USE_COUNT;
+/*     MOD_DEC_USE_COUNT; */
 #else
     module_put(pvfs2_fs_type.owner);
 #endif
@@ -405,7 +413,7 @@ static int pvfs2_devreq_ioctl(
             struct list_head *tmp = NULL;
             pvfs2_sb_info_t *pvfs2_sb = NULL;
 
-            pvfs2_print("ioctl: pvfs_dev_remount_all called\n");
+            pvfs2_print("pvfs2_devreq_ioctl: got PVFS_DEV_REMOUNT_ALL\n");
 
             /*
               remount all mounted pvfs2 volumes to regain the lost
@@ -450,7 +458,7 @@ static int pvfs2_devreq_ioctl(
 struct file_operations pvfs2_devreq_file_operations =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4
-    owner:   THIS_MODULE,
+    owner: THIS_MODULE,
     read : pvfs2_devreq_read,
     writev : pvfs2_devreq_writev,
     open : pvfs2_devreq_open,

@@ -1200,7 +1200,7 @@ int main(int argc, char **argv)
       systems/mount information
     */
     ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
-    if(ret < 0)
+    if (ret < 0)
     {
         return(ret);
     }
@@ -1212,10 +1212,10 @@ int main(int argc, char **argv)
     PINT_acache_set_timeout(ACACHE_TIMEOUT_MS);
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
-    if(ret < 0)
+    if (ret < 0)
     {
 	PVFS_perror("PINT_dev_initialize", ret);
-	return(-1);
+	return(-PVFS_EDEVINIT);
     }
 
     /* setup a mapped region for I/O transfers */

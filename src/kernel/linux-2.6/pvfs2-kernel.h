@@ -651,8 +651,6 @@ do {                                                                 \
 } while(0)
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
-#define pvfs2_lock_kernel() lock_kernel()
-#define pvfs2_unlock_kernel() unlock_kernel()
 #define pvfs2_lock_inode(inode) do {} while(0)
 #define pvfs2_unlock_inode(inode) do {} while(0)
 #define pvfs2_generic_file_readonly_mmap generic_file_mmap
@@ -677,8 +675,6 @@ do                                                \
 
 #else /* !(PVFS2_LINUX_KERNEL_2_4) */
 
-#define pvfs2_lock_kernel() do {} while(0)
-#define pvfs2_unlock_kernel() do {} while(0)
 #define pvfs2_lock_inode(inode) spin_lock(&inode->i_lock)
 #define pvfs2_unlock_inode(inode) spin_unlock(&inode->i_lock)
 #define pvfs2_generic_file_readonly_mmap generic_file_readonly_mmap
@@ -753,6 +749,23 @@ out:
     spin_unlock(&dcache_lock);
     return ret;
 }
+
+#if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER < 19)
+int dcache_dir_open(struct inode *inode, struct file *file)
+{
+    static struct qstr cursor_name = {.len = 1, .name = "."};
+
+    file->private_data = d_alloc(file->f_dentry, &cursor_name);
+
+    return file->private_data ? 0 : -ENOMEM;
+}
+
+int dcache_dir_close(struct inode *inode, struct file *file)
+{
+    dput(file->private_data);
+    return 0;
+}
+#endif /* PVFS2_LINUX_KERNEL_2_4_MINOR_VER */
 
 /* based on linux kernel 2.6.x fs.h routines not included in 2.4.x */
 static inline void i_size_write(struct inode *inode, loff_t i_size)

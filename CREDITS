@@ -13,6 +13,9 @@ Nathan Poznick <poznick@conwaycorp.net>
 -- extensive testing and suggestions (linux vfs interface)
    various pvfs2-client related patches (noted in cvs logs)
 
+Murali Vilayannur <vilayann@mcs.anl.gov>
+-- testing and development
+
 
 Other contributors
 ==================

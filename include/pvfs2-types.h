@@ -362,7 +362,8 @@ int32_t PVFS_get_errno_mapping(int32_t error);
 
 
 /***************** non-errno/pvfs2 specific error codes *****************/
-#define PVFS_ECANCEL  (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT)) 
+#define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT)) 
+#define PVFS_EDEVINIT   (2|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT)) 
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
@@ -438,10 +439,12 @@ int32_t PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = {    \
 char *PINT_non_errno_strerror_mapping[] = {           \
     "Success", /* 0 */                                \
     "Operation canceled (possibly due to timeout)",   \
+    "Device initialization failed"                    \
 };                                                    \
 int32_t PINT_non_errno_mapping[] = {                  \
     0,     /* leave this one empty */                 \
-    PVFS_ECANCEL  /* 1 */                             \
+    PVFS_ECANCEL,  /* 1 */                            \
+    PVFS_EDEVINIT  /* 2 */                            \
 }
 
 /*

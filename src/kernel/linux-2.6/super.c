@@ -25,7 +25,7 @@ LIST_HEAD(pvfs2_superblocks);
 spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
 
 static int parse_mount_options(
-    char *option_str, struct super_block *sb, int silent)
+   char *option_str, struct super_block *sb, int silent)
 {
     char *ptr = option_str;
     pvfs2_sb_info_t *pvfs2_sb = NULL;
@@ -37,11 +37,27 @@ static int parse_mount_options(
 
     if (!silent)
     {
-        pvfs2_print("pvfs2: parse_mount_options called with:\n");
-        pvfs2_print(" %s\n", options);
+        if (option_str) 
+        {
+            pvfs2_print("pvfs2: parse_mount_options called with:\n");
+            pvfs2_print(" %s\n", option_str);
+        }
+        else 
+        {
+            /* We need a non-NULL option string */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+            pvfs2_error("*******************************************\n");
+            pvfs2_error("Please pass the device name in the options "
+                        "string of the mount program in 2.4.x kernels\n");
+            pvfs2_error("e.g. mount -t pvfs2 pvfs2 /mnt/pvfs2 "
+                        "-o tcp://localhost:3334/pvfs2-fs\n");
+            pvfs2_error("*******************************************\n");
+#endif
+            goto exit;
+        }
     }
 
-    if (options && sb && PVFS2_SB(sb))
+    if (sb && PVFS2_SB(sb))
     {
         memset(options, 0,
                (PVFS2_MAX_NUM_OPTIONS * PVFS2_MAX_MOUNT_OPT_LEN));
@@ -52,14 +68,30 @@ static int parse_mount_options(
         while(ptr && (*ptr != '\0'))
         {
             options[num_keywords][j++] = *ptr;
-
-            if ((*ptr == ',') || (*ptr == '\0'))
+    
+            if (j == PVFS2_MAX_MOUNT_OPT_LEN)
             {
-                options[num_keywords][j] = '\0';
-                num_keywords++;
+                pvfs2_error("Cannot parse mount time options (length "
+                            "exceeded)\n");
+                got_device = 0;
+                goto exit;
+            }
+
+            if (*ptr == ',')
+            {
+                options[num_keywords++][j-1] = '\0';
+                if (num_keywords == PVFS2_MAX_NUM_OPTIONS)
+                {
+                    pvfs2_error("Cannot parse mount time options (option "
+                                "number exceeded)\n");
+                    got_device = 0;
+                    goto exit;
+                }
                 j = 0;
             }
+            ptr++;
         }
+        num_keywords++;
 
         for(i = 0; i < num_keywords; i++)
         {
@@ -67,7 +99,7 @@ static int parse_mount_options(
             {
                 if (strcmp(options[i], keywords[j]) == 0)
                 {
-                    if (strncmp(ptr, "intr", 4) == 0)
+                    if (strncmp(options[i], "intr", 4) == 0)
                     {
                         if (!silent)
                         {
@@ -75,33 +107,42 @@ static int parse_mount_options(
                                         "intr specified\n");
                         }
                         pvfs2_sb->mnt_options.intr = 1;
+                        break;
                     }
+                }
+            }
+
+            /* option string did not match any of the known keywords */
+            if (j == num_possible_keywords)
+            {
+                /* assume we have a device name */
+                if (got_device == 0)
+                {
+                    if (strlen(options[i]) >= PVFS_MAX_SERVER_ADDR_LEN)
+                    {
+                        pvfs2_error("Cannot parse mount time option %s "
+                                    "(length exceeded)\n",options[i]);
+                        goto exit;
+                    }
+                    strncpy(PVFS2_SB(sb)->devname, options[i],
+                            strlen(options[i]));
+                    got_device = 1;
                 }
                 else
                 {
-                    /* assume we have a device name */
-                    if (got_device == 0)
-                    {
-                        strncpy(PVFS2_SB(sb)->devname, options[i],
-                                strlen(options[i]));
-                        got_device = 1;
-                    }
-                    else
-                    {
-                        pvfs2_error("pvfs2: multiple device names "
-                                    "specified: ignoring %s\n",
-                                    options[i]);
-                    }
+                    pvfs2_error("pvfs2: multiple device names specified: "
+                                "ignoring %s\n", options[i]);
                 }
             }
         }
     }
-    /*
-      in 2.4.x, we require a devname in the options; in 2.6.x, parsed
-      mount options are optional; always return success
-    */
+/*
+  in 2.4.x, we require a devname in the options; in 2.6.x, parsed
+  mount options are optional; always return success
+*/
+exit:
 #ifdef PVFS2_LINUX_KERNEL_2_4
-    return (got_device ? 0 : 1);
+    return (got_device ? 0 : -EINVAL);
 #else
     return 0;
 #endif
@@ -124,7 +165,7 @@ static struct inode *pvfs2_alloc_inode(struct super_block *sb)
                                    PVFS2_CACHE_ALLOC_FLAGS);
     if (pvfs2_inode)
     {
-	new_inode = &pvfs2_inode->vfs_inode;
+        new_inode = &pvfs2_inode->vfs_inode;
     }
     return new_inode;
 }
@@ -186,9 +227,9 @@ static void pvfs2_read_inode(
 
     if (inode->u.generic_ip)
     {
-	pvfs2_panic("Found an initialized inode in pvfs2_read_inode! "
+        pvfs2_panic("Found an initialized inode in pvfs2_read_inode! "
                     "Should not have been initialized?\n");
-	return;
+        return;
     }
 
     /* Here we allocate the PVFS2 specific inode structure */
@@ -196,23 +237,23 @@ static void pvfs2_read_inode(
                                    PVFS2_CACHE_ALLOC_FLAGS);
     if (pvfs2_inode)
     {
-	pvfs2_inode_initialize(pvfs2_inode);
-	inode->u.generic_ip = pvfs2_inode;
-	pvfs2_inode->vfs_inode = inode;
+        pvfs2_inode_initialize(pvfs2_inode);
+        inode->u.generic_ip = pvfs2_inode;
+        pvfs2_inode->vfs_inode = inode;
     }
     else
     {
-	pvfs2_error("Could not allocate pvfs2_inode from "
+        pvfs2_error("Could not allocate pvfs2_inode from "
                     "pvfs2_inode_cache\n");
-	pvfs2_make_bad_inode(inode);
-	return;
+        pvfs2_make_bad_inode(inode);
+        return;
     }
 
     /* Need to do a getattr() on the inode */
     if (pvfs2_inode_getattr(inode) != 0)
     {
-	/* flag any I/O errors */
-	pvfs2_make_bad_inode(inode);
+        /* flag any I/O errors */
+        pvfs2_make_bad_inode(inode);
     }
 }
 
@@ -247,8 +288,8 @@ static void pvfs2_put_inode(
 
     if (atomic_read(&inode->i_count) == 1)
     {
-	/* kill dentries associated with this inode */
-	d_prune_aliases(inode);
+        /* kill dentries associated with this inode */
+        d_prune_aliases(inode);
     }
 }
 
@@ -258,7 +299,7 @@ static void pvfs2_write_inode(
     int do_sync)
 {
     pvfs2_print("pvfs2_write_inode: called (inode = %d)\n",
-		(int)inode->i_ino);
+                (int)inode->i_ino);
 }
 
 /*
@@ -284,8 +325,8 @@ static int pvfs2_statfs(
     new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!new_op)
     {
-	pvfs2_error("pvfs2_statfs: kmem_cache_alloc failed!\n");
-	return ret;
+        pvfs2_error("pvfs2_statfs: kmem_cache_alloc failed!\n");
+        return ret;
     }
     new_op->upcall.type = PVFS2_VFS_OP_STATFS;
     new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->fs_id;
@@ -475,63 +516,65 @@ struct super_block* pvfs2_get_sb(
     char *dev_name = NULL;
     int ret = -EINVAL;
 
-    MOD_INC_USE_COUNT;
+/*     MOD_INC_USE_COUNT; */
 
     if (!data || !sb)
     {
-	if (!silent)
+        if (!silent)
         {
-	    pvfs2_print("pvfs2_get_sb: no data parameter!\n");
-	}
-	goto error_exit;
+            pvfs2_print("pvfs2_get_sb: no data parameter!\n");
+        }
+        goto error_exit;
     }
     else
     {
-	/* alloc and init our private pvfs2 sb info */
-	sb->u.generic_sbp = kmalloc(
+        /* alloc and init our private pvfs2 sb info */
+        sb->u.generic_sbp = kmalloc(
             sizeof(pvfs2_sb_info_t), PVFS2_GFP_FLAGS);
 
-	if (!PVFS2_SB(sb))
-	{
-	    goto error_exit;
-	}
-	memset(sb->u.generic_sbp, 0, sizeof(pvfs2_sb_info_t));
-	PVFS2_SB(sb)->sb = sb;
-
-        if (parse_mount_options(data, sb, silent))
+        if (!PVFS2_SB(sb))
         {
-	    goto error_exit;
+            goto error_exit;
         }
-	dev_name = PVFS2_SB(sb)->devname;
+        memset(sb->u.generic_sbp, 0, sizeof(pvfs2_sb_info_t));
+        PVFS2_SB(sb)->sb = sb;
+
+        ret = parse_mount_options(data, sb, silent);
+        if (ret)
+        {
+            pvfs2_error("Failed to parse mount time options\n");
+            goto error_exit;
+        }
+        dev_name = PVFS2_SB(sb)->devname;
     }
 
     new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!new_op)
     {
-	goto error_exit;
+        goto error_exit;
     }
     new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
     strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
-	    dev_name, PVFS_MAX_SERVER_ADDR_LEN);
+            dev_name, PVFS_MAX_SERVER_ADDR_LEN);
 
     pvfs2_print("Attempting PVFS2 Mount via host %s\n",
-		new_op->upcall.req.fs_mount.pvfs2_config_server);
+                new_op->upcall.req.fs_mount.pvfs2_config_server);
 
     service_operation(new_op, "pvfs2_get_sb", 0);
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    pvfs2_error("pvfs2_get_sb: mount returned %d\n", ret);
     if (ret)
     {
-	goto error_exit;
+        pvfs2_error("pvfs2_get_sb: mount returned %d\n", ret);
+        goto error_exit;
     }
 
     if ((new_op->downcall.resp.fs_mount.fs_id == PVFS_FS_ID_NULL) ||
-	(new_op->downcall.resp.fs_mount.root_handle ==
-	 PVFS_HANDLE_NULL))
+        (new_op->downcall.resp.fs_mount.root_handle ==
+         PVFS_HANDLE_NULL))
     {
-	pvfs2_error("ERROR: Retrieved null fs_id or root_handle\n");
-	goto error_exit;
+        pvfs2_error("ERROR: Retrieved null fs_id or root_handle\n");
+        goto error_exit;
     }
     PVFS2_SB(sb)->root_handle = new_op->downcall.resp.fs_mount.root_handle;
     PVFS2_SB(sb)->fs_id = new_op->downcall.resp.fs_mount.fs_id;
@@ -550,7 +593,7 @@ struct super_block* pvfs2_get_sb(
         sb, (S_IFDIR | 0755), 0, PVFS2_SB(sb)->root_handle);
     if (!root)
     {
-	goto error_exit;
+        goto error_exit;
     }
     PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
 
@@ -558,8 +601,8 @@ struct super_block* pvfs2_get_sb(
     root_dentry = d_alloc_root(root);
     if (!root_dentry)
     {
-	iput(root);
-	goto error_exit;
+        iput(root);
+        goto error_exit;
     }
     root_dentry->d_op = &pvfs2_dentry_operations;
     sb->s_root = root_dentry;
@@ -569,7 +612,7 @@ struct super_block* pvfs2_get_sb(
 
     if (new_op)
     {
-	op_release(new_op);
+        op_release(new_op);
     }
     return sb;
 
@@ -578,9 +621,9 @@ struct super_block* pvfs2_get_sb(
                 "for the mount request %d\n", ret);
     if (sb)
     {
-	if (sb->u.generic_sbp != NULL)
+        if (sb->u.generic_sbp != NULL)
         {
-	    kfree(sb->u.generic_sbp);
+            kfree(sb->u.generic_sbp);
         }
     }
 
@@ -589,7 +632,7 @@ struct super_block* pvfs2_get_sb(
         op_release(new_op);
     }
 
-    MOD_DEC_USE_COUNT;
+/*     MOD_DEC_USE_COUNT; */
     return NULL;
 }
 
@@ -643,7 +686,7 @@ int pvfs2_fill_sb(
                                   0, PVFS2_SB(sb)->root_handle);
     if (!root)
     {
-	return -ENOMEM;
+        return -ENOMEM;
     }
     PVFS2_I(root)->refn.handle = PVFS2_SB(sb)->root_handle;
     PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
@@ -652,8 +695,8 @@ int pvfs2_fill_sb(
     root_dentry = d_alloc_root(root);
     if (!root_dentry)
     {
-	iput(root);
-	return -ENOMEM;
+        iput(root);
+        return -ENOMEM;
     }
     root_dentry->d_op = &pvfs2_dentry_operations;
 
@@ -788,7 +831,7 @@ void pvfs2_kill_sb(
 #ifdef PVFS2_LINUX_KERNEL_2_4
     sb->u.generic_sbp = NULL;
 
-    MOD_DEC_USE_COUNT;
+/*     MOD_DEC_USE_COUNT; */
 #endif
     pvfs2_print("pvfs2_kill_sb: returning normally\n");
 }

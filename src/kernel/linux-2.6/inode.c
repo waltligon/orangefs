@@ -60,9 +60,8 @@ static int pvfs2_get_blocks(
     const uint32_t blocksize = PAGE_CACHE_SIZE;  /* inode->i_blksize */
     const uint32_t blockbits = PAGE_CACHE_SHIFT; /* inode->i_blkbits */
 
-    pvfs2_print("pvfs2: pvfs2_get_blocks called for lblock %d "
-                "(create flag is %s)\n", (int)lblock,
-                (create ? "set" : "clear"));
+    pvfs2_print("pvfs2_get_blocks called for lblock %lu\n",
+                (unsigned long)lblock);
 
     /*
       this is a quick workaround for the case when a sequence
@@ -223,9 +222,7 @@ static int pvfs2_readpage(
     offset = (page->index) << PAGE_CACHE_SHIFT;
     inode = page->mapping->host;
 
-    pvfs2_lock_kernel();
     ret = pvfs2_get_blocks(inode, offset, 1, page);
-    pvfs2_unlock_kernel();
 
     UnlockPage(page);
     __free_page(page);
@@ -331,10 +328,7 @@ int pvfs2_revalidate(struct dentry *dentry)
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
 
-    pvfs2_lock_kernel();
     ret = pvfs2_inode_getattr(inode);
-    pvfs2_unlock_kernel();
-
     if (ret)
     {
         /* assume an I/O error and flag inode as bad */
