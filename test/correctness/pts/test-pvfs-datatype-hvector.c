@@ -41,7 +41,7 @@ int test_pvfs_datatype_hvector(MPI_Comm *mycomm, int myid, char *buf, void *para
         req_lk.fs_id = pvfs_helper.resp_init.fsid_list[0];
         req_lk.credentials.uid = 100;
         req_lk.credentials.gid = 100;
-        req_lk.credentials.perms = U_WRITE|U_READ;
+        req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
         ret = PVFS_sys_lookup(&req_lk, &resp_lk);
         if (ret < 0)
@@ -56,7 +56,7 @@ int test_pvfs_datatype_hvector(MPI_Comm *mycomm, int myid, char *buf, void *para
         req_io.pinode_refn.handle = resp_lk.pinode_refn.handle;
         req_io.credentials.uid = 100;
         req_io.credentials.gid = 100;
-        req_io.credentials.perms = U_WRITE|U_READ;
+        req_io.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
         req_io.buffer = io_buffer;
         req_io.buffer_size = TEST_PVFS_DATA_SIZE;
 

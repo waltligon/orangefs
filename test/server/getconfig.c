@@ -104,7 +104,7 @@ int main(int argc, char **argv)	{
 	server_req->credentials.uid = 0;
 	server_req->credentials.gid = 0;
 	/* TODO: fill below fields in with the correct values */
-	server_req->credentials.perms = U_WRITE | U_READ;
+	server_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
 	server_req->u.getconfig.max_strsize = 8192;
 	server_req->rsize = sizeof(struct PVFS_server_req_s);
 

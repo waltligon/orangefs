@@ -37,6 +37,17 @@ typedef uint32_t PVFS_gid;
 typedef int64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 
+/* permission bits */
+#define PVFS_O_EXECUTE    (1 << 0)
+#define PVFS_O_WRITE      (1 << 1)
+#define PVFS_O_READ       (1 << 2)
+#define PVFS_G_EXECUTE    (1 << 3)
+#define PVFS_G_WRITE      (1 << 4)
+#define PVFS_G_READ       (1 << 5)
+#define PVFS_U_EXECUTE    (1 << 6)
+#define PVFS_U_WRITE      (1 << 7)
+#define PVFS_U_READ       (1 << 8)
+
 /* pinode reference (uniquely refers to a single pinode) */
 typedef struct
 {

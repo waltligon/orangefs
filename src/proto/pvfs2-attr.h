@@ -39,17 +39,6 @@
 #define ATTR_SYM PVFS_TYPE_SYMLINK
 /* PVFS filesystem objects */
 
-/* Various permission bits */
-#define O_EXECUTE		1
-#define O_WRITE 	 	2
-#define O_READ  		4
-#define G_EXECUTE 	8
-#define G_WRITE 		16
-#define G_READ 		32
-#define U_EXECUTE 	64
-#define U_WRITE 		128
-#define U_READ 		256
-/*#define F_OK			512*/
 
 /*attributes*/
 /* MetaFile

@@ -52,7 +52,7 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
         req_lk.fs_id = pvfs_helper.resp_init.fsid_list[0];
         req_lk.credentials.uid = 100;
         req_lk.credentials.gid = 100;
-        req_lk.credentials.perms = U_WRITE|U_READ;
+        req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
         ret = PVFS_sys_lookup(&req_lk, &resp_lk);
         if (ret < 0)
@@ -64,7 +64,7 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
             req_lk.fs_id = pvfs_helper.resp_init.fsid_list[0];
             req_lk.credentials.uid = 100;
             req_lk.credentials.gid = 100;
-            req_lk.credentials.perms = U_WRITE|U_READ;
+            req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
             ret = PVFS_sys_lookup(&req_lk, &resp_lk);
             if ((ret < 0) || (!resp_lk.pinode_refn.handle))
@@ -79,10 +79,10 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
             req_cr.attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
             req_cr.attr.owner = 100;
             req_cr.attr.group = 100;
-            req_cr.attr.perms = U_WRITE|U_READ;
+            req_cr.attr.perms = PVFS_U_WRITE|PVFS_U_READ;
             req_cr.credentials.uid = 100;
             req_cr.credentials.gid = 100;
-            req_cr.credentials.perms = U_WRITE|U_READ;
+            req_cr.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
             req_cr.attr.u.meta.dist = NULL;
             req_cr.attr.u.meta.nr_datafiles = 1;
             req_cr.parent_refn.handle = resp_lk.pinode_refn.handle;

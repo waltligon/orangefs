@@ -243,7 +243,7 @@ int main(int argc, char **argv)
 	obj_attr[2].group = 103;
 	obj_attr[0].perms = 
 		obj_attr[1].perms = 
-			obj_attr[2].perms = O_READ | O_WRITE;
+			obj_attr[2].perms = PVFS_O_READ | PVFS_O_WRITE;
 				
 
 	//memcpy(response->u.lookup_path.attr_array,&obj_attr,sizeof(PVFS_object_attr)*3);

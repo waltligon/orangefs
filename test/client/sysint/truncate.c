@@ -67,7 +67,7 @@ int main(int argc,char **argv)
     req_lk.fs_id = resp_init.fsid_list[0];
     req_lk.credentials.uid = 100;
     req_lk.credentials.gid = 100;
-    req_lk.credentials.perms = U_WRITE|U_READ;
+    req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
     ret = PVFS_sys_lookup(&req_lk,&resp_lk);
     if (ret < 0)

@@ -81,7 +81,7 @@ static int test_lookup(int nullCase){
    req_lookup.fs_id = fs_id;
    req_lookup.credentials.uid = 100;
    req_lookup.credentials.gid = 100;
-   req_lookup.credentials.perms = U_WRITE|U_READ;
+   req_lookup.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
 	if(nullCase == 0){
    	return PVFS_sys_lookup(NULL,NULL);
@@ -119,7 +119,7 @@ static int test_getattr(int nullCase){
    req_lookup.fs_id = fs_id;
    req_lookup.credentials.uid = 100;
    req_lookup.credentials.gid = 100;
-   req_lookup.credentials.perms = U_WRITE|U_READ;
+   req_lookup.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
   	if((ret = PVFS_sys_lookup(&req_lookup,&resp_lookup))< 0){
 		fprintf(stderr,"lookup failed %d\n"ret);
@@ -179,7 +179,7 @@ static int test_mkdir(int nullCase){
    req_lookup.fs_id = fs_id;
    req_lookup.credentials.uid = 100;
    req_lookup.credentials.gid = 100;
-   req_lookup.credentials.perms = U_WRITE|U_READ;
+   req_lookup.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
   	if((ret = PVFS_sys_lookup(&req_lookup,&resp_lookup))< 0){
 		fprintf(stderr,"lookup failed %d\n"ret);
 		return -1;
@@ -241,7 +241,7 @@ static int test_readdir(int nullCase){
    req_lookup.fs_id = fs_id;
    req_lookup.credentials.uid = 100;
    req_lookup.credentials.gid = 100;
-   req_lookup.credentials.perms = U_WRITE|U_READ;
+   req_lookup.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
   	if((ret = PVFS_sys_lookup(&req_lookup,&resp_lookup))< 0){
 		fprintf(stderr,"lookup failed %d\n"ret);
 		return -1;

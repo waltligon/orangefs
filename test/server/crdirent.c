@@ -104,7 +104,7 @@ int main(int argc, char **argv)	{
 	my_req->credentials.uid = 0;
 	my_req->credentials.gid = 0;
 	/* TODO: fill below fields in with the correct values */
-	my_req->credentials.perms = U_WRITE | U_READ;  
+	my_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 	my_req->u.crdirent.name = user_opts->name;
 	my_req->u.crdirent.new_handle = user_opts->handle;
 	my_req->u.crdirent.parent_handle = user_opts->parent;

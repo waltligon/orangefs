@@ -39,7 +39,7 @@ PVFS_handle lookup_name(char *name,
     req_lookup.fs_id = fs_id;
     req_lookup.credentials.uid = 100;
     req_lookup.credentials.gid = 100;
-    req_lookup.credentials.perms = U_WRITE|U_READ;
+    req_lookup.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
     ret = PVFS_sys_lookup(&req_lookup,&resp_lookup);
     if (ret < 0)

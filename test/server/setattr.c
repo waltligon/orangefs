@@ -104,7 +104,7 @@ int main(int argc, char **argv)	{
 	my_req->rsize = sizeof(struct PVFS_server_req_s);
 	my_req->credentials.uid = 0;
 	my_req->credentials.gid = 0;
-	my_req->credentials.perms = U_WRITE | U_READ;  
+	my_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 	my_req->u.setattr.handle = user_opts->bucket;
 	my_req->u.setattr.fs_id = 9;
 	my_req->u.setattr.attr.owner = 100;

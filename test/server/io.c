@@ -163,7 +163,7 @@ int main(int argc, char **argv)	{
 	my_req.rsize = sizeof(struct PVFS_server_req_s);
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
-	my_req.credentials.perms = U_WRITE | U_READ;  
+	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 
 	/* create specific fields */
 	my_req.u.create.requested_handle = 4095;
@@ -295,7 +295,7 @@ int main(int argc, char **argv)	{
 	my_req.rsize = sizeof(struct PVFS_server_req_s);
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
-	my_req.credentials.perms = U_WRITE | U_READ;  
+	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 
 	/* io specific fields */
 	my_req.u.io.fs_id = 9;
@@ -489,7 +489,7 @@ int main(int argc, char **argv)	{
 	my_req.rsize = sizeof(struct PVFS_server_req_s);
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
-	my_req.credentials.perms = U_WRITE | U_READ;  
+	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 
 	/* remove specific fields */
 	my_req.u.remove.fs_id = 9;

@@ -91,7 +91,7 @@ int main(int argc,char **argv)
 	req_lk.fs_id = resp_init.fsid_list[0];
 	req_lk.credentials.uid = 100;
 	req_lk.credentials.gid = 100;
-	req_lk.credentials.perms = U_WRITE|U_READ;
+	req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
 	ret = PVFS_sys_lookup(&req_lk, &resp_lk);
 	/* TODO: really we probably want to look for a specific error code,
@@ -106,7 +106,7 @@ int main(int argc,char **argv)
 		req_lk.fs_id = resp_init.fsid_list[0];
 		req_lk.credentials.uid = 100;
 		req_lk.credentials.gid = 100;
-		req_lk.credentials.perms = U_WRITE|U_READ;
+		req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
 		ret = PVFS_sys_lookup(&req_lk, &resp_lk);
 		if(ret < 0)
@@ -121,7 +121,7 @@ int main(int argc,char **argv)
 		 * what's supposed to happen there */
 		req_cr.attr.owner = 100;
 		req_cr.attr.group = 100;
-		req_cr.attr.perms = U_WRITE|U_READ;
+		req_cr.attr.perms = PVFS_U_WRITE|PVFS_U_READ;
 		req_cr.attr.u.meta.nr_datafiles = 1;
 		req_cr.attr.u.meta.dist = NULL;
 		req_cr.parent_refn.handle = resp_lk.pinode_refn.handle;
@@ -129,7 +129,7 @@ int main(int argc,char **argv)
 		req_cr.entry_name = &(filename[1]); /* leave off slash */
 		req_cr.credentials.uid = 100;
 		req_cr.credentials.gid = 100;
-		req_cr.credentials.perms = U_WRITE|U_READ;
+		req_cr.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
 		ret = PVFS_sys_create(&req_cr, &resp_cr);
 		if(ret < 0)
@@ -158,7 +158,7 @@ int main(int argc,char **argv)
 
 	req_io.credentials.uid = 100;
 	req_io.credentials.gid = 100;
-	req_io.credentials.perms = U_WRITE|U_READ;
+	req_io.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 	req_io.buffer = io_buffer;
 	req_io.buffer_size = io_size*sizeof(int);
 
