@@ -98,8 +98,8 @@ typedef struct PINT_Request {
 #endif
 
 typedef struct PINT_reqstack {
-	int32_t      el;           /* number of element being processed */
-	int32_t      maxel;        /* total number of these elements to process */
+	int64_t      el;           /* number of element being processed */
+	int64_t      maxel;        /* total number of these elements to process */
 	PINT_Request *rq;    		/* pointer to request structure */
 	PINT_Request *rqbase; 		/* pointer to first request is sequence chain */
 	int32_t      blk;          /* number of block being processed */

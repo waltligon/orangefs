@@ -152,7 +152,7 @@ int PINT_Process_request(PINT_Request_state *req,
 	/* automatically tile the req */
 	if (!PINT_IS_MEMREQ(mode))
 	{
-		int count;
+		int64_t count;
 		if (req->cur[0].rqbase)
 		{
 			count = req->final_offset / req->cur[0].rqbase->aggregate_size;
@@ -162,7 +162,7 @@ int PINT_Process_request(PINT_Request_state *req,
 			count = req->final_offset;
 		}
 		req->cur[0].maxel = count + 1;
-		gossip_debug(REQUEST_DEBUG,"\ttiling %d copies\n", count+1);
+		gossip_debug(REQUEST_DEBUG,"\ttiling %Ld copies\n", Ld(count+1));
 	}
 	/* deal with skipping over some bytes (type offset) */
 	if (req->target_offset > req->type_offset)
@@ -192,8 +192,8 @@ int PINT_Process_request(PINT_Request_state *req,
 				Ld(req->cur[req->lvl].rq->ub), Ld(req->cur[req->lvl].rq->lb),
 				Ld(req->cur[req->lvl].rq->aggregate_size),
 				Ld(req->cur[req->lvl].chunk_offset));
-		gossip_debug(REQUEST_DEBUG,"\t\tlvl %d el %d blk %d by %lld\n",
-				req->lvl, req->cur[req->lvl].el, req->cur[req->lvl].blk,
+		gossip_debug(REQUEST_DEBUG,"\t\tlvl %d el %Ld blk %d by %lld\n",
+				req->lvl, Ld(req->cur[req->lvl].el), req->cur[req->lvl].blk,
 				Ld(req->bytes));
 		gossip_debug(REQUEST_DEBUG,"\t\tto %lld ta %lld fi %lld\n",
 				Ld(req->type_offset), Ld(req->target_offset),
