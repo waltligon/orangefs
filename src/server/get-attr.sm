@@ -4,6 +4,16 @@
  * See COPYING in top-level directory.
  */
 
+/* pvfs2_get_attr_sm
+ *
+ * This state machine handles incoming server getattr operations.  These
+ * are the operations sent by PVFS_sys_getattr() among others.
+ *
+ * The pvfs2_prelude_sm is responsible for reading the actual metadata
+ * to begin with, because it does this as part of the permission checking
+ * process.
+ */
+
 #include <string.h>
 #include <assert.h>
 
