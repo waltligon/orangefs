@@ -971,8 +971,7 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
 /* macro defined in include/pvfs2-types.h */
 DECLARE_ERRNO_MAPPING_AND_FN();
 
-int pvfs2_kernel_error_code_convert(
-    int pvfs2_error_code)
+PVFS_error pvfs2_kernel_error_code_convert(PVFS_error pvfs2_error_code)
 {
     if ((pvfs2_error_code == PVFS2_WAIT_TIMEOUT_REACHED) ||
         (pvfs2_error_code == PVFS2_WAIT_SIGNAL_RECVD))
@@ -982,17 +981,20 @@ int pvfs2_kernel_error_code_convert(
 
     if (IS_PVFS_NON_ERRNO_ERROR(pvfs2_error_code))
     {
-        int ret = -EPERM;
-        int index = PVFS_get_errno_mapping((int32_t)pvfs2_error_code);
+        PVFS_error ret = -EPERM;
+        int index = PVFS_get_errno_mapping(pvfs2_error_code);
         switch(PINT_non_errno_mapping[index])
         {
             case PVFS_ECANCEL:
                 ret = -EINTR;
                 break;
+            default:
+                pvfs2_error("Unhandled pvfs2 error code: %d\n",
+                            pvfs2_error_code);
         }
         return ret;
     }
-    return (int)PVFS_get_errno_mapping((int32_t)pvfs2_error_code);
+    return PVFS_get_errno_mapping(pvfs2_error_code);
 }
 
 void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)

@@ -383,8 +383,8 @@ int pvfs2_truncate_inode(
     struct inode *inode,
     loff_t size);
 
-int pvfs2_kernel_error_code_convert(
-    int pvfs2_error_code);
+PVFS_error pvfs2_kernel_error_code_convert(
+    PVFS_error pvfs2_error_code);
 
 void pvfs2_inode_initialize(
     pvfs2_inode_t *pvfs2_inode);

@@ -298,7 +298,7 @@ enum PVFS_server_mode
 int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(char *text, int retcode);
 void PVFS_perror_gossip(char* text, int retcode);
-int32_t PVFS_get_errno_mapping(int32_t error);
+PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 
 /* special bits used to differentiate PVFS error codes from system
  * errno values
@@ -312,11 +312,11 @@ int32_t PVFS_get_errno_mapping(int32_t error);
 
 /* 7 bits are used for the errno mapped error codes */
 #define PVFS_ERROR_CODE(__error) \
-((__error) & (int32_t) (0x7f|PVFS_ERROR_BIT))
+((__error) & (PVFS_error)(0x7f|PVFS_ERROR_BIT))
 #define PVFS_ERROR_CLASS(__error) \
-((__error) & ~((int32_t) (0x7f|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT)))
+((__error) & ~((PVFS_error)(0x7f|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT)))
 #define PVFS_NON_ERRNO_ERROR_CODE(__error) \
-((__error) & (int32_t) (127|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT))
+((__error) & (PVFS_error)(127|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT))
 
 #define PVFS_ERROR_BMI    (1 << 7) /* BMI-specific error */
 #define PVFS_ERROR_TROVE  (2 << 7) /* Trove-specific error */
@@ -408,7 +408,7 @@ int32_t PVFS_get_errno_mapping(int32_t error);
 #define PVFS_ERRNO_MAX          59
 
 #define DECLARE_ERRNO_MAPPING()                       \
-int32_t PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = {    \
+PVFS_error PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = { \
     0,     /* leave this one empty */                 \
     EPERM, /* 1 */                                    \
     ENOENT,                                           \
@@ -476,7 +476,7 @@ char *PINT_non_errno_strerror_mapping[] = {           \
     "Device initialization failed",                   \
     "Detailed per-server errors are available"        \
 };                                                    \
-int32_t PINT_non_errno_mapping[] = {                  \
+PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
     PVFS_ECANCEL,   /* 1 */                           \
     PVFS_EDEVINIT,  /* 2 */                           \
@@ -493,26 +493,26 @@ int32_t PINT_non_errno_mapping[] = {                  \
   passed in value will be returned unchanged.
 */
 #define DECLARE_ERRNO_MAPPING_AND_FN()                     \
-extern int32_t PINT_errno_mapping[];                       \
-extern int32_t PINT_non_errno_mapping[];                   \
+extern PVFS_error PINT_errno_mapping[];                    \
+extern PVFS_error PINT_non_errno_mapping[];                \
 extern char *PINT_non_errno_strerror_mapping[];            \
-int32_t PVFS_get_errno_mapping(int32_t error)              \
+PVFS_error PVFS_get_errno_mapping(PVFS_error error)        \
 {                                                          \
-    int32_t ret = error;                                   \
+    PVFS_error ret = error, mask = 0;                      \
     int32_t positive = ((error > -1) ? 1 : 0);             \
     if (IS_PVFS_NON_ERRNO_ERROR((positive? error: -error)))\
     {                                                      \
+    mask = (PVFS_NON_ERRNO_ERROR_BIT | PVFS_ERROR_BIT |    \
+            PVFS_ERROR_CLASS_BITS);                        \
     ret = PVFS_NON_ERRNO_ERROR_CODE(                       \
-          ((positive ? error : abs(error))) &              \
-           (~(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT|     \
-               PVFS_ERROR_CLASS_BITS)));                   \
+          ((positive ? error : abs(error))) & ~mask);      \
     }                                                      \
     else if (IS_PVFS_ERROR((positive? error: -error)))     \
     {                                                      \
+    mask = (PVFS_ERROR_BIT | PVFS_ERROR_CLASS_BITS);       \
     ret = PINT_errno_mapping[                              \
-        PVFS_ERROR_CODE(((positive ? error : abs(error))) &\
-                        (~(PVFS_ERROR_BIT)|                \
-                         ~(PVFS_ERROR_CLASS_BITS)))];      \
+        PVFS_ERROR_CODE(((positive ? error :               \
+                             abs(error))) & ~mask)];       \
     }                                                      \
     return (positive ? ret : -ret);                        \
 }                                                          \

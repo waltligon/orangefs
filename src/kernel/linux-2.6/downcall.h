@@ -101,7 +101,7 @@ typedef struct
 typedef struct
 {
     int type;
-    int status;
+    PVFS_error status;
 
     union
     {
@@ -122,8 +122,6 @@ typedef struct
 /* 	pvfs2_cancel_response_t cancel; */
     } resp;
 } pvfs2_downcall_t;
-
-
 
 #endif /* __DOWNCALL_H */
 

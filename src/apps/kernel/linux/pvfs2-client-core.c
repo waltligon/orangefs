@@ -236,10 +236,10 @@ static int initialize_ops_in_progress_table(void)
     return (s_ops_in_progress_table ? 0 : -PVFS_ENOMEM);
 }
 
-static int add_op_to_op_in_progress_table(
+static PVFS_error add_op_to_op_in_progress_table(
     vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     if (vfs_request)
     {
@@ -251,9 +251,9 @@ static int add_op_to_op_in_progress_table(
     return ret;
 }
 
-static int cancel_op_in_progress(PVFS_id_gen_t tag)
+static PVFS_error cancel_op_in_progress(PVFS_id_gen_t tag)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
     vfs_request_t *vfs_request = NULL;
 
@@ -320,10 +320,10 @@ static int is_op_in_progress(vfs_request_t *vfs_request)
     return op_found;
 }
 
-static int remove_op_from_op_in_progress_table(
+static PVFS_error remove_op_from_op_in_progress_table(
     vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
     vfs_request_t *tmp_vfs_request = NULL;
 
@@ -407,9 +407,9 @@ static inline void log_operation_timing(vfs_request_t *vfs_request)
 #endif
 }
 
-static int post_lookup_request(vfs_request_t *vfs_request)
+static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -438,9 +438,9 @@ static int post_lookup_request(vfs_request_t *vfs_request)
     return ret;
 }
 
-static int post_create_request(vfs_request_t *vfs_request)
+static PVFS_error post_create_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -464,9 +464,9 @@ static int post_create_request(vfs_request_t *vfs_request)
     return ret;
 }
 
-static int post_symlink_request(vfs_request_t *vfs_request)
+static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -492,9 +492,9 @@ static int post_symlink_request(vfs_request_t *vfs_request)
     return ret;
 }
 
-static int post_getattr_request(vfs_request_t *vfs_request)
+static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -516,9 +516,9 @@ static int post_getattr_request(vfs_request_t *vfs_request)
     return ret;
 }
 
-static int post_setattr_request(vfs_request_t *vfs_request)
+static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -539,9 +539,9 @@ static int post_setattr_request(vfs_request_t *vfs_request)
     return ret;
 }
 
-static int post_remove_request(vfs_request_t *vfs_request)
+static PVFS_error post_remove_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -563,9 +563,9 @@ static int post_remove_request(vfs_request_t *vfs_request)
     return ret;
 }
 
-static int post_mkdir_request(vfs_request_t *vfs_request)
+static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -589,9 +589,9 @@ static int post_mkdir_request(vfs_request_t *vfs_request)
     return ret;
 }
 
-static int post_readdir_request(vfs_request_t *vfs_request)
+static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdir request "
                  "for %Lu,%d (token %d)\n",
@@ -614,9 +614,9 @@ static int post_readdir_request(vfs_request_t *vfs_request)
     return ret;
 }
 
-static int post_rename_request(vfs_request_t *vfs_request)
+static PVFS_error post_rename_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -644,9 +644,9 @@ static int post_rename_request(vfs_request_t *vfs_request)
     return ret;
 }
 
-static int post_truncate_request(vfs_request_t *vfs_request)
+static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a truncate request for %Lu under "
@@ -766,9 +766,9 @@ do {                                                                  \
     ret = 0;                                                          \
 } while(0)
 
-static int service_fs_mount_request(vfs_request_t *vfs_request)
+static PVFS_error service_fs_mount_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_ENODEV;
+    PVFS_error ret = -PVFS_ENODEV;
     struct PVFS_sys_mntent mntent;
     PVFS_handle root_handle;
     char *ptr = NULL, *ptrcomma = NULL;
@@ -851,9 +851,9 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
     return 0;
 }
 
-static int service_fs_umount_request(vfs_request_t *vfs_request)
+static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_ENODEV;
+    PVFS_error ret = -PVFS_ENODEV;
     struct PVFS_sys_mntent mntent;
     char *ptr = NULL, *ptrcomma = NULL;
     char buf[PATH_MAX] = {0};
@@ -901,9 +901,9 @@ static int service_fs_umount_request(vfs_request_t *vfs_request)
     return 0;
 }
 
-static int service_statfs_request(vfs_request_t *vfs_request)
+static PVFS_error service_statfs_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a statfs request for fsid %d\n",
@@ -948,9 +948,9 @@ static int service_statfs_request(vfs_request_t *vfs_request)
 }
 
 #ifdef USE_MMAP_RA_CACHE
-static int post_io_readahead_request(vfs_request_t *vfs_request)
+static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_MMAP_RCACHE_DEBUG,
@@ -1000,9 +1000,9 @@ static int post_io_readahead_request(vfs_request_t *vfs_request)
 }
 #endif /* USE_MMAP_RA_CACHE */
 
-static int post_io_request(vfs_request_t *vfs_request)
+static PVFS_error post_io_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
 #ifdef USE_MMAP_RA_CACHE
     int val = 0, amt_returned = 0;
@@ -1154,9 +1154,10 @@ static int post_io_request(vfs_request_t *vfs_request)
 }
 
 #ifdef USE_MMAP_RA_CACHE
-static int service_mmap_ra_flush_request(vfs_request_t *vfs_request)
+static PVFS_error service_mmap_ra_flush_request(
+    vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(
         GOSSIP_MMAP_RCACHE_DEBUG, "Flushing mmap-racache elem %Lu, %d\n",
@@ -1175,9 +1176,10 @@ static int service_mmap_ra_flush_request(vfs_request_t *vfs_request)
 }
 #endif
 
-static int service_operation_cancellation(vfs_request_t *vfs_request)
+static PVFS_error service_operation_cancellation(
+    vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     /*
       based on the tag specified in the cancellation upcall, find the
@@ -1204,7 +1206,7 @@ static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_credentials *credentials,
     int follow_link)
 {
-    int ret = 0;
+    PVFS_error ret = 0;
     PVFS_sysresp_lookup lookup_response;
     PVFS_object_ref refn = { PVFS_HANDLE_NULL, PVFS_FS_ID_NULL };
 
@@ -1227,7 +1229,7 @@ static PVFS_object_ref perform_lookup_on_create_error(
     return refn;
 }
 
-int write_device_response(
+PVFS_error write_device_response(
     void *buffer_list,
     int *size_list,
     int list_size,
@@ -1237,7 +1239,7 @@ int write_device_response(
     job_status_s *jstat,
     job_context_id context)
 {
-    int ret = -1;
+    PVFS_error ret = -1;
     int outcount = 0;
 
     if (buffer_list && size_list && list_size &&
@@ -1606,10 +1608,10 @@ static inline void package_downcall_members(
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
 }
 
-static inline int repost_unexp_vfs_request(
+static inline PVFS_error repost_unexp_vfs_request(
     vfs_request_t *vfs_request, char *completion_handle_desc)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     assert(vfs_request);
 
@@ -1634,9 +1636,10 @@ static inline int repost_unexp_vfs_request(
     return ret;
 }
 
-static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
+static inline PVFS_error handle_unexp_vfs_request(
+    vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
 
     assert(vfs_request);
 
@@ -1827,9 +1830,10 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
     return ret;
 }
 
-int process_vfs_requests(void)
+PVFS_error process_vfs_requests(void)
 {
-    int ret = 0, op_count = 0, i = 0;
+    PVFS_error ret = 0; 
+    int op_count = 0, i = 0;
     vfs_request_t *vfs_request = NULL;
     vfs_request_t *vfs_request_array[MAX_NUM_OPS] = {NULL};
     PVFS_sys_op_id op_id_array[MAX_NUM_OPS];
