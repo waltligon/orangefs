@@ -26,15 +26,27 @@ int main(int argc,char **argv)
 	PVFS_sysresp_lookup resp_look;
 	PVFS_sysreq_readdir *req_readdir = NULL;
 	PVFS_sysresp_readdir *resp_readdir = NULL;
-	int ret = -1,i = 0;
+	int ret = -1,i = 0, name_sz = 0;
 	pvfs_mntlist mnt = {0,NULL};
-	int max_dirents_returned = 20;
+	int max_dirents_returned = 25;
+	char* starting_point = NULL;
 
-	if (argc > 1)
+	switch(argc)
 	{
-		sscanf(argv[1], "%d", &max_dirents_returned);
-		printf(" no more than %d dirents should be returned\n",max_dirents_returned);
+		case 3:
+			sscanf(argv[2], "%d", &max_dirents_returned);
+		case 2:
+			name_sz = strlen(argv[1]) + 1;
+			starting_point = malloc(name_sz);
+			memcpy(starting_point, argv[1], name_sz);
+			break;
+		default:
+			name_sz = 2;
+			starting_point = malloc(name_sz);
+			starting_point[0] = '/';
+			starting_point[1] = '\0';
 	}
+	printf("no more than %d dirents should be returned\n",max_dirents_returned);
 
 	/* Parse PVFStab */
 	ret = parse_pvfstab(NULL,&mnt);
@@ -52,15 +64,16 @@ int main(int argc,char **argv)
 	}
 
 	/* lookup the root handle */
+	req_look.credentials.uid = 100;
+	req_look.credentials.gid = 100;
 	req_look.credentials.perms = 1877;
-	req_look.name = malloc(2);/*null terminator included*/
-	req_look.name[0] = '/';
-	req_look.name[1] = '\0';
+	req_look.name = starting_point;
 	req_look.fs_id = resp_init.fsid_list[0];
 	ret = PVFS_sys_lookup(&req_look,&resp_look);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
+		free(starting_point);
 		return(-1);
 	}
 	/* print the handle */
@@ -79,6 +92,8 @@ int main(int argc,char **argv)
 		printf("Error in malloc\n");
 		return(-1);
 	}
+
+	printf("LOOKUP_RESPONSE===>\n\tresp_look.pinode_refn.handle = %ld\n\tresp_look.pinode_refn.fs_id = %d\n",resp_look.pinode_refn.handle, resp_look.pinode_refn.fs_id);
 
 	req_readdir->pinode_refn.handle = resp_look.pinode_refn.handle;
 	req_readdir->pinode_refn.fs_id = req_look.fs_id;
@@ -117,6 +132,8 @@ int main(int argc,char **argv)
 	free(resp_readdir->dirent_array); /*allocated by the system interface*/
 	free(req_readdir);		/* allocated by us */
 	free(resp_readdir);		/* allocated by us */
+
+	free(starting_point);
 
 	return(0);
 }

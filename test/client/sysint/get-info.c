@@ -62,6 +62,8 @@ int main(int argc,char **argv)
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the file we're getattr'ing */
+	req_look.credentials.uid = 100;
+	req_look.credentials.gid = 100;
 	req_look.credentials.perms = 1877;
 	req_look.name = filename;
 	req_look.fs_id = resp_init.fsid_list[0];

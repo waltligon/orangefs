@@ -61,6 +61,8 @@ int main(int argc,char **argv)
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the root handle */
+	req_look.credentials.uid = 100;
+	req_look.credentials.gid = 100;
 	req_look.credentials.perms = 1877;
 	req_look.name = malloc(2);/*null terminator included*/
 	req_look.name[0] = '/';

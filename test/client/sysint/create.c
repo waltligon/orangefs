@@ -65,7 +65,7 @@ int main(int argc,char **argv)
 			return(-1);
 	}
 
-	printf("creating a file named %s\n", filename);
+	printf("===>Creating a file named %s in directory %s\n", filename, starting_point);
 
 	/* Parse PVFStab */
 	ret = parse_pvfstab(NULL,&mnt);
