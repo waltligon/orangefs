@@ -2815,13 +2815,6 @@ int job_test(job_id_t id,
 
     assert(id != 0);
 
-    /* TODO: this implementation is going to be really clumsy for
-     * now, just to get us through with correct semantics.  It will
-     * search the completion queue way more than it needs to,
-     * because I haven't implemented an intelligent way to only
-     * look if the job you were interested in completed.
-     */
-
     /* TODO: here is another cheap shot.  I don't want to special
      * case the -1 (infinite) timeout possibility right now (maybe
      * later), but I want the semantics to work.  So.. if that's the
@@ -2985,13 +2978,6 @@ int job_testsome(job_id_t * id_array,
     int real_id_count = 0;
     job_id_t *tmp_id_array = NULL;
     int i;
-
-    /* TODO: this implementation is going to be really clumsy for
-     * now, just to get us through with correct semantics.  It will
-     * search the completion queue way more than it needs to,
-     * because I haven't implemented an intelligent way to only
-     * look if the job you were interested in completed.
-     */
 
     /* count how many of the id's are non zero */
     for (i = 0; i < original_count; i++)
@@ -3203,13 +3189,6 @@ int job_testcontext(job_id_t * out_id_array_p,
     struct timeval start;
     struct timeval end;
     int original_count = *inout_count_p;
-
-    /* TODO: this implementation is going to be really clumsy for
-     * now, just to get us through with correct semantics.  It will
-     * search the completion queue way more than it needs to,
-     * because I haven't implemented an intelligent way to only
-     * look if the job you were interested in completed.
-     */
 
     /* TODO: here is another cheap shot.  I don't want to special
      * case the -1 (infinite) timeout possibility right now (maybe
