@@ -98,7 +98,7 @@ static inline int copy_attributes_to_inode(
 
               clear all pages?
             */
-            vmtruncate(inode, inode_size);
+/*             vmtruncate(inode, inode_size); */
         }
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
                  (symname != NULL))

@@ -163,23 +163,17 @@ static int pvfs2_writepages(
     return mpage_writepages(mapping, wbc, pvfs2_get_block);
 }
 
-static int pvfs2_sync_page(struct page *page)
-{
-    pvfs2_print("pvfs2: pvfs2_sync_page called on page %p\n", page);
-    return 0;
-}
+/* static int pvfs2_sync_page(struct page *page) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_sync_page called on page %p\n", page); */
+/*     return 0; */
+/* } */
 
 static int pvfs2_readpage(
     struct file *file,
     struct page *page)
 {
     pvfs2_print("pvfs2: pvfs2_readpage called with page %p\n",page);
-
-
-/*     block_invalidatepage(page, 0); */
-/*     truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0); */
-
-
     /*
       NOTE: if not using mpage support, we need to drop
       the page lock here before returning
@@ -249,8 +243,8 @@ static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
     pvfs2_print("pvfs2: pvfs2_invalidatepage called on page %p "
                 "(offset is %lu)\n", page, offset);
 
-/*     ClearPageUptodate(page); */
-/*     ClearPageMappedToDisk(page); */
+    ClearPageUptodate(page);
+    ClearPageMappedToDisk(page);
     return 0;
 }
 
@@ -282,7 +276,7 @@ struct address_space_operations pvfs2_address_operations =
     .readpages = pvfs2_readpages,
     .writepage = pvfs2_writepage,
     .writepages = pvfs2_writepages,
-    .sync_page = pvfs2_sync_page,
+/*     .sync_page = pvfs2_sync_page, */
     .prepare_write = pvfs2_prepare_write,
     .commit_write = pvfs2_commit_write,
     .set_page_dirty = pvfs2_set_page_dirty,
