@@ -90,6 +90,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 			     job_status_s *js_p)
 {
     int ret, i;
+    struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "msgpairarray state: post (%d message(s))\n",
@@ -117,8 +118,9 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
 	/* encode request. fills in encoded_req.
 	 */
-	cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
-	  msg_p->fs_id);
+        server_config = PINT_get_server_config_struct();
+	cur_fs = PINT_config_find_fs_id(server_config, msg_p->fs_id);
+        PINT_put_server_config_struct(server_config);
 	assert(cur_fs);
 
 	ret = PINT_encode(&msg_p->req,

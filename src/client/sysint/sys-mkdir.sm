@@ -217,15 +217,6 @@ static int mkdir_init(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: init\n");
 
     assert(js_p->error_code == 0);
-
-    /*
-      grab a pointer to the server configuration object.
-      we need this later for mapping handles to servers
-      during meta/data handle creation
-    */
-    sm_p->server_config = PINT_get_server_config_struct();
-    assert(sm_p->server_config);
-
     return 1;
 }
 
@@ -280,6 +271,7 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_client_sm_msgpair_state *msg_p = NULL;
+    struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "mkdir state: mkdir_msg_setup_msgpair\n");
@@ -291,9 +283,12 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
+    server_config = PINT_get_server_config_struct();
     ret = PINT_bucket_get_next_meta(
-        sm_p->server_config, sm_p->parent_ref.fs_id,
+        server_config, sm_p->parent_ref.fs_id,
         &msg_p->svr_addr, &meta_handle_extent_array);
+    PINT_put_server_config_struct(server_config);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -301,12 +296,13 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         return 1;
     }
 
-    PINT_SERVREQ_MKDIR_FILL(msg_p->req,
-                            *sm_p->cred_p,
-                            sm_p->parent_ref.fs_id,
-                            meta_handle_extent_array,
-                            *sm_p->u.mkdir.sys_attr,
-                            PVFS_ATTR_SYS_ALL_NOSIZE);
+    PINT_SERVREQ_MKDIR_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->parent_ref.fs_id,
+        meta_handle_extent_array,
+        *sm_p->u.mkdir.sys_attr,
+        PVFS_ATTR_SYS_ALL_NOSIZE);
 
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;

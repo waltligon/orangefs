@@ -82,6 +82,8 @@ int PINT_server_get_config(
 void PINT_release_pvfstab(void);
 
 struct server_configuration_s *PINT_get_server_config_struct(void);
+void PINT_put_server_config_struct(
+    struct server_configuration_s *config);
 
 /*
  * Local variables:

@@ -157,6 +157,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     PINT_client_sm *sm_p = NULL;
     PVFS_error error;
     struct filesystem_configuration_s* cur_fs = NULL;
+    struct server_configuration_s *server_config = NULL;
 
     if (resp_p == NULL)
     {
@@ -169,8 +170,10 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
         return ret;
     }
 
-    cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
-                                    pinode_ref.fs_id);
+    server_config = PINT_get_server_config_struct();
+    cur_fs = PINT_config_find_fs_id(server_config, pinode_ref.fs_id);
+    PINT_put_server_config_struct(server_config);
+
     if (!cur_fs)
     {
         gossip_lerr("Error: invalid fs_id.\n");

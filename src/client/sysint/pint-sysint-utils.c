@@ -23,16 +23,52 @@
 static int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock = NULL;
 static struct server_configuration_s g_server_config;
-
-/* analogous to 'get_server_config_struct' in pvfs2-server.c */
-struct server_configuration_s *PINT_get_server_config_struct(void)
-{
-    return &g_server_config;
-}
+gen_mutex_t *g_server_config_mutex = NULL;
 
 static int server_parse_config(
     struct server_configuration_s *config,
     struct PVFS_servresp_getconfig *response);
+
+/*
+  analogous to 'get_server_config_struct' in pvfs2-server.c -- it
+  returns a pointer to the parsed configuration object to any client
+  code that is interested.  when mutexes are available, the get/put
+  mechanism is used to ensure serialized access to this object.  in
+  the future, it may change atomically in case the server
+  configuration changes during run-time.
+*/
+struct server_configuration_s *PINT_get_server_config_struct(void)
+{
+    if (g_server_config_mutex == NULL)
+    {
+        g_server_config_mutex = gen_mutex_build();
+        if (!g_server_config_mutex)
+        {
+            gossip_err("Cannot allocate server config mutex\n");
+            return NULL;
+        }
+    }
+    gen_mutex_lock(g_server_config_mutex);
+    return &g_server_config;
+}
+
+void PINT_put_server_config_struct(struct server_configuration_s *config)
+{
+    if (g_server_config_mutex == NULL)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Warning:  Calling put "
+                     "before a get\n");
+        g_server_config_mutex = gen_mutex_build();
+        if (!g_server_config_mutex)
+        {
+            gossip_err("Cannot allocate server config mutex\n");
+        }
+    }
+    else
+    {
+        gen_mutex_unlock(g_server_config_mutex);
+    }
+}
 
 int get_next_session_tag(void)
 {
@@ -68,20 +104,28 @@ int get_next_session_tag(void)
  *
  * returns 0 on success, -1 on error
  */
-int PINT_check_perms(PVFS_object_attr attr,
-		PVFS_permissions mode,
-		int uid,
-		int gid)
+int PINT_check_perms(
+    PVFS_object_attr attr,
+    PVFS_permissions mode,
+    int uid, int gid)
 {
     return ((((attr.perms & mode) == mode) ||
              ((attr.group == gid) && (attr.perms & mode) == mode) ||
              (attr.owner == uid)) ? 0 : -1);
 }
 
-int PINT_server_get_config(struct server_configuration_s *config,
-			    struct PVFS_sys_mntent* mntent_p)
+/*
+  given mount information, retrieve the server's configuration by
+  issuing a getconfig operation.  on successful response, we parse the
+  configuration and fill in the config object specified.
+
+  returns 0 on success, -errno on error
+*/
+int PINT_server_get_config(
+    struct server_configuration_s *config,
+    struct PVFS_sys_mntent* mntent_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t serv_addr;
     struct PVFS_server_req serv_req;
     struct PVFS_server_resp *serv_resp = NULL;
@@ -91,13 +135,18 @@ int PINT_server_get_config(struct server_configuration_s *config,
     PVFS_msg_tag_t op_tag = get_next_session_tag();
     struct filesystem_configuration_s* cur_fs = NULL;
 
-    /* obtain the metaserver to send the request */
+    if (!config || !mntent_p)
+    {
+        return ret;
+    }
+
+    /* find the metaserver to send the request toward */
     ret = BMI_addr_lookup(&serv_addr, mntent_p->pvfs_config_server);
     if (ret < 0)
     {
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Failed to resolve BMI "
-		      "address %s\n",mntent_p->pvfs_config_server);
-	return(ret);
+	gossip_lerr("Failed to resolve BMI address %s\n",
+                    mntent_p->pvfs_config_server);
+	return ret;
     }
 
     creds.uid = getuid();
@@ -120,7 +169,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	gossip_err("       please verify that your client configuration"
 	" is correct \n       and that the server is running.\n");
 	gossip_err("       (%s)\n", mntent_p->pvfs_config_server);
-	return(ret);
+	return ret;
     }
 
     serv_resp = (struct PVFS_server_resp *)decoded.buffer;
@@ -130,17 +179,18 @@ int PINT_server_get_config(struct server_configuration_s *config,
 			   serv_resp->status);
 	PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
 			 &decoded, &encoded_resp, op_tag);
-	return(serv_resp->status);
+	return serv_resp->status;
     }
 
-    if (server_parse_config(config,&(serv_resp->u.getconfig)))
+    ret = server_parse_config(config,&(serv_resp->u.getconfig));
+    if (ret)
     {
 	gossip_err("Failed to getconfig from host %s\n",
 		   mntent_p->pvfs_config_server);
 
 	PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
 			 &decoded, &encoded_resp, op_tag);
-	return(-PVFS_ENODEV);
+	return -PVFS_ENODEV;
     }
 
     PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
@@ -175,8 +225,9 @@ int PINT_server_get_config(struct server_configuration_s *config,
     return(0); 
 }
 
-static int server_parse_config(struct server_configuration_s *config,
-                               struct PVFS_servresp_getconfig *response)
+static int server_parse_config(
+    struct server_configuration_s *config,
+    struct PVFS_servresp_getconfig *response)
 {
     int ret = 1, template_index = 1;
     int fs_fd = 0, server_fd = 0;
@@ -224,8 +275,10 @@ static int server_parse_config(struct server_configuration_s *config,
             return ret;
         }
 
-        assert(!response->fs_config_buf[response->fs_config_buf_size - 1]);
-        assert(!response->server_config_buf[response->server_config_buf_size - 1]);
+        assert(!response->fs_config_buf[
+                   response->fs_config_buf_size - 1]);
+        assert(!response->server_config_buf[
+                   response->server_config_buf_size - 1]);
 
         if (write(fs_fd,response->fs_config_buf,
                   (response->fs_config_buf_size - 1)) ==
@@ -235,7 +288,8 @@ static int server_parse_config(struct server_configuration_s *config,
                       (response->server_config_buf_size - 1)) ==
                 (response->server_config_buf_size - 1))
             {
-                ret = PINT_parse_config(config, fs_template, server_template);
+                ret = PINT_parse_config(
+                    config, fs_template, server_template);
             }
         }
         close(fs_fd);

@@ -36,35 +36,46 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
 {
     int ret = -1;
     struct filesystem_configuration_s* cur_fs = NULL;
+    struct server_configuration_s *server_config = NULL;
 
     gen_mutex_lock(&mt_config);
 
-    /* Get configuration parameters from server */
-    ret = PINT_server_get_config(PINT_get_server_config_struct(),
-                                 mntent);
+    /* get exclusive access to the (global) server config object */
+    server_config = PINT_get_server_config_struct();
+
+    /* get configuration parameters from server */
+    ret = PINT_server_get_config(server_config, mntent);
     if (ret < 0)
     {
-	gen_mutex_unlock(&mt_config);
-	return(ret);
+        PVFS_perror("PINT_server_get_config failed", ret);
+        goto error_exit;
     }
 
-    cur_fs = PINT_config_find_fs_name(PINT_get_server_config_struct(), 
-	mntent->pvfs_fs_name);
+    cur_fs = PINT_config_find_fs_name(server_config, mntent->pvfs_fs_name);
     /* it should not be possible for this to fail after a successful call to
      * PINT_server_get_config()
      */
     assert(cur_fs);
 
     /* load the mapping of handles to servers */
-    ret = PINT_handle_load_mapping(PINT_get_server_config_struct(), cur_fs);
+    ret = PINT_handle_load_mapping(server_config, cur_fs);
     if(ret < 0)
     {
-	gen_mutex_unlock(&mt_config);
-	return(ret);
+        PVFS_perror("PINT_handle_load_mapping failed", ret);
+        goto error_exit;
     }
 
     gen_mutex_unlock(&mt_config);
-    return(0);
+    PINT_put_server_config_struct(server_config);
+    return 0;
+
+  error_exit:
+    gen_mutex_unlock(&mt_config);
+    if (server_config)
+    {
+        PINT_put_server_config_struct(server_config);
+    }
+    return ret;
 }
 
 /*

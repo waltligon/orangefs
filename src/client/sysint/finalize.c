@@ -18,8 +18,11 @@
 #include "PINT-reqproto-encode.h"
 #include "client-state-machine.h"
 
-extern gen_mutex_t *g_session_tag_mt_lock;
 extern job_context_id PVFS_sys_job_context;
+
+/* declared in initialize.c */
+extern gen_mutex_t *g_session_tag_mt_lock;
+extern gen_mutex_t *g_server_config_mutex;
 
 /* PVFS_finalize
  *
@@ -29,16 +32,22 @@ extern job_context_id PVFS_sys_job_context;
  */
 int PVFS_sys_finalize()
 {
-    /* Free the ncache */
+    struct server_configuration_s *server_config = NULL;
+
     PINT_ncache_finalize();
-    /* free all pinode structures */
     PINT_acache_finalize();
-	
-    /* shut down bucket interface */
     PINT_bucket_finalize();
 
-    PINT_config_release(PINT_get_server_config_struct());
-	
+    server_config = PINT_get_server_config_struct();
+    PINT_config_release(server_config);
+    PINT_put_server_config_struct(server_config);
+
+    if (g_server_config_mutex)
+    {
+        gen_mutex_destroy(g_server_config_mutex);
+        g_server_config_mutex = NULL;
+    }
+
     /* get rid of the mutex for the BMI session tag identifier */
     gen_mutex_lock(g_session_tag_mt_lock);
     gen_mutex_unlock(g_session_tag_mt_lock);
@@ -58,7 +67,7 @@ int PVFS_sys_finalize()
 
     gossip_disable();
 
-    return(0);
+    return 0;
 }
 
 /*

@@ -105,6 +105,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
     int ret;
     PVFS_msg_tag_t session_tag;
     struct filesystem_configuration_s *cur_fs;
+    struct server_configuration_s *server_config = NULL;
 
     PINT_client_sm_msgpair_state *msg_p; /* for convenience */
 
@@ -121,10 +122,10 @@ static int msgpair_post(PINT_client_sm *sm_p,
      * WE SHOULD GET RID OF ONE OF THEM OR SOMETHING...
      */
 
-    /* encode request. fills in encoded_req.
-     */
-    cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
-                                    msg_p->fs_id);
+    /* encode request. fills in encoded_req */
+    server_config = PINT_get_server_config_struct();
+    cur_fs = PINT_config_find_fs_id(server_config, msg_p->fs_id);
+    PINT_put_server_config_struct(server_config);
     assert(cur_fs);
 
     ret = PINT_encode(&msg_p->req,

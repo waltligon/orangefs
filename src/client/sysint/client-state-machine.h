@@ -317,9 +317,6 @@ typedef struct PINT_client_sm {
     PINT_pinode *pinode; /* filled in on acache hit */
     PVFS_object_attr acache_attr; /* a scratch attr space */
 
-    /* we need this for several state machines */
-    struct server_configuration_s *server_config;
-
     /* generic msgpair used with msgpair substate */
     PINT_client_sm_msgpair_state msgpair;
 
