@@ -5,6 +5,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <client.h>
 #include <string.h>
 #include "pvfs2-util.h"
@@ -169,13 +170,28 @@ int main(int argc, char **argv)
 {
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init init_response;
+    int go_twice = 0;
 
     if (argc != 2)
     {
-        fprintf(stderr,"usage: %s <starting dir>\n",argv[0]);
+        if (argc == 3)
+        {
+            go_twice = atoi(argv[2]);
+            if (go_twice != 1)
+            {
+                goto usage;
+            }
+            goto start_find;
+        }
+      usage:
+        fprintf(stderr,"usage: %s <starting dir> [ 1 ]\n",argv[0]);
         fprintf(stderr,"This is not a full featured version of FIND(1L)\n");
+        fprintf(stderr,"If the 3rd argument is a '1', find runs twice.\n");
+        fprintf(stderr," (useful for lookup/dcache testing).\n");
         return 1;
     }
+
+  start_find:
 
     if (PVFS_util_parse_pvfstab(&mnt))
     {
@@ -194,6 +210,15 @@ int main(int argc, char **argv)
     {
         fprintf(stderr,"Failed to do directory walk\n");
         return 1;
+    }
+
+    if (go_twice)
+    {
+        if (directory_walk(&init_response,argv[1],NULL,0))
+        {
+            fprintf(stderr,"Failed to do directory walk (2nd iteration)\n");
+            return 1;
+        }
     }
 
     if (PVFS_sys_finalize())

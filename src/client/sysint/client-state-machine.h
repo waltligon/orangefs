@@ -293,6 +293,7 @@ typedef struct PINT_client_sm {
 		  * jobs for some some states; typically set and
 		  * then decremented to zero as jobs complete */
 
+    int dcache_hit; /* set if last segment lookup was from dcache */
     int pcache_hit; /* set if pinode was from pcache */
     PINT_pinode *pinode; /* filled in on pcache hit */
     PVFS_object_attr pcache_attr; /* a scratch attr space */

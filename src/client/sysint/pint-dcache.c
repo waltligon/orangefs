@@ -41,8 +41,9 @@ typedef struct dcache_s dcache;
 #define STATUS_USED 1
 
 /* change this to 0 to disable directory caching
- * all calls return success, but lookups will not succeed, inserts/removes won't
- * actually change anything if the cache is disabled
+ * all calls return success, but lookups will not succeed,
+ * inserts/removes won't actually change anything if the cache
+ * is disabled
  */
 #define ENABLE_DCACHE 1
 
@@ -237,6 +238,11 @@ int PINT_dcache_insert(
 	unsigned char entry_found = 0;
 	
 	gen_mutex_lock(cache->mt_lock);
+
+        gossip_ldebug(DCACHE_DEBUG, "DCACHE: Inserting segment %s "
+                      "(%Lu|%d) under parent (%Lu|%d)\n", name,
+                      entry.handle, entry.fs_id, parent.handle,
+                      parent.fs_id);
 
 	for (i = cache->top; i != BAD_LINK; i = cache->element[i].next)
 	{
