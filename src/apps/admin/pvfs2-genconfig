@@ -579,7 +579,7 @@ $logging = get_logging();
 
 # could prompt for handle recycle time, but it is probably best if we pick a
 # reasonable value w/o prompting
-$handle_recycle_timeout_seconds = 50;
+$handle_recycle_timeout_seconds = 360;
 
 # ----------------------------------------------------------
 # now that we have all the info, emit the configuration data

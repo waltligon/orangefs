@@ -333,6 +333,10 @@ int trove_set_handle_timeout(TROVE_coll_id coll_id,
                            TROVE_DEFAULT_HANDLE_PURGATORY_SEC :
                            timeout->tv_sec);
 	ret = trove_ledger_set_timeout(ledger->ledger, timeout);
+
+        gossip_debug(GOSSIP_TROVE_DEBUG, "- set handle re-use "
+                     "timeout to %d seconds (ret=%d)\n",
+                     (int)timeout->tv_sec, ret);
     }
     return ret;
 }
