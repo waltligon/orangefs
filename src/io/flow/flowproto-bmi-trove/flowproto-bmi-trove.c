@@ -409,8 +409,16 @@ int flowproto_bmi_trove_announce_flow(
 
 	flow_d->flowproto_id = flowproto_bmi_trove_id;
 
-	/* we are ready for service now */
-	flow_d->state = FLOW_SVC_READY;
+	if(ret == 1)
+	{
+		/* already done! */
+		flow_d->state = FLOW_COMPLETE;
+	}
+	else
+	{
+		/* we are ready for service now */
+		flow_d->state = FLOW_SVC_READY;
+	}
 
 	return(0);
 }
@@ -770,6 +778,12 @@ static int buffer_setup_bmi_to_mem(flow_descriptor* flow_d)
 		return(ret);
 	}
 
+	if(eof_flag && (flow_data->bmi_total_size == 0))
+	{
+		/* no work to do here, return 1 to complete the flow */
+		return(1);
+	}
+
 	/* did we provide enough segments to satisfy the amount of data
 	 * available < buffer size? 
 	 */
@@ -1063,6 +1077,12 @@ static int buffer_setup_trove_to_bmi(flow_descriptor* flow_d)
 		return(ret);
 	}
 
+	if(eof_flag && (flow_data->fill_buffer_stepsize == 0))
+	{
+		/* there is no work to do; zero length flow */
+		return(1);
+	}
+
 	if(flow_data->fill_buffer_stepsize < flow_data->max_buffer_size
 		&& flow_d->current_req_offset != -1)
 	{
@@ -1152,11 +1172,6 @@ static int alloc_flow_data(flow_descriptor* flow_d)
 		}
 		flow_data->type = BMI_TO_MEM;
 		ret = buffer_setup_bmi_to_mem(flow_d);
-		if(ret < 0)
-		{
-			free(flow_data);
-			return(ret);
-		}
 	}
 	else if(flow_d->src.endpoint_id == MEM_ENDPOINT &&
 		flow_d->dest.endpoint_id == BMI_ENDPOINT)
@@ -1170,11 +1185,6 @@ static int alloc_flow_data(flow_descriptor* flow_d)
 		}
 		flow_data->type = MEM_TO_BMI;
 		ret = buffer_setup_mem_to_bmi(flow_d);
-		if(ret < 0)
-		{
-			free(flow_data);
-			return(ret);
-		}
 	}
 	else if(flow_d->src.endpoint_id == TROVE_ENDPOINT &&
 		flow_d->dest.endpoint_id == BMI_ENDPOINT)
@@ -1182,11 +1192,6 @@ static int alloc_flow_data(flow_descriptor* flow_d)
 		flow_data->type = TROVE_TO_BMI;
 		HACK_global_fsid = flow_d->src.u.trove.coll_id;
 		ret = buffer_setup_trove_to_bmi(flow_d);
-		if(ret < 0)
-		{
-			free(flow_data);
-			return(ret);
-		}
 	}
 	else if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
 		flow_d->dest.endpoint_id == TROVE_ENDPOINT)
@@ -1194,11 +1199,6 @@ static int alloc_flow_data(flow_descriptor* flow_d)
 		flow_data->type = BMI_TO_TROVE;
 		HACK_global_fsid = flow_d->dest.u.trove.coll_id;
 		ret = buffer_setup_bmi_to_trove(flow_d);
-		if(ret < 0)
-		{
-			free(flow_data);
-			return(ret);
-		}
 	}
 	else
 	{
@@ -1207,7 +1207,13 @@ static int alloc_flow_data(flow_descriptor* flow_d)
 		return(-EINVAL);
 	}
 
-	return(0);
+	if(ret < 0)
+	{
+		free(flow_data);
+	}
+
+	/* NOTE: we may return 1 here; the caller will catch it */
+	return(ret);
 }
 
 
