@@ -191,7 +191,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
             /* calculate maximum response message size and allocate space */
             msg_p->max_resp_sz = PINT_encode_calc_max_size(
-                PINT_ENCODE_RESP, msg_p->req.op, cur_fs->encoding);
+                PINT_ENCODE_RESP, msg_p->req.op, enc_type);
 
             msg_p->encoded_resp_p = BMI_memalloc(
                 msg_p->svr_addr, msg_p->max_resp_sz, BMI_RECV);
