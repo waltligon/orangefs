@@ -88,12 +88,12 @@ static int server_shutdown(
     PINT_server_status_flag status,
     int ret, int sig);
 static void *server_sig_handler(int sig);
-static int server_post_unexpected_recv(job_status_s * ret);
+static int server_post_unexpected_recv(job_status_s * js_p);
 static int server_parse_cmd_line_args(int argc, char **argv);
 
 static void server_state_table_initialize(void);
 static int server_state_machine_start(
-    PINT_server_op *s_op, job_status_s *ret);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int server_state_machine_start_noreq(enum PVFS_server_op op);
 
 /* main()
@@ -768,7 +768,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
  * - INVESTIGATE KEEPING A FIXED NUMBER OF PINT_SERVER_OPS AROUND TO AVOID
  *   MALLOC/FREE
  */
-static int server_post_unexpected_recv(job_status_s *temp_stat)
+static int server_post_unexpected_recv(job_status_s *js_p)
 {
     int ret;
     job_id_t j_id;
@@ -801,7 +801,7 @@ static int server_post_unexpected_recv(job_status_s *temp_stat)
     ret = job_bmi_unexp(&(s_op->unexp_bmi_buff),
 			s_op, /* user ptr */
 			0,
-			temp_stat,
+			js_p,
 			&j_id,
 			JOB_NO_IMMED_COMPLETE,
 			server_job_context);
@@ -823,7 +823,7 @@ static int server_post_unexpected_recv(job_status_s *temp_stat)
  */
 static int server_state_machine_start(
     PINT_server_op *s_op,
-    job_status_s *ret)
+    job_status_s *js_p)
 {
     int retval = -1;
 
@@ -857,7 +857,7 @@ static int server_state_machine_start(
 
     s_op->resp.op = s_op->req->op;
 
-    return ((s_op->current_state->state_action))(s_op,ret);
+    return ((s_op->current_state->state_action))(s_op,js_p);
 }
 
 /* static int server_state_machine_start_noreq()
