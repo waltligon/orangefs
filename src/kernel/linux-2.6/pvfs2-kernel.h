@@ -477,13 +477,11 @@ do {                                                         \
     {                                                        \
         ret = (etime ? etime : -EINVAL);                     \
         pvfs2_print("OP timed out.  Returning %d\n", ret);   \
-        goto error_exit;                                     \
     }                                                        \
     else if (ret == PVFS2_WAIT_SIGNAL_RECVD)                 \
     {                                                        \
         ret = (esig ? esig : -EINTR);                        \
         pvfs2_print("OP interrupted.  Returning %d\n", ret); \
-        goto error_exit;                                     \
     }                                                        \
 } while(0)
 

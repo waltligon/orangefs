@@ -151,7 +151,13 @@ static void __exit pvfs2_exit(void)
 	    if (hash_link)
 	    {
 		cur_op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
-		op_release(cur_op);
+                if (cur_op->upcall.type != PVFS2_VFS_OP_INVALID)
+                {
+                    pvfs2_print("Freeing op in progress of "
+                                "request type %d\n",
+                                cur_op->upcall.type);
+                    op_release(cur_op);
+                }
 	    }
 	} while (hash_link);
     }

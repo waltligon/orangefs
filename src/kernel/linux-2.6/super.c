@@ -515,8 +515,6 @@ struct super_block* pvfs2_get_sb(
     char *dev_name = NULL;
     int ret = -EINVAL;
 
-/*     MOD_INC_USE_COUNT; */
-
     if (!data || !sb)
     {
         if (!silent)
@@ -550,6 +548,7 @@ struct super_block* pvfs2_get_sb(
     new_op = op_alloc();
     if (!new_op)
     {
+        ret = -ENOMEM;
         goto error_exit;
     }
     new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
@@ -559,7 +558,7 @@ struct super_block* pvfs2_get_sb(
     pvfs2_print("Attempting PVFS2 Mount via host %s\n",
                 new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-    service_operation(new_op, "pvfs2_get_sb", 1);
+    service_operation(new_op, "pvfs2_get_sb", 0);
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("pvfs2_remount: mount got return value of %d\n", ret);
@@ -573,9 +572,12 @@ struct super_block* pvfs2_get_sb(
          PVFS_HANDLE_NULL))
     {
         pvfs2_error("ERROR: Retrieved null fs_id or root_handle\n");
+        ret = -EINVAL;
         goto error_exit;
     }
-    PVFS2_SB(sb)->root_handle = new_op->downcall.resp.fs_mount.root_handle;
+
+    PVFS2_SB(sb)->root_handle =
+        new_op->downcall.resp.fs_mount.root_handle;
     PVFS2_SB(sb)->fs_id = new_op->downcall.resp.fs_mount.fs_id;
     PVFS2_SB(sb)->id = new_op->downcall.resp.fs_mount.id;
 
@@ -592,6 +594,7 @@ struct super_block* pvfs2_get_sb(
         sb, (S_IFDIR | 0755), 0, PVFS2_SB(sb)->root_handle);
     if (!root)
     {
+        ret = -ENOMEM;
         goto error_exit;
     }
     PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
@@ -601,6 +604,7 @@ struct super_block* pvfs2_get_sb(
     if (!root_dentry)
     {
         iput(root);
+        ret = -ENOMEM;
         goto error_exit;
     }
     root_dentry->d_op = &pvfs2_dentry_operations;
@@ -609,32 +613,31 @@ struct super_block* pvfs2_get_sb(
     /* finally, add this sb to our list of known pvfs2 sb's */
     add_pvfs2_sb(sb);
 
-    if (new_op)
-    {
-        op_release(new_op);
-    }
+    op_release(new_op);
     return sb;
 
   error_exit:
-    translate_error_if_wait_failed(ret, 0, 0);
+    pvfs2_error("pvfs2_get_sb: mount request failed with %d\n", ret);
 
-    pvfs2_error("Could not succeed getting a super-block "
-                "for the mount request %d\n", ret);
-    if (sb)
+    if (sb && !IS_ERR(sb))
     {
         if (sb->u.generic_sbp != NULL)
         {
             kfree(sb->u.generic_sbp);
         }
-        sb = ERR_PTR(ret);
+    }
+
+    translate_error_if_wait_failed(ret, 0, 0);
+    if (ret || IS_ERR(sb))
+    {
+        sb = ERR_PTR(sb);
     }
 
     if (new_op)
     {
         op_release(new_op);
     }
-
-/*     MOD_DEC_USE_COUNT; */
+    pvfs2_print("pvfs2_get_sb: returning sb %p\n", sb);
     return sb;
 }
 
@@ -789,9 +792,14 @@ struct super_block *pvfs2_get_sb(
         pvfs2_error("ERROR: device name not specified.\n");
     }
 
+    op_release(new_op);
+    return sb;
+
   error_exit:
+    pvfs2_error("pvfs2_get_sb: mount request failed with %d\n", ret);
+
     translate_error_if_wait_failed(ret, 0, 0);
-    if (ret && IS_ERR(sb))
+    if (ret || IS_ERR(sb))
     {
         sb = ERR_PTR(ret);
     }
@@ -800,6 +808,7 @@ struct super_block *pvfs2_get_sb(
     {
         op_release(new_op);
     }
+    pvfs2_print("pvfs2_get_sb: returning sb %p\n", sb);
     return sb;
 }
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
@@ -809,37 +818,40 @@ void pvfs2_kill_sb(
 {
     pvfs2_print("pvfs2_kill_sb: called\n");
 
-    /*
-      issue the unmount to userspace to tell it to remove the dynamic
-      mount info it has for this superblock
-    */
-    pvfs2_unmount_sb(sb);
+    if (sb && !IS_ERR(sb))
+    {
+        /*
+          issue the unmount to userspace to tell it to remove the
+          dynamic mount info it has for this superblock
+        */
+        pvfs2_unmount_sb(sb);
 
-    /* remove the sb from our list of pvfs2 specific sb's */
-    remove_pvfs2_sb(sb);
+        /* remove the sb from our list of pvfs2 specific sb's */
+        remove_pvfs2_sb(sb);
 
 #ifndef PVFS2_LINUX_KERNEL_2_4
-    /* prune dcache based on sb */
-    shrink_dcache_sb(sb);
+        /* prune dcache based on sb */
+        shrink_dcache_sb(sb);
 
-    /* provided sb cleanup */
-    kill_litter_super(sb);
+        /* provided sb cleanup */
+        kill_litter_super(sb);
 
-    /* release the allocated root dentry */
-    if (sb->s_root)
-    {
-        dput(sb->s_root);
+        /* release the allocated root dentry */
+        if (sb->s_root)
+        {
+            dput(sb->s_root);
+        }
+
+        /* free the pvfs2 superblock private data */
+        kfree(PVFS2_SB(sb));
+#else
+        sb->u.generic_sbp = NULL;
+#endif
     }
-#endif
-
-    /* free the pvfs2 superblock private data */
-    kfree(PVFS2_SB(sb));
-
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    sb->u.generic_sbp = NULL;
-
-/*     MOD_DEC_USE_COUNT; */
-#endif
+    else
+    {
+        pvfs2_print("pvfs2_kill_sb: skipping due to invalid sb\n");
+    }
     pvfs2_print("pvfs2_kill_sb: returning normally\n");
 }
 
