@@ -104,21 +104,14 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	req_p.rsize = sizeof(struct PVFS_server_req_s) + handlesize;
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = entry.fs_id;
-	req_p.u.setattr.attrmask = 0;
-	if(attrmask & PVFS_ATTR_SYS_UID)
-	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_UID;
-	if(attrmask & PVFS_ATTR_SYS_GID)
-	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_GID;
-	if(attrmask & PVFS_ATTR_SYS_PERM)
-	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_PERM;
-	if(attrmask & PVFS_ATTR_SYS_ATIME)
-	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_ATIME;
-	if(attrmask & PVFS_ATTR_SYS_CTIME)
-	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_CTIME;
-	if(attrmask & PVFS_ATTR_SYS_MTIME)
-	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_MTIME;
-
+	/* let attributes fall through since PVFS_ATTR_SYS_xxx
+	 * mask values match PVFS_ATTR_COMMON_xxx mask values for
+	 * all of the attributes that are valid to set here
+	 */
 	req_p.u.setattr.attr = attr;
+	req_p.u.setattr.attrmask = attrmask;
+	/* but make sure the caller didn't set extra mask bits */
+	assert((attrmask & ~PVFS_ATTR_SYS_ALL_NOSIZE) == 0);
 
 	/* Make a server setattr request */	
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
