@@ -157,6 +157,7 @@ struct PINT_client_io_sm {
     int                     flow_comp_ct;
     flow_descriptor        *flow_array;
     job_status_s           *flow_status_array;
+    enum PVFS_flowproto_type flowproto_type;
 
     /* session tags, used in all messages */
     PVFS_msg_tag_t         *session_tag_array;

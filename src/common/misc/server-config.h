@@ -47,6 +47,7 @@ typedef struct filesystem_configuration_s
     PVFS_handle  root_handle;
     struct llist *meta_handle_ranges; /* ptrs are type host_handle_mapping_s* */
     struct llist *data_handle_ranges; /* ptrs are type host_handle_mapping_s* */
+    enum PVFS_flowproto_type flowproto; /* default flowprotocol */
 } filesystem_configuration_s;
 
 typedef struct server_configuration_s
@@ -104,9 +105,13 @@ int PINT_config_is_valid_collection_id(
     struct server_configuration_s *config_s,
     PVFS_fs_id fs_id);
 
-int PINT_config_has_fs_config_info(
+struct filesystem_configuration_s* PINT_config_find_fs_name(
     struct server_configuration_s *config_s,
     char *fs_name);
+
+struct filesystem_configuration_s* PINT_config_find_fs_id(
+    struct server_configuration_s* config_s,
+    PVFS_fs_id fs_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(

@@ -23,6 +23,7 @@
 #include "PINT-reqproto-encode.h"
 
 extern job_context_id pint_client_sm_context;
+extern struct server_configuration_s g_server_config;
 
 enum {
     IO_NO_DATA = 1,
@@ -120,6 +121,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     int ret;
     PINT_client_sm *sm_p;
     PVFS_error error;
+    struct filesystem_configuration_s* cur_fs = NULL;
 
     if (resp_p == NULL) {
 	gossip_lerr("NULL resp pointer\n");
@@ -128,6 +130,14 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
 
     if (io_type != PVFS_IO_READ && io_type != PVFS_IO_WRITE) {
 	return -PVFS_EINVAL;
+    }
+
+    /* find file system configuration */
+    cur_fs = PINT_config_find_fs_id(&g_server_config, pinode_ref.fs_id);
+    if(!cur_fs)
+    {
+	gossip_lerr("Error: invalid fs_id.\n");
+	return(-PVFS_EINVAL);
     }
 
     /* look for zero byte operations */
@@ -159,6 +169,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     sm_p->u.io.io_resp_p     = resp_p;
     sm_p->u.io.mem_req       = mem_req;
     sm_p->u.io.buffer        = buffer; 
+    sm_p->u.io.flowproto_type = cur_fs->flowproto;
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_IO);
     assert(ret == 0);
@@ -518,7 +529,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 			     iosm_p->object_ref.fs_id,
 			     target_datafile_array[i],
 			     iosm_p->io_type,
-			     FLOWPROTO_ANY,
+			     iosm_p->flowproto_type,
 			     orig_index,
 			     target_datafile_count,
 			     iosm_p->dist_p,
@@ -852,8 +863,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    /* this user_ptr should be left alone */
 	    fl_p->user_ptr = NULL;
 
-	    /* TODO: SAVE THE FLOWPROTO SOMEWHERE? */
-	    fl_p->type = FLOWPROTO_ANY;
+	    fl_p->type = iosm_p->flowproto_type;
 
 	    /* done with msgpair resources; free them now */
 	    ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,

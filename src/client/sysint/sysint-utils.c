@@ -347,6 +347,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
     struct pvfs_mntent *mntent_p = NULL;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
     int found_one_good=0;	/* do we have at least one valid filesystem? */
+    struct filesystem_configuration_s* cur_fs = NULL;
 
     /* TODO: Fill up the credentials information */
 
@@ -412,16 +413,19 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	mntent_p = &mntent_list.ptab_array[i];
 
         /* make sure we valid information about this fs */
-        if (PINT_config_has_fs_config_info(
-						  config,mntent_p->pvfs_fs_name) == 0)
+        if (!(cur_fs = PINT_config_find_fs_name(config,mntent_p->pvfs_fs_name)))
         {
             gossip_ldebug(CLIENT_DEBUG,"Warning:  Cannot retrieve "
                           "information about pvfstab entry %s\n",
                           mntent_p->pvfs_config_server);
             continue;
         } else
+	{
 	    found_one_good=1;
+	    cur_fs->flowproto = mntent_p->flowproto;
+	}
     }
+
     if (found_one_good)
 	return(0); 
     else

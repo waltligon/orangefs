@@ -1589,14 +1589,13 @@ int PINT_config_is_valid_collection_id(
 }
 
 /*
-  returns 1 if the config object has information on the specified
-  filesystem; 0 otherwise
+  returns pointer to fs config if the config object has information on 
+  the specified filesystem; NULL otherwise
 */
-int PINT_config_has_fs_config_info(
+struct filesystem_configuration_s* PINT_config_find_fs_name(
     struct server_configuration_s *config_s,
     char *fs_name)
 {
-    int ret = 0;
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
 
@@ -1613,13 +1612,49 @@ int PINT_config_has_fs_config_info(
             assert(cur_fs->file_system_name);
             if (strcmp(cur_fs->file_system_name,fs_name) == 0)
             {
-                ret = 1;
+                return(cur_fs);
                 break;
             }
             cur = llist_next(cur);
         }
     }
-    return ret;
+    return(NULL);
+}
+
+/* PINT_config_find_fs()
+ *
+ * searches the given server configuration information to find a file
+ * system configuration that matches the fs_id
+ *
+ * returns pointer to file system config struct on success, NULL on failure
+ */
+struct filesystem_configuration_s* PINT_config_find_fs_id(
+    struct server_configuration_s* config_s,
+    PVFS_fs_id fs_id)
+{
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+
+    if (config_s)
+    {
+        cur = config_s->file_systems;
+        while(cur)
+        {
+            cur_fs = llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
+            if (cur_fs->coll_id == fs_id)
+            {
+                return(cur_fs);
+                break;
+            }
+            cur = llist_next(cur);
+        }
+    }
+
+    return(NULL);
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__
