@@ -114,6 +114,17 @@ static int service_create_request(
                               *attrs, in_upcall->credentials, &response);
         if (ret < 0)
         {
+            /*
+              FIXME:
+              if the create failed because the file already exists,
+              do a (hopefully cached) lookup here and return the
+              pinode_reference along with success.
+
+              this is useful for the case where the file was created
+              before the pvfs2-client crashes; we want to report
+              success on resume to the vfs that retried the operation.
+            */
+
             gossip_err("Failed to create %s under %Ld on fsid %d!\n",
                        in_upcall->req.create.d_name,
                        parent_refn.handle,parent_refn.fs_id);

@@ -158,7 +158,8 @@ do {                                                          \
 add_op_to_request_list(op);                                   \
 if ((ret = wait_for_matching_downcall(new_op)) != 0)          \
 {                                                             \
-    pvfs2_error("pvfs2: %s -- wait failed (%x).",method,ret); \
+    pvfs2_error("pvfs2: %s -- wait failed (%x).\n",           \
+                method,ret);                                  \
     goto error_exit;                                          \
 }
 
@@ -179,7 +180,7 @@ wait_for_op:                                                  \
      }                                                        \
      else                                                     \
      {                                                        \
-         pvfs2_error("pvfs2: %s -- wait failed (%x).",        \
+         pvfs2_error("pvfs2: %s -- wait failed (%x).\n",      \
                      method,ret);                             \
          goto error_exit;                                     \
      }                                                        \

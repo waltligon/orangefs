@@ -254,8 +254,6 @@ int pvfs2_release(
     struct file *file)
 {
     pvfs2_print("pvfs2: pvfs2_release called\n");
-
-
     if (S_ISDIR(inode->i_mode))
     {
 	return dcache_dir_close(inode, file);
