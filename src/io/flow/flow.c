@@ -459,10 +459,22 @@ int PINT_flow_getinfo(flow_descriptor * flow_d,
 		      enum flow_getinfo_option opt,
 		      void *parameter)
 {
+    PVFS_size* tmp_size;
+
     gen_mutex_lock(&interface_mutex);
-    gossip_lerr("function not implemented.\n");
+    
+    switch(opt)
+    {
+    case FLOW_AMT_COMPLETE_QUERY:
+	tmp_size = (PVFS_size*)parameter;
+	*tmp_size = flow_d->total_transfered;
+	break;
+    default:
+	break;
+    }
+
     gen_mutex_unlock(&interface_mutex);
-    return (-ENOSYS);
+    return (0);
 }
 
 /*****************************************************************

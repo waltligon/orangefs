@@ -77,7 +77,8 @@ enum flow_state
 /* supported getinfo types */
 enum flow_getinfo_option
 {
-    FLOWPROTO_TYPE_QUERY = 1
+    FLOWPROTO_TYPE_QUERY = 1,
+    FLOW_AMT_COMPLETE_QUERY = 2
 };
 
 #define FLOW_MAX_CONTEXTS 16

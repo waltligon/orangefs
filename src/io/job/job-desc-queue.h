@@ -58,6 +58,8 @@ struct dev_unexp_desc
 struct flow_desc
 {
     flow_descriptor *flow_d;
+    PVFS_size last_amt_complete;
+    long timeout_sec;
 };
 
 /* describes request scheduler elements */

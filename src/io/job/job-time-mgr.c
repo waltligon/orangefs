@@ -73,14 +73,7 @@ int job_time_mgr_finalize(void)
     return(0);
 }
 
-/* job_time_mgr_add()
- *
- * adds a job to be monitored for timeout, timeout_sec is an interval in
- * seconds
- *
- * return 0 on success, -PVFS_error on failure
- */
-int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
+static int __job_time_mgr_add(struct job_desc* jd, int timeout_sec)
 {
     struct timeval tv;
     long expire_time_sec;
@@ -103,7 +96,10 @@ int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
     /* round up to the second that this job should expire */
     expire_time_sec = tv.tv_sec + timeout_sec;
 
-    gen_mutex_lock(&bucket_mutex);
+    if(jd->type == JOB_FLOW)
+    {
+	jd->u.flow.timeout_sec = timeout_sec;
+    }
 
     /* look for a bucket matching the desired seconds value */
     qlist_for_each(tmp_link, &bucket_queue)
@@ -148,9 +144,26 @@ int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
     qlist_add_tail(&jd->job_time_link, &tmp_bucket->jd_queue);
     jd->time_bucket = tmp_bucket;
 
+    return(0);
+}
+/* job_time_mgr_add()
+ *
+ * adds a job to be monitored for timeout, timeout_sec is an interval in
+ * seconds
+ *
+ * return 0 on success, -PVFS_error on failure
+ */
+int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
+{
+    int ret = -1;
+
+    gen_mutex_lock(&bucket_mutex);
+
+    ret = __job_time_mgr_add(jd, timeout_sec);
+
     gen_mutex_unlock(&bucket_mutex);
 
-    return(0);
+    return(ret);
 }
 
 /* job_time_mgr_rem()
@@ -204,6 +217,7 @@ int job_time_mgr_expire(void)
     struct time_bucket* tmp_bucket = NULL;
     struct job_desc* jd = NULL;
     int ret = -1;
+    PVFS_size tmp_size = 0;
 
     gettimeofday(&tv, NULL);
 
@@ -233,7 +247,21 @@ int job_time_mgr_expire(void)
 		ret = job_bmi_cancel(jd->job_id, jd->context_id);
 		break;
 	    case JOB_FLOW:
-		ret = job_flow_cancel(jd->job_id, jd->context_id);
+		/* have we made any progress since last time we checked? */
+		PINT_flow_getinfo(jd->u.flow.flow_d,
+		    FLOW_AMT_COMPLETE_QUERY, &tmp_size);
+		if(tmp_size > jd->u.flow.last_amt_complete)
+		{
+		    /* if so, then update progress and reset timer */
+		    jd->u.flow.last_amt_complete = tmp_size;
+		    __job_time_mgr_add(jd, jd->u.flow.timeout_sec);
+		    ret = 0;
+		}
+		else
+		{
+		    /* otherwise kill the flow */
+		    ret = job_flow_cancel(jd->job_id, jd->context_id);
+		}
 		break;
 	    case JOB_TROVE:
 		ret = job_trove_dspace_cancel(jd->u.trove.fsid, jd->job_id,
