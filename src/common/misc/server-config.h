@@ -66,7 +66,11 @@ typedef struct filesystem_configuration_s
     enum PVFS_flowproto_type flowproto; /* default flowprotocol */
     enum PVFS_encoding_type encoding;   /* encoding used for messages */
 
-    /* misc storage hints */
+    /*
+      misc storage hints
+      NOTE: will need to be a union later depending
+      on which trove storage backends are available
+    */
     struct timeval handle_purgatory;
     char *attr_cache_keywords;
     int attr_cache_size;
