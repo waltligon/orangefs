@@ -1072,9 +1072,10 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 		/* kill the address */
 		gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
 		    "bmi discarding address: %Lu\n", Lu(addr));
-		tmp_ref->interface->BMI_meth_set_info(BMI_DROP_ADDR,
-		    tmp_ref->method_addr);
 		ref_list_rem(cur_ref_list, addr);
+		/* NOTE: this triggers request to module to free underlying
+		 * resources if it wants to
+		 */
 		dealloc_ref_st(tmp_ref);
 	    }
 	}
