@@ -322,6 +322,14 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p)
     {
         PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
     }
+
+    /* decrement reference count for this bmi address */
+    /* NOTE: this would happen in final_response nested state machine for
+     * most operations, but io.sm is the one state machine which does not
+     * use final_response
+     */
+    BMI_set_info(s_op->addr, BMI_DEC_ADDR_REF, NULL);
+
     return(server_state_machine_complete(s_op));
 }
 

@@ -170,6 +170,9 @@ static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 
     PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 
+    /* decrement reference count for this bmi address */
+    BMI_set_info(s_op->addr, BMI_DEC_ADDR_REF, NULL);
+
     js_p->error_code = 0;
     return 1;
 }

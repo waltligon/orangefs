@@ -70,6 +70,12 @@ static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
                  "(%p) %s (prelude sm) state: req_sched\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
 
+    /* this is the first state for every normal pvfs2 server state machine,
+     * so we get to do some housekeeping here.  In particular, bump up the
+     * reference count on the bmi address that we are using 
+     */
+    BMI_set_info(s_op->addr, BMI_INC_ADDR_REF, NULL);
+
     /* this is a bit of a hack; if we are changing server mode we
      * must preserve the old mode value before calling req scheduler
      */

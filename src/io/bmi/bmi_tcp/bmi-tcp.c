@@ -643,6 +643,7 @@ int BMI_tcp_set_info(int option,
     case BMI_DEC_ADDR_REF:
 	tmp_addr = (method_addr_p) inout_parameter;
 	tmp_addr->ref_count++;
+	assert(tmp_addr->ref_count >= 0);
 	ret = 0;
 	break;
     default:
