@@ -24,8 +24,6 @@ general server functionality:
 - finishing file system semantics documentation
 - don't forget to define semantics for access times
 - access control, general security model
-- better error handling when unsupported request received
-- making server run as background daemon
 - testing multiple meta servers
 - more config file options:
   - bmi, trove, and flow methods
@@ -72,8 +70,6 @@ system installation:
 ====================================================================
 - make install target
 - reducing number of headers required for installation
-- creating pvfs2.h
-- reducing number of libraries needed by libpvfs2.a
 - quickstart guide
 
 performance tuning:
