@@ -5,7 +5,7 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.6.0pre1
 ===============
-- 
+- kill pvfs2-import and pvfs2-export in favor of pvfs2-cp 
 
 
 pvfs2-0.5.1
