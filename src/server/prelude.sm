@@ -22,7 +22,9 @@
  */
 
 /* TODO: document pre and post conditions (what server_op fields do we
- * require, and which ones do we modify?
+ * require, and which ones do we modify?) 
+ * TODO: don't forget in particular to document what we do with the 
+ * s_op->attr structure, so other state machines know how to use it
  */
 
 static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p);
