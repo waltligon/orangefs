@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -67,7 +68,11 @@ void op_cache_initialize(
     op_cache = kmem_cache_create("pvfs2_op_cache",
 				 sizeof(pvfs2_kernel_op_t),
 				 0,
+#ifdef CONFIG_DEBUG_SLAB
 				 SLAB_POISON | SLAB_RED_ZONE,
+#else
+				 0,
+#endif
 				 op_cache_ctor, NULL);
     if (!op_cache)
     {
@@ -120,7 +125,11 @@ void dev_req_cache_initialize(
     dev_req_cache = kmem_cache_create("pvfs2_dev_req_cache",
 				      MAX_DEV_REQ_DOWNSIZE,
 				      0,
+#ifdef CONFIG_DEBUG_SLAB
 				      SLAB_POISON | SLAB_RED_ZONE,
+#else
+				      0,
+#endif
 				      dev_req_cache_ctor, NULL);
     if (!dev_req_cache)
     {
@@ -189,7 +198,11 @@ void pvfs2_inode_cache_initialize(
     pvfs2_inode_cache = kmem_cache_create("pvfs2_inode_cache",
 					  sizeof(pvfs2_inode_t),
 					  0,
+#ifdef CONFIG_DEBUG_SLAB
 					  SLAB_POISON | SLAB_RED_ZONE,
+#else
+					  0,
+#endif
 					  pvfs2_inode_cache_ctor,
                                           pvfs2_inode_cache_dtor);
     if (!pvfs2_inode_cache)
