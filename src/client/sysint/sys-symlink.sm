@@ -460,8 +460,7 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
                               *sm_p->u.sym.sys_attr,
                               (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_SYMLNK_ALL));
 
-    /* fill in meta file specific attributes */
-
+    /* fill in symlink specific attributes */
     msg_p->req.u.setattr.attr.u.sym.target_path =
         sm_p->u.sym.link_target;
     msg_p->req.u.setattr.attr.u.sym.target_path_len =

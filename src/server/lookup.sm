@@ -244,7 +244,9 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
     if (s_op->u.lookup.seg_nr == 0) a_p = &s_op->u.lookup.base_attr;
     else                            a_p = &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.seg_nr - 1];
 
-    assert(a_p->objtype == PVFS_TYPE_DIRECTORY || a_p->objtype == PVFS_TYPE_METAFILE);
+    assert(((a_p->objtype == PVFS_TYPE_DIRECTORY) ||
+            (a_p->objtype == PVFS_TYPE_METAFILE)  ||
+            (a_p->objtype == PVFS_TYPE_SYMLINK)));
 
     gossip_debug(SERVER_DEBUG,
 		 "  attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
@@ -256,6 +258,18 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
     /* if we hit a metafile, we are done */
     if (a_p->objtype == PVFS_TYPE_METAFILE) {
 	gossip_debug(SERVER_DEBUG, "  object is a metafile; halting lookup and sending response\n");
+	js_p->error_code = STATE_ENOTDIR;
+	return 1;
+    }
+
+    /*
+      FIXME: if we hit a symlink, we need to tell lookup that
+      the path to lookup has now changed; for now, bail like metafile
+    */
+    if (a_p->objtype == PVFS_TYPE_SYMLINK)
+    {
+	gossip_debug(SERVER_DEBUG, "  object is a symlink; halting "
+                     "lookup and sending response\n");
 	js_p->error_code = STATE_ENOTDIR;
 	return 1;
     }

@@ -110,6 +110,9 @@ int main(int argc,char **argv)
             case PVFS_TYPE_DIRECTORY:
 		printf("directory\n");
 		break;
+            case PVFS_TYPE_SYMLINK:
+                printf("symlink\n");
+                break;
             default:
 		printf("unknown object type!\n");
 		break;
