@@ -44,14 +44,28 @@ typedef struct dcache dcache;
 
 
 /* Function Prototypes */
-int dcache_lookup(struct dcache *cache, char *name, pinode_reference parent,
-		pinode_reference *entry);
-int dcache_insert(struct dcache *cache, char *name, pinode_reference entry,
-		pinode_reference parent);
+int dcache_lookup(
+	struct dcache *cache, 
+	char *name, 
+	pinode_reference parent,
+	pinode_reference *entry);
+
+int dcache_insert(
+	struct dcache *cache, 
+	char *name, 
+	pinode_reference entry,
+	pinode_reference parent);
+
 int dcache_flush(struct dcache cache);
-int dcache_remove(struct dcache *cache, char *name, pinode_reference parent,
-		unsigned char *item_found);
+
+int dcache_remove(
+	struct dcache *cache, 
+	char *name, 
+	pinode_reference parent,
+	unsigned char *item_found);
+
 int dcache_initialize(struct dcache *cache);
+
 int dcache_finalize(struct dcache *cache);
 
 #endif 
