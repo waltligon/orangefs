@@ -209,15 +209,6 @@ struct dentry *pvfs2_lookup(
     return NULL;
 }
 
-static int pvfs2_link(
-    struct dentry *old_dentry,
-    struct inode *dir,
-    struct dentry *dentry)
-{
-    pvfs2_print("pvfs2_link: called (returning -ENOSYS)\n");
-    return -ENOSYS;
-}
-
 /* return 0 on success; non-zero otherwise */
 static int pvfs2_unlink(
     struct inode *dir,
@@ -409,7 +400,6 @@ struct inode_operations pvfs2_dir_inode_operations =
 #ifdef PVFS2_LINUX_KERNEL_2_4
     create : pvfs2_create,
     lookup : pvfs2_lookup,
-    link : pvfs2_link,
     unlink : pvfs2_unlink,
     symlink : pvfs2_symlink,
     mkdir : pvfs2_mkdir,
@@ -420,7 +410,6 @@ struct inode_operations pvfs2_dir_inode_operations =
 #else
     .create = pvfs2_create,
     .lookup = pvfs2_lookup,
-    .link = pvfs2_link,
     .unlink = pvfs2_unlink,
     .symlink = pvfs2_symlink,
     .mkdir = pvfs2_mkdir,

@@ -433,7 +433,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     db_recno_t recno;
     TROVE_ds_storedattr_s s_attr;
-    TROVE_handle dummy_handle;
+    TROVE_handle dummy_handle = TROVE_HANDLE_NULL;
     struct open_cache_ref tmp_ref;
 
     if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END)
@@ -455,6 +455,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     ret = tmp_ref.db_p->cursor(tmp_ref.db_p, NULL, &dbc_p, 0);
     if (ret != 0)
     {
+        ret = -dbpf_db_error_to_trove_error(ret);
+        gossip_err("failed to get a cursor\n");
         goto return_error;
     }
 
@@ -477,7 +479,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          * well, so that we can use the same loop below to read the
          * remainder in this or the above case.
          */
-        dummy_handle = *op_p->u.d_iterate_handles.position_p;
+        dummy_handle = (TROVE_handle)
+            (*op_p->u.d_iterate_handles.position_p);
         memset(&key, 0, sizeof(key));
         key.data  = &dummy_handle;
         key.size  = key.ulen = sizeof(dummy_handle);
@@ -496,6 +499,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         else if (ret != 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
+            gossip_err("failed to set cursor position at %Lu\n",
+                       Lu(dummy_handle));
             goto return_error;
         }
     }
@@ -520,6 +525,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         }
         else if (ret != 0)
         {
+            ret = -dbpf_db_error_to_trove_error(ret);
             gossip_err("c_get failed on iteration %d\n", i);
             goto return_error;
         }
@@ -538,8 +544,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          * note: key field is ignored by c_get in this case
          */
         memset(&key, 0, sizeof(key));
-        key.data  = &dummy_handle;
-        key.size  = key.ulen = sizeof(dummy_handle);
+        key.data = &dummy_handle;
+        key.size = key.ulen = sizeof(dummy_handle);
         key.flags |= DB_DBT_USERMEM;
 
         memset(&data, 0, sizeof(data));
@@ -564,7 +570,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 
     *op_p->u.d_iterate_handles.count_p = i;
 
-    if(dbc_p)
+    if (dbc_p)
     {
         dbc_p->c_close(dbc_p);
     }
@@ -573,11 +579,10 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     return 1;
 
 return_error:
-    *op_p->u.d_iterate_handles.count_p = i; 
-    gossip_err("dbpf_dspace_iterate_handles_op_svc: %s\n",
-               db_strerror(ret));
- 
-    if(dbc_p)
+    *op_p->u.d_iterate_handles.count_p = i;
+    PVFS_perror_gossip("dbpf_dspace_iterate_handles_op_svc", ret);
+
+    if (dbc_p)
     {
         dbc_p->c_close(dbc_p);
     }

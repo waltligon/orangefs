@@ -146,18 +146,19 @@ int pvfs2_mmap_ra_cache_get_block(
             }
             else
             {
-                int actual_len = ((offset + len) - cache_elem->data_sz);
+                int actual_len = (int)
+                    ((offset + len) - cache_elem->data_sz);
 
                 gossip_debug(
                     GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
-                    "found block but offset/len [%Lu/%Lu] are "
-                    "invalid\n", Lu(offset), Lu(len));
+                    "found invalid block [%Lu/%Lu]\n",
+                    Lu(offset), Lu(len));
 
                 if (actual_len > 0)
                 {
                     gossip_debug(
                         GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %Lu, "
-                        "offset is %Lu len is %Lu (filling partial %d "
+                        "offset is %Lu len is %Lu\n\t(filling partial %d "
                         "bytes)\n", Lu(cache_elem->data_sz), Lu(offset),
                         Lu(len), actual_len);
 

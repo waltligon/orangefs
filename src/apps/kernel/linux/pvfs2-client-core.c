@@ -1009,8 +1009,15 @@ static int post_io_request(vfs_request_t *vfs_request)
 
     if (vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ)
     {
-        /* check readahead cache for the read data being requested */
-        if (vfs_request->in_upcall.req.io.count > 0)
+        /*
+          if a non-zero readahead size and count are specified, check
+          the readahead cache for the read data being requested --
+          this should always be the case during mmap/execution, but
+          never the case during normal I/O reads (to avoid this
+          overhead in the common case)
+        */
+        if ((vfs_request->in_upcall.req.io.count > 0) &&
+            (vfs_request->in_upcall.req.io.readahead_size > 0))
         {
             vfs_request->io_tmp_buf = (char *)
                 ((vfs_request->in_upcall.req.io.count <=
@@ -1032,7 +1039,7 @@ static int post_io_request(vfs_request_t *vfs_request)
 
                 gossip_debug(
                     GOSSIP_MMAP_RCACHE_DEBUG, "[%Lu,%d] checking"
-                    " for %d bytes at offset %lu in cache\n",
+                    " for %d bytes at offset %lu\n",
                     Lu(vfs_request->in_upcall.req.io.refn.handle),
                     vfs_request->in_upcall.req.io.refn.fs_id,
                     (int)vfs_request->in_upcall.req.io.count,
@@ -2027,7 +2034,7 @@ int main(int argc, char **argv)
     start_time = time(NULL);
     local_time = localtime(&start_time);
 
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,  "\n\n***********************"
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,  "***********************"
                  "****************************\n");
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  " %s starting at %.4d-%.2d-%.2d %.2d:%.2d\n",

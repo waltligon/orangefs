@@ -45,8 +45,8 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->parent_ref.handle,
         PVFS_ATTR_COMMON_ALL);
 
-    sm_p->msgpair.fs_id   = sm_p->parent_ref.fs_id;
-    sm_p->msgpair.handle  = sm_p->parent_ref.handle;
+    sm_p->msgpair.fs_id = sm_p->parent_ref.fs_id;
+    sm_p->msgpair.handle = sm_p->parent_ref.handle;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = PINT_sm_common_object_getattr_comp_fn;
 
@@ -133,7 +133,7 @@ int PINT_sm_common_object_getattr_comp_fn(
 {
     int ret = -PVFS_EINVAL;
     PVFS_object_attr *attr = NULL;
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_sm_common_getattr_object_comp_fn\n");
@@ -186,7 +186,7 @@ int PINT_sm_common_object_getattr_comp_fn(
 
     /*
       if we didn't get a acache hit, we're making a copy of the
-      attributes here so that we can add a acache entry later in
+      attributes here so that we can add an acache entry later in
       cleanup.
     */
     if (!sm_p->acache_hit)

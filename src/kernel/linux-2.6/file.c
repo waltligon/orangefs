@@ -80,7 +80,7 @@ ssize_t pvfs2_inode_read(
     size_t count,
     loff_t *offset,
     int copy_to_user,
-    int readahead_size)
+    loff_t readahead_size)
 {
     int ret = -1, error_exit = 0;
     size_t each_count = 0, amt_complete = 0;
