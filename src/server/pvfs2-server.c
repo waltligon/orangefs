@@ -204,6 +204,7 @@ int main(int argc, char **argv)
 	goto server_shutdown;
     }
 
+#ifndef __PVFS2_DISABLE_PERF_COUNTERS__
     /* kick off performance update state machine */
     ret = server_state_machine_start_noreq(PVFS_SERV_PERF_UPDATE);
     if(ret < 0)
@@ -211,6 +212,7 @@ int main(int argc, char **argv)
 	gossip_lerr("Error: failed to start perf update state machine.\n");
 	goto server_shutdown;
     }
+#endif
 
     /* Initialization complete; process server requests indefinitely. */
     for ( ;; )  
@@ -642,6 +644,7 @@ static int server_initialize_subsystems(
     }
     *server_status_flag |= SERVER_REQ_SCHED_INIT;
 
+#ifndef __PVFS2_DISABLE_PERF_COUNTERS__
     /* initialize performanc monitoring */
     ret = PINT_perf_initialize();
     if(ret < 0)
@@ -650,6 +653,7 @@ static int server_initialize_subsystems(
 	return(ret);
     }
     *server_status_flag |= SERVER_PERF_COUNTER_INIT;
+#endif
 
     return ret;
 }

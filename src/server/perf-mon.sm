@@ -73,6 +73,12 @@ static int perf_mon_do_work(PINT_server_op *s_op, job_status_s* js_p)
 
     PINT_STATE_DEBUG("do_work");
 
+#ifdef __PVFS2_DISABLE_PERF_COUNTERS__
+    gossip_err("Error: perf_mon request received, but perf counters are disabled.\n");
+    js_p->error_code = -PVFS_ENOSYS;
+    return(1);
+#endif
+
     /* allocate memory to hold statistics */
     s_op->resp.u.mgmt_perf_mon.perf_array 
 	= (struct PVFS_mgmt_perf_stat*)malloc(s_op->req->u.mgmt_perf_mon.count *

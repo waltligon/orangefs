@@ -111,6 +111,13 @@ AC_ARG_ENABLE(verbose-build,
 ,
 QUIET_COMPILE=1)
 
+dnl a mechanism to turn off perf counters
+AC_ARG_ENABLE(perf-counters,
+[  --disable-perf-counters Disables pvfs2-server performance counters],
+[if test x$enableval = xno; then
+    CFLAGS="$CFLAGS -D__PVFS2_DISABLE_PERF_COUNTERS__"
+fi]
+,)
 
 AC_SUBST(QUIET_COMPILE)
 
