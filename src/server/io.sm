@@ -119,6 +119,7 @@ static int io_get_size(PINT_server_op *s_op, job_status_s* js_p)
 		s_op->req->u.io.fs_id,
 		s_op->req->u.io.handle,
 		s_op,
+                &(s_op->ds_datafile_attr),
 		0, 
 		js_p,
 		&tmp_id,
@@ -158,7 +159,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
 	 * failed to get the size, or failed for permission reasons
 	 */
 	s_op->resp.status = js_p->error_code;
-	s_op->resp.u.io.bstream_size = js_p->ds_attr.b_size;
+	s_op->resp.u.io.bstream_size = s_op->ds_datafile_attr.b_size;
 
 	err = PINT_encode(
 		&s_op->resp, 

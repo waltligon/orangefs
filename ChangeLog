@@ -5,7 +5,7 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.0.7pre1
 ===============
-- 
+- Re-worked architecture of metadata storage
 
 pvfs2-0.0.6
 ===========

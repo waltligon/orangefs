@@ -97,56 +97,57 @@ machine pvfs2_remove_sm(prelude,
 	}
 
 	state fallback_to_dspace_getattr
-	    {
-		run remove_fallback_to_dspace_getattr;
-		success => verify_dspace_attributes;
-		default => final_response;
-	    }
+	{
+            run remove_fallback_to_dspace_getattr;
+            success => verify_dspace_attributes;
+            default => final_response;
+        }
 
 	state verify_dspace_attributes
-	    {
-		run remove_verify_dspace_attributes;
-		success => remove_dspace;
-		default => final_response;
-	    }
-	state verify_object_metadata
 	{
-		run remove_verify_object_metadata;
-		STATE_TYPE_DIRECTORY => try_to_read_dirdata_handle;
-		success => remove_dspace;
-		default => final_response;
+            run remove_verify_dspace_attributes;
+            success => remove_dspace;
+            default => final_response;
+        }
+	
+        state verify_object_metadata
+	{
+            run remove_verify_object_metadata;
+            STATE_TYPE_DIRECTORY => try_to_read_dirdata_handle;
+            success => remove_dspace;
+            default => final_response;
 	}
 
 	state remove_dspace
 	{
-		run remove_remove_dspace;
-		default => final_response;
+            run remove_remove_dspace;
+            default => final_response;
 	}
 
 	state try_to_read_dirdata_handle
-	    {
-		run remove_try_to_read_dirdata_handle;
-		success => remove_dirdata_dspace;
-		default => remove_dspace;
-	    }
+	{
+            run remove_try_to_read_dirdata_handle;
+            success => remove_dirdata_dspace;
+            default => remove_dspace;
+        }
 
 	state remove_dirdata_dspace
-	    {
-		run remove_remove_dirdata_dspace;
-		success => remove_dspace;
-		default => final_response;
-	    }
+        {
+            run remove_remove_dirdata_dspace;
+            success => remove_dspace;
+            default => final_response;
+        }
 
 	state final_response
 	{
-		jump pvfs2_final_response_sm;
-		default => cleanup;
+            jump pvfs2_final_response_sm;
+            default => cleanup;
 	}
 
 	state cleanup
 	{
-		run remove_cleanup;
-		default => prelude;
+            run remove_cleanup;
+            default => prelude;
 	}
 }
 
@@ -181,15 +182,15 @@ static int remove_check_object_type(PINT_server_op *s_op,
 /*
  * Function: remove_fallback_to_dspace_getattr
  *
- * Initiate a dspace_getattr to read the attributes for the object, since we were
- * unable to find the metadata as a keyval.
+ * Initiate a dspace_getattr to read the attributes for the object,
+ * since we were unable to find the metadata.
  *
  * Note: PVFS_ds_attributes structure is returned in the job_status_s (member ds_attr).
  */
 static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
 					     job_status_s *js_p)
 {
-    int ret;
+    int ret = -1;
     job_id_t j_id;
 
     PINT_STATE_DEBUG("fallback_to_dspace_getattr");
@@ -197,17 +198,20 @@ static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
     js_p->error_code = 0;
 
     gossip_debug(SERVER_DEBUG,
-		 "  reading dspace attributes (coll_id = 0x%x, handle = 0x%08Lx)\n",
+		 "  reading dspace attributes (coll_id = 0x%x, "
+                 "handle = 0x%08Lx)\n",
 		 s_op->req->u.remove.fs_id,
 		 Lu(s_op->req->u.remove.handle));
 
-    ret = job_trove_dspace_getattr(s_op->req->u.remove.fs_id,
-					    s_op->req->u.remove.handle,
-					    s_op, /* user ptr */
-					    0,
-					    js_p,
-					    &j_id,
-					    server_job_context);
+    ret = job_trove_dspace_getattr(
+        s_op->req->u.remove.fs_id,
+        s_op->req->u.remove.handle,
+        s_op, /* user ptr */
+        &(s_op->ds_datafile_attr),
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
     return ret;
 }
 
@@ -220,13 +224,15 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op,
 {
     PINT_STATE_DEBUG("verify_dspace_attributes");
 
-    if (js_p->error_code != 0) {
-	gossip_debug(SERVER_DEBUG,
-		     "  previous dspace getattr had an error; data is useless\n");
+    if (js_p->error_code != 0)
+    {
+	gossip_debug(SERVER_DEBUG, "  previous dspace getattr "
+                     "had an error; data is useless\n");
 	js_p->error_code = -PVFS_EINVAL;
     }
-    else {
-	PVFS_ds_attributes *a_p = &js_p->ds_attr;
+    else
+    {
+	PVFS_ds_attributes *a_p = &(s_op->ds_datafile_attr);
 
 	gossip_debug(SERVER_DEBUG,
 		     "  attrs read from dspace = (..., type = %d)\n",
@@ -234,13 +240,17 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op,
 
 	/* TODO: MAKE THIS AN ERROR INSTEAD */
 	/* assert(a_p->type == PVFS_TYPE_DATAFILE); */
-	/* NOTE: assert removed by Phil, 3-22-2003, to allow removal of metadata file in 
-	 * error cases in which there are no attributes yet.
-	 */
-	if(a_p->type != PVFS_TYPE_DATAFILE)
+	/*
+          NOTE: assert removed by Phil, 3-22-2003, to allow
+          removal of metadata file in 
+          error cases in which there are no attributes yet.
+        */
+	if (a_p->type != PVFS_TYPE_DATAFILE)
 	{
-	    gossip_debug(SERVER_DEBUG,
-		"WARNING: removing object of type %d, even though it does not appear to have valid attributes.\n", (int)a_p->type);
+	    gossip_debug(
+                SERVER_DEBUG, "WARNING: removing object of type %d, even "
+                "though it does not appear to have valid attributes.\n",
+                (int)a_p->type);
 	}
     }
     return 1;
@@ -249,7 +259,8 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op,
 /*
  * Function: remove_verify_object_metadata
  *
- * Verifies that the user has permission to access the file (not yet implemented).
+ * Verifies that the user has permission to access the file
+ * (not yet implemented).
  * Also directs removal of dirdata dspace in the case of a directory.
  *
  * This state has changed some over time; it might need a new name.
@@ -267,17 +278,20 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
     a_p = &s_op->attr;
     
     gossip_debug(SERVER_DEBUG,
-		 "  attrs read from keyval = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		 "  attrs read from keyval = (owner = %d, "
+                 "group = %d, perms = %o, type = %d)\n",
 		 a_p->owner,
 		 a_p->group,
 		 a_p->perms,
 		 a_p->objtype);
 
-    if (a_p->objtype == PVFS_TYPE_DIRECTORY) {
+    if (a_p->objtype == PVFS_TYPE_DIRECTORY)
+    {
 	js_p->error_code = STATE_TYPE_DIRECTORY;
-	
-	gossip_debug(SERVER_DEBUG,
-		     "  type is directory; removing dirdata object before removing directory itself.\n");
+
+	gossip_debug(
+            SERVER_DEBUG, "  type is directory; removing "
+            "dirdata object before removing directory itself.\n");
     }
     else
     {

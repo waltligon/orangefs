@@ -37,12 +37,11 @@ typedef struct PINT_server_trove_keys
 enum
 {
     ROOT_HANDLE_KEY      = 0,
-    METADATA_KEY         = 1,
-    DIR_ENT_KEY          = 2,
-    METAFILE_HANDLES_KEY = 3,
-    METAFILE_DIST_KEY    = 4,
-    SYMLINK_TARGET_KEY   = 5,
-    KEYVAL_ARRAY_SIZE    = 6
+    DIR_ENT_KEY          = 1,
+    METAFILE_HANDLES_KEY = 2,
+    METAFILE_DIST_KEY    = 3,
+    SYMLINK_TARGET_KEY   = 4,
+    KEYVAL_ARRAY_SIZE    = 5
 };
 
 typedef enum
@@ -83,7 +82,7 @@ struct PINT_server_lookup_op {
     void *segstate;
 
     PVFS_handle dirent_handle;
-    PVFS_object_attr base_attr; /* holds attributes of the base handle, which don't go in resp */
+    PVFS_ds_attributes *ds_attr_array;
 };
 
 struct PINT_server_readdir_op {
@@ -147,7 +146,14 @@ typedef struct PINT_server_op
     /* attributes structure associated with target of operation; may be 
      * partially filled in by prelude nested state machine (for 
      * permission checking); may be used/modified by later states as well
+     *
+     * the ds_attr is used by the prelude sm only; don't use it -- the
+     * object_attr is prepared for other sm's, so use it instead.
+     * similarly, the ds_datafile_attr is used internally only for
+     * getting the size of a bstream (used in get-attr.sm).
      */
+    PVFS_ds_attributes ds_attr;
+    PVFS_ds_attributes ds_datafile_attr;
     PVFS_object_attr attr;
 
     bmi_addr_t addr;   /* address of client that contacted us */

@@ -21,6 +21,9 @@
 #include "server-config.h"
 #include "extent-utils.h"
 
+static char *dir_ent_string = "dir_ent";
+static char *root_handle_string = "root_handle";
+
 int pvfs2_mkspace(
     char *storage_space,
     char *collection,
@@ -30,18 +33,15 @@ int pvfs2_mkspace(
     int create_collection_only,
     int verbose)
 {
-    int ret, count;
+    int ret = - 1, count = 0;
     TROVE_op_id op_id;
     TROVE_handle new_root_handle, ent_handle;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
-    char *method_name;
-    char metastring[] = "metadata";
-    char entstring[]  = "dir_ent";
-    struct PVFS_object_attr attr; /* from proto/pvfs2-attr.h */
-    static char root_handle_string[PATH_MAX] = "root_handle";
-    PVFS_handle_extent cur_extent;
-    PVFS_handle_extent_array extent_array;
+    char *method_name = NULL;
+    TROVE_ds_attributes_s attr;
+    TROVE_handle_extent cur_extent;
+    TROVE_handle_extent_array extent_array;
     TROVE_context_id trove_context = -1;
 
     if (verbose)
@@ -53,7 +53,7 @@ int pvfs2_mkspace(
         gossip_debug(SERVER_DEBUG,"Handle Ranges: %s\n",handle_ranges);
     }
 
-    new_root_handle = (PVFS_handle)root_handle;
+    new_root_handle = (TROVE_handle)root_handle;
 
     /*
       if we're only creating a collection inside an existing
@@ -159,9 +159,6 @@ int pvfs2_mkspace(
       if a root_handle is specified, 1) create a dataspace to
       hold the root directory 2) create the dspace for dir
       entries, 3) set attributes on the dspace
-
-      Q: where are we going to define the dspace types? --
-      trove-test.h for now.
     */
     if (new_root_handle != (TROVE_handle)0)
     {
@@ -199,10 +196,7 @@ int pvfs2_mkspace(
                          "with handle %Lu.\n", Lu(new_root_handle));
         }
 
-        /*
-          add attribute to collection for root handle
-          NOTE: should be using the data_sz field, but it doesn't exist yet.
-        */
+        /* set collection attribute for root handle */
         key.buffer = root_handle_string;
         key.buffer_sz = strlen(root_handle_string) + 1;
         val.buffer = &new_root_handle;
@@ -222,30 +216,23 @@ int pvfs2_mkspace(
             return -1;
         }
 
-        memset(&attr, 0, sizeof(attr));
-        attr.owner    = getuid();
-        attr.group    = getgid();
-        attr.perms    = 0777;
-	attr.atime    = time(NULL);
-	attr.ctime    = time(NULL);
-	attr.mtime    = time(NULL);
-        attr.objtype  = PVFS_TYPE_DIRECTORY;
-	attr.mask     = PVFS_ATTR_COMMON_ALL;
+        /* set root directory dspace attributes */
+        memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
+        attr.uid = getuid();
+        attr.gid = getgid();
+        attr.mode = 0777;
+	attr.atime = time(NULL);
+	attr.ctime = time(NULL);
+	attr.mtime = time(NULL);
+        attr.type = PVFS_TYPE_DIRECTORY;
 
-        key.buffer    = metastring;
-        key.buffer_sz = strlen(metastring) + 1;
-        val.buffer    = &attr;
-        val.buffer_sz = sizeof(attr);
-
-        ret = trove_keyval_write(coll_id,
-                                 new_root_handle,
-                                 &key,
-                                 &val,
-                                 TROVE_SYNC,
-                                 0 /* vtag */,
-                                 NULL /* user ptr */,
-                                 trove_context,
-                                 &op_id);
+        ret = trove_dspace_setattr(coll_id,
+                                   new_root_handle,
+                                   &attr,
+                                   TROVE_SYNC,
+                                   NULL /* user ptr */,
+                                   trove_context,
+                                   &op_id);
         while (ret == 0)
         {
             ret = trove_dspace_test(coll_id, op_id, trove_context,
@@ -254,8 +241,8 @@ int pvfs2_mkspace(
         }
         if (ret < 0)
         {
-            gossip_err("error: keyval write for root handle attributes "
-                       "failed; aborting!\n");
+            gossip_err("error: dspace setattr for root handle "
+                       "attributes failed; aborting!\n");
             return -1;
         }
 
@@ -294,8 +281,8 @@ int pvfs2_mkspace(
                          "with handle %Lu.\n", Lu(ent_handle));
         }
 
-        key.buffer    = entstring;
-        key.buffer_sz = strlen(entstring) + 1;
+        key.buffer    = dir_ent_string;
+        key.buffer_sz = strlen(dir_ent_string) + 1;
         val.buffer    = &ent_handle;
         val.buffer_sz = sizeof(TROVE_handle);
 

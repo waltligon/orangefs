@@ -125,49 +125,28 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PVFS_object_attr *a_p;
-    int ret;
-    job_id_t i;
+    int ret = -1;
+    job_id_t j_id;
+    PVFS_object_attr *a_p = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
 
     PINT_STATE_DEBUG("setattrib");
 
     /* save the handle from the create in the response */
     s_op->resp.u.mkdir.handle = js_p->handle;
 
-    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
-
-    s_op->val.buffer    = &(s_op->req->u.mkdir.attr);
-    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
-
     a_p = &(s_op->req->u.mkdir.attr);
-    gossip_debug(SERVER_DEBUG,
-		 "  attrs to write = (owner = %d, group = %d, perms = %o, type = %d)\n",
-		 a_p->owner,
-		 a_p->group,
-		 a_p->perms,
-		 a_p->objtype);
+    gossip_debug(SERVER_DEBUG, "  attrs to write = (owner = %d, "
+                 "group = %d, perms = %o, type = %d)\n",
+		 a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
-    gossip_debug(SERVER_DEBUG,
-		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->req->u.mkdir.fs_id,
-		 Lu(s_op->resp.u.mkdir.handle),
-		 (char *) s_op->key.buffer,
-		 s_op->key.buffer_sz,
-		 s_op->val.buffer,
-		 s_op->val.buffer_sz);
+    /* finally, translate attrs to storage attr format */
+    ds_attr = (&s_op->ds_attr);
+    PVFS_object_attr_to_ds_attr(a_p, ds_attr);
 
-    ret = job_trove_keyval_write(s_op->req->u.mkdir.fs_id,
-					  s_op->resp.u.mkdir.handle,
-					  &(s_op->key),
-					  &(s_op->val),
-					  TROVE_SYNC,
-					  NULL,
-					  s_op,
-					  0,
-					  js_p,
-					  &i,
-					  server_job_context);
+    ret = job_trove_dspace_setattr(
+        s_op->req->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
+        ds_attr, s_op, 0, js_p, &j_id, server_job_context);
 
     return(ret);
 }

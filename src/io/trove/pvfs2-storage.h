@@ -58,6 +58,8 @@ struct PVFS_ds_attributes_s
     PVFS_time ctime;
     PVFS_time mtime;
     PVFS_time atime;
+    uint32_t dfile_count;
+    uint32_t dist_size;
     /* NOTE: PUT NON-STORED AT THE BOTTOM!!! */
     PVFS_size b_size;		/* bstream size */
     PVFS_size k_size;		/* keyval size; # of keys */
@@ -75,6 +77,8 @@ struct PVFS_ds_storedattr_s
     PVFS_time ctime;
     PVFS_time mtime;
     PVFS_time atime;
+    uint32_t dfile_count;
+    uint32_t dist_size;
 };
 typedef struct PVFS_ds_storedattr_s PVFS_ds_storedattr;
 
@@ -89,6 +93,26 @@ do {									\
     (__to).b_size = (__b_size);						\
     (__to).k_size = (__k_size);						\
 } while (0);
+
+#define PVFS_ds_attr_to_object_attr(__dsa, __oa)           \
+do {                                                       \
+    __oa->owner = __dsa->uid; __oa->group = __dsa->gid;    \
+    __oa->perms = __dsa->mode; __oa->ctime = __dsa->ctime; \
+    __oa->mtime = __dsa->mtime; __oa->atime = __dsa->atime;\
+    __oa->objtype = __dsa->type;                           \
+    __oa->u.meta.dfile_count = __dsa->dfile_count;         \
+    __oa->u.meta.dist_size = __dsa->dist_size;             \
+} while(0)
+
+#define PVFS_object_attr_to_ds_attr(__oa, __dsa)           \
+do {                                                       \
+    __dsa->uid = __oa->owner; __dsa->gid = __oa->group;    \
+    __dsa->mode = __oa->perms; __dsa->ctime = __oa->ctime; \
+    __dsa->mtime = __oa->mtime; __dsa->atime = __oa->atime;\
+    __dsa->type = __oa->objtype;                           \
+    __dsa->dfile_count = __oa->u.meta.dfile_count;         \
+    __dsa->dist_size = __oa->u.meta.dist_size;             \
+} while(0)
 
 #endif /* __PVFS2_STORAGE_H */
 

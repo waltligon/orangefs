@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <client.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
 #include "pvfs2-util.h"
 
 /* TODO: this can be larger after system interface readdir logic
@@ -43,7 +45,8 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
     pinode_refn.fs_id = fs_id;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
-    if (PVFS_sys_getattr(pinode_refn, attrmask, credentials, &getattr_response))
+    if (PVFS_sys_getattr(pinode_refn, attrmask,
+                         credentials, &getattr_response))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
                 "(fs_id is %d)\n",Lu(handle),fs_id);
@@ -102,48 +105,51 @@ int directory_walk(PVFS_sysresp_init *init_response,
 
     print_at_depth(name,depth);
 
-    memset(&rd_response,0,sizeof(PVFS_sysresp_readdir));
-
     pinode_refn.handle = lk_response.pinode_refn.handle;
     pinode_refn.fs_id = init_response->fsid_list[0];
-    token = PVFS_READDIR_START;
+    token = 0;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
 
-    if (PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,
-			 &rd_response))
+    do
     {
-        fprintf(stderr,"Failed to perform readdir operation\n");
-        return 1;
-    }
-
-    if (!rd_response.pvfs_dirent_outcount)
-    {
-        gossip_debug(CLIENT_DEBUG,"No files found.\n");
-        return 0;
-    }
-
-    gossip_debug(CLIENT_DEBUG, "%d files found.\n",
-                 rd_response.pvfs_dirent_outcount);
-    for(i = 0; i < rd_response.pvfs_dirent_outcount; i++)
-    {
-        cur_file = rd_response.dirent_array[i].d_name;
-        cur_handle = rd_response.dirent_array[i].handle;
-
-        gossip_debug(CLIENT_DEBUG,"Got handle 0x%08Lx\n",Lu(cur_handle));
-
-        is_dir = is_directory(cur_handle,
-                              init_response->fsid_list[0]);
-        switch(is_dir)
+        memset(&rd_response,0,sizeof(PVFS_sysresp_readdir));
+        if (PVFS_sys_readdir(pinode_refn,
+                             (!token ? PVFS_READDIR_START : token),
+                             pvfs_dirent_incount,
+                             credentials, &rd_response))
         {
-            case -1:
-                /* if we had an error, warn */
-                gossip_err("Failed to get attributes.  Skipping file %s\n",
-                       cur_file);
-                break;
-            case 0:
-                /* if we have a normal file, print it */
+            fprintf(stderr,"Failed to perform readdir operation\n");
+            return 1;
+        }
+
+        if (!rd_response.pvfs_dirent_outcount)
+        {
+            gossip_debug(CLIENT_DEBUG,"No files found.\n");
+            return 0;
+        }
+
+        gossip_debug(CLIENT_DEBUG, "%d files found.\n",
+                     rd_response.pvfs_dirent_outcount);
+        for(i = 0; i < rd_response.pvfs_dirent_outcount; i++)
+        {
+            cur_file = rd_response.dirent_array[i].d_name;
+            cur_handle = rd_response.dirent_array[i].handle;
+
+            gossip_debug(CLIENT_DEBUG,"Got handle 0x%08Lx\n",Lu(cur_handle));
+
+            is_dir = is_directory(cur_handle,
+                                  init_response->fsid_list[0]);
+            switch(is_dir)
+            {
+                case -1:
+                    /* if we had an error, warn */
+                    gossip_err("Failed to get attributes.  Skipping "
+                               "file %s\n", cur_file);
+                    break;
+                case 0:
+                    /* if we have a normal file, print it */
                 {
                     char buf[PVFS_NAME_MAX] = {0};
                     snprintf(buf,PVFS_NAME_MAX,"%s/%s",
@@ -152,17 +158,25 @@ int directory_walk(PVFS_sysresp_init *init_response,
                     print_at_depth(buf,depth);
                 }
                 break;
-            case 1:
-                /* if we have a dir, recurse */
-                if (directory_walk(init_response,cur_file,full_path,depth+1))
-                {
-                    fprintf(stderr,"Failed directory walk at depth %d\n",
-                            depth+1);
-                    return 1;
-                }
-                break;
+                case 1:
+                    /* if we have a dir, recurse */
+                    if (directory_walk(init_response,cur_file,
+                                       full_path,depth+1))
+                    {
+                        fprintf(stderr,"Failed directory walk at "
+                                "depth %d\n", depth+1);
+                        return 1;
+                    }
+                    break;
+            }
         }
-    }
+
+        token += rd_response.pvfs_dirent_outcount;
+        if (rd_response.pvfs_dirent_outcount)
+            free(rd_response.dirent_array);
+
+    } while(rd_response.pvfs_dirent_outcount != 0);
+
     return 0;
 }
 

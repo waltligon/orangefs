@@ -15,20 +15,26 @@
 #include "pvfs2-attr.h"
 #include "str-utils.h"
 
-/* TODO: DO WE NEED THESE TO BE HERE?  WHAT'S THE RIGHT WAY TO DO THIS? */
 enum 
 {
     STATE_ENOTDIR = 22,
     STATE_NOMORESEGS = 23
 };
 
-static int lookup_init(PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_verify_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_init(PINT_server_op *s_op,
+                       job_status_s* js_p);
+static int lookup_cleanup(PINT_server_op *s_op,
+                          job_status_s* js_p);
+static int lookup_read_object_metadata(PINT_server_op *s_op,
+                                       job_status_s* js_p);
+static int lookup_verify_object_metadata(PINT_server_op *s_op,
+                                         job_status_s* js_p);
+static int lookup_read_directory_entry(PINT_server_op *s_op,
+                                       job_status_s* js_p);
+static int lookup_read_directory_entry_handle(PINT_server_op *s_op,
+                                              job_status_s* js_p);
+static int lookup_setup_resp(PINT_server_op *s_op,
+                             job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -45,64 +51,64 @@ machine pvfs2_lookup_sm(prelude,
 			cleanup)
 {
     state prelude
-	{
-	    jump pvfs2_prelude_sm;
-	    success => init;
-	    default => final_response;
-	}
+    {
+        jump pvfs2_prelude_sm;
+        success => init;
+        default => final_response;
+    }
 
     state init
-	{
-	    run lookup_init;
-	    STATE_ENOTDIR => setup_resp;
-	    default       => read_object_metadata;
-	}
+    {
+        run lookup_init;
+        STATE_ENOTDIR => setup_resp;
+        default       => read_object_metadata;
+    }
 
     state read_object_metadata
-	{
-	    run lookup_read_object_metadata;
-	    success => verify_object_metadata;
-	    default => setup_resp;
-	}
+    {
+        run lookup_read_object_metadata;
+        success => verify_object_metadata;
+        default => setup_resp;
+    }
 
     state verify_object_metadata
-	{
-	    run lookup_verify_object_metadata;
-	    success          => read_directory_entry_handle;
-	    default          => setup_resp;
-	}
+    {
+        run lookup_verify_object_metadata;
+        success => read_directory_entry_handle;
+        default => setup_resp;
+    }
 
     state read_directory_entry_handle
-	{
-	    run lookup_read_directory_entry_handle;
-	    success => read_directory_entry;
-	    default => setup_resp;
-	}
+    {
+        run lookup_read_directory_entry_handle;
+        success => read_directory_entry;
+        default => setup_resp;
+    }
 
     state read_directory_entry
-	{
-	    run lookup_read_directory_entry;
-	    success => read_object_metadata;
-	    default => setup_resp;
-	}
-
+    {
+        run lookup_read_directory_entry;
+        success => read_object_metadata;
+        default => setup_resp;
+    }
+    
     state setup_resp 
-	{
-	    run lookup_setup_resp;
-	    default => final_response;
-	}
+    {
+        run lookup_setup_resp;
+        default => final_response;
+    }
 
     state final_response 
-	{
-	    jump pvfs2_final_response_sm;
-	    default => cleanup;
-	}
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
 
     state cleanup
-	{
-	    run lookup_cleanup;
-	    default => prelude;
-	}
+    {
+        run lookup_cleanup;
+        default => prelude;
+    }
 }
 
 %%
@@ -150,17 +156,24 @@ static int lookup_init(PINT_server_op *s_op,
         return 0;
     }
 
+    /* allocate the internal ds_attr_array */
+    s_op->u.lookup.ds_attr_array = (PVFS_ds_attributes *)
+        malloc(s_op->u.lookup.seg_ct * sizeof(PVFS_ds_attributes));
+    assert(s_op->u.lookup.ds_attr_array);
+
     /* allocate memory
      *
-     * Note: all memory is allocated in a single block, pointed to by s_op->resp.u.lookup_path.handle_array
+     * Note: all memory is allocated in a single block,
+     * pointed to by s_op->resp.u.lookup_path.handle_array
      */
     ptr = malloc(s_op->u.lookup.seg_ct *
                  (sizeof(PVFS_handle) + sizeof(PVFS_object_attr)));
-    assert(ptr != NULL);
+    assert(ptr);
 
-    s_op->resp.u.lookup_path.handle_array = (PVFS_handle *) ptr;
-    ptr += s_op->u.lookup.seg_ct * sizeof(PVFS_handle);
-    s_op->resp.u.lookup_path.attr_array = (PVFS_object_attr *) ptr;
+    s_op->resp.u.lookup_path.handle_array = (PVFS_handle *)ptr;
+    ptr += (s_op->u.lookup.seg_ct * sizeof(PVFS_handle));
+
+    s_op->resp.u.lookup_path.attr_array = (PVFS_object_attr *)ptr;
 
     js_p->error_code = 0;
     return(1);
@@ -181,9 +194,10 @@ static int lookup_init(PINT_server_op *s_op,
 static int lookup_read_object_metadata(PINT_server_op *s_op,
 				       job_status_s* js_p)
 {
-    int ret;
+    int ret = -1;
     job_id_t j_id;
     PVFS_handle handle;
+    PVFS_ds_attributes *ds_attr = NULL;
 
     PINT_STATE_DEBUG("read_object_metadata");
 
@@ -193,54 +207,23 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
     if (s_op->u.lookup.seg_nr == 0)
     {
         handle = s_op->req->u.lookup_path.starting_handle;
+        ds_attr = &(s_op->u.lookup.ds_attr_array[0]);
     }
     else
     {
         handle = s_op->resp.u.lookup_path.handle_array[
             s_op->u.lookup.seg_nr-1];
+        ds_attr = &(s_op->u.lookup.ds_attr_array[
+                        s_op->u.lookup.seg_nr - 1]);
     }
-
-    /* initialize keyvals prior to read list call */
-
-    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
-
-    if (s_op->u.lookup.seg_nr == 0)
-    {
-        s_op->val.buffer = &s_op->u.lookup.base_attr;
-    }
-    else
-    {
-        s_op->val.buffer = &s_op->resp.u.lookup_path.attr_array[
-            s_op->u.lookup.seg_nr-1];
-    }
-
-    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
-
-    gossip_debug(SERVER_DEBUG,
-                 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->req->u.lookup_path.fs_id,
-		 Lu(handle),
-		 (char *) s_op->key.buffer,
-		 s_op->key.buffer_sz,
-		 s_op->val.buffer,
-		 s_op->val.buffer_sz);
 
     /* update our successful handle read count */
     s_op->u.lookup.handle_ct++;
 
-    ret = job_trove_keyval_read(
-        s_op->req->u.lookup_path.fs_id,
-        handle,
-        &s_op->key,
-        &s_op->val,
-        0,
-        NULL,
-        s_op,
-        0,
-        js_p,
-        &j_id,
-        server_job_context);
+    /* get the dspace attributes/metadata */
+    ret = job_trove_dspace_getattr(
+        s_op->req->u.lookup_path.fs_id, handle, s_op, ds_attr,
+        0, js_p, &j_id, server_job_context);
 
     return ret;
 }
@@ -248,7 +231,7 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
 /*
  * Function: lookup_verify_object_metadata
  *
- * Synopsis: Examine the metadata returned from the keyval read.
+ * Synopsis: Examine the metadata returned from the prelude sm.
  * If the metadata is for a directory, prepare to read the handle
  * of the next segment, if there is one.  If the metadata is for
  * a file, prepare to send a response.
@@ -263,20 +246,27 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
 static int lookup_verify_object_metadata(PINT_server_op *s_op,
 					 job_status_s* js_p)
 {
-    int ret;
-    PVFS_object_attr *a_p;
+    int ret = -1;
+    PVFS_object_attr *a_p = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
 
     PINT_STATE_DEBUG("verify_object_metadata");
 
     if (s_op->u.lookup.seg_nr == 0)
     {
-        a_p = &s_op->u.lookup.base_attr;
+        a_p = &s_op->attr;
+        ds_attr = &(s_op->u.lookup.ds_attr_array[0]);
     }
     else
     {
         a_p = &s_op->resp.u.lookup_path.attr_array[
             s_op->u.lookup.seg_nr - 1];
+        ds_attr = &(s_op->u.lookup.ds_attr_array[
+                        s_op->u.lookup.seg_nr - 1]);
     }
+
+    PVFS_ds_attr_to_object_attr(ds_attr, a_p);
+    a_p->mask = PVFS_ATTR_COMMON_ALL;
 
     /* update our successful attr read count */
     s_op->u.lookup.attr_ct++;
@@ -521,6 +511,7 @@ static int lookup_cleanup(PINT_server_op *s_op,
     
     /* free dynamically allocated parts of non-encoded response */
     free(s_op->resp.u.lookup_path.handle_array);
+    free(s_op->u.lookup.ds_attr_array);
 
     return(server_state_machine_complete(s_op));
 }

@@ -578,7 +578,7 @@ static void lebf_encode_rel(
  * no return value
  */
 static void lebf_decode_rel(struct PINT_decoded_msg *msg,
-  enum PINT_encode_msg_type input_type)
+                            enum PINT_encode_msg_type input_type)
 {
     int i;
 
@@ -646,12 +646,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_LOOKUP_PATH: {
 		struct PVFS_servresp_lookup_path *lookup = &resp->u.lookup_path;
 		decode_free(lookup->handle_array);
-		for (i=0; i<lookup->attr_count; i++) {
-		    if (lookup->attr_array[i].mask & PVFS_ATTR_META_DIST)
-			decode_free(lookup->attr_array[i].u.meta.dist);
-		    if (lookup->attr_array[i].mask & PVFS_ATTR_META_DFILES)
-			decode_free(lookup->attr_array[i].u.meta.dfile_array);
-		}
 		decode_free(lookup->attr_array);
 		break;
 	    }

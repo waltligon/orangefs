@@ -14,6 +14,7 @@
 
 typedef PVFS_handle                TROVE_handle;
 typedef PVFS_handle_extent         TROVE_extent;
+typedef PVFS_handle_extent         TROVE_handle_extent;
 typedef PVFS_handle_extent_array   TROVE_handle_extent_array;
 typedef PVFS_size                  TROVE_size;
 typedef PVFS_offset                TROVE_offset;

@@ -115,9 +115,9 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
     /* first, run a request scheduler utility function that tells us
      * what handle this request will operate on
      */
-    ret = PINT_req_sched_target_handle(s_op->req, 0, &target_handle, 
-	&target_fs_id, &readonly_flag);
-    if(ret < 0)
+    ret = PINT_req_sched_target_handle(
+        s_op->req, 0, &target_handle, &target_fs_id, &readonly_flag);
+    if (ret < 0)
     {
 	js_p->error_code = ret;
 	return(1);
@@ -126,7 +126,7 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
     /* if the handle is 0, that indicates that the request does not
      * operate on a specific handle, so there is nothing we can do here
      */
-    if(target_handle == 0)
+    if (target_handle == 0)
     {
 	js_p->error_code = 0;
 	return(1);
@@ -135,22 +135,10 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
     /* all other operations fall to this point and read basic attribute
      * information 
      */
-    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
-    s_op->val.buffer    = &s_op->attr;
-    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
-
-    ret = job_trove_keyval_read(target_fs_id,
-	target_handle,
-	&(s_op->key),
-	&(s_op->val),
-	0,
-	NULL,
-	s_op,
-	0,
-	js_p,
-	&tmp_id,
-	server_job_context);
+    memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
+    ret = job_trove_dspace_getattr(
+        target_fs_id, target_handle, s_op, &(s_op->ds_attr),
+        0, js_p, &tmp_id, server_job_context);
 
     return(ret);
 }
@@ -163,11 +151,23 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 {
+    PVFS_object_attr *obj_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+
     gossip_debug(SERVER_DEBUG, 
 	"(%p) %s (prelude sm) state: perm_check\n", s_op,
 	PINT_map_server_op_to_string(s_op->req->op));
 
-    /* the first thing we need to do is interpret the error code from reading
+    /*
+      first we translate the dspace attributes into a more
+      convenient server use-able format.  i.e. a PVFS_object_attr
+    */
+    ds_attr = &(s_op->ds_attr);
+    obj_attr = &(s_op->attr);
+    PVFS_ds_attr_to_object_attr(ds_attr, obj_attr);
+    s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
+
+    /* the next thing we need to do is interpret the error code from reading
      * the attributes.  Normally it is an error if that step failed, but we 
      * have to look for the special case in which we set attributes on a file
      * that did not have attributes previously.
@@ -296,8 +296,8 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 static int check_mode(PVFS_object_attr* attr, PVFS_uid uid, PVFS_gid gid,
     PVFS_permissions mode)
 {
-    uint32_t perm_mask = PVFS_ATTR_COMMON_UID | PVFS_ATTR_COMMON_GID |
-	PVFS_ATTR_COMMON_PERM;
+    uint32_t perm_mask = (PVFS_ATTR_COMMON_UID |
+                          PVFS_ATTR_COMMON_GID | PVFS_ATTR_COMMON_PERM);
 
     /* if we don't have masks for the permission information that we need,
      * then the system is broken 

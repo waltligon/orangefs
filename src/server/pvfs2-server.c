@@ -66,9 +66,9 @@ static int server_remove_storage_space = 0;
 static int server_create_storage_space = 0;
 static int server_background = 1;
 
-PINT_server_trove_keys_s Trove_Common_Keys[] = {
+PINT_server_trove_keys_s Trove_Common_Keys[] =
+{
     {"root_handle", 12},
-    {"metadata", 9},
     {"dir_ent", 8},
     {"datafile_handles", 17},
     {"metafile_dist", 14},

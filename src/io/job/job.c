@@ -1680,9 +1680,10 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     void *user_ptr,
+                             PVFS_ds_attributes *out_ds_attr_ptr,
 			     job_aint status_user_tag,
-			     job_status_s * out_status_p,
-			     job_id_t * id,
+			     job_status_s *out_status_p,
+			     job_id_t *id,
 			     job_context_id context_id)
 {
     /* post a trove operation dspace get attr.  If it completes (or
@@ -1712,7 +1713,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr(coll_id,
-			       handle, &(jd->u.trove.attr), 0 /* flags */ ,
+			       handle, out_ds_attr_ptr, 0 /* flags */ ,
 			       user_ptr_internal, 
 			       global_trove_context, &(jd->u.trove.id));
 #else
@@ -1734,7 +1735,6 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 	/* immediate completion */
 	out_status_p->error_code = 0;
 	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->ds_attr = jd->u.trove.attr;
 	dealloc_job_desc(jd);
 	return (ret);
     }
@@ -1759,7 +1759,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
  */
 int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
-			     PVFS_ds_attributes * ds_attr_p,
+			     PVFS_ds_attributes *ds_attr_p,
 			     void *user_ptr,
 			     job_aint status_user_tag,
 			     job_status_s * out_status_p,
@@ -3607,7 +3607,6 @@ static void fill_status(struct job_desc *jd,
 	status->handle = jd->u.trove.handle;
 	status->position = jd->u.trove.position;
 	status->count = jd->u.trove.count;
-	status->ds_attr = jd->u.trove.attr;
 	status->type = jd->u.trove.type;
 	break;
     case JOB_DEV_UNEXP:

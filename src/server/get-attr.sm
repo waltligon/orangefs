@@ -123,7 +123,7 @@ machine pvfs2_get_attr_sm(prelude,
  */
 static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PVFS_object_attr *a_p;
+    PVFS_object_attr *a_p = NULL;
 
     PINT_STATE_DEBUG("verify_attribs");
 
@@ -132,18 +132,22 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     a_p = &s_op->resp.u.getattr.attr;
 
     gossip_debug(SERVER_DEBUG,
-		 "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
+		 "  attrs read from dspace = (owner = %d, group = %d, "
+                 "perms = %o, type = %d, atime = %lld, mtime = %lld, "
+                 "ctime = %lld | dfile_count=%d | dist_size = %d)\n",
 		 a_p->owner,
 		 a_p->group,
 		 a_p->perms,
 		 a_p->objtype,
 		 (long long)a_p->atime,
 		 (long long)a_p->mtime,
-		 (long long)a_p->ctime);
+		 (long long)a_p->ctime,
+                 (int)a_p->u.meta.dfile_count,
+                 (int)a_p->u.meta.dist_size);
 
     gossip_debug(SERVER_DEBUG, "mask output from getattr: ");
     PINT_attrmask_print(SERVER_DEBUG, s_op->attr.mask);
-    
+
     js_p->error_code = 0;
 
     if (a_p->objtype == PVFS_TYPE_METAFILE)
@@ -152,19 +156,22 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 		     "  handle 0x%08Lx refers to a metafile\n",
 		     Lu(s_op->req->u.getattr.handle));
 
-        gossip_debug(SERVER_DEBUG, " dspace has dfile_count of %d\n",
-                     s_op->attr.u.meta.dfile_count);
-        gossip_debug(SERVER_DEBUG, " dspace has dist size of %d\n",
-                     s_op->attr.u.meta.dist_size);
 	a_p->mask = PVFS_ATTR_COMMON_ALL;
 
-        if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
+/*         if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES) */
+        if (a_p->mask & PVFS_ATTR_META_DFILES)
         {
+            gossip_debug(SERVER_DEBUG, " dspace has dfile_count of %d\n",
+                         s_op->attr.u.meta.dfile_count);
+
             /* copy over the dfile count for reading later */
             a_p->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
         }
-        if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DIST)
+        if (a_p->mask & PVFS_ATTR_META_DIST)
         {
+            gossip_debug(SERVER_DEBUG, " dspace has dist size of %d\n",
+                         s_op->attr.u.meta.dist_size);
+
             /* copy over the dist size for reading later */
             a_p->u.meta.dist_size = s_op->attr.u.meta.dist_size;
         }
@@ -226,13 +233,15 @@ static int getattr_read_datafile_size(PINT_server_op *s_op, job_status_s* js_p)
 
     PINT_STATE_DEBUG("read_datafile_size");
 
-    ret = job_trove_dspace_getattr(s_op->req->u.getattr.fs_id,
-                                   s_op->req->u.getattr.handle,
-                                   s_op,
-				   0,
-                                   js_p,
-                                   &tmp_id,
-                                   server_job_context);
+    ret = job_trove_dspace_getattr(
+        s_op->req->u.getattr.fs_id,
+        s_op->req->u.getattr.handle,
+        s_op,
+        &(s_op->ds_datafile_attr),
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context);
 
     return ret;
 }
@@ -306,10 +315,10 @@ static int getattr_read_metafile_datafile_handles_if_required(
 
     dfile_count = s_op->attr.u.meta.dfile_count;
 
-    gossip_debug(SERVER_DEBUG, " request has dfile_count of %d | dspace has %d\n",
+    gossip_debug(SERVER_DEBUG,
+                 " request has dfile_count of %d | dspace has %d\n",
                  s_op->resp.u.getattr.attr.u.meta.dfile_count,
                  s_op->attr.u.meta.dfile_count);
-
 
     /* verify that the retrieved dfile count is sane */
     if ((dfile_count < 1) || (dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT))
@@ -330,7 +339,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
     /* NOTE: ALLOCATING MEMORY HERE */
     s_op->resp.u.getattr.attr.u.meta.dfile_array =
         malloc(dfile_count * sizeof(PVFS_handle));
-    if(!s_op->resp.u.getattr.attr.u.meta.dfile_array)
+    if (!s_op->resp.u.getattr.attr.u.meta.dfile_array)
     {
 	js_p->error_code = -PVFS_ENOMEM;
 	return(1);
@@ -473,7 +482,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
         else
         {
             /* assign properly retrieved size value to response */
-            a_p->u.data.size = js_p->ds_attr.b_size;
+            a_p->u.data.size = s_op->ds_datafile_attr.b_size;
 
             gossip_debug(SERVER_DEBUG,
                          "  also returning data size of %Ld\n",
