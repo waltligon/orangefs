@@ -19,6 +19,11 @@ static struct page** bufmap_page_array = NULL;
 static void** bufmap_kaddr_array = NULL;
 static int bufmap_page_count = 0;
 
+/* list of available descriptors, and lock to protect it */
+static LIST_HEAD(desc_list);
+static spinlock_t desc_list_lock = SPIN_LOCK_UNLOCKED;
+static struct pvfs_bufmap_desc desc_array[PVFS2_BUFMAP_DESC_COUNT];
+
 /* pvfs_bufmap_initialize()
  *
  * initializes the mapped buffer interface
@@ -29,6 +34,8 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 {
     int ret = -1;
     int i;
+    int pages_per_desc = 0;
+    int offset = 0;
 
     if(bufmap_init)
 	return(-EALREADY);
@@ -37,17 +44,23 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     if(PAGE_ALIGN((unsigned long)user_desc->ptr) != 
 	(unsigned long)user_desc->ptr)
     {
-	printk("pvfs2: error: memory alignment (front).\n");
+	pvfs2_error("pvfs2: error: memory alignment (front).\n");
 	return(-EINVAL);
     }
     if(PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->size)) != 
 	(unsigned long)(user_desc->ptr + user_desc->size))
     {
-	printk("pvfs2: error: memory alignment (back).\n");
+	pvfs2_error("pvfs2: error: memory alignment (back).\n");
 	return(-EINVAL);
     }
 
     bufmap_page_count = user_desc->size / PAGE_SIZE;
+    pages_per_desc = bufmap_page_count / PVFS2_BUFMAP_DESC_COUNT;
+    if(pages_per_desc < 1)
+    {
+	pvfs2_error("pvfs2: error: memory buffer too small.\n");
+	return(-EINVAL);
+    }
 
     /* allocate storage to track our page mappings */
     bufmap_page_array = 
@@ -111,7 +124,18 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	bufmap_kaddr_array[i] = kmap(bufmap_page_array[i]);
     }
 
-    /* TODO: still need to setup seperate descriptors */
+    /* build a list of available descriptors */
+    offset = 0;
+    for(i=0; i<PVFS2_BUFMAP_DESC_COUNT; i++)
+    {
+	desc_array[i].page_array = &bufmap_page_array[offset];
+	desc_array[i].kaddr_array = &bufmap_kaddr_array[offset];
+	desc_array[i].array_count = pages_per_desc;
+	desc_array[i].uaddr = user_desc->ptr +
+	    (i*pages_per_desc*PAGE_SIZE);
+	list_add_tail(&(desc_array[i].list_entry), &desc_list);
+	offset += pages_per_desc;
+    }
 
     bufmap_init = 1;
 
@@ -140,8 +164,6 @@ void pvfs_bufmap_finalize(void)
     }
     kfree(bufmap_page_array);
     kfree(bufmap_kaddr_array);
-
-    /* TODO: clean up descriptors */
 
     bufmap_init = 0;
 
@@ -182,8 +204,10 @@ void pvfs_bufmap_put(struct pvfs_bufmap_desc* desc)
  */
 int pvfs_bufmap_size_query(void)
 {
-    pvfs2_error("pvfs2: error: function not implemented.\n");
-    return(-ENOSYS);
+    if(!bufmap_init)
+	return(-EINVAL);
+
+    return((bufmap_page_count/PVFS2_BUFMAP_DESC_COUNT)*PAGE_SIZE);
 }
 
 /* pvfs_bufmap_copy_to_user()

@@ -10,7 +10,11 @@
 /* used to describe mapped buffers */
 struct pvfs_bufmap_desc
 {
-    void* u_ptr;	/* user space address pointer */
+    void* uaddr;		/* user space address pointer */
+    struct page** page_array;	/* array of mapped pages */
+    void** kaddr_array;		/* kernel addresses matching above */
+    int array_count;		/* size of above arrays */
+    struct list_head list_entry;
 };
 
 int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc);

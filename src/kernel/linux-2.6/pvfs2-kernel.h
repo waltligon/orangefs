@@ -37,6 +37,12 @@ sizeof(int64_t) + sizeof(pvfs2_upcall_t))
 #define MAX_DEV_REQ_DOWNSIZE (sizeof(int32_t) + \
 sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 
+/* This is the number of discrete buffers we will break the mapped I/O 
+ * region into.  In some sense it governs the number of concurrent I/O
+ * operations that we will allow
+ */
+#define PVFS2_BUFMAP_DESC_COUNT 4
+
 /* borrowed from irda.h */
 #ifndef MSECS_TO_JIFFIES
 #define MSECS_TO_JIFFIES(ms) (((ms)*HZ+999)/1000)
