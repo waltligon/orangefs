@@ -26,8 +26,9 @@
 /* TODO: this is temporary */
 static PVFS_fs_id HACK_global_fsid = -1;
 
-/* bmi context for use within the job interface */
+/* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
+static FLOW_context_id global_flow_context = -1;
 
 /* queues of pending jobs */
 static job_desc_q_p completion_queue = NULL;
@@ -146,10 +147,18 @@ int job_initialize(int flags)
     {
 	return(ret);
     }
+    /* ditto for flows */
+    ret = PINT_flow_open_context(&global_flow_context);
+    if(ret < 0)
+    {
+	BMI_close_context(global_bmi_context);
+	return(ret);
+    }
 
     ret = setup_queues();
     if (ret < 0)
     {
+	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
 	return (ret);
     }
@@ -159,6 +168,7 @@ int job_initialize(int flags)
     ret = pthread_create(&bmi_thread_id, NULL, bmi_thread_function, NULL);
     if (ret != 0)
     {
+	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
 	teardown_queues();
 	return (-ret);
@@ -167,6 +177,7 @@ int job_initialize(int flags)
     if (ret != 0)
     {
 	pthread_cancel(bmi_thread_id);
+	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
 	teardown_queues();
 	return (-ret);
@@ -176,6 +187,7 @@ int job_initialize(int flags)
     {
 	pthread_cancel(bmi_thread_id);
 	pthread_cancel(flow_thread_id);
+	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
 	teardown_queues();
 	return (-ret);
@@ -201,6 +213,7 @@ int job_finalize(void)
 #endif /* __PVFS2_JOB_THREADED__ */
 
     BMI_close_context(global_bmi_context);
+    PINT_flow_close_context(global_flow_context);
 
     teardown_queues();
 
@@ -753,7 +766,7 @@ int job_flow(flow_descriptor * flow_d,
     flow_d->user_ptr = jd;
 
     /* post the flow */
-    ret = PINT_flow_post(flow_d);
+    ret = PINT_flow_post(flow_d, global_flow_context);
     if (ret < 0)
     {
 	out_status_p->error_code = ret;
@@ -2924,7 +2937,8 @@ static int do_one_work_cycle_flow(int *num_completed)
     incount = offset;
 
     ret = PINT_flow_testsome(incount, stat_flow_array, &outcount,
-			     stat_flow_index_array, 10);
+			     stat_flow_index_array, 10,
+			     global_flow_context);
     if (ret < 0)
     {
 	/* critical failure */

@@ -20,7 +20,8 @@
 #include <pvfs-request.h>
 
 int TEST_SIZE=1024*1024*20; /* 1M */
-static int block_on_flow(flow_descriptor* flow_d);
+static int block_on_flow(flow_descriptor* flow_d, FLOW_context_id
+	flow_context);
 static double Wtime(void);
 
 int main(int argc, char **argv)	
@@ -38,6 +39,7 @@ int main(int argc, char **argv)
 	PINT_Request* req;
 	PINT_Request_file_data file_data;
 	bmi_context_id context;
+	FLOW_context_id flow_context;
 
 	/*************************************************************/
 	/* initialization stuff */
@@ -68,6 +70,14 @@ int main(int argc, char **argv)
 		fprintf(stderr, "flow init failure.\n");
 		return(-1);
 	}
+
+	ret = PINT_flow_open_context(&flow_context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "PINT_flow_open_context() failure.\n");
+		return(-1);
+	}
+
 
 	/* send some random crap to the other side to start up communication*/
 	ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3335");
@@ -180,7 +190,7 @@ int main(int argc, char **argv)
 	 */
 
 	time1 = Wtime();
-	ret = block_on_flow(flow_d);
+	ret = block_on_flow(flow_d, flow_context);
 	if(ret < 0)
 	{
 		return(-1);
@@ -196,6 +206,7 @@ int main(int argc, char **argv)
 	PINT_flow_free(flow_d);
 
 	/* shut down flow interface */
+	PINT_flow_close_context(flow_context);
 	ret = PINT_flow_finalize();
 	if(ret < 0)
 	{
@@ -214,13 +225,14 @@ int main(int argc, char **argv)
 }
 
 
-static int block_on_flow(flow_descriptor* flow_d)
+static int block_on_flow(flow_descriptor* flow_d, FLOW_context_id
+	flow_context)
 {
 	int ret = -1;
 	int count = 0;
 	int index = 5;
 
-	ret = PINT_flow_post(flow_d);
+	ret = PINT_flow_post(flow_d, flow_context);
 	if(ret == 1)
 	{
 		return(0);
@@ -233,7 +245,8 @@ static int block_on_flow(flow_descriptor* flow_d)
 
 	do
 	{
-		ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10);
+		ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10,
+			flow_context);
 	}while(ret == 0 && count == 0);
 	if(ret < 0)
 	{

@@ -21,7 +21,8 @@
 
 #include <wire-harness.h>
 
-static int block_on_flow(flow_descriptor* flow_d);
+static int block_on_flow(flow_descriptor* flow_d, FLOW_context_id
+	flow_context);
 static double Wtime(void);
 static int run_io_operation(
 	bmi_addr_t server_addr,
@@ -32,7 +33,8 @@ static int run_io_operation(
 	int memory_buffer_size,
 	PINT_Request* io_req,
 	PVFS_Dist* io_dist,
-	bmi_context_id context);
+	bmi_context_id context,
+	FLOW_context_id flow_context);
 
 int main(int argc, char **argv)	
 {
@@ -49,7 +51,7 @@ int main(int argc, char **argv)
 	void* memory_buffer;
 	PVFS_size io_size = 10*1024*1024; /* 10 M transfer */
 	bmi_context_id context;
-
+	FLOW_context_id flow_context;
 
 	/*************************************************************/
 	/* initialization stuff */
@@ -80,6 +82,14 @@ int main(int argc, char **argv)
 		fprintf(stderr, "flow init failure.\n");
 		return(-1);
 	}
+
+	ret = PINT_flow_open_context(&flow_context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "PINT_flow_open_context() failure.\n");
+		return(-1);
+	}
+
 
 	/* resolve the server address */
 	ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3335");
@@ -179,7 +189,7 @@ int main(int argc, char **argv)
 
 	/* this is where all of the work happens */
 	ret = run_io_operation(server_addr, req, total_req_size, ack,
-		memory_buffer, io_size, io_req, io_dist, context);
+		memory_buffer, io_size, io_req, io_dist, context, flow_context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: failed to successfully complete I/O exchange.\n");
@@ -194,6 +204,7 @@ int main(int argc, char **argv)
 	BMI_memfree(server_addr, req, total_req_size, BMI_SEND_BUFFER);
 
 	/* shut down flow interface */
+	PINT_flow_close_context(flow_context);
 	ret = PINT_flow_finalize();
 	if(ret < 0)
 	{
@@ -202,6 +213,7 @@ int main(int argc, char **argv)
 	}
 
 	/* shut down BMI */
+	BMI_close_context(context);
 	BMI_finalize();
 
 	gossip_disable();
@@ -209,13 +221,14 @@ int main(int argc, char **argv)
 }
 
 
-static int block_on_flow(flow_descriptor* flow_d)
+static int block_on_flow(flow_descriptor* flow_d, FLOW_context_id
+	flow_context)
 {
 	int ret = -1;
 	int count = 0;
 	int index = 5;
 
-	ret = PINT_flow_post(flow_d);
+	ret = PINT_flow_post(flow_d, flow_context);
 	if(ret == 1)
 	{
 		return(0);
@@ -228,7 +241,8 @@ static int block_on_flow(flow_descriptor* flow_d)
 
 	do
 	{
-		ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10);
+		ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10,
+			flow_context);
 	}while(ret == 0 && count == 0);
 	if(ret < 0)
 	{
@@ -266,7 +280,8 @@ static int run_io_operation(
 	int memory_buffer_size,
 	PINT_Request* io_req,
 	PVFS_Dist* io_dist,
-	bmi_context_id context
+	bmi_context_id context,
+	FLOW_context_id flow_context
 	)
 {
 	int ret = -1;
@@ -396,7 +411,7 @@ static int run_io_operation(
 
 	/* run the flow */
 	time1 = Wtime();
-	ret = block_on_flow(flow_d);
+	ret = block_on_flow(flow_d, flow_context);
 	if(ret < 0)
 	{
 		return(-1);

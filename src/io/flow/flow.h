@@ -72,6 +72,9 @@ enum
     FLOWPROTO_SUPPORT_QUERY = 1
 };
 
+/* context id type */
+typedef PVFS_context_id FLOW_context_id;
+
 /********************************************************************
  * flow descriptor
  */
@@ -152,7 +155,11 @@ void PINT_flow_reset(flow_descriptor * flow_d);
 
 void PINT_flow_free(flow_descriptor * flow_d);
 
-int PINT_flow_post(flow_descriptor * flow_d);
+int PINT_flow_open_context(FLOW_context_id* context_id);
+
+void PINT_flow_close_context(FLOW_context_id context_id);
+
+int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id);
 
 int PINT_flow_unpost(flow_descriptor * flow_d);
 
@@ -172,18 +179,21 @@ int PINT_flow_memfree(flow_descriptor * flow_d,
 
 int PINT_flow_test(flow_descriptor * flow_d,
 		   int *outcount,
-		   int max_idle_time_ms);
+		   int max_idle_time_ms,
+		   FLOW_context_id context_id);
 
 int PINT_flow_testsome(int incount,
 		       flow_descriptor ** flow_array,
 		       int *outcount,
 		       int *index_array,
-		       int max_idle_time_ms);
+		       int max_idle_time_ms,
+		       FLOW_context_id context_id);
 
-int PINT_flow_testworld(int incount,
+int PINT_flow_testcontext(int incount,
 			flow_descriptor ** flow_array,
 			int *outcount,
-			int max_idle_time_ms);
+			int max_idle_time_ms,
+			FLOW_context_id context_id);
 
 int PINT_flow_setinfo(flow_descriptor * flow_d,
 		      int option,

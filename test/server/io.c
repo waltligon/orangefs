@@ -43,7 +43,8 @@ struct options{
  */
 
 static struct options* parse_args(int argc, char* argv[]);
-static int block_on_flow(flow_descriptor* flow_d);
+static int block_on_flow(flow_descriptor* flow_d, FLOW_context_id
+	flow_context);
 
 
 /**************************************************************/
@@ -74,6 +75,7 @@ int main(int argc, char **argv)	{
 	struct PINT_encoded_msg encoded3;
 	struct PINT_decoded_msg decoded3;
 	bmi_context_id context;
+	FLOW_context_id flow_context;
 
 	/**************************************************
 	 * general setup 
@@ -137,6 +139,14 @@ int main(int argc, char **argv)	{
 		fprintf(stderr, "Error: flow_initialize() failure.\n");
 		return(-1);
 	}
+
+	ret = PINT_flow_open_context(&flow_context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "PINT_flow_open_context() failure.\n");
+		return(-1);
+	}
+
 
 	/* get a bmi_addr for the server */
 	ret = BMI_addr_lookup(&server_addr, user_opts->hostid);
@@ -461,7 +471,7 @@ int main(int argc, char **argv)	{
 	flow_d->dest.endpoint_id = BMI_ENDPOINT;
 	flow_d->dest.u.bmi.address = server_addr;
 
-	ret = block_on_flow(flow_d);
+	ret = block_on_flow(flow_d, flow_context);
 	if(ret < 0)
 	{
 		return(-1);
@@ -609,6 +619,9 @@ int main(int argc, char **argv)	{
 	PINT_decode_release(&decoded2, PINT_ENCODE_RESP, 0);
 	PINT_decode_release(&decoded3, PINT_ENCODE_RESP, 0);
 
+	PINT_flow_close_context(flow_context);
+	PINT_flow_finalize();
+
 	/* shutdown the local interface */
 	BMI_close_context(context);
 	ret = BMI_finalize();
@@ -706,13 +719,14 @@ parse_args_error:
 }
 
 
-static int block_on_flow(flow_descriptor* flow_d)
+static int block_on_flow(flow_descriptor* flow_d, FLOW_context_id
+	flow_context)
 {
 	int ret = -1;
 	int count = 0;
 	int index = 5;
 
-	ret = PINT_flow_post(flow_d);
+	ret = PINT_flow_post(flow_d, flow_context);
 	if(ret == 1)
 	{
 		return(0);
@@ -725,7 +739,8 @@ static int block_on_flow(flow_descriptor* flow_d)
 
 	do
 	{
-		ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10);
+		ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10,
+			flow_context);
 	}while(ret == 0 && count == 0);
 	if(ret < 0)
 	{

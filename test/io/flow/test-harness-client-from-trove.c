@@ -24,7 +24,8 @@
 #define TROVE_TEST_BSTREAM 3
 
 int TEST_SIZE=1024*1024*20; /* 20M */
-static int block_on_flow(flow_descriptor* flow_d);
+static int block_on_flow(flow_descriptor* flow_d, FLOW_context_id
+	flow_context);
 static double Wtime(void);
 
 char storage_space[] = "/tmp/trove-test-space";
@@ -55,6 +56,7 @@ int main(int argc, char **argv)
 	TROVE_ds_state state;
 	PVFS_size tmp_size;
 	bmi_context_id context;
+	FLOW_context_id flow_context;
 	
 	/* memory buffer to xfer */
 	mybuffer = (void*)malloc(TEST_SIZE);
@@ -105,6 +107,13 @@ int main(int argc, char **argv)
 	if(ret < 0)
 	{
 		fprintf(stderr, "flow init failure.\n");
+		return(-1);
+	}
+
+	ret = PINT_flow_open_context(&flow_context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "PINT_flow_open_context() failure.\n");
 		return(-1);
 	}
 
@@ -255,7 +264,7 @@ int main(int argc, char **argv)
 	 */
 
 	time1 = Wtime();
-	ret = block_on_flow(flow_d);
+	ret = block_on_flow(flow_d, flow_context);
 	if(ret < 0)
 	{
 		return(-1);
@@ -268,15 +277,16 @@ int main(int argc, char **argv)
 	printf("Client bw (send): %f MB/sec\n",
 		((TEST_SIZE)/((time2-time1)*1000000.0)));
 
+	PINT_flow_free(flow_d);
+
 	/* shut down flow interface */
+	PINT_flow_close_context(flow_context);
 	ret = PINT_flow_finalize();
 	if(ret < 0)
 	{
 		fprintf(stderr, "flow finalize failure.\n");
 		return(-1);
 	}
-
-	PINT_flow_free(flow_d);
 
 	/* shut down BMI */
 	BMI_close_context(context);
@@ -291,13 +301,14 @@ int main(int argc, char **argv)
 }
 
 
-static int block_on_flow(flow_descriptor* flow_d)
+static int block_on_flow(flow_descriptor* flow_d, FLOW_context_id
+	flow_context)
 {
 	int ret = -1;
 	int count = 0;
 	int index = 5;
 
-	ret = PINT_flow_post(flow_d);
+	ret = PINT_flow_post(flow_d, flow_context);
 	if(ret == 1)
 	{
 		return(0);
@@ -310,7 +321,8 @@ static int block_on_flow(flow_descriptor* flow_d)
 
 	do
 	{
-		ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10);
+		ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10,
+			flow_context);
 	}while(ret == 0 && count == 0);
 	if(ret < 0)
 	{

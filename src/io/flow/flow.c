@@ -306,6 +306,36 @@ void PINT_flow_free(flow_descriptor * flow_d)
     return;
 }
 
+
+/* PINT_flow_open_context()
+ *
+ * opens up a new flow context
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_flow_open_context(FLOW_context_id* context_id)
+{
+    gossip_lerr("WARNING: PINT_flow_open_context() stub executed.\n");
+    /* TODO: implement this for real */
+    *context_id = 0;
+    return(0);
+}
+
+
+/* PINT_flow_close_context()
+ *
+ * shuts down a context previously created with open_context()
+ *
+ * no return value
+ */
+void PINT_flow_close_context(FLOW_context_id context_id)
+{
+    gossip_lerr("WARNING: PINT_flow_close_context() stub executed.\n");
+    /* TODO: implement this for real */
+    return;
+}
+
+
 /* PINT_flow_post()
  * 
  * Posts a flow descriptor to the flow interface so that it may be
@@ -313,7 +343,7 @@ void PINT_flow_free(flow_descriptor * flow_d)
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_post(flow_descriptor * flow_d)
+int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
 {
     int flowproto_id = -1;
     int ret = -1;
@@ -468,7 +498,8 @@ int PINT_flow_memfree(flow_descriptor * flow_d,
  */
 int PINT_flow_test(flow_descriptor * flow_d,
 		   int *outcount,
-		   int max_idle_time_ms)
+		   int max_idle_time_ms,
+		   FLOW_context_id context_id)
 {
     int ret = -1;
     int num_completed;
@@ -528,7 +559,8 @@ int PINT_flow_testsome(int incount,
 		       flow_descriptor ** flow_array,
 		       int *outcount,
 		       int *index_array,
-		       int max_idle_time_ms)
+		       int max_idle_time_ms,
+		       FLOW_context_id context_id)
 {
     int ret = -1;
     int num_completed;
@@ -592,7 +624,7 @@ int PINT_flow_testsome(int incount,
 }
 
 
-/* PINT_flow_testworld()
+/* PINT_flow_testcontext()
  * 
  * Check for completion of any flows in progress for the
  * flow interface; is allowed to do work or briefly block within
@@ -600,10 +632,11 @@ int PINT_flow_testsome(int incount,
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_testworld(int incount,
+int PINT_flow_testcontext(int incount,
 			flow_descriptor ** flow_array,
 			int *outcount,
-			int max_idle_time_ms)
+			int max_idle_time_ms,
+			FLOW_context_id context_id)
 {
     flow_descriptor *flow_d = NULL;
     int num_completed = 0;
