@@ -154,6 +154,10 @@ struct filesystem_configuration_s *PINT_config_find_fs_id(
     struct server_configuration_s *config_s,
     PVFS_fs_id fs_id);
 
+PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
+    struct server_configuration_s *config_s,
+    char *fs_name);
+
 PINT_llist *PINT_config_get_filesystems(
     struct server_configuration_s *config_s);
 

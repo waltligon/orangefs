@@ -1840,8 +1840,21 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
             cur = PINT_llist_next(cur);
         }
     }
-
     return(NULL);
+}
+
+PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
+    struct server_configuration_s *config_s,
+    char *fs_name)
+{
+    PVFS_fs_id fs_id = 0;
+    struct filesystem_configuration_s *fs =
+        PINT_config_find_fs_name(config_s, fs_name);
+    if (fs)
+    {
+        fs_id = fs->coll_id;
+    }
+    return fs_id;
 }
 
 /* PINT_config_get_filesystems()
@@ -1857,7 +1870,6 @@ PINT_llist *PINT_config_get_filesystems(
 {
     return (config_s ? config_s->file_systems : NULL);
 }
-
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 static int is_root_handle_in_my_range(
