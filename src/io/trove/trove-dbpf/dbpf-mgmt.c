@@ -82,10 +82,18 @@ static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
 		    return(ret);
 		}
 		tmp_trove_statfs->fs_id = coll_id;
+                /*
+                  NOTE: use f_bavail instead of f_bfree here.
+                  see 'man statfs' for more information.
+                  it would be ideal to pass both so that the
+                  client can properly compute all values.
+                */
 		tmp_trove_statfs->bytes_available = 
-		    tmp_statfs.f_bsize * tmp_statfs.f_bfree;
-		tmp_trove_statfs->bytes_total = 
-		    tmp_statfs.f_bsize * tmp_statfs.f_blocks;
+		    (tmp_statfs.f_bsize * tmp_statfs.f_bavail);
+		tmp_trove_statfs->bytes_total =
+		    (tmp_statfs.f_bsize *
+                     (tmp_statfs.f_blocks -
+                      (tmp_statfs.f_bfree - tmp_statfs.f_bavail)));
 		return(1);
 	    }
 	    break;

@@ -5,6 +5,8 @@ PVFS2 Release ChangeLog
 pvfs2-0.0.5pre1
 ===============
 - compile cleanly on 64-bit machines
+- vfs stability improvements during I/O, including across client restarts
+- statfs reporting improvements (closer to correct)
 
 
 pvfs2-0.0.4

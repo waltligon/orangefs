@@ -69,10 +69,10 @@ typedef struct
 typedef struct
 {
     unsigned long block_size;
-    unsigned long blocks_total;
-    unsigned long blocks_avail;
-    unsigned long files_total;
-    unsigned long files_avail;
+    PVFS_size blocks_total;
+    PVFS_size blocks_avail;
+    uint64_t files_total;
+    uint64_t files_avail;
 } pvfs2_statfs_response_t;
 
 /* the truncate response is a blank downcall */

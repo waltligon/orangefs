@@ -649,10 +649,7 @@ static int service_statfs_request(
         {
             out_downcall->type = PVFS2_VFS_OP_STATFS;
             out_downcall->status = 0;
-            /*
-              can we get the real configured device blocksize?
-              should we use it if so?
-            */
+
             out_downcall->resp.statfs.block_size =
                 STATFS_DEFAULT_BLOCKSIZE;
             out_downcall->resp.statfs.blocks_total =

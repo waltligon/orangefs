@@ -120,7 +120,7 @@ static int pvfs2_get_blocks(
 
         if (bytes_read < 0)
         {
-            pvfs2_error("pvfs_get_blocks: failed to read page block %d\n",
+            pvfs2_print("pvfs_get_blocks: failed to read page block %d\n",
                         (int)page->index);
             pvfs2_inode->last_failed_block_index_read = page->index;
         }
