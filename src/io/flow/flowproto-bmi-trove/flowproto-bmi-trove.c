@@ -1122,23 +1122,6 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 	}
     }
 
-#if 0
-    /* TODO: why is this here? it seems to duplicate what happens in 
-     * alloc_flow_data() 
-     */
-    if(flow_d->aggregate_size > -1)
-    {
-	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
-	    flow_d->aggregate_size+flow_d->file_req_offset);
-    }
-    else
-    {
-	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
-	    flow_d->file_req_offset +
-	    PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
-    }
-#endif
-
     /* if a file datatype offset was specified, go ahead and skip ahead 
      * before doing anything else
      */
@@ -2140,11 +2123,6 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 	    {
 		flow_data->bmi_list_count = MAX_REGIONS;
 		flow_data->bmi_total_size = actual_size - total_copied;
-#if 0
-		/* this is nolonger valid - WBL */
-		gossip_ldebug(FLOW_PROTO_DEBUG, "req proc offset: %ld\n",
-		    (long)PINT_REQUEST_STATE_OFFSET(flow_d->file_req_state));
-#endif
 		flow_d->result.offset_array = flow_data->bmi_offset_list;
 		flow_d->result.size_array = flow_data->bmi_size_list;
 		flow_d->result.bytemax = flow_data->bmi_total_size;
