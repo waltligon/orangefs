@@ -256,7 +256,7 @@ int main(int argc, char **argv)	{
 
 	/* io specific fields */
 	my_req.u.io.fs_id = 9;
-	my_req.u.io.handle = user_opts->bucket;
+	my_req.u.io.handle = create_dec_ack->u.create.handle;
 
 	ret = PINT_encode(&my_req,PINT_ENCODE_REQ,&encoded2,server_addr,0);
 	if(ret < 0)
@@ -371,6 +371,14 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 	
+	/**************************************************
+	 * remove request  
+	 */
+
+	/* TODO: fill this in.  We need to get rid of the data file
+	 * that we created earlier
+	 */
+
 	/**************************************************
 	 * general cleanup  
 	 */

@@ -342,7 +342,7 @@ typedef struct PVFS_servreq_io_s PVFS_servreq_io;
 
 /* PVFS I/O response */
 struct PVFS_servresp_io_s {
-
+	PVFS_size bstream_size;
 };
 typedef struct PVFS_servresp_io_s PVFS_servresp_io;
 
