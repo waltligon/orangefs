@@ -38,8 +38,7 @@ int main(int argc, char **argv)
 
     for(i = 0; i < ENTRIES_TO_ADD; i++)
     {
-        snprintf(new_filename[i],PVFS_NAME_MAX,"dcache_testnameXXXXXX");
-        mkstemp(new_filename[i]);
+        snprintf(new_filename[i],PVFS_NAME_MAX,"dcache_testname%.3d",i);
 	test_ref.handle = i;
 	test_ref.fs_id = 0;
 	ret = PINT_dcache_insert(new_filename[i], test_ref, root_ref);
