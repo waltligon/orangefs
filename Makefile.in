@@ -335,11 +335,11 @@ $(MPIMISCDEPENDS): %.d: %.c
 	@$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@
 
 # default rules for building documents in .tex format:
-# TODO: these documentation rules are broken for out of tree builds
+# TODO: these documentation rules are a big hack!
 %.dvi: %.tex
-	cd $(@D); latex $(<F); latex $(<F)
+	$(srcdir)/maint/pvfs2latexwrapper.pl -i $< -o $@
 %.ps: %.dvi
-	cd $(@D); dvips -t letter $(<F) -o $(@F)
+	( cd $(@D); dvips -t letter $(<F) -o $(@F) )
 %.pdf: %.dvi
-	cd $(@D); dvipdf $(<F) $(@F)
+	( cd $(@D); dvipdf $(<F) $(@F) )
 
