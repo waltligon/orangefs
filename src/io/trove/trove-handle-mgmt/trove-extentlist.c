@@ -24,6 +24,8 @@ static int avltree_extent_search(struct avlnode *n, TROVE_handle handle, TROVE_h
 static inline void extent_init(struct TROVE_handle_extent *e, TROVE_handle first, TROVE_handle last);
 static void extent_show(struct avlnode *n, int param, int depth);
 
+static int64_t avltree_extent_search_in_range(struct avlnode *n, TROVE_extent * req_extent);
+
 /* constructor for an extent 
  * first: start of extent range
  * last: end of extent range
@@ -282,6 +284,34 @@ int64_t extentlist_get_and_dec_extent(struct TROVE_handle_extentlist *elist)
     return handle;
 }
 
+/*
+ * instead of returning an arbitrary handle, return a handle from within the
+ * given range
+ * elist    index of avaliable extents
+ * extent   the range from which we want to allocate a handle
+ *
+ * returns 
+ *   a valid trove handle from within the range specified by 'extent' 
+ *   
+ *   0 (an invalid handle) if error
+ */
+TROVE_handle extentlist_get_from_extent(struct TROVE_handle_extentlist *elist, 
+	TROVE_extent *extent)
+{
+    int ret;
+    TROVE_handle handle;
+
+    handle = avltree_extent_search_in_range(elist->index, extent); 
+    if (handle == 0) 
+	return 0;
+
+    ret = extentlist_handle_remove(elist, handle);
+    if (ret == -1) 
+	return 0;
+
+    return handle;
+
+}
 void extentlist_stats(struct TROVE_handle_extentlist *elist)
 {
     printf("handle/extent ratio: %f\n", (double)elist->num_handles/ (double)elist->num_extents);
@@ -400,6 +430,57 @@ static int avltree_extent_search(struct avlnode *n,
 	*last_p  = e->last;
 	return 0;
     }
+}
+
+/* avltree_extent_search_in_range()
+ * given a low and a high range for a handle, search the index for any extent
+ * in that range.  
+ * return 0 if no extents are within the range
+ * otherwise, return a handle within the given range 
+ *
+ * it is expected that something else will delete the handle from the index
+ */
+
+static int64_t avltree_extent_search_in_range(struct avlnode *n,
+				TROVE_extent * req_extent)
+{
+    struct TROVE_handle_extent *e, *left, *right;
+    if (!n) return 0;
+
+    e = (struct TROVE_handle_extent *) n->d;
+    left = NULL;
+    right = NULL;
+    if (n->left != NULL) 
+	left = (struct TROVE_handle_extent *) n->left->d;
+    if (n->right != NULL)
+	right = (struct TROVE_handle_extent *) n->right->d;
+
+    /* request matches at an edge */
+    if (req_extent->first == e->first || req_extent->first == e->last)
+	return(req_extent->first);
+
+    else if (req_extent->last == e->first || req_extent->last == e->last)
+	return(req_extent->last);
+
+    /* request completely or exactly overlaps */
+    else if ( req_extent->first < e->first && req_extent->last > e->last)
+	return (e->last);
+    
+    /* request left-overlaps */
+    else if ( req_extent->first < e->first && req_extent->last < e->last && req_extent->last > e->first )
+	return (e->first);
+    
+    /* request right-overlaps */
+    else if (req_extent->first > e->first && req_extent->last > e->last && req_extent->first < e->last )
+	return (e->last);
+
+    /* otherwise, look at children */
+    else if (left != NULL && (req_extent->last < e->first) )
+	return avltree_extent_search_in_range(n->left, req_extent);
+    else if ( right != NULL && (req_extent->first > e->last) )
+	return avltree_extent_search_in_range(n->right, req_extent);
+    else /* if no chance to match with the kids, we give up */
+	return 0;
 }
 
 /*

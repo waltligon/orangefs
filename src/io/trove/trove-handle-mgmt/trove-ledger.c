@@ -147,6 +147,19 @@ TROVE_handle trove_ledger_handle_alloc(struct handle_ledger *hl)
             (TROVE_handle)0);
 }
 
+/* if possible, allocate a handle within the given starting point and ending
+ * point (provided by the TROVE_extent)
+ *
+ * if no handle avaliable in the extent, return 0
+ */
+TROVE_handle trove_ledger_handle_alloc_from_range(struct handle_ledger *hl, 
+	TROVE_extent *extent)
+{
+    if (hl == NULL) return (TROVE_handle)0;
+
+    return( extentlist_get_from_extent(&(hl->free_list), extent) );
+}
+
 int trove_ledger_handle_free(struct handle_ledger *hl, TROVE_handle handle)
 {
     /* won't actually return to the free list until timeout stuff is in

@@ -56,6 +56,7 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
     TROVE_ds_state state = 0;
     TROVE_ds_position pos = TROVE_ITERATE_START;
     static TROVE_handle handles[MAX_NUM_VERIFY_HANDLE_COUNT] = {0};
+    TROVE_handle foo;
 
     if (extent_list && ledger)
     {
@@ -294,6 +295,42 @@ TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
     }
     return handle;
 }
+
+/* trove_handle_alloc_from_range
+ *  coll_id	collection id
+ *  extent_array    array of, well, PVFS_handle_extents. 
+ *
+ *  returns:
+ *	a handle from within one of the extents provided by extent_array
+ *	no gaurantee from which extent we will allocate a handle
+ *
+ *	0 if error or if there were no handles avaliable from the given ranges
+ */	
+TROVE_handle trove_handle_alloc_from_range(TROVE_coll_id coll_id,
+	PVFS_handle_extent_array *extent_array)
+{
+    handle_ledger_t *ledger = NULL;
+    struct qlist_head *hash_link = NULL;
+    TROVE_handle handle = (TROVE_handle)0;
+    int i;
+
+    hash_link = qhash_search(s_fsid_to_ledger_table, &(coll_id));
+    if (hash_link)
+    {
+	ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+	if (ledger)
+	{
+	    for(i=0; i<extent_array->extent_count; i++) {
+		handle = trove_ledger_handle_alloc_from_range(ledger->ledger, 
+		    &(extent_array->extent_array[i]));
+		if (handle != 0) break;
+	    }
+	}
+    }
+    return handle;
+}
+
+    
 
 int trove_handle_set_used(TROVE_coll_id coll_id, TROVE_handle handle)
 {
