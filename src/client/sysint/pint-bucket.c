@@ -289,23 +289,51 @@ int PINT_bucket_get_next_io(
  */
 int PINT_bucket_map_to_server(
 	bmi_addr_t* server_addr,
-	PVFS_handle bucket,
+	PVFS_handle handle,
 	PVFS_fs_id fsid)
 {
+    int ret = -EINVAL;
     char *bmi_server_addr = (char *)0;
+    struct llist *cur = NULL;
+    struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
 
-    /* make sure the specified fs_id is sane */
-    if (!PINT_server_config_is_valid_collection_id(
-            &g_server_config,(TROVE_coll_id)fsid))
+    assert(s_fsid_config_cache_table);
+
+    hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+    if (hash_link)
     {
-        gossip_lerr("PINT_bucket_map_to_server() called with invalid fs_id.\n");
-        return(-EINVAL);
+        cur_config_cache =
+            qlist_entry(hash_link, struct config_fs_cache_s,
+                        hash_link);
+        assert(cur_config_cache);
+        assert(cur_config_cache->fs);
+        assert(cur_config_cache->bmi_host_extent_tables);
+
+        cur = cur_config_cache->bmi_host_extent_tables;
+        while(cur)
+        {
+            cur_host_extent_table = llist_head(cur);
+            if (!cur_host_extent_table)
+            {
+                break;
+            }
+            assert(cur_host_extent_table->bmi_address);
+            assert(cur_host_extent_table->extent_list);
+
+            if (PINT_handle_in_extent_list(
+                    cur_host_extent_table->extent_list, handle))
+            {
+                bmi_server_addr = cur_host_extent_table->bmi_address;
+                ret = 0;
+                break;
+            }
+            cur = llist_next(cur);
+        }
     }
-
-    /* FIXME: hack for compatibility */
-    bmi_server_addr = HACK_server_name;
-
-    return BMI_addr_lookup(server_addr, bmi_server_addr);
+    return (((ret == 0) && bmi_server_addr) ?
+            BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
 }
 
 
