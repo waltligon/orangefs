@@ -184,27 +184,27 @@ static int pvfs2_get_block(
     return pvfs2_get_blocks(ip, lblock, 1, bh_result, create);
 }
 
-static int pvfs2_writepage(
-    struct page *page,
-    struct writeback_control *wbc)
-{
-    pvfs2_print("pvfs2: pvfs2_writepage called\n");
+/* static int pvfs2_writepage( */
+/*     struct page *page, */
+/*     struct writeback_control *wbc) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_writepage called\n"); */
 
-    ClearPageDirty(page);
+/*     ClearPageDirty(page); */
 
-    /* tell mpage_writepages that we're done */
-    return 1;
-}
+/*     /\* tell mpage_writepages that we're done *\/ */
+/*     return 1; */
+/* } */
 
-static int pvfs2_writepages(
-    struct address_space *mapping,
-    struct writeback_control *wbc)
-{
-    pvfs2_print("pvfs2: pvfs2_writepages called\n");
+/* static int pvfs2_writepages( */
+/*     struct address_space *mapping, */
+/*     struct writeback_control *wbc) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_writepages called\n"); */
 
-    /* using this calls our custom pvfs2_writepage above */
-    return mpage_writepages(mapping, wbc, pvfs2_get_block);
-}
+/*     /\* using this calls our custom pvfs2_writepage above *\/ */
+/*     return mpage_writepages(mapping, wbc, pvfs2_get_block); */
+/* } */
 
 /* static int pvfs2_sync_page(struct page *page) */
 /* { */
@@ -306,8 +306,8 @@ struct address_space_operations pvfs2_address_operations =
 {
     .readpage = pvfs2_readpage,
     .readpages = pvfs2_readpages,
-    .writepage = pvfs2_writepage,
-    .writepages = pvfs2_writepages,
+/*     .writepage = pvfs2_writepage, */
+/*     .writepages = pvfs2_writepages, */
 /*     .sync_page = pvfs2_sync_page, */
 /*     .prepare_write = pvfs2_prepare_write, */
 /*     .commit_write = pvfs2_commit_write, */
@@ -328,9 +328,6 @@ void pvfs2_truncate(struct inode *inode)
 {
     pvfs2_print("pvfs2: pvfs2_truncate called on inode %d "
                 "with size %d\n",(int)inode->i_ino,(int)inode->i_size);
-
-/*     block_truncate_page( */
-/*         inode->i_mapping, inode->i_size, pvfs2_get_block); */
 
     pvfs2_truncate_inode(inode, inode->i_size);
 }

@@ -77,9 +77,13 @@ static inline int copy_attributes_to_inode(
           to the nearest 4K.  This is apparently
           required to get proper size reports from
           the 'du' shell utility.
+
+          changing the inode->i_blkbits to something
+          other than PAGE_CACHE_SHIFT breaks mmap/execution
+          as we depend on that.
         */
-        inode->i_blksize =  pvfs_bufmap_size_query();
-        inode->i_blkbits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
+        inode->i_blksize = pvfs_bufmap_size_query();
+        inode->i_blkbits = PAGE_CACHE_SHIFT;
 
         if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
             (attrs->mask & PVFS_ATTR_SYS_SIZE))
@@ -357,7 +361,7 @@ int pvfs2_inode_getattr(
 
 	   if the inode were already in the inode cache, it looks like:
 	   lookup --> revalidate --> here
-	 */
+        */
 	if (pvfs2_inode->refn.handle == 0)
 	{
 	    pvfs2_inode->refn.handle = pvfs2_ino_to_handle(inode->i_ino);

@@ -77,7 +77,11 @@ static void pvfs2_read_inode(
        dentry lookup if the inode is not present in the inode
        cache already.  so this is our chance.
     */
-    pvfs2_inode_getattr(inode);
+    if (pvfs2_inode_getattr(inode) != 0)
+    {
+        /* assume an I/O error and flag inode as bad */
+        make_bad_inode(inode);
+    }
 }
 
 /* called on sync ; make sure data is safe */

@@ -328,12 +328,15 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
     struct inode *inode = file->f_dentry->d_inode;
 
-    pvfs2_print("pvfs2: pvfs2_mmap called\n");
+    pvfs2_print("pvfs2: pvfs2_mmap called on %s\n",
+                (file ? (char *)file->f_dentry->d_name.name :
+                 (char *)"Unknown"));
 
     /*
       for mmap on pvfs2, make sure we use pvfs2 specific
       address operations by explcitly setting the operations
     */
+    inode->i_mapping->host = inode;
     inode->i_mapping->a_ops = &pvfs2_address_operations;
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 
