@@ -126,6 +126,7 @@ system management utilities
 
 documentation:
 ====================================================================
+- status document
 - consider automated tools like doxygen
 - update all design docs!
 - review
