@@ -1239,15 +1239,13 @@ int PINT_server_config_pvfs2_mkspace(struct server_configuration_s *config)
                 break;
             }
 
-            /* check if root handle is in our handle range */
-            if (is_root_handle_in_my_range(config,cur_fs))
-            {
-                /*
-                  if it is, we're responsible for creating
-                  it on disk when creating the stroage space
-                */
-                root_handle = cur_fs->root_handle;
-            }
+            /*
+              check if root handle is in our handle range.
+              if it is, we're responsible for creating
+              it on disk when creating the storage space
+            */
+            root_handle = (is_root_handle_in_my_range(config,cur_fs) ?
+                           cur_fs->root_handle : 0);
 
             /*
               for the first fs we encounter, create the storage space
