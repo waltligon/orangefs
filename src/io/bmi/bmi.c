@@ -897,6 +897,89 @@ int BMI_testunexpected(int incount,
     return (0);
 }
 
+
+/* BMI_testcontext()
+ * 
+ * Checks to see if any messages from the specified context have completed.
+ *
+ * returns 0 on success, -errno on failure
+ */
+int BMI_testcontext(int incount,
+		    int *outcount,
+		    bmi_error_code_t * error_code_array,
+		    bmi_size_t * actual_size_array,
+		    void **user_ptr_array,
+		    int max_idle_time_ms,
+		    bmi_context_id context_id)
+{
+    int i = 0;
+    int ret = -1;
+    int position = 0;
+    int tmp_outcount = 0;
+    int idle_per_method = 0;
+
+    if (max_idle_time_ms < 0)
+	return (-EINVAL);
+
+    gen_mutex_lock(&interface_mutex);
+
+    *outcount = 0;
+
+    /* TODO: do something more clever here */
+    if (max_idle_time_ms)
+    {
+	idle_per_method = max_idle_time_ms / active_method_count;
+	if (!idle_per_method)
+	    idle_per_method = 1;
+    }
+
+    while (position < incount && i < active_method_count)
+    {
+	if(user_ptr_array)
+	{
+	    ret =
+		active_method_table[i]->
+		BMI_meth_testcontext((incount - position), &tmp_outcount,
+					(&(error_code_array[position])), 
+					(&(actual_size_array[position])),
+					(&(user_ptr_array[position])),
+					idle_per_method,
+					context_id);
+	}
+	else
+	{
+	    ret =
+		active_method_table[i]->
+		BMI_meth_testcontext((incount - position), &tmp_outcount,
+					(&(error_code_array[position])), 
+					(&(actual_size_array[position])),
+					NULL,
+					idle_per_method,
+					context_id);
+	}
+	if (ret < 0)
+	{
+	    /* can't recover from this */
+	    gossip_lerr("Error: critical BMI_testcontext failure.\n");
+	    gen_mutex_unlock(&interface_mutex);
+	    return (ret);
+	}
+	position += tmp_outcount;
+	(*outcount) += tmp_outcount;
+	i++;
+    }
+
+    gen_mutex_unlock(&interface_mutex);
+    /* return 1 if anything completed */
+    if (ret == 0 && *outcount > 0)
+    {
+	return (1);
+    }
+    return (0);
+
+}
+
+
 /* BMI_memalloc()
  * 
  * Allocates memory that can be used in native mode by the BMI layer.

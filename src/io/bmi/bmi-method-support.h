@@ -117,6 +117,13 @@ struct bmi_method_ops
 			      void **,
 			      int,
 			      bmi_context_id);
+    int (*BMI_meth_testcontext) (int,
+				int *,
+				bmi_error_code_t *,
+				bmi_size_t *,
+				void **,
+				int,
+				bmi_context_id);
     int (*BMI_meth_testunexpected) (int,
 				    int *,
 				    struct method_unexpected_info *,

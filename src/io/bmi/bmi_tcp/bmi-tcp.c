@@ -219,6 +219,7 @@ struct bmi_method_ops bmi_tcp_ops = {
     BMI_tcp_post_recv,
     BMI_tcp_test,
     BMI_tcp_testsome,
+    NULL, /* testcontext */
     BMI_tcp_testunexpected,
     BMI_tcp_method_addr_lookup,
     BMI_tcp_post_send_list,

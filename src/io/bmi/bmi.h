@@ -83,7 +83,15 @@ int BMI_testsome(int incount,
 int BMI_testunexpected(int incount,
 		       int *outcount,
 		       struct BMI_unexpected_info *info_array,
-		       int max_idel_time_ms);
+		       int max_idle_time_ms);
+
+int BMI_testcontext(int incount,
+		    int *outcount,
+		    bmi_error_code_t * error_code_array,
+		    bmi_size_t * actual_size_array,
+		    void** user_ptr_array,
+		    int max_idle_time_ms,
+		    bmi_context_id context_id);
 
 void *BMI_memalloc(bmi_addr_t addr,
 		   bmi_size_t size,
