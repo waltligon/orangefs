@@ -37,7 +37,8 @@ typedef struct PINT_client_sm_msgpair_state_s {
      * if the msgpair state machine is used for processing.
      */
     int (* comp_fn)(void *sm_p, /* actually (struct PINT_client_sm *) */
-		    struct PVFS_server_resp *resp_p);
+		    struct PVFS_server_resp *resp_p,
+		    int i);
 
     /* comp_ct used to keep up with number of operations remaining */
     int comp_ct;
@@ -80,8 +81,7 @@ struct PINT_client_getattr_sm {
     uint32_t              attrmask; /* input parameter */
     int                   datafile_count; /* from object attribs */
     PVFS_handle          *datafile_handles;
-    int                   sizes_count;
-    PVFS_Dist            *dist;
+    PVFS_Dist            *dist_p;
     uint32_t              dist_size;
     PVFS_size            *size_array; /* from datafile attribs */
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */

@@ -57,9 +57,11 @@ static int remove_cleanup(PINT_client_sm *sm_p,
 
 /* completion function prototypes */
 static int remove_getattr_comp_fn(void *v_p,
-				  struct PVFS_server_resp *resp_p);
+				  struct PVFS_server_resp *resp_p,
+				  int i);
 static int remove_rmdirent_comp_fn(void *v_p,
-				   struct PVFS_server_resp *resp_p);
+				   struct PVFS_server_resp *resp_p,
+				   int i);
 
 %%
 
@@ -258,7 +260,8 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
  * metafile.
  */
 static int remove_getattr_comp_fn(void *v_p,
-				  struct PVFS_server_resp *resp_p)
+				  struct PVFS_server_resp *resp_p,
+				  int index)
 {
     /* this is a little kludge to get around some struct definition
      * issues in the headers.  maybe fix later?
@@ -352,7 +355,8 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 /* remove_rmdirent_comp_fn()
  */
 static int remove_rmdirent_comp_fn(void *v_p,
-				 struct PVFS_server_resp *resp_p)
+				   struct PVFS_server_resp *resp_p,
+				   int index)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 

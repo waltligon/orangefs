@@ -4,11 +4,36 @@
  * See COPYING in top-level directory.
  */
 
+/* pvfs2_client_getattr_sm
+ *
+ * This state machine implements the getattr system interface function.
+ *
+ * The input parameters are held in sm_p->u.getattr.
+ *
+ * The sm_p->msgpair structure is used to get the attributes of the
+ * object itself.  We convert the original attribute mask (in
+ * sm_p->u.getattr.attrmask) to ask for datafile and distribution info
+ * if the user asked for file size (PVFS_ATTR_SYS_SIZE).  This allows us
+ * to obtain this information (if the object turns out to be a metafile)
+ * so that we can later look up the datafile sizes and calculate the overall
+ * file size.
+ *
+ * The datafile handles and distribution information are stored in
+ * sm_p->u.getattr also, if the object turns out to be a metafile and the 
+ * caller asked for the size.  These need to be freed once we are done with
+ * them.
+ *
+ * The sm_p->msgpairarray is used to get datafile sizes, if it turns out that
+ * we need them.  This space will also need to be freed, if we grab these
+ * sizes.
+ */
+
 #include <string.h>
 #include <assert.h>
 
 #include "client-state-machine.h"
 #include "state-machine-fns.h"
+#include "pvfs2-types-debug.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
@@ -31,8 +56,6 @@ enum {
 /* state function prototypes */
 static int getattr_check_parameters(PINT_client_sm *sm_p,
 			  job_status_s *js_p);
-static int getattr_maybe_get_size(PINT_client_sm *sm_p,
-				  job_status_s *js_p);
 static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p);
 static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
@@ -46,12 +69,15 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 
 /* completion function prototypes */
 static int getattr_object_getattr_comp_fn(void *v_p,
-					  struct PVFS_server_resp *resp_p);
+					  struct PVFS_server_resp *resp_p,
+					  int index);
+static int getattr_datafile_getattr_comp_fn(void *v_p,
+					    struct PVFS_server_resp *resp_p,
+					    int index);
 
 %%
 
 machine pvfs2_client_getattr_sm(check_parameters,
-				maybe_get_size,
 				object_getattr_setup_msgpair,
 				object_getattr_xfer_msgpair,
 				object_getattr_failure,
@@ -73,18 +99,12 @@ machine pvfs2_client_getattr_sm(check_parameters,
     }
     state object_getattr_xfer_msgpair {
 	jump pvfs2_client_getattr_pcache_sm;
-	success => maybe_get_size;
+	success => cleanup;
 	GETATTR_NEED_DATAFILE_SIZES => datafile_getattr_setup_msgpairarray;
 	default => object_getattr_failure;
     }
     state object_getattr_failure {
 	run getattr_object_getattr_failure;
-	default => cleanup;
-    }
-
-    state maybe_get_size {
-	run getattr_maybe_get_size;
-	GETATTR_NEED_SIZE => datafile_getattr_setup_msgpairarray;
 	default => cleanup;
     }
 
@@ -171,25 +191,34 @@ static int getattr_check_parameters(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int getattr_maybe_get_size(PINT_client_sm *sm_p,
-				  job_status_s *js_p)
-{
-    return 1;
-}
-
 /* getattr_object_getattr_setup_msgpair()
+ *
+ * Fills in sm_p->msgpair to perform a getattr using the getattr_pcache
+ * state machine.
  */
 static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p)
 {
+    uint32_t attrmask;
+
     gossip_debug(CLIENT_DEBUG, "(%p) getattr state: getattr_setup_msgpair\n", sm_p);
+
+    /* adjust parameters as necessary */
+    attrmask = sm_p->u.getattr.attrmask;
+    if (attrmask & PVFS_ATTR_SYS_SIZE) {
+	/* need datafile handles and distribution in order to get 
+	 * datafile handles and know what function to call to get
+	 * the file size.
+	 */
+	attrmask |= PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST;
+    }
 
     /* fill in getattr request */
     PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
 			      *sm_p->cred_p,
 			      sm_p->u.getattr.object_ref.fs_id,
 			      sm_p->u.getattr.object_ref.handle,
-			      sm_p->u.getattr.attrmask);
+			      attrmask);
     
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
@@ -214,7 +243,8 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
  * metafile.  Other types die right now.
  */
 static int getattr_object_getattr_comp_fn(void *v_p,
-					  struct PVFS_server_resp *resp_p)
+					  struct PVFS_server_resp *resp_p,
+					  int index)
 {
     /* this is a little kludge to get around some struct definition
      * issues in the headers.  maybe fix later?
@@ -242,24 +272,77 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     sm_p->u.getattr.getattr_resp_p->attr.atime = resp_p->u.getattr.attr.atime;
     sm_p->u.getattr.getattr_resp_p->attr.mtime = resp_p->u.getattr.attr.mtime;
     sm_p->u.getattr.getattr_resp_p->attr.ctime = resp_p->u.getattr.attr.ctime;
+    sm_p->u.getattr.getattr_resp_p->attr.mask  = resp_p->u.getattr.attr.mask;
     sm_p->u.getattr.getattr_resp_p->attr.size  = 0;
 
     sm_p->u.getattr.getattr_resp_p->attr.objtype = resp_p->u.getattr.attr.objtype;
     switch (resp_p->u.getattr.attr.objtype)
     {
 	case PVFS_TYPE_METAFILE:
-	    if (sm_p->u.getattr.attrmask & PVFS_ATTR_META_DFILES) {
+	    if (sm_p->msgpair.req.u.getattr.attrmask & PVFS_ATTR_META_DIST) {
+		PVFS_object_attr *r_attr_p = &resp_p->u.getattr.attr;
+
+		/* sanity checks */
+		assert(r_attr_p->mask & PVFS_ATTR_META_DIST);
+		assert(r_attr_p->u.meta.dist_size > 0);
+		
+		gossip_debug(CLIENT_DEBUG,
+			     "getattr_object_getattr_comp_fn: copying %d bytes of dist.\n",
+			     r_attr_p->u.meta.dist_size);
+
+		/* here we make a copy of the distribution information.
+		 *
+		 * KLUDGE: there is no copy function for distributions
+		 * right now, so we do this nasty thing.
+		 *
+		 * Also, there are assumptions in the dist code that ints
+		 * and char *s are the same size.  I thought we knew better.
+		 *
+		 * If the assert() blows up, we need to fix the dist code,
+		 * not this code.
+		 */
+		assert(sizeof(int) == sizeof(char *)); /* dist time bomb */
+
+		sm_p->u.getattr.dist_p =
+		    (PVFS_Dist *) malloc(r_attr_p->u.meta.dist_size);
+		if (sm_p->u.getattr.dist_p == NULL) {
+		    assert(0);
+		    return -PVFS_ENOMEM;
+		}
+
+		/* this encodes the previously decoded distribution into
+		 * our new space.
+		 */
+		PINT_Dist_encode(sm_p->u.getattr.dist_p,
+				 r_attr_p->u.meta.dist);
+
+		/* this does an in-place decoding of the distribution.  now
+		 * we have a decoded version where we want it.
+		 *
+		 * NOTE: we need to free this later.
+		 */
+		PINT_Dist_decode(sm_p->u.getattr.dist_p,
+				 NULL);
+
+		/* save the size too */
+		sm_p->u.getattr.dist_size = r_attr_p->u.meta.dist_size;
+
+		/* nothing special about our return value here */
+	    }
+	    if (sm_p->msgpair.req.u.getattr.attrmask & PVFS_ATTR_META_DFILES) {
+		PVFS_object_attr *r_attr_p = &resp_p->u.getattr.attr;
+
 		/* need to save datafile handles and remove them;
 		 * redirect us to those states.
 		 */
 		
 		/* sanity checks */
-		assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_SYS_SIZE);
-		assert(resp_p->u.getattr.attr.u.meta.dfile_count > 0);
+		assert(r_attr_p->mask & PVFS_ATTR_META_DFILES);
+		assert(r_attr_p->u.meta.dfile_count > 0);
 		
 		gossip_debug(CLIENT_DEBUG,
 			     "getattr_object_getattr_comp_fn: %d datafiles.\n",
-			     resp_p->u.getattr.attr.u.meta.dfile_count);
+			     r_attr_p->u.meta.dfile_count);
 		
 		/* save the datafile handles prior to freeing up the
 		 * buffers we used for messages.  we could keep them around
@@ -267,16 +350,24 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		 * it is likely that this stuff will be stuck in the pcache
 		 * anyway, so we'll be able to just reference it from there.
 		 */
-		sm_p->u.getattr.datafile_handles = (PVFS_handle *) malloc(resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle));
+		sm_p->u.getattr.datafile_handles = (PVFS_handle *) malloc(r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
 		if (sm_p->u.getattr.datafile_handles == NULL) {
 		    assert(0);
 		}
-		sm_p->u.getattr.datafile_count = resp_p->u.getattr.attr.u.meta.dfile_count;
+		sm_p->u.getattr.datafile_count = r_attr_p->u.meta.dfile_count;
 		memcpy(sm_p->u.getattr.datafile_handles,
-		   resp_p->u.getattr.attr.u.meta.dfile_array,
-		   resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle));
+		   r_attr_p->u.meta.dfile_array,
+		   r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
 
-		return GETATTR_NEED_DATAFILE_SIZES;
+		if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE) {
+		    /* if caller asked for the size, then we need to go get
+		     * the datafile sizes
+		     */
+		    return GETATTR_NEED_DATAFILE_SIZES;
+		}
+		else {
+		    return 0;
+		}
 	    }
 	    else return 0;
 	    break;
@@ -295,7 +386,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     } /* end of switch() */
 
     return -PVFS_EINVAL; /* should not get here */
-}
+} /* getattr_object_getattr_comp_fn */
 
 
 static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
@@ -312,10 +403,82 @@ static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
 static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
 						       job_status_s *js_p)
 {
+    int i;
+
     gossip_debug(CLIENT_DEBUG,
 		 "(%p) getattr state: getattr_datafile_getattr_setup_msgpairarray\n",
 		 sm_p);
+
+    /* clear error field in job */
+    js_p->error_code = 0;
+    
+    /* allocate memory for datafile message pairs, resulting sizes
+     *
+     * all this will need to be freed later.
+     */
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)
+	malloc(sm_p->u.getattr.datafile_count * sizeof(PINT_client_sm_msgpair_state));
+    if (sm_p->msgarray == NULL) {
+	assert(0);
+    }
+    sm_p->u.getattr.size_array = (PVFS_size *)
+	malloc(sm_p->u.getattr.datafile_count * sizeof(PVFS_size));
+    if (sm_p->u.getattr.size_array == NULL) {
+	assert(0);
+    }
+    sm_p->msgarray_count = sm_p->u.getattr.datafile_count;
+
+    /* for each datafile, post a send/recv pair to obtain the size */
+    for (i=0; i < sm_p->msgarray_count; i++) {
+	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+
+	gossip_debug(CLIENT_DEBUG,
+		     "  datafile_getattr: getting size for 0x%08Lx\n", 
+		     sm_p->u.getattr.datafile_handles[i]);
+
+	/* fill in getattr request; all we care about is the size */
+	PINT_SERVREQ_GETATTR_FILL(msg_p->req,
+				  *sm_p->cred_p,
+				  sm_p->u.getattr.object_ref.fs_id,
+				  sm_p->u.getattr.datafile_handles[i],
+				  PVFS_ATTR_DATA_SIZE);
+	
+	/* fill in msgpair structure components */
+	msg_p->fs_id   = sm_p->u.getattr.object_ref.fs_id;
+	msg_p->handle  = sm_p->u.getattr.object_ref.handle;
+	msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
+    }
+
+    /* return immediately; next state jumps to msgpairarray machine */
     return 1;
+}
+
+static int getattr_datafile_getattr_comp_fn(void *v_p,
+					    struct PVFS_server_resp *resp_p,
+					    int index)
+{
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+
+    if (resp_p->status != 0) {
+	return resp_p->status;
+    }
+
+    /* sanity checks:
+     * - this is a getattr response
+     * - the attributes indicate that this was indeed a datafile
+     * - the datafile has a positive size
+     */
+    assert(resp_p->op == PVFS_SERV_GETATTR);
+    assert(resp_p->u.getattr.attr.objtype == PVFS_TYPE_DATAFILE);
+    assert(resp_p->u.getattr.attr.u.data.size >= 0);
+
+    gossip_debug(CLIENT_DEBUG,
+		 "datafile_getattr: size of datafile %d is %Ld\n",
+		 index,
+		 resp_p->u.getattr.attr.u.data.size);
+    sm_p->u.getattr.size_array[index] = resp_p->u.getattr.attr.u.data.size;
+
+    return 0;
 }
 
 static int getattr_datafile_getattr_failure(PINT_client_sm *sm_p,
@@ -330,8 +493,67 @@ static int getattr_datafile_getattr_failure(PINT_client_sm *sm_p,
 static int getattr_cleanup(PINT_client_sm *sm_p,
 			   job_status_s *js_p)
 {
+    int ret;
+    uint32_t amask;
+    PVFS_sys_attr *s_attr_p = &sm_p->u.getattr.getattr_resp_p->attr;
+
     gossip_debug(CLIENT_DEBUG, "(%p) getattr state: getattr_cleanup\n", sm_p);
 
+    if (js_p->error_code == 0) {
+	/* calculate size of file if necessary */
+	s_attr_p->size = 0;
+
+	ret = PINT_Dist_lookup(sm_p->u.getattr.dist_p);
+	if (ret < 0) {
+	    assert(0);
+	}
+
+	s_attr_p->size = (sm_p->u.getattr.dist_p->methods->logical_file_size)
+	    (sm_p->u.getattr.dist_p->params,
+	     sm_p->u.getattr.datafile_count,
+	     sm_p->u.getattr.size_array);
+
+
+	/* redo the mask */
+	amask = s_attr_p->mask; /* from object getattr */
+	s_attr_p->mask = 0;
+
+	if (amask & PVFS_ATTR_COMMON_UID)   s_attr_p->mask |= PVFS_ATTR_SYS_UID;
+	if (amask & PVFS_ATTR_COMMON_GID)   s_attr_p->mask |= PVFS_ATTR_SYS_GID;
+	if (amask & PVFS_ATTR_COMMON_PERM)  s_attr_p->mask |= PVFS_ATTR_SYS_PERM;
+	if (amask & PVFS_ATTR_COMMON_ATIME) s_attr_p->mask |= PVFS_ATTR_SYS_ATIME;
+	if (amask & PVFS_ATTR_COMMON_CTIME) s_attr_p->mask |= PVFS_ATTR_SYS_CTIME;
+	if (amask & PVFS_ATTR_COMMON_MTIME) s_attr_p->mask |= PVFS_ATTR_SYS_MTIME;
+	if (amask & PVFS_ATTR_COMMON_TYPE)  s_attr_p->mask |= PVFS_ATTR_SYS_TYPE;
+    
+	/* we know we grabbed the size if they asked for it */
+	if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE) {
+	    s_attr_p->mask |= PVFS_ATTR_SYS_SIZE;
+	}
+
+	PINT_attrmask_print(CLIENT_DEBUG, s_attr_p->mask);
+
+	/* free all the memory we allocated, which could include:
+	 * - size array
+	 * - msgpair array
+	 * - datafile handle array
+	 * - distribution description
+	 */
+	if (sm_p->u.getattr.size_array != NULL) {
+	    free(sm_p->u.getattr.size_array);
+	}
+	if (sm_p->msgarray != NULL) {
+	    free(sm_p->msgarray);
+	}
+	if (sm_p->u.getattr.datafile_handles != NULL) {
+	    free(sm_p->u.getattr.datafile_handles);
+	}
+	if (sm_p->u.getattr.dist_p != NULL) {
+	    free(sm_p->u.getattr.dist_p);
+	}
+
+	/* TODO: POPULATE PINODE CACHE? */
+    }
     /* mark operation as complete */
     sm_p->op_complete = 1;
 

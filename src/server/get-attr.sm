@@ -10,6 +10,8 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
+#include "pvfs2-types.h"
+#include "pvfs2-types-debug.h"
 
 enum {
     STATE_METAFILE = 7,
@@ -117,6 +119,9 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 		 (long long)a_p->mtime,
 		 (long long)a_p->ctime);
 
+    gossip_debug(SERVER_DEBUG, "mask output from getattr: ");
+    PINT_attrmask_print(SERVER_DEBUG, s_op->attr.mask);
+    
     js_p->error_code = 0;
 
     if (a_p->objtype == PVFS_TYPE_METAFILE)
@@ -398,6 +403,9 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     gossip_debug(SERVER_DEBUG,
 		 "  sending status %d\n",
 		 s_op->resp.status);
+
+    gossip_debug(SERVER_DEBUG, "returning attrmask ");
+    PINT_attrmask_print(SERVER_DEBUG, s_op->resp.u.getattr.attr.mask);
 
     /* NOTE: we _intentionally_ preserve the error_code so that the 
      * following states can use it to set the status field in the

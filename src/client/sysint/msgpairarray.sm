@@ -116,6 +116,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 					msg_p->handle,
 					msg_p->fs_id);
 	if (ret != 0) {
+	    gossip_lerr("bucket map to server failed; probably invalid svr_addr\n");
 	    assert(ret < 0); /* return value range check */
 	    assert(0); /* placeholder until we have real error handling */
 	}
@@ -128,6 +129,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 			  msg_p->svr_addr,
 			  PINT_CLIENT_ENC_TYPE);
 	if (ret != 0) {
+	    gossip_lerr("pint_encode failed\n");
 	    assert(ret < 0); /* return value range check */
 	    assert(0); /* placeholder until we have real error handling */
 	}
@@ -161,13 +163,14 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 			   &msg_p->recv_id,
 			   pint_client_sm_context);
 	if (ret < 0) {
+	    gossip_lerr("post of receive failed\n");
 	    assert(0);
 	}
 	else if (ret == 1) {
 	    /* it shouldn't be possible for the receive to complete before
 	     * we send the request.
 	     */
-	    assert(0);
+	    assert(0); /* sanity check */
 	}
 	assert(ret == 0); /* return value range check */
 
@@ -185,6 +188,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 				&msg_p->send_id,
 				pint_client_sm_context);
 	if (ret < 0) {
+	    gossip_lerr("post of send failed\n");
 	    assert(0);
 	}
 	else if (ret == 1) {
@@ -293,11 +297,8 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 	     * necessary to return the value that they're interested
 	     * in I think? -- Rob
 	     *
-	     * Q: should completion functions take an index value for the
-	     *    server number?
-	     *
 	     */
-	    js_p->error_code = msg_p->comp_fn(sm_p, resp_p);
+	    js_p->error_code = msg_p->comp_fn(sm_p, resp_p, i);
 	}
 	else if (resp_p->status != 0) {
 	    /* no comp_fn specified and status non-zero */
