@@ -13,10 +13,6 @@
 
 #include <bmi-types.h>
 
-/* TODO: REMOVE THIS LATER, ONCE SERVER CODE USES THE CORRECT NAME
- */
-#define unexpected_info BMI_unexpected_info
-
 /* used to describe unexpected message arrivals */
 struct BMI_unexpected_info
 {

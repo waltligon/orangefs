@@ -510,7 +510,8 @@ int PINT_server_cp_bmi_unexp(PINT_server_op *serv_op, job_status_s *temp_stat)
 	mem_calc_ptr = (char *) serv_op;
 	serv_op->encoded.buffer_list = (void *) mem_calc_ptr + sizeof(PINT_server_op);
 
-	serv_op->unexp_bmi_buff = (struct unexpected_info *) malloc(sizeof(struct unexpected_info));
+	serv_op->unexp_bmi_buff = (struct BMI_unexpected_info *)
+		malloc(sizeof(struct BMI_unexpected_info));
 	if(!serv_op->unexp_bmi_buff)
 	{
 		return(-2);
