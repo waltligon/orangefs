@@ -46,7 +46,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 {
     int ret = -1, i = 0;
     int num_file_systems = 0;
-    gen_mutex_t mt_config;
+    gen_mutex_t *mt_config = NULL;
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
 
@@ -163,7 +163,16 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     assert(num_file_systems);
 
     /* Grab the mutex - serialize all writes to server_config */
-    gen_mutex_lock(&mt_config);	
+    mt_config = gen_mutex_build();
+    if (!mt_config)
+    {
+	init_fail = DCACHE_INIT_FAIL;
+	gossip_ldebug(CLIENT_DEBUG,
+                      "Failed to initialize mutex\n");
+	goto return_error;
+    }
+
+    gen_mutex_lock(mt_config);	
 
     /* Initialize the configuration management interface */
     ret = PINT_bucket_initialize();
@@ -172,7 +181,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 	init_fail = BUCKET_INIT_FAIL;
 	gossip_ldebug(CLIENT_DEBUG,"Error in initializing configuration management interface\n");
 	/* Release the mutex */
-	gen_mutex_unlock(&mt_config);
+	gen_mutex_unlock(mt_config);
 	goto return_error;
     }
 
@@ -205,7 +214,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
             init_fail = GET_CONFIG_INIT_FAIL;
             gossip_ldebug(CLIENT_DEBUG,"Failed to load fs info into the "
                           "PINT_handle interface.\n");
-            gen_mutex_unlock(&mt_config);
+            gen_mutex_unlock(mt_config);
             goto return_error;
         }
         resp->fsid_list[i++] = cur_fs->coll_id;
@@ -213,7 +222,8 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     }
 
     /* Release the mutex */
-    gen_mutex_unlock(&mt_config);
+    gen_mutex_unlock(mt_config);
+    gen_mutex_destroy(mt_config);
 
     assert(i == num_file_systems);
     return(0);
