@@ -97,6 +97,7 @@ I/O description:
 
 correctness/performance testing
 ====================================================================
+- a comprehensive test suite of the system interface API
 - more pts tests
 - profiling code paths
 - eliminate memory leaks
