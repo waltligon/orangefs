@@ -63,8 +63,8 @@ int main(int argc, char **argv)
 	char *target_mem_offset_array[4] = {0};
 	TROVE_size mem_size_array[4] = { 5*MB, 5*MB, 5*MB, 5*MB };
 	int mem_count = 4;
-	TROVE_offset stream_offset_array[4] = { 0,0,0,0 };
-	TROVE_size stream_size_array[4] = { 0, 0, 0, 0 };
+	TROVE_offset stream_offset_array[4] = { 0, 5*MB, 10*MB, 15*MB};
+	TROVE_size stream_size_array[4] = { 5*MB, 5*MB, 5*MB, 5*MB };
 	int stream_count = 4;
 	TROVE_size output_size;
 	void *user_ptr_array[1] = { (char *) 13 };
