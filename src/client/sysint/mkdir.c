@@ -32,8 +32,8 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
                         PVFS_object_attr attr, 
                         PVFS_credentials credentials, PVFS_sysresp_mkdir *resp)
 {
-    struct PVFS_server_req_s req_p;		/* server request */
-    struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
+    struct PVFS_server_req req_p;		/* server request */
+    struct PVFS_server_resp *ack_p = NULL;	/* server response */
     int ret = -1;
     pinode *pinode_ptr = NULL, *parent_ptr = NULL;
     bmi_addr_t serv_addr1, serv_addr2;	/* PVFS address type structure */
@@ -117,7 +117,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 
     /* send the create request for the meta file */
     req_p.op = PVFS_SERV_MKDIR;
-    req_p.rsize = sizeof(struct PVFS_server_req_s);
+    req_p.rsize = sizeof(struct PVFS_server_req);
     req_p.credentials = credentials;
     req_p.u.mkdir.requested_handle = 0;
     req_p.u.mkdir.fs_id = parent_refn.fs_id;
@@ -144,7 +144,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 	goto return_error;
     }
 
-    ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+    ack_p = (struct PVFS_server_resp *) decoded.buffer;
     if (ack_p->status < 0 )
     {
 	gossip_ldebug(CLIENT_DEBUG,"mkdir response indicates failure\n");
@@ -185,7 +185,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 
     name_sz = strlen(entry_name) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_CREATEDIRENT;
-    req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
+    req_p.rsize = sizeof(struct PVFS_server_req) + name_sz;
 
     /* credentials come from credentials and are set in the previous
      * create request.  so we don't have to set those again.
@@ -212,7 +212,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 	goto return_error;
     }
 
-    ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+    ack_p = (struct PVFS_server_resp *) decoded.buffer;
 
     if (ack_p->status < 0 )
     {
@@ -295,7 +295,7 @@ return_error:
 
 	    /* rollback mkdir message */
 	    req_p.op = PVFS_SERV_REMOVE;
-	    req_p.rsize = sizeof(struct PVFS_server_req_s);
+	    req_p.rsize = sizeof(struct PVFS_server_req);
 	    req_p.credentials = credentials;
 	    req_p.u.remove.handle = entry.handle;
 	    req_p.u.remove.fs_id = entry.fs_id;

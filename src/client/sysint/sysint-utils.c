@@ -29,7 +29,7 @@ struct server_configuration_s g_server_config;
 
 static int server_parse_config(
     struct server_configuration_s *config,
-    PVFS_servresp_getconfig *response);
+    struct PVFS_servresp_getconfig *response);
 
 /*
  * PINT_do_lookup looks up one dirent in a given parent directory
@@ -41,8 +41,8 @@ static int server_parse_config(
 int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
 		PVFS_credentials cred,PVFS_pinode_reference *entry)
 {
-	struct PVFS_server_req_s req_p;             /* server request */
-        struct PVFS_server_resp_s *ack_p = NULL;    /* server response */
+	struct PVFS_server_req req_p;             /* server request */
+        struct PVFS_server_resp *ack_p = NULL;    /* server response */
         int ret = -1, name_sz = 0;
         struct PINT_decoded_msg decoded;
         bmi_addr_t serv_addr;
@@ -70,7 +70,7 @@ int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
 
         req_p.op = PVFS_SERV_LOOKUP_PATH;
         req_p.credentials = cred;
-        req_p.rsize = name_sz + sizeof(struct PVFS_server_req_s);
+        req_p.rsize = name_sz + sizeof(struct PVFS_server_req);
         req_p.u.lookup_path.path = name;
         req_p.u.lookup_path.fs_id = parent.fs_id;
         req_p.u.lookup_path.starting_handle = parent.handle;
@@ -100,7 +100,7 @@ int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
             goto return_error;
         }
 
-        ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+        ack_p = (struct PVFS_server_resp *) decoded.buffer;
 
 	/* make sure the operation didn't fail*/
 	if (ack_p->status < 0 )
@@ -184,7 +184,7 @@ void debug_print_type(void* thing, int type)
 {
 	if (type ==0)
 	{
-		struct PVFS_server_req_s * req = thing;
+		struct PVFS_server_req * req = thing;
 		switch( req->op )
 		{
 			case PVFS_SERV_CREATE:
@@ -224,7 +224,7 @@ void debug_print_type(void* thing, int type)
 	}
 	else
 	{
-		struct PVFS_server_resp_s * resp = thing;
+		struct PVFS_server_resp * resp = thing;
 		switch( resp->op )
 		{
 			case PVFS_SERV_RMDIRENT:
@@ -337,8 +337,8 @@ int PINT_server_get_config(struct server_configuration_s *config,
 {
     int ret = -1, i = 0;
     bmi_addr_t serv_addr;
-    struct PVFS_server_req_s serv_req;
-    struct PVFS_server_resp_s *serv_resp = NULL;
+    struct PVFS_server_req serv_req;
+    struct PVFS_server_resp *serv_resp = NULL;
     PVFS_credentials creds;
     struct PINT_decoded_msg decoded;
     void* encoded_resp;
@@ -371,9 +371,9 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	}
 
 	/* Set up the request for getconfig */
-        memset(&serv_req,0,sizeof(struct PVFS_server_req_s));
+        memset(&serv_req,0,sizeof(struct PVFS_server_req));
 	serv_req.op = PVFS_SERV_GETCONFIG;
-	serv_req.rsize = sizeof(struct PVFS_server_req_s);
+	serv_req.rsize = sizeof(struct PVFS_server_req);
 	serv_req.credentials = creds;
 	serv_req.u.getconfig.max_strsize = PVFS_MAX_CONFIG_SIZE;
 
@@ -388,7 +388,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
             gossip_ldebug(CLIENT_DEBUG,"PINT_send_req failed\n");
             return -1;
 	}
-	serv_resp = (struct PVFS_server_resp_s *) decoded.buffer;
+	serv_resp = (struct PVFS_server_resp *) decoded.buffer;
 
         if (server_parse_config(config,&(serv_resp->u.getconfig)))
         {
@@ -426,7 +426,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 }
 
 static int server_parse_config(struct server_configuration_s *config,
-                               PVFS_servresp_getconfig *response)
+                               struct PVFS_servresp_getconfig *response)
 {
     int ret = 1;
     int fs_fd = 0, server_fd = 0;

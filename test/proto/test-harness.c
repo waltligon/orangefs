@@ -21,8 +21,8 @@
 
 int main(int argc, char **argv)
 {
-	struct PVFS_server_req_s *request;
-	struct PVFS_server_resp_s *response;
+	struct PVFS_server_req *request;
+	struct PVFS_server_resp *response;
 	struct PINT_encoded_msg encoded;
 	struct PINT_decoded_msg decoded;
 	int ret;
@@ -36,8 +36,8 @@ int main(int argc, char **argv)
 	bmi_context_id context;
 #endif
 
-	request = (struct PVFS_server_req_s *) malloc(sizeof(struct PVFS_server_req_s));
-	response = (struct PVFS_server_resp_s *) malloc(sizeof(struct PVFS_server_resp_s));
+	request = (struct PVFS_server_req *) malloc(sizeof(struct PVFS_server_req));
+	response = (struct PVFS_server_resp *) malloc(sizeof(struct PVFS_server_resp));
 
 	ret = BMI_initialize("bmi_tcp", NULL, 0);
 
@@ -107,18 +107,18 @@ int main(int argc, char **argv)
 
 	RET_CHECK("Error in Decoding Create Resp\n")
 
-	if(((struct PVFS_server_resp_s *)decoded.buffer)->op != PVFS_SERV_CREATE)
+	if(((struct PVFS_server_resp *)decoded.buffer)->op != PVFS_SERV_CREATE)
 		if(0)
 		{
 		printf("Op not correct after decoding Create Resp... Got %d\n",
 					//((struct PVFS_serv_req_s *)decoded.buffer)­>op);
-					((struct PVFS_server_resp_s *)decoded.buffer)->op);
+					((struct PVFS_server_resp *)decoded.buffer)->op);
 		ret = -1;
 		}
-	if(((struct PVFS_server_resp_s *)decoded.buffer)->u.create.handle !=7)
+	if(((struct PVFS_server_resp *)decoded.buffer)->u.create.handle !=7)
 	{
 		printf("Handle not correct after decoding Create Resp... Got %lld\n",
-					((struct PVFS_server_resp_s *)decoded.buffer)->u.create.handle);
+					((struct PVFS_server_resp *)decoded.buffer)->u.create.handle);
 		ret =-1;
 	}
 
@@ -197,10 +197,10 @@ int main(int argc, char **argv)
 							NULL);
 	RET_CHECK("Error in Decoding GetConfig Resp\n")
 	
-	if(((struct PVFS_server_resp_s *)decoded.buffer)->op != PVFS_SERV_GETCONFIG)
+	if(((struct PVFS_server_resp *)decoded.buffer)->op != PVFS_SERV_GETCONFIG)
 	{
 		printf("Op not correct after decoding Getconfig... Got %d\n",
-					((struct PVFS_server_resp_s *)decoded.buffer)->op);
+					((struct PVFS_server_resp *)decoded.buffer)->op);
 		ret = -1;
 	}
 #ifdef VERBOSE_DEBUG
@@ -306,10 +306,10 @@ int main(int argc, char **argv)
 							NULL);
 	RET_CHECK("Error in Decoding Lookup Resp\n")
 	
-	if(((struct PVFS_server_resp_s *)decoded.buffer)->op != PVFS_SERV_LOOKUP_PATH)
+	if(((struct PVFS_server_resp *)decoded.buffer)->op != PVFS_SERV_LOOKUP_PATH)
 	{
 		printf("Op not correct after decoding Getconfig... Got %d\n",
-					((struct PVFS_server_resp_s *)decoded.buffer)->op);
+					((struct PVFS_server_resp *)decoded.buffer)->op);
 		ret = -1;
 	}
 #ifdef VERBOSE_DEBUG

@@ -15,7 +15,7 @@
 int main(int argc, char **argv)	
 {
 	int ret;
-	struct PVFS_server_req_s req_array[3];
+	struct PVFS_server_req req_array[3];
 	job_id_t id_array[3];
 	job_id_t id_arrayB[3];
 	int count = 0;

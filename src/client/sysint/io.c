@@ -33,7 +33,7 @@ extern job_context_id PVFS_sys_job_context;
  */
 
 static int io_req_ack_flow_array(bmi_addr_t* addr_array,
-    struct PVFS_server_req_s* req_array,
+    struct PVFS_server_req* req_array,
     bmi_size_t max_resp_size,
     void** resp_encoded_array,
     struct PINT_decoded_msg* resp_decoded_array,
@@ -51,7 +51,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     enum PVFS_flowproto_type flow_type);
 
 static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
-    struct PVFS_server_req_s* req_array,
+    struct PVFS_server_req* req_array,
     bmi_size_t max_resp_size,
     void** resp_encoded_array,
     struct PINT_decoded_msg* resp_decoded_array,
@@ -74,8 +74,8 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     uint32_t attr_mask = 0;
     int ret = -1;
     bmi_addr_t* addr_array = NULL;
-    struct PVFS_server_req_s* req_array = NULL;
-    struct PVFS_server_resp_s* tmp_resp = NULL;
+    struct PVFS_server_req* req_array = NULL;
+    struct PVFS_server_resp* tmp_resp = NULL;
     void** resp_encoded_array = NULL;
     struct PINT_decoded_msg* resp_decoded_array = NULL;
     int* error_code_array = NULL;
@@ -188,9 +188,9 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     /* create storage for book keeping information */
     addr_array = (bmi_addr_t*)malloc(target_handle_count *
 	sizeof(bmi_addr_t));
-    req_array = (struct PVFS_server_req_s*)
+    req_array = (struct PVFS_server_req*)
 	malloc(target_handle_count * 
-	sizeof(struct PVFS_server_req_s));
+	sizeof(struct PVFS_server_req));
     resp_encoded_array = (void**)malloc(target_handle_count *
 	sizeof(void*));
     resp_decoded_array = (struct PINT_decoded_msg*)
@@ -239,7 +239,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 
 	/* fill in the I/O request */
 	req_array[i].op = PVFS_SERV_IO;
-	req_array[i].rsize = sizeof(struct PVFS_server_req_s);
+	req_array[i].rsize = sizeof(struct PVFS_server_req);
 	req_array[i].credentials = credentials;
 	req_array[i].u.io.handle = target_handle_array[i];
 	req_array[i].u.io.fs_id = pinode_refn.fs_id;
@@ -347,7 +347,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	for(i=0; i<target_handle_count; i++)
 	{
 	    tmp_resp = (struct
-		PVFS_server_resp_s*)resp_decoded_array[i].buffer;
+		PVFS_server_resp*)resp_decoded_array[i].buffer;
 	    if(!(error_code_array[i]) && tmp_resp->status)
 		error_code_array[i] = tmp_resp->status;
 	    if(!(error_code_array[i]) && !(tmp_resp->status))
@@ -375,7 +375,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     for(i=0; i<target_handle_count; i++)
     {
 	tmp_resp = (struct
-	    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
+	    PVFS_server_resp*)resp_decoded_array[i].buffer;
 	if(error_code_array[i])
 	{
 	    total_errors ++;
@@ -431,7 +431,7 @@ sys_io_out:
  * returns 0 on success, -errno on failure
  */
 static int io_req_ack_flow_array(bmi_addr_t* addr_array,
-    struct PVFS_server_req_s* req_array,
+    struct PVFS_server_req* req_array,
     bmi_size_t max_resp_size,
     void** resp_encoded_array,
     struct PINT_decoded_msg* resp_decoded_array,
@@ -457,7 +457,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     int count;
     int need_to_test = 0;
     PINT_Request_file_data* file_data_array = NULL;
-    struct PVFS_server_resp_s* tmp_resp = NULL;
+    struct PVFS_server_resp* tmp_resp = NULL;
     int recvs_to_complete = 0;
     int flows_to_complete = 0;
     int flows_to_post = 0;
@@ -670,7 +670,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		}
 
 		tmp_resp = (struct
-		    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
+		    PVFS_server_resp*)resp_decoded_array[i].buffer;
 		if(tmp_resp->status)
 		{
 		    /* don't post a flow; we got a negative ack */
@@ -816,7 +816,7 @@ array_out:
  * no return value
  */
 static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
-    struct PVFS_server_req_s* req_array,
+    struct PVFS_server_req* req_array,
     bmi_size_t max_resp_size,
     void** resp_encoded_array,
     struct PINT_decoded_msg* resp_decoded_array,

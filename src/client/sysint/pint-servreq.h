@@ -13,7 +13,7 @@
 #include "pvfs2-req-proto.h"
 
 int PINT_send_req_array(bmi_addr_t* addr_array,
-    struct PVFS_server_req_s* req_array,
+    struct PVFS_server_req* req_array,
     bmi_size_t max_resp_size,
     void** resp_encoded_array,
     struct PINT_decoded_msg* resp_decoded_array,
@@ -22,7 +22,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
     PVFS_msg_tag_t* op_tag_array);
 
 void PINT_release_req_array(bmi_addr_t* addr_array,
-    struct PVFS_server_req_s* req_array,
+    struct PVFS_server_req* req_array,
     bmi_size_t max_resp_size,
     void** resp_encoded_array,
     struct PINT_decoded_msg* resp_decoded_array,
@@ -30,14 +30,14 @@ void PINT_release_req_array(bmi_addr_t* addr_array,
     int array_size);
 
 int PINT_send_req(bmi_addr_t addr,
-    struct PVFS_server_req_s *req_p,
+    struct PVFS_server_req *req_p,
     bmi_size_t max_resp_size,
     struct PINT_decoded_msg *decoded_resp,
     void** encoded_resp,
     PVFS_msg_tag_t op_tag);
 
 void PINT_release_req(bmi_addr_t addr,
-    struct PVFS_server_req_s *req_p,
+    struct PVFS_server_req *req_p,
     bmi_size_t max_resp_size,
     struct PINT_decoded_msg *decoded_resp,
     void** encoded_resp,

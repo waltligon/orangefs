@@ -117,7 +117,7 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
 		  job_context_id context_id);
 
 /* request scheduler post */
-int job_req_sched_post(struct PVFS_server_req_s *in_request,
+int job_req_sched_post(struct PVFS_server_req *in_request,
 		       void *user_ptr,
 		       job_status_s * out_status_p,
 		       job_id_t * id,

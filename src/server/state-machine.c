@@ -94,7 +94,7 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
 		s_op->unexp_bmi_buff.size,
 		&(s_op->enc_type));
 
-    s_op->req  = (struct PVFS_server_req_s *) s_op->decoded.buffer;
+    s_op->req  = (struct PVFS_server_req *) s_op->decoded.buffer;
     assert(s_op->req != NULL);
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
@@ -109,8 +109,8 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
     }
 
     /* allocate and zero memory for (unencoded) response */
-    s_op->resp = (struct PVFS_server_resp_s *)
-	malloc(sizeof(struct PVFS_server_resp_s));
+    s_op->resp = (struct PVFS_server_resp *)
+	malloc(sizeof(struct PVFS_server_resp));
 
     if (!s_op->resp)
     {
@@ -118,7 +118,7 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
 	ret->error_code = 1;
 	return(-ENOMEM);
     }
-    memset(s_op->resp, 0, sizeof(struct PVFS_server_resp_s));
+    memset(s_op->resp, 0, sizeof(struct PVFS_server_resp));
 
     s_op->resp->op = s_op->req->op;
 

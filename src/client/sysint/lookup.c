@@ -73,8 +73,8 @@ int PVFS_sys_lookup(
     PVFS_credentials credentials,
     PVFS_sysresp_lookup *resp)
 {
-    struct PVFS_server_req_s req_p;
-    struct PVFS_server_resp_s *ack_p = NULL;
+    struct PVFS_server_req req_p;
+    struct PVFS_server_resp *ack_p = NULL;
     int ret = -1, i = 0;
     int max_msg_sz, name_sz;
     void* encoded_resp;
@@ -155,7 +155,7 @@ int PVFS_sys_lookup(
     {
 	name_sz = strlen(path) + 1;
 	req_p.op     = PVFS_SERV_LOOKUP_PATH;
-	req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
+	req_p.rsize = sizeof(struct PVFS_server_req) + name_sz;
 	req_p.credentials = credentials;
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + num_segments_remaining * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
 	gossip_debug(CLIENT_DEBUG,
@@ -188,7 +188,7 @@ int PVFS_sys_lookup(
 	    failure = SEND_REQ_FAILURE;
 	    goto return_error;
 	}
-	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+	ack_p = (struct PVFS_server_resp *) decoded.buffer;
 
 	if (ack_p->status < 0 )
 	{
@@ -244,7 +244,7 @@ int PVFS_sys_lookup(
 	    pinode_ptr->pinode_ref.fs_id = entry.fs_id;
 
 	    if ((i+1 == ack_p->u.lookup_path.count) && 
-		((ack_p->rsize % sizeof(struct PVFS_server_resp_s)) == 0))
+		((ack_p->rsize % sizeof(struct PVFS_server_resp)) == 0))
 	    {
 		/* the attributes on the last item may not be valid,  so if
 		 * we're on the last path segment, and we didn't get an attr

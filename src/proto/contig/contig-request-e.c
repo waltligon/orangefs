@@ -19,7 +19,7 @@
 #include "pint-request.h"
 
 int do_encode_req(
-		  struct PVFS_server_req_s *request,
+		  struct PVFS_server_req *request,
 		  struct PINT_encoded_msg *target_msg,
 		  int header_size
 		  )
@@ -45,7 +45,7 @@ int do_encode_req(
     switch( request->op )
     {
 	case PVFS_SERV_GETCONFIG:
-            size = sizeof(struct PVFS_server_req_s) + header_size;
+            size = sizeof(struct PVFS_server_req) + header_size;
 	    enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t)size,
 		BMI_SEND);
 
@@ -59,10 +59,10 @@ int do_encode_req(
 	    target_msg->size_list[0]   = size;
 	    target_msg->total_size     = size;
 
-	    memcpy(enc_msg, request, sizeof(struct PVFS_server_req_s));
+	    memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 
 	    /* set accurate rsize */
-	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;
+	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return 0;
 
 	    /* END NEW VERSION */
@@ -71,7 +71,7 @@ int do_encode_req(
 	    assert(request->u.lookup_path.path != NULL);
 
 	    name_sz = strlen( request->u.lookup_path.path ) + 1; /* include NULL terminator in size */
-	    size = sizeof( struct PVFS_server_req_s ) +
+	    size = sizeof( struct PVFS_server_req ) +
 		header_size + name_sz;
 	    enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t)size, 
 		BMI_SEND );
@@ -85,24 +85,24 @@ int do_encode_req(
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
 
-	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req ) );
 
 	    /* copy a null terminated string to another */
-	    memcpy(enc_msg + sizeof( struct PVFS_server_req_s ), request->u.lookup_path.path, name_sz);
+	    memcpy(enc_msg + sizeof( struct PVFS_server_req ), request->u.lookup_path.path, name_sz);
 
 	    /* make pointer since we're sending it over the wire and don't want 
 	     * random memory referenced on the other side */
 
-	    ((struct PVFS_server_req_s *)enc_msg)->u.lookup_path.path = NULL;
+	    ((struct PVFS_server_req *)enc_msg)->u.lookup_path.path = NULL;
 	    /* set accurate rsize */
-	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;
+	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 
 	case PVFS_SERV_CREATEDIRENT:
 	    assert(request->u.crdirent.name != NULL);
 
 	    name_sz = strlen( request->u.crdirent.name ) + 1; /* include NULL terminator in size */
-	    size = sizeof( struct PVFS_server_req_s ) +
+	    size = sizeof( struct PVFS_server_req ) +
 		header_size + name_sz;
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)size, 
 		BMI_SEND );
@@ -116,24 +116,24 @@ int do_encode_req(
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
 
-	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req ) );
 
 	    /* copy a null terminated string to another */
-	    memcpy(enc_msg + sizeof( struct PVFS_server_req_s ), request->u.crdirent.name, name_sz);
+	    memcpy(enc_msg + sizeof( struct PVFS_server_req ), request->u.crdirent.name, name_sz);
 
 	    /* make pointer since we're sending it over the wire and don't want 
 	     * random memory referenced on the other side */
 
-	    ((struct PVFS_server_req_s *)enc_msg)->u.crdirent.name = NULL;
+	    ((struct PVFS_server_req *)enc_msg)->u.crdirent.name = NULL;
 	    /* set accurate rsize */
-	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;
+	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 
 	case PVFS_SERV_RMDIRENT:
 	    assert(request->u.rmdirent.entry != NULL);
 
 	    name_sz = strlen( request->u.rmdirent.entry ) + 1; /* include NULL terminator in size */
-	    size = sizeof( struct PVFS_server_req_s ) + header_size 
+	    size = sizeof( struct PVFS_server_req ) + header_size 
 		+ name_sz;
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)size, 
 		BMI_SEND );
@@ -147,21 +147,21 @@ int do_encode_req(
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
 
-	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req ) );
 
 	    /* copy a null terminated string to another */
-	    memcpy( enc_msg + sizeof( struct PVFS_server_req_s ), request->u.rmdirent.entry, name_sz);
+	    memcpy( enc_msg + sizeof( struct PVFS_server_req ), request->u.rmdirent.entry, name_sz);
 
 	    /* make pointer since we're sending it over the wire and don't want 
 	     * random memory referenced on the other side */
 
-	    ((struct PVFS_server_req_s *)enc_msg)->u.rmdirent.entry = NULL;
+	    ((struct PVFS_server_req *)enc_msg)->u.rmdirent.entry = NULL;
 	    /* set accurate rsize */
-	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;
+	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 
 	case PVFS_SERV_MKDIR:
-	    size = sizeof( struct PVFS_server_req_s ) + sizeof(
+	    size = sizeof( struct PVFS_server_req ) + sizeof(
 		struct PVFS_object_attr ) + header_size;
 
 	    /* if we're mkdir'ing a meta file, we need to alloc space for the attributes */
@@ -184,27 +184,27 @@ int do_encode_req(
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
 
-	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req ) );
 
 	    /* throw handles at the end for metadata files */
 	    if ( request->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
 				/* handles */
-		memcpy( enc_msg + sizeof( struct PVFS_server_req_s ),
+		memcpy( enc_msg + sizeof( struct PVFS_server_req ),
 			request->u.mkdir.attr.u.meta.dfile_array, 
 			request->u.mkdir.attr.u.meta.dfile_count * sizeof( PVFS_handle ) );
 
 	        /* make pointer since we're sending it over the wire and don't want 
 		 * random memory referenced on the other side */
 
-		((struct PVFS_server_req_s *)enc_msg)->u.mkdir.attr.u.meta.dfile_array = NULL;
+		((struct PVFS_server_req *)enc_msg)->u.mkdir.attr.u.meta.dfile_array = NULL;
 	    }
 	    /* set accurate rsize */
-	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;
+	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 
 	case PVFS_SERV_SETATTR:
-	    size = sizeof( struct PVFS_server_req_s ) + sizeof(
+	    size = sizeof( struct PVFS_server_req ) + sizeof(
 		struct PVFS_object_attr ) + header_size;
 
 	    if(request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
@@ -239,14 +239,14 @@ int do_encode_req(
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
 
-	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req ) );
 	    /* override the rsize, so the receiver knows how much data
 	     * is in here (we packed more than the caller knew about in
 	     * order to indicate sizes of variable length structs)
 	     */
-	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size -
+	    ((struct PVFS_server_req*)enc_msg)->rsize = size -
 		header_size;
-	    enc_msg += sizeof( struct PVFS_server_req_s );
+	    enc_msg += sizeof( struct PVFS_server_req );
 
 	    /* throw handles at the end for metadata files */
 	    if ( request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE )
@@ -269,7 +269,7 @@ int do_encode_req(
 	     * io description, and two integers (used to indicate the
 	     * size of the dist and description)
 	     */
-	    size = sizeof(struct PVFS_server_req_s) + 2*sizeof(int) +
+	    size = sizeof(struct PVFS_server_req) + 2*sizeof(int) +
 		PINT_REQUEST_PACK_SIZE(request->u.io.io_req) +
 		PINT_DIST_PACK_SIZE(request->u.io.io_dist) +
 		header_size;
@@ -284,17 +284,17 @@ int do_encode_req(
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
 	    /* copy the basic request structure in */
-	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req ) );
 	    /* store the size of the io description */
-	    *(int*)((char*)(enc_msg) + sizeof(struct PVFS_server_req_s))
+	    *(int*)((char*)(enc_msg) + sizeof(struct PVFS_server_req))
 		= PINT_REQUEST_PACK_SIZE(request->u.io.io_req);
 	    /* store the size of the distribution */
-	    *(int*)((char*)(enc_msg) + sizeof(struct PVFS_server_req_s)
+	    *(int*)((char*)(enc_msg) + sizeof(struct PVFS_server_req)
 		+ sizeof(int))
 		= PINT_DIST_PACK_SIZE(request->u.io.io_dist);
 	    /* find pointers to where the req and dist will be packed */
 	    encode_io_req = (PINT_Request*)((char*)(enc_msg) + 
-		sizeof(struct PVFS_server_req_s) + 2*sizeof(int));
+		sizeof(struct PVFS_server_req) + 2*sizeof(int));
 	    encode_io_dist = (PVFS_Dist*)((char*)(encode_io_req) + 
 		PINT_REQUEST_PACK_SIZE(request->u.io.io_req));
 	    /* pack the I/O description */
@@ -318,7 +318,7 @@ int do_encode_req(
 	    PINT_Dist_encode(encode_io_dist, request->u.io.io_dist);
 
 	    /* set accurate rsize */
-	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;
+	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 	/*these structures are all self contained (no pointers that need to be packed) */
 	case PVFS_SERV_CREATE:
@@ -326,7 +326,7 @@ int do_encode_req(
 	case PVFS_SERV_GETATTR:
 	case PVFS_SERV_REMOVE:
 	case PVFS_SERV_TRUNCATE:
-	    size = sizeof( struct PVFS_server_req_s ) + header_size;
+	    size = sizeof( struct PVFS_server_req ) + header_size;
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)size, 
 		BMI_SEND ) ;
 	    if (enc_msg == NULL)
@@ -336,10 +336,10 @@ int do_encode_req(
 	    target_msg->buffer_list[0] = enc_msg;
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
-	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req ) );
 
 	    /* set accurate rsize */
-	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;
+	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 	default:
 	    printf("op: %d not defined\n", request->op);

@@ -32,8 +32,8 @@
 int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
                 PVFS_credentials credentials)
 {
-	struct PVFS_server_req_s req_p;			/* server request */
-	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
+	struct PVFS_server_req req_p;			/* server request */
+	struct PVFS_server_resp *ack_p = NULL;	/* server response */
 	int ret = -1;
 	pinode *pinode_ptr = NULL;
 	bmi_addr_t serv_addr;		/* PVFS address type structure */
@@ -100,7 +100,7 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	{
 	    handlesize = 0;
 	}
-	req_p.rsize = sizeof(struct PVFS_server_req_s) + handlesize;
+	req_p.rsize = sizeof(struct PVFS_server_req) + handlesize;
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = entry.fs_id;
 	/* let attributes fall through since PVFS_ATTR_SYS_xxx
@@ -120,7 +120,7 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	    goto return_error;
 	}
 
-	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+	ack_p = (struct PVFS_server_resp *) decoded.buffer;
 
 	/* make sure the actual IO suceeded */
 	if (ack_p->status < 0 )

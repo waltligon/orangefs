@@ -5,11 +5,11 @@
 
 /* Macros for function declarations */
 
-#define ENC_RESP_ARGS struct PVFS_server_resp_s *response, \
+#define ENC_RESP_ARGS struct PVFS_server_resp *response, \
 							 struct PINT_encoded_msg *target_msg, \
 							 int header_size\
 
-#define ENC_REQ_ARGS struct PVFS_server_req_s *request, \
+#define ENC_REQ_ARGS struct PVFS_server_req *request, \
 							struct PINT_encoded_msg *target_msg, \
 							int header_size\
 

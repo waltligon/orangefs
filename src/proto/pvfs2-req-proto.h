@@ -42,29 +42,26 @@ enum PVFS_server_op
 /* create
  *
  */
-struct PVFS_servreq_create_s
+struct PVFS_servreq_create
 {
     PVFS_handle requested_handle;	/* requested handle to create */
     PVFS_fs_id fs_id;		/* Filesystem ID */
     PVFS_ds_type object_type;		/* Type of PVFS object */
 };
-typedef struct PVFS_servreq_create_s PVFS_servreq_create;
 
-struct PVFS_servresp_create_s
+struct PVFS_servresp_create
 {
     PVFS_handle handle;
 };
-typedef struct PVFS_servresp_create_s PVFS_servresp_create;
 
 /* remove
  *
  */
-struct PVFS_servreq_remove_s
+struct PVFS_servreq_remove
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
 };
-typedef struct PVFS_servreq_remove_s PVFS_servreq_remove;
 
 /*no data returned for remove*/
 
@@ -72,72 +69,65 @@ typedef struct PVFS_servreq_remove_s PVFS_servreq_remove;
  * A series of operations to perform.  Abort all operations following a
  * failed one.
  */
-struct PVFS_servreq_batch_s
+struct PVFS_servreq_batch
 {
     /* list of other requests; need semantics */
     uint32_t rcount;
     /*void *req[rcount];This should be an array of ptrs that are 
        ptrs to structs */
 };
-typedef struct PVFS_servreq_batch_s PVFS_servreq_batch;
 
-struct PVFS_servresp_batch_s
+struct PVFS_servresp_batch
 {
     /* list of other requests; need semantics */
     uint32_t rcount;
     /*void *req[rcount];This should be an array of ptrs that are 
        ptrs to structs */
 };
-typedef struct PVFS_servresp_batch_s PVFS_servresp_batch;
 
 /* getattr
  *
  */
-struct PVFS_servreq_getattr_s
+struct PVFS_servreq_getattr
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
     uint32_t attrmask;
 };
-typedef struct PVFS_servreq_getattr_s PVFS_servreq_getattr;
 
-struct PVFS_servresp_getattr_s
+struct PVFS_servresp_getattr
 {
     PVFS_object_attr attr;
 };
-typedef struct PVFS_servresp_getattr_s PVFS_servresp_getattr;
 
 /* geteattr
  *
  */
-struct PVFS_servreq_geteattr_s
+struct PVFS_servreq_geteattr
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
 };
-typedef struct PVFS_servreq_geteattr_s PVFS_servreq_geteattr;
 
-struct PVFS_servresp_geteattr_s
+struct PVFS_servresp_geteattr
 {
 
 };
-typedef struct PVFS_servresp_geteattr_s PVFS_servresp_geteattr;
 
 /* setattr
  * 
  */
-struct PVFS_servreq_setattr_s
+struct PVFS_servreq_setattr
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
     PVFS_object_attr attr;
 };
-typedef struct PVFS_servreq_setattr_s PVFS_servreq_setattr;
 
 /* No resonse for setattr */
 
 /* Lookup_Path */
-struct PVFS_servreq_lookup_path_s
+struct PVFS_servreq_lookup_path
 {
     char* path;		/* full path to be traversed */
     PVFS_fs_id fs_id;		/* filesystem ID */
@@ -145,68 +135,60 @@ struct PVFS_servreq_lookup_path_s
     uint32_t attrmask;	/* mask to restrict the attributes to be 
 				   fetched */
 };
-typedef struct PVFS_servreq_lookup_path_s PVFS_servreq_lookup_path;
 
-struct PVFS_servresp_lookup_path_s
+struct PVFS_servresp_lookup_path
 {
     PVFS_handle *handle_array;	/* ordered array of handles(1 for each 
 				   element in path successfully traversed */
     PVFS_object_attr *attr_array;	/* array of object attributes */
     uint32_t count;		/*      count of number of handles returned */
 };
-typedef struct PVFS_servresp_lookup_path_s PVFS_servresp_lookup_path;
 
 /* Mkdir */
-struct PVFS_servreq_mkdir_s
+struct PVFS_servreq_mkdir
 {
     PVFS_handle requested_handle;
     PVFS_fs_id fs_id;
     PVFS_object_attr attr;
 };
-typedef struct PVFS_servreq_mkdir_s PVFS_servreq_mkdir;
 
-struct PVFS_servresp_mkdir_s
+struct PVFS_servresp_mkdir
 {
     PVFS_handle handle;
 };
-typedef struct PVFS_servresp_mkdir_s PVFS_servresp_mkdir;
 
 /* Createdirent */
-struct PVFS_servreq_createdirent_s
+struct PVFS_servreq_createdirent
 {
     char* name;		/* name of entry to create */
     PVFS_handle new_handle;	/* handle of new entry */
     PVFS_handle parent_handle;	/* handle of directory object to add entry to */
     PVFS_fs_id fs_id;		/* fs id of file system containing the directory */
 };
-typedef struct PVFS_servreq_createdirent_s PVFS_servreq_createdirent;
 
 /* No response for createdirent */
 
 /* Rmdirent */
-struct PVFS_servreq_rmdirent_s
+struct PVFS_servreq_rmdirent
 {
     char* entry;		/* entry to remove */
     PVFS_handle parent_handle;	/* handle of directory to remove entry from */
     PVFS_fs_id fs_id;		/* fs id of file system containing directory */
 };
-typedef struct PVFS_servreq_rmdirent_s PVFS_servreq_rmdirent;
 
-struct PVFS_servresp_rmdirent_s
+struct PVFS_servresp_rmdirent
 {
     PVFS_handle entry_handle;	/* handle of entry removed */
 };
-typedef struct PVFS_servresp_rmdirent_s PVFS_servresp_rmdirent;
 
 /* Generic ack */
-struct PVFS_servresp_generic_s
+struct PVFS_servresp_generic
 {
     PVFS_handle handle;
 };
-typedef struct PVFS_servresp_generic_s PVFS_servresp_generic;
 
 /* Readdir */
-struct PVFS_servreq_readdir_s
+struct PVFS_servreq_readdir
 {
     PVFS_handle handle;		/* Handle of directory to read entries from */
     PVFS_fs_id fs_id;		/* Filesystem identifier of directory's FS */
@@ -214,85 +196,73 @@ struct PVFS_servreq_readdir_s
     uint32_t pvfs_dirent_count;	/* count of no of dirents client 
 					   wants to read */
 };
-typedef struct PVFS_servreq_readdir_s PVFS_servreq_readdir;
 
-struct PVFS_servresp_readdir_s
+struct PVFS_servresp_readdir
 {
     PVFS_ds_position token;
     uint32_t pvfs_dirent_count;
     PVFS_dirent *pvfs_dirent_array;
 };
-typedef struct PVFS_servresp_readdir_s PVFS_servresp_readdir;
 
 /* Getconfig */
-struct PVFS_servreq_getconfig_s
+struct PVFS_servreq_getconfig
 {
     uint32_t max_strsize;	/* Expected size of string */
 };
-typedef struct PVFS_servreq_getconfig_s PVFS_servreq_getconfig;
 
-struct PVFS_servresp_getconfig_s
+struct PVFS_servresp_getconfig
 {
     uint32_t fs_config_buflen;	/* length of fs configuration file contents */
     char* fs_config_buf;	/* fs configuration file contents */
     uint32_t server_config_buflen;	/* length of fs configuration file contents */
     char* server_config_buf;	/* fs configuration file contents */
 };
-typedef struct PVFS_servresp_getconfig_s PVFS_servresp_getconfig;
 
 /* allocate */
-struct PVFS_servreq_allocate_s
+struct PVFS_servreq_allocate
 {
 
 };
-typedef struct PVFS_servreq_allocate_s PVFS_servreq_allocate;
 
-struct PVFS_servresp_allocate_s
+struct PVFS_servresp_allocate
 {
 
 };
-typedef struct PVFS_servresp_allocate_s PVFS_servresp_allocate;
 
 /* truncate */
-struct PVFS_servreq_truncate_s
+struct PVFS_servreq_truncate
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
     PVFS_size size;
 };
-typedef struct PVFS_servreq_truncate_s PVFS_servreq_truncate;
 
-struct PVFS_servresp_truncate_s
+struct PVFS_servresp_truncate
 {
 
 };
-typedef struct PVFS_servresp_truncate_s PVFS_servresp_truncate;
 
 /* extension */
-struct PVFS_servreq_extension_s
+struct PVFS_servreq_extension
 {
     /* ??? */
 };
-typedef struct PVFS_servreq_extension_s PVFS_servreq_extension;
 
-struct PVFS_servresp_extension_s
+struct PVFS_servresp_extension
 {
     /* ??? */
 };
-typedef struct PVFS_servresp_extension_s PVFS_servresp_extension;
 
 /* seteattr */
-struct PVFS_servreq_seteattr_s
+struct PVFS_servreq_seteattr
 {
     /* ??? */
 };
-typedef struct PVFS_servreq_seteattr_s PVFS_servreq_seteattr;
 
-struct PVFS_servresp_seteattr_s
+struct PVFS_servresp_seteattr
 {
     /* ??? */
 };
-typedef struct PVFS_servresp_seteattr_s PVFS_servresp_seteattr;
 
 /* supported I/O operation types */
 enum PVFS_servreq_io_type
@@ -302,7 +272,7 @@ enum PVFS_servreq_io_type
 };
 
 /* PVFS I/O request */
-struct PVFS_servreq_io_s
+struct PVFS_servreq_io
 {
     PVFS_handle handle;		/* handle to operate on */
     PVFS_fs_id fs_id;		/* file system id */
@@ -315,78 +285,75 @@ struct PVFS_servreq_io_s
     PVFS_Dist *io_dist;		/* physical distribution */
     PVFS_Request io_req;	/* datatype pattern */
 };
-typedef struct PVFS_servreq_io_s PVFS_servreq_io;
 
 /* PVFS I/O response */
-struct PVFS_servresp_io_s
+struct PVFS_servresp_io
 {
     PVFS_size bstream_size;
 };
-typedef struct PVFS_servresp_io_s PVFS_servresp_io;
 
 /* PVFS write completion response (there is no req for this one,
  * it is sent from server to client after completing a write) 
  */
-struct PVFS_servresp_write_completion_s
+struct PVFS_servresp_write_completion
 {
     PVFS_size total_completed;
 };
-typedef struct PVFS_servresp_write_completion_s PVFS_servresp_write_completion;
 
 /* PVFS Server Request
  *
  */
-struct PVFS_server_req_s
+struct PVFS_server_req
 {
     enum PVFS_server_op op;
     PVFS_size rsize;
     PVFS_credentials credentials;
     union
     {
-	PVFS_servreq_create create;
-	PVFS_servreq_remove remove;
-	PVFS_servreq_io io;
-	PVFS_servreq_batch batch;
-	PVFS_servreq_getattr getattr;
-	PVFS_servreq_setattr setattr;
-	PVFS_servreq_mkdir mkdir;
-	PVFS_servreq_readdir readdir;
-	PVFS_servreq_geteattr geteattr;
-	PVFS_servreq_seteattr seteattr;
-	PVFS_servreq_lookup_path lookup_path;
-	PVFS_servreq_createdirent crdirent;
-	PVFS_servreq_getconfig getconfig;
-	PVFS_servreq_rmdirent rmdirent;
-	PVFS_servreq_allocate allocate;
-	PVFS_servreq_truncate truncate;
-	PVFS_servreq_extension extension;
+	struct PVFS_servreq_create create;
+	struct PVFS_servreq_remove remove;
+	struct PVFS_servreq_io io;
+	struct PVFS_servreq_batch batch;
+	struct PVFS_servreq_getattr getattr;
+	struct PVFS_servreq_setattr setattr;
+	struct PVFS_servreq_mkdir mkdir;
+	struct PVFS_servreq_readdir readdir;
+	struct PVFS_servreq_geteattr geteattr;
+	struct PVFS_servreq_seteattr seteattr;
+	struct PVFS_servreq_lookup_path lookup_path;
+	struct PVFS_servreq_createdirent crdirent;
+	struct PVFS_servreq_getconfig getconfig;
+	struct PVFS_servreq_rmdirent rmdirent;
+	struct PVFS_servreq_allocate allocate;
+	struct PVFS_servreq_truncate truncate;
+	struct PVFS_servreq_extension extension;
     }
     u;
 };
 
-struct PVFS_server_resp_s
+struct PVFS_server_resp
 {
     enum PVFS_server_op op;
     PVFS_size rsize;
     PVFS_error status;
     union
     {
-	PVFS_servresp_create create;
-	PVFS_servresp_batch batch;
-	PVFS_servresp_getattr getattr;
-	PVFS_servresp_mkdir mkdir;
-	PVFS_servresp_readdir readdir;
-	PVFS_servresp_geteattr geteattr;
-	PVFS_servresp_seteattr seteattr;
-	PVFS_servresp_lookup_path lookup_path;
-	PVFS_servresp_rmdirent rmdirent;
-	PVFS_servresp_getconfig getconfig;
-	PVFS_servresp_allocate allocate;
-	PVFS_servresp_truncate truncate;
-	PVFS_servresp_extension extension;
-	PVFS_servresp_generic generic;
-	PVFS_servresp_io io;
-	PVFS_servresp_write_completion write_completion;
+	struct PVFS_servresp_create create;
+	struct PVFS_servresp_batch batch;
+	struct PVFS_servresp_getattr getattr;
+	struct PVFS_servresp_mkdir mkdir;
+	struct PVFS_servresp_readdir readdir;
+	struct PVFS_servresp_geteattr geteattr;
+	struct PVFS_servresp_seteattr seteattr;
+	struct PVFS_servresp_lookup_path lookup_path;
+	struct PVFS_servresp_rmdirent rmdirent;
+	struct PVFS_servresp_getconfig getconfig;
+	struct PVFS_servresp_allocate allocate;
+	struct PVFS_servresp_truncate truncate;
+	struct PVFS_servresp_extension extension;
+	struct PVFS_servresp_generic generic;
+	struct PVFS_servresp_io io;
+	struct PVFS_servresp_write_completion write_completion;
     }
     u;
 };

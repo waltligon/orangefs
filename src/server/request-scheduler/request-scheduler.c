@@ -60,7 +60,7 @@ struct req_sched_list
 struct req_sched_element
 {
 	struct qlist_head list_link;       /* ties it to a queue */
-	struct PVFS_server_req_s* req_ptr; /* ties it to a request */
+	struct PVFS_server_req* req_ptr; /* ties it to a request */
 	struct qlist_head ready_link;      /* ties to ready queue */
 	void* user_ptr;                    /* user pointer */
 	req_sched_id id;                   /* unique identifier */
@@ -80,7 +80,7 @@ static QLIST_HEAD(ready_queue);
 static int hash_handle(void* handle, int table_size);
 static int hash_handle_compare(void* key, struct qlist_head*
 	link);
-static int handle_from_request(struct PVFS_server_req_s*
+static int handle_from_request(struct PVFS_server_req*
 	req, PVFS_handle* handle);
 
 /* setup and teardown */
@@ -163,7 +163,7 @@ int PINT_req_sched_finalize(
  * caller should check back later, and -errno on failure
  */
 int PINT_req_sched_post(
-	struct PVFS_server_req_s* in_request, 
+	struct PVFS_server_req* in_request, 
 	void* in_user_ptr, 
 	req_sched_id* out_id)
 {
@@ -664,7 +664,7 @@ static int hash_handle_compare(void* key, struct qlist_head* link)
  * NOTE: a handle value of 0 and a return value of 0 indicates
  * that the request does not operate on any particular handle
  */
-static int handle_from_request(struct PVFS_server_req_s*
+static int handle_from_request(struct PVFS_server_req*
 	req, PVFS_handle* handle)
 {
 	*handle = 0;

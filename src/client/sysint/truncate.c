@@ -28,8 +28,8 @@
 int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size, 
                         PVFS_credentials credentials)
 {
-    struct PVFS_server_req_s req_p;			/* server request */
-    struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
+    struct PVFS_server_req req_p;			/* server request */
+    struct PVFS_server_resp *ack_p = NULL;	/* server response */
     int ret = -1;
     pinode *pinode_ptr = NULL;
     bmi_addr_t serv_addr;	/* PVFS address type structure */
@@ -80,7 +80,7 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size,
     dist = pinode_ptr->attr.u.meta.dist;
     req_p.op = PVFS_SERV_TRUNCATE;
     req_p.credentials = credentials;
-    req_p.rsize = sizeof(struct PVFS_server_req_s);
+    req_p.rsize = sizeof(struct PVFS_server_req);
     req_p.u.truncate.fs_id = pinode_refn.fs_id;
 
     /* we're sending the total logical filesize to the server and it will figure
@@ -112,7 +112,7 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size,
 	    goto return_error;
 	}
 
-	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+	ack_p = (struct PVFS_server_resp *) decoded.buffer;
 
 	if (ack_p->status < 0 )
 	{

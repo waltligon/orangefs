@@ -100,8 +100,8 @@ typedef struct PINT_server_op
     PINT_state_array_values *current_state; /* initialized in initialize_unexpected */
     PINT_state_array_values *state_stack[PINTSTACKSIZE]; 
     int stackptr; /* stack of contexts for nested state machines */
-    struct PVFS_server_req_s *req; /* req == decoded.buffer after initialize_unexpected */
-    struct PVFS_server_resp_s *resp; /* resp space allocated, memset(0) in initialize_unexpected
+    struct PVFS_server_req *req; /* req == decoded.buffer after initialize_unexpected */
+    struct PVFS_server_resp *resp; /* resp space allocated, memset(0) in initialize_unexpected
 				      *
                                       * note: resp->op == req->op after initialize_unexpected also!
 				      */

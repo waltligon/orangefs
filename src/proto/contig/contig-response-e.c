@@ -24,7 +24,7 @@
  */
 
 int do_encode_resp(
-	struct PVFS_server_resp_s *response,
+	struct PVFS_server_resp *response,
 	struct PINT_encoded_msg *target_msg,
 	int header_size
 	)
@@ -53,18 +53,18 @@ int do_encode_resp(
 	    target_msg->list_count  = 1;
 	    target_msg->buffer_type = BMI_PRE_ALLOC;
 	    target_msg->size_list[0] = target_msg->total_size 
-		= sizeof(struct PVFS_server_resp_s) + header_size;
+		= sizeof(struct PVFS_server_resp) + header_size;
 	    target_msg->buffer_list[0] 
 		= BMI_memalloc(target_msg->dest, 
-			sizeof(struct PVFS_server_resp_s) + header_size,
+			sizeof(struct PVFS_server_resp) + header_size,
 			BMI_SEND);
 	    memcpy(
 		    target_msg->buffer_list[0], 
 		    response, 
-		    sizeof(struct PVFS_server_resp_s)
+		    sizeof(struct PVFS_server_resp)
 		  );
 	    /* set accurate rsize for encoded version */
-	    ((struct PVFS_server_resp_s*)(target_msg->buffer_list[0]))->rsize
+	    ((struct PVFS_server_resp*)(target_msg->buffer_list[0]))->rsize
 		= target_msg->total_size - header_size;
 	    return(0);
 
@@ -94,7 +94,7 @@ int do_encode_resp(
 		/* make it big enough to hold datafiles and dist */
 		target_msg->size_list[0] = 
 		    target_msg->total_size = 
-		    sizeof(struct PVFS_server_resp_s) + header_size
+		    sizeof(struct PVFS_server_resp) + header_size
 		    + response->u.getattr.attr.u.meta.dist_size
 		    + (response->u.getattr.attr.u.meta.dfile_count
 		    * sizeof(PVFS_handle));
@@ -106,7 +106,7 @@ int do_encode_resp(
 		/* copy in the datafiles */
 		if(response->u.getattr.attr.u.meta.dfile_count > 0)
 		{
-		    pack_dest += sizeof(struct PVFS_server_resp_s);
+		    pack_dest += sizeof(struct PVFS_server_resp);
 		    memcpy(
 			pack_dest,
 			response->u.getattr.attr.u.meta.dfile_array,
@@ -127,10 +127,10 @@ int do_encode_resp(
 	    else
 	    {
 		target_msg->size_list[0] = 
-		    target_msg->total_size = sizeof(struct PVFS_server_resp_s)+header_size;
+		    target_msg->total_size = sizeof(struct PVFS_server_resp)+header_size;
 		target_msg->buffer_list[0]
 		    = BMI_memalloc(target_msg->dest, 
-			    sizeof(struct PVFS_server_resp_s) + header_size,
+			    sizeof(struct PVFS_server_resp) + header_size,
 			    BMI_SEND);
 	    }
 
@@ -138,11 +138,11 @@ int do_encode_resp(
 	    memcpy(
 		    target_msg->buffer_list[0], 
 		    response, 
-		    sizeof(struct PVFS_server_resp_s)
+		    sizeof(struct PVFS_server_resp)
 		  );
 
 	    /* set rsize for the "on-the-wire" version */
-	    ((struct PVFS_server_resp_s*)target_msg->buffer_list[0])->rsize =
+	    ((struct PVFS_server_resp*)target_msg->buffer_list[0])->rsize =
 		target_msg->total_size - header_size;
 	    return(0);
 
@@ -158,7 +158,7 @@ int do_encode_resp(
 		target_msg->list_count  = 3;
 		target_msg->buffer_type = BMI_EXT_ALLOC;
 
-		target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s);
+		target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
 		target_msg->size_list[1] = response->u.getconfig.fs_config_buflen;
 		target_msg->size_list[2] = response->u.getconfig.server_config_buflen;
 		target_msg->total_size = target_msg->size_list[0] +
@@ -176,7 +176,7 @@ int do_encode_resp(
 		target_msg->list_count  = 1;
 		target_msg->buffer_type = BMI_EXT_ALLOC;
 		target_msg->buffer_list[0] = response;
-		target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s);
+		target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
 		target_msg->total_size = target_msg->size_list[0];
 	    }
 
@@ -185,7 +185,7 @@ int do_encode_resp(
 	     */
 
 	    /* set accurate rsize for encoded version */
-	    ((struct PVFS_server_resp_s*)(target_msg->buffer_list[0]))->rsize
+	    ((struct PVFS_server_resp*)(target_msg->buffer_list[0]))->rsize
 		= target_msg->total_size;
 	    return(0);
 
@@ -193,14 +193,14 @@ int do_encode_resp(
 	    assert(response->u.lookup_path.handle_array != NULL);
 
 	    /* this one doesn't have header_size tacked onto it (!?) */
-	    response->rsize = sizeof(struct PVFS_server_resp_s) +
+	    response->rsize = sizeof(struct PVFS_server_resp) +
 		response->u.lookup_path.count * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
 
 	    /* We need to lookout for the fact that we may not have the attributes for
 	       a single segment within the path. In this case we will only have a handle
 	       which most of this is dealt with in the state machine.  dw
 	     */
-	    if((response->rsize - sizeof(struct PVFS_server_resp_s) 
+	    if((response->rsize - sizeof(struct PVFS_server_resp) 
 			- response->u.lookup_path.count * (sizeof(PVFS_handle) +
 			    sizeof(PVFS_object_attr))) < 0)
 		total_path_count = response->u.lookup_path.count -1;
@@ -215,7 +215,7 @@ int do_encode_resp(
 	    if(response->status != 0)
 		target_msg->list_count = 1;
 
-	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s);
+	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
 	    target_msg->size_list[1] = response->u.lookup_path.count*sizeof(PVFS_handle);
 	    target_msg->size_list[2] = total_path_count*sizeof(PVFS_object_attr);
 	    target_msg->total_size = target_msg->size_list[0]
@@ -232,8 +232,8 @@ int do_encode_resp(
 		    target_msg->total_size + header_size,
 		    BMI_SEND);
 
-	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp_s));
-	    respbuf += sizeof(struct PVFS_server_resp_s);
+	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp));
+	    respbuf += sizeof(struct PVFS_server_resp);
 
 	    /* make two passes, first to copy handles, second for attribs */
 	    for (i=0; i < response->u.lookup_path.count; i++) {
@@ -258,7 +258,7 @@ int do_encode_resp(
 	    if(response->status != 0)
 		target_msg->list_count = 1;
 
-	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s);
+	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
 	    target_msg->size_list[1] = response->u.readdir.pvfs_dirent_count 
 		* sizeof(PVFS_dirent);
 	    target_msg->total_size = target_msg->size_list[0] + target_msg->size_list[1];
@@ -271,8 +271,8 @@ int do_encode_resp(
 		    target_msg->total_size + header_size,
 		    BMI_SEND);
 
-	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp_s));
-	    respbuf += sizeof(struct PVFS_server_resp_s);
+	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp));
+	    respbuf += sizeof(struct PVFS_server_resp);
 
 	    for (i=0; i < response->u.readdir.pvfs_dirent_count; i++)
 	    {
@@ -285,7 +285,7 @@ int do_encode_resp(
 	     */
 
 	    /* set accurate rsize for encoded version */
-	    ((struct PVFS_server_resp_s*)(target_msg->buffer_list[0]))->rsize
+	    ((struct PVFS_server_resp*)(target_msg->buffer_list[0]))->rsize
 		= target_msg->total_size;
 
 	    return 0;

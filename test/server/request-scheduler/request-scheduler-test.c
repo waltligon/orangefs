@@ -16,10 +16,10 @@
 int main(int argc, char **argv)	
 {
 	int ret;
-	struct PVFS_server_req_s req_array[4];
+	struct PVFS_server_req req_array[4];
 	req_sched_id id_array[4];
 	req_sched_id id_arrayB[4];
-	struct PVFS_server_req_s io_req_array[4];
+	struct PVFS_server_req io_req_array[4];
 	req_sched_id io_id_array[4];
 	req_sched_id io_id_arrayB[4];
 	int count = 0;

@@ -28,7 +28,7 @@ int PINT_req_sched_finalize(
 /* scheduler submission */
 
 int PINT_req_sched_post(
-	struct PVFS_server_req_s* in_request, 
+	struct PVFS_server_req* in_request, 
 	void* in_user_ptr, 
 	req_sched_id* out_id);
 

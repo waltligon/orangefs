@@ -44,8 +44,8 @@ static struct options* parse_args(int argc, char* argv[]);
 int main(int argc, char **argv)	{
 
 	struct options* user_opts = NULL;
-	struct PVFS_server_req_s* my_req = NULL;
-	struct PVFS_server_resp_s* my_ack = NULL;
+	struct PVFS_server_req* my_req = NULL;
+	struct PVFS_server_resp* my_ack = NULL;
 	int ret = -1;
 	bmi_addr_t server_addr;
 	bmi_op_id_t client_ops[2];
@@ -89,10 +89,10 @@ int main(int argc, char **argv)	{
 	}
 
 	/* allocate a buffer for the initial request and ack */
-	my_req = (struct PVFS_server_req_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_req_s), BMI_SEND);
-	my_ack = (struct PVFS_server_resp_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_resp_s), BMI_RECV);
+	my_req = (struct PVFS_server_req*)BMI_memalloc(server_addr, 
+		sizeof(struct PVFS_server_req), BMI_SEND);
+	my_ack = (struct PVFS_server_resp*)BMI_memalloc(server_addr, 
+		sizeof(struct PVFS_server_resp), BMI_RECV);
 	if(!my_req || !my_ack){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
@@ -100,7 +100,7 @@ int main(int argc, char **argv)	{
 
 	/* setup create request */
 	my_req->op = PVFS_SERV_MKDIR;
-	my_req->rsize = sizeof(struct PVFS_server_req_s);
+	my_req->rsize = sizeof(struct PVFS_server_req);
 	my_req->credentials.uid = 0;
 	my_req->credentials.gid = 0;
 	/* TODO: fill below fields in with the correct values */
@@ -110,7 +110,7 @@ int main(int argc, char **argv)	{
 
 	/* send the initial request on its way */
 	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req, 
-		sizeof(struct PVFS_server_req_s), BMI_PRE_ALLOC, 0, NULL, context);
+		sizeof(struct PVFS_server_req), BMI_PRE_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -141,7 +141,7 @@ int main(int argc, char **argv)	{
 
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
-		sizeof(struct PVFS_server_resp_s), &actual_size, BMI_PRE_ALLOC, 0, 
+		sizeof(struct PVFS_server_resp), &actual_size, BMI_PRE_ALLOC, 0, 
 		NULL, context);
 	if(ret < 0)
 	{
@@ -168,7 +168,7 @@ int main(int argc, char **argv)	{
 	}
 	else
 	{
-		if(actual_size != sizeof(struct PVFS_server_resp_s))
+		if(actual_size != sizeof(struct PVFS_server_resp))
 		{
 			printf("Short recv.\n");
 			return(-1);
@@ -189,9 +189,9 @@ int main(int argc, char **argv)	{
 		long)my_ack->u.mkdir.handle);
 
 	/* free up memory buffers */
-	BMI_memfree(server_addr, my_req, sizeof(struct PVFS_server_req_s), 
+	BMI_memfree(server_addr, my_req, sizeof(struct PVFS_server_req), 
 		BMI_SEND);
-	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp_s), 
+	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp), 
 		BMI_RECV);
 
 	/* shutdown the local interface */

@@ -44,8 +44,8 @@ static struct options* parse_args(int argc, char* argv[]);
 int main(int argc, char **argv)	{
 
 	struct options* user_opts = NULL;
-	struct PVFS_server_req_s *server_req = NULL;
-	struct PVFS_server_resp_s *server_resp = NULL;
+	struct PVFS_server_req *server_req = NULL;
+	struct PVFS_server_resp *server_resp = NULL;
 	int ret = -1;
 	bmi_addr_t server_addr;
 	bmi_op_id_t client_ops[2];
@@ -90,10 +90,10 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
-	server_req = (struct PVFS_server_req_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_req_s), BMI_SEND);
-	server_resp = (struct PVFS_server_resp_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_resp_s)+8192, BMI_RECV);
+	server_req = (struct PVFS_server_req*)BMI_memalloc(server_addr, 
+		sizeof(struct PVFS_server_req), BMI_SEND);
+	server_resp = (struct PVFS_server_resp*)BMI_memalloc(server_addr, 
+		sizeof(struct PVFS_server_resp)+8192, BMI_RECV);
 	if(!server_req || !server_resp){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
@@ -106,7 +106,7 @@ int main(int argc, char **argv)	{
 	/* TODO: fill below fields in with the correct values */
 	server_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
 	server_req->u.getconfig.max_strsize = 8192;
-	server_req->rsize = sizeof(struct PVFS_server_req_s);
+	server_req->rsize = sizeof(struct PVFS_server_req);
 
 	display_pvfs_structure(server_req,1);
 	ret = PINT_encode(server_req,PINT_ENCODE_REQ,&encoded_msg,server_addr,0);
@@ -146,7 +146,7 @@ int main(int argc, char **argv)	{
 
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, server_resp, 
-		sizeof(struct PVFS_server_resp_s)+8192, &actual_size, BMI_PRE_ALLOC, 0, 
+		sizeof(struct PVFS_server_resp)+8192, &actual_size, BMI_PRE_ALLOC, 0, 
 		NULL, context);
 	if(ret < 0)
 	{
@@ -173,7 +173,7 @@ int main(int argc, char **argv)	{
 	}
 	else
 	{
-		if(actual_size != sizeof(struct PVFS_server_resp_s))
+		if(actual_size != sizeof(struct PVFS_server_resp))
 		{
 			printf("Short recv.\n");
 			return(-1);
@@ -185,7 +185,7 @@ int main(int argc, char **argv)	{
 	printf("Decoded response size: %d\n",(int)actual_size);
 	printf("\n---decoded_msg (server_resp) ---\n");
 	display_pvfs_structure(decoded_msg.buffer,0);
-	BMI_memfree(server_addr, server_resp, sizeof(struct PVFS_server_resp_s)+8192, 
+	BMI_memfree(server_addr, server_resp, sizeof(struct PVFS_server_resp)+8192, 
 		BMI_RECV);
 	server_resp = decoded_msg.buffer;
 	if(server_resp->op != PVFS_SERV_GETCONFIG)
@@ -199,9 +199,9 @@ int main(int argc, char **argv)	{
 	}
 
 	/* free up memory buffers */
-	BMI_memfree(server_addr, server_req, sizeof(struct PVFS_server_req_s), 
+	BMI_memfree(server_addr, server_req, sizeof(struct PVFS_server_req), 
 		BMI_SEND);
-	BMI_memfree(server_addr, server_resp, sizeof(struct PVFS_server_resp_s)+8192, 
+	BMI_memfree(server_addr, server_resp, sizeof(struct PVFS_server_resp)+8192, 
 		BMI_RECV);
 
 	/* shutdown the local interface */

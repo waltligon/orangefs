@@ -47,8 +47,8 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
                         char* new_entry, PVFS_pinode_reference new_parent_refn, 
                         PVFS_credentials credentials)
 {
-    struct PVFS_server_req_s req_p;		/* server request */
-    struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
+    struct PVFS_server_req req_p;		/* server request */
+    struct PVFS_server_resp *ack_p = NULL;	/* server response */
     int ret = -1;
     pinode *new_parent_p = NULL, *old_entry_p = NULL;
     bmi_addr_t serv_addr;	/* PVFS address type structure */
@@ -121,7 +121,7 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
 
     name_sz = strlen(new_entry) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_CREATEDIRENT;
-    req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
+    req_p.rsize = sizeof(struct PVFS_server_req) + name_sz;
     req_p.credentials = credentials;
 
     req_p.u.crdirent.name = new_entry;
@@ -142,7 +142,7 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
 	goto return_error;
     }
 
-    ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+    ack_p = (struct PVFS_server_resp *) decoded.buffer;
     if (ack_p->status < 0 )
     {
 	/* this could fail for many reasons, EEXISTS will probbably be the
@@ -173,7 +173,7 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
 
     name_sz = strlen(old_entry) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_RMDIRENT;
-    req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
+    req_p.rsize = sizeof(struct PVFS_server_req) + name_sz;
 
     req_p.u.rmdirent.entry = old_entry;
     req_p.u.rmdirent.parent_handle = old_parent_refn.handle;
@@ -189,7 +189,7 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
 	goto return_error;
     }
 
-    ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+    ack_p = (struct PVFS_server_resp *) decoded.buffer;
 
     if (ack_p->status < 0 )
     {

@@ -38,7 +38,7 @@ void arrow(int direction)
 	}
 }
 
-void print_request(struct PVFS_server_req_s *my_req, int direction)
+void print_request(struct PVFS_server_req *my_req, int direction)
 {
 	int i;
         // print shit
@@ -337,8 +337,8 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
 
 int main(int argc, char **argv)
 {
-	struct PVFS_server_req_s *request;
-	struct PVFS_server_resp_s *response;
+	struct PVFS_server_req *request;
+	struct PVFS_server_resp *response;
 	struct PINT_encoded_msg encoded;
 	struct PINT_decoded_msg decoded;
 	bmi_addr_t me;
@@ -355,9 +355,9 @@ int main(int argc, char **argv)
 		  bmi_context_id context;
 #endif
 
-	request = (struct PVFS_server_req_s *) malloc(sizeof(struct PVFS_server_req_s));
+	request = (struct PVFS_server_req *) malloc(sizeof(struct PVFS_server_req));
 	datafiles = (PVFS_handle*) malloc( NUM_DATAFILES * sizeof( PVFS_handle ) );
-	response = (struct PVFS_server_resp_s *) malloc( sizeof(struct PVFS_server_resp_s) );
+	response = (struct PVFS_server_resp *) malloc( sizeof(struct PVFS_server_resp) );
 
 	ret = BMI_initialize("bmi_tcp", NULL, 0);
 
@@ -577,7 +577,7 @@ int main(int argc, char **argv)
 							NULL);
 	RET_CHECK("Error in Decoding Create Resp\n")
 
-	print_request( (struct PVFS_server_req_s *)decoded.buffer , 1 );
+	print_request( (struct PVFS_server_req *)decoded.buffer , 1 );
 
 	PINT_encode_release(	&encoded,
 				PINT_ENCODE_REQ,

@@ -41,7 +41,7 @@ PINT_encoding_table_values_s contig_buffer_table =
 
 int do_encode_gen_ack_sz(int op)
 {
-	return sizeof(struct PVFS_server_resp_s) + ENCODED_HEADER_SIZE;
+	return sizeof(struct PVFS_server_resp) + ENCODED_HEADER_SIZE;
 }
 
 void init_contig(void)

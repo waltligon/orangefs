@@ -24,13 +24,13 @@ int do_decode_req(
 		  bmi_addr_t target_addr
 		  )
 {
-    struct PVFS_server_req_s * dec_msg = NULL;
+    struct PVFS_server_req * dec_msg = NULL;
     char* char_ptr = (char *) input_buffer;
     int size = 0;
     int tmp_count;
     int ret = -1;
 
-    size = ((struct PVFS_server_req_s *)input_buffer)->rsize;
+    size = ((struct PVFS_server_req *)input_buffer)->rsize;
 
     if (size <= 0)
     {
@@ -45,25 +45,25 @@ int do_decode_req(
     memcpy(dec_msg, char_ptr, size);
     target_msg->buffer = dec_msg;
 
-    switch(((struct PVFS_server_req_s *)char_ptr)->op)
+    switch(((struct PVFS_server_req *)char_ptr)->op)
     {
 	case PVFS_SERV_LOOKUP_PATH:
-	    char_ptr += sizeof( struct PVFS_server_req_s );
+	    char_ptr += sizeof( struct PVFS_server_req );
 	    dec_msg->u.lookup_path.path = char_ptr;
 	    return(0);
 
 	case PVFS_SERV_CREATEDIRENT:
-	    char_ptr += sizeof( struct PVFS_server_req_s );
+	    char_ptr += sizeof( struct PVFS_server_req );
 	    dec_msg->u.crdirent.name = char_ptr;
 	    return(0);
 
 	case PVFS_SERV_RMDIRENT:
-	    char_ptr += sizeof( struct PVFS_server_req_s );
+	    char_ptr += sizeof( struct PVFS_server_req );
 	    dec_msg->u.rmdirent.entry = char_ptr;
 	    return(0);
 
 	case PVFS_SERV_MKDIR:
-	    char_ptr += sizeof( struct PVFS_server_req_s );
+	    char_ptr += sizeof( struct PVFS_server_req );
 	    if ( dec_msg->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
 		dec_msg->u.mkdir.attr.u.meta.dfile_array = (PVFS_handle *)char_ptr;
@@ -71,7 +71,7 @@ int do_decode_req(
 	    return(0);
 
 	case PVFS_SERV_SETATTR:
-	    char_ptr += sizeof(struct PVFS_server_req_s);
+	    char_ptr += sizeof(struct PVFS_server_req);
 
 	    if ( dec_msg->u.setattr.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
@@ -82,7 +82,7 @@ int do_decode_req(
 
 		char_ptr += dec_msg->u.setattr.attr.u.meta.dfile_count
 				* sizeof(PVFS_handle);
-		if (dec_msg->rsize > (sizeof(struct PVFS_server_req_s)
+		if (dec_msg->rsize > (sizeof(struct PVFS_server_req)
 		    + dec_msg->u.setattr.attr.u.meta.dfile_count 
 			* sizeof(PVFS_handle)))
 		{
@@ -97,8 +97,8 @@ int do_decode_req(
 	case PVFS_SERV_IO: 
 	    /* set pointers to the request and dist information */
 	    tmp_count = *(int*)(char_ptr + sizeof(struct
-		PVFS_server_req_s));
-	    char_ptr += sizeof(struct PVFS_server_req_s) +
+		PVFS_server_req));
+	    char_ptr += sizeof(struct PVFS_server_req) +
 		2*sizeof(int);
 	    dec_msg->u.io.io_req = (PVFS_Request)char_ptr;
 	    char_ptr += tmp_count;
@@ -127,7 +127,7 @@ int do_decode_req(
 	case PVFS_SERV_GETCONFIG:
 	    return(0);
 	default:
-	    printf("Unpacking Req Op: %d Not Supported\n", ((struct PVFS_server_req_s *)char_ptr)->op);
+	    printf("Unpacking Req Op: %d Not Supported\n", ((struct PVFS_server_req *)char_ptr)->op);
 	    return -1;
     }
 }

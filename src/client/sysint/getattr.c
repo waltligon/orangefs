@@ -33,8 +33,8 @@
 int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
 		    PVFS_credentials credentials, PVFS_sysresp_getattr *resp)
 {
-    struct PVFS_server_req_s req_p;	 	/* server request */
-    struct PVFS_server_resp_s *ack_p = NULL; /* server response */
+    struct PVFS_server_req req_p;	 	/* server request */
+    struct PVFS_server_resp *ack_p = NULL; /* server response */
     int ret = -1;
     bmi_addr_t serv_addr;	            /* PVFS address type structure */ 
     char *server = NULL;
@@ -124,7 +124,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 
 	req_p.op = PVFS_SERV_GETATTR;
         req_p.credentials = credentials;
-	req_p.rsize = sizeof(struct PVFS_server_req_s);
+	req_p.rsize = sizeof(struct PVFS_server_req);
 	req_p.u.getattr.handle = entry.handle;
 	req_p.u.getattr.fs_id = entry.fs_id;
 	/* filter out aggregate size mask in the getattr request */
@@ -143,7 +143,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		goto return_error;
 	}
 
-	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+	ack_p = (struct PVFS_server_resp *) decoded.buffer;
 
 	if (ack_p->status < 0 )
         {
@@ -221,7 +221,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	    dist = resp->attr.u.meta.dist;
 	    req_p.op = PVFS_SERV_GETATTR;
 	    req_p.credentials = credentials;
-	    req_p.rsize = sizeof(struct PVFS_server_req_s);
+	    req_p.rsize = sizeof(struct PVFS_server_req);
 	    req_p.u.getattr.attrmask = PVFS_ATTR_DATA_SIZE;
 	    req_p.u.getattr.fs_id = entry.fs_id;
 
@@ -250,7 +250,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		    goto return_error;
 		}
 
-		ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+		ack_p = (struct PVFS_server_resp *) decoded.buffer;
 
 		if (ack_p->status < 0 )
 		{

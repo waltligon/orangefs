@@ -62,16 +62,16 @@ int main(int argc, char **argv)	{
 	struct PINT_decoded_msg decoded1;
 	struct PINT_encoded_msg encoded2;
 	struct PINT_decoded_msg decoded2;
-	struct PVFS_server_req_s my_req;
-	struct PVFS_server_resp_s* io_dec_ack;
-	struct PVFS_server_resp_s* create_dec_ack;
+	struct PVFS_server_req my_req;
+	struct PVFS_server_resp* io_dec_ack;
+	struct PVFS_server_resp* create_dec_ack;
 	void* my_ack, *create_ack, *remove_ack;
 	int my_ack_size, create_ack_size, remove_ack_size;
 	PVFS_size io_size = 10 * 1024 * 1024;
 	void* memory_buffer = NULL;
 	PINT_Request_file_data file_data;
 	flow_descriptor* flow_d = NULL;
-	struct PVFS_server_resp_s* remove_dec_ack;
+	struct PVFS_server_resp* remove_dec_ack;
 	struct PINT_encoded_msg encoded3;
 	struct PINT_decoded_msg decoded3;
 	bmi_context_id context;
@@ -160,7 +160,7 @@ int main(int argc, char **argv)	{
 	 * create request (create a data file to operate on) 
 	 */
 	my_req.op = PVFS_SERV_CREATE;
-	my_req.rsize = sizeof(struct PVFS_server_req_s);
+	my_req.rsize = sizeof(struct PVFS_server_req);
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
 	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
@@ -292,7 +292,7 @@ int main(int argc, char **argv)	{
 
 	/* request */
 	my_req.op = PVFS_SERV_IO;
-	my_req.rsize = sizeof(struct PVFS_server_req_s);
+	my_req.rsize = sizeof(struct PVFS_server_req);
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
 	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
@@ -486,7 +486,7 @@ int main(int argc, char **argv)	{
 	 */
 
 	my_req.op = PVFS_SERV_REMOVE;
-	my_req.rsize = sizeof(struct PVFS_server_req_s);
+	my_req.rsize = sizeof(struct PVFS_server_req);
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
 	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  

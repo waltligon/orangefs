@@ -342,7 +342,7 @@ static int rmdirent_send_bmi(PINT_server_op *s_op,
 
     /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status = ret->error_code;
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+    s_op->resp->rsize = sizeof(struct PVFS_server_resp);
 
     /* Set the handle if it was removed */
     if(ret->error_code == 0) {

@@ -28,8 +28,8 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
                         int pvfs_dirent_incount, PVFS_credentials credentials,
 			PVFS_sysresp_readdir *resp)
 {
-	struct PVFS_server_req_s req_p;			/* server request */
-	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
+	struct PVFS_server_req req_p;			/* server request */
+	struct PVFS_server_resp *ack_p = NULL;	/* server response */
 	int ret = -1;
 	pinode *pinode_ptr = NULL;
 	bmi_addr_t serv_addr;	/* PVFS address type structure */
@@ -73,7 +73,7 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
 	/* send a readdir message to the server */
 	req_p.op = PVFS_SERV_READDIR;
 	req_p.credentials = credentials;
-	req_p.rsize = sizeof(struct PVFS_server_req_s);
+	req_p.rsize = sizeof(struct PVFS_server_req);
 	req_p.u.readdir.handle = pinode_refn.handle;
 	req_p.u.readdir.fs_id = pinode_refn.fs_id;
 	req_p.u.readdir.token = token;
@@ -94,7 +94,7 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
             goto return_error;
         }
 
-        ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+        ack_p = (struct PVFS_server_resp *) decoded.buffer;
 
         if (ack_p->status < 0 )
         {
