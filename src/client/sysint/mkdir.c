@@ -56,7 +56,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 	PCACHE_INSERT2_FAILURE,
     } failure = NONE_FAILURE;
 	
-    if((strlen(entry_name) + 1) > PVFS_REQ_LIMIT_PATH_NAME_BYTES)
+    if((strlen(entry_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
     {
 	return -ENAMETOOLONG;
     }

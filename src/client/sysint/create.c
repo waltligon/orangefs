@@ -71,7 +71,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	{
 	    return -EINVAL;
 	}
-	if((strlen(entry_name) + 1) > PVFS_REQ_LIMIT_PATH_NAME_BYTES) 
+	if((strlen(entry_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES) 
 	{
 	    return -ENAMETOOLONG;
 	}

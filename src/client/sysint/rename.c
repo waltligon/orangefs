@@ -59,7 +59,7 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
     void* encoded_resp;
     PVFS_msg_tag_t op_tag;
 
-    if((strlen(new_entry) + 1) > PVFS_REQ_LIMIT_PATH_NAME_BYTES) 
+    if((strlen(new_entry) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES) 
     {
 	return -ENAMETOOLONG;
     }
