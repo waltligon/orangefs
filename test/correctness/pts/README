@@ -1,0 +1,145 @@
+# PVFS Testing Suite: PTS
+
+# Test harness structure
+
+PTS is an MPI program that is responsible for running a suite of tests
+based on a user supplied config file.  The system is also designed
+with the intention of making it trivial to add new tests.  This README
+outlines how to set up PTS and a PTS config file, as well as how to
+design/include your own tests.
+
+# Setting up PTS
+
+PTS only requires that you have a functional MPI devel/execution
+environment.  The system was designed and tested using mpich-1.2.3
+from ftp://ftp.mcs.anl.gov/mpi/mpich-1.2.3.tar.gz.
+
+After untarring the PTS tarball, inspect the Makefile to adjust the
+mpicc path and any other site specific options that are necessary for
+your site.  Run 'make'. The binary created is called 'pts' and is the
+only relevant binary in the entire system.  All tests are compiled
+into this binary.  Once compiled, one must create a config file with
+the following form:
+
+<test name>:<args>
+
+See the file 'sample.conf' for a sample config file that runs a few
+included tests.  Once all is set up, a command resembling the following will execute the test suite:
+
+mpirun -np 2 -machinefile <somemachines> ./pts -conf sample.conf If
+you are only running tests that execute on one host, you can run pts
+without mpirun.
+
+
+# Writing a PTS Test
+
+The PTS test environment gives the test programmer a lot of
+flexibility.  All tests must be written in C.  Each test must have a
+prototype that takes the following form:
+
+int function_name(MPI_Comm *mycomm, int myid, char *buf, void *rawparams);
+
+The 'mycomm' variable is set to an MPI_Comm allocated specifically for
+this test so as not to impact the harness communicator.  The 'myid' is
+of course the MPI id of the process running the function.  The 'buf'
+variable is space for storing text output from the test.  Finally the
+'rawparams' variable is a pointer to a structure containing parameter
+information about this specific test.
+
+As a test programmer, one can take two routes:
+
+a.) write a test function and use the generic parameter structure
+
+b.) define a custom parameter struct, write a parameter struct parser,
+and write a test function.
+
+For a.), all one must do is write a test function and rely on the
+generic parameter structure, which currently contains a member 'path'
+and a member 'mode', the values of which are specified in the pts
+config file.  For instance, a sample test function follows:
+
+int test_function(MPI_Comm *mycomm, int myid, char *buf, void *params) {
+  generic_params *myparams = (generic_params *)params;
+
+  fprintf(stderr, "%d: Trying to barrier on mycomm...\n", myid);
+  MPI_Barrier(*mycomm);
+
+  fprintf(stderr, "%d: here are my params: mode %d path %s\n",myid, 
+          myparams->mode, myparams->path);
+
+  return(0);
+}
+
+You must #include 'mpi.h' and 'pts.h' to get your test to compile
+correctly.
+
+If you decide to write your own parameter parser/parameter structure,
+you must handle the parsing yourself.  The parameter parser function
+will be called with in the following form:
+
+void *test_simple_mkdir_param_init(char *);
+
+The function will take a string (defined in the config file) and must
+return a pointer to your parameter struct.  An example of a parameter
+structure, parameter parser, and test function follows:
+
+/* Paramter struct */
+typedef struct test_simple_mkdir_params_t {
+  int mode;
+  char *path;
+  int myvalue;
+} test_simple_mkdir_params;
+
+/* Parameter parser */
+void *test_simple_mkdir_param_init(char *paramstr) {
+  test_simple_mkdir_params *myparams = malloc(sizeof(test_simple_mkdir_params));
+  char *tmpbuf = malloc(4096);
+  
+  sscanf(paramstr, "%d %s %d\n", &myparams->mode, tmpbuf, &myparams->myvalue);
+  myparams->path = (char *)str_malloc(tmpbuf);
+
+  free(tmpbuf);
+  return(myparams);
+
+}
+
+/* Test function itself */
+int test_simple_mkdir(MPI_Comm *mycomm, int myid, char *buf, void *params) {
+  test_simple_mkdir_params *myparams = (test_simple_mkdir_params *)params;
+  
+  printf("%d: my params %d %s %d\n", myid, myparams->mode, myparams->path, myparams->value);
+  return(0);
+}
+
+
+
+# Adding a Test
+
+Once your test code is written, it is trivial to add it to the PTS
+test harness.  Just follow the two steps below:
+
+1.) add the test code to the Makefile.  This is done by simply adding
+a 'test_function.o' line to the 'TESTS' variable at the top of the
+Makefile.
+
+2.) add a member to the test_types enum to represent your test (it's 
+going to be an index into the testpool array
+
+3.) add a pointer to the test function/param parser to test_protos.h.
+You will see a function 'setup_ptstests()' defined in test_protos.h,
+simply add an 'entry' for your new test.  Following is how we would
+add the test_simple_mkdir test from above:
+
+
+  myconfig->testpool[TEST_SIMPLE_MKDIR].test_func = (void *)test_simple_mkdir;	
+  myconfig->testpool[TEST_SIMPLE_MKDIR].test_param_init = (void *)test_simple_mkdir_param_init;
+  myconfig->testpool[TEST_SIMPLE_MKDIR].test_name = str_malloc("test_simple_mkdir");
+
+If your test does not require a custom parameter parser, simply leave
+out the line defining what test_param_init points to (you will get the
+default param parser).
+
+Have Fun!
+
+
+

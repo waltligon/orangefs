@@ -1,0 +1,17 @@
+DIR := test/correctness/pts
+
+TEST_PTS_SRC := $(DIR)/pts.c
+
+TEST_PTS_MISC := \
+	$(DIR)/create.c \
+	$(DIR)/generic_parser.c
+
+MPIMISCSRC += $(TEST_PTS_MISC)
+
+MPITESTSRC += $(TEST_PTS_SRC)
+
+
+LOCALMPITESTS := $(patsubst %.c,%, $(TEST_PTS_SRC))
+LOCALMPIOBJS := $(patsubst %.c,%.o, $(TEST_PTS_MISC))
+$(LOCALMPITESTS): %: %.o $(LOCALMPIOBJS) lib/libpvfs2.a
+	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lrt -ldb -o $@
