@@ -504,12 +504,19 @@ int modify_pinode(pinode *node,PVFS_object_attr attr,PVFS_bitfield mask)
  */
 static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, PVFS_bitfield mask)
 {
+#if 0
 	PVFS_count32 num_files = attr.u.meta.nr_datafiles;
 	PVFS_size size = num_files * sizeof(PVFS_handle);
+#endif
 
 	ptr->attr = attr;
 	if ((mask & ATTR_META) == ATTR_META)
 	{
+		gossip_lerr("WARNING: phelper not setting datafile handles.\n");
+#if 0
+		/* REMOVED BY PHIL, we don't have accurate datafile
+		 * information in getattr responses yet
+		 */
 		if (num_files > 0)
 		{
 			ptr->attr.u.meta.dfh = (PVFS_handle *)malloc(size);
@@ -519,11 +526,11 @@ static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, PVFS_bitfield ma
 			}
 			memcpy(ptr->attr.u.meta.dfh,attr.u.meta.dfh,size);
 			ptr->attr.u.meta.nr_datafiles = num_files;
-#if 0
+
 			/* REMOVED BY PHIL WHEN MOVING TO NEW TREE */
 			ptr->attr.u.meta.dist = attr.u.meta.dist;
-#endif
 		}
+#endif
 	}
 	if ((mask & ATTR_DATA) == ATTR_DATA)
 	{
