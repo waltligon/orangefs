@@ -333,6 +333,7 @@ return_error:
 		free(path);
 	case GET_PARENT_FAILURE:
 	case NONE_FAILURE:
+	    break;
     }
     return(ret);
 }
