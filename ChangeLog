@@ -40,6 +40,10 @@ pvfs2-0.0.8pre2
 - bound acache size, while it's only holding invalid entries and growing
   too large
 - powerpc file size listing fixed in pvfs2-ls
+- added appendices to quickstart to cover a few more scenarios
+- more sanity checks in remove path (in particular for directories)
+- reorganized thread management for kernel / userspace communication used
+  by pvfs2-client
 
 
 pvfs2-0.0.7
