@@ -69,6 +69,9 @@ typedef struct PVFS_credentials_s PVFS_credentials;
  * that indicates where the error came from.  These are |'d together.
  */
 
+/* TODO: this should probably be prototyped somewhere else? */
+void PVFS_perror(char* text, int retcode);
+
 /* 7 bits are used for the error code */
 #define PVFS_ERROR_CODE(__error)  ((__error) &   (int32_t) 0x7f)
 #define PVFS_ERROR_CLASS(__error) ((__error) & ~((int32_t) 0x7f))

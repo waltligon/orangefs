@@ -30,7 +30,7 @@ struct options
 
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
-static void pvfs_perror(char* text, int retcode);
+static void PVFS_perror(char* text, int retcode);
 static double Wtime(void);
 
 int main(int argc, char **argv)
@@ -111,7 +111,7 @@ int main(int argc, char **argv)
     ret = PVFS_sys_initialize(mnt,&resp_init);
     if(ret < 0)
     {
-	pvfs_perror("PVFS_sys_initialize", ret);
+	PVFS_perror("PVFS_sys_initialize", ret);
 	ret = -1;
 	goto main_out;
     }
@@ -157,7 +157,7 @@ int main(int argc, char **argv)
     ret = PVFS_sys_create(&req_create,&resp_create);
     if (ret < 0)
     {
-	pvfs_perror("PVFS_sys_create", ret);
+	PVFS_perror("PVFS_sys_create", ret);
 	ret = -1;
 	goto main_out;
     }
@@ -203,7 +203,7 @@ int main(int argc, char **argv)
 	ret = PVFS_sys_write(&req_io, &resp_io);
 	if(ret < 0)
 	{
-	    pvfs_perror("PVFS_sys_write", ret);
+	    PVFS_perror("PVFS_sys_write", ret);
 	    ret = -1;
 	    goto main_out;
 	}
@@ -339,23 +339,6 @@ static void usage(int argc, char** argv)
 	"Usage: %s [-s strip_size] [-n num_datafiles] [-b buffer_size]\n",
 	argv[0]);
     fprintf(stderr, "   unix_source_file pvfs2_dest_file\n");
-    return;
-}
-
-static void pvfs_perror(char* text, int retcode)
-{
-    if(PVFS_ERROR_CLASS(-retcode))
-    {
-	fprintf(stderr, "%s: %s\n", text,
-	    strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
-    }
-    else
-    {
-	fprintf(stderr, "Warning: returned a non PVFS2 error code:\n");
-	fprintf(stderr, "%s: %s\n", text,
-	    strerror(-retcode));
-    }
-
     return;
 }
 

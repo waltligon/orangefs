@@ -5,7 +5,36 @@
  */
 
 #include <errno.h>
+#include <stdio.h>
+
 #include "pvfs2-types.h"
+
+/* PVFS_perror()
+ *
+ * prints a message on stderr, consisting of text argument
+ * followed by a colon, space, and error string for the given
+ * retcode.
+ * NOTE: also prints a warning if the error code is not in pvfs2
+ * format and assumes errno
+ *
+ * no return value
+ */
+void PVFS_perror(char* text, int retcode)
+{
+    if(PVFS_ERROR_CLASS(-retcode))
+    {
+	fprintf(stderr, "%s: %s\n", text,
+	strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
+    }       
+    else
+    {
+	fprintf(stderr, "Warning: non PVFS2 error code:\n");
+	fprintf(stderr, "%s: %s\n", text,
+	strerror(-retcode));
+    }
+
+    return;
+}
 
 /* NOTE: PVFS error values are defined in include/pvfs2-types.h
  */
