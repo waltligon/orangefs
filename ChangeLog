@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-1.1.0pre1
+===============
+- 
+
+
 pvfs2-1.0.1
 ===========
 - ib: add configure-time checks for mosal library variations
