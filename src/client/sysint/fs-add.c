@@ -41,6 +41,17 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
 
     gen_mutex_lock(&mt_config);
 
+    /* get exclusive access to the (global) server config object */
+    server_config = PINT_get_server_config_struct();
+
+    /* get configuration parameters from server */
+    ret = PINT_server_get_config(server_config, mntent);
+    if (ret < 0)
+    {
+        PVFS_perror("PINT_server_get_config failed", ret);
+        goto error_exit;
+    }
+
     /*
       add the mntent to the internal mount tables; it's okay if it's
       already there, as the return value will tell us and we can
@@ -52,17 +63,6 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
     if (ret && (ret != -PVFS_EEXIST))
     {
         PVFS_perror("PVFS_util_add_mnt failed", ret);
-        goto error_exit;
-    }
-
-    /* get exclusive access to the (global) server config object */
-    server_config = PINT_get_server_config_struct();
-
-    /* get configuration parameters from server */
-    ret = PINT_server_get_config(server_config, mntent);
-    if (ret < 0)
-    {
-        PVFS_perror("PINT_server_get_config failed", ret);
         goto error_exit;
     }
 
