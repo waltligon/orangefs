@@ -21,28 +21,38 @@ typedef struct dcache_entry_s dcache_entry;
 /* Dcache element */
 struct dcache_t {
 	dcache_entry dentry;
-	int16_t prev;
-	int16_t next;
+	int prev;
+	int next;
+	int status;	    /*whether the entry is in use or not*/
 };
 
 /* Cache Management structure */
 struct dcache_s {
 	struct dcache_t element[PINT_DCACHE_MAX_ENTRIES];
 	int count;
-	int16_t top;
-	int16_t free;
-	int16_t bottom;
+	int top;
+	int bottom;
 	gen_mutex_t *mt_lock;
 };
 typedef struct dcache_s dcache;
 
+#define BAD_LINK -1
+#define STATUS_UNUSED 0
+#define STATUS_USED 1
 
-static void dcache_remove_dentry(int16_t item);
+/* change this to 0 to disable directory caching
+ * all calls return success, but lookups will not succeed, inserts/removes won't
+ * actually change anything if the cache is disabled
+ */
+#define ENABLE_DCACHE 1
+
+static void dcache_remove_dentry(int item);
+static void dcache_rotate_dentry(int item);
 static int dcache_update_dentry_timestamp(dcache_entry* entry); 
 static int check_dentry_expiry(struct timeval t2);
 static int dcache_add_dentry(char *name,
 	pinode_reference parent,pinode_reference entry);
-static int dcache_get_next_free(void);
+static int dcache_get_lru(void);
 static int compare(struct dcache_t element,char *name,pinode_reference refn);
 
 /* The PVFS Dcache */
@@ -55,60 +65,103 @@ static dcache* cache;
  * returns 0 on success, -1 on failure
  */
 int PINT_dcache_lookup(
-	char *name,
-	pinode_reference parent,
-	pinode_reference *entry)
+    char *name,
+    pinode_reference parent,
+    pinode_reference *entry)
 {
-#if 0
-	int16_t i = 0;
-	int ret = 0;
+#if ENABLE_DCACHE
+    int i = 0;
+    int ret = 0;
 
-	if (!name)
-		return(-ENOMEM);
+    if (!name)
+	return(-ENOMEM);
 
-	/* Grab a mutex */
-	gen_mutex_lock(cache->mt_lock);
-#endif
+    /* Grab a mutex */
+    gen_mutex_lock(cache->mt_lock);
 
-	/* No match found */
-	entry->handle = PINT_DCACHE_HANDLE_INVALID;	
+    /* No match found */
+    entry->handle = PINT_DCACHE_HANDLE_INVALID;	
 
-#if 0
-	
-	/* Search the cache */
-	for(i = cache->top; i != -1;)
+    /* Search the cache */
+    for(i = cache->top; i != BAD_LINK; i = cache->element[i].next)
+    {
+	if (compare(cache->element[i],name,parent))
 	{
-		if (compare(cache->element[i],name,parent))
-		{
-			/* Got a match */
-			/* Check the timestamp for validity */
-			gossip_ldebug(DCACHE_DEBUG, "dcache match; checking timestamp.\n");
-			ret = check_dentry_expiry(cache->element[i].dentry.tstamp_valid);
-			if (ret < 0)
-			{
-				gossip_ldebug(DCACHE_DEBUG, "dcache entry expired.\n");
-				/* Dentry is stale */
-				/* Remove the entry from the cache */
-				dcache_remove_dentry(i);
-				/* Release the mutex */
-				gen_mutex_unlock(cache->mt_lock);
-				
-				return(0);
-			}
-			entry->handle = cache->element[i].dentry.entry.handle;
-			entry->fs_id = cache->element[i].dentry.entry.fs_id;	
-			gossip_ldebug(DCACHE_DEBUG, "dcache entry valid.\n");
-			break;
-		}
-		/* Get next element in cache */
-		i = cache->element[i].next;
-	}
+	    gossip_ldebug(DCACHE_DEBUG, "dcache match; checking timestamp.\n");
+	    ret = check_dentry_expiry(cache->element[i].dentry.tstamp_valid);
+	    if (ret < 0)
+	    {
+		gossip_ldebug(DCACHE_DEBUG, "dcache entry expired.\n");
+		/* Dentry is stale */
+		/* Remove the entry from the cache */
+		dcache_remove_dentry(i);
+		/* Release the mutex */
+		gen_mutex_unlock(cache->mt_lock);
 
-	/* Release the mutex */
-	gen_mutex_unlock(cache->mt_lock);
+		return(0);
+	    }
+
+	    /*update links so that this dentry is at the top of our list*/
+	    dcache_rotate_dentry(i);
+
+	    /* TODO: should we extend the timeout period here? */
+	    entry->handle = cache->element[i].dentry.entry.handle;
+	    entry->fs_id = cache->element[i].dentry.entry.fs_id;	
+	    gossip_ldebug(DCACHE_DEBUG, "dcache entry valid.\n");
+	    break;
+	    }
+    }
+
+    /* Release the mutex */
+    gen_mutex_unlock(cache->mt_lock);
+
+    return(0);
+#else
+    entry->handle = PINT_DCACHE_HANDLE_INVALID;
+    return(0);
 #endif
+}
 
-	return(0);
+/* dcache_rotate_dentry()
+ *
+ * moves the specified item to the top of the dcache linked list to prevent it
+ * from being identified as the least recently used item in the cache.
+ *
+ * no return value
+ */
+static void dcache_rotate_dentry(int item)
+{
+    int prev = 0, next = 0, new_bottom;
+    if (cache->top != cache->bottom) 
+    {
+	if(cache->top != item)
+	{
+	    /*only move links if there's more than one thing in the list*/
+
+	    if (cache->bottom == item)
+	    {
+		new_bottom = cache->element[cache->bottom].prev;
+
+		cache->element[new_bottom].next = BAD_LINK;
+		cache->bottom = new_bottom;
+	    }
+	    else
+	    {
+		/*somewhere in the middle*/
+		next = cache->element[item].next;
+		prev = cache->element[item].prev;
+
+		cache->element[prev].next = next;
+		cache->element[next].prev = prev;
+	    }
+
+	    cache->element[cache->top].prev = item;
+
+	    cache->element[item].next = cache->top;
+	    cache->element[item].prev = BAD_LINK;
+	    cache->top = item;
+	}
+    }
 }
 
 /* dcache_insert
@@ -122,15 +175,15 @@ int PINT_dcache_insert(
 	pinode_reference entry,
 	pinode_reference parent)
 {
-#if 0
-	int16_t i = 0,index = 0, ret = 0;
+#if ENABLE_DCACHE
+	int i = 0, index = 0, ret = 0;
 	unsigned char entry_found = 0;
 	
 	/* Grab a mutex */
 	gen_mutex_lock(cache->mt_lock);
 
 	/* Search the cache */
-	for(i = cache->top; i != -1;)
+	for (i = cache->top; i != BAD_LINK; i = cache->element[i].next)
 	{
 		if (compare(cache->element[i],name,parent))
 		{
@@ -138,24 +191,21 @@ int PINT_dcache_insert(
 			index = i;
 			break;
 		}
-		/* Get next element in cache */
-		i = cache->element[i].next;
-		/*if (i == -1)
-			break;*/
 	}
 	
 	/* Add/Merge element to the cache */
-	if (!entry_found)
+	if (entry_found == 0)
 	{
-		/* Element absent in cache, add it */
+		/* Element not in cache, add it */
 		dcache_add_dentry(name,parent,entry);
 	}
 	else
 	{
-		/* For now we just leave the entry in place, update its
+		/* We move the dentry to the top of the list, update its
 		 * timestamp and return 
 		 */
 		gossip_ldebug(DCACHE_DEBUG, "dache inserting entry already present; timestamp update.\n");
+		dcache_rotate_dentry(index);
 		ret = dcache_update_dentry_timestamp(
 			&cache->element[index].dentry); 
 		if (ret < 0)
@@ -168,9 +218,11 @@ int PINT_dcache_insert(
 
 	/* Release the mutex */
 	gen_mutex_unlock(cache->mt_lock);
-#endif
 	
 	return(0);
+#else
+    return(0);
+#endif
 }
 
 /* dcache_remove
@@ -184,9 +236,8 @@ int PINT_dcache_remove(
 	pinode_reference parent,
 	int *item_found)
 {
-#if 0
-	int16_t i = 0;
-
+#if ENABLE_DCACHE
+	int i = 0;
 
 	if (name == NULL)
 		return(-EINVAL);
@@ -198,18 +249,16 @@ int PINT_dcache_remove(
 	*item_found = 0;
 	
 	/* Search the cache */
-	for(i = cache->top; i != -1;)
+	for(i = cache->top; i != BAD_LINK; i = cache->element[i].next)
 	{
 		if (compare(cache->element[i],name,parent))
 		{
 			/* Remove the cache element */
 			dcache_remove_dentry(i);
 			*item_found = 1;
-			gossip_ldebug(DCACHE_DEBUG, "dcache removing entry.\n");
+			gossip_ldebug(DCACHE_DEBUG, "dcache removing entry (%lld).\n", parent.handle);
 			break;
 		}
-		/* Get next element in cache */
-		i = cache->element[i].next;
 	}
 
 	if(*item_found == 0)
@@ -217,14 +266,13 @@ int PINT_dcache_remove(
 		gossip_ldebug(DCACHE_DEBUG, "dcache found no entry to remove.\n");
 	}
 
-#if 0
 	/* Relase the mutex */
 	gen_mutex_unlock(cache->mt_lock);
-#endif
-
-#endif
 
 	return(0);
+#else
+    return(0);
+#endif
 }
 
 /* dcache_flush
@@ -246,31 +294,31 @@ int PINT_dcache_flush(void)
  */
 int PINT_dcache_initialize(void)
 {
-	int16_t i = 0;	
+#if ENABLE_DCACHE
+    int i = 0;	
 
-	cache = (dcache*)malloc(sizeof(dcache));
-	if(cache == NULL)
-	{
-		return(-ENOMEM);
-	}
+    cache = (dcache*)malloc(sizeof(dcache));
+    if(cache == NULL)
+    {
+	return(-ENOMEM);
+    }
 
-	/* Init the mutex lock */
-#if 0
-	cache->mt_lock = gen_mutex_build();
+    /* Init the mutex lock */
+    cache->mt_lock = gen_mutex_build();
+    cache->top = BAD_LINK;
+    cache->bottom = 0;
+    cache->count = 0;
+
+    for(i = 0;i < PINT_DCACHE_MAX_ENTRIES; i++)
+    {
+	cache->element[i].prev = BAD_LINK;
+	cache->element[i].next = BAD_LINK;
+	cache->element[i].status = STATUS_UNUSED;
+    }
+    return(0);
+#else
+    return(0);
 #endif
-	cache->top = -1;
-	cache->bottom = -1;
-	cache->free = 0;
-	/* Form the link between the cache elements */
-	for(i = 0;i < PINT_DCACHE_MAX_ENTRIES; i++)
-	{
-		cache->element[i].prev = i - 1;
-		if ((i + 1) == PINT_DCACHE_MAX_ENTRIES)
-			cache->element[i].next = -1;
-		else
-			cache->element[i].next = i + 1;
-	}
-	return(0);
 }
 
 /* pint_dfinalize
@@ -281,15 +329,17 @@ int PINT_dcache_initialize(void)
  */
 int PINT_dcache_finalize(void)
 {
-	/* Destroy the mutex */
-#if 0
-	gen_mutex_destroy(cache->mt_lock);
+#if ENABLE_DCACHE
+    /* Destroy the mutex */
+    gen_mutex_destroy(cache->mt_lock);
+
+    if (cache != NULL);
+	free(cache);
+
+    return(0);
+#else
+    return(0);
 #endif
-
-	if (cache != NULL);
-		free(cache);
-
-	return(0);
 }
 
 /* compare
@@ -300,16 +350,14 @@ int PINT_dcache_finalize(void)
  */
 static int compare(struct dcache_t element,char *name,pinode_reference refn)
 {
-
-	/* Does the cache entry match the search key? */
-	if (!strncmp(name,element.dentry.name,strlen(name)) &&
-		element.dentry.parent.handle == refn.handle
-		&& element.dentry.parent.fs_id == refn.fs_id) 
-	{
-		return(1);
-	}
-	
-	return(0);
+    /* Does the cache entry match the search key? */
+    if (!strncmp(name,element.dentry.name,strlen(name)) &&
+	element.dentry.parent.handle == refn.handle
+	&& element.dentry.parent.fs_id == refn.fs_id) 
+    {
+	return(1);
+    }
+    return(0);
 }
 
 /* dcache_add_dentry
@@ -318,68 +366,72 @@ static int compare(struct dcache_t element,char *name,pinode_reference refn)
  *
  * returns 0 on success, -errno on failure
  */
-static int dcache_add_dentry(char *name,
-		pinode_reference parent,pinode_reference entry)
+static int dcache_add_dentry(char *name, pinode_reference parent,
+		pinode_reference entry)
 {
-	int16_t free = 0;
-	int size = strlen(name) + 1,ret = 0; /* size includes null terminator*/
+	int new = 0, ret = 0;
+	int size = strlen(name) + 1; /* size includes null terminator*/
 
 	/* Get the free item */
-	dcache_get_next_free();
+	new = dcache_get_lru();
 
-	/* Update the free list by pointing to next free item */
-	free = cache->free;
-	cache->free = cache->element[free].next;
-	if (cache->free >= 0)
-		cache->element[cache->free].prev = -1;
-		
-	/* Adding the element to the cache */
-	cache->element[free].dentry.parent = parent;
-	cache->element[free].dentry.entry = entry;
-	strncpy(cache->element[free].dentry.name,name,size);
-	cache->element[free].dentry.name[size] = '\0';
+	/* Add the element to the cache */
+	cache->element[new].status = STATUS_USED;
+	cache->element[new].dentry.parent = parent;
+	cache->element[new].dentry.entry = entry;
+	memcpy(cache->element[new].dentry.name,name,size);
 	/* Set the timestamp */
 	ret = dcache_update_dentry_timestamp(
-		&cache->element[free].dentry);
+		&cache->element[new].dentry);
 	if (ret < 0)
 	{
 		return(ret);	
 	}
-	cache->element[free].prev = -1;
-	cache->element[free].next = cache->top;
+	cache->element[new].prev = BAD_LINK;
+	cache->element[new].next = cache->top;
 	/* Make previous element point to new entry */
-	if (cache->top != -1)
-		cache->element[cache->top].prev = free;
-	/* Readjust the top */
-	cache->top = free;
+	if (cache->top != BAD_LINK)
+		cache->element[cache->top].prev = new;
+
+	cache->top = new;
 
 	return(0);
 }
 
-/* dcache_get_next_free
+/* dcache_get_lru
  *
- * implements cache replacement policy(LRU) if needed
+ * this function gets the least recently used cache entry (assuming a full 
+ * cache) or searches through the cache for the first unused slot (if there
+ * are some free slots)
  *
  * returns 0 on success, -errno on failure
  */
-static int dcache_get_next_free(void)
+static int dcache_get_lru(void)
 {
-	int16_t free = 0;
+    int new = 0, i = 0;
 
-	/* Check if free element exists */
-	if (cache->free == -1)
+    if (cache->count == PINT_DCACHE_MAX_ENTRIES)
+    {
+	new = cache->bottom;
+	cache->bottom = cache->element[new].prev;
+	cache->element[cache->bottom].next = BAD_LINK;
+	return new;
+    }
+    else
+    {
+	for(i = 0; i < PINT_DCACHE_MAX_ENTRIES; i++)
 	{
-		assert(cache->bottom != -1);
-		free = cache->bottom;
-		/* Replace at bottom of cache */
-		/* Assumption is that LRU element is at bottom */
-		cache->bottom = cache->element[free].prev;
-		cache->element[cache->bottom].next = -1;
-		memset(&cache->element[free],0,sizeof(struct dcache_t));
-		cache->free = free;
+	    if (cache->element[i].status == STATUS_UNUSED)
+	    {
+		cache->count++;
+		return i;
+	    }
 	}
+    }
 
-	return(0);
+    gossip_ldebug(DCACHE_DEBUG, "error getting least recently used dentry.\n");
+    gossip_ldebug(DCACHE_DEBUG, "cache->count = %d max_entries = %d.\n", cache->count, PINT_DCACHE_MAX_ENTRIES);
+    assert(0);
 }
 
 /* check_dentry_expiry
@@ -390,23 +442,25 @@ static int dcache_get_next_free(void)
  */
 static int check_dentry_expiry(struct timeval t2)
 {
-	int ret = 0;
-	struct timeval cur_time;
+    int ret = 0;
+    struct timeval cur_time;
 
-	ret = gettimeofday(&cur_time,NULL);
-	if (ret < 0)
-	{
-		return(ret);
-	}
-	/* Does the timestamp exceed the current time? 
-	 * If yes, dentry is valid. If no, it is stale.
-	 */
-	if (t2.tv_sec > cur_time.tv_sec || (t2.tv_sec == cur_time.tv_sec &&
-			t2.tv_usec > cur_time.tv_usec))
-		return(0);
+    ret = gettimeofday(&cur_time,NULL);
+    if (ret < 0)
+    {
+	return(ret);
+    }
+    /* Does the timestamp exceed the current time? 
+     * If yes, dentry is valid. If no, it is stale.
+     */
+    if (t2.tv_sec > cur_time.tv_sec || (t2.tv_sec == cur_time.tv_sec &&
+	t2.tv_usec > cur_time.tv_usec))
+    {
+	return(0);
+    }
 	
-	/* Dentry is stale */
-	return(-1);
+    /* Dentry is stale */
+    return(-1);
 }
 
 /* dcache_remove_dentry
@@ -415,38 +469,48 @@ static int check_dentry_expiry(struct timeval t2)
  *
  * returns nothing
  */
-static void dcache_remove_dentry(int16_t item)
+static void dcache_remove_dentry(int item)
 {
-	int16_t i = item,prev = 0,next = 0;
+    int prev = 0,next = 0;
 
-	/* Handle the details of removing an element from the cache */
+    cache->element[item].status = STATUS_UNUSED;
+    memset(&cache->element[item].dentry.name, 0, PVFS_NAME_MAX );
+    cache->count--;
 
-	/* Is it the first item? */
-	if (i == cache->top)
-	{
-		/* Adjust top */
-		cache->top = cache->element[i].next;
-		cache->element[cache->top].prev = -1;
-	}
-	/* Is it the last item? */
-	else if (i == cache->bottom)
-	{
-		/* Adjust bottom */
-		cache->bottom = cache->element[i].prev;
-		cache->element[cache->bottom].next = -1;
-	}
-	else
-	{
-		/* Item in the middle */
-		prev = cache->element[i].prev;
-		next = cache->element[i].next;
-		cache->element[prev].next = next;
-		cache->element[next].prev = prev;
-	}
-	/* Adjust the free list */
-	cache->element[i].next = cache->free;
-	cache->element[i].prev = -1;
-	cache->free = i;
+    /* if there's exactly one item in the list, just get rid of it*/
+    if (cache->top == cache->bottom)
+    {
+	cache->top = 0;
+	cache->bottom = 0;
+	cache->element[item].prev = BAD_LINK;
+	cache->element[item].next = BAD_LINK;
+	return;
+    }
+
+    /* depending on where the dentry is in the list, we have to do different
+     * things if its the first, last, or somewhere in the middle. 
+     */
+
+    if (item == cache->top)
+    {
+	/* Adjust top */
+	cache->top = cache->element[item].next;
+	cache->element[cache->top].prev = BAD_LINK;
+    }
+    else if (item == cache->bottom)
+    {
+	/* Adjust bottom */
+	cache->bottom = cache->element[item].prev;
+	cache->element[cache->bottom].next = -1;
+    }
+    else
+    {
+	/* Item in the middle */
+	prev = cache->element[item].prev;
+	next = cache->element[item].next;
+	cache->element[prev].next = next;
+	cache->element[next].prev = prev;
+    }
 }
 
 /* dcache_update_dentry_timestamp
@@ -457,16 +521,25 @@ static void dcache_remove_dentry(int16_t item)
  */
 static int dcache_update_dentry_timestamp(dcache_entry* entry) 
 {
-	int ret = 0;
-	
-	/* Update the timestamp */
-	ret = gettimeofday(&entry->tstamp_valid,NULL);
-	if (ret < 0)
-	{
-		return(-1);
-	}
+    int ret = 0;
 
-	entry->tstamp_valid.tv_sec += PINT_DCACHE_TIMEOUT;
+    /* Update the timestamp */
+    ret = gettimeofday(&entry->tstamp_valid,NULL);
+    if (ret < 0)
+    {
+	return(-1);
+    }
 
-	return(0);
+    entry->tstamp_valid.tv_sec += PINT_DCACHE_TIMEOUT;
+
+    return(0);
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
