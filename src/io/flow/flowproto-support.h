@@ -25,8 +25,8 @@ struct flowproto_ops
     int (*flowproto_setinfo) (flow_descriptor * flow_d,
 			      int option,
 			      void *parameter);
-    int (*flowproto_announce_flow) (flow_descriptor * flow_d);
-    int (*flowproto_checkworld) (flow_descriptor ** flow_d_array,
+    int (*flowproto_post) (flow_descriptor * flow_d);
+    int (*flowproto_find_serviceable) (flow_descriptor ** flow_d_array,
 				 int *count,
 				 int max_idle_time_ms);
     int (*flowproto_service) (flow_descriptor * flow_d);

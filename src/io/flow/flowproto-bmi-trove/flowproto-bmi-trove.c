@@ -40,9 +40,9 @@ int flowproto_bmi_trove_setinfo(flow_descriptor * flow_d,
 				int option,
 				void *parameter);
 
-int flowproto_bmi_trove_announce_flow(flow_descriptor * flow_d);
+int flowproto_bmi_trove_post(flow_descriptor * flow_d);
 
-int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
+int flowproto_bmi_trove_find_serviceable(flow_descriptor ** flow_d_array,
 				   int *count,
 				   int max_idle_time_ms);
 
@@ -56,8 +56,8 @@ struct flowproto_ops flowproto_bmi_trove_ops = {
     flowproto_bmi_trove_finalize,
     flowproto_bmi_trove_getinfo,
     flowproto_bmi_trove_setinfo,
-    flowproto_bmi_trove_announce_flow,
-    flowproto_bmi_trove_checkworld,
+    flowproto_bmi_trove_post,
+    flowproto_bmi_trove_find_serviceable,
     flowproto_bmi_trove_service
 };
 
@@ -431,13 +431,13 @@ int flowproto_bmi_trove_setinfo(flow_descriptor * flow_d,
     return (-ENOSYS);
 }
 
-/* flowproto_bmi_trove_announce_flow()
+/* flowproto_bmi_trove_post()
  *
  * informs the flow protocol that it is responsible for the given flow
  *
  * returns 0 on success, -errno on failure
  */
-int flowproto_bmi_trove_announce_flow(flow_descriptor * flow_d)
+int flowproto_bmi_trove_post(flow_descriptor * flow_d)
 {
     int ret = -1;
 
@@ -463,13 +463,13 @@ int flowproto_bmi_trove_announce_flow(flow_descriptor * flow_d)
     return (0);
 }
 
-/* flowproto_bmi_trove_checkworld()
+/* flowproto_bmi_trove_find_serviceable()
  *
  * checks to see if any previously posted flows need to be serviced
  *
  * returns 0 on success, -errno on failure
  */
-int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
+int flowproto_bmi_trove_find_serviceable(flow_descriptor ** flow_d_array,
 				   int *count,
 				   int max_idle_time_ms)
 {
@@ -1884,7 +1884,7 @@ gen_mutex_lock(&trove_notify_mutex);
 	&trove_notify_queue);
 gen_mutex_unlock(&trove_notify_mutex);
 
-    /* wake up anyone who may be sleeping in checkworld */
+    /* wake up anyone who may be sleeping in find_serviceable() */
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&callback_cond);
 #endif
@@ -1918,7 +1918,7 @@ gen_mutex_lock(&bmi_notify_mutex);
 	&bmi_notify_queue);
 gen_mutex_unlock(&bmi_notify_mutex);
 
-    /* wake up anyone who may be sleeping in checkworld */
+    /* wake up anyone who may be sleeping in find_serviceable() */
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&callback_cond);
 #endif

@@ -29,9 +29,9 @@ int flowproto_dump_offsets_setinfo(flow_descriptor * flow_d,
 				int option,
 				void *parameter);
 
-int flowproto_dump_offsets_announce_flow(flow_descriptor * flow_d);
+int flowproto_dump_offsets_post(flow_descriptor * flow_d);
 
-int flowproto_dump_offsets_checkworld(flow_descriptor ** flow_d_array,
+int flowproto_dump_offsets_find_serviceable(flow_descriptor ** flow_d_array,
 				   int *count,
 				   int max_idle_time_ms);
 
@@ -45,8 +45,8 @@ struct flowproto_ops flowproto_dump_offsets_ops = {
     flowproto_dump_offsets_finalize,
     flowproto_dump_offsets_getinfo,
     flowproto_dump_offsets_setinfo,
-    flowproto_dump_offsets_announce_flow,
-    flowproto_dump_offsets_checkworld,
+    flowproto_dump_offsets_post,
+    flowproto_dump_offsets_find_serviceable,
     flowproto_dump_offsets_service
 };
 
@@ -178,13 +178,13 @@ int flowproto_dump_offsets_setinfo(flow_descriptor * flow_d,
     return (-ENOSYS);
 }
 
-/* flowproto_dump_offsets_announce_flow()
+/* flowproto_dump_offsets_post()
  *
  * informs the flow protocol that it is responsible for the given flow
  *
  * returns 0 on success, -errno on failure
  */
-int flowproto_dump_offsets_announce_flow(flow_descriptor * flow_d)
+int flowproto_dump_offsets_post(flow_descriptor * flow_d)
 {
     flow_d->flowproto_id = flowproto_dump_offsets_id;
 
@@ -194,13 +194,13 @@ int flowproto_dump_offsets_announce_flow(flow_descriptor * flow_d)
     return (0);
 }
 
-/* flowproto_dump_offsets_checkworld()
+/* flowproto_dump_offsets_find_serviceable()
  *
  * checks to see if any previously posted flows need to be serviced
  *
  * returns 0 on success, -errno on failure
  */
-int flowproto_dump_offsets_checkworld(flow_descriptor ** flow_d_array,
+int flowproto_dump_offsets_find_serviceable(flow_descriptor ** flow_d_array,
 				   int *count,
 				   int max_idle_time_ms)
 {

@@ -459,8 +459,8 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
 	}
     }
 
-    /* announce the flow */
-    ret = active_flowproto_table[flowproto_id]->flowproto_announce_flow(flow_d);
+    /* post the flow to the flow protocol level */
+    ret = active_flowproto_table[flowproto_id]->flowproto_post(flow_d);
     if (ret < 0)
     {
 	flow_release(flow_d);
@@ -469,7 +469,7 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
     }
 
     /* put the flow in the correct queue based on the results of the
-     * announce_flow() function
+     * post() function
      */
     if (flow_d->state & FLOW_FINISH_MASK)
     {
@@ -800,11 +800,11 @@ static int do_one_work_cycle(int *num_completed,
      */
 
     gossip_ldebug(FLOW_DEBUG, "do_one_work_cycle checking.\n");
-    /* perform a checkworld for each protocol */
+    /* find serviceable flows from each protocol */
     for (i = 0; i < active_flowproto_count; i++)
     {
 	tmp_count = CHECKGLOBAL_COUNT;
-	ret = active_flowproto_table[i]->flowproto_checkworld(flow_array,
+	ret = active_flowproto_table[i]->flowproto_find_serviceable(flow_array,
 							      &tmp_count,
 							      max_idle_time_ms);
 	if (ret < 0)
@@ -814,7 +814,7 @@ static int do_one_work_cycle(int *num_completed,
 	    return (ret);
 	}
 
-	/* handle anything returned by checkworld */
+	/* handle flows (by completing or preparing for service) */
 	for (j = 0; j < tmp_count; j++)
 	{
 	    if (flow_array[j]->state & FLOW_FINISH_MASK)

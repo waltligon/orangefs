@@ -25,9 +25,9 @@ int template_flowproto_setinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter);
 
-int template_flowproto_announce_flow(flow_descriptor * flow_d);
+int template_flowproto_post(flow_descriptor * flow_d);
 
-int template_flowproto_checkworld(flow_descriptor ** flow_d_array,
+int template_flowproto_find_serviceable(flow_descriptor ** flow_d_array,
 				  int *count,
 				  int max_idle_time_ms);
 
@@ -41,8 +41,8 @@ struct flowproto_ops flowproto_template_ops = {
     template_flowproto_finalize,
     template_flowproto_getinfo,
     template_flowproto_setinfo,
-    template_flowproto_announce_flow,
-    template_flowproto_checkworld,
+    template_flowproto_post,
+    template_flowproto_find_serviceable,
     template_flowproto_service
 };
 
@@ -70,12 +70,12 @@ int template_flowproto_setinfo(flow_descriptor * flow_d,
     return (-ENOSYS);
 }
 
-int template_flowproto_announce_flow(flow_descriptor * flow_d)
+int template_flowproto_post(flow_descriptor * flow_d)
 {
     return (-ENOSYS);
 }
 
-int template_flowproto_checkworld(flow_descriptor ** flow_d_array,
+int template_flowproto_find_serviceable(flow_descriptor ** flow_d_array,
 				  int *count,
 				  int max_idle_time_ms)
 {
