@@ -7,8 +7,6 @@
 #include <client.h>
 #include "helper.h"
 
-extern PVFS_handle lookup_parent_handle(char *filename, PVFS_fs_id fs_id);
-
 int main(int argc, char **argv)
 {
     int ret = -1;
