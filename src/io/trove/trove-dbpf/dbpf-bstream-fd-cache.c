@@ -96,17 +96,17 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 				 int create_flag,
 				 int *fd_p)
 {
-    int i, fd;
+    int i, ret, fd;
     char filename[PATH_MAX];
 
 
     /* look to see if we already have an FD */
     for (i=0; i < FDCACHE_ENTRIES; i++) {
-	if (!gen_mutex_trylock(&bstream_fd_cache[i].mutex) &&
+	if (!(ret = gen_mutex_trylock(&bstream_fd_cache[i].mutex)) &&
 	    bstream_fd_cache[i].valid && 
 	    bstream_fd_cache[i].coll_id == coll_id &&
 	    bstream_fd_cache[i].handle  == handle) break;
-	else gen_mutex_unlock(&bstream_fd_cache[i].mutex);
+	else if (ret == 0) gen_mutex_unlock(&bstream_fd_cache[i].mutex);
     }
 
     /* NOTE: we're going to use a mutex here when all we really need is
@@ -125,19 +125,19 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
     
     /* no cached FD; open the file and cache the FD */
     for (i=0; i < FDCACHE_ENTRIES; i++) {
-	if (!gen_mutex_trylock(&bstream_fd_cache[i].mutex) && 
+	if (!(ret = gen_mutex_trylock(&bstream_fd_cache[i].mutex)) && 
 	    !bstream_fd_cache[i].valid) 
 	{
 	    printf("fdcache: found empty entry at %d\n", i);
 	    break;
 	}
-	else gen_mutex_unlock(&bstream_fd_cache[i].mutex);
+	else if (ret == 0) gen_mutex_unlock(&bstream_fd_cache[i].mutex);
     }
     if (i == FDCACHE_ENTRIES) {
 	/* no invalid entries; search for one that isn't in use */
 	for (i=0; i< FDCACHE_ENTRIES; i++) {
-	    if (!gen_mutex_trylock(&bstream_fd_cache[i].mutex) &&
-		!bstream_fd_cache[i].ref_ct == 0)
+	    if (!(ret = gen_mutex_trylock(&bstream_fd_cache[i].mutex)) &&
+		bstream_fd_cache[i].ref_ct == 0)
 	    {
 		printf("fdcache: no empty entries; found unused entry at %d\n", i);
 		DBPF_CLOSE(bstream_fd_cache[i].fd);
@@ -145,6 +145,7 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 		bstream_fd_cache[i].fd    = -1;
 		break;
 	    }
+	    else if (ret == 0) gen_mutex_unlock(&bstream_fd_cache[i].mutex);
 	}
 	if (i == FDCACHE_ENTRIES) assert(0);
     }
