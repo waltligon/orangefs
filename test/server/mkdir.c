@@ -95,9 +95,9 @@ int main(int argc, char **argv)	{
 	my_req->credentials.gid = 0;
 	/* TODO: fill below fields in with the correct values */
 	my_req->credentials.perms = U_WRITE | U_READ;  
-	my_req->u.create.bucket = user_opts->bucket;
-	my_req->u.create.handle_mask = 0xff00ff00;
-	my_req->u.create.fs_id = 7;
+	my_req->u.mkdir.bucket = user_opts->bucket;
+	my_req->u.mkdir.handle_mask = 0xff00ff00;
+	my_req->u.mkdir.fs_id = 7;
 
 	/* send the initial request on its way */
 	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req, 
@@ -177,7 +177,7 @@ int main(int argc, char **argv)	{
 			(int)my_ack->status);
 	}
 	printf("Handle returned by server: %lld\n", (long
-		long)my_ack->u.create.handle);
+		long)my_ack->u.mkdir.handle);
 
 	/* free up memory buffers */
 	BMI_memfree(server_addr, my_req, sizeof(struct PVFS_server_req_s), 
