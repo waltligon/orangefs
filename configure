@@ -588,7 +588,7 @@ BUILD_TIME=`date -u +"%F@%T"`
 PVFS2_MAJOR=0
 PVFS2_MINOR=6
 PVFS2_SUB=2
-PVFS2_PRE="pre1-$BUILD_TIME"
+PVFS2_PRE=""
 
 am__api_version="1.4"
 # Find a good install program.  We prefer a C program (faster),

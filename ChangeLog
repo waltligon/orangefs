@@ -3,15 +3,16 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.6.2pre1
-===============
+pvfs2-0.6.2
+===========
 - updated documentation for dist-simple-stripe.c and modified
   the basic distribution to use a single data file object.
 - fixed error reporting in pvfs2-server that didn't understand pvfs2
   specific error codes
-- extend request scheduler to allow operations to pass through without
-  being scheduled (and allow the noop operations to work like this)
-- disable the (unused) device interface on server builds, reducing
+- extended request scheduler to allow operations to pass through
+  without being scheduled (and allow the noop operations to work like
+  this)
+- disabled the (unused) device interface on server builds, reducing
   server run-time threads by one
 - bmi optimizations: avoid polling in test calls if operations are
   complete, or no operations are complete but there are unexpected
