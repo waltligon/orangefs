@@ -11,7 +11,7 @@
 
 #include <inttypes.h>
 
-#include "flow.h"
+#include "src/io/flow/flow.h"
 #include "bmi.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"

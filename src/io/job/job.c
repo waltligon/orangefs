@@ -15,7 +15,6 @@
 #include <assert.h>
 #include <time.h>
 
-#include "flow.h"
 #include "job.h"
 #include "job-desc-queue.h"
 #include "gen-locks.h"

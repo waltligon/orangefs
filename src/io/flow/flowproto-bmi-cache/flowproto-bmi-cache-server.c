@@ -15,8 +15,7 @@
 
 #include "gossip.h"
 #include "quicklist.h"
-#include "flow.h"
-#include "flowproto-support.h"
+#include "src/io/flow/flowproto-support.h"
 #include "gen-locks.h"
 #include "bmi.h"
 #include "thread-mgr.h"

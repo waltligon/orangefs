@@ -9,8 +9,7 @@
 #include <stdio.h>
 
 #include "gossip.h"
-#include "flow.h"
-#include "flowproto-support.h"
+#include "src/io/flow/flowproto-support.h"
 #include "quicklist.h"
 #include "pvfs2-request.h"
 

@@ -9,8 +9,7 @@
 #include <errno.h>
 
 #include "gossip.h"
-#include "flow.h"
-#include "flowproto-support.h"
+#include "src/io/flow/flowproto-support.h"
 
 /* interface prototypes */
 int template_flowproto_initialize(int flowproto_id);

@@ -120,7 +120,6 @@ INCLUDES := \
     src/io/trove \
     src/io/bmi \
     src/io/description \
-    src/io/flow \
     src/io/buffer \
     src/io/job \
     src/io/dev \

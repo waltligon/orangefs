@@ -11,7 +11,7 @@
 #ifndef __FLOWPROTO_SUPPORT_H
 #define __FLOWPROTO_SUPPORT_H
 
-#include "flow.h"
+#include "src/io/flow/flow.h"
 
 /* flow protocol interface */
 struct flowproto_ops
