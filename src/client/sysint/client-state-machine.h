@@ -201,13 +201,9 @@ struct PINT_client_lookup_sm {
     char                         *orig_pathname;/* input parameter */
     PVFS_pinode_reference        starting_refn; /* input parameter */
     PVFS_sysresp_lookup          *lookup_resp;  /* in/out parameter*/
-    bmi_addr_t                   meta_server_addr;
-    int                          num_meta_tries;
     int                          num_segments;
     char                         *remaining_pathname;
     PVFS_pinode_reference        remaining_starting_refn;
-    char                         *segment_space;
-    void                         *segment_state;
     PVFS_error                   last_error;
 };
 
