@@ -6,7 +6,7 @@
 
 #include <errno.h>
 #include <string.h>
-#include <dlfcn.h>
+#include <assert.h>
 
 #include "bmi.h"
 #include "bmi-method-support.h"
@@ -1529,10 +1529,10 @@ int BMI_cancel(bmi_op_id_t id,
     int ret = -1;
 
     target_op = id_gen_fast_lookup(id);
-    if (target_op->op_id != id)
-    {
-	return (-EINVAL);
-    }
+    /* TODO: figure out how we are hitting this, probably flow protocol
+     * error? 
+     */
+    assert(target_op->op_id == id);
 
     if(active_method_table[target_op->addr->method_type]->BMI_meth_cancel)
     {

@@ -1904,7 +1904,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	    {
 		gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
 		tcp_forget_addr(query_op->addr, 0, ret);
-		return (0);
+		return (ret);
 	    }
 
 	    query_op->amt_complete += ret;
@@ -2640,6 +2640,9 @@ static int tcp_do_work_error(method_addr_p map)
 	return (0);
     }
 
+    if(tmp_errno == 0)
+	tmp_errno = EPROTO;
+
     tcp_forget_addr(map, 0, -tmp_errno);
 
     return (0);
@@ -2818,6 +2821,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     if (ret < 0)
     {
 	gossip_lerr("Error: tcp_sock_init() failure.\n");
+	tcp_forget_addr(dest, 0, ret);
 	return (ret);
     }
 
