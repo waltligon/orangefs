@@ -94,7 +94,12 @@ ssize_t pvfs2_inode_read(
 	if (ret < 0)
 	{
 	    pvfs2_error("pvfs2: error: pvfs_bufmap_get() failure.\n");
-            goto error_exit;
+	    ret = new_op->downcall.status;
+            op_release(new_op);
+            kill_device_owner();
+	    pvfs_bufmap_put(buffer_index);
+	    *offset = original_offset;
+	    return(ret);
 	}
     
 	/* how much to transfer in this loop iteration */
@@ -232,7 +237,7 @@ static ssize_t pvfs2_file_write(
 	    pvfs2_error("pvfs2: error: pvfs_bufmap_get() failure.\n");
             goto error_exit;
 	}
-    
+
 	/* how much to transfer in this loop iteration */
 	each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
@@ -247,7 +252,12 @@ static ssize_t pvfs2_file_write(
         {
             pvfs2_error("Failed to copy user buffer.  Please make sure "
                         "that the pvfs2-client is running.\n");
-            goto error_exit;
+	    ret = new_op->downcall.status;
+            op_release(new_op);
+            kill_device_owner();
+	    pvfs_bufmap_put(buffer_index);
+	    *offset = original_offset;
+	    return(ret);
         }
 
         service_operation_with_timeout_retry(
