@@ -408,9 +408,9 @@ static int getattr_object_getattr_comp_fn(
         case PVFS_TYPE_SYMLINK:
             return 0;
         case PVFS_TYPE_DATAFILE:
-            /* fall through */
+	    return 0;
         case PVFS_TYPE_DIRDATA:
-            /* fall through */
+	    return 0;
         default:
             gossip_err("error: getattr_object_getattr_comp_fn: "
                        "handle refers to invalid object type\n");
