@@ -37,6 +37,7 @@ static DOTCONF_CB(exit_mhranges_context);
 static DOTCONF_CB(enter_dhranges_context);
 static DOTCONF_CB(exit_dhranges_context);
 static DOTCONF_CB(get_unexp_req);
+static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_handle_purgatory);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_filesystem_name);
@@ -111,6 +112,7 @@ static const configoption_t options[] =
     {"LogFile",ARG_STR, get_logfile,NULL,CTX_ALL},
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,CTX_ALL},
     {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
+    {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,CTX_ALL},
     {"HandlePurgatory", ARG_INT, get_handle_purgatory, NULL, CTX_ALL},
     {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,CTX_ALL},
     {"FlowModules",ARG_LIST, get_flow_module_list,NULL,CTX_ALL},
@@ -218,6 +220,12 @@ int PINT_parse_config(
     if (!config_s->handle_purgatory.tv_sec)
     {
 	gossip_err("Configuration file error. No HandlePurgatory specified\n");
+	return 1;
+    }
+
+    if (!config_s->perf_update_interval)
+    {
+	gossip_err("Configuration file error.  No PerfUpdateInterval specified.\n");
 	return 1;
     }
 
@@ -445,6 +453,19 @@ DOTCONF_CB(get_unexp_req)
         return NULL;
     }
     config_s->initial_unexpected_requests = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_perf_update_interval)
+{
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        gossip_lerr("PerfUpdateInterval Tag can only be in a "
+                    "Defaults or Global block");
+        return NULL;
+    }
+    config_s->perf_update_interval = cmd->data.value;
     return NULL;
 }
 

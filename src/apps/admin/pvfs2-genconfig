@@ -156,6 +156,7 @@ sub emit_defaults
     print $target "\tBMIModules $bmi_module\n";
     print $target "\tFlowModules flowproto_multiqueue\n";
     print $target "\tHandlePurgatory $handle_purg\n";
+    print $target "\tPerfUpdateInterval 1000\n";
     print $target "</Defaults>\n";
 }
 

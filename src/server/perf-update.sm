@@ -13,9 +13,7 @@
 
 #include "pvfs2-server.h"
 #include "pint-perf-counter.h"
-
-/* how often (in milliseconds) we update */
-#define PVFS2_PERF_UPDATE_INTERVAL 1000 
+#include "server-config.h"
 
 static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p);
 static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p);
@@ -63,6 +61,7 @@ static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p)
 static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
 {
     job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
 #if 0
     PINT_STATE_DEBUG("do_work");
@@ -72,7 +71,7 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
     PINT_perf_rollover();
 	
     /* post another timer */
-    return(job_req_sched_post_timer(PVFS2_PERF_UPDATE_INTERVAL,
+    return(job_req_sched_post_timer(user_opts->perf_update_interval,
 	s_op,
 	0,
 	js_p,
