@@ -24,15 +24,15 @@ typedef id_gen_t job_id_t;
 typedef struct job_status
 {
 	/* the comments indicate which type of job will fill in which fields */
-	int error_code;          /* returned by all operations */
-	PVFS_size actual_size; /* read_at, write_at, resize, bmi_recv */
-	PVFS_vtag_s* vtag;       /* most trove operations */
+	int error_code;         /* returned by all operations */
+	PVFS_size actual_size;  /* read_at, write_at, resize, bmi_recv */
+	PVFS_vtag_s* vtag;      /* most trove operations */
 	PVFS_ds_position position; /* iterate, iterate_keys */
 	PVFS_handle handle;     /* dspace_create */
 	PVFS_ds_attributes_s ds_attr;  /* getattr */
 	PVFS_ds_type type;      /* dspace_verify */
-	PVFS_fs_id coll_id;   /* fs_lookup */
-	int count;            /* keyval_iterate */
+	PVFS_fs_id coll_id;     /* fs_lookup */
+	int count;              /* keyval_iterate */
 } job_status_s;
 
 enum job_flags
