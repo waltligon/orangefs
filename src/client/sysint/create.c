@@ -150,7 +150,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 
 	req_p.u.create.object_type = ATTR_META;
 
-	max_msg_sz = sizeof(struct PVFS_server_resp_s);
+	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
 	op_tag = get_next_session_tag();
 	/* send the server request */
@@ -294,7 +294,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	req_p.u.create.object_type = ATTR_DATA;
 
 	/* create requests get a generic response */
-	max_msg_sz = sizeof(struct PVFS_server_resp_s);
+	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
 	/* NOTE: if we need to rollback data file creation, the first valid
 	 * handle to remove would be i - 1 (as long as i < 0).
@@ -361,7 +361,7 @@ gossip_ldebug(CLIENT_DEBUG,"\t\tnr_datafiles: %d\n",req_p.u.setattr.attr.u.meta.
     for(i=0;i<req_p.u.setattr.attr.u.meta.nr_datafiles;i++)
 	gossip_ldebug(CLIENT_DEBUG,"\t\tdatafile handle: %lld\n",req_p.u.setattr.attr.u.meta.dfh[i]);
 
-	max_msg_sz = sizeof(struct PVFS_server_resp_s);
+	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
 	op_tag = get_next_session_tag();
 
@@ -452,7 +452,7 @@ return_error:
 		req_p.rsize = sizeof(struct PVFS_server_req_s);
 		req_p.credentials = req->credentials;
 		req_p.u.remove.fs_id = req->parent_refn.fs_id;
-		max_msg_sz = sizeof(struct PVFS_server_resp_s);
+		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
 		for(i = 0;i < last_handle_created; i++)
 		{
@@ -482,7 +482,7 @@ return_error:
 		req_p.u.rmdirent.parent_handle = req->parent_refn.handle;
 		req_p.u.rmdirent.fs_id = req->parent_refn.fs_id;
 		req_p.u.rmdirent.entry = req->entry_name;
-		max_msg_sz = sizeof(struct PVFS_server_resp_s);
+		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 		op_tag = get_next_session_tag();
                 ret = PINT_send_req(serv_addr2, &req_p, max_msg_sz,
                     &decoded, &encoded_resp, op_tag);
@@ -497,7 +497,7 @@ return_error:
 		req_p.credentials = req->credentials;
 		req_p.u.remove.handle = entry.handle;
 		req_p.u.remove.fs_id = entry.fs_id;
-		max_msg_sz = sizeof(struct PVFS_server_resp_s);
+		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 		op_tag = get_next_session_tag();
                 ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
                     &decoded, &encoded_resp, op_tag);

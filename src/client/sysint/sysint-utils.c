@@ -35,6 +35,8 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
         struct PINT_decoded_msg decoded;
         bmi_addr_t serv_addr;
         pinode *pinode_ptr = NULL;
+	void* encoded_resp;
+	PVFS_msg_tag_t op_tag;
         bmi_size_t max_msg_sz = 0;
 
         /*Q: should I combine these into one since there's not much
@@ -63,7 +65,7 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
         req_p.u.lookup_path.attrmask = mask;
 
 	/*expecting exactly one segment to come back (maybe attribs)*/
-	max_msg_sz = sizeof(struct PVFS_server_resp_s) + (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
+	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
 
         ret = PINT_bucket_map_to_server(&serv_addr, parent.handle, parent.fs_id);
         if (ret < 0)
@@ -76,7 +78,10 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
          * attributes
          */
 
-        ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	op_tag = get_next_session_tag();
+
+	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+	    &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
         {
             failure = SEND_REQ_FAILURE;
@@ -137,7 +142,8 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
             goto return_error;
         }
 
-        PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+	    &encoded_resp, op_tag);
         return (0);
 
 return_error:
@@ -148,7 +154,8 @@ return_error:
             PINT_pcache_pinode_dealloc(pinode_ptr);
         case INVAL_LOOKUP_FAILURE:
         case SEND_REQ_FAILURE:
-            PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+		&encoded_resp, op_tag);
         case MAP_SERVER_FAILURE:
         case NONE_FAILURE:
 	    break;

@@ -33,6 +33,8 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 	bmi_addr_t serv_addr;	/* PVFS address type structure */
 	PVFS_bitfield attr_mask;
 	struct PINT_decoded_msg decoded;
+	void* encoded_resp;
+	PVFS_msg_tag_t op_tag;
 	int max_msg_sz;
 
 	enum {
@@ -75,12 +77,15 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 	req_p.u.readdir.token = req->token;
 	req_p.u.readdir.pvfs_dirent_count = req->pvfs_dirent_incount;
 
-	max_msg_sz = sizeof(struct PVFS_server_resp_s) 
+	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op)
 			+ req->pvfs_dirent_incount * sizeof(PVFS_dirent);
 
 	/*send the readdir request to the server*/
 
-	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	op_tag = get_next_session_tag();
+
+	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+	    &decoded, &encoded_resp, op_tag);
         if (ret < 0)
         {
             failure = SEND_REQ_FAILURE;
@@ -115,7 +120,8 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 	    }
 	}
 
-        PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+	    &encoded_resp, op_tag);
 
 	return(0);
 

@@ -89,12 +89,12 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 
 	/* send remove message to the meta file */
 
-	max_msg_sz = sizeof(struct PVFS_server_resp_s);
 	req_p.op = PVFS_SERV_REMOVE;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
 	req_p.credentials = req->credentials;
 	req_p.u.remove.handle = pinode_ptr->pinode_ref.handle;
 	req_p.u.remove.fs_id = req->parent_refn.fs_id;
+	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
 	op_tag = get_next_session_tag();
 
@@ -171,11 +171,11 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	
 
 	/* none of this stuff changes, so we don't need to set it in a loop */
-	max_msg_sz = sizeof(struct PVFS_server_resp_s);
 	req_p.op = PVFS_SERV_REMOVE;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
 	req_p.credentials = req->credentials;
 	req_p.u.remove.fs_id = req->parent_refn.fs_id;
+	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
 	ioserv_count = pinode_ptr->attr.u.meta.nr_datafiles;
 

@@ -88,12 +88,12 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
 
     gossip_ldebug(CLIENT_DEBUG,"Going to rmdir handle %d\n",pinode_ptr->pinode_ref.handle);
 
-    max_msg_sz = sizeof(struct PVFS_server_resp_s);
     req_p.op = PVFS_SERV_RMDIR;
     req_p.rsize = sizeof(struct PVFS_server_req_s);
     req_p.credentials = req->credentials;
     req_p.u.rmdir.handle = pinode_ptr->pinode_ref.handle;
     req_p.u.rmdir.fs_id = req->parent_refn.fs_id;
+    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
     op_tag = get_next_session_tag();
 

@@ -117,7 +117,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
     req_p.u.mkdir.attr = req->attr;
     req_p.u.mkdir.attrmask = req->attrmask;
 
-    max_msg_sz = sizeof(struct PVFS_server_resp_s);
+    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
     /* send the server request */
 
@@ -269,7 +269,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	    req_p.u.rmdir.handle = entry.handle;
 	    req_p.u.rmdir.fs_id = entry.fs_id;
 
-	    max_msg_sz = sizeof(struct PVFS_server_resp_s);
+	    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 	    op_tag = get_next_session_tag();
 	    ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
 		&decoded, &encoded_resp, op_tag);

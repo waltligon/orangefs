@@ -39,7 +39,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	PVFS_bitfield mask = req->attrmask;
 	pinode_reference entry;
 	PVFS_size handlesize = 0;
-	bmi_size_t max_msg_sz = sizeof(struct PVFS_server_resp_s);
+	bmi_size_t max_msg_sz = PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_SETATTR);
 	struct PINT_decoded_msg decoded;
 	void* encoded_resp;
 	PVFS_msg_tag_t op_tag = get_next_session_tag();

@@ -76,6 +76,8 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     struct PVFS_server_resp_s *ack_p = NULL; /* server response */
     int ret = -1, i = 0;
     int max_msg_sz, name_sz;
+    void* encoded_resp;
+    PVFS_msg_tag_t op_tag;
     struct PINT_decoded_msg decoded;
 
     pinode *pinode_ptr = NULL;
@@ -150,12 +152,12 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     while(num_segments_remaining > 0)
     {
 
-	max_msg_sz = sizeof(struct PVFS_server_resp_s) + num_segments_remaining * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
-	gossip_ldebug(CLIENT_DEBUG,"max msg size = %d \n",max_msg_sz);
 	name_sz = strlen(path) + 1;
 	req_p.op     = PVFS_SERV_LOOKUP_PATH;
 	req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
 	req_p.credentials = req->credentials;
+	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + num_segments_remaining * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
+	gossip_ldebug(CLIENT_DEBUG,"max msg size = %d \n",max_msg_sz);
 
 	/* update the pointer to the copy we already have */
 	req_p.u.lookup_path.path = path;
@@ -173,7 +175,10 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	    goto return_error;
 	}
 
-	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	op_tag = get_next_session_tag();
+
+	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+	    &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
 	    failure = SEND_REQ_FAILURE;
@@ -282,7 +287,8 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		free(segment);
 	}
 
-	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+	    &encoded_resp, op_tag);
 
 	if (path != NULL)
 	    free(path);
@@ -326,7 +332,8 @@ return_error:
 	    if (segment != NULL)
 		free(segment);
 	case RECV_REQ_FAILURE:
-	    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+		&encoded_resp, op_tag);
 	case SEND_REQ_FAILURE:
 	case MAP_TO_SERVER_FAILURE:
 	    if(path != NULL)
