@@ -166,7 +166,6 @@ typedef struct PVFS_servreq_getattr_s PVFS_servreq_getattr;
 struct PVFS_servresp_getattr_s
 {
     PVFS_object_attr attr;
-    PVFS_attr_extended extended;
 };
 typedef struct PVFS_servresp_getattr_s PVFS_servresp_getattr;
 
@@ -177,7 +176,6 @@ struct PVFS_servreq_geteattr_s
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
-    PVFS_object_eattr extended;	/*not in sysint */
 };
 typedef struct PVFS_servreq_geteattr_s PVFS_servreq_geteattr;
 
@@ -195,7 +193,6 @@ struct PVFS_servreq_setattr_s
     PVFS_handle handle;
     PVFS_fs_id fs_id;
     PVFS_object_attr attr;
-    PVFS_attr_extended extended;
 };
 typedef struct PVFS_servreq_setattr_s PVFS_servreq_setattr;
 

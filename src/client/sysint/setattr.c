@@ -30,8 +30,7 @@
  * returns 0 on success, -errno on failure
  */
 int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
-                PVFS_credentials credentials, 
-                PVFS_attr_extended extended)
+                PVFS_credentials credentials)
 {
 	struct PVFS_server_req_s req_p;			/* server request */
 	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */

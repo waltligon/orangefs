@@ -45,14 +45,7 @@ struct PVFS_symlink_attr_s
 };
 typedef struct PVFS_symlink_attr_s PVFS_symlink_attr;
 
-struct PVFS_object_eattr
-{
-
-};
-typedef struct PVFS_object_eattr PVFS_object_eattr;
-
-/* Attributes
- */
+/* generic attributes; applies to all objects */
 struct PVFS_object_attr
 {
     PVFS_uid owner;
@@ -62,7 +55,7 @@ struct PVFS_object_attr
     PVFS_time mtime;
     PVFS_time ctime;
     uint32_t mask;     /* indicates which fields are currently valid */
-    PVFS_ds_type objtype;	/* Type of PVFS Filesystem object */
+    PVFS_ds_type objtype;
     union
     {
 	PVFS_metafile_attr meta;
@@ -73,12 +66,6 @@ struct PVFS_object_attr
     u;
 };
 typedef struct PVFS_object_attr PVFS_object_attr;
-
-struct PVFS_attr_extended
-{
-
-};
-typedef struct PVFS_attr_extended PVFS_attr_extended;
 
 #endif /* __PVFS2_ATTR_H */
 

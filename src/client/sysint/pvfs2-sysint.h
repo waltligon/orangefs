@@ -149,7 +149,6 @@ typedef struct PVFS_sysresp_lookup_s PVFS_sysresp_lookup;
 /* getattr */
 struct PVFS_sysresp_getattr_s {
 	PVFS_object_attr attr;
-	PVFS_attr_extended extended;
 };
 typedef struct PVFS_sysresp_getattr_s PVFS_sysresp_getattr;
 
@@ -332,8 +331,7 @@ int PVFS_sys_lookup(PVFS_fs_id fs_id, char* name, PVFS_credentials
 int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
 		PVFS_credentials credentials, PVFS_sysresp_getattr *resp);
 int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
-		PVFS_credentials credentials, 
-		PVFS_attr_extended extended);
+		PVFS_credentials credentials);
 int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn, 
 		PVFS_object_attr attr, 
 		PVFS_credentials credentials, PVFS_sysresp_mkdir *resp);
