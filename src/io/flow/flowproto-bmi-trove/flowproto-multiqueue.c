@@ -374,7 +374,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
     gen_mutex_lock(&flow_data->src_mutex);
     gen_mutex_lock(&flow_data->empty_mutex);
 
-    if(qlist_empty(&flow_data->src_list) && !qlist_empty(&flow_data->empty_list))
+    if(!q_item->last_flag && qlist_empty(&flow_data->src_list) 
+	&& !qlist_empty(&flow_data->empty_list))
     {
 	q_item = qlist_entry(flow_data->empty_list.next,
 	    struct fp_queue_item, list_link);
@@ -461,10 +462,11 @@ static void trove_write_callback_fn(void *user_ptr,
     /* TODO: error handling */
     assert(error_code == 0);
 
+    q_item->parent->total_transfered += q_item->result.bytes;
+
     /* if this was the last operation, then mark the flow as done */
     if(q_item->last_flag)
     {
-	q_item->parent->total_transfered += q_item->result.bytes;
 	q_item->parent->state = FLOW_COMPLETE;
 	gen_mutex_lock(&completion_mutex);
 	qlist_add_tail(&(flow_data->list_link), 
