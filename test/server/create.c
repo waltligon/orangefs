@@ -80,7 +80,7 @@ int main(int argc, char **argv)	{
 	my_req = (struct PVFS_server_req_s*)BMI_memalloc(server_addr, 
 		sizeof(struct PVFS_server_req_s), BMI_SEND_BUFFER);
 	my_ack = (struct PVFS_server_resp_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_resp_s), BMI_RECV_BUFFER);
+		sizeof(struct PVFS_server_resp_s)+4, BMI_RECV_BUFFER);
 	if(!my_req || !my_ack){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
@@ -133,7 +133,7 @@ int main(int argc, char **argv)	{
 
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
-		sizeof(struct PVFS_server_resp_s), &actual_size, BMI_PRE_ALLOC, 0, 
+		sizeof(struct PVFS_server_resp_s)+4, &actual_size, BMI_PRE_ALLOC, 0, 
 		NULL);
 	if(ret < 0)
 	{
