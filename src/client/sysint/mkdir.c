@@ -51,7 +51,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	DCACHE_INSERT_FAILURE,
 	PCACHE_INSERT1_FAILURE,
 	PCACHE_INSERT2_FAILURE,
-    } failure;
+    } failure = NONE_FAILURE;
 	
 
     /* get the pinode of the parent so we can check permissions */

@@ -6,16 +6,18 @@
 
 /* Remove Directory Function Implementation */
 
+#include <assert.h>
+
 #include "pinode-helper.h"
 #include "pvfs2-sysint.h"
 #include "pint-sysint.h"
 #include "pint-dcache.h"
 #include "pint-servreq.h"
-#include "config-manage.h"
 #include "pcache.h"
+#include "pint-bucket.h"
+#include "PINT-reqproto-encode.h"
 
-static int do_crdirent(char *name,pinode_reference parent,\
-	PVFS_handle entry_handle,PVFS_credentials credentials,bmi_addr_t addr);
+#define REQ_ENC_FORMAT 0
 
 /* PVFS_sys_rmdir()
  *
@@ -25,212 +27,173 @@ static int do_crdirent(char *name,pinode_reference parent,\
  */
 int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
 {
-	struct PVFS_server_req_s *req_job = NULL;		/* server request */
-	struct PVFS_server_resp_s *ack_job = NULL;	/* server response */
-	int ret = -1;
-	pinode *pinode_ptr = NULL, *item_ptr = NULL;
-	bmi_addr_t serv_addr1,serv_addr2;	/* PVFS address type structure */
-	char *server1 = NULL,*server2 = NULL;
-	int cflags = 0,name_sz = 0;
-	int item_found = 0;
-	PVFS_bitfield mask;
-	pinode_reference entry;
-	PVFS_servreq_rmdir req_rmdir;
-	PVFS_servreq_rmdirent req_rmdirent;
-	
-	/* Allocate the pinode */
-	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
-	if (!pinode_ptr)
-	{
-		ret = -ENOMEM;
-		goto pinode_alloc_failure;
-	}
-	/* Revalidate the parent handle */
-	/* Get the parent pinode */
-	cflags = HANDLE_VALIDATE;
-	/* Search in pinode cache */
-	ret = PINT_pcache_lookup(req->parent_refn,&pinode_ptr);
-	if (ret < 0)
-	{
-		goto pinode_get_failure;
-	}
-	/* Is pinode present? */
-	if (pinode_ptr->pinode_ref.handle != -1)
-	{
-		cflags = HANDLE_VALIDATE;
-		mask = ATTR_BASIC;
-		ret = phelper_validate_pinode(pinode_ptr,cflags,mask,req->credentials);
-		if (ret < 0)
-		{
-			goto pinode_get_failure;
-		}
-	}
+    struct PVFS_server_req_s req_p;		/* server request */
+    struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
+    int ret = -1;
+    pinode *pinode_ptr = NULL, *item_ptr = NULL;
+    bmi_addr_t serv_addr1, serv_addr2;	/* PVFS address type structure */
+    int name_sz = 0, items_found, attr_mask;
+    pinode_reference entry;
+    struct PINT_decoded_msg decoded;
+    bmi_size_t max_msg_sz;
 
-	/* Remove directory entry server request */
+    enum{
+	NONE_FAILURE = 0,
+	GET_PINODE_FAILURE,
+	SERVER_LOOKUP_FAILURE,
+	SEND_REQ_FAILURE,
+	RECV_REQ_FAILURE,
+	REMOVE_CACHE_FAILURE,
+    } failure = NONE_FAILURE;
 
-	/* Query the BTI to get initial meta server */
-	ret = config_bt_map_bucket_to_server(&server1,req->parent_refn.handle,\
-			req->parent_refn.fs_id);
-	if (ret < 0)
-	{
-		goto pinode_get_failure;
-	}
-	ret = BMI_addr_lookup(&serv_addr1,server1);
-	if (ret < 0)
-	{
-		goto addr_lookup_failure;
-	}
-	name_sz = strlen(req->entry_name);
-	/* Fill in the parameters */
-	req_rmdirent.entry = (PVFS_string)malloc(name_sz + 1);
-	if (!req_rmdirent.entry)
-	{
-		ret = -ENOMEM;
-		goto addr_lookup_failure;	
-	}
-	strncpy(req_rmdirent.entry,req->entry_name,name_sz);
-	req_rmdirent.entry[name_sz] = '\0'; 
-	req_rmdirent.parent_handle = req->parent_refn.handle;
-	req_rmdirent.fs_id = req->parent_refn.fs_id;
-	 
-	/* server request */
-	ret = pint_serv_rmdirent(&req_job,&ack_job,&req_rmdirent,\
-			req->credentials,&serv_addr1); 
-	if (ret < 0)
-	{
-		goto rmdirent_failure;
-	}
-	/* New entry pinode reference */
-	entry.handle = ack_job->u.rmdirent.entry_handle;
-	entry.fs_id = req->parent_refn.fs_id;
+    /* lookup meta file */
+    attr_mask = ATTR_BASIC | ATTR_META;
 
-	/* Free the jobs */
-	sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr1,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
+    ret = PINT_do_lookup(req->entry_name, req->parent_refn, attr_mask,
+			    req->credentials, &entry);
+    if (ret < 0)
+    {
+	failure = GET_PINODE_FAILURE;
+	goto return_error;
+    }
 
-	/* Remove directory server request */
+    /* get the pinode for the thing we're deleting */
+    ret = phelper_get_pinode(entry, &pinode_ptr, attr_mask, req->credentials );
+    if (ret < 0)
+    {
+	failure = GET_PINODE_FAILURE;
+	goto return_error;
+    }
 
-	/* Fill in the parameters */
-	req_rmdir.handle = entry.handle;
-	req_rmdir.fs_id = entry.fs_id;
+    /* are we allowed to delete this file? */
+    ret = check_perms(pinode_ptr->attr, req->credentials.perms,
+				    req->credentials.uid, req->credentials.gid);
+    if (ret < 0)
+    {
+	ret = (-EPERM);
+	failure = GET_PINODE_FAILURE;
+	goto return_error;
+    }
 
-	/* Query the BTI to get initial meta server */
-	ret = config_bt_map_bucket_to_server(&server2,entry.handle,entry.fs_id);
-	if (ret < 0)
-	{
-		goto remove_map_failure;
-	}
-	ret = BMI_addr_lookup(&serv_addr2,server2);
-	if (ret < 0)
-	{
-		goto remove_addr_lookup_failure;
-	}
-	/* Do a Remove directory entry with a possible rollback  */
-	ret = pint_serv_rmdir(&req_job,&ack_job,&req_rmdir,\
-			req->credentials,&serv_addr2);
-	if (ret < 0)
-	{
-		goto remove_failure; 
-	}
-	
-	/* Remove from pinode cache */
-	ret = PINT_pcache_remove(entry,&item_ptr);
-	if (ret < 0)
-	{
-		goto remove_failure;
-	}
-	/* Free the pinode removed from cache */
-	PINT_pcache_pinode_dealloc(item_ptr);
-	
-	/* Create and fill in a dentry and add it to the dcache */
-	ret = PINT_dcache_remove(req->entry_name,req->parent_refn,\
-			&item_found);
-	if (ret < 0)
-	{
-		goto remove_failure;
-	}
+    ret = PINT_bucket_map_to_server(&serv_addr1, entry.handle, entry.fs_id);
+    if (ret < 0)
+    {
+	failure = SERVER_LOOKUP_FAILURE;
+	goto return_error;
+    }
 
-	sysjob_free(serv_addr2,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr2,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
+    /* send remove message to the meta file */
 
-	return(0);
+    max_msg_sz = sizeof(struct PVFS_server_resp_s);
+    req_p.op = PVFS_SERV_RMDIR;
+    req_p.rsize = sizeof(struct PVFS_server_req_s);
+    req_p.credentials = req->credentials;
+    req_p.u.rmdir.handle = pinode_ptr->pinode_ref.handle;
+    req_p.u.rmdir.fs_id = req->parent_refn.fs_id;
 
-remove_failure:
-	if (req_job)
-		sysjob_free(serv_addr2,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	if (ack_job)
-		sysjob_free(serv_addr2,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	
-remove_addr_lookup_failure:
-	if (server2)
-		free(server2);
+    /* dead man walking */
 
-remove_map_failure:
-	/* Make a crdirent request to the server */
-	ret = do_crdirent(req->entry_name,req->parent_refn,entry.handle,\
-			req->credentials,serv_addr1);
+    ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz, &decoded);
+    if (ret < 0)
+    {
+	failure = SEND_REQ_FAILURE;
+	goto return_error;
+    }
 
-rmdirent_failure:
-	if (req_rmdirent.entry)
-		free(req_rmdirent.entry);
+    ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
 
-addr_lookup_failure:
-	if (server1)
-		free(server1);
+    if (ack_p->status < 0 )
+    {
+	ret = ack_p->status;
+	failure = RECV_REQ_FAILURE;
+	goto return_error;
+    }
 
-pinode_get_failure:
-	if (req_job)
-		sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	if (ack_job)
-		sysjob_free(serv_addr1,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	
-	/* Free the pinode */
-	if (pinode_ptr)
-		PINT_pcache_pinode_dealloc(pinode_ptr);
+    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 
-pinode_alloc_failure:
+    /* rmdirent the dir entry */
+    ret = PINT_bucket_map_to_server(&serv_addr2, req->parent_refn.handle, req->parent_refn.fs_id);
+    if (ret < 0)
+    {
+	failure = SERVER_LOOKUP_FAILURE;
+	goto return_error;
+    }
 
-	return(ret);
-}
+    name_sz = strlen(req->entry_name) + 1; /*include null terminator*/
 
-/* do_crdirent 
- *
- * perform a create directory entry server request
- *
- * returns 0 on success, -errno on error
- */
-static int do_crdirent(char *name,pinode_reference parent,\
-		PVFS_handle entry_handle,PVFS_credentials credentials,bmi_addr_t addr)
-{
-	struct PVFS_server_req_s *req_job = NULL;
-	struct PVFS_server_resp_s *ack_job = NULL;
-	PVFS_servreq_createdirent req_crdirent;
-	int ret = 0,name_sz = strlen(name);
+    req_p.op = PVFS_SERV_RMDIRENT;
+    req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
+    req_p.credentials = req->credentials;
+    req_p.u.rmdirent.entry = req->entry_name;
+    req_p.u.rmdirent.parent_handle = req->parent_refn.handle;
+    req_p.u.rmdirent.fs_id = req->parent_refn.fs_id;
 
-	/* Fill in the arguments */
-	req_crdirent.name = (char *)malloc(name_sz + 1);
-	if (!req_crdirent.name)
-	{
-		return(-ENOMEM);	
-	}
-	strncpy(req_crdirent.name,name,name_sz);
-	req_crdirent.name[name_sz] = '\0';
-	req_crdirent.new_handle = entry_handle;
-	req_crdirent.parent_handle = parent.handle;
-	req_crdirent.fs_id = parent.fs_id;
+    /* dead man walking */
+    ret = PINT_server_send_req(serv_addr2, &req_p, max_msg_sz, &decoded);
+    if (ret < 0)
+    {
+	failure = SEND_REQ_FAILURE;
+	goto return_error;
+    }
 
-	/* Make the crdirent request */
-	ret = pint_serv_crdirent(&req_job,&ack_job,&req_crdirent,credentials,\
-			&addr);
-	if (ret < 0)
-	{
-		/* Free memory allocated for the name */
-		if (req_crdirent.name)
-			free(req_crdirent.name);
-		return(ret);
-	}
+    ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
 
-	return(0);
+    if (ack_p->status < 0 )
+    {
+	ret = ack_p->status;
+	failure = RECV_REQ_FAILURE;
+	goto return_error;
+    }
+
+    /* sanity check:
+     * rmdirent returns a handle to the file for the dirent that was
+     * removed. if this isn't equal to what we passed in, we need to figure
+     * out what we deleted and figure out why the server had the wrong link.
+     */
+
+    assert(ack_p->u.rmdirent.entry_handle == pinode_ptr->pinode_ref.handle);
+
+    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+
+    /* Remove the dentry from the dcache */
+    ret = PINT_dcache_remove(req->entry_name,req->parent_refn,&items_found);
+    if (ret < 0)
+    {
+	failure = REMOVE_CACHE_FAILURE;
+	goto return_error;
+    }
+
+    /* Remove from pinode cache */
+    ret = PINT_pcache_remove(entry,&item_ptr);
+    if (ret < 0)
+    {
+	failure = REMOVE_CACHE_FAILURE;
+	goto return_error;
+    }
+
+    /* free the pinode that we removed from cache */
+    PINT_pcache_pinode_dealloc(item_ptr);
+
+return_error:
+
+    /* TODO: same as the remove todo note, what exactly (if anything) needs to
+     * be rolled back here, right now we just return -- could lead to 
+     * consistancy problems.
+     */
+
+    switch(failure)
+    {
+	case RECV_REQ_FAILURE:
+	    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	case SEND_REQ_FAILURE:
+	case SERVER_LOOKUP_FAILURE:
+	case GET_PINODE_FAILURE:
+	case REMOVE_CACHE_FAILURE:
+	case NONE_FAILURE:
+    }
+
+    return(ret);
+
 }
 
 /*
