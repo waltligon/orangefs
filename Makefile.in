@@ -972,8 +972,8 @@ install:: install_doc
 	install -d $(prefix)/sbin
 	install -m 755 $(SERVER) $(prefix)/sbin
 
-	install -m 755 test/kernel/linux-2.6/pvfs2-client $(prefix)/sbin
-	install -m 755 test/kernel/linux-2.6/pvfs2-client-core $(prefix)/sbin
+	install -m 755 src/apps/kernel/linux-2.6/pvfs2-client $(prefix)/sbin
+	install -m 755 src/apps/kernel/linux-2.6/pvfs2-client-core $(prefix)/sbin
 
 ifneq (,$(LINUX_KERNEL_SRC))
 
