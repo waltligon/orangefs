@@ -32,7 +32,7 @@ sub process_latex
 	my($input,$do_html);
 	$input = $_[0];
 	$do_html = $_[1];
-	my $latex2html_cmd = "latex2html -split 0 -show_section_numbers -nonavigation";
+	my $latex2html_cmd = "latex2html -split 0 -show_section_numbers -nonavigation -init_file $indir/latex2html-init";
 
 	if ($do_html)
 	{
