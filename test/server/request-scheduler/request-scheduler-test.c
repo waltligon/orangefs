@@ -10,6 +10,8 @@
 
 #include <request-scheduler.h>
 #include <pvfs2-req-proto.h>
+#include <gossip.h>
+#include <pvfs2-debug.h>
 
 int main(int argc, char **argv)	
 {
@@ -17,6 +19,9 @@ int main(int argc, char **argv)
 	struct PVFS_server_req_s req_array[4];
 	req_sched_id id_array[4];
 	req_sched_id id_arrayB[4];
+	struct PVFS_server_req_s io_req_array[4];
+	req_sched_id io_id_array[4];
+	req_sched_id io_id_arrayB[4];
 	int count = 0;
 	int status = 0;
 
@@ -33,6 +38,18 @@ int main(int argc, char **argv)
 	req_array[3].op = PVFS_SERV_SETATTR;
 	req_array[3].u.setattr.handle = 5;
 
+	io_req_array[0].op = PVFS_SERV_IO;
+	io_req_array[0].u.io.handle = 5;
+	io_req_array[1].op = PVFS_SERV_IO;
+	io_req_array[1].u.io.handle = 5;
+	io_req_array[2].op = PVFS_SERV_IO;
+	io_req_array[2].u.io.handle = 5;
+	io_req_array[3].op = PVFS_SERV_IO;
+	io_req_array[3].u.io.handle = 5;
+
+	/* turn on gossip for the scheduler */
+	gossip_enable_stderr();
+	gossip_set_debug_mask(1, REQ_SCHED_DEBUG);
 
 	/* initialize scheduler */
 	ret = PINT_req_sched_initialize();
@@ -55,6 +72,20 @@ int main(int argc, char **argv)
 	if(ret != 0)
 	{
 		fprintf(stderr, "Error: 2nd post should queue.\n");
+		return(-1);
+	}
+
+	/* schedule two I/O requests */
+	ret = PINT_req_sched_post(&(io_req_array[1]), NULL, &(io_id_array[1]));
+	if(ret != 0)
+	{
+		fprintf(stderr, "Error: 1st I/O req should queue.\n");
+		return(-1);
+	}
+	ret = PINT_req_sched_post(&(io_req_array[0]), NULL, &(io_id_array[0]));
+	if(ret != 0)
+	{
+		fprintf(stderr, "Error: 1st I/O req should queue.\n");
 		return(-1);
 	}
 
@@ -97,11 +128,57 @@ int main(int argc, char **argv)
 		&(id_arrayB[0]));
 	if(ret != 1)
 	{
-		fprintf(stderr, "Error: release didn't immediately
-			complete.\n");
+		fprintf(stderr, "Error: release didn't immediately complete.\n");
+		return(-1);
+	}
+		
+	/* 4th request should still block on i/o requests */
+	ret = PINT_req_sched_test(id_array[3], &count, NULL, &status); 
+	if(ret != 0 || count != 0)
+	{
+		fprintf(stderr, "Error: test of 4th request failed.\n");
+		return(-1);
+	}
+
+	/* see if the first two i/o requests are ready */
+	/* test out of order, to make sure that works */
+	ret = PINT_req_sched_test(io_id_array[1], &count, NULL, &status); 
+	if(ret != 0 || count != 1 || status != 0)
+	{
+		fprintf(stderr, "Error: test of 2nd io request failed.\n");
+		return(-1);
+	}
+	ret = PINT_req_sched_test(io_id_array[0], &count, NULL, &status); 
+	if(ret != 0 || count != 1 || status != 0)
+	{
+		fprintf(stderr, "Error: test of 2nd io request failed.\n");
+		return(-1);
+	}
+
+	/* 4th request should still block on i/o requests */
+	ret = PINT_req_sched_test(id_array[3], &count, NULL, &status); 
+	if(ret != 0 || count != 0)
+	{
+		fprintf(stderr, "Error: test of 4th request failed.\n");
 		return(-1);
 	}
 	
+	/* release the first two io requests */
+	ret = PINT_req_sched_release(io_id_array[1], NULL,
+		&(io_id_arrayB[1]));
+	if(ret != 1)
+	{
+		fprintf(stderr, "Error: release didn't immediately complete.\n");
+		return(-1);
+	}
+	ret = PINT_req_sched_release(io_id_array[0], NULL,
+		&(io_id_arrayB[0]));
+	if(ret != 1)
+	{
+		fprintf(stderr, "Error: release didn't immediately complete.\n");
+		return(-1);
+	}
+
 	/* now the 4th request should be ready to go */
 	ret = PINT_req_sched_test(id_array[3], &count, NULL, &status); 
 	if(ret != 0 || count != 1 || status != 0)
@@ -115,16 +192,44 @@ int main(int argc, char **argv)
 		&(id_arrayB[2]));
 	if(ret != 1)
 	{
-		fprintf(stderr, "Error: release didn't immediately
-			complete.\n");
+		fprintf(stderr, "Error: release didn't immediately complete.\n");
 		return(-1);
 	}
 	ret = PINT_req_sched_release(id_array[3], NULL,
 		&(id_arrayB[3]));
 	if(ret != 1)
 	{
-		fprintf(stderr, "Error: release didn't immediately
-			complete.\n");
+		fprintf(stderr, "Error: release didn't immediately complete.\n");
+		return(-1);
+	}
+
+	/* schedule two more I/O requests, should both immediately complete */
+	ret = PINT_req_sched_post(&(io_req_array[2]), NULL, &(io_id_array[2]));
+	if(ret != 1)
+	{
+		fprintf(stderr, "Error: 3rd I/O req should complete.\n");
+		return(-1);
+	}
+	ret = PINT_req_sched_post(&(io_req_array[3]), NULL, &(io_id_array[3]));
+	if(ret != 1)
+	{
+		fprintf(stderr, "Error: 4th I/O req should complete.\n");
+		return(-1);
+	}
+
+	/* release last two i/o requests */
+	ret = PINT_req_sched_release(io_id_array[3], NULL,
+		&(io_id_arrayB[3]));
+	if(ret != 1)
+	{
+		fprintf(stderr, "Error: release didn't immediately complete.\n");
+		return(-1);
+	}
+	ret = PINT_req_sched_release(io_id_array[2], NULL,
+		&(io_id_arrayB[2]));
+	if(ret != 1)
+	{
+		fprintf(stderr, "Error: release didn't immediately complete.\n");
 		return(-1);
 	}
 
