@@ -123,7 +123,7 @@ int BMI_sockio_init_sock(struct sockaddr *saddrp,
 	ret = inet_aton(name, &addr);
     }
 
-    if (ret) return -1;
+    if (ret == 0) return -1;
 
     ((struct sockaddr_in *) saddrp)->sin_family = AF_INET;
     ((struct sockaddr_in *) saddrp)->sin_port = htons((u_short) service);
