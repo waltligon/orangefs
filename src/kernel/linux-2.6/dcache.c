@@ -12,11 +12,21 @@ int pvfs2_d_revalidate(
     struct dentry *dentry,
     int flags)
 {
+    int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
 
-    pvfs2_print("pvfs2_d_revalidate: called on dentry %p\n", dentry);
-
-    return pvfs2_internal_revalidate(inode);
+    pvfs2_print("pvfs2_d_revalidate: called on dentry %p", dentry);
+    if (inode)
+    {
+        pvfs2_print(" (inode %Lu)\n",
+                    Lu(pvfs2_ino_to_handle(inode->i_ino)));
+        ret = pvfs2_internal_revalidate(inode);
+    }
+    else
+    {
+        pvfs2_print("\n");
+    }
+    return ret;
 }
 
 #else

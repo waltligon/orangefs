@@ -331,6 +331,9 @@ int pvfs2_inode_getattr(struct inode *inode)
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
+    pvfs2_print("pvfs2_inode_getattr: called on inode %Lu\n",
+                Lu(pvfs2_ino_to_handle(inode->i_ino)));
+
     if (inode)
     {
         pvfs2_inode = PVFS2_I(inode);
