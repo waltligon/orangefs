@@ -9,6 +9,7 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>
 #include <linux/uio.h>
+#include <linux/sched.h>
 #include "pvfs2-kernel.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
@@ -23,6 +24,27 @@ extern struct qhash_table *htable_ops_in_progress;
 
 static int open_access_count = 0;
 
+/* a pointer to the task that opens the dev-req device file */
+static struct task_struct *device_owner = NULL;
+
+/* a function that forces termination of the device owner */
+void kill_device_owner(void)
+{
+    if (device_owner)
+    {
+        pvfs2_print("**************************************\n");
+        pvfs2_print("Killing pvfs2 daemon with pid %d\n",
+                    device_owner->pid);
+        pvfs2_print("**************************************\n");
+        force_sig(SIGKILL, device_owner);
+    }
+    else
+    {
+        panic("Trying to kill pvfs2 daemon before pvfs2-req "
+              "device was opened\n");
+    }
+}
+
 static int pvfs2_devreq_open(
     struct inode *inode,
     struct file *file)
@@ -36,6 +58,7 @@ static int pvfs2_devreq_open(
 	if (ret == 0)
 	{
 	    open_access_count++;
+            device_owner = current;
 	}
 	spin_unlock(&inode->i_lock);
     }
@@ -87,7 +110,7 @@ static ssize_t pvfs2_devreq_read(
 	    (cur_op->op_state == PVFS2_VFS_STATE_SERVICED))
 	{
 	    spin_unlock(&cur_op->lock);
-	    pvfs2_error("FIXME: Current op already queued...skipping\n");
+	    panic("FIXME: Current op already queued...skipping\n");
 	    return -1;
 	}
 	cur_op->op_state = PVFS2_VFS_STATE_INPROGR;
@@ -229,15 +252,11 @@ static int pvfs2_devreq_release(
     spin_lock(&inode->i_lock);
     open_access_count--;
 
-    /* FIXME: a sanity check that should be removed */
-    if (open_access_count != 0)
-    {
-	pvfs2_error("pvfs2: the impossible has happened.  again.\n");
-    }
-
     pvfs_bufmap_finalize();
 
+    device_owner = NULL;
     spin_unlock(&inode->i_lock);
+
     return 0;
 }
 

@@ -13,6 +13,9 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
+/* defined in devpvfs2-req.c */
+void kill_device_owner(void);
+
 extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
@@ -100,6 +103,7 @@ static ssize_t pvfs2_file_read(
 	if(new_op->downcall.status != 0)
 	{
           error_exit:
+            kill_device_owner();
 	    pvfs_bufmap_put(desc);
 	    ret = new_op->downcall.status;
 	    op_release(new_op);
@@ -205,6 +209,7 @@ static ssize_t pvfs2_file_write(
 	if(new_op->downcall.status != 0)
 	{
           error_exit:
+            kill_device_owner();
 	    pvfs_bufmap_put(desc);
 	    ret = new_op->downcall.status;
 	    op_release(new_op);

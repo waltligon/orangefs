@@ -85,8 +85,7 @@ struct file_system_type pvfs2_fs_type = {
     .owner = THIS_MODULE
 };
 
-static int __init pvfs2_init(
-    void)
+static int __init pvfs2_init(void)
 {
     pvfs2_print("pvfs2: pvfs2_init called\n");
 
@@ -118,8 +117,7 @@ static int __init pvfs2_init(
     return register_filesystem(&pvfs2_fs_type);
 }
 
-static void __exit pvfs2_exit(
-    void)
+static void __exit pvfs2_exit(void)
 {
     int i;
     pvfs2_kernel_op_t *cur_op = NULL;
