@@ -1914,14 +1914,15 @@ int job_test_HACK(
 	int timeout_ms)
 {
 	int ret = -1;
-	int completion_pending = 0;
 	struct job_desc* query = NULL;
 #ifdef __PVFS2_JOB_THREADED__
-	struct timeval now;
-	struct timespec timeout;
+	struct timespec pthread_timeout;
 #else
 	int num_completed;
 #endif /* __PVFS2_JOB_THREADED__ */
+	int timeout_remaining = timeout_ms;
+	struct timeval start;
+	struct timeval end;
 
 	*out_count_p = 0;
 	
@@ -1950,14 +1951,11 @@ int job_test_HACK(
 			return(completion_error);
 		}
 
-		completion_pending = !job_desc_q_empty(completion_queue);
-
 		query = job_desc_q_search(completion_queue, id);
 		if(query)
 		{
 			job_desc_q_remove(query);
 		}
-
 	gen_mutex_unlock(&completion_mutex);
 
 	/* see if we found what we wanted yet */
@@ -1987,74 +1985,169 @@ int job_test_HACK(
 	 * to eat up the timeout until the job that we want hits the
 	 * completion queue
 	 */
-#if 0
-	if(completion_pending)
+
+#ifdef __PVFS2_JOB_THREADED__
+	do
 	{
-		/* do a quick test first to see if the job has already completed */
-		ret = job_test(id, out_count_p, returned_user_ptr_p, out_status_p);
+		ret = gettimeofday(&start, NULL);
+		if(ret < 0)
+			return(ret);
+
+		/* TODO: clean up this silly timing math */
+		pthread_timeout.tv_sec = start.tv_sec;
+		if(timeout_ms / 1000)
+		{
+			pthread_timeout.tv_sec += timeout_remaining/1000;
+			timeout_ms = timeout_remaining % 1000;
+		}
+		pthread_timeout.tv_nsec = start.tv_usec * 1000 + timeout_remaining * 1000000;
+		if(pthread_timeout.tv_nsec > 1000000000)
+		{
+			pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
+			pthread_timeout.tv_sec++;
+		}
+		
+		gen_mutex_lock(&completion_mutex);
+		ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
+			&pthread_timeout);
+		gen_mutex_unlock(&completion_mutex);
+		if(ret == ETIMEDOUT)
+		{
+			/* nothing completed while we were waiting, trust that the
+			 * timedwait got the timing right
+			 */
+			return(0);
+		}	
+		else if(ret == EINTR)
+		{
+			/* fall through */
+		}
+		else if(ret != 0)
+		{
+			/* error */
+			return(-ret);
+		}
+		else
+		{
+			/* poke the queue */
+			gen_mutex_lock(&completion_mutex);
+				if(completion_error)
+				{
+					gen_mutex_unlock(&completion_mutex);
+					return(completion_error);
+				}
+
+				query = job_desc_q_search(completion_queue, id);
+				if(query)
+				{
+					job_desc_q_remove(query);
+				}
+			gen_mutex_unlock(&completion_mutex);
+
+			/* see if we found what we wanted yet */
+			if(query)
+			{
+				*out_count_p = 1;
+				fill_status(query, returned_user_ptr_p, out_status_p);
+				/* special case for request scheduler */
+				if(query->type == JOB_REQ_SCHED &&
+					query->u.req_sched.post_flag == 1)
+				{
+					/* hang onto desc until release time */
+					job_desc_q_add(req_sched_inprogress_queue, query);
+				}
+				else
+				{
+					dealloc_job_desc(query);
+				}
+				return(0);
+			}
+		}
+
+		/* if we fall to here, see how much time has expired and sleep
+		 * again if we need to
+		 */
+
+		ret = gettimeofday(&end, NULL);
+		if(ret < 0)
+			return(ret);
+		
+		timeout_remaining = (end.tv_sec - start.tv_sec)*1000 +
+			(end.tv_usec - start.tv_usec)/1000;
+
+	} while(timeout_remaining > 0);
+
+	/* fall through, nothing done, time is used up */
+	return(0);
+
+#else
+	
+	do
+	{
+		ret = gettimeofday(&start, NULL);
+		if(ret < 0)
+			return(ret);
+
+		/* push on work for one round */
+		ret = do_one_work_cycle_all(&num_completed, 1);
 		if(ret < 0)
 		{
 			return(ret);
 		}
-		if(*out_count_p == 1)
+		if(num_completed > 0)
 		{
-			/* done */
-			return(0);
+			/* poke the queue */
+			gen_mutex_lock(&completion_mutex);
+				if(completion_error)
+				{
+					gen_mutex_unlock(&completion_mutex);
+					return(completion_error);
+				}
+
+				query = job_desc_q_search(completion_queue, id);
+				if(query)
+				{
+					job_desc_q_remove(query);
+				}
+			gen_mutex_unlock(&completion_mutex);
+
+			/* see if we found what we wanted yet */
+			if(query)
+			{
+				*out_count_p = 1;
+				fill_status(query, returned_user_ptr_p, out_status_p);
+				/* special case for request scheduler */
+				if(query->type == JOB_REQ_SCHED &&
+					query->u.req_sched.post_flag == 1)
+				{
+					/* hang onto desc until release time */
+					job_desc_q_add(req_sched_inprogress_queue, query);
+				}
+				else
+				{
+					dealloc_job_desc(query);
+				}
+				return(0);
+			}
 		}
-	}
 
-#ifdef __PVFS2_JOB_THREADED__
-	/* wait for just a little while to see if anything shows up in the
-	 * completion queue
-	 */
-	ret = gettimeofday(&now, NULL);
-	if(ret < 0)
-	{
-		return(ret);
-	}
-	timeout.tv_sec = now.tv_sec;
-	timeout.tv_nsec = now.tv_usec * 1000 + thread_wait_timeout;
-	if(timeout.tv_nsec > 1000000000)
-	{
-		timeout.tv_nsec = timeout.tv_nsec - 1000000000;
-		timeout.tv_sec = timeout.tv_sec + 1;
-	}
+		/* if we fall to here, see how much time has expired and sleep
+		 * again if we need to 
+		 */
 
-	gen_mutex_lock(&completion_mutex);
-	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
-		&timeout);
-	gen_mutex_unlock(&completion_mutex);
-	if(ret == ETIMEDOUT || ret == EINTR)
-	{
-		/* nothing completed while we were waiting */
-		return(0);
-	}
-	else if(ret != 0)
-	{
-		/* error */
-		return(-ret);
-	}
+		ret = gettimeofday(&end, NULL);
+		if(ret < 0)
+			return(ret);
+		
+		timeout_remaining = (end.tv_sec - start.tv_sec)*1000 +
+			(end.tv_usec - start.tv_usec)/1000;
 
-	/* fall through to check completion queue again */
+	} while(timeout_remaining > 0);
 
-#else
-	/* push on work for one round */
-	ret = do_one_work_cycle_all(&num_completed, 1);
-	if(ret < 0)
-	{
-		return(ret);
-	}
-	if(num_completed == 0)
-	{
-		/* don't bother checking completion queue again */
-		return(0);
-	}
-#endif /* __PVFS2_JOB_THREADED__ */
+	/* fall through, nothing done, time is used up */
+	return(0);
+#endif
 
-	/* check again to see if the job finished */
-	return(job_test(id, out_count_p, returned_user_ptr_p, out_status_p));
-#endif /* 0 */
-	return(-ENOSYS);
 }
 
 /* job_wait()
