@@ -250,6 +250,13 @@ static int pvfs2_devreq_release(
     pvfs_bufmap_finalize();
 
     device_owner = NULL;
+
+    /*
+      prune dcache based to get rid of entries
+      that may no longer exist on re-open
+    */
+    shrink_dcache_sb(inode->i_sb);
+
     spin_unlock(&inode->i_lock);
 
     return 0;
