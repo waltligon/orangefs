@@ -22,6 +22,7 @@
 #include <test-uninitialized.h>
 #include <test-finalized.h>
 #include <test-misc.h>
+#include <test-concurrent-meta.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -38,7 +39,8 @@ enum test_types {
 	TEST_INVALID_FILES,
 	TEST_UNINITIALIZED,
 	TEST_FINALIZED,
-	TEST_MISC
+	TEST_MISC,
+	TEST_CONCURRENT_META
 };
 
 void setup_ptstests(config *myconfig) {
@@ -86,9 +88,12 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_FINALIZED].test_func = (void *)test_finalized;
    myconfig->testpool[TEST_FINALIZED].test_param_init = (void *)null_params_parser;
    myconfig->testpool[TEST_FINALIZED].test_name = str_malloc("test_finalized");
-   myconfig->testpool[TEST_MISC].test_func = (void *)test_finalized;
-   myconfig->testpool[TEST_MISC].test_param_init = (void *)test_misc;
+   myconfig->testpool[TEST_MISC].test_func = (void *)test_misc;
+   myconfig->testpool[TEST_MISC].test_param_init = (void *)null_params_parser;
    myconfig->testpool[TEST_MISC].test_name = str_malloc("test_misc");
+   myconfig->testpool[TEST_CONCURRENT_META].test_func = (void *)test_concurrent_meta;
+   myconfig->testpool[TEST_CONCURRENT_META].test_param_init = (void *)null_params_parser;
+   myconfig->testpool[TEST_CONCURRENT_META].test_name = str_malloc("test_concurrent_meta");
 }
 
 #endif

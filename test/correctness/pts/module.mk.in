@@ -20,7 +20,8 @@ TEST_PTS_MISC := \
 	$(DIR)/test-invalid-files.c \
 	$(DIR)/test-uninitialized.c \
 	$(DIR)/test-finalized.c \
-	$(DIR)/test-misc.c
+	$(DIR)/test-misc.c \
+	$(DIR)/test-concurrent-meta.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 
