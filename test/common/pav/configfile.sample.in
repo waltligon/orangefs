@@ -4,8 +4,12 @@
 #	. trailing whitespace can confuse some parts of PAV
 # 
 
-SRCDIR_TOP=@SRC_ABSOLUTE_TOP@
-BUILDDIR=@BUILD_ABSOLUTE_TOP@
+# pav is in the test/ sub-project, but it uses a lot of stuff in the main pvfs2
+# tree.  ASSUMPTION: test/ is a subdir of pvfs2, not a standalone directory
+
+SRCDIR_TOP=@SRC_ABSOLUTE_TOP@/../
+BUILDDIR=@BUILD_ABSOLUTE_TOP@/../
+
 # primative bakctick expansion is allowed: 
 # NODEFILE=`sort $PBS_NODEFILE | uniq > machines ; echo machines`
 NODEFILE=machines.pav
@@ -51,7 +55,7 @@ RCPPROG=scp
 #
 # LOCATION OF IMPORTANT BINARIES LOCALLY
 #
-PROGROOT=$SRCDIR_TOP/common/pav
+PROGROOT=$SRCDIR_TOP/test/common/pav
 
 # pav understands simple shell-like variables
 #PVFS=/homes/robl/pvfs2
