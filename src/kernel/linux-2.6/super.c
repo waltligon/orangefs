@@ -166,6 +166,12 @@ int pvfs2_fill_sb(
     shift_val = ((sizeof(sb->s_maxbytes) * 8) - 1);
     sb->s_maxbytes = (1 << shift_val);
 
+    if (!silent)
+    {
+        pvfs2_print("pvfs2: pvfs2_fill_sb -- sb max bytes is %llu\n",
+                    (unsigned long long)sb->s_maxbytes);
+    }
+
     /* alloc and initialize our root directory inode */
     root = pvfs2_get_custom_inode(sb, (S_IFDIR | 0755), 0);
     if (!root)

@@ -289,7 +289,7 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     /* and clear any associated pages in the page cache (if any) */
     truncate_inode_pages(inode->i_mapping, 0);
 
-    /* have the vfs enforece readonly mmap support for us */
+    /* have the vfs enforce readonly mmap support for us */
     return generic_file_readonly_mmap(file, vma);
 }
 
@@ -325,13 +325,21 @@ int pvfs2_fsync(
     return 0;
 }
 
+loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
+{
+    /*
+      NOTE: if .llseek is overriden, we must acquire lock as
+      described in Documentation/filesystems/Locking
+    */
+    pvfs2_print("pvfs2_file_llseek: offset is %llu | origin is %d\n",
+                (unsigned long long)offset, origin);
+
+    return generic_file_llseek(file, offset, origin);
+}
+
 struct file_operations pvfs2_file_operations =
 {
-/*
-  if .llseek is overriden, we must acquire lock as described
-  in Documentation/filesystems/Locking
-*/
-    .llseek = generic_file_llseek,
+    .llseek = pvfs2_file_llseek,
     .read = pvfs2_file_read,
     .aio_read = generic_file_aio_read,
     .write = pvfs2_file_write,
