@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <linux/types.h>
 #include <linux/dirent.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <assert.h>
 #include <ctype.h>
 
@@ -14,6 +16,7 @@
 #include "pvfs2-storage.h"
 #include "job.h"
 #include "gossip.h"
+#include "str_utils.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_storage_space);
@@ -33,6 +36,7 @@ static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(get_bucket_list);
 
 /* misc helper functions */
+static int cache_config_files(int argc, char **argv);
 static int is_valid_alias(char *str);
 static int is_valid_bucket_range_description(char *b_range);
 static int is_valid_filesystem_configuration(struct filesystem_configuration_s *fs);
@@ -94,9 +98,19 @@ int PINT_server_config(struct server_configuration_s *config_obj,
     config_s->storage_path = NULL;
     config_s->host_aliases = NULL;
     config_s->file_systems = NULL;
+    config_s->fs_config_buf = NULL;
+    config_s->fs_config_buflen = 0;
+    config_s->server_config_buf = NULL;
+    config_s->server_config_buflen = 0;
 
-    config_s->fs_config_filename = (argv[1] ? argv[1] : "fs.conf");
-    config_s->server_config_filename = (argv[2] ? argv[2] : "server.conf");
+    if (cache_config_files(argc,argv))
+    {
+        gossip_err("Failed to read config files.  "
+                   "Please make sure they exist and are valid!\n");
+        return 1;
+    }
+    assert(config_s->fs_config_buflen && config_s->fs_config_buf);
+    assert(config_s->server_config_buflen && config_s->server_config_buf);
 
     /* first read in the fs.conf defaults config file */
     config_s->configuration_context = GLOBAL_CONFIG;
@@ -503,9 +517,30 @@ void PINT_server_config_release(struct server_configuration_s *config_s)
         {
             free(config_s->host_id);
         }
+
         if (config_s->storage_path)
         {
             free(config_s->storage_path);
+        }
+
+        if (config_s->fs_config_filename)
+        {
+            free(config_s->fs_config_filename);
+        }
+
+        if (config_s->server_config_filename)
+        {
+            free(config_s->server_config_filename);
+        }
+
+        if (config_s->fs_config_buf)
+        {
+            free(config_s->fs_config_buf);
+        }
+
+        if (config_s->server_config_buf)
+        {
+            free(config_s->server_config_buf);
         }
 
         /* free all host alias objects */
@@ -514,7 +549,6 @@ void PINT_server_config_release(struct server_configuration_s *config_s)
         /* free all filesystem objects */
         llist_free(config_s->file_systems,free_filesystem);
     }
-    return;
 }
 
 static int is_valid_alias(char *str)
@@ -757,6 +791,132 @@ char *PINT_server_config_get_handle_range_str(struct server_configuration_s *con
     return ret;
 }
 
+/*
+  verify that both config files exist.  if so, cache them in RAM so
+  that getconfig will not have to re-read the file contents each time.
+  returns 0 on success; 1 on failure.
+
+  even if this call fails half way into it, a PINT_server_config_release
+  call should properly de-alloc all consumed memory.
+*/
+static int cache_config_files(int argc, char **argv)
+{
+    int fd = 0, nread = 0;
+    struct stat statbuf;
+    char *working_dir = (char *)0;
+    char *fs_config_filename = (char *)0;
+    char *server_config_filename = (char *)0;
+    char buf[512] = {0};
+
+    assert(config_s);
+
+    working_dir = getenv("PWD");
+    fs_config_filename = (argv[1] ? argv[1] : "fs.conf");
+    server_config_filename = (argv[2] ? argv[2] : "server.conf");
+
+    memset(&statbuf,0,sizeof(struct stat));
+    if (stat(fs_config_filename,&statbuf) == 0)
+    {
+        config_s->fs_config_filename = strdup(fs_config_filename);
+        config_s->fs_config_buflen = statbuf.st_size;
+    }
+    else
+    {
+        assert(working_dir);
+        snprintf(buf,512,"%s/%s",working_dir,fs_config_filename);
+        memset(&statbuf,0,sizeof(struct stat));
+        if (stat(buf,&statbuf) == 0)
+        {
+            config_s->fs_config_filename = strdup(buf);
+            config_s->fs_config_buflen = statbuf.st_size;
+        }
+    }
+
+    if (!config_s->fs_config_filename ||
+        (config_s->fs_config_buflen == 0))
+    {
+        gossip_err("Failed to stat fs config file.  (0 file size?)\n");
+        return 1;
+    }
+
+    memset(&statbuf,0,sizeof(struct stat));
+    if (stat(server_config_filename,&statbuf) == 0)
+    {
+        config_s->server_config_filename = strdup(server_config_filename);
+        config_s->server_config_buflen = statbuf.st_size;
+    }
+    else
+    {
+        assert(working_dir);
+        snprintf(buf,512,"%s/%s",working_dir,server_config_filename);
+        memset(&statbuf,0,sizeof(struct stat));
+        if (stat(buf,&statbuf) == 0)
+        {
+            config_s->server_config_filename = strdup(buf);
+            config_s->server_config_buflen = statbuf.st_size;
+        }
+    }
+
+    if (!config_s->server_config_filename ||
+        (config_s->server_config_buflen == 0))
+    {
+        gossip_err("Failed to stat server config file.  (0 file size?)\n");
+        return 1;
+    }
+
+    if ((fd = open(fs_config_filename,O_RDONLY)) == -1)
+    {
+        gossip_err("Failed to open fs config file %s.\n",
+                   fs_config_filename);
+        return 1;
+    }
+
+    config_s->fs_config_buf = (char *)malloc(config_s->fs_config_buflen);
+    if (!config_s->fs_config_buf)
+    {
+        gossip_err("Failed to allocate %d bytes for caching the fs "
+                   "config file\n",config_s->fs_config_buflen);
+        return 1;
+    }
+
+    nread = read(fd,config_s->fs_config_buf,config_s->fs_config_buflen);
+    if (nread != config_s->fs_config_buflen)
+    {
+        gossip_err("Failed to read fs config file %s (nread is %d)\n",
+                   fs_config_filename,nread);
+        close(fd);
+        return 1;
+    }
+    close(fd);
+
+    if ((fd = open(server_config_filename,O_RDONLY)) == -1)
+    {
+        gossip_err("Failed to open fs config file %s.\n",
+                   fs_config_filename);
+        return 1;
+    }
+
+    config_s->server_config_buf = (char *)
+        malloc(config_s->server_config_buflen);
+    if (!config_s->server_config_buf)
+    {
+        gossip_err("Failed to allocate %d bytes for caching the server "
+                   "config file\n",config_s->server_config_buflen);
+        return 1;
+    }
+
+    nread = read(fd,config_s->server_config_buf,
+                 config_s->server_config_buflen);
+    if (nread != config_s->server_config_buflen)
+    {
+        gossip_err("Failed to read server config file %s (nread is %d)\n",
+                   server_config_filename,nread);
+        close(fd);
+        return 1;
+    }
+    close(fd);
+    return 0;
+}
 
 /*
   vim:set ts=4:

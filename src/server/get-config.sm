@@ -102,10 +102,7 @@ void getconfig_init_state_machine(void)
 
 static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
 {
-    int fd = 0, nread = 0;
     int job_post_ret = 1;
-    char *meta_server, *data_server;
-    struct stat statbuf;
     struct llist *cur = NULL;
     struct server_configuration_s *user_opts;
     struct filesystem_configuration_s *cur_fs;
@@ -137,41 +134,15 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
         return 1;
     }
 
-    /*
-      FIXME:
-      if we're sure we're going to send back a whole file,
-      maybe there's a better more reliable way to do this
-    */
-    if (stat(user_opts->fs_config_filename,&statbuf) == -1)
-    {
-        ret->error_code = -98;
-        return 1;
-    }
-
     s_op->resp->u.getconfig.fs_id = cur_fs->coll_id;
-    s_op->resp->u.getconfig.config_buflen = (PVFS_count32)statbuf.st_size;
-    s_op->resp->u.getconfig.config_buf = (PVFS_string)malloc((int)statbuf.st_size);
-
-    if (!s_op->resp->u.getconfig.config_buf)
-    {
-        ret->error_code = -97;
-        return 1;
-    }
-
-    if ((fd = open(user_opts->fs_config_filename,O_RDONLY)) == -1)
-    {
-        ret->error_code = -96;
-        return 1;
-    }
-
-    nread = read(fd,s_op->resp->u.getconfig.config_buf,statbuf.st_size);
-    if (nread != statbuf.st_size)
-    {
-        close(fd);
-        ret->error_code = -95;
-        return 1;
-    }
-    close(fd);
+    s_op->resp->u.getconfig.fs_config_buflen =
+        (PVFS_count32)user_opts->fs_config_buflen;
+    s_op->resp->u.getconfig.fs_config_buf =
+        (PVFS_string)user_opts->fs_config_buf;
+    s_op->resp->u.getconfig.server_config_buflen =
+        (PVFS_count32)user_opts->server_config_buflen;
+    s_op->resp->u.getconfig.server_config_buf =
+        (PVFS_string)user_opts->server_config_buf;
 
     /* Set up the key/val pair for trove to get root handle */
     s_op->key.buffer = Trove_Common_Keys[ROOT_HANDLE_KEY].key;
@@ -308,10 +279,6 @@ static int getconfig_cleanup(PINT_server_op *s_op, job_status_s *ret)
 
     if (s_op->resp)
     {
-        if (s_op->resp->u.getconfig.config_buf)
-        {
-            free(s_op->resp->u.getconfig.config_buf);
-        }
 	free(s_op->resp);
     }
 

@@ -151,20 +151,24 @@ int do_encode_resp(
 	    /* assert on all strings (at least for now) */
 	    if(response->status == 0)
 	    {
-                assert(response->u.getconfig.config_buf != NULL);
+                assert(response->u.getconfig.fs_config_buf != NULL);
+                assert(response->u.getconfig.server_config_buf != NULL);
 
-		target_msg->size_list   = malloc(2*sizeof(PVFS_size));
-		target_msg->buffer_list = malloc(2*sizeof(void *));
-		target_msg->list_count  = 2;
+		target_msg->size_list   = malloc(3*sizeof(PVFS_size));
+		target_msg->buffer_list = malloc(3*sizeof(void *));
+		target_msg->list_count  = 3;
 		target_msg->buffer_flag = BMI_EXT_ALLOC;
 
 		target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s);
-		target_msg->size_list[1] = response->u.getconfig.config_buflen;
+		target_msg->size_list[1] = response->u.getconfig.fs_config_buflen;
+		target_msg->size_list[2] = response->u.getconfig.server_config_buflen;
 		target_msg->total_size = target_msg->size_list[0] +
-                    response->u.getconfig.config_buflen;
+                    response->u.getconfig.fs_config_buflen +
+                    response->u.getconfig.server_config_buflen;
 
 		target_msg->buffer_list[0] = response;
-		target_msg->buffer_list[1] = response->u.getconfig.config_buf;
+		target_msg->buffer_list[1] = response->u.getconfig.fs_config_buf;
+		target_msg->buffer_list[2] = response->u.getconfig.server_config_buf;
 	    }
 	    else
 	    {

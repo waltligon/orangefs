@@ -176,8 +176,10 @@ void display_pvfs_structure(void *s,int r)
 				printf("Get Config Resp\n");
 				printf("File system id: %d\n",p->u.getconfig.fs_id);
 				printf("Root Handle: %Ld\n",p->u.getconfig.root_handle);
-				printf("Config buffer length: %Ld\n",p->u.getconfig.config_buflen);
-				printf("Config buffer: %s\n",p->u.getconfig.config_buf);
+				printf("FS Config buffer length: %Ld\n",p->u.getconfig.fs_config_buflen);
+				printf("FS Config buffer: %s\n",p->u.getconfig.fs_config_buf);
+				printf("SERVER Config buffer length: %Ld\n",p->u.getconfig.server_config_buflen);
+				printf("SERVER Config buffer: %s\n",p->u.getconfig.server_config_buf);
 				break;
 			case PVFS_SERV_READDIR:
 				printf("Read dir\n");

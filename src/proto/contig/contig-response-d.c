@@ -32,8 +32,11 @@ DECODE_RESP_HEAD(do_decode_resp)
 	{
 
 		case PVFS_SERV_GETCONFIG:
-                    ((struct PVFS_server_resp_s *)target_msg->buffer)->u.getconfig.config_buf
+                    ((struct PVFS_server_resp_s *)target_msg->buffer)->u.getconfig.fs_config_buf
                         = (char *)(target_msg->buffer + sizeof(struct PVFS_server_resp_s));
+                    ((struct PVFS_server_resp_s *)target_msg->buffer)->u.getconfig.server_config_buf
+                        = (char *)(target_msg->buffer + sizeof(struct PVFS_server_resp_s) +
+                            response->u.getconfig.fs_config_buflen);
                     return 0;
 		case PVFS_SERV_LOOKUP_PATH:
 			((struct PVFS_server_resp_s *)target_msg->buffer)->u.lookup_path.handle_array = 
