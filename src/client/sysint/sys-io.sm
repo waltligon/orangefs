@@ -111,7 +111,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
 		PVFS_Request          file_req,
 		PVFS_offset           file_req_offset,
 		void                 *buffer,
-		PVFS_size             buffer_size,
+		PVFS_Request          mem_req,
 		PVFS_credentials      credentials,
 		PVFS_sysresp_io      *resp_p,
 		enum PVFS_io_type     io_type)
@@ -141,7 +141,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     sm_p->u.io.file_req        = file_req;
     sm_p->u.io.file_req_offset = file_req_offset;
     sm_p->u.io.io_resp_p     = resp_p;
-    sm_p->u.io.buffer_size   = buffer_size;
+    sm_p->u.io.mem_req       = mem_req;
 
     /* TODO: this is a hack for now; I think that I am
      * doing something wrong...
@@ -467,6 +467,10 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 	}
 	assert(orig_index < iosm_p->datafile_count); /* sanity check */
 
+	/* TODO: enable this when we are ready to actually use the memory 
+	 * datatype code
+	 */
+#if 0
 	/* fill in I/O request */
 	PINT_SERVREQ_IO_FILL(msg_p->req,
 			     *sm_p->cred_p,
@@ -478,7 +482,23 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 			     target_datafile_count,
 			     iosm_p->dist_p,
 			     iosm_p->file_req,
-			     iosm_p->file_req_offset);
+			     iosm_p->file_req_offset,
+			     PINT_REQUEST_TOTAL_BYTES(iosm_p->mem_req));
+#else
+	/* fill in I/O request */
+	PINT_SERVREQ_IO_FILL(msg_p->req,
+			     *sm_p->cred_p,
+			     iosm_p->object_ref.fs_id,
+			     target_datafile_array[i],
+			     iosm_p->io_type,
+			     FLOWPROTO_ANY,
+			     orig_index,
+			     target_datafile_count,
+			     iosm_p->dist_p,
+			     iosm_p->file_req,
+			     iosm_p->file_req_offset,
+			     -1);
+#endif
 
 	/* fill in msgpair structure components */
 	msg_p->fs_id   = iosm_p->object_ref.fs_id;
@@ -780,6 +800,8 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    /* this is the file datatype */
 	    fl_p->file_req        = iosm_p->file_req;
 	    fl_p->file_req_offset = iosm_p->file_req_offset;
+	    /* memory datatype */
+	    fl_p->mem_req         = iosm_p->mem_req;
 
 	    gossip_debug(CLIENT_DEBUG,
 			 "    bstream_size = %Ld, datafile_nr = %d, datafile_ct = %d, file_req_off = %Ld\n",
@@ -787,9 +809,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 			 fl_p->file_data.iod_num,
 			 fl_p->file_data.iod_count,
 			 fl_p->file_req_offset);
-
-	    /* this is the memory datatype */
-	    fl_p->mem_req = NULL;
 
 	    /* session tag, same as the one used in the send/recv */
 	    fl_p->tag = iosm_p->session_tag_array[recv_match];
@@ -825,7 +844,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 		fl_p->src.u.bmi.address = msg_p->svr_addr;
 		fl_p->dest.endpoint_id  = MEM_ENDPOINT;
 		fl_p->dest.u.mem.buffer = iosm_p->buffer;
-		fl_p->dest.u.mem.size   = iosm_p->buffer_size;
 	    }
 	    else {
 		assert (iosm_p->io_type == PVFS_IO_WRITE); /* sanity check */
@@ -834,7 +852,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 		fl_p->file_data.extend_flag = 1;
 		fl_p->src.endpoint_id    = MEM_ENDPOINT;
 		fl_p->src.u.mem.buffer   = iosm_p->buffer;
-		fl_p->src.u.mem.size     = iosm_p->buffer_size;
 		fl_p->dest.endpoint_id   = BMI_ENDPOINT;
 		fl_p->dest.u.bmi.address = msg_p->svr_addr;
 

@@ -114,7 +114,7 @@ struct PINT_client_io_sm {
     PVFS_Request          file_req;
     PVFS_offset           file_req_offset;
     void                 *buffer;
-    PVFS_size             buffer_size;
+    PVFS_Request          mem_req;
 
     /* cached from object attributes */
     int                   datafile_count;

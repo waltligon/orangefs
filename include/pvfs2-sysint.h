@@ -342,7 +342,7 @@ int PVFS_sys_io(
     PVFS_Request file_req, 
     PVFS_offset file_req_offset,
     void* buffer,
-    PVFS_size buffer_size,
+    PVFS_Request mem_req,
     PVFS_credentials credentials, 
     PVFS_sysresp_io *resp,
     enum PVFS_io_type type);

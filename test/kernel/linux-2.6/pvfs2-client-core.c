@@ -170,9 +170,10 @@ static int service_io_request(
                                    PVFS_BYTE, &io_req);
 	assert(ret == 0);
 
+	/* TODO: use memory datatype when ready */
 	ret = PVFS_sys_io(
             in_upcall->req.io.refn, io_req, 0, 
-	    in_upcall->req.io.buf, in_upcall->req.io.count,
+	    in_upcall->req.io.buf, NULL,
             in_upcall->credentials, &response, in_upcall->req.io.io_type);
 	if(ret < 0)
 	{

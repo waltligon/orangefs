@@ -34,6 +34,7 @@ int main(int argc,char **argv)
 	PVFS_sys_attr attr;
 	PVFS_pinode_reference pinode_refn;
 	PVFS_Request file_req;
+	PVFS_Request mem_req;
 	void* buffer;
 	int buffer_size;
 
@@ -164,6 +165,9 @@ int main(int argc,char **argv)
 	buffer = io_buffer;
 	buffer_size = io_size*sizeof(int);
 
+	/* TODO: use something simpler for the file datatype once 
+	 * the file datatype is implicitly tiled
+	 */
 	ret = PVFS_Request_contiguous(io_size*sizeof(int), PVFS_BYTE, &(file_req));
 	if(ret < 0)
 	{
@@ -171,8 +175,23 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 
-	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, buffer_size, 
+	ret = PVFS_Request_contiguous(io_size*sizeof(int), PVFS_BYTE, &(mem_req));
+	if(ret < 0)
+	{
+		fprintf(stderr, "Error: PVFS_Request_contiguous() failure.\n");
+		return(-1);
+	}
+
+	/* TODO: enable this when we are ready to actually use the 
+	 * memory datatype
+	 */
+#if 0
+	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, mem_req, 
 				credentials, &resp_io);
+#else
+	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, NULL, 
+				credentials, &resp_io);
+#endif
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_sys_write() failure.\n");
@@ -188,8 +207,15 @@ int main(int argc,char **argv)
 	/* verify */
 	printf("IO-TEST: performing read on handle: %ld, fs: %d\n",
 		(long)pinode_refn.handle, (int)pinode_refn.fs_id);
-	ret = PVFS_sys_read(pinode_refn, file_req, 0, buffer, buffer_size, 
+
+	/* TODO: enable once memory datatype code is ready */
+#if 0
+	ret = PVFS_sys_read(pinode_refn, file_req, 0, buffer, mem_req, 
 				credentials, &resp_io);
+#else
+	ret = PVFS_sys_read(pinode_refn, file_req, 0, buffer, NULL, 
+				credentials, &resp_io);
+#endif
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_sys_read() failure.\n");

@@ -294,6 +294,7 @@ void PINT_flow_reset(flow_descriptor * flow_d)
     memset(flow_d, 0, sizeof(struct flow_descriptor));
 
     flow_d->flowproto_id = -1;
+    flow_d->aggregate_size = -1;
     flow_d->state = FLOW_INITIAL;
     flow_d->type = FLOWPROTO_ANY;
     INIT_QLIST_HEAD(&(flow_d->sched_queue_link));
@@ -397,6 +398,14 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
     int i;
     int type = flow_d->type;
 
+    /* TODO: enable this when we are ready to use the memory datatypes */
+#if 0
+    /* sanity check; if the caller doesn't provide a memory datatype,
+     * then the must at least indicate the aggregate size to transfer
+     */
+    assert(flow_d->aggregate_size > -1 || flow_d->mem_req != 0);
+#endif
+
     gen_mutex_lock(&interface_mutex);
 
     /* NOTE: if an error occurs here, then we will normally just return
@@ -440,24 +449,24 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
 
     /* setup the request processing states */
     flow_d->file_req_state = PINT_New_request_state(flow_d->file_req);
-#if 0
-    flow_d->mem_req_state = PINT_New_request_state(flow_d->mem_req);
-    if (!flow_d->file_req_state || !flow_d->mem_req_state)
-    {
-	flow_release(flow_d);
-	gen_mutex_unlock(&interface_mutex);
-	return (-EINVAL);
-    }
-#else
-    flow_d->mem_req_state = NULL;
     if (!flow_d->file_req_state)
     {
 	flow_release(flow_d);
 	gen_mutex_unlock(&interface_mutex);
 	return (-EINVAL);
     }
-#endif
 
+    /* only setup a memory datatype state if caller provided a memory datatype */
+    if(flow_d->mem_req)
+    {
+	flow_d->mem_req_state = PINT_New_request_state(flow_d->mem_req);
+	if (!flow_d->mem_req_state)
+	{
+	    flow_release(flow_d);
+	    gen_mutex_unlock(&interface_mutex);
+	    return (-EINVAL);
+	}
+    }
 
     /* announce the flow */
     ret = active_flowproto_table[flowproto_id]->flowproto_announce_flow(flow_d);

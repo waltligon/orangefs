@@ -196,7 +196,8 @@ int main(int argc, char **argv)
 	}
 
 	/* write out the data */
-	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, buffer_size, 
+	/* TODO: use memory datatype when ready */
+	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, NULL, 
 			    credentials, &resp_io);
 	if(ret < 0)
 	{

@@ -363,22 +363,24 @@ struct PVFS_servreq_io
     PVFS_handle handle;		    /* target datafile */
     PVFS_fs_id fs_id;		    /* file system */
     /* type of I/O operation to perform */
-    enum PVFS_io_type io_type; /* enum defined in pvfs2-sysint.h */
+    enum PVFS_io_type io_type; /* enum defined in pvfs2-types.h */
 
     /* type of flow protocol to use for I/O transfer */
     enum PVFS_flowproto_type flow_type;
 
     /* relative number of this I/O server in distribution */
     uint32_t iod_num;
-
     /* total number of I/O servers involved in distribution */
     uint32_t iod_count;
+
     /* distribution */
     PVFS_Dist *io_dist;
-    /* I/O request description (file datatype) */
+    /* file datatype */
     PVFS_Request file_req;
-    /* I/O request offset (into file datatype) */
+    /* offset into file datatype */
     PVFS_offset file_req_offset;
+    /* aggregate size of data to transfer */
+    PVFS_size aggregate_size;
 };
 
 #define PINT_SERVREQ_IO_FILL(__req,		\
@@ -390,8 +392,9 @@ struct PVFS_servreq_io
 			     __datafile_nr,	\
 			     __datafile_ct,	\
 			     __io_dist,		\
-			     __file_req,		\
-			     __file_req_off)	\
+			     __file_req,	\
+			     __file_req_off,	\
+			     __aggregate_size)  \
 do {						\
     memset(&(__req), 0, sizeof(__req));		\
     (__req).op                 = PVFS_SERV_IO;	\
@@ -405,6 +408,7 @@ do {						\
     (__req).u.io.io_dist       = (__io_dist);	\
     (__req).u.io.file_req        = (__file_req);	\
     (__req).u.io.file_req_offset = (__file_req_off);	\
+    (__req).u.io.aggregate_size  = (__aggregate_size);	\
 } while (0)			     
 
 struct PVFS_servresp_io

@@ -1028,24 +1028,6 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
      * of what the trove half is doing 
      */
     flow_data->dup_file_req_state = PINT_New_request_state(flow_d->file_req);
-#if 0
-    flow_data->dup_mem_req_state = PINT_New_request_state(flow_d->mem_req);
-    if (!flow_data->dup_file_req_state || !flow_data->dup_mem_req_state)
-    {
-	BMI_memfree(flow_d->src.u.bmi.address,
-		    flow_data->fill_buffer, flow_data->max_buffer_size,
-		    BMI_RECV);
-	BMI_memfree(flow_d->src.u.bmi.address,
-		    flow_data->drain_buffer, flow_data->max_buffer_size,
-		    BMI_RECV);
-	if(flow_data->dup_file_req_state)
-	    PINT_Free_request_state(flow_data->dup_file_req_state);
-	if(flow_data->dup_mem_req_state)
-	    PINT_Free_request_state(flow_data->dup_mem_req_state);
-	return (-ENOMEM);
-    }
-#else
-    flow_data->dup_mem_req_state = NULL;
     if (!flow_data->dup_file_req_state)
     {
 	BMI_memfree(flow_d->src.u.bmi.address,
@@ -1056,7 +1038,22 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 		    BMI_RECV);
 	return (-ENOMEM);
     }
-#endif
+
+    if(flow_d->mem_req)
+    {
+	flow_data->dup_mem_req_state = PINT_New_request_state(flow_d->mem_req);
+	if (!flow_data->dup_mem_req_state)
+	{
+	    BMI_memfree(flow_d->src.u.bmi.address,
+			flow_data->fill_buffer, flow_data->max_buffer_size,
+			BMI_RECV);
+	    BMI_memfree(flow_d->src.u.bmi.address,
+			flow_data->drain_buffer, flow_data->max_buffer_size,
+			BMI_RECV);
+	    PINT_Free_request_state(flow_data->dup_file_req_state);
+	    return (-ENOMEM);
+	}
+    }
 
     /* if a file datatype offset was specified, go ahead and skip ahead 
      * before doing anything else
@@ -1065,6 +1062,30 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
     {
 	PINT_REQUEST_STATE_SET_TARGET(flow_data->dup_file_req_state, 
 	    flow_d->file_req_offset);
+
+	/* TODO: integrate this when we are ready to actually use the 
+	 * memory datatypes
+	 */
+#if 0
+	/* if no memory datatype was given, then we must use the aggregate
+	 * size field to set a boundary on the file datatype 
+	 */
+	if(!flow_d->mem_req)
+	{
+	    assert(flow_d->aggregate_size > -1); /* sanity check */
+	    PINT_REQUEST_STATE_SET_FINAL(flow_data->dup_file_req_state,
+		(flow_d->file_req_offset + flow_d->aggregate_size));
+	}
+	else
+	{
+	    /* we still set a boundary on the file datatype for convenience,
+	     * so that we can check its state to know when to stop
+	     */
+	    PINT_REQUEST_STATE_SET_FINAL(flow_data->dup_file_req_state,
+		(PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req) + 
+		flow_d->file_req_offset));
+	}
+#endif
     }
 
     return (0);
@@ -1223,6 +1244,30 @@ static int alloc_flow_data(flow_descriptor * flow_d)
     if(flow_d->file_req_offset)
 	PINT_REQUEST_STATE_SET_TARGET(flow_d->file_req_state,
 	    flow_d->file_req_offset);
+
+    /* TODO: enable this code when we are ready to actually use the memory
+     * datatypes 
+     */
+#if 0
+    /* if no memory datatype was given, then we must use the aggregate
+     * size field to set a boundary on the file datatype 
+     */
+    if(!flow_d->mem_req)
+    {
+	assert(flow_d->aggregate_size > -1); /* sanity check */
+	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
+	    (flow_d->file_req_offset + flow_d->aggregate_size));
+    }
+    else
+    {
+	/* we still set a boundary on the file datatype for convenience,
+	 * so that we can check its state to know when to stop
+	 */
+	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
+	    (PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req) + 
+	    flow_d->file_req_offset));
+    }
+#endif
     
     /* the rest of the buffer setup varies depending on the endpoints */
     if (flow_d->src.endpoint_id == BMI_ENDPOINT &&
@@ -1487,7 +1532,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	    flow_d->result.bytes = 0;
 	    flow_d->result.segs = 0;
 	    ret  = PINT_Process_request(flow_data->dup_file_req_state, 
-		flow_d->mem_req_state,
+		flow_data->dup_mem_req_state,
 		&flow_d->file_data, &flow_d->result, PINT_CKSIZE_MODIFY_OFFSET);
 	    flow_data->bmi_total_size = flow_d->result.bytes;
 	    if (ret < 0)
@@ -1935,20 +1980,9 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
      * - zero byte messages
      */
 
-    /* TODO: think about this some more.  This isn't the right test (even if
-     * we want to detect this case), because it breaks when we are using an 
-     * intermediate buffer.
+    /* TODO: handle case of receiving less data than we expected (or 
+     * at least assert on it)
      */
-#if 0
-    /* see if the flow is being aborted */
-    if (actual_size != flow_data->bmi_total_size)
-    {
-	/* TODO: handle this */
-	gossip_lerr("Error: unimplemented condition encountered.\n");
-	exit(-1);
-	return;
-    }
-#endif
 
     flow_d->total_transfered += actual_size;
     gossip_ldebug(FLOW_PROTO_DEBUG, "Total completed (bmi to mem): %ld\n",
@@ -2035,25 +2069,11 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 	}
     }
     else
-    {
-	/* no intermediate buffer */
-	/* if we got a short message, then we have to rewind the
-	 * request processing stream
-	 */
-	/* TODO: fix this; we should probably treat it as a managable error.
-	 * For now it is just an assertion; we don't want to have to rewind 
-	 * the stream as is done in the #if 0'd code
+    {   /* no intermediate buffer */
+	/* TODO: fix this; we need to do something reasonable if we
+	 * receive less data than we expected
 	 */
 	assert(actual_size == flow_data->bmi_total_size);
-#if 0
-	if (actual_size < flow_data->bmi_total_size)
-	{
-	    if (flow_d->current_req_offset != -1)
-	    {
-		flow_d->current_req_offset = (flow_d->total_transfered);
-	    }
-	}
-#endif
     }
 
     /* did this complete the flow? */
@@ -2244,9 +2264,8 @@ static void buffer_teardown_bmi_to_trove(flow_descriptor * flow_d)
     BMI_memfree(flow_d->src.u.bmi.address, flow_data->drain_buffer,
 		flow_data->max_buffer_size, BMI_RECV);
     PINT_Free_request_state(flow_data->dup_file_req_state);
-#if 0
-    PINT_Free_request_state(flow_data->dup_mem_req_state);
-#endif
+    if(flow_data->dup_mem_req_state)
+	PINT_Free_request_state(flow_data->dup_mem_req_state);
     return;
 }
 

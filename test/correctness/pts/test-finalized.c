@@ -374,8 +374,9 @@ static int test_read(void)
 		     "on %s\n", filename);
     }
 
+    /* TODO: use memory datatype when ready */
     ret =
-	PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, 100, credentials,
+	PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL, credentials,
 		      &resp_io);
     return ret;
 }
@@ -420,8 +421,9 @@ static int test_write(void)
 		     "on %s\n", filename);
     }
 
+    /* TODO: use memory datatype when ready */
     ret =
-	PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, 100, credentials,
+	PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL, credentials,
 		       &resp_io);
     return ret;
 }

@@ -49,8 +49,9 @@ struct trove_endpoint_data
 struct mem_endpoint_data
 {
     void *buffer;
-    PVFS_size size;
-    int prealloc_flag;
+    /* NOTE: there is no buffer size here; that is determined by
+     * the memory datatype or the aggregate_size field
+     */
 };
 
 struct flow_endpoint
@@ -97,6 +98,13 @@ struct flow_descriptor
     PINT_Request *file_req;
     PVFS_offset file_req_offset;
     PINT_Request *mem_req;
+    /* NOTE: aggregate_size is _optional_; it can be used to limit the 
+     * amount of data transferred through a flow in the absence of a 
+     * memory datatype (most commonly done by the pvfs2-server)
+     */
+    PVFS_size aggregate_size;
+
+    /* information about the datafile that this flow will access */
     PINT_Request_file_data file_data;
 
 	/***********************************************************/

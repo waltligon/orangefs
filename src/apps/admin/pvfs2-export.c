@@ -185,8 +185,9 @@ int main(int argc, char **argv)
     }
 
     time1 = Wtime();
+    /* TODO: use memory datatype when ready */
     while((ret = PVFS_sys_read(pinode_refn, file_req, 0,
-                buffer, buffer_size, credentials, &resp_io)) == 0 &&
+                buffer, NULL, credentials, &resp_io)) == 0 &&
 	resp_io.total_completed > 0)
     {
 	current_size = resp_io.total_completed;

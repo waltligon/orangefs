@@ -467,7 +467,6 @@ int main(int argc, char **argv)	{
 	/* the following section assumes we are doing a write */
 	flow_d->file_data.extend_flag = 1;
 	flow_d->src.endpoint_id = MEM_ENDPOINT;
-	flow_d->src.u.mem.size = io_size;
 	flow_d->src.u.mem.buffer = memory_buffer;
 	flow_d->dest.endpoint_id = BMI_ENDPOINT;
 	flow_d->dest.u.bmi.address = server_addr;
