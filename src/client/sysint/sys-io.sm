@@ -1828,8 +1828,7 @@ static inline int check_context_status(
     return ret;
 }
 
-static inline int check_for_zero_fill_on_read(
-    PINT_client_sm *sm_p)
+static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
 {
     int i = 0, val = 0;
     PINT_Request_state *mrs = NULL, *frs = NULL;
@@ -1837,6 +1836,8 @@ static inline int check_for_zero_fill_on_read(
     PINT_Request_file_data *file_data = NULL;
     int64_t offset_array[16] = {0}, size_array[16] = {0};
     PVFS_size total_ctx_size = 0;
+
+    assert(sm_p->u.io.io_type == PVFS_IO_READ);
 
     mrs = PINT_New_request_state(sm_p->u.io.mem_req);
     frs = PINT_New_request_state(sm_p->u.io.file_req);
@@ -1945,6 +1946,14 @@ static inline int check_for_zero_fill_on_read(
                 zero_fill_size = sm_p->u.io.size -
                     cur_ctx->flow_desc.file_req_offset;
             }
+            else if (total_ctx_size !=
+                     cur_ctx->flow_desc.total_transfered)
+            {
+                goto check_for_trailing_hole;
+            }
+            gossip_debug(GOSSIP_IO_DEBUG, "zero_fill_size is %Ld | "
+                         "sm_p->u.io.size is %Ld\n", zero_fill_size,
+                         sm_p->u.io.size);
 
             if (zero_fill_size > -1)
             {
@@ -1961,8 +1970,9 @@ static inline int check_for_zero_fill_on_read(
                 break;
             }
         }
-        else
+        else if (total_ctx_size != cur_ctx->flow_desc.total_transfered)
         {
+          check_for_trailing_hole:
             /*
               if there is a trailing file hole (i.e. a hole after
               valid data until EOF), handle that case here by zero
