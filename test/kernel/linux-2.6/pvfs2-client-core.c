@@ -44,7 +44,7 @@
   may be some inconsistencies, but this will be cleaned
   up as the system interface is changed in time.
 */
-#define PCACHE_TIMEOUT_MS 6000000
+#define PCACHE_TIMEOUT_MS 1 /*6000000*/
 
 static int service_lookup_request(
     PVFS_sysresp_init *init_response,
@@ -568,7 +568,7 @@ static int service_rename_request(
 
             /* we need to send a blank error response */
             out_downcall->type = PVFS2_VFS_OP_RENAME;
-            out_downcall->status = -1;
+            out_downcall->status = ret;
         }
         else
         {
@@ -627,12 +627,13 @@ static int service_statfs_request(
                 (resp_statfs.statfs_buf.bytes_available /
                  out_downcall->resp.statfs.block_size);
             /*
-              FIXME:
-              files_total should be the number of used handles and
-              files_avail should be the number of available handles
+              these values really represent handle/inode counts
+              rather than an accurate number of files
             */
-            out_downcall->resp.statfs.files_total = 100;
-            out_downcall->resp.statfs.files_avail = 100;
+            out_downcall->resp.statfs.files_total =
+                resp_statfs.statfs_buf.handles_total_count;
+            out_downcall->resp.statfs.files_avail =
+                resp_statfs.statfs_buf.handles_available_count;
 
             ret = 0;
         }
