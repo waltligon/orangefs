@@ -51,27 +51,46 @@ We will discuss how Trove is used to store these objects in the upcoming
 sections.  Additionally we will cover how PVFS2 bootstraps from the Trove
 perspective; that is, how it obtains a ``root handle'' and so on.
 
-\section{Current Implementation (03/17/2003)}
+\section{Current Implementation (03/21/2003)}
 
 This section describes the implementation as of the date above.  Eventually,
 when the implementation catches up with the long term plan, this entire
-section will disappear.
+section will probably disappear.
 
 \subsection{PVFS2 Objects}
 
-Directories are made up of two dataspaces.  The first one has the attributes
-in the keyval space and a pointer to a second dataspace (TODO: WHAT IS THE
-KEY?).  The second one holds the directory entries, with keys being short
-names of files in the directories and values of the corresponding handle
-(TODO: VERIFY!).
+At this time the type of an object is stored in at least one place, the
+dataspace attributes.  These can be retrieved using
+\texttt{job\_trove\_dspace\_getattr}.  Additionally, as we will see,
+directories and metafiles store metadata as keyvals.
 
-Metafiles are made up of a single dataspace.  All attributes (from the PVFS2
-perspective) are stored as keyvals (TODO: FLESH OUT DESCRIPTION).  A fixed
-size keyval is used for the fixed size data, while a second keyval is used for
-things that are of variable size (TODO: ENUMERATE LIST).
+Directories are of type \texttt{PVFS\_TYPE\_DIRECTORY}.  They are actually
+stored as two dataspaces in the current implementation.
+%
+The first dataspace is used solely to store the attributes of the directory
+(under the key \texttt{metadata}, as a \texttt{PVFS\_object\_attr} structure)
+and, if entries have been created, the handle of a second dataspace where the
+directory entries are stored (under the key \texttt{dir\_ent}, as a
+\texttt{PVFS\_handle} type).
+%
+The second dataspace is marked as type \texttt{PVFS\_TYPE\_DIRDATA} to
+differentiate it.  This one holds the directory entries, with keys being
+short names of files in the directory and values being the corresponding handle
+(stored as a \texttt{PVFS\_handle} type).  This dataspace is created lazily
+when the first entry is created (in the \texttt{crdirent} state machine).
 
-Datafiles are made up of a single Trove dataspace.  Currently there are no
-attributes stored for datafiles, and all data is stored in the bstream.
+Metafiles are made up of a single dataspace and are of type
+\texttt{PVFS\_TYPE\_METAFILE}.  Basic attributes
+are stored in a keyval under the key \texttt{metadata}, as a
+\texttt{PVFS\_object\_attr} structure, just as in the directory case.
+An additional keyval (\texttt{datafile\_handles}) stores the array of datafile
+handles as \texttt{PVFS\_handle} types.  A final keyval
+(\texttt{metafile\_dist}) stores the distribution information (in some
+arbitrary format at this time).
+
+Datafiles are made up of a single Trove dataspace of type
+\texttt{PVFS\_TYPE\_DATAFILE}.  Currently there are no attributes stored for
+datafiles, and all data is stored in the bstream.
 
 Symlinks are not currently implemented, but the intention is to use a keyval
 to hold the target of the link.
@@ -115,4 +134,5 @@ WHERE DO WE GET THE ROOT HANDLE?
 WHAT ELSE?
 
 \end{document}
+
 
