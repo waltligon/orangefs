@@ -461,7 +461,7 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
-	flow_d->request = my_req.u.io.io_req;
+	flow_d->io_req = my_req.u.io.io_req;
 	flow_d->file_data = &file_data;
 	flow_d->flags = 0;
 	flow_d->tag = 0;

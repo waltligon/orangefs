@@ -20,6 +20,7 @@
 #include <pint-bucket.h>
 #include <PINT-reqproto-encode.h>
 #include "pint-sysint.h"
+#include "pint-request.h"
 
 extern job_context_id PVFS_sys_job_context;
 
@@ -405,12 +406,9 @@ static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_req_offset,
 {
     struct PINT_Request_state* req_state = NULL;
     PINT_Request_file_data tmp_file_data;
-    int32_t segmax = 1;
-    PVFS_size bytemax = 1;
-    PVFS_offset offset = 0;
-    PVFS_boolean eof_flag = 0;
     int i = 0;
     int ret = -1;
+    PINT_Request_result tmp_result;
 
     *target_handle_count = 0;
 
@@ -435,32 +433,40 @@ static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_req_offset,
 	/* if a file datatype offset was specified, go ahead and skip ahead 
 	 * before calculating
 	 */
-	offset = 0;
-	if(offset)
+	if(io_req_offset)
 	{
-	    segmax = INT_MAX;
-	    bytemax = io_req_offset;
-	    eof_flag = 0;
+	    memset(&tmp_result, 0, sizeof(PINT_Request_result));
+	    tmp_result.bytemax = io_req_offset;
+	    tmp_result.segmax = INT_MAX;
+#if 0
 	    ret = PINT_Process_request(req_state, &tmp_file_data,
 		&segmax, NULL, NULL, &offset, &bytemax,
 		&eof_flag, PINT_CKSIZE_LOGICAL_SKIP);
+#endif
+	    ret = PINT_Process_request(req_state, NULL, &tmp_file_data,
+		&tmp_result, PINT_CKSIZE_LOGICAL_SKIP);
 	    if(ret < 0)
 	    {
 		PINT_Free_request_state(req_state);
 		return(ret);
 	    }
-	    if(offset == -1)
+	    if(PINT_REQUEST_STATE_OFFSET(req_state) == -1)
 	    {
+		/* no data here */
 		continue;
 	    }
 	}
 
-	bytemax = 1;
-	segmax = 1;
-	eof_flag = 0;
+	memset(&tmp_result, 0, sizeof(PINT_Request_result));
+	tmp_result.bytemax = 1;
+	tmp_result.segmax = 1;
+#if 0
 	ret = PINT_Process_request(req_state, &tmp_file_data,
 	    &segmax, NULL, NULL, &offset, &bytemax, &eof_flag,
 	    PINT_CKSIZE);
+#endif
+	ret = PINT_Process_request(req_state, NULL, &tmp_file_data,
+	    &tmp_result, PINT_CKSIZE);
 	if(ret < 0)
 	{
 	    PINT_Free_request_state(req_state);
@@ -468,7 +474,7 @@ static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_req_offset,
 	}
 
 	/* did we find that any data belongs to this handle? */
-	if(bytemax)
+	if(tmp_result.bytes)
 	{
 	    target_handle_array[*target_handle_count] =
 		pinode_ptr->attr.u.meta.dfile_array[i]; 
@@ -760,8 +766,9 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		flow_array[i]->file_data->iod_num = req_array[i].u.io.iod_num;
 		flow_array[i]->file_data->iod_count =
 		    attr_p->u.meta.dfile_count;
-		flow_array[i]->request = io_req;
-		flow_array[i]->request_offset = io_req_offset;
+		flow_array[i]->io_req = io_req;
+		flow_array[i]->io_req_offset = io_req_offset;
+		flow_array[i]->mem_req = NULL;
 		flow_array[i]->flags = 0;
 		flow_array[i]->tag = op_tag_array[i];
 		flow_array[i]->user_ptr = NULL;

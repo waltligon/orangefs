@@ -93,7 +93,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 
     /* Initialize flow */
     ret =
-	PINT_flow_initialize("flowproto_bmi_trove,flowproto_dump_offsets", 0);
+	PINT_flow_initialize("flowproto_bmi_trove", 0);
     if (ret < 0)
     {
 	init_fail = FLOW_INIT_FAIL;

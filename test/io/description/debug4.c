@@ -28,15 +28,10 @@ int main(int argc, char **argv)
 	PINT_Request_state *rs2;
 	PINT_Request_file_data rf1;
 	PINT_Request_file_data rf2;
+	PINT_Request_result seg1;
 
 	/* PVFS_Process_request arguments */
 	int retval;
-	int32_t segmax;
-	PVFS_offset *offset_array;
-	PVFS_size *size_array;
-	PVFS_offset offset;
-	PVFS_size bytemax;
-	PVFS_boolean eof_flag;
 
 	int32_t blocklength = 10*1024*1024; /* 10M */
 
@@ -67,81 +62,81 @@ int main(int argc, char **argv)
 	rf2.extend_flag = 0;
 	PINT_Dist_lookup(rf2.dist);
 
+	/* set up result struct */
+	seg1.offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
+	seg1.size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
+	seg1.bytemax = BYTEMAX;
+	seg1.segmax = SEGMAX;
+	seg1.eof_flag = 0;
+	seg1.bytes = 0;
+	seg1.segs = 0;
+
    /* Turn on debugging */
 	// gossip_enable_stderr(); 
 	// gossip_set_debug_mask(1,REQUEST_DEBUG); 
 
-	offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
-	size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
-	offset = 0;
-
 	printf("\n************************************\n");
 	do
 	{
-		eof_flag = 0;
-		segmax = SEGMAX;
-		bytemax = BYTEMAX;
+		seg1.eof_flag = 0;
+		seg1.bytes = 0;
+		seg1.segs = 0;
 
 		/* process request */
-		retval = PINT_Process_request(rs1, &rf1, &segmax,
-			offset_array, size_array, &offset, &bytemax, 
-			&eof_flag, PINT_SERVER);
+		retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
 
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request(PINT_SERVER):\n");
-			printf("total size: %d\n", (int)bytemax);
-			for(i=0; i<segmax; i++)
+			printf("total size: %d\n", (int)seg1.bytes);
+			for(i=0; i<seg1.segs; i++)
 			{
 				printf("  segment %d: offset: %d size: %d\n",
-					i, (int)offset_array[i], (int)size_array[i]);
+					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
 			}
 		}
 
-	} while(offset != -1 && retval >= 0);
+	} while(PINT_REQUEST_STATE_OFFSET(rs1) != -1 && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(offset == -1)
+	if(PINT_REQUEST_STATE_OFFSET(rs1) == -1)
 	{
 		printf("**** first request done.\n");
 	}
 
-	offset = 0;
 	printf("\n************************************\n");
 	do
 	{
-		eof_flag = 0;
-		segmax = SEGMAX;
-		bytemax = BYTEMAX;
+		seg1.eof_flag = 0;
+		seg1.bytes = 0;
+		seg1.segs = 0;
 
 		/* process request */
-		retval = PINT_Process_request(rs2, &rf2, &segmax,
-			offset_array, size_array, &offset, &bytemax, 
-			&eof_flag, PINT_CLIENT);
+		retval = PINT_Process_request(rs2, NULL, &rf2, &seg1, PINT_CLIENT);
 
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request(PINT_CLIENT):\n");
-			printf("total size: %d\n", (int)bytemax);
-			for(i=0; i<segmax; i++)
+			printf("total size: %d\n", (int)seg1.bytes);
+			for(i=0; i<seg1.segs; i++)
 			{
 				printf("  segment %d: offset: %d size: %d\n",
-					i, (int)offset_array[i], (int)size_array[i]);
+					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
 			}
 		}
 
-	} while(offset != -1 && retval >= 0);
+	} while(PINT_REQUEST_STATE_OFFSET(rs2) != -1 && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(offset == -1)
+	if(PINT_REQUEST_STATE_OFFSET(rs2) == -1)
 	{
 		printf("**** second request done.\n");
 	}

@@ -187,8 +187,8 @@ struct bmi_trove_flow_data
     /* extra request processing state information for the bmi receive
      * half of bmi->trove flows
      */
-    PINT_Request_state *dup_req_state;
-    PVFS_offset dup_req_offset;
+    PINT_Request_state *dup_io_req_state;
+    PINT_Request_state *dup_mem_req_state;
 };
 
 /****************************************************
@@ -729,12 +729,12 @@ static int buffer_setup_bmi_to_mem(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
     int ret = -1;
-    PVFS_boolean eof_flag = 0;
     int i = 0;
 
     /* set the buffer size to use for this flow */
     flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
 
+#if 0
     /* call req processing code to get first set of segments */
     flow_data->bmi_total_size = flow_data->max_buffer_size;
     flow_data->bmi_list_count = MAX_REGIONS;
@@ -748,12 +748,24 @@ static int buffer_setup_bmi_to_mem(flow_descriptor * flow_d)
 			       &flow_d->current_req_offset,
 			       &flow_data->bmi_total_size, &eof_flag,
 			       PINT_CLIENT);
+#endif
+    flow_d->result.offset_array = flow_data->bmi_offset_list;
+    flow_d->result.size_array = flow_data->bmi_size_list;
+    flow_d->result.bytemax = flow_data->max_buffer_size;
+    flow_d->result.segmax = MAX_REGIONS;
+    flow_d->result.eof_flag = 0;
+    flow_d->result.bytes = 0;
+    flow_d->result.segs = 0;
+    ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
+	flow_d->file_data, &flow_d->result, PINT_CLIENT);
     if (ret < 0)
     {
 	return (ret);
     }
+    flow_data->bmi_list_count = flow_d->result.segs;
+    flow_data->bmi_total_size = flow_d->result.bytes;
 
-    if (eof_flag && (flow_data->bmi_total_size == 0))
+    if (flow_d->result.eof_flag && (flow_data->bmi_total_size == 0))
     {
 	/* no work to do here, return 1 to complete the flow */
 	return (1);
@@ -762,7 +774,8 @@ static int buffer_setup_bmi_to_mem(flow_descriptor * flow_d)
     /* did we provide enough segments to satisfy the amount of data
      * available < buffer size? 
      */
-    if (!eof_flag && flow_d->current_req_offset != -1 &&
+    if (!flow_d->result.eof_flag && 
+	PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) != -1 &&
 	flow_data->bmi_total_size != flow_data->max_buffer_size)
     {
 	/* We aren't at the end, but we didn't get what we asked
@@ -821,7 +834,6 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
     int ret = -1;
-    PVFS_boolean eof_flag = 0;
     int i = 0;
     int intermediate_offset = 0;
     char *dest_ptr = NULL;
@@ -831,6 +843,7 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
     /* set the buffer size to use for this flow */
     flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
 
+#if 0
     /* call req processing code to get first set of segments */
     flow_data->bmi_total_size = flow_data->max_buffer_size;
     flow_data->bmi_list_count = MAX_REGIONS;
@@ -844,15 +857,28 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
 			       &flow_d->current_req_offset,
 			       &flow_data->bmi_total_size, &eof_flag,
 			       PINT_CLIENT);
+#endif
+    flow_d->result.offset_array = flow_data->bmi_offset_list;
+    flow_d->result.size_array = flow_data->bmi_size_list;
+    flow_d->result.bytemax = flow_data->max_buffer_size;
+    flow_d->result.segmax = MAX_REGIONS;
+    flow_d->result.eof_flag = 0;
+    flow_d->result.bytes = 0;
+    flow_d->result.segs = 0;
+    ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
+	flow_d->file_data, &flow_d->result, PINT_CLIENT);
     if (ret < 0)
     {
 	return (ret);
     }
+    flow_data->bmi_list_count = flow_d->result.segs;
+    flow_data->bmi_total_size = flow_d->result.bytes;
 
     /* did we provide enough segments to satisfy the amount of data
      * available < buffer size?
      */
-    if (!eof_flag && flow_d->current_req_offset != -1 &&
+    if (!flow_d->result.eof_flag && 
+	PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) != -1 &&
 	flow_data->bmi_total_size != flow_data->max_buffer_size)
     {
 	/* we aren't at the end, but we didn't get the amount of data that
@@ -895,25 +921,25 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
 		intermediate_offset += flow_data->bmi_size_list[i];
 	    }
 
-	    if (!eof_flag && flow_d->current_req_offset != -1 &&
+	    if (!flow_d->result.eof_flag && 
+		PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) != -1 &&
 		intermediate_offset < flow_data->max_buffer_size)
 	    {
-		flow_data->bmi_list_count = MAX_REGIONS;
-		flow_data->bmi_total_size = flow_data->max_buffer_size -
+		flow_d->result.bytemax = flow_data->max_buffer_size -
 		    intermediate_offset;
-
-		ret = PINT_Process_request(flow_d->request_state,
-					   flow_d->file_data,
-					   &flow_data->bmi_list_count,
-					   flow_data->bmi_offset_list,
-					   flow_data->bmi_size_list,
-					   &flow_d->current_req_offset,
-					   &flow_data->bmi_total_size,
-					   &eof_flag, PINT_CLIENT);
+		flow_d->result.segmax = MAX_REGIONS;
+		flow_d->result.eof_flag = 0;
+		flow_d->result.bytes = 0;
+		flow_d->result.segs = 0;
+		ret  = PINT_Process_request(flow_d->io_req_state, 
+		    flow_d->mem_req_state,
+		    flow_d->file_data, &flow_d->result, PINT_CLIENT);
 		if (ret < 0)
 		{
 		    return (ret);
 		}
+		flow_data->bmi_list_count = flow_d->result.segs;
+		flow_data->bmi_total_size = flow_d->result.bytes;
 	    }
 	    else
 	    {
@@ -955,10 +981,8 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
 static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
-    PVFS_boolean eof_flag = 0;
-    int32_t segmax = INT_MAX; 
     int ret = -1;
-    PVFS_offset tmp_offset = flow_d->request_offset;
+    PINT_Request_result tmp_result;
 
     /* set the buffer size to use for this flow */
     flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
@@ -989,9 +1013,26 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
      * receive half of this flow can figure out its position independent
      * of what the trove half is doing 
      */
-    flow_data->dup_req_state = PINT_New_request_state(flow_d->request);
-    flow_data->dup_req_offset = 0;
-    if (!flow_data->dup_req_state)
+    flow_data->dup_io_req_state = PINT_New_request_state(flow_d->io_req);
+#if 0
+    flow_data->dup_mem_req_state = PINT_New_request_state(flow_d->mem_req);
+    if (!flow_data->dup_io_req_state || !flow_data->dup_mem_req_state)
+    {
+	BMI_memfree(flow_d->src.u.bmi.address,
+		    flow_data->fill_buffer, flow_data->max_buffer_size,
+		    BMI_RECV);
+	BMI_memfree(flow_d->src.u.bmi.address,
+		    flow_data->drain_buffer, flow_data->max_buffer_size,
+		    BMI_RECV);
+	if(flow_data->dup_io_req_state)
+	    PINT_Free_request_state(flow_data->dup_io_req_state);
+	if(flow_data->dup_mem_req_state)
+	    PINT_Free_request_state(flow_data->dup_mem_req_state);
+	return (-ENOMEM);
+    }
+#else
+    flow_data->dup_mem_req_state = NULL;
+    if (!flow_data->dup_io_req_state)
     {
 	BMI_memfree(flow_d->src.u.bmi.address,
 		    flow_data->fill_buffer, flow_data->max_buffer_size,
@@ -1001,15 +1042,18 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 		    BMI_RECV);
 	return (-ENOMEM);
     }
+#endif
 
     /* if a file datatype offset was specified, go ahead and skip ahead 
      * before doing anything else
      */
-    if(flow_d->request_offset)
+    if(flow_d->io_req_offset)
     {
-	ret = PINT_Process_request(flow_data->dup_req_state, flow_d->file_data,
-	    &segmax, NULL, NULL, &flow_data->dup_req_offset, 
-	    &tmp_offset, &eof_flag, PINT_CKSIZE_LOGICAL_SKIP);
+	memset(&tmp_result, 0, sizeof(PINT_Request_result));
+	tmp_result.segmax = INT_MAX;
+	tmp_result.bytemax = flow_d->io_req_offset;
+	ret = PINT_Process_request(flow_d->io_req_state, NULL,
+	    flow_d->file_data, &flow_d->result, PINT_CKSIZE_LOGICAL_SKIP);
 	if(ret < 0)
 	{
 	    BMI_memfree(flow_d->src.u.bmi.address,
@@ -1018,11 +1062,13 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 	    BMI_memfree(flow_d->src.u.bmi.address,
 			flow_data->drain_buffer, flow_data->max_buffer_size,
 			BMI_RECV);
-	    PINT_Free_request_state(flow_data->dup_req_state);
+	    PINT_Free_request_state(flow_data->dup_io_req_state);
+#if 0
+	    PINT_Free_request_state(flow_data->dup_mem_req_state);
+#endif
 	    return (-EINVAL);
 	}
     }
-
 
     return (0);
 }
@@ -1039,7 +1085,6 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
     int ret = -1;
-    PVFS_boolean eof_flag = 0;
 
     /* set the buffer size to use for this flow */
     flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
@@ -1072,6 +1117,16 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
     flow_data->trove_list_count = MAX_REGIONS;
     flow_data->fill_buffer_stepsize = flow_data->max_buffer_size;
 
+    flow_d->result.offset_array = flow_data->trove_offset_list;
+    flow_d->result.size_array = flow_data->trove_size_list;
+    flow_d->result.bytemax = flow_data->max_buffer_size;
+    flow_d->result.segmax = MAX_REGIONS;
+    flow_d->result.eof_flag = 0;
+    flow_d->result.bytes = 0;
+    flow_d->result.segs = 0;
+    ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
+	flow_d->file_data, &flow_d->result, PINT_CLIENT);
+#if 0
     ret = PINT_Process_request(flow_d->request_state,
 			       flow_d->file_data, &flow_data->trove_list_count,
 			       flow_data->trove_offset_list,
@@ -1079,19 +1134,22 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
 			       &flow_d->current_req_offset,
 			       &flow_data->fill_buffer_stepsize, &eof_flag,
 			       PINT_SERVER);
+#endif
     if (ret < 0)
     {
 	return (ret);
     }
+    flow_data->trove_list_count = flow_d->result.segs;
+    flow_data->fill_buffer_stepsize = flow_d->result.bytes;
 
-    if (eof_flag && (flow_data->fill_buffer_stepsize == 0))
+    if (flow_d->result.eof_flag && (flow_data->fill_buffer_stepsize == 0))
     {
 	/* there is no work to do; zero length flow */
 	return (1);
     }
 
     if (flow_data->fill_buffer_stepsize < flow_data->max_buffer_size
-	&& flow_d->current_req_offset != -1)
+	&& PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) != -1)
     {
 	gossip_ldebug(FLOW_PROTO_DEBUG,
 		      "Warning: going into multistage mode for trove to bmi flow.\n");
@@ -1154,9 +1212,7 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = NULL;
     int ret = -1;
-    PVFS_boolean eof_flag = 0;
-    int32_t segmax = INT_MAX; 
-    PVFS_offset tmp_offset = flow_d->request_offset;
+    PINT_Request_result tmp_result;
 
     /* allocate the structure */
     flow_data = (struct bmi_trove_flow_data *) malloc(sizeof(struct
@@ -1172,11 +1228,13 @@ static int alloc_flow_data(flow_descriptor * flow_d)
     /* if a file datatype offset was specified, go ahead and skip ahead 
      * before doing anything else
      */
-    if(flow_d->request_offset)
+    if(flow_d->io_req_offset)
     {
-	ret = PINT_Process_request(flow_d->request_state, flow_d->file_data,
-	    &segmax, NULL, NULL, &flow_d->current_req_offset, &tmp_offset,
-	    &eof_flag, PINT_CKSIZE_LOGICAL_SKIP);
+	memset(&tmp_result, 0, sizeof(PINT_Request_result));
+	tmp_result.segmax = INT_MAX;
+	tmp_result.bytemax = flow_d->io_req_offset;
+	ret = PINT_Process_request(flow_d->io_req_state, NULL,
+	    flow_d->file_data, &flow_d->result, PINT_CKSIZE_LOGICAL_SKIP);
 	if(ret < 0)
 	{
 	    free(flow_data);
@@ -1299,7 +1357,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
      */
 
     /* are we using an intermediate buffer? */
-    if (flow_d->current_req_offset != -1 &&
+    if (PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) != -1 &&
 	flow_data->bmi_total_size != flow_data->max_buffer_size)
     {
 	gossip_ldebug(FLOW_PROTO_DEBUG,
@@ -1373,10 +1431,8 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
     void *tmp_buffer;
     PVFS_size tmp_used;
     int ret = -1;
-    PVFS_boolean eof_flag = 0;
     char *tmp_offset;
     PVFS_size actual_size = 0;
-    int32_t segmax = 0;
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "service_bmi_to_trove() called.\n");
 
@@ -1402,6 +1458,18 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	flow_data->drain_buffer_stepsize = flow_data->drain_buffer_used;
 	flow_data->trove_list_count = MAX_REGIONS;
 
+	flow_d->result.offset_array = flow_data->trove_offset_list;
+	flow_d->result.size_array = flow_data->trove_size_list;
+	flow_d->result.bytemax = flow_data->drain_buffer_stepsize;
+	flow_d->result.segmax = MAX_REGIONS;
+	flow_d->result.eof_flag = 0;
+	flow_d->result.bytes = 0;
+	flow_d->result.segs = 0;
+	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
+	    flow_d->file_data, &flow_d->result, PINT_CLIENT);
+	flow_data->trove_list_count = flow_d->result.segs;
+	flow_data->drain_buffer_stepsize = flow_d->result.bytes;
+#if 0
 	ret = PINT_Process_request(flow_d->request_state,
 				   flow_d->file_data,
 				   &flow_data->trove_list_count,
@@ -1410,6 +1478,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 				   &flow_d->current_req_offset,
 				   &(flow_data->drain_buffer_stepsize),
 				   &eof_flag, PINT_SERVER);
+#endif
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: PINT_Process_request() failure.\n");
@@ -1440,7 +1509,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
     if (flow_data->fill_buffer_state == BUF_READY_TO_FILL)
     {
 	/* have we gotten all of the data already? */
-	if (flow_data->dup_req_offset == -1)
+	if (PINT_REQUEST_STATE_OFFSET(flow_data->dup_io_req_state) == -1)
 	{
 	    flow_data->fill_buffer_state = BUF_DONE;
 	}
@@ -1448,7 +1517,19 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	{
 	    /* see how much more is in the pipe */
 	    flow_data->bmi_total_size = flow_data->max_buffer_size;
-	    eof_flag = 0;
+
+	    flow_d->result.offset_array = NULL;
+	    flow_d->result.size_array = NULL;
+	    flow_d->result.bytemax = flow_data->bmi_total_size;
+	    flow_d->result.segmax = INT_MAX;
+	    flow_d->result.eof_flag = 0;
+	    flow_d->result.bytes = 0;
+	    flow_d->result.segs = 0;
+	    ret  = PINT_Process_request(flow_data->dup_io_req_state, 
+		flow_d->mem_req_state,
+		flow_d->file_data, &flow_d->result, PINT_CKSIZE_MODIFY_OFFSET);
+	    flow_data->bmi_total_size = flow_d->result.bytes;
+#if 0
 	    ret = PINT_Process_request(flow_data->dup_req_state,
 		flow_d->file_data,
 		&segmax,
@@ -1458,6 +1539,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 		&flow_data->bmi_total_size,
 		&eof_flag,
 		PINT_CKSIZE_MODIFY_OFFSET);
+#endif
 	    if (ret < 0)
 	    {
 		/* TODO: do something */
@@ -1572,7 +1654,6 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
     void *tmp_buffer;
     PVFS_size tmp_used;
     int ret = -1;
-    PVFS_boolean eof_flag = 0;
     char *tmp_offset;
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "service_trove_to_bmi() called.\n");
@@ -1598,8 +1679,19 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	 * read from disk */
 	flow_data->trove_list_count = MAX_REGIONS;
 	flow_data->fill_buffer_stepsize = flow_data->max_buffer_size;
-	if (flow_d->current_req_offset != -1)
+	if (PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) != -1)
 	{
+	    flow_d->result.offset_array = flow_data->trove_offset_list;
+	    flow_d->result.size_array = flow_data->trove_size_list;
+	    flow_d->result.bytemax = flow_data->fill_buffer_stepsize;
+	    flow_d->result.segmax = MAX_REGIONS;
+	    flow_d->result.eof_flag = 0;
+	    flow_d->result.bytes = 0;
+	    flow_d->result.segs = 0;
+	    ret  = PINT_Process_request(flow_d->io_req_state, 
+		flow_d->mem_req_state,
+		flow_d->file_data, &flow_d->result, PINT_SERVER);
+#if 0
 	    ret = PINT_Process_request(flow_d->request_state,
 				       flow_d->file_data,
 				       &flow_data->trove_list_count,
@@ -1608,6 +1700,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 				       &flow_d->current_req_offset,
 				       &flow_data->fill_buffer_stepsize,
 				       &eof_flag, PINT_SERVER);
+#endif
 	    if (ret < 0)
 	    {
 		gossip_lerr("Error: PINT_Process_request() failure.\n");
@@ -1616,9 +1709,11 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 		/* no ops in flight, so we can just kick out error here */
 		return;
 	    }
+	    flow_data->trove_list_count = flow_d->result.segs;
+	    flow_data->fill_buffer_stepsize = flow_d->result.bytes;
 
 	    if (flow_data->fill_buffer_stepsize < flow_data->max_buffer_size
-		&& flow_d->current_req_offset != -1)
+		&& PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) != -1)
 	    {
 		gossip_ldebug(FLOW_PROTO_DEBUG,
 			      "Warning: going into multistage mode for trove to bmi flow.\n");
@@ -1793,7 +1888,7 @@ static void bmi_completion_mem_to_bmi(bmi_error_code_t error_code,
 		  (long) flow_d->total_transfered);
 
     /* did this complete the flow? */
-    if (flow_d->current_req_offset == -1)
+    if (PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) == -1)
     {
 	flow_d->state = FLOW_COMPLETE;
 	return;
@@ -1874,7 +1969,6 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
     int i = 0;
     PVFS_size total_copied = 0;
     PVFS_size region_size = 0;
-    PVFS_boolean eof_flag = 0;
 
     gossip_ldebug(FLOW_PROTO_DEBUG,
 		  "bmi_completion_bmi_to_mem() handling error_code = %d\n",
@@ -1914,7 +2008,7 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 		  (long) flow_d->total_transfered);
 
     /* were we using an intermediate buffer? */
-    if (flow_d->current_req_offset != -1 &&
+    if (PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) != -1 &&
 	flow_data->bmi_total_size != flow_data->max_buffer_size)
     {
 	gossip_ldebug(FLOW_PROTO_DEBUG, "copying out intermediate buffer.\n");
@@ -1947,7 +2041,8 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 	 */
 	if (total_copied < actual_size)
 	{
-	    if (eof_flag || flow_d->current_req_offset == -1)
+	    if (flow_d->result.eof_flag || 
+		PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) == -1)
 	    {
 		gossip_lerr
 		    ("Error: Flow sent more data than could be handled?\n");
@@ -1958,9 +2053,20 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 	    {
 		flow_data->bmi_list_count = MAX_REGIONS;
 		flow_data->bmi_total_size = actual_size - total_copied;
-		eof_flag = 0;
 		gossip_ldebug(FLOW_PROTO_DEBUG, "req proc offset: %ld\n",
-			      (long) flow_d->current_req_offset);
+		    (long)PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state));
+		flow_d->result.offset_array = flow_data->bmi_offset_list;
+		flow_d->result.size_array = flow_data->bmi_size_list;
+		flow_d->result.bytemax = flow_data->bmi_total_size;
+		flow_d->result.segmax = MAX_REGIONS;
+		flow_d->result.eof_flag = 0;
+		flow_d->result.bytes = 0;
+		flow_d->result.segs = 0;
+
+		ret  = PINT_Process_request(flow_d->io_req_state, 
+		    flow_d->mem_req_state,
+		    flow_d->file_data, &flow_d->result, PINT_CLIENT);
+#if 0
 		ret = PINT_Process_request(flow_d->request_state,
 					   flow_d->file_data,
 					   &flow_data->bmi_list_count,
@@ -1969,12 +2075,15 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 					   &flow_d->current_req_offset,
 					   &flow_data->bmi_total_size,
 					   &eof_flag, PINT_CLIENT);
+#endif
 		if (ret < 0)
 		{
 		    flow_d->state = FLOW_DEST_ERROR;
 		    flow_d->error_code = error_code;
 		    return;
 		}
+		flow_data->bmi_list_count = flow_d->result.segs;
+		flow_data->bmi_total_size = flow_d->result.bytes;
 
 		for (i = 0; i < flow_data->bmi_list_count; i++)
 		{
@@ -2013,7 +2122,7 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
     }
 
     /* did this complete the flow? */
-    if (flow_d->current_req_offset == -1)
+    if (PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) == -1)
     {
 	flow_d->state = FLOW_COMPLETE;
 	return;
@@ -2044,7 +2153,6 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 					  flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
-    PVFS_boolean eof_flag = 0;
     int ret = -1;
 
     if (error_code != 0)
@@ -2076,7 +2184,7 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
      * finish it as if it were a normal completion 
      */
     if (flow_data->fill_buffer_offset == flow_data->max_buffer_size ||
-	flow_d->current_req_offset == -1)
+	PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) == -1)
     {
 	flow_data->fill_buffer_state = BUF_READY_TO_SWAP;
 
@@ -2105,6 +2213,16 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 	flow_data->fill_buffer_stepsize = flow_data->max_buffer_size -
 	    flow_data->fill_buffer_offset;
 
+	flow_d->result.offset_array = flow_data->trove_offset_list;
+	flow_d->result.size_array = flow_data->trove_size_list;
+	flow_d->result.bytemax = flow_data->fill_buffer_stepsize;
+	flow_d->result.segmax = MAX_REGIONS;
+	flow_d->result.eof_flag = 0;
+	flow_d->result.bytes = 0;
+	flow_d->result.segs = 0;
+	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
+	    flow_d->file_data, &flow_d->result, PINT_SERVER);
+#if 0
 	ret = PINT_Process_request(flow_d->request_state,
 				   flow_d->file_data,
 				   &flow_data->trove_list_count,
@@ -2113,6 +2231,7 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 				   &flow_d->current_req_offset,
 				   &(flow_data->fill_buffer_stepsize),
 				   &eof_flag, PINT_SERVER);
+#endif
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: unimplemented condition encountered.\n");
@@ -2120,6 +2239,8 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 	    flow_d->error_code = ret;
 	    exit(-1);
 	}
+	flow_data->trove_list_count = flow_d->result.segs;
+	flow_data->fill_buffer_stepsize = flow_d->result.bytes;
 
 	/* set the state so that the next service will cause a post */
 	flow_data->fill_buffer_state = BUF_READY_TO_FILL;
@@ -2197,7 +2318,10 @@ static void buffer_teardown_bmi_to_trove(flow_descriptor * flow_d)
 		flow_data->max_buffer_size, BMI_RECV);
     BMI_memfree(flow_d->src.u.bmi.address, flow_data->drain_buffer,
 		flow_data->max_buffer_size, BMI_RECV);
-    PINT_Free_request_state(flow_data->dup_req_state);
+    PINT_Free_request_state(flow_data->dup_io_req_state);
+#if 0
+    PINT_Free_request_state(flow_data->dup_mem_req_state);
+#endif
     return;
 }
 
@@ -2253,7 +2377,6 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 					  flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
-    PVFS_boolean eof_flag;
     int ret;
 
     if (error_code != 0)
@@ -2289,10 +2412,10 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 	flow_data->drain_buffer_state = BUF_READY_TO_SWAP;
 
 	/* are we done ? */
-	if (flow_d->current_req_offset == -1 ||
+	if (PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) == -1 ||
 	    flow_data->fill_buffer_state == BUF_DONE)
 	{
-	    if (flow_d->current_req_offset != -1 ||
+	    if (PINT_REQUEST_STATE_OFFSET(flow_d->io_req_state) != -1 ||
 		flow_data->fill_buffer_state != BUF_DONE)
 	    {
 		gossip_lerr
@@ -2323,6 +2446,15 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 	flow_data->trove_list_count = MAX_REGIONS;
 	flow_data->drain_buffer_stepsize = flow_data->drain_buffer_used -
 	    flow_data->drain_buffer_offset;
+	
+	flow_d->result.offset_array = flow_data->trove_offset_list;
+	flow_d->result.size_array = flow_data->trove_size_list;
+	flow_d->result.bytemax = flow_data->drain_buffer_stepsize;
+	flow_d->result.segmax = MAX_REGIONS;
+	flow_d->result.eof_flag = 0;
+	flow_d->result.bytes = 0;
+	flow_d->result.segs = 0;
+#if 0
 	ret = PINT_Process_request(flow_d->request_state,
 				   flow_d->file_data,
 				   &flow_data->trove_list_count,
@@ -2331,6 +2463,9 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 				   &flow_d->current_req_offset,
 				   &(flow_data->drain_buffer_stepsize),
 				   &eof_flag, PINT_SERVER);
+#endif
+	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
+	    flow_d->file_data, &flow_d->result, PINT_SERVER);
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: unimplemented condition encountered.\n");
@@ -2338,6 +2473,8 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 	    flow_d->error_code = ret;
 	    exit(-1);
 	}
+	flow_data->trove_list_count = flow_d->result.segs;
+	flow_data->drain_buffer_stepsize = flow_d->result.bytes;
 #if 0
 	gossip_err("FOO2: current_req_offset: %d\n",
 		   (int) flow_d->current_req_offset);

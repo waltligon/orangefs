@@ -28,14 +28,9 @@ int main(int argc, char **argv)
 	PINT_Request_state *rs2;
 	PINT_Request_file_data rf1;
 	PINT_Request_file_data rf2;
+	PINT_Request_result seg1;
 
 	int retval;
-	int32_t segmax;
-	PVFS_offset *offset_array;
-	PVFS_size *size_array;
-	PVFS_offset offset;
-	PVFS_size bytemax;
-	PVFS_boolean eof_flag;
 
 	int32_t blocklength = 10*1024*1024;
 	PVFS_size displacement = 20*1024*1024;  
@@ -60,36 +55,37 @@ int main(int argc, char **argv)
 	rf2.extend_flag = 0;
 	PINT_Dist_lookup(rf2.dist);
 
+	/* set up result struct */
+	seg1.offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
+	seg1.size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
+	seg1.bytemax = BYTEMAX;
+	seg1.segmax = SEGMAX;
+	seg1.eof_flag = 0;
+	seg1.bytes = 0;
+	seg1.segs = 0;
+
    /* Turn on debugging */
 	//gossip_enable_stderr(); 
 	//gossip_set_debug_mask(1,REQUEST_DEBUG);
 
-	offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
-	size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
-
 // server stuff below this line
 /****************************************************************/
 
-	offset = 0;
 	fprintf(stderr, "\n************************************\n");
-	eof_flag = 0;
-	segmax = SEGMAX;
-	bytemax = BYTEMAX;
 
 	/* process request */
-	retval = PINT_Process_request(rs1, &rf1, &segmax,
-		offset_array, size_array, &offset, &bytemax, 
-		&eof_flag, PINT_SERVER);
+	retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
 
 	if(retval >= 0)
 	{
 		fprintf(stderr, "results of PINT_Process_request(PINT_SERVER):\n");
-		fprintf(stderr, "req proc offset: %d\n", (int)offset);
-		fprintf(stderr, "total size: %d\n", (int)bytemax);
-		for(i=0; i<segmax; i++)
+		fprintf(stderr, "req proc offset: %d\n",
+				(int)PINT_REQUEST_STATE_OFFSET(rs1));
+		fprintf(stderr, "total size: %d\n", (int)seg1.bytes);
+		for(i=0; i<seg1.segs; i++)
 		{
 			fprintf(stderr, "  segment %d: offset: %d size: %d\n",
-				i, (int)offset_array[i], (int)size_array[i]);
+				i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
 		}
 	}
 
@@ -99,7 +95,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(offset == -1)
+	if(PINT_REQUEST_STATE_OFFSET(rs1) == -1)
 	{
 		fprintf(stderr, "**** server done.\n");
 	}
@@ -107,26 +103,24 @@ int main(int argc, char **argv)
 // client stuff below this line
 /*******************************************************************/
 
-	offset = 0;
 	fprintf(stderr, "\n************************************\n");
-	eof_flag = 0;
-	segmax = SEGMAX;
-	bytemax = BYTEMAX;
+	seg1.eof_flag = 0;
+	seg1.bytes = 0;
+	seg1.segs = 0;
 
 	/* process request */
-	retval = PINT_Process_request(rs2, &rf2, &segmax,
-		offset_array, size_array, &offset, &bytemax, 
-		&eof_flag, PINT_CLIENT);
+	retval = PINT_Process_request(rs2, NULL, &rf2, &seg1, PINT_CLIENT);
 
 	if(retval >= 0)
 	{
 		fprintf(stderr, "results of PINT_Process_request(PINT_CLIENT):\n");
-		fprintf(stderr, "req proc offset: %d\n", (int)offset);
-		fprintf(stderr, "total size: %d\n", (int)bytemax);
-		for(i=0; i<segmax; i++)
+		fprintf(stderr, "req proc offset: %d\n",
+				(int)PINT_REQUEST_STATE_OFFSET(rs2));
+		fprintf(stderr, "total size: %d\n", (int)seg1.bytes);
+		for(i=0; i<seg1.segs; i++)
 		{
 			fprintf(stderr, "  segment %d: offset: %d size: %d\n",
-				i, (int)offset_array[i], (int)size_array[i]);
+				i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
 		}
 	}
 
@@ -136,32 +130,32 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(offset == -1)
+	if(PINT_REQUEST_STATE_OFFSET(rs2) == -1)
 	{
 		fprintf(stderr, "**** client request done.\n");
 	}
 	fprintf(stderr, "\n************************************\n");
-	eof_flag = 0;
-	segmax = SEGMAX;
-	bytemax = 393216;
+	seg1.bytemax = 393216;
+	seg1.eof_flag = 0;
+	seg1.bytes = 0;
+	seg1.segs = 0;
 
 	/* process request */
 	// gossip_enable_stderr(); 
 	// gossip_set_debug_mask(1,REQUEST_DEBUG);
 	
-	retval = PINT_Process_request(rs2, &rf2, &segmax,
-		offset_array, size_array, &offset, &bytemax, 
-		&eof_flag, PINT_CLIENT);
+	retval = PINT_Process_request(rs2, NULL, &rf2, &seg1, PINT_CLIENT);
 
 	if(retval >= 0)
 	{
 		fprintf(stderr, "results of PINT_Process_request(PINT_CLIENT):\n");
-		fprintf(stderr, "req proc offset: %d\n", (int)offset);
-		fprintf(stderr, "total size: %d\n", (int)bytemax);
-		for(i=0; i<segmax; i++)
+		fprintf(stderr, "req proc offset: %d\n",
+				(int)PINT_REQUEST_STATE_OFFSET(rs2));
+		fprintf(stderr, "total size: %d\n", (int)seg1.bytes);
+		for(i=0; i<seg1.segs; i++)
 		{
 			fprintf(stderr, "  segment %d: offset: %d size: %d\n",
-				i, (int)offset_array[i], (int)size_array[i]);
+				i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
 		}
 	}
 
@@ -171,7 +165,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(offset != -1)
+	if(PINT_REQUEST_STATE_OFFSET(rs2) != -1)
 	{
 		fprintf(stderr, "\nAIEEEeee!  Why doesn't the client side set req processing offset to -1?.\n");
 		fprintf(stderr, "... the server stopped correctly after this many bytes\n");

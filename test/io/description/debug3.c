@@ -28,6 +28,7 @@ int main(int argc, char **argv)
 	PINT_Request *r_dec;
 	PINT_Request_state *rs1;
 	PINT_Request_file_data rf1;
+	PINT_Request_result seg1;
 	int commit_index = 0;
 	int ret = -1;
 	int pack_size = 0;
@@ -40,12 +41,6 @@ int main(int argc, char **argv)
 
 	/* PVFS_Process_request arguments */
 	int retval;
-	int32_t segmax;
-	PVFS_offset *offset_array;
-	PVFS_size *size_array;
-	PVFS_offset offset;
-	PVFS_size bytemax;
-	PVFS_boolean eof_flag;
 	int32_t blocklength = 4390228;
 	PVFS_size displacement = 20*1024*1024;
 
@@ -92,55 +87,59 @@ int main(int argc, char **argv)
 	rf1.extend_flag = 1;
 	PINT_Dist_lookup(rf1.dist);
 
+	/* set up response struct */
+	seg1.offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
+	seg1.size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
+	seg1.segmax = SEGMAX;
+	seg1.bytemax = BYTEMAX;
+	seg1.eof_flag = 0;
+	seg1.bytes = 0;
+	seg1.segs = 0;
+
    /* Turn on debugging */
 	/* gossip_enable_stderr(); */
 	/* gossip_set_debug_mask(1,REQUEST_DEBUG); */
 
-	offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
-	size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
-	offset = 0;
-
 	printf("\n************************************\n");
 	do
 	{
-		eof_flag = 0;
-		segmax = SEGMAX;
-		bytemax = BYTEMAX;
+		seg1.eof_flag = 0;
+		seg1.bytes = 0;
+		seg1.segs = 0;
 
 		/* process request */
 		/* note that bytemax is exactly large enough to hold all of the
 		 * data that I should find here
 		 */
-		retval = PINT_Process_request(rs1, &rf1, &segmax,
-			offset_array, size_array, &offset, &bytemax, 
-			&eof_flag, PINT_CLIENT);
+		retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_CLIENT);
 
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request():\n");
-			if(segmax == 0)
+			if(seg1.segs == 0)
 			{
 				fprintf(stderr, "  AAIIEEE! no results to report.\n");
 			}
-			for(i=0; i<segmax; i++)
+			for(i=0; i<seg1.segs; i++)
 			{
 				printf("  segment %d: offset: %d size: %d\n",
-					i, (int)offset_array[i], (int)size_array[i]);
+					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
 			}
 		}
 
-		if(offset != -1 && bytemax != BYTEMAX && segmax != SEGMAX)
+		if(PINT_REQUEST_STATE_OFFSET(rs1) != -1 &&
+				seg1.bytemax != BYTEMAX && seg1.segmax != SEGMAX)
 		{
 			fprintf(stderr, "  AAIIEEE! Why am I done?\n");
 		}
-	} while(offset != -1 && retval >= 0);
+	} while(PINT_REQUEST_STATE_OFFSET(rs1) != -1 && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(offset == -1)
+	if(PINT_REQUEST_STATE_OFFSET(rs1) == -1)
 	{
 		printf("**** first request done.\n");
 	}

@@ -92,6 +92,15 @@ struct flow_descriptor
     int flags;	/* optional flags */
     PVFS_msg_tag_t tag;		/* matching tag */
     void *user_ptr;		/* for use by caller */
+    /* can be used to force use of specific flow protocol */
+    enum PVFS_flowproto_type type;        
+
+    PINT_Request *io_req;
+    PVFS_offset io_req_offset;
+    PINT_Request *mem_req;
+    PINT_Request_file_data *file_data;
+
+#if 0
     /* TODO: maybe these two should be renamed to reflect that they 
      * describe the file relative datatype?
      */
@@ -99,8 +108,7 @@ struct flow_descriptor
     PVFS_offset request_offset;	/* offset into the above description */
     /* information about the file that we are accessing */
     PINT_Request_file_data *file_data;
-    /* can be used to force use of specific flow protocol */
-    enum PVFS_flowproto_type type;        
+#endif
 
 	/***********************************************************/
     /* fields that can be read publicly upon completion */
@@ -117,11 +125,16 @@ struct flow_descriptor
     int priority;	/* priority of this flow */
     struct qlist_head sched_queue_link;	/* used by scheduler */
     void *flow_protocol_data;	/* used by flow protocols */
+
+    PINT_Request_state *io_req_state;
+    PINT_Request_state *mem_req_state;
+    PINT_Request_result result;
+#if 0
     PINT_Request_state *request_state;	/* req processor state */
     PVFS_offset current_req_offset;	/* offset of request processing */
     PVFS_offset *offset_array;	/* array of offsets being processed */
     PVFS_size *size_array;	/* array of sizes being processed */
-
+#endif
 };
 typedef struct flow_descriptor flow_descriptor;
 

@@ -19,6 +19,7 @@
 #define PINT_LOGICAL_SKIP          000020
 #define PINT_CKSIZE_LOGICAL_SKIP   000024
 #define PINT_SEEKING               000040
+#define PINT_MEMREQ                000100
 
 #define PINT_IS_SERVER(x)          ((x) & PINT_SERVER)
 #define PINT_EQ_SERVER(x)          ((x) == PINT_SERVER)
@@ -30,6 +31,8 @@
 #define PINT_EQ_LOGICAL_SKIP(x)    ((x) == PINT_LOGICAL_SKIP)
 #define PINT_IS_SEEKING(x)         ((x) & PINT_SEEKING)
 #define PINT_EQ_SEEKING(x)         ((x) == PINT_SEEKING)
+#define PINT_IS_MEMREQ(x)          ((x) & PINT_MEMREQ)
+#define PINT_EQ_MEMREQ(x)          ((x) == PINT_MEMREQ)
 #define PINT_SET_SEEKING(x)        ((x) |= PINT_SEEKING)
 #define PINT_CLR_SEEKING(x)        ((x) &= ~(PINT_SEEKING))
 
@@ -37,42 +40,53 @@
 
 typedef struct PINT_Request {
 	PVFS_offset  offset;        /* offset from start of last set of elements */
-	int32_t num_ereqs;     /* number of ereqs in a block */
-	int32_t num_blocks;    /* number of blocks */
+	int32_t      num_ereqs;     /* number of ereqs in a block */
+	int32_t      num_blocks;    /* number of blocks */
 	PVFS_size    stride;        /* stride between blocks in bytes */
 	PVFS_offset  ub;            /* upper bound of the type in bytes */
 	PVFS_offset  lb;            /* lower bound of the type in bytes */
 	PVFS_size    aggregate_size; /* amount of aggregate data in bytes */
-	int32_t num_contig_chunks; /* number of contiguous data chunks */
-	int32_t depth;    	    /* number of levels of nesting */
-	int32_t num_nested_req;/* number of requests nested under this one */
-	int32_t committed;     /* indicates if request has been commited */
-	int32_t refcount;      /* number of references to this request struct */
+	int32_t      num_contig_chunks; /* number of contiguous data chunks */
+	int32_t      depth;    	    /* number of levels of nesting */
+	int32_t      num_nested_req;/* number of requests nested under this one */
+	int32_t      committed;     /* indicates if request has been commited */
+	int32_t      refcount;      /* number of references to this request struct */
 	struct PINT_Request *ereq;  /* element type */
 	struct PINT_Request *sreq;  /* sequence type */
 } PINT_Request;
 
 typedef struct PINT_reqstack {
-	int32_t el;           /* number of element being processed */
-	int32_t maxel;        /* total number of these elements to process */
+	int32_t      el;           /* number of element being processed */
+	int32_t      maxel;        /* total number of these elements to process */
 	PINT_Request *rq;    		/* pointer to request structure */
 	PINT_Request *rqbase; 		/* pointer to first request is sequence chain */
-	int32_t blk;          /* number of block being processed */
+	int32_t      blk;          /* number of block being processed */
 	PVFS_offset  chunk_offset; /* offset of beginning of current contiguous chunk */
 } PINT_reqstack;           
           
 typedef struct PINT_Request_state { 
 	struct PINT_reqstack *cur; /* request element chain stack */
-	int32_t lvl;          /* level in element chain */
+	int32_t      lvl;          /* level in element chain */
 	PVFS_size    bytes;        /* bytes in current contiguous chunk processed */
 	PVFS_offset  buf_offset;   /* byte offset in user buffer */
 	PVFS_offset  last_offset;	/* last offset in previous call to process */
+	PVFS_offset  start_offset;	/* first offset in next call to process */
 } PINT_Request_state;           
+
+typedef struct PINT_Request_result {
+	PVFS_offset  *offset_array;/* array of offsets for each segment output */
+	PVFS_size    *size_array;  /* array of sizes for each segment output */
+	int32_t      segmax;       /* maximum number of segments to output */
+	int32_t      segs;         /* number of segments output */
+	PVFS_size    bytemax;      /* maximum number of bytes to output */
+	PVFS_size    bytes;        /* number of bytes output */
+	PVFS_boolean eof_flag;     /* is file at end of flile */
+} PINT_Request_result;
 
 typedef struct PINT_Request_file_data {
 	PVFS_size    fsize;			/* actual size of local storage object */
-	uint32_t iod_num;		/* ordinal number of THIS server for this file */
-	uint32_t iod_count;		/* number of servers for this file */
+	uint32_t     iod_num;		/* ordinal number of THIS server for this file */
+	uint32_t     iod_count;		/* number of servers for this file */
 	PVFS_Dist    *dist;			/* dist struct for the file */
 	PVFS_boolean extend_flag;	/* if zero, file will not be extended */
 } PINT_Request_file_data;
@@ -83,16 +97,19 @@ void PINT_Free_request_state (PINT_Request_state *req);
 
 /* generate offset length pairs from request and dist */
 int PINT_Process_request(PINT_Request_state *req,
-		PINT_Request_file_data *rfdata, int32_t *segmax,
-		PVFS_offset *offset_array, PVFS_size *size_array,
-		PVFS_offset *start_offset, PVFS_size *bytemax,
-		PVFS_boolean *eof_flag, int mode);
+		PINT_Request_state *mem,
+		PINT_Request_file_data *rfdata,
+		PINT_Request_result *result,
+		int mode);
 
 /* internal function */
-PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
-		PINT_Request_file_data *rfdata, PVFS_size *bytes, PVFS_size bytemax,
-		int32_t *segs, int32_t segmax, PVFS_offset *offset_array,
-		PVFS_size *size_array, PVFS_boolean *eof_flag, int mode);
+PVFS_size PINT_Distribute(PVFS_offset offset,
+		PVFS_size size,
+		PVFS_offset seq_offset,
+		PINT_Request_file_data *rfdata,
+		PINT_Request_state *mem,
+		PINT_Request_result *result,
+		int mode);
 
 /* pack request from node into a contiguous buffer pointed to by region */
 int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
@@ -129,6 +146,12 @@ int PINT_Request_decode(struct PINT_Request *req);
  */
 #define PINT_REQUEST_TOTAL_BYTES(reqp)\
 	((reqp)->aggregate_size)
+
+#define PINT_REQUEST_STATE_OFFSET(reqp)\
+	((reqp)->start_offset)
+
+#define PINT_REQUEST_STATE_SET_OFFSET(reqp,val)\
+	((reqp)->start_offset) = (val)
 
 /* set ref count of request to 1
  * never modify a refcount below zero

@@ -438,14 +438,26 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
 
     flow_d->context_id = context_id;
 
-    /* setup the request processing state */
-    flow_d->request_state = PINT_New_request_state(flow_d->request);
-    if (!flow_d->request_state)
+    /* setup the request processing states */
+    flow_d->io_req_state = PINT_New_request_state(flow_d->io_req);
+#if 0
+    flow_d->mem_req_state = PINT_New_request_state(flow_d->mem_req);
+    if (!flow_d->io_req_state || !flow_d->mem_req_state)
     {
 	flow_release(flow_d);
 	gen_mutex_unlock(&interface_mutex);
 	return (-EINVAL);
     }
+#else
+    flow_d->mem_req_state = NULL;
+    if (!flow_d->io_req_state)
+    {
+	flow_release(flow_d);
+	gen_mutex_unlock(&interface_mutex);
+	return (-EINVAL);
+    }
+#endif
+
 
     /* announce the flow */
     ret = active_flowproto_table[flowproto_id]->flowproto_announce_flow(flow_d);
@@ -955,11 +967,12 @@ static int teardown_flow_queues(void)
  */
 static void flow_release(flow_descriptor * flow_d)
 {
-    /* let go of the request processing state */
-    if (flow_d->request_state)
-    {
-	PINT_Free_request_state(flow_d->request_state);
-    }
+    /* let go of the request processing states */
+    if (flow_d->io_req_state)
+	PINT_Free_request_state(flow_d->io_req_state);
+    if (flow_d->mem_req_state)
+	PINT_Free_request_state(flow_d->mem_req_state);
+
     return;
 }
 
