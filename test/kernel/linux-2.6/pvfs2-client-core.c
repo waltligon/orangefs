@@ -383,8 +383,6 @@ static int service_io_request(
 
 	file_req = PVFS_BYTE;
 
-        gossip_debug(MMAP_RCACHE_DEBUG,"Building Contig Request of %d\n",
-                     (int)in_upcall->req.io.count);
 	ret = PVFS_Request_contiguous(
             (int32_t)in_upcall->req.io.count, PVFS_BYTE, &mem_req);
 	assert(ret == 0);
