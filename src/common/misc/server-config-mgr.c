@@ -227,8 +227,8 @@ int PINT_server_config_mgr_add_config(
     server_config_t *config = NULL;
     struct qlist_head *hash_link = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "server_config_mgr: Trying to "
-                 "add config obj %p\n", config_s);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: Trying to "
+                 "add config obj %p\n", __func__, config_s);
 
     if (SC_MGR_INITIALIZED() && config_s)
     {
@@ -264,8 +264,8 @@ int PINT_server_config_mgr_add_config(
                   &config->hash_link);
 
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "server_config_mgr: mapped "
-            "fs_id %d to config object %p\n", fs_id, config_s);
+            GOSSIP_CLIENT_DEBUG, "%s: mapped "
+            "fs_id %d to config object %p\n", __func__, fs_id, config_s);
 
         gen_mutex_unlock(s_server_config_mgr_mutex);
 
@@ -275,7 +275,7 @@ int PINT_server_config_mgr_add_config(
 
   add_failure:
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "server_config_mgr: add_failure reached\n");
+                 "%s: add_failure reached\n", __func__);
 
     if (config)
     {
@@ -298,8 +298,8 @@ int PINT_server_config_mgr_remove_config(
     server_config_t *config = NULL;
     struct qlist_head *hash_link = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "server_config_mgr: Trying to "
-                 "remove config obj for fs_id %d\n", fs_id);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: Trying to "
+                 "remove config obj for fs_id %d\n", __func__, fs_id);
 
     if (SC_MGR_INITIALIZED())
     {
@@ -315,9 +315,9 @@ int PINT_server_config_mgr_remove_config(
             assert(config->server_config);
             assert(config->fs_id == fs_id);
 
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "server_config_mgr: "
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: "
                          "Removed config object %p with fs_id %d\n",
-                         config, fs_id);
+                         __func__, config, fs_id);
 
             /*
               config objects are allocated by fs-add.c:PVFS_sys_fs_add
