@@ -19,6 +19,9 @@
 
 #include "PINT-reqproto-encode.h"
 
+
+extern job_context_id server_job_context;
+
 #define PINT_STATE_STACK_SIZE 8  /* size of stack for nested state machines */
 
 /* Some config values for the prototype pvfs2 server */

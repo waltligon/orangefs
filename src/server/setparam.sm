@@ -16,8 +16,6 @@
 static int setparam_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int setparam_work(PINT_server_op *s_op, job_status_s* js_p);
 
-extern job_context_id PINT_server_job_context;
-
 %%
 
 machine pvfs2_setparam_sm(prelude, work, final_response, cleanup)

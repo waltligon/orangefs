@@ -67,7 +67,6 @@ static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op, job_status_s*
 static int remove_verify_dspace_attributes(PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
-extern job_context_id PINT_server_job_context;
 
 %%
 
@@ -207,7 +206,7 @@ static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
 					    s_op, /* user ptr */
 					    js_p,
 					    &j_id,
-					    PINT_server_job_context);
+					    server_job_context);
     return ret;
 }
 
@@ -326,7 +325,7 @@ static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
 					 s_op,
 					 js_p,
 					 &j_id,
-					 PINT_server_job_context);
+					 server_job_context);
     return ret;
 }
 
@@ -353,7 +352,7 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
 					   s_op,
 					   js_p,
 					   &j_id,
-					   PINT_server_job_context);
+					   server_job_context);
     return ret;
 }
 
@@ -376,7 +375,7 @@ static int remove_remove_dspace(PINT_server_op *s_op,
 					   s_op,
 					   js_p,
 					   &j_id,
-					   PINT_server_job_context);
+					   server_job_context);
     return ret;
 }
 

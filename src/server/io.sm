@@ -25,7 +25,6 @@ static int io_release(PINT_server_op *s_op, job_status_s* js_p);
 static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
-extern job_context_id PINT_server_job_context;
 
 /****************************************************************
  * This is the state machine for file system I/O operations (both
@@ -122,7 +121,7 @@ static int io_get_size(PINT_server_op *s_op, job_status_s* js_p)
 		s_op,
 		js_p,
 		&tmp_id,
-		PINT_server_job_context);
+		server_job_context);
 	
 	return(err);
 }
@@ -191,7 +190,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
 			s_op,
 			js_p,
 			&tmp_id,
-			PINT_server_job_context);
+			server_job_context);
 	}
  
 	return(err);
@@ -294,7 +293,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
 		s_op,
 		js_p,
 		&tmp_id,
-		PINT_server_job_context);
+		server_job_context);
 
 	return(err);
 }
@@ -328,7 +327,7 @@ static int io_release(PINT_server_op *s_op, job_status_s* js_p)
 													  s_op,
 													  js_p,
 													  &i,
-													  PINT_server_job_context);
+													  server_job_context);
 	return ret;
 }
 
@@ -441,7 +440,7 @@ static int io_send_completion_ack(PINT_server_op *s_op,
 			s_op,
 			js_p,
 			&tmp_id,
-			PINT_server_job_context);
+			server_job_context);
 	}
  
 	return(err);

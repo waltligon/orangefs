@@ -31,7 +31,6 @@ static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s* js_p)
 static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
-extern job_context_id PINT_server_job_context;
 
 %%
 
@@ -215,7 +214,7 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
 					 s_op,
 					 js_p,
 					 &j_id,
-					 PINT_server_job_context);
+					 server_job_context);
     return ret;
 }
 
@@ -332,7 +331,7 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op,
 					 s_op,
 					 js_p,
 					 &j_id,
-					 PINT_server_job_context);
+					 server_job_context);
     return ret;
 }
 
@@ -386,7 +385,7 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
 					 s_op,
 					 js_p,
 					 &j_id,
-					 PINT_server_job_context);
+					 server_job_context);
     return ret;
 }
 

@@ -32,7 +32,7 @@
 #include "server-config.h"
 #include "quicklist.h"
 
-job_context_id PINT_server_job_context = -1;
+job_context_id server_job_context = -1;
 
 /* Lookup table for determining what state machine to use when a
  * new request is received.
@@ -167,7 +167,7 @@ int main(int argc, char **argv)
 			      server_completed_job_p_array,
 			      server_job_status_array,
 			      100, /* timeout, in unknown units :) */
-			      PINT_server_job_context);
+			      server_job_context);
 	if (ret < 0)
 	{
 	    gossip_lerr("FREAK OUT.\n");
@@ -540,7 +540,7 @@ static int server_initialize_subsystems(PINT_server_status_code *server_level_in
 	goto interface_init_failed;
     }
     
-    ret = job_open_context(&PINT_server_job_context);
+    ret = job_open_context(&server_job_context);
     if (ret < 0)
     {
 	gossip_err("Error opening job context.\n");
@@ -598,7 +598,7 @@ static int server_shutdown(PINT_server_status_code level,
 	/* State Machine */
 	PINT_state_machine_halt();
     case SHUTDOWN_HIGH_LEVEL_INTERFACE:
-	job_close_context(PINT_server_job_context);
+	job_close_context(server_job_context);
     case SHUTDOWN_JOB_INTERFACE:
 	job_finalize();
     case SHUTDOWN_STORAGE_INTERFACE:
@@ -716,7 +716,7 @@ static int server_post_unexpected_recv(job_status_s *temp_stat)
 			temp_stat,
 			&j_id,
 			JOB_NO_IMMED_COMPLETE,
-			PINT_server_job_context);
+			server_job_context);
     if (ret < 0) {
 	free(s_op);
 	return -1; /* TODO: ????????? */

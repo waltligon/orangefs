@@ -22,7 +22,6 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op, job_status_s* js_
 static int crdirent_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
-extern job_context_id PINT_server_job_context;
 
 enum {
     ERROR_BADNAME = 4
@@ -217,7 +216,7 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
 					 s_op,
 					 js_p,
 					 &i,
-					 PINT_server_job_context);
+					 server_job_context);
     return ret;
 }
 
@@ -264,7 +263,7 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
 					   s_op,
 					   js_p,
 					   &i,
-					   PINT_server_job_context);
+					   server_job_context);
     return ret;
 }
 
@@ -320,7 +319,7 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
 					  s_op,
 					  js_p,
 					  &i,
-					  PINT_server_job_context);
+					  server_job_context);
     return ret;
 }
 
@@ -379,7 +378,7 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
 					  s_op,
 					  js_p,
 					  &i,
-					  PINT_server_job_context);
+					  server_job_context);
     return ret;
 }
 
@@ -438,7 +437,7 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
 					  s_op,
 					  js_p,
 					  &i,
-					  PINT_server_job_context);
+					  server_job_context);
     return ret;
 }
 

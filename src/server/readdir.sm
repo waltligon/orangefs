@@ -24,7 +24,6 @@ static int readdir_verify_directory_metadata(PINT_server_op *s_op, job_status_s*
 static int readdir_setup_resp(PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
-extern job_context_id PINT_server_job_context;
 
 %%
 
@@ -164,7 +163,7 @@ static int readdir_read_dirdata_handle(PINT_server_op *s_op,
 					 s_op,
 					 js_p,
 					 &i,
-					 PINT_server_job_context);
+					 server_job_context);
     return ret;
 }
 
@@ -241,7 +240,7 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
 					    s_op,
 					    js_p, 
 					    &j_id,
-					    PINT_server_job_context);
+					    server_job_context);
     return ret;
 }
 

@@ -16,7 +16,6 @@ static int create_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int create_create(PINT_server_op *s_op, job_status_s* js_p);
 static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p);
 
-extern job_context_id PINT_server_job_context;
 
 %%
 
@@ -86,7 +85,7 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
 	    s_op,
 	    js_p,
 	    &i,
-	    PINT_server_job_context);
+	    server_job_context);
 
     return(ret);
 }

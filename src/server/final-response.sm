@@ -37,7 +37,6 @@ static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p);
 static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
-extern job_context_id PINT_server_job_context;
 
 %%
 
@@ -98,7 +97,7 @@ static int final_response_release(PINT_server_op *s_op, job_status_s *js_p)
 	s_op,
 	js_p,
 	&tmp_id,
-	PINT_server_job_context);
+	server_job_context);
 
     return(ret);
 }
@@ -150,7 +149,7 @@ static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p)
 	s_op,
 	js_p,
 	&tmp_id,
-	PINT_server_job_context);
+	server_job_context);
 
     return(ret);
 }

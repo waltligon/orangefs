@@ -23,7 +23,6 @@ static int setattr_write_metafile_distribution_if_required(
 static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
-extern job_context_id PINT_server_job_context;
 
 %%
 
@@ -306,7 +305,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 					  s_op,
 					  js_p,
 					  &j_id,
-					  PINT_server_job_context);
+					  server_job_context);
     return ret;
 }
 
@@ -374,7 +373,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
                                  s_op,
                                  js_p,
                                  &j_id,
-                                 PINT_server_job_context);
+                                 server_job_context);
 
     return ret;
 }
@@ -435,7 +434,7 @@ static int setattr_write_metafile_distribution_if_required(
 					  s_op,
 					  js_p,
 					  &j_id,
-					  PINT_server_job_context);
+					  server_job_context);
     return(ret);
 }
 
