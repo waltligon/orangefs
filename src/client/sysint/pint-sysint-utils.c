@@ -5,6 +5,7 @@
  */
 
 #include <unistd.h>
+#include <sys/types.h>
 
 #include "pvfs2-sysint.h"
 #include "pvfs2-req-proto.h"
@@ -46,9 +47,7 @@ int get_next_session_tag(void)
         }
     }
 
-    /* grab a lock for this variable */
     gen_mutex_lock(g_session_tag_mt_lock);
-
     ret = g_session_tag;
 
     /* increment the tag, don't use zero */
@@ -60,16 +59,12 @@ int get_next_session_tag(void)
     {
 	g_session_tag++;
     }
-
-    /* release the lock */
     gen_mutex_unlock(g_session_tag_mt_lock);
+
     return ret;
 }
 
-
-/* PINT_check_perms
- *
- * check permissions of a PVFS object against the access mode
+/* check permissions of a PVFS object against the access mode
  *
  * returns 0 on success, -1 on error
  */
@@ -78,24 +73,11 @@ int PINT_check_perms(PVFS_object_attr attr,
 		int uid,
 		int gid)
 {
-    int ret = 0;
-
-    if ((attr.perms & mode) == mode)
-        ret = 0;
-    else if (attr.group == gid && ((attr.perms & mode) == mode))
-	ret = 0;
-    else if (attr.owner == uid)
-	ret = 0;
-    else
-	ret = -1;
-
-    return(ret);
+    return ((((attr.perms & mode) == mode) ||
+             ((attr.group == gid) && (attr.perms & mode) == mode) ||
+             (attr.owner == uid)) ? 0 : -1);
 }
 
-
-/* PINT_server_get_config()
- *
- */
 int PINT_server_get_config(struct server_configuration_s *config,
                            pvfs_mntlist mntent_list)
 {
@@ -108,10 +90,8 @@ int PINT_server_get_config(struct server_configuration_s *config,
     void* encoded_resp;
     struct pvfs_mntent *mntent_p = NULL;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
-    int found_one_good=0;	/* do we have at least one valid filesystem? */
+    int found_one_good = 0;
     struct filesystem_configuration_s* cur_fs = NULL;
-
-    /* TODO: Fill up the credentials information */
 
     /*
       for each entry in the pvfstab, attempt to query the server for
@@ -121,7 +101,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
     {
 	mntent_p = &mntent_list.ptab_array[i];
 
-   	/* Obtain the metaserver to send the request */
+   	/* obtain the metaserver to send the request */
 	ret = BMI_addr_lookup(&serv_addr, mntent_p->pvfs_config_server);
 	if (ret < 0)
 	{
@@ -130,7 +110,9 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	    continue;
 	}
 
-	/* Set up the request for getconfig */
+        creds.uid = getuid();
+        creds.gid = getgid();
+
         memset(&serv_req,0,sizeof(struct PVFS_server_req));
 	serv_req.op = PVFS_SERV_GETCONFIG;
 	serv_req.credentials = creds;
@@ -150,10 +132,12 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	    gossip_err("       (%s)\n", mntent_p->pvfs_config_server);
 	    continue;
 	}
-	serv_resp = (struct PVFS_server_resp *) decoded.buffer;
-	if(serv_resp->status != 0)
+
+	serv_resp = (struct PVFS_server_resp *)decoded.buffer;
+	if (serv_resp->status != 0)
 	{
-	    PVFS_perror_gossip("Error: getconfig request denied", serv_resp->status);
+	    PVFS_perror_gossip("Error: getconfig request denied",
+                               serv_resp->status);
 	    continue;
 	}
 
@@ -163,14 +147,14 @@ int PINT_server_get_config(struct server_configuration_s *config,
                           "%s\n",mntent_p->pvfs_config_server);
 
             /* let go of any resources consumed by PINT_send_req() */
-            PINT_release_req(serv_addr, &serv_req, mntent_p->encoding, &decoded,
-                             &encoded_resp, op_tag);
+            PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
+                             &decoded, &encoded_resp, op_tag);
             continue;
         }
 
 	/* let go of any resources consumed by PINT_send_req() */
-	PINT_release_req(serv_addr, &serv_req, mntent_p->encoding, &decoded,
-                         &encoded_resp, op_tag);
+	PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
+                         &decoded, &encoded_resp, op_tag);
         break;
     }
 
@@ -206,7 +190,9 @@ int PINT_server_get_config(struct server_configuration_s *config,
     }
 
     if (found_one_good)
+    {
 	return(0); 
+    }
     else
     {
 	gossip_err("Error: no valid pvfs2tab entries found.\n");
