@@ -1984,6 +1984,8 @@ static int tcp_do_work_recv(method_addr_p map)
 		{
 			gossip_lerr("Error: message ordering violation;\n");
 			gossip_lerr("Error: message too large for next buffer.\n");
+			gossip_lerr("Error: incoming size: %ld, expected size: %ld\n",
+				(long)new_header.size, (long)active_method_op->expected_size);
 			/* TODO: return error here or do something else? */
 			return(-EPROTO);
 		}
