@@ -34,6 +34,7 @@ foreach $file (@files)
 		    /^  LD/ ||
 		    /^  BISON/ ||
 		    /^  FLEX/ ||
+		    /^  GENCONFIG/ ||
 		    /^  GEN/)
 		{
 			$last_cmd = $_;

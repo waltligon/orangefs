@@ -683,6 +683,8 @@ distclean: cleaner docsclean
 	rm -f $(SMCGEN)
 	rm -f $(TROVE_AUTOGEN_FILES)
 	rm -f Makefile pvfs2-config.h
+	rm -f src/server/simple.conf
+	rm -f src/server/server.conf-localhost
 
 # this is where we include all of our automatic dependencies.
 # NOTE: we wrap this in ifneq's in order to prevent the
@@ -744,6 +746,26 @@ ifdef QUIET_COMPILE
 else
 	src/common/statecomp/statecomp $< $@
 endif
+endif
+
+# if this is not a distribution tarball, then drop some example
+# config files in the server build directory with good defaults for
+# debugging
+ifndef DIST_RELEASE
+all: src/server/simple.conf src/server/server.conf-localhost
+endif
+src/server/simple.conf src/server/server.conf-localhost: src/apps/admin/pvfs2-genconfig
+ifdef QUIET_COMPILE
+	@echo "  GENCONFIG     $@"
+	@$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
+ --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
+ --storage /tmp/pvfs2-test-space --logging "server,network,storage,flow" \
+ --quiet src/server/simple.conf src/server/server.conf
+else
+	$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
+ --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
+ --storage /tmp/pvfs2-test-space --logging "server,network,storage,flow" \
+ --quiet src/server/simple.conf src/server/server.conf
 endif
 
 install_doc:
