@@ -92,14 +92,14 @@ int directory_walk(PVFS_sysresp_init *init_response,
     }
     name = full_path;
     fs_id = init_response->fsid_list[0];
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
 
     if (PVFS_sys_lookup(fs_id, name, credentials,
-                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW))
+                        &lk_response, PVFS2_LOOKUP_LINK_FOLLOW))
     {
         fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
-                start_dir,init_response->fsid_list[0]);
+                name,init_response->fsid_list[0]);
         return 1;
     }
 

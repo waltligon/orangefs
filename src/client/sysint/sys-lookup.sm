@@ -412,7 +412,8 @@ static int lookup_msg_comp_fn(void *v_p,
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     char buf[PVFS_SEGMENT_MAX] = {0};
-    
+    char tmp[PVFS_SEGMENT_MAX] = {0};
+
     gossip_debug(CLIENT_DEBUG, "lookup_msg_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
@@ -571,9 +572,13 @@ static int lookup_msg_comp_fn(void *v_p,
     else if ((resp_p->u.lookup_path.handle_count !=
               resp_p->u.lookup_path.attr_count))
     {
+        /*
+          this is the case where we have a distributed metadata
+          setup and a lookup returned a handle without an attribute
+          since we need to get those from another server
+        */
         int next_path_segment =
-            ((resp_p->u.lookup_path.attr_count == 0) ? 0 :
-             resp_p->u.lookup_path.handle_count);
+            resp_p->u.lookup_path.handle_count;
 
 #if 0
         /*
@@ -613,17 +618,24 @@ static int lookup_msg_comp_fn(void *v_p,
         }
 #endif
         gossip_debug(CLIENT_DEBUG, "Getting path element %d from "
-                     "path %s\n", next_path_segment,
-                     sm_p->u.lookup.remaining_pathname);
+                     "path %s [num segments is %d]\n", next_path_segment,
+                     sm_p->u.lookup.remaining_pathname,
+                     sm_p->u.lookup.num_segments);
 
+        /*
+          here we're updating the remaining_pathname by stripping
+          off the parts of the path that were just looked up.
+          out new parent handle is already valid at this point
+        */
         snprintf(buf, PVFS_SEGMENT_MAX, "%s",
                  sm_p->u.lookup.remaining_pathname);
         memset(sm_p->u.lookup.remaining_pathname, 0, PVFS_SEGMENT_MAX);
         PINT_get_path_element(
-            buf, next_path_segment,
-            sm_p->u.lookup.remaining_pathname, PVFS_SEGMENT_MAX);
-        assert(sm_p->u.lookup.remaining_pathname &&
-               strlen(sm_p->u.lookup.remaining_pathname) > 0);
+            buf, next_path_segment, tmp, PVFS_SEGMENT_MAX);
+        assert(strlen(tmp) > 0);
+
+        strncpy(sm_p->u.lookup.remaining_pathname,
+                strstr(buf, tmp), PVFS_SEGMENT_MAX);
 
         gossip_debug(CLIENT_DEBUG, "Remaining pathname is %s | "
                      "new starting handle is %Lu\n",
