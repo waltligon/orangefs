@@ -1,0 +1,3 @@
+DIR := src/common/misc
+LIBSRC += $(DIR)/str_utils.c
+SERVERSRC += $(DIR)/str_utils.c

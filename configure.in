@@ -119,6 +119,7 @@ src/apps/admin/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
 src/io/trove/trove-dbpf/module.mk
+src/common/misc/module.mk
 src/common/quickhash/module.mk
 src/common/quicklist/module.mk
 src/common/dotconf/module.mk
