@@ -288,10 +288,12 @@ static int lebf_encode_resp(
 	case PVFS_SERV_GETCONFIG:
 	    /* adjust size estimage based on what we are sending */
 	    target_msg->ptr_current = NULL;
+	    PINT_XENC_MODE = PINT_CALC_SIZE;
 	    PINT_XENC_RESP_GEN(target_msg, response);
 	    PINT_XENC_RESP_GETCONFIG(target_msg, response);
 	    target_msg->size_list[0] = target_msg->total_size = 
 		(int)(target_msg->ptr_current) + PINT_ENC_GENERIC_HEADER_SIZE;
+	    PINT_XENC_MODE = PINT_ENC;
 
 	    /* create a buffer */
 	    target_msg->buffer_list[0] = target_msg->ptr_current =  
@@ -306,6 +308,7 @@ static int lebf_encode_resp(
 	    PINT_XENC_RESP_GEN(target_msg, response);
 	    PINT_XENC_RESP_GETCONFIG(target_msg, response);
 	    ret = 0;
+	    break;
 	default:
 	    gossip_lerr("Error: unsupported operation.\n");
 	    ret = -ENOSYS;
