@@ -15,7 +15,6 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
-#include "quicklist.h"
 
 /* non-blocking operation handle */
 typedef PVFS_id_gen_t sysint_op_id_t;

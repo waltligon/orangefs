@@ -354,6 +354,7 @@ static int pvfs2_devreq_release(
 
     open_access_count--;
     device_owner = NULL;
+
     module_put(pvfs2_fs_type.owner);
 
     /*

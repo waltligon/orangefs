@@ -258,24 +258,29 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     int ret = -EINVAL;
     struct inode *inode = dentry->d_inode;
 
-    pvfs2_print("pvfs2: pvfs2_setattr called on %s\n",
-                dentry->d_name.name);
+    pvfs2_print("pvfs2_setattr: called on %s\n", dentry->d_name.name);
 
     ret = inode_change_ok(inode, iattr);
     if (ret == 0)
     {
-        update_atime(inode);
-        ret = pvfs2_inode_setattr(inode, iattr);
-        if ((ret == 0) && (S_ISREG(inode->i_mode)))
+        if (S_ISREG(inode->i_mode))
         {
-            pvfs2_print("calling inode_setattr\n");
-            inode_setattr(inode, iattr);
+            ret = inode_setattr(inode, iattr);
+            pvfs2_print("pvfs2_setattr: inode_setattr returned %d\n", ret);
+        }
+
+        if (ret == 0)
+        {
+            ret = pvfs2_inode_setattr(inode, iattr);
         }
     }
     else
     {
-        pvfs2_error("pvfs2: inode_change_ok failed with %d\n",ret);
+        pvfs2_error("pvfs2_setattr: inode_change_ok failed "
+                    "with %d\n", ret);
     }
+
+    pvfs2_print("pvfs2_setattr: returning %d\n", ret);
     return ret;
 }
 
@@ -287,8 +292,7 @@ int pvfs2_getattr(
     int ret = -ENOENT;
     struct inode *inode = dentry->d_inode;
 
-    pvfs2_print("pvfs2: pvfs2_getattr called on %s\n",
-                dentry->d_name.name);
+    pvfs2_print("pvfs2_getattr: called on %s\n", dentry->d_name.name);
 
     ret = pvfs2_inode_getattr(inode);
     if (ret == 0)
@@ -318,9 +322,9 @@ struct inode *pvfs2_get_custom_inode(
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    pvfs2_print("pvfs2_get_custom_inode: called (sb is %p | "
-                "MAJOR(dev)=%u | MINOR(dev)=%u)\n",
-                sb, MAJOR(dev), MINOR(dev));
+    pvfs2_print("pvfs2_get_custom_inode: called\n  (sb is %p | "
+                "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev),
+                MINOR(dev));
 
     inode = new_inode(sb);
     if (inode)
@@ -337,7 +341,7 @@ struct inode *pvfs2_get_custom_inode(
 	    pvfs2_inode->refn.handle = 0;
 	    pvfs2_inode->refn.fs_id = 0;
         }
-	pvfs2_print("pvfs2_get_custom_inode: inode %p allocated "
+	pvfs2_print("pvfs2_get_custom_inode: inode %p allocated\n  "
 		    "(pvfs2_inode is %p | sb is %p)\n", inode,
 		    pvfs2_inode, inode->i_sb);
 
@@ -379,7 +383,7 @@ struct inode *pvfs2_get_custom_inode(
         }
         else
         {
-	    pvfs2_print("pvfs2_get_custom_inode -- unsupported mode\n");
+	    pvfs2_print("pvfs2_get_custom_inode: unsupported mode\n");
 	}
     }
     return inode;

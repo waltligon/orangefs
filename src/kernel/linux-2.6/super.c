@@ -63,18 +63,17 @@ static int parse_mount_options(
     return 0;
 }
 
-static struct inode *pvfs2_alloc_inode(
-    struct super_block *sb)
+static struct inode *pvfs2_alloc_inode(struct super_block *sb)
 {
     struct inode *new_inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
     /*
        this allocator has an associated constructor that fills in the
-       internal vfs inode structure.  this initialization is
-       extremely important and is required since we're allocating
-       the inodes ourselves (rather than letting the system inode
-       allocator initialize them for us); see inode.c/inode_init_once()
+       internal vfs inode structure.  this initialization is extremely
+       important and is required since we're allocating the inodes
+       ourselves (rather than letting the system inode allocator
+       initialize them for us); see inode.c/inode_init_once()
      */
     pvfs2_inode = kmem_cache_alloc(pvfs2_inode_cache,
                                    PVFS2_CACHE_ALLOC_FLAGS);
@@ -85,8 +84,7 @@ static struct inode *pvfs2_alloc_inode(
     return new_inode;
 }
 
-static void pvfs2_destroy_inode(
-    struct inode *inode)
+static void pvfs2_destroy_inode(struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
@@ -102,9 +100,8 @@ static void pvfs2_read_inode(
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2: pvfs2_read_inode called (inode = %lu | "
-                "ct = %d)\n", inode->i_ino,
-                (int)atomic_read(&inode->i_count));
+    pvfs2_print("pvfs2_read_inode: (inode = %lu | ct = %d)\n",
+                inode->i_ino, (int)atomic_read(&inode->i_count));
 
     /*
       at this point we know the private inode data handle/fs_id can't
@@ -135,7 +132,7 @@ static void pvfs2_write_inode(
     struct inode *inode,
     int do_sync)
 {
-    pvfs2_print("pvfs2: pvfs2_write_inode called (inode = %d)\n",
+    pvfs2_print("pvfs2_write_inode: called (inode = %d)\n",
 		(int)inode->i_ino);
 }
 
@@ -143,9 +140,8 @@ static void pvfs2_write_inode(
 static void pvfs2_put_inode(
     struct inode *inode)
 {
-    pvfs2_print("pvfs2: pvfs2_put_inode called (ino %d | ct=%d | "
-                "nlink=%d)\n", (int) inode->i_ino,
-                (int)atomic_read(&inode->i_count),
+    pvfs2_print("pvfs2_put_inode: (%d | ct=%d | nlink=%d)\n",
+                (int)inode->i_ino, (int)atomic_read(&inode->i_count),
                 (int)inode->i_nlink);
 
     if (atomic_read(&inode->i_count) == 1)
@@ -167,13 +163,13 @@ static int pvfs2_statfs(
     pvfs2_kernel_op_t *new_op = NULL;
     struct statfs tmp_statfs;
 
-    pvfs2_print("pvfs2_: pvfs2_statfs called on sb %p "
-                "(fs_id is %d)\n", sb, (int)(PVFS2_SB(sb)->fs_id));
+    pvfs2_print("pvfs2_statfs: called on sb %p (fs_id is %d)\n",
+                sb, (int)(PVFS2_SB(sb)->fs_id));
 
     new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!new_op)
     {
-	pvfs2_error("pvfs2: pvfs2_statfs -- kmem_cache_alloc failed!\n");
+	pvfs2_error("pvfs2_statfs: kmem_cache_alloc failed!\n");
 	return ret;
     }
     new_op->upcall.type = PVFS2_VFS_OP_STATFS;
@@ -185,7 +181,7 @@ static int pvfs2_statfs(
 
     if (new_op->downcall.status > -1)
     {
-        pvfs2_print("pvfs2_statfs got %ld blocks available | "
+        pvfs2_print("pvfs2_statfs: got %ld blocks available | "
                     "%ld blocks total\n",
                     new_op->downcall.resp.statfs.blocks_avail,
                     new_op->downcall.resp.statfs.blocks_total);
@@ -245,7 +241,7 @@ static int pvfs2_statfs(
   error_exit:
     op_release(new_op);
 
-    pvfs2_print("pvfs2_statfs returning %d\n", ret);
+    pvfs2_print("pvfs2_statfs: returning %d\n", ret);
     return ret;
 }
 
@@ -268,7 +264,7 @@ int pvfs2_remount(
     int ret = -EINVAL;
     pvfs2_kernel_op_t *new_op = NULL;
 
-    pvfs2_print("pvfs2: pvfs2_remount called\n");
+    pvfs2_print("pvfs2_remount: called\n");
 
     if (sb && PVFS2_SB(sb))
     {
@@ -520,7 +516,7 @@ void pvfs2_kill_sb(
     /* free the pvfs2 superblock private data */
     kfree(PVFS2_SB(sb));
 
-    pvfs2_print("pvfs2_kill_sb returning normally\n");
+    pvfs2_print("pvfs2_kill_sb: returning normally\n");
 }
 
 /*

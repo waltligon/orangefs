@@ -19,7 +19,7 @@ int pvfs2_d_revalidate(
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
 
-    pvfs2_print("pvfs2: pvfs2_d_revalidate called\n");
+    pvfs2_print("pvfs2_d_revalidate: called on dentry %p\n", dentry);
 
     if (nd && (nd->flags & LOOKUP_FOLLOW) &&
         (!nd->flags & LOOKUP_CREATE))
@@ -58,8 +58,8 @@ static int pvfs2_d_compare(
     struct qstr *d_name,
     struct qstr *name)
 {
-    pvfs2_print("pvfs2: pvfs2_d_compare called (name1: %s | name2: %s)\n",
-                d_name->name, name->name);
+    pvfs2_print("pvfs2_d_compare: called on parent %p\n  (name1: %s| "
+                "name2: %s)\n", parent, d_name->name, name->name);
 
     /* if we have a match, return 0 (normally called from __d_lookup) */
     return !((d_name->len == name->len) &&

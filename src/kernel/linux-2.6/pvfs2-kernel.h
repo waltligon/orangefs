@@ -362,7 +362,7 @@ do {                                                         \
 do {                                                         \
     sigset_t orig_sigset;                                    \
     if (!intr) mask_blocked_signals(&orig_sigset);           \
-    down(&request_semaphore);                                \
+    down_interruptible(&request_semaphore);                  \
     add_op_to_request_list(op);                              \
     up(&request_semaphore);                                  \
     ret = wait_for_matching_downcall(new_op);                \
@@ -405,7 +405,7 @@ do {                                                               \
     sigset_t orig_sigset;                                          \
     if (!intr) mask_blocked_signals(&orig_sigset);                 \
   wait_for_op:                                                     \
-    down(&request_semaphore);                                      \
+    down_interruptible(&request_semaphore);                        \
     add_op_to_request_list(op);                                    \
     up(&request_semaphore);                                        \
     ret = wait_for_matching_downcall(op);                          \
@@ -441,36 +441,36 @@ do {                                                               \
   NOTE: used in namei.c:lookup, file.c:pvfs2_inode_read, and
   file.c:pvfs2_file_write
 */
-#define service_error_exit_op_with_timeout_retry(op,meth,num,e, intr)\
-do {                                                                 \
-    sigset_t orig_sigset;                                            \
-    if (!intr) mask_blocked_signals(&orig_sigset);                   \
-  wait_for_op:                                                       \
-    down(&request_semaphore);                                        \
-    add_op_to_request_list(op);                                      \
-    up(&request_semaphore);                                          \
-    ret = wait_for_matching_downcall(op);                            \
-    if (!intr) unmask_blocked_signals(&orig_sigset);                 \
-    if (ret != PVFS2_WAIT_SUCCESS)                                   \
-    {                                                                \
-        if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))          \
-        {                                                            \
-            pvfs2_print("pvfs2: %s -- timeout; requeing op\n",       \
-                        meth);                                       \
-            goto wait_for_op;                                        \
-        }                                                            \
-        else                                                         \
-        {                                                            \
-            if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                   \
-            {                                                        \
-                pvfs2_error("pvfs2: %s -- wait timed out (%x).  "    \
-                            "aborting retry attempts.\n",            \
-                            meth,ret);                               \
-            }                                                        \
-            e = 1;                                                   \
-            goto error_exit;                                         \
-        }                                                            \
-    }                                                                \
+#define service_error_exit_op_with_timeout_retry(op,meth,num,e,intr)\
+do {                                                                \
+    sigset_t orig_sigset;                                           \
+    if (!intr) mask_blocked_signals(&orig_sigset);                  \
+  wait_for_op:                                                      \
+    down_interruptible(&request_semaphore);                         \
+    add_op_to_request_list(op);                                     \
+    up(&request_semaphore);                                         \
+    ret = wait_for_matching_downcall(op);                           \
+    if (!intr) unmask_blocked_signals(&orig_sigset);                \
+    if (ret != PVFS2_WAIT_SUCCESS)                                  \
+    {                                                               \
+        if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))         \
+        {                                                           \
+            pvfs2_print("pvfs2: %s -- timeout; requeing op\n",      \
+                        meth);                                      \
+            goto wait_for_op;                                       \
+        }                                                           \
+        else                                                        \
+        {                                                           \
+            if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                  \
+            {                                                       \
+                pvfs2_error("pvfs2: %s -- wait timed out (%x).  "   \
+                            "aborting retry attempts.\n",           \
+                            meth,ret);                              \
+            }                                                       \
+            e = 1;                                                  \
+            goto error_exit;                                        \
+        }                                                           \
+    }                                                               \
 } while(0)
 
 /*
@@ -552,6 +552,22 @@ do {                                                                 \
     }                                                                \
     spin_unlock(&pvfs2_superblocks_lock);                            \
 } while(0)
+
+#define fill_default_sys_attrs(sys_attr,type,mode)\
+do                                                \
+{                                                 \
+    struct timespec tspec = CURRENT_TIME;         \
+    sys_attr.owner = current->fsuid;              \
+    sys_attr.group = current->fsgid;              \
+    sys_attr.atime = (PVFS_time)tspec.tv_sec;     \
+    sys_attr.mtime = (PVFS_time)tspec.tv_sec;     \
+    sys_attr.ctime = (PVFS_time)tspec.tv_sec;     \
+    sys_attr.size = 0;                            \
+    sys_attr.perms = mode;                        \
+    sys_attr.objtype = type;                      \
+    sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
+} while(0)
+
 
 #endif /* __PVFS2KERNEL_H */
 

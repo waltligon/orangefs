@@ -39,8 +39,14 @@ int pvfs2_file_open(
     struct inode *inode,
     struct file *file)
 {
+    int ret = -EINVAL;
+
     pvfs2_print("pvfs2: pvfs2_file_open called on %s (inode is %d)\n",
                 file->f_dentry->d_name.name, (int)inode->i_ino);
+
+    inode->i_mapping->host = inode;
+    inode->i_mapping->a_ops = &pvfs2_address_operations;
+    inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 
     if (S_ISDIR(inode->i_mode))
     {
@@ -54,11 +60,10 @@ int pvfs2_file_open(
     */
     if (file->f_flags & O_APPEND)
     {
-        int ret = -EINVAL;
-
         ret = pvfs2_inode_getattr(inode);
         if (ret)
         {
+            pvfs2_print("pvfs2_file_open getattr error: %d\n", ret);
             return ret;
         }
         file->f_pos = inode->i_size;
@@ -68,7 +73,10 @@ int pvfs2_file_open(
       fs/open.c: returns 0 after enforcing large file support if
       running on a 32 bit system w/o O_LARGFILE flag
     */
-    return generic_file_open(inode, file);
+    ret = generic_file_open(inode, file);
+
+    pvfs2_print("pvfs2_file_open returning normally: %d\n", ret);
+    return ret;
 }
 
 ssize_t pvfs2_inode_read(

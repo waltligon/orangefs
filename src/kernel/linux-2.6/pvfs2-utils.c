@@ -67,22 +67,18 @@ static inline int copy_attributes_to_inode(
         pvfs2_inode = PVFS2_I(inode);
 
         /*
-          arbitrarily set the inode block size;
-          FIXME: we need to resolve the difference
-          between the reported inode blocksize and
-          the PAGE_CACHE_SIZE, since our block count
-          will always be wrong.
+          arbitrarily set the inode block size; FIXME: we need to
+          resolve the difference between the reported inode blocksize
+          and the PAGE_CACHE_SIZE, since our block count will always
+          be wrong.
 
-          For now, we're setting the block count to
-          be the proper number assuming the block size
-          is 512 bytes, and the size is rounded up
-          to the nearest 4K.  This is apparently
-          required to get proper size reports from
-          the 'du' shell utility.
+          For now, we're setting the block count to be the proper
+          number assuming the block size is 512 bytes, and the size is
+          rounded up to the nearest 4K.  This is apparently required
+          to get proper size reports from the 'du' shell utility.
 
-          changing the inode->i_blkbits to something
-          other than PAGE_CACHE_SHIFT breaks mmap/execution
-          as we depend on that.
+          changing the inode->i_blkbits to something other than
+          PAGE_CACHE_SHIFT breaks mmap/execution as we depend on that.
         */
         inode->i_blksize = pvfs_bufmap_size_query();
         inode->i_blkbits = PAGE_CACHE_SHIFT;
@@ -261,9 +257,8 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
 }
 
 /*
-  NOTE: in kernel land, we never use the
-  sys_attr->link_target for anything, so don't bother
-  copying it into the sys_attr object here.
+  NOTE: in kernel land, we never use the sys_attr->link_target for
+  anything, so don't bother copying it into the sys_attr object here.
 */
 static inline int copy_attributes_from_inode(
     struct inode *inode,
@@ -275,9 +270,9 @@ static inline int copy_attributes_from_inode(
     if (inode && attrs)
     {
         /*
-          if we got a non-NULL iattr structure, we need to be
-          careful to only copy the attributes out of the iattr
-          object that we know are valid
+          if we got a non-NULL iattr structure, we need to be careful
+          to only copy the attributes out of the iattr object that we
+          know are valid
         */
         if (iattr && (iattr->ia_valid & ATTR_UID))
             attrs->owner = iattr->ia_uid;
@@ -329,10 +324,8 @@ static inline int copy_attributes_from_inode(
 }
 
 /*
-  issues a pvfs2 getattr request and fills in the
-  appropriate inode attributes if successful.
-
-  returns 0 on success; -errno otherwise
+  issues a pvfs2 getattr request and fills in the appropriate inode
+  attributes if successful.  returns 0 on success; -errno otherwise
 */
 int pvfs2_inode_getattr(
     struct inode *inode)
@@ -350,11 +343,11 @@ int pvfs2_inode_getattr(
         }
 
         /*
-           in the case of being called from s_op->read_inode,
-           the pvfs2_inode private data hasn't been initialized
-           yet, so we need to use the inode number as the handle
-           and query the superblock for the fs_id.  Further, we
-           assign that private data here.
+           in the case of being called from s_op->read_inode, the
+           pvfs2_inode private data hasn't been initialized yet, so we
+           need to use the inode number as the handle and query the
+           superblock for the fs_id.  Further, we assign that private
+           data here.
 
            that call flow looks like:
            lookup --> iget --> read_inode --> here
@@ -372,25 +365,19 @@ int pvfs2_inode_getattr(
         }
 
         /*
-           post a getattr request here;
-           make dentry valid if getattr passes
+           post a getattr request here; make dentry valid if getattr
+           passes
         */
         new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
         if (!new_op)
         {
-            pvfs2_error("pvfs2: pvfs2_inode_getattr -- "
-                        "kmem_cache_alloc failed!\n");
+            pvfs2_error("pvfs2_inode_getattr: kmem_cache_alloc "
+                        "failed!\n");
             ret = -ENOMEM;
             return ret;
         }
         new_op->upcall.type = PVFS2_VFS_OP_GETATTR;
         new_op->upcall.req.getattr.refn = pvfs2_inode->refn;
-
-        /* need to check downcall.status value */
-        pvfs2_print("Trying Getattr on handle %Lu on fsid %d "
-                    "(inode ct = %d)\n", pvfs2_inode->refn.handle,
-                    pvfs2_inode->refn.fs_id,
-                    (int)atomic_read(&inode->i_count));
 
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_inode_getattr", retries, error_exit,
@@ -403,24 +390,27 @@ int pvfs2_inode_getattr(
                 (inode, &new_op->downcall.resp.getattr.attributes,
                  new_op->downcall.resp.getattr.link_target))
             {
-                pvfs2_error("pvfs2: pvfs2_inode_getattr -- failed "
-                            "to copy attributes\n");
+                pvfs2_error("pvfs2_inode_getattr: failed to copy "
+                            "attributes\n");
             }
         }
-        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
       error_exit:
-        pvfs2_print(error_exit ? "*** warning: getattr error_exit\n" : "");
+        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+
+        pvfs2_print("Getattr on handle %Lu, fsid %d\n  (inode ct = %d) "
+                    "returned %d (error_exit = %d)\n",
+                    pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id,
+                    (int)atomic_read(&inode->i_count), ret, error_exit);
+
         op_release(new_op);
     }
     return ret;
 }
 
 /*
-  issues a pvfs2 setattr request to make sure the
-  new attribute values take effect if successful.
-
-  returns 0 on success; -1 otherwise
+  issues a pvfs2 setattr request to make sure the new attribute values
+  take effect if successful.  returns 0 on success; -errno otherwise
 */
 int pvfs2_inode_setattr(
     struct inode *inode,
@@ -458,11 +448,8 @@ int pvfs2_inode_setattr(
             new_op, "pvfs2_inode_setattr", retries,
             get_interruptible_flag(inode));
 
-        pvfs2_print("Setattr Got PVFS2 status value of %d\n",
-                    new_op->downcall.status);
-
       error_exit:
-        ret = new_op->downcall.status;
+        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -476,99 +463,88 @@ static inline struct inode *pvfs2_create_file(
     int mode,
     int *error_code)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     pvfs2_inode_t *pvfs2_inode = NULL;
-    struct inode *inode =
-        pvfs2_get_custom_inode(dir->i_sb, (S_IFREG | mode), 0);
+    struct inode *inode = NULL;
 
-    if (inode)
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    if (!new_op)
     {
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
-        if (!new_op)
+        pvfs2_error("pvfs2_create_file: kmem_cache_alloc failed!\n");
+        *error_code = -ENOMEM;
+        return NULL;
+    }
+
+    new_op->upcall.type = PVFS2_VFS_OP_CREATE;
+    if (parent && parent->refn.handle && parent->refn.fs_id)
+    {
+        new_op->upcall.req.create.parent_refn = parent->refn;
+    }
+    else
+    {
+        new_op->upcall.req.create.parent_refn.handle =
+            pvfs2_ino_to_handle(dir->i_ino);
+        new_op->upcall.req.create.parent_refn.fs_id =
+            PVFS2_SB(dir->i_sb)->fs_id;
+    }
+
+    /* macro defined in pvfs2-kernel.h */
+    fill_default_sys_attrs(new_op->upcall.req.create.attributes,
+                           PVFS_TYPE_METAFILE, (S_IFREG | mode));
+
+    strncpy(new_op->upcall.req.create.d_name,
+            dentry->d_name.name, PVFS2_NAME_LEN);
+
+    service_error_exit_op_with_timeout_retry(
+        new_op, "pvfs2_create_file", retries, error_exit,
+        get_interruptible_flag(dir));
+
+    pvfs2_print("Create Got PVFS2 handle %Lu on fsid %d\n",
+                new_op->downcall.resp.create.refn.handle,
+                new_op->downcall.resp.create.refn.fs_id);
+
+    if (new_op->downcall.status > -1)
+    {
+        inode = pvfs2_get_custom_inode(dir->i_sb, (S_IFREG | mode), 0);
+        if (!inode)
         {
-            pvfs2_error("pvfs2: pvfs2_create_file -- "
-                        "kmem_cache_alloc failed!\n");
-            iput(inode);
+            pvfs2_error("*** Failed to allocate pvfs2 file inode\n");
+            op_release(new_op);
             *error_code = -ENOMEM;
             return NULL;
         }
-        new_op->upcall.type = PVFS2_VFS_OP_CREATE;
-        if (parent && parent->refn.handle && parent->refn.fs_id)
-        {
-            new_op->upcall.req.create.parent_refn = parent->refn;
-        }
-        else
-        {
-            new_op->upcall.req.create.parent_refn.handle =
-                pvfs2_ino_to_handle(dir->i_ino);
-            new_op->upcall.req.create.parent_refn.fs_id =
-                PVFS2_SB(dir->i_sb)->fs_id;
-        }
-        copy_attributes_from_inode(
-            inode, &new_op->upcall.req.create.attributes, NULL);
-        strncpy(new_op->upcall.req.create.d_name,
-                dentry->d_name.name, PVFS2_NAME_LEN);
 
-        service_operation_with_timeout_retry(
-            new_op, "pvfs2_create_file", retries,
-            get_interruptible_flag(inode));
+        inode->i_ino = pvfs2_handle_to_ino(
+            new_op->downcall.resp.create.refn.handle);
 
-        pvfs2_print("Create Got PVFS2 handle %Lu on fsid %d\n",
-                    new_op->downcall.resp.create.refn.handle,
-                    new_op->downcall.resp.create.refn.fs_id);
+        pvfs2_print("Assigned file inode new number of %d\n",
+                    (int)inode->i_ino);
 
-        /*
-           set the inode private data here, and set the inode number
-           here
-         */
-        if (new_op->downcall.status > -1)
-        {
-            inode->i_ino = pvfs2_handle_to_ino(
-                new_op->downcall.resp.create.refn.handle);
+        pvfs2_inode = PVFS2_I(inode);
+        pvfs2_inode->refn = new_op->downcall.resp.create.refn;
 
-            pvfs2_print("Assigned inode new number of %d\n",
-                        (int)inode->i_ino);
+        /* finally, add dentry with this new inode to the dcache */
+        pvfs2_print("pvfs2_create_file: Instantiating\n *negative* "
+                    "dentry %p for %s\n", dentry,
+                    dentry->d_name.name);
 
-            pvfs2_inode = PVFS2_I(inode);
-            pvfs2_inode->refn = new_op->downcall.resp.create.refn;
-
-            /*
-               set up the dentry operations to make sure that our
-               pvfs2 specific dentry operations take effect.
-
-               this is exploited by defining a revalidate method to be
-               called each time a lookup is done to avoid the natural
-               caching effect of the vfs.  unfortunately, client side
-               caching isn't good for consistency across nodes.  this
-               is also done in the create_dir and create_symlink
-               methods below.
-
-               NOTE: when adding negative dentries, we set the pvfs2
-               specific dentry operations already, so this is more
-               just a sanity re-set.
-             */
-            dentry->d_op = &pvfs2_dentry_operations;
-
-            /* finally, add dentry with this new inode to the dcache */
-            pvfs2_print("pvfs2_create_file: Instantiating *negative* "
-                        "dentry for %s\n", dentry->d_name.name);
-            d_instantiate(dentry, inode);
-        }
-        else
-        {
-          error_exit:
-            pvfs2_print("pvfs2_create_file: An error occurred; "
-                        "removing created inode\n");
-            iput(inode);
-            inode = NULL;
-
-            *error_code = pvfs2_kernel_error_code_convert(
-                new_op->downcall.status);
-        }
-        op_release(new_op);
+        dentry->d_op = &pvfs2_dentry_operations;
+        d_instantiate(dentry, inode);
     }
+    else
+    {
+      error_exit:
+        *error_code = (error_exit ? -EINTR :
+                       pvfs2_kernel_error_code_convert(
+                           new_op->downcall.status));
+
+        pvfs2_print("pvfs2_create_file: failed with error code %d\n",
+                    *error_code);
+    }
+
+    op_release(new_op);
     return inode;
 }
 
@@ -578,87 +554,88 @@ static inline struct inode *pvfs2_create_dir(
     int mode,
     int *error_code)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     pvfs2_inode_t *pvfs2_inode = NULL;
-    struct inode *inode =
-        pvfs2_get_custom_inode(dir->i_sb, (S_IFDIR | mode), 0);
+    struct inode *inode = NULL;
 
-    if (inode)
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    if (!new_op)
     {
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
-        if (!new_op)
+        pvfs2_error("pvfs2_create_dir: kmem_cache_alloc failed!\n");
+        *error_code = -ENOMEM;
+        return NULL;
+    }
+
+    new_op->upcall.type = PVFS2_VFS_OP_MKDIR;
+    if (parent && parent->refn.handle && parent->refn.fs_id)
+    {
+        new_op->upcall.req.mkdir.parent_refn = parent->refn;
+    }
+    else
+    {
+        new_op->upcall.req.mkdir.parent_refn.handle =
+            pvfs2_ino_to_handle(dir->i_ino);
+        new_op->upcall.req.mkdir.parent_refn.fs_id =
+            PVFS2_SB(dir->i_sb)->fs_id;
+    }
+
+    /* macro defined in pvfs2-kernel.h */
+    fill_default_sys_attrs(new_op->upcall.req.mkdir.attributes,
+                           PVFS_TYPE_DIRECTORY, (S_IFDIR | mode));
+
+    strncpy(new_op->upcall.req.mkdir.d_name,
+            dentry->d_name.name, PVFS2_NAME_LEN);
+
+    service_error_exit_op_with_timeout_retry(
+        new_op, "pvfs2_create_dir", retries, error_exit,
+        get_interruptible_flag(dir));
+
+    pvfs2_print("Mkdir Got PVFS2 handle %Lu on fsid %d\n",
+                new_op->downcall.resp.mkdir.refn.handle,
+                new_op->downcall.resp.mkdir.refn.fs_id);
+
+    if (new_op->downcall.status > -1)
+    {
+        inode = pvfs2_get_custom_inode(dir->i_sb, (S_IFDIR | mode), 0);
+        if (!inode)
         {
-            pvfs2_error("pvfs2: pvfs2_create_dir -- "
-                        "kmem_cache_alloc failed!\n");
-            iput(inode);
+            pvfs2_error("*** Failed to allocate pvfs2 dir inode\n");
+            op_release(new_op);
             *error_code = -ENOMEM;
             return NULL;
         }
-        new_op->upcall.type = PVFS2_VFS_OP_MKDIR;
-        if (parent && parent->refn.handle && parent->refn.fs_id)
-        {
-            new_op->upcall.req.mkdir.parent_refn = parent->refn;
-        }
-        else
-        {
-            new_op->upcall.req.mkdir.parent_refn.handle =
-                pvfs2_ino_to_handle(dir->i_ino);
-            new_op->upcall.req.mkdir.parent_refn.fs_id =
-                PVFS2_SB(dir->i_sb)->fs_id;
-        }
-        copy_attributes_from_inode(
-            inode, &new_op->upcall.req.mkdir.attributes, NULL);
-        strncpy(new_op->upcall.req.mkdir.d_name,
-                dentry->d_name.name, PVFS2_NAME_LEN);
 
-        pvfs2_print("pvfs2: pvfs2_create_dir op initialized "
-                    "with type %d\n", new_op->upcall.type);
+        inode->i_ino = pvfs2_handle_to_ino(
+            new_op->downcall.resp.mkdir.refn.handle);
 
-        service_operation_with_timeout_retry(
-            new_op, "pvfs2_create_dir", retries,
-            get_interruptible_flag(inode));
+        pvfs2_print("Assigned dir inode new number of %d\n",
+                    (int) inode->i_ino);
 
-        pvfs2_print("Mkdir Got PVFS2 handle %Lu on fsid %d\n",
-                    new_op->downcall.resp.mkdir.refn.handle,
-                    new_op->downcall.resp.mkdir.refn.fs_id);
+        pvfs2_inode = PVFS2_I(inode);
+        pvfs2_inode->refn = new_op->downcall.resp.mkdir.refn;
 
-        /*
-           set the inode private data here, and set the
-           inode number here
-         */
-        if (new_op->downcall.status > -1)
-        {
-            inode->i_ino = pvfs2_handle_to_ino(
-                new_op->downcall.resp.mkdir.refn.handle);
+        /* finally, add dentry with this new inode to the dcache */
+        pvfs2_print("pvfs2_create_dir: Instantiating\n  *negative* "
+                    "dentry %p for %s\n", dentry,
+                    dentry->d_name.name);
 
-            pvfs2_print("Assigned inode new number of %d\n",
-                        (int) inode->i_ino);
-
-            pvfs2_inode = PVFS2_I(inode);
-            pvfs2_inode->refn = new_op->downcall.resp.mkdir.refn;
-
-            dentry->d_op = &pvfs2_dentry_operations;
-
-            /* finally, add dentry with this new inode to the dcache */
-            pvfs2_print("pvfs2_create_dir: Instantiating *negative* "
-                        "dentry for %s\n", dentry->d_name.name);
-            d_instantiate(dentry, inode);
-        }
-        else
-        {
-          error_exit:
-            pvfs2_error("pvfs2_create_dir: An error occurred; "
-                        "removing created inode\n");
-            iput(inode);
-            inode = NULL;
-
-            *error_code = pvfs2_kernel_error_code_convert(
-                new_op->downcall.status);
-        }
-        op_release(new_op);
+        dentry->d_op = &pvfs2_dentry_operations;
+        d_instantiate(dentry, inode);
     }
+    else
+    {
+      error_exit:
+        *error_code = (error_exit ? -EINTR :
+                       pvfs2_kernel_error_code_convert(
+                           new_op->downcall.status));
+
+        pvfs2_print("pvfs2_create_dir: failed with error code %d\n",
+                    *error_code);
+    }
+
+    op_release(new_op);
     return inode;
 }
 
@@ -669,86 +646,89 @@ static inline struct inode *pvfs2_create_symlink(
     int mode,
     int *error_code)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     pvfs2_inode_t *pvfs2_inode = NULL;
-    struct inode *inode =
-        pvfs2_get_custom_inode(dir->i_sb, (S_IFLNK | mode), 0);
+    struct inode *inode = NULL;
 
-    if (inode)
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    if (!new_op)
     {
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
-        if (!new_op)
+        pvfs2_error("pvfs2_create_symlink: kmem_cache_alloc failed!\n");
+        *error_code = -ENOMEM;
+        return NULL;
+    }
+
+    new_op->upcall.type = PVFS2_VFS_OP_SYMLINK;
+    if (parent && parent->refn.handle && parent->refn.fs_id)
+    {
+        new_op->upcall.req.sym.parent_refn = parent->refn;
+    }
+    else
+    {
+        new_op->upcall.req.sym.parent_refn.handle =
+            pvfs2_ino_to_handle(dir->i_ino);
+        new_op->upcall.req.sym.parent_refn.fs_id =
+            PVFS2_SB(dir->i_sb)->fs_id;
+    }
+
+    /* macro defined in pvfs2-kernel.h */
+    fill_default_sys_attrs(new_op->upcall.req.sym.attributes,
+                           PVFS_TYPE_SYMLINK, (S_IFLNK | mode));
+
+    strncpy(new_op->upcall.req.sym.entry_name, dentry->d_name.name,
+            PVFS2_NAME_LEN);
+    strncpy(new_op->upcall.req.sym.target, symname, PVFS2_NAME_LEN);
+
+    service_error_exit_op_with_timeout_retry(
+        new_op, "pvfs2_symlink_file", retries, error_exit,
+        get_interruptible_flag(dir));
+
+    pvfs2_print("Symlink Got PVFS2 handle %Lu on fsid %d\n",
+                new_op->downcall.resp.sym.refn.handle,
+                new_op->downcall.resp.sym.refn.fs_id);
+
+    if (new_op->downcall.status > -1)
+    {
+        inode = pvfs2_get_custom_inode(dir->i_sb, (S_IFLNK | mode), 0);
+        if (!inode)
         {
-            pvfs2_error("pvfs2: pvfs2_create_symlink -- "
-                        "kmem_cache_alloc failed!\n");
-            iput(inode);
+            pvfs2_error("*** Failed to allocate pvfs2 symlink inode\n");
+            op_release(new_op);
             *error_code = -ENOMEM;
             return NULL;
         }
-        new_op->upcall.type = PVFS2_VFS_OP_SYMLINK;
-        if (parent && parent->refn.handle && parent->refn.fs_id)
-        {
-            new_op->upcall.req.sym.parent_refn = parent->refn;
-        }
-        else
-        {
-            new_op->upcall.req.sym.parent_refn.handle =
-                pvfs2_ino_to_handle(dir->i_ino);
-            new_op->upcall.req.sym.parent_refn.fs_id =
-                PVFS2_SB(dir->i_sb)->fs_id;
-        }
-        copy_attributes_from_inode(
-            inode, &new_op->upcall.req.sym.attributes, NULL);
-        strncpy(new_op->upcall.req.sym.entry_name,
-                dentry->d_name.name, PVFS2_NAME_LEN);
-        strncpy(new_op->upcall.req.sym.target,
-                symname, PVFS2_NAME_LEN);
 
-        service_operation_with_timeout_retry(
-            new_op, "pvfs2_symlink_file", retries,
-            get_interruptible_flag(inode));
+        inode->i_ino = pvfs2_handle_to_ino(
+            new_op->downcall.resp.sym.refn.handle);
 
-        pvfs2_print("Symlink Got PVFS2 handle %Lu on fsid %d\n",
-                    new_op->downcall.resp.sym.refn.handle,
-                    new_op->downcall.resp.sym.refn.fs_id);
+        pvfs2_print("Assigned symlink inode new number of %d\n",
+                    (int)inode->i_ino);
 
-        /*
-           set the inode private data here, and set the
-           inode number here
-         */
-        if (new_op->downcall.status > -1)
-        {
-            inode->i_ino = pvfs2_handle_to_ino(
-                new_op->downcall.resp.sym.refn.handle);
+        pvfs2_inode = PVFS2_I(inode);
+        pvfs2_inode->refn = new_op->downcall.resp.sym.refn;
 
-            pvfs2_print("Assigned inode new number of %d\n",
-                        (int)inode->i_ino);
+        /* finally, add dentry with this new inode to the dcache */
+        pvfs2_print("pvfs2_create_symlink: Instantiating\n  "
+                    "*negative* dentry %p for %s\n", dentry,
+                    dentry->d_name.name);
 
-            pvfs2_inode = PVFS2_I(inode);
-            pvfs2_inode->refn = new_op->downcall.resp.sym.refn;
-
-            dentry->d_op = &pvfs2_dentry_operations;
-
-            /* finally, add dentry with this new inode to the dcache */
-            pvfs2_print("pvfs2_create_symlink: Instantiating *negative* "
-                        "dentry for %s\n", dentry->d_name.name);
-            d_instantiate(dentry, inode);
-        }
-        else
-        {
-          error_exit:
-            pvfs2_error("pvfs2_symlink_file: An error occurred; "
-                        "removing created inode\n");
-            iput(inode);
-            inode = NULL;
-
-            *error_code = pvfs2_kernel_error_code_convert(
-                new_op->downcall.status);
-        }
-        op_release(new_op);
+        dentry->d_op = &pvfs2_dentry_operations;
+        d_instantiate(dentry, inode);
     }
+    else
+    {
+      error_exit:
+        *error_code = (error_exit ? -EINTR :
+                       pvfs2_kernel_error_code_convert(
+                           new_op->downcall.status));
+
+        pvfs2_print("pvfs2_create_symlink: failed with error code %d\n",
+                    *error_code);
+    }
+
+    op_release(new_op);
     return inode;
 }
 
@@ -757,7 +737,7 @@ static inline struct inode *pvfs2_create_symlink(
   pointer on success; NULL on failure.
 
   the required error_code value will contain an error code ONLY if an
-  error occurs (i.e. NULL is returned) and is unmodified otherwise.
+  error occurs (i.e. NULL is returned) and is set to 0 otherwise.
 
   if op_type is PVFS_VFS_OP_CREATE, a file is created
   if op_type is PVFS_VFS_OP_MKDIR, a directory is created
@@ -788,6 +768,11 @@ struct inode *pvfs2_create_entry(
                 pvfs2_error("pvfs2_create_entry got a bad "
                             "op_type (%d)\n", op_type);
         }
+    }
+
+    if (error_code)
+    {
+        *error_code = -EINVAL;
     }
     return NULL;
 }
@@ -886,7 +871,7 @@ int pvfs2_truncate_inode(
       the truncate has no downcall members to retrieve, but
       the status value tells us if it went through ok or not
     */
-    ret = new_op->downcall.status;
+    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("pvfs2: pvfs2_truncate got return value of %d\n",ret);
 
@@ -918,7 +903,7 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
     service_operation(new_op, "pvfs2_flush_mmap_racache",
                       get_interruptible_flag(inode));
 
-    ret = new_op->downcall.status;
+    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("pvfs2: pvfs2_flush_mmap_racache got "
                 "return value of %d\n",ret);
@@ -958,16 +943,7 @@ int pvfs2_unmount_sb(struct super_block *sb)
     if (ret)
     {
         sb = ERR_PTR(ret);
-        goto error_exit;
     }
-
-    /*
-      the unmount has no downcall members to retrieve, but
-      the status value tells us if it went through ok or not
-    */
-    ret = new_op->downcall.status;
-
-    pvfs2_print("pvfs2_unmount got return value of %d\n",ret);
 
   error_exit:
     op_release(new_op);

@@ -21,8 +21,8 @@ extern wait_queue_head_t pvfs2_request_list_waitq;
 extern struct dentry_operations pvfs2_dentry_operations;
 
 /*
-  called with a negative dentry, so we need to hook
-  it up with a newly allocated inode
+  called with a negative dentry, so we need to hook it up with a newly
+  allocated inode
 */
 static int pvfs2_create(
     struct inode *dir,
@@ -33,11 +33,12 @@ static int pvfs2_create(
     int ret = -EINVAL;
     struct inode *inode = NULL;
 
-    pvfs2_print("pvfs2: pvfs2_create called\n");
+    pvfs2_print("pvfs2_create: called\n");
 
     inode = pvfs2_create_entry(
         dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE, &ret);
 
+    pvfs2_print("pvfs2_create: returning %d\n", (inode ? 0 : ret));
     return (inode ? 0 : ret);
 }
 
@@ -130,13 +131,12 @@ struct dentry *pvfs2_lookup(
     strncpy(new_op->upcall.req.lookup.d_name,
 	    dentry->d_name.name, PVFS2_NAME_LEN);
 
-    pvfs2_print(
-        "pvfs2_lookup: doing lookup on %s under %Lu,%d (follow=%s)\n",
-        new_op->upcall.req.lookup.d_name,
-        new_op->upcall.req.lookup.parent_refn.handle,
-        new_op->upcall.req.lookup.parent_refn.fs_id,
-        ((new_op->upcall.req.lookup.sym_follow ==
-          PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
+    pvfs2_print("pvfs2_lookup: doing lookup on %s\n  under %Lu,%d "
+                "(follow=%s)\n", new_op->upcall.req.lookup.d_name,
+                new_op->upcall.req.lookup.parent_refn.handle,
+                new_op->upcall.req.lookup.parent_refn.fs_id,
+                ((new_op->upcall.req.lookup.sym_follow ==
+                  PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
 
     service_error_exit_op_with_timeout_retry(
         new_op, "pvfs2_lookup", retries, error_exit,
@@ -144,7 +144,7 @@ struct dentry *pvfs2_lookup(
 
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    pvfs2_print("Lookup Got PVFS2 handle %Lu on fsid %d (ret=%d)\n",
+    pvfs2_print("Lookup Got %Lu, fsid %d (ret=%d)\n",
                 new_op->downcall.resp.lookup.refn.handle,
                 new_op->downcall.resp.lookup.refn.fs_id, ret);
 
@@ -188,19 +188,21 @@ struct dentry *pvfs2_lookup(
       noticeably break during directory renames.
 
       however, if the operation failed or exited, do not add the
-      dentry.
+      dentry (e.g. in the case that a touch is issued on a file that
+      already exists that was interrupted during this lookup -- no
+      need to add another negative dentry for an existing file)
     */
     if (!inode && !error_exit)
     {
-        pvfs2_print("pvfs2_lookup: Adding *negative* dentry for %s\n",
-                    dentry->d_name.name);
-
         /*
-          make sure to set the pvfs2 specific dentry operations, even
-          for the negative dentry that we're adding now so that a
+          make sure to set the pvfs2 specific dentry operations for
+          the negative dentry that we're adding now so that a
           potential future lookup of this cached negative dentry can
-          be properly revalidated
+          be properly revalidated.
         */
+        pvfs2_print("pvfs2_lookup: Adding *negative* dentry %p\n  "
+                    "for %s\n", dentry, dentry->d_name.name);
+
         dentry->d_op = &pvfs2_dentry_operations;
         d_add(dentry, inode);
     }
@@ -377,26 +379,18 @@ static int pvfs2_rename(
         new_op, "pvfs2_rename", retries,
         get_interruptible_flag(old_dentry->d_inode));
 
-    /*
-      nothing's returned; just return the exit status
-
-      NOTE: make sure the properly translated error code
-      is passed down from above to distinguish between
-      different types of rename errors (target dir/file
-      exists, other error, etc).
-    */
-    ret = new_op->downcall.status;
+    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("pvfs2: pvfs2_rename got downcall status %d\n", ret);
 
     if (new_dentry->d_inode)
     {
-        if (are_directories && simple_empty(new_dentry))
-        {
-            pvfs2_print("pvfs2: pvfs2_rename target dir not empty\n");
-            ret = -ENOTEMPTY;
-            goto error_exit;
-        }
+/*         if (are_directories && simple_empty(new_dentry)) */
+/*         { */
+/*             pvfs2_print("pvfs2: pvfs2_rename target dir not empty\n"); */
+/*             ret = -ENOTEMPTY; */
+/*             goto error_exit; */
+/*         } */
 
         new_dentry->d_inode->i_ctime = CURRENT_TIME;
         if (are_directories)
