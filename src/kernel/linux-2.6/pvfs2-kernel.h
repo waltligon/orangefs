@@ -205,11 +205,6 @@ int wait_for_matching_downcall(
     pvfs2_kernel_op_t * op);
 
 /****************************
- * defined in pvfs2-bufmap.c
- ****************************/
-int pvfs_bufmap_size_query(void);
-
-/****************************
  * defined in inode.c
  ****************************/
 int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr);

@@ -14,10 +14,12 @@
 #include "pvfs2-bufmap.h"
 #include "pint-dev-shared.h"
 
+#define BUFMAP_PAGE_COUNT (PVFS2_BUFMAP_TOTAL_SIZE/PAGE_SIZE)
+#define PAGES_PER_DESC (PVFS2_BUFMAP_DEFAULT_DESC_SIZE/PAGE_SIZE)
+
 static int bufmap_init = 0;
 static struct page** bufmap_page_array = NULL;
 static void** bufmap_kaddr_array = NULL;
-static int bufmap_page_count = 0;
 
 /* list of available descriptors, and lock to protect it */
 static LIST_HEAD(desc_list);
@@ -35,13 +37,14 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 {
     int ret = -1;
     int i;
-    int pages_per_desc = 0;
     int offset = 0;
 
     if(bufmap_init)
 	return(-EALREADY);
 
-    /* check the alignment and see if the caller was nice to us */
+    /* sanity check alignment and size of buffer that caller wants 
+     * to work with
+     */
     if(PAGE_ALIGN((unsigned long)user_desc->ptr) != 
 	(unsigned long)user_desc->ptr)
     {
@@ -54,18 +57,20 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	pvfs2_error("pvfs2: error: memory alignment (back).\n");
 	return(-EINVAL);
     }
-
-    bufmap_page_count = user_desc->size / PAGE_SIZE;
-    pages_per_desc = bufmap_page_count / PVFS2_BUFMAP_DESC_COUNT;
-    if(pages_per_desc < 1)
+    if(user_desc->size != PVFS2_BUFMAP_TOTAL_SIZE)
     {
-	pvfs2_error("pvfs2: error: memory buffer too small.\n");
+	pvfs2_error("pvfs2: error: user provided an oddly sized buffer...\n");
+	return(-EINVAL);
+    }
+    if(PVFS2_BUFMAP_DEFAULT_DESC_SIZE%PAGE_SIZE != 0)
+    {
+	pvfs2_error("pvfs2: error: bufmap size not page size divisable.\n");
 	return(-EINVAL);
     }
 
     /* allocate storage to track our page mappings */
     bufmap_page_array = 
-	(struct page**)kmalloc(bufmap_page_count*sizeof(struct page*), 
+	(struct page**)kmalloc(BUFMAP_PAGE_COUNT*sizeof(struct page*), 
 	GFP_KERNEL);
     if(!bufmap_page_array)
     {
@@ -73,7 +78,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     }
 
     bufmap_kaddr_array =
-	(void**)kmalloc(bufmap_page_count*sizeof(void*),
+	(void**)kmalloc(BUFMAP_PAGE_COUNT*sizeof(void*),
 	GFP_KERNEL);
     if(!bufmap_kaddr_array)
     {
@@ -88,7 +93,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	current,
 	current->mm,
 	(unsigned long)user_desc->ptr,
-	bufmap_page_count,
+	BUFMAP_PAGE_COUNT,
 	1,
 	0,
 	bufmap_page_array,
@@ -106,10 +111,10 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     /* in theory we could run with what we got, but I will just treat it
      * as an error for simplicity's sake right now
      */
-    if(ret < bufmap_page_count)
+    if(ret < BUFMAP_PAGE_COUNT)
     {
 	pvfs2_error("pvfs2: error: asked for %d pages, only got %d.\n",
-	    bufmap_page_count, ret);
+	    (int)BUFMAP_PAGE_COUNT, ret);
 	for(i=0; i<ret; i++)
 	{
 	    page_cache_release(bufmap_page_array[i]);
@@ -120,7 +125,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     }
 
     /* get kernel space pointers for each page */
-    for(i=0; i<bufmap_page_count; i++)
+    for(i=0; i<BUFMAP_PAGE_COUNT; i++)
     {
 	bufmap_kaddr_array[i] = kmap(bufmap_page_array[i]);
     }
@@ -131,11 +136,11 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     {
 	desc_array[i].page_array = &bufmap_page_array[offset];
 	desc_array[i].kaddr_array = &bufmap_kaddr_array[offset];
-	desc_array[i].array_count = pages_per_desc;
+	desc_array[i].array_count = PAGES_PER_DESC;
 	desc_array[i].uaddr = user_desc->ptr +
-	    (i*pages_per_desc*PAGE_SIZE);
+	    (i*PAGES_PER_DESC*PAGE_SIZE);
 	list_add_tail(&(desc_array[i].list_link), &desc_list);
-	offset += pages_per_desc;
+	offset += PAGES_PER_DESC;
     }
 
     bufmap_init = 1;
@@ -161,7 +166,7 @@ void pvfs_bufmap_finalize(void)
 	return;
     }
 
-    for(i=0; i<bufmap_page_count; i++)
+    for(i=0; i<BUFMAP_PAGE_COUNT; i++)
     {
 	page_cache_release(bufmap_page_array[i]);
     }
@@ -240,21 +245,6 @@ void pvfs_bufmap_put(struct pvfs_bufmap_desc* desc)
     wake_up_interruptible(&bufmap_waitq);
 
     return;
-}
-
-/* pvfs_bufmap_size_query()
- *
- * queries to determine the size of the memory represented by each 
- * mapped buffer description
- *
- * returns size on success, -errno on failure
- */
-int pvfs_bufmap_size_query(void)
-{
-    if(!bufmap_init)
-	return(-EINVAL);
-
-    return((bufmap_page_count/PVFS2_BUFMAP_DESC_COUNT)*PAGE_SIZE);
 }
 
 /* pvfs_bufmap_copy_to_user()

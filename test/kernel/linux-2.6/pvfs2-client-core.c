@@ -33,9 +33,6 @@
 /* the block size to report in statfs */
 #define STATFS_DEFAULT_BLOCKSIZE  1024
 
-/* size of mapped region to use for I/O transfers (in bytes) */
-#define MAPPED_REGION_SIZE (16*1024*1024)
-
 /*
   set extraordinarily long pcache timeout value (ms) so
   that the attributes of files can be cached for a long
@@ -806,7 +803,7 @@ int main(int argc, char **argv)
 
     /* setup a mapped region for I/O transfers */
     ret = PINT_dev_get_mapped_region(
-        &mapped_region, MAPPED_REGION_SIZE);
+        &mapped_region, PVFS2_BUFMAP_TOTAL_SIZE);
     if(ret < 0)
     {
 	PVFS_perror("PINT_dev_get_mapped_region", ret);

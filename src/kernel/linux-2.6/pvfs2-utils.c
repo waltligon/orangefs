@@ -13,6 +13,7 @@
 #include "pvfs2-kernel.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
+#include "pvfs2-bufmap.h"
 
 extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;

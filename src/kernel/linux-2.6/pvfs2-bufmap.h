@@ -7,6 +7,8 @@
 #ifndef __PVFS2_BUFMAP_H
 #define __PVFS2_BUFMAP_H
 
+#include "pint-dev-shared.h"
+
 /* used to describe mapped buffers */
 struct pvfs_bufmap_desc
 {
@@ -17,6 +19,9 @@ struct pvfs_bufmap_desc
     struct list_head list_link;
 };
 
+/* this would be a function call if the buffer sizes weren't hard coded */
+#define pvfs_bufmap_size_query() PVFS2_BUFMAP_DEFAULT_DESC_SIZE
+
 int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc);
 
 void pvfs_bufmap_finalize(void);
@@ -24,8 +29,6 @@ void pvfs_bufmap_finalize(void);
 int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc);
 
 void pvfs_bufmap_put(struct pvfs_bufmap_desc* desc);
-
-int pvfs_bufmap_size_query(void);
 
 int pvfs_bufmap_copy_from_user(struct pvfs_bufmap_desc* to, void* from,
     int size);
