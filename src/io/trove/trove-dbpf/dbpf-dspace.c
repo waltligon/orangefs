@@ -31,14 +31,12 @@
 #include "dbpf-thread.h"
 
 extern pthread_cond_t dbpf_op_completed_cond;
+extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
+extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 #else
 extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
 #endif
-
-extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
-extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
-
 
 #define DBPF_FSTAT fstat
 
@@ -934,14 +932,14 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
     int ret = -1;
 #ifdef __PVFS2_TROVE_THREADED__
     int state = 0;
-#endif
-    dbpf_queued_op_t *cur_op = NULL;
     gen_mutex_t *context_mutex = NULL;
 
     assert(dbpf_completion_queue_array[context_id]);
 
     context_mutex = dbpf_completion_queue_array_mutex[context_id];
     assert(context_mutex);
+#endif
+    dbpf_queued_op_t *cur_op = NULL;
 
     *out_count_p = 0;
 
