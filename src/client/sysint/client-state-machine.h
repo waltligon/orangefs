@@ -54,7 +54,7 @@ struct PINT_client_remove_sm {
 
 
 
-typedef struct PINT_client_sm_s {
+typedef struct PINT_client_sm {
     /* STATE MACHINE VALUES */
     int stackptr; /* stack of contexts for nested state machines */
     PINT_state_array_values *current_state; /* xxx */
@@ -127,6 +127,11 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 #endif
 
 #include "state-machine.h"
+
+extern struct PINT_state_machine_s pvfs2_client_remove_sm;
+extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;
+
+
 
 /*
  * Local variables:

@@ -43,19 +43,19 @@
 
 union PINT_state_array_values
 {
-    int (*state_action)(PINT_OP_STATE *, job_status_s *);
+    int (*state_action)(struct PINT_OP_STATE *, job_status_s *);
     int return_value;
     int flag;
     void *nested_machine; /* NOTE: this is really a PINT_state_machine */
     union PINT_state_array_values *next_state;
 };
 
-typedef struct PINT_state_machine_s
+struct PINT_state_machine_s
 {
-    PINT_state_array_values *state_machine;
+    union PINT_state_array_values *state_machine;
     char *name;
     void (*init_fun)(void);
-} PINT_state_machine;
+};
 
 enum {
     JMP_NOT_READY = 99,

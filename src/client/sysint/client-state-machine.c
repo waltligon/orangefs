@@ -26,8 +26,6 @@
 
 job_context_id pint_client_sm_context;
 
-extern PINT_state_machine pvfs2_client_remove_sm;
-
 /* all stuff used in test function */
 enum {
     MAX_RETURNED_JOBS = 32

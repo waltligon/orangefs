@@ -45,13 +45,13 @@
 static inline int PINT_state_machine_halt(void);
 static inline int PINT_state_machine_next(PINT_OP_STATE *,job_status_s *r);
 #ifdef PINT_OP_STATE_TABLE
-static PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *);
+static union PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *);
 #endif
-static inline PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s);
-static inline void PINT_push_state(PINT_OP_STATE *s, PINT_state_array_values *p);
+static inline union PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s);
+static inline void PINT_push_state(PINT_OP_STATE *s, union PINT_state_array_values *p);
 
 #ifdef PINT_OP_STATE_TABLE
-extern PINT_state_machine *PINT_OP_STATE_TABLE[];
+extern struct PINT_state_machine_s *PINT_OP_STATE_TABLE[];
 #endif
 
 /* Function: PINT_state_machine_halt(void)
@@ -78,7 +78,7 @@ static inline int PINT_state_machine_next(PINT_OP_STATE *s,
 
     int code_val = r->error_code;       /* temp to hold the return code */
     int retval;            /* temp to hold return value of state action */
-    PINT_state_array_values *loc;     /* temp pointer into state memory */
+    union PINT_state_array_values *loc; /* temp pointer into state memory */
 
     do {
 	/* skip over the current state action to get to the return code list */
@@ -126,7 +126,7 @@ static inline int PINT_state_machine_next(PINT_OP_STATE *s,
 	/* NOTE: nested_machine is defined as a void * to eliminate a nasty
 	 * cross-structure dependency that I couldn't handle any more.  -- Rob
 	 */
-	s->current_state = ((PINT_state_machine *) s->current_state->nested_machine)->state_machine;
+	s->current_state = ((struct PINT_state_machine_s *) s->current_state->nested_machine)->state_machine;
     }
 
     /* skip over the flag so that we point to the function for the next
@@ -148,7 +148,7 @@ static inline int PINT_state_machine_next(PINT_OP_STATE *s,
    Synopsis: This function is used to start a state machines execution.
  */
 
-static PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *s_op)
+static union PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *s_op)
 {
     /* check for valid inputs */
     if (!s_op || s_op->op < 0 || s_op->op > PVFS_MAX_SERVER_OP)
@@ -168,7 +168,7 @@ static PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *s_op)
 }
 #endif
 
-static inline PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s)
+static inline union PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s)
 {
     if (s->stackptr <= 0)
     {
@@ -182,7 +182,7 @@ static inline PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s)
 }
 
 static inline void PINT_push_state(PINT_OP_STATE *s,
-				   PINT_state_array_values *p)
+				   union PINT_state_array_values *p)
 {
     if (s->stackptr > PINT_STATE_STACK_SIZE)
     {

@@ -21,8 +21,10 @@
 
 #define PINT_STATE_STACK_SIZE 8  /* size of stack for nested state machines */
 
+#if 0
 /* HACK!!! */
 typedef union PINT_state_array_values PINT_state_array_values;
+#endif
 
 /* Some config values for the prototype pvfs2 server */
 enum
@@ -127,8 +129,8 @@ typedef struct PINT_server_op
     /* STATE MACHINE VALUES */
     int op; /* op == req->op after initialize_unexpected */
     int stackptr; /* stack of contexts for nested state machines */
-    PINT_state_array_values *current_state; /* initialized in initialize_unexpected */
-    PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE]; 
+    union PINT_state_array_values *current_state; /* initialized in initialize_unexpected */
+    union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE]; 
 
     /* SERVER-SPECIFIC VALUES */
     job_id_t scheduled_id; /* holds id from request scheduler so we can release it later */

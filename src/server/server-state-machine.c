@@ -10,21 +10,21 @@
 #include "pvfs2-server.h"
 #include "state-machine-fns.h"
 
-extern PINT_state_machine pvfs2_get_config_sm;
-extern PINT_state_machine pvfs2_get_attr_sm;
-extern PINT_state_machine pvfs2_set_attr_sm;
-extern PINT_state_machine pvfs2_create_sm;
-extern PINT_state_machine pvfs2_crdirent_sm;
-extern PINT_state_machine pvfs2_mkdir_sm;
-extern PINT_state_machine pvfs2_readdir_sm;
-extern PINT_state_machine pvfs2_lookup_sm;
-extern PINT_state_machine pvfs2_io_sm;
-extern PINT_state_machine pvfs2_remove_sm;
-extern PINT_state_machine pvfs2_rmdirent_sm;
+extern struct PINT_state_machine_s pvfs2_get_config_sm;
+extern struct PINT_state_machine_s pvfs2_get_attr_sm;
+extern struct PINT_state_machine_s pvfs2_set_attr_sm;
+extern struct PINT_state_machine_s pvfs2_create_sm;
+extern struct PINT_state_machine_s pvfs2_crdirent_sm;
+extern struct PINT_state_machine_s pvfs2_mkdir_sm;
+extern struct PINT_state_machine_s pvfs2_readdir_sm;
+extern struct PINT_state_machine_s pvfs2_lookup_sm;
+extern struct PINT_state_machine_s pvfs2_io_sm;
+extern struct PINT_state_machine_s pvfs2_remove_sm;
+extern struct PINT_state_machine_s pvfs2_rmdirent_sm;
 
 /* table of state machines, indexed based on PVFS_server_op enumeration */
 /* NOTE: this table is initialized at run time in PINT_state_machine_init() */
-PINT_state_machine *PINT_server_op_table[PVFS_MAX_SERVER_OP+1] = {NULL};
+struct PINT_state_machine_s *PINT_server_op_table[PVFS_MAX_SERVER_OP+1] = {NULL};
 
 /* 
  * Function: PINT_state_machine_initialize_unexpected(s_op,ret)
