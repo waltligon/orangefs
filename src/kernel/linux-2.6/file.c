@@ -104,18 +104,18 @@ ssize_t pvfs2_inode_read(
         new_op->upcall.req.io.io_type = PVFS_IO_READ;
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
-	/* get a buffer for the transfer */
-	/* note that we get a new buffer each time for fairness, though
-	 * it may speed things up in the common case more if we kept one
-	 * buffer the whole time; need to measure performance difference
+	/* note that we get a new buffer each time for fairness,
+	 * though it may speed things up in the common case more if we
+	 * kept one buffer the whole time; need to measure performance
+	 * difference
 	 */
 	ret = pvfs_bufmap_get(&buffer_index);
 	if (ret < 0)
 	{
 	    pvfs2_error("pvfs2: error: pvfs_bufmap_get() failure.\n");
 	    ret = new_op->downcall.status;
-            op_release(new_op);
             kill_device_owner();
+            op_release(new_op);
 	    pvfs_bufmap_put(buffer_index);
 	    *offset = original_offset;
 	    return(ret);
@@ -248,10 +248,10 @@ static ssize_t pvfs2_file_write(
 
 	pvfs2_print("pvfs2: writing %d bytes.\n", count);
 
-	/* get a buffer for the transfer */
-	/* note that we get a new buffer each time for fairness, though
-	 * it may speed things up in the common case more if we kept one
-	 * buffer the whole time; need to measure performance difference
+	/* note that we get a new buffer each time for fairness,
+	 * though it may speed things up in the common case more if we
+	 * kept one buffer the whole time; need to measure performance
+	 * difference
 	 */
 	ret = pvfs_bufmap_get(&buffer_index);
 	if(ret < 0)
