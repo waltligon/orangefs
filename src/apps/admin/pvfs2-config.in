@@ -1,0 +1,64 @@
+#!/bin/sh
+
+# taken from SDL's sdl-config.in
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+exec_prefix_set=no
+
+usage="\
+Usage: pvfs2-config [--prefix[=DIR]] [--exec-prefix[=DIR]] [--version] [--cflags] [--libs] [--static-libs]"
+
+if test $# -eq 0; then
+      echo "${usage}" 1>&2
+      exit 1
+fi
+
+while test $# -gt 0; do
+  case "$1" in
+  -*=*) optarg=`echo "$1" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+  *) optarg= ;;
+  esac
+
+  case $1 in
+    --prefix=*)
+      prefix=$optarg
+      if test $exec_prefix_set = no ; then
+        exec_prefix=$optarg
+      fi
+      ;;
+    --prefix)
+      echo $prefix
+      ;;
+    --exec-prefix=*)
+      exec_prefix=$optarg
+      exec_prefix_set=yes
+      ;;
+    --exec-prefix)
+      echo $exec_prefix
+      ;;
+    --version)
+      echo @PVFS2_VERSION@
+      ;;
+    --cflags)
+      echo -I@includedir@ 
+
+      ;;
+    --libs|--static-libs)
+	libflags="-L@libdir@ -lpvfs2" 
+	if [ x"@BUILD_GM@" = x"1" ]; then
+		$libflags="$libflags -L@GM_HOME/lib -lgm"
+	fi
+	if [ x"@BUILD_IB@" = x"1" ]; then
+		$libflags="$libflags -L@IB_HOME@/lib -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
+	fi
+
+	echo $libflags
+	;;
+    *)
+      echo "${usage}" 1>&2
+      exit 1
+      ;;
+  esac
+  shift
+done

@@ -54,3 +54,5 @@ Bitstream, Inc.
    (may be redistributed subject to the license which is embedded in
    the font files themselves)
 
+SDL project
+-- pvfs2-config borrows heavily from sdl-config
