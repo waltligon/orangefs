@@ -85,6 +85,21 @@ machine pvfs2_client_remove_sm(init,
 	default => rmdirent_setup_msgpair;
     }
 
+    state rmdirent_setup_msgpair {
+	run remove_rmdirent_setup_msgpair;
+	success => rmdirent_xfer_msgpair;
+	default => rmdirent_failure;
+    }
+    state rmdirent_xfer_msgpair {
+	jump pvfs2_client_msgpair_sm;
+	success => getattr_setup_msgpair;
+	default => rmdirent_failure;
+    }
+    state rmdirent_failure {
+	run remove_rmdirent_failure;
+	default => cleanup;
+    }
+
     state getattr_setup_msgpair {
 	run remove_getattr_setup_msgpair;
 	success => getattr_xfer_msgpair;
@@ -98,21 +113,6 @@ machine pvfs2_client_remove_sm(init,
     }
     state getattr_failure {
 	run remove_getattr_failure;
-	default => cleanup;
-    }
-
-    state rmdirent_setup_msgpair {
-	run remove_rmdirent_setup_msgpair;
-	success => rmdirent_xfer_msgpair;
-	default => rmdirent_failure;
-    }
-    state rmdirent_xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
-	success => getattr_setup_msgpair;
-	default => rmdirent_failure;
-    }
-    state rmdirent_failure {
-	run remove_rmdirent_failure;
 	default => cleanup;
     }
 
@@ -230,6 +230,10 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
     gossip_debug(CLIENT_DEBUG, "remove state: getattr_setup_msgpair\n");
+
+    /* parameter range checks */
+    assert(sm_p->u.remove.object_ref.fs_id != 0);
+    assert(sm_p->u.remove.object_ref.handle != 0);
 
     /* fill in getattr request */
     PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
