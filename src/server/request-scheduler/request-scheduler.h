@@ -29,7 +29,8 @@ int PINT_req_sched_finalize(
 int PINT_req_sched_target_handle(
     struct PVFS_server_req *req,
     PVFS_handle * handle,
-    PVFS_fs_id * fs_id);
+    PVFS_fs_id * fs_id,
+    int* readonly_flag);
 
 /* scheduler submission */
 

@@ -96,6 +96,7 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
     PVFS_handle target_handle = 0;
     PVFS_fs_id target_fs_id = 0;
     job_id_t tmp_id;
+    int readonly_flag;
 
     gossip_debug(SERVER_DEBUG, 
 	"(%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
@@ -105,7 +106,7 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
      * what handle this request will operate on
      */
     ret = PINT_req_sched_target_handle(s_op->req, &target_handle, 
-	&target_fs_id);
+	&target_fs_id, &readonly_flag);
     if(ret < 0)
     {
 	js_p->error_code = ret;

@@ -184,10 +184,12 @@ int PINT_req_sched_finalize(
 int PINT_req_sched_target_handle(
     struct PVFS_server_req *req,
     PVFS_handle * handle,
-    PVFS_fs_id * fs_id)
+    PVFS_fs_id * fs_id,
+    int* readonly_flag)
 {
     *handle = 0;
     *fs_id = 0;
+    *readonly_flag = 1;
 
     switch (req->op)
     {
@@ -198,14 +200,18 @@ int PINT_req_sched_target_handle(
 	return (0);
 	break;
     case PVFS_SERV_CREATE:
+	*readonly_flag = 0;
 	return (0);
 	break;
     case PVFS_SERV_REMOVE:
+	*readonly_flag = 0;
 	*handle = req->u.remove.handle;
 	*fs_id = req->u.remove.fs_id;
 	return (0);
 	break;
     case PVFS_SERV_IO:
+	if(req->u.io.io_type == PVFS_IO_WRITE)
+	    *readonly_flag = 0;
 	*handle = req->u.io.handle;
 	*fs_id = req->u.io.fs_id;
 	return (0);
@@ -216,6 +222,7 @@ int PINT_req_sched_target_handle(
 	return (0);
 	break;
     case PVFS_SERV_SETATTR:
+	*readonly_flag = 0;
 	*handle = req->u.setattr.handle;
 	*fs_id = req->u.setattr.fs_id;
 	return (0);
@@ -226,21 +233,25 @@ int PINT_req_sched_target_handle(
 	return (0);
 	break;
     case PVFS_SERV_CREATEDIRENT:
+	*readonly_flag = 0;
 	*handle = req->u.crdirent.parent_handle;
 	*fs_id = req->u.crdirent.fs_id;
 	return (0);
 	break;
     case PVFS_SERV_RMDIRENT:
+	*readonly_flag = 0;
 	*handle = req->u.rmdirent.parent_handle;
 	*fs_id = req->u.rmdirent.fs_id;
 	return (0);
 	break;
     case PVFS_SERV_TRUNCATE:
+	*readonly_flag = 0;
 	*handle = req->u.truncate.handle;
 	*fs_id = req->u.truncate.fs_id;
 	return (0);
 	break;
     case PVFS_SERV_MKDIR:
+	*readonly_flag = 0;
 	return (0);
 	break;
     case PVFS_SERV_READDIR:
@@ -252,6 +263,7 @@ int PINT_req_sched_target_handle(
 	return (0);
 	break;
     case PVFS_SERV_FLUSH:
+	*readonly_flag = 0;
 	*handle = req->u.flush.handle;
 	*fs_id = req->u.flush.fs_id;
 	return (0);
@@ -299,9 +311,11 @@ int PINT_req_sched_post(
     PVFS_fs_id fs_id;
     enum PVFS_server_mode target_mode;
     int mode_change_ready = 0;
+    int readonly_flag = 0;
 
     /* find the handle */
-    ret = PINT_req_sched_target_handle(in_request, &handle, &fs_id);
+    ret = PINT_req_sched_target_handle(in_request, &handle, &fs_id, 
+	&readonly_flag);
     if (ret < 0)
     {
 	return (ret);
@@ -377,18 +391,20 @@ int PINT_req_sched_post(
 	}
     }
 
-    /* for normal requests, check to see if we are either in 
-     * admin mode, or are about to move to admin mode; in those cases
-     * we must return an error code
-     */
-    if(!qlist_empty(&mode_queue))
-	mode_element = qlist_entry(mode_queue.next, struct req_sched_element,
-	    list_link);
-    if(current_mode == PVFS_SERVER_ADMIN_MODE || (mode_element 
-	&& mode_element->req_ptr->u.mgmt_setparam.value == PVFS_SERVER_ADMIN_MODE))
+    if(!readonly_flag)
     {
-	free(tmp_element);
-	return(-PVFS_EAGAIN);
+	/* if this requests modifies the file system, we have to check
+	 * to see if we are in admin mode or about to enter admin mode
+	 */
+	if(!qlist_empty(&mode_queue))
+	    mode_element = qlist_entry(mode_queue.next, struct req_sched_element,
+		list_link);
+	if(current_mode == PVFS_SERVER_ADMIN_MODE || (mode_element 
+	    && mode_element->req_ptr->u.mgmt_setparam.value == PVFS_SERVER_ADMIN_MODE))
+	{
+	    free(tmp_element);
+	    return(-PVFS_EAGAIN);
+	}
     }
 
     /* see if we have a request queue up for this handle */
