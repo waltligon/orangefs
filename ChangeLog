@@ -80,6 +80,7 @@ pvfs2-0.1.2pre1
   when in fact it did
 - added full support for dynamic vfs mount (which breaks the old way of
   mounting, but is more convenient and makes more sense)
+- Better documentation for building MPICH2+ROMIO+PVFS2
 
 
 pvfs2-0.1.1
