@@ -365,6 +365,7 @@ doc/design/module.mk
 doc/random/module.mk
 maint/mpi-depend.sh
 include/pvfs2-types.h
+examples/pvfs2-server.rc
 )
 
 if test -e $types.prev ; then

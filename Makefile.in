@@ -463,6 +463,7 @@ distclean: clean
 	rm -f src/kernel/linux-2.6/Makefile
 	rm -f maint/mpi-depend.sh
 	rm -f include/pvfs2-types.h
+	rm -f examples/pvfs2-server.rc
 	rm -rf autom4te-*.cache
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
 
