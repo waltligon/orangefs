@@ -875,6 +875,54 @@ int BMI_tcp_testunexpected(int incount,
 }
 
 
+/* BMI_tcp_testcontext()
+ * 
+ * Checks to see if any messages from the specified context have completed.
+ *
+ * returns 0 on success, -errno on failure
+ */
+int BMI_tcp_testcontext(int incount,
+		     int *outcount,
+		     bmi_error_code_t * error_code_array,
+		     bmi_size_t * actual_size_array,
+		     void **user_ptr_array,
+		     int max_idle_time,
+		     bmi_context_id context_id)
+{
+    int ret = -1;
+    method_op_p query_op = NULL;
+
+    *outcount = 0;
+
+    /* do some ``real work'' here */
+    ret = tcp_do_work(max_idle_time);
+    if (ret < 0)
+    {
+	return (ret);
+    }
+
+    /* pop as many items off of the completion queue as we can */
+    while((*outcount < incount) && (query_op == 
+	op_list_shownext(completion_array[context_id]))) 
+    {
+	assert(query_op->context_id == context_id);
+	/* this one's done; pop it out */
+	op_list_remove(query_op);
+	error_code_array[*outcount] = query_op->error_code;
+	actual_size_array[*outcount] = query_op->actual_size;
+	if (user_ptr_array != NULL)
+	{
+	    user_ptr_array[*outcount] = query_op->user_ptr;
+	}
+	dealloc_tcp_method_op(query_op);
+	(*outcount)++;
+    }
+
+    return(0);
+}
+
+
+
 /* BMI_tcp_post_send_list()
  *
  * same as the BMI_tcp_post_send() function, except that it sends
