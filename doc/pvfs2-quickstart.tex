@@ -75,7 +75,8 @@ The following software packages are currently required by PVFS2:
 The following software packages are currently encouraged for use with PVFS2:
 \begin{itemize}
 \item GNU Libc (glibc) 2.3.2 [ or later ]
-\item Linux kernel version 2.6.0-test4 [ or later ]
+\item Linux kernel version 2.6.0-test4, or later (NOTE: not necessary for
+  running PVFS2 servers, only the client kernel module)
 \end{itemize}
 
 The following system assumptions are also made:
@@ -730,7 +731,7 @@ devpts on /dev/pts type devpts (rw,gid=5,mode=620)
 pvfs2 on /mnt/pvfs2 type pvfs2 (rw)
 \end{verbatim}
 
-NOTE: The coll_id and root_handle options MUST be specified, and the
+NOTE: The coll\_id and root\_handle options MUST be specified, and the
 ordering must match the above example.  These values can be read from
 your configuration files.  Also, you can use 'umount' to unmount the
 PVFS2 volume.
