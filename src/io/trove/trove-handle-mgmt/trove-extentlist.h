@@ -19,10 +19,6 @@
  * TODO: (2) have a real api (like the pcache) to set the timeout values */
 #define EXTENTLIST_PURGATORY 50
 
-enum {
-    MIN_HANDLE = 0,
-    MAX_HANDLE = 1048576
-};
 
 struct TROVE_handle_extent {
     TROVE_handle first;	/* start of the extent */
