@@ -659,8 +659,11 @@ static int server_initialize_subsystems(
 static int server_setup_signal_handlers(void)
 {
     signal(SIGHUP, (void *) server_sig_handler);
-    signal(SIGILL, (void *) server_sig_handler);
     signal(SIGPIPE, (void *) server_sig_handler);
+    signal(SIGILL, (void *) server_sig_handler);
+    signal(SIGTERM, (void *) server_sig_handler);
+    signal(SIGSEGV, (void *) server_sig_handler);
+    signal(SIGHUP, (void *) server_sig_handler);
     return 0;
 }
 
@@ -728,6 +731,13 @@ static void *server_sig_handler(int sig)
 	/* reset handler and continue processing */
 	signal(sig, (void*) server_sig_handler);
 	return(NULL);
+    }
+    if(sig == SIGHUP)
+    {
+	/* TODO: fix this, need to clean up server initialization
+	 * and shut down before we can handle this cleanly
+	 */
+	gossip_err("SIGHUP: pvfs2-server cannot restart; shutting down instead.\n");
     }
 
     /* set the signal_recvd_flag on critical errors to cause the server to 
