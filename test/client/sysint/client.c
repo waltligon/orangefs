@@ -1,4 +1,5 @@
 #include <client.h>
+#include <sys/time.h>
 
 /*why were these commented out?*/
 
@@ -10,11 +11,11 @@
 #define ATTR_MTIME 32
 #define ATTR_TYPE 2048
 
+void gen_rand_str(int len, char** gen_str);
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
 int main(int argc,char **argv)
 {
-
 	PVFS_sysresp_init resp_init;
 	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
@@ -23,25 +24,28 @@ int main(int argc,char **argv)
 	PVFS_sysreq_getattr *req_gattr = NULL;
 	PVFS_sysresp_getattr *resp_gattr = NULL;
 	PVFS_sysreq_setattr *req_sattr = NULL;
+	PVFS_sysreq_readdir *req_readdir = NULL;
+	PVFS_sysresp_readdir *resp_readdir = NULL;
 #if 0
 	PVFS_sysreq_mkdir *req_mkdir = NULL;
 	PVFS_sysresp_mkdir *resp_mkdir = NULL;
 	PVFS_sysreq_rmdir *req_rmdir = NULL;
-	PVFS_sysreq_readdir *req_readdir = NULL;
-	PVFS_sysresp_readdir *resp_readdir = NULL;
 	PVFS_sysreq_statfs *req_statfs = NULL;
 	PVFS_sysresp_statfs *resp_statfs = NULL;
 #endif
 	PVFS_sysreq_create *req_create = NULL;
 	PVFS_sysresp_create *resp_create = NULL;
-	char filename[80] = "file1";
+	char *filename;
 	//char dirname[256] = "/parl/fshorte/sysint/home";
 	int ret = -1,i = 0;
-	PVFS_fs_id fsid = 9;
 	pvfs_mntlist mnt = {0,NULL};
 
 	PVFS_handle lk_handle;
 	PVFS_handle lk_fsid;
+
+	gen_rand_str(10,&filename);
+
+	printf("creating a file named %s\n", filename);
 
 /*
 	if (argc > 1)
@@ -68,10 +72,10 @@ int main(int argc,char **argv)
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the root handle */
-	req_look.credentials.perms = 7;
+	req_look.credentials.perms = 1877;
 	req_look.name = malloc(2);/*null terminator included*/
-	req_look.name[0] = "/";
-	req_look.name[1] = "/0";
+	req_look.name[0] = '/';
+	req_look.name[1] = '\0';
 	req_look.fs_id = resp_init.fsid_list[0];
 	printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
 	ret = PVFS_sys_lookup(&req_look,&resp_look);
@@ -108,13 +112,19 @@ int main(int argc,char **argv)
 	}
 	memcpy(req_create->entry_name,filename,strlen(filename) + 1);
 	req_create->attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
-	req_create->attr.owner = 12345;
-	req_create->attr.group = 56789;
-	req_create->attr.perms = 642;
+	req_create->attr.owner = 100;
+	req_create->attr.group = 100;
+	req_create->attr.perms = 1877;
 
-//	req_create->parent_refn.handle = ;
-//	req_create->parent_refn.fs_id = ;
-	
+	req_create->credentials.uid = 100;
+	req_create->credentials.gid = 100;
+	req_create->credentials.perms = 1877;
+
+	req_create->attr.u.meta.nr_datafiles = 4;
+
+	req_create->parent_refn.handle = resp_look.pinode_refn.handle;
+	req_create->parent_refn.fs_id = req_look.fs_id;
+
 	
 #if 0
 	// Fill in the dist 
@@ -129,7 +139,7 @@ int main(int argc,char **argv)
 	ret = PVFS_sys_create(req_create,resp_create);
 	if (ret < 0)
 	{
-		printf("create failed\n");
+		printf("create failed with errcode = %d\n", ret);
 		return(-1);
 	}
 	
@@ -137,10 +147,56 @@ int main(int argc,char **argv)
 	printf("--create--\n"); 
 	printf("Handle:%ld\n",(long int)resp_create->pinode_refn.handle);
 
+#if 0
+	printf("GETATTR HERE===>\n");
+	req_gattr = (PVFS_sysreq_getattr *)malloc(sizeof(PVFS_sysreq_getattr));
+	if (!req_gattr)
+	{
+		printf("Error in malloc\n");
+		return(-1);
+	}
+	resp_gattr = (PVFS_sysresp_getattr *)malloc(sizeof(PVFS_sysresp_getattr));
+	if (!resp_gattr)
+	{
+		printf("Error in malloc\n");
+		return(-1);
+	}
+	
+	// Fill in the handle 
+	req_gattr->pinode_refn.handle = resp_create->pinode_refn.handle;
+	req_gattr->pinode_refn.fs_id = resp_init.fsid_list[0];
+	req_gattr->attrmask = ATTR_META;
+
+	// Use it 
+	ret = PVFS_sys_getattr(req_gattr,resp_gattr);
+	if (ret < 0)
+	{
+		printf("getattr failed with errcode = %d\n", ret);
+		return(-1);
+	}
+	// print the handle 
+	printf("--getattr--\n"); 
+	printf("Handle:%ld\n",(long int)req_gattr->pinode_refn.handle);
+	printf("FSID:%ld\n",(long int)req_gattr->pinode_refn.fs_id);
+	printf("mask:%d\n",req_gattr->attrmask);
+	printf("uid:%d\n",resp_gattr->attr.owner);
+	printf("gid:%d\n",resp_gattr->attr.group);
+	printf("permissions:%d\n",resp_gattr->attr.perms);
+	printf("atime:%d\n",(int)resp_gattr->attr.atime);
+	printf("mtime:%d\n",(int)resp_gattr->attr.mtime);
+	printf("ctime:%d\n",(int)resp_gattr->attr.ctime);
+	printf("nr_datafiles:%d\n",resp_gattr->attr.u.meta.nr_datafiles);
+
+	for(i=0; i < resp_gattr->attr.u.meta.nr_datafiles; i++)
+	{
+		printf("\thandle: %d\n", resp_gattr->attr.u.meta.dfh[i]);
+	}
+#endif
+	
+
 	free(req_create->entry_name);
 	free(req_create);
 	free(resp_create);
-
 
 
 
@@ -158,15 +214,20 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	
-	req_lk->name = (char *)malloc(strlen(filename) + 1);
+	req_lk->name = (char *)malloc(strlen(filename) + 2);
 	if (!req_lk->name)
 	{
 		printf("Error in malloc\n");
 		return(-1);
 	}
-	memcpy(req_lk->name,filename,strlen(filename) + 1 );
-	req_lk->fs_id = fsid;
-	req_lk->credentials.perms = 7;
+	req_lk->name[0] = '/';
+	memcpy(req_lk->name + 1,filename,strlen(filename) + 1 );
+	req_lk->fs_id = resp_init.fsid_list[0];
+
+	req_lk->credentials.uid = 100;
+	req_lk->credentials.gid = 100;
+	req_lk->credentials.perms = 1877;
+
 	ret = PVFS_sys_lookup(req_lk,resp_lk);
 	if (ret < 0)
 	{
@@ -189,6 +250,7 @@ int main(int argc,char **argv)
 
 
 
+#if 0
 	/* Test the getattr function */
 	printf("GETATTR HERE===>\n");
 	req_gattr = (PVFS_sysreq_getattr *)malloc(sizeof(PVFS_sysreq_getattr));
@@ -316,6 +378,7 @@ int main(int argc,char **argv)
 	printf("mtime:%d\n",(int)resp_gattr->attr.mtime);
 	printf("ctime:%d\n",(int)resp_gattr->attr.ctime);
 	printf("nr_datafiles:%d\n",resp_gattr->attr.u.meta.nr_datafiles);
+#endif
 	
 #if 0
 	// close it down
@@ -355,7 +418,7 @@ int main(int argc,char **argv)
 	ret = PVFS_sys_getattr(req_gattr,resp_gattr);
 	if (ret < 0)
 	{
-		printf("getattr failed\n");
+		printf("getattr failed with errcode = %d\n", ret);
 		return(-1);
 	}
 	// print the handle 
@@ -424,9 +487,8 @@ int main(int argc,char **argv)
 	printf("--mkdir--\n"); 
 	printf("Handle:%ld\n",(long int)(resp_mkdir->pinode_refn.handle & 127));
 	printf("FSID:%ld\n",(long int)req_mkdir->parent_refn.fs_id);
+#endif
 
-	// test the readdir function 
-	//	Alloc memory and fill the structures
 	req_readdir = (PVFS_sysreq_readdir *)malloc(sizeof(PVFS_sysreq_readdir));
 	if (!req_readdir)
 	{
@@ -441,8 +503,9 @@ int main(int argc,char **argv)
 	}
 
 	// Fill in the dir info 
-	req_readdir->pinode_refn.handle = resp_mkdir->pinode_refn.handle;
-	req_readdir->pinode_refn.fs_id = 1;
+
+	req_readdir->pinode_refn.handle = resp_look.pinode_refn.handle;
+	req_readdir->pinode_refn.fs_id = req_look.fs_id;
 	req_readdir->token = PVFS_TOKEN_START;
 	req_readdir->pvfs_dirent_incount = 6;
 	resp_readdir->dirent_array = (PVFS_dirent *)malloc(sizeof(PVFS_dirent) *\
@@ -453,7 +516,7 @@ int main(int argc,char **argv)
 	ret = PVFS_sys_readdir(req_readdir,resp_readdir);
 	if (ret < 0)
 	{
-		printf("readdir failed\n");
+		printf("readdir failed with errcode = %d\n", ret);
 		return(-1);
 	}
 	
@@ -464,6 +527,7 @@ int main(int argc,char **argv)
 	{
 		printf("name:%s\n",resp_readdir->dirent_array[i].d_name);
 	}
+#if 0
 
 	// test the rmdir function 
 	//	Alloc memory and fill the structures
@@ -542,6 +606,27 @@ int main(int argc,char **argv)
 		return (-1);
 	}
 
+	free(filename);
 	return(0);
+}
 
+/* generate random filenames cause ddd sucks and doesn't like taking cmd line
+ * arguments (and remove doesn't work yet so I can't cleanup the crap I already
+ * created)
+ */
+void gen_rand_str(int len, char** gen_str)
+{
+	static char alphabet[] = "abcdefghijklmnopqrstuvwxyz";
+	int i;
+	struct timeval poop;
+	int newchar = 0;
+	gettimeofday(&poop, NULL);
+
+	*gen_str = malloc(len + 1);
+	for(i = 0; i < len; i++)
+	{
+		newchar = ((1+(rand() % 26)) + poop.tv_usec) % 26;
+		(*gen_str)[i] = alphabet[newchar];
+	}
+	(*gen_str)[len] = '\0';
 }
