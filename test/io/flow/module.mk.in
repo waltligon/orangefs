@@ -10,13 +10,12 @@ TEST_IO_FLOW_DIR_SRC := \
 
 TESTSRC += $(TEST_IO_FLOW_DIR_SRC)
 
-TEST_IO_FLOW_DIR_LOCALLIBS := -ldb -lrt -lpthread
 LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_FLOW_DIR_SRC))
 $(LOCALTESTS): %: %.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(LIBS) $(TEST_IO_FLOW_DIR_LOCALLIBS) -o $@
+	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 else
-	$(LD) $< $(LDFLAGS) $(LIBS) $(TEST_IO_FLOW_DIR_LOCALLIBS) -o $@
+	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 endif
 
