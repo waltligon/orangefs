@@ -21,13 +21,14 @@ TEST_SYSINT_DIR_SRC += \
 
 MISCSRC += \
 	$(DIR)/job.c \
-	$(DIR)/parse-pvfstab.c
+	$(DIR)/parse-pvfstab.c \
+	$(DIR)/helper.c
 
 TESTSRC += $(TEST_SYSINT_DIR_SRC)
 
 LOCALLIBS := -ldb -lrt -lpthread
 LOCALTESTS := $(patsubst %.c,%, $(TEST_SYSINT_DIR_SRC))
-$(LOCALTESTS): %: %.o $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o
-	$(LD) $< $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o\
+$(LOCALTESTS): %: %.o $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o $(TEST_SYSINT_DIR)/helper.o
+	$(LD) $< $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o $(TEST_SYSINT_DIR)/helper.o\
 	$(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
 

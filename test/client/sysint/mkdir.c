@@ -12,9 +12,6 @@ extern int PINT_get_base_dir(char *pathname,
 extern int PINT_remove_base_dir(char *pathname,
                                 char *out_dir, int out_max_len);
 
-
-/*why were these commented out?*/
-
 #define ATTR_UID 1
 #define ATTR_GID 2
 #define ATTR_PERM 4
