@@ -82,7 +82,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
                            pvfs_mntlist mntent_list)
 {
     int ret = -1, i = 0;
-    bmi_addr_t serv_addr;
+    PVFS_BMI_addr_t serv_addr;
     struct PVFS_server_req serv_req;
     struct PVFS_server_resp *serv_resp = NULL;
     PVFS_credentials creds;

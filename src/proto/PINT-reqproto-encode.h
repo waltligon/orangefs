@@ -17,7 +17,7 @@
 /* structure to describe messages that have been encoded */
 struct PINT_encoded_msg
 {
-    bmi_addr_t dest;			    /* host this is going to */
+    PVFS_BMI_addr_t dest;			    /* host this is going to */
     enum PVFS_encoding_type enc_type;	    /* type of encoding that was used */
     enum bmi_buffer_type buffer_type;	    /* buffer flag for BMI's use */
     void** buffer_list;			    /* list of buffers */
@@ -69,7 +69,7 @@ int PINT_encode(
 		void* input_buffer,
 		enum PINT_encode_msg_type input_type,
 		struct PINT_encoded_msg* target_msg,
-		bmi_addr_t target_addr,
+		PVFS_BMI_addr_t target_addr,
 		enum PVFS_encoding_type enc_type
 		);
 
@@ -77,7 +77,7 @@ int PINT_decode(
 		void* input_buffer,
 		enum PINT_encode_msg_type input_type,
 		struct PINT_decoded_msg* target_msg,
-		bmi_addr_t target_addr,
+		PVFS_BMI_addr_t target_addr,
 		PVFS_size size
 		);
 

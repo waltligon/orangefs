@@ -51,7 +51,7 @@ typedef struct PINT_client_sm_msgpair_state_s {
     int comp_ct;
 
     /* server address */
-    bmi_addr_t svr_addr;
+    PVFS_BMI_addr_t svr_addr;
 
     /* req and encoded_req are used to send a request */
     struct PVFS_server_req req;
@@ -102,7 +102,7 @@ struct PINT_client_create_sm {
     PVFS_sysresp_create          *create_resp;    /* in/out parameter*/
     PVFS_sys_attr                *sys_attr;       /* input parameter */
     int                          num_data_files;
-    bmi_addr_t                   *data_server_addrs;
+    PVFS_BMI_addr_t                   *data_server_addrs;
     PVFS_handle_extent_array     *io_handle_extent_array;
     PVFS_handle                  metafile_handle;
     PVFS_handle                  *datafile_handles;
@@ -406,20 +406,20 @@ int PINT_serv_prepare_msgpair(PVFS_pinode_reference object_ref,
 			      struct PVFS_server_req *req_p,
 			      struct PINT_encoded_msg *encoded_req_out_p,
 			      void **encoded_resp_out_pp,
-			      bmi_addr_t *svr_addr_p,
+			      PVFS_BMI_addr_t *svr_addr_p,
 			      int *max_resp_sz_out_p,
 			      PVFS_msg_tag_t *session_tag_out_p);
 
 int PINT_serv_decode_resp(void *encoded_resp_p,
 			  struct PINT_decoded_msg *decoded_resp_p,
-			  bmi_addr_t *svr_addr_p,
+			  PVFS_BMI_addr_t *svr_addr_p,
 			  int actual_resp_sz,
 			  struct PVFS_server_resp **resp_out_pp);
 
 int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 				     void *encoded_resp_p,
 				     struct PINT_decoded_msg *decoded_resp_p,
-				     bmi_addr_t *svr_addr_p,
+				     PVFS_BMI_addr_t *svr_addr_p,
 				     int max_resp_sz);
 
 /* TODO: is this the right name for this function? */

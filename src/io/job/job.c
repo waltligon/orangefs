@@ -242,7 +242,7 @@ void job_close_context(job_context_id context_id)
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_bmi_send(bmi_addr_t addr,
+int job_bmi_send(PVFS_BMI_addr_t addr,
 		 void *buffer,
 		 bmi_size_t size,
 		 bmi_msg_tag_t tag,
@@ -331,7 +331,7 @@ int job_bmi_send(bmi_addr_t addr,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_bmi_send_list(bmi_addr_t addr,
+int job_bmi_send_list(PVFS_BMI_addr_t addr,
 		      void **buffer_list,
 		      bmi_size_t * size_list,
 		      int list_count,
@@ -424,7 +424,7 @@ int job_bmi_send_list(bmi_addr_t addr,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_bmi_recv(bmi_addr_t addr,
+int job_bmi_recv(PVFS_BMI_addr_t addr,
 		 void *buffer,
 		 bmi_size_t size,
 		 bmi_msg_tag_t tag,
@@ -504,7 +504,7 @@ int job_bmi_recv(bmi_addr_t addr,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_bmi_recv_list(bmi_addr_t addr,
+int job_bmi_recv_list(PVFS_BMI_addr_t addr,
 		      void **buffer_list,
 		      bmi_size_t * size_list,
 		      int list_count,

@@ -16,11 +16,11 @@
 #include <bench-mem.h>
 
 static int bmi_server_postall(struct bench_options* opts, struct
-	mem_buffers* bmi_buf_array, int num_clients, bmi_addr_t* addr_array, 
+	mem_buffers* bmi_buf_array, int num_clients, PVFS_BMI_addr_t* addr_array, 
 	enum bmi_buffer_type buffer_type, double* wtime, int world_rank, bmi_context_id
 	context);
 static int bmi_client_postall(struct bench_options* opts, struct
-	mem_buffers* bmi_buf_array, int num_servers, bmi_addr_t* addr_array, 
+	mem_buffers* bmi_buf_array, int num_servers, PVFS_BMI_addr_t* addr_array, 
 	enum bmi_buffer_type buffer_type, double* wtime, int world_rank, bmi_context_id
 	context);
 static int mpi_client_postall(struct bench_options* opts, struct 
@@ -35,7 +35,7 @@ int main( int argc, char *argv[])
 	int ret = -1;
 	int world_rank = 0;
 	MPI_Comm comm;
-	bmi_addr_t* bmi_peer_array;
+	PVFS_BMI_addr_t* bmi_peer_array;
 	int* mpi_peer_array;
 	int num_clients;
 	struct bench_options opts;
@@ -378,7 +378,7 @@ MPI_COMM_WORLD);
 
 
 static int bmi_server_postall(struct bench_options* opts, struct
-	mem_buffers* bmi_buf_array, int num_clients, bmi_addr_t* addr_array, 
+	mem_buffers* bmi_buf_array, int num_clients, PVFS_BMI_addr_t* addr_array, 
 	enum bmi_buffer_type buffer_type, double* wtime, int world_rank, bmi_context_id
 	context)
 {
@@ -555,7 +555,7 @@ static int bmi_server_postall(struct bench_options* opts, struct
 
 
 static int bmi_client_postall(struct bench_options* opts, struct
-	mem_buffers* bmi_buf_array, int num_servers, bmi_addr_t* addr_array, 
+	mem_buffers* bmi_buf_array, int num_servers, PVFS_BMI_addr_t* addr_array, 
 	enum bmi_buffer_type buffer_type, double* wtime, int world_rank, bmi_context_id
 	context)
 {

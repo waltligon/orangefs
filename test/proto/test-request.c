@@ -298,7 +298,7 @@ int main(int argc, char **argv)
 	struct PVFS_server_resp *response;
 	struct PINT_encoded_msg encoded;
 	struct PINT_decoded_msg decoded;
-	bmi_addr_t me;
+	PVFS_BMI_addr_t me;
 	int ret = 0;
 	char* somechars = NULL;
 	int mylen = 0;

@@ -22,12 +22,12 @@ typedef struct
 	void *input_buffer,
 	int input_size,
 	struct PINT_decoded_msg * target_msg,
-	bmi_addr_t target_addr);
+	PVFS_BMI_addr_t target_addr);
     int (*decode_resp) (
 	void *input_buffer,
 	int input_size,
 	struct PINT_decoded_msg * target_msg,
-	bmi_addr_t target_addr);
+	PVFS_BMI_addr_t target_addr);
     void (*encode_release) (
 	struct PINT_encoded_msg * msg,
 	enum PINT_encode_msg_type input_type);

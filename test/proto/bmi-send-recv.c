@@ -16,7 +16,7 @@
 #define RET_CHECK(__name) if(ret != 0) {printf(__name);exit(-1);}
 
 int send_msg(bmi_op_id_t i, 
-		bmi_addr_t s, 
+		PVFS_BMI_addr_t s, 
 		void *msg, 
 		int size, 
 		int f, 
@@ -71,7 +71,7 @@ int send_msg(bmi_op_id_t i,
 }
 
 int recv_msg(bmi_op_id_t i,
-				bmi_addr_t a,
+				PVFS_BMI_addr_t a,
 				void *buffer,
 				bmi_size_t s,
 				bmi_size_t *as,

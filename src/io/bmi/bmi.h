@@ -18,7 +18,7 @@
 struct BMI_unexpected_info
 {
     bmi_error_code_t error_code;
-    bmi_addr_t addr;
+    PVFS_BMI_addr_t addr;
     void *buffer;
     bmi_size_t size;
     bmi_msg_tag_t tag;
@@ -35,7 +35,7 @@ int BMI_open_context(bmi_context_id* context_id);
 void BMI_close_context(bmi_context_id context_id);
 
 int BMI_post_send(bmi_op_id_t * id,
-		  bmi_addr_t dest,
+		  PVFS_BMI_addr_t dest,
 		  const void *buffer,
 		  bmi_size_t size,
 		  enum bmi_buffer_type buffer_type,
@@ -44,7 +44,7 @@ int BMI_post_send(bmi_op_id_t * id,
 		  bmi_context_id context_id);
 
 int BMI_post_sendunexpected(bmi_op_id_t * id,
-			    bmi_addr_t dest,
+			    PVFS_BMI_addr_t dest,
 			    const void *buffer,
 			    bmi_size_t size,
 			    enum bmi_buffer_type buffer_type,
@@ -53,7 +53,7 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    bmi_context_id context_id);
 
 int BMI_post_recv(bmi_op_id_t * id,
-		  bmi_addr_t src,
+		  PVFS_BMI_addr_t src,
 		  void *buffer,
 		  bmi_size_t expected_size,
 		  bmi_size_t * actual_size,
@@ -94,32 +94,32 @@ int BMI_testcontext(int incount,
 		    int max_idle_time_ms,
 		    bmi_context_id context_id);
 
-void *BMI_memalloc(bmi_addr_t addr,
+void *BMI_memalloc(PVFS_BMI_addr_t addr,
 		   bmi_size_t size,
 		   enum bmi_op_type send_recv);
 
-int BMI_memfree(bmi_addr_t addr,
+int BMI_memfree(PVFS_BMI_addr_t addr,
 		void *buffer,
 		bmi_size_t size,
 		enum bmi_op_type send_recv);
 
-int BMI_set_info(bmi_addr_t addr,
+int BMI_set_info(PVFS_BMI_addr_t addr,
 		 int option,
 		 void *inout_parameter);
 
-int BMI_get_info(bmi_addr_t addr,
+int BMI_get_info(PVFS_BMI_addr_t addr,
 		 int option,
 		 void *inout_parameter);
 
 const char *BMI_method_from_scheme(const char *uri);
 
-int BMI_addr_lookup(bmi_addr_t * new_addr,
+int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 		    const char *id_string);
 
-const char* BMI_addr_rev_lookup(bmi_addr_t addr);
+const char* BMI_addr_rev_lookup(PVFS_BMI_addr_t addr);
 
 int BMI_post_send_list(bmi_op_id_t * id,
-		       bmi_addr_t dest,
+		       PVFS_BMI_addr_t dest,
 		       const void *const *buffer_list,
 		       const bmi_size_t* size_list,
 		       int list_count,
@@ -131,7 +131,7 @@ int BMI_post_send_list(bmi_op_id_t * id,
 		       bmi_context_id context_id);
 
 int BMI_post_recv_list(bmi_op_id_t * id,
-		       bmi_addr_t src,
+		       PVFS_BMI_addr_t src,
 		       void *const *buffer_list,
 		       const bmi_size_t *size_list,
 		       int list_count,
@@ -145,7 +145,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 		       bmi_context_id context_id);
 
 int BMI_post_sendunexpected_list(bmi_op_id_t * id,
-				 bmi_addr_t dest,
+				 PVFS_BMI_addr_t dest,
 				 const void *const *buffer_list,
 				 const bmi_size_t *size_list,
 				 int list_count,

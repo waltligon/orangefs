@@ -43,7 +43,7 @@ int main(int argc, char **argv)	{
 	struct server_request* my_req = NULL;
 	struct server_ack* my_ack = NULL;
 	int ret = -1;
-	bmi_addr_t client_addr;
+	PVFS_BMI_addr_t client_addr;
 	void* recv_buffer = NULL;
 	bmi_op_id_t server_ops[2];
 	bmi_error_code_t error_code;

@@ -28,13 +28,13 @@ int PINT_handle_load_mapping(struct server_configuration_s *config,
 
 int PINT_bucket_get_next_meta(struct server_configuration_s *config,
 			      PVFS_fs_id fsid,
-			      bmi_addr_t *meta_addr,
+			      PVFS_BMI_addr_t *meta_addr,
 			      PVFS_handle_extent_array *meta_extent_array);
 
 int PINT_bucket_get_next_io(struct server_configuration_s *config,
 			    PVFS_fs_id fsid,
 			    int num_servers,
-			    bmi_addr_t *io_addr_array,
+			    PVFS_BMI_addr_t *io_addr_array,
 			    PVFS_handle_extent_array *io_handle_extent_array);
 
 #define PINT_BUCKET_IO PVFS_MGMT_IO_SERVER
@@ -57,7 +57,7 @@ int PINT_bucket_count_servers(struct server_configuration_s* config,
 			      int server_type,
 			      int* count);
 
-int PINT_bucket_map_to_server(bmi_addr_t *server_addr,
+int PINT_bucket_map_to_server(PVFS_BMI_addr_t *server_addr,
 			      PVFS_handle handle,
 			      PVFS_fs_id fsid);
 

@@ -154,7 +154,7 @@ typedef struct PINT_server_op
     PVFS_ds_attributes ds_attr;
     PVFS_object_attr attr;
 
-    bmi_addr_t addr;   /* address of client that contacted us */
+    PVFS_BMI_addr_t addr;   /* address of client that contacted us */
     bmi_msg_tag_t tag; /* operation tag */
     /* information about unexpected message that initiated this operation */
     struct BMI_unexpected_info unexp_bmi_buff;

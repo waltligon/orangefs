@@ -13,7 +13,7 @@
 #include "pvfs2-req-proto.h"
 
 #if 0  /* unused */
-int PINT_send_req_array(bmi_addr_t* addr_array,
+int PINT_send_req_array(PVFS_BMI_addr_t* addr_array,
     struct PVFS_server_req* req_array,
     enum PVFS_encoding_type encoding,
     void** resp_encoded_array,
@@ -22,7 +22,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
     int array_size,
     PVFS_msg_tag_t* op_tag_array);
 
-void PINT_release_req_array(bmi_addr_t* addr_array,
+void PINT_release_req_array(PVFS_BMI_addr_t* addr_array,
     struct PVFS_server_req* req_array,
     enum PVFS_encoding_type encoding,
     void** resp_encoded_array,
@@ -31,21 +31,21 @@ void PINT_release_req_array(bmi_addr_t* addr_array,
     int array_size);
 #endif
 
-int PINT_send_req(bmi_addr_t addr,
+int PINT_send_req(PVFS_BMI_addr_t addr,
     struct PVFS_server_req *req_p,
     enum PVFS_encoding_type encoding,
     struct PINT_decoded_msg *decoded_resp,
     void** encoded_resp,
     PVFS_msg_tag_t op_tag);
 
-void PINT_release_req(bmi_addr_t addr,
+void PINT_release_req(PVFS_BMI_addr_t addr,
     struct PVFS_server_req *req_p,
     enum PVFS_encoding_type encoding,
     struct PINT_decoded_msg *decoded_resp,
     void** encoded_resp,
     PVFS_msg_tag_t op_tag);
 
-int PINT_recv_ack_array(bmi_addr_t* addr_array,
+int PINT_recv_ack_array(PVFS_BMI_addr_t* addr_array,
     bmi_size_t max_resp_size,
     void** resp_encoded_array,
     struct PINT_decoded_msg* resp_decoded_array,
@@ -53,7 +53,7 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
     int array_size,
     PVFS_msg_tag_t* op_tag_array);
 
-void PINT_release_ack_array(bmi_addr_t* addr_array,
+void PINT_release_ack_array(PVFS_BMI_addr_t* addr_array,
     bmi_size_t max_resp_size,
     void** resp_encoded_array,
     struct PINT_decoded_msg* resp_decoded_array,

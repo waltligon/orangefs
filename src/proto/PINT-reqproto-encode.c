@@ -75,7 +75,7 @@ int PINT_encode(
 		void* input_buffer,
 		enum PINT_encode_msg_type input_type,
 		struct PINT_encoded_msg* target_msg,
-		bmi_addr_t target_addr,
+		PVFS_BMI_addr_t target_addr,
 		enum PVFS_encoding_type enc_type
 		)
 {
@@ -135,7 +135,7 @@ int PINT_decode(
 		void* input_buffer,
 		enum PINT_encode_msg_type input_type,
 		struct PINT_decoded_msg* target_msg,
-		bmi_addr_t target_addr,
+		PVFS_BMI_addr_t target_addr,
 		PVFS_size size
 		)
 {

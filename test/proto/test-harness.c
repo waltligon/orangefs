@@ -26,7 +26,7 @@ int main(int argc, char **argv)
 	struct PINT_encoded_msg encoded;
 	struct PINT_decoded_msg decoded;
 	int ret;
-	bmi_addr_t me;
+	PVFS_BMI_addr_t me;
 	PVFS_object_attr *obj_attr;
 #ifdef USE_BMI_MSGS
 	bmi_op_id_t client_ops[2];

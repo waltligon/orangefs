@@ -19,7 +19,6 @@ typedef PVFS_size bmi_size_t;	/* data region size */
 typedef PVFS_msg_tag_t bmi_msg_tag_t;	/* message tag */
 typedef PVFS_context_id bmi_context_id; /* context identifier */
 typedef PVFS_id_gen_t bmi_op_id_t;	/* network operation handle */
-typedef PVFS_BMI_addr_t bmi_addr_t;	/* network address handle */
 
 /* TODO: not using a real type for this yet; need to specify what
  * error codes look like */

@@ -19,7 +19,7 @@ int main( int argc, char *argv[])
 	int ret = -1;
 	int world_rank = 0;
 	MPI_Comm comm;
-	bmi_addr_t* bmi_peer_array;
+	PVFS_BMI_addr_t* bmi_peer_array;
 	int* mpi_peer_array;
 	int num_clients;
 	struct bench_options opts;

@@ -22,7 +22,7 @@ int do_decode_req(
     void *input_buffer,
     int input_size,
     struct PINT_decoded_msg *target_msg,
-    bmi_addr_t target_addr)
+    PVFS_BMI_addr_t target_addr)
 {
     struct PVFS_server_req *dec_msg = NULL;
     char *char_ptr = (char *) input_buffer;

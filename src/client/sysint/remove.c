@@ -34,7 +34,7 @@ int PVFS_sys_remove_old(char* entry_name,
     struct PVFS_server_resp *ack_p = NULL;    /* server response */
     int ret = -1, ioserv_count = 0;
     PINT_pinode *pinode_ptr = NULL, *item_ptr = NULL;
-    bmi_addr_t serv_addr;	/* PVFS address type structure */
+    PVFS_BMI_addr_t serv_addr;	/* PVFS address type structure */
     int name_sz = 0;
     PVFS_pinode_reference entry;
     int items_found = 0, i = 0;

@@ -7,7 +7,7 @@
 
 /*
  * Header file for reference list management functions.  Reference structures
- * are used to maintain the mapping between bmi_addr_t and
+ * are used to maintain the mapping between PVFS_BMI_addr_t and
  * method_addr_p addresses.   
  */
 
@@ -27,7 +27,7 @@ typedef struct qlist_head *ref_list_p;
  */
 struct ref_st
 {
-    bmi_addr_t bmi_addr;	/* the identifier passed out of the BMI layer */
+    PVFS_BMI_addr_t bmi_addr;	/* the identifier passed out of the BMI layer */
     char *id_string;		/* the id string that represents this reference */
     method_addr_p method_addr;	/* address structure used by the method */
 
@@ -48,9 +48,9 @@ ref_list_p ref_list_new(void);
 void ref_list_add(ref_list_p rlp,
 		  ref_st_p rsp);
 ref_st_p ref_list_search_addr(ref_list_p rlp,
-			      bmi_addr_t my_addr);
+			      PVFS_BMI_addr_t my_addr);
 ref_st_p ref_list_rem(ref_list_p rlp,
-		      bmi_addr_t my_addr);
+		      PVFS_BMI_addr_t my_addr);
 ref_st_p ref_list_search_method_addr(ref_list_p rlp,
 				     method_addr_p map);
 ref_st_p ref_list_search_str(ref_list_p rlp,

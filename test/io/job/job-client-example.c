@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 	int ret = -1;
 	struct request_foo* req = NULL;
 	struct ack_foo* ack = NULL;
-	bmi_addr_t server_addr;
+	PVFS_BMI_addr_t server_addr;
 	job_status_s status1;
 	job_id_t tmp_id;
 	job_context_id context;

@@ -174,7 +174,7 @@ int PINT_client_state_machine_test(void)
 
 int PINT_serv_decode_resp(void *encoded_resp_p,
 			  struct PINT_decoded_msg *decoded_resp_p,
-			  bmi_addr_t *svr_addr_p,
+			  PVFS_BMI_addr_t *svr_addr_p,
 			  int actual_resp_sz,
 			  struct PVFS_server_resp **resp_out_pp)
 {
@@ -197,7 +197,7 @@ int PINT_serv_free_msgpair_resources(
     struct PINT_encoded_msg *encoded_req_p,
     void *encoded_resp_p,
     struct PINT_decoded_msg *decoded_resp_p,
-    bmi_addr_t *svr_addr_p,
+    PVFS_BMI_addr_t *svr_addr_p,
     int max_resp_sz)
 {
     PINT_encode_release(encoded_req_p,

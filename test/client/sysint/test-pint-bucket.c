@@ -46,7 +46,7 @@ int main(int argc, char **argv)
     struct filesystem_configuration_s *cur_fs = NULL;
     int fs_ids[MAX_NUM_FS] = {0};
     int num_meta_servers = 0, num_data_servers = 0;
-    bmi_addr_t addr, m_addr, d_addr[NUM_DATA_SERVERS_TO_QUERY];
+    PVFS_BMI_addr_t addr, m_addr, d_addr[NUM_DATA_SERVERS_TO_QUERY];
     char server_name[PVFS_MAX_SERVER_ADDR_LEN] = {0};
     int test_handles_verified[NUM_TEST_HANDLES] = {0};
     PVFS_handle_extent_array meta_handle_extent_array;

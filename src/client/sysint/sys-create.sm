@@ -502,8 +502,8 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     }
 
     /* allocate data server bmi address array */
-    sm_p->u.create.data_server_addrs = (bmi_addr_t *)
-        malloc(sm_p->u.create.num_data_files * sizeof(bmi_addr_t));
+    sm_p->u.create.data_server_addrs = (PVFS_BMI_addr_t *)
+        malloc(sm_p->u.create.num_data_files * sizeof(PVFS_BMI_addr_t));
     if (!sm_p->u.create.data_server_addrs)
     {
         gossip_err("create: failed to allocate data server addrs\n"); 

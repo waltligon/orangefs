@@ -167,7 +167,7 @@ int PINT_handle_load_mapping(struct server_configuration_s *config,
  */
 int PINT_bucket_get_next_meta(struct server_configuration_s *config,
 			      PVFS_fs_id fsid,
-			      bmi_addr_t *meta_addr,
+			      PVFS_BMI_addr_t *meta_addr,
 			      PVFS_handle_extent_array *ext_array)
 {
     int ret = -EINVAL, jitter = 0, num_meta_servers = 0;
@@ -233,7 +233,7 @@ int PINT_bucket_get_next_meta(struct server_configuration_s *config,
 int PINT_bucket_get_next_io(struct server_configuration_s *config,
 			    PVFS_fs_id fsid,
 			    int num_servers,
-			    bmi_addr_t *io_addr_array,
+			    PVFS_BMI_addr_t *io_addr_array,
 			    PVFS_handle_extent_array *io_handle_extent_array)
 {
     int ret = -EINVAL, i = 0;
@@ -506,7 +506,7 @@ int PINT_bucket_get_server_array(struct server_configuration_s *config,
  *
  * returns 0 on success to -errno on failure
  */
-int PINT_bucket_map_to_server(bmi_addr_t *server_addr,
+int PINT_bucket_map_to_server(PVFS_BMI_addr_t *server_addr,
 			      PVFS_handle handle,
 			      PVFS_fs_id fsid)
 {
@@ -747,7 +747,7 @@ static int cache_server_array(struct server_configuration_s* config,
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
     PINT_llist* tmp_server = NULL;
-    bmi_addr_t tmp_bmi_addr;
+    PVFS_BMI_addr_t tmp_bmi_addr;
     int dup_flag = 0;
     int current = 0;
     int array_index = 0, array_index2 = 0;

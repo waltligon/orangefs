@@ -35,7 +35,7 @@ int main(
     int ret = -1;
     int outcount = 0;
     void *mybuffer;
-    bmi_addr_t server_addr;
+    PVFS_BMI_addr_t server_addr;
     bmi_op_id_t op;
     bmi_error_code_t error_code;
     flow_descriptor *flow_d = NULL;

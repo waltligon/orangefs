@@ -46,7 +46,7 @@ int main(int argc, char **argv)	{
 	struct server_request* my_req = NULL;
 	struct server_ack* my_ack = NULL;
 	int ret = -1;
-	bmi_addr_t server_addr;
+	PVFS_BMI_addr_t server_addr;
 	void* send_buffer1 = NULL;
 	void* send_buffer2 = NULL;
 	void* send_buffer3 = NULL;

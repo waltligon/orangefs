@@ -18,10 +18,10 @@
 #define ITERATIONS 1000
 
 static int bmi_server(struct bench_options* opts, struct mem_buffers*
-	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
+	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, PVFS_BMI_addr_t addr,
 	enum bmi_buffer_type buffer_type, double* wtime, bmi_context_id context);
 static int bmi_client(struct bench_options* opts, struct mem_buffers*
-	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
+	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, PVFS_BMI_addr_t addr,
 	enum bmi_buffer_type buffer_type, double* wtime, bmi_context_id context);
 static int mpi_server(struct bench_options* opts, struct mem_buffers*
 	mpi_recv_bufs, struct mem_buffers* mpi_send_bufs, int addr, double* wtime);
@@ -33,7 +33,7 @@ int main( int argc, char *argv[])
 	int ret = -1;
 	int world_rank = 0;
 	MPI_Comm comm;
-	bmi_addr_t* bmi_peer_array;
+	PVFS_BMI_addr_t* bmi_peer_array;
 	int* mpi_peer_array;
 	int num_clients;
 	struct bench_options opts;
@@ -216,7 +216,7 @@ int main( int argc, char *argv[])
 }
 
 static int bmi_server(struct bench_options* opts, struct mem_buffers*
-	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
+	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, PVFS_BMI_addr_t addr,
 	enum bmi_buffer_type buffer_type, double* wtime, bmi_context_id context)
 {
 	int i=0;
@@ -292,7 +292,7 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 
 
 static int bmi_client(struct bench_options* opts, struct mem_buffers*
-	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
+	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, PVFS_BMI_addr_t addr,
 	enum bmi_buffer_type buffer_type, double* wtime, bmi_context_id context)
 {
 	int i=0;

@@ -38,7 +38,7 @@ int alloc_buffers(struct mem_buffers* bufs, int num_buffers, int size)
 }
 
 int BMI_alloc_buffers(struct mem_buffers* bufs, int num_buffers, int
-	size, bmi_addr_t addr, enum bmi_op_type send_recv)
+	size, PVFS_BMI_addr_t addr, enum bmi_op_type send_recv)
 {
 
 	int i = 0;
@@ -78,7 +78,7 @@ int free_buffers(struct mem_buffers* bufs)
 	return(0);
 }
 
-int BMI_free_buffers(struct mem_buffers* bufs, bmi_addr_t addr,
+int BMI_free_buffers(struct mem_buffers* bufs, PVFS_BMI_addr_t addr,
 	enum bmi_op_type send_recv)
 {
 	int i=0;

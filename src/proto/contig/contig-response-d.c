@@ -21,7 +21,7 @@ int do_decode_resp(
     void *input_buffer,
     int input_size,
     struct PINT_decoded_msg *target_msg,
-    bmi_addr_t target_addr)
+    PVFS_BMI_addr_t target_addr)
 {
 
     struct PVFS_server_resp *response = input_buffer;

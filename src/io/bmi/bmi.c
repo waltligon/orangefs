@@ -503,7 +503,7 @@ void BMI_close_context(bmi_context_id context_id)
  * returns 0 on success, -errno on failure
  */
 int BMI_post_recv(bmi_op_id_t * id,
-		  bmi_addr_t src,
+		  PVFS_BMI_addr_t src,
 		  void *buffer,
 		  bmi_size_t expected_size,
 		  bmi_size_t * actual_size,
@@ -546,7 +546,7 @@ int BMI_post_recv(bmi_op_id_t * id,
  * returns 0 on success, -errno on failure
  */
 int BMI_post_send(bmi_op_id_t * id,
-		  bmi_addr_t dest,
+		  PVFS_BMI_addr_t dest,
 		  const void *buffer,
 		  bmi_size_t size,
 		  enum bmi_buffer_type buffer_type,
@@ -587,7 +587,7 @@ int BMI_post_send(bmi_op_id_t * id,
  * returns 0 on success, -errno on failure
  */
 int BMI_post_sendunexpected(bmi_op_id_t * id,
-			    bmi_addr_t dest,
+			    PVFS_BMI_addr_t dest,
 			    const void *buffer,
 			    bmi_size_t size,
 			    enum bmi_buffer_type buffer_type,
@@ -983,7 +983,7 @@ int BMI_testcontext(int incount,
  *
  * returns pointer to string on success, NULL on failure
  */
-const char* BMI_addr_rev_lookup(bmi_addr_t addr)
+const char* BMI_addr_rev_lookup(PVFS_BMI_addr_t addr)
 {
     ref_st_p tmp_ref = NULL;
     char* tmp_str = NULL;
@@ -1009,7 +1009,7 @@ const char* BMI_addr_rev_lookup(bmi_addr_t addr)
  *
  * returns pointer to buffer on success, NULL on failure.
  */
-void *BMI_memalloc(bmi_addr_t addr,
+void *BMI_memalloc(PVFS_BMI_addr_t addr,
 		   bmi_size_t size,
 		   enum bmi_op_type send_recv)
 {
@@ -1038,7 +1038,7 @@ void *BMI_memalloc(bmi_addr_t addr,
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_memfree(bmi_addr_t addr,
+int BMI_memfree(PVFS_BMI_addr_t addr,
 		void *buffer,
 		bmi_size_t size,
 		enum bmi_op_type send_recv)
@@ -1068,7 +1068,7 @@ int BMI_memfree(bmi_addr_t addr,
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_set_info(bmi_addr_t addr,
+int BMI_set_info(PVFS_BMI_addr_t addr,
 		 int option,
 		 void *inout_parameter)
 {
@@ -1121,7 +1121,7 @@ int BMI_set_info(bmi_addr_t addr,
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_get_info(bmi_addr_t addr,
+int BMI_get_info(PVFS_BMI_addr_t addr,
 		 int option,
 		 void *inout_parameter)
 {
@@ -1212,7 +1212,7 @@ BMI_method_from_scheme(const char *uri)
  *
  * returns 0 on success, -errno on failure.
  */
-int BMI_addr_lookup(bmi_addr_t * new_addr,
+int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 		    const char *id_string)
 {
 
@@ -1314,7 +1314,7 @@ int BMI_addr_lookup(bmi_addr_t * new_addr,
  * -errno on failure
  */
 int BMI_post_send_list(bmi_op_id_t * id,
-		       bmi_addr_t dest,
+		       PVFS_BMI_addr_t dest,
 		       const void *const *buffer_list,
 		       const bmi_size_t *size_list,
 		       int list_count,
@@ -1383,7 +1383,7 @@ int BMI_post_send_list(bmi_op_id_t * id,
  * -errno on failure
  */
 int BMI_post_recv_list(bmi_op_id_t * id,
-		       bmi_addr_t src,
+		       PVFS_BMI_addr_t src,
 		       void *const *buffer_list,
 		       const bmi_size_t *size_list,
 		       int list_count,
@@ -1455,7 +1455,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
  * -errno on failure
  */
 int BMI_post_sendunexpected_list(bmi_op_id_t * id,
-				 bmi_addr_t dest,
+				 PVFS_BMI_addr_t dest,
 				 const void *const *buffer_list,
 				 const bmi_size_t *size_list,
 				 int list_count,

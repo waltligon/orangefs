@@ -63,7 +63,7 @@ void job_close_context(job_context_id context_id);
  */
 
 /* network send */
-int job_bmi_send(bmi_addr_t addr,
+int job_bmi_send(PVFS_BMI_addr_t addr,
 		 void *buffer,
 		 bmi_size_t size,
 		 bmi_msg_tag_t tag,
@@ -76,7 +76,7 @@ int job_bmi_send(bmi_addr_t addr,
 		 job_context_id context_id);
 
 /* network send (list of buffers) */
-int job_bmi_send_list(bmi_addr_t addr,
+int job_bmi_send_list(PVFS_BMI_addr_t addr,
 		      void **buffer_list,
 		      bmi_size_t * size_list,
 		      int list_count,
@@ -91,7 +91,7 @@ int job_bmi_send_list(bmi_addr_t addr,
 		      job_context_id context_id);
 
 /* network receive */
-int job_bmi_recv(bmi_addr_t addr,
+int job_bmi_recv(PVFS_BMI_addr_t addr,
 		 void *buffer,
 		 bmi_size_t size,
 		 bmi_msg_tag_t tag,
@@ -103,7 +103,7 @@ int job_bmi_recv(bmi_addr_t addr,
 		 job_context_id context_id);
 
 /* network receive (list of buffers) */
-int job_bmi_recv_list(bmi_addr_t addr,
+int job_bmi_recv_list(PVFS_BMI_addr_t addr,
 		      void **buffer_list,
 		      bmi_size_t * size_list,
 		      int list_count,

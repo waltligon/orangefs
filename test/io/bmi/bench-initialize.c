@@ -18,7 +18,7 @@
 #include <strings.h>
 
 int bench_init(struct bench_options* opts, int argc, char* argv[], int*
-	num_clients, int* world_rank, MPI_Comm* comm, bmi_addr_t**
+	num_clients, int* world_rank, MPI_Comm* comm, PVFS_BMI_addr_t**
 	bmi_peer_array, int** mpi_peer_array, bmi_context_id* context)
 {
 	int ret = -1;
@@ -54,7 +54,7 @@ int bench_init(struct bench_options* opts, int argc, char* argv[], int*
 	if(*world_rank < opts->num_servers)
 	{
 		*bmi_peer_array =
-			(bmi_addr_t*)malloc((*num_clients)*sizeof(bmi_addr_t));
+			(PVFS_BMI_addr_t*)malloc((*num_clients)*sizeof(PVFS_BMI_addr_t));
 		*mpi_peer_array =
 			(int*)malloc((*num_clients)*sizeof(int));
 		if(!(*bmi_peer_array) || !(*mpi_peer_array))
@@ -71,7 +71,7 @@ int bench_init(struct bench_options* opts, int argc, char* argv[], int*
 	else
 	{
 		*bmi_peer_array =
-			(bmi_addr_t*)malloc(opts->num_servers*sizeof(bmi_addr_t));
+			(PVFS_BMI_addr_t*)malloc(opts->num_servers*sizeof(PVFS_BMI_addr_t));
 		*mpi_peer_array =
 			(int*)malloc(opts->num_servers*sizeof(int));
 		if(!(*bmi_peer_array) || !(*mpi_peer_array))
@@ -211,7 +211,7 @@ int bench_initialize_mpi_params(int argc, char** argv, int num_servers,
 }
 
 int bench_initialize_bmi_addresses_server(int num_servers, int num_clients, 
-	bmi_addr_t* client_array, char* local_proc_name)
+	PVFS_BMI_addr_t* client_array, char* local_proc_name)
 {
 	int i=0;
 	int ret = -1;
@@ -250,7 +250,7 @@ int bench_initialize_bmi_addresses_server(int num_servers, int num_clients,
 }
 
 int bench_initialize_bmi_addresses_client(int num_servers, int num_clients, 
-	bmi_addr_t* server_array, char* method_name, bmi_context_id context)
+	PVFS_BMI_addr_t* server_array, char* method_name, bmi_context_id context)
 {
 	int i=0;
 	int ret = -1;

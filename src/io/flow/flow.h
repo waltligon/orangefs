@@ -33,7 +33,7 @@ enum flow_endpoint_type
 /* describes BMI endpoints */
 struct BMI_endpoint_data
 {
-    bmi_addr_t address;
+    PVFS_BMI_addr_t address;
 };
 
 /* describes trove interface endpoints */
