@@ -144,7 +144,7 @@ int pvfs2_mkspace(
       if a root_handle is specified, 1) create a dataspace to
       hold the root directory 2) create the dspace for dir
       entries, 3) set attributes on the dspace
-    
+
       Q: where are we going to define the dspace types? --
       trove-test.h for now.
     */
@@ -231,8 +231,11 @@ int pvfs2_mkspace(
             return -1;
         }
 
-        /* create dataspace to hold directory entries */
-        ent_handle = new_root_handle - 1; /* just put something in here */
+        /*
+          create dataspace to hold directory entries; a
+          value of zero leaves the allocation to trove.
+        */
+        ent_handle = 0;
         ret = trove_dspace_create(coll_id,
                                   &ent_handle,
                                   PVFS_TYPE_DIRDATA,

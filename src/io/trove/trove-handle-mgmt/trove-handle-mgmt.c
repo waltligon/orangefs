@@ -90,7 +90,6 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
 
             if (count > 0)
             {
-
                 for(i = 0; i != count; i++)
                 {
                     /* check every item in our range list */
@@ -108,14 +107,6 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
 			printf("could not remove handle %Ld\n", handles[i]);
 			break;
 		    }
-#if 0
-                    else
-                    {
-                        printf("Handle %Ld is valid (i = %d | "
-                               "out_count = %d)\n",
-                               handles[i],i,count);
-                    }
-#endif
                 }
                 ret = ((i == count) ? 0 : -1);
             }
