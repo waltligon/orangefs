@@ -75,10 +75,13 @@ static int service_lookup_request(
                                   &response);
         if (ret < 0)
         {
-            gossip_err("Failed to lookup %s (fsid %d | parent is %Lu)!\n",
-                       in_upcall->req.lookup.d_name,
-                       parent_refn.fs_id,parent_refn.handle);
-            gossip_err("Lookup returned error code %d\n", ret);
+            gossip_debug(
+                CLIENT_DEBUG,
+                "Failed to lookup %s (fsid %d | parent is %Lu)!\n",
+                in_upcall->req.lookup.d_name,
+                parent_refn.fs_id,parent_refn.handle);
+            gossip_debug(CLIENT_DEBUG,
+                         "Lookup returned error code %d\n", ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_LOOKUP;
