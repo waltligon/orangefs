@@ -136,9 +136,14 @@ sub create_pvfs2config
     }
 
     my $cmd = $href->{'GENCONFIG'} 
-    		. " --protocol " . $href->{'PROTOCOL'}
-    		. " --port "     . $href->{'PVFSPORT'}
-		. " --ioservers ". $ioservers
+    		. " --protocol " . $href->{'PROTOCOL'};
+    foreach (split(',', $href->{'PROTOCOL'})) {
+	my $big = $_;
+	$big =~ y/a-z/A-Z/;
+	my $var = "PVFS" . $big . "PORT";
+	$cmd .= " --" . $_ . "port " . $href->{$var};
+    }
+    $cmd       .= " --ioservers ". $ioservers
 		. " --metaservers " . $metaservers
 		. " --logfile "  . $href->{'SERVERLOG'} . "/pvfs2.log"
 		. " --storage "  . $href->{'STORAGE'}
@@ -166,12 +171,6 @@ sub create_pvfs2tab {
     my $pvfstab = "undefined pvfstab\n";
     my $protocol = $href->{'PROTOCOL'};
 
-    if ( $protocol ne "tcp" && $protocol ne "gm" && $protocol ne "ib") {
-    	print STDERR "ERROR: unsupported protocol\n";
-	close (FH);
-	return (1);
-    }
-
     # maybe change the encoding
     my $mntopts = "defaults";
     if (defined($href->{'ENCODING'})) {
@@ -181,7 +180,20 @@ sub create_pvfs2tab {
     # string looks like this:
     # tcp://localhost:3334/pvfs2-fs /mnt/pvfs pvfs2 defaults 0 0
 
-    $pvfstab = $protocol . "://" . $metas[0] . ":" . $href->{'PVFSPORT'} . "/pvfs2-fs " .  $href->{'MOUNTPOINT'} .  " pvfs2 $mntopts 0 0";
+    my $num = 0;
+    $pvfstab = "";
+    foreach (split(',', $href->{'PROTOCOL'})) {
+	my $big = $_;
+	$big =~ y/a-z/A-Z/;
+	my $var = "PVFS" . $big . "PORT";
+	++$num;
+	if ($num > 1) {
+	    $pvfstab .= ",";
+	}
+	$pvfstab .= "$_://" . $metas[0] . ":" . $href->{$var} . "/pvfs2-fs";
+    }
+
+    $pvfstab .= " " .  $href->{'MOUNTPOINT'} .  " pvfs2 $mntopts 0 0";
     
     print FH "$pvfstab\n";
     
@@ -220,7 +232,9 @@ sub init {
 	return(1);
     }
 
-    %config = ('PVFSPORT' => 7000,
+    %config = ('PVFSTCPPORT' => 7000,
+               'PVFSGMPORT' => 6,
+               'PVFSIBPORT' => 3334,
 	       'WORKINGDIR' => "/tmp",
 	       'IONCOUNT' => 4,
 	       'NODEFILE' => machine_file,
@@ -298,6 +312,11 @@ sub init {
 
     $config{'PROGROOT'} = $args{'r'} || $config{'PROGROOT'};
     $config{'NODEFILE'} = $args{'m'} || $config{'NODEFILE'};
+
+    # backward compatibility
+    if (defined($config{'PVFSPORT'})) {
+	$config{'PVFSTCPPORT'} = $config{'PVFSPORT'};
+    }
     
     return(0);
 }

@@ -34,13 +34,17 @@ WORKINGDIR="/tmp/pvfs-pav-working"
 PROTOCOL=tcp
 
 # hopefully random enough...
-PVFSPORT=3349
+PVFSTCPPORT=3349
 #  --  could be --
 # PROTOCOL=gm
-# PVFSPORT=6
+# PVFSGMPORT=6
 #  --  or even --
 # PROTOCOL=ib
-# PVFSPORT=12345
+# PVFSIBPORT=12345
+#  --  or multiples --
+# PROTOCOL=ib,tcp
+# PVFSIBPORT=3334
+# PVFSTCPPORT=3335
 
 STORAGE=$WORKINGDIR/storage
 SERVERLOG=$WORKINGDIR/log
