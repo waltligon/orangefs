@@ -1,6 +1,7 @@
 #!/bin/sh
 
 # pass this script a bug number (from bugzilla.mcs.anl.gov/pvfs) and it will 
+# - tag HEAD at point we will branch
 # - create a branch (pvfs2-bugfix-XYZ) 
 # - check out that branch to pvfs2-bugfix-XYZ directory
 
@@ -30,6 +31,7 @@ done
 shift $(($OPTIND - 1))
 
 # branch for bugfixing
+cvs -d $CVSROOT rtag -b pvfs2-tag-bugfix-$1 $PROJECT
 cvs -d $CVSROOT rtag -b pvfs2-bugfix-$1 $PROJECT
 
 # check out branch into "pvfs2-bugfix-$1" directory 
