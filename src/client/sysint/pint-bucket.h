@@ -38,6 +38,13 @@ int PINT_bucket_get_next_io(
     int num_servers,
     bmi_addr_t *io_addr_array);
 
+int PINT_bucket_get_physical_io(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    int incount,
+    int* outcount,
+    bmi_addr_t *io_addr_array);
+
 int PINT_bucket_map_to_server(
     bmi_addr_t *server_addr,
     PVFS_handle handle,

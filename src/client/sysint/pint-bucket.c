@@ -281,6 +281,93 @@ int PINT_bucket_get_next_io(
 }
 
 
+/* PINT_bucket_get_physical_io()
+ *
+ * returns the BMI addresses of all of the I/O servers for a given file
+ * system (up to incount servers), without any duplicates (ie, I/O servers 
+ * with multiple handle ranges show up just once)
+ *
+ * NOTE: get_num_io() can be used to get an upper bound on the number
+ * of I/O servers in the file system to use for the incount argument
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_bucket_get_physical_io(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    int incount,
+    int* outcount,
+    bmi_addr_t *io_addr_array)
+{
+    int ret = -EINVAL;
+    char *data_server_bmi_str = (char *)0;
+    struct host_handle_mapping_s *cur_mapping = NULL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    struct llist* tmp_server = NULL;
+    bmi_addr_t tmp_bmi_addr;
+    int dup_flag = 0;
+    int i;
+
+    *outcount = 0;
+
+    if (config && incount && io_addr_array)
+    {
+        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        if (hash_link)
+        {
+            cur_config_cache =
+                qlist_entry(hash_link, struct config_fs_cache_s,
+                            hash_link);
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
+
+	    /* start at beginning of handle range list */
+            tmp_server = cur_config_cache->fs->data_handle_ranges;
+	    assert(tmp_server);
+
+            while(*outcount < incount)
+            {
+                cur_mapping =
+                    llist_head(tmp_server);
+                if (!cur_mapping)
+                {
+		    /* we hit the end of the list */
+		    break;
+                }
+		tmp_server = llist_next(tmp_server);
+
+                data_server_bmi_str = PINT_server_config_get_host_addr_ptr(
+                    config,cur_mapping->alias_mapping->host_alias);
+
+                ret = BMI_addr_lookup(&tmp_bmi_addr,data_server_bmi_str);
+                if (ret < 0)
+                {
+		    return(ret);
+                }
+
+		/* see if we have already listed this BMI address */
+		dup_flag = 0;
+		for(i=0; i<*outcount; i++)
+		{
+		    if(io_addr_array[i] == tmp_bmi_addr)
+			dup_flag = 1;
+		}
+		
+		if(!dup_flag)
+		{
+		    io_addr_array[*outcount] = tmp_bmi_addr;
+		    (*outcount)++;
+		}
+            }
+        }
+    }
+    return 0;
+}
+
+
+
+
 /* PINT_bucket_map_to_server()
  *
  * maps from a handle and fsid to a server address

@@ -265,6 +265,39 @@ int main(int argc, char **argv)
         }
     }
 
+    /* Nasty basic block trick, but hey- its just a test program, right? */
+    {
+	int incount = 0;
+	int outcount = 0;
+	bmi_addr_t* phys_array = NULL;
+	int ret = -1;
+	
+	ret = PINT_bucket_get_num_io(fs_ids[0], &incount);
+	if(ret < 0)
+	{
+	    fprintf(stderr, "PINT_bucket_get_num_io() failure.\n");
+	    return(-1);
+	}
+	phys_array = (bmi_addr_t*)malloc(incount*sizeof(bmi_addr_t));
+	if(!phys_array)
+	{
+	    perror("malloc");
+	    return(-1);
+	}
+	ret = PINT_bucket_get_physical_io(&server_config, fs_ids[0],
+	    incount, &outcount, phys_array);
+	if(ret < 0)
+	{
+	    fprintf(stderr, "PINT_bucket_get_physical_io() failure.\n");
+	    return(-1);
+	}
+	printf("PINT_bucket_get_physical_io() found %d servers.\n", outcount);
+	for(j = 0; j < outcount; j++)
+	{
+	    printf("I/O server %d addr: %lu\n",j,(long)phys_array[j]);
+	}
+    }
+
     if (PINT_bucket_finalize())
     {
         fprintf(stderr, "PINT_bucket_finalize() failure.\n");
