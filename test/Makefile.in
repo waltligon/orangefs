@@ -208,7 +208,7 @@ MPIIOTESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIIOTESTSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(TESTDEPENDS) $(MISCDEPENDS) $(PRIVATEDEPENDS))
+DEPENDS := $(sort $(TESTDEPENDS) $(MISCDEPENDS))
 ifdef BUILD_MPI
 DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
 endif

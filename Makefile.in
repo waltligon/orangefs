@@ -295,8 +295,6 @@ KARMASRC :=
 KERNAPPSRC :=
 # MISCSRC are sources that don't fall into the other categories
 MISCSRC := 
-# files generated as part of the build that should be deleted on "make clean"
-CLEANFILES :=
 # files created by trove-autogen.pl
 TROVE_AUTOGEN_FILES :=
 # c files generated from state machines
@@ -397,6 +395,10 @@ VISMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISMISCSRC)))
 KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
 KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
 
+# state machine generation tool
+STATECOMPOBJS := $(patsubst %.c,%.o,$(STATECOMPSRC))
+STATECOMPDEPS := $(patsubst %.c,%.d,$(STATECOMPSRC))
+
 # DOCSPDF, DOCSPS, and DOCSHTML are lists of documentation files generated 
 #   from latex
 DOCSPDF := $(patsubst %.tex,%.pdf, $(filter %.tex,$(DOCSRC)))
@@ -413,21 +415,8 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
 DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) \
-    $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(PRIVATEDEPENDS) \
-    $(KERNAPPDEPENDS) $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS))
-
-# CLEANFILES is a list of generated files that need to be removed at
-#    "make clean" time.  This is just for special case files that aren't
-#    cleaned up by our normal rules.
-# NOTE: This doesn't include automatically generated source code.
-#    Automatically generate source code is only removed during
-#    distclean
-CLEANFILES +=\
- src/common/statecomp/statecomp\
- src/common/statecomp/*.o \
- src/common/statecomp/scanner.c \
- src/common/statecomp/parser.c \
- src/common/statecomp/parser.h 
+    $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) $(VISDEPENDS) \
+    $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS))
 
 ####################################################################
 # Rules and dependencies
@@ -559,6 +548,15 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  CCPIC		$@"
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
+# bison and yacc
+%.c: %.y
+	$(Q) "  BISON		$@"
+	$(E)$(BISON) -d $< -o $@
+
+%.c: %.l
+	$(Q) "  FLEX		$@"
+	$(E)$(FLEX) -o$@ $<
+
 # handy rule to generate cpp-output file, for debugging
 .PHONY: FORCE
 %-server.i: %.c FORCE
@@ -579,7 +577,10 @@ $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 $(KERNAPPS): %: %.o $(LIBRARIES)
 
 # target for building _just_ the statecomp tool
-statecomp: src/common/statecomp/statecomp
+statecomp: $(STATECOMP)
+$(STATECOMP): $(STATECOMPOBJS)
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $(STATECOMPOBJS)
 
 # rule for generating cscope information
 cscope:
@@ -613,12 +614,13 @@ docsclean:
 clean:: 
 	$(Q) "  CLEAN"
 	$(E)rm -f $(LIBOBJS) $(SERVEROBJS) $(MISCOBJS) \
-		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) \
+		$(LIBRARIES) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		$(KERNAPPOBJS) $(KERNAPPS) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
+		$(STATECOMP) $(STATECOMPOBJS) $(STATECOMPGEN) \
 		src/server/pvfs2-server-server.o \
 		src/apps/karma/karma
 

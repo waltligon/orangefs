@@ -1,14 +1,18 @@
 DIR := src/common/statecomp
 
-$(DIR)/statecomp: $(DIR)/statecomp.o $(DIR)/parser.o $(DIR)/scanner.o $(DIR)/statecomp-symbol.o $(DIR)/emalloc.o $(DIR)/codegen.o $(DIR)/stringtbl.o
-	$(Q) "  LD		$@"
-	$(E)$(LD) $^ $(LDFLAGS) -o $@
+STATECOMP := $(DIR)/statecomp
+STATECOMPSRC := \
+    $(DIR)/statecomp.c \
+    $(DIR)/statecomp-symbol.c \
+    $(DIR)/emalloc.c \
+    $(DIR)/codegen.c \
+    $(DIR)/stringtbl.c \
+    $(DIR)/parser.c \
+    $(DIR)/scanner.c
 
-$(DIR)/parser.c: $(DIR)/parser.y
-	$(Q) "  BISON		$@"
-	$(E)$(BISON) -d $< -o $@
+STATECOMPGEN := \
+    $(DIR)/scanner.c \
+    $(DIR)/parser.c \
+    $(DIR)/parser.h \
 
-$(DIR)/scanner.c: $(DIR)/scanner.l
-	$(Q) "  FLEX		$@"
-	$(E)$(FLEX) -o$@ $<
-
+.SECONDARY: $(STATECOMPGEN)
