@@ -45,6 +45,9 @@ void dbpf_error_report(
 		       const DB_ENV *dbenv,
 #endif
 		       const char *errpfx,
+#ifdef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
+		       const
+#endif
 		       char *msg)
 {
 #ifdef BERKDB_ERROR_REPORTING
