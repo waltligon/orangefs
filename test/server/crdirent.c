@@ -26,6 +26,7 @@ struct options{
 	char* hostid;       /* host identifier */
 	char* method;       /* bmi method to use */
 	int bucket;
+	int parent;
 	char* name;
 };
 
@@ -96,8 +97,8 @@ int main(int argc, char **argv)	{
 	/* TODO: fill below fields in with the correct values */
 	my_req->credentials.perms = U_WRITE | U_READ;  
 	my_req->u.crdirent.name = "foo.c";
-	my_req->u.crdirent.new_handle = 1048574;
-	my_req->u.crdirent.parent_handle = 1048576;
+	my_req->u.crdirent.new_handle = user_opts->bucket;
+	my_req->u.crdirent.parent_handle = user_opts->parent;
 	my_req->u.crdirent.fs_id = 9;
 	my_req->rsize = sizeof(struct PVFS_server_req_s)+strlen(my_req->u.crdirent.name)+1;
 
@@ -216,7 +217,7 @@ static struct options* parse_args(int argc, char* argv[]){
 	/* getopt stuff */
 	extern char* optarg;
 	extern int optind, opterr, optopt;
-	char flags[] = "h:m:l:n:";
+	char flags[] = "h:m:l:n:p:";
 	char one_opt = ' ';
 
 	struct options* tmp_opts = NULL;
@@ -234,6 +235,8 @@ static struct options* parse_args(int argc, char* argv[]){
 	tmp_opts->hostid = (char*)malloc(strlen(default_hostid) + 1);
 	tmp_opts->method = (char*)malloc(strlen(default_method) + 1);
 	tmp_opts->name = (char*)malloc(strlen(default_name) + 1);
+	tmp_opts->bucket = 4095;
+	tmp_opts->parent= 4094;
 	if(!tmp_opts->method || !tmp_opts->hostid)
 	{
 		goto parse_args_error;
@@ -272,6 +275,9 @@ static struct options* parse_args(int argc, char* argv[]){
 					goto parse_args_error;
 				}
 				memcpy(tmp_opts->method, optarg, len);
+				break;
+			case('p'):
+				tmp_opts->parent = atoi(optarg);
 				break;
 			default:
 				break;
