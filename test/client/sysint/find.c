@@ -162,7 +162,7 @@ int main(int argc, char **argv)
     if (argc != 2)
     {
         fprintf(stderr,"usage: %s <starting dir>\n",argv[0]);
-        fprintf(stderr,"This is not a full featured version of FIND(1L)\n",argv[0]);
+        fprintf(stderr,"This is not a full featured version of FIND(1L)\n");
         return 1;
     }
 
