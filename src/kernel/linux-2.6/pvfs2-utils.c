@@ -801,6 +801,16 @@ int pvfs2_remove_entry(
            the remove has no downcall members to retrieve, but
            the status value tells us if it went through ok or not
          */
+        if (new_op->downcall.status == 0)
+        {
+            /*
+              adjust the readdir token if in fact we're in the middle
+              of a readdir for this directory
+            */
+            parent->readdir_token_adjustment++;
+            pvfs2_print("token adjustment is %d\n",
+                        parent->readdir_token_adjustment);
+        }
         ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
       error_exit:
@@ -991,6 +1001,7 @@ void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
     pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
     pvfs2_inode->last_failed_block_index_read = 0;
     pvfs2_inode->link_target = NULL;
+    pvfs2_inode->readdir_token_adjustment = 0;
     pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
 }
 
@@ -1003,6 +1014,7 @@ void pvfs2_inode_finalize(pvfs2_inode_t *pvfs2_inode)
     pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
     pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
     pvfs2_inode->last_failed_block_index_read = 0;
+    pvfs2_inode->readdir_token_adjustment = 0;
     pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
 }
 

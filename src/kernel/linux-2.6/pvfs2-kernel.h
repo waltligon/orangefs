@@ -13,7 +13,7 @@
 
 #define __NO_VERSION__
 #include <linux/version.h>
-#include <modules.h>
+#include <linux/module.h>
 
 #ifndef HAVE_SECTOR_T
 typedef unsigned long sector_t;
@@ -195,6 +195,7 @@ typedef struct
 typedef struct
 {
     PVFS_object_ref refn;
+    PVFS_ds_position readdir_token_adjustment;
     int num_readdir_retries;
     char *link_target;
 #ifdef PVFS2_LINUX_KERNEL_2_4
