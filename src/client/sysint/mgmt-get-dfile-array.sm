@@ -34,9 +34,6 @@ enum
 static int mgmt_get_dfile_array_getattr_setup_msgpair(
     PINT_client_sm * sm_p,
     job_status_s * js_p);
-static int mgmt_get_dfile_array_getattr_failure(
-    PINT_client_sm * sm_p,
-    job_status_s * js_p);
 
 static int mgmt_get_dfile_array_cleanup(
     PINT_client_sm * sm_p,
@@ -52,24 +49,17 @@ static int getattr_comp_fn(
 
 machine pvfs2_client_mgmt_get_dfile_array_sm(getattr_setup_msgpair,
 					       getattr_xfer_msgpair,
-					       getattr_failure, cleanup)
+					       cleanup)
 {
     state getattr_setup_msgpair
     {
 	run mgmt_get_dfile_array_getattr_setup_msgpair;
 	success => getattr_xfer_msgpair;
-	default => getattr_failure;
+	default => cleanup;
     }
     state getattr_xfer_msgpair
     {
 	jump pvfs2_client_getattr_pcache_sm;
-	success => cleanup;
-	MSGPAIR_RETURN_SUCCESS => cleanup;
-	default => getattr_failure;
-    }
-    state getattr_failure
-    {
-	run mgmt_get_dfile_array_getattr_failure;
 	default => cleanup;
     }
     state cleanup
@@ -116,7 +106,12 @@ int PVFS_mgmt_get_dfile_array(
 
     /* do something to kick off processing */
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_GET_DFILE_ARRAY);
-    assert(ret == 0);
+    if(ret < 0)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+	free(sm_p);
+	return(ret);
+    }
 
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0)
@@ -125,8 +120,12 @@ int PVFS_mgmt_get_dfile_array(
 		     "PVFS_mgmt_get_dfile_array calling PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-
-    assert(ret == 0);
+    if(ret < 0)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+	free(sm_p);
+	return(ret);
+    }
 
     gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_get_dfile_array completed\n");
 
@@ -154,9 +153,9 @@ static int mgmt_get_dfile_array_getattr_setup_msgpair(
 		 "mgmt_get_dfile_array state: getattr_setup_msgpair\n");
 
     /* parameter range checks */
-    /* TODO: do we have some defined values to check for here? */
+    assert(sm_p->u.get_dfile_array.pinode_refn.handle != PVFS_HANDLE_NULL);
+    /* TODO: do we have some defined value to check for here? */
     assert(sm_p->u.get_dfile_array.pinode_refn.fs_id != 0);
-    assert(sm_p->u.get_dfile_array.pinode_refn.handle != 0);
 
     /* fill in getattr request */
     PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
@@ -171,15 +170,15 @@ static int mgmt_get_dfile_array_getattr_setup_msgpair(
     sm_p->msgpair.comp_fn = getattr_comp_fn;
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
 				    sm_p->msgpair.handle, sm_p->msgpair.fs_id);
-    if (ret != 0)
+    if (ret < 0)
     {
 	gossip_err("Error: failure mapping to server.\n");
-	assert(ret < 0);	/* return value range check */
-	assert(0);	/* TODO: real error handling */
+	js_p->error_code = ret;
+	return(1);
     }
 
     js_p->error_code = 0;
-    return 1;
+    return(1);
 }
 
 /* getattr_comp_fn()
@@ -209,21 +208,26 @@ static int getattr_comp_fn(
 	return resp_p->status;
     }
 
-    /* TODO: be nicer about this */
-    assert(resp_p->u.getattr.attr.objtype == PVFS_TYPE_METAFILE);
+    /* make sure the caller asked about the right type of object */
+    if(resp_p->u.getattr.attr.objtype != PVFS_TYPE_METAFILE)
+    {
+	return (-PVFS_EINVAL);
+    }
 
     /* sanity checks */
     assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_META_DFILES);
     assert(resp_p->u.getattr.attr.u.meta.dfile_count > 0);
 
-    /* TODO: be nicer about this */
-    assert(resp_p->u.getattr.attr.u.meta.dfile_count <=
-	   sm_p->u.get_dfile_array.dfile_count);
+    /* make sure the caller provided a large enough array */
+    if(resp_p->u.getattr.attr.u.meta.dfile_count >
+	sm_p->u.get_dfile_array.dfile_count)
+    {
+	return (-PVFS_EMSGSIZE);
+    }
 
     /* copy out dfile count and array */
     sm_p->u.get_dfile_array.dfile_count =
 	resp_p->u.getattr.attr.u.meta.dfile_count;
-
     memcpy(sm_p->u.get_dfile_array.dfile_array,
 	   resp_p->u.getattr.attr.u.meta.dfile_array,
 	   (resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle)));
@@ -254,19 +258,6 @@ static int mgmt_get_dfile_array_cleanup(
     sm_p->op_complete = 1;
 
     return 0;
-}
-
-/* mgmt_get_dfile_array_getattr_failure()
- */
-static int mgmt_get_dfile_array_getattr_failure(
-    PINT_client_sm * sm_p,
-    job_status_s * js_p)
-{
-    gossip_debug(CLIENT_DEBUG, "mgmt_get_dfile_array state: getattr_failure\n");
-
-    /* TODO: what do I need to do here? */
-
-    return 1;
 }
 
 /*
