@@ -198,10 +198,16 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 		     "  handle 0x%08Lx refers to a symlink\n",
 		     s_op->req->u.setattr.handle);
 
-        gossip_debug(SERVER_DEBUG,
-                     " symlink links handle %Lu to %s\n",
-                     s_op->req->u.setattr.handle,
-                     req_a_p->u.sym.target_path);
+        if (req_a_p->mask & PVFS_ATTR_SYMLNK_ALL)
+        {
+            assert(req_a_p->u.sym.target_path_len > 0);
+            assert(req_a_p->u.sym.target_path);
+
+            gossip_debug(SERVER_DEBUG,
+                         " symlink links handle %Lu to %s\n",
+                         s_op->req->u.setattr.handle,
+                         req_a_p->u.sym.target_path);
+        }
     }
     else if ((req_a_p->objtype == PVFS_TYPE_DIRDATA) ||
              (a_p->objtype == PVFS_TYPE_DIRDATA))
