@@ -119,12 +119,8 @@ static int msgpairarray_init(PARENT_SM *sm_p,
 
     js_p->error_code = 0;
 
-    /*
-      set number of operations that must complete.  we're using the
-      comp_ct in the first msgarray entry to keep up with the count
-      for the entire array.
-    */
-    sm_p->msgarray[0].comp_ct = (2 * sm_p->msgarray_count);
+    /* set number of operations that must complete.  */
+    sm_p->msgarray_params.comp_ct = (2 * sm_p->msgarray_count);
 
     for(i = 0; i < sm_p->msgarray_count; i++)
     {
@@ -167,7 +163,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
     PVFS_msg_tag_t session_tag;
     PINT_sm_msgpair_state *msg_p = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
-    int num_incomplete_msgpairs = (sm_p->msgarray[0].comp_ct / 2);
+    int num_incomplete_msgpairs = (sm_p->msgarray_params.comp_ct / 2);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "(%p) msgpairarray state: post "
@@ -177,7 +173,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
     js_p->error_code = 0;
 
     assert(sm_p->msgarray_count > 0);
-    assert(num_incomplete_msgpairs && sm_p->msgarray[0].comp_ct);
+    assert(num_incomplete_msgpairs && sm_p->msgarray_params.comp_ct);
 
     for (i = 0; i < num_incomplete_msgpairs; i++)
     {
@@ -288,7 +284,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 	    /* mark send as bad too and don't post it */
 	    msg_p->send_status.error_code = msg_p->recv_status.error_code;
 	    msg_p->op_status = msg_p->recv_status.error_code;
-	    sm_p->msgarray[0].comp_ct -= 2;
+	    sm_p->msgarray_params.comp_ct -= 2;
 	    /* continue to send other array entries if possible */
 	    continue;
 	}
@@ -340,23 +336,19 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 	     */
 	    msg_p->op_status = msg_p->send_status.error_code;
 	    msg_p->send_id = 0;
-	    sm_p->msgarray[0].comp_ct--;
+	    sm_p->msgarray_params.comp_ct--;
 	}
 	else if (ret == 1)
 	{
 	    /* immediate completion */
 	    msg_p->send_id = 0;
-	    /* decrement our count, since send is already done.
-	     *
-	     * we're using the comp_ct in the first array element to
-	     * keep up with our count for the entire array.
-	     */
-	    sm_p->msgarray[0].comp_ct--;
+	    /* decrement our count, since send is already done. */
+	    sm_p->msgarray_params.comp_ct--;
 	}
         /* else: successful post, no immediate completion */
     }
 
-    if (sm_p->msgarray[0].comp_ct == 0)
+    if (sm_p->msgarray_params.comp_ct == 0)
     {
 	/* everything is completed already (could happen in some failure
 	 * cases); jump straight to final completion function.
@@ -437,12 +429,12 @@ static int msgpairarray_complete(PARENT_SM *sm_p,
     }
 
     /* decrement comp_ct until all operations have completed */
-    if (--sm_p->msgarray[0].comp_ct > 0)
+    if (--sm_p->msgarray_params.comp_ct > 0)
     {
 	return 0;
     }
 
-    assert(sm_p->msgarray[0].comp_ct == 0);
+    assert(sm_p->msgarray_params.comp_ct == 0);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "  msgpairarray: all operations complete\n");
 
@@ -484,14 +476,14 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
                   NOTE: we only retry msgpairs that haven't yet been
                   completed
                 */
-                sm_p->msgarray[0].comp_ct = 2 * count_incomplete_msgs(
+                sm_p->msgarray_params.comp_ct = 2 * count_incomplete_msgs(
                     sm_p->msgarray, sm_p->msgarray_count);
 
-                assert(sm_p->msgarray[0].comp_ct > 0);
+                assert(sm_p->msgarray_params.comp_ct > 0);
 
                 gossip_debug(GOSSIP_CLIENT_DEBUG, "*** msgpairarray is "
                              "retrying %d of %d total messages\n",
-                             sm_p->msgarray[0].comp_ct,
+                             sm_p->msgarray_params.comp_ct,
                              (2 * sm_p->msgarray_count));
 
                 js_p->error_code = MSGPAIRS_RETRY;

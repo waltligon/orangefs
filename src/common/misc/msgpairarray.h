@@ -37,9 +37,6 @@ typedef struct PINT_sm_msgpair_state_s
      */
     int (* comp_fn)(void *sm_p, struct PVFS_server_resp *resp_p, int i);
 
-    /* comp_ct used to keep up with number of operations remaining */
-    int comp_ct;
-
     /* server address */
     PVFS_BMI_addr_t svr_addr;
 
@@ -76,6 +73,8 @@ typedef struct PINT_sm_msgpair_params_s
     int retry_delay;
     int retry_limit;
     job_context_id job_context;
+    /* comp_ct used to keep up with number of operations remaining */
+    int comp_ct;
 } PINT_sm_msgpair_params;
 
 
