@@ -116,15 +116,14 @@ PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
 
 int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_status_s *ret)
 {
-	struct PINT_decoded_msg decoded_message;
 
 	PINT_decode(s_op->unexp_bmi_buff->buffer,
 					PINT_ENCODE_REQ,
-					&decoded_message,
+					&s_op->decoded,
 					s_op->unexp_bmi_buff->addr,
 					s_op->unexp_bmi_buff->size,
 					&(s_op->enc_type));
-	s_op->req  = (struct PVFS_server_req_s *) decoded_message.buffer;
+	s_op->req  = (struct PVFS_server_req_s *) s_op->decoded.buffer;
 	assert(s_op->req != NULL);
 
 	s_op->addr = s_op->unexp_bmi_buff->addr;

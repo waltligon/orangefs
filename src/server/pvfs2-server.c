@@ -585,6 +585,7 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
     {
 	return (-1);
     }
+    memset(serv_op, 0, sizeof(PINT_server_op));
 
     serv_op->op = BMI_UNEXP;
 

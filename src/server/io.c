@@ -12,6 +12,10 @@
 #include <pvfs2-attr.h>
 #include <job-consist.h>
 #include <assert.h>
+#include <pvfs-distribution.h>
+#include <pvfs-request.h>
+#include <pint-distribution.h>
+#include <pint-request.h>
 
 static int io_init(state_action_struct *s_op, job_status_s *ret);
 static int io_get_size(state_action_struct *s_op, job_status_s *ret);
@@ -30,7 +34,8 @@ PINT_state_machine_s io_req_s =
 	io_init_state_machine
 };
 
-/* This is the state machine for file system I/O operations (both
+/****************************************************************
+ * This is the state machine for file system I/O operations (both
  * read and write)
  */
 
@@ -38,14 +43,10 @@ PINT_state_machine_s io_req_s =
  * access control?
  */
 
-/* TODO: figure out how to jump from sending an ack to the release
- * function, without doing a flow in between.  We need this to be able
- * to skip the flow when we send a negative acknowledgement.
- */
-
 %%
 
-machine io(init, get_size, send_ack, start_flow, cleanup, release)
+machine io(init, get_size, send_positive_ack, send_negative_ack, 
+	start_flow, cleanup, release)
 {
 	state init
 	{
@@ -56,13 +57,20 @@ machine io(init, get_size, send_ack, start_flow, cleanup, release)
 	state get_size
 	{
 		run io_get_size;
-		default => send_ack;
+		success => send_positive_ack;
+		default => send_negative_ack;
 	}
 
-	state send_ack 
+	state send_positive_ack 
 	{
 		run io_send_ack;
 		success => start_flow;
+		default => release;
+	}
+
+	state send_negative_ack 
+	{
+		run io_send_ack;
 		default => release;
 	}
 
@@ -119,9 +127,7 @@ void io_init_state_machine(void)
  *            
  * Returns:  int
  *
- * Synopsis: This function sets up the buffers in preparation for any
- *           operations that require them.  Also runs the operation 
- *           through the request scheduler for consistency.
+ * Synopsis: posts the operation to the request scheduler
  *           
  */
 static int io_init(state_action_struct *s_op, job_status_s *ret)
@@ -145,21 +151,20 @@ static int io_init(state_action_struct *s_op, job_status_s *ret)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      Memory is allocated, and we are ready to do what we are 
- *           going to do.
+ * Pre:      operation has been scheduled.
  *
- * Post:     Some type of work has been done!
+ * Post:     attributes have been retrieved for the trove object
  *            
  * Returns:  int
  *
- * Synopsis: This function should make a call that will perform an 
- *           operation be it to Trove, BMI, server_config, etc.  
- *           But, the operation is non-blocking.
+ * Synopsis: performs a trove getattr operation, for the sole
+ *           purpose of finding out the size of the bstream that we 
+ *           intend to operate on 
  *           
  */
 static int io_get_size(state_action_struct *s_op, job_status_s *ret)
 {
-	int err = -ENOSYS;
+	int err = -1;
 	job_id_t tmp_id;
 	
 	gossip_ldebug(SERVER_DEBUG, "IO: io_get_size() executed.\n");
@@ -170,7 +175,7 @@ static int io_get_size(state_action_struct *s_op, job_status_s *ret)
 		s_op,
 		ret,
 		&tmp_id);
-
+	
 	return(err);
 }
 
@@ -181,16 +186,16 @@ static int io_get_size(state_action_struct *s_op, job_status_s *ret)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      Memory is allocated, and we are ready to do what we are 
- *           going to do.
+ * Pre:      error code has been set in job status for us to
+ *           report to client
  *
- * Post:     Some type of work has been done!
+ * Post:     response has been sent to client
  *            
  * Returns:  int
  *
- * Synopsis: This function should make a call that will perform an 
- *           operation be it to Trove, BMI, server_config, etc.  
- *           But, the operation is non-blocking.
+ * Synopsis: fills in a response to the I/O request, encodes it,
+ *           and sends it to the client via BMI.  Note that it may
+ *           send either positive or negative acknowledgements.
  *           
  */
 static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
@@ -217,9 +222,13 @@ static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
 
 	if(err < 0)
 	{
-		/* TODO: what do I do here? */
-		gossip_lerr("IO: AIEEEeee! PINT_encode() failure.\n");
-		gossip_lerr("IO: returning -1 from state function.\n");
+		/* critical error prior to job posting */
+		gossip_lerr("Server: IO SM: PINT_encode() failure.\n");
+		/* handle by setting error code in job status structure and
+		 * returning 1
+		 */
+		ret->error_code = err;
+		return(1);
 	}
 	else
 	{
@@ -246,16 +255,16 @@ static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      Memory is allocated, and we are ready to do what we are 
- *           going to do.
+ * Pre:      all of the previous steps have succeeded, so that we
+ *           are ready to actually perform the I/O
  *
- * Post:     Some type of work has been done!
+ * Post:     I/O has been carried out
  *            
  * Returns:  int
  *
- * Synopsis: This function should make a call that will perform an 
- *           operation be it to Trove, BMI, server_config, etc.  
- *           But, the operation is non-blocking.
+ * Synopsis: this is the most important part of the state machine.
+ *           we setup the flow descriptor and post it in order to 
+ *           carry out the data transfer
  *           
  */
 static int io_start_flow(state_action_struct *s_op, job_status_s *ret)
@@ -266,48 +275,76 @@ static int io_start_flow(state_action_struct *s_op, job_status_s *ret)
 	gossip_ldebug(SERVER_DEBUG, "IO: io_start_flow() executed.\n");
 
 	s_op->flow_d = PINT_flow_alloc();
-
-/* TODO: what the heck do I do if the above fails? */
-
-#if 0
-	/* this is where we report the file size to the client before
-	 * starting the I/O transfer, or else report an error if we
-	 * failed to get the size, or failed for permission reasons
-	 */
-	s_op->resp->status = ret->error_code;
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
-	s_op->resp->u.io.bstream_size = ret->ds_attr.b_size;
-
-	err = PINT_encode(
-		s_op->resp, 
-		PINT_ENCODE_RESP, 
-		&(s_op->encoded),
-		s_op->addr,
-		s_op->enc_type);
-
-	if(err < 0)
+	if(!s_op->flow_d)
 	{
-		/* TODO: what do I do here? */
-		gossip_lerr("IO: AIEEEeee! PINT_encode() failure.\n");
-		gossip_lerr("IO: returning -1 from state function.\n");
+		/* critical error, jump to next error state */
+		ret->error_code = -ENOMEM;
+		return(1);
+	}
+
+	s_op->flow_d->file_data =
+		(PINT_Request_file_data*)malloc(sizeof(PINT_Request_file_data));
+	if(!s_op->flow_d->file_data)
+	{
+		/* critical error, jump to next error state */
+		ret->error_code = -ENOMEM;
+		return(1);
+	}
+
+	/* we still have the file size stored in the response structure 
+	 * that we sent in the previous state, other details come from
+	 * request
+	 */
+	s_op->flow_d->file_data->fsize = s_op->resp->u.io.bstream_size;
+	s_op->flow_d->file_data->dist = s_op->req->u.io.io_dist;
+	s_op->flow_d->file_data->iod_num = s_op->req->u.io.iod_num;
+	s_op->flow_d->file_data->iod_count = s_op->req->u.io.iod_count;
+
+	/* on writes, we allow the bstream to be extended at EOF */
+	if(s_op->req->u.io.io_type == PVFS_IO_WRITE)
+		s_op->flow_d->file_data->extend_flag = 1;
+	else
+		s_op->flow_d->file_data->extend_flag = 0;
+
+	s_op->flow_d->request = s_op->req->u.io.io_req;
+	s_op->flow_d->flags = 0;
+	s_op->flow_d->tag = s_op->tag;
+	s_op->flow_d->user_ptr = NULL;
+
+	/* set endpoints depending on type of io requested */
+	if(s_op->req->u.io.io_type == PVFS_IO_WRITE)
+	{
+		s_op->flow_d->src.endpoint_id = BMI_ENDPOINT;
+		s_op->flow_d->src.u.bmi.address = s_op->addr;
+		s_op->flow_d->dest.endpoint_id = TROVE_ENDPOINT;
+		s_op->flow_d->dest.u.trove.handle = s_op->req->u.io.handle;
+		s_op->flow_d->dest.u.trove.coll_id = s_op->req->u.io.fs_id;
+	}
+	else if(s_op->req->u.io.io_type == PVFS_IO_READ)
+	{
+		s_op->flow_d->src.endpoint_id = TROVE_ENDPOINT;
+		s_op->flow_d->src.u.trove.handle = s_op->req->u.io.handle;
+		s_op->flow_d->src.u.trove.coll_id = s_op->req->u.io.fs_id;
+		s_op->flow_d->dest.endpoint_id = BMI_ENDPOINT;
+		s_op->flow_d->dest.u.bmi.address = s_op->addr;
 	}
 	else
 	{
-		err = job_bmi_send_list(
-			s_op->addr,
-			s_op->encoded.buffer_list,
-			s_op->encoded.size_list,
-			s_op->encoded.list_count,
-			s_op->encoded.total_size,
-			s_op->tag,
-			s_op->encoded.buffer_flag,
-			0,
-			s_op,
-			ret,
-			&tmp_id);
+		/* critical error; jump out of state */
+		gossip_lerr("Server: IO SM: unknown IO type requested.\n");
+		ret->error_code = -EINVAL;
+		return(1);
 	}
-#endif
-	return(0);
+
+
+	/* start the flow! */
+	err = job_flow(
+		s_op->flow_d,
+		s_op,
+		ret,
+		&tmp_id);
+
+	return(err);
 }
 
 
@@ -317,17 +354,14 @@ static int io_start_flow(state_action_struct *s_op, job_status_s *ret)
  * Params:   server_op *b, 
  *           job_status_s *ret
  *
- * Pre:      We are done!
+ * Pre:      we are done with all steps necessary to service
+ *           request
  *
- * Post:     We need to let the next operation go.
+ * Post:     operation has been released from the scheduler
  *
  * Returns:  int
  *
- * Synopsis: Free the job from the scheduler to allow next job to 
- *           proceed.  Once we reach this point, we assume all 
- *           communication has ceased with the client with respect 
- *           to this operation, so we must tell the scheduler to 
- *           proceed with the next operation on our handle!
+ * Synopsis: releases the operation from the scheduler
  */
 static int io_release(state_action_struct *s_op, job_status_s *ret)
 {
@@ -336,9 +370,6 @@ static int io_release(state_action_struct *s_op, job_status_s *ret)
 	job_id_t i;
 
 	gossip_ldebug(SERVER_DEBUG, "IO: io_release() executed.\n");
-
-	/* let go of our encoded buffer */
-	PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP, 0);
 
 	/* tell the scheduler that we are done with this operation */
 	job_post_ret = job_req_sched_release(s_op->scheduled_id,
@@ -354,31 +385,51 @@ static int io_release(state_action_struct *s_op, job_status_s *ret)
  * Params:   server_op *b, 
  *           job_status_s *ret
  *
- * Pre:      NONE
+ * Pre:      all jobs done, simply need to clean up
  *
- * Post:     everything is free!
+ * Post:     everything is free
  *
  * Returns:  int
  *
- * Synopsis: free memory and return
- *           We want to return 0 here so that the server thinks
- *           this job is "still processing" and does not try to 
- *           continue working on it.  After this state is done, 
- *           none of the work with respect to this request is valid.
+ * Synopsis: free up any buffers associated with the operation,
+ *           including any encoded or decoded protocol structures
  */
 static int io_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 	gossip_ldebug(SERVER_DEBUG, "IO: io_cleanup() executed.\n");
 	/* Free the encoded message if necessary! */
 
+	if(s_op->flow_d)
+	{
+		if(s_op->flow_d->file_data)
+		{
+			free(s_op->flow_d->file_data);
+		}
+		PINT_flow_free(s_op->flow_d);
+	}
+
+	/* let go of our encoded response buffer, 
+	 * if we appear to have made one 
+	 */
+	if(s_op->encoded.total_size)
+	{
+		PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP,
+			s_op->enc_type);
+	}
+
+	/* let go of our non-encoded response buffer */
 	if(s_op->resp)
 	{
 		free(s_op->resp);
 	}
 
-	if(s_op->req)
+	/* let go of our decoded request buffer */
+	if(s_op->decoded.buffer)
 	{
-		free(s_op->req);
+		PINT_decode_release(
+			&s_op->decoded,
+			PINT_ENCODE_REQ,
+			s_op->enc_type);
 	}
 
 	free(s_op->unexp_bmi_buff);

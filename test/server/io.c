@@ -9,6 +9,11 @@
 #include <pvfs2-req-proto.h>
 #include <print-struct.h>
 #include <PINT-reqproto-encode.h>
+#include <pvfs-request.h>
+#include <pint-request.h>
+#include <pvfs-distribution.h>
+#include <pint-distribution.h>
+#include <flow.h>
 
 
 /* TODO: update this as we go
@@ -39,6 +44,7 @@ struct options{
  */
 
 static struct options* parse_args(int argc, char* argv[]);
+static int block_on_flow(flow_descriptor* flow_d);
 
 
 /**************************************************************/
@@ -56,16 +62,26 @@ int main(int argc, char **argv)	{
 	struct PINT_decoded_msg decoded1;
 	struct PINT_encoded_msg encoded2;
 	struct PINT_decoded_msg decoded2;
-	struct PINT_encoded_msg encoded3;
-	struct PINT_decoded_msg decoded3;
 	struct PVFS_server_req_s my_req;
 	struct PVFS_server_resp_s* io_dec_ack;
 	struct PVFS_server_resp_s* create_dec_ack;
-	struct PVFS_server_resp_s* remove_dec_ack;
 	void* my_ack, *create_ack, *remove_ack;
 	int my_ack_size, create_ack_size, remove_ack_size;
 	PVFS_size io_size = 10 * 1024 * 1024;
+	void* memory_buffer = NULL;
+	PINT_Request_file_data file_data;
+	flow_descriptor* flow_d = NULL;
 	
+	/* TODO: use these once server remove state machine is
+	 * implemented and we can call remove at the end of the test
+	 * run 
+	 */
+#if 0
+	struct PVFS_server_resp_s* remove_dec_ack;
+	struct PINT_encoded_msg encoded3;
+	struct PINT_decoded_msg decoded3;
+#endif
+
 	/**************************************************
 	 * general setup 
 	 */
@@ -88,6 +104,14 @@ int main(int argc, char **argv)	{
 	if(!remove_ack)
 		return(-errno);
 
+	/* create a memory buffer to write from */
+	memory_buffer = malloc(io_size);
+	if(!memory_buffer)
+	{
+		fprintf(stderr, "Error: malloc() failure.\n");
+		return(-1);
+	}
+
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
 	if(!user_opts){
@@ -101,8 +125,15 @@ int main(int argc, char **argv)	{
 	/* initialize local interface */
 	ret = BMI_initialize(user_opts->method, NULL, 0);
 	if(ret < 0){
-		errno = -ret;
-		perror("BMI_initialize");
+		fprintf(stderr, "Error: BMI_initialize() failure.\n");
+		return(-1);
+	}
+
+	/* intialize flow interface */
+	ret = PINT_flow_initialize("flowproto_bmi_trove", 0);
+	if(ret < 0)
+	{
+		fprintf(stderr, "Error: flow_initialize() failure.\n");
 		return(-1);
 	}
 
@@ -258,6 +289,8 @@ int main(int argc, char **argv)	{
 	/* io specific fields */
 	my_req.u.io.fs_id = 9;
 	my_req.u.io.handle = create_dec_ack->u.create.handle;
+	my_req.u.io.iod_num = 0;
+	my_req.u.io.iod_count = 1;
 	my_req.u.io.io_type = PVFS_IO_WRITE;
 	my_req.u.io.io_dist = PVFS_Dist_create("default_dist");
 	if(!my_req.u.io.io_dist)
@@ -396,11 +429,50 @@ int main(int argc, char **argv)	{
 		(int)io_dec_ack->u.io.bstream_size);
 
 	/**************************************************
+	 * flow 
+	 */
+
+	file_data.fsize = io_dec_ack->u.io.bstream_size;
+	file_data.iod_num = 0;
+	file_data.iod_count = 1;
+	file_data.dist = my_req.u.io.io_dist;
+
+	flow_d = PINT_flow_alloc();
+	if(!flow_d)
+	{
+		fprintf(stderr, "Error: PINT_flow_alloc() failure.\n");
+		return(-1);
+	}
+
+	flow_d->request = my_req.u.io.io_req;
+	flow_d->file_data = &file_data;
+	flow_d->flags = 0;
+	flow_d->tag = 0;
+	flow_d->user_ptr = NULL;
+
+	/* the following section assumes we are doing a write */
+	file_data.extend_flag = 1;
+	flow_d->src.endpoint_id = MEM_ENDPOINT;
+	flow_d->src.u.mem.size = io_size;
+	flow_d->src.u.mem.buffer = memory_buffer;
+	flow_d->dest.endpoint_id = BMI_ENDPOINT;
+	flow_d->dest.u.bmi.address = server_addr;
+
+	ret = block_on_flow(flow_d);
+	if(ret < 0)
+	{
+		return(-1);
+	}
+
+	PINT_flow_free(flow_d);
+
+	/**************************************************
 	 * remove request  
 	 */
 
 	/* TODO: fill this in.  We need to get rid of the data file
-	 * that we created earlier
+	 * that we created earlier.  Waiting on implementation of
+	 * server side remove state machine.
 	 */
 
 	/**************************************************
@@ -421,6 +493,7 @@ int main(int argc, char **argv)	{
 	/* turn off debugging stuff */
 	gossip_disable();
 
+	free(memory_buffer);
 	free(my_ack);
 	free(create_ack);
 	free(remove_ack);
@@ -504,3 +577,39 @@ parse_args_error:
 	return(NULL);
 }
 
+
+static int block_on_flow(flow_descriptor* flow_d)
+{
+	int ret = -1;
+	int count = 0;
+	int index = 5;
+
+	ret = PINT_flow_post(flow_d);
+	if(ret == 1)
+	{
+		return(0);
+	}
+	if(ret < 0)
+	{
+		fprintf(stderr, "Error: flow_post() failure.\n");
+		return(ret);
+	}
+
+	do
+	{
+		ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10);
+	}while(ret == 0 && count == 0);
+	if(ret < 0)
+	{
+		fprintf(stderr, "Error: flow_test() failure.\n");
+		return(ret);
+	}
+	if(flow_d->state != FLOW_COMPLETE)
+	{
+		fprintf(stderr, "Error: flow finished in error state: %d\n",
+		flow_d->state);
+		return(-1);
+	}
+
+	return(0);
+}

@@ -9,3 +9,8 @@ TESTSRC += \
 	$(DIR)/readdir.c \
 	$(DIR)/setattr.c \
 	$(DIR)/io.c
+
+# special rule for io test program, which needs several other
+# libraries at the moment
+test/server/io: test/server/io.o
+	$(LD) $< $(LDFLAGS) $(LIBS) -ldb -lrt -lpthread -o $@
