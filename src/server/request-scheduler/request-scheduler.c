@@ -463,6 +463,9 @@ int PINT_req_sched_post_timer(
 	qlist_add_tail(&tmp_element->list_link, &timer_queue);
     }
 
+    gossip_debug(REQ_SCHED_DEBUG,
+		 "REQ SCHED POSTING, queue_element: %p\n",
+		 tmp_element);
     return(0);
 }
 
@@ -842,8 +845,45 @@ int PINT_req_sched_testworld(
 {
     int incount = *inout_count_p;
     struct req_sched_element *tmp_element;
+    struct qlist_head* scratch;
+    struct qlist_head* iterator;
+    struct timeval tv;
 
     *inout_count_p = 0;
+
+    /* do timers first, if we have them */
+    if(!qlist_empty(&timer_queue))
+    {
+	gettimeofday(&tv, NULL);
+	qlist_for_each_safe(iterator, scratch, &timer_queue)
+	{
+	    tmp_element = qlist_entry(iterator, struct req_sched_element,
+		list_link);
+	    if((tmp_element->tv.tv_sec > tv.tv_sec) 
+		|| (tmp_element->tv.tv_sec == tv.tv_sec && 
+		    tmp_element->tv.tv_usec > tv.tv_usec))
+	    {	
+		break;
+	    }
+	    else
+	    {
+		qlist_del(&(tmp_element->list_link));
+		out_id_array[*inout_count_p] = tmp_element->id;
+		if (returned_user_ptr_array)
+		{
+		    returned_user_ptr_array[*inout_count_p] = tmp_element->user_ptr;
+		}
+		out_status_array[*inout_count_p] = 0;
+		(*inout_count_p)++;
+		gossip_debug(REQ_SCHED_DEBUG,
+			     "REQ SCHED SCHEDULING, queue_element: %p\n",
+			     tmp_element);
+		free(tmp_element);
+		if(*inout_count_p == incount)
+		    break;
+	    }
+	}
+    }
 
     while (!qlist_empty(&ready_queue) && (*inout_count_p < incount))
     {

@@ -7,6 +7,7 @@
 /* test program for the request scheduler API */
 
 #include <stdio.h>
+#include <assert.h>
 
 #include "request-scheduler.h"
 #include "pvfs2-req-proto.h"
@@ -27,7 +28,6 @@ int main(
     int count = 0;
     int status = 0;
     req_sched_id timer_id_array[2];
-    int tmp_index;
 
     /* setup some requests to test */
     req_array[0].op = PVFS_SERV_GETATTR;
@@ -231,7 +231,13 @@ int main(
     }
 
     /* try a simple timer case */
-    ret = PINT_req_sched_post_timer(1000, NULL, &(timer_id_array[0]));
+    ret = PINT_req_sched_post_timer(1500, NULL, &(timer_id_array[0]));
+    if (ret != 0)
+    {
+	fprintf(stderr, "Error: post timer weirdness.\n");
+	return (-1);
+    }
+    ret = PINT_req_sched_post_timer(1000, NULL, &(timer_id_array[1]));
     if (ret != 0)
     {
 	fprintf(stderr, "Error: post timer weirdness.\n");
@@ -240,17 +246,29 @@ int main(
 
     do
     {
-	count = 1;
-	ret = PINT_req_sched_testsome(timer_id_array, &count, &tmp_index, 
-	    NULL, &status);
+	count = 2;
+	ret = PINT_req_sched_testworld(&count, timer_id_array, NULL, &status);
     } while (ret == 0 && count == 0);
 
+    assert(ret == 1 && count == 1 && status == 0);
     if (ret < 0 || status != 0)
     {
 	fprintf(stderr, "Error: test failure.\n");
     }
-    printf("Done.\n");
+    printf("Done 1.\n");
 
+    do
+    {
+	count = 2;
+	ret = PINT_req_sched_testworld(&count, timer_id_array, NULL, &status);
+    } while (ret == 0 && count == 0);
+
+    assert(ret == 1 && count == 1 && status == 0);
+    if (ret < 0 || status != 0)
+    {
+	fprintf(stderr, "Error: test failure.\n");
+    }
+    printf("Done 2.\n");
 
     /* shut down scheduler */
     ret = PINT_req_sched_finalize();
