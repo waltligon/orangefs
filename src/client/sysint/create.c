@@ -43,8 +43,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	PVFS_msg_tag_t op_tag;
 	bmi_size_t max_msg_sz;
 	int old_ret = -1;
-        int meta_handle_extent_array_len = 0;
-        PVFS_handle_extent *meta_handle_extent_array = NULL;
+        PVFS_handle_extent_array meta_handle_extent_array;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -163,8 +162,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	ret = PINT_bucket_get_next_meta(&g_server_config,
                                         parent_refn.fs_id,
                                         &serv_addr1,
-                                        meta_handle_extent_array,
-                                        &meta_handle_extent_array_len);
+                                        &meta_handle_extent_array);
 	if (ret < 0)
 	{
 	    failure = LOOKUP_SERVER_FAILURE;

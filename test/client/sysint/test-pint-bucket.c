@@ -55,8 +55,7 @@ int main(int argc, char **argv)
     bmi_addr_t addr, m_addr, d_addr[NUM_DATA_SERVERS_TO_QUERY];
     char server_name[MAX_BMI_ADDR_LEN] = {0};
     int test_handles_verified[NUM_TEST_HANDLES] = {0};
-    int meta_handle_extent_array_len = 0;
-    PVFS_handle_extent *meta_handle_extent_array = NULL;
+    PVFS_handle_extent_array meta_handle_extent_array;
 
     gossip_enable_stderr();
     gossip_set_debug_mask(0, 0);
@@ -150,9 +149,9 @@ int main(int argc, char **argv)
         for(j = 0; j < NUM_META_SERVERS_TO_QUERY; j++)
         {
             if (PINT_bucket_get_next_meta(&server_config,
-                                          fs_ids[i], &m_addr,
-                                          meta_handle_extent_array,
-                                          &meta_handle_extent_array_len))
+                                          fs_ids[i],
+                                          &m_addr,
+                                          &meta_handle_extent_array))
             {
                 fprintf(stderr, "PINT_bucket_get_next_meta failure.\n");
                 return(-1);
@@ -160,7 +159,7 @@ int main(int argc, char **argv)
             else
             {
                 printf("Next meta server addr: %lu (%d ranges)\n",
-                       (long)m_addr, meta_handle_extent_array_len);
+                       (long)m_addr, meta_handle_extent_array.extent_count);
             }
         }
 

@@ -30,8 +30,7 @@ int PINT_bucket_get_next_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     bmi_addr_t *meta_addr,
-    PVFS_handle_extent *out_handle_extent_array,
-    int *out_handle_extent_array_len);
+    PVFS_handle_extent_array *meta_handle_extent_array);
 
 int PINT_bucket_get_next_io(
     struct server_configuration_s *config,

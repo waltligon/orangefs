@@ -169,8 +169,7 @@ int PINT_bucket_get_next_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     bmi_addr_t *meta_addr,
-    PVFS_handle_extent *out_handle_extent_array,
-    int *out_handle_extent_array_len)
+    PVFS_handle_extent_array *meta_handle_extent_array)
 {
     int ret = -EINVAL;
     char *meta_server_bmi_str = NULL;
@@ -178,7 +177,7 @@ int PINT_bucket_get_next_meta(
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (config && meta_addr && out_handle_extent_array_len)
+    if (config && meta_addr && meta_handle_extent_array)
     {
         hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
         if (hash_link)
@@ -206,10 +205,10 @@ int PINT_bucket_get_next_meta(
             meta_server_bmi_str = PINT_server_config_get_host_addr_ptr(
                 config,cur_mapping->alias_mapping->host_alias);
 
-            out_handle_extent_array =
-                cur_mapping->handle_extent_array.extent_array;
-            *out_handle_extent_array_len =
+            meta_handle_extent_array->extent_count =
                 cur_mapping->handle_extent_array.extent_count;
+            meta_handle_extent_array->extent_array =
+                cur_mapping->handle_extent_array.extent_array;
 
             ret = BMI_addr_lookup(meta_addr,meta_server_bmi_str);
         }
