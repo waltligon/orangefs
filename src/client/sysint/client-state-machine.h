@@ -256,6 +256,8 @@ struct PINT_client_rename_sm {
     int             rmdirent_index;
     int             target_dirent_exists;
     PVFS_handle     old_dirent_handle;
+    int		    retry_count;
+    int             stored_error_code;
 };
 
 struct PINT_client_mgmt_setparam_list_sm 

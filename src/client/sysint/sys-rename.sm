@@ -156,7 +156,8 @@ machine pvfs2_client_rename_sm(
     state rename_rmdirent_failure
     {
         run rename_rmdirent_failure;
-        default => rename_rmdirent_setup_msgpair;
+        success => rename_rmdirent_setup_msgpair;
+	default => rename_warn_user_to_run_fsck;
     }
 
     state rename_check_for_remove
@@ -271,6 +272,7 @@ int PVFS_sys_rename(
     sm_p->u.rename.parent_refns[1] = new_parent_ref;
     sm_p->u.rename.rmdirent_index = 0;
     sm_p->u.rename.target_dirent_exists = 0;
+    sm_p->u.rename.stored_error_code = 0;
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under %Lu on "
@@ -302,7 +304,9 @@ int PVFS_sys_rename(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename completed\n");
 
-    error = sm_p->error_code;
+    error = (sm_p->u.rename.stored_error_code ?
+	sm_p->u.rename.stored_error_code :
+	sm_p->error_code);
 
     free(sm_p);
     return error;
@@ -646,11 +650,14 @@ static int rename_rmdirent_failure(PINT_client_sm *sm_p,
             GOSSIP_CLIENT_DEBUG, "cleaning up new dirent because of "
             "previous failure.\n");
         sm_p->u.rename.rmdirent_index++;
+	sm_p->u.rename.stored_error_code = js_p->error_code;
+	js_p->error_code = 0;
     }
     else
     {
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "failed to clean up created dirent!\n");
+	/* leave error code untouched, fall to next state */
     }
     return 1;
 }
