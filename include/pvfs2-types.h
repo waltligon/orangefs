@@ -360,6 +360,33 @@ enum PVFS_io_type {
     PVFS_IO_WRITE = 2
 };
 
+/* Printf wrappers for 32- and 64-bit compatibility.  Imagine trying
+ * to print out a PVFS_handle, which is typedefed to a uint64_t.  On
+ * a 32-bit machine, you use format "%Lu", while a 64-bit machine wants
+ * the format "%lu", and each machine complains at the use of the opposite.
+ * This is only a problem on primitive types that are bigger than the
+ * smallest supported machine, i.e. bigger than 32 bits.
+ *
+ * Rather than changing the printf format string, which is the "right"
+ * thing to do, we instead cast the parameters to the printf().  But only
+ * on one of the architectures so the other one will complain if the format
+ * string really is incorrect.
+ *
+ * Here we choose 32-bit machines as the dominant type.  If a format
+ * specifier and a parameter are mismatched, that machine will issue
+ * a warning, while 64-bit machines will silenly perform the cast.
+ */
+#if __WORDSIZE == 32
+#  define Lu(x) (x)
+#  define Ld(x) (x)
+#elif __WORDSIZE == 64
+#  define Lu(x) (unsigned long long)(x)
+#  define Ld(x) (long long)(x)
+#else
+/* If you see this, you can change the #if tests above to work around it. */
+#  error Unknown wordsize, perhaps your system headers are not POSIX
+#endif
+
 #endif /* __PVFS2_TYPES_H */
 
 /*
