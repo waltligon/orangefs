@@ -157,9 +157,8 @@ static int lookup_init(PINT_server_op *s_op,
     s_op->u.lookup.seg_nr = 0;
     s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->req->u.lookup_path.path);
     if (s_op->u.lookup.seg_ct < 0) {
-	gossip_debug(SERVER_DEBUG,
-		     "  invalid path %s; put a leading / on your paths!!!\n",
-		     s_op->req->u.lookup_path.path);
+	gossip_err("  invalid path %s; sending error response\n",
+		   s_op->req->u.lookup_path.path);
 	ret->error_code = ENOTDIR;
     }
 

@@ -57,6 +57,10 @@ struct PINT_server_crdirent_op {
     PVFS_handle dirent_handle; /* used to hold handle of dirdata dspace that we'll write the dirent into */
 };
 
+struct PINT_server_remove_op {
+    PVFS_object_attr object_attr; /* used to hold attributes of object to be removed */
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -66,7 +70,7 @@ typedef struct PINT_server_op
     int op;
     int strsize;
     int enc_type;
-    job_id_t scheduled_id;
+    job_id_t scheduled_id; /* holds id from request scheduler so we can release it later */
 
     PVFS_ds_keyval_s key;
     PVFS_ds_keyval_s val;
@@ -83,9 +87,11 @@ typedef struct PINT_server_op
     struct PINT_decoded_msg decoded;
     flow_descriptor* flow_d;
     union {
+	/* request-specific scratch spaces for use during processing */
 	struct PINT_server_lookup_op   lookup;
 	struct PINT_server_crdirent_op crdirent;
 	struct PINT_server_readdir_op  readdir;
+	struct PINT_server_remove_op   remove;
     } u;
 } PINT_server_op;
 

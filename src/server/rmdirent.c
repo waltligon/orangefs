@@ -30,13 +30,13 @@ My TODO list for this SM:
 #include <assert.h>
 #include <gossip.h>
 
-static int rmdirent_init(state_action_struct *s_op, job_status_s *ret);
-static int rmdirent_getattr(state_action_struct *s_op, job_status_s *ret);
-static int rmdirent_check_perms(state_action_struct *s_op, job_status_s *ret);
-static int rmdirent_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int rmdirent_rmdirent(state_action_struct *s_op, job_status_s *ret);
-static int rmdirent_release_job(state_action_struct *s_op, job_status_s *ret);
-static int rmdirent_send_bmi(state_action_struct *s_op, job_status_s *ret);
+static int rmdirent_init(PINT_server_op *s_op, job_status_s *ret);
+static int rmdirent_getattr(PINT_server_op *s_op, job_status_s *ret);
+static int rmdirent_check_perms(PINT_server_op *s_op, job_status_s *ret);
+static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s *ret);
+static int rmdirent_rmdirent(PINT_server_op *s_op, job_status_s *ret);
+static int rmdirent_release_job(PINT_server_op *s_op, job_status_s *ret);
+static int rmdirent_send_bmi(PINT_server_op *s_op, job_status_s *ret);
 void rmdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -139,7 +139,7 @@ void rmdirent_init_state_machine(void)
  */
 
 
-static int rmdirent_init(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_init(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
@@ -180,7 +180,7 @@ static int rmdirent_init(state_action_struct *s_op, job_status_s *ret)
  */
 
 
-static int rmdirent_getattr(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_getattr(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
@@ -219,7 +219,7 @@ static int rmdirent_getattr(state_action_struct *s_op, job_status_s *ret)
  *           
  */
 
-static int rmdirent_check_perms(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_check_perms(PINT_server_op *s_op, job_status_s *ret)
 {
     int job_post_ret;
     job_id_t i;
@@ -272,7 +272,7 @@ static int rmdirent_check_perms(state_action_struct *s_op, job_status_s *ret)
  */
 
 
-static int rmdirent_rmdirent(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_rmdirent(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
@@ -318,7 +318,7 @@ static int rmdirent_rmdirent(state_action_struct *s_op, job_status_s *ret)
  */
 
 
-static int rmdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
@@ -395,7 +395,7 @@ static int rmdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
 
-static int rmdirent_release_job(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_release_job(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
@@ -426,7 +426,7 @@ static int rmdirent_release_job(state_action_struct *s_op, job_status_s *ret)
  */
 
 
-static int rmdirent_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
 
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);

@@ -4,39 +4,22 @@
  * See COPYING in top-level directory.
  */
 
-/*
-
-SMS:  1. Very simple machine.  errors can be reported directly to client.
-      2. Request scheduler used, but not sure how good this is.
-      3. Documented
-				      
-SFS:  1. Almost all pre/post
-      2. Some assertions
-		      
-TS:   1. Exists but not thorough.
-
-My TODO list for this SM:
-
- This state machine is pretty simple and for the most part is hammered out.
- it might need a little more documentation, but that is it.
-
-*/
-
-#include <state-machine.h>
-#include <server-config.h>
-#include <pvfs2-server.h>
 #include <string.h>
-#include <pvfs2-attr.h>
 #include <assert.h>
-#include <gossip.h>
 
-static int remove_init(state_action_struct *s_op, job_status_s *ret);
-static int remove_getattr(state_action_struct *s_op, job_status_s *ret);
-static int remove_check_perms(state_action_struct *s_op, job_status_s *ret);
-static int remove_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int remove_remove(state_action_struct *s_op, job_status_s *ret);
-static int remove_release_posted_job(state_action_struct *s_op, job_status_s *ret);
-static int remove_send_bmi(state_action_struct *s_op, job_status_s *ret);
+#include "state-machine.h"
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "gossip.h"
+
+static int remove_init(PINT_server_op *s_op, job_status_s *ret);
+static int remove_read_object_metadata(PINT_server_op *s_op, job_status_s *ret);
+static int remove_verify_object_metadata(PINT_server_op *s_op, job_status_s *ret);
+static int remove_cleanup(PINT_server_op *s_op, job_status_s *ret);
+static int remove_remove_dspace(PINT_server_op *s_op, job_status_s *ret);
+static int remove_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
+static int remove_send_response(PINT_server_op *s_op, job_status_s *ret);
 void remove_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -50,37 +33,43 @@ PINT_state_machine_s remove_req_s =
 
 %%
 
-machine remove(init, getattr, check_perms, remove2, send, release, cleanup)
+machine remove(init,
+	       read_object_metadata,
+	       verify_object_metadata,
+	       remove_dspace,
+	       send_response,
+	       release,
+	       cleanup)
 {
 	state init
 	{
 		run remove_init;
-		default => getattr;
+		default => read_object_metadata;
 	}
 
-	state getattr
+	state read_object_metadata
 	{
-		run remove_getattr;
-		success => check_perms;
-		default => remove2;
+		run remove_read_object_metadata;
+		success => verify_object_metadata;
+		default => send_response;
 	}
 
-	state check_perms
+	state verify_object_metadata
 	{
-		run remove_check_perms;
-		success => remove2;
-		default => send;
+		run remove_verify_object_metadata;
+		success => remove_dspace;
+		default => send_response;
 	}
 
-	state remove2
+	state remove_dspace
 	{
-		run remove_remove;
-		default => send;
+		run remove_remove_dspace;
+		default => send_response;
 	}
 
-	state send
+	state send_response
 	{
-		run remove_send_bmi;
+		run remove_send_response;
 		default => release;
 	}
 
@@ -102,16 +91,6 @@ machine remove(init, getattr, check_perms, remove2, send, release, cleanup)
 /*
  * Function: remove_init_state_machine
  *
- * Params:   void
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  void
- *
- * Synopsis: Set up the state machine for remove. 
- *           
  */
 
 void remove_init_state_machine(void)
@@ -124,249 +103,200 @@ void remove_init_state_machine(void)
 /*
  * Function: remove_init
  *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
- *
- * Pre:      Valid request
- *
- * Post:     Job Scheduled
- *
- * Returns:  int
- *
- * Synopsis: Remove is a relatively easy server operation. 
- *           Get attributes if possible after scheduling.
- *           
+ * Post operation to request scheduler.
  */
-
-
-static int remove_init(state_action_struct *s_op, job_status_s *ret)
+static int remove_init(PINT_server_op *s_op,
+		       job_status_s *ret)
 {
 
     int job_post_ret;
 
-
-    s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
-
-    s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
+    gossip_debug(SERVER_DEBUG, "remove state: init\n");
 
     job_post_ret = job_req_sched_post(s_op->req,
-	    s_op,
-	    ret,
-	    &(s_op->scheduled_id));
-
-    return(job_post_ret);
-
+				      s_op,
+				      ret,
+				      &(s_op->scheduled_id));
+    return job_post_ret;
 }
 
 /*
- * Function: remove_getattr
+ * Function: remove_read_object_metadata
  *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
+ * Initiate a keyval read operation to read the metadata for the object.
+ * Metadata will be read into the remove scratch space (s_op->u.remove.object_attr).
  *
- * Pre:      Valid handle
- *
- * Post:     Attributes Structure Obtained if available
- *             --This could be a datafile which has no attribs
- *
- * Returns:  int
- *
- * Synopsis: We need to get the attribute structure if it is available.
- *           If it is not, we just remove it.  TODO: Semantics here!
- *           
- *           
  */
-
-
-static int remove_getattr(state_action_struct *s_op, job_status_s *ret)
+static int remove_read_object_metadata(PINT_server_op *s_op,
+				       job_status_s *ret)
 {
-
     int job_post_ret;
-    job_id_t i;
+    job_id_t j_id;
+
+    gossip_debug(SERVER_DEBUG, "remove state: read_object_metadata\n");
+
+    /* set up key and value structures for reading metadata */
+    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+
+    s_op->val.buffer    = &s_op->u.remove.object_attr;
+    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.remove.fs_id,
+		 s_op->req->u.remove.handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
 
     job_post_ret = job_trove_keyval_read(s_op->req->u.remove.fs_id,
-	    s_op->req->u.remove.handle,
-	    &(s_op->key),
-	    &(s_op->val),
-	    0,
-	    NULL,
-	    s_op,
-	    ret,
-	    &i);
-
-    return(job_post_ret);
-
+					 s_op->req->u.remove.handle,
+					 &s_op->key,
+					 &s_op->val,
+					 0,
+					 NULL,
+					 s_op,
+					 ret,
+					 &j_id);
+    return job_post_ret;
 }
 
 /*
- * Function: remove_check_perms
+ * Function: remove_verify_object_metadata
  *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
+ * Verifies that metadata was successfully read.  If so, verifies that
+ * the user has permission to access the file (not yet implemented).
  *
- * Pre:      s_op->val.buffer is a valid PVFS_object_attr structure
- *
- * Post:     User has permission to perform operation
- *
- * Returns:  int
- *
- * Synopsis: This should use a global function that verifies that the user
- *           has the necessary permissions to perform the operation it wants
- *           to do.
- *           
+ * TODO: do permission checking, probably with some shared function.
  */
 
-static int remove_check_perms(state_action_struct *s_op, job_status_s *ret)
+static int remove_verify_object_metadata(PINT_server_op *s_op,
+					 job_status_s *ret)
+{
+
+    gossip_debug(SERVER_DEBUG, "remove state: verify_object_metadata\n");
+
+    if (ret->error_code != 0) {
+	gossip_debug(SERVER_DEBUG,
+		     "  previous keyval read had an error (new metafile?); data is useless\n");
+	ret->error_code = -EINVAL;
+    }
+    else {
+	PVFS_object_attr *a_p = &s_op->u.remove.object_attr;
+
+	gossip_debug(SERVER_DEBUG,
+		     "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		     a_p->owner,
+		     a_p->group,
+		     a_p->perms,
+		     a_p->objtype);
+    }
+
+    /* TODO: CHECK PERMISSIONS */
+
+    return 1;
+}
+
+/*
+ * Function: remove_remove_dspace
+ *
+ * Remove the dspace using the handle from the incoming request
+ * (which was verified in previous states).
+ */
+static int remove_remove_dspace(PINT_server_op *s_op,
+				job_status_s *ret)
 {
     int job_post_ret;
-    /*job_id_t i;*/
+    job_id_t j_id;
 
-    job_post_ret = 1;  /* Just pretend it is good right now */
-    /*IF THEY don't have permission, set ret->error_code to -ENOPERM!*/
+    gossip_debug(SERVER_DEBUG, "remove state: remove_dspace\n");
 
-    return(job_post_ret);
+    job_post_ret = job_trove_dspace_remove(s_op->req->u.remove.fs_id,
+					   s_op->req->u.remove.handle,
+					   s_op,
+					   ret,
+					   &j_id);
+    return job_post_ret;
 }
 
+
 /*
- * Function: remove_remove
+ * Function: remove_bmi_response
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      None
+ * Send acknowledgement back to client that job has been completed
+ * (possibly in error).
  *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: Remove the Dspace
- *           
+ * NOTE: there was something in here about sending the handle back if
+ * successfully removed, but I don't see the point in that.  dropped.  -- rob
  */
-
-
-static int remove_remove(state_action_struct *s_op, job_status_s *ret)
+static int remove_send_response(PINT_server_op *s_op,
+				job_status_s *ret)
 {
 
     int job_post_ret;
-    job_id_t i;
+    job_id_t j_id;
 
-    job_post_ret = job_trove_dspace_remove(
-	    s_op->req->u.remove.fs_id,
-	    s_op->req->u.remove.handle,
-	    s_op,
-	    ret,
-	    &i);
-
-    return(job_post_ret);
-
-}
-
-
-/*
- * Function: remove_bmi_send
- *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: Send a message to the client.  If the dataspace was successfully
- *           removed, send the new handle back.
- *           
- */
-
-
-static int remove_send_bmi(state_action_struct *s_op, job_status_s *ret)
-{
-
-    int job_post_ret=0;
-    job_id_t i;
+    gossip_debug(SERVER_DEBUG, "remove state: send_response\n");
 
     s_op->resp->status = ret->error_code;
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
-    /* Set the handle IF it was removed */
     if(ret->error_code == 0) 
     {
-	gossip_err("Handle Removed: %lld\n",s_op->req->u.remove.handle);
-	s_op->resp->u.generic.handle = ret->handle;
-
+	gossip_debug(SERVER_DEBUG,
+		     "  successfully removed dspace 0x%08Lx\n",
+		     s_op->req->u.remove.handle);
+    }
+    else {
+	gossip_debug(SERVER_DEBUG,
+		     "  failed to remove dspace 0x%08Lx\n",
+		     s_op->req->u.remove.handle);
     }
 
     /* Encode the message */
     job_post_ret = PINT_encode(s_op->resp,
-	    PINT_ENCODE_RESP,
-	    &(s_op->encoded),
-	    s_op->addr,
-	    s_op->enc_type);
-
+			       PINT_ENCODE_RESP,
+			       &(s_op->encoded),
+			       s_op->addr,
+			       s_op->enc_type);
     assert(job_post_ret == 0);
 
-#ifndef PVFS2_SERVER_DEBUG_BMI
-
-    job_post_ret = job_bmi_send_list(
-	    s_op->addr,
-	    s_op->encoded.buffer_list,
-	    s_op->encoded.size_list,
-	    s_op->encoded.list_count,
-	    s_op->encoded.total_size,
-	    s_op->tag,
-	    s_op->encoded.buffer_flag,
-	    0,
-	    s_op, 
-	    ret, 
-	    &i);
-
-#else
-
-    job_post_ret = job_bmi_send(
-	    s_op->addr,
-	    s_op->encoded.buffer_list[0],
-	    s_op->encoded.total_size,
-	    s_op->tag,
-	    s_op->encoded.buffer_flag,
-	    0,
-	    s_op,
-	    ret,
-	    &i);
-
-#endif
-
-
-    return(job_post_ret);
-
+    job_post_ret = job_bmi_send_list(s_op->addr,
+				     s_op->encoded.buffer_list,
+				     s_op->encoded.size_list,
+				     s_op->encoded.list_count,
+				     s_op->encoded.total_size,
+				     s_op->tag,
+				     s_op->encoded.buffer_flag,
+				     0,
+				     s_op, 
+				     ret, 
+				     &j_id);
+    return job_post_ret;
 }
 
 /*
  * Function: remove_release_posted_job
  *
- * Params:   server_op *b, 
- *           job_status_s *ret
- *
- * Pre:      We are done!
- *
- * Post:     We need to let the next operation go.
- *
- * Returns:  int
- *
- * Synopsis: Free the job from the scheduler to allow next job to proceed.
+ * Notify request scheduling system that this request has been completed.
  */
-
-static int remove_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+static int remove_release_posted_job(PINT_server_op *s_op,
+				     job_status_s *ret)
 {
+    int job_post_ret;
+    job_id_t j_id;
 
-    int job_post_ret=0;
-    job_id_t i;
+    gossip_debug(SERVER_DEBUG, "remove state: release_posted_job\n");
 
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
-	    s_op,
-	    ret,
-	    &i);
+					 s_op,
+					 ret,
+					 &j_id);
     return job_post_ret;
 }
 
@@ -374,48 +304,27 @@ static int remove_release_posted_job(state_action_struct *s_op, job_status_s *re
 /*
  * Function: remove_cleanup
  *
- * Params:   server_op *b, 
- *           job_status_s *ret
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: free memory and return
- *           
+ * Free all memory associated with this request and return 0, indicating
+ * we're done processing.
  */
-
-
-static int remove_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int remove_cleanup(PINT_server_op *s_op,
+			  job_status_s *ret)
 {
 
-    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+    gossip_debug(SERVER_DEBUG, "remove state: cleanup\n");
+
+    /* free decoded, encoded requests */
     PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
-    
-    if(s_op->val.buffer)
-    {
-	free(s_op->val.buffer);
-    }
+    free(s_op->unexp_bmi_buff.buffer);
 
-    if(s_op->resp)
-    {
-	free(s_op->resp);
-    }
+    /* free encoded, original responses */
+    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+    free(s_op->resp);
 
-    /*
-    BMI_memfree(
-	    s_op->addr,
-	    s_op->req,
-	    s_op->unexp_bmi_buff->size,
-	    BMI_RECV_BUFFER
-	    );
-
-    */
+    /* free server operation structure */
     free(s_op);
 
-    return(0);
+    return 0;
 
 }
 
