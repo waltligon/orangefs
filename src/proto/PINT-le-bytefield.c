@@ -472,7 +472,7 @@ static int lebf_decode_req(
     decode_PVFS_server_req(p, req);
 
 #define CASE(tag,var) \
-    case tag: decode_PVFS_servreq_##var(p ,&req->u.var); break
+    case tag: decode_PVFS_servreq_##var(p, &req->u.var); break
 
     switch (req->op) {
 
