@@ -52,22 +52,39 @@ int main(int argc, char **argv)	{
 	int outcount = 0;
 	bmi_error_code_t error_code;
 	bmi_size_t actual_size;
-	struct PINT_encoded_msg foo;
-	struct PINT_decoded_msg bar;
+	struct PINT_encoded_msg encoded1;
+	struct PINT_decoded_msg decoded1;
+	struct PINT_encoded_msg encoded2;
+	struct PINT_decoded_msg decoded2;
+	struct PINT_encoded_msg encoded3;
+	struct PINT_decoded_msg decoded3;
 	struct PVFS_server_req_s my_req;
-	struct PVFS_server_resp_s* dec_ack;
-	void* my_ack;
-	int my_ack_size = 0;
+	struct PVFS_server_resp_s* io_dec_ack;
+	struct PVFS_server_resp_s* create_dec_ack;
+	struct PVFS_server_resp_s* remove_dec_ack;
+	void* my_ack, *create_ack, *remove_ack;
+	int my_ack_size, create_ack_size, remove_ack_size;
 	
+	/**************************************************
+	 * general setup 
+	 */
+
 	/* figure out how big of an ack to post */
 	my_ack_size = PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO);
+	create_ack_size = PINT_get_encoded_generic_ack_sz(0,
+		PVFS_SERV_CREATE);
+	remove_ack_size = PINT_get_encoded_generic_ack_sz(0,
+		PVFS_SERV_REMOVE);
 
-	/* TODO: how do I know how big to make this?
-	 * Dale is adding a function to tell me, need to remember to use it
-	 * later
-	 */
+	/* create storage for all of the acks */
 	my_ack = malloc(my_ack_size);
 	if(!my_ack)
+		return(-errno);
+	create_ack = malloc(create_ack_size);
+	if(!create_ack)
+		return(-errno);
+	remove_ack = malloc(remove_ack_size);
+	if(!remove_ack)
 		return(-errno);
 
 	/* grab any command line options */
@@ -96,28 +113,39 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
-	/* setup create request */
-	my_req.op = PVFS_SERV_IO;
+	/**************************************************
+	 * create request (create a data file to operate on) 
+	 */
+	my_req.op = PVFS_SERV_CREATE;
 	my_req.rsize = sizeof(struct PVFS_server_req_s);
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
 	my_req.credentials.perms = U_WRITE | U_READ;  
 
-	/* io specific fields */
-	/* TODO: need more stuff here */
-	my_req.u.io.fs_id = 9;
-	my_req.u.io.handle = user_opts->bucket;
+	/* create specific fields */
+	my_req.u.create.bucket = 4095;
+	my_req.u.create.handle_mask = 0;
+	my_req.u.create.fs_id = 9;
+	my_req.u.create.object_type = ATTR_DATA;
 
-	ret = PINT_encode(&my_req,PINT_ENCODE_REQ,&foo,server_addr,0);
+	ret = PINT_encode(&my_req,PINT_ENCODE_REQ,&encoded1,server_addr,0);
 	if(ret < 0)
 	{
-		fprintf(stderr, "PINT_encode failure.\n");
+		fprintf(stderr, "Error: PINT_encode failure.\n");
 		return(-1);
 	}
 
-	/* send the initial request on its way */
-	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr,
-		foo.buffer_list[0], foo.total_size, BMI_PRE_ALLOC, 0, NULL);
+	/* send the request on its way */
+	ret = BMI_post_sendunexpected_list(
+		&(client_ops[1]), 
+		encoded1.dest,
+		encoded1.buffer_list, 
+		encoded1.size_list,
+		encoded1.list_count,
+		encoded1.total_size, 
+		encoded1.buffer_flag, 
+		0, 
+		NULL);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -136,7 +164,7 @@ int main(int argc, char **argv)	{
 
 		if(ret < 0 || error_code != 0)
 		{
-			fprintf(stderr, "Request send failed.\n");
+			fprintf(stderr, "Error: request send failed.\n");
 			if(ret<0)
 			{
 				errno = -ret;
@@ -147,7 +175,137 @@ int main(int argc, char **argv)	{
 	}
 
 	/* release the encoded message */
-	PINT_encode_release(&foo, PINT_ENCODE_REQ, 0);
+	PINT_encode_release(&encoded1, PINT_ENCODE_REQ, 0);
+
+	/* post a recv for the server acknowledgement */
+	ret = BMI_post_recv(&(client_ops[0]), server_addr, create_ack, 
+		create_ack_size, &actual_size, BMI_EXT_ALLOC, 0, 
+		NULL);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_post_recv");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of ack recv */
+		do
+		{
+			ret = BMI_test(client_ops[0], &outcount, &error_code,
+				&actual_size, NULL, 10);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Error: ack recv.\n");
+			fprintf(stderr, "   ret: %d, error code: %d\n",ret,error_code);
+			return(-1);
+		}
+	}
+	else
+	{
+		if(actual_size != create_ack_size)
+		{
+			printf("Error: short recv.\n");
+			return(-1);
+		}
+	}
+				
+	/* look at the ack */
+	ret = PINT_decode(
+		create_ack,
+		PINT_ENCODE_RESP,
+		&decoded1,
+		server_addr,
+		actual_size,
+		NULL);
+	if(ret < 0)
+	{
+		fprintf(stderr, "Error: PINT_decode() failure.\n");
+		return(-1);
+	}
+
+	create_dec_ack = decoded1.buffer;
+	if(create_dec_ack->op != PVFS_SERV_CREATE)
+	{
+		fprintf(stderr, "ERROR: received ack of wrong type (%d)\n", 
+			(int)create_dec_ack->op);
+		return(-1);
+	}
+	if(create_dec_ack->status != 0)
+	{
+		fprintf(stderr, "ERROR: server returned status: %d\n",
+			(int)create_dec_ack->status);
+		return(-1);
+	}
+	
+
+
+	/**************************************************
+	 * io request  
+	 */
+
+	/* setup create request */
+	my_req.op = PVFS_SERV_IO;
+	my_req.rsize = sizeof(struct PVFS_server_req_s);
+	my_req.credentials.uid = 0;
+	my_req.credentials.gid = 0;
+	my_req.credentials.perms = U_WRITE | U_READ;  
+
+	/* io specific fields */
+	my_req.u.io.fs_id = 9;
+	my_req.u.io.handle = user_opts->bucket;
+
+	ret = PINT_encode(&my_req,PINT_ENCODE_REQ,&encoded2,server_addr,0);
+	if(ret < 0)
+	{
+		fprintf(stderr, "Error: PINT_encode failure.\n");
+		return(-1);
+	}
+
+	/* send the request on its way */
+	ret = BMI_post_sendunexpected_list(
+		&(client_ops[1]), 
+		encoded2.dest,
+		encoded2.buffer_list,
+		encoded2.size_list,
+		encoded2.list_count,
+		encoded2.total_size,
+		encoded2.buffer_flag,
+		0,
+		NULL);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_post_send");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of request */
+		do
+		{
+			ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
+				NULL, 10);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Error: request send failed.\n");
+			if(ret<0)
+			{
+				errno = -ret;
+				perror("BMI_test");
+			}
+			return(-1);
+		}
+	}
+
+	/* release the encoded message */
+	PINT_encode_release(&encoded2, PINT_ENCODE_REQ, 0);
 
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
@@ -171,8 +329,8 @@ int main(int argc, char **argv)	{
 
 		if(ret < 0 || error_code != 0)
 		{
-			fprintf(stderr, "Ack recv failed.\n");
-			fprintf(stderr, "Ret: %d, E_code: %d\n",ret,error_code);
+			fprintf(stderr, "Error: ack recv failed.\n");
+			fprintf(stderr, "   ret: %d, error code: %d\n",ret,error_code);
 			return(-1);
 		}
 	}
@@ -186,26 +344,39 @@ int main(int argc, char **argv)	{
 	}
 		
 	/* look at the ack */
-	ret = PINT_decode(my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
+	ret = PINT_decode(
+		my_ack,
+		PINT_ENCODE_RESP,
+		&decoded2,
+		server_addr,
+		actual_size,
+		NULL);
 	if(ret < 0)
 	{
-		fprintf(stderr, "PINT_decode() failure.\n");
+		fprintf(stderr, "Error: PINT_decode() failure.\n");
 		return(-1);
 	}
 
-	dec_ack = bar.buffer;
-	if(dec_ack->op != PVFS_SERV_IO)
+	io_dec_ack = decoded2.buffer;
+	if(io_dec_ack->op != PVFS_SERV_IO)
 	{
-		printf("ERROR: received ack of wrong type (%d)\n", (int)dec_ack->op);
+		fprintf(stderr, "ERROR: received ack of wrong type (%d)\n", 
+			(int)io_dec_ack->op);
+		return(-1);
 	}
-	if(dec_ack->status != 0)
+	if(io_dec_ack->status != 0)
 	{
-		printf("ERROR: server returned status: %d\n",
-			(int)dec_ack->status);
+		fprintf(stderr, "ERROR: server returned status: %d\n",
+			(int)io_dec_ack->status);
+		return(-1);
 	}
 	
-	/* release the decoded buffer */
-	PINT_decode_release(&bar, PINT_ENCODE_RESP, 0);
+	/**************************************************
+	 * general cleanup  
+	 */
+
+	/* release the decoded buffers */
+	PINT_decode_release(&decoded2, PINT_ENCODE_RESP, 0);
 
 	/* shutdown the local interface */
 	ret = BMI_finalize();
@@ -219,6 +390,8 @@ int main(int argc, char **argv)	{
 	gossip_disable();
 
 	free(my_ack);
+	free(create_ack);
+	free(remove_ack);
 	free(user_opts->hostid);
 	free(user_opts->method);
 	free(user_opts);
