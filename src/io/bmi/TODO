@@ -1,24 +1,14 @@
 General (critical)
 -----------------------
 
-Implement unpost() function for cancelling operations: 
-http://www.beowulf-underground.org/pipermail/pvfs2-internal/2002-April/000060.html
-
-Add a hint that indicates when a bmi address is "ok to get rid of".
-This would set a bit on the address interally and allow us to do things
-like close sockets when we start running into resource limits.  This bit
-would get cleared any time we use the address, and the hint doesn't
-necessarily take any action right away.
-
-convert PVFS to new error code scheme 
+add hints to allow reference counting on bmi addresses so that we know when
+they can be safely discarded
 
 General (portability)
 -----------------------
 
 Get rid of dynamic array declarations that are all over the BMI
 code!  This is a stupid hack that only gcc allows.
-
-Try building with some different compilers (at least gcc 3.2).
 
 Replace void* type for memory regions with PVFS_byte or BMI_byte
 types.  Audit code to make sure that buffers are indexed like
@@ -52,14 +42,6 @@ expected size, etc.
 Document what stuff in the method_op structure must be filled in by
 methods for correct BMI operation, and what is just there for convenience
 
-Optimize the locking, etc. so that we are more efficient in multi
-threaded environments.  For now we just grab one massive lock at
-the top of each API call.
-
-Implement some fairness in BMI_waitunexpected and BMI_testunexpected.
-The current implementation would allow starvation if a faster module is
-busy enough.
-
 Implement a mechanism for throttling the amount of eager or unexpected
 messages that a method is allowed to receive at a time.  Right now one
 could stream a huge number of such messages to use up memory buffers
@@ -71,34 +53,13 @@ time?  applies to both GM and TCP modules, maybe to flow and job stuff
 as well - actually, should probably just call close_context from
 upper level before shutting down modules
 
-test out running BMI with multiple modules, in particular need to
-exercise BMI_testsome() and see if it is correct
-
 TCP module:
 -----------------------
 
+optimize locking
+
 do a better job of cleaning out address structures that are no longer in use
 (may need a hint to say when this can be done)
-
-add checks (for socket == -1, for example) to see if tcp_forget_addr()
-or tcp_shutdown_addr() has been called on an addr before using it
-
-make sure that if we get this error:
-rc/io/bmi/bmi_tcp/socket-collection.c line 327: Error: poll error value:
-0x19
-src/io/bmi/bmi_tcp/socket-collection.c line 328: Error: on socket: 4
-... on a client side, when there is only one socket open, that we
-push the error all the way out and don't hang.  This scenario can
-be triggered by killing a server sometimes. 
-
-fix this bug:
-src/io/bmi/bmi_tcp/socket-collection.c line 256: Error: found bad socket in
-socket collection.
-src/io/bmi/bmi_tcp/socket-collection.c line 257: Error: not handle
-properly....
-src/io/flow/flow.c line 786: Error: Critical failure.
-src/io/job/job.c line 2942: Error: critical Flow failure.
-src/server/pvfs2-server.c line 348: FREAK OUT.
 
 turn off sigpipe (we will just catch errors at system call time)
 
@@ -109,26 +70,17 @@ also clean up use of tcp_msg_header structure- this is also cluttering the
 code, especially when considering what needs to be done to support 
 network encoding of the header.
 
-Audit code and check for EINTR on _all_ system calls.  This was burning
-me on a poll() call recently.
-
 There are more oportunities for immediate completion on receives
 (specifically, look at the end of tcp_post_recv_rend() when we add to the
 completion queue, and the bottom of tcp_post_recv_eager()).
 We should try to immediately complete towards the end of
 post_recv_rend also (see TODO in comments).
 
-The tcp module does a terrible job of detecting closed sockets.
-Fix it :)
-
 Redo tcp_do_work_recv().  It is huge.
 
 The data reception portions of tcp_post_recv_eager and
 tcp_post_recv_rend could be shared (maybe a separate function also used
 within poll?).
-
-Think of a way to make polling fairer so it doesn't favor certain
-sockets.
 
 Implement better fd management in the TCP module.  It should detect when
 we are running out of sockets and make efforts to free some up as
@@ -151,6 +103,10 @@ when it is safe to kill sockets.
 
 GM module:
 -----------------------
+
+optimize locking
+
+implement cancel
 
 make sure all control messages are network encoded somehow
 to work across different architectures
@@ -185,52 +141,4 @@ list operations!
 follow up on gm_blocking_receive() bug- it appears to still
 consume 99% cpu when alarms are used, despite report that bug was
 fixed.  For now still using XXX_no_spin() version.
-
-Benchmarking:
------------------------
-
-Fix the stupid buffer verification.  It fails sometimes for MPI and
-sometimes for BMI when I run this test:
-mpirun -np 16
-/home/pcarns/working/pvfs2/src/io/bmi/benchmark/driver_bw_multi -m
-bmi_tcp -l 100000 -t 10000000 -s 8
-It's always off by 34816 in the middle of a message...
-for now I am just commenting out the buffer verification.
-
-Figure out why aggregate bandwidth appears to be dropping off as go
-from 2 clients and 2 servers to 3 clients and 3 servers.  is the
-calculation correct?
-
-Remember to compile out gossip and turn off locking when doing
-serious BMI benchmarking.
-
-Look at difference between using test and wait calls in
-benchmarks.
-
-Maybe measure impact of immediate completion (turn on and off).
-
-Try altering post order in latency benchmark to see if that makes
-any difference.
-
-Try writing bw benchmark that doesn't post all at once before
-doing any testing.
-
-Try playing with socket buffer sizes, at least to demonstrate that
-this is something we should work on later.
-
-Measure the impact of interleaving buffers.
-
-Consider forcing an ack after streaming data rather than just
-measuring time on one side.
-
-Try removing tcp option calls to see if they impact performance 
-(could all benches- especially latency). -- too many system calls
-
-Also modify sockio code to not try calling send/recv until it hits EWOULDBLOCK,
-instead maybe stop short after first short operation
-
-Remember to look at the recv mode option to mpich-gm:
-	./mpirun.ch_gm --recv-mode polling -np 4 foo.x
-	./mpirun.ch_gm --recv-mode blocking -np 4 foo.x
-	./mpirun.ch_gm --recv-mode hybrid -np 4 foo.x
 
