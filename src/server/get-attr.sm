@@ -251,7 +251,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
         resp_attr->u.data.size = s_op->ds_attr.b_size;
         resp_attr->mask |= PVFS_ATTR_DATA_ALL;
 
-	gossip_debug(GOSSIP_SERVER_DEBUG, "  handle %Lu refers to "
+	gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %Lu refers to "
                      "a datafile (size = %Ld).\n",
                      Lu(s_op->req->u.getattr.handle),
                      Ld(resp_attr->u.data.size));
@@ -584,7 +584,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
         }
     }
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG,"  Got %s attributes: sending "
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"@ End %s attributes: sending "
                  "attr status %d (error code = %d)\n",
                  get_object_type(resp_attr->objtype),
 		 s_op->resp.status, js_p->error_code);
