@@ -180,7 +180,7 @@ int PINT_flow_initialize(const char *flowproto_list,
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: could not initialize protocol: %s.\n",
-			requested_flowprotos[i]);
+			active_flowproto_table[i]->flowproto_name);
 	    goto PINT_flow_initialize_failure;
 	}
     }
