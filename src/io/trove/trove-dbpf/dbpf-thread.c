@@ -184,7 +184,7 @@ int dbpf_do_one_work_cycle(int *out_count)
              *
              * returns error code from operation in queued_op struct
              */
-            *out_count++;
+            (*out_count)++;
 
             /* this is a macro defined in dbpf-thread.h */
             move_op_to_completion_queue(cur_op);
