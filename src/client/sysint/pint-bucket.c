@@ -398,6 +398,7 @@ int PINT_bucket_get_root_handle(
                 ret = 0;
                 break;
             }
+            cur = llist_next(cur);
         }
     }
     return ret;
