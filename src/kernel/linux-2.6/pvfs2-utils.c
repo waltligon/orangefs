@@ -125,9 +125,8 @@ static inline int copy_attributes_to_inode(
 	inode->i_mtime.tv_sec = (time_t) attrs->mtime;
 	inode->i_ctime.tv_sec = (time_t) attrs->ctime;
 
-        inode->i_mode &= ~S_IXOTH;
-        inode->i_mode &= ~S_IWOTH;
-        inode->i_mode &= ~S_IROTH;
+        inode->i_mode = 0;
+
 	if (attrs->perms & PVFS_O_EXECUTE)
 	    perm_mode |= S_IXOTH;
 	if (attrs->perms & PVFS_O_WRITE)
@@ -135,9 +134,6 @@ static inline int copy_attributes_to_inode(
 	if (attrs->perms & PVFS_O_READ)
 	    perm_mode |= S_IROTH;
 
-        inode->i_mode &= ~S_IXGRP;
-        inode->i_mode &= ~S_IWGRP;
-        inode->i_mode &= ~S_IRGRP;
 	if (attrs->perms & PVFS_G_EXECUTE)
 	    perm_mode |= S_IXGRP;
 	if (attrs->perms & PVFS_G_WRITE)
@@ -145,9 +141,6 @@ static inline int copy_attributes_to_inode(
 	if (attrs->perms & PVFS_G_READ)
 	    perm_mode |= S_IRGRP;
 
-        inode->i_mode &= ~S_IXUSR;
-        inode->i_mode &= ~S_IWUSR;
-        inode->i_mode &= ~S_IRUSR;
 	if (attrs->perms & PVFS_U_EXECUTE)
 	    perm_mode |= S_IXUSR;
 	if (attrs->perms & PVFS_U_WRITE)
@@ -159,45 +152,45 @@ static inline int copy_attributes_to_inode(
 
 	switch (attrs->objtype)
 	{
-	case PVFS_TYPE_METAFILE:
-	    inode->i_mode |= S_IFREG;
-	    inode->i_op = &pvfs2_file_inode_operations;
-	    inode->i_fop = &pvfs2_file_operations;
-	    ret = 0;
-	    break;
-	case PVFS_TYPE_DIRECTORY:
-	    inode->i_mode |= S_IFDIR;
-	    inode->i_op = &pvfs2_dir_inode_operations;
-	    inode->i_fop = &pvfs2_dir_operations;
-	    ret = 0;
-	    break;
-	case PVFS_TYPE_SYMLINK:
-	    inode->i_mode |= S_IFLNK;
-	    inode->i_op = &pvfs2_symlink_inode_operations;
-	    inode->i_fop = NULL;
+            case PVFS_TYPE_METAFILE:
+                inode->i_mode |= S_IFREG;
+                inode->i_op = &pvfs2_file_inode_operations;
+                inode->i_fop = &pvfs2_file_operations;
+                ret = 0;
+                break;
+            case PVFS_TYPE_DIRECTORY:
+                inode->i_mode |= S_IFDIR;
+                inode->i_op = &pvfs2_dir_inode_operations;
+                inode->i_fop = &pvfs2_dir_operations;
+                ret = 0;
+                break;
+            case PVFS_TYPE_SYMLINK:
+                inode->i_mode |= S_IFLNK;
+                inode->i_op = &pvfs2_symlink_inode_operations;
+                inode->i_fop = NULL;
 
-            /* copy the link target string to the inode private data */
-            if (pvfs2_inode && symname)
-            {
-                if (pvfs2_inode->link_target)
+                /* copy the link target string to the inode private data */
+                if (pvfs2_inode && symname)
                 {
-                    kfree(pvfs2_inode->link_target);
-                    pvfs2_inode->link_target = NULL;
+                    if (pvfs2_inode->link_target)
+                    {
+                        kfree(pvfs2_inode->link_target);
+                        pvfs2_inode->link_target = NULL;
+                    }
+                    pvfs2_inode->link_target = kmalloc(
+                        (strlen(symname) + 1), PVFS2_GFP_FLAGS);
+                    if (pvfs2_inode->link_target)
+                    {
+                        strcpy(pvfs2_inode->link_target, symname);
+                    }
+                    pvfs2_print("Copied attr link target %s\n",
+                                pvfs2_inode->link_target);
                 }
-                pvfs2_inode->link_target = kmalloc(
-                    (strlen(symname) + 1), PVFS2_GFP_FLAGS);
-                if (pvfs2_inode->link_target)
-                {
-                    strcpy(pvfs2_inode->link_target, symname);
-                }
-                pvfs2_print("Copied attr link target %s\n",
-                            pvfs2_inode->link_target);
-            }
-            ret = 0;
-	    break;
-	default:
-	    pvfs2_error("pvfs2: copy_attributes_to_inode: got invalid "
-                        "attribute type %d\n", attrs->objtype);
+                ret = 0;
+                break;
+            default:
+                pvfs2_error("pvfs2: copy_attributes_to_inode: got invalid "
+                            "attribute type %d\n", attrs->objtype);
 	}
     }
     return ret;
