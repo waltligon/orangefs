@@ -40,10 +40,12 @@ static struct task_struct *device_owner = NULL;
 /* a function that forces termination of the device owner */
 void kill_device_owner(void)
 {
+    down(&devreq_semaphore);
     if (device_owner)
     {
         force_sig(SIGKILL, device_owner);
     }
+    up(&devreq_semaphore);
 }
 
 static int pvfs2_devreq_open(
