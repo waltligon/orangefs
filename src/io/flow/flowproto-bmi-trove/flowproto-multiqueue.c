@@ -669,6 +669,8 @@ static void bmi_send_callback_fn(void *user_ptr,
     /* TODO: error handling */
     assert(error_code == 0);
 
+    flow_data->parent->total_transfered += actual_size;
+
     /* if this was the last operation, then mark the flow as done */
     if(flow_data->parent->total_transfered == flow_data->parent->aggregate_size)
     {
