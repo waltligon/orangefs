@@ -5,7 +5,15 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.6.1pre1
 ===============
-- 
+- misc. updates to msgpairarray and associated tools to allow for server
+  side use
+- reorganization of server request parameters so that more (but not all yet)
+  are stored in a centralized table
+- removed some depricated test programs
+- new pint-util.[ch] to contain utility functions shared between client and
+  server
+- some refactoring of server state machines (mainly crdirent) to allow for
+  code reuse in other state machines
 
 
 pvfs2-0.6.0
