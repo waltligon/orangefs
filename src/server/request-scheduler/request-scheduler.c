@@ -34,6 +34,8 @@
 #include <quickhash.h>
 #include <pvfs2-types.h>
 #include <pvfs2-req-proto.h>
+#include <pvfs2-debug.h>
+#include <gossip.h>
 
 /* element states */
 enum req_sched_states
@@ -66,6 +68,7 @@ struct req_sched_element
 	req_sched_id id;                   /* unique identifier */
 	struct req_sched_list* list_head;  /* points to head of queue */
 	enum req_sched_states state;       /* state of this element */
+	PVFS_handle handle;
 };
 
 /* hash table */
@@ -188,6 +191,7 @@ int PINT_req_sched_post(
 	id_gen_fast_register(out_id, tmp_element);
 	tmp_element->id = *out_id;
 	tmp_element->state = REQ_QUEUED;
+	tmp_element->handle = handle;
 
 	/* see if we have any requests queue up for this handle */
 	hash_link = qhash_search(req_sched_table, &(handle));
@@ -230,6 +234,16 @@ int PINT_req_sched_post(
 	tmp_element->list_head = tmp_list;
 	qlist_add_tail(&(tmp_element->list_link), &(tmp_list->req_list));
 
+	gossip_debug(REQ_SCHED_DEBUG, 
+		"REQ SCHED POSTING, handle: %ld, queue_element: %p\n", 
+		(long)handle, tmp_element);
+
+	if(ret == 1)
+	{
+		gossip_debug(REQ_SCHED_DEBUG, 
+			"REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n", 
+			(long)handle, tmp_element);
+	}
 	return(ret);
 }
 
@@ -359,6 +373,10 @@ int PINT_req_sched_release(
 		qlist_add_tail(&(next_element->ready_link), &ready_queue);
 	}
 
+	gossip_debug(REQ_SCHED_DEBUG, 
+		"REQ SCHED RELEASING, handle: %ld, queue_element: %p\n", 
+		(long)tmp_element->handle, tmp_element);
+
 	/* destroy the released request element */
 	free(tmp_element);
 
@@ -409,6 +427,9 @@ int PINT_req_sched_test(
 		}
 		*out_count_p = 1;
 		*out_status = 0;
+		gossip_debug(REQ_SCHED_DEBUG, 
+			"REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n", 
+			(long)tmp_element->handle, tmp_element);
 		/* TODO: make sure this is the semantics we want */
 		return(0);
 	}
@@ -464,6 +485,9 @@ int PINT_req_sched_testsome(
 			out_index_array[*inout_count_p] = i;
 			out_status_array[*inout_count_p] = 0;
 			(*inout_count_p)++;
+			gossip_debug(REQ_SCHED_DEBUG, 
+				"REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n", 
+				(long)tmp_element->handle, tmp_element);
 		}
 		else
 		{
@@ -500,6 +524,9 @@ int PINT_req_sched_testworld(
 		out_status_array[*inout_count_p] = 0;
 		tmp_element->state = REQ_SCHEDULED;
 		(*inout_count_p)++;
+		gossip_debug(REQ_SCHED_DEBUG, 
+			"REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n", 
+			(long)tmp_element->handle, tmp_element);
 	}
 	return(0);
 }
