@@ -213,6 +213,7 @@ SERVERLIBS = -lrt -lpthread -lpvfs2-server @LIBS@
 #
 # run ./configure --help for information on how to do this cleanly.
 LIBCFLAGS=@LIBCFLAGS@
+LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__
 LIBS += @THREAD_LIB@
 
 # VISCFLAGS/VISLIBS: special build flags for vis tools
@@ -343,6 +344,13 @@ LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+
+# LIBTHREADEDOBJS is a list of objects to put in the multithreaded client lib
+LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
+# LIBTHREADEDPICOBJS are the same, but compiled for use in a shared library
+LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
+# LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
+LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
@@ -506,6 +514,17 @@ else
 	ar rcs $@ $(LIBOBJS)
 endif
 
+# rule for building the _multithreaded_ pvfs2 library
+lib/libpvfs2-threaded.a: $(LIBTHREADEDOBJS)
+ifdef QUIET_COMPILE
+	@echo "  RANLIBTHREADED	$@"
+	@$(INSTALL) -d lib
+	@ar rcs $@ $(LIBTHREADEDOBJS)
+else
+	$(INSTALL) -d lib
+	ar rcs $@ $(LIBTHREADEDOBJS)
+endif
+
 # rule for building the pvfs2 library
 lib/libpvfs2.so: $(LIBPICOBJS)
 ifdef QUIET_COMPILE
@@ -516,6 +535,18 @@ else
 	$(INSTALL) -d lib
 	$(LDSHARED) -o $@ $(LIBPICOBJS)
 endif
+
+# rule for building the pvfs2 _multithreaded_ library
+lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
+ifdef QUIET_COMPILE
+	@echo "  LDSO		$@"
+	@$(INSTALL) -d lib
+	@$(LDSHARED) -o $@ $(LIBTHREADEDPICOBJS)
+else
+	$(INSTALL) -d lib
+	$(LDSHARED) -o $@ $(LIBTHREADEDPICOBJS)
+endif
+
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
@@ -603,6 +634,24 @@ else
 	$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 endif
 
+# default rule for building objects for threaded library
+%-threaded.o: %.c
+ifdef QUIET_COMPILE
+	@echo "  CC		$@"
+	@$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+else
+	$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+endif
+
+# rule for building shared objects for threaded library
+%-threaded.po: %.c
+ifdef QUIET_COMPILE
+	@echo "  CCPIC		$@"
+	@$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+else
+	$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+endif
+
 # default rule for building objects 
 %.o: %.c
 ifdef QUIET_COMPILE
@@ -637,6 +686,14 @@ ifdef QUIET_COMPILE
 	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
 else
 	$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
+endif
+
+%-threaded.i: %.c FORCE
+ifdef QUIET_COMPILE
+	@echo "  CPP		$@"
+	@$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
+else
+	$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
 endif
 
 # all applications depend on the pvfs2 library
