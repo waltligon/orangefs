@@ -134,6 +134,7 @@ system management utilities
 
 documentation:
 ====================================================================
+- document config file options
 - a way to export to html
 - faq
 - top level README/INSTALL files
