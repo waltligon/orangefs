@@ -21,6 +21,7 @@ pvfs2-0.1.2pre1
     - add cflags provided by module makefile stubs
     - install kernel module if configured
     - simplify dependency generator script, add .po
+- BMI: initialize needed methods dynamically, not at startup
 
 
 pvfs2-0.1.1
