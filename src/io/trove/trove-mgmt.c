@@ -16,12 +16,14 @@ struct TROVE_mgmt_ops    *mgmt_method_table[1];
 struct TROVE_dspace_ops  *dspace_method_table[1];
 struct TROVE_keyval_ops  *keyval_method_table[1];
 struct TROVE_bstream_ops *bstream_method_table[1];
+struct TROVE_context_ops *context_method_table[1];
 
 /* Currently DBPF is our only implementation */
 extern struct TROVE_mgmt_ops    dbpf_mgmt_ops;
 extern struct TROVE_dspace_ops  dbpf_dspace_ops;
 extern struct TROVE_keyval_ops  dbpf_keyval_ops;
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
+extern struct TROVE_context_ops dbpf_context_ops;
 
 /* NOTE: the collection get/set info/eattr functions are automatically 
  * generated.
@@ -79,6 +81,7 @@ int trove_initialize(char *stoname,
     dspace_method_table[0]  = &dbpf_dspace_ops;
     keyval_method_table[0]  = &dbpf_keyval_ops;
     bstream_method_table[0] = &dbpf_bstream_ops;
+    context_method_table[0] = &dbpf_context_ops;
 
     /* initialize can fail if storage name isn't valid, but we want those
      * ops pointers to be right either way.
@@ -93,8 +96,6 @@ int trove_initialize(char *stoname,
 	ret = 1;
 	trove_init_status = 1;
     }
-
-
     gen_mutex_unlock(&trove_init_mutex);
     return ret;
 }
@@ -122,23 +123,6 @@ int trove_finalize(void)
     gen_mutex_unlock(&trove_init_mutex);
     if (ret < 0) return ret;
     else return 1;
-}
-
-int trove_open_context(TROVE_context_id *context_id)
-{
-    int ret = -1;
-
-    if (context_id)
-    {
-        *context_id = 0;
-        ret = 0;
-    }
-    return ret;
-}
-
-int trove_close_context(TROVE_context_id context_id)
-{
-    return 0;
 }
 
 int trove_storage_create(char *stoname,

@@ -11,10 +11,11 @@
 extern "C" {
 #endif
 
-#include <trove.h>
-#include <dbpf.h>
 #include <string.h>
 #include <assert.h>
+
+#include "trove.h"
+#include "dbpf.h"
 
 #include "id-generator.h"
 

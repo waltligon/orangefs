@@ -7,7 +7,7 @@
 #ifndef __TROVE_INTERNAL_H
 #define __TROVE_INTERNAL_H
 
-#include <trove-types.h>
+#include "trove-types.h"
 
 int map_coll_id_to_method(int coll_id);
 
@@ -362,6 +362,12 @@ struct TROVE_mgmt_ops
 			       void *user_ptr,
 			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p);
+};
+
+struct TROVE_context_ops
+{
+    int (*open_context)(TROVE_context_id *context_id);
+    int (*close_context)(TROVE_context_id context_id);
 };
 
 /*

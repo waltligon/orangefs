@@ -4,8 +4,8 @@
  * See COPYING in top-level directory.
  */
 
-#include <dbpf-op-queue.h>
-#include <malloc.h>
+#include "dbpf-op-queue.h"
+#include "malloc.h"
 
 /* dbpf_op_queue_mutex - lock to be obtained before manipulating queue
  */

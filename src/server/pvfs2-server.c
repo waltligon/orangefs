@@ -113,17 +113,6 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     }
     gossip_debug(SERVER_DEBUG, "BMI Init Complete\n");
 
-    /* initialize the flow interface */
-    ret =
-	PINT_flow_initialize("flowproto_bmi_trove,flowproto_dump_offsets", 0);
-    if (ret < 0)
-    {
-	gossip_err("Flow_initialize Failed: %s\n", strerror(-ret));
-	*server_level_init = SHUTDOWN_BMI_INTERFACE;
-	goto interface_init_failed;
-    }
-    gossip_debug(SERVER_DEBUG, "Flow Init Complete\n");
-
     ret = trove_initialize(user_opts.storage_path, 0, &method_name, 0);
     if (ret < 0)
     {
@@ -218,6 +207,17 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     gossip_debug(SERVER_DEBUG, "Storage Init Complete\n");
     gossip_debug(SERVER_DEBUG, "%d filesystem(s) initialized\n",
                  llist_count(user_opts.file_systems));
+
+    /* initialize the flow interface */
+    ret =
+	PINT_flow_initialize("flowproto_bmi_trove,flowproto_dump_offsets", 0);
+    if (ret < 0)
+    {
+	gossip_err("Flow_initialize Failed: %s\n", strerror(-ret));
+	*server_level_init = SHUTDOWN_BMI_INTERFACE;
+	goto interface_init_failed;
+    }
+    gossip_debug(SERVER_DEBUG, "Flow Init Complete\n");
 
     /* initialize Job Interface */
     ret = job_initialize(0);
