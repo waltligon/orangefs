@@ -394,6 +394,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
     /* remove from current queue */
     qlist_del(&q_item->list_link);
     /* add to dest queue */
+    q_item->posted_id = 0;
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
     result_tmp = &q_item->result_chain;
     do{
@@ -438,6 +439,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	q_item = qlist_entry(flow_data->empty_list.next,
 	    struct fp_queue_item, list_link);
 	qlist_del(&q_item->list_link);
+	q_item->posted_id = 0;
 	qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 
 	if(!q_item->buffer)
@@ -491,6 +493,9 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	if(bytes_processed == 0)
 	{	
 	    gen_mutex_unlock(&flow_data->flow_mutex);
+	    qlist_del(&q_item->list_link);
+	    q_item->posted_id = 0;
+	    qlist_add_tail(&q_item->list_link, &flow_data->empty_list);
 	    return;
 	}
 
@@ -562,6 +567,7 @@ static void trove_read_callback_fn(void *user_ptr,
 
     /* remove from current queue */
     qlist_del(&q_item->list_link);
+    q_item->posted_id = 0;
     /* add to dest queue */
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
@@ -708,6 +714,7 @@ static int bmi_send_callback_fn(void *user_ptr,
     }
     
     /* add to src queue */
+    q_item->posted_id = 0;
     qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 
     result_tmp = &q_item->result_chain;
@@ -908,6 +915,7 @@ static void trove_write_callback_fn(void *user_ptr,
     if(qlist_empty(&flow_data->src_list))
     {
 	/* ready to post new recv! */
+	q_item->posted_id = 0;
 	qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 	
 	result_tmp = &q_item->result_chain;
@@ -983,6 +991,7 @@ static void trove_write_callback_fn(void *user_ptr,
     }
     else
     {
+	q_item->posted_id = 0;
 	qlist_add_tail(&q_item->list_link, 
 	    &(flow_data->empty_list));
     }
@@ -1493,22 +1502,30 @@ static int cancel_pending_bmi(struct qlist_head* list)
 {
     struct qlist_head* tmp_link;
     struct fp_queue_item* q_item = NULL;
+    int ret = 0;
+    int count = 0;
 
     /* run down the chain of pending operations */
     qlist_for_each(tmp_link, list)
     {
 	q_item = qlist_entry(tmp_link, struct fp_queue_item,
 	    list_link);
-	/* TODO: fill this in */
-
-	/* TODO: do something about the fact that not all of the BMI
-	 * operations on the list were necessarily posted; see use of "seq"
-	 * and "next_seq_to_send" elsewhere in code
-	 */
+	/* skip anything that is in the queue but not actually posted */
+	if(q_item->posted_id)
+	{
+	    count++;
+	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+		"flowprotocol cleanup: unposting BMI operation.\n");
+	    ret = PINT_thread_mgr_bmi_cancel(q_item->posted_id,
+		&q_item->bmi_callback);
+	    if(ret < 0)
+	    {
+		gossip_err("WARNING: BMI cancel failed, proceeding anyway.\n");
+	    }
+	}
     }
 
-    assert(0);
-    return (0);
+    return (count);
 }
 
 /*
