@@ -79,7 +79,6 @@ struct PINT_server_lookup_op {
 };
 
 struct PINT_server_readdir_op {
-    PVFS_object_attr directory_attr; /* holds attributes of directory to read */
     PVFS_handle dirent_handle;       /* holds handle of dirdata dspace from which entries are read */
 };
 
