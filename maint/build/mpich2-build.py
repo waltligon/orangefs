@@ -6,6 +6,7 @@ import os,sys,string
 # default directory to download and build in 
 rootdir="/tmp/pvfs2-build-test/"
 
+
 def get_build_MPICH2():
 
 	os.chdir(rootdir)
@@ -22,14 +23,15 @@ def get_build_MPICH2():
 		print "Failed to untar mpich2; Exiting..."
 		sys.exit(1)
 
+	
 	# find the release name
 	os.system('ln -s `head -n1 tarout` mpich2-src')
 
-	# see if there are any patches available for this mpich release
-	if os.system('wget -q http://www.parl.clemson.edu/~pcarns/patches/`head -n1 tarout`/pvfs2.patch') == 0:
-		if os.system('patch -s -p1 -d mpich2-src < pvfs2.patch'):
-			print "Failed to patch mpich2; Exiting..."
-			sys.exit(1)
+	# look for a patch that matches it- don't error out if this fails; 
+	# the mpich2 version we downloaded may not need a patch
+	os.system('ls pvfs2/doc/coding/romio-MPICH2-`head -n1 tarout | cut -d "-" -f 2 | cut -d "/" -f 1`-PVFS2* > target_patch')
+	os.system('patch -s -p0 -d mpich2-src/src/mpi/romio < `cat target_patch`')
+
 	os.remove('tarout')
 
 	# set the necessary variables for compiling with PVFS2 support and install it
