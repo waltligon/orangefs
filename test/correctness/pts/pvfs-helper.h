@@ -1,6 +1,9 @@
 #ifndef __PVFS_HELPER_H
 #define __PVFS_HELPER_H
 
+#include <unistd.h>
+#include <sys/types.h>
+
 /* pvfs specific includes (from test/client/sysint) */
 #include "client.h"
 

@@ -29,8 +29,8 @@ int create_file(PVFS_fs_id fs_id,
     PVFS_sysresp_create resp_create;
     PVFS_sysresp_getattr resp_getattr;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
 
     ret = PVFS_sys_lookup(fs_id, dirname, credentials, &resp_look);
     if (ret < 0)
@@ -40,8 +40,8 @@ int create_file(PVFS_fs_id fs_id,
     }
 
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = 100;
-    attr.group = 100;
+    attr.owner = getuid();
+    attr.group = getgid();
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
 

@@ -32,8 +32,8 @@ int test_pvfs_datatype_vector(MPI_Comm *mycomm, int myid, char *buf, void *param
         io_buffer[i] = ((i % 26) + 65);
     }
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
 
     for(i = 0; i < pvfs_helper.num_test_files; i++)
     {

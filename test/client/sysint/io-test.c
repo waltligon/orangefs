@@ -8,6 +8,7 @@
 #include <client.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include "pvfs2-util.h"
@@ -99,8 +100,8 @@ int main(int argc,char **argv)
 	
 	name = filename;
 	fs_id = resp_init.fsid_list[0];
-	credentials.uid = 100;
-	credentials.gid = 100;
+	credentials.uid = getuid();
+	credentials.gid = getgid();
 
 	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lk);
 	/* TODO: really we probably want to look for a specific error code,
@@ -113,8 +114,8 @@ int main(int argc,char **argv)
 		/* get root handle */
 		name = "/";
 		fs_id = resp_init.fsid_list[0];
-		credentials.uid = 100;
-		credentials.gid = 100;
+		credentials.uid = getuid();
+		credentials.gid = getgid();
 
 		ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lk);
 		if(ret < 0)
@@ -125,8 +126,8 @@ int main(int argc,char **argv)
 
 		/* create new file */
 
-		attr.owner = 100;
-		attr.group = 100;
+		attr.owner = getuid();
+		attr.group = getgid();
 		attr.perms = PVFS_U_WRITE|PVFS_U_READ;
 		attr.atime = attr.ctime = attr.mtime = 
 		    time(NULL);
@@ -134,8 +135,8 @@ int main(int argc,char **argv)
 		parent_refn.handle = resp_lk.pinode_refn.handle;
 		parent_refn.fs_id = fs_id;
 		entry_name = &(filename[1]); /* leave off slash */
-		credentials.uid = 100;
-		credentials.gid = 100;
+		credentials.uid = getuid();
+		credentials.gid = getgid();
 
 		ret = PVFS_sys_create(entry_name, parent_refn, attr, 
 					credentials, &resp_cr);
@@ -163,8 +164,8 @@ int main(int argc,char **argv)
 	printf("IO-TEST: performing write on handle: %ld, fs: %d\n",
 		(long)pinode_refn.handle, (int)pinode_refn.fs_id);
 
-	credentials.uid = 100;
-	credentials.gid = 100;
+	credentials.uid = getuid();
+	credentials.gid = getgid();
 	buffer = io_buffer;
 	buffer_size = io_size*sizeof(int);
 
