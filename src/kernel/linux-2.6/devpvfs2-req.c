@@ -8,6 +8,7 @@
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-bufmap.h"
+#include <linux/poll.h>
 
 /* this file implements the /dev/pvfs2-req device node */
 extern kmem_cache_t *dev_req_cache;
@@ -451,6 +452,8 @@ static unsigned int pvfs2_devreq_poll(
     struct poll_table_struct *poll_table)
 {
     int poll_revent_mask = 0;
+
+    poll_wait(file, &pvfs2_request_list_waitq, poll_table);
 
     spin_lock(&pvfs2_request_list_lock);
     if (!list_empty(&pvfs2_request_list))
