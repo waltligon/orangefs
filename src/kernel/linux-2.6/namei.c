@@ -29,10 +29,16 @@ static int pvfs2_create(
     int mode,
     struct nameidata *nd)
 {
+    int ret = -1;
     struct inode *inode =
 	pvfs2_create_entry(dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE);
 
-    return (inode ? 0 : -1);
+    if (inode)
+    {
+	dir->i_nlink++;
+	ret = 0;
+    }
+    return ret;
 }
 
 struct dentry *pvfs2_lookup(
@@ -153,7 +159,9 @@ struct dentry *pvfs2_lookup(
       anyway; if we don't, we don't hold expected lookup semantics
       and we most noticeably break during directory renames
     */
-    return d_splice_alias(inode, dentry);
+    d_splice_alias(inode, dentry);
+
+    return NULL;
 }
 
 static int pvfs2_link(
