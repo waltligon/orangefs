@@ -367,8 +367,6 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     sm_p->msgarray_count = sm_p->u.truncate.datafile_count;
 
     dist = sm_p->u.truncate.distribution;
-    fprintf(stderr,"Calling DistLookup on %p (name is %s)\n",
-            dist, dist->dist_name);
     ret = PINT_Dist_lookup(dist);
     assert (ret == 0);
 
