@@ -38,8 +38,7 @@ int pvfs2_d_revalidate(
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
 
-    pvfs2_print("pvfs2_d_revalidate: called on dentry %p\n", dentry);
-
+    pvfs2_print("pvfs2_d_revalidate: called on dentry %p", dentry);
     if (nd && (nd->flags & LOOKUP_FOLLOW) &&
         (!nd->flags & LOOKUP_CREATE))
     {
@@ -47,9 +46,15 @@ int pvfs2_d_revalidate(
                     "skipping getattr\n");
         ret = 1;
     }
+    else if (inode)
+    {
+        pvfs2_print(" (inode %Lu)\n",
+                    Lu(pvfs2_ino_to_handle(inode->i_ino)));
+        ret = pvfs2_internal_revalidate(inode);
+    }
     else
     {
-        ret = pvfs2_internal_revalidate(inode);
+        pvfs2_print("\n");
     }
     return ret;
 }
