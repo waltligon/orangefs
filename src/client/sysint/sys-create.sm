@@ -466,14 +466,13 @@ static int create_delete_handles_comp_fn(void *v_p,
 static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
                                               job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
 
-    /* clear error field in job */
     js_p->error_code = 0;
 
     if (sm_p->u.create.num_data_files > PVFS_REQ_LIMIT_DFILE_COUNT)
@@ -494,10 +493,11 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_bucket_get_next_meta(
         sm_p->server_config, sm_p->parent_ref.fs_id,
         &msg_p->svr_addr, &meta_handle_extent_array);
-    if (ret < 0)
+    if (ret)
     {
-        gossip_err("Failed to get meta server information\n");
-        assert(0);
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+        return 1;
     }
 
     PINT_SERVREQ_CREATE_FILL(msg_p->req,
@@ -525,12 +525,11 @@ static int create_dspace_create_failure(PINT_client_sm *sm_p,
 static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
                                                 job_status_s *js_p)
 {
-    int ret = -1, i = 0;
+    int ret = -PVFS_EINVAL, i = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "datafiles_setup_msgpair_array\n");
 
-    /* clear error field in job */
     js_p->error_code = 0;
 
     memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -541,8 +540,9 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
                sizeof(PINT_client_sm_msgpair_state));
     if (sm_p->msgarray == NULL)
     {
-        gossip_err("create: failed to allocate msgarray\n"); 
-        return -PVFS_ENOMEM;
+        gossip_err("create: failed to allocate msgarray\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
     sm_p->msgarray_count = sm_p->u.create.num_data_files;
 
@@ -553,7 +553,8 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     if (!sm_p->u.create.io_handle_extent_array)
     {
         gossip_err("create: failed to allocate handle_extent_array\n"); 
-        return -PVFS_ENOMEM;
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
 
     /* allocate data server bmi address array */
@@ -562,7 +563,8 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     if (!sm_p->u.create.data_server_addrs)
     {
         gossip_err("create: failed to allocate data server addrs\n"); 
-        return -PVFS_ENOMEM;
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
 
     ret = PINT_bucket_get_next_io(sm_p->server_config,
@@ -570,10 +572,11 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
                                   sm_p->u.create.num_data_files,
                                   sm_p->u.create.data_server_addrs,
                                   sm_p->u.create.io_handle_extent_array);
-    if (ret < 0)
+    if (ret)
     {
-	gossip_err("Error: failure retrieving io server information.\n");
-	assert(0); /* TODO: real error handling */
+        gossip_err("Failed to retrieve data server addresses\n");
+        js_p->error_code = ret;
+        return 1;
     }
     
     /* for each datafile, prepare to post a create send/recv pair */
@@ -611,12 +614,12 @@ static int create_datafiles_failure(PINT_client_sm *sm_p,
 static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
                                         job_status_s *js_p)
 {
+    int ret = -PVFS_EINVAL;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: setattr_setup_msgpair\n");
 
-    /* clear error field in job */
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting setattr req\n");
@@ -650,12 +653,13 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->handle = sm_p->u.create.metafile_handle;
     msg_p->comp_fn = create_setattr_comp_fn;
 
-    if (PINT_bucket_map_to_server(&msg_p->svr_addr,
-                                  msg_p->handle,
-                                  msg_p->fs_id) < 0)
+    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+                                    msg_p->handle,
+                                    msg_p->fs_id);
+    if (ret)
     {
-        gossip_err("Failed to get meta server information\n");
-        return -PVFS_EADDRNOTAVAIL;
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
     }
     return 1;
 }
@@ -700,10 +704,10 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
                                     sm_p->parent_ref.handle,
                                     sm_p->parent_ref.fs_id);
-    if (ret < 0)
+    if (ret)
     {
-        gossip_err("Failed to get meta server information\n");
-        return -PVFS_EADDRNOTAVAIL;
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
     }
     return 1;
 }
@@ -727,7 +731,7 @@ static int create_crdirent_failure(PINT_client_sm *sm_p,
 static int create_delete_handles_setup_msgpair_array(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    int ret = -1, i = 0;
+    int ret = -PVFS_EINVAL, i = 0;
     PVFS_BMI_addr_t metafile_server_addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
@@ -742,8 +746,9 @@ static int create_delete_handles_setup_msgpair_array(
                                     sm_p->parent_ref.fs_id);
     if (ret)
     {
-	gossip_err("Error: failure mapping to server.\n");
-        return -PVFS_EADDRNOTAVAIL;
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+        return 1;
     }
 
     if (sm_p->msgarray)
@@ -757,7 +762,8 @@ static int create_delete_handles_setup_msgpair_array(
     if (sm_p->msgarray == NULL)
     {
         gossip_err("create: failed to allocate msgarray\n"); 
-        return -PVFS_ENOMEM;
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
 
     sm_p->msgarray_count = (sm_p->u.create.num_data_files + 1);
