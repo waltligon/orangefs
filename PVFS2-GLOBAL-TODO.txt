@@ -1,0 +1,122 @@
+
+server operations:
+====================================================================
+- not started:
+  - noop
+  - eattrib (set/get)
+  - allocate
+  - truncate
+  - statfs
+  - iostatfs?
+
+- depricated (need to clean out):
+  - getdist
+  - revlookup
+  
+- unfinished:
+  - general error handling
+  - size in getattr for datafiles
+  - config file parsing
+  - getconfig
+
+general server functionality:
+====================================================================
+- attributes (permissions, etc.) on datafiles
+- defining "on disk" format for metadata
+- getting multiple servers working (io + metadata)
+- finishing file system semantics documentation
+- access control, general security model
+
+request scheduler:
+====================================================================
+- more generic implementation
+- smarter concurrency rules
+
+system interface functionality:
+====================================================================
+- not started:
+  - eattrib (set/get)?
+  - allocate
+  - truncate
+  - statfs
+  - rename
+
+- unfinished:
+  - aggregate size on getattr
+  - getconfig
+  - caches (pcache)
+  - thread safety
+  - way to pass in consistency semantics (timeout values, etc.)
+  - handling max size of responses (getattr)
+  - using a state machine for I/O operations
+  - bucket table interface
+
+user interfaces:
+====================================================================
+- pvfs-kernel implementation
+  - quick modification of existing pvfs-kernel and/or full rewrite
+- ROMIO module
+- pvfs_XXX interface?
+
+performance tuning:
+====================================================================
+- steal what we can from mpich2
+- architecture specific locking, etc.
+- thread tuning
+- memory allocation cache
+
+request encoding:
+====================================================================
+- defining an on-the-wire request format
+- heterogeneous platform support
+
+error codes:
+====================================================================
+- converting to new error code format (everywhere)
+- documenting valid error codes from functions
+
+I/O path:
+====================================================================
+- optimizing short reads and writes (packing data into req/ack messages)
+- GM support in BMI and flow
+- threads in trove?
+- general optimizations (lock granularity, immediate completion, etc.)
+- network encoding BMI message headers
+- trove support for buckets
+- ability to unpost, correct use of timeouts, preposting operations
+- semantics of short read and write operations
+
+I/O description:
+====================================================================
+- how to free request descriptions and distribution structures
+
+correctness/performance testing
+====================================================================
+- more pts tests
+
+system management utilities
+====================================================================
+- decide what we want/need here?
+  - performance monitoring
+  - health monitoring
+  - system recovery
+  - etc.
+- end user documentation
+
+documentation:
+====================================================================
+- consider automated tools like doxygen
+- update all design docs!
+- review
+
+code cleanup:
+====================================================================
+- consistent formatting
+- consistent function naming
+- consistent header file inclusion
+
+fault tolerance:
+=====================================================================
+- what does the API look like
+- data redundancy
+- failover
