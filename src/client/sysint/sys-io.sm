@@ -19,7 +19,7 @@
 #include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "pcache.h"
+#include "acache.h"
 #include "PINT-reqproto-encode.h"
 
 extern job_context_id pint_client_sm_context;
@@ -74,7 +74,7 @@ machine pvfs2_client_io_sm(object_getattr_setup_msgpair,
 	default => object_getattr_xfer_msgpair;
     }
     state object_getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_pcache_sm;
+	jump pvfs2_client_getattr_acache_sm;
 	success => datafile_setup_msgpairs;
 	default => object_getattr_failure;
     }
@@ -184,15 +184,15 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     error = sm_p->error_code;
 
     /* invalidate pinode entry's size on write if pinode exists */
-    if (sm_p->pcache_hit && (io_type == PVFS_IO_WRITE))
+    if (sm_p->acache_hit && (io_type == PVFS_IO_WRITE))
     {
         /* invalidate the size attribute in the pinode */
         sm_p->pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
         sm_p->pinode->size = 0;
 
-        PINT_pcache_set_valid(sm_p->pinode);
-        PINT_pcache_release(sm_p->pinode);
-        sm_p->pcache_hit = 0;
+        PINT_acache_set_valid(sm_p->pinode);
+        PINT_acache_release(sm_p->pinode);
+        sm_p->acache_hit = 0;
     }
     free(sm_p);
 
@@ -237,7 +237,7 @@ static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     }
 
 
-    /* drop through and jump to getattr_pcache state machine */
+    /* drop through and jump to getattr_acache state machine */
     return 1;
 }
 
@@ -278,7 +278,7 @@ static int io_object_getattr_comp_fn(void *v_p,
 	return resp_p->status;
     }
 
-    r_attr_p = (sm_p->pcache_hit ?
+    r_attr_p = (sm_p->acache_hit ?
                 &sm_p->pinode->attr :
                 &resp_p->u.getattr.attr);
 
@@ -295,27 +295,27 @@ static int io_object_getattr_comp_fn(void *v_p,
     assert(r_attr_p->mask & PVFS_ATTR_META_DFILES);
     assert(r_attr_p->u.meta.dfile_count > 0);
 
-    if (!sm_p->pcache_hit)
+    if (!sm_p->acache_hit)
     {
         int release_required = 1;
         PINT_pinode *pinode =
-            PINT_pcache_lookup(sm_p->u.io.object_ref);
+            PINT_acache_lookup(sm_p->u.io.object_ref);
         if (!pinode)
         {
-            pinode = PINT_pcache_pinode_alloc();
+            pinode = PINT_acache_pinode_alloc();
             assert(pinode);
             release_required = 0;
         }
         pinode->refn = sm_p->u.io.object_ref;
 
-        PINT_pcache_object_attr_deep_copy(
+        PINT_acache_object_attr_deep_copy(
             &pinode->attr, r_attr_p);
 
-        PINT_pcache_set_valid(pinode);
+        PINT_acache_set_valid(pinode);
 
         if (release_required)
         {
-            PINT_pcache_release(pinode);
+            PINT_acache_release(pinode);
         }
 
         /* here we make a copy of the distribution information. */
@@ -334,7 +334,7 @@ static int io_object_getattr_comp_fn(void *v_p,
         /* save the datafile handles prior to freeing up the
          * buffers we used for messages.  we could keep them around
          * i suppose, but we're not going to do that for now.  later
-         * it is likely that this stuff will be stuck in the pcache
+         * it is likely that this stuff will be stuck in the acache
          * anyway, so we'll be able to just reference it from there.
          */
         sm_p->u.io.datafile_handles = (PVFS_handle *)
@@ -531,7 +531,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     /*
      * Swap the new list in for the old one, freeing the old list.
      */
-    if (!sm_p->pcache_hit)
+    if (!sm_p->acache_hit)
     {
         free(iosm_p->datafile_handles);
     }
@@ -1177,7 +1177,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
      */
     free(sm_p->msgarray);
 
-    if (!sm_p->pcache_hit)
+    if (!sm_p->acache_hit)
     {
         free(sm_p->u.io.datafile_handles);
     }

@@ -22,7 +22,7 @@ typedef struct
 #define __DEBUG_ALL                                             \
 (TROVE_DEBUG | BMI_DEBUG_ALL | SERVER_DEBUG | CLIENT_DEBUG |    \
 JOB_DEBUG | REQUEST_DEBUG | REQ_SCHED_DEBUG | FLOW_PROTO_DEBUG |\
-FLOW_DEBUG | DCACHE_DEBUG | PCACHE_DEBUG | DIST_DEBUG)
+FLOW_DEBUG | DCACHE_DEBUG | ACACHE_DEBUG | DIST_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -38,7 +38,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "flowproto", FLOW_PROTO_DEBUG },
     { "flow", FLOW_DEBUG },
     { "dcache", DCACHE_DEBUG },
-    { "pcache", PCACHE_DEBUG },
+    { "acache", ACACHE_DEBUG },
     { "distribution", DIST_DEBUG },
     { "verbose",  (__DEBUG_ALL & ~REQ_SCHED_DEBUG) },
     { "none", 0x00000000 },

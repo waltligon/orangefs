@@ -44,7 +44,7 @@
 #include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "pcache.h"
+#include "acache.h"
 #include "PINT-reqproto-encode.h"
 
 extern job_context_id pint_client_sm_context;
@@ -99,7 +99,7 @@ machine pvfs2_client_getattr_sm(check_parameters,
 	default => cleanup;
     }
     state object_getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_pcache_sm;
+	jump pvfs2_client_getattr_acache_sm;
 	success => cleanup;
 	GETATTR_NEED_DATAFILE_SIZES => datafile_getattr_setup_msgpairarray;
 	default => object_getattr_failure;
@@ -194,7 +194,7 @@ static int getattr_check_parameters(PINT_client_sm *sm_p,
 
 /* getattr_object_getattr_setup_msgpair()
  *
- * Fills in sm_p->msgpair to perform a getattr using the getattr_pcache
+ * Fills in sm_p->msgpair to perform a getattr using the getattr_acache
  * state machine.
  */
 static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
@@ -259,7 +259,7 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(CLIENT_DEBUG, "attrmask being passed to server: ");
     PINT_attrmask_print(CLIENT_DEBUG, attrmask);
 
-    /* drop through and jump to getattr_pcache state machine */
+    /* drop through and jump to getattr_acache state machine */
     return 1;
 }
 
@@ -305,7 +305,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
       to do a full data file fetch.  (that's expensive)
     */
     if ((resp_p->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) &&
-        (!sm_p->pcache_hit) &&
+        (!sm_p->acache_hit) &&
         (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE))
     {
         need_datafiles = 1;
@@ -314,19 +314,19 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     /*
       if we didn't get a cache hit, we're making a
       copy of the attributes here so that we can add
-      a pcache entry later in cleanup.
+      a acache entry later in cleanup.
     */
-    if (!sm_p->pcache_hit)
+    if (!sm_p->acache_hit)
     {
-        PINT_pcache_object_attr_deep_copy(
-            &sm_p->pcache_attr, &resp_p->u.getattr.attr);
+        PINT_acache_object_attr_deep_copy(
+            &sm_p->acache_attr, &resp_p->u.getattr.attr);
     }
 
     /*
       if we got a cache hit, use those attributes,
       otherwise use the real server replied attrs
     */
-    attr = (sm_p->pcache_hit ?
+    attr = (sm_p->acache_hit ?
             &sm_p->pinode->attr :
             &resp_p->u.getattr.attr);
     assert(attr);
@@ -376,7 +376,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     sm_p->u.getattr.getattr_resp_p->attr.objtype = attr->objtype;
 
     /* on cache hit, we can skip all of the copying below;  joy! */
-    if (sm_p->pcache_hit)
+    if (sm_p->acache_hit)
     {
         return 0;
     }
@@ -422,7 +422,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		/* save the datafile handles prior to freeing up the
 		 * buffers we used for messages.  we could keep them around
 		 * i suppose, but we're not going to do that for now.  later
-		 * it is likely that this stuff will be stuck in the pcache
+		 * it is likely that this stuff will be stuck in the acache
 		 * anyway, so we'll be able to just reference it from there.
 		 */
 		sm_p->u.getattr.datafile_handles = (PVFS_handle *)
@@ -446,7 +446,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
                 {
 		    /* if caller asked for the size, AND we couldn't
-                     * retrieve them from the pcache, then we need to
+                     * retrieve them from the acache, then we need to
                      * go get the datafile sizes
 		     */
 		    return GETATTR_NEED_DATAFILE_SIZES;
@@ -618,11 +618,11 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
         if (amask & PVFS_ATTR_META_DIST)
         {
             /*
-              recompute size if it's not a pcache hit, or if it is
-              a pcache hit on an entry that no longer has a valid size
+              recompute size if it's not a acache hit, or if it is
+              a acache hit on an entry that no longer has a valid size
             */
-            if (!sm_p->pcache_hit ||
-                (sm_p->pcache_hit &&
+            if (!sm_p->acache_hit ||
+                (sm_p->acache_hit &&
                  !(sm_p->pinode->attr.mask & PVFS_ATTR_DATA_SIZE)))
             {
                 ret = PINT_Dist_lookup(sm_p->u.getattr.dist_p);
@@ -663,8 +663,8 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 	/* free all the memory we allocated, which could include:
 	 * - size array
 	 * - msgpair array
-	 * - datafile handle array (if not from pcache)
-	 * - distribution description (if not from pcache)
+	 * - datafile handle array (if not from acache)
+	 * - distribution description (if not from acache)
 	 */
 	if (sm_p->u.getattr.size_array != NULL) {
 	    free(sm_p->u.getattr.size_array);
@@ -675,11 +675,11 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 
         /*
           only free dist and dfile memory if we didn't get a
-          cache hit;  if we got a pcache hit, we're referencing
-          memory inside the pcache entries, so no allocations we
+          cache hit;  if we got a acache hit, we're referencing
+          memory inside the acache entries, so no allocations we
           made
         */
-        if (!sm_p->pcache_hit)
+        if (!sm_p->acache_hit)
         {
             if ((amask & PVFS_ATTR_META_DFILES) &&
                 (sm_p->u.getattr.datafile_handles != NULL)) {
@@ -691,23 +691,23 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             }
         }
 
-        /* add entry to pcache if not already present */
-        if (!sm_p->pcache_hit)
+        /* add entry to acache if not already present */
+        if (!sm_p->acache_hit)
         {
             int release_required = 1;
             PINT_pinode *pinode =
-                PINT_pcache_lookup(sm_p->u.getattr.object_ref);
+                PINT_acache_lookup(sm_p->u.getattr.object_ref);
             if (!pinode)
             {
-                pinode = PINT_pcache_pinode_alloc();
+                pinode = PINT_acache_pinode_alloc();
                 assert(pinode);
                 release_required = 0;
             }
             pinode->refn = sm_p->u.getattr.object_ref;
 
-            if (sm_p->pcache_attr.objtype == PVFS_TYPE_SYMLINK)
+            if (sm_p->acache_attr.objtype == PVFS_TYPE_SYMLINK)
             {
-                sm_p->pcache_attr.mask &=
+                sm_p->acache_attr.mask &=
                     (PVFS_ATTR_SYMLNK_ALL | PVFS_ATTR_COMMON_ALL);
             }
             else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
@@ -724,27 +724,27 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
                   we properly copy out all required fields in the
                   deep copy below to the pinode object
                 */
-                sm_p->pcache_attr.mask |= PVFS_ATTR_DATA_SIZE;
+                sm_p->acache_attr.mask |= PVFS_ATTR_DATA_SIZE;
                 /*
                   if we have the size, be sure to set the
                   META_ALL related bits since we also have
                   that information at this point
                 */
-                sm_p->pcache_attr.mask |= PVFS_ATTR_META_ALL;
+                sm_p->acache_attr.mask |= PVFS_ATTR_META_ALL;
             }
 
-            PINT_pcache_object_attr_deep_copy(
-                &pinode->attr, &sm_p->pcache_attr);
-            PINT_pcache_object_attr_deep_free(
-                &sm_p->pcache_attr);
+            PINT_acache_object_attr_deep_copy(
+                &pinode->attr, &sm_p->acache_attr);
+            PINT_acache_object_attr_deep_free(
+                &sm_p->acache_attr);
 
-            PINT_pcache_set_valid(pinode);
+            PINT_acache_set_valid(pinode);
 
             if (release_required)
             {
-                PINT_pcache_release(pinode);
+                PINT_acache_release(pinode);
             }
-            sm_p->pcache_hit = 0;
+            sm_p->acache_hit = 0;
         }
     }
     else {

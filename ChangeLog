@@ -18,6 +18,8 @@ pvfs2-0.0.6pre1
   bstream and keyval files in the host storage space
 - a pvfs2_rmspace (opposite of mkspace); can be invoked by server
   using the -r command line option
+- added kernel module highmem support
+- renamed attribute cache 'pcache' to 'acache'
 
 pvfs2-0.0.5
 ===========

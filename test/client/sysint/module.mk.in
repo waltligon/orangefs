@@ -4,7 +4,7 @@ TESTSRC += \
 	$(DIR)/client.c\
 	$(DIR)/lookup.c\
 	$(DIR)/dcache-torture.c\
-	$(DIR)/pcache-torture.c\
+	$(DIR)/acache-torture.c\
 	$(DIR)/get-info.c\
 	$(DIR)/set-info.c\
 	$(DIR)/mkdir.c\
@@ -20,7 +20,6 @@ TESTSRC += \
 	$(DIR)/flush-2.c\
 	$(DIR)/truncate.c\
 	$(DIR)/readdir.c\
-	$(DIR)/pcache-test.c\
 	$(DIR)/test-pint-bucket.c \
 	$(DIR)/test-pint-dcache.c \
 	$(DIR)/io-test.c \

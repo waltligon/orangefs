@@ -60,16 +60,16 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	    MAP_SERVER_FAILURE,
 	    SEND_REQ_FAILURE,
 	    MALLOC_DFH_FAILURE,
-	    PCACHE_INSERT_FAILURE,
+	    ACACHE_INSERT_FAILURE,
 	} failure = NONE_FAILURE;
 
 	entry.handle = pinode_refn.handle;
 	entry.fs_id = pinode_refn.fs_id;
 
-	entry_pinode = PINT_pcache_lookup(entry);
+	entry_pinode = PINT_acache_lookup(entry);
         if (!entry_pinode)
         {
-            entry_pinode = PINT_pcache_pinode_alloc();
+            entry_pinode = PINT_acache_pinode_alloc();
             assert(entry_pinode);
         }
         entry_pinode->refn = entry;
@@ -253,7 +253,7 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 
 	    entry_pinode->size = total_filesize;
 	}
-        PINT_pcache_set_valid(entry_pinode);
+        PINT_acache_set_valid(entry_pinode);
 
 	/* Free memory allocated for name */
 	if (size_array)
@@ -265,7 +265,7 @@ return_error:
 
 	switch( failure ) 
 	{
-		case PCACHE_INSERT_FAILURE:
+		case ACACHE_INSERT_FAILURE:
 		    free(out_attr->u.meta.dfile_array);
 		case MALLOC_DFH_FAILURE:
 		case SEND_REQ_FAILURE:

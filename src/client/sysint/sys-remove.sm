@@ -14,7 +14,7 @@
 #include "gossip.h"
 #include "str-utils.h"
 
-#include "pcache.h"
+#include "acache.h"
 #include "pinode-helper.h"
 #include "pint-dcache.h"
 #include "pint-servreq.h"
@@ -109,7 +109,7 @@ machine pvfs2_client_remove_sm(init,
 	default => getattr_failure;
     }
     state getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_pcache_sm;
+	jump pvfs2_client_getattr_acache_sm;
 	success => object_remove_setup_msgpair;
 	MSGPAIR_RETURN_SUCCESS => object_remove_setup_msgpair;
 	REMOVE_MUST_REMOVE_DATAFILES => datafile_remove_setup_msgpair;
@@ -207,9 +207,9 @@ int PVFS_sys_remove(char *object_name,
     error = sm_p->error_code;
 
     /* flush any matching pinode entries (if any) */
-    if (sm_p->pcache_hit)
+    if (sm_p->acache_hit)
     {
-        PINT_pcache_invalidate(sm_p->u.remove.object_ref);
+        PINT_acache_invalidate(sm_p->u.remove.object_ref);
     }
 
     /* clean up after ourselves */
@@ -322,7 +322,7 @@ static int remove_getattr_comp_fn(void *v_p,
 	    /* save the datafile handles prior to freeing up the
 	     * buffers we used for messages.  we could keep them around
 	     * i suppose, but we're not going to do that for now.  later
-	     * it is likely that this stuff will be stuck in the pcache
+	     * it is likely that this stuff will be stuck in the acache
 	     * anyway, so we'll be able to just reference it from there.
 	     */
 	    sm_p->u.remove.datafile_handles = (PVFS_handle *) malloc(resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle));
@@ -527,10 +527,10 @@ static int remove_cleanup(PINT_client_sm *sm_p,
      */
     sm_p->error_code = js_p->error_code;
 
-    /* if we pcache entry, release it */
-    if (sm_p->pcache_hit)
+    /* if we acache entry, release it */
+    if (sm_p->acache_hit)
     {
-	PINT_pcache_release(sm_p->pinode);
+	PINT_acache_release(sm_p->pinode);
     }
 
     /* free dynamically allocated resouces */

@@ -11,7 +11,7 @@
 #include "pint-sysint-utils.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "pcache.h"
+#include "acache.h"
 #include "pinode-helper.h"
 #include "PINT-reqproto-encode.h"
 #include "dotconf.h"
@@ -66,7 +66,7 @@ int PINT_do_lookup(char* name,
 	MAP_SERVER_FAILURE,
 	SEND_REQ_FAILURE,
 	INVAL_LOOKUP_FAILURE,
-	ADD_PCACHE_FAILURE,
+	ADD_ACACHE_FAILURE,
     } failure = NONE_FAILURE;
 
     if (name == NULL)  /* how do we look up a null name? */
@@ -141,18 +141,18 @@ int PINT_do_lookup(char* name,
     entry->handle = ack_p->u.lookup_path.handle_array[0];
     entry->fs_id = parent.fs_id;
 
-    /*in the event of a successful lookup, we need to add this to the pcache too*/
+    /*in the event of a successful lookup, we need to add this to the acache too*/
 
-    pinode_ptr = PINT_pcache_lookup(*entry);
+    pinode_ptr = PINT_acache_lookup(*entry);
     if (!pinode_ptr)
     {
-        pinode_ptr = PINT_pcache_pinode_alloc();
+        pinode_ptr = PINT_acache_pinode_alloc();
         assert(pinode_ptr);
     }
     ret = phelper_fill_timestamps(pinode_ptr);
     if (ret < 0)
     {
-	failure = ADD_PCACHE_FAILURE;
+	failure = ADD_ACACHE_FAILURE;
 	goto return_error;
     }
 
@@ -163,8 +163,8 @@ int PINT_do_lookup(char* name,
     /* filter to make sure we set a reasonable mask here */
     pinode_ptr->attr.mask &= PVFS_ATTR_COMMON_ALL;
 
-    PINT_pcache_set_valid(pinode_ptr);
-    PINT_pcache_release(pinode_ptr);
+    PINT_acache_set_valid(pinode_ptr);
+    PINT_acache_release(pinode_ptr);
 
     PINT_release_req(serv_addr, &req_p, encoding, &decoded,
 		     &encoded_resp, op_tag);
@@ -174,7 +174,7 @@ int PINT_do_lookup(char* name,
 
     switch(failure)
     {
-        case ADD_PCACHE_FAILURE:
+        case ADD_ACACHE_FAILURE:
         case INVAL_LOOKUP_FAILURE:
         case SEND_REQ_FAILURE:
 	    PINT_release_req(serv_addr, &req_p, encoding, &decoded,

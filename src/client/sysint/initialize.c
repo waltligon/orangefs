@@ -11,7 +11,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "pcache.h"
+#include "acache.h"
 #include "pint-bucket.h"
 #include "pint-dcache.h"
 #include "pvfs2-sysint.h"
@@ -67,7 +67,7 @@ int PVFS_sys_initialize(
 	FLOW_INIT_FAIL,
 	JOB_INIT_FAIL,
 	JOB_CONTEXT_FAIL,
-	PCACHE_INIT_FAIL,
+	ACACHE_INIT_FAIL,
 	DCACHE_INIT_FAIL,
 	BUCKET_INIT_FAIL,
 	GET_CONFIG_INIT_FAIL
@@ -203,14 +203,14 @@ int PVFS_sys_initialize(
     }
 	
     /* Initialize the pinode cache */
-    ret = PINT_pcache_initialize();
+    ret = PINT_acache_initialize();
     if (ret < 0)
     {
-	init_fail = PCACHE_INIT_FAIL;
+	init_fail = ACACHE_INIT_FAIL;
 	gossip_ldebug(CLIENT_DEBUG,"Error initializing pinode cache\n");
 	goto return_error;	
     }
-    PINT_pcache_set_timeout(PINT_PCACHE_TIMEOUT * 1000);
+    PINT_acache_set_timeout(PINT_ACACHE_TIMEOUT * 1000);
 
     /* Initialize the directory cache */
     ret = PINT_dcache_initialize();
@@ -308,8 +308,8 @@ int PVFS_sys_initialize(
 	case BUCKET_INIT_FAIL:
 	    PINT_dcache_finalize();
 	case DCACHE_INIT_FAIL:
-	    PINT_pcache_finalize();
-	case PCACHE_INIT_FAIL:
+	    PINT_acache_finalize();
+	case ACACHE_INIT_FAIL:
 	case JOB_CONTEXT_FAIL:
 	    job_finalize();
 	case JOB_INIT_FAIL:

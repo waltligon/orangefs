@@ -17,7 +17,7 @@
 #include "PINT-reqproto-encode.h"
 #include "job.h"
 #include "trove.h"
-#include "pcache.h"
+#include "acache.h"
 
 #define PINT_STATE_STACK_SIZE 3
 
@@ -300,9 +300,9 @@ typedef struct PINT_client_sm {
 		  * then decremented to zero as jobs complete */
 
     int dcache_hit; /* set if last segment lookup was from dcache */
-    int pcache_hit; /* set if pinode was from pcache */
-    PINT_pinode *pinode; /* filled in on pcache hit */
-    PVFS_object_attr pcache_attr; /* a scratch attr space */
+    int acache_hit; /* set if pinode was from acache */
+    PINT_pinode *pinode; /* filled in on acache hit */
+    PVFS_object_attr acache_attr; /* a scratch attr space */
 
     /* we need this for create */
     struct server_configuration_s *server_config;
@@ -435,7 +435,7 @@ extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;
 extern struct PINT_state_machine_s pvfs2_client_msgpairarray_sm;
-extern struct PINT_state_machine_s pvfs2_client_getattr_pcache_sm;
+extern struct PINT_state_machine_s pvfs2_client_getattr_acache_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_dcache_sm;
 
 /*

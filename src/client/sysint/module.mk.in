@@ -3,7 +3,7 @@ DIR := src/client/sysint
 CSRC := \
 	$(DIR)/finalize.c \
 	$(DIR)/initialize.c \
-	$(DIR)/pcache.c \
+	$(DIR)/acache.c \
 	$(DIR)/getattr.c \
 	$(DIR)/pinode-helper.c \
 	$(DIR)/pint-dcache.c \
@@ -20,7 +20,7 @@ CSRC := \
 SMSRC := \
 	msgpairarray.sm \
 	msgpair.sm \
-	getattr-pcache.sm \
+	getattr-acache.sm \
 	lookup-dcache.sm \
 	sys-getattr.sm \
 	sys-setattr.sm \

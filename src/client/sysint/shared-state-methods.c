@@ -18,7 +18,7 @@
 #include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "pcache.h"
+#include "acache.h"
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
 
@@ -145,19 +145,19 @@ int PINT_sm_common_directory_getattr_comp_fn(void *v_p,
     /*
       if we didn't get a cache hit, we're making a
       copy of the attributes here so that we can add
-      a pcache entry later in cleanup.
+      a acache entry later in cleanup.
     */
-    if (!sm_p->pcache_hit)
+    if (!sm_p->acache_hit)
     {
-        PINT_pcache_object_attr_deep_copy(
-            &sm_p->pcache_attr, &resp_p->u.getattr.attr);
+        PINT_acache_object_attr_deep_copy(
+            &sm_p->acache_attr, &resp_p->u.getattr.attr);
     }
 
     /*
       if we got a cache hit, use those attributes,
       otherwise use the real server replied attrs
     */
-    attr = (sm_p->pcache_hit ?
+    attr = (sm_p->acache_hit ?
             &sm_p->pinode->attr :
             &resp_p->u.getattr.attr);
     assert(attr);
@@ -184,16 +184,16 @@ int PINT_sm_common_directory_getattr_comp_fn(void *v_p,
 
     /*
       if our parent directory attributes are good, and not present
-      int the pcache, put them in the pcache now
+      int the acache, put them in the acache now
     */
-    if (!sm_p->pcache_hit)
+    if (!sm_p->acache_hit)
     {
         int release_required = 1;
         PINT_pinode *pinode =
-            PINT_pcache_lookup(sm_p->u.getattr.object_ref);
+            PINT_acache_lookup(sm_p->u.getattr.object_ref);
         if (!pinode)
         {
-            pinode = PINT_pcache_pinode_alloc();
+            pinode = PINT_acache_pinode_alloc();
             assert(pinode);
             release_required = 0;
         }
@@ -201,14 +201,14 @@ int PINT_sm_common_directory_getattr_comp_fn(void *v_p,
         pinode->size = ((attr->mask & PVFS_ATTR_DATA_ALL) ?
                         attr->u.data.size : 0);
 
-        PINT_pcache_object_attr_deep_copy(
+        PINT_acache_object_attr_deep_copy(
             &pinode->attr, attr);
 
-        PINT_pcache_set_valid(pinode);
+        PINT_acache_set_valid(pinode);
 
         if (release_required)
         {
-            PINT_pcache_release(pinode);
+            PINT_acache_release(pinode);
         }
     }
     return 0;
@@ -234,14 +234,14 @@ int PINT_sm_common_object_getattr_comp_fn(void *v_p,
     }
 
     /*
-      if we didn't get a pcache hit, we're making a
+      if we didn't get a acache hit, we're making a
       copy of the attributes here so that we can add
-      a pcache entry later in cleanup.
+      a acache entry later in cleanup.
     */
-    if (!sm_p->pcache_hit)
+    if (!sm_p->acache_hit)
     {
-        PINT_pcache_object_attr_deep_copy(
-            &sm_p->pcache_attr, &resp_p->u.getattr.attr);
+        PINT_acache_object_attr_deep_copy(
+            &sm_p->acache_attr, &resp_p->u.getattr.attr);
     }
     return 0;
 }

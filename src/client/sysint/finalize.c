@@ -8,7 +8,7 @@
 #include <malloc.h>
 
 #include "pint-sysint-utils.h"
-#include "pcache.h"
+#include "acache.h"
 #include "pint-dcache.h"
 #include "gen-locks.h"
 #include "pint-bucket.h"
@@ -32,7 +32,7 @@ int PVFS_sys_finalize()
     /* Free the dcache */
     PINT_dcache_finalize();
     /* free all pinode structures */
-    PINT_pcache_finalize();
+    PINT_acache_finalize();
 	
     /* shut down bucket interface */
     PINT_bucket_finalize();

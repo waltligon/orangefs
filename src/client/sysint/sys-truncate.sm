@@ -18,7 +18,7 @@
 #include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "pcache.h"
+#include "acache.h"
 #include "PINT-reqproto-encode.h"
 
 /* pvfs2_client_truncate_sm
@@ -82,7 +82,7 @@ machine pvfs2_client_truncate_sm(check_parameters,
     }
 
     state object_getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_pcache_sm;
+	jump pvfs2_client_getattr_acache_sm;
 	success => datafile_setup_msgpairarray;
 	default => object_getattr_failure;
     }
@@ -169,7 +169,7 @@ static int truncate_check_parameters(PINT_client_sm *sm_p,
 
 /* truncate_object_getattr_setup_msgpair()
  *
- * fills in sm_p->msgpair to perform a getattr using the getattr_pcache state
+ * fills in sm_p->msgpair to perform a getattr using the getattr_acache state
  * machine
  */
 static int truncate_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
@@ -202,7 +202,7 @@ static int truncate_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 	assert(0); /* TODO: real error handling */
     }
 
-    /* drop through and jump to getattr_pcache state machine */
+    /* drop through and jump to getattr_acache state machine */
     return 1;
 }
 
@@ -237,11 +237,11 @@ static int truncate_object_getattr_comp_fn(
 	return resp_p->status;
     }
 
-    if (!sm_p->pcache_hit)
+    if (!sm_p->acache_hit)
     {
         r_attr_p = &resp_p->u.getattr.attr;
-        PINT_pcache_object_attr_deep_copy(
-            &sm_p->pcache_attr, &resp_p->u.getattr.attr);
+        PINT_acache_object_attr_deep_copy(
+            &sm_p->acache_attr, &resp_p->u.getattr.attr);
     }
     else
     {
@@ -263,12 +263,12 @@ static int truncate_object_getattr_comp_fn(
 			 "truncate_object_getattr_comp_fn: %d datafiles.\n",
 			 r_attr_p->u.meta.dfile_count); 
 
-            if (!sm_p->pcache_hit)
+            if (!sm_p->acache_hit)
             {
                 /* save the datafile handles prior to freeing up the
                  * buffers we used for messages.  we could keep them around
                  * i suppose, but we're not going to do that for now.  later
-                 * it is likely that this stuff will be stuck in the pcache
+                 * it is likely that this stuff will be stuck in the acache
                  * anyway, so we'll be able to just reference it from there.
                  */
                 sm_p->u.truncate.datafile_handles = (PVFS_handle *) 
@@ -289,7 +289,7 @@ static int truncate_object_getattr_comp_fn(
             }
             else
             {
-                /* on pcache hit use cached dfile handle array */
+                /* on acache hit use cached dfile handle array */
                 sm_p->u.truncate.datafile_handles =
                     r_attr_p->u.meta.dfile_array;
                 sm_p->u.truncate.distribution = r_attr_p->u.meta.dist;
@@ -415,33 +415,33 @@ static int truncate_cleanup(PINT_client_sm *sm_p,
 	    free(sm_p->msgarray);
 	}
 
-        /* add entry to pcache if not already present */
-        if (!sm_p->pcache_hit)
+        /* add entry to acache if not already present */
+        if (!sm_p->acache_hit)
         {
             int release_required = 1;
             PINT_pinode *pinode =
-                PINT_pcache_lookup(sm_p->u.truncate.object_ref);
+                PINT_acache_lookup(sm_p->u.truncate.object_ref);
             if (!pinode)
             {
-                pinode = PINT_pcache_pinode_alloc();
+                pinode = PINT_acache_pinode_alloc();
                 assert(pinode);
                 release_required = 0;
             }
             pinode->size = sm_p->u.truncate.size;
             pinode->refn = sm_p->u.truncate.object_ref;
 
-            PINT_pcache_object_attr_deep_copy(
-                &pinode->attr, &sm_p->pcache_attr);
-            PINT_pcache_object_attr_deep_free(
-                &sm_p->pcache_attr);
+            PINT_acache_object_attr_deep_copy(
+                &pinode->attr, &sm_p->acache_attr);
+            PINT_acache_object_attr_deep_free(
+                &sm_p->acache_attr);
 
-            PINT_pcache_set_valid(pinode);
+            PINT_acache_set_valid(pinode);
 
             if (release_required)
             {
-                PINT_pcache_release(pinode);
+                PINT_acache_release(pinode);
             }
-            sm_p->pcache_hit = 0;
+            sm_p->acache_hit = 0;
 
             /* finally, free previously allocated memory if any */
             if (sm_p->u.truncate.datafile_handles != NULL)

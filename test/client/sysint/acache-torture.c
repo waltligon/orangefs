@@ -9,7 +9,7 @@
 #include <assert.h>
 
 #include "pvfs2-debug.h"
-#include "pcache.h"
+#include "acache.h"
 #include "gossip.h"
 
 #define ENTRIES_TO_ADD           512
@@ -33,37 +33,37 @@ int main(int argc, char **argv)
     }
 
     gossip_enable_stderr();
-    gossip_set_debug_mask(1, PCACHE_DEBUG);
+    gossip_set_debug_mask(1, ACACHE_DEBUG);
 
     /* initialize the cache */
-    ret = PINT_pcache_initialize();
+    ret = PINT_acache_initialize();
     if(ret < 0)
     {
-        gossip_err("pcache_initialize() failure.\n");
+        gossip_err("acache_initialize() failure.\n");
         return(-1);
     }
 
-    PINT_pcache_set_timeout(timeout * 1000);
+    PINT_acache_set_timeout(timeout * 1000);
 
     for(i = 0; i < entries_to_add; i++)
     {
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode1 = PINT_pcache_lookup(tmp);
+        pinode1 = PINT_acache_lookup(tmp);
         assert(pinode1 == NULL);
 
-        pinode1 = PINT_pcache_pinode_alloc();
+        pinode1 = PINT_acache_pinode_alloc();
         assert(pinode1);
 
         pinode1->refn = tmp;
 
-        PINT_pcache_set_valid(pinode1);
+        PINT_acache_set_valid(pinode1);
     }
 
     if (i == entries_to_add)
     {
-        gossip_debug(PCACHE_DEBUG, "Added %d entries to pcache\n", i);
+        gossip_debug(ACACHE_DEBUG, "Added %d entries to acache\n", i);
     }
 
     for(i = 0; i < entries_to_add; i++)
@@ -71,10 +71,10 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode2 = PINT_pcache_lookup(tmp);
+        pinode2 = PINT_acache_lookup(tmp);
         assert(pinode2);
 
-        if (PINT_pcache_pinode_status(pinode2) != PINODE_STATUS_VALID)
+        if (PINT_acache_pinode_status(pinode2) != PINODE_STATUS_VALID)
         {
             gossip_err("(1) Failure: lookup returned %Lu when it "
                        "should've returned %Lu.\n",
@@ -83,7 +83,7 @@ int main(int argc, char **argv)
     }
 
     /* sleep to make sure all entries expired */
-    gossip_debug(PCACHE_DEBUG," Sleeping for %d seconds\n",timeout);
+    gossip_debug(ACACHE_DEBUG," Sleeping for %d seconds\n",timeout);
     sleep(timeout);
 
     for(i = 0; i < entries_to_add; i++)
@@ -91,10 +91,10 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode2 = PINT_pcache_lookup(tmp);
+        pinode2 = PINT_acache_lookup(tmp);
         assert(pinode2);
 
-        if (PINT_pcache_pinode_status(pinode2) == PINODE_STATUS_VALID)
+        if (PINT_acache_pinode_status(pinode2) == PINODE_STATUS_VALID)
         {
             gossip_err("(2) Failure: lookup returned %Lu when it "
                        "should've been expired.\n",
@@ -102,8 +102,8 @@ int main(int argc, char **argv)
         }
 
         /* make them once again valid here before dropping the ref */
-        PINT_pcache_set_valid(pinode2);
-        PINT_pcache_release(pinode2);
+        PINT_acache_set_valid(pinode2);
+        PINT_acache_release(pinode2);
     }
 
     /* again make sure entries are all valid */
@@ -112,10 +112,10 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode2 = PINT_pcache_lookup(tmp);
+        pinode2 = PINT_acache_lookup(tmp);
         assert(pinode2);
 
-        if (PINT_pcache_pinode_status(pinode2) != PINODE_STATUS_VALID)
+        if (PINT_acache_pinode_status(pinode2) != PINODE_STATUS_VALID)
         {
             gossip_err("(3) Failure: lookup returned %Lu when it "
                        "should've returned %Lu.\n",
@@ -126,12 +126,12 @@ int main(int argc, char **argv)
           explicitly make all pinode entries invalid
           here (note, invalidate drops the ref)
         */
-        PINT_pcache_invalidate(tmp);
+        PINT_acache_invalidate(tmp);
     }
 
     if (i == entries_to_add)
     {
-        gossip_debug(PCACHE_DEBUG, "All expected lookups were ok\n");
+        gossip_debug(ACACHE_DEBUG, "All expected lookups were ok\n");
     }
 
     /* drop initial references */
@@ -140,10 +140,10 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        PINT_pcache_release_refn(tmp);
+        PINT_acache_release_refn(tmp);
     }
 
-    PINT_pcache_finalize();
+    PINT_acache_finalize();
 
     return 0;
 }

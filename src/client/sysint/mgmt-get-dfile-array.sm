@@ -14,7 +14,6 @@
 #include "gossip.h"
 #include "str-utils.h"
 
-#include "pcache.h"
 #include "pinode-helper.h"
 #include "pint-dcache.h"
 #include "pint-servreq.h"
@@ -48,8 +47,8 @@ static int getattr_comp_fn(
 %%
 
 machine pvfs2_client_mgmt_get_dfile_array_sm(getattr_setup_msgpair,
-					       getattr_xfer_msgpair,
-					       cleanup)
+                                             getattr_xfer_msgpair,
+                                             cleanup)
 {
     state getattr_setup_msgpair
     {
@@ -59,7 +58,7 @@ machine pvfs2_client_mgmt_get_dfile_array_sm(getattr_setup_msgpair,
     }
     state getattr_xfer_msgpair
     {
-	jump pvfs2_client_getattr_pcache_sm;
+	jump pvfs2_client_getattr_acache_sm;
 	default => cleanup;
     }
     state cleanup
@@ -209,7 +208,7 @@ static int getattr_comp_fn(
 	return resp_p->status;
     }
 
-    r_attr_p = (sm_p->pcache_hit ?
+    r_attr_p = (sm_p->acache_hit ?
 	&sm_p->pinode->attr :
 	&resp_p->u.getattr.attr);
 
@@ -253,10 +252,10 @@ static int mgmt_get_dfile_array_cleanup(
      */
     sm_p->error_code = js_p->error_code;
 
-    /* if we pcache entry, release it */
-    if (sm_p->pcache_hit)
+    /* if we acache entry, release it */
+    if (sm_p->acache_hit)
     {
-	PINT_pcache_release(sm_p->pinode);
+	PINT_acache_release(sm_p->pinode);
     }
 
     /* mark operation as complete */

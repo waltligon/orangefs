@@ -14,40 +14,40 @@
 #include "pvfs2-attr.h"
 #include "pint-sysint-utils.h"
 #include "gen-locks.h"
-#include "pcache.h"
+#include "acache.h"
 #include "quickhash.h"
 
-/* uncomment the following for verbose pcache debugging */
-/* #define VERBOSE_PCACHE_DEBUG */
+/* uncomment the following for verbose acache debugging */
+/* #define VERBOSE_ACACHE_DEBUG */
 
 /*
   uncomment the following for an experimental pinode
   cleanup mechanism for trying to bound the number of
-  pinode entries in the pcache at any given time
+  pinode entries in the acache at any given time
 */
-/* #define PINT_PCACHE_AUTO_CLEANUP */
+/* #define PINT_ACACHE_AUTO_CLEANUP */
 
 
-#ifdef VERBOSE_PCACHE_DEBUG
-#define pcache_debug(x) gossip_debug(PCACHE_DEBUG,x)
+#ifdef VERBOSE_ACACHE_DEBUG
+#define acache_debug(x) gossip_debug(ACACHE_DEBUG,x)
 #else
-#define pcache_debug(...)
+#define acache_debug(...)
 #endif
 
 /*
-  what we could do is disable the use of the pcache
+  what we could do is disable the use of the acache
   if locks are not available on the system, but for now...
 */
 #ifndef __GEN_POSIX_LOCKING__
-#error "Cannot use pcache without functioning mutex locking"
+#error "Cannot use acache without functioning mutex locking"
 #endif
 
-static struct qhash_table *s_pcache_htable = NULL;
-static gen_mutex_t *s_pcache_htable_mutex = NULL;
+static struct qhash_table *s_acache_htable = NULL;
+static gen_mutex_t *s_acache_htable_mutex = NULL;
 
-static int s_pcache_initialized = 0;
-static int s_pcache_timeout_ms = (PINT_PCACHE_TIMEOUT * 1000);
-static int s_pcache_allocated_entries = 0;
+static int s_acache_initialized = 0;
+static int s_acache_timeout_ms = (PINT_ACACHE_TIMEOUT * 1000);
+static int s_acache_allocated_entries = 0;
 
 /* static internal helper methods */
 static int pinode_hash_refn(void *pinode_refn_p, int table_size);
@@ -58,61 +58,61 @@ static int pinode_status(PINT_pinode *pinode);
 static void pinode_update_timestamp(PINT_pinode **pinode);
 static void pinode_invalidate(PINT_pinode *pinode);
 
-#ifdef PINT_PCACHE_AUTO_CLEANUP
+#ifdef PINT_ACACHE_AUTO_CLEANUP
 static void reclaim_pinode_entries(void);
 #endif
 
 
 /*
-  initializes pcache; MUST be called before
-  using any other pcache methods.
+  initializes acache; MUST be called before
+  using any other acache methods.
 
   returns 0 on success; -1 otherwise
 */
-int PINT_pcache_initialize()
+int PINT_acache_initialize()
 {
     int ret = -1;
 
-    pcache_debug("PINT_pcache_initialize entered\n");
+    acache_debug("PINT_acache_initialize entered\n");
 
-    s_pcache_htable_mutex = gen_mutex_build();
-    if (!s_pcache_htable_mutex)
+    s_acache_htable_mutex = gen_mutex_build();
+    if (!s_acache_htable_mutex)
     {
         return ret;
     }
 
-    s_pcache_htable = qhash_init(
+    s_acache_htable = qhash_init(
         pinode_hash_refn_compare,
-        pinode_hash_refn, PINT_PCACHE_HTABLE_SIZE);
-    assert(s_pcache_htable);
-    if (!s_pcache_htable)
+        pinode_hash_refn, PINT_ACACHE_HTABLE_SIZE);
+    assert(s_acache_htable);
+    if (!s_acache_htable)
     {
         goto error_exit;
     }
 
-    pcache_debug("PINT_pcache_initialize exiting\n");
-    s_pcache_initialized = 1;
+    acache_debug("PINT_acache_initialize exiting\n");
+    s_acache_initialized = 1;
     return 0;
 
   error_exit:
-    pcache_debug("PINT_pcache_initialize error exiting\n");
-    PINT_pcache_finalize();
+    acache_debug("PINT_acache_initialize error exiting\n");
+    PINT_acache_finalize();
     return ret;
 }
 
-void PINT_pcache_finalize()
+void PINT_acache_finalize()
 {
     int i = 0;
     PINT_pinode *pinode = NULL;
     struct qlist_head *link = NULL, *tmp = NULL;
 
-    pcache_debug("PINT_pcache_finalize entered\n");
-    if (s_pcache_htable_mutex && s_pcache_htable)
+    acache_debug("PINT_acache_finalize entered\n");
+    if (s_acache_htable_mutex && s_acache_htable)
     {
-        gen_mutex_lock(s_pcache_htable_mutex);
-        for(i = 0; i < s_pcache_htable->table_size; i++)
+        gen_mutex_lock(s_acache_htable_mutex);
+        for(i = 0; i < s_acache_htable->table_size; i++)
         {
-            qhash_for_each_safe(link, tmp, &(s_pcache_htable->array[i]))
+            qhash_for_each_safe(link, tmp, &(s_acache_htable->array[i]))
             {
                 pinode = qlist_entry(link, PINT_pinode, link);
                 assert(pinode);
@@ -120,51 +120,51 @@ void PINT_pcache_finalize()
                 pinode_free(pinode);
             }
         }
-        gen_mutex_unlock(s_pcache_htable_mutex);
-        gen_mutex_destroy(s_pcache_htable_mutex);
-        qhash_finalize(s_pcache_htable);
+        gen_mutex_unlock(s_acache_htable_mutex);
+        gen_mutex_destroy(s_acache_htable_mutex);
+        qhash_finalize(s_acache_htable);
     }
 
     /* make sure all pinodes are accounted for */
-    assert(s_pcache_allocated_entries == 0);
-    if (s_pcache_allocated_entries == 0)
+    assert(s_acache_allocated_entries == 0);
+    if (s_acache_allocated_entries == 0)
     {
-        pcache_debug("All pcache entries freed properly\n");
+        acache_debug("All acache entries freed properly\n");
     }
     else
     {
-        pcache_debug("Lost some pcache entries; memory leak\n");
+        acache_debug("Lost some acache entries; memory leak\n");
     }
 
-    s_pcache_htable = NULL;
-    s_pcache_htable_mutex = NULL;
-    pcache_debug("PINT_pcache_finalize exiting\n");
+    s_acache_htable = NULL;
+    s_acache_htable_mutex = NULL;
+    acache_debug("PINT_acache_finalize exiting\n");
 }
 
 /*
   returns the pinode matching the specified reference if
-  present in the pcache. returns NULL otherwise.
+  present in the acache. returns NULL otherwise.
 
   NOTE: if a pinode is returned, it is returned with the
   lock held.  That means no one else can use it before
   the lock is released (in release, or set_valid);
 */
-PINT_pinode *PINT_pcache_lookup(PVFS_pinode_reference refn)
+PINT_pinode *PINT_acache_lookup(PVFS_pinode_reference refn)
 {
     PINT_pinode *pinode = NULL;
     struct qhash_head *link = NULL;
 
-    pcache_debug("PINT_pcache_lookup entered\n");
-    assert(s_pcache_initialized);
+    acache_debug("PINT_acache_lookup entered\n");
+    assert(s_acache_initialized);
 
-    gen_mutex_lock(s_pcache_htable_mutex);
-    link = qhash_search(s_pcache_htable, &refn);
+    gen_mutex_lock(s_acache_htable_mutex);
+    link = qhash_search(s_acache_htable, &refn);
     if (link)
     {
         pinode = qlist_entry(link, PINT_pinode, link);
         assert(pinode);
     }
-    gen_mutex_unlock(s_pcache_htable_mutex);
+    gen_mutex_unlock(s_acache_htable_mutex);
 
     if (pinode)
     {
@@ -172,20 +172,20 @@ PINT_pinode *PINT_pcache_lookup(PVFS_pinode_reference refn)
         assert(pinode->flag = PINODE_INTERNAL_FLAG_HASHED);
         pinode->ref_cnt++;
     }
-    pcache_debug("PINT_pcache_lookup exiting\n");
+    acache_debug("PINT_acache_lookup exiting\n");
     return pinode;
 }
 
-PINT_pinode *PINT_pcache_pinode_alloc()
+PINT_pinode *PINT_acache_pinode_alloc()
 {
-#ifdef PINT_PCACHE_AUTO_CLEANUP
+#ifdef PINT_ACACHE_AUTO_CLEANUP
     /*
-      PINT_PCACHE_NUM_FLUSH_ENTRIES is a soft limit that triggers
+      PINT_ACACHE_NUM_FLUSH_ENTRIES is a soft limit that triggers
       an attempt to reclaim any expired or invalidated entries
-      that currently reside in the pcache.
+      that currently reside in the acache.
     */
-    if (s_pcache_allocated_entries &&
-        (s_pcache_allocated_entries % PINT_PCACHE_NUM_FLUSH_ENTRIES) == 0)
+    if (s_acache_allocated_entries &&
+        (s_acache_allocated_entries % PINT_ACACHE_NUM_FLUSH_ENTRIES) == 0)
     {
         reclaim_pinode_entries();
     }
@@ -193,22 +193,22 @@ PINT_pinode *PINT_pcache_pinode_alloc()
     return pinode_alloc();
 }
 
-void PINT_pcache_free_pinode(PINT_pinode *pinode)
+void PINT_acache_free_pinode(PINT_pinode *pinode)
 {
     pinode_free(pinode);
 }
 
-int PINT_pcache_pinode_status(PINT_pinode *pinode)
+int PINT_acache_pinode_status(PINT_pinode *pinode)
 {
-    assert(s_pcache_initialized);
-    pcache_debug("PINT_pcache_status called\n");
+    assert(s_acache_initialized);
+    acache_debug("PINT_acache_status called\n");
     return pinode_status(pinode);
 }
 
-void PINT_pcache_set_valid(PINT_pinode *pinode)
+void PINT_acache_set_valid(PINT_pinode *pinode)
 {
-    pcache_debug("PINT_pcache_set_valid entered\n");
-    assert(s_pcache_initialized);
+    acache_debug("PINT_acache_set_valid entered\n");
+    assert(s_acache_initialized);
     if (pinode)
     {
         /* if we don't have the lock, acquire it */
@@ -221,30 +221,30 @@ void PINT_pcache_set_valid(PINT_pinode *pinode)
         */
         if (pinode->flag == PINODE_INTERNAL_FLAG_UNHASHED)
         {
-            gen_mutex_lock(s_pcache_htable_mutex);
-            qhash_add(s_pcache_htable, &pinode->refn, &pinode->link);
-            gen_mutex_unlock(s_pcache_htable_mutex);
+            gen_mutex_lock(s_acache_htable_mutex);
+            qhash_add(s_acache_htable, &pinode->refn, &pinode->link);
+            gen_mutex_unlock(s_acache_htable_mutex);
 
             pinode->flag = PINODE_INTERNAL_FLAG_HASHED;
-            pcache_debug("*** added pinode to htable\n");
+            acache_debug("*** added pinode to htable\n");
         }
 
         pinode->status = PINODE_STATUS_VALID;
         pinode_update_timestamp(&pinode);
         gen_mutex_unlock(pinode->mutex);
     }
-    pcache_debug("PINT_pcache_set_valid exiting\n");
+    acache_debug("PINT_acache_set_valid exiting\n");
 }
 
 /* tries to release the pinode, based on the specified refn */
-void PINT_pcache_invalidate(PVFS_pinode_reference refn)
+void PINT_acache_invalidate(PVFS_pinode_reference refn)
 {
     PINT_pinode *pinode = NULL;
 
-    pcache_debug("PINT_pcache_invalidate entered\n");
-    assert(s_pcache_initialized);
+    acache_debug("PINT_acache_invalidate entered\n");
+    assert(s_acache_initialized);
 
-    pinode = PINT_pcache_lookup(refn);
+    pinode = PINT_acache_lookup(refn);
     if (pinode)
     {
         /* drop the ref count we picked up in lookup */
@@ -256,26 +256,26 @@ void PINT_pcache_invalidate(PVFS_pinode_reference refn)
         /* we should have the lock at this point */
         gen_mutex_unlock(pinode->mutex);
 
-        PINT_pcache_release(pinode);
+        PINT_acache_release(pinode);
     }
-    pcache_debug("PINT_pcache_invalidate exiting\n");
+    acache_debug("PINT_acache_invalidate exiting\n");
 }
 
-void PINT_pcache_release_refn(PVFS_pinode_reference refn)
+void PINT_acache_release_refn(PVFS_pinode_reference refn)
 {
-    PINT_pinode *pinode = PINT_pcache_lookup(refn);
+    PINT_pinode *pinode = PINT_acache_lookup(refn);
     if (pinode)
     {
         /* drop the ref count we picked up in lookup */
         pinode->ref_cnt--;
-        PINT_pcache_release(pinode);
+        PINT_acache_release(pinode);
     }
 }
 
-void PINT_pcache_release(PINT_pinode *pinode)
+void PINT_acache_release(PINT_pinode *pinode)
 {
-    pcache_debug("PINT_pcache_release entered\n");
-    assert(s_pcache_initialized);
+    acache_debug("PINT_acache_release entered\n");
+    assert(s_acache_initialized);
     if (pinode)
     {
         /*
@@ -294,10 +294,10 @@ void PINT_pcache_release(PINT_pinode *pinode)
             gen_mutex_unlock(pinode->mutex);
         }
     }
-    pcache_debug("PINT_pcache_release exited\n");
+    acache_debug("PINT_acache_release exited\n");
 }
 
-int PINT_pcache_object_attr_deep_copy(
+int PINT_acache_object_attr_deep_copy(
     PVFS_object_attr *dest,
     PVFS_object_attr *src)
 {
@@ -339,9 +339,9 @@ int PINT_pcache_object_attr_deep_copy(
           we only copy the size out if we're actually a
           datafile object.  sometimes the size field is
           valid when the objtype is a metafile because
-          of different uses of the pcache.  In this case
+          of different uses of the acache.  In this case
           (namely, getattr), the size is stored in the
-          pcache before this deep copy, so it's okay
+          acache before this deep copy, so it's okay
           that we're not copying here even though the
           size mask bit is set.
 
@@ -417,24 +417,24 @@ int PINT_pcache_object_attr_deep_copy(
     return ret;
 }
 
-int PINT_pcache_get_timeout()
+int PINT_acache_get_timeout()
 {
-    assert(s_pcache_initialized);
-    return s_pcache_timeout_ms;
+    assert(s_acache_initialized);
+    return s_acache_timeout_ms;
 }
-void PINT_pcache_set_timeout(int max_timeout_ms)
+void PINT_acache_set_timeout(int max_timeout_ms)
 {
-    assert(s_pcache_initialized);
-    s_pcache_timeout_ms = max_timeout_ms;
+    assert(s_acache_initialized);
+    s_acache_timeout_ms = max_timeout_ms;
 }
 
-int PINT_pcache_get_size()
+int PINT_acache_get_size()
 {
-    return s_pcache_allocated_entries;
+    return s_acache_allocated_entries;
 }
 
 /* free any internally allocated members; NOT passed in attr pointer */
-void PINT_pcache_object_attr_deep_free(PVFS_object_attr *attr)
+void PINT_acache_object_attr_deep_free(PVFS_object_attr *attr)
 {
     if (attr)
     {
@@ -517,7 +517,7 @@ static PINT_pinode *pinode_alloc()
             pinode->status = PINODE_STATUS_INVALID;
             pinode->flag = PINODE_INTERNAL_FLAG_UNHASHED;
 
-            s_pcache_allocated_entries++;
+            s_acache_allocated_entries++;
         }
     }
     return pinode;
@@ -534,7 +534,7 @@ static void pinode_free(PINT_pinode *pinode)
             pinode->mutex = NULL;
         }
         free(pinode);
-        s_pcache_allocated_entries--;
+        s_acache_allocated_entries--;
         pinode = NULL;
     }
 }
@@ -547,28 +547,28 @@ static void pinode_invalidate(PINT_pinode *pinode)
 {
     struct qlist_head *link = NULL;
 
-    pcache_debug("pinode_invalidate entered\n");
+    acache_debug("pinode_invalidate entered\n");
     gen_mutex_lock(pinode->mutex);
     pinode->status = PINODE_STATUS_INVALID;
 
     if (pinode->flag == PINODE_INTERNAL_FLAG_HASHED)
     {
-        gen_mutex_lock(s_pcache_htable_mutex);
-        link = qhash_search_and_remove(s_pcache_htable, &pinode->refn);
+        gen_mutex_lock(s_acache_htable_mutex);
+        link = qhash_search_and_remove(s_acache_htable, &pinode->refn);
         if (link)
         {
             pinode = qlist_entry(link, PINT_pinode, link);
             assert(pinode);
             pinode->flag = PINODE_INTERNAL_FLAG_UNHASHED;
         }
-        gen_mutex_unlock(s_pcache_htable_mutex);
-        pcache_debug("*** pinode_invalidate: removed from htable\n");
+        gen_mutex_unlock(s_acache_htable_mutex);
+        acache_debug("*** pinode_invalidate: removed from htable\n");
     }
-    PINT_pcache_object_attr_deep_free(&pinode->attr);
+    PINT_acache_object_attr_deep_free(&pinode->attr);
     gen_mutex_unlock(pinode->mutex);
     pinode_free(pinode);
-    pcache_debug("*** pinode_invalidate: freed pinode\n");
-    pcache_debug("pinode_invalidate exited\n");
+    acache_debug("*** pinode_invalidate: freed pinode\n");
+    acache_debug("pinode_invalidate exited\n");
 }
 
 static int pinode_status(PINT_pinode *pinode)
@@ -576,7 +576,7 @@ static int pinode_status(PINT_pinode *pinode)
     struct timeval now;
     int ret = PINODE_STATUS_INVALID;
 
-    pcache_debug("pinode_status entered\n");
+    acache_debug("pinode_status entered\n");
 
     /* if we don't have the lock, get it */
     gen_mutex_trylock(pinode->mutex);
@@ -595,27 +595,27 @@ static int pinode_status(PINT_pinode *pinode)
             }
         }
     }
-    pcache_debug("PINODE STATUS IS ");
+    acache_debug("PINODE STATUS IS ");
     switch(ret)
     {
         case PINODE_STATUS_VALID:
-            pcache_debug("PINODE STATUS VALID\n");
+            acache_debug("PINODE STATUS VALID\n");
             break;
         case PINODE_STATUS_INVALID:
-            pcache_debug("PINODE STATUS INVALID\n");
+            acache_debug("PINODE STATUS INVALID\n");
             break;
         case PINODE_STATUS_EXPIRED:
-            pcache_debug("PINODE STATUS EXPIRED\n");
+            acache_debug("PINODE STATUS EXPIRED\n");
             break;
         default:
-            pcache_debug("UNKNOWN\n");
+            acache_debug("UNKNOWN\n");
     }
     if (ret == PINODE_STATUS_EXPIRED)
     {
         pinode->ref_cnt--;
     }
     gen_mutex_unlock(pinode->mutex);
-    pcache_debug("pinode_status exited\n");
+    acache_debug("pinode_status exited\n");
     return ret;
 }
 
@@ -624,9 +624,9 @@ static void pinode_update_timestamp(PINT_pinode **pinode)
 {
     if (gettimeofday(&((*pinode)->time_stamp), NULL) == 0)
     {
-        (*pinode)->time_stamp.tv_sec += (int)(s_pcache_timeout_ms / 1000);
+        (*pinode)->time_stamp.tv_sec += (int)(s_acache_timeout_ms / 1000);
         (*pinode)->time_stamp.tv_usec +=
-            (int)((s_pcache_timeout_ms % 1000) * 1000);
+            (int)((s_acache_timeout_ms % 1000) * 1000);
         (*pinode)->ref_cnt++;
     }
     else
@@ -635,9 +635,9 @@ static void pinode_update_timestamp(PINT_pinode **pinode)
     }
 }
 
-#ifdef PINT_PCACHE_AUTO_CLEANUP
+#ifdef PINT_ACACHE_AUTO_CLEANUP
 /*
-  attempts to reclaim up to PINT_PCACHE_NUM_FLUSH_ENTRIES
+  attempts to reclaim up to PINT_ACACHE_NUM_FLUSH_ENTRIES
   stale pinode entries; may not reclaim any.
 */
 static void reclaim_pinode_entries()
@@ -646,13 +646,13 @@ static void reclaim_pinode_entries()
     struct qlist_head *link = NULL, *tmp = NULL;
     int i = 0, num_reclaimed = 0;
 
-    pcache_debug("reclaim_pinode_entries entered\n");
-    if (s_pcache_htable_mutex && s_pcache_htable)
+    acache_debug("reclaim_pinode_entries entered\n");
+    if (s_acache_htable_mutex && s_acache_htable)
     {
-        gen_mutex_lock(s_pcache_htable_mutex);
-        for(i = 0; i < s_pcache_htable->table_size; i++)
+        gen_mutex_lock(s_acache_htable_mutex);
+        for(i = 0; i < s_acache_htable->table_size; i++)
         {
-            qhash_for_each_safe(link, tmp, &(s_pcache_htable->array[i]))
+            qhash_for_each_safe(link, tmp, &(s_acache_htable->array[i]))
             {
                 pinode = qlist_entry(link, PINT_pinode, link);
                 assert(pinode);
@@ -660,7 +660,7 @@ static void reclaim_pinode_entries()
                 if (pinode_status(pinode) != PINODE_STATUS_VALID)
                 {
                     pinode_invalidate(pinode);
-                    if (num_reclaimed++ == PINT_PCACHE_NUM_FLUSH_ENTRIES)
+                    if (num_reclaimed++ == PINT_ACACHE_NUM_FLUSH_ENTRIES)
                     {
                         goto reclaim_exit;
                     }
@@ -668,15 +668,15 @@ static void reclaim_pinode_entries()
             }
         }
       reclaim_exit:
-        gen_mutex_unlock(s_pcache_htable_mutex);
+        gen_mutex_unlock(s_acache_htable_mutex);
     }
 /*     fprintf(stderr,"reclaim_pinode_entries reclaimed %d entries\n", */
 /*             num_reclaimed); */
 /*     fprintf(stderr,"Total allocated is %d\n", */
-/*             s_pcache_allocated_entries); */
-    pcache_debug("reclaim_pinode_entries exited\n");
+/*             s_acache_allocated_entries); */
+    acache_debug("reclaim_pinode_entries exited\n");
 }
-#endif /* PINT_PCACHE_AUTO_CLEANUP */
+#endif /* PINT_ACACHE_AUTO_CLEANUP */
 
 /*
  * Local variables:

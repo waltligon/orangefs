@@ -5,8 +5,8 @@
  *
  */
 
-#ifndef __PCACHE_H
-#define __PCACHE_H
+#ifndef __ACACHE_H
+#define __ACACHE_H
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
@@ -15,34 +15,34 @@
 #include "quickhash.h"
 
 /*
-  Using the pcache 2.0 for dummies
+  Using the acache 2.0 for dummies
   ================================
 
-  PINT_pcache_initialize must be the first called method, and
-  PINT_pcache_finalize must be the last.  The default lifespan
-  of a valid pcache entry is PINT_PCACHE_TIMEOUT seconds, but
+  PINT_acache_initialize must be the first called method, and
+  PINT_acache_finalize must be the last.  The default lifespan
+  of a valid acache entry is PINT_ACACHE_TIMEOUT seconds, but
   you can set the timeout (at millisecond granularity) at runtime
-  by called PINT_pcache_set_timeout. You can also retrieve the
-  pcache timeout at any time by calling PINT_pcache_get_timeout.
+  by called PINT_acache_set_timeout. You can also retrieve the
+  acache timeout at any time by calling PINT_acache_get_timeout.
 
-  How to use the pcache in 5 steps of less:
+  How to use the acache in 5 steps of less:
   -----------------------------------------
 
   - first acquire an existing PINT_pinode object by calling
-    PINT_pcache_lookup(), or a newly allocated one with
-    PINT_pcache_pinode_alloc()
+    PINT_acache_lookup(), or a newly allocated one with
+    PINT_acache_pinode_alloc()
   - if existing, check whether that pinode object is valid
-    by calling PINT_pcache_pinode_status()
+    by calling PINT_acache_pinode_status()
   - if it's valid, do your business with it, and the call
-    PINT_pcache_release() on it
+    PINT_acache_release() on it
   - if it's NOT valid, you can update the contents of the pinode
-    and call PINT_pcache_set_valid() to properly add it to the pcache,
-    or just call PINT_pcache_release to get rid of it
-  - don't call PINT_pcache_release on a freshly allocated pinode
+    and call PINT_acache_set_valid() to properly add it to the acache,
+    or just call PINT_acache_release to get rid of it
+  - don't call PINT_acache_release on a freshly allocated pinode
     that you've just done a set_valid on, otherwise, it won't remain
-    in the pcache.
+    in the acache.
 
-  tips and tricks of the pcache hacking gurus:
+  tips and tricks of the acache hacking gurus:
   --------------------------------------------
   update_timestamps internally bumps up the pinode reference count to
   make sure it stays in the pinode cache.  on expiration, the ref count
@@ -50,21 +50,21 @@
   influenced ref counts (i.e. lookup, invalidate, release)
 
 
-  if you define PINT_PCACHE_AUTO_CLEANUP, the following applies:
+  if you define PINT_ACACHE_AUTO_CLEANUP, the following applies:
   since the number of pinodes in existance at any time is unbounded,
   if the internal allocator sees that a multiple of
-  PINT_PCACHE_NUM_FLUSH_ENTRIES pinodes exist, we secretly try to
-  reclaim up to PINT_PCACHE_NUM_FLUSH_ENTRIES by scanning the htable
+  PINT_ACACHE_NUM_FLUSH_ENTRIES pinodes exist, we secretly try to
+  reclaim up to PINT_ACACHE_NUM_FLUSH_ENTRIES by scanning the htable
   of used pinodes and freeing any expired, invalid, or pinodes that
   are no longer being referenced.  If none meet these requirements,
   nothing is reclaimed.  The important thing is that we've tried.
   this 'feature' is mostly untested and may not be beneficial.
 */
 
-#define PINT_PCACHE_TIMEOUT                                        5
-#define PINT_PCACHE_NUM_ENTRIES                                 1024
-#define PINT_PCACHE_NUM_FLUSH_ENTRIES  (PINT_PCACHE_NUM_ENTRIES / 4)
-#define PINT_PCACHE_HTABLE_SIZE                                  511
+#define PINT_ACACHE_TIMEOUT                                        5
+#define PINT_ACACHE_NUM_ENTRIES                                 1024
+#define PINT_ACACHE_NUM_FLUSH_ENTRIES  (PINT_ACACHE_NUM_ENTRIES / 4)
+#define PINT_ACACHE_HTABLE_SIZE                                  511
 
 enum
 {
@@ -91,26 +91,26 @@ typedef struct
 
 } PINT_pinode;
 
-int PINT_pcache_initialize(void);
-void PINT_pcache_finalize(void);
-int PINT_pcache_get_timeout(void);
-void PINT_pcache_set_timeout(int max_timeout_ms);
-int PINT_pcache_get_size(void);
+int PINT_acache_initialize(void);
+void PINT_acache_finalize(void);
+int PINT_acache_get_timeout(void);
+void PINT_acache_set_timeout(int max_timeout_ms);
+int PINT_acache_get_size(void);
 
-PINT_pinode *PINT_pcache_lookup(PVFS_pinode_reference refn);
-int PINT_pcache_pinode_status(PINT_pinode *pinode);
-void PINT_pcache_set_valid(PINT_pinode *pinode);
-void PINT_pcache_invalidate(PVFS_pinode_reference refn);
-PINT_pinode *PINT_pcache_pinode_alloc(void);
-void PINT_pcache_release_refn(PVFS_pinode_reference refn);
-void PINT_pcache_release(PINT_pinode *pinode);
+PINT_pinode *PINT_acache_lookup(PVFS_pinode_reference refn);
+int PINT_acache_pinode_status(PINT_pinode *pinode);
+void PINT_acache_set_valid(PINT_pinode *pinode);
+void PINT_acache_invalidate(PVFS_pinode_reference refn);
+PINT_pinode *PINT_acache_pinode_alloc(void);
+void PINT_acache_release_refn(PVFS_pinode_reference refn);
+void PINT_acache_release(PINT_pinode *pinode);
 
 
 /* these should be moved to pvfs2-utils */
-int PINT_pcache_object_attr_deep_copy(
+int PINT_acache_object_attr_deep_copy(
     PVFS_object_attr *dest,
     PVFS_object_attr *src);
-void PINT_pcache_object_attr_deep_free(
+void PINT_acache_object_attr_deep_free(
     PVFS_object_attr *attr);
 
 /*
@@ -122,4 +122,4 @@ void PINT_pcache_object_attr_deep_free(
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
 
-#endif /* __PCACHE_H */
+#endif /* __ACACHE_H */

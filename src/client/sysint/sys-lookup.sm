@@ -18,7 +18,7 @@
 #include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "pcache.h"
+#include "acache.h"
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
 
@@ -103,7 +103,7 @@ machine pvfs2_client_lookup_sm(init,
     }
 
     state lookup_symlink_getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_pcache_sm;
+	jump pvfs2_client_getattr_acache_sm;
         success => lookup_msg_setup_msgpair;
         default => lookup_symlink_getattr_failure;
     }
@@ -463,8 +463,8 @@ static int lookup_msg_comp_fn(void *v_p,
         }
     }
 
-    /* FIXME: INSERT ALL ATTRS IN ARRAY INTO PCACHE HERE */
-    /* TODO : INSERT ALL ATTRS IN ARRAY INTO PCACHE HERE */
+    /* FIXME: INSERT ALL ATTRS IN ARRAY INTO ACACHE HERE */
+    /* TODO : INSERT ALL ATTRS IN ARRAY INTO ACACHE HERE */
 
     /* adjust local lookup processing state */
     sm_p->u.lookup.num_segments -= resp_p->u.lookup_path.handle_count;
@@ -843,7 +843,7 @@ static int lookup_symlink_getattr_comp_fn(
 	return resp_p->status;
     }
 
-    attr = (sm_p->pcache_hit ?
+    attr = (sm_p->acache_hit ?
             &sm_p->pinode->attr :
             &resp_p->u.getattr.attr);
     assert(attr);

@@ -18,7 +18,7 @@
 #include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "pcache.h"
+#include "acache.h"
 #include "PINT-reqproto-encode.h"
 
 /* pvfs2_client_flush-sm
@@ -86,7 +86,7 @@ machine pvfs2_client_flush_sm(check_parameters,
     }
 
     state object_getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_pcache_sm;
+	jump pvfs2_client_getattr_acache_sm;
 	success => datafile_setup_msgpairarray;
 	default =>object_getattr_failure;
     }
@@ -179,7 +179,7 @@ static int flush_check_parameters(PINT_client_sm *sm_p,
 
  /* flush_object_getattr_setup_msgpair()
  *
- * Fills in sm_p->msgpair to perform a getattr using the getattr_pcache
+ * Fills in sm_p->msgpair to perform a getattr using the getattr_acache
  * state machine.
  */
 static int flush_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
@@ -212,7 +212,7 @@ static int flush_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 	assert(0); /* TODO: real error handling */
     }
 
-    /* drop through and jump to getattr_pcache state machine */
+    /* drop through and jump to getattr_acache state machine */
     return 1;
 }
 
@@ -261,7 +261,7 @@ static int flush_object_getattr_comp_fn(void *v_p,
 	    /* save the datafile handles prior to freeing up the
 	     * buffers we used for messages.  we could keep them around
 	     * i suppose, but we're not going to do that for now.  later
-	     * it is likely that this stuff will be stuck in the pcache
+	     * it is likely that this stuff will be stuck in the acache
 	     * anyway, so we'll be able to just reference it from there.
 	     *
 	     * we malloc "+1" because unlike the remove and getattr cases, we

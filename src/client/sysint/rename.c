@@ -14,7 +14,6 @@
 #include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "pcache.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs-distribution.h"
 #include "client-state-machine.h"

@@ -29,7 +29,7 @@ enum
     DCACHE_DEBUG =	    (1 << 12),
     CLIENT_DEBUG =	    (1 << 13),
     REQ_SCHED_DEBUG =	    (1 << 14),
-    PCACHE_DEBUG =	    (1 << 15),
+    ACACHE_DEBUG =	    (1 << 15),
     TROVE_DEBUG =           (1 << 16),
     DIST_DEBUG =            (1 << 17),
     BMI_DEBUG_IB =          (1 << 18),

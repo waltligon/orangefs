@@ -18,7 +18,7 @@
 #include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "pcache.h"
+#include "acache.h"
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
 
@@ -62,7 +62,7 @@ machine pvfs2_client_readdir_sm(init,
     }
 
     state readdir_getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_pcache_sm;
+	jump pvfs2_client_getattr_acache_sm;
         success => readdir_msg_setup_msgpair;
 	default => readdir_getattr_failure;
     }

@@ -7,7 +7,7 @@
 #ifndef _PINODE_HELPER_H
 #define _PINODE_HELPER_H
 
-#include "pcache.h"
+#include "acache.h"
 
 int phelper_get_pinode(
     PVFS_pinode_reference pref,

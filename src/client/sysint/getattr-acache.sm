@@ -4,10 +4,10 @@
  * See COPYING in top-level directory.
  */
 
-/* pvfs2_client_getattr_pcache_sm
+/* pvfs2_client_getattr_acache_sm
  *
  * The purpose of this state machine is to obtain simple attributes for an
- * object.  These attributes could come from a local cache (the pcache)
+ * object.  These attributes could come from a local cache (the acache)
  * or be obtained from a remote server.
  *
  * This state machine is *not* appropriate for use, in itself, as a getattr
@@ -48,25 +48,25 @@
 #include "pvfs2-util.h"
 
 #include "pint-servreq.h"
-#include "pcache.h"
+#include "acache.h"
 #include "PINT-reqproto-encode.h"
 
 enum {
-    GETATTR_PCACHE_MISS = 1
+    GETATTR_ACACHE_MISS = 1
 };
 
-static int getattr_pcache_lookup(PINT_client_sm *sm_p,
+static int getattr_acache_lookup(PINT_client_sm *sm_p,
 				 job_status_s *js_p);
 
 %%
 
-nested machine pvfs2_client_getattr_pcache_sm(lookup,
+nested machine pvfs2_client_getattr_acache_sm(lookup,
 					      xfer_msgpair)
 {
     state lookup {
-	run getattr_pcache_lookup;
+	run getattr_acache_lookup;
 	success => return;
-	GETATTR_PCACHE_MISS => xfer_msgpair;
+	GETATTR_ACACHE_MISS => xfer_msgpair;
 	default => return;
     }
 
@@ -79,23 +79,23 @@ nested machine pvfs2_client_getattr_pcache_sm(lookup,
 %%
 
 
-/* The idea is to check pcache to see if we have an entry.  if so, set
+/* The idea is to check acache to see if we have an entry.  if so, set
  * up a fake, decoded response structure with the results so that
  * we can then call the comp_fn to copy data out of the response
  * and into the PINT_client_sm structure.
  *
  * This is a little inefficient I suppose, but it's the most general
  * way to accomplish this.  We can optimize later if it seems
- * necessary.  Or we can tailor the pcache to store in response
+ * necessary.  Or we can tailor the acache to store in response
  * format all the time...
  */
-static int getattr_pcache_lookup(PINT_client_sm *sm_p,
+static int getattr_acache_lookup(PINT_client_sm *sm_p,
 				 job_status_s *js_p)
 {
     uint32_t trimmed_mask = 0;
     struct PVFS_server_resp fake_resp;
 
-    gossip_debug(CLIENT_DEBUG, "getattr_pcache state: lookup\n");
+    gossip_debug(CLIENT_DEBUG, "getattr_acache state: lookup\n");
 
     /* check input parameters */
     assert(sm_p->pinode == NULL);
@@ -105,7 +105,7 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
      */
     js_p->error_code = 0;
 
-    sm_p->pinode = PINT_pcache_lookup(sm_p->u.getattr.object_ref);
+    sm_p->pinode = PINT_acache_lookup(sm_p->u.getattr.object_ref);
     if (sm_p->pinode)
     {
         /*
@@ -115,7 +115,7 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
           NOTE that the req attrmask has been tampered with by
           sys-getattr.sm.
         */
-        if (PINT_pcache_pinode_status(sm_p->pinode) == PINODE_STATUS_VALID)
+        if (PINT_acache_pinode_status(sm_p->pinode) == PINODE_STATUS_VALID)
         {
             /*
               the trimmed mask is used for making sure that we're only
@@ -168,7 +168,7 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
             goto cache_miss;
 
           cache_hit:
-            gossip_debug(PCACHE_DEBUG, "pcache: pcache hit\n");
+            gossip_debug(ACACHE_DEBUG, "acache: acache hit\n");
 
             /* build a fake response for completion */
             fake_resp.op = PVFS_SERV_GETATTR;
@@ -176,24 +176,24 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
 
             /*
               skip the deep fill (i.e. copy) of attributes
-              on cache hit.  by setting the pcache_hit flag,
+              on cache hit.  by setting the acache_hit flag,
               caller state machine won't try to read those
               attributes out of this faked response in their
               getattr completion functions
             */
-            sm_p->pcache_hit = 1;
+            sm_p->acache_hit = 1;
             sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
-            PINT_pcache_release(sm_p->pinode);
+            PINT_acache_release(sm_p->pinode);
             return 1;
         }
       cache_miss:
-        gossip_debug(PCACHE_DEBUG, "pcache: invalid pcache miss\n");
-        sm_p->pcache_hit = 0;
-        PINT_pcache_release(sm_p->pinode);
+        gossip_debug(ACACHE_DEBUG, "acache: invalid acache miss\n");
+        sm_p->acache_hit = 0;
+        PINT_acache_release(sm_p->pinode);
     }
-    gossip_debug(PCACHE_DEBUG, "pcache: clean pcache miss\n");
+    gossip_debug(ACACHE_DEBUG, "acache: clean acache miss\n");
     
-    js_p->error_code = GETATTR_PCACHE_MISS;
+    js_p->error_code = GETATTR_ACACHE_MISS;
     return 1;
 }
 

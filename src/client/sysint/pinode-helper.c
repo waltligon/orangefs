@@ -25,10 +25,10 @@ int phelper_get_pinode(
 {
     int ret = 0, pinode_valid = 0;
 
-    *pinode_p = PINT_pcache_lookup(pref);
+    *pinode_p = PINT_acache_lookup(pref);
     if (*pinode_p != NULL)
     {
-        pinode_valid = (PINT_pcache_pinode_status(*pinode_p) ==
+        pinode_valid = (PINT_acache_pinode_status(*pinode_p) ==
                         PINODE_STATUS_VALID);
         if (!pinode_valid)
         {
@@ -45,18 +45,18 @@ int phelper_get_pinode(
         {
             goto pinode_refresh_failure;	
         }
-        PINT_pcache_set_valid(*pinode_p);
+        PINT_acache_set_valid(*pinode_p);
     }
     return 0;
 
   pinode_refresh_failure:
-    PINT_pcache_release(*pinode_p);
+    PINT_acache_release(*pinode_p);
     return ret;
 }
 
 int phelper_release_pinode(PINT_pinode *pinode)
 {
-    PINT_pcache_release(pinode);
+    PINT_acache_release(pinode);
     return 0;
 }
 
@@ -84,8 +84,8 @@ static int phelper_refresh_pinode(
         return ret;
     }
 
-    /* getattr placed entry in pcache */
-    *pinode_ptr = PINT_pcache_lookup(pref);
+    /* getattr placed entry in acache */
+    *pinode_ptr = PINT_acache_lookup(pref);
     assert(*pinode_ptr);
 
     ret = phelper_fill_attr(*pinode_ptr, tmp_attr);

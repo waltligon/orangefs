@@ -16,7 +16,7 @@
 #include "gossip.h"
 #include "pint-dev.h"
 #include "job.h"
-#include "pcache.h"
+#include "acache.h"
 
 #include "client.h"
 
@@ -36,14 +36,14 @@
 #define STATFS_DEFAULT_BLOCKSIZE  1024
 
 /*
-  set extraordinarily long pcache timeout value (ms) so
+  set extraordinarily long acache timeout value (ms) so
   that the attributes of files can be cached for a long
   time; the system interface calls are responsible for
-  flushing the pcache when appropriate.  For now, there
+  flushing the acache when appropriate.  For now, there
   may be some inconsistencies, but this will be cleaned
   up as the system interface is changed in time.
 */
-#define PCACHE_TIMEOUT_MS 6000000
+#define ACACHE_TIMEOUT_MS 6000000
 
 static int service_lookup_request(
     PVFS_sysresp_init *init_response,
@@ -809,7 +809,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    PINT_pcache_set_timeout(PCACHE_TIMEOUT_MS);
+    PINT_acache_set_timeout(ACACHE_TIMEOUT_MS);
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
     if(ret < 0)
