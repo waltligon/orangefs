@@ -47,6 +47,9 @@
 
 # define a few generic variables that we need to use
 srcdir = @srcdir@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+
 VPATH = $(srcdir)
 SHELL = @SHELL@
 INSTALL = @INSTALL@
@@ -455,3 +458,22 @@ ifdef QUIET_COMPILE
 else
 	src/common/statecomp/statecomp $< $@
 endif
+
+install:
+	install -d $(prefix)/include
+	install -m 644 $(srcdir)/src/proto/pvfs2-attr.h $(prefix)/include/
+	install -m 644 $(srcdir)/include/pvfs2-storage.h $(prefix)/include/
+	install -m 644 $(srcdir)/include/pvfs2-types.h $(prefix)/include/
+	install -m 644 $(srcdir)/src/client/sysint/pvfs2-sysint.h $(prefix)/include/
+	install -m 644 $(srcdir)/src/io/description/pvfs-distribution.h $(prefix)/include
+	install -m 644 $(srcdir)/src/io/description/pvfs-request.h $(prefix)/include
+
+	install -d $(prefix)/lib
+	install -m 755 $(LIBRARIES) $(prefix)/lib
+
+	install -d $(prefix)/bin
+	install -m 755 $(ADMINTOOLS) $(prefix)/bin
+	install -m 755 $(TESTS)  $(prefix)/bin
+
+	install -d $(prefix)/sbin
+	install -m 755 $(SERVER) $(prefix)/sbin
