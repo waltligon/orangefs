@@ -52,11 +52,6 @@ enum
     DSPACE_CALC_VTAG = 4,	/* calculate and return a vtag (?) */
 };
 
-/* used to keep up with the current position when iterating through
- * key/value spaces
- */
-typedef int32_t PVFS_ds_position;
-
 /* vtag */
 struct PVFS_vtag
 {
