@@ -16,6 +16,26 @@ extern "C" {
 #include "trove.h"
 #include "gen-locks.h"
 
+/*
+  for more efficient host filesystem accesses, we have
+  a simple *_MAX_NEST_DEPTH define that can be thought of more
+  or less as buckets for storing bstreams and keyvals based
+  on a simple hash of the unique handle/coll_id combination.
+
+  in practice, this means we spread all bstreams and keyvals
+  into *_MAX_NEST_DEPTH directories instead of keeping all
+  bstream entries in a flat bstream directory, and all keyval
+  entries in a flat keyval directory on the host filesystem.
+*/
+#define DBPF_KEYVAL_MAX_NEST_DEPTH   32
+#define DBPF_BSTREAM_MAX_NEST_DEPTH  64
+
+#define DBPF_KEYVAL_GET_NEST_DEPTH(__handle, __id) \
+(((__id << ((sizeof(__id) - 1) * 8)) | __handle) % DBPF_KEYVAL_MAX_NEST_DEPTH)
+
+#define DBPF_BSTREAM_GET_NEST_DEPTH(__handle, __id) \
+(((__id << ((sizeof(__id) - 1) * 8)) | __handle) % DBPF_BSTREAM_MAX_NEST_DEPTH)
+
 #define DBPF_EVENT_START(__op, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id, \
  PVFS_EVENT_FLAG_START)
@@ -72,12 +92,12 @@ extern "C" {
 
 #define DBPF_GET_BSTREAM_FILENAME(__buf, __path_max, __stoname, __collid, __handle)				\
     do {													\
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.bstream", __stoname, __collid, BSTREAM_DIRNAME, Lu(__handle));	\
+    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%.8Lu/%08Lx.bstream", __stoname, __collid, BSTREAM_DIRNAME, DBPF_BSTREAM_GET_NEST_DEPTH(__handle, __collid), Lu(__handle));	\
     } while (0);
 
 #define DBPF_GET_KEYVAL_DBNAME(__buf, __path_max, __stoname, __collid, __handle)				\
     do {													\
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.keyval", __stoname, __collid, KEYVAL_DIRNAME, Lu(__handle));	\
+    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%.8Lu/%08Lx.keyval", __stoname, __collid, KEYVAL_DIRNAME, DBPF_KEYVAL_GET_NEST_DEPTH(__handle, __collid), Lu(__handle));	\
     } while (0);
 
 #define LAST_HANDLE_STRING "last_handle"

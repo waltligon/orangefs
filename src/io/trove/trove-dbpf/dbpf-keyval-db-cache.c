@@ -243,7 +243,26 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 		     0,
 		     0);
     if (ret == ENOENT && create_flag != 0) {
-	/* if no such DB and create_flag is set, try to create the DB */
+	/*
+          if no such DB and create_flag is set, try to
+          create the DB.  but first we have to create
+          all of the nested directories (buckets)
+        */
+        int i = 0;
+        char top_dir[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
+        for(i = 0; i < DBPF_KEYVAL_MAX_NEST_DEPTH; i++)
+        {
+            DBPF_GET_KEYVAL_DIRNAME(
+                top_dir, (PATH_MAX - 9), my_storage_p->name, coll_id);
+            snprintf(dir, PATH_MAX, "%s/%.8d", top_dir, i);
+            if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
+            {
+                gossip_lerr(
+                    "dbpf_keyval_dbcache_get: failed to mkdir %s\n",dir);
+                assert(0);
+            }
+        }
+
 	ret = db_p->open(db_p,
 #ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
                          NULL,

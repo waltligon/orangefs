@@ -230,6 +230,25 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
     
     fd = DBPF_OPEN(filename, O_RDWR, 0);
     if (fd < 0 && errno == ENOENT && create_flag) {
+        /*
+          if we're creating the dataspace, make sure the
+          proper bstream nested directories exist
+        */
+        int i = 0;
+        char top_dir[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
+        for(i = 0; i < DBPF_BSTREAM_MAX_NEST_DEPTH; i++)
+        {
+            DBPF_GET_BSTREAM_DIRNAME(
+                top_dir, (PATH_MAX - 9), my_storage_p->name, coll_id);
+            snprintf(dir, PATH_MAX, "%s/%.8d", top_dir, i);
+            if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
+            {
+                gossip_lerr(
+                    "dbpf_bstream_dbcache_get: failed to mkdir %s\n",dir);
+                assert(0);
+            }
+        }
+
 #if 0
 	gossip_debug(TROVE_DEBUG, "creating new dataspace\n");
 #endif
