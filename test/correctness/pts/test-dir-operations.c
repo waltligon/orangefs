@@ -29,7 +29,7 @@ static int remove_dirs(PVFS_pinode_reference parent_refn,
 
     for (i = 0; i < ndirs; i++)
     {
-	snprintf(name, PVFS_NAME_MAX, "/rank%d-iter%d", rank, i);
+	snprintf(name, PVFS_NAME_MAX, "rank%d-iter%d", rank, i);
 	ret = remove_dir(parent_refn, name);
 	if (ret < 0)
 	{

@@ -51,9 +51,6 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	    REMOVE_CACHE_FAILURE,
 	} failure = NONE_FAILURE;
 
-	/* lookup meta file */
-	attr_mask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_ALL;
-
 	ret = PINT_do_lookup(entry_name, parent_refn,
 				credentials, &entry);
 	if (ret < 0)
@@ -63,12 +60,35 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	}
 
 	/* get the pinode for the thing we're deleting */
+	attr_mask = PVFS_ATTR_COMMON_ALL;
 	ret = phelper_get_pinode(entry, &pinode_ptr,
 			attr_mask, credentials );
 	if (ret < 0)
 	{
 	    failure = GET_PINODE_FAILURE;
 	    goto return_error;
+	}
+
+	/* if this is a regular file, then we now also need to
+	 * make sure that we have distribution information in the
+	 * metadata attributes
+	 */
+	if(pinode_ptr->attr.objtype == PVFS_TYPE_METAFILE)
+	{
+	    if((pinode_ptr->mask & PVFS_ATTR_META_ALL) !=
+		PVFS_ATTR_META_ALL)
+	    {
+		phelper_release_pinode(pinode_ptr);
+		/* meta attributes aren't there- try again */
+		attr_mask += PVFS_ATTR_META_ALL;
+		ret = phelper_get_pinode(entry, &pinode_ptr,
+		    attr_mask, credentials);
+		if(ret < 0)
+		{
+		    failure = GET_PINODE_FAILURE;
+		    goto return_error;
+		}
+	    }
 	}
 
 	/* are we allowed to delete this file? */
@@ -172,53 +192,55 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
             &encoded_resp, op_tag);
 
-	/* send remove messages to each of the data file servers */
-	
-
-	/* none of this stuff changes, so we don't need to set it in a loop */
-	req_p.op = PVFS_SERV_REMOVE;
-	req_p.rsize = sizeof(struct PVFS_server_req_s);
-	req_p.credentials = credentials;
-	req_p.u.remove.fs_id = parent_refn.fs_id;
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
-
-	ioserv_count = pinode_ptr->attr.u.meta.nr_datafiles;
-
-	/* TODO: come back and unserialize this */
-	for(i = 0; i < ioserv_count; i++)
+	if(pinode_ptr->attr.objtype == PVFS_TYPE_METAFILE)
 	{
-	    /* each of the data files could be on different servers, so we need
-	     * to get the correct server from the bucket table interface
-	     */
-	    req_p.u.remove.handle = pinode_ptr->attr.u.meta.dfh[i];
-	    ret = PINT_bucket_map_to_server(&serv_addr, req_p.u.remove.handle, parent_refn.fs_id);
-	    if (ret < 0)
+	    /* send remove messages to each of the data file servers */
+
+	    /* none of this stuff changes, so we don't need to set it in a loop */
+	    req_p.op = PVFS_SERV_REMOVE;
+	    req_p.rsize = sizeof(struct PVFS_server_req_s);
+	    req_p.credentials = credentials;
+	    req_p.u.remove.fs_id = parent_refn.fs_id;
+	    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+
+	    ioserv_count = pinode_ptr->attr.u.meta.nr_datafiles;
+
+	    /* TODO: come back and unserialize this */
+	    for(i = 0; i < ioserv_count; i++)
 	    {
-		failure = SERVER_LOOKUP_FAILURE;
-		goto return_error;
+		/* each of the data files could be on different servers, so we need
+		 * to get the correct server from the bucket table interface
+		 */
+		req_p.u.remove.handle = pinode_ptr->attr.u.meta.dfh[i];
+		ret = PINT_bucket_map_to_server(&serv_addr, req_p.u.remove.handle, parent_refn.fs_id);
+		if (ret < 0)
+		{
+		    failure = SERVER_LOOKUP_FAILURE;
+		    goto return_error;
+		}
+
+		op_tag = get_next_session_tag();
+
+		ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+		    &decoded, &encoded_resp, op_tag);
+		if (ret < 0)
+		{
+		    failure = SEND_REQ_FAILURE;
+		    goto return_error;
+		}
+
+		ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+		if (ack_p->status < 0 )
+		{
+		    ret = ack_p->status;
+		    failure = RECV_REQ_FAILURE;
+		    goto return_error;
+		}
+
+		PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+		    &encoded_resp, op_tag);
 	    }
-
-	    op_tag = get_next_session_tag();
-
-	    ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
-		&decoded, &encoded_resp, op_tag);
-	    if (ret < 0)
-	    {
-		failure = SEND_REQ_FAILURE;
-		goto return_error;
-	    }
-
-	    ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
-
-	    if (ack_p->status < 0 )
-	    {
-		ret = ack_p->status;
-		failure = RECV_REQ_FAILURE;
-		goto return_error;
-	    }
-
-	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
-		&encoded_resp, op_tag);
 	}
 
 	phelper_release_pinode(pinode_ptr);
