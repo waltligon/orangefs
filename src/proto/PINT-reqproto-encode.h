@@ -35,11 +35,13 @@ struct PINT_decoded_msg
 /* types of messages we will encode or decode */
 enum PINT_encode_msg_type
 {
-    PINT_ENCODE_REQ = 7,
-    PINT_DECODE_REQ = 7,
-    PINT_ENCODE_RESP = 13,
-    PINT_DECODE_RESP = 13
+    PINT_ENCODE_REQ = 1,
+    PINT_ENCODE_RESP = 2
 };
+
+/* convenience, just for less weird looking arguments to decode functions */
+#define PINT_DECODE_REQ PINT_ENCODE_REQ
+#define PINT_DECODE_RESP PINT_ENCODE_RESP
 
 /*******************************************************
  * public function prototypes
