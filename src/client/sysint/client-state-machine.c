@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 
+/* from original remove.c */
 #include "pinode-helper.h"
 #include "pvfs2-sysint.h"
 #include "pint-sysint-utils.h"
@@ -176,49 +177,7 @@ int PINT_client_state_machine_test(void)
 
     return 0;
 }
-#if 0
-int PINT_client_state_machine_test_job(job_it_t id)
-{
-    int ret, i;
-    int job_count = MAX_RETURNED_JOBS;
 
-    PINT_client_sm *sm_p;
-
-    /* discover what jobs have completed */
-    ret = job_testcontext(job_id_array,
-			  &job_count, /* in/out parameter */
-			  client_sm_p_array,
-			  job_status_array,
-			  100, /* timeout? */
-			  pint_client_sm_context);
-    assert(ret > -1);
-
-    for (i = 0; i < job_count; i++)
-    {
-	sm_p = (PINT_client_sm *)client_sm_p_array[i];
-
-	ret = PINT_state_machine_next(
-            sm_p, &job_status_array[i]);
-
-	while (ret == 1)
-        {
-	    /* PINT_state_machine_next() calls next function and
-	     * returns the result.
-	     */
-	    ret = PINT_state_machine_next(
-                sm_p, &job_status_array[i]);
-	}
-	if (ret < 0)
-        {
-	    /* (ret < 0) indicates a problem from the job system
-	     * itself; the return value of the underlying operation
-	     * is kept in the job status structure.
-	     */
-	}
-    }
-    return 0;
-}
-#endif
 #if 0  /* seems unused  --pw */
 /* PINT_serv_prepare_msgpair()
  *
