@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
@@ -72,8 +73,16 @@ int PVFS_util_parse_pvfstab(
     while (fgets(line, PARSER_MAX_LINE_LENGTH, tab) != NULL)
     {
 	/* ignore any blank lines */
-	if (strlen(line) > 1)
+	linelen = strlen(line);
+	if (linelen > 1) {
+	    /* ignore comment lines, like fstab */
+	    for (i=0; i<linelen; i++)
+		if (!isspace(line[i]))
+		    break;
+	    if (i < linelen && line[i] == '#')
+		continue;
 	    lines++;
+	}
     }
     if ((ret = mntlist_new(lines, pvfstab_p) < 0))
     {
@@ -91,6 +100,12 @@ int PVFS_util_parse_pvfstab(
 	linelen = strlen(line);
 	if (linelen > 1)
 	{
+	    /* ignore comment lines, like fstab */
+	    for (i=0; i<linelen; i++)
+		if (!isspace(line[i]))
+		    break;
+	    if (i < linelen && line[i] == '#')
+		continue;
 
 	    /* 'pvfs-tcp://user:port/' */
 	    //sscanf("pvfs-%s://%s:%d/%s")
