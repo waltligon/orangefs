@@ -114,36 +114,15 @@ static int completion_query_context(job_id_t * out_id_array_p,
 				  job_status_s *
 				  out_status_array_p,
 				  job_context_id context_id);
-#ifdef __PVFS2_JOB_THREADED__
 static void bmi_thread_mgr_callback(void* data, 
     PVFS_size actual_size,
     PVFS_error error_code);
 static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp);
-#ifdef __PVFS2_TROVE_SUPPORT__
 static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
+#ifndef __PVFS2_JOB_THREADED__
+static int do_one_work_cycle_all(void);
 #endif
-#else /* __PVFS2_JOB_THREADED__ */
-static int do_one_work_cycle_all(int *num_completed,
-				 int wait_flag);
-static int do_one_work_cycle_bmi(int *num_completed,
-				 int wait_flag);
-static int do_one_work_cycle_bmi_unexp(int *num_completed,
-				       int wait_flag);
-#ifdef __PVFS2_TROVE_SUPPORT__
-static int do_one_work_cycle_trove(int *num_completed);
-static TROVE_op_id stat_trove_id_array[job_work_metric];
-static void *stat_trove_user_ptr_array[job_work_metric];
-static PVFS_error stat_trove_ds_state_array[job_work_metric];
-#endif
-static bmi_op_id_t stat_bmi_id_array[job_work_metric];
-static bmi_error_code_t stat_bmi_error_code_array[job_work_metric];
-static bmi_size_t stat_bmi_actual_size_array[job_work_metric];
-static struct BMI_unexpected_info stat_bmi_unexp_array[job_work_metric];
-static void *stat_bmi_user_ptr_array[job_work_metric];
-
-
-#endif /* __PVFS2_JOB_THREADED__ */
 
 /********************************************************
  * public interface 
@@ -173,7 +152,6 @@ int job_initialize(int flags)
 	return (ret);
     }
 
-#ifdef __PVFS2_JOB_THREADED__
     /* startup threads */
     ret = PINT_thread_mgr_bmi_start();
     if (ret != 0)
@@ -186,6 +164,7 @@ int job_initialize(int flags)
     /* this should never fail if the thread startup succeeded */
     assert(ret == 0);
 
+#ifdef __PVFS2_JOB_THREADED__
     ret = pthread_create(&flow_thread_id, NULL, flow_thread_function, NULL);
     if (ret != 0)
     {
@@ -194,12 +173,27 @@ int job_initialize(int flags)
 	teardown_queues();
 	return (-ret);
     }
+
+    ret = pthread_create(&dev_thread_id, NULL, dev_thread_function, NULL);
+    if (ret != 0)
+    {
+	PINT_thread_mgr_bmi_stop();
+	pthread_cancel(flow_thread_id);
+	PINT_flow_close_context(global_flow_context);
+	teardown_queues();
+	return (-ret);
+    }
+#endif
+
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = PINT_thread_mgr_trove_start();
     if(ret != 0)
     {
 	PINT_thread_mgr_bmi_stop();
+#ifdef __PVFS2_JOB_THREADED__
 	pthread_cancel(flow_thread_id);
+	pthread_cancel(dev_thread_id);
+#endif
 	PINT_flow_close_context(global_flow_context);
 	teardown_queues();
 	return (-ret);
@@ -207,43 +201,7 @@ int job_initialize(int flags)
     ret = PINT_thread_mgr_trove_getcontext(&global_trove_context);
     /* this should never fail if thread startup succeeded */
     assert(ret == 0);
-
 #endif
-    ret = pthread_create(&dev_thread_id, NULL, dev_thread_function, NULL);
-    if (ret != 0)
-    {
-	PINT_thread_mgr_bmi_stop();
-	pthread_cancel(flow_thread_id);
-#ifdef __PVFS2_TROVE_SUPPORT__
-	PINT_thread_mgr_trove_stop();
-#endif
-	PINT_flow_close_context(global_flow_context);
-	teardown_queues();
-	return (-ret);
-    }
-
-#else /* __PVFS2_JOB_THREADED__ */
-
-    /* get a bmi context to work in */
-    ret = BMI_open_context(&global_bmi_context);
-    if(ret < 0)
-    {
-	PINT_flow_close_context(global_flow_context);
-	return(ret);
-    }
-
-#ifdef __PVFS2_TROVE_SUPPORT__
-    /* ditto for trove */
-    ret = trove_open_context(/*FIXME: HACK*/9,&global_trove_context);
-    if (ret < 0)
-    {
-	PINT_flow_close_context(global_flow_context);
-	BMI_close_context(global_bmi_context);
-        return ret;
-    }
-#endif
-
-#endif /* __PVFS2_JOB_THREADED__ */
 
     return (0);
 }
@@ -257,19 +215,16 @@ int job_initialize(int flags)
 int job_finalize(void)
 {
 
-#ifdef __PVFS2_JOB_THREADED__
     PINT_thread_mgr_bmi_stop();
-    pthread_cancel(flow_thread_id);
+
 #ifdef __PVFS2_TROVE_SUPPORT__
     PINT_thread_mgr_trove_stop();
 #endif
+
+#ifdef __PVFS2_JOB_THREADED__
+    pthread_cancel(flow_thread_id);
     pthread_cancel(dev_thread_id);
-#else /* __PVFS2_JOB_THREADED__ */
-    BMI_close_context(global_bmi_context);
-#ifdef __PVFS2_TROVE_SUPPORT__
-    trove_close_context(/* FIXME: HACK*/9,global_trove_context);
 #endif
-#endif /* __PVFS2_JOB_THREADED__ */
 
     PINT_flow_close_context(global_flow_context);
 
@@ -376,13 +331,9 @@ int job_bmi_send(bmi_addr_t addr,
     jd->u.bmi.actual_size = size;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
     /* post appropriate type of send */
     if (!send_unexpected)
@@ -471,13 +422,9 @@ int job_bmi_send_list(bmi_addr_t addr,
     jd->u.bmi.actual_size = total_size;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
     /* post appropriate type of send */
     if (!send_unexpected)
@@ -565,13 +512,9 @@ int job_bmi_recv(bmi_addr_t addr,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
     ret = BMI_post_recv(&(jd->u.bmi.id), addr, buffer, size,
 			&(jd->u.bmi.actual_size), buffer_type, tag, 
@@ -651,13 +594,9 @@ int job_bmi_recv_list(bmi_addr_t addr,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
     ret = BMI_post_recv_list(&(jd->u.bmi.id), addr, buffer_list,
 			     size_list, list_count, total_expected_size,
@@ -773,9 +712,7 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     bmi_unexp_pending_count++;
     gen_mutex_unlock(&bmi_mutex);
 
-#ifdef __PVFS2_JOB_THREADED__
     PINT_thread_mgr_bmi_unexp_handler(bmi_thread_mgr_unexp_handler);
-#endif /* __PVFS2_JOB_THREADED__ */
 
     return (0);
 }
@@ -1236,13 +1173,9 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_write_at(coll_id, handle, buffer,
@@ -1328,13 +1261,9 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_read_at(coll_id, handle, buffer,
@@ -1411,13 +1340,9 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_flush(coll_id, handle, flags, user_ptr_internal,
@@ -1493,13 +1418,9 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read(coll_id, handle, key_p, val_p, flags,
@@ -1581,13 +1502,9 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read_list(coll_id, handle, key_array,
@@ -1669,13 +1586,9 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_write(coll_id, handle, key_p, val_p, flags,
@@ -1749,13 +1662,9 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_flush(coll_id, handle, flags, user_ptr_internal,
@@ -1831,15 +1740,9 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
-
-
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr(coll_id,
@@ -1918,13 +1821,9 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_setattr(coll_id, handle, ds_attr_p, 0 /* flags */ ,
@@ -2003,13 +1902,9 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_resize(coll_id, handle, &size, 0 /* flags */ ,
@@ -2109,13 +2004,9 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_remove(coll_id, handle, key_p, flags,
@@ -2220,13 +2111,9 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     jd->u.trove.count = count;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate(coll_id, handle,
@@ -2312,13 +2199,9 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     jd->u.trove.count = count;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_iterate_handles(coll_id,
@@ -2441,13 +2324,9 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     jd->u.trove.handle = 0;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_create(coll_id,
@@ -2527,13 +2406,9 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_remove(coll_id,
@@ -2609,13 +2484,9 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_verify(coll_id,
@@ -2691,13 +2562,9 @@ int job_trove_fs_create(char *collname,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_create(collname, new_coll_id, user_ptr_internal, 
@@ -2788,13 +2655,9 @@ int job_trove_fs_lookup(char *collname,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_lookup(collname, &(jd->u.trove.fsid), 
@@ -2866,13 +2729,9 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_seteattr(coll_id, key_p, val_p, flags,
@@ -2949,13 +2808,9 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
-#if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-#else
-    user_ptr_internal = jd;
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_geteattr(coll_id, key_p, val_p, flags,
@@ -3014,9 +2869,7 @@ int job_test(job_id_t id,
     int ret = -1;
 #ifdef __PVFS2_JOB_THREADED__
     struct timespec pthread_timeout;
-#else
-    int num_completed;
-#endif /* __PVFS2_JOB_THREADED__ */
+#endif
     int timeout_remaining = timeout_ms;
     struct timeval start;
     struct timeval end;
@@ -3099,6 +2952,9 @@ int job_test(job_id_t id,
 	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
 				     &pthread_timeout);
 	gen_mutex_unlock(&completion_mutex);
+#else
+	ret = do_one_work_cycle_all();
+#endif
 	if (ret == ETIMEDOUT)
 	{
 	    /* nothing completed while we were waiting, trust that the
@@ -3130,35 +2986,6 @@ int job_test(job_id_t id,
 	    }
 	    gen_mutex_unlock(&completion_mutex);
 	}
-
-#else /* __PVFS2_JOB_THREADED__ */
-
-	/* push on work for one round */
-	ret = do_one_work_cycle_all(&num_completed, 1);
-	if (ret < 0)
-	{
-	    return (ret);
-	}
-	if (num_completed > 0)
-	{
-	    /* check now to see if the job we want is done */
-	    gen_mutex_lock(&completion_mutex);
-	    if(completion_error)
-	    {
-		gen_mutex_unlock(&completion_mutex);
-		return(completion_error);
-	    }
-	    query = id_gen_fast_lookup(id);
-	    if(query->completed_flag)
-	    {
-		job_desc_q_remove(query);
-		gen_mutex_unlock(&completion_mutex);
-		goto job_test_complete;
-	    }
-	    gen_mutex_unlock(&completion_mutex);
-	}
-
-#endif /* __PVFS2_JOB_THREADED__ */
 
 	/* if we fall to here, see how much time has expired and
 	 * sleep/work again if we need to
@@ -3212,8 +3039,6 @@ int job_testsome(job_id_t * id_array,
     int ret = -1;
 #ifdef __PVFS2_JOB_THREADED__
     struct timespec pthread_timeout;
-#else
-    int num_completed;
 #endif /* __PVFS2_JOB_THREADED__ */
     int timeout_remaining = timeout_ms;
     struct timeval start;
@@ -3334,6 +3159,9 @@ int job_testsome(job_id_t * id_array,
 	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
 				     &pthread_timeout);
 	gen_mutex_unlock(&completion_mutex);
+#else
+	ret = do_one_work_cycle_all();
+#endif
 	if (ret == ETIMEDOUT)
 	{
 	    /* nothing completed while we were waiting, trust that the
@@ -3390,59 +3218,6 @@ int job_testsome(job_id_t * id_array,
 	    *inout_count_p = original_count;
 	}
 
-#else /* __PVFS2_JOB_THREADED__ */
-
-	/* push on work for one round */
-	ret = do_one_work_cycle_all(&num_completed, 1);
-	if (ret < 0)
-	{
-	    free(tmp_id_array);
-	    return (ret);
-	}
-	if (num_completed > 0)
-	{
-	    /* check queue now to see of the op we want is done */
-	    if(returned_user_ptr_array)
-	    {
-		ret = completion_query_some(tmp_id_array,
-					    inout_count_p,
-					    &out_index_array[total_completed],
-					    &returned_user_ptr_array
-					    [total_completed],
-					    &out_status_array_p
-					    [total_completed]);
-	    }
-	    else
-	    {
-		ret = completion_query_some(tmp_id_array,
-					    inout_count_p,
-					    &out_index_array[total_completed],
-					    NULL,
-					    &out_status_array_p
-					    [total_completed]);
-	    }
-	    
-	    /* return here on error or completion */
-	    if (ret < 0)
-	    {
-		free(tmp_id_array);
-		return (ret);
-	    }
-	    if (ret == 0 && (*inout_count_p + total_completed == real_id_count))
-	    {
-		*inout_count_p = real_id_count;
-		free(tmp_id_array);
-		return (1);
-	    }
-
-	    for (i = 0; i < (*inout_count_p); i++)
-		tmp_id_array[out_index_array[i + total_completed]] = 0;
-	    total_completed += *inout_count_p;
-	    *inout_count_p = original_count;
-	}
-
-#endif /* __PVFS2_JOB_THREADED__ */
-
 	/* if we fall to here, see how much time has expired and
 	 * sleep/work again if we need to
 	 */
@@ -3485,8 +3260,6 @@ int job_testcontext(job_id_t * out_id_array_p,
     int ret = -1;
 #ifdef __PVFS2_JOB_THREADED__
     struct timespec pthread_timeout;
-#else
-    int num_completed;
 #endif /* __PVFS2_JOB_THREADED__ */
     int timeout_remaining = timeout_ms;
     struct timeval start;
@@ -3569,6 +3342,9 @@ int job_testcontext(job_id_t * out_id_array_p,
 	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
 				     &pthread_timeout);
 	gen_mutex_unlock(&completion_mutex);
+#else
+	ret = do_one_work_cycle_all();
+#endif
 	if (ret == ETIMEDOUT)
 	{
 	    /* nothing completed while we were waiting, trust that the
@@ -3598,33 +3374,6 @@ int job_testcontext(job_id_t * out_id_array_p,
 
 	    *inout_count_p = original_count;
 	}
-
-#else /* __PVFS2_JOB_THREADED__ */
-
-	/* push on work for one round */
-	ret = do_one_work_cycle_all(&num_completed, 1);
-	if (ret < 0)
-	{
-	    return (ret);
-	}
-	if (num_completed > 0)
-	{
-	    /* check queue now to see if anything is done */
-	    ret = completion_query_context(out_id_array_p,
-					 inout_count_p,
-					 returned_user_ptr_array,
-					 out_status_array_p,
-					 context_id);
-	    /* return here on error or completion */
-	    if (ret < 0)
-		return (ret);
-	    if (ret == 0 && (*inout_count_p > 0))
-		return (1);
-
-	    *inout_count_p = original_count;
-	}
-
-#endif /* __PVFS2_JOB_THREADED__ */
 
 	/* if we fall to here, see how much time has expired and
 	 * sleep/work again if we need to
@@ -3690,268 +3439,6 @@ static void teardown_queues(void)
     return;
 }
 
-#ifndef __PVFS2_JOB_THREADED__
-/* do_one_work_cycle_all()
- *
- * performs one job work cycle (checks to see which jobs are pending,
- * tests those that neede it, etc)
- *
- * returns 0 on success, -errno on failure
- */
-static int do_one_work_cycle_all(int *num_completed,
-				 int wait_flag)
-{
-    int bmi_pending_flag, bmi_unexp_pending_flag, flow_pending_flag, 
-	trove_pending_flag, dev_unexp_pending_flag;
-    int bmi_completed = 0;
-    int bmi_unexp_completed = 0;
-    int flow_completed = 0;
-    int trove_completed = 0;
-    int dev_unexp_completed = 0;
-    int total_interfaces_pending = 0;
-    int ret = -1;
-
-    /* the first thing to do is to determine which interfaces have jobs
-     * pending
-     */
-    gen_mutex_lock(&bmi_mutex);
-	if(bmi_pending_count > 0)
-	    bmi_pending_flag = 1;
-	else
-	    bmi_pending_flag = 0;
-	if(bmi_unexp_pending_count > 0)
-	    bmi_unexp_pending_flag = 1;
-	else
-	    bmi_unexp_pending_flag = 0;
-    gen_mutex_unlock(&bmi_mutex);
-    gen_mutex_lock(&flow_mutex);
-	if(flow_pending_count > 0)
-	    flow_pending_flag = 1;
-	else
-	    flow_pending_flag = 0;
-    gen_mutex_unlock(&flow_mutex);
-    gen_mutex_lock(&trove_mutex);
-	if(trove_pending_count > 0)
-	    trove_pending_flag = 1;
-	else
-	    trove_pending_flag = 0;
-    gen_mutex_unlock(&trove_mutex);
-    gen_mutex_lock(&dev_mutex);
-	if(dev_unexp_pending_count > 0)
-	    dev_unexp_pending_flag = 1;
-	else
-	    dev_unexp_pending_flag = 0;
-    gen_mutex_unlock(&dev_mutex);
-
-    /* count the number of interfaces with jobs pending */
-    total_interfaces_pending = bmi_pending_flag + bmi_unexp_pending_flag 
-	+ flow_pending_flag + trove_pending_flag + dev_unexp_pending_flag;
-
-    /* TODO: need to check return values in here! */
-
-    /* handle BMI first */
-    if (bmi_pending_flag && (total_interfaces_pending == 1) && wait_flag)
-    {
-	/* nothing else going on, we can afford to wait */
-	if ((ret = do_one_work_cycle_bmi(&bmi_completed, 1)) < 0)
-	{
-	    return (ret);
-	}
-    }
-    else if (bmi_pending_flag)
-    {
-	/* just test */
-	if ((ret = do_one_work_cycle_bmi(&bmi_completed, 0)) < 0)
-	{
-	    return (ret);
-	}
-    }
-
-    /* now check for unexpected BMI messages */
-    if (bmi_unexp_pending_flag && (total_interfaces_pending == 1) && wait_flag)
-    {
-	if ((ret = do_one_work_cycle_bmi_unexp(&bmi_unexp_completed, 1)) < 0)
-	{
-	    return (ret);
-	}
-    }
-    else if (bmi_unexp_pending_flag)
-    {
-	if ((ret = do_one_work_cycle_bmi_unexp(&bmi_unexp_completed, 0)) < 0)
-	{
-	    return (ret);
-	}
-    }
-
-#ifdef __PVFS2_TROVE_SUPPORT__
-    /* trove operations */
-    if (trove_pending_flag)
-    {
-	if ((ret = do_one_work_cycle_trove(&trove_completed)) < 0)
-	{
-	    return (ret);
-	}
-    }
-#endif
-
-    /* flow operations */
-    if (flow_pending_flag)
-    {
-	if ((ret = do_one_work_cycle_flow(&flow_completed)) < 0)
-	{
-	    return (ret);
-	}
-    }
-
-    /* device operations */
-    if (dev_unexp_pending_flag)
-    {
-	if ((ret = do_one_work_cycle_dev_unexp(&dev_unexp_completed)) < 0)
-	{
-	    return(ret);
-	}
-    }
-
-    *num_completed = (flow_completed + trove_completed + bmi_completed +
-		      bmi_unexp_completed + dev_unexp_completed);
-
-    return (0);
-}
-
-/* do_one_work_cycle_bmi_unexp()
- *
- * performs one job work cycle, just on pending BMI unexpected operations 
- * (checks to see which jobs are pending, tests those that need it, etc)
- *
- * returns 0 on success, -errno on failure
- */
-static int do_one_work_cycle_bmi_unexp(int *num_completed,
-				       int wait_flag)
-{
-    int incount, outcount;
-    struct job_desc *tmp_desc;
-    int ret = -1;
-    int i = 0;
-
-    /* the first thing to do is to find out how many unexpected
-     * operations we are allowed to look for right now
-     */
-    gen_mutex_lock(&bmi_mutex);
-    if(bmi_unexp_pending_count > job_work_metric)
-	incount = job_work_metric;
-    else
-	incount = bmi_unexp_pending_count;
-    gen_mutex_unlock(&bmi_mutex);
-
-    if (wait_flag)
-    {
-	ret = BMI_testunexpected(incount, &outcount, stat_bmi_unexp_array, 10);
-    }
-    else
-    {
-	ret = BMI_testunexpected(incount, &outcount, stat_bmi_unexp_array, 0);
-    }
-
-    if (ret < 0)
-    {
-	/* critical failure */
-	/* TODO: can I clean up anything else here? */
-	gossip_lerr("Error: critical BMI failure.\n");
-	return (ret);
-    }
-
-    for (i = 0; i < outcount; i++)
-    {
-	/* remove the operation from the pending bmi_unexp queue */
-	gen_mutex_lock(&bmi_mutex);
-	tmp_desc = job_desc_q_shownext(bmi_unexp_queue);
-	job_desc_q_remove(tmp_desc);
-	bmi_unexp_pending_count--;
-	gen_mutex_unlock(&bmi_mutex);
-	/* set appropriate fields and store incompleted queue */
-	*(tmp_desc->u.bmi_unexp.info) = stat_bmi_unexp_array[i];
-	gen_mutex_lock(&completion_mutex);
-	/* set completed flag while holding queue lock */
-	tmp_desc->completed_flag = 1;
-	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
-	    tmp_desc);
-	gen_mutex_unlock(&completion_mutex);
-    }
-
-    *num_completed = outcount;
-
-    return (0);
-}
-
-
-/* do_one_work_cycle_bmi()
- *
- * performs one job work cycle, just on pending BMI operations 
- * (checks to see which jobs are pending, tests those that need it, etc)
- *
- * returns 0 on success, -errno on failure
- */
-static int do_one_work_cycle_bmi(int *num_completed,
-				 int wait_flag)
-{
-    struct job_desc *tmp_desc = NULL;
-    int incount, outcount;
-    int ret = -1;
-    int i = 0;
-
-    if(bmi_pending_count > job_work_metric)
-	incount = job_work_metric;
-    else
-	incount = bmi_pending_count;
-
-    if (wait_flag)
-    {
-	/* nothing else going on, we can afford to wait */
-	ret = BMI_testcontext(incount, stat_bmi_id_array, &outcount,
-			   stat_bmi_error_code_array,
-			   stat_bmi_actual_size_array, stat_bmi_user_ptr_array,
-			   10, global_bmi_context);
-    }
-    else
-    {
-	/* just test */
-	ret = BMI_testcontext(incount, stat_bmi_id_array, &outcount,
-			   stat_bmi_error_code_array,
-			   stat_bmi_actual_size_array, stat_bmi_user_ptr_array,
-			   0, global_bmi_context);
-    }
-
-    if (ret < 0)
-    {
-	/* critical failure */
-	/* TODO: can I clean up anything else here? */
-	gossip_lerr("Error: critical BMI failure.\n");
-	return (ret);
-    }
-
-    bmi_pending_count -= outcount;
-
-    for (i = 0; i < outcount; i++)
-    {
-	tmp_desc = (struct job_desc *) stat_bmi_user_ptr_array[i];
-	/* set appropriate fields and store in completed queue */
-	tmp_desc->u.bmi.error_code = stat_bmi_error_code_array[i];
-	tmp_desc->u.bmi.actual_size = stat_bmi_actual_size_array[i];
-	gen_mutex_lock(&completion_mutex);
-	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
-	    tmp_desc);
-	/* set completed flag while holding queue lock */
-	tmp_desc->completed_flag = 1;
-	gen_mutex_unlock(&completion_mutex);
-    }
-
-    *num_completed = outcount;
-    return (0);
-}
-
-#endif /* __PVFS2_JOB_THREADED__ */
-
-#ifdef __PVFS2_JOB_THREADED__
 /* trove_thread_mgr_callback()
  *
  * callback function executed by the thread manager for Trove when a Trove 
@@ -3975,13 +3462,13 @@ static void trove_thread_mgr_callback(void* data,
 
     trove_pending_count--;
 
+#ifdef __PVFS2_JOB_THREADED__
     /* wake up anyone waiting for completion */
     pthread_cond_signal(&completion_cond);
+#endif
     return;
 }
-#endif
 
-#ifdef __PVFS2_JOB_THREADED__
 /* bmi_thread_mgr_callback()
  *
  * callback function executed by the thread manager for BMI when a BMI
@@ -4007,8 +3494,10 @@ static void bmi_thread_mgr_callback(void* data,
 
     bmi_pending_count--;
 
+#ifdef __PVFS2_JOB_THREADED__
     /* wake up anyone waiting for completion */
     pthread_cond_signal(&completion_cond);
+#endif
 
     return;
 }
@@ -4041,12 +3530,13 @@ static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp)
 	tmp_desc);
     gen_mutex_unlock(&completion_mutex);
 
+#ifdef __PVFS2_JOB_THREADED__
     /* wake up anyone waiting for completion */
     pthread_cond_signal(&completion_cond);
-;
+#endif
+
     return;
 }
-#endif /* __PVFS2_JOB_THREADED__ */
 
 /* do_one_work_cycle_dev_unexp()
  *
@@ -4151,76 +3641,6 @@ static int do_one_work_cycle_flow(int *num_completed)
     *num_completed = outcount;
     return (0);
 }
-
-#ifndef __PVFS2_JOB_THREADED__
-#ifdef __PVFS2_TROVE_SUPPORT__
-/* do_one_work_cycle_trove()
- *
- * performs one job work cycle, just on pending trove operations 
- * (checks to see which jobs are pending, tests those that need it, etc)
- *
- * returns 0 on success, -errno on failure
- */
-static int do_one_work_cycle_trove(int *num_completed)
-{
-    struct job_desc *tmp_desc = NULL;
-    int count = 0;
-    int ret = -1;
-    int i = 0;
-
-    /* TODO: this is a HACK! */
-    /* fix later, I just want to try out testcontext right now */
-    PVFS_fs_id HACK_coll_id = 9;
-
-    *num_completed = 0;
-
-    if(trove_pending_count > job_work_metric)
-	count = job_work_metric;
-    else
-	count = trove_pending_count;
-
-    if(count > 0)
-    {
-	/* TODO: fix timeout later */
-	ret = trove_dspace_testcontext(HACK_coll_id,
-	    stat_trove_id_array,
-	    &count,
-	    stat_trove_ds_state_array,
-	    stat_trove_user_ptr_array,
-	    TROVE_DEFAULT_TEST_TIMEOUT,
-	    global_trove_context);
-	if (ret < 0)
-	{
-	    /* critical failure */
-	    /* TODO: can I clean up anything else here? */
-	    gossip_lerr("Error: critical trove failure.\n");
-	    return (ret);
-	}
-
-	for (i = 0; i < count; i++)
-	{
-	    tmp_desc = (struct job_desc *) stat_trove_user_ptr_array[i];
-	    gen_mutex_lock(&trove_mutex);
-	    trove_pending_count--;
-	    gen_mutex_unlock(&trove_mutex);
-	    /* set appropriate fields and store in completed queue */
-	    tmp_desc->u.trove.state = stat_trove_ds_state_array[i];
-
-	    gen_mutex_lock(&completion_mutex);
-	    /* set completed flag while holding queue lock */
-	    tmp_desc->completed_flag = 1;
-	    job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
-		tmp_desc);
-	    gen_mutex_unlock(&completion_mutex);
-	}
-
-	*num_completed = count;
-    }
-
-    return(0);
-}
-#endif
-#endif
 
 /* fill_status()
  *
@@ -4556,6 +3976,43 @@ static int completion_query_context(job_id_t * out_id_array_p,
 
     return (0);
 }
+
+#ifndef __PVFS2_JOB_THREADED__
+/* do_one_work_cycle_all()
+ *
+ * makes progress when threads are not used
+ *
+ * returns 0 on success, -errno on failure
+ */
+static int do_one_work_cycle_all(void)
+{
+    int ret = -1;
+    int num_completed;
+
+    if(flow_pending_count)
+    {
+	ret = do_one_work_cycle_flow(&num_completed);
+	if(ret < 0)
+	    return(ret);
+    }
+
+    if(dev_unexp_pending_count)
+    {
+	ret = do_one_work_cycle_dev_unexp(&num_completed);
+	if(ret < 0)
+	    return(ret);
+    }
+
+    if(bmi_pending_count || bmi_unexp_pending_count)
+	PINT_thread_mgr_bmi_push(10);
+#ifdef __PVFS2_TROVE_SUPPORT__
+    if(trove_pending_count)
+	PINT_thread_mgr_trove_push(10);
+#endif
+
+    return(0);
+}
+#endif
 
 /*
  * Local variables:

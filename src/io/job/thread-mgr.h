@@ -36,6 +36,10 @@ int PINT_thread_mgr_trove_start(void);
 int PINT_thread_mgr_trove_stop(void);
 int PINT_thread_mgr_trove_getcontext(PVFS_context_id *context);
 
+/* hooks to drive progress without threads */
+void PINT_thread_mgr_trove_push(int max_idle_time);
+void PINT_thread_mgr_bmi_push(int max_idle_time);
+
 #endif /* __THREAD_MGR_H */
 
 /*
