@@ -364,8 +364,11 @@ static int remove_rmdirent_comp_fn(void *v_p,
 
     /* don't attempt to parse the response if there was an error */
     if (resp_p->status != 0) {
+	assert(resp_p->status < 0); /* parameter range check */
 	return resp_p->status;
     }
+
+    assert(resp_p->u.rmdirent.entry_handle != 0); /* parameter range check */
 
     /* pull handle out of response, also copy in fs_id from before */
     sm_p->u.remove.object_ref.handle = resp_p->u.rmdirent.entry_handle;
