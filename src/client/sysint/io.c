@@ -231,7 +231,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	{
 	    if(target_handle_array[i] == pinode_ptr->attr.u.meta.dfh[j])
 	    {
-		fprintf(stderr, "FOO: talking to iod: %d\n", j);
 		req_array[i].u.io.iod_num = j;
 		break;
 	    }
