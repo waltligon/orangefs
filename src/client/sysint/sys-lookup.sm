@@ -36,10 +36,10 @@ enum
 {
     LOOKUP_CONTINUE         = 2,
     LOOKUP_TYPE_DIRECTORY   = 3,
-    LOOKUP_TYPE_RELATIVE_LN = 4,
-    LOOKUP_TYPE_ABSOLUTE_LN = 5,
-    LOOKUP_TYPE_LN_NO_FOLLOW= 6,
-    LOOKUP_TYPE_OTHER       = 7
+    LOOKUP_TYPE_METAFILE    = 4,
+    LOOKUP_TYPE_RELATIVE_LN = 5,
+    LOOKUP_TYPE_ABSOLUTE_LN = 6,
+    LOOKUP_TYPE_LN_NO_FOLLOW= 7
 };
 
 /* state function prototypes */
@@ -162,10 +162,10 @@ machine pvfs2_client_lookup_sm(
     {
         run lookup_segment_check_attr_type;
         LOOKUP_TYPE_DIRECTORY => lookup_context_check_completion;
+        LOOKUP_TYPE_METAFILE => lookup_context_check_completion;
         LOOKUP_TYPE_LN_NO_FOLLOW => lookup_context_check_completion;
         LOOKUP_TYPE_RELATIVE_LN => lookup_segment_handle_relative_link;
         LOOKUP_TYPE_ABSOLUTE_LN => lookup_segment_handle_absolute_link;
-        LOOKUP_TYPE_OTHER => lookup_context_check_completion;
         default => lookup_cleanup;
     }
 
@@ -709,6 +709,9 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
         case PVFS_TYPE_DIRECTORY:
             js_p->error_code = LOOKUP_TYPE_DIRECTORY;
             break;
+        case PVFS_TYPE_METAFILE:
+            js_p->error_code = LOOKUP_TYPE_METAFILE;
+            break;
         case PVFS_TYPE_SYMLINK:
             /*
               check if we need to skip the symlink resolution
@@ -739,7 +742,9 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
             }
             break;
         default:
-            js_p->error_code = LOOKUP_TYPE_OTHER;
+            gossip_debug(CLIENT_DEBUG, "cannot resolve object of "
+                         "type %d\n", cur_seg->seg_attr.objtype);
+            js_p->error_code = -PVFS_EINVAL;
     }
     return 1;
 }
