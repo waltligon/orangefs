@@ -5,13 +5,12 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.1 2003-08-26 19:07:13 pw Exp $
+ * $Id: ib.c,v 1.2 2003-10-22 10:05:53 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
 #include <src/common/quicklist/quicklist.h>
 #include <src/io/bmi/bmi-method-support.h>
-#include <src/io/bmi/bmi_tcp/sockio.h>
 #include <vapi.h>
 #include <vapi_common.h>
 #include "ib.h"
@@ -86,7 +85,7 @@ check_cq(void)
 
 	debug(2, "%s: found something non-empty", __func__);
 	if (desc.status != VAPI_SUCCESS)
-	    error("%s: cq entry id 0x%Lx opcode %s error %s", __func__,
+	    error("%s: entry id 0x%Lx opcode %s error %s", __func__,
 	      desc.id, VAPI_cqe_opcode_sym(desc.opcode),
 	      VAPI_wc_status_sym(desc.status));
 
@@ -235,6 +234,8 @@ encourage_send(ib_send_t *sq, incoming_t *in)
 
 	    /* wait for ack saying remote has received and recycled his buf */
 	    sq->state = SQ_WAITING_EAGER_ACK;
+	    debug(2, "%s: sq %p sent EAGER now state %s", __func__, sq,
+	      sq_state_name(sq->state));
 
 	} else {
 	    /*
@@ -256,6 +257,8 @@ encourage_send(ib_send_t *sq, incoming_t *in)
 	    post_sr(bh, sizeof(*mh) + sizeof(*mh_rts));
 
 	    sq->state = SQ_WAITING_RTS_ACK;
+	    debug(2, "%s: sq %p sent RTS now state %s", __func__, sq,
+	      sq_state_name(sq->state));
 	}
     } else if (sq->state == SQ_WAITING_EAGER_ACK) {
 
@@ -281,6 +284,7 @@ encourage_send(ib_send_t *sq, incoming_t *in)
 
 	msg_header_t *mh;
 	msg_header_cts_t *mh_cts;
+	u_int32_t want;
 
 	debug(2, "%s: sq %p %s in %p", __func__, sq, sq_state_name(sq->state),
 	  in);
@@ -294,10 +298,13 @@ encourage_send(ib_send_t *sq, incoming_t *in)
 	mh = in->bh->buf;
 	mh_cts = (void *)(mh + 1);
 
-	/* XXX: delete these silly tests */
-	assert(in->byte_len == sizeof(*mh) + sizeof(*mh_cts),
-	  "%s: wrong message size for CTS", __func__);
 	assert(mh->type == MSG_CTS, "%s: expecting CTS", __func__);
+
+	/* message, cts content, list of buffers and lengths */
+	want = sizeof(*mh) + sizeof(*mh_cts) + mh_cts->buflist_num * (8+4+4);
+	assert(in->byte_len == want,
+	  "%s: wrong message size for CTS, got %u, want %u", __func__,
+	  in->byte_len, want);
 
 	/* save the bh which received the CTS for later acking */
 	sq->bh = in->bh;
@@ -436,8 +443,16 @@ encourage_recv(ib_recv_t *rq, incoming_t *in)
 	    rq->rts_mop_id = mh_rts->mop_id;
 
 	    /* ack his rts for simplicity */
+	    debug(2, "%s: refill our recv and ack his RTS", __func__);
 	    post_rr(c, in->bh);
 	    post_sr_ack(c, in->bh);
+
+	    if (rq->state == RQ_RTS_WAITING_CTS_BUFFER) {
+		/* about 24 lines down, handle cts_buffer */
+		debug(2, "%s: jumping to push state %s", __func__,
+		  rq_state_name(rq->state));
+		goto continue_with_cts_buffer;
+	    }
 
 	} else if (mh->type == MSG_BYE) {
 	    /*
@@ -454,22 +469,24 @@ encourage_recv(ib_recv_t *rq, incoming_t *in)
 	 * The rq was matched during the receive, or this was called from
 	 * elsewhere.  Do something with it.
 	 */
-	debug(2, "%s: rq %p state %s", __func__, rq,
-	  rq_state_name(rq->state));
-
 	if (rq->state == RQ_RTS_WAITING_CTS_BUFFER) {
 
 	    int ret;
+	  continue_with_cts_buffer:
 	    debug(2, "%s: rq %p state %s", __func__, rq,
 	      rq_state_name(rq->state));
 	    ret = send_cts(rq);
 	    if (ret == 0)
 		rq->state = RQ_RTS_WAITING_DATA;
+		/* do not jump there, must wait for data to arrive */
 
 	} else if (rq->state == RQ_RTS_WAITING_DATA) {
 
 	    /* Data has arrived, we know because we got the ack to the CTS
 	     * we sent out.  Serves to release remote cts buffer too */
+	    debug(2, "%s: rq %p state %s", __func__, rq,
+	      rq_state_name(rq->state));
+
 	    /* XXX: should be head for cache, but use tail for debugging */
 	    qlist_add_tail(&rq->bh->list, &rq->c->eager_send_buf_free);
 	    ib_mem_deregister(&rq->buflist);
@@ -492,9 +509,10 @@ send_cts(ib_recv_t *rq)
     buf_head_t *bh;
     msg_header_t *mh;
     msg_header_cts_t *mh_cts;
-    VAPI_rkey_t rts_rkey;
     u_int64_t *bufp;
     u_int32_t *lenp;
+    u_int32_t *keyp;
+    u_int32_t post_len;
     int i;
 
     debug(2, "%s: sending on an rq", __func__);
@@ -515,23 +533,25 @@ send_cts(ib_recv_t *rq)
     mh = bh->buf;
     mh->type = MSG_CTS;
     /* XXX: mh->bmi_tag unused, consider a more primitive union */
-    mh_cts = (void*)((char *) bh->buf + sizeof(*mh));
+    mh_cts = (void *)((char *) bh->buf + sizeof(*mh));
     mh_cts->rts_mop_id = rq->rts_mop_id;
-    mh_cts->rts_rkey = rts_rkey;
     mh_cts->buflist_num = rq->buflist.num;
     mh_cts->buflist_tot_len = rq->buflist.tot_len;
     /* encode all the buflist entries */
     bufp = (u_int64_t *)(mh_cts + 1);
     lenp = (u_int32_t *)(bufp + rq->buflist.num);
-    if ((char *)(lenp + rq->buflist.num) - (char *) mh > EAGER_BUF_SIZE)
+    keyp = (u_int32_t *)(lenp + rq->buflist.num);
+    post_len = (char *)(keyp + rq->buflist.num) - (char *)mh;
+    if (post_len > EAGER_BUF_SIZE)
 	error("%s: too many (%d) recv buflist entries for buf",  __func__,
 	  rq->buflist.num);
     for (i=0; i<rq->buflist.num; i++) {
 	bufp[i] = int64_from_ptr(rq->buflist.buf.recv[i]);
 	lenp[i] = rq->buflist.len[i];
+	keyp[i] = rq->buflist.rkey[i];
     }
 
-    post_sr(bh, sizeof(*mh) + sizeof(*mh_cts));
+    post_sr(bh, post_len);
     return 0;
 }
 
@@ -648,13 +668,13 @@ static void
 post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 {
     VAPI_sr_desc_t sr;
-    VAPI_lkey_t rts_lkey;
     int done;
 
     int send_index = 0, recv_index = 0;    /* working entry in buflist */
     int send_offset = 0;  /* byte offset in working send entry */
     u_int64_t *recv_bufp = (u_int64_t *)(mh_cts + 1);
     u_int32_t *recv_lenp = (u_int32_t *)(recv_bufp + mh_cts->buflist_num);
+    u_int32_t *recv_rkey = (u_int32_t *)(recv_lenp + mh_cts->buflist_num);
 
     debug(2, "%s: sq %p totlen %d", __func__, sq, (int) sq->buflist.tot_len);
 
@@ -664,7 +684,6 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_RDMA_WRITE;
     sr.comp_type = VAPI_UNSIGNALED;
-    sr.r_key = mh_cts->rts_rkey;
     sr.sg_lst_p = sg_tmp_array;
 
     done = 0;
@@ -676,7 +695,8 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	 * Driven by recv elements.  Sizes have already been checked
 	 * (hopefully).
 	 */
-	sr.remote_addr = int64_from_ptr(recv_bufp[recv_index]);
+	sr.remote_addr = recv_bufp[recv_index];
+	sr.r_key = recv_rkey[recv_index];
 	sr.sg_lst_len = 0;
 	recv_bytes_needed = recv_lenp[recv_index];
 	while (recv_bytes_needed > 0) {
@@ -691,7 +711,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	      int64_from_ptr(sq->buflist.buf.send[send_index])
 	      + send_offset;
 	    sg_tmp_array[sr.sg_lst_len].len = this_bytes;
-	    sg_tmp_array[sr.sg_lst_len].lkey = rts_lkey;
+	    sg_tmp_array[sr.sg_lst_len].lkey = sq->buflist.lkey[send_index];
 	    ++sr.sg_lst_len;
 	    if ((int)sr.sg_lst_len > sg_max_len)
 		error("%s: send buflist len %d bigger than max %d", __func__,
@@ -863,6 +883,8 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
     list_t *l;
     int i;
     
+    /* XXX: maybe check recvq first, just an optimization... */
+
     /* check to see if matching recv is in the queue */
     qlist_for_each(l, &recvq) {
 	rq = qlist_upcast(l);

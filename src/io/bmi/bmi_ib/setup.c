@@ -6,16 +6,17 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.3 2003-10-17 18:50:46 pw Exp $
+ * $Id: setup.c,v 1.4 2003-10-22 10:05:53 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/socket.h>
 #include <netinet/in.h>  /* ntohs et al */
 #include <arpa/inet.h>   /* inet_ntoa */
+#include <netdb.h>       /* gethostbyname */
 #include <src/common/quicklist/quicklist.h>
 #include <src/io/bmi/bmi-method-support.h>
 #include <src/io/bmi/bmi-method-callback.h>
-#include <src/io/bmi/bmi_tcp/sockio.h>
 /* ib includes */
 #include <vapi.h>
 #include <evapi.h>
@@ -538,13 +539,27 @@ void
 ib_tcp_client_connect(ib_method_addr_t *ibmap, struct method_addr *remote_map)
 {
     int s;
+    struct hostent *hp;
+    struct sockaddr_in skin;
     
-    s = BMI_sockio_new_sock();
+    s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0)
 	error_errno("%s: create tcp socket", __func__);
-    if (BMI_sockio_connect_sock(s, ibmap->hostname, ibmap->port) < 0)
-	error_errno("%s: connect to server %s:%d", __func__,
-	  ibmap->hostname, ibmap->port);
+    hp = gethostbyname(ibmap->hostname);
+    if (!hp)
+	error_errno("%s: cannot resolve server %s", __func__, ibmap->hostname);
+    memset(&skin, 0, sizeof(skin));
+    skin.sin_family = hp->h_addrtype;
+    memcpy(&skin.sin_addr, hp->h_addr_list[0], hp->h_length);
+    skin.sin_port = htons(ibmap->port);
+  retry:
+    if (connect(s, (struct sockaddr *) &skin, sizeof(skin)) < 0) {
+	if (errno == EINTR)
+	    goto retry;
+	else
+	    error_errno("%s: connect to server %s:%d", __func__,
+	      ibmap->hostname, ibmap->port);
+    }
     ibmap->c = ib_new_connection(s, 0);
     ibmap->c->remote_map = remote_map;
     if (close(s) < 0)
@@ -558,17 +573,26 @@ static void
 ib_tcp_server_init_listen_socket(struct method_addr *addr)
 {
     int flags;
+    struct sockaddr_in skin;
     ib_method_addr_t *ibc = addr->method_data;
 
-    listen_sock = BMI_sockio_new_sock();
+    listen_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (listen_sock < 0)
 	error_errno("%s: create tcp socket", __func__);
     flags = 1;
     if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &flags,
       sizeof(flags)) < 0)
 	error_errno("%s: setsockopt REUSEADDR", __func__);
-    if (BMI_sockio_bind_sock(listen_sock, ibc->port) < 0)
-	error_errno("%s: bind tcp socket", __func__);
+    memset(&skin, 0, sizeof(skin));
+    skin.sin_family = AF_INET;
+    skin.sin_port = htons(ibc->port);
+  retry:
+    if (bind(listen_sock, (struct sockaddr *) &skin, sizeof(skin)) < 0) {
+	if (errno == EINTR)
+	    goto retry;
+	else
+	    error_errno("%s: bind tcp socket", __func__);
+    }
     if (listen(listen_sock, 1024) < 0)
 	error_errno("%s: listen tcp socket", __func__);
     flags = fcntl(listen_sock, F_GETFL);
@@ -746,6 +770,7 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
     ret = VAPI_alloc_pd(nic_handle, &nic_pd);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_create_pd", __func__);
+    debug(2, "%s: built pd %lx", __func__, nic_pd);
 
     /* see how many cq entries we are allowed to have */
     memset(&hca_cap, 0, sizeof(hca_cap));

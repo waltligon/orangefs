@@ -5,46 +5,22 @@
 #
 # See COPYING in top-level directory.
 #
-# $Id: module.mk.in,v 1.3 2003-10-17 18:49:41 pw Exp $
+# $Id: module.mk.in,v 1.4 2003-10-22 10:05:53 pw Exp $
 #
 
 # only do any of this if configure decided to use IB
 ifdef BUILD_IB
 
 # local definitions
-subdir := src/io/bmi/bmi_ib
-bmi_ib_src := $(patsubst %,$(subdir)/%,ib.c setup.c util.c)
+bmi_ib_subdir := src/io/bmi/bmi_ib
+bmi_ib_src := $(patsubst %,$(bmi_ib_subdir)/%,ib.c setup.c util.c)
 bmi_ib_obj := $(bmi_ib_src:.c=.o)
+bmi_ib_server_obj := $(bmi_ib_src:.c=-server.o)
 bmi_ib_dep := $(bmi_ib_src:.c=.d)
 
-# Feed these to the controlling makefile, a bit convoluted since
-# this file does not really exist, but the rules below cause the
-# predicted .o to be generated.
-LIBSRC    += $(subdir)/bmi_ib.c
-SERVERSRC += $(subdir)/bmi_ib.c
-PRIVATEDEPENDS += $(bmi_ib_dep)
-
-$(subdir)/bmi_ib-server.o: $(subdir)/bmi_ib.o
-ifdef QUIET_COMPILE
-	@echo "  LN -S		$@"
-	@test -e $@ || ln -s $(notdir $<) $@
-else
-	test -e $@ || ln -s $(notdir $<) $@
-endif
-
-$(subdir)/bmi_ib.o: $(bmi_ib_obj)
-ifdef QUIET_COMPILE
-	@echo "  LD 		$@"
-	@ld -r -o $@ $^
-else
-	ld -r -o $@ $^
-endif
-
-# make sure this gets pulled into libpvfs
-LIBSRC += $(subdir)/../bmi_tcp/sockio.c
-
-# delete our internal .o files too
-CLEANFILES += $(bmi_ib_obj) $(bmi_ib_dep)
+# export these to the top Makefile to tell it what to build
+LIBSRC    += $(bmi_ib_src)
+SERVERSRC += $(bmi_ib_src)
 
 # minimal cflags, removing the million include paths auto-generated from MODULES
 bmi_ib_bad_mod_inc := $(patsubst %, -I $(srcdir)/%, $(MODULES))
@@ -66,28 +42,32 @@ bmi_ib_cflags += -Wshadow -Wstrict-prototypes -Wredundant-decls
 #   -Wconversion
 
 #
-# The value for IBCFLAGS comes from top-level Makefile.in which gets
-# it from configure-time path given by --with-ib=PATH.  No need to
-# expose that directory to the rest of the pvfs2 compile.
+# Add extra include paths and warnings just for these IB files.
+# No need to expose the rest of the tree to the mess of IB include
+# dirs and warnings used here.
 #
 $(bmi_ib_obj): %.o: %.c
 ifdef QUIET_COMPILE
-	@echo "  CC		$@"
+	@echo "  IBCC		$@"
 	@$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(bmi_ib_cflags) $< -c -o $@
 else
 	$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(bmi_ib_cflags) $< -c -o $@
 endif
 
+$(bmi_ib_server_obj): %-server.o: %.c
+ifdef QUIET_COMPILE
+	@echo "  IBCC		$@"
+	@$(CC) $(IBCFLAGS) $(SERVERCFLAGS) $(bmi_ib_cflags) $< -c -o $@
+else
+	$(CC) $(IBCFLAGS) $(SERVERCFLAGS) $(bmi_ib_cflags) $< -c -o $@
+endif
+
 $(bmi_ib_dep): %.d: %.c
 ifdef QUIET_COMPILE
 	@echo "  IBDEP		$@"
-	@$(srcdir)/maint/depend.sh `dirname $*` $(bmi_ib_cflags) $< > $@
+	@$(srcdir)/maint/depend.sh $(bmi_ib_subdir) $(bmi_ib_cflags) $< > $@
 else
-	$(srcdir)/maint/depend.sh `dirname $*` $(bmi_ib_cflags) $< > $@
+	$(srcdir)/maint/depend.sh $(bmi_ib_subdir) $(bmi_ib_cflags) $< > $@
 endif
-
-# just to satisfy DEPENDS, not really used
-$(subdir)/bmi_ib.d:
-	@echo $(subdir)/bmi_ib.c: $(bmi_ib_src) >> $@
 
 endif  # BUILD_IB

@@ -5,13 +5,14 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.1 2003-08-26 19:07:14 pw Exp $
+ * $Id: ib.h,v 1.2 2003-10-22 10:05:53 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
 
 #ifdef __GNUC__
-#  define __hidden __attribute__((visibility("hidden")))
+/* #  define __hidden __attribute__((visibility("hidden"))) */
+#  define __hidden  /* confuses debugger */
 #  define __unused __attribute__((unused))
 #else
 #  define __hidden
@@ -258,12 +259,13 @@ typedef struct {
  */
 typedef struct {
     u_int64_t rts_mop_id;  /* return id from the RTS */
-    u_int32_t rts_rkey;  /* rkey to use to put the data */
-    u_int32_t buflist_num;  /* number of buffers, then lengths to follow */
     u_int64_t buflist_tot_len;
+    u_int32_t buflist_num;  /* number of buffers, then lengths to follow */
+    u_int32_t __pad;
     /* format:
      *   u_int64_t buf[1..buflist_num]
      *   u_int32_t len[1..buflist_num]
+     *   u_int32_t key[1..buflist_num]
      */
 } msg_header_cts_t;
 

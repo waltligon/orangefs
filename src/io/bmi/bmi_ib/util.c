@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: util.c,v 1.1 2003-08-26 19:07:14 pw Exp $
+ * $Id: util.c,v 1.2 2003-10-22 10:05:53 pw Exp $
  */
 #include <stdio.h>
 #include <stdarg.h>
@@ -95,7 +95,7 @@ info(const char *fmt, ...)
     va_start(ap, fmt);
     vsprintf(s, fmt, ap);
     va_end(ap);
-    gossip_err("%s.\n", s);
+    gossip_debug(BMI_DEBUG_IB, "%s.\n", s);
 }
 
 void * __attribute__((malloc)) __hidden
