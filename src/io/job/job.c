@@ -1889,6 +1889,7 @@ int job_test_HACK(
 			/* nothing completed while we were waiting, trust that the
 			 * timedwait got the timing right
 			 */
+			*out_count_p = 0;
 			return(0);
 		}	
 		else if(ret != 0 && ret != EINTR)
@@ -1939,6 +1940,7 @@ int job_test_HACK(
 	} while(timeout_remaining > 0);
 
 	/* fall through, nothing done, time is used up */
+	*out_count_p = 0;
 	return(0);
 }
 
