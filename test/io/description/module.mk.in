@@ -12,5 +12,6 @@ TESTSRC += \
 	$(DIR)/debug8.c\
 	$(DIR)/debug9.c\
 	$(DIR)/debug10.c\
-	$(DIR)/debug11.c
+	$(DIR)/debug11.c\
+	$(DIR)/test-encode-basic.c
 #	$(DIR)/test-req1.c\
