@@ -24,11 +24,6 @@ LIBSRC += \
 	$(DIR)/pack.c \
 	$(DIR)/print-struct.c
 
-# add the automatically generated files to the overall list of files
-# that must be generated at the top level before we calculate
-# dependencies
-$(SRCFILES) += $(SERVERGENSRC)
-
 # rule for automatically generated source files
 $(SERVERGENSRC): %.src.c: %.c src/common/statecomp/statecomp
 	src/common/statecomp/statecomp -o $@ < $<

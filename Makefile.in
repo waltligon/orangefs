@@ -39,15 +39,6 @@ SERVERCFLAGS = -D__GEN_POSIX_LOCKING__
 # add all module directories into include path
 CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 
-
-#
-# SRCFILES is a list of source files that need to be generated
-# before we get going.  This is kind of a hack, and we should
-# try to find a better way to take care of it.
-#
-SRCFILES :=\
- src/io/trove/trove-autogen.c
-
 #
 # CLEANFILES is a list of generated files that need to be removed at
 # "make clean" time.  This is just for special case files that aren't
@@ -96,6 +87,15 @@ DOCSCRUFT := $(patsubst %.tex,%.aux, $(filter %.tex,$(DOCSRC)))
 DOCSCRUFT += $(patsubst %.tex,%.dvi, $(filter %.tex,$(DOCSRC)))
 DOCSCRUFT += $(patsubst %.tex,%.log, $(filter %.tex,$(DOCSRC)))
 DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
+
+#
+# SRCFILES is a list of source files that need to be generated
+# before we get going.  This is kind of a hack, and we should
+# try to find a better way to take care of it.
+#
+SRCFILES :=\
+ src/io/trove/trove-autogen.c \
+ $(SERVERGENSRC)
 
 # we don't really care if the dependencies are sorted; 
 # this is just a trick to remove duplicate entries
