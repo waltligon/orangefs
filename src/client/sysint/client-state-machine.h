@@ -285,8 +285,7 @@ struct PINT_client_mgmt_iterate_handles_list_sm
 
 struct PINT_client_mgmt_get_dfile_array_sm
 {
-    PVFS_pinode_reference pinode_refn;
-    PVFS_handle* dfile_array;
+    PVFS_handle *dfile_array;
     int dfile_count;
 };
 
