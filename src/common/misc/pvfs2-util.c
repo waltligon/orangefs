@@ -17,6 +17,7 @@
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "str-utils.h"
+#include "gen-locks.h"
 
 /* TODO: add replacement functions for systems without getmntent() */
 #ifndef HAVE_GETMNTENT
@@ -31,6 +32,7 @@
 
 static PVFS_util_tab stat_tab_array[PVFS2_MAX_TABFILES];
 static int stat_tab_count = 0;
+static gen_mutex_t stat_tab_mutex = GEN_MUTEX_INITIALIZER;
 
 static int parse_flowproto_string(
     const char *input,
@@ -87,6 +89,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 	file_count = 4;
     }
 
+    gen_mutex_lock(&stat_tab_mutex);
+
     /* start by checking list of files we have already parsed */
     for (i = 0; i < stat_tab_count; i++)
     {
@@ -96,6 +100,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 					stat_tab_array[i].tabfile_name))
 	    {
 		/* already done */
+		gen_mutex_unlock(&stat_tab_mutex);
 		return (&stat_tab_array[i]);
 	    }
 	}
@@ -131,6 +136,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 	{
 	    gossip_err("       %s\n", file_list[i]);
 	}
+	gen_mutex_unlock(&stat_tab_mutex);
 	return (NULL);
     }
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Using pvfs2 tab file: %s\n", targetfile);
@@ -140,6 +146,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 	malloc(tmp_mntent_count * sizeof(struct PVFS_sys_mntent));
     if (!stat_tab_array[stat_tab_count].mntent_array)
     {
+	gen_mutex_unlock(&stat_tab_mutex);
 	return (NULL);
     }
     memset(stat_tab_array[stat_tab_count].mntent_array, 0,
@@ -176,6 +183,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 		gossip_lerr("Error: invalid tab file entry: %s\n",
 			    tmp_ent->mnt_fsname);
 		endmntent(mnt_fp);
+		gen_mutex_unlock(&stat_tab_mutex);
 		return (NULL);
 	    }
 
@@ -254,6 +262,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 	}
     }
     stat_tab_count++;
+    strcpy(stat_tab_array[stat_tab_count-1].tabfile_name, targetfile);
+    gen_mutex_unlock(&stat_tab_mutex);
     return (&stat_tab_array[stat_tab_count - 1]);
 
   error_exit:
@@ -286,6 +296,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 	}
     }
     endmntent(mnt_fp);
+    gen_mutex_unlock(&stat_tab_mutex);
     return (NULL);
 }
 
@@ -685,6 +696,7 @@ void PINT_release_pvfstab(void)
 {
     int i, j;
 
+    gen_mutex_lock(&stat_tab_mutex);
     for(i=0; i<stat_tab_count; i++)
     {
 	for (j = 0; j < stat_tab_array[i].mntent_count; j++)
@@ -696,6 +708,8 @@ void PINT_release_pvfstab(void)
 	}
 	free(stat_tab_array[i].mntent_array);
     }
+    gen_mutex_unlock(&stat_tab_mutex);
+    return;
 }
 
 /*
