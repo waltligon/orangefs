@@ -1,7 +1,8 @@
+NOTE: THIS IS OUT OF DATE
 
 Client side design decisions relating to consistency:
 --
-(IE: "wtf, why is the client sending these messages in this order")
+(IE: "why is the client sending these messages in this order")
 =============================================
 
 PVFS_sys_remove()

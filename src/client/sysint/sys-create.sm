@@ -1,0 +1,273 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "state-machine-fns.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+
+#include "pinode-helper.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+
+extern job_context_id pint_client_sm_context;
+
+/* state function prototypes */
+static int create_init(PINT_client_sm *sm_p,
+		       job_status_s *js_p);
+static int create_getattr_setup_msgpair(PINT_client_sm *sm_p,
+					job_status_s *js_p);
+static int create_getattr_failure(PINT_client_sm *sm_p,
+				  job_status_s *js_p);
+static int create_dspace_create_setup_msgpairs(PINT_client_sm *sm_p,
+					       job_status_s *js_p);
+static int create_dspace_create_failure(PINT_client_sm *sm_p,
+					job_status_s *js_p);
+static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
+					 job_status_s *js_p);
+static int create_crdirent_failure(PINT_client_sm *sm_p,
+				   job_status_s *js_p);
+
+/* completion function prototypes */
+static int create_getattr_comp_fn(void *v_p,
+				  struct PVFS_server_resp *resp_p,
+				  int index);
+
+%%
+
+machine pvfs2_client_create_sm(init,
+			       cleanup,
+			       getattr_setup_msgpair,
+			       getattr_xfer_msgpair,
+			       getattr_failure,
+			       dspace_create_setup_msgpairs,
+			       dspace_create_xfer_msgpairs,
+			       dspace_create_failure,
+			       crdirent_setup_msgpair,
+			       crdirent_xfer_msgpair,
+			       crdirent_failure)
+{
+    state init {
+	run create_init;
+	default => cleanup;
+    }
+
+    state getattr_setup_msgpair {
+	run create_getattr_setup_msgpair;
+	default => cleanup;
+    }
+    state getattr_xfer_msgpair {
+	jump pvfs2_client_getattr_pcache_sm;
+	default => cleanup;
+    }
+    state getattr_failure {
+	run create_getattr_failure;
+	default => cleanup;
+    }
+
+    state dspace_create_setup_msgpairs {
+	run create_dspace_create_setup_msgpairs;
+	default => cleanup;
+    }
+    state dspace_create_xfer_msgpairs {
+	jump pvfs2_client_msgpairarray_sm;
+	default => cleanup;
+    }
+    state dspace_create_failure {
+	run create_dspace_create_failure;
+	default => cleanup;
+    }
+
+    state crdirent_setup_msgpair {
+	run create_crdirent_setup_msgpair;
+	default => cleanup;
+    }
+    state crdirent_xfer_msgpair {
+	jump pvfs2_client_msgpair_sm;
+	default => cleanup;
+    }
+    state crdirent_failure {
+	run create_crdirent_failure;
+	default => cleanup;
+    }
+}
+
+%%
+
+int PVFS_sys_create2(char *object_name,
+		    PVFS_pinode_reference parent_refn,
+		    PVFS_sys_attr attr,
+		    PVFS_credentials credentials,
+		    PVFS_sysresp_create *resp)
+{
+    int ret;
+    PINT_client_sm *sm_p;
+    PVFS_error error;
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_sys_create entered\n");
+
+    /* parameter checking goes here.  assume everything from the user
+     * is ok past this point.
+     */
+    if (object_name == NULL) return -PVFS_EINVAL;
+
+        /* build PINT_client_sm structure */
+    /* TODO: KEEP A CACHE OF THESE AROUND SO WE'RE NOT ALWAYS MALLOC'ING? */
+    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    if (sm_p == NULL) return -PVFS_ENOMEM;
+
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    sm_p->cred_p = &credentials;
+    sm_p->u.create.object_name = object_name;
+    sm_p->u.create.parent_ref  = parent_ref;
+
+    gossip_debug(CLIENT_DEBUG,
+		 "PVFS_sys_create calling PINT_client_state_machine_post()\n");
+
+    /* do something to kick off processing */
+    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_CREATE);
+    assert(ret == 0);
+
+    /* while !done call progress function */
+    while (!sm_p->op_complete && ret == 0) {
+	gossip_debug(CLIENT_DEBUG,
+		     "PVFS_sys_create calling PINT_client_state_machine_test()\n");
+	ret = PINT_client_state_machine_test();
+    }
+
+    assert(ret == 0);
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_sys_create completed\n");
+
+    /* save our return value */
+    error = sm_p->error_code;
+
+    /* clean up after ourselves */
+    free(sm_p);
+    return error;
+}
+
+/****************************************************************/
+
+static int create_init(PINT_client_sm *sm_p,
+		       job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "create state: init\n");
+
+    assert(js_p->error_code == 0); /* sanity check */
+
+    /* do the request scheduler thing, if necessary */
+
+    return 1;
+}
+
+static int create_getattr_setup_msgpair(PINT_client_sm *sm_p,
+					job_status_s *js_p)
+{
+    int ret = -1;
+
+    gossip_debug(CLIENT_DEBUG, "remove state: getattr_setup_msgpair\n");
+
+    /* parameter range checks */
+    assert(sm_p->u.create.object_ref.fs_id != 0);
+    assert(sm_p->u.create.object_ref.handle != 0);
+
+    /* fill in getattr request */
+    PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
+			      *sm_p->cred_p,
+			      sm_p->u.create.object_ref.fs_id,
+			      sm_p->u.create.object_ref.handle,
+			      PVFS_ATTR_COMMON_ALL);
+    
+    /* fill in msgpair structure components */
+    sm_p->msgpair.fs_id   = sm_p->u.create.object_ref.fs_id;
+    sm_p->msgpair.handle  = sm_p->u.create.object_ref.handle;
+    sm_p->msgpair.comp_fn = create_getattr_comp_fn;
+
+    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
+				    sm_p->msgpair.handle,
+				    sm_p->msgpair.fs_id);
+    if(ret != 0)
+    {
+	gossip_err("Error: failure mapping to server.\n");
+	assert(ret < 0); /* return value range check */
+	assert(0); /* TODO: real error handling */
+    }
+
+    js_p->error_code = 0;
+    return 1;
+}
+
+static int create_getattr_comp_fn(void *v_p,
+				  struct PVFS_server_resp *resp_p,
+				  int index)
+{
+    /* this is a little kludge to get around some struct definition
+     * issues in the headers.  maybe fix later?
+     */
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    
+    assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
+
+    /* if we get an error, just return immediately, don't try to
+     * actually fill anything in.
+     */
+    if (resp_p->status != 0) {
+	return resp_p->status;
+    }
+
+    if (resp->u.getattr.attr.objtype != PVFS_TYPE_DIRECTORY) {
+	return -PVFS_ENOTDIR; /* path component isn't a directory */
+    }
+
+    /* TODO: WHAT ELSE?  COPY SOMETHING?  CHECK PARAMETERS HERE? */
+    return 0;
+}
+
+static int create_getattr_failure(PINT_client_sm *sm_p,
+				  job_status_s *js_p)
+{
+}
+
+static int create_dspace_create_setup_msgpairs(PINT_client_sm *sm_p,
+					       job_status_s *js_p)
+{
+}
+
+static int create_dspace_create_failure(PINT_client_sm *sm_p,
+					job_status_s *js_p)
+{
+}
+
+static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
+					 job_status_s *js_p)
+{
+}
+
+static int create_crdirent_failure(PINT_client_sm *sm_p,
+				   job_status_s *js_p)
+{
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */
