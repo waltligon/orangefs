@@ -84,6 +84,7 @@ typedef struct PVFS_credentials_s PVFS_credentials;
 /* PVFS_ERROR_TO_ERRNO - macro for mapping from a PVFS error value
  * to a local UNIX errno value
  */
+extern int32_t PINT_errno_mapping[];
 #define PVFS_ERROR_TO_ERRNO(__error) PINT_errno_mapping[PVFS_ERROR_CODE(__error)]
 
 /* PVFS2 error codes, compliments of asm/errno.h */

@@ -4,28 +4,45 @@
  * See COPYING in top-level directory.
  */
 
-#include <client.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+
+#include "pvfs2-sysint.h"
 #include "helper.h"
 
 #define DEFAULT_TAB "/etc/pvfs2tab"
+
+/* optional parameters, filled in by parse_args() */
+struct options
+{
+    int ssize;
+    int num_datafiles;
+    char* srcfile;
+    char* destfile;
+};
+
+static struct options* parse_args(int argc, char* argv[]);
+static void usage(int argc, char** argv);
 
 int main(int argc, char **argv)
 {
     int ret = -1;
     char str_buf[PVFS_NAME_MAX] = {0};
-    char *filename = NULL;
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     PVFS_sysreq_create req_create;
     PVFS_sysresp_create resp_create;
+    struct options* user_opts = NULL;
 
-    if (argc != 2)
+    user_opts = parse_args(argc, argv);
+    if(!user_opts)
     {
-        fprintf(stderr,"Usage: %s filename\n",argv[0]);
-        return ret;
+	fprintf(stderr, "Error: failed to parse command line arguments.\n");
+	return(-1);
     }
-    filename = argv[1];
 
     if (parse_pvfstab(DEFAULT_TAB, &mnt))
     {
@@ -34,32 +51,42 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
-    if (PVFS_sys_initialize(mnt,&resp_init))
+    ret = PVFS_sys_initialize(mnt,&resp_init);
+    if(ret < 0)
     {
-        fprintf(stderr, "Error: Failed to initialize system interface.\n");
-        return ret;
-    }
-
-    /* get the absolute path on the pvfs2 file system */
-    if (PINT_remove_base_dir(filename,str_buf,PVFS_NAME_MAX))
-    {
-        if (filename[0] != '/')
-        {
-            printf("You forgot the leading '/'\n");
-        }
-        printf("Cannot retrieve entry name for creation on %s\n",
-               filename);
+	if(PVFS_ERROR_CLASS(-ret))
+	{
+	    fprintf(stderr, "Error: PVFS_sys_initialize: %s.\n", 
+		strerror(PVFS_ERROR_TO_ERRNO(-ret)));
+	}
+	else
+	{
+	    fprintf(stderr, 
+		"Warning: PVFS_sys_initialize() returned a non PVFS2 error code:\n");
+	    fprintf(stderr, "Error: PVFS_sys_initialize: %s.\n", 
+		strerror(-ret));
+	}
         return(-1);
     }
 
-    printf("File to be created is %s\n",str_buf);
+    /* get the absolute path on the pvfs2 file system */
+    if (PINT_remove_base_dir(user_opts->destfile,str_buf,PVFS_NAME_MAX))
+    {
+        if (user_opts->destfile[0] != '/')
+        {
+            printf("You forgot the leading '/'\n");
+        }
+        fprintf(stderr, "Error: cannot retrieve entry name for creation on %s\n",
+               user_opts->destfile);
+        return(-1);
+    }
 
     memset(&req_create, 0, sizeof(PVFS_sysreq_create));
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
 
     cur_fs = resp_init.fsid_list[0];
 
-    printf("WARNING: overriding ownership and permissions to match prototype file system.\n");
+    printf("Warning: overriding ownership and permissions to match prototype file system.\n");
 
     req_create.entry_name = str_buf;
     req_create.attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
@@ -71,7 +98,7 @@ int main(int argc, char **argv)
     req_create.credentials.perms = 1877;
     req_create.attr.u.meta.nr_datafiles = -1;
     req_create.parent_refn.handle =
-        lookup_parent_handle(filename,cur_fs);
+        lookup_parent_handle(user_opts->destfile,cur_fs);
     req_create.parent_refn.fs_id = cur_fs;
 
     /* Fill in the dist -- NULL means the system interface used the 
@@ -82,21 +109,117 @@ int main(int argc, char **argv)
     ret = PVFS_sys_create(&req_create,&resp_create);
     if (ret < 0)
     {
-        printf("create failed with errcode = %d\n", ret);
+	if(PVFS_ERROR_CLASS(-ret))
+	{
+	    fprintf(stderr, "Error: PVFS_sys_create: %s.\n", 
+		strerror(PVFS_ERROR_TO_ERRNO(-ret)));
+	}
+	else
+	{
+	    fprintf(stderr, 
+		"Warning: PVFS_sys_create() returned a non PVFS2 error code:\n");
+	    fprintf(stderr, "Error: PVFS_sys_initialize: %s.\n", 
+		strerror(-ret));
+	}
         return(-1);
     }
 	
-    printf("Handle: %Ld\n",resp_create.pinode_refn.handle);
+    printf("copied %d bytes.\n", 0);
 
     ret = PVFS_sys_finalize();
     if (ret < 0)
     {
-        printf("finalizing sysint failed with errcode = %d\n", ret);
-        return (-1);
+	if(PVFS_ERROR_CLASS(-ret))
+	{
+	    fprintf(stderr, "Error: PVFS_sys_finalize: %s.\n", 
+		strerror(PVFS_ERROR_TO_ERRNO(-ret)));
+	}
+	else
+	{
+	    fprintf(stderr, 
+		"Warning: PVFS_sys_initialize() returned a non PVFS2 error code:\n");
+	    fprintf(stderr, "Error: PVFS_sys_finalize: %s.\n", 
+		strerror(-ret));
+	}
+	return(-1);
     }
+
     return(0);
 }
 
+
+/* parse_args()
+ *
+ * parses command line arguments
+ *
+ * returns pointer to options structure on success, NULL on failure
+ */
+static struct options* parse_args(int argc, char* argv[])
+{
+    /* getopt stuff */
+    extern char* optarg;
+    extern int optind, opterr, optopt;
+    char flags[] = "s:n:";
+    char one_opt = ' ';
+
+    struct options* tmp_opts = NULL;
+    int ret = -1;
+
+    /* create storage for the command line options */
+    tmp_opts = (struct options*)malloc(sizeof(struct options));
+    if(!tmp_opts){
+	return(NULL);
+    }
+    memset(tmp_opts, 0, sizeof(struct options));
+
+    /* fill in defaults (except for hostid) */
+    tmp_opts->ssize = 256 * 1024;
+    tmp_opts->num_datafiles = -1;
+
+    /* look at command line arguments */
+    while((one_opt = getopt(argc, argv, flags)) != EOF){
+	switch(one_opt){
+	    case('s'):
+		ret = sscanf(optarg, "%d", &tmp_opts->ssize);
+		if(ret < 1){
+		    free(tmp_opts);
+		    return(NULL);
+		}
+		break;
+	    case('n'):
+		ret = sscanf(optarg, "%d", &tmp_opts->num_datafiles);
+		if(ret < 1){
+		    free(tmp_opts);
+		    return(NULL);
+		}
+		break;
+	    case('?'):
+		usage(argc, argv);
+		exit(EXIT_FAILURE);
+	}
+    }
+
+    if(optind != (argc - 2))
+    {
+	usage(argc, argv);
+	exit(EXIT_FAILURE);
+    }
+
+    /* TODO: should probably malloc and copy instead */
+    tmp_opts->srcfile = argv[argc-2];
+    tmp_opts->destfile = argv[argc-1];
+
+    return(tmp_opts);
+}
+
+
+static void usage(int argc, char** argv)
+{
+    fprintf(stderr, 
+	"Usage: %s [-s strip_size] [-n num_datafiles] unix_source_file pvfs2_dest_file.\n",
+	argv[0]);
+    return;
+}
 
 /*
  * Local variables:
