@@ -16,6 +16,8 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-debug.h"
 #include "pvfs2-util.h"
+/* TODO: fix name */
+#include "pvfs-request.h"
 
 #endif /* __PVFS2_H */
 
