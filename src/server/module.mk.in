@@ -2,6 +2,7 @@ DIR := src/server
 
 # automatically generated c files
 SERVERGENSRC := \
+	$(DIR)/setparam.c \
 	$(DIR)/lookup.c \
 	$(DIR)/create.c \
 	$(DIR)/crdirent.c \

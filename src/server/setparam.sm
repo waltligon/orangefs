@@ -1,0 +1,90 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "pvfs2-server.h"
+
+static int setparam_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int setparam_work(PINT_server_op *s_op, job_status_s* js_p);
+
+extern job_context_id PINT_server_job_context;
+
+%%
+
+machine pvfs2_setparam_sm(prelude, work, final_response, cleanup)
+{
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
+		success => work;
+		default => final_response;
+	}
+
+	state work
+	{
+		run setparam_work;
+		default => final_response;
+	}
+
+	state final_response
+	{
+		jump pvfs2_final_response_sm;
+		default => cleanup;
+	}
+
+	state cleanup
+	{
+		run setparam_cleanup;
+		default => prelude;
+	}
+}
+
+%%
+
+/* setparam_work()
+ *
+ * actually does the "work" involved in setting a runtime server parameter
+ */
+static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
+{
+
+    PINT_STATE_DEBUG("work");
+
+    assert(0);
+
+    js_p->error_code = 0;
+    return(1);
+}
+
+
+/* setparam_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static int setparam_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+{
+    PINT_STATE_DEBUG("cleanup");
+    return(PINT_state_machine_complete(s_op));
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */
+

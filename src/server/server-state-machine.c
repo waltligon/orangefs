@@ -22,6 +22,7 @@ extern struct PINT_state_machine_s pvfs2_io_sm;
 extern struct PINT_state_machine_s pvfs2_remove_sm;
 extern struct PINT_state_machine_s pvfs2_rmdirent_sm;
 extern struct PINT_state_machine_s pvfs2_flush_sm;
+extern struct PINT_state_machine_s pvfs2_setparam_sm;
 
 /* table of state machines, indexed based on PVFS_server_op enumeration */
 /* NOTE: this table is setup at run time in PINT_state_table_initialize() */
@@ -116,6 +117,7 @@ int PINT_state_table_initialize(void)
     PINT_server_op_table[PVFS_SERV_READDIR]      = &pvfs2_readdir_sm;
     PINT_server_op_table[PVFS_SERV_GETCONFIG]    = &pvfs2_get_config_sm;
     PINT_server_op_table[PVFS_SERV_FLUSH]	 = &pvfs2_flush_sm;
+    PINT_server_op_table[PVFS_SERV_MGMT_SETPARAM] = &pvfs2_setparam_sm;
 
     return(0);
 }
