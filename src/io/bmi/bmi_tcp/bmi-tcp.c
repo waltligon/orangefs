@@ -2026,7 +2026,7 @@ static int tcp_do_work_recv(method_addr_p map)
      * It isn't worth the complication of reading only a partial message
      * header - we really want it atomically
      */
-    ret = nbpeek(tcp_addr_data->socket, header_size);
+    ret = nbpeek(tcp_addr_data->socket, &new_header, header_size);
     if (ret < 0)
     {
 	tcp_forget_addr(map, 0);

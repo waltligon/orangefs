@@ -80,6 +80,7 @@ int connect_timeout(int s,
 		    int len,
 		    int time_secs);
 int nbpeek(int s,
+	   void* buf,
 	   int len);
 #ifdef __USE_SENDFILE__
 int nbsendfile(int s,

@@ -185,12 +185,9 @@ int nbrecv(int s,
  *
  * returns number of bytes available on succes, -1 on failure.
  */
-int nbpeek(int s,
-	   int len)
+int nbpeek(int s, void* buf, int len)
 {
     int oldfl, ret, comp = len;
-    char buffer[len];
-    void *buf = buffer;
 
     oldfl = fcntl(s, F_GETFL, 0);
     if (!(oldfl & O_NONBLOCK))
@@ -218,7 +215,6 @@ int nbpeek(int s,
 	    return (-1);
 	}
 	comp -= ret;
-	buf += ret;
     }
     return (len - comp);
 }
