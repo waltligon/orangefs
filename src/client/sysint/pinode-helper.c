@@ -27,12 +27,12 @@ int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
 	int ret = 0;
 	
 	/* Does pinode exist? */
-	ret = PINT_pcache_lookup(pref,*pinode_ptr);
+	ret = PINT_pcache_lookup(pref, pinode_ptr);
 
 	if (ret == PCACHE_LOOKUP_FAILURE)
 	{
 		/* Pinode does not exist in cache */
-		ret = phelper_refresh_pinode(attrmask,(*pinode_ptr),pref,
+		ret = phelper_refresh_pinode(attrmask, pinode_ptr, pref,
 				credentials);
 		if (ret < 0)
 		{
@@ -57,7 +57,7 @@ int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
 			memset(*pinode_ptr,0,sizeof(pinode));	
 			/* Fill the pinode - already allocated */
 			ret = phelper_refresh_pinode( attrmask,
-						     (*pinode_ptr),pref,
+						     pinode_ptr ,pref,
 						     credentials);
 			if (ret < 0)
 			{
@@ -86,7 +86,7 @@ pinode_refresh_failure:
  *
  * returns 0 on success, -errno on failure
  */
-int phelper_refresh_pinode(PVFS_bitfield mask,pinode *pinode_ptr,
+int phelper_refresh_pinode(PVFS_bitfield mask,pinode **pinode_ptr,
 		pinode_reference pref, PVFS_credentials credentials)
 {
 	int ret = 0;
@@ -106,21 +106,34 @@ int phelper_refresh_pinode(PVFS_bitfield mask,pinode *pinode_ptr,
 		return(ret);
 	}
 
-	/* Fill in the pinode using the server response */
-	/* Also take care of filling in the timeouts */
-
-	pinode_ptr->pinode_ref.handle = pref.handle;
-	pinode_ptr->pinode_ref.fs_id = pref.fs_id;
-	pinode_ptr->mask = mask;
+	/* we just added this to the cache, do a lookup to get the pointer to
+	 * the pinode we just added to the cache
+	 */
 	
-	ret = phelper_fill_attr(pinode_ptr,resp.attr,mask);
+
+	ret = PINT_pcache_lookup(pref, pinode_ptr);
+	if (ret == PCACHE_LOOKUP_FAILURE)
+	{
+		/* we just added this, so if we get here maybe caching is off?*/
+		ret = PINT_pcache_pinode_alloc(pinode_ptr);
+		if (ret < 0)
+		{
+			ret = -ENOMEM;
+			return(ret);
+		}
+	}
+	(*pinode_ptr)->pinode_ref.handle = pref.handle;
+	(*pinode_ptr)->pinode_ref.fs_id = pref.fs_id;
+	(*pinode_ptr)->mask = mask;
+	
+	ret = phelper_fill_attr(*pinode_ptr,resp.attr,mask);
 	if (ret < 0)
 	{
 		return(ret);
 	}
 
 	/* Fill the pinode with timestamp info */
-	ret = phelper_fill_timestamps(pinode_ptr);
+	ret = phelper_fill_timestamps(*pinode_ptr);
 	if (ret < 0)
 	{
 		return(ret);
@@ -497,17 +510,20 @@ static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, PVFS_bitfield ma
 	ptr->attr = attr;
 	if ((mask & ATTR_META) == ATTR_META)
 	{
-		ptr->attr.u.meta.dfh = (PVFS_handle *)malloc(size);
-		if (!(ptr->attr.u.meta.dfh))
+		if (num_files > 0)
 		{
-			return(-ENOMEM);
-		}
-		memcpy(ptr->attr.u.meta.dfh,attr.u.meta.dfh,size);
-		ptr->attr.u.meta.nr_datafiles = num_files;
+			ptr->attr.u.meta.dfh = (PVFS_handle *)malloc(size);
+			if (!(ptr->attr.u.meta.dfh))
+			{
+				return(-ENOMEM);
+			}
+			memcpy(ptr->attr.u.meta.dfh,attr.u.meta.dfh,size);
+			ptr->attr.u.meta.nr_datafiles = num_files;
 #if 0
-		/* REMOVED BY PHIL WHEN MOVING TO NEW TREE */
-		ptr->attr.u.meta.dist = attr.u.meta.dist;
+			/* REMOVED BY PHIL WHEN MOVING TO NEW TREE */
+			ptr->attr.u.meta.dist = attr.u.meta.dist;
 #endif
+		}
 	}
 	if ((mask & ATTR_DATA) == ATTR_DATA)
 	{

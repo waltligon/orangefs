@@ -92,6 +92,11 @@ int PINT_server_send_req(bmi_addr_t addr,
     printf("r_status.error_code = %d\nreturn value = %d\n",r_status.error_code, ret);
 
     printf("status(insided encoded struct) = %d\n",((struct PVFS_server_resp_s *)encoded_resp)->status);
+    printf("rsize(insided encoded struct) = %d\n",((struct PVFS_server_resp_s *)encoded_resp)->rsize);
+/*
+    if (((struct PVFS_server_resp_s *)encoded_resp)->rsize == 0)
+	((struct PVFS_server_resp_s *)encoded_resp)->rsize = sizeof(struct PVFS_server_resp_s);
+*/
     if (ret < 0)
     {
 	goto return_error;

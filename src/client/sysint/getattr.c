@@ -73,7 +73,11 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		{
 			/* if we want the size, and its valid, then return now */
 			if (entry_pinode->size_flag == SIZE_VALID)
-				return (0);
+			{
+			    resp->attr = entry_pinode->attr;
+			    /* resp->extended */
+			    return (0);
+			}
 
 			/* if the pinode already exists in the cache, we need
 			 * to remember this so we can update fields instead
@@ -84,8 +88,10 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		}
 		else
 		{
-			/* if we don't care about size in our request, we're done already */
-			return(0);
+		    /* if we don't care about size in our request, we're done already */
+		    resp->attr = entry_pinode->attr;
+		    /* resp->extended */
+		    return (0);
 		}
         }
 	else
@@ -189,6 +195,11 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		failure = SEND_REQ_FAILURE;
 		goto return_error;
 	    }
+	    printf("GETATTR:  ADDING TO PCACHE\n");
+	}
+	else
+	{
+	    printf("GETATTR:   NOT ADDING TO PCACHE\n");
 	}
 
 	/* Free memory allocated for name */

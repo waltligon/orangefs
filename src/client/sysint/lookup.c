@@ -57,18 +57,37 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     /* Initialization */   
     struct PVFS_server_req_s *req_p = NULL;	 /* server request */
     struct PVFS_server_resp_s *ack_p = NULL; /* server response */
-    int ret = -1, i = 0, tflags = 0;
+    int ret = -1, i = 0;
     int max_msg_sz, name_sz;
     struct PINT_decoded_msg decoded;
 
     pinode *entry_pinode = NULL, *pinode_ptr = NULL;
     char *server = NULL, *segment = NULL, *path = NULL;
     bmi_addr_t serv_addr;
-    int start_seg = 0, vflags = 0, num_seg = 0, num_seg_looked_up = 0;
+    int start_seg = 0, vflags = 0, num_seg = 0;
     int start_path = 0, end_path = 0, path_len = 0;
     PVFS_handle parent_handle, final_handle = 0;
     PVFS_bitfield attr_mask;
     pinode_reference entry, parent;
+
+    /* NOTE: special case is that we're doing a lookup on the root handle (which
+     * we got during the getconfig) so we want to check to see if we're looking
+     * up "/"; if so, then get the root handle from the bucket table interface
+     * and return
+     */
+    resp->pinode_refn.fs_id = req->fs_id;
+    printf("looking up string %s\n",req->name);
+
+    if (!strcmp(req->name, "/"))
+    {
+	ret = PINT_bucket_get_root_handle(req->fs_id,&parent_handle);
+	if (ret < 0)
+	{
+	    return(ret);
+	}
+	resp->pinode_refn.handle = parent_handle;
+	return(0);
+    }
 
 
     req_p = (struct PVFS_server_req_s *) malloc(sizeof(struct PVFS_server_req_s));
@@ -84,7 +103,6 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     ret = PINT_bucket_get_root_handle(req->fs_id,&parent_handle);
     if (ret < 0)
     {
-	assert(0);
 	return(ret);
     }
 
@@ -105,7 +123,6 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	goto path_alloc_failure;
     }
     memcpy(path, req->name, path_len);
-    printf("looking up path = %s\n", path);
 
     /* Fill the parent pinode, parent handle is root handle */
     parent.handle = parent_handle;
@@ -299,7 +316,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	    }
 
 	    /* Check permissions for path */
-	    ret = check_perms(pinode_ptr->attr,req->credentials.perms,\
+	    ret = check_perms(entry_pinode->attr,req->credentials.perms,
 			      req->credentials.uid,req->credentials.gid);
 	    if (ret < 0)
 	    {
@@ -335,7 +352,6 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 
     /* Fill response structure */
     resp->pinode_refn.handle = final_handle; 
-    resp->pinode_refn.fs_id = req->fs_id;
 
     return(0);
  

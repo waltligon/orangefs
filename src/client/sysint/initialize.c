@@ -242,7 +242,9 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	req_p->op                      = PVFS_SERV_GETCONFIG;	
 	req_p->rsize                   = sizeof(struct PVFS_server_req_s) + name_sz;
 	req_p->credentials             = creds;
-	req_p->u.getconfig.fs_name     = malloc(7);
+
+/*TODO: rework the pvfstab parsing, cause its all hacked and sucks now*/
+	req_p->u.getconfig.fs_name     = malloc(8);
 	strcpy(req_p->u.getconfig.fs_name,"fs-foo");
 	req_p->u.getconfig.fs_name[7] = '\0';
 #if 0

@@ -32,7 +32,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 {
 	struct PVFS_server_req_s req_p;			/* server request */
 	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
-	int ret = -1, name_sz = 0, io_serv_cnt = 0, i = 0;
+	int ret = -1, name_sz = 0, io_serv_count = 0, i = 0;
 	int attr_mask, last_handle_created = 0;
 	pinode *parent_ptr = NULL, *pinode_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2,*bmi_addr_list = NULL;
@@ -58,12 +58,18 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	    PCACHE_INSERT2_FAILURE,
 	} failure = NONE_FAILURE;
 
-	/* get the pinode of the parent so we can check permissions */
-	attr_mask = ATTR_BASIC | ATTR_META;
-	ret = phelper_get_pinode(req->parent_refn, &parent_ptr, attr_mask, 
+	printf("creating file named %s\n", req->entry_name);
+	printf("parent handle = %lld\n", req->parent_refn.handle);
+	printf("parent fsid = %d\n", req->parent_refn.fs_id);
+
+        /* get the pinode of the parent so we can check permissions */
+        attr_mask = ATTR_BASIC | ATTR_META;
+        ret = phelper_get_pinode(req->parent_refn, &parent_ptr, attr_mask, 
 				    req->credentials);
-	{
+        if(ret < 0)
+        {
 	    /* parent pinode doesn't exist ?!? */
+	    printf("unable to get pinode for parent\n");
 	    failure = PCACHE_LOOKUP_FAILURE;
 	    goto return_error;
 	}
@@ -73,6 +79,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 			    req->credentials.uid, req->credentials.gid);
 	if (ret < 0)
 	{
+	    ret = (-EPERM);
+	    printf("--===PERMISSIONS===--\n");
 	    failure = PCACHE_LOOKUP_FAILURE;
 	    goto return_error;
 	}
@@ -197,10 +205,12 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
         }
 
 	/* how many data files do we need to create? */
-	io_serv_cnt = req->attr.u.meta.nr_datafiles;
+	io_serv_count = req->attr.u.meta.nr_datafiles;
+
+	printf("number of data files to create = %d\n",io_serv_count);
 
 	/* we need one BMI address for each data file */
-	bmi_addr_list = (bmi_addr_t *)malloc(sizeof(bmi_addr_t) * io_serv_cnt);
+	bmi_addr_list = (bmi_addr_t *)malloc(sizeof(bmi_addr_t)*io_serv_count);
 	if (bmi_addr_list == NULL)
 	{
 		ret = (-ENOMEM);
@@ -219,14 +229,14 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	 * 
 	 */
 
-	df_handle_array = (PVFS_handle*)malloc(io_serv_cnt*sizeof(PVFS_handle));
+	df_handle_array = (PVFS_handle*)malloc(io_serv_count*sizeof(PVFS_handle));
 	if (df_handle_array == NULL)
 	{
 	    failure = PREIO2_CREATE_FAILURE;
 	    goto return_error;
 	}
 	
-	ret = PINT_bucket_get_next_io(req->parent_refn.fs_id, io_serv_cnt,
+	ret = PINT_bucket_get_next_io(req->parent_refn.fs_id, io_serv_count,
 			bmi_addr_list, df_handle_array, &handle_mask);
 	if (ret < 0)
 	{
@@ -259,7 +269,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	 * handle to remove would be i - 1 (as long as i < 0).
 	 */
 
-	for(i = 0;i < io_serv_cnt; i++)
+	for(i = 0;i < io_serv_count; i++)
 	{
 		/* Fill in the parameters */
 		req_p.u.create.bucket = df_handle_array[i];
@@ -297,7 +307,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	 */
 	req_p.op = PVFS_SERV_SETATTR;
 	req_p.rsize = sizeof(struct PVFS_server_req_s) 
-			+ io_serv_cnt*sizeof(PVFS_handle);
+			+ io_serv_count*sizeof(PVFS_handle);
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = req->parent_refn.fs_id;
 	req_p.u.setattr.attrmask = req->attrmask;
@@ -305,7 +315,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	/* even though this says copy, we're just updating the pointer for the
 	 * array of data files
 	 */
-	copy_attributes(req_p.u.setattr.attr, req->attr, io_serv_cnt,
+	copy_attributes(req_p.u.setattr.attr, req->attr, io_serv_count,
 			df_handle_array);
 
 	max_msg_sz = sizeof(struct PVFS_server_resp_s);
@@ -376,13 +386,18 @@ return_error:
 	switch(failure)
 	{
 	    case PCACHE_INSERT2_FAILURE:
+		printf("PCACHE_INSERT2_FAILURE\n");
 		PINT_pcache_pinode_dealloc(pinode_ptr);
 	    case PCACHE_INSERT1_FAILURE:
+		printf("PCACHE_INSERT1_FAILURE\n");
 	    case DCACHE_INSERT_FAILURE:
+		printf("DCACHE_INSERT_FAILURE\n");
 		ret = 0;
 		break;
 	    case SETATTR_FAILURE:
+		printf("SETATTR_FAILURE\n");
 	    case IO_REQ_FAILURE:
+		printf("IO_REQ_FAILURE\n");
 		/* rollback each of the data files we created */
 		last_handle_created = i;
 		req_p.op = PVFS_SERV_REMOVE;
@@ -403,10 +418,13 @@ return_error:
 		}
 
 	    case PREIO3_CREATE_FAILURE:
+		printf("PREIO3_CREATE_FAILURE\n");
 		free(df_handle_array);
 	    case PREIO2_CREATE_FAILURE:
+		printf("PREIO2_CREATE_FAILURE\n");
 		free(bmi_addr_list);
 	    case PREIO1_CREATE_FAILURE:
+		printf("PREIO1_CREATE_FAILURE\n");
 		/* rollback crdirent */
 		req_p.op = PVFS_SERV_RMDIRENT;
 		req_p.rsize = sizeof(struct PVFS_server_req_s) 
@@ -422,6 +440,7 @@ return_error:
 
 		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 	    case CRDIRENT_MSG_FAILURE:
+		printf("CRDIRENT_MSG_FAILURE\n");
 		/* rollback create req*/
 		req_p.op = PVFS_SERV_REMOVE;
 		req_p.rsize = sizeof(struct PVFS_server_req_s);
@@ -432,13 +451,17 @@ return_error:
 
 		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 	    case CREATE_MSG_FAILURE:
+		printf("CREATE_MSG_FAILURE\n");
 		if (decoded.buffer != NULL)
 		    PINT_decode_release(&decoded, PINT_DECODE_RESP, 
 					    REQ_ENC_FORMAT);
 
 	    case LOOKUP_SERVER_FAILURE:
+		printf("LOOKUP_SERVER_FAILURE\n");
 	    case PCACHE_LOOKUP_FAILURE:
+		printf("PCACHE_LOOKUP_FAILURE\n");
 	    case DCACHE_LOOKUP_FAILURE:
+		printf("DCACHE_LOOKUP_FAILURE\n");
 	    case NONE_FAILURE:
 
 	    /* TODO: do we want to setup a #define for these invalid handle/fsid

@@ -88,6 +88,12 @@ int PINT_pcache_insert(pinode *pnode )
 	int16_t i = 0,entry = 0;
 	int ret = 0;
 	unsigned char entry_found = 0;
+
+	/* don't pass in null pointers kthnx */
+	if (pnode == NULL)
+	{
+		return (-EINVAL);
+	}
 	
 #if 0
 	/* TODO: does a mutex need to go here?*/
@@ -98,9 +104,9 @@ int PINT_pcache_insert(pinode *pnode )
 	/* Search the cache */
 	for(i = pvfs_pcache.top; i != -1; i = pvfs_pcache.element[i].next)
 	{
-		if ((pnode->pinode_ref.handle ==\
-			pvfs_pcache.element[i].pnode->pinode_ref.handle)\
-			&& (pnode->pinode_ref.fs_id ==\
+		if ((pnode->pinode_ref.handle ==
+			pvfs_pcache.element[i].pnode->pinode_ref.handle)
+			&& (pnode->pinode_ref.fs_id ==
 				pvfs_pcache.element[i].pnode->pinode_ref.fs_id))
 		{
 			entry_found = 1;

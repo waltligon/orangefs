@@ -158,6 +158,15 @@ void debug_print_type(void* thing, int type)
 		struct PVFS_server_req_s * req = thing;
 		switch( req->op )
 		{
+			case PVFS_SERV_CREATE:
+				printf("create request");
+				break;
+			case PVFS_SERV_CREATEDIRENT:
+				printf("create dirent request");
+				break;
+			case PVFS_SERV_REMOVE:
+				printf("remove request");
+				break;
 			case PVFS_SERV_LOOKUP_PATH:
 				printf("lookup path request");
 				break;
@@ -180,6 +189,15 @@ void debug_print_type(void* thing, int type)
 		struct PVFS_server_resp_s * resp = thing;
 		switch( resp->op )
 		{
+			case PVFS_SERV_CREATE:
+				printf("create response");
+				break;
+			case PVFS_SERV_CREATEDIRENT:
+				printf("create dirent response");
+				break;
+			case PVFS_SERV_REMOVE:
+				printf("remove response");
+				break;
 			case PVFS_SERV_LOOKUP_PATH:
 				printf("lookup path response");
 				break;
@@ -340,11 +358,11 @@ int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid)
 {
 	int ret = 0;
 
-	if (((attr.perms & 7) & mode) == mode)
+	if ((attr.perms & mode) == mode)
 		ret = 0;
-	else if (((attr.group == gid && (attr.perms >> 3) & 7) & mode) == mode)
+	else if (attr.group == gid && ((attr.perms & mode) == mode))
 		ret = 0;
-	else if (((attr.owner == uid && (attr.perms >> 6) & 7) & mode) == mode)
+	else if (attr.owner == uid)
 		ret = 0;
 	else
 		ret = -1;
