@@ -202,6 +202,7 @@ struct PINT_server_remove_op
     PVFS_handle dirdata_handle;   /* holds dirdata dspace handle in
                                    * the event that we are removing a
                                    * directory */
+    PVFS_ds_attributes dirdata_ds_attr;
 };
 
 struct PINT_server_mgmt_remove_dirent_op

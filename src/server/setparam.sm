@@ -134,7 +134,6 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
     return 1;
 }
 
-
 /* setparam_cleanup()
  *
  * cleans up any resources consumed by this state machine and ends

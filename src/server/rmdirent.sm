@@ -137,12 +137,12 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
                      "read_directory_entry_handle");
 
     /* set up key and value structures to read directory entry */
-    s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
     /* we will read the dirdata handle from the entry into the
      * rmdirent scratch space */
-    s_op->val.buffer    = &s_op->u.rmdirent.dirdata_handle;
+    s_op->val.buffer = &s_op->u.rmdirent.dirdata_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
@@ -151,7 +151,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
         "key = %s (%d), val_buf = %p (%d))\n",
         s_op->req->u.rmdirent.fs_id,
         Lu(s_op->req->u.rmdirent.parent_handle),
-        (char *) s_op->key.buffer,
+        (char *)s_op->key.buffer,
         s_op->key.buffer_sz,
         s_op->val.buffer,
         s_op->val.buffer_sz);
@@ -196,9 +196,9 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
      * We will read the handle into the rmdirent scratch space
      * (s_op->u.rmdirent.entry_handle).
      */
-    s_op->key.buffer    = s_op->req->u.rmdirent.entry;
+    s_op->key.buffer = s_op->req->u.rmdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.rmdirent.entry) + 1;
-    s_op->val.buffer    = &s_op->u.rmdirent.entry_handle;
+    s_op->val.buffer = &s_op->u.rmdirent.entry_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     ret = job_trove_keyval_read(

@@ -56,28 +56,35 @@ enum
 };
 
 static int remove_check_object_type(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int remove_verify_object_metadata(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int remove_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int remove_remove_dspace(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int remove_try_to_read_dirdata_handle(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
+static int remove_read_dirdata_handle(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int remove_getattr_of_dirdata_handle(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int remove_check_dirdata_entries(
+    PINT_server_op *s_op, job_status_s *js_p);
 static int remove_remove_dirdata_dspace(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 static int remove_setup_work(
-    PINT_server_op *s_op, job_status_s* js_p);
+    PINT_server_op *s_op, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-nested machine pvfs2_remove_work_sm(check_object_type,
+nested machine pvfs2_remove_work_sm(
+    check_object_type,
     verify_object_metadata,
     remove_dspace,
-    try_to_read_dirdata_handle,
+    read_dirdata_handle,
+    getattr_of_dirdata_handle,
+    check_dirdata_entries,
     remove_dirdata_dspace)
 {
 
@@ -92,7 +99,7 @@ nested machine pvfs2_remove_work_sm(check_object_type,
     state verify_object_metadata
     {
         run remove_verify_object_metadata;
-        STATE_TYPE_DIRECTORY => try_to_read_dirdata_handle;
+        STATE_TYPE_DIRECTORY => read_dirdata_handle;
         success => remove_dspace;
         default => return;
     }
@@ -103,11 +110,25 @@ nested machine pvfs2_remove_work_sm(check_object_type,
         default => return;
     }
 
-    state try_to_read_dirdata_handle
+    state read_dirdata_handle
     {
-        run remove_try_to_read_dirdata_handle;
-        success => remove_dirdata_dspace;
+        run remove_read_dirdata_handle;
+        success => getattr_of_dirdata_handle;
         default => remove_dspace;
+    }
+
+    state getattr_of_dirdata_handle
+    {
+        run remove_getattr_of_dirdata_handle;
+        success => check_dirdata_entries;
+        default => return;
+    }
+
+    state check_dirdata_entries
+    {
+        run remove_check_dirdata_entries;
+        success => remove_dirdata_dspace;
+        default => return;
     }
 
     state remove_dirdata_dspace
@@ -116,7 +137,6 @@ nested machine pvfs2_remove_work_sm(check_object_type,
         success => remove_dspace;
         default => return;
     }
-
 }
 
 machine pvfs2_remove_sm(
@@ -169,7 +189,7 @@ machine pvfs2_remove_sm(
  *
  */
 static int remove_check_object_type(PINT_server_op *s_op,
-                                    job_status_s* js_p)
+                                    job_status_s *js_p)
 {
     PINT_STATE_DEBUG("check_object_type");
 
@@ -199,13 +219,15 @@ static int remove_check_object_type(PINT_server_op *s_op,
  * we know that we have metadata if we make it here.
  */
 static int remove_verify_object_metadata(PINT_server_op *s_op,
-					 job_status_s* js_p)
+					 job_status_s *js_p)
 {
     PVFS_object_attr *a_p;
 
     PINT_STATE_DEBUG("verify_object_metadata");
 
     a_p = &s_op->attr;
+
+    js_p->error_code = 0;
     
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  attrs read from keyval = (owner = %d, "
@@ -223,59 +245,78 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
             GOSSIP_SERVER_DEBUG, "  type is directory; removing "
             "dirdata object before removing directory itself.\n");
     }
-    else
-    {
-	js_p->error_code = 0;
-    }
     return 1;
 }
 
-/* Function: remove_try_to_read_dirdata_handle
- *
- * Note: this is "try to read" because the dirdata handle is dropped
- * in lazily.  so, the dirdata object might not exist (in the case of
- * a directory that never had an object placed in it, for example).
- *
- */
-static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
-					     job_status_s* js_p)
+static int remove_read_dirdata_handle(PINT_server_op *s_op,
+                                      job_status_s *js_p)
 {
     int ret;
     job_id_t j_id;
 
-    PINT_STATE_DEBUG("try_to_read_dirdata_handle");
+    PINT_STATE_DEBUG("read_dirdata_handle");
 
     /* set up key and value structures for reading the dirdata handle */
-    s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
-    s_op->val.buffer    = &s_op->u.remove.dirdata_handle;
+    s_op->val.buffer = &s_op->u.remove.dirdata_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  trying to read dirdata handle (coll_id = 0x%x, "
+		 "  trying to read dirdata handle (coll_id = %d, "
                  "handle = %Lu, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->u.remove.fs_id,
-		 Lu(s_op->u.remove.handle),
-		 (char *) s_op->key.buffer,
-		 s_op->key.buffer_sz,
-		 s_op->val.buffer,
-		 s_op->val.buffer_sz);
+		 s_op->u.remove.fs_id, Lu(s_op->u.remove.handle),
+		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+		 s_op->val.buffer, s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(
-        s_op->u.remove.fs_id,
-        s_op->u.remove.handle,
-        &s_op->key,
-        &s_op->val,
-        0,
-        NULL,
-        s_op,
-        0,
-        js_p,
-        &j_id,
+        s_op->u.remove.fs_id, s_op->u.remove.handle,
+        &s_op->key, &s_op->val, 0, NULL, s_op, 0, js_p,
+        &j_id, server_job_context);
+
+    return ret;
+}
+
+static int remove_getattr_of_dirdata_handle(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret;
+    job_id_t tmp_id;
+
+    PINT_STATE_DEBUG("read_dirdata_handle");
+
+    if (js_p->error_code)
+    {
+        return 1;
+    }
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  trying to getattr of "
+                 "dirdata handle (coll_id = %d, handle = %Lu\n",
+                 s_op->u.remove.fs_id, Lu(s_op->u.remove.handle));
+
+    ret = job_trove_dspace_getattr(
+        s_op->u.remove.fs_id, s_op->u.remove.dirdata_handle, s_op,
+        &s_op->u.remove.dirdata_ds_attr, 0, js_p, &tmp_id,
         server_job_context);
 
     return ret;
+}
+
+static int remove_check_dirdata_entries(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    if (js_p->error_code == 0)
+    {
+        if (s_op->u.remove.dirdata_ds_attr.k_size > 0)
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, " detected non-empty "
+                         "directory -- returning error\n");
+            js_p->error_code = -PVFS_ENOTEMPTY;
+        }
+    }
+    return 1;
 }
 
 /*
@@ -285,7 +326,7 @@ static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
  * read_dirdata_handle state.
  */
 static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
-					job_status_s* js_p)
+					job_status_s *js_p)
 {
     int ret;
     job_id_t j_id;
@@ -318,7 +359,7 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
  * (which was verified in previous states).
  */
 static int remove_remove_dspace(PINT_server_op *s_op,
-				job_status_s* js_p)
+				job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
@@ -347,7 +388,7 @@ static int remove_remove_dspace(PINT_server_op *s_op,
  * we're done processing.
  */
 static int remove_cleanup(PINT_server_op *s_op,
-			  job_status_s* js_p)
+			  job_status_s *js_p)
 {
     PINT_STATE_DEBUG("cleanup");
 
@@ -355,7 +396,7 @@ static int remove_cleanup(PINT_server_op *s_op,
 }
 
 static int remove_setup_work(
-    PINT_server_op *s_op, job_status_s* js_p)
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("setup_work");
 
@@ -363,7 +404,7 @@ static int remove_setup_work(
     s_op->u.remove.fs_id = s_op->req->u.remove.fs_id;
 
     js_p->error_code = 0;
-    return(1);
+    return 1;
 }
 
 /*

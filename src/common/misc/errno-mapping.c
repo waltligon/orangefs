@@ -73,9 +73,9 @@ void PVFS_perror(char *text, int retcode)
     }
     else
     {
-	fprintf(stderr, "Warning: non PVFS2 error code:\n");
-	fprintf(stderr, "%s: %s\n", text,
-	strerror(-retcode));
+	fprintf(stderr, "Warning: non PVFS2 error code (%x):\n",
+                -retcode);
+	fprintf(stderr, "%s: %s\n", text, strerror(-retcode));
     }
     return;
 }
@@ -100,10 +100,10 @@ void PVFS_perror_gossip(char *text, int retcode)
     {
 	gossip_err("%s: %s\n", text,
                    strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
-    }       
+    }
     else
     {
-	gossip_err("Warning: non PVFS2 error code:\n");
+	gossip_err("Warning: non PVFS2 error code (%x):\n", -retcode);
 	gossip_err("%s: %s\n", text, strerror(-retcode));
     }
     return;

@@ -178,15 +178,17 @@ int main(int argc, char **argv)
 	(uint64_t)resp_lookup.ref.handle, NULL, NULL);
 
     /* check for understood error values */
-    if(ret == -PVFS_ENOENT)
+    if (ret == -PVFS_ENOENT)
     {
 	fprintf(stderr, "Failure: no servers claimed "
                 "ownership of root handle.\n");
 	return(-1);
     }
+
     if(ret == -PVFS_EALREADY)
     {
-	fprintf(stderr, "Failure: more than one server appears to own root handle.\n");
+	fprintf(stderr, "Failure: more than one server appears "
+                "to own root handle.\n");
 	return(-1);
     }
     if(ret < 0)

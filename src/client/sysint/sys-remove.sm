@@ -39,7 +39,7 @@ enum
     MSGPAIR_RETURN_SUCCESS = 1,
     RMDIRENT_RETRY,
     CRDIRENT_RETRY,
-    RETURN_STORED_ERROR_CODE,
+    RETURN_STORED_ERROR_CODE
 };
 
 static int remove_init(
@@ -402,15 +402,18 @@ static int remove_check_error_code(
                  "remove_check_error_code got %d\n", js_p->error_code);
 
     /*
-      check for error codes which are ok to return to the caller at
+      separate error codes which are ok to return to the caller at
       this point without trying to undo what we've done and retry the
       removal
     */
     switch(js_p->error_code)
     {
+        case -PVFS_ENOTEMPTY:
+            /* let the error pass through for the crdirent cleanup */
+            break;
         case -PVFS_EINVAL:
         case -PVFS_ENOMEM:
-        case -PVFS_ENOTEMPTY:
+            /* don't undo after these errors */
             sm_p->u.remove.stored_error_code = js_p->error_code;
             js_p->error_code = RETURN_STORED_ERROR_CODE;
             break;
