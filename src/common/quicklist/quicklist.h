@@ -155,4 +155,15 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
 #define qlist_for_each(pos, head) \
 	for (pos = (head)->next; pos != (head); pos = pos->next)
 
+/**
+ * list_for_each_safe - iterate over a list safe against 
+ *     removal of list entry
+ * @pos:  the &struct list_head to use as a loop counter.
+ * @n:    another &struct list_head to use as temporary storage
+ * @head: the head for your list.
+ */
+#define qlist_for_each_safe(pos, scratch, head) \
+	for (pos = (head)->next, scratch = pos->next; pos != (head);\
+	pos = scratch, scratch = pos->next)
+
 #endif /* QUICKLIST_H */
