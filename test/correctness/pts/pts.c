@@ -212,6 +212,8 @@ char *str_malloc(const char *instr) {
 int init_config(config *myconfig) {
   int i;
 
+  memset(myconfig, 0, sizeof(*myconfig));
+
   myconfig->debug = 0;
   myconfig->configfile = NULL;
 
