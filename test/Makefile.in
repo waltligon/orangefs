@@ -241,7 +241,7 @@ tests: $(TESTS)
 mpitests: $(MPITESTS)
 ifdef BUILD_MPI
 # add MPI programs to default rule
-all: mpitests
+all: mpitests mpiiotests
 endif
 
 # rule for building MPI objects
