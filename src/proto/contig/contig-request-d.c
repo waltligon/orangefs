@@ -82,6 +82,13 @@ int do_decode_req(
 	    target_msg->buffer = dec_msg;
 
 	    return(0);
+	case PVFS_SERV_IO: 
+	    /* TODO: finish filling this one in.  For now it just looks
+	     * like the self contained operations listed below, but more
+	     * will be added later
+	     */
+
+	     return(0);
 	case PVFS_SERV_RMDIR: /*these structures are all self contained (no pointers that need to be packed) */
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_READDIR:
@@ -92,8 +99,7 @@ int do_decode_req(
 	case PVFS_SERV_ALLOCATE:
 	    return(0);
 
-	case PVFS_SERV_IO: /*haven't been implemented yet*/
-	case PVFS_SERV_IOSTATFS:
+	case PVFS_SERV_IOSTATFS: /*haven't been implemented yet*/
 	case PVFS_SERV_GETDIST:
 	case PVFS_SERV_REVLOOKUP:
 	default:
