@@ -39,6 +39,9 @@ int main(int argc, char **argv)
 	request = (struct PVFS_server_req *) malloc(sizeof(struct PVFS_server_req));
 	response = (struct PVFS_server_resp *) malloc(sizeof(struct PVFS_server_resp));
 
+	ret = PINT_encode_initialize();
+	RET_CHECK("PINT_encode_initialize() failure")
+
 	ret = BMI_initialize("bmi_tcp", NULL, 0);
 
 	RET_CHECK("BMI init Error")
@@ -349,6 +352,8 @@ int main(int argc, char **argv)
 	BMI_close_context(context);
 	BMI_finalize();
 #endif
+	PINT_encode_finalize();
+
 	free(request);
 	free(response);
 

@@ -88,12 +88,21 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
 
+    /* intialize protocol encoder */
+    ret = PINT_encode_initialize();
+    if(ret < 0)
+    {
+	gossip_err("PINT_encode_initialize() failed.\n");
+	*server_level_init = SHUTDOWN_GOSSIP_INTERFACE;
+	goto interface_init_failed;
+    }
+
     printf("Passing in %s\n",user_opts.host_id);
     ret = BMI_initialize("bmi_tcp", user_opts.host_id, BMI_INIT_SERVER);
     if (ret < 0)
     {
 	gossip_err("BMI_initialize Failed: %s\n", strerror(-ret));
-	*server_level_init = SHUTDOWN_GOSSIP_INTERFACE;
+	*server_level_init = SHUTDOWN_ENCODE_INTERFACE;
 	goto interface_init_failed;
     }
     gossip_debug(SERVER_DEBUG, "BMI Init Complete\n");
@@ -608,6 +617,8 @@ static int server_shutdown(PINT_server_status_code level,
     case SHUTDOWN_BMI_INTERFACE:
 	/* Turn off BMI */
 	BMI_finalize();
+    case SHUTDOWN_ENCODE_INTERFACE:
+	PINT_encode_finalize();
     case SHUTDOWN_GOSSIP_INTERFACE:
 	gossip_disable();
     case DEALLOC_INIT_MEMORY:

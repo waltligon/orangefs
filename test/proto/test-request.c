@@ -337,6 +337,9 @@ int main(int argc, char **argv)
 	datafiles = (PVFS_handle*) malloc( NUM_DATAFILES * sizeof( PVFS_handle ) );
 	response = (struct PVFS_server_resp *) malloc( sizeof(struct PVFS_server_resp) );
 
+	ret = PINT_encode_initialize();
+	RET_CHECK("PINT_encode_initialize failure\n")
+
 	ret = BMI_initialize("bmi_tcp", NULL, 0);
 
 	RET_CHECK("BMI init Error\n")
@@ -561,6 +564,8 @@ int main(int argc, char **argv)
 #endif
 
 	}// end of for loop
+
+	PINT_encode_finalize();
 
 	free(request);
 	free(response);

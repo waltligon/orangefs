@@ -15,6 +15,7 @@
 #include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
+#include "PINT-reqproto-encode.h"
 
 extern struct server_configuration_s g_server_config;
 extern gen_mutex_t *g_session_tag_mt_lock;
@@ -50,6 +51,8 @@ int PVFS_sys_finalize()
     PINT_flow_finalize();
 
     BMI_finalize();
+
+    PINT_encode_finalize();
 
     return(0);
 }

@@ -51,6 +51,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 
     enum {
 	NONE_INIT_FAIL = 0,
+	ENCODER_INIT_FAIL,
 	BMI_INIT_FAIL,
 	FLOW_INIT_FAIL,
 	JOB_INIT_FAIL,
@@ -66,6 +67,14 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
     {
 	ret = -EINVAL;
 	init_fail = NONE_INIT_FAIL;
+	goto return_error;
+    }
+
+    /* initialize protocol encoder */
+    ret = PINT_encode_initialize();
+    if(ret < 0)
+    {
+	init_fail = ENCODER_INIT_FAIL;
 	goto return_error;
     }
 
@@ -210,6 +219,8 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	case FLOW_INIT_FAIL:
 	    BMI_finalize();
 	case BMI_INIT_FAIL:
+	    PINT_encode_finalize();
+	case ENCODER_INIT_FAIL:
 	case NONE_INIT_FAIL:
 	    /* nothing to do for either of these */
 	    break;

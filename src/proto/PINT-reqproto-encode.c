@@ -24,6 +24,29 @@ PINT_encoding_table_values_s *PINT_encoding_table[ENCODING_TABLE_SIZE] =
     NULL
 };
 
+/* PINT_encode_initialize()
+ *
+ * starts up the protocol encoding interface
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_encode_initialize(void)
+{
+    return(0);
+}
+
+/* PINT_encode_finalize()
+ *
+ * shuts down the protocol encoding interface
+ *
+ * no return value
+ */
+void PINT_encode_finalize(void)
+{
+    return;
+}
+
+
 /* PINT_encode_init()
  */
 int PINT_encode_init(void)

@@ -37,7 +37,7 @@ struct PINT_encoded_msg
 /* structure to describe messages that have been decoded */
 struct PINT_decoded_msg
 {
-    void* buffer;	    /* decoded buffer */
+    void* buffer;			    /* decoded buffer */
     enum PINT_encoding_type enc_type;	    /* type of encoding that was used */
 };
 
@@ -56,13 +56,10 @@ enum PINT_encode_msg_type
  * public function prototypes
  */
 
-/* PINT_encode()
- * 
- * encodes a buffer (containing a PVFS2 request or response) to be
- * sent over the network
- * 
- * returns 0 on success, -ERRNO on failure
- */
+int PINT_encode_initialize(void);
+
+void PINT_encode_finalize(void);
+
 int PINT_encode(
 		void* input_buffer,
 		enum PINT_encode_msg_type input_type,
@@ -71,13 +68,6 @@ int PINT_encode(
 		enum PINT_encoding_type enc_type
 		);
 
-/* PINT_decode()
- *
- * decodes a buffer (containing a PVFS2 request or response) that
- * has been received from the network
- *
- * returns 0 on success, -ERRNO on failure
- */
 int PINT_decode(
 		void* input_buffer,
 		enum PINT_encode_msg_type input_type,
@@ -85,37 +75,17 @@ int PINT_decode(
 		bmi_addr_t target_addr,
 		PVFS_size size
 		);
-	
-/* PINT_encode_release()
- *
- * frees all resources associated with a message that has been
- * encoded 
- *
- * no return value
- */
+
 void PINT_encode_release(
 			 struct PINT_encoded_msg* msg,
 			 enum PINT_encode_msg_type input_type
 			 );
 
-/* PINT_decode_release()
- *
- * frees all resources associated with a message that has been
- * decoded
- *
- * no return value
- */
 void PINT_decode_release(
 			 struct PINT_decoded_msg* msg,
 			 enum PINT_encode_msg_type input_type
 			 );
 
-/* PINT_encode_calc_max_size()
- *
- * calculates maximum size of the encoded version of a protocol message.
- *
- * returns max size of encoded buffer on success, -errno on failure
- */
 int PINT_encode_calc_max_size(
     enum PINT_encode_msg_type input_type,
     enum PVFS_server_op op_type,

@@ -24,6 +24,7 @@ typedef enum
     STATUS_UNKNOWN = 0,            /* default value                      */
     DEALLOC_INIT_MEMORY,           /* de-alloc any memory we have        */
     SHUTDOWN_GOSSIP_INTERFACE,     /* turn off gossip interface          */
+    SHUTDOWN_ENCODE_INTERFACE,     /* turn off protocol encoder          */
     SHUTDOWN_BMI_INTERFACE,        /* turn off bmi interface             */
     SHUTDOWN_FLOW_INTERFACE,       /* turn off flow interface            */
     SHUTDOWN_STORAGE_INTERFACE,    /* turn off storage interface         */

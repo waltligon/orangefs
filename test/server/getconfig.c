@@ -66,6 +66,13 @@ int main(int argc, char **argv)	{
 	gossip_enable_stderr();
 	gossip_set_debug_mask(0, 0);
 
+	ret = PINT_encode_initialize();
+	if(ret < 0)
+	{
+	    fprintf(stderr, "PINT_encode_initialize failure.\n");
+	    return(-1);
+	}
+
 	/* initialize local interface */
 	ret = BMI_initialize(user_opts->method, NULL, 0);
 	if(ret < 0){
@@ -210,6 +217,8 @@ int main(int argc, char **argv)	{
 		perror("BMI_finalize");
 		return(-1);
 	}
+
+	PINT_encode_finalize();
 
 	/* turn off debugging stuff */
 	gossip_disable();
