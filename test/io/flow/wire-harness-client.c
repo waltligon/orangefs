@@ -268,7 +268,12 @@ int main(int argc, char **argv)
 	printf("Client bw: %f MB/sec\n",
 		((io_size)/((time2-time1)*1000000.0)));
 
+	/* release buffers and such */
 	free(flow_d->src.u.mem.buffer);
+	PINT_flow_free(flow_d);
+	BMI_memfree(server_addr, ack, sizeof(struct wire_harness_ack), 
+		BMI_RECV_BUFFER);
+	BMI_memfree(server_addr, req, total_req_size, BMI_SEND_BUFFER);
 
 	/* shut down flow interface */
 	ret = PINT_flow_finalize();

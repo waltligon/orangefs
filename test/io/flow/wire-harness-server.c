@@ -178,6 +178,9 @@ int main(int argc, char **argv)
 		/* discard the buffer we got for the incoming request */
 		free(request_info.buffer);
 
+		/* discard the flow descriptor */
+		PINT_flow_free(flow_d);
+
 	}
 
 	/* shut down flow interface */
