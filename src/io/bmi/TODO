@@ -32,6 +32,9 @@ Replace void* type for memory regions with PVFS_byte or BMI_byte
 types.  Audit code to make sure that buffers are indexed like
 this: (type)((BMI_byte)buffer + offset)
 
+make sure all control messages (TCP and GM) are network encoded somehow
+to work across different architectures
+
 General (non critical)
 -----------------------
 
@@ -83,6 +86,17 @@ exercise BMI_testsome() and see if it is correct
 
 TCP module:
 -----------------------
+
+fix this bug:
+src/io/bmi/bmi_tcp/socket-collection.c line 256: Error: found bad socket in
+socket collection.
+src/io/bmi/bmi_tcp/socket-collection.c line 257: Error: not handle
+properly....
+src/io/flow/flow.c line 786: Error: Critical failure.
+src/io/job/job.c line 2942: Error: critical Flow failure.
+src/server/pvfs2-server.c line 348: FREAK OUT.
+
+turn off sigpipe (we will just catch errors at system call time)
 
 Do something better than the "enqueue_operation" function - it's
 list of arguments has gotten out of hand, I think...

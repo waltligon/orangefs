@@ -9,30 +9,19 @@ general stuff:
   flow descriptor fields are set to sane initial values - only use it
   during development
 
-- make sure that reuse of flow descriptors works, or at least document
-  if they don't
-
 - probably should get rid of alloca calls, not sure if portable
   (would be faster to keep static buffers for some of that anyway if
   possible)
 
-- figure out points at which zero byte messages should be sent to try
-  to abort flow
-  - in particular, make sure that we can handle receiving a zero
-	 byte message in bmi to mem case.
-
 - implement unpost()
-
-- NOTE: we can assume that every flow will be preceded by an ack from
-  the server.  This means that we already know how much can be
-  transfered, and that we don't have to do any special handling of
-  short cases (they are assumed to be an I/O error).  Ack will also tell
-  client what current size of datafile is.
 
 - think about how flow timeouts should be handled.  For example,
   suppose the sender experiences a BMI error and aborts.  The
   receiver may sit there indefinitely waiting for the next message
   if no one makes it time out.
+
+- fix error handling.  Document how errors are reported, what short
+  flows mean, etc.
 
 flowproto bmi_trove stuff:
 --------------------------
@@ -41,6 +30,11 @@ flowproto bmi_trove stuff:
   clever about multiplexing between bmi/trove and dividing up the
   max_idle_time.
 
-- signal I/O error by sending 0 byte message.  This means receiver
-  should shut down because no other data is coming.
+- finish implementing ability to test multiple collections, remove
+  HACK_global_fsid
 
+- handle corner cases (look for "TODO" entries in code); mostly error
+  conditions and short I/O conditions that we can't clean up right now
+
+- create client side build target that doesn't include trove stuff (and
+  also doesn't need ldb or lpthread)
