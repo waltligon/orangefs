@@ -778,5 +778,52 @@ drwxr-xr-x    3 root     root            0 Aug 15 13:21 ..
 -rw-r--r--    1 root     root       330526 Aug 15 13:30 foo
 \end{verbatim}
 
+\appendix
+
+\section{APPENDIX: Notes on running PVFS2 without root access}
+
+The preceding documentation assumes that you have root access on the
+machine(s) that you wish to install the file system.  However, this is not
+strictly required for any component except for the kernel VFS support.  The
+servers, client libraries (such as MPI-IO), and administrative tools can all
+be used by non-priviledged users.  This may be particularly useful for
+evaluation or testing purposes.
+
+In order to do this, you must make the following adjustments to the
+installation and configuration process:
+\begin{itemize}
+\item Use the --prefix option at configure time to choose an alternate
+directory (one that you have write access to) for installation.  An example
+would be /home/username/pvfs2-build.
+\item When generating the server config files, choose a data storage
+directory that you have write access to, but preferably not NFS mounted.  An
+example would be /tmp/pvfs2-test-space.
+\item Place the pvfs2tab file in an alternate location, such as
+/home/username/pvfs2-build/pvfs2tab, instead of /etc/pvfs2tab.
+Then set the PVFS2TAB\_FILE environment variable to the full path
+to this file.  A tcsh example would be: ``setenv PVFS2TAB\_FILE
+/home/username/pvfs2-build/pvfs2tab''.
+\end{itemize}
+
+
+\section{APPENDIX: Debugging your PVFS2 configuration}
+
+Bug reports and questions should be directed to the PVFS2 users mailing list
+for best results (see the PVFS2 web site for details:
+http://www.pvfs.org/pvfs2/lists.html).  It is helpful to
+include a description of your problem, the PVFS2 version number, and include
+relevant log information from /var/log/messages and /tmp/pvfs2-server.log. 
+
+People who wish to find more verbose information about what the file
+system is doing can enable extra logging messages from the server.
+This is done by adjusting the ``EventLogging'' field in the file system
+configuration file.  By default it is set to ``none''.  You can set it to
+a comma seperated list of log masks to get more information.  An example
+would be ``EventLogging storage,network,server'', which will result
+in verbose messages from the storage subsystem, the network subsystem,
+and server state machines.  \emph{WARNING: this may result in extremely
+large log files!}  The logging masks can also be set at runtime using the
+pvfs2-set-debugmask command line tool.  Usage information and a list of
+supported masks will be shown if it is run with no arguments.
 
 \end{document}
