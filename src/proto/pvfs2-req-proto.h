@@ -120,48 +120,53 @@ struct PVFS_servresp_lookup_path
 };
 
 
-/* Mkdir */
+/* mkdir *******************************************************/
+/* - makes a new directory object */
+
 struct PVFS_servreq_mkdir
 {
+    /* suggestion for what handle to use */
     PVFS_handle requested_handle;
-    PVFS_fs_id fs_id;
-    PVFS_object_attr attr;
+    PVFS_fs_id fs_id;		    /* file system */
+    PVFS_object_attr attr;	    /* initial attributes */
 };
 
 struct PVFS_servresp_mkdir
 {
-    PVFS_handle handle;
+    PVFS_handle handle;		    /* handle of new directory */
 };
 
-/* Createdirent */
+
+/* create dirent ***********************************************/
+/* - creates a new entry within an existing directory */
+
 struct PVFS_servreq_createdirent
 {
-    char* name;		/* name of entry to create */
-    PVFS_handle new_handle;	/* handle of new entry */
-    PVFS_handle parent_handle;	/* handle of directory object to add entry to */
-    PVFS_fs_id fs_id;		/* fs id of file system containing the directory */
+    char *name;			    /* name of new entry */
+    PVFS_handle new_handle;	    /* handle of new entry */
+    PVFS_handle parent_handle;	    /* handle of directory */
+    PVFS_fs_id fs_id;		    /* file system */
 };
 
-/* No response for createdirent */
+/* NOTE: no response structure; all necessary response info is 
+ * returned in generic server response structure
+ */
 
-/* Rmdirent */
+/* rmdirent ****************************************************/
+/* - removes an existing directory entry */
+
 struct PVFS_servreq_rmdirent
 {
-    char* entry;		/* entry to remove */
-    PVFS_handle parent_handle;	/* handle of directory to remove entry from */
-    PVFS_fs_id fs_id;		/* fs id of file system containing directory */
+    char *entry;		    /* name of entry to remove */
+    PVFS_handle parent_handle;	    /* handle of directory */
+    PVFS_fs_id fs_id;		    /* file system */
 };
 
 struct PVFS_servresp_rmdirent
 {
-    PVFS_handle entry_handle;	/* handle of entry removed */
+    PVFS_handle entry_handle;	    /* handle of removed entry */
 };
 
-/* Generic ack */
-struct PVFS_servresp_generic
-{
-    PVFS_handle handle;
-};
 
 /* Readdir */
 struct PVFS_servreq_readdir
@@ -323,7 +328,6 @@ struct PVFS_server_resp
 	struct PVFS_servresp_allocate allocate;
 	struct PVFS_servresp_truncate truncate;
 	struct PVFS_servresp_extension extension;
-	struct PVFS_servresp_generic generic;
 	struct PVFS_servresp_io io;
 	struct PVFS_servresp_write_completion write_completion;
     }

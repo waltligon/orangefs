@@ -635,11 +635,6 @@ static int crdirent_send_bmi(PINT_server_op *s_op,
     /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status = ret->error_code;
 
-    if(ret->error_code == 0) 
-    {
-	s_op->resp->u.generic.handle = s_op->req->u.crdirent.new_handle;
-    }
-
     /* Encode the message */
     job_post_ret = PINT_encode(s_op->resp,
 			       PINT_ENCODE_RESP,
