@@ -13,12 +13,15 @@
 #include <assert.h>
 #include <PINT-reqproto-encode.h>
 #include <PINT-reqproto-module.h>
+#include <assert.h>
 
 DECODE_RESP_HEAD(do_decode_resp)
 {
 
 	struct PVFS_server_resp_s *response = input_buffer;
 	struct PVFS_server_resp_s *decoded_response = NULL;
+
+	assert(response->rsize != 0);
 
 	target_msg->buffer = malloc(response->rsize);
 	memcpy(target_msg->buffer,response,response->rsize);
