@@ -257,7 +257,7 @@ static ssize_t pvfs2_file_write(
         new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
-        pvfs2_print("pvfs2_file_write: writing %d bytes.\n", count);
+        pvfs2_print("pvfs2_file_write: writing %d bytes.\n", (int)count);
 
         ret = pvfs_bufmap_get(&buffer_index);
         if (ret < 0)

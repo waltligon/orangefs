@@ -350,13 +350,16 @@ static int pvfs2_statfs(
 
             buf->f_frsize = 1024;
 
-            pvfs2_print("sizeof(kstatfs)=%d\n",sizeof(struct kstatfs));
+            pvfs2_print("sizeof(kstatfs)=%d\n",
+                        (int)sizeof(struct kstatfs));
             pvfs2_print("sizeof(kstatfs->f_blocks)=%d\n",
-                        sizeof(buf->f_blocks));
-            pvfs2_print("sizeof(statfs)=%d\n",sizeof(struct statfs));
+                        (int)sizeof(buf->f_blocks));
+            pvfs2_print("sizeof(statfs)=%d\n",
+                        (int)sizeof(struct statfs));
             pvfs2_print("sizeof(statfs->f_blocks)=%d\n",
-                        sizeof(tmp_statfs.f_blocks));
-            pvfs2_print("sizeof(sector_t)=%d\n",sizeof(sector_t));
+                        (int)sizeof(tmp_statfs.f_blocks));
+            pvfs2_print("sizeof(sector_t)=%d\n",
+                        (int)sizeof(sector_t));
 
             if ((sizeof(struct statfs) != sizeof(struct kstatfs)) &&
                 (sizeof(tmp_statfs.f_blocks) == 4))
@@ -374,15 +377,15 @@ static int pvfs2_statfs(
                 buf->f_files &= 0x00000000FFFFFFFFULL;
                 buf->f_ffree &= 0x00000000FFFFFFFFULL;
                 
-                pvfs2_print("pvfs2_statfs (T) got %ld files total | "
-                            "%ld files_avail\n", buf->f_files,
-                            buf->f_ffree);
+                pvfs2_print("pvfs2_statfs (T) got %lu files total | %lu "
+                            "files_avail\n", (unsigned long)buf->f_files,
+                            (unsigned long)buf->f_ffree);
             }
             else
             {
-                pvfs2_print("pvfs2_statfs (N) got %lu files total | "
-                            "%lu files_avail\n", buf->f_files,
-                            buf->f_ffree);
+                pvfs2_print("pvfs2_statfs (N) got %lu files total | %lu "
+                            "files_avail\n", (unsigned long)buf->f_files,
+                            (unsigned long)buf->f_ffree);
             }
         } while(0);
 #endif
