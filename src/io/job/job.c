@@ -3645,22 +3645,10 @@ int job_testcontext(job_id_t * out_id_array_p,
                     job_context_id context_id)
 {
     int ret = -1;
-    int timeout_remaining = timeout_ms;
-    struct timeval start;
+    struct timeval target_time;
     struct timeval end;
     int original_count = *inout_count_p;
-
-    /* TODO: here is another cheap shot.  I don't want to special
-     * case the -1 (infinite) timeout possibility right now (maybe
-     * later), but I want the semantics to work.  So.. if that's the
-     * timeout I get, then set the remaining time to the maximum
-     * value that an integer can take on.  That will hold it in
-     * this function for nearly a month. 
-     */
-    if (timeout_ms == -1)
-    {
-        timeout_remaining = INT_MAX;
-    }
+    int time_exhaust_flag = 0;
 
     /* use this as a chance to do a cheap test on the request
      * scheduler
@@ -3684,7 +3672,6 @@ int job_testcontext(job_id_t * out_id_array_p,
     {
         return (ret);
     }
-
     if (ret > 0)
     {
         return (1);
@@ -3692,17 +3679,29 @@ int job_testcontext(job_id_t * out_id_array_p,
 
     *inout_count_p = original_count;
 
+    /* figure out when the function should time out */
+    if(timeout_ms > 0)
+    {
+        ret = gettimeofday(&target_time, NULL);
+        if (ret < 0)
+        {
+            return (ret);
+        }
+        target_time.tv_sec += (timeout_ms/1000);
+        target_time.tv_usec += (timeout_ms%1000)*1000;
+        if(target_time.tv_usec > 1000000)
+        {
+            target_time.tv_sec++;
+            target_time.tv_usec -= 1000000;
+        }
+    }
+
     /* if we fall through to this point, then we need to just try
      * to eat up the timeout until the jobs that we want hit the
      * completion queue
      */
     do
     {
-        ret = gettimeofday(&start, NULL);
-        if (ret < 0)
-        {
-            return (ret);
-        }
 
         if (timeout_ms)
         {
@@ -3713,71 +3712,57 @@ int job_testcontext(job_id_t * out_id_array_p,
             do_one_work_cycle_all(0);
         }
 
-        ret = 0;
-        if (ret == ETIMEDOUT)
+        /* check queue now to see if anything is done */
+        gen_mutex_lock(&completion_mutex);
+        ret = completion_query_context(out_id_array_p,
+                                     inout_count_p,
+                                     returned_user_ptr_array,
+                                     out_status_array_p,
+                                     context_id);
+        gen_mutex_unlock(&completion_mutex);
+        /* return here on error or completion */
+        if (ret < 0)
         {
-            /* nothing completed while we were waiting, trust that the
-             * timedwait got the timing right
-             */
-            *inout_count_p = 0;
-            return (0);
+            return (ret);
         }
-        else if ((ret != 0) && (ret != EINTR) && (ret != EINVAL))
+        if (ret  > 0)
         {
-            /*
-              the above check will skip returning the error on
-              success, EINTR, or EINVAL and just continue processing
+            return (1);
+        }
 
-              NOTE: although not documented in the GNU/Linux manpage
-              POSIX says that pthread_cond_timedwait can return a
-              value of 22 (which corresponds to EINVAL) if the abstime
-              parameter is invalid -- i.e. smaller than (or equal to)
-              the system time.
+        *inout_count_p = original_count;
 
-              for more information:
-              http://nptl.bullopensource.org/phpBB/viewtopic.php?t=19
-            */
-
-            /* any other value we treat as a real error */
-            return (-ret);
+        /* if we reach this point, decide if we timeout or continue */
+        if(timeout_ms == 0)
+        {
+            time_exhaust_flag = 1;
+        }
+        else if(timeout_ms < 0)
+        {   
+            time_exhaust_flag = 0;
         }
         else
         {
-            /* check queue now to see if anything is done */
-            gen_mutex_lock(&completion_mutex);
-            ret = completion_query_context(out_id_array_p,
-                                         inout_count_p,
-                                         returned_user_ptr_array,
-                                         out_status_array_p,
-                                         context_id);
-            gen_mutex_unlock(&completion_mutex);
-            /* return here on error or completion */
+            ret = gettimeofday(&end, NULL);
             if (ret < 0)
             {
                 return (ret);
             }
 
-            if (ret  > 0)
+            /* compare current time with our projected timeout point */
+            if((end.tv_sec > target_time.tv_sec) || ((end.tv_sec ==
+                target_time.tv_sec) && (end.tv_usec >=
+                target_time.tv_usec)))
             {
-                return (1);
+                time_exhaust_flag = 1;
             }
-
-            *inout_count_p = original_count;
+            else
+            {
+                time_exhaust_flag = 0;
+            }
         }
 
-        /* if we fall to here, see how much time has expired and
-         * sleep/work again if we need to
-         */
-        ret = gettimeofday(&end, NULL);
-        if (ret < 0)
-        {
-            return (ret);
-        }
-
-        timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
-            ((end.tv_usec - start.tv_usec) / 1000);
-
-    } while (timeout_remaining > 0);
+    } while (!time_exhaust_flag);
 
     /* fall through, nothing done, time is used up */
     *inout_count_p = 0;
