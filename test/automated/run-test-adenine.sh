@@ -12,7 +12,7 @@ sed -e s/DATE/$DATE/g SUBMIT.pbs.template | sed -e s/USER/$USER/g > SUBMIT.pbs
 cd ../../maint/build/
 
 ./pvfs2-build.sh /home/$USER/testing/$DATE/work
-./mpich2-build.sh /home/$USER/testing/$DATE/work
+./mpich2-build.py /home/$USER/testing/$DATE/work
 
 cd $old_wd
 qsub -l nodes=4:ppn=1 SUBMIT.pbs
