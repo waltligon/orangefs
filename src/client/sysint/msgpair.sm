@@ -273,8 +273,15 @@ static int msgpair_complete(PINT_client_sm *sm_p,
     /* call completion function to perform operation-specific
      * functions.  this call must not block!!!
      */
-    if (msg_p->comp_fn != NULL) ret = msg_p->comp_fn(sm_p, resp_p);
-    if (ret != 0) {
+    if (msg_p->comp_fn != NULL) {
+	/* Q: IS THERE ANY CONSTRAINT ON comp_fn OUTPUT? */
+	js_p->error_code = msg_p->comp_fn(sm_p, resp_p);
+    }
+    else if (resp_p->status != 0) {
+	assert(resp_p->status <= 0); /* parameter range checking */
+	js_p->error_code = resp_p->status;
+    }
+    else if (ret != 0) {
 	/* return error code in job status */
 	/* TODO: SAVE THE ERROR CODE SOMEWHERE ELSE ALSO? */
 	js_p->error_code = ret;

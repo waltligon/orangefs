@@ -267,6 +267,13 @@ static int remove_getattr_comp_fn(void *v_p,
     
     assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
 
+    /* if we get an error, just return immediately, don't try to
+     * actually fill anything in.
+     */
+    if (resp_p->status != 0) {
+	return resp_p->status;
+    }
+
     switch (resp_p->u.getattr.attr.objtype)
     {
 	case PVFS_TYPE_METAFILE:
@@ -313,7 +320,7 @@ static int remove_getattr_comp_fn(void *v_p,
 	    assert(0);
     } /* end of switch() */
 
-    return -1; /* should not get here */
+    return -PVFS_EINVAL; /* should not get here */
 }
 
 /* remove_rmdirent_setup_msgpair()
@@ -350,6 +357,11 @@ static int remove_rmdirent_comp_fn(void *v_p,
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 
     assert(resp_p->op == PVFS_SERV_RMDIRENT); /* sanity check */
+
+    /* don't attempt to parse the response if there was an error */
+    if (resp_p->status != 0) {
+	return resp_p->status;
+    }
 
     /* pull handle out of response, also copy in fs_id from before */
     sm_p->u.remove.object_ref.handle = resp_p->u.rmdirent.entry_handle;
