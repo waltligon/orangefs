@@ -1,22 +1,20 @@
-
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <pint-sysint.h>
 
-/*int get_path_element(char *path, char** segment, int element)*/
-
 int main(int argc, char* argv[])
 {
-	char* path = NULL;
+	char* path = "/test/some/dir/misc/stuff/file.txt";
 	char *segment = NULL;
 	int num_segments = 10,i, ret=0;
 
 	gossip_enable_stderr();
 	gossip_set_debug_mask(1,CLIENT_DEBUG);
-
-	path = malloc(41);
-
-	strcpy(path,"/home/fshorte/porn/mp3s/crap/foobar.txt");
 
 	printf("path = %s\n",path);
 #if 0
@@ -43,9 +41,17 @@ int main(int argc, char* argv[])
 		printf("segment = %s\n",segment);
 		free(segment);
 	}
-	free(path);
 
 	gossip_disable();
 
 	return 0;
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

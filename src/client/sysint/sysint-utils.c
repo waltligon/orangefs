@@ -290,7 +290,7 @@ int get_next_session_tag(void)
 /* get_path_element
  *
  * gets the specified segment in the provided path.
- * IE:	path = "/home/fshorte/foo.txt"
+ * IE:	path = "/some/dir/file.txt"
  *	element = 0
  *  *segment would be pointed to a new buffer containing "home"
  *

@@ -28,17 +28,17 @@
  * steps in lookup
  * --------------
  * 1. First some terminology:
- * /parl/fshorte/crap/foobar.txt = path
+ * /parl/fshorte/some_dir/foobar.txt = path
  * /fshorte			 = segment
  *
  * 2. First we try to shorten the path by looking in the dcache for recently
- * used segments (IE: try to shorten "/parl/fshorte/crap/foobar.txt" to
- * "/crap/foobar.txt")
+ * used segments (IE: try to shorten "/parl/fshorte/some_dir/foobar.txt" to
+ * "/some_dir/foobar.txt")
  *
  * 3. Once we get to a point where we can't resolve the segment in the dcache, 
  * we send lookup the parent handle of the last segment of the path we were 
  * able to lookup, or the just use whatever parent was passed in if nothing
- * is in the dcache. (IE: send "/fshorte/crap/foobar.txt" to the server who has
+ * is in the dcache. (IE: send "/fshorte/some_dir/foobar.txt" to the server who has
  * the dirent for the "/parl" segment)
  * 
  * 4. We're sending the entire path that we have available to the server. We
@@ -49,10 +49,10 @@
  *	    N PVFS_object_attr structures
  *	b) the server can resolve more than one segment in the path, but can't
  *	    go all the way, so it returns M handles and M-1 PVFS_object_attr
- *	    structures.  (IE: it knew about "/fshorte/crap", but the metadata
- *	    server holding the crap directory is different from the server that
+ *	    structures.  (IE: it knew about "/fshorte/some_dir", but the metadata
+ *	    server holding the some_dir directory is different from the server that
  *	    holds the /fshorte segment [heh].  so we get back handles for both
- *	    "/fshorte" and "/crap" segments, but we only get a PVFS_object_attr
+ *	    "/fshorte" and "/some_dir" segments, but we only get a PVFS_object_attr
  *	    structure for "/fshorte".)
  *	c) the server figures out that the path doesn't resolve and returns an
  *	    error.
@@ -70,11 +70,13 @@
  * 1). If the user passes in "/" we return the root handle.
  *
  */
-int PVFS_sys_lookup(PVFS_fs_id fs_id, char* name, PVFS_credentials credentials, PVFS_sysresp_lookup *resp)
+int PVFS_sys_lookup(
+    PVFS_fs_id fs_id, char* name,
+    PVFS_credentials credentials,
+    PVFS_sysresp_lookup *resp)
 {
-    /* Initialization */   
-    struct PVFS_server_req_s req_p;	 /* server request */
-    struct PVFS_server_resp_s *ack_p = NULL; /* server response */
+    struct PVFS_server_req_s req_p;
+    struct PVFS_server_resp_s *ack_p = NULL;
     int ret = -1, i = 0;
     int max_msg_sz, name_sz;
     void* encoded_resp;
