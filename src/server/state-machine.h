@@ -26,6 +26,7 @@ union PINT_state_array_values
 {
 	int (*state_action)(state_action_struct*,job_status_s*);
 	int return_value;
+	int flag;
 	union PINT_state_array_values *next_state;
 };
 
@@ -67,6 +68,8 @@ int PINT_state_machine_halt(void);
 int PINT_state_machine_next(state_action_struct*,job_status_s *r);
 PINT_state_array_values *PINT_state_machine_locate(state_action_struct*);
 int PINT_state_machine_initialize_unexpected(state_action_struct*, job_status_s *ret);
+PINT_state_array_values *PINT_pop_state(state_action_struct *s);
+void PINT_push_state(state_action_struct *s, PINT_state_array_values *p);
 
 #include <pvfs2-server.h>
 

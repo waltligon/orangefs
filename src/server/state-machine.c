@@ -47,6 +47,8 @@
 PINT_server_trove_keys_s Trove_Common_Keys[3] = {{"root_handle",12},{"metadata",9},{"dir_ent",8}};
 
 #define ENCODE_TYPE 0
+#define SM_STATE_RETURN -1
+#define SM_NESTED_STATE 1
 
 /* Here is the idea...
  * For each state machine, you start with an initial function.
@@ -138,7 +140,8 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 		return(-1);
 	}
 	/* TODO:  This would be a good place for caching!!! */
-	s_op->resp = (struct PVFS_server_resp_s *) malloc(sizeof(struct PVFS_server_resp_s));
+	s_op->resp = (struct PVFS_server_resp_s *)
+			malloc(sizeof(struct PVFS_server_resp_s));
 
 	if (!s_op->resp)
 	{
@@ -177,6 +180,7 @@ int PINT_state_machine_init(void)
 	
 }
 
+
 /* Function: PINT_state_machine_halt(void)
    Params: None
    Returns: True
@@ -187,6 +191,7 @@ int PINT_state_machine_halt(void)
 {
 	return(-1);
 }
+
 
 /* Function: PINT_state_machine_next()
    Params: 
@@ -200,37 +205,54 @@ int PINT_state_machine_halt(void)
 int PINT_state_machine_next(state_action_struct *s,job_status_s *r)
 {
 
-   int code_val = r->error_code; 
-	/* move current state to the first return code */
-	PINT_state_array_values *loc;
+   int code_val = r->error_code; /* temp to hold the return code */
+	int retval; /* temp to hold return value of state action */
+	PINT_state_array_values *loc; /* temp pointer into state memory */
+
+	/* skip over the current state action to get to the return code list */
+	loc = s->current_state + 1;
 
 	/* for each entry in the state machine table there is a return
 	 * code followed by a next state pointer to the new state.
 	 * This loops through each entry, checking for a match on the
 	 * return address, and then sets the new current_state and calls
 	 * the new state action function */
-
-	loc = s->current_state + 1;
 	while (loc->return_value != code_val && loc->return_value != DEFAULT_ERROR) 
 	{
 		/* each entry is two items long */
 		loc += 2;
 	}
 
-	/* To do nested states, we check to see if the selected return
-	 * value references a RETURN and if so we get the next state off
-	 * of a stack */
+	/* skip over the return code to get to the next state */
+	loc += 1;
 
-	/* Update the server_op struct to reflect the new location */
-	s->current_state = (loc + 1)->next_state;
+	/* Update the server_op struct to reflect the new location
+	 * see if the selected return value is a STATE_RETURN */
+	if (loc->flag == SM_STATE_RETURN)
+	{
+		s->current_state = PINT_pop_state(s);
+	}
+	else
+	{
+		s->current_state = loc->next_state;
+	}
 
 	/* To do nested states, we check to see if the next state is
 	 * a nested state machine, and if so we push the return state
 	 * onto a stack */
+	if (s->current_state->flag == SM_NESTED_STATE)
+	{
+		PINT_push_state(s, NULL);
+	}
 
-	/* Call the new state function then return to the while
-	 * loop in pvfs2-server.c */
-	return((s->current_state->state_action)(s,r));
+	/* skip over the flag so we can execute the next state action */
+	s->current_state += 1;
+
+	/* Call the new state function then */
+	retval = (s->current_state->state_action)(s,r);
+
+	/* return to the while loop in pvfs2-server.c */
+	return retval;
 
 }
 
@@ -251,9 +273,21 @@ PINT_state_array_values *PINT_state_machine_locate(state_action_struct *s_op)
 	if(PINT_server_op_table[s_op->op] != NULL)
 	{
 		/* Return the first return value possible from the init function... =) */
-		return PINT_server_op_table[s_op->op]->state_machine;
+
+		/* WBL - adjusted for nested state machines
+		 * return PINT_server_op_table[s_op->op]->state_machine */
+		return PINT_server_op_table[s_op->op]->state_machine + 1;
 	}
 	gossip_err("State machine not found for operation %d\n",s_op->op);
 	return(NULL);
-	
 }
+
+PINT_state_array_values *PINT_pop_state(state_action_struct *s)
+{
+	return NULL;
+}
+
+void PINT_push_state(state_action_struct *s, PINT_state_array_values *p)
+{
+}
+
