@@ -332,8 +332,8 @@ This section covers issues related to fault tolerance in the context of PVFS2.
 
 \subsection{Does PVFS2 support some form of fault tolerance?}
 
-Systems can be set up to handle many types of failures for PVFS2.  Currently
-the only failure mode that cannot be handled well is server failure.
+Systems can be set up to handle many types of failures for PVFS2.  Given enough
+hardware, PVFS2 can even handle server failure.
 
 \subsection{Can PVFS2 tolerate client failures?}
 
@@ -357,10 +357,12 @@ server may be used with PVFS2.  \emph{Need a reference of some sort.}
 
 \subsection{Can PVFS2 tolerate server failures?}
 
-At this time we do not have a solution for this problem.  We are currently
-experimenting with clustering of servers for failover, but we do not have a
-cookbook recipe for setting this up.  We will update this are more information
-becomes available.
+We currently have a recipie decscribing the hardware and software needed to set
+up PVFS2 in a high availability cluster.  Our method is outlined in the
+`pvfs2-ha.\{ps,pdf\}' file.  Software redundancy offers a cheaper solution to
+redundancy, but at a non-trivial cost to performance.  We are studying how to
+implement software reduncancy with lower overhead, but we have more designing
+yet to do.
 
 %
 % INTERFACES
