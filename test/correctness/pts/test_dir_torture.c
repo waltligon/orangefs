@@ -89,10 +89,11 @@ PVFS_handle create_dir(PVFS_handle parent, PVFS_fs_id fs_id, char *name)
 	PVFS_sysreq_mkdir req_mkdir;
 	PVFS_sysresp_mkdir resp_mkdir;
 
+	int ret=-1;
+
 	memset(&req_mkdir, 0, sizeof(req_mkdir));
 	memset(&resp_mkdir, 0, sizeof(req_mkdir));
 
-	int ret=-1;
 
 	req_mkdir.entry_name = name; 
 	req_mkdir.parent_refn.handle = parent;
@@ -116,6 +117,37 @@ PVFS_handle create_dir(PVFS_handle parent, PVFS_fs_id fs_id, char *name)
 }
 
 /*
+ * handle:  handle of parent directory
+ * fs_id:   our file system
+ * depth:   how many directories to make at this level
+ * rank:    rank in the mpi process group 
+ */
+
+int recursive_create_dir(PVFS_handle handle, PVFS_fs_id fs_id, 
+		int depth, int ndirs, int rank)
+{
+	int i;
+	char name[PVFS_NAME_MAX];
+	PVFS_handle dir_handle;
+
+	/* base case: we've gone far enough */
+	if (depth == 0) return 0;
+
+	for(i=0; i<ndirs; i++) {
+		snprintf(name, PVFS_NAME_MAX, "depth=%d-rank=%d-iter=%d", 
+				depth, rank, i);
+		dir_handle = create_dir(handle, fs_id, name);
+		if (dir_handle < 0) {
+			return -1;
+		} else {
+			recursive_create_dir(dir_handle, fs_id, 
+					depth-1, ndirs, rank);
+		}
+	}
+	return -1;  /* shouldn't get here */
+}
+
+/*
  * driver for the test
  * comm:	special pts communicator
  * rank:	rank among processes
@@ -130,31 +162,22 @@ int test_dir_torture(MPI_Comm *comm, int rank,  char *buf, void *rawparams)
 {
 	int ret = -1;
 	PVFS_fs_id fs_id;
-	PVFS_handle dir_handle;
+	PVFS_handle  root_handle;
 	generic_params *myparams = (generic_params *)rawparams;
-	int i, depth, nerrs=0;
-	char name[PVFS_NAME_MAX];
+	int nerrs=0;
 
 	fs_id = system_init();
 	if (fs_id < 0)
 	{
 		printf("System initialization error\n");
-		return(ret);
+		return(fs_id);
 	}
 
-	dir_handle = get_root(fs_id);
+	root_handle = get_root(fs_id); 
 
-	for (depth=0; depth<myparams->mode; depth++) {
-		/*
-		snprintf(name, PVFS_NAME_MAX, "depth-%d-%d", depth, rank);
-		dir_handle = create_dir(dir_handle, fs_id, name);
-		*/
-		for (i=0; i<myparams->mode; i++) {
-			snprintf(name, PVFS_NAME_MAX, "%d-%d-testdir", i, rank);
-			dir_handle = create_dir(dir_handle, fs_id, name);
-			if (dir_handle < 0) ++nerrs;
-		}
-	}
+	/* this will make n^n directories, so be careful about running the test with mode=100 */
+	nerrs = recursive_create_dir(root_handle, fs_id, myparams->mode, 
+			myparams->mode, rank);
 
 	ret = PVFS_sys_finalize();
 	if (ret < 0)
