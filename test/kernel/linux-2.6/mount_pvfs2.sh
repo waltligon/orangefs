@@ -7,7 +7,7 @@ fi
 
 if [ "`lsmod | grep -c pvfs2`" = "0" ]; then
    echo "Loading the pvfs2 module"
-   insmod ../../../src/kernel/linux-2.6/pvfs2.o $1
+   insmod ../../../src/kernel/linux-2.6/pvfs2.ko $1
 fi
 
 CUR_DEV="pvfs2-flow"

@@ -142,25 +142,21 @@ static inline int copy_attributes_to_inode(
 
         inode->i_mode |= perm_mode;
 
-        pvfs2_print("COPY TO ATTR TYPE IS: ");
 	switch (attrs->objtype)
 	{
 	case PVFS_TYPE_METAFILE:
-            pvfs2_print("METAFILE\n");
 	    inode->i_mode |= S_IFREG;
 	    inode->i_op = &pvfs2_file_inode_operations;
 	    inode->i_fop = &pvfs2_file_operations;
 	    ret = 0;
 	    break;
 	case PVFS_TYPE_DIRECTORY:
-            pvfs2_print("DIRECTORY\n");
 	    inode->i_mode |= S_IFDIR;
 	    inode->i_op = &pvfs2_dir_inode_operations;
 	    inode->i_fop = &pvfs2_dir_operations;
 	    ret = 0;
 	    break;
 	case PVFS_TYPE_SYMLINK:
-            pvfs2_print("SYMLINK\n");
 	    inode->i_mode |= S_IFLNK;
 	    inode->i_op = &pvfs2_symlink_inode_operations;
 	    inode->i_fop = NULL;
@@ -380,8 +376,10 @@ int pvfs2_inode_getattr(
 	new_op->upcall.req.getattr.refn = pvfs2_inode->refn;
 
 	/* need to check downcall.status value */
-	pvfs2_print("Trying Getattr on handle %Lu on fsid %d\n",
-                    pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
+	pvfs2_print("Trying Getattr on handle %Lu on fsid %d "
+                    "(inode ct = %d)\n", pvfs2_inode->refn.handle,
+                    pvfs2_inode->refn.fs_id,
+                    (int)atomic_read(&inode->i_count));
 
         service_operation_with_timeout_retry(
             new_op, "pvfs2_inode_getattr", retries);
@@ -389,16 +387,10 @@ int pvfs2_inode_getattr(
 	/* check what kind of goodies we got */
 	if (new_op->downcall.status > -1)
 	{
-            if (!copy_attributes_to_inode
+            if (copy_attributes_to_inode
 		(inode, &new_op->downcall.resp.getattr.attributes,
                  new_op->downcall.resp.getattr.link_target))
 	    {
-                pvfs2_print("got good attributes (perms %d); "
-                            "inode is good to go\n",
-                            new_op->downcall.resp.getattr.attributes.perms);
-	    }
-            else
-            {
                 pvfs2_error("pvfs2: pvfs2_inode_getattr -- failed "
                             "to copy attributes\n");
             }
@@ -460,31 +452,6 @@ int pvfs2_inode_setattr(
 
 	/* when request is serviced properly, free req op struct */
 	op_release(new_op);
-
-        /*
-          on setattr success, if the file has changed in
-          size, truncate it now
-        */
-        if ((ret == 0) && (S_ISREG(inode->i_mode)))
-        {
-            if (iattr && (iattr->ia_valid & ATTR_SIZE) &&
-                (iattr->ia_size != inode->i_size))
-            {
-                pvfs2_print("Forcing truncate from %d to %d\n",
-                            (int)inode->i_size, (int)iattr->ia_size);
-                ret = pvfs2_truncate_inode(inode, iattr->ia_size);
-                if (ret == 0)
-                {
-                    i_size_write(inode, iattr->ia_size);
-                }
-            }
-            else
-            {
-                pvfs2_print("Forcing size truncate to %d\n",
-                            (int)inode->i_size);
-                ret = pvfs2_truncate_inode(inode, inode->i_size);
-            }
-        }
     }
     return ret;
 }
@@ -883,12 +850,6 @@ int pvfs2_truncate_inode(
     ret = new_op->downcall.status;
 
     pvfs2_print("pvfs2: pvfs2_truncate got return value of %d\n",ret);
-
-    if (ret == 0)
-    {
-        /* on success, make sure the page cache is also truncated */
-        vmtruncate(inode, size);
-    }
 
   error_exit:
     /* when request is serviced properly, free req op struct */

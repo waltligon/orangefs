@@ -14,6 +14,9 @@
 #include <linux/buffer_head.h>
 #include "pvfs2-kernel.h"
 
+/* defined in linux/fs/block_dev.c */
+extern struct super_block *blockdev_superblock;
+
 extern struct file_system_type pvfs2_fs_type;
 extern struct dentry_operations pvfs2_dentry_operations;
 extern struct inode *pvfs2_get_custom_inode(
@@ -53,14 +56,17 @@ static void pvfs2_destroy_inode(
     struct inode *inode)
 {
     /* free pvfs2 specific (private) inode data */
+    pvfs2_print("pvfs2_destroy_inode: destroying inode %d\n",
+                (int)inode->i_ino);
     kmem_cache_free(pvfs2_inode_cache, PVFS2_I(inode));
 }
 
 static void pvfs2_read_inode(
     struct inode *inode)
 {
-    pvfs2_print("pvfs2: pvfs2_read_inode called (inode = %d)\n",
-		(int) inode->i_ino);
+    pvfs2_print("pvfs2: pvfs2_read_inode called (inode = %d | "
+                "ct = %d)\n", (int)inode->i_ino,
+                (int)atomic_read(&inode->i_count));
 
     /*
        need to populate the freshly allocated (passed in)
@@ -69,36 +75,32 @@ static void pvfs2_read_inode(
        because d_revalidate isn't called after a successful
        dentry lookup if the inode is not present in the inode
        cache already.  so this is our chance.
-     */
+    */
     pvfs2_inode_getattr(inode);
 }
 
 /* called on sync ; make sure data is safe */
 static void pvfs2_write_inode(
     struct inode *inode,
-    int force_sync)
+    int do_sync)
 {
     pvfs2_print("pvfs2: pvfs2_write_inode called (inode = %d)\n",
-		(int) inode->i_ino);
-
-    /*
-       the force_sync flag was added to tell us that we
-       *really* need to sync the specified inode to disk
-     */
-    if (!force_sync)
-    {
-	return;
-    }
-    /* force real sync here */
+		(int)inode->i_ino);
 }
 
 /* called when the VFS removes this inode from the inode cache */
 static void pvfs2_put_inode(
     struct inode *inode)
 {
-    pvfs2_print("pvfs2: pvfs2_put_inode called (ino %d)\n", (int) inode->i_ino);
+    pvfs2_print("pvfs2: pvfs2_put_inode called (ino %d | ct=%d | "
+                "nlink=%d)\n", (int) inode->i_ino,
+                (int)atomic_read(&inode->i_count),
+                (int)inode->i_nlink);
 
-    if (atomic_read(&inode->i_count) == 0)
+    /* set nlink to 0 to allow the inode to be freed */
+    inode->i_nlink = 0;
+
+    if (atomic_read(&inode->i_count) == 1)
     {
 	/* kill dentries associated with this inode */
 	d_prune_aliases(inode);
@@ -176,6 +178,8 @@ static int pvfs2_remount(
     return 0;
 }
 
+/* static int pvfs2_sync_fs(struct super_block *sb, int wait) */
+
 struct super_operations pvfs2_s_ops = {
     .drop_inode = generic_delete_inode,
     .alloc_inode = pvfs2_alloc_inode,
@@ -184,7 +188,8 @@ struct super_operations pvfs2_s_ops = {
     .write_inode = pvfs2_write_inode,
     .put_inode = pvfs2_put_inode,
     .statfs = pvfs2_statfs,
-    .remount_fs = pvfs2_remount
+    .remount_fs = pvfs2_remount,
+/*     .sync_fs = pvfs2_sync_fs */
 /*     .delete_inode   = pvfs2_delete_inode */
 /*     .put_super      = pvfs2_put_super, */
 /*     .write_super    = pvfs2_write_super, */

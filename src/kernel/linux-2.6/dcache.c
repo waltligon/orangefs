@@ -19,7 +19,7 @@ int pvfs2_d_revalidate(
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
 
-    pvfs2_print("pvfs2: pvfs2_d_revalidate called\n");
+/*     pvfs2_print("pvfs2: pvfs2_d_revalidate called\n"); */
 
     if (nd && (nd->flags & LOOKUP_FOLLOW) &&
         (!nd->flags & LOOKUP_CREATE))
@@ -43,9 +43,9 @@ static int pvfs2_d_hash(
     struct dentry *parent,
     struct qstr *hash)
 {
-    pvfs2_print("pvfs2: pvfs2_d_hash called "
-		"(name: %s | len: %d | hash: %d)\n",
-		hash->name, hash->len, hash->hash);
+/*     pvfs2_print("pvfs2: pvfs2_d_hash called " */
+/* 		"(name: %s | len: %d | hash: %d)\n", */
+/* 		hash->name, hash->len, hash->hash); */
     return 0;
 }
 

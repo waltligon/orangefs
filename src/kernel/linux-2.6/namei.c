@@ -39,7 +39,6 @@ static int pvfs2_create(
     if (inode)
     {
         dir->i_nlink++;
-/*         mark_inode_dirty(dir); */
         ret = 0;
     }
     return ret;
@@ -158,10 +157,15 @@ struct dentry *pvfs2_lookup(
 	    /* update dentry/inode pair into dcache */
 	    dentry->d_op = &pvfs2_dentry_operations;
             d_splice_alias(inode, dentry);
+
+            pvfs2_print("Lookup success (inode ct = %d)\n",
+                        (int)atomic_read(&inode->i_count));
 	}
 	else
 	{
 	    pvfs2_error("FIXME: Invalid pvfs2 private data\n");
+            op_release(new_op);
+            return ERR_PTR(-EACCES);
 	}
     }
 
@@ -190,10 +194,10 @@ static int pvfs2_link(
 /*         dir, dentry, mode, PVFS2_VFS_OP_LINK); */
 
     pvfs2_print("pvfs2: pvfs2_link called\n");
-    if (dir->i_nlink >= PVFS2_LINK_MAX)
-    {
-	return -EMLINK;
-    }
+/*     if (dir->i_nlink >= PVFS2_LINK_MAX) */
+/*     { */
+/* 	return -EMLINK; */
+/*     } */
     return -ENOSYS;
 }
 
@@ -210,8 +214,6 @@ static int pvfs2_unlink(
     {
         inode->i_ctime = dir->i_ctime;
 	inode->i_nlink--;
-/* 	dir->i_nlink--; */
-        /* mark_inode_dirty(inode); */
     }
     return ret;
 }
@@ -232,7 +234,6 @@ static int pvfs2_symlink(
     if (inode)
     {
         dir->i_nlink++;
-/*         mark_inode_dirty(dir); */
         ret = 0;
     }
     return ret;
@@ -393,14 +394,11 @@ static int pvfs2_rename(
         {
             new_dentry->d_inode->i_nlink--;
         }
-/*         mark_inode_dirty(new_dentry->d_inode); */
     }
     else if (are_directories)
     {
         new_dir->i_nlink++;
-/*         mark_inode_dirty(new_dir); */
         old_dir->i_nlink--;
-/*         mark_inode_dirty(old_dir); */
     }
 
   error_exit:

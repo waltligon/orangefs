@@ -179,8 +179,11 @@ static int pvfs2_writepage(
     struct writeback_control *wbc)
 {
     pvfs2_print("pvfs2: pvfs2_writepage called\n");
-    return block_write_full_page(page, pvfs2_get_block, wbc);
-/*     return 0; */
+
+    ClearPageDirty(page);
+
+    /* tell mpage_writepages that we're done */
+    return 1;
 }
 
 static int pvfs2_writepages(
@@ -188,15 +191,16 @@ static int pvfs2_writepages(
     struct writeback_control *wbc)
 {
     pvfs2_print("pvfs2: pvfs2_writepages called\n");
+
+    /* using this calls our custom pvfs2_writepage above */
     return mpage_writepages(mapping, wbc, pvfs2_get_block);
-/*     return 0; */
 }
 
-static int pvfs2_sync_page(struct page *page)
-{
-    pvfs2_print("pvfs2: pvfs2_sync_page called on page %p\n", page);
-    return 0;
-}
+/* static int pvfs2_sync_page(struct page *page) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_sync_page called on page %p\n", page); */
+/*     return 0; */
+/* } */
 
 static int pvfs2_readpage(
     struct file *file,
@@ -220,41 +224,41 @@ static int pvfs2_readpages(
     return mpage_readpages(mapping, pages, nr_pages, pvfs2_get_block);
 }
 
-static int pvfs2_prepare_write(
-    struct file *file,
-    struct page *page,
-    unsigned from,
-    unsigned to)
-{
-    pvfs2_print("pvfs2: pvfs2_prepare_write called\n");
-    return block_prepare_write(page, from, to, pvfs2_get_block);
-}
+/* static int pvfs2_prepare_write( */
+/*     struct file *file, */
+/*     struct page *page, */
+/*     unsigned from, */
+/*     unsigned to) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_prepare_write called\n"); */
+/*     return block_prepare_write(page, from, to, pvfs2_get_block); */
+/* } */
 
-static int pvfs2_set_page_dirty(struct page *page)
-{
-    pvfs2_print("pvfs2: pvfs2_set_page_dirty called\n");
+/* static int pvfs2_set_page_dirty(struct page *page) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_set_page_dirty called\n"); */
 
-    set_page_dirty(page);
-    return 0;
-}
+/*     set_page_dirty(page); */
+/*     return 0; */
+/* } */
 
-static int pvfs2_commit_write(
-    struct file *file,
-    struct page *page,
-    unsigned offset,
-    unsigned to)
-{
-    pvfs2_print("pvfs2: pvfs2_commit_write called\n");
-    return 0;
-}
+/* static int pvfs2_commit_write( */
+/*     struct file *file, */
+/*     struct page *page, */
+/*     unsigned offset, */
+/*     unsigned to) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_commit_write called\n"); */
+/*     return 0; */
+/* } */
 
-static sector_t pvfs2_bmap(
-    struct address_space *mapping,
-    sector_t block)
-{
-    pvfs2_print("pvfs2: pvfs2_bmap called\n");
-    return generic_block_bmap(mapping, block, pvfs2_get_block);
-}
+/* static sector_t pvfs2_bmap( */
+/*     struct address_space *mapping, */
+/*     sector_t block) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_bmap called\n"); */
+/*     return generic_block_bmap(mapping, block, pvfs2_get_block); */
+/* } */
 
 static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 {
@@ -273,20 +277,20 @@ static int pvfs2_releasepage(struct page *page, int foo)
     return 0;
 }
 
-static int pvfs2_direct_IO(
-    int rw,
-    struct kiocb *iocb,
-    const struct iovec *iov,
-    loff_t offset,
-    unsigned long nr_segs)
-{
-    struct file *file = iocb->ki_filp;
-    struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
+/* static int pvfs2_direct_IO( */
+/*     int rw, */
+/*     struct kiocb *iocb, */
+/*     const struct iovec *iov, */
+/*     loff_t offset, */
+/*     unsigned long nr_segs) */
+/* { */
+/*     struct file *file = iocb->ki_filp; */
+/*     struct inode *inode = file->f_dentry->d_inode->i_mapping->host; */
 
-    pvfs2_print("pvfs2: pvfs2_direct_IO called\n");
-    return blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov,
-			      offset, nr_segs, pvfs2_get_blocks, NULL);
-}
+/*     pvfs2_print("pvfs2: pvfs2_direct_IO called\n"); */
+/*     return blockdev_direct_IO(rw, iocb, inode, inode->i_sb->s_bdev, iov, */
+/* 			      offset, nr_segs, pvfs2_get_blocks, NULL); */
+/* } */
 
 struct address_space_operations pvfs2_address_operations =
 {
@@ -294,20 +298,20 @@ struct address_space_operations pvfs2_address_operations =
     .readpages = pvfs2_readpages,
     .writepage = pvfs2_writepage,
     .writepages = pvfs2_writepages,
-    .sync_page = pvfs2_sync_page,
-    .prepare_write = pvfs2_prepare_write,
-    .commit_write = pvfs2_commit_write,
-    .set_page_dirty = pvfs2_set_page_dirty,
-    .bmap = pvfs2_bmap,
+/*     .sync_page = pvfs2_sync_page, */
+/*     .prepare_write = pvfs2_prepare_write, */
+/*     .commit_write = pvfs2_commit_write, */
+/*     .set_page_dirty = pvfs2_set_page_dirty, */
+/*     .bmap = pvfs2_bmap, */
     .invalidatepage = pvfs2_invalidatepage,
     .releasepage = pvfs2_releasepage,
-    .direct_IO = pvfs2_direct_IO
+/*     .direct_IO = pvfs2_direct_IO */
 };
 
 struct backing_dev_info pvfs2_backing_dev_info =
 {
     .ra_pages = 0,
-    .memory_backed = 0
+    .memory_backed = 1 /* does not contribute to dirty memory */
 };
 
 void pvfs2_truncate(struct inode *inode)
@@ -315,8 +319,10 @@ void pvfs2_truncate(struct inode *inode)
     pvfs2_print("pvfs2: pvfs2_truncate called on inode %d "
                 "with size %d\n",(int)inode->i_ino,(int)inode->i_size);
 
-    block_truncate_page(
-        inode->i_mapping, inode->i_size, pvfs2_get_block);
+/*     block_truncate_page( */
+/*         inode->i_mapping, inode->i_size, pvfs2_get_block); */
+
+    pvfs2_truncate_inode(inode, inode->i_size);
 }
 
 int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
@@ -331,6 +337,11 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     if (ret == 0)
     {
         ret = pvfs2_inode_setattr(inode, iattr);
+        if ((ret == 0) && (S_ISREG(inode->i_mode)))
+        {
+            pvfs2_print("calling inode_setattr\n");
+            inode_setattr(inode, iattr);
+        }
     }
     else
     {
@@ -392,8 +403,10 @@ struct inode *pvfs2_get_custom_inode(
         inode->i_blkbits = PAGE_CACHE_SHIFT;
         inode->i_blocks = 0;
         inode->i_rdev = dev;
+        inode->i_bdev = NULL;
+        inode->i_cdev = NULL;
 
-        if (mode & S_IFREG)
+        if ((mode & S_IFMT) == S_IFREG)
         {
 	    inode->i_op = &pvfs2_file_inode_operations;
 	    inode->i_fop = &pvfs2_file_operations;
@@ -401,12 +414,12 @@ struct inode *pvfs2_get_custom_inode(
             inode->i_blksize = pvfs_bufmap_size_query();
             inode->i_blkbits = PAGE_CACHE_SHIFT;
         }
-        else if (mode & S_IFLNK)
+        else if ((mode & S_IFMT) == S_IFLNK)
         {
             inode->i_op = &pvfs2_symlink_inode_operations;
             inode->i_fop = NULL;
         }
-        else if (mode & S_IFDIR)
+        else if ((mode & S_IFMT) == S_IFDIR)
         {
 	    inode->i_op = &pvfs2_dir_inode_operations;
 	    inode->i_fop = &pvfs2_dir_operations;

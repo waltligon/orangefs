@@ -315,8 +315,10 @@ int pvfs2_ioctl(
     unsigned int cmd,
     unsigned long arg)
 {
-    pvfs2_print("pvfs2: pvfs2_ioctl called\n");
-    return 0;
+    int ret = -ENOTTY;
+
+    pvfs2_print("pvfs2: pvfs2_ioctl called with cmd %d\n", cmd);
+    return ret;
 }
 
 static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)

@@ -170,9 +170,9 @@ static void aio_progress_notification(sigval_t sig)
             aiocb_ptr_array[i] = &aiocb_p[i];
         }
 
-        gossip_debug(TROVE_DEBUG, "(2) calling lio_listio on q_op %p "
-                     "w/count of %d (sigev is %p)\n",
-                     cur_op,aiocb_inuse_count,&op_p->u.b_rw_list.sigev);
+/*         gossip_debug(TROVE_DEBUG, "(2) calling lio_listio on q_op %p " */
+/*                      "w/count of %d (sigev is %p)\n", */
+/*                      cur_op,aiocb_inuse_count,&op_p->u.b_rw_list.sigev); */
         assert(cur_op == op_p->u.b_rw_list.sigev.sigev_value.sival_ptr);
 
         ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
@@ -833,9 +833,9 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
         aiocb_ptr_array[i] = &aiocb_p[i];
     }
 
-    gossip_debug(TROVE_DEBUG, "(1) calling lio_listio on q_op %p "
-                 "w/count of %d (sigev is %p)\n",
-                 q_op_p,aiocb_inuse_count,&op_p->u.b_rw_list.sigev);
+/*     gossip_debug(TROVE_DEBUG, "(1) calling lio_listio on q_op %p " */
+/*                  "w/count of %d (sigev is %p)\n", */
+/*                  q_op_p,aiocb_inuse_count,&op_p->u.b_rw_list.sigev); */
     assert(q_op_p == op_p->u.b_rw_list.sigev.sigev_value.sival_ptr);
 
     if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLCONVERTED)
@@ -906,7 +906,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
     int ret, i, aiocb_inuse_count, op_in_progress_count = 0;
     struct aiocb *aiocb_p, *aiocb_ptr_array[AIOCB_ARRAY_SZ];
 
-    gossip_debug(TROVE_DEBUG, "dbpf_bstream_rw_list_op_svc() entered.\n");
+/*     gossip_debug(TROVE_DEBUG, "dbpf_bstream_rw_list_op_svc() entered.\n"); */
 
     /* allocate space for aiocb array if necessary */
     /* TODO: watch memory allocation, delay this operation if no memory avail. */
@@ -947,7 +947,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 		/* this particular operation completed w/out error */
 
 		ret = aio_return(&aiocb_p[i]); /* gets the return value of the individual op */
-		gossip_debug(TROVE_DEBUG, "   aio_return() says %d\n", ret);
+/* 		gossip_debug(TROVE_DEBUG, "   aio_return() says %d\n", ret); */
 		/* WHAT DO WE DO WITH PARTIAL READ/WRITES??? */
 
 		/* mark as a NOP so we ignore it from now on */
@@ -1008,7 +1008,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	    aiocb_ptr_array[i] = &aiocb_p[i];
 	}
 
-	gossip_debug(TROVE_DEBUG, "calling lio_listio w/count of %d\n", aiocb_inuse_count);
+/* 	gossip_debug(TROVE_DEBUG, "calling lio_listio w/count of %d\n", aiocb_inuse_count); */
 
 	ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
 	if (ret != 0) {

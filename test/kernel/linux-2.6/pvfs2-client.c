@@ -13,12 +13,13 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <assert.h>
+#include <errno.h>
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define PVFS2_CLIENT_CORE_PATH  "./pvfs2-client-core"
+#define PVFS2_CLIENT_CORE_NAME  "pvfs2-client-core"
 
 typedef struct
 {
@@ -41,13 +42,6 @@ int main(int argc, char **argv)
     memset(&opts, 0, sizeof(options_t));
 
     parse_args(argc, argv, &opts);
-
-    if (verify_pvfs2_client_path(&opts))
-    {
-        fprintf(stderr, "Invalid pvfs2-client-core path: %s\n",
-                opts.path);
-        exit(1);
-    }
 
     if (opts.foreground && opts.verbose)
     {
@@ -148,7 +142,7 @@ static int monitor_pvfs2_client(options_t *opts)
                 if (opts->verbose)
                 {
                     printf("Child process with pid %d was killed by "
-                           "an uncaught signal\n", new_pid);
+                           "an uncaught signal %d\n", new_pid, WTERMSIG(ret));
                 }
                 continue;
             }
@@ -159,7 +153,10 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 printf("About to exec %s\n",opts->path);
             }
-            ret = execv(opts->path, NULL);
+            ret = execvp(opts->path, NULL);
+	    fprintf(stderr, "Could not exec %s, errno is %d\n",
+		    opts->path, errno);
+	    exit(1);
         }
     }
     return ret;
@@ -192,9 +189,6 @@ static void parse_args(int argc, char **argv, options_t *opts)
     };
 
     assert(opts);
-
-    /* set default path name if none is specified */
-    opts->path = PVFS2_CLIENT_CORE_PATH;
 
     while((ret = getopt_long(argc, argv, "-hvVfp:",
                              long_opts, &option_index)) != -1)
@@ -246,12 +240,24 @@ static void parse_args(int argc, char **argv, options_t *opts)
             case 'p':
           do_path:
                 opts->path = optarg;
+		if (verify_pvfs2_client_path(opts))
+		{
+		    fprintf(stderr, "Invalid pvfs2-client-core path: %s\n",
+			    opts->path);
+		    exit(1);
+		}
                 break;
             default:
                 fprintf(stderr, "Unrecognized option.  "
                         "Try --help for information.\n");
                 exit(1);
         }
+    }
+    if (!opts->path)
+    {
+	/* Since they didn't specify a specific path, we're going
+	 * to let execvp() sort things out later */
+      opts->path = PVFS2_CLIENT_CORE_NAME;
     }
 }
 

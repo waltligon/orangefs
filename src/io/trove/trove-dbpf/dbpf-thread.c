@@ -191,7 +191,8 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
         else
         {
-            gossip_debug(TROVE_DEBUG, "op partially serviced; re-queueing\n");
+/*             gossip_debug(TROVE_DEBUG, "op partially serviced; " */
+/*                          "re-queueing\n"); */
             dbpf_queued_op_queue(cur_op);
         }
 
