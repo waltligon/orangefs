@@ -250,6 +250,12 @@ struct PVFS_sysresp_extension_s {
 };
 typedef struct PVFS_sysresp_extension_s PVFS_sysresp_extension;
 
+struct PVFS_sysresp_getparent_s {
+	PVFS_pinode_reference parent_refn;
+	char basename[PVFS_NAME_MAX];
+};
+typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
+
 #if 0
 /* is this relevant to anything? */
 
@@ -366,5 +372,7 @@ int PVFS_sys_statfs(PVFS_fs_id fs_id, PVFS_credentials credentials,
 int PVFS_sys_config(PVFS_handle handle, PVFS_sysresp_config *resp);
 int PVFS_sys_hint(int undefined,  PVFS_sysresp_hint *resp);
 int PVFS_sys_extension(int undefined, PVFS_sysresp_extension *resp);
+int PVFS_sys_getparent(PVFS_fs_id fs_id, char *entry_name, 
+		PVFS_credentials credentials, PVFS_sysresp_getparent *resp);
 
 #endif

@@ -17,5 +17,6 @@ LIBSRC += \
 	$(DIR)/truncate.c \
 	$(DIR)/sysint-utils.c \
 	$(DIR)/pint-bucket.c \
-	$(DIR)/io.c
+	$(DIR)/io.c \
+	$(DIR)/getparent.c
 
