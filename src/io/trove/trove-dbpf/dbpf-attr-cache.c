@@ -218,8 +218,14 @@ int dbpf_attr_cache_finalize(void)
         free(s_cacheable_keywords);
         s_cacheable_keywords = NULL;
 
-        /* NOTE: this array was allocated as a single string */
-        free(s_cacheable_keyword_array);
+        /*
+          NOTE: this array was not allocated; it pointed
+          into s_cacheable_keywords string above
+        */
+        for(i = 0; i < s_cacheable_keyword_array_size; i++)
+        {
+            s_cacheable_keyword_array[i] = NULL;
+        }
     }
     return ret;
 }
