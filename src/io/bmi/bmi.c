@@ -1169,6 +1169,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     /* if not found, try to bring it up now */
     if (!meth_addr) {
 	for (i=0; i<known_method_count; i++) {
+	    const char *name;
 	    /* only bother with those not active */
 	    int j;
 	    for (j=0; j<active_method_count; j++)
@@ -1178,7 +1179,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 		continue;
 
 	    /* well-known that mapping is "x" -> "bmi_x" */
-	    const char *name = known_method_table[i]->method_name + 4;
+	    name = known_method_table[i]->method_name + 4;
 	    if (!strncmp(id_string, name, strlen(name))) {
 	        ret = activate_method(known_method_table[i]->method_name, 0, 0);
 	        if (ret < 0)
