@@ -19,6 +19,7 @@
 #include <signal.h>
 #include <rpc/rpc.h>
 #include <assert.h>
+#include <getopt.h>
 
 #include "bmi.h"
 #include "gossip.h"
@@ -37,6 +38,8 @@
 
 /* Internal Globals */
 job_context_id PINT_server_job_context = -1;
+
+static int server_create_storage_space = 0;
 
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_code server_level_init;
@@ -71,6 +74,7 @@ static int server_shutdown(
 static void *sig_handler(int sig);
 
 static int initialize_new_server_op(job_status_s * ret);
+static int server_parse_cmd_line_args(int argc, char **argv);
 
 
 /*
@@ -359,7 +363,10 @@ int main(int argc, char **argv)
      *      Read configuration options...
      * function located in server_config.c
      */
-    if (PINT_server_config(&user_opts, argv[1], argv[2]))
+    if (server_parse_cmd_line_args(argc, argv) != 0) {
+	goto server_shutdown;
+    }
+    if (PINT_server_config(&user_opts, argv[optind], argv[optind + 1]))
     {
 	gossip_err("Error: Could not read configuration; aborting.\n");
 	goto server_shutdown;
@@ -373,7 +380,7 @@ int main(int argc, char **argv)
     }
 
     /* check if we need to create a storage space and exit */
-    if ((argc == 4) && (strcmp(argv[3],"-f") == 0))
+    if (server_create_storage_space)
     {
         return PINT_server_config_pvfs2_mkspace(&user_opts);
     }
@@ -640,10 +647,28 @@ struct server_configuration_s *get_server_config_struct(void)
     return &user_opts;
 }
 
-/* PINT_server_cp_bmi_unexp
- *
- * Allocates space for server operation, zeros it, and calls job_bmi_unexp()
- */
+static int server_parse_cmd_line_args(int argc, char **argv)
+{
+    int opt;
+
+    while ((opt = getopt(argc, argv,"f")) != EOF) {
+	switch (opt) {
+	    case 'f':
+		server_create_storage_space = 1;
+		break;
+	    case '?':
+	    case 'h':
+	    default:
+		gossip_err("pvfs2-server: [-f] <global_config_file> <server_config_file>\n\n"
+			   "\t-f will cause server to create file system storage and exit\n"
+			   );
+		return 1;
+		break;
+	}
+    }
+    return 0;
+}
+
 static int initialize_new_server_op(job_status_s *temp_stat)
 {
     int ret;
