@@ -370,22 +370,22 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     /* if this attr is in the dbpf attr cache, remove it */
     dbpf_attr_cache_remove(ref);
 
-    /* remove keyval db if it exists
-     *
-     * NOTE: this is not a fatal error; this might have never been
-     * created.
-     */
+    /*
+      remove keyval db if it exists. failure here is not a fatal
+      error; this might have never been created.
+    */
     ret = dbpf_keyval_dbcache_try_remove(
         op_p->coll_p->coll_id, op_p->handle);
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
-    /* remove bstream file if it exists
-     *
-     * NOTE: this is not a fatal error; this might have never been created.
-     */
+    /*
+      remove bstream file if it exists. failure here is not a fatal
+      error; this might have never been created.
+    */
     ret = dbpf_bstream_fdcache_try_remove(
         op_p->coll_p->coll_id, op_p->handle);
+
     switch (ret)
     {
 	case DBPF_BSTREAM_FDCACHE_BUSY:

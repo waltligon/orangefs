@@ -21,9 +21,6 @@
 #include "dbpf.h"
 #include "dbpf-keyval.h"
 
-/* NOTE: THIS IS ALMOST CERTAINLY BROKEN FOR MULTITHREADED APPS!!!
- */
-
 enum
 {
     DBCACHE_ENTRIES = 16
@@ -77,7 +74,7 @@ void dbpf_keyval_dbcache_finalize(void)
 /* dbpf_keyval_dbcache_try_remove()
  *
  * Returns 0 on success, or one of -TROVE_EBUSY, -TROVE_ENOENT, or
- * -TROVE_EPERM (for now).
+ * -TROVE_EPERM.
  *
  */
 int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
@@ -162,8 +159,6 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
  * might change at some later time.
  *
  * Returns 0 on success, -TROVE_errno on failure.
- *
- * TODO: DO A BETTER JOB OF MAPPING ERROR VALUES!
  *
  * create_flag - 0 = don't create if doesn't exist; non-zero = create.
  */
