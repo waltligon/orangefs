@@ -17,6 +17,12 @@
  * Information specific to tcp/ip
  */
 
+/*
+  max number of sequential zero reads to allow; usually indicates a
+  dead connection, but it's used for checking several times to be sure
+*/
+#define BMI_TCP_ZERO_READ_LIMIT  10
+
 /* this contains TCP/IP addressing information- it is filled in as
  * connections are made */
 struct tcp_addr
@@ -38,6 +44,8 @@ struct tcp_addr
     /* socket collection link */
     struct qlist_head sc_link;
     int sc_index;
+    /* count of the number of sequential zero read operations */
+    int zero_read_limit;
 };
 
 /*****************************************************************

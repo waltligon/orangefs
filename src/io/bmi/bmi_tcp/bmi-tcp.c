@@ -180,9 +180,6 @@ enum bmi_tcp_state
     BMI_TCP_COMPLETE
 };
 
-/* max number of zero reads to allow; usually indictaes dead connection */
-#define BMI_TCP_ZERO_READ_LIMIT  10
-
 /* tcp private portion of operation structure */
 struct tcp_op
 {
@@ -195,7 +192,6 @@ struct tcp_op
      */
     void *buffer_list_stub;
     bmi_size_t size_list_stub;
-    int zero_read_limit;
 };
 
 /* static io vector for use with readv and writev; we can only use
@@ -2272,6 +2268,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
     int tmp_errno;
     int tmp;
     bmi_size_t old_amt_complete = 0;
+    struct tcp_op *tcp_op = NULL;
 
     *stall_flag = 1;
 
@@ -2304,26 +2301,29 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
                          (int)active_method_op->actual_size,
                          (int)active_method_op->amt_complete,
                          (int)old_amt_complete);
+
 	    if ((ret == 0) &&
                 (old_amt_complete == active_method_op->amt_complete) &&
                 active_method_op->actual_size &&
                 (active_method_op->amt_complete <
                  active_method_op->actual_size))
 	    {
-                struct tcp_op *tcp_op = (struct tcp_op *)
-                    active_method_op->method_data;
-                assert(tcp_op);
-
-		gossip_debug(
+                gossip_debug(
                     GOSSIP_BMI_DEBUG_TCP, "Warning: bmi_tcp unable "
-                    "to recv any data reported by poll().\n");
-                if (tcp_op->zero_read_limit++ == BMI_TCP_ZERO_READ_LIMIT)
+                    "to recv any data reported by poll(). [1]\n");
+
+                if (tcp_addr_data->zero_read_limit++ ==
+                    BMI_TCP_ZERO_READ_LIMIT)
                 {
                     gossip_debug(GOSSIP_BMI_DEBUG_TCP,
                                  "...dropping connection.\n");
                     tcp_forget_addr(map, 0, -EPIPE);
                 }
 	    }
+            else
+            {
+                tcp_addr_data->zero_read_limit = 0;
+            }
 	    return(ret);
 	}
     }
@@ -2333,19 +2333,34 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
      * It isn't worth the complication of reading only a partial message
      * header - we really want it atomically
      */
-    ret = BMI_sockio_nbpeek(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
+    ret = BMI_sockio_nbpeek(tcp_addr_data->socket,
+                            new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < 0)
     {
 	tcp_forget_addr(map, 0, -errno);
 	return (0);
     }
-    if(ret == 0)
+
+    if (ret == 0)
     {
-	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Warning: bmi_tcp unable to recv any data reported by poll().\n");
-	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "...dropping connection.\n");
-	tcp_forget_addr(map, 0, -EPIPE);
-	return(0);
+        gossip_debug(
+            GOSSIP_BMI_DEBUG_TCP, "Warning: bmi_tcp unable "
+            "to recv any data reported by poll(). [2]\n");
+
+        if (tcp_addr_data->zero_read_limit++ ==
+            BMI_TCP_ZERO_READ_LIMIT)
+        {
+            gossip_debug(GOSSIP_BMI_DEBUG_TCP,
+                         "...dropping connection.\n");
+            tcp_forget_addr(map, 0, -EPIPE);
+        }
+	return(ret);
     }
+    else
+    {
+        tcp_addr_data->zero_read_limit = 0;
+    }
+
     if (ret < TCP_ENC_HDR_SIZE)
     {
 	/* header not ready yet */
@@ -2357,7 +2372,8 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
     /* NOTE: we only allow a blocking call here because we peeked to see
      * if this amount of data was ready above.  
      */
-    ret = BMI_sockio_brecv(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
+    ret = BMI_sockio_brecv(tcp_addr_data->socket,
+                           new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < TCP_ENC_HDR_SIZE)
     {
 	tmp_errno = errno;
