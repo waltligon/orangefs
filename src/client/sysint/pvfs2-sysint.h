@@ -9,11 +9,9 @@
 #ifndef __PVFS_SYSINT_H
 #define __PVFS_SYSINT_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <malloc.h>
+#ifndef __KERNEL__
 #include <limits.h>
-#include <errno.h>
+#endif
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"

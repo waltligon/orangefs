@@ -6,6 +6,8 @@
 
 #include <client.h>
 #include <sys/time.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);

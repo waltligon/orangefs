@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <sys/time.h>
+#include <stdio.h>
 
 #include "client.h"
 #include "gossip.h"
