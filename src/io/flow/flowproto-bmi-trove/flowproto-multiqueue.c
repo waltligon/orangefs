@@ -19,9 +19,9 @@
 #include "trove.h"
 #include "thread-mgr.h"
     
-#define BUFFERS_PER_FLOW 12
+#define BUFFERS_PER_FLOW 6 
 #define BUFFER_SIZE (256*1024)
-#define MAX_REGIONS 8
+#define MAX_REGIONS 16
 
 /* fp_queue_item describes an individual buffer being used within the flow */
 struct fp_queue_item
