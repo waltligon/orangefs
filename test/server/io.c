@@ -168,7 +168,7 @@ int main(int argc, char **argv)	{
 	/* create specific fields */
 	my_req.u.create.requested_handle = 4095;
 	my_req.u.create.fs_id = 9;
-	my_req.u.create.object_type = ATTR_DATA;
+	my_req.u.create.object_type = PVFS_TYPE_DATAFILE;
 
 	ret = PINT_encode(&my_req,PINT_ENCODE_REQ,&encoded1,server_addr,0);
 	if(ret < 0)

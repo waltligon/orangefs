@@ -104,7 +104,7 @@ int main(int argc, char **argv)	{
 	my_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 	my_req->u.create.requested_handle = user_opts->handle;
 	my_req->u.create.fs_id = 9;
-	my_req->u.create.object_type = 2; /* TODO: where is the define/enum for this? */
+	my_req->u.create.object_type = PVFS_TYPE_DATAFILE;
 
 	display_pvfs_structure(my_req,1);
 

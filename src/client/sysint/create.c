@@ -156,7 +156,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	/* Q: is this sane?  pretty sure we're creating meta files here, but do 
 	 * we want to re-use this for other object types? symlinks, dirs, etc?*/
 
-	req_p.u.create.object_type = ATTR_META;
+	req_p.u.create.object_type = PVFS_TYPE_METAFILE;
 
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
@@ -301,7 +301,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	req_p.credentials = req->credentials;
 	req_p.u.create.fs_id = req->parent_refn.fs_id;
 	/* we're making data files on each server */
-	req_p.u.create.object_type = ATTR_DATA;
+	req_p.u.create.object_type = PVFS_TYPE_DATAFILE;
 
 	/* create requests get a generic response */
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);

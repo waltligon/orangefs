@@ -108,7 +108,7 @@ struct PVFS_servreq_create_s
 {
     PVFS_handle requested_handle;	/* requested handle to create */
     PVFS_fs_id fs_id;		/* Filesystem ID */
-    int object_type;		/* Type of PVFS object */
+    PVFS_ds_type object_type;		/* Type of PVFS object */
 };
 typedef struct PVFS_servreq_create_s PVFS_servreq_create;
 
