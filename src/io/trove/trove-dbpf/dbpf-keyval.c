@@ -22,6 +22,7 @@
 
 /* Internal function prototypes */
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p);
+static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p);
@@ -109,9 +110,10 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     ret = db_p->get(db_p, NULL, &key, &data, 0);
     if (ret != 0) {
 	db_p->err(db_p, ret, "DB->get");
-	printf("key = %s\n", op_p->u.k_read.key.buffer);
 	goto return_error;
     }
+
+    op_p->u.k_read.val.read_sz = data.size;
 
     /* sync if requested by user
      *
@@ -583,6 +585,104 @@ static int dbpf_keyval_read_list(
 				 void *user_ptr,
 				 TROVE_op_id *out_op_id_p)
 {
+    struct dbpf_queued_op *q_op_p;
+    struct dbpf_collection *coll_p;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL) return -1;
+
+    /* validate the handle, check permissions */
+
+    /* Q: do we want to somehow lock the handle here so that it
+     *    doesn't get removed while we're working on it?  To allow
+     *    for atomic access?
+     */
+
+    /* grab a queued op structure */
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL) return -1;
+
+    /* initialize all the common members */
+    dbpf_queued_op_init(
+			q_op_p,
+			KEYVAL_READ_LIST,
+			handle,
+			coll_p,
+			dbpf_keyval_read_list_op_svc,
+			user_ptr,
+			flags);
+
+    /* initialize the op-specific members */
+    q_op_p->op.u.k_read_list.key_array = key_array;
+    q_op_p->op.u.k_read_list.val_array = val_array;
+    q_op_p->op.u.k_read_list.count     = count;
+	
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    return 0;
+}
+
+/* dbpf_keyval_read_list_op_svc()
+ *
+ * Service a queued keyval read operation.
+ */
+static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
+{
+    int i, ret, got_db = 0;
+    DB *db_p;
+    DBT key, data;
+
+    /* TODO: move into initial function so we know that the DB is around before
+     * we enqueue (maybe?)
+     */
+    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
+    switch (ret) {
+	case DBPF_KEYVAL_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_KEYVAL_DBCACHE_BUSY:
+	    return 0;
+	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    got_db = 1;
+	    /* drop through */
+    }
+
+    for (i=0; i < op_p->u.k_read_list.count; i++) {
+	/* get keyval */
+	memset(&key, 0, sizeof(key));
+	key.data = op_p->u.k_read_list.key_array[i].buffer;
+	key.size = op_p->u.k_read_list.key_array[i].buffer_sz;
+	
+	memset(&data, 0, sizeof(data));
+	data.data = op_p->u.k_read_list.val_array[i].buffer;
+	data.ulen = op_p->u.k_read_list.val_array[i].buffer_sz;
+	data.flags = DB_DBT_USERMEM;
+	
+	ret = db_p->get(db_p, NULL, &key, &data, 0);
+	if (ret != 0) {
+	    db_p->err(db_p, ret, "DB->get");
+	    goto return_error;
+	}
+
+	op_p->u.k_read_list.val_array[i].read_sz = data.size;
+    }
+
+    /* sync if requested by user
+     *
+     * Note: this is a little bit silly in some sense, but the semantics allow for it.
+     *
+     */
+    if (op_p->flags & TROVE_SYNC) {
+	if ((ret = db_p->sync(db_p, 0)) != 0) {
+	    goto return_error;
+	}
+    }
+
+    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    return 1;
+
+ return_error:
+    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    /* TODO: SAVE COUNT? */
     return -1;
 }
 
