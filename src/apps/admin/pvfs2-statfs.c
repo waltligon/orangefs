@@ -182,6 +182,10 @@ int main(int argc, char **argv)
                     printf("\tuptime (seconds) : %Lu\n",
                            Lu(stat_array[i].uptime_seconds));
                 }
+                printf("\tload averages    : %Lu %Lu %Lu\n",
+                    Lu(stat_array[i].load_1),
+                    Lu(stat_array[i].load_5),
+                    Lu(stat_array[i].load_15));
                 printf("\thandles available: %Lu\n",
                        Lu(stat_array[i].handles_available_count));
                 printf("\thandles total    : %Lu\n",

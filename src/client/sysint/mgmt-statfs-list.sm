@@ -245,6 +245,9 @@ static int statfs_list_comp_fn(void *v_p,
 	sm_stat->bytes_total = resp_stat->bytes_total;
 	sm_stat->ram_total_bytes = resp_stat->ram_total_bytes;
 	sm_stat->ram_free_bytes = resp_stat->ram_free_bytes;
+	sm_stat->load_1 = resp_stat->load_1;
+	sm_stat->load_5 = resp_stat->load_5;
+	sm_stat->load_15 = resp_stat->load_15;
 	sm_stat->uptime_seconds = resp_stat->uptime_seconds;
 	sm_stat->handles_available_count =
             resp_stat->handles_available_count;

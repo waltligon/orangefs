@@ -214,18 +214,24 @@ struct PVFS_statfs_s
     PVFS_size bytes_total;
     uint64_t ram_total_bytes;
     uint64_t ram_free_bytes;
+    uint64_t load_1;
+    uint64_t load_5;
+    uint64_t load_15;
     uint64_t uptime_seconds;
     uint64_t handles_available_count;
     uint64_t handles_total_count;
 };
 typedef struct PVFS_statfs_s PVFS_statfs;
-endecode_fields_8(
+endecode_fields_11(
     PVFS_statfs,
     PVFS_fs_id, fs_id,
     PVFS_size, bytes_available,
     PVFS_size, bytes_total,
     uint64_t, ram_total_bytes,
     uint64_t, ram_free_bytes,
+    uint64_t, load_1,
+    uint64_t, load_5,
+    uint64_t, load_15,
     uint64_t, uptime_seconds,
     uint64_t, handles_available_count,
     uint64_t, handles_total_count)

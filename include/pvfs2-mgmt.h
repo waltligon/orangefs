@@ -23,6 +23,9 @@ struct PVFS_mgmt_server_stat
     PVFS_size bytes_total;
     uint64_t ram_total_bytes;
     uint64_t ram_free_bytes;
+    uint64_t load_1;
+    uint64_t load_5;
+    uint64_t load_15;
     uint64_t uptime_seconds;
     uint64_t handles_available_count;
     uint64_t handles_total_count;

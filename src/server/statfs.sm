@@ -113,12 +113,21 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
                 (system_metrics.freeram * system_metrics.mem_unit);
             s_op->resp.u.statfs.stat.uptime_seconds = (uint64_t)
                 system_metrics.uptime;
+            s_op->resp.u.statfs.stat.load_1 = (uint64_t)
+                system_metrics.loads[0];
+            s_op->resp.u.statfs.stat.load_5 = (uint64_t)
+                system_metrics.loads[1];
+            s_op->resp.u.statfs.stat.load_15 = (uint64_t)
+                system_metrics.loads[2];
         }
     }
 #else
     s_op->resp.u.statfs.stat.ram_total_bytes = 0;
     s_op->resp.u.statfs.stat.ram_free_bytes = 0;
     s_op->resp.u.statfs.stat.uptime_seconds = 0;
+    s_op->resp.u.statfs.stat.load_1 = 0;
+    s_op->resp.u.statfs.stat.load_5 = 0;
+    s_op->resp.u.statfs.stat.load_15 = 0;
 #endif
 
     js_p->error_code = ((ret != 1) ? ret : 0);
