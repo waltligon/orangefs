@@ -20,8 +20,6 @@ int PVFS_sys_statfs(
     PVFS_sysresp_statfs* resp)
 {
     int num_servers = 0;
-    int check_num_servers = 0;
-    int overflow_flag = 0;
     int ret = -1;
     struct PVFS_mgmt_server_stat* stat_array = NULL;
     int i;
@@ -49,20 +47,13 @@ int PVFS_sys_statfs(
     ret = PVFS_mgmt_statfs_all(
 	fs_id,
 	credentials,
-	num_servers,
-	&check_num_servers,
-	&overflow_flag,
-	stat_array);
+	stat_array,
+	&num_servers);
     if(ret < 0)
     {
 	free(stat_array);
 	return(ret);
     }
-
-    /* our logic is wrong somewhere if we didn't correctly calculate the
-     * number of servers to receive statfs information from
-     */
-    assert(num_servers == check_num_servers && overflow_flag == 0);
 
     /* aggregate statistics down into one statfs structure */
 
@@ -71,7 +62,7 @@ int PVFS_sys_statfs(
     resp->statfs_buf.bytes_total = 0;
     for(i=0; i<num_servers; i++)
     {
-	if(stat_array[i].flags & PVFS_MGMT_IO_SERVER)
+	if(stat_array[i].server_type & PVFS_MGMT_IO_SERVER)
 	{
 	    num_io_servers++;
 	    if(min_bytes_available == 0 || 

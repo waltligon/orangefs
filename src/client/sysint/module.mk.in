@@ -34,7 +34,7 @@ SMSRC := \
 	sys-create.sm \
 	sys-remove.sm \
 	mgmt-setparam-list.sm \
-	mgmt-statfs-all.sm \
+	mgmt-statfs-list.sm \
 	sys-flush.sm \
 	sys-symlink.sm
 

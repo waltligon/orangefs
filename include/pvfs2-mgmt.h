@@ -18,8 +18,8 @@ struct PVFS_mgmt_server_stat
     PVFS_fs_id fs_id;
     PVFS_size bytes_available;
     PVFS_size bytes_total;
-    char* bmi_address;
-    int flags;
+    const char* bmi_address;
+    int server_type;
 };
 
 /* values which may be or'd together in the flags field above */
@@ -43,6 +43,12 @@ int PVFS_mgmt_get_server_array(
     PVFS_id_gen_t* addr_array,
     int* inout_count_p);
 
+const char* PVFS_mgmt_map_addr(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    PVFS_id_gen_t addr,
+    int* server_type);
+
 int PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
@@ -57,26 +63,22 @@ int PVFS_mgmt_setparam_all(
     enum PVFS_server_param param,
     int64_t value);
 
-/* TODO: functions below this line need some adjustment... */
-/***********************************************************/
-
+int PVFS_mgmt_statfs_list(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    struct PVFS_mgmt_server_stat* stat_array,
+    PVFS_id_gen_t* addr_array,
+    int count);
 
 int PVFS_mgmt_statfs_all(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
-    int incount,
-    int* outcount,
-    int* overflow_flag,
-    struct PVFS_mgmt_server_stat* stat_array);
-
-char* PVFS_mgmt_build_virt_server_list(
-    PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
-    int server_type);
+    struct PVFS_mgmt_server_stat* stat_array,
+    int* inout_count_p);
 
 int PVFS_mgmt_noop(
     PVFS_credentials credentials,
-    char* host);
+    PVFS_id_gen_t addr);
 
 #endif /* __PVFS2_MGMT_H */
 

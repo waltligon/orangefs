@@ -59,7 +59,7 @@ machine pvfs2_client_mgmt_noop_sm(
 
 int PVFS_mgmt_noop(
     PVFS_credentials credentials,
-    char* host)
+    PVFS_id_gen_t addr)
 {
     int ret;
     PINT_client_sm *sm_p;
@@ -74,8 +74,8 @@ int PVFS_mgmt_noop(
 
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->u.noop.host = host;
     sm_p->cred_p = &credentials;
+    sm_p->msgpair.svr_addr = addr;
 
     gossip_debug(CLIENT_DEBUG,
 		 "PVFS_mgmt_noop calling PINT_client_state_machine_post()\n");
@@ -115,25 +115,11 @@ int PVFS_mgmt_noop(
 static int mgmt_noop_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    int ret = -1;
-
     gossip_debug(CLIENT_DEBUG, "noop state: mgmt_noop_setup_msgpair\n");
 
     /* fill in noop request */
     PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgpair.req,
 	*sm_p->cred_p);
-
-    /* fill in msgpair structure components */
-    /* NOTE: not filling fs_id or handle as one normally would here;
-     * they are irrelevant for the noop case
-     */
-    ret = BMI_addr_lookup(&sm_p->msgpair.svr_addr,
-	sm_p->u.noop.host);
-    if(ret != 0)
-    {
-	js_p->error_code = ret;
-	return(1);
-    }
 
     /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;

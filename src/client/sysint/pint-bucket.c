@@ -287,6 +287,58 @@ int PINT_bucket_get_next_io(
 }
 
 
+/* PINT_bucket_map_addr()
+ *
+ * takes an opaque server address and returns the server type and address
+ * string for that server
+ *
+ * returns pointer to string on success, NULL on failure
+ */
+const char* PINT_bucket_map_addr(struct server_configuration_s* config,
+    PVFS_fs_id fsid, 
+    PVFS_id_gen_t addr,
+    int* server_type)
+{
+    int ret = -EINVAL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    int i;
+
+    if (!(config && server_type))
+    {
+	return(NULL);
+    }
+
+    /* find the correct fs in our config information */
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if (!hash_link)
+    {
+	return(NULL);
+    }
+    cur_config_cache =
+	qlist_entry(hash_link, struct config_fs_cache_s,
+		    hash_link);
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+
+    ret = cache_server_array(config, fsid);
+    if(ret < 0)
+    {
+	return(NULL);
+    }
+
+    /* run through general server list for a match */
+    for(i=0; i<cur_config_cache->fs->server_count; i++)
+    {
+	if(cur_config_cache->fs->server_array[i].addr == addr)
+	{
+	    *server_type = cur_config_cache->fs->server_array[i].server_type;
+	    return(cur_config_cache->fs->server_array[i].addr_string);
+	}
+    }
+    return(NULL);
+}
+
 /* PINT_bucket_count_servers()
  *
  * counts the number of phyical servers of the specified type
@@ -932,6 +984,8 @@ static int cache_server_array(
 		    if(cur_config_cache->fs->server_array[j].addr
 			== tmp_bmi_addr)
 		    {
+			cur_config_cache->fs->server_array[j].server_type 
+			    |= current;
 			dup_flag = 1;
 			break;
 		    }
@@ -944,7 +998,7 @@ static int cache_server_array(
 		    cur_config_cache->fs->server_array[array_index].addr_string 
 			= server_bmi_str;
 		    cur_config_cache->fs->server_array[array_index].server_type 
-			+= current;
+			= current;
 		    array_index++;
 		    cur_config_cache->fs->server_count = array_index;
 		}

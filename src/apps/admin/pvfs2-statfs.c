@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     int i;
     PVFS_credentials creds;
     struct PVFS_mgmt_server_stat* stat_array = NULL;
-    int outcount, overflow_flag;
+    int outcount;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -123,8 +123,8 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    ret = PVFS_mgmt_statfs_all(cur_fs, creds, resp_statfs.server_count,
-	&outcount, &overflow_flag, stat_array);
+    outcount = resp_statfs.server_count;
+    ret = PVFS_mgmt_statfs_all(cur_fs, creds, stat_array, &outcount);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_statfs_all()", ret);
@@ -132,7 +132,7 @@ int main(int argc, char **argv)
     }
 
     /* sanity check */
-    if(overflow_flag || outcount != resp_statfs.server_count)
+    if(outcount != resp_statfs.server_count)
     {
 	fprintf(stderr, "Error: PVFS_mgmt_statfs_all() returned bad results.\n");
 	return(-1);
@@ -146,11 +146,11 @@ int main(int argc, char **argv)
 	printf("server: %s\n", stat_array[i].bmi_address);
 	printf("\tbytes available: %16Ld\n", (long long)stat_array[i].bytes_available);
 	printf("\tbytes total:     %16Ld\n", (long long)stat_array[i].bytes_total);
-	if(stat_array[i].flags & (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER))
+	if(stat_array[i].server_type & (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER))
 	    printf("\tmode: serving both metadata and I/O data\n");
-	else if(stat_array[i].flags & PVFS_MGMT_IO_SERVER)
+	else if(stat_array[i].server_type & PVFS_MGMT_IO_SERVER)
 	    printf("\tmode: serving only I/O data\n");
-	else if(stat_array[i].flags & PVFS_MGMT_META_SERVER)
+	else if(stat_array[i].server_type & PVFS_MGMT_META_SERVER)
 	    printf("\tmode: serving only metadata\n");
 	
 	printf("\n");

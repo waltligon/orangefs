@@ -74,6 +74,12 @@ char* PINT_bucket_build_virt_server_list(
     int server_type);
 /******************************************************/
 
+const char* PINT_bucket_map_addr(
+    struct server_configuration_s* config,
+    PVFS_fs_id fsid,
+    PVFS_id_gen_t addr,
+    int* server_type);
+
 int PINT_bucket_get_server_array(
     struct server_configuration_s* config,
     PVFS_fs_id fsid,

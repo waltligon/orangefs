@@ -210,29 +210,43 @@ int main(int argc, char **argv)
  */
 static int noop_all_servers(PVFS_fs_id fsid)
 {
-    char* server_list;
-    char* server_index;
     PVFS_credentials creds;
     int ret = -1;
-    char cur_server[PVFS_MAX_SERVER_ADDR_LEN];
+    int count;
+    PVFS_id_gen_t* addr_array;
+    int i;
+    int tmp;
  
     creds.uid = getuid();
     creds.gid = getgid();
 
-    printf("\n   meta servers (duplicates are normal):\n");
-    server_list = PVFS_mgmt_build_virt_server_list(
-	fsid, creds, PVFS_MGMT_META_SERVER);	
-    if(!server_list)
+    printf("\n   meta servers:\n");
+    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_META_SERVER,
+	&count);
+    if(ret < 0)
     {
-	fprintf(stderr, "Failure: could not find list of meta servers.\n");
-	return(-PVFS_EINVAL);
+	PVFS_perror("PVFS_mgmt_count_servers()", ret);
+	return(ret);
     }
-    server_index = server_list;
-   
-    while(server_index && sscanf(server_index, "%s ", cur_server) == 1)
+    addr_array = (PVFS_id_gen_t*)malloc(count*sizeof(PVFS_id_gen_t));
+    if(!addr_array)
     {
-	printf("   %s ", cur_server);
-	ret = PVFS_mgmt_noop(creds, cur_server);
+	perror("malloc");
+	return(-PVFS_ENOMEM);
+    }
+
+    ret = PVFS_mgmt_get_server_array(fsid, creds, PVFS_MGMT_META_SERVER,
+	addr_array, &count);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
+	return(ret);
+    }
+
+    for(i=0; i<count; i++)
+    {
+	printf("   %s ", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
+	ret = PVFS_mgmt_noop(creds, addr_array[i]);
 	if(ret == 0)
 	{
 	    printf("Ok\n");
@@ -242,27 +256,36 @@ static int noop_all_servers(PVFS_fs_id fsid)
 	    printf("Failure!\n");
 	    return(ret);
 	}
-
-	server_index = index(server_index, ' ');
-	if(server_index)
-	    server_index++;
     }
-    free(server_list);
+    free(addr_array);
 
-    printf("\n   data servers (duplicates are normal):\n");
-    server_list = PVFS_mgmt_build_virt_server_list(
-	fsid, creds, PVFS_MGMT_IO_SERVER);	
-    if(!server_list)
+    printf("\n   data servers:\n");
+    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_IO_SERVER,
+	&count);
+    if(ret < 0)
     {
-	fprintf(stderr, "Failure: could not find list of data servers.\n");
-	return(-PVFS_EINVAL);
+	PVFS_perror("PVFS_mgmt_count_servers()", ret);
+	return(ret);
     }
-    server_index = server_list;
-   
-    while(server_index && sscanf(server_index, "%s ", cur_server) == 1)
+    addr_array = (PVFS_id_gen_t*)malloc(count*sizeof(PVFS_id_gen_t));
+    if(!addr_array)
     {
-	printf("   %s ", cur_server);
-	ret = PVFS_mgmt_noop(creds, cur_server);
+	perror("malloc");
+	return(-PVFS_ENOMEM);
+    }
+
+    ret = PVFS_mgmt_get_server_array(fsid, creds, PVFS_MGMT_IO_SERVER,
+	addr_array, &count);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
+	return(ret);
+    }
+
+    for(i=0; i<count; i++)
+    {
+	printf("   %s ", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
+	ret = PVFS_mgmt_noop(creds, addr_array[i]);
 	if(ret == 0)
 	{
 	    printf("Ok\n");
@@ -272,12 +295,8 @@ static int noop_all_servers(PVFS_fs_id fsid)
 	    printf("Failure!\n");
 	    return(ret);
 	}
-
-	server_index = index(server_index, ' ');
-	if(server_index)
-	    server_index++;
     }
-    free(server_list);
+    free(addr_array);
 
     return(0);
 }
@@ -291,53 +310,73 @@ static int noop_all_servers(PVFS_fs_id fsid)
  */
 static int print_config(PVFS_fs_id fsid)
 {
-    char* server_list;
-    char* server_index;
-    char cur_server[PVFS_MAX_SERVER_ADDR_LEN];
     PVFS_credentials creds;
+    int i;
+    int ret = -1;
+    int tmp;
+    int count;
+    PVFS_id_gen_t* addr_array;
  
     creds.uid = getuid();
     creds.gid = getgid();
 
-    printf("\n   meta servers (duplicates are normal):\n");
-    server_list = PVFS_mgmt_build_virt_server_list(
-	fsid, creds, PVFS_MGMT_META_SERVER);	
-    if(!server_list)
+    printf("\n   meta servers:\n");
+    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_META_SERVER,
+	&count);
+    if(ret < 0)
     {
-	fprintf(stderr, "Failure: could not find list of meta servers.\n");
-	return(-PVFS_EINVAL);
+	PVFS_perror("PVFS_mgmt_count_servers()", ret);
+	return(ret);
     }
-    server_index = server_list;
-   
-    while(server_index && sscanf(server_index, "%s ", cur_server) == 1)
+    addr_array = (PVFS_id_gen_t*)malloc(count*sizeof(PVFS_id_gen_t));
+    if(!addr_array)
     {
-	printf("   %s\n", cur_server);
+	perror("malloc");
+	return(-PVFS_ENOMEM);
+    }
 
-	server_index = index(server_index, ' ');
-	if(server_index)
-	    server_index++;
-    }
-    free(server_list);
-
-    printf("\n   data servers (duplicates are normal):\n");
-    server_list = PVFS_mgmt_build_virt_server_list(
-	fsid, creds, PVFS_MGMT_IO_SERVER);	
-    if(!server_list)
+    ret = PVFS_mgmt_get_server_array(fsid, creds, PVFS_MGMT_META_SERVER,
+	addr_array, &count);
+    if(ret < 0)
     {
-	fprintf(stderr, "Failure: could not find list of data servers.\n");
-	return(-PVFS_EINVAL);
+	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
+	return(ret);
     }
-    server_index = server_list;
-   
-    while(server_index && sscanf(server_index, "%s ", cur_server) == 1)
-    {
-	printf("   %s\n", cur_server);
 
-	server_index = index(server_index, ' ');
-	if(server_index)
-	    server_index++;
+    for(i=0; i<count; i++)
+    {
+	printf("   %s\n", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
     }
-    free(server_list);
+    free(addr_array);
+
+    printf("\n   data servers:\n");
+    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_IO_SERVER,
+	&count);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_count_servers()", ret);
+	return(ret);
+    }
+    addr_array = (PVFS_id_gen_t*)malloc(count*sizeof(PVFS_id_gen_t));
+    if(!addr_array)
+    {
+	perror("malloc");
+	return(-PVFS_ENOMEM);
+    }
+
+    ret = PVFS_mgmt_get_server_array(fsid, creds, PVFS_MGMT_IO_SERVER,
+	addr_array, &count);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
+	return(ret);
+    }
+
+    for(i=0; i<count; i++)
+    {
+	printf("   %s\n", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
+    }
+    free(addr_array);
 
     return(0);
 }
