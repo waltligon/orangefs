@@ -401,10 +401,9 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 		 a_p->mtime,
 		 a_p->ctime);
 
-    /* Prepare the message */
+    /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status = ret->error_code;
 
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
     if (a_p->objtype == PVFS_TYPE_METAFILE) {
 	gossip_debug(SERVER_DEBUG,
 		     "  also returning %d datafile handles\n",

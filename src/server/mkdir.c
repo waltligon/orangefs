@@ -281,8 +281,8 @@ static int mkdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
     gossip_debug(SERVER_DEBUG, "mkdir state: send_bmi\n");
 
+    /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status = ret->error_code;
-    s_op->resp->rsize  = sizeof(struct PVFS_server_resp_s);
 
     /* Encode the message */
     job_post_ret = PINT_encode(s_op->resp,

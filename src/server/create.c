@@ -197,8 +197,8 @@ static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
     int job_post_ret=0;
     job_id_t i;
 
+    /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status = ret->error_code;
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
     /* Set the handle IF it was created */
     if(ret->error_code == 0) 

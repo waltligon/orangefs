@@ -439,11 +439,7 @@ static int lookup_send_response(PINT_server_op *s_op,
 		     "  error occurred in lookup process; decrementing number of segments.\n");
     }
 
-    payload_sz = s_op->u.lookup.seg_nr * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
-
-    /* fill in response -- WHAT IS GUARANTEED TO BE FILLED IN ALREADY??? */
-    s_op->resp->op                  = PVFS_SERV_LOOKUP_PATH;
-    s_op->resp->rsize               = sizeof(struct PVFS_server_resp_s) + payload_sz;
+    /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status              = 0; /* ??? */
     s_op->resp->u.lookup_path.count = s_op->u.lookup.seg_nr; /* # actually completed */
 

@@ -458,22 +458,17 @@ static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 
     gossip_ldebug(SERVER_DEBUG, "setattr state: setattr_send_bmi\n");
 
-    /* Prepare the message */
+    /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->u.generic.handle = s_op->req->u.setattr.handle;
     s_op->resp->status = ret->error_code;
 
-    gossip_debug(SERVER_DEBUG,"  Returning Status %d\n",ret->error_code);
-
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
-    
-    s_op->encoded.dest = s_op->addr;
+    gossip_debug(SERVER_DEBUG,"  returning Status %d\n",ret->error_code);
 
     job_post_ret = PINT_encode(s_op->resp,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
 			       s_op->enc_type);
-
     assert(job_post_ret == 0);
     
     /* Post message */
@@ -489,8 +484,7 @@ static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 				     s_op, 
 				     ret, 
 				     &i);
-
-    return(job_post_ret);
+    return job_post_ret;
 
 }
 

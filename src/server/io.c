@@ -487,10 +487,9 @@ static int io_send_completion_ack(state_action_struct *s_op,
 		return(1);
 	}
 
+	/* fill in response -- status field is the only generic one we should have to set */
 	s_op->resp->status = ret->error_code;
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
-	s_op->resp->u.write_completion.total_completed = 
-		s_op->flow_d->total_transfered;
+	s_op->resp->u.write_completion.total_completed = s_op->flow_d->total_transfered;
 
 	err = PINT_encode(
 		s_op->resp, 

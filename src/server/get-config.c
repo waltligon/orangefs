@@ -201,15 +201,20 @@ static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
     int job_post_ret;
     job_id_t i;
 
+    /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status = ret->error_code;
     if(!ret->error_code)
     {
+#if 0
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + s_op->u.getconfig.strsize;
+#endif
 	s_op->resp->u.getconfig.root_handle = *((TROVE_handle *)s_op->val.buffer);
     }
     else
     {
+#if 0
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+#endif
     }
     
     job_post_ret = PINT_encode(

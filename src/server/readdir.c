@@ -365,13 +365,13 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 
     gossip_debug(SERVER_DEBUG, "readdir state: send_bmi\n");
 
+    /* fill in response -- status field is the only generic one we should have to set */
     if (ret->error_code == STATE_ENOTDIR) {
 
 	gossip_debug(SERVER_DEBUG,
 		     "  handle didn't refer to a directory\n");
 
 	s_op->resp->status = -EINVAL;
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
     }
     else if (ret->error_code != 0) {
 	/* for now let's assume this is an "empty" directory */
@@ -381,12 +381,10 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 		     ret->error_code);
 
 	s_op->resp->status = 0;
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 	s_op->resp->u.readdir.pvfs_dirent_count = 0;
     }
     else {
 	s_op->resp->status = 0;
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + ret->count * sizeof(PVFS_dirent);
 	s_op->resp->u.readdir.pvfs_dirent_count = ret->count;
     }
 

@@ -520,8 +520,8 @@ static int crdirent_send_bmi(PINT_server_op *s_op,
 
     gossip_debug(SERVER_DEBUG, "crdirent state: send_bmi\n");
 
+    /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status = ret->error_code;
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
     if(ret->error_code == 0) 
     {

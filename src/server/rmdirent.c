@@ -330,10 +330,11 @@ static int rmdirent_send_bmi(PINT_server_op *s_op,
 
     gossip_debug(SERVER_DEBUG, "rmdirent state: send_bmi\n");
 
+    /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status = ret->error_code;
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
-    /* Set the handle IF it was removed */
+    /* Set the handle if it was removed */
     if(ret->error_code == 0) {
 	/* we return the handle from the directory entry in the response */
 	s_op->resp->u.rmdirent.entry_handle = s_op->u.rmdirent.entry_handle;
