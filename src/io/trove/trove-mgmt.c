@@ -61,6 +61,10 @@ int trove_initialize(char *stoname,
 	return -1;
     }
 
+#ifdef WITH_MTRACE
+    mtrace();
+#endif
+
     /* for each underlying method, call its initialize function */
 
     /* currently all we have is dbpf */

@@ -11,15 +11,19 @@ if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
 else AC_MSG_RESULT(yes)
 fi
 
-dnl Check for uname, cut, grep, install, cc
+dnl Check for install, cc, etc.
 AC_PROG_INSTALL
 AC_PROG_CC
 AC_PROG_CPP
-AC_CHECK_PROG(HAVE_UNAME, uname, yes, no)
-AC_CHECK_PROG(HAVE_CUT, cut, yes, no)
-AC_CHECK_PROG(HAVE_GREP, grep, yes, no)
 AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
 AC_CHECK_PROG(HAVE_FIND, find, yes, no)
+
+dnl Options for debugging
+AC_ARG_WITH(mtrace,
+[  --with-mtrace                  Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE).],
+CFLAGS="$CFLAGS -imcheck.h"
+AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
+)
 
 AC_OUTPUT(Makefile
 src/io/trove/module.mk
