@@ -12,6 +12,8 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 
+static int crdirent_setup_op(
+    PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_validate(
     PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_read_directory_entry_handle(
@@ -81,6 +83,7 @@ nested machine pvfs2_check_entry_not_exist_sm(validate,
 }
 
 machine pvfs2_crdirent_sm(prelude,
+			  setup_op,
 			  check_not_exist,
 			  write_directory_entry,
 			  cleanup,
@@ -89,8 +92,14 @@ machine pvfs2_crdirent_sm(prelude,
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		success => check_not_exist;
+		success => setup_op;
 		default => final_response;
+	}
+
+	state setup_op
+	{
+		run crdirent_setup_op;
+		default => check_not_exist;
 	}
 
 	state check_not_exist
@@ -139,18 +148,18 @@ static int crdirent_validate(PINT_server_op *s_op,
 
     /* verify input values -- some of this should be caught as
      * legitimate errors later! */
-    assert(s_op->req->u.crdirent.name != NULL);
-    assert(s_op->req->u.crdirent.new_handle != 0);
-    assert(s_op->req->u.crdirent.parent_handle != 0);
+    assert(s_op->u.crdirent.name != NULL);
+    assert(s_op->u.crdirent.new_handle != 0);
+    assert(s_op->u.crdirent.parent_handle != 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
 	    "  got crdirent for %s (with handle %Lu) in %Lu\n",
-	    s_op->req->u.crdirent.name,
-	    Lu(s_op->req->u.crdirent.new_handle),
-	    Lu(s_op->req->u.crdirent.parent_handle));
+	    s_op->u.crdirent.name,
+	    Lu(s_op->u.crdirent.new_handle),
+	    Lu(s_op->u.crdirent.parent_handle));
 
     /* check for invalid characters in name */
-    ptr = s_op->req->u.crdirent.name;
+    ptr = s_op->u.crdirent.name;
     while (*ptr != '\0' && *ptr != '/' && isprint(*ptr)) ptr++;
 
     if (*ptr != '\0')
@@ -160,7 +169,7 @@ static int crdirent_validate(PINT_server_op *s_op,
         {
 	    gossip_lerr("crdirent: error: invalid '/' character "
                         "in name (%s); sending error response.\n",
-			s_op->req->u.crdirent.name);
+			s_op->u.crdirent.name);
 	}
 	else
         {
@@ -226,8 +235,8 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     ret = job_trove_keyval_read(
-        s_op->req->u.crdirent.fs_id,
-        s_op->req->u.crdirent.parent_handle,
+        s_op->u.crdirent.fs_id,
+        s_op->u.crdirent.parent_handle,
         &s_op->key,
         &s_op->val,
         0,
@@ -272,7 +281,7 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  creating dspace (coll_id = %d)\n",
-        s_op->req->u.crdirent.fs_id);
+        s_op->u.crdirent.fs_id);
 
     /* FIXME: arbitrary handle here, or honor a range? */
     extent.first = extent.last = 0;
@@ -280,12 +289,12 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
     extent_array.extent_array = &extent;
 
     ret = job_trove_dspace_create(
-        s_op->req->u.crdirent.fs_id,
+        s_op->u.crdirent.fs_id,
         &extent_array,
         PVFS_TYPE_DIRDATA,
         NULL,
         PINT_config_get_trove_sync_mode(
-            user_opts, s_op->req->u.crdirent.fs_id),
+            user_opts, s_op->u.crdirent.fs_id),
         s_op,
         0,
         js_p,
@@ -339,15 +348,15 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
         GOSSIP_SERVER_DEBUG, "  writing dirdata handle (%Lu) "
         "into parent directory keyval space (%Lu)\n",
         Lu(s_op->u.crdirent.dirent_handle),
-        Lu(s_op->req->u.crdirent.parent_handle));
+        Lu(s_op->u.crdirent.parent_handle));
 
     ret = job_trove_keyval_write(
-        s_op->req->u.crdirent.fs_id,
-        s_op->req->u.crdirent.parent_handle,
+        s_op->u.crdirent.fs_id,
+        s_op->u.crdirent.parent_handle,
         &s_op->key,
         &s_op->val,
         PINT_config_get_trove_sync_mode(
-            user_opts, s_op->req->u.crdirent.fs_id),
+            user_opts, s_op->u.crdirent.fs_id),
         NULL,
         s_op,
         0, 
@@ -366,8 +375,8 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
  *           job_status_s* js_p
  *
  * Pre:      s_op->u.crdirent.dirent_handle is the directory entry k/v space
- *           s_op->req->u.crdirent.name != NULL
- *           s_op->req->u.crdirent.new_handle != NULL
+ *           s_op->u.crdirent.name != NULL
+ *           s_op->u.crdirent.new_handle != NULL
  *           ADD ASSERTS FOR THESE!
  *
  * Post:     key/val pair stored
@@ -392,26 +401,26 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
      */
 
     /* this is the name for the parent entry */
-    s_op->key.buffer    = s_op->req->u.crdirent.name;
-    s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
+    s_op->key.buffer    = s_op->u.crdirent.name;
+    s_op->key.buffer_sz = strlen(s_op->u.crdirent.name) + 1;
 
-    s_op->val.buffer    = &s_op->req->u.crdirent.new_handle;
+    s_op->val.buffer    = &s_op->u.crdirent.new_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  writing new directory entry "
         "for %s (handle = %Lu) to dirdata dspace %Lu\n",
-        s_op->req->u.crdirent.name,
-        Lu(s_op->req->u.crdirent.new_handle),
+        s_op->u.crdirent.name,
+        Lu(s_op->u.crdirent.new_handle),
         Lu(s_op->u.crdirent.dirent_handle));
 
     ret = job_trove_keyval_write(
-        s_op->req->u.crdirent.fs_id,
+        s_op->u.crdirent.fs_id,
         s_op->u.crdirent.dirent_handle,
         &s_op->key,
         &s_op->val,
         PINT_config_get_trove_sync_mode(
-            user_opts, s_op->req->u.crdirent.fs_id),
+            user_opts, s_op->u.crdirent.fs_id),
         NULL,
         s_op,
         0,
@@ -429,8 +438,8 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
  *           job_status_s* js_p
  *
  * Pre: s_op->u.crdirent.dirent_handle is the directory entry k/v space
- *      s_op->req->u.crdirent.name != NULL
- *      s_op->req->u.crdirent.new_handle != NULL
+ *      s_op->u.crdirent.name != NULL
+ *      s_op->u.crdirent.new_handle != NULL
  *
  * Post: tries to read a directory entry, so that we can check to see
  * if it already exists or not
@@ -455,21 +464,21 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
      */
 
     /* this is the name for the parent entry */
-    s_op->key.buffer    = s_op->req->u.crdirent.name;
-    s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
+    s_op->key.buffer    = s_op->u.crdirent.name;
+    s_op->key.buffer_sz = strlen(s_op->u.crdirent.name) + 1;
 
-    s_op->val.buffer    = &s_op->req->u.crdirent.new_handle;
+    s_op->val.buffer    = &s_op->u.crdirent.new_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  checking existence of new directory "
         "entry for %s (handle = %Lu) to dirdata dspace %Lu\n",
-        s_op->req->u.crdirent.name,
-        Lu(s_op->req->u.crdirent.new_handle),
+        s_op->u.crdirent.name,
+        Lu(s_op->u.crdirent.new_handle),
         Lu(s_op->u.crdirent.dirent_handle));
 
     ret = job_trove_keyval_read(
-        s_op->req->u.crdirent.fs_id,
+        s_op->u.crdirent.fs_id,
         s_op->u.crdirent.dirent_handle,
         &s_op->key,
         &s_op->val,
@@ -517,6 +526,26 @@ static int crdirent_set_error_code(
 	default:
 	    break;
     }
+    return(1);
+}
+
+/* crdirent_setup_op()
+ *
+ * prepare some state machine fields for later processing; mainly just
+ * storing request structure fields in state machine so that nested machines
+ * are not dependent on request type
+ */
+static int crdirent_setup_op(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    PINT_STATE_DEBUG("setup_op");
+
+    s_op->u.crdirent.name = s_op->req->u.crdirent.name;
+    s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;
+    s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.parent_handle;
+    s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
+
+    js_p->error_code = 0;
     return(1);
 }
 

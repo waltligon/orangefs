@@ -179,6 +179,10 @@ struct PINT_server_rmdirent_op {
 };
 
 struct PINT_server_crdirent_op {
+    char* name;
+    PVFS_handle new_handle;
+    PVFS_handle parent_handle;
+    PVFS_fs_id fs_id;
     PVFS_handle dirent_handle;    /* holds handle of dirdata dspace that we'll write the dirent into */
 };
 
