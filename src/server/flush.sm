@@ -20,6 +20,12 @@ static int flush_cleanup(PINT_server_op *s_op, job_status_s *ret);
 static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p);
 void flush_init_state_machine(void);
 
+
+/*
+ * todo:
+ * if given a metafile, just do a keyval flush
+ * if given a datafile, do just a bstream flush
+ */
 %%
 
 machine pvfs2_flush_sm(prelude, kflush, kflush_check_error, bflush, 
@@ -161,10 +167,6 @@ static int flush_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 
     return(server_state_machine_complete(s_op));
 }
-
-/*
- * also, bug neill about multiple data servers, single meta server
- */
 
 /*
  * Local variables:
