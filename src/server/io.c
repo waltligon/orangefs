@@ -14,6 +14,7 @@
 #include <assert.h>
 
 static int io_init(state_action_struct *s_op, job_status_s *ret);
+static int io_get_size(state_action_struct *s_op, job_status_s *ret);
 static int io_send_ack(state_action_struct *s_op, job_status_s *ret);
 static int io_release(state_action_struct *s_op, job_status_s *ret);
 static int io_cleanup(state_action_struct *s_op, job_status_s *ret);
@@ -32,13 +33,23 @@ PINT_state_machine_s io_req_s =
  * read and write)
  */
 
+/* TODO: need some more states to do things like permissions and
+ * access control?
+ */
+
 %%
 
-machine io(init, send_ack, cleanup, release)
+machine io(init, get_size, send_ack, cleanup, release)
 {
 	state init
 	{
 		run io_init;
+		default => get_size;
+	}
+
+	state get_size
+	{
+		run io_get_size;
 		default => send_ack;
 	}
 
@@ -116,6 +127,42 @@ static int io_init(state_action_struct *s_op, job_status_s *ret)
 }
 
 /*
+ * Function: io_get_size()
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *ret
+ *
+ * Pre:      Memory is allocated, and we are ready to do what we are 
+ *           going to do.
+ *
+ * Post:     Some type of work has been done!
+ *            
+ * Returns:  int
+ *
+ * Synopsis: This function should make a call that will perform an 
+ *           operation be it to Trove, BMI, server_config, etc.  
+ *           But, the operation is non-blocking.
+ *           
+ */
+static int io_get_size(state_action_struct *s_op, job_status_s *ret)
+{
+	int err = -ENOSYS;
+	job_id_t tmp_id;
+	
+	gossip_ldebug(SERVER_DEBUG, "IO: io_get_size() executed.\n");
+
+	err = job_trove_dspace_getattr(
+		s_op->req->u.io.fs_id,
+		s_op->req->u.io.handle,
+		s_op,
+		ret,
+		&tmp_id);
+
+	return(err);
+}
+
+
+/*
  * Function: io_send_ack()
  *
  * Params:   server_op *s_op, 
@@ -140,8 +187,13 @@ static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
 	
 	gossip_ldebug(SERVER_DEBUG, "IO: io_send_ack() executed.\n");
 
-	s_op->resp->status = -ENOSYS;
+	/* this is where we report the file size to the client before
+	 * starting the I/O transfer, or else report an error if we
+	 * failed to get the size, or failed for permission reasons
+	 */
+	s_op->resp->status = ret->error_code;
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+	s_op->resp->u.io.bstream_size = ret->ds_attr.b_size;
 
 	err = PINT_encode(
 		s_op->resp, 

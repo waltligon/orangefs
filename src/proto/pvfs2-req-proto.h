@@ -396,6 +396,7 @@ struct PVFS_server_resp_s {
 		PVFS_servresp_truncate truncate;
 		PVFS_servresp_extension extension;
 		PVFS_servresp_generic generic;
+		PVFS_servresp_io io;
 	} u;
 };
 
