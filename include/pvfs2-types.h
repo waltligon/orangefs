@@ -9,15 +9,14 @@
 
 #ifdef __KERNEL__
 #include <linux/types.h>
-#define __WORDSIZE BITS_PER_LONG
-#if (BITS_PER_LONG == 32)
-#define INT32_MAX INT_MAX
-#else
-#define INT32_MAX (int32_t)(1 << 31)
-#endif /* (BIT_PER_LONG == 32) */
 #else
 #include <stdint.h>
 #endif /* __KERNEL__ */
+
+#ifndef INT32_MAX
+/* definition taken from stdint.h */
+#define INT32_MAX (2147483647)
+#endif
 
 /* empty stubs to turn off encoding definition generation */
 #include "pvfs2-encode-stubs.h"
