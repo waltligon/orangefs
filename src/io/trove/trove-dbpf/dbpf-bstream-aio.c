@@ -51,6 +51,9 @@ static inline int listio_convert_equal_mem_stream_count(
     TROVE_offset cur_stream_off;
     struct aiocb *cur_aiocb_ptr;
 
+    fprintf(stderr,"*** equal mem/stream count called with "
+            "mcount %d | scount %d\n",mem_count,stream_count);
+
     if (lio_state == NULL)
     {
 	mct             = 0;
@@ -125,7 +128,6 @@ static inline int listio_convert_equal_mem_stream_count(
                 cur_stream_off  = stream_offset_array[sct];
             }
 	}
-
 	cur_aiocb_ptr = &aiocb_array[++act];
     }
 
@@ -174,6 +176,7 @@ static inline int listio_convert_weighted_mem_count(
     struct bstream_listio_state *lio_state)
 {
     int mct, sct, act = 0;
+    int oom = 0, oos = 0;
     int cur_mem_size;
     char *cur_mem_off;
     TROVE_size cur_stream_size;
@@ -211,20 +214,26 @@ static inline int listio_convert_weighted_mem_count(
 	cur_aiocb_ptr->aio_lio_opcode = op_type;
 	cur_aiocb_ptr->aio_sigevent.sigev_notify = SIGEV_NONE;
 
+        /*
+          determine if we're either out of memory (oom) regions,
+          or out of stream (oos) regions
+        */
+        oom = (((mct + 1) < mem_count) ? 0 : 1);
+        oos = (((sct + 1) < stream_count) ? 0 : 1);
+
 	if (cur_mem_size == cur_stream_size)
         {
 	    /* consume both mem and stream regions */
 	    cur_aiocb_ptr->aio_nbytes = cur_mem_size;
 
-	    /* update local copies of array values */
-            if (++mct < mem_count)
+            if (!oom)
             {
-                cur_mem_size = mem_size_array[mct];
+                cur_mem_size = mem_size_array[++mct];
                 cur_mem_off  = mem_offset_array[mct];
             }
-            if (++sct < stream_count)
+            if (!oos)
             {
-                cur_stream_size = stream_size_array[sct];
+                cur_stream_size = stream_size_array[++sct];
                 cur_stream_off  = stream_offset_array[sct];
             }
 	}
@@ -237,7 +246,7 @@ static inline int listio_convert_weighted_mem_count(
 	    cur_stream_size -= cur_mem_size;
 	    cur_stream_off  += cur_mem_size;
 
-            if (++mct < mem_count)
+            if (!oom)
             {
                 cur_mem_size = mem_size_array[++mct];
                 cur_mem_off  = mem_offset_array[mct];
@@ -252,29 +261,27 @@ static inline int listio_convert_weighted_mem_count(
 	    cur_mem_size -= cur_stream_size;
 	    cur_mem_off  += cur_stream_size;
 
-            if (++sct < stream_count)
+            if (!oos)
             {
                 cur_stream_size = stream_size_array[++sct];
                 cur_stream_off  = stream_offset_array[sct];
             }
 	}
+	cur_aiocb_ptr = &aiocb_array[++act];
 
-	cur_aiocb_ptr = &aiocb_array[act++];
-
-        if ((mct >= mem_count) || (sct >= stream_count))
+        if (oom || oos)
         {
             break;
         }
     }
-
     *aiocb_count_p = act; /* return the number actually used */
-    
-    if (mct < mem_count)
+
+    /* until we've consumed everything we have, we're not finished */
+    if (!oom || !oos)
     {
 	/* haven't processed all of list regions */
 	if (lio_state != NULL)
         {
-	    /* save state */
 	    lio_state->mem_ct          = mct;
 	    lio_state->stream_ct       = sct;
 	    lio_state->cur_mem_size    = cur_mem_size;
@@ -317,6 +324,9 @@ static inline int listio_convert_weighted_stream_count(
     TROVE_size cur_stream_size;
     TROVE_offset cur_stream_off;
     struct aiocb *cur_aiocb_ptr;
+
+    gossip_debug(TROVE_DEBUG,"*** weighted stream count called with "
+            "mcount %d | scount %d\n",mem_count,stream_count);
 
     if (lio_state == NULL)
     {
