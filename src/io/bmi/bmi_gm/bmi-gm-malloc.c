@@ -252,6 +252,11 @@ void *bmi_gm_sbrk(int);
     probably don't want to touch unless you are extending or adapting malloc.
 */
 
+#ifdef __PVFS2_H
+#include "pvfs2-debug.h"
+#include "gossip.h"
+#endif
+
 /*
   WIN32 sets up defaults for MS environment and compilers.
   Otherwise defaults are for unix.
@@ -4894,27 +4899,26 @@ void mSTATs()
     {
 	unsigned long free, reserved, committed;
 	vminfo(&free, &reserved, &committed);
-	fprintf(stderr, "free bytes       = %10lu\n", free);
-	fprintf(stderr, "reserved bytes   = %10lu\n", reserved);
-	fprintf(stderr, "committed bytes  = %10lu\n", committed);
+	gossip_debug(BMI_DEBUG_GM, "free bytes       = %10lu\n", free);
+	gossip_debug(BMI_DEBUG_GM, "reserved bytes   = %10lu\n", reserved);
+	gossip_debug(BMI_DEBUG_GM, "committed bytes  = %10lu\n", committed);
     }
 #endif
 
-
-    fprintf(stderr, "max system bytes = %10lu\n", (unsigned long) (mi.usmblks));
-    fprintf(stderr, "system bytes     = %10lu\n",
-	    (unsigned long) (mi.arena + mi.hblkhd));
-    fprintf(stderr, "in use bytes     = %10lu\n",
-	    (unsigned long) (mi.uordblks + mi.hblkhd));
-
+    gossip_debug(BMI_DEBUG_GM, "max system bytes = %10lu\n",
+                 (unsigned long) (mi.usmblks));
+    gossip_debug(BMI_DEBUG_GM, "system bytes     = %10lu\n",
+                 (unsigned long) (mi.arena + mi.hblkhd));
+    gossip_debug(BMI_DEBUG_GM, "in use bytes     = %10lu\n",
+                 (unsigned long) (mi.uordblks + mi.hblkhd)); 
 
 #ifdef WIN32
     {
 	unsigned long kernel, user;
 	if (cpuinfo(TRUE, &kernel, &user))
 	{
-	    fprintf(stderr, "kernel ms        = %10lu\n", kernel);
-	    fprintf(stderr, "user ms          = %10lu\n", user);
+	    gossip_debug(BMI_DEBUG_GM, "kernel ms        = %10lu\n", kernel);
+	    gossip_debug(BMI_DEBUG_GM, "user ms          = %10lu\n", user);
 	}
     }
 #endif
@@ -5234,7 +5238,7 @@ void *sbrk(long size)
     static region_list_entry *g_last;
     void *result = (void *) MORECORE_FAILURE;
 #ifdef TRACE
-    printf("sbrk %d\n", size);
+    gossip_debug(BMI_DEBUG_GM, "sbrk %d\n", size);
 #endif
 #if defined (USE_MALLOC_LOCK) && defined (NEEDED)
     /* Wait for spin lock */
@@ -5310,8 +5314,9 @@ void *sbrk(long size)
 			/* Assert postconditions */
 			assert((unsigned) base_committed % g_pagesize == 0);
 #ifdef TRACE
-			printf("Commit %p %d\n", base_committed,
-			       remaining_commit_size);
+			gossip_debug(
+                            BMI_DEBUG_GM, "Commit %p %d\n",
+                            base_committed, remaining_commit_size);
 #endif
 			/* Adjust the regions commit top */
 			g_last->top_committed =
@@ -5346,14 +5351,16 @@ void *sbrk(long size)
 			    assert((unsigned) memory_info.BaseAddress %
 				   g_pagesize == 0);
 #ifdef TRACE
-			    printf("Query %p %d %s\n", memory_info.BaseAddress,
-				   memory_info.RegionSize,
-				   memory_info.State ==
-				   MEM_FREE ? "FREE" : (memory_info.State ==
-							MEM_RESERVE ? "RESERVED"
-							: (memory_info.State ==
-							   MEM_COMMIT ?
-							   "COMMITTED" : "?")));
+			    gossip_debug(
+                                BMI_DEBUG_GM, "Query %p %d %s\n",
+                                memory_info.BaseAddress,
+                                memory_info.RegionSize,
+                                ((memory_info.State == MEM_FREE) ?
+                                 "FREE" : ((memory_info.State ==
+                                            MEM_RESERVE) ? "RESERVED"
+                                           : ((memory_info.State ==
+                                               MEM_COMMIT) ?
+                                              "COMMITTED" : "?"))));
 #endif
 			    /* Region is free, well aligned and big enough: we are done */
 			    if (memory_info.State == MEM_FREE &&
@@ -5406,7 +5413,8 @@ void *sbrk(long size)
 		    /* Assert postconditions */
 		    assert((unsigned) base_reserved % g_regionsize == 0);
 #ifdef TRACE
-		    printf("Reserve %p %d\n", base_reserved, reserve_size);
+		    gossip_debug(BMI_DEBUG_GM, "Reserve %p %d\n",
+                                 base_reserved, reserve_size);
 #endif
 		    /* Did we get contiguous memory? */
 		    if (contiguous)
@@ -5455,7 +5463,8 @@ void *sbrk(long size)
 		/* Assert postconditions */
 		assert((unsigned) base_committed % g_pagesize == 0);
 #ifdef TRACE
-		printf("Commit %p %d\n", base_committed, commit_size);
+		gossip_debug(BMI_DEBUG_GM, "Commit %p %d\n",
+                             base_committed, commit_size);
 #endif
 		/* Adjust the regions commit top */
 		g_last->top_committed = (char *) base_committed + commit_size;
@@ -5488,7 +5497,8 @@ void *sbrk(long size)
 		if (!rc)
 		    goto sbrk_exit;
 #ifdef TRACE
-		printf("Release %p %d\n", base_reserved, release_size);
+		gossip_debug(BMI_DEBUG_GM, "Release %p %d\n",
+                             base_reserved, release_size);
 #endif
 	    }
 	    /* Adjust deallocation size */
@@ -5521,7 +5531,8 @@ void *sbrk(long size)
 		    if (!rc)
 			goto sbrk_exit;
 #ifdef TRACE
-		    printf("Decommit %p %d\n", base_committed, decommit_size);
+		    gossip_debug(BMI_DEBUG_GM, "Decommit %p %d\n",
+                                 base_committed, decommit_size);
 #endif
 		}
 		/* Adjust deallocation size and regions commit and allocate top */
@@ -5577,7 +5588,7 @@ static void *mmap(void *ptr,
     static long g_pagesize;
     static long g_regionsize;
 #ifdef TRACE
-    printf("mmap %d\n", size);
+    gossip_debug(BMI_DEBUG_GM, "mmap %d\n", size);
 #endif
 #if defined (USE_MALLOC_LOCK) && defined (NEEDED)
     /* Wait for spin lock */
@@ -5602,7 +5613,7 @@ static void *mmap(void *ptr,
     /* Assert postconditions */
     assert((unsigned) ptr % g_regionsize == 0);
 #ifdef TRACE
-    printf("Commit %p %d\n", ptr, size);
+    gossp_debug(BMI_DEBUG_GM, "Commit %p %d\n", ptr, size);
 #endif
   mmap_exit:
 #if defined (USE_MALLOC_LOCK) && defined (NEEDED)
@@ -5620,7 +5631,7 @@ static long munmap(void *ptr,
     static long g_regionsize;
     int rc = MUNMAP_FAILURE;
 #ifdef TRACE
-    printf("munmap %p %d\n", ptr, size);
+    gossip_debug(BMI_DEBUG_GM, "munmap %p %d\n", ptr, size);
 #endif
 #if defined (USE_MALLOC_LOCK) && defined (NEEDED)
     /* Wait for spin lock */
@@ -5639,7 +5650,7 @@ static long munmap(void *ptr,
 	goto munmap_exit;
     rc = 0;
 #ifdef TRACE
-    printf("Release %p %d\n", ptr, size);
+    gossip_debug(BMI_DEBUG_GM, "Release %p %d\n", ptr, size);
 #endif
   munmap_exit:
 #if defined (USE_MALLOC_LOCK) && defined (NEEDED)
