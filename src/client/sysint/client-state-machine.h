@@ -299,7 +299,7 @@ typedef struct PINT_client_sm {
 		  * jobs for some some states; typically set and
 		  * then decremented to zero as jobs complete */
 
-    int dcache_hit; /* set if last segment lookup was from dcache */
+    int ncache_hit; /* set if last segment lookup was from ncache */
     int acache_hit; /* set if pinode was from acache */
     PINT_pinode *pinode; /* filled in on acache hit */
     PVFS_object_attr acache_attr; /* a scratch attr space */
@@ -436,7 +436,7 @@ extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;
 extern struct PINT_state_machine_s pvfs2_client_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_acache_sm;
-extern struct PINT_state_machine_s pvfs2_client_lookup_dcache_sm;
+extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 
 /*
  * Local variables:

@@ -26,7 +26,7 @@ enum
     BMI_DEBUG_GM_MEM =	    (1 << 9),
     REQUEST_DEBUG =	    (1 << 10),
     FLOW_PROTO_DEBUG =	    (1 << 11),
-    DCACHE_DEBUG =	    (1 << 12),
+    NCACHE_DEBUG =	    (1 << 12),
     CLIENT_DEBUG =	    (1 << 13),
     REQ_SCHED_DEBUG =	    (1 << 14),
     ACACHE_DEBUG =	    (1 << 15),

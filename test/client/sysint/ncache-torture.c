@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 #include "pvfs2.h"
-#include "pint-dcache.h"
+#include "ncache.h"
 #include "gossip.h"
 
 #define ENTRIES_TO_ADD 255
@@ -24,24 +24,24 @@ int main(int argc, char **argv)
     PVFS_pinode_reference root_ref = {100,0};
 
     gossip_enable_stderr();
-    gossip_set_debug_mask(1, DCACHE_DEBUG);
+    gossip_set_debug_mask(1, NCACHE_DEBUG);
 
     /* initialize the cache */
-    ret = PINT_dcache_initialize();
+    ret = PINT_ncache_initialize();
     if(ret < 0)
     {
-	gossip_err("dcache_initialize() failure.\n");
+	gossip_err("ncache_initialize() failure.\n");
 	return(-1);
     }
 
-    PINT_dcache_set_timeout(5000);
+    PINT_ncache_set_timeout(5000);
 
     for(i = 0; i < ENTRIES_TO_ADD; i++)
     {
-        snprintf(new_filename[i],PVFS_NAME_MAX,"dcache_testname%.3d",i);
+        snprintf(new_filename[i],PVFS_NAME_MAX,"ncache_testname%.3d",i);
 	test_ref.handle = i;
 	test_ref.fs_id = 0;
-	ret = PINT_dcache_insert(new_filename[i], test_ref, root_ref);
+	ret = PINT_ncache_insert(new_filename[i], test_ref, root_ref);
 	if (ret < 0)
 	{
 	    gossip_err("Error: failed to insert entry.\n");
@@ -49,19 +49,19 @@ int main(int argc, char **argv)
 	}
     }
 
-    gossip_debug(DCACHE_DEBUG, "Attempted insertion of %d dcache "
+    gossip_debug(NCACHE_DEBUG, "Attempted insertion of %d ncache "
                  "elements\n", ENTRIES_TO_ADD);
 
     for(i = 0; i < ENTRIES_TO_ADD; i++)
     {
-	ret = PINT_dcache_lookup(new_filename[i], root_ref, &test_ref);
+	ret = PINT_ncache_lookup(new_filename[i], root_ref, &test_ref);
 	if ((ret < 0) && (ret != -PVFS_ENOENT))
 	{
-	    gossip_err("dcache_lookup() failure.\n");
+	    gossip_err("ncache_lookup() failure.\n");
 	    return(-1);
 	}
 
-	if (i >= (ENTRIES_TO_ADD - PINT_DCACHE_MAX_ENTRIES))
+	if (i >= (ENTRIES_TO_ADD - PINT_NCACHE_MAX_ENTRIES))
 	{
 	    if (ret == -PVFS_ENOENT)
             {
@@ -91,43 +91,43 @@ int main(int argc, char **argv)
 
     if (i == ENTRIES_TO_ADD)
     {
-        gossip_debug(DCACHE_DEBUG, "All expected lookups were ok\n");
+        gossip_debug(NCACHE_DEBUG, "All expected lookups were ok\n");
     }
 
     /*remove all entries */
     for(i = 0; i < ENTRIES_TO_ADD; i++)
     {
-	ret = PINT_dcache_remove(new_filename[i], root_ref, &found_flag);
+	ret = PINT_ncache_remove(new_filename[i], root_ref, &found_flag);
 	if (ret < 0)
 	{
-	    gossip_err("Error: dcache_remove() failure.\n");
+	    gossip_err("Error: ncache_remove() failure.\n");
 	    return(-1);
 	}
 
 	if (!found_flag)
 	{
-	    if (i >= (ENTRIES_TO_ADD - PINT_DCACHE_MAX_ENTRIES))
+	    if (i >= (ENTRIES_TO_ADD - PINT_NCACHE_MAX_ENTRIES))
 	    {
                 /*should have a valid handle*/
-		gossip_err("Error: dcache_remove() didn't find %d when "
+		gossip_err("Error: ncache_remove() didn't find %d when "
                            "it was supposed to.\n", i);
 	    }
 	}
 	else
 	{
-	    if (i < (ENTRIES_TO_ADD - PINT_DCACHE_MAX_ENTRIES))
+	    if (i < (ENTRIES_TO_ADD - PINT_NCACHE_MAX_ENTRIES))
 	    {
                 /*shouldn't have a valid handle*/
-		gossip_err("Error: dcache_remove() found %d when it "
+		gossip_err("Error: ncache_remove() found %d when it "
                            "wasn't supposed to.\n", i);
 	    }
 	}
     }
 
-    ret = PINT_dcache_finalize();
+    ret = PINT_ncache_finalize();
     if (ret < 0)
     {
-	gossip_err("dcache_finalize() failure.\n");
+	gossip_err("ncache_finalize() failure.\n");
 	return(-1);
     }
     return(0);

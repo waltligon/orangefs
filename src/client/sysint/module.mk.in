@@ -4,9 +4,9 @@ CSRC := \
 	$(DIR)/finalize.c \
 	$(DIR)/initialize.c \
 	$(DIR)/acache.c \
+	$(DIR)/ncache.c \
 	$(DIR)/getattr.c \
 	$(DIR)/pinode-helper.c \
-	$(DIR)/pint-dcache.c \
 	$(DIR)/server-send-req.c \
 	$(DIR)/rename.c \
 	$(DIR)/pint-sysint-utils.c \
@@ -21,7 +21,7 @@ SMSRC := \
 	msgpairarray.sm \
 	msgpair.sm \
 	getattr-acache.sm \
-	lookup-dcache.sm \
+	lookup-ncache.sm \
 	sys-getattr.sm \
 	sys-setattr.sm \
         sys-lookup.sm \

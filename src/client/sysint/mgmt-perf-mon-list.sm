@@ -14,9 +14,6 @@
 #include "gossip.h"
 #include "str-utils.h"
 #include "pvfs2-mgmt.h"
-
-#include "pinode-helper.h"
-#include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
@@ -25,11 +22,11 @@ extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
 static int mgmt_perf_mon_list_setup_msgpair(PINT_client_sm *sm_p,
-					job_status_s *js_p);
+                                            job_status_s *js_p);
 static int mgmt_perf_mon_list_cleanup(PINT_client_sm *sm_p,
-			  job_status_s *js_p);
-static int perf_mon_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
-    int i);
+                                      job_status_s *js_p);
+static int perf_mon_list_comp_fn(
+    void* v_p, struct PVFS_server_resp* resp_p, int i);
 
 %%
 

@@ -12,8 +12,8 @@
 #include <unistd.h>
 
 #include "acache.h"
+#include "ncache.h"
 #include "pint-bucket.h"
-#include "pint-dcache.h"
 #include "pvfs2-sysint.h"
 #include "pint-sysint-utils.h"
 #include "gen-locks.h"
@@ -68,7 +68,7 @@ int PVFS_sys_initialize(
 	JOB_INIT_FAIL,
 	JOB_CONTEXT_FAIL,
 	ACACHE_INIT_FAIL,
-	DCACHE_INIT_FAIL,
+	NCACHE_INIT_FAIL,
 	BUCKET_INIT_FAIL,
 	GET_CONFIG_INIT_FAIL
     } init_fail = NONE_INIT_FAIL;
@@ -213,20 +213,20 @@ int PVFS_sys_initialize(
     PINT_acache_set_timeout(PINT_ACACHE_TIMEOUT * 1000);
 
     /* Initialize the directory cache */
-    ret = PINT_dcache_initialize();
+    ret = PINT_ncache_initialize();
     if (ret < 0)
     {
-	init_fail = DCACHE_INIT_FAIL;
+	init_fail = NCACHE_INIT_FAIL;
 	gossip_ldebug(CLIENT_DEBUG,"Error initializing directory cache\n");
 	goto return_error;	
     }	
-    PINT_dcache_set_timeout(PINT_DCACHE_TIMEOUT * 1000);
+    PINT_ncache_set_timeout(PINT_NCACHE_TIMEOUT * 1000);
 
     /* Get configuration parameters from server */
     ret = PINT_server_get_config(PINT_get_server_config_struct(),mntent_list);
     if (ret < 0)
     {
-	init_fail = DCACHE_INIT_FAIL;
+	init_fail = NCACHE_INIT_FAIL;
 	gossip_ldebug(CLIENT_DEBUG,"Error in getting server config parameters\n");
 	goto return_error;
     }
@@ -238,7 +238,7 @@ int PVFS_sys_initialize(
     mt_config = gen_mutex_build();
     if (!mt_config)
     {
-	init_fail = DCACHE_INIT_FAIL;
+	init_fail = NCACHE_INIT_FAIL;
 	gossip_ldebug(CLIENT_DEBUG,
                       "Failed to initialize mutex\n");
 	goto return_error;
@@ -306,8 +306,8 @@ int PVFS_sys_initialize(
 	case GET_CONFIG_INIT_FAIL:
 	    PINT_bucket_finalize();
 	case BUCKET_INIT_FAIL:
-	    PINT_dcache_finalize();
-	case DCACHE_INIT_FAIL:
+	    PINT_ncache_finalize();
+	case NCACHE_INIT_FAIL:
 	    PINT_acache_finalize();
 	case ACACHE_INIT_FAIL:
 	case JOB_CONTEXT_FAIL:

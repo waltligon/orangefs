@@ -41,10 +41,8 @@
 #include "pvfs2-util.h"
 
 #include "pinode-helper.h"
-#include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "acache.h"
 #include "PINT-reqproto-encode.h"
 
 extern job_context_id pint_client_sm_context;

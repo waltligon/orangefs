@@ -8,7 +8,7 @@
  *
  * The purpose of this state machine is to resolve a segment (one component
  * of a path) and a parent handle down to an object handle.  This object handle
- * might already be present in a local cache (the dcache) or could be obtained
+ * might already be present in a local cache (the ncache) or could be obtained
  * from a remote server.
  *
  * This state machine uses the msgpair structure in the PINT_client_sm
@@ -45,25 +45,25 @@
 #include "str-utils.h"
 
 #include "pint-servreq.h"
-#include "pint-dcache.h"
+#include "ncache.h"
 #include "PINT-reqproto-encode.h"
 
 enum {
-    LOOKUP_DCACHE_MISS = 1
+    LOOKUP_NCACHE_MISS = 1
 };
 
-static int lookup_dcache_lookup(PINT_client_sm *sm_p,
+static int lookup_ncache_lookup(PINT_client_sm *sm_p,
 				job_status_s *js_p);
 
 %%
 
-nested machine pvfs2_client_lookup_dcache_sm(lookup,
+nested machine pvfs2_client_lookup_ncache_sm(lookup,
 					     xfer_msgpair)
 {
     state lookup {
-	run lookup_dcache_lookup;
+	run lookup_ncache_lookup;
 	success => return;
-	LOOKUP_DCACHE_MISS => xfer_msgpair;
+	LOOKUP_NCACHE_MISS => xfer_msgpair;
 	default => return;
     }
 
@@ -75,22 +75,22 @@ nested machine pvfs2_client_lookup_dcache_sm(lookup,
 
 %%
 
-/* lookup_dcache_lookup()
+/* lookup_ncache_lookup()
  */
-static int lookup_dcache_lookup(PINT_client_sm *sm_p,
+static int lookup_ncache_lookup(PINT_client_sm *sm_p,
 				job_status_s *js_p)
 {
     int ret;
     PVFS_pinode_reference parent_ref, object_ref;
 
-    gossip_debug(CLIENT_DEBUG, "lookup_dcache state: lookup\n");
+    gossip_debug(CLIENT_DEBUG, "lookup_ncache state: lookup\n");
 
     assert(js_p->error_code == 0); /* sanity check */
 
     parent_ref.fs_id  = sm_p->msgpair.fs_id;
     parent_ref.handle = sm_p->msgpair.handle;
 
-    ret = PINT_dcache_lookup(sm_p->msgpair.req.u.lookup_path.path,
+    ret = PINT_ncache_lookup(sm_p->msgpair.req.u.lookup_path.path,
 			     parent_ref,
 			     &object_ref);
     if (ret == 0)
@@ -105,17 +105,17 @@ static int lookup_dcache_lookup(PINT_client_sm *sm_p,
 	fake_resp.u.lookup_path.handle_count = 1;
 	fake_resp.u.lookup_path.attr_count   = 0;
 
-        gossip_debug(DCACHE_DEBUG, "*** dcache hit on %s (%Lu|%d)!\n",
+        gossip_debug(NCACHE_DEBUG, "*** ncache hit on %s (%Lu|%d)!\n",
                      sm_p->msgpair.req.u.lookup_path.path,
                      Lu(object_ref.handle), object_ref.fs_id);
 
-        sm_p->dcache_hit = 1;
+        sm_p->ncache_hit = 1;
 	ret = sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
 	return 1;
     }
-    gossip_debug(DCACHE_DEBUG, "*** dcache clean miss on %s.\n",
+    gossip_debug(NCACHE_DEBUG, "*** ncache clean miss on %s.\n",
                  sm_p->msgpair.req.u.lookup_path.path);
-    js_p->error_code = LOOKUP_DCACHE_MISS;
+    js_p->error_code = LOOKUP_NCACHE_MISS;
     return 1;
 }
 

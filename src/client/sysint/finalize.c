@@ -9,7 +9,7 @@
 
 #include "pint-sysint-utils.h"
 #include "acache.h"
-#include "pint-dcache.h"
+#include "ncache.h"
 #include "gen-locks.h"
 #include "pint-bucket.h"
 #include "dotconf.h"
@@ -29,8 +29,8 @@ extern job_context_id PVFS_sys_job_context;
  */
 int PVFS_sys_finalize()
 {
-    /* Free the dcache */
-    PINT_dcache_finalize();
+    /* Free the ncache */
+    PINT_ncache_finalize();
     /* free all pinode structures */
     PINT_acache_finalize();
 	

@@ -7,34 +7,33 @@
 /* PVFS directory cache implementation */
 
 #include <assert.h>
-#include "pint-dcache.h"
+#include "ncache.h"
 
-/* Dcache Entry */
-struct dcache_entry_s {
-	PVFS_pinode_reference parent;   /* the pinode of the parent directory */
-	char name[PVFS_SEGMENT_MAX];  /* PVFS object name */
-	PVFS_pinode_reference entry;    /* the pinode of entry in parent */
-	struct timeval tstamp_valid;  /* timestamp indicating validity period */
+struct ncache_entry_s
+{
+    PVFS_pinode_reference parent; /* the pinode of the parent directory */
+    char name[PVFS_SEGMENT_MAX];  /* PVFS object name */
+    PVFS_pinode_reference entry;  /* the pinode of entry in parent */
+    struct timeval tstamp_valid;  /* timestamp indicating validity period */
 };
-typedef struct dcache_entry_s dcache_entry;
+typedef struct ncache_entry_s ncache_entry;
 
-/* Dcache element */
-struct dcache_t {
-	dcache_entry dentry;
-	int prev;
-	int next;
-	int status;	    /*whether the entry is in use or not*/
+struct ncache_t {
+    ncache_entry dentry;
+    int prev;
+    int next;
+    int status;	/*whether the entry is in use or not*/
 };
 
 /* Cache Management structure */
-struct dcache_s {
-	struct dcache_t element[PINT_DCACHE_MAX_ENTRIES];
+struct ncache_s {
+	struct ncache_t element[PINT_NCACHE_MAX_ENTRIES];
 	int count;
 	int top;
 	int bottom;
 	gen_mutex_t *mt_lock;
 };
-typedef struct dcache_s dcache;
+typedef struct ncache_s ncache;
 
 #define BAD_LINK -1
 #define STATUS_UNUSED 0
@@ -45,31 +44,31 @@ typedef struct dcache_s dcache;
  * inserts/removes won't actually change anything if the cache
  * is disabled
  */
-#define ENABLE_DCACHE 1
+#define ENABLE_NCACHE 1
 
 /* static internal helper methods */
-static void dcache_remove_dentry(int item);
-static void dcache_rotate_dentry(int item);
-static int dcache_update_dentry_timestamp(dcache_entry* entry); 
-static int dcache_get_lru(void);
-static int dcache_add_dentry(
+static void ncache_remove_dentry(int item);
+static void ncache_rotate_dentry(int item);
+static int ncache_update_dentry_timestamp(ncache_entry* entry); 
+static int ncache_get_lru(void);
+static int ncache_add_dentry(
     char *name,
     PVFS_pinode_reference parent,
     PVFS_pinode_reference entry);
 
-/* static globals required for dcache operation */
-static dcache *cache = NULL;
-static int s_pint_dcache_timeout_ms = (PINT_DCACHE_TIMEOUT * 1000);
+/* static globals required for ncache operation */
+static ncache *cache = NULL;
+static int s_pint_ncache_timeout_ms = (PINT_NCACHE_TIMEOUT * 1000);
 
 
 /* compare
  *
- * compares a dcache entry to the search key
+ * compares a ncache entry to the search key
  *
  * returns 1 on an equal comparison (match), 0 otherwise
  */
 static inline int compare(
-    struct dcache_t element,
+    struct ncache_t element,
     char *name,
     PVFS_pinode_reference refn)
 {
@@ -110,19 +109,19 @@ static inline int check_dentry_expiry(struct timeval time_stamp)
     return ret;
 }
 
-/* dcache_lookup
+/* ncache_lookup
  *
  * search PVFS directory cache for specific entry
  *
  * returns 0 on success, -pvfs_errno on failure,
  * -PVFS_ENOENT if entry is not present.
  */
-int PINT_dcache_lookup(
+int PINT_ncache_lookup(
     char *name,
     PVFS_pinode_reference parent,
     PVFS_pinode_reference *entry)
 {
-#if ENABLE_DCACHE
+#if ENABLE_NCACHE
     int i = 0;
     int ret = 0;
 
@@ -131,7 +130,7 @@ int PINT_dcache_lookup(
     gen_mutex_lock(cache->mt_lock);
 
     /* No match found */
-    entry->handle = PINT_DCACHE_HANDLE_INVALID;	
+    entry->handle = PINT_NCACHE_HANDLE_INVALID;	
 
     for(i = cache->top; i != BAD_LINK; i = cache->element[i].next)
     {
@@ -141,10 +140,10 @@ int PINT_dcache_lookup(
 	    ret = check_dentry_expiry(cache->element[i].dentry.tstamp_valid);
 	    if (ret < 0)
 	    {
-		gossip_ldebug(DCACHE_DEBUG, "dcache entry expired.\n");
+		gossip_ldebug(NCACHE_DEBUG, "ncache entry expired.\n");
 		/* Dentry is stale */
 		/* Remove the entry from the cache */
-		dcache_remove_dentry(i);
+		ncache_remove_dentry(i);
 
 		/* we never have more than one entry for the same object
 		 * in the cache, so we can assume we have no up-to-date one
@@ -156,10 +155,10 @@ int PINT_dcache_lookup(
 
 	    /*
               update links so that this dentry is at the top of our list;
-              update the time stamp on the dcache entry
+              update the time stamp on the ncache entry
             */
-	    dcache_rotate_dentry(i);
-            ret = dcache_update_dentry_timestamp(
+	    ncache_rotate_dentry(i);
+            ret = ncache_update_dentry_timestamp(
                 &cache->element[i].dentry);
             if (ret < 0)
             {
@@ -181,14 +180,14 @@ int PINT_dcache_lookup(
 #endif
 }
 
-/* dcache_rotate_dentry()
+/* ncache_rotate_dentry()
  *
- * moves the specified item to the top of the dcache linked list to prevent it
+ * moves the specified item to the top of the ncache linked list to prevent it
  * from being identified as the least recently used item in the cache.
  *
  * no return value
  */
-static void dcache_rotate_dentry(int item)
+static void ncache_rotate_dentry(int item)
 {
     int prev = 0, next = 0, new_bottom;
     if (cache->top != cache->bottom) 
@@ -222,24 +221,24 @@ static void dcache_rotate_dentry(int item)
     }
 }
 
-/* dcache_insert
+/* ncache_insert
  *
  * insert an entry into PVFS directory cache
  *
  * returns 0 on success, -1 on failure
  */
-int PINT_dcache_insert(
+int PINT_ncache_insert(
 	char *name,
 	PVFS_pinode_reference entry,
 	PVFS_pinode_reference parent)
 {
-#if ENABLE_DCACHE
+#if ENABLE_NCACHE
 	int i = 0, index = 0, ret = 0;
 	unsigned char entry_found = 0;
 	
 	gen_mutex_lock(cache->mt_lock);
 
-        gossip_ldebug(DCACHE_DEBUG, "DCACHE: Inserting segment %s "
+        gossip_ldebug(NCACHE_DEBUG, "NCACHE: Inserting segment %s "
                       "(%Lu|%d) under parent (%Lu|%d)\n", name,
                       Lu(entry.handle), entry.fs_id, Lu(parent.handle),
                       parent.fs_id);
@@ -258,17 +257,17 @@ int PINT_dcache_insert(
 	if (entry_found == 0)
 	{
 		/* Element not in cache, add it */
-		dcache_add_dentry(name,parent,entry);
+		ncache_add_dentry(name,parent,entry);
 	}
 	else
 	{
 		/* We move the dentry to the top of the list, update its
 		 * timestamp and return 
 		 */
-		gossip_ldebug(DCACHE_DEBUG, "dache inserting entry "
+		gossip_ldebug(NCACHE_DEBUG, "dache inserting entry "
                               "already present; timestamp update.\n");
-		dcache_rotate_dentry(index);
-		ret = dcache_update_dentry_timestamp(
+		ncache_rotate_dentry(index);
+		ret = ncache_update_dentry_timestamp(
 			&cache->element[index].dentry); 
 		if (ret < 0)
 		{
@@ -284,18 +283,18 @@ int PINT_dcache_insert(
 #endif
 }
 
-/* dcache_remove
+/* ncache_remove
  *
  * remove a particular entry from the PVFS directory cache
  *
  * returns 0 on success, -1 on failure
  */
-int PINT_dcache_remove(
+int PINT_ncache_remove(
 	char *name,
 	PVFS_pinode_reference parent,
 	int *item_found)
 {
-#if ENABLE_DCACHE
+#if ENABLE_NCACHE
 	int i = 0;
 
 	if (name == NULL)
@@ -310,7 +309,7 @@ int PINT_dcache_remove(
 	{
 		if (compare(cache->element[i],name,parent))
 		{
-			dcache_remove_dentry(i);
+			ncache_remove_dentry(i);
 			*item_found = 1;
 			break;
 		}
@@ -323,31 +322,31 @@ int PINT_dcache_remove(
 #endif
 }
 
-/* dcache_flush
+/* ncache_flush
  * 
  * remove all entries from the PVFS directory cache
  *
  * returns 0 on success, -1 on failure
  */
-int PINT_dcache_flush(void)
+int PINT_ncache_flush(void)
 {
 	return(-ENOSYS);
 }
 
-/* pint_dcache_initialize
+/* pint_ncache_initialize
  *
  * initialize the PVFS directory cache
  *
  * returns 0 on success, -1 on failure
  */
-int PINT_dcache_initialize(void)
+int PINT_ncache_initialize(void)
 {
-#if ENABLE_DCACHE
+#if ENABLE_NCACHE
     int ret = 0, i = 0;
 
     if (cache == NULL)
     {
-        cache = (dcache*)malloc(sizeof(dcache));
+        cache = (ncache*)malloc(sizeof(ncache));
         if (cache)
         {
             cache->mt_lock = gen_mutex_build();
@@ -355,7 +354,7 @@ int PINT_dcache_initialize(void)
             cache->bottom = 0;
             cache->count = 0;
 
-            for(i = 0;i < PINT_DCACHE_MAX_ENTRIES; i++)
+            for(i = 0;i < PINT_NCACHE_MAX_ENTRIES; i++)
             {
                 cache->element[i].prev = BAD_LINK;
                 cache->element[i].next = BAD_LINK;
@@ -370,15 +369,15 @@ int PINT_dcache_initialize(void)
 #endif
 }
 
-/* pint_dcache_finalize
+/* pint_ncache_finalize
  *
  * close down the PVFS directory cache framework
  *
  * returns 0
  */
-int PINT_dcache_finalize(void)
+int PINT_ncache_finalize(void)
 {
-#if ENABLE_DCACHE
+#if ENABLE_NCACHE
 
     if (cache)
     {
@@ -392,24 +391,24 @@ int PINT_dcache_finalize(void)
 #endif
 }
 
-int PINT_dcache_get_timeout(void)
+int PINT_ncache_get_timeout(void)
 {
-    return s_pint_dcache_timeout_ms;
+    return s_pint_ncache_timeout_ms;
 }
 
-void PINT_dcache_set_timeout(int max_timeout_ms)
+void PINT_ncache_set_timeout(int max_timeout_ms)
 {
-    s_pint_dcache_timeout_ms = max_timeout_ms;
+    s_pint_ncache_timeout_ms = max_timeout_ms;
 }
 
 
-/* dcache_add_dentry
+/* ncache_add_dentry
  *
- * add a dentry to the dcache
+ * add a dentry to the ncache
  *
  * returns 0 on success, -errno on failure
  */
-static int dcache_add_dentry(
+static int ncache_add_dentry(
     char *name,
     PVFS_pinode_reference parent,
     PVFS_pinode_reference entry)
@@ -417,7 +416,7 @@ static int dcache_add_dentry(
 	int new = 0, ret = 0;
 	int size = strlen(name) + 1; /* size includes null terminator*/
 
-	new = dcache_get_lru();
+	new = ncache_get_lru();
 
 	/* Add the element to the cache */
 	cache->element[new].status = STATUS_USED;
@@ -425,7 +424,7 @@ static int dcache_add_dentry(
 	cache->element[new].dentry.entry = entry;
 	memcpy(cache->element[new].dentry.name,name,size);
 	/* Set the timestamp */
-	ret = dcache_update_dentry_timestamp(
+	ret = ncache_update_dentry_timestamp(
 		&cache->element[new].dentry);
 	if (ret < 0)
 	{
@@ -442,7 +441,7 @@ static int dcache_add_dentry(
 	return(0);
 }
 
-/* dcache_get_lru
+/* ncache_get_lru
  *
  * this function gets the least recently used cache entry (assuming a full 
  * cache) or searches through the cache for the first unused slot (if there
@@ -450,11 +449,11 @@ static int dcache_add_dentry(
  *
  * returns 0 on success, -errno on failure
  */
-static int dcache_get_lru(void)
+static int ncache_get_lru(void)
 {
     int new = 0, i = 0;
 
-    if (cache->count == PINT_DCACHE_MAX_ENTRIES)
+    if (cache->count == PINT_NCACHE_MAX_ENTRIES)
     {
 	new = cache->bottom;
 	cache->bottom = cache->element[new].prev;
@@ -463,7 +462,7 @@ static int dcache_get_lru(void)
     }
     else
     {
-	for(i = 0; i < PINT_DCACHE_MAX_ENTRIES; i++)
+	for(i = 0; i < PINT_NCACHE_MAX_ENTRIES; i++)
 	{
 	    if (cache->element[i].status == STATUS_UNUSED)
 	    {
@@ -473,18 +472,18 @@ static int dcache_get_lru(void)
 	}
     }
 
-    gossip_ldebug(DCACHE_DEBUG, "error getting least recently used dentry.\n");
-    gossip_ldebug(DCACHE_DEBUG, "cache->count = %d max_entries = %d.\n", cache->count, PINT_DCACHE_MAX_ENTRIES);
+    gossip_ldebug(NCACHE_DEBUG, "error getting least recently used dentry.\n");
+    gossip_ldebug(NCACHE_DEBUG, "cache->count = %d max_entries = %d.\n", cache->count, PINT_NCACHE_MAX_ENTRIES);
     assert(0);
 }
 
-/* dcache_remove_dentry
+/* ncache_remove_dentry
  *
  * Handles the actual manipulation of the cache to handle removal
  *
  * returns nothing
  */
-static void dcache_remove_dentry(int item)
+static void ncache_remove_dentry(int item)
 {
     int prev = 0,next = 0;
 
@@ -528,13 +527,13 @@ static void dcache_remove_dentry(int item)
     }
 }
 
-/* dcache_update_dentry_timestamp
+/* ncache_update_dentry_timestamp
  *
- * updates the timestamp of the dcache entry
+ * updates the timestamp of the ncache entry
  *
  * returns 0 on success, -1 on failure
  */
-static int dcache_update_dentry_timestamp(dcache_entry* entry) 
+static int ncache_update_dentry_timestamp(ncache_entry* entry) 
 {
     int ret = 0;
 
@@ -542,9 +541,9 @@ static int dcache_update_dentry_timestamp(dcache_entry* entry)
     if (ret == 0)
     {
         entry->tstamp_valid.tv_sec +=
-            (int)(s_pint_dcache_timeout_ms / 1000);
+            (int)(s_pint_ncache_timeout_ms / 1000);
         entry->tstamp_valid.tv_usec +=
-            (int)((s_pint_dcache_timeout_ms % 1000) * 1000);
+            (int)((s_pint_ncache_timeout_ms % 1000) * 1000);
     }
     return ret;
 }

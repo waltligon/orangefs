@@ -15,10 +15,9 @@
 #include "str-utils.h"
 
 #include "pinode-helper.h"
-#include "pint-dcache.h"
+#include "ncache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "acache.h"
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
 
@@ -79,7 +78,7 @@ machine pvfs2_client_lookup_sm(init,
     }
 
     state lookup_msg_xfer_msgpair {
-        jump pvfs2_client_lookup_dcache_sm;
+        jump pvfs2_client_lookup_ncache_sm;
 	default => lookup_check_completion;
     }
 
@@ -546,8 +545,8 @@ static int lookup_msg_comp_fn(void *v_p,
             sm_p->u.lookup.starting_refn.fs_id;
 
 #if 0
-        /* insert final lookup entry into dcache if appropriate */
-        if (!sm_p->dcache_hit)
+        /* insert final lookup entry into ncache if appropriate */
+        if (!sm_p->ncache_hit)
         {
             PVFS_pinode_reference parent_refn;
 
@@ -557,13 +556,13 @@ static int lookup_msg_comp_fn(void *v_p,
                 resp_p->u.lookup_path.handle_array[
                     resp_p->u.lookup_path.handle_count - 1];
 
-            gossip_debug(DCACHE_DEBUG, "Final segment %s has starting "
+            gossip_debug(NCACHE_DEBUG, "Final segment %s has starting "
                          "handle %Lu (response had %d handles total)\n",
                          sm_p->u.lookup.remaining_pathname,
                          Lu(parent_refn.handle),
                          resp_p->u.lookup_path.handle_count);
 
-            PINT_dcache_insert(sm_p->u.lookup.remaining_pathname,
+            PINT_ncache_insert(sm_p->u.lookup.remaining_pathname,
                                sm_p->u.lookup.lookup_resp->pinode_refn,
                                parent_refn);
         }
@@ -578,10 +577,10 @@ static int lookup_msg_comp_fn(void *v_p,
 
 #if 0
         /*
-          if we didn't get a dcache hit, insert all
-          resolved segments into the dcache here
+          if we didn't get a ncache hit, insert all
+          resolved segments into the ncache here
         */
-        if (!sm_p->dcache_hit)
+        if (!sm_p->ncache_hit)
         {
             int i = 0;
             char cur_segment[PVFS_SEGMENT_MAX] = {0};
@@ -604,10 +603,10 @@ static int lookup_msg_comp_fn(void *v_p,
                     "\"%s\" Handle %Lu back\n", i, cur_segment,
                     Lu(cur_refn.handle));
 
-                if (PINT_dcache_lookup(
+                if (PINT_ncache_lookup(
                         cur_segment, parent_refn, &cur_refn) < 0)
                 {
-                    PINT_dcache_insert(cur_segment, cur_refn, parent_refn);
+                    PINT_ncache_insert(cur_segment, cur_refn, parent_refn);
                 }
                 parent_refn = cur_refn;
             }
@@ -767,8 +766,8 @@ static int lookup_symlink_getattr_setup_msgpair(PINT_client_sm *sm_p,
     /* clear error field in job */
     js_p->error_code = 0;
 
-    /* clear dcache hit flag */
-    sm_p->dcache_hit = 0;
+    /* clear ncache hit flag */
+    sm_p->ncache_hit = 0;
 
     gossip_debug(CLIENT_DEBUG," lookup: posting symlink getattr "
                  "req on handle %Lu (parent is %Lu)\n",

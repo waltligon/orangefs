@@ -3,7 +3,7 @@ DIR := test/client/sysint
 TESTSRC += \
 	$(DIR)/client.c\
 	$(DIR)/lookup.c\
-	$(DIR)/dcache-torture.c\
+	$(DIR)/ncache-torture.c\
 	$(DIR)/acache-torture.c\
 	$(DIR)/get-info.c\
 	$(DIR)/set-info.c\
@@ -21,7 +21,7 @@ TESTSRC += \
 	$(DIR)/truncate.c\
 	$(DIR)/readdir.c\
 	$(DIR)/test-pint-bucket.c \
-	$(DIR)/test-pint-dcache.c \
+	$(DIR)/test-pint-ncache.c \
 	$(DIR)/io-test.c \
 	$(DIR)/io-test-offset.c \
 	$(DIR)/initialize.c \
