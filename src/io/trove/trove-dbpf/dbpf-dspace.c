@@ -895,11 +895,16 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     switch (ret)
     {
         case DBPF_DSPACE_DBCACHE_ERROR:
+            ret = -TROVE_ENOENT;
             goto return_error;
         case DBPF_DSPACE_DBCACHE_BUSY:
             return 0; /* try again later */
         case DBPF_DSPACE_DBCACHE_SUCCESS:
             got_db = 1;
+            break;
+        default:
+            ret = -TROVE_EINVAL;
+            goto return_error;
             break;
     }
 
@@ -926,12 +931,14 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
                 op_p->coll_p->coll_id, op_p->handle);
 	    if (ret < 0)
             {
+                ret = -TROVE_EBADF;
                 goto return_error;
             }
 	    b_size = (TROVE_size) b_stat.st_size;
 	    break;
         default:
-            assert(0);
+            ret = -TROVE_EINVAL;
+            goto return_error;
             break;
     }
 
@@ -959,6 +966,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         }
         else
         {
+            ret = -TROVE_EIO;
             goto return_error;
         }
         /* drop through */
@@ -989,6 +997,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     if (ret != 0)
     {
         db_p->err(db_p, ret, "DB->get");
+        ret = -TROVE_EIO;
         goto return_error;
     }
 
@@ -1010,11 +1019,12 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     /* add retrieved ds_attr to dbpf_attr cache here */
     dbpf_attr_cache_insert(op_p->handle, attr);
 
-    /* sync if requested; permissable under API */
     if (op_p->flags & TROVE_SYNC)
     {
-        if ((ret = db_p->sync(db_p, 0)) != 0)
+        ret = db_p->sync(db_p, 0);
+        if (ret)
         {
+            ret = -TROVE_EIO;
             goto return_error;
         }
     }
@@ -1030,7 +1040,7 @@ return_error:
     {
         dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     }
-    return -1;
+    return ret;
 }
 
 /* dbpf_dspace_test()
