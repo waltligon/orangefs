@@ -50,6 +50,7 @@ typedef struct
 struct PVFS_dirent_s {
     /*pinode_number pinode_no;*/
     char d_name[PVFS_NAME_MAX + 1];
+	 PVFS_handle handle;
     /* something about how to get to the next one ? */
 };
 typedef struct PVFS_dirent_s PVFS_dirent;
