@@ -1119,7 +1119,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	q_item->parent->mem_req_state,
 	&q_item->parent->file_data,
 	&q_item->result_chain.result,
-	PINT_SERVER);
+	PINT_CLIENT);
 
     /* TODO: error handling */ 
     assert(ret >= 0);
@@ -1143,7 +1143,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	    /* copy what we have so far into intermediate buffer */
 	    for(i=0; i<q_item->result_chain.result.segs; i++)
 	    {
-		src_ptr = ((char*)q_item->buffer + 
+		src_ptr = ((char*)q_item->parent->src.u.mem.buffer + 
 		    q_item->result_chain.offset_list[i]);
 		dest_ptr = ((char*)flow_data->intermediate + bytes_processed);
 		memcpy(dest_ptr, src_ptr, q_item->result_chain.size_list[i]);
@@ -1159,7 +1159,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 		q_item->parent->mem_req_state,
 		&q_item->parent->file_data,
 		&q_item->result_chain.result,
-		PINT_SERVER);
+		PINT_CLIENT);
 	    /* TODO: error handling */
 	    assert(ret >= 0);
 	}while(bytes_processed < BUFFER_SIZE &&
@@ -1172,9 +1172,6 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	q_item->result_chain.result.segs = 1;
 	buffer_type = BMI_PRE_ALLOC;
     }
-
-    /* TODO: handle highly discontiguous cases */
-    assert(q_item->result_chain.result.segs <= MAX_REGIONS);
 
     if(q_item->result_chain.result.bytes == 0)
     {	
@@ -1232,6 +1229,13 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     int i;
     PVFS_id_gen_t tmp_id;
     PVFS_size tmp_actual_size;
+    PVFS_size* size_array;
+    int segs;
+    PVFS_size total_size;
+    enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
+    PVFS_size bytes_processed;
+    char *src_ptr, *dest_ptr;
+    PVFS_size region_size;
 
     /* TODO: error handling */
     if(error_code != 0)
@@ -1243,6 +1247,41 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     gen_mutex_lock(&flow_data->flow_mutex);
     
     flow_data->parent->total_transfered += actual_size;
+
+    /* if this is the result of a receive into an intermediate buffer,
+     * then we must copy out */
+    if(flow_data->tmp_buffer_list[0] == flow_data->intermediate &&
+	flow_data->intermediate != NULL)
+    {
+	do
+	{
+	    /* copy out what we have so far */
+	    for(i=0; i<q_item->result_chain.result.segs; i++)
+	    {
+		region_size = q_item->result_chain.size_list[i];
+		src_ptr = (char*)(flow_data->intermediate + 
+		    bytes_processed);
+		dest_ptr = (char*)(q_item->result_chain.offset_list[i]
+		    + q_item->parent->dest.u.mem.buffer);
+		memcpy(dest_ptr, src_ptr, region_size);
+		bytes_processed += region_size;
+	    }
+	    q_item->result_chain.result.bytemax = BUFFER_SIZE - bytes_processed;
+	    q_item->result_chain.result.bytes = 0;
+	    q_item->result_chain.result.segmax = MAX_REGIONS;
+	    q_item->result_chain.result.segs = 0;
+	    q_item->result_chain.buffer_offset = NULL;
+	    /* process ahead */
+	    ret = PINT_Process_request(q_item->parent->file_req_state,
+		q_item->parent->mem_req_state,
+		&q_item->parent->file_data,
+		&q_item->result_chain.result,
+		PINT_CLIENT);
+	    /* TODO: error handling */
+	    assert(ret >= 0);
+	}while(bytes_processed < BUFFER_SIZE &&
+	    !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+    }
 
     /* are we done? */
     if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
@@ -1273,33 +1312,60 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 	q_item->parent->mem_req_state,
 	&q_item->parent->file_data,
 	&q_item->result_chain.result,
-	PINT_SERVER);
-
+	PINT_CLIENT);
     /* TODO: error handling */ 
     assert(ret >= 0);
-    /* TODO: handle highly discontiguous cases */
-    assert(q_item->result_chain.result.segs <= MAX_REGIONS);
 
-    if(q_item->result_chain.result.bytes == 0)
-    {	
-	gen_mutex_unlock(&flow_data->flow_mutex);
-	return;
-    }
-
-    /* convert offsets to memory addresses */
-    for(i=0; i<q_item->result_chain.result.segs; i++)
+    /* was MAX_REGIONS enough to satisfy this step? */
+    if(!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
+	q_item->result_chain.result.bytes < BUFFER_SIZE)
     {
-	flow_data->tmp_buffer_list[i] = 
-	    (void*)(q_item->result_chain.result.offset_array[i] +
-	    q_item->buffer);
+	/* create an intermediate buffer */
+	if(!flow_data->intermediate)
+	{
+	    flow_data->intermediate = BMI_memalloc(
+		flow_data->parent->src.u.bmi.address,
+		BUFFER_SIZE, BMI_RECV);
+	    /* TODO: error handling */
+	    assert(flow_data->intermediate);
+	}
+	/* setup for BMI operation */
+	flow_data->tmp_buffer_list[0] = flow_data->intermediate;
+	buffer_type = BMI_PRE_ALLOC;
+	q_item->buffer_used = BUFFER_SIZE;
+	total_size = BUFFER_SIZE;
+	size_array = &q_item->buffer_used;
+	segs = 1;
+	/* we will copy data out on next iteration */
+    }
+    else
+    {
+	/* normal case */
+	segs = q_item->result_chain.result.segs;
+	size_array = q_item->result_chain.result.size_array;
+	total_size = q_item->result_chain.result.bytes;
+
+	/* convert offsets to memory addresses */
+	for(i=0; i<q_item->result_chain.result.segs; i++)
+	{
+	    flow_data->tmp_buffer_list[i] = 
+		(void*)(q_item->result_chain.result.offset_array[i] +
+		q_item->buffer);
+	}
+
+	if(q_item->result_chain.result.bytes == 0)
+	{	
+	    gen_mutex_unlock(&flow_data->flow_mutex);
+	    return;
+	}
     }
 
     ret = BMI_post_recv_list(&tmp_id,
 	q_item->parent->src.u.bmi.address,
 	flow_data->tmp_buffer_list,
-	q_item->result_chain.result.size_array,
-	q_item->result_chain.result.segs,
-	q_item->result_chain.result.bytes,
+	size_array,
+	segs,
+	total_size,
 	&tmp_actual_size,
 	BMI_EXT_ALLOC,
 	q_item->parent->tag,
