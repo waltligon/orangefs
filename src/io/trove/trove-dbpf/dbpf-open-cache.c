@@ -28,8 +28,7 @@
 #include "quicklist.h"
 #include "dbpf-open-cache.h"
 
-/* TODO: re-enable this later! */
-#define OPEN_CACHE_SIZE 0
+#define OPEN_CACHE_SIZE 64
 
 struct open_cache_entry
 {
