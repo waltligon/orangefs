@@ -10,11 +10,10 @@
 #include <limits.h>
 
 #include "pvfs2-config.h"
+#include "pvfs2-debug.h"
 
 #include "trove-types.h"
 #include "trove-proto.h"
-
-#define TROVE_GOSSIP_DEBUG 0xFF000000
 
 #define TROVE_MAX_CONTEXTS 16
 

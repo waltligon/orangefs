@@ -68,7 +68,7 @@ int trove_initialize(char *stoname,
 #endif
 
     gossip_enable_stderr();
-    gossip_set_debug_mask(1, TROVE_GOSSIP_DEBUG);
+    gossip_set_debug_mask(1, TROVE_DEBUG);
 
     /* initialize the handle management interface */
     ret = trove_handle_mgmt_initialize();

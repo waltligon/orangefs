@@ -132,7 +132,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             */
             new_handle = cur_extent.first;
             trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
-            gossip_debug(TROVE_GOSSIP_DEBUG,
+            gossip_debug(TROVE_DEBUG,
                          "new_handle was FORCED to be %Ld\n", new_handle);
         }
         else if (cur_extent.first == 0)
@@ -155,7 +155,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             &op_p->u.d_create.extent_array);
     }
 
-    gossip_debug(TROVE_GOSSIP_DEBUG, "[%d extents] -- new_handle is %Ld "
+    gossip_debug(TROVE_DEBUG, "[%d extents] -- new_handle is %Ld "
                  "(cur_extent is %Ld - %Ld)\n",
                  op_p->u.d_create.extent_array.extent_count,
                  new_handle, cur_extent.first, cur_extent.last);
@@ -185,7 +185,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     /* check to see if handle is already used */
     ret = db_p->get(db_p, NULL, &key, &data, 0);
     if (ret == 0) {
-	gossip_debug(TROVE_GOSSIP_DEBUG, "handle already exists...\n");
+	gossip_debug(TROVE_DEBUG, "handle already exists...\n");
 	return -1;
     }
     if (ret != DB_NOTFOUND) {
@@ -295,7 +295,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    error = -1;
 	    goto return_error;
 	case 0:
-	    gossip_debug(TROVE_GOSSIP_DEBUG, "removed dataspace with "
+	    gossip_debug(TROVE_DEBUG, "removed dataspace with "
                          "handle 0x%08Lx\n", op_p->handle);
 	    break;
     }
@@ -503,11 +503,11 @@ return_ok:
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
 	if (ret == DB_NOTFOUND)
         {
-            gossip_debug(TROVE_GOSSIP_DEBUG, "iterate -- notfound\n");
+            gossip_debug(TROVE_DEBUG, "iterate -- notfound\n");
         }
 	else if (ret != 0)
         {
-            gossip_debug(TROVE_GOSSIP_DEBUG, "iterate -- some other "
+            gossip_debug(TROVE_DEBUG, "iterate -- some other "
                          "failure @ recno\n");
         }
 
@@ -704,7 +704,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     /* initialize op-specific members */
     q_op_p->op.u.d_setattr.attr_p = ds_attr_p;
 
-    gossip_debug(TROVE_GOSSIP_DEBUG, "storing attributes (1), "
+    gossip_debug(TROVE_DEBUG, "storing attributes (1), "
                  "uid = %d, mode = %d, type = %d\n",
                  (int) ds_attr_p->uid,
                  (int) ds_attr_p->mode,
@@ -744,7 +744,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 
     trove_ds_attr_to_stored((*op_p->u.d_setattr.attr_p), s_attr);
 
-    gossip_debug(TROVE_GOSSIP_DEBUG, "storing attributes (2), "
+    gossip_debug(TROVE_DEBUG, "storing attributes (2), "
                  "uid = %d, mode = %d, type = %d\n",
                  (int) s_attr.uid,
                  (int) s_attr.mode,
@@ -862,11 +862,13 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	goto return_error;
     }
 
-    gossip_debug(TROVE_GOSSIP_DEBUG, "reading attributes (1), "
+#if 0
+    gossip_debug(TROVE_DEBUG, "reading attributes (1), "
                  "uid = %d, mode = %d, type = %d\n",
                  (int) s_attr.uid,
                  (int) s_attr.mode,
                  (int) s_attr.type);
+#endif
 
     trove_ds_stored_to_attr(s_attr, (*op_p->u.d_setattr.attr_p), b_size, k_size);
 
@@ -959,13 +961,11 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 	}
 	dbpf_queued_op_put_and_dequeue(q_op_p);
 	dbpf_queued_op_free(q_op_p);
-	gossip_debug(TROVE_GOSSIP_DEBUG,
-                     "dbpf_dspace_test returning success.\n");
 	return 1;
     }
 
     dbpf_queued_op_put(q_op_p, 0);
-    gossip_debug(TROVE_GOSSIP_DEBUG,
+    gossip_debug(TROVE_DEBUG,
                  "dbpf_dspace_test returning no progress.\n");
     sleep(1);
     return 0;

@@ -30,6 +30,7 @@ enum
     CLIENT_DEBUG =	    (1 << 13),
     REQ_SCHED_DEBUG =	    (1 << 14),
     PCACHE_DEBUG =	    (1 << 15),
+    TROVE_DEBUG =           (1 << 16),
 
     BMI_DEBUG_ALL = BMI_DEBUG_TCP + BMI_DEBUG_CONTROL +
 	+BMI_DEBUG_GM + BMI_DEBUG_OFFSETS
