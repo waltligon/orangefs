@@ -1584,7 +1584,11 @@ int process_vfs_requests(void)
         {
             vfs_request = vfs_request_array[i];
             assert(vfs_request);
-            assert(vfs_request->op_id == op_id_array[i]);
+            if (vfs_request->op_id != op_id_array[i])
+            {
+                gossip_err("Ignoring invalid op %p\n", vfs_request);
+                continue;
+            }
 
             /* check if this is a new dev unexp request */
             if (vfs_request->is_dev_unexp)
@@ -1615,7 +1619,12 @@ int process_vfs_requests(void)
                   already set appropriately
                 */
                 ret = remove_op_from_op_in_progress_table(vfs_request);
-                assert(ret == 0);
+                if (ret)
+                {
+                    PVFS_perror_gossip("Failed to remove op in progress "
+                                       "from table", ret);
+                    goto repost_unexp;
+                }
 
                 package_downcall_members(
                     vfs_request, error_code_array[i]);
@@ -1656,6 +1665,7 @@ int process_vfs_requests(void)
                                  "write due to previous cancellation\n");
                 }
 
+              repost_unexp:
                 ret = repost_unexp_vfs_request(
                     vfs_request, "normal completion");
 

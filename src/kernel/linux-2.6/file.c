@@ -184,7 +184,6 @@ ssize_t pvfs2_inode_read(
           after this.
         */
         wake_up_device_for_return(new_op);
-
         pvfs_bufmap_put(buffer_index);
 
         /* if we got a short read, fall out and return what we
@@ -275,6 +274,7 @@ static ssize_t pvfs2_file_write(
             pvfs2_error("Failed to copy user buffer.  Please make sure "
                         "that the pvfs2-client is running.\n");
             op_release(new_op);
+            pvfs_bufmap_put(buffer_index);
             *offset = original_offset;
             return -EIO;
         }
@@ -327,7 +327,6 @@ static ssize_t pvfs2_file_write(
           after this.
         */
         wake_up_device_for_return(new_op);
-
         pvfs_bufmap_put(buffer_index);
 
         /* if we got a short write, fall out and return what we got so

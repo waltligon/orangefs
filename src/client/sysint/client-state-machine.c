@@ -514,6 +514,7 @@ int PINT_client_state_machine_test(
     for(i = 0; i < job_count; i++)
     {
 	tmp_sm_p = (PINT_client_sm *)client_sm_p_array[i];
+        assert(tmp_sm_p);
 
         if (tmp_sm_p->op == PVFS_DEV_UNEXPECTED)
         {
@@ -600,6 +601,7 @@ int PINT_client_state_machine_testsome(
     for(i = 0; i < job_count; i++)
     {
 	sm_p = (PINT_client_sm *)client_sm_p_array[i];
+        assert(sm_p);
 
         /*
           note that dev unexp messages found here are treated as

@@ -48,6 +48,7 @@ typedef unsigned long sector_t;
 #include <linux/wait.h>
 #include <linux/dcache.h>
 #include <linux/pagemap.h>
+#include <linux/poll.h>
 
 /* taken from include/linux/fs.h from 2.4.19 or later kernels */
 #ifndef MAX_LFS_FILESIZE
@@ -629,6 +630,7 @@ do {                                                      \
     {                                                     \
         ret = pvfs2_cancel_op_in_progress(new_op->tag);   \
         op_release(new_op);                               \
+        pvfs_bufmap_put(buffer_index);                    \
     }                                                     \
     else                                                  \
     {                                                     \
@@ -636,6 +638,7 @@ do {                                                      \
                  new_op->downcall.status);                \
         *offset = original_offset;                        \
         wake_up_device_for_return(new_op);                \
+        pvfs_bufmap_put(buffer_index);                    \
     }                                                     \
     *offset = original_offset;                            \
 } while(0)

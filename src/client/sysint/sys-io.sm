@@ -747,26 +747,32 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
     /* check if we're completing a send or recv msgpair */
     if (STATUS_USER_TAG_IS_SEND_OR_RECV(status_user_tag))
     {
-        assert(sm_p->u.io.msgpair_completion_count > 0);
-
-        ret = complete_context_send_or_recv(sm_p, js_p);
-        if (ret < 0)
+        assert(sm_p->u.io.msgpair_completion_count > -1);
+        /*
+          the completion count might be zero when recovering from a
+          cancellation
+        */
+        if (sm_p->u.io.msgpair_completion_count)
         {
-            PVFS_perror_gossip(
-                "complete_context_send_or_recv failed", ret);
-            js_p->error_code = ret;
-            return 1;
-        }
-        else if (ret == 0)
-        {
-            gossip_debug(GOSSIP_IO_DEBUG, "  matched send in context "
-                         "%d; continuing.\n", index);
-            js_p->error_code = 0;
-            return 0;
-        }
-        assert(ret == IO_RECV_COMPLETED);
+            ret = complete_context_send_or_recv(sm_p, js_p);
+            if (ret < 0)
+            {
+                PVFS_perror_gossip(
+                    "complete_context_send_or_recv failed", ret);
+                js_p->error_code = ret;
+                return 1;
+            }
+            else if (ret == 0)
+            {
+                gossip_debug(GOSSIP_IO_DEBUG, "  matched send in context "
+                             "%d; continuing.\n", index);
+                js_p->error_code = 0;
+                return 0;
+            }
+            assert(ret == IO_RECV_COMPLETED);
 
-        matched_send_or_recv = 1;
+            matched_send_or_recv = 1;
+        }
     }
 
     /* if we've just completed a recv above, post the flow here */
@@ -908,8 +914,16 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                 cur_ctx, sm_p->u.io.io_type, &total_size);
             if (ret < 0)
             {
-                PVFS_perror_gossip(
-                    "check_context_status found error", ret);
+                if (ret == -PVFS_ECANCEL)
+                {
+                    gossip_debug(GOSSIP_IO_DEBUG, "*** I/O operation "
+                                 "cancelled\n");
+                }
+                else
+                {
+                    PVFS_perror_gossip(
+                        "check_context_status found error", ret);
+                }
                 break;
             }
 
@@ -1060,7 +1074,7 @@ static inline int process_context_recv(
 
     if (ret)
     {
-        PVFS_perror("PINT_server_decode_resp failed\n", ret);
+        PVFS_perror("PINT_server_decode_resp failed", ret);
         return ret;
     }
 
