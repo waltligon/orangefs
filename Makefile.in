@@ -80,7 +80,7 @@ CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LD = gcc
 LDFLAGS += -L lib
-LIBS += -lpvfs2
+LIBS += @LIBS@ -lpvfs2
   # enable BMI TCP module
 CFLAGS += -D__STATIC_METHOD_BMI_TCP__
   # enable Flow template protocol
@@ -103,7 +103,7 @@ CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 
 # the server will use a threaded job library 
 SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__
-SERVERLIBS = -ldb -lrt -lpthread
+SERVERLIBS = @LIBS@ -ldb -lrt -lpthread
 # the client libraries are not threaded (at the moment at least)
 #    and therefore can disable locking in the I/O subsystems
 LIBCFLAGS = -D__GEN_NULL_LOCKING__
