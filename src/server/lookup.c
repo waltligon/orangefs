@@ -330,7 +330,7 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
-    int job_post_ret=-1;
+    int job_post_ret=0;
     job_id_t i;
 
     gossip_ldebug(SERVER_DEBUG,"Send BMI\n");
