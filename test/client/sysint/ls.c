@@ -17,11 +17,18 @@ void print_entry_attr(
     PVFS_sys_attr *attr)
 {
     char buf[128] = {0};
+    PVFS_size computed_size = 0;
 
     struct tm *time = gmtime((time_t *)&attr->ctime);
     assert(time);
 
-    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t0 "
+    if ((attr->objtype == PVFS_TYPE_METAFILE) &&
+        (attr->mask & PVFS_ATTR_SYS_SIZE))
+    {
+        computed_size = attr->size;
+    }
+
+    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%Ld "
              "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
              ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
              ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
@@ -35,6 +42,7 @@ void print_entry_attr(
              ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
              attr->owner,
              attr->group,
+             computed_size,
              (time->tm_year + 1900),
              (time->tm_mon + 1),
              time->tm_mday,
@@ -53,16 +61,16 @@ void print_entry(
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
 
-    memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
-    memset(&credentials,0,sizeof(PVFS_credentials));
+    memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
+    memset(&credentials,0, sizeof(PVFS_credentials));
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = 0;
+    credentials.gid = 0;
     
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
 
-    if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_NOSIZE,
+    if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                          credentials, &getattr_response))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
@@ -93,8 +101,8 @@ int do_list(
 
     name = start_dir;
     fs_id = init_response->fsid_list[0];
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = 0;
+    credentials.gid = 0;
 
     if (PVFS_sys_lookup(fs_id, name, credentials, &lk_response))
     {
@@ -106,10 +114,10 @@ int do_list(
     pinode_refn.handle = lk_response.pinode_refn.handle;
     pinode_refn.fs_id = init_response->fsid_list[0];
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = 0;
+    credentials.gid = 0;
 
-    if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_NOSIZE,
+    if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                          credentials, &getattr_response) == 0)
     {
         if (getattr_response.attr.objtype == PVFS_TYPE_METAFILE)

@@ -57,7 +57,8 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     else
     {
         resp->attr.size = 0;
-        resp->attr.mask |= PVFS_ATTR_SYS_SIZE;
+        resp->attr.mask &= ~PVFS_ATTR_SYS_SIZE;
+        resp->attr.mask &= ~PVFS_ATTR_DATA_ALL;
     }
     return(0);
 }
@@ -251,7 +252,7 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
         {
             can_compute_size = 1;
         }
-	
+
 	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
                          &encoded_resp, op_tag);
 
@@ -262,7 +263,18 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	     * 2). call the dist code to figure out if a server has sparse
 	     *	data written
 	     */
-	    num_data_servers = entry_pinode->attr.u.meta.dfile_count;
+            num_data_servers = out_attr->u.meta.dfile_count;
+            if (num_data_servers == 0)
+            {
+                gossip_lerr("Number of dataservers is 0. "
+                            "Skipping size computation!\n");
+                /*
+                  if there are no data server, don't even try to
+                  compute anything here
+                */
+                ret = NONE_FAILURE;
+                goto return_error;
+            }
 
 	    size_array = malloc(num_data_servers * sizeof(PVFS_size));
 	    if (size_array == NULL)
@@ -293,6 +305,9 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 
 		max_msg_sz = PINT_encode_calc_max_size(
                     PINT_ENCODE_RESP, req_p.op, PINT_CLIENT_ENC_TYPE);
+
+                gossip_lerr("SENDING REQUEST FOR DATAFILE %Ld\n",
+                            req_p.u.getattr.handle);
 
 		ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
                                     &decoded, &encoded_resp, op_tag);
