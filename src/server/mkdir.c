@@ -278,21 +278,16 @@ static int mkdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
 static int mkdir_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
+    /* TODO: Free Decoded and Encoded Messages */
 
     if(s_op->resp)
     {
-	BMI_memfree(s_op->addr,
-		s_op->resp,
-		sizeof(struct PVFS_server_resp_s),
-		BMI_SEND_BUFFER);
+	free(s_op->resp);
     }
 
     if(s_op->req)
     {
-	BMI_memfree(s_op->addr,
-		s_op->req,
-		sizeof(struct PVFS_server_resp_s),
-		BMI_SEND_BUFFER);
+	free(s_op->req);
     }
 
     free(s_op->unexp_bmi_buff);
