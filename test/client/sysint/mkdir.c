@@ -7,6 +7,12 @@
 #include <client.h>
 #include <sys/time.h>
 
+extern int PINT_get_base_dir(char *pathname,
+                             char *out_base_dir, int out_max_len);
+extern int PINT_remove_base_dir(char *pathname,
+                                char *out_dir, int out_max_len);
+
+
 /*why were these commented out?*/
 
 #define ATTR_UID 1
@@ -22,26 +28,24 @@ extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
 int main(int argc,char **argv)
 {
+	int ret = -1;
+	char *dirname = (char *)0;
+        char str_buf[256] = {0};
 	PVFS_sysresp_init resp_init;
 	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
-	PVFS_sysreq_mkdir *req_mkdir = NULL;
-	PVFS_sysresp_mkdir *resp_mkdir = NULL;
-	char *dirname;
-	int ret = -1, name_sz;
+	PVFS_sysreq_mkdir req_mkdir;
+	PVFS_sysresp_mkdir resp_mkdir;
 	pvfs_mntlist mnt = {0,NULL};
 
-	if (argc > 1)
-	{
-		name_sz = strlen(argv[1]) + 1; /*include null terminator*/
-		dirname = malloc(name_sz);
-		memcpy(dirname, argv[1], name_sz);
-	}
-	else
+	if (argc != 2)
 	{
 		gen_rand_str(10,&dirname);
 	}
-
+	else
+	{
+		dirname = argv[1];
+	}
 	printf("creating a directory named %s\n", dirname);
 
 	/* Parse PVFStab */
@@ -58,17 +62,26 @@ int main(int argc,char **argv)
 		printf("PVFS_sys_initialize() failure. = %d\n", ret);
 		return(ret);
 	}
-	printf("SYSTEM INTERFACE INITIALIZED\n");
 
-	/* lookup the root handle */
+        if (PINT_get_base_dir(dirname,str_buf,256))
+        {
+		printf("Failed to get parent directory of %s\n",dirname);
+		if (dirname[0] != '/')
+                {
+                    printf("You forgot to use a leading '/'; invalid dirname\n");
+                }
+		return -1;
+        }
+        printf("Parent directory is %s\n",str_buf);
+
+	/* lookup the parent directory handle */
 	req_look.credentials.uid = 100;
 	req_look.credentials.gid = 100;
 	req_look.credentials.perms = 1877;
-	req_look.name = malloc(2);/*null terminator included*/
-	req_look.name[0] = '/';
-	req_look.name[1] = '\0';
+	req_look.name = str_buf;
 	req_look.fs_id = resp_init.fsid_list[0];
-	printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
+	printf("looking up the handle for %s on fsid = %d\n",
+               str_buf,req_look.fs_id);
 	ret = PVFS_sys_lookup(&req_look,&resp_look);
 	if (ret < 0)
 	{
@@ -77,43 +90,33 @@ int main(int argc,char **argv)
 	}
 	// print the handle 
 	printf("--lookup--\n"); 
-	printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
+	printf("PARENT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
 
-	printf("TESTING MKDIR HERE:\n");
+	memset(&req_mkdir, 0, sizeof(PVFS_sysreq_mkdir));
+	memset(&resp_mkdir, 0, sizeof(PVFS_sysresp_mkdir));
 
-	// test the mkdir function 
-	req_mkdir = (PVFS_sysreq_mkdir *)malloc(sizeof(PVFS_sysreq_mkdir));
-	if (req_mkdir == NULL)
-	{
-		printf("Error in malloc\n");
+        if (PINT_remove_base_dir(dirname,str_buf,256))
+        {
+		printf("Cannot retrieve entry name for creation\n");
 		return(-1);
-	}
-	memset(req_mkdir, 0, sizeof(PVFS_sysreq_mkdir));
-
-	resp_mkdir = (PVFS_sysresp_mkdir *)malloc(sizeof(PVFS_sysresp_mkdir));
-	if (resp_mkdir == NULL)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
-	memset(resp_mkdir, 0, sizeof(PVFS_sysresp_mkdir));
+        }
+        printf("New Directory component is %s\n",str_buf);
 
 	/* update the pointer to the string that was passed in */
-
-	req_mkdir->entry_name = dirname;
-	req_mkdir->parent_refn.handle = resp_look.pinode_refn.handle;
-	req_mkdir->parent_refn.fs_id = resp_look.pinode_refn.fs_id;
-	req_mkdir->attrmask = ATTR_BASIC;
-	req_mkdir->attr.owner = 100;
-	req_mkdir->attr.group = 100;
-	req_mkdir->attr.perms = 1877;
-	req_mkdir->attr.objtype = ATTR_DIR;
-	req_mkdir->credentials.perms = 1877;
-	req_mkdir->credentials.uid = 100;
-	req_mkdir->credentials.gid = 100;
+	req_mkdir.entry_name = str_buf;
+	req_mkdir.parent_refn.handle = resp_look.pinode_refn.handle;
+	req_mkdir.parent_refn.fs_id = resp_look.pinode_refn.fs_id;
+	req_mkdir.attrmask = ATTR_BASIC;
+	req_mkdir.attr.owner = 100;
+	req_mkdir.attr.group = 100;
+	req_mkdir.attr.perms = 1877;
+	req_mkdir.attr.objtype = ATTR_DIR;
+	req_mkdir.credentials.perms = 1877;
+	req_mkdir.credentials.uid = 100;
+	req_mkdir.credentials.gid = 100;
 
 	// call mkdir 
-	ret = PVFS_sys_mkdir(req_mkdir,resp_mkdir);
+	ret = PVFS_sys_mkdir(&req_mkdir,&resp_mkdir);
 	if (ret < 0)
 	{
 		printf("mkdir failed\n");
@@ -121,8 +124,8 @@ int main(int argc,char **argv)
 	}
 	// print the handle 
 	printf("--mkdir--\n"); 
-	printf("Handle:%ld\n",(long int)(resp_mkdir->pinode_refn.handle));
-	printf("FSID:%ld\n",(long int)req_mkdir->parent_refn.fs_id);
+	printf("Handle:%Ld\n",resp_mkdir.pinode_refn.handle);
+	printf("FSID:%d\n",req_mkdir.parent_refn.fs_id);
 
 	//close it down
 	ret = PVFS_sys_finalize();
@@ -131,14 +134,17 @@ int main(int argc,char **argv)
 		printf("finalizing sysint failed with errcode = %d\n", ret);
 		return (-1);
 	}
-
-	free(dirname);
 	return(0);
 }
 
 /* generate random filenames cause ddd sucks and doesn't like taking cmd line
  * arguments (and remove doesn't work yet so I can't cleanup the crap I already
  * created)
+
+NOTE: ddd isn't handicapped like this.  Try Program -> Run
+and enter something into the 'run with arguments' box.
+When you use 'Run Again', you're able to re-use those args.
+-N.M.
  */
 void gen_rand_str(int len, char** gen_str)
 {
