@@ -65,6 +65,21 @@ static inline void *id_gen_fast_lookup(PVFS_id_gen_t id)
 #endif
 }
 
+/* id_gen_safe_register()
+ * 
+ * registers a piece of data (a pointer of some sort) and returns an
+ * opaque id for it.  this register is safe because it is guaranteed
+ * to have an indirect association with the data being registered
+ *
+ * returns 0 on success, -errno on failure
+ */
+int id_gen_safe_register(PVFS_id_gen_t *new_id,
+                         void *item);
+
+void *id_gen_safe_lookup(PVFS_id_gen_t id);
+
+int id_gen_safe_unregister(PVFS_id_gen_t new_id);
+
 #endif /* __ID_GENERATOR_H */
 
 /*
