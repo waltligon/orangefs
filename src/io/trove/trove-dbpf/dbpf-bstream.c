@@ -686,8 +686,8 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "  RESIZED bstream %Lu [fd = %d] "
-                 "to %Ld \n", op_p->handle, tmp_ref.fd,
-                 op_p->u.b_resize.size);
+                 "to %Ld \n", Lu(op_p->handle), tmp_ref.fd,
+                 Ld(op_p->u.b_resize.size));
 
     dbpf_open_cache_put(&tmp_ref);
 

@@ -303,7 +303,7 @@ static int readdir_msg_comp_fn(void *v_p,
     gossip_debug(GOSSIP_READDIR_DEBUG, "*** Got %d directory entries "
                  "[version %Ld]\n",
                  sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount,
-                 sm_p->u.readdir.readdir_resp->directory_version);
+                 Ld(sm_p->u.readdir.readdir_resp->directory_version));
 
     return 0;
 }
