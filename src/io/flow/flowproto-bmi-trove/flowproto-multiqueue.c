@@ -19,6 +19,7 @@
 #include "bmi.h"
 #include "trove.h"
 #include "thread-mgr.h"
+#include "pint-perf-counter.h"
     
 #define BUFFERS_PER_FLOW 8
 #define BUFFER_SIZE (256*1024)
@@ -615,6 +616,8 @@ static int bmi_send_callback_fn(void *user_ptr,
     /* TODO: error handling */
     assert(error_code == 0);
 
+    PINT_perf_count(PINT_PERF_READ, actual_size, PINT_PERF_ADD);
+
     gen_mutex_lock(&flow_data->flow_mutex);
 
     flow_data->parent->total_transfered += actual_size;
@@ -796,6 +799,8 @@ static void trove_write_callback_fn(void *user_ptr,
     result_tmp = &q_item->result_chain;
     do{
 	q_item->parent->total_transfered += result_tmp->result.bytes;
+	PINT_perf_count(PINT_PERF_WRITE, result_tmp->result.bytes, 
+	    PINT_PERF_ADD);
 	old_result_tmp = result_tmp;
 	result_tmp = result_tmp->next;
 	if(old_result_tmp != &q_item->result_chain)
