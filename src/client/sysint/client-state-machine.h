@@ -219,7 +219,7 @@ struct PINT_client_mgmt_perf_mon_list_sm
 {
     PVFS_fs_id fs_id;
     struct PVFS_mgmt_perf_stat** perf_matrix;
-    uint64_t* end_time_ms;
+    uint64_t* end_time_ms_array;
     int server_count; 
     int history_count; 
     PVFS_id_gen_t* addr_array;

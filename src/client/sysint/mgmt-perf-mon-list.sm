@@ -63,7 +63,7 @@ int PVFS_mgmt_perf_mon_list(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     struct PVFS_mgmt_perf_stat** perf_matrix,
-    uint64_t* end_time_ms,
+    uint64_t* end_time_ms_array,
     PVFS_id_gen_t* addr_array,
     uint32_t* next_id_array,
     int server_count,
@@ -76,7 +76,7 @@ int PVFS_mgmt_perf_mon_list(
     gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_perf_mon_list entered\n");
 
     if(server_count < 1 || history_count < 1 || !perf_matrix || !addr_array 
-	|| !end_time_ms)
+	|| !end_time_ms_array)
     {
 	return(-PVFS_EINVAL);
     }
@@ -95,7 +95,7 @@ int PVFS_mgmt_perf_mon_list(
     sm_p->u.perf_mon_list.history_count = history_count;
     sm_p->u.perf_mon_list.addr_array = addr_array;
     sm_p->u.perf_mon_list.next_id_array = next_id_array;
-    sm_p->u.perf_mon_list.end_time_ms = end_time_ms;
+    sm_p->u.perf_mon_list.end_time_ms_array = end_time_ms_array;
 
     gossip_debug(CLIENT_DEBUG,
 		 "PVFS_mgmt_perf_mon_list calling PINT_client_state_machine_post()\n");
@@ -196,7 +196,7 @@ static int perf_mon_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
     {
 	sm_p->u.perf_mon_list.next_id_array[i] = 
 	    resp_p->u.mgmt_perf_mon.suggested_next_id;
-	*sm_p->u.perf_mon_list.end_time_ms =
+	sm_p->u.perf_mon_list.end_time_ms_array[i] =
 	    resp_p->u.mgmt_perf_mon.end_time_ms;
 	memcpy(sm_p->u.perf_mon_list.perf_matrix[i],
 	    resp_p->u.mgmt_perf_mon.perf_array,
