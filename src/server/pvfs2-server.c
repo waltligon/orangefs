@@ -256,7 +256,7 @@ int main(int argc, char **argv)
 	for (i = 0; i < comp_ct; i++)
 	{
 	    int unexpected_msg = 0;
-	    PINT_server_op *s_op = server_completed_job_p_array[i];;
+	    PINT_server_op *s_op = server_completed_job_p_array[i];
 
 	    /* Completed jobs might be ongoing, or might be new (unexpected)
 	     * ones.  We handle the first step of either type here.
