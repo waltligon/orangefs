@@ -106,6 +106,9 @@ int BMI_gm_testunexpected(int incount,
 			  struct method_unexpected_info *info,
 			  int max_idle_time_ms);
 method_addr_p BMI_gm_method_addr_lookup(const char *id_string);
+int BMI_gm_open_context(bmi_context_id context_id);
+void BMI_gm_close_context(bmi_context_id context_id);
+
 char BMI_gm_method_name[] = "bmi_gm";
 
 /* exported method interface */
@@ -128,8 +131,8 @@ struct bmi_method_ops bmi_gm_ops = {
     NULL,
     NULL,
     NULL,
-    NULL,
-    NULL
+    BMI_gm_open_context,
+    BMI_gm_close_context
 };
 
 /* module parameters */
@@ -1189,6 +1192,30 @@ int BMI_gm_waitunexpected(int incount,
 					  GM_WAIT_METRIC));
 }
 #endif
+
+/* BMI_gm_open_context()
+ *
+ * opens a new context with the specified context id
+ *
+ * returns 0 on success, -errno on failure
+ */
+int BMI_gm_open_context(bmi_context_id context_id)
+{
+    /* TODO: implement this later */
+    return(0);
+}
+
+/* BMI_gm_close_context()
+ *
+ * closes a context previously created with BMI_gm_open_context()
+ *
+ * no return value
+ */
+void BMI_gm_close_context(bmi_context_id context_id)
+{
+    /* TODO: implement this later */
+    return;
+}
 
 /******************************************************************
  * Internal support functions
