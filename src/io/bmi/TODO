@@ -87,6 +87,14 @@ exercise BMI_testsome() and see if it is correct
 TCP module:
 -----------------------
 
+make sure that if we get this error:
+rc/io/bmi/bmi_tcp/socket-collection.c line 327: Error: poll error value:
+0x19
+src/io/bmi/bmi_tcp/socket-collection.c line 328: Error: on socket: 4
+... on a client side, when there is only one socket open, that we
+push the error all the way out and don't hang.  This scenario can
+be triggered by killing a server sometimes. 
+
 fix this bug:
 src/io/bmi/bmi_tcp/socket-collection.c line 256: Error: found bad socket in
 socket collection.
