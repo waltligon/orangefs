@@ -329,6 +329,7 @@ static int handle_store_load(TROVE_coll_id coll_id,
 
     /* add everything onto the free list for now */
     extentlist_addextent(&(ledger->free_list), MIN_HANDLE, MAX_HANDLE);
+    extentlist_show(&(ledger->free_list));
 
     /* now take off everything that has been used...time consuming, but accurate. */
     array_count = 256;
