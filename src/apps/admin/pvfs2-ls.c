@@ -237,7 +237,7 @@ static inline void format_size_string(char *src_str,
 
     if ((len > 0) && (len <= spaces_size_allowed))
     {
-        memset(buf,' ',(spaces_size_allowed - 1));
+        memset(buf,' ',(spaces_size_allowed));
 
         src_start = src_str;
 
