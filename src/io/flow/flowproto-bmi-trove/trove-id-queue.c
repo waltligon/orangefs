@@ -50,7 +50,7 @@ trove_id_queue_p trove_id_queue_new(void)
  */
 int trove_id_queue_add(trove_id_queue_p queue,
 		    PVFS_ds_id op_id,
-		    PVFS_coll_id coll_id)
+		    PVFS_fs_id coll_id)
 {
     int index = -1;
     int i;
@@ -125,7 +125,7 @@ int trove_id_queue_add(trove_id_queue_p queue,
  */
 void trove_id_queue_del(trove_id_queue_p queue,
 		     PVFS_ds_id op_id,
-		     PVFS_coll_id coll_id)
+		     PVFS_fs_id coll_id)
 {
     int i;
     int index = -1;
@@ -215,7 +215,7 @@ int trove_id_queue_query(trove_id_queue_p queue,
 		      PVFS_ds_id *array,
 		      int *count,
 		      int *query_offset,
-		      PVFS_coll_id* coll_id)
+		      PVFS_fs_id* coll_id)
 {
     int i;
     struct qlist_head* iterator;

@@ -440,7 +440,7 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     PVFS_ds_id *trove_op_array = NULL;
     int split_idle_time_ms = max_idle_time_ms;
     int query_offset = 0;
-    PVFS_coll_id tmp_coll_id;
+    PVFS_fs_id tmp_coll_id;
 
     /* TODO: do something more clever with the max_idle_time_ms
      * argument.  For now we just split it evenly among the

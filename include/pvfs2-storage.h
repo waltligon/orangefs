@@ -39,11 +39,6 @@ struct PVFS_vtag_s
 typedef struct PVFS_vtag_s PVFS_vtag;
 
 
-/* unique identifier for each collection that is managed by the storage
- * interface within a specific storage space
- */
-typedef int32_t PVFS_coll_id;
-
 /* unique identifiers associated with dataspace operations */
 typedef int64_t PVFS_ds_id;
 

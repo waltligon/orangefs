@@ -138,7 +138,7 @@ int job_flow(flow_descriptor * flow_d,
 	     job_context_id context_id);
 
 /* storage byte stream write */
-int job_trove_bstream_write_at(PVFS_coll_id coll_id,
+int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 			       PVFS_handle handle,
 			       PVFS_offset offset,
 			       void *buffer,
@@ -151,7 +151,7 @@ int job_trove_bstream_write_at(PVFS_coll_id coll_id,
 			       job_context_id context_id);
 
 /* storage byte stream read */
-int job_trove_bstream_read_at(PVFS_coll_id coll_id,
+int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 			      PVFS_handle handle,
 			      PVFS_offset offset,
 			      void *buffer,
@@ -164,7 +164,7 @@ int job_trove_bstream_read_at(PVFS_coll_id coll_id,
 			      job_context_id context_id);
 
 /* storage key/value read */
-int job_trove_keyval_read(PVFS_coll_id coll_id,
+int job_trove_keyval_read(PVFS_fs_id coll_id,
 			  PVFS_handle handle,
 			  PVFS_ds_keyval * key_p,
 			  PVFS_ds_keyval * val_p,
@@ -176,7 +176,7 @@ int job_trove_keyval_read(PVFS_coll_id coll_id,
 			  job_context_id context_id);
 
 /* storage key/value read */
-int job_trove_keyval_read_list(PVFS_coll_id coll_id,
+int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 			       PVFS_handle handle,
 			       PVFS_ds_keyval * key_array,
 			       PVFS_ds_keyval * val_array,
@@ -189,7 +189,7 @@ int job_trove_keyval_read_list(PVFS_coll_id coll_id,
 			       job_context_id context_id);
 
 /* storage key/value write */
-int job_trove_keyval_write(PVFS_coll_id coll_id,
+int job_trove_keyval_write(PVFS_fs_id coll_id,
 			   PVFS_handle handle,
 			   PVFS_ds_keyval * key_p,
 			   PVFS_ds_keyval * val_p,
@@ -201,7 +201,7 @@ int job_trove_keyval_write(PVFS_coll_id coll_id,
 			   job_context_id context_id);
 
 /* read generic dspace attributes */
-int job_trove_dspace_getattr(PVFS_coll_id coll_id,
+int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     void *user_ptr,
 			     job_status_s * out_status_p,
@@ -209,7 +209,7 @@ int job_trove_dspace_getattr(PVFS_coll_id coll_id,
 			     job_context_id context_id);
 
 /* write generic dspace attributes */
-int job_trove_dspace_setattr(PVFS_coll_id coll_id,
+int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     PVFS_ds_attributes_s * ds_attr_p,
 			     void *user_ptr,
@@ -218,7 +218,7 @@ int job_trove_dspace_setattr(PVFS_coll_id coll_id,
 			     job_context_id context_id);
 
 /* resize (truncate or preallocate) a storage byte stream */
-int job_trove_bstream_resize(PVFS_coll_id coll_id,
+int job_trove_bstream_resize(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     PVFS_size size,
 			     PVFS_ds_flags flags,
@@ -229,7 +229,7 @@ int job_trove_bstream_resize(PVFS_coll_id coll_id,
 			     job_context_id context_id);
 
 /* check consistency of a bytestream for a given vtag */
-int job_trove_bstream_validate(PVFS_coll_id coll_id,
+int job_trove_bstream_validate(PVFS_fs_id coll_id,
 			       PVFS_handle handle,
 			       PVFS_vtag * vtag,
 			       void *user_ptr,
@@ -238,7 +238,7 @@ int job_trove_bstream_validate(PVFS_coll_id coll_id,
 			       job_context_id context_id);
 
 /* remove a key/value entry */
-int job_trove_keyval_remove(PVFS_coll_id coll_id,
+int job_trove_keyval_remove(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    PVFS_ds_keyval * key_p,
 			    PVFS_ds_flags flags,
@@ -249,7 +249,7 @@ int job_trove_keyval_remove(PVFS_coll_id coll_id,
 			    job_context_id context_id);
 
 /* check consistency of a key/value pair for a given vtag */
-int job_trove_keyval_validate(PVFS_coll_id coll_id,
+int job_trove_keyval_validate(PVFS_fs_id coll_id,
 			      PVFS_handle handle,
 			      PVFS_vtag * vtag,
 			      void *user_ptr,
@@ -258,7 +258,7 @@ int job_trove_keyval_validate(PVFS_coll_id coll_id,
 			      job_context_id context_id);
 
 /* iterate through all of the key/value pairs for a data space */
-int job_trove_keyval_iterate(PVFS_coll_id coll_id,
+int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     PVFS_ds_position position,
 			     PVFS_ds_keyval * key_array,
@@ -272,7 +272,7 @@ int job_trove_keyval_iterate(PVFS_coll_id coll_id,
 			     job_context_id context_id);
 
 /* iterate through all of the keys for a data space */
-int job_trove_keyval_iterate_keys(PVFS_coll_id coll_id,
+int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 				  PVFS_handle handle,
 				  PVFS_ds_position position,
 				  PVFS_ds_keyval * key_array,
@@ -285,7 +285,7 @@ int job_trove_keyval_iterate_keys(PVFS_coll_id coll_id,
 				  job_context_id context_id);
 
 /* create a new data space object */
-int job_trove_dspace_create(PVFS_coll_id coll_id,
+int job_trove_dspace_create(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    PVFS_ds_type type,
 			    void *hint,
@@ -295,7 +295,7 @@ int job_trove_dspace_create(PVFS_coll_id coll_id,
 			    job_context_id context_id);
 
 /* remove an entire data space object (byte stream and key/value) */
-int job_trove_dspace_remove(PVFS_coll_id coll_id,
+int job_trove_dspace_remove(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    void *user_ptr,
 			    job_status_s * out_status_p,
@@ -303,7 +303,7 @@ int job_trove_dspace_remove(PVFS_coll_id coll_id,
 			    job_context_id context_id);
 
 /* verify that a given dataspace exists and discover its type */
-int job_trove_dspace_verify(PVFS_coll_id coll_id,
+int job_trove_dspace_verify(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    void *user_ptr,
 			    job_status_s * out_status_p,
@@ -312,7 +312,7 @@ int job_trove_dspace_verify(PVFS_coll_id coll_id,
 
 /* create a new file system */
 int job_trove_fs_create(char *collname,
-			PVFS_coll_id new_coll_id,
+			PVFS_fs_id new_coll_id,
 			void *user_ptr,
 			job_status_s * out_status_p,
 			job_id_t * id,
@@ -333,7 +333,7 @@ int job_trove_fs_lookup(char *collname,
 			job_context_id context_id);
 
 /* set extended attributes for a file system */
-int job_trove_fs_seteattr(PVFS_coll_id coll_id,
+int job_trove_fs_seteattr(PVFS_fs_id coll_id,
 			  PVFS_ds_keyval * key_p,
 			  PVFS_ds_keyval * val_p,
 			  PVFS_ds_flags flags,
@@ -343,7 +343,7 @@ int job_trove_fs_seteattr(PVFS_coll_id coll_id,
 			  job_context_id context_id);
 
 /* read extended attributes for a file system */
-int job_trove_fs_geteattr(PVFS_coll_id coll_id,
+int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 			  PVFS_ds_keyval * key_p,
 			  PVFS_ds_keyval * val_p,
 			  PVFS_ds_flags flags,

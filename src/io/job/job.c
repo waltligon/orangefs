@@ -868,7 +868,7 @@ int job_flow(flow_descriptor * flow_d,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_bstream_write_at(PVFS_coll_id coll_id,
+int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 			       PVFS_handle handle,
 			       PVFS_offset offset,
 			       void *buffer,
@@ -950,7 +950,7 @@ int job_trove_bstream_write_at(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_bstream_read_at(PVFS_coll_id coll_id,
+int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 			      PVFS_handle handle,
 			      PVFS_offset offset,
 			      void *buffer,
@@ -1032,7 +1032,7 @@ int job_trove_bstream_read_at(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_keyval_read(PVFS_coll_id coll_id,
+int job_trove_keyval_read(PVFS_fs_id coll_id,
 			  PVFS_handle handle,
 			  PVFS_ds_keyval * key_p,
 			  PVFS_ds_keyval * val_p,
@@ -1110,7 +1110,7 @@ int job_trove_keyval_read(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_keyval_read_list(PVFS_coll_id coll_id,
+int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 			       PVFS_handle handle,
 			       PVFS_ds_keyval * key_array,
 			       PVFS_ds_keyval * val_array,
@@ -1190,7 +1190,7 @@ int job_trove_keyval_read_list(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_keyval_write(PVFS_coll_id coll_id,
+int job_trove_keyval_write(PVFS_fs_id coll_id,
 			   PVFS_handle handle,
 			   PVFS_ds_keyval * key_p,
 			   PVFS_ds_keyval * val_p,
@@ -1268,7 +1268,7 @@ int job_trove_keyval_write(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_dspace_getattr(PVFS_coll_id coll_id,
+int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     void *user_ptr,
 			     job_status_s * out_status_p,
@@ -1343,7 +1343,7 @@ int job_trove_dspace_getattr(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_dspace_setattr(PVFS_coll_id coll_id,
+int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     PVFS_ds_attributes_s * ds_attr_p,
 			     void *user_ptr,
@@ -1417,7 +1417,7 @@ int job_trove_dspace_setattr(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_bstream_resize(PVFS_coll_id coll_id,
+int job_trove_bstream_resize(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     PVFS_size size,
 			     PVFS_ds_flags flags,
@@ -1438,7 +1438,7 @@ int job_trove_bstream_resize(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_bstream_validate(PVFS_coll_id coll_id,
+int job_trove_bstream_validate(PVFS_fs_id coll_id,
 			       PVFS_handle handle,
 			       PVFS_vtag * vtag,
 			       void *user_ptr,
@@ -1457,7 +1457,7 @@ int job_trove_bstream_validate(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_keyval_remove(PVFS_coll_id coll_id,
+int job_trove_keyval_remove(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    PVFS_ds_keyval * key_p,
 			    PVFS_ds_flags flags,
@@ -1534,7 +1534,7 @@ int job_trove_keyval_remove(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_keyval_validate(PVFS_coll_id coll_id,
+int job_trove_keyval_validate(PVFS_fs_id coll_id,
 			      PVFS_handle handle,
 			      PVFS_vtag * vtag,
 			      void *user_ptr,
@@ -1553,7 +1553,7 @@ int job_trove_keyval_validate(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_keyval_iterate(PVFS_coll_id coll_id,
+int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     PVFS_ds_position position,
 			     PVFS_ds_keyval * key_array,
@@ -1639,7 +1639,7 @@ int job_trove_keyval_iterate(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_keyval_iterate_keys(PVFS_coll_id coll_id,
+int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 				  PVFS_handle handle,
 				  PVFS_ds_position position,
 				  PVFS_ds_keyval * key_array,
@@ -1662,7 +1662,7 @@ int job_trove_keyval_iterate_keys(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_dspace_create(PVFS_coll_id coll_id,
+int job_trove_dspace_create(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    PVFS_ds_type type,
 			    void *hint,
@@ -1741,7 +1741,7 @@ int job_trove_dspace_create(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_dspace_remove(PVFS_coll_id coll_id,
+int job_trove_dspace_remove(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    void *user_ptr,
 			    job_status_s * out_status_p,
@@ -1814,7 +1814,7 @@ int job_trove_dspace_remove(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_dspace_verify(PVFS_coll_id coll_id,
+int job_trove_dspace_verify(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    void *user_ptr,
 			    job_status_s * out_status_p,
@@ -1833,7 +1833,7 @@ int job_trove_dspace_verify(PVFS_coll_id coll_id,
  * failure
  */
 int job_trove_fs_create(char *collname,
-			PVFS_coll_id new_coll_id,
+			PVFS_fs_id new_coll_id,
 			void *user_ptr,
 			job_status_s * out_status_p,
 			job_id_t * id,
@@ -1978,7 +1978,7 @@ int job_trove_fs_lookup(char *collname,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_fs_seteattr(PVFS_coll_id coll_id,
+int job_trove_fs_seteattr(PVFS_fs_id coll_id,
 			  PVFS_ds_keyval * key_p,
 			  PVFS_ds_keyval * val_p,
 			  PVFS_ds_flags flags,
@@ -2052,7 +2052,7 @@ int job_trove_fs_seteattr(PVFS_coll_id coll_id,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_trove_fs_geteattr(PVFS_coll_id coll_id,
+int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 			  PVFS_ds_keyval * key_p,
 			  PVFS_ds_keyval * val_p,
 			  PVFS_ds_flags flags,
@@ -3115,7 +3115,7 @@ static int do_one_work_cycle_trove(int *num_completed)
     int ret = -1;
     int i = 0;
     int query_offset = 0;
-    PVFS_coll_id tmp_coll_id;
+    PVFS_fs_id tmp_coll_id;
 
     *num_completed = 0;
 

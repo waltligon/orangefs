@@ -41,7 +41,7 @@ struct BMI_endpoint_data
 /* describes trove interface endpoints */
 struct trove_endpoint_data
 {
-    PVFS_coll_id coll_id;
+    PVFS_fs_id coll_id;
     PVFS_handle handle;
 };
 
