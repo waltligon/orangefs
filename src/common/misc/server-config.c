@@ -727,9 +727,9 @@ static int is_valid_filesystem_configuration(
 
         if (ret == 0)
         {
-            gossip_err("Specified RootHandle is NOT within the "
-                       "valid handle range specified for this "
-                       "filesystem.\n");
+            gossip_err("RootHandle (%d) is NOT within the handle ranges "
+                       "specified for this filesystem (%s).\n",
+                       fs->root_handle,fs->file_system_name);
         }
     }
     return ret;

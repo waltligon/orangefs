@@ -19,7 +19,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
         fprintf(stderr,"FS Collection ID: %d\n",fs->coll_id);
         fprintf(stderr,"FS Root Handle  : %d\n",fs->root_handle);
 
-        fprintf(stderr,"\t*** Meta Servers for %s:\n",fs->file_system_name);
+        fprintf(stderr,"\t--- Meta Servers for %s:\n",fs->file_system_name);
         cur = fs->meta_server_list;
         while(cur)
         {
@@ -32,7 +32,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
             cur = llist_next(cur);
         }
 
-        fprintf(stderr,"\t*** Data Servers for %s:\n",fs->file_system_name);
+        fprintf(stderr,"\t--- Data Servers for %s:\n",fs->file_system_name);
         cur = fs->data_server_list;
         while(cur)
         {
@@ -45,7 +45,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
             cur = llist_next(cur);
         }
 
-        fprintf(stderr,"\t*** Handle Mappings for %s:\n",fs->file_system_name);
+        fprintf(stderr,"\t--- Handle Mappings for %s:\n",fs->file_system_name);
         cur = fs->handle_ranges;
         while(cur)
         {
@@ -84,22 +84,24 @@ int main(int argc, char **argv)
     }
 
     /* dump all gathered config values */
-    fprintf(stderr,"server id: %s\n",serverconfig.host_id);
-    fprintf(stderr,"storage space: %s\n",serverconfig.storage_path);
+    fprintf(stderr,"--- Printing filesystem configuration\n\n");
 
-    fprintf(stderr,"fs config file name: %s\n",
+    fprintf(stderr,"server id                : %s\n",
+            serverconfig.host_id);
+    fprintf(stderr,"storage space            : %s\n",
+            serverconfig.storage_path);
+    fprintf(stderr,"fs config file name      : %s\n",
             serverconfig.fs_config_filename);
-    fprintf(stderr,"fs config file length: %d\n",
+    fprintf(stderr,"fs config file length    : %d\n",
             (int)serverconfig.fs_config_buflen);
-    fprintf(stderr,"server config file name: %s\n",
+    fprintf(stderr,"server config file name  : %s\n",
             serverconfig.server_config_filename);
     fprintf(stderr,"server config file length: %d\n",
             (int)serverconfig.server_config_buflen);
-
-    fprintf(stderr,"unexp req: %d\n",
+    fprintf(stderr,"initial unexp requests   : %d\n",
             serverconfig.initial_unexpected_requests);
 
-    fprintf(stderr,"*** Host Aliases:\n");
+    fprintf(stderr,"\n--- Host Aliases:\n");
     cur = serverconfig.host_aliases;
     while(cur)
     {
@@ -115,7 +117,6 @@ int main(int argc, char **argv)
         cur = llist_next(cur);
     }
 
-
     cur = serverconfig.file_systems;
     while(cur)
     {
@@ -127,6 +128,13 @@ int main(int argc, char **argv)
         print_filesystem_configuration(cur_fs);
         cur = llist_next(cur);
     }
+
+    fprintf(stderr,"\n--- Analyzing filesystem configuration\n\n");
+    if (PINT_server_config_is_valid_configuration(&serverconfig))
+    {
+        fprintf(stderr,"\nOK: File system is VALID\n");
+    }
+    fprintf(stderr,"\nERROR: File system is INVALID\n");
 
     PINT_server_config_release(&serverconfig);
 
