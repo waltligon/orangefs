@@ -285,12 +285,12 @@ static int draw(void)
     if(channel_width > SIDE_BORDER)
 	channel_width = SIDE_BORDER;
 
-    left_offset = (screen->w - (channel_width*3))/2;
+    left_offset = (screen->w - (channel_width*3*pint_vis_shared.io_count))/2;
 
     /* fill in starting values for all bar graph areas */
     for(i=0; i<pint_vis_shared.io_count; i++)
     {
-	read_bws[i].full.x = left_offset + i*3;
+	read_bws[i].full.x = left_offset + i*channel_width*3;
 	read_bws[i].full.y = TOP_BORDER;
 	read_bws[i].full.h = (screen->h-(TOP_BORDER+BOTTOM_BORDER));
 	read_bws[i].full.w = channel_width;
