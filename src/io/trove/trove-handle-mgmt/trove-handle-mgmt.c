@@ -12,8 +12,29 @@
 #include "trove-types.h"
 #include "trove-proto.h"
 #include "llist.h"
+#include "quickhash.h"
 #include "extent-utils.h"
+#include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
+
+/*
+  this is an internal structure and shouldn't be used
+  by anyone except this module
+*/
+typedef struct
+{
+    struct qlist_head hash_link;
+
+    TROVE_coll_id coll_id;
+
+    struct handle_ledger *ledger;
+} handle_ledger_t;
+
+static struct qhash_table *s_fsid_to_ledger_table = NULL;
+
+/* these are based on code from src/server/request-scheduler.c */
+static int hash_fsid(void *fsid, int table_size);
+static int hash_fsid_compare(void *key, struct qlist_head *link);
 
 /* trove_check_handle_ranges:
  *  internal function to verify that handles
@@ -22,11 +43,13 @@
  *
  * coll_id: id of collection which we will verify
  * extent_list: llist of legal handle ranges/extents
+ * ledger: a book-keeping ledger object
  *
  * returns on success; -1 otherwise
  */
-int trove_check_handle_ranges(TROVE_coll_id coll_id,
-                              struct llist *extent_list)
+static int trove_check_handle_ranges(TROVE_coll_id coll_id,
+                                     struct llist *extent_list,
+                                     struct handle_ledger *ledger)
 {
     int ret = -1, i = 0, count = 0, op_count = 0;
     TROVE_op_id op_id = 0;
@@ -34,7 +57,7 @@ int trove_check_handle_ranges(TROVE_coll_id coll_id,
     TROVE_ds_position pos = TROVE_ITERATE_START;
     static TROVE_handle handles[MAX_NUM_VERIFY_HANDLE_COUNT] = {0};
 
-    if (extent_list)
+    if (extent_list && ledger)
     {
         count = MAX_NUM_VERIFY_HANDLE_COUNT;
 
@@ -84,14 +107,15 @@ int trove_check_handle_ranges(TROVE_coll_id coll_id,
     return ret;
 }
 
-int trove_map_handle_ranges(TROVE_coll_id coll_id,
-                            struct llist *extent_list)
+static int trove_map_handle_ranges(TROVE_coll_id coll_id,
+                                   struct llist *extent_list,
+                                   struct handle_ledger *ledger)
 {
     int ret = -1;
     struct llist *cur = NULL;
     struct extent *cur_extent = NULL;
 
-    if (extent_list)
+    if (extent_list && ledger)
     {
         cur = extent_list;
         while(cur)
@@ -116,26 +140,136 @@ int trove_map_handle_ranges(TROVE_coll_id coll_id,
     return ret;
 }
 
+static handle_ledger_t *get_or_add_handle_ledger(TROVE_coll_id coll_id)
+{
+    handle_ledger_t *ledger = NULL;
+    struct qlist_head *hash_link = NULL;
+
+    /* search for a matching entry */
+    hash_link = qhash_search(s_fsid_to_ledger_table,&coll_id);
+    if (hash_link)
+    {
+        /* return it if it exists */
+        ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+    }
+    else
+    {
+        /* alloc, initialize, then return otherwise */
+        ledger = (handle_ledger_t *)malloc(sizeof(handle_ledger_t));
+        if (ledger)
+        {
+            ledger->coll_id = coll_id;
+            ledger->ledger = trove_handle_ledger_init(coll_id,NULL);
+            if (ledger->ledger)
+            {
+                qhash_add(s_fsid_to_ledger_table,
+                          &coll_id,&ledger->hash_link);
+            }
+            else
+            {
+                free(ledger);
+                ledger = NULL;
+            }
+        }
+    }
+    return ledger;
+}
+
+/* hash_fsid()
+ *
+ * hash function for fsids added to table
+ *
+ * returns integer offset into table
+ */
+static int hash_fsid(void *fsid, int table_size)
+{
+    /* TODO: update this later with a better hash function,
+     * depending on what fsids look like, for now just modding
+     *
+     */
+    unsigned long tmp = 0;
+    TROVE_coll_id *real_fsid = (TROVE_coll_id *)fsid;
+
+    tmp += (*(real_fsid));
+    tmp = tmp%table_size;
+
+    return ((int)tmp);
+}
+
+/* hash_fsid_compare()
+ *
+ * performs a comparison of a hash table entry to a given key
+ * (used for searching)
+ *
+ * returns 1 if match found, 0 otherwise
+ */
+static int hash_fsid_compare(void *key, struct qlist_head *link)
+{
+    handle_ledger_t *ledger = NULL;
+    TROVE_coll_id *real_fsid = (TROVE_coll_id *)key;
+
+    ledger = qlist_entry(link, handle_ledger_t, hash_link);
+    if (ledger->coll_id == *real_fsid)
+    {
+        return(1);
+    }
+    return(0);
+}
+
+int trove_handle_mgmt_initialize()
+{
+    int ret = -1;
+
+    if (s_fsid_to_ledger_table == NULL)
+    {
+        s_fsid_to_ledger_table = qhash_init(hash_fsid_compare,
+                                            hash_fsid,67);
+        ret = (s_fsid_to_ledger_table ? 0 : -1);
+    }
+    return ret;
+}
+
 int trove_set_handle_ranges(TROVE_coll_id coll_id,
                             char *handle_range_str)
 {
     int ret = -1;
     struct llist *extent_list = NULL;
+    handle_ledger_t *ledger = NULL;
 
     if (handle_range_str)
     {
         extent_list = PINT_create_extent_list(handle_range_str);
         if (extent_list)
         {
-            if (trove_check_handle_ranges(coll_id,extent_list))
+            /*
+              get existing ledger management struct if any;
+              create otherwise
+            */
+            ledger = get_or_add_handle_ledger(coll_id);
+            if (ledger)
             {
-                ret = trove_map_handle_ranges(coll_id,extent_list);
+                /* assert the internal ledger struct is valid */
+                assert(ledger->ledger);
+
+                if (trove_check_handle_ranges(coll_id,extent_list,
+                                              ledger->ledger))
+                {
+                    ret = trove_map_handle_ranges(coll_id,extent_list,
+                                                  ledger->ledger);
+                }
             }
             PINT_release_extent_list(extent_list);
         }
     }
     return ret;
 }
+
+int trove_handle_mgmt_finalize()
+{
+    /* FIXME: clean up all ledger objects and wrappers */
+    return 0;
+}
+
 
 /*
  * Local variables:

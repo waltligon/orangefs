@@ -14,19 +14,14 @@
   0 on success  unless otherwise noted
 */
 
-/* private/internal methods */
-int trove_check_handle_ranges(
-    TROVE_coll_id coll_id,
-    struct llist *extent_list);
-
-int trove_map_handle_ranges(
-    TROVE_coll_id coll_id,
-    struct llist *extent_list);
-
 /* public methods */
+int trove_handle_mgmt_initialize();
+
 int trove_set_handle_ranges(
     TROVE_coll_id coll_id,
     char *handle_range_str);
+
+int trove_handle_mgmt_finalize();
 
 #endif /* __TROVE_HANDLE_MGMT_H */
 

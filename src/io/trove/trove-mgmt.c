@@ -9,6 +9,7 @@
 #include "trove.h"
 #include "trove-internal.h"
 #include "gen-locks.h"
+#include "trove-handle-mgmt.h"
 
 /* Currently we only have one method for these tables to refer to */
 struct TROVE_mgmt_ops    *mgmt_method_table[1];
@@ -87,6 +88,8 @@ int trove_initialize(char *stoname,
 	trove_init_status = 1;
     }
 
+    /* initialize the handle management interface */
+    ret = trove_handle_mgmt_initialize();
 
     gen_mutex_unlock(&trove_init_mutex);
     return ret;
@@ -109,6 +112,8 @@ int trove_finalize(void)
     }
 
     ret = mgmt_method_table[0]->finalize();
+
+    ret = trove_handle_mgmt_finalize();
 
     gen_mutex_unlock(&trove_init_mutex);
     if (ret < 0) return ret;
