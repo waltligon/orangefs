@@ -88,7 +88,6 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	}
 
 	/* send remove message to the meta file */
-
 	req_p.op = PVFS_SERV_REMOVE;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
 	req_p.credentials = req->credentials;
@@ -160,6 +159,10 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	 * rmdirent returns a handle to the meta file for the dirent that was 
 	 * removed. if this isn't equal to what we passed in, we need to figure 
 	 * out what we deleted and figure out why the server had the wrong link.
+	 *
+	 * CORRECTION:
+	 * rmdirent returns the handle in the directory (it may not be a
+	 * meta file)
 	 */
 
 	assert(ack_p->u.rmdirent.entry_handle == pinode_ptr->pinode_ref.handle);
