@@ -2,8 +2,9 @@
 PVFS2 Release ChangeLog
 -----------------------
 
-pvfs2-0.0.4pre1
-===============
+
+pvfs2-0.0.4
+===========
 - improved truncate support (pcache usage/integration)
 - kernel truncate support (improved file size reporting)
 - removed several run-time verbose (expected) warnings
