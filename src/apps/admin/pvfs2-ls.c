@@ -16,6 +16,7 @@
 #include <time.h>
 #include <pwd.h>
 #include <grp.h>
+#include <assert.h>
 
 #include "pvfs2.h"
 
@@ -52,23 +53,18 @@ static void print_entry_attr(
 int main(int argc, char **argv)
 {
     int ret = -1, i = 0;
-    char str_buf[PVFS_NAME_MAX] = {0};
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
-    PVFS_sysresp_lookup resp_lookup;
     struct options* user_opts = NULL;
     int mnt_index = -1;
-    PVFS_fs_id lk_fs_id;
-    char* lk_name;
-    PVFS_credentials credentials;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
     if (!user_opts)
     {
 	fprintf(stderr, "Error: failed to parse command line arguments.\n");
+	usage(argc, argv);
 	return(-1);
     }
 
@@ -110,52 +106,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* get the absolute path on the pvfs2 file system */
-    if (PVFS_util_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
-    {
-        if (strcmp(pvfs_path,"/") != 0)
-        {
-            if (pvfs_path[0] != '/')
-            {
-                fprintf(stderr, "Error: poorly formatted path.\n");
-            }
-            fprintf(stderr, "Error: cannot use entry name for lookup on %s\n",
-                    pvfs_path);
-            ret = -1;
-            goto main_out;
-        }
-    }
-    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-
-    cur_fs = resp_init.fsid_list[mnt_index];
-
-    credentials.uid = getuid();
-    credentials.gid = getgid();
-    lk_fs_id = cur_fs;
-
-    if (strlen(str_buf))
-    {
-        /* TODO: this is awkward- the remove_base_dir() function
-         * doesn't leave an opening slash on the path (because it was
-         * first written to help with sys_create() calls).  However,
-         * in the sys_lookup() case, we need the opening slash.
-         */
-        lk_name = (char*)malloc(strlen(str_buf) + 2);
-        if (!lk_name)
-        {
-            perror("malloc()");
-            ret = -1;
-            goto main_out;
-        }
-        lk_name[0] = '/';
-        strcpy(&(lk_name[1]), str_buf);
-    }
-    else
-    {
-        strcpy(lk_name, "/");
-    }
-
-    ret = do_list(&resp_init, lk_name, user_opts);
+    ret = do_list(&resp_init, pvfs_path, user_opts);
     if (ret < 0)
     {
 	PVFS_perror("do_list", ret);
@@ -170,18 +121,56 @@ main_out:
     return(ret);
 }
 
+static inline void format_size_string(unsigned long size,
+                                      int num_spaces_total,
+                                      char **out_str_p)
+{
+    int len = 0;
+    int spaces_size_allowed = num_spaces_total;
+
+    char *tmp_size = NULL, *buf = NULL;
+    char *start = NULL, *src_start = NULL;
+
+    tmp_size = (char *)malloc(spaces_size_allowed);
+    assert(tmp_size);
+    buf = (char *)malloc(spaces_size_allowed);
+    assert(buf);
+
+    memset(tmp_size,0,spaces_size_allowed);
+    memset(buf,0,spaces_size_allowed);
+
+    snprintf(tmp_size,spaces_size_allowed,"%lu",size);
+    len = strlen(tmp_size);
+
+    if ((len > 0) && (len < spaces_size_allowed))
+    {
+        memset(buf,' ',(spaces_size_allowed - 1));
+
+        src_start = tmp_size;
+        start = &buf[(spaces_size_allowed-(len+1))];
+
+        while(src_start && (*src_start))
+        {
+            *start++ = *src_start++;
+        }
+        *out_str_p = strdup(buf);
+    }
+    free(tmp_size);
+    free(buf);
+}
+
 void print_entry_attr(
     char *entry_name,
     PVFS_sys_attr *attr,
     struct options *opts)
 {
-    char buf[128] = {0};
+    char buf[128] = {0}, *formatted_size = NULL;
     struct group *grp = NULL;
     struct passwd *pwd = NULL;
     char *empty_str = "";
     char *owner = empty_str, *group = empty_str;
     struct tm *time = gmtime((time_t *)&attr->atime);
-    PVFS_size computed_size = 0;
+    unsigned long size = 0;
 
     if (!opts->list_all && (entry_name[0] == '.'))
     {
@@ -190,15 +179,14 @@ void print_entry_attr(
 
     if (!opts->list_long)
     {
-        printf("FIXME: %s\n", entry_name);
+        printf("%s\n", entry_name);
         return;
     }
 
-    if ((attr->objtype == PVFS_TYPE_METAFILE) &&
-        (attr->mask & PVFS_ATTR_SYS_SIZE))
-    {
-        computed_size = attr->size;
-    }
+    size = (((attr->objtype == PVFS_TYPE_METAFILE) &&
+             (attr->mask & PVFS_ATTR_SYS_SIZE)) ?
+            (unsigned long)attr->size : 0);
+    format_size_string(size,11,&formatted_size);
 
     if (!opts->list_numeric_uid_gid)
     {
@@ -214,7 +202,7 @@ void print_entry_attr(
             group = grp->gr_name;
         }
 
-        snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %s     %s\t%Ld "
+        snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %s     %s\t%s "
                  "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
                  ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
                  ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
@@ -228,7 +216,7 @@ void print_entry_attr(
                  ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
                  owner,
                  group,
-                 computed_size,
+                 formatted_size,
                  (time->tm_year + 1900),
                  (time->tm_mon + 1),
                  time->tm_mday,
@@ -238,7 +226,7 @@ void print_entry_attr(
     }
     else
     {
-    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%Ld "
+    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%s "
              "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
              ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
              ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
@@ -252,13 +240,18 @@ void print_entry_attr(
              ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
              attr->owner,
              attr->group,
-             computed_size,
+             formatted_size,
              (time->tm_year + 1900),
              (time->tm_mon + 1),
              time->tm_mday,
              (time->tm_hour + 1),
              (time->tm_min + 1),
              entry_name);
+    }
+
+    if (formatted_size)
+    {
+        free(formatted_size);
     }
     printf("%s",buf);
 }
@@ -410,13 +403,16 @@ static struct options* parse_args(int argc, char* argv[])
                 tmp_opts->list_long = 1;
 		break;
 	    case('n'):
+                tmp_opts->list_long = 1;
                 tmp_opts->list_numeric_uid_gid = 1;
 		break;
 	    case('o'):
-                tmp_opts->list_no_owner = 1;
+                tmp_opts->list_long = 1;
+                tmp_opts->list_no_group = 1;
 		break;
 	    case('g'):
-                tmp_opts->list_no_group = 1;
+                tmp_opts->list_long = 1;
+                tmp_opts->list_no_owner = 1;
 		break;
 	    case('?'):
 		usage(argc, argv);
