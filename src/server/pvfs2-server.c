@@ -94,7 +94,7 @@ static int server_setup_process_environment(int background);
 static int server_shutdown(
     PINT_server_status_flag status,
     int ret, int sig);
-static void *server_sig_handler(int sig);
+static void server_sig_handler(int sig);
 static int server_post_unexpected_recv(job_status_s * js_p);
 static int server_parse_cmd_line_args(int argc, char **argv);
 
@@ -730,12 +730,20 @@ static int server_initialize_subsystems(
  */
 static int server_setup_signal_handlers(void)
 {
-    signal(SIGHUP, (void *) server_sig_handler);
-    signal(SIGPIPE, (void *) server_sig_handler);
-    signal(SIGILL, (void *) server_sig_handler);
-    signal(SIGTERM, (void *) server_sig_handler);
-    signal(SIGSEGV, (void *) server_sig_handler);
-    signal(SIGHUP, (void *) server_sig_handler);
+    struct sigaction new_action;
+
+    /* Set up the structure to specify the new action. */
+    new_action.sa_handler = server_sig_handler;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+
+    sigaction (SIGHUP, &new_action, NULL);
+    sigaction (SIGPIPE, &new_action, NULL);
+    sigaction (SIGILL, &new_action, NULL);
+    sigaction (SIGTERM, &new_action, NULL);
+    sigaction (SIGSEGV, &new_action, NULL);
+    sigaction (SIGHUP, &new_action, NULL);
+
     return 0;
 }
 
@@ -792,7 +800,7 @@ static int server_shutdown(
 
 /* server_sig_handler()
  */
-static void *server_sig_handler(int sig)
+static void server_sig_handler(int sig)
 {
     gossip_err("PVFS2 server: got signal: %d, server_status_flag: %d\n", 
 	sig, (int)server_status_flag);
@@ -802,7 +810,7 @@ static void *server_sig_handler(int sig)
     {
 	/* reset handler and continue processing */
 	signal(sig, (void*) server_sig_handler);
-	return(NULL);
+	return;
     }
     if(sig == SIGHUP)
     {
@@ -821,7 +829,7 @@ static void *server_sig_handler(int sig)
      * exit gracefully on the next work cycle
      */
     signal_recvd_flag = sig;
-    return NULL;
+    return;
 }
 
 /* server_parse_cmd_line_args()
