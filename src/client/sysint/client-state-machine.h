@@ -230,6 +230,9 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 				     bmi_addr_t *svr_addr_p,
 				     int max_resp_sz);
 
+/* TODO: is this the right name for this function? */
+int PINT_serv_msgpairarray_resolve_addrs(int count, 
+    PINT_client_sm_msgpair_state* msgarray);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_client_sm

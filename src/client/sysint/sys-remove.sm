@@ -400,6 +400,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p)
 {
     int i;
+    int ret = -1;
 
    /* post all datafile remove requests and responses simultaneously.
      *
@@ -439,6 +440,16 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 	msg_p->fs_id   = sm_p->u.remove.object_ref.fs_id;
 	msg_p->handle  = sm_p->u.remove.object_ref.handle;
 	msg_p->comp_fn = NULL;
+    }
+
+    /* fill in address of each server to contact */
+    ret =  PINT_serv_msgpairarray_resolve_addrs(sm_p->msgarray_count,
+	sm_p->msgarray);
+    if(ret < 0)
+    {
+	gossip_lerr("Error: failed to resolve server addresses.\n");
+	js_p->error_code = ret;
+	return(1);
     }
 
     return 1;

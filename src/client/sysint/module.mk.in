@@ -25,7 +25,6 @@ LIBSRC += \
 	$(DIR)/flush.c \
 	$(DIR)/msgpair.c \
 	$(DIR)/msgpairarray.c \
-	$(DIR)/msgpairarray-explicit.c \
 	$(DIR)/lookup-dcache.c \
 	$(DIR)/getattr-pcache.c \
 	$(DIR)/mgmt-setparam-all.c 

@@ -41,7 +41,6 @@ int msgpairarray_post(PINT_client_sm *sm_p, job_status_s *js_p);
 int msgpairarray_complete(PINT_client_sm *sm_p, job_status_s *js_p);
 int msgpairarray_completion_fn(PINT_client_sm *sm_p, job_status_s *js_p);
 int msgpairarray_error(PINT_client_sm *sm_p, job_status_s *js_p);
-static int msgpairarray_resolve_addrs(PINT_client_sm *sm_p, job_status_s *js_p);
 
 /* WARNING: if you change the state transitions here, please also adjust
  * msgpairarray_explicit.sm
@@ -49,18 +48,11 @@ static int msgpairarray_resolve_addrs(PINT_client_sm *sm_p, job_status_s *js_p);
 
 %%
 
-nested machine pvfs2_client_msgpairarray_sm(resolve_addrs,
-					    post,
+nested machine pvfs2_client_msgpairarray_sm(post,
 					    complete,
 					    completion_fn,
 					    error)
 {
-    state resolve_addrs {
-	run msgpairarray_resolve_addrs;
-	success => post;
-	default => error;
-    }
-    
     state post {
 	run msgpairarray_post;
 	success => complete;
@@ -85,47 +77,6 @@ nested machine pvfs2_client_msgpairarray_sm(resolve_addrs,
 }
 
 %%
-
-/* msgpairarray_resolve_addrs()
- *
- * The following elements of the PINT_client_sm_msgpair_state
- * should be valid prior to this state (for each msgpair in array):
- * - fs_id
- * - handle
- *
- * This state performs the following operation for each msgpair:
- * map fs_id/handle to a server
- */
-static int msgpairarray_resolve_addrs(PINT_client_sm *sm_p,
-    job_status_s *js_p)
-{
-    int ret, i;
-
-    gossip_debug(CLIENT_DEBUG, "msgpairarray state: resove_addrs (%d message(s))\n",
-		 sm_p->msgarray_count);
-
-    assert(sm_p->msgarray_count > 0); /* sanity check */
-
-    /* run through array of msgpairarray */
-    for (i=0; i < sm_p->msgarray_count; i++) {
-	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
-
-	/* determine server address from fs_id/handle pair.
-	 * this is needed prior to encoding.
-	 */
-	ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
-					msg_p->handle,
-					msg_p->fs_id);
-	if (ret != 0) {
-	    gossip_lerr("bucket map to server failed; probably invalid svr_addr\n");
-	    assert(ret < 0); /* return value range check */
-	    assert(0); /* placeholder until we have real error handling */
-	}
-    }
-
-    js_p->error_code = 0;
-    return 1;
-}
 
 
 /* msgpairarray_post()

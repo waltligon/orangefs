@@ -310,6 +310,7 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 {
     int i;
     PINT_client_sm_msgpair_state *msg_p;
+    int ret = -1;
 
     gossip_debug(CLIENT_DEBUG,
 	    "(%p) flush state: datafile_setup_msgpairarray\n",
@@ -360,6 +361,15 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     msg_p->handle = sm_p->u.flush.object_ref.handle;
     msg_p->comp_fn = NULL;
 
+    /* fill in address of each server to contact */
+    ret = PINT_serv_msgpairarray_resolve_addrs(sm_p->msgarray_count,
+	sm_p->msgarray);
+    if(ret < 0)
+    {
+	gossip_lerr("Error: failed to resolve server addresses.\n");
+	js_p->error_code = ret;
+	return(1);
+    }
 
     /* immediate return: next state jumps to the msgpairarray machine */
     return 1;

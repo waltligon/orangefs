@@ -235,6 +235,44 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
     return 0;
 }
 
+
+/* PINT_serv_msgpair_array_resolve_addrs()
+ *
+ * fills in BMI address of server for each entry in the msgpair array, 
+ * based on the handle and fsid
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+/* TODO: is this the right name for this function? */
+int PINT_serv_msgpairarray_resolve_addrs(int count, 
+    PINT_client_sm_msgpair_state* msgarray)
+{
+    int i;
+    int ret = -1;
+
+    assert(count > 0); /* sanity check */
+
+    /* run through array of msgpairarray */
+    for (i=0; i < count; i++) {
+	PINT_client_sm_msgpair_state *msg_p = &msgarray[i];
+
+	/* determine server address from fs_id/handle pair.
+	 * this is needed prior to encoding.
+	 */
+	ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+					msg_p->handle,
+					msg_p->fs_id);
+	if (ret != 0) {
+	    gossip_lerr("bucket map to server failed; probably invalid svr_addr\n");
+	    assert(ret < 0); /* return value range check */
+	    return(ret);
+	}
+    }
+    
+    return(0);
+}
+
+
 /*
  * Local variables:
  *  c-indent-level: 4
