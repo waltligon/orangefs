@@ -17,7 +17,6 @@ enum {
 
 
 static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
@@ -32,7 +31,6 @@ extern job_context_id PINT_server_job_context;
 
 machine pvfs2_get_attr_sm(prelude,
 		 cleanup,
-		 getobj_attrib,
 		 setup_resp,
 		 final_response,
 		 verify_attribs,
@@ -42,14 +40,8 @@ machine pvfs2_get_attr_sm(prelude,
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		success => getobj_attrib;
+		success => verify_attribs;
 		default => final_response;
-	}
-
-	state getobj_attrib
-	{
-		run getattr_getobj_attribs;
-		default => verify_attribs;
 	}
 
 	state verify_attribs
@@ -93,55 +85,6 @@ machine pvfs2_get_attr_sm(prelude,
 %%
 
 
-/*
- * Function: getattr_getobj_attrib
- *
- * Params:   server_op *b, 
- *           job_status_s* js_p
- *
- * Returns:  int
- *
- * Synopsis: Post a trove operation to fetch the attributes
- *           
- *           
- */
-
-static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
-{
-    int ret;
-    job_id_t i;
-
-    gossip_debug(SERVER_DEBUG, "getattr state: getobj_attribs\n");
-
-    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
-
-    /* TODO: READ INTO A TEMPORARY BUFFER AND THEN EXTRACT JUST WHAT THEY WANT */
-    s_op->val.buffer    = &s_op->resp.u.getattr.attr;
-    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
-
-    gossip_debug(SERVER_DEBUG,
-		 "  reading attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
-		 s_op->req->u.getattr.fs_id,
-		 s_op->req->u.getattr.handle,
-		 (char *) s_op->key.buffer,
-		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
-		 s_op->val.buffer_sz);
-
-    ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
-					 s_op->req->u.getattr.handle,
-					 &(s_op->key),
-					 &(s_op->val),
-					 0,
-					 NULL,
-					 s_op,
-					 js_p,
-					 &i,
-					 PINT_server_job_context);
-    return(ret);
-}
-
 /* getattr_verify_attribs
  */
 static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
@@ -150,33 +93,24 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     gossip_debug(SERVER_DEBUG, "getattr state: verify_attribs\n");
 
-    /* attributes were read into s_op->val.buffer in previous state,
-     * which was pointing to s_op->resp.u.getattr.attr;
-     */
+    /* copy basic attributes structure into response */
+    s_op->resp.u.getattr.attr = s_op->attr;
+
     a_p = (PVFS_object_attr *) s_op->val.buffer;
     a_p = &s_op->resp.u.getattr.attr;
 
-    if (js_p->error_code != 0)
-    {
-	gossip_debug(SERVER_DEBUG, "  previous keyval read had "
-                     "an error (new metafile?); data is useless\n");
-    }
-    else
-    {
-	gossip_debug(SERVER_DEBUG,
-		     "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
-		     a_p->owner,
-		     a_p->group,
-		     a_p->perms,
-		     a_p->objtype,
-		     (long long)a_p->atime,
-		     (long long)a_p->mtime,
-		     (long long)a_p->ctime);
-    }
+    gossip_debug(SERVER_DEBUG,
+		 "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
+		 a_p->owner,
+		 a_p->group,
+		 a_p->perms,
+		 a_p->objtype,
+		 (long long)a_p->atime,
+		 (long long)a_p->mtime,
+		 (long long)a_p->ctime);
 
     /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
-    if ((js_p->error_code != 0 &&
-         s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_METAFILE) ||
+    if ((s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_METAFILE) ||
         a_p->objtype == PVFS_TYPE_METAFILE)
     {
 	gossip_debug(SERVER_DEBUG,
@@ -196,19 +130,14 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
             /* TODO: keep distribution size in here too */
         }
     }
-    else if (js_p->error_code == 0)
+    else
     {
 	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
                      "something other than a metafile\n",
 		     s_op->req->u.getattr.handle);
     }
-    else
-    {
-	/* got an error reading */
-	gossip_debug(SERVER_DEBUG,
-		     "  error reading attributes for handle 0x%08Lx; "
-                     "sending response\n", s_op->req->u.getattr.handle);
-    }
+
+    js_p->error_code = 0;
     return 1;
 }
 
