@@ -83,17 +83,19 @@ struct PVFS_servresp_getattr
     PVFS_object_attr attr;	    /* attributes */
 };
 
-/* setattr
- * 
- */
+/* setattr ****************************************************/
+/* - sets attributes specified by mask of PVFS_ATTR_XXX values */
+
 struct PVFS_servreq_setattr
 {
-    PVFS_handle handle;
-    PVFS_fs_id fs_id;
-    PVFS_object_attr attr;
+    PVFS_handle handle;		    /* handle of target object */
+    PVFS_fs_id fs_id;		    /* file system */
+    PVFS_object_attr attr;	    /* new attributes */
 };
 
-/* No resonse for setattr */
+/* NOTE: no response structure; all necessary response info is 
+ * returned in generic server response structure
+ */
 
 /* Lookup_Path */
 struct PVFS_servreq_lookup_path
