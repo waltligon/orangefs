@@ -12,6 +12,7 @@
 #include <assert.h>
 
 #include "pvfs2-server.h"
+#include "pint-event.h"
 
 static int setparam_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int setparam_work(PINT_server_op *s_op, job_status_s* js_p);
@@ -59,6 +60,9 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
     int ret = -1;
     int tmp_on;
     int tmp_mask;
+    int old_event_on;
+    int32_t old_api_mask;
+    int32_t old_op_mask;
 
     PINT_STATE_DEBUG("work");
 
@@ -90,6 +94,29 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 		&tmp_id,
 		server_job_context);
 	    return(ret);
+	case PVFS_SERV_PARAM_EVENT_ON:
+	    ret = 0;
+	    if(s_op->req->u.mgmt_setparam.value)
+		ret = PINT_event_initialize(PINT_EVENT_DEFAULT_RING_SIZE);
+	    else
+		PINT_event_finalize();
+	    PINT_event_get_masks(&old_event_on, &old_api_mask, &old_op_mask);
+	    PINT_event_set_masks(
+		(int)s_op->req->u.mgmt_setparam.value,
+		old_api_mask,
+		old_op_mask);
+	    s_op->resp.u.mgmt_setparam.old_value = old_event_on;
+	    js_p->error_code = ret;
+	    return(1);
+	case PVFS_SERV_PARAM_EVENT_MASKS:
+	    PINT_event_get_masks(&old_event_on, &old_api_mask, &old_op_mask);
+	    PINT_event_set_masks(old_event_on,
+		(int32_t)(s_op->req->u.mgmt_setparam.value & 0x0FFFFFFFF),
+		(int32_t)(s_op->req->u.mgmt_setparam.value >> 32));
+	    s_op->resp.u.mgmt_setparam.old_value = old_api_mask +
+		((int64_t)old_op_mask << 32);
+	    js_p->error_code = 0;
+	    return(1);
 	case PVFS_SERV_PARAM_MODE:
 	    /* no work to do here; request scheduler has already handled */
 	    js_p->error_code = 0;

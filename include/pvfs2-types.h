@@ -189,7 +189,9 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_GOSSIP_MASK = 1,  /* gossip debuggin on or off */
     PVFS_SERV_PARAM_FSID_CHECK = 2,   /* verify that a specific fsid is ok */
     PVFS_SERV_PARAM_ROOT_CHECK = 3,   /* verify existance of root handle */
-    PVFS_SERV_PARAM_MODE = 4	      /* change the current server mode */
+    PVFS_SERV_PARAM_MODE = 4,	      /* change the current server mode */
+    PVFS_SERV_PARAM_EVENT_ON = 5,     /* event logging on or off */
+    PVFS_SERV_PARAM_EVENT_MASKS = 6   /* API masks for event logging */
 };
 
 enum PVFS_server_mode

@@ -9,6 +9,9 @@
 
 #include <pvfs2-types.h>
 
+/* TODO: put this somewhere else? read from config file? */
+#define PINT_EVENT_DEFAULT_RING_SIZE 2000
+
 /* different API levels where we can log events */
 enum PINT_event_api
 {
@@ -56,6 +59,7 @@ extern int32_t PINT_event_op_mask;
 int PINT_event_initialize(int ring_size);
 void PINT_event_finalize(void);
 void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask);
+void PINT_event_get_masks(int* event_on, int32_t* api_mask, int32_t* op_mask);
 void __PINT_event_timestamp(
     enum PINT_event_api api,
     int32_t operation,

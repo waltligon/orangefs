@@ -89,13 +89,29 @@ void PINT_event_finalize(void)
  * is, and what the operation mask is.  The combination of these values
  * determines which events are recorded
  *
- * returns 0 on succes, -PVFS_error on failure
+ * no return value
  */
 void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask)
 {
     PINT_event_on = event_on;
     PINT_event_api_mask = api_mask;
     PINT_event_op_mask = op_mask;
+
+    return;
+}
+
+
+/* PINT_event_get_masks()
+ *
+ * retrieves current mask values 
+ *
+ * no return value
+ */
+void PINT_event_get_masks(int* event_on, int32_t* api_mask, int32_t* op_mask)
+{
+    *event_on = PINT_event_on;
+    *api_mask = PINT_event_api_mask;
+    *op_mask = PINT_event_op_mask;
 
     return;
 }
