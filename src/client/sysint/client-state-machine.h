@@ -155,6 +155,11 @@ struct PINT_client_mgmt_setparam_all_sm
     int64_t value;
 };
 
+struct PINT_client_mgmt_noop_sm
+{
+    char* host;
+};
+
 typedef struct PINT_client_sm {
     /* STATE MACHINE VALUES */
     int stackptr; /* stack of contexts for nested state machines */
@@ -194,6 +199,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_io_sm      io;
 	struct PINT_client_flush_sm   flush;
 	struct PINT_client_mgmt_setparam_all_sm   setparam_all;
+	struct PINT_client_mgmt_noop_sm noop;
     } u;
 } PINT_client_sm;
 
