@@ -33,6 +33,16 @@
 /* size of mapped region to use for I/O transfers (in bytes) */
 #define MAPPED_REGION_SIZE (16*1024*1024)
 
+/*
+  set extraordinarily long pcache timeout value (ms) so
+  that the attributes of files can be cached for a long
+  time; the system interface calls are responsible for
+  flushing the pcache when appropriate.  For now, there
+  may be some inconsistencies, but this will be cleaned
+  up as the system interface is changed in time.
+*/
+#define PCACHE_TIMEOUT_MS 6000000
+
 static int service_lookup_request(
     PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
@@ -125,7 +135,6 @@ static int service_create_request(
               before the pvfs2-client crashes; we want to report
               success on resume to the vfs that retried the operation.
             */
-
             gossip_err("Failed to create %s under %Ld on fsid %d!\n",
                        in_upcall->req.create.d_name,
                        parent_refn.handle,parent_refn.fs_id);
@@ -528,13 +537,7 @@ int main(int argc, char **argv)
     gossip_enable_stderr();
     gossip_set_debug_mask(0, CLIENT_DEBUG);
 
-    /*
-      set extraordinarily long pcache timeout value (ms) so
-      that the attributes of files can be cached for a long
-      time; the system interface calls are responsible for
-      flushing the pcache when appropriate.
-    */
-    PINT_pcache_set_timeout(600000);
+    PINT_pcache_set_timeout(PCACHE_TIMEOUT_MS);
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
     if(ret < 0)

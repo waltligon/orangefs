@@ -395,13 +395,12 @@ endif
 
 # all test programs depend on the pvfs2 library
 $(TESTS): %: %.o $(LIBRARIES)
-
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 
 # target for building _just_ the statecomp tool
 statecomp: src/common/statecomp/statecomp
-	
+
 # rule for generating cscope information
 cscope:
 	find $(srcdir) -iname "*.[ch]" -o -iname "*.sm"> $(srcdir)/cscope.files
@@ -423,7 +422,8 @@ clean: docsclean
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
 		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)  $(SERVER) $(MPIMISCOBJS)\
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
-		$(ADMINOBJS) $(ADMINTOOLS) lib/libpvfs2-server.a
+		$(ADMINOBJS) $(ADMINTOOLS) \
+		lib/libpvfs2-server.a
 
 # _really_ clean the tree; should go back to pristine state
 distclean: clean

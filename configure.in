@@ -61,25 +61,36 @@ dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
 dnl    freeing with the mtrace tool
 AC_ARG_WITH(mtrace,
-[  --with-mtrace                  Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE to output file name).],
+[  --with-mtrace           Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE to output file name).],
 CFLAGS="$CFLAGS -include mcheck.h"
 AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
 )
 
+dnl
+dnl Enables the kernel module to build if the appropriate
+dnl linux-2.6.x path is specified
+dnl
+AC_ARG_WITH(kernel,
+[  --with-kernel=src_path   Build pvfs2 kernel module against specified src (2.6.x only).], LINUX_KERNEL_SRC="$withval",LINUX_KERNEL_SRC="")
+
+SRC_TOP_LEVEL=`pwd`
+AC_SUBST(SRC_TOP_LEVEL)
+AC_SUBST(LINUX_KERNEL_SRC)
+
 dnl More options
 AC_ARG_ENABLE(fast,
-[  --enable-fast                  Disable optional debugging, enable optimizations.],
+[  --enable-fast           Disable optional debugging, enable optimizations.],
 CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG",
 CFLAGS="$CFLAGS -g"
 )
 
 AC_ARG_ENABLE(profiling,
-[  --enable-profiling             Enable profiling (using gprof).                     *** not yet working ***],
+[  --enable-profiling      Enable profiling (using gprof).                     *** not yet working ***],
 CFLAGS="$CFLAGS -pg -fprofile-arcs",
 )
 
 AC_ARG_ENABLE(coverage,
-[  --enable-coverage              Enable coverage analysis (disables optimizations).  *** not yet working ***],
+[  --enable-coverage       Enable coverage analysis (disables optimizations).  *** not yet working ***],
 CFLAGS="$CFLAGS -fprofile-arcs -ftest-coverage -O0",
 )
 
@@ -88,9 +99,10 @@ CFLAGS="$CFLAGS -Wall -O2 -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpoi
 
 dnl Check if user actually wants to see all our build output (compiles, links, etc.).
 AC_ARG_ENABLE(verbose-build,
-[  --enable-verbose-build         Enables full output during build process (compiles, etc.).],
+[  --enable-verbose-build  Enables full output during build process (compiles, etc.).],
 ,
 QUIET_COMPILE=1)
+
 
 AC_SUBST(QUIET_COMPILE)
 
@@ -104,7 +116,7 @@ AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
 AC_ARG_WITH(efence,
-[  --with-efence                  Use electric fence for malloc debugging.],
+[  --with-efence           Use electric fence for malloc debugging.],
 AC_CHECK_LIB(efence,malloc)
 )
 
@@ -160,7 +172,7 @@ Define if DB open function takes a txnid parameter),
 AC_MSG_RESULT(no))
 
 dnl configure options for GM install path
-AC_ARG_WITH(gm,[  --with-gm=<dir>          Location of the GM installation (default=/opt/gm)],
+AC_ARG_WITH(gm,[  --with-gm=<dir>         Location of the GM installation (default=/opt/gm)],
     GM_HOME="$withval",GM_HOME="/opt/gm")
 
 AC_SUBST(GM_HOME)
@@ -177,7 +189,7 @@ CPPFLAGS="$CPPFLAGS_OLD"
 AC_SUBST(BUILD_GM)
 
 AC_ARG_WITH(mpi, 
-[  --with-mpi=<dir>         Location of the MPI installation],
+[  --with-mpi=<dir>        Location of the MPI installation],
     if test x$withval = xyes; then
 	AC_MSG_ERROR(--with-mpi must be given a pathname)
     else
@@ -253,7 +265,7 @@ src/server/module.mk
 src/server/request-scheduler/module.mk
 src/client/sysint/module.mk
 src/proto/contig/module.mk
-src/kernel/linux-2.6/module.mk
+src/kernel/linux-2.6/Makefile
 test/io/trove/module.mk
 test/common/quicklist/module.mk
 test/common/id-generator/module.mk
