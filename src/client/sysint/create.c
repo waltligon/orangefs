@@ -104,7 +104,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	if(parent_ptr->attr.objtype != PVFS_TYPE_DIRECTORY)
 	{
 	    phelper_release_pinode(parent_ptr);
-	    ret = (-ENOTDIR);
+	    ret = (-PVFS_ENOTDIR);
 	    failure = PCACHE_LOOKUP_FAILURE;
 	    goto return_error;
 	}
@@ -114,21 +114,23 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 
 	/* Lookup handle(if it exists) in dcache */
 	ret = PINT_dcache_lookup(entry_name,parent_refn,&entry);
-	if (ret < 0 )
+	if (ret < 0 && ret != -PVFS_ENOENT)
 	{
 	    /* there was an error, bail*/
 	    failure = DCACHE_LOOKUP_FAILURE;
 	    goto return_error;
 	}
-
-	/* the entry could still exist, it may be uncached though */
-	if (entry.handle != PINT_DCACHE_HANDLE_INVALID)
+	else if (ret == 0)
 	{
 	    /* pinode already exists, should fail create with EXISTS*/
-	    ret = (-EEXIST);
+	    ret = (-PVFS_EEXIST);
 	    failure = DCACHE_LOOKUP_FAILURE;
 	    goto return_error;
 	}
+
+	/* otherwise we were returned -PVFS_ENOENT, indicating that
+	 * there was no match in the dcache.
+	 */
 
 	/* how many data files do we need to create? */
 	/* get default value from system */

@@ -88,18 +88,16 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 
     /* Lookup handle(if it exists) in dcache */
     ret = PINT_dcache_lookup(entry_name,parent_refn,&entry);
-    if (ret < 0 )
+    if (ret < 0 && ret != -PVFS_ENOENT)
     {
 	/* there was an error, bail*/
 	gossip_ldebug(CLIENT_DEBUG,"dcache lookup failure\n");
 	failure = DCACHE_LOOKUP_FAILURE;
 	goto return_error;
     }
-
-    /* the entry could still exist, it may be uncached though */
-
-    if (entry.handle != PINT_DCACHE_HANDLE_INVALID)
+    else if (ret == 0)
     {
+	/* found a match in the dcache */
 	/* pinode already exists, should fail create with EXISTS*/
 	gossip_ldebug(CLIENT_DEBUG,"pinode already exists\n");
 	ret = (-EEXIST);
@@ -107,11 +105,12 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 	goto return_error;
     }
 
-    /*
-      Determine the initial meta server and the appropriate
-      handle range for a new dir.  This extent array of
-      handles should NOT be freed.
-    */
+    /* otherwise we were returned -PVFS_ENOENT, indicating no match
+     * found in the dcache.
+     */
+
+    /* Determine the initial metaserver for new file */
+    /* This extent array of handles should NOT be freed. */
     ret = PINT_bucket_get_next_meta(&g_server_config,
                                     parent_refn.fs_id,
                                     &serv_addr1,

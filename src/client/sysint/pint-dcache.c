@@ -62,7 +62,8 @@ static dcache* cache = NULL;
  *
  * search PVFS directory cache for specific entry
  *
- * returns 0 on success, -1 on failure
+ * returns 0 on success, -pvfs_errno on failure, -PVFS_ENOENT if entry is
+ * not present.
  */
 int PINT_dcache_lookup(
     char *name,
@@ -73,8 +74,7 @@ int PINT_dcache_lookup(
     int i = 0;
     int ret = 0;
 
-    if (!name)
-	return(-ENOMEM);
+    assert(name != NULL);
 
     /* Grab a mutex */
     gen_mutex_lock(cache->mt_lock);
@@ -87,6 +87,7 @@ int PINT_dcache_lookup(
     {
 	if (compare(cache->element[i],name,parent))
 	{
+	    /* match found; check to see if it is still valid */
 	    gossip_ldebug(DCACHE_DEBUG, "dcache match; checking timestamp.\n");
 	    ret = check_dentry_expiry(cache->element[i].dentry.tstamp_valid);
 	    if (ret < 0)
@@ -95,10 +96,13 @@ int PINT_dcache_lookup(
 		/* Dentry is stale */
 		/* Remove the entry from the cache */
 		dcache_remove_dentry(i);
-		/* Release the mutex */
-		gen_mutex_unlock(cache->mt_lock);
 
-		return(0);
+		/* we never have more than one entry for the same object
+		 * in the cache, so we can assume we have no up-to-date one
+		 * at this point.
+		 */
+		gen_mutex_unlock(cache->mt_lock);
+		return -PVFS_ENOENT;
 	    }
 
 	    /*update links so that this dentry is at the top of our list*/
@@ -108,17 +112,16 @@ int PINT_dcache_lookup(
 	    entry->handle = cache->element[i].dentry.entry.handle;
 	    entry->fs_id = cache->element[i].dentry.entry.fs_id;	
 	    gossip_ldebug(DCACHE_DEBUG, "dcache entry valid.\n");
-	    break;
-	    }
+	    gen_mutex_unlock(cache->mt_lock);
+	    return 0;
+	}
     }
 
-    /* Release the mutex */
+    /* passed through entire cache with no matches */
     gen_mutex_unlock(cache->mt_lock);
-
-    return(0);
+    return -PVFS_ENOENT;
 #else
-    entry->handle = PINT_DCACHE_HANDLE_INVALID;
-    return(0);
+    return -PVFS_ENOENT;
 #endif
 }
 

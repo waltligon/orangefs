@@ -169,7 +169,8 @@ fi
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
-install -d src/apps src/io src/common src/client test/common test/io test/client doc test/correctness/pts
+install -d src/apps src/io src/common src/client src/kernel test/common \
+	test/io test/client doc test/correctness/pts test/kernel
 
 dnl output final version of top level makefile and subdirectory
 dnl    makefile includes

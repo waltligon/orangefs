@@ -17,15 +17,35 @@
 
 #define PINT_STATE_STACK_SIZE 3
 
+struct PINT_client_remove_sm {
+    char                 *object_name; /* input parameter */
+    PVFS_pinode_reference parent_ref;  /* input parameter */
+    PVFS_pinode_reference object_ref;  /* discovered during processing */
+};
+
 /* HACK!!! */
 typedef union PINT_state_array_values PINT_state_array_values;
 
 typedef struct PINT_client_sm_s {
     /* STATE MACHINE VALUES */
-    int op; /* op == req->op after initialize_unexpected */
     int stackptr; /* stack of contexts for nested state machines */
     PINT_state_array_values *current_state; /* xxx */
     PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
+
+    /* CLIENT SM VALUES */
+#if 0
+    int op; /* ??? */
+#endif
+    int comp_ct; /* used to keep up with completion of multiple
+		  * jobs for some some states; typically set and
+		  * then decremented to zero as jobs complete */
+
+    struct PVFS_server_req req;
+    struct PVFS_server_resp *resp_p; /* */
+    PVFS_credentials *cred_p;
+    union {
+	struct PINT_client_remove_sm remove;
+    } u;
 } PINT_client_sm;
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */

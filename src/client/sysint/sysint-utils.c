@@ -25,8 +25,8 @@ gen_mutex_t *g_session_tag_mt_lock;
 struct server_configuration_s g_server_config;
 
 static int server_parse_config(
-    struct server_configuration_s *config,
-    struct PVFS_servresp_getconfig *response);
+			       struct server_configuration_s *config,
+			       struct PVFS_servresp_getconfig *response);
 
 /*
  * PINT_do_lookup looks up one dirent in a given parent directory
@@ -35,137 +35,146 @@ static int server_parse_config(
  * returns 0 on success (with pinode_ref filled in), -ERRNO on failure
  */
 
-int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
-		PVFS_credentials cred,PVFS_pinode_reference *entry)
+int PINT_do_lookup(char* name,
+		   PVFS_pinode_reference parent,
+		   PVFS_credentials cred,
+		   PVFS_pinode_reference *entry)
 {
-	struct PVFS_server_req req_p;             /* server request */
-        struct PVFS_server_resp *ack_p = NULL;    /* server response */
-        int ret = -1, name_sz = 0;
-        struct PINT_decoded_msg decoded;
-        bmi_addr_t serv_addr;
-        pinode *pinode_ptr = NULL;
-	void* encoded_resp;
-	PVFS_msg_tag_t op_tag;
-        bmi_size_t max_msg_sz = 0;
+    struct PVFS_server_req req_p;             /* server request */
+    struct PVFS_server_resp *ack_p = NULL;    /* server response */
+    int ret = -1, name_sz = 0;
+    struct PINT_decoded_msg decoded;
+    bmi_addr_t serv_addr;
+    pinode *pinode_ptr = NULL;
+    void* encoded_resp;
+    PVFS_msg_tag_t op_tag;
+    bmi_size_t max_msg_sz = 0;
 
-        /*Q: should I combine these into one since there's not much
-         * cleanup going on for each case?
-         */
+    /*Q: should I combine these into one since there's not much
+     * cleanup going on for each case?
+     */
 
-        enum {
-            NONE_FAILURE = 0,
-            MAP_SERVER_FAILURE,
-            SEND_REQ_FAILURE,
-            INVAL_LOOKUP_FAILURE,
-            ADD_PCACHE_FAILURE,
-        } failure = NONE_FAILURE;
+    enum {
+	NONE_FAILURE = 0,
+	MAP_SERVER_FAILURE,
+	SEND_REQ_FAILURE,
+	INVAL_LOOKUP_FAILURE,
+	ADD_PCACHE_FAILURE,
+    } failure = NONE_FAILURE;
 
-	if (name == NULL)  /* how do we look up a null name? */
-	    return -ENOENT;
+    if (name == NULL)  /* how do we look up a null name? */
+	return -ENOENT;
 
-        name_sz = strlen(name) + 1; /*include the null terminator*/
+    name_sz = strlen(name) + 1; /*include the null terminator*/
 
-	/* check length of path and number of segments */
-	if(name_sz > PVFS_REQ_LIMIT_PATH_NAME_BYTES ||
-	    (PINT_string_count_segments(name) > 
-	    PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
-	{
-	    return(-ENAMETOOLONG);
-	}
+    /* check length of path and number of segments */
+    if(name_sz > PVFS_REQ_LIMIT_PATH_NAME_BYTES ||
+       (PINT_string_count_segments(name) > 
+	PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
+    {
+	return(-ENAMETOOLONG);
+    }
 
-        req_p.op = PVFS_SERV_LOOKUP_PATH;
-        req_p.credentials = cred;
-        req_p.u.lookup_path.path = name;
-        req_p.u.lookup_path.fs_id = parent.fs_id;
-        req_p.u.lookup_path.starting_handle = parent.handle;
-        req_p.u.lookup_path.attrmask = PVFS_ATTR_COMMON_ALL;
+    req_p.op = PVFS_SERV_LOOKUP_PATH;
+    req_p.credentials = cred;
+    req_p.u.lookup_path.path = name;
+    req_p.u.lookup_path.fs_id = parent.fs_id;
+    req_p.u.lookup_path.starting_handle = parent.handle;
+    req_p.u.lookup_path.attrmask = PVFS_ATTR_COMMON_ALL;
 
-	/*expecting exactly one segment to come back (maybe attribs)*/
-	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
-	    req_p.op, PINT_CLIENT_ENC_TYPE);
+    /*expecting exactly one segment to come back (maybe attribs)*/
+    max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
+					   req_p.op,
+					   PINT_CLIENT_ENC_TYPE);
 
-        ret = PINT_bucket_map_to_server(&serv_addr, parent.handle, parent.fs_id);
-        if (ret < 0)
-        {
-            failure = MAP_SERVER_FAILURE;
-            goto return_error;
-        }
+    ret = PINT_bucket_map_to_server(&serv_addr,
+				    parent.handle,
+				    parent.fs_id);
+    if (ret < 0)
+    {
+	failure = MAP_SERVER_FAILURE;
+	goto return_error;
+    }
 
-        /* Make a lookup_path server request to get the handle and
-         * attributes
-         */
+    /* Make a lookup_path server request to get the handle and
+     * attributes
+     */
 
-	op_tag = get_next_session_tag();
+    op_tag = get_next_session_tag();
 
-	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
-	    &decoded, &encoded_resp, op_tag);
-	if (ret < 0)
-        {
-            failure = SEND_REQ_FAILURE;
-            goto return_error;
-        }
+    ret = PINT_send_req(serv_addr,
+			&req_p,
+			max_msg_sz,
+			&decoded,
+			&encoded_resp,
+			op_tag);
+    if (ret < 0)
+    {
+	failure = SEND_REQ_FAILURE;
+	goto return_error;
+    }
 
-        ack_p = (struct PVFS_server_resp *) decoded.buffer;
+    ack_p = (struct PVFS_server_resp *) decoded.buffer;
 
-	/* make sure the operation didn't fail*/
-	if (ack_p->status < 0 )
-	{
-		ret = ack_p->status;
-		failure = SEND_REQ_FAILURE;
-		goto return_error;
-	}
+    /* make sure the operation didn't fail*/
+    if (ack_p->status < 0 )
+    {
+	ret = ack_p->status;
+	failure = SEND_REQ_FAILURE;
+	goto return_error;
+    }
 
-        /* we should never get multiple handles back for the meta file*/
-        if (ack_p->u.lookup_path.handle_count != 1)
-        {
-	    ret = -EINVAL;
-            failure = INVAL_LOOKUP_FAILURE;
-            goto return_error;
-        }
+    /* we should never get multiple handles back for the meta file*/
+    if (ack_p->u.lookup_path.handle_count != 1)
+    {
+	ret = -EINVAL;
+	failure = INVAL_LOOKUP_FAILURE;
+	goto return_error;
+    }
 
-        entry->handle = ack_p->u.lookup_path.handle_array[0];
-        entry->fs_id = parent.fs_id;
+    entry->handle = ack_p->u.lookup_path.handle_array[0];
+    entry->fs_id = parent.fs_id;
 
-        /*in the event of a successful lookup, we need to add this to the pcache too*/
+    /*in the event of a successful lookup, we need to add this to the pcache too*/
 
-        ret = PINT_pcache_pinode_alloc(&pinode_ptr);
-        if (ret < 0)
-        {
-            ret = -ENOMEM;
-            failure = INVAL_LOOKUP_FAILURE;
-            goto return_error;
-        }
+    ret = PINT_pcache_pinode_alloc(&pinode_ptr);
+    if (ret < 0)
+    {
+	ret = -ENOMEM;
+	failure = INVAL_LOOKUP_FAILURE;
+	goto return_error;
+    }
 
-        /* Fill in the timestamps */
-        ret = phelper_fill_timestamps(pinode_ptr);
-        if (ret < 0)
-        {
-            failure = ADD_PCACHE_FAILURE;
-            goto return_error;
-        }
+    /* Fill in the timestamps */
+    ret = phelper_fill_timestamps(pinode_ptr);
+    if (ret < 0)
+    {
+	failure = ADD_PCACHE_FAILURE;
+	goto return_error;
+    }
 
-        /* Set the size timestamp - size was not fetched */
-        pinode_ptr->size_flag = SIZE_INVALID;
-        pinode_ptr->pinode_ref.handle = ack_p->u.lookup_path.handle_array[0];
-        pinode_ptr->pinode_ref.fs_id = parent.fs_id;
-        pinode_ptr->attr = ack_p->u.lookup_path.attr_array[0];
-	/* filter to make sure we set a reasonable mask here */
-	pinode_ptr->attr.mask &= PVFS_ATTR_COMMON_ALL;
+    /* Set the size timestamp - size was not fetched */
+    pinode_ptr->size_flag = SIZE_INVALID;
+    pinode_ptr->pinode_ref.handle = ack_p->u.lookup_path.handle_array[0];
+    pinode_ptr->pinode_ref.fs_id = parent.fs_id;
+    pinode_ptr->attr = ack_p->u.lookup_path.attr_array[0];
+    /* filter to make sure we set a reasonable mask here */
+    pinode_ptr->attr.mask &= PVFS_ATTR_COMMON_ALL;
 
-        /* Add to the pinode list */
-        ret = PINT_pcache_insert(pinode_ptr);
-        if (ret < 0)
-        {
-            failure = ADD_PCACHE_FAILURE;
-            goto return_error;
-        }
-        PINT_pcache_insert_rls(pinode_ptr);
+    /* Add to the pinode list */
+    ret = PINT_pcache_insert(pinode_ptr);
+    if (ret < 0)
+    {
+	failure = ADD_PCACHE_FAILURE;
+	goto return_error;
+    }
+    PINT_pcache_insert_rls(pinode_ptr);
 
-	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
-	    &encoded_resp, op_tag);
-        return (0);
+    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+		     &encoded_resp, op_tag);
+    return (0);
 
-return_error:
+ return_error:
 
     switch(failure)
     {
@@ -174,7 +183,7 @@ return_error:
         case INVAL_LOOKUP_FAILURE:
         case SEND_REQ_FAILURE:
 	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
-		&encoded_resp, op_tag);
+			     &encoded_resp, op_tag);
         case MAP_SERVER_FAILURE:
         case NONE_FAILURE:
 	    break;
@@ -187,86 +196,86 @@ return_error:
  */
 void debug_print_type(void* thing, int type)
 {
-	if (type ==0)
+    if (type ==0)
+    {
+	struct PVFS_server_req * req = thing;
+	switch( req->op )
 	{
-		struct PVFS_server_req * req = thing;
-		switch( req->op )
-		{
-			case PVFS_SERV_CREATE:
-				gossip_ldebug(CLIENT_DEBUG,"create request\n");
-				break;
-			case PVFS_SERV_CREATEDIRENT:
-				gossip_ldebug(CLIENT_DEBUG,"create dirent request\n");
-				break;
-			case PVFS_SERV_REMOVE:
-				gossip_ldebug(CLIENT_DEBUG,"remove request\n");
-				break;
-			case PVFS_SERV_LOOKUP_PATH:
-				gossip_ldebug(CLIENT_DEBUG,"lookup path request\n");
-				break;
-			case PVFS_SERV_SETATTR:
-				gossip_ldebug(CLIENT_DEBUG,"setattr request\n");
-				break;
-			case PVFS_SERV_GETCONFIG:
-				gossip_ldebug(CLIENT_DEBUG,"getconfig request\n");
-				break;
-			case PVFS_SERV_GETATTR:
-				gossip_ldebug(CLIENT_DEBUG,"getattr request\n");
-				break;
-			case PVFS_SERV_READDIR:
-				gossip_ldebug(CLIENT_DEBUG,"readdir request\n");
-				break;
-			case PVFS_SERV_MKDIR:
-				gossip_ldebug(CLIENT_DEBUG,"mkdir request\n");
-				break;
-			case PVFS_SERV_RMDIRENT:
-				gossip_ldebug(CLIENT_DEBUG,"rmdirent request\n");
-				break;
-			default:
-				gossip_ldebug(CLIENT_DEBUG,"unknown request = %d\n", req->op);
-				break;
-		}
+	    case PVFS_SERV_CREATE:
+		gossip_ldebug(CLIENT_DEBUG,"create request\n");
+		break;
+	    case PVFS_SERV_CREATEDIRENT:
+		gossip_ldebug(CLIENT_DEBUG,"create dirent request\n");
+		break;
+	    case PVFS_SERV_REMOVE:
+		gossip_ldebug(CLIENT_DEBUG,"remove request\n");
+		break;
+	    case PVFS_SERV_LOOKUP_PATH:
+		gossip_ldebug(CLIENT_DEBUG,"lookup path request\n");
+		break;
+	    case PVFS_SERV_SETATTR:
+		gossip_ldebug(CLIENT_DEBUG,"setattr request\n");
+		break;
+	    case PVFS_SERV_GETCONFIG:
+		gossip_ldebug(CLIENT_DEBUG,"getconfig request\n");
+		break;
+	    case PVFS_SERV_GETATTR:
+		gossip_ldebug(CLIENT_DEBUG,"getattr request\n");
+		break;
+	    case PVFS_SERV_READDIR:
+		gossip_ldebug(CLIENT_DEBUG,"readdir request\n");
+		break;
+	    case PVFS_SERV_MKDIR:
+		gossip_ldebug(CLIENT_DEBUG,"mkdir request\n");
+		break;
+	    case PVFS_SERV_RMDIRENT:
+		gossip_ldebug(CLIENT_DEBUG,"rmdirent request\n");
+		break;
+	    default:
+		gossip_ldebug(CLIENT_DEBUG,"unknown request = %d\n", req->op);
+		break;
 	}
-	else
+    }
+    else
+    {
+	struct PVFS_server_resp * resp = thing;
+	switch( resp->op )
 	{
-		struct PVFS_server_resp * resp = thing;
-		switch( resp->op )
-		{
-			case PVFS_SERV_RMDIRENT:
-				gossip_ldebug(CLIENT_DEBUG,"rmdirent response\n");
-				break;
-			case PVFS_SERV_MKDIR:
-				gossip_ldebug(CLIENT_DEBUG,"mkdir response\n");
-				break;
-			case PVFS_SERV_READDIR:
-				gossip_ldebug(CLIENT_DEBUG,"readdir response\n");
-				break;
-			case PVFS_SERV_CREATE:
-				gossip_ldebug(CLIENT_DEBUG,"create response\n");
-				break;
-			case PVFS_SERV_CREATEDIRENT:
-				gossip_ldebug(CLIENT_DEBUG,"create dirent response\n");
-				break;
-			case PVFS_SERV_REMOVE:
-				gossip_ldebug(CLIENT_DEBUG,"remove response\n");
-				break;
-			case PVFS_SERV_LOOKUP_PATH:
-				gossip_ldebug(CLIENT_DEBUG,"lookup path response\n");
-				break;
-			case PVFS_SERV_SETATTR:
-				gossip_ldebug(CLIENT_DEBUG,"setattr request\n");
-				break;
-			case PVFS_SERV_GETCONFIG:
-				gossip_ldebug(CLIENT_DEBUG,"getconfig reply\n");
-				break;
-			case PVFS_SERV_GETATTR:
-				gossip_ldebug(CLIENT_DEBUG,"getattr reply\n");
-				break;
-			default:
-				gossip_ldebug(CLIENT_DEBUG,"unknown reply = %d\n", resp->op);
-				break;
-		}
+	    case PVFS_SERV_RMDIRENT:
+		gossip_ldebug(CLIENT_DEBUG,"rmdirent response\n");
+		break;
+	    case PVFS_SERV_MKDIR:
+		gossip_ldebug(CLIENT_DEBUG,"mkdir response\n");
+		break;
+	    case PVFS_SERV_READDIR:
+		gossip_ldebug(CLIENT_DEBUG,"readdir response\n");
+		break;
+	    case PVFS_SERV_CREATE:
+		gossip_ldebug(CLIENT_DEBUG,"create response\n");
+		break;
+	    case PVFS_SERV_CREATEDIRENT:
+		gossip_ldebug(CLIENT_DEBUG,"create dirent response\n");
+		break;
+	    case PVFS_SERV_REMOVE:
+		gossip_ldebug(CLIENT_DEBUG,"remove response\n");
+		break;
+	    case PVFS_SERV_LOOKUP_PATH:
+		gossip_ldebug(CLIENT_DEBUG,"lookup path response\n");
+		break;
+	    case PVFS_SERV_SETATTR:
+		gossip_ldebug(CLIENT_DEBUG,"setattr request\n");
+		break;
+	    case PVFS_SERV_GETCONFIG:
+		gossip_ldebug(CLIENT_DEBUG,"getconfig reply\n");
+		break;
+	    case PVFS_SERV_GETATTR:
+		gossip_ldebug(CLIENT_DEBUG,"getattr reply\n");
+		break;
+	    default:
+		gossip_ldebug(CLIENT_DEBUG,"unknown reply = %d\n", resp->op);
+		break;
 	}
+    }
 }
 
 int get_next_session_tag(void)
@@ -299,20 +308,23 @@ int get_next_session_tag(void)
  *
  * returns 0 on success, -1 on error
  */
-int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid)
+int check_perms(PVFS_object_attr attr,
+		PVFS_permissions mode,
+		int uid,
+		int gid)
 {
-	int ret = 0;
+    int ret = 0;
 
-	if ((attr.perms & mode) == mode)
-		ret = 0;
-	else if (attr.group == gid && ((attr.perms & mode) == mode))
-		ret = 0;
-	else if (attr.owner == uid)
-		ret = 0;
-	else
-		ret = -1;
+    if ((attr.perms & mode) == mode)
+	ret = 0;
+    else if (attr.group == gid && ((attr.perms & mode) == mode))
+	ret = 0;
+    else if (attr.owner == uid)
+	ret = 0;
+    else
+	ret = -1;
 
-	return(ret);
+    return(ret);
 }
 
 /* sysjob_free
@@ -322,16 +334,19 @@ int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid)
  * returns 0 on success, -errno on failure
  * 
  */
-int sysjob_free(bmi_addr_t server,void *tmp_job,bmi_size_t size, const int op,
-	int (*func)(void *,int))
+int sysjob_free(bmi_addr_t server,
+		void *tmp_job,
+		bmi_size_t size,
+		const int op,
+		int (*func)(void *,int))
 {
-	/* Call the respective free function */
-	if (func)
-		(*func)(tmp_job,0);
-	if (tmp_job)
-		BMI_memfree(server,tmp_job,size,op);
+    /* Call the respective free function */
+    if (func)
+	(*func)(tmp_job,0);
+    if (tmp_job)
+	BMI_memfree(server,tmp_job,size,op);
 
-	return(0);
+    return(0);
 }
 
 /* PINT_server_get_config()
@@ -354,7 +369,8 @@ int PINT_server_get_config(struct server_configuration_s *config,
     /* TODO: Fill up the credentials information */
 
     max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
-	PVFS_SERV_GETCONFIG, PINT_CLIENT_ENC_TYPE);
+					   PVFS_SERV_GETCONFIG,
+					   PINT_CLIENT_ENC_TYPE);
 
     /*
       for each entry in the pvfstab, attempt to query the server for
@@ -415,7 +431,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 
         /* make sure we valid information about this fs */
         if (PINT_server_config_has_fs_config_info(
-                config,mntent_p->service_name) == 0)
+						  config,mntent_p->service_name) == 0)
         {
             gossip_ldebug(CLIENT_DEBUG,"Error:  Cannot retrieve "
                           "information about pvfstab entry %s\n",
