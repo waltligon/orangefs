@@ -30,6 +30,125 @@
 
 #define AIOCB_ARRAY_SZ 8
 
+#ifdef __PVFS2_TROVE_AIO_THREADED__
+#include "dbpf-thread.h"
+
+#define AIO_DBPF_SIGNAL_MAGIC  0x0000FF0E
+
+extern pthread_cond_t dbpf_op_cond;
+extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
+extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
+
+static void aio_progress_notification(sigval_t sig)
+{
+    dbpf_queued_op_t *cur_op = NULL;
+    struct dbpf_op *op_p = NULL;
+    int ret, i, aiocb_inuse_count;
+    struct aiocb *aiocb_p, *aiocb_ptr_array[AIOCB_ARRAY_SZ];
+    gen_mutex_t *context_mutex = NULL;
+
+    cur_op = (dbpf_queued_op_t *)sig.sival_ptr;
+    assert(cur_op);
+
+    op_p = &cur_op->op;
+    assert(op_p);
+
+    aiocb_p = op_p->u.b_rw_list.aiocb_array;
+    assert(aiocb_p);
+
+    /*
+      we should iterate through the ops here to determine the
+      error/return value of the op based on individual request
+      error/return values.  they're ignored for now, however.
+    */
+#if 0
+    for (i = 0; i < op_p->u.b_rw_list.aiocb_array_count; i++)
+    {
+        /* aio_error gets the "errno" value of the individual op */
+        ret = aio_error(&aiocb_p[i]);
+        if (ret == 0)
+        {
+            /* aio_return gets the return value of the individual op */
+            ret = aio_return(&aiocb_p[i]);
+            gossip_debug(TROVE_DEBUG, "  aio_return() says %d\n", ret);
+
+            /* WHAT DO WE DO WITH PARTIAL READ/WRITES??? */
+        }
+
+        /* we shouldn't get called until all ops completed */
+        assert(ret != EINPROGRESS);
+    }
+#endif
+
+    if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLPOSTED)
+    {
+        /*
+          we've posted everything, and it all completed, so we're
+          done.  free the aiocb array, release the FD, and mark the
+          whole op as complete (placing on appropriate completion queue)
+        */
+        free(aiocb_p);
+
+        /* TODO: HOW DO WE DO A SYNC IN HERE?  WE DON'T HAVE THE FD */
+        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+
+        /* this is a macro defined in dbpf-thread.h */
+        gossip_debug(TROVE_DEBUG, " aio_progress_notification: "
+                     "op completed\n");
+        ret = 1;
+        move_op_to_completion_queue(cur_op);
+        return;
+    }
+    else
+    {
+        gossip_debug(TROVE_DEBUG, "*** issuing more aio requests\n");
+        /* no operations currently in progress; convert and post some more */
+
+        /* convert listio arguments into aiocb structures */
+        aiocb_inuse_count = op_p->u.b_rw_list.aiocb_array_count;
+        ret = dbpf_bstream_listio_convert(op_p->u.b_rw_list.fd,
+                                          op_p->u.b_rw_list.opcode,
+                                          op_p->u.b_rw_list.mem_offset_array,
+                                          op_p->u.b_rw_list.mem_size_array,
+                                          op_p->u.b_rw_list.mem_array_count,
+                                          op_p->u.b_rw_list.stream_offset_array,
+                                          op_p->u.b_rw_list.stream_size_array,
+                                          op_p->u.b_rw_list.stream_array_count,
+                                          aiocb_p,
+                                          &aiocb_inuse_count,
+                                          &op_p->u.b_rw_list.lio_state);
+        assert(ret == 1);
+
+        /*
+          if we didn't use the entire array,
+          mark the unused ones with LIO_NOPs
+        */
+        for(i = aiocb_inuse_count; i < op_p->u.b_rw_list.aiocb_array_count; i++)
+        {
+            /* for simplicity just mark these as NOPs and we'll ignore them */
+            aiocb_p[i].aio_lio_opcode = LIO_NOP;
+        }
+
+        for(i = 0; i < aiocb_inuse_count; i++)
+        {
+            aiocb_ptr_array[i] = &aiocb_p[i];
+        }
+
+        gossip_debug(TROVE_DEBUG, "calling lio_listio w/count of %d\n",
+                     aiocb_inuse_count);
+
+        ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
+                         aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
+        if (ret != 0)
+        {
+            gossip_lerr("lio_listio() returned %d\n", ret);
+            return;
+        }
+        op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLPOSTED;
+    }
+}
+#endif /* __PVFS2_TROVE_AIO_THREADED__ */
+
 /* Internal prototypes */
 static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 				       TROVE_handle handle,
@@ -453,12 +572,15 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     int ret, fd;
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
+#ifdef __PVFS2_TROVE_AIO_THREADED__
+    struct dbpf_op *op_p = NULL;
+    int i, aiocb_inuse_count;
+    struct aiocb *aiocb_p, *aiocb_ptr_array[AIOCB_ARRAY_SZ];
+#endif
 
     /* find the collection */
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL) return -TROVE_EINVAL;
-
-    /* validate the handle, check permissions */
 
     /* grab a queued op structure */
     q_op_p = dbpf_queued_op_alloc();
@@ -496,18 +618,106 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 
     q_op_p->op.u.b_rw_list.list_proc_state = LIST_PROC_INITIALIZED;
 
-    /* get an FD so we can access the file; last parameter controls file creation */
-    /* TODO: MOVE THIS INTO THE OP_SVC FUNCTION AS ANOTHER STATE */
-    ret = dbpf_bstream_fdcache_try_get(coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0, &fd);
-    if (ret < 0) {
+    /*
+      get an FD so we can access the file; last
+      parameter controls file creation
+    */
+    ret = dbpf_bstream_fdcache_try_get(
+        coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0, &fd);
+    if (ret < 0)
+    {
 	dbpf_queued_op_free(q_op_p);
 	gossip_ldebug(SERVER_DEBUG, "warning: useless error value\n");
 	return -1;
     }
     q_op_p->op.u.b_rw_list.fd = fd;
 
-    /* queue op*/
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+#else
+    op_p = &q_op_p->op;
+
+    /*
+      instead of queueing the op like most other trove operations,
+      we're going to issue the system aio calls here to begin
+      being serviced immediately.  We'll check progress in the 
+      aio_progress_notification callback method
+    */
+    aiocb_p = (struct aiocb *) malloc(AIOCB_ARRAY_SZ*sizeof(struct aiocb));
+    if (aiocb_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
+
+    /* initialize, paying particular attention to set the opcode to NOP.
+     */
+    memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
+    for(i = 0; i < AIOCB_ARRAY_SZ; i++)
+    {
+        aiocb_p[i].aio_lio_opcode = LIO_NOP;
+        aiocb_p[i].aio_sigevent.sigev_notify = SIGEV_NONE;
+        aiocb_p[i].aio_sigevent.sigev_notify_attributes = NULL;
+    }
+
+    op_p->u.b_rw_list.aiocb_array_count  = AIOCB_ARRAY_SZ;
+    op_p->u.b_rw_list.aiocb_array        = aiocb_p;
+    op_p->u.b_rw_list.list_proc_state    = LIST_PROC_INPROGRESS;
+    op_p->u.b_rw_list.sigev.sigev_notify = SIGEV_THREAD;
+    op_p->u.b_rw_list.sigev.sigev_notify_attributes = NULL;
+    op_p->u.b_rw_list.sigev.sigev_notify_function =
+        aio_progress_notification;
+    op_p->u.b_rw_list.sigev.sigev_value.sival_ptr = (void *)q_op_p;
+
+    /* convert listio arguments into aiocb structures */
+    aiocb_inuse_count = op_p->u.b_rw_list.aiocb_array_count;
+    ret = dbpf_bstream_listio_convert(op_p->u.b_rw_list.fd,
+                                      op_p->u.b_rw_list.opcode,
+                                      op_p->u.b_rw_list.mem_offset_array,
+                                      op_p->u.b_rw_list.mem_size_array,
+                                      op_p->u.b_rw_list.mem_array_count,
+                                      op_p->u.b_rw_list.stream_offset_array,
+                                      op_p->u.b_rw_list.stream_size_array,
+                                      op_p->u.b_rw_list.stream_array_count,
+                                      aiocb_p,
+                                      &aiocb_inuse_count,
+                                      &op_p->u.b_rw_list.lio_state);
+    assert(ret == 1);
+
+    /* if we didn't use the entire array, mark the unused ones with LIO_NOPs */
+    for(i = aiocb_inuse_count; i < op_p->u.b_rw_list.aiocb_array_count; i++)
+    {
+        /* for simplicity just mark these as NOPs and we'll ignore them */
+        aiocb_p[i].aio_lio_opcode = LIO_NOP;
+    }
+
+    for(i = 0; i < aiocb_inuse_count; i++)
+    {
+        aiocb_ptr_array[i] = &aiocb_p[i];
+    }
+
+    gossip_debug(TROVE_DEBUG, "calling lio_listio w/count of %d\n",
+                 aiocb_inuse_count);
+
+    ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
+                     aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
+    if (ret != 0)
+    {
+        gossip_lerr("lio_listio() returned %d\n", ret);
+        return -trove_errno_to_trove_error(errno);
+    }
+    op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLPOSTED;
+
+    /* update q_op structure's state */
+    gen_mutex_lock(&q_op_p->mutex);
+    q_op_p->op.state = OP_IN_SERVICE;
+    gen_mutex_unlock(&q_op_p->mutex);
+
+    /* assign a proper operation id here */
+    id_gen_fast_register(&q_op_p->op.id, q_op_p);
+    *out_op_id_p = q_op_p->op.id;
+#endif
 
     return 0;
 }
@@ -518,6 +728,10 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
  * This function is used to service both read_list and write_list operations.
  * State maintained in the struct dbpf_op (pointed to by op_p) keeps up with
  * which type of operation this is via the "opcode" field in the b_rw_list member.
+ *
+ * NOTE: This method will NEVER be called if __PVFS2_TROVE_AIO_THREADED__ is
+ * defined.  Instead, progress is monitored and pushed using
+ * aio_progress_notification callback method.
  *
  * Assumptions:
  * - FD has been retrieved from fdcache, is refct'd so it won't go away
@@ -531,8 +745,8 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
  * Outline:
  * - look to see if we have an aiocb array
  *   - if we don't, allocate one
- *   - if we do, then check on progress of each operation (having array implies that
- *     we have put some things in service)
+ *   - if we do, then check on progress of each operation (having
+ *     array implies that we have put some things in service)
  *     - if we got an error, ???
  *     - if op is finished, mark w/NOP
  *
@@ -547,9 +761,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
     int ret, i, aiocb_inuse_count, op_in_progress_count = 0;
     struct aiocb *aiocb_p, *aiocb_ptr_array[AIOCB_ARRAY_SZ];
 
-#if 0
     gossip_debug(TROVE_DEBUG, "dbpf_bstream_rw_list_op_svc() entered.\n");
-#endif
 
     /* allocate space for aiocb array if necessary */
     /* TODO: watch memory allocation, delay this operation if no memory avail. */
@@ -647,12 +859,11 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	    aiocb_p[i].aio_lio_opcode = LIO_NOP;
 	}
 
-	for (i=0; i < aiocb_inuse_count; i++) {
+	for (i=0; i < aiocb_inuse_count; i++){
 	    aiocb_ptr_array[i] = &aiocb_p[i];
 	}
 
 	gossip_debug(TROVE_DEBUG, "calling lio_listio w/count of %d\n", aiocb_inuse_count);
-	fflush(stdout);
 
 	ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
 	if (ret != 0) {

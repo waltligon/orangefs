@@ -535,7 +535,11 @@ static int server_initialize_subsystems(
         cur = llist_next(cur);
     }
 #ifdef __PVFS2_TROVE_THREADED__
+#ifdef __PVFS2_TROVE_AIO_THREADED__
+    gossip_debug(SERVER_DEBUG, "Storage Init Complete (aio-threaded)\n");
+#else
     gossip_debug(SERVER_DEBUG, "Storage Init Complete (threaded)\n");
+#endif
 #else
     gossip_debug(SERVER_DEBUG, "Storage Init Complete (non-threaded)\n");
 #endif

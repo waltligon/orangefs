@@ -24,6 +24,27 @@ void *dbpf_thread_function(void *ptr);
 
 int dbpf_do_one_work_cycle(int *out_count);
 
+#define move_op_to_completion_queue(cur_op) do {                   \
+TROVE_context_id cid = cur_op->op.context_id;                      \
+cur_op->state = (ret == 1) ? 0 : ret;                              \
+context_mutex = dbpf_completion_queue_array_mutex[cid];            \
+assert(context_mutex);                                             \
+/*                                                                 \
+  it's important to atomically place the op in the completion      \
+  queue and change the op state to completed so that dspace_test   \
+  and dspace_testcontext play nicely together                      \
+*/                                                                 \
+gen_mutex_lock(context_mutex);                                     \
+dbpf_op_queue_add(dbpf_completion_queue_array[cid],cur_op);        \
+gen_mutex_lock(&cur_op->mutex);                                    \
+cur_op->op.state = OP_COMPLETED;                                   \
+gen_mutex_unlock(&cur_op->mutex);                                  \
+gen_mutex_unlock(context_mutex);                                   \
+/* wake up one waiting thread in this context, if any */           \
+pthread_cond_signal(&dbpf_op_cond);                                \
+} while(0)
+
+
 #if defined(__cplusplus)
 }
 #endif

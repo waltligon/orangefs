@@ -81,7 +81,6 @@ int dbpf_do_one_work_cycle(int *out_count)
     int max_num_ops_to_service = DBPF_OPS_PER_WORK_CYCLE;
     dbpf_queued_op_t *cur_op = NULL;
     gen_mutex_t *context_mutex = NULL;
-    TROVE_context_id cur_ctx_id = -1;
 #endif
 
     assert(out_count);
@@ -121,30 +120,8 @@ int dbpf_do_one_work_cycle(int *out_count)
              */
             *out_count++;
 
-            cur_op->state = (ret == 1) ? 0 : ret;
-
-            cur_ctx_id = cur_op->op.context_id;
-            context_mutex =
-                dbpf_completion_queue_array_mutex[cur_ctx_id];
-            assert(context_mutex);
-
-            /*
-              it's important to atomically place the op in the completion
-              queue and change the op state to completed so that dspace_test
-              and dspace_testcontext play nicely together
-            */
-            gen_mutex_lock(context_mutex);
-            dbpf_op_queue_add(dbpf_completion_queue_array[cur_ctx_id],
-                              cur_op);
-
-            gen_mutex_lock(&cur_op->mutex);
-            cur_op->op.state = OP_COMPLETED;
-            gen_mutex_unlock(&cur_op->mutex);
-
-            gen_mutex_unlock(context_mutex);
-
-            /* wake up one waiting thread in this context, if any */
-            pthread_cond_signal(&dbpf_op_cond);
+            /* this is a macro defined in dbpf-thread.h */
+            move_op_to_completion_queue(cur_op);
         }
         else
         {
