@@ -4,8 +4,12 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.11 2003-07-23 12:40:22 neill Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.12 2003-08-07 20:15:39 walt Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.11  2003/07/23 12:40:22  neill
+// replaced some DIST_DEBUG lines I've added and gossipified some more request
+// related printfs
+//
 // Revision 1.10  2003/07/23 12:05:33  neill
 // added a DIST_DEBUG flag for gossip; gossipified some fprintfs in dist
 // code; added a line in the server to log what it's logging.
@@ -61,6 +65,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include "string.h"
 #include "pvfs2-types.h"
 #include "pint-request.h"
 #include "pvfs2-request.h"
@@ -73,55 +78,55 @@
 /* elementary reqs */
 
 static struct PINT_Request PINT_CHAR =
-		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_CHAR = &PINT_CHAR;
 
 static struct PINT_Request PINT_SHORT =
-		{0, 1, 0, 1, 2, 0, 2, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 2, 0, 2, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_SHORT = &PINT_SHORT;
 
 static struct PINT_Request PINT_INT =
-		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_INT = &PINT_INT;
 
 static struct PINT_Request PINT_LONG =
-		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_LONG = &PINT_LONG;
 
 static struct PINT_Request PINT_UNSIGNED_CHAR =
-		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_UNSIGNED_CHAR = &PINT_UNSIGNED_CHAR;
 
 static struct PINT_Request PINT_UNSIGNED_SHORT =
-		{0, 1, 0, 1, 2, 0, 2, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 2, 0, 2, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_UNSIGNED_SHORT = &PINT_UNSIGNED_SHORT;
 
 static struct PINT_Request PINT_UNSIGNED =
-		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_UNSIGNED = &PINT_UNSIGNED;
 
 static struct PINT_Request PINT_UNSIGNED_LONG =
-		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_UNSIGNED_LONG = &PINT_UNSIGNED_LONG;
 
 static struct PINT_Request PINT_FLOAT =
-		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_FLOAT = &PINT_FLOAT;
 
 static struct PINT_Request PINT_DOUBLE =
-		{0, 1, 0, 1, 8, 0, 8, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 8, 0, 8, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_DOUBLE = &PINT_DOUBLE;
 
 static struct PINT_Request PINT_LONG_DOUBLE =
-		{0, 1, 0, 1, 8, 0, 8, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 8, 0, 8, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_LONG_DOUBLE = &PINT_LONG_DOUBLE;
 
 static struct PINT_Request PINT_BYTE =
-		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_BYTE = &PINT_BYTE;
 
 static struct PINT_Request PINT_PACKED =
-		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, -1, NULL, NULL};
+		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, -1, NULL, NULL};
 PVFS_Request PVFS_PACKED = &PINT_PACKED;
 
 /* int PVFS_Request_extent(PVFS_Request request, PVFS_size *extent); */
@@ -396,7 +401,7 @@ int PVFS_Request_commit(PVFS_Request *reqp)
 	}
 
 	/* this is a committed request - can't re-commit */
-	if (req->committed)
+	if (PINT_REQUEST_IS_PACKED(req))
 	{
 		gossip_lerr("PVFS_Request_commit: pointer to commited request\n");
 		return PVFS_ERR_REQ;
@@ -405,16 +410,14 @@ int PVFS_Request_commit(PVFS_Request *reqp)
 	/* Allocate memory for contiguous region */
 	if(req->num_nested_req > 0)
 	{
-		int index = 0;
-		region = (PVFS_Request)malloc(req->num_nested_req *
-				sizeof(struct PINT_Request));
+		region = (PVFS_Request)malloc(PINT_REQUEST_PACK_SIZE(req));
 		if (region == NULL)
 		{
 			gossip_lerr("PVFS_Request_commit: Memory cannot be allocated\n");
 			return PVFS_ERR_REQ;
   		}   
 		/* pack the request */
-  		PINT_Request_commit(region, req, &index);
+  		PINT_Request_commit(region, req);
 	}
 	/* return the pointer to the memory region */
 	*reqp = region;
@@ -517,6 +520,7 @@ void PVFS_Dump_request(PVFS_Request req)
 	gossip_debug(REQUEST_DEBUG,"depth:\t\t%d\n",(int)req->depth);
 	gossip_debug(REQUEST_DEBUG,"num_nest:\t%d\n",(int)req->num_nested_req);
 	gossip_debug(REQUEST_DEBUG,"commit:\t\t%d\n",(int)req->committed);
+	gossip_debug(REQUEST_DEBUG,"refcount:\t\t%d\n",(int)req->refcount);
 	gossip_debug(REQUEST_DEBUG,"ereq:\t\t%x\n",(int)req->ereq);
 	gossip_debug(REQUEST_DEBUG,"sreq:\t\t%x\n",(int)req->sreq);
 	gossip_debug(REQUEST_DEBUG,"**********************\n");

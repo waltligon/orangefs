@@ -123,8 +123,10 @@ PVFS_size PINT_Distribute(PVFS_offset offset,
 		int mode);
 
 /* pack request from node into a contiguous buffer pointed to by region */
-int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
-		      int32_t *index);
+int PINT_Request_commit(PINT_Request *region, PINT_Request *node);
+int PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
+		int32_t *index, int32_t depth);
+int PINT_Do_clear_commit(PINT_Request *node);
 
 /* encode packed request in place for sending over wire */
 int PINT_Request_encode(struct PINT_Request *req);
@@ -138,13 +140,13 @@ int PINT_Request_decode(struct PINT_Request *req);
  * request struct pointed to by reqp
  */
 #define PINT_REQUEST_PACK_SIZE(reqp)\
-	(((reqp)->num_nested_req + 1) * sizeof(struct PINT_Request))
+	((((reqp)->num_nested_req + 1) * sizeof(struct PINT_Request)) + 8)
 
 /* returns true if the request struct pointed to by reqp is a packed
  * struct
  */
 #define PINT_REQUEST_IS_PACKED(reqp)\
-	((reqp)->committed == 1)
+	(!strncmp((char *)((reqp)+((reqp)->num_nested_req+1)),"committed",8))
 
 /* returns the number of contiguous memory regions referenced by the
  * request struct pointed to by reqp

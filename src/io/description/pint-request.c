@@ -701,8 +701,28 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
  * offsets must reflect the current offsets and then write each struct 
  * to the contiguous memory region
  */
-int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
-		int32_t *index)
+int PINT_Request_commit(PINT_Request *region, PINT_Request *node)
+{
+	int32_t index = 0;
+	return PINT_Do_Request_commit(region, node, &index, 0);
+}
+
+int PINT_Do_clear_commit(PINT_Request *node)
+{
+	if (node == NULL)
+		return -1;
+
+	if (!node->committed)
+		return 0;
+	
+	PINT_Do_clear_commit(node->ereq);
+	PINT_Do_clear_commit(node->sreq);
+	node->committed = 0;
+	return 0;
+}
+
+int PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
+		int32_t *index, int32_t depth)
 {
 	int32_t start_index = *index;
 	int32_t child_index;
@@ -722,7 +742,7 @@ int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
 	*index = *index + 1;
 
 	/* Update ereq so that the relative positions are maintained */
-	child_index = PINT_Request_commit(region, node->ereq, index);
+	child_index = PINT_Do_Request_commit(region, node->ereq, index, depth+1);
 	if (child_index == -1)
 		region[start_index].ereq = NULL;
 	else
@@ -733,18 +753,18 @@ int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
 		node->ereq->committed = child_index;
 
 	/* Update sreq so that the relative positions are maintained */
-	child_index = PINT_Request_commit(region, node->sreq, index);
+	child_index = PINT_Do_Request_commit(region, node->sreq, index, depth+1);
 	if (child_index == -1)
 		region[start_index].sreq = NULL;
 	else
 		region[start_index].sreq = &region[child_index];
 
-	/* restore committed value */
-	if (node->ereq)
-		node->ereq->committed = 0;
-
-	/* Mark this node as committed */
-	region[start_index].committed = 1;
+	if (depth == 0)
+	{
+		/* this does not get the 'd' but that's OK */
+		strncpy((char *)(region+(region->num_nested_req+1)),"committed",8);
+		PINT_Do_clear_commit(region);
+	}
 
 	/* Return the index of the committed struct */ 
 	return *index; 
@@ -756,7 +776,7 @@ int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
 int PINT_Request_encode(struct PINT_Request *req)
 {
 	int r;
-	if (req->committed != 1)
+	if (!PINT_REQUEST_IS_PACKED(req))
 		return -1;
 	for (r = 0; r < req->num_nested_req; r++)
 	{
@@ -778,7 +798,7 @@ int PINT_Request_encode(struct PINT_Request *req)
 int PINT_Request_decode(struct PINT_Request *req)
 {
 	int r;
-	if (req->committed != 1)
+	if (!PINT_REQUEST_IS_PACKED(req))
 		return -1;
 	for (r = 0; r < req->num_nested_req; r++)
 	{
