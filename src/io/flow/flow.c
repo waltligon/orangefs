@@ -572,7 +572,7 @@ int PINT_flow_test(
 	if(*outcount == 1)
 	{
 		/* done */
-		return(0);
+		return(1);
 	}
 
 	gen_mutex_lock(&interface_mutex);
@@ -592,7 +592,10 @@ int PINT_flow_test(
 	
 	/* check again to see if the flow finished */
 	ret = flow_quick_test(flow_d, outcount);
-	return(ret);
+	if(ret == 0 && *outcount == 1)
+		return(1);
+	else
+		return(ret);
 }
 
 
@@ -621,7 +624,7 @@ int PINT_flow_testsome(
 	}
 	if((*outcount) > 0)
 	{
-		return(0);
+		return(1);
 	}
 
 	gen_mutex_lock(&interface_mutex);
@@ -641,7 +644,10 @@ int PINT_flow_testsome(
 
 	/* check again to see if any of the flows completed */
 	ret = flow_quick_testsome(incount, flow_array, outcount, index_array);
-	return(ret);
+	if(ret == 0 && *outcount > 0)
+		return(1);
+	else
+		return(ret);
 }
 
 
@@ -687,7 +693,10 @@ int PINT_flow_testworld(
 	}
 
 	gen_mutex_unlock(&interface_mutex);
-	return(0);
+	if(*outcount > 0)
+		return(1);
+	else
+		return(0);
 }
 
 
