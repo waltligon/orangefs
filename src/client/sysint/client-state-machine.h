@@ -97,7 +97,8 @@ typedef struct PINT_client_sm_msgpair_state_s
  * This is used for extra receives, such as acknowledgements from
  * servers at the end of write operations.
  */
-typedef struct PINT_client_sm_recv_state_s {
+typedef struct PINT_client_sm_recv_state_s
+{
     int max_resp_sz;
     void *encoded_resp_p;
     job_id_t recv_id;
@@ -106,17 +107,18 @@ typedef struct PINT_client_sm_recv_state_s {
 } PINT_client_sm_recv_state;
 
 /* PINT_client_remove_sm */
-struct PINT_client_remove_sm {
-    char                         *object_name;   /* input parameter */
-    int                          stored_error_code;
-    int				 retry_count;
+struct PINT_client_remove_sm
+{
+    char *object_name;   /* input parameter */
+    int stored_error_code;
+    int	retry_count;
 };
 
 /* PINT_client_create_sm */
 struct PINT_client_create_sm {
     char                         *object_name;    /* input parameter */
     PVFS_sysresp_create          *create_resp;    /* in/out parameter*/
-    PVFS_sys_attr                *sys_attr;       /* input parameter */
+    PVFS_sys_attr                sys_attr;        /* input parameter */
     int                          num_data_files;
     PVFS_BMI_addr_t              *data_server_addrs;
     PVFS_handle_extent_array     *io_handle_extent_array;
@@ -131,7 +133,7 @@ struct PINT_client_create_sm {
 struct PINT_client_mkdir_sm {
     char                         *object_name;    /* input parameter  */
     PVFS_sysresp_mkdir           *mkdir_resp;     /* in/out parameter */
-    PVFS_sys_attr                *sys_attr;       /* input parameter  */
+    PVFS_sys_attr                sys_attr;        /* input parameter  */
     PVFS_handle                  metafile_handle;
     int                          stored_error_code;
     int                          retry_count;
@@ -143,7 +145,7 @@ struct PINT_client_symlink_sm {
     char                         *link_name;      /* input parameter */
     char                         *link_target;    /* input parameter */
     PVFS_sysresp_symlink         *sym_resp;       /* in/out parameter*/
-    PVFS_sys_attr                *sys_attr;       /* input parameter */
+    PVFS_sys_attr                sys_attr;        /* input parameter */
     PVFS_handle                  symlink_handle;
     int                          stored_error_code;
     int                          retry_count;
@@ -162,9 +164,10 @@ struct PINT_client_getattr_sm {
 };
 
 /* PINT_client_setattr_sm */
-struct PINT_client_setattr_sm {
-    PVFS_object_ref refn;           /* input parameter */
-    PVFS_sys_attr         *sys_attr;      /* input parameter */
+struct PINT_client_setattr_sm
+{
+    PVFS_object_ref refn;          /* input parameter */
+    PVFS_sys_attr   sys_attr;      /* input parameter */
 };
 
 /* PINT_client_io_sm

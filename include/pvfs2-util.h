@@ -36,6 +36,11 @@ PVFS_credentials *PVFS_util_dup_credentials(
 void PVFS_util_release_credentials(
     PVFS_credentials *credentials);
 
+int PVFS_util_copy_sys_attr(
+    PVFS_sys_attr *dest, PVFS_sys_attr *src);
+
+void PVFS_util_release_sys_attr(PVFS_sys_attr *attr);
+
 /* client side config file / option management */
 const PVFS_util_tab* PVFS_util_parse_pvfstab(
     const char* tabfile);
@@ -78,7 +83,8 @@ void PVFS_util_make_size_human_readable(
     int max_out_len);
 
 /* generic attribute conversion */
-static inline int PVFS_util_object_to_sys_attr_mask(int obj_mask)
+static inline int PVFS_util_object_to_sys_attr_mask(
+    int obj_mask)
 {
     int sys_mask = 0;
 

@@ -81,6 +81,7 @@ int create_dir(PVFS_object_ref parent_refn, char *name,
     PVFS_credentials credentials;
     PVFS_sysresp_mkdir resp_mkdir;
 
+    memset(&attr, 0, sizeof(PVFS_sys_attr));
     memset(&resp_mkdir, 0, sizeof(resp_mkdir));
 
     PVFS_util_gen_credentials(&credentials);

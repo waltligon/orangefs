@@ -265,7 +265,7 @@ int PVFS_isys_create(
     sm_p->u.create.object_name = object_name;
     sm_p->parent_ref = parent_ref;
     sm_p->u.create.create_resp = resp;
-    sm_p->u.create.sys_attr = &attr;
+    PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
 
@@ -685,25 +685,19 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
-
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;
 
-    /*
-    if (sm_p->u.create.dist == NULL)
-    {
-        sm_p->u.create.dist = PVFS_Dist_create("simple_stripe");
-        assert(sm_p->u.create.dist);
-    }
-    */
-    
+    gossip_err("SETATTR WILL SET UID=%d, GID=%d\n",
+               sm_p->cred_p->uid, sm_p->cred_p->gid);
+
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->u.create.metafile_handle,
         PVFS_TYPE_METAFILE,
-        *sm_p->u.create.sys_attr,
+        sm_p->u.create.sys_attr,
         (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_META_ALL));
 
     /* fill in meta file specific attributes */
@@ -729,9 +723,10 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
         js_p->error_code = ret;
     }
 
-    if (sm_p->msgarray != &(sm_p->msgpair))
+    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
     {
-	free(sm_p->msgarray);
+        free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
     return 1;
 }
@@ -923,6 +918,8 @@ static int create_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
 {
     PVFS_object_ref metafile_ref;
+
+    PVFS_util_release_sys_attr(&sm_p->u.create.sys_attr);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
 

@@ -17,28 +17,32 @@ enum
     STATE_SYMLINK = 8
 };
 
-static int setattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
+static int setattr_cleanup(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int setattr_setobj_attribs(
+    PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_write_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_write_metafile_distribution_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_write_symlink_target_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
-static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p);
+static int setattr_verify_attribs(
+    PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-machine pvfs2_set_attr_sm(prelude,
-			  cleanup,
-			  verify_attribs,
-			  write_metafile_datafile_handles_if_required,
-			  write_metafile_distribution_if_required,
-                          write_symlink_target_if_required,
-			  setobj_attrib,
-			  final_response)
+machine pvfs2_set_attr_sm(
+    prelude,
+    cleanup,
+    verify_attribs,
+    write_metafile_datafile_handles_if_required,
+    write_metafile_distribution_if_required,
+    write_symlink_target_if_required,
+    setobj_attrib,
+    final_response)
 {
     state prelude
     {
@@ -124,9 +128,9 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     /*
       here we're enforcing that no one can change the type of the
-      handle/object already stored once it's been set to
-      a non-zero value.  (zero is not a valid object type meaning
-      that it hasn't been assigned yet)
+      handle/object already stored once it's been set to a non-zero
+      value.  (zero is not a valid object type meaning that it hasn't
+      been assigned yet)
     */
     if (a_p->objtype &&
 	(a_p->objtype != s_op->req->u.setattr.attr.objtype))

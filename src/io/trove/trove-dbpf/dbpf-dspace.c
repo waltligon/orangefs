@@ -752,7 +752,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
             Lu(handle), ds_attr_p->dfile_count, ds_attr_p->dist_size,
             ds_attr_p->b_size);
 
-       UPDATE_PERF_METADATA_READ();
+        UPDATE_PERF_METADATA_READ();
         return 1;
     }
 

@@ -131,7 +131,7 @@ int PVFS_isys_setattr(
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
     sm_p->u.setattr.refn = ref;
-    sm_p->u.setattr.sys_attr = &attr;
+    PVFS_util_copy_sys_attr(&sm_p->u.setattr.sys_attr, &attr);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing setattr on handle %Lu "
                  "on fs %d\n", Lu(ref.handle),
@@ -232,7 +232,7 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.setattr.refn.fs_id,
         sm_p->u.setattr.refn.handle,
         attr->objtype,
-        *sm_p->u.setattr.sys_attr,
+        sm_p->u.setattr.sys_attr,
         PVFS_ATTR_COMMON_TYPE);
 
     if (attr->objtype == PVFS_TYPE_METAFILE)
@@ -290,6 +290,8 @@ static int setattr_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: cleanup\n");
+
+    PVFS_util_release_sys_attr(&sm_p->u.setattr.sys_attr);
 
     sm_p->error_code = js_p->error_code;
 

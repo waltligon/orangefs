@@ -86,6 +86,49 @@ void PVFS_util_release_credentials(
     }
 }
 
+int PVFS_util_copy_sys_attr(
+    PVFS_sys_attr *dest, PVFS_sys_attr *src)
+{
+    int ret = -PVFS_EINVAL;
+
+    if (src && dest)
+    {
+        dest->owner = src->owner;
+        dest->group = src->group;
+        dest->perms = src->perms;
+        dest->atime = src->atime;
+        dest->mtime = src->mtime;
+        dest->ctime = src->ctime;
+        dest->dfile_count = src->dfile_count;
+        dest->objtype = src->objtype;
+        dest->mask = src->mask;
+
+        if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
+            (src->objtype == PVFS_TYPE_SYMLINK) && src->link_target)
+        {
+            dest->link_target = strdup(src->link_target);
+            if (!dest->link_target)
+            {
+                ret = -PVFS_ENOMEM;
+            }
+        }
+    }
+    return ret;
+}
+
+void PVFS_util_release_sys_attr(PVFS_sys_attr *attr)
+{
+    if (attr)
+    {
+        if ((attr->mask & PVFS_ATTR_COMMON_TYPE) &&
+            (attr->objtype == PVFS_TYPE_SYMLINK) && attr->link_target)
+        {
+            free(attr->link_target);
+            attr->link_target = NULL;
+        }
+    }
+}
+
 /* PVFS_util_parse_pvfstab()
  *
  * parses either the file pointed to by the PVFS2TAB_FILE env

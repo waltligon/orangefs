@@ -227,7 +227,7 @@ int PVFS_isys_symlink(
     sm_p->u.sym.link_target = target;
     sm_p->parent_ref = parent_ref;
     sm_p->u.sym.sym_resp = resp;
-    sm_p->u.sym.sys_attr = &attr;
+    PVFS_util_copy_sys_attr(&sm_p->u.sym.sys_attr, &attr);
     sm_p->u.sym.stored_error_code = 0;
     sm_p->u.sym.retry_count = 0;
 
@@ -519,7 +519,7 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->parent_ref.fs_id,
         sm_p->u.sym.symlink_handle,
         PVFS_TYPE_SYMLINK,
-        *sm_p->u.sym.sys_attr,
+        sm_p->u.sym.sys_attr,
         (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_SYMLNK_ALL));
 
     /* fill in symlink specific attributes */
@@ -612,6 +612,8 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
     PVFS_object_ref symlink_ref;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: cleanup\n");
+
+    PVFS_util_release_sys_attr(&sm_p->u.sym.sys_attr);
 
     sm_p->error_code = (sm_p->u.sym.stored_error_code ?
                         sm_p->u.sym.stored_error_code :
