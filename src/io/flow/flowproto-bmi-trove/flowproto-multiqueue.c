@@ -870,14 +870,16 @@ static int bmi_send_callback_fn(void *user_ptr,
 
     flow_data->parent->total_transfered += actual_size;
 
-    if(q_item->buffer)
-    {
-	flow_data->dest_pending--;
-    }
-    else
-    {
+    if(initial_call_flag)
 	flow_data->initial_posts--;
-    }
+    else
+	flow_data->dest_pending--;
+
+#if 0
+    gossip_err("initial_posts: %d, dest_pending: %d, dest_last_posted: %d\n", 
+	flow_data->initial_posts, flow_data->dest_pending,
+	flow_data->dest_last_posted);
+#endif
 
     /* if this was the last operation, then mark the flow as done */
     if(flow_data->initial_posts == 0 &&
