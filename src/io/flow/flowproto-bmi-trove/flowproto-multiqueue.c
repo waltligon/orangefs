@@ -387,9 +387,9 @@ static void bmi_recv_callback_fn(void *user_ptr,
     void* tmp_buffer;
     void* tmp_user_ptr;
 
-    q_item->posted_id = 0;
-
     gen_mutex_lock(&flow_data->flow_mutex);
+
+    q_item->posted_id = 0;
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
@@ -556,11 +556,11 @@ static void trove_read_callback_fn(void *user_ptr,
     int done = 0;
     struct qlist_head* tmp_link;
 
-    result_tmp->posted_id = 0;
-
     q_item = result_tmp->q_item;
 
     gen_mutex_lock(&flow_data->flow_mutex);
+
+    result_tmp->posted_id = 0;
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
@@ -665,9 +665,9 @@ static int bmi_send_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
     void* tmp_user_ptr = NULL;
 
-    q_item->posted_id = 0;
-
     gen_mutex_lock(&flow_data->flow_mutex);
+
+    q_item->posted_id = 0;
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
@@ -860,9 +860,9 @@ static void trove_write_callback_fn(void *user_ptr,
     void* tmp_buffer;
     PVFS_size bytes_processed = 0;
 
-    result_tmp->posted_id = 0;
-
     gen_mutex_lock(&flow_data->flow_mutex);
+
+    result_tmp->posted_id = 0;
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
@@ -1114,10 +1114,10 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     char *src_ptr, *dest_ptr;
     enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
 
-    q_item->posted_id = 0;
-
     gen_mutex_lock(&flow_data->flow_mutex);
     
+    q_item->posted_id = 0;
+
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
 	handle_io_error(error_code, q_item, flow_data);
@@ -1286,10 +1286,10 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     char *src_ptr, *dest_ptr;
     PVFS_size region_size;
 
-    q_item->posted_id = 0;
-
     gen_mutex_lock(&flow_data->flow_mutex);
       
+    q_item->posted_id = 0;
+
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
 	handle_io_error(error_code, q_item, flow_data);
