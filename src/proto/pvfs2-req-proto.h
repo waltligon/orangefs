@@ -97,23 +97,28 @@ struct PVFS_servreq_setattr
  * returned in generic server response structure
  */
 
-/* Lookup_Path */
+/* lookup path ************************************************/
+/* - looks up as many elements of the specified path as possible */
+
 struct PVFS_servreq_lookup_path
 {
-    char* path;		/* full path to be traversed */
-    PVFS_fs_id fs_id;		/* filesystem ID */
-    PVFS_handle starting_handle;	/* handle of starting directory for path */
-    uint32_t attrmask;	/* mask to restrict the attributes to be 
-				   fetched */
+    char* path;			    /* path name */
+    PVFS_fs_id fs_id;		    /* file system */
+    PVFS_handle starting_handle;    /* handle of path parent */
+    /* mask of attribs to return with lookup results */
+    uint32_t attrmask;
 };
 
 struct PVFS_servresp_lookup_path
 {
-    PVFS_handle *handle_array;	/* ordered array of handles(1 for each 
-				   element in path successfully traversed */
-    PVFS_object_attr *attr_array;	/* array of object attributes */
-    uint32_t count;		/*      count of number of handles returned */
+    /* array of handles for each successfully resolved path segment */
+    PVFS_handle *handle_array;	    
+    /* array of attributes for each path segment (when available) */
+    PVFS_object_attr *attr_array;
+    uint32_t handle_count;	    /* # of handles returned */
+    uint32_t attr_count;	    /* # of attributes returned */
 };
+
 
 /* Mkdir */
 struct PVFS_servreq_mkdir

@@ -152,8 +152,8 @@ void display_pvfs_structure(void *s,int r)
 				break;
 			case PVFS_SERV_LOOKUP_PATH:
 				printf("Lookup Path Resp Struct\n");
-				printf("Handle Array (Total: %d)\n",p->u.lookup_path.count);
-					while(i++<p->u.lookup_path.count)
+				printf("Handle Array (Total: %d)\n",p->u.lookup_path.handle_count);
+					while(i++<p->u.lookup_path.handle_count)
 					{
 						printf("%d\t%Ld\n",i,p->u.lookup_path.handle_array[i-1]);
 						printf("Attribs:\n");

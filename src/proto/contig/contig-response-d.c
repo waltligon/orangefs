@@ -45,7 +45,7 @@ DECODE_RESP_HEAD(do_decode_resp)
 			((struct PVFS_server_resp *)target_msg->buffer)->u.lookup_path.attr_array = 
 						(PVFS_object_attr *) ((char*)target_msg->buffer 
 						+ sizeof(struct PVFS_server_resp) + 
-						sizeof(PVFS_handle)*response->u.lookup_path.count);
+						sizeof(PVFS_handle)*response->u.lookup_path.handle_count);
 			return 0;
 
 		case PVFS_SERV_READDIR:

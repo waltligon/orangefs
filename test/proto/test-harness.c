@@ -252,7 +252,8 @@ int main(int argc, char **argv)
 	response->u.lookup_path.handle_array[0] = 5;
 	response->u.lookup_path.handle_array[1] = 6;
 	response->u.lookup_path.handle_array[2] = 7;
-	response->u.lookup_path.count = 3;
+	response->u.lookup_path.handle_count = 3;
+	response->u.lookup_path.attr_count = 3;
 
 
 #ifdef USE_BMI_MSGS

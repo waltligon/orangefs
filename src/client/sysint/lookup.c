@@ -197,7 +197,7 @@ int PVFS_sys_lookup(
 	    goto return_error;
 	}
 
-	if (ack_p->u.lookup_path.count < 1)
+	if (ack_p->u.lookup_path.handle_count < 1)
 	{
 	    /*
 	     * TODO: EINVAL is obviously the wrong errocode to return, are we
@@ -210,9 +210,9 @@ int PVFS_sys_lookup(
 	    goto return_error;
 	}
 
-	num_segments_remaining -= ack_p->u.lookup_path.count;
+	num_segments_remaining -= ack_p->u.lookup_path.handle_count;
 
-	for(i = 0; i < ack_p->u.lookup_path.count; i++)
+	for(i = 0; i < ack_p->u.lookup_path.handle_count; i++)
 	{
 	    entry.handle = ack_p->u.lookup_path.handle_array[i];
 	    entry.fs_id = fs_id;
@@ -243,8 +243,8 @@ int PVFS_sys_lookup(
 	    pinode_ptr->pinode_ref.handle = entry.handle;
 	    pinode_ptr->pinode_ref.fs_id = entry.fs_id;
 
-	    if ((i+1 == ack_p->u.lookup_path.count) && 
-		((ack_p->rsize % sizeof(struct PVFS_server_resp)) == 0))
+	    /* TODO: this logic is kinda busted... -PHIL */
+	    if (i >= ack_p->u.lookup_path.attr_count)
 	    {
 		/* the attributes on the last item may not be valid,  so if
 		 * we're on the last path segment, and we didn't get an attr

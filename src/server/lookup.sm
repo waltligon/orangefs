@@ -444,12 +444,13 @@ static int lookup_send_response(PINT_server_op *s_op,
 
     /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status              = 0; /* ??? */
-    s_op->resp->u.lookup_path.count = s_op->u.lookup.seg_nr; /* # actually completed */
+    s_op->resp->u.lookup_path.handle_count = s_op->u.lookup.seg_nr; /* # actually completed */
+    /* TODO: this won't always be correct if we have multiple meta servers... */
+    s_op->resp->u.lookup_path.attr_count = s_op->u.lookup.seg_nr; /* # actually completed */
 
     gossip_debug(SERVER_DEBUG,
-		 "  sending response with %d segment(s) (size %Ld)\n",
-		 s_op->u.lookup.seg_nr,
-		 s_op->resp->rsize);
+		 "  sending response with %d segment(s)\n",
+		 s_op->u.lookup.seg_nr);
 
     encode_ret = PINT_encode(s_op->resp,
 			     PINT_ENCODE_RESP,

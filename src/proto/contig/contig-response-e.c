@@ -29,7 +29,6 @@ int do_encode_resp(
 	int header_size
 	)
 {
-    int total_path_count = 0;
 
     /* TODO: CHECK RETURN VALUES */
 
@@ -194,18 +193,8 @@ int do_encode_resp(
 
 	    /* this one doesn't have header_size tacked onto it (!?) */
 	    response->rsize = sizeof(struct PVFS_server_resp) +
-		response->u.lookup_path.count * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
-
-	    /* We need to lookout for the fact that we may not have the attributes for
-	       a single segment within the path. In this case we will only have a handle
-	       which most of this is dealt with in the state machine.  dw
-	     */
-	    if((response->rsize - sizeof(struct PVFS_server_resp) 
-			- response->u.lookup_path.count * (sizeof(PVFS_handle) +
-			    sizeof(PVFS_object_attr))) < 0)
-		total_path_count = response->u.lookup_path.count -1;
-	    else
-		total_path_count = response->u.lookup_path.count;
+		(response->u.lookup_path.handle_count * sizeof(PVFS_handle)) +
+		(response->u.lookup_path.attr_count * sizeof(PVFS_object_attr));
 
 	    target_msg->size_list   = malloc(3*sizeof(PVFS_size));
 	    target_msg->buffer_list = malloc(3*sizeof(void *));
@@ -216,8 +205,8 @@ int do_encode_resp(
 		target_msg->list_count = 1;
 
 	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
-	    target_msg->size_list[1] = response->u.lookup_path.count*sizeof(PVFS_handle);
-	    target_msg->size_list[2] = total_path_count*sizeof(PVFS_object_attr);
+	    target_msg->size_list[1] = response->u.lookup_path.handle_count*sizeof(PVFS_handle);
+	    target_msg->size_list[2] = response->u.lookup_path.attr_count*sizeof(PVFS_object_attr);
 	    target_msg->total_size = target_msg->size_list[0]
 		+ target_msg->size_list[1] + target_msg->size_list[2];
 
@@ -225,26 +214,6 @@ int do_encode_resp(
 	    target_msg->buffer_list[1] = response->u.lookup_path.handle_array;
 	    target_msg->buffer_list[2] = response->u.lookup_path.attr_array;
 
-
-#if 0
-	    target_msg->total_size = target_msg->size_list[0] = response->rsize;
-	    respbuf = target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest,
-		    target_msg->total_size + header_size,
-		    BMI_SEND);
-
-	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp));
-	    respbuf += sizeof(struct PVFS_server_resp);
-
-	    /* make two passes, first to copy handles, second for attribs */
-	    for (i=0; i < response->u.lookup_path.count; i++) {
-		memcpy(respbuf, &(response->u.lookup_path.handle_array[i]), sizeof(PVFS_handle));
-		respbuf += sizeof(PVFS_handle);
-	    }
-	    for (i=0; i < total_path_count; i++) {
-		memcpy(respbuf, &(response->u.lookup_path.attr_array[i]), sizeof(PVFS_object_attr));
-		respbuf += sizeof(PVFS_object_attr);
-	    }
-#endif
 	    return(0);
 
 	case PVFS_SERV_READDIR:
