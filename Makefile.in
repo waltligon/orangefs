@@ -15,6 +15,8 @@
 # tags       generates tags file for use by editors
 # codecheck  checks source code for nonconformance to our std.
 # mpitests   builds test programs that use mpi
+# kmod       builds kernel module
+# kmod_install installs kernel module in default system module location
 # 
 # NOTE: you can also specify any single object or executable to
 #    build by providing its name (including the relative path) as the
