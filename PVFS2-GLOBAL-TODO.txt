@@ -6,6 +6,23 @@
 PUT A POINTER AT THE TOP OF THIS FILE TO THE HIGH LEVEL STATUS
 DOCUMENT IN THE doc SUBDIR
 
+improving robustness of I/O apis:
+====================================================================
+- our internal api's should be able to handle the following cases:
+  a) operations posted before initialize() should return error
+  b) operations posted after finalize() has started should return error
+  c) finalize() should gracefully terminate pending operations, although 
+     those operations will have undefined results
+- these API's in particular need update in that regard:
+  - dbpf-attr-cache DONE
+  - trove
+  - bmi
+  - flow
+  - job
+  - request scheduler
+  - device interface
+  - ?
+
 server operations:
 ====================================================================
 - not started:
