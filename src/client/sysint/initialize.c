@@ -63,6 +63,14 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	GET_CONFIG_INIT_FAIL
     } init_fail = NONE_INIT_FAIL; /* used for cleanup in the event of failures */
 
+    /* make sure we were given sane arguments */
+    if ((mntent_list.ptab_p == NULL) || (resp == NULL))
+    {
+	ret = -EINVAL;
+	init_fail = NONE_INIT_FAIL;
+	goto return_error;
+    }
+
     /* Initialize BMI */
     /*TODO: change this so it parses the bmi module from the pvfstab file*/
     ret = BMI_initialize("bmi_tcp",NULL,0);

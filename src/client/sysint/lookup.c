@@ -100,6 +100,14 @@ int PVFS_sys_lookup(
 	GET_NEXT_PATHSEG_FAILURE,
     } failure = NONE_FAILURE;
 
+    /* make sure lookup was given sane arguments */
+    if(name == NULL)
+    {
+	ret = -EINVAL;
+	failure = NONE_FAILURE;
+	goto return_error;
+    }
+
     /*print args to make sure we're sane*/
     gossip_ldebug(CLIENT_DEBUG,"req->\n\tname: %s\n\tfs_id: %d\n\tcredentials:\n\t\tuid: %d\n\t\tgid: %d\n\t\tperms: %d\n",name,fs_id, credentials.uid, credentials.gid, credentials.perms);
 

@@ -100,6 +100,11 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	return(-EINVAL);
     }
 
+    if (io_req == NULL)
+    {
+	return(-EINVAL);
+    }
+
     /* find a pinode for the target file */
     attr_mask = PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_ALL;
     ret = phelper_get_pinode(pinode_refn, &pinode_ptr,

@@ -66,6 +66,12 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	    PCACHE_INSERT2_FAILURE,
 	} failure = NONE_FAILURE;
 
+	/* make sure we recieved sane arguments */
+	if (resp==NULL)
+	{
+	    return -EINVAL;
+	}
+
 	gossip_ldebug(CLIENT_DEBUG,"creating file named %s\n", entry_name);
 	gossip_ldebug(CLIENT_DEBUG,"parent handle = %lld\n", parent_refn.handle);
 	gossip_ldebug(CLIENT_DEBUG,"parent fsid = %d\n", parent_refn.fs_id);
