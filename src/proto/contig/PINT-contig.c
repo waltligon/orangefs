@@ -40,7 +40,7 @@ int do_encode_calc_max_size(
 void init_contig(
     void);
 
-PINT_encoding_functions contig_buffer_functions = {
+static PINT_encoding_functions contig_buffer_functions = {
     do_encode_req,
     do_encode_resp,
     do_decode_req,
