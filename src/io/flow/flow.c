@@ -44,8 +44,6 @@ static flow_ref_p flow_mapping = NULL;
 static int do_one_work_cycle(int *num_completed,
 			     int max_idle_time_ms);
 static void flow_release(flow_descriptor * flow_d);
-static int map_endpoints_to_flowproto(int src_endpoint_id,
-				      int dest_endpoint_id);
 static void default_scheduler(void);
 static int split_string_list(char ***tokens,
 			     const char *comma_list);
@@ -296,7 +294,7 @@ void PINT_flow_reset(flow_descriptor * flow_d)
     flow_d->flowproto_id = -1;
     flow_d->aggregate_size = -1;
     flow_d->state = FLOW_INITIAL;
-    flow_d->type = FLOWPROTO_ANY;
+    flow_d->type = FLOWPROTO_DEFAULT;
     INIT_QLIST_HEAD(&(flow_d->sched_queue_link));
 
     return;
@@ -411,27 +409,17 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
      * control of the flow until this function completes successfully.
      */
 
-    /* figure out who should handle this flow */
-    if(flow_d->type == FLOWPROTO_ANY)
+    /* search for match to specified flow protocol type */
+    for(i=0; i<active_flowproto_count; i++)
     {
-	/* just find the first proto that understands these endpoints */
-	flowproto_id = map_endpoints_to_flowproto(flow_d->src.endpoint_id,
-	     				      flow_d->dest.endpoint_id);
-    }
-    else
-    {
-	/* user requested a specific type of proto; search for match */
-	for(i=0; i<active_flowproto_count; i++)
+	ret =
+	    active_flowproto_table[i]->flowproto_getinfo(NULL,
+	    FLOWPROTO_TYPE_QUERY,
+	    &type);
+	if(ret >= 0)
 	{
-	    ret =
-		active_flowproto_table[i]->flowproto_getinfo(NULL,
-		FLOWPROTO_TYPE_QUERY,
-		&type);
-	    if(ret >= 0)
-	    {
-		flowproto_id = i;
-		break;
-	    }
+	    flowproto_id = i;
+	    break;
 	}
     }
 
@@ -981,50 +969,6 @@ static void flow_release(flow_descriptor * flow_d)
 	PINT_Free_request_state(flow_d->mem_req_state);
 
     return;
-}
-
-/* map_endpoints_to_flowproto()
- *
- * finds the flow protocol capable of handling a particular pair of
- * endpoints
- *
- * returns flowprotocol id on success, -errno on failure
- */
-static int map_endpoints_to_flowproto(int src_endpoint_id,
-				      int dest_endpoint_id)
-{
-    struct flow_ref_entry *query_entry = NULL;
-    int i = 0;
-    int ret = -1;
-    struct flowproto_type_support type_query;
-
-    /* check cache first */
-    query_entry = flow_ref_search(flow_mapping, src_endpoint_id,
-				  dest_endpoint_id);
-    if (query_entry)
-    {
-	return (query_entry->flowproto_id);
-    }
-
-    type_query.src_endpoint_id = src_endpoint_id;
-    type_query.dest_endpoint_id = dest_endpoint_id;
-
-    /* not in cache; query each active method */
-    for (i = 0; i < active_flowproto_count; i++)
-    {
-	ret = active_flowproto_table[i]->flowproto_getinfo(NULL,
-							   FLOWPROTO_SUPPORT_QUERY,
-							   &type_query);
-	if (ret >= 0)
-	{
-	    /* found a match; add it to the cache and return */
-	    flow_ref_add(flow_mapping, src_endpoint_id, dest_endpoint_id, ret);
-	    return (ret);
-	}
-    }
-
-    /* didn't find it */
-    return (-ENOPROTOOPT);
 }
 
 /* default_scheduler()

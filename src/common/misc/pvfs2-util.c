@@ -176,7 +176,7 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
 	    }
 	    else
 	    {
-		pvfstab_p->ptab_array[i].flowproto = FLOWPROTO_ANY;
+		pvfstab_p->ptab_array[i].flowproto = FLOWPROTO_DEFAULT;
 	    }
 	    i++;
 	}
@@ -450,9 +450,7 @@ static int parse_flowproto_string(const char* input, enum PVFS_flowproto_type*
 	comma[0] = '\0';
     }
 
-    if(!strcmp(flow, "any"))
-	*flowproto = FLOWPROTO_ANY;
-    else if(!strcmp(flow, "bmi_trove"))
+    if(!strcmp(flow, "bmi_trove"))
 	*flowproto = FLOWPROTO_BMI_TROVE;
     else if(!strcmp(flow, "dump_offsets"))
 	*flowproto = FLOWPROTO_DUMP_OFFSETS;

@@ -25,11 +25,11 @@ typedef int32_t PVFS_msg_tag_t;
 typedef int32_t PVFS_context_id;
 enum PVFS_flowproto_type
 {
-    FLOWPROTO_ANY = 1,
-    FLOWPROTO_BMI_TROVE = 2,
-    FLOWPROTO_DUMP_OFFSETS = 3,
-    FLOWPROTO_BMI_CACHE = 4
+    FLOWPROTO_BMI_TROVE = 1,
+    FLOWPROTO_DUMP_OFFSETS = 2,
+    FLOWPROTO_BMI_CACHE = 3
 };
+#define FLOWPROTO_DEFAULT FLOWPROTO_BMI_TROVE
 
 /* basic types used by storage subsystem */
 typedef uint64_t PVFS_handle;

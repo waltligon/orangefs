@@ -70,8 +70,7 @@ typedef struct flow_endpoint flow_endpoint;
 /* supported getinfo types */
 enum
 {
-    FLOWPROTO_SUPPORT_QUERY = 1,
-    FLOWPROTO_TYPE_QUERY = 2
+    FLOWPROTO_TYPE_QUERY = 1
 };
 
 /* context id type */

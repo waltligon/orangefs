@@ -163,8 +163,6 @@ int flowproto_dump_offsets_getinfo(flow_descriptor * flow_d,
 
     switch (option)
     {
-    case FLOWPROTO_SUPPORT_QUERY:
-	return (check_support(parameter));
     case FLOWPROTO_TYPE_QUERY:
 	type = parameter;
 	if(*type == FLOWPROTO_DUMP_OFFSETS)
@@ -299,49 +297,6 @@ int flowproto_dump_offsets_service(flow_descriptor * flow_d)
 /*******************************************************
  * definitions for internal utility functions
  */
-
-
-/* check_support()
- *
- * handles queries about which endpoint types we support
- *
- * returns 0 on success, -errno on failure
- */
-static int check_support(struct flowproto_type_support *type)
-{
-
-    /* bmi to memory */
-    if (type->src_endpoint_id == BMI_ENDPOINT &&
-	type->dest_endpoint_id == MEM_ENDPOINT)
-    {
-	return (0);
-    }
-
-    /* memory to bmi */
-    if (type->src_endpoint_id == MEM_ENDPOINT &&
-	type->dest_endpoint_id == BMI_ENDPOINT)
-    {
-	return (0);
-    }
-
-    /* bmi to storage */
-    if (type->src_endpoint_id == BMI_ENDPOINT &&
-	type->dest_endpoint_id == TROVE_ENDPOINT)
-    {
-	return (0);
-    }
-
-    /* storage to bmi */
-    if (type->src_endpoint_id == TROVE_ENDPOINT &&
-	type->dest_endpoint_id == BMI_ENDPOINT)
-    {
-	return (0);
-    }
-
-    /* we don't know about anything else */
-    return (-ENOPROTOOPT);
-}
-
 
 /* service_mem_to_bmi() 
  *

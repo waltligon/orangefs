@@ -252,7 +252,6 @@ static void buffer_teardown_trove_to_bmi(flow_descriptor * flow_d);
 static void buffer_teardown_bmi_to_trove(flow_descriptor * flow_d);
 static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d);
 static int buffer_setup_bmi_to_mem(flow_descriptor * flow_d);
-static int check_support(struct flowproto_type_support *type);
 static int alloc_flow_data(flow_descriptor * flow_d);
 static void service_mem_to_bmi(flow_descriptor * flow_d);
 static void service_trove_to_bmi(flow_descriptor * flow_d);
@@ -417,8 +416,6 @@ int flowproto_bmi_trove_getinfo(flow_descriptor * flow_d,
 
     switch (option)
     {
-    case FLOWPROTO_SUPPORT_QUERY:
-	return (check_support(parameter));
     case FLOWPROTO_TYPE_QUERY:
 	type = parameter;
 	if(*type == FLOWPROTO_BMI_TROVE)
@@ -1293,49 +1290,6 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
     return (0);
 }
 #endif
-
-
-/* check_support()
- *
- * handles queries about which endpoint types we support
- *
- * returns 0 on success, -errno on failure
- */
-static int check_support(struct flowproto_type_support *type)
-{
-    /* bmi to memory */
-    if (type->src_endpoint_id == BMI_ENDPOINT &&
-	type->dest_endpoint_id == MEM_ENDPOINT)
-    {
-	return (0);
-    }
-
-    /* memory to bmi */
-    if (type->src_endpoint_id == MEM_ENDPOINT &&
-	type->dest_endpoint_id == BMI_ENDPOINT)
-    {
-	return (0);
-    }
-
-#ifdef __PVFS2_TROVE_SUPPORT__
-    /* bmi to storage */
-    if (type->src_endpoint_id == BMI_ENDPOINT &&
-	type->dest_endpoint_id == TROVE_ENDPOINT)
-    {
-	return (0);
-    }
-
-    /* storage to bmi */
-    if (type->src_endpoint_id == TROVE_ENDPOINT &&
-	type->dest_endpoint_id == BMI_ENDPOINT)
-    {
-	return (0);
-    }
-#endif
-
-    /* we don't know about anything else */
-    return (-ENOPROTOOPT);
-}
 
 
 /* alloc_flow_data()

@@ -92,7 +92,7 @@ int PVFS_sys_io_old(PVFS_pinode_reference pinode_refn, PVFS_Request file_req,
     int total_errors = 0;
     PVFS_msg_tag_t* op_tag_array = NULL;
     /* TODO: might want hooks to set this from app. level later */
-    enum PVFS_flowproto_type flow_type = FLOWPROTO_ANY;
+    enum PVFS_flowproto_type flow_type = FLOWPROTO_DEFAULT;
 
     if((type != PVFS_IO_READ) && (type != PVFS_IO_WRITE))
     {
