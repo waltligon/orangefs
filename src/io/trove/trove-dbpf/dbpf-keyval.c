@@ -388,7 +388,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	return 1;
     }
 
-    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 1, &db_p);
+    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
     switch (ret) {
 	case DBPF_KEYVAL_DBCACHE_ERROR:
 	    goto return_error;

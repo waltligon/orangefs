@@ -144,7 +144,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	if (i == DBCACHE_ENTRIES) assert(0);
     }
 
-    /* have lock on an entry */
+    /* have lock on an entry, open/create */
 
     snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.keyval", TROVE_DIR, coll_id, KEYVAL_DIRNAME, handle);
 #if 0
@@ -157,7 +157,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	    assert(0);
     }
 
-    db_p = keyval_db_cache[i].db_p;
+    db_p = keyval_db_cache[i].db_p; /* for simplicity */
     db_p->set_errfile(db_p, stderr);
     db_p->set_errpfx(db_p, "xxx");
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
@@ -165,33 +165,37 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	    db_p->err(db_p, ret, "%s: set_flags", filename);
 	    assert(0);
     }
-    ret = keyval_db_cache[i].db_p->open(keyval_db_cache[i].db_p,
-					filename,
-					NULL,
-					DB_UNKNOWN,
-					0,
-					0);
+    ret = db_p->open(db_p,
+		     filename,
+		     NULL,
+		     DB_UNKNOWN,
+		     0,
+		     0);
     if (ret == ENOENT && create_flag != 0) {
 	/* if no such DB and create_flag is set, try to create the DB */
-	ret = keyval_db_cache[i].db_p->open(keyval_db_cache[i].db_p,
-					    filename,
-					    NULL,
-					    DB_BTREE,
-					    DB_CREATE|DB_EXCL,
-					    0644);
+	ret = db_p->open(db_p,
+			 filename,
+			 NULL,
+			 DB_BTREE,
+			 DB_CREATE|DB_EXCL,
+			 0644);
 	if (ret != 0) assert(0);
     }
     else if (ret != 0) {
 	    perror("dpbf_keyval_dbcache_get");
-	    assert(0);
+	    goto return_error;
     }
 
     keyval_db_cache[i].ref_ct  = 1;
     keyval_db_cache[i].coll_id = coll_id;
     keyval_db_cache[i].handle  = handle;
-    *db_pp = keyval_db_cache[i].db_p;
+    *db_pp = db_p;
     gen_mutex_unlock(&keyval_db_cache[i].mutex);
     return DBPF_KEYVAL_DBCACHE_SUCCESS;
+
+return_error:
+    gen_mutex_unlock(&keyval_db_cache[i].mutex);
+    return DBPF_KEYVAL_DBCACHE_ERROR;
 }
 
 /* dbpf_keyval_dbcache_put()
