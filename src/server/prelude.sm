@@ -182,13 +182,8 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
      * set attributes on a file that did not have attributes
      * previously.
      */
-    if ((js_p->error_code == -TROVE_ENOENT) && 
-	(s_op->req->op == PVFS_SERV_SETATTR ||
-	 s_op->req->op == PVFS_SERV_IO ||
-         s_op->req->op == PVFS_SERV_GETATTR ||
-	 s_op->req->op == PVFS_SERV_REMOVE ||
-	 s_op->req->op == PVFS_SERV_FLUSH ||
-	 s_op->req->op == PVFS_SERV_TRUNCATE))
+    if(PINT_server_req_table[s_op->req->op].attrib_flags ==
+	PINT_SERVER_ATTRIBS_NOT_REQUIRED)
     {
 	js_p->error_code = 0;
     }

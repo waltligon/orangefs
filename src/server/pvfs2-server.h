@@ -57,11 +57,26 @@ enum PINT_server_req_permissions
                                       needs ownership */
 };
 
+/* indicates if the attributes for the target object must exist for the 
+ * operation to proceed (see prelude.sm)
+ */
+enum PINT_server_req_attrib_flags
+{
+    PINT_SERVER_ATTRIBS_INVALID = 0,
+    PINT_SERVER_ATTRIBS_REQUIRED = 1,
+    /* operations that operate on datafiles or on incomplete metafiles do
+     * not expect to necessarily find attributes present before starting the
+     * operation
+     */
+    PINT_SERVER_ATTRIBS_NOT_REQUIRED = 2
+};
+
 struct PINT_server_req_params
 {
     enum PVFS_server_op op_type;
     char* string_name;
     enum PINT_server_req_permissions perm;
+    enum PINT_server_req_attrib_flags attrib_flags;
     struct PINT_state_machine_s* sm;
 };
 
