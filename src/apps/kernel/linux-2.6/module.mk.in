@@ -7,9 +7,7 @@ KERNAPPSRC += \
 
 # get kernel interface defines, and sysint client.h
 MODCFLAGS_$(DIR)/pvfs2-client-core.c = \
-  -I$(srcdir)/src/kernel/linux-2.6 \
-  -I$(srcdir)/test/client/sysint
+  -I$(srcdir)/src/kernel/linux-2.6 
 
 MODCFLAGS_$(DIR)/pvfs2-threaded-client-core.c = \
-  -I$(srcdir)/src/kernel/linux-2.6 \
-  -I$(srcdir)/test/client/sysint
+  -I$(srcdir)/src/kernel/linux-2.6 

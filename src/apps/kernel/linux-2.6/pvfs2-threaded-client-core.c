@@ -14,13 +14,11 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include "pvfs2.h"
 #include "gossip.h"
 #include "pint-dev.h"
 #include "job.h"
 #include "acache.h"
-
-#include "client.h"
-
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-util.h"
