@@ -86,7 +86,7 @@ machine pvfs2_client_flush_sm(check_parameters,
     state object_getattr_xfer_msgpair {
 	jump pvfs2_client_getattr_acache_sm;
 	success => datafile_setup_msgpairarray;
-	default =>object_getattr_failure;
+	default => object_getattr_failure;
     }
 
     state object_getattr_failure {
