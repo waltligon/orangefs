@@ -8,15 +8,17 @@
 #define __PINT_BUCKET_H
 
 #include <errno.h>
+#include <string.h>
 
-#include <pvfs2-types.h>
-#include <bmi.h>
-#include <gossip.h>
+#include "pvfs2-types.h"
+#include "bmi.h"
+#include "gossip.h"
 
 static char HACK_server_name[] = "tcp://localhost:3334";
 static PVFS_handle HACK_handle_mask = 0;
 static PVFS_fs_id HACK_fsid = 0;
 static PVFS_handle HACK_bucket = 0;
+static PVFS_handle HACK_root_fs_handle = 0;
 
 /* TODO: NOTE: THIS IS NOT A FULL IMPLEMENTATION.  It is simply a stub that
  * can operate on a single server file system for testing purposes.
@@ -308,6 +310,21 @@ int PINT_bucket_get_server_name(
 
 	strcpy(server_name, HACK_server_name);
 
+	return(0);
+}
+
+/* PINT_bucket_get_root_handle()
+ *
+ * return the root handle of any filesystem
+ *
+ * returns 0 on success -errno on failure
+ *
+ */
+int PINT_bucket_get_root_handle(
+	PVFS_fs_id fsid,
+	PVFS_handle *fh_root)
+{
+	*fh_root = HACK_root_fs_handle;
 	return(0);
 }
 

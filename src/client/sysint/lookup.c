@@ -15,7 +15,7 @@
 #include "pint-sysint.h"
 #include "pint-dcache.h"
 #include "pint-servreq.h"
-#include "config-manage.h"
+#include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
 
 #define REQ_ENC_FORMAT 0
@@ -81,7 +81,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     get_no_of_segments(req->name,&num_seg);
 
     /* Get root handle using bucket table interface */
-    ret = config_fsi_get_root_handle(req->fs_id,&parent_handle);
+    ret = PINT_bucket_get_root_handle(req->fs_id,&parent_handle);
     if (ret < 0)
     {
 	assert(0);

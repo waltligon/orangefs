@@ -65,4 +65,8 @@ int PINT_bucket_get_server_name(
 	PVFS_handle bucket,
 	PVFS_fs_id fsid);
 
+int PINT_bucket_get_root_handle(
+        PVFS_fs_id fsid,
+        PVFS_handle *fh_root);
+
 #endif
