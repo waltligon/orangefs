@@ -84,6 +84,16 @@ int main(int argc, char **argv)
     /* dump all gathered config values */
     fprintf(stderr,"server id: %s\n",serverconfig.host_id);
     fprintf(stderr,"storage space: %s\n",serverconfig.storage_path);
+
+    fprintf(stderr,"fs config file name: %s\n",
+            serverconfig.fs_config_filename);
+    fprintf(stderr,"fs config file length: %d\n",
+            (int)serverconfig.fs_config_buflen);
+    fprintf(stderr,"server config file name: %s\n",
+            serverconfig.server_config_filename);
+    fprintf(stderr,"fs config file length: %d\n",
+            (int)serverconfig.server_config_buflen);
+
     fprintf(stderr,"unexp req: %d\n",
             serverconfig.initial_unexpected_requests);
 
