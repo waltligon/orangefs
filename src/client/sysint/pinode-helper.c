@@ -107,17 +107,19 @@ int phelper_refresh_pinode(uint32_t mask,pinode **pinode_ptr,
 		pinode_reference pref, PVFS_credentials credentials)
 {
 	int ret = 0;
-	PVFS_sysreq_getattr req;
+	pinode_reference pinode_refn;
+	uint32_t attrmask;
+	PVFS_credentials credentials;
 	PVFS_sysresp_getattr resp;
 
 	/* build request */
 
-	req.pinode_refn.handle = pref.handle;
-	req.pinode_refn.fs_id = pref.fs_id;
-	req.attrmask = mask;
-	req.credentials = credentials;
+	pinode_refn.handle = pref.handle;
+	pinode_refn.fs_id = pref.fs_id;
+	attrmask = mask;
+	credentials = credentials;
 	
-	ret = PVFS_sys_getattr(&req, &resp);
+	ret = PVFS_sys_getattr(pinode_refn, attrmask, credentials, &resp);
 	if (ret < 0)
 	{
 		return(ret);

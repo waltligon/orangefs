@@ -24,17 +24,19 @@ void print_at_depth(char *name, int depth)
 */
 int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
 {
-    PVFS_sysreq_getattr getattr_request;
+    pinode_reference pinode_refn;
+    uint32_t attrmask;
+    PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
 
-    memset(&getattr_request,0,sizeof(PVFS_sysreq_getattr));
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
+    memset(&credentials,0,sizeof(PVFS_credentials));
 
-    getattr_request.pinode_refn.handle = handle;
-    getattr_request.pinode_refn.fs_id = fs_id;
-    getattr_request.attrmask = ATTR_BASIC;
+    pinode_refn.handle = handle;
+    pinode_refn.fs_id = fs_id;
+    attrmask = ATTR_BASIC;
 
-    if (PVFS_sys_getattr(&getattr_request,&getattr_response))
+    if (PVFS_sys_getattr(pinode_refn, attrmask, credentials, &getattr_response))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
                 "(fs_id is %d)\n",handle,fs_id);

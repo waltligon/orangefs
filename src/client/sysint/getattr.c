@@ -26,7 +26,8 @@
  * 
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
+int PVFS_sys_getattr(pinode_reference pinode_refn, uint32_t attrmask, 
+		    PVFS_credentials credentials, PVFS_sysresp_getattr *resp)
 {
     struct PVFS_server_req_s req_p;	 	/* server request */
     struct PVFS_server_resp_s *ack_p = NULL; /* server response */
@@ -36,9 +37,9 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
     struct timeval cur_time;
     PVFS_size *size_array = 0;
     pinode *entry_pinode = NULL;
-    uint32_t attr_mask = req->attrmask;
     pinode_reference entry;
     struct PINT_decoded_msg decoded;
+    uint32_t attr_mask;
     int max_msg_sz = 0;
     int pinode_exists_in_cache = 0;
     void* encoded_resp;
@@ -62,12 +63,12 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	 * attributes - is this the way we want this to be done?
 	 */
 
-	if (req->attrmask & ATTR_SIZE)
+	if (attrmask & ATTR_SIZE)
 		attr_mask |= ATTR_META;
 
 	/* Fill in pinode reference */ 
-	entry.handle = req->pinode_refn.handle;
-	entry.fs_id = req->pinode_refn.fs_id;
+	entry.handle = pinode_refn.handle;
+	entry.fs_id = pinode_refn.fs_id;
 
 	/* do we have a valid copy? 
 	 * if any of the attributes are stale, or absent then we need to 
@@ -77,7 +78,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	if (ret  == PCACHE_LOOKUP_SUCCESS)
         {
 		resp->attr = entry_pinode->attr;
-		if ((req->attrmask & ATTR_SIZE) == ATTR_SIZE)
+		if ((attrmask & ATTR_SIZE) == ATTR_SIZE)
 		{
 			/* if we want the size, and its valid, then return now */
 			if (entry_pinode->size_flag == SIZE_VALID)
@@ -126,11 +127,11 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
         }
 
 	req_p.op = PVFS_SERV_GETATTR;
-        req_p.credentials = req->credentials;
+        req_p.credentials = credentials;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
 	req_p.u.getattr.handle = entry.handle;
 	req_p.u.getattr.fs_id = entry.fs_id;
-	req_p.u.getattr.attrmask = req->attrmask;
+	req_p.u.getattr.attrmask = attrmask;
 
 	/* TODO: use some sane value for this, I dunno what to put --Phil */
 	gossip_lerr("KLUDGE: guessing at max size of getattr response.\n");
@@ -198,7 +199,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 
 	/* do size calculations here? */
 
-	if ((req->attrmask & ATTR_SIZE) == ATTR_SIZE)
+	if ((attrmask & ATTR_SIZE) == ATTR_SIZE)
 	{
 	    /*only do this if you want the size*/
 
@@ -222,7 +223,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	    data_files = resp->attr.u.meta.dfh;
 	    dist = resp->attr.u.meta.dist;
 	    req_p.op = PVFS_SERV_GETATTR;
-	    req_p.credentials = req->credentials;
+	    req_p.credentials = credentials;
 	    req_p.rsize = sizeof(struct PVFS_server_req_s);
 	    req_p.u.getattr.attrmask = ATTR_SIZE;
 	    req_p.u.getattr.fs_id = entry.fs_id;

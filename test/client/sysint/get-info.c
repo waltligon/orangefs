@@ -23,8 +23,9 @@ int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
 	PVFS_sysresp_lookup resp_look;
-	PVFS_sysreq_getattr *req_gattr = NULL;
 	PVFS_sysresp_getattr *resp_gattr = NULL;
+	pinode_reference pinode_refn;
+        uint32_t attrmask;
 	PVFS_fs_id fs_id;
 	char* name;
 	PVFS_credentials credentials;
@@ -80,12 +81,6 @@ int main(int argc,char **argv)
 	}
 
 	printf("GETATTR HERE===>\n");
-	req_gattr = (PVFS_sysreq_getattr *)malloc(sizeof(PVFS_sysreq_getattr));
-	if (req_gattr == NULL)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
 	resp_gattr = (PVFS_sysresp_getattr *)malloc(sizeof(PVFS_sysresp_getattr));
 	if (resp_gattr == NULL)
 	{
@@ -94,12 +89,12 @@ int main(int argc,char **argv)
 	}
 	
 	// Fill in the handle 
-	req_gattr->pinode_refn.handle = resp_look.pinode_refn.handle;
-	req_gattr->pinode_refn.fs_id = resp_init.fsid_list[0];
-	req_gattr->attrmask = ATTR_META | ATTR_SIZE;
+	pinode_refn.handle = resp_look.pinode_refn.handle;
+	pinode_refn.fs_id = fs_id;
+	attrmask = ATTR_META | ATTR_SIZE;
 
 	// Use it 
-	ret = PVFS_sys_getattr(req_gattr,resp_gattr);
+	ret = PVFS_sys_getattr(pinode_refn, attrmask, credentials, resp_gattr);
 	if (ret < 0)
 	{
 		printf("getattr failed with errcode = %d\n", ret);
@@ -107,9 +102,9 @@ int main(int argc,char **argv)
 	}
 	// print the handle 
 	printf("--getattr--\n"); 
-	printf("Handle:%ld\n",(long int)req_gattr->pinode_refn.handle);
-	printf("FSID:%ld\n",(long int)req_gattr->pinode_refn.fs_id);
-	printf("mask:%d\n",req_gattr->attrmask);
+	printf("Handle:%ld\n",(long int)pinode_refn.handle);
+	printf("FSID:%ld\n",(long int)pinode_refn.fs_id);
+	printf("mask:%d\n",attrmask);
 	printf("uid:%d\n",resp_gattr->attr.owner);
 	printf("gid:%d\n",resp_gattr->attr.group);
 	printf("permissions:%d\n",resp_gattr->attr.perms);
@@ -152,7 +147,6 @@ int main(int argc,char **argv)
 		return (-1);
 	}
 
-	free(req_gattr);
 	free(resp_gattr);
 
 	free(filename);
