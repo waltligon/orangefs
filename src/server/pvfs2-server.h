@@ -159,7 +159,9 @@ typedef struct PINT_server_op
 struct server_configuration_s *get_server_config_struct(void);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
-#define PINT_OP_STATE PINT_server_op
+#define PINT_OP_STATE       PINT_server_op
+#define PINT_OP_STATE_TABLE PINT_server_op_table
+
 #include <state-machine.h>
 
 /*

@@ -10,7 +10,6 @@
 #include "pvfs2-server.h"
 #include "state-machine-fns.h"
 
-
 extern PINT_state_machine get_config;
 extern PINT_state_machine get_attr;
 extern PINT_state_machine set_attr;

@@ -19,6 +19,9 @@
  * includes state-machine.h, because state-machine.h needs a key #define
  * before it can be included.
  *
+ * The structure holding the table of PINT_OP_STATE structures also needs to
+ * be declared; its name should be #defined as PINT_OP_STATE_TABLE.
+ *
  * A good example of this is the pvfs2-server.h in the src/server directory,
  * which includes state-machine.h at the bottom, and server-state-machine.c,
  * which includes first pvfs2-server.h and then state-machine-fns.h.
@@ -26,6 +29,9 @@
 
 #ifndef __STATE_MACHINE_H
 #error "state-machine.h must be included before state-machine-fns.h is included."
+#endif
+#ifndef PINT_OP_STATE_TABLE
+#error "PINT_OP_STATE_TABLE must be defined before state-machine-fns.h is included."
 #endif
 
 /* Prototypes for functions defined in here */
@@ -35,7 +41,7 @@ static PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *);
 static inline PINT_state_array_values *PINT_pop_state(PINT_OP_STATE *s);
 static inline void PINT_push_state(PINT_OP_STATE *s, PINT_state_array_values *p);
 
-extern PINT_state_machine *PINT_server_op_table[];
+extern PINT_state_machine *PINT_OP_STATE_TABLE[];
 
 /* Function: PINT_state_machine_halt(void)
    Params: None
@@ -133,9 +139,9 @@ static PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *s_op)
 	gossip_err("State machine requested not valid\n");
 	return NULL;
     }
-    if(PINT_server_op_table[s_op->op] != NULL)
+    if(PINT_OP_STATE_TABLE[s_op->op] != NULL)
     {
-	return PINT_server_op_table[s_op->op]->state_machine + 1;
+	return PINT_OP_STATE_TABLE[s_op->op]->state_machine + 1;
     }
     gossip_err("State machine not found for operation %d\n",s_op->op);
     return NULL;
