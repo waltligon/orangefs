@@ -29,45 +29,45 @@
 
 int BMI_sockio_new_sock(void);
 int BMI_sockio_bind_sock(int,
-	      int);
+			 int);
 int BMI_sockio_connect_sock(int,
-		 const char *,
-		 int);
+			    const char *,
+			    int);
 int BMI_sockio_init_sock(struct sockaddr *,
-	      const char *,
-	      int);
+			 const char *,
+			 int);
 int BMI_sockio_brecv(int s,
-	  void *buf,
-	  int len);
+		     void *buf,
+		     int len);
 int BMI_sockio_nbrecv(int s,
-	   void *buf,
-	   int len);
+		      void *buf,
+		      int len);
 int BMI_sockio_bsend(int s,
-	  void *buf,
-	  int len);
+		     void *buf,
+		     int len);
 int BMI_sockio_nbsend(int s,
-	   void *buf,
-	   int len);
+		      void *buf,
+		      int len);
 int BMI_sockio_nbvector(int s,
-	    struct iovec* vector,
-	    int count,
-	    int recv_flag);
+			struct iovec* vector,
+			int count,
+			int recv_flag);
 int BMI_sockio_get_sockopt(int s,
-		int optname);
+			   int optname);
 int BMI_sockio_set_tcpopt(int s,
-	       int optname,
-	       int val);
+			  int optname,
+			  int val);
 int BMI_sockio_set_sockopt(int s,
-		int optname,
-		int size);
+			   int optname,
+			   int size);
 int BMI_sockio_nbpeek(int s,
-	   void* buf,
-	   int len);
+		      void* buf,
+		      int len);
 #ifdef __USE_SENDFILE__
 int BMI_sockio_nbsendfile(int s,
-	       int f,
-	       int off,
-	       int len);
+			  int f,
+			  int off,
+			  int len);
 #endif
 
 #define GET_RECVBUFSIZE(s) BMI_sockio_get_sockopt(s, SO_RCVBUF)
@@ -97,8 +97,8 @@ int BMI_sockio_nbsendfile(int s,
 
 #define SET_NONBLOCK_AND_SIGIO(x_fd) \
 do { \
-	fcntl((x_fd), F_SETOWN, getpid()); \
-	fcntl((x_fd), F_SETFL, FASYNC | O_NONBLOCK | fcntl((x_fd), F_GETFL, 0)); \
+    fcntl((x_fd), F_SETOWN, getpid()); \
+    fcntl((x_fd), F_SETFL, FASYNC | O_NONBLOCK | fcntl((x_fd), F_GETFL, 0)); \
 } while (0)
 
 #define CLR_NONBLOCK(x_fd) fcntl((x_fd), F_SETFL, fcntl((x_fd), F_GETFL, 0) & \
@@ -115,3 +115,4 @@ do { \
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
+

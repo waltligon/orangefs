@@ -13,9 +13,9 @@
 #include "pvfs2-attr.h"
 
 /* final-response state machine:
- * This is a nested state machine that performs two primary tasks:
- * - releases the operation from the request scheduler
- * - sends a response to the client
+ * This is used as a nested state machine to perform two primary tasks:
+ * - release the operation from the request scheduler
+ * - send a response to the client
  */
 
 /* PRECONDITIONS:
@@ -35,8 +35,6 @@
 static int final_response_release(PINT_server_op *s_op, job_status_s *js_p);
 static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p);
 static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p);
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
@@ -74,8 +72,8 @@ static int final_response_release(PINT_server_op *s_op, job_status_s *js_p)
     job_id_t tmp_id;
 
     gossip_debug(SERVER_DEBUG, 
-	"(%p) %s (final_response sm) state: release\n", s_op,
-	PINT_map_server_op_to_string(s_op->req->op));
+		 "(%p) %s (final_response sm) state: release\n", s_op,
+		 PINT_map_server_op_to_string(s_op->req->op));
 
     /* this seems a little odd, but since this is the first state of the
      * nested machine, now is the time to grab the error code if we
@@ -87,20 +85,20 @@ static int final_response_release(PINT_server_op *s_op, job_status_s *js_p)
     s_op->resp.status = -PVFS_ERROR_CODE(-js_p->error_code);
 
     /* catch cases in which the operation has not been scheduled */
-    if(!s_op->scheduled_id)
+    if (!s_op->scheduled_id)
     {
 	js_p->error_code = 0;
-	return(1);
+	return 1;
     }
 
     ret = job_req_sched_release(s_op->scheduled_id,
-	s_op,
-	0,
-	js_p,
-	&tmp_id,
-	server_job_context);
+				s_op,
+				0,
+				js_p,
+				&tmp_id,
+				server_job_context);
 
-    return(ret);
+    return ret;
 }
 
 /* final_response_send_resp()
@@ -113,47 +111,47 @@ static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p)
     job_id_t tmp_id;
     
     gossip_debug(SERVER_DEBUG, 
-	"(%p) %s (final_response sm) state: send_resp\n", s_op,
-	PINT_map_server_op_to_string(s_op->req->op));
+		 "(%p) %s (final_response sm) state: send_resp\n",
+		 s_op,
+		 PINT_map_server_op_to_string(s_op->req->op));
 
-    if(js_p->error_code != 0)
+    if (js_p->error_code != 0)
     {
 	gossip_lerr("Error: req_sched_release() failure; continuing...\n");
     }
 
     /* encode message */
     ret = PINT_encode(&s_op->resp,
-	PINT_ENCODE_RESP,
-	&(s_op->encoded),
-	s_op->addr,
-	s_op->decoded.enc_type);
-    if(ret < 0)
+		      PINT_ENCODE_RESP,
+		      &(s_op->encoded),
+		      s_op->addr,
+		      s_op->decoded.enc_type);
+    if (ret < 0)
     {
 	gossip_lerr("Error: PINT_encode() failure.\n");
 	/* TODO: probably should dump contents of response to give 
 	 * some clues as to what went wrong
 	 */
 	js_p->error_code = ret;
-	return(1);
+	return 1;
     }
 
     /* send the response */
-    ret = job_bmi_send_list(
-	s_op->addr,
-	s_op->encoded.buffer_list,
-	s_op->encoded.size_list,
-	s_op->encoded.list_count,
-	s_op->encoded.total_size,
-	s_op->tag,
-	s_op->encoded.buffer_type,
-	0,
-	s_op,
-	0,
-	js_p,
-	&tmp_id,
-	server_job_context);
+    ret = job_bmi_send_list(s_op->addr,
+			    s_op->encoded.buffer_list,
+			    s_op->encoded.size_list,
+			    s_op->encoded.list_count,
+			    s_op->encoded.total_size,
+			    s_op->tag,
+			    s_op->encoded.buffer_type,
+			    0,
+			    s_op,
+			    0,
+			    js_p,
+			    &tmp_id,
+			    server_job_context);
 
-    return(ret);
+    return ret;
 }
 
 
@@ -165,13 +163,14 @@ static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p)
 static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     gossip_debug(SERVER_DEBUG, 
-	"(%p) %s (final_response sm) state: cleanup\n", s_op,
-	PINT_map_server_op_to_string(s_op->req->op));
+		 "(%p) %s (final_response sm) state: cleanup\n",
+		 s_op,
+		 PINT_map_server_op_to_string(s_op->req->op));
 
     PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 
     js_p->error_code = 0;
-    return(1);
+    return 1;
 }
 
 /*
@@ -183,4 +182,3 @@ static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
  *
  * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
  */
-

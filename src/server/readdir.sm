@@ -35,50 +35,50 @@ machine pvfs2_readdir_sm(prelude,
 			 final_response,
 			 cleanup)
 {
-	state prelude
-	{
-		jump pvfs2_prelude_sm;
-		success => verify_directory_metadata;
-		default => final_response;
-	}
+    state prelude
+    {
+	jump pvfs2_prelude_sm;
+	success => verify_directory_metadata;
+	default => final_response;
+    }
 
-	state verify_directory_metadata
-	{
-		run readdir_verify_directory_metadata;
-		success => read_dirdata_handle;
-		default => setup_resp;
-	}
+    state verify_directory_metadata
+    {
+	run readdir_verify_directory_metadata;
+	success => read_dirdata_handle;
+	default => setup_resp;
+    }
 
-	state read_dirdata_handle
-	{
-		run readdir_read_dirdata_handle;
-		success => iterate_on_entries;
-		default => setup_resp;
-	}
+    state read_dirdata_handle
+    {
+	run readdir_read_dirdata_handle;
+	success => iterate_on_entries;
+	default => setup_resp;
+    }
 
-	state iterate_on_entries
-	{
-		run readdir_iterate_on_entries;
-		default => setup_resp;
-	}
+    state iterate_on_entries
+    {
+	run readdir_iterate_on_entries;
+	default => setup_resp;
+    }
 
-	state setup_resp
-	{
-		run readdir_setup_resp;
-		default => final_response;
-	}
+    state setup_resp
+    {
+	run readdir_setup_resp;
+	default => final_response;
+    }
 
-	state final_response 
-	{
-		jump pvfs2_final_response_sm;
-		default => cleanup;
-	}
+    state final_response 
+    {
+	jump pvfs2_final_response_sm;
+	default => cleanup;
+    }
 
-	state cleanup
-	{
-		run readdir_cleanup;
-		default => prelude;
-	}
+    state cleanup
+    {
+	run readdir_cleanup;
+	default => prelude;
+    }
 }
 
 %%
@@ -155,16 +155,16 @@ static int readdir_read_dirdata_handle(PINT_server_op *s_op,
 		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(s_op->req->u.readdir.fs_id,
-					 s_op->req->u.readdir.handle,
-					 &s_op->key,
-					 &s_op->val,
-					 0,
-					 NULL,
-					 s_op,
-					 0,
-					 js_p,
-					 &i,
-					 server_job_context);
+				s_op->req->u.readdir.handle,
+				&s_op->key,
+				&s_op->val,
+				0,
+				NULL,
+				s_op,
+				0,
+				js_p,
+				&i,
+				server_job_context);
     return ret;
 }
 
@@ -241,18 +241,18 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
 		 s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,
-					    s_op->u.readdir.dirent_handle,
-					    s_op->req->u.readdir.token,
-					    s_op->key_a,
-					    s_op->val_a,
-					    s_op->req->u.readdir.dirent_count,
-					    0,
-					    NULL,
-					    s_op,
-					    0,
-					    js_p, 
-					    &j_id,
-					    server_job_context);
+				   s_op->u.readdir.dirent_handle,
+				   s_op->req->u.readdir.token,
+				   s_op->key_a,
+				   s_op->val_a,
+				   s_op->req->u.readdir.dirent_count,
+				   0,
+				   NULL,
+				   s_op,
+				   0,
+				   js_p, 
+				   &j_id,
+				   server_job_context);
     return ret;
 }
 
