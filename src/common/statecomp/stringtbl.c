@@ -6,6 +6,8 @@
 
 #include <stdio.h>
 
+void *emalloc(unsigned int size);
+
 char *enter_string(char *oldstring)
 {
 	char *newstring;

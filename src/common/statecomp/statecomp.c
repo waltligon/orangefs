@@ -23,6 +23,8 @@ static void initialize(void);
 static void parse_args(int argc, char **argv);
 static void finalize(void);
 void gen_init(void);
+void yywrap(void);
+void yyerror(char *s);
 
 /*
  * Global Variables
@@ -42,6 +44,7 @@ int main(int argc, char **argv)
 	gen_init();
 	yyparse();
 	finalize();
+	return 0;
 }
 
 static void initialize()
@@ -102,7 +105,7 @@ static void parse_args(int argc, char **argv)
 	}
 }
 
-static void finalize()
+static void finalize(void)
 {
 	fclose(out_file);
 	if (list_flag)
@@ -111,12 +114,12 @@ static void finalize()
 	}
 }
 
-void yyerror(s)
+void yyerror(char *s)
 {
 	fprintf(stderr,"syntax error line %d: %s\n", line, s);
 }
 
-void yywrap()
+void yywrap(void)
 {
 }
 

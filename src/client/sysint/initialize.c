@@ -11,11 +11,12 @@
 #include <malloc.h>
 #include <errno.h>
 
-#include <pcache.h>
-#include <pint-dcache.h>
-#include <config-manage.h>
-#include <pvfs2-sysint.h>
-//#include <pint-sysint.h>
+#include "pcache.h"
+#include "pint-dcache.h"
+#include "config-manage.h"
+#include "pvfs2-sysint.h"
+#include "pint-sysint.h"
+#include "gen-locks.h"
 
 /* pinode cache */
 extern pcache pvfs_pcache; 
@@ -23,7 +24,7 @@ extern pcache pvfs_pcache;
 extern struct dcache pvfs_dcache;
 extern fsconfig_array server_config;
 
-extern g_session_tag_mt_lock;
+extern gen_mutex_t *g_session_tag_mt_lock;
 
 /* PVFS_sys_initialize()
  *
@@ -47,7 +48,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
 	}
 
 	/* initialize bmi session identifier */
-	g_session_tag_mt_lock = gen_mutex_build( );
+	g_session_tag_mt_lock = gen_mutex_build();
 
 	/* Initialize flow */
 	/* Leaving out for now until flows are implemented */

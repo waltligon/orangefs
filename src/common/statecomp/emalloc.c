@@ -5,13 +5,14 @@
  */
 
 #include <stdio.h>
+#include <malloc.h>
 
-void *malloc();
+void *emalloc(unsigned int size);
 
 /*
  *	emalloc --- error checking malloc routine
  */
-void * emalloc(unsigned int size)
+void *emalloc(unsigned int size)
 {
 	void *p;
 

@@ -3,7 +3,7 @@
 #include <pvfs-request.h>
 #include <pint-request.h>
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 	struct PINT_Request *r;
 	struct PINT_Request *r_packed;

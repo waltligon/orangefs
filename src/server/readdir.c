@@ -3,13 +3,12 @@
  *
  * See COPYING in top-level directory.
  */
-
-
-#include <state-machine.h>
-#include <server-config.h>
-#include <pvfs2-server.h>
 #include <string.h>
-#include <pvfs2-attr.h>
+
+#include "state-machine.h"
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
 
 STATE_FXN_HEAD(readdir_init);
 STATE_FXN_HEAD(readdir_cleanup);
@@ -104,13 +103,13 @@ STATE_FXN_HEAD(readdir_init)
 
 #if 0
 	job_post_ret = job_trove_dspace_readdir(s_op->req->u.readdir.fs_id,
-														s_op->req->u.readdir.bucket,
-														s_op->req->u.readdir.handle_mask,
-														s_op->req->u.readdir.object_type,
-														NULL,
-														s_op,
-													 	ret,
-													 	&i);
+						s_op->req->u.readdir.bucket,
+						s_op->req->u.readdir.handle_mask,
+						s_op->req->u.readdir.object_type,
+						NULL,
+						s_op,
+						ret,
+						&i);
 #endif
 	
 	STATE_FXN_RET(job_post_ret);
@@ -232,3 +231,12 @@ STATE_FXN_HEAD(readdir_cleanup)
 	STATE_FXN_RET(0);
 	
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

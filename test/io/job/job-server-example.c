@@ -38,11 +38,14 @@ int main(int argc, char **argv)
 	struct unexpected_info req_info;
 	job_id_t job_id;
 	int outcount;
+#if 0
+	/* used in undef'd flow code below */
 	struct flow_endpoint* src;
 	struct flow_endpoint* dest;
 	struct flow_io_desc* io_desc = NULL;
 	job_id_t job_id1 = 0;
 	int index = 5;
+#endif
 
 	/* set debugging level */
 	gossip_enable_stderr();

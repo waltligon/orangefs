@@ -32,10 +32,6 @@ static int dbpf_filesystem_create(
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
 {
-    int ret;
-    DB *db_p;
-    DBT key, data;
-
     /* USE THE COLLECTION ROUTINES INSTEAD */
 
     return -1;

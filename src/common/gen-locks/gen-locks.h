@@ -78,8 +78,8 @@ int gen_posix_mutex_init(pthread_mutex_t* mut);
         static inline int gen_mutex_lock(gen_mutex_t *mutex_p) { return 0; }
         static inline int gen_mutex_unlock(gen_mutex_t *mutex_p) { return 0; }
         static inline int gen_mutex_trylock(gen_mutex_t *mutex_p) { return 0; }
+        static inline gen_mutex_t *gen_mutex_build(void) { return (int*) malloc(sizeof(int)); }
 	#define gen_mutex_init(m) do{}while(0)
-	#define gen_mutex_build() (int*)malloc(sizeof(int))
 	#define gen_mutex_destroy(m) free(m)
 #endif /* __GEN_NULL_LOCKING__ */
 

@@ -9,8 +9,11 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include "symbol.h"
 extern int line;
+
+void *emalloc(unsigned int size);
 
 /*
  *	MAXHASH --- determines the hash table width.
@@ -20,12 +23,6 @@ extern int line;
 #define MAXHASH	311
 
 static sym_ent_p symtab[MAXHASH];
-
-/*
- *	external routine declarations
- */
-
-int strcmp();
 
 /*
  *	hash --- scramble a name (hopefully) uniformly to fit in a table
@@ -49,7 +46,6 @@ sym_ent_p symenter(char *name)
 	register sym_ent_p p;
 	unsigned int h;
 
-	char *strcpy();
 	/* create an entry and insert it at the front of the table */
 	h = hash(name);
 	p = (sym_ent_p)emalloc(sizeof(sym_ent));
@@ -78,7 +74,7 @@ sym_ent_p symlook(char *name)
 	return(p);
 }
 
-void init_symbol_table()
+void init_symbol_table(void)
 {
-	bzero(symtab, MAXHASH * sizeof(sym_ent_p));
+	memset(symtab, 0, MAXHASH * sizeof(sym_ent_p));
 }

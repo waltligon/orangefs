@@ -3,12 +3,12 @@
  *
  * See COPYING in top-level directory.
  */
-
-
-#include <state-machine.h>
-#include <server-config.h>
-#include <pvfs2-server.h>
+#include <stdio.h>
 #include <string.h>
+
+#include "state-machine.h"
+#include "server-config.h"
+#include "pvfs2-server.h"
 
 STATE_FXN_HEAD(getconfig_cleanup);
 STATE_FXN_HEAD(getconfig_job_bmi_send);

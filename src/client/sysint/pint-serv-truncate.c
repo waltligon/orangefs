@@ -8,11 +8,15 @@
 
 #include <pint-servreq.h>
 
-extern PVFS_msg_tag_t get_next_session_tag();
-
-static int truncatereq_alloc(void *pjob,void *preq,bmi_addr_t server,\
-		PVFS_credentials credentials,int *sz);
-static int truncateack_alloc(void *pjob,void *presp,bmi_addr_t server,int *sz);
+static int truncatereq_alloc(void *pjob,
+			     void *preq,
+			     bmi_addr_t server,
+			     PVFS_credentials credentials,
+			     int *sz);
+static int truncateack_alloc(void *pjob,
+			     void *presp,
+			     bmi_addr_t server,
+			     int *sz);
 
 /* pint_serv_truncate()
  *
