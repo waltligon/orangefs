@@ -40,10 +40,16 @@ all: $(LIBRARIES) tests
 include $(patsubst %, %/module.mk, $(MODULES))
 
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
-DEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 
 TESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(TESTSRC)))
 TESTS := $(patsubst %.c,%, $(filter %.c, $(TESTSRC)))
+TESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(TESTSRC)))
+
+# we don't really care if the dependencies are sorted; 
+# this is just a trick to remove dependencies if a source file
+# appears in multiple sets
+DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS))
 
 tests: $(TESTS)
 
@@ -67,7 +73,7 @@ clean:
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;
 
--include $(patsubst %.o,%.d, $(LIBOBJS))
+-include $(DEPENDS)
 
 %.d: %.c $(SRCFILES)
 	$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@
