@@ -41,6 +41,7 @@ int     opt_stripe    = -1;
 int     opt_correct   = 0;
 int     opt_sync      = 0;
 int     opt_single    = 0;
+int     opt_verbose   = 0;
 int     amode         = O_RDWR | O_CREAT;
 char    opt_file[256] = "/foo/test.out\0";
 char    opt_pvfs2tab[256] = "notset\0";
@@ -78,14 +79,21 @@ int main(int argc, char **argv)
 	MPI_File fh;
 	MPI_Status status;
 	int nchars=0;
+	int namelen;
+	char processor_name[MPI_MAX_PROCESSOR_NAME];
+	
 
 	/* startup MPI and determine the rank of this process */
 	MPI_Init(&argc,&argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 	MPI_Comm_rank(MPI_COMM_WORLD, &mynod);
-
+	MPI_Get_processor_name(processor_name,&namelen); 
+	
 	/* parse the command line arguments */
 	parse_args(argc, argv);
+
+	if (opt_verbose) fprintf(stdout,"Process %d of %d is on %s\n",
+						  mynod, nprocs, processor_name);
 
 	if (mynod == 0) printf("# Using mpi-io calls.\n");
 
@@ -326,7 +334,7 @@ int parse_args(int argc, char **argv)
 {
 	int c;
 	
-	while ((c = getopt(argc, argv, "s:b:i:f:p:cySh")) != EOF) {
+	while ((c = getopt(argc, argv, "s:b:i:f:p:cyShv")) != EOF) {
 		switch (c) {
 			case 's': /* stripe */
 				opt_stripe = atoi(optarg);
@@ -352,6 +360,9 @@ int parse_args(int argc, char **argv)
 				break;
 			case 'S': /* Single region */
 				opt_single = 1;
+				break;
+			case 'v': /* verbose */
+				opt_verbose = 1;
 				break;
 			case 'h':
 			case '?': /* unknown */
