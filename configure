@@ -2857,7 +2857,6 @@ src/server/module.mk
 src/server/request-scheduler/module.mk
 src/client/sysint/module.mk
 src/proto/contig/module.mk
-src/kernel/linux-2.6/module.mk
 src/kernel/linux-2.6/Makefile
 doc/module.mk
 doc/coding/module.mk
@@ -3019,7 +3018,6 @@ src/server/module.mk
 src/server/request-scheduler/module.mk
 src/client/sysint/module.mk
 src/proto/contig/module.mk
-src/kernel/linux-2.6/module.mk
 src/kernel/linux-2.6/Makefile
 doc/module.mk
 doc/coding/module.mk
