@@ -622,14 +622,16 @@ int PINT_req_sched_testworld(
 static int hash_handle(void* handle, int table_size)
 {
 	/* TODO: update this later with a better hash function,
-	 * depending on what handles look like 
+	 * depending on what handles look like, for now just modding
+	 *
 	 */
-	int tmp = 0;
+	unsigned long tmp = 0;
 	PVFS_handle* real_handle = handle;
 	
 	tmp += (*(real_handle));
+	tmp = tmp%table_size;
 
-	return (tmp%table_size);
+	return ((int)tmp);
 }
 
 /* hash_handle_compare()
