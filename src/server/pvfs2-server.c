@@ -17,6 +17,12 @@
 #include <assert.h>
 #include <getopt.h>
 
+#ifdef __PVFS2_SEGV_BACKTRACE__
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
+#endif
+
 #include "bmi.h"
 #include "gossip.h"
 #include "job.h"
@@ -102,6 +108,9 @@ static void server_state_table_initialize(void);
 static int server_state_machine_start(
     PINT_server_op *s_op, job_status_s *js_p);
 static int server_state_machine_start_noreq(enum PVFS_server_op op);
+#ifdef __PVFS2_SEGV_BACKTRACE__
+static void bt_sighandler(int sig, siginfo_t *info, void *secret);
+#endif
 
 /* main()
  */
@@ -733,6 +742,13 @@ static int server_initialize_subsystems(
 static int server_setup_signal_handlers(void)
 {
     struct sigaction new_action;
+#ifdef __PVFS2_SEGV_BACKTRACE__
+    struct sigaction segv_action;
+
+    segv_action.sa_sigaction = (void *)bt_sighandler;
+    sigemptyset (&segv_action.sa_mask);
+    segv_action.sa_flags = SA_RESTART | SA_SIGINFO;
+#endif
 
     /* Set up the structure to specify the new action. */
     new_action.sa_handler = server_sig_handler;
@@ -742,13 +758,58 @@ static int server_setup_signal_handlers(void)
     sigaction (SIGPIPE, &new_action, NULL);
     sigaction (SIGILL, &new_action, NULL);
     sigaction (SIGTERM, &new_action, NULL);
-    sigaction (SIGSEGV, &new_action, NULL);
     sigaction (SIGHUP, &new_action, NULL);
     sigaction (SIGUSR1, &new_action, NULL);
     sigaction (SIGUSR2, &new_action, NULL);
+#ifdef __PVFS2_SEGV_BACKTRACE__
+    sigaction (SIGSEGV, &segv_action, NULL);
+#else
+    sigaction (SIGSEGV, &new_action, NULL);
+#endif
 
     return 0;
 }
+
+#ifdef __PVFS2_SEGV_BACKTRACE__
+/* bt_signalhandler()
+ *
+ * prints a stack trace from a signal handler; code taken from a Linux
+ * Journal article
+ *
+ * no return value
+ */
+static void bt_sighandler(int sig, siginfo_t *info, void *secret)
+{
+    void *trace[16];
+    char **messages = (char **)NULL;
+    int i, trace_size = 0;
+    ucontext_t *uc = (ucontext_t *)secret;
+
+    /* Do something useful with siginfo_t */
+    if (sig == SIGSEGV)
+    {
+	gossip_err("PVFS2 server: signal %d, faulty address is %p, " 
+	    "from %p\n", sig, info->si_addr, 
+	    (void*)uc->uc_mcontext.gregs[REG_EIP]);
+    }
+    else
+    {
+	gossip_err("PVFS2 server: signal %d\n", sig);
+    }
+
+    trace_size = backtrace(trace, 16);
+    /* overwrite sigaction with caller's address */
+    trace[1] = (void *) uc->uc_mcontext.gregs[REG_EIP];
+
+    messages = backtrace_symbols(trace, trace_size);
+    /* skip first stack frame (points here) */
+    for (i=1; i<trace_size; ++i)
+	gossip_err("[bt] %s\n", messages[i]);
+
+    signal_recvd_flag = sig;
+    return;
+}
+#endif
 
 /* server_shutdown()
  *

@@ -154,6 +154,13 @@ AC_ARG_ENABLE(disk-io,
 fi]
 ,)
 
+dnl enables a hack to print back traces out of segfault signal handler
+AC_ARG_ENABLE(segv-backtrace,
+[  --enable-segv-backtrace Enables back traces in segfault signal handler],
+CFLAGS="$CFLAGS -D__PVFS2_SEGV_BACKTRACE__"
+,)
+
+
 AC_SUBST(QUIET_COMPILE)
 
 dnl Check for utilities that we need during the build process
