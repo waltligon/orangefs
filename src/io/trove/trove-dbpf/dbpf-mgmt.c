@@ -588,16 +588,6 @@ static int dbpf_collection_create(char *collname,
         return -1;
     }
 
-    for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
-    {
-        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
-        if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
-        {
-            gossip_err("mkdir failed on keyval bucket directory %s\n", dir);
-            return -1;
-        }
-    }
-
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     ret = mkdir(path_name, 0755);
     if (ret != 0)
@@ -654,14 +644,14 @@ static int dbpf_collection_remove(char *collname,
                               sto_p->name, db_data.coll_id);
     if (unlink(path_name) != 0)
     {
-        perror("failure removing dataspace attrib db");
+        gossip_err("failure removing dataspace attrib db");
     }
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, db_data.coll_id);
     if (unlink(path_name) != 0)
     {
-        perror("failure removing collection attrib db");
+        gossip_err("failure removing collection attrib db");
         goto collection_remove_failure;
     }
     
@@ -687,7 +677,7 @@ static int dbpf_collection_remove(char *collname,
                 assert(current_dirent->d_type == DT_REG);
                 if (unlink(tmp_path) != 0)
                 {
-                    perror("failure removing bstream entry");
+                    gossip_err("failure removing bstream entry");
                     closedir(current_dir);
                     goto collection_remove_failure;
                 }
@@ -698,43 +688,27 @@ static int dbpf_collection_remove(char *collname,
     }
     rmdir(path_name);
 
-    DBPF_GET_KEYVAL_DIRNAME(path_name, PATH_MAX, sto_p->name, db_data.coll_id);
-    for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
+    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
+                           sto_p->name, db_data.coll_id);
+    if (unlink(path_name) != 0)
     {
-        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
-
-        /* remove all keyval files in this bucket directory */
-        current_dir = opendir(dir);
-        if (current_dir)
-        {
-            while((current_dirent = readdir(current_dir)))
-            {
-                if ((strcmp(current_dirent->d_name, ".") == 0) ||
-                    (strcmp(current_dirent->d_name, "..") == 0))
-                {
-                    continue;
-                }
-                snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
-                         current_dirent->d_name);
-                assert(current_dirent->d_type == DT_REG);
-                if (unlink(tmp_path) != 0)
-                {
-                    perror("failure removing keyval entry");
-                    closedir(current_dir);
-                    goto collection_remove_failure;
-                }
-            }
-            closedir(current_dir);
-        }
-        rmdir(dir);
+        gossip_err("failure removing dbname file %s", path_name);
+        goto collection_remove_failure;
     }
-    rmdir(path_name);
+
+    DBPF_GET_KEYVAL_DIRNAME(path_name, PATH_MAX,
+                            sto_p->name, db_data.coll_id);
+    if (rmdir(path_name) != 0)
+    {
+        gossip_err("failure removing dirname directory %s", path_name);
+        goto collection_remove_failure;
+    }
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
                           sto_p->name, db_data.coll_id);
     if (rmdir(path_name) != 0)
     {
-        perror("failure removing collection directory");
+        gossip_err("failure removing collection directory");
         goto collection_remove_failure;
     }
 

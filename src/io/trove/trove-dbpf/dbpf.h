@@ -17,7 +17,7 @@ extern "C" {
 #include "gen-locks.h"
 
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
-#define TROVE_DBPF_VERSION_VALUE                                  "0.0.1"
+#define TROVE_DBPF_VERSION_VALUE                                  "0.0.2"
 #define LAST_HANDLE_STRING                                  "last_handle"
 #define ROOT_HANDLE_STRING                                  "root_handle"
 
@@ -39,15 +39,14 @@ extern "C" {
 #define TROVE_DB_CREATE_FLAGS  (DB_CREATE | DB_EXCL | TROVE_DB_OPEN_FLAGS)
 
 /*
-  for more efficient host filesystem accesses, we have
-  a simple *_MAX_NUM_BUCKETS define that can be thought of more
-  or less as buckets for storing bstreams and keyvals based
-  on a simple hash of the unique handle/coll_id combination.
+  for more efficient host filesystem accesses, we have a simple
+  *_MAX_NUM_BUCKETS define that can be thought of more or less as
+  buckets for storing bstreams based on a simple hash of the unique
+  handle/coll_id combination.
 
-  in practice, this means we spread all bstreams and keyvals
-  into *_MAX_NUM_BUCKETS directories instead of keeping all
-  bstream entries in a flat bstream directory, and all keyval
-  entries in a flat keyval directory on the host filesystem.
+  in practice, this means we spread all bstreams into
+  *_MAX_NUM_BUCKETS directories instead of keeping all bstream entries
+  in a flat bstream directory on the host filesystem.
 */
 #define DBPF_KEYVAL_MAX_NUM_BUCKETS   32
 #define DBPF_BSTREAM_MAX_NUM_BUCKETS  64
@@ -125,7 +124,13 @@ do {                                                                     \
 } while (0)
 
 /* arguments are: buf, path_max, stoname, collid, handle */
-#define DBPF_GET_KEYVAL_DBNAME(__b, __pm, __stoname, __cid, __handle)    \
+#define DBPF_GET_KEYVAL_DBNAME(__b, __pm, __stoname, __cid)              \
+do {                                                                     \
+  snprintf(__b, __pm, "/%s/%08x/%s/pvfs2-keyvals", __stoname,            \
+           __cid, KEYVAL_DIRNAME);                                       \
+} while (0)
+
+#define __DBPF_GET_KEYVAL_DBNAME(__b, __pm, __stoname, __cid, __handle)  \
 do {                                                                     \
   snprintf(__b, __pm, "/%s/%08x/%s/%.8Lu/%08Lx.keyval", __stoname,       \
            __cid, KEYVAL_DIRNAME,                                        \

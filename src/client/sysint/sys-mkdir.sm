@@ -357,7 +357,6 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_msg_comp_fn;
 
-    /* 'msgpairarray' can process 'msgpair' */
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;
 
