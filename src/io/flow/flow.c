@@ -1070,7 +1070,7 @@ static int split_string_list(char ***tokens,
     }
 
     /* allocate pointers for each */
-    *tokens = (char **) malloc(sizeof(char **));
+    *tokens = (char **) malloc(tokencount * sizeof(char **));
     if (!(*tokens))
     {
 	return 0;
