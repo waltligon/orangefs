@@ -22,6 +22,7 @@
 #include "PINT-reqproto-encode.h"
 
 extern job_context_id pint_client_sm_context;
+extern struct server_configuration_s g_server_config;
 
 /* state function prototypes */
 static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
@@ -48,7 +49,7 @@ machine pvfs2_client_mgmt_setparam_all_sm(cleanup,
     }
 
     state xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
+	jump pvfs2_client_msgpairarray_sm;
 	success => cleanup;
 	default => failure;
     }
@@ -93,6 +94,7 @@ int PVFS_mgmt_setparam_all(
     sm_p->cred_p = &credentials;
     sm_p->u.setparam_all.param = param;
     sm_p->u.setparam_all.value = value;
+    sm_p->u.setparam_all.fs_id = fs_id;
 
     gossip_debug(CLIENT_DEBUG,
 		 "PVFS_mgmt_setparam_all calling PINT_client_state_machine_post()\n");
@@ -123,11 +125,91 @@ int PVFS_mgmt_setparam_all(
 static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
+    int ret = -1;
+    int num_meta = 0;
+    int num_io = 0;
+    int total_bound = 0;
+    int num_phys_servers = 0;
+    bmi_addr_t *addr_array;
+    int i;
+    PINT_client_sm_msgpair_state *msg_p;
+
     gossip_debug(CLIENT_DEBUG, "setparam_all state: mgmt_setparam_all_setup_msgpair\n");
 
-    /* fill in request structure */
+    /* the first thing we have to do is find out how many physical servers
+     * are present
+     */
+    /* calculate an upper bound on the number of servers present */
+    ret = PINT_bucket_get_num_meta(sm_p->u.setparam_all.fs_id, &num_meta);
+    if(ret < 0)
+    {
+	gossip_lerr("PINT_bucket_get_num_meta() failure.\n");
+	js_p->error_code = ret;
+	return(1);
+    }
+    ret = PINT_bucket_get_num_io(sm_p->u.setparam_all.fs_id, &num_io);
+    if(ret < 0)
+    {
+	gossip_lerr("PINT_bucket_get_num_io() failure.\n");
+	js_p->error_code = ret;
+	return(1);
+    }
 
-    assert(0);
+    /* allocate space to store BMI addresses */
+    total_bound = num_io + num_meta;
+    addr_array = (bmi_addr_t*)malloc(total_bound*sizeof(bmi_addr_t));
+    if(!addr_array)
+    {
+	js_p->error_code = -PVFS_ENOMEM;
+	return(1);
+    }
+
+    /* map to actual server instances */
+    ret = PINT_bucket_get_physical_all(&g_server_config, 
+	sm_p->u.setparam_all.fs_id, total_bound, &num_phys_servers, 
+	addr_array);
+    if(ret < 0)
+    {
+	gossip_lerr("PINT_bucket_get_physical_all() failure.\n");
+	js_p->error_code = ret;
+	return(1);
+    }
+
+    gossip_debug(CLIENT_DEBUG,
+	"PVFS_mgmt_setparam_all found %d servers.\n", num_phys_servers);
+
+    /* allocate memory for msgpair array */
+    sm_p->msgarray_count = num_phys_servers;
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)
+	malloc(num_phys_servers*sizeof(PINT_client_sm_msgpair_state));
+    if(!sm_p->msgarray)
+    {
+	js_p->error_code = -PVFS_ENOMEM;
+	return(1);
+    }
+
+    /* setup msgpair array */
+    for(i=0; i<num_phys_servers; i++)
+    {
+	msg_p = &sm_p->msgarray[i];
+
+	PINT_SERVREQ_MGMT_SETPARAM_FILL(msg_p->req,
+	    *sm_p->cred_p,
+	    sm_p->u.setparam_all.fs_id,
+	    sm_p->u.setparam_all.param,
+	    sm_p->u.setparam_all.value);
+
+	msg_p->fs_id = sm_p->u.setparam_all.fs_id;
+	msg_p->handle = PVFS_HANDLE_NULL;
+	msg_p->comp_fn = NULL;
+	msg_p->svr_addr = addr_array[i];
+    }
+
+    free(addr_array);
+
+    /* immediate return: next state jumps to msgpairarray machine */
+    js_p->error_code = 0;
+    return(1);
 }
 
 static int mgmt_setparam_all_cleanup(PINT_client_sm *sm_p,

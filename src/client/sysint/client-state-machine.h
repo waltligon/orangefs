@@ -148,6 +148,7 @@ struct PINT_client_flush_sm {
 
 struct PINT_client_mgmt_setparam_all_sm 
 {
+    PVFS_fs_id fs_id;
     enum PVFS_server_param param;
     int64_t value;
 };
