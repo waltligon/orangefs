@@ -548,7 +548,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 	ret = PVFS_sys_ref_lookup(parent_ref.fs_id, entry_name,
                                   parent_ref, credentials, &resp_lookup,
-                                  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_FOLLOW);
 
         if ((ret == 0) && (open_type == OPEN_SRC))
         {
