@@ -19,7 +19,7 @@
 #include <pvfs-distribution.h>
 #include <pvfs-request.h>
 
-int TEST_SIZE=1024*1024*20; /* 20M */
+int TEST_SIZE=1024*1024*1; /* 1M */
 static int block_on_flow(flow_descriptor* flow_d);
 static double Wtime(void);
 
@@ -195,6 +195,8 @@ int main(int argc, char **argv)
 
 	/* shut down BMI */
 	BMI_finalize();
+
+	free(mybuffer);
 
 	gossip_disable();
 	return(0);
