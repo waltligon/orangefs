@@ -82,14 +82,12 @@ int PINT_Process_request(PINT_Request_state *req,
 	}
 	gossip_debug(REQUEST_DEBUG,"\tstart_offset == %lld\n", *start_offset);
 	/* check to see if we are picking up where we left off */
-	if (req->lvl < 0 || *start_offset < (req->cur[req->lvl].chunk_offset +
-				(req->cur[req->lvl].el * (req->cur[req->lvl].rqbase->ub -
-				req->cur[req->lvl].rqbase->lb)) + req->cur[req->lvl].rq->offset +
-				(req->cur[req->lvl].rq->stride * req->cur[req->lvl].blk)) +
-				req->bytes)
+	if (req->lvl < 0 || *start_offset < req->last_offset)
 	{
-		gossip_debug(REQUEST_DEBUG,"\trequested start_offset before current offset\n");
+		gossip_debug(REQUEST_DEBUG,
+				"\trequested start_offset before current offset\n");
 		/* reinitialize the request state to zero */
+		req->last_offset = 0;
 		req->buf_offset = 0;
 		req->lvl = 0;
 		req->bytes = 0;
@@ -99,11 +97,7 @@ int PINT_Process_request(PINT_Request_state *req,
 		req->cur[0].chunk_offset = 0;
 	}
 	/* check to see of we are skipping some bytes */
-	if (*start_offset != (req->cur[req->lvl].chunk_offset +
-				(req->cur[req->lvl].el * (req->cur[req->lvl].rqbase->ub -
-				req->cur[req->lvl].rqbase->lb)) + req->cur[req->lvl].rq->offset +
-				(req->cur[req->lvl].rq->stride * req->cur[req->lvl].blk)) +
-				req->bytes)
+	if (*start_offset > req->last_offset)
 	{
 		gossip_debug(REQUEST_DEBUG,"\tskipping ahead to start_offset\n");
 		/* find start_offset in request structure */
@@ -287,7 +281,7 @@ int PINT_Process_request(PINT_Request_state *req,
 	}
 	else
 	{
-		*start_offset = (req->cur[req->lvl].chunk_offset +
+		*start_offset = req->last_offset = (req->cur[req->lvl].chunk_offset +
 				(req->cur[req->lvl].el * (req->cur[req->lvl].rqbase->ub -
 				req->cur[req->lvl].rqbase->lb)) + req->cur[req->lvl].rq->offset +
 				(req->cur[req->lvl].rq->stride * req->cur[req->lvl].blk)) +
@@ -321,6 +315,7 @@ struct PINT_Request_state *PINT_New_request_state (PINT_Request *request)
 	req->lvl = 0;
 	req->bytes = 0;
 	req->buf_offset = 0;
+	req->last_offset = 0;
 	/* we assume null request is a contiguous byte range depth 1 */
 	if (request)
 	{

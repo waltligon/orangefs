@@ -47,6 +47,7 @@ typedef struct PINT_Request_state {
 	PVFS_count32 lvl;          /* level in element chain */
 	PVFS_size    bytes;        /* bytes in current contiguous chunk processed */
 	PVFS_offset  buf_offset;   /* byte offset in user buffer */
+	PVFS_offset  last_offset;	/* last offset in previous call to process */
 } PINT_Request_state;           
 
 typedef struct PINT_Request_file_data {
