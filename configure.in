@@ -282,6 +282,13 @@ dnl if we use headers that might not be on every platform, add them here
 AC_CHECK_HEADERS(malloc.h)
 AC_CHECK_HEADERS(mntent.h)
 
+dnl this is a special case, used to key off options controlling gossip
+dnl   backtrace capability
+AC_CHECK_HEADERS(execinfo.h,
+LDFAGS="$LDFLAGS -rdynamic"
+CFLAGS="$CFLAGS -DGOSSIP_ENABLE_BACKTRACE"
+)
+
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in src/apps src/io src/common src/client src/kernel test/common \

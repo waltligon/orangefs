@@ -16,6 +16,7 @@
 #define __GOSSIP_H
 
 #include <syslog.h>
+#include <pvfs2-config.h>
 
 /********************************************************************
  * Visible interface
@@ -34,6 +35,9 @@ int gossip_set_debug_mask(
     int debug_on,
     int mask);
 
+#ifdef GOSSIP_ENABLE_BACKTRACE
+void gossip_backtrace(void);
+#endif
 
 #ifdef __GNUC__
 
@@ -71,11 +75,20 @@ extern int gossip_facility;
 	gossip_debug(mask, format, ##f);			\
     } while(0)
 
+#ifdef GOSSIP_ENABLE_BACKTRACE
+#define gossip_lerr(format, f...)			\
+    do {						\
+	gossip_err("%s line %d: ", __FILE__, __LINE__);	\
+	gossip_err(format, ##f);			\
+	gossip_backtrace();				\
+	} while(0)
+#else
 #define gossip_lerr(format, f...)			\
     do {						\
 	gossip_err("%s line %d: ", __FILE__, __LINE__);	\
 	    gossip_err(format, ##f);                    \
 	} while(0)
+#endif
 #else /* ! __GNUC__ */
 
 int __gossip_debug(

@@ -17,8 +17,14 @@
 #include <stdio.h>
 #include <errno.h>
 #include <syslog.h>
+#include <stdlib.h>
+#include "pvfs2-config.h"
+#ifdef HAVE_EXECINFO_H
+#include <execinfo.h>
+#endif
 
 #include "gossip.h"
+
 
 /* controls whether debugging is on or off */
 int gossip_debug_on = 0;
@@ -342,6 +348,33 @@ int gossip_err(
 
     return (ret);
 }
+
+#ifdef GOSSIP_ENABLE_BACKTRACE
+    #ifndef GOSSIP_BACKTRACE_DEPTH
+    #define GOSSIP_BACKTRACE_DEPTH 8
+    #endif
+/* gossip_backtrace()
+ *
+ * prints out a dump of the current stack (excluding this function)
+ * using gossip_err
+ *
+ * no return value
+ */
+void gossip_backtrace(void)
+{
+    void* trace[GOSSIP_BACKTRACE_DEPTH];
+    char** messages = NULL;
+    int i, trace_size;
+
+    trace_size = backtrace(trace, GOSSIP_BACKTRACE_DEPTH);
+    messages = backtrace_symbols(trace, trace_size);
+    for(i=1; i<trace_size; i++)
+    {
+	gossip_err("\t[bt] %s\n", messages[i]);
+    }
+    free(messages);
+}
+#endif
 
 /****************************************************************
  * Internal functions
