@@ -191,7 +191,7 @@ sub emit_filesystem
 
     print $target "\n<Filesystem>\n";
     print $target "\tName $name\n";
-    print $target "\tCollectionID $fs_id\n";
+    print $target "\tID $fs_id\n";
     print $target "\tRootHandle $root_handle\n";
     print $target "\t<MetaHandleRanges>\n";
 
