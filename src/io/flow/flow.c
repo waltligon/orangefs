@@ -83,6 +83,9 @@ int PINT_flow_initialize(const char *flowproto_list,
 #ifdef __STATIC_FLOWPROTO_DUMP_OFFSETS__
     extern struct flowproto_ops flowproto_dump_offsets_ops;
 #endif /* __STATIC_FLOWPROTO_DUMP_OFFSETS__ */
+#ifdef __STATIC_FLOWPROTO_BMI_CACHE__
+    extern struct flowproto_ops flowproto_bmi_cache_ops;
+#endif /* __STATIC_FLOWPROTO_BMI_CACHE__ */
 
     static struct flowproto_ops *static_flowprotos[] = {
 #ifdef __STATIC_FLOWPROTO_TEMPLATE__
@@ -94,6 +97,9 @@ int PINT_flow_initialize(const char *flowproto_list,
 #ifdef __STATIC_FLOWPROTO_DUMP_OFFSETS__
 	&flowproto_dump_offsets_ops,
 #endif				/* __STATIC_FLOWPROTO_DUMP_OFFSETS__ */
+#ifdef __STATIC_FLOWPROTO_BMI_CACHE__
+	&flowproto_bmi_cache_ops,
+#endif				/* __STATIC_FLOWPROTO_BMI_CACHE__ */
 	NULL
     };
 
