@@ -24,6 +24,7 @@
 extern struct dbpf_collection *my_coll_p;
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
+static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
@@ -32,13 +33,13 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
  *
  * TODO: should this have a ds_attributes with it?
  */
-int dbpf_dspace_create(TROVE_coll_id coll_id,
-		       TROVE_handle *handle_p,
-		       TROVE_handle bitmask,
-		       TROVE_ds_type type,
-		       TROVE_keyval_s *hint, /* TODO: What is this? */
-		       void *user_ptr,
-		       TROVE_op_id *out_op_id_p)
+static int dbpf_dspace_create(TROVE_coll_id coll_id,
+			      TROVE_handle *handle_p,
+			      TROVE_handle bitmask,
+			      TROVE_ds_type type,
+			      TROVE_keyval_s *hint, /* TODO: What is this? */
+			      void *user_ptr,
+			      TROVE_op_id *out_op_id_p)
 {
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
@@ -54,7 +55,7 @@ int dbpf_dspace_create(TROVE_coll_id coll_id,
 			DSPACE_CREATE,
 			*handle_p,
 			coll_p,
-			dbpf_dspace_remove_op_svc,
+			dbpf_dspace_create_op_svc,
 			user_ptr);
 
     /* no op-specific members here */
@@ -67,7 +68,7 @@ int dbpf_dspace_create(TROVE_coll_id coll_id,
     return 0;
 }
 
-int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
+static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 {
     int ret;
     TROVE_ds_storedattr_s s_attr;
