@@ -749,8 +749,6 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -1;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_time mtime_version =
-        PVFS_util_mktime_version(sm_p->u.create.sys_attr.mtime);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: crdirent_setup_msgpair\n");
