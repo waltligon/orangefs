@@ -21,6 +21,9 @@
 
 extern job_context_id pint_client_sm_context;
 
+#define GET_SEGMENT_AT(index)                                            \
+&(sm_p->u.lookup.contexts[sm_p->u.lookup.current_context].segments[      \
+index])
 #define GET_CURRENT_SEGMENT()                                            \
 &(sm_p->u.lookup.contexts[sm_p->u.lookup.current_context].segments[      \
 sm_p->u.lookup.contexts[sm_p->u.lookup.current_context].current_segment])
@@ -349,14 +352,15 @@ static int initialize_context(
                         prev_ctx_prev_seg->seg_starting_refn;
                     cur_seg_name = prev_ctx_prev_seg->seg_name;
                     gossip_debug(
-                        GOSSIP_LOOKUP_DEBUG, "using previous segment: %s\n",
-                        cur_seg_name);
+                        GOSSIP_LOOKUP_DEBUG,
+                        "using previous segment: %s\n", cur_seg_name);
 
                     cur_seg_index--;
                 }
                 else
                 {
-                    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  got a '..' segment\n");
+                    gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                                 "  got a '..' segment\n");
                     cur_seg_index--;
                     continue;
                 }
@@ -601,32 +605,6 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    /*
-      NOTE:
-
-      the pvfs2 lookup_path server operation has an optimization that
-      allows several path components to be resolved at once.  this
-      code here resolves on a segment-by-segment basis, so we're not
-      allowing for that optimization.
-
-      once we're sure this code is correct, we can start using that
-      optimization again.  it's tricky in distributed meta data setups
-      where a path with nested symlinks is distributed across multiple
-      servers (where the optimization doesn't help much either).
-
-      while this code isn't as efficient without using that
-      optimization, it works and is easy to understand.
-
-      fix this by storing the remaining path in each segment
-      (i.e. starting with this segment, the entire remaining path),
-      and always do the lookup on that path name.
-      [ this would be fixed in the segment init code and here ]
-
-      then in the comp_fn for this, advance through all properly
-      resolved segments by filling them all in (starting_refn,
-      resolved_refn) and advancing the current_segment
-    */
-
     /* do a lookup on the current segment of the current context */
     cur_seg = GET_CURRENT_SEGMENT();
     assert(cur_seg);
@@ -634,6 +612,18 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
+    /*
+      the pvfs2 lookup_path server operation has an optimization that
+      allows several path components to be resolved at once.  this
+      code here resolves on a segment-by-segment basis, but we can
+      handle the multi-segment resolution by advancing through all
+      handles/attrs returned and populating the segments on
+      completion.  the lookup_comp_fn does just this.
+
+      one way to disable use of this optimization is to make sure
+      seg_to_lookup is set to seg_name, and never seg_remaining.  that
+      guarantees we're issuing a lookup on a single path segment
+    */
     seg_to_lookup = (cur_seg->seg_remaining ? cur_seg->seg_remaining :
                      cur_seg->seg_name);
 
@@ -1058,8 +1048,12 @@ static int lookup_segment_lookup_comp_fn(
     struct PVFS_server_resp *resp_p,
     int index)
 {
+    int i = 0;
     PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
+    int current_seg_index = sm_p->u.lookup.contexts[
+        sm_p->u.lookup.current_context].current_segment;
+    PVFS_pinode_reference last_resolved_refn;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_segment_lookup_comp_fn\n");
 
@@ -1070,38 +1064,60 @@ static int lookup_segment_lookup_comp_fn(
         return resp_p->status;
     }            
 
-    cur_seg = GET_CURRENT_SEGMENT();
-    assert(cur_seg);
-
-    /*
-      if the lookup_path optimization is being used, this
-      may not be true.  leave it here until we fix that
-    */
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "lookup_comp_fn got index %d\n",
-                 index);
-    assert(index == 0);
-
     assert(resp_p->u.lookup_path.handle_count);
 
-    /* store the retrieved handle in the current segment */
-    cur_seg->seg_resolved_refn.handle =
-        resp_p->u.lookup_path.handle_array[index];
-    cur_seg->seg_resolved_refn.fs_id =
-        cur_seg->seg_starting_refn.fs_id;
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n",
+                 resp_p->u.lookup_path.handle_count);
 
     /*
-      store the retrieved attr in the current
-      segment (if one was returned)
+      at this point we have 1 or more resolved handles so we're going
+      to advance through all of them and populate the segments with
+      those resolved handles.  in addition, we fill in the attribute
+      information for each segment if the attrs are available here
     */
-    if (resp_p->u.lookup_path.handle_count ==
-        resp_p->u.lookup_path.attr_count)
+    for(i = 0; i < resp_p->u.lookup_path.handle_count; i++)
     {
-        PINT_acache_object_attr_deep_free(
-            &(cur_seg->seg_attr));
-        PINT_acache_object_attr_deep_copy(
-            &(cur_seg->seg_attr),
-            &(resp_p->u.lookup_path.attr_array[index]));
+        cur_seg = GET_SEGMENT_AT(current_seg_index + i);
+        assert(cur_seg);
+
+        if (i > 0)
+        {
+            /*
+              if we got more than one resolved segment, fill the
+              current segment with the previously resolved
+              handle/fs_id
+            */
+            cur_seg->seg_starting_refn = last_resolved_refn;
+        }
+
+        last_resolved_refn.handle = resp_p->u.lookup_path.handle_array[i];
+        last_resolved_refn.fs_id = cur_seg->seg_starting_refn.fs_id;
+
+        cur_seg->seg_resolved_refn = last_resolved_refn;
+
+        /*
+          and store the retrieved attr in the current
+          segment (if one was returned)
+        */
+        if (i < resp_p->u.lookup_path.attr_count)
+        {
+            PINT_acache_object_attr_deep_free(
+                &(cur_seg->seg_attr));
+            PINT_acache_object_attr_deep_copy(
+                &(cur_seg->seg_attr),
+                &(resp_p->u.lookup_path.attr_array[i]));
+        }
     }
+    assert(i == resp_p->u.lookup_path.handle_count);
+
+    /*
+      if we've updated all of the segments that we could, advance
+      the context's current segment position
+    */
+    sm_p->u.lookup.contexts[
+        sm_p->u.lookup.current_context].current_segment =
+        current_seg_index + (i - 1);
+
     return 0;
 }
 
