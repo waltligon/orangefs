@@ -54,6 +54,8 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL) return -1;
 
+    if (!extent_array || (extent_array->extent_count < 1)) return -1;
+
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
 			DSPACE_CREATE,
@@ -62,6 +64,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 			dbpf_dspace_create_op_svc,
 			user_ptr,
 			flags);
+
 
     /* no op-specific members here */
     q_op_p->op.u.d_create.extent_array.extent_count =
@@ -91,7 +94,8 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     TROVE_handle new_handle;
     DBT key, data;
     DB *db_p;
-    
+    TROVE_extent cur_extent;
+
     /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
     switch (ret) {
@@ -105,13 +109,16 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 	    break;
     }
 
-    /* if caller requests a specific handle, honor it */
-    if ((op_p->u.d_create.out_handle_p != NULL) &&
-        (*op_p->u.d_create.out_handle_p != 0))
-    {
-        new_handle = *op_p->u.d_create.out_handle_p;
+    cur_extent = op_p->u.d_create.extent_array.extent_array[0];
 
-        /* check if we MUST use the exact handle value specified */
+    /* check if we got a single specific handle */
+    if ((op_p->u.d_create.extent_array.extent_count == 1) &&
+        (cur_extent.first == cur_extent.last))
+    {
+        /*
+          check if we MUST use the exact handle value specified;
+          if caller requests a specific handle, honor it
+        */
         if (op_p->flags & TROVE_FORCE_REQUESTED_HANDLE)
         {
             /*
@@ -120,32 +127,32 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
               fails since the handle will already exist, but
               since we know it here, handle it here ?
             */
+            new_handle = cur_extent.first;
             trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
         }
-        else
+        else if (cur_extent.first == 0)
         {
             /*
-              given a starting point, find the next available
-              handle in the specified range
-              
-              FIXME: This is faked for now...we can't do the
-              real thing until our handle mgmt can understand
-              the concept of multiple handle ranges.
+              if we got zero, the caller doesn't care
+              where the handle comes from
             */
-            do
-            {
-                ret = trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
-            } while((ret != 0) && (++new_handle));
+            new_handle = trove_handle_alloc(op_p->coll_p->coll_id);
         }
     }
     else
     {
-        /* pick an arbitrary valid handle otherwise */
-        new_handle = trove_handle_alloc(op_p->coll_p->coll_id);
+        /*
+          otherwise, we have to try to allocate a handle from
+          the specified range that we're given
+        */
+        new_handle = trove_handle_alloc_from_range(
+            op_p->coll_p->coll_id,
+            &op_p->u.d_create.extent_array);
     }
 
 #if 0
-    printf("*** new handle = %Ld (%Lx).\n", new_handle, new_handle);
+    printf("new_handle is %Ld (cur_extent is %Ld - %Ld)\n",
+           new_handle, cur_extent.first, cur_extent.last);
 #endif
 
     s_attr.type = op_p->u.d_create.type;
@@ -187,11 +194,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 	    goto return_error;
 	}
     }
-    
-#if 0
-    printf("created new dspace with above handle.\n");
-#endif
-    
+
     *op_p->u.d_create.out_handle_p = new_handle;
     dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return 1;

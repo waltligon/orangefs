@@ -300,13 +300,14 @@ TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
  *  extent_array    array of, well, PVFS_handle_extents. 
  *
  *  returns:
- *	a handle from within one of the extents provided by extent_array
- *	no gaurantee from which extent we will allocate a handle
+ *  a handle from within one of the extents provided by extent_array
+ *  no gaurantee from which extent we will allocate a handle
  *
- *	0 if error or if there were no handles avaliable from the given ranges
- */	
-TROVE_handle trove_handle_alloc_from_range(TROVE_coll_id coll_id,
-	PVFS_handle_extent_array *extent_array)
+ *  0 if error or if there were no handles avaliable from the given ranges
+ */
+TROVE_handle trove_handle_alloc_from_range(
+    TROVE_coll_id coll_id,
+    TROVE_handle_extent_array *extent_array)
 {
     handle_ledger_t *ledger = NULL;
     struct qlist_head *hash_link = NULL;

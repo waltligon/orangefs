@@ -150,20 +150,22 @@ int pvfs2_mkspace(
       Q: where are we going to define the dspace types? --
       trove-test.h for now.
     */
-    if (new_root_handle)
+    if (new_root_handle != (TROVE_handle)0)
     {
         cur_extent.first = cur_extent.last = new_root_handle;
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
 
-        ret = trove_dspace_create(coll_id,
-                                  &extent_array,
-                                  &new_root_handle,
-                                  PVFS_TYPE_DIRECTORY,
-                                  NULL,
-                                  TROVE_SYNC,
-                                  NULL,
-                                  &op_id);
+        ret = trove_dspace_create(
+            coll_id,
+            &extent_array,
+            &new_root_handle,
+            PVFS_TYPE_DIRECTORY,
+            NULL,
+            (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
+            NULL,
+            &op_id);
+
         while (ret == 0)
         {
             ret = trove_dspace_test(coll_id, op_id, &count,
@@ -242,7 +244,6 @@ int pvfs2_mkspace(
           create dataspace to hold directory entries; a
           value of zero leaves the allocation to trove.
         */
-        ent_handle = 0;
         cur_extent.first = cur_extent.last = 0;
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;

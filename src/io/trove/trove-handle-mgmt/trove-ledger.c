@@ -31,14 +31,18 @@ struct handle_ledger {
 
 /* Functions used only internally:
  */
+
+#if 0
 /* handle_store_xxx - functions to handle moving handle free lists to/from storage */
 static int handle_store_save(void);/* unimplemented */
 static int handle_store_load(TROVE_coll_id coll_id, char *admin_name, struct handle_ledger *ledger); 
 
 /* handle_store_extentlist_xxx - functions to move extentlists to/from bstreams, used by handle_store_xxx */
 static int handle_store_extentlist_create(TROVE_coll_id coll_id, TROVE_handle bstream_handle, struct TROVE_handle_extentlist *el);
+
 static int handle_store_extentlist_exists(TROVE_coll_id coll_id, TROVE_handle bstream_handle);
 static int handle_store_extentlist_read(TROVE_coll_id coll_id, TROVE_handle handle, struct TROVE_handle_extentlist *el);
+#endif
 
 /* handle_recycle - takes care of moving handles among the various free lists */
 static int handle_recycle(struct handle_ledger *hl);
@@ -106,6 +110,7 @@ int trove_handle_ledger_dump(struct handle_ledger *hl)
     return -1;
 }
 
+#if 0
 /* handle_store_save
  * XXX: unimplemented
  */
@@ -129,6 +134,7 @@ static int handle_store_extentlist_read(TROVE_coll_id coll_id,
 {
     return -1;
 }
+#endif
 
 /* 
  * return all allocated memory back to the system
@@ -209,6 +215,8 @@ void trove_handle_ledger_show(struct handle_ledger *hl)
     extentlist_stats(&(hl->overflow_list));
 }
 
+
+#if 0
 /*
  * handle_store_extentlist_exists:
  *
@@ -402,6 +410,7 @@ static int handle_store_load(TROVE_coll_id coll_id,
 
     return 0;
 }
+#endif
 
 /* trove_handle_ledger_addextent:  add a new legal extent from which the ledger
  *   can dole out handles.  

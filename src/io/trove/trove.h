@@ -28,7 +28,7 @@ enum {
 enum {
     TROVE_SYNC   = 1,
     TROVE_ATOMIC = 2,
-    TROVE_FORCE_REQUESTED_HANDLE = 3
+    TROVE_FORCE_REQUESTED_HANDLE = 4
 };
 
 /* get/setinfo option flags */

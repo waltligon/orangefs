@@ -26,12 +26,17 @@ TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id);
 
 /* returns a valid TROVE_handle from the range-set given in the
  * PVFS_handle_extent_array; 0 otherwise */
-TROVE_handle trove_handle_alloc_from_range(TROVE_coll_id, 
-	PVFS_handle_extent_array *extent_array);
+TROVE_handle trove_handle_alloc_from_range(
+    TROVE_coll_id, 
+    TROVE_handle_extent_array *extent_array);
 
-int trove_handle_set_used(TROVE_coll_id coll_id, TROVE_handle handle);
+int trove_handle_set_used(
+    TROVE_coll_id coll_id,
+    TROVE_handle handle);
 
-int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle);
+int trove_handle_free(
+    TROVE_coll_id coll_id,
+    TROVE_handle handle);
 
 int trove_handle_mgmt_finalize(void);
 
