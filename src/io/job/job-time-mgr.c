@@ -244,6 +244,7 @@ int job_time_mgr_expire(void)
 	    switch(jd->type)
 	    {
 	    case JOB_BMI:
+		gossip_debug(GOSSIP_JOB_DEBUG, "Job timer: cancelling bmi.\n");
 		ret = job_bmi_cancel(jd->job_id, jd->context_id);
 		break;
 	    case JOB_FLOW:
@@ -260,10 +261,12 @@ int job_time_mgr_expire(void)
 		else
 		{
 		    /* otherwise kill the flow */
+		    gossip_debug(GOSSIP_JOB_DEBUG, "Job timer: cancelling flow.\n");
 		    ret = job_flow_cancel(jd->job_id, jd->context_id);
 		}
 		break;
 	    case JOB_TROVE:
+		gossip_debug(GOSSIP_JOB_DEBUG, "Job timer: cancelling trove.\n");
 		ret = job_trove_dspace_cancel(jd->u.trove.fsid, jd->job_id,
 		    jd->context_id);
 	    default:

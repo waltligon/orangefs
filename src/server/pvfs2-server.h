@@ -33,6 +33,13 @@ extern job_context_id server_job_context;
 /* TODO: this should be read from a config file */
 #define PVFS2_SERVER_RESPONSE_TIMEOUT         30
 
+/* the server will give up on a flow if more than PVFS2_SERVER_FLOW_TIMEOUT
+ * seconds pass without any progress being made on it
+ */
+/* TODO: this should be read from a config file */
+#define PVFS2_SERVER_FLOW_TIMEOUT             30
+
+
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
 {

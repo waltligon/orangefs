@@ -251,7 +251,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
     }
 
     err = job_flow(s_op->u.io.flow_d, s_op, 0, js_p, &tmp_id,
-                   server_job_context, JOB_TIMEOUT_INF);
+                   server_job_context, PVFS2_SERVER_FLOW_TIMEOUT);
 
     return(err);
 }
