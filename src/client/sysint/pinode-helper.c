@@ -47,6 +47,7 @@ int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
 		{
 			goto pinode_insert_failure;	
 		}
+		PINT_pcache_insert_rls(*pinode_ptr);
 	}
 	else 
 	{
@@ -64,8 +65,13 @@ int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
 						     credentials);
 			if (ret < 0)
 			{
+				/* can't release before we do pinode refresh */
+				PINT_pcache_lookup_rls(*pinode_ptr);
 				goto pinode_refresh_failure;
 			}
+
+			/* we still have one reference to this from refresh */
+			PINT_pcache_lookup_rls(*pinode_ptr);
 
 			/*its already in the cache so we don't need to update it*/
 		}
@@ -76,6 +82,18 @@ int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
 pinode_insert_failure:
 pinode_refresh_failure:
 	return(ret);
+}
+
+/* phelper_release_pinode
+ *
+ * let the pcache know that we're done with this pinode, so its safe to be 
+ * reused/deallocated/etc if neccessary.
+ *
+ * returns 0 on success, -errno on failure
+ */
+int phelper_release_pinode(pinode *pinode_ptr)
+{
+	return PINT_pcache_lookup_rls(pinode_ptr);
 }
 
 /* phelper_refresh_pinode

@@ -85,11 +85,15 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 			    req->credentials.uid, req->credentials.gid);
 	if (ret < 0)
 	{
+	    phelper_release_pinode(parent_ptr);
 	    ret = (-EPERM);
 	    gossip_ldebug(CLIENT_DEBUG,"--===PERMISSIONS===--\n");
 	    failure = PCACHE_LOOKUP_FAILURE;
 	    goto return_error;
 	}
+
+	/* we're done with the parent pinode pointer */
+        phelper_release_pinode(parent_ptr);
 
 	/* Lookup handle(if it exists) in dcache */
 	ret = PINT_dcache_lookup(req->entry_name,req->parent_refn,&entry);
@@ -439,6 +443,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	    failure = PCACHE_INSERT2_FAILURE;
 	    goto return_error;
 	}	
+
+	PINT_pcache_insert_rls(pinode_ptr);
 
   	return(0); 
 

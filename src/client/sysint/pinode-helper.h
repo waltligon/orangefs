@@ -22,5 +22,6 @@ int phelper_validate_pinode(pinode *pnode,int flags,PVFS_bitfield mask,
 		PVFS_credentials credentials);
 int modify_pinode(pinode *node,PVFS_object_attr attr,PVFS_bitfield mask);
 int phelper_fill_timestamps(pinode *pnode);
+int phelper_release_pinode(pinode *pinode_ptr);
 
 #endif

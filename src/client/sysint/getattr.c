@@ -84,6 +84,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 			{
 			    resp->attr = entry_pinode->attr;
 			    /* resp->extended */
+			    PINT_pcache_lookup_rls(entry_pinode);
 			    return (0);
 			}
 
@@ -98,6 +99,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		{
 		    /* if we don't care about size in our request, we're done already */
 		    resp->attr = entry_pinode->attr;
+		    PINT_pcache_lookup_rls(entry_pinode);
 		    /* resp->extended */
 		    return (0);
 		}
@@ -310,9 +312,11 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		goto return_error;
 	    }
 	    gossip_debug(CLIENT_DEBUG, "GETATTR:  ADDING TO PCACHE\n");
+	    PINT_pcache_insert_rls(entry_pinode);
 	}
 	else
 	{
+	    PINT_pcache_lookup_rls(entry_pinode);
 	    gossip_debug(CLIENT_DEBUG, "GETATTR:   NOT ADDING TO PCACHE\n");
 	}
 
@@ -329,18 +333,21 @@ return_error:
 	{
 		case PCACHE_INSERT_FAILURE:
 		    free(resp->attr.u.meta.dfh);
+		    PINT_pcache_insert_rls(entry_pinode);
 		case MALLOC_DFH_FAILURE:
 		case SEND_REQ_FAILURE:
 		case MAP_SERVER_FAILURE:
-			if (ack_p)
-			    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+		    if (pinode_exists_in_cache)
+			PINT_pcache_lookup_rls(entry_pinode);
+		    if (ack_p)
+			PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 				&encoded_resp, op_tag);
 
-			if (server)
-				free(server);
-			/* Free memory allocated for name */
-			if (size_array)
-				free(size_array);
+		    if (server)
+			free(server);
+		    /* Free memory allocated for name */
+		    if (size_array)
+			free(size_array);
 		case NONE_FAILURE:
 			break;
 	}

@@ -114,6 +114,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     ret = PINT_Dist_lookup(pinode_ptr->attr.u.meta.dist);
     if(ret < 0)
     {
+	phelper_release_pinode(pinode_ptr);
 	goto sys_io_out;
     }
 
@@ -122,6 +123,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	* sizeof(PVFS_handle));
     if(!target_handle_array)
     {
+	phelper_release_pinode(pinode_ptr);
 	ret = -errno;
 	goto sys_io_out;
     }
@@ -134,6 +136,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     req_state = PINT_New_request_state(req->io_req);
     if(!req_state)
     {
+	phelper_release_pinode(pinode_ptr);
 	ret = -ENOMEM;
 	goto sys_io_out;
     }
@@ -159,6 +162,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    PINT_CKSIZE);
 	if(ret < 0)
 	{
+	    phelper_release_pinode(pinode_ptr);
 	    goto sys_io_out;
 	}
 
@@ -206,6 +210,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     if(!addr_array || !req_array || !resp_encoded_array ||
 	!resp_decoded_array || !error_code_array || !flow_array)
     {
+	phelper_release_pinode(pinode_ptr);
 	ret = -ENOMEM;
 	gossip_lerr("Error: out of memory.\n");
 	goto sys_io_out;
@@ -221,6 +226,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    req->pinode_refn.fs_id);
 	if(ret < 0)
 	{
+	    phelper_release_pinode(pinode_ptr);
 	    gossip_lerr("Error: can't map to server.\n");
 	    goto sys_io_out;
 	}
@@ -268,9 +274,12 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	flow_type);
     if(ret < 0)
     {
+	phelper_release_pinode(pinode_ptr);
 	gossip_lerr("Error: io_req_ack_flow_array() failure.\n");
 	goto sys_io_out;
     }
+
+    phelper_release_pinode(pinode_ptr);
 
     resp->total_completed = 0;
 

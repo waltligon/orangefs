@@ -26,7 +26,8 @@
 enum
 {
     STATUS_UNUSED = 0,
-    STATUS_USED = 1
+    STATUS_USED = 1,
+    STATUS_SHOULD_DELETE = 2
 };
 
 enum

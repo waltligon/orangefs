@@ -151,6 +151,7 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
             failure = ADD_PCACHE_FAILURE;
             goto return_error;
         }
+        PINT_pcache_insert_rls(pinode_ptr);
 
 	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 	    &encoded_resp, op_tag);

@@ -73,11 +73,14 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 			req->credentials.uid, req->credentials.gid);
     if (ret < 0)
     {
+	phelper_release_pinode(parent_ptr);
 	ret = (-EPERM);
 	gossip_ldebug(CLIENT_DEBUG,"--===PERMISSIONS===--\n");
 	failure = PCACHE_LOOKUP_FAILURE;
 	goto return_error;
     }
+
+    phelper_release_pinode(parent_ptr);
 
     /* Lookup handle(if it exists) in dcache */
     ret = PINT_dcache_lookup(req->entry_name,req->parent_refn,&entry);
@@ -247,8 +250,11 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	goto return_error;
     }
 
+    ret = PINT_pcache_insert_rls(pinode_ptr);
+
     return(0);
 
+return_error:
     switch(failure)
     {
 	case PCACHE_INSERT2_FAILURE:
@@ -300,7 +306,6 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	    break;
     }
 
-return_error:
     return(ret);
 }
 

@@ -74,7 +74,8 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	ret = check_perms(pinode_ptr->attr, req->credentials.perms,
 				req->credentials.uid, req->credentials.gid);
 	if (ret < 0)
-	{
+	{ 
+	    phelper_release_pinode(pinode_ptr);
 	    ret = (-EPERM);
 	    failure = GET_PINODE_FAILURE;
 	    goto return_error;
@@ -219,6 +220,8 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 		&encoded_resp, op_tag);
 	}
 
+	phelper_release_pinode(pinode_ptr);
+
 	/* Remove the dentry from the dcache */
 	ret = PINT_dcache_remove(req->entry_name,req->parent_refn,&items_found);
 	if (ret < 0)
@@ -252,6 +255,7 @@ return_error:
 		&encoded_resp, op_tag);
 	case SEND_REQ_FAILURE:
 	case SERVER_LOOKUP_FAILURE:
+	    phelper_release_pinode(pinode_ptr);
 	case GET_PINODE_FAILURE:
 	case REMOVE_CACHE_FAILURE:
 	case NONE_FAILURE:

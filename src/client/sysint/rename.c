@@ -80,9 +80,11 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
 			    req->credentials.uid, req->credentials.gid);
     if (ret < 0)
     {
+	phelper_release_pinode(old_entry_p);
 	ret = (-EPERM);
 	goto return_error;
     }
+    phelper_release_pinode(old_entry_p);
 
     /* make sure the new parent exists */
 
@@ -100,10 +102,12 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
 				req->credentials.uid, req->credentials.gid);
     if (ret < 0)
     {
+	phelper_release_pinode(new_parent_p);
 	ret = (-EPERM);
 	gossip_ldebug(CLIENT_DEBUG,"error checking permissions for new parent\n");
 	goto return_error;
     }
+    phelper_release_pinode(new_parent_p);
 
     ret = PINT_bucket_map_to_server(&serv_addr,req->new_parent_refn.handle,
 					req->new_parent_refn.fs_id);
@@ -206,299 +210,7 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
 return_error:
 
     return (ret);
-
-#if 0
-	
-	/* Revalidate the old_parent handle */
-	/* Get the parent pinode */
-	cflags = HANDLE_VALIDATE;
-	vflags = 0;
-	attr_mask = ATTR_BASIC + ATTR_META;
-	/* Get the pinode either from cache or from server */
-	ret = phelper_get_pinode(req->old_parent_reference,pvfs_pcache,&pinode_ptr,\
-			attr_mask, vflags, req->credentials);
-	if (ret < 0)
-	{
-		goto pinode_get_failure;
-	}
-	cflags = HANDLE_VALIDATE;
-	mask = ATTR_BASIC + ATTR_META;
-	ret = phelper_validate_pinode(pinode_ptr,cflags,mask);
-	if (ret < 0)
-	{
-		goto pinode_get_failure;
-	}
-
-	/* Revalidate the new_parent handle */
-	/* Get the parent pinode */
-	cflags = HANDLE_VALIDATE;
-	vflags = 0;
-	attr_mask = ATTR_BASIC + ATTR_META;
-	/* Get the pinode either from cache or from server */
-	ret = phelper_get_pinode(req->new_parent_reference,pvfs_pcache,&pinode_ptr,\
-			attr_mask, vflags, req->credentials);
-	if (ret < 0)
-	{
-		goto pinode_get_failure;
-	}
-
-	/* Remove directory entry server request */
-
-	/* Query the BTI to get initial meta server */
-	/* TODO: Uncomment this after implementation !!! */
-	/*ret = bt_map_bucket_to_server(&server1,old_parent_reference.handle,\
-	 req->fs_id);
-	if (ret < 0)
-	{
-		goto rmdirent_map_failure;
-	}*/
-	ret = BMI_addr_lookup(&serv_addr1,server1);
-	if (ret < 0)
-	{
-		goto rmdirent_map_failure;
-	}
-	/* Deallocate allocated memory */
-	free(server1);
-	name_sz = strlen(req->old_entry);
-	/* Fill in the parameters */
-	req_rmdirent.entry = (PVFS_string)malloc(name_sz + 1);
-	if (!req_rmdirent.entry)
-	{
-		ret = -ENOMEM;
-		goto rmdirent_map_failure;	
-	}
-	strncpy(req_rmdir.entry,req->old_entry,name_sz);
-	req_rmdirent.entry[name_sz] = '\0'; 
-	req_rmdirent.parent_handle = req->parent_handle;
-	req_rmdirent.fs_id = req->fs_id;
-	 
-	/* server request */
-	ret = pint_serv_rmdirent(&req_job,&ack_job,&req_rmdirent,&serv_addr1); 
-	if (ret < 0)
-	{
-		goto rmdirent_failure;
-	}
-	/* Removed entry pinode reference */
-	entry.handle = ack_job->u.rmdirent.entry_handle;
-	entry.fs_id = req->fs_id;
-
-	/* Free the allocated memory */
-	if (req_rmdirent.entry)
-		free(req_rmdirent.entry);
-	sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr1,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-
-	/* Create directory entry server request */
-
-	/* Query the BTI to get initial meta server */
-	/* TODO: Uncomment this after implementation !!! */
-	/*ret = bt_map_bucket_to_server(&server2,new_parent_reference.handle,\
-	 req->fs_id);
-	if (ret < 0)
-	{
-		goto pinode_get_failure;
-	}*/
-	ret = BMI_addr_lookup(&serv_addr2,server2);
-	if (ret < 0)
-	{
-		goto pinode_get_failure;
-	}
-	name_sz = strlen(req->new_entry);
-	/* Fill in the parameters */
-	req_crdirent.name = (PVFS_string)malloc(name_sz + 1);
-	if (!req_crdirent.name)
-	{
-		ret = -ENOMEM;
-		goto pinode_get_failure;	
-	}
-	strncpy(req_crdirent.name,req->new_entry,name_sz);
-	req_crdirent.name[name_sz] = '\0'; 
-	req_crdirent.new_handle = entry.handle; 
-	req_crdirent.parent_handle = req->parent_handle;
-	req_crdirent.fs_id = req->fs_id;
-	 
-	/* server request */
-	ret = pint_serv_crdirent(&req_job,&ack_job,&req_crdirent,&serv_addr2); 
-	if (ret < 0)
-	{
-		goto crdirent_failure;
-	}
-
-	/* Free the jobs */
-	sysjob_free(serv_addr2,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr2,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	
-	/* Remove the dentry from the dcache */
-	/* TODO: We need to note down that this failed but let the rename 
-	 * complete successfully. The mechanism for that ain't in place yet!!
-	 */
-	ret = PINT_dcache_remove(req->old_entry,old_parent_reference,\
-			&item_found);
-	/*if (ret < 0)
-	{
-		goto remove_failure;
-	}*/
-	/* Insert the new entry into dcache */
-	ret = PINT_dcache_insert(req->new_entry,entry,new_parent_reference);
-
-	return(0);
-
-io_remove_failure:
-	/* Need to create datafiles on selected I/O servers */
-	for(j = 0;j < i;j++)
-	{
-		/* TODO: Get the bucket from the handle */	
-		/*req_create.bucket = pinode_attr->attr.u.meta.dfh[i];
-		req_create.handle_mask = x;*/
-		req_create.fs_id = req->fs_id;
-		req_create.type = pinode_attr->attr.objtype;
-
-		/* Server request */
-		ret = pint_serv_create(&req_job,&ack_job,&req_create,\
-				req->credentials,io_addr_array[j]);
-		if (ret < 0)
-		{
-			goto get_address_failure;	
-		}
-
-		/* Free the req,ack jobs */
-		sysjob_free(io_addr_array[j],ack_job,ack_job->rsize,BMI_RECV_BUFFER,\
-				NULL);
-		sysjob_free(io_addr_array[j],req_job,req_job->rsize,BMI_SEND_BUFFER,\
-				NULL);
-	}
-	/* Make a "create directory entry" server request */
-	ret = do_crdirent(req->entry_name,req->parent_handle,req->fs_id,
-				entry.handle,serv_addr1);
-	
-get_address_failure:
-	if (io_addr_array)
-		free(io_addr_array);
-
-rmdirent_failure:
-	if (req_rmdirent.entry)
-		free(req_rmdirent.entry);
-
-rmdirent_map_failure:
-	if (server1)
-		free(server1);
-pinode_get_failure:
-	sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr1,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	
-	/* Free the pinode */
-	pcache_pinode_dealloc(pinode_ptr);
-
-	return(ret);
-#endif
 }
-
-#if 0
-
-/* do_create 
- *
- * perform a create server request
- *
- * returns 0 on success, -errno on error
- */
-static int do_create(char *name,PVFS_handle parent,PVFS_fs_id fsid,\
-		PVFS_handle entry_handle,bmi_addr_t addr)
-{
-	struct PVFS_server_req_s *req_job = NULL;
-	struct PVFS_server_resp_s *ack_job = NULL;
-	PVFS_servreq_crdirent req_crdirent;
-	int ret = 0;
-
-	/* Fill in the arguments */
-	req_crdirent.name = (char *)malloc(strlen(name) + 1);
-	if (!req_crdirent.name)
-	{
-		return(-ENOMEM);	
-	}
-	req_crdirent.new_handle = entry_handle;
-	req_crdirent.parent_handle = parent;
-	req_crdirent.fs_id = fsid;
-
-	/* Make the crdirent request */
-	ret = pint_serv_crdirent(&req_job,&ack_job,&req_crdirent,&addr);
-	if (ret < 0)
-	{
-		/* Free memory allocated for the name */
-		if (req_crdirent.name)
-			free(req_crdirent.name);
-		return(ret);
-	}
-
-	return(0);
-}
-
-/* do_crdirent 
- *
- * perform a create directory entry server request
- *
- * returns 0 on success, -errno on error
- */
-static int do_crdirent(char *name,PVFS_handle parent,PVFS_fs_id fsid,\
-		PVFS_handle entry_handle,bmi_addr_t addr)
-{
-	struct PVFS_server_req_s *req_job = NULL;
-	struct PVFS_server_resp_s *ack_job = NULL;
-	PVFS_servreq_crdirent req_crdirent;
-	int ret = 0;
-
-	/* Fill in the arguments */
-	req_crdirent.name = (char *)malloc(strlen(name) + 1);
-	if (!req_crdirent.name)
-	{
-		return(-ENOMEM);	
-	}
-	req_crdirent.new_handle = entry_handle;
-	req_crdirent.parent_handle = parent;
-	req_crdirent.fs_id = fsid;
-
-	/* Make the crdirent request */
-	ret = pint_serv_crdirent(&req_job,&ack_job,&req_crdirent,&addr);
-	if (ret < 0)
-	{
-		/* Free memory allocated for the name */
-		if (req_crdirent.name)
-			free(req_crdirent.name);
-		return(ret);
-	}
-
-	return(0);
-}
-
-/*	get_bmi_address
- *
- * obtains an array of BMI addresses given an array of handles
- *
- * return 0 on success, -errno on failure
- */
-int get_bmi_address(bmi_addr_t *io_addr_array, int32_count num_io,\
-		PVFS_handle *handle_array)
-{
-	int index = 0;
-
-	for(index = 0;index < num_io; index++)
-	{
-		/* Query the BTI to get initial meta server */
-		/* TODO: Uncomment this!!! */
-		/*ret = bt_map_bucket_to_server(&server2,entry.handle);
-		if (ret < 0)
-		{
-			goto remove_map_failure;
-		}*/	
-		ret = BMI_addr_lookup(&serv_addr2,server2);
-		if (ret < 0)
-		{
-			goto remove_addr_lookup_failure;
-		}
-	}
-	return(0);
-}
-
-#endif
 
 /*
  * Local variables:

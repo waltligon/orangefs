@@ -43,6 +43,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	struct PINT_decoded_msg decoded;
 	void* encoded_resp;
 	PVFS_msg_tag_t op_tag = get_next_session_tag();
+	int pinode_was_in_cache = 1;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -66,6 +67,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	/* Check if pinode was returned */
 	if (ret == PCACHE_LOOKUP_FAILURE)
 	{
+		pinode_was_in_cache = 0;
 		mask = mask | ATTR_BASIC;	
 		ret = phelper_get_pinode(entry, &pinode_ptr, mask, req->credentials);
 		if (ret < 0)
@@ -132,6 +134,15 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 		goto return_error;
 	}
 
+	if (pinode_was_in_cache)
+	{
+	    PINT_pcache_lookup_rls(pinode_ptr);
+	}
+	else
+	{
+	    phelper_release_pinode(pinode_ptr);
+	}
+
 	return(0);
 
 return_error:
@@ -146,6 +157,15 @@ return_error:
 	    case MAP_TO_SERVER_FAILURE:
 		if (server != NULL)
 		    free(server);
+
+		if (pinode_was_in_cache)
+		{
+		    PINT_pcache_lookup_rls(pinode_ptr);
+		}
+		else
+		{
+		    phelper_release_pinode(pinode_ptr);
+		}
 
 	    case PCACHE_LOOKUP_FAILURE:
 		PINT_pcache_pinode_dealloc(pinode_ptr);

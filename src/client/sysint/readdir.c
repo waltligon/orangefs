@@ -57,6 +57,8 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 	    goto return_error;
 	}
 
+	phelper_release_pinode(pinode_ptr);
+
 	/* Read directory server request */
 
 	/* Query the BTI to get initial meta server */

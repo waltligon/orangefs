@@ -10,7 +10,7 @@
 
 #define ECACHEFULL 1
 
-#define PINT_ENABLE_PCACHE 0
+#define PINT_ENABLE_PCACHE 1
 
 #if PINT_ENABLE_PCACHE
 static int PINT_pcache_get_lru(void);
@@ -46,6 +46,11 @@ static int PINT_pcache_pinode_release(pinode *pnode)
 			pvfs_pcache.element[i].pnode->pinode_ref.fs_id))
 	    {
 		pvfs_pcache.element[i].ref_count--;
+		if ((pvfs_pcache.element[i].status == STATUS_SHOULD_DELETE) && (pvfs_pcache.element[i].ref_count == 0))
+		{
+		    PINT_pcache_remove_element(i);
+		    PINT_pcache_pinode_dealloc(pvfs_pcache.element[i].pnode);
+		}
 		return 0;
 	    }
 	}
@@ -83,6 +88,7 @@ void PINT_pcache_pinode_dealloc(pinode *pnode)
     int i;
     if (pnode != NULL)
     {
+	memset(pnode,0,sizeof(pinode));
 	if ((pnode->attr.objtype & ATTR_META) == ATTR_META)
 	{
 	    gossip_ldebug(PCACHE_DEBUG, "METADATA file handles:\n");
@@ -171,20 +177,23 @@ int PINT_pcache_insert(pinode *pnode )
     {
 	return (-EINVAL);
     }
-	
+
+    gossip_ldebug(PCACHE_DEBUG, "inserting pinode %lld %d.\n", pnode->pinode_ref.handle, pnode->pinode_ref.fs_id);
+
     /* Grab the mutex */
     gen_mutex_lock(pvfs_pcache.mt_lock);
 	
     /* Search the cache */
     for(i = pvfs_pcache.top; i != BAD_LINK; i = pvfs_pcache.element[i].next)
     {
-	if (pvfs_pcache.element[i].pnode != NULL)
+	if (pvfs_pcache.element[i].status == STATUS_USED)
 	{
 	    if ((pnode->pinode_ref.handle ==
 		pvfs_pcache.element[i].pnode->pinode_ref.handle)
 		    && (pnode->pinode_ref.fs_id ==
 			pvfs_pcache.element[i].pnode->pinode_ref.fs_id))
 	    {
+		gossip_ldebug(PCACHE_DEBUG, "CACHE ADDRESS: %d ARGUMENT ADDRESS: %d.\n", (int)pvfs_pcache.element[i].pnode, (int)pnode);
 		entry_found = 1;
 		entry = i;
 		break;
@@ -208,6 +217,7 @@ int PINT_pcache_insert(pinode *pnode )
     }
     else
     {
+	gossip_ldebug(PCACHE_DEBUG, "pinode %lld %d exists in cache at pos %d.\n", pnode->pinode_ref.handle, pnode->pinode_ref.fs_id, entry);
 	/* Element present in the cache, merge it */
 	/* Pinode with same <handle,fs_id> found...
 	 * Now, we need to merge the pinode values with
@@ -252,10 +262,12 @@ int PINT_pcache_lookup(pinode_reference refn,pinode **pinode_ptr)
 
     /* Grab a mutex */
     gen_mutex_lock(pvfs_pcache.mt_lock);
+    gossip_ldebug(PCACHE_DEBUG, "PINT_pcache_lookup( %lld %d )\n", refn.handle, refn.fs_id);
 
     /* Search the cache */
     for(i = pvfs_pcache.top; i != BAD_LINK; i = pvfs_pcache.element[i].next)
     {
+	gossip_ldebug(PCACHE_DEBUG, "PINT_pcache_lookup(_) top: %d bottom: %d element: %d\n", pvfs_pcache.top, pvfs_pcache.bottom, i);
 	if ((refn.handle == pvfs_pcache.element[i].pnode->pinode_ref.handle)
 	    && (refn.fs_id == pvfs_pcache.element[i].pnode->pinode_ref.fs_id))
 	{
@@ -267,10 +279,12 @@ int PINT_pcache_lookup(pinode_reference refn,pinode **pinode_ptr)
 		PINT_pcache_rotate_pinode(i);
 		ret = PCACHE_LOOKUP_SUCCESS;
 		break;
+		gossip_ldebug(PCACHE_DEBUG, "PINT_pcache_lookup() item found at position: %d.\n", i);
 	    }
 	}
     }
 
+    gossip_ldebug(PCACHE_DEBUG, "PINT_pcache_lookup(_) returning\n");
 
     /* Release the mutex */
     gen_mutex_unlock(pvfs_pcache.mt_lock);
@@ -295,6 +309,11 @@ int PINT_pcache_lookup_rls(pinode *pinode_ptr)
  * remove an element from the pinode cache
  *
  * returns 0 on success, -1 on failure
+ *
+ * Special case: if someone hasn't released this pinode yet, we don't want to 
+ * remove it, so we set a flag for the release function to remove it when the
+ * last process is done using it.
+ *
  */
 int PINT_pcache_remove(pinode_reference refn,pinode **item)
 {
@@ -307,22 +326,27 @@ int PINT_pcache_remove(pinode_reference refn,pinode **item)
     /* No match found */
     *item = NULL;
 
+    gossip_ldebug(PCACHE_DEBUG, "PINT_pcache_remove( %lld %d ) top: %d bottom: %d count: %d\n", refn.handle, refn.fs_id, pvfs_pcache.top, pvfs_pcache.bottom, pvfs_pcache.count);
     /* Search the cache */
     for(i = pvfs_pcache.top; i != BAD_LINK; i = pvfs_pcache.element[i].next)
     {
 	if (pvfs_pcache.element[i].pnode != NULL)
 	{
+	    //gossip_ldebug(PCACHE_DEBUG, "PINT_pcache_remove(_) element %d\n", i);
 	    if ((refn.handle == pvfs_pcache.element[i].pnode->pinode_ref.handle)
 	      && (refn.fs_id == pvfs_pcache.element[i].pnode->pinode_ref.fs_id))
 	    {
 		/* don't delete if somebody else is looking at this copy too */
 		if (pvfs_pcache.element[i].ref_count != 1)
 		{
+		    gossip_ldebug(PCACHE_DEBUG, "PINT_pcache_remove(_) item found in cache at pos %d\n", i);
 		    *item = pvfs_pcache.element[i].pnode;
 		    PINT_pcache_remove_element(i);
 		}
 		else
 		{
+		    gossip_ldebug(PCACHE_DEBUG, "PINT_pcache_remove(_) trying to remove an item someone hasn't released %d\n", i);
+		    pvfs_pcache.element[i].status = STATUS_SHOULD_DELETE;
 		    return -1;
 		}
 	    }
@@ -332,6 +356,7 @@ int PINT_pcache_remove(pinode_reference refn,pinode **item)
     /* Release the mutex */
     gen_mutex_unlock(pvfs_pcache.mt_lock);
 #endif
+    gossip_ldebug(PCACHE_DEBUG, "PINT_pcache_remove(_) returning\n");
     return(0);
 }
 
@@ -351,6 +376,7 @@ static void PINT_pcache_remove_element(int item)
     pvfs_pcache.element[item].status = STATUS_UNUSED;
     pvfs_pcache.element[item].ref_count = 0;
 
+    /*PINT_pcache_pinode_dealloc(pvfs_pcache.element[item].pnode);*/
     pvfs_pcache.element[item].pnode = NULL;
     pvfs_pcache.count--;
 
@@ -392,7 +418,7 @@ static void PINT_pcache_remove_element(int item)
 
 /* PINT_pcache_get_lru
  *
- * implements cache replacement policy(LRU) if needed 
+ * implements cache replacement policy(LRU)
  *
  * returns 0 on success, -errno on failure
  */
@@ -422,31 +448,37 @@ static int PINT_pcache_get_lru(void)
 		    /* last entry in list */
 		    pvfs_pcache.bottom = pvfs_pcache.element[new].prev;
 		    pvfs_pcache.element[pvfs_pcache.bottom].next = BAD_LINK;
+		    gossip_ldebug(PCACHE_DEBUG, "lru item found at pcache.bottom: %d.\n", new);
 		}
 		else if (new == pvfs_pcache.top)
 		{
 		    /* first entry in list */
 		    pvfs_pcache.top = pvfs_pcache.element[new].next;
 		    pvfs_pcache.element[pvfs_pcache.top].prev = BAD_LINK;
+		    gossip_ldebug(PCACHE_DEBUG, "lru item found at pcache.top: %d.\n", new);
 		}
 		else
 		{
+		    gossip_ldebug(PCACHE_DEBUG, "lru item found at: %d.\n", new);
 		    /* somewhere in the middle */
 		    prev = pvfs_pcache.element[new].prev;
 		    next = pvfs_pcache.element[new].next;
 		    pvfs_pcache.element[prev].next = next;
 		    pvfs_pcache.element[next].prev = prev;
 		}
+		break;
 	    }
 	}
 
 	if (found_one)
 	{
-	    PINT_pcache_pinode_dealloc(pvfs_pcache.element[next].pnode);
+	    gossip_ldebug(PCACHE_DEBUG, "deallocating pinode %lld %d.\n", pvfs_pcache.element[next].pnode->pinode_ref.handle, pvfs_pcache.element[next].pnode->pinode_ref.fs_id);
+	    PINT_pcache_pinode_dealloc(pvfs_pcache.element[new].pnode);
 	    return new;
 	}
 	else
 	{
+	    gossip_ldebug(PCACHE_DEBUG, "unable to get lru pinode b/c all entries have a ref_count greater than 1.\n");
 	    return BAD_LINK;/* should probbably be -ECACHEISFULL or something */
 	}
     }
@@ -456,6 +488,7 @@ static int PINT_pcache_get_lru(void)
 	{
 	    if (pvfs_pcache.element[i].status == STATUS_UNUSED)
 	    {
+		gossip_ldebug(PCACHE_DEBUG, "pcache.count: %d new pinode placecd at %d\n",pvfs_pcache.count, i);
 		pvfs_pcache.count++;
 		return i;
 	    }
@@ -476,6 +509,7 @@ static int PINT_pcache_get_lru(void)
 static void PINT_pcache_rotate_pinode(int item)
 {
     int prev = 0, next = 0, new_bottom;
+    gossip_ldebug(PCACHE_DEBUG, "PINT_pcache_rotate_pinode( %d ) top: %d bottom: %d count: %d prev: %d next: %d\n",item, pvfs_pcache.top, pvfs_pcache.bottom, pvfs_pcache.count, pvfs_pcache.element[item].prev, pvfs_pcache.element[item].next);
     if (pvfs_pcache.top != pvfs_pcache.bottom) 
     {
 	if (pvfs_pcache.top != item)

@@ -289,6 +289,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	    }
 	    if(segment != NULL)
 		free(segment);
+	    PINT_pcache_insert_rls(pinode_ptr);
 	}
 
 	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,

@@ -39,12 +39,16 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
     int max_msg_sz;
     PVFS_Dist *dist;
     int i;
-    
+
     enum
     {
 	NONE_FAILURE = 0,
+	GET_PINODE_FAILURE,
+	MAP_TO_SERVER_FAILURE,
+	SEND_MSG_FAILURE,
+	DECODE_MSG_FAILURE,
     } failure = NONE_FAILURE;
-	
+
     /* Get the directory pinode -- don't retrieve the size */
     attr_mask = ATTR_BASIC;
     ret = phelper_get_pinode(req->pinode_refn,&pinode_ptr, attr_mask, 
@@ -62,7 +66,7 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
     if (ret < 0)
     {
 	ret = (-EPERM);
-	failure = NONE_FAILURE;
+	failure = GET_PINODE_FAILURE;
 	goto return_error;
     }
 
@@ -94,7 +98,7 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
 		    req->pinode_refn.fs_id);
 	if (ret < 0)
 	{
-	    failure = NONE_FAILURE;
+	    failure = MAP_TO_SERVER_FAILURE;
 	    goto return_error;
 	}
 
@@ -103,7 +107,7 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
-	    failure = NONE_FAILURE;
+	    failure = SEND_MSG_FAILURE;
 	    goto return_error;
 	}
 
@@ -112,33 +116,34 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
 	if (ack_p->status < 0 )
 	{
 	    ret = ack_p->status;
-	    failure = NONE_FAILURE;
+	    failure = DECODE_MSG_FAILURE;
 	    goto return_error;
 	}
+
+	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+		&encoded_resp, op_tag);
     }
+
+    phelper_release_pinode(pinode_ptr);
 
     return(0);
-
 return_error:
 
-/* TODO: this error checking thing seems useless if there aren't any pointers.
- * I don't have to free anything, so I just took this part out.
- */
-
-#if 0
     switch(failure)
     {
-	case RECV_REQ_FAILURE:
-	case SEND_REQ_FAILURE:
-	case SERVER_LOOKUP_FAILURE:
+	case DECODE_MSG_FAILURE:
+	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+		&encoded_resp, op_tag);
+	case SEND_MSG_FAILURE:
+	case MAP_TO_SERVER_FAILURE:
 	case GET_PINODE_FAILURE:
+	    phelper_release_pinode(pinode_ptr);
 	case NONE_FAILURE:
+	default:
+	break;
     }
 
-#endif
-
     return(ret);
-
 }
 
 /*
