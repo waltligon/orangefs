@@ -14,6 +14,7 @@ pvfs2-0.0.7pre2
   execution, improving their performance greatly (running, editing,
   compiling, etc on a pvfs2 volume is now much more responsive)
 - fix size reporting using 'du' through the vfs interface
+- GNU/Linux PowerPC 32bit support, including the 2.6.x kernel interface
 
 
 pvfs2-0.0.6
