@@ -17,7 +17,6 @@
 
 #include "pvfs2.h"
 #include "gossip.h"
-#include "pint-dev.h"
 #include "job.h"
 #include "acache.h"
 #include "pint-dev-shared.h"

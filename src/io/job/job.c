@@ -21,7 +21,6 @@
 #include "bmi.h"
 #include "trove.h"
 #include "gossip.h"
-#include "pint-dev.h"
 #include "id-generator.h"
 #include "pint-event.h"
 #include "job-time-mgr.h"
