@@ -96,7 +96,7 @@ static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
 static void flow_callback(flow_descriptor* flow_d);
 #ifndef __PVFS2_JOB_THREADED__
-static void do_one_work_cycle_all(void);
+static void do_one_work_cycle_all(int idle_time_ms);
 #endif
 
 /********************************************************
@@ -2978,10 +2978,6 @@ int job_test(job_id_t id,
     }
     gen_mutex_unlock(&completion_mutex);
 
-    /* bail out if timeout is zero */
-    if (!timeout_ms)
-	return (0);
-
     /* if we fall through to this point, then we need to just try
      * to eat up the timeout until the job that we want hits the
      * completion queue
@@ -3011,7 +3007,10 @@ int job_test(job_id_t id,
 				     &pthread_timeout);
 	gen_mutex_unlock(&completion_mutex);
 #else
-	do_one_work_cycle_all();
+	if(timeout_ms)
+	    do_one_work_cycle_all(10);
+	else
+	    do_one_work_cycle_all(0);
 	ret = 0;
 #endif
 	if (ret == ETIMEDOUT)
@@ -3168,13 +3167,6 @@ int job_testsome(job_id_t * id_array,
 	return (1);
     }
 
-    /* bail out if timeout is zero */
-    if (!timeout_ms)
-    {
-	free(tmp_id_array);
-	return (0);
-    }
-
     for (i = 0; i < (*inout_count_p); i++)
 	tmp_id_array[out_index_array[i]] = 0;
     total_completed += *inout_count_p;
@@ -3212,7 +3204,10 @@ int job_testsome(job_id_t * id_array,
 				     &pthread_timeout);
 	gen_mutex_unlock(&completion_mutex);
 #else
-	do_one_work_cycle_all();
+	if(timeout_ms)
+	    do_one_work_cycle_all(10);
+	else
+	    do_one_work_cycle_all(0);
 	ret = 0;
 #endif
 	if (ret == ETIMEDOUT)
@@ -3350,12 +3345,6 @@ int job_testcontext(job_id_t * out_id_array_p,
     if (ret == 0 && (*inout_count_p > 0))
 	return (1);
 
-    /* bail out if timeout is zero */
-    if (!timeout_ms)
-    {
-	return (0);
-    }
-
     *inout_count_p = original_count;
 
     /* if we fall through to this point, then we need to just try
@@ -3389,7 +3378,10 @@ int job_testcontext(job_id_t * out_id_array_p,
 				     &pthread_timeout);
 	gen_mutex_unlock(&completion_mutex);
 #else
-	do_one_work_cycle_all();
+	if(timeout_ms)
+	    do_one_work_cycle_all(10);
+	else
+	    do_one_work_cycle_all(0);
 	ret = 0;
 #endif
 	if (ret == ETIMEDOUT)
@@ -3851,15 +3843,15 @@ static int completion_query_context(job_id_t * out_id_array_p,
  *
  * no return value
  */
-static void do_one_work_cycle_all(void)
+static void do_one_work_cycle_all(int idle_time_ms)
 {
     if(bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
-	PINT_thread_mgr_bmi_push(10);
+	PINT_thread_mgr_bmi_push(idle_time_ms);
     if(dev_unexp_pending_count)
-	PINT_thread_mgr_dev_push(10);
+	PINT_thread_mgr_dev_push(idle_time_ms);
 #ifdef __PVFS2_TROVE_SUPPORT__
     if(trove_pending_count || flow_pending_count)
-	PINT_thread_mgr_trove_push(10);
+	PINT_thread_mgr_trove_push(idle_time_ms);
 #endif
 
     return;
