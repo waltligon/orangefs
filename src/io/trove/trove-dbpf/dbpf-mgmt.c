@@ -353,26 +353,30 @@ static int dbpf_storage_create(char *stoname,
                                TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL;
-    char path_name[PATH_MAX] = {0};
+    char storage_dirname[PATH_MAX] = {0};
+    char sto_attrib_dbname[PATH_MAX] = {0};
+    char collections_dbname[PATH_MAX] = {0};
 
-    DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, stoname);
-    ret = dbpf_mkpath(path_name, 0755);
+    DBPF_GET_STORAGE_DIRNAME(storage_dirname, PATH_MAX, stoname);
+    ret = dbpf_mkpath(storage_dirname, 0755);
     if (ret != 0)
     {
         return ret;
     }
 
-    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
-    ret = dbpf_db_create(path_name);
+    DBPF_GET_STO_ATTRIB_DBNAME(sto_attrib_dbname, PATH_MAX, stoname);
+    ret = dbpf_db_create(sto_attrib_dbname);
     if (ret != 0)
     {
         return ret;
     }
     
-    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
-    ret = dbpf_db_create(path_name);
+    DBPF_GET_COLLECTIONS_DBNAME(collections_dbname, PATH_MAX, stoname);
+    ret = dbpf_db_create(collections_dbname);
     if (ret != 0)
     {
+	gossip_lerr("dbpf_storage_create: removing storage attribute database after failed create attempt");
+	unlink(sto_attrib_dbname);
         return ret;
     }
 
