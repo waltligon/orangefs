@@ -66,8 +66,7 @@ void display_pvfs_structure(void *s,int r)
 		{
 			case PVFS_SERV_CREATE:
 				printf("Create Request Structure\n");
-				printf("Bucket: %lld\n",p->u.create.bucket);
-				printf("Mask: %lXh\n",(long unsigned int)p->u.create.handle_mask);
+				printf("Requested Handle: %Ld\n",p->u.create.requested_handle);
 				printf("FSid: %d\n",p->u.create.fs_id);
 				printf("ObjectType: %d\n",p->u.create.object_type);
 				break;
@@ -102,8 +101,7 @@ void display_pvfs_structure(void *s,int r)
 				break;
 			case PVFS_SERV_MKDIR:
 				printf("Mkdir Req\n");
-				printf("Bucket: %lld\n",p->u.mkdir.bucket);
-				printf("Mask: %lXh\n",(long unsigned int)p->u.mkdir.handle_mask);
+				printf("Requested Handle: %Ld\n",p->u.mkdir.requested_handle);
 				printf("FSid: %d\n",p->u.mkdir.fs_id);
 				printf("Attribs:\n");
 				dump_attribs(p->u.mkdir.attr);

@@ -34,7 +34,7 @@
 struct options{
 	char* hostid;       /* host identifier */
 	char* method;       /* bmi method to use */
-	int bucket;
+	int handle;
 };
 
 
@@ -166,8 +166,7 @@ int main(int argc, char **argv)	{
 	my_req.credentials.perms = U_WRITE | U_READ;  
 
 	/* create specific fields */
-	my_req.u.create.bucket = 4095;
-	my_req.u.create.handle_mask = 0;
+	my_req.u.create.requested_handle = 4095;
 	my_req.u.create.fs_id = 9;
 	my_req.u.create.object_type = ATTR_DATA;
 
@@ -675,13 +674,13 @@ static struct options* parse_args(int argc, char* argv[]){
 	/* fill in defaults */
 	memcpy(tmp_opts->hostid, default_hostid, strlen(default_hostid) + 1);
 	memcpy(tmp_opts->method, default_method, strlen(default_method) + 1);
-	tmp_opts->bucket=4095;
+	tmp_opts->handle=4095;
 
 	/* look at command line arguments */
 	while((one_opt = getopt(argc, argv, flags)) != EOF){
 		switch(one_opt){
 			case('l'):
-				tmp_opts->bucket = atoi(optarg);
+				tmp_opts->handle = atoi(optarg);
 				break;
 			case('h'):
 				len = (strlen(optarg)) + 1;

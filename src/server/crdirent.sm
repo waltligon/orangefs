@@ -394,8 +394,9 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
     gossip_debug(SERVER_DEBUG, "  creating dspace (coll_id = 0x%x)\n",
 		 s_op->req->u.crdirent.fs_id);
 
+    /* specify a zero handle to create a new arbitrary handle */
     job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
-					   0, /* TODO: WHAT SHOULD HANDLE BE? */
+					   0,
 					   PVFS_TYPE_DIRDATA,
 					   NULL,
 					   s_op,

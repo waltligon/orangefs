@@ -39,7 +39,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	int attr_mask, last_handle_created = 0;
 	pinode *parent_ptr = NULL, *pinode_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2,*bmi_addr_list = NULL;
-	PVFS_handle *df_handle_array = NULL,new_bkt = 0,handle_mask = 0;
+	PVFS_handle *df_handle_array = NULL,new_bkt = 0;
 	pinode_reference entry;
 	struct PINT_decoded_msg decoded;
 	void* encoded_resp;
@@ -146,8 +146,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	req_p.op = PVFS_SERV_CREATE;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
 	req_p.credentials = req->credentials;
-	req_p.u.create.bucket = new_bkt;
-	req_p.u.create.handle_mask = handle_mask;
+	req_p.u.create.requested_handle = 0;
 	req_p.u.create.fs_id = req->parent_refn.fs_id;
 
 	/* Q: is this sane?  pretty sure we're creating meta files here, but do 
@@ -294,7 +293,6 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	req_p.op = PVFS_SERV_CREATE;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
 	req_p.credentials = req->credentials;
-	req_p.u.create.handle_mask = handle_mask;
 	req_p.u.create.fs_id = req->parent_refn.fs_id;
 	/* we're making data files on each server */
 	req_p.u.create.object_type = ATTR_DATA;
@@ -309,7 +307,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	for(i = 0;i < io_serv_count; i++)
 	{
 		/* Fill in the parameters */
-		req_p.u.create.bucket = df_handle_array[i];
+		req_p.u.create.requested_handle = df_handle_array[i];
 
 		op_tag = get_next_session_tag();
 

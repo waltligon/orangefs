@@ -19,7 +19,7 @@ static char storage_space[PATH_MAX] = "/tmp/pvfs2-test-space";
 static char collection[PATH_MAX] = "fs-foo";
 static int verbose = 0;
 static int new_coll_id = 9;
-static int new_root_handle = 7;
+static int new_root_handle = 1048576;
 static char ranges[PATH_MAX] = "1047000-1049000";
 
 static int parse_args(int argc, char **argv);

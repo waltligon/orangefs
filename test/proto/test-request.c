@@ -192,9 +192,7 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
 			arrow(direction);
                         printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
 			arrow(direction);
-                        printf("PVFS_servreq_create->bucket = %d\n", (int)my_req->u.create.bucket );
-			arrow(direction);
-                        printf("PVFS_servreq_create->handle_mask = %d\n", (int)my_req->u.create.handle_mask );
+                        printf("PVFS_servreq_create->requested_handle = %d\n", (int)my_req->u.create.requested_handle );
 			arrow(direction);
                         printf("PVFS_servreq_create->fs_id = %d\n",(int) my_req->u.create.fs_id );
 			arrow(direction);
@@ -450,8 +448,7 @@ int main(int argc, char **argv)
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
-	request->u.create.bucket = 69;
-	request->u.create.handle_mask = 11111;
+	request->u.create.requested_handle = 69;
 	request->u.create.fs_id = 11111;
 	request->u.create.object_type = 11111;
 	break;

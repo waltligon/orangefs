@@ -96,9 +96,7 @@ typedef struct PVFS_servresp_statfs_s PVFS_servresp_statfs;
  *
  */
 struct PVFS_servreq_create_s {
-	PVFS_handle bucket;		/* Bucket to create PVFS object in */
-	PVFS_handle handle_mask; /* Mask that specifies most significant
-										 bits used for bucket number */
+	PVFS_handle requested_handle; /* requested handle to create */
 	PVFS_fs_id fs_id; /* Filesystem ID */
 	int object_type; /* Type of PVFS object */	
 };
@@ -205,8 +203,7 @@ typedef struct PVFS_servresp_lookup_path_s PVFS_servresp_lookup_path;
 
 /* Mkdir */
 struct PVFS_servreq_mkdir_s {
-	PVFS_handle bucket;	
-	PVFS_handle handle_mask;
+	PVFS_handle requested_handle;	
 	PVFS_fs_id fs_id;
 	PVFS_object_attr attr;
 	PVFS_bitfield attrmask; 

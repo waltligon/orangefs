@@ -36,7 +36,6 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
     pinode *pinode_ptr = NULL, *parent_ptr = NULL;
     bmi_addr_t serv_addr1, serv_addr2;	/* PVFS address type structure */
     int name_sz = 0;
-    PVFS_handle new_bucket = 0, handle_mask = 0;
     pinode_reference entry;
     int attr_mask;
     struct PINT_decoded_msg decoded;
@@ -112,8 +111,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
     req_p.op = PVFS_SERV_MKDIR;
     req_p.rsize = sizeof(struct PVFS_server_req_s);
     req_p.credentials = req->credentials;
-    req_p.u.mkdir.bucket = new_bucket;
-    req_p.u.mkdir.handle_mask = handle_mask;
+    req_p.u.mkdir.requested_handle = 0;
     req_p.u.mkdir.fs_id = req->parent_refn.fs_id;
     req_p.u.mkdir.attr = req->attr;
     req_p.u.mkdir.attrmask = req->attrmask;

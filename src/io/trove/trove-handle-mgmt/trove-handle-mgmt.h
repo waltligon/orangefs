@@ -24,6 +24,8 @@ int trove_set_handle_ranges(
 /* returns a valid TROVE_handle on success; 0 otherwise */
 TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id);
 
+int trove_handle_set_used(TROVE_coll_id coll_id, TROVE_handle handle);
+
 int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle);
 
 int trove_handle_mgmt_finalize(void);

@@ -304,6 +304,24 @@ TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
     return handle;
 }
 
+int trove_handle_set_used(TROVE_coll_id coll_id, TROVE_handle handle)
+{
+    int ret = -1;
+    handle_ledger_t *ledger = NULL;
+    struct qlist_head *hash_link = NULL;
+
+    hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
+    if (hash_link)
+    {
+        ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+        if (ledger)
+        {
+            ret = trove_handle_remove(ledger->ledger,handle);
+        }
+    }
+    return ret;
+}
+
 int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
 {
     int ret = -1;
