@@ -27,6 +27,7 @@ struct handle_ledger {
     TROVE_handle free_list_handle;
     TROVE_handle recently_freed_list_handle;
     TROVE_handle overflow_list_handle;
+    TROVE_handle_count cutoff;	/* when to start trying to reuse handles */
 };
 
 /* Functions used only internally:
@@ -170,7 +171,7 @@ int trove_ledger_handle_free(struct handle_ledger *hl, TROVE_handle handle)
 {
     /* won't actually return to the free list until timeout stuff is in
      * place */
-    if ( extentlist_hit_cutoff(&(hl->recently_freed_list)))
+    if ( extentlist_hit_cutoff(&(hl->recently_freed_list), hl->cutoff))
 	extentlist_addextent(&(hl->overflow_list), handle, handle);
     else 
 	extentlist_addextent(&(hl->recently_freed_list), handle, handle);
@@ -440,6 +441,17 @@ inline int trove_handle_ledger_addextent(struct handle_ledger *hl,
 inline int trove_handle_remove(struct handle_ledger *hl, TROVE_handle handle)
 {
     return extentlist_handle_remove(&(hl->free_list), handle);
+}
+
+/* trove_handle_ledger_set_threshold()
+ * hl:  handle ledger object we will modify
+ * nhandles:  number of total handles in the system. we will make a cutoff
+ *                 value based upon this number
+ */
+inline void trove_handle_ledger_set_threshold(struct handle_ledger *hl,
+					    TROVE_handle_count nhandles)
+{
+    hl->cutoff = (nhandles/4)+1;
 }
 
 /*

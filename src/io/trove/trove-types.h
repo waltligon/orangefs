@@ -27,6 +27,7 @@ typedef PVFS_ds_position           TROVE_ds_position;
 typedef PVFS_ds_attributes         TROVE_ds_attributes_s;
 typedef PVFS_ds_storedattr         TROVE_ds_storedattr_s;
 typedef PVFS_error                 TROVE_ds_state;
+typedef PVFS_handle                TROVE_handle_count;
 
 #define trove_ds_attr_to_stored PVFS_ds_attr_to_stored
 #define trove_ds_stored_to_attr PVFS_ds_stored_to_attr

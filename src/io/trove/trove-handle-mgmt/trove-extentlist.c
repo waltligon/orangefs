@@ -54,6 +54,7 @@ int extentlist_init(struct TROVE_handle_extentlist *elist)
 	perror("extentlist_init: malloc");
 	return -1;
     }
+    gettimeofday(&elist->timestamp, NULL);
 #if 0 
     /* XXX: implement on-disk later */
     elist->num_entries = 0;
@@ -84,9 +85,6 @@ void extentlist_free(struct TROVE_handle_extentlist *e)
 }
 /* add an extent to a list
  *
- * we could check the time at every insert, but to avoid some system calls,
- * we'll update the timestamp at every EXTENTLIST_TIMECHECK_FREQ insertions 
- *
  * see if we can coalesce this extent with another in the index. if not,
  * add it to the tree ourselves
  */
@@ -111,8 +109,9 @@ int extentlist_addextent(struct TROVE_handle_extentlist *elist,
 	elist->num_extents++;
     }
 	
-    if ( elist->num_handles % EXTENTLIST_TIMECHECK_FREQ == 0 )
-	gettimeofday(&elist->timestamp, NULL );
+    /* it might be expensive to check the time every time an extent is
+     * released, but we'll cross that bridge when we get there */
+    gettimeofday(&elist->timestamp, NULL );
     elist->num_handles += (last - first + 1);
 
     /* XXX: implement on-disk stuff later */
@@ -339,9 +338,10 @@ static void extent_show(struct avlnode *n,
  *  0				plenty of room
  *  nonzero			time to move on
  */
-int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist) 
+int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist, 
+			    TROVE_handle_count cutoff) 
 {
-    return( (elist->num_handles > EXTENTLIST_CUTOFF) );
+    return( (elist->num_handles > cutoff) );
 }
 
 /*

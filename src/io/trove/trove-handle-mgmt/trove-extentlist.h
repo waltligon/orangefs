@@ -15,7 +15,6 @@
 #define EXTENTLIST_SIZE 1024
 #define EXTENTLIST_TIMECHECK_FREQ 1
 #define EXTENTLIST_PURGATORY 1
-#define EXTENTLIST_CUTOFF 50
 
 enum {
     MIN_HANDLE = 0,
@@ -60,7 +59,7 @@ TROVE_handle extentlist_get_from_extent(struct TROVE_handle_extentlist *elist,
 int extentlist_handle_remove(struct TROVE_handle_extentlist *elist, TROVE_handle handle);
 void extentlist_show(struct TROVE_handle_extentlist *elist);
 void extentlist_stats(struct TROVE_handle_extentlist *elist); 
-int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist);
+int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist, TROVE_handle_count cutoff);
 int extentlist_endured_purgatory(struct TROVE_handle_extentlist *querent, struct TROVE_handle_extentlist *reference);
 int extentlist_addextent(struct TROVE_handle_extentlist *elist, int64_t first, int64_t last);
 

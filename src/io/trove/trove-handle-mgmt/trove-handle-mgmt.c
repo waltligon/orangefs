@@ -122,6 +122,7 @@ static int trove_map_handle_ranges(TROVE_coll_id coll_id,
     int ret = -1;
     struct llist *cur = NULL;
     PVFS_handle_extent *cur_extent = NULL;
+    int64_t total_handles=0;
 
     if (extent_list && ledger)
     {
@@ -139,11 +140,14 @@ static int trove_map_handle_ranges(TROVE_coll_id coll_id,
 	    if (ret != 0)
 		break;
 
+	    total_handles += cur_extent->last - cur_extent->first;
             cur = llist_next(cur);
         }
+	trove_handle_ledger_set_threshold(ledger, total_handles);
     }
     return ret;
 }
+
 
 static handle_ledger_t *get_or_add_handle_ledger(TROVE_coll_id coll_id)
 {
