@@ -9,9 +9,6 @@
 
 #include "pvfs2-types.h"
 
-/* should be in a limits.h like file */
-#define MAX_SEGMENT_LEN   128
-
 int PINT_get_path_element(
     char *pathname,
     int segment_num,

@@ -50,6 +50,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_CONFIG_FILE_BYTES  16384
 /* max size of all path strings */
 #define PVFS_REQ_LIMIT_PATH_NAME_BYTES    PVFS_NAME_MAX
+/* max size of strings representing a single path element */
+#define PVFS_REQ_LIMIT_SEGMENT_BYTES      PVFS_SEGMENT_MAX
 /* max total size of I/O request descriptions */
 #define PVFS_REQ_LIMIT_IOREQ_BYTES        8192
 /* max count of segments allowed per path lookup (note that this governs 

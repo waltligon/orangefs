@@ -12,7 +12,7 @@
 /* Dcache Entry */
 struct dcache_entry_s {
 	PVFS_pinode_reference parent;   /* the pinode of the parent directory */
-	char name[PVFS_NAME_MAX];  /* PVFS object name */
+	char name[PVFS_SEGMENT_MAX];  /* PVFS object name */
 	PVFS_pinode_reference entry;    /* the pinode of entry in parent */
 	struct timeval tstamp_valid;  /* timestamp indicating validity period */
 };
@@ -478,7 +478,7 @@ static void dcache_remove_dentry(int item)
     int prev = 0,next = 0;
 
     cache->element[item].status = STATUS_UNUSED;
-    memset(&cache->element[item].dentry.name, 0, PVFS_NAME_MAX );
+    memset(&cache->element[item].dentry.name, 0, PVFS_SEGMENT_MAX );
     cache->count--;
 
     /* if there's exactly one item in the list, just get rid of it*/

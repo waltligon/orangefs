@@ -78,7 +78,7 @@ int PVFS_sys_ref_lookup(
 
     pinode *pinode_ptr = NULL;
     char *path = NULL;
-    char segment[MAX_SEGMENT_LEN] = {0};
+    char segment[PVFS_SEGMENT_MAX] = {0};
     bmi_addr_t serv_addr;
     int total_segments = 0, num_segments_remaining = 0;
     PVFS_pinode_reference entry;
@@ -215,7 +215,7 @@ int PVFS_sys_ref_lookup(
 	    entry.handle = ack_p->u.lookup_path.handle_array[i];
 	    entry.fs_id = fs_id;
 
-            ret = PINT_get_path_element(path, i, segment, MAX_SEGMENT_LEN);
+            ret = PINT_get_path_element(path, i, segment, PVFS_SEGMENT_MAX);
 	    if (ret < 0)
 	    {
 		failure = RECV_REQ_FAILURE;

@@ -11,7 +11,7 @@
 int main(int argc, char* argv[])
 {
 	char path[] = "/test/some/dir/misc/stuff/file.txt";
-	char segment[MAX_SEGMENT_LEN] = {0};
+	char segment[PVFS_SEGMENT_MAX] = {0};
 	int num_segments = 0,i, ret=0;
 
 	gossip_enable_stderr();
@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
 
 	for(i= 0; i < num_segments; i++)
 	{
-		ret = PINT_get_path_element(path,i,segment,MAX_SEGMENT_LEN);
+		ret = PINT_get_path_element(path,i,segment,PVFS_SEGMENT_MAX);
 		if (ret < 0)
 		{
 			printf("errcode = %d\n",ret);

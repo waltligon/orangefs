@@ -6,14 +6,13 @@
 
 #include <client.h>
 #include "helper.h"
-
-#define PVFS_NAME_MAX 256
+#include "pvfs2-types.h"
 
 int main(int argc,char **argv)
 {
     int ret = -1;
-    char old_buf[PVFS_NAME_MAX] = {0};
-    char new_buf[PVFS_NAME_MAX] = {0};
+    char old_buf[PVFS_SEGMENT_MAX] = {0};
+    char new_buf[PVFS_SEGMENT_MAX] = {0};
     char *old_filename = (char *)0;
     char *new_filename = (char *)0;
     PVFS_fs_id cur_fs;
@@ -49,7 +48,7 @@ int main(int argc,char **argv)
         return ret;
     }
 
-    if (PINT_remove_base_dir(old_filename, old_buf, PVFS_NAME_MAX))
+    if (PINT_remove_base_dir(old_filename, old_buf, PVFS_SEGMENT_MAX))
     {
         if (old_filename[0] != '/')
         {
@@ -61,7 +60,7 @@ int main(int argc,char **argv)
     }
     printf("Old filename is %s\n", old_buf);
 
-    if (PINT_remove_base_dir(new_filename, new_buf, PVFS_NAME_MAX))
+    if (PINT_remove_base_dir(new_filename, new_buf, PVFS_SEGMENT_MAX))
     {
         if (new_filename[0] != '/')
         {

@@ -25,11 +25,11 @@ static int remove_dirs(PVFS_pinode_reference parent_refn,
                        int rank)
 {
     int i, ret = -1;
-    char name[PVFS_NAME_MAX];
+    char name[PVFS_SEGMENT_MAX];
 
     for (i = 0; i < ndirs; i++)
     {
-	snprintf(name, PVFS_NAME_MAX, "rank%d-iter%d", rank, i);
+	snprintf(name, PVFS_SEGMENT_MAX, "rank%d-iter%d", rank, i);
 	ret = remove_dir(parent_refn, name);
 	if (ret < 0)
 	{
@@ -105,12 +105,12 @@ static int create_dirs(PVFS_pinode_reference refn,
                        int rank)
 {
     int i;
-    char name[PVFS_NAME_MAX];
+    char name[PVFS_SEGMENT_MAX];
     PVFS_pinode_reference out_refn;
 
     for (i = 0; i < ndirs; i++)
     {
-	snprintf(name, PVFS_NAME_MAX, "rank%d-iter%d", rank, i);
+	snprintf(name, PVFS_SEGMENT_MAX, "rank%d-iter%d", rank, i);
 	if (create_dir(refn, name, &out_refn) < 0)
 	{
             printf("failed to mkdir %s ... skipping.\n",name);
@@ -137,7 +137,7 @@ int test_dir_operations(MPI_Comm * comm,
 {
     int ret = -1;
     int nerrs = 0;
-    char name[PVFS_NAME_MAX];
+    char name[PVFS_SEGMENT_MAX];
     PVFS_fs_id fs_id = 0;
     PVFS_pinode_reference root_refn, out_refn;
     generic_params *myparams = (generic_params *) rawparams;
@@ -164,8 +164,8 @@ int test_dir_operations(MPI_Comm * comm,
      * less cluttered)
      *
      */
-    memset(name,0,PVFS_NAME_MAX);
-    snprintf(name, PVFS_NAME_MAX, "dir_op_test");
+    memset(name,0,PVFS_SEGMENT_MAX);
+    snprintf(name, PVFS_SEGMENT_MAX, "dir_op_test");
     if (rank == 0)
     {
 	if (create_dir(root_refn, name, &out_refn) < 0)

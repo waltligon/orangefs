@@ -59,7 +59,7 @@ int recursive_create_dir(PVFS_handle handle,
 			 int rank)
 {
     int i;
-    char name[PVFS_NAME_MAX];
+    char name[PVFS_SEGMENT_MAX];
     PVFS_pinode_reference refn;
     PVFS_pinode_reference out_refn;
 
@@ -72,7 +72,7 @@ int recursive_create_dir(PVFS_handle handle,
 
     for (i = 0; i < ndirs; i++)
     {
-	snprintf(name, PVFS_NAME_MAX, "depth=%d-rank=%d-iter=%d", depth, rank, i);
+	snprintf(name, PVFS_SEGMENT_MAX, "depth=%d-rank=%d-iter=%d", depth, rank, i);
 	create_dir(refn, name, &out_refn);
 	if (out_refn.handle < 0)
 	{
