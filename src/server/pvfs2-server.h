@@ -47,6 +47,11 @@ struct PINT_server_lookup_op {
     PVFS_ds_keyval_s k_a[1], v_a[1]; /* not sure that this is really necessary... */
 };
 
+struct PINT_server_crdirent_op {
+    PVFS_object_attr parent_attr; /* used to hold attributes of the parent directory */
+    PVFS_handle dirent_handle; /* used to hold handle of dirdata dspace that we'll write the dirent into */
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -73,7 +78,8 @@ typedef struct PINT_server_op
     struct PINT_decoded_msg decoded;
     flow_descriptor* flow_d;
     union {
-	struct PINT_server_lookup_op lookup;
+	struct PINT_server_lookup_op   lookup;
+	struct PINT_server_crdirent_op crdirent;
     } u;
 } PINT_server_op;
 

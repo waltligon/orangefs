@@ -27,24 +27,26 @@ My TODO list for this SM:
 
 */
 
-#include <state-machine.h>
-#include <server-config.h>
-#include <pvfs2-server.h>
+#include <ctype.h>
 #include <string.h>
-#include <pvfs2-attr.h>
-#include <job-consist.h>
 #include <assert.h>
 
-static int crdirent_init(state_action_struct *s_op, job_status_s *ret);
-static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret);
-static int crdirent_getattr(state_action_struct *s_op, job_status_s *ret);
-static int crdirent_check_perms(state_action_struct *s_op, job_status_s *ret);
-static int crdirent_create(state_action_struct *s_op, job_status_s *ret);
-static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_s *ret);
-static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_s *ret);
-static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret);
-static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *ret);
+#include "state-machine.h"
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "job-consist.h"
+
+static int crdirent_init(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_read_directory_entry_handle(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_getattr(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_check_perms(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_write_directory_entry(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_create_dirdata_dspace(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_write_dirdata_handle(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_send_bmi(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_cleanup(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
 void crdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -56,13 +58,27 @@ PINT_state_machine_s crdirent_req_s =
 	crdirent_init_state_machine
 };
 
+enum {
+    ERROR_BADNAME = 4
+};
+
 %%
 
-machine crdirent(init, get_handle, get_attrib, check_perms, create, send, cleanup, create_handle1, create_handle2,release)
+machine crdirent(init,
+		 read_directory_entry_handle,
+		 get_attrib,
+		 check_perms,
+		 write_directory_entry,
+		 send,
+		 cleanup,
+		 create_dirdata_dspace,
+		 write_dirdata_handle,
+		 release)
 {
 	state init
 	{
 		run crdirent_init;
+		ERROR_BADNAME => send;
 		default => get_attrib;
 	}
 
@@ -76,34 +92,34 @@ machine crdirent(init, get_handle, get_attrib, check_perms, create, send, cleanu
 	state check_perms
 	{
 		run crdirent_check_perms;
-		success => get_handle;
+		success => read_directory_entry_handle;
 		default => send;
 	}
 	
-	state get_handle
+	state read_directory_entry_handle
 	{
-		run crdirent_gethandle;
-		success => create;
-		default => create_handle1;
+		run crdirent_read_directory_entry_handle;
+		success => write_directory_entry;
+		default => create_dirdata_dspace;
 	}
 
-	state create
+	state write_directory_entry
 	{
-		run crdirent_create;
+		run crdirent_write_directory_entry;
 		default => send;
 	}
 
-	state create_handle1
+	state create_dirdata_dspace
 	{
-		run crdirent_create_dir_handle_ph1;
-		success => create_handle2;
+		run crdirent_create_dirdata_dspace;
+		success => write_dirdata_handle;
 		default => send;
 	}
 
-	state create_handle2
+	state write_dirdata_handle
 	{
-		run crdirent_create_dir_handle_ph2;
-		success => create;
+		run crdirent_write_dirdata_handle;
+		success => write_directory_entry;
 		default => send;
 	}
 
@@ -165,89 +181,56 @@ void crdirent_init_state_machine(void)
  *           the trove operation to get the attribute structure
  *           used in check permissions.  Also runs the operation through
  *           the request scheduler for consistency.
+ *
+ * NOTE: ALLOCATES MEMORY, POINTED TO BY VAL.BUFFER.
  *           
  */
-
-static int crdirent_init(state_action_struct *s_op, job_status_s *ret)
+static int crdirent_init(PINT_server_op *s_op,
+			 job_status_s *ret)
 {
     int job_post_ret;
-    gossip_ldebug(SERVER_DEBUG,
-	    "Got CrDirent for %s,%lld in %lld\n",
+    char *ptr;
+
+    gossip_debug(SERVER_DEBUG, "crdirent state: init\n");
+
+    /* verify input values -- some of this should be caught as legitimate errors later! */
+    assert(s_op->req->u.crdirent.name != NULL);
+    assert(s_op->req->u.crdirent.new_handle != 0);
+    assert(s_op->req->u.crdirent.parent_handle != 0);
+
+    gossip_debug(SERVER_DEBUG,
+	    "  got crdirent for %s (with handle 0x%08Lx) in 0x%08Lx\n",
 	    s_op->req->u.crdirent.name,
 	    s_op->req->u.crdirent.new_handle,
 	    s_op->req->u.crdirent.parent_handle);
 
-    /* get the key and key size out of our list of common keys */
-    s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+    /* check for invalid characters in name */
+    ptr = s_op->req->u.crdirent.name;
+    while (*ptr != '\0' && *ptr != '/' && isprint(*ptr)) ptr++;
 
-    /* create a buffer for the trove operations (get_attrib and get_handle) */
-    s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
+    if (*ptr != '\0') {
+	/* found an invalid character -- report it and send error response */
+	if (*ptr == '/') {
+	    gossip_lerr("crdirent: error: invalid '/' character in name (%s); sending error response.\n",
+			s_op->req->u.crdirent.name);
+	}
+	else {
+	    gossip_lerr("crdirent: error: invalid unprintable character (value = 0x%x) in name; sending error response.\n",
+			(int) *ptr);
+	}
+	ret->error_code = ERROR_BADNAME;
+	s_op->scheduled_id = 0;
+	return 1;
+    }
 
     /* post a scheduler job */
     job_post_ret = job_req_sched_post(s_op->req,
-	    s_op,
-	    ret,
-	    &(s_op->scheduled_id));
-    gossip_ldebug(SERVER_DEBUG,"jpr: %d\n",job_post_ret);
-    return(job_post_ret);
+				      s_op,
+				      ret,
+				      &(s_op->scheduled_id));
+    return job_post_ret;
 }
 
-/*
- * Function: crdirent_gethandle
- *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
- *
- * Pre:      s_op->u.crdirent.parent_handle is handle of directory
- *
- * Post:     s_op->val.buffer is the directory entry k/v space OR NULL
- *           if first entry
- *
- * Returns:  int
- *
- * Synopsis: Get the directory entry handle for the directory entry k/v space.
- *           Recall that directories have two key-val spaces, one of which is 
- *           synonymous with files where the metadata is stored.  The other
- *           space holds the filenames and their handles.  In this function, 
- *           we attempt to retrieve the handle for the filename/handle key/val
- *           space and if it does not exist, we need to create it.
- *
- *           TODO: Semantics here of whether we want to create it here, or upon
- *                 the creation of the directory. 
- *           
- */
-
-static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
-{
-    int job_post_ret;
-    job_id_t i;
-
-    gossip_ldebug(SERVER_DEBUG,"Get Handle Fxn for crdirent\n");
-
-    /* get the key and key size out of our list of common keys */
-    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
-
-    /* 
-     *	Assert that the buffer is big enough to hold a handle.
-     *  Recall that the buffer was previously allocated for the permission checking
-     */
-    assert(s_op->val.buffer != NULL && s_op->val.buffer_sz >= sizeof(PVFS_handle));
-
-    job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
-	    s_op->req->u.crdirent.parent_handle,
-	    &(s_op->key),
-	    &(s_op->val),
-	    0,
-	    NULL,
-	    s_op,
-	    ret,
-	    &i);
-
-
-    return(job_post_ret);
-}
 
 /*
  * Function: crdirent_getattr
@@ -263,30 +246,47 @@ static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
  *
  * Returns:  int
  *
- * Synopsis: Just returned from scheduler. init has set up key and val buffer.
- *           Post Trove job to read metadata for the parent directory so we can make sure
+ * Synopsis: Post Trove job to read metadata for the parent directory so we can make sure
  *           that the credentials are valid.
  *           
  */
-
-static int crdirent_getattr(state_action_struct *s_op, job_status_s *ret)
+static int crdirent_getattr(PINT_server_op *s_op,
+			    job_status_s *ret)
 {
 
     int job_post_ret;
     job_id_t i;
 
-    gossip_ldebug(SERVER_DEBUG,"Get attr Fxn for crdirent\n");
-    job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
-	    s_op->req->u.crdirent.parent_handle,
-	    &(s_op->key),
-	    &(s_op->val),
-	    0,
-	    NULL,
-	    s_op,
-	    ret,
-	    &i);
+    gossip_ldebug(SERVER_DEBUG,"crdirent state: getattr\n");
 
-    return(job_post_ret);
+    assert(s_op->scheduled_id != 0);
+
+    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+
+    /* store parent attributes in crdirent scratch space */
+    s_op->val.buffer    = &s_op->u.crdirent.parent_attr;
+    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.crdirent.fs_id,
+		 s_op->req->u.crdirent.parent_handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
+
+    job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
+					 s_op->req->u.crdirent.parent_handle,
+					 &s_op->key,
+					 &s_op->val,
+					 0,
+					 NULL,
+					 s_op,
+					 ret,
+					 &i);
+    return job_post_ret;
 }
 
 /*
@@ -306,75 +306,89 @@ static int crdirent_getattr(state_action_struct *s_op, job_status_s *ret)
  *           to do.
  *           
  */
-
-static int crdirent_check_perms(state_action_struct *s_op, job_status_s *ret)
+static int crdirent_check_perms(PINT_server_op *s_op,
+				job_status_s *ret)
 {
-    int job_post_ret;
-    /*job_id_t i;*/
+    PVFS_object_attr *a_p;
 
-    gossip_ldebug(SERVER_DEBUG,"CheckPerms Fxn for crdirent\n");
-    job_post_ret = 1;  /* Just pretend it is good right now */
+    a_p = &s_op->u.crdirent.parent_attr;
+
+    gossip_debug(SERVER_DEBUG,"crdirent state: check_perms\n");
+
+    gossip_debug(SERVER_DEBUG,
+		 "  attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		 a_p->owner,
+		 a_p->group,
+		 a_p->perms,
+		 a_p->objtype);
+
+    /* recall attributes are in s_op->u.crdirent.parent_attr */
+    /* TODO: MAKE THIS AN ERROR CHECK INSTEAD LATER */
+    assert(s_op->u.crdirent.parent_attr.objtype == PVFS_TYPE_DIRECTORY);
+
     /*IF THEY don't have permission, set ret->error_code to -ENOPERM!*/
 
-    return(job_post_ret);
+    return 1;
 }
 
+
 /*
- * Function: crdirent_create_dir_handle_ph2
+ * Function: crdirent_read_directory_entry_handle
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      ret->handle is the new directory entry k/v space
+ * Pre:      s_op->u.crdirent.parent_handle is handle of directory
  *
- * Post:     ret->handle is stored in the original k/v space for the
- *           parent handle.
+ * Post:     s_op->val.buffer is the directory entry k/v space OR NULL
+ *           if first entry
  *
  * Returns:  int
  *
- * Synopsis: We are storing the newly created k/v space for future
- *           directory entries.
+ * Synopsis: Given a directory handle, look up the handle used to store
+ * directory entries for this directory.
+ *
+ *           Get the directory entry handle for the directory entry k/v space.
+ *           Recall that directories have two key-val spaces, one of which is 
+ *           synonymous with files where the metadata is stored.  The other
+ *           space holds the filenames and their handles.  In this function, 
+ *           we attempt to retrieve the handle for the filename/handle key/val
+ *           space and if it does not exist, we need to create it.
+ *
+ *           TODO: Semantics here of whether we want to create it here, or upon
+ *                 the creation of the directory. 
  *           
  */
-
-static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_s *ret)
+static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
+						job_status_s *ret)
 {
     int job_post_ret;
     job_id_t i;
 
-    gossip_ldebug(SERVER_DEBUG,"phase2 Fxn for crdirent\n");
+    gossip_debug(SERVER_DEBUG, "crdirent state: gethandle\n");
 
     /* get the key and key size out of our list of common keys */
-    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
-    /*
-     * Recall again, this buffer was originally allocated for check_permissions
-     * Let's assert and continue.
-     */
-    assert(s_op->val.buffer != NULL && s_op->val.buffer_sz >= sizeof(PVFS_handle));
-
-    /* we are writing to Trove, so the val is set up here */
-    *((PVFS_handle *)s_op->val.buffer) = ret->handle;
+    /* store the handle in the crdirent-specific space in s_op */
+    s_op->val.buffer    = &s_op->u.crdirent.dirent_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-    gossip_debug(SERVER_DEBUG,"Kv write %lld, %lld\n",s_op->req->u.crdirent.parent_handle,*(PVFS_handle *) s_op->val.buffer);
-
-    /* adds the k/v space */
-    job_post_ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
-	    s_op->req->u.crdirent.parent_handle,
-	    &(s_op->key),
-	    &(s_op->val),
-	    TROVE_SYNC,
-	    NULL,
-	    s_op,
-	    ret,
-	    &i);
-    return(job_post_ret);
+    job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
+					 s_op->req->u.crdirent.parent_handle,
+					 &s_op->key,
+					 &s_op->val,
+					 0,
+					 NULL,
+					 s_op,
+					 ret,
+					 &i);
+    return job_post_ret;
 }
 
 /*
- * Function: crdirent_create_dir_handle_ph1
+ * Function: crdirent_create_dirdata_dspace
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -391,29 +405,86 @@ static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_
  *           for these entries.  This is the first part, and we store
  *           it in part two.
  */
-
-static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_s *ret)
+static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
+					  job_status_s *ret)
 {
     int job_post_ret;
     job_id_t i;
 
-    gossip_ldebug(SERVER_DEBUG,"CrDirent Phase 1 Creating Handle:  %d,%lld\n",
-	    s_op->req->u.crdirent.fs_id,\
-	    s_op->req->u.crdirent.parent_handle);
+    gossip_debug(SERVER_DEBUG, "crdirent state: create_dirdata_dspace\n");
+
+    gossip_debug(SERVER_DEBUG, "  creating dspace (coll_id = 0x%x)\n",
+		 s_op->req->u.crdirent.fs_id);
 
     job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
-	    s_op->req->u.crdirent.parent_handle,
-	    0x00000000, /* TODO: Change this */
-	    PVFS_TYPE_DIRDATA,
-	    NULL,
-	    s_op,
-	    ret,
-	    &i);
-    return(job_post_ret);
+					   0, /* TODO: WHAT SHOULD HANDLE BE? */
+					   0x00000000, /* TODO: Change this */
+					   PVFS_TYPE_DIRDATA,
+					   NULL,
+					   s_op,
+					   ret,
+					   &i);
+    return job_post_ret;
 }
 
 /*
- * Function: crdirent_create
+ * Function: crdirent_write_dirdata_handle
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *ret
+ *
+ * Pre:      ret->handle is the new directory entry k/v space
+ *
+ * Post:     ret->handle is stored in the original k/v space for the
+ *           parent handle.
+ *
+ * Returns:  int
+ *
+ * Synopsis: We are storing the newly created k/v space for future
+ *           directory entries.
+ *           
+ */
+static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
+					 job_status_s *ret)
+{
+    int job_post_ret;
+    job_id_t i;
+
+    gossip_debug(SERVER_DEBUG, "crdirent state: write_dirdata_handle\n");
+
+    /* TODO CHECK ERROR CODE */
+
+    /* get the key and key size out of our list of common keys */
+    s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+
+    /* the last state was create_dirdata_dspace, so handle is in ret->handle. save it. */
+    s_op->u.crdirent.dirent_handle = ret->handle;
+
+    /* get the handle out of the crdirent scratch space */
+    s_op->val.buffer    = &s_op->u.crdirent.dirent_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  writing dirdata handle (0x%08Lx) into parent directory keyval space (0x%08Lx)\n",
+		 s_op->u.crdirent.dirent_handle,
+		 s_op->req->u.crdirent.parent_handle);
+
+    job_post_ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
+					  s_op->req->u.crdirent.parent_handle,
+					  &s_op->key,
+					  &s_op->val,
+					  TROVE_SYNC,
+					  NULL,
+					  s_op,
+					  ret,
+					  &i);
+    return job_post_ret;
+}
+
+
+/*
+ * Function: crdirent_write_directory_entry
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -431,45 +502,42 @@ static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_
  *           space for directory handles.
  */
 
-static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
+static int crdirent_write_directory_entry(PINT_server_op *s_op,
+					  job_status_s *ret)
 {
     int job_post_ret;
     job_id_t i;
-    PVFS_handle h;
 
-    gossip_ldebug(SERVER_DEBUG,"create Fxn for crdirent %lld\n",*(PVFS_handle
-*)s_op->val.buffer);
-
-    /* Verify that we have all the information we need to store the pair */
-    assert(s_op->req->u.crdirent.name != NULL && s_op->req->u.crdirent.new_handle != 0);
+    gossip_debug(SERVER_DEBUG, "crdirent state: write_directory_entry\n");
 
     /* This buffer came from one of two places, either phase two of creating the
      * directory space when we wrote the value back to trove, or from the initial read
      * from trove.
      */
-    h = *((PVFS_handle *)s_op->val.buffer);
-    gossip_debug(SERVER_DEBUG,"Handle: %lld\n",h);
-    free(s_op->val.buffer);
 
     /* this is the name for the parent entry */
-    s_op->key.buffer = s_op->req->u.crdirent.name;
+    s_op->key.buffer    = s_op->req->u.crdirent.name;
     s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
-    gossip_ldebug(SERVER_DEBUG,"Creating Entry for %s,%d,%lld\n",(char *)s_op->key.buffer,s_op->key.buffer_sz,h);
 
-    /* this is the name for the new entry */
-    s_op->val.buffer = &(s_op->req->u.crdirent.new_handle);
+    s_op->val.buffer    = &s_op->req->u.crdirent.new_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
+    gossip_debug(SERVER_DEBUG,
+		 "  writing new directory entry for %s (handle = 0x%08Lx) to dirdata dspace 0x%08Lx\n",
+		 s_op->req->u.crdirent.name,
+		 s_op->req->u.crdirent.new_handle,
+		 s_op->u.crdirent.dirent_handle);
+
     job_post_ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
-	    h,
-	    &(s_op->key),
-	    &(s_op->val),
-	    TROVE_SYNC,
-	    NULL,
-	    s_op,
-	    ret,
-	    &i);
-    return(job_post_ret);
+					  s_op->u.crdirent.dirent_handle,
+					  &s_op->key,
+					  &s_op->val,
+					  TROVE_SYNC,
+					  NULL,
+					  s_op,
+					  ret,
+					  &i);
+    return job_post_ret;
 }
 
 /*
@@ -490,12 +558,13 @@ static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
  *           error_code, and here, it is just an acknowledgement.
  */
 
-static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
+static int crdirent_send_bmi(PINT_server_op *s_op,
+			     job_status_s *ret)
 {
     int job_post_ret=0;
     job_id_t i;
 
-    gossip_ldebug(SERVER_DEBUG,"send Fxn for crdirent %d\n",ret->error_code);
+    gossip_debug(SERVER_DEBUG, "crdirent state: send_bmi\n");
 
     s_op->resp->status = ret->error_code;
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
@@ -507,48 +576,25 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
     /* Encode the message */
     job_post_ret = PINT_encode(s_op->resp,
-	    PINT_ENCODE_RESP,
-	    &(s_op->encoded),
-	    s_op->addr,
-	    s_op->enc_type);
+			       PINT_ENCODE_RESP,
+			       &(s_op->encoded),
+			       s_op->addr,
+			       s_op->enc_type);
 
     assert(job_post_ret == 0);
 
-#ifndef PVFS2_SERVER_DEBUG_BMI
-
-    job_post_ret = job_bmi_send_list(
-	    s_op->addr,
-	    s_op->encoded.buffer_list,
-	    s_op->encoded.size_list,
-	    s_op->encoded.list_count,
-	    s_op->encoded.total_size,
-	    s_op->tag,
-	    s_op->encoded.buffer_flag,
-	    0,
-	    s_op, 
-	    ret, 
-	    &i);
-
-#else
-
-    job_post_ret = job_bmi_send(
-	    s_op->addr,
-	    s_op->encoded.buffer_list[0],
-	    s_op->encoded.total_size,
-	    s_op->tag,
-#ifdef PVFS2_SERVER_DEBUG_BMI
-	    s_op->encoded.buffer_flag,
-#else
-	    0,
-#endif
-	    0,
-	    s_op,
-	    ret,
-	    &i);
-
-#endif
-
-    return(job_post_ret);
+    job_post_ret = job_bmi_send_list(s_op->addr,
+				     s_op->encoded.buffer_list,
+				     s_op->encoded.size_list,
+				     s_op->encoded.list_count,
+				     s_op->encoded.total_size,
+				     s_op->tag,
+				     s_op->encoded.buffer_flag,
+				     0,
+				     s_op, 
+				     ret, 
+				     &i);
+    return job_post_ret;
 }
 
 /*
@@ -566,18 +612,26 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
 
-static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+static int crdirent_release_posted_job(PINT_server_op *s_op,
+				       job_status_s *ret)
 {
 
     int job_post_ret=0;
     job_id_t i;
 
-    gossip_ldebug(SERVER_DEBUG,"Release Fxn for crdirent\n");
-    job_post_ret = job_req_sched_release(s_op->scheduled_id,
-	    s_op,
-	    ret,
-	    &i);
-    return job_post_ret;
+    gossip_debug(SERVER_DEBUG, "crdirent state: release_posted_job\n");
+
+    if (s_op->scheduled_id == 0) {
+	gossip_debug(SERVER_DEBUG, "  skipping; didn't schedule this request\n");
+	return 1;
+    }
+    else {
+	job_post_ret = job_req_sched_release(s_op->scheduled_id,
+					     s_op,
+					     ret,
+					     &i);
+	return job_post_ret;
+    }
 }
 
 /*
@@ -586,39 +640,26 @@ static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *
  * Params:   server_op *b, 
  *           job_status_s *ret
  *
- * Pre:      NONE
- *
- * Post:     everything is free!
- *
- * Returns:  int
- *
  * Synopsis: free memory and return
  */
 
-static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int crdirent_cleanup(PINT_server_op *s_op,
+			    job_status_s *ret)
 {
-    gossip_ldebug(SERVER_DEBUG,"clean Fxn for crdirent\n");
+    gossip_debug(SERVER_DEBUG, "crdirent state: crdirent_cleanup\n");
 
-    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
-    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
+    /* free decoded, encoded requests */
+    PINT_decode_release(&s_op->decoded, PINT_DECODE_REQ, 0);
+    free(s_op->unexp_bmi_buff.buffer);
 
-    if(s_op->resp)
-    {
-	free(s_op->resp);
-    }
+    /* free encoded, decoded responses */
+    PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP, 0);
+    free(s_op->resp);
 
-    /*
-    BMI_memfree(
-	    s_op->addr,
-	    s_op->req,
-	    s_op->unexp_bmi_buff->size,
-	    BMI_RECV_BUFFER
-	    );
-    */
-
+    /* free server operation structure */
     free(s_op);
 
-    return(0);
+    return 0;
 }
 
 /*
