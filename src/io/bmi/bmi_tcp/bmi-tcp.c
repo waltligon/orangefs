@@ -138,6 +138,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_context_id context_id);
 int BMI_tcp_open_context(bmi_context_id context_id);
 void BMI_tcp_close_context(bmi_context_id context_id);
+int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id);
 
 char BMI_tcp_method_name[] = "bmi_tcp";
 
@@ -276,7 +277,7 @@ struct bmi_method_ops bmi_tcp_ops = {
     BMI_tcp_post_sendunexpected_list,
     BMI_tcp_open_context,
     BMI_tcp_close_context,
-    NULL
+    BMI_tcp_cancel,
 };
 
 /* module parameters */
@@ -1243,6 +1244,62 @@ void BMI_tcp_close_context(bmi_context_id context_id)
     return;
 }
 
+
+/* BMI_tcp_cancel()
+ *
+ * attempt to cancel a pending bmi tcp operation
+ *
+ * returns 0 on success, -errno on failure
+ * TODO: pick better error code than -EINTR for canceled operations
+ */
+int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
+{
+    method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
+
+    assert(query_op);
+
+    gen_mutex_lock(&interface_mutex);
+
+    /* easy case: is the operation already completed? */
+    if(((struct tcp_op*)(query_op->method_data))->tcp_op_state ==
+	BMI_TCP_COMPLETE)
+    {
+	/* we are done! status will be collected during test */
+	gen_mutex_unlock(&interface_mutex);
+	return(0);
+    }
+
+    /* has the operation started moving data yet? */
+    if(query_op->env_amt_complete)
+    {
+	/* be pessimistic and kill the socket */
+	/* NOTE: this may place other operations beside this one into
+	 * EINTR error state 
+	 */
+	tcp_forget_addr(query_op->addr, 0, -EINTR);
+	gen_mutex_unlock(&interface_mutex);
+	return(0);
+    }
+
+    /* if we fall to this point, op has been posted, but no data has moved
+     * for it yet as far as we know
+     */
+
+    /* mark op as canceled, move to completion queue */
+    query_op->error_code = -EINTR;
+    if(query_op->send_recv == BMI_SEND)
+    {
+	BMI_socket_collection_remove_write_bit(tcp_socket_collection_p,
+					   query_op->addr);
+    }
+    op_list_remove(query_op);
+    ((struct tcp_op*)(query_op->method_data))->tcp_op_state = 
+	BMI_TCP_COMPLETE;
+    op_list_add(completion_array[query_op->context_id], query_op);
+
+    gen_mutex_unlock(&interface_mutex);
+    return(0);
+}
 
 /* tcp_forget_addr()
  *

@@ -77,6 +77,9 @@ exercise BMI_testsome() and see if it is correct
 TCP module:
 -----------------------
 
+do a better job of cleaning out address structures that are no longer in use
+(may need a hint to say when this can be done)
+
 add checks (for socket == -1, for example) to see if tcp_forget_addr()
 or tcp_shutdown_addr() has been called on an addr before using it
 
