@@ -11,46 +11,38 @@
 #include <pint-distribution.h>
 
 /*
- * Looks up a distribution and copies it into a contiguous memory region
+ * Looks up a distribution and copies it into a contiguous memory region.
+ * This is similar to PVFS_Dist_copy, but it copies from the static table,
+ * not from another contiguous region.
  */
 PVFS_Dist *PVFS_Dist_create(char *name)
 {
-	//int name_size;
-	char *newname;
-	PVFS_Dist old_dist;
-	PVFS_Dist *new_dist;
-	if (!name)
-		return NULL;
-	//name_size = strnlen(name, PINT_DIST_NAME_SZ);
-	//name[name_size] = 0;
-	old_dist.dist_name = name;
-	old_dist.params = NULL;
-	old_dist.methods = NULL;
-	if (PINT_Dist_lookup(&old_dist) == 0)
+    PVFS_Dist old_dist;
+    PVFS_Dist *new_dist = 0;
+
+    if (!name)
+	return 0;
+    old_dist.dist_name = name;
+    old_dist.params = 0;
+    old_dist.methods = 0;
+    if (PINT_Dist_lookup(&old_dist) == 0)
+    {
+	/* distribution was found */
+	new_dist = malloc(PINT_DIST_PACK_SIZE(&old_dist));
+	if (new_dist)
 	{
-		/* distribution was found */
-		new_dist = (PVFS_Dist *)malloc(PINT_DIST_PACK_SIZE(&old_dist));
-		if (new_dist)
-		{
-			*new_dist = old_dist;
-			newname = (char *)(new_dist + 1);
-			new_dist->dist_name = strncpy(newname, name, old_dist.name_size);
-			newname[old_dist.name_size-1] = 0; /* force a terminating char */
-			new_dist->params =
-				(PVFS_Dist_params *)(((char *)(new_dist + 1)) + old_dist.name_size);
-			memcpy(new_dist->params, old_dist.params, old_dist.param_size);
-			/* copy in methods now */
-			new_dist->methods = old_dist.methods;
-			return (new_dist);
-		}
-		/* memory allocation failed */
-		return NULL;
+	    *new_dist = old_dist;
+	    new_dist->dist_name
+	      = (char *) new_dist + roundup8(sizeof(*new_dist));
+	    new_dist->params
+	      = (void *)(new_dist->dist_name + roundup8(new_dist->name_size));
+	    memcpy(new_dist->dist_name, old_dist.dist_name,
+	      old_dist.name_size);
+	    memcpy(new_dist->params, old_dist.params, old_dist.param_size);
+	    /* leave methods pointing to same static functions */
 	}
-	else
-	{
-		/* distribution was not found */
-		return NULL;
-	}
+    }
+    return new_dist;
 }
 
 int PVFS_Dist_free(PVFS_Dist *dist)
