@@ -26,52 +26,52 @@ enum
     MSGPAIR_RETURN_SUCCESS
 };
 
-/* state function prototypes */
-static int remove_init(PINT_client_sm *sm_p,
-		       job_status_s *js_p);
-
-static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
-					job_status_s *js_p);
-static int remove_getattr_failure(PINT_client_sm *sm_p,
-				  job_status_s *js_p);
-static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
-                                                   job_status_s *js_p);
-static int remove_check_dir_contents_failure(PINT_client_sm *sm_p,
-                                             job_status_s *js_p);
-static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
-						job_status_s *js_p);
-static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
-					  job_status_s *js_p);
-static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
-				     job_status_s *js_p);
-static int remove_rmdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p);
-static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
-					      job_status_s *js_p);
-static int remove_object_remove_failure(PINT_client_sm *sm_p,
-					job_status_s *js_p);
-static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-				     job_status_s *js_p);
-static int remove_crdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p);
-static int remove_cleanup(PINT_client_sm *sm_p,
-			  job_status_s *js_p);
+static int remove_init(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_getattr_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_getattr_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_check_dir_contents_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_check_dir_contents_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_datafile_remove_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_datafile_remove_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_rmdirent_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_rmdirent_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_object_remove_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_object_remove_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_crdirent_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_crdirent_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 /* completion function prototypes */
-static int remove_getattr_comp_fn(void *v_p,
-				  struct PVFS_server_resp *resp_p,
-				  int i);
-
+static int remove_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i);
 static int remove_check_dir_contents_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i);
-
-static int remove_rmdirent_comp_fn(void *v_p,
-				   struct PVFS_server_resp *resp_p,
-				   int i);
-
-static int remove_crdirent_comp_fn(void *v_p,
-				   struct PVFS_server_resp *resp_p,
-				   int i);
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i);
+static int remove_rmdirent_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i);
+static int remove_crdirent_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i);
 
 %%
 
@@ -286,10 +286,9 @@ int PVFS_sys_remove(char *object_name,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove calling "
                  "PINT_client_state_machine_post()\n");
 
-    /* do something to kick off processing */
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_REMOVE);
 
-    while (!sm_p->op_complete && ret == 0)
+    while (!sm_p->op_complete && (ret == 0))
     {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove calling "
                      "PINT_client_state_machine_test()\n");
@@ -334,7 +333,6 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: getattr_setup_msgpair\n");
-
 
     js_p->error_code = 0;
 
@@ -389,9 +387,6 @@ static int remove_getattr_comp_fn(void *v_p,
     
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
     if (resp_p->status != 0)
     {
         return resp_p->status;
@@ -434,9 +429,7 @@ static int remove_getattr_comp_fn(void *v_p,
 	case PVFS_TYPE_SYMLINK:
             return 0;
 	case PVFS_TYPE_DATAFILE:
-	    /* fall through */
 	case PVFS_TYPE_DIRDATA:
-	    /* fall through */
 	default:
 	    gossip_err("error: remove_getattr_comp_fn: unhandled "
                        "object type\n");
@@ -649,8 +642,6 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     * NOTE: it's easier to clean up from a metafile with no datafiles
     * than the other way around!  so we remove datafiles first.
     */
-
-    /* clear error field in job */
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -756,9 +747,7 @@ static int remove_cleanup(PINT_client_sm *sm_p,
         sm_p->u.remove.datafile_handles = NULL;
     }
 
-    /* mark operation as complete */
     sm_p->op_complete = 1;
-
     return 0;
 }
 
@@ -766,20 +755,6 @@ static int remove_getattr_failure(PINT_client_sm *sm_p,
 				  job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: getattr_failure\n");
-
-    /* TODO: unpost operations that are still in progress, once we can. */
-
-    /* ISSUE: can't tell which thing completed (with an error).
-     *
-     * SOLUTION: add job_id to the job_status structure, keep up with
-     * them in the PINT_client_sm structure so we can tell the
-     * difference.
-     */
-
-    /* Q: CAN WE HANDLE ALL THE SEND/RECV PAIRS FAILURE CASES WITH ONE
-     * STATE?
-     */
-
     return 1;
 }
 
