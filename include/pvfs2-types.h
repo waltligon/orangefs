@@ -288,7 +288,7 @@ int32_t PVFS_get_errno_mapping(int32_t error);
 
 /* 7 bits are used for the errno mapped error codes */
 #define PVFS_ERROR_CODE(__error) ((__error) & (int32_t) (0x7f|PVFS_ERROR_BIT))
-#define PVFS_ERROR_CLASS(__error) ((__error) & ~((int32_t) 0x7f))
+#define PVFS_ERROR_CLASS(__error) ((__error) & ~((int32_t) (0x7f|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT)))
 #define PVFS_NON_ERRNO_ERROR_CODE(__error) ((__error) & (int32_t) (127|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT))
 
 #define PVFS_ERROR_BMI    (1 << 7)	/* BMI-specific error (e.g. socket got closed ) */
