@@ -11,7 +11,7 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
-#include "request-scheduler.h"
+#include "src/server/request-scheduler/request-scheduler.h"
 #include "trove.h"
 
 /* prelude state machine:
