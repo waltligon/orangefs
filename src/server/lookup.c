@@ -200,7 +200,6 @@ static int lookup_read_directory_metadata(PINT_server_op *s_op, job_status_s *re
 {
     int job_post_ret;
     job_id_t j_id;
-    PVFS_vtag_s vtag;
     PVFS_handle handle;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_directory_metadata\n");
@@ -240,7 +239,7 @@ static int lookup_read_directory_metadata(PINT_server_op *s_op, job_status_s *re
 					      s_op->u.lookup.v_a,
 					      2,
 					      0 /* flags */,
-					      vtag, /* should eventually be a ptr, so we can use NULL */
+					      NULL,
 					      s_op,
 					      ret,
 					      &j_id);
@@ -308,7 +307,6 @@ static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
 {
     int job_post_ret;
     job_id_t j_id;
-    PVFS_vtag_s vtag;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_directory_entry\n");
 
@@ -331,7 +329,7 @@ static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
 					 s_op->u.lookup.k_a,
 					 s_op->u.lookup.v_a,
 					 0,
-					 vtag,
+					 NULL,
 					 s_op,
 					 ret,
 					 &j_id);

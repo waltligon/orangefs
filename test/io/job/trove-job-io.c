@@ -35,7 +35,6 @@ int main(int argc, char **argv)
     char path_name[PATH_SIZE];
 	 job_id_t foo_id;
 	 job_status_s job_stat;
-	 PVFS_vtag_s dummy_vtag;
 	 char buffer1[BUF_SIZE];
 	 char buffer2[BUF_SIZE];
 	 char testkey[] = "foo";
@@ -160,7 +159,7 @@ int main(int argc, char **argv)
     val.buffer_sz = sizeof(file_handle);
 
 	ret = job_trove_keyval_write(coll_id, parent_handle, &key,
-		&val, 0, dummy_vtag, NULL, &job_stat, &foo_id);
+		&val, 0, NULL, NULL, &job_stat, &foo_id);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_write() failure.\n");
@@ -197,7 +196,7 @@ int main(int argc, char **argv)
 	val.buffer_sz = BUF_SIZE;
 
 	ret = job_trove_keyval_write(coll_id, file_handle, &key,
-		&val, 0, dummy_vtag, NULL, &job_stat, &foo_id);
+		&val, 0, NULL, NULL, &job_stat, &foo_id);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_write() failure.\n");
@@ -225,7 +224,7 @@ int main(int argc, char **argv)
 	val.buffer_sz = BUF_SIZE;
 
 	ret = job_trove_keyval_read(coll_id, file_handle, &key,
-		&val, 0, dummy_vtag, NULL, &job_stat, &foo_id);
+		&val, 0, NULL, NULL, &job_stat, &foo_id);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_read() failure.\n");
@@ -255,7 +254,7 @@ int main(int argc, char **argv)
 
 	/* remove the key/val entry */
 	ret = job_trove_keyval_remove(coll_id, file_handle, &key,
-		0, dummy_vtag, NULL, &job_stat, &foo_id);
+		0, NULL, NULL, &job_stat, &foo_id);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_remove() failure.\n");
@@ -278,7 +277,7 @@ int main(int argc, char **argv)
 
 	/* write the buffer out into the bytestream space */
 	ret = job_trove_bstream_write_at(coll_id, file_handle, 0,
-		buffer1, BUF_SIZE, 0, dummy_vtag, NULL, &job_stat, &foo_id);
+		buffer1, BUF_SIZE, 0, NULL, NULL, &job_stat, &foo_id);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_bstream_write_at() failure.\n");
@@ -301,7 +300,7 @@ int main(int argc, char **argv)
 
 	/* read the buffer out into the bytestream space */
 	ret = job_trove_bstream_read_at(coll_id, file_handle, 0,
-		buffer2, BUF_SIZE, 0, dummy_vtag, NULL, &job_stat, &foo_id);
+		buffer2, BUF_SIZE, 0, NULL, NULL, &job_stat, &foo_id);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_bstream_read_at() failure.\n");

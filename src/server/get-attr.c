@@ -157,14 +157,13 @@ static int getattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret)
 
     int job_post_ret=0;
     job_id_t i;
-    PVFS_vtag_s bs;
 
     job_post_ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
 	    s_op->req->u.getattr.handle,
 	    &(s_op->key),
 	    &(s_op->val),
 	    0,
-	    bs,
+	    NULL,
 	    s_op,
 	    ret,
 	    &i);

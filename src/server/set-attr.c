@@ -145,7 +145,6 @@ static int setattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret)
 
     int job_post_ret=0;
     job_id_t i;
-    PVFS_vtag_s bs;
 
     /* 
        If ATTR_TYPE is set, assume that the object was just created.
@@ -168,7 +167,7 @@ TODO: Can I do that?  dw
 		&(s_op->key),
 		&(s_op->val),
 		0,
-		bs,
+		NULL,
 		s_op,
 		ret,
 		&i);
@@ -197,7 +196,6 @@ static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
 
     /*PVFS_object_attr *old_attr;*/
     int job_post_ret=0;
-    PVFS_vtag_s bs;
     job_id_t i;
 
 #if 0
@@ -258,7 +256,7 @@ static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
 	    &(s_op->key),
 	    &(s_op->val),
 	    TROVE_SYNC /* flags */,
-	    bs,
+	    NULL,
 	    s_op,
 	    ret,
 	    &i);

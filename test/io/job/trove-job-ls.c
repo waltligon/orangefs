@@ -34,7 +34,6 @@ int main(int argc, char **argv)
     char path_name[PATH_SIZE];
 	 job_status_s job_stat;
 	 job_id_t foo_id;
-	 PVFS_vtag_s dummy_vtag;
 
     TROVE_handle ls_handle[KEYVAL_ARRAY_LEN];
     char ls_name[KEYVAL_ARRAY_LEN][PATH_SIZE];
@@ -126,7 +125,7 @@ int main(int argc, char **argv)
     while ( num_processed == chunk ) 
 	{
 		ret = job_trove_keyval_iterate(coll_id, handle, pos, key, val, chunk,
-			0, dummy_vtag, NULL, &job_stat, &foo_id);
+			0, NULL, NULL, &job_stat, &foo_id);
 		if(ret < 0)
 		{
 			fprintf(stderr, "keyval iterate failed.\n");

@@ -185,7 +185,6 @@ static int mkdir_setattrib(state_action_struct *s_op, job_status_s *ret)
 
     int job_post_ret;
     job_id_t i;
-    PVFS_vtag_s j;
 
     s_op->resp->u.mkdir.handle = ret->handle;
 
@@ -200,7 +199,7 @@ static int mkdir_setattrib(state_action_struct *s_op, job_status_s *ret)
 	    &(s_op->key),
 	    &(s_op->val),
 	    TROVE_SYNC,
-	    j,
+	    NULL,
 	    s_op,
 	    ret,
 	    &i);

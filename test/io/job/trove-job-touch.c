@@ -32,7 +32,6 @@ int main(int argc, char **argv)
     char path_name[PATH_SIZE];
 	 job_id_t foo_id;
 	 job_status_s job_stat;
-	 PVFS_vtag_s dummy_vtag;
 
 
     ret = parse_args(argc, argv);
@@ -154,7 +153,7 @@ int main(int argc, char **argv)
     val.buffer_sz = sizeof(file_handle);
 
 	ret = job_trove_keyval_write(coll_id, parent_handle, &key,
-		&val, 0, dummy_vtag, NULL, &job_stat, &foo_id);
+		&val, 0, NULL, NULL, &job_stat, &foo_id);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_write() failure.\n");

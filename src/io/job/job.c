@@ -776,7 +776,7 @@ int job_trove_bstream_write_at(
 	void* buffer,
 	PVFS_size size,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -803,7 +803,7 @@ int job_trove_bstream_write_at(
 	jd->u.trove.vtag = vtag;
 
 	ret = trove_bstream_write_at(coll_id, handle, buffer,
-		&jd->u.trove.actual_size, offset, flags, &jd->u.trove.vtag, jd,
+		&jd->u.trove.actual_size, offset, flags, jd->u.trove.vtag, jd,
 		&(jd->u.trove.id));
 
 	if(ret < 0)
@@ -853,7 +853,7 @@ int job_trove_bstream_read_at(
 	void* buffer,
 	PVFS_size size,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -880,7 +880,7 @@ int job_trove_bstream_read_at(
 	jd->u.trove.vtag = vtag;
 
 	ret = trove_bstream_read_at(coll_id, handle, buffer,
-		&jd->u.trove.actual_size, offset, flags, &jd->u.trove.vtag, jd,
+		&jd->u.trove.actual_size, offset, flags, jd->u.trove.vtag, jd,
 		&(jd->u.trove.id));
 
 	if(ret < 0)
@@ -929,7 +929,7 @@ int job_trove_keyval_read(
 	PVFS_ds_keyval_s *key_p,
 	PVFS_ds_keyval_s *val_p,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -955,7 +955,7 @@ int job_trove_keyval_read(
 	jd->u.trove.vtag = vtag;
 
 	ret = trove_keyval_read(coll_id, handle, key_p, val_p, flags,
-		&(jd->u.trove.vtag), jd, &(jd->u.trove.id));
+		jd->u.trove.vtag, jd, &(jd->u.trove.id));
 	
 	if(ret < 0)
 	{
@@ -1003,7 +1003,7 @@ int job_trove_keyval_read_list(
 	PVFS_ds_keyval_s *val_array,
 	int count,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -1029,7 +1029,7 @@ int job_trove_keyval_read_list(
 	jd->u.trove.vtag = vtag;
 
 	ret = trove_keyval_read_list(coll_id, handle, key_array,
-		val_array, count, flags, &(jd->u.trove.vtag), jd, 
+		val_array, count, flags, jd->u.trove.vtag, jd, 
 		&(jd->u.trove.id));
 	
 	if(ret < 0)
@@ -1077,7 +1077,7 @@ int job_trove_keyval_write(
 	PVFS_ds_keyval_s *key_p,
 	PVFS_ds_keyval_s *val_p,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -1103,7 +1103,7 @@ int job_trove_keyval_write(
 	jd->u.trove.vtag = vtag;
 
 	ret = trove_keyval_write(coll_id, handle, key_p, val_p, flags,
-		&(jd->u.trove.vtag), jd, &(jd->u.trove.id));
+		jd->u.trove.vtag, jd, &(jd->u.trove.id));
 	
 	if(ret < 0)
 	{
@@ -1293,7 +1293,7 @@ int job_trove_bstream_resize(
 	PVFS_handle handle,
 	PVFS_size size,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -1312,7 +1312,7 @@ int job_trove_bstream_resize(
 int job_trove_bstream_validate(
 	PVFS_coll_id coll_id,
 	PVFS_handle handle,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -1333,7 +1333,7 @@ int job_trove_keyval_remove(
 	PVFS_handle handle,
 	PVFS_ds_keyval_s* key_p,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -1359,7 +1359,7 @@ int job_trove_keyval_remove(
 	jd->u.trove.vtag = vtag;
 
 	ret = trove_keyval_remove(coll_id, handle, key_p, flags,
-		&(jd->u.trove.vtag), jd, &(jd->u.trove.id));
+		jd->u.trove.vtag, jd, &(jd->u.trove.id));
 		
 	if(ret < 0)
 	{
@@ -1403,7 +1403,7 @@ int job_trove_keyval_remove(
 int job_trove_keyval_validate(
 	PVFS_coll_id coll_id,
 	PVFS_handle handle,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -1427,7 +1427,7 @@ int job_trove_keyval_iterate(
 	PVFS_ds_keyval_s* val_array,
 	int count,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -1456,7 +1456,7 @@ int job_trove_keyval_iterate(
 
 	ret = trove_keyval_iterate(coll_id, handle,
 		&(jd->u.trove.position), key_array, val_array,
-		&(jd->u.trove.count), flags, &(jd->u.trove.vtag), jd,
+		&(jd->u.trove.count), flags, jd->u.trove.vtag, jd,
 		&(jd->u.trove.id));
 	
 	if(ret < 0)
@@ -1507,7 +1507,7 @@ int job_trove_keyval_iterate_keys(
 	PVFS_ds_keyval_s* key_array,
 	int count,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)
@@ -2962,7 +2962,13 @@ static int do_one_work_cycle_trove(int* num_completed)
 		gen_mutex_unlock(&trove_mutex);
 		/* set appropriate fields and store in completed queue */
 		tmp_desc->u.trove.state = stat_trove_ds_state_array[i];
+		/* TODO: I don't really know how to handle vtags here */
+		/* I think these are filled in from pointers passed in
+		 * earlier?  Why have it in the test functions?
+		 */
+#if 0
 		tmp_desc->u.trove.vtag = stat_trove_vtag_array[i];
+#endif
 		gen_mutex_lock(&completion_mutex);
 			job_desc_q_add(completion_queue, tmp_desc);
 		gen_mutex_unlock(&completion_mutex);

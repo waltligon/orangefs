@@ -185,7 +185,6 @@ static int rmdirent_getattr(state_action_struct *s_op, job_status_s *ret)
 
     int job_post_ret;
     job_id_t i;
-    PVFS_vtag_s bs;
 
     job_post_ret = job_trove_keyval_read(
 	    s_op->req->u.rmdirent.fs_id,
@@ -193,7 +192,7 @@ static int rmdirent_getattr(state_action_struct *s_op, job_status_s *ret)
 	    &(s_op->key),
 	    &(s_op->val),
 	    0,
-	    bs,
+	    NULL,
 	    s_op,
 	    ret,
 	    &i);
@@ -224,7 +223,6 @@ static int rmdirent_check_perms(state_action_struct *s_op, job_status_s *ret)
 {
     int job_post_ret;
     job_id_t i;
-    PVFS_vtag_s bs;
 
     job_post_ret = 1;  /* Just pretend it is good right now */
     /*IF THEY don't have permission, set ret->error_code to -ENOPERM!*/
@@ -248,7 +246,7 @@ static int rmdirent_check_perms(state_action_struct *s_op, job_status_s *ret)
 	    &(s_op->key),
 	    &(s_op->val),
 	    0,
-	    bs,
+	    NULL,
 	    s_op,
 	    ret,
 	    &i);
@@ -280,7 +278,6 @@ static int rmdirent_rmdirent(state_action_struct *s_op, job_status_s *ret)
     int job_post_ret;
     job_id_t i;
     PVFS_handle h;
-    PVFS_vtag_s bs;
 
     h = *((PVFS_handle *)s_op->val.buffer);
 
@@ -292,7 +289,7 @@ static int rmdirent_rmdirent(state_action_struct *s_op, job_status_s *ret)
 	    h,
 	    &(s_op->key),
 	    TROVE_SYNC,
-	    bs,
+	    NULL,
 	    s_op,
 	    ret,
 	    &i);

@@ -178,7 +178,6 @@ static int readdir_kvread(state_action_struct *s_op, job_status_s *ret)
 
     int job_post_ret;
     job_id_t i;
-    PVFS_vtag_s vtag;
 
     gossip_ldebug(SERVER_DEBUG,"Kvread %lld\n",s_op->req->u.readdir.handle);
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
@@ -189,7 +188,7 @@ static int readdir_kvread(state_action_struct *s_op, job_status_s *ret)
 	    &(s_op->key),
 	    &(s_op->val),
 	    0,
-	    vtag,
+	    NULL,
 	    s_op,
 	    ret,
 	    &i);
@@ -216,7 +215,6 @@ static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret)
     int job_post_ret;
     job_id_t i;
     PVFS_handle h;
-    PVFS_vtag_s vtag;
 
     h = *((PVFS_handle *)s_op->val.buffer);
     gossip_ldebug(SERVER_DEBUG,"KVSpace %lld\n",h);
@@ -229,7 +227,7 @@ static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret)
 	    s_op->val_a,
 	    s_op->req->u.readdir.pvfs_dirent_count,
 	    0,
-	    vtag,
+	    NULL,
 	    s_op,
 	    ret, 
 	    &i);

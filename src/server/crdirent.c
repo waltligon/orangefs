@@ -222,7 +222,6 @@ static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
 {
     int job_post_ret;
     job_id_t i;
-    PVFS_vtag_s bs;
 
     gossip_ldebug(SERVER_DEBUG,"Get Handle Fxn for crdirent\n");
 
@@ -241,7 +240,7 @@ static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
 	    &(s_op->key),
 	    &(s_op->val),
 	    0,
-	    bs,
+	    NULL,
 	    s_op,
 	    ret,
 	    &i);
@@ -275,7 +274,6 @@ static int crdirent_getattr(state_action_struct *s_op, job_status_s *ret)
 
     int job_post_ret;
     job_id_t i;
-    PVFS_vtag_s bs;
 
     gossip_ldebug(SERVER_DEBUG,"Get attr Fxn for crdirent\n");
     job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
@@ -283,7 +281,7 @@ static int crdirent_getattr(state_action_struct *s_op, job_status_s *ret)
 	    &(s_op->key),
 	    &(s_op->val),
 	    0,
-	    bs,
+	    NULL,
 	    s_op,
 	    ret,
 	    &i);
@@ -368,7 +366,7 @@ static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_
 	    &(s_op->key),
 	    &(s_op->val),
 	    TROVE_SYNC,
-	    ret->vtag,
+	    NULL,
 	    s_op,
 	    ret,
 	    &i);
@@ -467,8 +465,8 @@ static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
 	    &(s_op->key),
 	    &(s_op->val),
 	    TROVE_SYNC,
-	    ret->vtag, /* This needs to change for vtags */
-	    s_op,      /* Or is that right? dw */
+	    NULL,
+	    s_op,
 	    ret,
 	    &i);
     return(job_post_ret);

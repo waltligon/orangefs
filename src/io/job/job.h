@@ -26,7 +26,7 @@ typedef struct job_status
 	/* the comments indicate which type of job will fill in which fields */
 	int error_code;          /* returned by all operations */
 	PVFS_size actual_size; /* read_at, write_at, resize, bmi_recv */
-	PVFS_vtag_s vtag;       /* most trove operations */
+	PVFS_vtag_s* vtag;       /* most trove operations */
 	PVFS_ds_position position; /* iterate, iterate_keys */
 	PVFS_handle handle;     /* dspace_create */
 	PVFS_ds_attributes_s ds_attr;  /* getattr */
@@ -142,7 +142,7 @@ int job_trove_bstream_write_at(
 	void* buffer,
 	PVFS_size size,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
@@ -155,7 +155,7 @@ int job_trove_bstream_read_at(
 	void* buffer,
 	PVFS_size size,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
@@ -167,7 +167,7 @@ int job_trove_keyval_read(
 	PVFS_ds_keyval_s *key_p,
 	PVFS_ds_keyval_s *val_p,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
@@ -180,7 +180,7 @@ int job_trove_keyval_read_list(
 	PVFS_ds_keyval_s *val_array,
 	int count,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
@@ -192,7 +192,7 @@ int job_trove_keyval_write(
 	PVFS_ds_keyval_s *key_p,
 	PVFS_ds_keyval_s *val_p,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
@@ -220,7 +220,7 @@ int job_trove_bstream_resize(
 	PVFS_handle handle,
 	PVFS_size size,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
@@ -229,7 +229,7 @@ int job_trove_bstream_resize(
 int job_trove_bstream_validate(
 	PVFS_coll_id coll_id,
 	PVFS_handle handle,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
@@ -240,7 +240,7 @@ int job_trove_keyval_remove(
 	PVFS_handle handle,
 	PVFS_ds_keyval_s* key_p,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
@@ -249,7 +249,7 @@ int job_trove_keyval_remove(
 int job_trove_keyval_validate(
 	PVFS_coll_id coll_id,
 	PVFS_handle handle,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
@@ -263,7 +263,7 @@ int job_trove_keyval_iterate(
 	PVFS_ds_keyval_s* val_array,
 	int count,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
@@ -276,7 +276,7 @@ int job_trove_keyval_iterate_keys(
 	PVFS_ds_keyval_s* key_array,
 	int count,
 	PVFS_ds_flags flags,
-	PVFS_vtag_s vtag,
+	PVFS_vtag_s* vtag,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);
