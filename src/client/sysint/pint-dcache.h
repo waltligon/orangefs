@@ -10,6 +10,8 @@
 
 #include <pint-sysint.h>
 
+#define PVFS2_MAX_DCACHE_ENTRIES 64
+
 /* Dcache Entry */
 struct dcache_entry_s {
 	pinode_reference parent;   /* the pinode of the parent directory */
@@ -28,7 +30,7 @@ struct dcache_t {
 
 /* Cache Management structure */
 struct dcache {
-	struct dcache_t element[MAX_ENTRIES];
+	struct dcache_t element[PVFS2_MAX_DCACHE_ENTRIES];
 	int count;
 	int16_t top;
 	int16_t free;
@@ -47,6 +49,6 @@ int dcache_flush(struct dcache cache);
 int dcache_remove(struct dcache *cache, char *name, pinode_reference parent,
 		unsigned char *item_found);
 int dcache_initialize(struct dcache *cache);
-int dcache_finalize(struct dcache cache);
+int dcache_finalize(struct dcache *cache);
 
 #endif 

@@ -128,7 +128,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
 config_bt_failure:
 	/* Free the server config */
 	free(server_config.fs_info);
-	dcache_finalize(pvfs_dcache);
+	dcache_finalize(&pvfs_dcache);
 
 dcache_init_failure:
 	pcache_finalize(pvfs_pcache);

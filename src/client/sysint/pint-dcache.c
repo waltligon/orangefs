@@ -183,9 +183,7 @@ int dcache_remove(struct dcache *cache,char *name,pinode_reference parent,
  */
 int dcache_flush(struct dcache cache)
 {
-	//int i = 0;
-
-	return(0);
+	return(-ENOSYS);
 }
 
 /* pint_dinitialize
@@ -204,10 +202,10 @@ int dcache_initialize(struct dcache *cache)
 	cache->bottom = -1;
 	cache->free = 0;
 	/* Form the link between the cache elements */
-	for(i = 0;i < MAX_ENTRIES; i++)
+	for(i = 0;i < PVFS2_MAX_DCACHE_ENTRIES; i++)
 	{
 		cache->element[i].prev = i - 1;
-		if ((i + 1) == MAX_ENTRIES)
+		if ((i + 1) == PVFS2_MAX_DCACHE_ENTRIES)
 			cache->element[i].next = -1;
 		else
 			cache->element[i].next = i + 1;
@@ -221,16 +219,17 @@ int dcache_initialize(struct dcache *cache)
  *
  * returns 0 on success, -1 on failure
  */
-int dcache_finalize(struct dcache cache)
+int dcache_finalize(struct dcache *cache)
 {
-	/* Grab the mutex - do we need to do this? */
-	gen_mutex_lock(cache.mt_lock);
-
-	/* Release the mutex */
-	gen_mutex_unlock(cache.mt_lock);
+	/* make sure this doesn't look like a populated dcache if someone
+	 * accesses it late 
+	 */
+	cache->top = -1;
+	cache->bottom = -1;
+	cache->free = 0;
 
 	/* Destroy the mutex */
-	gen_mutex_destroy(cache.mt_lock);
+	gen_mutex_destroy(cache->mt_lock);
 
 	return(0);
 }

@@ -29,7 +29,7 @@ int PVFS_sys_finalize()
     int ret = 0;
 	
     /* Free the dcache */
-    dcache_finalize(pvfs_dcache);
+    dcache_finalize(&pvfs_dcache);
     /* free all pinode structures */
     pcache_finalize(pvfs_pcache);
 	
