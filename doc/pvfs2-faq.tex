@@ -479,6 +479,16 @@ use of the NPTL on these few Redhat systems.  It should be noted that
 we are fully compatible with other distributions that ship NPTL
 libraries (such as Gentoo and Debian/unstable).
 
+\subsection{Where is the kernel source on a Fedora system?}
+
+Older systems used to split up the kernel into several packages
+(\texttt{kernel}, \texttt{kernel-headers}, \texttt{kernel-source}).
+Fedora kernels are not split up that way.  Everything you need to build a
+kernel module is in /lib/modules/`uname -r`/build.  For example, Fedora
+Core 3 ships with linux-2.6.9-1.667.  When configuring PVFS2, you would
+pass \texttt{--with-kernel=/lib/modules/2.6.9-1.667/build} to the
+configure script.
+
 %
 % PERFORMANCE
 %
