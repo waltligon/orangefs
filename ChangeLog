@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-0.1.0pre1
+===============
+- 
+
+
 pvfs2-0.0.9
 ============
 - added karma administration (new gtk+ gui) for interactive
