@@ -15,13 +15,13 @@
 #include <errno.h>
 #include <assert.h>
 
-#include <pvfs2-types.h>
-#include <pvfs2-attr.h>
-#include <gossip.h>
-#include <job.h>
-#include <bmi.h>
-#include <pvfs2-sysint.h>
-#include <gen-locks.h>
+#include "pvfs2-types.h"
+#include "pvfs2-attr.h"
+#include "gossip.h"
+#include "job.h"
+#include "bmi.h"
+#include "pvfs2-sysint.h"
+#include "gen-locks.h"
 
 #include "dotconf.h"
 #include "trove.h"

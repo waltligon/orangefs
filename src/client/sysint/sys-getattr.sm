@@ -291,57 +291,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
         }
         else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
         {
-            /*
-              the idea here is that if we got a metafile cache hit,
-              let's go all the way and try to retrieve cached
-              data file attributes all at once
-            */
-            int max = MAX_NUM_CACHED_DFILE_COUNT, i = 0;
-            int dfile_count = resp_p->u.getattr.attr.u.meta.dfile_count;
-
-            /* attempt to pull out all datafiles from the cache */
-            assert(dfile_count < MAX_NUM_CACHED_DFILE_COUNT);
-
-            need_datafiles = PINT_pcache_retrieve_datafile_attrs(
-                resp_p->u.getattr.attr, sm_p->u.getattr.object_ref.fs_id,
-                sm_p->u.getattr.scratch_attrs, &max);
-
-            /*
-              if all datafiles were retrieved, fill in all required
-              internal information so that the size can be computed
-              properly in getattr_cleanup method
-            */
-            if (max == dfile_count)
-            {
-                sm_p->u.getattr.size_array = (PVFS_size *)malloc(
-                    dfile_count * sizeof(PVFS_size));
-                assert(sm_p->u.getattr.size_array);
-
-                for(i = 0; i < dfile_count; i++)
-                {
-                    sm_p->u.getattr.size_array[i] =
-                        sm_p->u.getattr.scratch_attrs[i]->u.data.size;
-                }
-
-                if (sm_p->u.getattr.getattr_resp_p->attr.mask &
-                    PVFS_ATTR_META_DFILES)
-                {
-                    sm_p->u.getattr.datafile_count =
-                        resp_p->u.getattr.attr.u.meta.dfile_count;
-                    sm_p->u.getattr.datafile_handles =
-                        resp_p->u.getattr.attr.u.meta.dfile_array;
-                    assert(sm_p->u.getattr.datafile_handles);
-                }
-
-                if (sm_p->u.getattr.getattr_resp_p->attr.mask &
-                    PVFS_ATTR_META_DIST)
-                {
-                    sm_p->u.getattr.dist_p =
-                        resp_p->u.getattr.attr.u.meta.dist;
-                    sm_p->u.getattr.dist_size = 
-                        resp_p->u.getattr.attr.u.meta.dist_size;
-                }
-            }
+            need_datafiles = 0;
         }
     }
 
@@ -585,30 +535,6 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
 		 resp_p->u.getattr.attr.u.data.size);
     sm_p->u.getattr.size_array[index] = resp_p->u.getattr.attr.u.data.size;
 
-    /*
-      blindly add the newly retrieved sized entry to the pcache;
-      we should really be checking if it exists already and updating
-      that entry instead of what we're doing here.
-    */
-    PINT_pinode *pinode = NULL;
-
-    if (PINT_pcache_pinode_alloc(&pinode) < 0)
-    {
-        assert(0);
-    }
-    pinode->pinode_ref.handle =
-        sm_p->u.getattr.pcache_attr.u.meta.dfile_array[index];
-    pinode->pinode_ref.fs_id = sm_p->u.getattr.object_ref.fs_id;
-
-    PINT_pcache_object_attr_deep_copy(
-        &pinode->attr, &resp_p->u.getattr.attr);
-
-    if (PINT_pcache_insert(pinode) < 0)
-    {
-        PINT_pcache_pinode_dealloc(pinode);
-        assert(0);
-    }
-
     return 0;
 }
 
@@ -638,15 +564,23 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 
         if (amask & PVFS_ATTR_META_DIST)
         {
-            ret = PINT_Dist_lookup(sm_p->u.getattr.dist_p);
-            if (ret < 0) {
-                assert(0);
-            }
+            if (!sm_p->u.getattr.pcache_hit)
+            {
+                ret = PINT_Dist_lookup(sm_p->u.getattr.dist_p);
+                if (ret < 0) {
+                    assert(0);
+                }
 
-            s_attr_p->size = (sm_p->u.getattr.dist_p->methods->logical_file_size)
-                (sm_p->u.getattr.dist_p->params,
-                 sm_p->u.getattr.datafile_count,
-                 sm_p->u.getattr.size_array);
+                s_attr_p->size =
+                    (sm_p->u.getattr.dist_p->methods->logical_file_size)
+                    (sm_p->u.getattr.dist_p->params,
+                     sm_p->u.getattr.datafile_count,
+                     sm_p->u.getattr.size_array);
+            }
+            else
+            {
+                s_attr_p->size = sm_p->u.getattr.pcache_size;
+            }
         }
 
 	/* redo the mask */
@@ -700,6 +634,8 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
                 assert(0);
             }
             pinode->pinode_ref = sm_p->u.getattr.object_ref;
+            pinode->size = s_attr_p->size;
+
             PINT_pcache_object_attr_deep_copy(
                 &pinode->attr, &sm_p->u.getattr.pcache_attr);
             PINT_pcache_object_attr_deep_free(

@@ -115,6 +115,7 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
                 &fake_resp.u.getattr.attr, &pinode->attr);
 
             sm_p->u.getattr.pcache_hit = 1;
+            sm_p->u.getattr.pcache_size = pinode->size;
             sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
             return 1;
         }

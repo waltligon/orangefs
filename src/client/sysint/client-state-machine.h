@@ -92,7 +92,6 @@ struct PINT_client_remove_sm {
 };
 
 /* PINT_client_getattr_sm */
-#define MAX_NUM_CACHED_DFILE_COUNT 16
 struct PINT_client_getattr_sm {
     PVFS_pinode_reference object_ref;     /* input parameter */
     uint32_t              attrmask;       /* input parameter */
@@ -104,9 +103,7 @@ struct PINT_client_getattr_sm {
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
     int                  pcache_hit;     /* set on pcache hit */
     PVFS_object_attr     pcache_attr;    /* copy of getattr response */
-
-    /* scratch space for storing cached datafile attrs if necessary */
-    PVFS_object_attr *scratch_attrs[MAX_NUM_CACHED_DFILE_COUNT];
+    PVFS_size            pcache_size;    /* cached size value */
 };
 
 /* PINT_client_io_sm
