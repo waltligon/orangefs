@@ -30,11 +30,11 @@ My TODO list for this SM:
 #include <assert.h>
 #include <gossip.h>
 
-static int create_init(state_action_struct *s_op, job_status_s *ret);
-static int create_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int create_create(state_action_struct *s_op, job_status_s *ret);
-static int create_release_posted_job(state_action_struct *s_op, job_status_s *ret);
-static int create_send_bmi(state_action_struct *s_op, job_status_s *ret);
+static int create_init(PINT_server_op *s_op, job_status_s *ret);
+static int create_cleanup(PINT_server_op *s_op, job_status_s *ret);
+static int create_create(PINT_server_op *s_op, job_status_s *ret);
+static int create_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
+static int create_send_bmi(PINT_server_op *s_op, job_status_s *ret);
 void create_init_state_machine(void);
 
 PINT_state_machine_s create_req_s = 
@@ -121,7 +121,7 @@ void create_init_state_machine(void)
  */
 
 
-static int create_init(state_action_struct *s_op, job_status_s *ret)
+static int create_init(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
@@ -153,7 +153,7 @@ static int create_init(state_action_struct *s_op, job_status_s *ret)
  */
 
 
-static int create_create(state_action_struct *s_op, job_status_s *ret)
+static int create_create(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
@@ -191,7 +191,7 @@ static int create_create(state_action_struct *s_op, job_status_s *ret)
  */
 
 
-static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
+static int create_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
@@ -266,7 +266,7 @@ static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
 
-static int create_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+static int create_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
@@ -297,7 +297,7 @@ static int create_release_posted_job(state_action_struct *s_op, job_status_s *re
  */
 
 
-static int create_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int create_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
 
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);

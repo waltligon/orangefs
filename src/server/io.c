@@ -17,14 +17,14 @@
 #include <pint-distribution.h>
 #include <pint-request.h>
 
-static int io_init(state_action_struct *s_op, job_status_s *ret);
-static int io_get_size(state_action_struct *s_op, job_status_s *ret);
-static int io_send_ack(state_action_struct *s_op, job_status_s *ret);
-static int io_send_completion_ack(state_action_struct *s_op, 
+static int io_init(PINT_server_op *s_op, job_status_s *ret);
+static int io_get_size(PINT_server_op *s_op, job_status_s *ret);
+static int io_send_ack(PINT_server_op *s_op, job_status_s *ret);
+static int io_send_completion_ack(PINT_server_op *s_op, 
 	job_status_s *ret);
-static int io_start_flow(state_action_struct *s_op, job_status_s *ret);
-static int io_release(state_action_struct *s_op, job_status_s *ret);
-static int io_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int io_start_flow(PINT_server_op *s_op, job_status_s *ret);
+static int io_release(PINT_server_op *s_op, job_status_s *ret);
+static int io_cleanup(PINT_server_op *s_op, job_status_s *ret);
 void io_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -138,7 +138,7 @@ void io_init_state_machine(void)
  * Synopsis: posts the operation to the request scheduler
  *           
  */
-static int io_init(state_action_struct *s_op, job_status_s *ret)
+static int io_init(PINT_server_op *s_op, job_status_s *ret)
 {
 	int job_post_ret;
 	
@@ -170,7 +170,7 @@ static int io_init(state_action_struct *s_op, job_status_s *ret)
  *           intend to operate on 
  *           
  */
-static int io_get_size(state_action_struct *s_op, job_status_s *ret)
+static int io_get_size(PINT_server_op *s_op, job_status_s *ret)
 {
 	int err = -1;
 	job_id_t tmp_id;
@@ -206,7 +206,7 @@ static int io_get_size(state_action_struct *s_op, job_status_s *ret)
  *           send either positive or negative acknowledgements.
  *           
  */
-static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
+static int io_send_ack(PINT_server_op *s_op, job_status_s *ret)
 {
 	int err = -1;
 	job_id_t tmp_id;
@@ -275,7 +275,7 @@ static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
  *           carry out the data transfer
  *           
  */
-static int io_start_flow(state_action_struct *s_op, job_status_s *ret)
+static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 {
 	int err = -1;
 	job_id_t tmp_id;
@@ -371,7 +371,7 @@ static int io_start_flow(state_action_struct *s_op, job_status_s *ret)
  *
  * Synopsis: releases the operation from the scheduler
  */
-static int io_release(state_action_struct *s_op, job_status_s *ret)
+static int io_release(PINT_server_op *s_op, job_status_s *ret)
 {
 
 	int job_post_ret=0;
@@ -402,7 +402,7 @@ static int io_release(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: free up any buffers associated with the operation,
  *           including any encoded or decoded protocol structures
  */
-static int io_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int io_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
 	gossip_ldebug(SERVER_DEBUG, "IO: io_cleanup() executed.\n");
 	/* Free the encoded message if necessary! */
@@ -470,7 +470,7 @@ static int io_cleanup(state_action_struct *s_op, job_status_s *ret)
  *           send either positive or negative acknowledgements.
  *           
  */
-static int io_send_completion_ack(state_action_struct *s_op, 
+static int io_send_completion_ack(PINT_server_op *s_op, 
 	job_status_s *ret)
 {
 	int err = -1;

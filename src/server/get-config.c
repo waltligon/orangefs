@@ -11,10 +11,10 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 
-static int getconfig_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret);
-static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret);
-static int getconfig_init(state_action_struct *s_op, job_status_s *ret);
+static int getconfig_cleanup(PINT_server_op *s_op, job_status_s *ret);
+static int getconfig_job_bmi_send(PINT_server_op *s_op, job_status_s *ret);
+static int getconfig_job_trove(PINT_server_op *s_op, job_status_s *ret);
+static int getconfig_init(PINT_server_op *s_op, job_status_s *ret);
 void getconfig_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -96,7 +96,7 @@ void getconfig_init_state_machine(void)
  *           
  */
 
-static int getconfig_init(state_action_struct *s_op, job_status_s *ret)
+static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
 {
 
     server_configuration_s *user_opts;
@@ -157,7 +157,7 @@ static int getconfig_init(state_action_struct *s_op, job_status_s *ret)
  *           
  */
 
-static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret)
+static int getconfig_job_trove(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
@@ -195,7 +195,7 @@ static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret)
  *           
  */
 
-static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
+static int getconfig_job_bmi_send(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
@@ -259,7 +259,7 @@ static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
  *           response structure
  */
 
-static int getconfig_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int getconfig_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
 
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);

@@ -13,10 +13,10 @@
 #include <job-consist.h>
 #include <assert.h>
 
-static int request_init(state_action_struct *s_op, job_status_s *ret);
-static int request_do_some_work(state_action_struct *s_op, job_status_s *ret);
-static int request_release_posted_job(state_action_struct *s_op, job_status_s *ret);
-static int request_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int request_init(PINT_server_op *s_op, job_status_s *ret);
+static int request_do_some_work(PINT_server_op *s_op, job_status_s *ret);
+static int request_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
+static int request_cleanup(PINT_server_op *s_op, job_status_s *ret);
 void request_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -116,7 +116,7 @@ void request_init_state_machine(void)
  *           
  */
 
-static int request_init(state_action_struct *s_op, job_status_s *ret)
+static int request_init(PINT_server_op *s_op, job_status_s *ret)
 {
 	int job_post_ret;
 	gossip_ldebug(SERVER_DEBUG,
@@ -166,7 +166,7 @@ static int request_init(state_action_struct *s_op, job_status_s *ret)
  *           
  */
 
-static int request_do_some_work(state_action_struct *s_op, job_status_s *ret)
+static int request_do_some_work(PINT_server_op *s_op, job_status_s *ret)
 {
 	int job_post_ret = 1;
 	
@@ -204,7 +204,7 @@ static int request_do_some_work(state_action_struct *s_op, job_status_s *ret)
  *           the scheduler to proceed with the next operation on our handle!
  */
 
-static int request_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+static int request_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
 {
 
 	int job_post_ret=0;
@@ -236,7 +236,7 @@ static int request_release_posted_job(state_action_struct *s_op, job_status_s *r
  *           none of the work with respect to this request is valid.
  */
 
-static int request_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int request_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
 	gossip_ldebug(SERVER_DEBUG,"clean Fxn for request\n");
 

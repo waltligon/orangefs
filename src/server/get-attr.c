@@ -36,14 +36,14 @@ enum {
 };
 
 
-static int getattr_init(state_action_struct *s_op, job_status_s *ret);
-static int getattr_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int getattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret);
-static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *ret);
-static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret);
-static int getattr_verify_attribs(state_action_struct *s_op, job_status_s *ret);
-static int getattr_read_metafile_datafile_handles(state_action_struct *s_op, job_status_s *ret);
-static int getattr_read_metafile_distribution(state_action_struct *s_op, job_status_s *ret);
+static int getattr_init(PINT_server_op *s_op, job_status_s *ret);
+static int getattr_cleanup(PINT_server_op *s_op, job_status_s *ret);
+static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret);
+static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
+static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret);
+static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret);
+static int getattr_read_metafile_datafile_handles(PINT_server_op *s_op, job_status_s *ret);
+static int getattr_read_metafile_distribution(PINT_server_op *s_op, job_status_s *ret);
 void getattr_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -151,7 +151,7 @@ void getattr_init_state_machine(void)
  */
 
 
-static int getattr_init(state_action_struct *s_op, job_status_s *ret)
+static int getattr_init(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
@@ -183,7 +183,7 @@ static int getattr_init(state_action_struct *s_op, job_status_s *ret)
  *           
  */
 
-static int getattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret)
+static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
 {
     int job_post_ret;
     job_id_t i;
@@ -220,7 +220,7 @@ static int getattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret)
 
 /* getattr_verify_attribs
  */
-static int getattr_verify_attribs(state_action_struct *s_op, job_status_s *ret)
+static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
 {
     PVFS_object_attr *a_p;
 
@@ -277,7 +277,7 @@ static int getattr_verify_attribs(state_action_struct *s_op, job_status_s *ret)
 
 /* getattr_read_metafile_datafile_handles
  */
-static int getattr_read_metafile_datafile_handles(state_action_struct *s_op, job_status_s *ret)
+static int getattr_read_metafile_datafile_handles(PINT_server_op *s_op, job_status_s *ret)
 {
     int nr_datafiles;
     int job_post_ret;
@@ -329,7 +329,7 @@ static int getattr_read_metafile_datafile_handles(state_action_struct *s_op, job
 
 /* getattr_read_metafile_distribution
  */
-static int getattr_read_metafile_distribution(state_action_struct *s_op, job_status_s *ret)
+static int getattr_read_metafile_distribution(PINT_server_op *s_op, job_status_s *ret)
 {
     int job_post_ret;
     job_id_t i;
@@ -376,7 +376,7 @@ static int getattr_read_metafile_distribution(state_action_struct *s_op, job_sta
  *           
  */
 
-static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
+static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 {
     PVFS_object_attr *a_p;
     int job_post_ret=0;
@@ -477,7 +477,7 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
 
-static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
@@ -508,7 +508,7 @@ static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *r
  */
 
 
-static int getattr_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int getattr_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
 
     gossip_debug(SERVER_DEBUG, "getattr state: cleanup\n");
