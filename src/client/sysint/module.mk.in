@@ -44,5 +44,3 @@ SMSRC := \
 SMCGEN := $(patsubst %.sm,$(DIR)/%.c,$(SMSRC))
 
 LIBSRC += $(CSRC) $(SMCGEN)
-
-CLEANFILES += $(SMCGEN)

@@ -66,6 +66,11 @@ for f in `find . | grep \#`;  do rm -rf $f; done
 for f in `find . | grep \~`;  do rm -rf $f; done
 for f in `find . -name *.o`;  do rm -rf $f; done
 for f in `find . -name core`; do rm -rf $f; done
+for f in `find . -name module.mk`; do rm -rf $f; done
+for f in `find . -name "*.log"`; do rm -rf $f; done
+for f in `find . -name "*.toc"`; do rm -rf $f; done
+for f in `find . -name "*.aux"`; do rm -rf $f; done
+rm Makefile pvfs2-config.h
 
 # make sure the cleaned up directory exists
 cd /tmp

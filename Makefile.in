@@ -499,26 +499,33 @@ clean: docsclean
 		src/server/pvfs2-server-server.o $(MPIIOTESTS)
 
 # builds a tarball of the source tree suitable for distribution
-dist:	clean
+dist: $(SERVERGENSRC) $(SMCGEN) cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
 
-# _really_ clean the tree; should go back to pristine state
-distclean: clean
-	find . -name "module.mk" -exec rm \{\} \;
-	rm -f Makefile config.log config.status config.cache pvfs2-config.h
+# some stuff that is cleaned in both distclean and dist targets
+cleaner: clean
 	rm -f tags
-	rm -f $(SERVERGENSRC)
 	rm -f src/kernel/linux-2.6/Makefile
 	rm -f maint/mpi-depend.sh
 	rm -f examples/pvfs2-server.rc
 	rm -rf autom4te-*.cache
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
+	rm -f config.log config.status config.cache 
+	rm -f pvfs2-@PVFS2_VERSION@.tar.gz
+
+	
+# _really_ clean the tree; should go back to pristine state
+distclean: cleaner
+	find . -name "module.mk" -exec rm \{\} \;
+	rm -f $(SERVERGENSRC)
+	rm -f $(SMCGEN)
+	rm -f Makefile pvfs2-config.h
 
 # this is where we include all of our automatic dependencies.
 # NOTE: we wrap this in ifneq's in order to prevent the
 #    dependencies from being generated for special targets that don't 
 #    require them
-ifeq (,$(filter statecomp clean distclean docs cscope tags,$(MAKECMDGOALS)))
+ifeq (,$(filter statecomp clean distclean dist docs cscope tags,$(MAKECMDGOALS)))
 -include $(DEPENDS)
 endif
 
