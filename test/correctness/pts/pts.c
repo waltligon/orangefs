@@ -179,6 +179,7 @@ int run_tests(config *myconfig) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     allerrcodes = malloc(sizeof(int[myconfig->numprocs]));
+    memset(allerrcodes, 0, sizeof(int[myconfig->numprocs]));
     MPI_Gather(&errcode, 1, MPI_INT, allerrcodes, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     if (myconfig->myid == 0) {
