@@ -13,7 +13,6 @@
 
 #include <stdio.h>
 #include <job.h>
-#include <job-client-helper.h>
 #include <errno.h>
 #include <gossip.h>
 

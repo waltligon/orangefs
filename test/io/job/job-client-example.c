@@ -13,7 +13,6 @@
 
 #include <stdio.h>
 #include <job.h>
-#include <job-client-helper.h>
 #include <gossip.h>
 
 /* some fake items to send around */
