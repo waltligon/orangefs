@@ -70,8 +70,8 @@ int main(int argc,char **argv)
 	
 	req_lk.name = filename;
 	req_lk.fs_id = resp_init.fsid_list[0];
-	req_lk.credentials.uid = 0;
-	req_lk.credentials.gid = 0;
+	req_lk.credentials.uid = 100;
+	req_lk.credentials.gid = 100;
 	req_lk.credentials.perms = U_WRITE|U_READ;
 
 	ret = PVFS_sys_lookup(&req_lk, &resp_lk);
@@ -85,8 +85,8 @@ int main(int argc,char **argv)
 		/* get root handle */
 		req_lk.name = "/";
 		req_lk.fs_id = resp_init.fsid_list[0];
-		req_lk.credentials.uid = 0;
-		req_lk.credentials.gid = 0;
+		req_lk.credentials.uid = 100;
+		req_lk.credentials.gid = 100;
 		req_lk.credentials.perms = U_WRITE|U_READ;
 
 		ret = PVFS_sys_lookup(&req_lk, &resp_lk);
@@ -100,16 +100,16 @@ int main(int argc,char **argv)
 
 		/* TODO: I'm not setting the attribute mask... not real sure
 		 * what's supposed to happen there */
-		req_cr.attr.owner = 0;
-		req_cr.attr.group = 0;
+		req_cr.attr.owner = 100;
+		req_cr.attr.group = 100;
 		req_cr.attr.perms = U_WRITE|U_READ;
 		req_cr.attr.u.meta.nr_datafiles = 1;
 		req_cr.attr.u.meta.dist = NULL;
 		req_cr.parent_refn.handle = resp_lk.pinode_refn.handle;
 		req_cr.parent_refn.fs_id = req_lk.fs_id;
 		req_cr.entry_name = &(filename[1]); /* leave off slash */
-		req_cr.credentials.uid = 0;
-		req_cr.credentials.gid = 0;
+		req_cr.credentials.uid = 100;
+		req_cr.credentials.gid = 100;
 		req_cr.credentials.perms = U_WRITE|U_READ;
 
 		ret = PVFS_sys_create(&req_cr, &resp_cr);
@@ -137,8 +137,8 @@ int main(int argc,char **argv)
 	printf("Performing I/O on handle: %ld, fs: %d\n",
 		(long)req_io.pinode_refn.handle, (int)req_io.pinode_refn.fs_id);
 
-	req_io.credentials.uid = 0;
-	req_io.credentials.gid = 0;
+	req_io.credentials.uid = 100;
+	req_io.credentials.gid = 100;
 	req_io.credentials.perms = U_WRITE|U_READ;
 
 	ret = PVFS_Request_contiguous(io_size, PVFS_BYTE, &(req_io.io_req));
