@@ -276,90 +276,90 @@ void unmask_blocked_signals(
 /************************************
  * misc convenience macros
  ************************************/
-#define add_op_to_request_list(op)                            \
-do {                                                          \
-    spin_lock(&op->lock);                                     \
-    op->op_state = PVFS2_VFS_STATE_WAITING;                   \
-                                                              \
-    spin_lock(&pvfs2_request_list_lock);                      \
-    list_add_tail(&op->list, &pvfs2_request_list);            \
-    spin_unlock(&pvfs2_request_list_lock);                    \
-                                                              \
-    spin_unlock(&op->lock);                                   \
-    wake_up_interruptible(&pvfs2_request_list_waitq);         \
+#define add_op_to_request_list(op)                           \
+do {                                                         \
+    spin_lock(&op->lock);                                    \
+    op->op_state = PVFS2_VFS_STATE_WAITING;                  \
+                                                             \
+    spin_lock(&pvfs2_request_list_lock);                     \
+    list_add_tail(&op->list, &pvfs2_request_list);           \
+    spin_unlock(&pvfs2_request_list_lock);                   \
+                                                             \
+    spin_unlock(&op->lock);                                  \
+    wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
 
-#define remove_op_from_request_list(op)                       \
-do {                                                          \
-    struct list_head *tmp = NULL;                             \
-    pvfs2_kernel_op_t *tmp_op = NULL;                         \
-                                                              \
-    spin_lock(&pvfs2_request_list_lock);                      \
-    list_for_each(tmp, &pvfs2_request_list) {                 \
-        tmp_op = list_entry(tmp, pvfs2_kernel_op_t, list);    \
-        if (tmp_op && (tmp_op == op)) {                       \
-            list_del(&tmp_op->list);                          \
-            break;                                            \
-        }                                                     \
-    }                                                         \
-    spin_unlock(&pvfs2_request_list_lock);                    \
+#define remove_op_from_request_list(op)                      \
+do {                                                         \
+    struct list_head *tmp = NULL;                            \
+    pvfs2_kernel_op_t *tmp_op = NULL;                        \
+                                                             \
+    spin_lock(&pvfs2_request_list_lock);                     \
+    list_for_each(tmp, &pvfs2_request_list) {                \
+        tmp_op = list_entry(tmp, pvfs2_kernel_op_t, list);   \
+        if (tmp_op && (tmp_op == op)) {                      \
+            list_del(&tmp_op->list);                         \
+            break;                                           \
+        }                                                    \
+    }                                                        \
+    spin_unlock(&pvfs2_request_list_lock);                   \
 } while(0)
 
-#define remove_op_from_htable_ops_in_progress(op)             \
-do {                                                          \
-    qhash_search_and_remove(htable_ops_in_progress,           \
-                            &(op->tag));                      \
+#define remove_op_from_htable_ops_in_progress(op)            \
+do {                                                         \
+    qhash_search_and_remove(htable_ops_in_progress,          \
+                            &(op->tag));                     \
 } while(0)
 
-#define service_operation(op, method, intr)                       \
-do {                                                              \
-    sigset_t orig_sigset;                                         \
-    if (!intr) mask_blocked_signals(&orig_sigset);                \
-    add_op_to_request_list(op);                                   \
-    ret = wait_for_matching_downcall(new_op);                     \
-    if (!intr) unmask_blocked_signals(&orig_sigset);              \
-    if (ret != PVFS2_WAIT_SUCCESS)                                \
-    {                                                             \
-        if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                    \
-        {                                                         \
-            pvfs2_error("pvfs2: %s -- wait timed out (%x).  "     \
-                        "aborting attempt.\n", method,ret);       \
-        }                                                         \
-        goto error_exit;                                          \
-    }                                                             \
+#define service_operation(op, method, intr)                  \
+do {                                                         \
+    sigset_t orig_sigset;                                    \
+    if (!intr) mask_blocked_signals(&orig_sigset);           \
+    add_op_to_request_list(op);                              \
+    ret = wait_for_matching_downcall(new_op);                \
+    if (!intr) unmask_blocked_signals(&orig_sigset);         \
+    if (ret != PVFS2_WAIT_SUCCESS)                           \
+    {                                                        \
+        if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
+        {                                                    \
+            pvfs2_error("pvfs2: %s -- wait timed out (%x).  "\
+                        "aborting attempt.\n", method,ret);  \
+        }                                                    \
+        goto error_exit;                                     \
+    }                                                        \
 } while(0)
 
 /*
   tries to service the operation and will retry on timeout
   failure up to num times (num MUST be a numeric lvalue).
 */
-#define service_operation_with_timeout_retry(op, method, num, intr)   \
-do {                                                                  \
-    sigset_t orig_sigset;                                             \
-    if (!intr) mask_blocked_signals(&orig_sigset);                    \
-  wait_for_op:                                                        \
-    add_op_to_request_list(op);                                       \
-    ret = wait_for_matching_downcall(op);                             \
-    if (!intr) unmask_blocked_signals(&orig_sigset);                  \
-    if (ret != PVFS2_WAIT_SUCCESS)                                    \
-    {                                                                 \
-        if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))           \
-        {                                                             \
-            pvfs2_print("pvfs2: %s -- timeout; requeing op\n",        \
-                        method);                                      \
-            goto wait_for_op;                                         \
-        }                                                             \
-        else                                                          \
-        {                                                             \
-            if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                    \
-            {                                                         \
-                pvfs2_error("pvfs2: %s -- wait timed out (%x).  "     \
-                            "aborting retry attempts.\n",             \
-                            method,ret);                              \
-            }                                                         \
-            goto error_exit;                                          \
-         }                                                            \
-     }                                                                \
+#define service_operation_with_timeout_retry(op, method, num, intr)\
+do {                                                               \
+    sigset_t orig_sigset;                                          \
+    if (!intr) mask_blocked_signals(&orig_sigset);                 \
+  wait_for_op:                                                     \
+    add_op_to_request_list(op);                                    \
+    ret = wait_for_matching_downcall(op);                          \
+    if (!intr) unmask_blocked_signals(&orig_sigset);               \
+    if (ret != PVFS2_WAIT_SUCCESS)                                 \
+    {                                                              \
+        if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))        \
+        {                                                          \
+            pvfs2_print("pvfs2: %s -- timeout; requeing op\n",     \
+                        method);                                   \
+            goto wait_for_op;                                      \
+        }                                                          \
+        else                                                       \
+        {                                                          \
+            if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                 \
+            {                                                      \
+                pvfs2_error("pvfs2: %s -- wait timed out (%x).  "  \
+                            "aborting retry attempts.\n",          \
+                            method,ret);                           \
+            }                                                      \
+            goto error_exit;                                       \
+         }                                                         \
+     }                                                             \
 } while(0)
 
 /*
@@ -372,34 +372,34 @@ do {                                                                  \
   NOTE: used in namei.c:lookup, file.c:pvfs2_inode_read, and
   file.c:pvfs2_file_write
 */
-#define service_error_exit_op_with_timeout_retry(op,meth,num,e, intr)   \
-do {                                                                    \
-    sigset_t orig_sigset;                                               \
-    if (!intr) mask_blocked_signals(&orig_sigset);                      \
-  wait_for_op:                                                          \
-    add_op_to_request_list(op);                                         \
-    ret = wait_for_matching_downcall(op);                               \
-    if (!intr) unmask_blocked_signals(&orig_sigset);                    \
-    if (ret != PVFS2_WAIT_SUCCESS)                                      \
-    {                                                                   \
-        if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))             \
-        {                                                               \
-            pvfs2_print("pvfs2: %s -- timeout; requeing op\n",          \
-                        meth);                                          \
-            goto wait_for_op;                                           \
-        }                                                               \
-        else                                                            \
-        {                                                               \
-            if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                      \
-            {                                                           \
-                pvfs2_error("pvfs2: %s -- wait timed out (%x).  "       \
-                            "aborting retry attempts.\n",               \
-                            meth,ret);                                  \
-            }                                                           \
-            e = 1;                                                      \
-            goto error_exit;                                            \
-        }                                                               \
-    }                                                                   \
+#define service_error_exit_op_with_timeout_retry(op,meth,num,e, intr)\
+do {                                                                 \
+    sigset_t orig_sigset;                                            \
+    if (!intr) mask_blocked_signals(&orig_sigset);                   \
+  wait_for_op:                                                       \
+    add_op_to_request_list(op);                                      \
+    ret = wait_for_matching_downcall(op);                            \
+    if (!intr) unmask_blocked_signals(&orig_sigset);                 \
+    if (ret != PVFS2_WAIT_SUCCESS)                                   \
+    {                                                                \
+        if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))          \
+        {                                                            \
+            pvfs2_print("pvfs2: %s -- timeout; requeing op\n",       \
+                        meth);                                       \
+            goto wait_for_op;                                        \
+        }                                                            \
+        else                                                         \
+        {                                                            \
+            if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                   \
+            {                                                        \
+                pvfs2_error("pvfs2: %s -- wait timed out (%x).  "    \
+                            "aborting retry attempts.\n",            \
+                            meth,ret);                               \
+            }                                                        \
+            e = 1;                                                   \
+            goto error_exit;                                         \
+        }                                                            \
+    }                                                                \
 } while(0)
 
 /*
@@ -423,26 +423,26 @@ do {                                                                    \
   this is a macro is because both read and write cases need the exact
   same handling code.
 */
-#define handle_io_error()                                       \
-do {                                                            \
-    if (error_exit)                                             \
-    {                                                           \
-        ret = -EINTR;                                           \
-        kill_device_owner();                                    \
-        op_release(new_op);                                     \
-    }                                                           \
-    else                                                        \
-    {                                                           \
-        ret = ((new_op->downcall.status == -PVFS_ENOENT) ?      \
-               -ENOENT : -EINTR);                               \
-        *offset = original_offset;                              \
-        wake_up_device_for_return(new_op);                      \
-    }                                                           \
-    pvfs_bufmap_put(buffer_index);                              \
-    *offset = original_offset;                                  \
+#define handle_io_error()                                 \
+do {                                                      \
+    if (error_exit)                                       \
+    {                                                     \
+        ret = -EINTR;                                     \
+        kill_device_owner();                              \
+        op_release(new_op);                               \
+    }                                                     \
+    else                                                  \
+    {                                                     \
+        ret = ((new_op->downcall.status == -PVFS_ENOENT) ?\
+               -ENOENT : -EINTR);                         \
+        *offset = original_offset;                        \
+        wake_up_device_for_return(new_op);                \
+    }                                                     \
+    pvfs_bufmap_put(buffer_index);                        \
+    *offset = original_offset;                            \
 } while(0)
 
-#define get_interruptible_flag(inode)                           \
+#define get_interruptible_flag(inode)                     \
 (PVFS2_SB(inode->i_sb)->mnt_options.intr)
 
 
