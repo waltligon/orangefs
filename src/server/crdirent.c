@@ -18,6 +18,8 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op, job_status
 static int crdirent_read_parent_metadata(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_verify_parent_metadata(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_write_directory_entry(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_check_exist_directory_entry(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_handle_eexist(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_create_dirdata_dspace(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_write_dirdata_handle(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_send_bmi(PINT_server_op *s_op, job_status_s *ret);
@@ -49,7 +51,9 @@ machine crdirent(init,
 		 cleanup,
 		 create_dirdata_dspace,
 		 write_dirdata_handle,
-		 release)
+		 release,
+		 check_exist_directory_entry,
+		 handle_eexist)
 {
 	state init
 	{
@@ -75,8 +79,21 @@ machine crdirent(init,
 	state read_directory_entry_handle
 	{
 		run crdirent_read_directory_entry_handle;
-		success => write_directory_entry;
+		success => check_exist_directory_entry;
 		default => create_dirdata_dspace;
+	}
+
+	state check_exist_directory_entry
+	{
+		run crdirent_check_exist_directory_entry;
+		success => handle_eexist;
+		default => write_directory_entry;
+	}
+
+	state handle_eexist
+	{
+		run crdirent_handle_eexist;
+		default => send;
 	}
 
 	state write_directory_entry
@@ -442,7 +459,7 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      ret->handle is the directory entry k/v space
+ * Pre:      s_op->u.crdirent.dirent_handle is the directory entry k/v space
  *           s_op->req->u.crdirent.name != NULL
  *           s_op->req->u.crdirent.new_handle != NULL
  *           ADD ASSERTS FOR THESE!
@@ -492,6 +509,90 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
 					  &i);
     return job_post_ret;
 }
+
+/*
+ * Function: crdirent_check_exist_directory_entry
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *ret
+ *
+ * Pre:      s_op->u.crdirent.dirent_handle is the directory entry k/v space
+ *           s_op->req->u.crdirent.name != NULL
+ *           s_op->req->u.crdirent.new_handle != NULL
+ *           ADD ASSERTS FOR THESE!
+ *
+ * Post:     tries to read a directory entry, so that we can check to see if it
+ *           already exists or not
+ *
+ * Returns:  int
+ *
+ * Synopsis: We are now ready to store the name/handle pair in the k/v
+ *           space for directory handles.
+ */
+
+static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
+					  job_status_s *ret)
+{
+    int job_post_ret;
+    job_id_t i;
+
+    gossip_debug(SERVER_DEBUG, "crdirent state: check_exist_directory_entry\n");
+
+    /* This buffer came from one of two places, either phase two of creating the
+     * directory space when we wrote the value back to trove, or from the initial read
+     * from trove.
+     */
+
+    /* this is the name for the parent entry */
+    s_op->key.buffer    = s_op->req->u.crdirent.name;
+    s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
+
+    s_op->val.buffer    = &s_op->req->u.crdirent.new_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  checking existence of new directory entry for %s (handle = 0x%08Lx) to dirdata dspace 0x%08Lx\n",
+		 s_op->req->u.crdirent.name,
+		 s_op->req->u.crdirent.new_handle,
+		 s_op->u.crdirent.dirent_handle);
+
+    job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
+					  s_op->u.crdirent.dirent_handle,
+					  &s_op->key,
+					  &s_op->val,
+					  TROVE_SYNC,
+					  NULL,
+					  s_op,
+					  ret,
+					  &i);
+    return job_post_ret;
+}
+
+
+/*
+ * Function: crdirent_handle_eexist
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *ret
+ *
+ * Pre:      crdirent_check_exist_directory entry has returned with successful return
+ *           code (ret->error_code == 0)
+ *
+ * Post:     sets an appropriate return value (-EEXIST?) to send back to the client
+ *
+ * Returns:  int
+ *
+ * Synopsis: this state doesn't do anything except set the error code
+ */
+static int crdirent_handle_eexist(PINT_server_op *s_op,
+					  job_status_s *ret)
+{
+    gossip_debug(SERVER_DEBUG, "crdirent state: handle_eexist\n");
+
+    ret->error_code = -EEXIST;
+    return(1);
+}
+
 
 /*
  * Function: crdirent_bmi_send

@@ -300,7 +300,15 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op,
 		     a_p->type);
 
 	/* TODO: MAKE THIS AN ERROR INSTEAD */
-	assert(a_p->type == PVFS_TYPE_DATAFILE);
+	/* assert(a_p->type == PVFS_TYPE_DATAFILE); */
+	/* NOTE: assert removed by Phil, 3-22-2003, to allow removal of metadata file in 
+	 * error cases in which there are no attributes yet.
+	 */
+	if(a_p->type != PVFS_TYPE_DATAFILE)
+	{
+	    gossip_debug(SERVER_DEBUG,
+		"WARNING: removing object of type %d, even though it does not appear to have valid attributes.\n", (int)a_p->type);
+	}
 
 	/* TODO: CHECK PERMISSIONS */
 

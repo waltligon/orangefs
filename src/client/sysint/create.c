@@ -43,6 +43,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	void* encoded_resp;
 	PVFS_msg_tag_t op_tag;
 	bmi_size_t max_msg_sz;
+	int old_ret = -1;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -232,7 +233,6 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	    /* this could fail for many reasons, EEXISTS will probbably be the 
 	     * most common.
 	     */
-
             ret = ack_p->status;
             failure = CRDIRENT_MSG_FAILURE;
             goto return_error;
@@ -466,10 +466,13 @@ return_error:
 		    /*best effort rollback*/
 		    req_p.u.remove.handle = df_handle_array[i];
 		    op_tag = get_next_session_tag();
+		    old_ret = ret;
 		    ret = PINT_send_req(bmi_addr_list[i], &req_p, max_msg_sz,
 			&decoded, &encoded_resp, op_tag);
-		    PINT_release_req(bmi_addr_list[i], &req_p, max_msg_sz, &decoded,
-			&encoded_resp, op_tag);
+		    if(ret == 0)
+			PINT_release_req(bmi_addr_list[i], &req_p, max_msg_sz, &decoded,
+			    &encoded_resp, op_tag);
+		    ret = old_ret;
 		}
 
 	    case PREIO3_CREATE_FAILURE:
@@ -491,10 +494,13 @@ return_error:
 		req_p.u.rmdirent.entry = req->entry_name;
 		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 		op_tag = get_next_session_tag();
+		old_ret = ret;
                 ret = PINT_send_req(serv_addr2, &req_p, max_msg_sz,
                     &decoded, &encoded_resp, op_tag);
-                PINT_release_req(serv_addr2, &req_p, max_msg_sz, &decoded,
-                    &encoded_resp, op_tag);
+		if(ret == 0)
+		    PINT_release_req(serv_addr2, &req_p, max_msg_sz, &decoded,
+			&encoded_resp, op_tag);
+		ret = old_ret;
 
 	    case CRDIRENT_MSG_FAILURE:
 		gossip_ldebug(CLIENT_DEBUG,"CRDIRENT_MSG_FAILURE\n");
@@ -506,10 +512,17 @@ return_error:
 		req_p.u.remove.fs_id = entry.fs_id;
 		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 		op_tag = get_next_session_tag();
+		old_ret = ret;
                 ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
                     &decoded, &encoded_resp, op_tag);
-                PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
-                    &encoded_resp, op_tag);
+		if(ret == 0)
+		    PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
+			 &encoded_resp, op_tag);
+		ret = old_ret;
+		/* NOTE: setting buffer to NULL to keep the next
+		 * recovery case from trying to release it.
+		 */
+		decoded.buffer = NULL;
 
 	    case CREATE_MSG_FAILURE:
 		gossip_ldebug(CLIENT_DEBUG,"CREATE_MSG_FAILURE\n");
