@@ -329,12 +329,10 @@ static int remove_getattr_comp_fn(void *v_p,
 		   resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle));
 
 	    return REMOVE_MUST_REMOVE_DATAFILES;
-	    break;
 	case PVFS_TYPE_DIRECTORY:
 	    return 0;
-	    break;
 	case PVFS_TYPE_SYMLINK:
-	    /* fall through */
+            return 0;
 	case PVFS_TYPE_DATAFILE:
 	    /* fall through */
 	case PVFS_TYPE_DIRDATA:
