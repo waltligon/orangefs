@@ -31,7 +31,7 @@ int PVFS_mgmt_count_servers(
     int ret = -1;
     bmi_addr_t* addr_array;
 
-    ret = PINT_collect_physical_addrs(fs_id, count, addr_array);
+    ret = PINT_collect_physical_addrs(fs_id, count, &addr_array);
 
     /* the above call allocates a list of addresses, which we actually
      * don't need here 

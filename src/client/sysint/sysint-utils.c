@@ -493,7 +493,7 @@ static int server_parse_config(struct server_configuration_s *config,
 int PINT_collect_physical_addrs(
     PVFS_fs_id fs_id,
     int* outcount,
-    bmi_addr_t* addr_array)
+    bmi_addr_t** addr_array)
 {
     int ret = -1;
     int num_meta = 0;
@@ -518,15 +518,15 @@ int PINT_collect_physical_addrs(
 
     /* allocate space to store BMI addresses */
     total_bound = num_io + num_meta;
-    addr_array = (bmi_addr_t*)malloc(total_bound*sizeof(bmi_addr_t));
-    if(!addr_array)
+    *addr_array = (bmi_addr_t*)malloc(total_bound*sizeof(bmi_addr_t));
+    if(!*addr_array)
     {
 	return(-PVFS_ENOMEM);
     }
 
     /* map to actual server instances */
     ret = PINT_bucket_get_physical_all(&g_server_config, 
-	fs_id, total_bound, outcount, addr_array);
+	fs_id, total_bound, outcount, *addr_array);
 
     return(ret);
 }

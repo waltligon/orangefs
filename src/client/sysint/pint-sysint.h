@@ -82,7 +82,7 @@ int PINT_server_get_config(
 int PINT_collect_physical_addrs(
     PVFS_fs_id fs_id,
     int* outcount,
-    bmi_addr_t* addr_array);
+    bmi_addr_t** addr_array);
 
 /*
  * Local variables:
