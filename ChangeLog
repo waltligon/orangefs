@@ -3,9 +3,9 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.5.0pre1
-===============
-- scrap msgpair.  use one-element msgpairarray instead.
+pvfs2-0.5.0
+===========
+- consolidate msgpair and msgpairarray implementations
 - bug fixed in "make kmod" path handling
 - added ability to build kernel module and test programs to pvfs2-build.sh
 - added scripts (from Justin Luck) for nightly vfs testing
