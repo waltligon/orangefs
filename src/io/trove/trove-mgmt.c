@@ -10,7 +10,7 @@
 #include "trove.h"
 #include "trove-internal.h"
 #include "gen-locks.h"
-#include "trove-handle-mgmt.h"
+#include "trove-handle-mgmt/trove-handle-mgmt.h"
 
 /* currently we only have one method for these tables to refer to */
 struct TROVE_mgmt_ops    *mgmt_method_table[1];
