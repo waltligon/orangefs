@@ -36,6 +36,9 @@ do{								    \
     (msg_p)->ptr_current += sizeof(uint32_t);			    \
 }while(0)
 
+/* enum types */
+#define PINT_XENC_ENUM PINT_XENC_UINT32
+
 /* signed 32 bit int */
 #define PINT_XENC_INT32(msg_p,x_p)				    \
 do{								    \
@@ -48,6 +51,29 @@ do{								    \
     (msg_p)->ptr_current += sizeof(int32_t);			    \
 }while(0)
 
+/* unsigned 64 bit int */
+#define PINT_XENC_UINT64(msg_p,x_p)				    \
+do{								    \
+    if(PINT_XENC_MODE == PINT_ENC){				    \
+	*((uint64_t*)((msg_p)->ptr_current)) = htobmi64(*(x_p));    \
+    }								    \
+    else if(PINT_XENC_MODE == PINT_DEC){			    \
+	*(x_p) = bmitoh64(*((uint64_t*)((msg_p)->ptr_current)));    \
+    }								    \
+    (msg_p)->ptr_current += sizeof(uint64_t);			    \
+}while(0)
+
+/* signed 64 bit int */
+#define PINT_XENC_INT64(msg_p,x_p)				    \
+do{								    \
+    if(PINT_XENC_MODE == PINT_ENC){				    \
+	*((int64_t*)((msg_p)->ptr_current)) = htobmi64(*(x_p));     \
+    }								    \
+    else if(PINT_XENC_MODE == PINT_DEC){			    \
+	*(x_p) = bmitoh64(*((int64_t*)((msg_p)->ptr_current)));     \
+    }								    \
+    (msg_p)->ptr_current += sizeof(int64_t);			    \
+}while(0)
 
 /* strings */
 #define PINT_XENC_STRING(msg_p,x_p,size)			    \
@@ -61,6 +87,20 @@ do{								    \
     (msg_p)->ptr_current += size;				    \
 }while(0)
 
+/* PVFS2 specific types */
+#define PINT_XENC_PVFS_ERROR	    PINT_XENC_INT32
+#define PINT_XENC_PVFS_OFFSET	    PINT_XENC_INT64
+#define PINT_XENC_PVFS_SIZE	    PINT_XENC_INT64
+#define PINT_XENC_PVFS_MSG_TAG	    PINT_XENC_INT32
+#define PINT_XENC_PVFS_CONTEXT_ID   PINT_XENC_INT32
+#define PINT_XENC_PVFS_HANDLE	    PINT_XENC_UINT64
+#define PINT_XENC_PVFS_FS_ID	    PINT_XENC_INT32
+#define PINT_XENC_PVFS_DS_POSITION  PINT_XENC_INT32
+#define PINT_XENC_PVFS_UID	    PINT_XENC_UINT32
+#define PINT_XENC_PVFS_GID	    PINT_XENC_UINT32
+#define PINT_XENC_PVFS_TIME	    PINT_XENC_INT64
+#define PINT_XENC_PVFS_PERMISSIONS  PINT_XENC_UINT32
+
 /************************************************************
  * macros for transforming specific structures
  */
@@ -68,16 +108,16 @@ do{								    \
 /* operates on the generic part of a request structure */
 #define PINT_XENC_REQ_GEN(msg_p,req)			    \
 do{							    \
-    PINT_XENC_UINT32(msg_p,&((req)->op));		    \
-    PINT_XENC_UINT32(msg_p,&((req)->credentials.uid));	    \
-    PINT_XENC_UINT32(msg_p,&((req)->credentials.gid));      \
+    PINT_XENC_ENUM(msg_p,&((req)->op));			    \
+    PINT_XENC_PVFS_UID(msg_p,&((req)->credentials.uid));    \
+    PINT_XENC_PVFS_GID(msg_p,&((req)->credentials.gid));    \
 }while(0)
 
 /* operates on the generic part of a response structure */
 #define PINT_XENC_RESP_GEN(msg_p,resp)			    \
 do{							    \
-    PINT_XENC_UINT32(msg_p,&((resp)->op));		    \
-    PINT_XENC_INT32(msg_p,&((resp)->status));		    \
+    PINT_XENC_ENUM(msg_p,&((resp)->op));		    \
+    PINT_XENC_PVFS_ERROR(msg_p,&((resp)->status));	    \
 }while(0)
 
 /* operates on a getconfig request */
@@ -93,6 +133,7 @@ do{							    \
     PINT_XENC_STRING(msg_p, (resp)->u.getconfig.server_config_buf, \
 	(resp)->u.getconfig.server_config_buf_size);	    \
 }while(0)
+
 
 static int lebf_encode_req(
     struct PVFS_server_req *request,
