@@ -17,7 +17,10 @@ enum {
     TROVE_TEST_BSTREAM = 3
 };
 
-static int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p)
+static inline int path_lookup(
+    TROVE_coll_id coll_id,
+    char *path,
+    TROVE_handle *out_handle_p)
 {
     int i=0, ret, count, path_off=0;
     TROVE_ds_state state;
