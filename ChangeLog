@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-0.0.6pre1
+===============
+- 
+
+
 pvfs2-0.0.5
 ===========
 - clean compilation on 64-bit machines
