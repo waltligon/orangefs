@@ -12,7 +12,6 @@
 #include "pint-servreq.h"
 #include "pint-bucket.h"
 #include "acache.h"
-#include "pinode-helper.h"
 #include "PINT-reqproto-encode.h"
 #include "dotconf.h"
 #include "trove.h"

@@ -7,8 +7,6 @@
 #include <string.h>
 #include <assert.h>
 
-/* from original remove.c */
-#include "pinode-helper.h"
 #include "pvfs2-sysint.h"
 #include "pint-sysint-utils.h"
 #include "pint-servreq.h"
@@ -23,8 +21,8 @@
 
 job_context_id pint_client_sm_context;
 
-/* all stuff used in test function */
-enum {
+enum
+{
     MAX_RETURNED_JOBS = 32
 };
 static job_id_t job_id_array[MAX_RETURNED_JOBS];
@@ -39,8 +37,8 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 
     static int got_context = 0;
 
-    /* TODO: MOVE THIS INTO THE INITIALIZE OR SOMETHING. */
-    if (got_context == 0) {
+    if (got_context == 0)
+    {
 	/* get a context for our state machine operations */
 	job_open_context(&pint_client_sm_context);
 	got_context = 1;
@@ -50,9 +48,8 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
     sm_p->op = pvfs_sys_op;
     sm_p->op_complete = 0;
 
-    /* figure out what function needs to be called first */
-    /* TODO: maybe make this a table lookup instead?  later... */
-    switch (pvfs_sys_op) {
+    switch (pvfs_sys_op)
+    {
 	case PVFS_SYS_REMOVE:
 	    sm_p->current_state = pvfs2_client_remove_sm.state_machine + 1;
 	    break;
@@ -143,16 +140,13 @@ int PINT_client_state_machine_test(void)
 
     PINT_client_sm *sm_p;
 
-    /* discover what jobs have completed */
     ret = job_testcontext(job_id_array,
 			  &job_count, /* in/out parameter */
 			  client_sm_p_array,
 			  job_status_array,
 			  100, /* timeout? */
 			  pint_client_sm_context);
-    if (ret < 0) {
-	assert(0);
-    }
+    assert(ret > -1);
 
     /* do as much as we can on every job that has completed */
     for (i=0; i < job_count; i++) {
@@ -178,60 +172,6 @@ int PINT_client_state_machine_test(void)
     return 0;
 }
 
-#if 0  /* seems unused  --pw */
-/* PINT_serv_prepare_msgpair()
- *
- * TODO: cache some values locally and assign at the end.
- */
-int PINT_serv_prepare_msgpair(PVFS_pinode_reference object_ref,
-			      struct PVFS_server_req *req_p,
-			      struct PINT_encoded_msg *encoded_req_out_p,
-			      void **encoded_resp_out_pp,
-			      bmi_addr_t *svr_addr_p,
-			      int *max_resp_sz_out_p,
-			      PVFS_msg_tag_t *session_tag_out_p)
-{
-    int ret;
-
-    /* must determine destination server before we can encode;
-     * this fills in sm_p->svr_addr.
-     */
-    ret = PINT_bucket_map_to_server(svr_addr_p,
-				    object_ref.handle,
-				    object_ref.fs_id);
-    if (ret < 0) {
-	assert(0);
-    }
-
-    /* encode request */
-    ret = PINT_encode(req_p,
-		      PINT_ENCODE_REQ,
-		      encoded_req_out_p,
-		      *svr_addr_p,
-		      PINT_CLIENT_ENC_TYPE);
-    if (ret < 0) {
-	assert(0);
-    }
-
-    /* calculate maximum response message size and allocate space */
-    *max_resp_sz_out_p = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
-						  req_p->op,
-						  PINT_CLIENT_ENC_TYPE);
-
-    *encoded_resp_out_pp = BMI_memalloc(*svr_addr_p,
-					*max_resp_sz_out_p,
-					BMI_RECV);
-    if (*encoded_resp_out_pp == NULL) {
-	assert(0);
-    }
-
-    /* get session tag to associate with send and receive */
-    *session_tag_out_p = get_next_session_tag();
-
-    return 0;
-}
-#endif
-
 int PINT_serv_decode_resp(void *encoded_resp_p,
 			  struct PINT_decoded_msg *decoded_resp_p,
 			  bmi_addr_t *svr_addr_p,
@@ -240,15 +180,12 @@ int PINT_serv_decode_resp(void *encoded_resp_p,
 {
     int ret;
 
-    /* decode response */
     ret = PINT_decode(encoded_resp_p,
 		      PINT_DECODE_RESP,
 		      decoded_resp_p, /* holds data on decoded resp */
 		      *svr_addr_p,
 		      actual_resp_sz);
-    if (ret < 0) {
-	assert(0);
-    }
+    assert(ret > -1);
 
     /* point a reasonably typed pointer at the response data */
     *resp_out_pp = (struct PVFS_server_resp *) decoded_resp_p->buffer;
@@ -256,11 +193,12 @@ int PINT_serv_decode_resp(void *encoded_resp_p,
     return 0;
 }
 
-int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
-				     void *encoded_resp_p,
-				     struct PINT_decoded_msg *decoded_resp_p,
-				     bmi_addr_t *svr_addr_p,
-				     int max_resp_sz)
+int PINT_serv_free_msgpair_resources(
+    struct PINT_encoded_msg *encoded_req_p,
+    void *encoded_resp_p,
+    struct PINT_decoded_msg *decoded_resp_p,
+    bmi_addr_t *svr_addr_p,
+    int max_resp_sz)
 {
     PINT_encode_release(encoded_req_p,
 			PINT_ENCODE_REQ);
@@ -278,7 +216,6 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
     return 0;
 }
 
-
 /* PINT_serv_msgpair_array_resolve_addrs()
  *
  * fills in BMI address of server for each entry in the msgpair array, 
@@ -286,16 +223,14 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
  *
  * returns 0 on success, -PVFS_error on failure
  */
-/* TODO: is this the right name for this function? */
 int PINT_serv_msgpairarray_resolve_addrs(int count, 
     PINT_client_sm_msgpair_state* msgarray)
 {
     int i;
     int ret = -1;
 
-    assert(count > 0); /* sanity check */
+    assert(count > 0);
 
-    /* run through array of msgpairarray */
     for (i=0; i < count; i++)
     {
 	PINT_client_sm_msgpair_state *msg_p = &msgarray[i];
@@ -319,7 +254,6 @@ int PINT_serv_msgpairarray_resolve_addrs(int count,
     
     return(0);
 }
-
 
 /*
  * Local variables:

@@ -124,7 +124,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
     /* encode request. fills in encoded_req.
      */
     cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
-      msg_p->fs_id);
+                                    msg_p->fs_id);
     assert(cur_fs);
 
     ret = PINT_encode(&msg_p->req,

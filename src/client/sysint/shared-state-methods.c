@@ -14,7 +14,6 @@
 #include "gossip.h"
 #include "str-utils.h"
 
-#include "pinode-helper.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"

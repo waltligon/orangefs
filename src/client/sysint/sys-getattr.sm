@@ -39,8 +39,6 @@
 #include "gossip.h"
 #include "str-utils.h"
 #include "pvfs2-util.h"
-
-#include "pinode-helper.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
@@ -85,44 +83,56 @@ machine pvfs2_client_getattr_sm(check_parameters,
 				datafile_getattr_failure,
 				cleanup)
 {
-    state check_parameters {
+    state check_parameters
+    {
 	run getattr_check_parameters;
 	success => object_getattr_setup_msgpair;
 	default => cleanup;
     }
 
-    state object_getattr_setup_msgpair {
+    state object_getattr_setup_msgpair
+    {
 	run getattr_object_getattr_setup_msgpair;
 	success => object_getattr_xfer_msgpair;
 	default => cleanup;
     }
-    state object_getattr_xfer_msgpair {
+
+    state object_getattr_xfer_msgpair
+    {
 	jump pvfs2_client_getattr_acache_sm;
 	success => cleanup;
 	GETATTR_NEED_DATAFILE_SIZES => datafile_getattr_setup_msgpairarray;
 	default => object_getattr_failure;
     }
-    state object_getattr_failure {
+
+    state object_getattr_failure
+    {
 	run getattr_object_getattr_failure;
 	default => cleanup;
     }
 
-    state datafile_getattr_setup_msgpairarray {
+    state datafile_getattr_setup_msgpairarray
+    {
 	run getattr_datafile_getattr_setup_msgpairarray;
 	success => datafile_getattr_xfer_msgpairarray;
 	default => cleanup;
     }
-    state datafile_getattr_xfer_msgpairarray {
+
+    state datafile_getattr_xfer_msgpairarray
+    {
 	jump pvfs2_client_msgpairarray_sm;
 	success => cleanup;
 	default => datafile_getattr_failure;
     }
-    state datafile_getattr_failure {
+
+    state datafile_getattr_failure
+    {
 	run getattr_datafile_getattr_failure;
 	default => cleanup;
     }
 
-    state cleanup {
+    state cleanup
+    {
 	run getattr_cleanup;
 	default => terminate;
     }
