@@ -50,5 +50,6 @@ test/io/bmi/module.mk
 test/io/description/module.mk
 test/io/flow/module.mk
 test/io/job/module.mk
+doc/coding/module.mk
 )
 
