@@ -144,6 +144,9 @@ endif
 
 # ADMINSRC is source code for administrative programs
 ADMINSRC :=
+# ADMINSRC_SERVER special version of ADMINSRC for tools that need server 
+# library
+ADMINSRC_SERVER :=
 # TESTSRC is source code for test programs
 TESTSRC :=
 # LIBSRC is source code for libpvfs2
@@ -194,11 +197,13 @@ LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
+ADMINOBJS_SERVER := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC_SERVER)))
 # ADMINTOOLS is a list of admin program executables
 # ADMINTOOLS := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC)))
 # ADMINTOOLS IS DEFINED IN THE MODULE.MK FILE!!!
 # ADMINDEPENDS is a list of dependency files for admin programs
 ADMINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC)))
+ADMINDEPENDS_SERVER := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC_SERVER)))
 
 # TESTOBJS is a list of test program objects
 TESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(TESTSRC)))
@@ -244,7 +249,7 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS)) 
+DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER)) 
 ifdef BUILD_MPI
 DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
 endif
@@ -266,7 +271,7 @@ CLEANFILES :=\
 # Rules and dependencies
 
 # target for building admin tools
-admintools: $(ADMINTOOLS)
+admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 
 # target for building the test program executables
 tests: $(TESTS)
@@ -375,6 +380,7 @@ endif
 $(TESTS): %: %.o $(LIBRARIES)
 
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
+$(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 
 # target for building _just_ the statecomp tool
 statecomp: src/common/statecomp/statecomp

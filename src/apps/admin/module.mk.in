@@ -1,17 +1,30 @@
 DIR := src/apps/admin
 
 ADMINSRC := \
-	$(DIR)/pvfs2-mkspace.c \
-	$(DIR)/pvfs2-showcoll.c \
 	$(DIR)/pvfs2-import.c \
 	$(DIR)/pvfs2-set-debugmask.c \
 	$(DIR)/pvfs2-export.c \
         $(DIR)/pvfs2-ls.c
 
+ADMINSRC_SERVER := \
+	$(DIR)/pvfs2-mkspace.c \
+	$(DIR)/pvfs2-showcoll.c \
+
 ADMINLIBS := -ldb -lrt -lpthread
 
 ADMINTOOLS := $(patsubst %.c, %, $(ADMINSRC))
+ADMINTOOLS_SERVER := $(patsubst %.c, %, $(ADMINSRC_SERVER))
 
+# special rules for tools which also require server components
+$(ADMINTOOLS_SERVER): %: %.o
+ifdef QUIET_COMPILE
+	@echo "  LD		$@"
+	@$(LD) $< $(LDFLAGS) $(LIBS) $(SERVERLIBS) -o $@
+else
+	$(LD) $< $(LDFLAGS) $(LIBS) $(SERVERLIBS) -o $@
+endif
+
+# the rest of the tools
 $(ADMINTOOLS): %: %.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
