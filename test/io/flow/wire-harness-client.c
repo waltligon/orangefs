@@ -384,7 +384,6 @@ static int run_io_operation(
 
 	flow_d->io_req = io_req;
 	flow_d->file_data =  &file_data;
-	flow_d->flags = 0;
 	flow_d->tag = 0;
 	flow_d->user_ptr = NULL;
 

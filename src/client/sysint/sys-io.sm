@@ -806,9 +806,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    /* this is the memory datatype */
 	    fl_p->mem_req = NULL;
 
-	    /* flags -- not currently used */
-	    fl_p->flags = 0;
-
 	    /* session tag, same as the one used in the send/recv */
 	    fl_p->tag = iosm_p->session_tag_array[recv_match];
 

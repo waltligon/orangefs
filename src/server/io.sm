@@ -256,7 +256,6 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
 	s_op->u.io.flow_d->io_req = s_op->req->u.io.io_req;
 	s_op->u.io.flow_d->io_req_offset = s_op->req->u.io.io_req_offset;
 	s_op->u.io.flow_d->mem_req = NULL;
-	s_op->u.io.flow_d->flags = 0;
 	s_op->u.io.flow_d->tag = s_op->tag;
 	s_op->u.io.flow_d->user_ptr = NULL;
 	s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;

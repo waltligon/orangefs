@@ -89,7 +89,6 @@ struct flow_descriptor
 
     struct flow_endpoint src;	/* src endpoint */
     struct flow_endpoint dest;	/* dest endpoint */
-    int flags;	/* optional flags */
     PVFS_msg_tag_t tag;		/* matching tag */
     void *user_ptr;		/* for use by caller */
     /* can be used to force use of specific flow protocol */
