@@ -167,8 +167,6 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	}
 	else if (ret == 1) {
 	    /* we can get this if we have lost connectivity to this server */
-	    sm_p->msgarray[0].comp_ct -= 2;
-
 	    assert(msg_p->recv_status.error_code != 0); /* sanity check */
 
 	    msg_p->recv_id = 0;
@@ -177,6 +175,10 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	    /* mark send as bad too and don't post it */
 	    /* TODO: what should this error be?  copy of recv? */
 	    msg_p->send_status.error_code = -PVFS_EIO;
+
+	    msg_p->op_status = msg_p->recv_status.error_code;
+
+	    sm_p->msgarray[0].comp_ct -= 2;
 	    continue;
 	}
 	assert(ret == 0); /* return value range check */
@@ -198,6 +200,9 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	if (ret < 0) {
 	    gossip_lerr("post of send failed; should cancel recv\n");
 
+	    assert(msg_p->send_status.error_code != 0); /* sanity check */
+
+	    msg_p->op_status = msg_p->send_status.error_code;
 	    sm_p->msgarray[0].comp_ct--;
 
 	}
@@ -247,6 +252,9 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 
 	msg_p->recv_id     = 0;
 	msg_p->recv_status = *js_p;
+
+	/* save error, if any, in op_status */
+	msg_p->op_status = msg_p->recv_status.error_code;
     }
     else
     {
@@ -259,6 +267,9 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 	if (msg_p->send_status.error_code != 0) {
 	    gossip_err("msgarray bad send; should cancel recv\n");
 	}
+
+	/* save error, if any, in op_status */
+	msg_p->op_status = msg_p->send_status.error_code;
     }
 
     /* decrement comp_ct until all operations have completed.
@@ -291,18 +302,12 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
     for (i=0; i < sm_p->msgarray_count; i++) {
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
-	if (msg_p->send_status.error_code != 0 ||
-	    msg_p->recv_status.error_code != 0)
+	if (msg_p->op_status != 0)
 	{
-	    /* save a failed error code */
-	    if (msg_p->send_status.error_code) {
-		js_p->error_code = msg_p->send_status.error_code;
-	    }
-	    else {
-		js_p->error_code = msg_p->recv_status.error_code;
-	    }
+	    /* save an error code */
+	    js_p->error_code = msg_p->op_status;
 
-	    /* don't call comp fn on these -- RobR */
+	    /* don't call comp fn if we don't get a valid response -- RobR */
 	    gossip_err("msg pair did not complete; skipping comp_fn\n");
 	    continue;
 	}
@@ -320,7 +325,11 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 	}
 
 	assert(resp_p->status <= 0); /* parameter range checking */
-	msg_p->op_status = resp_p->status; /* save status value */
+
+	/* if we've made it this far, the server response status is
+	 * meaningful, so we save it.
+	 */
+	msg_p->op_status = resp_p->status;
 	
 	/* call completion function to perform operation-specific
 	 * functions.  this call must not block!!!
@@ -331,27 +340,21 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 	 *       each message (to handle different types of messages
 	 *       all in the same array).
 	 */
-	if (msg_p->comp_fn != NULL) {
-	    /* NOTE: this will result in only the last value being
-	     * returned.  this is fine; the comp_fn can do whatever
-	     * necessary to return the value that they're interested
-	     * in I think? -- Rob
-	     *
+	if (msg_p->comp_fn != NULL)
+	{
+	    /* If we call the completion function, store the result on a
+	     * per message pair basis.  Also store some non-zero (failure)
+	     * value in js_p->error_code if we see one.
 	     */
-	    js_p->error_code = msg_p->comp_fn(sm_p, resp_p, i);
+	    msg_p->op_status = msg_p->comp_fn(sm_p, resp_p, i);
+	    if (msg_p->op_status != 0)
+	    {
+		js_p->error_code = msg_p->op_status;
+	    }
 
-            /*
-              break out if a completion function fails;
-              caller will have to do manual cleanup in the
-              next state (presumably a failure or cleanup state)
-              -- Neill
-            */
-            if (js_p->error_code)
-            {
-                gossip_debug(GOSSIP_CLIENT_DEBUG, "Completion function %d "
-                             "failed; aborting\n", i);
-                break;
-            }
+	    /* even if we see a failure, continue to process with the
+	     * completion function. -- RobR
+	     */
 	}
 	else if (resp_p->status != 0) {
 	    /* no comp_fn specified and status non-zero */
@@ -363,6 +366,11 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 			 i);
 	    /* save a non-zero status to return if we see one */
 	    js_p->error_code = resp_p->status;
+
+	    /* If we don't have a completion function, there is no point
+	     * in continuing to process after seeing a failure.
+	     */
+	    if (js_p->error_code) break;
 	}
 	
 	/* free all the resources that we used to send and receive. */

@@ -132,12 +132,14 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list completed\n");
 
-    if (((error = sm_p->error_code) != 0) && (error_array != NULL)) {
+    error = sm_p->error_code;
+
+    if ((error != 0) && (error_array != NULL)) {
 	/* store server-specific errors in error_array */
 	for (i=0; i < count; i++) {
 	    error_array[i] = sm_p->msgarray[i].op_status;
 	}
-	error = PVFS_EPARTIAL;
+	error = -PVFS_EPARTIAL;
     }
 
  cleanup:

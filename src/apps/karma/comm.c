@@ -301,13 +301,35 @@ static int gui_comm_stats_collect(void)
 				internal_addrs,
 				internal_errors,
 				internal_stat_ct);
-    if (ret < 0)
-    {
+    if (ret == 0) return 0;
+    else if (ret == -PVFS_EPARTIAL) {
+	int i;
+	for (i=0; i < internal_stat_ct; i++)
+	{
+	    char msgbuf[64];
+
+	    if (internal_errors[i] != 0) {
+		/* note: statfs_list already clears out values,
+		 * so we don't need to zero stat fields in failure
+		 * cases.
+		 */
+		
+		snprintf(msgbuf,
+			 64,
+			 "Server %d not responding (need to map to addr!).\n",
+			 i);
+		gui_message_new(msgbuf);
+
+	    }
+	}
+
+	return 0;
+    }
+    else {
 	PVFS_perror("PVFS_mgmt_statfs_list", ret);
 	return -1;
     }
 #endif
-    return 0;
 }
 
 /* gui_comm_perf_collect()
