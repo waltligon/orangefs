@@ -4,6 +4,7 @@
 #include "pvfs2-storage.h"
 #include "dotconf.h"
 #include "server-config.h"
+#include "gossip.h"
 
 
 void print_filesystem_configuration(struct filesystem_configuration_s *fs)

@@ -98,12 +98,9 @@ void getconfig_init_state_machine(void)
 
 static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
 {
-
-    int i = 0;
     int job_post_ret = 1;
     char *meta_server, *data_server;
     struct llist *cur = NULL;
-    struct host_alias_s *cur_alias = NULL;
     struct server_configuration_s *user_opts;
     struct filesystem_configuration_s *cur_fs;
 

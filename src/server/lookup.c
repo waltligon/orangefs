@@ -418,7 +418,7 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
 static int lookup_send_response(PINT_server_op *s_op,
 				job_status_s *ret)
 {
-    int encode_ret, job_post_ret, payload_sz;
+    int encode_ret, job_post_ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_send_response\n");

@@ -29,9 +29,7 @@ int do_encode_resp(
 	int header_size
 	)
 {
-    int i=0;
     size_t strlen1, strlen2;
-    char *respbuf;
     int total_path_count = 0;
 
     /* TODO: CHECK RETURN VALUES */
