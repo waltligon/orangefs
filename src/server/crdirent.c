@@ -232,7 +232,7 @@ static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
 
     /* 
      *	Assert that the buffer is big enough to hold a handle.
-     * Recall that the buffer was previously allocated for the permission checking
+     *  Recall that the buffer was previously allocated for the permission checking
      */
     assert(s_op->val.buffer != NULL && s_op->val.buffer_sz >= sizeof(PVFS_handle));
 

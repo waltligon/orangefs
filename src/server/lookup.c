@@ -23,6 +23,7 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret);
 static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret);
 static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret);
 static int lookup_key_val(state_action_struct *s_op, job_status_s *ret);
+static int lookup_release_job(state_action_struct *s_op, job_status_s *ret);
 void lookup_init_state_machine(void);
 /* TODO: Release Scheduled Job */
 
@@ -37,7 +38,7 @@ PINT_state_machine_s lookup_req_s =
 
 %%
 
-machine lookup(init, key_val, dir_space, check_params, send, cleanup)
+machine lookup(init, key_val, dir_space, check_params, send, release, cleanup)
 {
 
     state init
@@ -70,6 +71,12 @@ machine lookup(init, key_val, dir_space, check_params, send, cleanup)
     state send
     {
 	run lookup_send_bmi;
+	default => release;
+    }
+
+    state release
+    {
+	run lookup_release_job;
 	default => cleanup;
     }
 
@@ -128,14 +135,18 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
     int memory_sz;
     int key_a_sz,val_a_sz,key_a0_sz,val_a0_sz,handle_array_sz,attr_array_sz;
 
+
+    /* Set up the response size */
+    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+    
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
-    /* s_op->key_a */
-    key_a_sz = 3*sizeof(PVFS_ds_keyval_s);  
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
 
+    /* s_op->key_a */
     /* s_op->val_a */
-    val_a_sz = 3*sizeof(PVFS_ds_keyval_s);
+    key_a_sz = val_a_sz = 3*sizeof(PVFS_ds_keyval_s);  
 
     /* key_a[0] */
     key_a0_sz = Trove_Common_Keys[DIR_ENT_KEY].size > Trove_Common_Keys[METADATA_KEY].size ? \
@@ -152,7 +163,8 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
     /* attr_array */
     attr_array_sz = LOOKUP_BUFF_SZ*sizeof(PVFS_object_attr) + sizeof(PVFS_datafile_attr);
 
-    memory_sz = key_a_sz+val_a_sz+2*(key_a0_sz+val_a0_sz)+handle_array_sz+attr_array_sz;
+    memory_sz = key_a_sz+val_a_sz+2*(key_a0_sz+val_a0_sz)+handle_array_sz+attr_array_sz
+	+ s_op->val.buffer_sz;
 
     /* Allocate space for attributes, handles, and path segments */
     big_memory_buffer = malloc(memory_sz);
@@ -188,9 +200,14 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 
     /* Attribute Array */
     s_op->resp->u.lookup_path.attr_array = (PVFS_object_attr *) big_memory_buffer;
+    big_memory_buffer += attr_array_sz;
+
+    /* Val Buffer */
+    s_op->val.buffer = (void *) big_memory_buffer;
+    big_memory_buffer += s_op->val.buffer_sz;
 
     /* We are done calculating pointers.  Check to make sure we are correct in pointer arith */
-    assert(big_memory_buffer+attr_array_sz-memory_sz == s_op->key_a);
+    assert(big_memory_buffer-memory_sz == s_op->key_a);
 
     /* Set up the right sizes that I allocated */
     s_op->key_a[0].buffer_sz = s_op->key_a[1].buffer_sz = key_a0_sz;
@@ -203,11 +220,14 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
      *	Set up the key val iterate pair.  When we go into a nice loop to find handles,
      *	it will help the state machine if the value of the handle we are looking for
      *	is stored in the same place.  So, lets use the starting handle...
+     * 
+     *  Note: the path will ALWAYS begin with a '/' as frank and I discussed.  dw
      *
      */
     s_op->strsize = strlen(s_op->req->u.lookup_path.path);
     if(index(s_op->req->u.lookup_path.path,'/')-s_op->req->u.lookup_path.path == 0)
     {
+	gossip_debug(SERVER_DEBUG,"Chopping Leading / \n");
 	s_op->req->u.lookup_path.path++;
 	s_op->strsize--;
     }
@@ -238,6 +258,9 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
  *           handle.  First, check the permissions on the directory, 
  *           Then, if they correspond, run key/val iter on the dspace
  *           
+ *           TODO: This still needs a little more work... follow the TODO's!
+ *                 -dw
+ *           
  */
 
 
@@ -249,63 +272,87 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 
   int k;
   char *end_of_path;
-  int meta_data_flag, directory_handle_flag;	//used to tell us that we have the data
+  int meta_data_flag, directory_handle_flag, root_dir_flag;	/*used to tell us that we have the data*/
 
-  meta_data_flag = directory_handle_flag = 0;
+  meta_data_flag = directory_handle_flag = root_dir_flag = 0;
 
   if (s_op->resp->u.lookup_path.count == -1)
-    {
+  {
       s_op->resp->u.lookup_path.count++;
-    }
+      root_dir_flag = 1;
+  }
   for (k = 0; k < ret->count; k++)
-    {
+  {
       switch (((char *) (s_op->key_a[k].buffer))[0])
-	{
-	case 'm':
-	  memcpy (&
-		  (s_op->resp->u.lookup_path.
-		   attr_array[s_op->resp->u.lookup_path.count]),
-		  s_op->val_a[0].buffer, s_op->val_a[0].buffer_sz);
-	  meta_data_flag = 1;
-	  break;
-	case 'd':
-	  s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.
-						 count] =
-	    s_op->req->u.lookup_path.starting_handle;
-	  s_op->req->u.lookup_path.starting_handle =
-	    *((PVFS_handle *) s_op->val_a[0].buffer), directory_handle_flag =
-	    1;
-	default:
-	  gossip_lerr ("Handle of unknown type found\n");
+      {
+	  case 'm':
+	      memcpy (&(s_op->resp->u.lookup_path.
+		       attr_array[s_op->resp->u.lookup_path.count]),
+		      s_op->val_a[0].buffer, s_op->val_a[0].buffer_sz);
+	      meta_data_flag = 1;
+	      s_op->resp->rsize += sizeof(PVFS_object_attr);
+	      break;
+	  case 'd':
+	      s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.
+		  count] =
+		  s_op->req->u.lookup_path.starting_handle;
+	      s_op->req->u.lookup_path.starting_handle =
+		  *((PVFS_handle *) s_op->val_a[0].buffer), directory_handle_flag =
+		  1;
+	      s_op->resp->rsize += sizeof(PVFS_handle);
+	      break;
+	  default:
+	      gossip_lerr ("Handle of unknown type found\n");
 
-	}
-    }
-  if (directory_handle_flag && meta_data_flag)
-    {
+      }
+  }
+  /* We don't want to increment again the first time.  Overwrite these values */
+  if (directory_handle_flag && meta_data_flag && !root_dir_flag)
+  {
       s_op->resp->u.lookup_path.count++;
       // CHECK PERMISSIONS HERE on attr_array[count-1];
-    }
+  }
   else
-    {
+  {
       if (!directory_handle_flag)
-	gossip_lerr ("Did not get directory handle\n");
-      else
-	gossip_lerr ("Did not get metadata\n");
+      {
+	  gossip_lerr ("Did not get directory handle\n");
+	  /* This means that this is a terminal file.  Which means we need to
+	     send what we have, i.e. this objects attribs.  Hopefully we have them.
+	     So we increment the count to say we have these attribs (if we do)
+	     and run with it.
+	   */
+	  if(meta_data_flag)
+	    s_op->resp->u.lookup_path.count++;
+	  /* TODO: Now jump to send if we have the attribs!! */
+      }
+      if(!meta_data_flag)
+      {
+	  /* TODO: Why don't we have them?? */
+	  gossip_lerr ("Did not get metadata.\n Damn.");
+      }
       gossip_lerr ("We did not get both... fix it\n");
-    }
+  }
   /* TODO: Better way of doing this??? */
   if (s_op->strsize)
-    {
+  {
       end_of_path = index (s_op->req->u.lookup_path.path, '/');
+
+      /* What we are doing here is if there is a multi-part string,
+	 we need to just get the first key, and hide the rest of the
+	 string 
+       */
       if (end_of_path)
-	end_of_path[0] = '\0';
+	  end_of_path[0] = '\0';
+#if 0
       else
-	//if(strlen(s_op->req->u.lookup_path.path)) // there is something there
-	s_op->key.buffer = s_op->req->u.lookup_path.path;
+	  if(strlen(s_op->req->u.lookup_path.path))
+#endif
+	      s_op->key.buffer = s_op->req->u.lookup_path.path;
       s_op->key.buffer_sz = strlen (s_op->key.buffer)+1;
       s_op->req->u.lookup_path.path += strlen (s_op->key.buffer) + 1;
       s_op->strsize -= strlen (s_op->key.buffer) + 1;
-    }
+  }
   gossip_ldebug (SERVER_DEBUG, "Looking up %s\n", (char *) s_op->key.buffer);
 
   gossip_ldebug (SERVER_DEBUG, "check returning: %d\n", job_post_ret);
@@ -313,66 +360,6 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 
 }
 
-/*
- * Function: lookup_send_bmi
- *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: Encode and send
- *           
- */
-
-
-static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
-{
-
-    int job_post_ret=0;
-    job_id_t i;
-
-    gossip_ldebug(SERVER_DEBUG,"Send BMI\n");
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) 
-	+ (s_op->resp->u.lookup_path.count * (sizeof(PVFS_handle)+sizeof(PVFS_object_attr)));
-    printf("Sop %lld\n",*(PVFS_handle *)s_op->val.buffer);
-    if (ret->error_code == 0)
-    {
-	job_post_ret = PINT_encode(s_op->resp,
-		PINT_ENCODE_RESP,
-		&(s_op->encoded),
-		s_op->addr,
-		s_op->enc_type);
-    }
-    else
-    {
-	/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
-	s_op->resp->op = PVFS_SERV_NOOP;
-	PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-	/* set it back */
-	((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = PVFS_SERV_GETCONFIG;
-    }
-    assert(job_post_ret == 0);
-
-    /* Post message */
-    job_post_ret = job_bmi_send(s_op->addr,
-	    s_op->encoded.buffer_list[0],
-	    s_op->encoded.total_size,
-	    s_op->tag,
-	    0,
-	    0,
-	    s_op,
-	    ret,
-	    &i);
-
-
-    return(job_post_ret);
-
-}
 
 /*
  * Function: lookup_dir_space
@@ -435,12 +422,18 @@ static int lookup_key_val(state_action_struct *s_op, job_status_s *ret)
     job_id_t i;
     PVFS_vtag_s bs;
 
-    job_post_ret = job_trove_keyval_iterate(s_op->req->u.lookup_path.fs_id,
+    if(s_op->resp->u.lookup_path.count > 0)
+	s_op->req->u.lookup_path.starting_handle = ret->handle;
+
+    gossip_ldebug(SERVER_DEBUG,"Lookup: K/V Iterate %lld\n",s_op->req->u.lookup_path.starting_handle);
+
+    job_post_ret = job_trove_keyval_iterate(
+	    s_op->req->u.lookup_path.fs_id,
 	    s_op->req->u.lookup_path.starting_handle,
 	    1,
 	    s_op->key_a,
 	    s_op->val_a,
-	    5,
+	    2,
 	    0,
 	    bs,
 	    s_op,
@@ -451,6 +444,88 @@ static int lookup_key_val(state_action_struct *s_op, job_status_s *ret)
 
 }
 
+
+/*
+ * Function: lookup_release_job
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *ret
+ *
+ * Pre:      We are done!
+ *
+ * Post:     We need to let the next operation go.
+ *
+ * Returns:  int
+ *
+ * Synopsis: Free the job from the scheduler to allow next job to proceed.
+ */
+
+
+static int lookup_release_job(state_action_struct *s_op, job_status_s *ret)
+{
+
+    int job_post_ret=0;
+    job_id_t i;
+
+    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+	    s_op,
+	    ret,
+	    &i);
+    return job_post_ret;
+}
+
+/*
+ * Function: lookup_send_bmi
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
+ *
+ * Returns:  int
+ *
+ * Synopsis: Encode and send
+ *           
+ */
+
+
+static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
+{
+
+    int job_post_ret=0;
+    job_id_t i;
+
+    gossip_ldebug(SERVER_DEBUG,"Send BMI\n");
+    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) 
+	+ (s_op->resp->u.lookup_path.count * (sizeof(PVFS_handle)+sizeof(PVFS_object_attr)));
+    /*if (ret->error_code == 0)
+    {
+    */
+	job_post_ret = PINT_encode(s_op->resp,
+		PINT_ENCODE_RESP,
+		&(s_op->encoded),
+		s_op->addr,
+		s_op->enc_type);
+    /*}*/
+    assert(job_post_ret == 0);
+
+    /* Post message */
+    job_post_ret = job_bmi_send(s_op->addr,
+	    s_op->encoded.buffer_list[0],
+	    s_op->encoded.total_size,
+	    s_op->tag,
+	    0,
+	    0,
+	    s_op,
+	    ret,
+	    &i);
+
+
+    return(job_post_ret);
+
+}
 
 /*
  * Function: lookup_cleanup

@@ -130,7 +130,6 @@ static int readdir_init(state_action_struct *s_op, job_status_s *ret)
     check_buffer = big_memory_buffer;
 
     s_op->key_a = (TROVE_keyval_s *) big_memory_buffer;
-    printf("%d\n",s_op->key_a);
     big_memory_buffer+=key_a_sz;
 
     s_op->val_a = (TROVE_keyval_s *) big_memory_buffer;
@@ -152,7 +151,6 @@ static int readdir_init(state_action_struct *s_op, job_status_s *ret)
 	s_op->val_a[j].buffer = &(s_op->resp->u.readdir.pvfs_dirent_array[j].handle);
 	s_op->val_a[j].buffer_sz = handle_sz;
     }
-    printf("%d\n",s_op->key_a);
 
     job_post_ret = job_req_sched_post(s_op->req,
 	    s_op,
@@ -221,14 +219,7 @@ static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret)
     PVFS_vtag_s vtag;
 
     h = *((PVFS_handle *)s_op->val.buffer);
-    gossip_ldebug(SERVER_DEBUG,"KVSpace %lld\n",s_op->req->u.readdir.handle);
-    gossip_ldebug(SERVER_DEBUG,"Posting : %d,%lld,%d,%d,%d,%d\n",
-	    s_op->req->u.readdir.fs_id,
-	    h,
-	    s_op->req->u.readdir.token,
-	    s_op->key_a,
-	    s_op->val_a,
-	    s_op->req->u.readdir.pvfs_dirent_count);
+    gossip_ldebug(SERVER_DEBUG,"KVSpace %lld\n",h);
 
     job_post_ret = job_trove_keyval_iterate(
 	    s_op->req->u.readdir.fs_id,

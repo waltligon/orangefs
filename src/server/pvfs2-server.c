@@ -360,6 +360,7 @@ int main(int argc,
 
 	for (i = 0; i < out_count; i++)
 	{
+	    printf("S_op %xh\n",s_op);
 	    s_op = (PINT_server_op *) completed_job_pointers[i];
 	    if (s_op->op == BMI_UNEXP)
 	    {
