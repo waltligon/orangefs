@@ -18,6 +18,7 @@
 #include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
 #include "gossip.h"
+#include "gen-locks.h"
 
 /*
   this is an internal structure and shouldn't be used
@@ -38,6 +39,8 @@ static struct qhash_table *s_fsid_to_ledger_table = NULL;
 /* these are based on code from src/server/request-scheduler.c */
 static int hash_fsid(void *fsid, int table_size);
 static int hash_fsid_compare(void *key, struct qlist_head *link);
+
+static gen_mutex_t trove_handle_mutex = GEN_MUTEX_INITIALIZER;
 
 /* trove_check_handle_ranges:
  *  internal function to verify that handles
@@ -249,6 +252,7 @@ int trove_handle_mgmt_initialize()
       unless the hash table initialization really fails.
     */
     int ret = 0;
+    gen_mutex_lock(&trove_handle_mutex);
 
     if (s_fsid_to_ledger_table == NULL)
     {
@@ -256,6 +260,7 @@ int trove_handle_mgmt_initialize()
                                             hash_fsid,67);
         ret = (s_fsid_to_ledger_table ? 0 : -1);
     }
+    gen_mutex_unlock(&trove_handle_mutex);
     return ret;
 }
 
@@ -267,6 +272,7 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
     PINT_llist *extent_list = NULL;
     handle_ledger_t *ledger = NULL;
 
+    gen_mutex_lock(&trove_handle_mutex);
     if (handle_range_str)
     {
         extent_list = PINT_create_extent_list(handle_range_str);
@@ -287,6 +293,7 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
                     extent_list, ledger->ledger);
 		if (ret != 0)
                 {
+                    gen_mutex_unlock(&trove_handle_mutex);
                     return ret;
                 }
 
@@ -294,6 +301,7 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
                     coll_id,context_id,extent_list,ledger->ledger);
 		if (ret != 0)
                 {
+                    gen_mutex_unlock(&trove_handle_mutex);
                     return ret;
                 }
                 else
@@ -304,6 +312,7 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
             PINT_release_extent_list(extent_list);
         }
     }
+    gen_mutex_unlock(&trove_handle_mutex);
     return ret;
 }
 
@@ -319,6 +328,7 @@ int trove_set_handle_timeout(TROVE_coll_id coll_id,
     int ret = -1;
     handle_ledger_t *ledger = NULL;
 
+    gen_mutex_lock(&trove_handle_mutex);
     ledger = get_or_add_handle_ledger(coll_id);
     if (ledger)
     {
@@ -338,6 +348,7 @@ int trove_set_handle_timeout(TROVE_coll_id coll_id,
                      "timeout to %d seconds (ret=%d)\n",
                      (int)timeout->tv_sec, ret);
     }
+    gen_mutex_unlock(&trove_handle_mutex);
     return ret;
 }
 
@@ -347,6 +358,7 @@ TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
     struct qlist_head *hash_link = NULL;
     TROVE_handle handle = TROVE_HANDLE_NULL;
 
+    gen_mutex_lock(&trove_handle_mutex);
     hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
     if (hash_link)
     {
@@ -356,6 +368,7 @@ TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
             handle = trove_ledger_handle_alloc(ledger->ledger);
         }
     }
+    gen_mutex_unlock(&trove_handle_mutex);
     return handle;
 }
 
@@ -368,6 +381,7 @@ TROVE_handle trove_handle_alloc_from_range(
     TROVE_handle handle = TROVE_HANDLE_NULL;
     int i = 0;
 
+    gen_mutex_lock(&trove_handle_mutex);
     hash_link = qhash_search(s_fsid_to_ledger_table, &(coll_id));
     if (hash_link)
     {
@@ -385,6 +399,7 @@ TROVE_handle trove_handle_alloc_from_range(
             }
         }
     }
+    gen_mutex_unlock(&trove_handle_mutex);
     return handle;
 }
 
@@ -403,6 +418,7 @@ int trove_handle_peek(
         return ret;
     }
 
+    gen_mutex_lock(&trove_handle_mutex);
     hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
     if (hash_link)
     {
@@ -414,6 +430,7 @@ int trove_handle_peek(
                 max_num_handles, returned_handle_count);
         }
     }
+    gen_mutex_unlock(&trove_handle_mutex);
     return ret;
 }
 
@@ -433,6 +450,7 @@ int trove_handle_peek_from_range(
         return ret;
     }
 
+    gen_mutex_lock(&trove_handle_mutex);
     hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
     if (hash_link)
     {
@@ -457,6 +475,7 @@ int trove_handle_peek_from_range(
             }
         }
     }
+    gen_mutex_unlock(&trove_handle_mutex);
     return ret;
 }
 
@@ -466,6 +485,7 @@ int trove_handle_set_used(TROVE_coll_id coll_id, TROVE_handle handle)
     handle_ledger_t *ledger = NULL;
     struct qlist_head *hash_link = NULL;
 
+    gen_mutex_lock(&trove_handle_mutex);
     hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
     if (hash_link)
     {
@@ -475,6 +495,7 @@ int trove_handle_set_used(TROVE_coll_id coll_id, TROVE_handle handle)
             ret = trove_handle_remove(ledger->ledger,handle);
         }
     }
+    gen_mutex_unlock(&trove_handle_mutex);
     return ret;
 }
 
@@ -484,6 +505,7 @@ int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
     handle_ledger_t *ledger = NULL;
     struct qlist_head *hash_link = NULL;
 
+    gen_mutex_lock(&trove_handle_mutex);
     hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
     if (hash_link)
     {
@@ -493,6 +515,7 @@ int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
             ret = trove_ledger_handle_free(ledger->ledger, handle);
         }
     }
+    gen_mutex_unlock(&trove_handle_mutex);
     return ret;
 }
 
@@ -508,6 +531,7 @@ int trove_handle_get_statistics(TROVE_coll_id coll_id, uint64_t* free_count)
     handle_ledger_t *ledger = NULL;
     struct qlist_head *hash_link = NULL;
 
+    gen_mutex_lock(&trove_handle_mutex);
     hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
     if (hash_link)
     {
@@ -516,15 +540,18 @@ int trove_handle_get_statistics(TROVE_coll_id coll_id, uint64_t* free_count)
         {
 	    trove_handle_ledger_get_statistics(ledger->ledger, 
 		free_count);
+            gen_mutex_unlock(&trove_handle_mutex);
 	    return(0);
         }
 	else
 	{
+            gen_mutex_unlock(&trove_handle_mutex);
 	    return(-PVFS_ENOENT);
 	}
     }
     else
     {
+        gen_mutex_unlock(&trove_handle_mutex);
 	return(-PVFS_ENOENT);
     }
 }
@@ -535,6 +562,7 @@ int trove_handle_mgmt_finalize()
     handle_ledger_t *ledger = NULL;
     struct qlist_head *hash_link = NULL;
 
+    gen_mutex_lock(&trove_handle_mutex);
     /*
       this is an exhaustive and slow iterate.  speed this up
       if 'finalize' is something that will be done frequently.
@@ -558,6 +586,8 @@ int trove_handle_mgmt_finalize()
     }
     qhash_finalize(s_fsid_to_ledger_table);
     s_fsid_to_ledger_table = NULL;
+
+    gen_mutex_unlock(&trove_handle_mutex);
     return 0;
 }
 

@@ -470,10 +470,10 @@ void extentlist_show(struct TROVE_handle_extentlist *elist)
 void extentlist_count(
     struct TROVE_handle_extentlist *elist, uint64_t *count)
 {
-    /* NOTE: this function is not thread safe at all- we count on the 
-     * fact that the request scheduler will prevent multiple 
-     * concurrent callers 
+    /* NOTE: this function is not thread safe at all- we count
+     * on the trove-handle-mgmt layer to serialize calls.
      */
+
     g_counter = 0;
     avldepthfirst(elist->index, extent_count, 0 , 0);
     *count = g_counter;
