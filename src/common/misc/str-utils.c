@@ -10,7 +10,7 @@
 #include <errno.h>
 #include <ctype.h>
 
-#include "str_utils.h"
+#include "str-utils.h"
 
 /* PINT_string_count_segments()
  *

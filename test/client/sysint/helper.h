@@ -19,7 +19,7 @@
 #define MAX_PVFS_PATH_LEN  512
 
 #include "pint-sysint.h"
-#include "str_utils.h"
+#include "str-utils.h"
 
 /* make uid, gid and perms passed in later */
 PVFS_handle lookup_parent_handle(char *filename, PVFS_fs_id fs_id);
