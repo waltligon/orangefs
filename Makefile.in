@@ -486,17 +486,15 @@ ifdef BUILD_VIS
 all: vis
 endif
 
-# build linux-2.6 kernel module if requested
-LINUX_KERNEL_SRC = @LINUX_KERNEL_SRC@
-ifneq (,$(LINUX_KERNEL_SRC))
-all: kernel
-endif
-
+# Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
 # dependencies---only the kernel source tree can do that.
-.PHONY: kernel
-kernel:
+LINUX_KERNEL_SRC = @LINUX_KERNEL_SRC@
+ifneq (,$(LINUX_KERNEL_SRC))
+.PHONY: kmod
+kmod:
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.6
+endif
 
 # target for building MPI-IO test programs 
 mpiiotests: $(MPIIOTESTS)
@@ -973,12 +971,12 @@ install:: install_doc
 	install -m 755 test/kernel/linux-2.6/pvfs2-client-core $(prefix)/sbin
 
 ifneq (,$(LINUX_KERNEL_SRC))
-install:: install_kmod
-endif
+install:: kmod_install
 
-.PHONY: install_kmod
-install_kmod:
+.PHONY: kmod_install
+kmod_install:
 	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(prefix)/sbin
+endif
 
 install_tests:
 	install -d $(prefix)/bin
