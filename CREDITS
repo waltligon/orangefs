@@ -1,50 +1,37 @@
-Nathan Poznick <poznick@conwaycorp.net> -- extensive testing and suggestions,
-particularly using the 2.6.x vfs interface.
+Active contributors
+===================
 
-Pete Wyckoff <pw@osc.edu> did a lot of Infiniband work
+Jiesheng Wu <wujs@mcs.anl.gov>
+-- buffer cache development (in progress)
 
-Jiesheng Wu <email address?> contributed a buffer cache 
+Pete Wyckoff <pw@osc.edu>
+-- Infiniband support
+   little endian encoding/decoding
+   IA64/Alpha clean compilation fixes
 
-
-The AVL tree used in the handle management code is from Georg Kraml
-
-	From georg@ads.tuwien.ac.at Wed Oct  9 12:02:42 2002
-	Date: Wed, 9 Oct 2002 19:02:27 +0200 (CEST)
-	From: Georg Kraml <georg@ads.tuwien.ac.at>
-	To: Robert Latham <robl@mcs.anl.gov>
-	Subject: Re: avl reference implementation: use in other programs
-
-	Hi,
-
-	On Tue, 8 Oct 2002, Robert Latham wrote:
-	> I have found your AVL discussion very helpful.  I'm also happy to
-	> find your reference implementation.
-
-	Thank you very much, I'm glad you like it.
-
-	> What is the license of that code?  I would like to use it in part of
-	> another project if possible.
-
-	The code is in the Public Domain; that is, you are free to do
-	with it whatever you see fit. Enjoy.
-
-	Best regards,
-	Georg
+Nathan Poznick <poznick@conwaycorp.net>
+-- extensive testing and suggestions, particularly using the 2.6.x vfs
+   interface.  several pvfs2-client patches.
 
 
-	-- 
-	Georg Kraml                         georg@ads.tuwien.ac.at
-	Inst. f. Computergraphik, TU Wien   (+431) 58801/18629
-	Favoritenstr. 9-11, A1040 Wien      Sprechstunde Fr 14:00-15:00
+Other contributors
+==================
 
-We use Lukas Schroeder's LGPLed dotconf (http://www.azzit.de/dotconf/) to parse
-pvfs2 config files
+Georg Kraml <georg@ads.tuwien.ac.at>
+-- AVL tree implementation (public domain)
 
-Mark Veltzer introduced us to the single makefile approach we now use in pvfs2
+Lukas Schroeder's
+-- the general purpose dotconf (http://www.azzit.de/dotconf/)
+   project for configuration file parsing (LGPL)
 
-Dan Nurmi started work on the PTS back when the P stood for pvfs-1
+Mark Veltzer
+-- realized the single makefile approach used in pvfs2
 
-The fonts used in the pvfs2 visualization tools (src/apps/vis) were
-created by Bitstream, Inc., and may be redistributed subject to the
-license which is embedded in the font files themselves.
+Dan Nurmi
+-- started work on the PTS back when the P stood for pvfs-1
+
+Bitstream, Inc.
+-- The fonts used in the pvfs2 visualization tools (src/apps/vis)
+   (may be redistributed subject to the license which is embedded in
+   the font files themselves)
 
