@@ -64,12 +64,10 @@ typedef struct PINT_client_sm_msgpair_state_s
     /* don't use this -- internal msgpairarray use only */
     int retry_count;
 
-    /* comp_fn called after successful reception and decode of respone,
-     * if the msgpair state machine is used for processing.
+    /* comp_fn called after successful reception and decode of
+     * respone, if the msgpair state machine is used for processing.
      */
-    int (* comp_fn)(void *sm_p, /* actually (struct PINT_client_sm *) */
-		    struct PVFS_server_resp *resp_p,
-		    int i);
+    int (* comp_fn)(void *sm_p, struct PVFS_server_resp *resp_p, int i);
 
     /* comp_ct used to keep up with number of operations remaining */
     int comp_ct;
@@ -90,10 +88,17 @@ typedef struct PINT_client_sm_msgpair_state_s
     /* send_status, recv_status used for error handling etc. */
     job_status_s send_status, recv_status;
 
-    /* op_status is the code returned from the server, if the operation
-     * was actually processed (recv_status.error_code == 0)
+    /* op_status is the code returned from the server, if the
+     * operation was actually processed (recv_status.error_code == 0)
      */
     PVFS_error op_status;
+
+    /*
+      used in the retry code path to know if we've already completed
+      or not (to avoid re-doing the work we've already done)
+    */
+    int complete;
+
 } PINT_client_sm_msgpair_state;
 
 /* PINT_client_sm_recv_state_s
@@ -193,6 +198,15 @@ typedef struct
     PVFS_msg_tag_t session_tag;
 
     PINT_client_sm_recv_state write_ack;
+
+    /*
+      all *_has_been_posted fields are used at io_analyze_results time
+      to know if we should be checking for errors on particular fields
+    */
+    int msg_send_has_been_posted;
+    int msg_recv_has_been_posted;
+    int flow_has_been_posted;
+    int write_ack_has_been_posted;
 
     /*
       all *_in_progress fields are used at cancellation time to

@@ -89,9 +89,9 @@ do {                                                           \
 #endif
 
 #ifdef PVFS2_KERNEL_DEBUG
-#define MAX_SERVICE_WAIT_IN_SECONDS       10
-#else
 #define MAX_SERVICE_WAIT_IN_SECONDS       30
+#else
+#define MAX_SERVICE_WAIT_IN_SECONDS       60
 #endif
 
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"

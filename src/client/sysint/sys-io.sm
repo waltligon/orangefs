@@ -600,6 +600,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             &msg->recv_status, &msg->recv_id, pint_client_sm_context,
             PVFS2_CLIENT_JOB_TIMEOUT);
 
+        cur_ctx->msg_recv_has_been_posted = 1;
         cur_ctx->msg_recv_in_progress = 1;
 
         if (ret == 0)
@@ -657,7 +658,8 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             &msg->send_status, &msg->send_id, pint_client_sm_context,
             PVFS2_CLIENT_JOB_TIMEOUT);
 
-        cur_ctx->msg_recv_in_progress = 1;
+        cur_ctx->msg_send_has_been_posted = 1;
+        cur_ctx->msg_send_in_progress = 1;
 
         if ((ret < 0) ||
             ((ret == 1) && (msg->send_status.error_code != 0)))
@@ -738,6 +740,35 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io state: "
                  "datafile_complete_operations (got user tag %lu)\n",
                  status_user_tag);
+
+    if (js_p->error_code)
+    {
+        PVFS_perror_gossip("io_datafile_complete_operations failed",
+                           js_p->error_code);
+        /*
+          if we looped back here following an error, we need to figure
+          out what happened and cleanup properly
+        */
+        if ((sm_p->u.io.msgpair_completion_count == 0) &&
+            (sm_p->u.io.flow_completion_count == 0) &&
+            (sm_p->u.io.write_ack_completion_count == 0))
+        {
+            gossip_err("*** error path and all operations are "
+                       "complete\n");
+
+            /* preserve this error code for io_analyze_results */
+            sm_p->u.io.stored_error_code = js_p->error_code;
+
+            js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
+            return 1;
+        }
+
+        gossip_err("*** error path with %d flows pending, %d write acks "
+                   "pending\n", sm_p->u.io.flow_completion_count,
+                   sm_p->u.io.write_ack_completion_count);
+    }
+
+    js_p->error_code = 0;
 
     assert(sm_p->msgarray_count == sm_p->u.io.datafile_count);
     assert(sm_p->u.io.msgpair_completion_count > -1);
@@ -929,6 +960,18 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 
             gossip_debug(GOSSIP_IO_DEBUG, "[%d/%d] running size is %Ld\n",
                          (i + 1), sm_p->msgarray_count, Ld(total_size));
+        }
+
+        /*
+          at this point, we know an error occurred.  if we couldn't
+          find any errors in the context, use the preserved error code
+          from the complete_operations state
+        */
+        if (ret == 0)
+        {
+            ret = sm_p->u.io.stored_error_code;
+            gossip_debug(GOSSIP_IO_DEBUG, "no context errors found; "
+                         "using %d\n", ret);
         }
     }
 
@@ -1259,6 +1302,7 @@ static inline int process_context_recv_and_post_flow(
         }
 
         assert(ret == 0);
+        cur_ctx->write_ack_has_been_posted = 1;
         cur_ctx->write_ack_in_progress = 1;
         sm_p->u.io.write_ack_completion_count++;
     }
@@ -1286,6 +1330,7 @@ static inline int process_context_recv_and_post_flow(
         gossip_debug(GOSSIP_IO_DEBUG, "  posted flow for "
                      "context %p\n", cur_ctx);
 
+        cur_ctx->flow_has_been_posted = 1;
         cur_ctx->flow_in_progress = 1;
         sm_p->u.io.flow_completion_count++;
     }
@@ -1309,6 +1354,7 @@ static inline int check_context_status(
                      "  error (%d) in msgpair send for context %p\n",
                      cur_ctx->msg->send_status.error_code, cur_ctx);
 
+        assert(cur_ctx->msg_send_has_been_posted);
         ret = cur_ctx->msg->send_status.error_code;
     }
     else if (cur_ctx->msg->recv_status.error_code)
@@ -1317,6 +1363,7 @@ static inline int check_context_status(
                      "  error (%d) in msgpair recv for context %p\n",
                      cur_ctx->msg->recv_status.error_code, cur_ctx);
 
+        assert(cur_ctx->msg_recv_has_been_posted);
         ret = cur_ctx->msg->recv_status.error_code;
     }
     else if (cur_ctx->flow_status.error_code)
@@ -1325,6 +1372,7 @@ static inline int check_context_status(
                      "  error (%d) in flow for context %p\n",
                      cur_ctx->flow_status.error_code, cur_ctx);
 
+        assert(cur_ctx->flow_has_been_posted);
         PINT_flow_reset(&cur_ctx->flow_desc);
         ret = cur_ctx->flow_status.error_code;
     }
@@ -1337,6 +1385,7 @@ static inline int check_context_status(
         /* size for reads are reported in the flow */
         *total_size += cur_ctx->flow_desc.total_transfered;
 
+        assert(cur_ctx->flow_has_been_posted);
         PINT_flow_reset(&cur_ctx->flow_desc);
     }
     else if (io_type == PVFS_IO_WRITE)
@@ -1348,9 +1397,10 @@ static inline int check_context_status(
                 "  error (%d) in final ack for context %p\n",
                 cur_ctx->write_ack.recv_status.error_code, cur_ctx);
 
+            assert(cur_ctx->write_ack_has_been_posted);
             ret = cur_ctx->write_ack.recv_status.error_code;
         }
-        else
+        else if (cur_ctx->write_ack_has_been_posted)
         {
             struct PINT_decoded_msg decoded_resp;
             struct PVFS_server_resp *resp = NULL;
@@ -1378,12 +1428,12 @@ static inline int check_context_status(
             {
                 PVFS_perror_gossip("PINT_serv_decode_resp failed", ret);
             }
-        }
 
-        PINT_flow_reset(&cur_ctx->flow_desc);
-        BMI_memfree(cur_ctx->msg->svr_addr,
-                    cur_ctx->write_ack.encoded_resp_p,
-                    cur_ctx->write_ack.max_resp_sz, BMI_RECV);
+            PINT_flow_reset(&cur_ctx->flow_desc);
+            BMI_memfree(cur_ctx->msg->svr_addr,
+                        cur_ctx->write_ack.encoded_resp_p,
+                        cur_ctx->write_ack.max_resp_sz, BMI_RECV);
+        }
     }
     return ret;
 }

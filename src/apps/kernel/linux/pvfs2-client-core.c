@@ -1354,7 +1354,7 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
     }
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Got device request message: "
+        GOSSIP_CLIENT_DEBUG, "Got dev request message: "
         "size: %d, tag: %Ld, payload: %p, op_type: %d\n",
         vfs_request->info.size, vfs_request->info.tag,
         vfs_request->info.buffer, vfs_request->in_upcall.type);

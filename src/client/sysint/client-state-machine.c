@@ -378,7 +378,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
     sm_p = PINT_id_gen_safe_lookup(id);
     if (!sm_p)
     {
-	/* we can't find it, maybe it already completed? */
+	/* if we can't find it, it may have already completed */
         return 0;
     }
 
@@ -387,7 +387,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
 
     if (sm_p->op_complete)
     {
-	/* found op, but it has already finished.  Nothing to cancel. */
+	/* op already completed; nothing to cancel. */
         return 0;
     }
 
@@ -752,20 +752,19 @@ int PINT_serv_free_msgpair_resources(
     PVFS_BMI_addr_t *svr_addr_p,
     int max_resp_sz)
 {
-    PINT_encode_release(encoded_req_p,
-			PINT_ENCODE_REQ);
+    int ret = -PVFS_EINVAL;
 
-    /* sm_p->req doesn't go anywhere; we'll use it again. */
+    if (encoded_req_p && decoded_resp_p && svr_addr_p)
+    {
+        PINT_encode_release(encoded_req_p, PINT_ENCODE_REQ);
 
-    PINT_decode_release(decoded_resp_p,
-			PINT_DECODE_RESP);
+        PINT_decode_release(decoded_resp_p, PINT_DECODE_RESP);
 
-    BMI_memfree(*svr_addr_p,
-		encoded_resp_p,
-		max_resp_sz,
-		BMI_RECV);
+        BMI_memfree(*svr_addr_p, encoded_resp_p, max_resp_sz, BMI_RECV);
 
-    return 0;
+        ret = 0;
+    }
+    return ret;
 }
 
 /* PINT_serv_msgpair_array_resolve_addrs()
