@@ -355,7 +355,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	&q_item->result.bytes,
 	0,
 	NULL,
-	q_item,
+	&q_item->trove_callback,
 	global_trove_context,
 	&tmp_id);
     /* TODO: error handling */
