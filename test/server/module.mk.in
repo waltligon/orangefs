@@ -8,9 +8,18 @@ TESTSRC += \
 	$(DIR)/mkdir.c \
 	$(DIR)/readdir.c \
 	$(DIR)/setattr.c \
-	$(DIR)/io.c
+	$(DIR)/io.c \
+	$(DIR)/showconfig.c
 
 # special rule for io test program, which needs several other
 # libraries at the moment
 test/server/io: test/server/io.o
 	$(LD) $< $(LDFLAGS) $(LIBS) -ldb -lrt -lpthread -o $@
+
+# special rule for the config dumper, which pulls an object from the server
+# this is rather gross, but it *does* avoid copying code around
+SHOWCONFIG_OBJ := test/server/showconfig.o \
+	src/server/server-config.o \
+	src/common/dotconf/dotconf.o
+test/server/showconfig: $(SHOWCONFIG_OBJ)
+	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
