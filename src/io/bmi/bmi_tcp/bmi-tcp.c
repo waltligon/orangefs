@@ -2296,7 +2296,6 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
     /* let's see if a the entire header is ready to be received.  If so
      * we will go ahead and pull it.  Otherwise, we will try again later.
      * It isn't worth the complication of reading only a partial message
-     a
      * header - we really want it atomically
      */
     ret = BMI_sockio_nbpeek(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
