@@ -636,6 +636,7 @@ static int dbpf_collection_remove(char *collname,
     int ret = 0, i = 0;
     DIR *current_dir = NULL;
     struct dirent *current_dirent = NULL;
+    struct stat file_info;
     char dir[PATH_MAX] = {0}, tmp_path[PATH_MAX] = {0};
 
     if (!collname)
@@ -715,7 +716,14 @@ static int dbpf_collection_remove(char *collname,
                 }
                 snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
                          current_dirent->d_name);
-                assert(current_dirent->d_type == DT_REG);
+                if (stat(tmp_path, &file_info) < 0)
+                {
+                    gossip_err("error doing stat on bstream entry\n");
+                    ret = -trove_errno_to_trove_error(errno);
+                    closedir(current_dir);
+                    goto collection_remove_failure;
+                }
+                assert(S_ISREG(file_info.st_mode));
                 if (unlink(tmp_path) != 0)
                 {
                     gossip_err("failure removing bstream entry\n");
@@ -755,7 +763,14 @@ static int dbpf_collection_remove(char *collname,
                 }
                 snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
                          current_dirent->d_name);
-                assert(current_dirent->d_type == DT_REG);
+                if (stat(tmp_path, &file_info) < 0)
+                {
+                    gossip_err("error doing stat on bstream entry\n");
+                    ret = -trove_errno_to_trove_error(errno);
+                    closedir(current_dir);
+                    goto collection_remove_failure;
+                }
+                assert(S_ISREG(file_info.st_mode));
                 if (unlink(tmp_path) != 0)
                 {
                     ret = -trove_errno_to_trove_error(errno);
