@@ -292,7 +292,7 @@ directory_test2()
         if test $? -ne 0 ; then
             echo ""
             echo "******************************************"
-            echo "* FAILED DIRECTORY TEST 3 [stage 3]"
+            echo "* FAILED DIRECTORY TEST 2 [stage 3]"
             echo "******************************************"
             return 1
         fi
@@ -310,7 +310,7 @@ directory_test2()
 
     echo ""
     echo "******************************************"
-    echo "* PASSED DIRECTORY TEST 3"
+    echo "* PASSED DIRECTORY TEST 2"
     echo "******************************************"
     return 0
 }

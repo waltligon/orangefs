@@ -944,7 +944,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
         (sm_p->u.io.write_ack_completion_count == 0))
     {
         gossip_debug(GOSSIP_IO_DEBUG, "*** all operations %s "
-                     "(msgspairs, flows, and write acks)\n",
+                     "(msgspairs, flows, write acks)\n",
                      (sm_p->op_cancelled ? "cancelled" : "completed"));
 
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;

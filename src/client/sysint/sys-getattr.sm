@@ -285,6 +285,9 @@ static int getattr_object_getattr_comp_fn(
 
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "getattr_object_getattr_comp_fn called\n");
+
     if (resp_p->status != 0)
     {
         return resp_p->status;

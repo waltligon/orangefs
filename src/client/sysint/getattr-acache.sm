@@ -86,11 +86,6 @@ nested machine pvfs2_client_getattr_acache_sm(lookup,
  * up a fake, decoded response structure with the results so that we
  * can then call the comp_fn to copy data out of the response and into
  * the PINT_client_sm structure.
- *
- * This is a little inefficient I suppose, but it's the most general
- * way to accomplish this.  We can optimize later if it seems
- * necessary.  Or we can tailor the acache to store in response format
- * all the time...
  */
 static int getattr_acache_lookup(PINT_client_sm *sm_p,
 				 job_status_s *js_p)
@@ -98,14 +93,20 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
     uint32_t trimmed_mask = 0;
     struct PVFS_server_resp fake_resp;
     int status = 0;
+    PVFS_object_ref object_ref;
 
     assert(sm_p->pinode == NULL);
+    js_p->error_code = 0;
+
+    object_ref.handle = sm_p->msgpair.handle;
+    object_ref.fs_id = sm_p->msgpair.fs_id;
+
+    assert(object_ref.handle != PVFS_HANDLE_NULL);
+    assert(object_ref.fs_id != PVFS_FS_ID_NULL);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "getattr_acache state: lookup "
-                 "on %Lu,%d\n", Lu(sm_p->object_ref.handle),
-                 sm_p->object_ref.fs_id);
-
-    js_p->error_code = 0;
+                 "on %Lu,%d\n", Lu(object_ref.handle),
+                 object_ref.fs_id);
 
     /* point msgarray to the statically allocated msgpair */
     if (sm_p->msgarray != &(sm_p->msgpair))
@@ -115,7 +116,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
 
-    sm_p->pinode = PINT_acache_lookup(sm_p->object_ref, &status);
+    sm_p->pinode = PINT_acache_lookup(object_ref, &status);
     if (sm_p->pinode)
     {
         /*
@@ -188,7 +189,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
 
           cache_hit:
             gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit "
-                         "[%Lu]\n", Lu(sm_p->object_ref.handle));
+                         "[%Lu]\n", Lu(object_ref.handle));
 
             /* build a fake response for completion */
             fake_resp.op = PVFS_SERV_GETATTR;
@@ -213,12 +214,12 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
           entry; note invalidate implies an internal acache release
         */
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalid acache "
-                     "miss [%Lu]\n",Lu(sm_p->object_ref.handle));
+                     "miss [%Lu]\n",Lu(object_ref.handle));
         sm_p->acache_hit = 0;
-        PINT_acache_invalidate(sm_p->object_ref);
+        PINT_acache_invalidate(object_ref);
     }
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss [%Lu] "
-                 "\n", Lu(sm_p->object_ref.handle));
+                 "\n", Lu(object_ref.handle));
 
     js_p->error_code = GETATTR_ACACHE_MISS;
     return 1;

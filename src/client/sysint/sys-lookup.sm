@@ -102,6 +102,7 @@ machine pvfs2_client_lookup_sm(
     {
 	run lookup_init;
 	success => lookup_segment_lookup_setup_msgpair;
+        LOOKUP_NCACHE_HIT_FASTPATH => lookup_cleanup;
         default => lookup_cleanup;
     }
 
@@ -128,7 +129,6 @@ machine pvfs2_client_lookup_sm(
     state lookup_segment_verify_attr_present
     {
 	run lookup_segment_verify_attr_present;
-        LOOKUP_NCACHE_HIT_FASTPATH => lookup_cleanup;
         success => lookup_segment_check_attr_type;
         default => lookup_segment_getattr_setup_msgpair;
     }
@@ -429,8 +429,6 @@ static void finalize_context(
     int i = 0;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "finalize_context called\n");
-
     for(i = 0; i < MAX_LOOKUP_SEGMENTS; i++)
     {
         cur_seg = &ctx->segments[i];
@@ -603,6 +601,15 @@ static int lookup_init(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_init\n");
 
     assert(js_p->error_code == 0);
+
+    /* check the ncache to see if we can bypass this entire lookup */
+    if (PINT_ncache_lookup(sm_p->u.lookup.orig_pathname, 0,
+                           sm_p->u.lookup.starting_refn,
+                           &sm_p->u.lookup.lookup_resp->ref) == 0)
+    {
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup: ncache fast path!\n");
+        js_p->error_code = LOOKUP_NCACHE_HIT_FASTPATH;
+    }
     return 1;
 }
 
@@ -686,24 +693,6 @@ static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
 
     cur_seg = GET_CURRENT_SEGMENT();
     assert(cur_seg);
-
-    /*
-      attempt to insert the resolved segment/object refn into the
-      ncache if it wasn't a cache hit
-    */
-    if (sm_p->ncache_hit)
-    {
-        /*
-          on ncache hit, there's no need to fetch attrs because we're
-          trusting that the ncache inserted properly resolved
-          references; just fill in the response with the last resolved
-          object reference
-        */
-        sm_p->u.lookup.lookup_resp->ref = cur_seg->seg_resolved_refn;
-
-        js_p->error_code = LOOKUP_NCACHE_HIT_FASTPATH;
-        return 1;
-    }
 
     /*
       NOTE: there are two cases here where we need to fetch the attrs.
@@ -791,8 +780,14 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
 static int lookup_segment_getattr_failure(PINT_client_sm *sm_p,
                                           job_status_s *js_p)
 {
+    char buf[64] = {0};
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_getattr_failure\n");
+
+    PVFS_strerror_r(js_p->error_code, buf, 64);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                 "lookup_segment_getattr_failure %s\n", buf);
     return 1;
 }
 
@@ -1096,6 +1091,7 @@ static int lookup_cleanup(PINT_client_sm *sm_p,
     {
         finalize_context(&sm_p->u.lookup.contexts[i]);
     }
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "All contexts finalized\n");
 
     if (sm_p->error_code)
     {
@@ -1208,7 +1204,7 @@ static int lookup_segment_getattr_comp_fn(
 
     if (resp_p->status != 0)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, " getattr failed with "
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, " getattr failed with "
                      "code %d\n", resp_p->status);
         return resp_p->status;
     }
@@ -1217,6 +1213,9 @@ static int lookup_segment_getattr_comp_fn(
     assert(cur_seg);
 
     assert(index == 0);
+
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, " getattr ok on %s\n",
+                 cur_seg->seg_name);
 
     PINT_free_object_attr(&(cur_seg->seg_attr));
     PINT_copy_object_attr(&(cur_seg->seg_attr),

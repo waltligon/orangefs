@@ -439,12 +439,9 @@ static int remove_cleanup(PINT_client_sm *sm_p, job_status_s *js_p)
         sm_p->pinode = NULL;
     }
 
-    if (sm_p->ncache_hit)
-    {
-        PINT_ncache_remove(sm_p->u.remove.object_name,
-                           0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */,
-                           sm_p->parent_ref, NULL);
-    }
+    PINT_ncache_remove(sm_p->u.remove.object_name,
+                       0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */,
+                       sm_p->parent_ref, NULL);
 
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
