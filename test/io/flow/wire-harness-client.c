@@ -23,27 +23,32 @@
 
 static int block_on_flow(flow_descriptor* flow_d);
 static double Wtime(void);
+static int run_io_operation(
+	bmi_addr_t server_addr,
+	struct wire_harness_req* req,
+	bmi_size_t total_req_size,
+	struct wire_harness_ack* ack,
+	void* memory_buffer,
+	int memory_buffer_size,
+	PINT_Request* io_req,
+	PVFS_Dist* io_dist);
 
 int main(int argc, char **argv)	
 {
 	int ret = -1;
-	int outcount = 0;
 	bmi_addr_t server_addr;
-	bmi_op_id_t op;
-	bmi_error_code_t error_code;
 	struct wire_harness_req* req = NULL;
 	struct wire_harness_ack* ack = NULL;
 	int total_req_size = 0;
-	PVFS_size actual_size = 0;
 	PINT_Request* io_req = NULL;
 	PVFS_Dist* io_dist = NULL;
 	PINT_Request* encode_io_req = NULL;
 	PVFS_Dist* encode_io_dist = NULL;
 	int commit_index = 0;
-	PINT_Request_file_data file_data;
-	flow_descriptor* flow_d = NULL;
-	double time1 = 0, time2 = 0;
+	void* memory_buffer;
 	PVFS_size io_size = 10*1024*1024; /* 10 M transfer */
+
+
 	/*************************************************************/
 	/* initialization stuff */
 
@@ -142,43 +147,11 @@ int main(int argc, char **argv)
 	encode_io_dist = (PVFS_Dist*)((char*)encode_io_req + req->io_req_size);
 	PINT_Dist_encode(encode_io_dist, io_dist);
 
-	/* TODO: fill this in with real values about what we want to access */
 	req->fs_id = 0;
 	req->handle = (PVFS_handle) atoi(argv[1]);
 	req->op = WIRE_HARNESS_READ;
 
-	printf("** sending req: fsid (ignored) = %d, handle = %d, op = %d, io_r_sz = %d, dist_sz = %d\n",
-	       (int) req->fs_id, (int) req->handle, req->op, (int) req->io_req_size, (int) req->dist_size);
-
-	/* send request */
-	ret = BMI_post_sendunexpected(&op, server_addr, req, total_req_size,
-		BMI_PRE_ALLOC, 0, NULL);
-	if(ret < 0)
-	{
-		fprintf(stderr, "BMI_post_sendunexpected failure.\n");
-		return(-1);
-	}
-	if(ret == 0)
-	{
-		/* check for completion of request */
-		do
-		{
-			ret = BMI_wait(op, &outcount, &error_code, &actual_size, NULL);
-		} while(ret == 0 && outcount == 0);
-
-		if(ret < 0 || error_code != 0)
-		{
-			fprintf(stderr, "Request send failed.\n");
-			if(ret<0)
-			{
-				errno = -ret;
-				perror("BMI_wait");
-			}
-			return(-1);
-		}
-	}
-
-	/* get a response back */
+	/* create a buffer for the response */
 	ack = BMI_memalloc(server_addr, sizeof(struct wire_harness_ack),
 		BMI_RECV_BUFFER);
 	if(!ack)
@@ -186,124 +159,27 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: BMI malloc failure.\n");
 		return(-1);
 	}
-	ret = BMI_post_recv(&op, server_addr, ack, sizeof(struct
-		wire_harness_ack), &actual_size, BMI_EXT_ALLOC, 0, NULL);
+
+	/* create a buffer to operate on */
+	memory_buffer = malloc(io_size);
+	if(!memory_buffer)
+	{
+		fprintf(stderr, "Error: malloc.\n");
+		return(-1);
+	}
+
+	/* this is where all of the work happens */
+	ret = run_io_operation(server_addr, req, total_req_size, ack,
+		memory_buffer, io_size, io_req, io_dist);
 	if(ret < 0)
 	{
-		fprintf(stderr, "BMI_post_recv failure.\n");
+		fprintf(stderr, "Error: failed to successfully complete I/O exchange.\n");
 		return(-1);
 	}
-	if(ret == 0)
-	{
-		/* check for completion of request */
-		do
-		{
-			ret = BMI_wait(op, &outcount, &error_code, &actual_size, NULL);
-		} while(ret == 0 && outcount == 0);
-
-		if(ret < 0 || error_code != 0)
-		{
-			fprintf(stderr, "Request send failed.\n");
-			if(ret<0)
-			{
-				errno = -ret;
-				perror("BMI_wait");
-			}
-			return(-1);
-		}
-	}
-	if(actual_size < sizeof(struct wire_harness_ack))
-	{
-		fprintf(stderr, "Error: short ack.\n");
-		return(-1);
-	}
-
-	if(ack->error_code != 0)
-	{
-		fprintf(stderr, "Error: server gave negative ack.\n");
-		return(-1);
-	}
-
-	printf("** received ack: handle = %d, err = %d, dspace_sz = %d\n", (int) ack->handle, ack->error_code, ack->dspace_size);
-
-	/* setup flow */
-	file_data.fsize = ack->dspace_size;
-	file_data.iod_num = 0;
-	file_data.iod_count = 1;
-	/* TODO: remember to set this to one if we were doing a write */
-	file_data.extend_flag = 0;
-	file_data.dist = io_dist;
-
-	flow_d = PINT_flow_alloc();
-	if(!flow_d)
-	{
-		fprintf(stderr, "mem.\n");
-		return(-1);
-	}
-
-	flow_d->request = io_req;
-	flow_d->file_data =  &file_data;
-	flow_d->flags = 0;
-	flow_d->tag = 0;
-	flow_d->user_ptr = NULL;
-
-
-	if (req->op == WIRE_HARNESS_WRITE) {
-	    flow_d->src.endpoint_id = MEM_ENDPOINT;
-	    flow_d->src.u.mem.size = io_size;
-
-		/* memory buffer */
-		flow_d->src.u.mem.buffer = malloc(io_size);
-		if(!flow_d->src.u.mem.buffer)
-		{
-			fprintf(stderr, "Error: malloc.\n");
-			return(-1);
-		}
-	    
-	    /* server endpoint */
-	    flow_d->dest.endpoint_id = BMI_ENDPOINT;
-	    flow_d->dest.u.bmi.address = server_addr;
-	}
-	else
-	{
-	    /* server endpoint */
-	    flow_d->src.endpoint_id = BMI_ENDPOINT;
-	    flow_d->src.u.bmi.address = server_addr;
-
-	    flow_d->dest.endpoint_id = MEM_ENDPOINT;
-	    flow_d->dest.u.mem.size = io_size;
-
-		/* memory buffer */
-		flow_d->dest.u.mem.buffer = malloc(io_size);
-		if(!flow_d->dest.u.mem.buffer)
-		{
-			fprintf(stderr, "Error: malloc.\n");
-			return(-1);
-		}
-	}
-
-	/* run the flow */
-	time1 = Wtime();
-	ret = block_on_flow(flow_d);
-	if(ret < 0)
-	{
-		return(-1);
-	}
-	time2 = Wtime();
-
-	printf("Client bw: %f MB/sec\n",
-		((io_size)/((time2-time1)*1000000.0)));
 
 	/* release buffers and such */
-	if (req->op == WIRE_HARNESS_WRITE) {
-		free(flow_d->src.u.mem.buffer);
-	}
-	else
-	{
-		free(flow_d->dest.u.mem.buffer);
-	}
+	free(memory_buffer);
 
-	PINT_flow_free(flow_d);
 	BMI_memfree(server_addr, ack, sizeof(struct wire_harness_ack), 
 		BMI_RECV_BUFFER);
 	BMI_memfree(server_addr, req, total_req_size, BMI_SEND_BUFFER);
@@ -371,3 +247,155 @@ static double Wtime(void)
 	return((double)t.tv_sec + (double)t.tv_usec / 1000000);
 }
 
+
+static int run_io_operation(
+	bmi_addr_t server_addr,
+	struct wire_harness_req* req,
+	bmi_size_t total_req_size,
+	struct wire_harness_ack* ack,
+	void* memory_buffer,
+	int memory_buffer_size,
+	PINT_Request* io_req,
+	PVFS_Dist* io_dist
+	)
+{
+	int ret = -1;
+	bmi_op_id_t op;
+	bmi_error_code_t error_code;
+	int outcount = 0;
+	PVFS_size actual_size = 0;
+	double time1 = 0, time2 = 0;
+	PINT_Request_file_data file_data;
+	flow_descriptor* flow_d = NULL;
+
+	printf("** sending req: fsid (ignored) = %d, handle = %d, op = %d, io_r_sz = %d, dist_sz = %d\n",
+	       (int) req->fs_id, (int) req->handle, req->op, (int) req->io_req_size, (int) req->dist_size);
+
+	/* send request */
+	ret = BMI_post_sendunexpected(&op, server_addr, req, total_req_size,
+		BMI_PRE_ALLOC, 0, NULL);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_post_sendunexpected failure.\n");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* check for completion of request */
+		do
+		{
+			ret = BMI_wait(op, &outcount, &error_code, &actual_size, NULL);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Request send failed.\n");
+			if(ret<0)
+			{
+				errno = -ret;
+				perror("BMI_wait");
+			}
+			return(-1);
+		}
+	}
+
+	/* get ack back */
+	ret = BMI_post_recv(&op, server_addr, ack, sizeof(struct
+		wire_harness_ack), &actual_size, BMI_PRE_ALLOC, 0, NULL);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_post_recv failure.\n");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* check for completion of request */
+		do
+		{
+			ret = BMI_wait(op, &outcount, &error_code, &actual_size, NULL);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Request send failed.\n");
+			if(ret<0)
+			{
+				errno = -ret;
+				perror("BMI_wait");
+			}
+			return(-1);
+		}
+	}
+	if(actual_size < sizeof(struct wire_harness_ack))
+	{
+		fprintf(stderr, "Error: short ack.\n");
+		return(-1);
+	}
+
+	if(ack->error_code != 0)
+	{
+		fprintf(stderr, "Error: server gave negative ack.\n");
+		return(-1);
+	}
+
+	printf("** received ack: handle = %d, err = %d, dspace_sz = %d\n", (int) ack->handle, ack->error_code, (int)ack->dspace_size);
+
+	/* setup flow */
+	file_data.fsize = ack->dspace_size;
+	file_data.iod_num = 0;
+	file_data.iod_count = 1;
+	/* TODO: remember to set this to one if we were doing a write */
+	file_data.extend_flag = 0;
+	file_data.dist = io_dist;
+
+	flow_d = PINT_flow_alloc();
+	if(!flow_d)
+	{
+		fprintf(stderr, "mem.\n");
+		return(-1);
+	}
+
+	flow_d->request = io_req;
+	flow_d->file_data =  &file_data;
+	flow_d->flags = 0;
+	flow_d->tag = 0;
+	flow_d->user_ptr = NULL;
+
+
+	if (req->op == WIRE_HARNESS_WRITE) {
+	    flow_d->src.endpoint_id = MEM_ENDPOINT;
+	    flow_d->src.u.mem.size = memory_buffer_size;
+		 flow_d->src.u.mem.buffer = memory_buffer;
+	    
+	    /* server endpoint */
+	    flow_d->dest.endpoint_id = BMI_ENDPOINT;
+	    flow_d->dest.u.bmi.address = server_addr;
+	}
+	else
+	{
+	    /* server endpoint */
+	    flow_d->src.endpoint_id = BMI_ENDPOINT;
+	    flow_d->src.u.bmi.address = server_addr;
+
+	    flow_d->dest.endpoint_id = MEM_ENDPOINT;
+	    flow_d->dest.u.mem.size = memory_buffer_size;
+		 flow_d->dest.u.mem.buffer = memory_buffer;
+	}
+
+	/* run the flow */
+	time1 = Wtime();
+	ret = block_on_flow(flow_d);
+	if(ret < 0)
+	{
+		return(-1);
+	}
+	time2 = Wtime();
+
+	/* get rid of the flow descriptor */
+	PINT_flow_free(flow_d);
+
+	printf("Client bw: %f MB/sec\n",
+		((io_req->aggregate_size)/((time2-time1)*1000000.0)));
+
+	return(0);
+}
