@@ -462,6 +462,8 @@ return_error:
 		req_p.op = PVFS_SERV_REMOVE;
 		req_p.rsize = sizeof(struct PVFS_server_req_s);
 		req_p.credentials = req->credentials;
+		req_p.u.remove.handle = entry.handle;
+		req_p.u.remove.fs_id = entry.fs_id;
 		max_msg_sz = sizeof(struct PVFS_server_resp_s);
 		ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz, 
 					    &decoded);
