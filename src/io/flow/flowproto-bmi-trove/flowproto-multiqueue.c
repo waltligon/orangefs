@@ -35,6 +35,7 @@ struct result_chain_entry
 /* fp_queue_item describes an individual buffer being used within the flow */
 struct fp_queue_item
 {
+    int seq;
     void* buffer;
     struct result_chain_entry result_chain;
     int result_chain_count;
@@ -52,6 +53,9 @@ struct fp_private_data
     flow_descriptor* parent;
     struct fp_queue_item prealloc_array[BUFFERS_PER_FLOW];
     struct qlist_head list_link;
+    int next_seq;
+    int next_seq_to_send;
+    gen_mutex_t flow_mutex;
 
     gen_mutex_t src_mutex;
     struct qlist_head src_list;
@@ -239,6 +243,7 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
     INIT_QLIST_HEAD(&flow_data->src_list);
     INIT_QLIST_HEAD(&flow_data->dest_list);
     INIT_QLIST_HEAD(&flow_data->empty_list);
+    gen_mutex_init(&flow_data->flow_mutex);
     gen_mutex_init(&flow_data->src_mutex);
     gen_mutex_init(&flow_data->dest_mutex);
     gen_mutex_init(&flow_data->empty_mutex);
@@ -554,6 +559,8 @@ static void trove_read_callback_fn(void *user_ptr,
     struct result_chain_entry* result_tmp;
     struct result_chain_entry* old_result_tmp;
     PVFS_id_gen_t tmp_id;
+    int done = 0;
+    struct qlist_head* tmp_link;
 
     /* TODO: error handling */
     if(error_code != 0)
@@ -591,23 +598,51 @@ static void trove_read_callback_fn(void *user_ptr,
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
     gen_mutex_unlock(&flow_data->dest_mutex);
 
-    ret = BMI_post_send(&tmp_id,
-	q_item->parent->dest.u.bmi.address,
-	q_item->buffer,
-	bytes_to_send,
-	BMI_PRE_ALLOC,
-	q_item->parent->tag,
-	&q_item->bmi_callback,
-	global_bmi_context);
-    
-    /* TODO: error handling */
-    assert(ret >= 0);
+    /* while we hold dest lock, look for next seq no. to send */
+    do{
+	gen_mutex_lock(&flow_data->flow_mutex);
+	gen_mutex_lock(&flow_data->dest_mutex);
+	qlist_for_each(tmp_link, &flow_data->dest_list)
+	{
+	    q_item = qlist_entry(tmp_link, struct fp_queue_item,
+		list_link);
+	    if(q_item->seq == flow_data->next_seq_to_send)
+		break;
+	}
+	gen_mutex_unlock(&flow_data->dest_mutex);
 
-    if(ret == 1)
-    {
-	/* immediate completion; trigger callback ourselves */
-	bmi_send_callback_fn(q_item, bytes_to_send, 0);
+	if(q_item->seq == flow_data->next_seq_to_send)
+	{
+	    ret = BMI_post_send(&tmp_id,
+		q_item->parent->dest.u.bmi.address,
+		q_item->buffer,
+		bytes_to_send,
+		BMI_PRE_ALLOC,
+		q_item->parent->tag,
+		&q_item->bmi_callback,
+		global_bmi_context);
+	    gen_mutex_unlock(&flow_data->flow_mutex);
+	    flow_data->next_seq_to_send++;
+	}
+	else
+	{
+	    ret = 0;
+	    done = 1;
+	}
+	gen_mutex_unlock(&flow_data->flow_mutex);
+	
+	/* TODO: error handling */
+	assert(ret >= 0);
+
+	if(ret == 1)
+	{
+	    gen_mutex_unlock(&flow_data->dest_mutex);
+	    /* immediate completion; trigger callback ourselves */
+	    bmi_send_callback_fn(q_item, bytes_to_send, 0);
+	    gen_mutex_lock(&flow_data->dest_mutex);
+	}
     }
+    while(!done);
 
     return;
 }
@@ -698,11 +733,15 @@ static void bmi_send_callback_fn(void *user_ptr,
 	result_tmp->result.segmax = MAX_REGIONS;
 	result_tmp->result.segs = 0;
 	result_tmp->buffer_offset = tmp_buffer;
+	gen_mutex_lock(&flow_data->flow_mutex);
+	q_item->seq = flow_data->next_seq;
+	flow_data->next_seq++;
 	ret = PINT_Process_request(q_item->parent->file_req_state,
 	    q_item->parent->mem_req_state,
 	    &q_item->parent->file_data,
 	    &result_tmp->result,
 	    PINT_SERVER);
+	gen_mutex_unlock(&flow_data->flow_mutex);
 	/* TODO: error handling */ 
 	assert(ret >= 0);
 	
