@@ -15,5 +15,7 @@ else
 	$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
 endif
 
-$(TEST_KERNEL_DIR_SRC)/file_read: $(TEST_KERNEL_DIR_SRC)/file_read.c
+$(TEST_KERNEL_DIR_SRC)/file_read: $(TEST_KERNEL_DIR_SRC)/file_read.o
 	gcc -Wall $^ -o $@
+$(TEST_KERNEL_DIR_SRC)/file_read.o: $(TEST_KERNEL_DIR_SRC)/file_read.c
+	gcc -Wall -c $^ 
