@@ -100,6 +100,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_MAX_PATH_ELEMENTS  40
 /* max number of symlinks to resolve before erroring out */
 #define PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT 8
+/* max depth of a PINT_Request used in anything, just servreq IO now */
+#define PVFS_REQ_LIMIT_PINT_REQUEST_NUM  100
 
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
@@ -628,9 +630,13 @@ struct PVFS_servreq_io
     encode_uint32_t(pptr, &(x)->server_ct); \
     encode_PVFS_Dist(pptr, &(x)->io_dist); \
     { \
-    /* XXX: linearize into a fresh buffer, encode it, then throw it away;
+    /* XXX: This linearizes into a fresh buffer, encodes, then throws it away;
      * later fix the structure so that it is easier to send. */ \
     struct PINT_Request *lin; \
+    if ((x)->file_req->num_nested_req > PVFS_REQ_LIMIT_PINT_REQUEST_NUM) \
+	gossip_err("%s: encode_PVFS_servreq_io: demands %d elements," \
+	  " more than maximum %d\n", __func__, \
+	  (x)->file_req->num_nested_req, PVFS_REQ_LIMIT_PINT_REQUEST_NUM); \
     lin = decode_malloc(((x)->file_req->num_nested_req + 1) * sizeof(*lin)); \
     (void) PINT_Request_commit(lin, (x)->file_req); \
     PINT_Request_encode(lin); /* packs the pointers */ \
@@ -658,7 +664,8 @@ struct PVFS_servreq_io
     decode_PVFS_size(pptr, &(x)->aggregate_size); \
 } while (0)
 /* could be huge, limit to max ioreq size beyond struct itself */
-#define extra_size_PVFS_servreq_io roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES)
+#define extra_size_PVFS_servreq_io roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES) \
+  + roundup8(PVFS_REQ_LIMIT_PINT_REQUEST_NUM * sizeof(PINT_Request))
 #endif
 
 #define PINT_SERVREQ_IO_FILL(__req,		\
