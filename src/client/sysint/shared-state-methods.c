@@ -20,7 +20,7 @@
 #include "shared-state-methods.h"
 
 int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
-                                           job_status_s *js_p)
+                                                job_status_s *js_p)
 {
     int ret = -1;
 
@@ -60,7 +60,7 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
 }
 
 int PINT_sm_common_parent_getattr_failure(PINT_client_sm *sm_p,
-                                     job_status_s *js_p)
+                                          job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_sm_common_parent_getattr_failure\n");
@@ -68,7 +68,7 @@ int PINT_sm_common_parent_getattr_failure(PINT_client_sm *sm_p,
 }
 
 int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
-                                           job_status_s *js_p)
+                                                job_status_s *js_p)
 {
     int ret = -1;
 
@@ -109,7 +109,7 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 }
 
 int PINT_sm_common_object_getattr_failure(PINT_client_sm *sm_p,
-                                     job_status_s *js_p)
+                                          job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_sm_common_object_getattr_failure\n");
@@ -120,9 +120,10 @@ int PINT_sm_common_object_getattr_failure(PINT_client_sm *sm_p,
 /*
   shared/common msgpair completion functions
 */
-int PINT_sm_common_directory_getattr_comp_fn(void *v_p,
-                                        struct PVFS_server_resp *resp_p,
-                                        int index)
+int PINT_sm_common_directory_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
 {
     int ret = 0;
     PVFS_object_attr *attr = NULL;
@@ -214,9 +215,10 @@ int PINT_sm_common_directory_getattr_comp_fn(void *v_p,
     return 0;
 }
 
-int PINT_sm_common_object_getattr_comp_fn(void *v_p,
-                                     struct PVFS_server_resp *resp_p,
-                                     int index)
+int PINT_sm_common_object_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     

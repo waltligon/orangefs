@@ -30,10 +30,15 @@ static int pvfs2_create(
     int mode,
     struct nameidata *nd)
 {
-    struct inode *inode =
-	pvfs2_create_entry(dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE);
+    int ret = -EINVAL;
+    struct inode *inode = NULL;
 
-    return (inode ? 0 : -EINVAL);
+    pvfs2_print("pvfs2: pvfs2_create called\n");
+
+    inode = pvfs2_create_entry(
+        dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE, &ret);
+
+    return (inode ? 0 : ret);
 }
 
 struct dentry *pvfs2_lookup(
@@ -216,19 +221,15 @@ static int pvfs2_symlink(
     struct dentry *dentry,
     const char *symname)
 {
-    int ret = -1, mode = 755;
+    int ret = -EINVAL, mode = 755;
     struct inode *inode = NULL;
 
     pvfs2_print("pvfs2: pvfs2_symlink called\n");
 
     inode = pvfs2_create_entry(
-        dir, dentry, symname, mode, PVFS2_VFS_OP_SYMLINK);
+        dir, dentry, symname, mode, PVFS2_VFS_OP_SYMLINK, &ret);
 
-    if (inode)
-    {
-        ret = 0;
-    }
-    return ret;
+    return (inode ? 0 : ret);
 }
 
 static int pvfs2_mknod(
@@ -246,9 +247,11 @@ static int pvfs2_mkdir(
     struct dentry *dentry,
     int mode)
 {
-    int ret = -1;
-    struct inode *inode =
-	pvfs2_create_entry(dir, dentry, NULL, mode, PVFS2_VFS_OP_MKDIR);
+    int ret = -EINVAL;
+    struct inode *inode = NULL;
+
+    inode = pvfs2_create_entry(
+        dir, dentry, NULL, mode, PVFS2_VFS_OP_MKDIR, &ret);
 
     if (inode)
     {
@@ -409,13 +412,6 @@ struct inode_operations pvfs2_dir_inode_operations =
     .mknod = pvfs2_mknod,
     .rename = pvfs2_rename,
     .setattr = pvfs2_setattr
-/*     .follow_link = pvfs2_follow_link */
-/*     .setxattr = pvfs2_setxattr, */
-/*     .getxattr = pvfs2_getxattr, */
-/*     .listxattr = pvfs2_listxattr, */
-/*     .removexattr = pvfs2_removexattr */
-/*     .setattr = pvfs2_setattr, */
-/*     .permission = pvfs2_permission */
 };
 
 /*

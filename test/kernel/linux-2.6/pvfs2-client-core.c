@@ -85,7 +85,7 @@ static int service_lookup_request(
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_LOOKUP;
-            out_downcall->status = -1;
+            out_downcall->status = ret;
             out_downcall->resp.lookup.refn.handle = 0;
             out_downcall->resp.lookup.refn.fs_id = 0;
         }
@@ -173,7 +173,7 @@ static int service_create_request(
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_CREATE;
-            out_downcall->status = -1;
+            out_downcall->status = ret;
             out_downcall->resp.create.refn.handle = 0;
             out_downcall->resp.create.refn.fs_id = 0;
         }
@@ -229,7 +229,7 @@ static int service_symlink_request(
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_SYMLINK;
-            out_downcall->status = -1;
+            out_downcall->status = ret;
             out_downcall->resp.sym.refn.handle = 0;
             out_downcall->resp.sym.refn.fs_id = 0;
         }
@@ -460,7 +460,7 @@ static int service_getattr_request(
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_GETATTR;
-            out_downcall->status = -1;
+            out_downcall->status = ret;
         }
         else
         {
@@ -520,7 +520,7 @@ static int service_setattr_request(
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_SETATTR;
-            out_downcall->status = -1;
+            out_downcall->status = ret;
         }
         else
         {
@@ -615,7 +615,7 @@ static int service_mkdir_request(
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_MKDIR;
-            out_downcall->status = -1;
+            out_downcall->status = ret;
             out_downcall->resp.mkdir.refn.handle = 0;
             out_downcall->resp.mkdir.refn.fs_id = 0;
         }
@@ -663,7 +663,7 @@ static int service_readdir_request(
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_READDIR;
-            out_downcall->status = -1;
+            out_downcall->status = ret;
             out_downcall->resp.readdir.dirent_count = 0;
         }
         else
@@ -782,7 +782,7 @@ static int service_statfs_request(
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_STATFS;
-            out_downcall->status = -1;
+            out_downcall->status = ret;
         }
         else
         {

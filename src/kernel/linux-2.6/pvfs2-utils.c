@@ -475,7 +475,8 @@ int pvfs2_inode_setattr(
 static inline struct inode *pvfs2_create_file(
     struct inode *dir,
     struct dentry *dentry,
-    int mode)
+    int mode,
+    int *error_code)
 {
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -489,6 +490,7 @@ static inline struct inode *pvfs2_create_file(
 	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
+            *error_code = -ENOMEM;
 	    return NULL;
 	}
 	new_op->upcall.type = PVFS2_VFS_OP_CREATE;
@@ -554,7 +556,10 @@ static inline struct inode *pvfs2_create_file(
 	    pvfs2_error("pvfs2_create_file: An error occurred; "
                         "removing created inode\n");
 	    iput(inode);
-	    inode = NULL;
+            inode = NULL;
+
+            *error_code = pvfs2_kernel_error_code_convert(
+                new_op->downcall.status);
 	}
 
 	/* when request is serviced properly, free req op struct */
@@ -566,7 +571,8 @@ static inline struct inode *pvfs2_create_file(
 static inline struct inode *pvfs2_create_dir(
     struct inode *dir,
     struct dentry *dentry,
-    int mode)
+    int mode,
+    int *error_code)
 {
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -582,6 +588,7 @@ static inline struct inode *pvfs2_create_dir(
 	{
 	    pvfs2_error("pvfs2: pvfs2_create_dir -- "
                         "kmem_cache_alloc failed!\n");
+            *error_code = -ENOMEM;
 	    return NULL;
 	}
 	new_op->upcall.type = PVFS2_VFS_OP_MKDIR;
@@ -648,6 +655,9 @@ static inline struct inode *pvfs2_create_dir(
                         "removing created inode\n");
 	    iput(inode);
 	    inode = NULL;
+
+            *error_code = pvfs2_kernel_error_code_convert(
+                new_op->downcall.status);
 	}
 
 	/* when request is serviced properly, free req op struct */
@@ -660,7 +670,8 @@ static inline struct inode *pvfs2_create_symlink(
     struct inode *dir,
     struct dentry *dentry,
     const char *symname,
-    int mode)
+    int mode,
+    int *error_code)
 {
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -674,6 +685,7 @@ static inline struct inode *pvfs2_create_symlink(
 	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
+            *error_code = -ENOMEM;
 	    return NULL;
 	}
 	new_op->upcall.type = PVFS2_VFS_OP_SYMLINK;
@@ -739,6 +751,9 @@ static inline struct inode *pvfs2_create_symlink(
                         "removing created inode\n");
 	    iput(inode);
 	    inode = NULL;
+
+            *error_code = pvfs2_kernel_error_code_convert(
+                new_op->downcall.status);
 	}
 
 	/* when request is serviced properly, free req op struct */
@@ -749,7 +764,10 @@ static inline struct inode *pvfs2_create_symlink(
 
 /*
   create a pvfs2 entry; returns a properly populated inode
-  pointer on success; NULL on failure
+  pointer on success; NULL on failure.
+
+  the required error_code value will contain an error code ONLY if an
+  error occurs (i.e. NULL is returned) and is unmodified otherwise.
 
   if op_type is PVFS_VFS_OP_CREATE, a file is created
   if op_type is PVFS_VFS_OP_MKDIR, a directory is created
@@ -762,21 +780,23 @@ struct inode *pvfs2_create_entry(
     struct dentry *dentry,
     const char *symname,
     int mode,
-    int op_type)
+    int op_type,
+    int *error_code)
 {
-    if (dir && dentry)
+    if (dir && dentry && error_code)
     {
 	switch (op_type)
 	{
-	case PVFS2_VFS_OP_CREATE:
-	    return pvfs2_create_file(dir, dentry, mode);
-	case PVFS2_VFS_OP_MKDIR:
-	    return pvfs2_create_dir(dir, dentry, mode);
-        case PVFS2_VFS_OP_SYMLINK:
-            return pvfs2_create_symlink(dir, dentry, symname, mode);
-	default:
-	    pvfs2_error("pvfs2_create_entry got a bad "
-                        "op_type (%d)\n", op_type);
+            case PVFS2_VFS_OP_CREATE:
+                return pvfs2_create_file(dir, dentry, mode, error_code);
+            case PVFS2_VFS_OP_MKDIR:
+                return pvfs2_create_dir(dir, dentry, mode, error_code);
+            case PVFS2_VFS_OP_SYMLINK:
+                return pvfs2_create_symlink(
+                    dir, dentry, symname, mode, error_code);
+            default:
+                pvfs2_error("pvfs2_create_entry got a bad "
+                            "op_type (%d)\n", op_type);
 	}
     }
     return NULL;
@@ -825,20 +845,15 @@ int pvfs2_remove_entry(
 	   the remove has no downcall members to retrieve, but
 	   the status value tells us if it went through ok or not
 	 */
-	ret = new_op->downcall.status;
-        switch(ret)
+        if (new_op->downcall.status == 0)
         {
-            case -PVFS_ENOTEMPTY:
-                ret = -ENOTEMPTY;
-                break;
-            case 0:
-                /*
-                  adjust the readdir token if in fact we're
-                  in the middle of a readdir for this directory
-                */
-                parent->readdir_token_adjustment++;
-                break;
+            /*
+              adjust the readdir token if in fact we're
+              in the middle of a readdir for this directory
+            */
+            parent->readdir_token_adjustment++;
         }
+        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
       error_exit:
 	/* when request is serviced properly, free req op struct */
@@ -884,6 +899,26 @@ int pvfs2_truncate_inode(
     /* when request is serviced properly, free req op struct */
     op_release(new_op);
 
+    return ret;
+}
+
+int pvfs2_kernel_error_code_convert(
+    int pvfs2_error_code)
+{
+    int ret = 0;
+
+    switch(pvfs2_error_code)
+    {
+        case -PVFS_ENOTEMPTY:
+            ret = -ENOTEMPTY;
+            break;
+        case -PVFS_ENOSPC:
+            ret = -ENOSPC;
+            break;
+        default:
+            pvfs2_print("Got an unknown pvfs2 error code: %d\n",
+                        pvfs2_error_code);
+    }
     return ret;
 }
 

@@ -269,7 +269,13 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 			 DB_BTREE,
 			 DB_CREATE|DB_EXCL,
 			 0644);
-	assert (ret == 0);
+
+        /* this can easily happen if the server is out of disk space */
+        if (ret)
+        {
+	    error = -dbpf_db_error_to_trove_error(ret);
+	    goto return_error;
+        }
     }
     else if (ret == ENOENT)
     {

@@ -384,11 +384,6 @@ int pvfs2_getattr(
 struct inode_operations pvfs2_file_inode_operations =
 {
     .truncate = pvfs2_truncate,
-/*     .setxattr = pvfs2_setxattr, */
-/*     .getxattr = pvfs2_getxattr, */
-/*     .listxattr = pvfs2_listxattr, */
-/*     .removexattr = pvfs2_removexattr, */
-/*     .permission = pvfs2_permission, */
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr
 };
@@ -411,15 +406,15 @@ struct inode *pvfs2_get_custom_inode(
 	/* initialize pvfs2 specific private data */
 	pvfs2_inode = PVFS2_I(inode);
 	if (!pvfs2_inode)
-	{
-	    panic("pvfs2_get_custom_inode: PRIVATE DATA NOT ALLOCATED\n");
-	    return NULL;
-	}
+        {
+            panic("pvfs2_get_custom_inode: PRIVATE DATA NOT ALLOCATED\n");
+            return NULL;
+        }
 	else
-	{
+        {
 	    pvfs2_inode->refn.handle = 0;
 	    pvfs2_inode->refn.fs_id = 0;
-	}
+        }
 	pvfs2_print("pvfs2_get_custom_inode: inode %p allocated "
 		    "(pvfs2_inode is %p | sb is %p)\n", inode,
 		    pvfs2_inode, inode->i_sb);

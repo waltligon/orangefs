@@ -376,7 +376,8 @@ struct inode *pvfs2_create_entry(
     struct dentry *dentry,
     const char *symname,
     int mode,
-    int op_type);
+    int op_type,
+    int *error_code);
 
 int pvfs2_remove_entry(
     struct inode *dir,
@@ -385,6 +386,13 @@ int pvfs2_remove_entry(
 int pvfs2_truncate_inode(
     struct inode *inode,
     loff_t size);
+
+int pvfs2_kernel_error_code_convert(
+    int pvfs2_error_code);
+
+void *pvfs2_kernel_error_code_ptr_convert(
+    int pvfs2_error_code);
+
 
 #endif /* __PVFS2KERNEL_H */
 
