@@ -1,17 +1,17 @@
 Active contributors
 ===================
 
-Jiesheng Wu <wujs@mcs.anl.gov>
--- buffer cache development (in progress)
-
 Pete Wyckoff <pw@osc.edu>
 -- Infiniband support
    little endian encoding/decoding
    IA64/Alpha clean compilation fixes
 
+Jiesheng Wu <wujs@mcs.anl.gov>
+-- buffer cache development (in progress)
+
 Nathan Poznick <poznick@conwaycorp.net>
--- extensive testing and suggestions, particularly using the 2.6.x vfs
-   interface.  several pvfs2-client patches.
+-- extensive testing and suggestions (linux vfs interface)
+   various pvfs2-client related patches (noted in cvs logs)
 
 
 Other contributors
