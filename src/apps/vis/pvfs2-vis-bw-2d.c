@@ -364,21 +364,43 @@ static int draw(void)
 	    }
 	}
 
+	/* x axis */
+	for(i=0; i<pint_vis_shared.io_count; i++)
+	{
+	    sprintf(scratch_string, "%d", i);
+	    text = TTF_RenderText_Shaded(font, scratch_string, font_color, black_color);
+	    assert(text);
+	    text_rect.h = text->h;
+	    text_rect.w = text->w;
+	    text_rect.x = read_bws[i].full.x;
+	    text_rect.y = read_bws[i].full.y + read_bws[i].full.h + 1;
+	    ret = SDL_BlitSurface(text, NULL, screen, &text_rect);
+	    assert(ret == 0);
+	    SDL_FreeSurface(text);
+	}
+
 	/* draw a border */
-	scratch.h = screen->h - TOP_BORDER - BOTTOM_BORDER;
+	scratch.h = screen->h - TOP_BORDER - BOTTOM_BORDER + 1;
 	scratch.w = screen->w - SIDE_BORDER*2;
 	scratch.y = TOP_BORDER+2;
 	scratch.x = SIDE_BORDER;
 	SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
 	    0xcc, 0xcc, 0xcc));
-	scratch.h -= 4;
+	scratch.h = scratch.h / 3 - 2;
 	scratch.w -= 4;
 	scratch.x += 2;
 	scratch.y += 2;
 	SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
 	    0x0, 0x0, 0x0));
+	scratch.y += scratch.h + 2;
+	SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
+	    0x0, 0x0, 0x0));
+	scratch.y += scratch.h + 2;
+	SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
+	    0x0, 0x0, 0x0));
 
 	/* label some parts of the graph */
+	/* top of y */
 	sprintf(scratch_string, "%.1f", max_bw);
 	text = TTF_RenderText_Shaded(font, scratch_string, font_color, black_color);
 	assert(text);
@@ -389,6 +411,27 @@ static int draw(void)
 	ret = SDL_BlitSurface(text, NULL, screen, &text_rect);
 	assert(ret == 0);
 	SDL_FreeSurface(text);
+
+	/* 2/3 of y */
+	sprintf(scratch_string, "%.1f", 2*max_bw/3);
+	text = TTF_RenderText_Shaded(font, scratch_string, font_color, black_color);
+	assert(text);
+	text_rect.y += scratch.h + 2;
+	text_rect.w = text->w;
+	ret = SDL_BlitSurface(text, NULL, screen, &text_rect);
+	assert(ret == 0);
+	SDL_FreeSurface(text);
+
+	/* 1/3 of y */
+	sprintf(scratch_string, "%.1f", max_bw/3);
+	text = TTF_RenderText_Shaded(font, scratch_string, font_color, black_color);
+	assert(text);
+	text_rect.y += scratch.h + 2;
+	text_rect.w = text->w;
+	ret = SDL_BlitSurface(text, NULL, screen, &text_rect);
+	assert(ret == 0);
+	SDL_FreeSurface(text);
+
 
 	for(i=0; i<pint_vis_shared.io_count; i++)
 	{
