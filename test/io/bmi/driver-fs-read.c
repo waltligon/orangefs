@@ -50,12 +50,12 @@ struct svr_xfer_state
 
 struct request
 {
-    int foo;
+    char filler[25];
 };
 
 struct response
 {
-    int bar;
+    int filler[400];
 };
 
 int num_done = 0;
