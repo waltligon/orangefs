@@ -185,8 +185,6 @@ TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
     tmp_id = q_op_p->op.id;
     gen_mutex_unlock(&q_op_p->mutex);
 
-    gen_mutex_unlock(&dbpf_op_queue_mutex);
-
 #ifdef __PVFS2_TROVE_THREADED__
     /*
       wake up our operation thread if it's sleeping to let
@@ -194,6 +192,8 @@ TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
     */
     pthread_cond_signal(&dbpf_op_incoming_cond);
 #endif
+
+    gen_mutex_unlock(&dbpf_op_queue_mutex);
     return tmp_id;
 }
 

@@ -26,7 +26,6 @@ extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 #ifdef __PVFS2_TROVE_THREADED__
 pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
 pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
-static gen_mutex_t *dbpf_op_incoming_cond_mutex = NULL;
 static pthread_t dbpf_thread;
 static int dbpf_thread_running = 0;
 #endif
@@ -36,31 +35,22 @@ int dbpf_thread_initialize(void)
     int ret = 0;
 #ifdef __PVFS2_TROVE_THREADED__
     ret = -1;
-    dbpf_op_incoming_cond_mutex = gen_mutex_build();
-    if (dbpf_op_incoming_cond_mutex)
+    
+    dbpf_thread_running = 1;
+    ret = pthread_create(&dbpf_thread, NULL,
+                         dbpf_thread_function, NULL);
+    if (ret == 0)
     {
-        dbpf_thread_running = 1;
-        ret = pthread_create(&dbpf_thread, NULL,
-                             dbpf_thread_function, NULL);
-        if (ret == 0)
-        {
-            gossip_debug(GOSSIP_TROVE_DEBUG,
-                         "dbpf_thread_initialize: initialized\n");
-        }
-        else
-        {
-            gen_mutex_destroy(dbpf_op_incoming_cond_mutex);
-            dbpf_op_incoming_cond_mutex = NULL;
-            dbpf_thread_running = 0;
-            gossip_debug(
-                GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
-        }
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf_thread_initialize: initialized\n");
     }
     else
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG,
-                     "dbpf_thread_initialize: failed (2)\n");
+        dbpf_thread_running = 0;
+        gossip_debug(
+            GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
     }
+
 #endif
     return ret;
 }
@@ -74,7 +64,6 @@ int dbpf_thread_finalize(void)
 
     pthread_cond_destroy(&dbpf_op_completed_cond);
     pthread_cond_destroy(&dbpf_op_incoming_cond);
-    gen_mutex_destroy(dbpf_op_incoming_cond_mutex);
 #endif
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_finalize: finalized\n");
     return ret;
@@ -94,7 +83,6 @@ void *dbpf_thread_function(void *ptr)
         /* check if we any have ops to service in our work queue */
         gen_mutex_lock(&dbpf_op_queue_mutex);
         op_queued_empty = qlist_empty(&dbpf_op_queue);
-        gen_mutex_unlock(&dbpf_op_queue_mutex);
 
         if (!op_queued_empty)
         {
@@ -125,12 +113,11 @@ void *dbpf_thread_function(void *ptr)
                 wait_time.tv_sec++;
             }
 
-            gen_mutex_lock(dbpf_op_incoming_cond_mutex);
             ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
-                                         dbpf_op_incoming_cond_mutex,
+                                         &dbpf_op_queue_mutex,
                                          &wait_time);
-            gen_mutex_unlock(dbpf_op_incoming_cond_mutex);
         }
+        gen_mutex_unlock(&dbpf_op_queue_mutex);
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function ending\n");
@@ -154,7 +141,6 @@ int dbpf_do_one_work_cycle(int *out_count)
     do
     {
         /* grab next op from queue and mark it as in service */
-        gen_mutex_lock(&dbpf_op_queue_mutex);
         cur_op = dbpf_op_queue_shownext(&dbpf_op_queue);
         if (cur_op)
         {
@@ -165,7 +151,6 @@ int dbpf_do_one_work_cycle(int *out_count)
             cur_op->op.state = OP_IN_SERVICE;
             gen_mutex_unlock(&cur_op->mutex);
         }
-        gen_mutex_unlock(&dbpf_op_queue_mutex);
 
         /* if there's no work to be done, return immediately */
         if (cur_op == NULL)
