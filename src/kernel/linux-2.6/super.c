@@ -132,6 +132,7 @@ static int pvfs2_statfs(
 {
     int ret = -1, retries = 5;
     pvfs2_kernel_op_t *new_op = NULL;
+    struct statfs tmp_statfs;
 
     pvfs2_print("pvfs2_: pvfs2_statfs called on sb %p "
                 "(fs_id is %d)\n", sb, (int)(PVFS2_SB(sb)->coll_id));
@@ -161,6 +162,14 @@ static int pvfs2_statfs(
         buf->f_frsize = 1024;
         buf->f_namelen = PVFS2_NAME_LEN;
 
+        pvfs2_print("sizeof(kstatfs)=%d\n",sizeof(struct kstatfs));
+        pvfs2_print("sizeof(kstatfs->f_blocks)=%d\n",
+                    sizeof(buf->f_blocks));
+        pvfs2_print("sizeof(statfs)=%d\n",sizeof(struct statfs));
+        pvfs2_print("sizeof(statfs->f_blocks)=%d\n",
+                    sizeof(tmp_statfs.f_blocks));
+        pvfs2_print("sizeof(sector_t)=%d\n",sizeof(sector_t));
+
         buf->f_blocks = (sector_t)
             new_op->downcall.resp.statfs.blocks_total;
         buf->f_bfree = (sector_t)
@@ -172,12 +181,8 @@ static int pvfs2_statfs(
         buf->f_ffree = (sector_t)
             new_op->downcall.resp.statfs.files_avail;
 
-        pvfs2_print("sizeof(kstatfs)=%d\n",sizeof(struct kstatfs));
-        pvfs2_print("sizeof(buf)=%d\n",sizeof(*buf));
-        pvfs2_print("sizeof(sector_t)=%d\n",sizeof(sector_t));
-
-        if ((sizeof(*buf) != sizeof(struct kstatfs)) &&
-            (sizeof(buf->f_blocks) == 4))
+        if ((sizeof(struct statfs) != sizeof(struct kstatfs)) &&
+            (sizeof(tmp_statfs.f_blocks) == 4))
         {
             /*
               in this case, we need to truncate the values here to be
@@ -186,15 +191,20 @@ static int pvfs2_statfs(
               see vfs_statfs_native in open.c for the actual overflow
               checks made.
             */
-            buf->f_blocks &= 0x00000000ffffffffULL;
-            buf->f_bfree &= 0x00000000ffffffffULL;
-            buf->f_bavail &= 0x00000000ffffffffULL;
-            buf->f_files &= 0x00000000ffffffffULL;
-            buf->f_ffree &= 0x00000000ffffffffULL;
-        }
+            buf->f_blocks &= 0x00000000FFFFFFFFULL;
+            buf->f_bfree &= 0x00000000FFFFFFFFULL;
+            buf->f_bavail &= 0x00000000FFFFFFFFULL;
+            buf->f_files &= 0x00000000FFFFFFFFULL;
+            buf->f_ffree &= 0x00000000FFFFFFFFULL;
 
-        pvfs2_print("pvfs2_statfs got %ld files total | "
-                    "%ld files_avail\n", buf->f_files, buf->f_ffree);
+            pvfs2_print("pvfs2_statfs (T) got %ld files total | "
+                        "%ld files_avail\n", buf->f_files, buf->f_ffree);
+        }
+        else
+        {
+            pvfs2_print("pvfs2_statfs (N) got %lu files total | "
+                        "%lu files_avail\n", buf->f_files, buf->f_ffree);
+        }
 
         ret = new_op->downcall.status;
     }
