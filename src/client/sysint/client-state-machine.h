@@ -67,12 +67,12 @@ typedef struct PINT_client_sm_msgpair_state_s {
 
 /* PINT_client_remove_sm */
 struct PINT_client_remove_sm {
-    char                         *object_name; /* input parameter */
-    PVFS_pinode_reference         parent_ref;  /* input parameter */
-    PVFS_pinode_reference         object_ref;  /* looked up */
+    char                         *object_name;    /* input parameter */
+    PVFS_pinode_reference         parent_ref;     /* input parameter */
+    PVFS_pinode_reference         object_ref;     /* looked up */
     int                           datafile_count; /* from attribs */
     PVFS_handle                  *datafile_handles;
-    PINT_client_sm_msgpair_state *msgpair; /* used in datafile remove */
+    PINT_client_sm_msgpair_state *msgpair;        /* for datafile remove */
 };
 
 /* PINT_client_getattr_sm */
@@ -89,11 +89,15 @@ struct PINT_client_getattr_sm {
 
 /* PINT_client_io_sm */
 struct PINT_client_io_sm {
-    PVFS_pinode_reference object_ref; /* input parameter */
-    PVFS_Request          io_req;
-    PVFS_offset           io_req_offset;
-    void                 *buffer;
-    PVFS_size             buffer_size;
+    PVFS_pinode_reference object_ref;       /* input parameter */
+    PVFS_Request          io_req;           /* input parameter */
+    PVFS_offset           io_req_offset;    /* input parameter */
+    void                 *buffer;           /* input parameter */
+    PVFS_size             buffer_size;      /* input parameter */
+    int                   datafile_count;   /* from object attribs */
+    PVFS_handle          *datafile_handles; /* from object attribs */
+    PVFS_Dist            *dist_p;           /* from object attribs */
+    uint32_t              dist_size;        /* from object attribs */
     PVFS_sysresp_io      *io_resp_p;
 };
 
