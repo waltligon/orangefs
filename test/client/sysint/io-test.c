@@ -80,7 +80,7 @@ int main(int argc,char **argv)
 	 */
 	if (ret < 0)
 	{
-		printf("Lookup failed; creating new file.\n");
+		printf("IO-TEST: lookup failed; creating new file.\n");
 
 		/* get root handle */
 		req_lk.name = "/";
@@ -124,7 +124,7 @@ int main(int argc,char **argv)
 	}
 	else
 	{
-		printf("Lookup succeeded; performing I/O on existing file.\n");
+		printf("IO-TEST: lookup succeeded; performing I/O on existing file.\n");
 
 		req_io.pinode_refn.fs_id = req_lk.fs_id;
 		req_io.pinode_refn.handle = resp_lk.pinode_refn.handle;
@@ -134,7 +134,7 @@ int main(int argc,char **argv)
 	 * carry out I/O operation
 	 */
 
-	printf("Performing I/O on handle: %ld, fs: %d\n",
+	printf("IO-TEST: performing I/O on handle: %ld, fs: %d\n",
 		(long)req_io.pinode_refn.handle, (int)req_io.pinode_refn.fs_id);
 
 	req_io.credentials.uid = 100;
@@ -151,11 +151,11 @@ int main(int argc,char **argv)
 	ret = PVFS_sys_write(&req_io, &resp_io);
 	if(ret < 0)
 	{
-		fprintf(stderr, "PVFS_sys_write() failure.\n");
+		fprintf(stderr, "Error: PVFS_sys_write() failure.\n");
 		return(-1);
 	}
 
-	printf("Wrote %d bytes.\n", (int)resp_io.total_completed);
+	printf("IO-TEST: wrote %d bytes.\n", (int)resp_io.total_completed);
 
 	/**************************************************************
 	 * shut down pending interfaces
@@ -171,3 +171,5 @@ int main(int argc,char **argv)
 	free(filename);
 	return(0);
 }
+
+
