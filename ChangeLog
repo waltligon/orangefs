@@ -3,11 +3,6 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-1.0.1pre1
-===============
-- 
-
-
 pvfs2-1.0.0
 ===========
 - disabled mmap readahead cache by default; allow configure option to
@@ -16,10 +11,11 @@ pvfs2-1.0.0
   (i.e. sparse files)
 - configured acache timeout to be 5 seconds by default through the
   vfs; sysint was already 5 seconds
+- added karma program installation to make install target
 - redhat 9 related changes (in order to work out of the box)
   - used some 2.6.x kernel code on redhat 9 2.4.x kernels, if detected
   - no longer mark pages as reserved on redhat 9 2.4.x kernels, as it
-    causes an oops on their kernel (no longer necessary)
+    causes an oops on their kernel (i.e. not necessary)
   - installed a wrapper script in place of the pvfs2-server that
     exports the LD_ASSUME_KERNEL environment variable before running
     the server(to avoid using the redhat NPTL library which is

@@ -1336,16 +1336,18 @@ static int io_analyze_size_results(
         zero_fill_size = sm_p->u.io.size -
             cur_ctx->flow_desc.file_req_offset;
     }
-    assert(zero_fill_size > -1);
 
-    gossip_debug(GOSSIP_IO_DEBUG, "computed zero fill size of %Ld at "
-                 "offset %Ld\n", Ld(zero_fill_size),
-                 Ld(sm_p->u.io.total_size));
+    if (zero_fill_size > -1)
+    {
+        gossip_debug(GOSSIP_IO_DEBUG, "computed zero fill size of %Ld "
+                     "at offset %Ld\n", Ld(zero_fill_size),
+                     Ld(sm_p->u.io.total_size));
 
-    memset((char *)(cur_ctx->flow_desc.dest.u.mem.buffer +
-                    sm_p->u.io.total_size), 0, zero_fill_size);
+        memset((char *)(cur_ctx->flow_desc.dest.u.mem.buffer +
+                        sm_p->u.io.total_size), 0, zero_fill_size);
 
-    sm_p->u.io.total_size += zero_fill_size;
+        sm_p->u.io.total_size += zero_fill_size;
+    }
 
     js_p->error_code = 0;
     return 1;
