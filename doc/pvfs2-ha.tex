@@ -16,7 +16,7 @@
 \headsep 0.0in
 \headheight 0.0in
 
-\title{PVFS2 High-Availibility Clustering}
+\title{PVFS2 High-Availability Clustering}
 \author{PVFS2 Development Team}
 \date{June, 2004}
 
@@ -37,7 +37,7 @@ performance.  While we are thinking how best to design software
 redundancy, there will always be a performance cost.  Hardware-based
 failover is one way to achieve resistance to failures while maintaining
 high performance.  This document outlines how we set up a PVFS2
-high-availiablity cluster using free software.  First we will walk
+high-availability cluster using free software.  First we will walk
 through setting up an active-passive system, then show what needs to be
 changed for a full active-active failover configuration.
 
@@ -61,7 +61,7 @@ Here's the hardware we used:
 	with 7 160 GB disks configured in RAID-5
 \end{itemize}
 
-It's concievable that a FibreChannel or Firewire drive would suffice for
+It's conceivable that a Fibre Channel or Firewire drive would suffice for
 the shared storage device.  Reports of success or failure using such
 devices would be most welcome.
 
@@ -90,7 +90,7 @@ Some preliminary notes about installing Linux (Debian) on this hardware:
   there is some movement on that front. 
 
 \item Put the PowerVault enclosure in \emph{cluster mode}.  To do so,
-  flip the little switch on the back of the PowerVault to the posistion
+  flip the little switch on the back of the PowerVault to the position
   with the linked SCSI symbols.  This is different from putting the
   controller into cluster mode, which you must also do and is described
   later on.
@@ -137,16 +137,16 @@ Some preliminary notes about installing Linux (Debian) on this hardware:
   really mess things up.  If one node (A) thinks the other (B) died, A
   will start taking over B's operations.  If B didn't actually die, but
   just got hung up for a time, it will continue as if everything is OK.
-  Then you have both A and B thinking they controll the file system,
+  Then you have both A and B thinking they control the file system,
   both will write to it, and the result is a corrupted file system. A
   100\% legitimate failover configuration would take measures so that
   one node can ``fence'' a node -- ensure that it will not attempt to
   access the storage until forgetting all state.  The most common way to
   do so is to Shoot The Other Node In The Head (STONITH), and the most
   common way to STONITH is via network-addressable power supplies.  You
-  can get away without a STONITH mechanisim, and we're going to outline
+  can get away without a STONITH mechanism, and we're going to outline
   just such a configuration, but just because you { \em can} do something
-  doesn't mean you nescesarily {\em should} do it.  
+  doesn't mean you necessarily {\em should} do it.  
 
 \item NOTE: the heartbeat software will set up IP addresses and mount file
   systems.  The nodes will have a private (192.168.1.x) address for
@@ -355,18 +355,18 @@ haresources file in Figure~\ref{fig:haresources}, the output of
 would still have /dev/sdb3 mounted on /shared, and pvfs2-server would
 still be running. 
 
-Ok, the moment of truth.  Everything is in place: node A serving PVFS2
+OK, the moment of truth.  Everything is in place: node A serving PVFS2
 requests, node B ready to step in.  Start a long-running process on the
 client (pvfs2-cp of a large file will work, as will unpacking a tarball
 onto a PVFS2 file system).  Kill node A somehow:  you could be as brutal
 as pulling the power cable, or as gentle as /etc/init.d/heartbeat stop.
 As the heartbeat docs note, don't just pull the network cables out: the
 heartbeat process on both nodes will assume the other process died and
-will attempt to recover.  Rembmer that ``takeover'' means taking over
+will attempt to recover.  Remember that ``takeover'' means taking over
 the IP address, file system, and programs, so you will have two nodes
 writing to the same file system and trying to share the same ip address.
 When you plug the network cables back in, you will have network
-collisions and simulatneous writes to the filesystem.  Yes this is
+collisions and simultaneous writes to the filesystem.  Yes this is
 different from stopping heartbeat and starting it up later: when
 heartbeat starts, it checks to see the state of its partner node, and
 will do the right thing. 
@@ -386,7 +386,7 @@ oblivious.
 \includegraphics[scale=0.75]{pvfs2-failover-AA.eps}
 \end{center}
 \caption{Simplified wiring diagram of a PVFS2 HA cluster, Active-Active
-confgiuration}
+configuration}
 \label{fig:nodes-aa}
 \end{figure}
 
@@ -444,7 +444,7 @@ PVFS2_PIDFILE=/var/run/pvfs2-1.pid
 ...  # remainder of init script omitted
 \end{verbatim}
 \end{scriptsize}
-\caption{Exerpt from PVFS2 init script on one A-A node}
+\caption{Excerpt from PVFS2 init script on one A-A node}
 \label{fig:init}
 \end{figure}
 
@@ -463,7 +463,7 @@ PVFS2_PIDFILE=/var/run/pvfs2-2.pid
 ...  # remainder of init script omitted
 \end{verbatim}
 \end{scriptsize}
-\caption{Exerpt from PVFS2 init script on the other A-A node}
+\caption{Excerpt from PVFS2 init script on the other A-A node}
 \label{fig:init-other}
 \end{figure}
 
@@ -535,7 +535,7 @@ addresses .}
 \label{fig:ifconfig-aa}
 \end{figure}
 
-\section{Acknowledgements}
+\section{Acknowledgments}
 We would like to thank Jasmina Janic for notes and technical support.
 The Dell Scalable Systems Group loaned the PVFS2 development team Dell
 hardware.  With this hardware, we were able to evaluate several high
