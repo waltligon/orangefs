@@ -21,7 +21,7 @@
 
 \title{A Quick Start Guide to PVFS2}
 \author{ PVFS2 Development Team }
-\date{ Last Updated: September 2003 }
+\date{Last Updated: March 2004}
 
 %
 % BEGINNING OF DOCUMENT
@@ -633,16 +633,17 @@ now running the kernel located in the /usr/src/linux directory.  After
 this command is issued, build the PVFS2 source tree if it has not yet
 been built.
 
-Building the kernel module should now be done automatically, though
-you must perform this step as root so that the build process can
-access dependency information in the kernel source tree.  Optionally,
-you can build the module by changing directory into the
-src/kernel/linux-2.6 and typing 'make'.
+Building the kernel module requires an extra step.  Since current kernels
+require writing a file in the kernel source directory to build a module, you
+may have to become root to compile the kernel module.  To build the module,
+type ``make kmod''.
 
 At this point, we have a valid PVFS2 Kernel module.  The module itself
-is contained in the output file 'pvfs2.ko' located in the directory
-src/kernel/linux-2.6/pvfs2.ko.  You may copy this module to another
-location if it better suits your environment.
+is the file {\tt pvfs.ko} in subdirectory {\tt src/kernel/linux-2.6} in
+your build tree.  You may install it
+to the standard system location with ``make kmod\_install'', again you will
+likely have to be root to do this.  Or you may override the install location
+by setting the variable {\tt KMOD\_DIR} variable when you install.
 
 \section{Testing the PVFS2 Linux VFS Interface}
 \label{sec:vfs-test}
