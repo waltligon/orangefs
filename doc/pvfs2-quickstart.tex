@@ -302,14 +302,24 @@ Stopping PVFS2 server:                                     [  OK  ]
 \subsection{Client configuration}
 \label{subsec:client}
 
-There are two primary methods for accessing a PVFS2 file system.  The
-first is the native PVFS2 interface which is made available through
-{\tt libpvfs2}.  This also happens to be the same interface used by
-ROMIO if you configure your system to use MPI-IO.  The second method
-relies on a kernel module to provide standard Linux file system
-compatibility.  This interface allows the user to use existing
-binaries and system utilities on PVFS2 without recompiling.  We will
-cover how to configure both access methods here.
+There are two primary methods for accessing a PVFS2 file system.  The first is
+using the kernel module to provide standard Linux file system compatibility.
+This interface allows the user to run existing binaries and system utilities
+on PVFS2 without recompiling.  The second is through the MPI-IO interface,
+which is built on top of the \texttt{libpvfs2} library and allows for higher
+performance for parallel applications.
+
+Both of these methods require the same bit of information on the client to
+tell the client where to find the PVFS2 file system (or systems).  The
+information is presented in the same way as an \texttt{fstab (5)} entry:
+
+\begin{verbatim}
+tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 default,noauto 0 0 
+\end{verbatim}
+
+The entry lists a PVFS2 server (\texttt{tcp://testhost:3334/pvfs2-fs}) and a
+mount point (\texttt{/mnt/pvfs2}) on the client.  See the \texttt{fstab (5)}
+man page for more information on the format of these lines.
 
 We must create a mount point for the file system as well as an {\tt
 /etc/pvfs2tab} entry that will be used by the PVFS2 libraries to
@@ -327,8 +337,10 @@ Now edit this file so that it contains the following, except that you should
 substitute your host name in place of ``testhost'':
 
 \begin{verbatim}
-tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 default 0 0 
+tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 default,noauto 0 0 
 \end{verbatim}
+
+Alternatively one could put this entry in \texttt{/etc/fstab} instead.
 
 \subsection{Testing your installation}
 \label{subsec:testing}
@@ -560,7 +572,15 @@ to the corresponding section \ref{sec:rc} from the single server example.
 
 \subsection{Client configuration}
 
-Setting up a client for multiple servers is the same as setting up a client for a single server.  Refer to section \ref{subsec:client}.  
+Setting up a client for multiple servers is the same as setting up a client
+for a single server.  Refer to section \ref{subsec:client}.
+
+The \texttt{/etc/pvfs2tab} file (or an \texttt{/etc/fstab} entry) needs to
+exist on each client so that each client can find the file system.  The server
+listed for each client can be different; any server in the PVFS2 file system
+will do.  For large clusters, using different server names will eliminate one
+potential bottleneck in the system by balancing the load of clients reading
+initial configuration information.
 
 \subsection {Testing your Installation}
 
