@@ -989,6 +989,81 @@ int job_trove_keyval_read(
 	return(0);
 }
 
+/* job_trove_keyval_read_list()
+ *
+ * storage key/value read list
+ *
+ * returns 0 on success, 1 on immediate completion, and -errno on
+ * failure
+ */
+int job_trove_keyval_read_list(
+	PVFS_coll_id coll_id,
+	PVFS_handle handle,
+	PVFS_ds_keyval_s *key_array,
+	PVFS_ds_keyval_s *val_array,
+	int count,
+	PVFS_ds_flags flags,
+	PVFS_vtag_s vtag,
+	void* user_ptr,
+	job_status_s* out_status_p,
+	job_id_t* id)
+{
+	/* post a trove keyval read.  If it completes (or fails)
+	 * immediately, then return and fill in the status structure.  
+	 * If it needs to be tested for completion later, then queue 
+	 * up a job_desc structure.  */
+	int ret = -1;
+	struct job_desc* jd = NULL;
+
+	HACK_global_fsid = coll_id;
+
+	/* create the job desc first, even though we may not use it.  This
+	 * gives us somewhere to store the BMI id and user ptr
+	 */
+	jd = alloc_job_desc(JOB_TROVE);
+	if(!jd)
+	{
+		return(-errno);
+	}
+	jd->job_user_ptr = user_ptr;
+	jd->u.trove.vtag = vtag;
+
+	ret = trove_keyval_read_list(coll_id, handle, key_array,
+		val_array, count, flags, &(jd->u.trove.vtag), jd, 
+		&(jd->u.trove.id));
+	
+	if(ret < 0)
+	{
+		/* error posting trove operation */
+		dealloc_job_desc(jd);
+		/* TODO: handle this correctly */
+		out_status_p->error_code = -EINVAL;
+		return(1);
+	}
+
+	if(ret == 1)
+	{
+		/* immediate completion */
+		out_status_p->error_code = 0;
+		out_status_p->vtag = jd->u.trove.vtag;
+		dealloc_job_desc(jd);
+		return(ret);
+	}
+
+	/* if we fall through to this point, the job did not
+	 * immediately complete and we must queue up to test later
+	 */
+	gen_mutex_lock(&trove_mutex);
+		*id = jd->job_id;
+		job_desc_q_add(trove_queue, jd);
+#ifdef __PVFS2_JOB_THREADED__
+		pthread_cond_signal(&trove_cond);
+#endif /* __PVFS2_JOB_THREADED__ */
+	gen_mutex_unlock(&trove_mutex);
+	
+	return(0);
+}
+
 /* job_trove_keyval_write()
  *
  * storage key/value write 

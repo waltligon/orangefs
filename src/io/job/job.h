@@ -172,6 +172,19 @@ int job_trove_keyval_read(
 	job_status_s* out_status_p,
 	job_id_t* id);
 
+/* storage key/value read */
+int job_trove_keyval_read_list(
+	PVFS_coll_id coll_id,
+	PVFS_handle handle,
+	PVFS_ds_keyval_s *key_array,
+	PVFS_ds_keyval_s *val_array,
+	int count,
+	PVFS_ds_flags flags,
+	PVFS_vtag_s vtag,
+	void* user_ptr,
+	job_status_s* out_status_p,
+	job_id_t* id);
+
 /* storage key/value write */
 int job_trove_keyval_write(
 	PVFS_coll_id coll_id,
