@@ -196,3 +196,7 @@ testing:
 - more datatype testing
   - remember example of ub < lb
 
+rob's random list:
+=====================================================================
+- do something about the weird PINT_sys_wait and PINT_mgmt_wait macros in
+  client-state-machine.h

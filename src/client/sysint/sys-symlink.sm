@@ -4,6 +4,10 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  PVFS2 system interface routines for creating symlinks.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -184,6 +188,8 @@ machine pvfs2_client_symlink_sm(
 
 %%
 
+/** Initiate creation of a new symlink object on some server.
+ */
 PVFS_error PVFS_isys_symlink(
     char *entry_name,
     PVFS_object_ref parent_ref,
@@ -251,6 +257,8 @@ PVFS_error PVFS_isys_symlink(
         sm_p, PVFS_SYS_SYMLINK, op_id, user_ptr);
 }
 
+/** Create a new symlink object on some server.
+ */
 PVFS_error PVFS_sys_symlink(
     char *entry_name,
     PVFS_object_ref parent_ref,

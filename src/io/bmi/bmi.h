@@ -5,8 +5,17 @@
  */
 
 
-/* This file contains the primary application interface to the BMI
- * system.
+/** \file
+ * Declarations for the Buffered Message Interface (BMI).
+ */
+
+/** \defgroup bmiint BMI network interface
+ *
+ *  The BMI interface provides functionality used for communication
+ *  between clients and servers.  Both clients and servers use this
+ *  interface, and the default flow protocol also builds on BMI.
+ *
+ * @{
  */
 
 #ifndef __BMI_H
@@ -158,6 +167,8 @@ int BMI_cancel(bmi_op_id_t id,
 	       bmi_context_id context_id);
 
 #endif /* __BMI_H */
+
+/* @} */
 
 /*
  * Local variables:

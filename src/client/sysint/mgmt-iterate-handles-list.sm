@@ -3,6 +3,15 @@
  *
  * See COPYING in top-level directory.
  */
+
+/** \file
+ *  PVFS2 management routines for iterating through handles of objects
+ *  stored on servers.
+ *
+ *  These routines are used primarily for file system check and repair
+ *  purposes.
+ */
+
 #include <string.h>
 
 #include "client-state-machine.h"
@@ -51,11 +60,10 @@ machine pvfs2_client_mgmt_iterate_handles_list_sm(
 
 %%
 
-/* PVFS_imgmt_iterate_handles_list()
+/** Initiate retrieval of a list of handles in use on a collection of
+ *  servers.
  *
- * iterates through all of the handles in a given collection for each server
- *
- * returns 0 on success, -PVFS_error on failure
+ * \return 0 on success, -PVFS_error on failure.
  */
 PVFS_error PVFS_imgmt_iterate_handles_list(
     PVFS_fs_id fs_id,
@@ -111,6 +119,8 @@ PVFS_error PVFS_imgmt_iterate_handles_list(
         sm_p, PVFS_MGMT_ITERATE_HANDLES_LIST, op_id, user_ptr);
 }
 
+/** Obtain a list of handles in use on a collection of servers.
+ */
 PVFS_error PVFS_mgmt_iterate_handles_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,

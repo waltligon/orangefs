@@ -4,6 +4,10 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  PVFS2 system interface routines for flushing data to disk on servers.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -87,6 +91,8 @@ machine pvfs2_client_flush_sm(
 
 %%
 
+/** Initiate flushing of file data to storage on servers.
+ */
 PVFS_error PVFS_isys_flush(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
@@ -127,6 +133,8 @@ PVFS_error PVFS_isys_flush(
         sm_p, PVFS_SYS_FLUSH, op_id, user_ptr);
 }
 
+/** Flush file data to storage on servers.
+ */
 PVFS_error PVFS_sys_flush(
     PVFS_object_ref ref,
     PVFS_credentials *credentials)

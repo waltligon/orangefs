@@ -4,6 +4,14 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  PVFS2 management interface routines for obtaining the handle of
+ *  the object that holds directory data (the dirdata object).
+ *
+ *  These routines are used primarily for file system check and repair
+ *  purposes, and expose internal details of PVFS2 that may change.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -65,6 +73,9 @@ machine pvfs2_client_mgmt_get_dirdata_handle_sm(
 
 %%
 
+/** Initiate retrieval of handle for dirdata object for a specific
+ *  directory.
+ */
 PVFS_error PVFS_imgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
     PVFS_handle *out_dirdata_handle,
@@ -105,6 +116,8 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
         sm_p, PVFS_MGMT_GET_DIRDATA_HANDLE, op_id, user_ptr);
 }
 
+/** Obtain handle for dirdata object for a specific directory.
+ */
 PVFS_error PVFS_mgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
     PVFS_handle *out_dirdata_handle,

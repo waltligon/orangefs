@@ -4,8 +4,19 @@
  * See COPYING in top-level directory.
  */
 
-/* This file contains the declarations for the PVFS system interface
+/** \file
+ *  Declarations for the PVFS2 system interface.
  */
+
+/** \defgroup sysint PVFS2 system interface
+ *
+ *  The PVFS2 system interface provides functionality used for everyday
+ *  interaction.  Both the PVFS2 kernel support and the PVFS2 ROMIO
+ *  implementation build on this interface.
+ *
+ * @{
+ */
+
 #ifndef __PVFS_SYSINT_H
 #define __PVFS_SYSINT_H
 
@@ -16,10 +27,10 @@
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
 
-/* non-blocking sysint operation handle */
+/** Holds a non-blocking system interface operation handle. */
 typedef PVFS_id_gen_t PVFS_sys_op_id;
 
-/* attributes */
+/** Describes attributes for a file, directory, or symlink. */
 struct PVFS_sys_attr_s
 {
     PVFS_uid owner;
@@ -36,7 +47,7 @@ struct PVFS_sys_attr_s
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 
-/* describes active file systems */
+/* Describes active file systems. */
 struct PVFS_sys_mntent
 {
     char **pvfs_config_servers;	/* addresses of servers with config info */
@@ -54,7 +65,7 @@ struct PVFS_sys_mntent
     char *mnt_opts;		/* full option list */
 };
 
-/* describes file distribution parameters */
+/** Describes file distribution parameters. */
 struct PVFS_sys_dist_s
 {
     char* name;
@@ -62,14 +73,14 @@ struct PVFS_sys_dist_s
 };
 typedef struct PVFS_sys_dist_s PVFS_sys_dist;
 
-/* lookup (request and response) */
+/** Holds results of a lookup operation (reference to object). */
 struct PVFS_sysresp_lookup_s
 {
     PVFS_object_ref ref;
 };
 typedef struct PVFS_sysresp_lookup_s PVFS_sysresp_lookup;
 
-/* getattr */
+/** Holds results of a getattr operation (attributes of object). */
 struct PVFS_sysresp_getattr_s
 {
     PVFS_sys_attr attr;
@@ -79,14 +90,14 @@ typedef struct PVFS_sysresp_getattr_s PVFS_sysresp_getattr;
 /* setattr */
 /* no data returned in setattr response */
 
-/* mkdir */
+/** Holds results of a mkdir operation (reference to new directory). */
 struct PVFS_sysresp_mkdir_s
 {
     PVFS_object_ref ref;
 };
 typedef struct PVFS_sysresp_mkdir_s PVFS_sysresp_mkdir;
 
-/* create */
+/** Holds results of a create operation (reference to new file). */
 struct PVFS_sysresp_create_s
 {
     PVFS_object_ref ref;
@@ -99,28 +110,30 @@ typedef struct PVFS_sysresp_create_s PVFS_sysresp_create;
 /* rename */
 /* no data returned in rename response */
 
-/* symlink */
+/** Holds results of a symlink operation (reference to new symlink). */
 struct PVFS_sysresp_symlink_s
 {
     PVFS_object_ref ref;
 };
 typedef struct PVFS_sysresp_symlink_s PVFS_sysresp_symlink;
 
-/* readlink */
+/** Holds results of a readlink operation (string name of target). */
 struct PVFS_sysresp_readlink_s
 {
     char *target;
 };
 typedef struct PVFS_sysresp_readlink_s PVFS_sysresp_readlink;
 
-/* read/write */
+/** Holds results of an I/O operation (total number of bytes read/written). */
 struct PVFS_sysresp_io_s
 {
     PVFS_size total_completed;
 };
 typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 
-/* readdir */
+/** Holds results of a readdir operation (position token, directory version
+ *  information, array of directory entries).
+ */
 struct PVFS_sysresp_readdir_s
 {
     PVFS_ds_position token;
@@ -133,7 +146,6 @@ typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
 /* truncate */
 /* no data returned in truncate response */
 
-/* statfs */
 struct PVFS_sysresp_statfs_s
 {
     PVFS_statfs statfs_buf;
@@ -396,6 +408,8 @@ PVFS_error PVFS_sys_dist_setparam(
     void* value);
 
 #endif
+
+/* @} */
 
 /*
  * Local variables:

@@ -3,6 +3,11 @@
  *
  * See COPYING in top-level directory.
  */
+
+/*
+ *  PVFS2 server state machine for driving I/O operations (read and write).
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -25,11 +30,6 @@ static int io_cleanup(
     PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
-
-/****************************************************************
- * This is the state machine for file system I/O operations (both
- * read and write)
- */
 
 %%
 

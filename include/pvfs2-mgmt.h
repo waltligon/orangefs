@@ -4,7 +4,18 @@
  * See COPYING in top-level directory.
  */
 
-/* This header includes prototypes for management functions.  */
+/** \file
+ *  Declarations for the PVFS2 management interface.
+ */
+
+/** \defgroup mgmtint PVFS2 management interface
+ *
+ *  The PVFS2 management interface provides functionality used to check
+ *  file system status and to repair damaged file systems.  Both blocking
+ *  and nonblocking calls are provided for most operations.
+ *
+ * @{
+ */
 
 #ifndef __PVFS2_MGMT_H
 #define __PVFS2_MGMT_H
@@ -255,6 +266,8 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
     PVFS_credentials *credentials);
 
 #endif /* __PVFS2_MGMT_H */
+
+/* @} */
 
 /*
  * Local variables:

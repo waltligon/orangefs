@@ -4,6 +4,10 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  Declarations for state machine processing on clients.
+ */
+
 #ifndef __PVFS2_CLIENT_STATE_MACHINE_H
 #define __PVFS2_CLIENT_STATE_MACHINE_H
 
@@ -553,6 +557,7 @@ int PINT_client_wait_internal(
 void PINT_sys_release(PVFS_sys_op_id op_id);
 
 /* internal helper macros */
+/** Waits for completion of a system interface function. */
 #define PINT_sys_wait(op_id, in_op_str, out_error)            \
 PINT_client_wait_internal(op_id, in_op_str, out_error, "sys")
 

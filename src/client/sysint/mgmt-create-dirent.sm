@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  PVFS2 management interface routines for creating directory entries
+ *  that point to specific existing objects.  These are used primarily
+ *  for file system repair purposes.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -65,6 +71,8 @@ machine pvfs2_client_mgmt_create_dirent_sm(
 
 %%
 
+/** Initiate creation of a directory entry pointing to a specific object.
+ */
 PVFS_error PVFS_imgmt_create_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
@@ -109,6 +117,8 @@ PVFS_error PVFS_imgmt_create_dirent(
         sm_p, PVFS_MGMT_CREATE_DIRENT, op_id, user_ptr);
 }
 
+/** Create a directory entry pointing to a specific object.
+ */
 PVFS_error PVFS_mgmt_create_dirent(
     PVFS_object_ref parent_ref,
     char *entry,

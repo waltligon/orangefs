@@ -4,6 +4,10 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  PVFS2 system interface routines for creating files.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -216,6 +220,8 @@ machine pvfs2_client_create_sm(
 
 %%
 
+/** Initiate creation of a file with a specified distribution.
+ */
 PVFS_error PVFS_isys_create(
     char *object_name,
     PVFS_object_ref parent_ref,
@@ -338,6 +344,8 @@ PVFS_error PVFS_isys_create(
         sm_p, PVFS_SYS_CREATE, op_id, user_ptr);
 }
 
+/** Create a file with a specified distribution.
+ */
 PVFS_error PVFS_sys_create(
     char *object_name,
     PVFS_object_ref parent_ref,

@@ -3,6 +3,10 @@
  *
  * See COPYING in top-level directory.
  */
+
+/** \file
+ *  Routines for state machine processing on clients.
+ */
 #include <string.h>
 #include <assert.h>
 
@@ -195,6 +199,10 @@ static inline int cancelled_io_jobs_are_pending(PINT_client_sm *sm_p)
   you need to call PVFS_sys_release on your own when the operation
   completes.
 */
+
+/** Adds a state machine into the list of machines that are being
+ *  actively serviced.
+ */
 PVFS_error PINT_client_state_machine_post(
     PINT_client_sm *sm_p,
     int pvfs_sys_op,
@@ -413,11 +421,9 @@ PVFS_error PINT_sys_dev_unexp(
     return ret;
 }
 
-/* PINT_client_io_cancel()
+/** Cancels in progress I/O operations.
  *
- * cancels in progress I/O operations
- *
- * returns 0 on success, -PVFS_error on failure
+ * \return 0 on success, -PVFS_error on failure.
  */
 PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
 {
@@ -530,6 +536,11 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     return ret;
 }
 
+/** Checks for completion of a specific state machine.
+ *
+ *  If specific state machine has not completed, progress is made on
+ *  all posted state machines.
+ */
 PVFS_error PINT_client_state_machine_test(
     PVFS_sys_op_id op_id,
     int *error_code)
@@ -626,6 +637,11 @@ PVFS_error PINT_client_state_machine_test(
     return 0;
 }
 
+/** Checks completion of one or more state machines.
+ *
+ *  If none of the state machines listed in op_id_array have completed,
+ *  then progress is made on all posted state machines.
+ */
 PVFS_error PINT_client_state_machine_testsome(
     PVFS_sys_op_id *op_id_array,
     int *op_count, /* in/out */
@@ -735,6 +751,10 @@ PVFS_error PINT_client_state_machine_testsome(
         op_id_array, user_ptr_array, error_code_array, limit, op_count);
 }
 
+/** Continually test on a specific state machine until it completes.
+ *
+ * This is what is called when PINT_sys_wait or PINT_mgmt_wait is used.
+ */
 PVFS_error PINT_client_wait_internal(
     PVFS_sys_op_id op_id,
     const char *in_op_str,
@@ -769,6 +789,8 @@ PVFS_error PINT_client_wait_internal(
     return ret;
 }
 
+/** Frees resources associated with state machine instance.
+ */
 void PINT_sys_release(PVFS_sys_op_id op_id)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);

@@ -4,6 +4,10 @@
  * See COPYING in top-level directory.
  */
 
+/*
+ *  Declarations for use in the PVFS2 server.
+ */
+
 #ifndef __PVFS2_SERVER_H
 #define __PVFS2_SERVER_H
 

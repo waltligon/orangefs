@@ -4,6 +4,10 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  Top-level BMI network interface routines.
+ */
+
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
@@ -94,14 +98,16 @@ static struct {
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
 
-/* BMI_initialize()
- * 
- * Initializes the BMI layer.  Must be called before any other BMI
- * functions.  method_list is a comma separated list of BMI methods to
- * use, listen_addr is a comma separated list of addresses to listen on
- * for each method (if needed), and flags are initialization flags.
+/** Initializes the BMI layer.  Must be called before any other BMI
+ *  functions.
  *
- * returns 0 on success, -errno on failure
+ *  \param method_list a comma separated list of BMI methods to
+ *         use
+ *  \param listen_addr a comma separated list of addresses to listen on
+ *         for each method (if needed)
+ *  \param flags initialization flags
+ *
+ *  \return 0 on success, -errno on failure
  */
 int BMI_initialize(const char *method_list,
 		   const char *listen_addr,
@@ -379,11 +385,9 @@ int BMI_initialize(const char *module_string,
 }
 #endif /* 0 */
 
-/* BMI_finalize()
- * 
- * Shuts down the BMI layer.
+/** Shuts down the BMI layer.
  *
- * returns 0 on success, -errno on failure
+ * \return 0.
  */
 int BMI_finalize(void)
 {
@@ -409,13 +413,11 @@ int BMI_finalize(void)
     return (0);
 }
 
-/* BMI_open_context()
+/** Creates a new context to be used for communication.  This can be
+ *  used, for example, to distinguish between operations posted by
+ *  different threads.
  *
- * creates a new context to be used for communication; this can be used,
- * for example, to distinguish between operations posted by different
- * threads 
- *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_open_context(bmi_context_id* context_id)
 {
@@ -473,11 +475,7 @@ out:
 }
 
 
-/* BMI_close_context()
- *
- * destroys a context previous generated with BMI_open_context()
- *
- * no return value
+/** Destroys a context previous generated with BMI_open_context().
  */
 void BMI_close_context(bmi_context_id context_id)
 {
@@ -505,11 +503,9 @@ void BMI_close_context(bmi_context_id context_id)
 }
 
 
-/* BMI_post_recv()
- * 
- * Submits receive operations.
+/** Submits receive operations for subsequent service.
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_post_recv(bmi_op_id_t * id,
 		  PVFS_BMI_addr_t src,
@@ -546,11 +542,9 @@ int BMI_post_recv(bmi_op_id_t * id,
 }
 
 
-/* BMI_post_send()
- * 
- * Submits send operations.
+/** Submits send operations for subsequent service.
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_post_send(bmi_op_id_t * id,
 		  PVFS_BMI_addr_t dest,
@@ -586,11 +580,9 @@ int BMI_post_send(bmi_op_id_t * id,
 }
 
 
-/* BMI_post_sendunexpected()
- * 
- * Submits send operations.
+/** Submits unexpected send operations for subsequent service.
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    PVFS_BMI_addr_t dest,
@@ -626,11 +618,9 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 }
 
 
-/* BMI_test()
- * 
- * Checks to see if a particular message has completed.
+/** Checks to see if a particular message has completed.
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_test(bmi_op_id_t id,
 	     int *outcount,
@@ -667,11 +657,9 @@ int BMI_test(bmi_op_id_t id,
 }
 
 
-/* BMI_testsome()
- * 
- * Checks to see if any messages from the specified list have completed.
+/** Checks to see if any messages from the specified list have completed.
  *
- * returns 0 on success, -errno on failure
+ * \return 0 on success, -errno on failure.
  *
  * XXX: never used.  May want to add adaptive polling strategy of testcontext
  * if it becomes used again.
@@ -833,11 +821,9 @@ construct_poll_plan(int nmeth, int *idle_time_ms)
 }
 
 
-/* BMI_testunexpected()
- * 
- * Checks to see if any unexpected messages have completed.
+/** Checks to see if any unexpected messages have completed.
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_testunexpected(int incount,
 		       int *outcount,
@@ -911,12 +897,10 @@ int BMI_testunexpected(int incount,
 }
 
 
-/* BMI_testcontext()
- * 
- * Checks to see if any messages from the specified context have
- * completed.
+/** Checks to see if any messages from the specified context have
+ *  completed.
  *
- * returns 0 on success, -errno on failure
+ *  \returns 0 on success, -errno on failure.
  */
 int BMI_testcontext(int incount,
 		    bmi_op_id_t* out_id_array,
@@ -998,13 +982,12 @@ int BMI_testcontext(int incount,
 }
 
 
-/* BMI_addr_rev_lookup()
+/** Performs a reverse lookup, returning the string (URL style)
+ *  address for a given opaque address.
  *
- * performs a reverse lookup, returning the string (URL style) address
- * for a given opaque address.
- * NOTE: caller must not free or modify returned string
+ *  NOTE: caller must not free or modify returned string
  *
- * returns pointer to string on success, NULL on failure
+ *  \return Pointer to string on success, NULL on failure.
  */
 const char* BMI_addr_rev_lookup(PVFS_BMI_addr_t addr)
 {
@@ -1026,11 +1009,9 @@ const char* BMI_addr_rev_lookup(PVFS_BMI_addr_t addr)
     return(tmp_str);
 }
 
-/* BMI_memalloc()
- * 
- * Allocates memory that can be used in native mode by the BMI layer.
+/** Allocates memory that can be used in native mode by the BMI layer.
  *
- * returns pointer to buffer on success, NULL on failure.
+ *  \return Pointer to buffer on success, NULL on failure.
  */
 void *BMI_memalloc(PVFS_BMI_addr_t addr,
 		   bmi_size_t size,
@@ -1055,11 +1036,9 @@ void *BMI_memalloc(PVFS_BMI_addr_t addr,
     return (new_buffer);
 }
 
-/* BMI_memfree()
- * 
- * Frees memory that was allocated with BMI_memalloc()
+/** Frees memory that was allocated with BMI_memalloc().
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_memfree(PVFS_BMI_addr_t addr,
 		void *buffer,
@@ -1085,11 +1064,9 @@ int BMI_memfree(PVFS_BMI_addr_t addr,
     return (ret);
 }
 
-/* BMI_set_info()
- * 
- * Pass in optional parameters.
+/** Pass in optional parameters.
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_set_info(PVFS_BMI_addr_t addr,
 		 int option,
@@ -1181,11 +1158,9 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
     return (ret);
 }
 
-/* BMI_get_info()
- * 
- * Query for optional parameters.
+/** Query for optional parameters.
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_get_info(PVFS_BMI_addr_t addr,
 		 int option,
@@ -1254,13 +1229,10 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
     return (0);
 }
 
-/*
- * BMI_addr_lookup()
+/** Resolves the string representation of a host address into a BMI
+ *  address handle.
  *
- * Resolves the string representation of a host address into a BMI
- * address handle.
- *
- * returns 0 on success, -errno on failure.
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 		    const char *id_string)
@@ -1388,13 +1360,11 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 }
 
 
-/* BMI_post_send_list()
+/** Similar to BMI_post_send(), except that the source buffer is 
+ *  replaced by a list of (possibly non contiguous) buffers.
  *
- * like BMI_post_send(), except that the source buffer is 
- * replaced by a list of (possibly non contiguous) buffers
- *
- * returns 0 on success, 1 on immediate successful completion,
- * -errno on failure
+ *  \return 0 on success, 1 on immediate successful completion,
+ *  -errno on failure.
  */
 int BMI_post_send_list(bmi_op_id_t * id,
 		       PVFS_BMI_addr_t dest,
@@ -1454,16 +1424,14 @@ int BMI_post_send_list(bmi_op_id_t * id,
 }
 
 
-/* BMI_post_recv_list()
+/** Similar to BMI_post_recv(), except that the dest buffer is 
+ *  replaced by a list of (possibly non contiguous) buffers
  *
- * like BMI_post_recv(), except that the dest buffer is 
- * replaced by a list of (possibly non contiguous) buffers
+ *  \param total_expected_size the sum of the size list.
+ *  \param total_actual_size the aggregate amt that was received.
  *
- * "total_expected_size" is the sum of the size list
- * "total_actual_size" is the aggregate amt that was received
- *
- * returns 0 on success, 1 on immediate successful completion,
- * -errno on failure
+ *  \return 0 on success, 1 on immediate successful completion,
+ *  -errno on failure.
  */
 int BMI_post_recv_list(bmi_op_id_t * id,
 		       PVFS_BMI_addr_t src,
@@ -1523,15 +1491,13 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 }
 
 
-/* BMI_post_sendunexpected_list()
+/** Similar to BMI_post_sendunexpected(), except that the source buffer is 
+ *  replaced by a list of (possibly non contiguous) buffers.
  *
- * like BMI_post_sendunexpected(), except that the source buffer is 
- * replaced by a list of (possibly non contiguous) buffers
+ *  \param total_size the sum of the size list.
  *
- * "total_size" is the sum of the size list
- *
- * returns 0 on success, 1 on immediate successful completion,
- * -errno on failure
+ *  \return 0 on success, 1 on immediate successful completion,
+ *  -errno on failure.
  */
 int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 PVFS_BMI_addr_t dest,
@@ -1591,13 +1557,11 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 }
 
 
-/* BMI_cancel()
+/** Attempts to cancel a pending operation that has not yet completed.
+ *  Caller must still test to gather error code after calling this
+ *  function even if it returns 0.
  *
- * attempts to cancel a pending operation that has not yet completed;
- * caller must still test to gather error code after calling this
- * function even if it returns 0
- *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int BMI_cancel(bmi_op_id_t id, 
 	       bmi_context_id context_id)

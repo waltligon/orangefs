@@ -9,9 +9,8 @@
 #include "pint-distribution.h"
 #include "pvfs2-sysint.h"
 
-/**
- * Return the distribution associated with the given identifier, or null
- * if none exists
+/** Return the distribution associated with the given identifier, or null
+ *  if none exists.
  */
 PVFS_sys_dist* PVFS_sys_dist_lookup(const char* dist_name)
 {
@@ -53,8 +52,7 @@ PVFS_sys_dist* PVFS_sys_dist_lookup(const char* dist_name)
     return sys_dist;
 }
 
-/**
- * Free resources associated with this distribution
+/** Free resources associated with this distribution.
  */
 PVFS_error PVFS_sys_dist_free(PVFS_sys_dist* dist)
 {
@@ -67,8 +65,7 @@ PVFS_error PVFS_sys_dist_free(PVFS_sys_dist* dist)
     return 0;
 }
 
-/**
- * Set the named distribution parameter with the given value
+/** Set the named distribution parameter with the given value.
  */
 PVFS_error PVFS_sys_dist_setparam(
     PVFS_sys_dist* dist,
