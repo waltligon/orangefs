@@ -59,12 +59,8 @@ int main(int argc,char* argv[])
 	//pinode1->attr.u.data = ;
 	pinode1->mask = ATTR_META;
 	pinode1->size = 1;
-	pinode1->tstamp_handle.tv_sec = 111;
-	pinode1->tstamp_handle.tv_usec = 111;
-	pinode1->tstamp_attr.tv_sec = 111111;
-	pinode1->tstamp_attr.tv_usec = 111111;
-	pinode1->tstamp_size.tv_sec = 111111111;
-	pinode1->tstamp_size.tv_usec = 111111111;
+	pinode1->tstamp.tv_sec = 111;
+	pinode1->tstamp.tv_usec = 111;
 
 	pinode2->pinode_ref.handle = 2;
 	pinode2->pinode_ref.fs_id = 2;
@@ -79,12 +75,8 @@ int main(int argc,char* argv[])
 	//pinode2->attr.u.data = ;
 	pinode2->mask = ATTR_META;
 	pinode2->size = 2;
-	pinode2->tstamp_handle.tv_sec = 222;
-	pinode2->tstamp_handle.tv_usec = 222;
-	pinode2->tstamp_attr.tv_usec = 222222;
-	pinode2->tstamp_attr.tv_usec = 222222;
-	pinode2->tstamp_size.tv_sec = 222222222;
-	pinode2->tstamp_size.tv_usec = 222222222;
+	pinode2->tstamp.tv_sec = 222;
+	pinode2->tstamp.tv_usec = 222;
 
 	pinode3->pinode_ref.handle = 3;
 	pinode3->pinode_ref.fs_id = 3;
@@ -99,12 +91,8 @@ int main(int argc,char* argv[])
 	//pinode3->attr.u.data = ;
 	pinode3->mask = ATTR_META;
 	pinode3->size = 3;
-	pinode3->tstamp_handle.tv_sec = 333;
-	pinode3->tstamp_handle.tv_usec = 333;
-	pinode3->tstamp_attr.tv_sec = 333333;
-	pinode3->tstamp_attr.tv_usec = 333333;
-	pinode3->tstamp_size.tv_sec = 333333333;
-	pinode3->tstamp_size.tv_usec = 333333333;
+	pinode3->tstamp.tv_sec = 333;
+	pinode3->tstamp.tv_usec = 333;
 
 	ret = PINT_pcache_insert(pinode1);
 	if (ret < 0)
@@ -179,14 +167,8 @@ void print_pinode(pinode *toprint)
 	}
 	printf("pinode.mask = %d\n", (int)toprint->mask);
 	printf("pinode.size = %d\n", (int)toprint->size);
-	printf("pinode.tstamp_handle.tv_sec = %d\n", (int)toprint->tstamp_handle.tv_sec);
-	printf("pinode.tstamp_handle.tv_usec = %d\n", (int)toprint->tstamp_handle.tv_usec);
-	printf("pinode.tstamp_handle.tv_sec = %d\n", (int)toprint->tstamp_handle.tv_sec);
-	printf("pinode.tstamp_handle.tv_usec = %d\n", (int)toprint->tstamp_handle.tv_usec);
-	printf("pinode.tstamp_attr.tv_sec = %d\n", (int)toprint->tstamp_attr.tv_sec);
-	printf("pinode.tstamp_attr.tv_usec = %d\n", (int)toprint->tstamp_attr.tv_usec);
-	printf("pinode.tstamp_size.tv_secc = %d\n", (int)toprint->tstamp_size.tv_sec);
-	printf("pinode.tstamp_size.tv_usec = %d\n", (int)toprint->tstamp_size.tv_usec);
+	printf("pinode.tstamp.tv_sec = %d\n", (int)toprint->tstamp.tv_sec);
+	printf("pinode.tstamp.tv_usec = %d\n", (int)toprint->tstamp.tv_usec);
 	printf("===================================\n");
 }
 
