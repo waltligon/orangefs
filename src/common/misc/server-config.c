@@ -1972,7 +1972,10 @@ int PINT_config_pvfs2_mkspace(
                 if (!cur_handle_range)
                 {
                     /* if we have no handle range, the config is broken */
-                    gossip_err("Invalid configuration handle range\n");
+                    gossip_err("Invalid configuration handle "
+                               "range for host %s\n", config->host_id);
+                    gossip_err("Please make sure that all configuration "
+                               "information for this host is correct\n");
                     break;
                 }
             }
