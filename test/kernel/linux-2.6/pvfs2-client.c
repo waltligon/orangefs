@@ -154,7 +154,7 @@ static int service_io_request(
 {
     int ret = 1;
     PVFS_sysresp_io response;
-    PVFS_Request io_req;
+    PVFS_Request file_req;
     PVFS_size displacement = 0;
     int32_t blocklength = 0;
 
@@ -167,11 +167,11 @@ static int service_io_request(
 	blocklength = in_upcall->req.io.count;
 
 	ret = PVFS_Request_indexed(1, &blocklength, &displacement,
-                                   PVFS_BYTE, &io_req);
+                                   PVFS_BYTE, &file_req);
 	assert(ret == 0);
 
 	ret = PVFS_sys_io(
-            in_upcall->req.io.refn, io_req, 0, 
+            in_upcall->req.io.refn, file_req, 0, 
 	    in_upcall->req.io.buf, in_upcall->req.io.count,
             in_upcall->credentials, &response, in_upcall->req.io.io_type);
 	if(ret < 0)

@@ -321,7 +321,7 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 	ret = PVFS_Request_contiguous(io_size, PVFS_BYTE,
-		&(my_req.u.io.io_req));
+		&(my_req.u.io.file_req));
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_Request_contiguous() failure.\n");
@@ -460,7 +460,7 @@ int main(int argc, char **argv)	{
 	flow_d->file_data.iod_count = 1;
 	flow_d->file_data.dist = my_req.u.io.io_dist;
 
-	flow_d->io_req = my_req.u.io.io_req;
+	flow_d->file_req = my_req.u.io.file_req;
 	flow_d->tag = 0;
 	flow_d->user_ptr = NULL;
 

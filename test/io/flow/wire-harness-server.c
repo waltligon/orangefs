@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 	struct BMI_unexpected_info request_info;
 	struct wire_harness_req* req;
 	struct wire_harness_ack ack;
-	PINT_Request* io_req;
+	PINT_Request* file_req;
 	PVFS_Dist* io_dist;
 	bmi_op_id_t op;
 	PVFS_size actual_size;
@@ -112,19 +112,19 @@ int main(int argc, char **argv)
 		
 		/* sanity check sizes and stuff */
 		if(request_info.size != (sizeof(struct wire_harness_req) +
-			req->io_req_size + req->dist_size))
+			req->file_req_size + req->dist_size))
 		{
 			fprintf(stderr, "Badly formatted request received.\n");
 			return(-1);
 		}
 
 		printf("** received req: fsid (ignored) = %d, handle = %d, op = %d, io_r_sz = %d, dist_sz = %d\n",
-		       (int) req->fs_id, (int) req->handle, req->op, (int) req->io_req_size, (int) req->dist_size);
+		       (int) req->fs_id, (int) req->handle, req->op, (int) req->file_req_size, (int) req->dist_size);
 
 		/* decode io description */
-		io_req = (PINT_Request*)((char*)req + sizeof(struct wire_harness_req));
-		io_dist = (PVFS_Dist*)((char*)io_req + req->io_req_size);
-		ret = PINT_Request_decode(io_req);
+		file_req = (PINT_Request*)((char*)req + sizeof(struct wire_harness_req));
+		io_dist = (PVFS_Dist*)((char*)file_req + req->file_req_size);
+		ret = PINT_Request_decode(file_req);
 		if(ret < 0)
 		{
 			fprintf(stderr, "Error: io request decode failure.\n");
@@ -238,7 +238,7 @@ int main(int argc, char **argv)
 		flow_d->file_data.extend_flag = 0;
 		flow_d->file_data.dist = io_dist;
 
-		flow_d->io_req = io_req;
+		flow_d->file_req = file_req;
 		flow_d->tag = 0;
 		flow_d->user_ptr = NULL;
 
@@ -269,7 +269,7 @@ int main(int argc, char **argv)
 		time2 = Wtime();
 
 		printf("Server bw: %f MB/sec\n",
-			((io_req->aggregate_size)/((time2-time1)*1000000.0)));
+			((file_req->aggregate_size)/((time2-time1)*1000000.0)));
 
 		/* discard the buffer we got for the incoming request */
 		free(request_info.buffer);

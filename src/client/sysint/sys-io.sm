@@ -49,8 +49,8 @@ static int io_object_getattr_comp_fn(void *v_p,
 				     int index);
 
 /* other helper functions */
-static int io_find_target_datafiles(PVFS_Request io_req,
-				    PVFS_offset io_req_offset, 
+static int io_find_target_datafiles(PVFS_Request file_req,
+				    PVFS_offset file_req_offset, 
 				    PVFS_Dist *dist_p,
 				    PVFS_handle *input_handle_array,
 				    int input_handle_count,
@@ -108,8 +108,8 @@ machine pvfs2_client_io_sm(object_getattr_setup_msgpair,
 /* PVFS_sys_io()
  */
 int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
-		PVFS_Request          io_req,
-		PVFS_offset           io_req_offset,
+		PVFS_Request          file_req,
+		PVFS_offset           file_req_offset,
 		void                 *buffer,
 		PVFS_size             buffer_size,
 		PVFS_credentials      credentials,
@@ -138,8 +138,8 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     sm_p->cred_p = &credentials;
     sm_p->u.io.object_ref    = pinode_ref;
     sm_p->u.io.io_type       = io_type;
-    sm_p->u.io.io_req        = io_req;
-    sm_p->u.io.io_req_offset = io_req_offset;
+    sm_p->u.io.file_req        = file_req;
+    sm_p->u.io.file_req_offset = file_req_offset;
     sm_p->u.io.io_resp_p     = resp_p;
     sm_p->u.io.buffer_size   = buffer_size;
 
@@ -148,7 +148,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
      */
     /* sm_p->u.io.buffer        = buffer; */
     sm_p->u.io.buffer   = (void*)((char*)buffer -
-	io_req_offset);
+	file_req_offset);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_IO);
     assert(ret == 0);
@@ -370,8 +370,8 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 	assert(0);
     }
 
-    ret = io_find_target_datafiles(iosm_p->io_req,
-				   iosm_p->io_req_offset,
+    ret = io_find_target_datafiles(iosm_p->file_req,
+				   iosm_p->file_req_offset,
 				   iosm_p->dist_p,
 				   iosm_p->datafile_handles,
 				   iosm_p->datafile_count,
@@ -477,8 +477,8 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 			     orig_index,
 			     target_datafile_count,
 			     iosm_p->dist_p,
-			     iosm_p->io_req,
-			     iosm_p->io_req_offset);
+			     iosm_p->file_req,
+			     iosm_p->file_req_offset);
 
 	/* fill in msgpair structure components */
 	msg_p->fs_id   = iosm_p->object_ref.fs_id;
@@ -778,16 +778,15 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    fl_p->file_data.iod_count = iosm_p->datafile_count;
 
 	    /* this is the file datatype */
-	    /* TODO: RENAME? */
-	    fl_p->io_req        = iosm_p->io_req;
-	    fl_p->io_req_offset = iosm_p->io_req_offset;
+	    fl_p->file_req        = iosm_p->file_req;
+	    fl_p->file_req_offset = iosm_p->file_req_offset;
 
 	    gossip_debug(CLIENT_DEBUG,
-			 "    bstream_size = %Ld, datafile_nr = %d, datafile_ct = %d, io_req_off = %Ld\n",
+			 "    bstream_size = %Ld, datafile_nr = %d, datafile_ct = %d, file_req_off = %Ld\n",
 			 fl_p->file_data.fsize,
 			 fl_p->file_data.iod_num,
 			 fl_p->file_data.iod_count,
-			 fl_p->io_req_offset);
+			 fl_p->file_req_offset);
 
 	    /* this is the memory datatype */
 	    fl_p->mem_req = NULL;
@@ -1036,9 +1035,9 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 	    }
 	    /* NOTE: this is a little bit of a hack to determine if we have
 	     * actually used this flow descriptor; we don't really care
-	     * what the io_req is
+	     * what the file_req is
 	     */
-	    else if (iosm_p->flow_array[i].io_req != NULL)
+	    else if (iosm_p->flow_array[i].file_req != NULL)
 	    {
 		if (iosm_p->flow_status_array[i].error_code != 0)
 		{
@@ -1159,8 +1158,8 @@ static int io_analyze_results(PINT_client_sm *sm_p,
  *
  * NOTE: this was ripped out of io.c and then modified.
  */
-static int io_find_target_datafiles(PVFS_Request io_req,
-				    PVFS_offset io_req_offset, 
+static int io_find_target_datafiles(PVFS_Request file_req,
+				    PVFS_offset file_req_offset, 
 				    PVFS_Dist *dist_p,
 				    PVFS_handle *input_handle_array,
 				    int input_handle_count,
@@ -1175,7 +1174,7 @@ static int io_find_target_datafiles(PVFS_Request io_req,
     /* initialize output handle count */
     *handle_count_out_p = 0;
 
-    req_state = PINT_New_request_state(io_req);
+    req_state = PINT_New_request_state(file_req);
     if(!req_state)
     {
 	return -PVFS_ENOMEM;
@@ -1199,8 +1198,8 @@ static int io_find_target_datafiles(PVFS_Request io_req,
 	/* if a file datatype offset was specified, go ahead and skip ahead 
 	 * before calculating
 	 */
-	if (io_req_offset)
-	    PINT_REQUEST_STATE_SET_TARGET(req_state, io_req_offset);
+	if (file_req_offset)
+	    PINT_REQUEST_STATE_SET_TARGET(req_state, file_req_offset);
 
 	memset(&tmp_result, 0, sizeof(PINT_Request_result));
 	tmp_result.bytemax = 1;

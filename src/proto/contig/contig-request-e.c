@@ -26,7 +26,7 @@ int do_encode_req(
 {
     void *enc_msg;
     bmi_size_t size = 0, name_sz = 0;
-    PINT_Request *encode_io_req = NULL;
+    PINT_Request *encode_file_req = NULL;
     PVFS_Dist *encode_io_dist = NULL;
     int commit_index = 0;
     int ret = -1;
@@ -346,7 +346,7 @@ int do_encode_req(
 	 * size of the dist and description)
 	 */
 	size = sizeof(struct PVFS_server_req) + 2 * sizeof(int) +
-	    PINT_REQUEST_PACK_SIZE(request->u.io.io_req) +
+	    PINT_REQUEST_PACK_SIZE(request->u.io.file_req) +
 	    PINT_DIST_PACK_SIZE(request->u.io.io_dist) + 
 	    PINT_ENC_GENERIC_HEADER_SIZE;
 
@@ -367,27 +367,27 @@ int do_encode_req(
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 	/* store the size of the io description */
 	*(int *) ((char *) (enc_msg) + sizeof(struct PVFS_server_req))
-	    = PINT_REQUEST_PACK_SIZE(request->u.io.io_req);
+	    = PINT_REQUEST_PACK_SIZE(request->u.io.file_req);
 	/* store the size of the distribution */
 	*(int *) ((char *) (enc_msg) + sizeof(struct PVFS_server_req)
 		  + sizeof(int)) = PINT_DIST_PACK_SIZE(request->u.io.io_dist);
 	/* find pointers to where the req and dist will be packed */
-	encode_io_req = (PINT_Request *) ((char *) (enc_msg) +
+	encode_file_req = (PINT_Request *) ((char *) (enc_msg) +
 					  sizeof(struct PVFS_server_req) +
 					  2 * sizeof(int));
 	encode_io_dist =
-	    (PVFS_Dist *) ((char *) (encode_io_req) +
-			   PINT_REQUEST_PACK_SIZE(request->u.io.io_req));
+	    (PVFS_Dist *) ((char *) (encode_file_req) +
+			   PINT_REQUEST_PACK_SIZE(request->u.io.file_req));
 	/* pack the I/O description */
 	commit_index = 0;
-	ret = PINT_Request_commit(encode_io_req, request->u.io.io_req,
+	ret = PINT_Request_commit(encode_file_req, request->u.io.file_req,
 				  &commit_index);
 	if (ret < 0)
 	{
 	    BMI_memfree(target_msg->dest, enc_msg, size, BMI_SEND);
 	    return (ret);
 	}
-	ret = PINT_Request_encode(encode_io_req);
+	ret = PINT_Request_encode(encode_file_req);
 	if (ret < 0)
 	{
 	    BMI_memfree(target_msg->dest, enc_msg, size, BMI_SEND);

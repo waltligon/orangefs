@@ -439,10 +439,10 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
     flow_d->context_id = context_id;
 
     /* setup the request processing states */
-    flow_d->io_req_state = PINT_New_request_state(flow_d->io_req);
+    flow_d->file_req_state = PINT_New_request_state(flow_d->file_req);
 #if 0
     flow_d->mem_req_state = PINT_New_request_state(flow_d->mem_req);
-    if (!flow_d->io_req_state || !flow_d->mem_req_state)
+    if (!flow_d->file_req_state || !flow_d->mem_req_state)
     {
 	flow_release(flow_d);
 	gen_mutex_unlock(&interface_mutex);
@@ -450,7 +450,7 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
     }
 #else
     flow_d->mem_req_state = NULL;
-    if (!flow_d->io_req_state)
+    if (!flow_d->file_req_state)
     {
 	flow_release(flow_d);
 	gen_mutex_unlock(&interface_mutex);
@@ -968,8 +968,8 @@ static int teardown_flow_queues(void)
 static void flow_release(flow_descriptor * flow_d)
 {
     /* let go of the request processing states */
-    if (flow_d->io_req_state)
-	PINT_Free_request_state(flow_d->io_req_state);
+    if (flow_d->file_req_state)
+	PINT_Free_request_state(flow_d->file_req_state);
     if (flow_d->mem_req_state)
 	PINT_Free_request_state(flow_d->mem_req_state);
 

@@ -376,9 +376,9 @@ struct PVFS_servreq_io
     /* distribution */
     PVFS_Dist *io_dist;
     /* I/O request description (file datatype) */
-    PVFS_Request io_req;
+    PVFS_Request file_req;
     /* I/O request offset (into file datatype) */
-    PVFS_offset io_req_offset;
+    PVFS_offset file_req_offset;
 };
 
 #define PINT_SERVREQ_IO_FILL(__req,		\
@@ -390,8 +390,8 @@ struct PVFS_servreq_io
 			     __datafile_nr,	\
 			     __datafile_ct,	\
 			     __io_dist,		\
-			     __io_req,		\
-			     __io_req_off)	\
+			     __file_req,		\
+			     __file_req_off)	\
 do {						\
     memset(&(__req), 0, sizeof(__req));		\
     (__req).op                 = PVFS_SERV_IO;	\
@@ -403,8 +403,8 @@ do {						\
     (__req).u.io.iod_num       = (__datafile_nr);	\
     (__req).u.io.iod_count     = (__datafile_ct);	\
     (__req).u.io.io_dist       = (__io_dist);	\
-    (__req).u.io.io_req        = (__io_req);	\
-    (__req).u.io.io_req_offset = (__io_req_off);	\
+    (__req).u.io.file_req        = (__file_req);	\
+    (__req).u.io.file_req_offset = (__file_req_off);	\
 } while (0)			     
 
 struct PVFS_servresp_io

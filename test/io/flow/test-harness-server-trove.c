@@ -239,7 +239,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: failed to lookup dist.\n");
 		return(-1);
 	}
-	flow_d->io_req    = req;
+	flow_d->file_req    = req;
 	flow_d->tag       = 0;
 	flow_d->user_ptr  = NULL;
 

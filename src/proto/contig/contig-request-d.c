@@ -117,11 +117,11 @@ int do_decode_req(
 	/* set pointers to the request and dist information */
 	tmp_count = *(int *) (char_ptr + sizeof(struct PVFS_server_req));
 	char_ptr += sizeof(struct PVFS_server_req) + 2 * sizeof(int);
-	dec_msg->u.io.io_req = (PVFS_Request) char_ptr;
+	dec_msg->u.io.file_req = (PVFS_Request) char_ptr;
 	char_ptr += tmp_count;
 	dec_msg->u.io.io_dist = (PVFS_Dist *) char_ptr;
 	/* decode the request and dist */
-	ret = PINT_Request_decode(dec_msg->u.io.io_req);
+	ret = PINT_Request_decode(dec_msg->u.io.file_req);
 	if (ret < 0)
 	{
 	    free(dec_msg);

@@ -339,8 +339,8 @@ int PVFS_sys_readlink(
 
 int PVFS_sys_io(
     PVFS_pinode_reference pinode_refn,
-    PVFS_Request io_req, 
-    PVFS_offset io_req_offset,
+    PVFS_Request file_req, 
+    PVFS_offset file_req_offset,
     void* buffer,
     PVFS_size buffer_size,
     PVFS_credentials credentials, 

@@ -94,8 +94,8 @@ struct flow_descriptor
     /* can be used to force use of specific flow protocol */
     enum PVFS_flowproto_type type;        
 
-    PINT_Request *io_req;
-    PVFS_offset io_req_offset;
+    PINT_Request *file_req;
+    PVFS_offset file_req_offset;
     PINT_Request *mem_req;
     PINT_Request_file_data file_data;
 
@@ -115,7 +115,7 @@ struct flow_descriptor
     struct qlist_head sched_queue_link;	/* used by scheduler */
     void *flow_protocol_data;	/* used by flow protocols */
 
-    PINT_Request_state *io_req_state;
+    PINT_Request_state *file_req_state;
     PINT_Request_state *mem_req_state;
     PINT_Request_result result;
 #if 0

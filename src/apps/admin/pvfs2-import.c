@@ -58,7 +58,7 @@ int main(int argc, char **argv)
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
-    PVFS_Request io_req;
+    PVFS_Request file_req;
     int buffer_size;
 
     /* look at command line arguments */
@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 	blocklength = current_size;
 	displacement = total_written;
 	ret = PVFS_Request_indexed(1, &blocklength,
-	    &displacement, PVFS_BYTE, &io_req);
+	    &displacement, PVFS_BYTE, &file_req);
 	if(ret < 0)
 	{
 	    fprintf(stderr, "Error: PVFS_Request_indexed failure.\n");
@@ -196,7 +196,7 @@ int main(int argc, char **argv)
 	}
 
 	/* write out the data */
-	ret = PVFS_sys_write(pinode_refn, io_req, 0, buffer, buffer_size, 
+	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, buffer_size, 
 			    credentials, &resp_io);
 	if(ret < 0)
 	{
