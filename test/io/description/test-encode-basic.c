@@ -21,6 +21,8 @@
 #define SEGMAX 16
 #define BYTEMAX (1024*1024)
 
+void Dump_request(PVFS_Request req);
+
 int main(int argc, char **argv)
 {
 	PINT_Request *r;
@@ -30,7 +32,7 @@ int main(int argc, char **argv)
 	int pack_size = 0;
 
 	r = PVFS_BYTE;
-	Dump_request(r);
+	Dump_request(r); 
 
 	/* allocate a new request and pack the original one into it */
 	pack_size = PINT_REQUEST_PACK_SIZE(r);
