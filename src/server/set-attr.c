@@ -317,12 +317,6 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
     s_op->val.buffer    = &s_op->req->u.setattr.attr;
     s_op->val.buffer_sz = sizeof(struct PVFS_object_attr);
 
-    /* FOR NOW ZERO THE DIST. SIZE */
-    if (s_op->req->u.setattr.attr.objtype == PVFS_TYPE_METAFILE) {
-	s_op->req->u.setattr.attr.u.meta.dist_size = 0;
-	gossip_debug(SERVER_DEBUG, "  ** zeroing distribution size **\n");
-    }
-
     gossip_debug(SERVER_DEBUG,
 		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
 		 s_op->req->u.setattr.fs_id,
@@ -403,10 +397,8 @@ static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_
 
     gossip_debug(SERVER_DEBUG, "setattr state: write_metafile_distribution\n");
 
-#if 0
     /* distribution should take up non-negative space :) */
     assert(s_op->req->u.setattr.attr.u.meta.dist_size >= 0);
-#endif
 
     /* set up key and value structure for keyval write */
     s_op->key.buffer    = Trove_Common_Keys[METAFILE_DIST_KEY].key;
@@ -419,9 +411,10 @@ static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_
     s_op->val.buffer    = s_op->req->u.setattr.attr.u.meta.dist;
     s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.meta.dist_size;
 
+    /* TODO: figure out if we need a different packing mechanism here */
+    gossip_err("KLUDGE: storing distribution on disk in network encoded format.\n");
+    PINT_Dist_encode(NULL, s_op->req->u.setattr.attr.u.meta.dist);    
 
-    /* TODO: ENABLE THIS WHEN DISTRIBUTIONS ARE CORRECTLY PASSED IN */
-#if 0
     gossip_debug(SERVER_DEBUG,
 		 "  writing distribution (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
 		 s_op->req->u.setattr.fs_id,
@@ -441,9 +434,6 @@ static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_
 					  ret,
 					  &j_id);
     return(job_post_ret);
-#else
-    return 1;
-#endif
 }
 
 /*

@@ -292,6 +292,11 @@ static int getattr_read_metafile_datafile_handles(state_action_struct *s_op, job
 
     /* NOTE: ALLOCATING MEMORY HERE */
     s_op->resp->u.getattr.attr.u.meta.dfh = malloc(nr_datafiles * sizeof(PVFS_handle));
+    if(!s_op->resp->u.getattr.attr.u.meta.dfh)
+    {
+	ret->error_code = -errno;
+	return(1);
+    }
 
     s_op->val.buffer    = s_op->resp->u.getattr.attr.u.meta.dfh;
     s_op->val.buffer_sz = nr_datafiles * sizeof(PVFS_handle);
@@ -323,13 +328,26 @@ static int getattr_read_metafile_datafile_handles(state_action_struct *s_op, job
  */
 static int getattr_read_metafile_distribution(state_action_struct *s_op, job_status_s *ret)
 {
-    /* TODO: IMPLEMENT THIS ONCE DISTRIBUTIONS ARE BEING PASSED ACROSS THE WIRE */
-#if 0
     int job_post_ret;
     job_id_t i;
 
     s_op->key.buffer    = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
+
+    /* should be some distribution information. */
+    assert(s_op->resp->u.getattr.attr.u.meta.dist_size > 0);
+
+    /* NOTE: allocating memory here, free'd in last state */
+    s_op->resp->u.getattr.attr.u.meta.dist =
+	malloc(s_op->resp->u.getattr.attr.u.meta.dist_size);
+    if(!s_op->resp->u.getattr.attr.u.meta.dist)
+    {
+	ret->error_code = -errno;
+	return(1);
+    }
+
+    s_op->val.buffer    = s_op->resp->u.getattr.attr.u.meta.dist;
+    s_op->val.buffer_sz = s_op->resp->u.getattr.attr.u.meta.dist_size;
 
     job_post_ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
 					 s_op->req->u.getattr.handle,
@@ -341,8 +359,6 @@ static int getattr_read_metafile_distribution(state_action_struct *s_op, job_sta
 					 ret,
 					 &i);
     return job_post_ret;
-#endif
-    return 1;
 }
 
 /*
@@ -367,6 +383,11 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
     a_p = &s_op->resp->u.getattr.attr;
     
+    /* TODO: figure out if we need a different packing mechanism here */
+    gossip_err("KLUDGE: reading distribution on disk in network encoded format.\n");
+    PINT_Dist_decode(a_p->u.meta.dist, NULL);    
+
+
     gossip_debug(SERVER_DEBUG,
 		 "  sending attrs (owner = %d, group = %d, perms = %o, type = %d)\n",
 		 a_p->owner,
@@ -377,20 +398,20 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
     /* Prepare the message */
     s_op->resp->status = ret->error_code;
 
-    /* TODO: ADD IN SIZE OF DISTRIBUTION INFO, IF ANY */
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
     if (a_p->objtype == PVFS_TYPE_METAFILE) {
 	gossip_debug(SERVER_DEBUG,
 		     "  also returning %d datafile handles\n",
 		     a_p->u.meta.nr_datafiles);
 
-	s_op->resp->rsize += a_p->u.meta.nr_datafiles * sizeof(PVFS_handle);
+	s_op->resp->rsize += (a_p->u.meta.nr_datafiles *
+	    sizeof(PVFS_handle)) + a_p->u.meta.dist_size;
     }
 
     gossip_debug(SERVER_DEBUG,
 		 "  sending status %d, rsize = %d\n",
 		 s_op->resp->status,
-		 s_op->resp->rsize);
+		 (int)s_op->resp->rsize);
 
     job_post_ret = PINT_encode(s_op->resp,
 			       PINT_ENCODE_RESP,
@@ -497,6 +518,7 @@ static int getattr_cleanup(state_action_struct *s_op, job_status_s *ret)
     /* if this is a metafile, we allocated space for the datafile handles; free that. */
     if (s_op->resp->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) {
 	free(s_op->resp->u.getattr.attr.u.meta.dfh);
+	free(s_op->resp->u.getattr.attr.u.meta.dist);
     }
 
     /* free response */
