@@ -51,11 +51,6 @@ int pint_serv_getconfig(struct PVFS_server_req_s **req_job,
 			struct PVFS_server_resp_s **resp_job,void *req,
 			PVFS_credentials credentials,bmi_addr_t *server);
 
-int PINT_server_send_req(bmi_addr_t addr,
-			 struct PVFS_server_req_s *req_p,
-			 bmi_size_t max_resp_sz,
-			 struct PINT_decoded_msg *decoded_p);
-
 int PINT_send_req_array(bmi_addr_t* addr_array,
     struct PVFS_server_req_s* req_array,
     bmi_size_t max_resp_size,
