@@ -139,6 +139,9 @@ int main(int argc, char **argv)
 		bytemax = BYTEMAX;
 
 		/* process request */
+		/* note that bytemax is exactly large enough to hold all of the
+		 * data that I should find here
+		 */
 		retval = PINT_Process_request(rs1, &rf1, &segmax,
 			offset_array, size_array, &offset, &bytemax, 
 			&eof_flag, PINT_SERVER);
@@ -185,6 +188,9 @@ int main(int argc, char **argv)
 		bytemax = BYTEMAX;
 
 		/* process request */
+		/* note that bytemax is exactly large enough to hold all of the
+		 * data that I should find here
+		 */
 		retval = PINT_Process_request(rs2, &rf2, &segmax,
 			offset_array, size_array, &offset, &bytemax, 
 			&eof_flag, PINT_SERVER);
@@ -229,6 +235,9 @@ int main(int argc, char **argv)
 		bytemax = BYTEMAX;
 
 		/* process request */
+		/* note that bytemax is exactly large enough to hold all of the
+		 * data that I should find here
+		 */
 		retval = PINT_Process_request(rs3, &rf3, &segmax,
 			offset_array, size_array, &offset, &bytemax, 
 			&eof_flag, PINT_SERVER);
@@ -274,6 +283,9 @@ int main(int argc, char **argv)
 		bytemax = BYTEMAX;
 
 		/* process request */
+		/* note that bytemax is exactly large enough to hold all of the
+		 * data that I should find here
+		 */
 		retval = PINT_Process_request(rs4, &rf4, &segmax,
 			offset_array, size_array, &offset, &bytemax, 
 			&eof_flag, PINT_SERVER);
