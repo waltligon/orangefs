@@ -176,14 +176,14 @@ int PVFS_sys_finalize(
   longer pathname. (i.e. partial path symlink resolution)
 
   These values dictate what to do when the final object
-  looked up is a symlink.  Using LOOKUP_LINK_NO_FOLLOW,
+  looked up is a symlink.  Using PVFS2_LOOKUP_LINK_NO_FOLLOW,
   the symlink object (i.e. handle) will be returned.
-  Using LOOKUP_LINK_FOLLOW, the symlink target will be
+  Using PVFS2_LOOKUP_LINK_FOLLOW, the symlink target will be
   continue to be resolved until a non symlink object type
   is resolved -- and this resolved object will be returned
 */
-#define LOOKUP_LINK_NO_FOLLOW 0
-#define LOOKUP_LINK_FOLLOW    1
+#define PVFS2_LOOKUP_LINK_NO_FOLLOW 0
+#define PVFS2_LOOKUP_LINK_FOLLOW    1
 
 int PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,

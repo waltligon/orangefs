@@ -154,7 +154,7 @@ int main(int argc, char **argv)
     printf("\n(5) Verifying that root handle is owned by one server...\n");    
 
     ret = PVFS_sys_lookup(cur_fs, "/", creds,
-                          &resp_lookup, LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if(ret != 0)
     {
 	PVFS_perror("PVFS_sys_lookup", ret);

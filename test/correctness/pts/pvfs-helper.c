@@ -67,7 +67,7 @@ int get_root(PVFS_fs_id fs_id, PVFS_pinode_reference *pinode_refn)
 
         printf("looking up the root handle for fsid = %d\n", fs_id);
         ret = PVFS_sys_lookup(fs_id, root, credentials,
-                              &resp_look, LOOKUP_LINK_NO_FOLLOW);
+                              &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
         if (ret < 0)
         {
             printf("Lookup failed with errcode = %d\n", ret);
@@ -168,7 +168,7 @@ int lookup_name(PVFS_pinode_reference pinode_refn, char *name,
 
     ret = PVFS_sys_lookup(pinode_refn.fs_id, name,
                           credentials, &resp_lookup,
-                          LOOKUP_LINK_NO_FOLLOW);
+                          PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
        printf("Lookup failed with errcode = %d\n", ret);

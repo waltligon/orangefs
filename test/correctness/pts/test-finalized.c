@@ -53,7 +53,7 @@ static int test_lookup(void)
     credentials.gid = 100;
 
     ret = PVFS_sys_lookup(-1, name, credentials,
-                          &resp_lookup, LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     return ret;
 }
 
@@ -89,7 +89,7 @@ static int test_getattr(void)
 
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
-             &resp_lookup, LOOKUP_LINK_NO_FOLLOW)) < 0)
+             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
 	return ret;
@@ -144,7 +144,7 @@ static int test_mkdir(void)
     credentials.gid = 100;
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
-             &resp_lookup, LOOKUP_LINK_NO_FOLLOW)) < 0)
+             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
 	return -1;
@@ -200,7 +200,7 @@ static int test_readdir(void)
     credentials.gid = 100;
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
-             &resp_lookup, LOOKUP_LINK_NO_FOLLOW)) < 0)
+             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
 	return -1;
@@ -262,7 +262,7 @@ static int test_create(void)
     fs_id = pvfs_helper.resp_init.fsid_list[0];
 
     ret = PVFS_sys_lookup(fs_id, "/", credentials,
-                          &resp_look, LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
@@ -304,7 +304,7 @@ static int test_remove(void)
     fs_id = pvfs_helper.resp_init.fsid_list[0];
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials,
-                          &resp_look, LOOKUP_LINK_NO_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
@@ -379,7 +379,7 @@ static int test_read(void)
     fs_id = pvfs_helper.resp_init.fsid_list[0];
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials,
-                          &resp_lk, LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
 	debug_printf("test_pvfs_datatype_hvector: lookup failed "
@@ -428,7 +428,7 @@ static int test_write(void)
     fs_id = pvfs_helper.resp_init.fsid_list[0];
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials,
-                          &resp_lk, LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
 	debug_printf("test_pvfs_datatype_hvector: lookup failed "

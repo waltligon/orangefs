@@ -61,7 +61,7 @@ int main(int argc,char **argv)
 	name = filename;
 	fs_id = resp_init.fsid_list[0];
 	ret = PVFS_sys_lookup(fs_id, name, credentials,
-                              &resp_look, LOOKUP_LINK_NO_FOLLOW);
+                              &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);

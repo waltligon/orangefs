@@ -156,7 +156,7 @@ int main(int argc, char **argv)
     strcpy(&(lk_name[1]), str_buf);
 
     ret = PVFS_sys_lookup(lk_fs_id, lk_name, credentials,
-                          &resp_lookup, LOOKUP_LINK_NO_FOLLOW);
+                          &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_lookup", ret);

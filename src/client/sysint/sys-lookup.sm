@@ -284,7 +284,7 @@ static int lookup_check_completion(PINT_client_sm *sm_p,
       3) need to query another meta server to continue resolution
       4) error, bad lookup (entry cannot be resolved)
     */
-    if (sm_p->u.lookup.resolve_symlink == LOOKUP_LINK_FOLLOW)
+    if (sm_p->u.lookup.resolve_symlink == PVFS2_LOOKUP_LINK_FOLLOW)
     {
         js_p->error_code = LOOKUP_SYMLINK;
         sm_p->u.lookup.resolve_symlink = 0;
@@ -522,7 +522,7 @@ static int lookup_msg_comp_fn(void *v_p,
               as long as we set this flag
             */
             sm_p->u.lookup.resolve_symlink = sm_p->u.lookup.follow_link;
-            if (sm_p->u.lookup.resolve_symlink == LOOKUP_LINK_NO_FOLLOW)
+            if (sm_p->u.lookup.resolve_symlink == PVFS2_LOOKUP_LINK_NO_FOLLOW)
             {
                 /* store final symlink refn into respose */
                 sm_p->u.lookup.lookup_resp->pinode_refn =

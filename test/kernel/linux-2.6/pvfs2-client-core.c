@@ -148,7 +148,7 @@ static int service_create_request(
                                           parent_refn,
                                           in_upcall->credentials,
                                           &lk_response,
-                                          LOOKUP_LINK_NO_FOLLOW);
+                                          PVFS2_LOOKUP_LINK_NO_FOLLOW);
                 if (ret != 0)
                 {
                     gossip_err("lookup on existing file failed; "

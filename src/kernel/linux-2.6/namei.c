@@ -94,7 +94,7 @@ struct dentry *pvfs2_lookup(
     /* if we're at a symlink, should we follow it? */
     new_op->upcall.req.lookup.sym_follow =
         ((nd && (nd->flags & LOOKUP_FOLLOW)) ?
-         LOOKUP_LINK_FOLLOW : LOOKUP_LINK_NO_FOLLOW);
+         PVFS2_LOOKUP_LINK_FOLLOW : PVFS2_LOOKUP_LINK_NO_FOLLOW);
 
     pvfs2_print("pvfs2: pvfs2_lookup -- follow %s? %s\n",
                 dentry->d_name.name,

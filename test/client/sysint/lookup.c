@@ -23,7 +23,7 @@ int main(int argc,char **argv)
 	char *filename;
 	int name_sz;
 	int ret = -1;
-        int follow_link = LOOKUP_LINK_NO_FOLLOW;
+        int follow_link = PVFS2_LOOKUP_LINK_NO_FOLLOW;
 	pvfs_mntlist mnt = {0,NULL};
 	PVFS_fs_id fs_id;
 	char* name;
@@ -36,7 +36,7 @@ int main(int argc,char **argv)
 	{
             if ((argc == 3) && (atoi(argv[2]) == 1))
             {
-                follow_link = LOOKUP_LINK_FOLLOW;
+                follow_link = PVFS2_LOOKUP_LINK_FOLLOW;
                 goto lookup_continue;
             }
             printf("USAGE: %s /path/to/lookup [ 1 ]\n", argv[0]);
@@ -74,7 +74,7 @@ int main(int argc,char **argv)
 	fs_id = resp_init.fsid_list[0];
 	printf("looking up the root handle for fsid = %d\n", fs_id);
 	ret = PVFS_sys_lookup(fs_id, name, credentials,
-                              &resp_look, LOOKUP_LINK_NO_FOLLOW);
+                              &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
