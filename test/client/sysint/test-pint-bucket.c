@@ -16,7 +16,6 @@
 #include "pvfs2-util.h"
 
 #define MAX_NUM_FS                   67
-#define MAX_BMI_ADDR_LEN            512
 
 /* determines how many times to call '_get_next_meta' */
 #define NUM_META_SERVERS_TO_QUERY     3
@@ -54,7 +53,7 @@ int main(int argc, char **argv)
     int fs_ids[MAX_NUM_FS] = {0};
     int num_meta_servers = 0, num_data_servers = 0;
     bmi_addr_t addr, m_addr, d_addr[NUM_DATA_SERVERS_TO_QUERY];
-    char server_name[MAX_BMI_ADDR_LEN] = {0};
+    char server_name[PVFS_MAX_SERVER_ADDR_LEN] = {0};
     int test_handles_verified[NUM_TEST_HANDLES] = {0};
     PVFS_handle_extent_array meta_handle_extent_array;
     PVFS_handle_extent_array data_handle_extent_array[NUM_DATA_SERVERS_TO_QUERY];
@@ -202,7 +201,7 @@ int main(int argc, char **argv)
         printf("\n");
         for(j = 0; j < NUM_TEST_HANDLES; j++)
         {
-            if (PINT_bucket_get_server_name(server_name,MAX_BMI_ADDR_LEN,
+            if (PINT_bucket_get_server_name(server_name,PVFS_MAX_SERVER_ADDR_LEN,
                                             test_handles[j],fs_ids[i]))
             {
                 printf("Error retrieving name of server managing handle "

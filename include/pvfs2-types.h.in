@@ -43,6 +43,13 @@ typedef uint32_t PVFS_gid;
 typedef int64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 
+/* some limits */
+/* TODO: is there a better place for this stuff?  maybe merge with
+ * limits at the top of pvfs2-req-proto.h somewhere?
+ */
+/* max length of BMI style URI's for identifying servers */
+#define PVFS_MAX_SERVER_ADDR_LEN 256
+
 /* contiguous range of handles */
 struct PVFS_handle_extent_s
 {

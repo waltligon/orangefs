@@ -21,13 +21,6 @@
 #include "extent-utils.h"
 #include "pint-bucket.h"
 
-/*
-  FIXME: is there a limits.h file that defines the max length
-  of a legal bmi_server URL?  If so, replace MAX_BMI_ADDR_LEN.
-  If not, why not?
-*/
-#define MAX_BMI_ADDR_LEN  512
-
 struct qhash_table *PINT_fsid_config_cache_table = NULL;
 
 /* these are based on code from src/server/request-scheduler.c */
@@ -414,10 +407,10 @@ int PINT_bucket_map_to_server(
 	PVFS_fs_id fsid)
 {
     int ret = -EINVAL;
-    char bmi_server_addr[MAX_BMI_ADDR_LEN] = {0};
+    char bmi_server_addr[PVFS_MAX_SERVER_ADDR_LEN] = {0};
 
     ret = PINT_bucket_get_server_name(bmi_server_addr,
-                                      MAX_BMI_ADDR_LEN,handle,fsid);
+                                      PVFS_MAX_SERVER_ADDR_LEN,handle,fsid);
 
     return (!ret ? BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
 }

@@ -25,6 +25,8 @@ typedef PVFS_id_gen_t bmi_addr_t;	/* network address handle */
  * error codes look like */
 typedef int32_t bmi_error_code_t;	/* error code information */
 
+#define BMI_MAX_ADDR_LEN PVFS_MAX_SERVER_ADDR_LEN
+
 /* BMI method initialization flags */
 enum
 {

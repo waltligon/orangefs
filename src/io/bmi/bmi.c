@@ -1229,6 +1229,11 @@ int BMI_addr_lookup(bmi_addr_t * new_addr,
     int ret = -1;
     int i = 0;
 
+    if((strlen(id_string)+1) > BMI_MAX_ADDR_LEN)
+    {
+	return(-ENAMETOOLONG);
+    }
+
     gen_mutex_lock(&interface_mutex);
 
     /* set the addr to zero in case we fail */
