@@ -14,6 +14,7 @@
 #define PINT_SERVER 1
 #define PINT_CLIENT 2
 #define PINT_CKSIZE 3
+#define PINT_CKSZ2  4
 
 /* PVFS Request Processing Stuff */
 
