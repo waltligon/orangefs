@@ -144,20 +144,25 @@ dnl
 dnl make sure that required db development package is installed
 dnl and valid; path can be specified at configure time
 dnl
-DB_PATH=""
 
 AC_ARG_WITH(db,
-            [  --with-db=<dir>         Location of installed DB package (default=/usr)],
-            DB_PATH=$withval,
-            DB_PATH="/usr")
+	[  --with-db=<dir>         Location of installed DB package (default=/usr)],
+	LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="$CFLAGS} -I$withval/include")
 
-AC_CHECK_FILE("$DB_PATH/include/db.h", ,
-              AC_MSG_ERROR("cannot find db.h header file.  try --with-db."))
-
-AC_CHECK_FILE("$DB_PATH/lib/libdb.so", ,
-             AC_MSG_ERROR("cannot find db library.  try --with-db."))
-
-AC_SUBST(DB_PATH)
+AC_MSG_CHECKING("for db library")
+oldlibs=$LIBS
+for lib in db4  db3  db  notfound; do
+	LIBS="${oldlibs} -l$lib"
+	AC_TRY_LINK(
+		[#include <db.h>],
+		[DB *dbp; db_create(&dbp, NULL, 0);],
+		[break])
+done
+if test x$lib == xnotfound ; then
+	AC_MSG_ERROR(could not find DB libraries)
+else
+	AC_MSG_RESULT($lib)
+fi
 
 dnl See if we have a new enough version of Berkeley DB; needed for
 dnl    compilation of trove-dbpf component
