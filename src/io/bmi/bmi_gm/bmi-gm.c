@@ -2781,19 +2781,7 @@ static int receive_cycle(int timeout)
     global_timeout_flag = 0;
     do
     {
-	if (timeout > 0)
-	{
-	    /* this call is in place to get around the fact that
-	     * gm_blocking_receive() never seems to sleep (in GM 1.5.1)
-	     * if I have an alarm set.
-	     */
-	    /* TODO: this should be fixed now; try the other call */
-	    poll_event = gm_blocking_receive_no_spin(local_port);
-	}
-	else
-	{
-	    poll_event = gm_receive(local_port);
-	}
+	poll_event = gm_receive(local_port);
 
 	switch (gm_ntohc(poll_event->recv.type))
 	{
