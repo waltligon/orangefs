@@ -283,11 +283,28 @@ PINT_state_array_values *PINT_state_machine_locate(PINT_server_op *s_op)
 
 PINT_state_array_values *PINT_pop_state(PINT_server_op *s)
 {
-    return NULL;
+    if (s->stackptr <= 0)
+    {
+	gossip_err("State machine return on empty stack\n");
+	return NULL;
+    }
+    else
+    {
+	return s->state_stack[--s->stackptr];
+    }
 }
 
 void PINT_push_state(PINT_server_op *s, PINT_state_array_values *p)
 {
+    if (s->stackptr > PINTSTACKSIZE)
+    {
+	gossip_err("State machine jump on full stack\n");
+	return;
+    }
+    else
+    {
+	s->state_stack[s->stackptr++] = p;
+    }
 }
 
 /*

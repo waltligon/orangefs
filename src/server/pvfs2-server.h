@@ -7,6 +7,8 @@
 #ifndef __PVFS2_SERVER_H
 #define __PVFS2_SERVER_H
 
+#define PINTSTACKSIZE 8  /* size of stack for nested state machines */
+
 typedef union PINT_state_array_values PINT_state_array_values;
 
 /* Some config values for the prototype pvfs2 server */
@@ -92,6 +94,8 @@ typedef struct PINT_server_op
     bmi_addr_t addr; /* set in initialize_unexpected */
     bmi_msg_tag_t tag; /* set in initialize_unexpected */
     PINT_state_array_values *current_state; /* initialized in initialize_unexpected */
+    PINT_state_array_values *state_stack[PINTSTACKSIZE]; 
+    int stackptr; /* stack of contexts for nested state machines */
     struct PVFS_server_req_s *req; /* req == decoded.buffer after initialize_unexpected */
     struct PVFS_server_resp_s *resp; /* resp space allocated, memset(0) in initialize_unexpected
 				      *
