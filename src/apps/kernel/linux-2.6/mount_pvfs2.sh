@@ -7,7 +7,7 @@ fi
 
 if [ "`lsmod | grep -c pvfs2`" = "0" ]; then
    echo "Loading the pvfs2 module"
-   insmod ../../../src/kernel/linux-2.6/pvfs2.ko $1
+   insmod ../../../../src/kernel/linux-2.6/pvfs2.ko $1
 fi
 
 CUR_DEV="pvfs2-flow"
@@ -25,7 +25,7 @@ if [ ! -d /tmp/mnt ]; then
 fi
 
 echo "Starting pvfs2-client"
-../../../src/apps/kernel/linux-2.6/pvfs2-client -p ../../../src/apps/kernel/linux-2.6/pvfs2-client-core
+./pvfs2-client -p ./pvfs2-client-core
 
 if [ "`mount | grep -c pvfs2`" = "0" ]; then
    echo "Mounting pvfs2 on /tmp/mnt"
