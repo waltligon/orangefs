@@ -13,6 +13,7 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
+#include "str_utils.h"
 
 /* TODO: DO WE NEED THESE TO BE HERE?  WHAT'S THE RIGHT WAY TO DO THIS? */
 enum 
@@ -20,12 +21,6 @@ enum
     STATE_ENOTDIR = 22,
     STATE_NOMORESEGS = 23
 };
-
-/* TODO: PUT THESE IN A HEADER SOMEWHERE */
-extern int PINT_string_count_segments(char *pathname);
-extern int PINT_string_next_segment(char *pathname,
-				    char **inout_segp,
-				    void **opaquep);
 
 static int lookup_init(PINT_server_op *s_op, job_status_s *ret);
 static int lookup_cleanup(PINT_server_op *s_op, job_status_s *ret);

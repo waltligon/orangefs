@@ -4,6 +4,9 @@
  * See COPYING in top-level directory.
  */
 
+#ifndef __HELPER_H
+#define __HELPER_H
+
 #define ATTR_UID 1
 #define ATTR_GID 2
 #define ATTR_PERM 4
@@ -15,11 +18,9 @@
 #define MAX_NUM_DIRENTS    512
 #define MAX_PVFS_PATH_LEN  512
 
-extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
-extern int PINT_get_base_dir(char *pathname,
-                             char *out_base_dir, int out_max_len);
-extern int PINT_remove_base_dir(char *pathname,
-                                char *out_dir, int out_max_len);
+#include "str_utils.h"
 
 /* make uid, gid and perms passed in later */
 PVFS_handle lookup_parent_handle(char *filename, PVFS_fs_id fs_id);
+
+#endif

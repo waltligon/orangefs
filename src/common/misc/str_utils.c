@@ -8,6 +8,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include "str_utils.h"
+
 /* PINT_string_count_segments()
  *
  * Count number of segments in a path.
