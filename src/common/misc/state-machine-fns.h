@@ -7,6 +7,8 @@
 #ifndef __STATE_MACHINE_FNS_H
 #define __STATE_MACHINE_FNS_H
 
+#include <assert.h>
+
 #include "gossip.h"
 
 /* STATE-MACHINE-FNS.H

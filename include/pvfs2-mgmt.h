@@ -105,6 +105,15 @@ int PVFS_mgmt_toggle_admin_mode(
     PVFS_credentials credentials,
     int on_flag);
 
+int PVFS_mgmt_iterate_handles_list(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    PVFS_handle** handle_matrix,
+    int* handle_count_array,
+    PVFS_ds_position* position_array,
+    PVFS_id_gen_t* addr_array,
+    int server_count);
+
 #endif /* __PVFS2_MGMT_H */
 
 /*
