@@ -370,6 +370,14 @@ static int server_initialize(
 {
     int ret = 0, i = 0;
 
+    /* handle backgrounding, setting up working directory, and so on. */
+    ret = server_setup_process_environment(server_background);
+    if (ret < 0)
+    {
+	gossip_err("Error: Could not start server; aborting.\n");
+        return ret;
+    }
+
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
     if (ret < 0)
@@ -404,14 +412,21 @@ static int server_initialize(
     gossip_debug(SERVER_DEBUG,
                  "Initialization completed successfully.\n");
 
-    /* Handle backgrounding, setting up working directory, and so on. */
-    ret = server_setup_process_environment(server_background);
-    if (ret < 0)
+    /* finally, redirect gossip to specified target if backgrounded */
+    if (server_background)
     {
-	gossip_err("Error: Could not start server; aborting.\n");
-        return ret;
-    }
+        freopen("/dev/null", "r", stdin);
+        freopen("/dev/null", "w", stdout);
+        freopen("/dev/null", "w", stderr);
 
+        assert(server_config.logfile != NULL);
+        if (gossip_enable_file(server_config.logfile, "a") < 0)
+        {
+            gossip_lerr("error opening log file %s\n",
+                        server_config.logfile);
+            exit(3);
+        }
+    }
     return ret;
 }
 
@@ -449,25 +464,8 @@ static int server_setup_process_environment(int background)
 	    gossip_lerr("error in setsid() system call.  aborting.\n");
 	    exit(2);
 	}
-        assert(new_pid == getpid());
-	server_controlling_pid = new_pid;
-
-        freopen("/dev/null", "r", stdin);
-        freopen("/dev/null", "w", stdout);
-        freopen("/dev/null", "w", stderr);
-
-        assert(server_config.logfile != NULL);
-	if (gossip_enable_file(server_config.logfile, "a") < 0)
-        {
-	    gossip_lerr("error opening log file %s\n",
-                        server_config.logfile);
-	    exit(3);
-	}
     }
-    else 
-    {
-	server_controlling_pid = getpid();
-    }
+    server_controlling_pid = getpid();
     return 0;
 }
 
