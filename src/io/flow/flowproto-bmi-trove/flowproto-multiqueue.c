@@ -421,6 +421,14 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	flow_data->prealloc_array[0].buffer = flow_d->dest.u.mem.buffer;
 	flow_data->prealloc_array[0].bmi_callback.fn =
 	    bmi_to_mem_callback_wrapper;
+	/* put all of the buffers on empty list, we don't really do any
+	 * queueing for this type of flow
+	 */
+	for(i=0; i<BUFFERS_PER_FLOW; i++)
+	{
+	    qlist_add_tail(&flow_data->prealloc_array[i].list_link,
+		&flow_data->empty_list);
+	}
 	gen_mutex_lock(&flow_data->flow_mutex);
 	bmi_to_mem_callback_fn(&(flow_data->prealloc_array[0]), 0, 0);
 	if(flow_data->parent->state == FLOW_COMPLETE)
@@ -439,6 +447,14 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	flow_data->prealloc_array[0].buffer = flow_d->src.u.mem.buffer;
 	flow_data->prealloc_array[0].bmi_callback.fn =
 	    mem_to_bmi_callback_wrapper;
+	/* put all of the buffers on empty list, we don't really do any
+	 * queueing for this type of flow
+	 */
+	for(i=0; i<BUFFERS_PER_FLOW; i++)
+	{
+	    qlist_add_tail(&flow_data->prealloc_array[i].list_link,
+		&flow_data->empty_list);
+	}
 	gen_mutex_lock(&flow_data->flow_mutex);
 	mem_to_bmi_callback_fn(&(flow_data->prealloc_array[0]), 0, 0);
 	if(flow_data->parent->state == FLOW_COMPLETE)
