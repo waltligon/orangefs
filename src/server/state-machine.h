@@ -10,16 +10,16 @@
 #ifndef __PVFS_SERVER_STATE
 #define __PVFS_SERVER_STATE
 
-#include <pvfs2-req-proto.h>
-#include <trove.h>
-#include <job.h>
-#include <bmi.h>
-#include <errno.h>
-#include <gossip.h>
-#include <pvfs2-debug.h>
-#include <pvfs2-storage.h>
-#include <PINT-reqproto-encode.h>
-#include <pvfs2-server.h>
+#include "pvfs2-req-proto.h"
+#include "trove.h"
+#include "job.h"
+#include "bmi.h"
+#include "errno.h"
+#include "gossip.h"
+#include "pvfs2-debug.h"
+#include "pvfs2-storage.h"
+#include "PINT-reqproto-encode.h"
+#include "pvfs2-server.h"
 
 typedef struct PINT_state_machine_s
 {
@@ -69,7 +69,5 @@ PINT_state_array_values *PINT_state_machine_locate(PINT_server_op*);
 int PINT_state_machine_initialize_unexpected(PINT_server_op*, job_status_s *ret);
 PINT_state_array_values *PINT_pop_state(PINT_server_op *s);
 void PINT_push_state(PINT_server_op *s, PINT_state_array_values *p);
-
-#include <pvfs2-server.h>
 
 #endif /* __PVFS_SERVER_STATE */
