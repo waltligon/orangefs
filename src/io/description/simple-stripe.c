@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <pvfs2-types.h>
 
 #include <simple-stripe.h>
@@ -52,6 +53,8 @@ static PVFS_size contiguous_length (PVFS_Dist_params *dparam,
 	return dparam->strip_size - (physical_offset % dparam->strip_size);
 }
 
+#if 0
+/* this is old stuff that will probably be removed shortly - WBL */
 static PVFS_size server_number (PVFS_Dist_params *dparam,
 		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset logical_offset)
 {
@@ -63,6 +66,7 @@ static PVFS_size contiguous_size (PVFS_Dist_params *dparam,
 {
 	return dparam->strip_size - (logical_offset % dparam->strip_size);
 }
+#endif
 
 static void encode (PVFS_Dist_params *dparam, void *buffer)
 {

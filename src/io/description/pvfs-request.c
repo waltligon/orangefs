@@ -4,8 +4,11 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.1 2003-01-10 18:37:29 pcarns Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.2 2003-01-15 19:36:45 walt Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.1  2003/01/10 18:37:29  pcarns
+// brought Walt's io description code over from the old pvfs2 tree
+//
 // Revision 1.2  2003/01/09 20:13:15  walt
 // more changes to dist and req - filling out stuff for first major test
 //
@@ -354,7 +357,7 @@ int PVFS_Request_commit(PVFS_Request *reqp)
 			return PVFS_ERR_REQ;
   		}   
 		/* pack the request */
-  		PINT_Request_commit(req, region, &index);
+  		PINT_Request_commit(region, req, &index);
 	}
 	/* return the pointer to the memory region */
 	*reqp = region;
@@ -391,21 +394,22 @@ int PVFS_Pack_size(int incount, PVFS_Request request, PVFS_Comm comm, int *size)
 */
 
 
-int PVFS_Dump_request(PVFS_Request req)
+void PVFS_Dump_request(PVFS_Request req)
 {
 	fprintf(stderr,"**********************\n");
-	fprintf(stderr,"offset:\t\t%d\n",req->offset);
-	fprintf(stderr,"num_ereqs:\t%d\n",req->num_ereqs);
-	fprintf(stderr,"num_blocks:\t%d\n",req->num_blocks);
-	fprintf(stderr,"stride:\t\t%d\n",req->stride);
-	fprintf(stderr,"ub:\t\t%d\n",req->ub);
-	fprintf(stderr,"lb:\t\t%d\n",req->lb);
-	fprintf(stderr,"agg_size:\t%d\n",req->aggregate_size);
-	fprintf(stderr,"num_chunk:\t%d\n",req->num_contig_chunks);
-	fprintf(stderr,"depth:\t\t%d\n",req->depth);
-	fprintf(stderr,"num_nest:\t%d\n",req->num_nested_req);
-	fprintf(stderr,"commit:\t\t%d\n",req->committed);
-	fprintf(stderr,"ereq:\t\t%x\n",req->ereq);
-	fprintf(stderr,"sreq:\t\t%x\n",req->sreq);
+	fprintf(stderr,"address:\t%x\n",(unsigned int)req);
+	fprintf(stderr,"offset:\t\t%d\n",(int)req->offset);
+	fprintf(stderr,"num_ereqs:\t%d\n",(int)req->num_ereqs);
+	fprintf(stderr,"num_blocks:\t%d\n",(int)req->num_blocks);
+	fprintf(stderr,"stride:\t\t%d\n",(int)req->stride);
+	fprintf(stderr,"ub:\t\t%d\n",(int)req->ub);
+	fprintf(stderr,"lb:\t\t%d\n",(int)req->lb);
+	fprintf(stderr,"agg_size:\t%d\n",(int)req->aggregate_size);
+	fprintf(stderr,"num_chunk:\t%d\n",(int)req->num_contig_chunks);
+	fprintf(stderr,"depth:\t\t%d\n",(int)req->depth);
+	fprintf(stderr,"num_nest:\t%d\n",(int)req->num_nested_req);
+	fprintf(stderr,"commit:\t\t%d\n",(int)req->committed);
+	fprintf(stderr,"ereq:\t\t%x\n",(int)req->ereq);
+	fprintf(stderr,"sreq:\t\t%x\n",(int)req->sreq);
 	fprintf(stderr,"**********************\n");
 }

@@ -74,8 +74,8 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 		PVFS_count32 *segs, PVFS_count32 segmax, PVFS_offset *offset_array,
 		PVFS_size *size_array, PVFS_boolean *eof_flag, PVFS_flag mode);
 
-/* pack request into a contiguous buffer */
-int PINT_Request_commit(PINT_Request *node, PINT_Request *region,
+/* pack request from node into a contiguous buffer pointed to by region */
+int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
 		      PVFS_count32 *index);
 
 /* encode packed request in place for sending over wire */
@@ -89,25 +89,25 @@ int PINT_Request_decode(struct PINT_Request *req);
 /* returns the number of bytes used by a contiguous packing of the
  * request struct pointed to by reqp
  */
-#define PINT_REQ_NUM_NESTED(reqp)\
+#define PINT_REQUEST_PACK_SIZE(reqp)\
 	(((reqp)->num_nested_req + 1) * sizeof(struct PINT_Request))
 
 /* returns true if the request struct pointed to by reqp is a packed
  * struct
  */
-#define PINT_REQ_IS_PACKED(reqp)\
+#define PINT_REQUEST_IS_PACKED(reqp)\
 	((reqp)->committed == 1)
 
 /* returns the number of contiguous memory regions referenced by the
  * request struct pointed to by reqp
  */
-#define PINT_REQ_NUM_CONTIG(reqp)\
+#define PINT_REQUEST_NUM_CONTIG(reqp)\
 	((reqp)->num_contig_chunks)
 
 /* returns the total number of bytes referenced by the struct pointed to
  * by reqp - bytes might not be contiguous
  */
-#define PINT_REQ_TOTAL_BYTES(reqp)\
+#define PINT_REQUEST_TOTAL_BYTES(reqp)\
 	((reqp)->aggregate_size)
 
 #endif /* __PINT_REQUEST_H */

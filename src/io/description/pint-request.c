@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <gossip.h>
 #include <pvfs2-types.h>
 #include <pvfs2-debug.h>
@@ -27,12 +28,11 @@ int PINT_Process_request(PINT_Request_state *req,
 	PVFS_offset *start_offset, PVFS_size *bytemax,
 	PVFS_boolean *eof_flag, PVFS_flag mode)
 {
-	void *temp_space;           /* temp copy of req state for size call */
+	void *temp_space = NULL;    /* temp copy of req state for size call */
 	PVFS_boolean seeking;       /* indicates we are seeking forward */
 	PVFS_boolean lvl_flag;      /* indicates level should be decremented */
 	PVFS_offset  contig_offset; /* temp for offset of a contig region */
 	PVFS_size    contig_size;   /* temp for size of a contig region */
-	PVFS_size    contig_return; /* temp for expected return from distribute */
 	PVFS_size    retval;        /* return value from calls to distribute */
 	PVFS_size    bytes_processed;
 	PVFS_count32 segs_processed;
@@ -383,7 +383,8 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
    PVFS_size   fraglen; /* length of physical strip contiguous on server */
 
 	gossip_debug(REQUEST_DEBUG,"\tPINT_Distribute\n");
-	gossip_debug(REQUEST_DEBUG,"\t\tof %lld sz %lld ix %d sm %d by %lld bm %d\n",
+	gossip_debug(REQUEST_DEBUG,
+			"\t\tof %lld sz %lld ix %d sm %d by %lld bm %lld\n",
 			offset, size, *segs, segmax, *bytes, bytemax);
 	orig_offset = offset;
 	orig_size = size;
@@ -467,7 +468,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 		if (mode == PINT_CKSIZE)
 		{
 			/* check size all we do is add up the sizes and count segs */
-			gossip_debug(REQUEST_DEBUG,"\t\t\tcheck size request sz %d\n",sz);
+			gossip_debug(REQUEST_DEBUG,"\t\t\tcheck size request sz %lld\n",sz);
 			(*segs)++;
 		}
 		else if (*segs > 0 &&
@@ -525,7 +526,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
  * offsets must reflect the current offsets and then write each struct 
  * to the contiguous memory region
  */
-int PINT_Request_commit(PINT_Request *node, PINT_Request *region,
+int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
 		PVFS_count32 *index)
 {
 	PVFS_count32 start_index = *index;
@@ -543,10 +544,10 @@ int PINT_Request_commit(PINT_Request *node, PINT_Request *region,
   
 	/* Copy node to contiguous region */
 	memcpy(&region[*index], node, sizeof(struct PINT_Request));
-	*index++;
+	*index = *index + 1;
 
 	/* Update ereq so that the relative positions are maintained */
-	child_index = PINT_Request_commit(node->ereq, region, index);
+	child_index = PINT_Request_commit(region, node->ereq, index);
 	if (child_index == -1)
 		region[start_index].ereq = NULL;
 	else
@@ -557,7 +558,7 @@ int PINT_Request_commit(PINT_Request *node, PINT_Request *region,
 		node->ereq->committed = child_index;
 
 	/* Update sreq so that the relative positions are maintained */
-	child_index = PINT_Request_commit(node->sreq, region, index);
+	child_index = PINT_Request_commit(region, node->sreq, index);
 	if (child_index == -1)
 		region[start_index].sreq = NULL;
 	else

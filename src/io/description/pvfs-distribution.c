@@ -15,7 +15,7 @@
  */
 PVFS_Dist *PVFS_Dist_create(char *name)
 {
-	int name_size;
+	//int name_size;
 	char *newname;
 	PVFS_Dist old_dist;
 	PVFS_Dist *new_dist;

@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <pvfs2-types.h>
 #include <pint-distribution.h>
 #include <pvfs-distribution.h>
