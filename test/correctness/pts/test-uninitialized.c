@@ -26,7 +26,7 @@ extern pvfs_helper_t pvfs_helper;
  * Postconditions: returns the error code given by lookup - thats if it doesn't segfault or other catostrophic failure
  * Hase 1 test cases
  */
-static int test_lookup(int testcase)
+static int test_lookup(void)
 {
     int fs_id, ret;
     PVFS_credentials credentials;
@@ -37,18 +37,13 @@ static int test_lookup(int testcase)
     name = (char *) malloc(sizeof(char) * 100);
     name = strcpy(name, "name");
 
-    if (initialize_sysint() < 0)
-    {
-	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
-	return -1;
-    }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = 9;
 
     credentials.uid = 100;
     credentials.gid = 100;
     credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
 
-    ret = PVFS_sys_lookup(-1, name, credentials, &resp_lookup);
+    ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup);
     return ret;
 }
 
@@ -57,7 +52,7 @@ static int test_lookup(int testcase)
  * Postconditions: returns error from getattr
  * Has 2 Test Cases
  */
-static int test_getattr(int testcase)
+static int test_getattr(void)
 {
     int fs_id, ret;
     PVFS_credentials credentials;
@@ -71,12 +66,7 @@ static int test_getattr(int testcase)
     name = (char *) malloc(sizeof(char) * 100);
     name = strcpy(name, "name");
 
-    if (initialize_sysint() < 0)
-    {
-	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
-	return -1;
-    }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = 9;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -91,21 +81,7 @@ static int test_getattr(int testcase)
     pinode_refn = resp_lookup.pinode_refn;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
-    switch (testcase)
-    {
-    case 0:
-	pinode_refn.handle = -1;
-	ret =
-	    PVFS_sys_getattr(pinode_refn, attrmask, credentials, &resp_getattr);
-	break;
-    case 1:
-	pinode_refn.fs_id = -1;
-	ret =
-	    PVFS_sys_getattr(pinode_refn, attrmask, credentials, &resp_getattr);
-	break;
-    default:
-	fprintf(stderr, "error, invlaid test case\n");
-    }
+    ret = PVFS_sys_getattr(pinode_refn, attrmask, credentials, &resp_getattr);
     return ret;
 }
 
@@ -113,7 +89,7 @@ static int test_getattr(int testcase)
  * Parameters: none
  * Postconditions:
  */
-static int test_setattr(int testcase)
+static int test_setattr(void)
 {
     return -2;
 }
@@ -123,7 +99,7 @@ static int test_setattr(int testcase)
  * Postconditions: returns the error returned by mkdir
  * Has 2 test cases
  */
-static int test_mkdir(int testcase)
+static int test_mkdir(void)
 {
     PVFS_pinode_reference parent_refn;
     uint32_t attrmask;
@@ -139,12 +115,7 @@ static int test_mkdir(int testcase)
     name = (char *) malloc(sizeof(char) * 100);
     name = strcpy(name, "name");
 
-    if (initialize_sysint() < 0)
-    {
-	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
-	return -1;
-    }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = 9;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -165,19 +136,7 @@ static int test_mkdir(int testcase)
     credentials.uid = 100;
     credentials.gid = 100;
 
-    switch (testcase)
-    {
-    case 0:
-	parent_refn.handle = -1;
-	ret = PVFS_sys_mkdir(name, parent_refn, attr, credentials, &resp_mkdir);
-	break;
-    case 1:
-	parent_refn.fs_id = -1;
-	ret = PVFS_sys_mkdir(name, parent_refn, attr, credentials, &resp_mkdir);
-	break;
-    default:
-	fprintf(stderr, "Error - no more cases\n");
-    }
+    ret = PVFS_sys_mkdir(name, parent_refn, attr, credentials, &resp_mkdir);
     return ret;
 }
 
@@ -186,7 +145,7 @@ static int test_mkdir(int testcase)
  * Postconditions: returns error code of readdir
  * Has 2 Test cases
  */
-static int test_readdir(int testcase)
+static int test_readdir(void)
 {
 
     int ret;
@@ -205,12 +164,7 @@ static int test_readdir(int testcase)
     name = (char *) malloc(sizeof(char) * 100);
     name = strcpy(name, "name");
 
-    if (initialize_sysint() < 0)
-    {
-	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
-	return -1;
-    }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = 9;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -229,21 +183,9 @@ static int test_readdir(int testcase)
     credentials.gid = 100;
     credentials.perms = 1877;
 
-    switch (testcase)
-    {
-    case 0:
-	pinode_refn.handle = -1;
-	ret =
-	    PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
-			     credentials, &resp_readdir);
-	break;
-    case 1:
-	pinode_refn.fs_id = -1;
-	ret =
-	    PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
-			     credentials, &resp_readdir);
-	break;
-    }
+    ret =
+	PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,
+			 &resp_readdir);
     return ret;
 }
 
@@ -252,7 +194,7 @@ static int test_readdir(int testcase)
  * Postconditions: returns error code of readdir
  * Has 2 test cases
  */
-static int test_create(int testcase)
+static int test_create(void)
 {
     int ret, fs_id;
     PVFS_object_attr attr;
@@ -269,12 +211,7 @@ static int test_create(int testcase)
     credentials.gid = 100;
     credentials.perms = 1877;
 
-    if (initialize_sysint() < 0)
-    {
-	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
-	return -1;
-    }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = 9;
 
     ret = PVFS_sys_lookup(fs_id, "/", credentials, &resp_look);
     if (ret < 0)
@@ -283,24 +220,9 @@ static int test_create(int testcase)
 	return (-1);
     }
 
-    switch (testcase)
-    {
-    case 0:
-	resp_look.pinode_refn.handle = -1;
-	ret =
-	    PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
-			    &resp_create);
-	break;
-    case 1:
-	resp_look.pinode_refn.fs_id = -1;
-	ret =
-	    PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
-			    &resp_create);
-	break;
-    default:
-	fprintf(stderr, "Error - incorect case number \n");
-	return -3;
-    }
+    ret =
+	PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
+			&resp_create);
     return ret;
 }
 
@@ -309,7 +231,7 @@ static int test_create(int testcase)
  * Postconditions: returns error code of readdir
  * Has 2 tset cases
  */
-static int test_remove(int testcase)
+static int test_remove(void)
 {
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
@@ -325,12 +247,7 @@ static int test_remove(int testcase)
     credentials.gid = 100;
     credentials.perms = 1877;
 
-    if (initialize_sysint() < 0)
-    {
-	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
-	return -1;
-    }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = 9;
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials, &resp_look);
     if (ret < 0)
@@ -338,19 +255,7 @@ static int test_remove(int testcase)
 	printf("Lookup failed with errcode = %d\n", ret);
 	return (-1);
     }
-    switch (testcase)
-    {
-    case 0:
-	resp_look.pinode_refn.handle = -1;
-	ret = PVFS_sys_remove(filename, resp_look.pinode_refn, credentials);
-	break;
-    case 1:
-	resp_look.pinode_refn.fs_id = -1;
-	ret = PVFS_sys_remove(filename, resp_look.pinode_refn, credentials);
-	break;
-    default:
-	fprintf(stderr, "Error: invalid case number \n");
-    }
+    ret = PVFS_sys_remove(filename, resp_look.pinode_refn, credentials);
     return ret;
 }
 
@@ -358,7 +263,7 @@ static int test_remove(int testcase)
  * Parameters: testcase - the test case that is checked for this function
  * Postconditions: returns error code of readdir
  */
-static int test_rename(int testcase)
+static int test_rename(void)
 {
 
 //      return PVFS_sys_rename(old_name, old_parent_refn, new_name, new_parent_refn, credentials);
@@ -369,7 +274,7 @@ static int test_rename(int testcase)
  * Parameters: testcase - the test case that is checked for this function
  * Postconditions: returns error code of readdir
  */
-static int test_symlink(int testcase)
+static int test_symlink(void)
 {
     return -2;
 }
@@ -378,7 +283,7 @@ static int test_symlink(int testcase)
  * Parameters: testcase - the test case that is checked for this function
  * Postconditions: returns error code of readdir
  */
-static int test_readlink(int testcase)
+static int test_readlink(void)
 {
     return -2;
 }
@@ -388,7 +293,7 @@ static int test_readlink(int testcase)
  * Postconditions: returns error code of readdir
  * Has 2 test cases
  */
-static int test_read(int testcase)
+static int test_read(void)
 {
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
@@ -409,12 +314,7 @@ static int test_read(int testcase)
     credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
-    if (initialize_sysint() < 0)
-    {
-	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
-	return -1;
-    }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = 9;
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials, &resp_lk);
     if (ret < 0)
@@ -423,21 +323,9 @@ static int test_read(int testcase)
 		     "on %s\n", filename);
     }
 
-    switch (testcase)
-    {
-    case 0:
-	resp_lk.pinode_refn.handle = -1;
-	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, req_io, io_buffer, 100,
-			  credentials, &resp_io);
-	break;
-    case 1:
-	resp_lk.pinode_refn.fs_id = -1;
-	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, req_io, io_buffer, 100,
-			  credentials, &resp_io);
-	break;
-    }
+    ret =
+	PVFS_sys_read(resp_lk.pinode_refn, req_io, io_buffer, 100, credentials,
+		      &resp_io);
     return ret;
 }
 
@@ -446,7 +334,7 @@ static int test_read(int testcase)
  * Postconditions: returns error code of readdir
  * Has 2 test cases
  */
-static int test_write(int testcase)
+static int test_write(void)
 {
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
@@ -467,12 +355,7 @@ static int test_write(int testcase)
     credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
-    if (initialize_sysint() < 0)
-    {
-	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
-	return -1;
-    }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = 9;
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials, &resp_lk);
     if (ret < 0)
@@ -481,65 +364,24 @@ static int test_write(int testcase)
 		     "on %s\n", filename);
     }
 
-    switch (testcase)
-    {
-    case 0:
-	resp_lk.pinode_refn.handle = -1;
-	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, req_io, io_buffer, 100,
-			   credentials, &resp_io);
-	break;
-    case 1:
-	resp_lk.pinode_refn.fs_id = -1;
-	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, req_io, io_buffer, 100,
-			   credentials, &resp_io);
-	break;
-    }
+    ret =
+	PVFS_sys_write(resp_lk.pinode_refn, req_io, io_buffer, 100, credentials,
+		       &resp_io);
     return ret;
 }
 
-static int init_file(void)
+static int test_finalize(void)
 {
-    int ret, fs_id;
-    PVFS_object_attr attr;
-    PVFS_credentials credentials;
-    PVFS_sysresp_lookup resp_look;
-    PVFS_sysresp_create resp_create;
-    char *filename;
-
-    filename = (char *) malloc(sizeof(char) * 100);
-    filename = strcpy(filename, "name");
-
-    credentials.uid = 100;
-    credentials.gid = 100;
-    credentials.perms = 1877;
-
-    if (initialize_sysint() < 0)
-    {
-	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
-	return -1;
-    }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
-
-    //get root
-    ret = PVFS_sys_lookup(fs_id, "/", credentials, &resp_look);
-    if (ret < 0)
-    {
-	printf("Lookup failed with errcode = %d\n", ret);
-	return (-1);
-    }
-
-    return PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
-			   &resp_create);
-
+    int ret = -2;
+    ret = PVFS_sys_finalize();
+    return ret;
 }
 
 /* Preconditions: Parameters must be valid
  * Parameters: comm - special pts communicator, rank - the rank of the process, buf -  * (not used), rawparams - configuration information to specify which function to test
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_invalid_files(MPI_Comm * comm,
+int test_uninitialized(MPI_Comm * comm,
 		       int rank,
 		       char *buf,
 		       void *rawparams)
@@ -556,106 +398,110 @@ int test_invalid_files(MPI_Comm * comm,
 	    switch (params->p1)
 	    {
 	    case 0:
-		fprintf(stderr, "[test_invalid_files] test_lookup %d\n",
+		fprintf(stderr, "[test_uninitialized] test_lookup %d\n",
 			params->p2);
-		ret = test_lookup(params->p2);
+		ret = test_lookup();
 		fprintf(stderr,
-			"[test_invalid_files] test_lookup return = %d\n", ret);
+			"[test_uninitialized] test_lookup return = %d\n", ret);
 		return ret;
 		break;
 	    case 1:
-		fprintf(stderr, "[test_invalid_files] test_getattr %d\n",
+		fprintf(stderr, "[test_uninitialized] test_getattr %d\n",
 			params->p2);
-		ret = test_getattr(params->p2);
+		ret = test_getattr();
 		fprintf(stderr,
-			"[test_invalid_files] test_getattr return = %d\n", ret);
+			"[test_uninitialized] test_getattr return = %d\n", ret);
 		return ret;
 		break;
 	    case 2:
-		fprintf(stderr, "[test_invalid_files] test_setattr %d\n",
+		fprintf(stderr, "[test_uninitialized] test_setattr %d\n",
 			params->p2);
-		ret = test_setattr(params->p2);
+		ret = test_setattr();
 		fprintf(stderr,
-			"[test_invalid_files] test_setattr return = %d\n", ret);
+			"[test_uninitialized] test_setattr return = %d\n", ret);
 		return ret;
 		break;
 	    case 3:
-		fprintf(stderr, "[test_invalid_files] test_mkdir %d\n",
+		fprintf(stderr, "[test_uninitialized] test_mkdir %d\n",
 			params->p2);
-		ret = test_mkdir(params->p2);
-		fprintf(stderr, "[test_invalid_files] test_mkdir return = %d\n",
+		ret = test_mkdir();
+		fprintf(stderr, "[test_uninitialized] test_mkdir return = %d\n",
 			ret);
 		return ret;
 		break;
 	    case 4:
-		fprintf(stderr, "[test_invalid_files] test_readdir %d\n",
+		fprintf(stderr, "[test_uninitialized] test_readdir %d\n",
 			params->p2);
-		ret = test_readdir(params->p2);
+		ret = test_readdir();
 		fprintf(stderr,
-			"[test_invalid_files] test_readdir return = %d\n", ret);
+			"[test_uninitialized] test_readdir return = %d\n", ret);
 		return ret;
 		break;
 	    case 5:
-		fprintf(stderr, "[test_invalid_files] test_create %d\n",
+		fprintf(stderr, "[test_uninitialized] test_create %d\n",
 			params->p2);
-		ret = test_create(params->p2);
+		ret = test_create();
 		fprintf(stderr,
-			"[test_invalid_files] test_create return = %d\n", ret);
+			"[test_uninitialized] test_create return = %d\n", ret);
 		return ret;
 		break;
 	    case 6:
-		fprintf(stderr, "[test_invalid_files] test_remove %d\n",
+		fprintf(stderr, "[test_uninitialized] test_remove %d\n",
 			params->p2);
-		ret = test_remove(params->p2);
+		ret = test_remove();
 		fprintf(stderr,
-			"[test_invalid_files] test_remove return = %d\n", ret);
+			"[test_uninitialized] test_remove return = %d\n", ret);
 		return ret;
 		break;
 	    case 7:
-		fprintf(stderr, "[test_invalid_files] test_rename %d\n",
+		fprintf(stderr, "[test_uninitialized] test_rename %d\n",
 			params->p2);
-		ret = test_rename(params->p2);
+		ret = test_rename();
 		fprintf(stderr,
-			"[test_invalid_files] test_rename return = %d\n", ret);
+			"[test_uninitialized] test_rename return = %d\n", ret);
 		return ret;
 		break;
 	    case 8:
-		fprintf(stderr, "[test_invalid_files] test_symlink %d\n",
+		fprintf(stderr, "[test_uninitialized] test_symlink %d\n",
 			params->p2);
-		ret = test_symlink(params->p2);
+		ret = test_symlink();
 		fprintf(stderr,
-			"[test_invalid_files] test_symlink return = %d\n", ret);
+			"[test_uninitialized] test_symlink return = %d\n", ret);
 		return ret;
 		break;
 	    case 9:
-		fprintf(stderr, "[test_invalid_files] test_readlink %d\n",
+		fprintf(stderr, "[test_uninitialized] test_readlink %d\n",
 			params->p2);
-		ret = test_readlink(params->p2);
+		ret = test_readlink();
 		fprintf(stderr,
-			"[test_invalid_files] test_readlink return = %d\n",
+			"[test_uninitialized] test_readlink return = %d\n",
 			ret);
 		return ret;
 		break;
 	    case 10:
-		fprintf(stderr, "[test_invalid_files] test_read %d\n",
+		fprintf(stderr, "[test_uninitialized] test_read %d\n",
 			params->p2);
-		ret = test_read(params->p2);
-		fprintf(stderr, "[test_invalid_files] test_read return = %d\n",
+		ret = test_read();
+		fprintf(stderr, "[test_uninitialized] test_read return = %d\n",
 			ret);
 		return ret;
 		break;
 	    case 11:
-		fprintf(stderr, "[test_invalid_files] test_write %d\n",
+		fprintf(stderr, "[test_uninitialized] test_write %d\n",
 			params->p2);
-		ret = test_write(params->p2);
-		fprintf(stderr, "[test_invalid_files] test_write return = %d\n",
+		ret = test_write();
+		fprintf(stderr, "[test_uninitialized] test_write return = %d\n",
 			ret);
 		return ret;
 		break;
-	    case 99:
-		fprintf(stderr, "[test_invalid_files] init_file %d\n",
+	    case 12:
+		fprintf(stderr, "[test_uninitialized] test_finalize %d\n",
 			params->p2);
-		return init_file();
+		ret = test_finalize();
+		fprintf(stderr,
+			"[test_uninitialized] test_finalize return = %d\n",
+			ret);
+		return ret;
 		break;
 	    default:
 		fprintf(stderr, "Error: invalid param %d\n", params->p1);

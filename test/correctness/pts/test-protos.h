@@ -19,6 +19,8 @@
 #include <pvfs-stop-server.h>
 #include <null_params.h>
 #include <test-invalid-files.h>
+#include <test-uninitialized.h>
+#include <test-finalized.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -32,7 +34,9 @@ enum test_types {
    TEST_NULL_PARAMS,
 	PVFS_RESTART_SERVER,
 	PVFS_STOP_SERVER,
-	TEST_INVALID_FILES
+	TEST_INVALID_FILES,
+	TEST_UNINITIALIZED,
+	TEST_FINALIZED
 };
 
 void setup_ptstests(config *myconfig) {
@@ -72,7 +76,14 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[PVFS_STOP_SERVER].test_func = (void *)pvfs_stop_server;
    myconfig->testpool[PVFS_STOP_SERVER].test_name = str_malloc("pvfs_stop_server");
    myconfig->testpool[TEST_INVALID_FILES].test_func = (void *)test_invalid_files;
+   myconfig->testpool[TEST_INVALID_FILES].test_param_init = (void *)null_params_parser;
    myconfig->testpool[TEST_INVALID_FILES].test_name = str_malloc("test_invalid_files");
+   myconfig->testpool[TEST_UNINITIALIZED].test_func = (void *)test_uninitialized;
+   myconfig->testpool[TEST_UNINITIALIZED].test_param_init = (void *)null_params_parser;
+   myconfig->testpool[TEST_UNINITIALIZED].test_name = str_malloc("test_uninitialized");
+   myconfig->testpool[TEST_FINALIZED].test_func = (void *)test_finalized;
+   myconfig->testpool[TEST_FINALIZED].test_param_init = (void *)null_params_parser;
+   myconfig->testpool[TEST_FINALIZED].test_name = str_malloc("test_finalized");
 }
 
 #endif
