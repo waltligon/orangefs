@@ -302,7 +302,6 @@ int PINT_pcache_object_attr_deep_copy(
     PVFS_object_attr *src)
 {
     int ret = -1;
-    PVFS_size df_array_size = 0;
 
     if (dest && src)
     {
@@ -361,26 +360,27 @@ int PINT_pcache_object_attr_deep_copy(
             (src->objtype == PVFS_TYPE_METAFILE) &&
             (src->mask & PVFS_ATTR_META_DFILES))
 	{
-            dest->u.meta.dfile_array = NULL;
-            dest->u.meta.dfile_count = src->u.meta.dfile_count;
-            df_array_size = src->u.meta.dfile_count *
+	    PVFS_size df_array_size = src->u.meta.dfile_count *
                 sizeof(PVFS_handle);
 
             if (df_array_size)
             {
-		if (dest->u.meta.dfile_array)
+		if ((dest->mask & PVFS_ATTR_META_DFILES) &&
+		    dest->u.meta.dfile_count > 0)
                 {
                     free(dest->u.meta.dfile_array);
                 }
-		dest->u.meta.dfile_array =
-                    (PVFS_handle *)malloc(df_array_size);
+		dest->u.meta.dfile_array = malloc(df_array_size);
 		if (!dest->u.meta.dfile_array)
 		{
                     return -ENOMEM;
 		}
 		memcpy(dest->u.meta.dfile_array,
                        src->u.meta.dfile_array, df_array_size);
-            }
+	    } else {
+		dest->u.meta.dfile_array = NULL;
+	    }
+	    dest->u.meta.dfile_count = src->u.meta.dfile_count;
 	}
 
 	if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
@@ -390,7 +390,7 @@ int PINT_pcache_object_attr_deep_copy(
             assert(src->u.meta.dist_size > 0);
 
             dest->u.meta.dist_size = src->u.meta.dist_size;
-            if (dest->u.meta.dist)
+	    if ((dest->mask & PVFS_ATTR_META_DIST))
             {
                 PVFS_Dist_free(dest->u.meta.dist);
             }
