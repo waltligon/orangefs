@@ -161,6 +161,8 @@ static void aiocb_print(struct aiocb *ptr)
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=4
  */
 
 

@@ -60,3 +60,12 @@ int trove_filesystem_get_root(
 		user_ptr,
 		out_op_id_p);
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=4
+ */

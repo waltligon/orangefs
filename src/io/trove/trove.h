@@ -11,11 +11,22 @@
 #include <trove-proto.h>
 
 enum { 
-	TROVE_ITERATE_START= 1,
-	TROVE_ITERATE_END  = 2
+    TROVE_ITERATE_START= 1,
+    TROVE_ITERATE_END  = 2
 };
 
-enum { TROVE_PLAIN_FILE,
-	TROVE_DIR,
+enum {
+    TROVE_PLAIN_FILE,
+    TROVE_DIR,
 };
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=4
+ */
+
 #endif

@@ -694,4 +694,6 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=4
  */

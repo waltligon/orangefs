@@ -25,4 +25,13 @@ typedef PVFS_ds_position     TROVE_ds_position;
 typedef PVFS_ds_attributes_s TROVE_ds_attributes_s;
 typedef PVFS_ds_state        TROVE_ds_state;
 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=4
+ */
+
 #endif

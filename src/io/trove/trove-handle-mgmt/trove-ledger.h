@@ -34,11 +34,14 @@ void trove_handle_ledger_free(struct handle_ledger *hl);
 TROVE_handle trove_handle_get(struct handle_ledger *hl, TROVE_handle requested_handle, TROVE_handle bitmask);
 int trove_handle_put(struct handle_ledger *hl, TROVE_handle handle);
 
-#endif
-
 /*
  * Local variables:
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=4
  */
+
+#endif
+

@@ -342,6 +342,8 @@ struct TROVE_fs_ops
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=4
  */
 
 #endif

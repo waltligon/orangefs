@@ -229,4 +229,6 @@ void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=4
  */

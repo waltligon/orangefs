@@ -545,4 +545,6 @@ struct TROVE_bstream_ops dbpf_bstream_ops =
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=4
  */

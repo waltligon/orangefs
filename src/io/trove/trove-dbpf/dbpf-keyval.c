@@ -506,4 +506,6 @@ struct TROVE_keyval_ops dbpf_keyval_ops =
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=4
  */

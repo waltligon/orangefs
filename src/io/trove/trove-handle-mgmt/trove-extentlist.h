@@ -69,4 +69,6 @@ int extentlist_addextent(struct TROVE_handle_extentlist *elist, int64_t first, i
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=4
  */

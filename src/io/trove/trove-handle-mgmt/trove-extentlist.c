@@ -407,4 +407,6 @@ static int avltree_extent_search(struct avlnode *n,
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=4
  */

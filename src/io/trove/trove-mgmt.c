@@ -158,3 +158,12 @@ int map_coll_id_to_method(int coll_id)
 {
     return 0;
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=4
+ */
