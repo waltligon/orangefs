@@ -145,7 +145,7 @@ sub emit_defaults
     print $target "\tEventLogging none\n";
     print $target "\tBMIModules $bmi_module\n";
     print $target "\tFlowModules flowproto_bmi_trove\n";
-    print $target "\tHandlePurgatory $handle_purg\n"
+    print $target "\tHandlePurgatory $handle_purg\n";
     print $target "</Defaults>\n";
 }
 
