@@ -61,8 +61,8 @@ int main(int argc, char **argv)
 	PINT_Dist_lookup(rf2.dist);
 
    /* Turn on debugging */
-	//gossip_enable_stderr(); 
-	//gossip_set_debug_mask(1,REQUEST_DEBUG);
+	gossip_enable_stderr(); 
+	gossip_set_debug_mask(1,REQUEST_DEBUG);
 
 	offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
 	size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
