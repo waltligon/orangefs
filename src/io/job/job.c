@@ -2072,7 +2072,7 @@ int job_test_HACK(
 		if(ret < 0)
 			return(ret);
 		
-		timeout_remaining = (end.tv_sec - start.tv_sec)*1000 +
+		timeout_remaining -= (end.tv_sec - start.tv_sec)*1000 +
 			(end.tv_usec - start.tv_usec)/1000;
 
 	} while(timeout_remaining > 0);
@@ -2139,7 +2139,7 @@ int job_test_HACK(
 		if(ret < 0)
 			return(ret);
 		
-		timeout_remaining = (end.tv_sec - start.tv_sec)*1000 +
+		timeout_remaining -= (end.tv_sec - start.tv_sec)*1000 +
 			(end.tv_usec - start.tv_usec)/1000;
 
 	} while(timeout_remaining > 0);
