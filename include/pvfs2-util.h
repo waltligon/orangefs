@@ -11,7 +11,13 @@
 #ifndef __PVFS2_UTIL_H
 #define __PVFS2_UTIL_H
 
+#include "pvfs2.h"
 #include "pvfs2-types.h"
+
+/* Define min macro with pvfs2 prefix */
+#ifndef PVFS_util_min
+#define PVFS_util_min(x1,x2) ((x1) > (x2))? (x2):(x1)
+#endif
 
 /* results of parsing a pvfs2 tabfile, may contain more than one entry */
 struct PVFS_util_tab_s

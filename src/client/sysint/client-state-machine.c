@@ -134,6 +134,29 @@ static int completion_list_retrieve_completed(
     return 0;
 }
 
+static inline int cancelled_io_jobs_are_pending(PINT_client_sm *sm_p)
+{
+    /*
+      NOTE: if the I/O cancellation has properly completed, the
+      cancelled contextual jobs within that I/O operation will be
+      popping out of the testcontext calls (in our testsome() or
+      test()).  to avoid passing out the same completed op mutliple
+      time, do not add the operation to the completion list until all
+      cancellations on the I/O operation are accounted for
+    */
+    assert(sm_p);
+    assert(sm_p->u.io.total_cancellations_remaining > 0);
+
+    sm_p->u.io.total_cancellations_remaining--;
+
+    gossip_debug(GOSSIP_IO_DEBUG,
+                 "cancelled_io_jobs_are_pending: %d remaining (op %s)\n",
+                 sm_p->u.io.total_cancellations_remaining,
+                 (sm_p->op_complete ? "complete" : "NOT complete"));
+
+    return (sm_p->u.io.total_cancellations_remaining != 0);
+}
+
 /*
   NOTE: important usage notes regarding post(), test(), and testsome()
 
@@ -416,6 +439,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
                 PVFS_perror_gossip("job_bmi_cancel failed", ret);
                 break;
             }
+            sm_p->u.io.total_cancellations_remaining++;
         }
 
         if (cur_ctx->msg_recv_in_progress)
@@ -431,6 +455,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
                 PVFS_perror_gossip("job_bmi_cancel failed", ret);
                 break;
             }
+            sm_p->u.io.total_cancellations_remaining++;
         }
 
         if (cur_ctx->flow_in_progress)
@@ -445,6 +470,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
                 PVFS_perror_gossip("job_flow_cancel failed", ret);
                 break;
             }
+            sm_p->u.io.total_cancellations_remaining++;
         }
 
         if (cur_ctx->write_ack_in_progress)
@@ -460,8 +486,11 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
                 PVFS_perror_gossip("job_bmi_cancel failed", ret);
                 break;
             }
+            sm_p->u.io.total_cancellations_remaining++;
         }
     }
+    gossip_debug(GOSSIP_IO_DEBUG, "Total cancellations remaining: %d\n",
+                 sm_p->u.io.total_cancellations_remaining);
     return ret;
 }
 
@@ -531,6 +560,13 @@ int PINT_client_state_machine_test(
             } while (ret == 1);
 
             assert(ret == 0);
+        }
+
+        /* make sure we don't return internally cancelled I/O jobs */
+        if ((tmp_sm_p->op == PVFS_SYS_IO) && (tmp_sm_p->op_cancelled) &&
+            (cancelled_io_jobs_are_pending(tmp_sm_p)))
+        {
+            continue;
         }
 
         /*
@@ -627,6 +663,13 @@ int PINT_client_state_machine_testsome(
              * kept in the job status structure.
              */
             assert(ret == 0);
+        }
+
+        /* make sure we don't return internally cancelled I/O jobs */
+        if ((sm_p->op == PVFS_SYS_IO) && (sm_p->op_cancelled) &&
+            (cancelled_io_jobs_are_pending(sm_p)))
+        {
+            continue;
         }
 
         /*

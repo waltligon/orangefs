@@ -243,6 +243,8 @@ struct PINT_client_io_sm
 
     PINT_client_io_ctx *contexts;
 
+    int total_cancellations_remaining;
+
     int retry_count;
     int stored_error_code;
 };

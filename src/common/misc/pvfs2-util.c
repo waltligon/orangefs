@@ -30,12 +30,6 @@
 #include <mntent.h>
 #endif
 
-/* Define min macro with pvfs2 prefix */
-#ifndef PVFS_util_min
-#define PVFS_util_min(x1,x2) ((x1) > (x2))? (x2):(x1)
-#endif
-
-
 #define PVFS2_MAX_INVALID_MNTENTS                     256
 #define PVFS2_MAX_TABFILES                              8
 #define PVFS2_DYNAMIC_TAB_INDEX  (PVFS2_MAX_TABFILES - 1)

@@ -272,6 +272,7 @@ enum PVFS_server_mode
  * that indicates where the error came from.  These are |'d together.
  */
 
+int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(char *text, int retcode);
 void PVFS_perror_gossip(char* text, int retcode);
 int32_t PVFS_get_errno_mapping(int32_t error);

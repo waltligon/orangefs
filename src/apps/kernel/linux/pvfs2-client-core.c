@@ -198,10 +198,6 @@ static int add_op_to_op_in_progress_table(
         qhash_add(s_ops_in_progress_table,
                   (void *)(&vfs_request->info.tag),
                   &vfs_request->hash_link);
-#if 0
-        gossip_err("HASHED TAG %Ld to REQ %p\n",
-                   vfs_request->info.tag, vfs_request);
-#endif
         ret = 0;
     }
     return ret;
@@ -294,10 +290,6 @@ static int remove_op_from_op_in_progress_table(
                 hash_link, vfs_request_t, hash_link);
             assert(tmp_vfs_request);
             assert(tmp_vfs_request == vfs_request);
-#if 0
-            gossip_err("UNHASHED TAG %Ld FROM REQ %p\n",
-                       vfs_request->info.tag, vfs_request);
-#endif
             ret = 0;
         }
     }
@@ -724,6 +716,23 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
     }
     else
     {
+        /*
+          ungracefully ask bmi to drop connections on cancellation so
+          that the server will immediately know that a cancellation
+          occurred
+        */
+        PVFS_BMI_addr_t tmp_addr;
+
+        if (BMI_addr_lookup(&tmp_addr, mntent.pvfs_config_server) == 0)
+        {
+            if (BMI_set_info(
+                    tmp_addr, BMI_FORCEFUL_CANCEL_MODE, NULL) == 0)
+            {
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "BMI forceful cancel "
+                             "mode enabled\n");
+            }
+        }
+
         /*
           before sending success response we need to resolve the root
           handle, given the previously resolved fs_id
@@ -1585,11 +1594,7 @@ int process_vfs_requests(void)
         {
             vfs_request = vfs_request_array[i];
             assert(vfs_request);
-            if (vfs_request->op_id != op_id_array[i])
-            {
-                gossip_err("Ignoring invalid op %p\n", vfs_request);
-                continue;
-            }
+            assert(vfs_request->op_id == op_id_array[i]);
 
             /* check if this is a new dev unexp request */
             if (vfs_request->is_dev_unexp)
@@ -1607,6 +1612,9 @@ int process_vfs_requests(void)
             }
             else
             {
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_sys_testsome "
+                             "returned completed vfs_request %p\n",
+                             vfs_request);
                 /*
                   if this is not a dev unexp msg, it's a non-blocking
                   sysint operation that has just completed
@@ -1655,15 +1663,20 @@ int process_vfs_requests(void)
 
                     if (ret < 0)
                     {
-                        gossip_err(
-                            "write_device_response failed (tag=%Ld)\n",
-                            vfs_request->info.tag);
+                        gossip_err("write_device_response failed "
+                                   "(tag=%Ld)\n", vfs_request->info.tag);
                     }
                 }
                 else
                 {
                     gossip_debug(GOSSIP_CLIENT_DEBUG, "skipping downcall "
                                  "write due to previous cancellation\n");
+
+                    ret = repost_unexp_vfs_request(
+                        vfs_request, "cancellation");
+
+                    assert(ret == 0);
+                    continue;
                 }
 
               repost_unexp:
