@@ -231,6 +231,11 @@ int PINT_req_sched_target_handle(struct PVFS_server_req*
 		case PVFS_SERV_GETCONFIG:
 			return(0);
 			break;
+		case PVFS_SERV_FLUSH:
+			*handle = req->u.flush.handle;
+			*fs_id = req->u.flush.fs_id;
+			return (0);
+			break;
 		case PVFS_SERV_WRITE_COMPLETION:
 			/* these should never show up here */
 			return(-EINVAL);

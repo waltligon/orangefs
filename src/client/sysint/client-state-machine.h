@@ -141,6 +141,15 @@ struct PINT_client_io_sm {
     PVFS_sysresp_io      *io_resp_p;
 };
 
+/* PINT_client_flush_sm */
+struct PINT_client_flush_sm {
+    PVFS_pinode_reference	object_ref; /* input parameter */
+    int				datafile_count; /* from attribs */
+    PVFS_handle			*datafile_handles;
+    PINT_client_sm_msgpair_state *msgpair; /* used in datafile flush */
+};
+
+
 typedef struct PINT_client_sm {
     /* STATE MACHINE VALUES */
     int stackptr; /* stack of contexts for nested state machines */
@@ -178,6 +187,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_remove_sm  remove;
 	struct PINT_client_getattr_sm getattr;
 	struct PINT_client_io_sm      io;
+	struct PINT_client_flush_sm   flush;
     } u;
 } PINT_client_sm;
 
@@ -191,7 +201,8 @@ int PINT_client_state_machine_test(void);
 enum {
     PVFS_SYS_REMOVE  = 1,
     PVFS_SYS_GETATTR = 2,
-    PVFS_SYS_IO      = 3
+    PVFS_SYS_IO      = 3,
+    PVFS_SYS_FLUSH
 };
 
 /* prototypes of helper functions */
@@ -228,6 +239,7 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
+extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;

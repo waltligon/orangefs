@@ -410,4 +410,8 @@ int PVFS_sys_getparent(
     PVFS_credentials credentials,
     PVFS_sysresp_getparent *resp);
 
+int PVFS_sys_flush(
+     PVFS_pinode_reference pinode_refn,
+     PVFS_credentials credentials);
+
 #endif

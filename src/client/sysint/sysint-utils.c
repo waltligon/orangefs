@@ -231,6 +231,9 @@ void debug_print_type(void* thing, int type)
 	    case PVFS_SERV_RMDIRENT:
 		gossip_ldebug(CLIENT_DEBUG,"rmdirent request\n");
 		break;
+	    case PVFS_SERV_FLUSH:
+		gossip_ldebug(CLIENT_DEBUG, "flush request\n");
+		break;
 	    default:
 		gossip_ldebug(CLIENT_DEBUG,"unknown request = %d\n", req->op);
 		break;

@@ -14,6 +14,8 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/ls.c \
 	$(DIR)/path-test.c\
 	$(DIR)/create.c\
+	$(DIR)/flush-1.c\
+	$(DIR)/flush-2.c\
 	$(DIR)/truncate.c\
 	$(DIR)/readdir.c\
 	$(DIR)/pcache-test.c\
@@ -30,7 +32,7 @@ LOCALLIBS := -ldb -lrt -lpthread
 LOCALTESTS := $(patsubst %.c,%, $(TEST_SYSINT_DIR_SRC))
 $(LOCALTESTS): %: %.o
 ifdef QUIET_COMPILE
-	@echo "  LD             $@"
+	@echo "  LD		$@"
 	@$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
 else
 	$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@

@@ -141,6 +141,7 @@ int do_decode_req(
     case PVFS_SERV_REMOVE:
     case PVFS_SERV_TRUNCATE:
     case PVFS_SERV_GETCONFIG:
+    case PVFS_SERV_FLUSH:
 	return (0);
     default:
 	printf("Unpacking Req Op: %d Not Supported\n",

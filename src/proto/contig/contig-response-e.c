@@ -37,6 +37,7 @@ int do_encode_resp(
     switch (response->op)
     {
 	/* these first response types have no trailing data */
+    case PVFS_SERV_FLUSH:
     case PVFS_SERV_CREATE:
     case PVFS_SERV_MKDIR:
     case PVFS_SERV_RMDIRENT:

@@ -1,0 +1,405 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "state-machine-fns.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+
+#include "pinode-helper.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+
+/* pvfs2_client_flush-sm
+ *
+ * implementes the flush system interface function
+ *
+ * the input parameters are held in sm_p->u.flush
+ *
+ * we getattr on the passed-in handle.  if we are acting on a metafile object,
+ * we will flush that metafile object and its associated datafiles, making use
+ * of the sm_p->msgpairarray 
+ *
+ *
+ */
+
+extern job_context_id pint_client_sm_context;
+
+enum {
+    FLUSH_MUST_FLUSH_DATAFILE = 1
+};
+
+/* static function prototypes */
+static int flush_check_parameters(PINT_client_sm *sm_p,
+				    job_status_s *js_p);
+
+static int flush_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+						job_status_s *js_p);
+
+static int flush_object_getattr_comp_fn(void *v_p,
+					struct PVFS_server_resp *resp_p,
+					int index);
+
+static int flush_object_getattr_failure(PINT_client_sm *sm_p,
+					job_status_s *js_p);
+
+static int flush_datafile_flush_failure(PINT_client_sm *sm_p,
+					job_status_s *js_p);
+
+static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
+					    job_status_s *js_p);
+
+static int flush_cleanup(PINT_client_sm *sm_p,
+			job_status_s *js_p);
+%%
+
+machine pvfs2_client_flush_sm(check_parameters,
+				object_getattr_setup_msgpair,
+				object_getattr_xfer_msgpair,
+				object_getattr_failure,
+				datafile_setup_msgpairarray,
+				datafile_xfer_msgpairarray,
+				datafile_flush_failure,
+				cleanup)
+{
+    state check_parameters {
+	run flush_check_parameters;
+	success => object_getattr_setup_msgpair;
+	default => cleanup;
+    }
+
+    state object_getattr_setup_msgpair {
+	run flush_object_getattr_setup_msgpair;
+	success => object_getattr_xfer_msgpair;
+	default => cleanup;
+    }
+
+    state object_getattr_xfer_msgpair {
+	jump pvfs2_client_getattr_pcache_sm;
+	success => datafile_setup_msgpairarray;
+	default =>object_getattr_failure;
+    }
+
+    state object_getattr_failure {
+	run flush_object_getattr_failure;
+	default => cleanup;
+    }
+
+    state datafile_setup_msgpairarray {
+	run flush_datafile_setup_msgpairarray;
+	success => datafile_xfer_msgpairarray;
+	default => cleanup;
+    }
+
+    state datafile_xfer_msgpairarray {
+	jump pvfs2_client_msgpairarray_sm;
+	success => cleanup;
+	default => datafile_flush_failure;
+    }
+
+    state datafile_flush_failure {
+	run flush_datafile_flush_failure;
+	default => cleanup;
+    }
+    
+    state cleanup {
+	run flush_cleanup;
+	default => check_parameters;
+    }
+}
+
+%%
+/* PVFS_sys_flush()
+ * TODO: all we reallly need is the pinode_ref.  Does it make sense to check
+ *       credentials for a flush operation?  does it make sense to add a
+ *       'flags' parameter so we could, say, tell flush to flush only metadata
+ *       or only datafiles?
+ *
+ * no need for a PVFS_sysrep_flush as we just need to know success or failure
+ *
+ */
+int PVFS_sys_flush(PVFS_pinode_reference pinode_ref,
+		    PVFS_credentials credentials)
+{
+    int ret;
+    PINT_client_sm *sm_p;
+    PVFS_error error;
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_sys_flush entered\n");
+
+    /* do parameter checking here, then assume things are ok below.
+     * assert()s are still ok of course :).
+     */
+    if (pinode_ref.fs_id == 0 || pinode_ref.handle == 0) {
+	gossip_lerr("Invalid pinode reference\n");
+	return -PVFS_EINVAL;
+    }
+
+    /* build PINT_client_sm structure */
+    /* TODO: KEEP A CACHE OF THESE AROUND SO WE'RE NOT ALWAYS MALLOC'ING? */
+    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    if (sm_p == NULL) return -PVFS_ENOMEM;
+
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    sm_p->cred_p = &credentials;
+    sm_p->u.flush.object_ref     = pinode_ref;
+
+    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_FLUSH);
+    assert(ret == 0);
+
+    while (!sm_p->op_complete && ret == 0) {
+	ret = PINT_client_state_machine_test();
+    }
+    assert(ret == 0);
+
+    error = sm_p->error_code;
+
+    free(sm_p);
+    return error;
+}
+
+/* XXX: what should this state do? */
+static int flush_check_parameters(PINT_client_sm *sm_p,
+				    job_status_s *js_p)
+{
+    return 1;
+}
+
+ /* flush_object_getattr_setup_msgpair()
+ *
+ * Fills in sm_p->msgpair to perform a getattr using the getattr_pcache
+ * state machine.
+ */
+static int flush_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+						job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, 
+	    "(%p) flush state: getattr_setup_msgpair\n", 
+	    sm_p);
+
+    /* fill in getattr request.  all we need is what (if any) handles are
+     * associated with the object */
+    PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
+			      *sm_p->cred_p,
+			      sm_p->u.flush.object_ref.fs_id,
+			      sm_p->u.flush.object_ref.handle,
+			      PVFS_ATTR_META_DFILES);
+    
+    /* fill in msgpair structure components */
+    sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
+    sm_p->msgpair.handle  = sm_p->u.getattr.object_ref.handle;
+    sm_p->msgpair.comp_fn = flush_object_getattr_comp_fn;
+
+    /* drop through and jump to getattr_pcache state machine */
+    return 1;
+}
+
+/*
+ * flush_object_getattr_comp_fn
+ *  copy data from the getattr response into our PINT_client_sm structure
+ *
+ *  if we got a metafile (very likely), get the handles of all the datafiles
+ *
+ *  return value is returned in job status, so it affects the resulting state
+ *  coming back from the nested state machine.
+ *
+ *  returns 0 for directory, or a metafile.  other types die right now.
+ */
+static int flush_object_getattr_comp_fn(void *v_p,
+					struct PVFS_server_resp *resp_p,
+					int index)
+{
+    /* this is a little kludge to get around some struct definition
+     * issues in the headers.  maybe fix later?
+     */
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+
+    PVFS_object_attr *r_attr_p = &resp_p->u.getattr.attr;
+
+    assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
+
+    /* if we get an error, just return immediately, don't try to
+     * actually fill anything in.
+     */
+    if (resp_p->status != 0) {
+	return resp_p->status;
+    }
+
+    /* copy in the attributes we care about from the response */
+    switch (resp_p->u.getattr.attr.objtype)
+    {
+	case PVFS_TYPE_METAFILE:
+	    /* sanity checks */
+	    assert(r_attr_p->mask & PVFS_ATTR_META_DFILES);
+	    assert(r_attr_p->u.meta.dfile_count > 0);
+	    
+	    gossip_debug(CLIENT_DEBUG,
+			 "flush_object_getattr_comp_fn: %d datafiles.\n",
+			 r_attr_p->u.meta.dfile_count); 
+	    /* save the datafile handles prior to freeing up the
+	     * buffers we used for messages.  we could keep them around
+	     * i suppose, but we're not going to do that for now.  later
+	     * it is likely that this stuff will be stuck in the pcache
+	     * anyway, so we'll be able to just reference it from there.
+	     *
+	     * we malloc "+1" because unlike the remove and getattr cases, we
+	     * want all the datafiles *and* the metafile. that way we can send
+	     * all the flush requests at once. there is no need to flush
+	     * anthying earlier than anything else (as with remove) 
+	     */
+	    sm_p->u.flush.datafile_handles = (PVFS_handle *) 
+		malloc((r_attr_p->u.meta.dfile_count+1) *sizeof(PVFS_handle));
+	    if (sm_p->u.flush.datafile_handles == NULL) {
+		assert(0);
+	    }
+	    sm_p->u.flush.datafile_count = r_attr_p->u.meta.dfile_count;
+	    memcpy(sm_p->u.flush.datafile_handles,
+		    r_attr_p->u.meta.dfile_array,
+		    r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
+	    return 0;
+	    break;
+	case PVFS_TYPE_DIRECTORY:
+	    /* TODO: semantics of flushing a directory */
+	    sm_p->u.flush.datafile_count = 0;
+	    return 0;
+	    break;
+	case PVFS_TYPE_SYMLINK:
+	    /* fall through */
+	case PVFS_TYPE_DATAFILE:
+	    /* fall through */
+	case PVFS_TYPE_DIRDATA:
+	    /* fall through */
+	default:
+	    gossip_err("error: flush_object_getattr_comp_fn: unhandled object type\n");
+	    assert(0);
+    } /* end of switch() */
+    return -PVFS_EINVAL; /* should not get here */
+}
+
+static int flush_object_getattr_failure(PINT_client_sm *sm_p,
+					job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG,
+		 "(%p) flush state: object_getattr_failure\n",
+		 sm_p);
+    assert(0);
+
+    return 1;
+}
+
+/*
+ * datafile_flush_setup_msgpairarray
+ *
+ * set up a bunch of msgpairs so we can queue up a bunch of flush requests in
+ * one shot
+ */
+static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
+					    job_status_s *js_p)
+{
+    int i;
+    PINT_client_sm_msgpair_state *msg_p;
+
+    gossip_debug(CLIENT_DEBUG,
+	    "(%p) flush state: datafile_setup_msgpairarray\n",
+	     sm_p);
+
+    /* clear error field in job */
+    js_p->error_code = 0;
+
+    /* allocate memory for datafile message pairs and the metafile */
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)
+	malloc((sm_p->u.flush.datafile_count + 1)* 
+		sizeof(PINT_client_sm_msgpair_state));
+    if (sm_p->msgarray == NULL) {
+	assert(0);
+    }
+
+    /* datafiles (if any) + metafile */
+    sm_p->msgarray_count = sm_p->u.flush.datafile_count + 1;
+
+    /* post our send/recv pairs for the datafile flush requests */
+    for (i=0; i< sm_p->u.flush.datafile_count; i++) {
+	msg_p = &sm_p->msgarray[i];
+
+	gossip_debug(CLIENT_DEBUG,
+		"  datafile_flush: flushing %Ld\n",
+		sm_p->u.flush.datafile_handles[i]);
+	PINT_SERVREQ_FLUSH_FILL(msg_p->req,
+				*sm_p->cred_p,
+				sm_p->u.flush.object_ref.fs_id,
+				sm_p->u.flush.datafile_handles[i]);
+
+	/* no callback. the status will be in the generic response structure */
+	msg_p->fs_id = sm_p->u.flush.object_ref.fs_id;
+	msg_p->handle = sm_p->u.flush.object_ref.handle;
+	msg_p->comp_fn = NULL;
+    }
+    /* ... and also our flush request for the metafile handle */
+    msg_p = &sm_p->msgarray[i];
+
+    gossip_debug(CLIENT_DEBUG,
+	    "  datafile_flush: flushing %Ld\n",
+	    sm_p->u.flush.object_ref.handle);
+    PINT_SERVREQ_FLUSH_FILL(msg_p->req,
+			    *sm_p->cred_p,
+			    sm_p->u.flush.object_ref.fs_id,
+			    sm_p->u.flush.object_ref.handle);
+    msg_p->fs_id = sm_p->u.flush.object_ref.fs_id;
+    msg_p->handle = sm_p->u.flush.object_ref.handle;
+    msg_p->comp_fn = NULL;
+
+
+    /* immediate return: next state jumps to the msgpairarray machine */
+    return 1;
+}
+
+static int flush_datafile_flush_failure(PINT_client_sm *sm_p,
+					job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG,
+		 "(%p) flush state: datafile_flush_failure\n",
+		 sm_p);
+    return 1;
+}
+
+/* flush_cleanup: deallocate memory */
+static int flush_cleanup(PINT_client_sm *sm_p,
+			job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "(%p) flush state: flush_cleanup\n", sm_p);
+
+    if (js_p->error_code == 0) {
+	if (sm_p->msgarray != NULL) {
+	    free(sm_p->msgarray);
+	}
+	if (sm_p->u.flush.datafile_handles != NULL) {
+	    free(sm_p->u.flush.datafile_handles);
+	}
+    }
+    sm_p->op_complete = 1;
+
+    return 0;
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */
