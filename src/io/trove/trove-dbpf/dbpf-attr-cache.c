@@ -20,6 +20,7 @@ static struct qhash_table *s_key_to_attr_table = NULL;
 static char *s_cacheable_keywords = NULL;
 static char *s_cacheable_keyword_array[
     DBPF_ATTR_CACHE_MAX_NUM_KEYVALS] = {0};
+static int s_cacheable_keyword_array_size = 0;
 
 int dbpf_attr_cache_set_keywords(char *keywords)
 {
@@ -100,15 +101,29 @@ int dbpf_attr_cache_initialize(
     char **cacheable_keywords,
     int num_cacheable_keywords)
 {
-    int ret = -1;
+    int ret = -1, i = 0;
 
     if (s_key_to_attr_table == NULL)
     {
-        if (cacheable_keywords &&
-            ((num_cacheable_keywords < 0) ||
-             (num_cacheable_keywords > DBPF_ATTR_CACHE_MAX_NUM_KEYVALS)))
+        if (cacheable_keywords)
         {
-            goto return_error;
+            if ((num_cacheable_keywords < 0) ||
+                (num_cacheable_keywords >
+                 DBPF_ATTR_CACHE_MAX_NUM_KEYVALS))
+            {
+                goto return_error;
+            }
+
+            s_cacheable_keyword_array_size = num_cacheable_keywords;
+            /*
+              NOTE: our keyword array must have already
+              been built by the do_initialize call.
+              we make sure it's ok here.
+            */
+            for(i = 0; i < s_cacheable_keyword_array_size; i++)
+            {
+                assert(s_cacheable_keyword_array[i]);
+            }
         }
 
         s_max_num_cache_elems = cache_max_num_elems;
@@ -161,7 +176,6 @@ int dbpf_attr_cache_finalize(void)
     return ret;
 }
 
-/* returns the looked up attr on success; NULL on failure */
 TROVE_ds_attributes *dbpf_attr_cache_lookup(TROVE_handle key)
 {
     struct qlist_head *hash_link = NULL;
@@ -184,11 +198,89 @@ TROVE_ds_attributes *dbpf_attr_cache_lookup(TROVE_handle key)
     return attr;
 }
 
+dbpf_attr_cache_elem_t *dbpf_cache_elem_lookup(TROVE_handle key)
+{
+    struct qlist_head *hash_link = NULL;
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
+
+    if (s_key_to_attr_table)
+    {
+        hash_link = qhash_search(s_key_to_attr_table,&(key));
+        if (hash_link)
+        {
+            cache_elem = qhash_entry(
+                hash_link, dbpf_attr_cache_elem_t, hash_link);
+            assert(cache_elem);
+            gossip_debug(TROVE_DEBUG, "dbpf_cache_elem_lookup: cache "
+                         "elem matching %Lu returned\n", Lu(key));
+        }
+    }
+    return cache_elem;
+}
+
+dbpf_keyval_pair_cache_elem_t *dbpf_cache_elem_get_data_based_on_key(
+    dbpf_attr_cache_elem_t *cached_elem, char *key)
+{
+    int i = 0;
+
+    if (cached_elem && key && cached_elem->num_keyval_pairs)
+    {
+        for(i = 0; i < cached_elem->num_keyval_pairs; i++)
+        {
+            if ((strcmp(cached_elem->keyval_pairs[i].key, key) == 0) &&
+                (cached_elem->keyval_pairs[i].data != NULL))
+            {
+                gossip_debug(TROVE_DEBUG, "Returning data %p based on "
+                             "key %Lu and key_str %s (data_sz=%d)\n",
+                             cached_elem->keyval_pairs[i].data,
+                             Lu(cached_elem->key), key,
+                             cached_elem->keyval_pairs[i].data_sz);
+                return &cached_elem->keyval_pairs[i];
+            }
+        }
+    }
+    return NULL;
+}
+
+int dbpf_cache_elem_set_data_based_on_key(
+    TROVE_handle key, char *key_str, void *data, int data_sz)
+{
+    int ret = - 1, i = 0;
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
+
+    cache_elem = dbpf_cache_elem_lookup(key);
+    if (cache_elem && key_str && cache_elem->num_keyval_pairs)
+    {
+        for(i = 0; i < cache_elem->num_keyval_pairs; i++)
+        {
+            if (strcmp(cache_elem->keyval_pairs[i].key, key_str) == 0)
+            {
+                gossip_debug(TROVE_DEBUG, "Setting data %p based on key "
+                             "%Lu and key_str %s (data_sz=%d)\n", data,
+                             Lu(key), key_str, data_sz);
+
+                if (cache_elem->keyval_pairs[i].data)
+                {
+                    free(cache_elem->keyval_pairs[i].data);
+                }
+                cache_elem->keyval_pairs[i].data = (void *)
+                    malloc(data_sz);
+                assert(cache_elem->keyval_pairs[i].data);
+                memcpy(cache_elem->keyval_pairs[i].data, data, data_sz);
+                cache_elem->keyval_pairs[i].data_sz = data_sz;
+                ret = 0;
+                break;
+            }
+        }
+    }
+    return ret;
+}
+
 int dbpf_attr_cache_insert(
     TROVE_handle key,
     TROVE_ds_attributes *attr)
 {
-    int ret = -1, already_exists = 0;
+    int ret = -1, i = 0, already_exists = 0;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     struct qlist_head *hash_link = NULL;
 
@@ -212,6 +304,20 @@ int dbpf_attr_cache_insert(
         if (cache_elem)
         {
             memset(cache_elem, 0, sizeof(dbpf_attr_cache_elem_t));
+
+            if (s_cacheable_keywords)
+            {
+                /* initialize all of the keyvals we're able to cache */
+                for(i = 0; i < s_cacheable_keyword_array_size; i++)
+                {
+                    cache_elem->keyval_pairs[i].key =
+                        s_cacheable_keyword_array[i];
+                    cache_elem->keyval_pairs[i].data = NULL;
+                }
+                cache_elem->num_keyval_pairs =
+                    s_cacheable_keyword_array_size;
+            }
+
             cache_elem->key = key;
             memcpy(&(cache_elem->attr), attr, sizeof(TROVE_ds_attributes));
             if (!already_exists)
@@ -233,7 +339,7 @@ int dbpf_attr_cache_insert(
 
 int dbpf_attr_cache_remove(TROVE_handle key)
 {
-    int ret = -1;
+    int ret = -1, i = 0;
     struct qlist_head *hash_link = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;    
 
@@ -244,10 +350,27 @@ int dbpf_attr_cache_remove(TROVE_handle key)
         {
             cache_elem = qhash_entry(
                 hash_link, dbpf_attr_cache_elem_t, hash_link);
+
             gossip_debug(TROVE_DEBUG, "dbpf_attr_cache_remove: removing "
                          "%Lu\n", Lu(key));
+
+            /* free any keyval data cached as well */
+            if (s_cacheable_keywords)
+            {
+                /* initialize all of the keyvals we're able to cache */
+                for(i = 0; i < cache_elem->num_keyval_pairs; i++)
+                {
+                    cache_elem->keyval_pairs[i].key = NULL;
+                    if (cache_elem->keyval_pairs[i].data)
+                    {
+                        free(cache_elem->keyval_pairs[i].data);
+                        cache_elem->keyval_pairs[i].data = NULL;
+                    }
+                }
+            }
+
             free(cache_elem);
-        ret = 0;
+            ret = 0;
         }
     }
     return ret;

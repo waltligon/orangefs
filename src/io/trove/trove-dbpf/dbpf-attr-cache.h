@@ -25,6 +25,7 @@ typedef struct
 {
     char *key;
     void *data;
+    int data_sz;
 } dbpf_keyval_pair_cache_elem_t;
 
 /*
@@ -39,6 +40,7 @@ typedef struct
     TROVE_ds_attributes attr;
     dbpf_keyval_pair_cache_elem_t keyval_pairs[
         DBPF_ATTR_CACHE_MAX_NUM_KEYVALS];
+    int num_keyval_pairs;
 } dbpf_attr_cache_elem_t;
 
 #define DBPF_ATTR_CACHE_INVALID_SIZE -1
@@ -66,6 +68,18 @@ TROVE_ds_attributes *dbpf_attr_cache_lookup(TROVE_handle key);
 
 /* returns the cached element object on success; NULL on failure */
 dbpf_attr_cache_elem_t *dbpf_cache_elem_lookup(TROVE_handle key);
+
+/*
+  given a cached elem and a keyval key, return associated
+  data if cached; NULL otherwise
+*/
+dbpf_keyval_pair_cache_elem_t *dbpf_cache_elem_get_data_based_on_key(
+    dbpf_attr_cache_elem_t *cached_elem, char *key);
+
+/* map data to key_str, based on specified handle attr cache entry */ 
+int dbpf_cache_elem_set_data_based_on_key(
+    TROVE_handle key, char *key_str, void *data, int data_sz);
+
 
 int dbpf_attr_cache_insert(TROVE_handle key, TROVE_ds_attributes *attr);
 int dbpf_attr_cache_remove(TROVE_handle key);

@@ -19,6 +19,7 @@
 #include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-keyval.h"
+#include "dbpf-attr-cache.h"
 #include "gossip.h"
 
 /* Internal function prototypes */
@@ -41,9 +42,31 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
 
     gossip_debug(TROVE_DEBUG, "*** Trove KeyVal Read of %s\n",
                  (char *)key_p->buffer);
+
+    cache_elem = dbpf_cache_elem_lookup(handle);
+    if (cache_elem)
+    {
+        dbpf_keyval_pair_cache_elem_t *data =
+            dbpf_cache_elem_get_data_based_on_key(
+                cache_elem, key_p->buffer);
+        if (data)
+        {
+            gossip_debug(TROVE_DEBUG, "fast path keyval cache hit "
+                         "(data_sz=%d)\n",data->data_sz);
+            /*
+              copy out data here into appropriate place and
+              return 1 for immed completion
+            */
+            memcpy(val_p->buffer, data->data, data->data_sz);
+            val_p->buffer_sz = data->data_sz;
+            val_p->read_sz = data->data_sz;
+            return 1;
+        }
+    }
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -71,7 +94,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     /* initialize the op-specific members */
     q_op_p->op.u.k_read.key   = *key_p;
     q_op_p->op.u.k_read.val   = *val_p;
-	
+
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
@@ -130,12 +153,24 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     }
 
     op_p->u.k_read.val.read_sz = data.size;
+    assert(op_p->u.k_read.val.buffer_sz == op_p->u.k_read.val.read_sz);
 
-    /* sync if requested by user
-     *
-     * Note: this is a little bit silly in some sense, but the semantics allow
-     * for it.
-     */
+    /* cache this data in the attr cache if we can */
+    if (dbpf_cache_elem_set_data_based_on_key(
+            op_p->handle, op_p->u.k_read.key.buffer,
+            op_p->u.k_read.val.buffer, op_p->u.k_read.val.buffer_sz))
+    {
+        gossip_debug(
+            TROVE_DEBUG,"** CANNOT cache data retrieved (key is %s)\n",
+            (char *)op_p->u.k_read.key.buffer);
+    }
+    else
+    {
+        gossip_debug(
+            TROVE_DEBUG,"*** cached keyval data retrieved (key is %s)\n",
+            (char *)op_p->u.k_read.key.buffer);
+    }
+
     if (op_p->flags & TROVE_SYNC)
     {
 	if ((ret = db_p->sync(db_p, 0)) != 0)

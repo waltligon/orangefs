@@ -232,7 +232,7 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
-    
+
     /* find the collection */
     /* TODO: how are we going to handle this?!?!? */
     coll_p = dbpf_collection_find_registered(coll_id);
