@@ -605,11 +605,14 @@ install: install_doc
 
 	install -d $(prefix)/bin
 	install -m 755 $(ADMINTOOLS) $(prefix)/bin
-	# if we ever auto-generate genconfig, remove the $(srcdir)
+	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(prefix)/bin
 
 	install -d $(prefix)/sbin
 	install -m 755 $(SERVER) $(prefix)/sbin
+
+	install -m 755 test/kernel/linux-2.6/pvfs2-client $(prefix)/sbin
+	install -m 755 test/kernel/linux-2.6/pvfs2-client-core $(prefix)/sbin
 
 install_tests:
 	install -d $(prefix)/bin
