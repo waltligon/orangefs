@@ -1,0 +1,340 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <pthread.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <pthread.h>
+
+#include "pvfs2.h"
+#include "pvfs2-mgmt.h"
+#include "pvfs2-vis.h"
+
+#define HISTORY 5
+#define FREQUENCY 1
+
+struct pvfs2_vis_buffer pint_vis_shared;
+pthread_mutex_t pint_vis_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t pint_vis_cond = PTHREAD_COND_INITIALIZER;
+
+static int poll_for_updates(
+    PVFS_fs_id fs,
+    PVFS_credentials credentials,
+    PVFS_id_gen_t* addr_array,
+    struct PVFS_mgmt_perf_stat** tmp_matrix,
+    uint32_t* next_id_array,
+    uint64_t* end_time_ms_array,
+    int server_count,
+    int history_count);
+
+/* pvfs2_vis_start()
+ *
+ * gathers statistics from the servers associated with given path,
+ * and launches concurrent thread with provided function pointer to 
+ * draw visualization
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
+{
+    PVFS_fs_id cur_fs;
+    pvfs_mntlist mnt = {0,NULL};
+    char pvfs_path[PVFS_NAME_MAX] = {0};
+    int i,j;
+    int mnt_index = -1;
+    PVFS_sysresp_init resp_init;
+    PVFS_credentials creds;
+    int ret = -1;
+    int io_server_count = 0;
+    uint32_t* next_id_array;
+    struct PVFS_mgmt_perf_stat** perf_matrix;
+    uint64_t* end_time_ms_array;
+    PVFS_id_gen_t* addr_array;
+    int done = 0;
+    pthread_t vis_id;
+
+    /* look at pvfstab */
+    if(PVFS_util_parse_pvfstab(&mnt))
+    {
+        fprintf(stderr, "Error: failed to parse pvfstab.\n");
+        return(-1);
+    }
+
+    /* see if the destination resides on any of the file systems
+     * listed in the pvfstab; find the pvfs fs relative path
+     */
+    for(i=0; i<mnt.ptab_count; i++)
+    {
+	ret = PVFS_util_remove_dir_prefix(path,
+	    mnt.ptab_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
+	if(ret == 0)
+	{
+	    mnt_index = i;
+	    break;
+	}
+    }
+
+    if(mnt_index == -1)
+    {
+	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
+	    path);
+	return(-1);
+    }
+
+    memset(&resp_init, 0, sizeof(resp_init));
+    ret = PVFS_sys_initialize(mnt, 0, &resp_init);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_sys_initialize", ret);
+	return(-1);
+    }
+
+    cur_fs = resp_init.fsid_list[mnt_index];
+
+    creds.uid = getuid();
+    creds.gid = getgid();
+
+    /* count how many I/O servers we have */
+    ret = PVFS_mgmt_count_servers(cur_fs, creds, PVFS_MGMT_IO_SERVER,
+	&io_server_count);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_count_servers", ret);
+	return(-1);
+    }
+
+    /* allocate a 2 dimensional array for statistics */
+    perf_matrix = (struct PVFS_mgmt_perf_stat**)malloc(
+	io_server_count*sizeof(struct PVFS_mgmt_perf_stat*));
+    if(!perf_matrix)
+    {
+	perror("malloc");
+	return(-1);
+    }
+    for(i=0; i<io_server_count; i++)
+    {
+	perf_matrix[i] = (struct PVFS_mgmt_perf_stat*)malloc(
+	    HISTORY*sizeof(struct PVFS_mgmt_perf_stat));
+	if(!perf_matrix[i])
+	{
+	    perror("malloc");
+	    return(-1);
+	}
+    }
+
+    /* allocate an array to keep up with what iteration of statistics
+     * we need from each server 
+     */
+    next_id_array = (uint32_t*)malloc(io_server_count*sizeof(uint32_t));
+    if(!next_id_array)
+    {
+	perror("malloc");
+	return(-1);
+    }
+    memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
+    end_time_ms_array = (uint64_t*)malloc(io_server_count*sizeof(uint64_t));
+    if(!end_time_ms_array)
+    {
+	perror("malloc");
+	return(-1);
+    }
+
+    /* build a list of servers to talk to */
+    addr_array = (PVFS_id_gen_t*)malloc(io_server_count*sizeof(PVFS_id_gen_t));
+    if(!addr_array)
+    {
+	perror("malloc");
+	return(-1);
+    }
+    ret = PVFS_mgmt_get_server_array(cur_fs, creds, PVFS_MGMT_IO_SERVER,
+	addr_array, &io_server_count);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_get_server_array", ret);
+	return(-1);
+    }
+
+    /* loop for a little bit, until we have 5 measurements queued up from each
+     * server
+     */
+    while(!done)
+    {
+	memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
+	ret = PVFS_mgmt_perf_mon_list(cur_fs, creds, perf_matrix, 
+	    end_time_ms_array, addr_array, next_id_array, io_server_count, 
+	    HISTORY);
+	if(ret < 0)
+	{
+	    PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
+	    return(-1);
+	}
+
+	done = 1;
+	for(i=0; i<io_server_count; i++)
+	{
+	    for(j=0; j<HISTORY; j++)
+	    {
+		if(!perf_matrix[i][j].valid_flag)
+		    done = 0;
+	    }
+	}
+	sleep(FREQUENCY);
+    }
+
+    /* populate the shared performance data */
+    pint_vis_shared.io_count = io_server_count;
+    pint_vis_shared.io_depth = HISTORY;
+
+    /* allocate a 2 dimensional array for statistics */
+    pint_vis_shared.io_perf_matrix = (struct PVFS_mgmt_perf_stat**)malloc(
+	io_server_count*sizeof(struct PVFS_mgmt_perf_stat*));
+    if(!pint_vis_shared.io_perf_matrix)
+    {
+	perror("malloc");
+	return(-1);
+    }
+    for(i=0; i<io_server_count; i++)
+    {
+	pint_vis_shared.io_perf_matrix[i] = (struct PVFS_mgmt_perf_stat*)malloc(
+	    HISTORY*sizeof(struct PVFS_mgmt_perf_stat));
+	if(!pint_vis_shared.io_perf_matrix[i])
+	{
+	    perror("malloc");
+	    return(-1);
+	}
+    }
+    pint_vis_shared.io_end_time_ms_array = (uint64_t*)malloc(
+	io_server_count*sizeof(uint64_t));
+
+    /* fill in first statistics */
+    for(i=0; i<io_server_count; i++)
+    {
+	memcpy(pint_vis_shared.io_perf_matrix[i], perf_matrix[i], HISTORY*
+	    sizeof(struct PVFS_mgmt_perf_stat));
+    }
+    memcpy(pint_vis_shared.io_end_time_ms_array, end_time_ms_array,
+	io_server_count*sizeof(uint64_t));
+
+    /* launch vis thread */
+    ret = pthread_create(&vis_id, NULL, vis_fn, NULL);
+    if(ret != 0)
+    {
+	fprintf(stderr, "pthread_create: %s\n", strerror(ret));
+	return(-1);
+    }
+
+    /* now we just sit here gathering statistics */
+    ret = poll_for_updates(cur_fs, creds, addr_array, perf_matrix, 
+	next_id_array, end_time_ms_array, io_server_count, HISTORY);
+    if(ret < 0)
+    {
+	PVFS_perror("poll_for_updates", ret);
+	return(-1);
+    }
+
+    PVFS_sys_finalize();
+
+    return(0);
+}
+
+/* poll_for_updates()
+ *
+ * sends a periodic request to the servers to probe for new performance 
+ * statistics, shifting them into the shared perf data as needed
+ *
+ * NOTE: we only pass in the tmp_matrix for convenience to avoid having
+ * to allocate another matrix; the caller already has some buffers we can use
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int poll_for_updates(
+    PVFS_fs_id fs,
+    PVFS_credentials credentials,
+    PVFS_id_gen_t* addr_array,
+    struct PVFS_mgmt_perf_stat** tmp_matrix,
+    uint32_t* next_id_array,
+    uint64_t* end_time_ms_array,
+    int server_count,
+    int history_count)
+{
+    int ret;
+    int i, j, k;
+    int new_count;
+    int new_flag = 0;
+
+    while(1)
+    {
+	ret = PVFS_mgmt_perf_mon_list(fs, credentials, tmp_matrix, 
+	    end_time_ms_array, addr_array, next_id_array, server_count, 
+	    history_count);
+	if(ret < 0)
+	{
+	    return(ret);
+	}
+
+	new_flag = 0;
+
+	pthread_mutex_lock(&pint_vis_mutex);
+	for(i=0; i<server_count; i++)
+	{
+	    for(j=0; j<history_count; j++)
+	    {
+		new_count = 0;
+		if(tmp_matrix[i][j].valid_flag)
+		{
+		    new_count++;
+		    new_flag = 1;
+		}
+		if(new_count > 0)
+		{
+
+		    /* if we hit this point, we need to shift one or more
+		     * new measurements into position
+		     */
+		    for(k=new_count; k<history_count; k++)
+		    {
+			/* move old ones over */
+			pint_vis_shared.io_perf_matrix[i][k-new_count]
+			    = pint_vis_shared.io_perf_matrix[i][k];
+		    }
+		    for(k=(history_count-new_count); k<history_count; k++)
+		    {
+			/* drop new ones in */
+			pint_vis_shared.io_perf_matrix[i][k] = 
+			    tmp_matrix[i][k-(history_count-new_count)];
+		    }
+		    /* update end time */
+		    pint_vis_shared.io_end_time_ms_array[i] 
+			= end_time_ms_array[i];
+
+		}
+	    }
+	}
+
+	if(new_flag)
+	{
+	    pthread_cond_signal(&pint_vis_cond);
+	}
+	pthread_mutex_unlock(&pint_vis_mutex);
+
+	sleep(FREQUENCY);
+    }
+
+    return(-PVFS_ENOSYS);
+}
+
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

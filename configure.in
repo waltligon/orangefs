@@ -319,6 +319,18 @@ LDFLAGS="$LDFLAGS -rdynamic"
 CFLAGS="$CFLAGS -DGOSSIP_ENABLE_BACKTRACE"
 )
 
+dnl Check for SDL
+SDL_VERSION=1.2.0
+AM_PATH_SDL($SDL_VERSION, 
+    VISCFLAGS="$SDL_CFLAGS"
+    VISLIBS="$SDL_LIBS"
+,
+    VISCFLAGS=
+    VISLIBS=
+)
+AC_SUBST(VISCFLAGS)
+AC_SUBST(VISLIBS)
+
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in src/apps src/io src/common src/client src/kernel test/common \
@@ -331,6 +343,7 @@ dnl    makefile includes
 AC_OUTPUT(Makefile
 module.mk
 src/apps/admin/module.mk
+src/apps/vis/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
 src/io/trove/trove-dbpf/module.mk

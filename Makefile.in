@@ -97,6 +97,8 @@ LDFLAGS = @LDFLAGS@
 LD = gcc
 LDFLAGS += -L lib 
 LIBS += @LIBS@ -lpvfs2
+VISCFLAGS = @VISCFLAGS@
+VISLIBS = @VISLIBS@
 # for Solaris:
 # LIBS += -lsocket -lnsl
 
@@ -171,6 +173,12 @@ SERVERLIBS = @LIBS@ -lrt -lpthread -lpvfs2-server
 # This is hack and should be fixed.
 LIBCFLAGS = -D__GEN_POSIX_LOCKING__
 LIBS += -lpthread
+
+# VISCFLAGS/VISLIBS: special build flags for vis tools
+# configure has already filled in special graphics flags, we just tack
+# on the PVFS2 stuff here
+VISCFLAGS += $(CFLAGS)
+VISLIBS += $(LIBS)
 
 ################################################################
 # enable GM if configure detected it
