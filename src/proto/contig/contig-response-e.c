@@ -93,17 +93,81 @@ int do_encode_resp(
 	    target_msg->list_count  = 1;
 	    target_msg->buffer_flag = BMI_PRE_ALLOC;
 
-	    target_msg->size_list[0] = 
-		target_msg->total_size = sizeof(struct PVFS_server_resp_s)+header_size;
-	    target_msg->buffer_list[0]
-		= BMI_memalloc(target_msg->dest, 
-			sizeof(struct PVFS_server_resp_s) + header_size,
-			BMI_SEND_BUFFER);
+	    /* we may need to pack trailing data for metafiles */
+	    if(response->u.getattr.attr.objtype ==
+		PVFS_TYPE_METAFILE)
+	    {
+		char* pack_dest = NULL;
+
+		/* TODO: quit doing this when the client and server
+		 * can actually take it
+		 */
+		if(response->u.getattr.attr.u.meta.dist_size != 0)
+		{
+		    gossip_lerr("KLUDGE: encoder is zeroing dist for now.\n");
+		    response->u.getattr.attr.u.meta.dist_size = 0;
+		}
+		if(response->u.getattr.attr.u.meta.nr_datafiles != 0)
+		{
+		    gossip_lerr("KLUDGE: encoder is zeroing nr_datafiles for now.\n");
+		    response->u.getattr.attr.u.meta.nr_datafiles = 0;
+		}
+
+		/* make it big enough to hold datafiles and dist */
+		target_msg->size_list[0] = 
+		    target_msg->total_size = 
+		    sizeof(struct PVFS_server_resp_s) + header_size
+		    + response->u.getattr.attr.u.meta.dist_size
+		    + (response->u.getattr.attr.u.meta.nr_datafiles
+		    * sizeof(PVFS_handle));
+		target_msg->buffer_list[0] = 
+		    BMI_memalloc(target_msg->dest, 
+		    target_msg->total_size,
+		    BMI_SEND_BUFFER);
+		pack_dest = (char*)target_msg->buffer_list[0];
+		/* copy in the datafiles */
+		if(response->u.getattr.attr.u.meta.nr_datafiles > 0)
+		{
+		    pack_dest += sizeof(struct PVFS_server_resp_s);
+		    memcpy(
+			pack_dest,
+			response->u.getattr.attr.u.meta.dfh,
+			(response->u.getattr.attr.u.meta.nr_datafiles
+			* sizeof(PVFS_handle)));
+		}
+		/* copy in the distribution */
+		if(response->u.getattr.attr.u.meta.dist_size > 0)
+		{
+		    pack_dest +=
+			(response->u.getattr.attr.u.meta.nr_datafiles
+			* sizeof(PVFS_handle));
+		    memcpy(
+			pack_dest,
+			response->u.getattr.attr.u.meta.dist,
+			response->u.getattr.attr.u.meta.dist_size);
+		}
+	    }
+	    /* not a metafile */
+	    else
+	    {
+		target_msg->size_list[0] = 
+		    target_msg->total_size = sizeof(struct PVFS_server_resp_s)+header_size;
+		target_msg->buffer_list[0]
+		    = BMI_memalloc(target_msg->dest, 
+			    sizeof(struct PVFS_server_resp_s) + header_size,
+			    BMI_SEND_BUFFER);
+	    }
+
+	    /* in either case, pack the basic ack in */
 	    memcpy(
 		    target_msg->buffer_list[0], 
 		    response, 
 		    sizeof(struct PVFS_server_resp_s)
 		  );
+
+	    /* set rsize for the "on-the-wire" version */
+	    ((struct PVFS_server_resp_s*)target_msg->buffer_list[0])->rsize =
+		target_msg->total_size;
 	    return(0);
 
 	case PVFS_SERV_GETCONFIG:

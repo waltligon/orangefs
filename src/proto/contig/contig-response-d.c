@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
 #include <PINT-reqproto-encode.h>
 #include <PINT-reqproto-module.h>
 
@@ -17,9 +18,13 @@ DECODE_RESP_HEAD(do_decode_resp)
 {
 
 	struct PVFS_server_resp_s *response = input_buffer;
+	struct PVFS_server_resp_s *decoded_response = NULL;
 
 	target_msg->buffer = malloc(response->rsize);
 	memcpy(target_msg->buffer,response,response->rsize);
+
+	decoded_response = (struct PVFS_server_resp_s*)target_msg->buffer;
+
 	switch(response->op)
 	{
 
@@ -47,6 +52,24 @@ DECODE_RESP_HEAD(do_decode_resp)
 					(PVFS_dirent *)(target_msg->buffer+sizeof(struct PVFS_server_resp_s));
 			return 0;
 
+		case PVFS_SERV_GETATTR:
+			if(decoded_response->u.getattr.attr.objtype ==
+				PVFS_TYPE_METAFILE)
+			{
+				/* TODO: don't take these out until getattr works right */
+				assert(response->u.getattr.attr.u.meta.dist_size == 0);
+				assert(response->u.getattr.attr.u.meta.nr_datafiles == 0);
+
+				decoded_response->u.getattr.attr.u.meta.dfh = 
+					(PVFS_handle*)(((char*)decoded_response) 
+					+ sizeof(struct PVFS_server_resp_s));
+				decoded_response->u.getattr.attr.u.meta.dist = 
+					(PVFS_Dist*)(((char*)decoded_response)
+					+ sizeof(struct PVFS_server_resp_s)
+					+ (decoded_response->u.getattr.attr.u.meta.nr_datafiles 
+					* sizeof(PVFS_handle)));
+			}
+			return 0;
 		case PVFS_SERV_CREATE:
 		case PVFS_SERV_NOOP:
 		case PVFS_SERV_SETATTR:
@@ -55,7 +78,6 @@ DECODE_RESP_HEAD(do_decode_resp)
 		case PVFS_SERV_CREATEDIRENT:
 		case PVFS_SERV_MKDIR:
 		case PVFS_SERV_RMDIRENT:
-		case PVFS_SERV_GETATTR:
 		case PVFS_SERV_IO:
 			return 0;
 		default:
