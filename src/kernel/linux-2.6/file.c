@@ -180,8 +180,8 @@ static ssize_t pvfs2_file_write(
 
     pvfs2_print("pvfs2: pvfs2_file_write called on %s\n",
 		(file && file->f_dentry && file->f_dentry->d_name.name ?
-                 file->f_dentry->d_name.name : "UNKNOWN"));
-    
+                 (char *)file->f_dentry->d_name.name : "UNKNOWN"));
+
     new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
     if (!new_op)
     {
@@ -320,6 +320,7 @@ int pvfs2_file_release(
       the next caller of mmap (or 'get_block' accesses)
     */
     truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0);
+    i_size_write(file->f_dentry->d_inode, 0);
     return 0;
 }
 
@@ -345,13 +346,18 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
             return -EINVAL;
         }
     }
+    else if (!inode)
+    {
+        pvfs2_error("pvfs2_file_llseek: invalid inode (NULL)\n");
+        return -EINVAL;
+    }
 
     /*
       NOTE: if .llseek is overriden, we must acquire lock as
       described in Documentation/filesystems/Locking
     */
-    pvfs2_print("pvfs2_file_llseek: offset is %llu (%d)| origin is %d\n",
-                (unsigned long long)offset, (int)offset, origin);
+    pvfs2_print("pvfs2_file_llseek: int offset is %d| origin is %d\n",
+                (int)offset, origin);
 
     pvfs2_print("pvfs2_file_llseek: inode thinks size is %lu\n",
                 (unsigned long)file->f_dentry->d_inode->i_size);

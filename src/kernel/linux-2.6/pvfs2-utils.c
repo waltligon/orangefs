@@ -859,7 +859,7 @@ int pvfs2_truncate_inode(
     new_op->upcall.req.truncate.size = (PVFS_size)size;
 
     service_operation_with_timeout_retry(
-        new_op, "pvfs2_remove_entry", retries);
+        new_op, "pvfs2_truncate_inode", retries);
 
     /*
       the truncate has no downcall members to retrieve, but

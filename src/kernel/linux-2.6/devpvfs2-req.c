@@ -27,6 +27,7 @@ static int open_access_count = 0;
 /* a pointer to the task that opens the dev-req device file */
 static struct task_struct *device_owner = NULL;
 
+
 /* a function that forces termination of the device owner */
 void kill_device_owner(void)
 {
@@ -160,7 +161,8 @@ static ssize_t pvfs2_devreq_writev(
     int num_remaining = max_downsize;
     int payload_size = 0;
     int32_t magic = 0;
-    int64_t _tag = 0;		/* a hack for now (we only looks at 32 bit tags) */
+    /* FIXME: tags are a hack for now (we only looks at 32 bit tags) */
+    int64_t _tag = 0;
     unsigned long tag = 0;
 
     buffer = kmem_cache_alloc(dev_req_cache, SLAB_KERNEL);
@@ -224,7 +226,6 @@ static ssize_t pvfs2_devreq_writev(
         /* ignore downcalls that we're not interested in */
 	pvfs2_print("WARNING: No one's waiting for the tag %lu\n", tag);
     }
-
     kmem_cache_free(dev_req_cache, buffer);
 
     return count;
