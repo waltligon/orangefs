@@ -197,8 +197,10 @@ static int add_op_to_op_in_progress_table(
         qhash_add(s_ops_in_progress_table,
                   (void *)(&vfs_request->info.tag),
                   &vfs_request->hash_link);
+#if 0
         gossip_err("HASHED TAG %lu to REQ %p\n",
                    (unsigned long)vfs_request->info.tag, vfs_request);
+#endif
         ret = 0;
     }
     return ret;
@@ -252,9 +254,10 @@ static int remove_op_from_op_in_progress_table(
                 hash_link, vfs_request_t, hash_link);
             assert(tmp_vfs_request);
             assert(tmp_vfs_request == vfs_request);
-
+#if 0
             gossip_err("UNHASHED TAG %lu FROM REQ %p\n",
                        (unsigned long)vfs_request->info.tag, vfs_request);
+#endif
             ret = 0;
         }
     }
