@@ -846,11 +846,10 @@ static int create_cleanup(PINT_client_sm *sm_p,
         free(sm_p->u.create.datafile_handles);
     }
 
-/* FIXME: Freeing this here seems to cause future lookups to fail */
-/*     if (sm_p->u.create.dist) */
-/*     { */
-/*         PVFS_Dist_free(sm_p->u.create.dist); */
-/*     } */
+    if (sm_p->u.create.dist)
+    {
+        PVFS_Dist_free(sm_p->u.create.dist);
+    }
 
     if (sm_p->msgarray)
     {
