@@ -20,6 +20,8 @@ pvfs2-1.1.0pre1
 - feature-test for kernel routines i_size_write, i_size_read, and parent_ino
 - recover better from server failures
 - kernel: export superblock magic number for romio autodetection
+- 64-bit: change some protocol encodings to avoid unaligned accesses, fix
+  server crash
 
 
 pvfs2-1.0.1
