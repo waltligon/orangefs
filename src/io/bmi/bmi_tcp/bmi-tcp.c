@@ -2268,7 +2268,6 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
     int tmp_errno;
     int tmp;
     bmi_size_t old_amt_complete = 0;
-    struct tcp_op *tcp_op = NULL;
 
     *stall_flag = 1;
 
