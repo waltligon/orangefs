@@ -903,6 +903,9 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     if (ret == 0)
     {
         ret = tmp_ref.db_p->stat(tmp_ref.db_p,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_STAT
+				 (DB_TXN *) NULL,
+#endif
                                  &k_stat_p,
 #ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
                                  NULL,

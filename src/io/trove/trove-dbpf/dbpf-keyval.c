@@ -281,6 +281,9 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
      * object; update the k_size in the cache
      */
     ret = tmp_ref.db_p->stat(tmp_ref.db_p,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_STAT
+			     (DB_TXN *) NULL,
+#endif
                              &k_stat_p,
 #ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
                              NULL,
@@ -390,6 +393,9 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
      * object; update the k_size in the cache
      */
     ret = tmp_ref.db_p->stat(tmp_ref.db_p,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_STAT
+			     (DB_TXN *) NULL,
+#endif
                              &k_stat_p,
 #ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
                              NULL,
