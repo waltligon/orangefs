@@ -18,6 +18,9 @@
 #define PAGES_PER_DESC (PVFS2_BUFMAP_DEFAULT_DESC_SIZE/PAGE_SIZE)
 
 static int bufmap_init = 0;
+static DECLARE_MUTEX(bufmap_init_sem);
+static DECLARE_WAIT_QUEUE_HEAD(bufmap_init_waitq);
+
 static struct page** bufmap_page_array = NULL;
 static void** bufmap_kaddr_array = NULL;
 
@@ -40,8 +43,13 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     int i;
     int offset = 0;
 
+    down(&bufmap_init_sem);
+
     if(bufmap_init)
+    {
+	up(&bufmap_init_sem);
 	return(-EALREADY);
+    }
 
     /* sanity check alignment and size of buffer that caller wants 
      * to work with
@@ -50,22 +58,26 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	(unsigned long)user_desc->ptr)
     {
 	pvfs2_error("pvfs2: error: memory alignment (front).\n");
+	up(&bufmap_init_sem);
 	return(-EINVAL);
     }
     if(PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->size)) != 
 	(unsigned long)(user_desc->ptr + user_desc->size))
     {
 	pvfs2_error("pvfs2: error: memory alignment (back).\n");
+	up(&bufmap_init_sem);
 	return(-EINVAL);
     }
     if(user_desc->size != PVFS2_BUFMAP_TOTAL_SIZE)
     {
 	pvfs2_error("pvfs2: error: user provided an oddly sized buffer...\n");
+	up(&bufmap_init_sem);
 	return(-EINVAL);
     }
     if(PVFS2_BUFMAP_DEFAULT_DESC_SIZE%PAGE_SIZE != 0)
     {
 	pvfs2_error("pvfs2: error: bufmap size not page size divisable.\n");
+	up(&bufmap_init_sem);
 	return(-EINVAL);
     }
 
@@ -75,6 +87,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	GFP_KERNEL);
     if(!bufmap_page_array)
     {
+	up(&bufmap_init_sem);
 	return(-ENOMEM);
     }
 
@@ -84,6 +97,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     if(!bufmap_kaddr_array)
     {
 	kfree(bufmap_page_array);
+	up(&bufmap_init_sem);
 	return(-ENOMEM);
     }
 
@@ -106,6 +120,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     {
 	kfree(bufmap_page_array);
 	kfree(bufmap_kaddr_array);
+	up(&bufmap_init_sem);
 	return(ret);
     }
 
@@ -122,6 +137,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	}
 	kfree(bufmap_page_array);
 	kfree(bufmap_kaddr_array);
+	up(&bufmap_init_sem);
 	return(-ENOMEM);
     }
 
@@ -144,6 +160,8 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     }
 
     bufmap_init = 1;
+    up(&bufmap_init_sem);
+    wake_up_interruptible(&bufmap_init_waitq);
 
     return(0);
 }
@@ -160,9 +178,12 @@ void pvfs_bufmap_finalize(void)
     int i;
 
     pvfs2_print("pvfs2_bufmap_finalize: called\n");
+
+    down(&bufmap_init_sem);
     if(!bufmap_init)
     {
         pvfs2_print("pvfs2_bufmap_finalize: not yet initialized; returning\n");
+	up(&bufmap_init_sem);
 	return;
     }
 
@@ -174,6 +195,7 @@ void pvfs_bufmap_finalize(void)
     kfree(bufmap_kaddr_array);
 
     bufmap_init = 0;
+    up(&bufmap_init_sem);
 
     pvfs2_print("pvfs2_bufmap_finalize: exited normally\n");
     return;
@@ -268,7 +290,28 @@ int pvfs_bufmap_copy_to_user(void* to, int buffer_index,
     int index = 0;
     void* offset = to;
     struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
+    int interrupted;
 
+    down(&bufmap_init_sem);
+    if(!bufmap_init)
+    {
+	up(&bufmap_init_sem);
+	
+	interrupted = wait_event_interruptible_timeout(
+	    bufmap_init_waitq, 
+	    (bufmap_init == 1),
+	    (10*HZ));
+	if(!interrupted)
+	{
+	    if(signal_pending(current))
+		return(-EINTR);
+	    else
+		return(-ETIMEDOUT);
+	}
+
+	down(&bufmap_init_sem);
+    }
+    
     while(amt_copied < size)
     {
 	if((size - amt_copied) > PAGE_SIZE)
@@ -282,6 +325,7 @@ int pvfs_bufmap_copy_to_user(void* to, int buffer_index,
 	amt_copied += amt_this;
 	index++;
     }
+    up(&bufmap_init_sem);
 
     return(0);
 }
@@ -294,6 +338,27 @@ int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index,
     int index = 0;
     void* offset = to;
     struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
+    int interrupted;
+
+    down(&bufmap_init_sem);
+    if(!bufmap_init)
+    {
+	up(&bufmap_init_sem);
+	
+	interrupted = wait_event_interruptible_timeout(
+	    bufmap_init_waitq, 
+	    (bufmap_init == 1),
+	    (10*HZ));
+	if(!interrupted)
+	{
+	    if(signal_pending(current))
+		return(-EINTR);
+	    else
+		return(-ETIMEDOUT);
+	}
+
+	down(&bufmap_init_sem);
+    }
 
     while(amt_copied < size)
     {
@@ -309,6 +374,7 @@ int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index,
 	index++;
     }
 
+    up(&bufmap_init_sem);
     return(0);
 }
 
@@ -326,6 +392,27 @@ int pvfs_bufmap_copy_from_user(int buffer_index, void* from,
     int index = 0;
     void* offset = from;
     struct pvfs_bufmap_desc* to = &desc_array[buffer_index];
+    int interrupted;
+
+    down(&bufmap_init_sem);
+    if(!bufmap_init)
+    {
+	up(&bufmap_init_sem);
+	
+	interrupted = wait_event_interruptible_timeout(
+	    bufmap_init_waitq, 
+	    (bufmap_init == 1),
+	    (10*HZ));
+	if(!interrupted)
+	{
+	    if(signal_pending(current))
+		return(-EINTR);
+	    else
+		return(-ETIMEDOUT);
+	}
+
+	down(&bufmap_init_sem);
+    }
 
     while(amt_copied < size)
     {
@@ -341,6 +428,7 @@ int pvfs_bufmap_copy_from_user(int buffer_index, void* from,
 	index++;
     }
 
+    up(&bufmap_init_sem);
     return(0);
 }
 
