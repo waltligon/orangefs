@@ -157,13 +157,13 @@ int phelper_refresh_pinode(int flags,PVFS_bitfield mask,pinode *pinode_ptr,\
 	{
 		return(-1);
 	}
-	//req_gattr.handle = pref.handle;
-	//req_gattr.fs_id = pref.fs_id;
+	req_gattr.handle = pref.handle;
+	req_gattr.fs_id = pref.fs_id;
 	/* Should be based on flag/attrmask */
 	/*req_gattr->attrmask = ATTR_UID + ATTR_GID + ATTR_PERM + ATTR_ATIME +\
 		ATTR_CTIME + ATTR_MTIME + ATTR_META + ATTR_DATA + ATTR_DIR +\
 		ATTR_SYM + ATTR_TYPE;*/
-//	req_gattr.attrmask = mask;	
+	req_gattr.attrmask = mask;	
 	
 	/* Setup getattr request to server */
 	ret = pint_serv_getattr(&req_job,&ack_job,&req_gattr,credentials,&serv_addr);
