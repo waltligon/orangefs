@@ -145,9 +145,6 @@ int PVFS_sys_mkdir(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir entered\n");
 
-    /* parameter checking goes here.  assume everything from the user
-     * is ok past this point.
-     */
     if ((object_name == NULL) || (resp == NULL))
     {
         return ret;

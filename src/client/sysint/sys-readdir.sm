@@ -20,20 +20,20 @@
 
 extern job_context_id pint_client_sm_context;
 
-/* state function prototypes */
-static int readdir_init(PINT_client_sm *sm_p,
-                        job_status_s *js_p);
-static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
-                                     job_status_s *js_p);
-static int readdir_msg_failure(PINT_client_sm *sm_p,
-                               job_status_s *js_p);
-static int readdir_cleanup(PINT_client_sm *sm_p,
-                           job_status_s *js_p);
+static int readdir_init(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int readdir_msg_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int readdir_msg_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int readdir_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 /* completion function prototypes */
-static int readdir_msg_comp_fn(void *v_p,
-                               struct PVFS_server_resp *resp_p,
-                               int index);
+static int readdir_msg_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index);
 
 %%
 
@@ -46,46 +46,54 @@ machine pvfs2_client_readdir_sm(init,
                                 readdir_msg_failure,
                                 cleanup)
 {
-    state init {
-	run readdir_init;
-	default => readdir_getattr_setup_msgpair;
+    state init
+    {
+        run readdir_init;
+        default => readdir_getattr_setup_msgpair;
     }
 
-    state readdir_getattr_setup_msgpair {
-	run PINT_sm_common_parent_getattr_setup_msgpair;
+    state readdir_getattr_setup_msgpair
+    {
+        run PINT_sm_common_parent_getattr_setup_msgpair;
         success => readdir_getattr_xfer_msgpair;
-	default => readdir_getattr_failure;
+        default => readdir_getattr_failure;
     }
 
-    state readdir_getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_acache_sm;
+    state readdir_getattr_xfer_msgpair
+    {
+        jump pvfs2_client_getattr_acache_sm;
         success => readdir_msg_setup_msgpair;
-	default => readdir_getattr_failure;
+        default => readdir_getattr_failure;
     }
 
-    state readdir_getattr_failure {
-	run PINT_sm_common_parent_getattr_failure;
-	default => cleanup;
+    state readdir_getattr_failure
+    {
+        run PINT_sm_common_parent_getattr_failure;
+        default => cleanup;
     }
 
-    state readdir_msg_setup_msgpair {
-	run readdir_msg_setup_msgpair;
-	success => readdir_msg_xfer_msgpair;
+    state readdir_msg_setup_msgpair
+    {
+        run readdir_msg_setup_msgpair;
+        success => readdir_msg_xfer_msgpair;
         default => readdir_msg_failure;
     }
 
-    state readdir_msg_xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
+    state readdir_msg_xfer_msgpair
+    {
+        jump pvfs2_client_msgpair_sm;
         success => cleanup;
-	default => readdir_msg_failure;
+        default => readdir_msg_failure;
     }
 
-    state readdir_msg_failure {
-	run readdir_msg_failure;
-	default => cleanup;
+    state readdir_msg_failure
+    {
+        run readdir_msg_failure;
+        default => cleanup;
     }
 
-    state cleanup {
+    state cleanup
+    {
         run readdir_cleanup;
         default => terminate;
     }
@@ -106,9 +114,6 @@ int PVFS_sys_readdir(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir entered\n");
 
-    /* parameter checking goes here.  assume everything from the user
-     * is ok past this point.
-     */
     if ((pvfs_dirent_incount > PVFS_REQ_LIMIT_DIRENT_COUNT) ||
         (resp == NULL))
     {
@@ -143,7 +148,7 @@ int PVFS_sys_readdir(
     assert(ret == 0);
 
     /* while !done call progress function */
-    while (!sm_p->op_complete && ret == 0)
+    while (!sm_p->op_complete && (ret == 0))
     {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir calling "
                      "PINT_client_state_machine_test()\n");
@@ -153,10 +158,8 @@ int PVFS_sys_readdir(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir completed\n");
 
-    /* save our return value */
     error = sm_p->error_code;
 
-    /* clean up after ourselves */
     free(sm_p);
     return error;
 }
@@ -170,32 +173,30 @@ static int readdir_init(PINT_client_sm *sm_p,
 
     assert(js_p->error_code == 0);
 
-    /* do the request scheduler thing, if necessary */
-
     return 1;
 }
 
 static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
                                      job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t server_addr;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: "
                  "readdir_msg_setup_msgpair\n");
 
-    /* clear error field in job */
     js_p->error_code = 0;
 
     /* determine the metadata server to contact */
     ret = PINT_bucket_map_to_server(
         &server_addr, sm_p->u.readdir.object_ref.handle,
         sm_p->u.readdir.object_ref.fs_id);
-    if (ret < 0)
+    if (ret)
     {
-        gossip_err("Failed to get meta server information\n");
-        assert(0);
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+        return 1;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," readdir: posting readdir req\n");
@@ -203,11 +204,12 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "%Lu|%d | token is %d | limit is %d\n",
-                 Lu(sm_p->u.readdir.object_ref.handle),
-                 sm_p->u.readdir.object_ref.fs_id,
-                 sm_p->u.readdir.pos_token,
-                 sm_p->u.readdir.dirent_limit);
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "%Lu|%d | token is %d | limit is %d\n",
+        Lu(sm_p->u.readdir.object_ref.handle),
+        sm_p->u.readdir.object_ref.fs_id,
+        sm_p->u.readdir.pos_token,
+        sm_p->u.readdir.dirent_limit);
 
     PINT_SERVREQ_READDIR_FILL(msg_p->req,
                               *sm_p->cred_p,
@@ -221,9 +223,7 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->handle = sm_p->u.readdir.object_ref.handle;
     msg_p->comp_fn = readdir_msg_comp_fn;
 
-    /* we've already resolved the appropriate meta server */
     msg_p->svr_addr = server_addr;
-
     return 1;
 }
 
@@ -237,9 +237,6 @@ static int readdir_msg_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_READDIR);
 
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
     if (resp_p->status != 0)
     {
 	return resp_p->status;
@@ -263,8 +260,9 @@ static int readdir_msg_comp_fn(void *v_p,
         memcpy(sm_p->u.readdir.readdir_resp->dirent_array,
                resp_p->u.readdir.dirent_array, dirent_array_len);
     }
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Got %d directory entries\n",
-                 sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount);
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "*** Got %d directory entries\n",
+        sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount);
 
     return 0;
 }
@@ -272,11 +270,8 @@ static int readdir_msg_comp_fn(void *v_p,
 static int readdir_msg_failure(PINT_client_sm *sm_p,
                                       job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: readdir_msg_failure\n");
-
-    /* FIXME: do real error handling */
-    js_p->error_code = -EINVAL;
-
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "readdir state: readdir_msg_failure\n");
     return 1;
 }
 
@@ -287,9 +282,7 @@ static int readdir_cleanup(PINT_client_sm *sm_p,
 
     sm_p->error_code = js_p->error_code;
 
-    /* mark operation as complete */
     sm_p->op_complete = 1;
-
     return 0;
 }
 
