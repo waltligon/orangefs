@@ -403,17 +403,17 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     /* set up space for flows */
     iosm_p->flow_comp_ct = 0;
 
-    /* flow descriptor array; it's important that we zero this one out
-     * so we can tell later if we allocated these or not.
-     */
-    iosm_p->flow_p_array = (flow_descriptor **)
-	malloc(target_datafile_count * sizeof(flow_descriptor *));
-    if (iosm_p->flow_p_array == NULL) {
+    /* flow descriptor array */
+    iosm_p->flow_array = (flow_descriptor *)
+	malloc(target_datafile_count * sizeof(flow_descriptor));
+    if (iosm_p->flow_array == NULL) {
 	assert(0);
     }
-    memset(iosm_p->flow_p_array,
-	   0,
-	   target_datafile_count * sizeof(flow_descriptor *));
+    /* set each flow descriptor to initial values */
+    for(i=0; i<target_datafile_count; i++)
+    {
+	PINT_flow_reset(&iosm_p->flow_array[i]);
+    }
 
     /* flow id array */
     iosm_p->flow_id_array = (job_id_t *)
@@ -767,16 +767,9 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 
 	    gossip_debug(CLIENT_DEBUG, "  building flow for %d.\n", recv_match);
 
-	    /* allocate flow descriptor
-	     *
-	     * NOTE: PHIL SAYS THAT THERE IS A WAY TO MANUALLY ALLOCATE
-	     *       SPACE FOR THESE AND THEN CALL SOME FUNCTION TO INITIALIZE
-	     *       THEM ALL.  PROBABLY SHOULD USE THAT.
-	     */
-	    fl_p = sm_p->u.io.flow_p_array[recv_match] = PINT_flow_alloc();
-	    if (fl_p == NULL) {
-		assert(0);
-	    }
+	    /* find matching flow descriptor */
+	    fl_p = &sm_p->u.io.flow_array[recv_match];
+
 	    /* fill in file_data structure */
 	    /* TODO: MACRO TO FILL THIS IN? */
 	    fl_p->file_data.fsize     = resp_p->u.io.bstream_size;
@@ -1041,7 +1034,11 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 		error_count++;
 		if (error == 0) error = msg_p->recv_status.error_code;
 	    }
-	    else if (iosm_p->flow_p_array[i] != NULL)
+	    /* NOTE: this is a little bit of a hack to determine if we have
+	     * actually used this flow descriptor; we don't really care
+	     * what the io_req is
+	     */
+	    else if (iosm_p->flow_array[i].io_req != NULL)
 	    {
 		if (iosm_p->flow_status_array[i].error_code != 0)
 		{
@@ -1061,9 +1058,9 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 		     */
 		    gossip_debug(CLIENT_DEBUG,
 				 "  %Ld bytes read from %d.\n",
-				 iosm_p->flow_p_array[i]->total_transfered,
+				 iosm_p->flow_array[i].total_transfered,
 				 i);
-		    total_size += iosm_p->flow_p_array[i]->total_transfered;
+		    total_size += iosm_p->flow_array[i].total_transfered;
 		}
 		else if (iosm_p->io_type == PVFS_IO_WRITE) {
 		    if (iosm_p->ackarray[i].recv_status.error_code != 0)
@@ -1108,12 +1105,10 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 		}
 
 		/* free resources associated with this flow array element:
-		 * - flow descriptor element
 		 * - write ack, if it was a write (we decoded it if we needed
 		 *   to above, and got rid of that already)
 		 */
-		PINT_flow_free(sm_p->u.io.flow_p_array[i]);
-		sm_p->u.io.flow_p_array[i] = NULL; /* pedantic */
+		PINT_flow_reset(&sm_p->u.io.flow_array[i]); /* pedantic */
 		if (iosm_p->io_type == PVFS_IO_WRITE) {
 		    BMI_memfree(msg_p->svr_addr,
 				iosm_p->ackarray[i].encoded_resp_p,
@@ -1121,7 +1116,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 				BMI_RECV);
 		}
 
-	    } /* flow_p_array[i] != NULL */
+	    }
 	}
     }
 
@@ -1137,7 +1132,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
      */
     free(sm_p->msgarray);
     free(sm_p->u.io.datafile_handles);
-    free(sm_p->u.io.flow_p_array);
+    free(sm_p->u.io.flow_array);
     free(sm_p->u.io.flow_id_array);
     free(sm_p->u.io.flow_status_array);
     free(sm_p->u.io.session_tag_array);
