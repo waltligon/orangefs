@@ -559,98 +559,121 @@ int test_invalid_files(MPI_Comm * comm,
 		fprintf(stderr, "[test_invalid_files] test_lookup %d\n",
 			params->p2);
 		ret = test_lookup(params->p2);
-		fprintf(stderr,
-			"[test_invalid_files] test_lookup return = %d\n", ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_lookup",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 1:
 		fprintf(stderr, "[test_invalid_files] test_getattr %d\n",
 			params->p2);
 		ret = test_getattr(params->p2);
-		fprintf(stderr,
-			"[test_invalid_files] test_getattr return = %d\n", ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_getattr",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 2:
 		fprintf(stderr, "[test_invalid_files] test_setattr %d\n",
 			params->p2);
 		ret = test_setattr(params->p2);
-		fprintf(stderr,
-			"[test_invalid_files] test_setattr return = %d\n", ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_setattr",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 3:
 		fprintf(stderr, "[test_invalid_files] test_mkdir %d\n",
 			params->p2);
 		ret = test_mkdir(params->p2);
-		fprintf(stderr, "[test_invalid_files] test_mkdir return = %d\n",
-			ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_mkdir",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 4:
 		fprintf(stderr, "[test_invalid_files] test_readdir %d\n",
 			params->p2);
 		ret = test_readdir(params->p2);
-		fprintf(stderr,
-			"[test_invalid_files] test_readdir return = %d\n", ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_readdir",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 5:
 		fprintf(stderr, "[test_invalid_files] test_create %d\n",
 			params->p2);
 		ret = test_create(params->p2);
-		fprintf(stderr,
-			"[test_invalid_files] test_create return = %d\n", ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_create",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 6:
 		fprintf(stderr, "[test_invalid_files] test_remove %d\n",
 			params->p2);
 		ret = test_remove(params->p2);
-		fprintf(stderr,
-			"[test_invalid_files] test_remove return = %d\n", ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_remove",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 7:
 		fprintf(stderr, "[test_invalid_files] test_rename %d\n",
 			params->p2);
 		ret = test_rename(params->p2);
-		fprintf(stderr,
-			"[test_invalid_files] test_rename return = %d\n", ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_rename",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 8:
 		fprintf(stderr, "[test_invalid_files] test_symlink %d\n",
 			params->p2);
 		ret = test_symlink(params->p2);
-		fprintf(stderr,
-			"[test_invalid_files] test_symlink return = %d\n", ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_symlink",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 9:
 		fprintf(stderr, "[test_invalid_files] test_readlink %d\n",
 			params->p2);
 		ret = test_readlink(params->p2);
-		fprintf(stderr,
-			"[test_invalid_files] test_readlink return = %d\n",
-			ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_readlink",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 10:
 		fprintf(stderr, "[test_invalid_files] test_read %d\n",
 			params->p2);
 		ret = test_read(params->p2);
-		fprintf(stderr, "[test_invalid_files] test_read return = %d\n",
-			ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_read",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 11:
 		fprintf(stderr, "[test_invalid_files] test_write %d\n",
 			params->p2);
 		ret = test_write(params->p2);
-		fprintf(stderr, "[test_invalid_files] test_write return = %d\n",
-			ret);
-		return ret;
+		if(ret >= 0){
+		    PVFS_perror("test_write",ret);
+		    return ret;
+		}
+		return 0;
 		break;
 	    case 99:
 		fprintf(stderr, "[test_invalid_files] init_file %d\n",
