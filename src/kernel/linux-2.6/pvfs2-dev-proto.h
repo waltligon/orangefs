@@ -28,6 +28,7 @@
 #define PVFS2_VFS_OP_FS_MOUNT          0xFF00000E
 #define PVFS2_VFS_OP_FS_UMOUNT         0xFF00000F
 #define PVFS2_VFS_OP_CANCEL            0xFF00EE00
+#define PVFS2_VFS_OP_FSYNC             0xFF00EE01
 
 /* misc constants */
 #define PVFS2_NAME_LEN                 0x000000FF

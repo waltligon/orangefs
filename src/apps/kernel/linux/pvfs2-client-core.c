@@ -1205,6 +1205,27 @@ static PVFS_error service_operation_cancellation(
     return 0;
 }
 
+static PVFS_error post_fsync_request(vfs_request_t *vfs_request)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG, "Got a flush request for %Lu,%d\n",
+        Lu(vfs_request->in_upcall.req.fsync.refn.handle),
+        vfs_request->in_upcall.req.fsync.refn.fs_id);
+
+    ret = PVFS_isys_flush(
+        vfs_request->in_upcall.req.fsync.refn,
+        &vfs_request->in_upcall.credentials,
+        &vfs_request->op_id, (void *)vfs_request);
+
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Posting flush failed", ret);
+    }
+    return ret;
+}
+
 static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
     char *entry_name,
@@ -1512,6 +1533,8 @@ static inline void package_downcall_members(
             break;
         case PVFS2_VFS_OP_TRUNCATE:
             break;
+        case PVFS2_VFS_OP_FSYNC:
+            break;
         case PVFS2_VFS_OP_FILE_IO:
             if (*error_code == 0)
             {
@@ -1776,6 +1799,9 @@ static inline PVFS_error handle_unexp_vfs_request(
 #endif
         case PVFS2_VFS_OP_CANCEL:
             ret = service_operation_cancellation(vfs_request);
+            break;
+        case PVFS2_VFS_OP_FSYNC:
+            ret = post_fsync_request(vfs_request);
             break;
         case PVFS2_VFS_OP_INVALID:
         default:

@@ -115,6 +115,11 @@ typedef struct
 
 typedef struct
 {
+    PVFS_object_ref refn;
+} pvfs2_fsync_request_t;
+
+typedef struct
+{
     int type;
     PVFS_credentials credentials;
 
@@ -136,6 +141,7 @@ typedef struct
         pvfs2_fs_mount_request_t fs_mount;
         pvfs2_fs_umount_request_t fs_umount;
         pvfs2_op_cancel_t cancel;
+        pvfs2_fsync_request_t fsync;
     } req;
 } pvfs2_upcall_t;
 

@@ -82,7 +82,7 @@ nested machine pvfs2_msgpairarray_sm(
     state post
     {
         run msgpairarray_post;
-	MSGPAIRS_COMPLETE => completion_fn;
+        MSGPAIRS_COMPLETE => completion_fn;
         default => complete;
     }
 
@@ -159,7 +159,7 @@ static int msgpairarray_init(PARENT_SM *sm_p,
  *
  */
 static int msgpairarray_post(PARENT_SM *sm_p,
-			     job_status_s *js_p)
+                             job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, i = 0, tmp = 0;
     struct server_configuration_s *server_config = NULL;
@@ -264,58 +264,58 @@ static int msgpairarray_post(PARENT_SM *sm_p,
             local_enc_and_alloc = 1;
         }
 
-	session_tag = PINT_util_get_next_tag();
+        session_tag = PINT_util_get_next_tag();
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpair %d (%p): "
                      "posting recv\n", sm_p, (i + 1), msg_p);
 
-	/* post receive of response; job_id stored in recv_id */
-	ret = job_bmi_recv(msg_p->svr_addr,
-			   msg_p->encoded_resp_p,
-			   msg_p->max_resp_sz,
-			   session_tag,
-			   BMI_PRE_ALLOC,
-			   sm_p,
-			   i,
-			   &msg_p->recv_status,
-			   &msg_p->recv_id,
-			   sm_p->msgarray_params.job_context,
-			   sm_p->msgarray_params.job_timeout);
-	if (ret == 0)
-	{
-	    /* perform a quick test to see if the recv failed before posting
-	     * the send; if it reports an error quickly then we can save the
-	     * confusion of sending a request for which we can't recv a
-	     * response
-	     */
-	    ret = job_test(msg_p->recv_id, &tmp, NULL,
-			   &msg_p->recv_status, 0,
-			   sm_p->msgarray_params.job_context);
-	}
-
-	if ((ret < 0) || (ret == 1))
+        /* post receive of response; job_id stored in recv_id */
+        ret = job_bmi_recv(msg_p->svr_addr,
+                           msg_p->encoded_resp_p,
+                           msg_p->max_resp_sz,
+                           session_tag,
+                           BMI_PRE_ALLOC,
+                           sm_p,
+                           i,
+                           &msg_p->recv_status,
+                           &msg_p->recv_id,
+                           sm_p->msgarray_params.job_context,
+                           sm_p->msgarray_params.job_timeout);
+        if (ret == 0)
         {
-	    /* it is impossible for this recv to complete at this point
-	     * without errors; we haven't sent the request yet!
-	     */
-	    assert(ret < 0 || msg_p->recv_status.error_code != 0);
-	    if (ret < 0)
+            /* perform a quick test to see if the recv failed before posting
+             * the send; if it reports an error quickly then we can save the
+             * confusion of sending a request for which we can't recv a
+             * response
+             */
+            ret = job_test(msg_p->recv_id, &tmp, NULL,
+                           &msg_p->recv_status, 0,
+                           sm_p->msgarray_params.job_context);
+        }
+
+        if ((ret < 0) || (ret == 1))
+        {
+            /* it is impossible for this recv to complete at this point
+             * without errors; we haven't sent the request yet!
+             */
+            assert(ret < 0 || msg_p->recv_status.error_code != 0);
+            if (ret < 0)
             {
-		PVFS_perror_gossip("Post of receive failed", ret);
+                PVFS_perror_gossip("Post of receive failed", ret);
             }
-	    else
+            else
             {
-		PVFS_perror_gossip("Receive immediately failed",
-			    msg_p->recv_status.error_code);
+                PVFS_perror_gossip("Receive immediately failed",
+                            msg_p->recv_status.error_code);
             }
 
-	    msg_p->recv_id = 0;
-	    msg_p->send_id = 0;
+            msg_p->recv_id = 0;
+            msg_p->send_id = 0;
 
-	    /* mark send as bad too and don't post it */
-	    msg_p->send_status.error_code = msg_p->recv_status.error_code;
-	    msg_p->op_status = msg_p->recv_status.error_code;
-	    sm_p->msgarray_params.comp_ct -= 2;
+            /* mark send as bad too and don't post it */
+            msg_p->send_status.error_code = msg_p->recv_status.error_code;
+            msg_p->op_status = msg_p->recv_status.error_code;
+            sm_p->msgarray_params.comp_ct -= 2;
 
             if (local_enc_and_alloc)
             {
@@ -326,75 +326,75 @@ static int msgpairarray_post(PARENT_SM *sm_p,
                 local_enc_and_alloc = 0;
             }
 
-	    /* continue to send other array entries if possible */
-	    continue;
-	}
+            /* continue to send other array entries if possible */
+            continue;
+        }
 
-	/* if we reach here, the recv has been posted without failure, but
-	 * has not completed yet
-	 */
-	assert(ret == 0);
+        /* if we reach here, the recv has been posted without failure, but
+         * has not completed yet
+         */
+        assert(ret == 0);
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpair %d (%p): "
                      "posting send\n", sm_p, (i + 1), msg_p);
 
-	/* post send of request; job_id stored in send_id */
-	ret = job_bmi_send_list(msg_p->encoded_req.dest,
-				msg_p->encoded_req.buffer_list,
-				msg_p->encoded_req.size_list,
-				msg_p->encoded_req.list_count,
-				msg_p->encoded_req.total_size,
-				session_tag,
-				msg_p->encoded_req.buffer_type,
-				1,
-				sm_p,
-				sm_p->msgarray_count+i,
-				&msg_p->send_status,
-				&msg_p->send_id,
-				sm_p->msgarray_params.job_context,
-				sm_p->msgarray_params.job_timeout);
+        /* post send of request; job_id stored in send_id */
+        ret = job_bmi_send_list(msg_p->encoded_req.dest,
+                                msg_p->encoded_req.buffer_list,
+                                msg_p->encoded_req.size_list,
+                                msg_p->encoded_req.list_count,
+                                msg_p->encoded_req.total_size,
+                                session_tag,
+                                msg_p->encoded_req.buffer_type,
+                                1,
+                                sm_p,
+                                sm_p->msgarray_count+i,
+                                &msg_p->send_status,
+                                &msg_p->send_id,
+                                sm_p->msgarray_params.job_context,
+                                sm_p->msgarray_params.job_timeout);
 
- 	if ((ret < 0) ||
+         if ((ret < 0) ||
             ((ret == 1) && (msg_p->send_status.error_code != 0)))
-	{
-	    if (ret < 0)
+        {
+            if (ret < 0)
             {
-		PVFS_perror_gossip("Post of send failed", ret);
+                PVFS_perror_gossip("Post of send failed", ret);
             }
-	    else
+            else
             {
-		PVFS_perror_gossip("Send immediately failed",
-		    msg_p->recv_status.error_code);
+                PVFS_perror_gossip("Send immediately failed",
+                    msg_p->recv_status.error_code);
             }
 
-	    gossip_err("Send error: cancelling recv.\n");
+            gossip_err("Send error: cancelling recv.\n");
 
-	    job_bmi_cancel(msg_p->recv_id, sm_p->msgarray_params.job_context);
-	    
-	    /* we still have to wait for recv completion, so just decrement
-	     * comp_ct by one and keep going
-	     */
-	    msg_p->op_status = msg_p->send_status.error_code;
-	    msg_p->send_id = 0;
-	    sm_p->msgarray_params.comp_ct--;
-	}
-	else if (ret == 1)
-	{
-	    /* immediate completion */
-	    msg_p->send_id = 0;
-	    /* decrement our count, since send is already done. */
-	    sm_p->msgarray_params.comp_ct--;
-	}
+            job_bmi_cancel(msg_p->recv_id, sm_p->msgarray_params.job_context);
+            
+            /* we still have to wait for recv completion, so just decrement
+             * comp_ct by one and keep going
+             */
+            msg_p->op_status = msg_p->send_status.error_code;
+            msg_p->send_id = 0;
+            sm_p->msgarray_params.comp_ct--;
+        }
+        else if (ret == 1)
+        {
+            /* immediate completion */
+            msg_p->send_id = 0;
+            /* decrement our count, since send is already done. */
+            sm_p->msgarray_params.comp_ct--;
+        }
         /* else: successful post, no immediate completion */
     }
 
     if (sm_p->msgarray_params.comp_ct == 0)
     {
-	/* everything is completed already (could happen in some failure
-	 * cases); jump straight to final completion function.
-	 */
-	 js_p->error_code = MSGPAIRS_COMPLETE;
-	 return 1;
+        /* everything is completed already (could happen in some failure
+         * cases); jump straight to final completion function.
+         */
+         js_p->error_code = MSGPAIRS_COMPLETE;
+         return 1;
     }
 
     /* we are still waiting on operations to complete, next state
@@ -412,9 +412,9 @@ static int msgpairarray_post_retry(PARENT_SM *sm_p,
                  "(%p) msgpairarray state: post_retry\n", sm_p);
 
     return job_req_sched_post_timer(
-	sm_p->msgarray_params.retry_delay,
+        sm_p->msgarray_params.retry_delay,
         sm_p, 0, js_p, &tmp_id,
-	sm_p->msgarray_params.job_context);
+        sm_p->msgarray_params.job_context);
 }
 
 static int msgpairarray_complete(PARENT_SM *sm_p,
@@ -429,49 +429,49 @@ static int msgpairarray_complete(PARENT_SM *sm_p,
 
     if (js_p->status_user_tag < sm_p->msgarray_count)
     {
-	PINT_sm_msgpair_state *msg_p = 
-	    &sm_p->msgarray[js_p->status_user_tag];
+        PINT_sm_msgpair_state *msg_p = 
+            &sm_p->msgarray[js_p->status_user_tag];
 
-	msg_p->recv_id = 0;
-	msg_p->recv_status = *js_p;
+        msg_p->recv_id = 0;
+        msg_p->recv_status = *js_p;
 
-	/* save error (if we don't already have one) in op_status */
-	if(msg_p->op_status == 0)
-	    msg_p->op_status = msg_p->recv_status.error_code;
+        /* save error (if we don't already have one) in op_status */
+        if(msg_p->op_status == 0)
+            msg_p->op_status = msg_p->recv_status.error_code;
 
-	if(msg_p->recv_status.error_code && msg_p->send_id != 0)
-	{
-	    /* we got a receive error, but send is still pending.  Cancel
-	     * the send
-	     */
-	    job_bmi_cancel(msg_p->send_id, sm_p->msgarray_params.job_context);
-	}
+        if(msg_p->recv_status.error_code && msg_p->send_id != 0)
+        {
+            /* we got a receive error, but send is still pending.  Cancel
+             * the send
+             */
+            job_bmi_cancel(msg_p->send_id, sm_p->msgarray_params.job_context);
+        }
     }
     else
     {
-	PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[
+        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[
             js_p->status_user_tag - sm_p->msgarray_count];
 
-	msg_p->send_id = 0;
-	msg_p->send_status = *js_p;
+        msg_p->send_id = 0;
+        msg_p->send_status = *js_p;
 
-	/* save error (if we don't already have one) in op_status */
-	if(msg_p->op_status == 0)
-	    msg_p->op_status = msg_p->send_status.error_code;
+        /* save error (if we don't already have one) in op_status */
+        if(msg_p->op_status == 0)
+            msg_p->op_status = msg_p->send_status.error_code;
 
-	if(msg_p->send_status.error_code && msg_p->recv_id != 0)
-	{
-	    /* we got a send error, but recv is still pending.  Cancel
-	     * the recv 
-	     */
-	    job_bmi_cancel(msg_p->recv_id, sm_p->msgarray_params.job_context);
-	}
+        if(msg_p->send_status.error_code && msg_p->recv_id != 0)
+        {
+            /* we got a send error, but recv is still pending.  Cancel
+             * the recv 
+             */
+            job_bmi_cancel(msg_p->recv_id, sm_p->msgarray_params.job_context);
+        }
     }
 
     /* decrement comp_ct until all operations have completed */
     if (--sm_p->msgarray_params.comp_ct > 0)
     {
-	return 0;
+        return 0;
     }
 
     assert(sm_p->msgarray_params.comp_ct == 0);
@@ -483,11 +483,13 @@ static int msgpairarray_complete(PARENT_SM *sm_p,
 }
 
 static int msgpairarray_completion_fn(PARENT_SM *sm_p,
-				      job_status_s *js_p)
+                                      job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, i = 0;
     struct PINT_decoded_msg decoded_resp;
-    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
+
+    /* response structure (decoded) */
+    struct PVFS_server_resp *resp_p = NULL;
 
     js_p->error_code = 0;
 
@@ -496,11 +498,11 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
 
     for (i = 0; i < sm_p->msgarray_count; i++)
     {
-	PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
         assert(msg_p);
 
-	if (msg_p->op_status != 0)
-	{
+        if (msg_p->op_status != 0)
+        {
             if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
                 (PVFS_ERROR_CLASS(-msg_p->op_status) ==
                  PVFS_ERROR_BMI) &&
@@ -530,84 +532,84 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
                 return 1;
             }
 
-	    PVFS_perror_gossip("*** msgpair did not complete successfully",
+            PVFS_perror_gossip("*** msgpair did not complete successfully",
                         msg_p->op_status);
 
-	    js_p->error_code = msg_p->op_status;
-	    continue;
-	}
+            js_p->error_code = msg_p->op_status;
+            continue;
+        }
 
-	ret = PINT_serv_decode_resp(msg_p->fs_id,
-				    msg_p->encoded_resp_p,
-				    &decoded_resp,
-				    &msg_p->svr_addr,
-				    msg_p->recv_status.actual_size,
-				    &resp_p);
-	if (ret != 0)
+        ret = PINT_serv_decode_resp(msg_p->fs_id,
+                                    msg_p->encoded_resp_p,
+                                    &decoded_resp,
+                                    &msg_p->svr_addr,
+                                    msg_p->recv_status.actual_size,
+                                    &resp_p);
+        if (ret != 0)
         {
             PVFS_perror_gossip("msgpairarray decode error", ret);
             js_p->error_code = ret;
             return 1;
-	}
+        }
 
-	assert(resp_p->status <= 0);
+        assert(resp_p->status <= 0);
 
-	/* if we've made it this far, the server response status is
-	 * meaningful, so we save it.
-	 */
-	msg_p->op_status = resp_p->status;
+        /* if we've made it this far, the server response status is
+         * meaningful, so we save it.
+         */
+        msg_p->op_status = resp_p->status;
 
-	/* NOTE: we call the function associated with each message,
-	 *       not just the one from the first array element.  so
-	 *       there could in theory be different functions for each
-	 *       message (to handle different types of messages all in
-	 *       the same array).
-	 */
-	if (msg_p->comp_fn != NULL)
-	{
-	    /* If we call the completion function, store the result on
-	     * a per message pair basis.  Also store some non-zero
-	     * (failure) value in js_p->error_code if we see one.
-	     */
-	    msg_p->op_status = msg_p->comp_fn(sm_p, resp_p, i);
-	    if (msg_p->op_status != 0)
-	    {
-		js_p->error_code = msg_p->op_status;
-	    }
-
-	    /* even if we see a failure, continue to process with the
-	     * completion function. -- RobR
-	     */
-	}
-	else if (resp_p->status != 0)
+        /* NOTE: we call the function associated with each message,
+         *       not just the one from the first array element.  so
+         *       there could in theory be different functions for each
+         *       message (to handle different types of messages all in
+         *       the same array).
+         */
+        if (msg_p->comp_fn != NULL)
         {
-	    /* no comp_fn specified and status non-zero */
-	    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+            /* If we call the completion function, store the result on
+             * a per message pair basis.  Also store some non-zero
+             * (failure) value in js_p->error_code if we see one.
+             */
+            msg_p->op_status = msg_p->comp_fn(sm_p, resp_p, i);
+            if (msg_p->op_status != 0)
+            {
+                js_p->error_code = msg_p->op_status;
+            }
+
+            /* even if we see a failure, continue to process with the
+             * completion function. -- RobR
+             */
+        }
+        else if (resp_p->status != 0)
+        {
+            /* no comp_fn specified and status non-zero */
+            gossip_debug(GOSSIP_MSGPAIR_DEBUG,
                          "notice: msgpairarray_complete: error %d "
                          "from server %d\n", resp_p->status, i);
 
-	    /* save a non-zero status to return if we see one */
-	    js_p->error_code = resp_p->status;
+            /* save a non-zero status to return if we see one */
+            js_p->error_code = resp_p->status;
 
-	    /* If we don't have a completion function, there is no point
-	     * in continuing to process after seeing a failure.
-	     */
-	    if (js_p->error_code)
+            /* If we don't have a completion function, there is no point
+             * in continuing to process after seeing a failure.
+             */
+            if (js_p->error_code)
             {
                 break;
             }
-	}
-	
-	/* free all the resources that we used to send and receive. */
-	ret = PINT_serv_free_msgpair_resources(
+        }
+
+        /* free all the resources that we used to send and receive. */
+        ret = PINT_serv_free_msgpair_resources(
             &msg_p->encoded_req, msg_p->encoded_resp_p, &decoded_resp,
             &msg_p->svr_addr, msg_p->max_resp_sz);
-	if (ret)
+        if (ret)
         {
             PVFS_perror_gossip("Failed to free msgpair resources", ret);
             js_p->error_code = ret;
             return 1;
-	}
+        }
 
         msg_p->encoded_resp_p = NULL;
         msg_p->max_resp_sz = 0;
@@ -644,11 +646,11 @@ static int count_incomplete_msgs(
  * helper functions used in conjunction with state machine defined above
  */
 int PINT_serv_decode_resp(PVFS_fs_id fs_id,
-			  void *encoded_resp_p,
-			  struct PINT_decoded_msg *decoded_resp_p,
-			  PVFS_BMI_addr_t *svr_addr_p,
-			  int actual_resp_sz,
-			  struct PVFS_server_resp **resp_out_pp)
+                          void *encoded_resp_p,
+                          struct PINT_decoded_msg *decoded_resp_p,
+                          PVFS_BMI_addr_t *svr_addr_p,
+                          int actual_resp_sz,
+                          struct PVFS_server_resp **resp_out_pp)
 {
     int ret = -1, server_type = 0;
     struct server_configuration_s *server_config;
@@ -660,30 +662,30 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
     if (ret > -1)
     {
         *resp_out_pp = (struct PVFS_server_resp *)decoded_resp_p->buffer;
-	if ((*resp_out_pp)->op == PVFS_SERV_PROTO_ERROR)
-	{
+        if ((*resp_out_pp)->op == PVFS_SERV_PROTO_ERROR)
+        {
 
-	    gossip_err("Error: server does not seem to understand "
+            gossip_err("Error: server does not seem to understand "
                        "the protocol that this client is using.\n");
-	    gossip_err("   Please check server logs for more "
+            gossip_err("   Please check server logs for more "
                        "information.\n");
 
-	    if (fs_id != PVFS_FS_ID_NULL)
-	    {
-		server_config = PINT_server_config_mgr_get_config(fs_id);
-		server_string = PINT_cached_config_map_addr(
+            if (fs_id != PVFS_FS_ID_NULL)
+            {
+                server_config = PINT_server_config_mgr_get_config(fs_id);
+                server_string = PINT_cached_config_map_addr(
                     server_config, fs_id, *svr_addr_p, &server_type);
-		PINT_server_config_mgr_put_config(server_config);
-		gossip_err("   Server: %s.\n", server_string);
-	    }
-	    else
-	    {
-		gossip_err("   Server: unknown; probably an error "
+                PINT_server_config_mgr_put_config(server_config);
+                gossip_err("   Server: %s.\n", server_string);
+            }
+            else
+            {
+                gossip_err("   Server: unknown; probably an error "
                            "contacting server listed in pvfs2tab "
                            "file.\n");
-	    }
-	    return(-EPROTONOSUPPORT);
-	}
+            }
+            return(-EPROTONOSUPPORT);
+        }
     }
     return ret;
 }

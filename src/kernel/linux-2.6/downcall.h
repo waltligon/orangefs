@@ -98,6 +98,11 @@ typedef struct
 {
 } pvfs2_cancel_response_t;
 
+/* the fsync response is a blank downcall */
+typedef struct
+{
+} pvfs2_fsync_response_t;
+
 typedef struct
 {
     int type;
@@ -120,6 +125,7 @@ typedef struct
         pvfs2_fs_mount_response_t fs_mount;
 /* 	pvfs2_fs_umount_response_t fs_umount; */
 /* 	pvfs2_cancel_response_t cancel; */
+/* 	pvfs2_fsync_response_t fsync; */
     } resp;
 } pvfs2_downcall_t;
 

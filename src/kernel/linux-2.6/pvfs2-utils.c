@@ -868,8 +868,8 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     pvfs2_kernel_op_t *new_op = NULL;
 
-    pvfs2_print("pvfs2: pvfs2_flush_mmap_racache %d: "
-                "Handle is %Lu | fs_id %d\n",(int)inode->i_ino,
+    pvfs2_print("pvfs2_flush_mmap_racache %d: Handle is %Lu "
+                "| fs_id %d\n",(int)inode->i_ino,
                 pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
 
     new_op = op_alloc();
@@ -885,8 +885,8 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
 
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    pvfs2_print("pvfs2: pvfs2_flush_mmap_racache got "
-                "return value of %d\n",ret);
+    pvfs2_print("pvfs2_flush_mmap_racache got return "
+                "value of %d\n",ret);
 
   error_exit:
     translate_error_if_wait_failed(ret, 0, 0);

@@ -107,17 +107,17 @@ static int __job_time_mgr_add(struct job_desc* jd, int timeout_sec)
     /* look for a bucket matching the desired seconds value */
     qlist_for_each(tmp_link, &bucket_queue)
     {
-	tmp_bucket = qlist_entry(
+        tmp_bucket = qlist_entry(
             tmp_link, struct time_bucket, bucket_link);
         assert(tmp_bucket);
 
-	if(tmp_bucket->expire_time_sec >= expire_time_sec)
-	{
-	    break;
-	}
+        if(tmp_bucket->expire_time_sec >= expire_time_sec)
+        {
+            break;
+        }
 
-	tmp_bucket = NULL;
-	prev_bucket = tmp_bucket;
+        tmp_bucket = NULL;
+        prev_bucket = tmp_bucket;
     }
 
     if(!tmp_bucket || tmp_bucket->expire_time_sec != expire_time_sec)
@@ -126,8 +126,9 @@ static int __job_time_mgr_add(struct job_desc* jd, int timeout_sec)
 	new_bucket = (struct time_bucket*)
             malloc(sizeof(struct time_bucket));
 	assert(new_bucket);
-	memset(new_bucket, 0, sizeof(struct time_bucket));
+
 	new_bucket->expire_time_sec = expire_time_sec;
+	INIT_QLIST_HEAD(&new_bucket->bucket_link);
 	INIT_QLIST_HEAD(&new_bucket->jd_queue);
 
 	if(tmp_bucket)
@@ -193,7 +194,6 @@ void job_time_mgr_rem(struct job_desc* jd)
 	return;
     }
 
-    qlist_del(&jd->job_time_link);
     tmp_bucket = (struct time_bucket*)jd->time_bucket;
 
     if(qlist_empty(&tmp_bucket->jd_queue))
@@ -203,6 +203,7 @@ void job_time_mgr_rem(struct job_desc* jd)
 	INIT_QLIST_HEAD(&tmp_bucket->jd_queue);
 	free(tmp_bucket);
     }
+    qlist_del(&jd->job_time_link);
     jd->time_bucket = NULL;
 
     gen_mutex_unlock(&bucket_mutex);

@@ -507,7 +507,7 @@ do {                                                         \
     {                                                        \
         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
         {                                                    \
-            pvfs2_error("pvfs2: %s -- wait timed out (%x).  "\
+            pvfs2_error("%s -- wait timed out (%x).  "       \
                         "aborting attempt.\n", method, ret); \
         }                                                    \
         goto error_exit;                                     \
@@ -542,7 +542,7 @@ do {                                                         \
     {                                                        \
         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
         {                                                    \
-            pvfs2_error("pvfs2: %s -- wait timed out (%x).  "\
+            pvfs2_error("%s -- wait timed out (%x).  "       \
                         "aborting attempt.\n", method,ret);  \
         }                                                    \
         goto error_exit;                                     \
@@ -567,17 +567,15 @@ do {                                                               \
     {                                                              \
         if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))        \
         {                                                          \
-            pvfs2_print("pvfs2: %s -- timeout; requeing op\n",     \
-                        method);                                   \
+            pvfs2_print("%s -- timeout; requeing op\n", method);   \
             goto wait_for_op;                                      \
         }                                                          \
         else                                                       \
         {                                                          \
             if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                 \
             {                                                      \
-                pvfs2_error("pvfs2: %s -- wait timed out (%x).  "  \
-                            "aborting retry attempts.\n",          \
-                            method,ret);                           \
+                pvfs2_error("%s -- wait timed out (%x).  aborting "\
+                            "retry attempts.\n", method, ret);     \
             }                                                      \
             goto error_exit;                                       \
          }                                                         \
@@ -608,17 +606,15 @@ do {                                                                \
     {                                                               \
         if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))         \
         {                                                           \
-            pvfs2_print("pvfs2: %s -- timeout; requeing op\n",      \
-                        meth);                                      \
+            pvfs2_print("%s -- timeout; requeing op\n", meth);      \
             goto wait_for_op;                                       \
         }                                                           \
         else                                                        \
         {                                                           \
             if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                  \
             {                                                       \
-                pvfs2_error("pvfs2: %s -- wait timed out (%x).  "   \
-                            "aborting retry attempts.\n",           \
-                            meth,ret);                              \
+                pvfs2_error("%s -- wait timed out (%x). aborting "  \
+                            " retry attempts.\n", meth, ret);       \
             }                                                       \
             e = 1;                                                  \
             goto error_exit;                                        \

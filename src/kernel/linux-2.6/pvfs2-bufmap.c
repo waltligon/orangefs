@@ -149,7 +149,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
         buffer_index_array[i] = 0;
     }
     spin_unlock(&buffer_index_lock);
-        
+
     bufmap_init = 1;
 
     pvfs2_print("pvfs2_bufmap_initialize: exiting normally\n");
@@ -230,13 +230,21 @@ int pvfs_bufmap_get(int *buffer_index)
             break;
         }
 
-        if (signal_pending(current))
+        if (!signal_pending(current))
         {
-            pvfs2_print("pvfs2: bufmap_get() interrupted.\n");
-            ret = -EINTR;
-            break;
+            int timeout = MSECS_TO_JIFFIES(
+                1000 * MAX_SERVICE_WAIT_IN_SECONDS);
+            if (!schedule_timeout(timeout))
+            {
+                pvfs2_print("*** pvfs_bufmap_get timed out\n");
+                break;
+            }
+            continue;
         }
-        schedule();
+
+        pvfs2_print("pvfs2: bufmap_get() interrupted.\n");
+        ret = -EINTR;
+        break;
     }
 
     set_current_state(TASK_RUNNING);
