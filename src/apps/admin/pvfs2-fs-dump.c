@@ -350,6 +350,10 @@ int build_handlelist(PVFS_fs_id cur_fs,
     for (i=0; i < server_count; i++) {
 	handle_count_array[i] = stat_array[i].handles_total_count - stat_array[i].handles_available_count;
     }
+
+    free(stat_array);
+    stat_array = NULL;
+
     handlelist_initialize(handle_count_array, server_count);
 
     for(i=0; i<server_count; i++)
@@ -411,6 +415,12 @@ int build_handlelist(PVFS_fs_id cur_fs,
 	}
     } while(more_flag);
 
+    for (i = 0; i < server_count; i++) {
+	free(handle_matrix[i]);
+    }
+    free(handle_matrix);
+    free(handle_count_array);
+
     handlelist_finished_adding_handles();
 
     return 0;
@@ -451,6 +461,8 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     return 0;
 }
 
+/* descend()
+ */
 int descend(PVFS_fs_id cur_fs,
 	    PVFS_pinode_reference pref,
 	    PVFS_credentials creds,
@@ -924,8 +936,11 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-m fs_mount_point]\n",
+    fprintf(stderr, "Usage  : %s [-dv] [-m fs_mount_point]\n",
 	argv[0]);
+    fprintf(stderr, "Display information about contents of file system.\n");
+    fprintf(stderr, "  -d              output in format suitable for dot\n");
+    fprintf(stderr, "  -v              print version and exit\n");
     fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
 	argv[0]);
     return;
