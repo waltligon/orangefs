@@ -52,6 +52,12 @@ int descend(PVFS_fs_id cur_fs,
 	    PVFS_credentials creds,
 	    struct options *opts_p);
 
+void verify_datafiles(PVFS_fs_id cur_fs,
+		      PVFS_pinode_reference mf_ref,
+		      int df_count,
+		      PVFS_credentials creds,
+		      int dot_fmt);
+
 void analyze_remaining_handles(PVFS_fs_id cur_fs,
 			       PVFS_id_gen_t *addr_array,
 			       PVFS_credentials creds,
@@ -499,9 +505,11 @@ int descend(PVFS_fs_id cur_fs,
 
 	switch (getattr_resp.attr.objtype) {
 	    case PVFS_TYPE_METAFILE:
-#if 0
-		verify_datafiles(cur_fs, entry_ref, getattr_resp, creds);
-#endif
+		verify_datafiles(cur_fs,
+				 entry_ref,
+				 getattr_resp.attr.dfile_count,
+				 creds,
+				 opts_p->dot_format);
 		break;
 	    case PVFS_TYPE_DIRECTORY:
 		descend(cur_fs, entry_ref, creds, opts_p);
@@ -516,20 +524,38 @@ int descend(PVFS_fs_id cur_fs,
     return 0;
 }
 
-#if 0
+/* verify_datafiles()
+ *
+ * Discovers the datafile handles for a given metafile,
+ * verifies that they exist, and removes them from the handlelist.
+ */
 void verify_datafiles(PVFS_fs_id cur_fs,
 		      PVFS_pinode_reference mf_ref,
-		      PVFS_sysresp_getattr mf_getattr_resp,
-		      PVFS_credentials creds)
+		      int df_count,
+		      PVFS_credentials creds,
+		      int dot_fmt)
 {
-    int i;
+    int ret, i, server_idx;
+    PVFS_handle *df_handles;
 
-    for (i = 0; i < mf_getattr_resp.attr.u.meta.dfile_count; i++)
+    df_handles = (PVFS_handle *) malloc(df_count * sizeof(PVFS_handle));
+    if (df_handles == NULL)
     {
+	assert(0);
+    }
+    ret = PVFS_mgmt_get_dfile_array(mf_ref, creds, df_handles, df_count);
+    if (ret != 0)
+    {
+	assert(0);
+    }
+
+    for (i = 0; i < df_count; i++)
+    {
+#if 0
 	PVFS_pinode_reference df_ref;
 	PVFS_sysresp_getattr df_getattr_resp;
 
-	df_ref.handle = mf_getattr_resp.attr.u.meta.dfile_array[i];
+	df_ref.handle = df_handles[i];
 	df_ref.fs_id  = cur_fs;
 
 	printf("going after 0x%08Lx\n", df_ref.handle);
@@ -538,9 +564,26 @@ void verify_datafiles(PVFS_fs_id cur_fs,
 			 PVFS_ATTR_SYS_ALL,
 			 creds,
 			 &df_getattr_resp);
-    }
-}
 #endif
+
+	ret = handlelist_find_handle(df_handles[i], &server_idx);
+	if (ret != 0)
+	{
+	    assert(0);
+	}
+
+	print_entry(NULL,
+		    df_handles[i],
+		    mf_ref.handle,
+		    PVFS_TYPE_DATAFILE,
+		    server_idx,
+		    dot_fmt);
+
+	handlelist_remove_handle(df_handles[i], server_idx);
+    }
+
+    free(df_handles);
+}
 
 void analyze_remaining_handles(PVFS_fs_id cur_fs,
 			       PVFS_id_gen_t *addr_array,
@@ -773,6 +816,8 @@ static void print_entry(char *name,
 		       handle, name, handle, server_idx);
 		break;
 	    case PVFS_TYPE_DATAFILE:
+		printf("\tH0x%08Lx [shape=ellipse, label =\"0x%08Lx (%d)\"];\n",
+		       handle, handle, server_idx);
 		break;
 	    case PVFS_TYPE_DIRDATA:
 		break;
@@ -784,11 +829,21 @@ static void print_entry(char *name,
     }
     else
     {
-	printf("file = %s, handle = 0x%08Lx, type = %d, server = %d\n",
-	       name,
-	       handle,
-	       objtype,
-	       server_idx);
+	switch (objtype) {
+	    case PVFS_TYPE_DATAFILE:
+		printf("handle = 0x%08Lx, type = %d, server = %d\n",
+		       handle,
+		       objtype,
+		       server_idx);
+		break;
+	    default:
+		printf("file = %s, handle = 0x%08Lx, type = %d, server = %d\n",
+		       name,
+		       handle,
+		       objtype,
+		       server_idx);
+		break;
+	}
     }
 }
 
