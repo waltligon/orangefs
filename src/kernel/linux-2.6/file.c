@@ -47,9 +47,9 @@ int pvfs2_file_open(
 	return dcache_dir_open(inode, file);
     }
     /*
-       fs/open.c: returns 0 after enforcing large file support
-       if running on a 32 bit system w/o O_LARGFILE flag
-     */
+      fs/open.c: returns 0 after enforcing large file support
+      if running on a 32 bit system w/o O_LARGFILE flag
+    */
     return generic_file_open(inode, file);
 }
 

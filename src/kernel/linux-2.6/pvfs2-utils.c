@@ -412,10 +412,21 @@ int pvfs2_inode_getattr(
 	}
         ret = new_op->downcall.status;
 
+#if 0 /* DEBUGGING ONLY */
+	printk("**** GETATTR on handle %Lu,%d | inode ct=%d | "
+               "ret=%d | perms=(%d,%d)\n", pvfs2_inode->refn.handle,
+               pvfs2_inode->refn.fs_id,(int)atomic_read(&inode->i_count),
+               ret, (int)inode->i_uid, (int)inode->i_gid);
+#endif
+
       error_exit:
         pvfs2_print(error_exit ? "*** warning: getattr error_exit\n" : "");
 	op_release(new_op);
     }
+/* DEBUGGING ONLY */
+#if 0
+    printk("GETATTR RETURNING %d\n",ret);
+#endif
     return ret;
 }
 

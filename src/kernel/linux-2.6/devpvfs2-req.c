@@ -241,28 +241,28 @@ static ssize_t pvfs2_devreq_writev(
 	    spin_unlock(&op->lock);
 
             /*
-              if this operation is an I/O operation, we need to
-              wait for all data to be copied before we can return
-              to avoid buffer corruption and races that can pull
-              the buffers out from under us.
+              if this operation is an I/O operation, we need to wait
+              for all data to be copied before we can return to avoid
+              buffer corruption and races that can pull the buffers
+              out from under us.
 
-              Essentially we're synchronizing with other parts of
-              the vfs implicitly by not allow the user space
-              application reading/writing this device to return
-              until the buffers are done being used.
+              Essentially we're synchronizing with other parts of the
+              vfs implicitly by not allowing the user space
+              application reading/writing this device to return until
+              the buffers are done being used.
             */
             if (op->upcall.type == PVFS2_VFS_OP_FILE_IO)
             {
                 int timed_out = 0;
                 DECLARE_WAITQUEUE(wait_entry, current);
 
+                set_current_state(TASK_INTERRUPTIBLE);
+
                 add_wait_queue(&op->io_completion_waitq, &wait_entry);
                 wake_up_interruptible(&op->waitq);
 
                 while(1)
                 {
-                    set_current_state(TASK_INTERRUPTIBLE);
-
                     spin_lock(&op->lock);
                     if (op->io_completed)
                     {
