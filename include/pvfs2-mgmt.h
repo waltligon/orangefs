@@ -36,11 +36,30 @@ int PVFS_mgmt_count_servers(
     int server_type,
     int* count);
 
+int PVFS_mgmt_get_server_array(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    int server_type,
+    PVFS_id_gen_t* addr_array,
+    int* inout_count_p);
+
+int PVFS_mgmt_setparam_list(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    enum PVFS_server_param param,
+    int64_t value,
+    PVFS_id_gen_t* addr_array,
+    int count);
+
 int PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     enum PVFS_server_param param,
     int64_t value);
+
+/* TODO: functions below this line need some adjustment... */
+/***********************************************************/
+
 
 int PVFS_mgmt_statfs_all(
     PVFS_fs_id fs_id,

@@ -85,8 +85,8 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 	case PVFS_SYS_FLUSH:
 	    sm_p->current_state = pvfs2_client_flush_sm.state_machine + 1;
 	    break;
-	case PVFS_MGMT_SETPARAM_ALL:
-	    sm_p->current_state = pvfs2_client_mgmt_setparam_all_sm.state_machine + 1;
+	case PVFS_MGMT_SETPARAM_LIST:
+	    sm_p->current_state = pvfs2_client_mgmt_setparam_list_sm.state_machine + 1;
 	    break;
 	case PVFS_MGMT_NOOP:
 	    sm_p->current_state = pvfs2_client_mgmt_noop_sm.state_machine + 1;

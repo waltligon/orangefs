@@ -20,6 +20,75 @@
 
 extern struct server_configuration_s g_server_config;
 
+/* PVFS_mgmt_setparam_all()
+ *
+ * helper function on top of PVFS_mgmt_setparam_list(); automatically
+ * generates list of all servers and operates on that list
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_mgmt_setparam_all(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    enum PVFS_server_param param,
+    int64_t value)
+{
+    PVFS_id_gen_t* addr_array = NULL;
+    int count = 0;
+    int ret = -1;
+
+    ret = PINT_bucket_count_servers(&g_server_config, fs_id, 
+	(PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER), &count);
+    if(ret < 0)
+	return(ret);
+
+    addr_array = (PVFS_id_gen_t*)malloc(count*sizeof(PVFS_id_gen_t));
+    if(!addr_array)
+	return(-PVFS_ENOMEM);
+
+    /* generate default list of servers */
+    ret = PINT_bucket_get_server_array(&g_server_config,
+	fs_id,
+	(PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER),
+	addr_array, 
+	&count);
+    if(ret < 0)
+    {
+	free(addr_array);
+	return(ret);
+    }
+
+    /* issue setparam call */
+    ret = PVFS_mgmt_setparam_list(
+	fs_id,
+	credentials,
+	param,
+	value,
+	addr_array,
+	count);
+
+    free(addr_array);
+
+    return(ret);
+}
+
+/* PVFS_mgmt_get_server_array()
+ *
+ * fills in an array of opaque server addresses of the specified type
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_mgmt_get_server_array(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    int server_type,
+    PVFS_id_gen_t* addr_array,
+    int* inout_count_p)
+{
+    return(PINT_bucket_get_server_array(&g_server_config, fs_id, 
+	server_type, addr_array, inout_count_p));
+}
+
 /* PVFS_mgmt_count_servers()
  *
  * counts the number of physical servers present in a given PVFS2 file 

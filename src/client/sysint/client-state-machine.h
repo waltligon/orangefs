@@ -178,11 +178,13 @@ struct PINT_client_flush_sm {
     PINT_client_sm_msgpair_state *msgpair; /* used in datafile flush */
 };
 
-struct PINT_client_mgmt_setparam_all_sm 
+struct PINT_client_mgmt_setparam_list_sm 
 {
     PVFS_fs_id fs_id;
     enum PVFS_server_param param;
     int64_t value;
+    PVFS_id_gen_t* addr_array;
+    int count;
 };
 
 struct PINT_client_mgmt_statfs_all_sm
@@ -255,7 +257,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_getattr_sm getattr;
 	struct PINT_client_io_sm io;
 	struct PINT_client_flush_sm flush;
-	struct PINT_client_mgmt_setparam_all_sm setparam_all;
+	struct PINT_client_mgmt_setparam_list_sm setparam_list;
 	struct PINT_client_mgmt_noop_sm noop;
 	struct PINT_client_truncate_sm  truncate;
 	struct PINT_client_mgmt_statfs_all_sm statfs_all;
@@ -278,7 +280,7 @@ enum {
     PVFS_SYS_IO      = 6,
     PVFS_SYS_FLUSH   = 7,
     PVFS_SYS_TRUNCATE= 8,
-    PVFS_MGMT_SETPARAM_ALL = 9,
+    PVFS_MGMT_SETPARAM_LIST = 9,
     PVFS_MGMT_NOOP   = 10,
     PVFS_MGMT_STATFS_ALL = 11
 };
@@ -327,7 +329,7 @@ extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
-extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_all_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_all_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_noop_sm;
 extern struct PINT_state_machine_s pvfs2_client_truncate_sm;

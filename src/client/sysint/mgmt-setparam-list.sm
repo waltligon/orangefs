@@ -25,10 +25,10 @@ extern job_context_id pint_client_sm_context;
 extern struct server_configuration_s g_server_config;
 
 /* state function prototypes */
-static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
+static int mgmt_setparam_list_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p);
 
-static int mgmt_setparam_all_cleanup(PINT_client_sm *sm_p,
+static int mgmt_setparam_list_cleanup(PINT_client_sm *sm_p,
 			  job_status_s *js_p);
 
 static int root_check_comp_fn(void* v_p, struct PVFS_server_resp * resp_p,
@@ -36,14 +36,14 @@ static int root_check_comp_fn(void* v_p, struct PVFS_server_resp * resp_p,
 
 %%
 
-machine pvfs2_client_mgmt_setparam_all_sm(
+machine pvfs2_client_mgmt_setparam_list_sm(
     setup_msgpair,
     xfer_msgpair,
     cleanup)
 {
 
     state setup_msgpair {
-	run mgmt_setparam_all_setup_msgpair;
+	run mgmt_setparam_list_setup_msgpair;
 	success => xfer_msgpair;
 	default => cleanup;
     }
@@ -54,24 +54,26 @@ machine pvfs2_client_mgmt_setparam_all_sm(
     }
 
     state cleanup {
-	run mgmt_setparam_all_cleanup;
+	run mgmt_setparam_list_cleanup;
 	default => setup_msgpair;
     }
 }
 
 %%
 
-int PVFS_mgmt_setparam_all(
+int PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     enum PVFS_server_param param,
-    int64_t value)
+    int64_t value,
+    PVFS_id_gen_t* addr_array,
+    int count)
 {
     int ret;
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_setparam_all entered\n");
+    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_setparam_list entered\n");
 
     if (param == PVFS_SERV_PARAM_INVALID) 
     {
@@ -86,15 +88,17 @@ int PVFS_mgmt_setparam_all(
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
-    sm_p->u.setparam_all.param = param;
-    sm_p->u.setparam_all.value = value;
-    sm_p->u.setparam_all.fs_id = fs_id;
+    sm_p->u.setparam_list.param = param;
+    sm_p->u.setparam_list.value = value;
+    sm_p->u.setparam_list.fs_id = fs_id;
+    sm_p->u.setparam_list.addr_array = addr_array;
+    sm_p->u.setparam_list.count = count;
 
     gossip_debug(CLIENT_DEBUG,
-		 "PVFS_mgmt_setparam_all calling PINT_client_state_machine_post()\n");
+		 "PVFS_mgmt_setparam_list calling PINT_client_state_machine_post()\n");
 
     /* do something to kick off processing */
-    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_SETPARAM_ALL);
+    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_SETPARAM_LIST);
     if(ret < 0)
     {
 	/* this should not fail under normal conditions */
@@ -106,7 +110,7 @@ int PVFS_mgmt_setparam_all(
     /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0) {
 	gossip_debug(CLIENT_DEBUG,
-		     "PVFS_mgmt_setparam_all calling PINT_client_state_machine_test()\n");
+		     "PVFS_mgmt_setparam_list calling PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
     if(ret < 0)
@@ -115,7 +119,7 @@ int PVFS_mgmt_setparam_all(
 	return(ret);
     }
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_setparam_all completed\n");
+    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_setparam_list completed\n");
 
     /* save our return value */
     error = sm_p->error_code;
@@ -125,70 +129,50 @@ int PVFS_mgmt_setparam_all(
     return error;
 }
 
-static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
+static int mgmt_setparam_list_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    int ret = -1;
-    int num_phys_servers = 0;
-    struct PINT_bucket_server_info* info_array;
     int i;
     PINT_client_sm_msgpair_state *msg_p;
 
-    gossip_debug(CLIENT_DEBUG, "setparam_all state: mgmt_setparam_all_setup_msgpair\n");
-
-    /* the first thing we have to do is find out how many physical servers
-     * are present, and build and array of addresses to reach them
-     */
-    ret = PINT_collect_physical_server_info(sm_p->u.setparam_all.fs_id,
-	&num_phys_servers, &info_array);
-    if(ret < 0)
-    {
-	js_p->error_code = ret;
-	return(1);
-    }
-
-    gossip_debug(CLIENT_DEBUG,
-	"PVFS_mgmt_setparam_all found %d servers.\n", num_phys_servers);
+    gossip_debug(CLIENT_DEBUG, "setparam_list state: mgmt_setparam_list_setup_msgpair\n");
 
     /* allocate memory for msgpair array */
-    sm_p->msgarray_count = num_phys_servers;
+    sm_p->msgarray_count = sm_p->u.setparam_list.count;
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
-    malloc(num_phys_servers*sizeof(PINT_client_sm_msgpair_state));
+    malloc(sm_p->msgarray_count*sizeof(PINT_client_sm_msgpair_state));
     if(!sm_p->msgarray)
     {
-	free(info_array);
 	js_p->error_code = -PVFS_ENOMEM;
 	return(1);
     }
 
     /* setup msgpair array */
-    for(i=0; i<num_phys_servers; i++)
+    for(i=0; i<sm_p->msgarray_count; i++)
     {
 	msg_p = &sm_p->msgarray[i];
 
 	PINT_SERVREQ_MGMT_SETPARAM_FILL(msg_p->req,
 	    *sm_p->cred_p,
-	    sm_p->u.setparam_all.fs_id,
-	    sm_p->u.setparam_all.param,
-	    sm_p->u.setparam_all.value);
+	    sm_p->u.setparam_list.fs_id,
+	    sm_p->u.setparam_list.param,
+	    sm_p->u.setparam_list.value);
 
-	msg_p->fs_id = sm_p->u.setparam_all.fs_id;
+	msg_p->fs_id = sm_p->u.setparam_list.fs_id;
 	msg_p->handle = PVFS_HANDLE_NULL;
-	if(sm_p->u.setparam_all.param == PVFS_SERV_PARAM_ROOT_CHECK)
+	if(sm_p->u.setparam_list.param == PVFS_SERV_PARAM_ROOT_CHECK)
 	    msg_p->comp_fn = root_check_comp_fn;
 	else
 	    msg_p->comp_fn = NULL;
-	msg_p->svr_addr = info_array[i].addr;
+	msg_p->svr_addr = sm_p->u.setparam_list.addr_array[i];
     }
-
-    free(info_array);
 
     /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;
     return(1);
 }
 
-static int mgmt_setparam_all_cleanup(PINT_client_sm *sm_p,
+static int mgmt_setparam_list_cleanup(PINT_client_sm *sm_p,
 			  job_status_s *js_p)
 {
     if(sm_p->msgarray)
