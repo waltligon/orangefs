@@ -32,9 +32,9 @@
 
 #define PVFS2_MAX_TABFILES 8
 
-static PVFS_util_tab stat_tab_array[PVFS2_MAX_TABFILES];
-static int stat_tab_count = 0;
-static gen_mutex_t stat_tab_mutex = GEN_MUTEX_INITIALIZER;
+static PVFS_util_tab s_stat_tab_array[PVFS2_MAX_TABFILES];
+static int s_stat_tab_count = 0;
+static gen_mutex_t s_stat_tab_mutex = GEN_MUTEX_INITIALIZER;
 
 static int parse_flowproto_string(
     const char *input,
@@ -56,17 +56,18 @@ void PVFS_util_gen_credentials(
 
 /* PVFS_util_parse_pvfstab()
  *
- * parses either the file pointed to by the PVFS2TAB_FILE env variable,
- * or /etc/fstab, or /etc/pvfs2tab or ./pvfs2tab to extract pvfs2 mount 
- * entries.
+ * parses either the file pointed to by the PVFS2TAB_FILE env
+ * variable, or /etc/fstab, or /etc/pvfs2tab or ./pvfs2tab to extract
+ * pvfs2 mount entries.
  * 
- * NOTE: if tabfile argument is given at runtime to specify which tabfile to
- * use, then that will be the _only_ file searched for pvfs2 entries.
+ * NOTE: if tabfile argument is given at runtime to specify which
+ * tabfile to use, then that will be the _only_ file searched for
+ * pvfs2 entries.
  *
  * example entry:
  * tcp://localhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 defaults 0 0
  *
- * returns constant pointer to internal tab structure on success, NULL on
+ * returns const pointer to internal tab structure on success, NULL on
  * failure
  */
 const PVFS_util_tab *PVFS_util_parse_pvfstab(
@@ -75,7 +76,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     FILE *mnt_fp = NULL;
     int file_count = 4;
     const char *file_list[4] =
-	{ NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab" };
+        { NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab" };
     const char *targetfile = NULL;
     struct mntent *tmp_ent;
     int i, j;
@@ -85,89 +86,96 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     const char *cp;
     int ret = -1;
     int tmp_mntent_count = 0;
+    PVFS_util_tab *current_tab = NULL;
 
     if (tabfile != NULL)
     {
-	/* caller wants us to look in a specific location for the tabfile */
-	file_list[0] = tabfile;
-	file_count = 1;
+        /*
+          caller wants us to look in a specific location for the
+          tabfile
+        */
+        file_list[0] = tabfile;
+        file_count = 1;
     }
     else
     {
-	/* search the system and env vars for tab files */
-
-	/* first check for environment variable override */
-	file_list[0] = getenv("PVFS2TAB_FILE");
-	file_count = 4;
+        /*
+          search the system and env vars for tab files;
+          first check for environment variable override
+        */
+        file_list[0] = getenv("PVFS2TAB_FILE");
+        file_count = 4;
     }
 
-    gen_mutex_lock(&stat_tab_mutex);
+    gen_mutex_lock(&s_stat_tab_mutex);
 
     /* start by checking list of files we have already parsed */
-    for (i = 0; i < stat_tab_count; i++)
+    for (i = 0; i < s_stat_tab_count; i++)
     {
-	for (j = 0; j < file_count; j++)
-	{
-	    if (file_list[j] && !strcmp(file_list[j],
-					stat_tab_array[i].tabfile_name))
-	    {
-		/* already done */
-		gen_mutex_unlock(&stat_tab_mutex);
-		return (&stat_tab_array[i]);
-	    }
-	}
+        for (j = 0; j < file_count; j++)
+        {
+            if (file_list[j] &&
+                !strcmp(file_list[j], s_stat_tab_array[i].tabfile_name))
+            {
+                /* already done */
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return (&s_stat_tab_array[i]);
+            }
+        }
     }
 
-    assert(stat_tab_count < PVFS2_MAX_TABFILES);
+    assert(s_stat_tab_count < PVFS2_MAX_TABFILES);
 
-    /* scan our prioritized list of tab files in order, stop when we find
-     * one that has at least one pvfs2 entry
+    /* scan our prioritized list of tab files in order, stop when we
+     * find one that has at least one pvfs2 entry
      */
     for (i = 0; (i < file_count && !targetfile); i++)
     {
-	mnt_fp = setmntent(file_list[i], "r");
-	if (mnt_fp)
-	{
-	    while ((tmp_ent = getmntent(mnt_fp)))
-	    {
-		if (strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
-		{
-		    targetfile = file_list[i];
-		    tmp_mntent_count++;
-		}
-	    }
-	    endmntent(mnt_fp);
-	}
+        mnt_fp = setmntent(file_list[i], "r");
+        if (mnt_fp)
+        {
+            while ((tmp_ent = getmntent(mnt_fp)))
+            {
+                if (strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
+                {
+                    targetfile = file_list[i];
+                    tmp_mntent_count++;
+                }
+            }
+            endmntent(mnt_fp);
+        }
     }
 
     if (!targetfile)
     {
-	gossip_err("Error: could not find any pvfs2 tabfile entries.\n");
-	gossip_err("Error: tried the following tabfiles:\n");
-	for (i = 0; i < file_count; i++)
-	{
-	    gossip_err("       %s\n", file_list[i]);
-	}
-	gen_mutex_unlock(&stat_tab_mutex);
-	return (NULL);
+        gossip_err("Error: could not find any pvfs2 tabfile entries.\n");
+        gossip_err("Error: tried the following tabfiles:\n");
+        for (i = 0; i < file_count; i++)
+        {
+            gossip_err("       %s\n", file_list[i]);
+        }
+        gen_mutex_unlock(&s_stat_tab_mutex);
+        return (NULL);
     }
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "Using pvfs2 tab file: %s\n", targetfile);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "Using pvfs2 tab file: %s\n", targetfile);
 
     /* allocate array of entries */
-    stat_tab_array[stat_tab_count].mntent_array = (struct PVFS_sys_mntent *)
-	malloc(tmp_mntent_count * sizeof(struct PVFS_sys_mntent));
-    if (!stat_tab_array[stat_tab_count].mntent_array)
+    current_tab = &s_stat_tab_array[s_stat_tab_count];
+    current_tab->mntent_array = (struct PVFS_sys_mntent *)malloc(
+        (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
+    if (!current_tab->mntent_array)
     {
-	gen_mutex_unlock(&stat_tab_mutex);
-	return (NULL);
+        gen_mutex_unlock(&s_stat_tab_mutex);
+        return (NULL);
     }
-    memset(stat_tab_array[stat_tab_count].mntent_array, 0,
-	   tmp_mntent_count * sizeof(struct PVFS_sys_mntent));
+    memset(current_tab->mntent_array, 0,
+           (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
     for (i = 0; i < tmp_mntent_count; i++)
     {
-	stat_tab_array[stat_tab_count].mntent_array[i].fs_id = PVFS_FS_ID_NULL;
+        current_tab->mntent_array[i].fs_id = PVFS_FS_ID_NULL;
     }
-    stat_tab_array[stat_tab_count].mntent_count = tmp_mntent_count;
+    current_tab->mntent_count = tmp_mntent_count;
 
     /* reopen our chosen fstab file */
     mnt_fp = setmntent(targetfile, "r");
@@ -177,138 +185,135 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     i = 0;
     while ((tmp_ent = getmntent(mnt_fp)))
     {
-	if (strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
-	{
-	    slash = tmp_ent->mnt_fsname;
-	    slashcount = 0;
-	    while ((slash = index(slash, '/')))
-	    {
-		slash++;
-		slashcount++;
-	    }
+        if (strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
+        {
+            slash = tmp_ent->mnt_fsname;
+            slashcount = 0;
+            while ((slash = index(slash, '/')))
+            {
+                slash++;
+                slashcount++;
+            }
 
-	    /* find a reference point in the string */
-	    last_slash = rindex(tmp_ent->mnt_fsname, '/');
+            /* find a reference point in the string */
+            last_slash = rindex(tmp_ent->mnt_fsname, '/');
 
-	    if (slashcount != 3)
-	    {
-		gossip_lerr("Error: invalid tab file entry: %s\n",
-			    tmp_ent->mnt_fsname);
-		endmntent(mnt_fp);
-		gen_mutex_unlock(&stat_tab_mutex);
-		return (NULL);
-	    }
+            if (slashcount != 3)
+            {
+                gossip_lerr("Error: invalid tab file entry: %s\n",
+                            tmp_ent->mnt_fsname);
+                endmntent(mnt_fp);
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return (NULL);
+            }
 
-	    /* allocate room for our copies of the strings */
-	    stat_tab_array[stat_tab_count].mntent_array[i].pvfs_config_server =
-		(char *) malloc(strlen(tmp_ent->mnt_fsname) + 1);
-	    stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir =
-		(char *) malloc(strlen(tmp_ent->mnt_dir) + 1);
-	    stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts =
-		(char *) malloc(strlen(tmp_ent->mnt_opts) + 1);
+            /* allocate room for our copies of the strings */
+            current_tab->mntent_array[i].pvfs_config_server =
+                (char *)malloc(strlen(tmp_ent->mnt_fsname) + 1);
+            current_tab->mntent_array[i].mnt_dir =
+                (char *)malloc(strlen(tmp_ent->mnt_dir) + 1);
+            current_tab->mntent_array[i].mnt_opts =
+                (char *)malloc(strlen(tmp_ent->mnt_opts) + 1);
 
-	    /* bail if any mallocs failed */
-	    if (!stat_tab_array[stat_tab_count].mntent_array[i].
-		pvfs_config_server
-		|| !stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir
-		|| !stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts)
-	    {
-		goto error_exit;
-	    }
+            /* bail if any mallocs failed */
+            if (!current_tab->mntent_array[i].pvfs_config_server ||
+                !current_tab->mntent_array[i].mnt_dir ||
+                !current_tab->mntent_array[i].mnt_opts)
+            {
+                goto error_exit;
+            }
 
-	    /* make our own copy of parameters of interest */
+            /* make our own copy of parameters of interest */
+            /* config server and fs name are a special case, take one 
+             * string and split it in half on "/" delimiter
+             */
+            *last_slash = '\0';
+            strcpy(current_tab->mntent_array[i].pvfs_config_server,
+                   tmp_ent->mnt_fsname);
+            last_slash++;
+            current_tab->mntent_array[i].pvfs_fs_name =
+                strdup(last_slash);
+            if (!current_tab->mntent_array[i].pvfs_fs_name)
+            {
+                goto error_exit;
+            }
 
-	    /* config server and fs name are a special case, take one 
-	     * string and split it in half on "/" delimiter
-	     */
-	    *last_slash = '\0';
-	    strcpy(stat_tab_array[stat_tab_count].mntent_array[i].
-		   pvfs_config_server, tmp_ent->mnt_fsname);
-	    last_slash++;
-	    stat_tab_array[stat_tab_count].mntent_array[i].pvfs_fs_name =
-		strdup(last_slash);
-	    if (!stat_tab_array[stat_tab_count].mntent_array[i].pvfs_fs_name)
-	    {
-		goto error_exit;
-	    }
+            /* mnt_dir and mnt_opts are verbatim copies */
+            strcpy(current_tab->mntent_array[i].mnt_dir,
+                   tmp_ent->mnt_dir);
+            strcpy(current_tab->mntent_array[i].mnt_opts,
+                   tmp_ent->mnt_opts);
 
-	    /* mnt_dir and mnt_opts are verbatim copies */
-	    strcpy(stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir,
-		   tmp_ent->mnt_dir);
-	    strcpy(stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts,
-		   tmp_ent->mnt_opts);
+            /* find out if a particular flow protocol was specified */
+            if ((hasmntopt(tmp_ent, "flowproto")))
+            {
+                ret = parse_flowproto_string(
+                    tmp_ent->mnt_opts,
+                    &(current_tab->
+                      mntent_array[i].flowproto));
+                if (ret < 0)
+                {
+                    goto error_exit;
+                }
+            }
+            else
+            {
+                current_tab->mntent_array[i].flowproto =
+                    FLOWPROTO_DEFAULT;
+            }
 
-	    /* find out if a particular flow protocol was specified */
-	    if ((hasmntopt(tmp_ent, "flowproto")))
-	    {
-		ret = parse_flowproto_string(tmp_ent->mnt_opts,
-					     &(stat_tab_array[stat_tab_count].
-					       mntent_array[i].flowproto));
-		if (ret < 0)
-		{
-		    goto error_exit;
-		}
-	    }
-	    else
-	    {
-		stat_tab_array[stat_tab_count].mntent_array[i].flowproto =
-		    FLOWPROTO_DEFAULT;
-	    }
-
-	    /* pick an encoding to use with the server */
-	    stat_tab_array[stat_tab_count].mntent_array[i].encoding =
-		ENCODING_DEFAULT;
-	    cp = hasmntopt(tmp_ent, "encoding");
-	    if (cp)
-	    {
-		ret =
-		    parse_encoding_string(cp,
-					  &stat_tab_array[stat_tab_count].
-					  mntent_array[i].encoding);
-		if (ret < 0)
-		{
-		    goto error_exit;
-		}
-	    }
-	    i++;
-	}
+            /* pick an encoding to use with the server */
+            current_tab->mntent_array[i].encoding =
+                ENCODING_DEFAULT;
+            cp = hasmntopt(tmp_ent, "encoding");
+            if (cp)
+            {
+                ret = parse_encoding_string(
+                    cp, &current_tab->mntent_array[i].encoding);
+                if (ret < 0)
+                {
+                    goto error_exit;
+                }
+            }
+            i++;
+        }
     }
-    stat_tab_count++;
-    strcpy(stat_tab_array[stat_tab_count-1].tabfile_name, targetfile);
-    gen_mutex_unlock(&stat_tab_mutex);
-    return (&stat_tab_array[stat_tab_count - 1]);
+    s_stat_tab_count++;
+    strcpy(s_stat_tab_array[s_stat_tab_count-1].tabfile_name, targetfile);
+    gen_mutex_unlock(&s_stat_tab_mutex);
+    return (&s_stat_tab_array[s_stat_tab_count - 1]);
 
   error_exit:
     for (; i > -1; i--)
     {
-	if (stat_tab_array[stat_tab_count].mntent_array[i].pvfs_config_server)
-	{
-	    free(stat_tab_array[stat_tab_count].mntent_array[i].
-		 pvfs_config_server);
-	    stat_tab_array[stat_tab_count].mntent_array[i].pvfs_config_server =
-		NULL;
-	}
+        if (current_tab->mntent_array[i].pvfs_config_server)
+        {
+            free(current_tab->mntent_array[i].
+                 pvfs_config_server);
+            current_tab->mntent_array[i].pvfs_config_server =
+                NULL;
+        }
 
-	if (stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir)
-	{
-	    free(stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir);
-	    stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir = NULL;
-	}
+        if (current_tab->mntent_array[i].mnt_dir)
+        {
+            free(current_tab->mntent_array[i].mnt_dir);
+            current_tab->mntent_array[i].mnt_dir = NULL;
+        }
 
-	if (stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts)
-	{
-	    free(stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts);
-	    stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts = NULL;
-	}
+        if (current_tab->mntent_array[i].mnt_opts)
+        {
+            free(current_tab->mntent_array[i].mnt_opts);
+            current_tab->mntent_array[i].mnt_opts = NULL;
+        }
 
-	if (stat_tab_array[stat_tab_count].mntent_array[i].pvfs_fs_name)
-	{
-	    free(stat_tab_array[stat_tab_count].mntent_array[i].pvfs_fs_name);
-	    stat_tab_array[stat_tab_count].mntent_array[i].pvfs_fs_name = NULL;
-	}
+        if (current_tab->mntent_array[i].pvfs_fs_name)
+        {
+            free(current_tab->mntent_array[i].pvfs_fs_name);
+            current_tab->mntent_array[i].pvfs_fs_name = NULL;
+        }
     }
     endmntent(mnt_fp);
-    gen_mutex_unlock(&stat_tab_mutex);
+    gen_mutex_unlock(&s_stat_tab_mutex);
     return (NULL);
 }
 
@@ -324,22 +329,22 @@ int PVFS_util_get_default_fsid(PVFS_fs_id* out_fs_id)
 {
     int i, j;
 
-    gen_mutex_lock(&stat_tab_mutex);
+    gen_mutex_lock(&s_stat_tab_mutex);
 
-    for (i=0; i < stat_tab_count; i++)
+    for (i=0; i < s_stat_tab_count; i++)
     {
-	for(j=0; j<stat_tab_array[i].mntent_count; j++)
-	{
-	    *out_fs_id = stat_tab_array[i].mntent_array[j].fs_id;
-	    if(*out_fs_id != PVFS_FS_ID_NULL)
-	    {
-		gen_mutex_unlock(&stat_tab_mutex);
-		return(0);
-	    }
-	}
+        for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
+        {
+            *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
+            if(*out_fs_id != PVFS_FS_ID_NULL)
+            {
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return(0);
+            }
+        }
     }
 
-    gen_mutex_unlock(&stat_tab_mutex);
+    gen_mutex_unlock(&s_stat_tab_mutex);
     return(-PVFS_ENOENT);
 }
 
@@ -359,34 +364,34 @@ int PVFS_util_resolve(
     int i,j;
     int ret = -1;
 
-    gen_mutex_lock(&stat_tab_mutex);
+    gen_mutex_lock(&s_stat_tab_mutex);
 
-    for (i=0; i < stat_tab_count; i++)
+    for (i=0; i < s_stat_tab_count; i++)
     {
-	for(j=0; j<stat_tab_array[i].mntent_count; j++)
-	{
-	    ret = PVFS_util_remove_dir_prefix(local_path,
-		stat_tab_array[i].mntent_array[j].mnt_dir,
-		out_fs_path,
-		out_fs_path_max);
-	    if(ret == 0)
-	    {
-		*out_fs_id = stat_tab_array[i].mntent_array[j].fs_id;
-		if(*out_fs_id == PVFS_FS_ID_NULL)
-		{
-		    gossip_err("Error: %s resides on a PVFS2 file system "
-		    "that has not yet been initialized.\n", local_path);
+        for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
+        {
+            ret = PVFS_util_remove_dir_prefix(local_path,
+                s_stat_tab_array[i].mntent_array[j].mnt_dir,
+                out_fs_path,
+                out_fs_path_max);
+            if(ret == 0)
+            {
+                *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
+                if(*out_fs_id == PVFS_FS_ID_NULL)
+                {
+                    gossip_err("Error: %s resides on a PVFS2 file system "
+                    "that has not yet been initialized.\n", local_path);
 
-		    gen_mutex_unlock(&stat_tab_mutex);
-		    return(-PVFS_ENXIO);
-		}
-		gen_mutex_unlock(&stat_tab_mutex);
-		return(0);
-	    }
-	}
+                    gen_mutex_unlock(&s_stat_tab_mutex);
+                    return(-PVFS_ENXIO);
+                }
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return(0);
+            }
+        }
     }
 
-    gen_mutex_unlock(&stat_tab_mutex);
+    gen_mutex_unlock(&s_stat_tab_mutex);
     return(-PVFS_ENOENT);
 }
 
@@ -408,43 +413,43 @@ int PVFS_util_init_defaults(void)
     tab = PVFS_util_parse_pvfstab(NULL);
     if(!tab)
     {
-	gossip_err("Error: failed to find any pvfs2 file systems in the "
-	    "standard system tab files.\n");
-	return(-PVFS_ENOENT);
+        gossip_err("Error: failed to find any pvfs2 file systems in the "
+            "standard system tab files.\n");
+        return(-PVFS_ENOENT);
     }
 
     /* initialize pvfs system interface */
     ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if(ret < 0)
     {
-	return(ret);
+        return(ret);
     }
 
     /* add in any file systems we found in the fstab */
     for(i=0; i<tab->mntent_count; i++)
     {
-	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
-	if(ret == 0)
-	{
-	    found_one = 1;
-	}
-	else
-	{
-	    gossip_err("WARNING: failed to initialize file system for mount "
-		"point %s in tab file %s\n", tab->mntent_array[i].mnt_dir,
-		tab->tabfile_name);
-	}
+        ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
+        if(ret == 0)
+        {
+            found_one = 1;
+        }
+        else
+        {
+            gossip_err("WARNING: failed to initialize file system for mount "
+                "point %s in tab file %s\n", tab->mntent_array[i].mnt_dir,
+                tab->tabfile_name);
+        }
     }
 
     if(found_one)
     {
-	return(0);
+        return(0);
     }
     else
     {
-	gossip_err("ERROR: could not initialize any file systems in %s.\n",
-	    tab->tabfile_name);
-	return(-PVFS_ENODEV);
+        gossip_err("ERROR: could not initialize any file systems in %s.\n",
+            tab->tabfile_name);
+        return(-PVFS_ENODEV);
     }
 }
 
@@ -469,24 +474,24 @@ int PVFS_util_lookup_parent(
 
     if (PINT_get_base_dir(filename, buf, PVFS_SEGMENT_MAX))
     {
-	if (filename[0] != '/')
-	{
-	    gossip_err("Invalid dirname (no leading '/')\n");
-	}
-	gossip_err("cannot get parent directory of %s\n", filename);
-	/* TODO: use defined name for this */
-	*handle = 0;
-	return (-EINVAL);
+        if (filename[0] != '/')
+        {
+            gossip_err("Invalid dirname (no leading '/')\n");
+        }
+        gossip_err("cannot get parent directory of %s\n", filename);
+        /* TODO: use defined name for this */
+        *handle = 0;
+        return (-EINVAL);
     }
 
     ret = PVFS_sys_lookup(fs_id, buf, credentials,
-			  &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
-	gossip_err("Lookup failed on %s\n", buf);
-	/* TODO: use defined name for this */
-	*handle = 0;
-	return (ret);
+        gossip_err("Lookup failed on %s\n", buf);
+        /* TODO: use defined name for this */
+        *handle = 0;
+        return (ret);
     }
     *handle = resp_look.pinode_refn.handle;
     return (0);
@@ -528,24 +533,24 @@ int PVFS_util_remove_base_dir(
 
     if (pathname && out_dir && out_max_len)
     {
-	if ((strcmp(pathname, "/") == 0) || (pathname[0] != '/'))
-	{
-	    return ret;
-	}
+        if ((strcmp(pathname, "/") == 0) || (pathname[0] != '/'))
+        {
+            return ret;
+        }
 
-	start = pathname;
-	end = (char *) (pathname + strlen(pathname));
-	end_ref = end;
+        start = pathname;
+        end = (char *) (pathname + strlen(pathname));
+        end_ref = end;
 
-	while (end && (end > start) && (*(--end) != '/'));
+        while (end && (end > start) && (*(--end) != '/'));
 
-	len = end_ref - ++end;
-	if (len < out_max_len)
-	{
-	    memcpy(out_dir, end, len);
-	    out_dir[len] = '\0';
-	    ret = 0;
-	}
+        len = end_ref - ++end;
+        if (len < out_max_len)
+        {
+            memcpy(out_dir, end, len);
+            out_dir[len] = '\0';
+            ret = 0;
+        }
     }
     return ret;
 }
@@ -599,17 +604,17 @@ int PVFS_util_remove_dir_prefix(
 
     if (!pathname || !prefix || !out_path || !out_max_len)
     {
-	return (-EINVAL);
+        return (-EINVAL);
     }
 
     /* make sure we are given absolute paths */
     if ((pathname[0] != '/') || (prefix[0] != '/'))
     {
-	return ret;
+        return ret;
     }
 
     while (pathname[1] == '/')
-	pathname++;
+        pathname++;
 
     prefix_len = strlen(prefix);
     pathname_len = strlen(pathname);
@@ -617,7 +622,7 @@ int PVFS_util_remove_dir_prefix(
     /* account for trailing slashes on prefix */
     while (prefix[prefix_len - 1] == '/')
     {
-	prefix_len--;
+        prefix_len--;
     }
 
     /* if prefix_len is now zero, then prefix must have been root
@@ -625,55 +630,50 @@ int PVFS_util_remove_dir_prefix(
      */
     if (prefix_len == 0)
     {
-	cut_index = 0;
+        cut_index = 0;
     }
     else
     {
 
-	/* make sure prefix would fit in pathname */
-	if (prefix_len > (pathname_len + 1))
-	    return (-ENOENT);
+        /* make sure prefix would fit in pathname */
+        if (prefix_len > (pathname_len + 1))
+            return (-ENOENT);
 
-	/* see if we can find prefix at beginning of path */
-	if (strncmp(prefix, pathname, prefix_len) == 0)
-	{
-	    /* apparent match; see if next element is a slash */
-	    if (pathname[prefix_len] != '/' && pathname[prefix_len] != '\0')
-		return (-ENOENT);
+        /* see if we can find prefix at beginning of path */
+        if (strncmp(prefix, pathname, prefix_len) == 0)
+        {
+            /* apparent match; see if next element is a slash */
+            if ((pathname[prefix_len] != '/') &&
+                (pathname[prefix_len] != '\0'))
+                return (-ENOENT);
 
-	    /* this was indeed a match */
-	    /* in the case of no trailing slash cut_index will point to the end
-	     * of "prefix" (NULL).   */
-	    cut_index = prefix_len;
-	}
-	else
-	{
-	    return (-ENOENT);
-	}
+            /* this was indeed a match */
+            /* in the case of no trailing slash cut_index will point to the end
+             * of "prefix" (NULL).   */
+            cut_index = prefix_len;
+        }
+        else
+        {
+            return (-ENOENT);
+        }
     }
 
     /* if we hit this point, then we were successful */
 
     /* is the buffer large enough? */
     if ((1 + strlen(&(pathname[cut_index]))) > out_max_len)
-	return (-ENAMETOOLONG);
+        return (-ENAMETOOLONG);
 
     /* try to handle the case of no trailing slash */
     if (pathname[cut_index] == '\0')
-	out_path[0] = '/';
+        out_path[0] = '/';
     else
-	/* copy out appropriate part of pathname */
-	strcpy(out_path, &(pathname[cut_index]));
+        /* copy out appropriate part of pathname */
+        strcpy(out_path, &(pathname[cut_index]));
 
     return (0);
 }
 
-/* help out lazy humans:
- * size		size of file in 2431251234123412 format
- * out_str      nicely formatted number, like "3.4M"
- *                  (caller must allocate this string)
- * max_out_len  maximum lenght of "out_str"
- */
 #define KILOBYTE                1024
 #define MEGABYTE   (1024 * KILOBYTE)
 #define GIGABYTE   (1024 * MEGABYTE)
@@ -686,12 +686,28 @@ int PVFS_util_remove_dir_prefix(
 */
 #define NUM_SIZES                  3
 
-PVFS_size PINT_s_size_table[NUM_SIZES] = {	/*YOTTABYTE, ZETTABYTE, EXABYTE, PETABYTE,
-						   TERABYTE, */ GIGABYTE, MEGABYTE, KILOBYTE };
-char *PINT_s_str_size_table[NUM_SIZES] =
-    { /*"Y", "Z", "E", "P","T", */ "G", "M", "K" };
+static PVFS_size PINT_s_size_table[NUM_SIZES] =
+{
+    /*YOTTABYTE, ZETTABYTE, EXABYTE, PETABYTE, TERABYTE, */
+    GIGABYTE, MEGABYTE, KILOBYTE
+};
 
+static char *PINT_s_str_size_table[NUM_SIZES] =
+{
+    /*"Y", "Z", "E", "P","T", */
+    "G", "M", "K"
+};
 
+/*
+ * PVFS_util_make_size_human_readable
+ *
+ * converts a size value to a human readable string format
+ *
+ * size         - numeric size of file
+ * out_str      - nicely formatted string, like "3.4M"
+ *                  (caller must allocate this string)
+ * max_out_len  - maximum lenght of out_str
+ */
 void PVFS_util_make_size_human_readable(
     PVFS_size size,
     char *out_str,
@@ -702,24 +718,24 @@ void PVFS_util_make_size_human_readable(
 
     if (out_str)
     {
-	for (i = 0; i < NUM_SIZES; i++)
-	{
-	    tmp = size;
-	    if ((PVFS_size) (tmp / PINT_s_size_table[i]) > 0)
-	    {
-		tmp = (PVFS_size) (tmp / PINT_s_size_table[i]);
-		break;
-	    }
-	}
-	if (i == NUM_SIZES)
-	{
-	    snprintf(out_str, 16, "%Ld", Ld(size));
-	}
-	else
-	{
-	    snprintf(out_str, max_out_len, "%Ld%s",
-		     Ld(tmp), PINT_s_str_size_table[i]);
-	}
+        for (i = 0; i < NUM_SIZES; i++)
+        {
+            tmp = size;
+            if ((PVFS_size) (tmp / PINT_s_size_table[i]) > 0)
+            {
+                tmp = (PVFS_size) (tmp / PINT_s_size_table[i]);
+                break;
+            }
+        }
+        if (i == NUM_SIZES)
+        {
+            snprintf(out_str, 16, "%Ld", Ld(size));
+        }
+        else
+        {
+            snprintf(out_str, max_out_len, "%Ld%s",
+                     Ld(tmp), PINT_s_str_size_table[i]);
+        }
     }
 }
 
@@ -747,29 +763,29 @@ static int parse_flowproto_string(
     ret = sscanf(start, "flowproto = %255s ,", flow);
     if (ret != 1)
     {
-	gossip_err("Error: malformed flowproto option in tab file.\n");
-	return (-PVFS_EINVAL);
+        gossip_err("Error: malformed flowproto option in tab file.\n");
+        return (-PVFS_EINVAL);
     }
 
     /* chop it off at any trailing comma */
     comma = index(flow, ',');
     if (comma)
     {
-	comma[0] = '\0';
+        comma[0] = '\0';
     }
 
     if (!strcmp(flow, "bmi_trove"))
-	*flowproto = FLOWPROTO_BMI_TROVE;
+        *flowproto = FLOWPROTO_BMI_TROVE;
     else if (!strcmp(flow, "dump_offsets"))
-	*flowproto = FLOWPROTO_DUMP_OFFSETS;
+        *flowproto = FLOWPROTO_DUMP_OFFSETS;
     else if (!strcmp(flow, "bmi_cache"))
-	*flowproto = FLOWPROTO_BMI_CACHE;
+        *flowproto = FLOWPROTO_BMI_CACHE;
     else if (!strcmp(flow, "multiqueue"))
-	*flowproto = FLOWPROTO_MULTIQUEUE;
+        *flowproto = FLOWPROTO_MULTIQUEUE;
     else
     {
-	gossip_err("Error: unrecognized flowproto option: %s\n", flow);
-	return (-PVFS_EINVAL);
+        gossip_err("Error: unrecognized flowproto option: %s\n", flow);
+        return (-PVFS_EINVAL);
     }
 
     return (0);
@@ -791,45 +807,44 @@ static int parse_encoding_string(
     int i;
     struct
     {
-	const char *name;
-	enum PVFS_encoding_type val;
-    } enc_str[] =
-    {
-	{
-	"direct", ENCODING_DIRECT},
-	{
-	"le_bfield", ENCODING_LE_BFIELD},
-	{
-    "xdr", ENCODING_XDR},};
+        const char *name;
+        enum PVFS_encoding_type val;
+    } enc_str[] = {
+        { "direct", ENCODING_DIRECT },
+        { "le_bfield", ENCODING_LE_BFIELD },
+        { "xdr", ENCODING_XDR }
+    };
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: input is %s\n", __func__, cp);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: input is %s\n",
+                 __func__, cp);
     cp += strlen("encoding");
-    for (; isspace(*cp); cp++);	/* optional spaces */
+    for (; isspace(*cp); cp++);        /* optional spaces */
     if (*cp != '=')
     {
-	gossip_err("Error: %s: malformed encoding option in tab file.\n",
-		   __func__);
-	return -PVFS_EINVAL;
+        gossip_err("Error: %s: malformed encoding option in tab file.\n",
+                   __func__);
+        return -PVFS_EINVAL;
     }
-    for (++cp; isspace(*cp); cp++);	/* optional spaces */
-    for (cq = cp; *cq && *cq != ','; cq++);	/* find option end */
+    for (++cp; isspace(*cp); cp++);        /* optional spaces */
+    for (cq = cp; *cq && *cq != ','; cq++);/* find option end */
 
     *et = -1;
     for (i = 0; i < sizeof(enc_str) / sizeof(enc_str[0]); i++)
     {
-	int n = strlen(enc_str[i].name);
-	if (cq - cp > n)
-	    n = cq - cp;
-	if (!strncmp(enc_str[i].name, cp, n))
-	{
-	    *et = enc_str[i].val;
-	    break;
-	}
+        int n = strlen(enc_str[i].name);
+        if (cq - cp > n)
+            n = cq - cp;
+        if (!strncmp(enc_str[i].name, cp, n))
+        {
+            *et = enc_str[i].val;
+            break;
+        }
     }
     if (*et == -1)
     {
-	gossip_err("Error: %s: unknown encoding type in tab file.\n", __func__);
-	return -PVFS_EINVAL;
+        gossip_err("Error: %s: unknown encoding type in tab file.\n",
+                   __func__);
+        return -PVFS_EINVAL;
     }
     return 0;
 }
@@ -844,20 +859,20 @@ void PINT_release_pvfstab(void)
 {
     int i, j;
 
-    gen_mutex_lock(&stat_tab_mutex);
-    for(i=0; i<stat_tab_count; i++)
+    gen_mutex_lock(&s_stat_tab_mutex);
+    for(i=0; i<s_stat_tab_count; i++)
     {
-	for (j = 0; j < stat_tab_array[i].mntent_count; j++)
-	{
-	    free(stat_tab_array[i].mntent_array[j].pvfs_config_server);
-	    free(stat_tab_array[i].mntent_array[j].mnt_dir);
-	    free(stat_tab_array[i].mntent_array[j].mnt_opts);
-	    free(stat_tab_array[i].mntent_array[j].pvfs_fs_name);
-	}
-	free(stat_tab_array[i].mntent_array);
+        for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
+        {
+            free(s_stat_tab_array[i].mntent_array[j].pvfs_config_server);
+            free(s_stat_tab_array[i].mntent_array[j].mnt_dir);
+            free(s_stat_tab_array[i].mntent_array[j].mnt_opts);
+            free(s_stat_tab_array[i].mntent_array[j].pvfs_fs_name);
+        }
+        free(s_stat_tab_array[i].mntent_array);
     }
-    stat_tab_count = 0;
-    gen_mutex_unlock(&stat_tab_mutex);
+    s_stat_tab_count = 0;
+    gen_mutex_unlock(&s_stat_tab_mutex);
     return;
 }
 

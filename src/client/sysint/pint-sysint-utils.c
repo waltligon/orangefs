@@ -18,6 +18,7 @@
 #include "trove.h"
 #include "server-config.h"
 #include "str-utils.h"
+#include "pvfs2-util.h"
 #include "client-state-machine.h"
 
 static int g_session_tag;
@@ -149,8 +150,7 @@ int PINT_server_get_config(
 	return ret;
     }
 
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
     memset(&serv_req,0,sizeof(struct PVFS_server_req));
     serv_req.op = PVFS_SERV_GETCONFIG;

@@ -52,8 +52,8 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
     }
 
     cur_fs = PINT_config_find_fs_name(server_config, mntent->pvfs_fs_name);
-    /* it should not be possible for this to fail after a successful call to
-     * PINT_server_get_config()
+    /* it should not be possible for this to fail after a successful
+     * call to PINT_server_get_config()
      */
     assert(cur_fs);
 
