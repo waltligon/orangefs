@@ -1,5 +1,3 @@
 DIR := src/io/flow/flowproto-bmi-cache
-LIBSRC += \
-    $(DIR)/flowproto-bmi-cache-client.c
 SERVERSRC += \
     $(DIR)/flowproto-bmi-cache-server.c
