@@ -67,7 +67,8 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 static int initialize_interfaces(PINT_server_status_code *server_level_init);
 static int initialize_signal_handlers();
 static int initialize_server_state(PINT_server_status_code *server_level_init,
-                                   PINT_server_op *s_op, job_status_s *job_status_structs[]);
+                                   PINT_server_op *s_op, job_status_s
+				   *job_status_structs[]);
 static int server_init(void);
 static int server_shutdown(PINT_server_status_code level,
 			   int ret,
@@ -120,8 +121,8 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     /* Uses filesystems in config file. */
     for (i = 0; i < user_opts->number_filesystems; i++)
     {
-	ret = trove_collection_lookup(user_opts->file_systems[i]->file_system_name,
-				      &(user_opts->file_systems[i]->coll_id), NULL, NULL);
+       ret=trove_collection_lookup(user_opts->file_systems[i]->file_system_name,
+			      &(user_opts->file_systems[i]->coll_id),NULL,NULL);
 	if (ret < 0)
 	{
 	    gossip_lerr("Error initializing filesystem %s\n",
@@ -193,7 +194,8 @@ static int initialize_signal_handlers()
   to the appropriate value for proper server shutdown.
 */
 static int initialize_server_state(PINT_server_status_code *server_level_init,
-                                   PINT_server_op *s_op, job_status_s *job_status_structs[])
+                                   PINT_server_op *s_op,
+				   job_status_s *job_status_structs[])
 {
     int ret = 0, i = 0;
 
@@ -209,7 +211,8 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
     ret = PINT_state_machine_init();	/* state_machine.c:68 */
     if (ret < 0)
     {
-	gossip_err("Error initializing state_machine interface: %s\n", strerror(-ret));
+	gossip_err("Error initializing state_machine interface: %s\n",
+		strerror(-ret));
 	*server_level_init = SHUTDOWN_HIGH_LEVEL_INTERFACE;
 	goto state_init_failed;
     }
@@ -219,7 +222,8 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
     ret = PINT_req_sched_initialize();
     if (ret < 0)
     {
-	gossip_err("Error initializing Request Scheduler interface: %s\n", strerror(-ret));
+	gossip_err("Error initializing Request Scheduler interface: %s\n",
+		strerror(-ret));
 	*server_level_init = STATE_MACHINE_HALT;
 	goto state_init_failed;
     }
@@ -346,7 +350,8 @@ int main(int argc,
 	    goto server_shutdown;
 	}
 	/* TODO: use a named default value for the timeout eventually */
-	ret = job_testworld(job_id_array, &out_count, completed_job_pointers, job_status_structs, 100);
+	ret = job_testworld(job_id_array, &out_count,
+		completed_job_pointers, job_status_structs, 100);
 	if (ret < 0)
 	{
 	    gossip_lerr("FREAK OUT.\n");
@@ -358,6 +363,7 @@ int main(int argc,
 	    s_op = (PINT_server_op *) completed_job_pointers[i];
 	    if (s_op->op == BMI_UNEXP)
 	    {
+		postBMIFlag = 1;
 #ifdef DEBUG
 		if (Temp_Jobs_Complete_Debug++ == Temp_Check_Out_Debug)
 		{
@@ -365,20 +371,12 @@ int main(int argc,
 		    goto server_shutdown;
 		}
 #endif
-		ret = PINT_state_machine_initialize_unexpected(s_op, &job_status_structs[i]);
-                do
-                {
-                    ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
-                } while (ret == 1);
-		postBMIFlag = 1;
-	    }
-	    else
-	    {
-                do
-                {
-                    ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
-                } while (ret == 1);
-	    }
+		ret = PINT_state_machine_initialize_unexpected(s_op,
+			&job_status_structs[i]);
+            do
+            {
+                ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
+            } while (ret == 1);
 
 	    if (ret < 0)
 	    {
@@ -541,7 +539,8 @@ static int server_shutdown(PINT_server_status_code level,
 
 static void *sig_handler(int sig)
 {
-    gossip_debug(SERVER_DEBUG, "Got Signal %d... Level...%d\n", sig, (int)server_level_init);
+    gossip_debug(SERVER_DEBUG, "Got Signal %d... Level...%d\n",
+	    sig, (int)server_level_init);
     signal_recvd_flag = sig;
 #if 0
     if (sig == SIGSEGV)
@@ -578,7 +577,7 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
     int ret;
     char *mem_calc_ptr;
 
-    serv_op = (PINT_server_op *) malloc(sizeof(PINT_server_op) + sizeof(void *));
+    serv_op = (PINT_server_op *) malloc(sizeof(PINT_server_op)+sizeof(void *));
     if (!serv_op)
     {
 	return (-1);
@@ -588,9 +587,10 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
 
 
     mem_calc_ptr = (char *) serv_op;
-    serv_op->encoded.buffer_list = (void *) mem_calc_ptr + sizeof(PINT_server_op);
+    serv_op->encoded.buffer_list = (void *)mem_calc_ptr+sizeof(PINT_server_op);
 
-    serv_op->unexp_bmi_buff = (struct BMI_unexpected_info *) malloc(sizeof(struct BMI_unexpected_info));
+    serv_op->unexp_bmi_buff = (struct BMI_unexpected_info *)
+	    malloc(sizeof(struct BMI_unexpected_info));
     if (!serv_op->unexp_bmi_buff)
     {
 	return (-2);
@@ -607,7 +607,8 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
      * in this part of the code.
      * -Phil
      */
-    ret = job_bmi_unexp(serv_op->unexp_bmi_buff, serv_op, temp_stat, &jid, JOB_NO_IMMED_COMPLETE);
+    ret = job_bmi_unexp(serv_op->unexp_bmi_buff, serv_op,
+	    temp_stat, &jid, JOB_NO_IMMED_COMPLETE);
     if (ret < 0)
     {
 	return (-4);
