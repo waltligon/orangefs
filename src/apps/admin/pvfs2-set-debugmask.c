@@ -183,16 +183,24 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
-    /* TODO: need a way to print the valid masks... */
+    int i = 0;
+    char *mask = NULL;
 
     fprintf(stderr, "\n");
-    fprintf(stderr, 
-	"Usage: %s [-m fs_mount_point] <mask list>\n",
+    fprintf(stderr, "Usage  : %s [-m fs_mount_point] <mask list>\n",
 	argv[0]);
     fprintf(stderr, "Example: %s -m /mnt/pvfs2 \"network,server\"\n",
 	argv[0]);
-    fprintf(stderr, "See pvfs2-debug.h for more masks.\n");
-    fprintf(stderr, "Note: this utility reads /etc/pvfs2tab for file system configuration.\n");
+    fprintf(stderr, "Available masks include:\n");
+
+    while((mask = PVFS_debug_get_next_debug_keyword(i++)) != NULL)
+    {
+        fprintf(stderr,"\t%s  ",mask);
+        if ((i % 4) == 0)
+            fprintf(stderr,"\n");
+    }
+
+    fprintf(stderr, "\nNote: this utility reads /etc/pvfs2tab for file system configuration.\n");
     return;
 }
 

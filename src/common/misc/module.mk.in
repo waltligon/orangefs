@@ -3,9 +3,11 @@ LIBSRC += $(DIR)/server-config.c \
           $(DIR)/str-utils.c \
 	  $(DIR)/extent-utils.c \
 	  $(DIR)/errno-mapping.c \
-	  $(DIR)/pvfs2-util.c
+	  $(DIR)/pvfs2-util.c \
+          $(DIR)/pvfs2-debug.c
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/str-utils.c \
 	     $(DIR)/extent-utils.c \
 	     $(DIR)/errno-mapping.c \
-	     $(DIR)/mkspace.c
+	     $(DIR)/mkspace.c \
+             $(DIR)/pvfs2-debug.c
