@@ -154,6 +154,7 @@ src/io/flow/flowproto-bmi-trove/module.mk
 src/io/flow/flowproto-template/module.mk
 src/io/flow/flowproto-dump-offsets/module.mk
 src/io/job/module.mk
+src/io/dev/module.mk
 src/proto/module.mk
 src/server/module.mk
 src/server/request-scheduler/module.mk
