@@ -88,4 +88,4 @@ this command will kill all iod/mgr processes and clean up all data
 stored in the associated data directories.
 
 Thanks and good luck!  Any questions/comments should be sent to
-pvfs-developers@beowulf-underground.org
+pvfs2-developers@beowulf-underground.org
