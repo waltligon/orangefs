@@ -641,6 +641,18 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
 fi
 # end of NEED_BERKELEY_DB section
 
+AC_CHECK_HEADERS(netdb.h)
+dnl check for gethostbyname function
+AC_MSG_CHECKING(for gethostbyname)
+AC_TRY_COMPILE([
+#include <netdb.h>
+], [
+gethostbyname("localhost");
+],
+AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists),
+AC_MSG_RESULT(no))
+
 dnl configure options for GM install path
 GM_HOME=
 AC_ARG_WITH(gm,
@@ -708,7 +720,6 @@ AC_FUNC_GETMNTENT
 dnl if we use headers that might not be on every platform, add them here
 AC_CHECK_HEADERS(malloc.h)
 AC_CHECK_HEADERS(mntent.h)
-AC_CHECK_HEADERS(netdb.h)
 
 dnl this is a special case, used to key off options controlling gossip
 dnl   backtrace capability
