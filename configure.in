@@ -25,6 +25,19 @@ CFLAGS="$CFLAGS -imcheck.h"
 AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
 )
 
+dnl Check for kernel version using headers
+AC_MSG_CHECKING(whether version of Berkeley DB is new enough)
+	AC_TRY_COMPILE([
+	#include <db.h>
+	], [
+	#if DB_VERSION_MAJOR < 4
+		#error "DB_VERSION_MAJOR < 4; need newer Berkeley DB implementation"
+	#endif
+	], AC_MSG_RESULT(yes),
+	AC_MSG_RESULT(no)
+		AC_MSG_ERROR(Need newer (4.x.x or later) version of Berkeley DB.)
+	)
+
 AC_OUTPUT(Makefile
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
