@@ -62,7 +62,7 @@ sub setup_remotedirs {
 
     my $cmd = "%node \'cp -af $working_dir/pvfs2-server $working_dir/pvfs2-ping $working_dir/fs.conf  $bin_dir\'";
    
-    $rc = do_remote_command($href->{'RCMDPROG'}, 8, 30, $cmd, undef, undef, @servers);
+    $rc = do_remote_command($href->{'RCMDPROG'}, 8, 60, $cmd, undef, undef, @servers);
 
     
 
