@@ -28,8 +28,8 @@ struct handle_ledger *trove_handle_ledger_init(TROVE_coll_id coll_id, char *admi
 void trove_handle_ledger_show(struct handle_ledger *hl);
 int trove_handle_ledger_dump(struct handle_ledger *hl);
 void trove_handle_ledger_free(struct handle_ledger *hl);
-int trove_handle_ledger_addextent(struct handle_ledger *hl, TROVE_extent e);
-int trove_handle_remove(struct handle_ledger *hl, TROVE_extent e);
+inline int trove_handle_ledger_addextent(struct handle_ledger *hl, TROVE_extent * e);
+inline int trove_handle_remove(struct handle_ledger *hl, TROVE_handle handle);
 
 /* handle_get,put - obtain, return a handle from/to a particular handle ledger.
  */

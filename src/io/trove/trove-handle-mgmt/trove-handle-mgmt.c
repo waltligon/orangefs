@@ -92,7 +92,7 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                         break;
                     }
 		    /* remove handle from trove-handle-mgmt */
-		    trove_handle_remove(ledger, handle[i]);
+		    trove_handle_remove(ledger, handles[i]);
 
 #if 0
                     else

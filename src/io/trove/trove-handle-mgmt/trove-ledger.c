@@ -58,7 +58,6 @@ struct handle_ledger * trove_handle_ledger_init(TROVE_coll_id coll_id,
 						char *admin_name)
 {
     struct handle_ledger *ledger;
-    int ret;
 
     ledger = calloc(1, sizeof(struct handle_ledger));
     if (ledger == NULL) {
@@ -305,10 +304,6 @@ static int handle_store_load(TROVE_coll_id coll_id,
 			     char *admin_name,
 			     struct handle_ledger *ledger) 
 {
-    TROVE_op_id op_id;
-
-    int i, ret, count, array_count, state;
-
     /* initialize lists to empty */
     extentlist_init(&ledger->free_list);
     extentlist_init(&ledger->recently_freed_list);
@@ -391,7 +386,7 @@ static int handle_store_load(TROVE_coll_id coll_id,
 inline int trove_handle_ledger_addextent(struct handle_ledger *hl, 
 	TROVE_extent * extent)
 {
-   return extentlist_addextent(&(ledger->free_list), 
+   return extentlist_addextent(&(hl->free_list), 
 	   extent->first, extent->last);
 }
 
@@ -405,7 +400,7 @@ inline int trove_handle_ledger_addextent(struct handle_ledger *hl,
 
 inline int trove_handle_remove(struct handle_ledger *hl, TROVE_handle handle)
 {
-    return extentlist_handle_remove(hl->free_list, handle);
+    return extentlist_handle_remove(&(hl->free_list), handle);
 }
 
 /*
