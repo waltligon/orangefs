@@ -62,13 +62,13 @@ int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist);
 int extentlist_endured_purgatory(struct TROVE_handle_extentlist *querent, struct TROVE_handle_extentlist *reference);
 int extentlist_addextent(struct TROVE_handle_extentlist *elist, int64_t first, int64_t last);
 
-#endif
-
 /*
  * Local variables:
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=4
+ * vim: ts=8 sw=4 noexpandtab
  */
+
+#endif

@@ -25,6 +25,7 @@ extern TROVE_handle dbpf_last_handle;
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
+static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
 
 /* TODO: should this have a ds_attributes with it? */
 int dbpf_dspace_create(TROVE_coll_id coll_id,
@@ -341,7 +342,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 			DSPACE_GETATTR,
 			handle,
 			coll_p,
-			dbpf_dspace_setattr_op_svc,
+			dbpf_dspace_getattr_op_svc,
 			user_ptr);
 
     /* initialize op-specific members */
@@ -583,5 +584,5 @@ struct TROVE_dspace_ops dbpf_dspace_ops =
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=4
+ * vim: ts=8 sw=4 noexpandtab
  */

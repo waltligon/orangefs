@@ -696,5 +696,5 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=4
+ * vim: ts=8 sw=4 noexpandtab
  */

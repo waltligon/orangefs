@@ -153,4 +153,6 @@ int parse_args(int argc, char **argv)
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=8 sw=4 noexpandtab
  */

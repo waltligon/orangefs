@@ -123,7 +123,7 @@ typedef struct PVFS_ds_keyval PVFS_ds_keyval_s;
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=4
+ * vim: ts=8 sw=4 noexpandtab
  */
 
 #endif /* __PVFS2_STORAGE_H */
