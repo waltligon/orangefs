@@ -125,6 +125,9 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
 		  enum job_flags flags,
 		  job_context_id context_id);
 
+int job_bmi_cancel(job_id_t * id,
+		   job_context_id context_id);
+
 /* unexpected device receive */
 int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
     void* user_ptr,
@@ -189,6 +192,8 @@ int job_flow(flow_descriptor * flow_d,
 	     job_status_s * out_status_p,
 	     job_id_t * id,
 	     job_context_id context_id);
+
+int job_flow_cancel(flow_descriptor * flow_d);
 
 /* storage byte stream write */
 int job_trove_bstream_write_at(PVFS_fs_id coll_id,
@@ -413,6 +418,10 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 			    job_id_t * id,
 			    job_context_id context_id);
 
+int job_trove_dspace_cancel(PVFS_fs_id coll_id,
+			    job_id_t * id,
+			    job_context_id context_id);
+
 /* create a new file system */
 int job_trove_fs_create(char *collname,
 			PVFS_fs_id new_coll_id,
@@ -459,6 +468,8 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 			  job_status_s * out_status_p,
 			  job_id_t * id,
 			  job_context_id context_id);
+
+
 
 /******************************************************************
  * job test/wait for completion functions 

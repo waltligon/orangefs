@@ -661,6 +661,20 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     return (0);
 }
 
+/* job_bmi_cancel()
+ *
+ * cancels a job handling a BMI message
+ *
+ * returns 0 on succcess, 1 on immediate completion, and -errno on
+ * failure
+ */
+int job_bmi_cancel(job_id_t * id,
+		   job_context_id context_id)
+{
+    return(-1);
+}
+
+
 /* job_dev_unexp()
  *
  * posts a job for an unexpected device message
@@ -1072,6 +1086,19 @@ int job_flow(flow_descriptor * flow_d,
     return (0);
 }
 
+/* job_flow_cancel()
+ *
+ * cancels a posted job that is servicing a flow (where a flow is a
+ * complex I/O operation between two endpoints, which may be memory,
+ * disk, or network)
+ *
+ * returns 0 on success, 1 on immediate completion, and -errno on
+ * failure
+ */
+int job_flow_cancel(flow_descriptor * flow_d)
+{
+    return(-1);
+}
 
 /* job_trove_bstream_write_at()
  *
@@ -2470,6 +2497,21 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 
     return (0);
 }
+
+/* job_trove_dspace_cancel()
+ *
+ * used to cancel a trove dspace operation in progress
+ *
+ * returns 0 on success, 1 on immediate completion, and -errno on
+ * failure
+ */
+int job_trove_dspace_cancel(PVFS_fs_id coll_id,
+			    job_id_t * id,
+			    job_context_id context_id)
+{
+    return(-1);
+}
+
 
 /* job_trove_fs_create()
  *
