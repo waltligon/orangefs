@@ -29,19 +29,6 @@
 #include "trove.h"
 #include "server-config.h"
 
-/* converts common fields between sys attr and obj attr structures */
-#define PINT_CONVERT_ATTR(dest, src, attrmask)	\
-do{						\
-    (dest)->owner = (src)->owner;		\
-    (dest)->group = (src)->group;		\
-    (dest)->perms = (src)->perms;		\
-    (dest)->atime = (src)->atime;		\
-    (dest)->mtime = (src)->mtime;		\
-    (dest)->ctime = (src)->ctime;		\
-    (dest)->objtype = (src)->objtype;		\
-    (dest)->mask = ((src)->mask & attrmask);	\
-}while(0)
-
 /* maps bmi address to handle ranges/extents */
 typedef struct bmi_host_extent_table_s
 {

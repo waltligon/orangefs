@@ -18,6 +18,7 @@
 #include "pint-distribution.h"
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
+#include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
 

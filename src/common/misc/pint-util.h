@@ -11,6 +11,19 @@
 
 #include "pvfs2-types.h"
 
+/* converts common fields between sys attr and obj attr structures */
+#define PINT_CONVERT_ATTR(dest, src, attrmask)  \
+do{                                             \
+    (dest)->owner = (src)->owner;               \
+    (dest)->group = (src)->group;               \
+    (dest)->perms = (src)->perms;               \
+    (dest)->atime = (src)->atime;               \
+    (dest)->mtime = (src)->mtime;               \
+    (dest)->ctime = (src)->ctime;               \
+    (dest)->objtype = (src)->objtype;           \
+    (dest)->mask = ((src)->mask & attrmask);    \
+}while(0)
+
 PVFS_msg_tag_t PINT_util_get_next_tag(void);
 
 #endif /* __PINT_UTIL_H */
