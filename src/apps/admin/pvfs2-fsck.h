@@ -61,6 +61,11 @@ void cull_leftovers(PVFS_fs_id cur_fs,
 int create_lost_and_found(PVFS_fs_id cur_fs,
 			  PVFS_credentials *creds);
 
+int create_dirent(PVFS_object_ref dir_ref,
+		  char *name,
+		  PVFS_handle handle,
+		  PVFS_credentials *creds);
+
 int remove_object(PVFS_object_ref obj_ref,
 		  PVFS_ds_type obj_type,
 		  PVFS_credentials *creds);

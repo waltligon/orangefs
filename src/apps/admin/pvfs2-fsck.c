@@ -35,7 +35,8 @@ struct options
 };
 struct options *fsck_opts = NULL;
 
-int created_lost_and_found = 0;
+/* lost+found reference */
+PVFS_object_ref laf_ref;
 
 int main(int argc, char **argv)
 {
@@ -815,19 +816,21 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 		else
 		{
 		    sprintf(filename + 20, "%Lu", Lu(handle));
-		    printf("* saving %s %Lu as %s.\n",
-			   get_type_str(getattr_resp.attr.objtype),
-			   Lu(handle),
-			   filename);
+		    ret = create_dirent(laf_ref,
+					filename,
+					handle,
+					creds);
+		    assert(ret == 0);
 		}
 		break;
 	    case PVFS_TYPE_DIRECTORY:
-		if (1) {
-		    sprintf(dirname + 19, "%Lu", Lu(handle));
-		    printf("* saving %Lu (directory) as %s.\n",
-			   Lu(handle),
-			   dirname);
-		}
+		sprintf(dirname + 19, "%Lu", Lu(handle));
+
+		ret = create_dirent(laf_ref,
+				    dirname,
+				    handle,
+				    creds);
+		assert(ret == 0);
 		break;
 	    case PVFS_TYPE_DATAFILE:
 #if 0
@@ -914,7 +917,10 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
 			  creds,
 			  &lookup_resp,
 			  PVFS2_LOOKUP_LINK_NO_FOLLOW);
-    if (ret == 0) return 0;
+    if (ret == 0) {
+	laf_ref = lookup_resp.ref;
+	return 0;
+    }
 
     attr.owner = creds->uid;
     attr.owner = creds->uid;
@@ -943,12 +949,31 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
 			     attr,
 			     creds,
 			     &mkdir_resp);
+	if (ret == 0) {
+	    laf_ref = mkdir_resp.ref;
+	}
     }
     else {
 	ret = 0;
     }
     assert(ret == 0);
 		   
+    return 0;
+}
+
+int create_dirent(PVFS_object_ref dir_ref,
+		  char *name,
+		  PVFS_handle handle,
+		  PVFS_credentials *creds)
+{
+    int ret;
+
+    printf("* %s creating new reference to %s (%Lu) in %Lu.\n",
+	   fsck_opts->destructive ? "" : "not",
+	   name,
+	   Lu(handle),
+	   Lu(dir_ref.handle));
+
     return 0;
 }
 
