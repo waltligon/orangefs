@@ -153,9 +153,10 @@ static int lookup_init(PINT_server_op *s_op,
 
     /* fill in the lookup portion of the PINT_server_op */
     /* NOTE: it would be nice if we just decoded into this in the first place. */
-    s_op->u.lookup.segp = NULL;
+    s_op->u.lookup.segp   = NULL;
     s_op->u.lookup.seg_nr = 0;
     s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->req->u.lookup_path.path);
+
     if (s_op->u.lookup.seg_ct < 0) {
 	gossip_err("  invalid path %s; sending error response\n",
 		   s_op->req->u.lookup_path.path);
@@ -210,27 +211,27 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
 
     /* initialize keyvals prior to read list call */
 
-    s_op->u.lookup.k_a[0].buffer    = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->u.lookup.k_a[0].buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-    if (s_op->u.lookup.seg_nr == 0) s_op->u.lookup.v_a[0].buffer = &s_op->u.lookup.base_attr;
-    else                            s_op->u.lookup.v_a[0].buffer = &s_op->resp->u.lookup_path.attr_array[s_op->u.lookup.seg_nr-1];
+    if (s_op->u.lookup.seg_nr == 0) s_op->val.buffer = &s_op->u.lookup.base_attr;
+    else                            s_op->val.buffer = &s_op->resp->u.lookup_path.attr_array[s_op->u.lookup.seg_nr-1];
 
-    s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_object_attr);
+    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
 		 s_op->req->u.lookup_path.fs_id,
 		 handle,
-		 (char *) s_op->u.lookup.k_a->buffer,
-		 s_op->u.lookup.k_a->buffer_sz,
-		 (unsigned) s_op->u.lookup.v_a->buffer,
-		 s_op->u.lookup.v_a->buffer_sz);
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
 
     job_post_ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
 					 handle,
-					 s_op->u.lookup.k_a,
-					 s_op->u.lookup.v_a,
+					 &s_op->key,
+					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
@@ -316,7 +317,8 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
  *
  * Posts the keyval read to trove.
  */
-static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s *ret)
+static int lookup_read_directory_entry_handle(PINT_server_op *s_op,
+					      job_status_s *ret)
 {
     TROVE_handle handle;
     int job_post_ret;
@@ -337,15 +339,15 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s
 		 "  reading dirent handle value from handle 0x%08Lx\n",
 		 handle);
 
-    s_op->u.lookup.k_a[0].buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
-    s_op->u.lookup.k_a[0].buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
-    s_op->u.lookup.v_a[0].buffer    = &s_op->u.lookup.dirent_handle;
-    s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_handle);
+    s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+    s_op->val.buffer    = &s_op->u.lookup.dirent_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     job_post_ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
 					 handle,
-					 s_op->u.lookup.k_a,
-					 s_op->u.lookup.v_a,
+					 &s_op->key,
+					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
@@ -368,7 +370,8 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s
  *
  * Posts the keyval read to trove.
  */
-static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
+static int lookup_read_directory_entry(PINT_server_op *s_op,
+				       job_status_s *ret)
 {
     int job_post_ret;
     job_id_t j_id;
@@ -384,17 +387,17 @@ static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
      *
      * We will read the handle of the current segment here.
      */
-    s_op->u.lookup.k_a[0].buffer    = s_op->u.lookup.segp;
-    s_op->u.lookup.k_a[0].buffer_sz = strlen(s_op->u.lookup.segp) + 1;
-    s_op->u.lookup.v_a[0].buffer    = &s_op->resp->u.lookup_path.handle_array[s_op->u.lookup.seg_nr];
-    s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_handle);
+    s_op->key.buffer    = s_op->u.lookup.segp;
+    s_op->key.buffer_sz = strlen(s_op->u.lookup.segp) + 1;
+    s_op->val.buffer    = &s_op->resp->u.lookup_path.handle_array[s_op->u.lookup.seg_nr];
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     s_op->u.lookup.seg_nr++;
 
     job_post_ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
 					 s_op->u.lookup.dirent_handle,
-					 s_op->u.lookup.k_a,
-					 s_op->u.lookup.v_a,
+					 &s_op->key,
+					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
@@ -411,18 +414,19 @@ static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
  *
  * Posts release request to job scheduler.
  */
-static int lookup_release_job(PINT_server_op *s_op, job_status_s *ret)
+static int lookup_release_job(PINT_server_op *s_op,
+			      job_status_s *ret)
 {
 
     int job_post_ret=0;
-    job_id_t i;
+    job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG,"lookup state: lookup_release_job\n");
 
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
 					 s_op,
 					 ret,
-					 &i);
+					 &j_id);
     return job_post_ret;
 }
 
@@ -437,20 +441,21 @@ static int lookup_release_job(PINT_server_op *s_op, job_status_s *ret)
  *
  * Posts send to BMI.
  */
-static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret)
+static int lookup_send_response(PINT_server_op *s_op,
+				job_status_s *ret)
 {
     int encode_ret, job_post_ret, payload_sz;
-    job_id_t i;
+    job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_send_response\n");
 
     payload_sz = s_op->u.lookup.seg_nr * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
 
     /* fill in response -- WHAT IS GUARANTEED TO BE FILLED IN ALREADY??? */
-    s_op->resp->op = PVFS_SERV_LOOKUP_PATH;
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + payload_sz;
-    s_op->resp->status = 0; /* ??? */
-    s_op->resp->u.lookup_path.count        = s_op->u.lookup.seg_nr; /* # actually completed */
+    s_op->resp->op                  = PVFS_SERV_LOOKUP_PATH;
+    s_op->resp->rsize               = sizeof(struct PVFS_server_resp_s) + payload_sz;
+    s_op->resp->status              = 0; /* ??? */
+    s_op->resp->u.lookup_path.count = s_op->u.lookup.seg_nr; /* # actually completed */
 
     gossip_debug(SERVER_DEBUG,
 		 "  sending response with %d segment(s) (size %Ld)\n",
@@ -462,9 +467,6 @@ static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret)
 			     &(s_op->encoded),
 			     s_op->addr,
 			     s_op->enc_type);
-
-    /* Q: IS ALL MY DATA OK TO BE FREED AFTER THE ENCODE??? */
-
     assert(encode_ret == 0);
 
     /* Post message */
@@ -478,8 +480,8 @@ static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret)
 				     0,
 				     s_op, 
 				     ret, 
-				     &i);
-    return(job_post_ret);
+				     &j_id);
+    return job_post_ret;
 }
 
 /*
@@ -500,7 +502,8 @@ static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret)
  * This function does not post an operation, but instead returns 0,
  * indicating that this state machine is finished.           
  */
-static int lookup_cleanup(PINT_server_op *s_op, job_status_s *ret)
+static int lookup_cleanup(PINT_server_op *s_op,
+			  job_status_s *ret)
 {
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_cleanup\n");
     
@@ -518,7 +521,7 @@ static int lookup_cleanup(PINT_server_op *s_op, job_status_s *ret)
     /* free server operation structure */
     free(s_op);
 
-    return(0);
+    return 0;
 }
 
 /*

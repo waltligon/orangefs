@@ -43,8 +43,6 @@ struct PINT_server_lookup_op {
 
     PVFS_handle dirent_handle;
     PVFS_object_attr base_attr; /* used to hold attributes of the base handle, which don't go in resp */
-
-    PVFS_ds_keyval_s k_a[1], v_a[1]; /* not sure that this is really necessary... */
 };
 
 struct PINT_server_readdir_op {
