@@ -47,12 +47,17 @@ struct dbpf_storage {
 
 /* struct dbpf_dspace_attr
  *
- * used to store dspace attributes in the dspace attributes database.
+ * used when storing dspace handle (this is the data).
+ *
+ * NOTE: NEED TO GET THIS STRAIGHT WRT PVFS_ds_attributes!!!
+ *
+ * To clarify, it is a TROVE_ds_attributes_s that is stored for the
+ * setattr/getattr operations, which is defined way up in pvfs2-storage.h.
+ * So there are two "attribute" structures for the moment...
  */
 struct dbpf_dspace_attr {
     TROVE_coll_id coll_id;
     TROVE_ds_type type;
-    /* plus all the other stuff...create time, mod. time, creator? */
 };
 
 /* struct dbpf_collection
@@ -93,6 +98,10 @@ struct dbpf_dspace_iterate_handles_op {
     TROVE_handle *handle_array;
     TROVE_ds_position *position_p;
     int *count_p;
+};
+
+struct dbpf_dspace_setattr_op {
+    TROVE_ds_attributes_s *attr_p;
 };
 
 struct dbpf_keyval_read_op {
@@ -198,7 +207,8 @@ enum dbpf_op_type {
     DSPACE_REMOVE,
     DSPACE_ITERATE_HANDLES,
     DSPACE_VERIFY,
-    DSPACE_GETATTRIB
+    DSPACE_GETATTR,
+    DSPACE_SETATTR
 };
 
 enum dbpf_op_state {
@@ -230,6 +240,7 @@ struct dbpf_op {
 	struct dbpf_dspace_create_op d_create;
 	/* struct dbpf_dspace_remove_op d_remove; -- EMPTY */
 	struct dbpf_dspace_iterate_handles_op d_iterate_handles;
+	struct dbpf_dspace_setattr_op d_setattr;
 	struct dbpf_bstream_rw_at_op b_read_at;
 	struct dbpf_bstream_rw_at_op b_write_at;
 	struct dbpf_bstream_rw_list_op b_rw_list;

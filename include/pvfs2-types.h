@@ -41,24 +41,33 @@ typedef int32_t PVFS_msg_tag_t;
 /* Pinode Number */
 typedef struct
 {
-	int64_t handle;		/* unique identifier per PVFS2 file */
-	PVFS_fs_id fs_id;		/* Filesystem ID */
+    int64_t handle;		/* unique identifier per PVFS2 file */
+    PVFS_fs_id fs_id;		/* Filesystem ID */
 }pinode_reference;
 
 /* PVFS directory entry */
 struct PVFS_dirent_s {
-	/*pinode_number pinode_no;*/
-	char d_name[PVFS_NAME_MAX + 1];
-	/* something about how to get to the next one ? */
+    /*pinode_number pinode_no;*/
+    char d_name[PVFS_NAME_MAX + 1];
+    /* something about how to get to the next one ? */
 };
 typedef struct PVFS_dirent_s PVFS_dirent;
 
 /* PVFS_credentials structure */
 struct PVFS_credentials_s {
-	PVFS_uid uid;
-	PVFS_gid gid;
-	PVFS_permissions perms;
+    PVFS_uid uid;
+    PVFS_gid gid;
+    PVFS_permissions perms;
 };
 typedef struct PVFS_credentials_s PVFS_credentials;
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=4
+ */
 
 #endif /* __PVFS2_TYPES_H */

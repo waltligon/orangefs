@@ -36,9 +36,9 @@ typedef int32_t PVFS_ds_flags;
 /* Bit values of flags for various dspace operations */
 /* TODO: do we use a flag to get a vtag back or do we use VTAG_RETURN? */
 enum {
-	DSPACE_SYNC = 1, /* sync storage on completion of operation */
-	DSPACE_PREALLOC = 2, /* preallocate space (for resize op only) */
-	DSPACE_CALC_VTAG = 4, /* calculate and return a vtag (?) */
+    DSPACE_SYNC = 1, /* sync storage on completion of operation */
+    DSPACE_PREALLOC = 2, /* preallocate space (for resize op only) */
+    DSPACE_CALC_VTAG = 4, /* calculate and return a vtag (?) */
 };
 
 /* used to keep up with the current position when iterating through
@@ -49,34 +49,53 @@ typedef int32_t PVFS_ds_position;
 /* vtag */
 struct PVFS_vtag
 {
-	int foo; /* TODO: we haven't defined what vtags look like yet */
+    int foo; /* TODO: we haven't defined what vtags look like yet */
 };
 typedef struct PVFS_vtag PVFS_vtag_s;
 
 /* dataspace attributes that are not explicitly stored within the
  * dataspace itself.
+ *
+ * Note: this is what is being stored by the trove code as the attributes
+ * right now.  Do we need to have a separation between the attributes as
+ * sent across the wire/to the user vs. what is stored in trove?  Is that
+ * already done?
  */
 struct PVFS_ds_attributes
 {
-	int foo;  /* TODO: we don't have any attributes defined yet */
+    /* handle is used to get this, so shouldn't need it in here? */
+    PVFS_uid uid;
+    PVFS_gid gid;
+    PVFS_permissions mode;
+    PVFS_time ctime;
+
 };
 typedef struct PVFS_ds_attributes PVFS_ds_attributes_s;
 
 /* key descriptors for use in key/value spaces */
 struct PVFS_ds_key
 {
-	/* TODO: not really defined yet */
-	char* name; 
-	int32_t length; /* NOTE: Should include NULL terminator on strings */
+    /* TODO: not really defined yet */
+    char* name; 
+    int32_t length; /* NOTE: Should include NULL terminator on strings */
 };
 typedef struct PVFS_ds_key PVFS_ds_key_s;
 
 struct PVFS_ds_keyval
 {
-	/* TODO: not really defined yet */
-	void   *buffer;
-	int32_t buffer_sz;
+    /* TODO: not really defined yet */
+    void   *buffer;
+    int32_t buffer_sz;
 };
 typedef struct PVFS_ds_keyval PVFS_ds_keyval_s;
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=4
+ */
 
 #endif /* __PVFS2_STORAGE_H */

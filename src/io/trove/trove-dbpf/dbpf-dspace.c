@@ -24,6 +24,7 @@ extern struct dbpf_collection *my_coll_p;
 extern TROVE_handle dbpf_last_handle;
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
+static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 
 /* TODO: should this have a ds_attributes with it? */
 int dbpf_dspace_create(TROVE_coll_id coll_id,
@@ -168,7 +169,7 @@ int dbpf_dspace_iterate_handles(
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
 			DSPACE_ITERATE_HANDLES,
-			0, /* handle -- ignored in this case */
+			(TROVE_handle) 0, /* handle -- ignored in this case */
 			coll_p,
 			dbpf_dspace_iterate_handles_op_svc,
 			user_ptr);
@@ -187,7 +188,7 @@ int dbpf_dspace_iterate_handles(
  */
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 {
-    int ret, i=0;
+    int ret = 0, i = 0;
     DB *db_p;
     DBC *dbc_p;
     DBT key, data;
@@ -343,6 +344,33 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 			       TROVE_ds_attributes_s *ds_attr_p, 
 			       void *user_ptr,
 			       TROVE_op_id *out_op_id_p)
+{
+    struct dbpf_queued_op *q_op_p;
+    struct dbpf_collection *coll_p;
+
+    coll_p = my_coll_p;
+    if (coll_p == NULL) return -1;
+
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL) return -1;
+
+    /* initialize all the common members */
+    dbpf_queued_op_init(q_op_p,
+			DSPACE_SETATTR,
+			handle,
+			coll_p,
+			dbpf_dspace_setattr_op_svc,
+			user_ptr);
+
+    /* initialize op-specific members */
+    q_op_p->op.u.d_setattr.attr_p = ds_attr_p;
+
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    return 0;
+}
+
+static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 {
     return -1;
 }
