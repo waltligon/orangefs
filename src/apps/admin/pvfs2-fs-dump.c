@@ -175,6 +175,27 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    /* put the servers into administrative mode */
+    ret = PVFS_mgmt_setparam_list(
+	cur_fs,
+	creds,
+	PVFS_SERV_PARAM_MODE,
+	(int64_t)PVFS_SERVER_ADMIN_MODE,
+	addr_array,
+	server_count);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_setparam_list", ret);
+	PVFS_mgmt_setparam_list(
+	    cur_fs,
+	    creds,
+	    PVFS_SERV_PARAM_MODE,
+	    (int64_t)PVFS_SERVER_NORMAL_MODE,
+	    addr_array,
+	    server_count);
+	return(-1);
+    }
+
     /* iterate until we have retrieved all handles */
     do
     {
@@ -189,6 +210,13 @@ int main(int argc, char **argv)
 	if(ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_iterate_handles_list", ret);
+	    PVFS_mgmt_setparam_list(
+		cur_fs,
+		creds,
+		PVFS_SERV_PARAM_MODE,
+		(int64_t)PVFS_SERVER_NORMAL_MODE,
+		addr_array,
+		server_count);
 	    return(-1);
 	}
 
@@ -213,6 +241,14 @@ int main(int argc, char **argv)
 	    }
 	}
     }while(more_flag);
+
+    PVFS_mgmt_setparam_list(
+	cur_fs,
+	creds,
+	PVFS_SERV_PARAM_MODE,
+	(int64_t)PVFS_SERVER_NORMAL_MODE,
+	addr_array,
+	server_count);
 
     PVFS_sys_finalize();
 
