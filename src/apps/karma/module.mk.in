@@ -12,3 +12,10 @@ KARMASRC += \
     $(DIR)/status.c \
     $(DIR)/traffic.c \
     $(DIR)/units.c
+
+# add GTK include dirs and libs
+MODCFLAGS_$(DIR) := @GTKCFLAGS@
+MODLDFLAGS_$(DIR) := @GTKLIBS@
+
+# gtk-2.0 has many bad prototypes
+MODCFLAGS_$(DIR) += -Wno-strict-prototypes

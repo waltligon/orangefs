@@ -131,8 +131,6 @@ LDFLAGS += -L lib
 LIBS += -lpvfs2 @LIBS@ 
 VISCFLAGS = @VISCFLAGS@
 VISLIBS = @VISLIBS@ -lSDL_ttf
-GTKCFLAGS = @GTKCFLAGS@
-GTKLIBS = @GTKLIBS@
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 REDHAT_RELEASE = @REDHAT_RELEASE@
 # for Solaris:
@@ -223,9 +221,6 @@ LIBS += @THREAD_LIB@
 # on the PVFS2 stuff here
 VISCFLAGS += $(CFLAGS)
 VISLIBS += $(LIBS)
-
-KARMACFLAGS = $(CFLAGS) $(GTKCFLAGS)
-KARMALIBS = $(LIBS) $(GTKLIBS)
 
 ################################################################
 # enable GM if configure detected it
@@ -489,9 +484,12 @@ canonname = $(patsubst $(srcdir)/%,%,$(call dirname,$(1)))
 # Grab any CFLAGS defined by the make stub for a particular file, and
 # for the directory in which the source resides.
 # Always add the directory in question for "local" includes.
+# Similar for ldflags.
 modcflags = $(MODCFLAGS_$(call canonname,$(1))) \
             $(MODCFLAGS_$(patsubst $(srcdir)/%,%,$(1))) \
 	    -I$(call dirname,$(1))
+modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
+             $(MODLDFLAGS_$(patsubst $(srcdir)/%,%,$(1)))
 
 # note: this will look better if you use two tabs instead of spaces between
 # SHORT_NAME and the object
@@ -590,17 +588,9 @@ ifdef BUILD_KARMA
 $(KARMA): $(KARMAOBJS) $(LIBRARIES)
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $(KARMAOBJS) -o $@ $(LDFLAGS) $(KARMALIBS)
+	@$(LD) $(KARMAOBJS) -o $@ $(LDFLAGS) $(LIBS) $(call modldflags,$<)
 else
-	$(LD) $(KARMAOBJS) -o $@ $(LDFLAGS) $(KARMALIBS)
-endif
-
-$(KARMAOBJS): %.o: %.c
-ifdef QUIET_COMPILE
-	@echo "  CC		$@"
-	@$(CC) $(KARMACFLAGS) $< -c -o $@
-else 
-	$(CC) $(KARMACFLAGS) $< -c -o $@
+	$(LD) $(KARMAOBJS) -o $@ $(LDFLAGS) $(LIBS) $(call modldflags,$<)
 endif
 endif
 
@@ -802,6 +792,7 @@ distclean: cleaner docsclean
 	rm -f Makefile pvfs2-config.h
 	rm -f src/server/simple.conf
 	rm -f src/server/server.conf-localhost
+	rm -f src/apps/admin/pvfs2-config
 ifndef DIST_RELEASE
 	rm -f $(TROVE_AUTOGEN_FILES)
 	rm -f $(SMCGEN)
@@ -826,15 +817,6 @@ else
 	@echo generating vis dependency file $@.
 endif
 	@$(srcdir)/maint/depend.sh `dirname $*` $(VISCFLAGS) $(call modcflags,$<) $< > $@
-
-# rule for generating dependency files for karma
-$(KARMADEPENDS): %.d: %.c
-ifdef QUIET_COMPILE
-	@echo "  DEP		$@"
-else
-	@echo generating karma dependency file $@.
-endif
-	@$(srcdir)/maint/depend.sh `dirname $*` $(KARMACFLAGS) $(call modcflags,$<) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c
