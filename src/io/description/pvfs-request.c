@@ -4,8 +4,12 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.5 2003-07-01 20:19:03 walt Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.6 2003-07-01 22:15:21 neill Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.5  2003/07/01 20:19:03  walt
+// added new mode to request processor to skip logical bytes
+// cleaned up mode code
+//
 // Revision 1.4  2003/06/02 19:55:41  pcarns
 // got rid of PVFS_count32 type; replaced with int32_t or uint32_t or int
 // where appropriate
@@ -154,7 +158,7 @@ int PVFS_Request_hvector(int32_t count, int32_t blocklength,
 	if (oldreq == NULL)
 		return PVFS_ERR_REQ;
 	PVFS_Request_extent(oldreq, &oldext);
-	(*oldreq)->refcount++;
+	oldreq->refcount++;
 	*newreq = (PINT_Request *)malloc(sizeof(struct PINT_Request));
 	(*newreq)->sreq = NULL;
 	PINT_subreq(0, blocklength, stride, count, oldreq, oldext, newreq);
@@ -176,7 +180,7 @@ int PVFS_Request_indexed(int32_t count, int32_t *blocklengths,
 	if (oldreq == NULL)
 		return PVFS_ERR_REQ;
 	PVFS_Request_extent(oldreq, &oldext);
-	(*oldreq)->refcount++;
+	oldreq->refcount++;
 	while (count--)
 	{
 		dt = *newreq;
@@ -222,7 +226,7 @@ int PVFS_Request_hindexed(int32_t count, int32_t *blocklengths,
 	if (oldreq == NULL)
 		return PVFS_ERR_REQ;
 	PVFS_Request_extent(oldreq, &oldext);
-	(*oldreq)->refcount++;
+	oldreq->refcount++;
 	while (count--)
 	{
 		dt = *newreq;
