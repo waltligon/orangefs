@@ -1899,6 +1899,164 @@ int job_testworld(
 	return(0);
 }
 
+/* job_test_HACK()
+ *
+ * check for completion of a particular job, don't return until
+ * either job completes or timeout expires 
+ *
+ * returns 0 on success, -errno on failure 
+ */
+int job_test_HACK(
+	job_id_t id,
+	int* out_count_p,
+	void** returned_user_ptr_p,
+	job_status_s* out_status_p,
+	int timeout_ms)
+{
+	int ret = -1;
+	int completion_pending = 0;
+	struct job_desc* query = NULL;
+#ifdef __PVFS2_JOB_THREADED__
+	struct timeval now;
+	struct timespec timeout;
+#else
+	int num_completed;
+#endif /* __PVFS2_JOB_THREADED__ */
+
+	*out_count_p = 0;
+	
+	/* TODO: this implementation is going to be really clumsy for
+	 * now, just to get us through with correct semantics.  It will
+	 * search the completion queue way more than it needs to,
+	 * because I haven't implemented an intelligent way to only
+	 * look if the job you were interested in completed.
+	 */
+	
+	/* use this as a chance to do a cheap test on the request
+	 * scheduler
+	 */
+	if((ret = do_one_test_cycle_req_sched()) < 0)
+	{
+		return(ret);
+	}
+
+	/* see if we have anything in the completion queue, and go
+	 * ahead with first search 
+	 */
+	gen_mutex_lock(&completion_mutex);
+		if(completion_error)
+		{
+			gen_mutex_unlock(&completion_mutex);
+			return(completion_error);
+		}
+
+		completion_pending = !job_desc_q_empty(completion_queue);
+
+		query = job_desc_q_search(completion_queue, id);
+		if(query)
+		{
+			job_desc_q_remove(query);
+		}
+
+	gen_mutex_unlock(&completion_mutex);
+
+	/* see if we found what we wanted yet */
+	if(query)
+	{
+		*out_count_p = 1;
+		fill_status(query, returned_user_ptr_p, out_status_p);
+		/* special case for request scheduler */
+		if(query->type == JOB_REQ_SCHED &&
+			query->u.req_sched.post_flag == 1)
+		{
+			/* hang onto desc until release time */
+			job_desc_q_add(req_sched_inprogress_queue, query);
+		}
+		else
+		{
+			dealloc_job_desc(query);
+		}
+		return(0);
+	}
+
+	/* bail out if timeout is zero */
+	if(!timeout_ms)
+		return(0);
+
+	/* if we fall through to this point, then we need to just try
+	 * to eat up the timeout until the job that we want hits the
+	 * completion queue
+	 */
+#if 0
+	if(completion_pending)
+	{
+		/* do a quick test first to see if the job has already completed */
+		ret = job_test(id, out_count_p, returned_user_ptr_p, out_status_p);
+		if(ret < 0)
+		{
+			return(ret);
+		}
+		if(*out_count_p == 1)
+		{
+			/* done */
+			return(0);
+		}
+	}
+
+#ifdef __PVFS2_JOB_THREADED__
+	/* wait for just a little while to see if anything shows up in the
+	 * completion queue
+	 */
+	ret = gettimeofday(&now, NULL);
+	if(ret < 0)
+	{
+		return(ret);
+	}
+	timeout.tv_sec = now.tv_sec;
+	timeout.tv_nsec = now.tv_usec * 1000 + thread_wait_timeout;
+	if(timeout.tv_nsec > 1000000000)
+	{
+		timeout.tv_nsec = timeout.tv_nsec - 1000000000;
+		timeout.tv_sec = timeout.tv_sec + 1;
+	}
+
+	gen_mutex_lock(&completion_mutex);
+	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
+		&timeout);
+	gen_mutex_unlock(&completion_mutex);
+	if(ret == ETIMEDOUT || ret == EINTR)
+	{
+		/* nothing completed while we were waiting */
+		return(0);
+	}
+	else if(ret != 0)
+	{
+		/* error */
+		return(-ret);
+	}
+
+	/* fall through to check completion queue again */
+
+#else
+	/* push on work for one round */
+	ret = do_one_work_cycle_all(&num_completed, 1);
+	if(ret < 0)
+	{
+		return(ret);
+	}
+	if(num_completed == 0)
+	{
+		/* don't bother checking completion queue again */
+		return(0);
+	}
+#endif /* __PVFS2_JOB_THREADED__ */
+
+	/* check again to see if the job finished */
+	return(job_test(id, out_count_p, returned_user_ptr_p, out_status_p));
+#endif /* 0 */
+	return(-ENOSYS);
+}
+
 /* job_wait()
  *
  * briefly blocking check for completion of a particular job 
