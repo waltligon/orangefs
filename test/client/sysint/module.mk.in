@@ -1,9 +1,6 @@
 DIR := test/client/sysint
-TEST_JOBINT_DIR := src/io/job
-TEST_SYSINT_DIR := test/client/sysint
-TEST_REALSYSINT_DIR := src/client/unix-io
 
-TEST_SYSINT_DIR_SRC += \
+TEST_SRC += \
 	$(DIR)/client.c\
 	$(DIR)/lookup.c\
 	$(DIR)/dcache-torture.c\
@@ -27,16 +24,3 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/initialize.c \
 	$(DIR)/getparent.c
 
-TESTSRC += $(TEST_SYSINT_DIR_SRC)
-
-LOCALLIBS := -ldb -lrt -lpthread
-LOCALTESTS := $(patsubst %.c,%, $(TEST_SYSINT_DIR_SRC))
-$(LOCALTESTS): %: %.o $(TEST_JOBINT_DIR)/job.o 
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $< $(TEST_JOBINT_DIR)/job.o \
-	$(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
-else
-	$(LD) $< $(TEST_JOBINT_DIR)/job.o \
-	$(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
-endif
