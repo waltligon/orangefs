@@ -10,15 +10,6 @@ LIBSRC += \
 	$(DIR)/pcache.c \
 	$(DIR)/pinode-helper.c \
 	$(DIR)/pint-dcache.c \
-	$(DIR)/pint-serv-crdirent.c \
-	$(DIR)/pint-serv-create.c \
-	$(DIR)/pint-serv-lookup-path.c \
-	$(DIR)/pint-serv-mkdir.c \
-	$(DIR)/pint-serv-readdir.c \
-	$(DIR)/pint-serv-remove.c \
-	$(DIR)/pint-serv-rmdir.c \
-	$(DIR)/pint-serv-rmdirent.c \
-	$(DIR)/pint-serv-truncate.c \
 	$(DIR)/server-send-req.c \
 	$(DIR)/readdir.c \
 	$(DIR)/remove.c \
