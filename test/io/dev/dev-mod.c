@@ -86,14 +86,14 @@ int pdev_open(struct inode *inode, struct file *filp)
 {
     printk("pdev: pdev_open()\n");
     MOD_INC_USE_COUNT;
-    return(-ENOSYS);
+    return(0);
 }
 
 int pdev_release(struct inode *inode, struct file *filp)
 {
     printk("pdev: pdev_release()\n");
     MOD_DEC_USE_COUNT;
-    return(-ENOSYS);
+    return(0);
 }
 
 int pdev_ioctl(struct inode *inode, 
