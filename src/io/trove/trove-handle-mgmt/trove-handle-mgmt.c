@@ -77,8 +77,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
 
             if (ret != 1)
             {
-                /* gossip or log something */
-                gossip_debug(TROVE_DEBUG, "trove_dspace_iterate_handles failed\n");
+                gossip_debug(TROVE_DEBUG,
+                             "trove_dspace_iterate_handles failed\n");
                 return -1;
             }
 
@@ -87,8 +87,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
             /* look for special case of a blank fs */
             if ((count == 1) && (handles[0] == 0))
             {
-                /* gossip or log something */
-                gossip_debug(TROVE_DEBUG, "* Trove: Assuming a blank filesystem\n");
+                gossip_debug(TROVE_DEBUG,
+                             "* Trove: Assuming a blank filesystem\n");
                 return ret;
             }
 
@@ -100,15 +100,16 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                     if (!PINT_handle_in_extent_list(extent_list,
                                                     handles[i]))
                     {
-                        /* gossip or log the invalid handle */
-                        gossip_debug(TROVE_DEBUG, "handle %Ld is invalid (out of bounds)\n",
-                               handles[i]);
+                        gossip_debug(TROVE_DEBUG, "handle %Lu is invalid "
+                                     "(out of bounds)\n", handles[i]);
                         return -1;
                     }
 		    /* remove handle from trove-handle-mgmt */
 		    ret = trove_handle_remove(ledger, handles[i]);
-		    if (ret != 0){
-			gossip_debug(TROVE_DEBUG, "could not remove handle %Ld\n", handles[i]);
+		    if (ret != 0)
+                    {
+			gossip_debug(TROVE_DEBUG, "could not remove "
+                                     "handle %Lu\n", handles[i]);
 			break;
 		    }
                 }

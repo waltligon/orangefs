@@ -861,7 +861,7 @@ static int is_valid_filesystem_configuration(
     int ret = is_root_handle_in_a_meta_range(config,fs);
     if (ret == 0)
     {
-        gossip_err("RootHandle (%Ld) is NOT within the meta handle "
+        gossip_err("RootHandle (%Lu) is NOT within the meta handle "
                    "ranges specified for this filesystem (%s).\n",
                    fs->root_handle,fs->file_system_name);
     }

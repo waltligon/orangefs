@@ -236,11 +236,11 @@ static inline void make_size_human_readable(
         }
         if (i == NUM_SIZES)
         {
-            snprintf(out_str,16, "%Ld", size);
+            snprintf(out_str,16, "%Lu", size);
         }
         else
         {
-            snprintf(out_str,max_out_len,"%Ld%s",
+            snprintf(out_str,max_out_len,"%Lu%s",
                      tmp,s_str_size_table[i]);
         }
     }
@@ -325,7 +325,7 @@ void print_entry_attr(
 
     if (opts->list_inode)
     {
-        snprintf(scratch_inode,16,"%Ld ",handle);
+        snprintf(scratch_inode,16,"%Lu ",handle);
         inode = scratch_inode;
     }
 
@@ -339,7 +339,7 @@ void print_entry_attr(
     }
     else
     {
-        snprintf(scratch_size,16, "%Ld", size);
+        snprintf(scratch_size,16, "%Lu", size);
     }
     format_size_string(scratch_size,11,&formatted_size,1);
 
@@ -421,7 +421,7 @@ void print_entry(
     {
         if (opts->list_inode)
         {
-            printf("%Ld %s\n", handle, entry_name);
+            printf("%Lu %s\n", handle, entry_name);
         }
         else
         {
@@ -536,8 +536,8 @@ int do_list(
                 */
                 if (opts->list_inode && !opts->list_long)
                 {
-                    printf("%Ld .\n",pinode_refn.handle);
-                    printf("%Ld .. (faked)\n",pinode_refn.handle);
+                    printf("%Lu .\n",pinode_refn.handle);
+                    printf("%Lu .. (faked)\n",pinode_refn.handle);
                 }
                 else if (opts->list_long)
                 {

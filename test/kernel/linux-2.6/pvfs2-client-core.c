@@ -59,7 +59,7 @@ static int service_lookup_request(
 
         gossip_debug(
             CLIENT_DEBUG,
-            "Got a lookup request for %s (fsid %d | parent %Ld)\n",
+            "Got a lookup request for %s (fsid %d | parent %Lu)\n",
             in_upcall->req.lookup.d_name,
             in_upcall->req.lookup.parent_refn.fs_id,
             in_upcall->req.lookup.parent_refn.handle);
@@ -72,7 +72,7 @@ static int service_lookup_request(
                                   &response);
         if (ret < 0)
         {
-            gossip_err("Failed to lookup %s (fsid %d | parent is %Ld)!\n",
+            gossip_err("Failed to lookup %s (fsid %d | parent is %Lu)!\n",
                        in_upcall->req.lookup.d_name,
                        parent_refn.fs_id,parent_refn.handle);
             gossip_err("Lookup returned error code %d\n", ret);
@@ -117,7 +117,7 @@ static int service_create_request(
 
         gossip_debug(
             CLIENT_DEBUG,
-            "Got a create request for %s (fsid %d | parent %Ld)\n",
+            "Got a create request for %s (fsid %d | parent %Lu)\n",
             in_upcall->req.create.d_name,parent_refn.fs_id,
             parent_refn.handle);
 
@@ -135,7 +135,7 @@ static int service_create_request(
               before the pvfs2-client crashes; we want to report
               success on resume to the vfs that retried the operation.
             */
-            gossip_err("Failed to create %s under %Ld on fsid %d!\n",
+            gossip_err("Failed to create %s under %Lu on fsid %d!\n",
                        in_upcall->req.create.d_name,
                        parent_refn.handle,parent_refn.fs_id);
             gossip_err("Create returned error code %d\n",ret);
@@ -215,7 +215,7 @@ static int service_getattr_request(
 
         gossip_debug(
             CLIENT_DEBUG,
-            "got a getattr request for fsid %d | handle %Ld\n",
+            "got a getattr request for fsid %d | handle %Lu\n",
             in_upcall->req.getattr.refn.fs_id,
             in_upcall->req.getattr.refn.handle);
 
@@ -223,7 +223,7 @@ static int service_getattr_request(
                                in_upcall->credentials, &response);
         if (ret < 0)
         {
-            gossip_err("failed to getattr handle %Ld on fsid %d!\n",
+            gossip_err("failed to getattr handle %Lu on fsid %d!\n",
                        in_upcall->req.getattr.refn.handle,
                        in_upcall->req.getattr.refn.fs_id);
             gossip_err("getattr returned error code %d\n",ret);
@@ -256,7 +256,7 @@ static int service_setattr_request(
 
         gossip_debug(
             CLIENT_DEBUG,
-            "got a setattr request for fsid %d | handle %Ld\n",
+            "got a setattr request for fsid %d | handle %Lu\n",
             in_upcall->req.setattr.refn.fs_id,
             in_upcall->req.setattr.refn.handle);
 
@@ -265,7 +265,7 @@ static int service_setattr_request(
                                in_upcall->credentials);
         if (ret < 0)
         {
-            gossip_err("failed to setattr handle %Ld on fsid %d!\n",
+            gossip_err("failed to setattr handle %Lu on fsid %d!\n",
                        in_upcall->req.setattr.refn.handle,
                        in_upcall->req.setattr.refn.fs_id);
             gossip_err("setattr returned error code %d\n",ret);
@@ -301,14 +301,14 @@ static int service_remove_request(
         gossip_debug(
             CLIENT_DEBUG,
             "Got a remove request for %s under fsid %d and "
-            "handle %Ld\n", in_upcall->req.remove.d_name,
+            "handle %Lu\n", in_upcall->req.remove.d_name,
             parent_refn.fs_id, parent_refn.handle);
 
         ret = PVFS_sys_remove(in_upcall->req.remove.d_name,
                               parent_refn, in_upcall->credentials);
         if (ret < 0)
         {
-            gossip_err("Failed to remove %s under handle %Ld "
+            gossip_err("Failed to remove %s under handle %Lu "
                        "on fsid %d!\n", in_upcall->req.remove.d_name,
                        parent_refn.handle, parent_refn.fs_id);
             gossip_err("Remove returned error code %d\n",ret);
@@ -351,7 +351,7 @@ static int service_mkdir_request(
 
         gossip_debug(
             CLIENT_DEBUG,
-            "Got a mkdir request for %s (fsid %d | parent %Ld)\n",
+            "Got a mkdir request for %s (fsid %d | parent %Lu)\n",
             in_upcall->req.mkdir.d_name,parent_refn.fs_id,
             parent_refn.handle);
 
@@ -359,7 +359,7 @@ static int service_mkdir_request(
                              *attrs, in_upcall->credentials, &response);
         if (ret < 0)
         {
-            gossip_err("Failed to mkdir %s under %Ld on fsid %d!\n",
+            gossip_err("Failed to mkdir %s under %Lu on fsid %d!\n",
                        in_upcall->req.mkdir.d_name,
                        parent_refn.handle,parent_refn.fs_id);
             gossip_err("Mkdir returned error code %d\n",ret);
@@ -399,7 +399,7 @@ static int service_readdir_request(
 
         gossip_debug(
             CLIENT_DEBUG,
-            "Got a readdir request for fsid %d | parent %Ld\n",
+            "Got a readdir request for fsid %d | parent %Lu\n",
             refn.fs_id, refn.handle);
 
         ret = PVFS_sys_readdir(refn, in_upcall->req.readdir.token,
@@ -407,7 +407,7 @@ static int service_readdir_request(
                                in_upcall->credentials, &response);
         if (ret < 0)
         {
-            gossip_err("Failed to readdir under %Ld on fsid %d!\n",
+            gossip_err("Failed to readdir under %Lu on fsid %d!\n",
                        refn.handle, refn.fs_id);
             gossip_err("Readdir returned error code %d\n",ret);
 

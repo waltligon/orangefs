@@ -303,7 +303,7 @@ int pvfs2_inode_getattr(
 	new_op->upcall.req.getattr.refn = pvfs2_inode->refn;
 
 	/* need to check downcall.status value */
-	pvfs2_print("Trying Getattr on handle %Ld on fsid %d\n",
+	pvfs2_print("Trying Getattr on handle %Lu on fsid %d\n",
                     pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
 
         service_operation_with_timeout_retry(
@@ -417,7 +417,7 @@ static inline struct inode *pvfs2_create_file(
         service_operation_with_timeout_retry(
             new_op, "pvfs2_create_file", retries);
 
-	pvfs2_print("Create Got PVFS2 handle %Ld on fsid %d\n",
+	pvfs2_print("Create Got PVFS2 handle %Lu on fsid %d\n",
                     new_op->downcall.resp.create.refn.handle,
                     new_op->downcall.resp.create.refn.fs_id);
 
@@ -511,7 +511,7 @@ static inline struct inode *pvfs2_create_dir(
             new_op, "pvfs2_create_dir", retries);
 
 	/* check what kind of goodies we got */
-	pvfs2_print("Mkdir Got PVFS2 handle %Ld on fsid %d\n",
+	pvfs2_print("Mkdir Got PVFS2 handle %Lu on fsid %d\n",
                     new_op->downcall.resp.mkdir.refn.handle,
                     new_op->downcall.resp.mkdir.refn.fs_id);
 
@@ -605,7 +605,7 @@ int pvfs2_remove_entry(
     if (inode && parent)
     {
 	pvfs2_print("pvfs2: pvfs2_remove_entry on inode %d: "
-                    "Parent is %Ld | fs_id %d\n",
+                    "Parent is %Lu | fs_id %d\n",
                     (int)inode->i_ino, parent->refn.handle,
                     parent->refn.fs_id);
 	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);

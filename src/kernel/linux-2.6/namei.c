@@ -97,7 +97,7 @@ static struct dentry *pvfs2_lookup(
         new_op, "pvfs2_lookup", retries);
 
     /* check what kind of goodies we got */
-    pvfs2_print("Lookup Got PVFS2 handle %Ld on fsid %d\n",
+    pvfs2_print("Lookup Got PVFS2 handle %Lu on fsid %d\n",
                 new_op->downcall.resp.lookup.refn.handle,
                 new_op->downcall.resp.lookup.refn.fs_id);
 

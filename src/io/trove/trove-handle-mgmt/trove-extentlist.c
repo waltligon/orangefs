@@ -201,7 +201,7 @@ static int extentlist_coalesce_extent(struct avlnode **n,
     if ( (lesser = avlaltaccess(*n, (e->first - 1))) != NULL) {
 	e->first = (*lesser)->first;
 	if ( avlremove(n, (*lesser)->first) == 0 ) {
-	    gossip_lerr("error removing key %Ld\n", (*lesser)->first);
+	    gossip_lerr("error removing key %Lu\n", (*lesser)->first);
 	    return COALESCE_ERROR;
 	}
 	merge_lesser = 1;
@@ -209,7 +209,7 @@ static int extentlist_coalesce_extent(struct avlnode **n,
     if ( (greater = avlaccess(*n, (e->last + 1)) )!= NULL ) {
 	e->last = (*greater)->last;
 	if (avlremove(n, (*greater)->first) == 0 ) {
-	    gossip_lerr("error removing key %Ld\n", (*greater)->first);
+	    gossip_lerr("error removing key %Lu\n", (*greater)->first);
 	    return COALESCE_ERROR;
 	}
 	merge_greater = 1;
@@ -217,7 +217,7 @@ static int extentlist_coalesce_extent(struct avlnode **n,
 
     if (merge_lesser || merge_greater ) {
 	if (avlinsert(n, e) == 0 ) {
-	    gossip_lerr("error inserting key %Ld\n", e->first);
+	    gossip_lerr("error inserting key %Lu\n", e->first);
 	    return COALESCE_ERROR;
 	} else
 	    return COALESCE_SUCCESS;
@@ -326,7 +326,7 @@ static void extent_show(struct avlnode *n,
 			int depth)
 {
     struct TROVE_handle_extent *e = (struct TROVE_handle_extent *)(n->d);
-    gossip_debug(TROVE_DEBUG, "lb: %Ld ub: %Ld\n", e->first, e->last);
+    gossip_debug(TROVE_DEBUG, "lb: %Lu ub: %Lu\n", e->first, e->last);
 }
 
 /*
@@ -339,7 +339,7 @@ static void extent_show(struct avlnode *n,
  *  nonzero			time to move on
  */
 int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist, 
-			    uint64_t cutoff) 
+                          TROVE_handle cutoff) 
 {
     return( (elist->num_handles > cutoff) );
 }

@@ -49,7 +49,7 @@ int pvfs2_mkspace(
         gossip_debug(SERVER_DEBUG,"Storage space: %s\n",storage_space);
         gossip_debug(SERVER_DEBUG,"Collection   : %s\n",collection);
         gossip_debug(SERVER_DEBUG,"Collection ID: %d\n",coll_id);
-        gossip_debug(SERVER_DEBUG,"Root Handle  : %Ld\n",root_handle);
+        gossip_debug(SERVER_DEBUG,"Root Handle  : %Lu\n",root_handle);
         gossip_debug(SERVER_DEBUG,"Handle Ranges: %s\n",handle_ranges);
     }
 
@@ -196,7 +196,7 @@ int pvfs2_mkspace(
         if (verbose)
         {
             gossip_debug(SERVER_DEBUG,"info: created root directory "
-                         "with handle %Ld.\n", new_root_handle);
+                         "with handle %Lu.\n", new_root_handle);
         }
 
         /*
@@ -291,7 +291,7 @@ int pvfs2_mkspace(
         if (verbose)
         {
             gossip_debug(SERVER_DEBUG,"info: created dspace for dirents "
-                         "with handle %Ld.\n", ent_handle);
+                         "with handle %Lu.\n", ent_handle);
         }
 
         key.buffer    = entstring;
@@ -337,7 +337,7 @@ int pvfs2_mkspace(
     if (verbose)
     {
         gossip_debug(SERVER_DEBUG,
-                     "info: collection created (root handle = %Ld, coll "
+                     "info: collection created (root handle = %Lu, coll "
                      "id = %d, root string = %s).\n",root_handle,
                      (int)coll_id, root_handle_string);
     }
