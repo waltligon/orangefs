@@ -262,7 +262,6 @@ struct bstream_listio_state
     TROVE_offset cur_stream_off;
 };
 
-
 /* Values for list_proc_state below */
 enum
 {
@@ -275,11 +274,11 @@ enum
 
 /* Used for both read and write list
  *
- * list_proc_state is used to retain the status of processing on the list
- * arrays.
+ * list_proc_state is used to retain the status of processing on the
+ * list arrays.
  *
- * aiocb_array_count - size of the aiocb_array (nothing to do
- * with # of things in progress)
+ * aiocb_array_count - size of the aiocb_array (nothing to do with #
+ * of things in progress)
  */
 struct dbpf_bstream_rw_list_op
 {
@@ -293,6 +292,9 @@ struct dbpf_bstream_rw_list_op
     struct aiocb *aiocb_array;
     struct sigevent sigev;
     struct bstream_listio_state lio_state;
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+    void *queued_op_ptr;
+#endif
 };
 
 /* List of operation types that might be queued */
@@ -336,7 +338,8 @@ enum dbpf_op_state
     OP_IN_SERVICE,
     OP_COMPLETED,
     OP_DEQUEUED,
-    OP_CANCELED
+    OP_CANCELED,
+    OP_INTERNALLY_DELAYED
 };
 
 /* Used to store parameters for queued operations */

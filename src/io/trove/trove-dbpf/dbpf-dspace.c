@@ -103,11 +103,13 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
         return -TROVE_ENOMEM;
     }
+
     if (!extent_array || (extent_array->extent_count < 1))
     {
         return -TROVE_EINVAL;
@@ -701,8 +703,8 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     {
         gossip_debug(
             GOSSIP_TROVE_DEBUG, "ATTRIB: dspace_getattr retrieved "
-            "attributes from CACHE for key %Lu\n uid = %d, mode = %d, "
-            "type = %d, dfile_count = %d, dist_size = %d\n",
+            "attributes from CACHE\n for key %Lu, uid = %d, mode = %d, "
+            "type = %d\n  dfile_count = %d, dist_size = %d\n",
             Lu(handle), (int)ds_attr_p->uid, (int)ds_attr_p->mode,
             (int)ds_attr_p->type, (int)ds_attr_p->dfile_count,
             (int)ds_attr_p->dist_size);
@@ -942,7 +944,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG, "ATTRIB: dspace_getattr retrieved attributes "
-        "from DISK for key %Lu\n uid = %d, mode = %d, type = %d "
+        "from DISK\n for key %Lu uid = %d, mode = %d, type = %d\n  "
         "dfile_count = %d, dist_size = %d, b_size = %Ld, k_size = %Ld\n",
         Lu(op_p->handle), (int)s_attr.uid, (int)s_attr.mode,
         (int)s_attr.type, (int)s_attr.dfile_count, (int)s_attr.dist_size,
@@ -984,8 +986,8 @@ static int dbpf_dspace_cancel(
     dbpf_queued_op_t *cur_op = NULL;
 #endif
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called for id %Lu.\n",
-        Lu(id));
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called for "
+                 "id %Lu.\n", Lu(id));
 
 #ifdef __PVFS2_TROVE_THREADED__
 

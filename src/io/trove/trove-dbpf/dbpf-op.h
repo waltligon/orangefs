@@ -47,8 +47,7 @@ typedef struct
     struct qlist_head link;
 } dbpf_queued_op_t;
 
-dbpf_queued_op_t *dbpf_queued_op_alloc(
-    void);
+dbpf_queued_op_t *dbpf_queued_op_alloc(void);
 
 void dbpf_queued_op_init(
     dbpf_queued_op_t *q_op_p,

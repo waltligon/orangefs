@@ -23,8 +23,7 @@ extern "C" {
 
 typedef struct qlist_head *dbpf_op_queue_p;
 
-dbpf_op_queue_p dbpf_op_queue_new(
-    void);
+dbpf_op_queue_p dbpf_op_queue_new(void);
 
 void dbpf_op_queue_cleanup(
     dbpf_op_queue_p op_queue);

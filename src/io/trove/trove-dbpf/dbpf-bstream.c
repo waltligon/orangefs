@@ -26,6 +26,16 @@
 
 #define AIOCB_ARRAY_SZ 8
 
+#define DBPF_MAX_IOS_IN_PROGRESS  16
+static int s_dbpf_ios_in_progress = 0;
+static dbpf_op_queue_p s_dbpf_io_ready_queue = NULL;
+static gen_mutex_t s_dbpf_io_mutex = GEN_MUTEX_INITIALIZER;
+
+static int issue_or_delay_io_operation(
+    dbpf_queued_op_t *cur_op, struct aiocb **aiocb_ptr_array,
+    int aiocb_inuse_count, struct sigevent *sig);
+static void start_delayed_ops_if_any(int dec_first);
+
 static inline int dbpf_bstream_rw_list(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -42,6 +52,7 @@ static inline int dbpf_bstream_rw_list(
     TROVE_context_id context_id,
     TROVE_op_id *out_op_id_p,
     int opcode);
+
 static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p);
 #ifndef __PVFS2_TROVE_AIO_THREADED__
@@ -73,7 +84,7 @@ static void aio_progress_notification(sigval_t sig)
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG," --- aio_progress_notification called "
-        "with %p (handle %Lu)\n", sig.sival_ptr, Lu(op_p->handle));
+        "with handle %Lu\n", Lu(op_p->handle));
 
     aiocb_p = op_p->u.b_rw_list.aiocb_array;
     assert(aiocb_p);
@@ -128,9 +139,6 @@ static void aio_progress_notification(sigval_t sig)
         ret = 0;
 
       final_threaded_aio_cleanup:
-        gossip_debug(GOSSIP_TROVE_DEBUG, " aio_progress_notification: "
-                     "op completed\n");
-
         if ((op_p->type == BSTREAM_WRITE_AT) ||
             (op_p->type == BSTREAM_WRITE_LIST))
         {
@@ -145,6 +153,8 @@ static void aio_progress_notification(sigval_t sig)
         move_op_to_completion_queue(
             cur_op, ret,
             ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
+
+        start_delayed_ops_if_any(1);
     }
     else
     {
@@ -196,20 +206,168 @@ static void aio_progress_notification(sigval_t sig)
 
         assert(cur_op == op_p->u.b_rw_list.sigev.sigev_value.sival_ptr);
 
-        ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
-                         aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
-        if (ret != 0)
-        {
-            gossip_lerr("lio_listio() returned %d\n", ret);
-            return;
-        }
         if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLCONVERTED)
         {
             op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLPOSTED;
         }
+
+        ret = issue_or_delay_io_operation(
+            cur_op, aiocb_ptr_array, aiocb_inuse_count,
+            &op_p->u.b_rw_list.sigev);
+
+        if (ret)
+        {
+            gossip_lerr("issue_or_delay_io_operation() returned "
+                        "%d\n", ret);
+        }
     }
 }
 #endif /* __PVFS2_TROVE_AIO_THREADED__ */
+
+static void start_delayed_ops_if_any(int dec_first)
+{
+    int ret = 0;
+    dbpf_queued_op_t *cur_op = NULL;
+    int i = 0, aiocb_inuse_count = 0;
+    struct aiocb *aiocbs = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
+
+    gen_mutex_lock(&s_dbpf_io_mutex);
+    if (dec_first)
+    {
+        s_dbpf_ios_in_progress--;
+    }
+
+    if (s_dbpf_io_ready_queue == NULL)
+    {
+        s_dbpf_io_ready_queue = dbpf_op_queue_new();
+    }
+    assert(s_dbpf_io_ready_queue);
+
+    if (!dbpf_op_queue_empty(s_dbpf_io_ready_queue))
+    {
+        cur_op = dbpf_op_queue_shownext(s_dbpf_io_ready_queue);
+        assert(cur_op);
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+        assert(cur_op->op.state == OP_INTERNALLY_DELAYED);
+#endif
+        assert((cur_op->op.type == BSTREAM_READ_AT) ||
+               (cur_op->op.type == BSTREAM_READ_LIST) ||
+               (cur_op->op.type == BSTREAM_WRITE_AT) ||
+               (cur_op->op.type == BSTREAM_WRITE_LIST));
+        dbpf_op_queue_remove(cur_op);
+
+        assert(s_dbpf_ios_in_progress <
+               (DBPF_MAX_IOS_IN_PROGRESS + 1));
+
+        gossip_debug(GOSSIP_TROVE_DEBUG, "starting delayed I/O "
+                     "operation %p (%d in progress)\n", cur_op,
+                     s_dbpf_ios_in_progress);
+
+        aiocbs = cur_op->op.u.b_rw_list.aiocb_array;
+        assert(aiocbs);
+
+        for(i = 0; i < AIOCB_ARRAY_SZ; i++)
+        {
+            if (aiocbs[i].aio_lio_opcode != LIO_NOP)
+            {
+                aiocb_inuse_count++;
+            }
+        }
+
+        for(i = 0; i < aiocb_inuse_count; i++)
+        {
+            aiocb_ptr_array[i] = &aiocbs[i];
+        }
+
+        ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count,
+                         &cur_op->op.u.b_rw_list.sigev);
+
+        if (ret != 0)
+        {
+            gossip_lerr("lio_listio() returned %d\n", ret);
+            dbpf_open_cache_put(&cur_op->op.u.b_rw_list.open_ref);
+            goto error_exit;
+        }
+        s_dbpf_ios_in_progress++;
+
+        gossip_debug(GOSSIP_TROVE_DEBUG, " +++ lio_listio posted %p "
+                     "(handle %Lu, ret %d))\n", cur_op,
+                     Lu(cur_op->op.handle), ret);
+
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+        /*
+          to continue making progress on this previously delayed I/O
+          operation, we need to re-add it back to the normal dbpf
+          operation queue so that the calling thread can continue to
+          call the service method (state flag is updated as well)
+        */
+        dbpf_queued_op_queue_nolock(cur_op);
+#endif
+    }
+  error_exit:
+    gen_mutex_unlock(&s_dbpf_io_mutex);
+}
+
+static int issue_or_delay_io_operation(
+    dbpf_queued_op_t *cur_op, struct aiocb **aiocb_ptr_array,
+    int aiocb_inuse_count, struct sigevent *sig)
+{
+    int ret = -TROVE_EINVAL, op_delayed = 0;
+    assert(cur_op);
+
+    gen_mutex_lock(&s_dbpf_io_mutex);
+    if (s_dbpf_ios_in_progress < DBPF_MAX_IOS_IN_PROGRESS)
+    {
+        s_dbpf_ios_in_progress++;
+    }
+    else
+    {
+        if (s_dbpf_io_ready_queue == NULL)
+        {
+            s_dbpf_io_ready_queue = dbpf_op_queue_new();
+            if (!s_dbpf_io_ready_queue)
+            {
+                return -TROVE_ENOMEM;
+            }
+        }
+        assert(s_dbpf_io_ready_queue);
+        dbpf_op_queue_add(s_dbpf_io_ready_queue, cur_op);
+
+        op_delayed = 1;
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+        /*
+          setting this state flag tells the caller not to re-add this
+          operation to the normal dbpf-op queue because it will be
+          started automatically (internally) on completion of other
+          I/O operations
+        */
+        gen_mutex_lock(&cur_op->mutex);
+        cur_op->op.state = OP_INTERNALLY_DELAYED;
+        gen_mutex_unlock(&cur_op->mutex);
+#endif
+
+        gossip_debug(GOSSIP_TROVE_DEBUG, "delayed I/O operation %p "
+                     "(%d already in progress)\n",
+                     cur_op, s_dbpf_ios_in_progress);
+    }
+    gen_mutex_unlock(&s_dbpf_io_mutex);
+
+    if (!op_delayed)
+    {
+        ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
+                         aiocb_inuse_count, sig);
+        if (ret != 0)
+        {
+            gossip_lerr("lio_listio() returned %d\n", ret);
+            dbpf_open_cache_put(&cur_op->op.u.b_rw_list.open_ref);
+            return -trove_errno_to_trove_error(errno);
+        }
+        gossip_debug(GOSSIP_TROVE_DEBUG, " +++ lio_listio posted %p "
+                     "(handle %Lu, ret %d))\n", cur_op,
+                     Lu(cur_op->op.handle), ret);
+    }
+    return 0;
+}
 
 static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
                                 TROVE_handle handle,
@@ -642,7 +800,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     int event_type;
 #ifdef __PVFS2_TROVE_AIO_THREADED__
     struct dbpf_op *op_p = NULL;
-    int i, aiocb_inuse_count;
+    int i = 0, aiocb_inuse_count = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
 #endif
 
@@ -651,6 +809,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -695,6 +854,9 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.stream_size_array = stream_size_array;
     q_op_p->op.u.b_rw_list.aiocb_array_count = 0;
     q_op_p->op.u.b_rw_list.aiocb_array = NULL;
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+    q_op_p->op.u.b_rw_list.queued_op_ptr = (void *)q_op_p;
+#endif
 
     /* initialize list processing state (more op-specific members) */
     q_op_p->op.u.b_rw_list.lio_state.mem_ct = 0;
@@ -744,14 +906,15 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
       aio_progress_notification callback method; this array is freed
       in dbpf-op.c:dbpf_queued_op_free
     */
-    aiocb_p = (struct aiocb *)malloc(AIOCB_ARRAY_SZ*sizeof(struct aiocb));
+    aiocb_p = (struct aiocb *)malloc(
+        (AIOCB_ARRAY_SZ * sizeof(struct aiocb)));
     if (aiocb_p == NULL)
     {
         dbpf_open_cache_put(&q_op_p->op.u.b_rw_list.open_ref);
         return -TROVE_ENOMEM;
     }
 
-    memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
+    memset(aiocb_p, 0, (AIOCB_ARRAY_SZ * sizeof(struct aiocb)));
     for(i = 0; i < AIOCB_ARRAY_SZ; i++)
     {
         aiocb_p[i].aio_lio_opcode = LIO_NOP;
@@ -814,21 +977,17 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     id_gen_fast_register(&q_op_p->op.id, q_op_p);
     *out_op_id_p = q_op_p->op.id;
 
-    ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
-                     aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
-    if (ret != 0)
+    ret = issue_or_delay_io_operation(
+        q_op_p, aiocb_ptr_array, aiocb_inuse_count,
+        &op_p->u.b_rw_list.sigev);
+
+    if (ret)
     {
-        gossip_lerr("lio_listio() returned %d\n", ret);
-        dbpf_open_cache_put(&q_op_p->op.u.b_rw_list.open_ref);
-        return -trove_errno_to_trove_error(errno);
+        return ret;
     }
-    gossip_debug(GOSSIP_TROVE_DEBUG, " +++ lio_listio posted %p "
-                 "(handle %Lu) and returned %d\n", q_op_p,
-                 Lu(handle), ret);
 #endif
     return 0;
 }
-
 
 /* dbpf_bstream_rw_list_op_svc()
  *
@@ -881,7 +1040,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
           this array is freed in dbpf-op.c:dbpf_queued_op_free
         */
         aiocb_p = (struct aiocb *)malloc(
-            AIOCB_ARRAY_SZ*sizeof(struct aiocb));
+            (AIOCB_ARRAY_SZ * sizeof(struct aiocb)));
 
         if (aiocb_p == NULL)
         {
@@ -889,7 +1048,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         }
 
         memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
-        for (i=0; i < AIOCB_ARRAY_SZ; i++)
+        for(i = 0; i < AIOCB_ARRAY_SZ; i++)
         {
             aiocb_p[i].aio_lio_opcode = LIO_NOP;
             aiocb_p[i].aio_sigevent.sigev_notify = SIGEV_NONE;
@@ -906,7 +1065,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         aiocb_p = op_p->u.b_rw_list.aiocb_array;
 
         /* check to see how we're progressing on previous operations */
-        for (i=0; i < op_p->u.b_rw_list.aiocb_array_count; i++)
+        for(i = 0; i < op_p->u.b_rw_list.aiocb_array_count; i++)
         {
             if (aiocb_p[i].aio_lio_opcode == LIO_NOP)
             {
@@ -922,6 +1081,12 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
                   gets the return value of the individual op
                 */
                 ret = aio_return(&aiocb_p[i]);
+
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "  %s complete: aio_return() says %d\n",
+                             ((op_p->type == BSTREAM_WRITE_LIST) ||
+                              (op_p->type == BSTREAM_WRITE_AT) ?
+                              "WRITE" : "READ"), ret);
 
                 /* mark as a NOP so we ignore it from now on */
                 aiocb_p[i].aio_lio_opcode = LIO_NOP;
@@ -957,13 +1122,13 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         if ((op_p->type == BSTREAM_WRITE_AT) ||
             (op_p->type == BSTREAM_WRITE_LIST))
         {
-            DBPF_AIO_SYNC_IF_NECESSARY(
-                op_p, op_p->u.b_rw_list.fd, ret);
+            DBPF_AIO_SYNC_IF_NECESSARY(op_p, op_p->u.b_rw_list.fd, ret);
         }
 
         dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
         op_p->u.b_rw_list.fd = -1;
 
+        start_delayed_ops_if_any(1);
         return ret;
     }
     else
@@ -1000,17 +1165,26 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
             aiocb_ptr_array[i] = &aiocb_p[i];
         }
 
-        ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
-                         aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
-        if (ret != 0)
-        {
-            gossip_lerr("lio_listio() returned %d\n", ret);
-            return -trove_errno_to_trove_error(errno);
-        }
-
         if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLCONVERTED)
         {
             op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLPOSTED;
+        }
+
+        /*
+          we use a reverse mapped ptr for I/O operations in order to
+          access the queued op from the op.  this is only useful for
+          the delayed io operation scheme.  it's initialized in
+          dbpf_bstream_rw_list
+        */
+        assert(op_p->u.b_rw_list.queued_op_ptr);
+
+        ret = issue_or_delay_io_operation(
+            (dbpf_queued_op_t *)op_p->u.b_rw_list.queued_op_ptr,
+            aiocb_ptr_array, aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
+
+        if (ret)
+        {
+            return ret;
         }
         return 0;
     }

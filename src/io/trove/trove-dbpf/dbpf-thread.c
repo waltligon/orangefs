@@ -149,6 +149,11 @@ int dbpf_do_one_work_cycle(int *out_count)
             dbpf_op_queue_remove(cur_op);
 
             gen_mutex_lock(&cur_op->mutex);
+            if (cur_op->op.state != OP_QUEUED)
+            {
+                gossip_err("INVALID OP STATE FOUND %d (op is %p)\n",
+                           cur_op->op.state, cur_op);
+            }
             assert(cur_op->op.state == OP_QUEUED);
             cur_op->op.state = OP_IN_SERVICE;
             gen_mutex_unlock(&cur_op->mutex);
@@ -183,6 +188,20 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
         else
         {
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+            /*
+              check if trove is telling us to NOT mark this as
+              completed, and also to NOT re-add it to the service
+              queue.  this can happen if trove is throttling I/O
+              internally and will handle re-starting the operation
+              without our help.
+            */
+            if (cur_op->op.state == OP_INTERNALLY_DELAYED)
+            {
+                continue;
+            }
+#endif
+            assert(cur_op->op.state != OP_COMPLETED);
             dbpf_queued_op_queue_nolock(cur_op);
         }
 
