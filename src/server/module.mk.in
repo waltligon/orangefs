@@ -25,7 +25,10 @@ SERVERGENSRC := \
 	$(DIR)/event-mon.c \
 	$(DIR)/iterate-handles.c
 
-# "normal" c files
+# "normal" c files that should be added to server library
 SERVERSRC += \
 	$(SERVERGENSRC)
 
+# server code that will be linked manually, not included in library
+MISCSRC += \
+	$(DIR)/pvfs2-server.c
