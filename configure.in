@@ -403,6 +403,65 @@ AC_ARG_WITH(kernel24,
     LINUX24_KERNEL_SRC="$withval" LINUX24_KERNEL_MINOR_VER="$k24_minor_ver"
     , LINUX24_KERNEL_SRC="" LINUX24_KERNEL_MINOR_VER="")
 
+
+dnl now that we have the path to kernel source we can feature-test kernels. 
+dnl currently it's a few functions that SuSE-8 backports from
+dnl 2.6 into 2.4
+
+oldcflags=$CFLAGS
+AC_MSG_CHECKING(for i_size_write in kernel)
+CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+dnl if this test passes, the kernel does not have it
+dnl if this test fails, the kernel already defined it
+AC_TRY_COMPILE([
+	#define __KERNEL__
+        #include <linux/fs.h>
+	void i_size_write(struct inode *inode,
+			loff_t i_size)
+        {
+		return;
+	}
+], [],
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_I_SIZE_WRITE, 1, Define if kernel has i_size_write),
+)
+
+AC_MSG_CHECKING(for i_size_read in kernel)
+CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+dnl if this test passes, the kernel does not have it
+dnl if this test fails, the kernel already defined it
+AC_TRY_COMPILE([
+	#define __KERNEL__
+        #include <linux/fs.h>
+	loff_t i_size_read(struct inode *inode)
+        {
+		return 0;
+	}
+], [],
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_I_SIZE_READ, 1, Define if kernel has i_size_read),
+)
+
+AC_MSG_CHECKING(for parent_ino in kernel)
+CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+dnl if this test passes, the kernel does not have it
+dnl if this test fails, the kernel already defined it
+AC_TRY_COMPILE([
+	#define __KERNEL__
+        #include <linux/fs.h>
+	ino_t parent_ino(struct dentry *dentry)
+        {
+		return (ino_t)0;
+	}
+], [],
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_PARENT_INO, 1, Define if kernel has parent_ino),
+)
+CFLAGS=$oldcflags
+
 dnl PAV configuration needs absolute location of source and build.
 dnl Linux-2.6 module needs absolute location of source, and uses the
 dnl relative location for soft links for out-of-tree builds.

@@ -61,6 +61,8 @@ typedef unsigned long sector_t;
 #include <linux/pagemap.h>
 #include <linux/poll.h>
 
+#include "pvfs2-config.h"
+
 /* taken from include/linux/fs.h from 2.4.19 or later kernels */
 #ifndef MAX_LFS_FILESIZE
 #if BITS_PER_LONG == 32
@@ -858,22 +860,30 @@ static inline int dcache_dir_close(struct inode *inode, struct file *file)
 }
 #endif /* PVFS2_LINUX_KERNEL_2_4_MINOR_VER */
 
-/* based on linux kernel 2.6.x fs.h routines not included in 2.4.x */
-static inline void i_size_write(struct inode *inode, loff_t i_size)
-{
-    inode->i_size = i_size;
-}
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
+/* some 2.4 kernels backport a lot of stuff from 2.6, so we have to
+ * feature-test instead of relying on kernel versions */
+#ifndef HAVE_I_SIZE_READ
 static inline loff_t i_size_read(struct inode *inode)
 {
     return inode->i_size;
 }
+#endif
 
+#ifndef HAVE_I_SIZE_WRITE
+static inline void i_size_write(struct inode *inode, loff_t i_size)
+{
+    inode->i_size = i_size;
+}
+#endif
+
+#ifndef HAVE_PARENT_INO
 static inline ino_t parent_ino(struct dentry *dentry)
 {
     return dentry->d_parent->d_inode->i_ino;
 }
-#endif /* PVFS2_LINUX_KERNEL_2_4 */
+#endif
 
 
 #endif /* __PVFS2KERNEL_H */

@@ -17,6 +17,7 @@ pvfs2-1.1.0pre1
 - pvfs2-cp: can pass strip size as a parameter (thanks David Beilloin
   <dbeilloi@mc.com>)
 - gossip: avoid double-timestamp in debug and error messages
+- feature-test for kernel routines i_size_write, i_size_read, and parent_ino
 
 
 pvfs2-1.0.1

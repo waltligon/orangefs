@@ -37,6 +37,12 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define if kernel has i_size_read */
+#undef HAVE_I_SIZE_READ
+
+/* Define if kernel has i_size_write */
+#undef HAVE_I_SIZE_WRITE
+
 /* Define to 1 if you have the `efence' library (-lefence). */
 #undef HAVE_LIBEFENCE
 
@@ -57,6 +63,9 @@
 
 /* Define if Pablo library is used */
 #undef HAVE_PABLO
+
+/* Define if kernel has parent_ino */
+#undef HAVE_PARENT_INO
 
 /* Define to 1 if you have the <SDL/SDL_ttf.h> header file. */
 #undef HAVE_SDL_SDL_TTF_H
