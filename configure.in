@@ -149,7 +149,8 @@ CFLAGS="$CFLAGS -pg -fprofile-arcs",
 
 AC_ARG_ENABLE(coverage,
 [  --enable-coverage       Enable coverage analysis (disables optimizations).  *** not yet working ***],
-CFLAGS="$CFLAGS -fprofile-arcs -ftest-coverage -O0",
+[ CFLAGS="$CFLAGS -fprofile-arcs -ftest-coverage -O0"
+ENABLE_COVERAGE=1 ],
 )
 
 AC_ARG_ENABLE(strict,
@@ -550,4 +551,7 @@ examples/pvfs2-server.rc
 # print a summary of the configuration after all the junky output
 if test x$BUILD_KARMA = x1 ; then
 	echo PVFS2 "configured to build karma gui."
+fi
+if test x$ENABLE_COVERAGE = x1 ; then
+	echo PVFS2 "configured to perform coverage analysis."
 fi
