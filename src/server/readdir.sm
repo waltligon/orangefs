@@ -191,6 +191,16 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
 
     PINT_STATE_DEBUG("iterate_on_entries");
 
+    /*
+      if a client issues a readdir but asks for no entries,
+      we can skip doing anything here
+    */
+    if (s_op->req->u.readdir.dirent_count == 0)
+    {
+	js_p->error_code = 0;
+        return 1;
+    }
+
     /* TODO: handle this error properly */
     assert(s_op->req->u.readdir.dirent_count <= PVFS_REQ_LIMIT_DIRENT_COUNT);
 

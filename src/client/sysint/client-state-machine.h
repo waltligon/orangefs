@@ -179,6 +179,14 @@ struct PINT_client_flush_sm {
     PINT_client_sm_msgpair_state *msgpair; /* used in datafile flush */
 };
 
+/* PINT_client_readdir_sm */
+struct PINT_client_readdir_sm {
+    PVFS_pinode_reference         object_ref;     /* looked up */
+    PVFS_ds_position              pos_token;      /* input parameter */
+    int                           dirent_limit;   /* input parameter */
+    PVFS_sysresp_readdir          *readdir_resp;  /* in/out parameter*/
+};
+
 struct PINT_client_mgmt_setparam_list_sm 
 {
     PVFS_fs_id fs_id;
@@ -289,6 +297,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_getattr_sm getattr;
 	struct PINT_client_io_sm io;
 	struct PINT_client_flush_sm flush;
+	struct PINT_client_readdir_sm readdir;
 	struct PINT_client_mgmt_setparam_list_sm setparam_list;
 	struct PINT_client_truncate_sm  truncate;
 	struct PINT_client_mgmt_statfs_list_sm statfs_list;
@@ -315,13 +324,14 @@ enum {
     PVFS_SYS_IO      = 6,
     PVFS_SYS_FLUSH   = 7,
     PVFS_SYS_TRUNCATE= 8,
-    PVFS_MGMT_SETPARAM_LIST = 9,
-    PVFS_MGMT_NOOP   = 10,
-    PVFS_MGMT_STATFS_LIST = 11,
-    PVFS_MGMT_PERF_MON_LIST = 12,
-    PVFS_MGMT_ITERATE_HANDLES_LIST = 13,
-    PVFS_MGMT_GET_DFILE_ARRAY = 14,
-    PVFS_MGMT_EVENT_MON_LIST = 15
+    PVFS_SYS_READDIR = 9,
+    PVFS_MGMT_SETPARAM_LIST = 70,
+    PVFS_MGMT_NOOP   = 71,
+    PVFS_MGMT_STATFS_LIST = 72,
+    PVFS_MGMT_PERF_MON_LIST = 73,
+    PVFS_MGMT_ITERATE_HANDLES_LIST = 74,
+    PVFS_MGMT_GET_DFILE_ARRAY = 75,
+    PVFS_MGMT_EVENT_MON_LIST = 76
 };
 
 /* prototypes of helper functions */
@@ -368,6 +378,7 @@ extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
+extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_perf_mon_list_sm;

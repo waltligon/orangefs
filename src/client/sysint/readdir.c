@@ -16,13 +16,13 @@
 #include "pcache.h"
 #include "PINT-reqproto-encode.h"
 
-/* PVFS_sys_readdir()
+/* PVFS_sys_readdir_old() : DEPRECATED -- see sys-readdir.sm
  *
  * read a directory with specified attributes 
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_readdir(
+int PVFS_sys_readdir_old(
     PVFS_pinode_reference pinode_refn,
     PVFS_ds_position token, 
     int pvfs_dirent_incount,

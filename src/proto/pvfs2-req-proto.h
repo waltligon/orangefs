@@ -450,6 +450,22 @@ endecode_fields_4_struct(PVFS_servreq_readdir,
   PVFS_ds_position, token,
   uint32_t, dirent_count);
 
+#define PINT_SERVREQ_READDIR_FILL(__req,		\
+				  __creds,		\
+				  __fsid,		\
+				  __handle,		\
+				  __token,		\
+				  __dirent_count)	\
+do {							\
+    memset(&(__req), 0, sizeof(__req));			\
+    (__req).op = PVFS_SERV_READDIR;			\
+    (__req).credentials = (__creds);			\
+    (__req).u.readdir.fs_id = (__fsid);			\
+    (__req).u.readdir.handle = (__handle);		\
+    (__req).u.readdir.token = (__token);		\
+    (__req).u.readdir.dirent_count = (__dirent_count);	\
+} while (0);
+
 struct PVFS_servresp_readdir
 {
     PVFS_ds_position token;	    /* new dir offset */

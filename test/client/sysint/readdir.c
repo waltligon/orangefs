@@ -99,6 +99,15 @@ int main(int argc,char **argv)
             if (resp_readdir.pvfs_dirent_outcount)
                 free(resp_readdir.dirent_array);
 
+            /*
+              if we got a short read, assume that we're finished
+              readding all dirents
+            */
+            if (resp_readdir.pvfs_dirent_outcount < pvfs_dirent_incount)
+            {
+                break;
+            }
+
         } while(resp_readdir.pvfs_dirent_outcount != 0);
 
 	/*close it down*/
