@@ -89,15 +89,14 @@ struct dentry *pvfs2_lookup(
     }
     new_op->upcall.type = PVFS2_VFS_OP_LOOKUP;
 
-    /* if we're at a symlink, should we follow it? */
+    /*
+      if we're at a symlink, should we follow it? never attempt to
+      follow negative dentries
+    */
     new_op->upcall.req.lookup.sym_follow =
-        ((nd && (nd->flags & LOOKUP_FOLLOW)) ?
+        ((nd && (nd->flags & LOOKUP_FOLLOW) &&
+          (dentry->d_inode != NULL)) ?
          PVFS2_LOOKUP_LINK_FOLLOW : PVFS2_LOOKUP_LINK_NO_FOLLOW);
-
-    pvfs2_print("pvfs2: pvfs2_lookup -- follow %s? %s\n",
-                dentry->d_name.name,
-                (new_op->upcall.req.lookup.sym_follow ?
-                 "yes" : "no"));
 
     if (dir)
     {
@@ -131,19 +130,26 @@ struct dentry *pvfs2_lookup(
     strncpy(new_op->upcall.req.lookup.d_name,
 	    dentry->d_name.name, PVFS2_NAME_LEN);
 
+    pvfs2_print(
+        "pvfs2_lookup: doing lookup on %s under %Lu,%d (follow=%s)\n",
+        new_op->upcall.req.lookup.d_name,
+        new_op->upcall.req.lookup.parent_refn.handle,
+        new_op->upcall.req.lookup.parent_refn.fs_id,
+        ((new_op->upcall.req.lookup.sym_follow ==
+          PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
+
     service_error_exit_op_with_timeout_retry(
         new_op, "pvfs2_lookup", retries, error_exit,
         PVFS2_SB(dir->i_sb)->mnt_options.intr);
 
-    /* check what kind of goodies we got */
-    pvfs2_print("Lookup Got PVFS2 handle %Lu on fsid %d\n",
-                new_op->downcall.resp.lookup.refn.handle,
-                new_op->downcall.resp.lookup.refn.fs_id);
+    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    ret = new_op->downcall.status;
+    pvfs2_print("Lookup Got PVFS2 handle %Lu on fsid %d (ret=%d)\n",
+                new_op->downcall.resp.lookup.refn.handle,
+                new_op->downcall.resp.lookup.refn.fs_id, ret);
 
     /* lookup inode matching name (or add if not there) */
-    if (new_op->downcall.status > -1)
+    if (ret > -1)
     {
 	inode = iget(sb, pvfs2_handle_to_ino(
                          new_op->downcall.resp.lookup.refn.handle));
