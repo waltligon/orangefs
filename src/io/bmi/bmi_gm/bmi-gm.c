@@ -10,10 +10,11 @@
 /* TODO: implement max idle time */
 /* TODO: implement test context */
 
-#include<errno.h>
-#include<string.h>
-#include<unistd.h>
-#include<fcntl.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <assert.h>
 
 #include "bmi-method-support.h"
 #include "bmi-method-callback.h"
@@ -190,9 +191,9 @@ enum
 /* control messages */
 struct ctrl_req
 {
+    /* TODO: do we really need a mode field? */
     bmi_flag_t mode;		/* immediate, rendezvous, etc. */
     bmi_size_t actual_size;	/* size of message we want to send */
-    bmi_size_t expected_size;	/* expected size of message we want to send */
     bmi_msg_tag_t msg_tag;	/* message tag */
     bmi_op_id_t sender_op_id;	/* used for matching ctrl's */
     /* will probably be padded later for immediate messages */
@@ -205,6 +206,7 @@ struct ctrl_ack
 };
 struct ctrl_immed
 {
+    /* TODO: do we really need a mode field? */
     bmi_flag_t mode;		/* immediate, rendezvous, etc. */
     bmi_msg_tag_t msg_tag;	/* message tag */
     int32_t actual_size;
@@ -284,7 +286,6 @@ static int gm_post_send_check_resource(bmi_op_id_t * id,
 				       method_addr_p dest,
 				       void *buffer,
 				       bmi_size_t size,
-				       bmi_size_t expected_size,
 				       bmi_msg_tag_t tag,
 				       bmi_flag_t mode,
 				       bmi_flag_t buffer_status,
@@ -312,7 +313,6 @@ static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
 			     bmi_op_id_t peer_op_id);
 static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 				 bmi_size_t ctrl_actual_size,
-				 bmi_size_t ctrl_expected_size,
 				 bmi_msg_tag_t ctrl_tag,
 				 unsigned int node_id);
 static int immed_unexp_recv_handler(bmi_size_t size,
@@ -320,7 +320,6 @@ static int immed_unexp_recv_handler(bmi_size_t size,
 				    method_addr_p map,
 				    void *buffer);
 static int immed_recv_handler(bmi_size_t actual_size,
-			      bmi_size_t expected_size,
 			      bmi_msg_tag_t msg_tag,
 			      method_addr_p map,
 			      void *buffer);
@@ -779,8 +778,6 @@ int BMI_gm_post_send(bmi_op_id_t * id,
     void *new_buffer = NULL;
     struct ctrl_msg *new_ctrl_msg = NULL;
     bmi_size_t buffer_size = 0;
-    /* TODO: fix this */
-    bmi_size_t expected_size = size;
 
     gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_send called.\n");
 
@@ -788,14 +785,14 @@ int BMI_gm_post_send(bmi_op_id_t * id,
     *id = 0;
 
     /* make sure it's not too big */
-    if (expected_size > GM_MODE_REND_LIMIT)
+    if (size > GM_MODE_REND_LIMIT)
     {
 	return (-EINVAL);
     }
 
     if (!(buffer_flag & BMI_PRE_ALLOC))
     {
-	if (expected_size <= GM_IMMED_LENGTH)
+	if (size <= GM_IMMED_LENGTH)
 	{
 	    /* pad enough room for a ctrl structure */
 	    buffer_size = sizeof(struct ctrl_msg) + size;
@@ -809,30 +806,26 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		return (-ENOMEM);
 	    }
 	    memcpy(new_buffer, buffer, size);
-	    buffer_status = GM_BUF_METH_ALLOC;
 	    /* this seems little shady, but we are going to go ahead and forget
 	     * about the buffer that the user gave us.  It serves no purpose
 	     * here anymore.
 	     */
 	    buffer = new_buffer;
 	}
-	else
-	{
-	    buffer_status = GM_BUF_METH_REG;
-	}
+
+        buffer_status = GM_BUF_METH_REG;
     }
 
-    if (expected_size <= GM_IMMED_LENGTH)
+    if (size <= GM_IMMED_LENGTH)
     {
 	/* Immediate mode stuff */
 	new_ctrl_msg = (struct ctrl_msg *) (buffer + size);
 	new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
 	new_ctrl_msg->u.immed.actual_size = size;
-	new_ctrl_msg->u.immed.expected_size = expected_size;
 	new_ctrl_msg->u.immed.msg_tag = tag;
 	new_ctrl_msg->u.immed.mode = GM_MODE_IMMED;
 	return (gm_post_send_check_resource(id, dest, buffer, size,
-					    expected_size, tag,
+					    tag,
 					    new_ctrl_msg->u.immed.mode,
 					    buffer_status, user_ptr));
     }
@@ -840,7 +833,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
     {
 	/* 3 way rendezvous mode */
 	return (gm_post_send_check_resource(id, dest, buffer, size,
-					    expected_size, tag, GM_MODE_REND,
+					    tag, GM_MODE_REND,
 					    buffer_status, user_ptr));
     }
 }
@@ -908,7 +901,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
     new_ctrl_msg->u.immed.mode = GM_MODE_UNEXP;
 
     return (gm_post_send_check_resource(id, dest, buffer, size,
-					0, tag, new_ctrl_msg->u.immed.mode,
+					tag, new_ctrl_msg->u.immed.mode,
 					buffer_status, user_ptr));
 }
 
@@ -984,8 +977,6 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
     memset(&key, 0, sizeof(struct op_list_search_key));
     key.method_addr = src;
     key.method_addr_yes = 1;
-    key.expected_size = expected_size;
-    key.expected_size_yes = 1;
     key.msg_tag = tag;
     key.msg_tag_yes = 1;
     key.mode_mask = mode;
@@ -996,8 +987,11 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
     {
 	gm_addr_data = query_op->addr->method_data;
 	*id = query_op->op_id;
+	/* TODO: handle this more gracefully later... */
+	assert(query_op->actual_size <= expected_size);
+
 	/* we found the operation in progress. */
-	if (mode == GM_MODE_REND)
+	if (query_op->mode == GM_MODE_REND)
 	{
 	    /* post has occurred */
 	    op_list_remove(query_op);
@@ -1031,7 +1025,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		ret = 0;
 	    }
 	}
-	else if (mode == GM_MODE_IMMED)
+	else if (query_op->mode == GM_MODE_IMMED)
 	{
 	    /* all is done except memory copy- complete instantly */
 	    op_list_remove(query_op);
@@ -1312,7 +1306,6 @@ static int gm_post_send_check_resource(bmi_op_id_t * id,
 				       method_addr_p dest,
 				       void *buffer,
 				       bmi_size_t size,
-				       bmi_size_t expected_size,
 				       bmi_msg_tag_t tag,
 				       bmi_flag_t mode,
 				       bmi_flag_t buffer_status,
@@ -1342,7 +1335,8 @@ static int gm_post_send_check_resource(bmi_op_id_t * id,
     new_method_op->addr = dest;
     new_method_op->buffer = buffer;
     new_method_op->actual_size = size;
-    new_method_op->expected_size = expected_size;
+    /* TODO: is this right thing to do for send side? */
+    new_method_op->expected_size = 0;  
     new_method_op->msg_tag = tag;
     gossip_ldebug(BMI_DEBUG_GM, "Tag: %d.\n", (int) tag);
     new_method_op->mode = mode;
@@ -1474,7 +1468,6 @@ static void initiate_send_rend(method_op_p mop)
     my_ctrl->ctrl_type = CTRL_REQ_TYPE;
     my_ctrl->u.req.mode = mop->mode;
     my_ctrl->u.req.actual_size = mop->actual_size;
-    my_ctrl->u.req.expected_size = mop->expected_size;
     my_ctrl->u.req.msg_tag = mop->msg_tag;
     my_ctrl->u.req.sender_op_id = mop->op_id;
     /* keep up with this buffer in the op structure */
@@ -2133,7 +2126,6 @@ static int immed_unexp_recv_handler(bmi_size_t size,
  * returns 0 on success, -errno on failure
  */
 static int immed_recv_handler(bmi_size_t actual_size,
-			      bmi_size_t expected_size,
 			      bmi_msg_tag_t msg_tag,
 			      method_addr_p map,
 			      void *buffer)
@@ -2149,7 +2141,8 @@ static int immed_recv_handler(bmi_size_t actual_size,
     new_method_op->send_recv = BMI_OP_RECV;
     new_method_op->addr = map;
     new_method_op->actual_size = actual_size;
-    new_method_op->expected_size = expected_size;
+    /* TODO: is this the right thing to do here? */
+    new_method_op->expected_size = 0;
     new_method_op->msg_tag = msg_tag;
     new_method_op->mode = GM_MODE_IMMED;
     new_method_op->buffer = buffer;
@@ -2175,7 +2168,6 @@ static int high_recv_handler(gm_recv_event_t * poll_event,
     bmi_op_id_t ctrl_op_id = 0;
     bmi_op_id_t ctrl_peer_op_id = 0;
     bmi_size_t ctrl_actual_size = 0;
-    bmi_size_t ctrl_expected_size = 0;
     bmi_msg_tag_t ctrl_tag = 0;
     method_addr_p map = NULL;
     struct op_list_search_key key;
@@ -2239,7 +2231,6 @@ static int high_recv_handler(gm_recv_event_t * poll_event,
 	gossip_ldebug(BMI_DEBUG_GM, "Mode: %d.\n", (int) my_ctrl->u.req.mode);
 	ctrl_op_id = my_ctrl->u.req.sender_op_id;
 	ctrl_actual_size = my_ctrl->u.req.actual_size;
-	ctrl_expected_size = my_ctrl->u.req.expected_size;
 	ctrl_tag = my_ctrl->u.req.msg_tag;
 
 	/* Post this control buffer again to be ready for next time  */
@@ -2252,7 +2243,7 @@ static int high_recv_handler(gm_recv_event_t * poll_event,
 	{
 	case GM_MODE_REND:
 	    ret = ctrl_req_handler_rend(ctrl_op_id, ctrl_actual_size,
-					ctrl_expected_size, ctrl_tag,
+					ctrl_tag,
 					gm_ntohs(poll_event->recv.
 						 sender_node_id));
 	    break;
@@ -2268,7 +2259,6 @@ static int high_recv_handler(gm_recv_event_t * poll_event,
 	     == GM_MODE_IMMED)
     {
 	ctrl_actual_size = my_ctrl->u.immed.actual_size;
-	ctrl_expected_size = my_ctrl->u.immed.expected_size;
 	ctrl_tag = my_ctrl->u.immed.msg_tag;
 
 	/* try to find a matching post from the receiver so that we don't
@@ -2285,13 +2275,12 @@ static int high_recv_handler(gm_recv_event_t * poll_event,
 	memset(&key, 0, sizeof(struct op_list_search_key));
 	key.method_addr = map;
 	key.method_addr_yes = 1;
-	key.expected_size = my_ctrl->u.immed.expected_size;
-	key.expected_size_yes = 1;
 	key.msg_tag = my_ctrl->u.immed.msg_tag;
 	key.msg_tag_yes = 1;
-	key.mode_mask = my_ctrl->u.immed.mode;
-	key.mode_mask_yes = 1;
 
+	/* TODO: if receiver expected rendezvous, then we have to
+	 * do some fixing...
+	 */
 	query_op = op_list_search(op_list_array[IND_NEED_CTRL_MATCH], &key);
 	if (!query_op)
 	{
@@ -2315,7 +2304,7 @@ static int high_recv_handler(gm_recv_event_t * poll_event,
 	    gm_provide_receive_buffer(local_port,
 				      gm_ntohp(poll_event->recv.buffer),
 				      GM_IMMED_SIZE, GM_HIGH_PRIORITY);
-	    ret = immed_recv_handler(ctrl_actual_size, ctrl_expected_size,
+	    ret = immed_recv_handler(ctrl_actual_size,
 				     ctrl_tag, map, tmp_buffer);
 	}
 	else
@@ -2336,6 +2325,9 @@ static int high_recv_handler(gm_recv_event_t * poll_event,
 				      GM_IMMED_SIZE, GM_HIGH_PRIORITY);
 	    op_list_remove(query_op);
 	    query_op->actual_size = ctrl_actual_size;
+	    /* TODO: test this path in cases where receiver
+	     * thought that this would be rendezvous mode
+	     */ 
 	    query_op->error_code = 0;
 	    op_list_add(op_list_array[IND_COMPLETE], query_op);
 	    ret = 0;
@@ -2821,7 +2813,6 @@ static void data_send_callback(struct gm_port *port,
  */
 static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 				 bmi_size_t ctrl_actual_size,
-				 bmi_size_t ctrl_expected_size,
 				 bmi_msg_tag_t ctrl_tag,
 				 unsigned int node_id)
 {
@@ -2858,8 +2849,6 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
     memset(&key, 0, sizeof(struct op_list_search_key));
     key.method_addr = map;
     key.method_addr_yes = 1;
-    key.expected_size = ctrl_expected_size;
-    key.expected_size_yes = 1;
     key.msg_tag = ctrl_tag;
     key.msg_tag_yes = 1;
 
@@ -2868,6 +2857,8 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
     {
 	op_list_remove(active_method_op);
 
+	/* TODO: clean up from this gracefully */
+	assert(active_method_op->expected_size >= ctrl_actual_size);
 	/* store remote side's op_id */
 	gm_op_data = active_method_op->method_data;
 	gm_op_data->peer_op_id = ctrl_op_id;
@@ -2916,7 +2907,8 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 	active_method_op->send_recv = BMI_OP_RECV;
 	active_method_op->addr = map;
 	active_method_op->actual_size = ctrl_actual_size;
-	active_method_op->expected_size = ctrl_expected_size;
+	/* TODO: is this the right thing to do here? */
+	active_method_op->expected_size = 0;
 	active_method_op->msg_tag = ctrl_tag;
 	active_method_op->mode = GM_MODE_REND;
 	gm_op_data = active_method_op->method_data;
