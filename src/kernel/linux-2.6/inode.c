@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup pvfs2linux
+ *
+ *  Linux VFS inode operations.
+ */
+
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
@@ -316,6 +322,7 @@ int pvfs2_getattr(
 }
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
+/** PVFS2 implementation of VFS inode operations */
 struct inode_operations pvfs2_file_inode_operations =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4
