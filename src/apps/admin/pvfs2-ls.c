@@ -287,9 +287,16 @@ void print_entry_attr(
         inode = scratch_inode;
     }
 
-    size = (((attr->objtype == PVFS_TYPE_METAFILE) &&
-             (attr->mask & PVFS_ATTR_SYS_SIZE)) ?
-            (unsigned long)attr->size : 0);
+    if ((attr->objtype == PVFS_TYPE_METAFILE) &&
+        (attr->mask & PVFS_ATTR_SYS_SIZE))
+    {
+        size = attr->size;
+    }
+    else if ((attr->objtype == PVFS_TYPE_SYMLINK) &&
+             (attr->link_target))
+    {
+        size = (PVFS_size)strlen(attr->link_target);
+    }
 
     if (opts->list_human_readable)
     {
