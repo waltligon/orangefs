@@ -192,7 +192,7 @@ int phelper_fill_attr(PINT_pinode *ptr, PVFS_object_attr attr)
 		gossip_lerr("WARNING: packing distribution to memcpy it.\n");
 		if(ptr->attr.u.meta.dist)
 		{
-			gossip_lerr("WARNING: need to free old dist, but I don't know how.\n");
+                    PVFS_Dist_free(ptr->attr.u.meta.dist);
 		}
 		ptr->attr.u.meta.dist = malloc(attr.u.meta.dist_size);
 		if(ptr->attr.u.meta.dist == NULL)

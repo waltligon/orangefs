@@ -7,8 +7,8 @@
 #ifndef __PINT_DISTRIBUTION_H
 #define __PINT_DISTRIBUTION_H
 
-#include <pvfs2-types.h>
-#include <pvfs-distribution.h>
+#include "pvfs2-types.h"
+#include "pvfs-distribution.h"
 
 /* PVFS Distribution Processing Stuff */
 

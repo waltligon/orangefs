@@ -370,9 +370,7 @@ int PINT_pcache_object_attr_deep_copy(
 
             if (dest->u.meta.dist)
             {
-                /* FIXME: memory leak */
-                pcache_debug("WARNING: need to free old dist, "
-                             "but I don't know how.\n");
+                PVFS_Dist_free(dest->u.meta.dist);
             }
             dest->u.meta.dist = malloc(src->u.meta.dist_size);
             if(dest->u.meta.dist == NULL)
@@ -423,9 +421,7 @@ void PINT_pcache_object_attr_deep_free(PVFS_object_attr *attr)
         {
             if (attr->u.meta.dist)
             {
-                /* FIXME: memory leak */
-                pcache_debug("WARNING: need to free old dist, "
-                             "but I don't know how.\n");
+                PVFS_Dist_free(attr->u.meta.dist);
             }
         }
     }
