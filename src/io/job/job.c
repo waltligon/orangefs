@@ -61,18 +61,7 @@ static gen_mutex_t dev_mutex = GEN_MUTEX_INITIALIZER;
  */
 
 #ifdef __PVFS2_JOB_THREADED__
-/* conditions and mutexes to use for sleeping threads when they have no
- * work to do and waking them when work is available 
- */
 static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
-static pthread_cond_t dev_cond = PTHREAD_COND_INITIALIZER;
-/* NOTE: the above conditions are protected by the same mutexes that
- * protect the queues
- */
-
-/* code that the threads will run when initialized */
-static void *dev_thread_function(void* ptr);
-static pthread_t dev_thread_id;
 #endif /* __PVFS2_JOB_THREADED__ */
 
 /* number of jobs to test for at once inside of do_one_work_cycle() */
@@ -82,15 +71,12 @@ enum
     thread_wait_timeout = 10000	/* usecs */
 };
 
-static struct PINT_dev_unexp_info stat_dev_unexp_array[job_work_metric];
-
 /********************************************************
  * function prototypes
  */
 
 static int setup_queues(void);
 static void teardown_queues(void);
-static int do_one_work_cycle_dev_unexp(int *num_completed);
 static int do_one_test_cycle_req_sched(void);
 static void fill_status(struct job_desc *jd,
 			void **returned_user_ptr_p,
@@ -110,11 +96,12 @@ static void bmi_thread_mgr_callback(void* data,
     PVFS_size actual_size,
     PVFS_error error_code);
 static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp);
+static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp);
 static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
 static void flow_callback(flow_descriptor* flow_d);
 #ifndef __PVFS2_JOB_THREADED__
-static int do_one_work_cycle_all(void);
+static void do_one_work_cycle_all(void);
 #endif
 
 /********************************************************
@@ -148,24 +135,20 @@ int job_initialize(int flags)
     /* this should never fail if the thread startup succeeded */
     assert(ret == 0);
 
-#ifdef __PVFS2_JOB_THREADED__
-    ret = pthread_create(&dev_thread_id, NULL, dev_thread_function, NULL);
+    ret = PINT_thread_mgr_dev_start();
     if (ret != 0)
     {
 	PINT_thread_mgr_bmi_stop();
 	teardown_queues();
-	return (-ret);
+	return(-ret);
     }
-#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = PINT_thread_mgr_trove_start();
     if(ret != 0)
     {
 	PINT_thread_mgr_bmi_stop();
-#ifdef __PVFS2_JOB_THREADED__
-	pthread_cancel(dev_thread_id);
-#endif
+	PINT_thread_mgr_dev_stop();
 	teardown_queues();
 	return (-ret);
     }
@@ -187,13 +170,9 @@ int job_finalize(void)
 {
 
     PINT_thread_mgr_bmi_stop();
-
+    PINT_thread_mgr_dev_stop();
 #ifdef __PVFS2_TROVE_SUPPORT__
     PINT_thread_mgr_trove_stop();
-#endif
-
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cancel(dev_thread_id);
 #endif
 
     teardown_queues();
@@ -746,10 +725,9 @@ int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
     *id = jd->job_id;
     job_desc_q_add(dev_unexp_queue, jd);
     dev_unexp_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&dev_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&dev_mutex);
+
+    PINT_thread_mgr_dev_unexp_handler(dev_thread_mgr_unexp_handler);
 
     return (0);
 }
@@ -2921,7 +2899,8 @@ int job_test(job_id_t id,
 				     &pthread_timeout);
 	gen_mutex_unlock(&completion_mutex);
 #else
-	ret = do_one_work_cycle_all();
+	do_one_work_cycle_all();
+	ret = 0;
 #endif
 	if (ret == ETIMEDOUT)
 	{
@@ -3128,7 +3107,8 @@ int job_testsome(job_id_t * id_array,
 				     &pthread_timeout);
 	gen_mutex_unlock(&completion_mutex);
 #else
-	ret = do_one_work_cycle_all();
+	do_one_work_cycle_all();
+	ret = 0;
 #endif
 	if (ret == ETIMEDOUT)
 	{
@@ -3311,7 +3291,8 @@ int job_testcontext(job_id_t * out_id_array_p,
 				     &pthread_timeout);
 	gen_mutex_unlock(&completion_mutex);
 #else
-	ret = do_one_work_cycle_all();
+	do_one_work_cycle_all();
+	ret = 0;
 #endif
 	if (ret == ETIMEDOUT)
 	{
@@ -3508,62 +3489,42 @@ static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp)
     return;
 }
 
-/* do_one_work_cycle_dev_unexp()
+/* dev_thread_mgr_unexp_handler()
  *
- * performs one job work cycle, just on pending device operations 
- * (checks to see which jobs are pending, tests those that need it, etc)
+ * callback function executed by the thread manager for dev when an unexpected 
+ * device message arrives
  *
- * returns 0 on success, -errno on failure
+ * no return value
  */
-static int do_one_work_cycle_dev_unexp(int *num_completed)
+static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
 {
-    int ret = -1;
-    struct job_desc *tmp_desc = NULL;
-    int incount, outcount;
-    int i = 0;
+    struct job_desc* tmp_desc = NULL; 
 
-    /* the first thing to do is to find out how many unexpected
-     * operations we are allowed to look for right now
-     */
+    /* remove the operation from the pending dev_unexp queue */
     gen_mutex_lock(&dev_mutex);
-    if(dev_unexp_pending_count > job_work_metric)
-	incount = job_work_metric;
-    else
-	incount = dev_unexp_pending_count;
+    tmp_desc = job_desc_q_shownext(dev_unexp_queue);
+    assert(tmp_desc != NULL);	/* TODO: fix this */
+    job_desc_q_remove(tmp_desc);
+    dev_unexp_pending_count--;
     gen_mutex_unlock(&dev_mutex);
-
-    ret = PINT_dev_test_unexpected(incount, &outcount, 
-	stat_dev_unexp_array, 10);
-
-    if (ret < 0)
+    /* set appropriate fields and store in completed queue */
+    *(tmp_desc->u.dev_unexp.info) = *unexp;
+    gen_mutex_lock(&completion_mutex);
+    /* set completed flag while holding queue lock */
+    tmp_desc->completed_flag = 1;
+    if (completion_queue_array[tmp_desc->context_id] != 0)
     {
-	/* critical failure */
-	/* TODO: can I clean up anything else here? */
-	gossip_lerr("Error: critical device failure.\n");
-	return (ret);
+        job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+                       tmp_desc);
     }
+    gen_mutex_unlock(&completion_mutex);
 
-    for (i = 0; i < outcount; i++)
-    {
-	/* remove the operation from the pending dev_unexp queue */
-	gen_mutex_lock(&dev_mutex);
-	tmp_desc = job_desc_q_shownext(dev_unexp_queue);
-	job_desc_q_remove(tmp_desc);
-	dev_unexp_pending_count--;
-	gen_mutex_unlock(&dev_mutex);
-	/* set appropriate fields and store incompleted queue */
-	*(tmp_desc->u.dev_unexp.info) = stat_dev_unexp_array[i];
-	gen_mutex_lock(&completion_mutex);
-	/* set completed flag while holding queue lock */
-	tmp_desc->completed_flag = 1;
-	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
-	    tmp_desc);
-	gen_mutex_unlock(&completion_mutex);
+#ifdef __PVFS2_JOB_THREADED__
+    /* wake up anyone waiting for completion */
+    pthread_cond_signal(&completion_cond);
+#endif
 
-    }
-
-    *num_completed = outcount;
-    return (0);
+    return;
 }
 
 /* fill_status()
@@ -3624,68 +3585,6 @@ static void fill_status(struct job_desc *jd,
 
     return;
 }
-
-#ifdef __PVFS2_JOB_THREADED__
-
-/* dev_thread_function()
- *
- * function executed by the thread in charge of the device interface
- */
-static void *dev_thread_function(void *ptr)
-{
-    int dev_unexp_pending_flag;
-    int num_completed;
-    int ret = -1;
-
-    while (1)
-    {
-	/* see if there is any device work to do */
-	gen_mutex_lock(&dev_mutex);
-	if(dev_unexp_pending_count > 0)
-	    dev_unexp_pending_flag = 1;
-	else
-	    dev_unexp_pending_flag = 0;
-	gen_mutex_unlock(&dev_mutex);
-
-	num_completed = 0;
-	if(dev_unexp_pending_flag)
-	{
-	    ret = do_one_work_cycle_dev_unexp(&num_completed);
-	    if(ret < 0)
-	    {
-		/* set an error flag to be propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	}
-	else
-	{
-	    /* nothing to do; block on condition */
-	    gen_mutex_lock(&dev_mutex);
-	    ret = pthread_cond_wait(&dev_cond, &dev_mutex);
-	    gen_mutex_unlock(&dev_mutex);
-	    if (ret != ETIMEDOUT && ret != EINTR && ret != 0)
-	    {
-		/* set an error flag to get propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = -ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	}
-
-	if (num_completed > 0)
-	{
-	    /* signal anyone blocking on completion queue */
-	    pthread_cond_signal(&completion_cond);
-	}
-    }
-
-    return (NULL);
-}
-
-
-#endif /* __PVFS2_JOB_THREADED__ */
 
 /* do_one_test_cycle_req_sched()
  *
@@ -3848,28 +3747,20 @@ static int completion_query_context(job_id_t * out_id_array_p,
  *
  * makes progress when threads are not used
  *
- * returns 0 on success, -errno on failure
+ * no return value
  */
-static int do_one_work_cycle_all(void)
+static void do_one_work_cycle_all(void)
 {
-    int ret = -1;
-    int num_completed;
-
     if(bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
 	PINT_thread_mgr_bmi_push(10);
+    if(dev_unexp_pending_count)
+	PINT_thread_mgr_dev_push(10);
 #ifdef __PVFS2_TROVE_SUPPORT__
     if(trove_pending_count || flow_pending_count)
 	PINT_thread_mgr_trove_push(10);
 #endif
 
-    if(dev_unexp_pending_count)
-    {
-	ret = do_one_work_cycle_dev_unexp(&num_completed);
-	if(ret < 0)
-	    return(ret);
-    }
-
-    return(0);
+    return;
 }
 #endif
 

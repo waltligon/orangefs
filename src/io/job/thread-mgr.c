@@ -22,6 +22,7 @@ static int thread_mgr_test_timeout = THREAD_MGR_TEST_TIMEOUT;
 /* TODO: organize this stuff better */
 static void *bmi_thread_function(void *ptr);
 static void *trove_thread_function(void *ptr);
+static void *dev_thread_function(void *ptr);
 static struct BMI_unexpected_info stat_bmi_unexp_array[THREAD_MGR_TEST_COUNT];
 static bmi_op_id_t stat_bmi_id_array[THREAD_MGR_TEST_COUNT];
 static bmi_error_code_t stat_bmi_error_code_array[THREAD_MGR_TEST_COUNT];
@@ -32,20 +33,27 @@ static void *stat_trove_user_ptr_array[THREAD_MGR_TEST_COUNT];
 static TROVE_ds_state stat_trove_error_code_array[THREAD_MGR_TEST_COUNT];
 static gen_mutex_t bmi_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t trove_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t dev_mutex = GEN_MUTEX_INITIALIZER;
 static int bmi_unexp_count = 0;
+static int dev_unexp_count = 0;
 static void (*bmi_unexp_fn)(struct BMI_unexpected_info* unexp);
+static void (*dev_unexp_fn)(struct PINT_dev_unexp_info* unexp);
 static bmi_context_id global_bmi_context = -1;
 static TROVE_context_id global_trove_context = -1;
 static int bmi_thread_ref_count = 0;
 static int trove_thread_ref_count = 0;
+static int dev_thread_ref_count = 0;
 static PVFS_fs_id HACK_fs_id = 9; /* TODO: fix later */
+static struct PINT_dev_unexp_info stat_dev_unexp_array[THREAD_MGR_TEST_COUNT];
 #ifdef __PVFS2_JOB_THREADED__
 static pthread_t bmi_thread_id;
 static pthread_t trove_thread_id;
+static pthread_t dev_thread_id;
 #endif /* __PVFS2_JOB_THREADED__ */
 
 static int bmi_thread_running = 0;
 static int trove_thread_running = 0;
+static int dev_thread_running = 0;
 
 /* trove_thread_function()
  *
@@ -113,8 +121,6 @@ static void *bmi_thread_function(void *ptr)
     int i=0;
     int test_timeout = thread_mgr_test_timeout;
     struct PINT_thread_mgr_bmi_callback *tmp_callback;
-
-    /* TODO: fix the locking */
 
 #ifdef __PVFS2_JOB_THREADED__
     while (bmi_thread_running)
@@ -197,6 +203,92 @@ static void *bmi_thread_function(void *ptr)
     return (NULL);
 }
 
+/* dev_thread_function()
+ *
+ * function executed by the thread in charge of the device interface
+ */
+static void *dev_thread_function(void *ptr)
+{
+    int ret = -1;
+    int incount, outcount;
+    int i=0;
+    int timeout = thread_mgr_test_timeout;
+
+#ifdef __PVFS2_JOB_THREADED__
+    while (dev_thread_running)
+#endif
+    {
+	gen_mutex_lock(&dev_mutex);
+	incount = dev_unexp_count;
+	if(incount > THREAD_MGR_TEST_COUNT)
+	    incount = THREAD_MGR_TEST_COUNT;
+	gen_mutex_unlock(&dev_mutex);
+
+	ret = PINT_dev_test_unexpected(incount, &outcount,
+	    stat_dev_unexp_array, timeout);
+	if(ret < 0)
+	{
+	    /* critical failure */
+	    /* TODO: how to handle this? */
+	    gossip_lerr("Error: critical device failure.\n");
+	    assert(0);
+	}
+
+	/* execute callback function for each completed unexpected message */
+	gen_mutex_lock(&dev_mutex);
+	for(i=0; i<outcount; i++)
+	{
+	    dev_unexp_fn(&stat_dev_unexp_array[i]);
+	    dev_unexp_count--;
+	}
+	gen_mutex_unlock(&dev_mutex);
+    }
+
+    return (NULL);
+}
+
+
+/* PINT_thread_mgr_dev_start()
+ *
+ * starts a dev mgmt thread, if not already running
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_thread_mgr_dev_start(void)
+{
+    int ret;
+
+    ret = -1;
+
+    gen_mutex_lock(&dev_mutex);
+    if(dev_thread_ref_count > 0)
+    {
+	/* nothing to do, thread is already started.  Just increment 
+	 * reference count and return
+	 */
+	dev_thread_ref_count++;
+	gen_mutex_unlock(&dev_mutex);
+	return(0);
+    }
+
+    dev_thread_running = 1;
+#ifdef __PVFS2_JOB_THREADED__
+    ret = pthread_create(&dev_thread_id, NULL, dev_thread_function, NULL);
+    if(ret != 0)
+    {
+	gen_mutex_unlock(&dev_mutex);
+	dev_thread_running = 0;
+	/* TODO: convert error code */
+	return(-ret);
+    }
+#endif
+    dev_thread_ref_count++;
+
+    gen_mutex_unlock(&dev_mutex);
+    return(0);
+}
+
+
 
 /* PINT_thread_mgr_trove_start()
  *
@@ -237,7 +329,7 @@ int PINT_thread_mgr_trove_start(void)
     ret = pthread_create(&trove_thread_id, NULL, trove_thread_function, NULL);
     if(ret != 0)
     {
-	BMI_close_context(global_trove_context);
+	trove_close_context(HACK_fs_id, global_trove_context);
 	gen_mutex_unlock(&trove_mutex);
 	trove_thread_running = 0;
 	/* TODO: convert error code */
@@ -297,6 +389,30 @@ int PINT_thread_mgr_bmi_start(void)
     gen_mutex_unlock(&bmi_mutex);
     return(0);
 }
+
+/* PINT_thread_mgr_dev_stop()
+ *
+ * stops a Trove mgmt thread
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_thread_mgr_dev_stop(void)
+{
+    gen_mutex_lock(&dev_mutex);
+    dev_thread_ref_count--;
+    if(dev_thread_ref_count <= 0)
+    {
+	assert(dev_thread_ref_count == 0); /* sanity check */
+	dev_thread_running = 0;
+#ifdef __PVFS2_JOB_THREADED__
+	pthread_join(dev_thread_id, NULL);
+#endif
+    }
+    gen_mutex_unlock(&dev_mutex);
+
+    return(0);
+}
+
 
 /* PINT_thread_mgr_trove_stop()
  *
@@ -391,6 +507,32 @@ int PINT_thread_mgr_bmi_getcontext(PVFS_context_id *context)
     return(-PVFS_EINVAL);
 }
 
+/* PINT_thread_mgr_dev_unexp_handler()
+ *
+ * registers a handler for unexpected device messages
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_thread_mgr_dev_unexp_handler(
+    void (*fn)(struct PINT_dev_unexp_info* unexp))
+{
+    /* sanity check */
+    assert(fn != 0);
+
+    gen_mutex_lock(&dev_mutex);
+    if(dev_unexp_count > 0 && fn != dev_unexp_fn)
+    {
+	gossip_lerr("Error: dev_unexp_handler already set.\n");
+	gen_mutex_unlock(&dev_mutex);
+	return(-PVFS_EALREADY);
+    }
+    dev_unexp_fn = fn;
+    dev_unexp_count++;
+    gen_mutex_unlock(&dev_mutex);
+    return(0);
+}
+
+
 /* PINT_thread_mgr_bmi_unexp_handler()
  *
  * registers a handler for unexpected BMI messages
@@ -415,6 +557,19 @@ int PINT_thread_mgr_bmi_unexp_handler(
     gen_mutex_unlock(&bmi_mutex);
     return(0);
 }
+
+/* PINT_thread_mgr_dev_push()
+ *
+ * pushes on test progress manually, without using threads 
+ *
+ * no return value 
+ */
+void PINT_thread_mgr_dev_push(int max_idle_time)
+{
+    thread_mgr_test_timeout = max_idle_time;
+    dev_thread_function(NULL);
+}
+
 
 /* PINT_thread_mgr_trove_push()
  *
