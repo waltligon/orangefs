@@ -482,6 +482,27 @@ int32_t PVFS_get_errno_mapping(int32_t error)              \
 DECLARE_ERRNO_MAPPING()
 #define PVFS_ERROR_TO_ERRNO(__error) PVFS_get_errno_mapping(__error)
 
+/* PVFS2 error details
+ *
+ * These structures/calls are used when returning detailed lists of
+ * errors from a particular call.  This is done, to report on specific
+ * server failures.
+ */
+struct PVFS_error_server_s {
+    PVFS_error      error;
+    PVFS_BMI_addr_t addr;
+};
+typedef struct PVFS_error_server_s PVFS_error_server;
+
+struct PVFS_error_details_s {
+    int count;
+    int count_exceeded; /* set if we ran out of space for errors */
+    PVFS_error_server error[1]; /* structure is alloc'd larger for more errors */
+};
+typedef struct PVFS_error_details_s PVFS_error_details;
+
+PVFS_error_details *PVFS_error_details_new(int count);
+void PVFS_error_details_free(PVFS_error_details *details);
 
 /* PVFS I/O operation types, used in both system and server interfaces */
 enum PVFS_io_type

@@ -13,6 +13,7 @@ CSRC := \
 	$(DIR)/shared-state-methods.c \
 	$(DIR)/mgmt-misc.c \
 	$(DIR)/sys-statfs.c \
+	$(DIR)/error-details.c \
 	$(DIR)/fs-add.c
 
 SMSRC := \
