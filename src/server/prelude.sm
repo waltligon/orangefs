@@ -29,6 +29,9 @@ static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p);
 static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p);
 static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p);
 
+static int check_mode(PVFS_object_attr* attr, PVFS_uid uid, PVFS_gid gid,
+    PVFS_permissions mode);
+
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
@@ -167,15 +170,117 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	js_p->error_code = -js_p->error_code;
 	return(1);
     }
-	
-    /* TODO: actually check permissions, now that we have all the info
-     * that we need 
-     */
-    gossip_debug(SERVER_DEBUG, "(%p) warning: not really checking permissions.\n", s_op);
 
-    js_p->error_code = 0;
+    /* lets clean up the mask to insure that later states don't accidentally
+     * use fields that they shouldn't (really the attr structure should 
+     * already be stored on disk like this)
+     */
+     s_op->attr.mask &= PVFS_ATTR_COMMON_ALL;
+	
+    /* decide what kind of permission checking to do based on the 
+     * request type:
+     */
+    switch(s_op->req->op)
+    {
+	/* things that need read permissions */
+	case PVFS_SERV_GETATTR:
+	case PVFS_SERV_READDIR:
+	    /* TODO: figure out something cleaner looking than using 
+	     * PVFS_U_READ here to indicate we need read access; its 
+	     * misleading
+	     */
+	    js_p->error_code = check_mode(&(s_op->attr), 
+		s_op->req->credentials.uid,
+		s_op->req->credentials.gid,
+		PVFS_U_READ);
+	    break;
+
+	/* things that need write permissions */
+	case PVFS_SERV_CREATEDIRENT:
+	case PVFS_SERV_RMDIRENT:
+	    /* TODO: figure out something cleaner looking than using 
+	     * PVFS_U_WRITE here to indicate we need read access; its 
+	     * misleading
+	     */
+	    js_p->error_code = check_mode(&(s_op->attr), 
+		s_op->req->credentials.uid,
+		s_op->req->credentials.gid,
+		PVFS_U_WRITE);
+	    break;
+	/* special case: we only check permissions on setattr if it 
+	 * already has attributes
+	 */
+	case PVFS_SERV_SETATTR:
+	    if(s_op->attr.mask == 0)
+	    {
+		js_p->error_code = 0;
+	    }
+	    else
+	    {
+		js_p->error_code = check_mode(&(s_op->attr), 
+		    s_op->req->credentials.uid,
+		    s_op->req->credentials.gid,
+		    PVFS_U_WRITE);
+	    }
+	    break;
+
+	/* things we don't check permissions on */
+	case PVFS_SERV_CREATE:
+	case PVFS_SERV_REMOVE:
+	case PVFS_SERV_IO:
+	case PVFS_SERV_LOOKUP_PATH:
+	case PVFS_SERV_TRUNCATE:
+	case PVFS_SERV_MKDIR:
+	case PVFS_SERV_GETCONFIG:
+	    js_p->error_code = 0;
+	    break;
+
+	/* things we shouldn't see here */
+	case PVFS_SERV_INVALID: 
+	case PVFS_SERV_WRITE_COMPLETION:
+	    assert(0);
+	    js_p->error_code = -PVFS_EINVAL;
+	    break;
+    }
+
     return(1);
 }
+
+
+/* check_mode()
+ *
+ * checks permissions based on desired mode
+ *
+ * returns 0 on success, -PVFS_EPERM on failure
+ */
+static int check_mode(PVFS_object_attr* attr, PVFS_uid uid, PVFS_gid gid,
+    PVFS_permissions mode)
+{
+    uint32_t perm_mask = PVFS_ATTR_COMMON_UID | PVFS_ATTR_COMMON_GID |
+	PVFS_ATTR_COMMON_PERM;
+
+    /* if we don't have masks for the permission information that we need,
+     * then the system is broken 
+     */
+    assert((attr->mask & perm_mask) == perm_mask);
+
+    /* give root permissions, no matter what */
+    if(attr->owner == 0)
+	return(0);
+    /* uid test */
+    if((attr->owner == uid) && (((attr->perms >> 6) & mode) == mode))
+	return(0);
+    /* gid test */
+    if((attr->group == gid) && (((attr->perms >> 3) & mode) == mode))
+	return(0);
+    /* other test */
+    if((attr->perms & mode) == mode)
+	return(0);
+
+    /* access denied */
+    return(-PVFS_EPERM);
+}
+
 
 /*
  * Local variables:

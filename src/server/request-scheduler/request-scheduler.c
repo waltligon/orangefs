@@ -229,7 +229,8 @@ int PINT_req_sched_target_handle(struct PVFS_server_req*
 			return(0);
 			break;
 		case PVFS_SERV_WRITE_COMPLETION:
-			return(0);
+			/* these should never show up here */
+			return(-EINVAL);
 			break;
 	}
 
