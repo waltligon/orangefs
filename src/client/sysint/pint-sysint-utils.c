@@ -386,7 +386,11 @@ int PINT_server_get_config(struct server_configuration_s *config,
                             &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
         {
-            gossip_lerr("Error: PINT_send_req failed\n");
+            gossip_err("Error: failed to send request to initial"
+	    " configuration server;\n");
+	    gossip_err("       please verify that your client configuration"
+	    " is correct \n       and that the server is running.\n");
+	    gossip_err("       (%s)\n", mntent_p->pvfs_config_server);
 	    continue;
 	}
 	serv_resp = (struct PVFS_server_resp *) decoded.buffer;
@@ -448,8 +452,8 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	return(0); 
     else
     {
-	gossip_lerr("Error: no valid pvfs2tab entries found.\n");
-	return(-PVFS_ENOENT);
+	gossip_err("Error: no valid pvfs2tab entries found.\n");
+	return(-PVFS_ENODEV);
     }
 }
 
