@@ -18,7 +18,8 @@
 #include <stdint.h>
 #endif /* __KERNEL__ */
 
-#include "src/proto/endecode-funcs.h"
+/* empty stubs to turn off encoding definition generation */
+#include "pvfs2-encode-stubs.h"
 
 /* basic types used throughout code */
 typedef uint8_t PVFS_boolean;
