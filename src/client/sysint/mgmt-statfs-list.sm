@@ -55,12 +55,12 @@ machine pvfs2_client_mgmt_statfs_list_sm(
 
 %%
 
-int PVFS_mgmt_statfs_list(
-    PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
-    struct PVFS_mgmt_server_stat* stat_array,
-    PVFS_id_gen_t* addr_array,
-    int count)
+int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
+			  PVFS_credentials credentials,
+			  struct PVFS_mgmt_server_stat* stat_array,
+			  PVFS_id_gen_t* addr_array,
+			  int *error_array,
+			  int count)
 {
     int ret;
     PINT_client_sm *sm_p;

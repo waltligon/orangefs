@@ -282,6 +282,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
 				creds,
 				stat_array,
 				addr_array,
+				NULL, /* error array */
 				server_count);
     if (ret != 0)
     {

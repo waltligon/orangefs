@@ -129,7 +129,8 @@ int32_t PINT_errno_mapping[PVFS_ERRNO_MAX + 1] =
     ECONNREFUSED,
     EHOSTDOWN,
     EHOSTUNREACH,
-    EALREADY   /* 57 */
+    EALREADY,   /* 57 */
+    0 /* EPARTIAL */
 };
 
 /*

@@ -17,6 +17,7 @@
 static pvfs_mntlist mnt = {0, NULL};
 static struct PVFS_mgmt_server_stat *visible_stats = NULL;
 static struct PVFS_mgmt_server_stat *internal_stats = NULL;
+static int *internal_errors = NULL;
 static int visible_stat_ct;
 static int internal_stat_ct;
 
@@ -195,6 +196,7 @@ void gui_comm_set_active_fs(char *contact_server,
     else if (internal_stats != NULL) {
 	/* free all our dynamically allocated memory for resizing */
 	free(internal_stats);
+	free(internal_errors);
 	free(internal_perf[0]);
 	free(internal_perf);
 	free(internal_perf_ids);
@@ -203,6 +205,7 @@ void gui_comm_set_active_fs(char *contact_server,
 
     internal_stats   = (struct PVFS_mgmt_server_stat *)
 	malloc(outcount * sizeof(struct PVFS_mgmt_server_stat));
+    internal_errors  = (int *) malloc(outcount * sizeof(int));
     internal_stat_ct = outcount;
 
     /* save addresses of servers */
@@ -296,6 +299,7 @@ static int gui_comm_stats_collect(void)
 				creds,
 				internal_stats,
 				internal_addrs,
+				internal_errors,
 				internal_stat_ct);
     if (ret < 0)
     {

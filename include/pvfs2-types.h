@@ -358,6 +358,7 @@ extern int32_t PINT_errno_mapping[];
 #define PVFS_EHOSTDOWN	        (55|(PVFS_ERROR_BIT))	/* Host is down */
 #define PVFS_EHOSTUNREACH	(56|(PVFS_ERROR_BIT))	/* No route to host */
 #define PVFS_EALREADY	        (57|(PVFS_ERROR_BIT))	/* Operation already in progress */
+#define PVFS_EPARTIAL           (58|(PVFS_ERROR_BIT))   /* Operation was only partially successful */
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERROR CODES!
  *
@@ -366,7 +367,7 @@ extern int32_t PINT_errno_mapping[];
  * A MAPPING TO A UNIX ERRNO VALUE IN src/common/misc/errno-mapping.c
  */
 
-#define PVFS_ERRNO_MAX          57
+#define PVFS_ERRNO_MAX          58
 
 /* PVFS I/O operation types, used in both system and server interfaces */
 enum PVFS_io_type {

@@ -191,7 +191,12 @@ int main(int argc, char **argv)
 	    return(-1);
 	}
 
-	ret = PVFS_mgmt_statfs_list(cur_fs, creds, stat_array, addr_array, outcount);
+	ret = PVFS_mgmt_statfs_list(cur_fs,
+				    creds,
+				    stat_array,
+				    addr_array,
+				    NULL, /* error array */
+				    outcount);
 	if(ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_statfs_list", ret);
