@@ -81,11 +81,15 @@ static inline int PINT_state_machine_next(PINT_OP_STATE *s,
 	while (loc->return_value != code_val &&
 		loc->return_value != DEFAULT_ERROR) 
 	{
-	    /* each entry is two items long */
+	    /* each entry has a return value followed by a next state
+	     * pointer, so we increment by two.
+	     */
 	    loc += 2;
 	}
 
-	/* skip over the return code to get to the next state */
+	/* skip over the return code to get to the pointer for the
+	 * next state
+	 */
 	loc += 1;
 
 	/* Update the server_op struct to reflect the new location
@@ -105,7 +109,8 @@ static inline int PINT_state_machine_next(PINT_OP_STATE *s,
     while (s->current_state->flag == SM_NESTED_STATE)
     {
 	PINT_push_state(s, NULL);
-	s->current_state += 1; /* skip state flag */
+	s->current_state += 1; /* skip state flag; now we point to the state
+				* machine */
 
 	/* NOTE: nested_machine is defined as a void * to eliminate a nasty
 	 * cross-structure dependency that I couldn't handle any more.  -- Rob
@@ -113,15 +118,15 @@ static inline int PINT_state_machine_next(PINT_OP_STATE *s,
 	s->current_state = ((PINT_state_machine *) s->current_state->nested_machine)->state_machine;
     }
 
-    /* skip over the flag so we can execute the next state action */
+    /* skip over the flag so that we point to the function for the next
+     * state.  then call it.
+     */
     s->current_state += 1;
 
-    /* Call the new state function then */
     retval = (s->current_state->state_action)(s,r);
 
     /* return to the while loop in pvfs2-server.c */
     return retval;
-
 }
 
 /* Function: PINT_state_machine_locate(void)
@@ -139,8 +144,11 @@ static PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *s_op)
 	gossip_err("State machine requested not valid\n");
 	return NULL;
     }
-    if(PINT_OP_STATE_TABLE[s_op->op] != NULL)
+    if (PINT_OP_STATE_TABLE[s_op->op] != NULL)
     {
+	/* this (rather nonintuitively) returns a pointer to the function
+	 * to call for the first state in the appropriate state machine.
+	 */
 	return PINT_OP_STATE_TABLE[s_op->op]->state_machine + 1;
     }
     gossip_err("State machine not found for operation %d\n",s_op->op);
