@@ -197,7 +197,7 @@ static int test_readdir(void)
 static int test_create(void)
 {
     int ret, fs_id;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_create resp_create;

@@ -12,7 +12,7 @@
 
 extern int parse_pvfstab(char *fn,
 			 pvfs_mntlist * mnt);
-int compare_attribs(PVFS_object_attr attr1,
+int compare_attribs(PVFS_sys_attr attr1,
 		    PVFS_sys_attr attr2);
 
 /* files, directories, tree of directories */
@@ -21,7 +21,7 @@ int create_file(PVFS_fs_id fs_id,
 		char *filename)
 {
     int ret;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_create resp_create;
@@ -75,12 +75,12 @@ int create_file(PVFS_fs_id fs_id,
  * compare members of two attributes structures
  * 	currently reports verbosely what members differ, but perhaps we should
  * 	do that based on a 'verbose' option 
- * attr1, attr2:  the PVFS_object_attr structures to compare
+ * attr1, attr2:  the PVFS_sys_attr structures to compare
  * returns:	
  * 	0 	if equivalent	
  * 	-1 	if we found a difference
  */
-int compare_attribs(PVFS_object_attr attr1,
+int compare_attribs(PVFS_sys_attr attr1,
 		    PVFS_sys_attr attr2)
 {
     if (attr1.owner != attr2.owner)

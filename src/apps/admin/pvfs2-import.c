@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     PVFS_size displacement = 0;
     char* entry_name;
     PVFS_pinode_reference parent_refn;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
     PVFS_Request io_req;
@@ -157,26 +157,6 @@ int main(int argc, char **argv)
     parent_refn.handle =
         lookup_parent_handle(pvfs_path,cur_fs);
     parent_refn.fs_id = cur_fs;
-
-    /* Fill in the dist -- NULL means the system interface used the 
-     * "default_dist" as the default
-     */
-    if(user_opts->strip_size == -1)
-    {
-	attr.u.meta.dist = NULL;
-    }
-    else
-    {
-	attr.u.meta.dist = PVFS_Dist_create("simple_stripe");
-	if(!attr.u.meta.dist)
-	{
-	    fprintf(stderr, "Error: PVFS_Dist_create() failure.\n");
-	    ret = -1;
-	    goto main_out;
-	}
-	attr.u.meta.dist->params->strip_size =
-	    user_opts->strip_size;
-    }
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr, credentials,
 			    &resp_create);
@@ -312,6 +292,9 @@ static struct options* parse_args(int argc, char* argv[])
     while((one_opt = getopt(argc, argv, flags)) != EOF){
 	switch(one_opt){
 	    case('s'):
+		gossip_lerr("Error: strip size option not supported.\n");
+		free(tmp_opts);
+		return(NULL);
 		ret = sscanf(optarg, "%d", &tmp_opts->strip_size);
 		if(ret < 1){
 		    free(tmp_opts);

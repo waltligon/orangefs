@@ -41,7 +41,7 @@ int main(int argc,char **argv)
 	PVFS_credentials credentials;
 	char* entry_name;
 	PVFS_pinode_reference parent_refn;
-	PVFS_object_attr attr;
+	PVFS_sys_attr attr;
 	PVFS_pinode_reference pinode_refn;
 	PVFS_ds_position token;
 	int pvfs_dirent_incount;
@@ -137,9 +137,6 @@ int main(int argc,char **argv)
 	req_create->dist.u.striped.pcount = 3;
 	req_create->dist.u.striped.ssize = 512;
 #endif
-
-	/* use default dist */
-	attr.u.meta.dist = NULL;
 
 	// call create 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,

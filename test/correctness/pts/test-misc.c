@@ -636,7 +636,7 @@ static int test_write_beyond(int testcase){
 static int test_files_as_dirs(int testcase)
 {
     int ret, fs_id;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_create resp_create;
@@ -862,7 +862,7 @@ static int test_remove_nonempty_dir(int testcase)
 static int init_files(int testcase)
 {
     int ret, fs_id;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_create resp_create;

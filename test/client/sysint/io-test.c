@@ -31,7 +31,7 @@ int main(int argc,char **argv)
 	PVFS_credentials credentials;
 	char* entry_name;
 	PVFS_pinode_reference parent_refn;
-	PVFS_object_attr attr;
+	PVFS_sys_attr attr;
 	PVFS_pinode_reference pinode_refn;
 	PVFS_Request io_req;
 	void* buffer;

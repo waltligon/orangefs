@@ -20,9 +20,6 @@
 
 extern struct server_configuration_s g_server_config;
 
-static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
-	int handle_count, PVFS_handle *handle_array);
-
 /* PVFS_sys_create()
  *
  * create a PVFS file with specified attributes 
@@ -30,7 +27,7 @@ static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
  * returns 0 on success, -errno on failure
  */
 int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
-                PVFS_object_attr attr,
+                PVFS_sys_attr attr,
                 PVFS_credentials credentials, PVFS_sysresp_create *resp)
 {
 	struct PVFS_server_req req_p;			/* server request */
@@ -153,11 +150,6 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	}
 
 	gossip_ldebug(CLIENT_DEBUG,"number of data files to create = %d\n",io_serv_count);
-
-	/* also no way to pass in distribution right now- just go 
-	 * with the system default. 
-	 */
-	attr.u.meta.dist = PVFS_Dist_create("simple_stripe");
 
 	/* Determine the initial metaserver for new file */
 	ret = PINT_bucket_get_next_meta(&g_server_config,
@@ -373,15 +365,11 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = parent_refn.fs_id;
 
-	/* TODO: figure out how we're storing the distribution for the file
-	 * does this go in the attributes, or the eattr?
-	 */
+	PINT_CONVERT_ATTR(&req_p.u.setattr.attr, &attr);
+	req_p.u.setattr.attr.u.meta.dfile_array = df_handle_array;
+	req_p.u.setattr.attr.u.meta.dfile_count = io_serv_count;
+	req_p.u.setattr.attr.u.meta.dist = PVFS_Dist_create("simple_stripe");
 
-	/* even though this says copy, we're just updating the pointer for the
-	 * array of data files
-	 */
-	copy_attributes(&req_p.u.setattr.attr, attr, io_serv_count,
-			df_handle_array); 
 	gossip_ldebug(CLIENT_DEBUG,"\towner: %d\n\tgroup: %d\n\tperms: %d\n\tatime: %lld\n\tmtime: %lld\n\tctime: %lld\n\tobjtype: %d\n",
 		req_p.u.setattr.attr.owner, 
 		req_p.u.setattr.attr.group, 
@@ -392,6 +380,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 		req_p.u.setattr.attr.objtype);
 	gossip_ldebug(CLIENT_DEBUG,"\t\tdfile_count: %d\n",
 		(int)req_p.u.setattr.attr.u.meta.dfile_count);
+
     for(i=0;i<req_p.u.setattr.attr.u.meta.dfile_count;i++)
 	gossip_ldebug(CLIENT_DEBUG,"\t\tdatafile handle: %lld\n",
 		req_p.u.setattr.attr.u.meta.dfile_array[i]);
@@ -586,36 +575,6 @@ return_error:
 	return (ret);
 }
 
-/* copy_attributes
- *
- * copies the attributes from an attribute to another attribute 
- * structure
- *
- */
-static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
-	int handle_count, PVFS_handle *handle_array)
-{
-	/* no need to copy member by member, and we might add attributes later
-	 */
-    /* i have no idea what's going on, but i can't just copy the structures
-     * around.. PINT_Dist_decode will trigger a seg fault trying to read
-     * dist->dist_name, but won't care if i copy the structs members by hand */
-    /* *new = old;  */
-
-	new->owner = old.owner;
-	new->group = old.group;
-	new->perms = old.perms;
-	new->atime = old.atime;
-	new->mtime = old.mtime;
-	new->ctime = old.ctime;
-	new->mask = old.mask;
-	new->objtype = PVFS_TYPE_METAFILE;
-
-	/* Fill in the metafile attributes */
-	new->u.meta.dist = old.u.meta.dist;
-	new->u.meta.dfile_array = handle_array;
-	new->u.meta.dfile_count = handle_count;
-}
 
 /*
  * Local variables:

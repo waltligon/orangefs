@@ -286,7 +286,7 @@ static int test_readdir(int nullCase)
 static int test_create(int nullCase)
 {
     int ret, fs_id;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_create resp_create;
@@ -532,7 +532,7 @@ static int test_write(int nullCase)
 static int init_file(void)
 {
     int ret, fs_id;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_create resp_create;

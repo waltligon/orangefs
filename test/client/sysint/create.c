@@ -18,7 +18,7 @@ int main(int argc, char **argv)
     PVFS_sysresp_create resp_create;
     char* entry_name;
     PVFS_pinode_reference parent_refn;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_credentials credentials;
 
     gossip_enable_stderr();
@@ -72,11 +72,6 @@ int main(int argc, char **argv)
     parent_refn.handle =
         lookup_parent_handle(filename,cur_fs);
     parent_refn.fs_id = cur_fs;
-
-    /* Fill in the dist -- NULL means the system interface used the 
-     * "default_dist" as the default
-     */
-    attr.u.meta.dist = NULL;
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
                 credentials, &resp_create);
