@@ -13,8 +13,7 @@ LOCALTESTSRC := \
 
 TESTSRC += $(LOCALTESTSRC)
 
-LOCALLIBS := -ldb -lrt -lpthread -lefence
+LOCALLIBS := -ldb -lrt -lpthread 
 LOCALTESTS := $(patsubst %.c,%, $(LOCALTESTSRC))
 $(LOCALTESTS): %: %.o
 	$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
-

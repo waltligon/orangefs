@@ -10,7 +10,7 @@ TEST_IO_FLOW_DIR_SRC := \
 
 TESTSRC += $(TEST_IO_FLOW_DIR_SRC)
 
-TEST_IO_FLOW_DIR_LOCALLIBS := -ldb -lrt -lpthread -lefence
+TEST_IO_FLOW_DIR_LOCALLIBS := -ldb -lrt -lpthread
 LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_FLOW_DIR_SRC))
 $(LOCALTESTS): %: %.o
 	$(LD) $< $(LDFLAGS) $(LIBS) $(TEST_IO_FLOW_DIR_LOCALLIBS) -o $@
