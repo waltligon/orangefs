@@ -103,6 +103,11 @@ static int do_one_work_cycle_trove(int* num_completed);
 static int do_one_test_cycle_req_sched(void);
 static void fill_status(struct job_desc* jd, void** returned_user_ptr_p, 
 	job_status_s* status);
+static int job_testworld_old(
+	job_id_t* out_id_array_p,
+	int* inout_count_p,
+	void** returned_user_ptr_array,
+	job_status_s* out_status_array_p);
 
 #ifndef __PVFS2_JOB_THREADED__
 static int do_one_work_cycle_all(int* num_completed, int wait_flag);
@@ -1838,14 +1843,15 @@ int job_testsome(
 	return(0);
 }
 
-/* job_testworld()
+/* job_testworld_old()
  *
  * instantaneous check for completion of one or more of any currently
  * pending jobs
  *
+ * TODO: remove this later
  * returns 0 on success, -errno on failure
  */
-int job_testworld(
+static int job_testworld_old(
 	job_id_t* out_id_array_p,
 	int* inout_count_p,
 	void** returned_user_ptr_array,
@@ -2355,18 +2361,19 @@ int job_waitsome(
 		returned_user_ptr_array, out_status_array_p));
 }
 
-/* job_waitworld()
+/* job_testworld()
  *
  * briefly blocking check for completion of one or more of any currently
  * pending jobs
  *
  * returns 0 on success, -errno on failure
  */
-int job_waitworld(
+int job_testworld(
 	job_id_t* out_id_array_p,
 	int* inout_count_p,
 	void** returned_user_ptr_array,
-	job_status_s* out_status_array_p)
+	job_status_s* out_status_array_p,
+	int timeout_ms)
 {
 	int ret = -1;
 	int incount = *inout_count_p;
@@ -2402,7 +2409,7 @@ int job_waitworld(
 	{
 		/* do a quick test first to see if any of the jobs are ready */
 		*inout_count_p = incount;
-		ret = job_testworld(out_id_array_p, inout_count_p,
+		ret = job_testworld_old(out_id_array_p, inout_count_p,
 			returned_user_ptr_array, out_status_array_p);
 		if(ret < 0)
 		{
@@ -2465,7 +2472,7 @@ int job_waitworld(
 
 	/* check again to see if any jobs finished */
 	*inout_count_p = incount;
-	return(job_testworld(out_id_array_p, inout_count_p,
+	return(job_testworld_old(out_id_array_p, inout_count_p,
 		returned_user_ptr_array, out_status_array_p));
 }
 

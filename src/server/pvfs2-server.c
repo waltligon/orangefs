@@ -292,7 +292,13 @@ int main(int argc, char **argv) {
 		{
 			server_shutdown(server_level_init,signal_recvd_flag,0);
 		}
-      ret = job_waitworld(job_id_array,&out_count,completed_job_pointers,job_status_structs);
+		/* TODO: use a named default value for the timeout eventually */
+      ret = job_testworld(
+			job_id_array,
+			&out_count,
+			completed_job_pointers,
+			job_status_structs, 
+			100);
 		if(ret < 0)
 		{
 			gossip_lerr("FREAK OUT.\n");

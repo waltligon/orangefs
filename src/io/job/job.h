@@ -365,7 +365,8 @@ int job_testworld(
 	job_id_t* out_id_array_p,
 	int* inout_count_p,
 	void** returned_user_ptr_array,
-	job_status_s* out_status_array_p);
+	job_status_s* out_status_array_p,
+	int timeout_ms);
 
 /* briefly blocking check for completion of a particular job */
 int job_wait(
@@ -381,15 +382,6 @@ int job_waitsome(
 	job_id_t* id_array,
 	int* inout_count_p,
 	int* out_index_array,
-	void** returned_user_ptr_array,
-	job_status_s* out_status_array_p);
-
-/* briefly blocking check for completion of one or more of any currently
- * pending jobs
- */
-int job_waitworld(
-	job_id_t* out_id_array_p,
-	int* inout_count_p,
 	void** returned_user_ptr_array,
 	job_status_s* out_status_array_p);
 
