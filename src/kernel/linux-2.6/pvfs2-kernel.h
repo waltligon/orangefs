@@ -268,6 +268,49 @@ wait_for_op:                                                    \
      }                                                          \
  }
 
+/*
+  by design, our vfs i/o errors need to be handled in one of two ways,
+  depending on where the error occured.
+
+
+  if the error happens in the waitqueue code because we either timed
+  out or a signal was raised while waiting, we need to kill the
+  device_owner and free the op manually.  this is done to avoid having
+  the device start writing to our shared bufmap pages without us
+  expecting it.
+
+  if a pvfs2 sysint level error occured and i/o has been completed,
+  there is no need to kill the device_owner, as the user has finished
+  using the bufmap page and so there is no danger in this case.  in
+  this case, we wake up the device normally so that it may free the
+  op, as normal.
+
+  this macro handle both of these cases, depending on which error
+  happened based on information known in context.  the only reason
+  this is a macro is because both read and write cases need the exact
+  same handling code.
+*/
+#define handle_io_error()                                       \
+do {                                                            \
+if (error_exit)                                                 \
+{                                                               \
+    ret = -EIO;                                                 \
+    kill_device_owner();                                        \
+    op_release(new_op);                                         \
+}                                                               \
+else                                                            \
+{                                                               \
+    ret = ((new_op->downcall.status == -PVFS_ENOENT) ?          \
+           -ENOENT : -EIO);                                     \
+    *offset = original_offset;                                  \
+    wake_up_device_for_return(new_op);                          \
+}                                                               \
+pvfs_bufmap_put(buffer_index);                                  \
+*offset = original_offset;                                      \
+} while(0)
+
+
+
 /****************************
  * defined in pvfs2-cache.c
  ****************************/

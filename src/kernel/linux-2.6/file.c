@@ -120,39 +120,12 @@ ssize_t pvfs2_inode_read(
 	    pvfs2_error("pvfs2_inode_read: error: io downcall status.\n");
 
           error_exit:
-            if (error_exit)
-            {
-                /*
-                  this means that the waitqueue code failed to
-                  retrieve a proper downcall (either via timeout or a
-                  signal being raised).  in this case, we need to kill
-                  the device_owner and free the op ourselves, to avoid
-                  having the device start writing to our shared bufmap
-                  pages.
-                */
-                ret = -EIO;
-                kill_device_owner();
-                op_release(new_op);
-            }
-            else
-            {
-                /*
-                  NOTE: DO NOT kill the device owner in this case, as
-                  the I/O has already been completed so there's no
-                  danger in corrupting our bufmap or reqlist.  Also,
-                  DO NOT free the op, since this code path relies on
-                  the devreq code to free it.  signal it normally
-                  before returning the error code.
-                */
-                ret = ((new_op->downcall.status == -PVFS_ENOENT) ?
-                       -ENOENT : -EIO);
-                *offset = original_offset;
-                wake_up_device_for_return(new_op);
-            }
-            pvfs_bufmap_put(buffer_index);
+            /* this macro is defined in pvfs2-kernel.h */
+            handle_io_error();
+
 	    pvfs2_error("pvfs2_inode_read: returning error %d "
                         "(error_exit=%d)\n", ret, error_exit);
-	    return(ret);
+	    return ret;
 	}
 
 	/* copy data out to destination */
@@ -296,12 +269,12 @@ static ssize_t pvfs2_file_write(
 	    pvfs2_error("pvfs2_file_write: error: io downcall status.\n");
 
           error_exit:
-	    ret = new_op->downcall.status;
-            kill_device_owner();
-            op_release(new_op);
-	    pvfs_bufmap_put(buffer_index);
-	    *offset = original_offset;
-	    return(ret);
+            /* this macro is defined in pvfs2-kernel.h */
+            handle_io_error();
+
+	    pvfs2_error("pvfs2_file_write: returning error %d "
+                        "(error_exit=%d)\n", ret, error_exit);
+	    return ret;
 	}
 
 	current_buf += new_op->downcall.resp.io.amt_complete;
