@@ -38,6 +38,8 @@ static struct qhash_table *s_fsid_config_cache_table = NULL;
 static int hash_fsid(void *fsid, int table_size);
 static int hash_fsid_compare(void *key, struct qlist_head *link);
 
+static void free_host_extent_table(void *ptr);
+
 /*
   FIXME:
   there's a header file problem that needs to be resolved...
@@ -88,10 +90,34 @@ int PINT_bucket_initialize(void)
  */
 int PINT_bucket_finalize(void)
 {
-	/* FIXME: iterate through hashtable and free each element */
-	gossip_lerr("Warning: PINT_bucket_finalize leaking memory.\n");
-	qhash_finalize(s_fsid_config_cache_table);
-	return(0);
+    int i;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+
+    /*
+      this is an exhaustive and slow iterate.  speed this up
+      if 'finalize' is something that will be done frequently.
+    */
+    for (i = 0; i < s_fsid_config_cache_table->table_size; i++)
+    {
+        hash_link = qhash_search(s_fsid_config_cache_table,&(i));
+        if (hash_link)
+        {
+            cur_config_cache =
+                qlist_entry(hash_link, struct config_fs_cache_s,
+                            hash_link);
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
+            assert(cur_config_cache->bmi_host_extent_tables);
+
+            /* fs object is freed by PINT_server_config_release */
+            cur_config_cache->fs = NULL;
+            llist_free(cur_config_cache->bmi_host_extent_tables,
+                       free_host_extent_table);
+        }
+    }
+    qhash_finalize(s_fsid_config_cache_table);
+    return(0);
 }
 
 /* PINT_handle_load_mapping()
@@ -525,6 +551,20 @@ static int hash_fsid_compare(void *key, struct qlist_head *link)
     }
 
     return(0);
+}
+
+static void free_host_extent_table(void *ptr)
+{
+    struct bmi_host_extent_table_s *cur_host_extent_table =
+        (struct bmi_host_extent_table_s *)ptr;
+
+    assert(cur_host_extent_table);
+    assert(cur_host_extent_table->bmi_address);
+    assert(cur_host_extent_table->extent_list);
+
+    free(cur_host_extent_table->bmi_address);
+    llist_free(cur_host_extent_table->extent_list,
+               PINT_release_extent_list);
 }
 
 #endif

@@ -70,7 +70,7 @@ typedef struct bmi_host_extent_table_s
 {
     char *bmi_address;
 
-    /* type is struct extent */
+    /* ptrs are type struct extent */
     struct llist *extent_list;
 } bmi_host_extent_table_s;
 
