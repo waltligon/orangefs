@@ -67,6 +67,8 @@ DECODE_RESP_HEAD(do_decode_resp)
 					+ sizeof(struct PVFS_server_resp_s)
 					+ (decoded_response->u.getattr.attr.u.meta.nr_datafiles 
 					* sizeof(PVFS_handle)));
+				PINT_Dist_decode(decoded_response->u.getattr.attr.u.meta.dist,
+					NULL);
 			}
 			return 0;
 		case PVFS_SERV_CREATE:

@@ -127,10 +127,14 @@ int do_encode_resp(
 		    pack_dest +=
 			(response->u.getattr.attr.u.meta.nr_datafiles
 			* sizeof(PVFS_handle));
+#if 0
 		    memcpy(
 			pack_dest,
 			response->u.getattr.attr.u.meta.dist,
 			response->u.getattr.attr.u.meta.dist_size);
+#endif
+		    PINT_Dist_encode(pack_dest,
+			response->u.getattr.attr.u.meta.dist);
 		}
 	    }
 	    /* not a metafile */

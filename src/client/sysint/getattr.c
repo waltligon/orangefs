@@ -165,6 +165,22 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 			ack_p->u.getattr.attr.u.meta.dfh, 
 			resp->attr.u.meta.nr_datafiles * sizeof(PVFS_handle));
 	    }
+	    /* TODO: make this better */
+	    if(resp->attr.u.meta.dist_size > 0)
+	    {
+		gossip_lerr("KLUDGE: packing dist to memcpy it.\n");
+		resp->attr.u.meta.dist =
+		    malloc(resp->attr.u.meta.dist_size);
+		if(resp->attr.u.meta.dist == NULL)
+		{
+		    ret = -ENOMEM;
+		    failure = MALLOC_DFH_FAILURE;
+		    goto return_error;
+		}
+		PINT_Dist_encode(resp->attr.u.meta.dist, 
+		    ack_p->u.getattr.attr.u.meta.dist);
+		PINT_Dist_decode(resp->attr.u.meta.dist, NULL);
+	    }
 	}
 	
 	/* TODO: copy extended attributes just like normal attr */

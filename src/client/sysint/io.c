@@ -22,10 +22,7 @@
 /* TODO: where does this define really belong? */
 #define REQ_ENC_FORMAT 0
 
-/* TODO: remove anything with the word "HACK" in it later on; we
- * are just kludging some stuff for now to be able to test I/O
- * functionality 
- * TODO: try to do something to avoid so many mallocs
+/* TODO: try to do something to avoid so many mallocs
  * TODO: figure out if we have to do anything special for short
  * reads or writes
  * TODO: figure out what should be passed out in the system
@@ -67,8 +64,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     PVFS_offset offset = 0;
     PVFS_boolean eof_flag = 0;
 
-    PVFS_Dist* HACK_io_dist = NULL;
-
     if((type != PVFS_SYS_IO_READ) && (type != PVFS_SYS_IO_WRITE))
     {
 	return(-EINVAL);
@@ -93,14 +88,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 
     gossip_err("WARNING: kludging distribution in PINT_sys_io().\n");
 
-    /* for now, build our own dist */
-    HACK_io_dist = PVFS_Dist_create("default_dist");
-    if(!HACK_io_dist)
-    {
-	gossip_lerr("Error: PVFS_Dist_create() failure.\n");
-	return(-EINVAL);
-    }
-    ret = PINT_Dist_lookup(HACK_io_dist);
+    /* TODO: do I need to do this here? */
+    ret = PINT_Dist_lookup(pinode_ptr->attr.u.meta.dist);
     if(ret < 0)
     {
 	goto out;
@@ -133,7 +122,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	 * processor to continue past eof if needed
 	 */
 	tmp_file_data.fsize = 0;  
-	tmp_file_data.dist = HACK_io_dist;
+	tmp_file_data.dist = pinode_ptr->attr.u.meta.dist;
 	tmp_file_data.iod_num = i;
 	tmp_file_data.iod_count = pinode_ptr->attr.u.meta.nr_datafiles;
 	tmp_file_data.extend_flag = 1;
@@ -233,7 +222,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	req_array[i].u.io.iod_count = 1;
 #endif
 	req_array[i].u.io.io_req = req->io_req;
-	req_array[i].u.io.io_dist = HACK_io_dist;
+	req_array[i].u.io.io_dist = pinode_ptr->attr.u.meta.dist;
 	if(type == PVFS_SYS_IO_READ)
 	    req_array[i].u.io.io_type = PVFS_IO_READ;
 	if(type == PVFS_SYS_IO_WRITE)
@@ -282,7 +271,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    flow_array[i]->file_data = &(file_data_array[i]);
 	    flow_array[i]->file_data->fsize =
 		tmp_resp->u.io.bstream_size;
-	    flow_array[i]->file_data->dist = HACK_io_dist;
+	    flow_array[i]->file_data->dist =
+		pinode_ptr->attr.u.meta.dist;
 	    flow_array[i]->file_data->iod_num = i;
 	    /* TODO: change this to support multiple handles */
 #if 0
@@ -422,11 +412,6 @@ out:
 		PINT_flow_free(flow_array[i]);
 	}
 	free(flow_array);
-    }
-
-    if(HACK_io_dist)
-    {
-	free(HACK_io_dist);
     }
 
     if(req_state)

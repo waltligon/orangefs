@@ -4,6 +4,8 @@
  * See COPYING in top-level directory.
  */
 
+#include <assert.h>
+
 #include "pinode-helper.h"
 #include "pvfs2-sysint.h"
 #include "pint-servreq.h"
@@ -468,6 +470,8 @@ int modify_pinode(pinode *node,PVFS_object_attr attr,PVFS_bitfield mask)
 	}
 	if (ATTR_META & mask)
 	{
+		/* TODO: we don't want to be here, this is broken ... */
+		assert(0);
 #if 0
 		/* REMOVED BY PHIL WHEN MOVING TO NEW TREE */
 		node->attr.u.meta.dist = attr.u.meta.dist;
@@ -520,9 +524,25 @@ static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, PVFS_bitfield ma
 			memcpy(ptr->attr.u.meta.dfh,attr.u.meta.dfh,size);
 			ptr->attr.u.meta.nr_datafiles = num_files;
 
+#if 0
 			/* REMOVED BY PHIL WHEN MOVING TO NEW TREE */
 			ptr->attr.u.meta.dist = attr.u.meta.dist;
+#endif
 		}
+		/* TODO: make this better */
+		if(attr.u.meta.dist_size > 0)
+		{
+			gossip_lerr("KLUDGE: packing dist to memcpy it.\n");
+			ptr->attr.u.meta.dist = malloc(attr.u.meta.dist_size);
+			if(ptr->attr.u.meta.dist == NULL)
+			{
+				return(-ENOMEM);
+			}
+			PINT_Dist_encode(ptr->attr.u.meta.dist, 
+				attr.u.meta.dist);
+			PINT_Dist_decode(ptr->attr.u.meta.dist, NULL);
+		}
+
 	}
 	if ((mask & ATTR_DATA) == ATTR_DATA)
 	{

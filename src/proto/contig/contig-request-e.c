@@ -234,6 +234,11 @@ int do_encode_req(
 	    target_msg->total_size = size;
 
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+	    /* override the rsize, so the receiver knows how much data
+	     * is in here (we packed more than the caller knew about in
+	     * order to indicate sizes of variable length structs)
+	     */
+	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size;
 	    enc_msg += sizeof( struct PVFS_server_req_s );
 
 	    /* throw handles at the end for metadata files */
