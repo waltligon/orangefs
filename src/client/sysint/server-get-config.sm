@@ -183,7 +183,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 
  cleanup:
 
-    if (sm_p != NULL)
+    if (sm_p != NULL && 0 == sm_p->u.get_config.persist_config_buffers)
     {
 	free(sm_p->u.get_config.fs_config_buf);
 	free(sm_p->u.get_config.server_config_buf);

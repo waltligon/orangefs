@@ -326,6 +326,7 @@ struct PINT_server_get_config_sm {
     uint32_t fs_config_buf_size;
     char *server_config_buf;
     uint32_t server_config_buf_size;
+    int persist_config_buffers;
 };
 
 typedef struct PINT_client_sm {
