@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.2 2003-09-09 16:12:46 pcarns Exp $
+ * $Id: setup.c,v 1.3 2003-10-17 18:50:46 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -16,14 +16,17 @@
 #include <src/io/bmi/bmi-method-support.h>
 #include <src/io/bmi/bmi-method-callback.h>
 #include <src/io/bmi/bmi_tcp/sockio.h>
+/* ib includes */
 #include <vapi.h>
 #include <evapi.h>
+#include <wrap_common.h>
+/* bmi ib private header */
 #include "ib.h"
 
 /* constants used to initialize infiniband device */
 static const char *VAPI_DEVICE = "InfiniHost0";
 static const int VAPI_PORT = 1;
-static const int VAPI_NUM_CQ_ENTRIES = 1024;
+static const unsigned int VAPI_NUM_CQ_ENTRIES = 1024;
 static const int VAPI_MTU = MTU2048;  /* default mtu */
 
 /*
@@ -456,7 +459,6 @@ ib_alloc_method_addr(ib_connection_t *c, const char *hostname, int port)
 {
     struct method_addr *map;
     ib_method_addr_t *ibmap;
-    int ret;
 
     map = alloc_method_addr(bmi_ib_method_id, sizeof(*ibmap));
     ibmap = map->method_data;
@@ -464,17 +466,12 @@ ib_alloc_method_addr(ib_connection_t *c, const char *hostname, int port)
     ibmap->hostname = hostname;
     ibmap->port = port;
 
-    /* register this address with the method control layer */
-    ret = bmi_method_addr_reg_callback(map);
-    if (ret < 0)
-	error_xerrno(ret, "%s: bmi_method_addr_reg_callback", __func__);
-
     return map;
 }
 
 /*
  * Break up a method string like:
- *   ib://hostname:port
+ *   ib://hostname:port/filesystem
  * into its constituent fields, storing them in an opaque
  * type which is returned.
  * XXX: I'm assuming that these actually return a _const_ pointer
@@ -487,19 +484,24 @@ BMI_ib_method_addr_lookup(const char *id)
     int port;
     struct method_addr *map = 0;
 
-    /* parse hostname and port */
-    s = string_key("ib", id);
+    /* parse hostname */
+    s = string_key("ib", id);  /* allocs a string */
     if (!s)
 	return 0;
     cp = strchr(s, ':');
     if (!cp)
 	error("%s: no ':' found", __func__);
 
+    /* copy to permanent storage */
     hostname = Malloc(cp - s + 1);
     strncpy(hostname, s, cp-s);
     hostname[cp-s] = '\0';
 
+    /* strip /filesystem  */
     ++cp;
+    cq = strchr(cp, '/');
+    if (cq)
+	*cq = 0;
     port = strtoul(cp, &cq, 10);
     if (cq == cp)
 	error("%s: invalid port number", __func__);
@@ -524,6 +526,7 @@ BMI_ib_method_addr_lookup(const char *id)
 	free(hostname);  /* found it */
     else
 	map = ib_alloc_method_addr(0, hostname, port);  /* alloc new one */
+	/* but don't call method_addr_reg_callback! */
 
     return map;
 }
@@ -592,13 +595,19 @@ ib_tcp_server_check_new_connections(void)
 	if (!(errno == EAGAIN))
 	    error_errno("%s: accept listen sock", __func__);
     } else {
+	int ret;
 	ib_connection_t *c = ib_new_connection(s, 1);
 	char *hostname = strdup(inet_ntoa(ssin.sin_addr));
 	int port = ntohs(ssin.sin_port);
 	c->remote_map = ib_alloc_method_addr(c, hostname, port);
+	/* register this address with the method control layer */
+	ret = bmi_method_addr_reg_callback(c->remote_map);
+	if (ret < 0)
+	    error_xerrno(ret, "%s: bmi_method_addr_reg_callback", __func__);
 	debug(2, "%s: accepted new connection at server", __func__);
 	if (close(s) < 0)
 	    error_errno("%s: close new sock", __func__);
+
     }
 }
 
@@ -649,14 +658,53 @@ async_event_handler(VAPI_hca_hndl_t nic_handle_in __attribute__((unused)),
 }
 
 /*
+ * Hack to work around fork in daemon mode which confuses kernel
+ * state.  I wish they did not have an _init function.  It calls
+ * into MOSAL_user_lib_init(), but there is no finalize equivalent.
+ * This just breaks its saved state and reinitializes.
+ *
+ * Seems to work even in the case of a non-backgrounded server too,
+ * fortunately.
+ */
+extern call_result_t _dev_mosal_init_lib(t_lib_descriptor **pp_t_lib);
+extern void MOSAL_user_lib_init(void);
+extern int mosal_fd;
+
+static void
+reinit_mosal(void)
+{
+    t_lib_descriptor *desc;
+    int ret;
+
+    ret = _dev_mosal_init_lib(&desc);
+    debug(2, "%s: mosal init ret %d, desc %p", __func__, ret, desc);
+    debug(2, "%s: desc->fd %d", __func__, desc->os_lib_desc_st.fd);
+    close(desc->os_lib_desc_st.fd);
+    /* both these state items protect against a reinit */
+    desc->state = 0;
+    mosal_fd = -1;
+    MOSAL_user_lib_init();
+#if 0
+    /* just for debugging, print out the same values again */
+    ret = _dev_mosal_init_lib(&desc);
+    debug(2, "%s: after close of state fd", __func__);
+    debug(2, "%s: mosal init ret %d, desc %p", __func__, ret, desc);
+    debug(2, "%s: desc->fd %d", __func__, desc->os_lib_desc_st.fd);
+#endif
+}
+
+/*
  * Startup, once per application.
  */
 int
 BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
   int init_flags)
 {
-    int ret, i;
+    int ret;
     VAPI_hca_port_t nic_port_props;
+    VAPI_hca_vendor_t vendor_cap;
+    VAPI_hca_cap_t hca_cap;
+    VAPI_cqe_num_t cqe_num, cqe_num_out;
 
     debug(0, "%s: init", __func__);
 
@@ -666,6 +714,8 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
 	error("%s: error: BMI_INIT_SERVER requires non-null listen_addr"
 	  " and v.v", __func__);
 
+    reinit_mosal();
+
     /* open device; discard const char* for silly mellanox prototype */
     ret = VAPI_open_hca((char *)(unsigned long) VAPI_DEVICE, &nic_handle);
     /*
@@ -674,6 +724,8 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_open_hca", __func__);
     */
+
+    /* starts all the ib threads */
     ret = EVAPI_get_hca_hndl((char *)(unsigned long) VAPI_DEVICE, &nic_handle);
     if (ret < 0)
 	error_verrno(ret, "%s: EVAPI_get_hca_hndl", __func__);
@@ -695,10 +747,26 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_create_pd", __func__);
 
-    /* build a CQ (ignore actual number returned) */
-    ret = VAPI_create_cq(nic_handle, VAPI_NUM_CQ_ENTRIES, &nic_cq, &i);
+    /* see how many cq entries we are allowed to have */
+    memset(&hca_cap, 0, sizeof(hca_cap));
+    ret = VAPI_query_hca_cap(nic_handle, &vendor_cap, &hca_cap);
     if (ret < 0)
-	error_verrno(ret, "%s: VAPI_create_cq", __func__);
+	error_verrno(ret, "%s: VAPI_query_hca_cap", __func__);
+
+    debug(0, "%s: max %d completion queue entries", __func__,
+      hca_cap.max_num_cq);
+    cqe_num = VAPI_NUM_CQ_ENTRIES;
+    if (hca_cap.max_num_cq < cqe_num) {
+	cqe_num = hca_cap.max_num_cq;
+	warning("%s: hardly enough completion queue entries %d, hoping for %d",
+	  __func__, hca_cap.max_num_cq, cqe_num);
+    }
+
+    /* build a CQ (ignore actual number returned) */
+    debug(0, "%s: asking for %d completion queue entries", __func__, cqe_num);
+    ret = VAPI_create_cq(nic_handle, cqe_num, &nic_cq, &cqe_num_out);
+    if (ret < 0)
+	error_verrno(ret, "%s: VAPI_create_cq ret %d", __func__, ret);
 
     /*
      * Set up tcp socket to listen for connection requests.
