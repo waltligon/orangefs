@@ -2288,8 +2288,15 @@ static void trove_completion_bmi_to_trove(PVFS_ds_state error_code,
 		flow_data->drain_buffer_state = BUF_READY_TO_SWAP;
 
 		/* are we done ? */
-		if(flow_d->current_req_offset == -1)
+		if(flow_d->current_req_offset == -1 ||
+			flow_data->fill_buffer_state == BUF_DONE)
 		{
+			if(flow_d->current_req_offset != -1 ||
+				flow_data->fill_buffer_state != BUF_DONE)
+			{
+				gossip_lerr("WARNING: PINT_Process_request() appears to be giving inconsistent results.\n");
+				gossip_lerr("WARNING: assuming flow is complete.\n");
+			}
 			flow_d->state = FLOW_COMPLETE;
 		}
 		else if(flow_data->fill_buffer_state == BUF_READY_TO_SWAP)
