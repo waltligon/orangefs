@@ -20,6 +20,7 @@
  */
 
 #include <pvfs2-types.h>
+#include <pvfs2-storage.h>
 #include <pint-distribution.h>
 
 /*#define ATTR_UID 1
@@ -32,10 +33,10 @@
 */
 #define ATTR_BASIC 1
 #define ATTR_SIZE 64
-#define ATTR_META 128
-#define ATTR_DATA 256
-#define ATTR_DIR 512
-#define ATTR_SYM 1024
+#define ATTR_META PVFS_TYPE_METAFILE
+#define ATTR_DATA PVFS_TYPE_DATAFILE
+#define ATTR_DIR PVFS_TYPE_DIRECTORY
+#define ATTR_SYM PVFS_TYPE_SYMLINK
 /* PVFS filesystem objects */
 
 /* Various permission bits */
