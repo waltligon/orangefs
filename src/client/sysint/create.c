@@ -365,13 +365,13 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	 */
 	copy_attributes(&req_p.u.setattr.attr, req->attr, io_serv_count,
 			df_handle_array); 
-	gossip_ldebug(CLIENT_DEBUG,"\towner: %d\n\tgroup: %d\n\tperms: %d\n\tatime: %ld\n\tmtime: %ld\n\tctime: %ld\n\tobjtype: %d\n",
+	gossip_ldebug(CLIENT_DEBUG,"\towner: %d\n\tgroup: %d\n\tperms: %d\n\tatime: %lld\n\tmtime: %lld\n\tctime: %lld\n\tobjtype: %d\n",
 		req_p.u.setattr.attr.owner, 
 		req_p.u.setattr.attr.group, 
 		req_p.u.setattr.attr.perms, 
-		req_p.u.setattr.attr.atime, 
-		req_p.u.setattr.attr.mtime, 
-		req_p.u.setattr.attr.ctime, 
+		(long long)req_p.u.setattr.attr.atime, 
+		(long long)req_p.u.setattr.attr.mtime, 
+		(long long)req_p.u.setattr.attr.ctime, 
 		req_p.u.setattr.attr.objtype);
 	gossip_ldebug(CLIENT_DEBUG,"\t\tnr_datafiles: %d\n",
 		req_p.u.setattr.attr.u.meta.nr_datafiles);

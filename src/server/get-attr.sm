@@ -245,14 +245,14 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
     }
     else {
 	gossip_debug(SERVER_DEBUG,
-		     "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d, atime = %ld, mtime = %ld, ctime = %ld)\n",
+		     "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
 		     a_p->owner,
 		     a_p->group,
 		     a_p->perms,
 		     a_p->objtype,
-		     a_p->atime,
-		     a_p->mtime,
-		     a_p->ctime);
+		     (long long)a_p->atime,
+		     (long long)a_p->mtime,
+		     (long long)a_p->ctime);
     }
 
     /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
@@ -401,14 +401,15 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 
 
     gossip_debug(SERVER_DEBUG,
-		 "  sending attrs (owner = %d, group = %d, perms = %o, type = %d, atime = %ld, mtime = %ld, ctime = %ld)\n",
+		 "  sending attrs (owner = %d, group = %d, perms = %o,
+		 type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
 		 a_p->owner,
 		 a_p->group,
 		 a_p->perms,
 		 a_p->objtype,
-		 a_p->atime,
-		 a_p->mtime,
-		 a_p->ctime);
+		 (long long)a_p->atime,
+		 (long long)a_p->mtime,
+		 (long long)a_p->ctime);
 
     /* fill in response -- status field is the only generic one we should have to set */
     s_op->resp->status = ret->error_code;

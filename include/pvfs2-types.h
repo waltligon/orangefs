@@ -8,7 +8,6 @@
 #define __PVFS2_TYPES_H
 
 #include <stdint.h>
-#include <time.h>
 
 /* basic types used throughout code */
 typedef uint8_t PVFS_boolean;
@@ -27,6 +26,7 @@ typedef int32_t PVFS_fs_id;
 /* basic types used within metadata */
 typedef uint32_t PVFS_uid;
 typedef uint32_t PVFS_gid;
+typedef int64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 
 
@@ -38,7 +38,6 @@ typedef int64_t PVFS_count64;
 typedef uint64_t PVFS_flow_id;
 typedef int16_t PVFS_type;
 typedef int64_t PVFS_token;
-typedef time_t PVFS_time;	/* TODO: is this really a good idea? */
 
 #define MAX_STRING_SIZE  1000
 

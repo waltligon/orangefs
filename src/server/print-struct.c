@@ -48,9 +48,9 @@ void dump_attribs(PVFS_object_attr a)
    printf("\tUserID: %d\n",a.owner);
    printf("\tGID: %d\n",a.group);
    printf("\tPerms: %xh\n",a.perms);
-   printf("\tAtime: %ld\n",a.atime);
-   printf("\tMtime: %ld\n",a.mtime);
-   printf("\tCtime: %ld\n",a.ctime);
+   printf("\tAtime: %lld\n",(long long)a.atime);
+   printf("\tMtime: %lld\n",(long long)a.mtime);
+   printf("\tCtime: %lld\n",(long long)a.ctime);
    printf("\tType: %d\n",a.objtype);
 }
 
