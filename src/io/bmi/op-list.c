@@ -119,13 +119,14 @@ void op_list_add(op_list_p olp, method_op_p oip)
  */
 void op_list_cleanup(op_list_p olp)
 {
-	op_list_p tmp_entry = NULL;
+	op_list_p iterator = NULL;
+	op_list_p scratch = NULL;
 	method_op_p tmp_method_op = NULL;
 
-	qlist_for_each(tmp_entry, olp)
+	qlist_for_each_safe(iterator, scratch, olp)
 	{
-		qlist_del(tmp_entry);
-		tmp_method_op = qlist_entry(tmp_entry, struct method_op, op_list_entry); 
+		tmp_method_op = qlist_entry(iterator, struct method_op, 
+			op_list_entry); 
 		dealloc_method_op(tmp_method_op);
 	}
 	free(olp);
