@@ -29,7 +29,7 @@ static gen_mutex_t ref_mutex = GEN_MUTEX_INITIALIZER;
 #if defined(__STATIC_METHOD_BMI_TCP__) \
   + defined(__STATIC_METHOD_BMI_GM__) \
   + defined(__STATIC_METHOD_BMI_IB__) == 1
-/* define if there is only one active method */
+/* define if there is only one active method to maybe speed up testsome() */
 #define __BMI_SINGLE_METHOD__
 #endif
 
@@ -707,7 +707,7 @@ int BMI_testsome(int incount,
 		 int max_idle_time_ms,
 		 bmi_context_id context_id)
 {
-    int ret = -1;
+    int ret;
 
     if (max_idle_time_ms < 0)
 	return (bmi_errno_to_pvfs(-EINVAL));
@@ -742,7 +742,7 @@ int BMI_testsome(int incount,
 		 int max_idle_time_ms,
 		 bmi_context_id context_id)
 {
-    int ret = -1;
+    int ret = 0;
     int idle_per_method = 0;
     bmi_op_id_t* tmp_id_array;
     int i,j;
@@ -773,7 +773,6 @@ int BMI_testsome(int incount,
 	/* setup the tmp id array with only operations that match
 	 * that method
 	 */
-	memset(tmp_id_array, 0, incount*sizeof(bmi_op_id_t));
 	need_to_test = 0;
 	for(j=0; j<incount; j++)
 	{
@@ -794,35 +793,25 @@ int BMI_testsome(int incount,
 	if(need_to_test)
 	{
 	    tmp_outcount = 0;
-	    if(user_ptr_array)
-		ret = active_method_table[i]->BMI_meth_testsome(
-		    incount, tmp_id_array, &tmp_outcount, 
-		    &(index_array[*outcount]),
-		    &(error_code_array[*outcount]),
-		    &(actual_size_array[*outcount]),
-		    &(user_ptr_array[*outcount]),
-		    idle_per_method,
-		    context_id);
-	    else
-		ret = active_method_table[i]->BMI_meth_testsome(
-		    incount, tmp_id_array, &tmp_outcount, 
-		    &(index_array[*outcount]),
-		    &(error_code_array[*outcount]),
-		    &(actual_size_array[*outcount]),
-		    &(user_ptr_array[*outcount]),
-		    idle_per_method,
-		    context_id);
+	    ret = active_method_table[i]->BMI_meth_testsome(
+		need_to_test, tmp_id_array, &tmp_outcount, 
+		&(index_array[*outcount]),
+		&(error_code_array[*outcount]),
+		&(actual_size_array[*outcount]),
+		user_ptr_array ? &(user_ptr_array[*outcount]) : 0,
+		idle_per_method,
+		context_id);
 	    if(ret < 0)
 	    {
 		/* can't recover from this... */
 		gossip_lerr("Error: critical BMI_testsome failure.\n");
-		free(tmp_id_array);
-		return(ret);
+		goto out;
 	    }
 	    *outcount += tmp_outcount;
 	}
     }
 
+  out:
     free(tmp_id_array);
 
     if(ret == 0 && *outcount > 0)
