@@ -34,6 +34,7 @@ int main(int argc, char **argv)
 	struct ack_foo* ack = NULL;
 	bmi_addr_t server_addr;
 	job_status_s status1;
+	job_id_t tmp_id;
 
 	/* set debugging level */
 	gossip_enable_stderr();
@@ -82,13 +83,23 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	/* post a blocking BMI send job */
-	ret = job_bmi_send_blocking(server_addr, req, 
-		sizeof(struct request_foo), 0, BMI_PRE_ALLOC, 1, &status1);
+	/* send a message */
+	ret = job_bmi_send(server_addr, req, sizeof(struct request_foo),
+		0, BMI_PRE_ALLOC, 1, NULL, &status1, &tmp_id);
 	if(ret < 0)
 	{
-		fprintf(stderr, "job_bmi_send_blocking failure.\n");
+		fprintf(stderr, "job_bmi_send() failure.\n");
 		return(-1);
+	}
+	if(ret == 0)
+	{
+		int count = 0;
+		ret = job_test(tmp_id, &count, NULL, &status1, -1);
+		if(ret < 0)
+		{
+			fprintf(stderr, "job_test() failure.\n");
+			return(-1);
+		}
 	}
 
 	/* check status */
@@ -98,13 +109,23 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	/* post a blocking BMI recv job */
-	ret = job_bmi_recv_blocking(server_addr, ack, sizeof(struct ack_foo), 0,
-		BMI_PRE_ALLOC, &status1);
+	/* receive a message */
+	ret = job_bmi_recv(server_addr, ack, sizeof(struct ack_foo),
+		0, BMI_PRE_ALLOC, NULL, &status1, &tmp_id);
 	if(ret < 0)
 	{
-		fprintf(stderr, "job_bmi_recv_blocking failure.\n");
+		fprintf(stderr, "job_bmi_recv() failure.\n");
 		return(-1);
+	}
+	if(ret == 0)
+	{
+		int count = 0;
+		ret = job_test(tmp_id, &count, NULL, &status1, -1);
+		if(ret < 0)
+		{
+			fprintf(stderr, "job_test() failure.\n");
+			return(-1);
+		}
 	}
 		
 	/* check status */
@@ -120,52 +141,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "short recv.\n");
 		return(-1);
 	}
-#if 0
-	/* receive the same thing using a flow */
-	src = PINT_endpoint_alloc();
-	dest = PINT_endpoint_alloc();
-	io_desc = (struct flow_io_desc*)malloc(sizeof(struct flow_io_desc));
-	if(!src || !dest || !io_desc)
-	{
-		fprintf(stderr, "Failed to alloc endpoints.\n");
-		return(-1);
-	}
-	src->endpoint_id = BMI_ENDPOINT;
-	src->u.bmi.address = server_addr;
-	dest->endpoint_id = MEM_ENDPOINT;
-	dest->u.mem.size = sizeof(struct ack_foo);
-	dest->u.mem.buffer = ack;
-	io_desc->offset = 0;
-	io_desc->size = sizeof(struct ack_foo);
 
-	ret = job_flow(0, 0, src, dest, io_desc, NULL, 0, NULL, &status1,
-		&job_id1);
-	if(ret < 0)
-	{
-		fprintf(stderr, "job_flow() failure.\n");
-		return(-1);
-	}
-	if(ret != 1)
-	{
-		/* wait until job finishes */
-		do
-		{
-			ret = job_wait(job_id1, &outcount, NULL, &status1);
-		} while(ret == 0 && outcount == 0);
-		if(ret < 0)
-		{
-			fprintf(stderr, "job_wait() failure.\n");
-			return(-1);
-		}
-	}
-
-	/* check status */
-	if(status1.error_code != 0)
-	{
-		fprintf(stderr, "Bad status in flow.\n");
-		return(-1);
-	}
-#endif
 	/* free memory buffers */
 	BMI_memfree(server_addr, req, sizeof(struct request_foo), 
 		BMI_SEND_BUFFER);
