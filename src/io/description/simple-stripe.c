@@ -26,11 +26,11 @@ static PVFS_offset logical_to_physical_offset (PVFS_Dist_params *dparam,
     leftover = logical_offset - full_stripes * dparam->strip_size * iod_count;
     if(leftover >= iod_num*dparam->strip_size)
     {
-	/* if so, tack that on to the physical offset as well */
-	if(leftover < (iod_num+1)*dparam->strip_size)
-	    ret_offset += leftover - (iod_num*dparam->strip_size);
-	else
-	    ret_offset += dparam->strip_size;
+	     /* if so, tack that on to the physical offset as well */
+	     if(leftover < (iod_num + 1) * dparam->strip_size)
+	         ret_offset += leftover - (iod_num * dparam->strip_size);
+	     else
+	         ret_offset += dparam->strip_size;
     }
     return(ret_offset);
 
