@@ -81,27 +81,32 @@ PVFS_handle get_root(PVFS_fs_id fs_id)
  */
 PVFS_handle create_dir(PVFS_handle parent, PVFS_fs_id fs_id, char *name)
 {
-	PVFS_sysreq_mkdir *req_mkdir = NULL;
-	PVFS_sysresp_mkdir *resp_mkdir = NULL;
+	PVFS_sysreq_mkdir req_mkdir;
+	PVFS_sysresp_mkdir resp_mkdir;
+
+	memset(&req_mkdir, 0, sizeof(req_mkdir));
+	memset(&resp_mkdir, 0, sizeof(req_mkdir));
+
 	int ret=-1;
 
-	req_mkdir->entry_name = name; 
-	req_mkdir->parent_refn.handle = parent;
-	req_mkdir->parent_refn.fs_id = fs_id;
-	req_mkdir->attrmask = ATTR_BASIC;
-	req_mkdir->attr.owner = 100;
-	req_mkdir->attr.group = 100;
-	req_mkdir->attr.perms = 1877;
-	req_mkdir->attr.objtype = ATTR_DIR;
-	req_mkdir->credentials.perms = 1877;
+	req_mkdir.entry_name = name; 
+	req_mkdir.parent_refn.handle = parent;
+	req_mkdir.parent_refn.fs_id = fs_id;
+	req_mkdir.attrmask = ATTR_BASIC;
+	req_mkdir.attr.owner = 100;
+	req_mkdir.attr.group = 100;
+	req_mkdir.attr.perms = 1877;
+	req_mkdir.attr.objtype = ATTR_DIR;
+	req_mkdir.credentials.perms = 1877;
 
-	ret = PVFS_sys_mkdir(req_mkdir,resp_mkdir);
+	ret = PVFS_sys_mkdir(&req_mkdir,&resp_mkdir);
 	if (ret < 0)
 	{
 		printf("mkdir failed\n");
 		return(-1);
 	}
-	return (PVFS_handle)resp_mkdir->pinode_refn.handle;
+	free(req_mkdir.entry_name);
+	return (PVFS_handle)resp_mkdir.pinode_refn.handle;
 }
 
 /*
