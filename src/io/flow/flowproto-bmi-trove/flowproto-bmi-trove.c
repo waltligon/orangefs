@@ -87,7 +87,7 @@ enum flow_type
 };
 
 /* default buffer size to use for I/O */
-static int DEFAULT_BUFFER_SIZE = 1024 * 1024 * 4;
+static int DEFAULT_BUFFER_SIZE = (1024 * 256);
 /* our assigned flowproto id */
 static int flowproto_bmi_trove_id = -1;
 
