@@ -6,7 +6,7 @@
 
 /* don't change this w/o changing the test_files array */
 #define NUM_TEST_FILES                         10
-#define TEST_FILE_PREFIX     "/__test_pvfs_file_"
+#define TEST_FILE_PREFIX       "/test_pvfs_file_"
 #define MAX_TEST_PATH_LEN              0x00000040
 #define TEST_PVFS_DATA_SIZE             1024*1024
 

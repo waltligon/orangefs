@@ -46,8 +46,8 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
     for(i = 0; i < pvfs_helper.num_test_files; i++)
     {
         memset(filename,0,MAX_TEST_PATH_LEN);
-        snprintf(filename,MAX_TEST_PATH_LEN,"%s%.5d\n",
-                 TEST_FILE_PREFIX,i);
+        snprintf(filename,MAX_TEST_PATH_LEN,"%s%.5d-rank%d\n",
+                 TEST_FILE_PREFIX,i,myid);
 
         memset(&req_lk,0,sizeof(PVFS_sysreq_lookup));
         req_lk.name = filename;
