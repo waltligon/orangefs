@@ -8,6 +8,8 @@
 
 #include <pint-dcache.h>
 
+/* Timeout for a dcache entry */
+static struct timeval dentry_to;
 
 /* TODO: Figure out how timeouts are going to be used to invalidate
  * the cache entries 
@@ -16,7 +18,7 @@
 static void dcache_remove_dentry(struct dcache *cache, int16_t item);
 static int dcache_update_dentry_timestamp(dcache_entry entry); 
 static int check_dentry_expiry(struct timeval t2);
-static int dcache_add_dentry(struct dcache *cache,char *name,\
+static int dcache_add_dentry(struct dcache *cache,char *name,
 		pinode_reference parent,pinode_reference entry);
 static int dcache_get_next_free(struct dcache *cache);
 static int compare(struct dcache_t element,char *name,pinode_reference refn);
@@ -30,7 +32,7 @@ dcache pvfs_dcache;
  *
  * returns 0 on success, -1 on failure
  */
-int dcache_lookup(struct dcache *cache,char *name,pinode_reference parent,\
+int dcache_lookup(struct dcache *cache,char *name,pinode_reference parent,
 		pinode_reference *entry)
 {
 	int16_t i = 0;
@@ -83,7 +85,7 @@ int dcache_lookup(struct dcache *cache,char *name,pinode_reference parent,\
  *
  * returns 0 on success, -1 on failure
  */
-int dcache_insert(struct dcache *cache,char *name,pinode_reference entry,\
+int dcache_insert(struct dcache *cache,char *name,pinode_reference entry,
 		pinode_reference parent)
 {
 	int16_t i = 0,index = 0, ret = 0;
@@ -259,7 +261,7 @@ static int compare(struct dcache_t element,char *name,pinode_reference refn)
  *
  * returns 0 on success, -errno on failure
  */
-static int dcache_add_dentry(struct dcache *cache,char *name,\
+static int dcache_add_dentry(struct dcache *cache,char *name,
 		pinode_reference parent,pinode_reference entry)
 {
 	int16_t free = 0;
@@ -339,7 +341,7 @@ static int check_dentry_expiry(struct timeval t2)
 	/* Does the timestamp exceed the current time? 
 	 * If yes, dentry is valid. If no, it is stale.
 	 */
-	if (t2.tv_sec > cur_time.tv_sec || (t2.tv_sec == cur_time.tv_sec &&\
+	if (t2.tv_sec > cur_time.tv_sec || (t2.tv_sec == cur_time.tv_sec &&
 			t2.tv_usec > cur_time.tv_usec))
 		return(0);
 	
