@@ -179,7 +179,7 @@ struct PVFS_servreq_flush
 {
     PVFS_handle handle;		/* handle of object to flush */
     PVFS_fs_id fs_id;		/* file system */
-    int flags;			/* future use */
+    int32_t flags;		/* future use */
 };
 endecode_fields_3_struct(PVFS_servreq_flush,
   PVFS_handle, handle,
