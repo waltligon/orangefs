@@ -213,6 +213,7 @@ struct ctrl_put
 {
     bmi_op_id_t receiver_op_id;	/* remote op that this completes */
 };
+
 struct ctrl_msg
 {
     bmi_flag_t ctrl_type;
@@ -2141,18 +2142,13 @@ static int immed_recv_handler(bmi_size_t actual_size,
 static int recv_event_handler(gm_recv_event_t * poll_event,
 			     int fast)
 {
-    struct ctrl_msg *my_ctrl = NULL;
+    struct ctrl_msg ctrl_copy;
     int ret = -ENOSYS;
-    bmi_op_id_t ctrl_op_id = 0;
-    bmi_op_id_t ctrl_peer_op_id = 0;
-    bmi_size_t ctrl_actual_size = 0;
-    bmi_msg_tag_t ctrl_tag = 0;
     method_addr_p map = NULL;
     struct op_list_search_key key;
     void *tmp_buffer = NULL;
     method_op_p query_op = NULL;
     struct gm_addr *gm_addr_data = NULL;
-    gm_remote_ptr_t remote_ptr = 0;
 
     gossip_ldebug(BMI_DEBUG_GM, "recv_event_handler() called.\n");
     /* what are the possibilities here? 
@@ -2172,60 +2168,50 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
      * cannot let too many remain out of service.
      */
 
-    /* grab the control message out of the event */
+    /* grab a copy of the control message out of the event */
     if (fast)
     {
-	my_ctrl = (struct ctrl_msg *) (gm_ntohp(poll_event->recv.message) +
+	ctrl_copy = *(struct ctrl_msg *) (gm_ntohp(poll_event->recv.message) +
 				       gm_ntohl(poll_event->recv.length) -
 				       sizeof(struct ctrl_msg));
     }
     else
     {
-	my_ctrl = (struct ctrl_msg *) (gm_ntohp(poll_event->recv.buffer) +
+	ctrl_copy = *(struct ctrl_msg *) (gm_ntohp(poll_event->recv.buffer) +
 				       gm_ntohl(poll_event->recv.length) -
 				       sizeof(struct ctrl_msg));
     }
+    /* repost buffer ASAP unless we need to copy data out of it */
+    if(ctrl_copy.ctrl_type != CTRL_IMMED_TYPE && 
+	ctrl_copy.ctrl_type != CTRL_UNEXP_TYPE)
+    {
+	gm_provide_receive_buffer(local_port,
+				  gm_ntohp(poll_event->recv.buffer),
+				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
+    }
 
     /* see what it is */
-    gossip_ldebug(BMI_DEBUG_GM, "Ctrl_type: %d.\n", my_ctrl->ctrl_type);
-    if (my_ctrl->ctrl_type == CTRL_ACK_TYPE)
+    gossip_ldebug(BMI_DEBUG_GM, "Ctrl_type: %d.\n", ctrl_copy.ctrl_type);
+    if (ctrl_copy.ctrl_type == CTRL_ACK_TYPE)
     {
-	ctrl_op_id = my_ctrl->u.ack.sender_op_id;
-	ctrl_peer_op_id = my_ctrl->u.ack.receiver_op_id;
-	remote_ptr = my_ctrl->u.ack.remote_ptr;
-	/* Post this control buffer again to be ready for next time  */
-	gossip_ldebug(BMI_DEBUG_GM, "Replacing control buffer.\n");
-	gm_provide_receive_buffer(local_port,
-				  gm_ntohp(poll_event->recv.buffer),
-				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
 	/* this is a response to one of our control requests */
-	ctrl_ack_handler(ctrl_op_id,
-			 gm_ntohs(poll_event->recv.sender_node_id), remote_ptr,
-			 ctrl_peer_op_id);
+	ctrl_ack_handler(ctrl_copy.u.ack.sender_op_id,
+			 gm_ntohs(poll_event->recv.sender_node_id), 
+			 ctrl_copy.u.ack.remote_ptr,
+			 ctrl_copy.u.ack.receiver_op_id);
 	ret = 0;
     }
-    else if (my_ctrl->ctrl_type == CTRL_REQ_TYPE)
+    else if (ctrl_copy.ctrl_type == CTRL_REQ_TYPE)
     {
-	ctrl_op_id = my_ctrl->u.req.sender_op_id;
-	ctrl_actual_size = my_ctrl->u.req.actual_size;
-	ctrl_tag = my_ctrl->u.req.msg_tag;
-
-	/* Post this control buffer again to be ready for next time  */
-	gossip_ldebug(BMI_DEBUG_GM, "Replacing control buffer.\n");
-	gm_provide_receive_buffer(local_port,
-				  gm_ntohp(poll_event->recv.buffer),
-				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
 	/* this is a new control request from someone */
-	ret = ctrl_req_handler_rend(ctrl_op_id, ctrl_actual_size,
-					ctrl_tag,
+	ret = ctrl_req_handler_rend(ctrl_copy.u.req.sender_op_id, 
+					ctrl_copy.u.req.actual_size,
+					ctrl_copy.u.req.msg_tag,
 					gm_ntohs(poll_event->recv.
 						 sender_node_id));
     }
-    else if (my_ctrl->ctrl_type == CTRL_IMMED_TYPE)
+    else if (ctrl_copy.ctrl_type == CTRL_IMMED_TYPE)
     {
-	ctrl_actual_size = my_ctrl->u.immed.actual_size;
-	ctrl_tag = my_ctrl->u.immed.msg_tag;
-
 	/* try to find a matching post from the receiver so that we don't
 	 * have to buffer this yet again */
 	map = gm_addr_search(&gm_addr_list,
@@ -2240,17 +2226,14 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	memset(&key, 0, sizeof(struct op_list_search_key));
 	key.method_addr = map;
 	key.method_addr_yes = 1;
-	key.msg_tag = my_ctrl->u.immed.msg_tag;
+	key.msg_tag = ctrl_copy.u.immed.msg_tag;
 	key.msg_tag_yes = 1;
 
-	/* TODO: if receiver expected rendezvous, then we have to
-	 * do some fixing...
-	 */
 	query_op = op_list_search(op_list_array[IND_NEED_CTRL_MATCH], &key);
 	if (!query_op)
 	{
 	    gossip_ldebug(BMI_DEBUG_GM, "Doh! Using extra buffer.\n");
-	    tmp_buffer = malloc(my_ctrl->u.immed.actual_size);
+	    tmp_buffer = malloc(ctrl_copy.u.immed.actual_size);
 	    if (!tmp_buffer)
 	    {
 		/* TODO: handle error */
@@ -2259,18 +2242,19 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    if (fast)
 	    {
 		memcpy(tmp_buffer, gm_ntohp(poll_event->recv.message),
-		       my_ctrl->u.immed.actual_size);
+		       ctrl_copy.u.immed.actual_size);
 	    }
 	    else
 	    {
 		memcpy(tmp_buffer, gm_ntohp(poll_event->recv.buffer),
-		       my_ctrl->u.immed.actual_size);
+		       ctrl_copy.u.immed.actual_size);
 	    }
 	    gm_provide_receive_buffer(local_port,
 				      gm_ntohp(poll_event->recv.buffer),
 				      GM_IMMED_SIZE, GM_HIGH_PRIORITY);
-	    ret = immed_recv_handler(ctrl_actual_size,
-				     ctrl_tag, map, tmp_buffer);
+	    ret = immed_recv_handler(ctrl_copy.u.immed.actual_size,
+				     ctrl_copy.u.immed.msg_tag, map, 
+				     tmp_buffer);
 	}
 	else
 	{
@@ -2278,18 +2262,18 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    if (fast)
 	    {
 		memcpy(query_op->buffer, gm_ntohp(poll_event->recv.message),
-		       ctrl_actual_size);
+		       ctrl_copy.u.immed.actual_size);
 	    }
 	    else
 	    {
 		memcpy(query_op->buffer, gm_ntohp(poll_event->recv.buffer),
-		       ctrl_actual_size);
+		       ctrl_copy.u.immed.actual_size);
 	    }
 	    gm_provide_receive_buffer(local_port,
 				      gm_ntohp(poll_event->recv.buffer),
 				      GM_IMMED_SIZE, GM_HIGH_PRIORITY);
 	    op_list_remove(query_op);
-	    query_op->actual_size = ctrl_actual_size;
+	    query_op->actual_size = ctrl_copy.u.immed.actual_size;
 	    /* TODO: test this path in cases where receiver
 	     * thought that this would be rendezvous mode
 	     */ 
@@ -2298,10 +2282,8 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    ret = 0;
 	}
     }
-    else if (my_ctrl->ctrl_type == CTRL_UNEXP_TYPE)
+    else if (ctrl_copy.ctrl_type == CTRL_UNEXP_TYPE)
     {
-	ctrl_actual_size = my_ctrl->u.immed.actual_size;
-	ctrl_tag = my_ctrl->u.immed.msg_tag;
 	map = gm_addr_search(&gm_addr_list,
 			     gm_ntohs(poll_event->recv.sender_node_id));
 	if (!map)
@@ -2321,7 +2303,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    gm_addr_add(&gm_addr_list, map);
 	}
 
-	tmp_buffer = malloc(my_ctrl->u.immed.actual_size);
+	tmp_buffer = malloc(ctrl_copy.u.immed.actual_size);
 	if (!tmp_buffer)
 	{
 	    /* TODO: handle error */
@@ -2330,27 +2312,26 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	if (fast)
 	{
 	    memcpy(tmp_buffer, gm_ntohp(poll_event->recv.message),
-		   my_ctrl->u.immed.actual_size);
+		   ctrl_copy.u.immed.actual_size);
 	}
 	else
 	{
 	    memcpy(tmp_buffer, gm_ntohp(poll_event->recv.buffer),
-		   my_ctrl->u.immed.actual_size);
+		   ctrl_copy.u.immed.actual_size);
 	}
 	gm_provide_receive_buffer(local_port,
 				  gm_ntohp(poll_event->recv.buffer),
 				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
 	ret =
-	    immed_unexp_recv_handler(ctrl_actual_size, ctrl_tag, map,
-				     tmp_buffer);
+	    immed_unexp_recv_handler(ctrl_copy.u.immed.actual_size, 
+		ctrl_copy.u.immed.msg_tag, map, tmp_buffer);
     }
-    else if (my_ctrl->ctrl_type == CTRL_PUT_TYPE)
+    else if (ctrl_copy.ctrl_type == CTRL_PUT_TYPE)
     {
-	ctrl_op_id = my_ctrl->u.put.receiver_op_id;
 	gm_provide_receive_buffer(local_port,
 				  gm_ntohp(poll_event->recv.buffer),
 				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
-	put_recv_handler(ctrl_op_id);
+	put_recv_handler(ctrl_copy.u.put.receiver_op_id);
 	ret = 0;
     }
 
