@@ -25,14 +25,6 @@ int template_flowproto_setinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter);
 
-void *template_flowproto_memalloc(flow_descriptor * flow_d,
-				  PVFS_size size,
-				  int send_recv_flag);
-
-int template_flowproto_memfree(flow_descriptor * flow_d,
-			       void *buffer,
-			       int send_recv_flag);
-
 int template_flowproto_announce_flow(flow_descriptor * flow_d);
 
 int template_flowproto_checkworld(flow_descriptor ** flow_d_array,
@@ -49,8 +41,6 @@ struct flowproto_ops flowproto_template_ops = {
     template_flowproto_finalize,
     template_flowproto_getinfo,
     template_flowproto_setinfo,
-    template_flowproto_memalloc,
-    template_flowproto_memfree,
     template_flowproto_announce_flow,
     template_flowproto_checkworld,
     template_flowproto_service
@@ -76,20 +66,6 @@ int template_flowproto_getinfo(flow_descriptor * flow_d,
 int template_flowproto_setinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter)
-{
-    return (-ENOSYS);
-}
-
-void *template_flowproto_memalloc(flow_descriptor * flow_d,
-				  PVFS_size size,
-				  int send_recv_flag)
-{
-    return (NULL);
-}
-
-int template_flowproto_memfree(flow_descriptor * flow_d,
-			       void *buffer,
-			       int send_recv_flag)
 {
     return (-ENOSYS);
 }

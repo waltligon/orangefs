@@ -25,12 +25,6 @@ struct flowproto_ops
     int (*flowproto_setinfo) (flow_descriptor * flow_d,
 			      int option,
 			      void *parameter);
-    void *(*flowproto_memalloc) (flow_descriptor * flow_d,
-				 PVFS_size size,
-				 int send_recv_flag);
-    int (*flowproto_memfree) (flow_descriptor * flow_d,
-			      void *buffer,
-			      int send_recv_flag);
     int (*flowproto_announce_flow) (flow_descriptor * flow_d);
     int (*flowproto_checkworld) (flow_descriptor ** flow_d_array,
 				 int *count,

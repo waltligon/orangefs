@@ -128,13 +128,6 @@ struct flow_descriptor
 };
 typedef struct flow_descriptor flow_descriptor;
 
-/* memalloc flags */
-enum
-{
-    FLOW_SEND_BUFFER = 1,
-    FLOW_RECV_BUFFER = 2
-};
-
 /* valid flow descriptor states */
 enum
 {
@@ -181,14 +174,6 @@ int PINT_flow_setpriority(flow_descriptor * flow_d,
 
 int PINT_flow_getpriority(flow_descriptor * flow_d,
 			  int * priority);
-
-void *PINT_flow_memalloc(flow_descriptor * flow_d,
-			 PVFS_size size,
-			 int send_recv_flag);
-
-int PINT_flow_memfree(flow_descriptor * flow_d,
-		      void *buffer,
-		      int send_recv_flag);
 
 int PINT_flow_test(flow_descriptor * flow_d,
 		   int *outcount,

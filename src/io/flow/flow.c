@@ -542,37 +542,6 @@ int PINT_flow_getpriority(flow_descriptor * flow_d,
     return (-ENOSYS);
 }
 
-
-/* PINT_flow_memalloc()
- * 
- * Allocates a region of memory optimized for use in conjunction with a
- * particular endpoint
- *
- * returns pointer to memory region on success, NULL on failure
- */
-void *PINT_flow_memalloc(flow_descriptor * flow_d,
-			 PVFS_size size,
-			 int send_recv_flag)
-{
-    gossip_lerr("function not implemented.\n");
-    return (NULL);
-}
-
-
-/* PINT_flow_memfree()
- *
- * Frees a region of memory allocated with PINT_flow_memalloc
- *
- * returns 0 on success, -errno on failure
- */
-int PINT_flow_memfree(flow_descriptor * flow_d,
-		      void *buffer,
-		      int send_recv_flag)
-{
-    gossip_lerr("function not implemented.\n");
-    return (-ENOSYS);
-}
-
 /* PINT_flow_test()
  *
  * Check for completion of a particular flow; is allowed to do work or

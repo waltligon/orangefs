@@ -38,14 +38,6 @@ int flowproto_bmi_cache_setinfo(flow_descriptor * flow_d,
 				int option,
 				void *parameter);
 
-void *flowproto_bmi_cache_memalloc(flow_descriptor * flow_d,
-				   PVFS_size size,
-				   int send_recv_flag);
-
-int flowproto_bmi_cache_memfree(flow_descriptor * flow_d,
-				void *buffer,
-				int send_recv_flag);
-
 int flowproto_bmi_cache_announce_flow(flow_descriptor * flow_d);
 
 int flowproto_bmi_cache_checkworld(flow_descriptor ** flow_d_array,
@@ -62,8 +54,6 @@ struct flowproto_ops flowproto_bmi_cache_ops = {
     flowproto_bmi_cache_finalize,
     flowproto_bmi_cache_getinfo,
     flowproto_bmi_cache_setinfo,
-    flowproto_bmi_cache_memalloc,
-    flowproto_bmi_cache_memfree,
     flowproto_bmi_cache_announce_flow,
     flowproto_bmi_cache_checkworld,
     flowproto_bmi_cache_service
@@ -312,32 +302,6 @@ int flowproto_bmi_cache_getinfo(flow_descriptor * flow_d,
 int flowproto_bmi_cache_setinfo(flow_descriptor * flow_d,
 				int option,
 				void *parameter)
-{
-    return (-ENOSYS);
-}
-
-/* flowproto_bmi_cache_memalloc()
- *
- * allocates a memory region optimized for use with the flow protocol
- *
- * returns pointer to buffer on success, NULL on failure
- */
-void *flowproto_bmi_cache_memalloc(flow_descriptor * flow_d,
-				   PVFS_size size,
-				   int send_recv_flag)
-{
-    return (NULL);
-}
-
-/* flowproto_bmi_cache_memfree()
- *
- * releases a buffer previously allocated with memalloc()
- *
- * returns 0 on success, -errno on failure
- */
-int flowproto_bmi_cache_memfree(flow_descriptor * flow_d,
-				void *buffer,
-				int send_recv_flag)
 {
     return (-ENOSYS);
 }

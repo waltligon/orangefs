@@ -29,14 +29,6 @@ int flowproto_dump_offsets_setinfo(flow_descriptor * flow_d,
 				int option,
 				void *parameter);
 
-void *flowproto_dump_offsets_memalloc(flow_descriptor * flow_d,
-				   PVFS_size size,
-				   int send_recv_flag);
-
-int flowproto_dump_offsets_memfree(flow_descriptor * flow_d,
-				void *buffer,
-				int send_recv_flag);
-
 int flowproto_dump_offsets_announce_flow(flow_descriptor * flow_d);
 
 int flowproto_dump_offsets_checkworld(flow_descriptor ** flow_d_array,
@@ -53,8 +45,6 @@ struct flowproto_ops flowproto_dump_offsets_ops = {
     flowproto_dump_offsets_finalize,
     flowproto_dump_offsets_getinfo,
     flowproto_dump_offsets_setinfo,
-    flowproto_dump_offsets_memalloc,
-    flowproto_dump_offsets_memfree,
     flowproto_dump_offsets_announce_flow,
     flowproto_dump_offsets_checkworld,
     flowproto_dump_offsets_service
@@ -184,32 +174,6 @@ int flowproto_dump_offsets_getinfo(flow_descriptor * flow_d,
 int flowproto_dump_offsets_setinfo(flow_descriptor * flow_d,
 				int option,
 				void *parameter)
-{
-    return (-ENOSYS);
-}
-
-/* flowproto_dump_offsets_memalloc()
- *
- * allocates a memory region optimized for use with the flow protocol
- *
- * returns pointer to buffer on success, NULL on failure
- */
-void *flowproto_dump_offsets_memalloc(flow_descriptor * flow_d,
-				   PVFS_size size,
-				   int send_recv_flag)
-{
-    return (NULL);
-}
-
-/* flowproto_dump_offsets_memfree()
- *
- * releases a buffer previously allocated with memalloc()
- *
- * returns 0 on success, -errno on failure
- */
-int flowproto_dump_offsets_memfree(flow_descriptor * flow_d,
-				void *buffer,
-				int send_recv_flag)
 {
     return (-ENOSYS);
 }
