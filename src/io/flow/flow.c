@@ -277,6 +277,7 @@ void PINT_flow_reset(flow_descriptor * flow_d)
     flow_d->aggregate_size = -1;
     flow_d->state = FLOW_INITIAL;
     flow_d->type = FLOWPROTO_DEFAULT;
+    gen_mutex_init(&flow_d->flow_mutex);
 
     return;
 }
@@ -289,6 +290,7 @@ void PINT_flow_reset(flow_descriptor * flow_d)
  */
 void PINT_flow_free(flow_descriptor * flow_d)
 {
+    gen_mutex_destroy(&flow_d->flow_mutex);
     free(flow_d);
     return;
 }
