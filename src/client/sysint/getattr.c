@@ -266,12 +266,12 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
             num_data_servers = out_attr->u.meta.dfile_count;
             if (num_data_servers == 0)
             {
-                gossip_lerr("Number of dataservers is 0. "
-                            "Skipping size computation!\n");
                 /*
-                  if there are no data server, don't even try to
+                  if there are no data servers, don't even try to
                   compute anything here
                 */
+                gossip_lerr("Number of dataservers is 0. "
+                            "Skipping size computation!\n");
                 ret = NONE_FAILURE;
                 goto return_error;
             }
