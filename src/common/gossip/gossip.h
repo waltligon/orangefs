@@ -1,10 +1,9 @@
 /*
- * copyright (c) 2000 Clemson University, all rights reserved.
+ * copyright (c) 2000-2003 Clemson University, all rights reserved.
  *
  * Written by Phil Carns.
  *
- * This program is free software; you can redistribute it and/or
- * modify
+ * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published
  * by the Free Software Foundation; either version 2 of the License,
  * or any later version.
@@ -47,61 +46,64 @@ int gossip_set_debug_mask(int debug_on, int mask);
 #ifdef __GNUC__
 
 /* do printf style type checking if built with gcc */
-int __gossip_debug(int mask, const char* format, ...)
-	__attribute__ ((format (printf, 2, 3)));
-int gossip_err(const char* format, ...)
-	__attribute__ ((format (printf, 1, 2)));
+int __gossip_debug(int mask, const char* format, ...) __attribute__ ((format (printf, 2, 3)));
+int gossip_err(const char* format, ...) __attribute__ ((format (printf, 1, 2)));
 
 #ifdef GOSSIP_DISABLE_DEBUG
-	#define gossip_debug(mask, format, f...)							\
-		do{}while(0)															
+    #define gossip_debug(mask, format, f...)	\
+	do { } while(0)
 #else
+    extern int gossip_debug_on;
+    extern int gossip_debug_mask;
+    extern int gossip_facility;
 
-	extern int gossip_debug_on;
-	extern int gossip_debug_mask;
-	extern int gossip_facility;
-
-	/* try to avoid function call overhead by checking masks in macro */
-	#define gossip_debug(mask, format, f...)								\
-		do{																			\
-			if((gossip_debug_on) && (gossip_debug_mask & mask) &&    \
-				(gossip_facility)){												\
-				__gossip_debug(mask, format, ##f);							\
-			}																			\
-		}while(0)																	
-
+    /* try to avoid function call overhead by checking masks in macro */
+    #define gossip_debug(mask, format, f...)						\
+        do {										\
+	    if ((gossip_debug_on) && (gossip_debug_mask & mask) && (gossip_facility))	\
+            {										\
+	        __gossip_debug(mask, format, ##f);					\
+            }										\
+	} while(0)
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 /* do file and line number printouts w/ the GNU preprocessor */
-#define gossip_ldebug(mask, format, f...)								\
-	do{																			\
-		gossip_debug(mask, "%s line %d: ", __FILE__, __LINE__);	\
-		gossip_debug(mask, format, ##f);									\
-	} while(0)
+#define gossip_ldebug(mask, format, f...)			\
+    do {							\
+	gossip_debug(mask, "%s line %d: ", __FILE__, __LINE__);	\
+	gossip_debug(mask, format, ##f);			\
+    } while(0)
 
-#define gossip_lerr(format, f...)										\
-	do{																			\
-		gossip_err("%s line %d: ", __FILE__, __LINE__);				\
-		gossip_err(format, ##f);											\
+#define gossip_lerr(format, f...)			\
+    do {						\
+	gossip_err("%s line %d: ", __FILE__, __LINE__);	\
+	    gossip_err(format, ##f);                    \
 	} while(0)
-
-#else
+#else /* ! __GNUC__ */
 
 int __gossip_debug(int mask, const char* format, ...);
 int __gossip_debug_stub(int mask, const char* format, ...);
 int gossip_err(const char* format, ...);
 
 #ifdef GOSSIP_DISABLE_DEBUG
-	#define gossip_debug __gossip_debug_stub
-	#define gossip_ldebug __gossip_debug_stub
+    #define gossip_debug __gossip_debug_stub
+    #define gossip_ldebug __gossip_debug_stub
 #else
-	#define gossip_debug __gossip_debug
-	#define gossip_ldebug __gossip_debug
+    #define gossip_debug __gossip_debug
+    #define gossip_ldebug __gossip_debug
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err
 
 #endif /* __GNUC__ */
 
-#endif /* __GOSSIP_H */
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
 
+#endif /* __GOSSIP_H */
