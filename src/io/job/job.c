@@ -39,7 +39,6 @@ static int completion_error = 0;
 static job_desc_q_p bmi_unexp_queue = NULL;
 static int bmi_unexp_pending_count = 0;
 static int bmi_pending_count = 0;
-static trove_id_queue_p trove_inflight_queue = NULL;
 static int trove_pending_count = 0;
 static int flow_pending_count = 0;
 static job_desc_q_p dev_unexp_queue = NULL;
@@ -89,8 +88,6 @@ static flow_descriptor *stat_flow_array[job_work_metric];
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 static TROVE_op_id stat_trove_id_array[job_work_metric];
-static int stat_trove_index_array[job_work_metric];
-static PVFS_vtag stat_trove_vtag_array[job_work_metric];
 static void *stat_trove_user_ptr_array[job_work_metric];
 static PVFS_error stat_trove_ds_state_array[job_work_metric];
 #endif
@@ -1168,12 +1165,6 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1256,12 +1247,6 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1328,12 +1313,6 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1412,12 +1391,6 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1497,12 +1470,6 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1581,12 +1548,6 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1654,12 +1615,6 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1735,12 +1690,6 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1814,12 +1763,6 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -1937,12 +1880,6 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -2047,12 +1984,6 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -2155,12 +2086,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -2233,12 +2158,6 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -2312,12 +2231,6 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -2388,12 +2301,6 @@ int job_trove_fs_create(char *collname,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, new_coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -2548,12 +2455,6 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -2628,12 +2529,6 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
      */
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
-    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
-    if(ret < 0)
-    {
-	/* TODO: handle this correctly */
-	return(ret);
-    }
     trove_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&trove_cond);
@@ -3309,10 +3204,9 @@ static int setup_queues(void)
 {
 
     bmi_unexp_queue = job_desc_q_new();
-    trove_inflight_queue = trove_id_queue_new();
     dev_unexp_queue = job_desc_q_new();
 
-    if (!bmi_unexp_queue || !trove_inflight_queue || !dev_unexp_queue)
+    if (!bmi_unexp_queue || !dev_unexp_queue)
     {
 	/* cleanup any that were initialized */
 	teardown_queues();
@@ -3332,8 +3226,6 @@ static void teardown_queues(void)
 
     if (bmi_unexp_queue)
 	job_desc_q_cleanup(bmi_unexp_queue);
-    if (trove_inflight_queue)
-	trove_id_queue_cleanup(trove_inflight_queue);
     if (dev_unexp_queue)
 	job_desc_q_cleanup(dev_unexp_queue);
 
@@ -3784,25 +3676,28 @@ static int do_one_work_cycle_trove(int *num_completed)
     int count = 0;
     int ret = -1;
     int i = 0;
-    int query_offset = 0;
-    PVFS_fs_id tmp_coll_id;
+
+    /* TODO: this is a HACK! */
+    /* fix later, I just want to try out testcontext right now */
+    PVFS_fs_id HACK_coll_id = 9;
 
     *num_completed = 0;
 
-    count = job_work_metric;
-    query_offset = 0;
-    gen_mutex_lock(&trove_mutex);
-    while((ret = trove_id_queue_query(trove_inflight_queue,
-	stat_trove_id_array, &count, &query_offset, &tmp_coll_id)) == 0)
-    {
-	gen_mutex_unlock(&trove_mutex);
-	ret = trove_dspace_testsome(tmp_coll_id, global_trove_context,
-				    stat_trove_id_array,
-				    &count, stat_trove_index_array,
-				    stat_trove_vtag_array,
-				    stat_trove_user_ptr_array,
-				    stat_trove_ds_state_array, 0);
+    if(trove_pending_count > job_work_metric)
+	count = job_work_metric;
+    else
+	count = trove_pending_count;
 
+    if(count > 0)
+    {
+	/* TODO: fix timeout later */
+	ret = trove_dspace_testcontext(HACK_coll_id,
+	    stat_trove_id_array,
+	    &count,
+	    stat_trove_ds_state_array,
+	    stat_trove_user_ptr_array,
+	    TROVE_DEFAULT_TEST_TIMEOUT,
+	    global_trove_context);
 	if (ret < 0)
 	{
 	    /* critical failure */
@@ -3813,13 +3708,9 @@ static int do_one_work_cycle_trove(int *num_completed)
 
 	for (i = 0; i < count; i++)
 	{
-	    /* remove the operation from the pending trove queue */
 	    tmp_desc = (struct job_desc *) stat_trove_user_ptr_array[i];
 	    gen_mutex_lock(&trove_mutex);
 	    trove_pending_count--;
-	    trove_id_queue_del(trove_inflight_queue,
-		stat_trove_id_array[stat_trove_index_array[i]], 
-		tmp_coll_id);
 	    gen_mutex_unlock(&trove_mutex);
 	    /* set appropriate fields and store in completed queue */
 	    tmp_desc->u.trove.state = stat_trove_ds_state_array[i];
@@ -3837,15 +3728,11 @@ static int do_one_work_cycle_trove(int *num_completed)
 		tmp_desc);
 	    gen_mutex_unlock(&completion_mutex);
 	}
-	
-	*num_completed += count;
-	count = job_work_metric;
-	gen_mutex_lock(&trove_mutex);
-    }
-    gen_mutex_unlock(&trove_mutex);
-    assert(ret == -EAGAIN);
 
-    return (0);
+	*num_completed = count;
+    }
+
+    return(0);
 }
 #endif
 

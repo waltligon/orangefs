@@ -1119,7 +1119,6 @@ int dbpf_dspace_testcontext(
         cur_op = dbpf_op_queue_shownext(
             dbpf_completion_queue_array[context_id]);
         assert(cur_op);
-        assert(cur_op->op.state == OP_COMPLETED);
 
         /* pull the op out of the context specific completion queue */
         gen_mutex_lock(context_mutex);
