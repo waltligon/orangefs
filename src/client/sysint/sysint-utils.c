@@ -21,8 +21,6 @@
 
 #define REQ_ENC_FORMAT 0
 
-#define PVFS_MAX_CONFIG_SIZE 1000
-
 int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock;
 struct server_configuration_s g_server_config;
@@ -364,7 +362,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
     /* TODO: IS THIS A REASONABLE MAXIMUM MESSAGE SIZE?  I HAVE NO IDEA */
     max_msg_sz = 
 	PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_GETCONFIG) 
-	+ (2 * PVFS_MAX_CONFIG_SIZE);
+	+ (2 * PVFS_REQ_LIMIT_CONFIG_FILE_BYTES);
 
     /*
       for each entry in the pvfstab, attempt to query the server for
@@ -387,7 +385,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
         memset(&serv_req,0,sizeof(struct PVFS_server_req));
 	serv_req.op = PVFS_SERV_GETCONFIG;
 	serv_req.credentials = creds;
-	serv_req.u.getconfig.config_buf_size = PVFS_MAX_CONFIG_SIZE;
+	serv_req.u.getconfig.config_buf_size = PVFS_REQ_LIMIT_CONFIG_FILE_BYTES;
 
 	gossip_ldebug(CLIENT_DEBUG,"asked for fs name = %s\n",
                       mntent_p->service_name);

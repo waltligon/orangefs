@@ -15,7 +15,7 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
     PVFS_sysresp_lookup resp_lk;
     PVFS_sysresp_create resp_cr;
     generic_params *args = (generic_params *)params;
-    char filename[MAX_TEST_PATH_LEN];
+    char filename[PVFS_NAME_MAX];
 
     debug_printf("test_pvfs_datatype_init called\n");
 
@@ -48,7 +48,7 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
     */
     for(i = 0; i < pvfs_helper.num_test_files; i++)
     {
-        snprintf(filename,MAX_TEST_PATH_LEN,"%s%.5drank%d",
+        snprintf(filename,PVFS_NAME_MAX,"%s%.5drank%d",
                  TEST_FILE_PREFIX,i,myid);
 
         ret = PVFS_sys_lookup(pvfs_helper.resp_init.fsid_list[0],

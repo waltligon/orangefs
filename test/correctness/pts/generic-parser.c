@@ -65,7 +65,7 @@ void *generic_param_parser( char * stuff) {
 				gp->mode=strtoul(optarg,  NULL, 0);
 				break;
 			case 'p':
-				strncpy(gp->path, optarg, MAXPATHLEN);
+				strncpy(gp->path, optarg, PVFS_NAME_MAX);
 				break;
 			case ':':
 				fprintf(stderr, "missing parameter to argument\n");

@@ -54,7 +54,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
     PVFS_handle cur_handle;
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdir rd_response;
-    char full_path[MAX_PVFS_PATH_LEN] = {0};
+    char full_path[PVFS_NAME_MAX] = {0};
     PVFS_fs_id fs_id;
     char* name;
     PVFS_credentials credentials;
@@ -68,12 +68,12 @@ int directory_walk(PVFS_sysresp_init *init_response,
 
     if (base_dir)
     {
-        strncpy(full_path,base_dir,MAX_PVFS_PATH_LEN);
+        strncpy(full_path,base_dir,PVFS_NAME_MAX);
         if (strlen(base_dir) > 1)
         {
             strcat(full_path,"/");
         }
-        strncat(full_path,start_dir,MAX_PVFS_PATH_LEN);
+        strncat(full_path,start_dir,PVFS_NAME_MAX);
     }
     else
     {
@@ -137,8 +137,8 @@ int directory_walk(PVFS_sysresp_init *init_response,
             case 0:
                 /* if we have a normal file, print it */
                 {
-                    char buf[MAX_PVFS_PATH_LEN] = {0};
-                    snprintf(buf,MAX_PVFS_PATH_LEN,"%s/%s",
+                    char buf[PVFS_NAME_MAX] = {0};
+                    snprintf(buf,PVFS_NAME_MAX,"%s/%s",
                              ((full_path && (strcmp(full_path,"/"))) ?
                               full_path : ""),cur_file);
                     print_at_depth(buf,depth);

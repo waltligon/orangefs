@@ -7,8 +7,10 @@
 #ifndef __HELPER_H
 #define __HELPER_H
 
-#define MAX_NUM_DIRENTS    512
-#define MAX_PVFS_PATH_LEN  512
+/* TODO: this can be larger after system interface readdir logic
+ * is in place to break up large readdirs into multiple operations
+ */
+#define MAX_NUM_DIRENTS    32
 
 #include "pint-sysint.h"
 #include "str-utils.h"

@@ -11,7 +11,7 @@ int test_pvfs_datatype_contig(MPI_Comm *mycomm, int myid, char *buf, void *param
     PVFS_sysresp_lookup resp_lk;
     PVFS_sysresp_io resp_io;
     PVFS_Request req_io;
-    char filename[MAX_TEST_PATH_LEN];
+    char filename[PVFS_NAME_MAX];
     char io_buffer[TEST_PVFS_DATA_SIZE];
 
     debug_printf("test_pvfs_datatype_contig called\n");
@@ -36,7 +36,7 @@ int test_pvfs_datatype_contig(MPI_Comm *mycomm, int myid, char *buf, void *param
 
     for(i = 0; i < pvfs_helper.num_test_files; i++)
     {
-        snprintf(filename,MAX_TEST_PATH_LEN,"%s%.5drank%d",
+        snprintf(filename,PVFS_NAME_MAX,"%s%.5drank%d",
                  TEST_FILE_PREFIX,i,myid);
 
         memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));

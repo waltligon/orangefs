@@ -7,9 +7,10 @@
 #ifndef __STR_UTILS_H
 #define __STR_UTILS_H
 
+#include "pvfs2-types.h"
+
 /* should be in a limits.h like file */
 #define MAX_SEGMENT_LEN   128
-#define MAX_PATH_LEN      512
 
 int PINT_get_path_element(
     char *pathname,

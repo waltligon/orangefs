@@ -7,13 +7,13 @@
 #include <client.h>
 #include "helper.h"
 
-#define MAX_PATHNAME_LEN 256
+#define PVFS_NAME_MAX 256
 
 int main(int argc,char **argv)
 {
     int ret = -1;
-    char old_buf[MAX_PATHNAME_LEN] = {0};
-    char new_buf[MAX_PATHNAME_LEN] = {0};
+    char old_buf[PVFS_NAME_MAX] = {0};
+    char new_buf[PVFS_NAME_MAX] = {0};
     char *old_filename = (char *)0;
     char *new_filename = (char *)0;
     PVFS_fs_id cur_fs;
@@ -49,7 +49,7 @@ int main(int argc,char **argv)
         return ret;
     }
 
-    if (PINT_remove_base_dir(old_filename, old_buf, MAX_PATHNAME_LEN))
+    if (PINT_remove_base_dir(old_filename, old_buf, PVFS_NAME_MAX))
     {
         if (old_filename[0] != '/')
         {
@@ -61,7 +61,7 @@ int main(int argc,char **argv)
     }
     printf("Old filename is %s\n", old_buf);
 
-    if (PINT_remove_base_dir(new_filename, new_buf, MAX_PATHNAME_LEN))
+    if (PINT_remove_base_dir(new_filename, new_buf, PVFS_NAME_MAX))
     {
         if (new_filename[0] != '/')
         {

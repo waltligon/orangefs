@@ -11,13 +11,13 @@
 /* make uid, gid and perms passed in later */
 PVFS_handle lookup_parent_handle(char *filename, PVFS_fs_id fs_id)
 {
-    char buf[MAX_PVFS_PATH_LEN] = {0};
+    char buf[PVFS_NAME_MAX] = {0};
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
 
     memset(&resp_look,0,sizeof(PVFS_sysresp_lookup));
 
-    if (PINT_get_base_dir(filename,buf,MAX_PVFS_PATH_LEN))
+    if (PINT_get_base_dir(filename,buf,PVFS_NAME_MAX))
     {
         if (filename[0] != '/')
         {
