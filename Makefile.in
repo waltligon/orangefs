@@ -479,5 +479,5 @@ install:
 
 install_tests:
 	install -d $(prefix)/bin
-	for f in test/client/sysint/{create,mkdir,readdir,remove,find}; do \
+	for f in test/client/sysint/{create,mkdir,readdir,remove,find,io-test}; do \
 		install -m 755 $$f $(prefix)/bin/ ; done
