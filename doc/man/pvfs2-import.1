@@ -1,0 +1,61 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH IMPORT/EXPORT 1 "SEPTEMBER 2003"  PVFS2 "PVFS2 Manuals"
+.SH NAME
+pvfs2-import, pvfs2-export \- Copy files to and from PVFS2 volumes 
+.SH SYNOPSIS
+.B pvfs2-export 
+.I [-b buffer_size ] <SOURCE> <DESTINATION>
+.br
+.B pvfs2-import
+.I [ -s strip_size] [-n nr_datafiles] [ -b buffer_size] <SOURCE> <DESTINATION>
+
+.SH DESCRIPTION
+.B pvfs2-export
+and 
+.B pvfs2-import
+copy data to and from a PVFS2 volume without going through the kernel (VFS)
+interface.  
+.PP
+.B pvfs2-export
+reads a PVFS2 file given by the absolute path
+.I SOURCE 
+and produces the local file
+.I DESTINATION.
+.PP
+.B pvfs2-import
+does the reverse of 
+.B pvfs2-export.
+It reads a local file given by 
+.I SOURCE
+and copies it to the PVFS2 file given by the absolute path
+.I DESTINATION.
+
+.SH OPTIONS
+.IP -b
+Use an intermediate buffer of
+.I buffer_size
+bytes when copying the file
+.IP -s
+The newly created PVFS2 file will have a strip size of 
+.I strip_size
+bytes
+.IP -n
+The newly created PVFS2 file will have
+.I nr_datafiles
+datafiles
+
+.SH ENVIRONMENT
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate 
+.IR pvfs2tab
+file
+
+.SH BUGS
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH AUTHOR
+The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
+.SH "SEE ALSO"
+.BR pvfs2-statfs (1)
+.BR pvfs2-ping (1)
