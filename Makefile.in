@@ -243,7 +243,7 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS)) 
+DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS)) 
 ifdef BUILD_MPI
 DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
 endif
