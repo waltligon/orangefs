@@ -24,18 +24,36 @@
  * message pair.  We need arrays of these in some cases, so it's
  * convenient to group it like this.
  *
- * Q: SHOULD WE USE ONE OF THESE IN THE COMMON PART OF THE STRUCTURE
- * RATHER THAN THE INDIVIDUAL ONES?
  */
 typedef struct PINT_client_sm_msgpair_state_s {
-    /* req and encoded_req are needed to send a request */
+    /* NOTE: these top three elements: fs_id, handle, and comp_fn,
+     * should be filled in prior to going into the msgpair code path.
+     */
+
+    /* fs_id and handle used to map to server */
+    PVFS_fs_id fs_id;
+    PVFS_handle handle;
+    /* comp_fn called after successful reception and decode of respone,
+     * if the msgpair state machine is used for processing.
+     */
+    int (* comp_fn)(void *sm_p, /* actually (struct PINT_client_sm *) */
+		    struct PVFS_server_resp *resp_p);
+
+    /* comp_ct used to keep up with number of operations remaining */
+    int comp_ct;
+
+    /* server address */
+    bmi_addr_t svr_addr;
+
+    /* req and encoded_req are used to send a request */
     struct PVFS_server_req req;
     struct PINT_encoded_msg encoded_req;
 
-    /* max_msg_sz, svr_addr, and encoded_resp_p needed to recv a response */
+    /* max_resp_sz, svr_addr, and encoded_resp_p used to recv a response */
     int max_resp_sz, actual_resp_sz;
-    bmi_addr_t svr_addr;
     void *encoded_resp_p;
+
+    /* send_id, recv_id used to track completion of operations */
     job_id_t send_id, recv_id;
 } PINT_client_sm_msgpair_state;
 
@@ -74,6 +92,9 @@ typedef struct PINT_client_sm {
 
     int pcache_lock; /* used to indicate that we have a lock to release */
     PINT_pinode *object_pinode_p;
+
+    /* generic msgpair used with msgpair substate */
+    PINT_client_sm_msgpair_state msgpair;
 
     /* req and encoded_req are needed to send a request */
     struct PVFS_server_req req;

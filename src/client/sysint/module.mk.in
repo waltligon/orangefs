@@ -12,12 +12,13 @@ LIBSRC += \
 	$(DIR)/server-send-req.c \
 	$(DIR)/readdir.c \
 	$(DIR)/remove.c \
-	$(DIR)/sys-remove.c \
 	$(DIR)/rename.c \
 	$(DIR)/setattr.c \
 	$(DIR)/truncate.c \
 	$(DIR)/sysint-utils.c \
 	$(DIR)/pint-bucket.c \
 	$(DIR)/io.c \
-	$(DIR)/getparent.c
+	$(DIR)/getparent.c \
+	$(DIR)/sys-remove.c \
+	$(DIR)/msgpair.c
 
