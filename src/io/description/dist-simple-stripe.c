@@ -141,7 +141,7 @@ static void registration_init(void* params)
     
 
 static PVFS_simple_stripe_params simple_stripe_params = {
-	65536 /* stripe size */
+	65536 /* strip size */
 };
 
 static PINT_dist_methods simple_stripe_methods = {

@@ -57,6 +57,14 @@ static PVFS_size logical_file_size(void* params,
     return psizes[0];
 }
 
+static int get_num_dfiles(void* params,
+                          uint32_t num_servers_requested,
+                          uint32_t num_dfiles_requested)
+{
+    return 1;
+}
+
+
 static void encode_lebf(char **pptr, void* params)
 {
 }
@@ -78,7 +86,7 @@ static PINT_dist_methods basic_methods = {
     next_mapped_offset,
     contiguous_length,
     logical_file_size,
-    PINT_dist_default_get_num_dfiles,
+    get_num_dfiles,
     PINT_dist_default_set_param,
     encode_lebf,
     decode_lebf,
