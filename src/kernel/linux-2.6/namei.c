@@ -16,9 +16,7 @@
 extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
-#ifdef DEVREQ_WAITQ_INTERFACE
 extern wait_queue_head_t pvfs2_request_list_waitq;
-#endif
 
 extern struct dentry_operations pvfs2_dentry_operations;
 
