@@ -37,6 +37,8 @@ struct PINT_thread_mgr_trove_callback
 int PINT_thread_mgr_trove_start(void);
 int PINT_thread_mgr_trove_stop(void);
 int PINT_thread_mgr_trove_getcontext(PVFS_context_id *context);
+int PINT_thread_mgr_trove_cancel(PVFS_id_gen_t id, PVFS_fs_id fs_id, 
+    void* user_ptr);
 
 /* dev thread */
 
