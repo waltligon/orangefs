@@ -9,6 +9,7 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
+#include "pvfs2-mgmt.h"
 #include "bmi.h"
 #include "dotconf.h"
 #include "trove.h"
@@ -39,8 +40,8 @@ int PINT_bucket_get_next_io(
     bmi_addr_t *io_addr_array,
     PVFS_handle_extent_array *io_handle_extent_array);
 
-#define PINT_BUCKET_IO 1
-#define PINT_BUCKET_META 2
+#define PINT_BUCKET_IO PVFS_MGMT_IO_SERVER
+#define PINT_BUCKET_META PVFS_MGMT_META_SERVER
 #define PINT_BUCKET_ALL (PINT_BUCKET_META|PINT_BUCKET_IO)
 
 /* TODO get rid of this stuff later */
