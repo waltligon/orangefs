@@ -633,6 +633,7 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
 	    free(gm_string);
 	    return (NULL);
 	}
+	gm_data->port_id = BMI_GM_PORT_NUM;
     }
 
     free(gm_string);
@@ -1929,9 +1930,9 @@ static void initiate_send_immed(method_op_p mop)
     true_msg_len = mop->actual_size + sizeof(struct ctrl_msg);
 
     /* send ctrl message */
-    gm_send_to_peer_with_callback(local_port, mop->buffer,
+    gm_send_with_callback(local_port, mop->buffer,
 				  GM_IMMED_SIZE, true_msg_len, GM_HIGH_PRIORITY,
-				  gm_addr_data->node_id, immed_send_callback,
+				  gm_addr_data->node_id, gm_addr_data->port_id, immed_send_callback,
 				  mop);
 
     /* queue up to wait for completion */
@@ -1965,9 +1966,10 @@ static void initiate_put_announcement(method_op_p mop)
     gossip_ldebug(BMI_DEBUG_GM, "Sending ctrl msg.\n");
 
     /* send ctrl message */
-    gm_send_to_peer_with_callback(local_port, my_ctrl,
+    gm_send_with_callback(local_port, my_ctrl,
 				  GM_IMMED_SIZE, GM_CTRL_LENGTH,
 				  GM_HIGH_PRIORITY, gm_addr_data->node_id,
+				  gm_addr_data->port_id,
 				  ctrl_put_callback, mop);
 
     /* queue up to wait for completion */
@@ -2003,9 +2005,10 @@ static void initiate_send_rend(method_op_p mop)
     gossip_ldebug(BMI_DEBUG_GM, "Sending ctrl msg.\n");
 
     /* send ctrl message */
-    gm_send_to_peer_with_callback(local_port, my_ctrl,
+    gm_send_with_callback(local_port, my_ctrl,
 				  GM_IMMED_SIZE, GM_CTRL_LENGTH,
 				  GM_HIGH_PRIORITY, gm_addr_data->node_id,
+				  gm_addr_data->port_id,
 				  ctrl_req_callback, mop);
 
     /* queue up to wait for completion */
@@ -3163,9 +3166,10 @@ static void prepare_for_recv(method_op_p mop)
 
     /* send ctrl message */
     gossip_ldebug(BMI_DEBUG_GM, "Sending ctrl ack.\n");
-    gm_send_to_peer_with_callback(local_port, new_ctrl,
+    gm_send_with_callback(local_port, new_ctrl,
 				  GM_IMMED_SIZE, GM_CTRL_LENGTH,
 				  GM_HIGH_PRIORITY, gm_addr_data->node_id,
+				  gm_addr_data->port_id,
 				  ctrl_ack_callback, mop);
 
     /* queue up op */
@@ -3230,9 +3234,10 @@ static void prepare_for_recv_list(method_op_p mop)
 
     /* send ctrl message */
     gossip_ldebug(BMI_DEBUG_GM, "Sending ctrl ack.\n");
-    gm_send_to_peer_with_callback(local_port, new_ctrl,
+    gm_send_with_callback(local_port, new_ctrl,
 				  GM_IMMED_SIZE, GM_CTRL_LENGTH,
 				  GM_HIGH_PRIORITY, gm_addr_data->node_id,
+				  gm_addr_data->port_id,
 				  ctrl_ack_callback, mop);
 
     /* queue up op */
