@@ -127,8 +127,8 @@ void PINT_perf_rollover(void)
     int i = 0;
     uint32_t old_id;
     struct timeval tv;
-    static int64_t metadata_read_hwm = 0;
-    static int64_t metadata_write_hwm = 0;
+    int64_t metadata_read_hwm = 0;
+    int64_t metadata_write_hwm = 0;
 
     gen_mutex_lock(&perf_mutex);
 
@@ -140,7 +140,6 @@ void PINT_perf_rollover(void)
     /* if we bump into the tail, shift it too */
     if(perf_count_tail == perf_count_head)
 	perf_count_tail = (perf_count_tail+1)%PINT_PERF_HISTORY_SIZE;
-
 
     /* update metadata read/write high water marks */
     metadata_read_hwm = find_high_water_mark(PINT_PERF_METADATA_READ);
