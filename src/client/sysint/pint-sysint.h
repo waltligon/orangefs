@@ -72,7 +72,6 @@ typedef struct config_fs_cache_s
     struct llist *data_server_cursor;
 } config_fs_cache_s;
 
-int get_next_path(char *path, char **newpath, int skip);
 int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid);
 int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
                 PVFS_credentials cred,PVFS_pinode_reference *entry);

@@ -293,13 +293,13 @@ int PINT_get_path_element(
     return ((count == segment_num) ? 0 : -1);
 }
 
-/* get_next_path
+/* PINT_get_next_path
  *
  * gets remaining path given number of path segments to skip
  *
  * returns 0 on success, -errno on failure
  */
-int get_next_path(char *path, char **newpath, int skip)
+int PINT_get_next_path(char *path, char **newpath, int skip)
 {
     int pathlen=0, i=0, num_slashes_seen=0;
     int delimiter1=0;

@@ -277,7 +277,7 @@ int PVFS_sys_ref_lookup(
 	/*get rid of the old path*/
 
 	/* get the next chunk of the path to send */
-	ret = get_next_path(relative_pathname,&path,total_segments - num_segments_remaining);
+	ret = PINT_get_next_path(relative_pathname,&path,total_segments - num_segments_remaining);
 	if (ret < 0)
 	{
 	    failure = GET_NEXT_PATHSEG_FAILURE;

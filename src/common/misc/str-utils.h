@@ -30,6 +30,10 @@ int PINT_parse_handle_ranges(
     char *range, 
     PVFS_handle_extent *out_extent,
     int *status);
+int PINT_get_next_path(
+    char* path,
+    char** newpath,
+    int skip);
 
 #ifndef HAVE_STRNLEN
 size_t strnlen(const char *s, size_t limit);
