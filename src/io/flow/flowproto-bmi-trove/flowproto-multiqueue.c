@@ -81,9 +81,21 @@ static TROVE_context_id global_trove_context = -1;
 static void bmi_recv_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code);
-static void bmi_send_callback_fn(void *user_ptr,
+
+static int bmi_send_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code);
+/* the above function is a special case; we need to look at a return
+ * value when we invoke it directly, so we use the following function
+ * to trigger it from a callback
+ */
+static void bmi_send_callback_wrapper(void *user_ptr,
+		         PVFS_size actual_size,
+		         PVFS_error error_code)
+{
+    bmi_send_callback_fn(user_ptr, actual_size, error_code);
+    return;
+};
 static void trove_read_callback_fn(void *user_ptr,
 		           PVFS_error error_code);
 static void trove_write_callback_fn(void *user_ptr,
@@ -567,7 +579,10 @@ static void trove_read_callback_fn(void *user_ptr,
 	{
 	    gen_mutex_unlock(&flow_data->flow_mutex);
 	    /* immediate completion; trigger callback ourselves */
-	    bmi_send_callback_fn(q_item, q_item->buffer_used, 0);
+	    ret = bmi_send_callback_fn(q_item, q_item->buffer_used, 0);
+	    /* if that callback finished the flow, then return now */
+	    if(ret == 1)
+		return;
 	    gen_mutex_lock(&flow_data->flow_mutex);
 	}
     }
@@ -581,9 +596,9 @@ static void trove_read_callback_fn(void *user_ptr,
  *
  * function to be called upon completion of a BMI send operation
  *
- * no return value
+ * returns 1 if flow completes, 0 otherwise
  */
-static void bmi_send_callback_fn(void *user_ptr,
+static int bmi_send_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code)
 {
@@ -625,7 +640,7 @@ static void bmi_send_callback_fn(void *user_ptr,
 	free(flow_data);
 	flow_d->release(flow_d);
 	flow_d->callback(flow_d);
-	return;
+	return(1);
     }
 
     if(q_item->buffer)
@@ -641,7 +656,7 @@ static void bmi_send_callback_fn(void *user_ptr,
 	    BUFFER_SIZE, BMI_SEND);
 	/* TODO: error handling */
 	assert(q_item->buffer);
-	q_item->bmi_callback.fn = bmi_send_callback_fn;
+	q_item->bmi_callback.fn = bmi_send_callback_wrapper;
 	q_item->trove_callback.fn = trove_read_callback_fn;
     }
     
@@ -704,7 +719,7 @@ static void bmi_send_callback_fn(void *user_ptr,
     if(bytes_processed == 0)
     {	
 	gen_mutex_unlock(&flow_data->flow_mutex);
-	return;
+	return(0);
     }
 
     assert(q_item->buffer_used);
@@ -742,7 +757,7 @@ static void bmi_send_callback_fn(void *user_ptr,
     }while(result_tmp);
 
     gen_mutex_unlock(&flow_data->flow_mutex);
-    return;
+    return(0);
 };
 
 /* trove_write_callback_fn()
