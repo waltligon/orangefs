@@ -1,7 +1,9 @@
 /* File to be included for modules of the Encoding Library */
 
-
 #ifndef PINT_ENCODING_MODULE_H
+#define PINT_ENCODING_MODULE_H
+
+#define ENCODED_HEADER_SIZE sizeof(int)
 
 /* Macros for function declarations */
 
