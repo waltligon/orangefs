@@ -20,6 +20,11 @@
 
 extern job_context_id pint_client_sm_context;
 
+enum
+{
+    CREATE_RETRY = 170
+};
+
 /* state function prototypes */
 static int create_init(
     PINT_client_sm *sm_p, job_status_s *js_p);
@@ -142,7 +147,7 @@ machine pvfs2_client_create_sm(
     state datafiles_failure
     {
         run create_datafiles_failure;
-        default => cleanup;
+        default => delete_handles_setup_msgpair_array;
     }
 
     state create_setattr_setup_msgpair
@@ -162,7 +167,7 @@ machine pvfs2_client_create_sm(
     state create_setattr_failure
     {
         run create_setattr_failure;
-        default => cleanup;
+        default => delete_handles_setup_msgpair_array;
     }
 
     state crdirent_setup_msgpair
@@ -201,6 +206,7 @@ machine pvfs2_client_create_sm(
     state cleanup
     {
         run create_cleanup;
+        CREATE_RETRY => init;
         default => terminate;
     }
 }
@@ -212,7 +218,7 @@ int PVFS_sys_create(
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
     PVFS_credentials credentials,
-    PVFS_sys_dist* dist,
+    PVFS_sys_dist *dist,
     PVFS_sysresp_create *resp)
 {
     int ret = -PVFS_EINVAL;
@@ -220,9 +226,6 @@ int PVFS_sys_create(
     PVFS_error error;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
-
-    /* we have not yet implemented hooks for user specified distributions */
-    assert(dist == NULL);
 
     /* parameter checking goes here.  assume everything from the user
      * is ok past this point.
@@ -237,16 +240,19 @@ int PVFS_sys_create(
         return -PVFS_ENAMETOOLONG;
     }
 
-    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) != PVFS_ATTR_SYS_ALL_SETABLE)
+    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) !=
+        PVFS_ATTR_SYS_ALL_SETABLE)
     {
         gossip_lerr("Error: Attribute sanity check failed\n");
         return ret;
     }
 
-    if ((attr.mask & PVFS_ATTR_SYS_DFILE_COUNT) && (attr.dfile_count < 1))
+    if ((attr.mask & PVFS_ATTR_SYS_DFILE_COUNT) &&
+        (attr.dfile_count < 1))
     {
-	gossip_err("Error: invalid number of datafiles (%d) specified in PVFS_sys_create().\n", (int)attr.dfile_count);
-	return(-PVFS_EINVAL);
+	gossip_err("Error: invalid number of datafiles (%d) specified "
+                   "in PVFS_sys_create().\n", (int)attr.dfile_count);
+	return ret;
     }
 
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
@@ -262,6 +268,7 @@ int PVFS_sys_create(
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.sys_attr = &attr;
     sm_p->u.create.stored_error_code = 0;
+    sm_p->u.create.retry_count = 0;
 
     if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
@@ -275,7 +282,7 @@ int PVFS_sys_create(
 	{
 	    gossip_err("Failed to get number of data servers\n");
 	    free(sm_p);
-	    return(ret);
+	    return ret;
 	}
     }
 
@@ -303,7 +310,7 @@ int PVFS_sys_create(
     {
 	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
 	free(sm_p);
-	return(ret);
+	return ret;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create completed\n");
@@ -321,7 +328,9 @@ static int create_init(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: init\n");
 
-    assert(js_p->error_code == 0);
+    assert((js_p->error_code == 0) ||
+           (js_p->error_code == CREATE_RETRY));
+
     return 1;
 }
 
@@ -335,9 +344,6 @@ static int create_create_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_CREATE);
 
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
     if (resp_p->status != 0)
     {
 	return resp_p->status;
@@ -364,9 +370,6 @@ static int create_datafiles_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_CREATE);
 
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
     if (resp_p->status != 0)
     {
 	return resp_p->status;
@@ -375,8 +378,11 @@ static int create_datafiles_comp_fn(void *v_p,
     /* allocate memory for the data handles if we haven't already */
     if (index == 0)
     {
-        sm_p->u.create.datafile_handles = (PVFS_handle *)
-            malloc(sm_p->u.create.num_data_files * sizeof(PVFS_handle));
+        if (sm_p->u.create.datafile_handles == NULL)
+        {
+            sm_p->u.create.datafile_handles = (PVFS_handle *)malloc(
+                sm_p->u.create.num_data_files * sizeof(PVFS_handle));
+        }
         if (sm_p->u.create.datafile_handles == NULL)
         {
             gossip_err("create: Failed to allocate data handle array\n");
@@ -393,15 +399,9 @@ static int create_datafiles_comp_fn(void *v_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Datafile handle %d is %Lu\n",
                  index, Lu(sm_p->u.create.datafile_handles[index]));
-
     return 0;
 }
 
-/* 
-   NOTE: this function only does a sanity check and doesn't
-   need to be called.  Set the completion function to NULL
-   when setting up the setattr msgpair to avoid this
-*/
 static int create_setattr_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index)
@@ -412,22 +412,13 @@ static int create_setattr_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
 
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
     if (resp_p->status != 0)
     {
 	return resp_p->status;
     }
-
     return 0;
 }
 
-/* 
-   NOTE: this function only does a sanity check and doesn't
-   need to be called.  Set the completion function to NULL
-   when setting up the crdirent msgpair to avoid this
-*/
 static int create_crdirent_comp_fn(void *v_p,
                                    struct PVFS_server_resp *resp_p,
                                    int index)
@@ -533,6 +524,8 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
 static int create_dspace_create_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
+    sm_p->u.create.stored_error_code = js_p->error_code;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: dspace_create_failure\n");
     return 1;
@@ -552,11 +545,13 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
 
     /* allocate msgarray and set msgarray_count */
-    if (sm_p->msgarray != &(sm_p->msgpair))
-	    free(sm_p->msgarray);
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)
-        malloc(sm_p->u.create.num_data_files *
-               sizeof(PINT_client_sm_msgpair_state));
+    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
+    {
+        free(sm_p->msgarray);
+    }
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
+        (sm_p->u.create.num_data_files *
+         sizeof(PINT_client_sm_msgpair_state)));
     if (sm_p->msgarray == NULL)
     {
         gossip_err("create: failed to allocate msgarray\n");
@@ -566,9 +561,12 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     sm_p->msgarray_count = sm_p->u.create.num_data_files;
 
     /* allocate handle extent array objects */
-    sm_p->u.create.io_handle_extent_array = (PVFS_handle_extent_array *)
-        malloc(sm_p->u.create.num_data_files *
-               sizeof(PVFS_handle_extent_array));
+    if (sm_p->u.create.io_handle_extent_array == NULL)
+    {
+        sm_p->u.create.io_handle_extent_array = (PVFS_handle_extent_array *)
+            malloc(sm_p->u.create.num_data_files *
+                   sizeof(PVFS_handle_extent_array));
+    }
     if (!sm_p->u.create.io_handle_extent_array)
     {
         gossip_err("create: failed to allocate handle_extent_array\n"); 
@@ -577,8 +575,11 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     }
 
     /* allocate data server bmi address array */
-    sm_p->u.create.data_server_addrs = (PVFS_BMI_addr_t *)
-        malloc(sm_p->u.create.num_data_files * sizeof(PVFS_BMI_addr_t));
+    if (sm_p->u.create.data_server_addrs == NULL)
+    {
+        sm_p->u.create.data_server_addrs = (PVFS_BMI_addr_t *)malloc(
+            sm_p->u.create.num_data_files * sizeof(PVFS_BMI_addr_t));
+    }
     if (!sm_p->u.create.data_server_addrs)
     {
         gossip_err("create: failed to allocate data server addrs\n"); 
@@ -633,6 +634,8 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 static int create_datafiles_failure(PINT_client_sm *sm_p,
                                     job_status_s *js_p)
 {
+    sm_p->u.create.stored_error_code = js_p->error_code;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: datafiles_failure\n");
     return 1;
@@ -654,9 +657,11 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
-    /* FIXME: do we have a slicker way to do this at runtime? */
-    sm_p->u.create.dist = PVFS_Dist_create("simple_stripe");
-    assert(sm_p->u.create.dist);
+    if (sm_p->u.create.dist == NULL)
+    {
+        sm_p->u.create.dist = PVFS_Dist_create("simple_stripe");
+        assert(sm_p->u.create.dist);
+    }
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
@@ -690,11 +695,10 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
         js_p->error_code = ret;
     }
 
-    /* in the single message case (formerly msgpair), msgarray points to the
-     * single statically allocated msgpair member.  so free only if dynamically
-     * allocated */
-    if (sm_p->msgarray != &(sm_p->msgpair) )
+    if (sm_p->msgarray != &(sm_p->msgpair))
+    {
 	free(sm_p->msgarray);
+    }
 
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;
@@ -705,6 +709,8 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
 static int create_setattr_failure(PINT_client_sm *sm_p,
                                   job_status_s *js_p)
 {
+    sm_p->u.create.stored_error_code = js_p->error_code;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: setattr_failure\n");
     return 1;
@@ -749,11 +755,10 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         js_p->error_code = ret;
     }
 
-    /* in the single message case (formerly msgpair), msgarray points to the
-     * single statically allocated msgpair member.  so free only if dynamically
-     * allocated */
-    if (sm_p->msgarray != &(sm_p->msgpair) )
+    if (sm_p->msgarray != &(sm_p->msgpair))
+    {
 	free(sm_p->msgarray);
+    }
 
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count =1;
@@ -780,7 +785,7 @@ static int create_crdirent_failure(PINT_client_sm *sm_p,
 static int create_delete_handles_setup_msgpair_array(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    int ret = -PVFS_EINVAL, i = 0;
+    int ret = -PVFS_EINVAL, i = 0, actual_count = 0;
     PVFS_BMI_addr_t metafile_server_addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
@@ -800,16 +805,28 @@ static int create_delete_handles_setup_msgpair_array(
         return 1;
     }
 
-    /* in the single message case (formerly msgpair), msgarray points to the
-     * single statically allocated msgpair member.  so free only if dynamically
-     * allocated */
     if (sm_p->msgarray != &(sm_p->msgpair))
     {
         free(sm_p->msgarray);
     }
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)
-        malloc((sm_p->u.create.num_data_files + 1) *
-               sizeof(PINT_client_sm_msgpair_state));
+
+    /*
+      in the case that all datafiles have already been created,
+      actual_count will be (sm_p->u.create.num_data_files + 1).
+      otherwise, it will be somewhere between 1 (for the metafile) and
+      1 + the number of data files
+    */
+    actual_count = 1;
+    for(i = 0; i < sm_p->u.create.num_data_files; i++)
+    {
+        if (sm_p->u.create.datafile_handles[i] != PVFS_HANDLE_NULL)
+        {
+            actual_count++;
+        }
+    }
+
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
+        (actual_count * sizeof(PINT_client_sm_msgpair_state)));
 
     if (sm_p->msgarray == NULL)
     {
@@ -818,15 +835,15 @@ static int create_delete_handles_setup_msgpair_array(
         return 1;
     }
 
-    sm_p->msgarray_count = (sm_p->u.create.num_data_files + 1);
+    sm_p->msgarray_count = actual_count;
 
     assert(sm_p->u.create.data_server_addrs);
 
     /*
-      for the metafile and each datafile, prepare to post
-      a remove send/recv pair
+      for the metafile and each datafile, prepare to post a remove
+      send/recv pair
     */
-    for(i = 0; i < (sm_p->u.create.num_data_files + 1); i++)
+    for(i = 0; i < actual_count; i++)
     {
         PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
@@ -834,7 +851,7 @@ static int create_delete_handles_setup_msgpair_array(
                      "create: posting data file remove req %d\n",i);
 
         /* arbitrarily handle deletion of the metafile last */
-        if (i == sm_p->u.create.num_data_files)
+        if (i == (actual_count - 1))
         {
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
@@ -872,7 +889,6 @@ static int create_delete_handles_setup_msgpair_array(
     return 1;
 }
 
-
 static int create_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
 {
@@ -891,6 +907,23 @@ static int create_cleanup(PINT_client_sm *sm_p,
 
         /* fill in outgoing response fields */
         sm_p->u.create.create_resp->ref = metafile_ref;
+    }
+    else if (sm_p->u.create.retry_count < PVFS2_CLIENT_RETRY_LIMIT)
+    {
+        if ((sm_p->acache_hit != 0) || (sm_p->pinode != NULL))
+        {
+            sm_p->acache_hit = 0;
+            PINT_acache_release(sm_p->pinode);
+            sm_p->pinode = NULL;
+        }
+
+        sm_p->u.create.retry_count++;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Retrying create operation "
+                     "(attempt number %d)\n", sm_p->u.create.retry_count);
+
+        js_p->error_code = CREATE_RETRY;
+        return 1;
     }
 
     if (sm_p->u.create.io_handle_extent_array)
@@ -913,10 +946,6 @@ static int create_cleanup(PINT_client_sm *sm_p,
         PVFS_Dist_free(sm_p->u.create.dist);
     }
 
-
-    /* in the single message case (formerly msgpair), msgarray points to the
-     * single statically allocated msgpair member.  so free only if dynamically
-     * allocated */
     if (sm_p->msgarray != &(sm_p->msgpair))
     {
         free(sm_p->msgarray);

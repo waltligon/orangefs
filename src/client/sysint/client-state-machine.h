@@ -32,6 +32,9 @@
 /* TODO: this should be configurable at runtime somehow */
 #define PVFS2_CLIENT_JOB_TIMEOUT 30
 
+/* the maximum number of times to retry restartable client operations */
+#define PVFS2_CLIENT_RETRY_LIMIT  5
+
 /*
  * This structure holds everything that we need for the state of a
  * message pair.  We need arrays of these in some cases, so it's
@@ -120,6 +123,7 @@ struct PINT_client_create_sm {
     PVFS_handle                  *datafile_handles;
     PVFS_Dist                    *dist;
     int                           stored_error_code;
+    int                          retry_count;
 };
 
 /* PINT_client_mkdir_sm */
