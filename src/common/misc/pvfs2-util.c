@@ -731,9 +731,6 @@ int PVFS_util_init_defaults(void)
         else
         {
             failed_indices[j++] = i;
-            gossip_err("WARNING: failed to initialize file system for "
-                       "mount point %s in tab file %s\n",
-                       tab->mntent_array[i].mnt_dir, tab->tabfile_name);
 
             if (j > (PVFS2_MAX_INVALID_MNTENTS - 1))
             {

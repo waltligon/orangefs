@@ -1235,9 +1235,6 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     /* make sure one was successful */
     if (!meth_addr)
     {
-	gossip_err("Error: could not resolve id_string!\n");
-	gossip_lerr("Error: no BMI methods could resolve: %s\n",
-                    id_string);
 	return (bmi_errno_to_pvfs(-ENOPROTOOPT));
     }
 

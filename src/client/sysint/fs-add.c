@@ -37,6 +37,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
 {
     int ret = -PVFS_EINVAL;
     struct server_configuration_s *new_server_config = NULL;
+    PVFS_BMI_addr_t test_addr;
 
     gen_mutex_lock(&mt_config);
 
@@ -47,6 +48,11 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
         PVFS_perror_gossip("Configuration for fs already exists", ret);
         return -PVFS_EEXIST;
     }
+
+    /* first make sure BMI knows how to handle this method, else fail quietly */
+    ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_server);
+    if (ret == bmi_errno_to_pvfs(-ENOPROTOOPT))
+	goto error_exit;
 
     new_server_config = (struct server_configuration_s *)malloc(
         sizeof(struct server_configuration_s));
