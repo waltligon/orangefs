@@ -26,4 +26,5 @@ TESTSRC += \
 	$(DIR)/io-test-offset.c \
 	$(DIR)/initialize.c \
 	$(DIR)/initialize-dyn.c \
-	$(DIR)/getparent.c
+	$(DIR)/getparent.c \
+	$(DIR)/io-bug.c
