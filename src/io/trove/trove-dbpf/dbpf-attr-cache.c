@@ -552,7 +552,10 @@ int dbpf_attr_cache_insert(
 
         if (cache_elem)
         {
-            memset(cache_elem, 0, sizeof(dbpf_attr_cache_elem_t));
+            if (!already_exists)
+            {
+                memset(cache_elem, 0, sizeof(dbpf_attr_cache_elem_t));
+            }
 
             if (s_cacheable_keywords)
             {
