@@ -4,9 +4,9 @@
  * See COPYING in top-level directory.
  */
 
-#include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "client.h"
 #include "gossip.h"
@@ -94,46 +94,29 @@ int main(int argc,char **argv)
 		printf("getattr failed with errcode = %d\n", ret);
 		return(-1);
 	}
-	// print the handle 
+
 	printf("--getattr--\n"); 
-	printf("Handle:%ld\n",(long int)pinode_refn.handle);
-	printf("FSID:%ld\n",(long int)pinode_refn.fs_id);
-	printf("mask:%d\n",attrmask);
-	printf("uid:%d\n",resp_gattr->attr.owner);
-	printf("gid:%d\n",resp_gattr->attr.group);
-	printf("permissions:%d\n",resp_gattr->attr.perms);
-	printf("atime:%d\n",(int)resp_gattr->attr.atime);
-	printf("mtime:%d\n",(int)resp_gattr->attr.mtime);
-	printf("ctime:%d\n",(int)resp_gattr->attr.ctime);
+	printf("Handle      : %Ld\n", pinode_refn.handle);
+	printf("FSID        : %d\n", (int)pinode_refn.fs_id);
+	printf("mask        : %d\n", attrmask);
+	printf("uid         : %d\n", resp_gattr->attr.owner);
+	printf("gid         : %d\n", resp_gattr->attr.group);
+	printf("permissions : %d\n", resp_gattr->attr.perms);
+	printf("atime       : %s", ctime((time_t *)&resp_gattr->attr.atime));
+	printf("mtime       : %s", ctime((time_t *)&resp_gattr->attr.mtime));
+	printf("ctime       : %s", ctime((time_t *)&resp_gattr->attr.ctime));
+	printf("handle type : ");
+
 	switch(resp_gattr->attr.objtype)
 	{
-		case PVFS_TYPE_METAFILE:
-		printf("METAFILE\n");
-#if 0
-		/* ifdef out; we don't let this kind of information out of
-		 * the system interface!
-		 */
-		printf("nr_datafiles:%d\n",resp_gattr->attr.u.meta.nr_datafiles);
-
-		for(i=0; i < resp_gattr->attr.u.meta.nr_datafiles; i++)
-		{
-			printf("\thandle: %d\n", (int)resp_gattr->attr.u.meta.dfh[i]);
-		}
-#endif
+            case PVFS_TYPE_METAFILE:
+                printf("metafile\n");
+                break;
+            case PVFS_TYPE_DIRECTORY:
+		printf("directory\n");
 		break;
-
-		case PVFS_TYPE_DIRECTORY:
-		printf("DIRECTORY\n");
-#if 0
-		/* ifdef out; we don't let this kind of information out of
-		 * the system interface!
-		 */
-		printf("handle: = %d", (int)resp_gattr->attr.u.dir.dfh);
-#endif
-		break;
-
-		default:
-		printf("UNKNOWN object type!\n");
+            default:
+		printf("unknown object type!\n");
 		break;
 	}
 	
