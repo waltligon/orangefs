@@ -53,7 +53,11 @@ void *write_file(void *ptr)
             fprintf(stderr, "thread %d writing data (%d bytes))\n",
                     info->index, info->size);
 
-            info->error_code = writev(info->fd, iov, 2);
+            if (writev(info->fd, iov, 2) == -1)
+            {
+                /* at least *try* to capture the errno */
+                info->error_code = errno;
+            }
             free(buf);
         }
         fprintf(stderr, "thread %d returning\n", info->index);
@@ -107,9 +111,10 @@ int main(int argc, char **argv)
     for(i = 0; i < num_threads; i++)
     {
         pthread_join(threads[i], NULL);
-        if (info[i].error_code == -1)
+        if (info[i].error_code)
         {
-            fprintf(stderr, "Thread %d failed to write\n", i);
+            fprintf(stderr, "Thread %d failed to write (%x)\n", i,
+                    info[i].error_code);
         }
     }
 
