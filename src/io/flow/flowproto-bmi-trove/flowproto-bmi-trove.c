@@ -800,7 +800,8 @@ static int buffer_setup_bmi_to_mem(flow_descriptor * flow_d)
     flow_data->bmi_list_count = flow_d->result.segs;
     flow_data->bmi_total_size = flow_d->result.bytes;
 
-    if (flow_d->result.eof_flag && (flow_data->bmi_total_size == 0))
+    if(PINT_REQUEST_DONE(flow_d->io_req_state, &flow_d->result) 
+	&& (flow_data->bmi_total_size == 0))
     {
 	/* no work to do here, return 1 to complete the flow */
 	return (1);
@@ -1135,7 +1136,8 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
     flow_data->trove_list_count = flow_d->result.segs;
     flow_data->fill_buffer_stepsize = flow_d->result.bytes;
 
-    if (flow_d->result.eof_flag && (flow_data->fill_buffer_stepsize == 0))
+    if(PINT_REQUEST_DONE(flow_d->io_req_state, &flow_d->result)
+	&& flow_data->fill_buffer_stepsize == 0)
     {
 	/* there is no work to do; zero length flow */
 	return (1);
