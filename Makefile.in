@@ -113,7 +113,7 @@ CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
   # include current directory (for pvfs2-config.h)
 CFLAGS += -I .
   # setup general warning levels and gcc options
-CFLAGS += -I $(srcdir)/include -I include
+CFLAGS += -I $(srcdir)/include -I include -I $(srcdir)
   # add all module directories into include path
 CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
   # add package version information
