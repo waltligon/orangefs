@@ -267,20 +267,30 @@ int PVFS_sys_create(
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
 
-    if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
+    /* Lookup the distribution */
+    if (NULL != dist)
     {
-	sm_p->u.create.num_data_files = attr.dfile_count;
+        assert(dist->name);
+        sm_p->u.create.dist = PVFS_dist_create(dist->name);
+        assert(sm_p->u.create.dist);
+        sm_p->u.create.dist->params = dist->params;
     }
     else
     {
-	ret = PINT_bucket_get_num_io(sm_p->parent_ref.fs_id,
-				     &sm_p->u.create.num_data_files);
-	if (ret < 0)
-	{
-	    gossip_err("Failed to get number of data servers\n");
-	    free(sm_p);
-	    return ret;
-	}
+        sm_p->u.create.dist = PVFS_dist_create("simple_stripe");
+        assert(sm_p->u.create.dist);
+    }
+    
+    /* Determine the number of datafile objects to use */
+    ret = PINT_bucket_get_num_dfiles(sm_p->parent_ref.fs_id,
+                                     sm_p->u.create.dist,
+                                     attr,
+                                     &sm_p->u.create.num_data_files);
+    if (ret < 0)
+    {
+        gossip_err("Failed to get number of data servers\n");
+        free(sm_p);
+        return ret;
     }
 
     gossip_debug(
@@ -668,12 +678,14 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;
 
+    /*
     if (sm_p->u.create.dist == NULL)
     {
         sm_p->u.create.dist = PVFS_Dist_create("simple_stripe");
         assert(sm_p->u.create.dist);
     }
-
+    */
+    
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
         *sm_p->cred_p,
@@ -952,7 +964,7 @@ static int create_cleanup(PINT_client_sm *sm_p,
 
     if (sm_p->u.create.dist)
     {
-        PVFS_Dist_free(sm_p->u.create.dist);
+        PVFS_dist_free(sm_p->u.create.dist);
     }
 
     if (sm_p->msgarray != &(sm_p->msgpair))

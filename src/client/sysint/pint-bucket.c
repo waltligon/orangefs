@@ -541,7 +541,6 @@ int PINT_bucket_get_server_array(
     return ret;
 }
 
-
 /* PINT_bucket_map_to_server()
  *
  * maps from a handle and fsid to a server address
@@ -563,6 +562,30 @@ int PINT_bucket_map_to_server(
         PVFS_perror_gossip("PINT_bucket_get_server_name failed", ret);
     }
     return (!ret ? BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
+}
+
+/** PINT_bucker_get_num_dfiles
+ *
+ * Return the number of dfiles to use for files with this combination of
+ * fs id, distribution, and attributes.  If the distribution and attributes
+ * do not specify a number of dfiles, the number of io servers will be used.
+ */
+int PINT_bucket_get_num_dfiles(PVFS_fs_id fsid,
+                               PINT_dist* dist,
+                               PVFS_sys_attr attr,
+                               int* num_dfiles)
+{
+    int ret = -PVFS_EINVAL;
+    if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
+    {
+        *num_dfiles = attr.dfile_count;
+        ret = 0;
+    }
+    else
+    {
+        ret = PINT_bucket_get_num_io(fsid, num_dfiles);
+    }
+    return ret;
 }
 
 /* PINT_bucket_get_num_meta()

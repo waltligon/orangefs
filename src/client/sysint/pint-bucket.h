@@ -61,6 +61,11 @@ int PINT_bucket_map_to_server(PVFS_BMI_addr_t *server_addr,
 			      PVFS_handle handle,
 			      PVFS_fs_id fsid);
 
+int PINT_bucket_get_num_dfiles(PVFS_fs_id fsid,
+                               PINT_dist* dist,
+                               PVFS_sys_attr attr,
+                               int* num_dfiles);
+
 int PINT_bucket_get_num_meta(PVFS_fs_id fsid,
 			     int *num_meta);
 
