@@ -30,6 +30,11 @@ enum {
     TROVE_ATOMIC = 2
 };
 
+/* get/setinfo option flags */
+enum {
+    TROVE_COLLECTION_HANDLE_RANGES
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4
