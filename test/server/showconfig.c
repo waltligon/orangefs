@@ -19,7 +19,8 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
         fprintf(stderr,"FS Collection ID: %d\n",fs->coll_id);
         fprintf(stderr,"FS Root Handle  : %d\n",fs->root_handle);
 
-        fprintf(stderr,"\t--- Meta Servers for %s:\n",fs->file_system_name);
+        fprintf(stderr,"\t--- Meta Servers for %s (%d total):\n",
+                fs->file_system_name,llist_count(fs->meta_server_list));
         cur = fs->meta_server_list;
         while(cur)
         {
@@ -32,7 +33,8 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
             cur = llist_next(cur);
         }
 
-        fprintf(stderr,"\t--- Data Servers for %s:\n",fs->file_system_name);
+        fprintf(stderr,"\t--- Data Servers for %s (%d total):\n",
+                fs->file_system_name,llist_count(fs->data_server_list));
         cur = fs->data_server_list;
         while(cur)
         {
