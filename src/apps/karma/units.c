@@ -15,6 +15,11 @@ static float count_table[5]  = { 1000000000000.0, 1000000000.0, 1000000.0,
 static char *count_abbrev[5] = { "trillion", "billion", "million", "thousand",
 				 "" };
 
+static float ops_table[5]  = { 1048576.0 * 1048576.0, 1024.0 * 1048576.0,
+			       1048576.0, 1024.0, 1.0 };
+static char *ops_abbrev[5] = { "Tops", "Gops", "Mops", "Kops" , "ops" };
+
+
 char *gui_units_time(uint64_t time_sec,
 		     float *divisor)
 {
@@ -53,3 +58,17 @@ char *gui_units_count(uint64_t count,
     *divisor = count_table[i];
     return count_abbrev[i];
 }
+
+char *gui_units_ops(PVFS_size ops,
+		    float *divisor)
+{
+    int i;
+
+    for (i=0; i < (sizeof(ops_table) / sizeof(*ops_table)) - 1; i++) {
+	if (((float) ops) / ops_table[i] > 1.0) break;
+    }
+
+    *divisor = ops_table[i];
+    return ops_abbrev[i];
+}
+

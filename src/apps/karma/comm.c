@@ -5,16 +5,28 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gtk/gtk.h>
+#include <time.h> /* nanosleep() */
 
 #include "karma.h"
 
+#define GUI_COMM_PERF_HISTORY 5
 #undef FAKE_STATS
 
+/* statistics data structures */
 static pvfs_mntlist mnt = {0, NULL};
 static struct PVFS_mgmt_server_stat *visible_stats = NULL;
 static struct PVFS_mgmt_server_stat *internal_stats = NULL;
 static int visible_stat_ct;
 static int internal_stat_ct;
+
+static PVFS_id_gen_t *internal_addrs = NULL;
+static int internal_addr_ct;
+
+/* performance data structures */
+static struct PVFS_mgmt_perf_stat **internal_perf;
+static uint32_t *internal_perf_ids;
+static uint64_t *internal_end_time_ms;
+static struct gui_traffic_raw_data *visible_perf = NULL;
 
 GtkListStore *gui_comm_fslist;
 
@@ -131,8 +143,9 @@ void gui_comm_set_active_fs(char *contact_server,
 			    char *fs_name,
 			    PVFS_fs_id new_fsid)
 {
-    int ret, outcount;
+    int i, ret, outcount;
     char msgbuf[80];
+    struct PVFS_mgmt_perf_stat *bigperfbuf;
 
 #ifdef FAKE_STATS
     return;
@@ -157,12 +170,49 @@ void gui_comm_set_active_fs(char *contact_server,
     /* allocate space for our stats if we need to */
     if (internal_stats != NULL && internal_stat_ct == outcount) return;
     else if (internal_stats != NULL) {
+	/* free all our dynamically allocated memory for resizing */
 	free(internal_stats);
+	free(internal_perf[0]);
+	free(internal_perf);
+	free(internal_perf_ids);
+	free(internal_end_time_ms);
     }
 
     internal_stats   = (struct PVFS_mgmt_server_stat *)
 	malloc(outcount * sizeof(struct PVFS_mgmt_server_stat));
     internal_stat_ct = outcount;
+
+    /* save addresses of servers */
+    if (internal_addrs != NULL) {
+	free(internal_addrs);
+    }
+    internal_addrs = (PVFS_id_gen_t *)
+	malloc(outcount * sizeof(PVFS_id_gen_t));
+    internal_addr_ct = outcount;
+    ret = PVFS_mgmt_get_server_array(cur_fsid,
+				     creds,
+				     PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+				     internal_addrs,
+				     &outcount);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_get_server_array", ret);
+	return;
+    }
+
+    /* allocate space for performance data */
+    bigperfbuf = (struct PVFS_mgmt_perf_stat *)
+	malloc(GUI_COMM_PERF_HISTORY * outcount *
+	       sizeof(struct PVFS_mgmt_perf_stat));
+    internal_perf = (struct PVFS_mgmt_perf_stat **)
+	malloc(outcount * sizeof(struct PVFS_mgmt_perf_stat *));
+    for (i=0; i < outcount; i++) {
+	internal_perf[i] = &bigperfbuf[i * GUI_COMM_PERF_HISTORY];
+    }
+    internal_perf_ids = (uint32_t *) malloc(outcount * sizeof(uint32_t));
+    memset(internal_perf_ids, 0, outcount * sizeof(uint32_t));
+    internal_end_time_ms = (uint64_t *) malloc(outcount * sizeof(uint64_t));
+    
 #endif
 }
 
@@ -209,48 +259,110 @@ int gui_comm_stats_retrieve(struct PVFS_mgmt_server_stat **svr_stat,
 /* gui_comm_stats_collect()
  *
  * Updates internal stat structures.
- *
- * Assumes number of servers does not change over time.
  */
 static int gui_comm_stats_collect(void)
 {
-    int ret, outcount;
-    PVFS_id_gen_t *addr_array;
+    int ret;
 
 #ifdef FAKE_STATS
     return 0;
 #else
-    addr_array = (PVFS_id_gen_t*) malloc(internal_stat_ct * sizeof(PVFS_id_gen_t));
-    if (!addr_array)
-    {
-	perror("malloc");
-	return -1;
-    }
+    assert(internal_addr_ct == internal_stat_ct);
 
-    outcount = internal_stat_ct;
-    ret = PVFS_mgmt_get_server_array(cur_fsid,
-				     creds,
-				     PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
-				     addr_array,
-				     &outcount);
-    if (ret < 0)
-    {
-	PVFS_perror("PVFS_mgmt_get_server_array", ret);
-	return -1;
-    }
-    
     ret = PVFS_mgmt_statfs_list(cur_fsid,
 				creds,
 				internal_stats,
-				addr_array,
+				internal_addrs,
 				internal_stat_ct);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_statfs_list", ret);
 	return -1;
     }
-
-    free(addr_array);
 #endif
+    return 0;
+}
+
+/* gui_comm_perf_collect()
+ */
+static int gui_comm_perf_collect(void)
+{
+    int ret;
+
+    ret = PVFS_mgmt_perf_mon_list(cur_fsid,
+				  creds,
+				  internal_perf,
+				  internal_end_time_ms,
+				  internal_addrs,
+				  internal_perf_ids,
+				  internal_addr_ct,
+				  GUI_COMM_PERF_HISTORY);
+    if (ret != 0) {
+	PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
+	return -1;
+    }
+
+    return 0;
+}
+
+/* gui_comm_traffic_retrieve()
+ *
+ * Passes back pointer to "raw" traffic data, fills in # of servers.
+ */
+int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
+			      int *svr_traffic_ct)
+{
+    int ret, svr, idx;
+
+    ret = gui_comm_perf_collect();
+    if (ret != 0) return ret;
+
+    /* initialize visible_perf array if we haven't already */
+    if (visible_perf == NULL) {
+	visible_perf = (struct gui_traffic_raw_data *)
+	    malloc(internal_addr_ct * sizeof(struct gui_traffic_raw_data));
+	assert(visible_perf != NULL);
+    }
+    memset(visible_perf,
+	   0,
+	   internal_addr_ct * sizeof(struct gui_traffic_raw_data));
+
+    /* summarize data and store in visible_perf array */
+    for (svr=0; svr < internal_addr_ct; svr++) {
+	int valid_start_time = 0;
+	uint64_t start_time_ms;
+
+	struct gui_traffic_raw_data *raw = &visible_perf[svr];
+
+	for (idx=0; idx < GUI_COMM_PERF_HISTORY; idx++) {
+	    if (!internal_perf[svr][idx].valid_flag) continue;
+	    
+	    if (!valid_start_time) {
+		/* Q: should we just assume first entry is good? */
+		valid_start_time = 1;
+		start_time_ms = internal_perf[svr][idx].start_time_ms;
+	    }
+
+	    raw->data_write_bytes += internal_perf[svr][idx].write;
+	    raw->data_read_bytes  += internal_perf[svr][idx].read;
+	    raw->meta_write_ops    = internal_perf[svr][idx].metadata_write;
+	    raw->meta_read_ops     = internal_perf[svr][idx].metadata_read;
+	}
+
+	raw->elapsed_time_ms  = internal_end_time_ms[svr] - start_time_ms;
+
+	/* deal with format in which metadata is returned */
+	if (internal_perf[svr][0].valid_flag) {
+	    raw->meta_write_ops -= internal_perf[svr][0].metadata_write;
+	    raw->meta_read_ops  -= internal_perf[svr][0].metadata_read;
+
+	    /* simple, if somewhat inaccurate, handling of overflow */
+	    if (raw->meta_write_ops < 0) raw->meta_write_ops = 0;
+	    if (raw->meta_read_ops < 0) raw->meta_read_ops = 0;
+	}
+    }
+
+    *svr_traffic    = visible_perf;
+    *svr_traffic_ct = internal_addr_ct;
     return 0;
 }

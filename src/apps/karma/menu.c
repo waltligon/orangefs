@@ -12,19 +12,23 @@ static GtkItemFactoryEntry menu_items[] = {
     "<CTRL>S",
     gui_fsview_popup, 0,
     "<Item>" },
+#if 0
   { "/File/_Re-read Fstab",
     NULL,
     NULL, 0,
     "<Item>" },
+#endif
   { "/File/_Quit",
     "<CTRL>Q",
     gtk_main_quit, 0,
     "<StockItem>",
     GTK_STOCK_QUIT },
+#if 0
   { "/_Options",
     NULL,
     NULL, 0,
     "<Branch>" },
+#endif
   { "/_Help",
     NULL,
     NULL, 0,

@@ -6,6 +6,8 @@
 
 #include "karma.h"
 
+#undef GUI_DETAILS_ENABLE_SORTING
+
 /* values used for column names; don't mess with these indescriminately */
 enum {
     GUI_DETAILS_NAME = 0,
@@ -29,12 +31,13 @@ char *column_name[] = { "Server Address (BMI)",
 			"Available Space",
 			"Type of Service" };
 
-static int gui_details_initialized = 0;
-static GtkListStore *gui_details_list;
-static GtkWidget *gui_details_view;
+static int gui_details_initialized    = 0;
+static GtkListStore *gui_details_list = NULL;
+static GtkWidget *gui_details_view    = NULL;
 
-static GtkTreeViewColumn *gui_details_col[GUI_DETAILS_TYPE];
+static GtkTreeViewColumn *gui_details_col[GUI_DETAILS_TYPE + 1];
 
+#ifdef GUI_DETAILS_ENABLE_SORTING
 static gint gui_details_float_string_compare(GtkTreeModel *model,
 					     GtkTreeIter *iter_a,
 					     GtkTreeIter *iter_b,
@@ -44,12 +47,13 @@ static gint gui_details_text_compare(GtkTreeModel *model,
 				     GtkTreeIter *iter_a,
 				     GtkTreeIter *iter_b,
 				     gpointer col_id);
+#endif
 
 GtkWidget *gui_details_setup(void)
 {
     int i;
 
-    gui_details_list = gtk_list_store_new(9,
+    gui_details_list = gtk_list_store_new(GUI_DETAILS_TYPE + 1,
 					  G_TYPE_STRING,  /* name */
 					  G_TYPE_STRING,  /* ram total */
 					  G_TYPE_STRING,  /* ram avail */
@@ -83,7 +87,7 @@ GtkWidget *gui_details_setup(void)
 			    GTK_TREE_MODEL(gui_details_list));
 
     /* NOTE: SORTING CAUSES BIG PROBLEMS; DISABLED UNTIL WE KNOW MORE */
-#if 0
+#ifdef GUI_DETAILS_ENABLE_SORTING
     /* for all the numerical values, set up sorting */
     for (i=1; i < GUI_DETAILS_TYPE; i++) {
 	gtk_tree_sortable_set_sort_func(GTK_TREE_SORTABLE(gui_details_list),
@@ -219,7 +223,7 @@ void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
     for (i=0; i < server_stat_ct; i++) {
 	GtkTreeIter iter;
 	char *type, meta[] = "meta", data[] = "data", both[] = "both";
-	char fmtbuf[GUI_DETAILS_TYPE][12];
+	char fmtbuf[GUI_DETAILS_TYPE][12]; /* don't need one for type */
 
 	snprintf(fmtbuf[GUI_DETAILS_RAM_TOT], 12, "%.2f",
 		 (float) server_stat[i].ram_total_bytes / rt_div);
@@ -282,6 +286,7 @@ void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
     g_object_unref(model);
 }
 
+#ifdef GUI_DETAILS_ENABLE_SORTING
 static gint gui_details_float_string_compare(GtkTreeModel *model,
 					     GtkTreeIter *iter_a,
 					     GtkTreeIter *iter_b,
@@ -323,3 +328,4 @@ static gint gui_details_text_compare(GtkTreeModel *model,
 
     return ret;
 }
+#endif

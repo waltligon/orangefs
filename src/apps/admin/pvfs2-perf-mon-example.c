@@ -166,7 +166,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* loop for every, grabbing stats at regular intervals */
+    /* loop for ever, grabbing stats at regular intervals */
     while(1)
     {
 	ret = PVFS_mgmt_perf_mon_list(cur_fs, creds, perf_matrix, 

@@ -5,12 +5,14 @@
 
 #include "karma.h"
 
-static struct gui_graph_data *graph_data = NULL;
+static struct gui_status_graph_data *graph_data = NULL;
 static int graph_data_ct;
 
-void gui_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
-		      int svr_stat_ct,
-		      struct gui_graph_data **out_graph_data)
+/* gui_status_data_prepare()
+ */
+void gui_status_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
+			     int svr_stat_ct,
+			     struct gui_status_graph_data **out_graph_data)
 {
     int i, j, done = 0;
     int total_free_handles = 0;
@@ -31,8 +33,8 @@ void gui_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
 	    free(graph_data);
 	}
 
-	graph_data = (struct gui_graph_data *)
-	    malloc(6 * sizeof(struct gui_graph_data));
+	graph_data = (struct gui_status_graph_data *)
+	    malloc(6 * sizeof(struct gui_status_graph_data));
 	for (i=0; i < 6; i++) {
 	    graph_data[i].first_val  = (float *) malloc(svr_stat_ct * sizeof(float));
 	    graph_data[i].second_val = (float *) malloc(svr_stat_ct * sizeof(float));
@@ -217,4 +219,88 @@ void gui_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
     *out_graph_data = graph_data;
 
     return;
+}
+
+/* gui_traffic_data_prepare()
+ *
+ * Performs data formatting to convert "raw" performance data into
+ * values for graphing (deciding on units, updating titles).
+ *
+ * Parameters:
+ * raw    - pointer to array of raw data (svr_ct elements)
+ * svr_ct - number of elements in raw array
+ * graph  - pointer to preallocated graph data
+ *
+ * Assumes that svr_data pointer in graph points to allocated region.
+ *
+ */
+void gui_traffic_data_prepare(struct gui_traffic_raw_data *raw,
+			      int svr_ct,
+			      struct gui_traffic_graph_data *graph)
+{
+    int i;
+    uint64_t max_rate = 0;
+    char *units;
+    float divisor;
+
+    /* find max. I/O value, get units, format data */
+    for (i=0; i < svr_ct; i++) {
+	uint64_t time_ms = raw[i].elapsed_time_ms;
+	float write_rate = 0.0, read_rate = 0.0;
+
+	if (time_ms) {
+	    write_rate = (raw[i].data_write_bytes * 1000) / time_ms;
+	    read_rate  = (raw[i].data_read_bytes * 1000) / time_ms;
+
+	    /* save these values for later */
+	    graph->svr_data[i].data_write = (float) write_rate;
+	    graph->svr_data[i].data_read = (float) read_rate;
+	}
+
+	if (write_rate > max_rate) max_rate = write_rate;
+	if (read_rate > max_rate)  max_rate = read_rate;
+    }
+
+    units = gui_units_size(max_rate, &divisor);
+
+    snprintf(graph->io_label,
+	     64,
+	     "I/O Bandwidth (orange = read, blue = write, %s/sec)",
+	     units);
+
+    /* adjust for units */
+    for (i=0; i < svr_ct; i++) {
+	graph->svr_data[i].data_write = graph->svr_data[i].data_write /divisor;
+	graph->svr_data[i].data_read  = graph->svr_data[i].data_read / divisor;
+    }
+
+    /* find max. metadata op value, get units, format data */
+    max_rate = 0;
+    for (i=0; i < svr_ct; i++) {
+	uint64_t time_ms = raw[i].elapsed_time_ms;
+	uint64_t write_rate = 0, read_rate = 0;
+
+	if (time_ms) {
+	    write_rate = raw[i].meta_write_ops * 1000 / time_ms;
+	    read_rate  = raw[i].meta_read_ops * 1000 / time_ms;
+
+	    graph->svr_data[i].meta_write = (float) write_rate;
+	    graph->svr_data[i].meta_read  = (float) read_rate;
+	}
+
+	if (write_rate > max_rate) max_rate = write_rate;
+	if (read_rate > max_rate) max_rate  = read_rate;
+    }
+
+    units = gui_units_ops(max_rate, &divisor);
+
+    snprintf(graph->meta_label,
+	     64,
+	     "Metadata Ops (green = read, purple = modify, %s/sec)",
+	     units);
+
+    for (i=0; i < svr_ct; i++) {
+	graph->svr_data[i].meta_write = graph->svr_data[i].meta_write /divisor;
+	graph->svr_data[i].meta_read  = graph->svr_data[i].meta_read / divisor;
+    }
 }

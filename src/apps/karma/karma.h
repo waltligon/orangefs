@@ -15,25 +15,41 @@ GtkWidget *gui_menu_setup(GtkWidget  *window);
 GtkWidget *gui_message_setup(void);
 void       gui_message_new(char *message);
 
-/* communication interface */
-int gui_comm_setup(void);
-void gui_comm_set_active_fs(char *contact_server,
-			    char *fs_name,
-			    PVFS_fs_id new_fsid);
-int gui_comm_stats_retrieve(struct PVFS_mgmt_server_stat **svr_stat,
-			    int *svr_stat_ct);
+/* color grabbing interface */
+GdkGC *gui_get_new_fg_color_gc(GtkWidget *drawing_area,
+			       gint red,
+			       gint green,
+			       gint blue);
 
-/* communication interface builds list of file systems as well */
-enum {
-    GUI_FSLIST_MNTPT = 0,
-    GUI_FSLIST_SERVER,
-    GUI_FSLIST_FSNAME,
-    GUI_FSLIST_FSID
+
+/* traffic page interface (traffic.c) */
+struct gui_traffic_raw_data {
+    int64_t data_write_bytes;
+    int64_t data_read_bytes;
+    int64_t meta_write_ops;
+    int64_t meta_read_ops;
+    int64_t elapsed_time_ms;
 };
-extern GtkListStore *gui_comm_fslist;
+
+struct gui_traffic_server_data {
+    float data_write;
+    float data_read;
+    float meta_write;
+    float meta_read;
+};
+
+struct gui_traffic_graph_data {
+    char io_label[64];
+    char meta_label[64];
+    int svr_ct;
+    struct gui_traffic_server_data *svr_data;
+};
+
+GtkWidget *gui_traffic_setup(void);
+void gui_traffic_graph_update(struct gui_traffic_graph_data *data);
 
 /* data preparation interface */
-struct gui_graph_data {
+struct gui_status_graph_data {
     char title[64];
     int count;
     int has_second_val;
@@ -43,9 +59,32 @@ struct gui_graph_data {
     char footer[64];
 };
 
-void gui_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
-		      int svr_stat_ct,
-		      struct gui_graph_data **out_graph_data);
+
+void gui_status_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
+			     int svr_stat_ct,
+			     struct gui_status_graph_data **out_graph_data);
+void gui_traffic_data_prepare(struct gui_traffic_raw_data *raw,
+			      int svr_ct,
+			      struct gui_traffic_graph_data *graph);
+
+/* communication interface */
+int gui_comm_setup(void);
+void gui_comm_set_active_fs(char *contact_server,
+			    char *fs_name,
+			    PVFS_fs_id new_fsid);
+int gui_comm_stats_retrieve(struct PVFS_mgmt_server_stat **svr_stat,
+			    int *svr_stat_ct);
+int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
+			      int *svr_traffic_ct);
+
+/* communication interface builds list of file systems as well */
+enum {
+    GUI_FSLIST_MNTPT = 0,
+    GUI_FSLIST_SERVER,
+    GUI_FSLIST_FSNAME,
+    GUI_FSLIST_FSID
+};
+extern GtkListStore *gui_comm_fslist;
 
 /* details page interface (details.c) */
 GtkWidget *gui_details_setup(void);
@@ -72,7 +111,7 @@ enum {
 };
 
 void gui_status_graph_update(int graph_id,
-			     struct gui_graph_data *graph_data);
+			     struct gui_status_graph_data *graph_data);
 
 /* file system view/selection interface (fsview.c) */
 void gui_fsview_popup(void);
@@ -81,3 +120,5 @@ void gui_fsview_popup(void);
 char *gui_units_time(uint64_t time_sec, float *divisor);
 char *gui_units_size(PVFS_size size_bytes, float *divisor);
 char *gui_units_count(uint64_t count, float *divisor);
+char *gui_units_ops(PVFS_size ops, float *divisor);
+

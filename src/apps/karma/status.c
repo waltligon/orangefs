@@ -19,11 +19,6 @@
  * repeatedly to update the data on a given graph.  The particular graph
  * to update is indicated by the graph_id field, which takes one of the
  * GUI_STATUS_* values enumerated in karma.h.
- *
- * TODO: Figure out what to do about the units on the graphs; right now
- * they are established at setup time and cannot change, and they are
- * set without interaction outside this file.  Probably they need to be set
- * on a per-update basis, maybe with a header string similar to the footer?
  */
 
 /* struct gui_status_graph_state gui_status_graphs[]
@@ -56,10 +51,6 @@ static struct gui_status_graph_state {
 } gui_status_graphs[6];
 
 /* internal helper fn prototypes */
-static GdkGC *gui_get_new_fg_color_gc(GtkWidget *drawing_area,
-				      gint red,
-				      gint green,
-				      gint blue);
 static void gui_status_graph_draw_stacked(struct gui_status_graph_state *g_state,
 					  char *title,
 					  int nr_bars,
@@ -126,7 +117,7 @@ GtkWidget *gui_status_setup(void)
  * External interface for updating graphs.
  */
 void gui_status_graph_update(int graph_id,
-			     struct gui_graph_data *graph_data)
+			     struct gui_status_graph_data *graph_data)
 {
     int count;
     struct gui_status_graph_state *g_state;
@@ -191,36 +182,6 @@ void gui_status_graph_update(int graph_id,
 
 /******* internal helper functions ********/
 
-/* gui_get_new_fg_color_gc()
- *
- * Colors are from 0 to 255.
- */ 
-static GdkGC *gui_get_new_fg_color_gc(GtkWidget *drawing_area,
-				      gint red,
-				      gint green,
-				      gint blue)
-{
-    GdkGC *gc;
-    GdkColor *color;
-
-    assert(red >= 0 && red <= 255 &&
-	   green >= 0 && green <= 255 &&
-	   blue >= 0 && blue <= 255);
-
-    color = (GdkColor *) malloc(sizeof(GdkColor));
-    color->red   = red * (65535/255);
-    color->green = green * (65535/255);
-    color->blue  = blue * (65535/255);
-    color->pixel = (gulong) (red * 65536 + green * 256 + blue);
-
-    gc = gdk_gc_new(drawing_area->window);
-    gdk_color_alloc(gtk_widget_get_colormap(drawing_area), color);
-    gdk_gc_set_foreground(gc, color);
-
-    return gc;
-}
-
-
 /* gui_status_graph_draw_stacked()
  *
  * TODO: Allow graph to start at a non-zero value, so that we can get
@@ -257,8 +218,8 @@ static void gui_status_graph_draw_stacked(struct gui_status_graph_state *g_state
 		       g_state->drawing_area->style->white_gc,
 		       TRUE,
 		       0, 0,
-		       g_state->drawing_area->allocation.width,
-		       g_state->drawing_area->allocation.height);
+		       width,
+		       height);
 
     /* handle no data case separately */
     if (nr_bars == 0) {
@@ -273,7 +234,9 @@ static void gui_status_graph_draw_stacked(struct gui_status_graph_state *g_state
     assert(barheight > 0);
 
     /* aesthetics: limit maximum bar height */
-    if (barheight > (height - topspace) / 8) barheight = (height - topspace) / 8;
+    if (barheight > (height - topspace) / 8) {
+	barheight = (height - topspace) / 8;
+    }
     
     /* find largest composite value */
     if (secondval != NULL) maxval = firstval[0] + secondval[0];
@@ -294,7 +257,7 @@ static void gui_status_graph_draw_stacked(struct gui_status_graph_state *g_state
     labelstring = malloc(64);
     for (i=0; i < GUI_STATUS_GRAPH_NR_TICS; i++) {
 	snprintf(labelstring, 64, "%.2f",
-		 (maxval * (float) i) / (float) (GUI_STATUS_GRAPH_NR_TICS - 1));
+		 (maxval * (float) i) / (float) (GUI_STATUS_GRAPH_NR_TICS-1));
 
 	gtk_label_set_text(GTK_LABEL(g_state->xaxis_label[i]), labelstring);
     }
@@ -440,9 +403,6 @@ static GtkWidget *gui_status_graph_setup(gint width,
 
     return g_state->frame;
 }
-
-
-
 
 /******* internal callback functions *******/
 

@@ -24,31 +24,31 @@ static void destroy_event(GtkWidget *widget,
     gtk_main_quit();
 }
 
-static GtkWidget *get_notebook_pages(GtkWidget *window)
+static GtkWidget *get_notebook_pages(void)
 {
     GtkWidget *notebook;
-    GtkWidget *statslabel, *detailslabel;
-#if 0
-    GtkWidget *summarylabel, *perflabel;
-#endif
-    GtkWidget *statspage, *detailspage;
+    GtkWidget *statslabel, *detailslabel, *trafficlabel;
+    GtkWidget *statspage, *detailspage, *trafficpage;
 
     notebook = gtk_notebook_new();
 
-#if 0
-    summarylabel = gtk_label_new("Summary");
-#endif
-
     statslabel = gtk_label_new("Status");
-
-    statspage = gui_status_setup();
-    gtk_notebook_append_page(GTK_NOTEBOOK(notebook), statspage, statslabel);
+    statspage  = gui_status_setup();
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
+			     statspage,
+			     statslabel);
 
     detailslabel = gtk_label_new("Details");
-    detailspage = gui_details_setup();
+    detailspage  = gui_details_setup();
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
 			     detailspage,
 			     detailslabel);
+
+    trafficlabel = gtk_label_new("Traffic");
+    trafficpage  = gui_traffic_setup();
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
+			     trafficpage,
+			     trafficlabel);
 
     return notebook;
 }
@@ -87,13 +87,13 @@ int main(int   argc,
 
     if (gui_comm_setup()) return 1;
 
-    notepagesframe = get_notebook_pages(main_window);
+    notepagesframe = get_notebook_pages();
 
     messageframe = gui_message_setup();
 
     /* create vbox, drop in menus, notepages, and message window */
     main_vbox = gtk_vbox_new(FALSE, 0);
-    gtk_container_set_border_width(GTK_CONTAINER (main_vbox), 1);
+    gtk_container_set_border_width(GTK_CONTAINER(main_vbox), 1);
     gtk_container_add(GTK_CONTAINER(main_window), main_vbox);
 
     gtk_box_pack_start(GTK_BOX(main_vbox), menubar, FALSE, TRUE, 0);
@@ -105,7 +105,7 @@ int main(int   argc,
 
     timer_callback(NULL);
 
-    gtk_timeout_add(4000 /* 4 seconds */,
+    gtk_timeout_add(1000 /* 1 second */,
 		    timer_callback,
 		    NULL);
 
@@ -119,14 +119,21 @@ gint timer_callback(gpointer data)
 {
     struct PVFS_mgmt_server_stat *svr_stat;
     int i, ret, svr_stat_ct = 0;
-    struct gui_graph_data *graph_data;
+    struct gui_status_graph_data *graph_data;
+    struct gui_traffic_raw_data *raw_traffic_data;
+
+    static struct gui_traffic_graph_data *traffic_graph = NULL;
+
+    float r[] = { 1.3, 1.4, 1.0, 4.3, 5.5, 0.3 };
+    float w[] = { 0.3, 4.4, 0.0, 1.3, 3.5, 7.3 };
+    float m[] = { 2.3, 2.4, 2.0, 2.3, 2.5, 2.3 };
 
     ret = gui_comm_stats_retrieve(&svr_stat, &svr_stat_ct);
     if (ret != 0) {
 	return -1;
     }
 
-    gui_data_prepare(svr_stat, svr_stat_ct, &graph_data);
+    gui_status_data_prepare(svr_stat, svr_stat_ct, &graph_data);
 
     /* note: relying on graph data values going from 0...5 */
     for (i=0; i < 6; i++) {
@@ -135,6 +142,29 @@ gint timer_callback(gpointer data)
     }
 
     gui_details_update(svr_stat, svr_stat_ct);
+
+    ret = gui_comm_traffic_retrieve(&raw_traffic_data, &svr_stat_ct);
+
+    /* we are responsible for allocating the traffic graph data storage;
+     * this way we only have to do it once.
+     */
+    if (traffic_graph == NULL) {
+	traffic_graph = (struct gui_traffic_graph_data *)
+	    malloc(sizeof(struct gui_traffic_graph_data));
+	traffic_graph->svr_data = (struct gui_traffic_server_data *)
+	    malloc(svr_stat_ct * sizeof(struct gui_traffic_server_data));
+	traffic_graph->svr_ct = svr_stat_ct;
+    }
+
+    if (traffic_graph->svr_ct != svr_stat_ct) {
+	free(traffic_graph->svr_data);
+	traffic_graph->svr_data = (struct gui_traffic_server_data *)
+	    malloc(svr_stat_ct * sizeof(struct gui_traffic_server_data));
+    }
+
+    gui_traffic_data_prepare(raw_traffic_data, svr_stat_ct, traffic_graph);
+
+    gui_traffic_graph_update(traffic_graph);
 
     return 1; /* schedule it again */
 }
