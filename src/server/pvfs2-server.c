@@ -626,30 +626,6 @@ static int initialize_new_server_op(job_status_s *temp_stat)
     return 0;
 }
 
-void PINT_server_gossip_debug(PINT_server_op *s_op,
-			      char *format,
-			      ...)
-{
-    va_list ap;
-    int new_format_sz;
-    char prefix[] = "(%p) ";
-    char *new_format;
-
-    /* allocate some space to temporarily hold new format string */
-    new_format_sz = strlen(format) + strlen(prefix) + 1;
-    new_format    = malloc(new_format_sz);
-    assert(new_format != NULL);
-
-    /* copy in prefix, old format string */
-    strcpy(new_format, prefix);
-    strcpy(new_format + strlen(prefix), format);
-    
-    va_start(ap, format);
-    gossip_debug(SERVER_DEBUG, new_format, s_op, ap);
-    va_end(ap);
-    free(new_format);
-}
-
 /*
  * Local variables:
  *  c-indent-level: 4
