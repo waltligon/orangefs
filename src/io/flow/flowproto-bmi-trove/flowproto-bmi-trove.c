@@ -867,6 +867,10 @@ static int buffer_setup_mem_to_bmi(flow_descriptor* flow_d)
 	int ret = -1;
 	PVFS_boolean eof_flag = 0; 
 	int i=0;
+	int intermediate_offset = 0;
+	char* dest_ptr = NULL;
+	char* src_ptr = NULL;
+	int done_flag = 0;
 
 	/* call req processing code to get first set of segments */
 	flow_data->bmi_total_size = DEFAULT_BUFFER_SIZE;
@@ -884,12 +888,94 @@ static int buffer_setup_mem_to_bmi(flow_descriptor* flow_d)
 		return(ret);
 	}
 
-	for(i=0; i<flow_data->bmi_list_count; i++)
+	/* did we provide enough segments to satisfy the amount of data
+	 * available < buffer size?
+	 */
+	if(!eof_flag && flow_d->current_req_offset != -1 &&
+		flow_data->bmi_total_size != DEFAULT_BUFFER_SIZE)
 	{
-		/* setup buffer list */
-		flow_data->bmi_buffer_list[i] =
-			flow_d->src.u.mem.buffer +
-			flow_data->bmi_offset_list[i];
+		/* we aren't at the end, but we didn't get the amount of data that
+		 * we asked for.  In this case, we should pack into an
+		 * intermediate buffer to send with BMI, because apparently we
+		 * have a lot of small segments to deal with 
+		 */
+		gossip_ldebug(FLOW_PROTO_DEBUG, "Warning: falling back to intermediate buffer.\n");
+		if(flow_data->bmi_list_count != MAX_REGIONS)
+		{
+			gossip_lerr("Error: reached an unexpected req processing state.\n");
+			return(-EINVAL);
+		}
+
+		/* allocate an intermediate buffer if not already present */
+		if(!flow_data->intermediate_buffer)
+		{
+			flow_data->intermediate_buffer = 
+				BMI_memalloc(flow_d->dest.u.bmi.address,
+				DEFAULT_BUFFER_SIZE, BMI_SEND_BUFFER);
+			if(!flow_data->intermediate_buffer)
+			{
+				return(-ENOMEM);
+			}
+		}
+
+		/* now, cycle through copying a full buffer's worth of data into
+		 * a contiguous intermediate buffer
+		 */
+		do
+		{
+			for(i=0; i<flow_data->bmi_list_count; i++)
+			{
+				dest_ptr = ((char*)flow_data->intermediate_buffer + 
+					intermediate_offset);
+				src_ptr = ((char*)flow_d->src.u.mem.buffer + 
+					flow_data->bmi_offset_list[i]);
+				memcpy(dest_ptr, src_ptr, flow_data->bmi_size_list[i]);
+				intermediate_offset += flow_data->bmi_size_list[i];
+			}
+
+			if(!eof_flag && flow_d->current_req_offset != -1 &&
+				intermediate_offset < DEFAULT_BUFFER_SIZE)
+			{
+				flow_data->bmi_list_count = MAX_REGIONS;
+				flow_data->bmi_total_size = DEFAULT_BUFFER_SIZE -
+					intermediate_offset;
+
+				ret = PINT_Process_request(flow_d->request_state,
+					flow_d->file_data, &flow_data->bmi_list_count,
+					flow_data->bmi_offset_list, flow_data->bmi_size_list,
+					&flow_d->current_req_offset, &flow_data->bmi_total_size,
+					&eof_flag, PINT_CLIENT);
+				if(ret < 0)
+				{
+					return(ret);
+				}
+			}
+			else
+			{
+				done_flag = 1;
+			}
+
+		} while(!done_flag);
+
+		/* set pointers and such to intermediate buffer so that we send
+		 * from the right place on the next bmi send operation
+		 */
+		flow_data->bmi_list_count = 1;
+		flow_data->bmi_buffer_list[0] = flow_data->intermediate_buffer;
+		flow_data->bmi_size_list[0] = intermediate_offset;
+		flow_data->bmi_total_size = intermediate_offset;
+		
+	}
+	else
+	{
+		/* setup buffer list with respect to user provided region */
+		for(i=0; i<flow_data->bmi_list_count; i++)
+		{
+			/* setup buffer list */
+			flow_data->bmi_buffer_list[i] =
+				flow_d->src.u.mem.buffer +
+				flow_data->bmi_offset_list[i];
+		}
 	}
 
 	return(0);
@@ -1175,6 +1261,19 @@ static void service_mem_to_bmi(flow_descriptor* flow_d)
 {
 	struct bmi_trove_flow_data* flow_data = PRIVATE_FLOW(flow_d);
 	int ret = -1;
+	int buffer_flag = 0;
+
+	/* make sure BMI knows if we are using an intermediate buffer or not,
+	 * because those have been created with bmi_memalloc()
+	 */
+	if(flow_data->bmi_buffer_list[0] == flow_data->intermediate_buffer)
+	{
+		buffer_flag = BMI_PRE_ALLOC;
+	}
+	else
+	{
+		buffer_flag = BMI_EXT_ALLOC;
+	}
 
 	/* post list send */
 	gossip_ldebug(FLOW_PROTO_DEBUG, "Posting send, total size: %ld\n", 
@@ -1182,7 +1281,7 @@ static void service_mem_to_bmi(flow_descriptor* flow_d)
 	ret = BMI_post_send_list(&flow_data->bmi_id,
 		flow_d->dest.u.bmi.address, flow_data->bmi_buffer_list,
 		flow_data->bmi_size_list, flow_data->bmi_list_count,
-		flow_data->bmi_total_size, BMI_EXT_ALLOC, 
+		flow_data->bmi_total_size, buffer_flag, 
 		flow_d->tag, flow_d);
 	if(ret == 1)
 	{
