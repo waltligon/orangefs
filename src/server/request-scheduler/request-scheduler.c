@@ -337,10 +337,11 @@ int PINT_req_sched_unpost(
 				/* keep going as long as the operations are I/O requests;
 				 * we let these all go concurrently
 				 */
-				while(next_element && next_element->req_ptr->op == PVFS_SERV_IO)
+				while(next_element && next_element->req_ptr->op == PVFS_SERV_IO
+					&& next_element->list_link.next != &(tmp_element->list_head->req_list))
 				{
 					next_element =
-						qlist_entry((tmp_element->list_head->req_list.next),
+						qlist_entry(next_element->list_link.next,
 						struct req_sched_element, list_link);
 					if(next_element && next_element->req_ptr->op == PVFS_SERV_IO)
 					{
@@ -421,10 +422,11 @@ int PINT_req_sched_release(
 			/* keep going as long as the operations are I/O requests;
 			 * we let these all go concurrently
 			 */
-			while(next_element && next_element->req_ptr->op == PVFS_SERV_IO)
+			while(next_element && next_element->req_ptr->op == PVFS_SERV_IO
+				&& next_element->list_link.next != &(tmp_list->req_list))
 			{
 				next_element =
-					qlist_entry((tmp_element->list_head->req_list.next),
+					qlist_entry(next_element->list_link.next,
 					struct req_sched_element, list_link);
 				if(next_element && next_element->req_ptr->op == PVFS_SERV_IO)
 				{
