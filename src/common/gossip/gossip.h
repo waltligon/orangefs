@@ -15,8 +15,8 @@
 #ifndef __GOSSIP_H
 #define __GOSSIP_H
 
-#include <syslog.h>
-#include <pvfs2-config.h>
+#include "syslog.h"
+#include "pvfs2-config.h"
 
 /********************************************************************
  * Visible interface

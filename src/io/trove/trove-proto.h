@@ -298,6 +298,9 @@ int trove_dspace_setattr(TROVE_coll_id coll_id,
 			 TROVE_context_id context_id,
 			 TROVE_op_id *out_op_id_p);
 
+int trove_dspace_cancel(TROVE_coll_id coll_id,
+                        TROVE_op_id id,
+                        TROVE_context_id context_id);
 
 int trove_dspace_test(TROVE_coll_id coll_id,
 		      TROVE_op_id id,

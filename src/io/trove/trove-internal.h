@@ -263,6 +263,11 @@ struct TROVE_dspace_ops
 			  TROVE_context_id context_id,
 			  TROVE_op_id *out_op_id_p);
     
+    int (*dspace_cancel)(
+		       TROVE_coll_id coll_id,
+		       TROVE_op_id ds_id,
+		       TROVE_context_id context_id);
+
     int (*dspace_test)(
 		       TROVE_coll_id coll_id,
 		       TROVE_op_id ds_id,

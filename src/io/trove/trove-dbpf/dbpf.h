@@ -311,11 +311,11 @@ enum dbpf_op_state
     OP_QUEUED,
     OP_IN_SERVICE,
     OP_COMPLETED,
-    OP_DEQUEUED
+    OP_DEQUEUED,
+    OP_CANCELED
 };
 
-
-/* Used to keep in-memory copy of parameters for queued operations */
+/* Used to store parameters for queued operations */
 struct dbpf_op
 {
     enum dbpf_op_type type;

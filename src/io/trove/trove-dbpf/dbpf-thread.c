@@ -103,14 +103,14 @@ void *dbpf_thread_function(void *ptr)
         }
 
         /*
-          if we have no work to do, wait nicely until an
-          operation to be serviced has entered the system.
+          if we have no work to do, wait nicely until an operation to
+          be serviced has entered the system.
 
-          if the queue isn't empty, and the out_count is 0,
-          that means that we're driving i/o operations without
-          using the aio callback completion.  we sleep between
-          those calls to avoid busy waiting (i.e. the timedwait
-          call is okay in those cases)
+          if the queue isn't empty, and the out_count is 0, that means
+          that we're driving i/o operations without using the aio
+          callback completion.  we sleep between those calls to avoid
+          busy waiting (i.e. the timedwait call is okay in those
+          cases)
         */
         if ((op_queued_empty) || (!op_queued_empty && (out_count == 0)))
         {
@@ -186,7 +186,8 @@ int dbpf_do_one_work_cycle(int *out_count)
             (*out_count)++;
 
             /* this is a macro defined in dbpf-thread.h */
-            move_op_to_completion_queue(cur_op);
+            move_op_to_completion_queue(
+                cur_op, ((ret == 1) ? 0 : ret), OP_COMPLETED);
         }
         else
         {

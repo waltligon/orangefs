@@ -40,8 +40,6 @@ struct keyval_dbcache_entry
 
 static struct keyval_dbcache_entry keyval_db_cache[DBCACHE_ENTRIES];
 
-/* dbpf_keyval_dbcache_initialize()
- */
 void dbpf_keyval_dbcache_initialize(void)
 {
     int i;
@@ -54,8 +52,6 @@ void dbpf_keyval_dbcache_initialize(void)
     }
 }
 
-/* dbpf_keyval_dbcache_finalize()
- */
 void dbpf_keyval_dbcache_finalize(void)
 {
     int i, ret;
@@ -309,8 +305,6 @@ return_error:
     return error;
 }
 
-/* dbpf_keyval_dbcache_put()
- */
 void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id, TROVE_handle handle)
 {
     int i;

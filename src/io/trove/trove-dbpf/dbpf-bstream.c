@@ -68,7 +68,7 @@ static void aio_progress_notification(sigval_t sig)
 {
     dbpf_queued_op_t *cur_op = NULL;
     struct dbpf_op *op_p = NULL;
-    int ret, i, aiocb_inuse_count, state = 0;
+    int ret, i, aiocb_inuse_count, state = 0, error_code = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
     gen_mutex_t *context_mutex = NULL;
 
@@ -96,7 +96,6 @@ static void aio_progress_notification(sigval_t sig)
       error/return value of the op based on individual request
       error/return values.  they're ignored for now, however.
     */
-#if 0
     for (i = 0; i < op_p->u.b_rw_list.aiocb_array_count; i++)
     {
         if (aiocb_p[i].aio_lio_opcode == LIO_NOP)
@@ -110,26 +109,40 @@ static void aio_progress_notification(sigval_t sig)
         {
             /* aio_return gets the return value of the individual op */
             ret = aio_return(&aiocb_p[i]);
+#if 0
             gossip_debug(GOSSIP_TROVE_DEBUG,
                          "  aio_return() says %d\n", ret);
-
-            /* WHAT DO WE DO WITH PARTIAL READ/WRITES??? */
+#endif
 
             /* mark as a NOP so we ignore it from now on */
             aiocb_p[i].aio_lio_opcode = LIO_NOP;
         }
+        else
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG, "error %d (%s) from "
+                         "aio_error/aio_return on block %d; "
+                         "skipping\n", ret, strerror(ret), i);
 
-        /* we shouldn't get called until all ops completed */
-        assert(ret != EINPROGRESS);
+            error_code = ret;
+            goto final_threaded_aio_cleanup;
+        }
     }
-#endif
 
     if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLPOSTED)
     {
+        error_code = 0;
+
+      final_threaded_aio_cleanup:
         gossip_debug(GOSSIP_TROVE_DEBUG, " aio_progress_notification: "
                      "op completed\n");
 
-        /* TODO: HOW DO WE DO A SYNC IN HERE?  WE DON'T HAVE THE FD */
+        if (op_p->flags & TROVE_SYNC)
+        {
+            if ((ret = DBPF_SYNC(op_p->u.b_rw_list.fd)) != 0)
+            {
+                error_code = -trove_errno_to_trove_error(ret);
+            }
+        }
         dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
 
         /*
@@ -141,8 +154,9 @@ static void aio_progress_notification(sigval_t sig)
         op_p->u.b_rw_list.aiocb_array = NULL;
 
         /* this is a macro defined in dbpf-thread.h */
-        ret = 1;
-        move_op_to_completion_queue(cur_op);
+        move_op_to_completion_queue(
+            cur_op, error_code,
+            ((error_code == ECANCELED) ? OP_CANCELED : OP_COMPLETED));
         return;
     }
     else
@@ -988,7 +1002,9 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 		gossip_debug(GOSSIP_TROVE_DEBUG, "error %d (%s) from "
                              "aio_error/aio_return on block %d; "
                              "skipping\n", ret, strerror(ret), i);
-		aiocb_p[i].aio_lio_opcode = LIO_NOP;
+
+                ret = -trove_errno_to_trove_error(ret);
+                goto final_aio_cleanup;
 	    }
 	    else
             {
@@ -999,7 +1015,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
     }
 
     /* if we're not done with the last set of operations, break out */
-    if (op_in_progress_count > 0) 
+    if (op_in_progress_count > 0)
     {
         return 0;
     }
@@ -1010,10 +1026,13 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
           done.  free the aiocb array, release the FD, and mark the
           whole op as complete
         */
+        ret = 1;
+
+      final_aio_cleanup:
 	free(aiocb_p);
 
 	dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
-	return 1;
+	return ret;
     }
     else
     {

@@ -48,10 +48,6 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
 
-/* dbpf_dspace_create()
- *
- * TODO: should this have a ds_attributes with it?
- */
 static int dbpf_dspace_create(TROVE_coll_id coll_id,
 			      TROVE_handle_extent_array *extent_array,
 			      TROVE_handle *handle_p,
@@ -257,8 +253,6 @@ return_error:
     return -TROVE_EINVAL;
 }
 
-/* dbpf_dspace_remove()
- */
 static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 			      TROVE_handle handle,
 			      TROVE_ds_flags flags,
@@ -292,8 +286,6 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     return 0;
 }
 
-/* dbpf_dspace_remove_op_svc()
- */
 static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 {
     int error, ret, got_db = 0;
@@ -427,8 +419,6 @@ int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
     return 0;
 }
 
-/* dbpf_dspace_iterate_handles_op_svc()
- */
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 {
     int ret = 0, i = 0, got_db = 0;
@@ -703,9 +693,6 @@ return_error:
     return error;
 }
 
-
-/* dbpf_dspace_getattr()
- */
 static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 			       TROVE_handle handle,
 			       TROVE_ds_attributes_s *ds_attr_p,
@@ -759,8 +746,6 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     return 0;
 }
 
-/* dbpf_dspace_setattr()
- */
 static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 			       TROVE_handle handle,
 			       TROVE_ds_attributes_s *ds_attr_p,
@@ -1048,6 +1033,103 @@ return_error:
     return ret;
 }
 
+/*
+  FIXME: it's possible to have a non-threaded version of this, but
+  it's not implemented right now
+*/
+static int dbpf_dspace_cancel(
+    TROVE_coll_id coll_id,
+    TROVE_op_id id,
+    TROVE_context_id context_id)
+{
+    int ret = -TROVE_ENOSYS;
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called\n");
+
+#ifdef __PVFS2_TROVE_THREADED__
+    int state = 0;
+    gen_mutex_t *context_mutex = NULL;
+    dbpf_queued_op_t *cur_op = NULL;
+
+    assert(dbpf_completion_queue_array[context_id]);
+    context_mutex = dbpf_completion_queue_array_mutex[context_id];
+    assert(context_mutex);
+    cur_op = id_gen_fast_lookup(id);
+    if (cur_op == NULL)
+    {
+        gossip_err("Invalid operation to test against\n");
+        return -TROVE_EINVAL;
+    }
+
+    /* check the state of the current op to see if it's completed */
+    gen_mutex_lock(&cur_op->mutex);
+    state = cur_op->op.state;
+    gen_mutex_unlock(&cur_op->mutex);
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "got cur_op %p\n", cur_op);
+
+    switch(state)
+    {
+        case OP_QUEUED:
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG, "op is queued: handling\n");
+
+            /* try to quietly dequeue the op ; fail cancel otherwise */
+            dbpf_queued_op_put_and_dequeue(cur_op);
+            assert(cur_op->op.state == OP_DEQUEUED);
+
+            /* this is a macro defined in dbpf-thread.h */
+            move_op_to_completion_queue(cur_op, 0, OP_CANCELED);
+            ret = 0;
+        }
+        break;
+        case OP_IN_SERVICE:
+        {
+            /*
+              for bstream i/o op, try an aio_cancel.  for other ops,
+              there's not much we can do other than let the op
+              complete normally
+            */
+            if ((cur_op->op.type == BSTREAM_READ_LIST) ||
+                (cur_op->op.type == BSTREAM_WRITE_LIST))
+            {
+                ret = aio_cancel(cur_op->op.u.b_rw_list.fd,
+                                 cur_op->op.u.b_rw_list.aiocb_array);
+                gossip_debug(
+                    GOSSIP_TROVE_DEBUG, "aio_cancel returned %s\n",
+                    ((ret == AIO_CANCELED) ? "CANCELED" :
+                     "NOT CANCELED"));
+
+                /*
+                  NOTE: the normal aio notification method takes care
+                  of completing the op and moving it to the completion
+                  queue
+                */
+            }
+            else
+            {
+                gossip_debug(
+                    GOSSIP_TROVE_DEBUG, "op is in service: ignoring "
+                    "operation type %d\n", cur_op->op.type);
+            }
+            ret = 0;
+        }
+        break;
+        case OP_COMPLETED:
+            /* easy cancelation case; do nothing */
+            gossip_debug(
+                GOSSIP_TROVE_DEBUG, "op is completed: ignoring\n");
+            ret = 0;
+            break;
+        default:
+            gossip_err("Invalid dbpf_op state found (%d)\n", state);
+            assert(0);
+    }
+#endif
+    return ret;
+}
+
+
 /* dbpf_dspace_test()
  *
  * Returns 0 if not completed, 1 if completed (successfully or with error).
@@ -1059,14 +1141,15 @@ return_error:
  *
  * Removes completed operations from the queue.
  */
-static int dbpf_dspace_test(TROVE_coll_id coll_id,
-			    TROVE_op_id id,
-                            TROVE_context_id context_id,
-			    int *out_count_p,
-			    TROVE_vtag_s *vtag,
-			    void **returned_user_ptr_p,
-			    TROVE_ds_state *state_p,
-                            int max_idle_time_ms)
+static int dbpf_dspace_test(
+    TROVE_coll_id coll_id,
+    TROVE_op_id id,
+    TROVE_context_id context_id,
+    int *out_count_p,
+    TROVE_vtag_s *vtag,
+    void **returned_user_ptr_p,
+    TROVE_ds_state *state_p,
+    int max_idle_time_ms)
 {
     int ret = -1;
     dbpf_queued_op_t *cur_op = NULL;
@@ -1379,10 +1462,11 @@ int dbpf_dspace_testcontext(
 
 /* dbpf_dspace_testsome()
  *
- * Returns 0 if nothing completed, 1 if something is completed (successfully
- * or with error).
+ * Returns 0 if nothing completed, 1 if something is completed
+ * (successfully or with error).
  *
- * The error state of the completed operation is returned via the state_p.
+ * The error state of the completed operation is returned via the
+ * state_p.
  */
 static int dbpf_dspace_testsome(
     TROVE_coll_id coll_id,
@@ -1533,6 +1617,7 @@ struct TROVE_dspace_ops dbpf_dspace_ops =
     dbpf_dspace_verify,
     dbpf_dspace_getattr,
     dbpf_dspace_setattr,
+    dbpf_dspace_cancel,
     dbpf_dspace_test,
     dbpf_dspace_testsome,
     dbpf_dspace_testcontext
