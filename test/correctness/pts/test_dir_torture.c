@@ -144,7 +144,7 @@ int recursive_create_dir(PVFS_handle handle, PVFS_fs_id fs_id,
 					depth-1, ndirs, rank);
 		}
 	}
-	return -1;  /* shouldn't get here */
+	return 0; 
 }
 
 /*
