@@ -123,6 +123,7 @@ int main(int argc, char **argv)
 	MPI_Finalize();
 
 	if (rank == 0) {
+		printf("%d procs ", nprocs);
 		if (opt_do_open) {
 			printf("%f seconds to open %d files: %f secs/open\n", 
 					total_time, opt_nfiles, 
@@ -192,7 +193,6 @@ int test_resize(int rank, unsigned int seed, int iterations,
 
 	for(i=0; i<iterations; i++) {
 		size = rand();
-		printf("resizing file to %Ld bytes\n", size);
 		errcode = MPI_File_set_size(fh, size);
 		if (errcode != MPI_SUCCESS) {
 			handle_error(errcode, "MPI_File_set_size");
