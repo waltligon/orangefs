@@ -63,7 +63,8 @@ struct PINT_server_crdirent_op {
 };
 
 struct PINT_server_remove_op {
-    PVFS_object_attr object_attr; /* used to hold attributes of object to be removed as read from keyval space*/
+    PVFS_object_attr object_attr; /* holds attributes of object to be removed as read from keyval space*/
+    PVFS_handle dirdata_handle;   /* holds dirdata dspace handle in the event that we are removing a directory */
 };
 
 struct PINT_server_getconfig_op {
@@ -107,7 +108,7 @@ typedef struct PINT_server_op
 	struct PINT_server_readdir_op   readdir;
 	struct PINT_server_remove_op    remove;
 	struct PINT_server_rmdirent_op  rmdirent;
-    } u;
+    } u; /* TODO: RENAME TO 'scratch' */
 } PINT_server_op;
 
 

@@ -14,11 +14,57 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 
+/* Implementation notes
+ *
+ * This is a complicated machine.  It is capable of removing the three externally visible
+ * PVFS2 object types: datafiles, metafiles, and directories.
+ *
+ * For a datafile, the path through the state machine looks like:
+ * 1) init
+ * 2) read_object_metadata (fails)
+ * 3) fallback_to_dspace_getattr
+ * 4) remove_dspace
+ * 5) send_response
+ * 6) release_posted_job
+ * 7) cleanup
+ *
+ * For a metafile, the path is:
+ * 1) init
+ * 2) read_object_metadata (completes)
+ * 3) verify_object_metadata
+ * 4) remove_dspace
+ * 5) send_response
+ * 6) release_posted_job
+ * 7) cleanup
+ *
+ * For a directory that has (or at one time had) entries, the path is:
+ * 1) init
+ * 2) read_object_metadata (completes)
+ * 3) verify_object_metadata
+ * 4) try_to_read_dirdata_handle
+ * 5) remove_dirdata_dspace
+ * 6) remove_dspace
+ * 7) send_response
+ * 8) release_posted_job
+ * 9) cleanup
+ *
+ * A directory that never had entries will skip step (5), as there would be no
+ * dirdata dspace.
+ *
+ * Hopefully this will help in understanding all that goes on here... -- Rob
+ */
+
+enum {
+    STATE_TYPE_DIRECTORY = 1
+};
+
 static int remove_init(PINT_server_op *s_op, job_status_s *ret);
 static int remove_read_object_metadata(PINT_server_op *s_op, job_status_s *ret);
 static int remove_verify_object_metadata(PINT_server_op *s_op, job_status_s *ret);
 static int remove_cleanup(PINT_server_op *s_op, job_status_s *ret);
 static int remove_remove_dspace(PINT_server_op *s_op, job_status_s *ret);
+static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op, job_status_s *ret);
+static int remove_remove_dirdata_dspace(PINT_server_op *s_op, job_status_s *ret);
 static int remove_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
 static int remove_send_response(PINT_server_op *s_op, job_status_s *ret);
 static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op, job_status_s *ret);
@@ -42,6 +88,8 @@ machine remove(init,
 	       fallback_to_dspace_getattr,
 	       verify_dspace_attributes,
 	       remove_dspace,
+	       try_to_read_dirdata_handle,
+	       remove_dirdata_dspace,
 	       send_response,
 	       release,
 	       cleanup)
@@ -75,6 +123,7 @@ machine remove(init,
 	state verify_object_metadata
 	{
 		run remove_verify_object_metadata;
+		STATE_TYPE_DIRECTORY => try_to_read_dirdata_handle;
 		success => remove_dspace;
 		default => send_response;
 	}
@@ -84,6 +133,20 @@ machine remove(init,
 		run remove_remove_dspace;
 		default => send_response;
 	}
+
+	state try_to_read_dirdata_handle
+	    {
+		run remove_try_to_read_dirdata_handle;
+		success => remove_dirdata_dspace;
+		default => remove_dspace;
+	    }
+
+	state remove_dirdata_dspace
+	    {
+		run remove_remove_dirdata_dspace;
+		success => remove_dspace;
+		default => send_response;
+	    }
 
 	state send_response
 	{
@@ -248,8 +311,13 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op,
 /*
  * Function: remove_verify_object_metadata
  *
- * Verifies that metadata was successfully read.  If so, verifies that
- * the user has permission to access the file (not yet implemented).
+ * Verifies that the user has permission to access the file (not yet implemented).
+ * Also directs removal of dirdata dspace in the case of a directory.
+ *
+ * This state has changed some over time; it might need a new name.
+ *
+ * Note: errors from the previous state are redirected elsewhere, so we
+ * know that we have metadata if we make it here.
  *
  * TODO: do permission checking, probably with some shared function.
  */
@@ -257,28 +325,98 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op,
 static int remove_verify_object_metadata(PINT_server_op *s_op,
 					 job_status_s *ret)
 {
+    PVFS_object_attr *a_p;
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: verify_object_metadata\n", s_op);
 
-    if (ret->error_code != 0) {
-	gossip_debug(SERVER_DEBUG,
-		     "  previous keyval read had an error (new metafile?); data is useless\n");
-	ret->error_code = -EINVAL;
-    }
-    else {
-	PVFS_object_attr *a_p = &s_op->u.remove.object_attr;
-
-	gossip_debug(SERVER_DEBUG,
-		     "  attrs read from keyval = (owner = %d, group = %d, perms = %o, type = %d)\n",
-		     a_p->owner,
-		     a_p->group,
-		     a_p->perms,
-		     a_p->objtype);
-    }
+    a_p = &s_op->u.remove.object_attr;
+    
+    gossip_debug(SERVER_DEBUG,
+		 "  attrs read from keyval = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		 a_p->owner,
+		 a_p->group,
+		 a_p->perms,
+		 a_p->objtype);
 
     /* TODO: CHECK PERMISSIONS */
 
+    if (a_p->objtype == PVFS_TYPE_DIRECTORY) {
+	ret->error_code = STATE_TYPE_DIRECTORY;
+	
+	gossip_debug(SERVER_DEBUG,
+		     "  type is directory; removing dirdata object before removing directory itself.\n");
+    }
+
     return 1;
+}
+
+/* Function: remove_try_to_read_dirdata_handle
+ *
+ * Note: this is "try to read" because the dirdata handle is dropped in lazily.
+ * so, the dirdata object might not exist (in the case of a directory that never
+ * had an object placed in it, for example).
+ *
+ */
+static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
+					     job_status_s *ret)
+{
+    int job_post_ret;
+    job_id_t j_id;
+
+    gossip_debug(SERVER_DEBUG, "(%p) remove state: read_dirdata_handle\n", s_op);
+
+    /* set up key and value structures for reading the dirdata handle */
+    s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+
+    s_op->val.buffer    = &s_op->u.remove.dirdata_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  trying to read dirdata handle (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.remove.fs_id,
+		 s_op->req->u.remove.handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
+
+    job_post_ret = job_trove_keyval_read(s_op->req->u.remove.fs_id,
+					 s_op->req->u.remove.handle,
+					 &s_op->key,
+					 &s_op->val,
+					 0,
+					 NULL,
+					 s_op,
+					 ret,
+					 &j_id);
+    return job_post_ret;
+}
+
+/*
+ * Function: remove_remove_dirdata_dspace
+ *
+ * Remove the dirdata dspace using the handle that we ready in the 
+ * read_dirdata_handle state.
+ */
+static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
+					job_status_s *ret)
+{
+    int job_post_ret;
+    job_id_t j_id;
+
+    gossip_debug(SERVER_DEBUG, "(%p) remove state: remove_dspace\n", s_op);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  removing dirdata dspace 0x%08Lx\n",
+		 s_op->u.remove.dirdata_handle);
+
+    job_post_ret = job_trove_dspace_remove(s_op->req->u.remove.fs_id,
+					   s_op->u.remove.dirdata_handle,
+					   s_op,
+					   ret,
+					   &j_id);
+    return job_post_ret;
 }
 
 /*
