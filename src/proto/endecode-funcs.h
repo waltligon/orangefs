@@ -3,33 +3,18 @@
  *
  * See COPYING in top-level directory.
  *
- * Defines for macros related to wire encoding and decoding.
- *
- * Included before pvfs2-req-proto.h by a file that wants to have the #defines
- * for encoding and decoding expanded out into functions.  Most users of that
- * header file get noop #defines.
+ * Defines for macros related to wire encoding and decoding.  Only included
+ * by include/pvfs2-encode-stubs.h by core encoding users.
  */
-#ifndef __PINT_REQPROTO_ENCODE_FUNCS_H
-#define __PINT_REQPROTO_ENCODE_FUNCS_H
-
-/*
- * All character types are rounded up to avoid seriously unaligned accesses;
- * generally handy elsewhere too.
- */
-#define roundup4(x) (((x)+3) & ~3)
-#define roundup8(x) (((x)+7) & ~7)
-
-/*
- * Only encoders will get the real definitions of all these things.
- * See below for the else clause full of empties.
- */
-#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#ifndef __SRC_PROTO_ENDECODE_FUNCS_H
+#define __SRC_PROTO_ENDECODE_FUNCS_H
 
 #include "src/io/bmi/bmi-byteswap.h"
 
 /*
  * Generic macros to define encoding near target structure declarations.
  */
+
 /* basic types */
 #define encode_uint64_t(pptr,x) do { \
     *(u_int64_t*) *(pptr) = htobmi64(*(x)); \
@@ -87,7 +72,12 @@
     *(pptr) += roundup4(4 + len + 1); \
 } while (0)
 
-/* type maps are put near the type definitions, except for this special one */
+/*
+ * Type maps are put near the type definitions, except for this special one.
+ *
+ * Please remember when changing a fundamental type, e.g. PVFS_size, to update
+ * also the set of #defines that tell the encoder what its type really is.
+ */
 #define encode_enum encode_int32_t
 #define decode_enum decode_int32_t
 
@@ -97,8 +87,9 @@
 
 /*
  * These wrappers define functions to do the encoding of the types or
- * structures they describe.  Below are some empty defines which are
- * used by most .c files.
+ * structures they describe.  Please remember to update the empty stub versions
+ * of these routines in include/pvfs2-encode-stubs.h, although the compiler
+ * will certainly complain too.
  *
  * Note that decode can not take a const since we point into the
  * undecoded buffer for strings.
@@ -334,27 +325,4 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 	decode_##ta1(pptr, &(x)->a1[i]); \
 }
 
-#else  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
-
-/* dummy declarations to turn off functions */
-#define endecode_fields_0(n)
-#define endecode_fields_0a(n,tn1,n1,ta1,a1)
-#define endecode_fields_1(n,t1,x1)
-#define endecode_fields_2(n,t1,x1,t2,x2)
-#define endecode_fields_3(n,t1,x1,t2,x2,t3,x3)
-#define endecode_fields_5(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5)
-#define endecode_fields_1_struct(n,t1,x1)
-#define endecode_fields_2_struct(n,t1,x1,t2,x2)
-#define endecode_fields_3_struct(n,t1,x1,t2,x2,t3,x3)
-#define endecode_fields_4_struct(n,t1,x1,t2,x2,t3,x3,t4,x4)
-#define endecode_fields_5_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5)
-#define endecode_fields_6_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6)
-#define endecode_fields_7_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7)
-#define endecode_fields_0a_struct(n,tn1,n1,ta1,a1)
-#define endecode_fields_0aa_struct(n,tn1,n1,ta1,a1,tn2,n2,ta2,a2)
-#define endecode_fields_1a_struct(n,t1,x1,tn1,n1,ta1,a1)
-#define endecode_fields_3a_struct(n,t1,x1,t2,x2,t3,x3,tn1,n1,ta1,a1)
-
-#endif  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
-
-#endif  /* __PINT_REQPROTO_ENCODE_FUNCS_H */
+#endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
