@@ -25,7 +25,13 @@ TEST_PTS_MISC := \
 	$(DIR)/test-request-indexed.c \
 	$(DIR)/test-request-contiguous.c \
 	$(DIR)/test-encode-basic.c \
-	$(DIR)/test-noncontig-pattern.c
+	$(DIR)/test-noncontig-pattern.c \
+	$(DIR)/test-write-eof.c \
+	$(DIR)/test-vector-offset.c\
+	$(DIR)/test-vector-start-final-offset.c\
+	$(DIR)/test-contiguous-datatype.c \
+	$(DIR)/test-explicit-offset.c \
+	$(DIR)/test-request-tiled.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 

@@ -27,6 +27,12 @@
 #include <test-request-contiguous.h>
 #include <test-encode-basic.h>
 #include <test-noncontig-pattern.h>
+#include <test-write-eof.h>
+#include <test-vector-offset.h>
+#include <test-vector-start-final-offset.h>
+#include <test-contiguous-datatype.h>
+#include <test-explicit-offset.h>
+#include <test-request-tiled.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -48,7 +54,13 @@ enum test_types {
 	TEST_REQUEST_INDEXED,
 	TEST_REQUEST_CONTIGUOUS,
 	TEST_ENCODE_BASIC,
-	TEST_NONCONTIG_PATTERN
+	TEST_NONCONTIG_PATTERN,
+	TEST_WRITE_EOF,
+	TEST_VECTOR_OFFSET,
+	TEST_VECTOR_START_FINAL_OFFSET,
+	TEST_CONTIGUOUS_DATATYPE,
+	TEST_EXPLICIT_OFFSET,
+	TEST_REQUEST_TILED
 };
 
 void setup_ptstests(config *myconfig) {
@@ -110,6 +122,18 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_ENCODE_BASIC].test_name = str_malloc("test_encode_basic");
    myconfig->testpool[TEST_NONCONTIG_PATTERN].test_func = (void *)test_noncontig_pattern;
    myconfig->testpool[TEST_NONCONTIG_PATTERN].test_name = str_malloc("test_noncontig_pattern");
+   myconfig->testpool[TEST_WRITE_EOF].test_func = (void *)test_write_eof;
+   myconfig->testpool[TEST_WRITE_EOF].test_name = str_malloc("test_write_eof");
+   myconfig->testpool[TEST_VECTOR_OFFSET].test_func = (void *)test_vector_offset;
+   myconfig->testpool[TEST_VECTOR_OFFSET].test_name = str_malloc("test_vector_offset");
+   myconfig->testpool[TEST_VECTOR_START_FINAL_OFFSET].test_func = (void *)test_vector_start_final_offset;
+   myconfig->testpool[TEST_VECTOR_START_FINAL_OFFSET].test_name = str_malloc("test_vector_start_final_offset");
+   myconfig->testpool[TEST_CONTIGUOUS_DATATYPE].test_func = (void *)test_contiguous_datatype;
+   myconfig->testpool[TEST_CONTIGUOUS_DATATYPE].test_name = str_malloc("test_contiguous_datatype");
+   myconfig->testpool[TEST_EXPLICIT_OFFSET].test_func = (void *)test_explicit_offset;
+   myconfig->testpool[TEST_EXPLICIT_OFFSET].test_name = str_malloc("test_explicit_offset");
+   myconfig->testpool[TEST_REQUEST_TILED].test_func = (void *)test_request_tiled;
+   myconfig->testpool[TEST_REQUEST_TILED].test_name = str_malloc("test_request_tiled");
 }
 
 #endif
