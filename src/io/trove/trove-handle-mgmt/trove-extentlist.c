@@ -455,14 +455,18 @@ static int64_t avltree_extent_search_in_range(struct avlnode *n,
     if (n->right != NULL)
 	right = (struct TROVE_handle_extent *) n->right->d;
 
-    /* request matches at an edge */
-    if (req_extent->first == e->first || req_extent->first == e->last)
+    /* request matches at one edge or the other of an existing extent */
+    if ( (req_extent->first == e->first) || req_extent->first == e->last)
 	return(req_extent->first);
 
-    else if (req_extent->last == e->first || req_extent->last == e->last)
+    else if ( (req_extent->last == e->first) || (req_extent->last == e->last))
 	return(req_extent->last);
 
-    /* request completely or exactly overlaps */
+    /* request fits within an existing extent */
+    else if ( req_extent->first > e->first && req_extent->last < e->last)
+	return (req_extent->last);
+
+    /* request completely overlaps */
     else if ( req_extent->first < e->first && req_extent->last > e->last)
 	return (e->last);
     
