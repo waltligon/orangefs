@@ -20,8 +20,6 @@ static int copy_attributes(PVFS_object_attr new,PVFS_object_attr old,\
 static int do_lookup(PVFS_string name,pinode_reference parent,\
 		PVFS_bitfield mask,PVFS_credentials cred,pinode_reference *entry);
 
-extern pcache pvfs_pcache;
-
 /* PVFS_sys_create()
  *
  * create a PVFS file with specified attributes 
@@ -49,7 +47,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	int io_serv_cnt = 0, i = 0, j = 0;
 	
 	/* Allocate the pinode */
-	ret = pcache_pinode_alloc(&pinode_ptr);
+	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
 	if (ret < 0)
 	{
 		ret = -ENOMEM;
@@ -82,7 +80,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	if (entry.handle != PINT_DCACHE_HANDLE_INVALID)
 	{
 		/* Search in pinode cache */
-		ret = pcache_lookup(&pvfs_pcache,entry,pinode_ptr);
+		ret = PINT_pcache_lookup(entry,pinode_ptr);
 		if (ret < 0)
 		{
 			goto pinode_get_failure;
@@ -91,13 +89,13 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 		if (pinode_ptr->pinode_ref.handle != -1)
 		{
 			/* Pinode is present, remove it */
-			ret = pcache_remove(&pvfs_pcache,entry,&item_ptr);
+			ret = PINT_pcache_remove(entry,&item_ptr);
 			if (ret < 0)
 			{
 				goto pinode_remove_failure;
 			}
 			/* Free pinode removed from the cache */
-			pcache_pinode_dealloc(item_ptr);
+			PINT_pcache_pinode_dealloc(item_ptr);
 		}
 		/* Remove dcache entry */
 		ret = PINT_dcache_remove(req->entry_name,req->parent_refn,&item);
@@ -111,7 +109,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	/* Get the parent pinode */
 	cflags = HANDLE_VALIDATE;
 	/* Search in pinode cache */
-	ret = pcache_lookup(&pvfs_pcache,req->parent_refn,pinode_ptr);
+	ret = PINT_pcache_lookup(req->parent_refn,pinode_ptr);
 	if (ret < 0)
 	{
 		goto pinode_get_failure;
@@ -127,7 +125,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 			goto pinode_remove_failure;
 		}
 		/* Free the pinode */
-		pcache_pinode_dealloc(pinode_ptr);
+		PINT_pcache_pinode_dealloc(pinode_ptr);
 	}
 	
 	/* Determine the initial metaserver for new file */
@@ -297,7 +295,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	}
 
 	/* Allocate the pinode */
-	ret = pcache_pinode_alloc(&pinode_ptr);
+	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
 	if (ret < 0)
 	{
 		ret = -ENOMEM;
@@ -324,7 +322,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 		goto pinode_fill_failure;
 	}
 	/* Add pinode to the cache */
-	ret = pcache_insert(&pvfs_pcache,pinode_ptr);
+	ret = PINT_pcache_insert(pinode_ptr);
 	if (ret < 0)
 	{
 		goto pinode_fill_failure;
@@ -427,7 +425,7 @@ addr_lookup_failure:
 
 pinode_remove_failure:
 	/* Free the pinode allocated */
-	pcache_pinode_dealloc(pinode_ptr);
+	PINT_pcache_pinode_dealloc(pinode_ptr);
 
 pinode_get_failure:
 	sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);

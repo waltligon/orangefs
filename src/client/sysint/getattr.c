@@ -14,8 +14,6 @@
 #include <pint-servreq.h>
 #include <config-manage.h>
 
-extern pcache pvfs_pcache;
-
 /* PVFS_sys_getattr()
  *
  * obtain the attributes of a PVFS file
@@ -55,7 +53,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	cflags = HANDLE_VALIDATE + ATTR_VALIDATE;
 	if (cflags & ATTR_SIZE)
 		cflags += SIZE_VALIDATE;
-	ret = phelper_get_pinode(entry,&pvfs_pcache,&entry_pinode,attr_mask,
+	ret = phelper_get_pinode(entry,&entry_pinode,attr_mask,
 			vflags,cflags,req->credentials);
 	if (ret < 0)
 	{
@@ -149,7 +147,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	}/* if size is required */
 
 	/* Add to cache  */
-	ret = pcache_insert(&pvfs_pcache,entry_pinode);
+	ret = PINT_pcache_insert(entry_pinode);
 	if (ret < 0)
 	{
 		goto map_server_failure;

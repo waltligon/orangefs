@@ -13,7 +13,6 @@
 #include "config-manage.h"
 #include "gen-locks.h"
 
-extern pcache pvfs_pcache;
 extern fsconfig_array server_config;
 extern gen_mutex_t *g_session_tag_mt_lock;
 
@@ -30,7 +29,7 @@ int PVFS_sys_finalize()
     /* Free the dcache */
     PINT_dcache_finalize();
     /* free all pinode structures */
-    pcache_finalize(pvfs_pcache);
+    PINT_pcache_finalize();
 	
     /* Shut down the configuration management interface */
     ret = config_bt_finalize();

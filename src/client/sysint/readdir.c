@@ -12,8 +12,6 @@
 #include <pint-servreq.h>
 #include <config-manage.h>
 
-extern pcache pvfs_pcache;
-
 /* PVFS_sys_readdir()
  *
  * read a directory with specified attributes 
@@ -37,7 +35,7 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 	cflags = HANDLE_VALIDATE;
 	vflags = 0;
 	attr_mask = ATTR_BASIC;
-	ret = phelper_get_pinode(req->pinode_refn,&pvfs_pcache,&pinode_ptr,\
+	ret = phelper_get_pinode(req->pinode_refn,&pinode_ptr,
 			attr_mask, vflags, cflags, req->credentials);
 	if (ret < 0)
 	{
@@ -50,7 +48,7 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 			goto pinode_get_failure;
 	}
 	/* Free the pinode */
-	pcache_pinode_dealloc(pinode_ptr);
+	PINT_pcache_pinode_dealloc(pinode_ptr);
 
 	/* Read directory server request */
 

@@ -12,8 +12,6 @@
 #include <pint-servreq.h>
 #include <config-manage.h>
 
-extern pcache pvfs_pcache;
-
 /* PVFS_sys_setattr()
  *
  * sets attributes for a particular PVFS file 
@@ -45,14 +43,14 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	entry.fs_id = req->pinode_refn.fs_id;
 	
 	/* Get the pinode */
-	ret = pcache_pinode_alloc(&pinode_ptr);
+	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
 	if (ret < 0)
 	{
 		ret = -ENOMEM;
 		goto pinode_alloc_failure;
 	}
 	/* Lookup the entry...may or may not exist in the cache */
-	ret = pcache_lookup(&pvfs_pcache,entry,pinode_ptr);
+	ret = PINT_pcache_lookup(entry,pinode_ptr);
 	if (ret < 0)
 	{
 		goto pcache_lookup_failure;
@@ -114,13 +112,13 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	 */
 	if (pinode_ptr->pinode_ref.handle != -1)
 	{
-		ret = pcache_remove(&pvfs_pcache,entry,&item_ptr);
+		ret = PINT_pcache_remove(entry,&item_ptr);
 		if (ret < 0)
 		{
 			goto pinode_remove_failure;
 		}
 		/* Free the pinode returned */
-		pcache_pinode_dealloc(item_ptr);
+		PINT_pcache_pinode_dealloc(item_ptr);
 	}
 	else
 	{
@@ -136,7 +134,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	}
 		
 	/* Add the pinode and return */
-	ret = pcache_insert(&pvfs_pcache,pinode_ptr);
+	ret = PINT_pcache_insert(pinode_ptr);
 	if (ret < 0)
 	{
 		goto pinode_remove_failure;
@@ -155,7 +153,7 @@ map_to_server_failure:
 		free(server);
 
 pcache_lookup_failure:
-	pcache_pinode_dealloc(pinode_ptr);
+	PINT_pcache_pinode_dealloc(pinode_ptr);
 
 pinode_alloc_failure:
 

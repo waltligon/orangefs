@@ -53,13 +53,13 @@ struct pinodecache {
 typedef struct pinodecache pcache;
 
 /* Public Interface */
-int pcache_initialize(pcache *cache);
-int pcache_finalize(pcache cache);
-int pcache_lookup(pcache *cache,pinode_reference refn,pinode *pinode_ptr);
-int pcache_insert(pcache *cache, pinode *pnode);
-int pcache_remove(pcache *cache, pinode_reference refn,pinode **item);
-int pcache_pinode_alloc(pinode **pnode);
-void pcache_pinode_dealloc(pinode *pnode);
+int PINT_pcache_initialize(void);
+int PINT_pcache_finalize(void);
+int PINT_pcache_lookup(pinode_reference refn,pinode *pinode_ptr);
+int PINT_pcache_insert(pinode *pnode);
+int PINT_pcache_remove(pinode_reference refn,pinode **item);
+int PINT_pcache_pinode_alloc(pinode **pnode);
+void PINT_pcache_pinode_dealloc(pinode *pnode);
 
 /*
  * Local variables:

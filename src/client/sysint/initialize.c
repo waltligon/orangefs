@@ -25,7 +25,6 @@
 #define REQ_ENC_FORMAT 0
 
 /* pinode cache */
-extern pcache pvfs_pcache; 
 
 extern fsconfig_array server_config;
 
@@ -89,7 +88,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
     }
 	
     /* Initialize the pinode cache */
-    ret = pcache_initialize(&pvfs_pcache);
+    ret = PINT_pcache_initialize();
     if (ret < 0)
     {
 	init_fail = PCACHE_INIT_FAIL;
@@ -156,7 +155,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
 	case BUCKET_INIT_FAIL:
 	    PINT_dcache_finalize();
 	case DCACHE_INIT_FAIL:
-	    pcache_finalize(pvfs_pcache);
+	    PINT_pcache_finalize();
 	case PCACHE_INIT_FAIL:
 	    job_finalize();
 	case JOB_INIT_FAIL:

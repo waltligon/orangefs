@@ -23,21 +23,21 @@ static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr,\
  *
  * returns 0 on success, -errno on failure
  */
-int phelper_get_pinode(pinode_reference pref,pcache *cache,\
-		pinode **pinode_ptr,PVFS_bitfield attrmask,int valid_flags,\
+int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
+		PVFS_bitfield attrmask,int valid_flags,
 		int cache_flags,PVFS_credentials credentials)
 {
 	int ret = 0;
 	
 	/* Allocate a pinode */
-	ret = pcache_pinode_alloc(pinode_ptr);
+	ret = PINT_pcache_pinode_alloc(pinode_ptr);
 	if (ret < 0)
 	{
 		ret = -ENOMEM;
 		goto pinode_alloc_failure;
 	}
 	/* Does pinode exist? */
-	ret = pcache_lookup(cache,pref,*pinode_ptr);
+	ret = PINT_pcache_lookup(pref,*pinode_ptr);
 	if (ret < 0)
 	{
 		goto pinode_refresh_failure;
@@ -113,7 +113,7 @@ int phelper_get_pinode(pinode_reference pref,pcache *cache,\
 	}
 
 	/* Add/Merge the pinode to the pinode cache */
-	ret = pcache_insert(cache,(*pinode_ptr));
+	ret = PINT_pcache_insert(*pinode_ptr);
 	if (ret < 0)
 	{
 		goto pinode_refresh_failure;
@@ -123,7 +123,7 @@ int phelper_get_pinode(pinode_reference pref,pcache *cache,\
 	
 pinode_refresh_failure:
 	/* Free the allocated pinode */
-	pcache_pinode_dealloc(*pinode_ptr);
+	PINT_pcache_pinode_dealloc(*pinode_ptr);
 
 pinode_alloc_failure:
 	return(ret);
@@ -238,7 +238,7 @@ int phelper_validate_pinode(pinode *pnode,int flags,PVFS_bitfield mask,\
 			/* Handle could have changed, need to verify this */
 			/* Server getattr request */
 			/* Allocate a pinode */
-			ret = pcache_pinode_alloc(&pinode_ptr);
+			ret = PINT_pcache_pinode_alloc(&pinode_ptr);
 			if (ret < 0)
 			{
 				ret = -ENOMEM;
@@ -249,7 +249,7 @@ int phelper_validate_pinode(pinode *pnode,int flags,PVFS_bitfield mask,\
 			if (ret < 0)
 			{
 				/* Free the memory allocated for pinode */
-				pcache_pinode_dealloc(pinode_ptr);
+				PINT_pcache_pinode_dealloc(pinode_ptr);
 				return(ret);
 			}
 
@@ -264,7 +264,7 @@ int phelper_validate_pinode(pinode *pnode,int flags,PVFS_bitfield mask,\
 				 * to redo lookup
 				 */
 				/* Free the memory allocated for pinode */
-				pcache_pinode_dealloc(pinode_ptr);
+				PINT_pcache_pinode_dealloc(pinode_ptr);
 				return(ret); /* handle info has changed */
 			}
 			else 
@@ -280,7 +280,7 @@ int phelper_validate_pinode(pinode *pnode,int flags,PVFS_bitfield mask,\
 					return(ret);
 				}
 				/* Free the memory allocated for pinode */
-				pcache_pinode_dealloc(pinode_ptr);
+				PINT_pcache_pinode_dealloc(pinode_ptr);
 				/* Safe to use the pinode values */
 				return(0); 
 			}
@@ -303,7 +303,7 @@ int phelper_validate_pinode(pinode *pnode,int flags,PVFS_bitfield mask,\
 			 * pinode again
 			 */
 			/* Allocate a pinode */
-			ret = pcache_pinode_alloc(&pinode_ptr);
+			ret = PINT_pcache_pinode_alloc(&pinode_ptr);
 			if (ret < 0)
 			{
 				ret = -ENOMEM;
@@ -315,7 +315,7 @@ int phelper_validate_pinode(pinode *pnode,int flags,PVFS_bitfield mask,\
 			if (ret < 0)
 			{
 				/* Free the memory allocated for pinode */
-				pcache_pinode_dealloc(pinode_ptr);
+				PINT_pcache_pinode_dealloc(pinode_ptr);
 				return(-1);
 			}
 			else
@@ -330,7 +330,7 @@ int phelper_validate_pinode(pinode *pnode,int flags,PVFS_bitfield mask,\
 					return(ret);
 				}
 				/* Free the memory allocated for pinode */
-				pcache_pinode_dealloc(pinode_ptr);
+				PINT_pcache_pinode_dealloc(pinode_ptr);
 				return(0);
 			}
 		}
