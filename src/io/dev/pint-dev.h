@@ -30,6 +30,8 @@ int PINT_dev_initialize(
 
 void PINT_dev_finalize(void);
 
+int PINT_dev_get_mapped_region(void** ptr, int size);
+
 int PINT_dev_test_unexpected(
 	int incount,
 	int* outcount,

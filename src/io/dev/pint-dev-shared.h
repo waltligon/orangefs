@@ -15,6 +15,14 @@
 #define PVFS_DEV_GET_MAGIC                      1
 #define PVFS_DEV_GET_MAX_UPSIZE                 2
 #define PVFS_DEV_GET_MAX_DOWNSIZE               3
+#define PVFS_DEV_MAP				4
+
+/* describes memory regions to map in the PVFS_DEV_MAP ioctl */
+struct PVFS_dev_map_desc
+{
+    void* ptr;
+    int size;
+};
 
 #endif /* __PINT_DEV_SHARED_H */
 
