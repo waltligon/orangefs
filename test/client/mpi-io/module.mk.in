@@ -1,0 +1,4 @@
+DIR := test/client/mpi-io
+
+MPITESTSRC += \
+	$(DIR)/mpi-io-test.c
