@@ -555,9 +555,6 @@ struct server_configuration_s *PINT_get_server_config_struct(
  * state-machine.h included here
  ************************************/
 #define PINT_OP_STATE       PINT_client_sm
-#if 0
-#define PINT_OP_STATE_TABLE PINT_server_op_table
-#endif
 
 #include "state-machine.h"
 

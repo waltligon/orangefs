@@ -66,12 +66,6 @@
  */
 #define PVFS_SERVER_TEST_COUNT 64
 
-/* Lookup table for determining what state machine to use when a
- * new request is received.
- */
-static struct PINT_state_machine_s *PINT_server_op_table[
-    PVFS_MAX_SERVER_OP+1] = {NULL};
-
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_flag server_status_flag;
 
@@ -122,7 +116,6 @@ static int server_shutdown(
 static void server_sig_handler(int sig);
 static int server_post_unexpected_recv(job_status_s * js_p);
 static int server_parse_cmd_line_args(int argc, char **argv);
-static void server_state_table_initialize(void);
 static int server_state_machine_start(
     PINT_server_op *s_op, job_status_s *js_p);
 static void init_req_table(void);
@@ -460,9 +453,6 @@ static int server_initialize(
                    "aborting.\n");
         return ret;
     }
-
-    /* Initialize table of state machines (no return value) */
-    server_state_table_initialize();
 
     *server_status_flag |= SERVER_STATE_MACHINE_INIT;
 
@@ -1398,42 +1388,6 @@ int server_state_machine_start_noreq(PINT_server_op* new_op)
     return(0);
 }
 
-/* server_state_table_initialize()
- *
- * sets up a table of state machines that can be located with
- * PINT_state_machine_locate()
- *
- */
-static void server_state_table_initialize(void)
-{
-
-    /* fill in indexes for each supported request type */
-    PINT_server_op_table[PVFS_SERV_INVALID]       = NULL;
-    PINT_server_op_table[PVFS_SERV_CREATE]        = &pvfs2_create_sm;
-    PINT_server_op_table[PVFS_SERV_REMOVE]        = &pvfs2_remove_sm;
-    PINT_server_op_table[PVFS_SERV_IO]            = &pvfs2_io_sm;
-    PINT_server_op_table[PVFS_SERV_GETATTR]       = &pvfs2_get_attr_sm;
-    PINT_server_op_table[PVFS_SERV_SETATTR]       = &pvfs2_set_attr_sm;
-    PINT_server_op_table[PVFS_SERV_LOOKUP_PATH]   = &pvfs2_lookup_sm;
-    PINT_server_op_table[PVFS_SERV_CRDIRENT]      = &pvfs2_crdirent_sm;
-    PINT_server_op_table[PVFS_SERV_RMDIRENT]      = &pvfs2_rmdirent_sm;
-    PINT_server_op_table[PVFS_SERV_CHDIRENT]      = &pvfs2_chdirent_sm;
-    PINT_server_op_table[PVFS_SERV_MKDIR]         = &pvfs2_mkdir_sm;
-    PINT_server_op_table[PVFS_SERV_READDIR]       = &pvfs2_readdir_sm;
-    PINT_server_op_table[PVFS_SERV_GETCONFIG]     = &pvfs2_get_config_sm;
-    PINT_server_op_table[PVFS_SERV_FLUSH]	  = &pvfs2_flush_sm;
-    PINT_server_op_table[PVFS_SERV_TRUNCATE]	  = &pvfs2_truncate_sm;
-    PINT_server_op_table[PVFS_SERV_MGMT_SETPARAM] = &pvfs2_setparam_sm;
-    PINT_server_op_table[PVFS_SERV_MGMT_NOOP]     = &pvfs2_noop_sm;
-    PINT_server_op_table[PVFS_SERV_STATFS]	  = &pvfs2_statfs_sm;
-    PINT_server_op_table[PVFS_SERV_PERF_UPDATE]	  = &pvfs2_perf_update_sm;
-    PINT_server_op_table[PVFS_SERV_JOB_TIMER]	  = &pvfs2_job_timer_sm;
-    PINT_server_op_table[PVFS_SERV_PROTO_ERROR]	  = &pvfs2_proto_error_sm;
-    PINT_server_op_table[PVFS_SERV_MGMT_PERF_MON] = &pvfs2_perf_mon_sm;
-    PINT_server_op_table[PVFS_SERV_MGMT_EVENT_MON] = &pvfs2_event_mon_sm;
-    PINT_server_op_table[PVFS_SERV_MGMT_ITERATE_HANDLES] 
-	= &pvfs2_iterate_handles_sm;
-}
 
 /* server_state_machine_complete()
  *
@@ -1492,50 +1446,68 @@ static void init_req_table(void)
      * that the compiler will generate a warning if someone forgets to
      * update this table when they add a new server operation 
      */
-    #define OP_CASE(_type,_string,_perm) \
+    #define OP_CASE(_type,_string,_perm,_sm) \
 	case _type: \
 	    PINT_server_req_table[i].op_type = _type; \
 	    PINT_server_req_table[i].string_name = _string; \
 	    PINT_server_req_table[i].perm = _perm; \
+	    PINT_server_req_table[i].sm = _sm; \
 	    break;
 
     for(i=0; i<(PVFS_MAX_SERVER_OP+1); i++)
     {
 	switch(i){
-	OP_CASE(PVFS_SERV_INVALID, "invalid", PINT_SERVER_CHECK_INVALID);
-	OP_CASE(PVFS_SERV_CREATE, "create", PINT_SERVER_CHECK_NONE);
-	OP_CASE(PVFS_SERV_REMOVE, "remove", PINT_SERVER_CHECK_NONE);
-	OP_CASE(PVFS_SERV_IO, "io", PINT_SERVER_CHECK_NONE);
-	OP_CASE(PVFS_SERV_GETATTR, "getattr", PINT_SERVER_CHECK_ATTR);
-	OP_CASE(PVFS_SERV_SETATTR, "setattr", PINT_SERVER_CHECK_ATTR);
-	OP_CASE(PVFS_SERV_LOOKUP_PATH, "lookup_path", PINT_SERVER_CHECK_NONE);
-	OP_CASE(PVFS_SERV_CRDIRENT, "crdirent", PINT_SERVER_CHECK_WRITE);
-	OP_CASE(PVFS_SERV_RMDIRENT, "rmdirent", PINT_SERVER_CHECK_WRITE);
-	OP_CASE(PVFS_SERV_CHDIRENT, "chdirent", PINT_SERVER_CHECK_WRITE);
-	OP_CASE(PVFS_SERV_TRUNCATE, "truncate", PINT_SERVER_CHECK_NONE);
-	OP_CASE(PVFS_SERV_MKDIR, "mkdir", PINT_SERVER_CHECK_NONE);
-	OP_CASE(PVFS_SERV_READDIR, "readdir", PINT_SERVER_CHECK_READ);
-	OP_CASE(PVFS_SERV_GETCONFIG, "getconfig", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_INVALID, "invalid", PINT_SERVER_CHECK_INVALID,
+	    NULL);
+	OP_CASE(PVFS_SERV_CREATE, "create", PINT_SERVER_CHECK_NONE,
+	    &pvfs2_create_sm);
+	OP_CASE(PVFS_SERV_REMOVE, "remove", PINT_SERVER_CHECK_NONE, 
+	    &pvfs2_remove_sm);
+	OP_CASE(PVFS_SERV_IO, "io", PINT_SERVER_CHECK_NONE, &pvfs2_io_sm);
+	OP_CASE(PVFS_SERV_GETATTR, "getattr", PINT_SERVER_CHECK_ATTR,
+	    &pvfs2_get_attr_sm);
+	OP_CASE(PVFS_SERV_SETATTR, "setattr", PINT_SERVER_CHECK_ATTR, 
+	    &pvfs2_set_attr_sm);
+	OP_CASE(PVFS_SERV_LOOKUP_PATH, "lookup_path", PINT_SERVER_CHECK_NONE, 
+	    &pvfs2_lookup_sm);
+	OP_CASE(PVFS_SERV_CRDIRENT, "crdirent", PINT_SERVER_CHECK_WRITE, 
+	    &pvfs2_crdirent_sm);
+	OP_CASE(PVFS_SERV_RMDIRENT, "rmdirent", PINT_SERVER_CHECK_WRITE, 
+	    &pvfs2_rmdirent_sm);
+	OP_CASE(PVFS_SERV_CHDIRENT, "chdirent", PINT_SERVER_CHECK_WRITE, 
+	    &pvfs2_chdirent_sm);
+	OP_CASE(PVFS_SERV_TRUNCATE, "truncate", PINT_SERVER_CHECK_NONE,
+	    &pvfs2_truncate_sm);
+	OP_CASE(PVFS_SERV_MKDIR, "mkdir", PINT_SERVER_CHECK_NONE,
+	    &pvfs2_mkdir_sm);
+	OP_CASE(PVFS_SERV_READDIR, "readdir", PINT_SERVER_CHECK_READ,
+	    &pvfs2_readdir_sm);
+	OP_CASE(PVFS_SERV_GETCONFIG, "getconfig", PINT_SERVER_CHECK_NONE,
+	    &pvfs2_get_config_sm);
 	OP_CASE(PVFS_SERV_WRITE_COMPLETION, "write_completion", 
-	    PINT_SERVER_CHECK_INVALID);
-	OP_CASE(PVFS_SERV_FLUSH, "flush", PINT_SERVER_CHECK_NONE);
+	    PINT_SERVER_CHECK_INVALID, NULL);
+	OP_CASE(PVFS_SERV_FLUSH, "flush", PINT_SERVER_CHECK_NONE,
+	    &pvfs2_flush_sm);
 	OP_CASE(PVFS_SERV_MGMT_SETPARAM, "mgmt_setparam",
-	    PINT_SERVER_CHECK_NONE);
-	OP_CASE(PVFS_SERV_MGMT_NOOP, "mgmt_noop", PINT_SERVER_CHECK_NONE);
-	OP_CASE(PVFS_SERV_STATFS, "statfs", PINT_SERVER_CHECK_NONE);
+	    PINT_SERVER_CHECK_NONE, &pvfs2_setparam_sm);
+	OP_CASE(PVFS_SERV_MGMT_NOOP, "mgmt_noop", PINT_SERVER_CHECK_NONE, 
+	    &pvfs2_noop_sm);
+	OP_CASE(PVFS_SERV_STATFS, "statfs", PINT_SERVER_CHECK_NONE,
+	    &pvfs2_statfs_sm);
 	OP_CASE(PVFS_SERV_PERF_UPDATE, "perf_update",
-	    PINT_SERVER_CHECK_INVALID);
+	    PINT_SERVER_CHECK_INVALID, &pvfs2_perf_update_sm);
 	OP_CASE(PVFS_SERV_MGMT_PERF_MON, "mgmt_perf_mon",
-	    PINT_SERVER_CHECK_NONE);
+	    PINT_SERVER_CHECK_NONE, &pvfs2_perf_mon_sm);
 	OP_CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, "mgmt_iterate_handles", 
-	    PINT_SERVER_CHECK_NONE);
+	    PINT_SERVER_CHECK_NONE, &pvfs2_iterate_handles_sm);
 	OP_CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, "mgmt_dspace_info_list", 
-	    PINT_SERVER_CHECK_NONE);
+	    PINT_SERVER_CHECK_NONE, NULL);
 	OP_CASE(PVFS_SERV_MGMT_EVENT_MON, "mgmt_event_mon", 
-	    PINT_SERVER_CHECK_NONE);
-	OP_CASE(PVFS_SERV_JOB_TIMER, "job_timer", PINT_SERVER_CHECK_INVALID);
+	    PINT_SERVER_CHECK_NONE, &pvfs2_event_mon_sm);
+	OP_CASE(PVFS_SERV_JOB_TIMER, "job_timer", PINT_SERVER_CHECK_INVALID, 
+	    &pvfs2_job_timer_sm);
 	OP_CASE(PVFS_SERV_PROTO_ERROR, "proto_error",
-	    PINT_SERVER_CHECK_INVALID);
+	    PINT_SERVER_CHECK_INVALID, &pvfs2_proto_error_sm);
 	}
     }
     #undef OP_CASE

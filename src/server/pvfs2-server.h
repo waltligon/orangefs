@@ -25,6 +25,24 @@
  * on conflicting headers for dependency information
  */
 #ifndef __SM_CHECK_DEP
+extern job_context_id server_job_context;
+
+/* size of stack for nested state machines */
+#define PINT_STATE_STACK_SIZE                  8
+#define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
+#define BMI_UNEXPECTED_OP                    999
+
+/* the server will give up on sending a response if the send does not
+ * complete in PVFS2_SERVER_RESPONSE_TIMEOUT seconds
+ */
+/* TODO: this should be read from a config file */
+#define PVFS2_SERVER_RESPONSE_TIMEOUT         30
+
+/* the server will give up on a flow if more than PVFS2_SERVER_FLOW_TIMEOUT
+ * seconds pass without any progress being made on it
+ */
+/* TODO: this should be read from a config file */
+#define PVFS2_SERVER_FLOW_TIMEOUT             30
 
 /* types of permission checking that a server may need to perform
  * for incoming requests
@@ -44,29 +62,28 @@ struct PINT_server_req_params
     enum PVFS_server_op op_type;
     char* string_name;
     enum PINT_server_req_permissions perm;
+    struct PINT_state_machine_s* sm;
 };
 
 extern struct PINT_server_req_params
     PINT_server_req_table[];
 
-extern job_context_id server_job_context;
-
-/* size of stack for nested state machines */
-#define PINT_STATE_STACK_SIZE                  8
-#define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
-#define BMI_UNEXPECTED_OP                    999
-
-/* the server will give up on sending a response if the send does not
- * complete in PVFS2_SERVER_RESPONSE_TIMEOUT seconds
+/* TODO: maybe this should be put somewhere else? */
+/* PINT_map_server_op_to_string()
+ *
+ * provides a string representation of the server operation number
+ *
+ * returns a pointer to a static string (DONT FREE IT) on success,
+ * null on failure
  */
-/* TODO: this should be read from a config file */
-#define PVFS2_SERVER_RESPONSE_TIMEOUT         30
+static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
+{
+    if(op > PVFS_MAX_SERVER_OP)
+	return(NULL);
 
-/* the server will give up on a flow if more than PVFS2_SERVER_FLOW_TIMEOUT
- * seconds pass without any progress being made on it
- */
-/* TODO: this should be read from a config file */
-#define PVFS2_SERVER_FLOW_TIMEOUT             30
+    return(PINT_server_req_table[op].string_name);
+}
+
 
 
 /* used to keep a random, but handy, list of keys around */
@@ -240,22 +257,6 @@ typedef struct PINT_server_op
     } u;
 } PINT_server_op;
 
-/* TODO: maybe this should be put somewhere else? */
-/* PINT_map_server_op_to_string()
- *
- * provides a string representation of the server operation number
- *
- * returns a pointer to a static string (DONT FREE IT) on success,
- * null on failure
- */
-static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
-{
-    if(op > PVFS_MAX_SERVER_OP)
-	return(NULL);
-
-    return(PINT_server_req_table[op].string_name);
-}
-
 /* PINT_STATE_DEBUG()
  *
  * macro for consistent printing of state transition information
@@ -312,7 +313,7 @@ int server_state_machine_start_noreq(PINT_server_op* new_op);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_server_op
-#define PINT_OP_STATE_TABLE PINT_server_op_table
+#define PINT_OP_STATE_TABLE PINT_server_req_table
 
 #include "state-machine.h"
 

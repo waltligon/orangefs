@@ -37,12 +37,6 @@
 #error "state-machine.h must be included before state-machine-fns.h is included."
 #endif
 
-#if 0
-#ifndef PINT_OP_STATE_TABLE
-#error "PINT_OP_STATE_TABLE must be defined before state-machine-fns.h is included."
-#endif
-#endif
-
 /* Prototypes for functions defined in here */
 static inline int PINT_state_machine_halt(void);
 static inline int PINT_state_machine_next(struct PINT_OP_STATE *,job_status_s *r);
@@ -51,10 +45,6 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
 #endif
 static inline union PINT_state_array_values *PINT_pop_state(struct PINT_OP_STATE *s);
 static inline void PINT_push_state(struct PINT_OP_STATE *s, union PINT_state_array_values *p);
-
-#ifdef PINT_OP_STATE_TABLE
-extern struct PINT_state_machine_s *PINT_OP_STATE_TABLE[];
-#endif
 
 /* Function: PINT_state_machine_halt(void)
    Params: None
@@ -171,9 +161,9 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
 	gossip_err("State machine requested not valid\n");
 	return NULL;
     }
-    if (PINT_OP_STATE_TABLE[s_op->op] != NULL)
+    if (PINT_OP_STATE_TABLE[s_op->op].sm != NULL)
     {
-	current_tmp = PINT_OP_STATE_TABLE[s_op->op]->state_machine;
+	current_tmp = PINT_OP_STATE_TABLE[s_op->op].sm->state_machine;
 	/* handle the case in which the first state points to a nested
 	 * machine, rather than a simple function
 	 */
