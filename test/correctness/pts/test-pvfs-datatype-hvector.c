@@ -85,7 +85,7 @@ int test_pvfs_datatype_hvector(MPI_Comm *mycomm, int myid, char *buf, void *para
         /* finally, verify the data */
         for(j = 0; j < TEST_PVFS_DATA_SIZE; j++)
         {
-            if (io_buffer[j] != ((i % 26) + 65))
+            if (io_buffer[j] != ((j % 26) + 65))
             {
                 debug_printf("test_pvfs_datatype_hvector: data "
                              "verification failed\n");
