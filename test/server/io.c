@@ -64,6 +64,7 @@ int main(int argc, char **argv)	{
 	struct PVFS_server_resp_s* remove_dec_ack;
 	void* my_ack, *create_ack, *remove_ack;
 	int my_ack_size, create_ack_size, remove_ack_size;
+	PVFS_size io_size = 10 * 1024 * 1024;
 	
 	/**************************************************
 	 * general setup 
@@ -257,6 +258,26 @@ int main(int argc, char **argv)	{
 	/* io specific fields */
 	my_req.u.io.fs_id = 9;
 	my_req.u.io.handle = create_dec_ack->u.create.handle;
+	my_req.u.io.io_type = PVFS_IO_WRITE;
+	my_req.u.io.io_dist = PVFS_Dist_create("default_dist");
+	if(!my_req.u.io.io_dist)
+	{
+		fprintf(stderr, "Error: failed to create dist.\n");
+		return(-1);
+	}
+	ret = PINT_Dist_lookup(my_req.u.io.io_dist);
+	if(ret != 0)
+	{
+		fprintf(stderr, "Error: failed to lookup dist.\n");
+		return(-1);
+	}
+	ret = PVFS_Request_contiguous(io_size, PVFS_BYTE,
+		&(my_req.u.io.io_req));
+	if(ret < 0)
+	{
+		fprintf(stderr, "Error: PVFS_Request_contiguous() failure.\n");
+		return(-1);
+	}
 
 	ret = PINT_encode(&my_req,PINT_ENCODE_REQ,&encoded2,server_addr,0);
 	if(ret < 0)

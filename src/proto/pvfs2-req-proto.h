@@ -349,7 +349,7 @@ struct PVFS_servreq_io_s
 	PVFS_fs_id fs_id;                   /* file system id */
 	enum PVFS_servreq_io_type io_type;  /* type of I/O operation */
 	PVFS_Dist* io_dist;                 /* physical distribution */
-	PVFS_Request* io_req;               /* datatype pattern */
+	PVFS_Request io_req;                /* datatype pattern */
 };
 typedef struct PVFS_servreq_io_s PVFS_servreq_io;
 
