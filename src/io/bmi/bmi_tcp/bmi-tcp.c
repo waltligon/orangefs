@@ -13,6 +13,7 @@
 #include <sys/poll.h>
 #include <netinet/tcp.h>
 #include <assert.h>
+#include <sys/uio.h>
 
 #include "bmi-method-support.h"
 #include "bmi-method-callback.h"
@@ -179,6 +180,12 @@ struct tcp_op
     bmi_size_t size_list_stub;
 };
 
+/* static io vector for use with readv and writev; we can only use
+ * this because BMI serializes module calls
+ */
+#define BMI_TCP_IOV_COUNT 10
+static struct iovec stat_io_vector[BMI_TCP_IOV_COUNT];
+
 /* internal utility functions */
 static int tcp_server_init(void);
 static void dealloc_tcp_method_addr(method_addr_p map);
@@ -235,6 +242,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 void *user_ptr,
 				 int list_stub_flag,
 				 bmi_context_id context_id);
+static int send_payload_progress(int s, void** buffer_list, bmi_size_t* 
+    size_list, int list_count, bmi_size_t total_size, int* list_index, 
+    bmi_size_t* current_index_complete);
 
 /* exported method interface */
 struct bmi_method_ops bmi_tcp_ops = {
@@ -2285,16 +2295,16 @@ static int work_on_send_op(method_op_p my_method_op,
 
     if (my_method_op->actual_size != 0)
     {
-	/* now let's try to send some actual data */
-	working_buf =
-	    (void *) (my_method_op->buffer_list[my_method_op->list_index] +
-		      my_method_op->cur_index_complete);
-	ret = nbsend(tcp_addr_data->socket, working_buf,
-		     (my_method_op->size_list[my_method_op->list_index] -
-		      my_method_op->cur_index_complete));
+	ret = send_payload_progress(tcp_addr_data->socket,
+	    my_method_op->buffer_list,
+	    my_method_op->size_list,
+	    my_method_op->list_count,
+	    my_method_op->actual_size,
+	    &(my_method_op->list_index),
+	    &(my_method_op->cur_index_complete));
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: nbsend: %s\n", strerror(errno));
+	    gossip_lerr("Error: send_payload_progress: %s\n", strerror(errno));
 	    tcp_forget_addr(my_method_op->addr, 0);
 	    return (0);
 	}
@@ -2306,7 +2316,6 @@ static int work_on_send_op(method_op_p my_method_op,
 
     gossip_ldebug(BMI_DEBUG_TCP, "Sent: %d bytes of data.\n", ret);
     my_method_op->amt_complete += ret;
-    my_method_op->cur_index_complete += ret;
 
     if (my_method_op->amt_complete == my_method_op->actual_size)
     {
@@ -2322,13 +2331,6 @@ static int work_on_send_op(method_op_p my_method_op,
     }
     else
     {
-	/* update list indices for next time through */
-	if (my_method_op->cur_index_complete ==
-	    my_method_op->size_list[my_method_op->list_index])
-	{
-	    my_method_op->cur_index_complete = 0;
-	    my_method_op->list_index++;
-	}
 	/* there is still more work to do */
 	tcp_op_data->tcp_op_state = BMI_TCP_INPROGRESS;
     }
@@ -2691,6 +2693,72 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 			    context_id);
 
     return (ret);
+}
+
+
+/* send_payload_progress()
+ *
+ * makes progress on sending data payload portion of a message; uses writev()
+ *
+ * returns amount completed on success, -errno on failure
+ */
+static int send_payload_progress(int s, void** buffer_list, bmi_size_t* 
+    size_list, int list_count, bmi_size_t total_size, int* list_index, 
+    bmi_size_t* current_index_complete)
+{
+    int i;
+    int count;
+    int ret;
+    int completed;
+
+    assert(list_count > *list_index);
+
+    /* make sure we don't overrun our preallocated iovec array */
+    if((list_count - (*list_index)) > BMI_TCP_IOV_COUNT)
+    {
+	list_count = (*list_index) + BMI_TCP_IOV_COUNT;
+    }
+
+    /* setup vector */
+    stat_io_vector[0].iov_len = 
+	size_list[*list_index] - *current_index_complete;
+    stat_io_vector[0].iov_base = 
+	(char*)buffer_list[*list_index] + *current_index_complete;
+    for(i = (*list_index + 1); i < list_count; i++)
+    {
+	stat_io_vector[(i-*list_index)].iov_len = size_list[i];
+	stat_io_vector[(i-*list_index)].iov_base = buffer_list[i];
+    }
+
+    count = list_count - *list_index;
+
+    assert(count > 0);
+    ret = nbsendv(s, stat_io_vector, count);
+
+    /* if error or nothing done, return now */
+    if(ret <= 0)
+	return(ret);
+
+    /* update position */
+    completed = ret;
+    i=0;
+    while(completed > 0)
+    {
+	if(completed >= stat_io_vector[i].iov_len)
+	{
+	    completed -= stat_io_vector[i].iov_len;
+	    *current_index_complete = 0;
+	    (*list_index)++;
+	    i++;
+	}
+	else
+	{
+	    *current_index_complete += completed;
+	    break;
+	}
+    }
+
+    return(ret);
 }
 
 /*
