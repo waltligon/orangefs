@@ -49,17 +49,17 @@
 	#define __GEN_POSIX_LOCKING__
 #endif
 
-/* function prototypes for specific locking implementations*/
-int gen_posix_mutex_lock(pthread_mutex_t* mut);
-int gen_posix_mutex_unlock(pthread_mutex_t* mut);
-int gen_posix_mutex_trylock(pthread_mutex_t* mut);
-pthread_mutex_t* gen_posix_mutex_build(void);
-int gen_posix_mutex_destroy(pthread_mutex_t* mut);
-int gen_posix_mutex_init(pthread_mutex_t* mut);
-
-
 #ifdef __GEN_POSIX_LOCKING__
 	#include <pthread.h>
+
+	/* function prototypes for specific locking implementations*/
+	int gen_posix_mutex_lock(pthread_mutex_t* mut);
+	int gen_posix_mutex_unlock(pthread_mutex_t* mut);
+	int gen_posix_mutex_trylock(pthread_mutex_t* mut);
+	pthread_mutex_t* gen_posix_mutex_build(void);
+	int gen_posix_mutex_destroy(pthread_mutex_t* mut);
+	int gen_posix_mutex_init(pthread_mutex_t* mut);
+
 	typedef pthread_mutex_t gen_mutex_t;
 	#define GEN_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER;
 	#define gen_mutex_lock(m) gen_posix_mutex_lock(m)

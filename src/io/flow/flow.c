@@ -59,10 +59,6 @@ static int flow_quick_testsome(
 	flow_descriptor** flow_array, 
 	int* outcount, 
 	int* index_array);
-static int flow_quick_testworld(
-	int incount, 
-	flow_descriptor** flow_array, 
-	int* outcount);
 
 /* tunable parameters */
 enum
@@ -533,38 +529,6 @@ static int flow_quick_testsome(
 			flow_queue_remove(flow_array[index_array[i]]);
 			flow_release(flow_array[index_array[i]]);
 		}
-	}
-
-	gen_mutex_unlock(&interface_mutex);
-	return(0);
-}
-
-
-/* flow_quick_testworld()
- * 
- * Instantaneous check for completion of any flows in progress for the
- * flow interface.  This may return unexpected flows as well.
- *
- * returns 0 on success, -errno on failure
- */
-static int flow_quick_testworld(
-	int incount, 
-	flow_descriptor** flow_array, 
-	int* outcount)
-{
-	flow_descriptor* flow_d = NULL;
-
-	gen_mutex_lock(&interface_mutex);
-
-	*outcount = 0;
-
-	while(*outcount < incount && (flow_d =
-		flow_queue_shownext(completion_queue)))
-	{
-		flow_array[*outcount] = flow_d;
-		flow_queue_remove(flow_d);
-		flow_release(flow_d);
-		(*outcount)++;
 	}
 
 	gen_mutex_unlock(&interface_mutex);

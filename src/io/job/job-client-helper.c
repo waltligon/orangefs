@@ -140,7 +140,6 @@ int job_waitall_blocking(
 
 	int ret = -1;
 	int* internal_index_array = NULL;
-	int i = 0;
 
 	/* setup an index array to use internally */
 	internal_index_array = (int*)alloca(in_count*sizeof(int));
