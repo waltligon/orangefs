@@ -691,14 +691,19 @@ do {                                                                  \
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Using %s Point %s\n",      \
                  (mount ? "Mount" : "Unmount"), mntent.mnt_dir);      \
                                                                       \
-    if (mount)                                                        \
+    if (mount) {                                                      \
         ptr = rindex(in_upcall.req.fs_mount.pvfs2_config_server,      \
                      (int)'/');                                       \
-    else                                                              \
+        ptrcomma = strchr(in_upcall.req.fs_mount.pvfs2_config_server, \
+                     (int)',');                                       \
+    } else {                                                          \
         ptr = rindex(in_upcall.req.fs_umount.pvfs2_config_server,     \
                      (int)'/');                                       \
+        ptrcomma = strchr(in_upcall.req.fs_umount.pvfs2_config_server,\
+                     (int)',');                                       \
+    }                                                                 \
                                                                       \
-    if (!ptr)                                                         \
+    if (!ptr || ptrcomma)                                             \
     {                                                                 \
         gossip_err("Configuration server MUST be of the form "        \
                    "protocol://address/fs_name\n");                   \
@@ -708,26 +713,39 @@ do {                                                                  \
     *ptr = '\0';                                                      \
     ptr++;                                                            \
                                                                       \
-    if (mount)                                                        \
-        mntent.pvfs_config_server = strdup(                           \
-            in_upcall.req.fs_mount.pvfs2_config_server);              \
-    else                                                              \
-        mntent.pvfs_config_server = strdup(                           \
-            in_upcall.req.fs_umount.pvfs2_config_server);             \
-                                                                      \
-    if (!mntent.pvfs_config_server)                                   \
+    /* We do not yet support multi-home for kernel module; needs */   \
+    /* same parsing code as in PVFS_util_parse_pvfstab() and a */     \
+    /* loop around BMI_addr_lookup() to pick one that works. */       \
+    mntent.pvfs_config_servers =                                      \
+        malloc(sizeof(*mntent.pvfs_config_servers));                  \
+    if (!mntent.pvfs_config_servers)                                  \
     {                                                                 \
         ret = -PVFS_ENOMEM;                                           \
         goto fail_downcall;                                           \
     }                                                                 \
                                                                       \
+    if (mount)                                                        \
+        mntent.pvfs_config_servers[0] = strdup(                       \
+            in_upcall.req.fs_mount.pvfs2_config_server);              \
+    else                                                              \
+        mntent.pvfs_config_servers[0] = strdup(                       \
+            in_upcall.req.fs_umount.pvfs2_config_server);             \
+                                                                      \
+    if (!mntent.pvfs_config_servers[0])                               \
+    {                                                                 \
+        ret = -PVFS_ENOMEM;                                           \
+        goto fail_downcall;                                           \
+    }                                                                 \
+    mntent.the_pvfs_config_server = mntent.pvfs_config_servers[0];    \
+    mntent.num_pvfs_config_servers = 1;                               \
+                                                                      \
     gossip_debug(                                                     \
         GOSSIP_CLIENTCORE_DEBUG, "Got Configuration Server: %s "      \
-        "(len=%d)\n", mntent.pvfs_config_server,                      \
-        (int)strlen(mntent.pvfs_config_server));                      \
+        "(len=%d)\n", mntent.the_pvfs_config_server,                  \
+        (int)strlen(mntent.the_pvfs_config_server));                  \
                                                                       \
     mntent.pvfs_fs_name = strdup(ptr);                                \
-    if (!mntent.pvfs_config_server)                                   \
+    if (!mntent.pvfs_fs_name)                                         \
     {                                                                 \
         ret = -PVFS_ENOMEM;                                           \
         goto fail_downcall;                                           \
@@ -752,7 +770,7 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
     int ret = -PVFS_ENODEV;
     struct PVFS_sys_mntent mntent;
     PVFS_handle root_handle;
-    char *ptr = NULL;
+    char *ptr = NULL, *ptrcomma = NULL;
     char buf[PATH_MAX] = {0};
 
     /*
@@ -791,7 +809,7 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
         */
         PVFS_BMI_addr_t tmp_addr;
 
-        if (BMI_addr_lookup(&tmp_addr, mntent.pvfs_config_server) == 0)
+        if (BMI_addr_lookup(&tmp_addr, mntent.the_pvfs_config_server) == 0)
         {
             if (BMI_set_info(
                     tmp_addr, BMI_FORCEFUL_CANCEL_MODE, NULL) == 0)
@@ -836,7 +854,7 @@ static int service_fs_umount_request(vfs_request_t *vfs_request)
 {
     int ret = -PVFS_ENODEV;
     struct PVFS_sys_mntent mntent;
-    char *ptr = NULL;
+    char *ptr = NULL, *ptrcomma = NULL;
     char buf[PATH_MAX] = {0};
 
     /*
