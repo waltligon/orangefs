@@ -52,7 +52,7 @@ enum
 };
 
 int PVFS_debug_eventlog_to_mask(
-    char *event_logging);
+    const char *event_logging);
 
 char *PVFS_debug_get_next_debug_keyword(
     int position);

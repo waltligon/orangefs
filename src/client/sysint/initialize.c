@@ -63,7 +63,7 @@ typedef enum
 int PVFS_sys_initialize(int default_debug_mask)
 {
     int ret = -PVFS_EINVAL, debug_mask = 0;
-    char *debug_mask_str = NULL, *debug_file = NULL;
+    const char *debug_mask_str = NULL, *debug_file = NULL;
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
     PINT_client_sm *sm_p = NULL;
 

@@ -62,36 +62,49 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "all",  __DEBUG_ALL }
 };
 #undef __DEBUG_ALL
+static const int num_keyword_mask_map = (int) (sizeof(s_keyword_mask_map)
+  / sizeof(s_keyword_mask_map[0]));
 
 /*
-  based on human readable keywords, translate them into
-  a mask value appropriate for the debugging level desired.
-
-  the 'computed' mask is returned; 0 if no keywords are
-  present or recognized.
-*/
-int PVFS_debug_eventlog_to_mask(char *event_logging)
+ * Based on human readable keywords, translate them into
+ * a mask value appropriate for the debugging level desired.
+ * The 'computed' mask is returned; 0 if no keywords are
+ * present or recognized.
+ *
+ * Prefix a keyword with "-" to turn it off.  All keywords
+ * processed in specified order.
+ */
+int PVFS_debug_eventlog_to_mask(const char *event_logging)
 {
-    char *ptr = NULL;
-    int mask = 0, i = 0, num_entries = 0;
+    char *s;
+    char *t;
+    const char *toks = ",: ";
+    int mask = 0;
+    
+    if (!event_logging)
+        return mask;
 
-    num_entries = (int)(sizeof(s_keyword_mask_map) /
-                        sizeof(__keyword_mask_t));
-    if (event_logging)
-    {
-        for(i = 0; i < num_entries; i++)
-        {
-            ptr = strstr(event_logging, s_keyword_mask_map[i].keyword);
-            if (ptr)
-            {
-                ptr += (int)strlen(s_keyword_mask_map[i].keyword);
-                if ((*ptr == '\0') || (*ptr == ' ') || (*ptr == ','))
-                {
+    s = strdup(event_logging);
+    t = strtok(s, toks);
+    while (t) {
+        int i, negate = 0;
+        if (*t == '-') {
+            negate = 1;
+            ++t;
+        }
+        for (i=0; i<num_keyword_mask_map; i++) {
+            if (!strcmp(t, s_keyword_mask_map[i].keyword)) {
+                if (negate)
+                    mask &= ~s_keyword_mask_map[i].mask_val;
+                else
                     mask |= s_keyword_mask_map[i].mask_val;
-                }
+                break;
             }
         }
+        t = strtok(NULL, toks);
     }
+
+    free(s);
     return mask;
 }
 
