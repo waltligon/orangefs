@@ -20,8 +20,14 @@ void gen_state_decl(char *state_name)
 
 void gen_state_array(char *machine_name, char *first_state_name)
 {
+#if 0
 	fprintf(out_file,"\nPINT_state_array_values %s[] = {\n", machine_name);
 	fprintf(out_file,"(PINT_state_array_values)ST_%s\n};\n\n", first_state_name);
+#endif
+	fprintf(out_file,"\nextern PINT_state_array_values ST_%s[];\n",
+				first_state_name);
+	fprintf(out_file,"PINT_state_array_values *%s = ST_%s;\n\n",
+				machine_name, first_state_name);
 }
 
 void gen_state_start(char *state_name)
