@@ -149,7 +149,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n",seg1.segs,seg1.bytes);
+			printf("%d segments with %lld bytes\n",seg1.segs,Ld(seg1.bytes));
 			if(seg1.segs == 0)
 			{
 				fprintf(stderr, "  IEEE! no results to report.\n");
@@ -195,7 +195,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 			if(seg1.segs == 0)
 			{
 				fprintf(stderr, "  IEEE! no results to report.\n");
@@ -239,7 +239,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 			if(seg1.segs == 0)
 			{
 				fprintf(stderr, "  IEEE! no results to report.\n");
@@ -284,7 +284,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 			if(seg1.segs == 0)
 			{
 				fprintf(stderr, "  IEEE! no results to report.\n");

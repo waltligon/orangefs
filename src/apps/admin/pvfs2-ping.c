@@ -160,7 +160,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Failure: could not lookup root handle.\n");
 	return(-1);
     }
-    printf("\n   Root handle: 0x%08Lx\n", resp_lookup.pinode_refn.handle);
+    printf("\n   Root handle: 0x%08Lx\n", Lu(resp_lookup.pinode_refn.handle));
 
     /* check that only one server controls root handle */
     /* TODO: we need a way to get information out about which server failed

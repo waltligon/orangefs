@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
                                 "cur_stream_size: %Ld, cur_stream_off:%Ld\n", 
                                 lio_state.mem_ct, lio_state.stream_ct, 
                                 lio_state.cur_mem_size, lio_state.cur_mem_off,
-                                lio_state.cur_stream_size, lio_state.cur_stream_off); 
+                                Ld(lio_state.cur_stream_size), Ld(lio_state.cur_stream_off));
 		}
 	}
 

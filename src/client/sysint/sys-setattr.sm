@@ -132,7 +132,7 @@ int PVFS_sys_setattr(
     sm_p->u.setattr.sys_attr = &attr;
 
     gossip_debug(CLIENT_DEBUG, "Doing setattr on handle %Lu "
-                 "on fs %d\n", pinode_refn.handle,
+                 "on fs %d\n", Lu(pinode_refn.handle),
                  pinode_refn.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_SETATTR);
@@ -258,7 +258,7 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
                                   msg_p->fs_id) < 0)
     {
         gossip_err("Failed to map handle %Lu to server\n",
-                   sm_p->u.setattr.refn.handle);
+                   Lu(sm_p->u.setattr.refn.handle));
         assert(0);
     }
     return 1;

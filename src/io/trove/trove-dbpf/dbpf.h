@@ -72,12 +72,12 @@ extern "C" {
 
 #define DBPF_GET_BSTREAM_FILENAME(__buf, __path_max, __stoname, __collid, __handle)				\
     do {													\
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.bstream", __stoname, __collid, BSTREAM_DIRNAME, __handle);	\
+    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.bstream", __stoname, __collid, BSTREAM_DIRNAME, Lu(__handle));	\
     } while (0);
 
 #define DBPF_GET_KEYVAL_DBNAME(__buf, __path_max, __stoname, __collid, __handle)				\
     do {													\
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.keyval", __stoname, __collid, KEYVAL_DIRNAME, __handle);	\
+    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.keyval", __stoname, __collid, KEYVAL_DIRNAME, Lu(__handle));	\
     } while (0);
 
 #define LAST_HANDLE_STRING "last_handle"

@@ -94,8 +94,8 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p)
         SERVER_DEBUG, "\ttrying to dspace create on "
         "fs_id %d | handle-range[0]: %Lu-%Lu\n",
         s_op->req->u.mkdir.fs_id,
-        s_op->req->u.mkdir.handle_extent_array.extent_array[0].first,
-        s_op->req->u.mkdir.handle_extent_array.extent_array[0].last);
+        Lu(s_op->req->u.mkdir.handle_extent_array.extent_array[0].first),
+        Lu(s_op->req->u.mkdir.handle_extent_array.extent_array[0].last));
 
     ret = job_trove_dspace_create(
         s_op->req->u.mkdir.fs_id,
@@ -149,12 +149,12 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
 		 a_p->objtype);
 
     gossip_debug(SERVER_DEBUG,
-		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.mkdir.fs_id,
-		 s_op->resp.u.mkdir.handle,
+		 Lu(s_op->resp.u.mkdir.handle),
 		 (char *) s_op->key.buffer,
 		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(s_op->req->u.mkdir.fs_id,

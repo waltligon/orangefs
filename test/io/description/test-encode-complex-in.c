@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 			for(i=0; i<seg1.segs; i++)
 			{
 				printf("  segment %d: offset: %d size: %d\n",
@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 void Dump_request(PVFS_Request req)
 {
 	fprintf(stderr,"**********************\n");
-	fprintf(stderr,"address:\t%x\n",(unsigned int)req);
+	fprintf(stderr,"address:\t%p\n",req);
 	fprintf(stderr,"offset:\t\t%d\n",(int)req->offset);
 	fprintf(stderr,"num_ereqs:\t%d\n",(int)req->num_ereqs);
 	fprintf(stderr,"num_blocks:\t%d\n",(int)req->num_blocks);
@@ -138,8 +138,8 @@ void Dump_request(PVFS_Request req)
 	fprintf(stderr,"num_nest:\t%d\n",(int)req->num_nested_req);
 	fprintf(stderr,"commit:\t\t%d\n",(int)req->committed);
 	fprintf(stderr,"refcount:\t\t%d\n",(int)req->refcount);
-	fprintf(stderr,"ereq:\t\t%x\n",(int)req->ereq);
-	fprintf(stderr,"sreq:\t\t%x\n",(int)req->sreq);
+	fprintf(stderr,"ereq:\t\t%p\n",req->ereq);
+	fprintf(stderr,"sreq:\t\t%p\n",req->sreq);
 	fprintf(stderr,"**********************\n");
 }
 

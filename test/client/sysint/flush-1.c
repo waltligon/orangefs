@@ -92,7 +92,7 @@ int main(int argc, char **argv)
 	
     // print the handle 
     printf("--create--\n"); 
-    printf("Handle: %Ld\n",resp_create.pinode_refn.handle);
+    printf("Handle: %Ld\n",Ld(resp_create.pinode_refn.handle));
 
     ret = PVFS_sys_flush(resp_create.pinode_refn, credentials);
     if (ret < 0)

@@ -363,7 +363,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 
 	gossip_debug(CLIENT_DEBUG,
 		"  datafile_truncate: resizing %Ld\n",
-		sm_p->u.truncate.datafile_handles[i]);
+		Lu(sm_p->u.truncate.datafile_handles[i]));
 	new_dfile_size = 
 	    dist->methods->logical_to_physical_offset(dist->params, i, 
 		    sm_p->u.truncate.datafile_count, sm_p->u.truncate.size);

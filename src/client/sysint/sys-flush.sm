@@ -345,8 +345,8 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 	msg_p = &sm_p->msgarray[i];
 
 	gossip_debug(CLIENT_DEBUG,
-		"  datafile_flush: flushing %Ld\n",
-		sm_p->u.flush.datafile_handles[i]);
+		"  datafile_flush: flushing %Lu\n",
+		Lu(sm_p->u.flush.datafile_handles[i]));
 	PINT_SERVREQ_FLUSH_FILL(msg_p->req,
 				*sm_p->cred_p,
 				sm_p->u.flush.object_ref.fs_id,
@@ -362,8 +362,8 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     msg_p = &sm_p->msgarray[i];
 
     gossip_debug(CLIENT_DEBUG,
-	    "  datafile_flush: flushing %Ld\n",
-	    sm_p->u.flush.object_ref.handle);
+	    "  datafile_flush: flushing %Lu\n",
+	    Lu(sm_p->u.flush.object_ref.handle));
     PINT_SERVREQ_FLUSH_FILL(msg_p->req,
 			    *sm_p->cred_p,
 			    sm_p->u.flush.object_ref.fs_id,

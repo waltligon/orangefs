@@ -46,7 +46,7 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 	arrow(direction);
         printf("======================================\n");
 	arrow(direction);
-        printf("struct address = %d\n", (int)my_req );
+        printf("struct address = %p\n", my_req);
         switch(my_req->op)
         {
                 case PVFS_SERV_READDIR:

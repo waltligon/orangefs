@@ -119,8 +119,8 @@ int main(int argc, char **argv)
 		}
 	if(((struct PVFS_server_resp *)decoded.buffer)->u.create.handle !=7)
 	{
-		printf("Handle not correct after decoding Create Resp... Got %lld\n",
-					((struct PVFS_server_resp *)decoded.buffer)->u.create.handle);
+		printf("Handle not correct after decoding Create Resp... Got %llu\n",
+					Lu(((struct PVFS_server_resp *)decoded.buffer)->u.create.handle));
 		ret =-1;
 	}
 

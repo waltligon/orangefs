@@ -962,7 +962,7 @@ static int is_valid_filesystem_configuration(
     {
         gossip_err("RootHandle (%Lu) is NOT within the meta handle "
                    "ranges specified for this filesystem (%s).\n",
-                   fs->root_handle,fs->file_system_name);
+                   Lu(fs->root_handle),fs->file_system_name);
     }
     return ret;
 }
@@ -1439,7 +1439,7 @@ static int cache_config_files(
     if (!config_s->fs_config_buf)
     {
         gossip_err("Failed to allocate %d bytes for caching the fs "
-                   "config file\n", config_s->fs_config_buflen);
+                   "config file\n", (int) config_s->fs_config_buflen);
         goto close_fd_fail;
     }
 
@@ -1468,7 +1468,7 @@ static int cache_config_files(
     if (!config_s->server_config_buf)
     {
         gossip_err("Failed to allocate %d bytes for caching the server "
-                   "config file\n",config_s->server_config_buflen);
+                   "config file\n", (int) config_s->server_config_buflen);
         goto close_fd_fail;
     }
 

@@ -498,7 +498,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 
 	gossip_debug(CLIENT_DEBUG,
 		     "  sending I/O request for 0x%08Lx\n",
-		     target_datafile_array[i]);
+		     Lu(target_datafile_array[i]));
 
 	/* find the original index for the handle */
 	for (orig_index = 0; orig_index < iosm_p->datafile_count; orig_index++)
@@ -842,10 +842,10 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 
 	    gossip_debug(CLIENT_DEBUG,
 			 "    bstream_size = %Ld, datafile_nr = %d, datafile_ct = %d, file_req_off = %Ld\n",
-			 fl_p->file_data.fsize,
+			 Ld(fl_p->file_data.fsize),
 			 fl_p->file_data.iod_num,
 			 fl_p->file_data.iod_count,
-			 fl_p->file_req_offset);
+			 Ld(fl_p->file_req_offset));
 
 	    /* session tag, same as the one used in the send/recv */
 	    fl_p->tag = iosm_p->session_tag_array[recv_match];
@@ -981,12 +981,13 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
     {
 	/* the third set of N user tags correspond to flows */
 	matched_flow = 1;
+	i = js_p->status_user_tag - (sm_p->msgarray_count*2);
 	sm_p->u.io.flow_status_array[js_p->status_user_tag-(sm_p->msgarray_count*2)] 
 	    = *js_p;
 	sm_p->u.io.flow_comp_ct--;
 	gossip_debug(CLIENT_DEBUG,
 		     "  matched completed flow for %d\n",
-		     (js_p->status_user_tag-(sm_p->msgarray_count*2)));
+		     i);
 
 	assert(sm_p->u.io.flow_comp_ct >= 0); /* sanity check */
     }
@@ -1102,7 +1103,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 		     */
 		    gossip_debug(CLIENT_DEBUG,
 				 "  %Ld bytes read from %d.\n",
-				 iosm_p->flow_array[i].total_transfered,
+				 Ld(iosm_p->flow_array[i].total_transfered),
 				 i);
 		    total_size += iosm_p->flow_array[i].total_transfered;
 		}
@@ -1139,7 +1140,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 			}
 			gossip_debug(CLIENT_DEBUG,
 				     "  %Ld bytes written to %d.\n",
-				     resp_p->u.write_completion.total_completed,
+				     Ld(resp_p->u.write_completion.total_completed),
 				     i);
 			total_size += resp_p->u.write_completion.total_completed;
 

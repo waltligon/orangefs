@@ -172,7 +172,7 @@ int PVFS_sys_mkdir(
 
     gossip_debug(CLIENT_DEBUG, "Creating directory named %s under "
                  "parent handle %Lu on fs %d\n", object_name,
-                 parent_refn.handle, parent_refn.fs_id);
+                 Lu(parent_refn.handle), parent_refn.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_MKDIR);
     assert(ret == 0);
@@ -240,7 +240,7 @@ static int mkdir_msg_comp_fn(void *v_p,
     sm_p->u.mkdir.metafile_handle = resp_p->u.mkdir.handle;
 
     gossip_debug(CLIENT_DEBUG, "*** Got newly created dir handle %Lu\n",
-                 sm_p->u.mkdir.metafile_handle);
+                 Lu(sm_p->u.mkdir.metafile_handle));
 
     return 0;
 }

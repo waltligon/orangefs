@@ -101,7 +101,7 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                                                     handles[i]))
                     {
                         gossip_debug(TROVE_DEBUG, "handle %Lu is invalid "
-                                     "(out of bounds)\n", handles[i]);
+                                     "(out of bounds)\n", Lu(handles[i]));
                         return -1;
                     }
 		    /* remove handle from trove-handle-mgmt */
@@ -109,7 +109,7 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
 		    if (ret != 0)
                     {
 			gossip_debug(TROVE_DEBUG, "could not remove "
-                                     "handle %Lu\n", handles[i]);
+                                     "handle %Lu\n", Lu(handles[i]));
 			break;
 		    }
                 }

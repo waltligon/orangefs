@@ -320,7 +320,7 @@ static int lebf_encode_req(
     if (target_msg->total_size > max_size_array[req->op].req) {
 	ret = -ENOMEM;
 	gossip_err("%s: op %d needed %Ld bytes but alloced only %d\n",
-	  __func__, req->op, target_msg->total_size,
+	  __func__, req->op, Ld(target_msg->total_size),
 	  max_size_array[req->op].req);
     }
 
@@ -399,7 +399,7 @@ static int lebf_encode_resp(
     if (target_msg->total_size > max_size_array[resp->op].resp) {
 	ret = -ENOMEM;
 	gossip_err("%s: op %d needed %Ld bytes but alloced only %d\n",
-	  __func__, resp->op, target_msg->total_size,
+	  __func__, resp->op, Ld(target_msg->total_size),
 	  max_size_array[resp->op].resp);
     }
 

@@ -313,8 +313,8 @@ int PINT_serv_msgpairarray_resolve_addrs(int count,
 	    assert(ret < 0); /* return value range check */
 	    return(ret);
 	}
-        gossip_debug(CLIENT_DEBUG, " mapped handle %Lu to server %lu\n",
-                     msg_p->handle, (unsigned long)msg_p->svr_addr);
+        gossip_debug(CLIENT_DEBUG, " mapped handle %Lu to server %Ld\n",
+                     Lu(msg_p->handle), Ld(msg_p->svr_addr));
     }
     
     return(0);

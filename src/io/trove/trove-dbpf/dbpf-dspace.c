@@ -147,7 +147,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             new_handle = cur_extent.first;
             trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
             gossip_debug(TROVE_DEBUG,
-                         "new_handle was FORCED to be %Lu\n", new_handle);
+                         "new_handle was FORCED to be %Lu\n", Lu(new_handle));
         }
         else if (cur_extent.first == 0)
         {
@@ -171,7 +171,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     gossip_debug(TROVE_DEBUG, "[%d extents] -- new_handle is %Lu "
                  "(cur_extent is %Lu - %Lu)\n",
                  op_p->u.d_create.extent_array.extent_count,
-                 new_handle, cur_extent.first, cur_extent.last);
+                 Lu(new_handle), Lu(cur_extent.first), Lu(cur_extent.last));
 
     /*
       if we got a zero handle, we're either completely out
@@ -319,7 +319,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    goto return_error;
 	case 0:
 	    gossip_debug(TROVE_DEBUG, "removed dataspace with "
-                         "handle 0x%08Lx\n", op_p->handle);
+                         "handle 0x%08Lx\n", Lu(op_p->handle));
 	    break;
     }
 

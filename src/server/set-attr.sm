@@ -138,7 +138,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     {
 	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx is of type %d "
 		     "and cannot be changed to type %d\n",
-		     s_op->req->u.setattr.handle,
+		     Lu(s_op->req->u.setattr.handle),
 		     a_p->objtype, s_op->req->u.setattr.attr.objtype);
 
 	/* set an error to bail out of set-attr processing */
@@ -153,7 +153,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a metafile\n",
-		     s_op->req->u.setattr.handle);
+		     Lu(s_op->req->u.setattr.handle));
 
 	gossip_debug(SERVER_DEBUG, " ** dspace has dfile count of %d | "
                      "request has dfile count of %d\n",
@@ -194,21 +194,21 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a datafile\n",
-		     s_op->req->u.setattr.handle);
+		     Lu(s_op->req->u.setattr.handle));
     }
     else if ((req_a_p->objtype == PVFS_TYPE_DIRECTORY) ||
              (a_p->objtype == PVFS_TYPE_DIRECTORY))
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a directory\n",
-		     s_op->req->u.setattr.handle);
+		     Lu(s_op->req->u.setattr.handle));
     }
     else if ((req_a_p->objtype == PVFS_TYPE_SYMLINK) ||
              (a_p->objtype == PVFS_TYPE_SYMLINK))
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a symlink\n",
-		     s_op->req->u.setattr.handle);
+		     Lu(s_op->req->u.setattr.handle));
 
         if (req_a_p->mask & PVFS_ATTR_SYMLNK_ALL)
         {
@@ -217,7 +217,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
             gossip_debug(SERVER_DEBUG,
                          " symlink links handle %Lu to %s\n",
-                         s_op->req->u.setattr.handle,
+                         Lu(s_op->req->u.setattr.handle),
                          req_a_p->u.sym.target_path);
 
             a_p->u.sym.target_path_len = req_a_p->u.sym.target_path_len;
@@ -230,13 +230,13 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a dirdata object\n",
-		     s_op->req->u.setattr.handle);
+		     Lu(s_op->req->u.setattr.handle));
     }
     else
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to something unknown\n",
-		     s_op->req->u.setattr.handle);
+		     Lu(s_op->req->u.setattr.handle));
         assert(0);
     }
     return 1;
@@ -319,12 +319,12 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
     s_op->val.buffer_sz = sizeof(struct PVFS_object_attr);
 
     gossip_debug(SERVER_DEBUG,
-		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.setattr.fs_id,
-		 s_op->req->u.setattr.handle,
+		 Lu(s_op->req->u.setattr.handle),
 		 (char *) s_op->key.buffer,
 		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
@@ -388,12 +388,12 @@ static int setattr_write_metafile_datafile_handles_if_required(
     s_op->val.buffer_sz = dfile_count * sizeof(PVFS_handle);
 
     gossip_debug(SERVER_DEBUG,
-		 "  writing datafile handles (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 "  writing datafile handles (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.setattr.fs_id,
-		 s_op->req->u.setattr.handle,
+		 Lu(s_op->req->u.setattr.handle),
 		 (char *) s_op->key.buffer,
 		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
@@ -448,12 +448,12 @@ static int setattr_write_metafile_distribution_if_required(
     PINT_Dist_encode(NULL, s_op->req->u.setattr.attr.u.meta.dist);    
 
     gossip_debug(SERVER_DEBUG,
-		 "  writing distribution (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 "  writing distribution (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.setattr.fs_id,
-		 s_op->req->u.setattr.handle,
+		 Lu(s_op->req->u.setattr.handle),
 		 (char *) s_op->key.buffer,
 		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
@@ -502,12 +502,12 @@ static int setattr_write_symlink_target_if_required(
 
     gossip_debug(SERVER_DEBUG,
 		 "  writing symlink target (coll_id = 0x%x, handle = "
-                 "0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+                 "0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.setattr.fs_id,
-		 s_op->req->u.setattr.handle,
+		 Lu(s_op->req->u.setattr.handle),
 		 (char *) s_op->key.buffer,
 		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,

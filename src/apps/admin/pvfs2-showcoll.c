@@ -175,7 +175,7 @@ int main(int argc, char **argv)
 		storage_space,
 		collection,
 		coll_id,
-		root_handle);
+		Lu(root_handle));
     }
 
     if (got_dspace_handle)
@@ -303,10 +303,10 @@ static int print_dspace(TROVE_coll_id coll_id,
 		
     fprintf(stdout,
 	    "\t0x%08Lx (dspace_getattr output: type = %s, b_size = %Ld, k_size = %Ld)\n",
-	    handle,
+	    Lu(handle),
 	    type_to_string(ds_attr.type),
-	    ds_attr.b_size,
-	    ds_attr.k_size);
+	    Ld(ds_attr.b_size),
+	    Ld(ds_attr.k_size));
 
     if (print_keyvals) {
 	ret = print_dspace_keyvals(coll_id, handle,
@@ -404,7 +404,7 @@ static void print_datafile_handles(PVFS_handle *h_p,
 {
     int i;
 
-    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "0x%08Lx ", h_p[i]);
+    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "0x%08Lx ", Lu(h_p[i]));
 
     if (i == 10) fprintf(stdout, "...\n");
     else fprintf(stdout, "\n");
@@ -445,7 +445,7 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		key_p->read_sz,
 		(char *) val_p->buffer,
 		val_p->read_sz,
-		*(TROVE_handle *) val_p->buffer);
+		Lu(*(TROVE_handle *) val_p->buffer));
     }
     else if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8) {
 	fprintf(stdout,
@@ -454,7 +454,7 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		key_p->read_sz,
 		(char *) val_p->buffer,
 		val_p->read_sz,
-		*(TROVE_handle *) val_p->buffer);
+		Lu(*(TROVE_handle *) val_p->buffer));
     }
     else if (key_printable && val_printable) {
 	fprintf(stdout,

@@ -539,7 +539,7 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
 
 	gossip_debug(CLIENT_DEBUG,
 		     "  datafile_getattr: getting size for handle %Lu\n", 
-		     sm_p->u.getattr.datafile_handles[i]);
+		     Lu(sm_p->u.getattr.datafile_handles[i]));
 
 	/* fill in getattr request; all we care about is the size */
 	PINT_SERVREQ_GETATTR_FILL(msg_p->req,
@@ -592,7 +592,7 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
     gossip_debug(CLIENT_DEBUG,
 		 "datafile_getattr: size of datafile %d is %Ld\n",
 		 index,
-		 resp_p->u.getattr.attr.u.data.size);
+		 Ld(resp_p->u.getattr.attr.u.data.size));
     sm_p->u.getattr.size_array[index] = resp_p->u.getattr.attr.u.data.size;
 
     return 0;

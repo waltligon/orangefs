@@ -288,7 +288,7 @@ void print_entry_attr(
 
     if (opts->list_inode)
     {
-        snprintf(scratch_inode,16,"%Lu ",handle);
+        snprintf(scratch_inode,16,"%Lu ",Lu(handle));
         inode = scratch_inode;
     }
 
@@ -302,7 +302,7 @@ void print_entry_attr(
     }
     else
     {
-        snprintf(scratch_size,16, "%Lu", size);
+        snprintf(scratch_size,16, "%Ld", Ld(size));
     }
     format_size_string(scratch_size,11,&formatted_size,1);
 
@@ -395,7 +395,7 @@ void print_entry(
     {
         if (opts->list_inode)
         {
-            printf("%Lu %s\n", handle, entry_name);
+            printf("%Lu %s\n", Lu(handle), entry_name);
         }
         else
         {
@@ -417,7 +417,7 @@ void print_entry(
                          credentials, &getattr_response))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
-                "(fs_id is %d)\n",handle,fs_id);
+                "(fs_id is %d)\n",Lu(handle),fs_id);
         return;
     }
     print_entry_attr(handle, entry_name, &getattr_response.attr, opts);
@@ -510,8 +510,8 @@ int do_list(
                 */
                 if (opts->list_inode && !opts->list_long)
                 {
-                    printf("%Lu .\n",pinode_refn.handle);
-                    printf("%Lu .. (faked)\n",pinode_refn.handle);
+                    printf("%Lu .\n",Lu(pinode_refn.handle));
+                    printf("%Lu .. (faked)\n",Lu(pinode_refn.handle));
                 }
                 else if (opts->list_long)
                 {

@@ -122,7 +122,7 @@ void do_io_read(int *result)
 					for ( ncnt=0; ncnt < reply[0].count; ncnt ++ ) {
 						fprintf(stderr, "[%d] %p len:%Ld\n", ncnt,
 									reply[0].cbuf_offset_array[ncnt], 
-									reply[0].cbuf_size_array[ncnt]);
+									Ld(reply[0].cbuf_size_array[ncnt]));
 					}	
 		    		break;		
                 }

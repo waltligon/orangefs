@@ -88,7 +88,7 @@ int main(int argc,char **argv)
 	}
 	// print the handle 
 	printf("--lookup--\n"); 
-	printf("\tHandle:%Ld\n",resp_lk.pinode_refn.handle);
+	printf("\tHandle:%Ld\n",Ld(resp_lk.pinode_refn.handle));
 	printf("\tFSID:%d\n",resp_lk.pinode_refn.fs_id);
 
 	lk_handle = resp_lk.pinode_refn.handle;

@@ -101,7 +101,7 @@ static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 
     if(js_p->error_code == 0)
     {
-	gossip_debug(SERVER_DEBUG, "Handle created: %lld\n", js_p->handle);
+	gossip_debug(SERVER_DEBUG, "Handle created: %Lu\n", Lu(js_p->handle));
 	s_op->resp.u.create.handle = js_p->handle;
     }
 

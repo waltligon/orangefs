@@ -76,9 +76,9 @@ int main(int argc, char **argv)
 
         if (PINT_pcache_pinode_status(pinode2) != PINODE_STATUS_VALID)
         {
-            gossip_err("(1) Failure: lookup returned %Ld when it "
-                       "should've returned %Ld.\n",
-                       pinode2->refn.handle, tmp.handle);
+            gossip_err("(1) Failure: lookup returned %Lu when it "
+                       "should've returned %Lu.\n",
+                       Lu(pinode2->refn.handle), Lu(tmp.handle));
         }
     }
 
@@ -96,9 +96,9 @@ int main(int argc, char **argv)
 
         if (PINT_pcache_pinode_status(pinode2) == PINODE_STATUS_VALID)
         {
-            gossip_err("(2) Failure: lookup returned %Ld when it "
+            gossip_err("(2) Failure: lookup returned %Lu when it "
                        "should've been expired.\n",
-                       pinode2->refn.handle);
+                       Lu(pinode2->refn.handle));
         }
 
         /* make them once again valid here before dropping the ref */
@@ -117,9 +117,9 @@ int main(int argc, char **argv)
 
         if (PINT_pcache_pinode_status(pinode2) != PINODE_STATUS_VALID)
         {
-            gossip_err("(3) Failure: lookup returned %Ld when it "
-                       "should've returned %Ld.\n",
-                       pinode2->refn.handle, tmp.handle);
+            gossip_err("(3) Failure: lookup returned %Lu when it "
+                       "should've returned %Lu.\n",
+                       Lu(pinode2->refn.handle), Lu(tmp.handle));
         }
 
         /*

@@ -97,7 +97,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 			for(i = 0; i < seg1.segs; i++)
 			{
 				printf("  segment %d: offset: %d size: %d\n",
@@ -111,7 +111,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	printf("final file size %lld\n", rf1.fsize);
+	printf("final file size %lld\n", Ld(rf1.fsize));
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** first request done.\n");
@@ -127,7 +127,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg2.segs, seg2.bytes);
+			printf("%d segments with %lld bytes\n", seg2.segs, Ld(seg2.bytes));
 			for(i=0; i < seg2.segs; i++)
 			{
 				printf("  segment %d: offset: %d size: %d\n",
@@ -142,7 +142,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	printf("final file size %lld\n", rf2.fsize);
+	printf("final file size %lld\n", Ld(rf2.fsize));
 	if(PINT_REQUEST_DONE(rs2))
 	{
 		printf("**** second request done.\n");

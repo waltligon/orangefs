@@ -77,7 +77,7 @@ int main(int argc, char **argv)
     }
 
     printf("Retrieved the following attributes\n");
-    printf("Handle      : %Ld\n", pinode_refn.handle);
+    printf("Handle      : %Lu\n", Lu(pinode_refn.handle));
     printf("FSID        : %d\n", (int)pinode_refn.fs_id);
     printf("mask        : %d\n", resp_getattr.attr.mask);
     printf("uid         : %d\n", resp_getattr.attr.owner);
@@ -113,7 +113,7 @@ int main(int argc, char **argv)
         printf("setattr returned success\n");
 
         printf("Set the following attributes\n");
-        printf("Handle      : %Ld\n", pinode_refn.handle);
+        printf("Handle      : %Lu\n", Lu(pinode_refn.handle));
         printf("FSID        : %d\n", (int)pinode_refn.fs_id);
         printf("mask        : %d\n", resp_getattr.attr.mask);
         printf("uid         : %d\n", resp_getattr.attr.owner);

@@ -45,7 +45,7 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
     if (PVFS_sys_getattr(pinode_refn, attrmask, credentials, &getattr_response))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
-                "(fs_id is %d)\n",handle,fs_id);
+                "(fs_id is %d)\n",Lu(handle),fs_id);
         return -1;
     }
     return ((getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY) ? 1 : 0);
@@ -129,7 +129,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
         cur_file = rd_response.dirent_array[i].d_name;
         cur_handle = rd_response.dirent_array[i].handle;
 
-        gossip_debug(CLIENT_DEBUG,"Got handle 0x%08Lx\n",cur_handle);
+        gossip_debug(CLIENT_DEBUG,"Got handle 0x%08Lx\n",Lu(cur_handle));
 
         is_dir = is_directory(cur_handle,
                               init_response->fsid_list[0]);

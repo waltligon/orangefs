@@ -92,7 +92,7 @@ int main(int argc, char **argv)
     }
 	
     printf("--symlink--\n"); 
-    printf("Handle: %Ld\n", resp_sym.pinode_refn.handle);
+    printf("Handle: %Ld\n", Ld(resp_sym.pinode_refn.handle));
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

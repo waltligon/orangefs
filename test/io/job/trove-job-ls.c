@@ -161,7 +161,7 @@ int main(int argc, char **argv)
 		for(i=0; i<job_stat.count; i++)
 		{
 			printf("%s (%Ld)\n", (char *) key[i].buffer, 
-				*(TROVE_handle *) val[i].buffer);
+				Ld(*(TROVE_handle *) val[i].buffer));
 		}
 	}
 

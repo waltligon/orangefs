@@ -62,7 +62,7 @@ static int service_lookup_request(
             "Got a lookup request for %s (fsid %d | parent %Lu)\n",
             in_upcall->req.lookup.d_name,
             in_upcall->req.lookup.parent_refn.fs_id,
-            in_upcall->req.lookup.parent_refn.handle);
+            Lu(in_upcall->req.lookup.parent_refn.handle));
 
         parent_refn = in_upcall->req.lookup.parent_refn;
 
@@ -76,7 +76,7 @@ static int service_lookup_request(
                 CLIENT_DEBUG,
                 "Failed to lookup %s (fsid %d | parent is %Lu)!\n",
                 in_upcall->req.lookup.d_name,
-                parent_refn.fs_id,parent_refn.handle);
+                parent_refn.fs_id, Lu(parent_refn.handle));
             gossip_debug(CLIENT_DEBUG,
                          "Lookup returned error code %d\n", ret);
 
@@ -122,7 +122,7 @@ static int service_create_request(
             CLIENT_DEBUG,
             "Got a create request for %s (fsid %d | parent %Lu)\n",
             in_upcall->req.create.d_name,parent_refn.fs_id,
-            parent_refn.handle);
+            Lu(parent_refn.handle));
 
         ret = PVFS_sys_create(in_upcall->req.create.d_name, parent_refn,
                               *attrs, in_upcall->credentials, &response);
@@ -163,7 +163,7 @@ static int service_create_request(
           create_failure:
             gossip_err("Failed to create %s under %Lu on fsid %d!\n",
                        in_upcall->req.create.d_name,
-                       parent_refn.handle,parent_refn.fs_id);
+                       Lu(parent_refn.handle), parent_refn.fs_id);
             gossip_err("Create returned error code %d\n",ret);
 
             /* we need to send a blank response */
@@ -209,7 +209,7 @@ static int service_symlink_request(
             CLIENT_DEBUG,
             "Got a symlink request from %s (fsid %d | parent %Lu) to %s\n",
             in_upcall->req.sym.entry_name,parent_refn.fs_id,
-            parent_refn.handle, in_upcall->req.sym.target);
+            Lu(parent_refn.handle), in_upcall->req.sym.target);
 
         ret = PVFS_sys_symlink(in_upcall->req.sym.entry_name, parent_refn,
                                in_upcall->req.sym.target, *attrs,
@@ -219,7 +219,7 @@ static int service_symlink_request(
             gossip_err("Failed to symlink %s to %s under %Lu on "
                        "fsid %d!\n", in_upcall->req.sym.entry_name,
                        in_upcall->req.sym.target,
-                       parent_refn.handle, parent_refn.fs_id);
+                       Lu(parent_refn.handle), parent_refn.fs_id);
             gossip_err("Symlink returned error code %d\n",ret);
 
             /* we need to send a blank response */
@@ -308,7 +308,7 @@ static int service_getattr_request(
             CLIENT_DEBUG,
             "got a getattr request for fsid %d | handle %Lu\n",
             in_upcall->req.getattr.refn.fs_id,
-            in_upcall->req.getattr.refn.handle);
+            Lu(in_upcall->req.getattr.refn.handle));
 
         ret = PVFS_sys_getattr(in_upcall->req.getattr.refn,
                                PVFS_ATTR_SYS_ALL,
@@ -316,7 +316,7 @@ static int service_getattr_request(
         if (ret < 0)
         {
             gossip_err("failed to getattr handle %Lu on fsid %d!\n",
-                       in_upcall->req.getattr.refn.handle,
+                       Lu(in_upcall->req.getattr.refn.handle),
                        in_upcall->req.getattr.refn.fs_id);
             gossip_err("getattr returned error code %d\n",ret);
 
@@ -368,7 +368,7 @@ static int service_setattr_request(
             CLIENT_DEBUG,
             "got a setattr request for fsid %d | handle %Lu\n",
             in_upcall->req.setattr.refn.fs_id,
-            in_upcall->req.setattr.refn.handle);
+            Lu(in_upcall->req.setattr.refn.handle));
 
         ret = PVFS_sys_setattr(in_upcall->req.setattr.refn,
                                in_upcall->req.setattr.attributes,
@@ -376,7 +376,7 @@ static int service_setattr_request(
         if (ret < 0)
         {
             gossip_err("failed to setattr handle %Lu on fsid %d!\n",
-                       in_upcall->req.setattr.refn.handle,
+                       Lu(in_upcall->req.setattr.refn.handle),
                        in_upcall->req.setattr.refn.fs_id);
             gossip_err("setattr returned error code %d\n",ret);
 
@@ -412,7 +412,7 @@ static int service_remove_request(
             CLIENT_DEBUG,
             "Got a remove request for %s under fsid %d and "
             "handle %Lu\n", in_upcall->req.remove.d_name,
-            parent_refn.fs_id, parent_refn.handle);
+            parent_refn.fs_id, Lu(parent_refn.handle));
 
         ret = PVFS_sys_remove(in_upcall->req.remove.d_name,
                               parent_refn, in_upcall->credentials);
@@ -420,7 +420,7 @@ static int service_remove_request(
         {
             gossip_err("Failed to remove %s under handle %Lu "
                        "on fsid %d!\n", in_upcall->req.remove.d_name,
-                       parent_refn.handle, parent_refn.fs_id);
+                       Lu(parent_refn.handle), parent_refn.fs_id);
             gossip_err("Remove returned error code %d\n",ret);
 
             /* we need to send a blank error response */
@@ -463,7 +463,7 @@ static int service_mkdir_request(
             CLIENT_DEBUG,
             "Got a mkdir request for %s (fsid %d | parent %Lu)\n",
             in_upcall->req.mkdir.d_name,parent_refn.fs_id,
-            parent_refn.handle);
+            Lu(parent_refn.handle));
 
         ret = PVFS_sys_mkdir(in_upcall->req.mkdir.d_name, parent_refn,
                              *attrs, in_upcall->credentials, &response);
@@ -471,7 +471,7 @@ static int service_mkdir_request(
         {
             gossip_err("Failed to mkdir %s under %Lu on fsid %d!\n",
                        in_upcall->req.mkdir.d_name,
-                       parent_refn.handle,parent_refn.fs_id);
+                       Lu(parent_refn.handle), parent_refn.fs_id);
             gossip_err("Mkdir returned error code %d\n",ret);
 
             /* we need to send a blank response */
@@ -510,7 +510,7 @@ static int service_readdir_request(
         gossip_debug(
             CLIENT_DEBUG,
             "Got a readdir request for fsid %d | parent %Lu "
-            "(token is %d)\n", refn.fs_id, refn.handle,
+            "(token is %d)\n", refn.fs_id, Lu(refn.handle),
             in_upcall->req.readdir.token);
 
         ret = PVFS_sys_readdir(refn, in_upcall->req.readdir.token,
@@ -519,7 +519,7 @@ static int service_readdir_request(
         if (ret < 0)
         {
             gossip_err("Failed to readdir under %Lu on fsid %d!\n",
-                       refn.handle, refn.fs_id);
+                       Lu(refn.handle), refn.fs_id);
             gossip_err("Readdir returned error code %d\n",ret);
 
             /* we need to send a blank response */
@@ -585,9 +585,9 @@ static int service_rename_request(
             "Got a rename request for %s under fsid %d and "
             "handle %Lu to be %s under fsid %d and handle %Lu\n",
             in_upcall->req.rename.d_old_name,
-            old_parent_refn.fs_id, old_parent_refn.handle,
+            old_parent_refn.fs_id, Lu(old_parent_refn.handle),
             in_upcall->req.rename.d_new_name,
-            new_parent_refn.fs_id, new_parent_refn.handle);
+            new_parent_refn.fs_id, Lu(new_parent_refn.handle));
 
         ret = PVFS_sys_rename(in_upcall->req.rename.d_old_name,
                               in_upcall->req.rename.old_parent_refn,
@@ -690,9 +690,9 @@ static int service_truncate_request(
         gossip_debug(
             CLIENT_DEBUG,
             "Got a truncate request for %Lu under fsid %d to be "
-            "size %Lu\n", in_upcall->req.truncate.refn.handle,
+            "size %Ld\n", Lu(in_upcall->req.truncate.refn.handle),
             in_upcall->req.truncate.refn.fs_id,
-            in_upcall->req.truncate.size);
+            Ld(in_upcall->req.truncate.size));
 
         ret = PVFS_sys_truncate(in_upcall->req.truncate.refn,
                                 in_upcall->req.truncate.size,
@@ -700,7 +700,7 @@ static int service_truncate_request(
         if (ret < 0)
         {
             gossip_err("Failed to truncate %Lu on %d\n",
-                       in_upcall->req.truncate.refn.handle,
+                       Lu(in_upcall->req.truncate.refn.handle),
                        in_upcall->req.truncate.refn.fs_id);
             gossip_err("Truncate returned error code %d\n", ret);
 

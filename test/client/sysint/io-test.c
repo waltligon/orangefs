@@ -257,7 +257,7 @@ int main(int argc,char **argv)
 	}
 	for(i=0; i<resp_getattr.attr.dfile_count; i++)
 	{
-	    printf("0x%08Lx\n", dfile_array[i]);
+	    printf("0x%08Lx\n", Lu(dfile_array[i]));
 	}
 
 	/**************************************************************

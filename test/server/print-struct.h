@@ -44,7 +44,7 @@ static inline void display_pvfs_structure(
 	    break;
 	case PVFS_SERV_REMOVE:
 	    printf("Remove Request Structure\n");
-	    printf("Handle: %Ld\n", p->u.remove.handle);
+	    printf("Handle: %Lu\n", Lu(p->u.remove.handle));
 	    printf("FSid: %d\n", p->u.remove.fs_id);
 	    break;
 	case PVFS_SERV_IO:
@@ -52,13 +52,13 @@ static inline void display_pvfs_structure(
 	    break;
 	case PVFS_SERV_GETATTR:
 	    printf("Get Attrib Request Struct\n");
-	    printf("Handle: %Ld\n", p->u.getattr.handle);
+	    printf("Handle: %Lu\n", Lu(p->u.getattr.handle));
 	    printf("FSid: %d\n", p->u.getattr.fs_id);
 	    printf("AttrMsk: %Xh\n", p->u.getattr.attrmask);
 	    break;
 	case PVFS_SERV_SETATTR:
 	    printf("Set Attrib Request Struct\n");
-	    printf("Handle: %Ld\n", p->u.setattr.handle);
+	    printf("Handle: %Lu\n", Lu(p->u.setattr.handle));
 	    printf("FSid: %d\n", p->u.setattr.fs_id);
 	    printf("Attribs:\n");
 	    dump_attribs(p->u.setattr.attr);
@@ -67,7 +67,7 @@ static inline void display_pvfs_structure(
 	    printf("Lookup Path Request Struct\n");
 	    printf("Path: %s\n", p->u.lookup_path.path);
 	    printf("FSid: %d\n", p->u.lookup_path.fs_id);
-	    printf("Start Handle: %Ld\n", p->u.lookup_path.starting_handle);
+	    printf("Start Handle: %Lu\n", Lu(p->u.lookup_path.starting_handle));
 	    printf("Bitmask: %Xh\n", p->u.lookup_path.attrmask);
 	    break;
 	case PVFS_SERV_MKDIR:
@@ -82,14 +82,14 @@ static inline void display_pvfs_structure(
 	case PVFS_SERV_CRDIRENT:
 	    printf("Create Dirent Req\n");
 	    printf("Name: %s\n", p->u.crdirent.name);
-	    printf("New Handle: %Ld\n", p->u.crdirent.new_handle);
-	    printf("Parent Handle: %Ld\n", p->u.crdirent.parent_handle);
+	    printf("New Handle: %Lu\n", Lu(p->u.crdirent.new_handle));
+	    printf("Parent Handle: %Lu\n", Lu(p->u.crdirent.parent_handle));
 	    printf("FSid: %d\n", p->u.crdirent.fs_id);
 	    break;
 	case PVFS_SERV_RMDIRENT:
 	    printf("Remove Dir Entry Req\n");
 	    printf("Entry: %s\n", p->u.rmdirent.entry);
-	    printf("Parent Handle: %Ld\n", p->u.rmdirent.parent_handle);
+	    printf("Parent Handle: %Lu\n", Lu(p->u.rmdirent.parent_handle));
 	    printf("FSid: %d\n", p->u.rmdirent.fs_id);
 	    break;
 	case PVFS_SERV_GETCONFIG:
@@ -97,7 +97,7 @@ static inline void display_pvfs_structure(
 	    break;
 	case PVFS_SERV_READDIR:
 	    printf("Read Dir\n");
-	    printf("Handle: %Ld\n", p->u.readdir.handle);
+	    printf("Handle: %Lu\n", Lu(p->u.readdir.handle));
 	    printf("FSid: %d\n", p->u.readdir.fs_id);
 	    printf("Token: %d\n", (int) p->u.readdir.token);
 	    printf("Dir Ents: %d\n", p->u.readdir.dirent_count);
@@ -119,25 +119,25 @@ static inline void display_pvfs_structure(
 	    break;
 	case PVFS_SERV_CREATE:
 	    printf("Create Resp Structure\n");
-	    printf("Bucket: %Ld\n", p->u.create.handle);
+	    printf("Bucket: %Lu\n", Lu(p->u.create.handle));
 	    break;
 	case PVFS_SERV_LOOKUP_PATH:
 	    printf("Lookup Path Resp Struct\n");
 	    printf("Handle Array (Total: %d)\n", p->u.lookup_path.handle_count);
 	    while (i++ < p->u.lookup_path.handle_count)
 	    {
-		printf("%d\t%Ld\n", i, p->u.lookup_path.handle_array[i - 1]);
+		printf("%d\t%Lu\n", i, Lu(p->u.lookup_path.handle_array[i - 1]));
 		printf("Attribs:\n");
 		dump_attribs(p->u.lookup_path.attr_array[i - 1]);
 	    }
 	    break;
 	case PVFS_SERV_MKDIR:
 	    printf("Mkdir Resp\n");
-	    printf("Handle: %Ld\n", p->u.mkdir.handle);
+	    printf("Handle: %Lu\n", Lu(p->u.mkdir.handle));
 	    break;
 	case PVFS_SERV_RMDIRENT:
 	    printf("Remove Dir Entry Resp\n");
-	    printf("Entry Handle: %Ld\n", p->u.rmdirent.entry_handle);
+	    printf("Entry Handle: %Lu\n", Lu(p->u.rmdirent.entry_handle));
 	    break;
 	case PVFS_SERV_GETCONFIG:
 	    printf("Get Config Resp\n");
@@ -155,8 +155,8 @@ static inline void display_pvfs_structure(
 	    printf("Count: %d\n", p->u.readdir.dirent_count);
 	    while (i++ < p->u.readdir.dirent_count)
 	    {
-		printf("%s\t%Ld\n", p->u.readdir.dirent_array[i - 1].d_name,
-		       p->u.readdir.dirent_array[i - 1].handle);
+		printf("%s\t%Lu\n", p->u.readdir.dirent_array[i - 1].d_name,
+		       Lu(p->u.readdir.dirent_array[i - 1].handle));
 	    }
 	    break;
 

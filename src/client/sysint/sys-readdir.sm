@@ -140,7 +140,7 @@ int PVFS_sys_readdir(
     sm_p->u.readdir.object_ref = pinode_refn;
 
     gossip_debug(CLIENT_DEBUG, "Doing readdir on parent handle "
-                 "%Lu on fs %d\n", pinode_refn.handle,
+                 "%Lu on fs %d\n", Lu(pinode_refn.handle),
                  pinode_refn.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_READDIR);
@@ -208,7 +208,7 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
     gossip_debug(CLIENT_DEBUG, "%Lu|%d | token is %d | limit is %d\n",
-                 sm_p->u.readdir.object_ref.handle,
+                 Lu(sm_p->u.readdir.object_ref.handle),
                  sm_p->u.readdir.object_ref.fs_id,
                  sm_p->u.readdir.pos_token,
                  sm_p->u.readdir.dirent_limit);

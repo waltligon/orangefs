@@ -414,7 +414,7 @@ static int remove_rmdirent_comp_fn(void *v_p,
 
     gossip_debug(CLIENT_DEBUG,
 		 "  remove_rmdirent_comp_fn: metafile handle = 0x%08Lx\n",
-		 sm_p->u.remove.object_ref.handle);
+		 Lu(sm_p->u.remove.object_ref.handle));
 
     return 0;
 }
@@ -455,7 +455,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 
 	gossip_debug(CLIENT_DEBUG,
 		     "  datafile_remove: removing handle 0x%08Lx\n",
-		     sm_p->u.remove.datafile_handles[i]);
+		     Lu(sm_p->u.remove.datafile_handles[i]));
 
 	PINT_SERVREQ_REMOVE_FILL(msg_p->req,
 				 *sm_p->cred_p,

@@ -133,8 +133,8 @@ static int crdirent_validate(PINT_server_op *s_op,
     gossip_debug(SERVER_DEBUG,
 	    "  got crdirent for %s (with handle 0x%08Lx) in 0x%08Lx\n",
 	    s_op->req->u.crdirent.name,
-	    s_op->req->u.crdirent.new_handle,
-	    s_op->req->u.crdirent.parent_handle);
+	    Lu(s_op->req->u.crdirent.new_handle),
+	    Lu(s_op->req->u.crdirent.parent_handle));
 
     /* check for invalid characters in name */
     ptr = s_op->req->u.crdirent.name;
@@ -309,8 +309,8 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
 
     gossip_debug(SERVER_DEBUG,
 		 "  writing dirdata handle (0x%08Lx) into parent directory keyval space (0x%08Lx)\n",
-		 s_op->u.crdirent.dirent_handle,
-		 s_op->req->u.crdirent.parent_handle);
+		 Lu(s_op->u.crdirent.dirent_handle),
+		 Lu(s_op->req->u.crdirent.parent_handle));
 
     ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
 					  s_op->req->u.crdirent.parent_handle,
@@ -369,8 +369,8 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
     gossip_debug(SERVER_DEBUG,
 		 "  writing new directory entry for %s (handle = 0x%08Lx) to dirdata dspace 0x%08Lx\n",
 		 s_op->req->u.crdirent.name,
-		 s_op->req->u.crdirent.new_handle,
-		 s_op->u.crdirent.dirent_handle);
+		 Lu(s_op->req->u.crdirent.new_handle),
+		 Lu(s_op->u.crdirent.dirent_handle));
 
     ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
 					  s_op->u.crdirent.dirent_handle,
@@ -429,8 +429,8 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
     gossip_debug(SERVER_DEBUG,
 		 "  checking existence of new directory entry for %s (handle = 0x%08Lx) to dirdata dspace 0x%08Lx\n",
 		 s_op->req->u.crdirent.name,
-		 s_op->req->u.crdirent.new_handle,
-		 s_op->u.crdirent.dirent_handle);
+		 Lu(s_op->req->u.crdirent.new_handle),
+		 Lu(s_op->u.crdirent.dirent_handle));
 
     ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
 					  s_op->u.crdirent.dirent_handle,

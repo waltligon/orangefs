@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 	if(retval >= 0)
 	{
 		fprintf(stderr, "results of PINT_Process_request(PINT_CLIENT):\n");
-		printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+		printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 		for(i=0; i<seg1.segs; i++)
 		{
 			fprintf(stderr, "  segment %d: offset: %d size: %d\n",

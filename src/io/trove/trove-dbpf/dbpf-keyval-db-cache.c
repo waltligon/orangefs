@@ -61,7 +61,7 @@ void dbpf_keyval_dbcache_finalize(void)
 	if (keyval_db_cache[i].ref_ct > 0) {
 	    gossip_debug(TROVE_DEBUG, "warning: ref_ct = %d on handle %Lx in dbcache\n",
 		   keyval_db_cache[i].ref_ct,
-		   keyval_db_cache[i].handle);
+		   Lu(keyval_db_cache[i].handle));
 	}
 	if (keyval_db_cache[i].ref_ct >= 0) {
 	    /* close DB */

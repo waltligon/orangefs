@@ -167,8 +167,8 @@ int main(int argc, char **argv)
                 for(n = 0; n < meta_handle_extent_array.extent_count; n++)
                 {
                     printf("Meta server %d handle range: %Lu-%Lu\n", j,
-                           meta_handle_extent_array.extent_array[n].first,
-                           meta_handle_extent_array.extent_array[n].last);
+                           Lu(meta_handle_extent_array.extent_array[n].first),
+                           Lu(meta_handle_extent_array.extent_array[n].last));
                 }
             }
         }
@@ -192,8 +192,8 @@ int main(int argc, char **argv)
                 for(n = 0; n < data_handle_extent_array[j].extent_count; n++)
                 {
                     printf("Data server %d handle range: %Lu-%Lu\n", n,
-                           data_handle_extent_array[j].extent_array[n].first,
-                           data_handle_extent_array[j].extent_array[n].last);
+                           Lu(data_handle_extent_array[j].extent_array[n].first),
+                           Lu(data_handle_extent_array[j].extent_array[n].last));
                 }
             }
         }
@@ -205,16 +205,16 @@ int main(int argc, char **argv)
                                             test_handles[j],fs_ids[i]))
             {
                 printf("Error retrieving name of server managing handle "
-                       "%Ld!\n",test_handles[j]);
+                       "%Ld!\n",Ld(test_handles[j]));
                 printf("** This may be okay if the handle (%Ld) exists "
                        "on a different fs (not %d)\n",
-                       test_handles[j],fs_ids[i]);
+                       Ld(test_handles[j]),fs_ids[i]);
                 continue;
             }
             else
             {
                 printf("Retrieved name of server managing handle "
-                       "%Ld is %s\n",test_handles[j],server_name);
+                       "%Ld is %s\n",Ld(test_handles[j]),server_name);
                 test_handles_verified[j]++;
             }
         }
@@ -227,7 +227,7 @@ int main(int argc, char **argv)
                 fprintf(stderr, "PINT_bucket_map_to_server failure.\n");
                 printf("** This may be okay if the handle (%Ld) exists "
                        "on a different fs (not %d)\n",
-                       test_handles[j],fs_ids[i]);
+                       Ld(test_handles[j]),fs_ids[i]);
                 continue;
             }
             else
@@ -252,7 +252,7 @@ int main(int argc, char **argv)
                 else
                 {
                     printf("Retrieved address of server managing handle "
-                           "%Ld is %lu\n",test_handles[j],(long)addr);
+                           "%Ld is %lu\n",Ld(test_handles[j]),(long)addr);
                     test_handles_verified[j]++;
                 }
             }
@@ -275,7 +275,7 @@ int main(int argc, char **argv)
         {
             printf("** Failed to verify ability to map servers to handles.\n");
             printf("** Handle value %Ld failed -- cannot be mapped.\n",
-                   (j ? test_handles[j-1] : test_handles[j]));
+                   Ld(j ? test_handles[j-1] : test_handles[j]));
             return -1;
         }
     }

@@ -49,7 +49,7 @@ void print_entry_attr(
              ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
              attr->owner,
              attr->group,
-             computed_size,
+             Ld(computed_size),
              (time->tm_year + 1900),
              (time->tm_mon + 1),
              time->tm_mday,
@@ -91,7 +91,7 @@ void print_entry(
                          credentials, &getattr_response))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
-                "(fs_id is %d)\n",handle,fs_id);
+                "(fs_id is %d)\n",Lu(handle),fs_id);
         return;
     }
     print_entry_attr(entry_name, &getattr_response.attr);

@@ -16,7 +16,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
     {
         fprintf(stderr,"File system name: %s\n",fs->file_system_name);
         fprintf(stderr,"FS Collection ID: %d\n",fs->coll_id);
-        fprintf(stderr,"FS Root Handle  : %Ld\n",fs->root_handle);
+        fprintf(stderr,"FS Root Handle  : %Lu\n",Lu(fs->root_handle));
 
         fprintf(stderr,"\t--- Meta Server(s) for %s (%d total):\n",
                 fs->file_system_name,PINT_llist_count(fs->meta_handle_ranges));

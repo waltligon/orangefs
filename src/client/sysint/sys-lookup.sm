@@ -181,7 +181,7 @@ int PVFS_sys_ref_lookup(
     sm_p->u.lookup.num_symlinks_followed = 0;
 
     gossip_debug(CLIENT_DEBUG, "Looking up %s under parent handle "
-                 "%Lu on fs %d\n", relative_pathname, parent.handle,
+                 "%Lu on fs %d\n", relative_pathname, Lu(parent.handle),
                  parent.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_LOOKUP);
@@ -348,7 +348,7 @@ static int lookup_msg_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(CLIENT_DEBUG,
                  "Looking up path %s under handle %Lu and fs %d\n",
                  sm_p->u.lookup.remaining_pathname,
-                 sm_p->u.lookup.remaining_starting_refn.handle,
+                 Lu(sm_p->u.lookup.remaining_starting_refn.handle),
                  sm_p->u.lookup.remaining_starting_refn.fs_id);
 
     /* fill in msgpair structure components */
@@ -494,7 +494,7 @@ static int lookup_msg_comp_fn(void *v_p,
         gossip_debug(CLIENT_DEBUG, "Remaining pathname is %s | "
                      "new starting handle is %Lu\n",
                      sm_p->u.lookup.remaining_pathname,
-                     sm_p->u.lookup.remaining_starting_refn.handle);
+                     Lu(sm_p->u.lookup.remaining_starting_refn.handle));
     }
     return 1;
 }
@@ -520,7 +520,7 @@ static int lookup_symlink_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(CLIENT_DEBUG," lookup: posting symlink getattr "
                  "req on handle %Lu\n",
-                 sm_p->u.lookup.remaining_starting_refn.handle);
+                 Lu(sm_p->u.lookup.remaining_starting_refn.handle));
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));

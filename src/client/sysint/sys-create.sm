@@ -239,7 +239,7 @@ int PVFS_sys_create(
     }
 
     gossip_debug(CLIENT_DEBUG, "Creating file named %s under parent handle "
-                 "%Lu on fs %d\n", object_name, parent_refn.handle,
+                 "%Lu on fs %d\n", object_name, Lu(parent_refn.handle),
                  parent_refn.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_CREATE);
@@ -309,7 +309,7 @@ static int create_create_comp_fn(void *v_p,
     sm_p->u.create.metafile_handle = resp_p->u.create.handle;
 
     gossip_debug(CLIENT_DEBUG, "*** Got newly created handle %Lu\n",
-                 sm_p->u.create.metafile_handle);
+                 Lu(sm_p->u.create.metafile_handle));
 
     return 0;
 }
@@ -378,7 +378,7 @@ static int create_datafiles_comp_fn(void *v_p,
     sm_p->u.create.datafile_handles[index] = resp_p->u.create.handle;
 
     gossip_debug(CLIENT_DEBUG, "Datafile handle %d is %Lu\n",
-                 index, sm_p->u.create.datafile_handles[index]);
+                 index, Lu(sm_p->u.create.datafile_handles[index]));
 
     return 0;
 }

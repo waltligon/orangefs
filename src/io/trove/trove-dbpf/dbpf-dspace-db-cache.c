@@ -55,9 +55,9 @@ void dbpf_dspace_dbcache_finalize(void)
 
     for (i=0; i < DBCACHE_ENTRIES; i++) {
 	if (dspace_db_cache[i].ref_ct > 0) {
-	    gossip_debug(TROVE_DEBUG, "warning: ref_ct = %d on coll_id %Lx in dspace dbcache\n",
+	    gossip_debug(TROVE_DEBUG, "warning: ref_ct = %d on coll_id %x in dspace dbcache\n",
 		   dspace_db_cache[i].ref_ct,
-		   (int64_t) dspace_db_cache[i].coll_id);
+		   dspace_db_cache[i].coll_id);
 	}
 	if (dspace_db_cache[i].ref_ct >= 0) {
 	    /* close DB */

@@ -91,7 +91,7 @@ int main(int argc,char **argv)
     }
     // print the handle 
     printf("--mkdir--\n"); 
-    printf("Handle:%Ld\n",resp_mkdir.pinode_refn.handle);
+    printf("Handle:%Lu\n",Lu(resp_mkdir.pinode_refn.handle));
     printf("FSID:%d\n",parent_refn.fs_id);
 
     //close it down

@@ -89,7 +89,7 @@ int main(int argc,char **argv)
 	}
 
 	printf("--getattr--\n"); 
-	printf("Handle      : %Ld\n", pinode_refn.handle);
+	printf("Handle      : %Lu\n", Lu(pinode_refn.handle));
 	printf("FSID        : %d\n", (int)pinode_refn.fs_id);
 	printf("mask        : %d\n", resp_gattr->attr.mask);
 	printf("uid         : %d\n", resp_gattr->attr.owner);
@@ -98,7 +98,7 @@ int main(int argc,char **argv)
 	printf("atime       : %s", ctime((time_t *)&resp_gattr->attr.atime));
 	printf("mtime       : %s", ctime((time_t *)&resp_gattr->attr.mtime));
 	printf("ctime       : %s", ctime((time_t *)&resp_gattr->attr.ctime));
-        printf("file size   : %Ld\n", resp_gattr->attr.size);
+        printf("file size   : %Ld\n", Ld(resp_gattr->attr.size));
 	printf("handle type : ");
 
 	switch(resp_gattr->attr.objtype)

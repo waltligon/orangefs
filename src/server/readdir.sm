@@ -146,12 +146,12 @@ static int readdir_read_dirdata_handle(PINT_server_op *s_op,
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(SERVER_DEBUG,
-		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.readdir.fs_id,
-		 s_op->req->u.readdir.handle,
+		 Lu(s_op->req->u.readdir.handle),
 		 (char *) s_op->key.buffer,
 		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(s_op->req->u.readdir.fs_id,
@@ -234,10 +234,10 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
     }
 
     gossip_debug(SERVER_DEBUG,
-		 "  iterating over keyvals (coll_id = 0x%x, handle = 0x%08Lx, token = 0x%Lx, count = %d)\n",
+		 "  iterating over keyvals (coll_id = 0x%x, handle = 0x%08Lx, token = 0x%x, count = %d)\n",
 		 s_op->req->u.readdir.fs_id,
-		 s_op->u.readdir.dirent_handle,
-		 (long long)s_op->req->u.readdir.token,
+		 Lu(s_op->u.readdir.dirent_handle),
+		 s_op->req->u.readdir.token,
 		 s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,

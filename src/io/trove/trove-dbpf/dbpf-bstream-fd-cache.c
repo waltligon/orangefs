@@ -69,7 +69,7 @@ void dbpf_bstream_fdcache_finalize(void)
 	if (bstream_fd_cache[i].ref_ct > 0) {
 	    gossip_debug(TROVE_DEBUG, "warning: ref_ct = %d on handle %Lx in fdcache\n",
 		   bstream_fd_cache[i].ref_ct,
-		   bstream_fd_cache[i].handle);
+		   Lu(bstream_fd_cache[i].handle));
 	}
 
 	/* warning or no, close the FD */

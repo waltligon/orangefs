@@ -200,7 +200,7 @@ int PVFS_sys_symlink(
     sm_p->u.sym.sys_attr = &attr;
 
     gossip_debug(CLIENT_DEBUG, "Symlinking %s under parent handle %Lu "
-                 "on fs %d to %s\n", entry_name, parent_refn.handle,
+                 "on fs %d to %s\n", entry_name, Lu(parent_refn.handle),
                  parent_refn.fs_id, target);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_SYMLINK);
@@ -270,7 +270,7 @@ static int symlink_create_comp_fn(void *v_p,
     sm_p->u.sym.symlink_handle = resp_p->u.create.handle;
 
     gossip_debug(CLIENT_DEBUG, "*** Got newly created symlink "
-                 "handle %Lu\n", sm_p->u.sym.symlink_handle);
+                 "handle %Lu\n", Lu(sm_p->u.sym.symlink_handle));
 
     return 0;
 }

@@ -218,12 +218,12 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
     s_op->val.buffer_sz = sizeof(PVFS_object_attr);
 
     gossip_debug(SERVER_DEBUG,
-                 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+                 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.lookup_path.fs_id,
-		 handle,
+		 Lu(handle),
 		 (char *) s_op->key.buffer,
 		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
     /* update our successful handle read count */
@@ -373,8 +373,8 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op,
     }
 
     gossip_debug(SERVER_DEBUG,
-		 "  reading dirent handle value from handle 0x%08Lx\n",
-		 handle);
+		 "  reading dirent handle value from handle 0x%Lx\n",
+		 Lu(handle));
 
     s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
@@ -420,8 +420,8 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
     PINT_STATE_DEBUG("read_directory_entry");
 
     gossip_debug(SERVER_DEBUG,
-		 "  reading from dirent handle = 0x%08Lx, segment = %s\n",
-		 s_op->u.lookup.dirent_handle,
+		 "  reading from dirent handle = 0x%Lx, segment = %s\n",
+		 Lu(s_op->u.lookup.dirent_handle),
 		 s_op->u.lookup.segp);
 
     /* initialize keyval prior to read call
