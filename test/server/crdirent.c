@@ -216,7 +216,7 @@ static struct options* parse_args(int argc, char* argv[]){
 	/* getopt stuff */
 	extern char* optarg;
 	extern int optind, opterr, optopt;
-	char flags[] = "h:m:l:n";
+	char flags[] = "h:m:l:n:";
 	char one_opt = ' ';
 
 	struct options* tmp_opts = NULL;
