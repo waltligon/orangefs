@@ -258,19 +258,12 @@ static void pvfs2_clear_inode(struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2_clear_inode called (ino %u | ct = %d | "
-                "nlink = %d | pvfs2_inode = %p\n", (unsigned int)
-                inode->i_ino, (int)atomic_read(&inode->i_count),
-                (int)inode->i_nlink, pvfs2_inode);
+    pvfs2_print("pvfs2_clear_inode: destroying inode %d\n",
+                (int)inode->i_ino);
 
-    if (pvfs2_inode)
-    {
-        pvfs2_inode_finalize(pvfs2_inode);
-        kmem_cache_free(pvfs2_inode_cache, pvfs2_inode);
-    }
+    pvfs2_inode_finalize(pvfs2_inode);
+    kmem_cache_free(pvfs2_inode_cache, pvfs2_inode);
     inode->u.generic_ip = NULL;
-
-    pvfs2_print("pvfs2_clear_inode finished\n");
 }
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */

@@ -155,7 +155,7 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
  ************************************/
 
 #if ((defined PVFS2_KERNEL_DEBUG) && (defined CONFIG_DEBUG_SLAB))
-#define PVFS2_CACHE_CREATE_FLAGS (SLAB_POISON | SLAB_RED_ZONE)
+#define PVFS2_CACHE_CREATE_FLAGS SLAB_RED_ZONE
 #else
 #define PVFS2_CACHE_CREATE_FLAGS 0
 #endif /* ((defined PVFS2_KERNEL_DEBUG) && (defined CONFIG_DEBUG_SLAB)) */
@@ -700,6 +700,8 @@ do {                                                                 \
 #define pvfs2_recalc_sigpending() recalc_sigpending(current)
 #define pvfs2_d_splice_alias(dentry, inode) d_add(dentry, inode)
 #define pvfs2_kernel_readpage block_read_full_page
+#define pvfs2_set_page_reserved SetPageReserved
+#define pvfs2_clear_page_reserved ClearPageReserved
 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
@@ -725,6 +727,8 @@ do                                                \
 #define pvfs2_recalc_sigpending recalc_sigpending
 #define pvfs2_d_splice_alias(dentry, inode) d_splice_alias(inode, dentry)
 #define pvfs2_kernel_readpage mpage_readpage
+#define pvfs2_set_page_reserved do {} while(0)
+#define pvfs2_clear_page_reserved do {} while(0)
 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \

@@ -1443,6 +1443,7 @@ static inline void package_downcall_members(
                 else
                 {
                     assert(vfs_request->io_tmp_buf == NULL);
+                    assert(vfs_request->io_kernel_mapped_buf);
 
                     PVFS_Request_free(&vfs_request->mem_req);
                     PVFS_Request_free(&vfs_request->file_req);

@@ -84,15 +84,11 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
 
     /* map the pages */
     down_read(&current->mm->mmap_sem);
+
     ret = get_user_pages(
-        current,
-        current->mm,
-        (unsigned long)user_desc->ptr,
-        BUFMAP_PAGE_COUNT,
-        1,
-        0,
-        bufmap_page_array,
-        NULL);
+        current, current->mm, (unsigned long)user_desc->ptr,
+        BUFMAP_PAGE_COUNT, 1, 0, bufmap_page_array, NULL);
+
     up_read(&current->mm->mmap_sem);
 
     if (ret < 0)
@@ -101,15 +97,18 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
         goto init_failure;
     }
 
-    /* in theory we could run with what we got, but I will just treat
-     * it as an error for simplicity's sake right now
-     */
+    /*
+      in theory we could run with what we got, but I will just treat
+      it as an error for simplicity's sake right now
+    */
     if (ret != BUFMAP_PAGE_COUNT)
     {
-        pvfs2_error("pvfs2: error: asked for %d pages, only got %d.\n",
+        pvfs2_error("pvfs2 error: asked for %d pages, only got %d.\n",
                     (int)BUFMAP_PAGE_COUNT, ret);
+
         for(i = 0; i < ret; i++)
         {
+            SetPageError(bufmap_page_array[i]);
             page_cache_release(bufmap_page_array[i]);
         }
         kfree(bufmap_page_array);
@@ -121,21 +120,25 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
       ideally we want to get kernel space pointers for each page, but
       we can't kmap that many pages at once if highmem is being used.
       so instead, we just kmap/kunmap the page address each time the
-      kaddr is needed.
+      kaddr is needed.  this loop used to kmap every page, but now it
+      only ensures every page is marked reserved (non-pageable) NOTE:
+      setting PageReserved in 2.6.x seems to cause more trouble than
+      it's worth.  in 2.4.x, marking the pages does what's expected
+      and doesn't try to swap out our pages
     */
     for(i = 0; i < BUFMAP_PAGE_COUNT; i++)
     {
         flush_dcache_page(bufmap_page_array[i]);
+        pvfs2_set_page_reserved(bufmap_page_array[i]);
     }
 
     /* build a list of available descriptors */
-    offset = 0;
-    for(i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
+    for(offset = 0, i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
     {
         desc_array[i].page_array = &bufmap_page_array[offset];
         desc_array[i].array_count = PAGES_PER_DESC;
         desc_array[i].uaddr =
-            user_desc->ptr + (i*PAGES_PER_DESC*PAGE_SIZE);
+            (user_desc->ptr + (i * PAGES_PER_DESC*PAGE_SIZE));
         offset += PAGES_PER_DESC;
     }
 
@@ -177,8 +180,9 @@ void pvfs_bufmap_finalize(void)
         return;
     }
 
-    for(i=0; i<BUFMAP_PAGE_COUNT; i++)
+    for(i = 0; i < BUFMAP_PAGE_COUNT; i++)
     {
+        pvfs2_clear_page_reserved(bufmap_page_array[i]);
         page_cache_release(bufmap_page_array[i]);
     }
     kfree(bufmap_page_array);
@@ -186,7 +190,6 @@ void pvfs_bufmap_finalize(void)
     bufmap_init = 0;
 
     pvfs2_print("pvfs2_bufmap_finalize: exiting normally\n");
-    return;
 }
 
 /* pvfs_bufmap_get()
