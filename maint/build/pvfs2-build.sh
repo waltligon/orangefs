@@ -1,10 +1,50 @@
 #!/bin/sh 
 #
-#
+# requires: 
+#  expect
+#  cvs (if pulling from CVS
 
 rootdir=/tmp/pvfs2-build-test
-
 tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
+cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs 
+
+
+#
+# use this method if you want to test a release
+#   takes no arguments.  returns nonzero on error
+get_dist() {
+	# get the source (-nv keeps it kinda quiet)
+	wget -nv $tarballurl
+
+	if [ $? != 0 ] ; then
+		echo "wget of $tarballurl failed.  Aborting."
+		exit 1
+	fi
+	# untar the source
+	tar xzf $tarball
+
+	if [ -d $tarballdir ] ; then
+		mv $tarballdir $srcdir
+	fi
+
+	if [ ! -d $srcdir ] ; then
+		echo "Tarball $tarball did not create a $srcdir directory or a $tarballdir directory.  Aborting."
+		exit 1
+	fi
+
+}
+
+# get_cvs requires expect
+# use this method if you want to, well, test whatever is in cvs at this very
+# moment.  takes no arguments. returns nonzero on error.
+get_cvs() {
+	expect -c "spawn -noecho cvs -Q -d $cvsroot login; send \r;"
+	cvs -Q -d $cvsroot co pvfs2
+	if [ $? -ne 0 ] ; then
+		echo "Pulling PVFS2 from $cvsroot failed."
+		exit 1
+	fi
+}
 
 # end of user defines
 
@@ -33,25 +73,9 @@ rm -rf $rootdir/pvfs2
 # move to our root dir
 cd $rootdir
 
-# get the source (-nv keeps it kinda quiet)
-wget -nv $tarballurl
+# could make this some sort of command line option... 
+get_cvs || exit 1
 
-if [ $? != 0 ] ; then
-	echo "wget of $tarballurl failed.  Aborting."
-	exit 1
-fi
-
-# untar the source
-tar xzf $tarball
-
-if [ -d $tarballdir ] ; then
-	mv $tarballdir $srcdir
-fi
-
-if [ ! -d $srcdir ] ; then
-	echo "Tarball $tarball did not create a $srcdir directory or a $tarballdir directory.  Aborting."
-	exit 1
-fi
 
 # create build and install directories, configure
 mkdir $builddir
@@ -73,7 +97,7 @@ if [ $? != 0 ] ; then
 fi
 
 # look through make output
-PEMM=`which pvfs2-extract-make-msgs.pl`
+PEMM=`which pvfs2-extract-make-msgs.pl 2>/dev/null`
 if [ x$PEMM == "x" ] ; then
 	if [ ! -x $old_wd/pvfs2-extract-make-msgs.pl ] ; then
 		echo "Failed to find pvfs2-extract-make-msgs.pl.  Aborting."
@@ -98,5 +122,33 @@ if [ $? != 0 ] ; then
 fi
 
 # after installing, create a pvfs volume (PAV)
+#  . start the volume
+#  . load up some environment variables, exporting the important ones 
+#          like PVFS2TAB_FILE
+
+PAV_DIR=/test/common/pav
+$srcdir/$PAV_DIR/pav_start -c $builddir/${PAV_DIR}/configfile.sample > $rootdir/pav-setup.log 2>&1
+
+if [ $? -ne 0 ] ; then
+	echo "Failed to start PAV. see $rootdir/pav-setup.log for details"
+	exit 1
+fi
+
+eval $($srcdir/${PAV_DIR}/pav_info -c $builddir/${PAV_DIR}/configfile.sample)
+export PVFS2TAB_FILE
+
 # then run a test or set of tests (most likely PTS)
-echo "Script completed successfully.  Exiting."
+$builddir/src/apps/admin/pvfs2-ping -m $MOUNTPOINT >/dev/null 
+if [ $? -eq 0 ] ; then 
+	echo "Servers started successfully"
+else 
+	echo "Servers failed to start"
+	exit 1
+fi
+
+# now do some testing. something trivial for now
+$builddir/src/apps/admin/pvfs2-import $builddir/src/apps/admin/pvfs2-import $MOUNTPOINT/pvfs2-import 
+
+
+# and clean up
+$srcdir/$PAV_DIR/pav_stop -c $builddir/${PAV_DIR}/configfile.sample > $rootdir/pav-shutdown.log 2>&1 &&  echo "Script completed successfully." 
