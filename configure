@@ -600,7 +600,7 @@ fi
 # Check whether --enable-fast or --disable-fast was given.
 if test "${enable_fast+set}" = set; then
   enableval="$enable_fast"
-  CFLAGS="$CFLAGS -DNDEBUG -O3"
+  CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG"
 else
   CFLAGS="$CFLAGS -g"
 
