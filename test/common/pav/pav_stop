@@ -19,12 +19,12 @@ my $working_dir = $config{"WORKINGDIR"};
 
 if ($prog_name =~ /pav_start/) {
 
-    @commands = ("$prog_root/pav_create -c $config_file", "$prog_root/pav_check -ping -one-all -sd $working_dir", "$prog_root/pav_dist -sd $working_dir", "$prog_root/pav_init -sd $working_dir");
+    @commands = ("$prog_root/pav_create -c $config_file -r $prog_root", "$prog_root/pav_check -ping -one-all -sd $working_dir -r $prog_root", "$prog_root/pav_dist -sd $working_dir -r $prog_root", "$prog_root/pav_init -sd $working_dir -r $prog_root");
     
 } elsif ($prog_name =~ /pav_stop/) {
-    @commands = ("$prog_root/pav_uninit -sd $working_dir", "$prog_root/pav_clean -sd $working_dir");
+    @commands = ("$prog_root/pav_uninit -sd $working_dir -r $prog_root", "$prog_root/pav_clean -sd $working_dir -r $prog_root");
 } else {
-    print STDERR "ERROR: unknown command function: $prog_root\n";
+    print STDERR "ERROR: unknown command function: $prog_name\n";
     exit(1);
 }
 
