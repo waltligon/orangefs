@@ -2,9 +2,7 @@
 #include <test-pvfs-datatype-vector.h>
 #include <stdio.h>
 
-extern pvfs_helper_t pvfs_helper;
-
-int test_pvfs_datatype_vector(MPI_Comm *mycomm, int myid, char *buf, void *params)
+int test_pvfs_datatype_vector(MPI_Comm *mycomm __unused, int myid, char *buf __unused, void *params __unused)
 {
     int ret = -1, i = 0, j = 0, num_ok = 0;
     PVFS_credentials credentials;
@@ -29,7 +27,7 @@ int test_pvfs_datatype_vector(MPI_Comm *mycomm, int myid, char *buf, void *param
 
     for(i = 0; i < TEST_PVFS_DATA_SIZE; i++)
     {
-        io_buffer[i] = ((i % 26) + 65);
+        io_buffer[i] = (char)((i % 26) + 65);
     }
 
     credentials.uid = getuid();

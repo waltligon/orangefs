@@ -12,8 +12,7 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
-
-extern pvfs_helper_t pvfs_helper;
+#include "test-dir-torture.h"
 
 /*
  * handle:  handle of parent directory
@@ -22,7 +21,7 @@ extern pvfs_helper_t pvfs_helper;
  * rank:    rank in the mpi process group 
  */
 
-int recursive_create_dir(PVFS_handle handle,
+static int recursive_create_dir(PVFS_handle handle,
 			 PVFS_fs_id fs_id,
 			 int depth,
 			 int ndirs,
@@ -75,9 +74,9 @@ int recursive_create_dir(PVFS_handle handle,
  * 	0:  	all went well
  * 	nonzero: errors encountered making one or more directories
  */
-int test_dir_torture(MPI_Comm * comm,
+int test_dir_torture(MPI_Comm * comm __unused,
 		     int rank,
-		     char *buf,
+		     char *buf __unused,
 		     void *rawparams)
 {
     PVFS_fs_id fs_id;

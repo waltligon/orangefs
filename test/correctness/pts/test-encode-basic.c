@@ -24,19 +24,19 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
+#include "test-encode-basic.h"
 #define SEGMAX 16
 #define BYTEMAX (1024*1024)
-extern pvfs_helper_t pvfs_helper;
 
 /* PROTO-TYPES */
-void Dump_request(PVFS_Request);
+/* static void Dump_request(PVFS_Request); */
 
 /*
  * Parameters: none
  * Returns 0 on success and -1 on failure (ie - the segment offsets
  * were not calcuated correctly by Request_indexed
  */
-int test_encode(void){
+static int test_encode(void){
     /* Used for calculating correct offset values */
 
    PINT_Request *r;
@@ -99,6 +99,7 @@ int test_encode(void){
    return 0;
 }
                                                                                 
+#if 0
 void Dump_request(PVFS_Request req)
 {
    fprintf(stderr,"**********************\n");
@@ -119,16 +120,17 @@ void Dump_request(PVFS_Request req)
    fprintf(stderr,"sreq:\t\t%x\n",(int)req->sreq);
    fprintf(stderr,"**********************\n");
 }
+#endif
 
 /* Preconditions: None
  * Parameters: comm - special pts communicator, rank - the rank of the process,
  * buf - not used
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_encode_basic(MPI_Comm * comm,
+int test_encode_basic(MPI_Comm * comm __unused,
 		     int rank,
-		     char *buf,
-		     void *rawparams)
+		     char *buf __unused,
+		     void *rawparams __unused)
 {
     int ret = -1;
 

@@ -21,9 +21,7 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "null_params.h"
-
-extern pvfs_helper_t pvfs_helper;
-
+#include "test-uninitialized.h"
 
 /* Preconditions: none
  * Parameters: none
@@ -107,7 +105,6 @@ static int test_setattr(void)
 static int test_mkdir(void)
 {
     PVFS_pinode_reference parent_refn;
-    uint32_t attrmask;
     PVFS_sys_attr attr;
     PVFS_sysresp_mkdir resp_mkdir;
 
@@ -133,7 +130,7 @@ static int test_mkdir(void)
     }
 
     parent_refn = resp_lookup.pinode_refn;
-    attrmask = PVFS_ATTR_SYS_ALL_SETABLE;
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
@@ -213,6 +210,10 @@ static int test_create(void)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
+    attr.owner = 100;
+    attr.group = 100;
+    attr.perms = 1877;
+    attr.atime = attr.ctime = attr.mtime = time(NULL);
     credentials.uid = 100;
     credentials.gid = 100;
 
@@ -387,9 +388,9 @@ static int test_finalize(void)
  * Parameters: comm - special pts communicator, rank - the rank of the process, buf -  * (not used), rawparams - configuration information to specify which function to test
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_uninitialized(MPI_Comm * comm,
+int test_uninitialized(MPI_Comm * comm __unused,
 		       int rank,
-		       char *buf,
+		       char *buf __unused,
 		       void *rawparams)
 {
     int ret = -1;
@@ -412,7 +413,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 1:
 		fprintf(stderr, "[test_uninitialized] test_getattr %d\n",
 			params->p2);
@@ -422,7 +422,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 2:
 		fprintf(stderr, "[test_uninitialized] test_setattr %d\n",
 			params->p2);
@@ -432,7 +431,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 3:
 		fprintf(stderr, "[test_uninitialized] test_mkdir %d\n",
 			params->p2);
@@ -442,7 +440,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 4:
 		fprintf(stderr, "[test_uninitialized] test_readdir %d\n",
 			params->p2);
@@ -452,7 +449,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 5:
 		fprintf(stderr, "[test_uninitialized] test_create %d\n",
 			params->p2);
@@ -462,7 +458,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 6:
 		fprintf(stderr, "[test_uninitialized] test_remove %d\n",
 			params->p2);
@@ -472,7 +467,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 7:
 		fprintf(stderr, "[test_uninitialized] test_rename %d\n",
 			params->p2);
@@ -482,7 +476,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 8:
 		fprintf(stderr, "[test_uninitialized] test_symlink %d\n",
 			params->p2);
@@ -492,7 +485,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 9:
 		fprintf(stderr, "[test_uninitialized] test_readlink %d\n",
 			params->p2);
@@ -502,7 +494,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 10:
 		fprintf(stderr, "[test_uninitialized] test_read %d\n",
 			params->p2);
@@ -512,7 +503,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 11:
 		fprintf(stderr, "[test_uninitialized] test_write %d\n",
 			params->p2);
@@ -522,7 +512,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 12:
 		fprintf(stderr, "[test_uninitialized] test_finalize %d\n",
 			params->p2);
@@ -532,7 +521,6 @@ int test_uninitialized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    default:
 		fprintf(stderr, "Error: invalid param %d\n", params->p1);
 		return -2;

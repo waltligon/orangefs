@@ -21,9 +21,7 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "null_params.h"
-
-extern pvfs_helper_t pvfs_helper;
-
+#include "test-finalized.h"
 
 /* Preconditions: none
  * Parameters: none
@@ -32,7 +30,7 @@ extern pvfs_helper_t pvfs_helper;
  */
 static int test_lookup(void)
 {
-    int fs_id, ret;
+    int ret;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lookup;
     char *name;
@@ -47,7 +45,6 @@ static int test_lookup(void)
 	return -1;
     }
     PVFS_sys_finalize();
-    fs_id = pvfs_helper.fs_id;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -119,7 +116,6 @@ static int test_setattr(void)
 static int test_mkdir(void)
 {
     PVFS_pinode_reference parent_refn;
-    uint32_t attrmask;
     PVFS_sys_attr attr;
     PVFS_sysresp_mkdir resp_mkdir;
 
@@ -151,7 +147,7 @@ static int test_mkdir(void)
     }
 
     parent_refn = resp_lookup.pinode_refn;
-    attrmask = PVFS_ATTR_SYS_ALL_SETABLE;
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
@@ -250,6 +246,10 @@ static int test_create(void)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
+    attr.owner = 100;
+    attr.group = 100;
+    attr.perms = 1877;
+    attr.atime = attr.mtime = attr.ctime = time(NULL);
     credentials.uid = 100;
     credentials.gid = 100;
 
@@ -445,9 +445,9 @@ static int test_write(void)
  * Parameters: comm - special pts communicator, rank - the rank of the process, buf -  * (not used), rawparams - configuration information to specify which function to test
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_finalized(MPI_Comm * comm,
+int test_finalized(MPI_Comm * comm __unused,
 		   int rank,
-		   char *buf,
+		   char *buf __unused,
 		   void *rawparams)
 {
     int ret = -1;
@@ -470,7 +470,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 1:
 		fprintf(stderr, "[test_finalized] test_getattr %d\n",
 			params->p2);
@@ -480,7 +479,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 2:
 		fprintf(stderr, "[test_finalized] test_setattr %d\n",
 			params->p2);
@@ -490,7 +488,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 3:
 		fprintf(stderr, "[test_finalized] test_mkdir %d\n", params->p2);
 		ret = test_mkdir();
@@ -499,7 +496,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 4:
 		fprintf(stderr, "[test_finalized] test_readdir %d\n",
 			params->p2);
@@ -509,7 +505,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 5:
 		fprintf(stderr, "[test_finalized] test_create %d\n",
 			params->p2);
@@ -519,7 +514,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 6:
 		fprintf(stderr, "[test_finalized] test_remove %d\n",
 			params->p2);
@@ -529,7 +523,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 7:
 		fprintf(stderr, "[test_finalized] test_rename %d\n",
 			params->p2);
@@ -539,7 +532,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 8:
 		fprintf(stderr, "[test_finalized] test_symlink %d\n",
 			params->p2);
@@ -549,7 +541,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 9:
 		fprintf(stderr, "[test_finalized] test_readlink %d\n",
 			params->p2);
@@ -559,7 +550,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 10:
 		fprintf(stderr, "[test_finalized] test_read %d\n", params->p2);
 		ret = test_read();
@@ -568,7 +558,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 11:
 		fprintf(stderr, "[test_finalized] test_write %d\n", params->p2);
 		ret = test_write();
@@ -577,7 +566,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 12:
 		fprintf(stderr, "[test_finalized] test_finalize %d\n",
 			params->p2);
@@ -587,7 +575,6 @@ int test_finalized(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    default:
 		fprintf(stderr, "Error: invalid param %d\n", params->p1);
 		return -2;

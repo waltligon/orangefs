@@ -25,16 +25,16 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
+#include "test-mix.h"
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
-extern pvfs_helper_t pvfs_helper;
 
 /*
  * Parameters: none
  * Returns 0 on success and -1 on failure (ie - the segment offsets
  * were not calcuated correctly by Request_indexed
  */
-int test_mx(void){
+static int test_mx(void){
    int i, r_size;
    PINT_Request *r1, *r1a, *r1b, *r_packed;
    PINT_Request *r2;
@@ -249,10 +249,10 @@ int test_mx(void){
  * buf - not used
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_mix(MPI_Comm * comm,
+int test_mix(MPI_Comm * comm __unused,
 		     int rank,
-		     char *buf,
-		     void *rawparams)
+		     char *buf __unused,
+		     void *rawparams __unused)
 {
     int ret = -1;
 

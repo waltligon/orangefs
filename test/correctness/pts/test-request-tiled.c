@@ -25,16 +25,16 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
+#include "test-request-tiled.h"
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
-extern pvfs_helper_t pvfs_helper;
 
 /*
  * Parameters: none
  * Returns 0 on success and -1 on failure (ie - the segment offsets
  * were not calcuated correctly by Request_indexed
  */
-int test_req_tiled(void){
+static int test_req_tiled(void){
    int i;
    PINT_Request *r2;
    PINT_Request_state *rs1;
@@ -123,10 +123,10 @@ int test_req_tiled(void){
  * buf - not used
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_request_tiled(MPI_Comm * comm,
+int test_request_tiled(MPI_Comm * comm __unused,
 		     int rank,
-		     char *buf,
-		     void *rawparams)
+		     char *buf __unused,
+		     void *rawparams __unused)
 {
     int ret = -1;
 

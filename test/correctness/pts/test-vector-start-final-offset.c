@@ -25,16 +25,16 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
+#include "test-vector-start-final-offset.h"
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
-extern pvfs_helper_t pvfs_helper;
 
 /*
  * Parameters: none
  * Returns 0 on success and -1 on failure (ie - the segment offsets
  * were not calcuated correctly by Request_indexed
  */
-int test_vec_start_final(void){
+static int test_vec_start_final(void){
     int i;
     PINT_Request *r1;
     PINT_Request_state *rs1;
@@ -139,10 +139,10 @@ int test_vec_start_final(void){
  * buf - not used
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_vector_start_final_offset(MPI_Comm * comm,
+int test_vector_start_final_offset(MPI_Comm * comm __unused,
 		     int rank,
-		     char *buf,
-		     void *rawparams)
+		     char *buf __unused,
+		     void *rawparams __unused)
 {
     int ret = -1;
 

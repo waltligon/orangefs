@@ -14,8 +14,6 @@
 #include "test-path-lookup.h"
 #include "pvfs2-req-proto.h"
 
-extern pvfs_helper_t pvfs_helper;
-
 #define GENERATE_FILENAME(fname, max_len, f, i, r, slash) \
 do {                                                      \
 snprintf(fname, max_len, (slash ? "/%s%dr%d" : "%s%dr%d"),\
@@ -25,7 +23,7 @@ snprintf(fname, max_len, (slash ? "/%s%dr%d" : "%s%dr%d"),\
 #define RELATIVE_SYMLINK_NAME "rl"
 #define ABSOLUTE_SYMLINK_NAME "al"
 
-int build_nested_path(int levels, char *format, int rank, int test_symlinks)
+static int build_nested_path(int levels, char *format, int rank, int test_symlinks)
 {
     int ret = -1, i = 0;
     char cur_filename[64] = {0}, tmp_buf[PVFS_NAME_MAX] = {0};
@@ -51,6 +49,7 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
         cur_fs_id = pvfs_helper.fs_id;
 
         /* look up the root handle */
+        PVFS_util_gen_credentials(&credentials);
         ret = PVFS_sys_lookup(
             cur_fs_id, "/", credentials, &lookup_resp,
             PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -69,8 +68,6 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
         attr.group = getgid();
         attr.perms = 1877;
         attr.atime = attr.ctime = attr.mtime = time(NULL);
-        credentials.uid = attr.owner;
-        credentials.gid = attr.group;
 
         /* make the top-level base directory */
         fprintf(stderr," Creating base directory %s under %Lu, %d\n",
@@ -462,7 +459,7 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
     return ret;
 }
 
-int test_path_lookup(MPI_Comm *comm, int rank, char *buf, void *params)
+int test_path_lookup(MPI_Comm *comm __unused, int rank, char *buf __unused, void *params __unused)
 {
     int ret = -1;
     char *format_prefix1 = "pt-0";

@@ -16,7 +16,7 @@
   do {                                                          \
      fprintf(stderr, "file %s, line %d\n", __FILE__, __LINE__); \
      fprintf(stderr, format, ##f);                              \
-   } while (0);
+   } while (0)
 
 typedef struct
 {
@@ -24,6 +24,7 @@ typedef struct
     int num_test_files;
     PVFS_fs_id fs_id;
 } pvfs_helper_t;
+extern pvfs_helper_t pvfs_helper;
 
 /*
   these are some helper functions that are implemented in pvfs-helper.c

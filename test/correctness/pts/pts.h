@@ -4,6 +4,12 @@
 #include <mpi.h>
 #include <generic.h>
 
+#ifdef __GNUC__
+#  define __unused __attribute__((unused))
+#else
+#  define __unused
+#endif
+
 #define MAX_DISTINCT_TESTS 256
 #define MAX_RUN_TESTS 8192
 

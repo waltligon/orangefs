@@ -30,17 +30,16 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
+#include "test-request-indexed.h"
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
-extern pvfs_helper_t pvfs_helper;
-
 
 /* Checks for valid segmentation on 2 request types for PVFS_Request_indexed
  * Parameters: none
  * Returns 0 on success and -1 on failure (ie - the segment offsets
  * were not calcuated correctly by Request_indexed
  */
-int test_request(void){
+static int test_request(void){
     int i;
     PINT_Request *r1;
     PINT_Request *r2;
@@ -59,7 +58,7 @@ int test_request(void){
 
     /* Used for calculating correct offset values */
     int32_t tmpSize;
-    int32_t tmpOff;
+    PVFS_size tmpOff;
     int32_t segSize;
                                                                                 
     /* set up two requests */
@@ -125,7 +124,7 @@ int test_request(void){
 	    for(i = 0; i < seg1.segs; i++)
 	    {
 		if(tmpOff != ((int)seg1.offset_array[i])){
-		    printf("Error:  segment %d offset is %d but should be %d\n",i,(int)seg1.offset_array[i],tmpOff);
+		    printf("Error:  segment %d offset is %d but should be %d\n",i,(int)seg1.offset_array[i],(int)tmpOff);
 		    return -1;
 		}
 		if(segSize != ((int)seg1.size_array[i])){
@@ -168,7 +167,7 @@ int test_request(void){
          for(i=0; i < seg2.segs; i++)
          {
 		if(tmpOff != ((int)seg2.offset_array[i])){
-		    printf("Error:  segment %d offset is %d but should be %d\n",i,(int)seg2.offset_array[i],tmpOff);
+		    printf("Error:  segment %d offset is %d but should be %d\n",i,(int)seg2.offset_array[i],(int)tmpOff);
 		    return -1;
 		}
 		if(segSize != ((int)seg2.size_array[i])){
@@ -207,10 +206,10 @@ int test_request(void){
  * buf - not used
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_request_indexed(MPI_Comm * comm,
+int test_request_indexed(MPI_Comm * comm __unused,
 		     int rank,
-		     char *buf,
-		     void *rawparams)
+		     char *buf __unused,
+		     void *rawparams __unused)
 {
     int ret = -1;
 

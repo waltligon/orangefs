@@ -26,16 +26,16 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
+#include "test-noncontig-pattern.h"
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
-extern pvfs_helper_t pvfs_helper;
 
 /*
  * Parameters: none
  * Returns 0 on success and -1 on failure (ie - the segment offsets
  * were not calcuated correctly by Request_indexed
  */
-int test_noncontig(void){
+static int test_noncontig(void){
    int i;
    PINT_Request *file_req;
    PINT_Request *mem_req;
@@ -231,10 +231,10 @@ int test_noncontig(void){
  * buf - not used
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_noncontig_pattern(MPI_Comm * comm,
+int test_noncontig_pattern(MPI_Comm * comm __unused,
 		     int rank,
-		     char *buf,
-		     void *rawparams)
+		     char *buf __unused,
+		     void *rawparams __unused)
 {
     int ret = -1;
 

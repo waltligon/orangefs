@@ -20,8 +20,7 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "null_params.h"
-
-extern pvfs_helper_t pvfs_helper;
+#include "test-concurrent-meta.h"
 
 /**
  * Calls lookup.
@@ -182,6 +181,11 @@ static int create_file(char *filename, char *directory, int fs_id)
 
     ret = -2;
 
+    attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
+    attr.owner = 100;
+    attr.group = 100;
+    attr.perms = 1877;
+    attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
     credentials.uid = 100;
     credentials.gid = 100;
 
@@ -209,7 +213,6 @@ static int create_file(char *filename, char *directory, int fs_id)
 static int create_dir2(char *name, int fs_id)
 {
     PVFS_pinode_reference parent_refn;
-    uint32_t attrmask;
     PVFS_sys_attr attr;
     PVFS_sysresp_mkdir resp_mkdir;
 
@@ -228,7 +231,7 @@ static int create_dir2(char *name, int fs_id)
     }
 
     parent_refn = resp_lookup.pinode_refn;
-    attrmask = PVFS_ATTR_SYS_ALL_SETABLE;
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
@@ -245,9 +248,9 @@ static int create_dir2(char *name, int fs_id)
  * Parameters: comm - special pts communicator, rank - the rank of the process, buf -  * (not used), rawparams - configuration information to specify which function to test
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_concurrent_meta(MPI_Comm * comm,
+int test_concurrent_meta(MPI_Comm * comm __unused,
 		       int rank,
-		       char *buf,
+		       char *buf __unused,
 		       void *rawparams)
 {
     int ret = -1;
@@ -281,7 +284,6 @@ int test_concurrent_meta(MPI_Comm * comm,
 		    }
 		}
 		return 0;
-		break;
 	    case 1:
 		fprintf(stderr,"[test_concurrent_meta] get attribs while removing\n");
 		for(i = 0; i < 100; i++)
@@ -294,7 +296,6 @@ int test_concurrent_meta(MPI_Comm * comm,
 		    }
 		}
 		return 0;
-		break;
 	    case 2:
 		fprintf(stderr,"[test_concurrent_meta] lookup files when created\n");
 		for(i = 0; i < 100; i++)
@@ -307,7 +308,6 @@ int test_concurrent_meta(MPI_Comm * comm,
 		    }
 		}
 		return 0;
-		break;
 	    case 3:
 		fprintf(stderr,"[test_concurrent_meta] lookup files when dir destyd\n");
 		for(i = 0; i < 100; i++)
@@ -320,7 +320,6 @@ int test_concurrent_meta(MPI_Comm * comm,
 		    }
 		}
 		return 0;
-		break;	
 	    case 99:
 		fprintf(stderr,"[test_concurrent_meta] setup directory\n");
 		ret = create_dir2("test_dir",fs_id);
@@ -354,7 +353,6 @@ int test_concurrent_meta(MPI_Comm * comm,
 		    }
 		}
 		return 0;
-		break;
 	    case 1:
 		fprintf(stderr, "[test_concurrent_meta] repeatedly listing dirs while anotehr process adds/remove files/dirs %d\n", params->p2);
 		for(i = 0; i < 100; i++)
@@ -371,7 +369,6 @@ int test_concurrent_meta(MPI_Comm * comm,
 		    }
 		}
 		return 0;
-		break;
 	    case 2:
 		fprintf(stderr, "[test_concurrent_meta] repeat lookups %d\n", params->p2);
 		for(i = 0; i < 100; i++)
@@ -388,7 +385,6 @@ int test_concurrent_meta(MPI_Comm * comm,
 		    }
 		}
 		return 0;
-		break;
 	    case 3:
 		fprintf(stderr, "[test_concurrent_meta] repeat lookups on dir destyd %d\n", params->p2);
 		ret = remove_file_dir("/test_dir",fs_id);
@@ -397,7 +393,6 @@ int test_concurrent_meta(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    }
 	}
     }

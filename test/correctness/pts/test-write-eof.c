@@ -26,16 +26,16 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
+#include "test-write-eof.h"
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
-extern pvfs_helper_t pvfs_helper;
 
 /*
  * Parameters: none
  * Returns 0 on success and -1 on failure (ie - the segment offsets
  * were not calcuated correctly by Request_indexed
  */
-int test_write(void){
+static int test_write(void){
    int i;
    PINT_Request *r1;
    PINT_Request *r2;
@@ -178,10 +178,10 @@ int test_write(void){
  * buf - not used
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_write_eof(MPI_Comm * comm,
+int test_write_eof(MPI_Comm * comm __unused,
 		     int rank,
-		     char *buf,
-		     void *rawparams)
+		     char *buf __unused,
+		     void *rawparams __unused)
 {
     int ret = -1;
 

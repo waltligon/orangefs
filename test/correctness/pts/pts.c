@@ -21,7 +21,7 @@
 #include "test-protos.h"
 
 /* yeah yeah, only one global...stores all config data (debug flag, mpi_id, etc */
-config pts_config;
+static config pts_config;
 
 int main(int argc, char **argv) {
   
@@ -248,8 +248,6 @@ int init_config(config *myconfig) {
 
 int parse_cmdline(int argc, char **argv, config *myconfig) {
   int c, index;
-  extern char *optarg;
-  extern int optind, opterr, optopt;
 
   static struct option long_opts[] = {
 	  { "debug", required_argument, NULL, 'd' },

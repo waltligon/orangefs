@@ -21,18 +21,16 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "null_params.h"
-
-extern pvfs_helper_t pvfs_helper;
-
+#include "test-invalid-files.h"
 
 /* Preconditions: none
  * Parameters: none
  * Postconditions: returns the error code given by lookup - thats if it doesn't segfault or other catostrophic failure
  * Hase 1 test cases
  */
-static int test_lookup(int testcase)
+static int test_lookup(void)
 {
-    int fs_id, ret;
+    int ret;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lookup;
     char *name;
@@ -46,7 +44,6 @@ static int test_lookup(int testcase)
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
 	return -1;
     }
-    fs_id = pvfs_helper.fs_id;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -118,7 +115,7 @@ static int test_getattr(int testcase)
  * Parameters: none
  * Postconditions:
  */
-static int test_setattr(int testcase)
+static int test_setattr(void)
 {
     return -2;
 }
@@ -131,7 +128,6 @@ static int test_setattr(int testcase)
 static int test_mkdir(int testcase)
 {
     PVFS_pinode_reference parent_refn;
-    uint32_t attrmask;
     PVFS_sys_attr attr;
     PVFS_sysresp_mkdir resp_mkdir;
 
@@ -162,7 +158,7 @@ static int test_mkdir(int testcase)
     }
 
     parent_refn = resp_lookup.pinode_refn;
-    attrmask = PVFS_ATTR_SYS_ALL_SETABLE;
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
@@ -271,6 +267,12 @@ static int test_create(int testcase)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+    attr.owner = 100;
+    attr.group = 100;
+    attr.perms = 1877;
+    attr.atime = attr.mtime = attr.ctime =
+	time(NULL);
     credentials.uid = 100;
     credentials.gid = 100;
 
@@ -364,7 +366,7 @@ static int test_remove(int testcase)
  * Parameters: testcase - the test case that is checked for this function
  * Postconditions: returns error code of readdir
  */
-static int test_rename(int testcase)
+static int test_rename(void)
 {
 
 //      return PVFS_sys_rename(old_name, old_parent_refn, new_name, new_parent_refn, credentials);
@@ -375,7 +377,7 @@ static int test_rename(int testcase)
  * Parameters: testcase - the test case that is checked for this function
  * Postconditions: returns error code of readdir
  */
-static int test_symlink(int testcase)
+static int test_symlink(void)
 {
     return -2;
 }
@@ -384,7 +386,7 @@ static int test_symlink(int testcase)
  * Parameters: testcase - the test case that is checked for this function
  * Postconditions: returns error code of readdir
  */
-static int test_readlink(int testcase)
+static int test_readlink(void)
 {
     return -2;
 }
@@ -521,6 +523,12 @@ static int init_file(void)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+    attr.owner = 100;
+    attr.group = 100;
+    attr.perms = 1877;
+    attr.atime = attr.mtime = attr.ctime =
+	time(NULL);
     credentials.uid = 100;
     credentials.gid = 100;
 
@@ -549,9 +557,9 @@ static int init_file(void)
  * Parameters: comm - special pts communicator, rank - the rank of the process, buf -  * (not used), rawparams - configuration information to specify which function to test
  * Postconditions: 0 if no errors and nonzero otherwise
  */
-int test_invalid_files(MPI_Comm * comm,
+int test_invalid_files(MPI_Comm * comm __unused,
 		       int rank,
-		       char *buf,
+		       char *buf __unused,
 		       void *rawparams)
 {
     int ret = -1;
@@ -568,13 +576,12 @@ int test_invalid_files(MPI_Comm * comm,
 	    case 0:
 		fprintf(stderr, "[test_invalid_files] test_lookup %d\n",
 			params->p2);
-		ret = test_lookup(params->p2);
+		ret = test_lookup();
 		if(ret >= 0){
 		    PVFS_perror("test_lookup",ret);
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 1:
 		fprintf(stderr, "[test_invalid_files] test_getattr %d\n",
 			params->p2);
@@ -584,17 +591,15 @@ int test_invalid_files(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 2:
 		fprintf(stderr, "[test_invalid_files] test_setattr %d\n",
 			params->p2);
-		ret = test_setattr(params->p2);
+		ret = test_setattr();
 		if(ret >= 0){
 		    PVFS_perror("test_setattr",ret);
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 3:
 		fprintf(stderr, "[test_invalid_files] test_mkdir %d\n",
 			params->p2);
@@ -604,7 +609,6 @@ int test_invalid_files(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 4:
 		fprintf(stderr, "[test_invalid_files] test_readdir %d\n",
 			params->p2);
@@ -614,7 +618,6 @@ int test_invalid_files(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 5:
 		fprintf(stderr, "[test_invalid_files] test_create %d\n",
 			params->p2);
@@ -624,7 +627,6 @@ int test_invalid_files(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 6:
 		fprintf(stderr, "[test_invalid_files] test_remove %d\n",
 			params->p2);
@@ -634,37 +636,33 @@ int test_invalid_files(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 7:
 		fprintf(stderr, "[test_invalid_files] test_rename %d\n",
 			params->p2);
-		ret = test_rename(params->p2);
+		ret = test_rename();
 		if(ret >= 0){
 		    PVFS_perror("test_rename",ret);
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 8:
 		fprintf(stderr, "[test_invalid_files] test_symlink %d\n",
 			params->p2);
-		ret = test_symlink(params->p2);
+		ret = test_symlink();
 		if(ret >= 0){
 		    PVFS_perror("test_symlink",ret);
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 9:
 		fprintf(stderr, "[test_invalid_files] test_readlink %d\n",
 			params->p2);
-		ret = test_readlink(params->p2);
+		ret = test_readlink();
 		if(ret >= 0){
 		    PVFS_perror("test_readlink",ret);
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 10:
 		fprintf(stderr, "[test_invalid_files] test_read %d\n",
 			params->p2);
@@ -674,7 +672,6 @@ int test_invalid_files(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 11:
 		fprintf(stderr, "[test_invalid_files] test_write %d\n",
 			params->p2);
@@ -684,12 +681,10 @@ int test_invalid_files(MPI_Comm * comm,
 		    return ret;
 		}
 		return 0;
-		break;
 	    case 99:
 		fprintf(stderr, "[test_invalid_files] init_file %d\n",
 			params->p2);
 		return init_file();
-		break;
 	    default:
 		fprintf(stderr, "Error: invalid param %d\n", params->p1);
 		return -2;

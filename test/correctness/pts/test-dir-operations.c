@@ -11,8 +11,7 @@
 #include "mpi.h"
 #include "pts.h"
 #include "pvfs-helper.h"
-
-extern pvfs_helper_t pvfs_helper;
+#include "test-dir-operations.h"
 
 /*
  * parent_refn:  pinode_refn of parent directory
@@ -53,7 +52,7 @@ static int read_dirs(PVFS_pinode_reference refn,
     credentials.gid = 100;
 
     /* call readdir */
-    printf("Calling readdir with handle %Ld and fsid %d\n",refn.handle,refn.fs_id);
+    printf("Calling readdir with handle %Ld and fsid %d\n", Ld(refn.handle), refn.fs_id);
     printf("ndirs is %d\n",ndirs);
     ret = PVFS_sys_readdir(refn, PVFS_READDIR_START, ndirs,
                            credentials, &resp_readdir);
@@ -131,7 +130,7 @@ static int create_dirs(PVFS_pinode_reference refn,
  */
 int test_dir_operations(MPI_Comm * comm,
                         int rank,
-                        char *buf,
+                        char *buf __unused,
                         void *rawparams)
 {
     int ret = -1;
@@ -157,7 +156,7 @@ int test_dir_operations(MPI_Comm * comm,
 
     get_root(fs_id, &root_refn);
     printf("got root handle %Ld in fsid %d\n",
-           root_refn.handle,root_refn.fs_id);
+           Ld(root_refn.handle),root_refn.fs_id);
 
     /* setup a dir in the root directory to do tests in (so the root dir is
      * less cluttered)
@@ -173,7 +172,7 @@ int test_dir_operations(MPI_Comm * comm,
 	}
         else
         {
-            printf("created directory %s (handle is %Ld)\n",name,out_refn.handle);
+            printf("created directory %s (handle is %Ld)\n",name, Ld(out_refn.handle));
         }
     }
     MPI_Barrier(*comm);
@@ -187,11 +186,11 @@ int test_dir_operations(MPI_Comm * comm,
 	}
         else
         {
-            printf("directory %s has handle %Ld\n",name,out_refn.handle);
+            printf("directory %s has handle %Ld\n",name, Ld(out_refn.handle));
         }
     }
 
-    printf("test dir handle is %Ld\n",out_refn.handle);
+    printf("test dir handle is %Ld\n", Ld(out_refn.handle));
     ret = create_dirs(out_refn, myparams->mode, rank);
     if (ret < 0)
     {

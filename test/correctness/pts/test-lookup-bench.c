@@ -12,9 +12,8 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
+#include "test-lookup-bench.h"
 
-
-extern pvfs_helper_t pvfs_helper;
 
 /*
  * simple helper to lookup a handle given a filename
@@ -45,7 +44,7 @@ static PVFS_handle simple_lookup_name(char *name,
     return (PVFS_handle) resp_lookup.pinode_refn.handle;
 }
 
-int do_create_lookup(PVFS_pinode_reference parent_refn,
+static int do_create_lookup(PVFS_pinode_reference parent_refn,
                      PVFS_fs_id fs_id,
                      int depth,
                      int ndirs,
@@ -113,9 +112,9 @@ int do_create_lookup(PVFS_pinode_reference parent_refn,
  * 	0:  	all went well
  * 	nonzero: errors encountered making one or more directories
  */
-int test_lookup_bench(MPI_Comm * comm,
+int test_lookup_bench(MPI_Comm * comm __unused,
 		     int rank,
-		     char *buf,
+		     char *buf __unused,
 		     void *rawparams)
 {
     int ret = -1;

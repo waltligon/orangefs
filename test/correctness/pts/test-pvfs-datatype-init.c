@@ -3,12 +3,10 @@
 #include <test-pvfs-datatype-init.h>
 #include <stdio.h>
 
-extern pvfs_helper_t pvfs_helper;
-
 /*
   initialize the sysint and create files to be used by subsequent tests.
 */
-int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
+int test_pvfs_datatype_init(MPI_Comm *mycomm __unused, int myid, char *buf __unused, void *params)
 {
     int ret = -1, i = 0, num_test_files_ok = 0;
     PVFS_sys_attr attr;
@@ -85,13 +83,13 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
                 break;
             }
             debug_printf("Created file %s\n",&(filename[1]));
-            debug_printf("Got handle %Ld.\n",resp_cr.pinode_refn.handle);
+            debug_printf("Got handle %Ld.\n", Ld(resp_cr.pinode_refn.handle));
             num_test_files_ok++;
         }
         else
         {
             debug_printf("lookup succeeded; skipping existing file.\n");
-            debug_printf("Got handle %Ld.\n",resp_lk.pinode_refn.handle);
+            debug_printf("Got handle %Ld.\n", Ld(resp_lk.pinode_refn.handle));
             num_test_files_ok++;
         }
     }

@@ -11,14 +11,13 @@
 #include "pts.h"
 #include "pvfs2-util.h"
 #include "pvfs-helper.h"
+#include "test-create.h"
 
-extern pvfs_helper_t pvfs_helper;
-
-int compare_attribs(PVFS_sys_attr attr1,
+static int compare_attribs(PVFS_sys_attr attr1,
 		    PVFS_sys_attr attr2);
 
 /* files, directories, tree of directories */
-int create_file(PVFS_fs_id fs_id,
+static int create_file(PVFS_fs_id fs_id,
 		char *dirname,
 		char *filename)
 {
@@ -80,7 +79,7 @@ int create_file(PVFS_fs_id fs_id,
  * 	0 	if equivalent	
  * 	-1 	if we found a difference
  */
-int compare_attribs(PVFS_sys_attr attr1,
+static int compare_attribs(PVFS_sys_attr attr1,
 		    PVFS_sys_attr attr2)
 {
     if (attr1.owner != attr2.owner)
@@ -153,9 +152,9 @@ int compare_attribs(PVFS_sys_attr attr1,
     return 0;
 }
 
-int test_create(MPI_Comm * comm,
+int test_create(MPI_Comm * comm __unused,
 		int rank,
-		char *buf,
+		char *buf __unused,
 		void *params)
 {
     const PVFS_util_tab* tab;
