@@ -16,6 +16,7 @@
 #include <gossip.h>
 #include <pvfs2-req-proto.h>
 
+#define TROVE_FS_ID 9
 /**************************************************************
  * Data structures 
  */
@@ -97,7 +98,7 @@ int main(int argc, char **argv)	{
 	my_req->credentials.perms = U_WRITE | U_READ;  
 	my_req->u.mkdir.bucket = user_opts->bucket;
 	my_req->u.mkdir.handle_mask = 0xff00ff00;
-	my_req->u.mkdir.fs_id = 7;
+	my_req->u.mkdir.fs_id = TROVE_FS_ID;
 
 	/* send the initial request on its way */
 	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req, 
