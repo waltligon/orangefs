@@ -115,7 +115,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 {
     int ret, got_db = 0;
     TROVE_ds_storedattr_s s_attr;
-    TROVE_handle new_handle;
+    TROVE_handle new_handle = TROVE_HANDLE_NULL;
     DBT key, data;
     DB *db_p;
     TROVE_extent cur_extent;

@@ -28,6 +28,7 @@ typedef struct
     struct qlist_head hash_link;
 
     TROVE_coll_id coll_id;
+    int have_valid_ranges;
 
     struct handle_ledger *ledger;
 } handle_ledger_t;
@@ -58,7 +59,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
     TROVE_op_id op_id = 0;
     TROVE_ds_state state = 0;
     TROVE_ds_position pos = TROVE_ITERATE_START;
-    static TROVE_handle handles[MAX_NUM_VERIFY_HANDLE_COUNT] = {0};
+    static TROVE_handle handles[MAX_NUM_VERIFY_HANDLE_COUNT] =
+        {TROVE_HANDLE_NULL};
 
     if (extent_list && ledger)
     {
@@ -145,10 +147,12 @@ static int trove_map_handle_ranges( PINT_llist *extent_list,
 
 	    ret = trove_handle_ledger_addextent(ledger, cur_extent);
 	    if (ret != 0)
+            {
 		break;
+            }
 
-	    /* if, for example, you had a 'first' of 5 and a 'last' of 5, the
-	     * difference is 0, but there is one handle */
+	    /* if, for example, you had a 'first' of 5 and a 'last' of
+	     * 5, the difference is 0, but there is one handle */
 	    total_handles += (cur_extent->last - cur_extent->first + 1);
             cur = PINT_llist_next(cur);
         }
@@ -177,6 +181,7 @@ static handle_ledger_t *get_or_add_handle_ledger(TROVE_coll_id coll_id)
         if (ledger)
         {
             ledger->coll_id = coll_id;
+            ledger->have_valid_ranges = 0;
             ledger->ledger = trove_handle_ledger_init(coll_id,NULL);
             if (ledger->ledger)
             {
@@ -277,13 +282,23 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
                 assert(ledger->ledger);
 		
 		/* tell trove what are our valid ranges are */
-		ret = trove_map_handle_ranges(extent_list, 
-			ledger->ledger);
-		if (ret != 0) return ret;
+		ret = trove_map_handle_ranges(
+                    extent_list, ledger->ledger);
+		if (ret != 0)
+                {
+                    return ret;
+                }
 
                 ret = trove_check_handle_ranges(
                     coll_id,context_id,extent_list,ledger->ledger);
-		if (ret != 0) return ret;
+		if (ret != 0)
+                {
+                    return ret;
+                }
+                else
+                {
+                    ledger->have_valid_ranges = 1;
+                }
             }
             PINT_release_extent_list(extent_list);
         }
@@ -325,13 +340,13 @@ TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
 {
     handle_ledger_t *ledger = NULL;
     struct qlist_head *hash_link = NULL;
-    TROVE_handle handle = (TROVE_handle)0;
+    TROVE_handle handle = TROVE_HANDLE_NULL;
 
     hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
     if (hash_link)
     {
         ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
-        if (ledger)
+        if (ledger && (ledger->have_valid_ranges == 1))
         {
             handle = trove_ledger_handle_alloc(ledger->ledger);
         }
@@ -355,26 +370,28 @@ TROVE_handle trove_handle_alloc_from_range(
 {
     handle_ledger_t *ledger = NULL;
     struct qlist_head *hash_link = NULL;
-    TROVE_handle handle = (TROVE_handle)0;
-    int i;
+    TROVE_handle handle = TROVE_HANDLE_NULL;
+    int i = 0;
 
     hash_link = qhash_search(s_fsid_to_ledger_table, &(coll_id));
     if (hash_link)
     {
-	ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
-	if (ledger)
-	{
-	    for(i=0; i<extent_array->extent_count; i++) {
-		handle = trove_ledger_handle_alloc_from_range(ledger->ledger, 
-		    &(extent_array->extent_array[i]));
-		if (handle != 0) break;
-	    }
-	}
+        ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+        if (ledger && (ledger->have_valid_ranges == 1))
+        {
+            for(i = 0; i < extent_array->extent_count; i++)
+            {
+                handle = trove_ledger_handle_alloc_from_range(
+                    ledger->ledger, &(extent_array->extent_array[i]));
+                if (handle != TROVE_HANDLE_NULL)
+                {
+                    break;
+                }
+            }
+        }
     }
     return handle;
 }
-
-    
 
 int trove_handle_set_used(TROVE_coll_id coll_id, TROVE_handle handle)
 {
