@@ -13,6 +13,7 @@
 #include "job.h"
 #include "quicklist.h"
 #include "gen-locks.h"
+#include "gossip.h"
 
 QLIST_HEAD(bucket_queue);
 static gen_mutex_t bucket_mutex = GEN_MUTEX_INITIALIZER;
@@ -100,7 +101,7 @@ int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
     gettimeofday(&tv, NULL);
 
     /* round up to the second that this job should expire */
-    expire_time_sec = tv.tv_sec = 1;
+    expire_time_sec = tv.tv_sec + timeout_sec;
 
     gen_mutex_lock(&bucket_mutex);
 
@@ -223,6 +224,8 @@ int job_time_mgr_expire(void)
 	{
 	    jd = qlist_entry(iterator2, struct job_desc, job_time_link);
 	    qlist_del(&jd->job_time_link);
+
+	    gossip_debug(GOSSIP_JOB_DEBUG, "job_timer: expiring job!\n");
 
 	    switch(jd->type)
 	    {
