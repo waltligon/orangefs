@@ -86,7 +86,7 @@ machine pvfs2_client_create_sm(init,
     }
 
     state create_parent_getattr_setup_msgpair {
-	run sm_common_parent_getattr_setup_msgpair;
+	run PINT_sm_common_parent_getattr_setup_msgpair;
         success => create_parent_getattr_xfer_msgpair;
 	default => create_parent_getattr_failure;
     }
@@ -98,7 +98,7 @@ machine pvfs2_client_create_sm(init,
     }
 
     state create_parent_getattr_failure {
-	run sm_common_parent_getattr_failure;
+	run PINT_sm_common_parent_getattr_failure;
 	default => cleanup;
     }
 

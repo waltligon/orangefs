@@ -56,7 +56,7 @@ machine pvfs2_client_setattr_sm(init,
     }
 
     state setattr_getattr_setup_msgpair {
-	run sm_common_object_getattr_setup_msgpair;
+	run PINT_sm_common_object_getattr_setup_msgpair;
         success => setattr_getattr_xfer_msgpair;
 	default => setattr_getattr_failure;
     }
@@ -68,7 +68,7 @@ machine pvfs2_client_setattr_sm(init,
     }
 
     state setattr_getattr_failure {
-        run sm_common_object_getattr_failure;
+        run PINT_sm_common_object_getattr_failure;
         default => cleanup;
     }
 

@@ -22,13 +22,13 @@
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
 
-int sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
+int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                            job_status_s *js_p)
 {
     int ret = -1;
 
     gossip_debug(CLIENT_DEBUG,
-                 "sm_common_parent_getattr_setup_msgpair\n");
+                 "PINT_sm_common_parent_getattr_setup_msgpair\n");
 
     memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
 
@@ -46,7 +46,7 @@ int sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->parent_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->parent_ref.handle;
-    sm_p->msgpair.comp_fn = sm_common_directory_getattr_comp_fn;
+    sm_p->msgpair.comp_fn = PINT_sm_common_directory_getattr_comp_fn;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
 				    sm_p->msgpair.handle,
@@ -62,20 +62,20 @@ int sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-int sm_common_parent_getattr_failure(PINT_client_sm *sm_p,
+int PINT_sm_common_parent_getattr_failure(PINT_client_sm *sm_p,
                                      job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "sm_common_parent_getattr_failure\n");
+    gossip_debug(CLIENT_DEBUG, "PINT_sm_common_parent_getattr_failure\n");
     return 1;
 }
 
-int sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                            job_status_s *js_p)
 {
     int ret = -1;
 
     gossip_debug(CLIENT_DEBUG,
-                 "sm_common_object_getattr_setup_msgpair\n");
+                 "PINT_sm_common_object_getattr_setup_msgpair\n");
 
     memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
 
@@ -94,7 +94,7 @@ int sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->object_ref.handle;
-    sm_p->msgpair.comp_fn = sm_common_object_getattr_comp_fn;
+    sm_p->msgpair.comp_fn = PINT_sm_common_object_getattr_comp_fn;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
 				    sm_p->msgpair.handle,
@@ -110,10 +110,10 @@ int sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-int sm_common_object_getattr_failure(PINT_client_sm *sm_p,
+int PINT_sm_common_object_getattr_failure(PINT_client_sm *sm_p,
                                      job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "sm_common_object_getattr_failure\n");
+    gossip_debug(CLIENT_DEBUG, "PINT_sm_common_object_getattr_failure\n");
     return 1;
 }
 
@@ -121,7 +121,7 @@ int sm_common_object_getattr_failure(PINT_client_sm *sm_p,
 /*
   shared/common msgpair completion functions
 */
-int sm_common_directory_getattr_comp_fn(void *v_p,
+int PINT_sm_common_directory_getattr_comp_fn(void *v_p,
                                         struct PVFS_server_resp *resp_p,
                                         int index)
 {
@@ -131,7 +131,7 @@ int sm_common_directory_getattr_comp_fn(void *v_p,
     
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
-    gossip_debug(CLIENT_DEBUG, "sm_common_getattr_directory_comp_fn\n");
+    gossip_debug(CLIENT_DEBUG, "PINT_sm_common_getattr_directory_comp_fn\n");
 
     /* if we get an error, just return immediately, don't try to
      * actually fill anything in.
@@ -214,7 +214,7 @@ int sm_common_directory_getattr_comp_fn(void *v_p,
     return 0;
 }
 
-int sm_common_object_getattr_comp_fn(void *v_p,
+int PINT_sm_common_object_getattr_comp_fn(void *v_p,
                                      struct PVFS_server_resp *resp_p,
                                      int index)
 {
@@ -222,7 +222,7 @@ int sm_common_object_getattr_comp_fn(void *v_p,
     
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
-    gossip_debug(CLIENT_DEBUG, "sm_common_getattr_object_comp_fn\n");
+    gossip_debug(CLIENT_DEBUG, "PINT_sm_common_getattr_object_comp_fn\n");
 
     /* if we get an error, just return immediately, don't try to
      * actually fill anything in.

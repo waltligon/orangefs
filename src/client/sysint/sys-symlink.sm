@@ -76,7 +76,7 @@ machine pvfs2_client_symlink_sm(init,
     }
 
     state symlink_parent_getattr_setup_msgpair {
-	run sm_common_parent_getattr_setup_msgpair;
+	run PINT_sm_common_parent_getattr_setup_msgpair;
         success => symlink_parent_getattr_xfer_msgpair;
 	default => symlink_parent_getattr_failure;
     }
@@ -88,7 +88,7 @@ machine pvfs2_client_symlink_sm(init,
     }
 
     state symlink_parent_getattr_failure {
-	run sm_common_parent_getattr_failure;
+	run PINT_sm_common_parent_getattr_failure;
 	default => cleanup;
     }
 

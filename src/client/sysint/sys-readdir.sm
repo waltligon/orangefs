@@ -56,7 +56,7 @@ machine pvfs2_client_readdir_sm(init,
     }
 
     state readdir_getattr_setup_msgpair {
-	run sm_common_parent_getattr_setup_msgpair;
+	run PINT_sm_common_parent_getattr_setup_msgpair;
         success => readdir_getattr_xfer_msgpair;
 	default => readdir_getattr_failure;
     }
@@ -68,7 +68,7 @@ machine pvfs2_client_readdir_sm(init,
     }
 
     state readdir_getattr_failure {
-	run sm_common_parent_getattr_failure;
+	run PINT_sm_common_parent_getattr_failure;
 	default => cleanup;
     }
 

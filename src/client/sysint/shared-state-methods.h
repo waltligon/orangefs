@@ -19,22 +19,22 @@
 /*
   shared/common state operation functions
 */
-int sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
+int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                            job_status_s *js_p);
-int sm_common_parent_getattr_failure(PINT_client_sm *sm_p,
+int PINT_sm_common_parent_getattr_failure(PINT_client_sm *sm_p,
                                      job_status_s *js_p);
-int sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                            job_status_s *js_p);
-int sm_common_object_getattr_failure(PINT_client_sm *sm_p,
+int PINT_sm_common_object_getattr_failure(PINT_client_sm *sm_p,
                                      job_status_s *js_p);
 
 /*
   shared/common msgpair completion functions
 */
-int sm_common_directory_getattr_comp_fn(void *v_p,
+int PINT_sm_common_directory_getattr_comp_fn(void *v_p,
                                         struct PVFS_server_resp *resp_p,
                                         int index);
-int sm_common_object_getattr_comp_fn(void *v_p,
+int PINT_sm_common_object_getattr_comp_fn(void *v_p,
                                      struct PVFS_server_resp *resp_p,
                                      int index);
 
