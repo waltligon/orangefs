@@ -236,12 +236,6 @@ void print_entry_attr(
         return;
     }
 
-    if (!opts->list_long)
-    {
-        printf("%s\n", entry_name);
-        return;
-    }
-
     snprintf(scratch_owner,16,"%d",(int)attr->owner);
     snprintf(scratch_group,16,"%d",(int)attr->group);
 
@@ -328,6 +322,13 @@ void print_entry(
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
 
+    /* if we're not doing a long listing, we can skip all of this */
+    if (!opts->list_long)
+    {
+        printf("%s\n", entry_name);
+        return;
+    }
+
     memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
     memset(&credentials,0, sizeof(PVFS_credentials));
 
@@ -364,14 +365,13 @@ int do_list(
     PVFS_pinode_reference pinode_refn;
     PVFS_ds_position token;
 
-    memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
-    memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
 
     name = start;
     fs_id = init_response->fsid_list[0];
     credentials.uid = 0;
     credentials.gid = 0;
 
+    memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
     if (PVFS_sys_lookup(fs_id, name, credentials, &lk_response))
     {
         fprintf(stderr, "%s: %s: No such file or directory\n",
@@ -384,6 +384,8 @@ int do_list(
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
     credentials.uid = 0;
     credentials.gid = 0;
+
+    memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
 
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                          credentials, &getattr_response) == 0)
