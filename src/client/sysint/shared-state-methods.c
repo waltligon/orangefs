@@ -51,8 +51,7 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
     if (ret != 0)
     {
 	gossip_err("Error: failure mapping to server.\n");
-	assert(ret < 0); /* return value range check */
-	assert(0); /* TODO: real error handling */
+        return -PVFS_EADDRNOTAVAIL;
     }
 
     js_p->error_code = 0;
@@ -100,8 +99,7 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     if (ret != 0)
     {
 	gossip_err("Error: failure mapping to server.\n");
-	assert(ret < 0); /* return value range check */
-	assert(0); /* TODO: real error handling */
+        return -PVFS_EADDRNOTAVAIL;
     }
 
     js_p->error_code = 0;

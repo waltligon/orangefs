@@ -279,7 +279,11 @@ int PVFS_sys_create(
         parent_refn.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_CREATE);
-    assert(ret == 0);
+    if (ret)
+    {
+        free(sm_p);
+        return ret;
+    }
 
     while (!sm_p->op_complete && ret == 0)
     {
@@ -651,7 +655,7 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
                                   msg_p->fs_id) < 0)
     {
         gossip_err("Failed to get meta server information\n");
-        assert(0);
+        return -PVFS_EADDRNOTAVAIL;
     }
     return 1;
 }
@@ -699,7 +703,7 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     if (ret < 0)
     {
         gossip_err("Failed to get meta server information\n");
-        js_p->error_code = ret;
+        return -PVFS_EADDRNOTAVAIL;
     }
     return 1;
 }
