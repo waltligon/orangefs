@@ -37,27 +37,20 @@
 
 extern job_context_id pint_client_sm_context;
 
+enum {
+    MSGPAIR_COMPLETE = 9999
+};
+
 static int msgpair_post(PINT_client_sm *sm_p, job_status_s *js_p);
 static int msgpair_complete(PINT_client_sm *sm_p, job_status_s *js_p);
+static int msgpair_completion_fn(PINT_client_sm *sm_p, job_status_s *js_p);
 static int msgpair_error(PINT_client_sm *sm_p, job_status_s *js_p);
-
-enum
-{
-    /* TODO: this is a hack- we have to pull it in from sys-remove.sm,
-     * because the comp_fn is using it as a valid return value...
-     */
-    REMOVE_MUST_REMOVE_DATAFILES = 1,
-    /* this gives us a special error_code to indicate when the completion
-     * state has been called enough times that we should return from this
-     * nested state machine
-     */
-    MSGPAIR_RETURN_SUCCESS = 2
-};
 
 %%
 
 nested machine pvfs2_client_msgpair_sm(post,
 				       complete,
+				       completion_fn,
 				       error)
 {
     state post {
@@ -69,9 +62,13 @@ nested machine pvfs2_client_msgpair_sm(post,
     state complete {
 	run msgpair_complete;
 	success => complete;
-	MSGPAIR_RETURN_SUCCESS => return;
-	REMOVE_MUST_REMOVE_DATAFILES => return;
+	MSGPAIR_COMPLETE => completion_fn;
 	default => error;
+    }
+
+    state completion_fn {
+	run msgpair_completion_fn;
+	default => return;
     }
     
     state error {
@@ -117,9 +114,6 @@ static int msgpair_post(PINT_client_sm *sm_p,
     js_p->error_code = 0;
 
     msg_p = &sm_p->msgpair;
-
-    assert(msg_p->handle != 0);
-    assert(msg_p->fs_id != 0);
 
     /* NOTE: THIS IS REPLICATED IN PINT_SERV_PREPARE_MSGPAIR();
      * WE SHOULD GET RID OF ONE OF THEM OR SOMETHING...
@@ -211,7 +205,6 @@ static int msgpair_post(PINT_client_sm *sm_p,
 	gossip_err("msgpair_post: failure in job_bmi_send_list\n");
 	assert(0);
     }
-#if 0
     else if (ret == 1) {
 	/* send completed immediately; decrement the completion counter */
 	gossip_debug(CLIENT_DEBUG, "  msgpair: send completed immediately.\n");
@@ -226,10 +219,9 @@ static int msgpair_post(PINT_client_sm *sm_p,
 	msg_p->comp_ct--;
 	assert(msg_p->comp_ct == 1);
     }
-#endif
     assert(ret == 0 || ret == 1); /* return value range check */
 
-    return(ret);
+    return 0;
 }
 
 /* msgpair_complete()
@@ -241,15 +233,9 @@ static int msgpair_post(PINT_client_sm *sm_p,
 static int msgpair_complete(PINT_client_sm *sm_p,
 			    job_status_s *js_p)
 {
-    int ret;
-    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
-    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
-
-    PINT_client_sm_msgpair_state *msg_p; /* for convenience */
+    PINT_client_sm_msgpair_state *msg_p = &sm_p->msgpair; /* for convenience */
 
     gossip_debug(CLIENT_DEBUG, "msgpair state: complete\n");
-
-    msg_p = &sm_p->msgpair;
 
     /* we know status of operation is 0, or we wouldn't be in this state. */
 
@@ -257,20 +243,37 @@ static int msgpair_complete(PINT_client_sm *sm_p,
     if (--msg_p->comp_ct > 0) {
 	/* if this the first completion, then it is the send.  save
 	 * the status.
+	 *
+	 * we will be woken up again by the next completion.
 	 */
 	msg_p->send_status = *js_p;
 	return 0;
     }
-    assert(msg_p->comp_ct == 0); /* sanity check */
+    else {
+	/* this is the second completion, which is the recv. */
 
-    gossip_debug(CLIENT_DEBUG, "  msgpair: all operations complete\n");
+	assert(msg_p->comp_ct == 0); /* sanity check */
+	msg_p->recv_status = *js_p; /* save recv status */
+	gossip_debug(CLIENT_DEBUG, "  msgpair: all operations complete\n");
 
-    /* in the success case we can assume that the last thing we received
-     * was the response.  we get the actual size of the received message
-     * from the job status structure.
-     *
-     */
-    msg_p->recv_status = *js_p;
+	js_p->error_code = MSGPAIR_COMPLETE;
+	return 1;
+    }
+}
+
+static int msgpair_completion_fn(PINT_client_sm *sm_p,
+				 job_status_s *js_p)
+{
+    int ret;
+    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
+    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
+
+    PINT_client_sm_msgpair_state *msg_p = &sm_p->msgpair; /* for convenience */
+
+    gossip_debug(CLIENT_DEBUG, "msgpair state: completion_fn\n");
+
+    /* clear error code; was explicitly set to MSGPAIR_COMPLETE to get here. */
+    js_p->error_code = 0;
 
     /* decode; resp_p will point to response */
     ret = PINT_serv_decode_resp(msg_p->encoded_resp_p,
@@ -279,14 +282,14 @@ static int msgpair_complete(PINT_client_sm *sm_p,
 				msg_p->recv_status.actual_size,
 				&resp_p);
     if (ret != 0) {
-	gossip_err("error: msgpair_complete: decode error\n");
+	gossip_err("error: msgpair_completion_fn: decode error\n");
 	assert(ret < 0); /* return value range check */
 	assert(0); /* placeholder */
     }
 
     /* check status of response -- let errors pass though. */
     if (resp_p->status != 0) {
-	gossip_err("notice: msgpair_complete: response status non-zero (%d)\n",
+	gossip_err("notice: msgpair_completion_fn: response status non-zero (%d)\n",
 		   resp_p->status);
     }
 
@@ -320,24 +323,6 @@ static int msgpair_complete(PINT_client_sm *sm_p,
 	assert(0); /* placeholder */
     }
 
-    /* TODO: is this really what we want to do?  Maybe we need to just 
-     * report this error code somewhere else so that it can get propigated
-     * back to the parent SM?  Depends on how the error handling is 
-     * supposed to work.  -Phil
-     */
-    /* TODO: note that this is especially bad right now, because it means
-     * that msgpair sm must know about valid return codes from comp_fn, like
-     * REMOVE_MUST_REMOVE_DATAFILES :(  We definitely need to change
-     * the way error values are propigated somehow.
-     */
-    if(js_p->error_code == 0)
-    {
-	/* for now, return this to indicate that all completions are done
-	 * and return out of the nested state machine
-	 */
-	js_p->error_code = MSGPAIR_RETURN_SUCCESS;
-    }
-	
     return 1;
 }
 
