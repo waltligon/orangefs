@@ -12,6 +12,7 @@
 #include "pvfs-distribution.h"
 #include "pvfs-request.h"
 
+/* enumeration of supported server operations */
 enum PVFS_server_op
 {
     PVFS_SERV_INVALID = 0,
@@ -37,6 +38,29 @@ enum PVFS_server_op
  * PVFS_SERV_STATFS
  */
 };
+
+/******************************************************************/
+/* these values define limits on the maximum size of variable length
+ * parameters used within the request protocol
+ */
+
+/* max size of opaque distribution parameters */
+#define PVFS_REQ_LIMIT_DIST_BYTES         1024
+/* max size of each configuration file transmitted to clients */
+#define PVFS_REQ_LIMIT_CONFIG_FILE_BYTES  16384
+/* max size of all path strings */
+#define PVFS_REQ_LIMIT_PATH_NAME_BYTES    PVFS_NAME_MAX
+/* max total size of I/O request descriptions */
+#define PVFS_REQ_LIMIT_IOREQ_BYTES        8192
+/* max count of segments allowed per path lookup (note that this governs 
+ * the number of handles and attributes returned in lookup_path responses)
+ */
+#define PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT 256
+/* max count of datafiles associated with a logical file */
+#define PVFS_REQ_LIMIT_DFILE_COUNT        1024
+/* max count of directory entries per readdir request */
+#define PVFS_REQ_LIMIT_DIRENT_COUNT       64
+
 
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
