@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <assert.h>
+#include <stdio.h>
 
 #include "bmi-method-support.h"
 #include "bmi-method-callback.h"
@@ -600,6 +601,8 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
     method_addr_p new_addr = NULL;
     struct gm_addr *gm_data = NULL;
     char local_tag[] = "NULL";
+    char* delim = NULL;
+    int ret = -1;
 
     gm_string = string_key("gm", id_string);
     if (!gm_string)
@@ -609,7 +612,13 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
     }
 
     /* start breaking up the method information */
-    /* for normal gm, it is simply a hostname */
+    /* for gm, it is hostname:portnumber */
+    if((delim = index(gm_string, ':')) == NULL)
+    {
+	gossip_lerr("Error: malformed gm address.\n");
+	free(gm_string);
+	return(NULL);
+    }
 
     /* looks ok, so let's build the method addr structure */
     new_addr = alloc_gm_method_addr();
@@ -619,6 +628,19 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
 	return (NULL);
     }
     gm_data = new_addr->method_data;
+
+    /* pull off the port first */
+    ret = sscanf((delim+1), "%u", &(gm_data->port_id));
+    if(ret != 1)
+    {
+	gossip_lerr("Error: malformed gm address.\n");
+	dealloc_gm_method_addr(new_addr);
+	free(gm_string);
+	return(NULL);
+    }
+
+    /* now chop off the port information and parse the rest */
+    *delim = '\0';
 
     if (strncmp(gm_string, local_tag, strlen(local_tag)) == 0)
     {
@@ -633,7 +655,6 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
 	    free(gm_string);
 	    return (NULL);
 	}
-	gm_data->port_id = BMI_GM_PORT_NUM;
     }
 
     free(gm_string);
@@ -2743,6 +2764,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 		map = alloc_gm_method_addr();
 		gm_addr_data = map->method_data;
 		gm_addr_data->node_id = gm_ntohs(poll_event->recv.sender_node_id);
+		gm_addr_data->port_id = gm_ntohc(poll_event->recv.sender_port_id);
 		/* let the bmi layer know about it */
 		ret = bmi_method_addr_reg_callback(map);
 		if (ret < 0)

@@ -127,7 +127,7 @@ int bench_initialize_bmi_interface(char* method, int flags,
 	}
 	else if(strcmp(method, "bmi_gm") == 0)
 	{
-		sprintf(local_address, "gm://NULL");
+		sprintf(local_address, "gm://NULL:%d\n", BMI_GM_PORT);
 	}
 	else
 	{
@@ -269,7 +269,7 @@ int bench_initialize_bmi_addresses_client(int num_servers, int num_clients,
 		}
 		else if(strcmp(method_name, "bmi_gm") == 0)
 		{
-			sprintf(bmi_server_name, "gm://%s", server_name);
+			sprintf(bmi_server_name, "gm://%s:%d", server_name, BMI_GM_PORT);
 		}
 		else
 		{

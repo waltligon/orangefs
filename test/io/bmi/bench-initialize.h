@@ -16,6 +16,7 @@
 #define __BENCH_INITIALIZE_H
 
 #define BMI_TCP_PORT 3334
+#define BMI_GM_PORT 5
 
 int bench_initialize_bmi_interface(char* method, int flags,
 	bmi_context_id* context);
