@@ -167,6 +167,11 @@ void yyerror(char *s)
 
 void yywrap(void)
 {
+    /*
+      this is a complete hack that stops the infinite read
+      loop that statecomp sometimes gets into on my setup
+    */
+    fprintf(stderr,".\b");
 }
 
 void produce_listing(int line, char *listing)

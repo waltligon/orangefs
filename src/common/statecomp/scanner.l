@@ -23,13 +23,6 @@
 */
 #define YY_NEVER_INTERACTIVE 1
 
-/*
-  this is a complete hack that stops the infinite read
-  loop that statecomp sometimes gets into on my setup
-*/
-#define yywrap() (fprintf(stderr,".\b") && yywrap())
-
-
 extern YYSTYPE yylval;
 
 extern FILE *out_file;
