@@ -1617,6 +1617,81 @@ char *PINT_config_get_meta_handle_range_str(
     return get_handle_range_str(config_s,fs,1);
 }
 
+int PINT_config_get_meta_handle_extent_array(
+    struct server_configuration_s *config_s,
+    PVFS_fs_id fs_id,
+    PVFS_handle_extent_array *extent_array)
+{
+    int ret = -1;
+    PINT_llist *cur = NULL;
+    char *my_alias = NULL;
+    filesystem_configuration_s *cur_fs = NULL;
+    struct host_handle_mapping_s *cur_h_mapping = NULL;
+
+    if (config_s && extent_array)
+    {
+        cur = config_s->file_systems;
+        while(cur)
+        {
+            cur_fs = PINT_llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
+
+            if (cur_fs->coll_id == fs_id)
+            {
+                break;
+            }
+            cur = PINT_llist_next(cur);
+        }
+
+        if (cur_fs)
+        {
+            my_alias = PINT_config_get_host_alias_ptr(
+                config_s, config_s->host_id);
+            if (my_alias)
+            {
+                cur = cur_fs->meta_handle_ranges;
+
+                while(cur)
+                {
+                    cur_h_mapping = PINT_llist_head(cur);
+                    if (!cur_h_mapping)
+                    {
+                        break;
+                    }
+
+                    assert(cur_h_mapping->handle_range);
+                    assert(cur_h_mapping->alias_mapping);
+                    assert(cur_h_mapping->alias_mapping->host_alias);
+
+                    if (strcmp(cur_h_mapping->alias_mapping->host_alias,
+                               my_alias) == 0)
+                    {
+                        extent_array->extent_count = 
+                            cur_h_mapping->handle_extent_array.extent_count;
+                        extent_array->extent_array = malloc(
+                            (extent_array->extent_count *
+                             sizeof(PVFS_handle_extent)));
+                        assert(extent_array->extent_array);
+                        memcpy(extent_array->extent_array,
+                               cur_h_mapping->handle_extent_array.extent_array,
+                               (extent_array->extent_count *
+                                sizeof(PVFS_handle_extent)));
+
+                        ret = 0;
+                        break;
+                    }
+                    cur = PINT_llist_next(cur);
+                }
+            }
+        }
+    }
+    return ret;
+}
+
+
 /*
  * Function: PINT_config_get_data_handle_range_str
  *

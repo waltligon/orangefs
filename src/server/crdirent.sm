@@ -266,9 +266,8 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
 static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
 					  job_status_s* js_p)
 {
-    int ret;
+    int ret = -PVFS_ENOMEM;
     job_id_t i;
-    PVFS_handle_extent extent;
     PVFS_handle_extent_array extent_array;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
@@ -278,10 +277,16 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
         GOSSIP_SERVER_DEBUG, "  creating dspace (coll_id = %d)\n",
         s_op->u.crdirent.fs_id);
 
-    /* FIXME: arbitrary handle here, or honor a range? */
-    extent.first = extent.last = 0;
-    extent_array.extent_count = 1;
-    extent_array.extent_array = &extent;
+    /* find our meta handle range for this create */
+    ret = PINT_config_get_meta_handle_extent_array(
+        user_opts, s_op->u.crdirent.fs_id, &extent_array);
+    assert(ret == 0);
+    assert(extent_array.extent_count > 0);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  new handle should be in range "
+                 "starting with %Lu-%Lu\n",
+                 extent_array.extent_array[0].first,
+                 extent_array.extent_array[0].last);
 
     ret = job_trove_dspace_create(
         s_op->u.crdirent.fs_id,
@@ -295,6 +300,9 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
         js_p,
         &i,
         server_job_context);
+
+    free(extent_array.extent_array);
+    extent_array.extent_array = NULL;
 
     return ret;
 }

@@ -122,6 +122,11 @@ char *PINT_config_get_meta_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
 
+int PINT_config_get_meta_handle_extent_array(
+    struct server_configuration_s *config_s,
+    PVFS_fs_id fs_id,
+    PVFS_handle_extent_array *extent_array);
+
 char *PINT_config_get_data_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
