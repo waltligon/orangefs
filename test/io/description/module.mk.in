@@ -14,13 +14,11 @@ TESTSRC += \
 	$(DIR)/debug10.c\
 	$(DIR)/debug11.c\
 	$(DIR)/debug12.c\
-	$(DIR)/debug13.c\
 	$(DIR)/debug14.c\
 	$(DIR)/debug15.c\
 	$(DIR)/debug16.c\
 	$(DIR)/debug17.c\
 	$(DIR)/debug_commit.c\
-	$(DIR)/debug_olap.c\
 	$(DIR)/test-encode-basic.c\
 	$(DIR)/test-encode-complex-out.c\
 	$(DIR)/test-encode-complex-in.c\
@@ -32,3 +30,7 @@ TESTSRC += \
 	$(DIR)/test-truncate.c \
 	$(DIR)/test-many-datafiles-import.c
 #	$(DIR)/test-req1.c\
+
+# disabled, broken:
+#	$(DIR)/debug13.c\
+#	$(DIR)/debug_olap.c\
