@@ -301,6 +301,16 @@ AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_OPEN, 1,
 Define if DB open function takes a txnid parameter),
 AC_MSG_RESULT(no))
 
+dnl check for DB_DIRTY_READ (it is not in db-3.2.9, for example)
+AC_MSG_CHECKING(for DB_DIRTY_READ flag)
+AC_TRY_COMPILE([
+#include <db.h>
+], [
+u_int32_t flags = DB_DIRTY_READ;
+], AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_DB_DIRTY_READ, 1, [Define if db library has DB_DIRTY_READ flag]),
+AC_MSG_RESULT(no))
+
 dnl configure options for GM install path
 AC_ARG_WITH(gm,[  --with-gm=<dir>         Location of the GM installation (default=/opt/gm)],
     GM_HOME="$withval",GM_HOME="/opt/gm")
