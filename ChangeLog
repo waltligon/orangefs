@@ -23,7 +23,11 @@ pvfs2-0.0.6pre1
 - large file support bug fixes
 - improved client sysint rename implementation (state-machine)
 - improved signal handling in pvfs2-client
-
+- switch to a new protocol encoder which translates requests and
+  responses into a machine-independent format, allowing
+  interoperability between 32- and 64-bit machines and little-
+  and big-endian machines.
+	
 	
 pvfs2-0.0.5
 ===========

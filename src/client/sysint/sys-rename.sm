@@ -77,7 +77,7 @@ machine pvfs2_client_rename_sm(init,
                                rename_rmdirent_setup_msgpair,
                                rename_rmdirent_xfer_msgpair,
                                rename_rmdirent_failure,
-			       cleanup)
+                               cleanup)
 {
     state init {
 	run rename_init;
@@ -255,17 +255,6 @@ static int rename_init(PINT_client_sm *sm_p,
     gossip_debug(CLIENT_DEBUG, "rename state: init\n");
 
     assert(js_p->error_code == 0);
-
-    /*
-      FIXME: Do we really?!
-
-
-      grab a pointer to the server configuration object.
-      we need this later for mapping handles to servers
-      during meta/data handle creation
-    */
-    sm_p->server_config = PINT_get_server_config_struct();
-    assert(sm_p->server_config);
 
     /* do the request scheduler thing, if necessary */
 

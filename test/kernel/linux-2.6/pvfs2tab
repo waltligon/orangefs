@@ -1,1 +1,1 @@
-tcp://localhost:3334/pvfs2-fs /mnt/pvfs pvfs2 defaults 0 0 
+tcp://localhost:3334/pvfs2-fs /mnt/pvfs pvfs2 encoding=le_bfield 0 0 
