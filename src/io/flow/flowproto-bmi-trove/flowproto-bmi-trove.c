@@ -103,8 +103,10 @@ static int flowproto_bmi_trove_id = -1;
 /* bmi context */
 static bmi_context_id global_bmi_context = -1;
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 /* trove context */
 static TROVE_context_id global_trove_context = -1;
+#endif
 
 /* array of bmi ops in flight; filled in when needed to call
  * testcontext() 
@@ -237,8 +239,10 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 					  flow_descriptor * flow_d);
 static void trove_completion_bmi_to_trove(PVFS_error error_code,
 					  flow_descriptor * flow_d);
+#ifdef __PVFS2_TROVE_SUPPORT__
 static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d);
 static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d);
+#endif
 
 /****************************************************
  * public interface functions
@@ -289,19 +293,23 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
 	return(ret);
     }
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     /* get a TROVE context */
     ret = trove_open_context(/*FIXME: HACK*/9,&global_trove_context);
     if (ret < 0)
     {
         return(ret);
     }
+#endif
 
     /* setup our queues to track low level operations */
     trove_inflight_queue = trove_id_queue_new();
     if (!trove_inflight_queue)
     {
 	BMI_close_context(global_bmi_context);
+#ifdef __PVFS2_TROVE_SUPPORT__
         trove_close_context(/*FIXME: HACK*/9,global_trove_context);
+#endif
 	return (-ENOMEM);
     }
 
@@ -327,8 +335,9 @@ int flowproto_bmi_trove_finalize(void)
     trove_id_queue_cleanup(trove_inflight_queue);
 
     BMI_close_context(global_bmi_context);
+#ifdef __PVFS2_TROVE_SUPPORT__
     trove_close_context(/*FIXME: HACK*/9,global_trove_context);
-
+#endif
     gossip_ldebug(FLOW_PROTO_DEBUG, "flowproto_bmi_trove shut down.\n");
     return (0);
 }
@@ -445,6 +454,11 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     PVFS_error *trove_error_code_array = NULL;
     void **trove_usrptr_array = NULL;
     int *trove_index_array = NULL;
+    int query_offset = 0;
+    PVFS_fs_id tmp_coll_id;
+    PVFS_error scratch_error_code_array[BMI_TEST_SIZE];
+    int scratch_index_array[BMI_TEST_SIZE];
+    char scratch_usrptr_array[BMI_TEST_SIZE * SIZEOF_VOID_P];
     int trove_count = *count;
     int bmi_outcount = 0;
     int ret = -1;
@@ -454,11 +468,6 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     int incount = *count;
     TROVE_op_id *trove_op_array = NULL;
     int split_idle_time_ms = max_idle_time_ms;
-    int query_offset = 0;
-    PVFS_fs_id tmp_coll_id;
-    PVFS_error scratch_error_code_array[BMI_TEST_SIZE];
-    int scratch_index_array[BMI_TEST_SIZE];
-    char scratch_usrptr_array[BMI_TEST_SIZE * SIZEOF_VOID_P];
 
     /* TODO: do something more clever with the max_idle_time_ms
      * argument.  For now we just split it evenly among the
@@ -547,12 +556,14 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
                 }
             }
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 	    ret = trove_dspace_testsome(tmp_coll_id, global_trove_context,
 					trove_op_array, &trove_count,
 					trove_index_array, NULL,
 					trove_usrptr_array, 
 					trove_error_code_array,
                                         TROVE_DEFAULT_TEST_TIMEOUT);
+#endif
 	    if (ret < 0)
 	    {
 		/* TODO: cleanup properly */
@@ -1010,6 +1021,7 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
     return (0);
 }
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 /* buffer_setup_bmi_to_trove()
  *
  * sets up initial internal buffer configuration for a particular type
@@ -1111,8 +1123,10 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 
     return (0);
 }
+#endif
 
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 /* buffer_setup_trove_to_bmi()
  *
  * sets up initial internal buffer configuration for a particular type
@@ -1196,7 +1210,7 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
 
     return (0);
 }
-
+#endif
 
 
 /* check_support()
@@ -1221,6 +1235,7 @@ static int check_support(struct flowproto_type_support *type)
 	return (0);
     }
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     /* bmi to storage */
     if (type->src_endpoint_id == BMI_ENDPOINT &&
 	type->dest_endpoint_id == TROVE_ENDPOINT)
@@ -1234,6 +1249,7 @@ static int check_support(struct flowproto_type_support *type)
     {
 	return (0);
     }
+#endif
 
     /* we don't know about anything else */
     return (-ENOPROTOOPT);
@@ -1295,6 +1311,7 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 	flow_data->type = MEM_TO_BMI;
 	ret = buffer_setup_mem_to_bmi(flow_d);
     }
+#ifdef __PVFS2_TROVE_SUPPORT__
     else if (flow_d->src.endpoint_id == TROVE_ENDPOINT &&
 	     flow_d->dest.endpoint_id == BMI_ENDPOINT)
     {
@@ -1307,6 +1324,7 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 	flow_data->type = BMI_TO_TROVE;
 	ret = buffer_setup_bmi_to_trove(flow_d);
     }
+#endif
     else
     {
 	gossip_lerr("Error: Unknown/unimplemented endpoint combination.\n");
@@ -1632,6 +1650,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	gossip_ldebug(FLOW_PROTO_DEBUG,
 		      "about to call trove_bstream_write_list().\n");
 	tmp_offset = flow_data->drain_buffer + flow_data->drain_buffer_offset;
+#ifdef __PVFS2_TROVE_SUPPORT__
 	ret = trove_bstream_write_list(flow_d->dest.u.trove.coll_id,
 				       flow_d->dest.u.trove.handle,
 				       &(tmp_offset),
@@ -1642,6 +1661,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 				       &(flow_data->drain_buffer_stepsize), 0,
 				       NULL, flow_d, global_trove_context,
 				       &(flow_data->trove_id));
+#endif
 	if (ret == 1)
 	{
 	    /* handle immediate completion */
@@ -1817,6 +1837,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	gossip_ldebug(FLOW_PROTO_DEBUG,
 		      "about to call trove_bstream_read_list().\n");
 	tmp_offset = flow_data->fill_buffer + flow_data->fill_buffer_offset;
+#ifdef __PVFS2_TROVE_SUPPORT__
 	ret = trove_bstream_read_list(flow_d->src.u.trove.coll_id,
 				      flow_d->src.u.trove.handle, &(tmp_offset),
 				      &(flow_data->trove_total_size), 1,
@@ -1826,6 +1847,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 				      &(flow_data->fill_buffer_stepsize), 0,
 				      NULL, flow_d, global_trove_context,
 				      &(flow_data->trove_id));
+#endif
 	if (ret == 1)
 	{
 	    /* handle immediate completion */
