@@ -747,7 +747,19 @@ DOTCONF_CB(get_trove_sync_mode)
     assert(fs_conf);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
+#ifndef HAVE_DB_DIRTY_READ
     fs_conf->trove_sync_mode = trove_sync_mode_to_enum(cmd->data.str);
+    if (fs_conf->trove_sync_mode != TROVE_SYNC)
+    {
+        gossip_err("Forcing TroveSyncMode to be sync instead of %s\n",
+                   cmd->data.str);
+        gossip_err("Non-sync mode is NOT supported without "
+                   "DB_DIRTY_READ support\n");
+        fs_conf->trove_sync_mode = TROVE_SYNC;
+    }
+#else
+    fs_conf->trove_sync_mode = trove_sync_mode_to_enum(cmd->data.str);
+#endif
 #endif
     return NULL;
 }
