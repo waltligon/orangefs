@@ -116,7 +116,7 @@ int main(int argc,char **argv)
 	printf("ctime:%d\n",(int)resp_gattr->attr.ctime);
 	switch(resp_gattr->attr.objtype)
 	{
-		case ATTR_META:
+		case PVFS_TYPE_METAFILE:
 		printf("METAFILE\n");
 		printf("nr_datafiles:%d\n",resp_gattr->attr.u.meta.nr_datafiles);
 
@@ -126,14 +126,18 @@ int main(int argc,char **argv)
 		}
 		break;
 
-		case ATTR_DATA:
+		case PVFS_TYPE_DATAFILE:
 		printf("DATAFILE?? we shouldn't see these\n");
 		printf("size written on server = %Ld", resp_gattr->attr.u.data.size);
 		break;
 
-		case ATTR_DIR:
+		case PVFS_TYPE_DIRECTORY:
 		printf("DIRECTORY\n");
 		printf("handle: = %d", (int)resp_gattr->attr.u.dir.dfh);
+		break;
+
+		default:
+		printf("UNKNOWN object type!\n");
 		break;
 	}
 	

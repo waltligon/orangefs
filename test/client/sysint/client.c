@@ -323,7 +323,7 @@ int main(int argc,char **argv)
 	req_sattr->attr.atime = 1111111;
 	req_sattr->attr.mtime = 2222222;
 	req_sattr->attr.ctime = 3333333;
-	req_sattr->attr.objtype = ATTR_META;
+	req_sattr->attr.objtype = PVFS_TYPE_METAFILE;
 
 	req_sattr->attr.u.meta.dfh = NULL;
 	req_sattr->attr.u.meta.nr_datafiles = 0;
@@ -485,7 +485,7 @@ int main(int argc,char **argv)
 	req_mkdir->attr.owner = 12345;
 	req_mkdir->attr.group = 56789;
 	req_mkdir->attr.perms = 63;
-	req_mkdir->attr.objtype = ATTR_DIR;
+	req_mkdir->attr.objtype = PVFS_TYPE_DIRECTORY;
 	req_mkdir->credentials.perms = 7;
 
 	// call mkdir 

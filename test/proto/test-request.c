@@ -330,8 +330,8 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
 			arrow(direction);
 			switch (my_req->u.setattr.attr.objtype)
 			{
-				case ATTR_META:
-                        		printf("PVFS_servreq_setattr.attr.objtype = ATTR_META\n" );
+				case PVFS_TYPE_METAFILE:
+                        		printf("PVFS_servreq_setattr.attr.objtype = PVFS_TYPE_METAFILE\n" );
 			arrow(direction);
                         		printf("PVFS_servreq_setattr.attr.u.meta.nr_datafiles = %d\n", (int)my_req->u.setattr.attr.u.meta.nr_datafiles );
 					for( i=0; i<my_req->u.setattr.attr.u.meta.nr_datafiles; i++ )
@@ -340,20 +340,20 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
                         			printf("PVFS_servreq_setattr.attr.u.meta.nr_dfh[%d] = %d\n",(int)i, (int)my_req->u.setattr.attr.u.meta.dfh[i] );
 					}
 					break;
-				case ATTR_DATA:
-                        		printf("PVFS_servreq_setattr.attr.objtype = ATTR_DATA\n" );
+				case PVFS_TYPE_DATAFILE:
+                        		printf("PVFS_servreq_setattr.attr.objtype = PVFS_TYPE_DATAFILE\n" );
 					arrow(direction);
                         		printf("PVFS_servreq_setattr.attr.u.data.size = %d\n", (int)my_req->u.setattr.attr.u.data.size );
 					arrow(direction);
 					break;
-				case ATTR_DIR:
-                        		printf("PVFS_servreq_setattr.attr.objtype = ATTR_DIR\n" );
+				case PVFS_TYPE_DIRECTORY:
+                        		printf("PVFS_servreq_setattr.attr.objtype = PVFS_TYPE_DIRECTORY\n" );
 					arrow(direction);
 					printf("PVFS_directory_attr_s is undefined\n");
         				//request->u.setattr.attr.u.dir = ;
 					break;
-				case ATTR_SYM:
-                        		printf("PVFS_servreq_setattr.attr.objtype = ATTR_SYM\n" );
+				case PVFS_TYPE_SYMLINK:
+                        		printf("PVFS_servreq_setattr.attr.objtype = PVFS_TYPE_SYMLINK\n" );
 					arrow(direction);
 					printf("PVFS_symlink_attr_s is undefined\n");
         				//request->u.setattr.attr.u.sym = ;
@@ -569,12 +569,12 @@ int main(int argc, char **argv)
         request->u.setattr.attr.atime = 16661;
         request->u.setattr.attr.mtime = 16661;
         request->u.setattr.attr.ctime = 16661;
-        request->u.setattr.attr.objtype = ATTR_META;
+        request->u.setattr.attr.objtype = PVFS_TYPE_METAFILE;
        		request->u.setattr.attr.u.meta.nr_datafiles = NUM_DATAFILES;
 		for( i=0; i<request->u.setattr.attr.u.meta.nr_datafiles; i++ )
 			datafiles[i] = i;
 		request->u.setattr.attr.u.meta.dfh = datafiles;
-        //request->u.setattr.attr.objtype = ATTR_DATA;
+        //request->u.setattr.attr.objtype = PVFS_TYPE_DATAFILE;
 	//	request->u.setattr.attr.u.data.size = 100;
 
         // -

@@ -57,7 +57,7 @@ int main(int argc,char* argv[])
 	pinode1->attr.ctime = 1;
 	pinode1->attr.mtime = 1;
 	pinode1->attr.atime = 1;
-	pinode1->attr.objtype = ATTR_META;
+	pinode1->attr.objtype = PVFS_TYPE_METAFILE;
 	//pinode1->attr.u.meta = ;
 	pinode1->mask = ATTR_META;
 	pinode1->size = 1;
@@ -72,7 +72,7 @@ int main(int argc,char* argv[])
 	pinode2->attr.ctime = 2;
 	pinode2->attr.mtime = 2;
 	pinode2->attr.atime = 2;
-	pinode2->attr.objtype = ATTR_META;
+	pinode2->attr.objtype = PVFS_TYPE_METAFILE;
 	//pinode2->attr.u.meta = ;
 	pinode2->mask = ATTR_META;
 	pinode2->size = 2;
@@ -87,7 +87,7 @@ int main(int argc,char* argv[])
 	pinode3->attr.ctime = 3;
 	pinode3->attr.mtime = 3;
 	pinode3->attr.atime = 3;
-	pinode3->attr.objtype = ATTR_META;
+	pinode3->attr.objtype = PVFS_TYPE_METAFILE;
 	//pinode3->attr.u.meta = ;
 	pinode3->mask = ATTR_META;
 	pinode3->size = 3;
@@ -161,8 +161,8 @@ void print_pinode(pinode *toprint)
 	printf("pinode.attr.atime = %d\n", (int)toprint->attr.atime);
 	switch(toprint->attr.objtype)
 	{
-		case ATTR_META:
-			printf("pinode.attr.objtype = ATTR_META\n");
+		case PVFS_TYPE_METAFILE:
+			printf("pinode.attr.objtype = PVFS_TYPE_METAFILE\n");
 		default:
 			printf("pinode.attr.objtype = dunno\n");
 			break;

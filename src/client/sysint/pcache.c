@@ -89,7 +89,7 @@ void PINT_pcache_pinode_dealloc(pinode *pnode)
     if (pnode != NULL)
     {
 	memset(pnode,0,sizeof(pinode));
-	if ((pnode->attr.objtype & ATTR_META) == ATTR_META)
+	if (pnode->attr.objtype == PVFS_TYPE_METAFILE)
 	{
 	    gossip_ldebug(PCACHE_DEBUG, "METADATA file handles:\n");
 	    for(i = 0; i < pnode->attr.u.meta.nr_datafiles; i++)

@@ -64,7 +64,7 @@ int do_decode_req(
 
 	case PVFS_SERV_MKDIR:
 	    char_ptr += sizeof( struct PVFS_server_req_s );
-	    if ( dec_msg->u.mkdir.attr.objtype == ATTR_META )
+	    if ( dec_msg->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
 		dec_msg->u.mkdir.attr.u.meta.dfh = (PVFS_handle *)char_ptr;
 	    }
@@ -73,7 +73,7 @@ int do_decode_req(
 	case PVFS_SERV_SETATTR:
 	    char_ptr += sizeof(struct PVFS_server_req_s);
 
-	    if ( dec_msg->u.setattr.attr.objtype == ATTR_META )
+	    if ( dec_msg->u.setattr.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
 		dec_msg->u.setattr.attr.u.meta.dfh = (PVFS_handle *)char_ptr;
 		/* move the pointer past the data files, we could have

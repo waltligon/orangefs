@@ -581,7 +581,7 @@ static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
 	new->atime = old.atime;
 	new->mtime = old.mtime;
 	new->ctime = old.ctime;
-	new->objtype = ATTR_META;
+	new->objtype = PVFS_TYPE_METAFILE;
 
 	/* Fill in the metafile attributes */
 	new->u.meta.dist = old.u.meta.dist;

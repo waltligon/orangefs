@@ -90,7 +90,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	/* Create the server request */
 	req_p.op = PVFS_SERV_SETATTR;
 	req_p.credentials = req->credentials;
-	if ((req->attr.objtype & ATTR_META) == ATTR_META)
+	if (req->attr.objtype == PVFS_TYPE_METAFILE)
 	{
 	    handlesize = req->attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
 	}

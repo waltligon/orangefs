@@ -98,7 +98,7 @@ PVFS_handle create_dir(PVFS_handle parent,
     req_mkdir.attr.owner = 100;
     req_mkdir.attr.group = 100;
     req_mkdir.attr.perms = 1877;
-    req_mkdir.attr.objtype = ATTR_DIR;
+    req_mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;
     req_mkdir.credentials.perms = 1877;
     req_mkdir.credentials.uid = 100;
     req_mkdir.credentials.gid = 100;

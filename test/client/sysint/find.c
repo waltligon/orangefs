@@ -40,7 +40,7 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
                 "(fs_id is %d)\n",handle,fs_id);
         return -1;
     }
-    return ((getattr_response.attr.objtype == ATTR_DIR) ? 1 : 0);
+    return ((getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY) ? 1 : 0);
 }
 
 int directory_walk(PVFS_sysresp_init *init_response,

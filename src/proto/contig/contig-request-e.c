@@ -165,7 +165,7 @@ int do_encode_req(
 		struct PVFS_object_attr ) + header_size;
 
 	    /* if we're mkdir'ing a meta file, we need to alloc space for the attributes */
-	    if ( request->u.mkdir.attr.objtype == ATTR_META )
+	    if ( request->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
 		size += request->u.mkdir.attr.u.meta.nr_datafiles * sizeof( PVFS_handle );
 	    }
@@ -187,7 +187,7 @@ int do_encode_req(
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
 	    /* throw handles at the end for metadata files */
-	    if ( request->u.mkdir.attr.objtype == ATTR_META )
+	    if ( request->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
 				/* handles */
 		memcpy( enc_msg + sizeof( struct PVFS_server_req_s ),
@@ -207,7 +207,7 @@ int do_encode_req(
 	    size = sizeof( struct PVFS_server_req_s ) + sizeof(
 		struct PVFS_object_attr ) + header_size;
 
-	    if(request->u.setattr.attr.objtype == ATTR_META)
+	    if(request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
 	    {
 		/* negative datafiles? wtf ... */
 		if(request->u.setattr.attr.u.meta.nr_datafiles >= 0)
@@ -249,7 +249,7 @@ int do_encode_req(
 	    enc_msg += sizeof( struct PVFS_server_req_s );
 
 	    /* throw handles at the end for metadata files */
-	    if ( request->u.setattr.attr.objtype == ATTR_META )
+	    if ( request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
 		memcpy( enc_msg, 
 			request->u.setattr.attr.u.meta.dfh, 

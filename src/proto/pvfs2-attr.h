@@ -104,7 +104,7 @@ struct PVFS_object_attr
     PVFS_time atime;
     PVFS_time mtime;
     PVFS_time ctime;
-    int objtype;		/* Type of PVFS Filesystem object */
+    PVFS_ds_type objtype;	/* Type of PVFS Filesystem object */
     union
     {
 	PVFS_metafile_attr meta;

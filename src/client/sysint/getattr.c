@@ -155,7 +155,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
         }
 
 	resp->attr = ack_p->u.getattr.attr;
-	if (resp->attr.objtype == ATTR_META)
+	if (resp->attr.objtype == PVFS_TYPE_METAFILE)
 	{
 	    if(resp->attr.u.meta.nr_datafiles > 0)
 	    {
