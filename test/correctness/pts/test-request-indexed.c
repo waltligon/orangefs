@@ -5,10 +5,16 @@
  */
 
 /* 
- * test-request_indexed: 
+ * test-request_indexed: Checks PVFS_Request_indexed for correct segmentation 
+ * of the request.  For instance, If the segment size is to be 4M and there 
+ * are 3 segments that are allocated to a 10M chunk, then the offsets for
+ * those segments should be 
+ * 0 (first segment with 4M of space) 
+ * 4M (second segment with 4M of space)
+ * 8M (third segment with 2M of space)
  * Author: Michael Speth
  * Date: 8/14/2003
- * Last Updated: 8/14/2003
+ * Last Updated: 8/21/2003
  */
 
 #include <time.h>
@@ -28,6 +34,12 @@
 #define BYTEMAX (4*1024*1024)
 extern pvfs_helper_t pvfs_helper;
 
+
+/* Checks for valid segmentation on 2 request types for PVFS_Request_indexed
+ * Parameters: none
+ * Returns 0 on success and -1 on failure (ie - the segment offsets
+ * were not calcuated correctly by Request_indexed
+ */
 int test_request(void){
     int i;
     PINT_Request *r1;
@@ -96,7 +108,8 @@ int test_request(void){
     /* gossip_enable_stderr();
     gossip_set_debug_mask(1,REQUEST_DEBUG); */
                                                                                  
-//    printf("\n************************************\n");
+/*    printf("\n************************************\n");
+*/
     tmpSize = blocklength;
     tmpOff = displacement1;
     segSize = BYTEMAX;
@@ -110,12 +123,14 @@ int test_request(void){
                                                                                 
 	if(retval >= 0)
 	{
-//	    printf("results of PINT_Process_request():\n");
-//	    printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+/*	    printf("results of PINT_Process_request():\n");
+	    printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+*/
 	    for(i = 0; i < seg1.segs; i++)
 	    {
-//		printf("  segment %d: offset: %d size: %d\n",
- //              i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
+/*		printf("  segment %d: offset: %d size: %d\n",
+               i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
+*/
 		if(tmpOff != ((int)seg1.offset_array[i])){
 		    printf("Error:  segment %d offset is %d but should be %d\n",i,(int)seg1.offset_array[i],tmpOff);
 		    return -1;
@@ -140,12 +155,15 @@ int test_request(void){
     {
       fprintf(stderr, "Error: PINT_Process_request() failure.\n");      return(-1);
    }
-//   printf("final file size %lld\n", rf1.fsize);
+/*   printf("final file size %lld\n", rf1.fsize);
+*/
    if(PINT_REQUEST_DONE(rs1))
    {
-//      printf("**** first request done.\n");
+/*      printf("**** first request done.\n");
+*/
    }
- //  printf("\n************************************\n");
+ /*  printf("\n************************************\n");
+*/
     tmpOff = displacement2;
     tmpSize = blocklength;
     segSize = BYTEMAX;
@@ -158,12 +176,15 @@ int test_request(void){
                                                                                 
       if(retval >= 0)
       {
-    //     printf("results of PINT_Process_request():\n");
-//         printf("%d segments with %lld bytes\n", seg2.segs, seg2.bytes);
+/*
+         printf("results of PINT_Process_request():\n");
+         printf("%d segments with %lld bytes\n", seg2.segs, seg2.bytes);
+*/
          for(i=0; i < seg2.segs; i++)
          {
-//            printf("  segment %d: offset: %d size: %d\n",
- //              i, (int)seg2.offset_array[i], (int)seg2.size_array[i]);
+/*            printf("  segment %d: offset: %d size: %d\n",
+               i, (int)seg2.offset_array[i], (int)seg2.size_array[i]);
+*/
 
 		if(tmpOff != ((int)seg2.offset_array[i])){
 		    printf("Error:  segment %d offset is %d but should be %d\n",i,(int)seg2.offset_array[i],tmpOff);
@@ -192,16 +213,16 @@ int test_request(void){
       fprintf(stderr, "Error: PINT_Process_request() failure.\n");
       return(-1);
    }
-//   printf("final file size %lld\n", rf2.fsize);
+/*   printf("final file size %lld\n", rf2.fsize); */
    if(PINT_REQUEST_DONE(rs2))
    {
- //     printf("**** second request done.\n");
+ /*     printf("**** second request done.\n"); */
    }
                                                                                 
    return 0;
 }
 
-/* Preconditions:
+/* Preconditions: None
  * Parameters: comm - special pts communicator, rank - the rank of the process,
  * buf - not used
  * Postconditions: 0 if no errors and nonzero otherwise
@@ -213,7 +234,6 @@ int test_request_indexed(MPI_Comm * comm,
 {
     int ret = -1;
 
-    /* right now, the system interface isn't threadsafe, so we just want to run with one process. */
     if (rank == 0)
     {
 	ret = test_request();
