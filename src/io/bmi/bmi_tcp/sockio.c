@@ -388,7 +388,10 @@ int set_tcpopt(int s,
 	       int optname,
 	       int val)
 {
-    if (setsockopt(s, SOL_TCP, optname, &val, sizeof(val)) == -1)
+    struct protoent* p = getprotobyname("tcp");
+    if(!p)
+	return(-1);
+    if (setsockopt(s, p->p_proto, optname, &val, sizeof(val)) == -1)
 	return (-1);
     else
 	return (val);
