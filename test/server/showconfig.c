@@ -77,7 +77,7 @@ int main(int argc, char **argv)
     memset(&serverconfig,0,sizeof(serverconfig));
     if (PINT_server_config(&serverconfig,argc,argv))
     {
-        printf("Failed to parse config file\n");
+        printf("Failed to parse config files\n");
         return 1;
     }
 
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
             (int)serverconfig.fs_config_buflen);
     fprintf(stderr,"server config file name: %s\n",
             serverconfig.server_config_filename);
-    fprintf(stderr,"fs config file length: %d\n",
+    fprintf(stderr,"server config file length: %d\n",
             (int)serverconfig.server_config_buflen);
 
     fprintf(stderr,"unexp req: %d\n",
