@@ -235,6 +235,11 @@ clients will never write large files, use a smaller number of servers.
 If your clients are writing out gigantic checkpoint files or reading in
 huge datasets, then use more servers.
 
+It is entirely possible to run PVFS2 servers on the same nodes doing
+computation. In most cases, however, you will see better performance if 
+you have some portion of your cluster dedicated to IO and another portion
+dedicated to computation.
+
 
 \subsection{Can PVFS2 servers listen on two network interfaces simultaneously (i.e. multihome)?}
 
