@@ -392,6 +392,9 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
     s_op->val.buffer    = &s_op->resp->u.lookup_path.handle_array[s_op->u.lookup.seg_nr];
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
+    /* note: if this operation fails, seg_nr will indicate one too many valid
+     * segments; this is addressed in lookup_send_response.
+     */
     s_op->u.lookup.seg_nr++;
 
     job_post_ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
@@ -406,29 +409,6 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
     return job_post_ret;
 }
 
-
-/*
- * Function: lookup_release_job
- *
- * Synopsis: Free the job from the scheduler to allow next job to proceed.
- *
- * Posts release request to job scheduler.
- */
-static int lookup_release_job(PINT_server_op *s_op,
-			      job_status_s *ret)
-{
-
-    int job_post_ret=0;
-    job_id_t j_id;
-
-    gossip_debug(SERVER_DEBUG,"lookup state: lookup_release_job\n");
-
-    job_post_ret = job_req_sched_release(s_op->scheduled_id,
-					 s_op,
-					 ret,
-					 &j_id);
-    return job_post_ret;
-}
 
 /*
  * Function: lookup_send_response
@@ -448,6 +428,15 @@ static int lookup_send_response(PINT_server_op *s_op,
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_send_response\n");
+
+    if (ret->error_code != 0) {
+	/* as mentioned in lookup_read_directory_entry, on error seg_nr
+	 * is one too large.
+	 */
+	s_op->u.lookup.seg_nr--;
+	gossip_debug(SERVER_DEBUG,
+		     "  error occurred in lookup process; decrementing number of segments.\n");
+    }
 
     payload_sz = s_op->u.lookup.seg_nr * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
 
@@ -483,6 +472,31 @@ static int lookup_send_response(PINT_server_op *s_op,
 				     &j_id);
     return job_post_ret;
 }
+
+
+/*
+ * Function: lookup_release_job
+ *
+ * Synopsis: Free the job from the scheduler to allow next job to proceed.
+ *
+ * Posts release request to job scheduler.
+ */
+static int lookup_release_job(PINT_server_op *s_op,
+			      job_status_s *ret)
+{
+
+    int job_post_ret=0;
+    job_id_t j_id;
+
+    gossip_debug(SERVER_DEBUG,"lookup state: lookup_release_job\n");
+
+    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+					 s_op,
+					 ret,
+					 &j_id);
+    return job_post_ret;
+}
+
 
 /*
  * Function: lookup_cleanup

@@ -600,6 +600,10 @@ struct server_configuration_s *get_server_config_struct(void)
     return user_opts;
 }
 
+/* PINT_server_cp_bmi_unexp
+ *
+ * Allocates space for server operation, zeros it, and calls job_bmi_unexp()
+ */
 int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
 			     job_status_s * temp_stat)
 {
@@ -607,6 +611,7 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
     int ret;
     char *mem_calc_ptr;
 
+    /* allocate space for server operation structure, and memset() it to zero */
     serv_op = (PINT_server_op *) malloc(sizeof(PINT_server_op) + ENCODED_HEADER_SIZE);
     if (!serv_op)
     {
@@ -617,17 +622,6 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
     serv_op->op = BMI_UNEXP;
 
     mem_calc_ptr = (char *) serv_op;
-
-#if 0
-    serv_op->unexp_bmi_buff = (struct BMI_unexpected_info *)
-	    malloc(sizeof(struct BMI_unexpected_info));
-    if (!serv_op->unexp_bmi_buff)
-    {
-	free(serv_op);
-	serv_op = (PINT_server_op *)0;
-	return (-2);
-    }
-#endif
 
     /* TODO:
      * Consider optimizations later, so that we don't have to
@@ -641,7 +635,7 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
      * -Phil
      */
     ret = job_bmi_unexp(&(serv_op->unexp_bmi_buff), serv_op,
-	    temp_stat, &jid, JOB_NO_IMMED_COMPLETE);
+			temp_stat, &jid, JOB_NO_IMMED_COMPLETE);
     if (ret < 0)
     {
 	free(serv_op);

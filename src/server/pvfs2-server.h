@@ -67,6 +67,9 @@ struct PINT_server_remove_op {
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
+ *
+ * This structure is allocated and memset() to zero in PINT_server_cp_bmi_unexp().
+ * s_op->op is set to BMI_UNEXP at that time, but reset in intialize_unexpected.
  */
 typedef struct PINT_server_op
 {
