@@ -511,11 +511,14 @@ int do_list(
                 snprintf(segment,128,"/");
             }
 
-            if (PVFS_sys_getparent(pinode_refn.fs_id, name,
-                                   credentials, &getparent_resp) == 0)
+            if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
             {
-                print_dot_and_dot_dot_info_if_required(
-                    getparent_resp.parent_refn);
+                if (PVFS_sys_getparent(pinode_refn.fs_id, name,
+                                       credentials, &getparent_resp) == 0)
+                {
+                    print_dot_and_dot_dot_info_if_required(
+                        getparent_resp.parent_refn);
+                }
             }
 
             if (opts->list_long)
