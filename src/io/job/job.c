@@ -3338,7 +3338,6 @@ int job_testsome(job_id_t * id_array,
     /* check before we do anything else to see if the job that we
      * want is in the completion queue
      */
-    gen_mutex_lock(&completion_mutex);
     ret = completion_query_some(tmp_id_array,
                                 inout_count_p, out_index_array,
                                 returned_user_ptr_array,
@@ -3347,14 +3346,12 @@ int job_testsome(job_id_t * id_array,
     /* return here on error or completion */
     if (ret < 0)
     {
-        gen_mutex_unlock(&completion_mutex);
         free(tmp_id_array);
         return (ret);
     }
 
     if ((ret == 0) && (*inout_count_p == real_id_count))
     {
-        gen_mutex_unlock(&completion_mutex);
         free(tmp_id_array);
         return (1);
     }
@@ -3375,7 +3372,6 @@ int job_testsome(job_id_t * id_array,
         ret = gettimeofday(&start, NULL);
         if (ret < 0)
         {
-            gen_mutex_unlock(&completion_mutex);
             free(tmp_id_array);
             return (ret);
         }
@@ -3394,11 +3390,11 @@ int job_testsome(job_id_t * id_array,
         /* wait to see if anything completes before the timeout
          * expires 
          */
+        gen_mutex_lock(&completion_mutex);
         ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
                                      &pthread_timeout);
         gen_mutex_unlock(&completion_mutex);
 #else
-        gen_mutex_unlock(&completion_mutex);
         if(timeout_ms)
             do_one_work_cycle_all(10);
         else
@@ -3422,7 +3418,6 @@ int job_testsome(job_id_t * id_array,
         }
         else
         {
-            gen_mutex_lock(&completion_mutex);
             if(returned_user_ptr_array)
             {
                 ret = completion_query_some(tmp_id_array,
@@ -3446,13 +3441,11 @@ int job_testsome(job_id_t * id_array,
             /* return here on error or completion */
             if (ret < 0)
             {
-                gen_mutex_unlock(&completion_mutex);
                 free(tmp_id_array);
                 return (ret);
             }
             if (ret == 0 && (*inout_count_p + total_completed == real_id_count))
             {
-                gen_mutex_unlock(&completion_mutex);
                 *inout_count_p = real_id_count;
                 free(tmp_id_array);
                 return (1);
@@ -3472,7 +3465,6 @@ int job_testsome(job_id_t * id_array,
         ret = gettimeofday(&end, NULL);
         if (ret < 0)
         {
-            gen_mutex_unlock(&completion_mutex);
             free(tmp_id_array);
             return (ret);
         }
@@ -3481,8 +3473,6 @@ int job_testsome(job_id_t * id_array,
             (end.tv_usec - start.tv_usec) / 1000;
 
     } while (timeout_remaining > 0);
-
-    gen_mutex_unlock(&completion_mutex);
 
     /* fall through, not everything is done, time is used up */
     *inout_count_p = total_completed;
@@ -3538,7 +3528,6 @@ int job_testcontext(job_id_t * out_id_array_p,
     /* check before we do anything else to see if the completion queue
      * has anything in it
      */
-    gen_mutex_lock(&completion_mutex);
     ret = completion_query_context(out_id_array_p,
                                  inout_count_p,
                                  returned_user_ptr_array,
@@ -3546,13 +3535,11 @@ int job_testcontext(job_id_t * out_id_array_p,
     /* return here on error or completion */
     if (ret < 0)
     {
-        gen_mutex_unlock(&completion_mutex);
         return (ret);
     }
 
     if (ret == 0 && (*inout_count_p > 0))
     {
-        gen_mutex_unlock(&completion_mutex);
         return (1);
     }
 
@@ -3567,7 +3554,6 @@ int job_testcontext(job_id_t * out_id_array_p,
         ret = gettimeofday(&start, NULL);
         if (ret < 0)
         {
-            gen_mutex_unlock(&completion_mutex);
             return (ret);
         }
 
@@ -3585,11 +3571,11 @@ int job_testcontext(job_id_t * out_id_array_p,
         /* wait to see if anything completes before the timeout
          * expires 
          */
+        gen_mutex_lock(&completion_mutex);
         ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
                                      &pthread_timeout);
         gen_mutex_unlock(&completion_mutex);
 #else
-        gen_mutex_unlock(&completion_mutex);
         if (timeout_ms)
         {
             do_one_work_cycle_all(10);
@@ -3630,7 +3616,6 @@ int job_testcontext(job_id_t * out_id_array_p,
         }
         else
         {
-            gen_mutex_lock(&completion_mutex);
             /* check queue now to see if anything is done */
             ret = completion_query_context(out_id_array_p,
                                          inout_count_p,
@@ -3640,13 +3625,11 @@ int job_testcontext(job_id_t * out_id_array_p,
             /* return here on error or completion */
             if (ret < 0)
             {
-                gen_mutex_unlock(&completion_mutex);
                 return (ret);
             }
 
             if (ret == 0 && (*inout_count_p > 0))
             {
-                gen_mutex_unlock(&completion_mutex);
                 return (1);
             }
 
@@ -3659,7 +3642,6 @@ int job_testcontext(job_id_t * out_id_array_p,
         ret = gettimeofday(&end, NULL);
         if (ret < 0)
         {
-            gen_mutex_unlock(&completion_mutex);
             return (ret);
         }
 
@@ -3667,7 +3649,6 @@ int job_testcontext(job_id_t * out_id_array_p,
             ((end.tv_usec - start.tv_usec) / 1000);
 
     } while (timeout_remaining > 0);
-    gen_mutex_unlock(&completion_mutex);
 
     /* fall through, nothing done, time is used up */
     *inout_count_p = 0;
@@ -4005,8 +3986,10 @@ static int completion_query_some(job_id_t * id_array,
 
     *inout_count_p = 0;
 
+    gen_mutex_lock(&completion_mutex);
     if (completion_error)
     {
+        gen_mutex_unlock(&completion_mutex);
         return (completion_error);
     }
 
@@ -4044,6 +4027,7 @@ static int completion_query_some(job_id_t * id_array,
             (*inout_count_p)++;
         }
     }
+    gen_mutex_unlock(&completion_mutex);
     return(0);
 }
 
@@ -4059,8 +4043,10 @@ static int completion_query_context(job_id_t * out_id_array_p,
     int incount = *inout_count_p;
     *inout_count_p = 0;
 
+    gen_mutex_lock(&completion_mutex);
     if (completion_error)
     {
+        gen_mutex_unlock(&completion_mutex);
         return (completion_error);
     }
     while (*inout_count_p < incount && (query =
@@ -4095,6 +4081,7 @@ static int completion_query_context(job_id_t * out_id_array_p,
             query = NULL;
         }
     }
+    gen_mutex_unlock(&completion_mutex);
 
     return (0);
 }
