@@ -208,11 +208,28 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
         ((s_op->attr.mask & PVFS_ATTR_COMMON_UID) ? "yes" :
          "no"), s_op->attr.owner, s_op->req->credentials.uid);
 	
-    switch(s_op->req->op)
+    switch(PINT_server_req_table[s_op->req->op].perm)
     {
-	/* things that need read permissions */
-	case PVFS_SERV_GETATTR:
-            /* a datafile will have a 0 mask value here */
+	case PINT_SERVER_CHECK_WRITE:
+	    /* TODO: figure out something cleaner looking than using 
+	     * PVFS_U_WRITE here to indicate we need write access; its 
+	     * misleading
+	     */
+	    js_p->error_code = check_mode(
+                &(s_op->attr), s_op->req->credentials.uid,
+                s_op->req->credentials.gid, PVFS_U_WRITE);
+	    break;
+	case PINT_SERVER_CHECK_READ:
+	    /* TODO: figure out something cleaner looking than using 
+	     * PVFS_U_READ here to indicate we need read access; its 
+	     * misleading
+	     */
+	    js_p->error_code = check_mode(
+                &(s_op->attr), s_op->req->credentials.uid,
+                s_op->req->credentials.gid, PVFS_U_READ);
+	    break;
+	case PINT_SERVER_CHECK_ATTR:
+	    /* a datafile will have a 0 mask value here */
             if (s_op->attr.mask == 0)
             {
                 js_p->error_code = 0;
@@ -220,7 +237,7 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	    else
 	    {
                 /*
-                  NOTE: on other file systems, getattr doesn't seem to
+                  NOTE: on other file systems, getattr/setattr doesn't seem to
                   require read permissions by the user, group OR
                   other, so long as the user matches (or is root)
                 */
@@ -237,82 +254,10 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
                 }
 	    }
             break;
-	case PVFS_SERV_READDIR:
-	    /* TODO: figure out something cleaner looking than using 
-	     * PVFS_U_READ here to indicate we need read access; its 
-	     * misleading
-	     */
-	    js_p->error_code = check_mode(
-                &(s_op->attr), s_op->req->credentials.uid,
-                s_op->req->credentials.gid, PVFS_U_READ);
-	    break;
-
-	/* things that need write permissions */
-	case PVFS_SERV_CRDIRENT:
-	case PVFS_SERV_RMDIRENT:
-	case PVFS_SERV_CHDIRENT:
-	    /* TODO: figure out something cleaner looking than using 
-	     * PVFS_U_WRITE here to indicate we need write access; its 
-	     * misleading
-	     */
-	    js_p->error_code = check_mode(
-                &(s_op->attr), s_op->req->credentials.uid,
-                s_op->req->credentials.gid, PVFS_U_WRITE);
-	    break;
-	/* special case: we only check permissions on setattr if it 
-	 * already has attributes
-	 */
-	case PVFS_SERV_SETATTR:
-	    if (s_op->attr.mask == 0)
-	    {
-		js_p->error_code = 0;
-	    }
-	    else
-	    {
-                /*
-                  NOTE: on other file systems, setattr doesn't seem to
-                  require write permissions by the user, group OR
-                  other, so long as the user matches (or is root)
-                */
-                if (((s_op->attr.mask & PVFS_ATTR_COMMON_UID) &&
-                     ((s_op->attr.owner == 0) ||
-                      (s_op->attr.owner == s_op->req->credentials.uid))) ||
-                    (s_op->req->credentials.uid == 0))
-                {
-                    js_p->error_code = 0;
-                }
-                else
-                {
-                    js_p->error_code = -PVFS_EPERM;
-                }
-	    }
-	    break;
-
-	/* things we don't check permissions on */
-	case PVFS_SERV_MGMT_SETPARAM:
-	case PVFS_SERV_CREATE:
-	case PVFS_SERV_REMOVE:
-	case PVFS_SERV_IO:
-	case PVFS_SERV_LOOKUP_PATH:
-	case PVFS_SERV_TRUNCATE:
-	case PVFS_SERV_MKDIR:
-	case PVFS_SERV_GETCONFIG:
-	case PVFS_SERV_FLUSH:
-	case PVFS_SERV_MGMT_NOOP:
-	case PVFS_SERV_MGMT_PERF_MON:
-	case PVFS_SERV_MGMT_EVENT_MON:
-	case PVFS_SERV_STATFS:
-	case PVFS_SERV_MGMT_ITERATE_HANDLES:
-	case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+	case PINT_SERVER_CHECK_NONE:
 	    js_p->error_code = 0;
 	    break;
-
-	/* things we shouldn't see here */
-	case PVFS_SERV_INVALID: 
-	case PVFS_SERV_WRITE_COMPLETION:
-	case PVFS_SERV_PERF_UPDATE:
-	case PVFS_SERV_JOB_TIMER:
-	case PVFS_SERV_PROTO_ERROR:
+	case PINT_SERVER_CHECK_INVALID:
 	    js_p->error_code = -PVFS_EINVAL;
 	    break;
     }

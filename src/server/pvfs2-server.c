@@ -125,10 +125,13 @@ static int server_parse_cmd_line_args(int argc, char **argv);
 static void server_state_table_initialize(void);
 static int server_state_machine_start(
     PINT_server_op *s_op, job_status_s *js_p);
+static void init_req_table(void);
 #ifdef __PVFS2_SEGV_BACKTRACE__
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 #endif
 
+/* table of incoming request types and associated parameters */
+struct PINT_server_req_params PINT_server_req_table[PVFS_MAX_SERVER_OP+1];
 
 int main(int argc, char **argv)
 {
@@ -136,6 +139,8 @@ int main(int argc, char **argv)
     char *fs_conf = NULL, *server_conf = NULL;
     int siglevel = 0;
     PINT_server_op* tmp_op = NULL;
+
+    init_req_table();
 
 #ifdef WITH_MTRACE
     mtrace();
@@ -1467,6 +1472,75 @@ int server_state_machine_complete(PINT_server_op *s_op)
 struct server_configuration_s *get_server_config_struct(void)
 {
     return &server_config;
+}
+
+/* init_req_table()
+ *
+ * used to initialize static table of server request types
+ *
+ * no return value
+ */
+static void init_req_table(void)
+{
+    int i;
+
+    memset(PINT_server_req_table, 0, (PVFS_MAX_SERVER_OP+1)*sizeof(struct
+	PINT_server_req_params));
+
+    /* intitialize the table of server operation parameters */
+    /* NOTE: this is done in an awkward looking case loop specifically so
+     * that the compiler will generate a warning if someone forgets to
+     * update this table when they add a new server operation 
+     */
+    #define OP_CASE(_type,_string,_perm) \
+	case _type: \
+	    PINT_server_req_table[i].op_type = _type; \
+	    PINT_server_req_table[i].string_name = _string; \
+	    PINT_server_req_table[i].perm = _perm; \
+	    break;
+
+    for(i=0; i<(PVFS_MAX_SERVER_OP+1); i++)
+    {
+	switch(i){
+	OP_CASE(PVFS_SERV_INVALID, "invalid", PINT_SERVER_CHECK_INVALID);
+	OP_CASE(PVFS_SERV_CREATE, "create", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_REMOVE, "remove", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_IO, "io", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_GETATTR, "getattr", PINT_SERVER_CHECK_ATTR);
+	OP_CASE(PVFS_SERV_SETATTR, "setattr", PINT_SERVER_CHECK_ATTR);
+	OP_CASE(PVFS_SERV_LOOKUP_PATH, "lookup_path", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_CRDIRENT, "crdirent", PINT_SERVER_CHECK_WRITE);
+	OP_CASE(PVFS_SERV_RMDIRENT, "rmdirent", PINT_SERVER_CHECK_WRITE);
+	OP_CASE(PVFS_SERV_CHDIRENT, "chdirent", PINT_SERVER_CHECK_WRITE);
+	OP_CASE(PVFS_SERV_TRUNCATE, "truncate", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_MKDIR, "mkdir", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_READDIR, "readdir", PINT_SERVER_CHECK_READ);
+	OP_CASE(PVFS_SERV_GETCONFIG, "getconfig", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_WRITE_COMPLETION, "write_completion", 
+	    PINT_SERVER_CHECK_INVALID);
+	OP_CASE(PVFS_SERV_FLUSH, "flush", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_MGMT_SETPARAM, "mgmt_setparam",
+	    PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_MGMT_NOOP, "mgmt_noop", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_STATFS, "statfs", PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_PERF_UPDATE, "perf_update",
+	    PINT_SERVER_CHECK_INVALID);
+	OP_CASE(PVFS_SERV_MGMT_PERF_MON, "mgmt_perf_mon",
+	    PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, "mgmt_iterate_handles", 
+	    PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, "mgmt_dspace_info_list", 
+	    PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_MGMT_EVENT_MON, "mgmt_event_mon", 
+	    PINT_SERVER_CHECK_NONE);
+	OP_CASE(PVFS_SERV_JOB_TIMER, "job_timer", PINT_SERVER_CHECK_INVALID);
+	OP_CASE(PVFS_SERV_PROTO_ERROR, "proto_error",
+	    PINT_SERVER_CHECK_INVALID);
+	}
+    }
+    #undef OP_CASE
+
+    return;
 }
 
 /*

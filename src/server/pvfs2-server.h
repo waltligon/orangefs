@@ -18,12 +18,36 @@
 #include "gossip.h"
 #include "PINT-reqproto-encode.h"
 #include "msgpairarray.h"
+#include "pvfs2-req-proto.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
  * allows us to get the dependencies right for msgpairarray.sm which relies
  * on conflicting headers for dependency information
  */
 #ifndef __SM_CHECK_DEP
+
+/* types of permission checking that a server may need to perform
+ * for incoming requests
+ */
+enum PINT_server_req_permissions
+{
+    PINT_SERVER_CHECK_INVALID = 0, /* invalid request */
+    PINT_SERVER_CHECK_WRITE = 1,   /* needs write permission */
+    PINT_SERVER_CHECK_READ = 2,    /* needs read permission */
+    PINT_SERVER_CHECK_NONE = 3,    /* needs no permission */
+    PINT_SERVER_CHECK_ATTR = 4     /* special case for attribute operations; 
+                                      needs ownership */
+};
+
+struct PINT_server_req_params
+{
+    enum PVFS_server_op op_type;
+    char* string_name;
+    enum PINT_server_req_permissions perm;
+};
+
+extern struct PINT_server_req_params
+    PINT_server_req_table[];
 
 extern job_context_id server_job_context;
 
@@ -226,93 +250,10 @@ typedef struct PINT_server_op
  */
 static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
-    char* ret_ptr = NULL;
-
     if(op > PVFS_MAX_SERVER_OP)
 	return(NULL);
 
-    switch(op)
-    {
-	case PVFS_SERV_INVALID:
-	    ret_ptr = "invalid";
-	    break;
-	case PVFS_SERV_MGMT_SETPARAM:
-	    ret_ptr = "mgmt_setparam";
-	    break;
-	case PVFS_SERV_CREATE:
-	    ret_ptr = "create";
-	    break;
-	case PVFS_SERV_REMOVE:
-	    ret_ptr = "remove";
-	    break;
-	case PVFS_SERV_IO:
-	    ret_ptr = "io";
-	    break;
-	case PVFS_SERV_GETATTR:
-	    ret_ptr = "getattr";
-	    break;
-	case PVFS_SERV_SETATTR:
-	    ret_ptr = "setattr";
-	    break;
-	case PVFS_SERV_LOOKUP_PATH:
-	    ret_ptr = "lookup_path";
-	    break;
-	case PVFS_SERV_CRDIRENT:
-	    ret_ptr = "crdirent";
-	    break;
-	case PVFS_SERV_RMDIRENT:
-	    ret_ptr = "rmdirent";
-	    break;
-	case PVFS_SERV_CHDIRENT:
-	    ret_ptr = "chdirent";
-	    break;
-	case PVFS_SERV_TRUNCATE:
-	    ret_ptr = "truncate";
-	    break;
-	case PVFS_SERV_MKDIR:
-	    ret_ptr = "mkdir";
-	    break;
-	case PVFS_SERV_READDIR:
-	    ret_ptr = "readdir";
-	    break;
-	case PVFS_SERV_GETCONFIG:
-	    ret_ptr = "getconfig";
-	    break;
-	case PVFS_SERV_WRITE_COMPLETION:
-	    ret_ptr = "write_completion";
-	    break;
-	case PVFS_SERV_FLUSH:
-	    ret_ptr = "flush";
-	    break;
-	case PVFS_SERV_MGMT_NOOP:
-	    ret_ptr = "mgmt_noop";
-	    break;
-	case PVFS_SERV_MGMT_PERF_MON:
-	    ret_ptr = "mgmt_perf_mon";
-	    break;
-	case PVFS_SERV_MGMT_EVENT_MON:
-	    ret_ptr = "mgmt_event_mon";
-	    break;
-	case PVFS_SERV_MGMT_ITERATE_HANDLES:
-	    ret_ptr = "mgmt_iterate_handles";
-	    break;
-	case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
-	    ret_ptr = "mgmt_dspace_info_list";
-	    break;
-	case PVFS_SERV_STATFS:
-	    ret_ptr = "statfs";
-	    break;
-	case PVFS_SERV_PERF_UPDATE:
-	    ret_ptr = "perf_update";
-	    break;
-	case PVFS_SERV_JOB_TIMER:
-	    ret_ptr = "job_timer";
-	    break;
-	case PVFS_SERV_PROTO_ERROR:
-	    ret_ptr = "proto_error";
-	    break;
-    }
-    return(ret_ptr);
+    return(PINT_server_req_table[op].string_name);
 }
 
 /* PINT_STATE_DEBUG()
