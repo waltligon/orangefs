@@ -49,7 +49,8 @@ static int io_object_getattr_comp_fn(void *v_p,
 				     int index);
 
 /* other helper functions */
-static int io_find_target_datafiles(PVFS_Request file_req,
+static int io_find_target_datafiles(PVFS_Request mem_req,
+				    PVFS_Request file_req,
 				    PVFS_offset file_req_offset, 
 				    PVFS_Dist *dist_p,
 				    PVFS_handle *input_handle_array,
@@ -142,13 +143,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     sm_p->u.io.file_req_offset = file_req_offset;
     sm_p->u.io.io_resp_p     = resp_p;
     sm_p->u.io.mem_req       = mem_req;
-
-    /* TODO: this is a hack for now; I think that I am
-     * doing something wrong...
-     */
-    /* sm_p->u.io.buffer        = buffer; */
-    sm_p->u.io.buffer   = (void*)((char*)buffer -
-	file_req_offset);
+    sm_p->u.io.buffer        = buffer; 
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_IO);
     assert(ret == 0);
@@ -373,7 +368,8 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 	assert(0);
     }
 
-    ret = io_find_target_datafiles(iosm_p->file_req,
+    ret = io_find_target_datafiles(iosm_p->mem_req,
+				   iosm_p->file_req,
 				   iosm_p->file_req_offset,
 				   iosm_p->dist_p,
 				   iosm_p->datafile_handles,
@@ -470,10 +466,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 	}
 	assert(orig_index < iosm_p->datafile_count); /* sanity check */
 
-	/* TODO: enable this when we are ready to actually use the memory 
-	 * datatype code
-	 */
-#if 0
+#if 1
 	/* fill in I/O request */
 	PINT_SERVREQ_IO_FILL(msg_p->req,
 			     *sm_p->cred_p,
@@ -488,6 +481,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 			     iosm_p->file_req_offset,
 			     PINT_REQUEST_TOTAL_BYTES(iosm_p->mem_req));
 #else
+	/* TODO: get rid of this one */
 	/* fill in I/O request */
 	PINT_SERVREQ_IO_FILL(msg_p->req,
 			     *sm_p->cred_p,
@@ -1178,7 +1172,8 @@ static int io_analyze_results(PINT_client_sm *sm_p,
  *
  * NOTE: this was ripped out of io.c and then modified.
  */
-static int io_find_target_datafiles(PVFS_Request file_req,
+static int io_find_target_datafiles(PVFS_Request mem_req,
+				    PVFS_Request file_req,
 				    PVFS_offset file_req_offset, 
 				    PVFS_Dist *dist_p,
 				    PVFS_handle *input_handle_array,
@@ -1188,6 +1183,7 @@ static int io_find_target_datafiles(PVFS_Request file_req,
 {
     int i, ret;
     struct PINT_Request_state *req_state = NULL;
+    struct PINT_Request_state *mem_req_state = NULL;
     PINT_Request_file_data tmp_file_data;
     PINT_Request_result tmp_result;
 
@@ -1197,6 +1193,12 @@ static int io_find_target_datafiles(PVFS_Request file_req,
     req_state = PINT_New_request_state(file_req);
     if(!req_state)
     {
+	return -PVFS_ENOMEM;
+    }
+    mem_req_state = PINT_New_request_state(mem_req);
+    if(!mem_req_state)
+    {
+	PINT_Free_request_state(req_state);
 	return -PVFS_ENOMEM;
     }
 
@@ -1214,6 +1216,7 @@ static int io_find_target_datafiles(PVFS_Request file_req,
 	tmp_file_data.iod_num = i;
 
 	PINT_REQUEST_STATE_RESET(req_state);
+	PINT_REQUEST_STATE_RESET(mem_req_state);
 
 	/* if a file datatype offset was specified, go ahead and skip ahead 
 	 * before calculating
@@ -1221,18 +1224,22 @@ static int io_find_target_datafiles(PVFS_Request file_req,
 	if (file_req_offset)
 	    PINT_REQUEST_STATE_SET_TARGET(req_state, file_req_offset);
 
+	PINT_REQUEST_STATE_SET_FINAL(req_state, 
+	    file_req_offset+PINT_REQUEST_TOTAL_BYTES(mem_req));
+
 	memset(&tmp_result, 0, sizeof(PINT_Request_result));
 	tmp_result.bytemax = 1;
 	tmp_result.segmax = 1;
 
 	/* PINT_Process_request() returns number of bytes processed */
 	ret = PINT_Process_request(req_state,
-				   NULL,
+				   mem_req_state,
 				   &tmp_file_data,
 				   &tmp_result,
 				   PINT_CKSIZE);
 	if (ret < 0)
 	{
+	    PINT_Free_request_state(mem_req_state);
 	    PINT_Free_request_state(req_state);
 	    return ret;
 	}
@@ -1251,6 +1258,7 @@ static int io_find_target_datafiles(PVFS_Request file_req,
 	}
     }
     PINT_Free_request_state(req_state);
+    PINT_Free_request_state(mem_req_state);
 
     return 0;
 } /* io_find_target_datafiles */

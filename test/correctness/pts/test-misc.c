@@ -98,6 +98,7 @@ static int test_permissions(int testcase){
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     PVFS_offset file_req_offset;
     char *filename;
@@ -109,6 +110,7 @@ static int test_permissions(int testcase){
     filename = strcpy(filename, "name");
 
     memset(&req_io, 0, sizeof(PVFS_Request));
+    memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
     credentials.uid = 100;
@@ -146,8 +148,7 @@ static int test_permissions(int testcase){
 	}
 	break;
     }
-    /* TODO: use memory datatype when ready */
-    ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, file_req_offset,io_buffer, NULL,
+    ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, file_req_offset,io_buffer, req_mem,
                           credentials, &resp_io);
     PVFS_sys_finalize();
     return ret;
@@ -157,6 +158,7 @@ static int test_size_after_write(int testcase){
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     PVFS_sysresp_getattr resp;
     PVFS_offset file_req_offset = 0;
@@ -172,6 +174,7 @@ static int test_size_after_write(int testcase){
     filename = strcpy(filename, "name");
 
     memset(&req_io, 0, sizeof(PVFS_Request));
+    memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
     credentials.uid = 100;
@@ -201,8 +204,7 @@ static int test_size_after_write(int testcase){
 	io_buffer[i] = 'a';
     }
 
-    /* TODO: use memory datatype when ready */
-    ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, NULL,
+    ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, req_mem,
                            credentials, &resp_io);
     if(ret < 0){
         debug_printf("write failed on %s\n", filename);
@@ -224,6 +226,7 @@ static int test_sparse_files(int testcase){
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     PVFS_sysresp_getattr resp;
     PVFS_offset file_req_offset = 0;
@@ -239,6 +242,7 @@ static int test_sparse_files(int testcase){
     filename = strcpy(filename, "sparse");
 
     memset(&req_io, 0, sizeof(PVFS_Request));
+    memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
     credentials.uid = 100;
@@ -285,8 +289,7 @@ static int test_sparse_files(int testcase){
 	io_buffer[i] = 'a';
     }
 
-    /* TODO: use memory datatype when ready */
-    ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, NULL,
+    ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, req_mem,
                            credentials, &resp_io);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
@@ -308,6 +311,7 @@ static int test_read_sparse_files(int testcase){
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     PVFS_sysresp_getattr resp;
     PVFS_offset file_req_offset = 0;
@@ -323,6 +327,7 @@ static int test_read_sparse_files(int testcase){
     filename = strcpy(filename, "sparse2");
 
     memset(&req_io, 0, sizeof(PVFS_Request));
+    memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
     credentials.uid = 100;
@@ -368,14 +373,12 @@ static int test_read_sparse_files(int testcase){
     {
 	io_buffer[i] = 'a';
     }
-    /* TODO: use memory datatype when ready */
-    ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, NULL,
+    ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, req_mem,
                            credentials, &resp_io);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
     }
-    /* TODO: use memory datatype when ready */
-    ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, NULL,
+    ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, req_mem,
                            credentials, &resp_io);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
@@ -535,6 +538,7 @@ static int test_truncat(int testcase)
 static int test_read_beyond(int testcase){
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     PVFS_credentials credentials;
     PVFS_offset file_req_offset = 0;
@@ -550,6 +554,7 @@ static int test_read_beyond(int testcase){
     filename = strcpy(filename, "name");
 
     memset(&req_io, 0, sizeof(PVFS_Request));
+    memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
@@ -574,8 +579,7 @@ static int test_read_beyond(int testcase){
 	return ret;
     io_buffer = (char *)malloc(sizeof(char)*resp.attr.size+100);
 
-    /* TODO: use memory datatype when ready */
-    ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, NULL, credentials, &resp_io);
+    ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, req_mem, credentials, &resp_io);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
     }
@@ -587,6 +591,7 @@ static int test_read_beyond(int testcase){
 static int test_write_beyond(int testcase){
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     PVFS_credentials credentials;
     char *filename;
@@ -603,6 +608,7 @@ static int test_write_beyond(int testcase){
     filename = strcpy(filename, "name");
 
     memset(&req_io, 0, sizeof(PVFS_Request));
+    memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
@@ -633,8 +639,7 @@ static int test_write_beyond(int testcase){
     {
 	io_buffer[i] = 'a';
     }
-    /* TODO: use memory datatype when ready */
-    ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, NULL,
+    ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, file_req_offset, io_buffer, req_mem,
                            credentials, &resp_io);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
@@ -782,6 +787,7 @@ static int test_io_on_dir(int testcase)
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     PVFS_offset file_req_offset = 0;
     char *name;
@@ -809,16 +815,14 @@ static int test_io_on_dir(int testcase)
     switch(testcase)
     {
 	case 0:
-	    /* TODO: use memory datatype when ready */
-	    ret = PVFS_sys_read(resp_lookup.pinode_refn, req_io, file_req_offset, io_buffer, NULL, credentials, &resp_io);
+	    ret = PVFS_sys_read(resp_lookup.pinode_refn, req_io, file_req_offset, io_buffer, req_mem, credentials, &resp_io);
 	    break;
 	case 1:
 	    for(i = 0; i < 100; i++)
 	    {
 		io_buffer[i] = 'a';
 	    }
-	    /* TODO: use memory datatype when ready */
-	    ret = PVFS_sys_write(resp_lookup.pinode_refn, req_io, file_req_offset, io_buffer, NULL, credentials, &resp_io);
+	    ret = PVFS_sys_write(resp_lookup.pinode_refn, req_io, file_req_offset, io_buffer, req_mem, credentials, &resp_io);
 	    break;
 
     }

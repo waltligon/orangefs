@@ -398,13 +398,10 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
     int i;
     int type = flow_d->type;
 
-    /* TODO: enable this when we are ready to use the memory datatypes */
-#if 0
     /* sanity check; if the caller doesn't provide a memory datatype,
      * then the must at least indicate the aggregate size to transfer
      */
     assert(flow_d->aggregate_size > -1 || flow_d->mem_req != 0);
-#endif
 
     gen_mutex_lock(&interface_mutex);
 

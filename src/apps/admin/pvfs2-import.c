@@ -59,6 +59,7 @@ int main(int argc, char **argv)
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
     PVFS_Request file_req;
+    PVFS_Request mem_req;
     int buffer_size;
 
     /* look at command line arguments */
@@ -172,7 +173,7 @@ int main(int argc, char **argv)
     buffer = malloc(user_opts->buf_size);
     if(!buffer)
     {
-	PVFS_sys_finalize();
+	perror("malloc");
 	ret = -1;
 	goto main_out;
     }
@@ -186,6 +187,7 @@ int main(int argc, char **argv)
 	buffer_size = current_size;
 	blocklength = current_size;
 	displacement = total_written;
+	/* TODO: use simpler datatype when tiling is working */
 	ret = PVFS_Request_indexed(1, &blocklength,
 	    &displacement, PVFS_BYTE, &file_req);
 	if(ret < 0)
@@ -195,9 +197,17 @@ int main(int argc, char **argv)
 	    goto main_out;
 	}
 
+	/* setup memory datatype */
+	ret = PVFS_Request_contiguous(current_size, PVFS_BYTE, &mem_req);
+	if(ret < 0)
+	{
+	    PVFS_perror("PVFS_Request_contiguous", ret);
+	    ret = -1;
+	    goto main_out;
+	}
+
 	/* write out the data */
-	/* TODO: use memory datatype when ready */
-	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, NULL, 
+	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, mem_req, 
 			    credentials, &resp_io);
 	if(ret < 0)
 	{
@@ -219,7 +229,7 @@ int main(int argc, char **argv)
 
 	total_written += current_size;
 
-	/* TODO: need to free the request description */
+	/* TODO: need to free the request descriptions */
     };
     time2 = Wtime();
 

@@ -182,16 +182,8 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 
-	/* TODO: enable this when we are ready to actually use the 
-	 * memory datatype
-	 */
-#if 0
 	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, mem_req, 
 				credentials, &resp_io);
-#else
-	ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, NULL, 
-				credentials, &resp_io);
-#endif
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_sys_write() failure.\n");
@@ -208,14 +200,8 @@ int main(int argc,char **argv)
 	printf("IO-TEST: performing read on handle: %ld, fs: %d\n",
 		(long)pinode_refn.handle, (int)pinode_refn.fs_id);
 
-	/* TODO: enable once memory datatype code is ready */
-#if 0
 	ret = PVFS_sys_read(pinode_refn, file_req, 0, buffer, mem_req, 
 				credentials, &resp_io);
-#else
-	ret = PVFS_sys_read(pinode_refn, file_req, 0, buffer, NULL, 
-				credentials, &resp_io);
-#endif
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_sys_read() failure.\n");

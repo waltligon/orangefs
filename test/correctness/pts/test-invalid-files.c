@@ -390,6 +390,7 @@ static int test_read(int testcase)
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     char *filename;
     char io_buffer[100];
@@ -399,6 +400,7 @@ static int test_read(int testcase)
     filename = strcpy(filename, "name");
 
     memset(&req_io, 0, sizeof(PVFS_Request));
+    memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
     credentials.uid = 100;
@@ -423,16 +425,14 @@ static int test_read(int testcase)
     {
     case 0:
 	resp_lk.pinode_refn.handle = -1;
-	/* TODO: use memory datatype when ready */
 	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL,
+	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, req_mem,
 			  credentials, &resp_io);
 	break;
     case 1:
 	resp_lk.pinode_refn.fs_id = -1;
-	/* TODO: use memory datatype when ready */
 	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL,
+	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, req_mem,
 			  credentials, &resp_io);
 	break;
     }
@@ -449,6 +449,7 @@ static int test_write(int testcase)
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     char *filename;
     char io_buffer[100];
@@ -458,6 +459,7 @@ static int test_write(int testcase)
     filename = strcpy(filename, "name");
 
     memset(&req_io, 0, sizeof(PVFS_Request));
+    memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
     credentials.uid = 100;
@@ -482,16 +484,14 @@ static int test_write(int testcase)
     {
     case 0:
 	resp_lk.pinode_refn.handle = -1;
-	/* TODO: use memory datatype when ready */
 	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL,
+	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, req_mem,
 			   credentials, &resp_io);
 	break;
     case 1:
 	resp_lk.pinode_refn.fs_id = -1;
-	/* TODO: use memory datatype when ready */
 	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL,
+	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, req_mem,
 			   credentials, &resp_io);
 	break;
     }

@@ -10,6 +10,7 @@ int test_pvfs_datatype_hvector(MPI_Comm *mycomm, int myid, char *buf, void *para
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     char filename[PVFS_NAME_MAX];
     char io_buffer[TEST_PVFS_DATA_SIZE];
@@ -17,6 +18,7 @@ int test_pvfs_datatype_hvector(MPI_Comm *mycomm, int myid, char *buf, void *para
     debug_printf("test_pvfs_datatype_hvector called\n");
 
     memset(&req_io,0,sizeof(PVFS_Request));
+    memset(&req_mem,0,sizeof(PVFS_Request));
     memset(&resp_io,0,sizeof(PVFS_sysresp_io));
 
     if (!pvfs_helper.initialized)
@@ -56,10 +58,16 @@ int test_pvfs_datatype_hvector(MPI_Comm *mycomm, int myid, char *buf, void *para
             debug_printf("Error: PVFS_Request_hvector() failure.\n");
             break;
         }
+	ret = PVFS_Request_contiguous(TEST_PVFS_DATA_SIZE*sizeof(char), 
+	    PVFS_BYTE, &req_mem);
+	if(ret < 0)
+	{
+	    debug_printf("Error: PVFS_Request_contiguous() failure.\n");
+	    break;
+	}
 
-	/* TODO: use memory datatype when ready */
         ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer,
-                             NULL, credentials, &resp_io);
+                             req_mem, credentials, &resp_io);
         if(ret < 0)
         {
             debug_printf("Error: PVFS_sys_write() failure.\n");
@@ -71,9 +79,8 @@ int test_pvfs_datatype_hvector(MPI_Comm *mycomm, int myid, char *buf, void *para
 
         /* now try to read the data back */
         memset(io_buffer,0,TEST_PVFS_DATA_SIZE);
-	/* TODO: use memory datatype when ready */
         ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer,
-                            NULL, credentials, &resp_io);
+                            req_mem, credentials, &resp_io);
         if(ret < 0)
         {
             debug_printf("Error: PVFS_sys_write() failure (2).\n");

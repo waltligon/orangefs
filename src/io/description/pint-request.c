@@ -141,6 +141,28 @@ int PINT_Process_request(PINT_Request_state *req,
 		PINT_CLR_SEEKING(mode);
 	}
 #endif
+	/* automatically set final_offset of req based on mem size */
+	if (PINT_IS_CLIENT(mode) && mem)
+	{
+		req->final_offset = req->target_offset + mem->cur[0].rq->aggregate_size;
+		gossip_debug(REQUEST_DEBUG,"\tsetting final offset %lld\n",
+				req->final_offset);
+	}
+	/* automatically tile the req */
+	if (!PINT_IS_MEMREQ(mode))
+	{
+		int count;
+		if (req->cur[0].rq)
+		{
+			count = req->final_offset / req->cur[0].rq->aggregate_size;
+		}
+		else
+		{
+			count = req->final_offset;
+		}
+		req->cur[0].maxel = count + 1;
+		gossip_debug(REQUEST_DEBUG,"\ttiling %d copies\n", count+1);
+	}
 	/* deal with skipping over some bytes (type offset) */
 	if (req->target_offset > req->type_offset)
 	{
@@ -232,9 +254,9 @@ int PINT_Process_request(PINT_Request_state *req,
 			continue;
 		}
 		/* set this up for client processing */
-		if (PINT_IS_CLIENT(mode))
+		if (PINT_IS_CLIENT(mode) && mem)
 		{
-			result->offset_array[result->segs] = req->type_offset;
+			result->offset_array[result->segs] = mem->type_offset;
 		}
 		/*** BEFORE CALLING DISTRIBUTE ***/
 #if 0
@@ -688,13 +710,13 @@ int PINT_Request_commit(PINT_Request *region, PINT_Request *node,
 	/* Leaf Node? */
 	if(node == NULL)
 		return -1;
-
+  
 	/* this node was previously committed */
 	if (node->committed)
 	{
 		return node->committed; /* should contain the index */
 	}
-  
+
 	/* Copy node to contiguous region */
 	memcpy(&region[*index], node, sizeof(struct PINT_Request));
 	*index = *index + 1;

@@ -55,6 +55,7 @@ int main(int argc, char **argv)
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
     PVFS_Request file_req;
+    PVFS_Request mem_req;
     int buffer_size;
 
     /* look at command line arguments */
@@ -175,6 +176,7 @@ int main(int argc, char **argv)
     buffer_size = user_opts->buf_size;
     blocklength = user_opts->buf_size;
     displacement = 0;
+    /* TODO: use simpler file datatype when tiling is ready */
     ret = PVFS_Request_indexed(1, &blocklength, &displacement,
 	PVFS_BYTE, &file_req);
     if(ret < 0)
@@ -184,10 +186,17 @@ int main(int argc, char **argv)
 	goto main_out;
     }
 
+    ret = PVFS_Request_contiguous(buffer_size, PVFS_BYTE, &mem_req);
+    if(ret < 0)
+    {
+	fprintf(stderr, "Error: PVFS_Request_indexed failure.\n");
+	ret = -1;
+	goto main_out;
+    }
+
     time1 = Wtime();
-    /* TODO: use memory datatype when ready */
     while((ret = PVFS_sys_read(pinode_refn, file_req, 0,
-                buffer, NULL, credentials, &resp_io)) == 0 &&
+                buffer, mem_req, credentials, &resp_io)) == 0 &&
 	resp_io.total_completed > 0)
     {
 	current_size = resp_io.total_completed;

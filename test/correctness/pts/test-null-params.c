@@ -445,19 +445,16 @@ static int test_read(int nullCase)
     switch (nullCase)
     {
     case 0:
-	/* TODO: use memory datatype when ready */
 	ret =
 	    PVFS_sys_read(resp_lk.pinode_refn, NULL, 0, io_buffer, NULL,
 			  credentials, &resp_io);
 	break;
     case 1:
-	/* TODO: use memory datatype when ready */
 	ret =
 	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, NULL, NULL, credentials,
 			  &resp_io);
 	break;
     case 2:
-	/* TODO: use memory datatype when ready */
 	ret =
 	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL,
 			  credentials, NULL);
@@ -508,19 +505,16 @@ static int test_write(int nullCase)
     switch (nullCase)
     {
     case 0:
-	/* TODO: use memory datatypes when ready */
 	ret =
 	    PVFS_sys_write(resp_lk.pinode_refn, NULL, 0, io_buffer, NULL,
 			   credentials, &resp_io);
 	break;
     case 1:
-	/* TODO: use memory datatypes when ready */
 	ret =
 	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, NULL, NULL, credentials,
 			   &resp_io);
 	break;
     case 2:
-	/* TODO: use memory datatypes when ready */
 	ret =
 	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL,
 			   credentials, NULL);

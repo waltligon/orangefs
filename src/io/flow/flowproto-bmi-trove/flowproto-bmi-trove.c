@@ -1055,6 +1055,19 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 	}
     }
 
+    if(flow_d->aggregate_size)
+    {
+	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
+	    flow_d->aggregate_size+flow_d->file_req_offset);
+    }
+    else
+    {
+	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
+	    flow_d->file_req_offset +
+	    PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
+    }
+
+
     /* if a file datatype offset was specified, go ahead and skip ahead 
      * before doing anything else
      */
@@ -1062,30 +1075,6 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
     {
 	PINT_REQUEST_STATE_SET_TARGET(flow_data->dup_file_req_state, 
 	    flow_d->file_req_offset);
-
-	/* TODO: integrate this when we are ready to actually use the 
-	 * memory datatypes
-	 */
-#if 0
-	/* if no memory datatype was given, then we must use the aggregate
-	 * size field to set a boundary on the file datatype 
-	 */
-	if(!flow_d->mem_req)
-	{
-	    assert(flow_d->aggregate_size > -1); /* sanity check */
-	    PINT_REQUEST_STATE_SET_FINAL(flow_data->dup_file_req_state,
-		(flow_d->file_req_offset + flow_d->aggregate_size));
-	}
-	else
-	{
-	    /* we still set a boundary on the file datatype for convenience,
-	     * so that we can check its state to know when to stop
-	     */
-	    PINT_REQUEST_STATE_SET_FINAL(flow_data->dup_file_req_state,
-		(PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req) + 
-		flow_d->file_req_offset));
-	}
-#endif
     }
 
     return (0);
@@ -1245,10 +1234,18 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 	PINT_REQUEST_STATE_SET_TARGET(flow_d->file_req_state,
 	    flow_d->file_req_offset);
 
-    /* TODO: enable this code when we are ready to actually use the memory
-     * datatypes 
-     */
-#if 0
+    if(flow_d->aggregate_size)
+    {
+	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
+	    flow_d->aggregate_size+flow_d->file_req_offset);
+    }
+    else
+    {
+	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
+	    flow_d->file_req_offset +
+	    PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
+    }
+
     /* if no memory datatype was given, then we must use the aggregate
      * size field to set a boundary on the file datatype 
      */
@@ -1267,7 +1264,6 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 	    (PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req) + 
 	    flow_d->file_req_offset));
     }
-#endif
     
     /* the rest of the buffer setup varies depending on the endpoints */
     if (flow_d->src.endpoint_id == BMI_ENDPOINT &&

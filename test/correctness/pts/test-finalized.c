@@ -344,6 +344,7 @@ static int test_read(void)
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     char *filename;
     char io_buffer[100];
@@ -353,6 +354,7 @@ static int test_read(void)
     filename = strcpy(filename, "name");
 
     memset(&req_io, 0, sizeof(PVFS_Request));
+    memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
     credentials.uid = 100;
@@ -374,9 +376,8 @@ static int test_read(void)
 		     "on %s\n", filename);
     }
 
-    /* TODO: use memory datatype when ready */
     ret =
-	PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL, credentials,
+	PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, req_mem, credentials,
 		      &resp_io);
     return ret;
 }
@@ -391,6 +392,7 @@ static int test_write(void)
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
+    PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
     char *filename;
     char io_buffer[100];
@@ -400,6 +402,7 @@ static int test_write(void)
     filename = strcpy(filename, "name");
 
     memset(&req_io, 0, sizeof(PVFS_Request));
+    memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
     credentials.uid = 100;
@@ -421,9 +424,8 @@ static int test_write(void)
 		     "on %s\n", filename);
     }
 
-    /* TODO: use memory datatype when ready */
     ret =
-	PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL, credentials,
+	PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, req_mem, credentials,
 		       &resp_io);
     return ret;
 }
