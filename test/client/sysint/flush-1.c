@@ -62,15 +62,15 @@ int main(int argc, char **argv)
 
     entry_name = str_buf;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = 100;
-    attr.group = 100;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = 
 	time(NULL);
-    credentials.uid = 100;
-    credentials.gid = 100;
+
+    PVFS_util_gen_credentials(&credentials);
     ret = PVFS_util_lookup_parent(filename, cur_fs, credentials, 
-	&parent_refn.handle);
+                                  &parent_refn.handle);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_lookup_parent", ret);

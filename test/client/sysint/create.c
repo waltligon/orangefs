@@ -57,18 +57,18 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
+    PVFS_util_gen_credentials(&credentials);
 
     entry_name = str_buf;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = getuid();
-    attr.group = getgid();
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = 
 	time(NULL);
-    credentials.uid = getuid();
-    credentials.gid = getgid();
+
     ret = PVFS_util_lookup_parent(filename, cur_fs, credentials, 
-	&parent_refn.handle);
+                                  &parent_refn.handle);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_lookup_parent", ret);

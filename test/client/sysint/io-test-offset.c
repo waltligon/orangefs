@@ -101,9 +101,8 @@ int main(
 	 */
 
     name = filename;
-    credentials.uid = 100;
-    credentials.gid = 100;
 
+    PVFS_util_gen_credentials(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, credentials,
 			  &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     /* TODO: really we probably want to look for a specific error code,
@@ -115,8 +114,6 @@ int main(
 
 	/* get root handle */
 	name = "/";
-	credentials.uid = 100;
-	credentials.gid = 100;
 
 	ret = PVFS_sys_lookup(fs_id, name, credentials,
 			      &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -129,16 +126,14 @@ int main(
 
 	/* create new file */
 
-	attr.owner = 100;
-	attr.group = 100;
+	attr.owner = credentials.uid;
+	attr.group = credentials.gid;
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 	parent_refn.handle = resp_lk.pinode_refn.handle;
 	parent_refn.fs_id = fs_id;
 	entry_name = &(filename[1]);	/* leave off slash */
-	credentials.uid = 100;
-	credentials.gid = 100;
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
 			      credentials, &resp_cr);
@@ -166,8 +161,6 @@ int main(
     printf("IO-TEST: performing write on handle: %ld, fs: %d\n",
 	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
 
-    credentials.uid = 100;
-    credentials.gid = 100;
     buffer = io_buffer;
     buffer_size = io_size * sizeof(int);
 

@@ -71,12 +71,11 @@ int main(int argc,char **argv)
     }
     printf("New filename is %s\n",new_buf);
 
-    credentials.uid = getuid();
-    credentials.gid = getgid();
+    PVFS_util_gen_credentials(&credentials);
 
     old_entry = old_buf;
     ret = PVFS_util_lookup_parent(old_filename, cur_fs, credentials,
-	&old_parent_refn.handle);
+                                  &old_parent_refn.handle);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_lookup_parent", ret);

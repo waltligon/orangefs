@@ -43,8 +43,7 @@ int main(int argc,char **argv)
     filename = argv[1];
     printf("lookup up path %s\n", filename);
 
-    credentials.uid = getuid();
-    credentials.gid = getgid();
+    PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_util_init_defaults();
     if (ret < 0)

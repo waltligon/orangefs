@@ -51,10 +51,9 @@ int main(int argc,char **argv)
 	return (-1);
     }
 
-    credentials.uid = getuid();
-    credentials.gid = getgid();
 
     name = starting_point;
+    PVFS_util_gen_credentials(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)

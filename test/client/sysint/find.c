@@ -39,12 +39,12 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
     PVFS_sysresp_getattr getattr_response;
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
-    memset(&credentials,0,sizeof(PVFS_credentials));
 
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
+    PVFS_util_gen_credentials(&credentials);
     if (PVFS_sys_getattr(pinode_refn, attrmask,
                          credentials, &getattr_response))
     {
@@ -90,9 +90,8 @@ int directory_walk(PVFS_fs_id cur_fs,
         strcpy(full_path,start_dir);
     }
     name = full_path;
-    credentials.uid = getuid();
-    credentials.gid = getgid();
 
+    PVFS_util_gen_credentials(&credentials);
     if (PVFS_sys_lookup(cur_fs, name, credentials,
                         &lk_response, PVFS2_LOOKUP_LINK_FOLLOW))
     {
@@ -107,8 +106,6 @@ int directory_walk(PVFS_fs_id cur_fs,
     pinode_refn.fs_id = cur_fs;
     token = 0;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
-    credentials.uid = getuid();
-    credentials.gid = getgid();
 
     do
     {

@@ -99,14 +99,13 @@ int main(
 	return (-1);
     }
     memcpy(entry_name, filename, strlen(filename) + 1);
+    PVFS_util_gen_credentials(&credentials);
+
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = 100;
-    attr.group = 100;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
-
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     parent_refn.handle = resp_look.pinode_refn.handle;
     parent_refn.fs_id = fs_id;
@@ -477,9 +476,6 @@ int main(
     pinode_refn.fs_id = fs_id;
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 6;
-    credentials.uid = 100;
-    credentials.gid = 100;
-
 
     // call readdir 
     ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,

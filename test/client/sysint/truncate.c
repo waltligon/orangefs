@@ -69,9 +69,8 @@ int main(int argc,char **argv)
     memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
     name = filename;
-    credentials.uid = 100;
-    credentials.gid = 100;
 
+    PVFS_util_gen_credentials(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
@@ -84,8 +83,6 @@ int main(int argc,char **argv)
 
     pinode_refn.handle = resp_lk.pinode_refn.handle;
     pinode_refn.fs_id = resp_lk.pinode_refn.fs_id;
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     ret = PVFS_sys_truncate(pinode_refn, size, credentials);
     if (ret < 0)

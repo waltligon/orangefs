@@ -65,27 +65,26 @@ int main(int argc,char **argv)
            str_buf, str_buf2, str_buf3);
 
     memset(&resp_mkdir, 0, sizeof(PVFS_sysresp_mkdir));
+    PVFS_util_gen_credentials(&credentials);
 
     entry_name = str_buf;
     ret = PVFS_util_lookup_parent(dirname, cur_fs, credentials, 
-	&parent_refn.handle);
+                                  &parent_refn.handle);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_lookup_parent", ret);
 	return(-1);
     }
+
     parent_refn.fs_id = cur_fs;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = getuid();
-    attr.group = getgid();
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 0777;
-    attr.atime = attr.ctime = attr.mtime =
-	time(NULL);
-    credentials.uid = getuid();
-    credentials.gid = getgid();
+    attr.atime = attr.ctime = attr.mtime = time(NULL);
 
     ret = PVFS_sys_mkdir(entry_name, parent_refn, attr, 
-			credentials, &resp_mkdir);
+                         credentials, &resp_mkdir);
     if (ret < 0)
     {
         printf("mkdir failed\n");
@@ -97,7 +96,7 @@ int main(int argc,char **argv)
     printf("FSID:%d\n",parent_refn.fs_id);
 
     ret = PVFS_sys_mkdir(str_buf2, resp_mkdir.pinode_refn, attr, 
-			credentials, &resp_mkdir);
+                         credentials, &resp_mkdir);
     if (ret < 0)
     {
         printf("mkdir failed\n");

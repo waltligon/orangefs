@@ -55,16 +55,16 @@ int main(int argc,char **argv)
     printf("File to be removed is %s\n",str_buf);
 
     entry_name = str_buf;
+
+    PVFS_util_gen_credentials(&credentials);
     ret = PVFS_util_lookup_parent(filename, cur_fs, credentials,
-	&parent_refn.handle);
+                                  &parent_refn.handle);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_lookup_parent", ret);
 	return(-1);
     }
     parent_refn.fs_id = cur_fs;
-    credentials.uid = getuid();
-    credentials.gid = getgid();
 
     ret = PVFS_sys_remove(entry_name, parent_refn, credentials);
     if (ret < 0)

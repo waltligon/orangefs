@@ -41,9 +41,7 @@ int main(int argc,char **argv)
 	return (-1);
     }
 
-    credentials.uid = getuid();
-    credentials.gid = getgid();
-
+    PVFS_util_gen_credentials(&credentials);
     ret = PVFS_sys_getparent(fs_id, argv[1], credentials, &resp_getparent);
     if (ret == 0)
     {
