@@ -168,6 +168,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     PINT_Free_request_state(req_state);
     req_state = NULL;
 
+    assert(target_handle_count > 0);
+
     /* create storage for book keeping information */
     addr_array = (bmi_addr_t*)malloc(target_handle_count *
 	sizeof(bmi_addr_t));
