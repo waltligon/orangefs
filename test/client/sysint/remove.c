@@ -5,105 +5,78 @@
  */
 
 #include <client.h>
-#include <sys/time.h>
-
-/*why were these commented out?*/
-
-#define ATTR_UID 1
-#define ATTR_GID 2
-#define ATTR_PERM 4
-#define ATTR_ATIME 8
-#define ATTR_CTIME 16
-#define ATTR_MTIME 32
-#define ATTR_TYPE 2048
-
-extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
+#include "helper.h"
 
 int main(int argc,char **argv)
 {
-	PVFS_sysresp_init resp_init;
-	PVFS_sysreq_lookup req_look;
-	PVFS_sysresp_lookup resp_look;
-	PVFS_sysreq_remove *req_remove;
-	int ret = -1;
-	pvfs_mntlist mnt = {0,NULL};
+    int ret = -1;
+    char str_buf[256] = {0};
+    char *filename = (char *)0;
+    PVFS_fs_id cur_fs;
+    pvfs_mntlist mnt = {0,NULL};
+    PVFS_sysresp_init resp_init;
+    PVFS_sysreq_remove req_remove;
 
+    if (argc != 2)
+    {
+        printf("usage: %s file_to_remove\n", argv[0]);
+        return 1;
+    }
+    filename = argv[1];
 
-	if (argc != 2)
-	{
-		printf("usage: %s file_to_remove\n", argv[0]);
-		return 1;
-	}
-	printf("creating a file named %s\n", argv[1]);
+    if (parse_pvfstab(NULL,&mnt))
+    {
+        printf("Failed to parse pvfstab\n");
+        return ret;
+    }
 
-	/* Parse PVFStab */
-	ret = parse_pvfstab(NULL,&mnt);
-	if (ret < 0)
-	{
-		printf("Parsing error\n");
-		return(-1);
-	}
-	/*Init the system interface*/
-	ret = PVFS_sys_initialize(mnt, &resp_init);
-	if(ret < 0)
-	{
-		printf("PVFS_sys_initialize() failure. = %d\n", ret);
-		return(ret);
-	}
-	printf("SYSTEM INTERFACE INITIALIZED\n");
+    memset(&resp_init, 0, sizeof(resp_init));
+    if (PVFS_sys_initialize(mnt, &resp_init))
+    {
+        printf("Failed to initialize system interface\n");
+        return ret;
+    }
 
-	/* lookup the root handle */
-	req_look.credentials.perms = 1877;
-	req_look.name = malloc(2);/*null terminator included*/
-	req_look.name[0] = '/';
-	req_look.name[1] = '\0';
-	req_look.fs_id = resp_init.fsid_list[0];
-	printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
-	ret = PVFS_sys_lookup(&req_look,&resp_look);
-	if (ret < 0)
-	{
-		printf("Lookup failed with errcode = %d\n", ret);
-		return(-1);
-	}
-	// print the handle 
-	printf("--lookup--\n"); 
-	printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
-	
+    if (PINT_remove_base_dir(filename,str_buf,256))
+    {
+        if (filename[0] != '/')
+        {
+            printf("You forgot the leading '/'\n");
+        }
+        printf("Cannot retrieve entry name for creation on %s\n",
+               filename);
+        return(-1);
+    }
+    printf("File to be removed is %s\n",str_buf);
 
-	// test the rmdir function 
-	printf("--remove--\n"); 
-	req_remove = (PVFS_sysreq_remove *)malloc(sizeof(PVFS_sysreq_remove));
-	if (req_remove == NULL)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
+    memset(&req_remove,0,sizeof(PVFS_sysreq_remove));
 
-	req_remove->entry_name = argv[1];
-	req_remove->parent_refn.handle = resp_look.pinode_refn.handle;
-	req_remove->parent_refn.fs_id = resp_look.pinode_refn.fs_id;
-	req_remove->credentials.uid = 100;
-	req_remove->credentials.gid = 100;
-	req_remove->credentials.perms = 1877;
+    cur_fs = resp_init.fsid_list[0];
 
-	// call rmdir 
-	ret = PVFS_sys_remove(req_remove);
-	if (ret < 0)
-	{
-		printf("remove failed with errcode = %d\n",ret);
-		return(-1);
-	}
+    req_remove.entry_name = str_buf;
+    req_remove.parent_refn.handle =
+        lookup_parent_handle(filename,cur_fs);
+    req_remove.parent_refn.fs_id = cur_fs;
+    req_remove.credentials.uid = 100;
+    req_remove.credentials.gid = 100;
+    req_remove.credentials.perms = 1877;
 
-	printf("===================================");
-	printf("file named %s has been removed.", argv[1]);
+    ret = PVFS_sys_remove(&req_remove);
+    if (ret < 0)
+    {
+        printf("remove failed with errcode = %d\n",ret);
+        return(-1);
+    }
 
-	//close it down
-	ret = PVFS_sys_finalize();
-	if (ret < 0)
-	{
-		printf("finalizing sysint failed with errcode = %d\n", ret);
-		return (-1);
-	}
+    printf("===================================");
+    printf("file named %s has been removed.", filename);
 
-	return(0);
+    //close it down
+    ret = PVFS_sys_finalize();
+    if (ret < 0)
+    {
+        printf("finalizing sysint failed with errcode = %d\n", ret);
+        return (-1);
+    }
+    return(0);
 }
