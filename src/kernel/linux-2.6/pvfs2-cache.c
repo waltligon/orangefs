@@ -41,6 +41,9 @@ static void op_cache_ctor(
 	spin_lock_init(&op->lock);
 	init_waitqueue_head(&op->waitq);
 
+        op->io_completed = 0;
+        init_waitqueue_head(&op->io_completion_waitq);
+
 	op->upcall.type = PVFS2_VFS_OP_INVALID;
 	op->downcall.type = PVFS2_VFS_OP_INVALID;
         op->downcall.status = -1;

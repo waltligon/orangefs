@@ -20,6 +20,7 @@ extern kmem_cache_t *dev_req_cache;
 
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
+extern wait_queue_head_t pvfs2_request_list_waitq;
 extern struct qhash_table *htable_ops_in_progress;
 
 static int open_access_count = 0;
@@ -71,6 +72,7 @@ static int pvfs2_devreq_open(
     return ret;
 }
 
+#if 0
 static ssize_t pvfs2_devreq_read(
     struct file *file,
     char *buf,
@@ -142,6 +144,103 @@ static ssize_t pvfs2_devreq_read(
 	{
 	    goto check_if_req_pending;
 	}
+    }
+    return len;
+}
+#endif
+
+static ssize_t pvfs2_devreq_read(
+    struct file *file,
+    char *buf,
+    size_t count,
+    loff_t * offset)
+{
+    int len = 0;
+    pvfs2_kernel_op_t *cur_op = NULL;
+    static int32_t magic = PVFS2_DEVREQ_MAGIC;
+
+    if (!(file->f_flags & O_NONBLOCK))
+    {
+        /* block until we have a request */
+        DECLARE_WAITQUEUE(wait_entry, current);
+
+        add_wait_queue_exclusive(&pvfs2_request_list_waitq, &wait_entry);
+
+        while(1)
+        {
+            set_current_state(TASK_INTERRUPTIBLE);
+
+            spin_lock(&pvfs2_request_list_lock);
+            if (!list_empty(&pvfs2_request_list))
+            {
+                cur_op = list_entry(
+                    pvfs2_request_list.next, pvfs2_kernel_op_t, list);
+                list_del(&cur_op->list);
+                spin_unlock(&pvfs2_request_list_lock);
+                break;
+            }
+            spin_unlock(&pvfs2_request_list_lock);
+
+            if (!signal_pending(current))
+            {
+                schedule();
+                continue;
+            }
+
+            pvfs2_print("*** device read interrupted by signal\n");
+            break;
+        }
+
+        set_current_state(TASK_RUNNING);
+        remove_wait_queue(&pvfs2_request_list_waitq, &wait_entry);
+    }
+    else
+    {
+        /* get next op (if any) from top of list */
+        spin_lock(&pvfs2_request_list_lock);
+        if (!list_empty(&pvfs2_request_list))
+        {
+            cur_op = list_entry(
+                pvfs2_request_list.next, pvfs2_kernel_op_t, list);
+            list_del(&cur_op->list);
+        }
+        spin_unlock(&pvfs2_request_list_lock);
+    }
+
+    if (cur_op)
+    {
+        spin_lock(&cur_op->lock);
+
+        /* FIXME: this is a sanity check and should be removed */
+        if ((cur_op->op_state == PVFS2_VFS_STATE_INPROGR) ||
+            (cur_op->op_state == PVFS2_VFS_STATE_SERVICED))
+        {
+            spin_unlock(&cur_op->lock);
+            panic("FIXME: Current op already queued...skipping\n");
+            return -1;
+        }
+        cur_op->op_state = PVFS2_VFS_STATE_INPROGR;
+
+        /* atomically move the operation to the htable_ops_in_progress */
+        qhash_add(htable_ops_in_progress,
+                  (void *) &(cur_op->tag), &cur_op->list);
+        
+        spin_unlock(&cur_op->lock);
+
+        len = MAX_DEV_REQ_UPSIZE;
+        if ((size_t) len <= count)
+        {
+            copy_to_user(buf, &magic, sizeof(int32_t));
+            copy_to_user(buf + sizeof(int32_t),
+                         &cur_op->tag, sizeof(int64_t));
+            copy_to_user(buf + sizeof(int32_t) + sizeof(int64_t),
+                         &cur_op->upcall, sizeof(pvfs2_upcall_t));
+        }
+        else
+        {
+            pvfs2_error("Read buffer is too small to copy pvfs2 op\n");
+            len = -1;
+        }
     }
     return len;
 }
@@ -219,6 +318,54 @@ static ssize_t pvfs2_devreq_writev(
 	    spin_unlock(&op->lock);
 
 	    wake_up_interruptible(&op->waitq);
+
+            /*
+              if this operation is an I/O operation, we need to
+              wait for all data to be copied before we can return
+              to avoid buffer corruption and races that can pull
+              the buffers out from under us
+            */
+            if ((op->upcall.type == PVFS2_VFS_OP_FILE_IO) &&
+                (op->upcall.req.io.io_type == PVFS_IO_READ))
+            {
+                DECLARE_WAITQUEUE(wait_entry, current);
+
+                add_wait_queue(&op->io_completion_waitq, &wait_entry);
+
+                while(1)
+                {
+                    set_current_state(TASK_INTERRUPTIBLE);
+
+                    spin_lock(&op->lock);
+                    if (op->io_completed)
+                    {
+                        spin_unlock(&op->lock);
+                        break;
+                    }
+                    spin_unlock(&op->lock);
+
+                    if (!signal_pending(current))
+                    {
+                        int timeout = MSECS_TO_JIFFIES(
+                            1000 * MAX_SERVICE_WAIT_IN_SECONDS);
+                        if (!schedule_timeout(timeout))
+                        {
+                            pvfs2_print("*** I/O wait time is up\n");
+                            break;
+                        }
+                        continue;
+                    }
+
+                    pvfs2_print("*** signal on I/O wait -- aborting\n");
+                    break;
+                }
+
+                set_current_state(TASK_RUNNING);
+                remove_wait_queue(&op->io_completion_waitq, &wait_entry);
+
+                /* special case: we release op in this case */
+                op_release(op);
+            }
 	}
     }
     else

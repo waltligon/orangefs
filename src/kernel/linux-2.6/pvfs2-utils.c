@@ -18,6 +18,7 @@
 extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
+extern wait_queue_head_t pvfs2_request_list_waitq;
 
 extern struct inode_operations pvfs2_file_inode_operations;
 extern struct file_operations pvfs2_file_operations;

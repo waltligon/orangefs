@@ -15,12 +15,6 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern struct qhash_table *htable_ops_in_progress;
 
-#ifdef PVFS2_KERNEL_DEBUG
-#define MAX_SERVICE_WAIT_IN_SECONDS       10
-#else
-#define MAX_SERVICE_WAIT_IN_SECONDS       30
-#endif
-
 static inline void clean_up_interrupted_operation(
     pvfs2_kernel_op_t * op)
 {

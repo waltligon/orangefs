@@ -78,6 +78,9 @@ LIST_HEAD(pvfs2_request_list);
 /* used to protect the above pvfs2_request_list */
 spinlock_t pvfs2_request_list_lock = SPIN_LOCK_UNLOCKED;
 
+/* used for incoming request notification */
+wait_queue_head_t pvfs2_request_list_waitq;
+
 struct file_system_type pvfs2_fs_type = {
     .name = "pvfs2",
     .get_sb = pvfs2_get_sb,
@@ -104,6 +107,7 @@ static int __init pvfs2_init(void)
                 pvfs2_dev_major);
 
     /* initialize global book keeping data structures */
+    init_waitqueue_head(&pvfs2_request_list_waitq);
     op_cache_initialize();
     dev_req_cache_initialize();
     pvfs2_inode_cache_initialize();

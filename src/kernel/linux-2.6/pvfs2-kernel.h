@@ -23,6 +23,12 @@ MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
 #endif
 #define pvfs2_error printk
 
+#ifdef PVFS2_KERNEL_DEBUG
+#define MAX_SERVICE_WAIT_IN_SECONDS       10
+#else
+#define MAX_SERVICE_WAIT_IN_SECONDS       30
+#endif
+
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
 
 #define PVFS2_MAGIC                    0x20030528
@@ -75,6 +81,9 @@ typedef struct
     wait_queue_head_t waitq;
     spinlock_t lock;
 
+    int io_completed;
+    wait_queue_head_t io_completion_waitq;
+
     struct list_head list;
 } pvfs2_kernel_op_t;
 
@@ -123,6 +132,8 @@ do {                                                          \
     spin_lock(&op->lock);                                     \
     op->op_state = PVFS2_VFS_STATE_WAITING;                   \
     spin_unlock(&op->lock);                                   \
+                                                              \
+    wake_up_interruptible(&pvfs2_request_list_waitq);         \
 } while(0)
 
 #define remove_op_from_request_list(op)                       \
@@ -134,7 +145,6 @@ do {                                                          \
     list_for_each(tmp, &pvfs2_request_list) {                 \
         tmp_op = list_entry(tmp, pvfs2_kernel_op_t, list);    \
         if (tmp_op && (tmp_op == op)) {                       \
-            printk("Removing op with tag %lu\n",tmp_op->tag); \
             list_del(&tmp_op->list);                          \
             break;                                            \
         }                                                     \

@@ -20,9 +20,19 @@ void kill_device_owner(void);
 extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
+extern wait_queue_head_t pvfs2_request_list_waitq;
 
 extern struct address_space_operations pvfs2_address_operations;
 extern struct backing_dev_info pvfs2_backing_dev_info;
+
+
+#define wake_up_device_for_return(op)           \
+do {                                            \
+spin_lock(&op->lock);                           \
+op->io_completed = 1;                           \
+spin_unlock(&op->lock);                         \
+wake_up_interruptible(&op->io_completion_waitq);\
+} while(0)
 
 
 int pvfs2_file_open(
@@ -50,7 +60,7 @@ ssize_t pvfs2_inode_read(
     int copy_to_user)
 {
     int ret = -1;
-    size_t each_count = 0;
+    size_t each_count = 0, amt_complete = 0;
     size_t total_count = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
@@ -59,39 +69,37 @@ ssize_t pvfs2_inode_read(
     int retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
-    if (!new_op)
-    {
-	pvfs2_error("pvfs2: ERROR -- pvfs2_inode_read "
-		    "kmem_cache_alloc failed!\n");
-	return -ENOMEM;
-    }
-
-    new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
-    new_op->upcall.req.io.io_type = PVFS_IO_READ;
-    new_op->upcall.req.io.refn = pvfs2_inode->refn;
-
     while(total_count < count)
     {
+        new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+        if (!new_op)
+        {
+            pvfs2_error("pvfs2: ERROR -- pvfs2_inode_read "
+                        "kmem_cache_alloc failed!\n");
+            return -ENOMEM;
+        }
+
+        new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
+        new_op->upcall.req.io.io_type = PVFS_IO_READ;
+        new_op->upcall.req.io.refn = pvfs2_inode->refn;
+
 	/* get a buffer for the transfer */
 	/* note that we get a new buffer each time for fairness, though
 	 * it may speed things up in the common case more if we kept one
 	 * buffer the whole time; need to measure performance difference
 	 */
 	ret = pvfs_bufmap_get(&buffer_index);
-	if(ret < 0)
+	if (ret < 0)
 	{
-	    *offset = original_offset;
-	    op_release(new_op);
+/* 	    *offset = original_offset; */
+/* 	    op_release(new_op); */
 	    pvfs2_error("pvfs2: error: pvfs_bufmap_get() failure.\n");
-	    return(ret);
+            goto error_exit;
 	}
     
 	/* how much to transfer in this loop iteration */
-	if((count - total_count) > pvfs_bufmap_size_query())
-	    each_count = pvfs_bufmap_size_query();
-	else
-	    each_count = count - total_count;
+	each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
+                      pvfs_bufmap_size_query() : (count - total_count));
 
 	new_op->upcall.req.io.buf_index = buffer_index;
 	new_op->upcall.req.io.count = each_count;
@@ -100,20 +108,21 @@ ssize_t pvfs2_inode_read(
         service_operation_with_timeout_retry(
             new_op, "pvfs2_inode_read", retries);
 
-	if(new_op->downcall.status != 0)
+	if (new_op->downcall.status != 0)
 	{
+	    pvfs2_error("pvfs2_inode_read: error: io downcall status.\n");
+
           error_exit:
+	    ret = new_op->downcall.status;
+            wake_up_device_for_return(new_op);
             kill_device_owner();
 	    pvfs_bufmap_put(buffer_index);
-	    ret = new_op->downcall.status;
-	    op_release(new_op);
 	    *offset = original_offset;
-	    pvfs2_error("pvfs2: error: read downcall status.\n");
 	    return(ret);
 	}
 
 	/* copy data out to destination */
-	if(new_op->downcall.resp.io.amt_complete)
+	if (new_op->downcall.resp.io.amt_complete)
 	{
             if (copy_to_user)
             {
@@ -129,22 +138,32 @@ ssize_t pvfs2_inode_read(
             }
 	}
 
-	pvfs_bufmap_put(buffer_index);
-
 	current_buf += new_op->downcall.resp.io.amt_complete;
 	*offset += new_op->downcall.resp.io.amt_complete;
 	total_count += new_op->downcall.resp.io.amt_complete;
+        amt_complete = new_op->downcall.resp.io.amt_complete;
+
+        /*
+          tell the device file owner waiting on I/O that
+          this read has completed and it can return now
+        */
+        wake_up_device_for_return(new_op);
+
+	pvfs_bufmap_put(buffer_index);
 
 	/* if we got a short read, fall out and return what we
 	 * got so far
 	 */
-	if(new_op->downcall.resp.io.amt_complete < each_count)
+	if (amt_complete < each_count)
 	{
 	    break;
 	}
     }
 
-    op_release(new_op);
+    /*
+      NOTE: for this special case, op is freed
+      by devreq_writev and *not* here.
+    */
 
     return(total_count); 
 }
@@ -231,7 +250,7 @@ static ssize_t pvfs2_file_write(
 	    ret = new_op->downcall.status;
 	    op_release(new_op);
 	    *offset = original_offset;
-	    pvfs2_error("pvfs2: error: read downcall status.\n");
+	    pvfs2_error("pvfs2_file_write: error: io downcall status.\n");
 	    return(ret);
 	}
 

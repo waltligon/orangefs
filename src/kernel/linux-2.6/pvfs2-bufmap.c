@@ -188,9 +188,8 @@ void pvfs_bufmap_finalize(void)
  */
 int pvfs_bufmap_get(int* buffer_index)
 {
-    int ret = -1;
+    int ret = -1, i = 0;
     DECLARE_WAITQUEUE(my_wait, current);
-    int i;
 
     add_wait_queue_exclusive(&bufmap_waitq, &my_wait);
 
@@ -312,7 +311,7 @@ int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index,
     return(0);
 }
 
-/* pvfs2_bufmap_copy_from_user()
+/* pvfs_bufmap_copy_from_user()
  *
  * copies data from a user space address to a mapped buffer
  *

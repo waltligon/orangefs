@@ -24,6 +24,7 @@ extern kmem_cache_t *pvfs2_inode_cache;
 extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
+extern wait_queue_head_t pvfs2_request_list_waitq;
 
 
 static struct inode *pvfs2_alloc_inode(
