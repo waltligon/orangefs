@@ -47,10 +47,10 @@ while test $# -gt 0; do
     --libs|--static-libs)
 	libflags="-L@libdir@ -lpvfs2" 
 	if [ x"@BUILD_GM@" = x"1" ]; then
-		$libflags="$libflags -L@GM_HOME/lib -lgm"
+		libflags="$libflags -L@GM_HOME@/lib -lgm"
 	fi
 	if [ x"@BUILD_IB@" = x"1" ]; then
-		$libflags="$libflags -L@IB_HOME@/lib -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
+		libflags="$libflags -L@IB_HOME@/lib -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
 	fi
 
 	echo $libflags
