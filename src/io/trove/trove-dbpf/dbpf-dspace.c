@@ -732,12 +732,13 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     if (dbpf_attr_cache_ds_attr_fetch_cached_data(
             ref, ds_attr_p) == 0)
     {
-#if 0
-        gossip_debug(GOSSIP_TROVE_DEBUG, "fast path attr cache hit on %Lu"
-                     "(dfile_count=%d | dist_size=%d)\n", Lu(handle),
-                     ds_attr_p->dfile_count, ds_attr_p->dist_size);
-#endif
-        UPDATE_PERF_METADATA_READ();
+        gossip_debug(
+            GOSSIP_DBPF_ATTRCACHE_DEBUG, "fast path attr cache hit "
+            "on %Lu\n (dfile_count=%d | dist_size=%d | data_size=%Ld)\n",
+            Lu(handle), ds_attr_p->dfile_count, ds_attr_p->dist_size,
+            ds_attr_p->b_size);
+
+       UPDATE_PERF_METADATA_READ();
         return 1;
     }
 
@@ -1013,17 +1014,13 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-#if 0
-    gossip_debug(GOSSIP_TROVE_DEBUG, "reading attributes (1) on key %Lu, "
-                 "uid = %d, mode = %d, type = %d, dfile_count "
-                 "= %d, dist_size = %d\n",
-                 Lu(op_p->handle),
-                 (int) s_attr.uid,
-                 (int) s_attr.mode,
-                 (int) s_attr.type,
-                 (int) s_attr.dfile_count,
-                 (int) s_attr.dist_size);
-#endif
+    gossip_debug(
+        GOSSIP_TROVE_DEBUG, "dspace_getattr retrieved attributes from "
+        "disk for key %Lu\n uid = %d, mode = %d, type = %d\n "
+        "dfile_count = %d, dist_size = %d, b_size = %Ld, k_size = %Ld\n",
+        Lu(op_p->handle), (int)s_attr.uid, (int)s_attr.mode,
+        (int)s_attr.type, (int)s_attr.dfile_count, (int)s_attr.dist_size,
+        Lu(b_size), Lu(k_size));
 
     attr = op_p->u.d_getattr.attr_p;
     trove_ds_stored_to_attr(s_attr, *attr, b_size, k_size);
