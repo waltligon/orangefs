@@ -107,7 +107,7 @@ struct PVFS_credentials_s
 typedef struct PVFS_credentials_s PVFS_credentials;
 
 /* directory entry */
-#define PVFS_NAME_MAX    256	/* Max length of PVFS filename */
+#define PVFS_NAME_MAX    256	/* max length of PVFS filename */
 struct PVFS_dirent_s
 {
     char d_name[PVFS_NAME_MAX + 1];
