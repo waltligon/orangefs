@@ -19,11 +19,18 @@
 #include <pint-bucket.h>
 #include <PINT-reqproto-encode.h>
 
+/* TODO: where does this define really belong? */
 #define REQ_ENC_FORMAT 0
 
 /* TODO: remove anything with the word "HACK" in it later on; we
  * are just kludging some stuff for now to be able to test I/O
  * functionality 
+ * TODO: try to do something to avoid so many mallocs
+ * TODO: figure out if we have to do anything special for short
+ * reads or writes
+ * TODO: figure out what should be passed out in the system
+ * interface response (more info on what completed, info on which
+ * servers failed, etc.)
  */
 
 static int HACK_create(PVFS_handle* handle, PVFS_fs_id fsid);
@@ -114,9 +121,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	goto out;
     }
 
-    /* TODO: figure out which servers we really need to contact.  It may
-     * not really be all of them 
-     */
     target_handle_array = (PVFS_handle*)malloc(HACK_num_datafiles
 	* sizeof(PVFS_handle));
     if(!target_handle_array)
@@ -125,6 +129,11 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	goto out;
     }
 
+    /* find out which handles must be included to service this
+     * particular I/O request; hopefully we don't really have to
+     * contact everyone, just the servers that hold the parts of
+     * the file that we are interested in.
+     */
     req_state = PINT_New_request_state(req->io_req);
     if(!req_state)
     {
@@ -133,7 +142,11 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     }
     for(i=0; i<HACK_num_datafiles; i++)
     {
-	tmp_file_data.fsize = 0;  /* don't worry about file size yet */
+	/* NOTE: we don't have to give an accurate file size here,
+	 * as long as we set the extend flag to tell the I/O req
+	 * processor to continue past eof if needed
+	 */
+	tmp_file_data.fsize = 0;  
 	tmp_file_data.dist = HACK_io_dist;
 	tmp_file_data.iod_num = i;
 	tmp_file_data.iod_count = HACK_num_datafiles;
@@ -147,7 +160,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    goto out;
 	}
 
-	/* does any of the requested data belong to this handle? */
+	/* did we find that any data belongs to this handle? */
 	if(bytemax)
 	{
 	    target_handle_array[target_handle_count] =
@@ -159,7 +172,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     req_state = NULL;
 
     /* allocate storage for bookkeeping information */
-    /* TODO: try to do something to avoid so many mallocs */
     addr_array = (bmi_addr_t*)malloc(target_handle_count *
 	sizeof(bmi_addr_t));
     req_array = (struct PVFS_server_req_s*)
@@ -312,9 +324,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     {
 	if(error_code_array[i] || flow_array[i]->error_code)
 	{
-	    /* TODO: note that in the future, we could return
-	     * information about which servers actually failed in
-	     * this case
+	    /* we suffered at least one failure that is specific
+	     * to a particular server
 	     */
 	    ret = -EIO;
 	}
@@ -325,11 +336,9 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	}
     }
 
-    /* TODO: do we need to do anything special for "short" reads
-     * or writes?
+    /* drop through and pass out return value, successful cases go
+     * through here also
      */
-
-    /* drop through and pass out return value */
 out:
     
     if(addr_array)
@@ -542,6 +551,7 @@ static int HACK_create(PVFS_handle* handle, PVFS_fs_id fsid)
     return(0);
 }
 
+/* TODO: remove these later */
 static int HACK_remove(PVFS_handle handle, PVFS_fs_id fsid)
 {
     int ret = -1;

@@ -148,6 +148,7 @@ int PINT_server_send_req(bmi_addr_t addr,
  *
  * TODO: prepost receives 
  * TODO: use timeouts rather than infinite blocking
+ * TODO: try to avoid mallocing so much 
  *
  * Sends an array of requests and waits for an acknowledgement for each.
  *

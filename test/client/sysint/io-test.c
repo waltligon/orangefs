@@ -44,7 +44,7 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 
-	/* build the full path name (work out of the root dir) */
+	/* build the full path name (work out of the root dir for this test) */
 
 	name_sz = strlen(argv[1]) + 2; /* include null terminator and slash */
 	filename = malloc(name_sz);
