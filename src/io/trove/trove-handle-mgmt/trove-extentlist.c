@@ -333,7 +333,6 @@ void extentlist_count(struct TROVE_handle_extentlist *elist, uint64_t* count)
      * fact that the request scheduler will prevent multiple 
      * concurrent callers 
      */
-    gossip_err("FOO: extentlist_count.\n");
     g_counter = 0;
     avldepthfirst(elist->index, extent_count, 0 , 0);
     *count = g_counter;
