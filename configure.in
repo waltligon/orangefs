@@ -130,13 +130,23 @@ dnl if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
 dnl else AC_MSG_RESULT(yes)
 dnl fi
 
-dnl check for redhat 9, as we have to use different kernel code
-dnl for their 2.4.x kernels
+dnl check for tagged redhat release, as we have to use different
+dnl kernel code for their 2.4.x kernels to work
+dnl
+dnl We check for the following redhat tags, as they all have similarly
+dnl modified 2.4.x kernels
+dnl
+RHTAG1="Red Hat Linux release 9"
+RHTAG2="Red Hat Enterprise Linux WS release 3"
+RHTAG3="Red Hat Linux Advanced Server release 2.1AS"
+
 REDHAT_RELEASE=""
 if test -f /etc/redhat-release; then
-    AC_MSG_CHECKING(for redhat release 9 (must patch))
-    REDHAT_REL=`cat /etc/redhat-release | cut -b 1-23`
-    if test "x$REDHAT_REL" = "xRed Hat Linux release 9"; then
+    AC_MSG_CHECKING(for tagged Redhat releases (must patch))
+    REDHAT_REL=`cat /etc/redhat-release`
+    if test "x`echo $REDHAT_REL | cut -b 1-23`" = "x$RHTAG1" ||
+       test "x`echo $REDHAT_REL | cut -b 1-37`" = "x$RHTAG2" ||
+       test "x`echo $REDHAT_REL | cut -b 1-43`" = "x$RHTAG3" ; then
        REDHAT_RELEASE="-DREDHAT_RELEASE_9"
        AC_MSG_RESULT(yes)
     else
