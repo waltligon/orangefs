@@ -40,7 +40,9 @@ static int pvfs2_readdir(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
+#if 0
   restart_readdir:
+#endif
 
     pos = (PVFS_ds_position)file->f_pos;
     if (pos == 0)
@@ -155,7 +157,13 @@ static int pvfs2_readdir(
             {
                 goto graceful_termination_path;
             }
-
+#if 0
+            /*
+              NOTE: we can't do the retries with the token_adjustment
+              in use because an rm -rf will cause all kinds of
+              problems since the dir is changin as it's being read and
+              we don't want retries in that case.
+            */
             if (pvfs2_inode->directory_version == 0)
             {
                 pvfs2_inode->directory_version =
@@ -185,7 +193,7 @@ static int pvfs2_readdir(
                             "possible livelock (%d tries attempted)\n",
                             PVFS2_NUM_READDIR_RETRIES);
             }
-
+#endif
 	    for (i = 0; i < new_op->downcall.resp.readdir.dirent_count; i++)
 	    {
                 len = new_op->downcall.resp.readdir.d_name_len[i];
