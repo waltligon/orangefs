@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.4 2003-10-22 10:05:53 pw Exp $
+ * $Id: setup.c,v 1.5 2003-10-23 14:59:56 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -67,31 +67,36 @@ ib_new_connection(int s, int is_server)
 
     /* build new connection */
     c = Malloc(sizeof(*c));
+
+    /* fill send and recv free lists and buf heads */
     c->eager_send_buf_contig = Malloc(EAGER_BUF_NUM * EAGER_BUF_SIZE);
     c->eager_recv_buf_contig = Malloc(EAGER_BUF_NUM * EAGER_BUF_SIZE);
     INIT_QLIST_HEAD(&c->eager_send_buf_free);
     INIT_QLIST_HEAD(&c->eager_recv_buf_free);
     c->eager_send_buf_head_contig = Malloc(EAGER_BUF_NUM
       * sizeof(*c->eager_send_buf_head_contig));
-    c->eager_recv_buf_head_contig = Malloc( EAGER_BUF_NUM
+    c->eager_recv_buf_head_contig = Malloc(EAGER_BUF_NUM
       * sizeof(*c->eager_recv_buf_head_contig));
-    c->incoming_contig = Malloc(EAGER_BUF_NUM * sizeof(*c->incoming_contig));
-    INIT_QLIST_HEAD(&c->incoming_free);
     for (i=0; i<EAGER_BUF_NUM; i++) {
 	buf_head_t *ebs = &c->eager_send_buf_head_contig[i];
 	buf_head_t *ebr = &c->eager_recv_buf_head_contig[i];
-	incoming_t *in = &c->incoming_contig[i];
 	INIT_QLIST_HEAD(&ebs->list);
 	INIT_QLIST_HEAD(&ebr->list);
-	ebs->c = c;
-	ebr->c = c;
+	ebs->c = ebr->c = c;
+	ebs->num = ebr->num = i;
 	ebs->buf = (char *) c->eager_send_buf_contig + i * EAGER_BUF_SIZE;
 	ebr->buf = (char *) c->eager_recv_buf_contig + i * EAGER_BUF_SIZE;
-	ebs->num = i;
-	ebr->num = i;
-	in->c = c;
 	qlist_add_tail(&ebs->list, &c->eager_send_buf_free);
 	qlist_add_tail(&ebr->list, &c->eager_recv_buf_free);
+    }
+
+    /* one set for incoming messages, another for acks of our messages */
+    c->incoming_contig = Malloc(2 * EAGER_BUF_NUM
+      * sizeof(*c->incoming_contig));
+    INIT_QLIST_HEAD(&c->incoming_free);
+    for (i=0; i<2*EAGER_BUF_NUM; i++) {
+	incoming_t *in = &c->incoming_contig[i];
+	in->c = c;
 	qlist_add_tail(&in->list, &c->incoming_free);
     }
 

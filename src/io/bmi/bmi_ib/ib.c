@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.2 2003-10-22 10:05:53 pw Exp $
+ * $Id: ib.c,v 1.3 2003-10-23 14:59:56 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -83,7 +83,7 @@ check_cq(void)
 	    error_verrno(ret, "%s: VAPI_poll_cq", __func__);
 	}
 
-	debug(2, "%s: found something non-empty", __func__);
+	debug(2, "%s: found something", __func__);
 	if (desc.status != VAPI_SUCCESS)
 	    error("%s: entry id 0x%Lx opcode %s error %s", __func__,
 	      desc.id, VAPI_cqe_opcode_sym(desc.opcode),
@@ -210,8 +210,11 @@ encourage_send(ib_send_t *sq, incoming_t *in)
 	assert(!in, "%s: state %s yet incoming non-null", __func__,
 	  sq_state_name(sq->state));
 	bh = qlist_try_del_head(&sq->c->eager_send_buf_free);
-	if (!bh)
+	if (!bh) {
+	    debug(2, "%s: sq %p %s no free send buffers", __func__, sq,
+	      sq_state_name(sq->state));
 	    return;
+	}
 	sq->bh = bh;
 	bh->sq = sq;  /* uplink for completion */
 
@@ -260,6 +263,7 @@ encourage_send(ib_send_t *sq, incoming_t *in)
 	    debug(2, "%s: sq %p sent RTS now state %s", __func__, sq,
 	      sq_state_name(sq->state));
 	}
+
     } else if (sq->state == SQ_WAITING_EAGER_ACK) {
 
 	debug(2, "%s: sq %p %s in %p", __func__, sq, sq_state_name(sq->state),
@@ -515,7 +519,8 @@ send_cts(ib_recv_t *rq)
     u_int32_t post_len;
     int i;
 
-    debug(2, "%s: sending on an rq", __func__);
+    debug(2, "%s: sending on an rq, offering to recv len %Ld", __func__,
+      Ld(rq->buflist.tot_len));
 
     bh = qlist_try_del_head(&rq->c->eager_send_buf_free);
     if (!bh) {
@@ -718,13 +723,23 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 		  sr.sg_lst_len, sg_max_len);
 
 	    send_offset += this_bytes;
-	    if (send_offset == sq->buflist.len[send_index])
+	    if (send_offset == sq->buflist.len[send_index]) {
 		++send_index;
+		if (send_index == sq->buflist.num) {
+		    done = 1;
+		    break;  /* short send */
+		}
+	    }
 	    recv_bytes_needed -= this_bytes;
 	}
 
-	if (++recv_index == (int)mh_cts->buflist_num) {
+	/* done with the one we were just working on, is this the last recv? */
+	++recv_index;
+	if (++recv_index == (int)mh_cts->buflist_num)
 	    done = 1;
+
+	/* either filled the recv or exhausted the send */
+	if (done) {
 	    sr.id = int64_from_ptr(sq);    /* used to match in completion */
 	    sr.comp_type = VAPI_SIGNALED;  /* completion drives the unpin */
 	}
@@ -907,6 +922,7 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
     qlist_add_tail(&rq->list, &recvq);
 
   build_buflist:
+    debug(2, "%s: new recv matches nothing on queue", __func__);
     if (numbufs == 0) {
 	rq->buflist_one_buf = *buffers;
 	rq->buflist_one_len = *sizes;
@@ -944,6 +960,8 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
     /* encourage these directly; XXX: more generally make progress */
     if (rq->state == RQ_EAGER_WAITING_USER_POST) {
 
+	debug(2, "%s: state %s finish eager directly", __func__,
+	  rq_state_name(rq->state));
 	if (rq->actual_len > tot_expected_len) {
 	    error("%s: received " FORMAT_BMI_SIZE_T
 	      " matches too-small buffer " FORMAT_BMI_SIZE_T,
@@ -963,7 +981,10 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 	rq->state = RQ_EAGER_WAITING_USER_TEST;
     }
     if (rq->state == RQ_RTS_WAITING_USER_POST) {
-	int ret = send_cts(rq);
+	int ret;
+
+	debug(2, "%s: state %s send cts", __func__, rq_state_name(rq->state));
+	ret = send_cts(rq);
 	if (ret == 0)
 	    rq->state = RQ_RTS_WAITING_DATA;
 	else
@@ -1022,17 +1043,22 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *error_code,
 	if (sq->state == SQ_WAITING_USER_TEST) {
 	    debug(2, "%s: send done, freeing and returning true", __func__);
 	    ret = 1;
+	    *error_code = 0;
 	    *actual_size = sq->buflist.tot_len;
-	    if (user_ptr)
-		*user_ptr = mop->user_ptr;
+	    *user_ptr = mop->user_ptr;
 	    qlist_del(&sq->list);
-	    free(sq);
 	    free(mop);
+	    free(sq);
+	} else if (sq->state == SQ_WAITING_BUFFER) {
+	    debug(2, "%s: send state %s, encouraging",
+	      __func__, sq_state_name(sq->state));
+	    encourage_send(sq, 0);
 	} else {
 	    debug(9, "%s: send found, not done, state %s", __func__,
 	      sq_state_name(sq->state));
 	}
     } else {
+	/* actually a recv */
 	ib_recv_t *rq = mop->method_data;
 	assert(rq->type == TYPE_RECV, "%s: type not send or recv", __func__);
 	if (rq->state == RQ_EAGER_WAITING_USER_TEST
@@ -1040,12 +1066,13 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *error_code,
 	    debug(2, "%s: recv done from state %s", __func__,
 	      rq_state_name(rq->state));
 	    ret = 1;
+	    *error_code = 0;
 	    *actual_size = rq->actual_len;
 	    if (user_ptr)
 		*user_ptr = mop->user_ptr;
 	    qlist_del(&rq->list);
-	    free(rq);
 	    free(mop);
+	    free(rq);
 	} else if (rq->state == RQ_RTS_WAITING_CTS_BUFFER) {
 	    debug(2, "%s: recv state %s, encouraging",
 	      __func__, rq_state_name(rq->state));
@@ -1055,7 +1082,6 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *error_code,
 	      rq_state_name(rq->state));
 	}
     }
-    *error_code = 0;
     *outcount = ret;
     return ret;
 }
@@ -1069,54 +1095,62 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
   bmi_error_code_t *errs, bmi_size_t *sizes, void **user_ptrs,
   int max_idle_time __unused, bmi_context_id context_id)
 {
-    list_t *l;
+    list_t *l, *lnext;
 
     /* poke cq */
     (void) check_cq();
     process_cq();
 
-    /* walk sq, rq */
+    /* walk sq, rq, marking completed or encouraging next step */
     *outcount = 0;
-    for (l=sendq.next; l != &sendq; ) {
-	list_t *lnext = l->next;
+    for (l=sendq.next; l != &sendq; l=lnext) {
 	ib_send_t *sq = qlist_upcast(l);
-	if (sq->state == SQ_WAITING_USER_TEST
-	 && sq->mop->context_id == context_id) {
-	    if (*outcount == incount)
-		goto done;
-	    debug(2, "%s: send found completed", __func__);
-	    outids[*outcount] = sq->mop->op_id;
-	    errs[*outcount] = 0;
-	    sizes[*outcount] = sq->buflist.tot_len;
-	    user_ptrs[*outcount] = sq->mop->user_ptr;
-	    ++*outcount;
-	    qlist_del(&sq->list);
-	    free(sq->mop);
-	    free(sq);
+	lnext = l->next;
+
+	if (sq->state == SQ_WAITING_USER_TEST) {
+	    /* if context id matches and leftover output room */
+	    if (sq->mop->context_id == context_id && *outcount < incount) {
+		debug(2, "%s: send found completed", __func__);
+		outids[*outcount] = sq->mop->op_id;
+		errs[*outcount] = 0;
+		sizes[*outcount] = sq->buflist.tot_len;
+		user_ptrs[*outcount] = sq->mop->user_ptr;
+		++*outcount;
+		qlist_del(&sq->list);
+		free(sq->mop);
+		free(sq);
+	    }
+	/* always encourage other operations */
+	} else if (sq->state == SQ_WAITING_BUFFER) {
+	    debug(2, "%s: send state %s, encouraging", __func__,
+	      sq_state_name(sq->state));
+	    encourage_send(sq, 0);
 	}
-	l = lnext;
     }
-    for (l=recvq.next; l != &recvq; ) {
-	list_t *lnext = l->next;
+
+    for (l=recvq.next; l != &recvq; l=lnext) {
 	ib_recv_t *rq = qlist_upcast(l);
-	if ((rq->state == RQ_EAGER_WAITING_USER_TEST
-	  || rq->state == RQ_RTS_WAITING_USER_TEST)
-	  && rq->mop->context_id == context_id) {
-	    if (*outcount == incount)
-		goto done;
-	    debug(2, "%s: recv found completed", __func__);
-	    outids[*outcount] = rq->mop->op_id;
-	    errs[*outcount] = 0;
-	    sizes[*outcount] = rq->actual_len;
-	    user_ptrs[*outcount] = rq->mop->user_ptr;
-	    ++*outcount;
-	    qlist_del(&rq->list);
-	    free(rq->mop);
-	    free(rq);
+	lnext = l->next;
+
+	if (rq->state == RQ_EAGER_WAITING_USER_TEST 
+	  || rq->state == RQ_RTS_WAITING_USER_TEST) {
+	    if (rq->mop->context_id == context_id && *outcount < incount) {
+		debug(2, "%s: recv found completed", __func__);
+		outids[*outcount] = rq->mop->op_id;
+		errs[*outcount] = 0;
+		sizes[*outcount] = rq->actual_len;
+		user_ptrs[*outcount] = rq->mop->user_ptr;
+		++*outcount;
+		qlist_del(&rq->list);
+		free(rq->mop);
+		free(rq);
+	    }
+	} else if (rq->state == RQ_RTS_WAITING_CTS_BUFFER) {
+	    debug(2, "%s: recv state %s, encouraging",
+	      __func__, rq_state_name(rq->state));
+	    encourage_recv(rq, 0);
 	}
-	l = lnext;
     }
-  done:
     return 0;
 }
 
