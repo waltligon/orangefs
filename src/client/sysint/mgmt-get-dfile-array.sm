@@ -197,6 +197,7 @@ static int getattr_comp_fn(
     int index)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PVFS_object_attr* r_attr_p;
 
     assert(resp_p->op == PVFS_SERV_GETATTR);	/* sanity check */
 
@@ -208,18 +209,22 @@ static int getattr_comp_fn(
 	return resp_p->status;
     }
 
+    r_attr_p = (sm_p->pcache_hit ?
+	&sm_p->pinode->attr :
+	&resp_p->u.getattr.attr);
+
     /* make sure the caller asked about the right type of object */
-    if(resp_p->u.getattr.attr.objtype != PVFS_TYPE_METAFILE)
+    if(r_attr_p->objtype != PVFS_TYPE_METAFILE)
     {
 	return (-PVFS_EINVAL);
     }
 
     /* sanity checks */
-    assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_META_DFILES);
-    assert(resp_p->u.getattr.attr.u.meta.dfile_count > 0);
+    assert(r_attr_p->mask & PVFS_ATTR_META_DFILES);
+    assert(r_attr_p->u.meta.dfile_count > 0);
 
     /* make sure the caller provided a large enough array */
-    if(resp_p->u.getattr.attr.u.meta.dfile_count >
+    if(r_attr_p->u.meta.dfile_count >
 	sm_p->u.get_dfile_array.dfile_count)
     {
 	return (-PVFS_EMSGSIZE);
@@ -227,10 +232,10 @@ static int getattr_comp_fn(
 
     /* copy out dfile count and array */
     sm_p->u.get_dfile_array.dfile_count =
-	resp_p->u.getattr.attr.u.meta.dfile_count;
+	r_attr_p->u.meta.dfile_count;
     memcpy(sm_p->u.get_dfile_array.dfile_array,
-	   resp_p->u.getattr.attr.u.meta.dfile_array,
-	   (resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle)));
+	   r_attr_p->u.meta.dfile_array,
+	   (r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle)));
 
     return (0);
 }
