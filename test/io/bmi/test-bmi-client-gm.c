@@ -13,7 +13,7 @@
 #include <string.h>
 
 #include <bmi.h>
-#include <test_bmi.h>
+#include <test-bmi.h>
 #include <gossip.h>
 
 /**************************************************************

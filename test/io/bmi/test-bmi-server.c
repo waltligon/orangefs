@@ -14,7 +14,7 @@
 
 #include <bmi.h>
 #include <gossip.h>
-#include <test_bmi.h>
+#include <test-bmi.h>
 
 /**************************************************************
  * Data structures 
@@ -59,11 +59,11 @@ int main(int argc, char **argv)	{
 
 	/* set debugging stuff */
 	gossip_enable_stderr();
-	gossip_set_debug_mask(0, BMI_DEBUG_ALL);
+	gossip_set_debug_mask(1, BMI_DEBUG_ALL);
 
 
 	/* initialize local interface (default options) */
-	ret = BMI_initialize("bmi_gm", user_opts->hostid, BMI_INIT_SERVER);
+	ret = BMI_initialize("bmi_tcp", user_opts->hostid, BMI_INIT_SERVER);
 	if(ret < 0){
 		errno = -ret;
 		perror("BMI_initialize");
@@ -80,12 +80,12 @@ int main(int argc, char **argv)	{
 		fprintf(stderr, "Request recv failure (bad state).\n");
 		errno = -ret;
 		perror("BMI_waitunexpected");
-		goto server_exit;
+		return(-1);
 	}
 	if(request_info.error_code != 0)
 	{
 		fprintf(stderr, "Request recv failure (bad state).\n");
-		goto server_exit;
+		return(-1);
 	}
 
 	printf("Received a new request.\n");
@@ -93,8 +93,7 @@ int main(int argc, char **argv)	{
 	if(request_info.size != sizeof(struct
 		server_request)){
 		fprintf(stderr, "Bad Request!\n");
-		printf("size: %d\n", (int)request_info.size);
-		goto server_exit;
+		exit(-1);
 	}
 
 	my_req = (struct server_request*)request_info.buffer;
@@ -121,7 +120,7 @@ int main(int argc, char **argv)	{
 		sizeof(struct server_ack), BMI_PRE_ALLOC, 0, NULL);
 	if(ret < 0)
 	{
-		fprintf(stderr, "BMI_post_send failure.\n");
+		fprintf(stderr, "BMI_post_send_failure.\n");
 		return(-1);
 	}
 	if(ret == 0)
@@ -157,28 +156,24 @@ int main(int argc, char **argv)	{
 			ret = BMI_wait(server_ops[0], &outcount, &error_code, &actual_size, NULL);
 		} while(ret == 0 && outcount == 0);
 
-		if(ret < 0 || error_code != 0) 
+		if(ret < 0 || error_code != 0)
 		{
 			fprintf(stderr, "data recv failed.\n");
 			return(-1);
 		}
 	}
-	else
+	
+	if(actual_size != 15000)
 	{
-		if(actual_size != my_req->size)
-		{
-			printf("Short recv.\n");
-			return(-1);
-		}
+		printf("Didn't get short recv when expected.\n");
+		printf("actual_size: %d\n", (int)actual_size);
+		return(0);
 	}
-	printf("Got: %s\n", (char*)recv_buffer);
 
 	/* free up the message buffers */
 	BMI_memfree(client_addr, recv_buffer, my_req->size, BMI_RECV_BUFFER);
 	BMI_memfree(client_addr, my_ack, sizeof(struct server_ack), 
 		BMI_SEND_BUFFER);
-
-server_exit:
 
 	/* shutdown the local interface */
 	ret = BMI_finalize();
@@ -229,11 +224,11 @@ static struct options* parse_args(int argc, char* argv[]){
 	}
 	
 	/* if we didn't get a host argument, fill in a default: */
-	len = (strlen(DEFAULT_SERVERID_GM)) + 1;
+	len = (strlen(DEFAULT_SERVERID)) + 1;
 	if((tmp_opts->hostid = (char*)malloc(len))==NULL){
 		goto parse_args_error;
 	}
-	memcpy(tmp_opts->hostid, DEFAULT_SERVERID_GM, len);
+	memcpy(tmp_opts->hostid, DEFAULT_SERVERID, len);
 
 	return(tmp_opts);
 

@@ -14,7 +14,7 @@
 
 #include <bmi.h>
 #include <gossip.h>
-#include <test_bmi.h>
+#include <test-bmi.h>
 
 /**************************************************************
  * Data structures 
@@ -26,7 +26,6 @@
 struct options{
 	char* hostid;       /* host identifier */
 };
-
 
 /**************************************************************
  * Internal utility functions
@@ -44,12 +43,17 @@ int main(int argc, char **argv)	{
 	struct server_ack* my_ack = NULL;
 	int ret = -1;
 	bmi_addr_t client_addr;
-	void* recv_buffer = NULL;
+	void* recv_buffer1 = NULL;
+	void* recv_buffer2 = NULL;
 	bmi_op_id_t server_ops[2];
 	bmi_error_code_t error_code;
 	int outcount = 0;
 	struct unexpected_info request_info;
 	bmi_size_t actual_size;
+	bmi_size_t size_list[2];
+	void* buffer_list[2];
+	int last = 0;
+	int i = 0;
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -108,12 +112,19 @@ int main(int argc, char **argv)	{
 	}
 	memset(my_ack, 0, sizeof(struct server_ack));
 
-	/* create a buffer to recv into */
-	recv_buffer = BMI_memalloc(client_addr, my_req->size, BMI_RECV_BUFFER);
-	if(!recv_buffer){
+	/* create 2 buffers to recv into */
+	recv_buffer1 = BMI_memalloc(client_addr, (my_req->size/2), 
+		BMI_RECV_BUFFER);
+	recv_buffer2 = BMI_memalloc(client_addr,
+		(my_req->size-(my_req->size/2)), BMI_RECV_BUFFER);
+	if(!recv_buffer1 || !recv_buffer2){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
 	}
+	buffer_list[0] = recv_buffer1;
+	buffer_list[1] = recv_buffer2;
+	size_list[0] = my_req->size/2;
+	size_list[1] = my_req->size - (my_req->size/2);
 	
 	/* post the ack */
 	ret = BMI_post_send(&(server_ops[1]), client_addr, my_ack, 
@@ -140,8 +151,8 @@ int main(int argc, char **argv)	{
 	}
 
 	/* post the recv */
-	ret = BMI_post_recv(&(server_ops[0]), client_addr, recv_buffer,
-		my_req->size, &actual_size, BMI_PRE_ALLOC, 0, NULL);
+	ret = BMI_post_recv_list(&(server_ops[0]), client_addr, buffer_list, 
+		size_list, 2, my_req->size, &actual_size, BMI_PRE_ALLOC, 0, NULL);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_recv_failure.\n");
@@ -162,16 +173,35 @@ int main(int argc, char **argv)	{
 			return(-1);
 		}
 	}
-	
-	if(actual_size != 15000)
+
+	if(actual_size != my_req->size)
 	{
-		printf("Didn't get short recv when expected.\n");
-		printf("actual_size: %d\n", (int)actual_size);
-		return(0);
+		printf("Short recv.\n");
+		printf("diff: %d\n", (int)(my_req->size - actual_size));
+	}
+
+	/* check validity of received message */
+	for(i=0; i<((my_req->size/2)/sizeof(int)); i++)
+	{
+		if(((int*)recv_buffer1)[i] != i)
+		{
+			fprintf(stderr, "Validation failure, offset %d.\n", i);
+		}
+	}
+	last = i;
+	for(i=last; i<(last+ ((my_req->size - (my_req->size/2))/sizeof(int))); i++)
+	{
+		if(((int*)recv_buffer2)[i-last] != i)
+		{
+			fprintf(stderr, "Validation failure, offset %d.\n", i);
+		}
 	}
 
 	/* free up the message buffers */
-	BMI_memfree(client_addr, recv_buffer, my_req->size, BMI_RECV_BUFFER);
+	BMI_memfree(client_addr, recv_buffer1, (my_req->size/2), 
+		BMI_RECV_BUFFER);
+	BMI_memfree(client_addr, recv_buffer2, (my_req->size -
+		(my_req->size/2)), BMI_RECV_BUFFER);
 	BMI_memfree(client_addr, my_ack, sizeof(struct server_ack), 
 		BMI_SEND_BUFFER);
 

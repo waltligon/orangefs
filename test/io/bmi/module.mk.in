@@ -1,9 +1,9 @@
 DIR := test/io/bmi
 
 TESTSRC += \
-	$(DIR)/test_bmi_client.c \
-	$(DIR)/test_bmi_client_gm.c \
-	$(DIR)/test_bmi_client_list.c \
-	$(DIR)/test_bmi_server.c \
-	$(DIR)/test_bmi_server_gm.c \
-	$(DIR)/test_bmi_server_list.c
+	$(DIR)/test-bmi-client.c \
+	$(DIR)/test-bmi-client-gm.c \
+	$(DIR)/test-bmi-client-list.c \
+	$(DIR)/test-bmi-server.c \
+	$(DIR)/test-bmi-server-gm.c \
+	$(DIR)/test-bmi-server-list.c
