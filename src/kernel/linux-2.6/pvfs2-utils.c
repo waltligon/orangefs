@@ -390,6 +390,7 @@ int pvfs2_inode_getattr(
 
       error_exit:
         ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+        translate_error_if_wait_failed(ret, 0, 0);
 
         pvfs2_print("Getattr on handle %Lu, fsid %d\n  (inode ct = %d) "
                     "returned %d (error_exit = %d)\n",
@@ -865,6 +866,7 @@ int pvfs2_truncate_inode(
     pvfs2_print("pvfs2: pvfs2_truncate got return value of %d\n",ret);
 
   error_exit:
+    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
 
     return ret;
@@ -898,6 +900,7 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
                 "return value of %d\n",ret);
 
   error_exit:
+    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
 
     return ret;
@@ -935,6 +938,7 @@ int pvfs2_unmount_sb(struct super_block *sb)
     }
 
   error_exit:
+    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
 
     return ret;
@@ -969,6 +973,7 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
                 "value of %d\n", ret);
 
   error_exit:
+    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
 
     return -EINTR;
@@ -980,6 +985,11 @@ DECLARE_ERRNO_MAPPING_AND_FN();
 int pvfs2_kernel_error_code_convert(
     int pvfs2_error_code)
 {
+    if ((pvfs2_error_code == PVFS2_WAIT_TIMEOUT_REACHED) ||
+        (pvfs2_error_code == PVFS2_WAIT_SIGNAL_RECVD))
+    {
+        return pvfs2_error_code;
+    }
     return (int)PVFS_get_errno_mapping((int32_t)pvfs2_error_code);
 }
 

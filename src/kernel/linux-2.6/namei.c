@@ -52,7 +52,7 @@ struct dentry *pvfs2_lookup(
     struct nameidata *nd)
 #endif
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int ret = -EINVAL, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     struct inode *inode = NULL;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL, *found_pvfs2_inode = NULL;
@@ -190,7 +190,6 @@ struct dentry *pvfs2_lookup(
     }
 
   error_exit:
-    /* when request is serviced properly, free req op struct */
     op_release(new_op);
 
     /*
@@ -326,7 +325,7 @@ static int pvfs2_rename(
     struct inode *new_dir,
     struct dentry *new_dentry)
 {
-    int ret = -1, retries = 5, are_directories = 0;
+    int ret = -EINVAL, retries = 5, are_directories = 0;
     pvfs2_inode_t *pvfs2_old_parent_inode = PVFS2_I(old_dir);
     pvfs2_inode_t *pvfs2_new_parent_inode = PVFS2_I(new_dir);
     pvfs2_kernel_op_t *new_op = NULL;
@@ -403,13 +402,6 @@ static int pvfs2_rename(
 
     if (new_dentry->d_inode)
     {
-/*         if (are_directories && simple_empty(new_dentry)) */
-/*         { */
-/*             pvfs2_print("pvfs2: pvfs2_rename target dir not empty\n"); */
-/*             ret = -ENOTEMPTY; */
-/*             goto error_exit; */
-/*         } */
-
         new_dentry->d_inode->i_ctime = CURRENT_TIME;
         if (are_directories)
         {
@@ -423,6 +415,7 @@ static int pvfs2_rename(
     }
 
   error_exit:
+    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
 
 #ifdef PVFS2_LINUX_KERNEL_2_4

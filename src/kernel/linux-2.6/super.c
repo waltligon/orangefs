@@ -401,6 +401,7 @@ static int pvfs2_statfs(
     }
 
   error_exit:
+    translate_error_if_wait_failed(ret, -ENOENT, 0);
     op_release(new_op);
 
     pvfs2_print("pvfs2_statfs: returning %d\n", ret);
@@ -473,6 +474,7 @@ int pvfs2_remount(
         }
 
       error_exit:
+        translate_error_if_wait_failed(ret, 0, 0);
         op_release(new_op);
     }
     return ret;
@@ -557,12 +559,14 @@ struct super_block* pvfs2_get_sb(
     pvfs2_print("Attempting PVFS2 Mount via host %s\n",
                 new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-    service_operation(new_op, "pvfs2_get_sb", 0);
+    service_operation(new_op, "pvfs2_get_sb", 1);
+    goto_error_exit_if_wait_failed(ret, 0, 0);
+
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
+    pvfs2_print("pvfs2_remount: mount got return value of %d\n", ret);
     if (ret)
     {
-        pvfs2_error("pvfs2_get_sb: mount returned %d\n", ret);
         goto error_exit;
     }
 
@@ -614,6 +618,8 @@ struct super_block* pvfs2_get_sb(
     return sb;
 
   error_exit:
+    translate_error_if_wait_failed(ret, 0, 0);
+
     pvfs2_error("Could not succeed getting a super-block "
                 "for the mount request %d\n", ret);
     if (sb)
@@ -622,6 +628,7 @@ struct super_block* pvfs2_get_sb(
         {
             kfree(sb->u.generic_sbp);
         }
+        sb = ERR_PTR(ret);
     }
 
     if (new_op)
@@ -630,7 +637,7 @@ struct super_block* pvfs2_get_sb(
     }
 
 /*     MOD_DEC_USE_COUNT; */
-    return NULL;
+    return sb;
 }
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
@@ -730,12 +737,11 @@ struct super_block *pvfs2_get_sb(
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
         service_operation(new_op, "pvfs2_get_sb", 0);
-        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
+        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
         pvfs2_print("pvfs2_get_sb: mount got return value of %d\n", ret);
         if (ret)
         {
-            sb = ERR_PTR(ret);
             goto error_exit;
         }
 
@@ -744,7 +750,7 @@ struct super_block *pvfs2_get_sb(
              PVFS_HANDLE_NULL))
         {
             pvfs2_error("ERROR: Retrieved null fs_id or root_handle\n");
-            sb = ERR_PTR(-EINVAL);
+            ret = -EINVAL;
             goto error_exit;
         }
 
@@ -786,6 +792,12 @@ struct super_block *pvfs2_get_sb(
     }
 
   error_exit:
+    translate_error_if_wait_failed(ret, 0, 0);
+    if (ret && !sb)
+    {
+        sb = ERR_PTR(ret);
+    }
+
     if (new_op)
     {
         op_release(new_op);

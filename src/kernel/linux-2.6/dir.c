@@ -171,6 +171,7 @@ static int pvfs2_readdir(
         }
 
       error_exit:
+        translate_error_if_wait_failed(ret, -EIO, 0);
 	op_release(new_op);
 	break;
     }

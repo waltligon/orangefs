@@ -153,8 +153,8 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 /* defines used for wait_for_matching_downcall return values */
 #define PVFS2_WAIT_ERROR               0xFFFFFFFF
 #define PVFS2_WAIT_SUCCESS             0x00000000
-#define PVFS2_WAIT_TIMEOUT_REACHED     0x00000001
-#define PVFS2_WAIT_SIGNAL_RECVD        0x00000002
+#define PVFS2_WAIT_TIMEOUT_REACHED     0x00EC0001
+#define PVFS2_WAIT_SIGNAL_RECVD        0x00EC0002
 
 /************************************
  * pvfs2 kernel memory related flags
@@ -471,6 +471,22 @@ do {                                                         \
                             &(op->tag));                     \
 } while(0)
 
+#define translate_error_if_wait_failed(ret, etime, esig)     \
+do {                                                         \
+    if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                   \
+    {                                                        \
+        ret = (etime ? etime : -EINVAL);                     \
+        pvfs2_print("OP timed out.  Returning %d\n", ret);   \
+        goto error_exit;                                     \
+    }                                                        \
+    else if (ret == PVFS2_WAIT_SIGNAL_RECVD)                 \
+    {                                                        \
+        ret = (esig ? esig : -EINTR);                        \
+        pvfs2_print("OP interrupted.  Returning %d\n", ret); \
+        goto error_exit;                                     \
+    }                                                        \
+} while(0)
+
 #define service_operation(op, method, intr)                  \
 do {                                                         \
     sigset_t orig_sigset;                                    \
@@ -485,7 +501,7 @@ do {                                                         \
         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
         {                                                    \
             pvfs2_error("pvfs2: %s -- wait timed out (%x).  "\
-                        "aborting attempt.\n", method,ret);  \
+                        "aborting attempt.\n", method, ret); \
         }                                                    \
         goto error_exit;                                     \
     }                                                        \
@@ -636,6 +652,7 @@ do {                                                      \
     {                                                     \
         ret = pvfs2_kernel_error_code_convert(            \
                  new_op->downcall.status);                \
+        translate_error_if_wait_failed(ret, -EIO, 0);     \
         *offset = original_offset;                        \
         wake_up_device_for_return(new_op);                \
         pvfs_bufmap_put(buffer_index);                    \

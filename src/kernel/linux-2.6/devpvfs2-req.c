@@ -363,9 +363,13 @@ static int pvfs2_devreq_release(
 
     /*
       prune dcache here to get rid of entries that may no longer exist
-      on device re-open
+      on device re-open, assuming that the sb has been properly filled
+      (may not have been if a mount wasn't attempted)
     */
-    shrink_dcache_sb(inode->i_sb);
+    if (inode && inode->i_sb)
+    {
+        shrink_dcache_sb(inode->i_sb);
+    }
 
     up(&devreq_semaphore);
 
