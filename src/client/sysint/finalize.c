@@ -39,16 +39,10 @@ int PVFS_sys_finalize()
     gen_mutex_unlock(g_session_tag_mt_lock);
     gen_mutex_destroy(g_session_tag_mt_lock);
 
-    /* Close down all flows,endpoints */
-    /* leaving this out for now until flows are implemented */
-#if 0
-    PINT_flow_finalize();
-#endif
-
-    /* TODO: finalize BMI and JOB interface */
-
-    /* finalize the job interface */
+    /* finalize the I/O interfaces */
     job_finalize();
+
+    PINT_flow_finalize();
 
     BMI_finalize();
 
