@@ -296,8 +296,11 @@ AC_SUBST(INTELC)
 AC_SUBST(GNUC)
 
 AC_ARG_WITH(efence,
-[  --with-efence           Use electric fence for malloc debugging.],
-AC_CHECK_LIB(efence,malloc)
+[  --with-efence=<path>        Use electric fence for malloc debugging.],
+	if test x$withval != xyes ; then
+		LDFLAGS="${LDFLAGS} -L$withval"
+	fi
+	AC_CHECK_LIB(efence,malloc)
 )
 
 dnl
@@ -595,10 +598,10 @@ test/server/request-scheduler/module.mk
 test/correctness/pts/module.mk
 test/common/pav/configfile.sample
 test/kernel/linux-2.6/module.mk
+doc/module.mk
 doc/coding/module.mk
 doc/design/module.mk
 doc/random/module.mk
-doc/module.mk
 maint/mpi-depend.sh
 examples/pvfs2-server.rc
 )
