@@ -17,6 +17,7 @@ typedef struct
     PVFS_pinode_reference refn;
     void *data;
     PVFS_size data_sz;
+    int data_invalid;
 } mmap_ra_cache_elem_t;
 
 
@@ -36,6 +37,11 @@ int pvfs2_mmap_ra_cache_initialize(void);
 int pvfs2_mmap_ra_cache_register(PVFS_pinode_reference refn,
                                  void *data, int data_len);
 
+/*
+  returns 0 on cache hit
+  returns -1 on cache miss
+  returns -2 if the data matching the refn should be flushed
+*/
 int pvfs2_mmap_ra_cache_get_block(
     PVFS_pinode_reference refn, PVFS_size offset,
     PVFS_size len, void *dest);

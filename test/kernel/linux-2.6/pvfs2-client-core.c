@@ -273,12 +273,22 @@ static int service_io_readahead_request(
         if ((in_upcall->req.io.io_type == PVFS_IO_READ) &&
             in_upcall->req.io.readahead_size)
         {
+            int val = 0;
+
             /* check readahead cache first */
-            if (pvfs2_mmap_ra_cache_get_block(
-                    in_upcall->req.io.refn, in_upcall->req.io.offset,
-                    in_upcall->req.io.count, tmp_buf) == 0)
+            if ((val = pvfs2_mmap_ra_cache_get_block(
+                     in_upcall->req.io.refn, in_upcall->req.io.offset,
+                     in_upcall->req.io.count, tmp_buf) == 0))
             {
                 goto mmap_ra_cache_hit;
+            }
+            else if (val == -2)
+            {
+                /* check if we should flush stale cache data */
+                pvfs2_mmap_ra_cache_flush(in_upcall->req.io.refn);
+
+                free(tmp_buf);
+                return ret;
             }
 
             /* make the full-blown readahead sized request */
@@ -353,13 +363,13 @@ static int service_io_request(
     if (desc && init_response && in_upcall && out_downcall)
     {
 #ifdef USE_MMAP_RA_CACHE
-        if ((in_upcall->req.io.offset == (loff_t)0) &&
-            (in_upcall->req.io.readahead_size ==
+        if ((in_upcall->req.io.readahead_size ==
              PVFS2_MMAP_RACACHE_FLUSH))
         {
             pvfs2_mmap_ra_cache_flush(in_upcall->req.io.refn);
         }
-        else if ((in_upcall->req.io.readahead_size > 0) &&
+        else if ((in_upcall->req.io.offset == (loff_t)0) &&
+                 (in_upcall->req.io.readahead_size > 0) &&
                  (in_upcall->req.io.readahead_size <
                   PVFS2_MMAP_RACACHE_MAX_SIZE))
         {
