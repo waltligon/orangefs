@@ -97,10 +97,10 @@ int main(int argc,char **argv)
         return(-1);
     }
 
-    printf("===================================");
-    printf("file named %s has been truncated to %lld bytes.", filename, Ld(trunc_size));
+    printf("===================================\n");
+    printf("file named %s has been truncated to %lld bytes.\n",
+           filename, Ld(trunc_size));
 
-    //close it down
     ret = PVFS_sys_finalize();
     if (ret < 0)
     {

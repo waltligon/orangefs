@@ -19,6 +19,7 @@
 #include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-keyval.h"
+#include "dbpf-attr-cache.h"
 #include "gossip.h"
 
 /* Internal function prototypes */
@@ -29,8 +30,7 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p);
 
-static int dbpf_keyval_read(
-			    TROVE_coll_id coll_id,
+static int dbpf_keyval_read(TROVE_coll_id coll_id,
 			    TROVE_handle handle,
 			    TROVE_keyval_s *key_p,
 			    TROVE_keyval_s *val_p,
@@ -42,24 +42,42 @@ static int dbpf_keyval_read(
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
+
+    gossip_debug(DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Read "
+                 "of %s\n", (char *)key_p->buffer);
+
+    cache_elem = dbpf_attr_cache_elem_lookup(handle);
+    if (cache_elem)
+    {
+        dbpf_keyval_pair_cache_elem_t *keyval_pair =
+            dbpf_attr_cache_elem_get_data_based_on_key(
+                cache_elem, key_p->buffer);
+        if (keyval_pair)
+        {
+            dbpf_attr_cache_keyval_pair_fetch_cached_data(
+                cache_elem, keyval_pair, val_p->buffer,
+                &val_p->buffer_sz);
+            val_p->read_sz = val_p->buffer_sz;
+            return 1;
+        }
+    }
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
-
-    /* validate the handle, check permissions */
-
-    /* Q: do we want to somehow lock the handle here so that it
-     *    doesn't get removed while we're working on it?  To allow
-     *    for atomic access?
-     */
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     /* grab a queued op structure */
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     /* initialize all the common members */
-    dbpf_queued_op_init(
-			q_op_p,
+    dbpf_queued_op_init(q_op_p,
 			KEYVAL_READ,
 			handle,
 			coll_p,
@@ -71,7 +89,7 @@ static int dbpf_keyval_read(
     /* initialize the op-specific members */
     q_op_p->op.u.k_read.key   = *key_p;
     q_op_p->op.u.k_read.val   = *val_p;
-	
+
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
@@ -86,26 +104,27 @@ static int dbpf_keyval_read(
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 {
     int error, ret, got_db = 0;
-    DB *db_p;
+    DB *db_p = NULL;
     DBT key, data;
 
-    /* TODO: move into initial function so we know that the DB is around
-     * before we enqueue (maybe?).
-     */
-    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id,
-				      op_p->handle,
-				      0,
-				      &db_p);
-    if (ret == -TROVE_EBUSY) return 0;
-    else if (ret < 0) {
-	error = ret; /* dbpf_keyval_dbcache_try_get returns trove errors */
+    ret = dbpf_keyval_dbcache_try_get(
+        op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
+
+    if (ret == -TROVE_EBUSY)
+    {
+        return 0;
+    }
+    else if (ret < 0)
+    {
+        /* dbpf_keyval_dbcache_try_get returns trove errors */
+	error = ret;
 	goto return_error;
     }
-    else {
+    else
+    {
 	got_db = 1;
     }
 
-    /* get keyval */
     memset(&key, 0, sizeof(key));
     key.data = op_p->u.k_read.key.buffer;
     key.size = op_p->u.k_read.key.buffer_sz;
@@ -116,10 +135,12 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     data.flags = DB_DBT_USERMEM;
 
     ret = db_p->get(db_p, NULL, &key, &data, 0);
-    if (ret != 0) {
+    if (ret != 0)
+    {
         gossip_debug(TROVE_DEBUG,
-                     "warning: keyval read error (get() failed)\n");
-/* 	db_p->err(db_p, ret, "DB->get in dbpf_keyval_read_op_svc"); */
+                     "warning: keyval read error (get() failed on "
+                     "handle %Lu and key: %s)\n", Lu(op_p->handle),
+                     (char *)key.data);
 	error = -dbpf_db_error_to_trove_error(ret);
 
 	goto return_error;
@@ -127,33 +148,48 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 
     op_p->u.k_read.val.read_sz = data.size;
 
-    /* sync if requested by user
-     *
-     * Note: this is a little bit silly in some sense, but the semantics allow
-     * for it.
-     */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = db_p->sync(db_p, 0)) != 0) {
+    /* cache this data in the attr cache if we can */
+    if (dbpf_attr_cache_elem_set_data_based_on_key(
+            op_p->handle, op_p->u.k_read.key.buffer,
+            op_p->u.k_read.val.buffer, data.size))
+    {
+        /*
+          NOTE: this can happen if the keyword isn't registered,
+          or if there is no associated cache_elem for this key
+        */
+        gossip_debug(
+            DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
+            "(key is %s)\n", (char *)op_p->u.k_read.key.buffer);
+    }
+    else
+    {
+        gossip_debug(
+            DBPF_ATTRCACHE_DEBUG,"*** cached keyval data retrieved "
+            "(key is %s)\n", (char *)op_p->u.k_read.key.buffer);
+    }
+
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
 	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
     }
 
-    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id,
-			    op_p->handle);
+    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;
 
  return_error:
-    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id,
-					op_p->handle);
+    if (got_db)
+    {
+        dbpf_keyval_dbcache_put(
+            op_p->coll_p->coll_id, op_p->handle);
+    }
     return error;
 }
 
-/* TODO: switch valsize and valbuffer ordering, maybe use ds_key_s
- * (renamed) for val too?
- */
-static int dbpf_keyval_write(
-			     TROVE_coll_id coll_id,
+static int dbpf_keyval_write(TROVE_coll_id coll_id,
 			     TROVE_handle handle,
 			     TROVE_keyval_s *key_p,
 			     TROVE_keyval_s *val_p,
@@ -167,22 +203,20 @@ static int dbpf_keyval_write(
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
-
-    /* validate the handle, check permissions */
-
-    /* Q: do we want to somehow lock the handle here so that it
-     *    doesn't get removed while we're working on it?  To allow
-     *    for atomic access?
-     */
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     /* grab a queued op structure */
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     /* initialize all the common members */
-    dbpf_queued_op_init(
-			q_op_p,
+    dbpf_queued_op_init(q_op_p,
 			KEYVAL_WRITE,
 			handle,
 			coll_p,
@@ -207,23 +241,25 @@ static int dbpf_keyval_write(
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 {
     int error, ret, got_db = 0;
-    DB *db_p;
+    DB *db_p = NULL;
     DBT key, data;
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
 
-    /* TODO: move into initial function so that we know the DB is around
-     * before we enqueue.
-     */
-    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id,
-				      op_p->handle,
-				      1,
-				      &db_p);
-    if (ret == -TROVE_EBUSY) return 0;
-    else if (ret < 0) {
+    ret = dbpf_keyval_dbcache_try_get(
+        op_p->coll_p->coll_id, op_p->handle, 1, &db_p);
+
+    if (ret == -TROVE_EBUSY)
+    {
+        return 0;
+    }
+    else if (ret < 0)
+    {
 	error = ret;
 	goto return_error;
     }
-    else {
-	got_db = 1;
+    else
+    {
+        got_db = 1;
     }
 
     /* we have a keyval space now, maybe a brand new one. */
@@ -235,15 +271,37 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     data.size = op_p->u.k_write.val.buffer_sz;
 
     ret = db_p->put(db_p, NULL, &key, &data, 0);
-    if (ret != 0) {
+    if (ret != 0)
+    {
 	db_p->err(db_p, ret, "DB->put");
 	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
 
-    /* sync if requested by user */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = db_p->sync(db_p, 0)) != 0) {
+    /*
+      now that the data is written to disk, update
+      the cache if it's an attr keyval we manage
+    */
+    gossip_debug(DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Write "
+                 "of %s\n", (char *)op_p->u.k_write.key.buffer);
+
+    cache_elem = dbpf_attr_cache_elem_lookup(op_p->handle);
+    if (cache_elem)
+    {
+        dbpf_keyval_pair_cache_elem_t *keyval_pair =
+            dbpf_attr_cache_elem_get_data_based_on_key(
+                cache_elem, op_p->u.k_write.key.buffer);
+        if (keyval_pair)
+        {
+            dbpf_attr_cache_keyval_pair_update_cached_data(
+                cache_elem, keyval_pair, data.data, data.size);
+        }
+    }
+
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
 	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
@@ -253,7 +311,10 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     return 1;
 
  return_error:
-    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    if (got_db)
+    {
+        dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    }
     return error;
 }
 
@@ -273,17 +334,19 @@ static int dbpf_keyval_remove(
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
-
-    /* Q: what happens if someone queues a read/write request on 
-     * a deleted keyval? */
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     /* initialaze common members */
-    dbpf_queued_op_init(
-			q_op_p,
+    dbpf_queued_op_init(q_op_p,
 			KEYVAL_REMOVE_KEY,
 			handle,
 			coll_p,
@@ -303,17 +366,24 @@ static int dbpf_keyval_remove(
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 {
     int error, ret, got_db = 0;
-    DB *db_p;
+    DB *db_p = NULL;
     DBT key;
 
     /* absolutely no need to create the db if we are removing entries */
-    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
-    if (ret == -TROVE_EBUSY) return 0;
-    else if (ret < 0) {
+    ret = dbpf_keyval_dbcache_try_get(
+        op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
+
+    if (ret == -TROVE_EBUSY)
+    {
+        return 0;
+    }
+    else if (ret < 0)
+    {
 	error = ret;
 	goto return_error;
     }
-    else {
+    else
+    {
 	got_db = 1;
     }
 
@@ -322,15 +392,17 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
     key.size = op_p->u.k_remove.key.buffer_sz;
     ret = db_p->del(db_p, NULL, &key, 0);
 
-    if (ret != 0) {
+    if (ret != 0)
+    {
 	db_p->err(db_p, ret, "DB->del");
 	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
 
-    /* sync only if requested by user */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = db_p->sync(db_p, 0)) != 0) {
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
 	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
@@ -340,14 +412,16 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
     return 1;
 
  return_error:
-    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    if (got_db)
+    {
+        dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    }
     return error;
 }
 
 /* dbpf_keyval_validate()
  */
-static int dbpf_keyval_validate(
-				TROVE_coll_id coll_id,
+static int dbpf_keyval_validate(TROVE_coll_id coll_id,
 				TROVE_handle handle,
 				TROVE_ds_flags flags,
 				TROVE_vtag_s *vtag,
@@ -376,10 +450,16 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -425,8 +505,8 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 {
     int error, ret, i=0, got_db = 0;
     db_recno_t recno;
-    DB *db_p;
-    DBC *dbc_p;
+    DB *db_p = NULL;
+    DBC *dbc_p = NULL;
     DBT key, data;
 
     /* if they passed in that they are at the end, return 0.
@@ -434,7 +514,8 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
      * this seems silly maybe, but it makes while (count) loops
      * work right.
      */
-    if (*op_p->u.k_iterate.position_p == TROVE_ITERATE_END) {
+    if (*op_p->u.k_iterate.position_p == TROVE_ITERATE_END)
+    {
 	*op_p->u.k_iterate.count_p = 0;
 	return 1;
     }
@@ -446,22 +527,27 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
      * FOR NOW JUST CREATE THE SPACE IF IT ISN'T THERE.  FIX LATER.
      */
 
-    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id,
-				      op_p->handle,
-				      1,
-				      &db_p);
-    if (ret == -TROVE_EBUSY) return 0;
-    else if (ret < 0) {
+    ret = dbpf_keyval_dbcache_try_get(
+        op_p->coll_p->coll_id, op_p->handle, 1, &db_p);
+
+    if (ret == -TROVE_EBUSY)
+    {
+        return 0;
+    }
+    else if (ret < 0)
+    {
 	error = ret;
 	goto return_error;
     }
-    else {
+    else
+    {
 	got_db = 1;
     }
 
     /* get a cursor */
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
-    if (ret != 0) {
+    if (ret != 0)
+    {
 	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
@@ -473,7 +559,8 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
      * to keep in mind if at some point simultaneous modifications to pvfs
      * perform badly.   -- robl */
 
-    if (*op_p->u.k_iterate.position_p != TROVE_ITERATE_START) {
+    if (*op_p->u.k_iterate.position_p != TROVE_ITERATE_START)
+    {
 	/* need to position cursor before reading.  note that this will
 	 * actually position the cursor over the last thing that was read
 	 * on the last call, so we don't need to return what we get back.
@@ -483,11 +570,13 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	 * position that we need to pass in.
 	 */
 	memset(&key, 0, sizeof(key));
-	if (sizeof(recno) < op_p->u.k_iterate.key_array[0].buffer_sz) {
+	if (sizeof(recno) < op_p->u.k_iterate.key_array[0].buffer_sz)
+        {
 	    key.data = op_p->u.k_iterate.key_array[0].buffer;
 	    key.size = key.ulen = op_p->u.k_iterate.key_array[0].buffer_sz;
 	}
-	else {
+	else
+        {
 	    key.data = &recno;
 	    key.size = key.ulen = sizeof(recno);
 	}
@@ -501,14 +590,18 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 
 	/* position the cursor */
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
-	if (ret == DB_NOTFOUND) goto return_ok;
-	else if (ret != 0) {
+	if (ret == DB_NOTFOUND)
+        {
+            goto return_ok;
+        }
+	else if (ret != 0)
+        {
 	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
     }
 
-    for (i=0; i < *op_p->u.k_iterate.count_p; i++)
+    for (i = 0; i < *op_p->u.k_iterate.count_p; i++)
     {
 	memset(&key, 0, sizeof(key));
 	key.data = op_p->u.k_iterate.key_array[i].buffer;
@@ -521,8 +614,12 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	data.flags |= DB_DBT_USERMEM;
 	
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-	if (ret == DB_NOTFOUND) goto return_ok;
-	else if (ret != 0) {
+	if (ret == DB_NOTFOUND)
+        {
+            goto return_ok;
+        }
+	else if (ret != 0)
+        {
 	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
@@ -532,10 +629,12 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
     }
     
 return_ok:
-    if (ret == DB_NOTFOUND) {
+    if (ret == DB_NOTFOUND)
+    {
 	*op_p->u.k_iterate.position_p = TROVE_ITERATE_END;
     }
-    else {
+    else
+    {
 	char buf[64];
 	/* get the record number to return.
 	 *
@@ -559,9 +658,16 @@ return_ok:
 	data.flags |= DB_DBT_USERMEM;
 
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
-	if (ret == DB_NOTFOUND) gossip_debug(TROVE_DEBUG, "warning: keyval iterate -- notfound\n");
-	else if (ret != 0) gossip_debug(TROVE_DEBUG, "warning: keyval iterate -- some other failure @ recno\n");
-
+	if (ret == DB_NOTFOUND)
+        {
+            gossip_debug(TROVE_DEBUG, "warning: keyval "
+                         "iterate -- notfound\n");
+        }
+	else if (ret != 0)
+        {
+            gossip_debug(TROVE_DEBUG, "warning: keyval iterate "
+                         "-- some other failure @ recno\n");
+        }
 	assert(recno != TROVE_ITERATE_START && recno != TROVE_ITERATE_END);
 	*op_p->u.k_iterate.position_p = recno;
     }
@@ -569,13 +675,10 @@ return_ok:
 
     *op_p->u.k_iterate.count_p = i;
 
-    /* sync if requested by user
-     *
-     * Note: this is a little bit silly in some sense, but the semantics allow for it.
-     *
-     */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = db_p->sync(db_p, 0)) != 0) {
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
 	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
@@ -586,7 +689,8 @@ return_ok:
 
     /* free the cursor */
     ret = dbc_p->c_close(dbc_p);
-    if (ret != 0) {
+    if (ret != 0)
+    {
 	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
@@ -595,12 +699,15 @@ return_ok:
 return_error:
     gossip_lerr("dbpf_keyval_iterate_op_svc: %s\n", db_strerror(ret));
     *op_p->u.k_iterate.count_p = i;
-    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+
+    if (got_db)
+    {
+        dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    }
     return error;
 }
 
-static int dbpf_keyval_iterate_keys(
-				    TROVE_coll_id coll_id,
+static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
 				    TROVE_handle handle,
 				    TROVE_ds_position *position_p,
 				    TROVE_keyval_s *key_array,
@@ -614,8 +721,7 @@ static int dbpf_keyval_iterate_keys(
     return -TROVE_ENOSYS;
 }
 
-static int dbpf_keyval_read_list(
-				 TROVE_coll_id coll_id,
+static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
 				 TROVE_handle handle,
 				 TROVE_keyval_s *key_array,
 				 TROVE_keyval_s *val_array,
@@ -630,22 +736,20 @@ static int dbpf_keyval_read_list(
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
-
-    /* validate the handle, check permissions */
-
-    /* Q: do we want to somehow lock the handle here so that it
-     *    doesn't get removed while we're working on it?  To allow
-     *    for atomic access?
-     */
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     /* grab a queued op structure */
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     /* initialize all the common members */
-    dbpf_queued_op_init(
-			q_op_p,
+    dbpf_queued_op_init(q_op_p,
 			KEYVAL_READ_LIST,
 			handle,
 			coll_p,
@@ -671,29 +775,27 @@ static int dbpf_keyval_read_list(
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
 {
     int i, error, ret, got_db = 0;
-    DB *db_p;
+    DB *db_p = NULL;
     DBT key, data;
 
-    /* TODO: move into initial function so we know that the DB is around
-     * before we enqueue (maybe?)
-     */
-    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id,
-				      op_p->handle,
-				      0,
-				      &db_p);
-    if (ret == -TROVE_EBUSY) {
+    ret = dbpf_keyval_dbcache_try_get(
+        op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
+    if (ret == -TROVE_EBUSY)
+    {
 	return 0;
     }
-    else if (ret < 0) {
+    else if (ret < 0)
+    {
 	error = ret;
 	goto return_error;
     }
-    else {
+    else
+    {
 	got_db = 1;
     }
 
-    for (i=0; i < op_p->u.k_read_list.count; i++) {
-	/* get keyval */
+    for (i=0; i < op_p->u.k_read_list.count; i++)
+    {
 	memset(&key, 0, sizeof(key));
 	key.data = op_p->u.k_read_list.key_array[i].buffer;
 	key.size = op_p->u.k_read_list.key_array[i].buffer_sz;
@@ -704,7 +806,8 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
 	data.flags = DB_DBT_USERMEM;
 	
 	ret = db_p->get(db_p, NULL, &key, &data, 0);
-	if (ret != 0) {
+	if (ret != 0)
+        {
 	    db_p->err(db_p, ret, "DB->get");
 	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
@@ -713,13 +816,10 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
 	op_p->u.k_read_list.val_array[i].read_sz = data.size;
     }
 
-    /* sync if requested by user
-     *
-     * Note: this is a little bit silly in some sense, but the semantics allow for it.
-     *
-     */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = db_p->sync(db_p, 0)) != 0) {
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
 	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
 	}
@@ -729,13 +829,15 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
     return 1;
 
  return_error:
-    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    if (got_db)
+    {
+        dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    }
     /* TODO: SAVE COUNT? */
     return error;
 }
 
-static int dbpf_keyval_write_list(
-				  TROVE_coll_id coll_id,
+static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
 				  TROVE_handle handle,
 				  TROVE_keyval_s *key_array,
 				  TROVE_keyval_s *val_array,
@@ -749,27 +851,31 @@ static int dbpf_keyval_write_list(
     return -TROVE_ENOSYS;
 }
 
-static int dbpf_keyval_flush(
-			    TROVE_coll_id coll_id,
-			    TROVE_handle handle,
-			    TROVE_ds_flags flags,
-			    void *user_ptr,
-			    TROVE_context_id context_id,
-			    TROVE_op_id *out_op_id_p)
+static int dbpf_keyval_flush(TROVE_coll_id coll_id,
+                             TROVE_handle handle,
+                             TROVE_ds_flags flags,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p)
 {
     struct dbpf_collection *coll_p;
     dbpf_queued_op_t *q_op_p;
     
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     /* grab a queued op structure */
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     /* initialize all the common members */
-    dbpf_queued_op_init(
-			q_op_p,
+    dbpf_queued_op_init(q_op_p,
 			KEYVAL_FLUSH,
 			handle,
 			coll_p,
@@ -793,21 +899,27 @@ static int dbpf_keyval_flush(
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
 {
     int error, ret, got_db = 0;
-    DB *db_p;
+    DB *db_p = NULL;
 
-    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id,
-				      op_p->handle,
-				      0,
-				      &db_p);
-    if (ret == -TROVE_EBUSY) return 0;
-    else if (ret < 0) {
+    ret = dbpf_keyval_dbcache_try_get(
+        op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
+
+    if (ret == -TROVE_EBUSY)
+    {
+        return 0;
+    }
+    else if (ret < 0)
+    {
 	error = ret;
 	goto return_error;
     }
-    else {
+    else
+    {
 	got_db = 1;
     }
-    if ((ret = db_p->sync(db_p, 0)) != 0) {
+
+    if ((ret = db_p->sync(db_p, 0)) != 0)
+    {
 	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
@@ -816,7 +928,10 @@ static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
     return 1;
 
  return_error:
-    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    if (got_db)
+    {
+        dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    }
     return error;
 }    
 
@@ -832,7 +947,6 @@ struct TROVE_keyval_ops dbpf_keyval_ops =
     dbpf_keyval_write_list,
     dbpf_keyval_flush
 };
-
 
 /*
  * Local variables:

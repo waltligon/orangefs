@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/time.h>
 
 #include "trove-types.h"
 #include "trove-proto.h"
@@ -289,13 +290,13 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
 }
 
 /*
- * trove_set_handle_timeout: controls how long a handle, once freed, will sit
- * on the sidelines before returning to the pool of avaliable handles 
+ * trove_set_handle_timeout: controls how long a handle, once freed,
+ * will sit on the sidelines before returning to the pool of
+ * avaliable handles 
  */
-
 int trove_set_handle_timeout(TROVE_coll_id coll_id,
-			    TROVE_context_id context_id,
-			    struct timeval * timeout)
+                             TROVE_context_id context_id,
+                             struct timeval *timeout)
 {
     int ret = -1;
     handle_ledger_t *ledger = NULL;
@@ -305,7 +306,14 @@ int trove_set_handle_timeout(TROVE_coll_id coll_id,
     {
 	/* assert the internal ledger struct is valid */
 	assert(ledger->ledger);
-	/* tell trove how long the timeout should be */
+
+	/*
+          tell trove how long the timeout should be.
+          if 0 is specified, use a reasonable default value
+        */
+        timeout->tv_sec = ((timeout->tv_sec == 0) ?
+                           TROVE_DEFAULT_HANDLE_PURGATORY_SEC :
+                           timeout->tv_sec);
 	ret = trove_ledger_set_timeout(ledger->ledger, timeout);
     }
     return ret;
@@ -447,16 +455,20 @@ int trove_handle_mgmt_finalize()
     */
     for (i = 0; i < s_fsid_to_ledger_table->table_size; i++)
     {
-        hash_link = qhash_search(s_fsid_to_ledger_table,&(i));
-        if (hash_link)
+        do
         {
-            ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
-            assert(ledger);
-            assert(ledger->ledger);
+            hash_link =
+                qhash_search_and_remove_at_index(s_fsid_to_ledger_table, i);
+            if (hash_link)
+            {
+                ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+                assert(ledger);
+                assert(ledger->ledger);
 
-            trove_handle_ledger_free(ledger->ledger);
-            free(ledger);
-        }
+                trove_handle_ledger_free(ledger->ledger);
+                free(ledger);
+            }
+        } while(hash_link);
     }
     qhash_finalize(s_fsid_to_ledger_table);
     s_fsid_to_ledger_table = NULL;

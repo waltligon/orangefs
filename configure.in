@@ -13,7 +13,7 @@ dnl PVFS2 versioning information
 PVFS2_MAJOR=0
 PVFS2_MINOR=0
 PVFS2_SUB=7
-PVFS2_PRE="pre1"
+PVFS2_PRE="pre2"
 
 AM_INIT_AUTOMAKE(pvfs2, $PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE)
 
@@ -45,7 +45,7 @@ if test x$host_os = xlinux-gnu; then
     libc=`echo /lib/libc.so.* | sed 1q`
     if test x$libc != x ; then
 	if test -x $libc ; then
-	    vers=`$libc | sed 's/.*version \(.*\),.*/\1/; q'`
+	    vers=`$libc 2> /dev/null | sed 's/.*version \(.*\),.*/\1/; q'`
             if test x$vers = x; then
                vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
             fi
@@ -338,8 +338,8 @@ CFLAGS="$CFLAGS -DGOSSIP_ENABLE_BACKTRACE"
 dnl --
 dnl Check for SDL
 AC_MSG_CHECKING([for SDL])
-SDL_CONFIG=`which sdl-config`
-if test -x $SDL_CONFIG; then
+SDL_CONFIG=`which sdl-config 2> /dev/null`
+if ! test -z $SDL_CONFIG && test -x $SDL_CONFIG; then
    AC_MSG_RESULT(yes)
    SDL_VERSION=`sdl-config --version`
    VISCFLAGS=`sdl-config --cflags`
@@ -349,14 +349,13 @@ if test -x $SDL_CONFIG; then
    dnl only define BUILD_VIS if we have all required parts
    AC_CHECK_HEADERS(SDL_ttf.h,
        [BUILD_VIS="1"
-        AC_SUBST(BUILD_VIS)
         CPPFLAGS="$CPPFLAGS $VISCFLAGS"],
         [AC_CHECK_HEADERS(SDL/SDL_ttf.h,
             [BUILD_VIS="1"
-            AC_SUBST(BUILD_VIS)
             CPPFLAGS="$CPPFLAGS $VISCFLAGS"],)],
 )
 
+   AC_SUBST(BUILD_VIS)
    AC_SUBST(VISCFLAGS)
    AC_SUBST(VISLIBS)
 else

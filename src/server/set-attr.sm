@@ -333,7 +333,8 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     ret = job_trove_dspace_setattr(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
-        ds_attr, s_op, 0, js_p, &j_id, server_job_context);
+        ds_attr, s_op, 0 /* status tag */, js_p, &j_id,
+        server_job_context);
     return ret;
 }
 

@@ -155,7 +155,6 @@ sub emit_defaults
     print $target "\tEventLogging none\n";
     print $target "\tBMIModules $bmi_module\n";
     print $target "\tFlowModules flowproto_multiqueue\n";
-    print $target "\tHandlePurgatory $handle_purg\n";
     print $target "\tPerfUpdateInterval 1000\n";
     print $target "</Defaults>\n";
 }
@@ -215,6 +214,14 @@ sub emit_filesystem
         print $target "\t\tRange $_ $start-$end\n";
     }
     print $target "\t</DataHandleRanges>\n";
+
+    print $target "\t<StorageHints>\n";
+    print $target "\t\tHandlePurgatory $handle_purgatory\n";
+    print $target "\t\tAttrCacheKeywords datafile_handles,metafile_dist\n";
+    print $target "\t\tAttrCacheSize 1031\n";
+    print $target "\t\tAttrCacheMaxNumElems 8192\n";
+    print $target "\t</StorageHints>\n";
+
     print $target "</Filesystem>\n";
 }
 

@@ -1792,7 +1792,8 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_dspace_setattr(coll_id, handle, ds_attr_p, 0 /* flags */ ,
+    ret = trove_dspace_setattr(coll_id, handle, ds_attr_p,
+                               TROVE_SYNC /* flags */ ,
 			       user_ptr_internal, global_trove_context, 
 			       &(jd->u.trove.id));
 #else
@@ -1873,7 +1874,8 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     user_ptr_internal = &jd->trove_callback;
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_bstream_resize(coll_id, handle, &size, 0 /* flags */ ,
+    ret = trove_bstream_resize(coll_id, handle, &size,
+                               TROVE_SYNC /* flags */ ,
 			       vtag, user_ptr_internal, global_trove_context, 
 			       &(jd->u.trove.id));
 #else
@@ -2299,7 +2301,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
                               handle_extent_array,
 			      &(jd->u.trove.handle),
 			      type,
-			      hint, TROVE_SYNC /* flags -- sync for now */ ,
+			      hint, TROVE_SYNC /* flags */ ,
 			      user_ptr_internal, 
 			      global_trove_context, &(jd->u.trove.id));
 #else
@@ -2378,7 +2380,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_remove(coll_id,
-			      handle, TROVE_SYNC /* flags -- sync for now */ ,
+			      handle, TROVE_SYNC /* flags */ ,
 			      user_ptr_internal, 
 			      global_trove_context, &(jd->u.trove.id));
 #else
@@ -2457,7 +2459,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_verify(coll_id,
 			      handle, &jd->u.trove.type, 
-			      TROVE_SYNC /* flags -- sync for now */ ,
+			      TROVE_SYNC /* flags */ ,
 			      user_ptr_internal, global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");

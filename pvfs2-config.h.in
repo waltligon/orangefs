@@ -25,6 +25,9 @@
 /* Define if you have the strtoull function.  */
 #undef HAVE_STRTOULL
 
+/* Define if you have the <SDL/SDL_ttf.h> header file.  */
+#undef HAVE_SDL_SDL_TTF_H
+
 /* Define if you have the <SDL_ttf.h> header file.  */
 #undef HAVE_SDL_TTF_H
 

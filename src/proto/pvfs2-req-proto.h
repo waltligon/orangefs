@@ -81,6 +81,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT 256
 /* max count of datafiles associated with a logical file */
 #define PVFS_REQ_LIMIT_DFILE_COUNT        1024
+#define PVFS_REQ_LIMIT_DFILE_COUNT_IS_VALID(dfile_count) \
+((dfile_count > 0) && (dfile_count < PVFS_REQ_LIMIT_DFILE_COUNT))
 /* max count of directory entries per readdir request */
 #define PVFS_REQ_LIMIT_DIRENT_COUNT       64
 /* max number of perf metrics returned by mgmt perf mon op */

@@ -33,7 +33,8 @@
 #include "dbpf-bstream.h"
 #include "gossip.h"
 
-enum {
+enum
+{
     FDCACHE_ENTRIES = 256
 };
 
@@ -160,22 +161,24 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
     int i = 0, ret = 0, fd = 0, open_errno = 0;
     char filename[PATH_MAX];
 
-
     /* look to see if we already have an FD */
-    for (i=0; i < FDCACHE_ENTRIES; i++) {
+    for (i = 0; i < FDCACHE_ENTRIES; i++)
+    {
 	if (!(ret = gen_mutex_trylock(&bstream_fd_cache[i].mutex)) &&
 	    bstream_fd_cache[i].valid && 
 	    bstream_fd_cache[i].coll_id == coll_id &&
-	    bstream_fd_cache[i].handle  == handle) break;
-	else if (ret == 0) gen_mutex_unlock(&bstream_fd_cache[i].mutex);
+	    bstream_fd_cache[i].handle  == handle)
+        {
+            break;
+        }
+	else if (ret == 0)
+        {
+            gen_mutex_unlock(&bstream_fd_cache[i].mutex);
+        }
     }
 
-    /* NOTE: we're going to use a mutex here when all we really need is
-     * an atomic increment.  We should grab that code from MPICH2 some
-     * time or something...
-     */
-
-    if (i < FDCACHE_ENTRIES) {
+    if (i < FDCACHE_ENTRIES)
+    {
 	/* found cached FD, and have the lock */
 #if 0
 	gossip_debug(TROVE_DEBUG, "fdcache: found cached fd at index %d\n", i);
@@ -183,13 +186,15 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 	bstream_fd_cache[i].ref_ct++;
 	*fd_p = bstream_fd_cache[i].fd;
 	gen_mutex_unlock(&bstream_fd_cache[i].mutex);
+
 	return DBPF_BSTREAM_FDCACHE_SUCCESS;
     }
     
     /* no cached FD; open the file and cache the FD */
-    for (i=0; i < FDCACHE_ENTRIES; i++) {
-	if (!(ret = gen_mutex_trylock(&bstream_fd_cache[i].mutex)) && 
-	    !bstream_fd_cache[i].valid) 
+    for (i = 0; i < FDCACHE_ENTRIES; i++)
+    {
+	if (!(ret = gen_mutex_trylock(&bstream_fd_cache[i].mutex)) &&
+	    !bstream_fd_cache[i].valid)
 	{
 #if 0
 	    gossip_debug(TROVE_DEBUG, "fdcache: found empty entry at %d\n", i);
@@ -212,21 +217,19 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 		bstream_fd_cache[i].fd    = -1;
 		break;
 	    }
-	    else if (ret == 0) gen_mutex_unlock(&bstream_fd_cache[i].mutex);
+	    else if (ret == 0)
+            {
+                gen_mutex_unlock(&bstream_fd_cache[i].mutex);
+            }
 	}
-	if (i == FDCACHE_ENTRIES) assert(0);
+        assert(i != FDCACHE_ENTRIES);
     }
 
-    /* have a lock on an entry */
-
-    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name, coll_id, Lu(handle));
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
+                              my_storage_p->name, coll_id, Lu(handle));
 #if 0
     gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
-    
-    /* note: we don't really need the coll_id for this operation,
-     * but it doesn't really hurt anything...
-     */
     
     fd = DBPF_OPEN(filename, O_RDWR, 0);
     if (fd < 0 && errno == ENOENT && create_flag)
@@ -240,7 +243,8 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 	    goto return_error;
 	}
     }
-    else if (fd < 0) {
+    else if (fd < 0)
+    {
 	open_errno = errno;
 	goto return_error;
     }
@@ -257,17 +261,11 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 
  return_error:
     gen_mutex_unlock(&bstream_fd_cache[i].mutex);
-    /* return DBPF_BSTREAM_FDCACHE_ERROR; */
-    return -trove_errno_to_trove_error(open_errno);
+    return DBPF_BSTREAM_FDCACHE_ERROR;
+/*     return -trove_errno_to_trove_error(open_errno); */
 }
 
-/* dbpf_bstream_fdcache_put()
- *
- * I think that it's more convenient to reference based on [coll_id, handle]
- * than on FD?
- */
-void dbpf_bstream_fdcache_put(TROVE_coll_id coll_id,
-			      TROVE_handle handle)
+void dbpf_bstream_fdcache_put(TROVE_coll_id coll_id, TROVE_handle handle)
 {
     int i;
 

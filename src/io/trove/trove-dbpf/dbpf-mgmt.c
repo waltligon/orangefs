@@ -29,6 +29,7 @@
 #include "dbpf-keyval.h"
 #include "dbpf-dspace.h"
 #include "dbpf-thread.h"
+#include "dbpf-attr-cache.h"
 #include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
 #include "gossip.h"
@@ -114,12 +115,28 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
     switch(option)
     {
         case TROVE_COLLECTION_HANDLE_RANGES:
-            ret = trove_set_handle_ranges(coll_id, context_id,
-                                          (char *)parameter);
+            ret = trove_set_handle_ranges(
+                coll_id, context_id, (char *)parameter);
             break;
 	case TROVE_COLLECTION_HANDLE_TIMEOUT:
-	    ret = trove_set_handle_timeout(coll_id, context_id, 
-		    (struct timeval *) parameter);
+	    ret = trove_set_handle_timeout(
+                coll_id, context_id, (struct timeval *)parameter);
+	    break;
+	case TROVE_COLLECTION_ATTR_CACHE_KEYWORDS:
+            ret = dbpf_attr_cache_set_keywords((char *)parameter);
+	    break;
+	case TROVE_COLLECTION_ATTR_CACHE_SIZE:
+            ret = dbpf_attr_cache_set_size(*((int *)parameter));
+	    break;
+	case TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS:
+            ret = dbpf_attr_cache_set_max_num_elems(*((int *)parameter));
+	    break;
+	case TROVE_COLLECTION_ATTR_CACHE_INITIALIZE:
+            /*
+              finally, initialize the dbpf_attr_cache.
+              finalize is done at trove_finalize time
+            */
+            ret = dbpf_attr_cache_do_initialize();
 	    break;
     }
     return ret;
@@ -263,6 +280,7 @@ static int dbpf_finalize(void)
     dbpf_bstream_fdcache_finalize();
     dbpf_keyval_dbcache_finalize();
     dbpf_dspace_dbcache_finalize();
+    dbpf_attr_cache_finalize();
 
     dbpf_collection_clear_registered();
 
@@ -611,6 +629,7 @@ static int dbpf_collection_remove(char *collname,
                 if (unlink(tmp_path) != 0)
                 {
                     perror("failure removing bstream entry");
+                    closedir(current_dir);
                     goto collection_remove_failure;
                 }
             }
@@ -647,6 +666,7 @@ static int dbpf_collection_remove(char *collname,
                 if (unlink(tmp_path) != 0)
                 {
                     perror("failure removing keyval entry");
+                    closedir(current_dir);
                     goto collection_remove_failure;
                 }
             }

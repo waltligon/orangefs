@@ -75,11 +75,12 @@ static inline struct qhash_table *qhash_init(
 		 int table_size),
     int table_size)
 {
-    struct qhash_table *new_table = NULL;
     int i = 0;
+    struct qhash_table *new_table = NULL;
 
     /* create struct to contain table information */
-    new_table = (struct qhash_table *) qhash_malloc(sizeof(struct qhash_table));
+    new_table = (struct qhash_table *)
+        qhash_malloc(sizeof(struct qhash_table));
     if (!new_table)
     {
 	return (NULL);
@@ -148,10 +149,10 @@ static inline void qhash_add(
     return;
 }
 
-/* qlist_search()
+/* qhash_search()
  *
- * searches for a link in the hash table that matches the given
- * key
+ * searches for a link in the hash table
+ * that matches the given key
  *
  * returns pointer to link on success, NULL on failure (or item
  * not found)
@@ -161,7 +162,7 @@ static inline struct qhash_head *qhash_search(
     void *key)
 {
     int index = 0;
-    struct qhash_head *tmp_link;
+    struct qhash_head *tmp_link = NULL;
 
     /* find the hash value */
     index = table->hash(key, table->table_size);
@@ -179,10 +180,33 @@ static inline struct qhash_head *qhash_search(
     return (NULL);
 }
 
+/* qhash_search_at_index()
+ *
+ * searches for a link in the list matching
+ * the specified index
+ *
+ * returns pointer to link on success, NULL on failure (or item
+ * not found)
+ */
+static inline struct qhash_head *qhash_search_at_index(
+    struct qhash_table *table,
+    int index)
+{
+    struct qhash_head *tmp_link = NULL;
+
+    qhash_lock(&table->lock);
+    qhash_for_each(tmp_link, &(table->array[index]))
+    {
+        return (tmp_link);
+    }
+    qhash_unlock(&table->lock);
+    return (NULL);
+}
+
 /* qhash_search_and_remove()
  *
- * searches for a link in the hash table that matches the given
- * key
+ * searches for and removes a link in the hash table
+ * that matches the given key
  *
  * returns pointer to link on success, NULL on failure (or item
  * not found).  On success, link is removed from hashtable.
@@ -192,7 +216,7 @@ static inline struct qhash_head *qhash_search_and_remove(
     void *key)
 {
     int index = 0;
-    struct qhash_head *tmp_link;
+    struct qhash_head *tmp_link = NULL;
 
     /* find the hash value */
     index = table->hash(key, table->table_size);
@@ -207,6 +231,31 @@ static inline struct qhash_head *qhash_search_and_remove(
 	    qhash_unlock(&table->lock);
 	    return (tmp_link);
 	}
+    }
+    qhash_unlock(&table->lock);
+    return (NULL);
+}
+
+/* qhash_search_and_remove_at_index()
+ *
+ * searches for and removes the first link in the list
+ * matching the specified index
+ *
+ * returns pointer to link on success, NULL on failure (or item
+ * not found).  On success, link is removed from hashtable.
+ */
+static inline struct qhash_head *qhash_search_and_remove_at_index(
+    struct qhash_table *table,
+    int index)
+{
+    struct qhash_head *tmp_link = NULL;
+
+    qhash_lock(&table->lock);
+    qhash_for_each(tmp_link, &(table->array[index]))
+    {
+        qhash_del(tmp_link);
+        qhash_unlock(&table->lock);
+        return (tmp_link);
     }
     qhash_unlock(&table->lock);
     return (NULL);

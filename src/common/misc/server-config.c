@@ -32,13 +32,14 @@ static DOTCONF_CB(enter_aliases_context);
 static DOTCONF_CB(exit_aliases_context);
 static DOTCONF_CB(enter_filesystem_context);
 static DOTCONF_CB(exit_filesystem_context);
+static DOTCONF_CB(enter_storage_hints_context);
+static DOTCONF_CB(exit_storage_hints_context);
 static DOTCONF_CB(enter_mhranges_context);
 static DOTCONF_CB(exit_mhranges_context);
 static DOTCONF_CB(enter_dhranges_context);
 static DOTCONF_CB(exit_dhranges_context);
 static DOTCONF_CB(get_unexp_req);
 static DOTCONF_CB(get_perf_update_interval);
-static DOTCONF_CB(get_handle_purgatory);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_filesystem_name);
 static DOTCONF_CB(get_logfile);
@@ -48,6 +49,10 @@ static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
+static DOTCONF_CB(get_handle_purgatory);
+static DOTCONF_CB(get_attr_cache_keywords_list);
+static DOTCONF_CB(get_attr_cache_size);
+static DOTCONF_CB(get_attr_cache_max_num_elems);
 
 /* internal helper functions */
 static int is_valid_alias(char *str);
@@ -101,6 +106,8 @@ static const configoption_t options[] =
     {"Alias",ARG_LIST, get_alias_list,NULL,CTX_ALL},
     {"<FileSystem>",ARG_NONE, enter_filesystem_context,NULL,CTX_ALL},
     {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_ALL},
+    {"<StorageHints>",ARG_NONE, enter_storage_hints_context,NULL,CTX_ALL},
+    {"</StorageHints>",ARG_NONE, exit_storage_hints_context,NULL,CTX_ALL},
     {"<MetaHandleRanges>",ARG_NONE, enter_mhranges_context,NULL,CTX_ALL},
     {"</MetaHandleRanges>",ARG_NONE, exit_mhranges_context,NULL,CTX_ALL},
     {"<DataHandleRanges>",ARG_NONE, enter_dhranges_context,NULL,CTX_ALL},
@@ -113,9 +120,12 @@ static const configoption_t options[] =
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,CTX_ALL},
     {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
     {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,CTX_ALL},
-    {"HandlePurgatory", ARG_INT, get_handle_purgatory, NULL, CTX_ALL},
     {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,CTX_ALL},
     {"FlowModules",ARG_LIST, get_flow_module_list,NULL,CTX_ALL},
+    {"HandlePurgatory",ARG_INT,get_handle_purgatory,NULL,CTX_ALL},
+    {"AttrCacheKeywords",ARG_LIST, get_attr_cache_keywords_list,NULL,CTX_ALL},
+    {"AttrCacheSize",ARG_INT, get_attr_cache_size, NULL,CTX_ALL},
+    {"AttrCacheMaxNumElems",ARG_INT,get_attr_cache_max_num_elems,NULL,CTX_ALL},
     LAST_OPTION
 };
 
@@ -195,37 +205,36 @@ int PINT_parse_config(
 
     if (!config_s->host_id)
     {
-        gossip_err("Configuration file error. No host ID specified.\n");
+        gossip_err("Configuration file error. "
+                   "No host ID specified.\n");
         return 1;
     }
 
     if (!config_s->storage_path)
     {
-        gossip_err("Configuration file error. No storage path specified.\n");
+        gossip_err("Configuration file error. "
+                   "No storage path specified.\n");
         return 1;
     }
 
     if (!config_s->bmi_modules)
     {
-	gossip_err("Configuration file error. No BMI modules specified.\n");
+	gossip_err("Configuration file error. "
+                   "No BMI modules specified.\n");
 	return 1;
     }
 
     if (!config_s->flow_modules)
     {
-	gossip_err("Configuration file error. No Flow modules specified.\n");
-	return 1;
-    }
-
-    if (!config_s->handle_purgatory.tv_sec)
-    {
-	gossip_err("Configuration file error. No HandlePurgatory specified\n");
+	gossip_err("Configuration file error. "
+                   "No Flow modules specified.\n");
 	return 1;
     }
 
     if (!config_s->perf_update_interval)
     {
-	gossip_err("Configuration file error.  No PerfUpdateInterval specified.\n");
+	gossip_err("Configuration file error.  "
+                   "No PerfUpdateInterval specified.\n");
 	return 1;
     }
 
@@ -371,6 +380,31 @@ DOTCONF_CB(exit_filesystem_context)
     return NULL;
 }
 
+DOTCONF_CB(enter_storage_hints_context)
+{
+    if (config_s->configuration_context != FILESYSTEM_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot "
+                    "have StorageHints tag here\n");
+        return NULL;
+    }
+    config_s->configuration_context = STORAGEHINTS_CONFIG;
+    return NULL;
+}
+
+DOTCONF_CB(exit_storage_hints_context)
+{
+    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot "
+                    "have /StorageHints tag here\n");
+        return NULL;
+    }
+    config_s->configuration_context = FILESYSTEM_CONFIG;
+    return NULL;
+}
+
+
 DOTCONF_CB(enter_mhranges_context)
 {
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
@@ -466,12 +500,6 @@ DOTCONF_CB(get_perf_update_interval)
         return NULL;
     }
     config_s->perf_update_interval = cmd->data.value;
-    return NULL;
-}
-
-DOTCONF_CB(get_handle_purgatory)
-{
-    config_s->handle_purgatory.tv_sec = cmd->data.value;
     return NULL;
 }
 
@@ -579,6 +607,119 @@ DOTCONF_CB(get_bmi_module_list)
     return NULL;
 }
 
+DOTCONF_CB(get_handle_purgatory)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
+    {
+        gossip_lerr("HandlePurgatory Tag can only be in a "
+                    "StorageHints block");
+        return NULL;
+    }
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (fs_conf->handle_purgatory.tv_sec)
+    {
+        gossip_lerr("WARNING: Overwriting %d with %d\n",
+                    (int)fs_conf->handle_purgatory.tv_sec,
+                    (int)cmd->data.value);
+    }
+    fs_conf->handle_purgatory.tv_sec = (int)cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_attr_cache_keywords_list)
+{
+    int i = 0, len = 0;
+    char buf[512] = {0};
+    char *ptr = buf;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
+    {
+        gossip_lerr("AttrCacheKeywords Tag can only be in a "
+                    "Filesystem block");
+        return NULL;
+    }
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (fs_conf->attr_cache_keywords != NULL)
+    {
+        len = strlen(fs_conf->attr_cache_keywords);
+        strncpy(ptr,fs_conf->attr_cache_keywords,len);
+        ptr += (len * sizeof(char));
+        if (*(ptr-1) != ',')
+        {
+            *ptr = ',';
+            ptr++;
+        }
+        free(fs_conf->attr_cache_keywords);
+    }
+    for(i = 0; i < cmd->arg_count; i++)
+    {
+        strncat(ptr, cmd->data.list[i], 512 - len);
+        len += strlen(cmd->data.list[i]);
+    }
+    fs_conf->attr_cache_keywords = strdup(buf);
+    return NULL;
+}
+
+DOTCONF_CB(get_attr_cache_size)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
+    {
+        gossip_lerr("AttrCacheSize Tag can only be in a "
+                    "StorageHints block");
+        return NULL;
+    }
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (fs_conf->attr_cache_size)
+    {
+        gossip_lerr("WARNING: Overwriting %d with %d\n",
+                    fs_conf->attr_cache_size,
+                    (int)cmd->data.value);
+    }
+    fs_conf->attr_cache_size = (int)cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_attr_cache_max_num_elems)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
+    {
+        gossip_lerr("AttrCacheMaxNumElems Tag can only be in a "
+                    "StorageHints block");
+        return NULL;
+    }
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (fs_conf->attr_cache_max_num_elems)
+    {
+        gossip_lerr("WARNING: Overwriting %d with %d\n",
+                    fs_conf->attr_cache_max_num_elems,
+                    (int)cmd->data.value);
+    }
+    fs_conf->attr_cache_max_num_elems = (int)cmd->data.value;
+    return NULL;
+}
 
 DOTCONF_CB(get_root_handle)
 {
@@ -1041,6 +1182,13 @@ static void free_filesystem(void *ptr)
         /* free all handle ranges */
         PINT_llist_free(fs->meta_handle_ranges,free_host_handle_mapping);
         PINT_llist_free(fs->data_handle_ranges,free_host_handle_mapping);
+
+        /* if the optional hints are used, free them */
+        if (fs->attr_cache_keywords)
+        {
+            free(fs->attr_cache_keywords);
+            fs->attr_cache_keywords = NULL;
+        }
 
         free(fs);
         fs = NULL;

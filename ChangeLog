@@ -3,9 +3,13 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.0.7pre1
+pvfs2-0.0.7pre2
 ===============
-- Re-worked architecture of metadata storage
+- re-worked architecture of metadata storage (generic dspace attrs are
+  used instead of a separate keyval/data pair)
+- added a trove-dbpf attribute cache layer for caching generic attributes
+  and keyval/data pairs that are user configurable
+
 
 pvfs2-0.0.6
 ===========

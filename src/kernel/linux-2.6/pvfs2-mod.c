@@ -133,17 +133,12 @@ static void __exit pvfs2_exit(void)
     }
     spin_unlock(&pvfs2_request_list_lock);
 
-    /*
-       this is an exhaustive and slow iterate through two hashtables
-       of the same size.  since we're only doing this on unload only,
-       there shouldn't be a significant performance penalty.
-     */
     for (i = 0; i < htable_ops_in_progress->table_size; i++)
     {
 	do
 	{
-	    hash_link =
-                qhash_search_and_remove(htable_ops_in_progress, &(i));
+	    hash_link = qhash_search_and_remove_at_index(
+                htable_ops_in_progress, i);
 	    if (hash_link)
 	    {
 		cur_op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);

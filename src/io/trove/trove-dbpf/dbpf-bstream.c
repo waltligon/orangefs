@@ -20,6 +20,7 @@
 #include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-bstream.h"
+#include "dbpf-attr-cache.h"
 #include "pint-event.h"
 
 #define DBPF_OPEN open
@@ -32,13 +33,36 @@
 
 #define AIOCB_ARRAY_SZ 8
 
+/* Internal prototypes */
+static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
+				       TROVE_handle handle,
+				       char **mem_offset_array, 
+				       TROVE_size *mem_size_array,
+				       int mem_count,
+				       TROVE_offset *stream_offset_array, 
+				       TROVE_size *stream_size_array,
+				       int stream_count,
+				       TROVE_size *out_size_p,
+				       TROVE_ds_flags flags, 
+				       TROVE_vtag_s *vtag,
+				       void *user_ptr,
+				       TROVE_context_id context_id,
+				       TROVE_op_id *out_op_id_p,
+				       int opcode);
+static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p);
+static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p);
+#ifndef __PVFS2_TROVE_AIO_THREADED__
+static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p);
+#endif
+static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p);
+static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p);
+
 #ifdef __PVFS2_TROVE_AIO_THREADED__
 #include "dbpf-thread.h"
 
 extern pthread_cond_t dbpf_op_completed_cond;
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
-
 
 static void aio_progress_notification(sigval_t sig)
 {
@@ -48,14 +72,15 @@ static void aio_progress_notification(sigval_t sig)
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
     gen_mutex_t *context_mutex = NULL;
 
-    gossip_debug(TROVE_DEBUG,"aio_progress_notification called with %p\n",
-                 sig.sival_ptr);
-
     cur_op = (dbpf_queued_op_t *)sig.sival_ptr;
     assert(cur_op);
 
     op_p = &cur_op->op;
     assert(op_p);
+
+    gossip_debug(
+        TROVE_DEBUG,"aio_progress_notification called "
+        "with %p (handle %Lu)\n", sig.sival_ptr, Lu(op_p->handle));
 
     aiocb_p = op_p->u.b_rw_list.aiocb_array;
     assert(aiocb_p);
@@ -190,32 +215,6 @@ static void aio_progress_notification(sigval_t sig)
 }
 #endif /* __PVFS2_TROVE_AIO_THREADED__ */
 
-/* Internal prototypes */
-static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
-				       TROVE_handle handle,
-				       char **mem_offset_array, 
-				       TROVE_size *mem_size_array,
-				       int mem_count,
-				       TROVE_offset *stream_offset_array, 
-				       TROVE_size *stream_size_array,
-				       int stream_count,
-				       TROVE_size *out_size_p,
-				       TROVE_ds_flags flags, 
-				       TROVE_vtag_s *vtag,
-				       void *user_ptr,
-				       TROVE_context_id context_id,
-				       TROVE_op_id *out_op_id_p,
-				       int opcode);
-static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p);
-static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p);
-#ifndef __PVFS2_TROVE_AIO_THREADED__
-static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p);
-#endif
-static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p);
-static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p);
-
-/* Functions */
-
 /* dbpf_bstream_read_at()
  */
 static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
@@ -231,26 +230,20 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
-    
-    /* find the collection */
-    /* TODO: how are we going to handle this?!?!? */
+
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -1;
-    
-    /* validate the handle, check permissions */
-    
-    /* Q: do we want to somehow lock the handle here so that it
-     *    doesn't get removed while we're working on it?  To allow
-     *    for atomic access?
-     */
-    
-    /* grab a queued op structure */
+    if (coll_p == NULL)
+    {
+        return -1;
+    }
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -1;
+    if (q_op_p == NULL)
+    {
+        return -1;
+    }
     
     /* initialize all the common members */
-    dbpf_queued_op_init(
-			q_op_p,
+    dbpf_queued_op_init(q_op_p,
 			BSTREAM_READ_AT,
 			handle,
 			coll_p,
@@ -258,14 +251,14 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
 			user_ptr,
 			flags,
                         context_id);
-    
+
     /* initialize the op-specific members */
     q_op_p->op.u.b_read_at.offset =  offset;
     q_op_p->op.u.b_read_at.size   = *inout_size_p;
     q_op_p->op.u.b_read_at.buffer =  buffer;
-   
+
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-    
+
     return 0;
 }
 
@@ -278,29 +271,35 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
     int ret, fd, got_fd = 0;
 
     /* grab the FD (also increments a reference count) */
-    /* TODO: CONSIDER PUTTING COLL_ID IN THE OP INSTEAD OF THE PTR */
-    ret = dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &fd);
-    switch (ret) {
+    ret = dbpf_bstream_fdcache_try_get(
+        op_p->coll_p->coll_id, op_p->handle, 0, &fd);
+    switch (ret)
+    {
 	case DBPF_BSTREAM_FDCACHE_ERROR:
 	    goto return_error;
 	case DBPF_BSTREAM_FDCACHE_BUSY:
 	    return 0;
 	case DBPF_BSTREAM_FDCACHE_SUCCESS:
 	    got_fd = 1;
-	    /* drop through */
+            break;
     }
 
-    /* we have a dataspace now, maybe a new one. */
-    
     ret = DBPF_LSEEK(fd, op_p->u.b_read_at.offset, SEEK_SET);
-    if (ret < 0) goto return_error;
+    if (ret < 0)
+    {
+        goto return_error;
+    }
     
     ret = DBPF_READ(fd, op_p->u.b_read_at.buffer, op_p->u.b_read_at.size);
-    if (ret < 0) goto return_error;
+    if (ret < 0)
+    {
+        goto return_error;
+    }
     
-    /* sync if user requested it */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = DBPF_SYNC(fd)) != 0) {
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = DBPF_SYNC(fd)) != 0)
+        {
 	    goto return_error;
 	}
     }
@@ -313,7 +312,10 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
     return 1;
    
  return_error:
-    if (got_fd) dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    if (got_fd)
+    {
+        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    }
     return -1;
 }
 
@@ -333,22 +335,18 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
     
     /* find the collection */
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -1;
-    
-    /* validate the handle, check permissions?? */
-    
-    /* Q: do we want to somehow lock the handle here so that it
-     *    doesn't get removed while we're working on it?  To allow
-     *    for atomic access?
-     */
-    
-    /* grab a queued op structure */
+    if (coll_p == NULL)
+    {
+        return -1;
+    }
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -1;
+    if (q_op_p == NULL)
+    {
+        return -1;
+    }
     
     /* initialize all the common members */
-    dbpf_queued_op_init(
-			q_op_p,
+    dbpf_queued_op_init(q_op_p,
 			BSTREAM_WRITE_AT,
 			handle,
 			coll_p,
@@ -356,14 +354,14 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
 			user_ptr,
 			flags,
                         context_id);
-    
+
     /* initialize the op-specific members */
     q_op_p->op.u.b_write_at.offset =  offset;
     q_op_p->op.u.b_write_at.size   = *inout_size_p;
     q_op_p->op.u.b_write_at.buffer =  buffer;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-    
+
     return 0;
 }
 
@@ -375,32 +373,36 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
     int ret, fd, got_fd = 0;
 
     /* grab the FD (also increments a reference count) */
-    ret = dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 1, &fd);
-    switch (ret) {
+    ret = dbpf_bstream_fdcache_try_get(
+        op_p->coll_p->coll_id, op_p->handle, 1, &fd);
+    switch (ret)
+    {
 	case DBPF_BSTREAM_FDCACHE_ERROR:
 	    goto return_error;
 	case DBPF_BSTREAM_FDCACHE_BUSY:
 	    return 0;
 	case DBPF_BSTREAM_FDCACHE_SUCCESS:
 	    got_fd = 1;
-	    /* drop through */
+            break;
     }
     
-    /* we have a dataspace now, maybe a new one. */
-    
     ret = DBPF_LSEEK(fd, op_p->u.b_write_at.offset, SEEK_SET);
-    if (ret < 0) goto return_error;
+    if (ret < 0)
+    {
+        goto return_error;
+    }
     
-    ret = DBPF_WRITE(
-		     fd,
-		     op_p->u.b_write_at.buffer,
-		     op_p->u.b_write_at.size);
-    if (ret < 0) goto return_error;
-    
+    ret = DBPF_WRITE(fd, op_p->u.b_write_at.buffer,
+                     op_p->u.b_write_at.size);
+    if (ret < 0)
+    {
+        goto return_error;
+    }
 
-    /* sync if user requested it */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = DBPF_SYNC(fd)) != 0) {
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = DBPF_SYNC(fd)) != 0)
+        {
 	    goto return_error;
 	}
     }
@@ -414,32 +416,36 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
     return 1;
     
  return_error:
-    if (got_fd) dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    if (got_fd)
+    {
+        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    }
     return -1;
 }
 
-static int dbpf_bstream_flush(
-				TROVE_coll_id coll_id,
-				TROVE_handle handle,
-				TROVE_ds_flags flags,
-				void *user_ptr,
-				TROVE_context_id context_id,
-				TROVE_op_id *out_op_id_p)
+static int dbpf_bstream_flush(TROVE_coll_id coll_id,
+                              TROVE_handle handle,
+                              TROVE_ds_flags flags,
+                              void *user_ptr,
+                              TROVE_context_id context_id,
+                              TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
-    
-    /* find the collection */
+
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
-    
-    /* grab a queued op structure */
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
-    
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
+
     /* initialize all the common members */
-    dbpf_queued_op_init(
-			q_op_p,
+    dbpf_queued_op_init(q_op_p,
 			BSTREAM_FLUSH,
 			handle,
 			coll_p,
@@ -463,10 +469,14 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
     int ret, error, fd, got_fd = 0;
 
     /* grab the FD (also increments a reference count) */
-    /* TODO: CONSIDER PUTTING COLL_ID IN THE OP INSTEAD OF THE PTR */
-    ret = dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &fd);
-    switch (ret) {
-	/* TODO: fix the bstream error codes to be like the keyval error codes*/
+    ret = dbpf_bstream_fdcache_try_get(
+        op_p->coll_p->coll_id, op_p->handle, 0, &fd);
+    switch (ret)
+    {
+	/*
+          TODO: fix the bstream error codes to
+          be like the keyval error codes
+        */
 	case -TROVE_ENOENT:
 	    error = ret;
 	    goto return_error;
@@ -477,11 +487,12 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
 	    return 0;
 	case DBPF_BSTREAM_FDCACHE_SUCCESS:
 	    got_fd = 1;
-	    /* drop through */
+            break;
     }
 
     ret = DBPF_SYNC(fd);
-    if ( ret != 0) {
+    if (ret != 0)
+    {
 	error = -trove_errno_to_trove_error(errno);
 	goto return_error;
     }
@@ -489,14 +500,14 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
     return 1;
 
 return_error:
-    if (got_fd) dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    if (got_fd)
+    {
+        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    }
     return error;
 }
 
-/* dbpf_bstream_resize()
- */
-static int dbpf_bstream_resize(
-			       TROVE_coll_id coll_id,
+static int dbpf_bstream_resize(TROVE_coll_id coll_id,
 			       TROVE_handle handle,
 			       TROVE_size *inout_size_p,
 			       TROVE_ds_flags flags,
@@ -507,18 +518,20 @@ static int dbpf_bstream_resize(
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
-    
-    /* find the collection */
+
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
-    
-    /* grab a queued op structure */
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
-    
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
+
     /* initialize all the common members */
-    dbpf_queued_op_init(
-			q_op_p,
+    dbpf_queued_op_init(q_op_p,
 			BSTREAM_RESIZE,
 			handle,
 			coll_p,
@@ -531,7 +544,7 @@ static int dbpf_bstream_resize(
     q_op_p->op.u.b_resize.size = *inout_size_p;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-    
+
     return 0;
 }
 
@@ -543,10 +556,14 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
     int ret, error, fd, got_fd = 0;
 
     /* grab the FD (also increments a reference count) */
-    /* TODO: CONSIDER PUTTING COLL_ID IN THE OP INSTEAD OF THE PTR */
-    ret = dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 1, &fd);
-    switch (ret) {
-	/* TODO: fix the bstream error codes to be like the keyval error codes*/
+    ret = dbpf_bstream_fdcache_try_get(
+        op_p->coll_p->coll_id, op_p->handle, 1, &fd);
+    switch (ret)
+    {
+	/*
+          TODO: fix the bstream error codes to
+          be like the keyval error codes
+        */
 	case -TROVE_ENOENT:
 	    error = ret;
 	    goto return_error;
@@ -557,27 +574,32 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
 	    return 0;
 	case DBPF_BSTREAM_FDCACHE_SUCCESS:
 	    got_fd = 1;
-	    /* drop through */
+            break;
     }
 
-    ret = DBPF_RESIZE(fd,
-		    op_p->u.b_resize.size);
-    if ( ret != 0) {
+    ret = DBPF_RESIZE(fd, op_p->u.b_resize.size);
+    if ( ret != 0)
+    {
 	error = -trove_errno_to_trove_error(errno);
 	goto return_error;
     }
     dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+
+    /* adjust size in cached attribute element, if present */
+    dbpf_attr_cache_ds_attr_update_cached_data_bsize(
+        op_p->handle,  op_p->u.b_resize.size);
+
     return 1;
 
 return_error:
-    if (got_fd) dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    if (got_fd)
+    {
+        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    }
     return error;
 }
 
-/* dbpf_bstream_validate()
- */
-static int dbpf_bstream_validate(
-				 TROVE_coll_id coll_id,
+static int dbpf_bstream_validate(TROVE_coll_id coll_id,
 				 TROVE_handle handle,
 			       	 TROVE_ds_flags flags,
 				 TROVE_vtag_s *vtag,
@@ -588,9 +610,6 @@ static int dbpf_bstream_validate(
     return -TROVE_ENOSYS;
 }
 
-
-/* dbpf_bstream_read_list()
- */
 static int dbpf_bstream_read_list(TROVE_coll_id coll_id,
 				  TROVE_handle handle,
 				  char **mem_offset_array, 
@@ -623,8 +642,6 @@ static int dbpf_bstream_read_list(TROVE_coll_id coll_id,
 				LIO_READ);
 }
 
-/* dbpf_bstream_write_list()
- */
 static int dbpf_bstream_write_list(TROVE_coll_id coll_id,
 				   TROVE_handle handle,
 				   char **mem_offset_array, 
@@ -690,15 +707,18 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
 #endif
 
-    /* find the collection */
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
-
-    /* grab a queued op structure */
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
-    if(opcode == LIO_READ)
+    if (opcode == LIO_READ)
     {
 	tmp_type = BSTREAM_READ_LIST;
 	event_type = PVFS_EVENT_TROVE_READ_LIST;
@@ -759,6 +779,15 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     }
     q_op_p->op.u.b_rw_list.fd = fd;
 
+    /*
+      if we're doing an i/o write, remove the cached
+      attribute for this handle if it's present
+    */
+    if (opcode == LIO_WRITE)
+    {
+        dbpf_attr_cache_remove(handle);
+    }
+
 #ifndef __PVFS2_TROVE_AIO_THREADED__
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
@@ -776,6 +805,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     aiocb_p = (struct aiocb *) malloc(AIOCB_ARRAY_SZ*sizeof(struct aiocb));
     if (aiocb_p == NULL)
     {
+        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, handle);
         return -TROVE_ENOMEM;
     }
 
@@ -858,9 +888,9 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     if (ret != 0)
     {
         gossip_lerr("lio_listio() returned %d\n", ret);
+	dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, handle);
         return -trove_errno_to_trove_error(errno);
     }
-
 #endif
 
     return 0;
@@ -906,15 +936,14 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
     int ret, i, aiocb_inuse_count, op_in_progress_count = 0;
     struct aiocb *aiocb_p, *aiocb_ptr_array[AIOCB_ARRAY_SZ];
 
-/*     gossip_debug(TROVE_DEBUG, "dbpf_bstream_rw_list_op_svc() entered.\n"); */
-
-    /* allocate space for aiocb array if necessary */
-    /* TODO: watch memory allocation, delay this operation if no memory avail. */
-    if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_INITIALIZED) {
+    if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_INITIALIZED)
+    {
 	/* first call; need to allocate aiocb array and ptr array */
-	aiocb_p = (struct aiocb *) malloc(AIOCB_ARRAY_SZ*sizeof(struct aiocb));
+	aiocb_p = (struct aiocb *)malloc(
+            AIOCB_ARRAY_SZ*sizeof(struct aiocb));
 
-	if (aiocb_p == NULL) {
+	if (aiocb_p == NULL)
+        {
 	    return -TROVE_ENOMEM;
 	}
 

@@ -24,11 +24,13 @@
 /* NOTE: THIS IS ALMOST CERTAINLY BROKEN FOR MULTITHREADED APPS!!!
  */
 
-enum {
+enum
+{
     DBCACHE_ENTRIES = 16
 };
 
-struct keyval_dbcache_entry {
+struct keyval_dbcache_entry
+{
     int ref_ct; /* -1 == not a valid cache entry */
     gen_mutex_t mutex;
     TROVE_coll_id coll_id;
@@ -44,7 +46,8 @@ void dbpf_keyval_dbcache_initialize(void)
 {
     int i;
 
-    for (i=0; i < DBCACHE_ENTRIES; i++) {
+    for (i = 0; i < DBCACHE_ENTRIES; i++)
+    {
 	gen_mutex_init(&keyval_db_cache[i].mutex);
 	keyval_db_cache[i].ref_ct = -1;
 	keyval_db_cache[i].db_p   = NULL;
@@ -57,16 +60,21 @@ void dbpf_keyval_dbcache_finalize(void)
 {
     int i, ret;
 
-    for (i=0; i < DBCACHE_ENTRIES; i++) {
-	if (keyval_db_cache[i].ref_ct > 0) {
-	    gossip_debug(TROVE_DEBUG, "warning: ref_ct = %d on handle %Lx in dbcache\n",
-		   keyval_db_cache[i].ref_ct,
-		   Lu(keyval_db_cache[i].handle));
+    for (i = 0; i < DBCACHE_ENTRIES; i++)
+    {
+	if (keyval_db_cache[i].ref_ct > 0)
+        {
+	    gossip_debug(TROVE_DEBUG, "warning: ref_ct = %d "
+                         "on handle %Lx in dbcache\n",
+                         keyval_db_cache[i].ref_ct,
+                         Lu(keyval_db_cache[i].handle));
 	}
-	if (keyval_db_cache[i].ref_ct >= 0) {
+	if (keyval_db_cache[i].ref_ct >= 0)
+        {
 	    /* close DB */
-	    ret = keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
-	    if (ret != 0) assert(0);
+	    ret = keyval_db_cache[i].db_p->close(
+                keyval_db_cache[i].db_p, 0);
+            assert(ret == 0);
 	}
     }
 }
@@ -84,25 +92,34 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
     int i, ret;
     char filename[PATH_MAX];
 
-    for (i=0; i < DBCACHE_ENTRIES; i++) {
+    for (i = 0; i < DBCACHE_ENTRIES; i++)
+    {
 	if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
-	    keyval_db_cache[i].ref_ct  >= 0 &&
-	    keyval_db_cache[i].coll_id == coll_id &&
-	    keyval_db_cache[i].handle  == handle) break;
-	else if (ret == 0) gen_mutex_unlock(&keyval_db_cache[i].mutex);
+	    (keyval_db_cache[i].ref_ct >= 0) &&
+             (keyval_db_cache[i].coll_id == coll_id) &&
+              (keyval_db_cache[i].handle == handle))
+        {
+            break;
+        }
+	else if (ret == 0)
+        {
+            gen_mutex_unlock(&keyval_db_cache[i].mutex);
+        }
     }
 
-    if (i < DBCACHE_ENTRIES) {
+    if (i < DBCACHE_ENTRIES)
+    {
 	/* found cached DB */
-
-	if (keyval_db_cache[i].ref_ct > 0) {
+	if (keyval_db_cache[i].ref_ct > 0)
+        {
 	    gen_mutex_unlock(&keyval_db_cache[i].mutex);
 	    return -TROVE_EBUSY;
 	}
 
 	/* close it */
 	ret = keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
-	if (ret != 0) {
+	if (ret != 0)
+        {
 	    gossip_debug(TROVE_DEBUG, "db: close error\n");
 	}
 	keyval_db_cache[i].ref_ct = -1;
@@ -110,18 +127,17 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 	gen_mutex_unlock(&keyval_db_cache[i].mutex);
     }
 
-    DBPF_GET_KEYVAL_DBNAME(filename,
-			   PATH_MAX,
-			   my_storage_p->name,
-			   coll_id,
-			   Lu(handle));
+    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name,
+			   coll_id, Lu(handle));
 #if 0
     gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
 
     ret = DBPF_UNLINK(filename);
-    if (ret != 0) {
-	switch (errno) {
+    if (ret != 0)
+    {
+	switch (errno)
+        {
 	    case ENOENT:
 		return -TROVE_ENOENT;
 	    default:
@@ -129,7 +145,6 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 		return -TROVE_EPERM;
 	}
     }
-
     return 0;
 }
 
@@ -152,18 +167,26 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 {
     int i, ret, error;
     char filename[PATH_MAX];
-    DB *db_p;
-    int got_db=0;
+    DB *db_p = NULL;
+    int got_db = 0;
 
-    for (i=0; i < DBCACHE_ENTRIES; i++) {
+    for (i = 0; i < DBCACHE_ENTRIES; i++)
+    {
 	if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
-	    keyval_db_cache[i].ref_ct  >= 0 &&
-	    keyval_db_cache[i].coll_id == coll_id &&
-	    keyval_db_cache[i].handle  == handle) break;
-	else if (ret == 0) gen_mutex_unlock(&keyval_db_cache[i].mutex);
+	    (keyval_db_cache[i].ref_ct >= 0) &&
+            (keyval_db_cache[i].coll_id == coll_id) &&
+            (keyval_db_cache[i].handle == handle))
+        {
+            break;
+        }
+	else if (ret == 0)
+        {
+            gen_mutex_unlock(&keyval_db_cache[i].mutex);
+        }
     }
 
-    if (i < DBCACHE_ENTRIES) {
+    if (i < DBCACHE_ENTRIES)
+    {
 	/* found cached DB */
 #if 0
 	gossip_debug(TROVE_DEBUG, "dbcache: found cached db at index %d\n", i);
@@ -175,53 +198,67 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     }
 
     /* no cached db; open it */
-    for (i=0; i < DBCACHE_ENTRIES; i++) {
+    for (i = 0; i < DBCACHE_ENTRIES; i++)
+    {
 	if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
-	    keyval_db_cache[i].ref_ct == -1)
+	    (keyval_db_cache[i].ref_ct == -1))
 	{
 #if 0
-	    gossip_debug(TROVE_DEBUG, "dbcache: found empty entry at %d\n", i);
+	    gossip_debug(TROVE_DEBUG, "dbcache: found empty "
+                         "entry at %d\n", i);
 #endif
 	    break;
 	}
-	else if (ret == 0) gen_mutex_unlock(&keyval_db_cache[i].mutex);
+	else if (ret == 0)
+        {
+            gen_mutex_unlock(&keyval_db_cache[i].mutex);
+        }
     }
 
-    if (i == DBCACHE_ENTRIES) {
+    if (i == DBCACHE_ENTRIES)
+    {
 	/* no invalid entries; search for one that isn't in use */
-	for (i=0; i < DBCACHE_ENTRIES; i++) {
+	for (i = 0; i < DBCACHE_ENTRIES; i++)
+        {
 	    if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
-		keyval_db_cache[i].ref_ct == 0)
+		(keyval_db_cache[i].ref_ct == 0))
 	    {
 #if 0
-		gossip_debug(TROVE_DEBUG, "dbcache: no empty entries; found unused entry at %d\n", i);
+		gossip_debug(TROVE_DEBUG, "dbcache: no empty entries; "
+                             "found unused entry at %d\n", i);
 #endif
-		
-		ret = keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
-		if (ret != 0) {
+
+		ret = keyval_db_cache[i].db_p->close(
+                    keyval_db_cache[i].db_p, 0);
+		if (ret != 0)
+                {
 		    gossip_debug(TROVE_DEBUG, "db: close error\n");
 		}
 		keyval_db_cache[i].ref_ct = -1;
 		keyval_db_cache[i].db_p   = NULL;
 		break;
 	    }
-	    else if (ret == 0) gen_mutex_unlock(&keyval_db_cache[i].mutex);
+	    else if (ret == 0)
+            {
+                gen_mutex_unlock(&keyval_db_cache[i].mutex);
+            }
 	}
-	if (i == DBCACHE_ENTRIES) assert(0);
+	assert(i != DBCACHE_ENTRIES);
     }
 
-    /* have lock on an entry, open/create */
-
-    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name, coll_id, Lu(handle));
+    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
+                           my_storage_p->name, coll_id, Lu(handle));
 #if 0
     gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
 
     ret = db_create(&(keyval_db_cache[i].db_p), NULL, 0);
-    if (ret != 0) {
+    if (ret != 0)
+    {
 	    gossip_lerr("dbpf_keyval_dbcache_get: %s\n", db_strerror(ret));
 	    assert(0);
-    } else {
+    } else
+    {
 	got_db =1;
     }
 
@@ -229,7 +266,8 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     db_p->set_errfile(db_p, stderr);
     db_p->set_errpfx(db_p, "xxx");
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
-    if (( ret =  db_p->set_flags(db_p, DB_RECNUM)) ) {
+    if (( ret =  db_p->set_flags(db_p, DB_RECNUM)))
+    {
 	    db_p->err(db_p, ret, "%s: set_flags", filename);
 	    assert(0);
     }
@@ -253,13 +291,15 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 			 DB_BTREE,
 			 DB_CREATE|DB_EXCL,
 			 0644);
-	if (ret != 0) assert(0);
+	assert (ret == 0);
     }
-    else if (ret == ENOENT) {
+    else if (ret == ENOENT)
+    {
 	error = -TROVE_ENOENT;
 	goto failed_open_error;
     }
-    else if (ret != 0) {
+    else if (ret != 0)
+    {
 #if 0
 	    perror("dpbf_keyval_dbcache_get");
 #endif
@@ -277,13 +317,14 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 failed_open_error:
     /* db_create allocates memory -- even if db->open fails -- which can only
      * be freed with db->close */
-    if(got_db && (keyval_db_cache[i].db_p  != NULL) ) {
+    if (got_db && (keyval_db_cache[i].db_p != NULL))
+    {
 	/* ignore errors, since we are trying to clean up anyway */
 	keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
 	keyval_db_cache[i].ref_ct = -1;
 	keyval_db_cache[i].db_p = NULL;
     }
-    /* fall through */
+
 return_error:
     gen_mutex_unlock(&keyval_db_cache[i].mutex);
     return error;
@@ -291,31 +332,38 @@ return_error:
 
 /* dbpf_keyval_dbcache_put()
  */
-void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
-			     TROVE_handle handle)
+void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id, TROVE_handle handle)
 {
     int i;
 
-    for (i=0; i < DBCACHE_ENTRIES; i++) {
+    for (i = 0; i < DBCACHE_ENTRIES; i++)
+    {
 	gen_mutex_lock(&keyval_db_cache[i].mutex);
-	if (keyval_db_cache[i].ref_ct  >= 0 &&
-	    keyval_db_cache[i].coll_id == coll_id &&
-	    keyval_db_cache[i].handle  == handle) break;
-	else gen_mutex_unlock(&keyval_db_cache[i].mutex);
+	if ((keyval_db_cache[i].ref_ct >= 0) &&
+	    (keyval_db_cache[i].coll_id == coll_id) &&
+	    (keyval_db_cache[i].handle  == handle))
+        {
+            break;
+        }
+	else
+        {
+            gen_mutex_unlock(&keyval_db_cache[i].mutex);
+        }
     }
-    if (i == DBCACHE_ENTRIES) {
-	gossip_debug(TROVE_DEBUG, "warning: no matching entry for dbcache_put op\n");
-	return;
+    if (i == DBCACHE_ENTRIES)
+    {
+	gossip_debug(TROVE_DEBUG, "warning: no matching entry "
+                     "for dbcache_put op\n");
+ 	return;
     }
 
     keyval_db_cache[i].ref_ct--;
 
 #ifdef DBCACHE_DONT_CACHE
-    if (keyval_db_cache[i].ref_ct == 0) {
-    	int ret;
-
-	ret = keyval_db_cache[i].db_p->close(db_p, 0);
-	if (ret != 0) assert(0);
+    if (keyval_db_cache[i].ref_ct == 0)
+    {
+    	int ret = keyval_db_cache[i].db_p->close(db_p, 0);
+        assert(ret == 0);
 
 	keyval_db_cache[i].ref_ct = -1;
 	keyval_db_cache[i].db_p   = NULL;

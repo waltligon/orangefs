@@ -6,6 +6,7 @@ SERVERSRC += \
 	$(DIR)/dbpf-bstream-fd-cache.c \
 	$(DIR)/dbpf-keyval.c \
 	$(DIR)/dbpf-keyval-db-cache.c \
+	$(DIR)/dbpf-attr-cache.c \
 	$(DIR)/dbpf-dspace.c \
 	$(DIR)/dbpf-dspace-db-cache.c \
         $(DIR)/dbpf-context.c \

@@ -21,7 +21,8 @@ enum
     DEFAULTS_CONFIG = 3,
     ALIASES_CONFIG = 4,
     META_HANDLERANGES_CONFIG = 5,
-    DATA_HANDLERANGES_CONFIG = 6
+    DATA_HANDLERANGES_CONFIG = 6,
+    STORAGEHINTS_CONFIG = 7
 };
 
 typedef struct phys_server_desc
@@ -56,10 +57,24 @@ typedef struct filesystem_configuration_s
     char *file_system_name;
     PVFS_fs_id coll_id;
     PVFS_handle  root_handle;
-    PINT_llist *meta_handle_ranges; /* ptrs are type host_handle_mapping_s* */
-    PINT_llist *data_handle_ranges; /* ptrs are type host_handle_mapping_s* */
+
+    /* ptrs are type host_handle_mapping_s* */
+    PINT_llist *meta_handle_ranges;
+    /* ptrs are type host_handle_mapping_s* */
+    PINT_llist *data_handle_ranges;
+
     enum PVFS_flowproto_type flowproto; /* default flowprotocol */
     enum PVFS_encoding_type encoding;   /* encoding used for messages */
+
+    /*
+      misc storage hints
+      NOTE: will need to be a union later depending
+      on which trove storage backends are available
+    */
+    struct timeval handle_purgatory;
+    char *attr_cache_keywords;
+    int attr_cache_size;
+    int attr_cache_max_num_elems;
 
     /* the following fields will be used to cache arrays of
      * unique physical server addresses, of particular use to the 
@@ -84,15 +99,16 @@ typedef struct server_configuration_s
     ssize_t server_config_buflen;   /* the server.conf file length      */
     char *server_config_buf;        /* the server.conf file contents    */
     int  initial_unexpected_requests;
-    int  perf_update_interval;      /* how quickly (in msecs) to update perf monitor */
-    struct timeval handle_purgatory; /* how long before freed handle reused */
+    int  perf_update_interval;      /* how quickly (in msecs) to
+                                       update perf monitor              */
     char *logfile;
     char *event_logging;
-    char *bmi_modules;              /* BMI modules */
-    char *flow_modules;             /* Flow modules */
+    char *bmi_modules;              /* BMI modules                      */
+    char *flow_modules;             /* Flow modules                     */
     int  configuration_context;
-    PINT_llist *host_aliases;     /* ptrs are type host_alias_s               */
-    PINT_llist *file_systems;     /* ptrs are type filesystem_configuration_s */
+    PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
+    PINT_llist *file_systems;       /* ptrs are type
+                                       filesystem_configuration_s       */
 } server_configuration_s;
 
 int PINT_parse_config(
