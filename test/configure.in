@@ -125,7 +125,9 @@ dnl ask pvfs2-config to tell us what libraries to use for client and server
 dnl tests
 LIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --libs`
 SERVERLIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --serverlibs`
+PVFS2_TOP_PREFIX=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --prefix`
 AC_SUBST(SERVERLIBS)
+AC_SUBST(PVFS2_TOP_PREFIX)
 
 MPI_INTELC=
 MPI_GNUC=
