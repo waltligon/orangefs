@@ -330,6 +330,7 @@ int dbpf_open_cache_remove(
     int found = 0;
     char filename[PATH_MAX];
     int ret = -1;
+    struct qlist_head* scratch;
 
     /* for error checking for now, let's make sure that this object is _not_
      * in the used list (we shouldn't be able to delete while another thread
@@ -351,7 +352,7 @@ int dbpf_open_cache_remove(
 
     /* see if the item is in the unused list (ref_ct == 0) */    
     gen_mutex_lock(&unused_mutex);
-    qlist_for_each(tmp_link, &unused_list)
+    qlist_for_each_safe(tmp_link, scratch, &unused_list)
     {
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
 	    queue_link);
@@ -359,6 +360,7 @@ int dbpf_open_cache_remove(
 	{
 	    qlist_del(&tmp_entry->queue_link);
 	    found = 1;
+	    break;
 	}
     }
     gen_mutex_unlock(&unused_mutex);
