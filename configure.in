@@ -1,4 +1,10 @@
+dnl **************************************************************
+dnl PVFS2 AUTOCONF SCRIPT
+dnl
 dnl Process this file with autoconf to produce a configure script.
+dnl You may need to use autoheader as well if changing any DEFINEs
+
+dnl sanity checks, output header, location of scripts used here
 AC_INIT(include/pvfs2-types.h)
 AC_CONFIG_HEADER(pvfs2-config.h)
 AC_CONFIG_AUX_DIR(maint/config)
@@ -11,7 +17,7 @@ if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
 else AC_MSG_RESULT(yes)
 fi
 
-dnl Check for install, cc, etc.
+dnl Check for utilities that we need during the build process
 AC_PROG_INSTALL
 AC_PROG_CC
 AC_PROG_CPP
@@ -19,13 +25,16 @@ AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
 AC_CHECK_PROG(HAVE_FIND, find, yes, no)
 
 dnl Options for debugging
+dnl This particular one enables tracing of memory allocation and
+dnl    freeing with the mtrace tool
 AC_ARG_WITH(mtrace,
 [  --with-mtrace                  Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE).],
 CFLAGS="$CFLAGS -imcheck.h"
 AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
 )
 
-dnl Check for kernel version using headers
+dnl See if we have a new enough version of Berkeley DB; needed for
+dnl    compilation of trove-dbpf component
 AC_MSG_CHECKING(whether version of Berkeley DB is new enough)
 	AC_TRY_COMPILE([
 	#include <db.h>
@@ -40,6 +49,8 @@ AC_MSG_CHECKING(whether version of Berkeley DB is new enough)
  or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm))
 	)
 
+dnl output final version of top level makefile and subdirectory
+dnl    makefile includes
 AC_OUTPUT(Makefile
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
