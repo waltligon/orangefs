@@ -110,7 +110,7 @@ AC_MSG_RESULT(no))
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
-install -d src/apps src/io src/common src/client test/common test/io test/client doc
+install -d src/apps src/io src/common src/client test/common test/io test/client doc test/correctness/pts
 
 dnl output final version of top level makefile and subdirectory
 dnl    makefile includes
@@ -152,6 +152,7 @@ test/io/job/module.mk
 test/client/sysint/module.mk
 test/proto/module.mk
 test/server/module.mk
+test/correctness/pts/module.mk
 doc/coding/module.mk
 doc/design/module.mk
 )

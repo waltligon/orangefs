@@ -1234,7 +1234,7 @@ else
 fi
 rm -f conftest*
 
-install -d src/apps src/io src/common src/client test/common test/io test/client doc
+install -d src/apps src/io src/common src/client test/common test/io test/client doc test/correctness/pts
 
 trap '' 1 2 15
 cat > confcache <<\EOF
@@ -1375,6 +1375,7 @@ test/io/job/module.mk
 test/client/sysint/module.mk
 test/proto/module.mk
 test/server/module.mk
+test/correctness/pts/module.mk
 doc/coding/module.mk
 doc/design/module.mk
  pvfs2-config.h" | sed "s/:[^ ]*//g"` conftest*; exit 1' 1 2 15
@@ -1502,6 +1503,7 @@ test/io/job/module.mk
 test/client/sysint/module.mk
 test/proto/module.mk
 test/server/module.mk
+test/correctness/pts/module.mk
 doc/coding/module.mk
 doc/design/module.mk
 "}
