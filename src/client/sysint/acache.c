@@ -370,7 +370,10 @@ int PINT_acache_object_attr_deep_copy(
 		if ((dest->mask & PVFS_ATTR_META_DFILES) &&
 		    dest->u.meta.dfile_count > 0)
                 {
-                    free(dest->u.meta.dfile_array);
+                    if (dest->u.meta.dfile_array)
+                    {
+                        free(dest->u.meta.dfile_array);
+                    }
                 }
 		dest->u.meta.dfile_array = malloc(df_array_size);
 		if (!dest->u.meta.dfile_array)

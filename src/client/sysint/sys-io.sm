@@ -24,9 +24,12 @@ extern job_context_id pint_client_sm_context;
 enum
 {
     IO_NO_DATA = 1,
-    IO_DATAFILE_TRANSFERS_COMPLETE = 2
+    IO_DATAFILE_TRANSFERS_COMPLETE = 2,
+    IO_RETRY = 3
 };
 
+static int io_init(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 static int io_object_getattr_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int io_datafile_setup_msgpairs(
@@ -57,10 +60,12 @@ do {                                        \
         free(iosm_p->datafile_index_array); \
         iosm_p->datafile_index_array = NULL;\
     }                                       \
-    if (sm_p->msgarray)                     \
+    if (sm_p->msgarray &&                   \
+        (sm_p->msgarray != &sm_p->msgpair)) \
     {                                       \
         free(sm_p->msgarray);               \
         sm_p->msgarray = NULL;              \
+        sm_p->msgarray_count = 0;           \
     }                                       \
     if (iosm_p->flow_array)                 \
     {                                       \
@@ -86,14 +91,22 @@ do {                                        \
 
 %%
 
-machine pvfs2_client_io_sm(io_getattr_setup_msgpair,
-                           io_getattr_xfer_msgpair,
-                           io_getattr_failure,
-                           io_datafile_setup_msgpairs,
-                           io_datafile_post_msgpairs,
-                           io_datafile_complete_msgpairs,
-                           io_analyze_results)
+machine pvfs2_client_io_sm(
+    init,
+    io_getattr_setup_msgpair,
+    io_getattr_xfer_msgpair,
+    io_getattr_failure,
+    io_datafile_setup_msgpairs,
+    io_datafile_post_msgpairs,
+    io_datafile_complete_msgpairs,
+    io_analyze_results)
 {
+    state init
+    {
+        run io_init;
+        default => io_getattr_setup_msgpair;
+    }
+
     state io_getattr_setup_msgpair
     {
         run PINT_sm_common_object_getattr_setup_msgpair;
@@ -138,6 +151,7 @@ machine pvfs2_client_io_sm(io_getattr_setup_msgpair,
     state io_analyze_results
     {
         run io_analyze_results;
+        IO_RETRY => init;
         default => terminate;
     }
 }
@@ -145,13 +159,13 @@ machine pvfs2_client_io_sm(io_getattr_setup_msgpair,
 %%
 
 int PVFS_sys_io(PVFS_object_ref ref,
-                PVFS_Request          file_req,
-                PVFS_offset           file_req_offset,
-                void                 *buffer,
-                PVFS_Request          mem_req,
-                PVFS_credentials      credentials,
-                PVFS_sysresp_io      *resp_p,
-                enum PVFS_io_type     io_type)
+                PVFS_Request file_req,
+                PVFS_offset file_req_offset,
+                void *buffer,
+                PVFS_Request mem_req,
+                PVFS_credentials credentials,
+                PVFS_sysresp_io *resp_p,
+                enum PVFS_io_type io_type)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
@@ -195,8 +209,8 @@ int PVFS_sys_io(PVFS_object_ref ref,
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(*sm_p));
 
+    memset(sm_p, 0, sizeof(*sm_p));
     sm_p->cred_p = &credentials;
     sm_p->object_ref = ref;
     sm_p->u.io.io_type = io_type;
@@ -207,6 +221,19 @@ int PVFS_sys_io(PVFS_object_ref ref,
     sm_p->u.io.buffer = buffer; 
     sm_p->u.io.flowproto_type = cur_fs->flowproto;
     sm_p->u.io.encoding = cur_fs->encoding;
+    sm_p->u.io.stored_error_code = 0;
+    sm_p->u.io.retry_count = 0;
+    sm_p->u.io.datafile_handles = NULL;
+    sm_p->u.io.datafile_index_array = NULL;
+    sm_p->msgarray = NULL;
+    sm_p->u.io.dist_p = NULL;
+    sm_p->u.io.dist_size = 0;
+    sm_p->u.io.datafile_handles = NULL;
+    sm_p->u.io.datafile_count = 0;
+    sm_p->u.io.flow_array = NULL;
+    sm_p->u.io.flow_status_array = NULL;
+    sm_p->u.io.session_tag_array = NULL;
+    sm_p->u.io.ackarray = NULL;
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_IO);
     if (ret)
@@ -250,6 +277,28 @@ int PVFS_sys_io(PVFS_object_ref ref,
 
 /*******************************************************************/
 
+static int io_init(PINT_client_sm *sm_p,
+                   job_status_s *js_p)
+{
+    job_id_t tmp_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "io state: init\n");
+
+    assert((js_p->error_code == 0) ||
+           (js_p->error_code == IO_RETRY));
+
+    if (js_p->error_code == IO_RETRY)
+    {
+        js_p->error_code = 0;
+
+        return job_req_sched_post_timer(
+            PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
+            pint_client_sm_context);
+    }
+    return 1;
+}
+
+
 /* io_datafile_setup_msgpairs()
  *
  * Sets up msgpairs to send I/O requests to servers holding datafiles
@@ -288,27 +337,49 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dist_size > 0);
+    assert(attr->u.meta.dfile_array);
     assert(attr->u.meta.dfile_count > 0);
 
-    /* assign internal io ptrs for convenience here (without copying) */
-    sm_p->u.io.dist_p = attr->u.meta.dist;
-    sm_p->u.io.dist_size = attr->u.meta.dist_size;
-    sm_p->u.io.datafile_handles = attr->u.meta.dfile_array;
-    sm_p->u.io.datafile_count = attr->u.meta.dfile_count;
+    /*
+      assign internal io ptrs for convenience here (without
+      copying) if unassigned
+    */
+    if (!sm_p->u.io.dist_p)
+    {
+        sm_p->u.io.dist_p = attr->u.meta.dist;
+    }
+    if (!sm_p->u.io.dist_size)
+    {
+        sm_p->u.io.dist_size = attr->u.meta.dist_size;
+    }
+    if (!sm_p->u.io.datafile_handles)
+    {
+        sm_p->u.io.datafile_handles = attr->u.meta.dfile_array;
+    }
+    if (!sm_p->u.io.datafile_count)
+    {
+        sm_p->u.io.datafile_count = attr->u.meta.dfile_count;
+    }
 
     ret = PINT_Dist_lookup(iosm_p->dist_p);
     assert(ret == 0);
 
-    target_datafile_array = (PVFS_handle *)malloc(
-        (iosm_p->datafile_count * sizeof(PVFS_handle)));
+    if (!target_datafile_array)
+    {
+        target_datafile_array = (PVFS_handle *)malloc(
+            (iosm_p->datafile_count * sizeof(PVFS_handle)));
+    }
     if (!target_datafile_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
 
-    iosm_p->datafile_index_array = (int *)malloc(
-        (iosm_p->datafile_count * sizeof(int)));
+    if (!iosm_p->datafile_index_array)
+    {
+        iosm_p->datafile_index_array = (int *)malloc(
+            (iosm_p->datafile_count * sizeof(int)));
+    }
     if (!iosm_p->datafile_index_array)
     {
         goto malloc_error_exit;
@@ -328,9 +399,17 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 
     if (target_datafile_count == 0)
     {
-        free(target_datafile_array);
-        free(iosm_p->datafile_index_array);
-        iosm_p->datafile_index_array = NULL;
+        if (target_datafile_array)
+        {
+            free(target_datafile_array);
+            target_datafile_array = NULL;
+        }
+
+        if (iosm_p->datafile_index_array)
+        {
+            free(iosm_p->datafile_index_array);
+            iosm_p->datafile_index_array = NULL;
+        }
 
         /* the no data case should be caught earlier than this */
         js_p->error_code = IO_NO_DATA;
@@ -342,8 +421,12 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
                  "might have data\n", target_datafile_count);
 
     /* setup msgpair array */
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
-        (target_datafile_count * sizeof(PINT_client_sm_msgpair_state)));
+    if (!sm_p->msgarray)
+    {
+        sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
+            (target_datafile_count *
+             sizeof(PINT_client_sm_msgpair_state)));
+    }
     if (!sm_p->msgarray)
     {
         goto malloc_error_exit;
@@ -351,8 +434,11 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     sm_p->msgarray_count = target_datafile_count;
 
     /* setup flow descriptor array */
-    iosm_p->flow_array = (flow_descriptor *)malloc(
-        (target_datafile_count * sizeof(flow_descriptor)));
+    if (!iosm_p->flow_array)
+    {
+        iosm_p->flow_array = (flow_descriptor *)malloc(
+            (target_datafile_count * sizeof(flow_descriptor)));
+    }
     if (!iosm_p->flow_array)
     {
         goto malloc_error_exit;
@@ -366,16 +452,22 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     }
 
     /* setup flow status array */
-    iosm_p->flow_status_array = (job_status_s *)malloc(
-        (target_datafile_count * sizeof(job_status_s)));
+    if (!iosm_p->flow_status_array)
+    {
+        iosm_p->flow_status_array = (job_status_s *)malloc(
+            (target_datafile_count * sizeof(job_status_s)));
+    }
     if (!iosm_p->flow_status_array)
     {
         goto malloc_error_exit;
     }
 
     /* setup session tag array */
-    iosm_p->session_tag_array = (PVFS_msg_tag_t *)malloc(
-        (target_datafile_count * sizeof(PVFS_msg_tag_t)));
+    if (!iosm_p->session_tag_array)
+    {
+        iosm_p->session_tag_array = (PVFS_msg_tag_t *)malloc(
+            (target_datafile_count * sizeof(PVFS_msg_tag_t)));
+    }
     if (!iosm_p->session_tag_array)
     {
         goto malloc_error_exit;
@@ -385,8 +477,12 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     if (iosm_p->io_type == PVFS_IO_WRITE)
     {
         /* setup the write acknowledgement array */
-        iosm_p->ackarray = (PINT_client_sm_recv_state *)malloc(
-            (target_datafile_count * sizeof(PINT_client_sm_recv_state)));
+        if (!iosm_p->ackarray)
+        {
+            iosm_p->ackarray = (PINT_client_sm_recv_state *)malloc(
+                (target_datafile_count *
+                 sizeof(PINT_client_sm_recv_state)));
+        }
         if (!iosm_p->ackarray)
         {
             goto malloc_error_exit;
@@ -401,6 +497,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     {
         int orig_index = 0;
         PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+        assert(msg_p);
 
         gossip_debug(GOSSIP_IO_DEBUG, "  sending I/O request "
                      "for %Lu\n", Lu(target_datafile_array[i]));
@@ -436,14 +533,28 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
         msg_p->handle = target_datafile_array[i];
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = NULL;
+
+        ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+                                        msg_p->handle,
+                                        msg_p->fs_id);
+        if (ret)
+        {
+            gossip_err("Failed to map meta server address\n");
+            js_p->error_code = ret;
+            return 1;
+        }
     }
 
     /* swap the new list in for the old one, freeing the old list */
-    if (!sm_p->acache_hit)
+    if (!sm_p->acache_hit && iosm_p->datafile_handles)
     {
         free(iosm_p->datafile_handles);
     }
-    iosm_p->datafile_handles = target_datafile_array;
+
+    if (target_datafile_array)
+    {
+        iosm_p->datafile_handles = target_datafile_array;
+    }
 
     /*
       store the original datafile_count before it's modified,
@@ -488,22 +599,13 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
     assert(sm_p->msgarray);
     assert(sm_p->msgarray_count > 0);
 
-    sm_p->msgarray[0].comp_ct = 2 * sm_p->msgarray_count;
+    sm_p->msgarray[0].comp_ct = (2 * sm_p->msgarray_count);
 
     for (i = 0; i < sm_p->msgarray_count; i++)
     {
         PVFS_msg_tag_t session_tag;
         PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
-
-        ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
-                                        msg_p->handle,
-                                        msg_p->fs_id);
-        if (ret)
-        {
-            gossip_err("Failed to map meta server address\n");
-            js_p->error_code = ret;
-            return 1;
-        }
+        assert(msg_p);
 
         ret = PINT_encode(&msg_p->req,
                           PINT_ENCODE_REQ,
@@ -635,7 +737,8 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
     job_id_t tmp_id;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "io state: datafile_complete\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "io state: "
+                 "datafile_complete_msgpairs\n");
 
     assert(sm_p->msgarray_count == sm_p->u.io.datafile_count);
     assert(sm_p->msgarray[0].comp_ct >= 0);
@@ -939,11 +1042,9 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
         return 1;
     }
-    else
-    {
-        /* there's still something left to transfer */
-        return 0;
-    }
+
+    /* there's still something left to transfer */
+    return 0;
 }
 
 static int io_object_getattr_failure(PINT_client_sm *sm_p,
@@ -953,14 +1054,15 @@ static int io_object_getattr_failure(PINT_client_sm *sm_p,
                  "io_object_getattr_failure\n", sm_p);
 
     /*
-      NOTE:
-      this can easily happen if we're doing I/O on a file that
+      NOTE: this can easily happen if we're doing I/O on a file that
       was removed by another process
     */
     if (js_p->error_code == 0)
     {
         js_p->error_code = -PVFS_ENOENT;
     }
+
+    sm_p->u.io.stored_error_code = js_p->error_code;
     return 1;
 }
 
@@ -977,6 +1079,9 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     if (js_p->error_code != IO_DATAFILE_TRANSFERS_COMPLETE)
     {
         /* some sort of error occurred early on */
+        js_p->error_code = (sm_p->u.io.stored_error_code ?
+                            sm_p->u.io.stored_error_code :
+                            js_p->error_code);
         if (js_p->error_code == 0)
         {
             js_p->error_code = -PVFS_EIO;
@@ -1110,12 +1215,42 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     if (!sm_p->acache_hit)
     {
         free(sm_p->u.io.datafile_handles);
+        sm_p->u.io.datafile_handles = NULL;
     }
+
+    /*
+      FIXME: non bmi errors pop out in flow failures above -- they are
+      not properly marked as flow errors either, so we check for them
+      explicitly here (but not all -- fix it for real).
+    */
+    if (((PVFS_ERROR_CLASS(-error) == PVFS_ERROR_BMI) ||
+         (PVFS_ERROR_CLASS(-error) == PVFS_ERROR_FLOW) ||
+         (error == -ECONNRESET)) &&
+        (sm_p->u.io.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+    {
+        if (sm_p->acache_hit || sm_p->pinode)
+        {
+            sm_p->acache_hit = 0;
+            PINT_acache_release(sm_p->pinode);
+            sm_p->pinode = NULL;
+        }
+
+        sm_p->u.io.stored_error_code = 0;
+        sm_p->u.io.retry_count++;
+
+        gossip_debug(GOSSIP_IO_DEBUG, "Retrying I/O operation "
+                     "(attempt number %d)\n", sm_p->u.io.retry_count);
+
+        js_p->error_code = IO_RETRY;
+        return 1;
+    }
+
     CLEAN_PRIVATE_MEMBERS(iosm_p);
 
     /* return size, error, and set operation as complete */
     sm_p->u.io.io_resp_p->total_completed = total_size;
-    sm_p->error_code = error;
+    sm_p->error_code = (sm_p->u.io.stored_error_code ?
+                        sm_p->u.io.stored_error_code : error);
     sm_p->op_complete = 1;
 
     return 0;

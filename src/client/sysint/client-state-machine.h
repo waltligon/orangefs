@@ -180,6 +180,8 @@ struct PINT_client_io_sm {
     PVFS_offset           file_req_offset;
     void                 *buffer;
     PVFS_Request          mem_req;
+    int                   stored_error_code;
+    int                   retry_count;
 
     /* cached from object attributes */
     int                   orig_datafile_count;

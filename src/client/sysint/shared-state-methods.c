@@ -55,7 +55,6 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
         js_p->error_code = ret;
     }
 
-    /* let 'msgpairarray' handle the 'msgpair' case */
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
 
@@ -107,7 +106,6 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
         js_p->error_code = ret;
     }
 
-    /* let 'msgpairarray' handle the 'msgpair' case */
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
 
@@ -122,10 +120,6 @@ int PINT_sm_common_object_getattr_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
-
-/*
-  shared/common msgpair completion functions
-*/
 int PINT_sm_common_directory_getattr_comp_fn(
     void *v_p,
     struct PVFS_server_resp *resp_p,
@@ -137,12 +131,13 @@ int PINT_sm_common_directory_getattr_comp_fn(
     
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
+    assert(sm_p->msgarray == &sm_p->msgpair);
+    sm_p->msgarray = NULL;
+    sm_p->msgarray_count = 0;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_sm_common_getattr_directory_comp_fn\n");
 
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
     if (resp_p->status != 0)
     {
         gossip_err("Error: getattr failure\n");
@@ -150,9 +145,9 @@ int PINT_sm_common_directory_getattr_comp_fn(
     }
 
     /*
-      if we didn't get a cache hit, we're making a
-      copy of the attributes here so that we can add
-      a acache entry later in cleanup.
+      if we didn't get a cache hit, we're making a copy of the
+      attributes here so that we can add a acache entry later in
+      cleanup.
     */
     if (!sm_p->acache_hit)
     {
@@ -161,8 +156,8 @@ int PINT_sm_common_directory_getattr_comp_fn(
     }
 
     /*
-      if we got a cache hit, use those attributes,
-      otherwise use the real server replied attrs
+      if we got a cache hit, use those attributes, otherwise use the
+      real server replied attrs
     */
     attr = (sm_p->acache_hit ?
             &sm_p->pinode->attr :
@@ -230,12 +225,13 @@ int PINT_sm_common_object_getattr_comp_fn(
     
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
+    assert(sm_p->msgarray == &sm_p->msgpair);
+    sm_p->msgarray = NULL;
+    sm_p->msgarray_count = 0;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_sm_common_getattr_object_comp_fn\n");
 
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
     if (resp_p->status != 0)
     {
         gossip_err("Error: getattr failure\n");
@@ -243,12 +239,13 @@ int PINT_sm_common_object_getattr_comp_fn(
     }
 
     /*
-      if we didn't get a acache hit, we're making a
-      copy of the attributes here so that we can add
-      a acache entry later in cleanup.
+      if we didn't get a acache hit, we're making a copy of the
+      attributes here so that we can add a acache entry later in
+      cleanup.
     */
     if (!sm_p->acache_hit)
     {
+        memset(&sm_p->acache_attr, 0, sizeof(PVFS_object_attr));
         PINT_acache_object_attr_deep_copy(
             &sm_p->acache_attr, &resp_p->u.getattr.attr);
     }
