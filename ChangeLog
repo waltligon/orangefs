@@ -20,6 +20,14 @@ pvfs2-0.0.9pre1
 - pvfs2-ping and pvfs2-statfs support for multiple file systems
 - improved server error reporting if failure occurs before backgrounding
 - fix hang on server shutdown via signal
+- new maint script (pvfs2smdot.pl) for generating a graphical representation
+  of the state machines and transitions (dotty format)
+- updates to state machine syntax, including support for comments and
+  explicit termination of state machines
+- initial work on ability to gracefully cancel pending I/O operations 
+  within the system
+- added new gtk gui program (karma) for interactive monitoring of pvfs2
+  servers (statistics and performance)
 
 	
 pvfs2-0.0.8
