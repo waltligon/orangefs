@@ -1563,13 +1563,22 @@ int PINT_config_pvfs2_mkspace(
                 break;
             }
 
+            /* check if we've got a meta handle range */
             cur_handle_range =
                 PINT_config_get_meta_handle_range_str(
                     config, cur_fs);
             if (!cur_handle_range)
             {
-                gossip_err("Invalid configuration handle range\n");
-                break;
+                /* if not, check if we've got a data handle range */
+                cur_handle_range =
+                    PINT_config_get_data_handle_range_str(
+                        config, cur_fs);
+                if (!cur_handle_range)
+                {
+                    /* if we have no handle range, the config is broken */
+                    gossip_err("Invalid configuration handle range\n");
+                    break;
+                }
             }
 
             /*
