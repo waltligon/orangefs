@@ -1,0 +1,49 @@
+
+creating requests:
+
+requests are created using the request constructor calls
+and the predefined requests defined in pvfs_requests.h.
+
+"packing" requests:
+
+can be done two ways.  User function PVFS_Request_commit
+allocates new memory and packs the request into it.  internal
+function PINT_Request_commit packs into a buffer provided
+by the call.  struct PINT_Request structure has a field
+named num_nested_req that is the number of struct PINT_Request
+structures in the request below (not including) the current one.
+This is an upper bound assuming you don't re-pack the same
+subtree (which the functions shouldn't do).
+
+encoding/decoding requests:
+
+requests are encoded in place with PINT_Request_encode - copy
+first if you want to.  decode function works the same way
+
+processing requests:
+
+to process a request you need a request state structure (which
+references a request), and rfdata struct which references a
+distribution and has a few key metadata items (number of servers,
+server number, file size) plus you need arrays to receive the
+offset and length pairs, plus a few arguments.  You can
+have multiple states in use simultaneously
+
+creating distributions
+
+users create distributions before creating files with PVFS_Dist_create
+These are allocated contiguously in memory, have a private copy
+of the default parameters, but no pointer to the methods (users
+don't need 'em).  These can be passed to the create system call
+
+encoding/decoding distributions
+
+PINT_Dist_encode can either copy a dist into a provided buffer
+or encode in place to avoid a copy. same for decode.
+
+finding methods
+
+PINT_Dist_lookup looks up a distribution and sets up the methods
+in the PINT_Dist structure - this should be done before passing
+a dist in for processing a request (a future version could do
+this automatically).
