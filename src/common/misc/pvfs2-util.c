@@ -237,18 +237,19 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             strcpy(current_tab->mntent_array[i].pvfs_config_server,
                    tmp_ent->mnt_fsname);
             last_slash++;
-            current_tab->mntent_array[i].pvfs_fs_name =
-                strdup(last_slash);
-            if (!current_tab->mntent_array[i].pvfs_fs_name)
-            {
-                goto error_exit;
-            }
 
             /* mnt_dir and mnt_opts are verbatim copies */
             strcpy(current_tab->mntent_array[i].mnt_dir,
                    tmp_ent->mnt_dir);
             strcpy(current_tab->mntent_array[i].mnt_opts,
                    tmp_ent->mnt_opts);
+
+            current_tab->mntent_array[i].pvfs_fs_name =
+                strdup(last_slash);
+            if (!current_tab->mntent_array[i].pvfs_fs_name)
+            {
+                goto error_exit;
+            }
 
             /* find out if a particular flow protocol was specified */
             if ((hasmntopt(tmp_ent, "flowproto")))
@@ -1134,15 +1135,20 @@ static int copy_mntent(
 
         dest_mntent->pvfs_config_server =
             strdup(src_mntent->pvfs_config_server);
+        assert(dest_mntent->pvfs_config_server);
+
         dest_mntent->pvfs_fs_name = strdup(src_mntent->pvfs_fs_name);
+        assert(dest_mntent->pvfs_fs_name);
 
         if (src_mntent->mnt_dir)
         {
             dest_mntent->mnt_dir = strdup(src_mntent->mnt_dir);
+            assert(dest_mntent->mnt_dir);
         }
         if (src_mntent->mnt_opts)
         {
             dest_mntent->mnt_opts = strdup(src_mntent->mnt_opts);
+            assert(dest_mntent->mnt_opts);
         }
         dest_mntent->flowproto = src_mntent->flowproto;
         dest_mntent->encoding = src_mntent->encoding;
@@ -1227,7 +1233,12 @@ void PINT_release_pvfstab(void)
     {
         for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
-            PVFS_sys_free_mntent(&s_stat_tab_array[i].mntent_array[j]);
+            if (s_stat_tab_array[i].mntent_array[j].fs_id !=
+                PVFS_FS_ID_NULL)
+            {
+                PVFS_sys_free_mntent(
+                    &s_stat_tab_array[i].mntent_array[j]);
+            }
         }
         free(s_stat_tab_array[i].mntent_array);
     }
@@ -1236,9 +1247,13 @@ void PINT_release_pvfstab(void)
     for (j = 0; j < s_stat_tab_array[
              PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
     {
-        PVFS_sys_free_mntent(
-            &s_stat_tab_array[
-                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j]);
+        if (s_stat_tab_array[i].mntent_array[j].fs_id !=
+            PVFS_FS_ID_NULL)
+        {
+            PVFS_sys_free_mntent(
+                &s_stat_tab_array[
+                    PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j]);
+        }
     }
     if (s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array)
     {

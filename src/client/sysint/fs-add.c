@@ -99,8 +99,8 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
         new_server_config, mntent->fs_id);
     if (ret < 0)
     {
-        PVFS_util_remove_internal_mntent(mntent);
         PVFS_perror_gossip("PINT_server_config_mgr_add_config failed", ret);
+        PVFS_util_remove_internal_mntent(mntent);
         goto error_exit;
     }
 
