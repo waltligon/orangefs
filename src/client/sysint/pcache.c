@@ -323,7 +323,10 @@ static int PINT_pcache_add_pinode(pinode *pnode)
 	pvfs_pcache.element[free].prev = -1;
 	pvfs_pcache.element[free].next = pvfs_pcache.top;
 	/* Make previous element point to new entry */
-	pvfs_pcache.element[pvfs_pcache.top].prev = free;
+	if (pvfs_pcache.top != -1)
+	    pvfs_pcache.element[pvfs_pcache.top].prev = free;
+	else
+	    pvfs_pcache.element[free].prev = pvfs_pcache.top;
 	/* Readjust the top */
 	pvfs_pcache.top = free;
 
@@ -354,6 +357,11 @@ int PINT_pcache_pinode_alloc(pinode **pnode)
  */
 void PINT_pcache_pinode_dealloc(pinode *pnode)
 {
+
+/*TODO: figure out why this is crashing on free()
+ * I guess I'm trashing the stack somewhere
+ */
+#if 0
     if (pnode != NULL)
     {
 	if (pnode->attr.objtype == ATTR_META)
@@ -363,6 +371,7 @@ void PINT_pcache_pinode_dealloc(pinode *pnode)
 	}
 	free(pnode);
     }
+#endif
 }
 
 /* check_expiry

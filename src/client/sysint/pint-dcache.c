@@ -336,8 +336,8 @@ static int dcache_add_dentry(char *name,
 	cache->element[free].prev = -1;
 	cache->element[free].next = cache->top;
 	/* Make previous element point to new entry */
-//	cache->element[cache->top].prev = free;
-	cache->element[free].prev = free;
+	if (cache->top != -1)
+		cache->element[cache->top].prev = free;
 	/* Readjust the top */
 	cache->top = free;
 

@@ -225,15 +225,16 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		goto return_error;
 	    }
 	}
-	/* If it is the final object handle,save it!! */
+
+	if (path != NULL)
+	    free(path);
+
 	if (num_segments_remaining == 0)
 	{
-	    final_handle = pinode_ptr->pinode_ref.handle;
+	    break;
 	}
 
 	/*get rid of the old path*/
-	if (path != NULL)
-	    free(path);
 
 	/* get the next chunk of the path to send */
 	ret = get_next_path(req->name,&path,total_segments - num_segments_remaining);
