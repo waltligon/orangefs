@@ -503,7 +503,6 @@ static int server_shutdown(PINT_server_status_code level,
     case SHUTDOWN_STORAGE_INTERFACE:
 	/* Turn off Storage IFace */
 	trove_finalize();
-        PINT_server_config_release(&user_opts);
     case SHUTDOWN_FLOW_INTERFACE:
 	/* Turn off Flows */
 	PINT_flow_finalize();
@@ -513,10 +512,8 @@ static int server_shutdown(PINT_server_status_code level,
     case SHUTDOWN_GOSSIP_INTERFACE:
 	gossip_disable();
     case DEALLOC_INIT_MEMORY:
-	/* Unalloc any memory we have */
-	//free(user_opts.host_id);
-	//free(user_opts.tcp_path_bmi_library);
-	//free(user_opts);
+	/* De-alloc any memory we have */
+        PINT_server_config_release(&user_opts);
     case STATUS_UNKNOWN:
     default:
 	if (siglevel == 0)

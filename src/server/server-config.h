@@ -55,7 +55,13 @@ int PINT_server_config(struct server_configuration_s *config_s,
 
 void PINT_server_config_release(struct server_configuration_s *config_s);
 
+char *PINT_server_config_get_host_addr_ptr(struct server_configuration_s *config_s,
+                                           char *alias);
+
 char *PINT_server_config_get_host_alias_ptr(struct server_configuration_s *config_s,
-                                            char *alias);
+                                            char *bmi_address);
+
+char *PINT_server_config_get_handle_range_str(struct server_configuration_s *config_s,
+                                              struct filesystem_configuration_s *fs);
 
 #endif  /* __SERVER_CONFIG_H */

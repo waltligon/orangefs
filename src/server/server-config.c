@@ -64,7 +64,7 @@ static const configoption_t options[] =
 };
 
 /*
- * Function: server_config
+ * Function: PINT_server_config
  *
  * Params:   struct server_configuration_s*,
  *           int argc,
@@ -479,6 +479,17 @@ DOTCONF_CB(get_bucket_list)
     return NULL;
 }
 
+/*
+ * Function: PINT_server_config_release
+ *
+ * Params:   struct server_configuration_s*
+ *
+ * Returns:  void
+ *
+ * Synopsis: De-allocates memory consumed internally
+ *           by the specified server_configuration_s
+ *           
+ */
 void PINT_server_config_release(struct server_configuration_s *config_s)
 {
     if (config_s)
@@ -517,6 +528,9 @@ static int is_valid_alias(char *str)
             {
                 break;
             }
+            assert(cur_alias->host_alias);
+            assert(cur_alias->bmi_address);
+
             if (strcmp(str,cur_alias->host_alias) == 0)
             {
                 ret = 1;
@@ -558,14 +572,8 @@ static int is_valid_bucket_range_description(char *b_range)
 
 static int is_valid_filesystem_configuration(struct filesystem_configuration_s *fs)
 {
-    int ret = 0;
-
-    if (fs)
-    {
-        ret = (fs->file_system_name && fs->meta_server_list &&
-               fs->data_server_list && fs->bucket_ranges);
-    }
-    return ret;
+    return ((fs && fs->file_system_name && fs->meta_server_list &&
+             fs->data_server_list && fs->bucket_ranges) ? 1 : 0);
 }
 
 static void free_host_bucket_mapping(void *ptr)
@@ -612,8 +620,19 @@ static void free_filesystem(void *ptr)
     }
 }
 
-char *PINT_server_config_get_host_alias_ptr(struct server_configuration_s *config_s,
-                                            char *alias)
+/*
+ * Function: PINT_server_config_get_host_addr_ptr
+ *
+ * Params:   struct server_configuration_s*,
+ *           char *alias
+ *
+ * Returns:  char * (bmi_address) on success; NULL on failure
+ *
+ * Synopsis: retrieve the bmi_address matching the specified alias
+ *           
+ */
+char *PINT_server_config_get_host_addr_ptr(struct server_configuration_s *config_s,
+                                           char *alias)
 {
     char *ret = (char *)0;
     struct llist *cur = NULL;
@@ -629,10 +648,104 @@ char *PINT_server_config_get_host_alias_ptr(struct server_configuration_s *confi
             {
                 break;
             }
+            assert(cur_alias->host_alias);
+            assert(cur_alias->bmi_address);
+
             if (strcmp(cur_alias->host_alias,alias) == 0)
             {
                 ret = cur_alias->bmi_address;
                 break;
+            }
+            cur = llist_next(cur);
+        }
+    }
+    return ret;
+}
+
+/*
+ * Function: PINT_server_config_get_host_alias_ptr
+ *
+ * Params:   struct server_configuration_s*,
+ *           char *bmi_address
+ *
+ * Returns:  char * (alias) on success; NULL on failure
+ *
+ * Synopsis: retrieve the alias matching the specified bmi_address
+ *           
+ */
+char *PINT_server_config_get_host_alias_ptr(struct server_configuration_s *config_s,
+                                            char *bmi_address)
+{
+    char *ret = (char *)0;
+    struct llist *cur = NULL;
+    struct host_alias_s *cur_alias = NULL;
+
+    if (config_s && bmi_address)
+    {
+        cur = config_s->host_aliases;
+        while(cur)
+        {
+            cur_alias = llist_head(cur);
+            if (!cur_alias)
+            {
+                break;
+            }
+            assert(cur_alias->host_alias);
+            assert(cur_alias->bmi_address);
+
+            if (strcmp(cur_alias->bmi_address,bmi_address) == 0)
+            {
+                ret = cur_alias->host_alias;
+                break;
+            }
+            cur = llist_next(cur);
+        }
+    }
+    return ret;
+}
+
+/*
+ * Function: PINT_server_config_get_handle_range_str
+ *
+ * Params:   struct server_configuration_s*,
+ *           struct filesystem_configuration_s *fs
+ *
+ * Returns:  char * (bucket range) on success; NULL on failure
+ *
+ * Synopsis: return the bucket range (string) on the specified
+ *           filesystem that matches the host specific configuration
+ *           
+ */
+char *PINT_server_config_get_handle_range_str(struct server_configuration_s *config_s,
+                                              struct filesystem_configuration_s *fs)
+{
+    char *ret = (char *)0;
+    char *my_alias = (char *)0;
+    struct llist *cur = NULL;
+    struct host_bucket_mapping_s *cur_b_mapping = NULL;
+
+    if (config_s && config_s->host_id && fs)
+    {
+        my_alias = PINT_server_config_get_host_alias_ptr(config_s,config_s->host_id);
+        if (my_alias)
+        {
+            cur = fs->bucket_ranges;
+            while(cur)
+            {
+                cur_b_mapping = llist_head(cur);
+                if (!cur_b_mapping)
+                {
+                    break;
+                }
+                assert(cur_b_mapping->host_alias);
+                assert(cur_b_mapping->bucket_range);
+
+                if (strcmp(cur_b_mapping->host_alias,my_alias) == 0)
+                {
+                    ret = cur_b_mapping->bucket_range;
+                    break;
+                }
+                cur = llist_next(cur);
             }
         }
     }

@@ -154,12 +154,12 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
     meta_server = (char *)llist_head(cur_fs->meta_server_list);
     data_server = (char *)llist_head(cur_fs->data_server_list);
 
-    /* get alias for meta server */
-    meta_server = PINT_server_config_get_host_alias_ptr(user_opts,meta_server);
+    /* get bmi-address for meta server alias */
+    meta_server = PINT_server_config_get_host_addr_ptr(user_opts,meta_server);
     assert(meta_server);
  
-    /* get alias for io server */
-    data_server = PINT_server_config_get_host_alias_ptr(user_opts,data_server);
+    /* get bmi-address for io server alias */
+    data_server = PINT_server_config_get_host_addr_ptr(user_opts,data_server);
     assert(data_server);
 
     s_op->resp->u.getconfig.meta_server_mapping = meta_server;
