@@ -184,6 +184,7 @@ static int parse_args(int argc, char **argv)
 		fprintf(stderr, "\tdefault storage space is '/tmp/pvfs2-test-space'.\n");
 		fprintf(stderr, "\t'-v' turns on verbose output.\n");
 		fprintf(stderr, "\t'-k' prints data in keyval spaces.\n");
+		fprintf(stderr, "\n\tWithout a collection name, a list of collections will be printed.\n");
 		return -1;
 	}
     }
