@@ -43,7 +43,7 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    ret = PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init);
+    ret = PVFS_sys_initialize(mnt, NO_DEBUG, &resp_init);
     if(ret < 0)
     {
         fprintf(stderr, "PVFS_sys_initialize() failure. = %d\n", ret);

@@ -69,7 +69,7 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	/*Init the system interface*/
-	ret = PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init);
+	ret = PVFS_sys_initialize(mnt, NO_DEBUG, &resp_init);
 	if(ret < 0)
 	{
 		printf("PVFS_sys_initialize() failure. = %d\n", ret);

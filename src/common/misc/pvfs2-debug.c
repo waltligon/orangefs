@@ -45,7 +45,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "dbpfattrcache", DBPF_ATTRCACHE_DEBUG },
     { "lookup", LOOKUP_DEBUG },
     { "verbose",  (__DEBUG_ALL & ~REQ_SCHED_DEBUG) },
-    { "none", 0x00000000 },
+    { "none", NO_DEBUG },
     { "all",  __DEBUG_ALL }
 };
 #undef __DEBUG_ALL

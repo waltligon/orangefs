@@ -14,6 +14,7 @@
 
 enum
 {
+    NO_DEBUG =                     0,
     BMI_DEBUG_TCP =	    (1 << 0),
     BMI_DEBUG_CONTROL =	    (1 << 1),
     BMI_DEBUG_OFFSETS =	    (1 << 2),

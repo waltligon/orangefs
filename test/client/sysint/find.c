@@ -215,7 +215,7 @@ int main(int argc, char **argv)
     }
 
     memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(mnt, 0, &init_response))
+    if (PVFS_sys_initialize(mnt, NO_DEBUG, &init_response))
     {
         fprintf(stderr,"Cannot initialize system interface\n");
         return 1;
