@@ -15,6 +15,7 @@
 #include <bmi.h>
 #include <bench-initialize.h>
 #include <bench-args.h>
+#include <strings.h>
 
 int bench_init(struct bench_options* opts, int argc, char* argv[], int*
 	num_clients, int* world_rank, MPI_Comm* comm, bmi_addr_t**
@@ -161,7 +162,7 @@ int bench_initialize_mpi_params(int argc, char** argv, int num_servers,
 {
 	int ret = -1;
 	int numprocs, proc_namelen;
-
+	char* trunc_point = NULL;
 
 	/* find out total # of processes & local id */
 	MPI_Comm_size(MPI_COMM_WORLD,&numprocs);
@@ -198,6 +199,13 @@ int bench_initialize_mpi_params(int argc, char** argv, int num_servers,
 
 	/* record the name of this processor */
 	MPI_Get_processor_name(local_proc_name,&proc_namelen);
+
+	/* trim off all but hostname portion */
+	trunc_point = index(local_proc_name, '.');
+	if(trunc_point)
+	{
+	    trunc_point[0] = '\0';
+	}
 
 	return(0);
 }
