@@ -56,13 +56,16 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
 	GET_CONFIG_INIT_FAIL
     } init_fail = NONE_INIT_FAIL; /* used for cleanup in the event of failures */
 
+    gossip_enable_stderr();
+    gossip_set_debug_mask(1,CLIENT_DEBUG);
+
     /* Initialize BMI */
     /*TODO: change this so it parses the bmi module from the pvfstab file*/
     ret = BMI_initialize("bmi_tcp",NULL,0);
     if (ret < 0)
     {
 	init_fail = BMI_INIT_FAIL;
-	printf("BMI initialize failure\n");
+	gossip_ldebug(CLIENT_DEBUG,"BMI initialize failure\n");
 	goto return_error;
     }
 
@@ -74,7 +77,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
     if (ret < 0)
     {
 	init_fail = FLOW_INIT_FAIL;
-	printf("Flow initialize failure.\n");
+	gossip_ldebug(CLIENT_DEBUG,"Flow initialize failure.\n");
 	goto return_error;
     }
 
@@ -83,7 +86,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
     if (ret < 0)
     {
 	init_fail = JOB_INIT_FAIL;
-	printf("Error initializing job interface: %s\n",strerror(-ret));
+	gossip_ldebug(CLIENT_DEBUG,"Error initializing job interface: %s\n",strerror(-ret));
 	goto return_error;
     }
 	
@@ -92,7 +95,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
     if (ret < 0)
     {
 	init_fail = PCACHE_INIT_FAIL;
-	printf("Error initializing pinode cache\n");
+	gossip_ldebug(CLIENT_DEBUG,"Error initializing pinode cache\n");
 	goto return_error;	
     }
 
@@ -101,16 +104,17 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
     if (ret < 0)
     {
 	init_fail = DCACHE_INIT_FAIL;
-	printf("Error initializing directory cache\n");
+	gossip_ldebug(CLIENT_DEBUG,"Error initializing directory cache\n");
 	goto return_error;	
     }	
 
     server_config.nr_fs = mntent_list.nr_entry;
     server_config.fs_info = (fsconfig *)malloc(mntent_list.nr_entry * sizeof(fsconfig));
+    memset(server_config.fs_info, 0, mntent_list.nr_entry * sizeof(fsconfig));
     if (server_config.fs_info == NULL)
     {
 	assert(0);
-	printf("Error in allocating configuration parameters\n");
+	gossip_ldebug(CLIENT_DEBUG,"Error in allocating configuration parameters\n");
 	ret = -ENOMEM;
 	goto return_error;
     }
@@ -123,7 +127,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
     if (ret < 0)
     {
 	init_fail = BUCKET_INIT_FAIL;
-	printf("Error in initializing configuration management interface\n");
+	gossip_ldebug(CLIENT_DEBUG,"Error in initializing configuration management interface\n");
 	/* Release the mutex */
 	gen_mutex_unlock(&mt_config);
 	goto return_error;
@@ -134,7 +138,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
     if (ret < 0)
     {
 	init_fail = GET_CONFIG_INIT_FAIL;
-	printf("Error in getting server config parameters\n");
+	gossip_ldebug(CLIENT_DEBUG,"Error in getting server config parameters\n");
 	/* Release the mutex */
 	gen_mutex_unlock(&mt_config);
 	goto return_error;
@@ -257,12 +261,12 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	metalen = strlen(ack_p->u.getconfig.meta_server_mapping);
 	iolen   = strlen(ack_p->u.getconfig.io_server_mapping);
 
-	printf("server %d config reply:\n\tmeta = %s\n\tio = %s\n",
+	gossip_ldebug(CLIENT_DEBUG,"server %d config reply:\n\tmeta = %s\n\tio = %s\n",
 	       i,
 	       ack_p->u.getconfig.meta_server_mapping,
 	       ack_p->u.getconfig.io_server_mapping);
 
-	printf("maskbits = %d \nfh_root = %d\n",fsinfo_p->maskbits, fsinfo_p->fh_root, fsinfo_p->fsid);
+	gossip_ldebug(CLIENT_DEBUG,"maskbits = %d \nfh_root = %d\n",fsinfo_p->maskbits, fsinfo_p->fh_root, fsinfo_p->fsid);
 
 	/* How to get the size of metaserver list in ack? */
 	/* NOTE: PVFS_string == char *, SO I HAVE DOUBTS ABOUT THIS LINE!!! -- ROB */
@@ -280,7 +284,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	}
 	/* Copy the metaservers from ack to config info */
 	parse_p = ack_p->u.getconfig.meta_server_mapping;
-	printf("meta server count = %d\n", fsinfo_p->meta_serv_count);
+	gossip_ldebug(CLIENT_DEBUG,"meta server count = %d\n", fsinfo_p->meta_serv_count);
 	for (j=0; j < fsinfo_p->meta_serv_count; j++)
 	{
 	    len = 0;
@@ -307,7 +311,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	    /* copy entry */
 	    memcpy(fsinfo_p->meta_serv_array[j], parse_p, len);
 	    fsinfo_p->meta_serv_array[j][len] = '\0';
-	    printf("\tmeta server[%d] = %s\n", j, fsinfo_p->meta_serv_array[j]);
+	    gossip_ldebug(CLIENT_DEBUG,"\tmeta server[%d] = %s\n", j, fsinfo_p->meta_serv_array[j]);
 
 	    if (parse_p[len] == '\0') break;
 	    else parse_p += len + 1;
@@ -327,7 +331,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	    goto return_error;
 	}
 	parse_p = ack_p->u.getconfig.io_server_mapping;
-	printf("io server count = %d\n", fsinfo_p->io_serv_count);
+	gossip_ldebug(CLIENT_DEBUG,"io server count = %d\n", fsinfo_p->io_serv_count);
 	for (j=0; j < fsinfo_p->io_serv_count; j++)
 	{
 	    len = 0;
@@ -354,7 +358,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	    /* copy entry */
 	    memcpy(fsinfo_p->io_serv_array[j], parse_p, len);
 	    fsinfo_p->io_serv_array[j][len] = '\0';
-	    printf("\tio server[%d] = %s\n", j, fsinfo_p->io_serv_array[j]);
+	    gossip_ldebug(CLIENT_DEBUG,"\tio server[%d] = %s\n", j, fsinfo_p->io_serv_array[j]);
 
 	    if (parse_p[len] == '\0') break;
 	    else parse_p += len + 1;

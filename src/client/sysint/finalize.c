@@ -51,6 +51,8 @@ int PVFS_sys_finalize()
     job_finalize();
 
     BMI_finalize();
+
+    gossip_disable();
 	
     return(0);
 }

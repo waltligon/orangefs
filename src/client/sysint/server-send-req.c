@@ -20,6 +20,10 @@
 
 #define REQ_ENC_FORMAT 0
 
+#ifndef HEADER_SIZE
+#define HEADER_SIZE sizeof(int)
+#endif
+
 /* server_send_req()
  *
  * TODO: PREPOST RECV
@@ -39,6 +43,11 @@ int PINT_server_send_req(bmi_addr_t addr,
     char *encoded_resp;
     job_status_s s_status, r_status;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
+
+    /* the request protocol adds a small header (at the end--so its really a footer, but..)
+     * so since this parameter only counts the structure size we need to add it here
+     */
+    max_resp_size += HEADER_SIZE;
 
     /* convert into something we can send across the wire.
      *
@@ -69,7 +78,7 @@ int PINT_server_send_req(bmi_addr_t addr,
     }
     else if (ret == 0 && s_status.error_code != 0)
     {
-	printf("send failed\n");
+	gossip_ldebug(CLIENT_DEBUG,"send failed\n");
 	ret = -EINVAL;
 	goto return_error;
     }
@@ -79,7 +88,7 @@ int PINT_server_send_req(bmi_addr_t addr,
 
     /* post a blocking receive job */
     ret = job_bmi_recv_blocking(addr, encoded_resp, max_resp_size, op_tag, BMI_PRE_ALLOC, &r_status);
-    printf("message recieved: \nr_status.actual_size = %d\n",r_status.actual_size);
+    printf("message recieved: r_status.actual_size = %d\n",r_status.actual_size);
     printf("r_status.error_code = %d\nreturn value = %d\n",r_status.error_code, ret);
     if (ret < 0)
     {
@@ -89,7 +98,7 @@ int PINT_server_send_req(bmi_addr_t addr,
     {
 	if (((ret == 0) && (r_status.error_code != 0)) || (r_status.actual_size > max_resp_size))
 	{
-	    printf("status code error failed\n");
+	    gossip_ldebug(CLIENT_DEBUG,"status code error failed\n");
 	    ret = -EINVAL;
 	    goto return_error;
 	}
@@ -114,7 +123,7 @@ int PINT_server_send_req(bmi_addr_t addr,
 		      NULL);
     if (ret < 0)
     {
-	printf("decode failed\n");
+	gossip_ldebug(CLIENT_DEBUG,"decode failed\n");
 	ret = (-EINVAL);
 	goto return_error;
     }

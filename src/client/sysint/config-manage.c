@@ -306,6 +306,8 @@ int config_bt_map_bucket_to_server(char **server_name, PVFS_handle bucket,\
 {
 	int i = 0,j = 0,name_sz = 0;
 	PVFS_handle bkt = 0;
+	PVFS_handle bucket_start = 0, bucket_end = 0;
+	PVFS_string *meta_serv = NULL;
 	
 	/* Grab the mutex */
 	gen_mutex_lock(server_config.mt_lock);
@@ -327,9 +329,9 @@ int config_bt_map_bucket_to_server(char **server_name, PVFS_handle bucket,\
 
 			for(j = 0; j < server_config.fs_info[i].meta_serv_count; j++)
 			{
-#define bucket_start server_config.fs_info[i].bucket_array[j].bucket_st
-#define bucket_end server_config.fs_info[i].bucket_array[j].bucket_end
-#define meta_serv server_config.fs_info[i].meta_serv_array[j]
+				bucket_start = server_config.fs_info[i].bucket_array[j].bucket_st;
+				bucket_end = server_config.fs_info[i].bucket_array[j].bucket_end;
+				meta_serv = server_config.fs_info[i].meta_serv_array[j];
 				if ((bkt >= bucket_start) && (bkt <= bucket_end))
 				{
 					name_sz = strlen(meta_serv) + 1;
@@ -339,9 +341,6 @@ int config_bt_map_bucket_to_server(char **server_name, PVFS_handle bucket,\
 					gen_mutex_unlock(server_config.mt_lock);
 					return(0);
 				}
-#undef meta_serv
-#undef bucket_end
-#undef bucket_start
 			}
 		}
 	}
