@@ -93,8 +93,6 @@ ssize_t pvfs2_inode_read(
 	ret = pvfs_bufmap_get(&buffer_index);
 	if (ret < 0)
 	{
-/* 	    *offset = original_offset; */
-/* 	    op_release(new_op); */
 	    pvfs2_error("pvfs2: error: pvfs_bufmap_get() failure.\n");
             goto error_exit;
 	}

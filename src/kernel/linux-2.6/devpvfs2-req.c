@@ -321,8 +321,6 @@ static ssize_t pvfs2_devreq_writev(
 	    op->op_state = PVFS2_VFS_STATE_SERVICED;
 	    spin_unlock(&op->lock);
 
-	    wake_up_interruptible(&op->waitq);
-
             /*
               if this operation is an I/O operation, we need to
               wait for all data to be copied before we can return
@@ -332,9 +330,11 @@ static ssize_t pvfs2_devreq_writev(
             if ((op->upcall.type == PVFS2_VFS_OP_FILE_IO) &&
                 (op->upcall.req.io.io_type == PVFS_IO_READ))
             {
+                int timed_out = 0;
                 DECLARE_WAITQUEUE(wait_entry, current);
 
                 add_wait_queue(&op->io_completion_waitq, &wait_entry);
+                wake_up_interruptible(&op->waitq);
 
                 while(1)
                 {
@@ -355,6 +355,7 @@ static ssize_t pvfs2_devreq_writev(
                         if (!schedule_timeout(timeout))
                         {
                             pvfs2_print("*** I/O wait time is up\n");
+                            timed_out = 1;
                             break;
                         }
                         continue;
@@ -368,7 +369,18 @@ static ssize_t pvfs2_devreq_writev(
                 remove_wait_queue(&op->io_completion_waitq, &wait_entry);
 
                 /* special case: we release op in this case */
-                op_release(op);
+                if (!timed_out)
+                {
+                    op_release(op);
+                }
+            }
+            else
+            {
+                /*
+                  for every other operation, we need to wake up
+                  the callers for downcall completion notification
+                */
+                wake_up_interruptible(&op->waitq);
             }
 	}
     }
