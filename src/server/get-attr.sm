@@ -205,7 +205,7 @@ static int getattr_verify_attribs(
     {
         gossip_debug(
             GOSSIP_GETATTR_DEBUG, " VERSION is %Lu, mtime is %Lu\n",
-            s_op->attr.mtime, resp_attr->mtime);
+            Lu(s_op->attr.mtime), Lu(resp_attr->mtime));
     }
 
     resp_attr->ctime = s_op->attr.ctime;

@@ -1952,8 +1952,8 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
                 goto check_for_trailing_hole;
             }
             gossip_debug(GOSSIP_IO_DEBUG, "zero_fill_size is %Ld | "
-                         "sm_p->u.io.size is %Ld\n", zero_fill_size,
-                         sm_p->u.io.size);
+                         "sm_p->u.io.size is %Ld\n", Ld(zero_fill_size),
+                         Ld(sm_p->u.io.size));
 
             if (zero_fill_size > -1)
             {
