@@ -72,9 +72,9 @@ typedef struct PINT_Request {
 	encode_int32_t(pptr, &(rp+i)->num_nested_req); \
 	encode_int32_t(pptr, &(rp+i)->committed); \
 	encode_int32_t(pptr, &(rp+i)->refcount); \
-	/* XXX: this is not pretty, later will changes structures */ \
-	encode_uint32_t(pptr, (u_int32_t*)&(rp+i)->ereq); \
-	encode_uint32_t(pptr, (u_int32_t*)&(rp+i)->sreq); \
+	/* These pointers have been encoded already, just write as ints */ \
+	encode_uint32_t(pptr, (u_int32_t*) &(rp+i)->ereq); \
+	encode_uint32_t(pptr, (u_int32_t*) &(rp+i)->sreq); \
     } \
 } while (0);
 #define decode_PVFS_Request(pptr,rp) do { int i; \
@@ -91,8 +91,9 @@ typedef struct PINT_Request {
 	decode_int32_t(pptr, &(rp+i)->num_nested_req); \
 	decode_int32_t(pptr, &(rp+i)->committed); \
 	decode_int32_t(pptr, &(rp+i)->refcount); \
-	decode_uint32_t(pptr, (u_int32_t*)&(rp+i)->ereq); \
-	decode_uint32_t(pptr, (u_int32_t*)&(rp+i)->sreq); \
+	/* put integer offsets into pointers, let PINT_Request_decode fix */ \
+	decode_uint32_t(pptr, (u_int32_t*) &(rp+i)->ereq); \
+	decode_uint32_t(pptr, (u_int32_t*) &(rp+i)->sreq); \
     } \
 } while (0);
 #endif
