@@ -3228,41 +3228,10 @@ int job_testsome(job_id_t * id_array,
                  job_context_id context_id)
 {
     int ret = -1;
-    int timeout_remaining = timeout_ms;
-    struct timeval start;
+    struct timeval target_time;
     struct timeval end;
-    int total_completed = 0;
     int original_count = *inout_count_p;
-    int real_id_count = 0;
-    job_id_t *tmp_id_array = NULL;
-    int i;
-
-    /* count how many of the id's are non zero */
-    for (i = 0; i < original_count; i++)
-    {
-        if (id_array[i])
-        {
-            real_id_count++;
-        }
-    }
-
-    if (!real_id_count)
-    {
-        gossip_lerr("job_testsome() called with nothing to do.\n");
-        return (-EINVAL);
-    }
-
-    /* TODO: here is another cheap shot.  I don't want to special
-     * case the -1 (infinite) timeout possibility right now (maybe
-     * later), but I want the semantics to work.  So.. if that's the
-     * timeout I get, then set the remaining time to the maximum
-     * value that an integer can take on.  That will hold it in
-     * this function for nearly a month. 
-     */
-    if (timeout_ms == -1)
-    {
-        timeout_remaining = INT_MAX;
-    }
+    int time_exhaust_flag = 0;
 
     /* use this as a chance to do a cheap test on the request
      * scheduler
@@ -3272,45 +3241,44 @@ int job_testsome(job_id_t * id_array,
         return (ret);
     }
 
-    /* need to duplicate the id array, so that I have a copy I can
-     * modify
-     */
-    tmp_id_array = (job_id_t *) malloc(original_count * sizeof(job_id_t));
-    if (!tmp_id_array)
-    {
-        return (-errno);
-    }
-    memcpy(tmp_id_array, id_array, (original_count * sizeof(job_id_t)));
-
-    /* check before we do anything else to see if the job that we
-     * want is in the completion queue
+    /* check before we do anything else to see if the completion queue
+     * has anything in it
      */
     gen_mutex_lock(&completion_mutex);
-    ret = completion_query_some(tmp_id_array,
-                                inout_count_p, out_index_array,
-                                returned_user_ptr_array,
-                                out_status_array_p);
+    ret = completion_query_some(id_array,
+                                 inout_count_p,
+                                 out_index_array,
+                                 returned_user_ptr_array,
+                                 out_status_array_p);
     gen_mutex_unlock(&completion_mutex);
-
     /* return here on error or completion */
     if (ret < 0)
     {
-        free(tmp_id_array);
         return (ret);
     }
-
     if (ret > 0)
     {
-        free(tmp_id_array);
         return (1);
     }
 
-    for (i = 0; i < (*inout_count_p); i++)
-    {
-        tmp_id_array[out_index_array[i]] = 0;
-    }
-    total_completed += *inout_count_p;
     *inout_count_p = original_count;
+
+    /* figure out when the function should time out */
+    if(timeout_ms > 0)
+    {
+        ret = gettimeofday(&target_time, NULL);
+        if (ret < 0)
+        {
+            return (ret);
+        }
+        target_time.tv_sec += (timeout_ms/1000);
+        target_time.tv_usec += (timeout_ms%1000)*1000;
+        if(target_time.tv_usec > 1000000)
+        {
+            target_time.tv_sec++;
+            target_time.tv_usec -= 1000000;
+        }
+    }
 
     /* if we fall through to this point, then we need to just try
      * to eat up the timeout until the jobs that we want hit the
@@ -3318,98 +3286,72 @@ int job_testsome(job_id_t * id_array,
      */
     do
     {
-        ret = gettimeofday(&start, NULL);
-        if (ret < 0)
+
+        if (timeout_ms)
         {
-            free(tmp_id_array);
-            return (ret);
+            do_one_work_cycle_all(10);
+        }
+        else
+        {
+            do_one_work_cycle_all(0);
         }
 
-        if(timeout_ms)
-            do_one_work_cycle_all(10);
-        else
-            do_one_work_cycle_all(0);
-        ret = 0;
-        if (ret == ETIMEDOUT)
+        /* check queue now to see if anything is done */
+        gen_mutex_lock(&completion_mutex);
+        ret = completion_query_some(id_array,
+                                     inout_count_p,
+                                     out_index_array,
+                                     returned_user_ptr_array,
+                                     out_status_array_p);
+        gen_mutex_unlock(&completion_mutex);
+        /* return here on error or completion */
+        if (ret < 0)
         {
-            /* nothing completed while we were waiting, trust that the
-             * timedwait got the timing right
-             */
-            free(tmp_id_array);
-            *inout_count_p = total_completed;
-            return (0);
+            return (ret);
         }
-        else if ((ret != 0) && (ret != EINTR) && (ret != EINVAL))
+        if (ret  > 0)
         {
-            /* error */
-            free(tmp_id_array);
-            return (-ret);
+            return (1);
+        }
+
+        *inout_count_p = original_count;
+
+        /* if we reach this point, decide if we timeout or continue */
+        if(timeout_ms == 0)
+        {
+            time_exhaust_flag = 1;
+        }
+        else if(timeout_ms < 0)
+        {   
+            time_exhaust_flag = 0;
         }
         else
         {
-            gen_mutex_lock(&completion_mutex);
-            if(returned_user_ptr_array)
+            ret = gettimeofday(&end, NULL);
+            if (ret < 0)
             {
-                ret = completion_query_some(tmp_id_array,
-                                            inout_count_p,
-                                            &out_index_array[total_completed],
-                                            &returned_user_ptr_array
-                                            [total_completed],
-                                            &out_status_array_p
-                                            [total_completed]);
+                return (ret);
+            }
+
+            /* compare current time with our projected timeout point */
+            if((end.tv_sec > target_time.tv_sec) || ((end.tv_sec ==
+                target_time.tv_sec) && (end.tv_usec >=
+                target_time.tv_usec)))
+            {
+                time_exhaust_flag = 1;
             }
             else
             {
-                ret = completion_query_some(tmp_id_array,
-                                            inout_count_p,
-                                            &out_index_array[total_completed],
-                                            NULL,
-                                            &out_status_array_p
-                                            [total_completed]);
+                time_exhaust_flag = 0;
             }
-            gen_mutex_unlock(&completion_mutex);
-
-            /* return here on error or completion */
-            if (ret < 0)
-            {
-                free(tmp_id_array);
-                return (ret);
-            }
-            if (ret > 0)
-            {
-                *inout_count_p = real_id_count;
-                free(tmp_id_array);
-                return (1);
-            }
-
-            for (i = 0; i < (*inout_count_p); i++)
-            {
-                tmp_id_array[out_index_array[i + total_completed]] = 0;
-            }
-            total_completed += *inout_count_p;
-            *inout_count_p = original_count;
         }
 
-        /* if we fall to here, see how much time has expired and
-         * sleep/work again if we need to
-         */
-        ret = gettimeofday(&end, NULL);
-        if (ret < 0)
-        {
-            free(tmp_id_array);
-            return (ret);
-        }
+    } while (!time_exhaust_flag);
 
-        timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
-            (end.tv_usec - start.tv_usec) / 1000;
+    /* fall through, nothing done, time is used up */
+    *inout_count_p = 0;
 
-    } while (timeout_remaining > 0);
-
-    /* fall through, not everything is done, time is used up */
-    *inout_count_p = total_completed;
-    free(tmp_id_array);
-
-    return ((total_completed > 0) ? 1 : 0);
+    return (0);
 }
 #endif /* __PVFS2_JOB_THREADED__ */
 
