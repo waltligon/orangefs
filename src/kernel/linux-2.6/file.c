@@ -398,7 +398,7 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
         pvfs2_error("pvfs2_file_llseek: invalid inode (NULL)\n");
         return -EINVAL;
     }
-    if (pvfs2_inode_getattr(inode))
+    if ((inode->i_size == 0) && pvfs2_inode_getattr(inode))
     {
         return -EINVAL;
     }
