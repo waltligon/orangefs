@@ -142,15 +142,6 @@ static void aio_progress_notification(sigval_t sig)
                 error_code = -trove_errno_to_trove_error(ret);
             }
         }
-        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
-
-        /*
-          we've posted everything, and it all completed, so we're
-          done.  free the aiocb array, release the FD, and mark the
-          whole op as complete (placing on appropriate completion queue)
-        */
-        free(aiocb_p);
-        op_p->u.b_rw_list.aiocb_array = NULL;
 
         /* this is a macro defined in dbpf-thread.h */
         move_op_to_completion_queue(
@@ -1023,17 +1014,10 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
     }
     else if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLPOSTED)
     {
-	/*
-          we've posted everything, and it all completed, so we're
-          done.  free the aiocb array, release the FD, and mark the
-          whole op as complete
-        */
+	/* we've posted everything, and it all completed */
         ret = 1;
 
       final_aio_cleanup:
-	free(aiocb_p);
-
-	dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
 	return ret;
     }
     else

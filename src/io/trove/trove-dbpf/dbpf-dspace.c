@@ -1164,6 +1164,7 @@ static int dbpf_dspace_cancel(
         }
         break;
         case OP_COMPLETED:
+        case OP_CANCELED:
             /* easy cancelation case; do nothing */
             gossip_debug(
                 GOSSIP_TROVE_DEBUG, "op is completed: ignoring\n");

@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include "dbpf-op.h"
+#include "dbpf-bstream.h"
 #include "gossip.h"
 
 dbpf_queued_op_t *dbpf_queued_op_alloc(void)
@@ -53,6 +54,22 @@ void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p)
     if (q_op_p->op.type == DSPACE_CREATE)
     {
         free(q_op_p->op.u.d_create.extent_array.extent_array);
+        q_op_p->op.u.d_create.extent_array.extent_array = NULL;
+    }
+    else if ((q_op_p->op.type == BSTREAM_READ_LIST) ||
+             (q_op_p->op.type == BSTREAM_WRITE_LIST))
+    {
+        if (q_op_p->op.u.b_rw_list.fd != -1)
+        {
+            dbpf_bstream_fdcache_put(q_op_p->op.coll_p->coll_id,
+                                     q_op_p->op.handle);
+            q_op_p->op.u.b_rw_list.fd = -1;
+        }
+        if (q_op_p->op.u.b_rw_list.aiocb_array)
+        {
+            free(q_op_p->op.u.b_rw_list.aiocb_array);
+            q_op_p->op.u.b_rw_list.aiocb_array = NULL;
+        }
     }
     free(q_op_p);
 }
