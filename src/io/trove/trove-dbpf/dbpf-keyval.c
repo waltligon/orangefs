@@ -549,7 +549,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	    key.data = &recno;
 	    key.size = key.ulen = sizeof(recno);
 	}
-	*(TROVE_ds_position *) key.data = *op_p->u.k_iterate.position_p;
+	*(TROVE_ds_position *)key.data = *op_p->u.k_iterate.position_p;
 	key.flags |= DB_DBT_USERMEM;
 
 	memset(&data, 0, sizeof(data));

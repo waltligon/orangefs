@@ -392,6 +392,7 @@ void dbpf_error_report(const char *errpfx, char *msg);
 #define DBPF_UNLINK unlink
 #define DBPF_SYNC   fsync
 #define DBPF_RESIZE ftruncate
+#define DBPF_FSTAT  fstat
 
 #define DBPF_DB_SYNC_IF_NECESSARY(dbpf_op_ptr, db_ptr) \
 do {                                                   \

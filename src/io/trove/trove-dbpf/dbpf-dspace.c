@@ -39,8 +39,6 @@ extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
 #endif
 
-#define DBPF_FSTAT fstat
-
 static int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 
 static inline void organize_post_op_statistics(
