@@ -17,7 +17,7 @@
  * looped over the most
  */
 static int64_t perf_count_matrix[PINT_PERF_COUNT_KEY_MAX+1][PINT_PERF_HISTORY_SIZE];
-static int32_t perf_count_id[PINT_PERF_HISTORY_SIZE];
+static uint32_t perf_count_id[PINT_PERF_HISTORY_SIZE];
 static uint64_t perf_count_start_times_ms[PINT_PERF_HISTORY_SIZE];
 static int perf_count_head = 0;
 static int perf_count_tail = 0;
@@ -35,7 +35,7 @@ int PINT_perf_initialize(void)
     /* zero out counters */
     memset(perf_count_matrix, 0, 
 	(PINT_PERF_COUNT_KEY_MAX+1)*PINT_PERF_HISTORY_SIZE*sizeof(int64_t));
-    memset(perf_count_id, 0, PINT_PERF_HISTORY_SIZE*sizeof(int32_t));
+    memset(perf_count_id, 0, PINT_PERF_HISTORY_SIZE*sizeof(uint32_t));
     memset(perf_count_start_times_ms, 0, 
 	PINT_PERF_HISTORY_SIZE*sizeof(uint64_t));
 
@@ -98,7 +98,7 @@ void PINT_perf_count(enum PINT_perf_count_keys key,
 void PINT_perf_rollover(void)
 {
     int i;
-    int32_t old_id;
+    uint32_t old_id;
     struct timeval tv;
 
     old_id = perf_count_id[perf_count_head];

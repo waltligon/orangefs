@@ -66,7 +66,12 @@ int do_decode_resp(
 	    (PVFS_dirent *) (target_msg->buffer +
 			     sizeof(struct PVFS_server_resp));
 	return 0;
-
+    case PVFS_SERV_MGMT_PERF_MON:
+	((struct PVFS_server_resp *) target_msg->buffer)->u.mgmt_perf_mon.
+	    perf_array = 
+	    (struct PVFS_mgmt_perf_stat*)(target_msg->buffer +
+					  sizeof(struct PVFS_server_resp));
+	return(0);
     case PVFS_SERV_GETATTR:
 	if (decoded_response->u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
 	{

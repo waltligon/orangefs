@@ -252,6 +252,9 @@ int PINT_req_sched_target_handle(
     case PVFS_SERV_MGMT_NOOP:
 	return (0);
 	break;
+    case PVFS_SERV_MGMT_PERF_MON:
+	return (0);
+	break;
     case PVFS_SERV_STATFS:
 	return (0);
 	break;

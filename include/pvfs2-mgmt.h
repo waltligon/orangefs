@@ -22,6 +22,15 @@ struct PVFS_mgmt_server_stat
     int server_type;
 };
 
+/* performance monitoring statistics */
+struct PVFS_mgmt_perf_stat
+{
+    uint32_t id;	    /* timestep id */
+    uint64_t start_time_ms; /* start time of perf set, ms since epoch */
+    int64_t write;	    /* bytes written */
+    int64_t read;	    /* bytes read */
+};
+
 /* values which may be or'd together in the flags field above */
 enum
 {

@@ -12,6 +12,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs-distribution.h"
 #include "pvfs2-request.h"
+#include "pvfs2-mgmt.h"
 
 /* release number:
  * This is a base-10, 5 digit number, with one digit for the most
@@ -41,7 +42,8 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_SETPARAM = 15,
     PVFS_SERV_MGMT_NOOP = 16,
     PVFS_SERV_STATFS = 17,
-    PVFS_SERV_PERF_UPDATE = 18  /* _not_ a real request */
+    PVFS_SERV_PERF_UPDATE = 18,  /* not a real protocol request */
+    PVFS_SERV_MGMT_PERF_MON = 19
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
      * if you add a new operation to this list
      */
@@ -53,7 +55,7 @@ enum PVFS_server_op
      * PVFS_SERV_EXTENSION
      */
 };
-#define PVFS_MAX_SERVER_OP 18
+#define PVFS_MAX_SERVER_OP 19
 
 /* max number of jobs the server is able to manage at a time */
 #define PVFS_SERVER_MAX_JOBS  512
@@ -560,6 +562,22 @@ do {						\
     (__req).credentials = (__creds);		\
 } while (0)
 
+
+/* mgmt_perf_mon ****************************************************/
+/* retrieves performance statistics from server */
+
+struct PVFS_servreq_mgmt_perf_mon
+{
+    uint32_t next_id;  /* next time stamp id we want to retrieve */
+};
+
+struct PVFS_servresp_mgmt_perf_mon
+{
+    struct PVFS_mgmt_perf_stat* perf_array;	/* array of statistics */
+    uint32_t perf_array_count;		/* size of above array */
+    uint64_t end_time_ms;		/* end time for final array entry */
+};
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -583,6 +601,7 @@ struct PVFS_server_req
 	struct PVFS_servreq_flush flush;
 	struct PVFS_servreq_mgmt_setparam mgmt_setparam;
 	struct PVFS_servreq_statfs statfs;
+	struct PVFS_servreq_mgmt_perf_mon mgmt_perf_mon;
     }
     u;
 };
@@ -605,6 +624,7 @@ struct PVFS_server_resp
 	struct PVFS_servresp_io io;
 	struct PVFS_servresp_write_completion write_completion;
 	struct PVFS_servresp_statfs statfs;
+	struct PVFS_servresp_mgmt_perf_mon mgmt_perf_mon;
     }
     u;
 };

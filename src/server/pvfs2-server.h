@@ -236,6 +236,9 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 	case PVFS_SERV_MGMT_NOOP:
 	    ret_ptr = "mgmt_noop";
 	    break;
+	case PVFS_SERV_MGMT_PERF_MON:
+	    ret_ptr = "mgmt_perf_mon";
+	    break;
 	case PVFS_SERV_STATFS:
 	    ret_ptr = "statfs";
 	    break;
@@ -278,6 +281,7 @@ extern struct PINT_state_machine_s pvfs2_setparam_sm;
 extern struct PINT_state_machine_s pvfs2_noop_sm;
 extern struct PINT_state_machine_s pvfs2_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_perf_update_sm;
+extern struct PINT_state_machine_s pvfs2_perf_mon_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_prelude_sm;

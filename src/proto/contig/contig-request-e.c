@@ -426,6 +426,7 @@ int do_encode_req(
     case PVFS_SERV_FLUSH:
     case PVFS_SERV_MGMT_SETPARAM:
     case PVFS_SERV_MGMT_NOOP:
+    case PVFS_SERV_MGMT_PERF_MON:
     case PVFS_SERV_STATFS:
 	/* XXX: is PVFS_SERV_FLUSH really 'self contained' ?*/
 	size = sizeof(struct PVFS_server_req) + PINT_ENC_GENERIC_HEADER_SIZE;

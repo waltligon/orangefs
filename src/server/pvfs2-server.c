@@ -959,6 +959,7 @@ static void server_state_table_initialize(void)
     PINT_server_op_table[PVFS_SERV_MGMT_NOOP]     = &pvfs2_noop_sm;
     PINT_server_op_table[PVFS_SERV_STATFS]	  = &pvfs2_statfs_sm;
     PINT_server_op_table[PVFS_SERV_PERF_UPDATE]	  = &pvfs2_perf_update_sm;
+    PINT_server_op_table[PVFS_SERV_MGMT_PERF_MON] = &pvfs2_perf_mon_sm;
 }
 
 /* server_state_machine_complete()
