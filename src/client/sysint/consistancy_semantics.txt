@@ -44,3 +44,7 @@ we're going to assume that most creates will not fail as a result of a file alre
 	==> create is not atomic, we have to send multiple messages on the network, so its possible that someone could try to setattr/remove the metafile before the create operation succeeds.
 	Should we add a boolean flag to the metadata "isComplete" or something so that if the file is in the process of being created, we'll know to make any operations block?
 
+PVFS_sys_truncate()
+-------------------
+-instead of retrieving the size, figuring out which servers need to get truncate messages, we're just sending truncate messages to each server with the physical offset (found from the logical size that is passed in).  it may be the case that someone is doing io on a file, and the size could be changing in the middle of a truncate operation, which could lead to problems making sure everything that is supposed to get truncated is truncated.
+

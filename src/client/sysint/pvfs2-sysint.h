@@ -382,10 +382,7 @@ struct PVFS_sysreq_truncate_s {
 };
 typedef struct PVFS_sysreq_truncate_s PVFS_sysreq_truncate;
 
-struct PVFS_sysresp_truncate_s {
-
-};
-typedef struct PVFS_sysresp_truncate_s PVFS_sysresp_truncate;
+/* no data returned in truncate response */
 
 /* extension */
 struct PVFS_sysreq_extension_s {
@@ -494,6 +491,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 #define PVFS_sys_read(x,y) PVFS_sys_io(x,y,PVFS_SYS_IO_READ)
 #define PVFS_sys_write(x,y) PVFS_sys_io(x,y,PVFS_SYS_IO_WRITE)
 int PVFS_sys_allocate(PVFS_sysreq_allocate *req);
+int PVFS_sys_truncate(PVFS_sysreq_truncate *req);
 int PVFS_sys_duplicate(PVFS_sysreq_duplicate *req,PVFS_sysresp_duplicate *resp);
 int PVFS_sys_lock(PVFS_sysreq_lock *req, PVFS_sysresp_lock *resp);
 int PVFS_sys_unlock(PVFS_sysreq_unlock *req);

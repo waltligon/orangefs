@@ -14,6 +14,7 @@ LIBSRC += \
 	$(DIR)/remove.c \
 	$(DIR)/rename.c \
 	$(DIR)/setattr.c \
+	$(DIR)/truncate.c \
 	$(DIR)/sysint-utils.c \
 	$(DIR)/pint-bucket.c \
 	$(DIR)/io.c

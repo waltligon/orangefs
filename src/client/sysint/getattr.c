@@ -43,6 +43,11 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
     int pinode_exists_in_cache = 0;
     void* encoded_resp;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
+    PVFS_handle *data_files = NULL;
+    PVFS_Dist *dist = NULL;
+    PVFS_size total_filesize;
+    PVFS_count32 num_data_servers;
+    int i;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -193,24 +198,90 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 
 	if ((req->attrmask & ATTR_SIZE) == ATTR_SIZE)
 	{
-	    /* getting size isn't implemented yet, figure this out,
-	     * and uncomment.
+	    /*only do this if you want the size*/
+
+	    /* TODO: things to do to get the size:
+	     * 1). send a getattr message to each server that has a datafile
+	     * 2). call the dist code to figure out if a server has sparse
+	     *	data written
 	     */
-	    return (-EINVAL);
-#if 0
-		/*only do this if you want the size*/
 
-		/* TODO: things to do to get the size:
-		 * 1). get each handle
-		 * 2). for each handle find out how much data is written on each (dist code)
-		 * 3). uhm, I think that's it?
-		 */
+	    num_data_servers = entry_pinode->attr.u.meta.nr_datafiles;
 
-		num_data_servers = entry_pinode->attr.u.meta.nr_datafiles;
-		/**/
+	    size_array = malloc(num_data_servers * sizeof(PVFS_size));
+	    if (size_array == NULL)
+	    {
+		ret = -ENOMEM;
+		goto return_error;
+	    }
 
-		entry_pinode->size_flag = SIZE_VALID;
-#endif
+	    /* we need to send one getattr to each server for each datafile*/
+
+	    data_files = resp->attr.u.meta.dfh;
+	    dist = resp->attr.u.meta.dist;
+	    req_p.op = PVFS_SERV_GETATTR;
+	    req_p.credentials = req->credentials;
+	    req_p.rsize = sizeof(struct PVFS_server_req_s);
+	    req_p.u.getattr.attrmask = ATTR_SIZE;
+	    req_p.u.getattr.fs_id = entry.fs_id;
+
+	    /* TODO: come back and unserialize this */
+
+	    for(i = 0; i < num_data_servers; i++)
+	    {
+		ret = PINT_bucket_map_to_server(&serv_addr,data_files[i],entry.fs_id);
+		if (ret < 0)
+		{
+		    failure = MAP_SERVER_FAILURE;
+		    goto return_error;
+		}
+
+		req_p.u.getattr.handle = data_files[i];
+
+		/* TODO: use some sane value for this, I dunno what to put --Phil */
+		gossip_lerr("KLUDGE: guessing at max size of getattr response.\n");
+		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + 1000;
+
+		/* Make a server getattr request */
+		ret = PINT_send_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp, op_tag);
+		if (ret < 0)
+		{
+		    failure = SEND_REQ_FAILURE;
+		    goto return_error;
+		}
+
+		ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+		if (ack_p->status < 0 )
+		{
+		    ret = ack_p->status;
+		    failure = SEND_REQ_FAILURE;
+		    goto return_error;
+		}
+
+		size_array[i] = ack_p->u.getattr.attr.u.data.size;
+	    }
+
+	    /* now call the distribution code for this data so we can figure
+	     * out what the true filesize is.
+	     */
+
+	    ret = PINT_Dist_lookup(dist);
+	    if (ret < 0)
+	    {
+		
+		goto return_error;
+	    }
+
+	    total_filesize = (dist->methods->logical_file_size)(dist->params, 
+						num_data_servers, 
+						size_array);
+
+	    /*TODO: stick this in a size somewhere .. wtf?*/
+	    /*resp->attr.u.meta.size = total_filesize;*/
+
+	    entry_pinode->size = total_filesize;
+	    entry_pinode->size_flag = SIZE_VALID;
 	}
 	else
 	{
