@@ -182,7 +182,7 @@ int main(int argc, char **argv)
                 printf("Error retrieving name of server managing handle "
                        "%Ld!\n",test_handles[j]);
                 printf("** This may be okay if the handle (%Ld) exists "
-                       "on a different fs (than id %d))\n",
+                       "on a different fs (not %d)\n",
                        test_handles[j],fs_ids[i]);
                 continue;
             }
@@ -201,7 +201,7 @@ int main(int argc, char **argv)
             {
                 fprintf(stderr, "PINT_bucket_map_to_server failure.\n");
                 printf("** This may be okay if the handle (%Ld) exists "
-                       "on a different fs (than id %d))\n",
+                       "on a different fs (not %d)\n",
                        test_handles[j],fs_ids[i]);
                 continue;
             }
@@ -249,8 +249,8 @@ int main(int argc, char **argv)
         else
         {
             printf("** Failed to verify ability to map servers to handles.\n");
-            printf("** Handle value %Ld failed cannot be mapped.\n",
-                   test_handles[j-1]);
+            printf("** Handle value %Ld failed -- cannot be mapped.\n",
+                   (j ? test_handles[j-1] : test_handles[j]));
             return -1;
         }
     }
