@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup pvfs2linux
+ *
+ *  Implementation of dentry (directory cache) functions.
+ */
+
 #include "pvfs2-kernel.h"
 
 /* should return 1 if dentry can still be trusted, else 0 */
@@ -31,6 +37,8 @@ int pvfs2_d_revalidate(
 
 #else
 
+/** Verify that dentry is valid.
+ */
 int pvfs2_d_revalidate(
     struct dentry *dentry,
     struct nameidata *nd)
@@ -89,6 +97,7 @@ static int pvfs2_d_compare(
              (memcmp(d_name->name, name->name, d_name->len) == 0));
 }
 
+/** PVFS2 implementation of VFS dentry operations */
 struct dentry_operations pvfs2_dentry_operations =
 {
     .d_revalidate = pvfs2_d_revalidate,

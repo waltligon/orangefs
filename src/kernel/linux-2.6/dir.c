@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup pvfs2linux
+ *
+ *  Linux VFS directory operations.
+ */
+
 #include "pvfs2-kernel.h"
 #include "pvfs2-sysint.h"
 
@@ -19,15 +25,17 @@ extern int pvfs2_file_release(
     struct inode *inode,
     struct file *file);
 
-/*
-  should return 0 when we're done traversing a directory;
-  return a negative value on error, or a positive value otherwise.
-  (i.e. if we don't call filldir for ALL entries, return a
-  positive value)
-
-  If the filldir call-back returns non-zero, then readdir should
-  assume that it has had enough, and should return as well.
-*/
+/** Read directory entries from an instance of an open directory.
+ *
+ * \param filldir callback function called for each entry read.
+ *
+ * \retval <0 on error
+ * \retval 0  when directory has been completely traversed
+ * \retval >0 if we don't call filldir for all entries
+ *
+ * \note If the filldir call-back returns non-zero, then readdir should
+ *       assume that it has had enough, and should return as well.
+ */
 static int pvfs2_readdir(
     struct file *file,
     void *dirent,
@@ -265,6 +273,7 @@ static int pvfs2_readdir(
     return ret;
 }
 
+/** PVFS2 implementation of VFS directory operations */
 struct file_operations pvfs2_dir_operations =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4
