@@ -6,6 +6,7 @@
 
 #include <string.h>
 #include <stddef.h>
+#include <assert.h>
 
 #include "state-machine.h"
 #include "server-config.h"
@@ -24,8 +25,6 @@ static int lookup_key_val(state_action_struct *s_op, job_status_s *ret);
 void lookup_init_state_machine(void);
 
 extern PINT_server_trove_keys_s *Trove_Common_Keys;
-
-static char path_delim[] = "/";
 
 PINT_state_machine_s lookup_req_s = 
 {
@@ -123,8 +122,8 @@ void lookup_init_state_machine(void)
 static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
-	job_id_t i;
+	int job_post_ret=0;
+	/*job_id_t i;*/
 	void *big_memory_buffer;
 
 	int memory_sz;
@@ -151,7 +150,7 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 	/* attr_array */
 	attr_array_sz = LOOKUP_BUFF_SZ*sizeof(PVFS_object_attr) + sizeof(PVFS_datafile_attr);
 
-	memory_sz = key_a_sz+val_a_sz+key_a0_sz+key_a1_sz+handle_array_sz+attr_array_sz;
+	memory_sz = key_a_sz+val_a_sz+key_a0_sz+val_a0_sz+handle_array_sz+attr_array_sz;
 
 	/* Allocate space for attributes, handles, and path segments */
 	big_memory_buffer = malloc(memory_sz);
@@ -326,8 +325,8 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
-	job_id_t i;
+	int job_post_ret=-1;
+	/*job_id_t i;*/
 
 	gossip_ldebug(SERVER_DEBUG,"Send BMI\n");
 	return(job_post_ret);
@@ -350,8 +349,8 @@ static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
 static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
-	job_id_t i;
+	int job_post_ret=-1;
+	/*job_id_t i;*/
 
 	gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space\n");
 	
@@ -379,7 +378,7 @@ static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret)
 static int lookup_key_val(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
+	int job_post_ret=-1;
 	job_id_t i;
 	PVFS_vtag_s bs;
 
