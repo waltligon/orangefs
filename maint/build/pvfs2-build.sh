@@ -121,34 +121,3 @@ if [ $? != 0 ] ; then
 	exit 1
 fi
 
-# after installing, create a pvfs volume (PAV)
-#  . start the volume
-#  . load up some environment variables, exporting the important ones 
-#          like PVFS2TAB_FILE
-
-PAV_DIR=/test/common/pav
-$srcdir/$PAV_DIR/pav_start -c $builddir/${PAV_DIR}/configfile.sample > $rootdir/pav-setup.log 2>&1
-
-if [ $? -ne 0 ] ; then
-	echo "Failed to start PAV. see $rootdir/pav-setup.log for details"
-	exit 1
-fi
-
-eval $($srcdir/${PAV_DIR}/pav_info -c $builddir/${PAV_DIR}/configfile.sample)
-export PVFS2TAB_FILE
-
-# then run a test or set of tests (most likely PTS)
-$builddir/src/apps/admin/pvfs2-ping -m $MOUNTPOINT >/dev/null 
-if [ $? -eq 0 ] ; then 
-	echo "Servers started successfully"
-else 
-	echo "Servers failed to start"
-	exit 1
-fi
-
-# now do some testing. something trivial for now
-$builddir/src/apps/admin/pvfs2-import $builddir/src/apps/admin/pvfs2-import $MOUNTPOINT/pvfs2-import 
-
-
-# and clean up
-$srcdir/$PAV_DIR/pav_stop -c $builddir/${PAV_DIR}/configfile.sample > $rootdir/pav-shutdown.log 2>&1 &&  echo "Script completed successfully." 
