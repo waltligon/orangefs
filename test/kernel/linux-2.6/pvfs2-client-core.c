@@ -791,19 +791,19 @@ static int service_statfs_request(
 
             out_downcall->resp.statfs.block_size =
                 STATFS_DEFAULT_BLOCKSIZE;
-            out_downcall->resp.statfs.blocks_total =
+            out_downcall->resp.statfs.blocks_total = (long)
                 (resp_statfs.statfs_buf.bytes_total /
                  out_downcall->resp.statfs.block_size);
-            out_downcall->resp.statfs.blocks_avail =
+            out_downcall->resp.statfs.blocks_avail = (long)
                 (resp_statfs.statfs_buf.bytes_available /
                  out_downcall->resp.statfs.block_size);
             /*
               these values really represent handle/inode counts
               rather than an accurate number of files
             */
-            out_downcall->resp.statfs.files_total =
+            out_downcall->resp.statfs.files_total = (long)
                 resp_statfs.statfs_buf.handles_total_count;
-            out_downcall->resp.statfs.files_avail =
+            out_downcall->resp.statfs.files_avail = (long)
                 resp_statfs.statfs_buf.handles_available_count;
 
             ret = 0;
