@@ -131,6 +131,8 @@ static void aio_progress_notification(sigval_t sig)
         DBPF_AIO_SYNC_IF_NECESSARY(
             op_p, op_p->u.b_rw_list.fd, ret, error_code);
 
+	dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
+
         /* this is a macro defined in dbpf-thread.h */
         move_op_to_completion_queue(
             cur_op, error_code,
@@ -971,6 +973,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         ret = 1;
 
       final_aio_cleanup:
+	dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
 
 	return ret;
     }

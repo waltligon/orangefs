@@ -101,9 +101,10 @@ static int readdir_verify_directory_metadata(
 
     attr = &s_op->attr;
 
-    gossip_debug(GOSSIP_READDIR_DEBUG, "  attrs = (owner = %d, group = "
-                 "%d, perms = %o, type = %d)\n", attr->owner,
-                 attr->group, attr->perms, attr->objtype);
+    gossip_debug(GOSSIP_READDIR_DEBUG, " - attrs: owner=%d, group=%d "
+                 "perms=%d, type=%d, mtime=%Ld\n", attr->owner,
+                 attr->group, attr->perms, attr->objtype,
+                 Ld(attr->mtime));
 
     if (attr->objtype != PVFS_TYPE_DIRECTORY)
     {
@@ -131,8 +132,8 @@ static int readdir_read_dirdata_handle(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, "  reading metadata (coll_id = %d, "
-        "handle = %Lu, key = %s (%d), val_buf = %p (%d))\n",
+        GOSSIP_READDIR_DEBUG, " - reading metadata: coll_id=%d, "
+        "handle=%Lu, key=%s (sz=%d)\n\tval_buf=%p (sz=%d)\n",
         s_op->req->u.readdir.fs_id, Lu(s_op->req->u.readdir.handle),
         (char *)s_op->key.buffer, s_op->key.buffer_sz,
         s_op->val.buffer, s_op->val.buffer_sz);
@@ -210,8 +211,8 @@ static int readdir_iterate_on_entries(
     }
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, "  iterating over keyvals (coll_id = %d, "
-        "handle = %Lu, token = 0x%x, count = %d)\n",
+        GOSSIP_READDIR_DEBUG, " - iterating keyvals: coll_id=%d, "
+        "handle=%Lu, token=0x%x, count=%d\n",
         s_op->req->u.readdir.fs_id, Lu(s_op->u.readdir.dirent_handle),
         s_op->req->u.readdir.token, s_op->req->u.readdir.dirent_count);
 

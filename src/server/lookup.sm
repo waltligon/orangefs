@@ -62,7 +62,7 @@ machine pvfs2_lookup_sm(
     {
         run lookup_init;
         STATE_ENOTDIR => setup_resp;
-        default       => read_object_metadata;
+        default => read_object_metadata;
     }
 
     state read_object_metadata

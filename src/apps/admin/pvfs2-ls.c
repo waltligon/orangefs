@@ -183,8 +183,8 @@ void print_entry_attr(
     char *empty_str = "";
     char *owner = empty_str, *group = empty_str;
     char *inode = empty_str;
-    time_t atime = (time_t)attr->atime;
-    struct tm *time = localtime(&atime);
+    time_t mtime = (time_t)attr->mtime;
+    struct tm *time = localtime(&mtime);
     PVFS_size size = 0;
     char scratch_owner[16] = {0}, scratch_group[16] = {0};
     char scratch_size[16] = {0}, scratch_inode[16] = {0};
