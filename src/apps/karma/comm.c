@@ -55,6 +55,7 @@ int gui_comm_setup(void)
 
     for (i=0; i < mnt.ptab_count; i++) {
 	GtkTreeIter iter;
+        PVFS_fs_id cur_fs_id;
 
 	gtk_list_store_append(gui_comm_fslist, &iter);
 
@@ -67,12 +68,17 @@ int gui_comm_setup(void)
 	strncpy(msgbuf, mnt.ptab_array[i].pvfs_config_server, j);
 	msgbuf[j] = '\0';
 
+        cur_fs_id = PINT_config_get_fs_id_by_fs_name(
+            PINT_get_server_config_struct(),
+            mnt.ptab_array[i].pvfs_fs_name);
+        assert(cur_fs_id != (PVFS_fs_id)0);
+
 	gtk_list_store_set(gui_comm_fslist,
 			   &iter,
 			   0, mnt.ptab_array[i].mnt_dir,
 			   1, msgbuf,
 			   2, mnt.ptab_array[i].pvfs_fs_name,
-			   3, (gint) resp_init.fsid_list[i],
+			   3, (gint) cur_fs_id,
 			   -1);
     }
 
