@@ -25,6 +25,7 @@ typedef PVFS_context_id job_context_id;
 typedef struct job_status
 {
     /* the comments indicate which type of job will fill in which fields */
+    job_id_t id;		/* id of completed operation */
     int error_code;		/* returned by all operations */
     PVFS_size actual_size;	/* read_at, write_at, resize, bmi_recv */
     PVFS_vtag *vtag;		/* most trove operations */

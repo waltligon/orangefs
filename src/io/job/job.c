@@ -3433,6 +3433,8 @@ static void fill_status(struct job_desc *jd,
 			void **returned_user_ptr_p,
 			job_status_s * status)
 {
+    status->id = jd->job_id;
+
     if (returned_user_ptr_p)
     {
 	*returned_user_ptr_p = jd->job_user_ptr;
