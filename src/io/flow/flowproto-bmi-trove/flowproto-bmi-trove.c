@@ -1861,6 +1861,11 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
      * - zero byte messages
      */
 
+    /* TODO: think about this some more.  This isn't the right test (even if
+     * we want to detect this case), because it breaks when we are using an 
+     * intermediate buffer.
+     */
+#if 0
     /* see if the flow is being aborted */
     if (actual_size != flow_data->bmi_total_size)
     {
@@ -1869,6 +1874,7 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 	exit(-1);
 	return;
     }
+#endif
 
     flow_d->total_transfered += actual_size;
     gossip_ldebug(FLOW_PROTO_DEBUG, "Total completed (bmi to mem): %ld\n",
