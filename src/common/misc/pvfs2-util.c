@@ -376,7 +376,8 @@ int PVFS_util_get_default_fsid(PVFS_fs_id* out_fs_id)
  * dynamic mnt entries can only be added to a particular dynamic
  * region of our book keeping, so they're the exception, not the rule.
  *
- * returns 0 on success, -PVFS_error on failure
+ * returns 0 on success, -PVFS_error on failure, and 1 if the mount
+ * entry already exists as a parsed entry (not dynamic)
  */
 int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
 {
@@ -401,18 +402,13 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
 
                 if (current_mnt->fs_id == mntent->fs_id)
                 {
-                    gossip_debug(
-                        GOSSIP_CLIENT_DEBUG, "* File system %d already "
-                        "mounted on %s already exists [parsed]\n",
-                        mntent->fs_id, current_mnt->mnt_dir);
-
-                    gossip_debug(
-                        GOSSIP_CLIENT_DEBUG, "Reporting success since we "
-                        "do not try to add dynamic mount entries\n"
-                        "  matching parsed entries\n");
-
+                    /*
+                      no need to add the dynamic mount information
+                      because the file system already exists as a
+                      parsed mount entry
+                    */
                     gen_mutex_unlock(&s_stat_tab_mutex);
-                    return 0;
+                    return 1;
                 }
             }
         }
@@ -702,13 +698,12 @@ int PVFS_util_resolve(
  */
 int PVFS_util_init_defaults(void)
 {
-    const PVFS_util_tab* tab;
     int ret = -1;
     int i;
     int found_one = 0;
 
     /* use standard system tab files */
-    tab = PVFS_util_parse_pvfstab(NULL);
+    const PVFS_util_tab* tab = PVFS_util_parse_pvfstab(NULL);
     if(!tab)
     {
         gossip_err(

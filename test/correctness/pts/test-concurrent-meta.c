@@ -387,7 +387,7 @@ int test_concurrent_meta(MPI_Comm * comm __unused,
 	}
     }
 
-    finalize_sysint();
+/*     finalize_sysint(); */
     return ret;
 }
 

@@ -29,6 +29,7 @@ int initialize_sysint(void)
     pvfs_helper.initialized = 1;
     pvfs_helper.num_test_files = NUM_TEST_FILES;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG,"sysint intialized\n");
     return 0;
 }
 

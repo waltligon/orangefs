@@ -29,7 +29,7 @@ int test_pvfs_datatype_init(
 
     debug_printf("test_pvfs_datatype_init called\n");
 
-    if (initialize_sysint() || (!pvfs_helper.initialized))
+    if (!pvfs_helper.initialized && initialize_sysint())
     {
         debug_printf("initialize_sysint failed\n");
         return ret;

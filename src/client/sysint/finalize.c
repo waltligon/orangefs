@@ -14,7 +14,7 @@
 #include "pint-bucket.h"
 #include "dotconf.h"
 #include "trove.h"
-#include "server-config.h"
+#include "server-config-mgr.h"
 #include "PINT-reqproto-encode.h"
 #include "client-state-machine.h"
 
@@ -32,21 +32,12 @@ extern gen_mutex_t *g_server_config_mutex;
  */
 int PVFS_sys_finalize()
 {
-    struct server_configuration_s *server_config = NULL;
-
     PINT_ncache_finalize();
     PINT_acache_finalize();
     PINT_bucket_finalize();
 
-    server_config = PINT_get_server_config_struct();
-    PINT_config_release(server_config);
-    PINT_put_server_config_struct(server_config);
-
-    if (g_server_config_mutex)
-    {
-        gen_mutex_destroy(g_server_config_mutex);
-        g_server_config_mutex = NULL;
-    }
+    /* flush all known server configurations */
+    PINT_server_config_mgr_finalize();
 
     /* get rid of the mutex for the BMI session tag identifier */
     gen_mutex_lock(g_session_tag_mt_lock);

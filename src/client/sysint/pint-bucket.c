@@ -13,7 +13,6 @@
 #include "pvfs2-attr.h"
 #include "pint-sysint-utils.h"
 #include "bmi.h"
-#include "gossip.h"
 #include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
@@ -169,17 +168,21 @@ int PINT_handle_load_mapping(
           map_handle_range_to_extent_list is a macro defined in
           pint-bucket.h for convenience only.
         */
+        assert(cur_config_fs_cache->fs->meta_handle_ranges);
         map_handle_range_to_extent_list(
             cur_config_fs_cache->fs->meta_handle_ranges);
 
+        assert(cur_config_fs_cache->fs->data_handle_ranges);
         map_handle_range_to_extent_list(
             cur_config_fs_cache->fs->data_handle_ranges);
 
         /*
-          add config cache object to the hash table
-          that maps fsid to a config_fs_cache_s
+          add config cache object to the hash table that maps fsid to
+          a config_fs_cache_s.  NOTE: the
+          'map_handle_range_to_extent_list' can set ret to -ENOMEM, so
+          check for that here.
         */
-        if (ret == 0)
+        if (ret != -ENOMEM)
         {
             cur_config_fs_cache->meta_server_cursor =
                 cur_config_fs_cache->fs->meta_handle_ranges;
@@ -189,6 +192,8 @@ int PINT_handle_load_mapping(
             qhash_add(PINT_fsid_config_cache_table,
                       &(cur_config_fs_cache->fs->coll_id),
                       &(cur_config_fs_cache->hash_link));
+
+            ret = 0;
         }
     }
     return ret;
@@ -546,14 +551,17 @@ int PINT_bucket_get_server_array(
 int PINT_bucket_map_to_server(
     PVFS_BMI_addr_t *server_addr,
     PVFS_handle handle,
-    PVFS_fs_id fsid)
+    PVFS_fs_id fs_id)
 {
     int ret = -PVFS_EINVAL;
     char bmi_server_addr[PVFS_MAX_SERVER_ADDR_LEN] = {0};
 
     ret = PINT_bucket_get_server_name(
-        bmi_server_addr, PVFS_MAX_SERVER_ADDR_LEN, handle, fsid);
-
+        bmi_server_addr, PVFS_MAX_SERVER_ADDR_LEN, handle, fs_id);
+    if (ret)
+    {
+        PVFS_perror("PINT_bucket_get_server_name failed", ret);
+    }
     return (!ret ? BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
 }
 
@@ -703,9 +711,9 @@ int PINT_bucket_get_server_name(
     hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
     if (hash_link)
     {
-        cur_config_cache = qlist_entry(hash_link,
-				       struct config_fs_cache_s,
-				       hash_link);
+        cur_config_cache = qlist_entry(
+            hash_link, struct config_fs_cache_s, hash_link);
+
         assert(cur_config_cache);
         assert(cur_config_cache->fs);
         assert(cur_config_cache->bmi_host_extent_tables);

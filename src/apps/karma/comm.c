@@ -127,14 +127,18 @@ int gui_comm_setup(void)
 	strncpy(msgbuf, tab->mntent_array[i].pvfs_config_server, j);
 	msgbuf[j] = '\0';
 
-        server_config = PINT_get_server_config_struct();
-        assert(server_config);
+        while(cur_fs_id == PVFS_FS_ID_NULL)
+        {
+            server_config = PINT_get_server_config_struct(
+                tab->mntent_array[i].fs_id);
+            assert(server_config);
 
-        cur_fs_id = PINT_config_get_fs_id_by_fs_name(
-            server_config, tab->mntent_array[i].pvfs_fs_name);
+            cur_fs_id = PINT_config_get_fs_id_by_fs_name(
+                server_config, tab->mntent_array[i].pvfs_fs_name);
+
+            PINT_put_server_config_struct(server_config);
+        }
         assert(cur_fs_id != PVFS_FS_ID_NULL);
-
-        PINT_put_server_config_struct(server_config);
 
 	gtk_list_store_set(gui_comm_fslist,
 			   &iter,

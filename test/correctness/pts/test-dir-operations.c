@@ -222,12 +222,12 @@ int test_dir_operations(MPI_Comm * comm,
 	}
     }
 
-    ret = finalize_sysint();
-    if (ret < 0)
-    {
-	printf("finalizing sysint failed with errcode = %d\n", ret);
-	return (-1);
-    }
+/*     ret = finalize_sysint(); */
+/*     if (ret < 0) */
+/*     { */
+/* 	printf("finalizing sysint failed with errcode = %d\n", ret); */
+/* 	return (-1); */
+/*     } */
 
     return -nerrs;
 }

@@ -60,6 +60,9 @@ static int is_valid_handle_range_description(char *h_range);
 static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
+static void copy_filesystem(
+    struct filesystem_configuration_s *dest_fs,
+    struct filesystem_configuration_s *src_fs);
 static int cache_config_files(
     char *global_config_filename,
     char *server_config_filename);
@@ -903,13 +906,14 @@ DOTCONF_CB(get_range_list)
                 {
                     is_new_handle_mapping = 1;
                     handle_mapping->alias_mapping =
-                        find_host_alias_ptr_by_alias(config_s,
-                                                     cmd->data.list[i-1]);
+                        find_host_alias_ptr_by_alias(
+                            config_s, cmd->data.list[i-1]);
                 }
-                /* removeable sanity check */
+
                 assert(handle_mapping->alias_mapping ==
-                       find_host_alias_ptr_by_alias(config_s,
-                                                    cmd->data.list[i-1]));
+                       find_host_alias_ptr_by_alias(
+                           config_s, cmd->data.list[i-1]));
+
                 if (!handle_mapping->handle_range &&
                     !handle_mapping->handle_extent_array.extent_array)
                 {
@@ -917,8 +921,9 @@ DOTCONF_CB(get_range_list)
                         strdup(cmd->data.list[i]);
 
                     /* build the extent array, based on range */
-                    build_extent_array(handle_mapping->handle_range,
-                                       &handle_mapping->handle_extent_array);
+                    build_extent_array(
+                        handle_mapping->handle_range,
+                        &handle_mapping->handle_extent_array);
                 }
                 else
                 {
@@ -1264,6 +1269,127 @@ static void free_filesystem(void *ptr)
         fs = NULL;
     }
 }
+
+static void copy_filesystem(
+    struct filesystem_configuration_s *dest_fs,
+    struct filesystem_configuration_s *src_fs)
+{
+    PINT_llist *cur = NULL;
+    struct host_handle_mapping_s *cur_h_mapping = NULL;
+    struct host_handle_mapping_s *new_h_mapping = NULL;
+
+    if (dest_fs && src_fs)
+    {
+        dest_fs->file_system_name = strdup(src_fs->file_system_name);
+        assert(dest_fs->file_system_name);
+
+        dest_fs->coll_id = src_fs->coll_id;
+        dest_fs->root_handle = src_fs->root_handle;
+
+        dest_fs->flowproto = src_fs->flowproto;
+        dest_fs->encoding = src_fs->encoding;
+
+        dest_fs->meta_handle_ranges = PINT_llist_new();
+        dest_fs->data_handle_ranges = PINT_llist_new();
+
+        assert(dest_fs->meta_handle_ranges);
+        assert(dest_fs->data_handle_ranges);
+
+        /* copy all meta handle ranges */
+        cur = src_fs->meta_handle_ranges;
+        while(cur)
+        {
+            cur_h_mapping = PINT_llist_head(cur);
+            if (!cur_h_mapping)
+            {
+                break;
+            }
+
+            new_h_mapping = (struct host_handle_mapping_s *)
+                malloc(sizeof(struct host_handle_mapping_s));
+            assert(new_h_mapping);
+
+            new_h_mapping->alias_mapping = (struct host_alias_s *)
+                malloc(sizeof(struct host_alias_s));
+            assert(new_h_mapping->alias_mapping);
+
+            new_h_mapping->alias_mapping->host_alias =
+                strdup(cur_h_mapping->alias_mapping->host_alias);
+            assert(new_h_mapping->alias_mapping->host_alias);
+
+            new_h_mapping->alias_mapping->bmi_address =
+                strdup(cur_h_mapping->alias_mapping->bmi_address);
+            assert(new_h_mapping->alias_mapping->bmi_address);
+
+            new_h_mapping->handle_range =
+                strdup(cur_h_mapping->handle_range);
+            assert(new_h_mapping->handle_range);
+
+            build_extent_array(new_h_mapping->handle_range,
+                               &new_h_mapping->handle_extent_array);
+
+            PINT_llist_add_to_tail(
+                dest_fs->meta_handle_ranges, new_h_mapping);
+
+            cur = PINT_llist_next(cur);
+        }
+
+        /* copy all data handle ranges */
+        cur = src_fs->data_handle_ranges;
+        while(cur)
+        {
+            cur_h_mapping = PINT_llist_head(cur);
+            if (!cur_h_mapping)
+            {
+                break;
+            }
+
+            new_h_mapping = (struct host_handle_mapping_s *)
+                malloc(sizeof(struct host_handle_mapping_s));
+            assert(new_h_mapping);
+
+            new_h_mapping->alias_mapping = (struct host_alias_s *)
+                malloc(sizeof(struct host_alias_s));
+            assert(new_h_mapping->alias_mapping);
+
+            new_h_mapping->alias_mapping->host_alias =
+                strdup(cur_h_mapping->alias_mapping->host_alias);
+            assert(new_h_mapping->alias_mapping->host_alias);
+
+            new_h_mapping->alias_mapping->bmi_address =
+                strdup(cur_h_mapping->alias_mapping->bmi_address);
+            assert(new_h_mapping->alias_mapping->bmi_address);
+
+            new_h_mapping->handle_range =
+                strdup(cur_h_mapping->handle_range);
+            assert(new_h_mapping->handle_range);
+
+            build_extent_array(new_h_mapping->handle_range,
+                               &new_h_mapping->handle_extent_array);
+
+            PINT_llist_add_to_tail(
+                dest_fs->data_handle_ranges, new_h_mapping);
+
+            cur = PINT_llist_next(cur);
+        }
+
+        /* if the optional hints are used, copy them too */
+        if (src_fs->attr_cache_keywords)
+        {
+            dest_fs->attr_cache_keywords =
+                strdup(src_fs->attr_cache_keywords);
+            assert(dest_fs->attr_cache_keywords);
+        }
+
+        dest_fs->handle_recycle_timeout_sec =
+            src_fs->handle_recycle_timeout_sec;
+        dest_fs->attr_cache_size = src_fs->attr_cache_size;
+        dest_fs->attr_cache_max_num_elems =
+            src_fs->attr_cache_max_num_elems;
+        dest_fs->trove_sync_mode = src_fs->trove_sync_mode;
+    }
+}
+
 
 static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
@@ -1934,6 +2060,62 @@ PINT_llist *PINT_config_get_filesystems(
     struct server_configuration_s *config_s)
 {
     return (config_s ? config_s->file_systems : NULL);
+}
+
+/*
+  given a configuration object, weed out all information about other
+  filesystems if the fs_id does not match that of the specifed fs_id
+*/
+int PINT_config_trim_filesystems_except(
+    struct server_configuration_s *config_s,
+    PVFS_fs_id fs_id)
+{
+    int ret = -PVFS_EINVAL;
+    PINT_llist *cur = NULL, *new_fs_list = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL, *new_fs = NULL;
+
+    if (config_s)
+    {
+        new_fs_list = PINT_llist_new();
+        if (!new_fs_list)
+        {
+            return -PVFS_ENOMEM;
+        }
+
+        cur = config_s->file_systems;
+        while(cur)
+        {
+            cur_fs = PINT_llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
+
+            if (cur_fs->coll_id == fs_id)
+            {
+                new_fs = (struct filesystem_configuration_s *)malloc(
+                    sizeof(struct filesystem_configuration_s));
+                assert(new_fs);
+
+                memset(new_fs, 0,
+                       sizeof(struct filesystem_configuration_s));
+
+                copy_filesystem(new_fs, cur_fs);
+                PINT_llist_add_to_head(new_fs_list, (void *)new_fs);
+                break;
+            }
+            cur = PINT_llist_next(cur);
+        }
+
+        PINT_llist_free(config_s->file_systems,free_filesystem);
+        config_s->file_systems = new_fs_list;
+
+        if (PINT_llist_count(config_s->file_systems) == 1)
+        {
+            ret = 0;
+        }
+    }
+    return ret;
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__

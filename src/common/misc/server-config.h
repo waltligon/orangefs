@@ -117,17 +117,21 @@ typedef struct server_configuration_s
                                        filesystem_configuration_s       */
 } server_configuration_s;
 
-int PINT_parse_config(struct server_configuration_s *config_s,
-		      char *global_config_filename,
-		      char *server_config_filename);
+int PINT_parse_config(
+    struct server_configuration_s *config_s,
+    char *global_config_filename,
+    char *server_config_filename);
 
-void PINT_config_release(struct server_configuration_s *config_s);
+void PINT_config_release(
+    struct server_configuration_s *config_s);
 
-char *PINT_config_get_host_addr_ptr(struct server_configuration_s *config_s,
-				    char *alias);
+char *PINT_config_get_host_addr_ptr(
+    struct server_configuration_s *config_s,
+    char *alias);
 
-char *PINT_config_get_host_alias_ptr(struct server_configuration_s *config_s,
-				     char *bmi_address);
+char *PINT_config_get_host_alias_ptr(
+    struct server_configuration_s *config_s,
+    char *bmi_address);
 
 char *PINT_config_get_meta_handle_range_str(
     struct server_configuration_s *config_s,
@@ -162,6 +166,10 @@ PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
 
 PINT_llist *PINT_config_get_filesystems(
     struct server_configuration_s *config_s);
+
+int PINT_config_trim_filesystems_except(
+    struct server_configuration_s *config_s,
+    PVFS_fs_id fs_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(struct server_configuration_s *config);

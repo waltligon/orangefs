@@ -81,7 +81,8 @@ int PINT_server_get_config(
     struct PVFS_sys_mntent* mntent);
 void PINT_release_pvfstab(void);
 
-struct server_configuration_s *PINT_get_server_config_struct(void);
+struct server_configuration_s *PINT_get_server_config_struct(
+    PVFS_fs_id fs_id);
 void PINT_put_server_config_struct(
     struct server_configuration_s *config);
 

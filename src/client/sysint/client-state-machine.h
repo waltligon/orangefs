@@ -423,7 +423,7 @@ int PINT_serv_msgpairarray_resolve_addrs(int count,
 #include "state-machine.h"
 
 /* misc helper methods */
-struct server_configuration_s *PINT_get_server_config_struct(void);
+struct server_configuration_s *PINT_get_server_config_struct(PVFS_fs_id);
 
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;

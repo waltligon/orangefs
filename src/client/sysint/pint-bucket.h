@@ -23,8 +23,6 @@ int PINT_bucket_initialize(void);
 
 int PINT_bucket_finalize(void);
 
-int PINT_bucket_reinitialize(struct server_configuration_s *config);
-
 int PINT_handle_load_mapping(struct server_configuration_s *config,
 			     struct filesystem_configuration_s *fs);
 

@@ -21,7 +21,7 @@
 #include "PINT-reqproto-encode.h"
 #include "dotconf.h"
 #include "trove.h"
-#include "server-config.h"
+#include "server-config-mgr.h"
 #include "client-state-machine.h"
 
 job_context_id PVFS_sys_job_context = -1;
@@ -30,14 +30,15 @@ extern gen_mutex_t *g_session_tag_mt_lock;
 
 typedef enum
 {
-    CLIENT_NO_INIT =      0,
-    CLIENT_ENCODER_INIT = (1 << 0),
-    CLIENT_BMI_INIT     = (1 << 1),
-    CLIENT_FLOW_INIT    = (1 << 2),
-    CLIENT_JOB_INIT     = (1 << 3),
-    CLIENT_JOB_CTX_INIT = (1 << 4),
-    CLIENT_ACACHE_INIT  = (1 << 5),
-    CLIENT_NCACHE_INIT  = (1 << 6)
+    CLIENT_NO_INIT         =      0,
+    CLIENT_ENCODER_INIT    = (1 << 0),
+    CLIENT_BMI_INIT        = (1 << 1),
+    CLIENT_FLOW_INIT       = (1 << 2),
+    CLIENT_JOB_INIT        = (1 << 3),
+    CLIENT_JOB_CTX_INIT    = (1 << 4),
+    CLIENT_ACACHE_INIT     = (1 << 5),
+    CLIENT_NCACHE_INIT     = (1 << 6),
+    CLIENT_CONFIG_MGR_INIT = (1 << 7)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -139,6 +140,15 @@ int PVFS_sys_initialize(int default_debug_mask)
     PINT_ncache_set_timeout(PINT_NCACHE_TIMEOUT * 1000);
     client_status_flag |= CLIENT_NCACHE_INIT;
 
+    /* initialize the server configuration manager */
+    ret = PINT_server_config_mgr_initialize();
+    if (ret < 0)
+    {
+        gossip_lerr("Error initializing server configuration manager\n");
+        goto error_exit;        
+    }        
+    client_status_flag |= CLIENT_CONFIG_MGR_INIT;
+
     /* initialize the handle mapping interface */
     ret = PINT_bucket_initialize();
     if (ret < 0)
@@ -150,6 +160,11 @@ int PVFS_sys_initialize(int default_debug_mask)
     return 0;
 
   error_exit:
+
+    if (client_status_flag & CLIENT_CONFIG_MGR_INIT)
+    {
+        PINT_server_config_mgr_finalize();
+    }
 
     if (client_status_flag & CLIENT_NCACHE_INIT)
     {

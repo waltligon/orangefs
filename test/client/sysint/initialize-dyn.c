@@ -57,7 +57,7 @@ int main(int argc, char **argv)
             printf("Failed to resolve mount point %s\n",
                    mntent[i].mnt_dir);
             PVFS_perror("Error", ret);
-            break;
+            return ret;
         }
         else
         {
@@ -76,7 +76,7 @@ int main(int argc, char **argv)
         {
             printf("Failed to remove mount entry %d\n",i);
             PVFS_perror("Error", ret);
-            break;
+            return ret;
         }
     }
 
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
         {
             printf("Resolved an unresolvable mount point %s\n",
                    mntent[i].mnt_dir);
-            break;
+            return ret;
         }
         else
         {
@@ -108,7 +108,7 @@ int main(int argc, char **argv)
         {
             printf("Failed to add mount entry %d\n",i);
             PVFS_perror("Error", ret);
-            break;
+            return ret;
         }
     }
 
@@ -125,7 +125,7 @@ int main(int argc, char **argv)
             printf("Failed to resolve mount point %s\n",
                    mntent[i].mnt_dir);
             PVFS_perror("Error", ret);
-            break;
+            return ret;
         }
         else
         {
@@ -144,7 +144,7 @@ int main(int argc, char **argv)
         {
             printf("Failed to remove mount entry %d\n",i);
             PVFS_perror("Error", ret);
-            break;
+            return ret;
         }
     }
 
@@ -157,7 +157,7 @@ int main(int argc, char **argv)
         {
             printf("Resolved an unresolvable mount point %s\n",
                    mntent[i].mnt_dir);
-            break;
+            return ret;
         }
         else
         {
@@ -176,7 +176,7 @@ int main(int argc, char **argv)
         {
             printf("Failed to add mount entry %d\n",i);
             PVFS_perror("Error", ret);
-            break;
+            return ret;
         }
     }
 
@@ -190,7 +190,7 @@ int main(int argc, char **argv)
             printf("Failed to resolve mount point %s\n",
                    mntent[i].mnt_dir);
             PVFS_perror("Error", ret);
-            break;
+            return ret;
         }
         else
         {
@@ -205,7 +205,6 @@ int main(int argc, char **argv)
 	printf("finalizing sysint failed with errcode = %d\n", ret);
 	return (-1);
     }
-
     return (0);
 }
 

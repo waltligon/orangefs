@@ -150,13 +150,6 @@ int test_lookup_bench(MPI_Comm * comm __unused,
 	/* this will make n directories and look up each */
 	nerrs = do_create_lookup(root_refn, fs_id, myparams->mode,
                                  myparams->mode, rank);
-
-	ret = finalize_sysint();
-	if (ret < 0)
-	{
-	    printf("finalizing sysint failed with errcode = %d\n", ret);
-	    return (-1);
-	}
     }
     return -nerrs;
 }

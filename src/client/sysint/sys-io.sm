@@ -170,7 +170,7 @@ int PVFS_sys_io(PVFS_object_ref ref,
         return ret;
     }
 
-    server_config = PINT_get_server_config_struct();
+    server_config = PINT_get_server_config_struct(ref.fs_id);
     cur_fs = PINT_config_find_fs_id(server_config, ref.fs_id);
     PINT_put_server_config_struct(server_config);
 

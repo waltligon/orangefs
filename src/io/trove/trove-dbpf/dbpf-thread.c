@@ -60,7 +60,8 @@ int dbpf_thread_initialize(void)
     }
     else
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (2)\n");
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "dbpf_thread_initialize: failed (2)\n");
     }
 #endif
     return ret;

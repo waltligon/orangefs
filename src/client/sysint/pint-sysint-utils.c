@@ -16,59 +16,32 @@
 #include "PINT-reqproto-encode.h"
 #include "dotconf.h"
 #include "trove.h"
-#include "server-config.h"
+#include "server-config-mgr.h"
 #include "str-utils.h"
 #include "pvfs2-util.h"
 #include "client-state-machine.h"
 
 static int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock = NULL;
-static struct server_configuration_s g_server_config;
-gen_mutex_t *g_server_config_mutex = NULL;
 
 static int server_parse_config(
     struct server_configuration_s *config,
     struct PVFS_servresp_getconfig *response);
 
 /*
-  analogous to 'get_server_config_struct' in pvfs2-server.c -- it
-  returns a pointer to the parsed configuration object to any client
-  code that is interested.  when mutexes are available, the get/put
-  mechanism is used to ensure serialized access to this object.  in
-  the future, it may change atomically in case the server
-  configuration changes during run-time.
+  analogous to 'get_server_config_struct' in pvfs2-server.c -- only an
+  fs_id is required since any client may know about different server
+  configurations during run-time
 */
-struct server_configuration_s *PINT_get_server_config_struct(void)
+struct server_configuration_s *PINT_get_server_config_struct(
+    PVFS_fs_id fs_id)
 {
-    if (g_server_config_mutex == NULL)
-    {
-        g_server_config_mutex = gen_mutex_build();
-        if (!g_server_config_mutex)
-        {
-            gossip_err("Cannot allocate server config mutex\n");
-            return NULL;
-        }
-    }
-    gen_mutex_lock(g_server_config_mutex);
-    return &g_server_config;
+    return PINT_server_config_mgr_get_config(fs_id);
 }
 
 void PINT_put_server_config_struct(struct server_configuration_s *config)
 {
-    if (g_server_config_mutex == NULL)
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "Warning:  Calling put "
-                     "before a get\n");
-        g_server_config_mutex = gen_mutex_build();
-        if (!g_server_config_mutex)
-        {
-            gossip_err("Cannot allocate server config mutex\n");
-        }
-    }
-    else
-    {
-        gen_mutex_unlock(g_server_config_mutex);
-    }
+    PINT_server_config_mgr_put_config(config);
 }
 
 int get_next_session_tag(void)
