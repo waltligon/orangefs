@@ -24,7 +24,7 @@ void produce_listing(int line, char *listing);
 #define	LIST				strcat(text,yytext);
 #define	RETURNVAL(x)	yylval.i = (int)(token = x); return((int)x);
 #define	MAKELIST			produce_listing(line,text);text[0]=0;
-char     text[132];
+char     text[500];
 int      token;
 
 %}
