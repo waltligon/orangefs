@@ -61,6 +61,9 @@ system interface functionality:
   (how to do paths, fstab, url stuff, whatever)
 - define how to pass in distribution and number of datafiles for 
   cases in which the caller wants to override the defaults
+- add nonblocking api for some functions
+- clean up API (in particular fstab parsing / initialize path, and removal of
+  depricated terminology)
 
 kernel/vfs interface
 ====================================================================
@@ -98,6 +101,8 @@ error codes:
 I/O path:
 ====================================================================
 - buffer cache on top of trove
+- clean up buffer management in BMI to be more useful for I/O buffer 
+  cache, maybe push to a seperate component
 - optimizing small reads and writes (packing data into req/ack messages)
 - native GM flowprotocol
 - general optimizations (lock granularity, immediate completion, etc.)
@@ -112,6 +117,7 @@ I/O path:
   from spawning if not used
 - come up with a scheme to handle cases in dbpf-bstream-fd-cache in which
   the number of fd's in use exceeds FDCACHE_ENTRIES
+- ability to fail over with multiple bmi transports
 
 correctness/performance testing
 ====================================================================
@@ -124,6 +130,7 @@ correctness/performance testing
 
 system management utilities
 ====================================================================
+- pvfs2-fsck (serial tool, evolve into parallel tool)
 - decide what we want/need here?
   - health monitoring
   - system recovery
