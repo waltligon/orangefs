@@ -218,8 +218,8 @@ static int handle_recycle(struct handle_ledger *hl)
 void trove_handle_ledger_get_statistics(struct handle_ledger *hl,
     uint64_t* free_count)
 {
-    *free_count = 0;
     uint64_t tmp_count;
+    *free_count = 0;
 
     extentlist_count(&(hl->free_list), &tmp_count);
     *free_count += tmp_count;
