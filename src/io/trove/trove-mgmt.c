@@ -42,9 +42,7 @@ extern struct TROVE_context_ops dbpf_context_ops;
 static gen_mutex_t trove_init_mutex = GEN_MUTEX_INITIALIZER;
 static int trove_init_status = 0;
 
-/* trove_initialize()
- *
- * Returns -1 on failure (already initialized), 1 on success.  This is in
+/* Returns -1 on failure (already initialized), 1 on success.  This is in
  * keeping with the "1 is immediate succcess" semantic for return values used
  * throughout trove.
  */
@@ -53,43 +51,39 @@ int trove_initialize(char *stoname,
 		     char **method_name_p,
 		     int method_id)
 {
-    int ret;
-    char *ret_method_name_p;
+    int ret = -1;
+    char *ret_method_name_p = NULL;
 
     ret = gen_mutex_lock(&trove_init_mutex);
-    assert (!ret);
-    if (trove_init_status) {
+    assert(ret == 0);
+
+    if (trove_init_status)
+    {
 	gen_mutex_unlock(&trove_init_mutex);
 	return -1;
     }
 
-    /* initialize the handle management interface */
     ret = trove_handle_mgmt_initialize();
-    if ( ret == -1 ) {
+    if (ret == -1)
+    {
 	return ret;
     }
 
-    /* for each underlying method, call its initialize function */
-
-    /* currently all we have is dbpf */
-
-    /* add mapping into method table */
     mgmt_method_table[0]    = &dbpf_mgmt_ops;
     dspace_method_table[0]  = &dbpf_dspace_ops;
     keyval_method_table[0]  = &dbpf_keyval_ops;
     bstream_method_table[0] = &dbpf_bstream_ops;
     context_method_table[0] = &dbpf_context_ops;
 
-    /* initialize can fail if storage name isn't valid, but we want those
-     * ops pointers to be right either way.
-     */
-    ret = dbpf_mgmt_ops.initialize(stoname,
-				   flags, 
-				   &ret_method_name_p,
-				   0); /* first and only method */
-
-    if (ret >= 0) {
-	free(ret_method_name_p); /* space for name of method is allocated in call */
+    /*
+      for each underlying method, call its initialize function.
+      initialize can fail if storage name isn't valid, but we want those
+      op pointers to be right either way.
+    */
+    ret = dbpf_mgmt_ops.initialize(stoname, flags, &ret_method_name_p, 0);
+    if (ret >= 0)
+    {
+	free(ret_method_name_p);
 	ret = 1;
 	trove_init_status = 1;
     }
@@ -97,8 +91,6 @@ int trove_initialize(char *stoname,
     return ret;
 }
 
-/* trove_finalize()
- */
 int trove_finalize(void)
 {
     int ret;

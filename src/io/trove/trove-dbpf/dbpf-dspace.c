@@ -159,10 +159,10 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             gossip_debug(TROVE_DEBUG,
                          "new_handle was FORCED to be %Lu\n", Lu(new_handle));
         }
-        else if (cur_extent.first == 0)
+        else if (cur_extent.first == TROVE_HANDLE_NULL)
         {
             /*
-              if we got zero, the caller doesn't care
+              if we got TROVE_HANDLE_NULL, the caller doesn't care
               where the handle comes from
             */
             new_handle = trove_handle_alloc(op_p->coll_p->coll_id);

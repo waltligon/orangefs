@@ -16,6 +16,11 @@ extern "C" {
 #include "trove.h"
 #include "gen-locks.h"
 
+#define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
+#define TROVE_DBPF_VERSION_VALUE                                  "0.0.1"
+#define LAST_HANDLE_STRING                                  "last_handle"
+#define ROOT_HANDLE_STRING                                  "root_handle"
+
 /*
   for more efficient host filesystem accesses, we have
   a simple *_MAX_NUM_BUCKETS define that can be thought of more
@@ -30,100 +35,101 @@ extern "C" {
 #define DBPF_KEYVAL_MAX_NUM_BUCKETS   32
 #define DBPF_BSTREAM_MAX_NUM_BUCKETS  64
 
-#define DBPF_KEYVAL_GET_BUCKET(__handle, __id) \
-(((__id << ((sizeof(__id) - 1) * 8)) | __handle) % DBPF_KEYVAL_MAX_NUM_BUCKETS)
+#define DBPF_KEYVAL_GET_BUCKET(__handle, __id)                           \
+(((__id << ((sizeof(__id) - 1) * 8)) | __handle) %                       \
+ DBPF_KEYVAL_MAX_NUM_BUCKETS)
 
-#define DBPF_BSTREAM_GET_BUCKET(__handle, __id) \
-(((__id << ((sizeof(__id) - 1) * 8)) | __handle) % DBPF_BSTREAM_MAX_NUM_BUCKETS)
+#define DBPF_BSTREAM_GET_BUCKET(__handle, __id)                          \
+(((__id << ((sizeof(__id) - 1) * 8)) | __handle) %                       \
+ DBPF_BSTREAM_MAX_NUM_BUCKETS)
 
-#define DBPF_EVENT_START(__op, __id) \
- PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id, \
+#define DBPF_EVENT_START(__op, __id)                                     \
+ PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
  PVFS_EVENT_FLAG_START)
 
-#define DBPF_EVENT_END(__op, __id) \
- PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id, \
+#define DBPF_EVENT_END(__op, __id)                                       \
+ PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
  PVFS_EVENT_FLAG_END)
 
-#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)	\
-    do {							\
-        snprintf(__buf, __path_max, "/%s", __stoname);		\
-    } while (0);
+#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)	         \
+do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
 
 #define STO_ATTRIB_DBNAME "storage_attributes.db"
-#define DBPF_GET_STO_ATTRIB_DBNAME(__buf, __path_max, __stoname)		\
-    do { 									\
-        snprintf(__buf, __path_max, "/%s/%s", __stoname, STO_ATTRIB_DBNAME);	\
-    } while (0);
+#define DBPF_GET_STO_ATTRIB_DBNAME(__buf, __path_max, __stoname)         \
+do {                                                                     \
+  snprintf(__buf, __path_max, "/%s/%s", __stoname, STO_ATTRIB_DBNAME);   \
+} while (0)
 
 #define COLLECTIONS_DBNAME "collections.db"
-#define DBPF_GET_COLLECTIONS_DBNAME(__buf, __path_max, __stoname)		\
-    do { 									\
-        snprintf(__buf, __path_max, "/%s/%s", __stoname, COLLECTIONS_DBNAME);	\
-    } while (0);
+#define DBPF_GET_COLLECTIONS_DBNAME(__buf, __path_max, __stoname)        \
+do {                                                                     \
+  snprintf(__buf, __path_max, "/%s/%s", __stoname, COLLECTIONS_DBNAME);  \
+} while (0)
 
-#define DBPF_GET_COLL_DIRNAME(__buf, __path_max, __stoname, __collid)	\
-    do {								\
-        snprintf(__buf, __path_max, "/%s/%08x", __stoname, __collid);   \
-    } while (0);
+#define DBPF_GET_COLL_DIRNAME(__buf, __path_max, __stoname, __collid)    \
+do {                                                                     \
+  snprintf(__buf, __path_max, "/%s/%08x", __stoname, __collid);          \
+} while (0)
 
 #define COLL_ATTRIB_DBNAME "collection_attributes.db"
-#define DBPF_GET_COLL_ATTRIB_DBNAME(__buf, __path_max, __stoname, __collid)			\
-    do {											\
-        snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid, COLL_ATTRIB_DBNAME);	\
-    } while (0);
+#define DBPF_GET_COLL_ATTRIB_DBNAME(__buf,__path_max,__stoname,__collid) \
+do {                                                                     \
+  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
+           COLL_ATTRIB_DBNAME);                                          \
+} while (0)
 
 #define DS_ATTRIB_DBNAME "dataspace_attributes.db"
-#define DBPF_GET_DS_ATTRIB_DBNAME(__buf, __path_max, __stoname, __collid)			\
-    do {											\
-        snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid, DS_ATTRIB_DBNAME);	\
-    } while (0);
+#define DBPF_GET_DS_ATTRIB_DBNAME(__buf,__path_max,__stoname,__collid)   \
+do {                                                                     \
+  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
+           DS_ATTRIB_DBNAME);                                            \
+} while (0)
 
 #define KEYVAL_DIRNAME "keyvals"
-#define DBPF_GET_KEYVAL_DIRNAME(__buf, __path_max, __stoname, __collid)				\
-    do {											\
-        snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid, KEYVAL_DIRNAME);	\
-    } while (0);
+#define DBPF_GET_KEYVAL_DIRNAME(__buf, __path_max, __stoname, __collid)  \
+do {                                                                     \
+  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
+           KEYVAL_DIRNAME);                                              \
+} while (0)
 
 #define BSTREAM_DIRNAME "bstreams"
-#define DBPF_GET_BSTREAM_DIRNAME(__buf, __path_max, __stoname, __collid)			\
-    do {											\
-        snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid, BSTREAM_DIRNAME);	\
-    } while (0);
+#define DBPF_GET_BSTREAM_DIRNAME(__buf, __path_max, __stoname, __collid) \
+do {                                                                     \
+  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
+           BSTREAM_DIRNAME);                                             \
+} while (0)
 
-#define DBPF_GET_BSTREAM_FILENAME(__buf, __path_max, __stoname, __collid, __handle)				\
-    do {													\
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%.8Lu/%08Lx.bstream", __stoname, __collid, BSTREAM_DIRNAME, DBPF_BSTREAM_GET_BUCKET(__handle, __collid), Lu(__handle));	\
-    } while (0);
+/* arguments are: buf, path_max, stoname, collid, handle */
+#define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __stoname, __cid, __handle) \
+do {                                                                     \
+  snprintf(__b, __pm, "/%s/%08x/%s/%.8Lu/%08Lx.bstream",                 \
+           __stoname, __cid, BSTREAM_DIRNAME,                            \
+           DBPF_BSTREAM_GET_BUCKET(__handle, __cid), Lu(__handle));      \
+} while (0)
 
-#define DBPF_GET_KEYVAL_DBNAME(__buf, __path_max, __stoname, __collid, __handle)				\
-    do {													\
-    snprintf(filename, PATH_MAX, "/%s/%08x/%s/%.8Lu/%08Lx.keyval", __stoname, __collid, KEYVAL_DIRNAME, DBPF_KEYVAL_GET_BUCKET(__handle, __collid), Lu(__handle));	\
-    } while (0);
-
-#define LAST_HANDLE_STRING "last_handle"
-#define ROOT_HANDLE_STRING "root_handle"
+/* arguments are: buf, path_max, stoname, collid, handle */
+#define DBPF_GET_KEYVAL_DBNAME(__b, __pm, __stoname, __cid, __handle)    \
+do {                                                                     \
+  snprintf(__b, __pm, "/%s/%08x/%s/%.8Lu/%08Lx.keyval", __stoname,       \
+           __cid, KEYVAL_DIRNAME,                                        \
+           DBPF_KEYVAL_GET_BUCKET(__handle, __cid), Lu(__handle));       \
+} while (0)
 
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
 extern struct TROVE_dspace_ops dbpf_dspace_ops;
 extern struct TROVE_keyval_ops dbpf_keyval_ops;
 extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
 
-/* struct dbpf_storage
- *
- * used to store storage space info in memory.
- */
-struct dbpf_storage {
+struct dbpf_storage
+{
     int refct;
     char *name;
     DB *sto_attr_db;
     DB *coll_db;
 };
 
-/* struct dbpf_collection
- *
- * used to store collection info in memory.
- */
-struct dbpf_collection {
+struct dbpf_collection
+{
     int refct;
     char *name;
     DB *coll_attr_db;
@@ -132,22 +138,21 @@ struct dbpf_collection {
     TROVE_handle root_dir_handle;
     struct dbpf_storage *storage;
     struct handle_ledger *free_handles;
-    struct dbpf_collection *next_p; /* used by dbpf_collection.c calls to
-				     * maintain list of collections
-				     */
+
+    /* used by dbpf_collection.c calls to maintain list of collections */
+    struct dbpf_collection *next_p;
 };
 
-/* struct dbpf_collection_db_entry
- *
- * Structure stored as data in collections database with collection
+/* Structure stored as data in collections database with collection
  * directory name as key.
  */
-struct dbpf_collection_db_entry {
+struct dbpf_collection_db_entry
+{
     TROVE_coll_id coll_id;
 };
 
-
-struct dbpf_dspace_create_op {
+struct dbpf_dspace_create_op
+{
     TROVE_handle_extent_array extent_array;
     TROVE_handle *out_handle_p;
     TROVE_ds_type type;
@@ -156,49 +161,58 @@ struct dbpf_dspace_create_op {
 
 /* struct dbpf_dspace_remove_op {}; -- nothing belongs in here */
 
-struct dbpf_dspace_iterate_handles_op {
+struct dbpf_dspace_iterate_handles_op
+{
     TROVE_handle *handle_array;
     TROVE_ds_position *position_p;
     int *count_p;
 };
 
-struct dbpf_dspace_verify_op {
+struct dbpf_dspace_verify_op
+{
     TROVE_ds_type *type_p;
 };
 
-struct dbpf_dspace_setattr_op {
+struct dbpf_dspace_setattr_op
+{
     TROVE_ds_attributes_s *attr_p;
 };
 
-struct dbpf_dspace_getattr_op {
+struct dbpf_dspace_getattr_op
+{
     TROVE_ds_attributes_s *attr_p;
 };
 
-struct dbpf_keyval_read_op {
+struct dbpf_keyval_read_op
+{
     TROVE_keyval_s key;
     TROVE_keyval_s val;
     /* vtag? */
 };
 
-struct dbpf_keyval_read_list_op {
+struct dbpf_keyval_read_list_op
+{
     TROVE_keyval_s *key_array;
     TROVE_keyval_s *val_array;
     int count; /* TODO: MAKE INOUT? */
 };
 
-struct dbpf_keyval_write_op {
+struct dbpf_keyval_write_op
+{
     TROVE_keyval_s key;
     TROVE_keyval_s val;
     /* vtag? */
 };
 
-struct dbpf_keyval_remove_op {
+struct dbpf_keyval_remove_op
+{
     TROVE_keyval_s key;
     TROVE_keyval_s val;
     /* vtag? */
 };
 
-struct dbpf_keyval_iterate_op {
+struct dbpf_keyval_iterate_op
+{
     TROVE_keyval_s *key_array;
     TROVE_keyval_s *val_array;
     TROVE_ds_position *position_p;
@@ -207,23 +221,24 @@ struct dbpf_keyval_iterate_op {
 };
 
 /* used for both read and write at */
-struct dbpf_bstream_rw_at_op {
+struct dbpf_bstream_rw_at_op
+{
     TROVE_offset offset;
     TROVE_size size;
     void *buffer;
     /* vtag? */
 };
 
-struct dbpf_bstream_resize_op {
+struct dbpf_bstream_resize_op
+{
     TROVE_size size;
     /* vtag? */
 };
 
-/* struct bstream_listio_state
- *
- * Used to maintain state of partial processing of a listio operation
+/* Used to maintain state of partial processing of a listio operation
  */
-struct bstream_listio_state {
+struct bstream_listio_state
+{
     int mem_ct, stream_ct, cur_mem_size;
     char *cur_mem_off;
     TROVE_size cur_stream_size;
@@ -232,23 +247,25 @@ struct bstream_listio_state {
 
 
 /* Values for list_proc_state below */
-enum {
-    LIST_PROC_INITIALIZED,  /* list state initialized, but no aiocb array */
+enum
+{
+    LIST_PROC_INITIALIZED,  /* list state initialized,
+                               but no aiocb array */
     LIST_PROC_INPROGRESS,   /* aiocb array allocated, ops in progress */
     LIST_PROC_ALLCONVERTED, /* all list elements converted */
     LIST_PROC_ALLPOSTED     /* all list elements also posted */
 };
 
-/* struct dbpf_bstream_rw_list_op
- *
- * Used for both read and write list
+/* Used for both read and write list
  *
  * list_proc_state is used to retain the status of processing on the list
  * arrays.
  *
- * aiocb_array_count - size of the aiocb_array (nothing to do with # of things in progress)
+ * aiocb_array_count - size of the aiocb_array (nothing to do
+ * with # of things in progress)
  */
-struct dbpf_bstream_rw_list_op {
+struct dbpf_bstream_rw_list_op
+{
     int fd, list_proc_state, opcode;
     int aiocb_array_count, mem_array_count, stream_array_count;
     char **mem_offset_array;
@@ -256,12 +273,13 @@ struct dbpf_bstream_rw_list_op {
     TROVE_offset *stream_offset_array;
     TROVE_size *stream_size_array;
     struct aiocb *aiocb_array;
-    struct sigevent sigev; /* needed to keep linux lio_listio happy */
+    struct sigevent sigev;
     struct bstream_listio_state lio_state;
 };
 
 /* List of operation types that might be queued */
-enum dbpf_op_type {
+enum dbpf_op_type
+{
     BSTREAM_READ_AT = 1,
     BSTREAM_WRITE_AT,
     BSTREAM_RESIZE,
@@ -286,7 +304,8 @@ enum dbpf_op_type {
     DSPACE_SETATTR
 };
 
-enum dbpf_op_state {
+enum dbpf_op_state
+{
     OP_UNITIALIZED = 0,
     OP_NOT_QUEUED,
     OP_QUEUED,
@@ -296,21 +315,20 @@ enum dbpf_op_state {
 };
 
 
-/* struct dbpf_op
- *
- * Used to keep in-memory copy of parameters for queued operations
- */
-struct dbpf_op {
+/* Used to keep in-memory copy of parameters for queued operations */
+struct dbpf_op
+{
     enum dbpf_op_type type;
     enum dbpf_op_state state;
     TROVE_handle handle;
     TROVE_op_id id;
-    struct dbpf_collection *coll_p; /* TODO: would this be better as an id? */
+    struct dbpf_collection *coll_p;
     int (*svc_fn)(struct dbpf_op *op);
     void *user_ptr;
     TROVE_ds_flags flags;
     TROVE_context_id context_id;
-    union {
+    union
+    {
 	/* all the op types go in here; structs are all
 	 * defined just below the prototypes for the functions.
 	 */

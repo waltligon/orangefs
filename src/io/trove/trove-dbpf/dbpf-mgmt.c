@@ -39,8 +39,6 @@ char dbpf_method_name[] = "dbpf";
 
 extern int dbpf_thread_initialize(void);
 
-/* Globals */
-
 struct dbpf_storage *my_storage_p = NULL;
 
 void dbpf_error_report(const char *errpfx, char *msg)
@@ -56,14 +54,12 @@ void dbpf_error_report(const char *errpfx, char *msg)
 #endif
 }
 
-/* Internally used only */
 static struct dbpf_storage *dbpf_storage_lookup(char *stoname, int *err_p);
 static int dbpf_db_create(char *dbname);
 static DB *dbpf_db_open(char *dbname, int *err_p);
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
-/* dbpf_collection_getinfo()
- */
+
 static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
 				   TROVE_context_id context_id,
 				   TROVE_coll_getinfo_options opt,
@@ -74,50 +70,52 @@ static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
     int ret = -1;
 
     sto_p = my_storage_p;
-    /* TODO: use trove error code */
-    if (sto_p == NULL) return -1;
+    if (sto_p == NULL)
+    {
+        return -1;
+    }
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    /* TODO: use trove error code */
-    if (coll_p == NULL) return -1;
+    if (coll_p == NULL)
+    {
+        return -1;
+    }
 
     switch(opt)
     {
 	case PVFS_COLLECTION_STATFS:
-	    {
-		TROVE_statfs* tmp_trove_statfs = (TROVE_statfs*)parameter;
-		struct statfs tmp_statfs;
-		char path_name[PATH_MAX];
+        {
+            TROVE_statfs* tmp_trove_statfs = (TROVE_statfs*)parameter;
+            struct statfs tmp_statfs;
+            char path_name[PATH_MAX];
 
-		DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, sto_p->name);
-		ret = statfs(path_name, &tmp_statfs);
-		if(ret < 0)
-		{
-		    /* TODO: use trove error code */
-		    return(ret);
-		}
-		tmp_trove_statfs->fs_id = coll_id;
-                /*
-                  NOTE: use f_bavail instead of f_bfree here.
-                  see 'man statfs' for more information.
-                  it would be ideal to pass both so that the
-                  client can properly compute all values.
-                */
-		tmp_trove_statfs->bytes_available = 
-		    (tmp_statfs.f_bsize * tmp_statfs.f_bavail);
-		tmp_trove_statfs->bytes_total =
-		    (tmp_statfs.f_bsize *
-                     (tmp_statfs.f_blocks -
-                      (tmp_statfs.f_bfree - tmp_statfs.f_bavail)));
-		return(1);
-	    }
-	    break;
+            DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, sto_p->name);
+            ret = statfs(path_name, &tmp_statfs);
+            if(ret < 0)
+            {
+                return(ret);
+            }
+            tmp_trove_statfs->fs_id = coll_id;
+            /*
+              NOTE: use f_bavail instead of f_bfree here.
+              see 'man statfs' for more information.
+              it would be ideal to pass both so that the
+              client can properly compute all values.
+            */
+            tmp_trove_statfs->bytes_available = 
+                (tmp_statfs.f_bsize * tmp_statfs.f_bavail);
+            tmp_trove_statfs->bytes_total =
+                (tmp_statfs.f_bsize *
+                 (tmp_statfs.f_blocks -
+                  (tmp_statfs.f_bfree - tmp_statfs.f_bavail)));
+
+            return 1;
+        }
+        break;
     }
     return(-TROVE_ENOSYS);
 }
 
-/* dbpf_collection_setinfo()
- */
 static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
 				   TROVE_context_id context_id,
 				   int option,
@@ -155,8 +153,6 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
     return ret;
 }
 
-/* dbpf_collection_seteattr()
- */
 static int dbpf_collection_seteattr(TROVE_coll_id coll_id,
 				    TROVE_keyval_s *key_p,
 				    TROVE_keyval_s *val_p,
@@ -171,10 +167,16 @@ static int dbpf_collection_seteattr(TROVE_coll_id coll_id,
     DBT db_key, db_data;
 
     sto_p = my_storage_p;
-    if (sto_p == NULL) return -1;
+    if (sto_p == NULL)
+    {
+        return -1;
+    }
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -1;
+    if (coll_p == NULL)
+    {
+        return -1;
+    }
 
     memset(&db_key, 0, sizeof(db_key));
     memset(&db_data, 0, sizeof(db_data));
@@ -182,26 +184,25 @@ static int dbpf_collection_seteattr(TROVE_coll_id coll_id,
     db_key.size = key_p->buffer_sz;
     db_data.data = val_p->buffer;
     db_data.size = val_p->buffer_sz;
-    ret = coll_p->coll_attr_db->put(coll_p->coll_attr_db, NULL, &db_key, &db_data, 0);
-    if (ret != 0) {
-	gossip_lerr("dbpf_collection_seteattr: %s\n", db_strerror(ret));
-	return -1;
+
+    ret = coll_p->coll_attr_db->put(coll_p->coll_attr_db,
+                                    NULL, &db_key, &db_data, 0);
+    if (ret != 0)
+    {
+        gossip_lerr("dbpf_collection_seteattr: %s\n", db_strerror(ret));
+        return -1;
     }
 
     ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0);
-    if (ret != 0) {
-	gossip_lerr("dbpf_collection_seteattr: %s\n", db_strerror(ret));
-	return -1;
+    if (ret != 0)
+    {
+        gossip_lerr("dbpf_collection_seteattr: %s\n", db_strerror(ret));
+        return -1;
     }
 
-#if 0
-    gossip_debug(TROVE_DEBUG, "seteattr done.\n");
-#endif
     return 1;
 }
 
-/* dbpf_collection_geteattr()
- */
 static int dbpf_collection_geteattr(TROVE_coll_id coll_id,
 				    TROVE_keyval_s *key_p,
 				    TROVE_keyval_s *val_p,
@@ -216,10 +217,16 @@ static int dbpf_collection_geteattr(TROVE_coll_id coll_id,
     DBT db_key, db_data;
 
     sto_p = my_storage_p;
-    if (sto_p == NULL) return -1;
+    if (sto_p == NULL)
+    {
+        return -1;
+    }
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -1;
+    if (coll_p == NULL)
+    {
+        return -1;
+    }
 
     memset(&db_key, 0, sizeof(db_key));
     memset(&db_data, 0, sizeof(db_data));
@@ -228,48 +235,50 @@ static int dbpf_collection_geteattr(TROVE_coll_id coll_id,
 
     db_data.data  = val_p->buffer;
     db_data.ulen  = val_p->buffer_sz;
-    db_data.flags = DB_DBT_USERMEM; /* put the data in our buffer */
+    db_data.flags = DB_DBT_USERMEM;
 
-    ret = coll_p->coll_attr_db->get(coll_p->coll_attr_db, NULL, &db_key, &db_data, 0);
-    if (ret != 0) {
-	gossip_lerr("dbpf_collection_geteattr: %s\n", db_strerror(ret));
-	return -1;
+    ret = coll_p->coll_attr_db->get(coll_p->coll_attr_db,
+                                    NULL, &db_key, &db_data, 0);
+    if (ret != 0)
+    {
+        gossip_lerr("dbpf_collection_geteattr: %s\n", db_strerror(ret));
+        return -1;
     }
 
-    val_p->read_sz = db_data.size; /* return the actual size */
-
+    val_p->read_sz = db_data.size;
     return 1;
 }
 
-/* dbpf_initialize()
- *
- */
 static int dbpf_initialize(char *stoname,
 			   TROVE_ds_flags flags,
 			   char **method_name_p,
 			   int method_id)
 {
     int error;
-    char *new_method_name;
-    struct dbpf_storage *sto_p;
-    
+    struct dbpf_storage *sto_p = NULL;
+
+    if (!method_name_p)
+    {
+        gossip_err("dbpf_initialize failure: invalid method name ptr\n");
+        return -1;
+    }
+
     sto_p = dbpf_storage_lookup(stoname, &error);
     if (sto_p == NULL)
     {
+        gossip_err("dbpf_initialize failure: storage lookup failed\n");
         return -1;
     }
     
     my_storage_p = sto_p;
-    
     dbpf_method_id = method_id;
     
-    new_method_name = (char *) malloc(sizeof(dbpf_method_name));
-    if (new_method_name == NULL)
+    *method_name_p = strdup(dbpf_method_name);
+    if (*method_name_p == NULL)
     {
+        gossip_err("dbpf_initialize failure: cannot allocate memory\n");
         return -1;
     }
-    strcpy(new_method_name, dbpf_method_name);
-    *method_name_p = new_method_name;
     
     dbpf_dspace_dbcache_initialize();
     dbpf_bstream_fdcache_initialize();
@@ -278,18 +287,13 @@ static int dbpf_initialize(char *stoname,
     return dbpf_thread_initialize();
 }
 
-/* dbpf_finalize()
- */
 static int dbpf_finalize(void)
 {
-    int ret;
+    int ret = -1;
 
     dbpf_method_id = -1;
 
     dbpf_thread_finalize();
-
-    /* TODO: clean up all internally allocated structures */
-
     dbpf_bstream_fdcache_finalize();
     dbpf_keyval_dbcache_finalize();
     dbpf_dspace_dbcache_finalize();
@@ -297,25 +301,34 @@ static int dbpf_finalize(void)
 
     dbpf_collection_clear_registered();
 
-    /* manually free the cached storage space info */
-    /* always sync to ensure that data made it to the disk */
-    if ((ret = my_storage_p->sto_attr_db->sync(my_storage_p->sto_attr_db, 0)) != 0) {
-	return -1;
+    ret = my_storage_p->sto_attr_db->sync(my_storage_p->sto_attr_db, 0);
+    if (ret)
+    {
+	gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
+        return -1;
     }
-    if ((ret = my_storage_p->sto_attr_db->close(my_storage_p->sto_attr_db, 0)) != 0) {
-	gossip_lerr("dbpf_finalize: %s\n",
-		db_strerror(ret));
+
+    ret = my_storage_p->sto_attr_db->close(my_storage_p->sto_attr_db, 0);
+    if (ret)
+    {
+	gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
 	return -1;
     }
 
-    if ((ret = my_storage_p->coll_db->sync(my_storage_p->coll_db, 0)) != 0) {
+    ret = my_storage_p->coll_db->sync(my_storage_p->coll_db, 0);
+    if (ret)
+    {
+	gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
 	return -1;
     }
-    if ((ret = my_storage_p->coll_db->close(my_storage_p->coll_db, 0)) != 0) {
-	gossip_lerr("dbpf_finalize: %s\n",
-		db_strerror(ret));
+
+    ret = my_storage_p->coll_db->close(my_storage_p->coll_db, 0);
+    if (ret)
+    {
+	gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
 	return -1;
     }
+
     free(my_storage_p->name);
     free(my_storage_p);
     my_storage_p = NULL;
@@ -323,9 +336,7 @@ static int dbpf_finalize(void)
     return 1;
 }
 
-/* dbpf_storage_create()
- *
- * Creates and initializes the databases needed for a dbpf storage
+/* Creates and initializes the databases needed for a dbpf storage
  * space.  This includes:
  * - creating the path to the storage directory
  * - creating storage attribute database, propagating with create time
@@ -340,21 +351,28 @@ static int dbpf_storage_create(char *stoname,
 
     DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, stoname);
     ret = dbpf_mkpath(path_name, 0755);
-    if (ret != 0) return -1;
+    if (ret != 0)
+    {
+        return -1;
+    }
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
     ret = dbpf_db_create(path_name);
-    if (ret != 0) return -1;
+    if (ret != 0)
+    {
+        return -1;
+    }
     
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
     ret = dbpf_db_create(path_name);
-    if (ret != 0) return -1;
+    if (ret != 0)
+    {
+        return -1;
+    }
 
     return 1;
 }
 
-/* dbpf_storage_remove()
- */
 static int dbpf_storage_remove(char *stoname,
 			       void *user_ptr,
 			       TROVE_op_id *out_op_id_p)
@@ -362,18 +380,16 @@ static int dbpf_storage_remove(char *stoname,
     char path_name[PATH_MAX];
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
-#if 0
     gossip_debug(TROVE_DEBUG, "Removing %s\n", path_name);
-#endif
+
     if (unlink(path_name) != 0)
     {
         goto storage_remove_failure;
     }
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
-#if 0
     gossip_debug(TROVE_DEBUG, "Removing %s\n", path_name);
-#endif
+
     if (unlink(path_name) != 0)
     {
         goto storage_remove_failure;
@@ -393,15 +409,15 @@ static int dbpf_storage_remove(char *stoname,
     return -1;
 }
 
-/* dbpf_collection_create()
- *
- * 1) Look in collections database to see if coll_id is already used
- *    (error out if so).
- * 2) Create collection attribute database.
- * 3) Store last handle value in collection attribute database.
- * 4) Create dataspace attributes database.
- * 5) Create keyval and bstream directories.
- */
+/*
+  1) check collections database to see if coll_id is already used
+     (error out if so)
+  2) create collection attribute database
+  3) store trove-dbpf version in collection attribute database
+  4) store last handle value in collection attribute database
+  5) create dataspace attributes database
+  6) create keyval and bstream directories
+*/
 static int dbpf_collection_create(char *collname,
 				  TROVE_coll_id new_coll_id,
 				  void *user_ptr,
@@ -416,13 +432,12 @@ static int dbpf_collection_create(char *collname,
     struct stat dirstat;
     char path_name[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
 
+    if (my_storage_p == NULL)
+    {
+        gossip_err("Invalid storage name specified\n");
+        return -1;
+    }
     sto_p = my_storage_p;
-
-    if (sto_p == NULL) return -1;
-    
-    /* TODO: we need to look through all storage regions to see
-     * if the coll_id is previously used.
-     */
     
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
@@ -431,21 +446,18 @@ static int dbpf_collection_create(char *collname,
     key.size = strlen(collname)+1;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
-    data.flags = DB_DBT_USERMEM; /* put the data in our space */
+    data.flags = DB_DBT_USERMEM;
     
     /* ensure that the collection record isn't already there */
     ret = sto_p->coll_db->get(sto_p->coll_db, NULL, &key, &data, 0);
-    if (ret != DB_NOTFOUND) {
-#if 0
-	gossip_debug(TROVE_DEBUG, "coll %s already exists with coll_id %d, len = %d.\n",
-	       collname, db_data.coll_id, data.size);
-#endif
+    if (ret != DB_NOTFOUND)
+    {
+	gossip_debug(TROVE_DEBUG, "coll %s already exists with "
+                     "coll_id %d, len = %d.\n",
+                     collname, db_data.coll_id, data.size);
 	return -1;
     }
-#if 0
-    gossip_debug(TROVE_DEBUG, "collection %s didn't already exist.\n", collname);
-#endif
-    
+
     key.data = collname;
     key.size = strlen(collname)+1;
     data.data = &db_data;
@@ -455,59 +467,83 @@ static int dbpf_collection_create(char *collname,
     db_data.coll_id = new_coll_id;
     
     ret = sto_p->coll_db->put(sto_p->coll_db, NULL, &key, &data, 0);
-    if (ret != 0) {
-	return -1;
+    if (ret)
+    {
+	gossip_err("dbpf_collection_create: %s\n", db_strerror(ret));
+        return -1;
     }
     
-    /* always sync to ensure that data made it to the disk */
-    if ((ret = sto_p->coll_db->sync(sto_p->coll_db, 0)) != 0) {
-	return -1;
+    ret = sto_p->coll_db->sync(sto_p->coll_db, 0);
+    if (ret)
+    {
+	gossip_err("dbpf_collection_create: %s\n", db_strerror(ret));
+        return -1;
     }
 
-#if 0    
-    gossip_debug(TROVE_DEBUG, "collection db updated, coll_id = %d.\n", new_coll_id);
-#endif
-
-    /* Create both the base directory, if necessary, then the new collection
-     * directory.
-     */
-    DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, sto_p->name); /* see dbpf.h */
+    DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, sto_p->name);
     ret = stat(path_name, &dirstat);
-    if (ret < 0 && errno != ENOENT) {
-	perror("trove collection directory create");
+    if (ret < 0 && errno != ENOENT)
+    {
+        gossip_err("stat failed on storage directory %s", path_name);
 	return -1;
     }
-    else if (ret < 0) {
+    else if (ret < 0)
+    {
 	ret = mkdir(path_name, 0755);
-	if (ret != 0) {
-	    perror("base collection directory create");
+	if (ret != 0)
+        {
+            gossip_err("mkdir failed on storage directory %s", path_name);
 	    return -1;
 	}
     }
     
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-#if 0
-    gossip_debug(TROVE_DEBUG, "dirname = %s\n", path_name);
-#endif
     ret = mkdir(path_name, 0755);
-    if (ret != 0) {
-	perror("base collection directory create");
+    if (ret != 0)
+    {
+        gossip_err("mkdir failed on collection directory %s", path_name);
 	return -1;
     }
 
-    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    /* create collection attributes database, drop in last handle */
+    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
+                                sto_p->name, new_coll_id);
     ret = dbpf_db_create(path_name);
-    if (ret != 0) return -1;
-    
-    /* Note: somewhat inefficient, but we don't create collections
-     * often enough to matter
-     */
-    db_p = dbpf_db_open(path_name, &error);
-    if (db_p == NULL) {
-	return -error;
+    if (ret != 0)
+    {
+        gossip_err("dbpf_db_create failed on attrib db %s", path_name);
+        return -1;
     }
     
+    db_p = dbpf_db_open(path_name, &error);
+    if (db_p == NULL)
+    {
+        gossip_err("dbpf_db_open failed on attrib db %s", path_name);
+	return -error;
+    }
+
+    /*
+      store trove-dbpf version string in the collection.  this is used
+      to know what format the metadata is stored in on disk.
+    */
+    memset(&key, 0, sizeof(key));
+    memset(&data, 0, sizeof(data));
+    key.data = TROVE_DBPF_VERSION_KEY;
+    key.size = strlen(TROVE_DBPF_VERSION_KEY);
+    data.data = TROVE_DBPF_VERSION_VALUE;
+    data.size = strlen(TROVE_DBPF_VERSION_VALUE);
+
+    ret = db_p->put(db_p, NULL, &key, &data, 0);
+    if (ret != 0)
+    {
+	gossip_err("db_p->put failed writing trove-dbpf version "
+                   "string: %s\n", db_strerror(ret));
+        return -1;
+    }
+
+    gossip_debug(
+        TROVE_DEBUG, "wrote trove-dbpf version %s to "
+        "collection attribute database\n", TROVE_DBPF_VERSION_VALUE);
+
     /* store initial handle value */
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
@@ -515,36 +551,47 @@ static int dbpf_collection_create(char *collname,
     key.size = sizeof(LAST_HANDLE_STRING);
     data.data = &zero;
     data.size = sizeof(zero);
+
     ret = db_p->put(db_p, NULL, &key, &data, 0);
-    if (ret != 0) return -1;
-    
+    if (ret != 0)
+    {
+	gossip_err("db_p->put failed writing initial handle value: %s\n",
+                   db_strerror(ret));
+        return -1;
+    }
+    db_p->sync(db_p, 0);
+
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    /* create dataspace attributes database */
     ret = dbpf_db_create(path_name);
-    if (ret != 0) return -1;
+    if (ret != 0)
+    {
+        gossip_err("dbpf_db_create failed on %s", path_name);
+        return -1;
+    }
     
     DBPF_GET_KEYVAL_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     ret = mkdir(path_name, 0755);
-    if (ret != 0) {
-	perror("keyval directory create");
+    if (ret != 0)
+    {
+        gossip_err("mkdir failed on keyval directory %s", path_name);
 	return -1;
     }
 
-    /* create keyval bucket directories */
     for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
     {
         snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
         if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
         {
-            perror("keyval bucket directory create");
+            gossip_err("mkdir failed on keyval bucket directory %s", dir);
             return -1;
         }
     }
 
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     ret = mkdir(path_name, 0755);
-    if (ret != 0) {
-	perror("bstream directory create");
+    if (ret != 0)
+    {
+        gossip_err("mkdir failed on bstream directory %s", path_name);
 	return -1;
     }
 
@@ -553,19 +600,14 @@ static int dbpf_collection_create(char *collname,
         snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
         if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
         {
-            perror("bstream bucket directory create");
+            gossip_err("mkdir failed on bstream bucket directory %s",
+                       dir);
             return -1;
         }
     }
-
-#if 0
-    gossip_debug(TROVE_DEBUG, "subdirectories for storing bstreams and keyvals created.\n");
-#endif
     return 1;
 }
 
-/* dbpf_collection_remove()
- */
 static int dbpf_collection_remove(char *collname,
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
@@ -579,9 +621,6 @@ static int dbpf_collection_remove(char *collname,
     struct dirent *current_dirent = NULL;
     char dir[PATH_MAX] = {0}, tmp_path[PATH_MAX] = {0};
 
-    /* to get the path, need to get handle from name */
-
-    /* only one storage space for now */
     sto_p = my_storage_p;
 
     memset(&key, 0, sizeof(key));
@@ -594,9 +633,10 @@ static int dbpf_collection_remove(char *collname,
     data.flags = DB_DBT_USERMEM;
 
     ret = sto_p->coll_db->get(sto_p->coll_db, NULL, &key, &data, 0);
-    if (ret != 0) {
-	    sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
-	    return -1;
+    if (ret != 0)
+    {
+        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
+        return -1;
     }
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
@@ -648,7 +688,6 @@ static int dbpf_collection_remove(char *collname,
             }
             closedir(current_dir);
         }
-        /* remove the now empty bstream bucket directory */
         rmdir(dir);
     }
     rmdir(path_name);
@@ -685,7 +724,6 @@ static int dbpf_collection_remove(char *collname,
             }
             closedir(current_dir);
         }
-        /* remove the now empty keyval bucket directory */
         rmdir(dir);
     }
     rmdir(path_name);
@@ -698,18 +736,12 @@ static int dbpf_collection_remove(char *collname,
         goto collection_remove_failure;
     }
 
-#if 0
-    gossip_debug(TROVE_DEBUG, "databases and directories for collection removed.\n");
-#endif
-
     return ret;
 
   collection_remove_failure:
     return -1;
 }
 
-/* dbpf_collection_iterate()
- */
 static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
 				   TROVE_keyval_s *name_array,
 				   TROVE_coll_id *coll_id_array,
@@ -731,7 +763,8 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
      * this seems silly maybe, but it makes while (count) loops
      * work right.
      */
-    if (*inout_position_p == TROVE_ITERATE_END) {
+    if (*inout_position_p == TROVE_ITERATE_END)
+    {
 	*inout_count_p = 0;
 	return 1;
     }
@@ -741,14 +774,16 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
 
     /* get a cursor */
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
-    if (ret != 0) goto return_error;
-
+    if (ret != 0)
+    {
+        goto return_error;
+    }
 
     /* see keyval iterate for discussion of this implementation; it was
      * basically copied from there. -- RobR
      */
-
-    if (*inout_position_p != TROVE_ITERATE_START) {
+    if (*inout_position_p != TROVE_ITERATE_START)
+    {
 	/* need to position cursor before reading.  note that this will
 	 * actually position the cursor over the last thing that was read
 	 * on the last call, so we don't need to return what we get back.
@@ -758,11 +793,13 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
 	 * position that we need to pass in.
 	 */
 	memset(&key, 0, sizeof(key));
-	if (sizeof(recno) < name_array[0].buffer_sz) {
+	if (sizeof(recno) < name_array[0].buffer_sz)
+        {
 	    key.data = name_array[0].buffer;
 	    key.size = key.ulen = name_array[0].buffer_sz;
 	}
-	else {
+	else
+        {
 	    key.data = &recno;
 	    key.size = key.ulen = sizeof(recno);
 	}
@@ -776,11 +813,17 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
 
 	/* position the cursor and grab the first key/value pair */
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
-	if (ret == DB_NOTFOUND) goto return_ok;
-	else if (ret != 0) goto return_error;
+	if (ret == DB_NOTFOUND)
+        {
+            goto return_ok;
+        }
+	else if (ret != 0)
+        {
+            goto return_error;
+        }
     }
 
-    for (i=0; i < *inout_count_p; i++)
+    for (i = 0; i < *inout_count_p; i++)
     {
 	memset(&key, 0, sizeof(key));
 	key.data = name_array[i].buffer;
@@ -793,20 +836,24 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
 	data.flags |= DB_DBT_USERMEM;
 	
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-	if (ret == DB_NOTFOUND) {
+	if (ret == DB_NOTFOUND)
+        {
 	    goto return_ok;
 	}
-	else if (ret != 0) goto return_error;
-
-	/* store coll_id for return */
+	else if (ret != 0)
+        {
+            goto return_error;
+        }
 	coll_id_array[i] = db_entry.coll_id;
     }
     
 return_ok:
-    if (ret == DB_NOTFOUND) {
+    if (ret == DB_NOTFOUND)
+    {
 	*inout_position_p = TROVE_ITERATE_END;
     }
-    else {
+    else
+    {
 	char buf[64];
 	/* get the record number to return.
 	 *
@@ -830,52 +877,64 @@ return_ok:
 	data.flags |= DB_DBT_USERMEM;
 
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
-	if (ret == DB_NOTFOUND) gossip_debug(TROVE_DEBUG, "warning: keyval iterate -- notfound\n");
-	else if (ret != 0) gossip_debug(TROVE_DEBUG, "warning: keyval iterate -- some other failure @ recno\n");
+	if (ret == DB_NOTFOUND)
+        {
+            gossip_debug(
+                TROVE_DEBUG, "warning: keyval iterate -- notfound\n");
+        }
+	else if (ret != 0)
+        {
+            gossip_debug(TROVE_DEBUG, "warning: keyval iterate -- "
+                         "some other failure @ recno\n");
+        }
 
-	assert(recno != TROVE_ITERATE_START && recno != TROVE_ITERATE_END);
+	assert(recno != TROVE_ITERATE_START &&
+               recno != TROVE_ITERATE_END);
 	*inout_position_p = recno;
     }
-    /* 'position' points us to the record we just read, or is set to END */
+    /*
+      'position' points us to the record we
+      just read, or is set to END
+    */
 
     *inout_count_p = i;
 
-    /* sync if requested by user
-     */
-    if (flags & TROVE_SYNC) {
-	if ((ret = db_p->sync(db_p, 0)) != 0) {
+    if (flags & TROVE_SYNC)
+    {
+	if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
 	    goto return_error;
 	}
     }
 
-    /* free the cursor */
     ret = dbc_p->c_close(dbc_p);
-    if (ret != 0) goto return_error;
+    if (ret != 0)
+    {
+        goto return_error;
+    }
     return 1;
     
 return_error:
-    gossip_lerr("dbpf_collection_iterate_op_svc: %s\n", db_strerror(ret));
+    gossip_lerr("dbpf_collection_iterate_op_svc: %s\n",
+                db_strerror(ret));
     *inout_count_p = i;
     return -1;
 }
 
 
-/* dbpf_collection_lookup()
- */
 static int dbpf_collection_lookup(char *collname,
 				  TROVE_coll_id *out_coll_id_p,
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
 {
     int ret, error;
-    size_t slen;
     struct dbpf_storage *sto_p;
     struct dbpf_collection *coll_p;
     struct dbpf_collection_db_entry db_data;
     DBT key, data;
     char path_name[PATH_MAX];
+    char trove_dbpf_version[32] = {0};
     
-    /* only one fs for now */
     sto_p = my_storage_p;
     
     memset(&key, 0, sizeof(key));
@@ -884,66 +943,101 @@ static int dbpf_collection_lookup(char *collname,
     key.size = strlen(collname)+1;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
-    data.flags = DB_DBT_USERMEM; /* put the data in our space */
+    data.flags = DB_DBT_USERMEM;
     
     ret = sto_p->coll_db->get(sto_p->coll_db, NULL, &key, &data, 0);
-    if (ret == DB_NOTFOUND) {
-	/* not an error per se */
-#if 0
-	gossip_debug(TROVE_DEBUG, "lookup didn't find collection\n");
-#endif
+    if (ret == DB_NOTFOUND)
+    {
+	/* not an error, but nothing left to do */
 	return -1;
     }
-    else if (ret != 0) {
+    else if (ret != 0)
+    {
 	/* really an error of some kind */
 	sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
 	gossip_debug(TROVE_DEBUG, "lookup got error\n");
 	return -1;
     }
 
-#if 0
-    gossip_debug(TROVE_DEBUG, "found collection %s in database.\n", collname);
-    
-    gossip_debug(TROVE_DEBUG, "coll_id = %d.\n", db_data.coll_id);
-#endif
-
-    /* look to see if we have already registered this collection; if so, return */
+    /*
+      look to see if we have already registered
+      this collection; if so, return
+    */
     coll_p = dbpf_collection_find_registered(db_data.coll_id);
-    if (coll_p != NULL) {
-	*out_coll_id_p = coll_p->coll_id;
-	return 1;
+    if (coll_p != NULL)
+    {
+        *out_coll_id_p = coll_p->coll_id;
+        return 1;
     }
 
-    /* this collection hasn't been registered already (ie. looked up before) */
-
-    coll_p = (struct dbpf_collection *)malloc(sizeof(struct dbpf_collection));
-    if (coll_p == NULL) {
-	return -1;
+    /*
+      this collection hasn't been registered
+      already (ie. looked up before)
+    */
+    coll_p = (struct dbpf_collection *)
+        malloc(sizeof(struct dbpf_collection));
+    if (coll_p == NULL)
+    {
+        return -1;
     }
-    
+
     coll_p->refct = 0;
     coll_p->coll_id = db_data.coll_id;
     coll_p->storage = sto_p;
-    
-    slen = strlen(collname)+1;
-    if ((coll_p->name = (char *) malloc(slen)) == NULL) {
-		return -1;
-    }
-    strncpy(coll_p->name, collname, slen);
 
-    /* open collection attribute database */
-    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, coll_p->coll_id);
-    coll_p->coll_attr_db = dbpf_db_open(path_name, &error);
-    if (coll_p->coll_attr_db == NULL) return -error;
-    
-    /* open dataspace database */
-    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, coll_p->coll_id);
+    coll_p->name = strdup(collname);
+    if (!coll_p->name)
+    {
+        return -1;
+    }
+
+    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
+                              sto_p->name, coll_p->coll_id);
     coll_p->ds_db = dbpf_db_open(path_name, &error);
-    if (coll_p->ds_db == NULL) return -error;
+    if (coll_p->ds_db == NULL)
+    {
+        return -error;
+    }
+
+    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
+                                sto_p->name, coll_p->coll_id);
+    coll_p->coll_attr_db = dbpf_db_open(path_name, &error);
+    if (coll_p->coll_attr_db == NULL)
+    {
+        return -error;
+    }
+
+    /* make sure the version matches the version we understand */
+    memset(&key, 0, sizeof(key));
+    memset(&data, 0, sizeof(data));
+    key.data = TROVE_DBPF_VERSION_KEY;
+    key.size = strlen(TROVE_DBPF_VERSION_KEY);
+    data.data = &trove_dbpf_version;
+    data.ulen = 32;
+    data.flags = DB_DBT_USERMEM;
+
+    ret = coll_p->coll_attr_db->get(coll_p->coll_attr_db,
+                                    NULL, &key, &data, 0);
+    if (ret)
+    {
+        gossip_err("Failed to retrieve collection version: %s\n",
+                   db_strerror(ret));
+        return -1;
+    }
+
+    gossip_debug(TROVE_DEBUG, "collection lookup: version is %s\n",
+                 trove_dbpf_version);
+
+    if (strcmp(trove_dbpf_version, TROVE_DBPF_VERSION_VALUE) != 0)
+    {
+        gossip_err("Trove-dbpf metadata format version mismatch!\n");
+        gossip_err("This collection has version %s\n", trove_dbpf_version);
+        gossip_err("This code understands version %s\n",
+                   TROVE_DBPF_VERSION_VALUE);
+        return -1;
+    }
 
     dbpf_collection_register(coll_p);
-
-    /* fill in output parameter */
     *out_coll_id_p = coll_p->coll_id;
     return 1;
 }
@@ -967,44 +1061,43 @@ static int dbpf_collection_lookup(char *collname,
 static struct dbpf_storage *dbpf_storage_lookup(char *stoname,
 						int *error_p)
 {
-    size_t slen;
     struct dbpf_storage *sto_p;
     char path_name[PATH_MAX];
 
-    if (my_storage_p != NULL) return my_storage_p;
+    if (my_storage_p != NULL)
+    {
+        return my_storage_p;
+    }
 
-    /* at the moment we just allocate a region and return it.  later
-     * we will build a data structure to keep up with these, etc.
-     */
-
-    sto_p = (struct dbpf_storage *) malloc(sizeof(struct dbpf_storage));
-    if (sto_p == NULL) {
+    sto_p = (struct dbpf_storage *)malloc(sizeof(struct dbpf_storage));
+    if (sto_p == NULL)
+    {
 	*error_p = TROVE_ENOMEM;
 	return NULL;
     }
 
-    /* TODO: could do one malloc and some pointer math */
-    slen = strlen(stoname)+1;
-    sto_p->name = (char *) malloc(slen);
-    if (sto_p->name == NULL) {
+    sto_p->name = strdup(stoname);
+    if (sto_p->name == NULL)
+    {
 	free(sto_p);
 	*error_p = TROVE_ENOMEM;
 	return NULL;
     }
-    strncpy(sto_p->name, stoname, slen);
 
-    /* TODO: make real names based on paths... */
     sto_p->refct = 0;
+
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
     sto_p->sto_attr_db = dbpf_db_open(path_name, error_p);
-    if (sto_p->sto_attr_db == NULL) {
+    if (sto_p->sto_attr_db == NULL)
+    {
 	/* dbpf_db_open will have filled in error */
 	return NULL;
     }
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
     sto_p->coll_db = dbpf_db_open(path_name, error_p);
-    if (sto_p->coll_db == NULL) {
+    if (sto_p->coll_db == NULL)
+    {
 	/* dbpf_db_open will have filled in error */
 	return NULL;
     }
@@ -1013,8 +1106,6 @@ static struct dbpf_storage *dbpf_storage_lookup(char *stoname,
     return sto_p;
 }
 
-/* dbpf_mkpath()
- */
 static int dbpf_mkpath(char *pathname, mode_t mode)
 {
     int ret, len, pos = 0, nullpos = 0, killed_slash;
@@ -1066,9 +1157,7 @@ static int dbpf_mkpath(char *pathname, mode_t mode)
     return 0;
 }
 
-/* dbpf_db_create()
- *
- * Internal function for creating first instances of the databases for a
+/* Internal function for creating first instances of the databases for a
  * db plus files storage region.
  */
 static int dbpf_db_create(char *dbname)

@@ -36,6 +36,7 @@ pvfs2-0.0.8pre2
   args)
 - improvements to several test programs (in test/client/sysint)
 - removed several files and function that are no longer needed
+- on disk storage format is now versioned
 
 
 pvfs2-0.0.7

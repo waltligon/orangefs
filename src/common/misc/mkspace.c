@@ -61,7 +61,10 @@ int pvfs2_mkspace(
     */
     if (!create_collection_only)
     {
-        /* try to initialize; fails if storage space isn't there? */
+        /*
+          try to initialize; fails if storage space isn't there, which
+          is exactly what we're expecting in this case.
+        */
         ret = trove_initialize(storage_space, 0, &method_name, 0);
         if (ret > -1)
         {
@@ -70,12 +73,6 @@ int pvfs2_mkspace(
             return -1;
         }
 
-        /*
-          create the storage space
-          
-          Q: what good is the op_id here if we have to match
-          on coll_id in test fn?
-        */
         ret = trove_storage_create(storage_space, NULL, &op_id);
         if (ret != 1)
         {
@@ -84,7 +81,7 @@ int pvfs2_mkspace(
         }
     }
 
-    /* second try at initialize, in case it failed first try. */
+    /* now that the storage space exists, initialize trove properly */
     ret = trove_initialize(storage_space, 0, &method_name, 0);
     if (ret < 0)
     {
@@ -102,8 +99,8 @@ int pvfs2_mkspace(
     ret = trove_collection_lookup(collection, &coll_id, NULL, &op_id);
     if (ret != -1)
     {
-	gossip_debug(SERVER_DEBUG, "error: collection lookup succeeded before it "
-                "should; aborting!\n");
+	gossip_debug(SERVER_DEBUG, "error: collection lookup succeeded "
+                     "before it should; aborting!\n");
 	trove_finalize();
 	return -1;
     }
@@ -117,12 +114,7 @@ int pvfs2_mkspace(
 	return -1;
     }
 
-    /*
-      lookup collection.  this is redundant because we just gave
-      it a coll. id to use, but it's a good test i guess...
-
-      NOTE: can't test on this because we still don't know a coll_id
-    */
+    /* make sure a collection lookup succeeds */
     ret = trove_collection_lookup(collection, &coll_id, NULL, &op_id);
     if (ret != 1)
     {
@@ -133,7 +125,8 @@ int pvfs2_mkspace(
 
     if (verbose)
     {
-        gossip_debug(SERVER_DEBUG,"info: created collection '%s'.\n",collection);
+        gossip_debug(
+            SERVER_DEBUG,"info: created collection '%s'.\n",collection);
     }
 
     ret = trove_open_context(coll_id, &trove_context);
@@ -143,8 +136,10 @@ int pvfs2_mkspace(
         return -1;
     }
 
-    /* we have a three-step process for starting trove:
-     * initialize, collection_lookup, collection_setinfo */
+    /*
+      we have a three-step process for starting trove:
+      initialize, collection_lookup, collection_setinfo
+    */
     ret = trove_collection_setinfo(coll_id,
                                    trove_context,
                                    TROVE_COLLECTION_HANDLE_RANGES,
@@ -183,6 +178,7 @@ int pvfs2_mkspace(
                                     &count, NULL, NULL, &state,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
+
         if (ret != 1 && state != 0)
         {
             gossip_debug(SERVER_DEBUG,
@@ -226,19 +222,17 @@ int pvfs2_mkspace(
 	attr.mtime = time(NULL);
         attr.type = PVFS_TYPE_DIRECTORY;
 
-        ret = trove_dspace_setattr(coll_id,
-                                   new_root_handle,
-                                   &attr,
-                                   TROVE_SYNC,
-                                   NULL /* user ptr */,
-                                   trove_context,
-                                   &op_id);
+        ret = trove_dspace_setattr(
+            coll_id, new_root_handle, &attr, TROVE_SYNC, NULL,
+            trove_context, &op_id);
+
         while (ret == 0)
         {
             ret = trove_dspace_test(coll_id, op_id, trove_context,
                                     &count, NULL, NULL, &state,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
+
         if (ret < 0)
         {
             gossip_err("error: dspace setattr for root handle "
@@ -247,28 +241,24 @@ int pvfs2_mkspace(
         }
 
         /*
-          create dataspace to hold directory entries; a
-          value of zero leaves the allocation to trove.
+          create a dataspace to hold directory entries; a handle value
+          of TROVE_HANDLE_NULL leaves the allocation to trove.
         */
-        cur_extent.first = cur_extent.last = 0;
+        cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
 
-        ret = trove_dspace_create(coll_id,
-                                  &extent_array,
-                                  &ent_handle,
-                                  PVFS_TYPE_DIRDATA,
-                                  NULL,
-                                  TROVE_SYNC,
-                                  NULL,
-                                  trove_context,
-                                  &op_id);
+        ret = trove_dspace_create(
+            coll_id, &extent_array, &ent_handle, PVFS_TYPE_DIRDATA, NULL,
+            TROVE_SYNC, NULL, trove_context, &op_id);
+
         while (ret == 0)
         {
             ret = trove_dspace_test(coll_id, op_id, trove_context,
                                     &count, NULL, NULL, &state,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
+
         if (ret != 1 && state != 0)
         {
             gossip_err("dspace create (for dirent storage) failed.\n");
@@ -286,21 +276,17 @@ int pvfs2_mkspace(
         val.buffer    = &ent_handle;
         val.buffer_sz = sizeof(TROVE_handle);
 
-        ret = trove_keyval_write(coll_id,
-                                 new_root_handle,
-                                 &key,
-                                 &val,
-                                 TROVE_SYNC,
-                                 0 /* vtag */,
-                                 NULL /* user ptr */,
-                                 trove_context,
-                                 &op_id);
+        ret = trove_keyval_write(
+            coll_id, new_root_handle, &key, &val, TROVE_SYNC, 0, NULL,
+            trove_context, &op_id);
+
         while (ret == 0)
         {
             ret = trove_dspace_test(coll_id, op_id, trove_context,
                                     &count, NULL, NULL, &state,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
+
         if (ret < 0)
         {
             gossip_err("error: keyval write for handle used to store "
@@ -323,10 +309,10 @@ int pvfs2_mkspace(
 
     if (verbose)
     {
-        gossip_debug(SERVER_DEBUG,
-                     "info: collection created (root handle = %Lu, coll "
-                     "id = %d, root string = %s).\n",Lu(root_handle),
-                     coll_id, root_handle_string);
+        gossip_debug(SERVER_DEBUG, "collection created:\n"
+                     "\troot handle = %Lu, coll id = %d, "
+                     "root string = \"%s\"\n",
+                     Lu(root_handle), coll_id, root_handle_string);
     }
     return 0;
 }
