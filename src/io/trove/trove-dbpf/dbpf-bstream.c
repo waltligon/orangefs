@@ -838,13 +838,6 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                  q_op_p,aiocb_inuse_count,&op_p->u.b_rw_list.sigev);
     assert(q_op_p == op_p->u.b_rw_list.sigev.sigev_value.sival_ptr);
 
-    ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
-                     aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
-    if (ret != 0)
-    {
-        gossip_lerr("lio_listio() returned %d\n", ret);
-        return -trove_errno_to_trove_error(errno);
-    }
     if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_ALLCONVERTED)
     {
         op_p->u.b_rw_list.list_proc_state = LIST_PROC_ALLPOSTED;
@@ -859,6 +852,15 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     id_gen_fast_register(&q_op_p->op.id, q_op_p);
     *out_op_id_p = q_op_p->op.id;
     DBPF_EVENT_START(event_type, *out_op_id_p);
+
+    ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
+                     aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
+    if (ret != 0)
+    {
+        gossip_lerr("lio_listio() returned %d\n", ret);
+        return -trove_errno_to_trove_error(errno);
+    }
+
 #endif
 
     return 0;
