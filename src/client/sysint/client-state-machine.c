@@ -430,7 +430,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
 
         if (cur_ctx->msg_send_in_progress)
         {
-            gossip_debug(GOSSIP_IO_DEBUG,  "[%d] Posting "
+            gossip_debug(GOSSIP_CANCEL_DEBUG,  "[%d] Posting "
                          "cancellation of type: BMI Send "
                          "(Request)\n",i);
 
@@ -446,7 +446,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
 
         if (cur_ctx->msg_recv_in_progress)
         {
-            gossip_debug(GOSSIP_IO_DEBUG,  "[%d] Posting "
+            gossip_debug(GOSSIP_CANCEL_DEBUG,  "[%d] Posting "
                          "cancellation of type: BMI Recv "
                          "(Response)\n",i);
 
@@ -462,7 +462,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
 
         if (cur_ctx->flow_in_progress)
         {
-            gossip_debug(GOSSIP_IO_DEBUG,
+            gossip_debug(GOSSIP_CANCEL_DEBUG,
                          "[%d] Posting cancellation of type: FLOW\n",i);
 
             ret = job_flow_cancel(
@@ -477,7 +477,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
 
         if (cur_ctx->write_ack_in_progress)
         {
-            gossip_debug(GOSSIP_IO_DEBUG,  "[%d] Posting "
+            gossip_debug(GOSSIP_CANCEL_DEBUG,  "[%d] Posting "
                          "cancellation of type: BMI Recv "
                          "(Write Ack)\n",i);
 
@@ -491,7 +491,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
             sm_p->u.io.total_cancellations_remaining++;
         }
     }
-    gossip_debug(GOSSIP_IO_DEBUG, "(%p) Total cancellations "
+    gossip_debug(GOSSIP_CANCEL_DEBUG, "(%p) Total cancellations "
                  "remaining: %d\n", sm_p,
                  sm_p->u.io.total_cancellations_remaining);
     return ret;
