@@ -43,7 +43,8 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_NOOP = 16,
     PVFS_SERV_STATFS = 17,
     PVFS_SERV_PERF_UPDATE = 18,  /* not a real protocol request */
-    PVFS_SERV_MGMT_PERF_MON = 19
+    PVFS_SERV_MGMT_PERF_MON = 19,
+    PVFS_SERV_MGMT_ITERATE_HANDLES = 20
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
      * if you add a new operation to this list
      */
@@ -55,7 +56,7 @@ enum PVFS_server_op
      * PVFS_SERV_EXTENSION
      */
 };
-#define PVFS_MAX_SERVER_OP 19
+#define PVFS_MAX_SERVER_OP 20
 
 /* max number of jobs the server is able to manage at a time */
 #define PVFS_SERVER_MAX_JOBS  512
@@ -85,6 +86,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_DIRENT_COUNT       64
 /* max number of perf metrics returned by mgmt perf mon op */
 #define PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT 16
+/* max number of handles returned by mgmt iterate handles op */
+#define PVFS_REQ_LIMIT_MGMT_ITERATE_HANDLES_COUNT 1024
 
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
@@ -594,6 +597,23 @@ struct PVFS_servresp_mgmt_perf_mon
     uint64_t cur_time_ms;		/* current time according to svr */
 };
 
+/* mgmt_iterate_handles ***************************************/
+/* iterates through handles stored on server */
+
+struct PVFS_servreq_mgmt_iterate_handles
+{
+    PVFS_fs_id fs_id;
+    int handle_count;
+    PVFS_ds_position position;
+};
+
+struct PVFS_servresp_mgmt_iterate_handles
+{
+    PVFS_ds_position position;
+    PVFS_handle* handle_array;
+    int handle_count;
+};
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -624,6 +644,7 @@ struct PVFS_server_req
 	struct PVFS_servreq_mgmt_setparam mgmt_setparam;
 	struct PVFS_servreq_statfs statfs;
 	struct PVFS_servreq_mgmt_perf_mon mgmt_perf_mon;
+	struct PVFS_servreq_mgmt_iterate_handles mgmt_iterate_handles;
     }
     u;
 };
@@ -647,6 +668,7 @@ struct PVFS_server_resp
 	struct PVFS_servresp_write_completion write_completion;
 	struct PVFS_servresp_statfs statfs;
 	struct PVFS_servresp_mgmt_perf_mon mgmt_perf_mon;
+	struct PVFS_servresp_mgmt_iterate_handles mgmt_iterate_handles;
     }
     u;
 };

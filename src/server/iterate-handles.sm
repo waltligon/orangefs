@@ -1,0 +1,85 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "pvfs2-server.h"
+
+static int iterate_handles_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int iterate_handles_do_work(PINT_server_op *s_op, job_status_s* js_p);
+
+%%
+
+machine pvfs2_iterate_handles_sm(prelude, do_work, final_response, cleanup)
+{
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
+		default => do_work;
+	}
+
+	state do_work
+	{
+		run iterate_handles_do_work;
+		default => final_response;
+	}
+
+	state final_response
+	{
+		jump pvfs2_final_response_sm;
+		default => cleanup;
+	}
+
+	state cleanup
+	{
+		run iterate_handles_cleanup;
+		default => prelude;
+	}
+}
+
+%%
+
+/* iterate_handles_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static int iterate_handles_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+{
+    PINT_STATE_DEBUG("cleanup");
+    return(server_state_machine_complete(s_op));
+}
+
+
+/* iterate_handles_do_work()
+ *
+ * actually performs work necessary to retrieve handles
+ */
+static int iterate_handles_do_work(PINT_server_op *s_op, job_status_s* js_p)
+{
+    PINT_STATE_DEBUG("do_work");
+    
+    /* TODO: fill this in */
+
+    js_p->error_code = -PVFS_ENOSYS;
+    return(1);
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */
+

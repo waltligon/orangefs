@@ -160,6 +160,7 @@ int do_decode_req(
     case PVFS_SERV_MGMT_NOOP:
     case PVFS_SERV_STATFS:
     case PVFS_SERV_MGMT_PERF_MON:
+    case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	return (0);
 
     /* invalid request types */

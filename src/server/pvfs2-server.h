@@ -239,6 +239,9 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 	case PVFS_SERV_MGMT_PERF_MON:
 	    ret_ptr = "mgmt_perf_mon";
 	    break;
+	case PVFS_SERV_MGMT_ITERATE_HANDLES:
+	    ret_ptr = "mgmt_iterate_handles";
+	    break;
 	case PVFS_SERV_STATFS:
 	    ret_ptr = "statfs";
 	    break;

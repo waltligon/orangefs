@@ -258,6 +258,7 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	case PVFS_SERV_MGMT_NOOP:
 	case PVFS_SERV_MGMT_PERF_MON:
 	case PVFS_SERV_STATFS:
+	case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	    js_p->error_code = 0;
 	    break;
 

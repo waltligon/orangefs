@@ -274,7 +274,12 @@ int PINT_req_sched_target_handle(
     case PVFS_SERV_MGMT_PERF_MON:
 	return (0);
 	break;
+    case PVFS_SERV_MGMT_ITERATE_HANDLES:
+	*fs_id = req->u.mgmt_iterate_handles.fs_id;
+	return (0);
+	break;
     case PVFS_SERV_STATFS:
+	*fs_id = req->u.statfs.fs_id;
 	return (0);
 	break;
     case PVFS_SERV_WRITE_COMPLETION:

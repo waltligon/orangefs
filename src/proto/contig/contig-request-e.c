@@ -41,6 +41,13 @@ int do_encode_req(
     target_msg->list_count = 1;
     target_msg->buffer_type = BMI_EXT_ALLOC;
 
+    if(request->op == PVFS_SERV_MGMT_ITERATE_HANDLES)
+	assert(request->u.mgmt_iterate_handles.handle_count
+	    <= PVFS_REQ_LIMIT_MGMT_ITERATE_HANDLES_COUNT);
+    if(request->op == PVFS_SERV_MGMT_PERF_MON)
+	assert(request->u.mgmt_perf_mon.count
+	    <= PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT);
+
     switch (request->op)
     {
     case PVFS_SERV_GETCONFIG:
@@ -418,12 +425,10 @@ int do_encode_req(
 	/* pack the distribution */
 	PINT_Dist_encode(encode_io_dist, request->u.io.io_dist);
 	return (0);
-    case PVFS_SERV_MGMT_PERF_MON:
-	assert(request->u.mgmt_perf_mon.count < 
-	    PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT);
-	/* NOTE: falling through on purpose after sanity check */
 
 	/*these structures are all self contained (no pointers that need to be packed) */
+    case PVFS_SERV_MGMT_ITERATE_HANDLES:
+    case PVFS_SERV_MGMT_PERF_MON:
     case PVFS_SERV_READDIR:
     case PVFS_SERV_GETATTR:
     case PVFS_SERV_REMOVE:
@@ -432,7 +437,6 @@ int do_encode_req(
     case PVFS_SERV_MGMT_SETPARAM:
     case PVFS_SERV_MGMT_NOOP:
     case PVFS_SERV_STATFS:
-	/* XXX: is PVFS_SERV_FLUSH really 'self contained' ?*/
 	size = sizeof(struct PVFS_server_req) + PINT_ENC_GENERIC_HEADER_SIZE;
 	enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);
 	if (enc_msg == NULL)
