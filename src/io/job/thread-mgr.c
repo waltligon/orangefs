@@ -44,6 +44,9 @@ static pthread_t bmi_thread_id;
 static pthread_t trove_thread_id;
 #endif /* __PVFS2_JOB_THREADED__ */
 
+static int bmi_thread_running = 0;
+static int trove_thread_running = 0;
+
 /* trove_thread_function()
  *
  * function executed by the thread in charge of trove
@@ -57,7 +60,7 @@ static void *trove_thread_function(void *ptr)
     int timeout = thread_mgr_test_timeout;
 
 #ifdef __PVFS2_JOB_THREADED__
-    while (1)
+    while (trove_thread_running)
 #endif
     {
 	count = THREAD_MGR_TEST_COUNT;
@@ -114,13 +117,10 @@ static void *bmi_thread_function(void *ptr)
     /* TODO: fix the locking */
 
 #ifdef __PVFS2_JOB_THREADED__
-    while (1)
+    while (bmi_thread_running)
 #endif
     {
 	gen_mutex_lock(&bmi_mutex);
-#ifdef __PVFS2_JOB_THREADED__
-	pthread_testcancel();
-#endif /* __PVFS2_JOB_THREADED__ */
 	if(bmi_unexp_count)
 	{
 	    incount = bmi_unexp_count;
@@ -232,12 +232,14 @@ int PINT_thread_mgr_trove_start(void)
     assert(0);
 #endif
 
+    trove_thread_running = 1;
 #ifdef __PVFS2_JOB_THREADED__
     ret = pthread_create(&trove_thread_id, NULL, trove_thread_function, NULL);
     if(ret != 0)
     {
 	BMI_close_context(global_trove_context);
 	gen_mutex_unlock(&trove_mutex);
+	trove_thread_running = 0;
 	/* TODO: convert error code */
 	return(-ret);
     }
@@ -278,12 +280,14 @@ int PINT_thread_mgr_bmi_start(void)
 	return(ret);
     }
 
+    bmi_thread_running = 1;
 #ifdef __PVFS2_JOB_THREADED__
     ret = pthread_create(&bmi_thread_id, NULL, bmi_thread_function, NULL);
     if(ret != 0)
     {
 	BMI_close_context(global_bmi_context);
 	gen_mutex_unlock(&bmi_mutex);
+	bmi_thread_running = 0;
 	/* TODO: convert error code */
 	return(-ret);
     }
@@ -307,8 +311,9 @@ int PINT_thread_mgr_trove_stop(void)
     if(trove_thread_ref_count <= 0)
     {
 	assert(trove_thread_ref_count == 0); /* sanity check */
+	trove_thread_running = 0;
 #ifdef __PVFS2_JOB_THREADED__
-	pthread_cancel(trove_thread_id);
+	pthread_join(trove_thread_id, NULL);
 #endif
 #ifdef __PVFS2_TROVE_SUPPORT__
 	trove_close_context(HACK_fs_id, global_trove_context);
@@ -335,8 +340,9 @@ int PINT_thread_mgr_bmi_stop(void)
     if(bmi_thread_ref_count <= 0)
     {
 	assert(bmi_thread_ref_count == 0); /* sanity check */
+	bmi_thread_running = 0;
 #ifdef __PVFS2_JOB_THREADED__
-	pthread_cancel(bmi_thread_id);
+	pthread_join(bmi_thread_id, NULL);
 #endif
 	BMI_close_context(global_bmi_context);
     }
