@@ -1,15 +1,16 @@
-#!/bin/sh
+#!/bin/sh 
 #
 #
 
 rootdir=/tmp/pvfs2-build-test
 
-tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.5.tar.gz
+tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
 
 # end of user defines
 
 tarball=`basename $tarballurl`
 tarballdir=`echo $tarball | sed -e "s/.tar.gz//" | sed -e "s/.tgz//"`
+old_wd=`pwd`
 
 if [ ! -d $rootdir ] ; then
 	echo "Specified directory $rootdir does not exist.  Aborting."
@@ -78,10 +79,10 @@ if [ x$PEMM == "x" ] ; then
 		echo "Failed to find pvfs2-extract-make-msgs.pl.  Aborting."
 		exit 1
 	else
-		PEMM=$old_wd/pvfs2-extract-make-msgs.pl 2>&1 > $rootdir/make-extracted.log
+		PEMM=$old_wd/pvfs2-extract-make-msgs.pl 
 	fi
 fi
-$PEMM $rootdir/make.log
+$PEMM $rootdir/make.log 2>&1 > $rootdir/make-extracted.log
 
 if [ $? != 0 ] ; then
 	echo "Spurious output during make; see $rootdir/make-extracted.log.  Aborting."
@@ -96,4 +97,6 @@ if [ $? != 0 ] ; then
 	exit 1
 fi
 
+# after installing, create a pvfs volume (PAV)
+# then run a test or set of tests (most likely PTS)
 echo "Script completed successfully.  Exiting."
