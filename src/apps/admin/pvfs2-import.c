@@ -30,7 +30,6 @@ struct options
 
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
-static void PVFS_perror(char* text, int retcode);
 static double Wtime(void);
 
 int main(int argc, char **argv)
