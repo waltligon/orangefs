@@ -43,7 +43,19 @@ int do_encode_resp(
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_MKDIR:
 	case PVFS_SERV_RMDIRENT:
+
+	    /* 
+	     *	There is no response struct for
+	     *	these requests below.  Therefore
+	     *	we should not call it.
+	     * TODO: Are we still using Generic ACK? dw 07.01.03
+	     */
+				//free(target_msg->buffer_list);
 	case PVFS_SERV_NOOP:
+	case PVFS_SERV_SETATTR:
+	case PVFS_SERV_REMOVE:
+	case PVFS_SERV_RMDIR:
+	case PVFS_SERV_CREATEDIRENT:
 	    /* 
 	     *	There is an int64_t here...
 	     *	but handled correctly so far!
@@ -55,18 +67,6 @@ int do_encode_resp(
 	    memcpy(target_msg->buffer_list[0], response, sizeof(struct PVFS_server_resp_s));
 	    return(0);
 
-	case PVFS_SERV_SETATTR:
-	case PVFS_SERV_REMOVE:
-	case PVFS_SERV_RMDIR:
-	case PVFS_SERV_CREATEDIRENT:
-	    /* 
-	     *	There is no response struct for
-	     *	these requests.  Therefore
-	     *	we should not call it.
-	     * TODO: Are we still using Generic ACK? dw 07.01.03
-	     */
-				//free(target_msg->buffer_list);
-	    return -1;
 
 	case PVFS_SERV_GETATTR:
 	    /* 
