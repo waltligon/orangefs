@@ -619,6 +619,8 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 		if (PINT_IS_CLIENT(mode))
 		{
 			poff = result->offset_array[result->segs] + diff;
+			gossip_debug(REQUEST_DEBUG,"\tclient lstof %lld diff %lld sgof %lld\n",
+					result->offset_array[result->segs], diff, poff);
 		}
 		/* else poff is the offset of the segment */
 		if (PINT_IS_CLIENT(mode) && mem)
@@ -641,7 +643,8 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 		if (PINT_IS_CLIENT(mode) && result->segs < result->segmax)
 		{
 			result->offset_array[result->segs] =
-				result->offset_array[result->segs - 1] + sz;
+				result->offset_array[result->segs - 1] + 
+				result->size_array[result->segs - 1];
 		}
       /* prepare for next iteration */
       loff  += sz;
