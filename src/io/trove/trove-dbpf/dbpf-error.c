@@ -36,7 +36,7 @@ PVFS_error dbpf_db_error_to_trove_error(int db_error_value)
 	    gossip_err("Error: DB_RUNRECOVERY encountered.\n");
 	    return TROVE_EIO;
     }
-    return 4243; /* return some identifiable number */
+    return -4243; /* return some identifiable number */
 }
 
 /*

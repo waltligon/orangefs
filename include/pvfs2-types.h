@@ -67,10 +67,10 @@ enum PVFS_encoding_type
 #define ENCODING_INVALID_MAX                    4
 #define ENCODING_SUPPORTED_MIN ENCODING_LE_BFIELD
 #define ENCODING_SUPPORTED_MAX ENCODING_LE_BFIELD
-#define ENCODING_IS_VALID(enc_type)     \
-((enc_type > ENCODING_INVALID_MIN) &&   \
+#define ENCODING_IS_VALID(enc_type)      \
+((enc_type > ENCODING_INVALID_MIN) &&    \
  (enc_type < ENCODING_INVALID_MAX))
-#define ENCODING_IS_SUPPORTED(enc_type) \
+#define ENCODING_IS_SUPPORTED(enc_type)  \
 ((enc_type >= ENCODING_SUPPORTED_MIN) && \
  (enc_type <= ENCODING_SUPPORTED_MAX))
 #define ENCODING_DEFAULT ENCODING_LE_BFIELD
@@ -101,76 +101,68 @@ typedef uint32_t PVFS_permissions;
 #define encode_PVFS_permissions encode_uint32_t
 #define decode_PVFS_permissions decode_uint32_t
 
-/* some limits */
-/* TODO: is there a better place for this stuff?  maybe merge with
- * limits at the top of pvfs2-req-proto.h somewhere?
- */
-/* max length of BMI style URI's for identifying servers */
-#define PVFS_MAX_SERVER_ADDR_LEN 256
-
 /* contiguous range of handles */
-struct PVFS_handle_extent_s
+typedef struct
 {
     PVFS_handle first;
     PVFS_handle last;
-};
-typedef struct PVFS_handle_extent_s PVFS_handle_extent;
-endecode_fields_2(PVFS_handle_extent,
-  PVFS_handle, first,
-  PVFS_handle, last)
+} PVFS_handle_extent;
+endecode_fields_2(
+    PVFS_handle_extent,
+    PVFS_handle, first,
+    PVFS_handle, last)
 
 /* an array of contiguous ranges of handles */
-struct PVFS_handle_extent_array_s
+typedef struct
 {
     uint32_t extent_count;
     PVFS_handle_extent *extent_array;
-};
-typedef struct PVFS_handle_extent_array_s PVFS_handle_extent_array;
-endecode_fields_0a(PVFS_handle_extent_array,
-  uint32_t, extent_count,
-  PVFS_handle_extent, extent_array)
+} PVFS_handle_extent_array;
+endecode_fields_0a(
+    PVFS_handle_extent_array,
+    uint32_t, extent_count,
+    PVFS_handle_extent, extent_array)
 
 /* predefined special values for types */
-#define PVFS_HANDLE_NULL ((PVFS_handle)0) /* invalid object handle */
-#define PVFS_FS_ID_NULL ((PVFS_fs_id)0)   /* invalid object handle */
-#define PVFS_OP_NULL ((id_gen_t)0)        /* invalid op id for I/O */
-#define PVFS_ITERATE_START (INT32_MAX - 1)
-#define PVFS_ITERATE_END   (INT32_MAX - 2)
+#define PVFS_HANDLE_NULL     ((PVFS_handle)0)
+#define PVFS_FS_ID_NULL       ((PVFS_fs_id)0)
+#define PVFS_OP_NULL            ((id_gen_t)0)
+#define PVFS_ITERATE_START    (INT32_MAX - 1)
+#define PVFS_ITERATE_END      (INT32_MAX - 2)
 #define PVFS_READDIR_START PVFS_ITERATE_START
 
 /* permission bits */
-#define PVFS_O_EXECUTE	(1 << 0)
-#define PVFS_O_WRITE	(1 << 1)
-#define PVFS_O_READ	(1 << 2)
-#define PVFS_G_EXECUTE	(1 << 3)
-#define PVFS_G_WRITE	(1 << 4)
-#define PVFS_G_READ	(1 << 5)
-#define PVFS_U_EXECUTE	(1 << 6)
-#define PVFS_U_WRITE	(1 << 7)
-#define PVFS_U_READ	(1 << 8)
+#define PVFS_O_EXECUTE (1 << 0)
+#define PVFS_O_WRITE   (1 << 1)
+#define PVFS_O_READ    (1 << 2)
+#define PVFS_G_EXECUTE (1 << 3)
+#define PVFS_G_WRITE   (1 << 4)
+#define PVFS_G_READ    (1 << 5)
+#define PVFS_U_EXECUTE (1 << 6)
+#define PVFS_U_WRITE   (1 << 7)
+#define PVFS_U_READ    (1 << 8)
 
 /* object and attribute types */
-enum PVFS_ds_type_e
+typedef enum
 {
     PVFS_TYPE_NONE =              0,
     PVFS_TYPE_METAFILE =    (1 << 0),
     PVFS_TYPE_DATAFILE =    (1 << 1),
     PVFS_TYPE_DIRECTORY =   (1 << 2),
-    PVFS_TYPE_SYMLINK =	    (1 << 3),
-    PVFS_TYPE_DIRDATA =	    (1 << 4)
-};
-typedef enum PVFS_ds_type_e PVFS_ds_type;
+    PVFS_TYPE_SYMLINK =     (1 << 3),
+    PVFS_TYPE_DIRDATA =     (1 << 4)
+} PVFS_ds_type;
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
 
 /* internal attribute masks, common to all obj types */
-#define PVFS_ATTR_COMMON_UID	(1 << 0)
-#define PVFS_ATTR_COMMON_GID	(1 << 1)
-#define PVFS_ATTR_COMMON_PERM	(1 << 2)
-#define PVFS_ATTR_COMMON_ATIME	(1 << 3)
-#define PVFS_ATTR_COMMON_CTIME	(1 << 4)
-#define PVFS_ATTR_COMMON_MTIME	(1 << 5)
-#define PVFS_ATTR_COMMON_TYPE	(1 << 6)
+#define PVFS_ATTR_COMMON_UID   (1 << 0)
+#define PVFS_ATTR_COMMON_GID   (1 << 1)
+#define PVFS_ATTR_COMMON_PERM  (1 << 2)
+#define PVFS_ATTR_COMMON_ATIME (1 << 3)
+#define PVFS_ATTR_COMMON_CTIME (1 << 4)
+#define PVFS_ATTR_COMMON_MTIME (1 << 5)
+#define PVFS_ATTR_COMMON_TYPE  (1 << 6)
 #define PVFS_ATTR_COMMON_ALL                       \
 (PVFS_ATTR_COMMON_UID   | PVFS_ATTR_COMMON_GID   | \
  PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_ATIME | \
@@ -178,36 +170,41 @@ typedef enum PVFS_ds_type_e PVFS_ds_type;
  PVFS_ATTR_COMMON_TYPE)
 
 /* internal attribute masks for metadata objects */
-#define PVFS_ATTR_META_DIST	(1 << 10)
-#define PVFS_ATTR_META_DFILES	(1 << 11)
-#define PVFS_ATTR_META_ALL	(PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES)
+#define PVFS_ATTR_META_DIST    (1 << 10)
+#define PVFS_ATTR_META_DFILES  (1 << 11)
+#define PVFS_ATTR_META_ALL \
+(PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES)
 
 /* internal attribute masks for datafile objects */
-#define PVFS_ATTR_DATA_SIZE	(1 << 15)
-#define PVFS_ATTR_DATA_ALL	PVFS_ATTR_DATA_SIZE
+#define PVFS_ATTR_DATA_SIZE            (1 << 15)
+#define PVFS_ATTR_DATA_ALL   PVFS_ATTR_DATA_SIZE
 
 /* internal attribute masks for symlink objects */
-#define PVFS_ATTR_SYMLNK_TARGET	(1 << 18)
-#define PVFS_ATTR_SYMLNK_ALL	PVFS_ATTR_SYMLNK_TARGET
+#define PVFS_ATTR_SYMLNK_TARGET            (1 << 18)
+#define PVFS_ATTR_SYMLNK_ALL PVFS_ATTR_SYMLNK_TARGET
 
 /* attribute masks used by system interface callers */
-#define PVFS_ATTR_SYS_SIZE	 (1 << 20)
-#define PVFS_ATTR_SYS_LNK_TARGET (1 << 24)
-#define PVFS_ATTR_SYS_DFILE_COUNT (1 << 25)
-#define PVFS_ATTR_SYS_UID	PVFS_ATTR_COMMON_UID
-#define PVFS_ATTR_SYS_GID	PVFS_ATTR_COMMON_GID
-#define PVFS_ATTR_SYS_PERM	PVFS_ATTR_COMMON_PERM
-#define PVFS_ATTR_SYS_ATIME	PVFS_ATTR_COMMON_ATIME
-#define PVFS_ATTR_SYS_CTIME	PVFS_ATTR_COMMON_CTIME
-#define PVFS_ATTR_SYS_MTIME	PVFS_ATTR_COMMON_MTIME
-#define PVFS_ATTR_SYS_TYPE	PVFS_ATTR_COMMON_TYPE
-#define PVFS_ATTR_SYS_ALL       \
-(PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYS_SIZE | PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT)
-#define PVFS_ATTR_SYS_ALL_NOSIZE (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT)
-#define PVFS_ATTR_SYS_ALL_SETABLE (PVFS_ATTR_COMMON_ALL-PVFS_ATTR_COMMON_TYPE)
+#define PVFS_ATTR_SYS_SIZE                  (1 << 20)
+#define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
+#define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
+#define PVFS_ATTR_SYS_UID        PVFS_ATTR_COMMON_UID
+#define PVFS_ATTR_SYS_GID        PVFS_ATTR_COMMON_GID
+#define PVFS_ATTR_SYS_PERM       PVFS_ATTR_COMMON_PERM
+#define PVFS_ATTR_SYS_ATIME      PVFS_ATTR_COMMON_ATIME
+#define PVFS_ATTR_SYS_CTIME      PVFS_ATTR_COMMON_CTIME
+#define PVFS_ATTR_SYS_MTIME      PVFS_ATTR_COMMON_MTIME
+#define PVFS_ATTR_SYS_TYPE       PVFS_ATTR_COMMON_TYPE
+#define PVFS_ATTR_SYS_ALL                    \
+(PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
+ PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT)
+#define PVFS_ATTR_SYS_ALL_NOSIZE                   \
+(PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
+ PVFS_ATTR_SYS_DFILE_COUNT)
+#define PVFS_ATTR_SYS_ALL_SETABLE \
+(PVFS_ATTR_COMMON_ALL-PVFS_ATTR_COMMON_TYPE)
 
 /* statfs and misc server statistic information */
-struct PVFS_statfs_s
+typedef struct
 {
     PVFS_fs_id fs_id;
     PVFS_size bytes_available;
@@ -220,8 +217,7 @@ struct PVFS_statfs_s
     uint64_t uptime_seconds;
     uint64_t handles_available_count;
     uint64_t handles_total_count;
-};
-typedef struct PVFS_statfs_s PVFS_statfs;
+} PVFS_statfs;
 endecode_fields_11(
     PVFS_statfs,
     PVFS_fs_id, fs_id,
@@ -236,33 +232,43 @@ endecode_fields_11(
     uint64_t, handles_available_count,
     uint64_t, handles_total_count)
 
-/* object reference (uniquely refers to a single file, directory, or symlink) */
-struct PVFS_object_ref_s
+/*
+  object reference (uniquely refers to a single file, directory, or
+  symlink)
+*/
+typedef struct
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
-};
-typedef struct PVFS_object_ref_s PVFS_object_ref;
+} PVFS_object_ref;
 
 /* credentials (stubbed for future authentication methods) */
-struct PVFS_credentials_s
+typedef struct
 {
     PVFS_uid uid;
     PVFS_gid gid;
-};
-typedef struct PVFS_credentials_s PVFS_credentials;
-endecode_fields_2(PVFS_credentials, PVFS_uid, uid, PVFS_gid, gid)
+} PVFS_credentials;
+endecode_fields_2(
+    PVFS_credentials,
+    PVFS_uid, uid,
+    PVFS_gid, gid)
 
-/* directory entry */
-#define PVFS_NAME_MAX    256	/* max length of PVFS filename */
-#define PVFS_SEGMENT_MAX 128    /* max len of individual path element */
-struct PVFS_dirent_s
+/* max length of BMI style URI's for identifying servers */
+#define PVFS_MAX_SERVER_ADDR_LEN 256
+/* max length of PVFS filename */
+#define PVFS_NAME_MAX            256
+/* max len of individual path element */
+#define PVFS_SEGMENT_MAX         128
+
+typedef struct
 {
     char d_name[PVFS_NAME_MAX + 1];
     PVFS_handle handle;
-};
-typedef struct PVFS_dirent_s PVFS_dirent;
-endecode_fields_2(PVFS_dirent, here_string, d_name, PVFS_handle, handle)
+} PVFS_dirent;
+endecode_fields_2(
+    PVFS_dirent,
+    here_string, d_name,
+    PVFS_handle, handle)
 
 /* these are predefined server parameters that can be manipulated
  * through the mgmt interface
@@ -270,18 +276,18 @@ endecode_fields_2(PVFS_dirent, here_string, d_name, PVFS_handle, handle)
 enum PVFS_server_param
 {
     PVFS_SERV_PARAM_INVALID = 0,
-    PVFS_SERV_PARAM_GOSSIP_MASK = 1,  /* gossip debugging on or off */
-    PVFS_SERV_PARAM_FSID_CHECK = 2,   /* verify that a specific fsid is ok */
-    PVFS_SERV_PARAM_ROOT_CHECK = 3,   /* verify existance of root handle */
-    PVFS_SERV_PARAM_MODE = 4,	      /* change the current server mode */
-    PVFS_SERV_PARAM_EVENT_ON = 5,     /* event logging on or off */
-    PVFS_SERV_PARAM_EVENT_MASKS = 6   /* API masks for event logging */
+    PVFS_SERV_PARAM_GOSSIP_MASK = 1, /* gossip debugging on or off */
+    PVFS_SERV_PARAM_FSID_CHECK = 2,  /* verify that an fsid is ok */
+    PVFS_SERV_PARAM_ROOT_CHECK = 3,  /* verify existance of root handle */
+    PVFS_SERV_PARAM_MODE = 4,        /* change the current server mode */
+    PVFS_SERV_PARAM_EVENT_ON = 5,    /* event logging on or off */
+    PVFS_SERV_PARAM_EVENT_MASKS = 6  /* API masks for event logging */
 };
 
 enum PVFS_server_mode
 {
     PVFS_SERVER_NORMAL_MODE = 1,      /* default server operating mode */
-    PVFS_SERVER_ADMIN_MODE = 2	      /* administrative mode */
+    PVFS_SERVER_ADMIN_MODE = 2        /* administrative mode */
 };
 
 /* PVFS2 errors
@@ -289,7 +295,6 @@ enum PVFS_server_mode
  * Errors are made up of a code to indicate the error type and a class
  * that indicates where the error came from.  These are |'d together.
  */
-
 int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(char *text, int retcode);
 void PVFS_perror_gossip(char* text, int retcode);
@@ -306,83 +311,91 @@ int32_t PVFS_get_errno_mapping(int32_t error);
 (((__error)&(PVFS_NON_ERRNO_ERROR_BIT)) && IS_PVFS_ERROR(__error))
 
 /* 7 bits are used for the errno mapped error codes */
-#define PVFS_ERROR_CODE(__error) ((__error) & (int32_t) (0x7f|PVFS_ERROR_BIT))
-#define PVFS_ERROR_CLASS(__error) ((__error) & ~((int32_t) (0x7f|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT)))
-#define PVFS_NON_ERRNO_ERROR_CODE(__error) ((__error) & (int32_t) (127|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT))
+#define PVFS_ERROR_CODE(__error) \
+((__error) & (int32_t) (0x7f|PVFS_ERROR_BIT))
+#define PVFS_ERROR_CLASS(__error) \
+((__error) & ~((int32_t) (0x7f|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT)))
+#define PVFS_NON_ERRNO_ERROR_CODE(__error) \
+((__error) & (int32_t) (127|PVFS_ERROR_BIT|PVFS_NON_ERRNO_ERROR_BIT))
 
-#define PVFS_ERROR_BMI    (1 << 7)	/* BMI-specific error (e.g. socket got closed ) */
-#define PVFS_ERROR_TROVE  (2 << 7)	/* Trove-specific error (e.g. no space on device) */
+#define PVFS_ERROR_BMI    (1 << 7) /* BMI-specific error */
+#define PVFS_ERROR_TROVE  (2 << 7) /* Trove-specific error */
 #define PVFS_ERROR_FLOW   (3 << 7)
-#define PVFS_ERROR_SM     (4 << 7)	/* state machine specific error */
+#define PVFS_ERROR_SM     (4 << 7) /* state machine specific error */
 #define PVFS_ERROR_SCHED  (5 << 7)
 #define PVFS_ERROR_CLIENT (6 << 7)
-#define PVFS_ERROR_DEV    (7 << 7)	/* device file interaction */
+#define PVFS_ERROR_DEV    (7 << 7) /* device file interaction */
 
+#define PVFS_ERROR_CLASS_BITS                                          \
+(PVFS_ERROR_BMI | PVFS_ERROR_TROVE | PVFS_ERROR_FLOW | PVFS_ERROR_SM | \
+ PVFS_ERROR_SCHED | PVFS_ERROR_CLIENT | PVFS_ERROR_DEV)
+
+/* a shorthand to make the error code definitions more readable */
+#define E(num) (num|PVFS_ERROR_BIT)
 
 /* PVFS2 error codes, compliments of asm/errno.h */
-#define PVFS_EPERM		 (1|(PVFS_ERROR_BIT))	/* Operation not permitted */
-#define PVFS_ENOENT		 (2|(PVFS_ERROR_BIT))	/* No such file or directory */
-#define PVFS_EINTR		 (3|(PVFS_ERROR_BIT))	/* Interrupted system call */
-#define PVFS_EIO		 (4|(PVFS_ERROR_BIT))	/* I/O error */
-#define PVFS_ENXIO		 (5|(PVFS_ERROR_BIT))	/* No such device or address */
-#define PVFS_EBADF		 (6|(PVFS_ERROR_BIT))	/* Bad file number */
-#define PVFS_EAGAIN		 (7|(PVFS_ERROR_BIT))	/* Try again */
-#define PVFS_ENOMEM		 (8|(PVFS_ERROR_BIT))	/* Out of memory */
-#define PVFS_EFAULT		 (9|(PVFS_ERROR_BIT))	/* Bad address */
-#define PVFS_EBUSY		(10|(PVFS_ERROR_BIT))	/* Device or resource busy */
-#define PVFS_EEXIST		(11|(PVFS_ERROR_BIT))	/* File exists */
-#define PVFS_ENODEV		(12|(PVFS_ERROR_BIT))	/* No such device */
-#define PVFS_ENOTDIR		(13|(PVFS_ERROR_BIT))	/* Not a directory */
-#define PVFS_EISDIR		(14|(PVFS_ERROR_BIT))	/* Is a directory */
-#define PVFS_EINVAL		(15|(PVFS_ERROR_BIT))	/* Invalid argument */
-#define PVFS_EMFILE		(16|(PVFS_ERROR_BIT))	/* Too many open files */
-#define PVFS_EFBIG		(17|(PVFS_ERROR_BIT))	/* File too large */
-#define PVFS_ENOSPC		(18|(PVFS_ERROR_BIT))	/* No space left on device */
-#define PVFS_EROFS		(19|(PVFS_ERROR_BIT))	/* Read-only file system */
-#define PVFS_EMLINK		(20|(PVFS_ERROR_BIT))	/* Too many links */
-#define PVFS_EPIPE		(21|(PVFS_ERROR_BIT))	/* Broken pipe */
-#define PVFS_EDEADLK		(22|(PVFS_ERROR_BIT))	/* Resource deadlock would occur */
-#define PVFS_ENAMETOOLONG	(23|(PVFS_ERROR_BIT))	/* File name too long */
-#define PVFS_ENOLCK		(24|(PVFS_ERROR_BIT))	/* No record locks available */
-#define PVFS_ENOSYS		(25|(PVFS_ERROR_BIT))	/* Function not implemented */
-#define PVFS_ENOTEMPTY	        (26|(PVFS_ERROR_BIT))	/* Directory not empty */
-#define PVFS_ELOOP		(27|(PVFS_ERROR_BIT))	/* Too many symbolic links encountered */
-#define PVFS_EWOULDBLOCK	(28|(PVFS_ERROR_BIT))	/* Operation would block */
-#define PVFS_ENOMSG		(29|(PVFS_ERROR_BIT))	/* No message of desired type */
-#define PVFS_EUNATCH		(30|(PVFS_ERROR_BIT))	/* Protocol driver not attached */
-#define PVFS_EBADR		(31|(PVFS_ERROR_BIT))	/* Invalid request descriptor */
-#define PVFS_EDEADLOCK	        (32|(PVFS_ERROR_BIT))
-#define PVFS_ENODATA		(33|(PVFS_ERROR_BIT))	/* No data available */
-#define PVFS_ETIME		(34|(PVFS_ERROR_BIT))	/* Timer expired */
-#define PVFS_ENONET		(35|(PVFS_ERROR_BIT))	/* Machine is not on the network */
-#define PVFS_EREMOTE		(36|(PVFS_ERROR_BIT))	/* Object is remote */
-#define PVFS_ECOMM		(37|(PVFS_ERROR_BIT))	/* Communication error on send */
-#define PVFS_EPROTO		(38|(PVFS_ERROR_BIT))	/* Protocol error */
-#define PVFS_EBADMSG		(39|(PVFS_ERROR_BIT))	/* Not a data message */
-#define PVFS_EOVERFLOW	        (40|(PVFS_ERROR_BIT))	/* Value too large for defined data type */
-#define PVFS_ERESTART	        (41|(PVFS_ERROR_BIT))	/* Interrupted system call should be restarted */
-#define PVFS_EMSGSIZE	        (42|(PVFS_ERROR_BIT))	/* Message too long */
-#define PVFS_EPROTOTYPE	        (43|(PVFS_ERROR_BIT))	/* Protocol wrong type for socket */
-#define PVFS_ENOPROTOOPT	(44|(PVFS_ERROR_BIT))	/* Protocol not available */
-#define PVFS_EPROTONOSUPPORT	(45|(PVFS_ERROR_BIT))	/* Protocol not supported */
-#define PVFS_EOPNOTSUPP	        (46|(PVFS_ERROR_BIT))	/* Operation not supported on transport endpoint */
-#define PVFS_EADDRINUSE	        (47|(PVFS_ERROR_BIT))	/* Address already in use */
-#define PVFS_EADDRNOTAVAIL	(48|(PVFS_ERROR_BIT))	/* Cannot assign requested address */
-#define PVFS_ENETDOWN	        (49|(PVFS_ERROR_BIT))	/* Network is down */
-#define PVFS_ENETUNREACH	(50|(PVFS_ERROR_BIT))	/* Network is unreachable */
-#define PVFS_ENETRESET	        (51|(PVFS_ERROR_BIT))	/* Network dropped connection because of reset */
-#define PVFS_ENOBUFS		(52|(PVFS_ERROR_BIT))	/* No buffer space available */
-#define PVFS_ETIMEDOUT	        (53|(PVFS_ERROR_BIT))	/* Connection timed out */
-#define PVFS_ECONNREFUSED	(54|(PVFS_ERROR_BIT))	/* Connection refused */
-#define PVFS_EHOSTDOWN	        (55|(PVFS_ERROR_BIT))	/* Host is down */
-#define PVFS_EHOSTUNREACH	(56|(PVFS_ERROR_BIT))	/* No route to host */
-#define PVFS_EALREADY	        (57|(PVFS_ERROR_BIT))	/* Operation already in progress */
-#define PVFS_EACCES	        (58|(PVFS_ERROR_BIT))	/* Operation already in progress */
-
+#define PVFS_EPERM            E(1) /* Operation not permitted */
+#define PVFS_ENOENT           E(2) /* No such file or directory */
+#define PVFS_EINTR            E(3) /* Interrupted system call */
+#define PVFS_EIO              E(4) /* I/O error */
+#define PVFS_ENXIO            E(5) /* No such device or address */
+#define PVFS_EBADF            E(6) /* Bad file number */
+#define PVFS_EAGAIN           E(7) /* Try again */
+#define PVFS_ENOMEM           E(8) /* Out of memory */
+#define PVFS_EFAULT           E(9) /* Bad address */
+#define PVFS_EBUSY           E(10) /* Device or resource busy */
+#define PVFS_EEXIST          E(11) /* File exists */
+#define PVFS_ENODEV          E(12) /* No such device */
+#define PVFS_ENOTDIR         E(13) /* Not a directory */
+#define PVFS_EISDIR          E(14) /* Is a directory */
+#define PVFS_EINVAL          E(15) /* Invalid argument */
+#define PVFS_EMFILE          E(16) /* Too many open files */
+#define PVFS_EFBIG           E(17) /* File too large */
+#define PVFS_ENOSPC          E(18) /* No space left on device */
+#define PVFS_EROFS           E(19) /* Read-only file system */
+#define PVFS_EMLINK          E(20) /* Too many links */
+#define PVFS_EPIPE           E(21) /* Broken pipe */
+#define PVFS_EDEADLK         E(22) /* Resource deadlock would occur */
+#define PVFS_ENAMETOOLONG    E(23) /* File name too long */
+#define PVFS_ENOLCK          E(24) /* No record locks available */
+#define PVFS_ENOSYS          E(25) /* Function not implemented */
+#define PVFS_ENOTEMPTY       E(26) /* Directory not empty */
+#define PVFS_ELOOP           E(27) /* Too many symbolic links encountered */
+#define PVFS_EWOULDBLOCK     E(28) /* Operation would block */
+#define PVFS_ENOMSG          E(29) /* No message of desired type */
+#define PVFS_EUNATCH         E(30) /* Protocol driver not attached */
+#define PVFS_EBADR           E(31) /* Invalid request descriptor */
+#define PVFS_EDEADLOCK       E(32)
+#define PVFS_ENODATA         E(33) /* No data available */
+#define PVFS_ETIME           E(34) /* Timer expired */
+#define PVFS_ENONET          E(35) /* Machine is not on the network */
+#define PVFS_EREMOTE         E(36) /* Object is remote */
+#define PVFS_ECOMM           E(37) /* Communication error on send */
+#define PVFS_EPROTO          E(38) /* Protocol error */
+#define PVFS_EBADMSG         E(39) /* Not a data message */
+#define PVFS_EOVERFLOW       E(40) /* Value too large for defined data type */
+#define PVFS_ERESTART        E(41) /* Interrupted system call should be restarted */
+#define PVFS_EMSGSIZE        E(42) /* Message too long */
+#define PVFS_EPROTOTYPE      E(43) /* Protocol wrong type for socket */
+#define PVFS_ENOPROTOOPT     E(44) /* Protocol not available */
+#define PVFS_EPROTONOSUPPORT E(45) /* Protocol not supported */
+#define PVFS_EOPNOTSUPP      E(46) /* Operation not supported on transport endpoint */
+#define PVFS_EADDRINUSE      E(47) /* Address already in use */
+#define PVFS_EADDRNOTAVAIL   E(48) /* Cannot assign requested address */
+#define PVFS_ENETDOWN        E(49) /* Network is down */
+#define PVFS_ENETUNREACH     E(50) /* Network is unreachable */
+#define PVFS_ENETRESET       E(51) /* Network dropped connection because of reset */
+#define PVFS_ENOBUFS         E(52) /* No buffer space available */
+#define PVFS_ETIMEDOUT       E(53) /* Connection timed out */
+#define PVFS_ECONNREFUSED    E(54) /* Connection refused */
+#define PVFS_EHOSTDOWN       E(55) /* Host is down */
+#define PVFS_EHOSTUNREACH    E(56) /* No route to host */
+#define PVFS_EALREADY        E(57) /* Operation already in progress */
+#define PVFS_EACCES          E(58) /* Operation already in progress */
 
 /***************** non-errno/pvfs2 specific error codes *****************/
-#define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT)) 
-#define PVFS_EDEVINIT   (2|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT)) 
+#define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_EDEVINIT   (2|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_EDETAIL    (3|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
@@ -392,7 +405,6 @@ int32_t PVFS_get_errno_mapping(int32_t error);
  * UNIX ERRNO VALUE IN THE MACROS BELOW (USED IN
  * src/common/misc/errno-mapping.c and the kernel module)
  */
-
 #define PVFS_ERRNO_MAX          59
 
 #define DECLARE_ERRNO_MAPPING()                       \
@@ -492,13 +504,15 @@ int32_t PVFS_get_errno_mapping(int32_t error)              \
     {                                                      \
     ret = PVFS_NON_ERRNO_ERROR_CODE(                       \
           ((positive ? error : abs(error))) &              \
-           (~(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT)));  \
+           (~(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT|     \
+               PVFS_ERROR_CLASS_BITS)));                   \
     }                                                      \
     else if (IS_PVFS_ERROR((positive? error: -error)))     \
     {                                                      \
     ret = PINT_errno_mapping[                              \
         PVFS_ERROR_CODE(((positive ? error : abs(error))) &\
-                        ~(PVFS_ERROR_BIT))];               \
+                        (~(PVFS_ERROR_BIT)|                \
+                         ~(PVFS_ERROR_CLASS_BITS))];       \
     }                                                      \
     return (positive ? ret : -ret);                        \
 }                                                          \
@@ -511,19 +525,20 @@ DECLARE_ERRNO_MAPPING()
  * errors from a particular call.  This is done, to report on specific
  * server failures.
  */
-struct PVFS_error_server_s {
-    PVFS_error      error;
+typedef struct
+{
+    PVFS_error error;
     PVFS_BMI_addr_t addr;
-};
-typedef struct PVFS_error_server_s PVFS_error_server;
+} PVFS_error_server;
 
-struct PVFS_error_details_s {
+typedef struct
+{
     int count_allocated;
     int count_used;
     int count_exceeded; /* set if we ran out of space for errors */
-    PVFS_error_server error[1]; /* structure is alloc'd larger for more errors */
-};
-typedef struct PVFS_error_details_s PVFS_error_details;
+    /* structure is alloc'd larger for more errors */
+    PVFS_error_server error[1];
+} PVFS_error_details;
 
 PVFS_error_details *PVFS_error_details_new(int count);
 void PVFS_error_details_free(PVFS_error_details *details);

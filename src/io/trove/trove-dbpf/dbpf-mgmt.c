@@ -251,6 +251,12 @@ static int dbpf_initialize(char *stoname,
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
 
+    if (!stoname)
+    {
+        gossip_err("dbpf_initialize failure: invalid storage name\n");
+        return ret;
+    }
+
     if (!method_name_p)
     {
         gossip_err("dbpf_initialize failure: invalid method name ptr\n");
@@ -263,9 +269,9 @@ static int dbpf_initialize(char *stoname,
         gossip_debug(
             GOSSIP_TROVE_DEBUG, "dbpf_initialize failure: storage "
             "lookup failed\n");
-        return ret;
+        return -TROVE_ENOENT;
     }
-    
+
     my_storage_p = sto_p;
     dbpf_method_id = method_id;
     
@@ -1115,7 +1121,6 @@ static struct dbpf_storage *dbpf_storage_lookup(
     sto_p->sto_attr_db = dbpf_db_open(path_name, error_p);
     if (sto_p->sto_attr_db == NULL)
     {
-        *error_p = -dbpf_db_error_to_trove_error(*error_p);
         return NULL;
     }
 
@@ -1124,7 +1129,6 @@ static struct dbpf_storage *dbpf_storage_lookup(
     sto_p->coll_db = dbpf_db_open(path_name, error_p);
     if (sto_p->coll_db == NULL)
     {
-        *error_p = -dbpf_db_error_to_trove_error(*error_p);
         return NULL;
     }
 

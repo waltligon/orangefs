@@ -258,7 +258,7 @@ DOTCONF_CB(get_pvfs_server_id)
                    "%s to %s).\n",config_s->host_id,cmd->data.str);
         free(config_s->host_id);
     }
-    config_s->host_id = strdup(cmd->data.str);
+    config_s->host_id = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 
@@ -274,7 +274,8 @@ DOTCONF_CB(get_storage_space)
         gossip_err("WARNING: StorageSpace value being overwritten.\n");
         free(config_s->storage_path);
     }
-    config_s->storage_path = strdup(cmd->data.str);
+    config_s->storage_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 
@@ -522,7 +523,7 @@ DOTCONF_CB(get_logfile)
                    "or Global block");
         return NULL;
     }
-    config_s->logfile = strdup(cmd->data.str);
+    config_s->logfile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 
@@ -824,7 +825,8 @@ DOTCONF_CB(get_filesystem_name)
         gossip_err("WARNING: Overwriting %s with %s\n",
                    fs_conf->file_system_name,cmd->data.str);
     }
-    fs_conf->file_system_name = strdup(cmd->data.str);
+    fs_conf->file_system_name =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 

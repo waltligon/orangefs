@@ -75,7 +75,7 @@ int trove_initialize(char *stoname,
       those op pointers to be right either way.
     */
     ret = dbpf_mgmt_ops.initialize(stoname, flags, &ret_method_name_p, 0);
-    if (ret >= 0)
+    if (ret > -1)
     {
         free(ret_method_name_p);
         ret = 1;

@@ -74,7 +74,7 @@ int LRU_shrink_cache(struct cache_stack *cache, unsigned int expected,
         if ( is_extent_discardable(victim) ){
             LRU_remove_cache_item(cache, victim);
             list_add_tail(&victim->list, &cache->free_extent_list);
-            *shrinked ++;
+            *shrinked++;
         }
     }
     return ret;

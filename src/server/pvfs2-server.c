@@ -573,7 +573,7 @@ static int server_setup_process_environment(int background)
 static int server_initialize_subsystems(
     PINT_server_status_flag *server_status_flag)
 {
-    int ret = 0;
+    int ret = -PVFS_EINVAL;
     char *method_name = NULL;
     char *cur_merged_handle_range = NULL;
     PINT_llist *cur = NULL;
@@ -586,11 +586,10 @@ static int server_initialize_subsystems(
     if (ret < 0)
     {
         gossip_err("Error initializing distribution interface.\n");
-        return (ret);
+        return ret;
     }
     *server_status_flag |= SERVER_DIST_INIT;
 
-    
     ret = PINT_encode_initialize();
     if (ret < 0)
     {
@@ -605,7 +604,7 @@ static int server_initialize_subsystems(
                  server_config.host_id);
 
     ret = BMI_initialize(server_config.bmi_modules, 
-        server_config.host_id, BMI_INIT_SERVER);
+                         server_config.host_id, BMI_INIT_SERVER);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: BMI_initialize", ret);
@@ -620,19 +619,16 @@ static int server_initialize_subsystems(
     {
         PVFS_perror_gossip("Error: trove_initialize", ret);
 
-        if (ret == -1)
-        {
-            gossip_err("\n*****************************\n");
-            gossip_err("Invalid Storage Space: %s\n\n",
-                       server_config.storage_path);
-            gossip_err("Storage initialization failed.  The most "
-                       "common reason\nfor this is that the storage space "
-                       "has not yet been\ncreated or is located on a "
-                       "partition that has not yet\nbeen mounted.  "
-                       "If you'd like to create the storage space,\n"
-                       "re-run this program with a -f option.\n");
-            gossip_err("\n*****************************\n");
-        }
+        gossip_err("\n***********************************************\n");
+        gossip_err("Invalid Storage Space: %s\n\n",
+                   server_config.storage_path);
+        gossip_err("Storage initialization failed.  The most "
+                   "common reason\nfor this is that the storage space "
+                   "has not yet been\ncreated or is located on a "
+                   "partition that has not yet\nbeen mounted.  "
+                   "If you'd like to create the storage space,\n"
+                   "re-run this program with a -f option.\n");
+        gossip_err("\n***********************************************\n");
         return ret;
     }
 
