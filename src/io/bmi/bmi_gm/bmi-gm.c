@@ -866,6 +866,16 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
 
     gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_send_list called.\n");
 
+    /* if there is only one buffer in the list, pass it on to the
+     * normal post_send() function because it is more efficient in
+     * the single buffer case 
+     */
+    if(list_count == 1)
+    {
+	return(BMI_gm_post_send(id, dest, buffer_list[0], size_list[0], 
+	    buffer_flag, tag, user_ptr, context_id));
+    }
+
     /* TODO: think about this some.  For now this is going to be
      * lame because we aren't going to take advantage of
      * having buffers pinned in advance...
@@ -951,6 +961,16 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
 
     gossip_ldebug(BMI_DEBUG_GM, 
 	"BMI_gm_post_sendunexpected_list called.\n");
+
+    /* if there is only one buffer in the list, pass it on to the
+     * normal post_sendunexpected() function because it is more 
+     * efficient in the single buffer case 
+     */
+    if(list_count == 1)
+    {
+	return(BMI_gm_post_sendunexpected(id, dest, buffer_list[0], 
+	    size_list[0], buffer_flag, tag, user_ptr, context_id));
+    }
 
     /* TODO: think about this some.  For now this is going to be
      * lame because we aren't going to take advantage of
@@ -1260,6 +1280,16 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     bmi_size_t copy_size, total_copied;
 
     gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_recv_list called.\n");
+
+    /* if there is only one buffer in the list, pass it on to the
+     * normal post_recv() function because it is more efficient in
+     * the single buffer case 
+     */
+    if(list_count == 1)
+    {
+	return(BMI_gm_post_recv(id, src, buffer_list[0], size_list[0],
+	    total_actual_size, buffer_flag, tag, user_ptr, context_id));
+    }
 
     /* what happens here ?
      * see if the operation is already in progress (IND_NEED_RECV_POST)
