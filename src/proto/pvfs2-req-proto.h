@@ -47,86 +47,6 @@ typedef enum {
 	PVFS_SERV_GETCONFIG = 23,
 	PVFS_SERV_EXTENSION = 99,
 } PVFS_server_op;
-/*
-Issue:In above struct is the distribution information included in the 
-extended attributes?In this case we could name it getdattr(less vague) or
-getdist.
-Answer:The distribution information is in the geteattr request structure
-but it is a separate struct from the eattr structure.
-*/
-typedef enum {
-	PVFS_IO_INVALID = 0,
-	PVFS_IO_READ_DATAFILE_CONTIG = 1,
-	PVFS_IO_WRITE_DATAFILE_CONTIG = 2,
-	PVFS_IO_DATAFILE_ALLOCATE = 3,
-	PVFS_IO_READ_DIRECTORY_CONTIG = 4,
-	PVFS_IO_WRITE_DIRECTORY_CONTIG = 5,
-	PVFS_IO_DUPLICATE = 6,
-	PVFS_IO_EXTENSION = 99,
-} PVFS_io_op;
-/*
-Issue:Should we have both read and write extensions?Like what is done
-in MPI for specifying non-contiguous regions.In that case should we
-directly support the MPI-based request format.
-*/
-/* io
- *
- * Concept:
- * 1) All I/O operations are defined by a handle, some opaque starting
- *    position, and some object-specific region description
- * 2) The minimum atomicity of an I/O operation is specified using a
- *    flag.  Not all types of objects support atomic operations.
- * 3) Conditional operations are supported in some cases as well.
- *    Basically you pass in a vtag (version tag) which is compared on the
- *    server side to data it holds describing a region.  If the vtag it
- *    holds fails, a conditional write operation will also fail.
- *
- *    Ask me about this later.
- *
- * I/O operations are only defined on directories and datafiles at the
- * moment.
- *
- */
-/* io_datafile_contig
- *
- */
-struct PVFS_io_datafile_contig_s {
-	PVFS_size size;
-};
-typedef struct PVFS_io_datafile_contig_s PVFS_io_datafile_contig;
-
-/*PVFS_Extensions*/
-typedef enum
-{
-	temp,
-	temp1
-} PVFS_Extensions;
-
-/* io_directory_contig
- *
- */
-struct PVFS_io_directory_contig_s {
-	PVFS_count32 dcount;	/*# of directory entries???*/
-};
-typedef struct PVFS_io_directory_contig_s PVFS_io_directory_contig;
-
-union PVFS_io_position_s {
-	PVFS_offset df_position;
-	/* directory position is something else */
-};
-typedef union PVFS_io_position_s PVFS_io_position;
-
-union PVFS_io_region_s {
-	PVFS_io_datafile_contig df_contig;
-	PVFS_io_directory_contig dir_contig;
-};
-typedef union PVFS_io_region_s PVFS_io_region;
-
-/* conditional op stuff (vtag) */
-struct PVFS_io_conditional_s {
-	/* vtag? */
-};
-typedef struct PVFS_io_conditional_s PVFS_io_conditional;
 
 /* Metaserver status structure */
 struct PVFS_mserv_stat_s {
@@ -260,22 +180,6 @@ struct PVFS_servreq_setattr_s {
 typedef struct PVFS_servreq_setattr_s PVFS_servreq_setattr;
 
 /* No resonse for setattr */
-
-/* Lookup_Single */
-/*
-struct PVFS_servreq_lookup_single_s{
-	PVFS_handle parent_handle; 
-	PVFS_string name; 		
-	PVFS_fs_id fs_id; 		
-};
-typedef struct PVFS_servreq_lookup_single_s PVFS_servreq_lookup_single;
-
-struct PVFS_servresp_lookup_single_s {
-	PVFS_handle handle;
-	PVFS_object_attr obj_attr;
-};
-typedef struct PVFS_servresp_lookup_single_s PVFS_servresp_lookup_single;
-*/
 
 /* Lookup_Path */
 struct PVFS_servreq_lookup_path_s {
@@ -433,25 +337,12 @@ typedef struct PVFS_servresp_seteattr_s PVFS_servresp_seteattr;
 struct PVFS_servreq_io_s {
 	PVFS_handle handle;
 	PVFS_fs_id fs_id;
-	PVFS_io_op op;
-	//PVFS_Request request;
-	//PVFS_Dist dist;
-	PVFS_boolean atomic;
-	PVFS_boolean conditional;
-	PVFS_Extensions *extensions;
 };
-
 typedef struct PVFS_servreq_io_s PVFS_servreq_io;
-/*
-Issue: We need a pointer for IO extensions.Hence, a ptr has been added
-to the struct.
-*/
 
-/*PVFS I/O response*/
+/* PVFS I/O response */
 struct PVFS_servresp_io_s {
-/*TODO:
- * how should the io responses look?
- */
+
 };
 typedef struct PVFS_servresp_io_s PVFS_servresp_io;
 
