@@ -3114,6 +3114,7 @@ int job_test(job_id_t id,
     return(ret);
 }
 
+#ifdef __PVFS2_JOB_THREADED__
 
 /* job_testsome()
  *
@@ -3131,9 +3132,7 @@ int job_testsome(job_id_t * id_array,
                  job_context_id context_id)
 {
     int ret = -1;
-#ifdef __PVFS2_JOB_THREADED__
     struct timespec pthread_timeout;
-#endif /* __PVFS2_JOB_THREADED__ */
     int timeout_remaining = timeout_ms;
     struct timeval start;
     struct timeval end;
@@ -3231,7 +3230,6 @@ int job_testsome(job_id_t * id_array,
             return (ret);
         }
 
-#ifdef __PVFS2_JOB_THREADED__
         /* figure out how long to wait */
         pthread_timeout.tv_sec = start.tv_sec + timeout_remaining / 1000;
         pthread_timeout.tv_nsec = start.tv_usec * 1000 +
@@ -3249,13 +3247,7 @@ int job_testsome(job_id_t * id_array,
         ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
                                      &pthread_timeout);
         gen_mutex_unlock(&completion_mutex);
-#else
-        if(timeout_ms)
-            do_one_work_cycle_all(10);
-        else
-            do_one_work_cycle_all(0);
-        ret = 0;
-#endif
+
         if (ret == ETIMEDOUT)
         {
             /* nothing completed while we were waiting, trust that the
@@ -3338,6 +3330,210 @@ int job_testsome(job_id_t * id_array,
     return ((total_completed > 0) ? 1 : 0);
 }
 
+#else /* __PVFS2_JOB_THREADED__ */
+
+/* job_testsome()
+ *
+ * check for completion of a set of jobs, don't return until
+ * either all jobs complete or timeout expires 
+ *
+ * returns 0 on success, -errno on failure
+ */
+int job_testsome(job_id_t * id_array,
+                 int *inout_count_p,
+                 int *out_index_array,
+                 void **returned_user_ptr_array,
+                 job_status_s * out_status_array_p,
+                 int timeout_ms,
+                 job_context_id context_id)
+{
+    int ret = -1;
+    int timeout_remaining = timeout_ms;
+    struct timeval start;
+    struct timeval end;
+    int total_completed = 0;
+    int original_count = *inout_count_p;
+    int real_id_count = 0;
+    job_id_t *tmp_id_array = NULL;
+    int i;
+
+    /* count how many of the id's are non zero */
+    for (i = 0; i < original_count; i++)
+    {
+        if (id_array[i])
+        {
+            real_id_count++;
+        }
+    }
+
+    if (!real_id_count)
+    {
+        gossip_lerr("job_testsome() called with nothing to do.\n");
+        return (-EINVAL);
+    }
+
+    /* TODO: here is another cheap shot.  I don't want to special
+     * case the -1 (infinite) timeout possibility right now (maybe
+     * later), but I want the semantics to work.  So.. if that's the
+     * timeout I get, then set the remaining time to the maximum
+     * value that an integer can take on.  That will hold it in
+     * this function for nearly a month. 
+     */
+    if (timeout_ms == -1)
+    {
+        timeout_remaining = INT_MAX;
+    }
+
+    /* use this as a chance to do a cheap test on the request
+     * scheduler
+     */
+    if ((ret = do_one_test_cycle_req_sched()) < 0)
+    {
+        return (ret);
+    }
+
+    /* need to duplicate the id array, so that I have a copy I can
+     * modify
+     */
+    tmp_id_array = (job_id_t *) malloc(original_count * sizeof(job_id_t));
+    if (!tmp_id_array)
+    {
+        return (-errno);
+    }
+    memcpy(tmp_id_array, id_array, (original_count * sizeof(job_id_t)));
+
+    /* check before we do anything else to see if the job that we
+     * want is in the completion queue
+     */
+    gen_mutex_lock(&completion_mutex);
+    ret = completion_query_some(tmp_id_array,
+                                inout_count_p, out_index_array,
+                                returned_user_ptr_array,
+                                out_status_array_p);
+    gen_mutex_unlock(&completion_mutex);
+
+    /* return here on error or completion */
+    if (ret < 0)
+    {
+        free(tmp_id_array);
+        return (ret);
+    }
+
+    if (ret > 0)
+    {
+        free(tmp_id_array);
+        return (1);
+    }
+
+    for (i = 0; i < (*inout_count_p); i++)
+    {
+        tmp_id_array[out_index_array[i]] = 0;
+    }
+    total_completed += *inout_count_p;
+    *inout_count_p = original_count;
+
+    /* if we fall through to this point, then we need to just try
+     * to eat up the timeout until the jobs that we want hit the
+     * completion queue
+     */
+    do
+    {
+        ret = gettimeofday(&start, NULL);
+        if (ret < 0)
+        {
+            free(tmp_id_array);
+            return (ret);
+        }
+
+        if(timeout_ms)
+            do_one_work_cycle_all(10);
+        else
+            do_one_work_cycle_all(0);
+        ret = 0;
+        if (ret == ETIMEDOUT)
+        {
+            /* nothing completed while we were waiting, trust that the
+             * timedwait got the timing right
+             */
+            free(tmp_id_array);
+            *inout_count_p = total_completed;
+            return (0);
+        }
+        else if ((ret != 0) && (ret != EINTR) && (ret != EINVAL))
+        {
+            /* error */
+            free(tmp_id_array);
+            return (-ret);
+        }
+        else
+        {
+            gen_mutex_lock(&completion_mutex);
+            if(returned_user_ptr_array)
+            {
+                ret = completion_query_some(tmp_id_array,
+                                            inout_count_p,
+                                            &out_index_array[total_completed],
+                                            &returned_user_ptr_array
+                                            [total_completed],
+                                            &out_status_array_p
+                                            [total_completed]);
+            }
+            else
+            {
+                ret = completion_query_some(tmp_id_array,
+                                            inout_count_p,
+                                            &out_index_array[total_completed],
+                                            NULL,
+                                            &out_status_array_p
+                                            [total_completed]);
+            }
+            gen_mutex_unlock(&completion_mutex);
+
+            /* return here on error or completion */
+            if (ret < 0)
+            {
+                free(tmp_id_array);
+                return (ret);
+            }
+            if (ret > 0)
+            {
+                *inout_count_p = real_id_count;
+                free(tmp_id_array);
+                return (1);
+            }
+
+            for (i = 0; i < (*inout_count_p); i++)
+            {
+                tmp_id_array[out_index_array[i + total_completed]] = 0;
+            }
+            total_completed += *inout_count_p;
+            *inout_count_p = original_count;
+        }
+
+        /* if we fall to here, see how much time has expired and
+         * sleep/work again if we need to
+         */
+        ret = gettimeofday(&end, NULL);
+        if (ret < 0)
+        {
+            free(tmp_id_array);
+            return (ret);
+        }
+
+        timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
+            (end.tv_usec - start.tv_usec) / 1000;
+
+    } while (timeout_remaining > 0);
+
+    /* fall through, not everything is done, time is used up */
+    *inout_count_p = total_completed;
+    free(tmp_id_array);
+
+    return ((total_completed > 0) ? 1 : 0);
+}
+#endif /* __PVFS2_JOB_THREADED__ */
+
+#ifdef __PVFS2_JOB_THREADED__
 /* job_testcontext()
  *
  * check for completion of any jobs currently in progress.  Don't return
@@ -3354,9 +3550,7 @@ int job_testcontext(job_id_t * out_id_array_p,
                     job_context_id context_id)
 {
     int ret = -1;
-#ifdef __PVFS2_JOB_THREADED__
     struct timespec pthread_timeout;
-#endif /* __PVFS2_JOB_THREADED__ */
     int timeout_remaining = timeout_ms;
     struct timeval start;
     struct timeval end;
@@ -3416,7 +3610,6 @@ int job_testcontext(job_id_t * out_id_array_p,
             return (ret);
         }
 
-#ifdef __PVFS2_JOB_THREADED__
         /* figure out how long to wait */
         pthread_timeout.tv_sec = start.tv_sec + timeout_remaining / 1000;
         pthread_timeout.tv_nsec = start.tv_usec * 1000 +
@@ -3434,18 +3627,7 @@ int job_testcontext(job_id_t * out_id_array_p,
         ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
                                      &pthread_timeout);
         gen_mutex_unlock(&completion_mutex);
-#else
-        if (timeout_ms)
-        {
-            do_one_work_cycle_all(10);
-        }
-        else
-        {
-            do_one_work_cycle_all(0);
-        }
 
-        ret = 0;
-#endif
         if (ret == ETIMEDOUT)
         {
             /* nothing completed while we were waiting, trust that the
@@ -3516,6 +3698,165 @@ int job_testcontext(job_id_t * out_id_array_p,
 
     return (0);
 }
+
+#else /* __PVFS2_JOB_THREADED__ */
+
+/* job_testcontext()
+ *
+ * check for completion of any jobs currently in progress.  Don't return
+ * until either at least one job has completed or the timeout has
+ * expired
+ *
+ * returns 0 on success, -errno on failure
+ */
+int job_testcontext(job_id_t * out_id_array_p,
+                    int *inout_count_p,
+                    void **returned_user_ptr_array,
+                    job_status_s * out_status_array_p,
+                    int timeout_ms,
+                    job_context_id context_id)
+{
+    int ret = -1;
+    int timeout_remaining = timeout_ms;
+    struct timeval start;
+    struct timeval end;
+    int original_count = *inout_count_p;
+
+    /* TODO: here is another cheap shot.  I don't want to special
+     * case the -1 (infinite) timeout possibility right now (maybe
+     * later), but I want the semantics to work.  So.. if that's the
+     * timeout I get, then set the remaining time to the maximum
+     * value that an integer can take on.  That will hold it in
+     * this function for nearly a month. 
+     */
+    if (timeout_ms == -1)
+    {
+        timeout_remaining = INT_MAX;
+    }
+
+    /* use this as a chance to do a cheap test on the request
+     * scheduler
+     */
+    if ((ret = do_one_test_cycle_req_sched()) < 0)
+    {
+        return (ret);
+    }
+
+    /* check before we do anything else to see if the completion queue
+     * has anything in it
+     */
+    gen_mutex_lock(&completion_mutex);
+    ret = completion_query_context(out_id_array_p,
+                                 inout_count_p,
+                                 returned_user_ptr_array,
+                                 out_status_array_p, context_id);
+    gen_mutex_unlock(&completion_mutex);
+    /* return here on error or completion */
+    if (ret < 0)
+    {
+        return (ret);
+    }
+
+    if (ret > 0)
+    {
+        return (1);
+    }
+
+    *inout_count_p = original_count;
+
+    /* if we fall through to this point, then we need to just try
+     * to eat up the timeout until the jobs that we want hit the
+     * completion queue
+     */
+    do
+    {
+        ret = gettimeofday(&start, NULL);
+        if (ret < 0)
+        {
+            return (ret);
+        }
+
+        if (timeout_ms)
+        {
+            do_one_work_cycle_all(10);
+        }
+        else
+        {
+            do_one_work_cycle_all(0);
+        }
+
+        ret = 0;
+        if (ret == ETIMEDOUT)
+        {
+            /* nothing completed while we were waiting, trust that the
+             * timedwait got the timing right
+             */
+            *inout_count_p = 0;
+            return (0);
+        }
+        else if ((ret != 0) && (ret != EINTR) && (ret != EINVAL))
+        {
+            /*
+              the above check will skip returning the error on
+              success, EINTR, or EINVAL and just continue processing
+
+              NOTE: although not documented in the GNU/Linux manpage
+              POSIX says that pthread_cond_timedwait can return a
+              value of 22 (which corresponds to EINVAL) if the abstime
+              parameter is invalid -- i.e. smaller than (or equal to)
+              the system time.
+
+              for more information:
+              http://nptl.bullopensource.org/phpBB/viewtopic.php?t=19
+            */
+
+            /* any other value we treat as a real error */
+            return (-ret);
+        }
+        else
+        {
+            /* check queue now to see if anything is done */
+            gen_mutex_lock(&completion_mutex);
+            ret = completion_query_context(out_id_array_p,
+                                         inout_count_p,
+                                         returned_user_ptr_array,
+                                         out_status_array_p,
+                                         context_id);
+            gen_mutex_unlock(&completion_mutex);
+            /* return here on error or completion */
+            if (ret < 0)
+            {
+                return (ret);
+            }
+
+            if (ret  > 0)
+            {
+                return (1);
+            }
+
+            *inout_count_p = original_count;
+        }
+
+        /* if we fall to here, see how much time has expired and
+         * sleep/work again if we need to
+         */
+        ret = gettimeofday(&end, NULL);
+        if (ret < 0)
+        {
+            return (ret);
+        }
+
+        timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
+            ((end.tv_usec - start.tv_usec) / 1000);
+
+    } while (timeout_remaining > 0);
+
+    /* fall through, nothing done, time is used up */
+    *inout_count_p = 0;
+
+    return (0);
+}
+#endif /* __PVFS2_JOB_THREADED__ */
 
 
 /*********************************************************
