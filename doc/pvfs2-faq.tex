@@ -138,6 +138,32 @@ Absolutely!  Any PVFS2 server can store either metadata, data, or both.
 Simply allocate unique MetaHandleRanges for each server that you would like to
 store metadata; the clients will handle the rest.
 
+\subsection{Can PVFS2 servers listen on two interfaces (multihome)}
+
+PVFS2 servers currently listen on one interface at a time.  Multihome support,
+wehre a PVFS2 server can accept connections from several network interfaces,
+would be helpful in many situations.  We will implement this feature at some
+point, but not in the next few releases.
+
+\subsection{PVFS2 and automount}
+
+The Linux automounter needs some help dealing with PVFS2's resource strings.  A
+typical mount command would look like this:
+
+\begin{verbatim}
+	mount -t pvfs2 tcp://server0:3334/pvfs2-fs /mnt/pvfs2
+\end{verbatim}
+
+The entry in the automount config file should look like this:
+
+\begin{verbatim}
+	pvfs -fstype=pvfs2           :tcp://cave0\:3334/pvfs2-fs
+\end{verbatim}
+
+Note the backslash-escape of the colon before the port number.  Without that
+escape, the automounter will get confused and replace \texttt{'tcp://'} with
+\texttt{'tcp:///'}
+
 %
 % REPORTING PROBLEMS
 %
