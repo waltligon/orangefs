@@ -72,7 +72,7 @@ int gui_comm_setup(void)
 			   0, mnt.ptab_array[i].mnt_dir,
 			   1, msgbuf,
 			   2, mnt.ptab_array[i].pvfs_fs_name,
-			   3, (gint) resp_init.fsid_list[0],
+			   3, (gint) resp_init.fsid_list[i],
 			   -1);
     }
 
