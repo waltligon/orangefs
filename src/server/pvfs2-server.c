@@ -855,7 +855,9 @@ static void server_state_table_initialize(void)
     PINT_server_op_table[PVFS_SERV_FLUSH]	  = &pvfs2_flush_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_SETPARAM] = &pvfs2_setparam_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_NOOP]     = &pvfs2_noop_sm;
+    /*
     PINT_server_op_table[PVFS_SERV_STATFS]	  = &pvfs2_statfs_sm;
+    */
 }
 
 /* server_state_machine_complete()

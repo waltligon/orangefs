@@ -155,15 +155,11 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
 
     error = sm_p->error_code;
 
-    /*
-      invalidate pinode entry's size on write (and the meta
-      distribution to force a recomputation), if pinode exists
-    */
+    /* invalidate pinode entry's size on write if pinode exists */
     if (sm_p->pcache_hit && (io_type == PVFS_IO_WRITE))
     {
         /* invalidate the size attribute in the pinode */
-        sm_p->pinode->attr.mask &=
-            ~(PVFS_ATTR_DATA_SIZE | PVFS_ATTR_META_DIST);
+        sm_p->pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
 
         PINT_pcache_set_valid(sm_p->pinode);
         PINT_pcache_release(sm_p->pinode);
