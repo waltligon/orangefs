@@ -786,14 +786,17 @@ cleaner: clean
 	rm -f pvfs2-@PVFS2_VERSION@.tar.gz
 
 # _really_ clean the tree; should go back to pristine state
+# except, don't remove generated .c files if this is a distributed release
 distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
-	rm -f $(SMCGEN)
-	rm -f $(TROVE_AUTOGEN_FILES)
 	rm -f Makefile pvfs2-config.h
 	rm -f src/server/simple.conf
 	rm -f src/server/server.conf-localhost
 	rm -f .libs
+ifndef DIST_RELEASE
+	rm -f $(TROVE_AUTOGEN_FILES)
+	rm -f $(SMCGEN)
+endif
 
 # this is where we include all of our automatic dependencies.
 # NOTE: we wrap this in ifneq's in order to prevent the
