@@ -147,9 +147,6 @@ int PVFS_sys_mkdir_old(char* entry_name, PVFS_pinode_reference parent_refn,
     req_p.u.mkdir.attr.mask |= PVFS_ATTR_COMMON_TYPE;
     req_p.u.mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;
 
-    fprintf(stderr,"PASSING MKDIR ATTR MASK OF %d\n",
-            req_p.u.mkdir.attr.mask);
-
     max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op, 
 	PINT_CLIENT_ENC_TYPE);
 

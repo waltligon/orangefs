@@ -368,8 +368,7 @@ do {							\
         (__ext_array.extent_array);			\
     PINT_CONVERT_ATTR(&(__req).u.mkdir.attr,		\
        &(__attr), PVFS_ATTR_COMMON_ALL);		\
-    (__req).u.mkdir.attr.mask &=			\
-        PVFS_ATTR_SYS_ALL_NOSIZE;			\
+    (__req).u.mkdir.attr.mask &= (__amask);		\
     (__req).u.mkdir.attr.mask |= PVFS_ATTR_COMMON_TYPE;	\
     (__req).u.mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;	\
 } while (0)
