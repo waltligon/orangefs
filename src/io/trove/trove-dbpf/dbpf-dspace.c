@@ -1023,7 +1023,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
 	        break;
 	    case BSTREAM_WRITE_LIST:
-		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+		DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, cur_op->op.id); 
 		break;
 	    default:
 		break;
@@ -1089,7 +1089,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
 	        break;
 	    case BSTREAM_WRITE_LIST:
-		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+		DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, cur_op->op.id); 
 		break;
 	    default:
 		break;
@@ -1167,7 +1167,7 @@ int dbpf_dspace_testcontext(
 		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
 		break;
 	    case BSTREAM_WRITE_LIST:
-		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+		DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, cur_op->op.id); 
 		break;
 	    default:
 		break;
@@ -1321,7 +1321,7 @@ static int dbpf_dspace_testsome(
 		    DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
 		    break;
 		case BSTREAM_WRITE_LIST:
-		    DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+		    DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, cur_op->op.id); 
 		    break;
 		default:
 		    break;

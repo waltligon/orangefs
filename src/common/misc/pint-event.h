@@ -13,7 +13,7 @@
 #include "pvfs2-event.h"
 
 /* TODO: put this value somewhere else? read from config file? */
-#define PINT_EVENT_DEFAULT_RING_SIZE 2000
+#define PINT_EVENT_DEFAULT_RING_SIZE 4000
 
 /* variables that provide runtime control over which events are recorded */
 extern int PINT_event_on;
