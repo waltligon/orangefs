@@ -227,7 +227,8 @@ static void gui_traffic_graph_draw(void)
 	leftspace = 20, rightspace = 20;
     char *io_string, *meta_string;
     gint width, height;
-    float tmp, max_magnitude, max_r, max_w, max_rm, max_wm, max_m, max_bw;
+    float tmp = 0.0, max_magnitude, max_r, max_w, max_rm, max_wm, max_m,
+	max_bw;
     GdkRectangle update_rect;
 
     /* grab width, height */
