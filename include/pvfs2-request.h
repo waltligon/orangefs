@@ -10,6 +10,8 @@
 
 #include <pvfs2-types.h>
 
+#define PVFS_BOTTOM NULL
+
 typedef struct PINT_Request *PVFS_Request;
 
 int PVFS_Request_contiguous(int32_t count, PVFS_Request oldreq,
