@@ -2,7 +2,7 @@
 %
 \documentclass[11pt, letterpaper]{article}
 \usepackage[dvips]{graphicx}
-\usepackage{html}
+%\usepackage{html}
 \usepackage{psfig}
 \usepackage{rotating}
 \usepackage{times}
@@ -544,11 +544,11 @@ each machine.
 
 \begin{verbatim}
 root@cluster1:~# for i in `seq 1 8`; do
-> scp /etc/pvfs2-server.conf-cluster${i} cluster${i}:/etc/
-> scp /etc/pvfs2-fs.conf cluster${i}:/etc/
+> scp /etc/pvfs2-server.conf-cluster\${i} cluster\${i}:/etc/
+> scp /etc/pvfs2-fs.conf cluster\${i}:/etc/
 > scp /usr/src/pvfs2/examples/pvfs2-server.rc \
-    cluster${i}:/etc/rc.d/init.d/pvfs2-server
-> ssh cluster${i} /sbin/chkconfig pvfs2-server on
+    cluster\${i}:/etc/rc.d/init.d/pvfs2-server
+> ssh cluster\${i} /sbin/chkconfig pvfs2-server on
 > done
 \end{verbatim}
 
@@ -738,7 +738,7 @@ NOTE: The device of the format tcp://testhost:3334/pvfs2-fs MUST be
 specified, as we need to know a valid running pvfs2-server and file
 system name to dynamically mount a pvfs2 volume.  These values can be
 read from your configuration files.  As a side note, you can use
-'umount' to unmount the PVFS2 volume when you're read.
+'umount' to unmount the PVFS2 volume when you're ready.
 
 Now that a PVFS2 volume is mounted, normal VFS operation can be issued
 on the command line.  An example is provided below:
@@ -826,15 +826,14 @@ Building ROMIO with PVFS2 support can be a bit tricky, and is certainly
 not well documented.  While ROMIO has been updated with PVFS2 support,
 only MPICH2 has included a recent snapshot of ROMIO.  
 
-First, get the software.  Download MPICH2 from \htmladdnormallink{
-http://www.mcs.anl.gov/mpi/mpich2/}{http://www.mcs.anl.gov/mpi/mpich2/}.
-While MPICH2 contains a ROMIO with PVFS2 support, the PVFS2 API has
-continued to stabalize since MPICH2 was last released.  Patches to
-syncronize the ROMIO in MPICH2 with PVFS2 can be found at
-\htmladdnormallink{
-http://www.mcs.anl.gov/romio/pvfs2-patches.html}{http://www.mcs.anl.gov/romio/pvfs2-patches.html}.
-There is also a patch in the PVFS2 source in {\tt doc/coding}. For
-example's sake, assume all software was downloaded to {\tt \$\{HOME\}/src}. 
+First, get the software.  Download MPICH2 from
+http://www.mcs.anl.gov/mpi/mpich2/.  While MPICH2 contains a ROMIO
+with PVFS2 support, the PVFS2 API has continued to stabilize since
+MPICH2 was last released.  Patches to syncronize the ROMIO in MPICH2
+with PVFS2 can be found at
+http://www.mcs.anl.gov/romio/pvfs2-patches.html.  There is also a
+patch in the PVFS2 source in {\tt doc/coding}. For example's sake,
+assume all software was downloaded to {\tt \$\{HOME\}/src}.
 
 Unpack mpich2, then change to the src/mpi/romio directory.  Apply the
 ROMIO patch.  The patch makes changes to the ROMIO configure scripts, so you'll have to re-run {\tt autoconf} to generate a new configure file.
