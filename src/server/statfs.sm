@@ -106,6 +106,10 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
                 system_metrics.uptime;
         }
     }
+#else
+    s_op->resp.u.statfs.stat.ram_total_bytes = 0;
+    s_op->resp.u.statfs.stat.ram_free_bytes = 0;
+    s_op->resp.u.statfs.stat.uptime_seconds = 0;
 #endif
 
     if (ret != 1)

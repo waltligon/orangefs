@@ -199,7 +199,6 @@ int main(int argc, char **argv)
 	{
 	    printf("server: %s\n", stat_array[i].bmi_address);
 
-#ifdef HAVE_SYSINFO
 	    if (user_opts->human_readable)
             {
 		PVFS_util_make_size_human_readable(
@@ -223,7 +222,6 @@ int main(int argc, char **argv)
                 printf("\tuptime (seconds) : %Lu\n",
                        Lu(stat_array[i].uptime_seconds));
             }
-#endif
 	    printf("\thandles available: %Lu\n",
                    Lu(stat_array[i].handles_available_count));
 	    printf("\thandles total    : %Lu\n",

@@ -194,7 +194,6 @@ typedef enum PVFS_ds_type_e PVFS_ds_type;
 #define PVFS_ATTR_SYS_ALL_SETABLE (PVFS_ATTR_COMMON_ALL-PVFS_ATTR_COMMON_TYPE)
 
 /* statfs and misc server statistic information */
-#ifdef HAVE_SYSINFO
 struct PVFS_statfs_s
 {
     PVFS_fs_id fs_id;
@@ -217,24 +216,6 @@ endecode_fields_8(
     uint64_t, uptime_seconds,
     uint64_t, handles_available_count,
     uint64_t, handles_total_count);
-#else /* HAVE_SYSINFO */
-struct PVFS_statfs_s
-{
-    PVFS_fs_id fs_id;
-    PVFS_size bytes_available;
-    PVFS_size bytes_total;
-    uint64_t handles_available_count;
-    uint64_t handles_total_count;
-};
-typedef struct PVFS_statfs_s PVFS_statfs;
-endecode_fields_5(
-    PVFS_statfs,
-    PVFS_fs_id, fs_id,
-    PVFS_size, bytes_available,
-    PVFS_size, bytes_total,
-    uint64_t, handles_available_count,
-    uint64_t, handles_total_count);
-#endif /* HAVE_SYSINFO */
 
 /* pinode reference (uniquely refers to a single pinode) */
 struct PVFS_pinode_reference_s
