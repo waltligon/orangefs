@@ -1126,7 +1126,6 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = NULL;
     int ret = -1;
-    PVFS_size extent = 0;
 
     /* allocate the structure */
     flow_data = (struct bmi_trove_flow_data *) malloc(sizeof(struct
@@ -1143,42 +1142,12 @@ static int alloc_flow_data(flow_descriptor * flow_d)
     if (flow_d->src.endpoint_id == BMI_ENDPOINT &&
 	flow_d->dest.endpoint_id == MEM_ENDPOINT)
     {
-	/* sanity check size of mem buffer */
-	ret = PVFS_Request_extent(flow_d->request, &extent);
-	if (ret < 0)
-	{
-	    free(flow_data);
-	    return (ret);
-	}
-
-	if (extent > flow_d->dest.u.mem.size)
-	{
-	    gossip_lerr("Error: buffer not large enough for request.\n");
-	    free(flow_data);
-	    return (-EINVAL);
-	}
-
 	flow_data->type = BMI_TO_MEM;
 	ret = buffer_setup_bmi_to_mem(flow_d);
     }
     else if (flow_d->src.endpoint_id == MEM_ENDPOINT &&
 	     flow_d->dest.endpoint_id == BMI_ENDPOINT)
     {
-	/* sanity check size of mem buffer */
-	ret = PVFS_Request_extent(flow_d->request, &extent);
-	if (ret < 0)
-	{
-	    free(flow_data);
-	    return (ret);
-	}
-
-	if (extent > flow_d->src.u.mem.size)
-	{
-	    gossip_lerr("Error: buffer not large enough for request.\n");
-	    free(flow_data);
-	    return (-EINVAL);
-	}
-
 	flow_data->type = MEM_TO_BMI;
 	ret = buffer_setup_mem_to_bmi(flow_d);
     }
