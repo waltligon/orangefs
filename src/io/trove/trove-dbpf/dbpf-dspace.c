@@ -163,8 +163,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
           the specified range that we're given
         */
         new_handle = trove_handle_alloc_from_range(
-            op_p->coll_p->coll_id,
-            &op_p->u.d_create.extent_array);
+            op_p->coll_p->coll_id, &op_p->u.d_create.extent_array);
     }
 
     gossip_debug(TROVE_DEBUG, "[%d extents] -- new_handle is %Ld "
@@ -196,12 +195,15 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 
     /* check to see if handle is already used */
     ret = db_p->get(db_p, NULL, &key, &data, 0);
-    if (ret == 0) {
+    if (ret == 0)
+    {
 	gossip_debug(TROVE_DEBUG, "handle already exists...\n");
 	return -1;
     }
-    if (ret != DB_NOTFOUND) {
+    if (ret != DB_NOTFOUND)
+    {
 	gossip_err("error in dspace create (db_p->get failed).\n");
+        trove_handle_free(op_p->coll_p->coll_id, new_handle);
 	return -1;
     }
     
@@ -211,13 +213,19 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     
     /* create new dataspace entry */
     ret = db_p->put(db_p, NULL, &key, &data, 0);
-    if (ret != 0) {
+    if (ret != 0)
+    {
+	gossip_err("error in dspace create (db_p->put failed).\n");
+        trove_handle_free(op_p->coll_p->coll_id, new_handle);
 	goto return_error;
     }
     
     /* sync if requested by the user */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = db_p->sync(db_p, 0)) != 0) {
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
+            gossip_err("error in dspace create (db_p->sync failed).\n");
 	    goto return_error;
 	}
     }
