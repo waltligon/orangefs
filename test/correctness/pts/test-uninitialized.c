@@ -219,7 +219,7 @@ static int test_create(void)
 
     ret =
 	PVFS_sys_create(filename, resp_look.ref, attr, credentials,
-			&resp_create);
+			NULL, &resp_create);
     return ret;
 }
 

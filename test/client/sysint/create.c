@@ -80,7 +80,7 @@ int main(int argc, char **argv)
            str_buf, Lu(parent_refn.handle));
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          credentials, &resp_create);
+                          credentials, NULL, &resp_create);
     if (ret < 0)
     {
         PVFS_perror("create failed with errcode", ret);

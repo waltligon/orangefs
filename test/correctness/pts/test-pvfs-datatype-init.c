@@ -86,7 +86,7 @@ int test_pvfs_datatype_init(
 		time(NULL);
 
             ret = PVFS_sys_create(&(filename[1]),resp_lk.ref,
-                                  attr, credentials, &resp_cr);
+                                  attr, credentials, NULL, &resp_cr);
             if ((ret < 0) || (!resp_cr.ref.handle))
             {
                 debug_printf("Error: PVFS_sys_create() failure.\n");

@@ -49,6 +49,15 @@ struct PVFS_sys_mntent
     char *mnt_opts;		/* full option list */
 };
 
+/* describes file distribution parameters */
+struct PVFS_sys_dist_s
+{
+    /* empty for now; this is just a stub so that we can start getting the
+     * arguments right on existing system interface functions
+     */
+};
+typedef struct PVFS_sys_dist_s PVFS_sys_dist;
+
 /* lookup (request and response) */
 struct PVFS_sysresp_lookup_s
 {
@@ -207,6 +216,7 @@ int PVFS_sys_create(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
     PVFS_credentials credentials,
+    PVFS_sys_dist* dist,
     PVFS_sysresp_create * resp);
 
 int PVFS_sys_remove(

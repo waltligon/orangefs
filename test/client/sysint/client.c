@@ -122,7 +122,7 @@ int main(
 
     // call create 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			  credentials, resp_create);
+			  credentials, NULL, resp_create);
     if (ret < 0)
     {
 	printf("create failed with errcode = %d\n", ret);

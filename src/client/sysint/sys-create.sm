@@ -216,6 +216,7 @@ int PVFS_sys_create(
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
     PVFS_credentials credentials,
+    PVFS_sys_dist* dist,
     PVFS_sysresp_create *resp)
 {
     int ret = -PVFS_EINVAL;
@@ -223,6 +224,9 @@ int PVFS_sys_create(
     PVFS_error error;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
+
+    /* we have not yet implemented hooks for user specified distributions */
+    assert(dist == NULL);
 
     /* parameter checking goes here.  assume everything from the user
      * is ok past this point.

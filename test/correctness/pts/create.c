@@ -46,7 +46,7 @@ static int create_file(PVFS_fs_id fs_id,
 
     memset(&resp_create,0,sizeof(resp_create));
     ret = PVFS_sys_create(filename, resp_look.ref,
-                          attr, credentials, &resp_create);
+                          attr, credentials, NULL, &resp_create);
     if (ret < 0)
     {
 	printf("create failed with errcode = %d\n", ret);

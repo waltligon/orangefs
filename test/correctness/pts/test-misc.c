@@ -690,7 +690,7 @@ static int test_files_as_dirs(int testcase)
 	}
 
 	ret = PVFS_sys_create("foo", resp_look.ref, attr, credentials,
-                           &resp_create);
+                           NULL, &resp_create);
 	//get root
 	ret = PVFS_sys_lookup(fs_id, "/foo", credentials,
                               &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -701,7 +701,7 @@ static int test_files_as_dirs(int testcase)
 	}
 
 	ret = PVFS_sys_create("bar", resp_look.ref, attr, credentials,
-                           &resp_create);
+                           NULL, &resp_create);
 	break;
     case 1:
 	//Need to add some more interesting cases
@@ -920,19 +920,19 @@ static int init_files(void)
     }
 
     ret = PVFS_sys_create(filename, resp_look.ref, attr, credentials,
-                           &resp_create);
+                           NULL, &resp_create);
 
     /* create sparse file */
     filename = strcpy(filename, "sparse");
 
     ret = PVFS_sys_create(filename, resp_look.ref, attr, credentials,
-                           &resp_create);
+                           NULL, &resp_create);
 
     /* create a file for testing alocate and truncate*/
     filename = strcpy(filename, "altrun");
 
     ret = PVFS_sys_create(filename, resp_look.ref, attr, credentials,
-                           &resp_create);
+                           NULL, &resp_create);
 
 
     filename = strcpy(filename, "invalid_perms");
@@ -957,7 +957,7 @@ static int init_files(void)
     }
 
     return PVFS_sys_create(filename, resp_look.ref, attr, credentials,
-                           &resp_create);
+                           NULL, &resp_create);
 }   
 
 

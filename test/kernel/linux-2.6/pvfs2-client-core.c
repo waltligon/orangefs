@@ -127,7 +127,7 @@ static int service_create_request(
             Lu(parent_refn.handle));
 
         ret = PVFS_sys_create(in_upcall->req.create.d_name, parent_refn,
-                              *attrs, in_upcall->credentials, &response);
+                              *attrs, in_upcall->credentials, NULL, &response);
         if (ret < 0)
         {
             /*

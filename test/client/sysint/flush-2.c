@@ -130,7 +130,7 @@ int main(
 	entry_name = &(filename[1]);	/* leave off slash */
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      credentials, &resp_cr);
+			      credentials, NULL, &resp_cr);
 	if (ret < 0)
 	{
 	    fprintf(stderr, "Error: PVFS_sys_create() failure.\n");

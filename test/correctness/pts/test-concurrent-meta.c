@@ -191,7 +191,7 @@ static int create_file(char *filename, char *directory, int fs_id)
     }
 
     ret = PVFS_sys_create(filename, resp_look.ref,
-                          attr, credentials, &resp_create);
+                          attr, credentials, NULL, &resp_create);
    return ret;
 }
 
