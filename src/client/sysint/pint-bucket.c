@@ -283,7 +283,7 @@ int PINT_bucket_get_next_io(
 
 /* PINT_bucket_map_to_server()
  *
- * maps from a bucket and fsid to a server address
+ * maps from a handle and fsid to a server address
  *
  * returns 0 on success to -errno on failure
  */
@@ -293,45 +293,12 @@ int PINT_bucket_map_to_server(
 	PVFS_fs_id fsid)
 {
     int ret = -EINVAL;
-    char *bmi_server_addr = (char *)0;
-    struct llist *cur = NULL;
-    struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
-    struct qlist_head *hash_link = NULL;
-    struct config_fs_cache_s *cur_config_cache = NULL;
-
-    assert(s_fsid_config_cache_table);
-
-    hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
-    if (hash_link)
-    {
-        cur_config_cache =
-            qlist_entry(hash_link, struct config_fs_cache_s,
-                        hash_link);
-        assert(cur_config_cache);
-        assert(cur_config_cache->fs);
-        assert(cur_config_cache->bmi_host_extent_tables);
-
-        cur = cur_config_cache->bmi_host_extent_tables;
-        while(cur)
-        {
-            cur_host_extent_table = llist_head(cur);
-            if (!cur_host_extent_table)
-            {
-                break;
-            }
-            assert(cur_host_extent_table->bmi_address);
-            assert(cur_host_extent_table->extent_list);
-
-            if (PINT_handle_in_extent_list(
-                    cur_host_extent_table->extent_list, handle))
-            {
-                bmi_server_addr = cur_host_extent_table->bmi_address;
-                ret = 0;
-                break;
-            }
-            cur = llist_next(cur);
-        }
-    }
+    char bmi_server_addr[1024] = {0};
+    /*
+      FIXME: is there a limits.h file that defines the max length
+      of a legal bmi_server URL?  If so, replace '1024' with it
+    */
+    ret = PINT_bucket_get_server_name(bmi_server_addr,1024,handle,fsid);
     return (((ret == 0) && bmi_server_addr) ?
             BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
 }
@@ -379,35 +346,23 @@ int PINT_bucket_map_from_server(
 int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
 {
     int ret = -EINVAL;
-    struct llist *cur = NULL;
-    struct filesystem_configuration_s *cur_fs = NULL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
 
-    /* make sure the specified fs_id is sane */
-    if (!PINT_server_config_is_valid_collection_id(
-            &g_server_config,(TROVE_coll_id)fsid))
+    if (num_meta)
     {
-        gossip_lerr("PINT_bucket_get_num_meta() called with invalid fs_id.\n");
-        return(-EINVAL);
-    }
+        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        if (hash_link)
+        {
+            cur_config_cache =
+                qlist_entry(hash_link, struct config_fs_cache_s,
+                            hash_link);
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
 
-    cur = g_server_config.file_systems;
-    while(cur)
-    {
-        cur_fs = llist_head(cur);
-        if (!cur_fs)
-        {
-            break;
+            *num_meta = llist_count(cur_config_cache->fs->meta_server_list);
+            ret = 0;
         }
-        if (fsid == (PVFS_fs_id)cur_fs->coll_id)
-        {
-            if (cur_fs->meta_server_list)
-            {
-                *num_meta = llist_count(cur_fs->meta_server_list);
-                ret = 0;
-            }
-            break;
-        }
-        cur = llist_next(cur);
     }
     return ret;
 }
@@ -421,35 +376,23 @@ int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
 int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
 {
     int ret = -EINVAL;
-    struct llist *cur = NULL;
-    struct filesystem_configuration_s *cur_fs = NULL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
 
-    /* make sure the specified fs_id is sane */
-    if (!PINT_server_config_is_valid_collection_id(
-            &g_server_config,(TROVE_coll_id)fsid))
+    if (num_io)
     {
-        gossip_lerr("PINT_bucket_get_num_meta() called with invalid fs_id.\n");
-        return(-EINVAL);
-    }
+        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        if (hash_link)
+        {
+            cur_config_cache =
+                qlist_entry(hash_link, struct config_fs_cache_s,
+                            hash_link);
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
 
-    cur = g_server_config.file_systems;
-    while(cur)
-    {
-        cur_fs = llist_head(cur);
-        if (!cur_fs)
-        {
-            break;
+            *num_io = llist_count(cur_config_cache->fs->data_server_list);
+            ret = 0;
         }
-        if (fsid == (PVFS_fs_id)cur_fs->coll_id)
-        {
-            if (cur_fs->data_server_list)
-            {
-                *num_io = llist_count(cur_fs->data_server_list);
-                ret = 0;
-            }
-            break;
-        }
-        cur = llist_next(cur);
     }
     return ret;
 }
@@ -462,36 +405,61 @@ int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
  * returns 0 on success, -errno on failure
  */
 int PINT_bucket_get_server_name(
-	char* server_name,
-	int max_server_name_len,
-	PVFS_handle handle,
-	PVFS_fs_id fsid)
+    char* server_name,
+    int max_server_name_len,
+    PVFS_handle handle,
+    PVFS_fs_id fsid)
 {
     int ret = -EINVAL;
+    int len = 0;
+    struct llist *cur = NULL;
+    struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
 
-    /* make sure the specified fs_id is sane */
-    if (!PINT_server_config_is_valid_collection_id(
-            &g_server_config,(TROVE_coll_id)fsid))
+    assert(s_fsid_config_cache_table);
+
+    hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+    if (hash_link)
     {
-        gossip_lerr("PINT_bucket_get_server_name() called with invalid fs_id.\n");
-        return(-EINVAL);
+        cur_config_cache =
+            qlist_entry(hash_link, struct config_fs_cache_s,
+                        hash_link);
+        assert(cur_config_cache);
+        assert(cur_config_cache->fs);
+        assert(cur_config_cache->bmi_host_extent_tables);
+
+        cur = cur_config_cache->bmi_host_extent_tables;
+        while(cur)
+        {
+            cur_host_extent_table = llist_head(cur);
+            if (!cur_host_extent_table)
+            {
+                break;
+            }
+            assert(cur_host_extent_table->bmi_address);
+            assert(cur_host_extent_table->extent_list);
+
+            if (PINT_handle_in_extent_list(
+                    cur_host_extent_table->extent_list, handle))
+            {
+                len = strlen(cur_host_extent_table->bmi_address) + 1;
+                len = ((len < max_server_name_len) ? len :
+                       max_server_name_len);
+                memcpy(server_name,cur_host_extent_table->bmi_address,len);
+                server_name[len-1] = '\0';
+                ret = 0;
+                break;
+            }
+            cur = llist_next(cur);
+        }
     }
-
-    /*
-      hash from fsid to struct
-      
-    */
-
-    memcpy(server_name,HACK_server_name,max_server_name_len);
-    server_name[max_server_name_len] = '\0';
-    ret = 0;
-
     return ret;
 }
 
 /* PINT_bucket_get_root_handle()
  *
- * return the root handle of any filesystem
+ * return the root handle of any valid filesystem
  *
  * returns 0 on success -errno on failure
  *
