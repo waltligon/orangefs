@@ -472,7 +472,7 @@ struct PINT_Request_state *PINT_New_request_state (PINT_Request *request)
 {
 	struct PINT_Request_state *req;
 	int32_t rqdepth;
-	gossip_debug(REQUEST_DEBUG,"PINT_New_request_state\n",__func__);
+	gossip_debug(REQUEST_DEBUG,"PINT_New_request_state\n");
 	if (!(req = (struct PINT_Request_state *)malloc(sizeof(struct PINT_Request_state))))
 	{
 		gossip_lerr("PINT_New_request_state failed to malloc req !!!!!!!\n");
