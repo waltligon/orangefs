@@ -24,7 +24,12 @@
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-util.h"
 
+/* comment out to disable the mmap readahead cache */
+#define USE_MMAP_RA_CACHE
+
+#ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
+#endif
 
 /*
   an arbitrary limit to the max number of items
@@ -239,6 +244,7 @@ static int service_symlink_request(
     return ret;
 }
 
+#ifdef USE_MMAP_RA_CACHE
 static int service_io_readahead_request(
     struct PVFS_dev_map_desc *desc,
     PVFS_sysresp_init *init_response,
@@ -329,6 +335,7 @@ static int service_io_readahead_request(
     }
     return(ret);
 }
+#endif /* USE_MMAP_RA_CACHE */
 
 static int service_io_request(
     struct PVFS_dev_map_desc *desc,
@@ -341,41 +348,45 @@ static int service_io_request(
     PVFS_Request file_req;
     PVFS_Request mem_req;
     void *buf = NULL;
+    size_t amt_completed = 0;
 
     if (desc && init_response && in_upcall && out_downcall)
     {
-        if ((uint32_t)in_upcall->req.io.readahead_size ==
+#ifdef USE_MMAP_RA_CACHE
+        if ((in_upcall->req.io.offset == (loff_t)0) &&
+            (uint32_t)in_upcall->req.io.readahead_size ==
             PVFS2_MMAP_RACACHE_FLUSH)
         {
-            gossip_debug(MMAP_RCACHE_DEBUG," Flushing CACHE\n");
-            /* check if we need to flush any cached data now */
+            gossip_debug(MMAP_RCACHE_DEBUG," Flushing MMAP_RCACHE\n");
             pvfs2_mmap_ra_cache_flush(in_upcall->req.io.refn);
         }
         else if ((in_upcall->req.io.readahead_size > 0) &&
                  (in_upcall->req.io.readahead_size <
                   PVFS2_MMAP_RACACHE_MAX_SIZE))
         {
-            /* check if we can do a readahead io operation */
             ret = service_io_readahead_request(
                 desc, init_response, in_upcall, out_downcall);
 
             /*
-              if the readahead request succeeds, return;
-              otherwise fallback to this normal servicing
+              if the readahead request succeeds, return.
+              otherwise fallback to normal servicing
             */
             if (ret == 0)
             {
                 return ret;
             }
         }
+#endif /* USE_MMAP_RA_CACHE */
 
         memset(&response,0,sizeof(PVFS_sysresp_io));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
 	file_req = PVFS_BYTE;
-	
+
+        gossip_debug(MMAP_RCACHE_DEBUG,"Building Contig Request of %d\n",
+                     (int)in_upcall->req.io.count);
 	ret = PVFS_Request_contiguous(
-            in_upcall->req.io.count, PVFS_BYTE, &mem_req);
+            (int32_t)in_upcall->req.io.count, PVFS_BYTE, &mem_req);
 	assert(ret == 0);
 
         assert((in_upcall->req.io.buf_index > -1) &&
@@ -390,7 +401,10 @@ static int service_io_request(
             in_upcall->req.io.refn, file_req, in_upcall->req.io.offset, 
 	    buf, mem_req, in_upcall->credentials, &response,
             in_upcall->req.io.io_type);
-	if(ret < 0)
+
+        amt_completed = (size_t)response.total_completed;
+
+	if (ret < 0)
 	{
 	    /* report an error */
 	    out_downcall->type = PVFS2_VFS_OP_FILE_IO;
@@ -400,7 +414,7 @@ static int service_io_request(
 	{
 	    out_downcall->type = PVFS2_VFS_OP_FILE_IO;
 	    out_downcall->status = 0;
-	    out_downcall->resp.io.amt_complete = response.total_completed;
+	    out_downcall->resp.io.amt_complete = amt_completed;
 	    ret = 0;
 	}
     }
@@ -922,7 +936,9 @@ int main(int argc, char **argv)
         return 1;
     }
 
+#ifdef USE_MMAP_RA_CACHE
     pvfs2_mmap_ra_cache_initialize();
+#endif
 
     PINT_acache_set_timeout(ACACHE_TIMEOUT_MS);
 
@@ -1057,7 +1073,9 @@ int main(int argc, char **argv)
 
     job_close_context(context);
 
+#ifdef USE_MMAP_RA_CACHE
     pvfs2_mmap_ra_cache_finalize();
+#endif
 
     if (PVFS_sys_finalize())
     {

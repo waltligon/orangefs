@@ -13,7 +13,7 @@
 
 typedef struct
 {
-    PVFS_size amt_complete;
+    size_t amt_complete;
 } pvfs2_io_response_t;
 
 typedef struct
