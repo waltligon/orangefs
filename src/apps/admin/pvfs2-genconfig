@@ -128,7 +128,7 @@ sub emit_filesystem
 
     # since meta and data handle ranges must be split, increment
     # num nodes for calculation purposes below
-    $step = sprintf("%llu",($total_num_handles_available / ($num_nodes + 1)));
+    $step = sprintf("%lu",($total_num_handles_available / ($num_nodes + 1)));
 
     # pre-compute the single meta handle range
     $start = 2^1;
@@ -146,7 +146,7 @@ sub emit_filesystem
     $i = (($num_nodes == 1) ? 0 : 1);
     for($i; $i < $num_nodes; $i++)
     {
-        $start = sprintf("%llu",($end + 1));
+        $start = sprintf("%lu",($end + 1));
         $end += $step;
         print $target "\t\tRange $server_aliases[$i] $start-$end\n";
     }
