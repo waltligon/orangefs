@@ -21,6 +21,7 @@ int PVFS_util_resolve(
     PVFS_fs_id* out_fs_id,
     char* out_fs_path,
     int out_fs_path_max);
+int PVFS_util_get_default_fsid(PVFS_fs_id* out_fs_id);
 
 
 /* path management */

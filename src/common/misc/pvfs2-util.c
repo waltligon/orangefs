@@ -300,6 +300,37 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     return (NULL);
 }
 
+/* PVFS_util_get_deault_fsid()
+ *
+ * fills in the fs identifier for the first active file system that the
+ * library knows about.  Useful for test programs or admin tools that need 
+ * default file system to access if the user has not specified one
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_util_get_default_fsid(PVFS_fs_id* out_fs_id)
+{
+    int i, j;
+
+    gen_mutex_lock(&stat_tab_mutex);
+
+    for (i=0; i < stat_tab_count; i++)
+    {
+	for(j=0; j<stat_tab_array[i].mntent_count; j++)
+	{
+	    *out_fs_id = stat_tab_array[i].mntent_array[j].fs_id;
+	    if(*out_fs_id != PVFS_FS_ID_NULL)
+	    {
+		gen_mutex_unlock(&stat_tab_mutex);
+		return(0);
+	    }
+	}
+    }
+
+    gen_mutex_unlock(&stat_tab_mutex);
+    return(-PVFS_ENOENT);
+}
+
 /* PVFS_util_resolve()
  *
  * given a local path of a file that resides on a pvfs2 volume, 

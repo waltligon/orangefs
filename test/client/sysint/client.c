@@ -17,7 +17,6 @@ void gen_rand_str(int len, char** gen_str);
 
 int main(int argc,char **argv)
 {
-	PVFS_sysresp_init resp_init;
 	PVFS_sysresp_lookup resp_look;
 	PVFS_sysresp_lookup *resp_lk = NULL;
 	PVFS_sysresp_readdir *resp_readdir = NULL;
@@ -35,7 +34,6 @@ int main(int argc,char **argv)
 	char *filename;
 	//char dirname[256] = "/parl/fshorte/sysint/home";
 	int ret = -1,i = 0;
-	const PVFS_util_tab* tab;
 	PVFS_fs_id fs_id;
 	char* name = "/";
 	PVFS_credentials credentials;
@@ -53,23 +51,22 @@ int main(int argc,char **argv)
 
 	printf("creating a file named %s\n", filename);
 
-	tab = PVFS_util_parse_pvfstab(NULL);
-	if (!tab)
+	ret = PVFS_util_init_defaults();
+	if(ret < 0)
 	{
-		printf("Parsing error\n");
+		PVFS_perror("PVFS_util_init_defaults", ret);
+		return(-1);
+	}
+	ret = PVFS_util_get_default_fsid(&fs_id);
+	if(ret < 0)
+	{
+		PVFS_perror("PVFS_util_get_default_fsid", ret);
 		return(-1);
 	}
 
-	ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
-	if(ret < 0)
-	{
-		printf("PVFS_sys_initialize() failure. = %d\n", ret);
-		return(ret);
-	}
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the root handle */
-	fs_id = resp_init.fsid_list[0];
 	printf("looking up the root handle for fsid = %d\n", fs_id);
 	ret = PVFS_sys_lookup(fs_id, name, credentials,
                               &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -81,8 +78,6 @@ int main(int argc,char **argv)
 	// print the handle 
 	printf("--lookup--\n"); 
 	printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
-	free(name);
-	
 
 	/* test create */
 	resp_create = (PVFS_sysresp_create *)malloc(sizeof(PVFS_sysresp_create));
