@@ -15,6 +15,9 @@
 #include <print-struct.h>
 #include <PINT-reqproto-encode.h>
 
+/* taken from trove-test.h */
+#define FS_COLL_ID 9
+
 /**************************************************************
  * Data structures 
  */
@@ -95,7 +98,7 @@ int main(int argc, char **argv)	{
 	my_req->credentials.gid = 0;
 	my_req->credentials.perms = U_WRITE | U_READ;  
 	my_req->u.readdir.handle = user_opts->bucket;
-	my_req->u.readdir.fs_id = 9;
+	my_req->u.readdir.fs_id = FS_COLL_ID;
 	my_req->u.readdir.token = 1;
 	my_req->u.readdir.pvfs_dirent_count = 5;
 	

@@ -14,6 +14,9 @@
 #include <pvfs2-req-proto.h>
 #include <print-struct.h>
 
+/*  taken from trove-test.h */
+#define FS_COLL_ID 9
+
 /**************************************************************
  * Data structures 
  */
@@ -93,7 +96,7 @@ int main(int argc, char **argv)	{
 	my_req->credentials.gid = 0;
 	my_req->credentials.perms = U_WRITE | U_READ;  
 	my_req->u.getattr.handle = user_opts->bucket;
-	my_req->u.getattr.fs_id = 9;
+	my_req->u.getattr.fs_id = FS_COLL_ID;
 	/*my_req->u.setattr.attrmask = ATTR_UID | ATTR_GID | ATTR_PERM | ATTR_TYPE;*/
 	my_req->u.setattr.attrmask = ATTR_BASIC;
 
