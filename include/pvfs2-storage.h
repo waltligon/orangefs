@@ -38,9 +38,6 @@ struct PVFS_vtag_s
 };
 typedef struct PVFS_vtag_s PVFS_vtag;
 
-/* the state of completed operations */
-typedef int32_t PVFS_ds_state;
-
 /* Bit values of flags for various dspace operations */
 /* TODO: do we use a flag to get a vtag back or do we use VTAG_RETURN? */
 enum

@@ -216,7 +216,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d);
 static flow_descriptor *bmi_completion(bmi_error_code_t error_code,
 				       bmi_size_t actual_size,
 				       void *user_ptr);
-static flow_descriptor *trove_completion(PVFS_ds_state error_code,
+static flow_descriptor *trove_completion(PVFS_error error_code,
 					 void *user_ptr);
 static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 				      bmi_size_t actual_size,
@@ -228,9 +228,9 @@ static void bmi_completion_mem_to_bmi(bmi_error_code_t error_code,
 				      flow_descriptor * flow_d);
 static void bmi_completion_trove_to_bmi(bmi_error_code_t error_code,
 					flow_descriptor * flow_d);
-static void trove_completion_trove_to_bmi(PVFS_ds_state error_code,
+static void trove_completion_trove_to_bmi(PVFS_error error_code,
 					  flow_descriptor * flow_d);
-static void trove_completion_bmi_to_trove(PVFS_ds_state error_code,
+static void trove_completion_bmi_to_trove(PVFS_error error_code,
 					  flow_descriptor * flow_d);
 static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d);
 static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d);
@@ -427,7 +427,7 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 				   int *count,
 				   int max_idle_time_ms)
 {
-    PVFS_ds_state *trove_error_code_array = NULL;
+    PVFS_error *trove_error_code_array = NULL;
     void **trove_usrptr_array = NULL;
     int *trove_index_array = NULL;
     int trove_count = *count;
@@ -511,7 +511,7 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 	    &trove_count, &query_offset, &tmp_coll_id)) == 0)
 	{
 	    /* TODO: this is stupid.  Make these fixed size arrays */
-	    trove_error_code_array = malloc(sizeof(PVFS_ds_state) * trove_count);
+	    trove_error_code_array = malloc(sizeof(PVFS_error) * trove_count);
 	    trove_index_array = malloc(sizeof(int) * trove_count);
 	    trove_usrptr_array = malloc(sizeof(void *) * trove_count);
 	    if (!trove_error_code_array || !trove_index_array ||
@@ -2017,7 +2017,7 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
  *
  * no return value
  */
-static void trove_completion_trove_to_bmi(PVFS_ds_state error_code,
+static void trove_completion_trove_to_bmi(PVFS_error error_code,
 					  flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
@@ -2115,7 +2115,7 @@ static void trove_completion_trove_to_bmi(PVFS_ds_state error_code,
  *
  * returns pointer to associated flow on success, NULL on failure
  */
-static flow_descriptor *trove_completion(PVFS_ds_state error_code,
+static flow_descriptor *trove_completion(PVFS_error error_code,
 					 void *user_ptr)
 {
     flow_descriptor *flow_d = user_ptr;
@@ -2226,7 +2226,7 @@ static void bmi_completion_bmi_to_trove(bmi_error_code_t error_code,
  *
  * no return value
  */
-static void trove_completion_bmi_to_trove(PVFS_ds_state error_code,
+static void trove_completion_bmi_to_trove(PVFS_error error_code,
 					  flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);

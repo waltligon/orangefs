@@ -32,7 +32,7 @@ struct trove_desc
     PVFS_size actual_size;
     PVFS_vtag *vtag;
     PVFS_fs_id fsid;
-    PVFS_ds_state state;
+    PVFS_error state;
     PVFS_handle handle;
     PVFS_ds_position position;
     PVFS_ds_attributes_s attr;

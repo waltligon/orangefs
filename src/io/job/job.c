@@ -87,7 +87,7 @@ static TROVE_op_id stat_trove_id_array[job_work_metric];
 static int stat_trove_index_array[job_work_metric];
 static PVFS_vtag stat_trove_vtag_array[job_work_metric];
 static void *stat_trove_user_ptr_array[job_work_metric];
-static PVFS_ds_state stat_trove_ds_state_array[job_work_metric];
+static PVFS_error stat_trove_ds_state_array[job_work_metric];
 
 /********************************************************
  * function prototypes
