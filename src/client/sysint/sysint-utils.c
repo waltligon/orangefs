@@ -59,7 +59,8 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
         req_p.u.lookup_path.starting_handle = parent.handle;
         req_p.u.lookup_path.attrmask = mask;
 
-	max_msg_sz = sizeof(struct PVFS_server_resp_s);
+	/*expecting exactly one segment to come back (maybe attribs)*/
+	max_msg_sz = sizeof(struct PVFS_server_resp_s) + (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
 
         ret = PINT_bucket_map_to_server(&serv_addr, parent.handle, parent.fs_id);
         if (ret < 0)
