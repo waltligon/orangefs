@@ -6,10 +6,18 @@ PVFS2 Release ChangeLog
 pvfs2-0.1.1
 ===========
 - can now specify Trove sync behavior when setting up PVFS2 volumes w/ pav
-- add a new mpi-io test to exercise ROMIO's scalable operations
+- added a new mpi-io test to exercise ROMIO's scalable operations
 - better detection of dead sockets in BMI TCP/IP module
-- bug fix to pvfs2tab file parsing
-- completely rewritten TCP/IP socket management 
+- fixed pvfs2tab file parsing bug
+- completely rewritten TCP/IP socket management
+- fixed potential server deadlock on shutdown bugs
+- fixed vfs bug that stalled the server on signal cancelled operations
+- enhance vfs support to ignore non-fatal signals caught while waiting for
+  a remote operation to complete
+- added support for the "intr" mount option to allow any signal to
+  interrupt remote operations (similar to the nfs option)
+- enhanced test/kernel/linux-2.6/pvfs2-shell-test.sh test script to test
+  mmap reads and allow more run-time flexibility
 
 
 pvfs2-0.1.0
