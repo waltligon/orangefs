@@ -67,8 +67,8 @@ do { \
 
 #define BMI_socket_collection_add_write_bit(s, m) \
 do { \
-    gen_mutex_lock(&((s)->queue_mutex)); \
     struct tcp_addr* tcp_data = (m)->method_data; \
+    gen_mutex_lock(&((s)->queue_mutex)); \
     tcp_data->write_ref_count++; \
     BMI_socket_collection_queue((s),(m), &((s)->add_queue)); \
     gen_mutex_unlock(&((s)->queue_mutex)); \
@@ -76,8 +76,8 @@ do { \
 
 #define BMI_socket_collection_remove_write_bit(s, m) \
 do { \
-    gen_mutex_lock(&((s)->queue_mutex)); \
     struct tcp_addr* tcp_data = (m)->method_data; \
+    gen_mutex_lock(&((s)->queue_mutex)); \
     tcp_data->write_ref_count--; \
     assert(tcp_data->write_ref_count > -1); \
     BMI_socket_collection_queue((s),(m), &((s)->add_queue)); \
