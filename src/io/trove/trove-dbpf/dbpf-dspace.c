@@ -922,9 +922,8 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
             /* b_size is already set to zero */
 	    break;
 	case DBPF_BSTREAM_FDCACHE_BUSY:
-            /* release the dspace dbcache entry; try again later */
-            dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
-	    return 0;
+            ret = 0;
+            goto return_error;
 	case DBPF_BSTREAM_FDCACHE_SUCCESS:
 	    ret = DBPF_FSTAT(fd, &b_stat);
             dbpf_bstream_fdcache_put(
@@ -946,9 +945,8 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         op_p->coll_p->coll_id, op_p->handle, 0, &kdb_p);
     if (ret == -TROVE_EBUSY)
     {
-        /* release the dspace dbcache entry */
-        dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
-        return 0; /* try again later */
+        ret = 0;
+        goto return_error;
     }
     else if (ret == 0)
     {
@@ -958,6 +956,9 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
                           NULL,
 #endif
                           0);
+
+        dbpf_keyval_dbcache_put(
+            op_p->coll_p->coll_id, op_p->handle);
 
         if (ret == 0)
         {
@@ -979,9 +980,6 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         /* b_size is already set to zero */
         /* drop through */
     }
-
-    dbpf_keyval_dbcache_put(
-        op_p->coll_p->coll_id, op_p->handle);
 
     memset(&key, 0, sizeof(key));
     key.data = &op_p->handle;
