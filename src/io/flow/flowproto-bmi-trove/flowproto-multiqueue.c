@@ -35,21 +35,6 @@ do{								\
     __flow_d->callback(__flow_d);				\
 }while(0)
 
-#define ERROR_CLEANUP(__f)					\
-do{								\
-    if((__f)->parent->state == FLOW_COMPLETE)			\
-    {								\
-	gen_mutex_unlock(&(__f)->flow_mutex);			\
-	FLOW_CLEANUP(__f);					\
-	return;							\
-    }								\
-    else							\
-    {								\
-	gen_mutex_unlock(&(__f)->flow_mutex);			\
-	return;							\
-    }								\
-}while(0)
-
 struct result_chain_entry
 {
     PVFS_id_gen_t posted_id;
