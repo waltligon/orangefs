@@ -201,7 +201,7 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	    req_p.u.remove.fs_id = parent_refn.fs_id;
 	    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
-	    ioserv_count = pinode_ptr->attr.u.meta.nr_datafiles;
+	    ioserv_count = pinode_ptr->attr.u.meta.dfile_count;
 
 	    /* TODO: come back and unserialize this */
 	    for(i = 0; i < ioserv_count; i++)
@@ -209,7 +209,7 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 		/* each of the data files could be on different servers, so we need
 		 * to get the correct server from the bucket table interface
 		 */
-		req_p.u.remove.handle = pinode_ptr->attr.u.meta.dfh[i];
+		req_p.u.remove.handle = pinode_ptr->attr.u.meta.dfile_array[i];
 		ret = PINT_bucket_map_to_server(&serv_addr, req_p.u.remove.handle, parent_refn.fs_id);
 		if (ret < 0)
 		{

@@ -57,13 +57,13 @@ DECODE_RESP_HEAD(do_decode_resp)
 			if(decoded_response->u.getattr.attr.objtype ==
 				PVFS_TYPE_METAFILE)
 			{
-				decoded_response->u.getattr.attr.u.meta.dfh = 
+				decoded_response->u.getattr.attr.u.meta.dfile_array = 
 					(PVFS_handle*)(((char*)decoded_response) 
 					+ sizeof(struct PVFS_server_resp_s));
 				decoded_response->u.getattr.attr.u.meta.dist = 
 					(PVFS_Dist*)(((char*)decoded_response)
 					+ sizeof(struct PVFS_server_resp_s)
-					+ (decoded_response->u.getattr.attr.u.meta.nr_datafiles 
+					+ (decoded_response->u.getattr.attr.u.meta.dfile_count 
 					* sizeof(PVFS_handle)));
 				PINT_Dist_decode(decoded_response->u.getattr.attr.u.meta.dist,
 					NULL);

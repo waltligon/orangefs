@@ -92,10 +92,10 @@ void PINT_pcache_pinode_dealloc(pinode *pnode)
 	if (pnode->attr.objtype == PVFS_TYPE_METAFILE)
 	{
 	    gossip_ldebug(PCACHE_DEBUG, "METADATA file handles:\n");
-	    for(i = 0; i < pnode->attr.u.meta.nr_datafiles; i++)
-		gossip_ldebug(PCACHE_DEBUG, "\t%lld\n", pnode->attr.u.meta.dfh[i]);
-	    if(pnode->attr.u.meta.dfh != NULL)
-		free(pnode->attr.u.meta.dfh);
+	    for(i = 0; i < pnode->attr.u.meta.dfile_count; i++)
+		gossip_ldebug(PCACHE_DEBUG, "\t%lld\n", pnode->attr.u.meta.dfile_array[i]);
+	    if(pnode->attr.u.meta.dfile_array != NULL)
+		free(pnode->attr.u.meta.dfile_array);
 	}
 	free(pnode);
     }

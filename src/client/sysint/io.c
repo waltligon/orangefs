@@ -125,7 +125,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     }
 
     target_handle_array =
-	(PVFS_handle*)malloc(pinode_ptr->attr.u.meta.nr_datafiles
+	(PVFS_handle*)malloc(pinode_ptr->attr.u.meta.dfile_count
 	* sizeof(PVFS_handle));
     if(!target_handle_array)
     {
@@ -146,7 +146,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	ret = -ENOMEM;
 	goto sys_io_out;
     }
-    for(i=0; i<pinode_ptr->attr.u.meta.nr_datafiles; i++)
+    for(i=0; i<pinode_ptr->attr.u.meta.dfile_count; i++)
     {
 	/* NOTE: we don't have to give an accurate file size here,
 	 * as long as we set the extend flag to tell the I/O req
@@ -155,7 +155,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	tmp_file_data.fsize = 0;  
 	tmp_file_data.dist = pinode_ptr->attr.u.meta.dist;
 	tmp_file_data.iod_num = i;
-	tmp_file_data.iod_count = pinode_ptr->attr.u.meta.nr_datafiles;
+	tmp_file_data.iod_count = pinode_ptr->attr.u.meta.dfile_count;
 	tmp_file_data.extend_flag = 1;
 
 	bytemax = 1;
@@ -176,7 +176,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	if(bytemax)
 	{
 	    target_handle_array[target_handle_count] =
-		pinode_ptr->attr.u.meta.dfh[i]; 
+		pinode_ptr->attr.u.meta.dfile_array[i]; 
 	    target_handle_count++;
 	}
     }
@@ -245,16 +245,16 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	req_array[i].u.io.fs_id = pinode_refn.fs_id;
 	req_array[i].u.io.flow_type = flow_type;
 	/* TODO: this is silly */
-	for(j=0; j<pinode_ptr->attr.u.meta.nr_datafiles; j++)
+	for(j=0; j<pinode_ptr->attr.u.meta.dfile_count; j++)
 	{
-	    if(target_handle_array[i] == pinode_ptr->attr.u.meta.dfh[j])
+	    if(target_handle_array[i] == pinode_ptr->attr.u.meta.dfile_array[j])
 	    {
 		req_array[i].u.io.iod_num = j;
 		break;
 	    }
 	}
 	req_array[i].u.io.iod_count =
-	    pinode_ptr->attr.u.meta.nr_datafiles;
+	    pinode_ptr->attr.u.meta.dfile_count;
 	req_array[i].u.io.io_req = io_req;
 	req_array[i].u.io.io_dist = pinode_ptr->attr.u.meta.dist;
 	if(type == PVFS_SYS_IO_READ)
@@ -694,7 +694,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		    attr_p->u.meta.dist;
 		flow_array[i]->file_data->iod_num = req_array[i].u.io.iod_num;
 		flow_array[i]->file_data->iod_count =
-		    attr_p->u.meta.nr_datafiles;
+		    attr_p->u.meta.dfile_count;
 		flow_array[i]->request = io_req;
 		flow_array[i]->flags = 0;
 		flow_array[i]->tag = op_tag_array[i];

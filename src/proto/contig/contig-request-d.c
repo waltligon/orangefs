@@ -66,7 +66,7 @@ int do_decode_req(
 	    char_ptr += sizeof( struct PVFS_server_req_s );
 	    if ( dec_msg->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
-		dec_msg->u.mkdir.attr.u.meta.dfh = (PVFS_handle *)char_ptr;
+		dec_msg->u.mkdir.attr.u.meta.dfile_array = (PVFS_handle *)char_ptr;
 	    }
 	    return(0);
 
@@ -75,15 +75,15 @@ int do_decode_req(
 
 	    if ( dec_msg->u.setattr.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
-		dec_msg->u.setattr.attr.u.meta.dfh = (PVFS_handle *)char_ptr;
+		dec_msg->u.setattr.attr.u.meta.dfile_array = (PVFS_handle *)char_ptr;
 		/* move the pointer past the data files, we could have
 		 * distribution information, check the size to be sure
 		 */
 
-		char_ptr += dec_msg->u.setattr.attr.u.meta.nr_datafiles
+		char_ptr += dec_msg->u.setattr.attr.u.meta.dfile_count
 				* sizeof(PVFS_handle);
 		if (dec_msg->rsize > (sizeof(struct PVFS_server_req_s)
-		    + dec_msg->u.setattr.attr.u.meta.nr_datafiles 
+		    + dec_msg->u.setattr.attr.u.meta.dfile_count 
 			* sizeof(PVFS_handle)))
 		{
 		    /* update the pointer, and decode */

@@ -167,7 +167,7 @@ int do_encode_req(
 	    /* if we're mkdir'ing a meta file, we need to alloc space for the attributes */
 	    if ( request->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
-		size += request->u.mkdir.attr.u.meta.nr_datafiles * sizeof( PVFS_handle );
+		size += request->u.mkdir.attr.u.meta.dfile_count * sizeof( PVFS_handle );
 	    }
 
 	    /* TODO: come back and alloc the right spaces for 
@@ -191,13 +191,13 @@ int do_encode_req(
 	    {
 				/* handles */
 		memcpy( enc_msg + sizeof( struct PVFS_server_req_s ),
-			request->u.mkdir.attr.u.meta.dfh, 
-			request->u.mkdir.attr.u.meta.nr_datafiles * sizeof( PVFS_handle ) );
+			request->u.mkdir.attr.u.meta.dfile_array, 
+			request->u.mkdir.attr.u.meta.dfile_count * sizeof( PVFS_handle ) );
 
 	        /* make pointer since we're sending it over the wire and don't want 
 		 * random memory referenced on the other side */
 
-		((struct PVFS_server_req_s *)enc_msg)->u.mkdir.attr.u.meta.dfh = NULL;
+		((struct PVFS_server_req_s *)enc_msg)->u.mkdir.attr.u.meta.dfile_array = NULL;
 	    }
 	    /* set accurate rsize */
 	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;
@@ -210,10 +210,10 @@ int do_encode_req(
 	    if(request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
 	    {
 		/* negative datafiles? wtf ... */
-		if(request->u.setattr.attr.u.meta.nr_datafiles >= 0)
+		if(request->u.setattr.attr.u.meta.dfile_count >= 0)
 		{
-		    assert(request->u.setattr.attr.u.meta.dfh != NULL);
-		    size += request->u.setattr.attr.u.meta.nr_datafiles * sizeof( PVFS_handle );
+		    assert(request->u.setattr.attr.u.meta.dfile_array != NULL);
+		    size += request->u.setattr.attr.u.meta.dfile_count * sizeof( PVFS_handle );
 		}
 		if (request->u.setattr.attr.u.meta.dist != NULL)
 		{
@@ -252,10 +252,10 @@ int do_encode_req(
 	    if ( request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE )
 	    {
 		memcpy( enc_msg, 
-			request->u.setattr.attr.u.meta.dfh, 
-			request->u.setattr.attr.u.meta.nr_datafiles * sizeof(PVFS_handle) );
+			request->u.setattr.attr.u.meta.dfile_array, 
+			request->u.setattr.attr.u.meta.dfile_count * sizeof(PVFS_handle) );
 
-		enc_msg += request->u.setattr.attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
+		enc_msg += request->u.setattr.attr.u.meta.dfile_count * sizeof(PVFS_handle);
 		/*pack distribution information now*/
 
 		/* Q:we alloc'ed what the macro said the packed size was, is this enough?*/

@@ -155,20 +155,20 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	resp->attr = ack_p->u.getattr.attr;
 	if (resp->attr.objtype == PVFS_TYPE_METAFILE)
 	{
-	    if(resp->attr.u.meta.nr_datafiles > 0)
+	    if(resp->attr.u.meta.dfile_count > 0)
 	    {
-		assert(ack_p->u.getattr.attr.u.meta.dfh != NULL);
+		assert(ack_p->u.getattr.attr.u.meta.dfile_array != NULL);
 
-		resp->attr.u.meta.dfh = malloc(resp->attr.u.meta.nr_datafiles * sizeof(PVFS_handle));
-		if (resp->attr.u.meta.dfh ==  NULL)
+		resp->attr.u.meta.dfile_array = malloc(resp->attr.u.meta.dfile_count * sizeof(PVFS_handle));
+		if (resp->attr.u.meta.dfile_array ==  NULL)
 		{
 		    ret = (-ENOMEM);
 		    failure = MALLOC_DFH_FAILURE;
 		    goto return_error;
 		}
-		memcpy(	resp->attr.u.meta.dfh, 
-			ack_p->u.getattr.attr.u.meta.dfh, 
-			resp->attr.u.meta.nr_datafiles * sizeof(PVFS_handle));
+		memcpy(	resp->attr.u.meta.dfile_array, 
+			ack_p->u.getattr.attr.u.meta.dfile_array, 
+			resp->attr.u.meta.dfile_count * sizeof(PVFS_handle));
 	    }
 	    /* TODO: make this better */
 	    if(resp->attr.u.meta.dist_size > 0)
@@ -206,7 +206,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	     *	data written
 	     */
 
-	    num_data_servers = entry_pinode->attr.u.meta.nr_datafiles;
+	    num_data_servers = entry_pinode->attr.u.meta.dfile_count;
 
 	    size_array = malloc(num_data_servers * sizeof(PVFS_size));
 	    if (size_array == NULL)
@@ -217,7 +217,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 
 	    /* we need to send one getattr to each server for each datafile*/
 
-	    data_files = resp->attr.u.meta.dfh;
+	    data_files = resp->attr.u.meta.dfile_array;
 	    dist = resp->attr.u.meta.dist;
 	    req_p.op = PVFS_SERV_GETATTR;
 	    req_p.credentials = credentials;
@@ -330,7 +330,7 @@ return_error:
 	switch( failure ) 
 	{
 		case PCACHE_INSERT_FAILURE:
-		    free(resp->attr.u.meta.dfh);
+		    free(resp->attr.u.meta.dfile_array);
 		    PINT_pcache_insert_rls(entry_pinode);
 		case MALLOC_DFH_FAILURE:
 		case SEND_REQ_FAILURE:

@@ -11,20 +11,16 @@
 #include "pvfs2-storage.h"
 #include "pvfs-distribution.h"
 
-/*attributes*/
-/* MetaFile
- *
- */
+/* attributes specific to metadata objects */
 struct PVFS_metafile_attr_s
 {
-    /* distribution info */
+    /* distribution */
     PVFS_Dist *dist;
-    /* array of datafile handles */
-    PVFS_handle *dfh;
-    /* Number of datafiles */
-    uint32_t nr_datafiles;
-    /* size of the distribution info */
-    PVFS_size dist_size;
+    uint32_t dist_size;
+
+    /* list of datafiles */
+    PVFS_handle *dfile_array;
+    uint32_t dfile_count;
 };
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 

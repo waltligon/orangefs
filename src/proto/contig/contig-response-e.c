@@ -97,7 +97,7 @@ int do_encode_resp(
 		    target_msg->total_size = 
 		    sizeof(struct PVFS_server_resp_s) + header_size
 		    + response->u.getattr.attr.u.meta.dist_size
-		    + (response->u.getattr.attr.u.meta.nr_datafiles
+		    + (response->u.getattr.attr.u.meta.dfile_count
 		    * sizeof(PVFS_handle));
 		target_msg->buffer_list[0] = 
 		    BMI_memalloc(target_msg->dest, 
@@ -105,20 +105,20 @@ int do_encode_resp(
 		    BMI_SEND);
 		pack_dest = (char*)target_msg->buffer_list[0];
 		/* copy in the datafiles */
-		if(response->u.getattr.attr.u.meta.nr_datafiles > 0)
+		if(response->u.getattr.attr.u.meta.dfile_count > 0)
 		{
 		    pack_dest += sizeof(struct PVFS_server_resp_s);
 		    memcpy(
 			pack_dest,
-			response->u.getattr.attr.u.meta.dfh,
-			(response->u.getattr.attr.u.meta.nr_datafiles
+			response->u.getattr.attr.u.meta.dfile_array,
+			(response->u.getattr.attr.u.meta.dfile_count
 			* sizeof(PVFS_handle)));
 		}
 		/* copy in the distribution */
 		if(response->u.getattr.attr.u.meta.dist_size > 0)
 		{
 		    pack_dest +=
-			(response->u.getattr.attr.u.meta.nr_datafiles
+			(response->u.getattr.attr.u.meta.dfile_count
 			* sizeof(PVFS_handle));
 		    PINT_Dist_encode(pack_dest,
 			response->u.getattr.attr.u.meta.dist);

@@ -381,11 +381,11 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 		(long long)req_p.u.setattr.attr.mtime, 
 		(long long)req_p.u.setattr.attr.ctime, 
 		req_p.u.setattr.attr.objtype);
-	gossip_ldebug(CLIENT_DEBUG,"\t\tnr_datafiles: %d\n",
-		req_p.u.setattr.attr.u.meta.nr_datafiles);
-    for(i=0;i<req_p.u.setattr.attr.u.meta.nr_datafiles;i++)
+	gossip_ldebug(CLIENT_DEBUG,"\t\tdfile_count: %d\n",
+		(int)req_p.u.setattr.attr.u.meta.dfile_count);
+    for(i=0;i<req_p.u.setattr.attr.u.meta.dfile_count;i++)
 	gossip_ldebug(CLIENT_DEBUG,"\t\tdatafile handle: %lld\n",
-		req_p.u.setattr.attr.u.meta.dfh[i]);
+		req_p.u.setattr.attr.u.meta.dfile_array[i]);
 
 	/* set the type of the object */
 	req_p.u.setattr.attr.objtype = PVFS_TYPE_METAFILE;
@@ -604,8 +604,8 @@ static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
 
 	/* Fill in the metafile attributes */
 	new->u.meta.dist = old.u.meta.dist;
-	new->u.meta.dfh = handle_array;
-	new->u.meta.nr_datafiles = handle_count;
+	new->u.meta.dfile_array = handle_array;
+	new->u.meta.dfile_count = handle_count;
 }
 
 /*

@@ -333,11 +333,11 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
 				case PVFS_TYPE_METAFILE:
                         		printf("PVFS_servreq_setattr.attr.objtype = PVFS_TYPE_METAFILE\n" );
 			arrow(direction);
-                        		printf("PVFS_servreq_setattr.attr.u.meta.nr_datafiles = %d\n", (int)my_req->u.setattr.attr.u.meta.nr_datafiles );
-					for( i=0; i<my_req->u.setattr.attr.u.meta.nr_datafiles; i++ )
+                        		printf("PVFS_servreq_setattr.attr.u.meta.dfile_count = %d\n", (int)my_req->u.setattr.attr.u.meta.dfile_count );
+					for( i=0; i<my_req->u.setattr.attr.u.meta.dfile_count; i++ )
 					{
 						arrow(direction);
-                        			printf("PVFS_servreq_setattr.attr.u.meta.nr_dfh[%d] = %d\n",(int)i, (int)my_req->u.setattr.attr.u.meta.dfh[i] );
+                        			printf("PVFS_servreq_setattr.attr.u.meta.dfile_array[%d] = %d\n",(int)i, (int)my_req->u.setattr.attr.u.meta.dfile_array[i] );
 					}
 					break;
 				case PVFS_TYPE_DATAFILE:

@@ -91,9 +91,9 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size,
 
     /* TODO: come back and unserialize this eventually */
 
-    for(i = 0; i < pinode_ptr->attr.u.meta.nr_datafiles; i++)
+    for(i = 0; i < pinode_ptr->attr.u.meta.dfile_count; i++)
     {
-	req_p.u.truncate.handle = pinode_ptr->attr.u.meta.dfh[i];
+	req_p.u.truncate.handle = pinode_ptr->attr.u.meta.dfile_array[i];
 
 	ret = PINT_bucket_map_to_server(&serv_addr, req_p.u.truncate.handle,
 		    pinode_refn.fs_id);

@@ -264,7 +264,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
 	ret->error_code = STATE_METAFILE;
 
 	/* save # of datafiles so we know the size for reading later */
-	s_op->resp->u.getattr.attr.u.meta.nr_datafiles = a_p->u.meta.nr_datafiles;
+	s_op->resp->u.getattr.attr.u.meta.dfile_count = a_p->u.meta.dfile_count;
 	/* TODO: keep distribution size in here too */
     }
     else if (ret->error_code == 0) {
@@ -286,37 +286,37 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
  */
 static int getattr_read_metafile_datafile_handles(PINT_server_op *s_op, job_status_s *ret)
 {
-    int nr_datafiles;
+    int dfile_count;
     int job_post_ret;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "getattr state: read_metafile_datafile_handles\n");
 
-    nr_datafiles = s_op->resp->u.getattr.attr.u.meta.nr_datafiles;
+    dfile_count = s_op->resp->u.getattr.attr.u.meta.dfile_count;
 
     s_op->key.buffer    = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
 
     /* should be more than one datafile. */
-    assert(nr_datafiles > 0);
+    assert(dfile_count > 0);
 
     /* add mask value to indicate the data file array is filled */
     s_op->resp->u.getattr.attr.mask |= PVFS_ATTR_META_DFILES;
 
     /* NOTE: ALLOCATING MEMORY HERE */
-    s_op->resp->u.getattr.attr.u.meta.dfh = malloc(nr_datafiles * sizeof(PVFS_handle));
-    if(!s_op->resp->u.getattr.attr.u.meta.dfh)
+    s_op->resp->u.getattr.attr.u.meta.dfile_array = malloc(dfile_count * sizeof(PVFS_handle));
+    if(!s_op->resp->u.getattr.attr.u.meta.dfile_array)
     {
 	ret->error_code = -errno;
 	return(1);
     }
 
-    s_op->val.buffer    = s_op->resp->u.getattr.attr.u.meta.dfh;
-    s_op->val.buffer_sz = nr_datafiles * sizeof(PVFS_handle);
+    s_op->val.buffer    = s_op->resp->u.getattr.attr.u.meta.dfile_array;
+    s_op->val.buffer_sz = dfile_count * sizeof(PVFS_handle);
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading %d datafile handles (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
-		 nr_datafiles,
+		 dfile_count,
 		 s_op->req->u.getattr.fs_id,
 		 s_op->req->u.getattr.handle,
 		 (char *) s_op->key.buffer,
@@ -425,9 +425,9 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
     if (a_p->objtype == PVFS_TYPE_METAFILE) {
 	gossip_debug(SERVER_DEBUG,
 		     "  also returning %d datafile handles\n",
-		     a_p->u.meta.nr_datafiles);
+		     a_p->u.meta.dfile_count);
 
-	s_op->resp->rsize += (a_p->u.meta.nr_datafiles *
+	s_op->resp->rsize += (a_p->u.meta.dfile_count *
 	    sizeof(PVFS_handle)) + a_p->u.meta.dist_size;
     }
 
@@ -542,7 +542,7 @@ static int getattr_cleanup(PINT_server_op *s_op, job_status_s *ret)
 
     /* if this is a metafile, we allocated space for the datafile handles; free that. */
     if (s_op->resp->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) {
-	free(s_op->resp->u.getattr.attr.u.meta.dfh);
+	free(s_op->resp->u.getattr.attr.u.meta.dfile_array);
 	free(s_op->resp->u.getattr.attr.u.meta.dist);
     }
 

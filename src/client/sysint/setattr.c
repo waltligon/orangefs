@@ -95,7 +95,7 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	req_p.credentials = credentials;
 	if (attr.objtype == PVFS_TYPE_METAFILE)
 	{
-	    handlesize = attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
+	    handlesize = attr.u.meta.dfile_count * sizeof(PVFS_handle);
 	}
 	else
 	{
