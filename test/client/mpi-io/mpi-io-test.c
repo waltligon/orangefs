@@ -49,6 +49,7 @@ int     opt_pvfstab_set = 0;
 int parse_args(int argc, char **argv);
 void usage(void);
 double Wtime(void);
+void handle_error(int errcode, char *str);
 
 extern int debug_on;
 
@@ -110,9 +111,9 @@ int main(int argc, char **argv)
 	/* open the file for writing */
 	err = MPI_File_open(MPI_COMM_SELF, opt_file, 
 	MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &fh);
-	if (err < 0) {
-		fprintf(stderr, "node %d, open error: %s\n", mynod, strerror(errno));
-		goto die_jar_jar_die;
+	if (err != MPI_SUCCESS) {
+			  handle_error(err, "MPI_File_open");
+			  goto die_jar_jar_die;
 	}
 
 	/* now repeat the seek and write operations the number of times
@@ -255,7 +256,7 @@ int main(int argc, char **argv)
 			printf("nr_procs = %d, nr_iter = %d, blk_sz = %ld\n", nprocs,
 		opt_iter, (long)opt_block);
 			
-			printf("# total_size = %ld\n", (long)(opt_block*nprocs*opt_iter));
+			printf("# total_size = %lld\n", (int64_t)(opt_block*nprocs*opt_iter));
 			
 			printf("# Write:  min_time = %f, max_time = %f, mean_time = %f\n", 
 				min_write_tim, max_write_tim, ave_write_tim);
@@ -343,6 +344,15 @@ void usage(void)
 		  printf(" -c       verify correctness of file data [default: off]\n");
 		  printf(" -y       sYnc the file after each write [default: off]\n");
 		  printf(" -h       print this help\n");
+}
+
+void handle_error(int errcode, char *msg)
+{
+		  char msg[MPI_MAX_ERROR_STRING];
+		  int resultlen;
+		  MPI_Error_string(errcode, msg, &resultlen);
+		  fprintf(stderr, "%s: %s\n", str, msg);
+		  MPI_Abort(MPI_COMM_WORLD,1);
 }
 
 /*
