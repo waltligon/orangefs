@@ -57,7 +57,10 @@ int main(int argc, char **argv)	{
 	struct PVFS_server_req_s my_req;
 	struct PVFS_server_resp_s* dec_ack;
 	void* my_ack;
-	int my_ack_size = sizeof(struct PVFS_server_resp_s) + 4;
+	int my_ack_size = 0;
+	
+	/* figure out how big of an ack to post */
+	my_ack_size = PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO);
 
 	/* TODO: how do I know how big to make this?
 	 * Dale is adding a function to tell me, need to remember to use it
