@@ -89,7 +89,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     debug_file = getenv("PVFS2_DEBUGFILE");
     if (debug_file)
     {
-        gossip_enable_file(debug_file, "a");
+        gossip_enable_file(debug_file, "w");
     }
 
     /* Initialize the distribution subsystem */

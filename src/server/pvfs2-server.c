@@ -484,7 +484,7 @@ static int server_initialize(
         freopen("/dev/null", "w", stderr);
 
         assert(server_config.logfile != NULL);
-        if (gossip_enable_file(server_config.logfile, "a") < 0)
+        if (gossip_enable_file(server_config.logfile, "w") < 0)
         {
             gossip_lerr("error opening log file %s\n",
                         server_config.logfile);
