@@ -33,7 +33,7 @@ struct options
 
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
-static void print_mntent(struct pvfs_mntent *entries, int num_entries);
+static void print_mntent(struct PVFS_sys_mntent *entries, int num_entries);
 static int print_config(PVFS_fs_id fsid);
 static int noop_all_servers(PVFS_fs_id fsid);
 
@@ -413,7 +413,7 @@ static int print_config(PVFS_fs_id fsid)
  *
  * no return value
  */
-static void print_mntent(struct pvfs_mntent *entries, int num_entries)
+static void print_mntent(struct PVFS_sys_mntent *entries, int num_entries)
 {
     int i;
 

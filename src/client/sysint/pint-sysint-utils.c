@@ -88,7 +88,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
     PVFS_credentials creds;
     struct PINT_decoded_msg decoded;
     void* encoded_resp;
-    struct pvfs_mntent *mntent_p = NULL;
+    struct PVFS_sys_mntent *mntent_p = NULL;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
     int found_one_good = 0;
     struct filesystem_configuration_s* cur_fs = NULL;

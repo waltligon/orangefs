@@ -7,7 +7,7 @@
 #include <pvfs2-sysint.h>
 #include <pint-sysint-utils.h>
 
-void print_mount_entry(pvfs_mntent *mount);
+void print_mount_entry(PVFS_sys_mntent *mount);
 void print_mount_list(pvfs_mntlist *mnt_list);
 
 int main(int argc, char* argv[])
@@ -42,7 +42,7 @@ void print_mount_list(pvfs_mntlist *mnt_list)
     }
 }
 
-void print_mount_entry(pvfs_mntent *mount)
+void print_mount_entry(PVFS_sys_mntent *mount)
 {
     printf("\tServer address: %s\n",mount->meta_addr);
     printf("\tServce name: %s\n",mount->service_name);

@@ -112,14 +112,14 @@ int PVFS_util_parse_pvfstab(const char* tabfile, pvfs_mntlist* pvfstab_p)
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Using pvfs2 tab file: %s\n", targetfile);
 
     /* allocate array of entries */
-    pvfstab_p->ptab_array = (struct pvfs_mntent*)
-        malloc(pvfstab_p->ptab_count * sizeof(struct pvfs_mntent));
+    pvfstab_p->ptab_array = (struct PVFS_sys_mntent*)
+        malloc(pvfstab_p->ptab_count * sizeof(struct PVFS_sys_mntent));
     if (!pvfstab_p->ptab_array)
     {
 	return(-PVFS_ENOMEM);
     }
     memset(pvfstab_p->ptab_array, 0, 
-	pvfstab_p->ptab_count*sizeof(struct pvfs_mntent));
+	pvfstab_p->ptab_count*sizeof(struct PVFS_sys_mntent));
 
     /* reopen our chosen fstab file */
     mnt_fp = setmntent(targetfile, "r");

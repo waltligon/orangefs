@@ -37,21 +37,24 @@ struct PVFS_sys_attr_s
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 
-/* PVFS2 tab file entries */
-struct pvfs_mntent
+/* describes active file systems */
+struct PVFS_sys_mntent
 {
     char *pvfs_config_server;	/* address of server with config info */
     char *pvfs_fs_name;		/* name of PVFS2 file system */
-    char *mnt_dir;		/* local mount path */
-    char *mnt_opts;		/* full option list */
     enum PVFS_flowproto_type flowproto;	/* flow protocol */
     enum PVFS_encoding_type encoding;   /* wire data encoding */
+
+    /* the following fields are included for convenience;
+     * useful if the file system is "mounted" */
+    char *mnt_dir;		/* local mount path */
+    char *mnt_opts;		/* full option list */
 };
 
 struct pvfs_mntlist_s
 {
     int ptab_count;		/* number of tab file entries */
-    struct pvfs_mntent *ptab_array;	/* array of entries */
+    struct PVFS_sys_mntent *ptab_array;	/* array of entries */
 };
 typedef struct pvfs_mntlist_s pvfs_mntlist;
 
