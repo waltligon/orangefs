@@ -232,7 +232,8 @@ int main(int argc, char **argv)	{
 
 	/* send the data payload on its way */
 	ret = BMI_post_send_list(&(client_ops[0]), server_addr,
-		buffer_list, size_list, 3, (MSG1_SIZE+MSG2_SIZE+MSG3_SIZE), 
+		(const void **) buffer_list, size_list, 3,
+		(MSG1_SIZE+MSG2_SIZE+MSG3_SIZE), 
 		BMI_PRE_ALLOC, 0, in_test_user_ptr, context);
 	if(ret < 0)
 	{

@@ -119,8 +119,8 @@ int main(int argc, char **argv)	{
 	buffer_list[0] = my_req;
 	size_list[0] = sizeof(struct server_request);
 	ret = BMI_post_sendunexpected_list(&(client_ops[1]), server_addr, 
-		buffer_list, size_list, 1, size_list[0], BMI_PRE_ALLOC, 0, 
-		in_test_user_ptr, context);
+		(const void **) buffer_list, size_list, 1, size_list[0],
+		BMI_PRE_ALLOC, 0, in_test_user_ptr, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -244,7 +244,8 @@ int main(int argc, char **argv)	{
 
 	/* send the data payload on its way */
 	ret = BMI_post_send_list(&(client_ops[0]), server_addr,
-		buffer_list, size_list, 3, (MSG1_SIZE+MSG2_SIZE+MSG3_SIZE), 
+		(const void **) buffer_list, size_list, 3,
+		(MSG1_SIZE+MSG2_SIZE+MSG3_SIZE), 
 		BMI_PRE_ALLOC, 0, in_test_user_ptr, context);
 	if(ret < 0)
 	{

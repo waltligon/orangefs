@@ -189,7 +189,7 @@ int main(int argc, char **argv)	{
 	ret = BMI_post_sendunexpected_list(
 		&(client_ops[1]), 
 		encoded1.dest,
-		encoded1.buffer_list, 
+		(const void **) encoded1.buffer_list, 
 		encoded1.size_list,
 		encoded1.list_count,
 		encoded1.total_size, 
@@ -339,7 +339,7 @@ int main(int argc, char **argv)	{
 	ret = BMI_post_sendunexpected_list(
 		&(client_ops[1]), 
 		encoded2.dest,
-		encoded2.buffer_list,
+		(const void **) encoded2.buffer_list,
 		encoded2.size_list,
 		encoded2.list_count,
 		encoded2.total_size,
@@ -505,7 +505,7 @@ int main(int argc, char **argv)	{
 	ret = BMI_post_sendunexpected_list(
 		&(client_ops[1]), 
 		encoded3.dest,
-		encoded3.buffer_list, 
+		(const void **) encoded3.buffer_list, 
 		encoded3.size_list,
 		encoded3.list_count,
 		encoded3.total_size, 

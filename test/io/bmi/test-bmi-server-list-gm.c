@@ -125,8 +125,9 @@ int main(int argc, char **argv)	{
 	buffer_list[0] = my_ack;
 	size_list[0] = sizeof(struct server_ack);
 
-	ret = BMI_post_send_list(&(server_ops[1]), client_addr, buffer_list, 
-		size_list, 1, sizeof(struct server_ack), BMI_PRE_ALLOC, 0, NULL, context);
+	ret = BMI_post_send_list(&(server_ops[1]), client_addr,
+		(const void **) buffer_list, size_list, 1,
+		sizeof(struct server_ack), BMI_PRE_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_send_failure.\n");

@@ -473,14 +473,16 @@ int job_bmi_send_list(bmi_addr_t addr,
     /* post appropriate type of send */
     if (!send_unexpected)
     {
-	ret = BMI_post_send_list(&(jd->u.bmi.id), addr, buffer_list, size_list,
+	ret = BMI_post_send_list(&(jd->u.bmi.id), addr,
+				 (const void **) buffer_list, size_list,
 				 list_count, total_size, buffer_type,
 				 tag, user_ptr_internal, global_bmi_context);
     }
     else
     {
 	ret = BMI_post_sendunexpected_list(&(jd->u.bmi.id), addr,
-					   buffer_list, size_list, list_count,
+					   (const void **) buffer_list,
+					   size_list, list_count,
 					   total_size, buffer_type, tag,
 					   user_ptr_internal, global_bmi_context);
     }

@@ -1461,7 +1461,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 		  (long) flow_data->bmi_total_size);
     ret = BMI_post_send_list(&flow_data->bmi_id,
 			     flow_d->dest.u.bmi.address,
-			     flow_data->bmi_buffer_list,
+			     (const void **) flow_data->bmi_buffer_list,
 			     flow_data->bmi_size_list,
 			     flow_data->bmi_list_count,
 			     flow_data->bmi_total_size, buffer_type,
