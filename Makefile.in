@@ -793,7 +793,6 @@ distclean: cleaner docsclean
 	rm -f Makefile pvfs2-config.h
 	rm -f src/server/simple.conf
 	rm -f src/server/server.conf-localhost
-	rm -f .libs
 ifndef DIST_RELEASE
 	rm -f $(TROVE_AUTOGEN_FILES)
 	rm -f $(SMCGEN)

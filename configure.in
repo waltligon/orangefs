@@ -620,10 +620,6 @@ doc/random/module.mk
 examples/pvfs2-server.rc
 )
 
-# dump LIBS variable into a file to be used by test/configure
-AC_OUTPUT_COMMANDS([echo ${LIBS}> .libs])
-
-
 # print a summary of the configuration information
 AC_MSG_RESULT()
 AC_MSG_RESULT([***** Displaying PVFS2 Configuration Information *****])
