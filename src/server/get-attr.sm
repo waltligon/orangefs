@@ -181,7 +181,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     /*
       weed out the attr mask of the response based on what the client
-      request asked for.  also, check if need to retrieve more
+      request asked for.  also, check if we need to retrieve more
       information before returning the response to the client (by
       guiding the state machine to get it).
 
