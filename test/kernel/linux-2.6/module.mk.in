@@ -9,7 +9,7 @@ LOCALLIBS := -ldb -lrt -lpthread
 LOCALTESTS := $(patsubst %.c,%, $(TEST_KERNEL_DIR_SRC))
 $(LOCALTESTS): %: %.o 
 ifdef QUIET_COMPILE
-	@echo "  LD             $@"
+	@echo "  LD		$@"
 	@$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
 else
 	$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
