@@ -678,7 +678,7 @@ do                                                \
     sys_attr.mtime = (PVFS_time)CURRENT_TIME;     \
     sys_attr.ctime = (PVFS_time)CURRENT_TIME;     \
     sys_attr.size = 0;                            \
-    sys_attr.perms = mode;                        \
+    sys_attr.perms = pvfs2_translate_mode(mode);  \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
@@ -704,7 +704,7 @@ do                                                \
     sys_attr.mtime = (PVFS_time)tspec.tv_sec;     \
     sys_attr.ctime = (PVFS_time)tspec.tv_sec;     \
     sys_attr.size = 0;                            \
-    sys_attr.perms = mode;                        \
+    sys_attr.perms = pvfs2_translate_mode(mode);  \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
@@ -715,6 +715,49 @@ do                                                \
 /************************************
  * misc convenience functions
  ************************************/
+static inline int pvfs2_translate_mode(int vfs_mode)
+{
+    int ret = 0;
+
+    if (mode & S_IXOTH)
+    {
+        ret |= PVFS_O_EXECUTE;
+    }
+    if (mode & S_IWOTH)
+    {
+        ret |= PVFS_O_WRITE;
+    }
+    if (mode & S_IROTH)
+    {
+        ret |= PVFS_O_READ;
+    }
+    if (mode & S_IXGRP)
+    {
+        ret |= PVFS_G_EXECUTE;
+    }
+    if (mode & S_IWGRP)
+    {
+        ret |= PVFS_G_WRITE;
+    }
+    if (mode & S_IRGRP)
+    {
+        ret |= PVFS_G_READ;
+    }
+    if (mode & S_IXUSR)
+    {
+        ret |= PVFS_U_EXECUTE;
+    }
+    if (mode & S_IWUSR)
+    {
+        ret |= PVFS_U_WRITE;
+    }
+    if (mode & S_IRUSR)
+    {
+        ret |= PVFS_U_READ;
+    }
+    return ret;
+}
+
 static inline int pvfs2_internal_revalidate(
     struct inode *inode)
 {

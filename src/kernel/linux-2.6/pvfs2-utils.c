@@ -518,7 +518,7 @@ static inline struct inode *pvfs2_create_file(
 
     /* macro defined in pvfs2-kernel.h */
     fill_default_sys_attrs(new_op->upcall.req.create.attributes,
-                           PVFS_TYPE_METAFILE, (S_IFREG | mode));
+                           PVFS_TYPE_METAFILE, mode);
 
     strncpy(new_op->upcall.req.create.d_name,
             dentry->d_name.name, PVFS2_NAME_LEN);
@@ -608,7 +608,7 @@ static inline struct inode *pvfs2_create_dir(
 
     /* macro defined in pvfs2-kernel.h */
     fill_default_sys_attrs(new_op->upcall.req.mkdir.attributes,
-                           PVFS_TYPE_DIRECTORY, (S_IFDIR | mode));
+                           PVFS_TYPE_DIRECTORY, mode);
 
     strncpy(new_op->upcall.req.mkdir.d_name,
             dentry->d_name.name, PVFS2_NAME_LEN);
@@ -699,7 +699,7 @@ static inline struct inode *pvfs2_create_symlink(
 
     /* macro defined in pvfs2-kernel.h */
     fill_default_sys_attrs(new_op->upcall.req.sym.attributes,
-                           PVFS_TYPE_SYMLINK, (S_IFLNK | mode));
+                           PVFS_TYPE_SYMLINK, mode);
 
     strncpy(new_op->upcall.req.sym.entry_name, dentry->d_name.name,
             PVFS2_NAME_LEN);
