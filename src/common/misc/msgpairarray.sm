@@ -115,9 +115,8 @@ static int msgpairarray_init(PARENT_SM *sm_p,
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "(%p) msgpairarray state: init (%d msgpair(s))\n",
-                 sm_p, sm_p->msgarray_count);
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: init "
+                 "(%d msgpair(s))\n", sm_p, sm_p->msgarray_count);
 
     assert(sm_p->msgarray_count > 0);
 
@@ -171,7 +170,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
     int must_loop_encodings = 0;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "(%p) msgpairarray state: post "
+        GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: post "
         "(%d total message(s) with %d incomplete)\n", sm_p,
         (sm_p->msgarray_count * 2), (num_incomplete_msgpairs * 2));
 
@@ -234,7 +233,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
             {
                 if (must_loop_encodings)
                 {
-                    gossip_debug(GOSSIP_CLIENT_DEBUG, "Looping through "
+                    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "Looping through "
                                  "encodings [%d/%d]\n", msg_p->enc_type,
                                  ENCODING_INVALID_MAX);
 
@@ -265,9 +264,8 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 
 	session_tag = PINT_util_get_next_tag();
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "(%p) msgpair %d (%p): posting recv\n",
-                     sm_p, (i + 1), msg_p);
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpair %d (%p): "
+                     "posting recv\n", sm_p, (i + 1), msg_p);
 
 	/* post receive of response; job_id stored in recv_id */
 	ret = job_bmi_recv(msg_p->svr_addr,
@@ -325,9 +323,8 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 	 */
 	assert(ret == 0);
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "(%p) msgpair %d (%p): posting send\n",
-                     sm_p, (i + 1), msg_p);
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpair %d (%p): "
+                     "posting send\n", sm_p, (i + 1), msg_p);
 
 	/* post send of request; job_id stored in send_id */
 	ret = job_bmi_send_list(msg_p->encoded_req.dest,
@@ -399,7 +396,7 @@ static int msgpairarray_post_retry(PARENT_SM *sm_p,
 {
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
                  "(%p) msgpairarray state: post_retry\n", sm_p);
 
     return job_req_sched_post_timer(
@@ -411,7 +408,7 @@ static int msgpairarray_post_retry(PARENT_SM *sm_p,
 static int msgpairarray_complete(PARENT_SM *sm_p,
                                  job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
                  "(%p) msgpairarray state: complete\n", sm_p);
 
     /* match operation with something in the msgpair array */
@@ -466,7 +463,7 @@ static int msgpairarray_complete(PARENT_SM *sm_p,
     }
 
     assert(sm_p->msgarray_params.comp_ct == 0);
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
                  "  msgpairarray: all operations complete\n");
 
     js_p->error_code = MSGPAIRS_COMPLETE;
@@ -482,7 +479,7 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
 
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) msgpairarray state: "
+    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: "
                  "completion_fn\n", sm_p);
 
     for (i = 0; i < sm_p->msgarray_count; i++)
@@ -499,9 +496,9 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
             {
                 msg_p->retry_count++;
 
-                gossip_debug(GOSSIP_CLIENT_DEBUG, "*** msgpairarray send "
-                             "failed -- retrying msgpair (count = %d)\n",
-                             msg_p->retry_count);
+                gossip_debug(GOSSIP_MSGPAIR_DEBUG, "*** msgpairarray "
+                             "send failed -- retrying msgpair (count "
+                             "= %d)\n", msg_p->retry_count);
 
                 /*
                   NOTE: we only retry msgpairs that haven't yet been
@@ -512,7 +509,7 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
 
                 assert(sm_p->msgarray_params.comp_ct > 0);
 
-                gossip_debug(GOSSIP_CLIENT_DEBUG, "*** msgpairarray is "
+                gossip_debug(GOSSIP_MSGPAIR_DEBUG, "*** msgpairarray is "
                              "retrying %d of %d total messages\n",
                              sm_p->msgarray_params.comp_ct,
                              (2 * sm_p->msgarray_count));
@@ -573,7 +570,7 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
 	else if (resp_p->status != 0)
         {
 	    /* no comp_fn specified and status non-zero */
-	    gossip_debug(GOSSIP_CLIENT_DEBUG,
+	    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
                          "notice: msgpairarray_complete: error %d "
                          "from server %d\n", resp_p->status, i);
 
@@ -609,9 +606,8 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
         */
         msg_p->complete = 1;
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "(%p) msgpair %d (%p): marked complete\n",
-                     sm_p, (i + 1), msg_p);
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpair %d (%p): "
+                     "marked complete\n", sm_p, (i + 1), msg_p);
     }
     return 1;
 }
@@ -731,7 +727,7 @@ int PINT_serv_msgpairarray_resolve_addrs(
                 break;
             }
 
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
+            gossip_debug(GOSSIP_MSGPAIR_DEBUG,
                          " mapped handle %Lu to server %Ld\n",
                          Lu(msg_p->handle), Ld(msg_p->svr_addr));
         }
