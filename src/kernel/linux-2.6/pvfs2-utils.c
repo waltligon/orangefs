@@ -213,6 +213,8 @@ int pvfs2_inode_setattr(
 
         /* fill in all attributes that we're interested in */
         attrs = &new_op->upcall.req.setattr.attributes;
+        memset(attrs, 0, sizeof(PVFS_sys_attr));
+
         attrs->owner = inode->i_uid;
         attrs->group = inode->i_gid;
         attrs->atime = (PVFS_time)inode->i_atime.tv_sec;
@@ -242,10 +244,19 @@ int pvfs2_inode_setattr(
         if (perm_mode & S_IRUSR)
             attrs->perms |= PVFS_U_READ;
 
-        /* set mask to reflect all values, but defintely NOT
-           the object type since we're ignoring that (and
-           safely can)
-        */
+        if (perm_mode & S_IFREG)
+        {
+            attrs->objtype = PVFS_TYPE_METAFILE;
+        }
+        else if (perm_mode & S_IFDIR)
+        {
+            attrs->objtype = PVFS_TYPE_DIRECTORY;
+        }
+        else if (perm_mode & S_IFLNK)
+        {
+            attrs->objtype = PVFS_TYPE_SYMLINK;
+        }
+
         attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
 	/* post req and wait for request to be serviced here */

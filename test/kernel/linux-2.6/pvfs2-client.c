@@ -263,8 +263,6 @@ static int service_setattr_request(
                in_upcall->req.setattr.refn.fs_id,
                in_upcall->req.setattr.refn.handle);
 
-        printf("ATTR MASK IS %d\n",in_upcall->req.setattr.attributes.mask);
-
         ret = PVFS_sys_setattr(in_upcall->req.setattr.refn,
                                in_upcall->req.setattr.attributes,
                                credentials);
