@@ -743,6 +743,11 @@ static void *server_sig_handler(int sig)
 	 */
 	gossip_err("SIGHUP: pvfs2-server cannot restart; shutting down instead.\n");
     }
+    if(sig == SIGSEGV)
+    {
+	gossip_err("SIGSEGV: skipping cleanup; exit now!\n");
+	exit(-1);
+    }
 
     /* set the signal_recvd_flag on critical errors to cause the server to 
      * exit gracefully on the next work cycle
