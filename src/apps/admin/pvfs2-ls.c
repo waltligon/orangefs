@@ -141,8 +141,9 @@ int main(int argc, char **argv)
             {
                 if ((mnt_index != -1) && (i != mnt_index))
                 {
-                    fprintf(stderr, "Cannot use pvfs2-ls across "
-                                "mount points at this time!\n");
+                    fprintf(stderr, "Cannot use %s across "
+                            "mount points at this time!\n",
+                            process_name);
                     return(-1);
                 }
                 else
