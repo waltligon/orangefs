@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <stdio.h>
+#include <sys/time.h>
 #include <gm.h>
 
 #include "bmi-method-support.h"
@@ -172,7 +173,7 @@ enum
     /* be careful changing these indexes!  op list searches rely on these
      * numerical values.
      */
-    NUM_INDICES = 9,
+    NUM_INDICES = 10,
     IND_NEED_SEND_TOK_HI_CTRLACK = 0,
     IND_NEED_SEND_TOK_LOW = 1,
     IND_NEED_SEND_TOK_HI_CTRL = 2,
@@ -181,8 +182,11 @@ enum
     IND_RECVING = 5,
     IND_NEED_RECV_POST = 6,
     IND_NEED_CTRL_MATCH = 7,
-    IND_COMPLETE_RECV_UNEXP = 8
+    IND_COMPLETE_RECV_UNEXP = 8,
+    IND_CANCELLED_REND = 9,
 };
+
+static int cancelled_rend_count = 0;
 
 /* buffer status indicator */
 enum
@@ -287,6 +291,7 @@ struct gm_op
     uint8_t complete; /* indicates when operation is completed */
     uint8_t list_flag; /* indicates this is a list operation */
     uint8_t cancelled; /* indicates operation has been cancelled */
+    long cancelled_tv_sec; /* timestamp for when the op was cancelled */
 };
 
 /* the local port that we are communicating on */
@@ -1616,6 +1621,19 @@ int BMI_gm_test(bmi_op_id_t id,
 	dealloc_gm_method_op(query_op);
 	(*outcount)++;
     }
+    if(gm_op_data->cancelled && gm_op_data->cancelled_tv_sec)
+    {
+        /* report this operation as complete; it is only hanging around
+         * to protect a recv buffer after cancellation
+         */
+        if(user_ptr != NULL)
+	{
+	    (*user_ptr) = query_op->user_ptr;
+	}
+	(*error_code) = -PVFS_ECANCEL;
+	(*actual_size) = 0;
+	(*outcount)++;
+    }
     if(*outcount)
     {
         gen_mutex_unlock(&interface_mutex);
@@ -1692,6 +1710,18 @@ int BMI_gm_testsome(int incount,
 		dealloc_gm_method_op(query_op);
 		(*outcount)++;
 	    }
+            if(gm_op_data->cancelled && gm_op_data->cancelled_tv_sec)
+            {
+                /* report this operation as complete; it is only hanging around
+                 * to protect a recv buffer after cancellation
+                 */
+		error_code_array[*outcount] = -PVFS_ECANCEL;
+		actual_size_array[*outcount] = 0;
+		index_array[*outcount] = i;
+                if(user_ptr_array != NULL)
+                    user_ptr_array[*outcount] = query_op->user_ptr;
+                (*outcount)++;
+            }
 	}
     }
     if(*outcount)
@@ -1752,6 +1782,8 @@ int BMI_gm_testcontext(int incount,
 {
     int ret = -1;
     method_op_p query_op = NULL;
+    op_list_p tmp_entry = NULL;
+    struct gm_op *gm_op_data = NULL;
 
     *outcount = 0;
 
@@ -1770,6 +1802,26 @@ int BMI_gm_testcontext(int incount,
 	    user_ptr_array[*outcount] = query_op->user_ptr;
 	dealloc_gm_method_op(query_op);
 	(*outcount)++;
+    }
+    /* this is kind of nasty- look for cancelled rend recvs that we
+     * have not reported yet.  Must iterate queue.
+     */
+    qlist_for_each(tmp_entry, op_list_array[IND_CANCELLED_REND])
+    {
+        if(*outcount >= incount)
+            break;
+        query_op = qlist_entry(tmp_entry, struct method_op, op_list_entry);
+	gm_op_data = query_op->method_data;
+        if(!gm_op_data->complete)
+        {
+            gm_op_data->complete = 1;
+            error_code_array[*outcount] = -PVFS_ECANCEL;
+            actual_size_array[*outcount] = 0;
+            out_id_array[*outcount] = query_op->op_id;
+            if(user_ptr_array != NULL)
+                user_ptr_array[*outcount] = query_op->user_ptr;
+	    (*outcount)++;
+        }
     }
     if(*outcount)
     {
@@ -1798,6 +1850,26 @@ int BMI_gm_testcontext(int incount,
 	    user_ptr_array[*outcount] = query_op->user_ptr;
 	dealloc_gm_method_op(query_op);
 	(*outcount)++;
+    }
+    /* this is kind of nasty- look for cancelled rend recvs that we
+     * have not reported yet.  Must iterate queue.
+     */
+    qlist_for_each(tmp_entry, op_list_array[IND_CANCELLED_REND])
+    {
+        if(*outcount >= incount)
+            break;
+        query_op = qlist_entry(tmp_entry, struct method_op, op_list_entry);
+	gm_op_data = query_op->method_data;
+        if(!gm_op_data->complete)
+        {
+            gm_op_data->complete = 1;
+            error_code_array[*outcount] = -PVFS_ECANCEL;
+            actual_size_array[*outcount] = 0;
+            out_id_array[*outcount] = query_op->op_id;
+            if(user_ptr_array != NULL)
+                user_ptr_array[*outcount] = query_op->user_ptr;
+	    (*outcount)++;
+        }
     }
 
     gen_mutex_unlock(&interface_mutex);
@@ -3093,6 +3165,12 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
 
     /* find the matching operation */
     query_op = id_gen_safe_lookup(ctrl_op_id);
+    if(!query_op)
+    {
+        /* operation must have been cancelled; just return */
+        return;
+    }
+
     op_list_remove(query_op);
     gm_op_data = query_op->method_data;
 
@@ -3156,6 +3234,17 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
 	    bmi_gm_bufferpool_put(io_pool, gm_op_data->tmp_xfer_buffer);
 #endif /* ENABLE_GM_BUFPOOL */
 	}
+    }
+
+    /* if this is an operation that has been cancelled, then don't put
+     * it in the completion queue (it should have already been announced)
+     * Instead, just quietly gid rid of the operation
+     */
+    if(gm_op_data->cancelled)
+    {
+        cancelled_rend_count--;
+	dealloc_gm_method_op(query_op);
+        return;
     }
 
     /* done */
@@ -4010,8 +4099,37 @@ int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
             return(0);
         }
 
-        /* TODO: final case: IND_RECVING */
-        assert(0);
+        /* are we actually in the process of receiving data? */
+        tmp_op = op_list_search(op_list_array[IND_RECVING], &key);
+        if(tmp_op)
+        {
+            struct timeval tv;
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: receiving data.\n");
+            assert(tmp_op == query_op);
+
+            /* resources have been consumed (big recv buffer), 
+             * and we can't risk reusing it.  The sender may wake up and
+             * perform a remote put operation
+             */
+            /* mark operation as cancelled, set timestamp, and move to
+             * special queue; we may reclaim it much later
+             */
+            op_list_remove(query_op);
+            gm_op_data->cancelled = 1;
+            gettimeofday(&tv, NULL);
+            gm_op_data->cancelled_tv_sec = tv.tv_sec;
+            op_list_add(op_list_array[IND_CANCELLED_REND], query_op);
+            cancelled_rend_count++;
+
+            /* NOTE: test functions will find this special case operation
+             * and report it as completed with PVFS_ECANCEL error code so 
+             * that the caller doesn't get hung.  The caller can continue
+             * without any risk at this point. */
+            
+	    gen_mutex_unlock(&interface_mutex);
+            return(0);
+        }
     }
 
     /* if we fall through to here then something has gone terribly wrong,
