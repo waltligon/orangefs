@@ -5,6 +5,7 @@
  */
 
 #include <client.h>
+#include <assert.h>
 #include <sys/time.h>
 
 /*why were these commented out?*/
@@ -25,8 +26,8 @@ int main(int argc,char **argv)
 	PVFS_sysresp_init resp_init;
 	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
-	PVFS_sysreq_lookup *req_lk = NULL;
-	PVFS_sysresp_lookup *resp_lk = NULL;
+	PVFS_sysreq_lookup req_lk;
+	PVFS_sysresp_lookup resp_lk;
 	char *filename;
 	int name_sz;
 	int ret = -1;
@@ -42,6 +43,7 @@ int main(int argc,char **argv)
 	}
 	name_sz = strlen(argv[1]) + 1; /*include null terminator*/
 	filename = malloc(name_sz);
+        assert(filename);
 
 	memcpy(filename, argv[1], name_sz);
 	printf("lookup up path %s\n", filename);
@@ -80,32 +82,16 @@ int main(int argc,char **argv)
 	printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
 	
 	/* test the lookup function */
-	req_lk = (PVFS_sysreq_lookup *)malloc(sizeof(PVFS_sysreq_lookup));
-	if (!req_lk)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
-	resp_lk = (PVFS_sysresp_lookup *)malloc(sizeof(PVFS_sysresp_lookup));
-	if (!resp_lk)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
-	
-	req_lk->name = filename;
-	if (!req_lk->name)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
-	req_lk->fs_id = resp_init.fsid_list[0];
+        memset(&req_lk,0,sizeof(PVFS_sysreq_lookup));
+        memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
-	req_lk->credentials.uid = 100;
-	req_lk->credentials.gid = 100;
-	req_lk->credentials.perms = 1877;
+	req_lk.name = filename;
+	req_lk.fs_id = resp_init.fsid_list[0];
+	req_lk.credentials.uid = 100;
+	req_lk.credentials.gid = 100;
+	req_lk.credentials.perms = U_WRITE|U_READ;
 
-	ret = PVFS_sys_lookup(req_lk,resp_lk);
+	ret = PVFS_sys_lookup(&req_lk,&resp_lk);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
@@ -113,14 +99,11 @@ int main(int argc,char **argv)
 	}
 	// print the handle 
 	printf("--lookup--\n"); 
-	printf("\tHandle:%ld\n", (long int)resp_lk->pinode_refn.handle);
-	printf("\tFSID:%ld\n", (long int)resp_lk->pinode_refn.fs_id);
+	printf("\tHandle:%Ld\n",resp_lk.pinode_refn.handle);
+	printf("\tFSID:%d\n",resp_lk.pinode_refn.fs_id);
 
-	lk_handle = resp_lk->pinode_refn.handle;
-	lk_fsid = resp_lk->pinode_refn.fs_id;
-
-	free(req_lk);
-	free(resp_lk);
+	lk_handle = resp_lk.pinode_refn.handle;
+	lk_fsid = resp_lk.pinode_refn.fs_id;
 
 	//close it down
 	ret = PVFS_sys_finalize();
