@@ -185,68 +185,6 @@ method_op_p op_list_search(op_list_p olp,
 }
 
 
-/* op_list_search_array()
- *
- * Searches for the presence of any of an array of ids
- *
- * returns 0 on success, -errno on failure
- */
-int op_list_search_array(int incount,
-			 bmi_op_id_t * id_array,
-			 int *outcount,
-			 int *index_array,
-			 bmi_error_code_t * error_code_array,
-			 bmi_size_t * actual_size_array,
-			 void **user_ptr_array,
-			 op_list_p olp)
-{
-    op_list_p tmp_link = NULL;
-    struct method_op *tmp_op = NULL;
-    int i = 0, search_count = 0;
-
-    /* safety */
-    *outcount = 0;
-
-    /* count how many entries are really in the array */
-    for (i = 0; i < incount; i++)
-    {
-	if (id_array[i])
-	{
-	    search_count++;
-	}
-    }
-
-    /* make sure there is something to find */
-    if (!search_count)
-	return (0);
-
-    qlist_for_each(tmp_link, olp)
-    {
-	tmp_op = qlist_entry(tmp_link, struct method_op, op_list_entry);
-	/* for each entry, see if it is in the search array */
-	for (i = 0; i < incount; i++)
-	{
-	    if (id_array[i] == tmp_op->op_id)
-	    {
-		index_array[*outcount] = i;
-		error_code_array[*outcount] = tmp_op->error_code;
-		actual_size_array[*outcount] = tmp_op->actual_size;
-		if (user_ptr_array)
-		    user_ptr_array[*outcount] = tmp_op->user_ptr;
-		(*outcount)++;
-		break;
-	    }
-	}
-	/* quit early if we have already found everything */
-	if (*outcount == search_count)
-	{
-	    return (0);
-	}
-    }
-
-    return (0);
-}
-
 /* op_list_shownext()
  *
  * shows the next entry in an op list; does not remove the entry
@@ -279,10 +217,6 @@ static int op_list_cmp_key(struct op_list_search_key *my_key,
 {
 
     if (my_key->method_addr_yes && (my_key->method_addr != my_op->addr))
-    {
-	return (1);
-    }
-    if (my_key->actual_size_yes && (my_key->actual_size != my_op->actual_size))
     {
 	return (1);
     }
