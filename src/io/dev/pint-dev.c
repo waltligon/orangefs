@@ -5,9 +5,17 @@
  */
 
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 
+#include "pvfs2-types.h"
 #include "gossip.h"
 #include "pint-dev.h"
+
+static int pdev_fd = -1;
 
 /* PINT_dev_initialize()
  *
@@ -19,6 +27,34 @@ int PINT_dev_initialize(
 	const char* dev_name,
 	int flags)
 {
+    int ret = -1;
+
+    /* we have to be root to access the device */
+    if(getuid() != 0 && geteuid() != 0)
+    {
+	gossip_err("Error: must be root to open pvfs2 device.\n");
+	return(-(PVFS_EPERM|PVFS_ERROR_DEV));
+    }
+
+    /* TODO: put in code that sets up the device, copy from pvfsd */
+
+    /* try to open the device */
+    pdev_fd = open(dev_name, O_RDWR);
+    if(pdev_fd < 0)
+    {
+	switch(errno)
+	{
+	    case EACCES:
+		return(-(PVFS_EPERM|PVFS_ERROR_DEV));
+	    case ENOENT:
+		return(-(PVFS_ENOENT|PVFS_ERROR_DEV));
+	    default:
+		return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+	}
+    }
+
+    /* run some ioctls to find out device parameters */
+
     gossip_lerr("Error: function not implemented.\n");
     return(-(PVFS_ENOSYS|PVFS_ERROR_DEV));
 }
