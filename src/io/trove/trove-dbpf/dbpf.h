@@ -388,6 +388,27 @@ void dbpf_error_report(const char *errpfx, char *msg);
 #define DBPF_READ   read
 #define DBPF_CLOSE  close
 #define DBPF_UNLINK unlink
+#define DBPF_SYNC   fsync
+#define DBPF_RESIZE ftruncate
+
+#define DBPF_DB_SYNC_IF_NECESSARY(dbpf_op_ptr, db_ptr) \
+do {                                                   \
+    if (dbpf_op_ptr->flags & TROVE_SYNC)               \
+    {                                                  \
+	if ((ret = db_ptr->sync(db_ptr, 0)) != 0)      \
+        {                                              \
+            gossip_err("db_p->sync failed: %s\n",      \
+                       db_strerror(ret));              \
+	    error = -dbpf_db_error_to_trove_error(ret);\
+	    goto return_error;                         \
+	}                                              \
+        gossip_debug(                                  \
+          GOSSIP_TROVE_DEBUG,"db_p->sync called "      \
+          "servicing op type %s\n",                    \
+          dbpf_op_type_to_str(dbpf_op_ptr->type));     \
+    }                                                  \
+} while(0)
+
 
 extern struct dbpf_storage *my_storage_p;
 

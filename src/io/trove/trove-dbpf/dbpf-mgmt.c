@@ -753,7 +753,7 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
 				   void *user_ptr,
 				   TROVE_op_id *out_op_id_p)
 {
-    int ret, i=0;
+    int ret, i = 0, error = -TROVE_EINVAL;
     db_recno_t recno;
     DB *db_p;
     DBC *dbc_p;
@@ -778,6 +778,7 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
     if (ret != 0)
     {
+	error = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
 
@@ -821,6 +822,7 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
         }
 	else if (ret != 0)
         {
+            error = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
         }
     }
@@ -844,12 +846,13 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
 	}
 	else if (ret != 0)
         {
+            error = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
         }
 	coll_id_array[i] = db_entry.coll_id;
     }
-    
-return_ok:
+
+  return_ok:
     if (ret == DB_NOTFOUND)
     {
 	*inout_position_p = TROVE_ITERATE_END;
@@ -888,6 +891,7 @@ return_ok:
         {
             gossip_debug(GOSSIP_TROVE_DEBUG, "warning: keyval iterate -- "
                          "some other failure @ recno\n");
+            error = -dbpf_db_error_to_trove_error(ret);
         }
 
 	assert(recno != TROVE_ITERATE_START &&
@@ -903,24 +907,27 @@ return_ok:
 
     if (flags & TROVE_SYNC)
     {
-	if ((ret = db_p->sync(db_p, 0)) != 0)
+        if ((ret = db_p->sync(db_p, 0)) != 0)
         {
+	    error = -dbpf_db_error_to_trove_error(ret);
 	    goto return_error;
-	}
+        }
     }
 
     ret = dbc_p->c_close(dbc_p);
     if (ret != 0)
     {
+        error = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
     return 1;
     
-return_error:
+  return_error:
     gossip_lerr("dbpf_collection_iterate_op_svc: %s\n",
                 db_strerror(ret));
+
     *inout_count_p = i;
-    return -1;
+    return error;
 }
 
 

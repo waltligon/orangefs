@@ -169,14 +169,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
             (char *)op_p->u.k_read.key.buffer);
     }
 
-    if (op_p->flags & TROVE_SYNC)
-    {
-	if ((ret = db_p->sync(db_p, 0)) != 0)
-        {
-	    error = -dbpf_db_error_to_trove_error(ret);
-	    goto return_error;
-	}
-    }
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;
@@ -299,14 +292,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
         }
     }
 
-    if (op_p->flags & TROVE_SYNC)
-    {
-	if ((ret = db_p->sync(db_p, 0)) != 0)
-        {
-	    error = -dbpf_db_error_to_trove_error(ret);
-	    goto return_error;
-	}
-    }
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;
@@ -397,14 +383,7 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 	goto return_error;
     }
 
-    if (op_p->flags & TROVE_SYNC)
-    {
-	if ((ret = db_p->sync(db_p, 0)) != 0)
-        {
-	    error = -dbpf_db_error_to_trove_error(ret);
-	    goto return_error;
-	}
-    }
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;
@@ -669,14 +648,7 @@ return_ok:
 
     *op_p->u.k_iterate.count_p = i;
 
-    if (op_p->flags & TROVE_SYNC)
-    {
-	if ((ret = db_p->sync(db_p, 0)) != 0)
-        {
-	    error = -dbpf_db_error_to_trove_error(ret);
-	    goto return_error;
-	}
-    }
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
     /* give up the db reference */
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
@@ -810,14 +782,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
 	op_p->u.k_read_list.val_array[i].read_sz = data.size;
     }
 
-    if (op_p->flags & TROVE_SYNC)
-    {
-	if ((ret = db_p->sync(db_p, 0)) != 0)
-        {
-	    error = -dbpf_db_error_to_trove_error(ret);
-	    goto return_error;
-	}
-    }
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;

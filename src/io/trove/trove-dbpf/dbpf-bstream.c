@@ -23,14 +23,6 @@
 #include "dbpf-attr-cache.h"
 #include "pint-event.h"
 
-#define DBPF_OPEN open
-#define DBPF_WRITE write
-#define DBPF_LSEEK lseek
-#define DBPF_READ read
-#define DBPF_CLOSE close
-#define DBPF_SYNC fsync
-#define DBPF_RESIZE ftruncate
-
 #define AIOCB_ARRAY_SZ 8
 
 /* Internal prototypes */
