@@ -70,8 +70,9 @@ int dbpf_close_context(
     }
 
     gen_mutex_destroy(dbpf_completion_queue_array_mutex[context_id]);
-    dbpf_op_queue_cleanup(dbpf_completion_queue_array[context_id]);
+    dbpf_completion_queue_array_mutex[context_id] = NULL;
 
+    dbpf_op_queue_cleanup(dbpf_completion_queue_array[context_id]);
     dbpf_completion_queue_array[context_id] = NULL;
 
     gen_mutex_unlock(&dbpf_context_mutex);
