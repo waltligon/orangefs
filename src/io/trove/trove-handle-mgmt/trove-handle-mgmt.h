@@ -9,7 +9,7 @@
 
 #define MAX_NUM_VERIFY_HANDLE_COUNT        512
 
-#define TROVE_DEFAULT_HANDLE_PURGATORY_SEC  45
+#define TROVE_DEFAULT_HANDLE_PURGATORY_SEC 360
 
 /*
   NOTE: all methods return -1 on error;
