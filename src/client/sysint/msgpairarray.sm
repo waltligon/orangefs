@@ -1,0 +1,326 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/* pvfs2_client_msgpairarray_sm
+ *
+ * The purpose of this state machine is to prepare, send, and
+ * receive a collection of request/response pairs (msgpairs).
+ *
+ * The following elements of the PINT_client_sm_msgpair_state
+ * must be valid prior to entering this state machine:
+ * - req (unencoded request)
+ * - fs_id
+ * - handle
+ * - comp_fn
+ *
+ * When this state machine returns, ...
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "state-machine-fns.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "pint-servreq.h"
+#include "PINT-reqproto-encode.h"
+
+extern job_context_id pint_client_sm_context;
+
+static int msgpairarray_post(PINT_client_sm *sm_p, job_status_s *js_p);
+static int msgpairarray_complete(PINT_client_sm *sm_p, job_status_s *js_p);
+static int msgpairarray_error(PINT_client_sm *sm_p, job_status_s *js_p);
+
+%%
+
+nested machine pvfs2_client_msgpairarray_sm(post,
+					    complete,
+					    error)
+{
+    state post {
+	run msgpairarray_post;
+	success => complete;
+	default => error;
+    }
+
+    state complete {
+	run msgpairarray_complete;
+	success => return;
+	default => error;
+    }
+    
+    state error {
+	run msgpairarray_error;
+	default => return;
+    }
+}
+
+%%
+
+/* msgpairarray_post()
+ *
+ * The following elements of the PINT_client_sm_msgpair_state
+ * should be valid prior to this state (for each msgpair in array):
+ * - req (unencoded request)
+ * - fs_id
+ * - handle
+ *
+ * This state performs the following operations for each msgpair,
+ * one at a time:
+ * (1) map fs_id/handle to a server
+ * (2) encodes request
+ * (3) calculates maximum response size
+ * (4) allocates BMI memory for response data (encoded)
+ * (5) gets a session tag for the pair of messages
+ * (6) posts the receive of the response
+ * (7) posts the send of the request
+ * (8) stores job ids for later matching
+ *
+ */
+static int msgpairarray_post(PINT_client_sm *sm_p,
+			     job_status_s *js_p)
+{
+    int ret, i;
+
+    gossip_debug(CLIENT_DEBUG, "msgpairarray state: post\n");
+
+    /* set number of operations that must complete.
+     *
+     * NOTE: we're using the comp_ct in the first msgarray
+     * entry to keep up with the count for the entire array.
+     */
+    sm_p->msgarray[0].comp_ct += 2 * sm_p->msgarray_count;
+
+    /* run through array of msgpairarray to kick off */
+    for (i=0; i < sm_p->msgarray_count; i++) {
+	PVFS_msg_tag_t session_tag;
+	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+
+	/* NOTE: THIS IS REPLICATED IN PINT_SERV_PREPARE_MSGPAIR();
+	 * WE SHOULD GET RID OF ONE OF THEM OR SOMETHING...
+	 */
+
+	/* determine server address from fs_id/handle pair.
+	 * this is needed prior to encoding.
+	 */
+	ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+					msg_p->handle,
+					msg_p->fs_id);
+	if (ret != 0) {
+	    assert(ret < 0); /* return value range check */
+	    assert(0); /* placeholder until we have real error handling */
+	}
+
+	/* encode request. fills in encoded_req.
+	 */
+	ret = PINT_encode(&msg_p->req,
+			  PINT_ENCODE_REQ,
+			  &msg_p->encoded_req,
+			  msg_p->svr_addr,
+			  PINT_CLIENT_ENC_TYPE);
+	if (ret != 0) {
+	    assert(ret < 0); /* return value range check */
+	    assert(0); /* placeholder until we have real error handling */
+	}
+
+	/* calculate maximum response message size and allocate space.
+	 * fills in max_resp_sz, encoded_resp_p
+	 */
+	msg_p->max_resp_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
+						       msg_p->req.op,
+						       PINT_CLIENT_ENC_TYPE);
+	msg_p->encoded_resp_p = BMI_memalloc(msg_p->svr_addr,
+					     msg_p->max_resp_sz,
+					     BMI_RECV);
+	if (msg_p->encoded_resp_p == NULL) {
+	    assert(0);
+	}
+
+	/* get session tag to associate with send and receive.
+	 * session tag is kept as a local variable.
+	 */
+	session_tag = get_next_session_tag();
+
+	/* post receive of response; job_id stored in recv_id */
+	ret = job_bmi_recv(msg_p->svr_addr,
+			   msg_p->encoded_resp_p,
+			   msg_p->max_resp_sz,
+			   session_tag,
+			   BMI_PRE_ALLOC,
+			   sm_p,
+			   &msg_p->recv_status,
+			   &msg_p->recv_id,
+			   pint_client_sm_context);
+	if (ret < 0) {
+	    assert(0);
+	}
+	else if (ret == 1) {
+	    /* it shouldn't be possible for the receive to complete before
+	     * we send the request.
+	     */
+	    assert(0);
+	}
+	assert(ret == 0); /* return value range check */
+
+	/* post send of request; job_id stored in send_id */
+	ret = job_bmi_send_list(msg_p->encoded_req.dest,
+				msg_p->encoded_req.buffer_list,
+				msg_p->encoded_req.size_list,
+				msg_p->encoded_req.list_count,
+				msg_p->encoded_req.total_size,
+				session_tag,
+				msg_p->encoded_req.buffer_type,
+				1,
+				sm_p,
+				&msg_p->send_status,
+				&msg_p->send_id,
+				pint_client_sm_context);
+	if (ret < 0) {
+	    assert(0);
+	}
+	else if (ret == 1) {
+	    /* send completed immediately; decrement the completion counter */
+	    gossip_debug(CLIENT_DEBUG, "  msgpairarray: send completed immediately.\n");
+
+	    /* 0 is the valid "completed job id" value, according to Phil */
+	    msg_p->send_id = 0;
+
+	    /* TODO: CHECK THE STATUS!!! */
+	    assert(msg_p->send_status.error_code == 0);
+
+	    /* decrement our count, since send is already done.
+	     *
+	     * recall we're using the comp_ct in the first array
+	     * element to keep up with our count for the entire
+	     * array.
+	     */
+	    sm_p->msgarray[0].comp_ct--;
+	}
+	assert(ret == 0 || ret == 1); /* return value range check */
+    }
+
+    return 0;
+}
+
+/* msgpairarray_complete()
+ *
+ */     
+static int msgpairarray_complete(PINT_client_sm *sm_p,
+				 job_status_s *js_p)
+{
+    int ret, i;
+    int matched_job = 0;
+    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
+    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
+
+    PINT_client_sm_msgpair_state *msg_p; /* for convenience */
+
+    gossip_debug(CLIENT_DEBUG, "msgpairarray state: complete\n");
+
+    /* match operation with something in the msgpair array */
+    for (i=0; i < sm_p->msgarray_count; i++) {
+	msg_p = &sm_p->msgarray[i];
+
+	if (msg_p->recv_id == js_p->id) {
+	    matched_job = 1;
+
+	    msg_p->recv_id     = 0;
+	    msg_p->recv_status = *js_p;
+	    break;
+	}
+	else if (msg_p->send_id == js_p->id) {
+	    matched_job = 1;
+
+	    msg_p->send_id     = 0;
+	    msg_p->send_status = *js_p;
+	    break;
+	}
+    }
+    assert(matched_job == 1); /* sanity check */
+
+    /* we know status of operation is 0, or we wouldn't be in this state. */
+
+    /* decrement comp_ct until all operations have completed.
+     *
+     * recall we're using the comp_ct in the first array element...
+     */
+    if (--sm_p->msgarray[0].comp_ct > 0) return 0;
+    assert(msg_p->comp_ct == 0); /* sanity check */
+
+    /*** we have completed all the operations; now process results ***/
+
+    gossip_debug(CLIENT_DEBUG, "  msgpairarray: all operations complete\n");
+
+    for (i=0; i < sm_p->msgarray_count; i++) {
+	msg_p = &sm_p->msgarray[i];
+
+	/* decode; resp_p will point to response */
+	ret = PINT_serv_decode_resp(msg_p->encoded_resp_p,
+				    &decoded_resp,
+				    &msg_p->svr_addr,
+				    msg_p->recv_status.actual_size,
+				    &resp_p);
+	if (ret != 0) {
+	    gossip_err("error: msgpairarray_complete: decode error\n");
+	    assert(ret < 0); /* return value range check */
+	    assert(0); /* placeholder */
+	}
+
+	/* check status of response */
+	if (resp_p->status != 0) {
+	    gossip_err("error: msgpairarray_complete: status error\n");
+	    assert(0); /* placeholder */
+	}
+	
+	/* call completion function to perform operation-specific
+	 * functions.  this call must not block!!!
+	 *
+	 * NOTE: we call the function associated with each message,
+	 *       not just the one from the first array element.  so
+	 *       there could in theory be different functions for
+	 *       each message (to handle different types of messages
+	 *       all in the same array).
+	 */
+	if (msg_p->comp_fn != NULL) ret = msg_p->comp_fn(sm_p, resp_p);
+	if (ret != 0) {
+	    assert(0); /* placeholder */
+	}
+	
+	/* free all the resources that we used to send and receive. */
+	ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
+					       msg_p->encoded_resp_p,
+					       &decoded_resp,
+					       &msg_p->svr_addr,
+					       msg_p->max_resp_sz);
+	if (ret != 0) {
+	    assert(ret < 0); /* return value range check */
+	    assert(0); /* placeholder */
+	}
+    }
+
+    return 1;
+}
+    
+/* msgpairarray_error()
+ */
+static int msgpairarray_error(PINT_client_sm *sm_p,
+			      job_status_s *js_p)
+{
+    assert(0); /* placeholder */
+    return 1;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

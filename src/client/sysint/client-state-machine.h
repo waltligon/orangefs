@@ -50,11 +50,13 @@ typedef struct PINT_client_sm_msgpair_state_s {
     struct PINT_encoded_msg encoded_req;
 
     /* max_resp_sz, svr_addr, and encoded_resp_p used to recv a response */
-    int max_resp_sz, actual_resp_sz;
+    int max_resp_sz;
     void *encoded_resp_p;
 
     /* send_id, recv_id used to track completion of operations */
     job_id_t send_id, recv_id;
+    /* send_status, recv_status used for error handling etc. */
+    job_status_s send_status, recv_status;
 } PINT_client_sm_msgpair_state;
 
 
@@ -95,6 +97,16 @@ typedef struct PINT_client_sm {
 
     /* generic msgpair used with msgpair substate */
     PINT_client_sm_msgpair_state msgpair;
+
+    /* msgpair array ptr used when operations can be performed concurrently.
+     * obviously this has to be allocated within the upper-level state
+     * machine.  used with msgpairs substate typically.
+     *
+     * Q: DO WE WANT TO GET RID OF msgpair ABOVE AND FORCE INTO JUST
+     *    USING THIS?  I DON'T THINK SO...
+     */
+    int msgarray_count;
+    PINT_client_sm_msgpair_state *msgarray;
 
     /* req and encoded_req are needed to send a request */
     struct PVFS_server_req req;
@@ -148,7 +160,7 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;
-
+extern struct PINT_state_machine_s pvfs2_client_msgpairarray_sm;
 
 
 /*

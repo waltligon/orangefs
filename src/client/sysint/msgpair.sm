@@ -27,16 +27,7 @@
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
-
-/* from original remove.c */
-#include "pinode-helper.h"
-#include "pvfs2-sysint.h"
-#include "pint-sysint.h"
-#include "pint-dcache.h"
 #include "pint-servreq.h"
-#include "pint-dcache.h"
-#include "pint-bucket.h"
-#include "pcache.h"
 #include "PINT-reqproto-encode.h"
 
 extern job_context_id pint_client_sm_context;
@@ -95,7 +86,6 @@ static int msgpair_post(PINT_client_sm *sm_p,
 {
     int ret;
     PVFS_msg_tag_t session_tag;
-    job_status_s send_status, recv_status;
 
     PINT_client_sm_msgpair_state *msg_p; /* for convenience */
 
@@ -158,7 +148,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
 		       session_tag,
 		       BMI_PRE_ALLOC,
 		       sm_p,
-		       &recv_status,
+		       &msg_p->recv_status,
 		       &msg_p->recv_id,
 		       pint_client_sm_context);
     if (ret < 0) {
@@ -182,7 +172,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
 			    msg_p->encoded_req.buffer_type,
 			    1,
 			    sm_p,
-			    &send_status,
+			    &msg_p->send_status,
 			    &msg_p->send_id,
 			    pint_client_sm_context);
     if (ret < 0) {
@@ -196,7 +186,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
 	msg_p->send_id = 0;
 
 	/* TODO: CHECK THE STATUS!!! */
-	assert(send_status.error_code == 0);
+	assert(msg_p->send_status.error_code == 0);
 
 	/* decrement our count, since send is already done */
 	msg_p->comp_ct--;
@@ -226,11 +216,14 @@ static int msgpair_complete(PINT_client_sm *sm_p,
     /* we know status of operation is 0, or we wouldn't be in this state. */
 
     /* decrement until both operations have completed */
-    if (--msg_p->comp_ct > 0) return 0;
-
-    /* TODO: ADD IN ID MATCHING CODE HERE */
-
-    assert(msg_p->comp_ct == 0);
+    if (--msg_p->comp_ct > 0) {
+	/* if this the first completion, then it is the send.  save
+	 * the status.
+	 */
+	msg_p->send_status = *js_p;
+	return 0;
+    }
+    assert(msg_p->comp_ct == 0); /* sanity check */
 
     gossip_debug(CLIENT_DEBUG, "  msgpair: all operations complete\n");
 
@@ -239,13 +232,13 @@ static int msgpair_complete(PINT_client_sm *sm_p,
      * from the job status structure.
      *
      */
-    msg_p->actual_resp_sz = js_p->actual_size;
+    msg_p->recv_status = *js_p;
 
     /* decode; resp_p will point to response */
     ret = PINT_serv_decode_resp(msg_p->encoded_resp_p,
 				&decoded_resp,
 				&msg_p->svr_addr,
-				msg_p->actual_resp_sz,
+				msg_p->recv_status.actual_size,
 				&resp_p);
     if (ret != 0) {
 	gossip_err("error: msgpair_complete: decode error\n");
