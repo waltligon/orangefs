@@ -45,15 +45,10 @@ static void free_host_extent_table(void *ptr);
  */
 int PINT_bucket_initialize(void)
 {
-    int ret = -EINVAL;
+    s_fsid_config_cache_table =
+        qhash_init(hash_fsid_compare,hash_fsid,67);
 
-    s_fsid_config_cache_table = qhash_init(
-        hash_fsid_compare,hash_fsid,67);
-    if (!s_fsid_config_cache_table)
-    {
-        return (-ENOMEM);
-    }
-    return(0);
+    return (s_fsid_config_cache_table ? 0 : -ENOMEM);
 }
 
 /* PINT_bucket_finalize()

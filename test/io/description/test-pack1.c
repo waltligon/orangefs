@@ -1,5 +1,5 @@
 #include <malloc.h>
-
+#include <string.h>
 #include <pvfs-request.h>
 #include <pint-request.h>
 

@@ -72,9 +72,12 @@ static int initialize_new_server_op(job_status_s * ret);
 */
 static int initialize_interfaces(PINT_server_status_code *server_level_init)
 {
-    int ret = 0, i = 0;
+    int ret = 0;
     char *method_name = NULL;
+/* uncomment when trove supports the TROVE_COLLECTION_HANDLE_RANGES */
+#if 0
     char *cur_handle_range = NULL;
+#endif
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
 
@@ -141,11 +144,11 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 	    goto interface_init_failed;
         }
 #endif
-        i++;
         cur = llist_next(cur);
     }
     gossip_debug(SERVER_DEBUG, "Storage Init Complete\n");
-    gossip_debug(SERVER_DEBUG, "%d filesystems initialized\n", i);
+    gossip_debug(SERVER_DEBUG, "%d filesystems initialized\n",
+                 llist_count(user_opts.file_systems));
 
     /* initialize Job Interface */
     ret = job_initialize(0);

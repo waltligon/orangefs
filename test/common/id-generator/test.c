@@ -22,6 +22,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <id-generator.h>
 
 /* This code is a pretty pointless example.  It just generates a handle
