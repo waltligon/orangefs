@@ -48,8 +48,6 @@ int main(int argc, char **argv)
     void* buffer = NULL;
     int64_t total_written = 0;
     double time1, time2;
-    int32_t blocklength = 0;
-    PVFS_size displacement = 0;
     PVFS_fs_id lk_fs_id;
     char* lk_name;
     PVFS_credentials credentials;
@@ -174,17 +172,8 @@ int main(int argc, char **argv)
 
     pinode_refn = resp_lookup.pinode_refn;
     buffer_size = user_opts->buf_size;
-    blocklength = user_opts->buf_size;
-    displacement = 0;
-    /* TODO: use simpler file datatype when tiling is ready */
-    ret = PVFS_Request_indexed(1, &blocklength, &displacement,
-	PVFS_BYTE, &file_req);
-    if(ret < 0)
-    {
-	fprintf(stderr, "Error: PVFS_Request_indexed failure.\n");
-	ret = -1;
-	goto main_out;
-    }
+
+    file_req = PVFS_BYTE;
 
     ret = PVFS_Request_contiguous(buffer_size, PVFS_BYTE, &mem_req);
     if(ret < 0)
@@ -195,7 +184,7 @@ int main(int argc, char **argv)
     }
 
     time1 = Wtime();
-    while((ret = PVFS_sys_read(pinode_refn, file_req, 0,
+    while((ret = PVFS_sys_read(pinode_refn, file_req, total_written,
                 buffer, mem_req, credentials, &resp_io)) == 0 &&
 	resp_io.total_completed > 0)
     {
@@ -211,19 +200,6 @@ int main(int argc, char **argv)
 	}
 
 	total_written += current_size;
-
-	/* TODO: need to free the old request description */
-	
-	/* setup I/O description */
-	displacement = total_written;
-	ret = PVFS_Request_indexed(1, &blocklength,
-	    &displacement, PVFS_BYTE, &file_req);
-	if(ret < 0)
-	{
-	    fprintf(stderr, "Error: PVFS_Request_indexed failure.\n");
-	    ret = -1;
-	    goto main_out;
-	}
     };
     time2 = Wtime();
 
