@@ -1,31 +1,8 @@
-VISDIR := src/apps/vis
+DIR := src/apps/vis
 
-$(VISDIR)/pvfs2-vis-bw-2d: lib/libpvfs2.a
+VISSRC += \
+    $(DIR)/pvfs2-vis-bw-2d.c
 
-$(VISDIR)/pvfs2-vis-bw-2d: $(VISDIR)/pvfs2-vis-bw-2d.o $(VISDIR)/pvfs2-vis.o 
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $(LDFLAGS) $(VISLIBS) $^ -o $@
-else
-	$(LD) $(LDFLAGS) $(VISLIBS) $^ -o $@
-endif
+VISMISCSRC += \
+    $(DIR)/pvfs2-vis.c
 
-$(VISDIR)/pvfs2-vis.o: $(VISDIR)/pvfs2-vis.c
-ifdef QUIET_COMPILE
-	@echo "  CC             $@"
-	@$(CC) $(VISCFLAGS) $< -c -o $@
-else
-	$(CC) $(VISCFLAGS) $< -c -o $@
-endif
-
-$(VISDIR)/pvfs2-vis-bw-2d.o: $(VISDIR)/pvfs2-vis-bw-2d.c
-ifdef QUIET_COMPILE
-	@echo "  CC             $@"
-	@$(CC) $(VISCFLAGS) $< -c -o $@
-else
-	$(CC) $(VISCFLAGS) $< -c -o $@
-endif
-
-CLEANFILES += $(VISDIR)/pvfs2-vis-bw-2d.o
-CLEANFILES += $(VISDIR)/pvfs2-vis-bw-2d
-CLEANFILES += $(VISDIR)/pvfs2-vis.o

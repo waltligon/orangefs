@@ -324,12 +324,14 @@ SDL_VERSION=1.2.0
 AM_PATH_SDL($SDL_VERSION, 
     VISCFLAGS="$SDL_CFLAGS"
     VISLIBS="$SDL_LIBS"
+    BUILD_VIS="1"
 ,
     VISCFLAGS=
     VISLIBS=
 )
 AC_SUBST(VISCFLAGS)
 AC_SUBST(VISLIBS)
+AC_SUBST(BUILD_VIS)
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).

@@ -61,6 +61,7 @@ FLEX = flex
 BUILD_GM = @BUILD_GM@
 BUILD_IB = @BUILD_IB@
 BUILD_MPI = @BUILD_MPI@
+BUILD_VIS = @BUILD_VIS@
 MPICC = @MPICC@
 GNUC = @GNUC@
 MPI_GNUC = @MPI_GNUC@
@@ -250,8 +251,13 @@ MPITESTSRC :=
 #    object form using MPI
 MPIMISCSRC :=
 # MPIIOTESTSRC is the source for test programs that must be compiled 
-#	with MPI-IO
+#    with MPI-IO
 MPIIOTESTSRC :=
+# VISSRC is the source code for visualization tools
+VISSRC :=
+# VISMISCSRC is a collection of sources that must be built into objects for 
+#    visualization tools
+VISMISCSRC :=
 # files generated as part of the build that should be deleted on "make clean"
 CLEANFILES :=
 # files created by trove-autogen.pl
@@ -334,7 +340,17 @@ MPIIOTESTS := $(patsubst %.c,%, $(filter %.c, $(MPIIOTESTSRC)))
 # MPIIOTESTDEPENDS is a list of dependency files for MPI-IO test programs
 MPIIOTESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIIOTESTSRC)))
 
+# VISOBJS is a list of visualization program objects
+VISOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISSRC)))
+# VISS is a list of visualization program executables
+VISS := $(patsubst %.c,%, $(filter %.c, $(VISSRC)))
+# TESTDEPENDS is a list of dependency files for visualization programs
+VISDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISSRC)))
 
+# VISMISCOBJS is a list of misc. vis objects not in the above categories
+VISMISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISMISCSRC)))
+# VISMISCDEPENDS is a list of dependency files for vis misc. objects
+VISMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISMISCSRC)))
 
 # DOCSPDF and DOCSPS are lists of documentation files generated from
 #    latex
@@ -353,6 +369,9 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(PRIVATEDEPENDS))
 ifdef BUILD_MPI
 DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
+endif
+ifdef BUILD_VIS
+DEPENDS += $(VISDEPENDS) $(VISMISCDEPENDS)
 endif
 
 # CLEANFILES is a list of generated files that need to be removed at
@@ -383,6 +402,14 @@ ifdef BUILD_MPI
 # add MPI programs to default rule
 all: mpitests
 endif
+
+# target for building vis program executables
+vis: $(VISS)
+ifdef BUILD_VIS
+# add vis programs to default rule
+all: vis
+endif
+
 
 # target for building MPI-IO test programs 
 mpiiotests: $(MPIIOTESTS)
@@ -431,6 +458,20 @@ else
 endif
 
 
+# rule for building vis objects
+$(VISOBJS): %.o: %.c
+ifdef BUILD_VIS
+ifdef QUIET_COMPILE
+	@echo "  CC		$@"
+	@$(CC) $(VISCFLAGS) $< -c -o $@
+else
+	$(CC) $(VISCFLAGS) $< -c -o $@
+endif
+else
+	@echo Error: libraries needed by vis tools not detected.
+	@false
+endif
+
 # rule for building MPI objects
 $(MPITESTOBJS): %.o: %.c
 ifdef BUILD_MPI
@@ -476,6 +517,20 @@ else
 	@false
 endif
 
+# rule for building vis misc. objects
+$(VISMISCOBJS): %.o: %.c
+ifdef BUILD_VIS
+ifdef QUIET_COMPILE
+	@echo "  CC		$@"
+	@$(CC) $(VISCFLAGS) $< -c -o $@
+else
+	$(CC) $(VISCFLAGS) $< -c -o $@
+endif
+else
+	@echo Error: libraries needed by vis tools not detected.
+	@false
+endif
+
 # rule for building MPI executables from object files
 $(MPITESTS): %: %.o $(MPIMISCOBJS) $(LIBRARIES)
 ifdef QUIET_COMPILE
@@ -484,6 +539,16 @@ ifdef QUIET_COMPILE
 else
 	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
 endif
+
+# rule for building vis executables from object files
+$(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
+ifdef QUIET_COMPILE
+	@echo "  LD		$@"
+	@$(LD) $^ $(LDFLAGS) $(VISLIBS) -o $@
+else
+	$(LD) $^ $(LDFLAGS) $(VISLIBS) -o $@
+endif
+
 # rule for building MPI-IO executables from object files
 # note: add a $(MPIMISCOBJS) prereq if we build multi-object tests someday
 $(MPIIOTESTS): %: %.o $(LIBRARIES)
@@ -582,6 +647,8 @@ ifdef QUIET_COMPILE
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
+		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
+		$(VISMISCDEPENDS)\
 		src/server/pvfs2-server-server.o $(MPIIOTESTS)
 else
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
@@ -589,6 +656,8 @@ else
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
+		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
+		$(VISMISCDEPENDS)\
 		src/server/pvfs2-server-server.o $(MPIIOTESTS)
 endif
 
@@ -630,7 +699,7 @@ nodep:; @:
 #
 # note: mpi-depend.sh is automatically generated, so it is in
 #       the build directory already.
-$(MPITESTDEPENDS): %.d: %.c
+$(MPITESTDEPENDS) $(MPIMISCDEPENDS): %.d: %.c
 ifdef QUIET_COMPILE
 	@echo "  DEP		$@"
 else
@@ -638,13 +707,14 @@ else
 endif
 	@sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $< > $@
 
-$(MPIMISCDEPENDS): %.d: %.c
+# rule for generating dependency files for vis code
+$(VISDEPENDS) $(VISMISCDEPENDS): %.d: %.c
 ifdef QUIET_COMPILE
 	@echo "  DEP		$@"
 else
-	@echo generating mpimisc dependency file $@.
+	@echo generating vis dependency file $@.
 endif
-	@sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $< > $@
+	@$(srcdir)/maint/depend.sh `dirname $*` $(VISCFLAGS) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c
