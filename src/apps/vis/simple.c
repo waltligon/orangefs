@@ -138,9 +138,9 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s -m [fs_mount_point] -w [width in pixels]\n",
+    fprintf(stderr, "Usage  : %s -m [fs_mount_point]\n",
 	argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -w 800\n",
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
 	argv[0]);
     return;
 }
