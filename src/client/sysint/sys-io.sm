@@ -27,14 +27,47 @@ extern job_context_id pint_client_sm_context;
 /* state function prototypes */
 static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					   job_status_s *js_p);
+static int io_object_getattr_failure(PINT_client_sm *sm_p,
+				     job_status_s *js_p);
+static int io_datafile_setup_io(PINT_client_sm *sm_p,
+				job_status_s *js_p);
+static int io_cleanup(PINT_client_sm *sm_p,
+		      job_status_s *js_p);
 
+/* completion function prototypes */
+static int io_object_getattr_comp_fn(void *v_p,
+				     struct PVFS_server_resp *resp_p,
+				     int index);
 %%
 
-machine pvfs2_client_io_sm(object_getattr_setup_msgpair)
+machine pvfs2_client_io_sm(object_getattr_setup_msgpair,
+			   object_getattr_xfer_msgpair,
+			   object_getattr_failure,
+			   datafile_setup_io,
+			   cleanup)
 {
     state object_getattr_setup_msgpair {
 	run io_object_getattr_setup_msgpair;
-	default => object_getattr_setup_msgpair;
+	default => object_getattr_xfer_msgpair;
+    }
+    state object_getattr_xfer_msgpair {
+	jump pvfs2_client_getattr_sm;
+	success => datafile_setup_io;
+	default => object_getattr_failure;
+    }
+    state object_getattr_failure {
+	run io_object_getattr_failure;
+	default => cleanup;
+    }
+
+    state datafile_setup_io {
+	run io_datafile_setup_io;
+	default => cleanup;
+    }
+
+    state cleanup {
+	run io_cleanup;
+	default => cleanup;
     }
 }
 
@@ -94,6 +127,160 @@ int PVFS_sys_io2(PVFS_pinode_reference pinode_ref,
 static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					   job_status_s *js_p)
 {
+    uint32_t attrmask;
+
+    /* we need datafile handles, distribution, and common attribs */
+    attrmask = (PVFS_ATTR_META_DFILES |
+		PVFS_ATTR_META_DIST |
+		PVFS_ATTR_COMMON_ALL);
+
+    PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
+			      *sm_p->cred_p,
+			      sm_p->u.io.object_ref.fs_id,
+			      sm_p->u.io.object_ref.handle,
+			      attrmask);
+
+    /* fill in msgpair structure components */
+    sm_p->msgpair.fs_id = sm_p->u.io.object_ref.fs_id;
+    sm_p->msgpair.handle = sm_p->u.io.object_ref.handle;
+    sm_p->msgpair.comp_fn = io_object_getattr_comp_fn;
+
+    /* drop through and jump to getattr_pcache state machine */
+    return 1;
+}
+
+/* io_object_getattr_comp_fn()
+ *
+ * Called to copy data from getattr response into the io-specific portion of
+ * the PINT_client_sm structure, so we can use the data after returning to
+ * this state machine.
+ *
+ * Return value is returned in job status, so it affects the resulting state
+ * coming back from the nested state machine.
+ *
+ * Returns 0 for metafiles, error for all the other types.
+ */
+static int io_object_getattr_comp_fn(void *v_p,
+				     struct PVFS_server_resp *resp_p,
+				     int index)
+{
+    PVFS_object_attr *r_attr_p;
+
+    /* this is a little kludge to get around some struct definition
+     * issues in the headers.  maybe fix later?
+     */
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    
+    /* sanity checks: this is a getattr response and has a valid
+     * type field
+     */
+    assert(resp_p->op == PVFS_SERV_GETATTR);
+    assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_COMMON_TYPE);
+
+    /* if we get an error, just return immediately, don't try to
+     * actually fill anything in.
+     */
+    if (resp_p->status != 0) {
+	return resp_p->status;
+    }
+
+    if (resp_p->u.getattr.attr.objtype != PVFS_TYPE_METAFILE) {
+	/* invalid type - we only do I/O on files */
+	return -PVFS_EINVAL;
+    }
+
+    r_attr_p = &resp_p->u.getattr.attr;
+
+    /* sanity checks */
+    assert(r_attr_p->mask & PVFS_ATTR_META_DIST);
+    assert(r_attr_p->u.meta.dist_size > 0);
+		
+    gossip_debug(CLIENT_DEBUG,
+		 "io_object_getattr_comp_fn: copying %d bytes of dist.\n",
+		 r_attr_p->u.meta.dist_size);
+
+    /* here we make a copy of the distribution information.
+     *
+     * KLUDGE: there is no copy function for distributions
+     * right now, so we do this nasty thing.
+     */
+
+    sm_p->u.io.dist_p = (PVFS_Dist *) malloc(r_attr_p->u.meta.dist_size);
+    if (sm_p->u.io.dist_p == NULL) {
+	assert(0);
+	return -PVFS_ENOMEM;
+    }
+
+    /* this encodes the previously decoded distribution into
+     * our new space.
+     */
+    PINT_Dist_encode(sm_p->u.io.dist_p, r_attr_p->u.meta.dist);
+
+    /* this does an in-place decoding of the distribution.  now
+     * we have a decoded version where we want it.
+     *
+     * NOTE: we need to free this later.
+     */
+    PINT_Dist_decode(sm_p->u.io.dist_p, NULL);
+
+    /* save the size too */
+    sm_p->u.io.dist_size = r_attr_p->u.meta.dist_size;
+
+    /* sanity checks */
+    assert(r_attr_p->mask & PVFS_ATTR_META_DFILES);
+    assert(r_attr_p->u.meta.dfile_count > 0);
+
+    gossip_debug(CLIENT_DEBUG,
+		 "io_object_getattr_comp_fn: %d datafiles.\n",
+		 r_attr_p->u.meta.dfile_count);
+		
+    /* save the datafile handles prior to freeing up the
+     * buffers we used for messages.  we could keep them around
+     * i suppose, but we're not going to do that for now.  later
+     * it is likely that this stuff will be stuck in the pcache
+     * anyway, so we'll be able to just reference it from there.
+     */
+    sm_p->u.io.datafile_handles =
+	(PVFS_handle *) malloc(r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
+    if (sm_p->u.io.datafile_handles == NULL) {
+	assert(0);
+    }
+    sm_p->u.io.datafile_count = r_attr_p->u.meta.dfile_count;
+    memcpy(sm_p->u.io.datafile_handles,
+	   r_attr_p->u.meta.dfile_array,
+	   r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
+
+    return 0;
+} /* io_object_getattr_comp_fn */
+
+static int io_datafile_setup_io(PINT_client_sm *sm_p,
+				job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG,
+		 "(%p) io state: io_datafile_setup_io\n",
+		 sm_p);
+
+    return 1;
+}
+
+static int io_object_getattr_failure(PINT_client_sm *sm_p,
+				     job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG,
+		 "(%p) io state: io_object_getattr_failure\n",
+		 sm_p);
+    assert(0);
+
+    return 1;
+}
+
+static int io_cleanup(PINT_client_sm *sm_p,
+		      job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG,
+		 "(%p) io state: cleanup\n",
+		 sm_p);
+
     return 0;
 }
 
@@ -106,7 +293,3 @@ static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
  *
  * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
  */
-
-
-
-
