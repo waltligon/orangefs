@@ -12,10 +12,12 @@
 #include <pint-dcache.h>
 #include <pint-servreq.h>
 
+#if 0
 static int get_bmi_address(bmi_addr_t *io_addr_array, int32_count num_io,\
 		PVFS_handle *handle_array);
 static int do_crdirent(char *name,PVFS_handle parent,PVFS_fs_id fsid,\
 		PVFS_handle entry_handle,bmi_addr_t addr);
+#endif
 
 extern pcache pvfs_pcache; 
 
@@ -30,7 +32,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req, PVFS_sysresp_remove *resp)
 	struct PVFS_server_req_s *req_job = NULL;		/* server request */
 	struct PVFS_server_resp_s *ack_job = NULL;	/* server response */
 	int ret = -1,req_size = 0,ack_size = 0, ioserv_cnt = 0;
-	pinode_p pinode_ptr = NULL, *item_ptr = NULL;
+	pinode *pinode_ptr = NULL, *item_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2;	/* PVFS address type structure */
 	char *server1 = NULL,*server2 = NULL;
 	int cflags = 0,name_sz = 0;
@@ -41,7 +43,31 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req, PVFS_sysresp_remove *resp)
 	PVFS_servreq_remove req_remove;
 	PVFS_servreq_createdirent req_crdirent;
 	int item_found;
+
+	/* lookup meta file */
+	req->entry_name
+	/* refresh parent pinode */
+	attr_mask = ATTR_BASIC | ATTR_META;
+	ret = phelper_get_pinode(req->parent_refn,&pinode_ptr,
+			attr_mask, req->credentials );
+	if (ret < 0)
+	{
+		goto pinode_get_failure;
+	}
+
+	/* check permsission on parent */
 	
+	req->credentials
+	/* getattr the meta file */
+	/* send remove message to the meta file */
+	/* rmdirent the dir entry */
+	/* send remove messages to each of the data file servers */
+	
+
+
+}
+#if 0
+
 	/* Fill in parent pinode reference */
 	parent_reference.handle = req->parent_handle;
 	parent_reference.fs_id = req->fs_id;
@@ -353,3 +379,4 @@ int get_bmi_address(bmi_addr_t *io_addr_array, int32_count num_io,\
 	return(0);
 }
 
+#endif

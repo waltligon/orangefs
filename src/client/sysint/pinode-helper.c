@@ -29,11 +29,7 @@ int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
 	/* Does pinode exist? */
 	ret = PINT_pcache_lookup(pref,*pinode_ptr);
 
-	/* Also check to see if attributes requested thru mask are in 
-	 * pinode else refresh it 
-	 */
-	if (ret == PCACHE_LOOKUP_FAILURE ||
-		(*pinode_ptr)->mask != attrmask)
+	if (ret == PCACHE_LOOKUP_FAILURE)
 	{
 		/* Pinode does not exist in cache */
 		ret = phelper_refresh_pinode(attrmask,(*pinode_ptr),pref,
@@ -43,14 +39,16 @@ int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
 			goto pinode_refresh_failure;	
 		}
 
-		/* TODO: Should the object name be filled in?
-		 */
+		ret = PINT_pcache_insert(*pinode_ptr);
+		if (ret < 0)
+		{
+			goto pinode_insert_failure;	
+		}
 	}
 	else 
 	{
 		/* Pinode does exist */
 
-		/* Check if pinode contents are valid using timeout values */
 		if (((*pinode_ptr)->mask & attrmask) != attrmask)
 		{ 
 			/* All the requested values are not contained in the pinode 
@@ -65,25 +63,19 @@ int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
 			{
 				goto pinode_refresh_failure;
 			}
+
+			ret = PINT_pcache_insert(*pinode_ptr);
+			if (ret < 0)
+			{
+				goto pinode_insert_failure;	
+			}
 		}
 	}
 
-#if 0
-	/* Add/Merge the pinode to the pinode cache */
-	ret = PINT_pcache_insert(*pinode_ptr);
-	if (ret < 0)
-	{
-		goto pinode_refresh_failure;
-	}
-#endif
-
 	return(0);
 	
+pinode_insert_failure:
 pinode_refresh_failure:
-	/* Free the allocated pinode */
-	PINT_pcache_pinode_dealloc(*pinode_ptr);
-
-pinode_alloc_failure:
 	return(ret);
 }
 
@@ -116,10 +108,6 @@ int phelper_refresh_pinode(PVFS_bitfield mask,pinode *pinode_ptr,
 
 	/* Fill in the pinode using the server response */
 	/* Also take care of filling in the timeouts */
-	/* TODO: How to fill in the object name? Does the 
-	 * dcache layer pass that name to the pinode helper
-	 * layer?
-	 */
 
 	pinode_ptr->pinode_ref.handle = pref.handle;
 	pinode_ptr->pinode_ref.fs_id = pref.fs_id;

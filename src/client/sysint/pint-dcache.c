@@ -304,7 +304,7 @@ static int dcache_add_dentry(char *name,
 		pinode_reference parent,pinode_reference entry)
 {
 	int16_t free = 0;
-	int size = strlen(name),ret = 0;
+	int size = strlen(name) + 1,ret = 0; /* size includes null terminator*/
 
 	/* Get the free item */
 	dcache_get_next_free();

@@ -181,6 +181,9 @@ int get_next_path(char *fname,int num,int *start,int *end);
 int get_next_segment(char *inout,char **output,int *start);
 int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid);
 
+int PINT_do_lookup (PVFS_string name,pinode_reference parent,PVFS_bitfield mask,
+                PVFS_credentials cred,pinode_reference *entry);
+
 /*
  * Local variables:
  *  c-indent-level: 4

@@ -6,6 +6,8 @@
 
 /* Create Function Implementation */
 
+#include <assert.h>
+
 #include "pinode-helper.h"
 #include "pvfs2-sysint.h"
 #include "pint-sysint.h"
@@ -17,11 +19,8 @@
 
 #define REQ_ENC_FORMAT 0
 
-static int get_bmi_addr(char **name,int count,bmi_addr_t *addr);
-static int copy_attributes(PVFS_object_attr new,PVFS_object_attr old,\
-	PVFS_size *sz, int handle_count, PVFS_handle *handle_array);
-static int do_lookup(PVFS_string name,pinode_reference parent,\
-		PVFS_bitfield mask,PVFS_credentials cred,pinode_reference *entry);
+static void copy_attributes(PVFS_object_attr new,PVFS_object_attr old,
+	int handle_count, PVFS_handle *handle_array);
 
 /* PVFS_sys_create()
  *
@@ -36,14 +35,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	int ret = -1, ret1 = -1, cflags = 0, name_sz = 0, mask = 0;
 	int item = 0;
 	PVFS_size handle_size = 0;
-	pinode *pinode_ptr = NULL, *item_ptr = NULL;
-#if 0
-	PVFS_servreq_create req_create;
-	PVFS_servreq_createdirent req_crdirent;
-	PVFS_servreq_setattr req_setattr;
-	PVFS_servreq_rmdirent req_rmdirent;
-	PVFS_servreq_remove req_remove;
-#endif
+	pinode *parent_ptr = NULL, *pinode_ptr = NULL, *item_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2,*bmi_addr_list = NULL;
 	char *server = NULL,**io_serv_list = NULL,*segment = NULL;
 	PVFS_handle *df_handle_array = NULL,new_bkt = 0,handle_mask = 0,
@@ -52,74 +44,70 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	int io_serv_cnt = 0, i = 0, j = 0;
 	struct PINT_decoded_msg decoded;
 	bmi_size_t max_msg_sz;
+	int attr_mask, start = 0, failed_after_send = 0;
 
-	/* Allocate the pinode */
-	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
-	if (ret < 0)
+	enum {
+	    NONE_FAILURE = 0,
+	    PCACHE_LOOKUP_FAILURE,
+	    DCACHE_LOOKUP_FAILURE,
+	    DCACHE_INSERT_FAILURE,
+	    LOOKUP_SERVER_FAILURE,
+	    CREATE_MSG_FAILURE,
+	    CRDIRENT_MSG_FAILURE,
+	    PREIO1_CREATE_FAILURE,
+	    PREIO2_CREATE_FAILURE,
+	    PREIO3_CREATE_FAILURE,
+	    IO_SEND_FAILURE,
+	    IO_REQ_FAILURE,
+	    SETATTR_SEND_FAILURE,
+	    SETATTR_RECV_FAILURE,
+	    PCACHE_INSERT1_FAILURE,
+	    PCACHE_INSERT2_FAILURE,
+	    PCACHE_INSERT3_FAILURE,
+	} failure = NONE_FAILURE;
+
+	attr_mask = ATTR_BASIC | ATTR_META;
+
+	ret = phelper_get_pinode(req->parent_refn, &parent_ptr, attr_mask, req->credentials);
 	{
-		ret = -ENOMEM;
-		goto pinode_alloc_failure;
+	    /* parent pinode doesn't exist ?!? */
+	    assert(0);
 	}
 
-	/* Check for pinode existence */
+	/* check permissions in parent directory */
+
+	ret = check_perms(parent_ptr->attr,req->credentials.perms,
+			    req->credentials.uid, req->credentials.gid);
+	if (ret < 0)
+	{
+	    failure = PCACHE_LOOKUP_FAILURE;
+	    goto return_error;
+	}
 
 	/* Lookup handle(if it exists) in dcache */
-	/* TODO: Should I do lookup to get the handle in case I don't
-	 * find the entry in the dcache. In this case, it may end up
-	 * creating the pinode. Is that what we want?
-	 */
 	ret = PINT_dcache_lookup(req->entry_name,req->parent_refn,&entry);
-	if (ret < 0)
+	if (ret < 0 )
 	{
-		/* Entry not in dcache */
-
-		/* Set the attribute mask */
-		mask = ATTR_BASIC;
-		/* Entry not in dcache, do a lookup */
-		ret = do_lookup(req->entry_name,req->parent_refn,mask,\
-				req->credentials,&entry);
-		if (ret < 0)
-		{
-			entry.handle = -1;
-		}
+	    /* there was an error, bail*/
+	    failure = DCACHE_LOOKUP_FAILURE;
+	    goto return_error;
 	}
-	/* Do only if pinode reference exists */
+
 	if (entry.handle != PINT_DCACHE_HANDLE_INVALID)
 	{
-		/* Search in pinode cache */
-		ret = PINT_pcache_lookup(entry, &pinode_ptr);
-		/* Is pinode present? */
-		if (ret  == PCACHE_LOOKUP_SUCCESS)
-		{
-			/* Pinode is present, remove it */
-			ret = PINT_pcache_remove(entry, &item_ptr);
-			if (ret < 0)
-			{
-				goto pinode_remove_failure;
-			}
-			/* Free pinode removed from the cache */
-			PINT_pcache_pinode_dealloc(item_ptr);
-		}
-		/* Remove dcache entry */
-		ret = PINT_dcache_remove(req->entry_name,req->parent_refn,&item);
-		if (ret < 0)
-		{
-			goto pinode_remove_failure;
-		}
+	    /* pinode already exists, should fail create with EXISTS*/
+	    ret = (-EEXIST);
+	    failure = DCACHE_LOOKUP_FAILURE;
+	    goto return_error;
 	}
-	
-	/* Revalidate the parent handle */
-	/* Get the parent pinode */
-	cflags = HANDLE_VALIDATE;
-	/* Search in pinode cache */
-	ret = PINT_pcache_lookup(req->parent_refn, &pinode_ptr);
-	
+
 	/* Determine the initial metaserver for new file */
 	ret = PINT_bucket_get_next_meta(req->parent_refn.fs_id,&serv_addr1,
 			&new_bkt,&handle_mask);	
 	if (ret < 0)
 	{
-		goto addr_lookup_failure;
+	    failure = LOOKUP_SERVER_FAILURE;
+	    goto return_error;
 	}	
 	
 	/* Fill in the parameters */
@@ -130,11 +118,11 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	req_p.u.create.bucket = new_bkt;
 	req_p.u.create.handle_mask = handle_mask;
 	req_p.u.create.fs_id = req->parent_refn.fs_id;
-	/* User's responsible for filling this up in the
-	 * attrmask before passing it. Should we assume
-	 * a default?
-	 */
-	req_p.u.create.object_type = req->attr.objtype;
+
+	/* Q: is this sane?  pretty sure we're creating meta files here, but do 
+	 * we wanna re-use this for other object types?  symlinks, dirs, etc?*/
+
+	req_p.u.create.object_type = ATTR_META;
 
 	max_msg_sz = sizeof(struct PVFS_server_resp_s);
 
@@ -142,7 +130,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz, &decoded);
 	if (ret < 0)
 	{
-	    //failure = RECV_CREATE_REQ_FAILURE;
+	    failure = LOOKUP_SERVER_FAILURE;
 	    goto return_error;
 	}
 
@@ -150,7 +138,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	if (ack_p->status < 0 )
 	{
 	    ret = ack_p->status;
-	    //failure = RECV_CREATE_REQ_FAILURE;
+	    failure = CREATE_MSG_FAILURE;
 	    goto return_error;
         }
 
@@ -159,9 +147,6 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 
 	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 
-	if (server)
-		free(server);
-
 	/* Create directory entry server request to parent */
 
 	/* Query BTI to get initial meta server */
@@ -169,7 +154,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 			req->parent_refn.fs_id);
 	if (ret < 0)
 	{
-		goto addr_lookup_failure;
+	    failure = CREATE_MSG_FAILURE;
+	    goto return_error;
 	}
 
 	/* Fill in the parameters */
@@ -180,16 +166,12 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	/* credentials come from req->credentials and are set in the previous
 	 * create request.
 	 */
-	req_p.u.crdirent.name = (PVFS_string)malloc(name_sz);
 
-	if (req_p.u.crdirent.name == NULL)
-	{
-		ret = -ENOMEM;
-		//goto crdirent_failure;
-		goto return_error;
-	}
+	/* just update the pointer, it'll get malloc'ed when its sent on the 
+	 * wire 
+	 */
 
-	memcpy(req_p.u.crdirent.name, req->entry_name, name_sz);
+	req_p.u.crdirent.name = req->entry_name;
 	req_p.u.crdirent.new_handle = entry.handle;
 	req_p.u.crdirent.parent_handle = req->parent_refn.handle;
 	req_p.u.crdirent.fs_id = req->parent_refn.fs_id;
@@ -200,266 +182,246 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	ret = PINT_server_send_req(serv_addr2, &req_p, max_msg_sz, &decoded);
 	if (ret < 0)
 	{
-		/* Error - EALREADY, file present */
-		/* TODO: Handle this */
-		//goto crdirent_failure;
-		goto return_error;
+	    failure = CREATE_MSG_FAILURE;
+	    goto return_error;
 	}
-#if 0
 
-	/* Determine list of I/O servers */
+	if (ack_p->status < 0 )
+        {
+	    /* Error - EXISTS, file present */
+            ret = ack_p->status;
+            failure = CRDIRENT_MSG_FAILURE;
+            goto return_error;
+        }
+
 	/* Get I/O server list and bucket list */
 	io_serv_cnt = req->attr.u.meta.nr_datafiles;
-	ret = PINT_bucket_get_next_io(req->parent_refn.fs_id,
-			io_serv_cnt,io_serv_list,&bkt_array,&handle_mask);
-	if (ret < 0)
+
+	/* Allocate BMI address array */
+	bmi_addr_list = (bmi_addr_t *)malloc(sizeof(bmi_addr_t) * io_serv_cnt);
+	if (bmi_addr_list == NULL)
 	{
-		goto get_io_array_failure;
+		ret = (-ENOMEM);
+		failure = PREIO1_CREATE_FAILURE;
+		goto return_error;
 	}
 
-	/* Allocate handle array */
-	df_handle_array = (PVFS_handle *)(io_serv_cnt * sizeof(PVFS_handle));
-	if (!df_handle_array)
+	/* I'm using the df_handle array to store the new bucket # before I 
+	 * send the create request and then the newly created handle.  when I
+	 * get that back from the server.
+	 *
+	 * this may be confusing:  since we don't care about the bucket after
+	 * sending the create request, I'm reusing this space to store the new
+	 * handle that we get back from the server. its cheaper since I only
+	 * malloc once.
+	 * 
+	 */
+
+	df_handle_array = (PVFS_handle *)malloc(io_serv_cnt * sizeof(PVFS_handle));
+	if (df_handle_array == NULL)
 	{
-		goto handle_alloc_failure;
+	    failure = PREIO2_CREATE_FAILURE;
+	    goto return_error;
 	}
 	
-	/* Allocate BMI address array */
-	bmi_addr_list = (PVFS_handle *)malloc(sizeof(PVFS_handle) * io_serv_cnt);
-	if (!bmi_addr_list)
-	{
-		goto bmi_addr_alloc_failure;
-	}
-	ret = get_bmi_addr(io_serv_list,io_serv_cnt,bmi_addr_list);
+	ret = PINT_bucket_get_next_io(req->parent_refn.fs_id, io_serv_cnt,
+			bmi_addr_list, df_handle_array, &handle_mask);
 	if (ret < 0)
 	{
-		goto addr_map_failure;
+	    failure = PREIO3_CREATE_FAILURE;
+	    goto return_error;
 	}
 
 	/* Make create requests to each I/O server */
+	/* right now this is serialized, we should come back later and make this
+	 * asynchronous or something
+	 */
+
+	/* these fields are the same for each server message so we only need to
+	 * set them once
+	 */
+
+	req_p.op = PVFS_SERV_CREATE;
+	req_p.rsize = sizeof(struct PVFS_server_req_s);
+	req_p.credentials = req->credentials;
+	req_p.u.create.handle_mask = handle_mask;
+	req_p.u.create.fs_id = req->parent_refn.fs_id;
+	/* we're making data files on each server */
+	req_p.u.create.object_type = ATTR_DATA;
+
+	max_msg_sz = sizeof(struct PVFS_server_resp_s);
+
 	for(i = 0;i < io_serv_cnt; i++)
 	{
 		/* Fill in the parameters */
-		/* TODO: Fill in bucket ID */
-		req_create.bucket = bkt_array[i];
-		req_create.handle_mask = handle_mask;
-		req_create.fs_id = req->parent_refn.fs_id;
-		/* User's responsible for filling this up in the
-	 	 * attrmask before passing it. Should we fill in
-	 	 * a default?
-	 	 */
-		req_create.object_type = req->attr.objtype;
-	
+		req_p.u.create.bucket = df_handle_array[i];
+
 		/* Server request */
-		ret = pint_serv_create(&req_job,&ack_job,&req_create,req->credentials,
-				&bmi_addr_list[i]);
+		ret = PINT_server_send_req(bmi_addr_list[i], &req_p, max_msg_sz, &decoded);
 		if (ret < 0)
 		{
-			goto create_io_failure;
+		    failure = IO_SEND_FAILURE;
+		    goto return_error;
 		}
 
-		/* New entry pinode reference */
-		df_handle_array[i] = ack_job->u.create.handle;
+		ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+		/* make sure the operation didn't fail*/
+		if (ack_p->status < 0 )
+		{
+		    ret = ack_p->status;
+		    failure = IO_REQ_FAILURE;
+		    goto return_error;
+		}
+
+		/* store the new handle here */
+		df_handle_array[i] = ack_p->u.create.handle;
+
+		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 		
-		/* Free the req,ack jobs */	
-		sysjob_free(bmi_addr_list[i],ack_job,ack_job->rsize,BMI_RECV_BUFFER,\
-				NULL);
-		sysjob_free(bmi_addr_list[i],req_job,req_job->rsize,BMI_SEND_BUFFER,\
-				NULL);
-	}	
+	}
 
 	/* Aggregate all handles and make a setattr request */
-	req_setattr.handle = entry.handle;
-	req_setattr.fs_id = req->parent_refn.fs_id;
-	req_setattr.attrmask = req->attrmask;
+	req_p.op = PVFS_SERV_SETATTR;
+	req_p.rsize = sizeof(struct PVFS_server_req_s) + io_serv_cnt * sizeof(PVFS_handle);
+	req_p.u.setattr.handle = entry.handle;
+	req_p.u.setattr.fs_id = req->parent_refn.fs_id;
+	req_p.u.setattr.attrmask = req->attrmask;
 	/* Copy the attribute structure */
-	ret = copy_attributes(req_setattr.attr,req->attr,&handle_size,io_serv_cnt,\
-			df_handle_array);
-	if (ret < 0)
-	{
-		goto create_io_failure;
-	}
+	copy_attributes(req_p.u.setattr.attr,req->attr,io_serv_cnt,df_handle_array);
+
+	max_msg_sz = sizeof(struct PVFS_server_resp_s);
 
 	/* Make a setattr server request */
-	ret = pint_serv_setattr(&req_job,&ack_job,&req_setattr,req->credentials,\
-			handle_size,&serv_addr1);
+	ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz, &decoded);
 	if (ret < 0)
 	{
-		goto create_io_failure;
+		failure = SETATTR_SEND_FAILURE;
+		goto return_error;
 	}
 
+	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+	/* make sure the operation didn't fail*/
+	if (ack_p->status < 0 )
+	{
+	    ret = ack_p->status;
+	    failure = SETATTR_RECV_FAILURE;
+	    goto return_error;
+	}
+
+
 	/* Add entry to dcache */
-	segment = (char *)malloc(name_sz + 1);
-	strncpy(segment,req->entry_name,name_sz);
-	segment[name_sz] = '\0';
-	ret = PINT_dcache_insert(segment,entry,req->parent_refn);
+	ret = PINT_dcache_insert(req->entry_name,entry,req->parent_refn);
 	if (ret < 0)
 	{
-		goto dcache_add_failure;
+	    failure = DCACHE_INSERT_FAILURE;
+	    goto return_error;
 	}
 
 	/* Allocate the pinode */
 	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
 	if (ret < 0)
 	{
-		ret = -ENOMEM;
-		goto dcache_add_failure;
+	    failure = PCACHE_INSERT1_FAILURE;
+	    goto return_error;
 	}
 	/* Fill up the pinode */
 	pinode_ptr->pinode_ref.handle = entry.handle;
 	pinode_ptr->pinode_ref.fs_id = req->parent_refn.fs_id;
 	pinode_ptr->mask = req->attrmask;
 	/* Allocate the handle array */
-	pinode_ptr->attr.u.meta.dfh = (PVFS_handle *)malloc(io_serv_cnt\
+	pinode_ptr->attr.u.meta.dfh = (PVFS_handle *)malloc(io_serv_cnt
 			* sizeof(PVFS_handle));
 	if (!(pinode_ptr->attr.u.meta.dfh))
 	{
-		ret = -ENOMEM;
-		goto dcache_add_failure;
+	    failure = PCACHE_INSERT2_FAILURE;
+	    goto return_error;
 	}
-	memcpy(pinode_ptr->attr.u.meta.dfh,df_handle_array,handle_size);
+	memcpy(pinode_ptr->attr.u.meta.dfh,df_handle_array, io_serv_cnt * sizeof(PVFS_handle));
 	/* Fill in the timestamps */
-	cflags = HANDLE_TSTAMP + ATTR_TSTAMP;
 	ret = phelper_fill_timestamps(pinode_ptr);
 	if (ret <0)
 	{
-		goto pinode_fill_failure;
+	    failure = PCACHE_INSERT3_FAILURE;
+	    goto return_error;
 	}
 	/* Add pinode to the cache */
 	ret = PINT_pcache_insert(pinode_ptr);
 	if (ret < 0)
 	{
-		goto pinode_fill_failure;
+	    failure = PCACHE_INSERT3_FAILURE;
+	    goto return_error;
 	}	
 
   	return(0); 
 
-pinode_fill_failure:
-	if (pinode_ptr->attr.u.meta.dfh)
-		free(pinode_ptr->attr.u.meta.dfh);
-
-dcache_add_failure:
-	if (segment)
-		free(segment);
-
-create_io_failure:
-	/* Free the req,ack jobs */
-	sysjob_free(serv_addr2,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	sysjob_free(serv_addr2,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-
-	/* Rollback all create requests */
-	/* Issue: What if there is an error during rollback. we could
-	 * be left with inconsistent data on the metaserver and or
-	 * io servers 
-	 */
-	/* Make create requests to each I/O server */
-	for(j = 0; j < i ; j++)
-	{
-		/* Make a remove request */
-		/* Fill in the parameters */
-		req_remove.handle = df_handle_array[j];
-		req_remove.fs_id = req->parent_refn.fs_id;
-		req_create.object_type = req->attr.objtype;
-
-		/* Server request */
-		ret = pint_serv_remove(&req_job,&ack_job,&req_remove,req->credentials,\
-				&bmi_addr_list[j]);
-		if (ret < 0)
-		{
-			/* Free the req,ack jobs */	
-			sysjob_free(bmi_addr_list[j],ack_job,ack_job->rsize,BMI_RECV_BUFFER,\
-				NULL);
-			sysjob_free(bmi_addr_list[j],req_job,req_job->rsize,BMI_SEND_BUFFER,\
-				NULL);
-			goto addr_map_failure;
-		}
-	
-		/* Free the req,ack jobs */	
-		sysjob_free(bmi_addr_list[j],ack_job,ack_job->rsize,BMI_RECV_BUFFER,\
-				NULL);
-		sysjob_free(bmi_addr_list[j],req_job,req_job->rsize,BMI_SEND_BUFFER,\
-				NULL);
-	}
-
-addr_map_failure:
-	/* Free BMI address array */
-	if (bmi_addr_list)
-		free(bmi_addr_list);
-
-bmi_addr_alloc_failure:
-	/* Free handle array */
-	if (df_handle_array)
-		free(df_handle_array);
-
-handle_alloc_failure:
-	/* Need to free the I/O servers list */
-	for(i = 0; i < io_serv_cnt;i++)
-	{
-		if (io_serv_list[i])
-			free(io_serv_list[i]);
-	}
-
-get_io_array_failure:
-	/* Make a rmdirent request */
-	req_rmdirent.entry = (char *)malloc(name_sz + 1);
-	if (!req_rmdirent.entry)
-	{
-		goto crdirent_failure;
-	}
-	strncpy(req_rmdirent.entry,req->entry_name,name_sz);
-	req_rmdirent.entry[name_sz] = '\0';
-	req_rmdirent.parent_handle = req->parent_refn.handle;
-	req_rmdirent.fs_id = req->parent_refn.fs_id;
-	ret1 = pint_serv_rmdirent(&req_job,&ack_job,&req_rmdirent,req->credentials,\
-			&serv_addr2);
-
-crdirent_failure:
-	/* Handle failure gracefully */
-	/* Make a remove request */
-	/* Fill in the parameters */
-	req_remove.handle = entry.handle;
-	req_remove.fs_id = req->parent_refn.fs_id;
-	/* Server request */
-	ret1 = pint_serv_remove(&req_job,&ack_job,&req_remove,req->credentials,\
-			&serv_addr1);
-
-#endif
-
 return_error:
-
-addr_lookup_failure:
-	if (server)
-		free(server);
-
-pinode_remove_failure:
-	/* Free the pinode allocated */
-	PINT_pcache_pinode_dealloc(pinode_ptr);
-
-pinode_get_failure:
-
-pinode_alloc_failure:	
-	return(ret);
-}
-
-/*	get_bmi_addr
- *
- * obtains the BMI addresses of servers
- *
- * returns 0 on success, -errno on failure
- */
-static int get_bmi_addr(char **name, int count, bmi_addr_t *addr)
-{
-	int i = 0, ret = 0;
-
-	for(i = 0;i < count;i++)
+	switch(failure)
 	{
-		ret = BMI_addr_lookup(&addr[i],name[i]);
-		if (ret < 0)
+	    case PCACHE_INSERT3_FAILURE:
+		free(pinode_ptr->attr.u.meta.dfh);
+	    case PCACHE_INSERT2_FAILURE:
+		PINT_pcache_pinode_dealloc(pinode_ptr);
+	    case PCACHE_INSERT1_FAILURE:
+	    case DCACHE_INSERT_FAILURE:
+		ret = 1;
+		break;
+	    case SETATTR_RECV_FAILURE:
+	    case SETATTR_SEND_FAILURE:
+	    case IO_REQ_FAILURE:
+		failed_after_send = 1;
+	    case IO_SEND_FAILURE:
+		/* rollback each of the data files we created */
+		start = i;
+		if (failed_after_send != 1)
+		    start--;
+		req_p.op = PVFS_SERV_REMOVE;
+		req_p.rsize = sizeof(struct PVFS_server_req_s);
+		req_p.credentials = req->credentials;
+		req_p.u.remove.fs_id = req->parent_refn.fs_id;
+		max_msg_sz = sizeof(struct PVFS_server_resp_s);
+
+		for(i = 0;i < start; i++)
 		{
-			return(ret);	
+		    /*best effort rollback*/
+		    req_p.u.remove.handle = df_handle_array[i];
+		    ret = PINT_server_send_req(bmi_addr_list[i], &req_p, max_msg_sz, &decoded);
+		    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 		}
+
+	    case PREIO3_CREATE_FAILURE:
+		free(df_handle_array);
+	    case PREIO2_CREATE_FAILURE:
+		free(bmi_addr_list);
+	    case PREIO1_CREATE_FAILURE:
+		/* rollback crdirent */
+		req_p.op = PVFS_SERV_RMDIRENT;
+		req_p.rsize = sizeof(struct PVFS_server_req_s) + strlen(req->entry_name) + 1; /* include null terminator */
+		req_p.credentials = req->credentials;
+		req_p.u.rmdirent.parent_handle = req->parent_refn.handle;
+		req_p.u.rmdirent.fs_id = req->parent_refn.fs_id;
+		req_p.u.rmdirent.entry = req->entry_name;
+		max_msg_sz = sizeof(struct PVFS_server_resp_s);
+		ret = PINT_server_send_req(serv_addr2, &req_p, max_msg_sz, &decoded);
+		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	    case CRDIRENT_MSG_FAILURE:
+		/* rollback create req*/
+		req_p.op = PVFS_SERV_REMOVE;
+		req_p.rsize = sizeof(struct PVFS_server_req_s);
+		req_p.credentials = req->credentials;
+		max_msg_sz = sizeof(struct PVFS_server_resp_s);
+		ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz, &decoded);
+		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	    case CREATE_MSG_FAILURE:
+		if (decoded.buffer != NULL)
+		    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	    case LOOKUP_SERVER_FAILURE:
+	    case PCACHE_LOOKUP_FAILURE:
+	    case DCACHE_LOOKUP_FAILURE:
+	    case NONE_FAILURE:
 	}
-	return(0);
+	return (ret);
 }
 
 /* copy_attributes
@@ -467,13 +429,10 @@ static int get_bmi_addr(char **name, int count, bmi_addr_t *addr)
  * copies the attributes from an attribute to another attribute 
  * structure
  *
- * returns 0 on success, -errno on error
  */
-static int copy_attributes(PVFS_object_attr new,PVFS_object_attr old,\
-	PVFS_size *sz, int handle_count, PVFS_handle *handle_array)
+static void copy_attributes(PVFS_object_attr new,PVFS_object_attr old,
+	int handle_count, PVFS_handle *handle_array)
 {
-	PVFS_size handle_size = handle_count * sizeof(PVFS_handle);
-
 	/* Copy the generic attributes */	
 	new.owner = old.owner;
 	new.group = old.group;
@@ -486,95 +445,8 @@ static int copy_attributes(PVFS_object_attr new,PVFS_object_attr old,\
 	/* REMOVED BY PHIL WHEN MOVING TO NEW TREE */
 	new.u.meta.dist = old.u.meta.dist;
 #endif
-	new.u.meta.dfh = (PVFS_handle *)malloc(handle_size);
-	if (!new.u.meta.dfh)
-	{
-		return(-ENOMEM);
-	}
-	memcpy(new.u.meta.dfh,handle_array,handle_size);	
+	new.u.meta.dfh = handle_array;
 	new.u.meta.nr_datafiles = handle_count;
-	*sz = handle_size;
-	
-	return(0);
-}
-
-/* do_lookup()
- *
- * perform a server lookup path request
- *
- * returns 0 on success, -errno on failure
- */
-static int do_lookup(PVFS_string name,pinode_reference parent,\
-		PVFS_bitfield mask,PVFS_credentials cred,pinode_reference *entry)
-{
-	struct PVFS_server_req_s *req_job;
-	struct PVFS_server_resp_s *ack_job;
-	PVFS_servreq_lookup_path req_args;
-	char *server = NULL;
-	bmi_addr_t serv_addr;
-	int ret = 0,count = 0;
-
-	/* Get Metaserver in BMI URL format using the bucket table 
-	 * interface */
-	/* TODO: Do this...I am assuming that the handle contains the
-	 * bucket ID which is used to perform the mapping
-	 */
-	ret = PINT_bucket_map_to_server(&serv_addr,parent.handle,parent.fs_id);
-	if (ret < 0)
-	{
-		goto addr_lookup_failure;
-	}
-
-	/* Fill in the arguments */
-	req_args.path = (PVFS_string)malloc(strlen(name) + 1);
-	if (!req_args.path)
-	{
-		ret = -ENOMEM;
-		goto addr_lookup_failure;
-	}
-	strncpy(req_args.path,name,strlen(name));
-	req_args.path[strlen(name)] = '\0';
-	req_args.starting_handle = parent.handle;
-	req_args.fs_id = parent.fs_id;
-	req_args.attrmask = mask;
-
-	/* Make a lookup_path server request to get the handle and
-	 * attributes of segment
-	 */
-	ret = pint_serv_lookup_path(&req_job,&ack_job,&req_args,\
-			cred,&serv_addr);
-	if (ret < 0)
-	{
-		goto lookup_path_failure;
-	}
-	count = ack_job->u.lookup_path.count;
-	if (count != 1)
-	{
-		ret = -EINVAL;
-		goto lookup_path_failure;
-	}
-
-	/* Fill up pinode reference for entry */
-	entry->handle = ack_job->u.lookup_path.handle_array[1];
-
-	/* Free the jobs */
-	sysjob_free(serv_addr,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	sysjob_free(serv_addr,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-
-	return(0);
-
-lookup_path_failure:
-	if (req_args.path)
-		free(req_args.path);
-addr_lookup_failure:
-	if (server)
-		free(server);
-
-map_to_server_failure:
-	sysjob_free(serv_addr,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	sysjob_free(serv_addr,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-
-	return(ret);
 }
 
 /*

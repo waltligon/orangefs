@@ -4,11 +4,152 @@
  * See COPYING in top-level directory.
  */
 
-#include <pvfs2-sysint.h>
-#include <pint-sysint.h>
+#include "pvfs2-sysint.h"
+#include "pvfs2-req-proto.h"
+#include "pint-sysint.h"
+#include "pint-servreq.h"
+#include "pint-sysint.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+
+#define REQ_ENC_FORMAT 0
 
 int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock;
+
+/*
+ * PINT_do_lookup looks up one dirent in a given parent directory
+ * create and remove (possibly others) have to check for a dirent's presence
+ *
+ * returns 0 on success (with pinode_ref filled in), -ERRNO on failure
+ */
+
+int PINT_do_lookup (PVFS_string name,pinode_reference parent,
+		PVFS_bitfield mask,PVFS_credentials cred,pinode_reference *entry);
+#if 0
+int PINT_do_lookup (PVFS_string name,pinode_reference parent,
+		PVFS_bitfield mask,PVFS_credentials cred,pinode_reference *entry)
+{
+	struct PVFS_server_req_s req_p;             /* server request */
+        struct PVFS_server_resp_s *ack_p = NULL;    /* server response */
+        int ret = -1, i = 0, tflags = 0;
+        int max_msg_sz, name_sz;
+        struct PINT_decoded_msg decoded;
+        bmi_addr_t serv_addr;
+        pinode *pinode_ptr = NULL;
+
+        /*Q: should I combine these into one since there's not much
+         * cleanup going on for each case?
+         */
+
+        enum {
+            NONE_FAILURE = 0,
+            MAP_SERVER_FAILURE,
+            SEND_REQ_FAILURE,
+            INVAL_LOOKUP_FAILURE,
+            ADD_PCACHE_FAILURE,
+        } failure = NONE_FAILURE;
+
+        name_sz = strlen(name) + 1; /*include the null terminator*/
+
+        req_p.op = PVFS_SERV_LOOKUP_PATH;
+        req_p.credentials = credentials;
+        req_p.rsize = name_sz + sizeof(PVFS_server_req_s);
+        req_p.u.lookup_path.path = name;
+        req_p.u.lookup_path.fs_id = parent.fsid;
+        req_p.u.lookup_path.starting_handle = parent.handle;
+        req_p.u.lookup_path.attrmask = mask
+
+        ret = PINT_bucket_map_to_server(&serv_addr, parent.handle, parent.fs_id);
+        if (ret < 0)
+        {
+            failure = MAP_SERVER_FAILURE;
+            goto return_error;
+        }
+
+        /* Make a lookup_path server request to get the handle and
+         * attributes
+         */
+
+        ret = PINT_server_send_req(serv_addr, req_p, max_msg_sz, &decoded);
+	if (ret < 0)
+        {
+            failure = SEND_REQ_FAILURE;
+            goto return_error;
+        }
+
+        ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+	/* make sure the operation didn't fail*/
+	if (ack_p->status < 0 )
+	{
+		ret = ack_p->status;
+		failure = SEND_REQ_FAILURE;
+		goto return_error;
+	}
+
+        /* we should never get multiple handles back for the meta file*/
+        if (ack_p->u.lookup_path.count != 1)
+        {
+            failure = INVAL_LOOKUP_FAILURE;
+            goto return_error;
+        }
+
+        entry->handle = ack_p->u.lookup_path.handle_array[0];
+        entry->fs_id = parent.fs_id;
+
+        /*in the event of a successful lookup, we need to add this to the pcache too*/
+
+        ret = PINT_pcache_pinode_alloc(&pinode_ptr);
+        if (ret < 0)
+        {
+            ret = -ENOMEM;
+            failure = INVAL_LOOKUP_FAILURE;
+            goto return_error;
+        }
+
+        /* Fill in the timestamps */
+        ret = phelper_fill_timestamps(pinode_ptr);
+        if (ret < 0)
+        {
+            failure = PCACHE_ADD_FAILURE;
+            goto return_error;
+        }
+
+        /* Set the size timestamp - size was not fetched */
+        pinode_ptr->size_flag = SIZE_INVALID;
+        pinode_ptr->pinode_ref.handle = ack_p->u.lookup_path.handle_array[0];
+        pinode_ptr->pinode_ref.fs_id = entry.fs_id;
+        pinode_ptr->attr = ack_p->u.lookup_path.attr_array[0];
+	pinode_ptr->mask = req_p->u.lookup_path.attrmask;
+
+        /* Add to the pinode list */
+        ret = PINT_pcache_insert(pinode_ptr);
+        if (ret < 0)
+        {
+            failure = PCACHE_ADD_FAILURE;
+            goto return_error;
+        }
+
+        PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+        return (0);
+
+return_error:
+
+    switch(failure)
+    {
+        case ADD_PCACHE_FAILURE:
+            PINT_pcache_pinode_dealloc(&pinode_ptr);
+        case INVAL_LOOKUP_FAILURE:
+        case SEND_REQ_FAILURE:
+            PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+        case MAP_SERVER_FAILURE:
+        case NONE_FAILURE:
+    }
+    return (ret);
+}
+#endif
 
 /*
  * type: if 0 for requests, 1 for reponses.

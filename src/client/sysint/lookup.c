@@ -64,7 +64,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     pinode *entry_pinode = NULL, *pinode_ptr = NULL;
     char *server = NULL, *segment = NULL, *path = NULL;
     bmi_addr_t serv_addr;
-    int start_seg = 0, vflags = 0, num_seg = 0;
+    int start_seg = 0, vflags = 0, num_seg = 0, num_seg_looked_up = 0;
     int start_path = 0, end_path = 0, path_len = 0;
     PVFS_handle parent_handle, final_handle = 0;
     PVFS_bitfield attr_mask;
@@ -165,21 +165,15 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 
 		/* Get Metaserver in BMI URL format using the bucket table 
 		 * interface */
-	    ret = config_bt_map_bucket_to_server(&server, parent.handle,
+	    ret = PINT_bucket_map_to_server(&serv_addr, parent.handle,
 						 parent.fs_id);
 	    if (ret < 0)
 	    {
 		goto map_to_server_failure;
 	    }
-	    printf("mapping server address from bti to bmi address\n");
-	    ret = BMI_addr_lookup(&serv_addr,server);
-	    if (ret < 0)
-	    {
-		goto map_to_server_failure;
-	    }
 	    /* Free the server */
-	    free(server);
-	    server = NULL;
+	    /*free(server);
+	    server = NULL;*/
 
 	/* Make a lookup_path server request to get the handle and
 	 * attributes of segment
@@ -195,6 +189,14 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	    /* Repeat for number of handles returned */
 	    for(i = 0; i < ack_p->u.lookup_path.count; i++)
 	    {
+
+		/* TODO: rework [p|d]cache here, we need to lookup the handle
+		 * that was provided in the lookup response, if the pinode
+		 * exists, update it, otherwise, alloc a new one and add it
+		 * to the cache.  we obviously don't have anything in the dcache
+		 * if we're in this part of the code, just alloc a new one of
+		 * those.
+		 */
 				/* Fill up pinode reference for entry */
 		entry.handle = ack_p->u.lookup_path.handle_array[i];
 		entry.fs_id = req->fs_id;
@@ -219,7 +221,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		pinode_ptr->mask = req_p->u.lookup_path.attrmask;
 
 		/* Check permissions for path */
-		ret = check_perms(pinode_ptr->attr,req->credentials.perms,\
+		ret = check_perms(pinode_ptr->attr,req->credentials.perms,
 				  req->credentials.uid, req->credentials.gid);
 		if (ret < 0)
 		{
@@ -270,6 +272,13 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	    {
 		goto check_perms_failure;
 	    }
+
+	    /* Free request,ack jobs */
+	    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+
+	    free(req_p->u.lookup_path.path);
+	    free(req_p);
+
 	}
 	else
 	{
@@ -297,7 +306,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		goto lookup_path_failure;
 	    }
 
-	    /* Get next path */
+	    /* advance one segment in the path */
 	    ret = get_next_path(path,1,&start_path,&end_path);
 	    if (ret < 0)
 	    {
@@ -321,12 +330,6 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		
 	/* Update the parent handle */
 	parent.handle = entry.handle;
-
-	/* Free request,ack jobs */
-	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
-
-	free(req_p->u.lookup_path.path);
-	free(req_p);
 
     }/* end of while */
 
