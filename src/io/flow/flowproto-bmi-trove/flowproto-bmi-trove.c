@@ -136,6 +136,7 @@ static int trove_pending_count = 0;
  * have not yet been passed back by flow_proto_checkXXX()
  */
 static QLIST_HEAD(done_checking_queue);
+static gen_mutex_t done_checking_queue_mutex = GEN_MUTEX_INITIALIZER;
 
 #ifdef __PVFS2_JOB_THREADED__
 static pthread_cond_t bmi_cond = PTHREAD_COND_INITIALIZER;
@@ -570,8 +571,10 @@ gen_mutex_lock(&(PRIVATE_FLOW(active_flowd)->mutex));
 	    if (active_flowd->state & FLOW_FINISH_MASK ||
 		active_flowd->state == FLOW_SVC_READY)
 	    {
+gen_mutex_lock(&done_checking_queue_mutex);
 		qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
 			       &done_checking_queue);
+gen_mutex_unlock(&done_checking_queue_mutex);
 	    }
 gen_mutex_unlock(&(PRIVATE_FLOW(active_flowd)->mutex));
 	}
@@ -641,8 +644,10 @@ gen_mutex_lock(&(PRIVATE_FLOW(active_flowd)->mutex));
                     if (active_flowd->state & FLOW_FINISH_MASK ||
                         active_flowd->state == FLOW_SVC_READY)
                     {
+gen_mutex_lock(&done_checking_queue_mutex);
                         qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
                                        &done_checking_queue);
+gen_mutex_unlock(&done_checking_queue_mutex);
                     }
 gen_mutex_unlock(&(PRIVATE_FLOW(active_flowd)->mutex));
                 }
@@ -686,6 +691,7 @@ gen_mutex_unlock(&(PRIVATE_FLOW(active_flowd)->mutex));
     }
 #endif
 
+gen_mutex_lock(&done_checking_queue_mutex);
     /* collect flows out of the done_checking_queue and return */
     *count = 0;
     while (*count < incount && !qlist_empty(&done_checking_queue))
@@ -702,6 +708,7 @@ gen_mutex_unlock(&(PRIVATE_FLOW(active_flowd)->mutex));
 	flow_d_array[*count] = active_flowd;
 	(*count)++;
     }
+gen_mutex_unlock(&done_checking_queue_mutex);
     return (0);
 }
 
@@ -1976,8 +1983,10 @@ gen_mutex_lock(&(PRIVATE_FLOW(flow_d)->mutex));
     if (flow_d->state & FLOW_FINISH_MASK ||
 	flow_d->state == FLOW_SVC_READY)
     {
+gen_mutex_lock(&done_checking_queue_mutex);
 	qlist_add_tail(&(PRIVATE_FLOW(flow_d)->queue_link),
 		       &done_checking_queue);
+gen_mutex_unlock(&done_checking_queue_mutex);
     }
 gen_mutex_unlock(&(PRIVATE_FLOW(flow_d)->mutex));
 
