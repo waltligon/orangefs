@@ -57,6 +57,7 @@ int test_request(void){
                                                                                 
     int32_t blocklength = 10*1024*1024; /* 10M */
 
+    /* Used for calculating correct offset values */
     int32_t tmpSize;
     int32_t tmpOff;
     int32_t segSize;
@@ -107,9 +108,7 @@ int test_request(void){
     /* Turn on debugging */
     /* gossip_enable_stderr();
     gossip_set_debug_mask(1,REQUEST_DEBUG); */
-                                                                                 
-/*    printf("\n************************************\n");
-*/
+                                                                                
     tmpSize = blocklength;
     tmpOff = displacement1;
     segSize = BYTEMAX;
@@ -123,14 +122,8 @@ int test_request(void){
                                                                                 
 	if(retval >= 0)
 	{
-/*	    printf("results of PINT_Process_request():\n");
-	    printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
-*/
 	    for(i = 0; i < seg1.segs; i++)
 	    {
-/*		printf("  segment %d: offset: %d size: %d\n",
-               i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
-*/
 		if(tmpOff != ((int)seg1.offset_array[i])){
 		    printf("Error:  segment %d offset is %d but should be %d\n",i,(int)seg1.offset_array[i],tmpOff);
 		    return -1;
@@ -155,15 +148,11 @@ int test_request(void){
     {
       fprintf(stderr, "Error: PINT_Process_request() failure.\n");      return(-1);
    }
-/*   printf("final file size %lld\n", rf1.fsize);
-*/
    if(PINT_REQUEST_DONE(rs1))
    {
 /*      printf("**** first request done.\n");
 */
    }
- /*  printf("\n************************************\n");
-*/
     tmpOff = displacement2;
     tmpSize = blocklength;
     segSize = BYTEMAX;
@@ -176,16 +165,8 @@ int test_request(void){
                                                                                 
       if(retval >= 0)
       {
-/*
-         printf("results of PINT_Process_request():\n");
-         printf("%d segments with %lld bytes\n", seg2.segs, seg2.bytes);
-*/
          for(i=0; i < seg2.segs; i++)
          {
-/*            printf("  segment %d: offset: %d size: %d\n",
-               i, (int)seg2.offset_array[i], (int)seg2.size_array[i]);
-*/
-
 		if(tmpOff != ((int)seg2.offset_array[i])){
 		    printf("Error:  segment %d offset is %d but should be %d\n",i,(int)seg2.offset_array[i],tmpOff);
 		    return -1;
@@ -213,7 +194,6 @@ int test_request(void){
       fprintf(stderr, "Error: PINT_Process_request() failure.\n");
       return(-1);
    }
-/*   printf("final file size %lld\n", rf2.fsize); */
    if(PINT_REQUEST_DONE(rs2))
    {
  /*     printf("**** second request done.\n"); */
