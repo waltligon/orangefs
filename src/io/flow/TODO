@@ -5,12 +5,6 @@ general stuff:
   clever about dividing time between multiple modules and
   splitting up the max_idle_time_ms argument
 
-- get Walt to implement another request processing function (or another
-  mode of the current function) that discards segments and lets me seek
-  ahead in the stream as far as I want (maintaining state, unlike the
-  CKSIZE function).  When implemented, use it in place of
-  process_request_discard_regions().
-
 - make an optional flow descriptor checker function that makes sure the
   flow descriptor fields are set to sane initial values - only use it
   during development
@@ -46,15 +40,6 @@ flowproto bmi_trove stuff:
 - do a better implementation of checkworld, so that it is more
   clever about multiplexing between bmi/trove and dividing up the
   max_idle_time.
-
-- think about queue/array layout for op id's a little more.
-  Is there any reason why we can't maintain an array the whole time
-  rather than converting between list and array?
-
-- NOTE: it is ok to post lots of list trove messages at once; this is a
-  handy feature (on server write operation case) when there is a
-  large buffer with too many discontig regions to do in one list
-  from request processor
 
 - signal I/O error by sending 0 byte message.  This means receiver
   should shut down because no other data is coming.
