@@ -45,32 +45,35 @@
 
 extern job_context_id pint_client_sm_context;
 
-enum {
+enum
+{
     GETATTR_NEED_SIZE = 1,
     GETATTR_NEED_DATAFILE_SIZES = 2
 };
 
 /* state function prototypes */
-static int getattr_check_parameters(PINT_client_sm *sm_p,
-                                    job_status_s *js_p);
-static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
-						job_status_s *js_p);
-static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
-					  job_status_s *js_p);
-static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
-						       job_status_s *js_p);
-static int getattr_datafile_getattr_failure(PINT_client_sm *sm_p,
-					    job_status_s *js_p);
-static int getattr_cleanup(PINT_client_sm *sm_p,
-			   job_status_s *js_p);
+static int getattr_check_parameters(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int getattr_object_getattr_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int getattr_object_getattr_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int getattr_datafile_getattr_setup_msgpairarray(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int getattr_datafile_getattr_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int getattr_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 /* completion function prototypes */
-static int getattr_object_getattr_comp_fn(void *v_p,
-					  struct PVFS_server_resp *resp_p,
-					  int index);
-static int getattr_datafile_getattr_comp_fn(void *v_p,
-					    struct PVFS_server_resp *resp_p,
-					    int index);
+static int getattr_object_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index);
+static int getattr_datafile_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index);
 
 %%
 
@@ -163,7 +166,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
         return ret;
     }
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
         return -PVFS_ENOMEM;
@@ -260,20 +263,21 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.getattr.object_ref.handle;
     sm_p->msgpair.comp_fn = getattr_object_getattr_comp_fn;
+
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
                                     sm_p->msgpair.handle,
                                     sm_p->msgpair.fs_id);
     if(ret != 0)
     {
 	gossip_err("Error: failure mapping to server.\n");
-	assert(ret < 0); /* return value range check */
-	assert(0); /* TODO: real error handling */
+        js_p->error_code = ret;
+        return 1;
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "attrmask being passed to server: ");
-    PINT_attrmask_print(GOSSIP_CLIENT_DEBUG, attrmask);
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "attrmask being passed to server: ");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
 
-    /* drop through and jump to getattr_acache state machine */
     return 1;
 }
 
@@ -376,8 +380,9 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
     /* transform the attributes from the response
      *
-     * Note: the structure in sm_p is a PVFS_sys_attr, while the data returned
-     * is in a PVFS_object_attr.  So some translation is necessary.
+     * Note: the structure in sm_p is a PVFS_sys_attr, while the data
+     * returned is in a PVFS_object_attr.  So some translation is
+     * necessary.
      */
     sm_p->u.getattr.getattr_resp_p->attr.owner = attr->owner;
     sm_p->u.getattr.getattr_resp_p->attr.group = attr->group;
@@ -404,7 +409,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		assert(attr->mask & PVFS_ATTR_META_DIST);
 		assert(attr->u.meta.dist_size > 0);
 		
-		gossip_debug(GOSSIP_CLIENT_DEBUG,
+		gossip_debug(GOSSIP_GETATTR_DEBUG,
                              "getattr_object_getattr_comp_fn: "
                              "copying %d bytes of dist.\n",
                              attr->u.meta.dist_size);
@@ -429,7 +434,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		assert(attr->mask & PVFS_ATTR_META_DFILES);
 		assert(attr->u.meta.dfile_count > 0);
 		
-		gossip_debug(GOSSIP_CLIENT_DEBUG,
+		gossip_debug(GOSSIP_GETATTR_DEBUG,
 			     "getattr_object_getattr_comp_fn: %d datafiles.\n",
 			     attr->u.meta.dfile_count);
 		
@@ -480,10 +485,10 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 	    gossip_err("error: getattr_object_getattr_comp_fn: "
                        "handle refers to invalid object type\n");
 	    return -PVFS_EINVAL;
-    } /* end of switch() */
+    }
 
     return -PVFS_EINVAL; /* should not get here */
-} /* getattr_object_getattr_comp_fn */
+}
 
 
 static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
@@ -530,7 +535,7 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
     {
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
-	gossip_debug(GOSSIP_CLIENT_DEBUG,
+	gossip_debug(GOSSIP_GETATTR_DEBUG,
 		     "  datafile_getattr: getting size for handle %Lu\n", 
 		     Lu(sm_p->u.getattr.datafile_handles[i]));
 
@@ -553,13 +558,10 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
     if(ret < 0)
     {
 	gossip_lerr("Error: failed to resolve server addresses.\n");
-	/* TODO: handle this properly */
-	assert(0);
 	js_p->error_code = ret;
 	return 1;
     }
 
-    /* return immediately; next state jumps to msgpairarray machine */
     return 1;
 }
 
@@ -569,7 +571,8 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 
-    if (resp_p->status != 0) {
+    if (resp_p->status != 0)
+    {
 	return resp_p->status;
     }
 
@@ -582,10 +585,10 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
     assert(resp_p->u.getattr.attr.objtype == PVFS_TYPE_DATAFILE);
     assert(resp_p->u.getattr.attr.u.data.size >= 0);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
 		 "datafile_getattr: size of datafile %d is %Ld\n",
-		 index,
-		 Ld(resp_p->u.getattr.attr.u.data.size));
+		 index, Ld(resp_p->u.getattr.attr.u.data.size));
+
     sm_p->u.getattr.size_array[index] = resp_p->u.getattr.attr.u.data.size;
 
     return 0;
@@ -661,8 +664,6 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
         {
             s_attr_p->mask |= PVFS_ATTR_SYS_LNK_TARGET;
         }
-
-	PINT_attrmask_print(GOSSIP_CLIENT_DEBUG, s_attr_p->mask);
 
 	/* free all the memory we allocated, which could include:
 	 * - size array
