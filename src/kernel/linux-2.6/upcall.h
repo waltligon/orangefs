@@ -59,6 +59,7 @@ typedef struct
 typedef struct
 {
     PVFS_pinode_reference parent_refn;
+    PVFS_sys_attr attributes;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_mkdir_request_t;
 

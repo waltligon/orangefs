@@ -426,6 +426,8 @@ static inline struct inode *pvfs2_create_dir(
 	    new_op->upcall.req.mkdir.parent_refn.fs_id =
 		PVFS2_SB(dir->i_sb)->fs_id;
 	}
+        copy_attributes_from_inode(
+            inode, &new_op->upcall.req.mkdir.attributes);
 	strncpy(new_op->upcall.req.mkdir.d_name,
 		dentry->d_name.name, PVFS2_NAME_LEN);
 
