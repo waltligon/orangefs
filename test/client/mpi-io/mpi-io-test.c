@@ -32,32 +32,24 @@
 #include <sys/time.h>
 #include <mpi.h>
 #include <errno.h>
+#include <getopt.h>
 
 
 /* DEFAULT VALUES FOR OPTIONS */
-int64_t opt_block     = 1048576*16;
-int     opt_iter      = 1;
-int     opt_stripe    = -1;
-int     opt_correct   = 0;
-int     opt_sync      = 0;
-int     opt_single    = 0;
-int     opt_verbose   = 0;
-int     amode         = O_RDWR | O_CREAT;
-char    opt_file[256] = "/foo/test.out\0";
-char    opt_pvfs2tab[256] = "notset\0";
-int     opt_pvfstab_set = 0;
+static int     opt_block     = 16*1024*1024;
+static int     opt_iter      = 1;
+static int     opt_correct   = 0;
+static int     opt_sync      = 0;
+static int     opt_single    = 0;
+static int     opt_verbose   = 0;
+static char    opt_file[256] = "/foo/test.out";
+static char    opt_pvfs2tab[256] = "notset";
+static int     opt_pvfstab_set = 0;
 
 /* function prototypes */
-int parse_args(int argc, char **argv);
-void usage(void);
-double Wtime(void);
-void handle_error(int errcode, char *str);
-
-extern int debug_on;
-
-/* globals needed for getopt */
-extern char *optarg;
-extern int optind, opterr;
+static int parse_args(int argc, char **argv);
+static void usage(void);
+static void handle_error(int errcode, char *str);
 
 int main(int argc, char **argv)
 {
@@ -115,7 +107,7 @@ int main(int argc, char **argv)
 	iter_jump = nprocs * opt_block;
 		
 	/* setup a buffer of data to write */
-	if (!(tmp = (char *) malloc(opt_block + 256))) {
+	if (!(tmp = malloc(opt_block + 256))) {
 		perror("malloc");
 		goto die_jar_jar_die;
 	}
@@ -296,13 +288,13 @@ int main(int argc, char **argv)
 	
 	/* print out the results on one node */
 	if (mynod == 0) {
-	   read_bw = ((int64_t)(opt_block*nprocs*opt_iter))/(max_read_tim*1000000.0);
-	   write_bw = ((int64_t)(opt_block*nprocs*opt_iter))/(max_write_tim*1000000.0);
+	   read_bw = ((int64_t)opt_block*nprocs*opt_iter)/(max_read_tim*1.0e6);
+	   write_bw = ((int64_t)opt_block*nprocs*opt_iter)/(max_write_tim*1.0e6);
 		
 			printf("nr_procs = %d, nr_iter = %d, blk_sz = %ld\n", nprocs,
 		opt_iter, (long)opt_block);
 			
-			printf("# total_size = %lld\n", (int64_t)(opt_block*nprocs*opt_iter));
+			printf("# total_size = %lld\n", (int64_t)opt_block*nprocs*opt_iter);
 			
 			printf("# Write: min_t = %f, max_t = %f, mean_t = %f, var_t = %f\n", 
 				min_write_tim, max_write_tim, ave_write_tim, var_write_tim);
@@ -320,25 +312,17 @@ int main(int argc, char **argv)
 
 die_jar_jar_die:	
 
-	/* clear the environment variable if it was set earlier */
-	if	(opt_pvfstab_set){
-		unsetenv("PVFSTAB_FILE");
-	}
-	
 	free(tmp);
 	MPI_Finalize();
 	return(0);
 }
 
-int parse_args(int argc, char **argv)
+static int parse_args(int argc, char **argv)
 {
 	int c;
 	
-	while ((c = getopt(argc, argv, "s:b:i:f:p:cyShv")) != EOF) {
+	while ((c = getopt(argc, argv, "b:i:f:p:cyShv")) != EOF) {
 		switch (c) {
-			case 's': /* stripe */
-				opt_stripe = atoi(optarg);
-				break;
 			case 'b': /* block size */
 				opt_block = atoi(optarg);
 				break;
@@ -365,6 +349,8 @@ int parse_args(int argc, char **argv)
 				opt_verbose = 1;
 				break;
 			case 'h':
+				usage();
+				exit(0);
 			case '?': /* unknown */
 				usage();
 				exit(1);
@@ -375,37 +361,29 @@ int parse_args(int argc, char **argv)
 	return(0);
 }
 
-/* Wtime() - returns current time in sec., in a double */
-double Wtime()
+static void usage(void)
 {
-	struct timeval t;
-	
-	gettimeofday(&t, NULL);
-	return((double)t.tv_sec + (double)t.tv_usec / 1000000);
+	 printf("Usage: mpi-io-test [<OPTIONS>...]\n");
+	 printf("\n<OPTIONS> is one of\n");
+	 printf(" -b       block size (in bytes) [default: 16777216]\n");
+	 printf(" -i       iterations [default: 1]\n");
+	 printf(" -f       filename [default: /foo/test.out]\n");
+	 printf(" -p       path to pvfs2tab file to use [default: notset]\n");
+	 printf(" -c       verify correctness of file data [default: off]\n");
+	 printf(" -y       sYnc the file after each write [default: off]\n");
+	 printf(" -S       all process write to same Single region of file [default: off]\n");
+	 printf(" -v       be more verbose\n");
+	 printf(" -h       print this help\n");
 }
 
-void usage(void)
+static void handle_error(int errcode, char *str)
 {
-		  printf("usage: mpi-io-test <OPTIONS>\n");
-		  printf("\n<OPTIONS> is one of\n");
-		  printf(" -s       stripe size (UNUSED)\n");
-		  printf(" -b       block size (in bytes) [default: 16777216]\n");
-		  printf(" -i       iterations [default: 1]\n");
-		  printf(" -f       filename [default: /foo/test.out]\n");
-		  printf(" -p       path to pvfs2tab file to use [default: notset]\n");
-		  printf(" -c       verify correctness of file data [default: off]\n");
-		  printf(" -y       sYnc the file after each write [default: off]\n");
-		  printf(" -S       all process write to same Single region of file [default: off]\n");
-		  printf(" -h       print this help\n");
-}
+	 char msg[MPI_MAX_ERROR_STRING];
+	 int resultlen;
 
-void handle_error(int errcode, char *str)
-{
-		  char msg[MPI_MAX_ERROR_STRING];
-		  int resultlen;
-		  MPI_Error_string(errcode, msg, &resultlen);
-		  fprintf(stderr, "%s: %s\n", str, msg);
-		  MPI_Abort(MPI_COMM_WORLD,1);
+	 MPI_Error_string(errcode, msg, &resultlen);
+	 fprintf(stderr, "%s: %s\n", str, msg);
+	 MPI_Abort(MPI_COMM_WORLD, 1);
 }
 
 /*
