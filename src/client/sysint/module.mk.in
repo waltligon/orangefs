@@ -2,11 +2,11 @@ DIR := src/client/sysint
 LIBSRC += \
 	$(DIR)/create.c \
 	$(DIR)/finalize.c \
-	$(DIR)/getattr.c \
 	$(DIR)/initialize.c \
 	$(DIR)/lookup.c \
 	$(DIR)/mkdir.c \
 	$(DIR)/pcache.c \
+	$(DIR)/getattr.c \
 	$(DIR)/pinode-helper.c \
 	$(DIR)/pint-dcache.c \
 	$(DIR)/server-send-req.c \
@@ -17,7 +17,6 @@ LIBSRC += \
 	$(DIR)/truncate.c \
 	$(DIR)/sysint-utils.c \
 	$(DIR)/pint-bucket.c \
-	$(DIR)/io.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
 	$(DIR)/sys-remove.c \
