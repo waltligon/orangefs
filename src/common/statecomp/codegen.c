@@ -10,7 +10,7 @@ extern FILE *out_file;
 
 gen_init()
 {
-	fprintf(out_file,"\n#include <state_machine.h>\n");
+	fprintf(out_file,"\n#include <state-machine.h>\n");
 }
 
 gen_state_decl(char *state_name)

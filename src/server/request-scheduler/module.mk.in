@@ -1,6 +1,6 @@
 DIR := src/server/request-scheduler
 LIBSRC += \
-	$(DIR)/request-scheduler.c
+	$(DIR)/request-scheduler.c 
 SERVERSRC += \
-	$(DIR)/request-scheduler.c
+	$(DIR)/request-scheduler.c 
 

@@ -1,3 +1,5 @@
 DIR := src/proto
 LIBSRC += \
 	$(DIR)/PINT-reqproto-lib.c 
+SERVERSRC += \
+	$(DIR)/PINT-reqproto-lib.c 

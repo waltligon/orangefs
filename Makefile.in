@@ -4,7 +4,7 @@ SHELL = @SHELL@
 INSTALL = @INSTALL@
 
 .SUFFIXES:
-.PHONY: all clean tests distclean tmp_server_objs docs docsclean
+.PHONY: all clean tests distclean docs docsclean
 
 # main source subdirectories
 #
@@ -32,6 +32,7 @@ CFLAGS +=\
  -I src/common/statecomp
 LDFLAGS += -L lib
 LIBS += -lpvfs2
+SERVERLIBS = -ldb -lrt -lpthread
 # here we differentiate cflags between some components
 LIBCFLAGS = -D__GEN_NULL_LOCKING__
 SERVERCFLAGS = -D__GEN_POSIX_LOCKING__
@@ -44,7 +45,9 @@ CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 # before we get going.  This is kind of a hack, and we should
 # try to find a better way to take care of it.
 #
-SRCFILES := src/io/trove/trove-autogen.c
+SRCFILES :=\
+ src/io/trove/trove-autogen.c
+
 #
 # CLEANFILES is a list of generated files that need to be removed at
 # "make clean" time.  This is just for special case files that aren't
@@ -63,8 +66,10 @@ LIBSRC :=
 SERVERSRC :=
 MISCSRC := 
 DOCSRC :=
+SERVER := src/server/server-daemon
 
-all: $(LIBRARIES) tests tmp_server_objs
+#all: $(LIBRARIES) tests $(SERVER)
+all: $(LIBRARIES) tests
 
 include $(patsubst %, %/module.mk, $(MODULES))
 
@@ -99,10 +104,8 @@ DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS))
 
 tests: $(TESTS)
 
-# TODO: this rule is temporary to force the building of objects to
-# be used in the server until we have a server target; remove this
-# later
-tmp_server_objs: $(SERVEROBJS)
+$(SERVER): $(SERVEROBJS)
+	$(LD) $(LDFLAGS) $(SERVERLIBS) $^ -o $@
 
 lib/libpvfs2.a: $(LIBOBJS)
 	$(INSTALL) -d lib
@@ -131,7 +134,7 @@ docsclean:
 
 clean: docsclean
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
-		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)
+		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)  $(SERVER)
 
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;
@@ -147,6 +150,10 @@ ifneq ($(MAKECMDGOALS),docs)
 endif
 endif
 endif
+
+# build program needed to generate state machines source before 
+# generating source
+$(SRCFILES): src/common/statecomp/statecomp
 
 # @ suppresses output from the depend shell script.
 %.d: %.c $(SRCFILES)
