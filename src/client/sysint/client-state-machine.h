@@ -387,7 +387,8 @@ enum {
     PVFS_MGMT_PERF_MON_LIST = 73,
     PVFS_MGMT_ITERATE_HANDLES_LIST = 74,
     PVFS_MGMT_GET_DFILE_ARRAY = 75,
-    PVFS_MGMT_EVENT_MON_LIST = 76
+    PVFS_MGMT_EVENT_MON_LIST = 76,
+    PVFS_CLIENT_JOB_TIMER = 200
 };
 
 /* prototypes of helper functions */
@@ -447,6 +448,7 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_iterate_handles_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dfile_array_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_noop_sm;
 extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
+extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_msgpairarray_sm;

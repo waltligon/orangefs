@@ -63,6 +63,14 @@ int PVFS_sys_initialize(int default_debug_mask)
     int ret = -PVFS_EINVAL, debug_mask = 0;
     char *debug_mask_str = NULL, *debug_file = NULL;
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
+    PINT_client_sm *sm_p = NULL;
+
+    sm_p = (PINT_client_sm*)malloc(sizeof(PINT_client_sm));
+    if(!sm_p)
+    {
+	return(-PVFS_ENOMEM);
+    }
+    memset(sm_p, 0, sizeof(*sm_p));
 
     gossip_enable_stderr();
 
@@ -179,6 +187,13 @@ int PVFS_sys_initialize(int default_debug_mask)
         goto error_exit;
     }
 
+    ret = PINT_client_state_machine_post(sm_p, PVFS_CLIENT_JOB_TIMER);
+    if(ret < 0)
+    {
+	gossip_lerr("Error posting job timer.\n");
+	goto error_exit;
+    }
+
     return 0;
 
   error_exit:
@@ -232,6 +247,9 @@ int PVFS_sys_initialize(int default_debug_mask)
     {
         PINT_encode_finalize();
     }
+
+    free(sm_p);
+
     return ret;
 }
 
