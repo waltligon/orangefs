@@ -17,9 +17,6 @@
  * Information specific to tcp/ip
  */
 
-typedef int32_t bmi_sock_t;	/* tcp/ip socket */
-typedef int32_t bmi_port_t;	/* tcp/ip port */
-
 /* this contains TCP/IP addressing information- it is filled in as
  * connections are made */
 struct tcp_addr
@@ -29,8 +26,8 @@ struct tcp_addr
     int addr_error;		
     char *hostname;
     char *ipaddr;
-    bmi_port_t port;
-    bmi_sock_t socket;
+    int port;
+    int socket;
     /* flag that indicates this address represents a
      * server port on which connections may be accepted */
     int server_port;
@@ -40,6 +37,7 @@ struct tcp_addr
     int not_connected;
     /* socket collection link */
     struct qlist_head sc_link;
+    int sc_index;
 };
 
 /*****************************************************************

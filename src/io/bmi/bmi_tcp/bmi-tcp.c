@@ -1405,6 +1405,7 @@ method_addr_p alloc_tcp_method_addr(void)
     tcp_addr_data->socket = -1;
     tcp_addr_data->port = -1;
     tcp_addr_data->map = my_method_addr;
+    tcp_addr_data->sc_index = -1;
 
     return (my_method_addr);
 }
@@ -2069,12 +2070,16 @@ static int tcp_do_work(int max_idle_time)
     int stall_flag = 0;
     int busy_flag = 1;
     struct timespec req;
+    struct tcp_addr* tcp_addr_data = NULL;
 
     /* now we need to poll and see what to work on */
+    /* drop mutex while we make this call */
+    gen_mutex_unlock(&interface_mutex);
     ret = BMI_socket_collection_testglobal(tcp_socket_collection_p,
 				       TCP_WORK_METRIC, &socket_count,
 				       addr_array, status_array,
 				       max_idle_time, &interface_mutex);
+    gen_mutex_lock(&interface_mutex);
     if (ret < 0)
     {
 	return (ret);
@@ -2086,6 +2091,14 @@ static int tcp_do_work(int max_idle_time)
     /* do different kinds of work depending on results */
     for (i = 0; i < socket_count; i++)
     {
+	tcp_addr_data = addr_array[i]->method_data;
+	/* skip working on addresses in failure mode */
+	if(tcp_addr_data->addr_error)
+	{
+	    tcp_forget_addr(addr_array[i], 0, tcp_addr_data->addr_error);
+	    continue;
+	}
+
 	if (status_array[i] & SC_ERROR_BIT)
 	{
 	    ret = tcp_do_work_error(addr_array[i]);
