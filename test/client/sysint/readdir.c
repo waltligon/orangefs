@@ -93,7 +93,7 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 
-	printf("LOOKUP_RESPONSE===>\n\tresp_look.pinode_refn.handle = %ld\n\tresp_look.pinode_refn.fs_id = %d\n",resp_look.pinode_refn.handle, resp_look.pinode_refn.fs_id);
+	printf("LOOKUP_RESPONSE===>\n\tresp_look.pinode_refn.handle = %Ld\n\tresp_look.pinode_refn.fs_id = %d\n",resp_look.pinode_refn.handle, resp_look.pinode_refn.fs_id);
 
 	req_readdir->pinode_refn.handle = resp_look.pinode_refn.handle;
 	req_readdir->pinode_refn.fs_id = req_look.fs_id;
@@ -119,7 +119,7 @@ int main(int argc,char **argv)
 	printf("Returned %d dirents\n",resp_readdir->pvfs_dirent_outcount);
 	for(i = 0;i < resp_readdir->pvfs_dirent_outcount;i++)
 	{
-		printf("name:%s\t%d\n",resp_readdir->dirent_array[i].d_name,
+		printf("name:%s\t%Ld\n",resp_readdir->dirent_array[i].d_name,
 				resp_readdir->dirent_array[i].handle);
 	}
 

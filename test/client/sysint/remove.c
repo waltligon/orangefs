@@ -25,19 +25,15 @@ int main(int argc,char **argv)
 	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
 	PVFS_sysreq_remove *req_remove;
-	int ret = -1, name_sz = 0;
+	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
 
 
 	if (argc != 2)
 	{
+		printf("usage: %s file_to_remove\n", argv[0]);
 		return 1;
 	}
-	else
-	{
-		printf("usage: %s file_to_remove\n", argv[0]);
-	}
-
 	printf("creating a file named %s\n", argv[1]);
 
 	/* Parse PVFStab */
