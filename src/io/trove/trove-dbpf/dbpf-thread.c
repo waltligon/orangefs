@@ -15,9 +15,7 @@
 #include "trove-handle-mgmt.h"
 #include "dbpf.h"
 #include "dbpf-thread.h"
-#include "dbpf-dspace.h"
 #include "dbpf-bstream.h"
-#include "dbpf-keyval.h"
 #include "dbpf-op-queue.h"
 
 extern struct qlist_head dbpf_op_queue;

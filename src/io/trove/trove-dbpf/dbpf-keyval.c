@@ -18,7 +18,6 @@
 #include "trove-internal.h"
 #include "dbpf.h"
 #include "dbpf-op-queue.h"
-#include "dbpf-keyval.h"
 #include "dbpf-attr-cache.h"
 #include "gossip.h"
 

@@ -26,8 +26,6 @@
 #include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-bstream.h"
-#include "dbpf-keyval.h"
-#include "dbpf-dspace.h"
 #include "dbpf-thread.h"
 #include "dbpf-attr-cache.h"
 #include "trove-ledger.h"
