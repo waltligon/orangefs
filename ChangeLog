@@ -16,7 +16,8 @@ pvfs2-0.0.6pre1
 - kernel inode link count fixes
 - bucketized (single indirection) 'on-disk' representation of
   bstream and keyval files in the host storage space
-
+- a pvfs2_rmspace (opposite of mkspace); can be invoked by server
+  using the -r command line option
 
 pvfs2-0.0.5
 ===========

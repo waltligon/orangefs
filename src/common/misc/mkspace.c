@@ -48,7 +48,7 @@ int pvfs2_mkspace(
     {
         gossip_debug(SERVER_DEBUG,"Storage space: %s\n",storage_space);
         gossip_debug(SERVER_DEBUG,"Collection   : %s\n",collection);
-        gossip_debug(SERVER_DEBUG,"Collection ID: %d\n",coll_id);
+        gossip_debug(SERVER_DEBUG,"ID           : %d\n",coll_id);
         gossip_debug(SERVER_DEBUG,"Root Handle  : %Lu\n",Lu(root_handle));
         gossip_debug(SERVER_DEBUG,"Handle Ranges: %s\n",handle_ranges);
     }
@@ -359,8 +359,8 @@ int pvfs2_rmspace(
     ret = trove_initialize(storage_space, 0, &method_name, 0);
     if (ret == -1)
     {
-        gossip_err("error: storage space %s already "
-                   "exists; aborting!\n",storage_space);
+        gossip_err("error: storage space %s does not "
+                   "exist; aborting!\n", storage_space);
         return -1;
     }
 
@@ -389,5 +389,15 @@ int pvfs2_rmspace(
                 ((ret != -1) ? "successfully" : "with errors"));
         }
     }
+
+    /*
+      we should be doing a trove finalize here, but for now
+      we can't because it will fail horribly during the sync/close
+      calls to files that we've just removed.
+     
+      an extra flag to finalize, or a static var in the dbpf-mgmt
+      methods could resolve this.
+    */
+/*     trove_finalize(); */
     return ret;
 }
