@@ -141,17 +141,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	goto out;
     }
 
-    /* create flow descriptors */
-    for(i=0; i<HACK_num_datafiles; i++)
-    {
-	flow_array[i] = PINT_flow_alloc();
-	if(!flow_array[i])
-	{
-	    ret = -ENOMEM;
-	    goto out;
-	}
-    }
-
     /* setup the I/O request to each data server */
     for(i=0; i<HACK_num_datafiles; i++)
     {
@@ -215,6 +204,12 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
 	if(!(error_code_array[i]) && !(tmp_resp->status))
 	{
+	    flow_array[i] = PINT_flow_alloc();
+	    if(!flow_array[i])
+	    {
+		error_code_array[i] = -ENOMEM;
+		continue;
+	    }
 	    flow_array[i]->file_data = &(file_data_array[i]);
 	    flow_array[i]->file_data->fsize =
 		tmp_resp->u.io.bstream_size;
