@@ -39,7 +39,8 @@ enum PVFS_server_op
     PVFS_SERV_WRITE_COMPLETION = 13,
     PVFS_SERV_FLUSH = 14,
     PVFS_SERV_MGMT_SETPARAM = 15,
-    PVFS_SERV_MGMT_NOOP = 16
+    PVFS_SERV_MGMT_NOOP = 16,
+    PVFS_SERV_STATFS = 17
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
      * if you add a new operation to this list
      */
@@ -49,10 +50,9 @@ enum PVFS_server_op
      * PVFS_SERV_SETEATTR,
      * PVFS_SERV_BATCH
      * PVFS_SERV_EXTENSION
-     * PVFS_SERV_STATFS
      */
 };
-#define PVFS_MAX_SERVER_OP 16
+#define PVFS_MAX_SERVER_OP 17
 
 /* max number of jobs the server is able to manage at a time */
 #define PVFS_SERVER_MAX_JOBS  512
@@ -408,9 +408,18 @@ struct PVFS_servreq_truncate
  * returned in generic server response structure
  */
 
-/* NOTE: no response structure: all necessary response info is returned in
- * generic server response structure
- */
+/* statfs ****************************************************/
+/* - retrieves statistics for a particular file system */
+
+struct PVFS_servreq_statfs
+{
+    PVFS_fs_id fs_id;		    /* file system */
+};
+
+struct PVFS_servresp_statfs
+{
+    /* TODO: fill this in */
+};
 
 /* io **********************************************************/
 /* - performs a read or write operation */
@@ -546,6 +555,7 @@ struct PVFS_server_req
 	struct PVFS_servreq_truncate truncate;
 	struct PVFS_servreq_flush flush;
 	struct PVFS_servreq_mgmt_setparam mgmt_setparam;
+	struct PVFS_servreq_statfs statfs;
     }
     u;
 };
@@ -567,6 +577,7 @@ struct PVFS_server_resp
 	struct PVFS_servresp_getconfig getconfig;
 	struct PVFS_servresp_io io;
 	struct PVFS_servresp_write_completion write_completion;
+	struct PVFS_servresp_statfs statfs;
     }
     u;
 };

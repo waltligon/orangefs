@@ -158,6 +158,7 @@ int do_decode_req(
     case PVFS_SERV_FLUSH:
     case PVFS_SERV_MGMT_SETPARAM:
     case PVFS_SERV_MGMT_NOOP:
+    case PVFS_SERV_STATFS:
 	return (0);
 
     /* invalid request types */
