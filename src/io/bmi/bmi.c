@@ -1044,7 +1044,16 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
     gen_mutex_unlock(&ref_mutex);
 
     /* pass along the set_info to the method */
-    ret = tmp_ref->interface->BMI_meth_set_info(option, inout_parameter);
+    if(option == BMI_INC_ADDR_REF || option == BMI_DEC_ADDR_REF)
+    {
+	/* special case for address reference counting */
+	ret = tmp_ref->interface->BMI_meth_set_info(option,
+	    tmp_ref->method_addr);
+    }
+    else
+    {
+	ret = tmp_ref->interface->BMI_meth_set_info(option, inout_parameter);
+    }
     return (ret);
 }
 

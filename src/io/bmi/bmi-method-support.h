@@ -30,6 +30,7 @@
  */
 struct method_addr
 {
+    int ref_count;
     int method_type;
     /* indicates if the address is on the local machine (usually for 
      * server listening) */
