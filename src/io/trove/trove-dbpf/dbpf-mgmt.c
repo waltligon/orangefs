@@ -1274,7 +1274,7 @@ static int dbpf_db_create(char *dbname)
                           TROVE_DB_CREATE_FLAGS,
                           TROVE_DB_MODE)) != 0)
     {
-        db_p->err(db_p, ret, "%s\n", dbname);
+        db_p->err(db_p, ret, "%s", dbname);
         return -dbpf_db_error_to_trove_error(ret);
     }
     
