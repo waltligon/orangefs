@@ -625,7 +625,7 @@ static int lookup_msg_comp_fn(void *v_p,
         /*
           here we're updating the remaining_pathname by stripping
           off the parts of the path that were just looked up.
-          out new parent handle is already valid at this point
+          our new parent handle is already valid at this point
         */
         snprintf(buf, PVFS_SEGMENT_MAX, "%s",
                  sm_p->u.lookup.remaining_pathname);
@@ -636,6 +636,8 @@ static int lookup_msg_comp_fn(void *v_p,
 
         strncpy(sm_p->u.lookup.remaining_pathname,
                 strstr(buf, tmp), PVFS_SEGMENT_MAX);
+        assert(sm_p->u.lookup.remaining_pathname &&
+               strlen(sm_p->u.lookup.remaining_pathname) > 0);
 
         gossip_debug(CLIENT_DEBUG, "Remaining pathname is %s | "
                      "new starting handle is %Lu\n",
