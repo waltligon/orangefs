@@ -215,6 +215,16 @@ struct PINT_client_lookup_sm {
     int                          num_symlinks_followed;
 };
 
+/* PINT_client_rename_sm */
+struct PINT_client_rename_sm {
+    char                  *entries[2];     /* old/new entry names;
+                                              input parameter */
+    PVFS_pinode_reference parent_refns[2]; /* old/new parent pinode refns;
+                                              input parameter */
+    PVFS_pinode_reference refns[2];        /* old/new pinode ref */
+    int                   rmdirent_index;
+};
+
 struct PINT_client_mgmt_setparam_list_sm 
 {
     PVFS_fs_id fs_id;
@@ -304,7 +314,7 @@ typedef struct PINT_client_sm {
     PINT_pinode *pinode; /* filled in on acache hit */
     PVFS_object_attr acache_attr; /* a scratch attr space */
 
-    /* we need this for create */
+    /* we need this for several state machines */
     struct server_configuration_s *server_config;
 
     /* generic msgpair used with msgpair substate */
@@ -338,6 +348,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_flush_sm flush;
 	struct PINT_client_readdir_sm readdir;
 	struct PINT_client_lookup_sm lookup;
+	struct PINT_client_rename_sm rename;
 	struct PINT_client_mgmt_setparam_list_sm setparam_list;
 	struct PINT_client_truncate_sm  truncate;
 	struct PINT_client_mgmt_statfs_list_sm statfs_list;
@@ -367,6 +378,7 @@ enum {
     PVFS_SYS_READDIR = 9,
     PVFS_SYS_SETATTR = 10,
     PVFS_SYS_LOOKUP  = 11,
+    PVFS_SYS_RENAME  = 12,
     PVFS_MGMT_SETPARAM_LIST = 70,
     PVFS_MGMT_NOOP   = 71,
     PVFS_MGMT_STATFS_LIST = 72,
@@ -423,6 +435,7 @@ extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_sm;
+extern struct PINT_state_machine_s pvfs2_client_rename_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_perf_mon_list_sm;

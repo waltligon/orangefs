@@ -71,6 +71,9 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 	case PVFS_SYS_LOOKUP:
 	    sm_p->current_state = pvfs2_client_lookup_sm.state_machine + 1;
 	    break;
+	case PVFS_SYS_RENAME:
+	    sm_p->current_state = pvfs2_client_rename_sm.state_machine + 1;
+	    break;
 	case PVFS_SYS_GETATTR:
 	    sm_p->current_state = pvfs2_client_getattr_sm.state_machine + 1;
 	    break;

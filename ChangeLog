@@ -21,7 +21,10 @@ pvfs2-0.0.6pre1
 - added kernel module highmem support
 - renamed attribute cache 'pcache' to 'acache'
 - large file support bug fixes
+- improved client sysint rename implementation (state-machine)
+- improved signal handling in pvfs2-client
 
+	
 pvfs2-0.0.5
 ===========
 - clean compilation on 64-bit machines

@@ -5,6 +5,8 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
 #include "client.h"
 #include "pvfs2-types.h"
 #include "pvfs2-util.h"
@@ -74,8 +76,8 @@ int main(int argc,char **argv)
 
     cur_fs = resp_init.fsid_list[0];
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
 
     old_entry = old_buf;
     ret = PVFS_util_lookup_parent(old_filename, cur_fs, credentials,
@@ -87,7 +89,7 @@ int main(int argc,char **argv)
     }
     old_parent_refn.fs_id = cur_fs;
     new_entry = new_buf;
-    ret = PVFS_util_lookup_parent(old_filename, cur_fs, credentials,
+    ret = PVFS_util_lookup_parent(new_filename, cur_fs, credentials,
 	&new_parent_refn.handle);
     if(ret < 0)
     {
@@ -104,8 +106,8 @@ int main(int argc,char **argv)
         return(-1);
     }
 
-    printf("===================================");
-    printf("file named %s has been renamed to %s.", old_filename,  new_filename);
+    printf("===================================\n");
+    printf("file named %s has been renamed to %s\n", old_filename,  new_filename);
 
     //close it down
     ret = PVFS_sys_finalize();

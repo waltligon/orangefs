@@ -56,7 +56,7 @@ enum PVFS_encoding_type
     ENCODING_LE_BFIELD = 1,
     ENCODING_XDR = 2
 };
-#define ENCODING_DEFAULT ENCODING_DIRECT
+#define ENCODING_DEFAULT ENCODING_LE_BFIELD
 
 /* basic types used by storage subsystem */
 typedef uint64_t PVFS_handle;
