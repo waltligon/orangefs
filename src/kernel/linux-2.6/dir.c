@@ -48,9 +48,11 @@ static int pvfs2_readdir(
         pvfs2_inode->readdir_token_adjustment = 0;
     }
 
-    pvfs2_print("pvfs2: pvfs2_readdir called on %s (pos=%d, token "
-                "adj=%d)\n", dentry->d_name.name, (int)pos,
-                (int)pvfs2_inode->readdir_token_adjustment);
+    pvfs2_print("pvfs2: pvfs2_readdir called on %s (pos=%d, tadj=%d, "
+                "retry=%d, v=%Lu)\n", dentry->d_name.name, (int)pos,
+                (int)pvfs2_inode->readdir_token_adjustment,
+                (int)pvfs2_inode->num_readdir_retries,
+                pvfs2_inode->directory_version);
 
     switch (pos)
     {
@@ -59,22 +61,28 @@ static int pvfs2_readdir(
 	   of the current directory; these always appear
 	 */
     case 0:
-	ino = dentry->d_inode->i_ino;
-	if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
-	{
-	    break;
-	}
-	file->f_pos++;
-	pos++;
+        if (pvfs2_inode->directory_version == 0)
+        {
+            ino = dentry->d_inode->i_ino;
+            if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
+            {
+                break;
+            }
+        }
+        file->f_pos++;
+        pos++;
 	/* drop through */
     case 1:
-	ino = parent_ino(dentry);
-	if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
-	{
-	    break;
-	}
-	file->f_pos++;
-	pos++;
+        if (pvfs2_inode->directory_version == 0)
+        {
+            ino = parent_ino(dentry);
+            if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
+            {
+                break;
+            }
+        }
+        file->f_pos++;
+        pos++;
 	/* drop through */
     default:
 	/* handle the normal cases here */
@@ -143,23 +151,32 @@ static int pvfs2_readdir(
 	    ino_t current_ino = 0;
 	    char *current_entry = NULL;
 
+            if (new_op->downcall.resp.readdir.dirent_count == 0)
+            {
+                goto graceful_termination_path;
+            }
+
+            if (pvfs2_inode->directory_version == 0)
+            {
+                pvfs2_inode->directory_version =
+                    new_op->downcall.resp.readdir.directory_version;
+            }
+
             if (pvfs2_inode->num_readdir_retries > -1)
             {
-                if (file->f_version !=
+                if (pvfs2_inode->directory_version !=
                     new_op->downcall.resp.readdir.directory_version)
                 {
                     pvfs2_print("detected directory change on listing; "
                                 "starting over\n");
+
                     file->f_pos = 0;
+                    pvfs2_inode->directory_version =
+                        new_op->downcall.resp.readdir.directory_version;
 
                     op_release(new_op);
                     pvfs2_inode->num_readdir_retries--;
                     goto restart_readdir;
-                }
-                else if (file->f_version == 0)
-                {
-                    file->f_version =
-                        new_op->downcall.resp.readdir.directory_version;
                 }
             }
             else
@@ -180,9 +197,12 @@ static int pvfs2_readdir(
                 if (filldir(dirent, current_entry, len, pos,
                             current_ino, DT_UNKNOWN) < 0)
                 {
+                  graceful_termination_path:
+
+                    pvfs2_inode->directory_version = 0;
                     pvfs2_inode->num_readdir_retries =
                         PVFS2_NUM_READDIR_RETRIES;
-                    file->f_version = 0;
+
                     ret = 0;
                     break;
                 }
