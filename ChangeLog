@@ -39,6 +39,7 @@ pvfs2-0.0.8pre2
 - on disk storage format is now versioned
 - bound acache size, while it's only holding invalid entries and growing
   too large
+- powerpc file size listing fixed in pvfs2-ls
 
 
 pvfs2-0.0.7
