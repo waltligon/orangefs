@@ -302,6 +302,8 @@ int PINT_cached_config_get_next_meta(
  * store new pieces of file data.  This function is responsible for
  * evenly distributing the file data storage load to all servers.
  *
+ * NOTE: if io_addr_array is NULL, then don't resolve addresses
+ *
  * returns 0 on success, -errno on failure
  */
 int PINT_cached_config_get_next_io(
@@ -317,7 +319,7 @@ int PINT_cached_config_get_next_io(
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (config && num_servers && io_addr_array && io_handle_extent_array)
+    if (config && num_servers && io_handle_extent_array)
     {
         hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
         if (hash_link)
@@ -346,11 +348,14 @@ int PINT_cached_config_get_next_io(
                 data_server_bmi_str = PINT_config_get_host_addr_ptr(
                     config,cur_mapping->alias_mapping->host_alias);
 
-                ret = BMI_addr_lookup(io_addr_array,data_server_bmi_str);
-                if (ret)
-                {
-                    break;
-                }
+		if(io_addr_array != NULL)
+		{
+		    ret = BMI_addr_lookup(io_addr_array,data_server_bmi_str);
+		    if (ret)
+		    {
+			break;
+		    }
+		}
 
                 io_handle_extent_array[i].extent_count =
                     cur_mapping->handle_extent_array.extent_count;
@@ -358,8 +363,9 @@ int PINT_cached_config_get_next_io(
                     cur_mapping->handle_extent_array.extent_array;
 
                 i++;
-                io_addr_array++;
                 num_servers--;
+		if(io_addr_array != NULL)
+		    io_addr_array++;
             }
             ret = ((num_servers == 0) ? 0 : ret);
         }
