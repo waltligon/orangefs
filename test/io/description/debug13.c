@@ -48,6 +48,9 @@ int main(int argc, char **argv)
 	PINT_Request_commit(r_packed, r1b);
 
 	PINT_Request_encode(r_packed);
+
+	r_size = PINT_REQUEST_PACK_SIZE(r_packed);
+	r1 = (struct PINT_Request *)malloc(r_size);
 	memcpy(r1, r_packed, r_size);
 	PINT_Request_decode(r1);
 
@@ -219,6 +222,15 @@ int main(int argc, char **argv)
 	{
 		printf("**** request done.\n");
 	}
+
+	 gossip_enable_stderr();
+	 gossip_set_debug_mask(1,REQUEST_DEBUG); 
+
+	PVFS_Request_free(&r1);
+	PVFS_Request_free(&r1a);
+	PVFS_Request_free(&r1b);
+	PVFS_Request_free(&r2);
+	PVFS_Request_free(&r_packed);
 
 	return 0;
 }
