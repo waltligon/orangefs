@@ -28,20 +28,41 @@ int main(int argc,char **argv)
 	PVFS_sysreq_create *req_create = NULL;
 	PVFS_sysresp_create *resp_create = NULL;
 	char *filename;
+	char *starting_point;
 	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
 	int name_sz;
 
+	switch(argc)
+	{
+		case 3:
+			name_sz = strlen(argv[2]) + 1; /*include null terminator*/
+			filename = malloc(name_sz);
+			memcpy(filename, argv[2],name_sz);
 
-	if (argc > 1)
-	{
-		name_sz = strlen(argv[1]) + 1; /*include null terminator*/
-		filename = malloc(name_sz);
-		memcpy(filename, argv[1],name_sz);
-	}
-	else
-	{
-		gen_rand_str(10,&filename);
+			name_sz = strlen(argv[1]) + 1; /*include null terminator*/
+			starting_point = malloc(name_sz);
+			memcpy(starting_point, argv[1],name_sz);
+			break;
+		case 2:
+			name_sz = strlen(argv[1]) + 1; /*include null terminator*/
+			filename = malloc(name_sz);
+			memcpy(filename, argv[1],name_sz);
+
+			starting_point = malloc(2);/*null terminator included*/
+			starting_point[0] = '/';
+			starting_point[1] = '\0';
+			break;
+		case 1:
+			gen_rand_str(10,&filename);
+
+			starting_point = malloc(2);/*null terminator included*/
+			starting_point[0] = '/';
+			starting_point[1] = '\0';
+			break;
+		default:
+			printf("usage: create <optional_starting_point> name_to_create\n");
+			return(-1);
 	}
 
 	printf("creating a file named %s\n", filename);
@@ -64,9 +85,7 @@ int main(int argc,char **argv)
 
 	/* lookup the root handle */
 	req_look.credentials.perms = 1877;
-	req_look.name = malloc(2);/*null terminator included*/
-	req_look.name[0] = '/';
-	req_look.name[1] = '\0';
+	req_look.name = starting_point;
 	req_look.fs_id = resp_init.fsid_list[0];
 	printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
 	ret = PVFS_sys_lookup(&req_look,&resp_look);
@@ -77,7 +96,7 @@ int main(int argc,char **argv)
 	}
 	// print the handle 
 	printf("--lookup--\n"); 
-	printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
+	printf("starting Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
 	
 
 	/* test create */
@@ -150,6 +169,7 @@ int main(int argc,char **argv)
 	}
 
 	free(filename);
+	free(starting_point);
 	return(0);
 }
 

@@ -39,7 +39,6 @@ int main(int argc,char **argv)
 	PVFS_sysreq_statfs *req_statfs = NULL;
 	PVFS_sysresp_statfs *resp_statfs = NULL;
 #endif
-	int IF_YOU_CAN_SEE_THIS_DALE_DIDNT_BREAK_CVS;
 	PVFS_sysreq_create *req_create = NULL;
 	PVFS_sysresp_create *resp_create = NULL;
 	char *filename;
