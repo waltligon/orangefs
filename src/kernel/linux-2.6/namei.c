@@ -91,6 +91,14 @@ struct dentry *pvfs2_lookup(
     }
     new_op->upcall.type = PVFS2_VFS_OP_LOOKUP;
 
+    /* if we're at a symlink, should we follow it? */
+    new_op->upcall.req.lookup.sym_follow =
+        ((nd && (nd->flags & LOOKUP_FOLLOW)) ? 1 : 0);
+
+    pvfs2_print("pvfs2: pvfs2_lookup -- follow? %s",
+                (new_op->upcall.req.lookup.sym_follow ?
+                 "yes" : "no"));
+
     if (dir)
     {
         sb = dir->i_sb;
@@ -386,7 +394,8 @@ static int pvfs2_rename(
     return ret;
 }
 
-struct inode_operations pvfs2_dir_inode_operations = {
+struct inode_operations pvfs2_dir_inode_operations =
+{
     .create = pvfs2_create,
     .lookup = pvfs2_lookup,
     .link = pvfs2_link,

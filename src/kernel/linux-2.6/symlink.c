@@ -18,12 +18,6 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern struct dentry_operations pvfs2_dentry_operations;
 
-/* defined in namei.c */
-struct dentry *pvfs2_lookup(
-    struct inode *dir,
-    struct dentry *dentry,
-    struct nameidata *nd);
-
 static int pvfs2_readlink(struct dentry *dentry, char *buffer, int buflen)
 {
     int len = 0;
@@ -45,15 +39,24 @@ static int pvfs2_readlink(struct dentry *dentry, char *buffer, int buflen)
     return len;
 }
 
-/*
-  see some rules at:
-  http://www.cryptofreak.org/projects/port/#inode_ops
-*/
 static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-    pvfs2_print("pvfs2: pvfs2_follow_link called on inode %d\n",
-                (int)dentry->d_inode->i_ino);
-    return 0;
+    char *link_target = NULL;
+    int ret = PTR_ERR(NULL);
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
+
+    pvfs2_print("pvfs2: pvfs2_follow_link called on %s\n",
+                (char *)dentry->d_name.name);
+
+    link_target = (pvfs2_inode && pvfs2_inode->link_target ?
+                   pvfs2_inode->link_target : NULL);
+
+    if (link_target)
+    {
+        pvfs2_print("Link has target of %s\n", link_target);
+        ret = vfs_follow_link(nd, link_target);
+    }
+    return ret;
 }
 
 struct inode_operations pvfs2_symlink_inode_operations = {

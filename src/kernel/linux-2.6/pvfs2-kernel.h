@@ -232,6 +232,14 @@ int wait_for_matching_downcall(
 int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr);
 
 /****************************
+ * defined in namei.c
+ ****************************/
+struct dentry *pvfs2_lookup(
+    struct inode *dir,
+    struct dentry *dentry,
+    struct nameidata *nd);
+
+/****************************
  * defined in pvfs2-utils.c
  ****************************/
 int pvfs2_gen_credentials(

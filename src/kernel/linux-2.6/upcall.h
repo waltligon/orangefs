@@ -21,6 +21,7 @@ typedef struct
 
 typedef struct
 {
+    int sym_follow;
     PVFS_pinode_reference parent_refn;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_lookup_request_t;
