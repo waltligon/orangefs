@@ -13,6 +13,7 @@
 
 #include "pvfs2-server.h"
 #include "trove-handle-mgmt.h"
+#include "pint-cached-config.h"
 
 #ifdef HAVE_SYSINFO
 #include <sys/sysinfo.h>
@@ -66,6 +67,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
 {
     int ret = -1;
     TROVE_context_id tmp_context;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("do_statfs");
 
@@ -80,8 +82,15 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
         return 1;
     }
 
-    /* NOTE: we let the client side code compute this on its own */
-    s_op->resp.u.statfs.stat.handles_total_count = 0;
+    /* find out how many total handles this server controls */
+    ret = PINT_cached_config_get_server_handle_count(
+        user_opts->host_id, s_op->req->u.statfs.fs_id,
+        &s_op->resp.u.statfs.stat.handles_total_count);
+    if(ret < 0)
+    {   
+        js_p->error_code = ret;
+        return(1);
+    }
 
     /* we need a context to be able to make the getinfo call */
     ret = trove_open_context(s_op->req->u.statfs.fs_id, &tmp_context);

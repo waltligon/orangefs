@@ -228,7 +228,7 @@ static int statfs_list_comp_fn(void *v_p,
 			       struct PVFS_server_resp *resp_p,
 			       int i)
 {
-    int ret = -PVFS_EINVAL, j = 0;
+    int j = 0;
     PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
 
     /* if this particular request was successful, then store the
@@ -251,23 +251,14 @@ static int statfs_list_comp_fn(void *v_p,
 	sm_stat->uptime_seconds = resp_stat->uptime_seconds;
 	sm_stat->handles_available_count =
             resp_stat->handles_available_count;
+	sm_stat->handles_total_count =
+            resp_stat->handles_total_count;
 
 	sm_stat->bmi_address = PVFS_mgmt_map_addr(
             sm_p->u.statfs_list.fs_id, sm_p->cred_p,
             sm_p->msgarray[i].svr_addr, &sm_stat->server_type);
 	assert(sm_stat->bmi_address);
 
-	ret = PINT_cached_config_get_server_handle_count(
-            sm_stat->bmi_address, sm_p->u.statfs_list.fs_id,
-            &sm_stat->handles_total_count);
-
-        if (ret)
-        {
-            PVFS_perror_gossip(
-                "PINT_cached_config_get_server_handle_count failed ",
-                ret);
-            return ret;
-        }
 	assert(sm_stat->handles_total_count >=
 	       sm_stat->handles_available_count);
     }
