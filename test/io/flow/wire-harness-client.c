@@ -44,7 +44,6 @@ int main(int argc, char **argv)
 	flow_descriptor* flow_d = NULL;
 	double time1 = 0, time2 = 0;
 	PVFS_size io_size = 10*1024*1024; /* 10 M transfer */
-
 	/*************************************************************/
 	/* initialization stuff */
 
@@ -252,17 +251,18 @@ int main(int argc, char **argv)
 	flow_d->tag = 0;
 	flow_d->user_ptr = NULL;
 
-	/* memory buffer */
-	flow_d->src.u.mem.buffer = malloc(io_size);
-	if(!flow_d->src.u.mem.buffer)
-	{
-		fprintf(stderr, "Error: malloc.\n");
-		return(-1);
-	}
 
 	if (req->op == WIRE_HARNESS_WRITE) {
 	    flow_d->src.endpoint_id = MEM_ENDPOINT;
 	    flow_d->src.u.mem.size = io_size;
+
+		/* memory buffer */
+		flow_d->src.u.mem.buffer = malloc(io_size);
+		if(!flow_d->src.u.mem.buffer)
+		{
+			fprintf(stderr, "Error: malloc.\n");
+			return(-1);
+		}
 	    
 	    /* server endpoint */
 	    flow_d->dest.endpoint_id = BMI_ENDPOINT;
@@ -276,6 +276,14 @@ int main(int argc, char **argv)
 
 	    flow_d->dest.endpoint_id = MEM_ENDPOINT;
 	    flow_d->dest.u.mem.size = io_size;
+
+		/* memory buffer */
+		flow_d->dest.u.mem.buffer = malloc(io_size);
+		if(!flow_d->dest.u.mem.buffer)
+		{
+			fprintf(stderr, "Error: malloc.\n");
+			return(-1);
+		}
 	}
 
 	/* run the flow */
@@ -291,7 +299,14 @@ int main(int argc, char **argv)
 		((io_size)/((time2-time1)*1000000.0)));
 
 	/* release buffers and such */
-	free(flow_d->src.u.mem.buffer);
+	if (req->op == WIRE_HARNESS_WRITE) {
+		free(flow_d->src.u.mem.buffer);
+	}
+	else
+	{
+		free(flow_d->dest.u.mem.buffer);
+	}
+
 	PINT_flow_free(flow_d);
 	BMI_memfree(server_addr, ack, sizeof(struct wire_harness_ack), 
 		BMI_RECV_BUFFER);
