@@ -68,7 +68,6 @@ struct options
     int list_all;
     int list_no_owner;
     int list_inode;
-    int list_size;
     char *start[MAX_NUM_PATHS];
     int num_starts;
 };
@@ -621,7 +620,7 @@ static struct options* parse_args(int argc, char* argv[])
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while((ret = getopt_long(argc, argv, "hvndGoAaisgl",
+    while((ret = getopt_long(argc, argv, "hvndGoAaigl",
                              long_opts, &option_index)) != -1)
     {
 	switch(ret)
@@ -667,10 +666,6 @@ static struct options* parse_args(int argc, char* argv[])
                 {
                     goto list_inode;
                 }
-                else if (strcmp("size", cur_option) == 0)
-                {
-                    goto list_size;
-                }
                 else
                 {
                     usage(argc, argv);
@@ -713,10 +708,6 @@ static struct options* parse_args(int argc, char* argv[])
             case 'i':
           list_inode:
                 tmp_opts->list_inode = 1;
-                break;
-            case 's':
-          list_size:
-                tmp_opts->list_size = 1;
                 break;
 	    case '?':
 		usage(argc, argv);
@@ -764,8 +755,6 @@ static void usage(int argc, char** argv)
             "numeric UIDs and GIDs\n");
     fprintf(stderr,"  -o                         like -l, but do not "
             "list group information\n");
-    fprintf(stderr,"  -s, --size                 print size of each "
-            "file, in blocks\n");
     fprintf(stderr,"      --help     display this help and exit\n");
     fprintf(stderr,"      --version  output version information "
             "and exit\n");
