@@ -1568,13 +1568,9 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 {
     method_op_p query_op = NULL;
     int ret = -1;
-    int tmp_errno = 0;
-    void *working_buf = NULL;
     struct tcp_addr *tcp_addr_data = NULL;
     struct tcp_op *tcp_op_data = NULL;
     struct tcp_msg_header bogus_header;
-    bmi_size_t cur_recv_size = 0;
-    bmi_size_t max_recv_size = 0;
     struct op_list_search_key key;
     int copy_size = 0;
     bmi_size_t total_copied = 0;
@@ -1710,27 +1706,22 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	{
 	    /* try to recv some more data */
 	    tcp_addr_data = query_op->addr->method_data;
-	    max_recv_size = query_op->actual_size - query_op->amt_complete;
-	    cur_recv_size = query_op->size_list[query_op->list_index]
-		- query_op->cur_index_complete;
-	    if (cur_recv_size > max_recv_size)
-	    {
-		cur_recv_size = max_recv_size;
-	    }
-	    working_buf =
-		(void *) (query_op->buffer_list[query_op->list_index] +
-			  query_op->cur_index_complete);
-	    ret = nbrecv(tcp_addr_data->socket, working_buf, cur_recv_size);
+	    ret = payload_progress(tcp_addr_data->socket,
+		query_op->buffer_list,
+		query_op->size_list,
+		query_op->list_count,
+		query_op->actual_size,
+		&(query_op->list_index),
+		&(query_op->cur_index_complete),
+		BMI_RECV);
 	    if (ret < 0)
 	    {
-		tmp_errno = errno;
-		gossip_lerr("Error: nbrecv: %s\n", strerror(tmp_errno));
+		gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
 		tcp_forget_addr(query_op->addr, 0);
 		return (0);
 	    }
 
 	    query_op->amt_complete += ret;
-	    query_op->cur_index_complete += ret;
 	}
 
 	if (query_op->amt_complete == query_op->actual_size)
@@ -1744,13 +1735,6 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	}
 	else
 	{
-	    /* update indices for next time through */
-	    if (query_op->cur_index_complete ==
-		query_op->size_list[query_op->list_index])
-	    {
-		query_op->cur_index_complete = 0;
-		query_op->list_index++;
-	    }
 	    /* there is still more work to do */
 	    tcp_op_data->tcp_op_state = BMI_TCP_INPROGRESS;
 	    return (0);
