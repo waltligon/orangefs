@@ -155,11 +155,11 @@ static void print_help(char *progname)
     assert(progname);
 
     printf("Usage: %s [OPTION]...[PATH]\n\n",progname);
-    printf("-h, --help         display this help and exit\n");
-    printf("-v, --version      display version information and exit\n");
-    printf("-V, --verbose      run in verbose output mode\n");
-    printf("-f, --foreground   run in foreground mode\n");
-    printf("-p, --path=PATH    execute pvfs2-client at PATH\n");
+    printf("-h, --help            display this help and exit\n");
+    printf("-v, --version         display version and exit\n");
+    printf("-V, --verbose         run in verbose output mode\n");
+    printf("-f, --foreground      run in foreground mode\n");
+    printf("-p PATH, --path PATH  execute pvfs2-client at PATH\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
