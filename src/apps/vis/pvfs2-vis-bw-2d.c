@@ -228,6 +228,7 @@ static int draw(void)
 	fprintf(stderr, "TTF_Openfont: %s\n", TTF_GetError());
 	TTF_Quit();
 	SDL_Quit();
+	return(-1);
     }
 	
     screen = SDL_SetVideoMode(user_opts->width, ((user_opts->width * 3)/4), 
