@@ -62,6 +62,16 @@ int PVFS_sys_getattr_old(PVFS_pinode_reference pinode_refn,
         resp->attr.mask &= ~PVFS_ATTR_SYS_SIZE;
         resp->attr.mask &= ~PVFS_ATTR_DATA_ALL;
     }
+
+    /*
+      FIXME/NOTE: if this is ever used anymore, you may have
+      to add appropriate symlink conversion as well.
+
+      i.e. if (attrmask & PVFS_ATTR_SYS_LNKTARGET)
+      resp->link_target = strdup(tmp_attr.u.sym.target_path);
+      of something ...
+    */
+
     return(0);
 }
 

@@ -88,6 +88,18 @@ int do_decode_resp(
                                  NULL);
             }
 	}
+        else if (decoded_response->u.getattr.attr.objtype == PVFS_TYPE_SYMLINK)
+        {
+            if (decoded_response->u.getattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET)
+            {
+                decoded_response->u.getattr.attr.u.sym.target_path_len =
+                    *((uint32_t *)(target_msg->buffer +
+                                   sizeof(struct PVFS_server_resp)));
+                decoded_response->u.getattr.attr.u.sym.target_path =
+                    (char *)(target_msg->buffer + sizeof(uint32_t) +
+                             sizeof(struct PVFS_server_resp));
+            }
+        }
 	return 0;
     case PVFS_SERV_CREATE:
     case PVFS_SERV_SETATTR:

@@ -32,6 +32,7 @@ struct PVFS_sys_attr_s
     PVFS_time mtime;
     PVFS_time ctime;
     PVFS_size size;
+    char *link_target; /* NOTE: caller must free if valid */
     PVFS_ds_type objtype;
     uint32_t mask;
 

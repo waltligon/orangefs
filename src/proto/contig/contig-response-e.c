@@ -142,6 +142,45 @@ int do_encode_resp(
                 }
             }
 	}
+        else if (response->u.getattr.attr.objtype == PVFS_TYPE_SYMLINK)
+        {
+            char *pack_dest = NULL;
+
+            target_msg->total_size = sizeof(struct PVFS_server_resp) +
+                PINT_ENC_GENERIC_HEADER_SIZE;
+
+            if (response->u.getattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET)
+            {
+                target_msg->total_size +=
+                    sizeof(response->u.getattr.attr.u.sym.target_path_len);
+                target_msg->total_size +=
+                    response->u.getattr.attr.u.sym.target_path_len;
+            }
+
+            target_msg->size_list[0] = target_msg->total_size;
+            target_msg->buffer_list[0] =
+                BMI_memalloc(target_msg->dest,
+                             target_msg->total_size, BMI_SEND);
+
+            pack_dest = (char *) target_msg->buffer_list[0]
+                + PINT_ENC_GENERIC_HEADER_SIZE;
+
+            if (response->u.getattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET)
+            {
+                /* copy in the symlink target path len and path */
+                assert(response->u.getattr.attr.u.sym.target_path_len > 0);
+
+                pack_dest += sizeof(struct PVFS_server_resp);
+                *((uint32_t *)pack_dest) =
+                    response->u.getattr.attr.u.sym.target_path_len;
+                pack_dest += sizeof(uint32_t);
+                memcpy(pack_dest,
+                       response->u.getattr.attr.u.sym.target_path,
+                       response->u.getattr.attr.u.sym.target_path_len);
+                pack_dest +=
+                    response->u.getattr.attr.u.sym.target_path_len;
+            }
+        }
 	else
 	{
 	    target_msg->size_list[0] =

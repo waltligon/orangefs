@@ -123,7 +123,7 @@ machine pvfs2_client_getattr_sm(check_parameters,
 	run getattr_datafile_getattr_failure;
 	default => cleanup;
     }
-    
+
     state cleanup {
 	run getattr_cleanup;
 	default => check_parameters;
@@ -207,13 +207,20 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     /* adjust parameters as necessary */
     attrmask = sm_p->u.getattr.attrmask;
-    if (attrmask & PVFS_ATTR_SYS_SIZE) {
+    if (attrmask & PVFS_ATTR_SYS_SIZE)
+    {
 	/* need datafile handles and distribution in order to get 
 	 * datafile handles and know what function to call to get
 	 * the file size.
 	 */
 	attrmask &= ~(PVFS_ATTR_SYS_SIZE);
 	attrmask |= PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST;
+    }
+
+    if (attrmask & PVFS_ATTR_SYS_LNKTARGET)
+    {
+        attrmask &= ~(PVFS_ATTR_SYS_LNKTARGET);
+        attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
     /* fill in getattr request */
@@ -290,6 +297,25 @@ static int getattr_object_getattr_comp_fn(void *v_p,
         (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE))
     {
         need_datafiles = 1;
+    }
+
+    /*
+      if we got a symlink target, copy it for caller; this target
+      path will be handed all the way back up to the caller via
+      the PVFS_sys_attr object.  caller must free it.
+    */
+    if ((resp_p->u.getattr.attr.objtype == PVFS_TYPE_SYMLINK) &&
+        (resp_p->u.getattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET))
+    {
+        assert(resp_p->u.getattr.attr.u.sym.target_path_len > 0);
+        assert(resp_p->u.getattr.attr.u.sym.target_path);
+
+        sm_p->u.getattr.getattr_resp_p->attr.link_target =
+            strdup(resp_p->u.getattr.attr.u.sym.target_path);
+        if (!sm_p->u.getattr.getattr_resp_p->attr.link_target)
+        {
+            return -PVFS_ENOMEM;
+        }
     }
 
     /*

@@ -337,11 +337,15 @@ int PINT_pcache_object_attr_deep_copy(
 
         if (src->mask & PVFS_ATTR_DATA_SIZE)
         {
+            assert(src->objtype == PVFS_TYPE_DATAFILE);
+
             dest->u.data.size = src->u.data.size;
         }
 
 	if (src->mask & PVFS_ATTR_META_DFILES)
 	{
+            assert(src->objtype == PVFS_TYPE_METAFILE);
+
             dest->u.meta.dfile_array = NULL;
             dest->u.meta.dfile_count = src->u.meta.dfile_count;
             df_array_size = src->u.meta.dfile_count *
@@ -366,6 +370,7 @@ int PINT_pcache_object_attr_deep_copy(
 
 	if (src->mask & PVFS_ATTR_META_DIST)
 	{
+            assert(src->objtype == PVFS_TYPE_METAFILE);
             dest->u.meta.dist_size = src->u.meta.dist_size;
 
             if (dest->u.meta.dist)
@@ -394,6 +399,15 @@ int PINT_pcache_object_attr_deep_copy(
              * NOTE: we need to free this later.
              */
             PINT_Dist_decode(dest->u.meta.dist, NULL);
+        }
+
+        if (src->mask & PVFS_ATTR_SYMLNK_TARGET)
+        {
+            assert(src->objtype == PVFS_TYPE_SYMLINK);
+
+            dest->u.sym.target_path_len = src->u.sym.target_path_len;
+            dest->u.sym.target_path = strdup(src->u.sym.target_path);
+            assert(dest->u.sym.target_path);
         }
 
 	/* add mask to existing values */
@@ -427,6 +441,7 @@ void PINT_pcache_object_attr_deep_free(PVFS_object_attr *attr)
     {
         if (attr->mask & PVFS_ATTR_META_DFILES)
         {
+            assert(attr->objtype == PVFS_TYPE_METAFILE);
             if (attr->u.meta.dfile_array)
             {
                 free(attr->u.meta.dfile_array);
@@ -434,9 +449,19 @@ void PINT_pcache_object_attr_deep_free(PVFS_object_attr *attr)
         }
         if (attr->mask & PVFS_ATTR_META_DIST)
         {
+            assert(attr->objtype == PVFS_TYPE_METAFILE);
             if (attr->u.meta.dist)
             {
                 PVFS_Dist_free(attr->u.meta.dist);
+            }
+        }
+        if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
+        {
+            assert(attr->objtype == PVFS_TYPE_SYMLINK);
+            if ((attr->u.sym.target_path_len > 0) &&
+                attr->u.sym.target_path)
+            {
+                free(attr->u.sym.target_path);
             }
         }
     }

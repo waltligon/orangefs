@@ -36,7 +36,7 @@ void print_entry_attr(
     }
 
     snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%Ld "
-             "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
+             "%.4d-%.2d-%.2d %.2d:%.2d %s",
              ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
              ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
              ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
@@ -56,7 +56,17 @@ void print_entry_attr(
              (time->tm_hour + 1),
              (time->tm_min + 1),
              entry_name);
-    printf("%s",buf);
+
+    if (attr->objtype == PVFS_TYPE_SYMLINK)
+    {
+        assert(attr->link_target);
+        printf("%s -> %s\n",buf,attr->link_target);
+        free(attr->link_target);
+    }
+    else
+    {
+        printf("%s\n",buf);
+    }
 }
 
 void print_entry(
