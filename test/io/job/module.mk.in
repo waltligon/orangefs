@@ -1,7 +1,7 @@
 DIR := test/io/job
 TEST_IO_JOB_DIR := test/io/job
 
-LOCALTESTSRC := \
+TEST_IO_JOB_DIR_SRC := \
 	$(DIR)/job-client-example.c \
 	$(DIR)/job-client-multi-example.c \
 	$(DIR)/job-flow-server.c \
@@ -15,10 +15,10 @@ LOCALTESTSRC := \
 
 MISCSRC += $(DIR)/job-help.c
 
-TESTSRC += $(LOCALTESTSRC)
+TESTSRC += $(TEST_IO_JOB_DIR_SRC)
 
 LOCALLIBS := -ldb -lrt -lpthread
-LOCALTESTS := $(patsubst %.c,%, $(LOCALTESTSRC))
+LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_JOB_DIR_SRC))
 $(LOCALTESTS): %: %.o $(TEST_IO_JOB_DIR)/job-help.o
 	$(LD) $< $(TEST_IO_JOB_DIR)/job-help.o $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
 

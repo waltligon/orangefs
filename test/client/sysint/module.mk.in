@@ -1,0 +1,16 @@
+DIR := test/client/sysint
+TEST_SYSINT_DIR := test/client/sysint
+
+TEST_SYSINT_DIR_SRC += \
+	$(DIR)/client.c
+
+MISCSRC += \
+	$(DIR)/job.c 
+
+TESTSRC += $(TEST_SYSINT_DIR_SRC)
+
+LOCALLIBS := -ldb -lrt -lpthread
+LOCALTESTS := $(patsubst %.c,%, $(TEST_SYSINT_DIR_SRC))
+$(LOCALTESTS): %: %.o $(TEST_SYSINT_DIR)/job.o
+	$(LD) $< $(TEST_SYSINT_DIR)/job.o $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
+

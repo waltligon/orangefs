@@ -1,0 +1,4 @@
+3
+tcp://www.batcave.com 0
+tcp://www.ece.clemson.edu 1
+gm://www.freshmeat.org 2
