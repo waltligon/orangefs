@@ -9,6 +9,7 @@
 
 #ifdef __KERNEL__
 #include <linux/types.h>
+#define __WORDSIZE BITS_PER_LONG
 #if (BITS_PER_LONG == 32)
 #define INT32_MAX INT_MAX
 #else
