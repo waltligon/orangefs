@@ -80,7 +80,7 @@ int PINT_bucket_finalize(void)
             assert(cur_config_cache->fs);
             assert(cur_config_cache->bmi_host_extent_tables);
 
-            /* fs object is freed by PINT_server_config_release */
+            /* fs object is freed by PINT_config_release */
             cur_config_cache->fs = NULL;
             llist_free(cur_config_cache->bmi_host_extent_tables,
                        free_host_extent_table);
@@ -202,7 +202,7 @@ int PINT_bucket_get_next_meta(
             cur_config_cache->meta_server_cursor =
                 llist_next(cur_config_cache->meta_server_cursor);
 
-            meta_server_bmi_str = PINT_server_config_get_host_addr_ptr(
+            meta_server_bmi_str = PINT_config_get_host_addr_ptr(
                 config,cur_mapping->alias_mapping->host_alias);
 
             meta_handle_extent_array->extent_count =
@@ -263,7 +263,7 @@ int PINT_bucket_get_next_io(
                 cur_config_cache->data_server_cursor =
                     llist_next(cur_config_cache->data_server_cursor);
 
-                data_server_bmi_str = PINT_server_config_get_host_addr_ptr(
+                data_server_bmi_str = PINT_config_get_host_addr_ptr(
                     config,cur_mapping->alias_mapping->host_alias);
 
                 ret = BMI_addr_lookup(io_addr_array,data_server_bmi_str);
@@ -355,7 +355,7 @@ int PINT_bucket_get_physical(
 		}
 		tmp_server = llist_next(tmp_server);
 
-		server_bmi_str = PINT_server_config_get_host_addr_ptr(
+		server_bmi_str = PINT_config_get_host_addr_ptr(
 		    config,cur_mapping->alias_mapping->host_alias);
 
 		ret = BMI_addr_lookup(&tmp_bmi_addr,server_bmi_str);
@@ -611,7 +611,7 @@ static void free_host_extent_table(void *ptr)
     /*
       NOTE: cur_host_extent_table->bmi_address is a ptr
       into a server_configuration_s->host_aliases object.
-      it is properly freed by PINT_server_config_release
+      it is properly freed by PINT_config_release
     */
     cur_host_extent_table->bmi_address = (char *)0;
     PINT_release_extent_list(cur_host_extent_table->extent_list);

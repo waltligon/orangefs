@@ -98,7 +98,7 @@ int main(int argc, char **argv)
     gossip_enable_stderr();
 
     memset(&serverconfig,0,sizeof(serverconfig));
-    if (PINT_server_config(&serverconfig, argv[1], argv[2]))
+    if (PINT_parse_config(&serverconfig, argv[1], argv[2]))
     {
         printf("Failed to parse config files\n");
         return 1;
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
     }
 
     fprintf(stderr,"\n--- Analyzing filesystem configuration\n\n");
-    if (PINT_server_config_is_valid_configuration(&serverconfig))
+    if (PINT_config_is_valid_configuration(&serverconfig))
     {
         fprintf(stderr,"\nOK: Configuration file is VALID\n");
     }
@@ -164,7 +164,7 @@ int main(int argc, char **argv)
         fprintf(stderr,"\nERROR: Configuration file is INVALID\n");
     }
 
-    PINT_server_config_release(&serverconfig);
+    PINT_config_release(&serverconfig);
 
     gossip_disable();
     return 0;

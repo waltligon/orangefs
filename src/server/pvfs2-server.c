@@ -113,7 +113,7 @@ int main(int argc, char **argv)
     {
 	goto server_shutdown;
     }
-    if (PINT_server_config(&server_config, argv[optind], argv[optind + 1]))
+    if (PINT_parse_config(&server_config, argv[optind], argv[optind + 1]))
     {
 	gossip_err("Fatal Error: This server requires a valid "
                    "configuration for operation.\nPlease check your "
@@ -124,7 +124,7 @@ int main(int argc, char **argv)
     server_status_flag |= SERVER_CONFIG_INIT;
 
     /* Verify that our configuration makes sense. */
-    if (!PINT_server_config_is_valid_configuration(&server_config))
+    if (!PINT_config_is_valid_configuration(&server_config))
     {
 	gossip_err("Error: Invalid configuration; aborting.\n");
 	goto server_shutdown;
@@ -135,7 +135,7 @@ int main(int argc, char **argv)
      */
     if (server_create_storage_space)
     {
-        ret = PINT_server_config_pvfs2_mkspace(&server_config);
+        ret = PINT_config_pvfs2_mkspace(&server_config);
 	exit(ret);
     }
 
@@ -477,7 +477,7 @@ static int server_initialize_subsystems(
          * all together and hand them to trove-handle-mgmt.
          */
         cur_merged_handle_range =
-            PINT_server_config_get_merged_handle_range_str(
+            PINT_config_get_merged_handle_range_str(
                 &server_config, cur_fs);
 
         /*
@@ -489,7 +489,7 @@ static int server_initialize_subsystems(
 	    gossip_lerr("Error: Invalid handle range for host %s "
                         "(alias %s) specified in file system %s\n",
                         server_config.host_id,
-                        PINT_server_config_get_host_alias_ptr(
+                        PINT_config_get_host_alias_ptr(
                             &server_config, server_config.host_id),
                         cur_fs->file_system_name);
             return -1;
@@ -624,7 +624,7 @@ static int server_shutdown(
 	gossip_disable();
 
     if (status & SERVER_CONFIG_INIT)
-        PINT_server_config_release(&server_config);
+        PINT_config_release(&server_config);
 
     exit((siglevel == 0) ? -ret : 0);
 }

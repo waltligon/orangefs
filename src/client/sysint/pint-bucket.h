@@ -95,7 +95,7 @@ do { cur = hrange_list;                                          \
          break;                                                  \
      }                                                           \
      cur_host_extent_table->bmi_address =                        \
-         PINT_server_config_get_host_addr_ptr(                   \
+         PINT_config_get_host_addr_ptr(                          \
              config,cur_mapping->alias_mapping->host_alias);     \
      assert(cur_host_extent_table->bmi_address);                 \
      cur_host_extent_table->extent_list =                        \

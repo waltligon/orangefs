@@ -433,7 +433,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	mntent_p = &mntent_list.ptab_p[i];
 
         /* make sure we valid information about this fs */
-        if (PINT_server_config_has_fs_config_info(
+        if (PINT_config_has_fs_config_info(
 						  config,mntent_p->service_name) == 0)
         {
             gossip_ldebug(CLIENT_DEBUG,"Error:  Cannot retrieve "
@@ -482,7 +482,7 @@ static int server_parse_config(struct server_configuration_s *config,
                       (response->server_config_buf_size - 1)) ==
                 (response->server_config_buf_size - 1))
             {
-                ret = PINT_server_config(config, fs_template, server_template);
+                ret = PINT_parse_config(config, fs_template, server_template);
             }
         }
         close(fs_fd);

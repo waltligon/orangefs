@@ -67,46 +67,46 @@ typedef struct server_configuration_s
     struct llist *file_systems;     /* ptrs are type filesystem_configuration_s */
 } server_configuration_s;
 
-int PINT_server_config(
+int PINT_parse_config(
     struct server_configuration_s *config_s,
     char *global_config_filename,
     char *server_config_filename);
 
-void PINT_server_config_release(
+void PINT_config_release(
     struct server_configuration_s *config_s);
 
-char *PINT_server_config_get_host_addr_ptr(
+char *PINT_config_get_host_addr_ptr(
     struct server_configuration_s *config_s,
     char *alias);
 
-char *PINT_server_config_get_host_alias_ptr(
+char *PINT_config_get_host_alias_ptr(
     struct server_configuration_s *config_s,
     char *bmi_address);
 
-char *PINT_server_config_get_meta_handle_range_str(
+char *PINT_config_get_meta_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
 
-char *PINT_server_config_get_data_handle_range_str(
+char *PINT_config_get_data_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
 
-char *PINT_server_config_get_merged_handle_range_str(
+char *PINT_config_get_merged_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
 
-int PINT_server_config_is_valid_configuration(
+int PINT_config_is_valid_configuration(
     struct server_configuration_s *config_s);
 
-int PINT_server_config_is_valid_collection_id(
+int PINT_config_is_valid_collection_id(
     struct server_configuration_s *config_s,
     PVFS_fs_id fs_id);
 
-int PINT_server_config_has_fs_config_info(
+int PINT_config_has_fs_config_info(
     struct server_configuration_s *config_s,
     char *fs_name);
 
-int PINT_server_config_pvfs2_mkspace(
+int PINT_config_pvfs2_mkspace(
     struct server_configuration_s *config);
 
 /*

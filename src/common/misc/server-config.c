@@ -110,7 +110,7 @@ static const configoption_t options[] =
 };
 
 /*
- * Function: PINT_server_config
+ * Function: PINT_parse_config
  *
  * Params:   struct server_configuration_s*,
  *           global_config_filename - common config file for all servers
@@ -121,7 +121,7 @@ static const configoption_t options[] =
  * Returns:  0 on success; 1 on failure
  *
  */
-int PINT_server_config(
+int PINT_parse_config(
     struct server_configuration_s *config_obj,
     char *global_config_filename,
     char *server_config_filename)
@@ -656,7 +656,7 @@ DOTCONF_CB(get_range_list)
 }
 
 /*
- * Function: PINT_server_config_release
+ * Function: PINT_config_release
  *
  * Params:   struct server_configuration_s*
  *
@@ -666,7 +666,7 @@ DOTCONF_CB(get_range_list)
  *           by the specified server_configuration_s
  *           
  */
-void PINT_server_config_release(struct server_configuration_s *config_s)
+void PINT_config_release(struct server_configuration_s *config_s)
 {
     if (config_s)
     {
@@ -1131,7 +1131,7 @@ static int build_extent_array(
 
 
 /*
- * Function: PINT_server_config_get_host_addr_ptr
+ * Function: PINT_config_get_host_addr_ptr
  *
  * Params:   struct server_configuration_s*,
  *           char *alias
@@ -1141,7 +1141,7 @@ static int build_extent_array(
  * Synopsis: retrieve the bmi_address matching the specified alias
  *           
  */
-char *PINT_server_config_get_host_addr_ptr(
+char *PINT_config_get_host_addr_ptr(
     struct server_configuration_s *config_s,
     char *alias)
 {
@@ -1174,7 +1174,7 @@ char *PINT_server_config_get_host_addr_ptr(
 }
 
 /*
- * Function: PINT_server_config_get_host_alias_ptr
+ * Function: PINT_config_get_host_alias_ptr
  *
  * Params:   struct server_configuration_s*,
  *           char *bmi_address
@@ -1184,7 +1184,7 @@ char *PINT_server_config_get_host_addr_ptr(
  * Synopsis: retrieve the alias matching the specified bmi_address
  *           
  */
-char *PINT_server_config_get_host_alias_ptr(
+char *PINT_config_get_host_alias_ptr(
     struct server_configuration_s *config_s,
     char *bmi_address)
 {
@@ -1217,7 +1217,7 @@ char *PINT_server_config_get_host_alias_ptr(
 }
 
 /*
- * Function: PINT_server_config_get_meta_handle_range_str
+ * Function: PINT_config_get_meta_handle_range_str
  *
  * Params:   struct server_configuration_s*,
  *           struct filesystem_configuration_s *fs
@@ -1228,7 +1228,7 @@ char *PINT_server_config_get_host_alias_ptr(
  *           filesystem that matches the host specific configuration
  *           
  */
-char *PINT_server_config_get_meta_handle_range_str(
+char *PINT_config_get_meta_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs)
 {
@@ -1236,7 +1236,7 @@ char *PINT_server_config_get_meta_handle_range_str(
 }
 
 /*
- * Function: PINT_server_config_get_data_handle_range_str
+ * Function: PINT_config_get_data_handle_range_str
  *
  * Params:   struct server_configuration_s*,
  *           struct filesystem_configuration_s *fs
@@ -1247,7 +1247,7 @@ char *PINT_server_config_get_meta_handle_range_str(
  *           filesystem that matches the host specific configuration
  *           
  */
-char *PINT_server_config_get_data_handle_range_str(
+char *PINT_config_get_data_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs)
 {
@@ -1255,7 +1255,7 @@ char *PINT_server_config_get_data_handle_range_str(
 }
 
 /*
- * Function: PINT_server_config_get_merged_handle_range_str
+ * Function: PINT_config_get_merged_handle_range_str
  *
  * Params:   struct server_configuration_s*,
  *           struct filesystem_configuration_s *fs
@@ -1269,7 +1269,7 @@ char *PINT_server_config_get_data_handle_range_str(
  *           configuration merged as one single handle range
  *           
  */
-char *PINT_server_config_get_merged_handle_range_str(
+char *PINT_config_get_merged_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs)
 {
@@ -1297,7 +1297,7 @@ char *PINT_server_config_get_merged_handle_range_str(
   that getconfig will not have to re-read the file contents each time.
   returns 0 on success; 1 on failure.
 
-  even if this call fails half way into it, a PINT_server_config_release
+  even if this call fails half way into it, a PINT_config_release
   call should properly de-alloc all consumed memory.
 */
 static int cache_config_files(
@@ -1470,7 +1470,7 @@ static char *get_handle_range_str(
 
     if (config_s && config_s->host_id && fs)
     {
-        my_alias = PINT_server_config_get_host_alias_ptr(
+        my_alias = PINT_config_get_host_alias_ptr(
             config_s,config_s->host_id);
         if (my_alias)
         {
@@ -1504,7 +1504,7 @@ static char *get_handle_range_str(
   returns 1 if the specified configuration object is valid
   (i.e. contains values that make sense); 0 otherwise
 */
-int PINT_server_config_is_valid_configuration(
+int PINT_config_is_valid_configuration(
     struct server_configuration_s *config_s)
 {
     int ret = 0, fs_count = 0;
@@ -1537,7 +1537,7 @@ int PINT_server_config_is_valid_configuration(
   returns 1 if the specified coll_id is valid based on
   the specified server_configuration struct; 0 otherwise
 */
-int PINT_server_config_is_valid_collection_id(
+int PINT_config_is_valid_collection_id(
     struct server_configuration_s *config_s,
     PVFS_fs_id fs_id)
 {
@@ -1570,7 +1570,7 @@ int PINT_server_config_is_valid_collection_id(
   returns 1 if the config object has information on the specified
   filesystem; 0 otherwise
 */
-int PINT_server_config_has_fs_config_info(
+int PINT_config_has_fs_config_info(
     struct server_configuration_s *config_s,
     char *fs_name)
 {
@@ -1604,7 +1604,7 @@ int PINT_server_config_has_fs_config_info(
   create a storage space based on configuration settings object
   with the particular host settings local to the caller
 */
-int PINT_server_config_pvfs2_mkspace(
+int PINT_config_pvfs2_mkspace(
     struct server_configuration_s *config)
 {
     int ret = 1;
@@ -1626,7 +1626,7 @@ int PINT_server_config_pvfs2_mkspace(
             }
 
             cur_handle_range =
-                PINT_server_config_get_meta_handle_range_str(
+                PINT_config_get_meta_handle_range_str(
                     config, cur_fs);
             if (!cur_handle_range)
             {
