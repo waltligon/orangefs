@@ -65,11 +65,10 @@ static PVFS_fs_id test_system_init(int nullCase)
  */
 static int test_lookup(int nullCase){
 	int fs_id
-   PVFS_sysreq_lookup req_lookup;
+	PVFS_credentials credentials;
    PVFS_sysresp_lookup resp_lookup;
 	char *name;
 
-   memset(&req_lookup, 0, sizeof(req_lookup));
    memset(&resp_lookup, 0, sizeof(req_lookup));
 
 	name = (char *)malloc(sizeof(char)*100);
@@ -77,21 +76,37 @@ static int test_lookup(int nullCase){
 
 	fs_id = initialize_sysint();
 
-   req_lookup.name = name;
-   req_lookup.fs_id = fs_id;
-   req_lookup.credentials.uid = 100;
-   req_lookup.credentials.gid = 100;
-   req_lookup.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
+   credentials.uid = 100;
+   credentials.gid = 100;
+   credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
-	if(nullCase == 0){
-   	return PVFS_sys_lookup(NULL,NULL);
+	switch(nullCase){
+		case 0:
+   		return PVFS_sys_lookup(NULL,NULL,NULL,NULL);
+			break;
+		case 1:
+   		return PVFS_sys_lookup(NULL,credentials,&resp_lookup);
+			break;
+		case 2:
+			credentials.uid = NULL;
+   		return PVFS_sys_lookup(fs_id,credentials,&resp_lookup);
+			break;
+		case 3:
+			credentials.gid = NULL;
+   		return PVFS_sys_lookup(fs_id,credentials,&resp_lookup);
+			break;
+		case 4:
+			credentials.perms = NULL;
+   		return PVFS_sys_lookup(fs_id,credentials,&resp_lookup);
+			break;
+		case 5:
+   		return PVFS_sys_lookup(fs_id,credentials,NULL);
+			//PVFS_sys_lookup(fs_id,name,credentials,&resp_lookup);
+			break;
+		default:
+			fprintf(stderr,"Error - not a case\n");
 	}
-	else if(nullCase == 1){
-   	return PVFS_sys_lookup(NULL,&resp_lookup);
-	}
-	else if(nullCase == 2){
-   	return PVFS_sys_lookup(&req_lookup,NULL);
-	}
+	return -2;
 }
 
 /* Preconditions: none
@@ -100,10 +115,10 @@ static int test_lookup(int nullCase){
  */
 static int test_getattr(int nullCase){
 	int fs_id,ret;
-
-   PVFS_sysreq_lookup req_lookup;
+	PVFS_credentials credentials;
+	PVFS_pinode_refernce pinode_refn;
+	uint32_t attrmask;
    PVFS_sysresp_lookup resp_lookup;
-	PVFS_sysreq_getattr req_getattr;
 	PVFS_sysresp_getattr resp_getattr;
 	char *name;
 
@@ -115,11 +130,9 @@ static int test_getattr(int nullCase){
 
 	fs_id = initialize_sysint();
 
-   req_lookup.name = name;
-   req_lookup.fs_id = fs_id;
-   req_lookup.credentials.uid = 100;
-   req_lookup.credentials.gid = 100;
-   req_lookup.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
+   credentials.uid = 100;
+   credentials.gid = 100;
+   credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
   	if((ret = PVFS_sys_lookup(&req_lookup,&resp_lookup))< 0){
 		fprintf(stderr,"lookup failed %d\n"ret);
@@ -127,19 +140,48 @@ static int test_getattr(int nullCase){
 	}
 
 //    req_getattr.pinode_refn.handle = resp_create->pinode_refn.handle;
-    req_getattr.pinode_refn.handle = resp_lookup->attr->meta->dfh
-    req_getattr.pinode_refn.fs_id = fs_id;
-    req_getattr.attrmask = ATTR_META;
+    pinode_refn.handle = resp_lookup->attr->meta->dfh
+    pinode_refn.fs_id = fs_id;
+    attrmask = ATTR_META;
 
-	if(nullCase == 0){
-		return PVFS_sys_getattr(NULL,NULL);
+	switch(nullCase){
+		case 0:
+			return PVFS_sys_getattr(NULL,NULL,NULL,NULL);
+			break;
+		case 1:
+			return PVFS_sys_getattr(NULL,attrmask,credentials,&resp_getattr);
+			break;
+		case 2:
+			pinode_refn.handle = NULL;
+			return PVFS_sys_getattr(pinode_refn.handle,attrmask,credentials,&resp_getattr);
+			break;
+		case 3:
+			pinode_refn.fs_id = NULL;
+			return PVFS_sys_getattr(pinode_refn.handle,attrmask,credentials,&resp_getattr);
+			break;
+		case 4:
+			return PVFS_sys_getattr(pinode_refn.handle,NULL,credentials,&resp_getattr);
+			break;
+		case 5:
+			return PVFS_sys_getattr(pinode_refn.handle,attrmask,NULL,&resp_getattr);
+			break;
+		case 6:
+   		credentials.uid = NULL;
+			return PVFS_sys_getattr(pinode_refn.handle,attrmask,credentials,&resp_getattr);
+			break;
+		case 7:
+   		credentials.gid = NULL;
+			return PVFS_sys_getattr(pinode_refn.handle,attrmask,credentials,&resp_getattr);
+			break;
+		case 8:
+   		credentials.perms = NULL;
+			return PVFS_sys_getattr(pinode_refn.handle,attrmask,credentials,&resp_getattr);
+			break;
+		case 9:
+			return PVFS_sys_getattr(pinode_refn.handle,attrmask,credentials,NULL);
+			break;
 	}
-	else if(nullCase == 1){
-		return PVFS_sys_getattr(NULL,&resp_getattr);
-	}
-	else if(nullCase == 2){
-		return PVFS_sys_getattr(&req_getattr,NULL);
-	}
+	return -2;
 }
 
 /* Preconditions: None
@@ -147,7 +189,7 @@ static int test_getattr(int nullCase){
  * Postconditions:
  */
 static int test_setattr(int nullCase){
-	return -1;
+	return -2;
 }
 
 /* Preconditions: None
@@ -155,12 +197,14 @@ static int test_setattr(int nullCase){
  * Postconditions: returns the error returned by mkdir
  */
 static int test_mkdir(int nullCase){
-	PVFS_sysreq_mkdir req_mkdir;
+	PVFS_pinode_reference parent_refn;
+	uint32_t attrmask;
+	PVFS_object_attr attr;
    PVFS_sysresp_mkdir resp_mkdir;
 
    int ret = -1;
 	int fs_id
-   PVFS_sysreq_lookup req_lookup;
+	PVFS_credentials credentials;
    PVFS_sysresp_lookup resp_lookup;
 	char *name;
 
@@ -175,38 +219,71 @@ static int test_mkdir(int nullCase){
 
 	fs_id = initialize_sysint();
 
-   req_lookup.name = name;
-   req_lookup.fs_id = fs_id;
-   req_lookup.credentials.uid = 100;
-   req_lookup.credentials.gid = 100;
-   req_lookup.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
-  	if((ret = PVFS_sys_lookup(&req_lookup,&resp_lookup))< 0){
+   credentials.uid = 100;
+   credentials.gid = 100;
+   credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
+  	if((ret = PVFS_sys_lookup(fs_id,name,&resp_lookup))< 0){
 		fprintf(stderr,"lookup failed %d\n"ret);
 		return -1;
 	}
         
-   req_mkdir.entry_name = name;
 //   req_mkdir.parent_refn.handle = parent;
-   req_mkdir.parent_refn.handle = resp_lookup->attr->meta->dfh
-   req_mkdir.parent_refn.fs_id = fs_id; 
-   req_mkdir.attr.mask = ATTR_BASIC;
-   req_mkdir.attr.owner = 100;
-   req_mkdir.attr.group = 100;
-   req_mkdir.attr.perms = 1877;
-   req_mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;
-   req_mkdir.credentials.perms = 1877;
-   req_mkdir.credentials.uid = 100;
-   req_mkdir.credentials.gid = 100;
+   parent_refn.handle = attr->meta->dfh
+   parent_refn.fs_id = fs_id; 
+   attrmask = ATTR_BASIC;
+   attr.owner = 100;
+   attr.group = 100;
+   attr.perms = 1877;
+   attr.objtype = PVFS_TYPE_DIRECTORY;
+   credentials.perms = 1877;
+   credentials.uid = 100;
+   credentials.gid = 100;
 
-	if(nullCase == 0){
-   	return PVFS_sys_mkdir(NULL,NULL);
+	switch(nullCase){
+		case 0:
+   		return PVFS_sys_mkdir(NULL,NULL,NULL, NULL, NULL, NULL);
+			break;
+		case 1:
+   		return PVFS_sys_mkdir(NULL,parent_refn,attrmask,attr, &resp_mkdir);
+			break;
+		case 2:
+			parent_refn.handle = NULL;
+   		return PVFS_sys_mkdir(fs_id,parent_refn,attrmask,attr, &resp_mkdir);
+			break;
+		case 3:
+			parent_refn.fs_id = NULL;
+   		return PVFS_sys_mkdir(fs_id,parent_refn,attrmask,attr, &resp_mkdir);
+			break;
+		case 4:
+   		return PVFS_sys_mkdir(fs_id,parent_refn,NULL,attr, &resp_mkdir);
+			break;
+		case 5:
+   		return PVFS_sys_mkdir(fs_id,parent_refn,attrmask,NULL, &resp_mkdir);
+			break;
+		case 6:
+   		attr.owner = NULL;
+   		return PVFS_sys_mkdir(fs_id,parent_refn,attrmask,attr, &resp_mkdir);
+			break;
+		case 7:
+   		attr.group = NULL;
+   		return PVFS_sys_mkdir(fs_id,parent_refn,attrmask,attr, &resp_mkdir);
+			break;
+		case 8:
+   		attr.perms = NULL;
+   		return PVFS_sys_mkdir(fs_id,parent_refn,attrmask,attr, &resp_mkdir);
+			break;
+		case 9:
+   		attr.objtype = NULL;
+   		return PVFS_sys_mkdir(fs_id,parent_refn,attrmask,attr, &resp_mkdir);
+			break;
+		case 10:
+   		return PVFS_sys_mkdir(fs_id,parent_refn,attrmask,attr, NULL);
+			break;
+
+		default:
+			fprintf(stderr,"Error - no more cases\n");
 	}
-	else if(nullCase == 1){
-   	return PVFS_sys_mkdir(NULL, &resp_mkdir);
-	}
-	else if(nullCase == 2){
-   	return PVFS_sys_mkdir(&req_mkdir, NULL);
-	}
+	return -2;
 }
 
 /* Preconditions: none
@@ -217,12 +294,14 @@ static int test_readdir(int nullCase){
 
    int i, iter, ret;
                          
-   PVFS_sysreq_readdir req_readdir;
+	PVFS_pinode_reference pinode_refn;
+	PVFS_ds_position token;
+	int pvfs_dirent_incount;
+	PVFS_credentials credentials;
    PVFS_sysresp_readdir resp_readdir;
 
    int ret = -1;
 	int fs_id
-   PVFS_sysreq_lookup req_lookup;
    PVFS_sysresp_lookup resp_lookup;
 	char *name;
 
@@ -237,33 +316,63 @@ static int test_readdir(int nullCase){
 
 	fs_id = initialize_sysint();
 
-   req_lookup.name = name;
-   req_lookup.fs_id = fs_id;
-   req_lookup.credentials.uid = 100;
-   req_lookup.credentials.gid = 100;
-   req_lookup.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
-  	if((ret = PVFS_sys_lookup(&req_lookup,&resp_lookup))< 0){
+   credentials.uid = 100;
+   credentials.gid = 100;
+   credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
+  	if((ret = PVFS_sys_lookup(fs_id,name,credentials,&resp_lookup))< 0){
 		fprintf(stderr,"lookup failed %d\n"ret);
 		return -1;
 	}
 
    //req_readdir.pinode_refn.handle = handle;
-   req_readdir.pinode_refn.handle = resp_lookup->attr->meta->dfh;
-   req_readdir.pinode_refn.fs_id = fs_id;
-   req_readdir.token = PVFS2_READDIR_START;
-   req_readdir.pvfs_dirent_incount = ndirs;
+   pinode_refn.handle = resp_lookup->attr->meta->dfh;
+   pinode_refn.fs_id = fs_id;
+   token = PVFS2_READDIR_START;
+   pvfs_dirent_incount = ndirs;
     
-   req_readdir.credentials.uid = 100;
-   req_readdir.credentials.gid = 100;
-   req_readdir.credentials.perms = 1877;
+   credentials.uid = 100;
+   credentials.gid = 100;
+   credentials.perms = 1877;
     
-	if(nullCase == 0){
-  		return  PVFS_sys_readdir(NULL,NULL);
+	switch(nullCase){
+		case 0:
+  			return PVFS_sys_readdir(NULL,NULL,NULL, NULL, NULL);
+			break;
+		case 1:
+  			return PVFS_sys_readdir(NULL, token, pvfs_dirent_incount, credentials,&resp_readdir);
+			break;
+		case 2:
+   		pinode_refn.handle = NULL;
+  			return PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,&resp_readdir);
+			break;
+		case 3:
+   		pinode_refn.fs_id = NULL;
+  			return PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,&resp_readdir);
+			break;
+		case 4:
+  			return PVFS_sys_readdir(pinode_refn, NULL, pvfs_dirent_incount, credentials,&resp_readdir);
+			break;
+		case 5:
+  			return PVFS_sys_readdir(pinode_refn, token, NULL, credentials,&resp_readdir);
+			break;
+		case 6:
+  			return PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, NULL,&resp_readdir);
+			break;
+		case 7:
+   		credentials.uid = NULL
+  			return PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,&resp_readdir);
+			break;
+		case 8:
+   		credentials.gid = NULL
+  			return PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,&resp_readdir);
+			break;
+		case 9:
+   		credentials.perm = NULL
+  			return PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,&resp_readdir);
+			break;
+		case 10:
+  			return PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,NULL);
+			break;
 	}
-	else if(nullCase == 1){
-  		return PVFS_sys_readdir(NULL,&resp_readdir);
-	}
-	else if(nullCase == 2){
-  		return PVFS_sys_readdir(&req_readdir,NULL);
-	}
+	return -2;
 }
