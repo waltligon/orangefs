@@ -54,7 +54,7 @@ def get_build_MPICH2():
 		sys.exit(1)
 	os.chdir("../../../")
 
-	if os.system('./configure -enable-romio --with-file-system=ufs+nfs++pvfs2 --disable-f77 --prefix='+mpichdir+' --exec-prefix='+mpichdir+' >../mpich-configure.log 2>&1'):
+	if os.system('./configure -enable-romio --with-file-system=ufs+nfs+pvfs2 --disable-f77 --prefix='+mpichdir+' --exec-prefix='+mpichdir+' >../mpich-configure.log 2>&1'):
 		print "MPICH2 configure failed; Exiting..."
 		print "See " + rootdir + "mpich-configure.log for details."
 		print "Perhaps you forgot to run pvfs2-build first?"
