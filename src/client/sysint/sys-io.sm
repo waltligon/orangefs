@@ -296,6 +296,12 @@ static int io_init(PINT_client_sm *sm_p,
     {
         js_p->error_code = 0;
 
+	if(sm_p->op_cancelled)
+	{
+	    js_p->error_code = -PVFS_ECANCEL;
+	    return(1);
+	}
+
         return job_req_sched_post_timer(
             PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
             pint_client_sm_context);
@@ -330,6 +336,12 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_datafile_setup_msgpairs\n", sm_p);
+
+    if(sm_p->op_cancelled)
+    {
+	js_p->error_code = -PVFS_ECANCEL;
+	return(1);
+    }
 
     js_p->error_code = 0;
 
@@ -605,6 +617,12 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io_datafile_post_msgpairs "
                  "state: post (%d message(s))\n", sm_p->msgarray_count);
 
+    if(sm_p->op_cancelled)
+    {
+	js_p->error_code = -PVFS_ECANCEL;
+	return(1);
+    }
+
     js_p->error_code = 0;
 
     /* set number of operations that must complete.
@@ -656,17 +674,17 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
         sm_p->u.io.session_tag_array[i] = session_tag;
 
         /* post receive of response; job_id stored in recv_id */
-        ret = job_bmi_recv(
-            msg_p->svr_addr,
-            msg_p->encoded_resp_p,
-            msg_p->max_resp_sz,
-            session_tag,
-            BMI_PRE_ALLOC,
-            sm_p,
-            i,
-            &msg_p->recv_status,
-            &msg_p->recv_id,
-            pint_client_sm_context,
+	ret = job_bmi_recv(
+	    msg_p->svr_addr,
+	    msg_p->encoded_resp_p,
+	    msg_p->max_resp_sz,
+	    session_tag,
+	    BMI_PRE_ALLOC,
+	    sm_p,
+	    i,
+	    &msg_p->recv_status,
+	    &msg_p->recv_id,
+	    pint_client_sm_context,
 	    PVFS2_CLIENT_JOB_TIMEOUT);
 
         if (ret != 0)
@@ -1068,6 +1086,12 @@ static int io_object_getattr_failure(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_object_getattr_failure\n", sm_p);
+
+    if(sm_p->op_cancelled)
+    {
+	js_p->error_code = -PVFS_ECANCEL;
+	return(1);
+    }
 
     /*
       NOTE: this can easily happen if we're doing I/O on a file that

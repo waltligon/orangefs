@@ -350,6 +350,7 @@ typedef struct PINT_client_sm {
     int op_complete; /* used to indicate that the operation as a 
 		      * whole is finished.
 		      */
+    int op_cancelled; /* used to indicate operation has been cancelled */
     PVFS_error error_code; /* used to hold final job status so client
 			    * can determine what finally happened
 			    */

@@ -338,8 +338,33 @@ int PINT_client_bmi_cancel(job_id_t id)
  */
 int PINT_client_io_cancel(PVFS_sys_op_id id)
 {
-    /* FIXME: this isn't right, but it's a stub for now */
-    return job_flow_cancel(id, pint_client_sm_context);
+    PINT_client_sm *sm_p = NULL;
+ 
+    sm_p = PINT_id_gen_safe_lookup(id);
+    if (!sm_p)
+    {
+	/* we can't find it, maybe it already completed? */
+        return 0;
+    }
+
+    /* we can't cancel any arbitrary operation */
+    assert(sm_p->op == PVFS_SYS_IO);
+
+    if (sm_p->op_complete)
+    {
+	/* found op, but it has already finished.  Nothing to cancel. */
+        return 0;
+    }
+
+    /* if we fall to here, the I/O operation is still in flight */
+    /* first, set a flag informing the sys_io state machine that the
+     * operation has been cancelled so it doesn't post any new jobs 
+     */
+    sm_p->op_cancelled = 1;
+
+    /* now run through cancelling outstanding jobs */
+
+    return(-PVFS_ENOSYS);
 }
 
 int PINT_client_state_machine_test(
