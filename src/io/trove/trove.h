@@ -33,7 +33,7 @@ enum {
 /* get/setinfo option flags */
 enum {
     TROVE_COLLECTION_HANDLE_RANGES
-}
+};
 
 /*
  * Local variables:
