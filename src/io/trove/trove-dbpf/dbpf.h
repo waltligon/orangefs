@@ -36,7 +36,7 @@ extern "C" {
 #define TROVE_DB_MODE                                                 0644
 #define TROVE_DB_TYPE                                             DB_BTREE
 #define TROVE_DB_OPEN_FLAGS        (TROVE_DB_DIRTY_READ | TROVE_DB_THREAD)
-#define TROVE_DB_CREATE_FLAGS  (DB_CREATE | DB_EXCL | TROVE_DB_OPEN_FLAGS)
+#define TROVE_DB_CREATE_FLAGS  (DB_CREATE | TROVE_DB_OPEN_FLAGS)
 
 /*
   for more efficient host filesystem accesses, we have a simple
