@@ -344,7 +344,7 @@ int main(int argc, char **argv)
                     s_op, &server_job_status_array[i]);
                 if (ret < 0)
                 {
-                    PVFS_perror_gossip("server_state_machine_start", ret);
+                    PVFS_perror_gossip("Error: server_state_machine_start", ret);
                     free(s_op->unexp_bmi_buff.buffer);
                     /* TODO: tell BMI to drop this address? */
                     /* set return code to zero to allow server to continue
@@ -376,7 +376,7 @@ int main(int argc, char **argv)
 
             if (ret < 0)
             {
-                PVFS_perror_gossip("state machine processing error", ret);
+                PVFS_perror_gossip("Error: state machine processing error", ret);
                 ret = 0;
             }
 
@@ -604,7 +604,7 @@ static int server_initialize_subsystems(
         server_config.host_id, BMI_INIT_SERVER);
     if (ret < 0)
     {
-        gossip_err("BMI_initialize Failed: %s\n", strerror(-ret));
+        PVFS_perror_gossip("Error: BMI_initialize", ret);
         return ret;
     }
 
@@ -614,7 +614,7 @@ static int server_initialize_subsystems(
                            0, &method_name, 0);
     if (ret < 0)
     {
-        gossip_err("Trove Init Failed: %s\n", strerror(-ret));
+        PVFS_perror_gossip("Error: trove_initialize", ret);
 
         if (ret == -1)
         {
@@ -653,7 +653,7 @@ static int server_initialize_subsystems(
         ret = PINT_handle_load_mapping(&server_config, cur_fs);
         if(ret)
         {
-            PVFS_perror("PINT_handle_load_mapping", ret);
+            PVFS_perror("Error: PINT_handle_load_mapping", ret);
             return(ret);
         }
 
@@ -801,7 +801,7 @@ static int server_initialize_subsystems(
     ret = PINT_flow_initialize(server_config.flow_modules, 0);
     if (ret < 0)
     {
-        gossip_err("Flow_initialize Failed: %s\n", strerror(-ret));
+        PVFS_perror_gossip("Error: PINT_flow_initialize", ret);
         return ret;
     }
 
@@ -810,7 +810,7 @@ static int server_initialize_subsystems(
     ret = job_time_mgr_init();
     if(ret < 0)
     {
-        PVFS_perror_gossip("job_time_mgr_init", ret);
+        PVFS_perror_gossip("Error: job_time_mgr_init", ret);
         return(ret);
     }
 
@@ -820,8 +820,7 @@ static int server_initialize_subsystems(
     ret = job_initialize(0);
     if (ret < 0)
     {
-        gossip_err("Error initializing job interface: %s\n",
-                   strerror(-ret));
+        PVFS_perror_gossip("Error: job_initialize", ret);
         return ret;
     }
 
@@ -839,8 +838,7 @@ static int server_initialize_subsystems(
     ret = PINT_req_sched_initialize();
     if (ret < 0)
     {
-        gossip_err("Error initializing Request Scheduler interface: %s\n",
-                strerror(-ret));
+        PVFS_perror_gossip("Error: PINT_req_sched_intialize", ret);
         return ret;
     }
     *server_status_flag |= SERVER_REQ_SCHED_INIT;
@@ -1245,7 +1243,7 @@ static int server_post_unexpected_recv(job_status_s *js_p)
                             server_job_context);
         if (ret < 0)
         {
-            PVFS_perror_gossip("job_bmi_unexp failure", ret);
+            PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
             free(s_op);
             s_op = NULL;
         }
@@ -1288,7 +1286,7 @@ static int server_state_machine_start(
     }
     else
     {
-        PVFS_perror_gossip("PINT_decode failure", ret);
+        PVFS_perror_gossip("Error: PINT_decode failure", ret);
         return ret;
     }
 
