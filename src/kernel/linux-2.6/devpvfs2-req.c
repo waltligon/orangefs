@@ -138,16 +138,14 @@ static ssize_t pvfs2_devreq_read(
         if ((cur_op->op_state == PVFS2_VFS_STATE_INPROGR) ||
             (cur_op->op_state == PVFS2_VFS_STATE_SERVICED))
         {
-            spin_unlock(&cur_op->lock);
-            panic("FIXME: Current op already queued...skipping\n");
-            return -1;
+            pvfs2_error("WARNING: Current op already queued...skipping\n");
         }
         cur_op->op_state = PVFS2_VFS_STATE_INPROGR;
 
         /* atomically move the operation to the htable_ops_in_progress */
         qhash_add(htable_ops_in_progress,
                   (void *) &(cur_op->tag), &cur_op->list);
-        
+
         spin_unlock(&cur_op->lock);
 
         len = MAX_ALIGNED_DEV_REQ_UPSIZE;

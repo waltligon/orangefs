@@ -19,39 +19,35 @@ static inline void clean_up_interrupted_operation(
     pvfs2_kernel_op_t * op)
 {
     /*
-      handle interrupted cases depending on what state
-      we were in when the interruption is detected.
-      there is a coarse grained lock across the operation.
+      handle interrupted cases depending on what state we were in when
+      the interruption is detected.  there is a coarse grained lock
+      across the operation.
 
-      NOTE: be sure not to reverse lock ordering by locking
-      an op lock while holding the request_list lock.
-
-      (Here, we first lock the op and then lock
-      the appropriate list).
+      NOTE: be sure not to reverse lock ordering by locking an op lock
+      while holding the request_list lock.  Here, we first lock the op
+      and then lock the appropriate list.
     */
     spin_lock(&op->lock);
     switch (op->op_state)
     {
 	case PVFS2_VFS_STATE_WAITING:
 	    /*
-              upcall hasn't been read; remove
-              op from upcall request list
+              upcall hasn't been read; remove op from upcall request
+              list.
             */
 	    remove_op_from_request_list(op);
 	    pvfs2_print("Interrupted: Removed op from request_list\n");
 	    break;
 	case PVFS2_VFS_STATE_INPROGR:
-	    /*
-              op must be removed from the in progress htable
-            */
+	    /* op must be removed from the in progress htable */
 	    remove_op_from_htable_ops_in_progress(op);
 	    pvfs2_print("Interrupted: Removed op from "
 			"htable_ops_in_progress\n");
 	    break;
 	case PVFS2_VFS_STATE_SERVICED:
 	    /*
-              can this happen? even if it does, I think we're
-              ok with doing nothing since no cleanup is necessary
+              can this happen? even if it does, I think we're ok with
+              doing nothing since no cleanup is necessary
 	     */
 	    break;
     }

@@ -56,6 +56,10 @@ static void op_cache_ctor(
         /* preemptively fill in the upcall credentials */
         pvfs2_gen_credentials(&op->upcall.credentials);
     }
+    else
+    {
+        pvfs2_error("WARNING!! op_ctor called without ctor flag\n");
+    }
 }
 
 void op_cache_initialize(void)
@@ -106,6 +110,10 @@ static void dev_req_cache_ctor(
     {
 	memset(req, 0, sizeof(MAX_ALIGNED_DEV_REQ_DOWNSIZE));
     }
+    else
+    {
+        pvfs2_error("WARNING!! devreq_ctor called without ctor flag\n");
+    }
 }
 
 void dev_req_cache_initialize(void)
@@ -155,6 +163,10 @@ static void pvfs2_inode_cache_ctor(
 	 */
 	inode_init_once(&pvfs2_inode->vfs_inode);
 	pvfs2_inode->vfs_inode.i_version = 1;
+    }
+    else
+    {
+        pvfs2_error("WARNING!! inode_ctor called without ctor flag\n");
     }
 }
 

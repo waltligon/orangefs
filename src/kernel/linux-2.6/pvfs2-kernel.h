@@ -168,12 +168,13 @@ static inline pvfs2_sb_info *PVFS2_SB(
  ************************************/
 #define add_op_to_request_list(op)                            \
 do {                                                          \
+    spin_lock(&op->lock);                                     \
+    op->op_state = PVFS2_VFS_STATE_WAITING;                   \
+                                                              \
     spin_lock(&pvfs2_request_list_lock);                      \
     list_add_tail(&op->list, &pvfs2_request_list);            \
     spin_unlock(&pvfs2_request_list_lock);                    \
                                                               \
-    spin_lock(&op->lock);                                     \
-    op->op_state = PVFS2_VFS_STATE_WAITING;                   \
     spin_unlock(&op->lock);                                   \
     wake_up_interruptible(&pvfs2_request_list_waitq);         \
 } while(0)
