@@ -411,7 +411,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     if ((init_flags & BMI_INIT_SERVER) && !listen_addr)
     {
 	gossip_lerr("Error: bad parameters to GM module.\n");
-	return (-EINVAL);
+	return (bmi_gm_errno_to_pvfs(-EINVAL));
     }
 
     gen_mutex_lock(&interface_mutex);
@@ -435,7 +435,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 	op_list_array[i] = op_list_new();
 	if (!op_list_array[i])
 	{
-	    tmp_errno = -ENOMEM;
+	    tmp_errno = bmi_gm_errno_to_pvfs(-ENOMEM);
 	    goto gm_initialize_failure;
 	}
     }
@@ -446,7 +446,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     {
 	gossip_lerr("Error: gm_init() failure.\n");
 	gen_mutex_unlock(&interface_mutex);
-	return (-EPROTO);
+	return (bmi_gm_errno_to_pvfs(-EPROTO));
     }
 
     if(init_flags & BMI_INIT_SERVER)
@@ -460,7 +460,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 	    gm_addr_data->port_id, BMI_GM_PORT_NAME, GM_API_VERSION_1_3);
 	if (gm_ret != GM_SUCCESS)
 	{
-	    ret = -EPROTO;
+	    ret = bmi_gm_errno_to_pvfs(-EPROTO);
 	    goto gm_initialize_failure;
 	}
     }
@@ -480,7 +480,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 	if(i >= BMI_GM_MAX_PORTS)
 	{
 	    gossip_lerr("Error: failed to find available GM port.\n");
-	    ret = -EPROTO;
+	    ret = bmi_gm_errno_to_pvfs(-EPROTO);
 	    goto gm_initialize_failure;
 	}
 	gossip_ldebug(GOSSIP_BMI_DEBUG_GM, "Using port number %i.\n", i);
@@ -502,7 +502,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     ret = ctrl_recv_pool_init(recv_token_count_high);
     if (ret < 0)
     {
-	tmp_errno = ret;
+	tmp_errno = bmi_gm_errno_to_pvfs(ret);
 	goto gm_initialize_failure;
     }
 
@@ -511,7 +511,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     ret = bmi_gm_regcache_init(local_port);
     if (ret < 0)
     {
-	tmp_errno = ret;
+	tmp_errno = bmi_gm_errno_to_pvfs(ret);
 	goto gm_initialize_failure;
     }
 #endif /* ENABLE_GM_REGCACHE */
@@ -521,7 +521,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 					    GM_CTRL_LENGTH);
     if (!ctrl_send_pool)
     {
-	tmp_errno = ret;
+	tmp_errno = bmi_gm_errno_to_pvfs(ret);
 	goto gm_initialize_failure;
     }
 
@@ -530,7 +530,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     io_pool = bmi_gm_bufferpool_init(local_port, 32, GM_MODE_REND_LIMIT);
     if (!io_pool)
     {
-	tmp_errno = ret;
+	tmp_errno = bmi_gm_errno_to_pvfs(ret);
 	gossip_lerr("Error: failed to obtain memory for buffer pool.\n");
 	goto gm_initialize_failure;
     }
@@ -582,8 +582,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     gm_finalize();
     gossip_lerr("Error: BMI_gm_initialize failure.\n");
     gen_mutex_unlock(&interface_mutex);
-    return (ret);
-
+    return (bmi_gm_errno_to_pvfs(ret));
 }
 
 
@@ -795,7 +794,7 @@ int BMI_gm_memfree(void *buffer,
     else
     {
 	gen_mutex_unlock(&interface_mutex);
-	return (-EINVAL);
+	return (bmi_gm_errno_to_pvfs(-EINVAL));
     }
 
     buffer = NULL;
@@ -813,8 +812,7 @@ int BMI_gm_memfree(void *buffer,
 int BMI_gm_set_info(int option,
 		    void *inout_parameter)
 {
-    return (-ENOSYS);
-
+    return (bmi_gm_errno_to_pvfs(-ENOSYS));
 }
 
 /* BMI_gm_get_info()
@@ -874,7 +872,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
     /* make sure it's not too big */
     if (size > GM_MODE_REND_LIMIT)
     {
-	return (-EMSGSIZE);
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     gen_mutex_lock(&interface_mutex);
@@ -892,7 +890,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 	    {
 		gen_mutex_unlock(&interface_mutex);
 		gossip_lerr("Error: gm_dma_malloc failure.\n");
-		return (-ENOMEM);
+		return (bmi_gm_errno_to_pvfs(-ENOMEM));
 	    }
 	    memcpy(new_buffer, buffer, size);
 	    /* this seems little shady, but we are going to go ahead and forget
@@ -985,7 +983,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     /* make sure it's not too big */
     if (total_size > GM_MODE_REND_LIMIT)
     {
-	return (-EMSGSIZE);
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     gen_mutex_lock(&interface_mutex);
@@ -1001,7 +999,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
 	{
 	    gossip_lerr("Error: gm_dma_malloc failure.\n");
 	    gen_mutex_unlock(&interface_mutex);
-	    return (-ENOMEM);
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
 	}
 
 	copy_buffer = new_buffer;
@@ -1089,7 +1087,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     /* make sure it's not too big */
     if (total_size > GM_MODE_UNEXP_LIMIT)
     {
-	return (-EMSGSIZE);
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     /* pad enough room for a ctrl structure */
@@ -1104,7 +1102,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     {
 	gen_mutex_unlock(&interface_mutex);
 	gossip_lerr("Error: gm_dma_malloc failure.\n");
-	return (-ENOMEM);
+	return (bmi_gm_errno_to_pvfs(-ENOMEM));
     }
 
     copy_buffer = new_buffer;
@@ -1158,7 +1156,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 
     if (size > GM_MODE_UNEXP_LIMIT)
     {
-	return (-EMSGSIZE);
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     gen_mutex_lock(&interface_mutex);
@@ -1174,7 +1172,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 	{
 	    gossip_lerr("Error: gm_dma_malloc failure.\n");
 	    gen_mutex_unlock(&interface_mutex);
-	    return (-ENOMEM);
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
 	}
 	memcpy(new_buffer, buffer, size);
 	buffer_status = GM_BUF_METH_ALLOC;
@@ -1240,7 +1238,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
     /* make sure it's not too big */
     if (expected_size > GM_MODE_REND_LIMIT)
     {
-	return (-EMSGSIZE);
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     /* set flag to indicate if we need to pinn this buffer internally */ 
@@ -1280,7 +1278,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	    gossip_lerr("Error: message ordering violation;\n");
 	    gossip_lerr("Error: message too large for next buffer.\n");
 	    gen_mutex_unlock(&interface_mutex);
-	    return(-EPROTO);
+	    return(bmi_gm_errno_to_pvfs(-EPROTO));
 	}
 
 	/* we found the operation in progress. */
@@ -1333,7 +1331,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	else
 	{
 	    /* we don't have any other modes implemented yet */
-	    ret = -ENOSYS;
+	    ret = bmi_gm_errno_to_pvfs(-ENOSYS);
 	}
     }
     else
@@ -1343,7 +1341,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	if (!new_method_op)
 	{
 	    gen_mutex_unlock(&interface_mutex);
-	    return (-ENOMEM);
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
 	}
 	*id = new_method_op->op_id;
 	new_method_op->user_ptr = user_ptr;
@@ -1425,7 +1423,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     /* make sure it's not too big */
     if (total_expected_size > GM_MODE_REND_LIMIT)
     {
-	return (-EMSGSIZE);
+	return (bmi_gm_errno_to_pvfs(-EMSGSIZE));
     }
 
     /* TODO: this is going to be lame for a while; if we are in
@@ -1467,7 +1465,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
 	    gossip_lerr("Error: message ordering violation;\n");
 	    gossip_lerr("Error: message too large for next buffer.\n");
 	    gen_mutex_unlock(&interface_mutex);
-	    return(-EPROTO);
+	    return(bmi_gm_errno_to_pvfs(-EPROTO));
 	}
 
 	/* we found the operation in progress. */
@@ -1541,7 +1539,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
 	else
 	{
 	    /* we don't have any other modes implemented yet */
-	    ret = -ENOSYS;
+	    ret = bmi_gm_errno_to_pvfs(-ENOSYS);
 	}
     }
     else
@@ -1551,7 +1549,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
 	if (!new_method_op)
 	{
 	    gen_mutex_unlock(&interface_mutex);
-	    return (-ENOMEM);
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
 	}
 	*id = new_method_op->op_id;
 	new_method_op->user_ptr = user_ptr;
@@ -1793,7 +1791,7 @@ int BMI_gm_open_context(bmi_context_id context_id)
     if (!completion_array[context_id])
     {
 	gen_mutex_unlock(&interface_mutex);
-	return(-ENOMEM);
+	return(bmi_gm_errno_to_pvfs(-ENOMEM));
     }
 
     gen_mutex_unlock(&interface_mutex);
@@ -1927,7 +1925,7 @@ static int gm_post_send_build_op_list(bmi_op_id_t * id,
     new_method_op = alloc_gm_method_op();
     if (!new_method_op)
     {
-	return (-ENOMEM);
+	return (bmi_gm_errno_to_pvfs(-ENOMEM));
     }
     *id = new_method_op->op_id;
     new_method_op->user_ptr = user_ptr;
@@ -1978,7 +1976,7 @@ static int gm_post_send_build_op(bmi_op_id_t * id,
     new_method_op = alloc_gm_method_op();
     if (!new_method_op)
     {
-	return (-ENOMEM);
+	return (bmi_gm_errno_to_pvfs(-ENOMEM));
     }
     *id = new_method_op->op_id;
     new_method_op->user_ptr = user_ptr;
@@ -2191,7 +2189,7 @@ static void ctrl_put_callback(struct gm_port *port,
     {
 	gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
 	op_list_remove(my_op);
-	my_op->error_code = -ETIMEDOUT;
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
@@ -2260,7 +2258,7 @@ static void immed_send_callback(struct gm_port *port,
     {
 	gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
 	op_list_remove(my_op);
-	my_op->error_code = -ETIMEDOUT;
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
@@ -2333,7 +2331,7 @@ static void ctrl_req_callback(struct gm_port *port,
     {
 	gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
 	op_list_remove(my_op);
-	my_op->error_code = -ETIMEDOUT;
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
@@ -2390,7 +2388,7 @@ static int ctrl_recv_pool_init(int pool_size)
 				 gm_max_length_for_size(GM_IMMED_SIZE));
 	if (!tmp_ctrl)
 	{
-	    return (-ENOMEM);
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
 	}
 	gm_provide_receive_buffer(local_port, tmp_ctrl,
 				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
@@ -2685,7 +2683,7 @@ static int immed_unexp_recv_handler(bmi_size_t size,
     new_method_op = alloc_gm_method_op();
     if (!new_method_op)
     {
-	return (-ENOMEM);
+	return (bmi_gm_errno_to_pvfs(-ENOMEM));
     }
     new_method_op->send_recv = BMI_RECV;
     new_method_op->addr = map;
@@ -2721,7 +2719,7 @@ static int immed_recv_handler(bmi_size_t actual_size,
     new_method_op = alloc_gm_method_op();
     if (!new_method_op)
     {
-	return (-ENOMEM);
+	return (bmi_gm_errno_to_pvfs(-ENOMEM));
     }
     new_method_op->send_recv = BMI_RECV;
     new_method_op->addr = map;
@@ -2750,7 +2748,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 			     int fast)
 {
     struct ctrl_msg ctrl_copy;
-    int ret = -ENOSYS;
+    int ret = bmi_gm_errno_to_pvfs(-ENOSYS);
     method_addr_p map = NULL;
     struct op_list_search_key key;
     void *tmp_buffer = NULL;
@@ -2840,7 +2838,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    {
 		/* TODO: handle this error better */
 		gossip_lerr("Error: unknown sender!\n");
-		return (-EPROTO);
+		return (bmi_gm_errno_to_pvfs(-EPROTO));
 	    }
 
 	    memset(&key, 0, sizeof(struct op_list_search_key));
@@ -2857,7 +2855,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 		if (!tmp_buffer)
 		{
 		    /* TODO: handle error */
-		    return (-ENOMEM);
+		    return (bmi_gm_errno_to_pvfs(-ENOMEM));
 		}
 		if (fast)
 		{
@@ -2943,7 +2941,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    if (!tmp_buffer)
 	    {
 		/* TODO: handle error */
-		return (-ENOMEM);
+		return (bmi_gm_errno_to_pvfs(-ENOMEM));
 	    }
 	    if (fast)
 	    {
@@ -3145,7 +3143,7 @@ static void setup_send_data_buffer(method_op_p mop)
 		 (int) mop->actual_size, (int) pinned_size);
 	    bmi_gm_unuse_interval((unsigned long) mop->buffer, pinned_size);
 	    /* TODO: handle this better */
-	    mop->error_code = -ENOMEM;
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
 	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
@@ -3158,7 +3156,7 @@ static void setup_send_data_buffer(method_op_p mop)
 	{
 	    gossip_lerr("Error: could not register memory.\n");
 	    /* TODO: handle this better */
-	    mop->error_code = -ENOMEM;
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
 	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
@@ -3172,7 +3170,7 @@ static void setup_send_data_buffer(method_op_p mop)
 	if (!gm_op_data->tmp_xfer_buffer)
 	{
 	    gossip_lerr("Error: gm_dma_malloc().\n");
-	    mop->error_code = -ENOMEM;
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
 	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
@@ -3303,7 +3301,7 @@ static void prepare_for_recv(method_op_p mop)
 		("Error: could not register memory, wanted: %d, got: %d\n",
 		 (int) mop->actual_size, (int) pinned_size);
 	    /* TODO: handle this error better */
-	    mop->error_code = -ENOMEM;
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
 	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
@@ -3316,7 +3314,7 @@ static void prepare_for_recv(method_op_p mop)
 	{
 	    gossip_lerr("Error: could not register memory.\n");
 	    /* TODO: handle this better */
-	    mop->error_code = -ENOMEM;
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
 	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
@@ -3331,7 +3329,7 @@ static void prepare_for_recv(method_op_p mop)
 	{
 	    gossip_lerr("Error: gm_dma_malloc().\n");
 	    /* TODO: handle this better */
-	    mop->error_code = -ENOMEM;
+	    mop->error_code = bmi_gm_errno_to_pvfs(-ENOMEM);
 	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
@@ -3463,7 +3461,7 @@ static void ctrl_ack_callback(struct gm_port *port,
     {
 	gossip_lerr("Error: GM TIMEOUT!  Not handled.\n");
 	op_list_remove(my_op);
-	my_op->error_code = -ETIMEDOUT;
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
@@ -3477,7 +3475,7 @@ static void ctrl_ack_callback(struct gm_port *port,
 	gossip_err("Sending from %s to %s\n", gm_host_name,
 	    gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
 	op_list_remove(my_op);
-	my_op->error_code = -ETIMEDOUT;
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
@@ -3537,7 +3535,7 @@ static void data_send_callback(struct gm_port *port,
     {
 	gossip_lerr("Error: GM TIMEOUT!  Not handled.\n");
 	op_list_remove(my_op);
-	my_op->error_code = -ETIMEDOUT;
+	my_op->error_code = bmi_gm_errno_to_pvfs(-ETIMEDOUT);
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
@@ -3611,7 +3609,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 	/* where did this come from?! */
 	/* TODO: handle this error condition */
 	gossip_lerr("Error: ctrl message from unknown host!!!\n");
-	return (-EPROTO);
+	return (bmi_gm_errno_to_pvfs(-EPROTO));
     }
     gm_addr_data = map->method_data;
 
@@ -3632,7 +3630,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 	    gossip_lerr("Error: message ordering violation;\n");
 	    gossip_lerr("Error: message too large for next buffer.\n");
 	    /* TODO: handle this better */
-	    return(-EPROTO);
+	    return(bmi_gm_errno_to_pvfs(-EPROTO));
 	}
 
 	/* store remote side's op_id */
@@ -3681,7 +3679,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 	active_method_op = alloc_gm_method_op();
 	if (!active_method_op)
 	{
-	    return (-ENOMEM);
+	    return (bmi_gm_errno_to_pvfs(-ENOMEM));
 	}
 	active_method_op->send_recv = BMI_RECV;
 	active_method_op->addr = map;

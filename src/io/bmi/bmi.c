@@ -1678,7 +1678,9 @@ int bmi_errno_to_pvfs(int error)
 {
     int bmi_errno = error;
 
-#define __CASE(err) case -err: bmi_errno = BMI_##err; break
+#define __CASE(err)                      \
+case -err: bmi_errno = -BMI_##err; break;\
+case err: bmi_errno = BMI_##err; break
 
     switch(error)
     {
