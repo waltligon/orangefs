@@ -28,7 +28,7 @@ sub stop_servers {
     my $rc = 0;
 
     # a bit viscious, but we don't store our pid anywhere 
-    my $cmd = "%node killall pvfs2-server";
+    my $cmd = "%node killall pvfs2-server \\\; sleep 1 \\\; killall -9 pvfs2-server";
    
     $rc = do_remote_command($href->{'RCMDPROG'}, 8, 30, $cmd, undef, undef, @servers);
 
