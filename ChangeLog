@@ -6,6 +6,8 @@ PVFS2 Release ChangeLog
 pvfs2-0.9.0pre1
 ===============
 - documentation updates to HA and FAQ documents
+- better balancing (randomization) of data server selection when
+  creating new files
 
 
 pvfs2-0.8.0
