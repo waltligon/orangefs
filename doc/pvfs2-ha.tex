@@ -7,7 +7,7 @@
 %
 % GET THE MARGINS RIGHT, THE UGLY WAY
 %
-\topmargin 0.2in
+\topmargin 0.0in
 \textwidth 6.5in
 \textheight 8.75in
 \columnsep 0.25in
@@ -167,9 +167,15 @@ mounting the file system just long enough to put a PVFS2 storage space
 on it.  Reboot the other node to make sure it sees the new partition
 information on the enclosure.
 
-Download, build, install, and configure PVFS2.  Create a storage space
-on the PowerVault filesystem.  Now shutdown PVFS2 and unmount the file
-system.  
+Download, build, install, and configure PVFS2.  PVFS2 can work in a
+failover environment as long as the clients and servers are version
+0.5.0 or newer (Version 0.5.0 introduced the ability to retry failed
+operations). In this document, we have configured both PVFS2 server to
+act as both a Metadata and a Data server.  Since the config files and
+storage device are shared between both nodes of this cluster, it is not
+strictly necessary to configure the servers for both roles. Create a
+storage space on the PowerVault filesystem.  Now shutdown PVFS2 and
+unmount the file system.  
 
 \subsection{Failover Software}
 
