@@ -36,39 +36,39 @@ enum {
 static int remove_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p);
 
-static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
+static int remove_lookup_post_msgpair(PINT_client_sm *sm_p,
 				       job_status_s *js_p);
 static int remove_lookup_failure(PINT_client_sm *sm_p,
 				 job_status_s *js_p);
-static int remove_recv_lookup_resp(PINT_client_sm *sm_p,
+static int remove_lookup_complete_msgpair(PINT_client_sm *sm_p,
 				   job_status_s *js_p);
 
-static int remove_post_getattr_sendrecv(PINT_client_sm *sm_p,
+static int remove_getattr_post_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p);
 static int remove_getattr_failure(PINT_client_sm *sm_p,
 				  job_status_s *js_p);
-static int remove_recv_getattr_resp(PINT_client_sm *sm_p,
+static int remove_getattr_complete_msgpair(PINT_client_sm *sm_p,
 				    job_status_s *js_p);
 
-static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
+static int remove_datafile_remove_post_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p);
 static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
 					  job_status_s *js_p);
-static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
+static int remove_datafile_complete_msgpair(PINT_client_sm *sm_p,
 					    job_status_s *js_p);
 
-static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm_p,
+static int remove_rmdirent_post_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p);
 static int remove_rmdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p);
-static int remove_recv_rmdirent_resp(PINT_client_sm *sm_p,
+static int remove_rmdirent_complete_msgpair(PINT_client_sm *sm_p,
 				     job_status_s *js_p);
 
-static int remove_post_object_remove_sendrecv(PINT_client_sm *sm_p,
+static int remove_object_remove_post_msgpair(PINT_client_sm *sm_p,
 					      job_status_s *js_p);
 static int remove_object_remove_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p);
-static int remove_recv_object_remove_resp(PINT_client_sm *sm_p,
+static int remove_object_remove_complete_msgpair(PINT_client_sm *sm_p,
 					  job_status_s *js_p);
 
 static int remove_cleanup(PINT_client_sm *sm_p,
@@ -86,33 +86,33 @@ static job_status_s job_status_array[MAX_RETURNED_JOBS];
 
 machine pvfs2_client_remove_sm(init,
 			       cleanup,
-			       post_lookup_sendrecv,
+			       lookup_post_msgpair,
 			       lookup_failure,
-			       recv_lookup_resp,
-			       post_getattr_sendrecv,
+			       lookup_complete_msgpair,
+			       getattr_post_msgpair,
 			       getattr_failure,
-			       recv_getattr_resp,
-			       post_datafile_remove_sendrecv,
+			       getattr_complete_msgpair,
+			       datafile_remove_post_msgpair,
 			       datafile_remove_failure,
-			       recv_datafile_remove_resp,
-			       post_rmdirent_sendrecv,
+			       datafile_complete_msgpair,
+			       rmdirent_post_msgpair,
 			       rmdirent_failure,
-			       recv_rmdirent_resp,
-			       post_object_remove_sendrecv,
+			       rmdirent_complete_msgpair,
+			       object_remove_post_msgpair,
 			       object_remove_failure,
-			       recv_object_remove_resp)
+			       object_remove_complete_msgpair)
 {
     state init
 	{
 	    run remove_init;
-	    default => post_lookup_sendrecv;
+	    default => lookup_post_msgpair;
 	}
 
-    state post_lookup_sendrecv
+    state lookup_post_msgpair
 	{
-	    run remove_post_lookup_sendrecv;
-	    success => recv_lookup_resp;
-	    REMOVE_DCACHE_HIT => post_getattr_sendrecv;
+	    run remove_lookup_post_msgpair;
+	    success => lookup_complete_msgpair;
+	    REMOVE_DCACHE_HIT => getattr_post_msgpair;
 	    REMOVE_PCACHE_HIT => cleanup;
 	    default => lookup_failure;
 	}
@@ -123,17 +123,17 @@ machine pvfs2_client_remove_sm(init,
 	    default => cleanup;
 	}
 
-    state recv_lookup_resp
+    state lookup_complete_msgpair
 	{
-	    run remove_recv_lookup_resp;
-	    success => post_rmdirent_sendrecv;
+	    run remove_lookup_complete_msgpair;
+	    success => rmdirent_post_msgpair;
 	    default => cleanup;
 	}
 
-    state post_getattr_sendrecv
+    state getattr_post_msgpair
 	{
-	    run remove_post_getattr_sendrecv;
-	    success => recv_getattr_resp;
+	    run remove_getattr_post_msgpair;
+	    success => getattr_complete_msgpair;
 	    default => getattr_failure;
 	}
 
@@ -143,18 +143,18 @@ machine pvfs2_client_remove_sm(init,
 	    default => cleanup;
 	}
 
-    state recv_getattr_resp
+    state getattr_complete_msgpair
 	{
-	    run remove_recv_getattr_resp;
-	    REMOVE_MUST_REMOVE_DATAFILES => post_datafile_remove_sendrecv;
-	    success => post_object_remove_sendrecv;
+	    run remove_getattr_complete_msgpair;
+	    REMOVE_MUST_REMOVE_DATAFILES => datafile_remove_post_msgpair;
+	    success => object_remove_post_msgpair;
 	    default => cleanup;
 	}
 
-    state post_rmdirent_sendrecv
+    state rmdirent_post_msgpair
 	{
-	    run remove_post_rmdirent_sendrecv;
-	    success => recv_rmdirent_resp;
+	    run remove_rmdirent_post_msgpair;
+	    success => rmdirent_complete_msgpair;
 	    default => rmdirent_failure;
 	}
 
@@ -164,16 +164,16 @@ machine pvfs2_client_remove_sm(init,
 	    default => cleanup;
 	}
 
-    state recv_rmdirent_resp
+    state rmdirent_complete_msgpair
 	{
-	    run remove_recv_rmdirent_resp;
-	    default => post_getattr_sendrecv;
+	    run remove_rmdirent_complete_msgpair;
+	    default => getattr_post_msgpair;
 	}
 
-    state post_datafile_remove_sendrecv
+    state datafile_remove_post_msgpair
 	{
-	    run remove_post_datafile_remove_sendrecv;
-	    success => recv_datafile_remove_resp;
+	    run remove_datafile_remove_post_msgpair;
+	    success => datafile_complete_msgpair;
 	    default => datafile_remove_failure;
 	}
 
@@ -183,16 +183,16 @@ machine pvfs2_client_remove_sm(init,
 	    default => cleanup;
 	}
 
-    state recv_datafile_remove_resp
+    state datafile_complete_msgpair
 	{
-	    run remove_recv_datafile_remove_resp;
-	    default => post_object_remove_sendrecv;
+	    run remove_datafile_complete_msgpair;
+	    default => object_remove_post_msgpair;
 	}
 
-    state post_object_remove_sendrecv
+    state object_remove_post_msgpair
 	{
-	    run remove_post_object_remove_sendrecv;
-	    success => recv_object_remove_resp;
+	    run remove_object_remove_post_msgpair;
+	    success => object_remove_complete_msgpair;
 	    default => object_remove_failure;
 	}
 
@@ -202,9 +202,9 @@ machine pvfs2_client_remove_sm(init,
 	    default => cleanup;
 	}
 
-    state recv_object_remove_resp
+    state object_remove_complete_msgpair
 	{
-	    run remove_recv_object_remove_resp;
+	    run remove_object_remove_complete_msgpair;
 	    default => cleanup;
 	}
 
@@ -461,9 +461,9 @@ static int remove_init(PINT_client_sm *sm_p,
     return 1;
 }
 
-/* remove_post_lookup_sendrecv()
+/* remove_lookup_post_msgpair()
  */
-static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
+static int remove_lookup_post_msgpair(PINT_client_sm *sm_p,
 				       job_status_s *js_p)
 {
     int ret;
@@ -472,7 +472,7 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
     job_status_s send_status, recv_status;
     job_id_t send_id, recv_id;
 
-    gossip_debug(CLIENT_DEBUG, "remove state: post_lookup_sendrecv\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: post_lookup_post_msgpair\n");
 
     /* check and see if we have the handle for the object in
      * our directory cache already.
@@ -626,9 +626,9 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
     return 0;
 }
 
-/* remove_recv_lookup_resp()
+/* remove_lookup_complete_msgpair()
  */
-static int remove_recv_lookup_resp(PINT_client_sm *sm_p,
+static int remove_lookup_complete_msgpair(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
     int ret;
@@ -698,11 +698,11 @@ static int remove_recv_lookup_resp(PINT_client_sm *sm_p,
     return 1;
 }
 
-/* remove_post_getattr_sendrecv()
+/* remove_getattr_post_msgpair()
  *
  * Q: DO WE WANT TO REMOVE THE DIRECTORY ENTRY BEFORE THIS???
  */
-static int remove_post_getattr_sendrecv(PINT_client_sm *sm_p,
+static int remove_getattr_post_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
     int ret;
@@ -710,7 +710,7 @@ static int remove_post_getattr_sendrecv(PINT_client_sm *sm_p,
     job_status_s send_status, recv_status;
     job_id_t send_id, recv_id;
 
-    gossip_debug(CLIENT_DEBUG, "remove state: post_getattr_sendrecv\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: post_getattr_post_msgpair\n");
 
     /* do parameter checking */
 
@@ -790,9 +790,9 @@ static int remove_post_getattr_sendrecv(PINT_client_sm *sm_p,
     return 0;
 }
 
-/* remove_recv_getattr_resp()
+/* remove_getattr_complete_msgpair()
  */
-static int remove_recv_getattr_resp(PINT_client_sm *sm_p,
+static int remove_getattr_complete_msgpair(PINT_client_sm *sm_p,
 				    job_status_s *js_p)
 {
     int ret;
@@ -905,9 +905,9 @@ static int remove_recv_getattr_resp(PINT_client_sm *sm_p,
 
 
 
-/* remove_post_rmdirent_sendrecv()
+/* remove_rmdirent_post_msgpair()
  */
-static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm_p,
+static int remove_rmdirent_post_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
     int ret;
@@ -919,7 +919,7 @@ static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm_p,
      * object out of the system fastest.
      */
 
-    gossip_debug(CLIENT_DEBUG, "remove state: post_rmdirent_sendrecv\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: post_rmdirent_post_msgpair\n");
 
     /* do parameter checking */
 
@@ -994,9 +994,9 @@ static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm_p,
     return 0;
 }
 
-/* remove_recv_rmdirent_resp()
+/* remove_rmdirent_complete_msgpair()
  */
-static int remove_recv_rmdirent_resp(PINT_client_sm *sm_p,
+static int remove_rmdirent_complete_msgpair(PINT_client_sm *sm_p,
 				     job_status_s *js_p)
 {
     /* receive rmdirent response from the server */
@@ -1004,7 +1004,7 @@ static int remove_recv_rmdirent_resp(PINT_client_sm *sm_p,
     struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
     struct PVFS_server_resp *resp_p; /* response structure (decoded) */
 
-    gossip_debug(CLIENT_DEBUG, "remove state: recv_rmdirent_resp\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: recv_rmdirent_complete_msgpair\n");
 
     /* decrement until both operations have completed */
     if (--sm_p->comp_ct > 0) return 0;
@@ -1046,9 +1046,9 @@ static int remove_recv_rmdirent_resp(PINT_client_sm *sm_p,
     return 1;
 }
 
-/* remove_post_datafile_remove_sendrecv()
+/* remove_datafile_remove_post_msgpair()
  */
-static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
+static int remove_datafile_remove_post_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p)
 {
     int ret, i;
@@ -1059,7 +1059,7 @@ static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
      * than the other way around!  so we remove datafiles first.
      */
 
-    gossip_debug(CLIENT_DEBUG, "remove state: post_getattr_sendrecv\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: post_getattr_post_msgpair\n");
 
     /* do parameter checking */
 
@@ -1144,27 +1144,27 @@ static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
 	}
     }
 
-    gossip_debug(CLIENT_DEBUG, "remove sm: post_datafile_remove_sendrecv: count = %d\n",
+    gossip_debug(CLIENT_DEBUG, "remove sm: post_datafile_remove_post_msgpair: count = %d\n",
 		 sm_p->comp_ct);
 
     return 0;
 }
 
-static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
+static int remove_datafile_complete_msgpair(PINT_client_sm *sm_p,
 					    job_status_s *js_p)
 {
     int ret, i;
     struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
     struct PVFS_server_resp *resp_p; /* response structure (decoded) */
 
-    gossip_debug(CLIENT_DEBUG, "remove state: recv_datafile_remove_resp\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: recv_datafile_complete_msgpair\n");
 
     /* keep decrementing comp_ct until we're done */
     /* TODO: MARK THE ONES THAT WE RECEIVED ALREADY, SO WE COULD CLEAN
      * UP NICELY.
      */
 
-    gossip_debug(CLIENT_DEBUG, "remove sm: recv_datafile_remove_resp: count = %d\n",
+    gossip_debug(CLIENT_DEBUG, "remove sm: recv_datafile_complete_msgpair: count = %d\n",
 		 sm_p->comp_ct);
 
     if (--sm_p->comp_ct > 0) {
@@ -1233,7 +1233,7 @@ static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int remove_post_object_remove_sendrecv(PINT_client_sm *sm_p,
+static int remove_object_remove_post_msgpair(PINT_client_sm *sm_p,
 					      job_status_s *js_p)
 {
     int ret;
@@ -1241,7 +1241,7 @@ static int remove_post_object_remove_sendrecv(PINT_client_sm *sm_p,
     job_status_s send_status, recv_status;
     job_id_t send_id, recv_id;
 
-    gossip_debug(CLIENT_DEBUG, "remove state: post_object_remove_sendrecv\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: post_object_remove_post_msgpair\n");
 
     /* mark that we have two messages to receive */
     sm_p->comp_ct = 2;
@@ -1313,14 +1313,14 @@ static int remove_post_object_remove_sendrecv(PINT_client_sm *sm_p,
     return 0;
 }
 
-static int remove_recv_object_remove_resp(PINT_client_sm *sm_p,
+static int remove_object_remove_complete_msgpair(PINT_client_sm *sm_p,
 					  job_status_s *js_p)
 {
     int ret;
     struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
     struct PVFS_server_resp *resp_p; /* response structure (decoded) */
 
-    gossip_debug(CLIENT_DEBUG, "remove state: recv_object_remove_resp\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: recv_object_remove_complete_msgpair\n");
 
     /* decrement until both operations have completed */
     if (--sm_p->comp_ct > 0) return 0;
