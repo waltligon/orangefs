@@ -275,6 +275,35 @@ int nbsend(int s,
     return (len - comp);
 }
 
+/* nonblocking vector send */
+int nbsendv(int s,
+	    struct iovec* vector,
+	    int count)
+{
+    int oldfl, ret;
+    oldfl = fcntl(s, F_GETFL, 0);
+    if (!(oldfl & O_NONBLOCK))
+	fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
+
+    /* NOTE: this function is different from the others that will
+     * keep making the I/O system call until EWOULDBLOCK is encountered; we 
+     * give up after one call
+     */
+
+    /* loop over if interrupted */
+    do
+    {
+	ret = writev(s, vector, count);
+    }while(ret == -1 && errno == EINTR);
+
+    /* return zero if can't do any work at all */
+    if(ret == -1 && errno == EWOULDBLOCK)
+	return(0);
+
+    /* if data transferred or an error */
+    return(ret);
+}
+
 #ifdef __USE_SENDFILE__
 /* NBSENDFILE() - nonblocking (on the socket) send from file
  *

@@ -21,9 +21,6 @@
  * BRAINDEADSOCKS can be defined to prevent the macros that set socket
  * buffer sizes from having an effect.  On some kernels (such as Linux
  * 1.3) setting socket buffer sizes can cause problems.
- *
- * BSEND_NO_WRITEV determines whether the bsendv (blocking vector send)
- * function will use the writev system call or not.
  */
 
 #ifndef SOCKIO_H
@@ -55,6 +52,9 @@ int bsend(int s,
 int nbsend(int s,
 	   void *buf,
 	   int len);
+int nbsendv(int s,
+	    struct iovec* vector,
+	    int count);
 int get_sockopt(int s,
 		int optname);
 int set_tcpopt(int s,
