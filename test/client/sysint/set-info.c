@@ -91,10 +91,11 @@ int main(int argc, char **argv)
     printf("atime       : %s", ctime((time_t *)&resp_getattr.attr.atime));
     printf("mtime       : %s", ctime((time_t *)&resp_getattr.attr.mtime));
     printf("ctime       : %s", ctime((time_t *)&resp_getattr.attr.ctime));
+    printf("file size   : %Ld\n", resp_getattr.attr.size);
 
     /* take the retrieved attributes and update the access time */
     resp_getattr.attr.atime = time(NULL);
-    resp_getattr.attr.mask &= ~ PVFS_ATTR_COMMON_TYPE;
+    resp_getattr.attr.mask &= ~PVFS_ATTR_COMMON_TYPE;
 
     /* use stored credentials here */
     credentials.uid = resp_getattr.attr.owner;

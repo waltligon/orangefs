@@ -11,7 +11,7 @@
 #include "pvfs2-attr.h"
 
 enum {
-    STATE_METAFILE = 7,
+    STATE_METAFILE = 7
 };
 
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
@@ -135,11 +135,8 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 	return 1;
     }
 
-    /* TODO: LOOK AT ATTRIBUTE MASK, SET UP s_op->req->u.setattr.attr for writing
-     * in next step
-     */
+    js_p->error_code = 0;
 
-    /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
     if (((req_a_p->objtype == PVFS_TYPE_METAFILE) ||
          (a_p->objtype == PVFS_TYPE_METAFILE)))
     {
@@ -148,12 +145,40 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 		     s_op->req->u.setattr.handle);
 	js_p->error_code = STATE_METAFILE;
     }
+    else if (((req_a_p->objtype == PVFS_TYPE_DATAFILE) ||
+              (a_p->objtype == PVFS_TYPE_DATAFILE)))
+    {
+	gossip_debug(SERVER_DEBUG,
+		     "  handle 0x%08Lx refers to a datafile\n",
+		     s_op->req->u.setattr.handle);
+    }
+    else if (((req_a_p->objtype == PVFS_TYPE_DIRECTORY) ||
+              (a_p->objtype == PVFS_TYPE_DIRECTORY)))
+    {
+	gossip_debug(SERVER_DEBUG,
+		     "  handle 0x%08Lx refers to a directory\n",
+		     s_op->req->u.setattr.handle);
+    }
+    else if (((req_a_p->objtype == PVFS_TYPE_SYMLINK) ||
+              (a_p->objtype == PVFS_TYPE_SYMLINK)))
+    {
+	gossip_debug(SERVER_DEBUG,
+		     "  handle 0x%08Lx refers to a symlink\n",
+		     s_op->req->u.setattr.handle);
+    }
+    else if (((req_a_p->objtype == PVFS_TYPE_DIRDATA) ||
+              (a_p->objtype == PVFS_TYPE_DIRDATA)))
+    {
+	gossip_debug(SERVER_DEBUG,
+		     "  handle 0x%08Lx refers to a dirdata object\n",
+		     s_op->req->u.setattr.handle);
+    }
     else
     {
 	gossip_debug(SERVER_DEBUG,
-		     "  handle 0x%08Lx refers to something other than "
-                     "a metafile\n", s_op->req->u.setattr.handle);
-	js_p->error_code = 0;
+		     "  handle 0x%08Lx refers to something unknown\n",
+		     s_op->req->u.setattr.handle);
+        assert(0);
     }
     return 1;
 }
@@ -230,22 +255,30 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 static int setattr_write_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p)
 {
-    /*PVFS_object_attr *old_attr;*/
-    int ret=0;
+    int ret = 0, dfile_count = 0;
     job_id_t j_id;
 
-    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES))
-    {
-        /* if we don't need to write the dfiles, skip them */
-        js_p->error_code = 0;
-        return 1;
-    }
+    /* if we don't need to write the dfiles, skip them */
+/*     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)) */
+/*     { */
+/*         gossip_debug(SERVER_DEBUG, "skipping data handle write\n"); */
+/*         js_p->error_code = 0; */
+/*         return 1; */
+/*     } */
 
     gossip_debug(SERVER_DEBUG, "setattr state: "
                  "write_metafile_datafile_handles_if_required\n");
 
-    /* we should have at least one datafile... */
-    assert(s_op->req->u.setattr.attr.u.meta.dfile_count > 0);
+    /* verify that the requested dfile count is sane */
+    dfile_count = s_op->req->u.setattr.attr.u.meta.dfile_count;
+    if ((dfile_count < 1) || (dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT))
+    {
+        gossip_err("The requested dfile count of %d is invalid; "
+                   "aborting operation.\n", dfile_count);
+	js_p->error_code = -PVFS_EOVERFLOW;
+        assert(0);
+	return 1;
+    }
 
     /* set up key and value structure for keyval write */
     s_op->key.buffer    = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
@@ -293,12 +326,13 @@ static int setattr_write_metafile_distribution_if_required(
 
     gossip_debug(SERVER_DEBUG, "setattr state: write_metafile_distribution\n");
 
-    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
-    {
-        /* if we don't need to fill in the distribution, skip it */
-        js_p->error_code = 0;
-        return 1;
-    }
+    /* if we don't need to fill in the distribution, skip it */
+/*     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)) */
+/*     { */
+/*         gossip_debug(SERVER_DEBUG, "skipping distribution write\n"); */
+/*         js_p->error_code = 0; */
+/*         return 1; */
+/*     } */
 
     /* distribution should take up non-negative space :) */
     assert(s_op->req->u.setattr.attr.u.meta.dist_size >= 0);

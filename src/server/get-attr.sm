@@ -142,7 +142,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
     else if (a_p->objtype == PVFS_TYPE_DATAFILE)
     {
 	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
-                     "a directory. doing nothing special\n",
+                     "a datafile. doing nothing special\n",
 		     s_op->req->u.getattr.handle);
     }
     else if (a_p->objtype == PVFS_TYPE_DIRECTORY)
@@ -221,11 +221,18 @@ static int getattr_read_metafile_datafile_handles_if_required(
 
     dfile_count = s_op->resp.u.getattr.attr.u.meta.dfile_count;
 
+    /* verify that the retrieved dfile count is sane */
+    if ((dfile_count < 1) || (dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT))
+    {
+        gossip_err("The requested dfile count of %d is invalid; "
+                   "aborting operation.\n", dfile_count);
+	js_p->error_code = -PVFS_EOVERFLOW;
+        assert(0);
+	return 1;
+    }
+
     s_op->key.buffer    = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
-
-    /* should be more than one datafile. */
-    assert(dfile_count > 0);
 
     /* add mask value to indicate the data file array is filled */
     s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DFILES;

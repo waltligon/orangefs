@@ -55,7 +55,8 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 	/* in particular, note that you can't set size here */
 	if((attr.mask & ~PVFS_ATTR_SYS_ALL_SETABLE) != 0)
 	{
-	    gossip_lerr("Error: PVFS_sys_setattr(): attempted to set invalid attributes.\n");
+	    gossip_lerr("Error: PVFS_sys_setattr(): attempted to set "
+                        "invalid attributes.\n");
 	    return(-EINVAL);
 	}
 
@@ -66,8 +67,7 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 	/* Lookup the entry...may or may not exist in the cache */
 
 	ret = PINT_pcache_lookup(entry, &pinode_ptr);
-	/* Check if pinode was returned */
-	if (ret == PCACHE_LOOKUP_FAILURE)
+	if ((ret == PCACHE_LOOKUP_FAILURE) || (pinode_ptr == NULL))
 	{
 		pinode_was_in_cache = 0;
 		ret = phelper_get_pinode(entry, &pinode_ptr,
