@@ -452,8 +452,7 @@ int PINT_Process_request(PINT_Request_state *req,
 				req->bytes;
 	}
 #endif
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"\tdone ");
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"sg %d sm %d by %lld bm %lld ta %lld to %lld fo %lld eof %d\n",
+	gossip_debug(GOSSIP_REQUEST_DEBUG,"\tdone sg %d sm %d by %lld bm %lld ta %lld to %lld fo %lld eof %d\n",
 			result->segs, result->segmax, Ld(result->bytes), Ld(result->bytemax),
 			Ld(req->target_offset), Ld(req->type_offset), Ld(req->final_offset),
 			req->eof_flag);
@@ -551,10 +550,10 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"\tPINT_Distribute\n");
 	gossip_debug(GOSSIP_REQUEST_DEBUG,
-			"\t\tof %lld sz %lld ix %d sm %d by %lld bm %lld ",
+			"\t\tof %lld sz %lld ix %d sm %d by %lld bm %lld "
+			"fsz %lld exfl %d\n",
 			Ld(offset), Ld(size), result->segs, result->segmax, Ld(result->bytes),
-			Ld(result->bytemax));
-	gossip_debug(GOSSIP_REQUEST_DEBUG, "fsz %lld exfl %d\n",
+			Ld(result->bytemax),
 			Ld(rfdata->fsize), rfdata->extend_flag);
 	orig_offset = offset;
 	orig_size = size;
