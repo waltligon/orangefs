@@ -3843,6 +3843,11 @@ int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
         {
             assert(tmp_op == query_op);
             op_list_remove(query_op);
+            if (gm_op_data->buffer_status == GM_BUF_METH_ALLOC)
+            {
+                /* this was an internally allocated buffer */
+                gm_dma_free(local_port, query_op->buffer);
+            }
             query_op->error_code = -PVFS_ECANCEL;
             op_list_add(completion_array[query_op->context_id], query_op);
             gm_op_data->complete = 1;
@@ -3861,6 +3866,12 @@ int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
     {
 	gen_mutex_unlock(&interface_mutex);
         return(0);
+    }
+
+    /* how about immediate mode recv messages? */
+    if(query_op->send_recv == BMI_RECV && query_op->mode == GM_MODE_IMMED)
+    {
+
     }
 
     /* TODO: implement the rest of this; based on the op type we have to look
