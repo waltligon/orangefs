@@ -290,7 +290,7 @@ AC_CHECK_HEADERS(mntent.h)
 dnl this is a special case, used to key off options controlling gossip
 dnl   backtrace capability
 AC_CHECK_HEADERS(execinfo.h,
-LDFAGS="$LDFLAGS -rdynamic"
+LDFLAGS="$LDFLAGS -rdynamic"
 CFLAGS="$CFLAGS -DGOSSIP_ENABLE_BACKTRACE"
 )
 
