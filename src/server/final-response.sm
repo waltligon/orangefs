@@ -76,7 +76,7 @@ static int final_response_release(
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(%p) %s (final_response sm) state: release\n", s_op,
+                 "(%p) %s (FR sm) state: release\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
 
     /* this seems a little odd, but since this is the first state of the
@@ -111,10 +111,12 @@ static int final_response_send_resp(
     int ret = -1;
     job_id_t tmp_id;
     
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(%p) %s (final_response sm) state: send_resp\n",
-                 s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, 
+	"(%p) %s (FR sm) state: send_resp (status = %d)\n",
+	s_op,
+	PINT_map_server_op_to_string(s_op->req->op),
+	s_op->resp.status);
 
     if (js_p->error_code != 0)
     {
@@ -151,7 +153,7 @@ static int final_response_send_resp(
 static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(%p) %s (final_response sm) state: cleanup\n",
+                 "(%p) %s (FR sm) state: cleanup\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
 
     PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
