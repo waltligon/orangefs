@@ -56,7 +56,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
 			DSPACE_CREATE,
-			*handle_p,
+			(handle_p ? *handle_p : NULL),
 			coll_p,
 			dbpf_dspace_create_op_svc,
 			user_ptr,
@@ -92,10 +92,29 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 	    break;
     }
 
-    new_handle = trove_handle_alloc(op_p->coll_p->coll_id);
-    
+    /* if caller requests a specific handle, honor it */
+    if ((op_p->u.d_create.out_handle_p != NULL) &&
+        (*op_p->u.d_create.out_handle_p != 0))
+    {
+        new_handle = *op_p->u.d_create.out_handle_p;
+
+        /*
+          we should probably handle this error nicely;
+          right now, it will fail later (gracefully) if this
+          fails since the handle will already exist, but
+          since we know it here, handle it here ?
+        */
+        trove_handle_set_used(op_p->coll_p->coll_id,
+                              (TROVE_handle)new_handle);
+    }
+    else
+    {
+        /* pick an arbitrary valid handle otherwise */
+        new_handle = trove_handle_alloc(op_p->coll_p->coll_id);
+    }
+
 #if 0
-    printf("new handle = %Lu (%Lx).\n", new_handle, new_handle);
+    printf("*** new handle = %Ld (%Lx).\n", new_handle, new_handle);
 #endif
 
     s_attr.type = op_p->u.d_create.type;

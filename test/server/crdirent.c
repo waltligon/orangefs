@@ -25,7 +25,7 @@
 struct options{
 	char* hostid;       /* host identifier */
 	char* method;       /* bmi method to use */
-	int bucket;
+	int handle;
 	int parent;
 	char* name;
 };
@@ -106,7 +106,7 @@ int main(int argc, char **argv)	{
 	/* TODO: fill below fields in with the correct values */
 	my_req->credentials.perms = U_WRITE | U_READ;  
 	my_req->u.crdirent.name = user_opts->name;
-	my_req->u.crdirent.new_handle = user_opts->bucket;
+	my_req->u.crdirent.new_handle = user_opts->handle;
 	my_req->u.crdirent.parent_handle = user_opts->parent;
 	my_req->u.crdirent.fs_id = 9;
 	my_req->rsize = sizeof(struct PVFS_server_req_s)+strlen(my_req->u.crdirent.name)+1;
@@ -246,7 +246,7 @@ static struct options* parse_args(int argc, char* argv[]){
 	tmp_opts->hostid = (char*)malloc(strlen(default_hostid) + 1);
 	tmp_opts->method = (char*)malloc(strlen(default_method) + 1);
 	tmp_opts->name = (char*)malloc(strlen(default_name) + 1);
-	tmp_opts->bucket = 4095;
+	tmp_opts->handle = 4095;
 	tmp_opts->parent= 4094;
 	if(!tmp_opts->method || !tmp_opts->hostid)
 	{
@@ -261,7 +261,7 @@ static struct options* parse_args(int argc, char* argv[]){
 	while((one_opt = getopt(argc, argv, flags)) != EOF){
 		switch(one_opt){
 			case('l'):
-				tmp_opts->bucket = atoi(optarg);
+				tmp_opts->handle = atoi(optarg);
 				break;
 			case('n'):
 				len = (strlen(optarg)) + 1;
