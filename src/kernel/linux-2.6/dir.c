@@ -133,10 +133,10 @@ static int pvfs2_readdir(
             new_op, "pvfs2_readdir", retries,
             get_interruptible_flag(dentry->d_inode));
 
-	/* need to check downcall.status value */
 	pvfs2_print("Readdir downcall status is %d (dirent_count "
 		    "is %d)\n", new_op->downcall.status,
 		    new_op->downcall.resp.readdir.dirent_count);
+
 	if (new_op->downcall.status == 0)
 	{
 	    int i = 0, len = 0;
@@ -151,8 +151,6 @@ static int pvfs2_readdir(
                     pvfs2_handle_to_ino(
                         new_op->downcall.resp.readdir.refn[i].handle);
 
-/* 		pvfs2_print("pvfs2: pvfs2_readdir -- Calling filldir " */
-/* 			    "on %s\n", current_entry); */
                 if (filldir(dirent, current_entry, len, pos,
                             current_ino, DT_UNKNOWN) < 0)
                 {

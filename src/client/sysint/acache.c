@@ -181,12 +181,12 @@ static PINT_pinode *acache_internal_lookup(PVFS_object_ref refn)
 }
 
 /*
-  returns the pinode matching the specified reference if
-  present in the acache. returns NULL otherwise.
+  returns the pinode matching the specified reference if present in
+  the acache. returns NULL otherwise.
 
-  NOTE: if a pinode is returned, it is returned with the
-  lock held.  That means no one else can use it before
-  the lock is released (in release, or set_valid);
+  NOTE: if a pinode is returned, it is returned with the lock held.
+  That means no one else can use it before the lock is released (in
+  release, or set_valid);
 */
 PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn)
 {
@@ -225,12 +225,14 @@ PINT_pinode *PINT_acache_pinode_alloc()
 #ifdef PINT_ACACHE_AUTO_CLEANUP
     gen_mutex_lock(&s_acache_interface_mutex);
     /*
-      PINT_ACACHE_NUM_FLUSH_ENTRIES is a soft limit that triggers
-      an attempt to reclaim any expired or invalidated entries
-      that currently reside in the acache.
+      PINT_ACACHE_NUM_FLUSH_ENTRIES is a soft limit that triggers an
+      attempt to reclaim any expired or invalidated entries that
+      currently reside in the acache.
     */
-    if (s_acache_allocated_entries &&
-        (s_acache_allocated_entries % PINT_ACACHE_NUM_FLUSH_ENTRIES) == 0)
+    if (((s_acache_allocated_entries &&
+          (s_acache_allocated_entries %
+           PINT_ACACHE_NUM_FLUSH_ENTRIES) == 0)) ||
+        (s_acache_allocated_entries > PINT_ACACHE_NUM_ENTRIES))
     {
         reclaim_pinode_entries();
     }
@@ -391,7 +393,7 @@ static int pinode_hash_refn(void *refn_p, int table_size)
     tmp += (unsigned long)(refn->handle + refn->fs_id);
     tmp = tmp%table_size;
 
-    return ((int)tmp);
+    return (int)tmp;
 }
 
 static int pinode_hash_refn_compare(void *key, struct qlist_head *link)
@@ -405,9 +407,9 @@ static int pinode_hash_refn_compare(void *key, struct qlist_head *link)
     if ((pinode->refn.handle == refn->handle) &&
         (pinode->refn.fs_id == refn->fs_id))
     {
-        return(1);
+        return 1;
     }
-    return(0);
+    return 0;
 }
 
 /* never call this directly; internal use only */
@@ -589,10 +591,10 @@ static void reclaim_pinode_entries()
       reclaim_exit:
         gen_mutex_unlock(s_acache_htable_mutex);
     }
-/*     fprintf(stderr,"reclaim_pinode_entries reclaimed %d entries\n", */
-/*             num_reclaimed); */
-/*     fprintf(stderr,"Total allocated is %d\n", */
-/*             s_acache_allocated_entries); */
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "reclaim_pinode_entries "
+                 "reclaimed %d entries\n", num_reclaimed);
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "Total allocated is %d\n",
+                 s_acache_allocated_entries);
     acache_debug("reclaim_pinode_entries exited\n");
 }
 #endif /* PINT_ACACHE_AUTO_CLEANUP */

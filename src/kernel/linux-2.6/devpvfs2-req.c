@@ -346,6 +346,8 @@ static int pvfs2_devreq_release(
     struct inode *inode,
     struct file *file)
 {
+    int unmounted = 0;
+
     pvfs2_print("pvfs2_devreq_release: trying to finalize\n");
 
     down_interruptible(&devreq_semaphore);
@@ -364,7 +366,14 @@ static int pvfs2_devreq_release(
       on device re-open, assuming that the sb has been properly filled
       (may not have been if a mount wasn't attempted)
     */
-    if (inode && inode->i_sb)
+    spin_lock(&pvfs2_superblocks_lock);
+    unmounted = list_empty(&pvfs2_superblocks);
+    spin_unlock(&pvfs2_superblocks_lock);
+
+    pvfs2_print("PVFS2 Device Close: Filesystem(s) %s\n",
+                (unmounted ? "UNMOUNTED" : "MOUNTED"));
+
+    if (unmounted && inode && inode->i_sb)
     {
         shrink_dcache_sb(inode->i_sb);
     }

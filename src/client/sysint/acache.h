@@ -59,6 +59,15 @@
   are no longer being referenced.  If none meet these requirements,
   nothing is reclaimed.  The important thing is that we've tried.
   this 'feature' is mostly untested and may not be beneficial.
+
+  PINT_ACACHE_NUM_ENTRIES is a soft limit.  when there are more
+  allocated entries than this number, the reclaim becomes much more
+  aggressive, but we still can't guarantee to free any entries if
+  they're all valid (as callers have references that we can't pull out
+  from under them).  in practice, the reclaim appears to work very
+  well, but if it becomes a problem and we need an absolute hard
+  limit, we could fail the allocations of new pinodes (and modify the
+  caller code to better handle allocation failures)
 */
 
 #define PINT_ACACHE_TIMEOUT_MS                                  5000
