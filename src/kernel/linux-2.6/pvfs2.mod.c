@@ -8,6 +8,7 @@ static const struct modversion_info ____versions[]
 __attribute__((section("__versions"))) = {
 	{ 0x1f779334, "struct_module" },
 	{ 0xdf83c692, "kmem_cache_destroy" },
+	{ 0x7da8156e, "__kmalloc" },
 	{ 0xa940c30f, "update_atime" },
 	{ 0xc94c299b, "generic_file_llseek" },
 	{ 0x9f322acd, "blockdev_direct_IO" },
