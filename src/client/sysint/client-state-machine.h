@@ -64,7 +64,7 @@ typedef struct PINT_client_sm_msgpair_state_s {
     PVFS_error op_status;
 } PINT_client_sm_msgpair_state;
 
-
+/* PINT_client_remove_sm */
 struct PINT_client_remove_sm {
     char                         *object_name; /* input parameter */
     PVFS_pinode_reference         parent_ref;  /* input parameter */
@@ -72,6 +72,19 @@ struct PINT_client_remove_sm {
     int                           datafile_count; /* from attribs */
     PVFS_handle                  *datafile_handles;
     PINT_client_sm_msgpair_state *msgpair; /* used in datafile remove */
+};
+
+/* PINT_client_getattr_sm */
+struct PINT_client_getattr_sm {
+    PVFS_pinode_reference object_ref; /* input parameter */
+    uint32_t              attrmask; /* input parameter */
+    int                   datafile_count; /* from object attribs */
+    PVFS_handle          *datafile_handles;
+    int                   sizes_count;
+    PVFS_Dist            *dist;
+    uint32_t              dist_size;
+    PVFS_size            *size_array; /* from datafile attribs */
+    PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
 };
 
 typedef struct PINT_client_sm {
@@ -108,7 +121,8 @@ typedef struct PINT_client_sm {
 
     PVFS_credentials *cred_p;
     union {
-	struct PINT_client_remove_sm remove;
+	struct PINT_client_remove_sm  remove;
+	struct PINT_client_getattr_sm getattr;
     } u;
 } PINT_client_sm;
 

@@ -24,12 +24,15 @@
 extern job_context_id pint_client_sm_context;
 
 enum {
-    GETATTR_USE_FAST_PATH = 1
+    GETATTR_NEED_SIZE = 1,
+    GETATTR_NEED_DATAFILE_SIZES = 2
 };
 
 /* state function prototypes */
 static int getattr_check_parameters(PINT_client_sm *sm_p,
 			  job_status_s *js_p);
+static int getattr_maybe_get_size(PINT_client_sm *sm_p,
+				  job_status_s *js_p);
 static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p);
 static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
@@ -42,11 +45,13 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 			   job_status_s *js_p);
 
 /* completion function prototypes */
+static int getattr_object_getattr_comp_fn(void *v_p,
+					  struct PVFS_server_resp *resp_p);
 
 %%
 
 machine pvfs2_client_getattr_sm(check_parameters,
-				getattr_pcache_fast_path,
+				maybe_get_size,
 				object_getattr_setup_msgpair,
 				object_getattr_xfer_msgpair,
 				object_getattr_failure,
@@ -57,13 +62,7 @@ machine pvfs2_client_getattr_sm(check_parameters,
 {
     state check_parameters {
 	run getattr_check_parameters;
-	GETATTR_USE_FAST_PATH => getattr_pcache_fast_path;
 	success => object_getattr_setup_msgpair;
-	default => cleanup;
-    }
-    state getattr_pcache_fast_path {
-	jump pvfs2_client_getattr_pcache_sm;
-	success => cleanup;
 	default => cleanup;
     }
 
@@ -73,12 +72,19 @@ machine pvfs2_client_getattr_sm(check_parameters,
 	default => cleanup;
     }
     state object_getattr_xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
-	success => datafile_getattr_setup_msgpairarray;
+	jump pvfs2_client_getattr_pcache_sm;
+	success => maybe_get_size;
+	GETATTR_NEED_DATAFILE_SIZES => datafile_getattr_setup_msgpairarray;
 	default => object_getattr_failure;
     }
     state object_getattr_failure {
 	run getattr_object_getattr_failure;
+	default => cleanup;
+    }
+
+    state maybe_get_size {
+	run getattr_maybe_get_size;
+	GETATTR_NEED_SIZE => datafile_getattr_setup_msgpairarray;
 	default => cleanup;
     }
 
@@ -107,21 +113,28 @@ machine pvfs2_client_getattr_sm(check_parameters,
 
 /* PVFS_sys_getattr()
  */
-int PVFS_sys_getattr2(PVFS_pinode_reference pinode_refn,
+int PVFS_sys_getattr2(PVFS_pinode_reference pinode_ref,
 		      uint32_t attrmask, 
 		      PVFS_credentials credentials,
-		      PVFS_sysresp_getattr *resp)
+		      PVFS_sysresp_getattr *resp_p)
 {
     int ret;
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(CLIENT_DEBUG, "PVFS_sys_remove entered\n");
+    gossip_debug(CLIENT_DEBUG, "PVFS_sys_getattr entered\n");
 
     /* do parameter checking here, then assume things are ok below.
      * assert()s are still ok of course :).
      */
-    if (resp == NULL) return -PVFS_EINVAL;
+    if (resp_p == NULL) {
+	gossip_lerr("NULL resp pointer\n");
+	return -PVFS_EINVAL;
+    }
+    if (attrmask & ~(PVFS_ATTR_SYS_ALL)) {
+	gossip_lerr("invalid attrmask\n");
+	return -PVFS_EINVAL;
+    }
 
     /* build PINT_client_sm structure */
     /* TODO: KEEP A CACHE OF THESE AROUND SO WE'RE NOT ALWAYS MALLOC'ING? */
@@ -131,9 +144,9 @@ int PVFS_sys_getattr2(PVFS_pinode_reference pinode_refn,
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
-#if 0
-    sm_p->u.getattr.object_ref = xxx; /* KEEP IN msgpair one? */
-#endif
+    sm_p->u.getattr.object_ref     = pinode_ref;
+    sm_p->u.getattr.attrmask       = attrmask;
+    sm_p->u.getattr.getattr_resp_p = resp_p;
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_GETATTR);
     assert(ret == 0);
@@ -158,40 +171,159 @@ static int getattr_check_parameters(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int getattr_pcache_fast_path(PINT_client_sm *sm_p,
-				    job_status_s *js_p)
+static int getattr_maybe_get_size(PINT_client_sm *sm_p,
+				  job_status_s *js_p)
 {
     return 1;
 }
 
+/* getattr_object_getattr_setup_msgpair()
+ */
 static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p)
 {
+    gossip_debug(CLIENT_DEBUG, "(%p) getattr state: getattr_setup_msgpair\n", sm_p);
+
+    /* fill in getattr request */
+    PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
+			      *sm_p->cred_p,
+			      sm_p->u.getattr.object_ref.fs_id,
+			      sm_p->u.getattr.object_ref.handle,
+			      sm_p->u.getattr.attrmask);
+    
+    /* fill in msgpair structure components */
+    sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
+    sm_p->msgpair.handle  = sm_p->u.getattr.object_ref.handle;
+    sm_p->msgpair.comp_fn = getattr_object_getattr_comp_fn;
+
+    /* drop through and jump to getattr_pcache state machine */
     return 1;
 }
+
+/* getattr_object_getattr_comp_fn()
+ *
+ * Called to copy data from getattr response into the
+ * getattr-specific portion of the PINT_client_sm structure,
+ * so we can use the data after returning to this state
+ * machine.
+ *
+ * Return value is returned in job status, so it affects the
+ * resulting state coming back from the nested state machine.
+ *
+ * Returns 0 for directory, GETATTR_NEED_DATAFILE_SIZES for a
+ * metafile.  Other types die right now.
+ */
+static int getattr_object_getattr_comp_fn(void *v_p,
+					  struct PVFS_server_resp *resp_p)
+{
+    /* this is a little kludge to get around some struct definition
+     * issues in the headers.  maybe fix later?
+     */
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    
+    assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
+
+    /* if we get an error, just return immediately, don't try to
+     * actually fill anything in.
+     */
+    if (resp_p->status != 0) {
+	return resp_p->status;
+    }
+
+    /* copy in the attributes from the response */
+    sm_p->u.getattr.getattr_resp_p.attr = resp_p->u.getattr.attr;
+
+    switch (resp_p->u.getattr.attr.objtype)
+    {
+	case PVFS_TYPE_METAFILE:
+	    if (sm_p->u.getattr.attrmask & PVFS_ATTR_META_DFILES) {
+		/* need to save datafile handles and remove them;
+		 * redirect us to those states.
+		 */
+		
+		/* sanity checks */
+		assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_SYS_SIZE);
+		assert(resp_p->u.getattr.attr.u.meta.dfile_count > 0);
+		
+		gossip_debug(CLIENT_DEBUG,
+			     "getattr_object_getattr_comp_fn: %d datafiles.\n",
+			     resp_p->u.getattr.attr.u.meta.dfile_count);
+		
+		/* save the datafile handles prior to freeing up the
+		 * buffers we used for messages.  we could keep them around
+		 * i suppose, but we're not going to do that for now.  later
+		 * it is likely that this stuff will be stuck in the pcache
+		 * anyway, so we'll be able to just reference it from there.
+		 */
+		sm_p->u.getattr.datafile_handles = (PVFS_handle *) malloc(resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle));
+		if (sm_p->u.getattr.datafile_handles == NULL) {
+		    assert(0);
+		}
+		sm_p->u.getattr.datafile_count = resp_p->u.getattr.attr.u.meta.dfile_count;
+		memcpy(sm_p->u.getattr.datafile_handles,
+		   resp_p->u.getattr.attr.u.meta.dfile_array,
+		   resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle));
+
+		return GETATTR_NEED_DATAFILE_SIZES;
+	    }
+	    else return 0;
+	    break;
+	case PVFS_TYPE_DIRECTORY:
+	    return 0;
+	    break;
+	case PVFS_TYPE_SYMLINK:
+	    /* fall through */
+	case PVFS_TYPE_DATAFILE:
+	    /* fall through */
+	case PVFS_TYPE_DIRDATA:
+	    /* fall through */
+	default:
+	    gossip_err("error: getattr_object_getattr_comp_fn: unhandled object type\n");
+	    assert(0);
+    } /* end of switch() */
+
+    return -PVFS_EINVAL; /* should not get here */
+}
+
 
 static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
 					  job_status_s *js_p)
 {
+    gossip_debug(CLIENT_DEBUG,
+		 "(%p) getattr state: getattr_object_getattr_failure\n",
+		 sm_p);
+    assert(0);
+
     return 1;
 }
 
 static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
 						       job_status_s *js_p)
 {
+    gossip_debug(CLIENT_DEBUG,
+		 "(%p) getattr state: getattr_datafile_getattr_setup_msgpairarray\n",
+		 sm_p);
     return 1;
 }
 
 static int getattr_datafile_getattr_failure(PINT_client_sm *sm_p,
 					    job_status_s *js_p)
 {
+    gossip_debug(CLIENT_DEBUG,
+		 "(%p) getattr state: getattr_datafile_getattr_failure\n",
+		 sm_p);
     return 1;
 }
 
 static int getattr_cleanup(PINT_client_sm *sm_p,
 			   job_status_s *js_p)
 {
-    return 1;
+    gossip_debug(CLIENT_DEBUG, "(%p) getattr state: getattr_cleanup\n", sm_p);
+
+    /* mark operation as complete */
+    sm_p->op_complete = 1;
+
+    return 0;
 }
 
 /*
