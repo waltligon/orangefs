@@ -21,6 +21,7 @@ LIBSRC += \
 	$(DIR)/pint-serv-truncate.c \
 	$(DIR)/server-send-req.c \
 	$(DIR)/readdir.c \
+	$(DIR)/remove.c \
 	$(DIR)/rmdir.c \
 	$(DIR)/setattr.c \
 	$(DIR)/sysint-utils.c \

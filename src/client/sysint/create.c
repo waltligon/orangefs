@@ -33,7 +33,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	struct PVFS_server_req_s req_p;			/* server request */
 	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
 	int ret = -1, name_sz = 0, io_serv_cnt = 0, i = 0;
-	int attr_mask, last_handle_created = 0, failed_after_send = 0;
+	int attr_mask, last_handle_created = 0;
 	pinode *parent_ptr = NULL, *pinode_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2,*bmi_addr_list = NULL;
 	PVFS_handle *df_handle_array = NULL,new_bkt = 0,handle_mask = 0;
@@ -56,7 +56,6 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	    SETATTR_FAILURE,
 	    PCACHE_INSERT1_FAILURE,
 	    PCACHE_INSERT2_FAILURE,
-	    PCACHE_INSERT3_FAILURE,
 	} failure = NONE_FAILURE;
 
 	/* get the pinode of the parent so we can check permissions */
@@ -138,6 +137,13 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 
 	/* save the handle for the meta file so we can refer to it later */
 	entry.handle = ack_p->u.create.handle;
+
+	/* these fields are the only thing we need to set for the response to
+	 * the calling function
+	 */
+
+	resp->pinode_refn.handle = entry.handle;
+	resp->pinode_refn.fs_id = req->parent_refn.fs_id;
 
 	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 
@@ -322,6 +328,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	    goto return_error;
 	}
 
+	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+
 	/* don't need to hold on to the io server addresses anymore */
 	free(bmi_addr_list);
 
@@ -432,6 +440,11 @@ return_error:
 	    case PCACHE_LOOKUP_FAILURE:
 	    case DCACHE_LOOKUP_FAILURE:
 	    case NONE_FAILURE:
+
+	    /* TODO: do we want to setup a #define for these invalid handle/fsid
+	     * values? */
+	    resp->pinode_refn.handle = -1;
+	    resp->pinode_refn.fs_id = -1;
 	}
 	return (ret);
 }

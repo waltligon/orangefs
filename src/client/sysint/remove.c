@@ -6,20 +6,19 @@
 
 /* Remove Function Implementation */
 
-#include <pinode-helper.h>
-#include <pvfs2-sysint.h>
-#include <pint-sysint.h>
-#include <pint-dcache.h>
-#include <pint-servreq.h>
+#include <assert.h>
 
-#if 0
-static int get_bmi_address(bmi_addr_t *io_addr_array, int32_count num_io,\
-		PVFS_handle *handle_array);
-static int do_crdirent(char *name,PVFS_handle parent,PVFS_fs_id fsid,\
-		PVFS_handle entry_handle,bmi_addr_t addr);
-#endif
+#include "pinode-helper.h"
+#include "pvfs2-sysint.h"
+#include "pint-sysint.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-dcache.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
 
-extern pcache pvfs_pcache; 
+#define REQ_ENC_FORMAT 0
 
 /* PVFS_sys_remove()
  *
@@ -27,34 +26,33 @@ extern pcache pvfs_pcache;
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_remove(PVFS_sysreq_remove *req, PVFS_sysresp_remove *resp)
+int PVFS_sys_remove(PVFS_sysreq_remove *req)
 {
-	struct PVFS_server_req_s *req_job = NULL;	/* server request */
-	struct PVFS_server_resp_s *ack_job = NULL;	/* server response */
-	int ret = -1,req_size = 0,ack_size = 0, ioserv_cnt = 0;
+	struct PVFS_server_req_s req_p;		    /* server request */
+	struct PVFS_server_resp_s *ack_p = NULL;    /* server response */
+	int ret = -1, ioserv_count = 0;
 	pinode *pinode_ptr = NULL, *item_ptr = NULL;
-	bmi_addr_t serv_addr1,serv_addr2;	/* PVFS address type structure */
-	char *server1 = NULL,*server2 = NULL;
-	int cflags = 0,name_sz = 0, attr_mask = 0;
-	PVFS_bitfield mask;
-	bmi_addr_t *io_addr_array = NULL;
-	struct timeval cur_time;
+	bmi_addr_t serv_addr;	/* PVFS address type structure */
+	int name_sz = 0, attr_mask = 0;
 	pinode_reference entry;
-	PVFS_servreq_remove req_remove;
-	PVFS_servreq_createdirent req_crdirent;
-	int item_found;
+	int items_found = 0, i = 0;
+	struct PINT_decoded_msg decoded;
+	bmi_size_t max_msg_sz;
+
+	enum {
+	    NONE_FAILURE = 0,
+	    LOOKUP_FAILURE,
+	} failure = NONE_FAILURE;
 
 	/* lookup meta file */
-	req->entry_name
-
 	attr_mask = ATTR_BASIC | ATTR_META;
 
 	ret = PINT_do_lookup(req->entry_name, req->parent_refn, attr_mask,
-				req->credentials, &entry)
+				req->credentials, &entry);
 	if (ret < 0)
 	{
-		failure = LOOKUP_FAILURE;
-		goto return_error;
+	    failure = LOOKUP_FAILURE;
+	    goto return_error;
 	}
 
 	/* get the pinode for the thing we're deleting */
@@ -62,8 +60,8 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req, PVFS_sysresp_remove *resp)
 			attr_mask, req->credentials );
 	if (ret < 0)
 	{
-		failure = LOOKUP_FAILURE;
-		goto return_error;
+	    failure = LOOKUP_FAILURE;
+	    goto return_error;
 	}
 
 	/* are we allowed to delete this file? */
@@ -71,353 +69,164 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req, PVFS_sysresp_remove *resp)
 				req->credentials.uid, req->credentials.gid);
 	if (ret < 0)
 	{
-		failure = LOOKUP_FAILURE;
-		goto return_error;
+	    failure = LOOKUP_FAILURE;
+	    goto return_error;
 	}
 
 	ret = PINT_bucket_map_to_server(&serv_addr, entry.handle, entry.fs_id);
 	if (ret < 0)
 	{
-		failure = LOOKUP_FAILURE;
-		goto return_error;
+	    failure = LOOKUP_FAILURE;
+	    goto return_error;
 	}
 
 	/* send remove message to the meta file */
 
+	max_msg_sz = sizeof(struct PVFS_server_resp_s);
 	req_p.op = PVFS_SERV_REMOVE;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
-	req_p.credentials = credentials;
-	req_p.u.remove.handle = req->handle;
-	req_p.u.remove.fs_id = req->fs_id;
+	req_p.credentials = req->credentials;
+	req_p.u.remove.handle = pinode_ptr->pinode_ref.handle;
+	req_p.u.remove.fs_id = req->parent_refn.fs_id;
 
 	/* dead man walking */
 	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
 	if (ret < 0)
 	{
-		failure = LOOKUP_FAILURE;
-		goto return_error;
+	    failure = LOOKUP_FAILURE;
+	    goto return_error;
 	}
 
+	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+	if (ack_p->status < 0 )
+	{
+	    ret = ack_p->status;
+	    failure = LOOKUP_FAILURE;
+	    goto return_error;
+	}
+
+	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+
 	/* rmdirent the dir entry */
+	ret = PINT_bucket_map_to_server(&serv_addr, req->parent_refn.handle, req->parent_refn.fs_id);
+	if (ret < 0)
+	{
+	    failure = LOOKUP_FAILURE;
+	    goto return_error;
+	}
+
+	name_sz = strlen(req->entry_name) + 1; /*include null terminator*/
+
+	req_p.op = PVFS_SERV_RMDIRENT;
+	req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
+	req_p.credentials = req->credentials;
+	req_p.u.rmdirent.entry = req->entry_name;
+	req_p.u.rmdirent.parent_handle = req->parent_refn.handle;
+	req_p.u.rmdirent.fs_id = req->parent_refn.fs_id;
+
+	/* dead man walking */
+	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	if (ret < 0)
+	{
+	    failure = LOOKUP_FAILURE;
+	    goto return_error;
+	}
+
+	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+	if (ack_p->status < 0 )
+	{
+	    ret = ack_p->status;
+	    failure = LOOKUP_FAILURE;
+	    goto return_error;
+	}
+
+	/* sanity check:
+	 * rmdirent returns a handle to the meta file for the dirent that was 
+	 * removed. if this isn't equal to what we passed in, we need to figure 
+	 * out what we deleted and figure out why the server had the wrong link.
+	 */
+
+	assert(ack_p->u.rmdirent.entry_handle == pinode_ptr->pinode_ref.handle);
+
+	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+
 	/* send remove messages to each of the data file servers */
 	
 
+	/* none of this stuff changes, so we don't need to set it in a loop */
+	max_msg_sz = sizeof(struct PVFS_server_resp_s);
+	req_p.op = PVFS_SERV_REMOVE;
+	req_p.rsize = sizeof(struct PVFS_server_req_s);
+	req_p.credentials = req->credentials;
+	req_p.u.remove.fs_id = req->parent_refn.fs_id;
 
-	return(0);
-return_error:
-	return(ret);
-}
-#if 0
+	ioserv_count = pinode_ptr->attr.u.meta.nr_datafiles;
 
-	/* Fill in parent pinode reference */
-	parent_reference.handle = req->parent_handle;
-	parent_reference.fs_id = req->fs_id;
+	/* TODO: come back and unserialize this */
+	for(i = 0; i < ioserv_count; i++)
+	{
+	    /* each of the data files could be on different servers, so we need
+	     * to get the correct server from the bucket table interface
+	     */
+	    req_p.u.remove.handle = pinode_ptr->attr.u.meta.dfh[i];
+	    ret = PINT_bucket_map_to_server(&serv_addr, req_p.u.remove.handle, req->parent_refn.fs_id);
+	    if (ret < 0)
+	    {
+		failure = LOOKUP_FAILURE;
+		goto return_error;
+	    }
 
-	/* Revalidate the parent handle */
-	/* Get the parent pinode */
-	vflags = 0;
-	attr_mask = ATTR_BASIC + ATTR_META;
-	/* Get the pinode either from cache or from server */
-	ret = phelper_get_pinode(parent_reference,pvfs_pcache,&pinode_ptr,\
-			attr_mask, vflags, req->credentials );
-	if (ret < 0)
-	{
-		goto pinode_get_failure;
-	}
-	cflags = HANDLE_REUSE;
-	mask = ATTR_BASIC + ATTR_META;
-	ret = phelper_validate_pinode(pinode_ptr,cflags,mask);
-	if (ret < 0)
-	{
-		goto pinode_get_failure;
+	    ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	    if (ret < 0)
+	    {
+		failure = LOOKUP_FAILURE;
+		goto return_error;
+	    }
+
+	    ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+	    if (ack_p->status < 0 )
+	    {
+		ret = ack_p->status;
+		failure = LOOKUP_FAILURE;
+		goto return_error;
+	    }
+
+	    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 	}
 
-	/* Remove directory entry server request */
-
-	/* Query the BTI to get initial meta server */
-	/* TODO: Uncomment this after implementation !!! */
-	/*ret = bt_map_bucket_to_server(&server1,req->parent_handle,req->fs_id);
+	/* Remove the dentry from the dcache */
+	ret = PINT_dcache_remove(req->entry_name,req->parent_refn,&items_found);
 	if (ret < 0)
 	{
-		goto pinode_get_failure;
-	}*/
-	ret = BMI_addr_lookup(&serv_addr1,server1);
-	if (ret < 0)
-	{
-		goto pinode_get_failure;
-	}
-	name_sz = strlen(req->entry_name);
-	/* Fill in the parameters */
-	req_rmdirent.entry = (PVFS_string)malloc(name_sz + 1);
-	if (!req_rmdirent.entry)
-	{
-		ret = -ENOMEM;
-		goto pinode_get_failure;	
-	}
-	strncpy(req_rmdir.entry,req->entry_name,name_sz);
-	req_rmdirent.entry[name_sz] = '\0'; 
-	req_rmdirent.parent_handle = req->parent_handle;
-	req_rmdirent.fs_id = req->fs_id;
-	 
-	/* server request */
-	ret = pint_serv_rmdirent(&req_job,&ack_job,&req_rmdirent,&serv_addr1); 
-	if (ret < 0)
-	{
-		goto rmdirent_failure;
-	}
-	/* Removed entry pinode reference */
-	entry.handle = ack_job->u.rmdirent.entry_handle;
-	entry.fs_id = req->fs_id;
-
-	/* Free the jobs */
-	sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr1,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-
-	/* Make a "remove" request to all I/O servers */
-	/* Store the I/O server count */
-	ioserv_cnt = pinode_ptr->attr.u.meta.nr_datafiles;
-	/* Allocate the I/O server address array */
-	io_addr_array = (bmi_addr_t *)malloc(sizeof(bmi_addr_t) * ioserv_cnt);
-	if (!io_addr_array)
-	{
-		ret = -ENOMEM;
-		goto rmdirent_failure; 
-	}
-	/* Convert all handles to BMI_addresses */
-	ret = get_bmi_address(io_addr_array,ioserv_cnt,\
-			pinode_attr->attr.u.meta.dfh);
-	if (ret < 0)
-	{	
-		goto get_address_failure;
-	}
-			
-	/* Make server request */
-	for(i = 0;i < ioserv_cnt;i++)
-	{
-		/* Fill in the parameters */
-		req_remove.handle = pinode_attr->attr.u.meta.dfh[i];
-		req_remove.fs_id = entry.fs_id;
-	
-		/* Do a remove with a possible rollback  */
-		ret = pint_serv_remove(&req_job,&ack_job,&req_remove,req->credentials,\
-				io_addr_array[i]);
-		if (ret < 0)
-		{
-			goto io_remove_failure; 
-		}
-
-		/* Free the req,ack jobs */
-		sysjob_free(io_addr_array[i],ack_job,ack_job->rsize,BMI_RECV_BUFFER,\
-				NULL);
-		sysjob_free(io_addr_array[i],req_job,req_job->rsize,BMI_SEND_BUFFER,\
-				NULL);
-	}
-	
-	/* Make a "remove" request to metaserver */
-	/* Query the BTI to get initial meta server */
-	/* TODO: Uncomment this after implementation !!! */
-	/*ret = bt_map_bucket_to_server(&server2,entry->handle,req->fs_id);
-	if (ret < 0)
-	{
-		goto remove_map_bucket_failure;
-	}*/
-	ret = BMI_addr_lookup(&serv_addr2,server2);
-	if (ret < 0)
-	{
-		goto remove_addr_lookup_failure;
-	}
-	/* Make server request */
-	req_remove.handle = entry->handle;
-	req_remove.fs_id = entry->fs_id;
-	
-	ret = pint_serv_remove(&req_job,&ack_job,&req_remove,req->credentials,\
-			&serv_addr2);
-	if (ret < 0)
-	{
-		goto io_remove_failure;
+		goto return_error;
 	}
 
 	/* Remove from pinode cache */
-	/* TODO: Need we track the error as otherwise the entire operation
-	 * has completed? */
-	ret = pcache_remove(pvfs_pcache,entry,&item_ptr);
-	/*if (ret < 0)
+	ret = PINT_pcache_remove(entry,&item_ptr);
+	if (ret < 0)
 	{
-		goto remove_failure;
-	}*/
-	/* Free the pinode removed from cache */
-	/*pcache_pinode_dealloc(item_ptr);*/
-	
-	/* Remove the dentry from the dcache */
-	/* TODO: Need we track the error as otherwise the entire operation
-	 * has completed? */
-	ret = PINT_dcache_remove(req->entry_name,parent_reference,\
-			&item_found);
-	/*if (ret < 0)
-	{
-		goto remove_failure;
-	}*/
+		goto return_error;
+	}
 
-	sysjob_free(serv_addr2,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr2,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
+	/* free the pinode that we removed from cache */
+	PINT_pcache_pinode_dealloc(item_ptr);
 
 	return(0);
-
-io_remove_failure:
-	/* Need to create datafiles on selected I/O servers */
-	for(j = 0;j < i;j++)
+return_error:
+	switch(failure)
 	{
-		/* TODO: Get the bucket from the handle */	
-		/*req_create.bucket = pinode_attr->attr.u.meta.dfh[i];
-		req_create.handle_mask = x;*/
-		req_create.fs_id = req->fs_id;
-		req_create.type = pinode_attr->attr.objtype;
-
-		/* Server request */
-		ret = pint_serv_create(&req_job,&ack_job,&req_create,\
-				req->credentials,io_addr_array[j]);
-		if (ret < 0)
-		{
-			goto get_address_failure;	
-		}
-
-		/* Free the req,ack jobs */
-		sysjob_free(io_addr_array[j],ack_job,ack_job->rsize,BMI_RECV_BUFFER,\
-				NULL);
-		sysjob_free(io_addr_array[j],req_job,req_job->rsize,BMI_SEND_BUFFER,\
-				NULL);
 	}
-	/* Make a "create directory entry" server request */
-	ret = do_crdirent(req->entry_name,req->parent_handle,req->fs_id,
-				entry.handle,serv_addr1);
-	
-get_address_failure:
-	if (io_addr_array)
-		free(io_addr_array);
-
-rmdirent_failure:
-	sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr1,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-
-	if (req_rmdirent.entry)
-		free(req_rmdirent.entry);
-
-addr_lookup_failure:
-	if (server1)
-		free(server1);
-
-pinode_get_failure:
-	sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr1,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	
-	/* Free the pinode */
-	if (pinode_ptr)
-		pcache_pinode_dealloc(pinode_ptr);
-
 	return(ret);
 }
 
-/* do_create 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
  *
- * perform a create server request
- *
- * returns 0 on success, -errno on error
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-static int do_create(char *name,PVFS_handle parent,PVFS_fs_id fsid,\
-		PVFS_handle entry_handle,bmi_addr_t addr)
-{
-	struct PVFS_server_req_s *req_job = NULL;
-	struct PVFS_server_resp_s *ack_job = NULL;
-	PVFS_servreq_crdirent req_crdirent;
-	int ret = 0;
-
-	/* Fill in the arguments */
-	req_crdirent.name = (char *)malloc(strlen(name) + 1);
-	if (!req_crdirent.name)
-	{
-		return(-ENOMEM);	
-	}
-	req_crdirent.new_handle = entry_handle;
-	req_crdirent.parent_handle = parent;
-	req_crdirent.fs_id = fsid;
-
-	/* Make the crdirent request */
-	ret = pint_serv_crdirent(&req_job,&ack_job,&req_crdirent,&addr);
-	if (ret < 0)
-	{
-		/* Free memory allocated for the name */
-		if (req_crdirent.name)
-			free(req_crdirent.name);
-		return(ret);
-	}
-
-	return(0);
-}
-
-/* do_crdirent 
- *
- * perform a create directory entry server request
- *
- * returns 0 on success, -errno on error
- */
-static int do_crdirent(char *name,PVFS_handle parent,PVFS_fs_id fsid,\
-		PVFS_handle entry_handle,bmi_addr_t addr)
-{
-	struct PVFS_server_req_s *req_job = NULL;
-	struct PVFS_server_resp_s *ack_job = NULL;
-	PVFS_servreq_crdirent req_crdirent;
-	int ret = 0;
-
-	/* Fill in the arguments */
-	req_crdirent.name = (char *)malloc(strlen(name) + 1);
-	if (!req_crdirent.name)
-	{
-		return(-ENOMEM);	
-	}
-	req_crdirent.new_handle = entry_handle;
-	req_crdirent.parent_handle = parent;
-	req_crdirent.fs_id = fsid;
-
-	/* Make the crdirent request */
-	ret = pint_serv_crdirent(&req_job,&ack_job,&req_crdirent,&addr);
-	if (ret < 0)
-	{
-		/* Free memory allocated for the name */
-		if (req_crdirent.name)
-			free(req_crdirent.name);
-		return(ret);
-	}
-
-	return(0);
-}
-
-/*	get_bmi_address
- *
- * obtains an array of BMI addresses given an array of handles
- *
- * return 0 on success, -errno on failure
- */
-int get_bmi_address(bmi_addr_t *io_addr_array, int32_count num_io,\
-		PVFS_handle *handle_array)
-{
-	int index = 0;
-
-	for(index = 0;index < num_io; index++)
-	{
-		/* Query the BTI to get initial meta server */
-		/* TODO: Uncomment this!!! */
-		/*ret = bt_map_bucket_to_server(&server2,entry.handle);
-		if (ret < 0)
-		{
-			goto remove_map_failure;
-		}*/	
-		ret = BMI_addr_lookup(&serv_addr2,server2);
-		if (ret < 0)
-		{
-			goto remove_addr_lookup_failure;
-		}
-	}
-	return(0);
-}
-
-#endif
