@@ -31,17 +31,17 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
     decode_PVFS_Dist(pptr, &(x)->dist); \
     (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist); \
 } while (0)
-#define encode_PVFS_metafile_attr_dfiles(pptr,x) do { int i; \
+#define encode_PVFS_metafile_attr_dfiles(pptr,x) do { int dfiles_i; \
     encode_uint32_t(pptr, &(x)->dfile_count); \
-    for (i=0; i<(x)->dfile_count; i++) \
-	encode_PVFS_handle(pptr, &(x)->dfile_array[i]); \
+    for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++) \
+	encode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]); \
 } while (0)
-#define decode_PVFS_metafile_attr_dfiles(pptr,x) do { int i; \
+#define decode_PVFS_metafile_attr_dfiles(pptr,x) do { int dfiles_i; \
     decode_uint32_t(pptr, &(x)->dfile_count); \
     (x)->dfile_array = decode_malloc((x)->dfile_count \
       * sizeof(*(x)->dfile_array)); \
-    for (i=0; i<(x)->dfile_count; i++) \
-	decode_PVFS_handle(pptr, &(x)->dfile_array[i]); \
+    for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++) \
+	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]); \
 } while (0)
 #endif
 
