@@ -73,9 +73,9 @@ a request.
 \end{verbatim}
 
 Given a logical offset, return the physical offset that corresponds to
-that logical offset.  Returns a physical offset.  The return value is
-undefined if the logical offset does not map to a physical offset on
-the current PVFS server.
+that logical offset.  Returns a physical offset.  The return value rounds 
+down to the largest physical offset held by the I/O server if the 
+logical offset does not map to a physical offset on that server.
 
 \begin{verbatim}
    	PVFS_offset physical_to_logical_offset (PVFS_Dist_parm *dparm,

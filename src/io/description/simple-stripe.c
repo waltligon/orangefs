@@ -14,8 +14,30 @@
 static PVFS_offset logical_to_physical_offset (PVFS_Dist_params *dparam,
 		uint32_t iod_num, uint32_t iod_count, PVFS_offset logical_offset)
 {
-	return (((logical_offset / dparam->strip_size) / iod_count)
-			* dparam->strip_size) + (logical_offset % dparam->strip_size);
+    PVFS_offset ret_offset = 0;
+    int full_stripes = 0;
+    PVFS_size leftover = 0;
+
+    /* how many complete stripes are in there? */
+    full_stripes = logical_offset / (dparam->strip_size*iod_count);
+    ret_offset += full_stripes * dparam->strip_size;
+    
+    /* do the leftovers fall within our region? */
+    leftover = logical_offset - full_stripes * dparam->strip_size * iod_count;
+    if(leftover >= iod_num*dparam->strip_size)
+    {
+	/* if so, tack that on to the physical offset as well */
+	if(leftover < (iod_num+1)*dparam->strip_size)
+	    ret_offset += leftover - (iod_num*dparam->strip_size);
+	else
+	    ret_offset += dparam->strip_size;
+    }
+    return(ret_offset);
+
+#if 0
+    return (((logical_offset / dparam->strip_size) / iod_count)
+	* dparam->strip_size) + (logical_offset % dparam->strip_size);
+#endif
 }
 
 static PVFS_offset physical_to_logical_offset (PVFS_Dist_params *dparam,
