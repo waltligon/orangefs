@@ -218,6 +218,7 @@ static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret)
     PVFS_handle h;
     PVFS_vtag_s vtag;
 
+    gossip_ldebug(SERVER_DEBUG,"KVSpace %lld\n",s_op->req->u.readdir.handle);
     h = *((PVFS_handle *)s_op->val.buffer);
     job_post_ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,
 	    h,
@@ -258,7 +259,16 @@ static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
     gossip_debug(SERVER_DEBUG,"Kvsend -- %d\n",ret->error_code);
     gossip_debug(SERVER_DEBUG,"Kvsend -- %d\n",ret->count);
-    s_op->resp->status = ret->error_code;
+    if((s_op->resp->status = ret->error_code) < 0)
+    {
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+    }
+    else
+    {
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) 
+	    + ret->count *sizeof(PVFS_dirent);
+    }
+    
 
     s_op->resp->u.readdir.pvfs_dirent_count = ret->count;
 

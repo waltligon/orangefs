@@ -186,6 +186,7 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
     s_op->resp->u.lookup_path.attr_array = (PVFS_object_attr *) big_memory_buffer;
 
     /* We are done calculating pointers.  Check to make sure we are correct in pointer arith */
+    gossip_debug(SERVER_DEBUG,"%d - %d\n",big_memory_buffer+attr_array_sz-memory_sz,s_op->key_a);
     assert(big_memory_buffer+attr_array_sz-memory_sz == s_op->key_a);
 
     /* Set up the right sizes that I allocated */
