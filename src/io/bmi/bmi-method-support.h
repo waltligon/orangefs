@@ -30,10 +30,10 @@
  */
 struct method_addr
 {
-    bmi_flag_t method_type;
+    int method_type;
     /* indicates if the address is on the local machine (usually for 
      * server listening) */
-    bmi_flag_t local_addr;
+    int local_addr;
     void *method_data;		/* area to be used by specific methods */
 };
 typedef struct method_addr method_addr_st, *method_addr_p;
@@ -55,8 +55,8 @@ struct bmi_method_ops
 {
     char *method_name;
     int (*BMI_meth_initialize) (method_addr_p,
-				bmi_flag_t,
-				bmi_flag_t);
+				int,
+				int);
     int (*BMI_meth_finalize) (void);
     int (*BMI_meth_set_info) (int,
 			      void *);
@@ -71,7 +71,7 @@ struct bmi_method_ops
 			       method_addr_p,
 			       void *,
 			       bmi_size_t,
-			       bmi_flag_t,
+			       int,
 			       bmi_msg_tag_t,
 			       void *,
 			       bmi_context_id);
@@ -79,7 +79,7 @@ struct bmi_method_ops
 					 method_addr_p,
 					 void *,
 					 bmi_size_t,
-					 bmi_flag_t,
+					 int,
 					 bmi_msg_tag_t,
 					 void *,
 					 bmi_context_id);
@@ -88,7 +88,7 @@ struct bmi_method_ops
 			       void *,
 			       bmi_size_t,
 			       bmi_size_t *,
-			       bmi_flag_t,
+			       int,
 			       bmi_msg_tag_t,
 			       void *,
 			       bmi_context_id);
@@ -127,7 +127,7 @@ struct bmi_method_ops
 				    bmi_size_t *,
 				    int,
 				    bmi_size_t,
-				    bmi_flag_t,
+				    int,
 				    bmi_msg_tag_t,
 				    void *,
 				    bmi_context_id);
@@ -138,7 +138,7 @@ struct bmi_method_ops
 				    int,
 				    bmi_size_t,
 				    bmi_size_t *,
-				    bmi_flag_t,
+				    int,
 				    bmi_msg_tag_t,
 				    void *,
 				    bmi_context_id);
@@ -148,7 +148,7 @@ struct bmi_method_ops
 					      bmi_size_t *,
 					      int,
 					      bmi_size_t,
-					      bmi_flag_t,
+					      int,
 					      bmi_msg_tag_t,
 					      void *,
 					      bmi_context_id);
@@ -171,7 +171,7 @@ struct method_op
     bmi_size_t actual_size;	/* total size of the transfer */
     bmi_size_t expected_size;	/* expected size of the transfer */
     method_addr_st *addr;	/* peer address involved in the communication */
-    bmi_flag_t mode;		/* operation mode */
+    int mode;		/* operation mode */
     bmi_context_id context_id;  /* context */
     struct qlist_head op_list_entry;	/* op_list link */
     struct qlist_head hash_link;	/* hash table link */
@@ -193,8 +193,8 @@ typedef struct method_op method_op_st, *method_op_p;
 /* generic method parameters */
 struct method_params
 {
-    bmi_flag_t method_flags;
-    bmi_flag_t method_id;
+    int method_flags;
+    int method_id;
     method_addr_p listen_addr;
     /* message size limits: */
     bmi_size_t mode_immed_limit;
@@ -214,7 +214,7 @@ method_op_p alloc_method_op(bmi_size_t payload_size);
 void dealloc_method_op(method_op_p op_p);
 
 /* These functions can be used to manage generic address structures */
-method_addr_p alloc_method_addr(bmi_flag_t method_type,
+method_addr_p alloc_method_addr(int method_type,
 				bmi_size_t payload_size);
 void dealloc_method_addr(method_addr_p old_method_addr);
 

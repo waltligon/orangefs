@@ -43,7 +43,7 @@ static int context_array[BMI_MAX_CONTEXTS] = { 0 };
  */
 int BMI_initialize(const char *method_list,
 		   const char *listen_addr,
-		   bmi_flag_t flags)
+		   int flags)
 {
     int ret = -1;
     int i = 0;
@@ -231,7 +231,7 @@ int BMI_initialize(const char *method_list,
  */
 int BMI_initialize(const char *module_string,
 		   const char *listen_addr,
-		   bmi_flag_t flags)
+		   int flags)
 {
 
     int ret = -1;
@@ -500,7 +500,7 @@ int BMI_post_recv(bmi_op_id_t * id,
 		  void *buffer,
 		  bmi_size_t expected_size,
 		  bmi_size_t * actual_size,
-		  bmi_flag_t buffer_flag,
+		  int buffer_flag,
 		  bmi_msg_tag_t tag,
 		  void *user_ptr,
 		  bmi_context_id context_id)
@@ -542,7 +542,7 @@ int BMI_post_send(bmi_op_id_t * id,
 		  bmi_addr_t dest,
 		  void *buffer,
 		  bmi_size_t size,
-		  bmi_flag_t buffer_flag,
+		  int buffer_flag,
 		  bmi_msg_tag_t tag,
 		  void *user_ptr,
 		  bmi_context_id context_id)
@@ -583,7 +583,7 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    bmi_addr_t dest,
 			    void *buffer,
 			    bmi_size_t size,
-			    bmi_flag_t buffer_flag,
+			    int buffer_flag,
 			    bmi_msg_tag_t tag,
 			    void *user_ptr,
 			    bmi_context_id context_id)
@@ -1294,7 +1294,7 @@ int BMI_post_send_list(bmi_op_id_t * id,
 		       int list_count,
 		       /* "total_size" is the sum of the size list */
 		       bmi_size_t total_size,
-		       bmi_flag_t buffer_flag,
+		       int buffer_flag,
 		       bmi_msg_tag_t tag,
 		       void *user_ptr,
 		       bmi_context_id context_id)
@@ -1367,7 +1367,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 		       bmi_size_t total_expected_size,
 		       /* "total_actual_size" is the aggregate amt that was received */
 		       bmi_size_t * total_actual_size,
-		       bmi_flag_t buffer_flag,
+		       int buffer_flag,
 		       bmi_msg_tag_t tag,
 		       void *user_ptr,
 		       bmi_context_id context_id)
@@ -1440,7 +1440,7 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 int list_count,
 				 /* "total_size" is the sum of the size list */
 				 bmi_size_t total_size,
-				 bmi_flag_t buffer_flag,
+				 int buffer_flag,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
 				 bmi_context_id context_id)

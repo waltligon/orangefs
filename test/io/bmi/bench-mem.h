@@ -24,11 +24,11 @@ struct mem_buffers
 
 int alloc_buffers(struct mem_buffers* bufs, int num_buffers, int size);
 int BMI_alloc_buffers(struct mem_buffers* bufs, int num_buffers, int
-	size, bmi_addr_t addr, bmi_flag_t send_recv);
+	size, bmi_addr_t addr, enum bmi_op_type send_recv);
 
 int free_buffers(struct mem_buffers* bufs);
 int BMI_free_buffers(struct mem_buffers* bufs, bmi_addr_t addr,
-	bmi_flag_t send_recv);
+	enum bmi_op_type send_recv);
 
 int mark_buffers(struct mem_buffers* bufs);
 int check_buffers(struct mem_buffers* bufs);

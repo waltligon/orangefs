@@ -17,11 +17,11 @@
 
 static int bmi_server_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_clients, bmi_addr_t* addr_array, 
-	bmi_flag_t buffer_flag, double* wtime, int world_rank, bmi_context_id
+	int buffer_flag, double* wtime, int world_rank, bmi_context_id
 	context);
 static int bmi_client_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_servers, bmi_addr_t* addr_array, 
-	bmi_flag_t buffer_flag, double* wtime, int world_rank, bmi_context_id
+	int buffer_flag, double* wtime, int world_rank, bmi_context_id
 	context);
 static int mpi_client_postall(struct bench_options* opts, struct 
 	mem_buffers* mpi_buf_array, int num_servers, int* addr_array, 
@@ -40,7 +40,7 @@ int main( int argc, char *argv[])
 	int num_clients;
 	struct bench_options opts;
 	int i = 0;
-	bmi_flag_t buffer_flag = BMI_EXT_ALLOC;
+	int buffer_flag = BMI_EXT_ALLOC;
 	struct mem_buffers* mpi_buf_array = NULL;
 	struct mem_buffers* bmi_buf_array = NULL;
 	int im_a_server = 0;
@@ -379,7 +379,7 @@ MPI_COMM_WORLD);
 
 static int bmi_server_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_clients, bmi_addr_t* addr_array, 
-	bmi_flag_t buffer_flag, double* wtime, int world_rank, bmi_context_id
+	int buffer_flag, double* wtime, int world_rank, bmi_context_id
 	context)
 {
 	double time1, time2;
@@ -556,7 +556,7 @@ static int bmi_server_postall(struct bench_options* opts, struct
 
 static int bmi_client_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_servers, bmi_addr_t* addr_array, 
-	bmi_flag_t buffer_flag, double* wtime, int world_rank, bmi_context_id
+	int buffer_flag, double* wtime, int world_rank, bmi_context_id
 	context)
 {
 	double time1, time2;

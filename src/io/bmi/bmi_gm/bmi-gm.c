@@ -28,8 +28,8 @@
 
 /* function prototypes */
 int BMI_gm_initialize(method_addr_p listen_addr,
-		      bmi_flag_t method_id,
-		      bmi_flag_t init_flags);
+		      int method_id,
+		      int init_flags);
 int BMI_gm_finalize(void);
 int BMI_gm_set_info(int option,
 		    void *inout_parameter);
@@ -44,7 +44,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     method_addr_p dest,
 		     void *buffer,
 		     bmi_size_t size,
-		     bmi_flag_t buffer_flag,
+		     int buffer_flag,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
 		     bmi_context_id context_id);
@@ -54,7 +54,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     bmi_size_t * size_list,
     int list_count,
     bmi_size_t total_size,
-    bmi_flag_t buffer_flag,
+    int buffer_flag,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id);
@@ -64,7 +64,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     bmi_size_t * size_list,
     int list_count,
     bmi_size_t total_size,
-    bmi_flag_t buffer_flag,
+    int buffer_flag,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id);
@@ -72,7 +72,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       method_addr_p dest,
 			       void *buffer,
 			       bmi_size_t size,
-			       bmi_flag_t buffer_flag,
+			       int buffer_flag,
 			       bmi_msg_tag_t tag,
 			       void *user_ptr,
 			       bmi_context_id context_id);
@@ -81,7 +81,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     void *buffer,
 		     bmi_size_t expected_size,
 		     bmi_size_t * actual_size,
-		     bmi_flag_t buffer_flag,
+		     int buffer_flag,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
 		     bmi_context_id context_id);
@@ -92,7 +92,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     int list_count,
     bmi_size_t total_expected_size,
     bmi_size_t * total_actual_size,
-    bmi_flag_t buffer_flag,
+    int buffer_flag,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id);
@@ -234,7 +234,7 @@ struct ctrl_put
 
 struct ctrl_msg
 {
-    bmi_flag_t ctrl_type;
+    uint32_t ctrl_type;
     uint32_t magic_nr;
     union
     {
@@ -272,7 +272,7 @@ struct gm_op
     struct ctrl_msg *freeable_ctrl_buffer;
     bmi_op_id_t peer_op_id;	/* op id of partner's operation */
     /* indicates how buffer was allocated or pinned */
-    bmi_flag_t buffer_status;
+    int buffer_status;
     gm_remote_ptr_t remote_ptr;
     void *tmp_xfer_buffer;
     uint8_t complete; /* indicates when operation is completed */
@@ -307,8 +307,8 @@ static int gm_post_send_build_op(bmi_op_id_t * id,
     void *buffer,
     bmi_size_t size,
     bmi_msg_tag_t tag,
-    bmi_flag_t mode,
-    bmi_flag_t buffer_status,
+    int mode,
+    int buffer_status,
     void *user_ptr, bmi_context_id context_id);
 static int gm_post_send_build_op_list(bmi_op_id_t * id,
     method_addr_p dest,
@@ -317,8 +317,8 @@ static int gm_post_send_build_op_list(bmi_op_id_t * id,
     int list_count,
     bmi_size_t total_size,
     bmi_msg_tag_t tag,
-    bmi_flag_t mode,
-    bmi_flag_t buffer_status,
+    int mode,
+    int buffer_status,
     void *user_ptr, bmi_context_id context_id);
 static void ctrl_req_callback(struct gm_port *port,
 			      void *context,
@@ -382,8 +382,8 @@ static void prepare_for_recv_list(method_op_p mop);
  * returns 0 on success, -errno on failure
  */
 int BMI_gm_initialize(method_addr_p listen_addr,
-		      bmi_flag_t method_id,
-		      bmi_flag_t init_flags)
+		      int method_id,
+		      int init_flags)
 {
     gm_status_t gm_ret;
     unsigned int rec_tokens = 0;
@@ -827,12 +827,12 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     method_addr_p dest,
 		     void *buffer,
 		     bmi_size_t size,
-		     bmi_flag_t buffer_flag,
+		     int buffer_flag,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
 		     bmi_context_id context_id)
 {
-    bmi_flag_t buffer_status = GM_BUF_USER_ALLOC;
+    int buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
     struct ctrl_msg *new_ctrl_msg = NULL;
     bmi_size_t buffer_size = 0;
@@ -913,12 +913,12 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     bmi_size_t * size_list,
     int list_count,
     bmi_size_t total_size,
-    bmi_flag_t buffer_flag,
+    int buffer_flag,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id)
 {
-    bmi_flag_t buffer_status = GM_BUF_USER_ALLOC;
+    int buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
     void *copy_buffer = NULL;
     struct ctrl_msg *new_ctrl_msg = NULL;
@@ -1009,12 +1009,12 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     bmi_size_t * size_list,
     int list_count,
     bmi_size_t total_size,
-    bmi_flag_t buffer_flag,
+    int buffer_flag,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id)
 {
-    bmi_flag_t buffer_status = GM_BUF_USER_ALLOC;
+    int buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
     void *copy_buffer = NULL;
     struct ctrl_msg *new_ctrl_msg = NULL;
@@ -1093,12 +1093,12 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       method_addr_p dest,
 			       void *buffer,
 			       bmi_size_t size,
-			       bmi_flag_t buffer_flag,
+			       int buffer_flag,
 			       bmi_msg_tag_t tag,
 			       void *user_ptr,
 			       bmi_context_id context_id)
 {
-    bmi_flag_t buffer_status = GM_BUF_USER_ALLOC;
+    int buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
     struct ctrl_msg *new_ctrl_msg = NULL;
     bmi_size_t buffer_size = 0;
@@ -1161,7 +1161,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     void *buffer,
 		     bmi_size_t expected_size,
 		     bmi_size_t * actual_size,
-		     bmi_flag_t buffer_flag,
+		     int buffer_flag,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
 		     bmi_context_id context_id)
@@ -1328,7 +1328,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     int list_count,
     bmi_size_t total_expected_size,
     bmi_size_t * total_actual_size,
-    bmi_flag_t buffer_flag,
+    int buffer_flag,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id)
@@ -1836,8 +1836,8 @@ static int gm_post_send_build_op_list(bmi_op_id_t * id,
     int list_count,
     bmi_size_t total_size,
     bmi_msg_tag_t tag,
-    bmi_flag_t mode,
-    bmi_flag_t buffer_status,
+    int mode,
+    int buffer_status,
     void *user_ptr, bmi_context_id context_id)
 {
     method_op_p new_method_op = NULL;
@@ -1887,8 +1887,8 @@ static int gm_post_send_build_op(bmi_op_id_t * id,
     void *buffer,
     bmi_size_t size,
     bmi_msg_tag_t tag,
-    bmi_flag_t mode,
-    bmi_flag_t buffer_status,
+    int mode,
+    int buffer_status,
     void *user_ptr, bmi_context_id context_id)
 {
     method_op_p new_method_op = NULL;

@@ -83,7 +83,7 @@ void dealloc_method_op(method_op_p op_p)
  * Returns a pointer to an allocated method_addr struct on success,
  * NULL on failure.
  */
-struct method_addr *alloc_method_addr(bmi_flag_t method_type,
+struct method_addr *alloc_method_addr(int method_type,
 				      bmi_size_t payload_size)
 {
 

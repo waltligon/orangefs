@@ -22,7 +22,7 @@ struct server_request{
 
 /* test server acknowledgement format */
 struct server_ack{
-	bmi_flag_t status;
+	int status;
 };
 
 #endif /* __TEST_BMI_H */

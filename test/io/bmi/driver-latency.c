@@ -17,10 +17,10 @@
 
 static int bmi_server(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	bmi_flag_t buffer_flag, double* wtime, bmi_context_id context);
+	int buffer_flag, double* wtime, bmi_context_id context);
 static int bmi_client(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	bmi_flag_t buffer_flag, double* wtime, bmi_context_id context);
+	int buffer_flag, double* wtime, bmi_context_id context);
 static int mpi_server(struct bench_options* opts, struct mem_buffers*
 	mpi_recv_bufs, struct mem_buffers* mpi_send_bufs, int addr, double* wtime);
 static int mpi_client(struct bench_options* opts, struct mem_buffers*
@@ -39,7 +39,7 @@ int main( int argc, char *argv[])
 	struct mem_buffers mpi_recv_bufs;
 	struct mem_buffers bmi_send_bufs;
 	struct mem_buffers bmi_recv_bufs;
-	bmi_flag_t buffer_flag = BMI_EXT_ALLOC;
+	int buffer_flag = BMI_EXT_ALLOC;
 	double mpi_time, bmi_time;
 	bmi_context_id context;
 
@@ -212,7 +212,7 @@ int main( int argc, char *argv[])
 
 static int bmi_server(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	bmi_flag_t buffer_flag, double* wtime, bmi_context_id context)
+	int buffer_flag, double* wtime, bmi_context_id context)
 {
 	int i=0;
 	bmi_size_t actual_size;
@@ -288,7 +288,7 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 
 static int bmi_client(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	bmi_flag_t buffer_flag, double* wtime, bmi_context_id context)
+	int buffer_flag, double* wtime, bmi_context_id context)
 {
 	int i=0;
 	bmi_size_t actual_size;

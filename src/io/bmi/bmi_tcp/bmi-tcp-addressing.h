@@ -31,11 +31,11 @@ struct tcp_addr
     bmi_sock_t socket;
     /* flag that indicates this address represents a
      * server port on which connections may be accepted */
-    bmi_flag_t server_port;
+    int server_port;
     /* reference count of pending send operations to this address */
-    bmi_flag_t write_ref_count;
+    int write_ref_count;
     /* is the socket connected yet? */
-    bmi_flag_t not_connected;
+    int not_connected;
     /* socket collection link */
     struct qlist_head sc_link;
 };

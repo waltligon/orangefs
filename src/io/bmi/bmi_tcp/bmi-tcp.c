@@ -24,8 +24,8 @@
 
 /* function prototypes */
 int BMI_tcp_initialize(method_addr_p listen_addr,
-		       bmi_flag_t method_id,
-		       bmi_flag_t init_flags);
+		       int method_id,
+		       int init_flags);
 int BMI_tcp_finalize(void);
 int BMI_tcp_set_info(int option,
 		     void *inout_parameter);
@@ -40,7 +40,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 		      method_addr_p dest,
 		      void *buffer,
 		      bmi_size_t size,
-		      bmi_flag_t buffer_flag,
+		      int buffer_flag,
 		      bmi_msg_tag_t tag,
 		      void *user_ptr,
 		      bmi_context_id context_id);
@@ -48,7 +48,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				method_addr_p dest,
 				void *buffer,
 				bmi_size_t size,
-				bmi_flag_t buffer_flag,
+				int buffer_flag,
 				bmi_msg_tag_t tag,
 				void *user_ptr,
 				bmi_context_id context_id);
@@ -57,7 +57,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      void *buffer,
 		      bmi_size_t expected_size,
 		      bmi_size_t * actual_size,
-		      bmi_flag_t buffer_flag,
+		      int buffer_flag,
 		      bmi_msg_tag_t tag,
 		      void *user_ptr,
 		      bmi_context_id context_id);
@@ -96,7 +96,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   bmi_size_t * size_list,
 			   int list_count,
 			   bmi_size_t total_size,
-			   bmi_flag_t buffer_flag,
+			   int buffer_flag,
 			   bmi_msg_tag_t tag,
 			   void *user_ptr,
 			   bmi_context_id context_id);
@@ -107,7 +107,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   int list_count,
 			   bmi_size_t total_expected_size,
 			   bmi_size_t * total_actual_size,
-			   bmi_flag_t buffer_flag,
+			   int buffer_flag,
 			   bmi_msg_tag_t tag,
 			   void *user_ptr,
 			   bmi_context_id context_id);
@@ -117,7 +117,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_size_t * size_list,
 				     int list_count,
 				     bmi_size_t total_size,
-				     bmi_flag_t buffer_flag,
+				     int buffer_flag,
 				     bmi_msg_tag_t tag,
 				     void *user_ptr,
 				     bmi_context_id context_id);
@@ -129,7 +129,7 @@ char BMI_tcp_method_name[] = "bmi_tcp";
 /* structure internal to tcp for use as a message header */
 struct tcp_msg_header
 {
-    bmi_flag_t mode;		/* eager, rendezvous, etc. */
+    uint32_t mode;		/* eager, rendezvous, etc. */
     bmi_msg_tag_t tag;		/* user specified message tag */
     bmi_size_t size;		/* length of trailing message */
     uint32_t magic_nr;          /* magic number */
@@ -196,7 +196,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				     void **buffer_list,
 				     bmi_size_t * size_list,
 				     int list_count,
-				     bmi_flag_t buffer_flag,
+				     int buffer_flag,
 				     struct tcp_msg_header my_header,
 				     void *user_ptr,
 				     int list_stub_flag,
@@ -208,7 +208,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 int list_count,
 				 bmi_size_t expected_size,
 				 bmi_size_t * actual_size,
-				 bmi_flag_t buffer_flag,
+				 int buffer_flag,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
 				 int list_stub_flag,
@@ -305,8 +305,8 @@ enum
  * returns 0 on success, -errno on failure
  */
 int BMI_tcp_initialize(method_addr_p listen_addr,
-		       bmi_flag_t method_id,
-		       bmi_flag_t init_flags)
+		       int method_id,
+		       int init_flags)
 {
 
     int ret = -1;
@@ -626,7 +626,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 		      method_addr_p dest,
 		      void *buffer,
 		      bmi_size_t size,
-		      bmi_flag_t buffer_flag,
+		      int buffer_flag,
 		      bmi_msg_tag_t tag,
 		      void *user_ptr,
 		      bmi_context_id context_id)
@@ -671,7 +671,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				method_addr_p dest,
 				void *buffer,
 				bmi_size_t size,
-				bmi_flag_t buffer_flag,
+				int buffer_flag,
 				bmi_msg_tag_t tag,
 				void *user_ptr,
 				bmi_context_id context_id)
@@ -710,7 +710,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      void *buffer,
 		      bmi_size_t expected_size,
 		      bmi_size_t * actual_size,
-		      bmi_flag_t buffer_flag,
+		      int buffer_flag,
 		      bmi_msg_tag_t tag,
 		      void *user_ptr,
 		      bmi_context_id context_id)
@@ -950,7 +950,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   bmi_size_t * size_list,
 			   int list_count,
 			   bmi_size_t total_size,
-			   bmi_flag_t buffer_flag,
+			   int buffer_flag,
 			   bmi_msg_tag_t tag,
 			   void *user_ptr,
 			   bmi_context_id context_id)
@@ -998,7 +998,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   int list_count,
 			   bmi_size_t total_expected_size,
 			   bmi_size_t * total_actual_size,
-			   bmi_flag_t buffer_flag,
+			   int buffer_flag,
 			   bmi_msg_tag_t tag,
 			   void *user_ptr,
 			   bmi_context_id context_id)
@@ -1033,7 +1033,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_size_t * size_list,
 				     int list_count,
 				     bmi_size_t total_size,
-				     bmi_flag_t buffer_flag,
+				     int buffer_flag,
 				     bmi_msg_tag_t tag,
 				     void *user_ptr,
 				     bmi_context_id context_id)
@@ -1528,7 +1528,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 int list_count,
 				 bmi_size_t expected_size,
 				 bmi_size_t * actual_size,
-				 bmi_flag_t buffer_flag,
+				 int buffer_flag,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
 				 int list_stub_flag,
@@ -1835,7 +1835,7 @@ static int tcp_do_work(int max_idle_time)
 {
     int ret = -1;
     method_addr_p addr_array[TCP_WORK_METRIC];
-    bmi_flag_t status_array[TCP_WORK_METRIC];
+    int status_array[TCP_WORK_METRIC];
     int socket_count = 0;
     int i = 0;
 
@@ -2532,7 +2532,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				     void **buffer_list,
 				     bmi_size_t * size_list,
 				     int list_count,
-				     bmi_flag_t buffer_flag,
+				     int buffer_flag,
 				     struct tcp_msg_header my_header,
 				     void *user_ptr,
 				     int list_stub_flag,

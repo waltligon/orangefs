@@ -16,7 +16,6 @@
 #include "pvfs2-types.h"
 
 /* PVFS type mapping */
-typedef PVFS_flag bmi_flag_t;	/* generic flag */
 typedef PVFS_size bmi_size_t;	/* data region size */
 typedef PVFS_msg_tag_t bmi_msg_tag_t;	/* message tag */
 typedef PVFS_context_id bmi_context_id; /* context identifier */

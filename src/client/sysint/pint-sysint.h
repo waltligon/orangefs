@@ -102,8 +102,8 @@ typedef struct
     bmi_size_t size;
     bmi_size_t expected_size;
     bmi_msg_tag_t tag;
-    bmi_flag_t flag;
-    bmi_flag_t unexpected;
+    int flag;
+    int unexpected;
     void *user_ptr;
     job_status_s *status_p;
     job_id_t *id;

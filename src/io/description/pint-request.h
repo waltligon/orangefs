@@ -68,13 +68,13 @@ int PINT_Process_request(PINT_Request_state *req,
 		PINT_Request_file_data *rfdata, PVFS_count32 *segmax,
 		PVFS_offset *offset_array, PVFS_size *size_array,
 		PVFS_offset *start_offset, PVFS_size *bytemax,
-		PVFS_boolean *eof_flag, PVFS_flag mode);
+		PVFS_boolean *eof_flag, int mode);
 
 /* internal function */
 PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 		PINT_Request_file_data *rfdata, PVFS_size *bytes, PVFS_size bytemax,
 		PVFS_count32 *segs, PVFS_count32 segmax, PVFS_offset *offset_array,
-		PVFS_size *size_array, PVFS_boolean *eof_flag, PVFS_flag mode);
+		PVFS_size *size_array, PVFS_boolean *eof_flag, int mode);
 
 /* pack request from node into a contiguous buffer pointed to by region */
 int PINT_Request_commit(PINT_Request *region, PINT_Request *node,

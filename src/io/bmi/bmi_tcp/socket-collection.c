@@ -208,7 +208,7 @@ int socket_collection_testglobal(socket_collection_p scp,
 				 int incount,
 				 int *outcount,
 				 method_addr_p * maps,
-				 bmi_flag_t * status,
+				 int * status,
 				 int poll_timeout)
 {
 
@@ -228,7 +228,7 @@ int socket_collection_testglobal(socket_collection_p scp,
     /* init the outgoing arguments for safety */
     *outcount = 0;
     memset(maps, 0, (sizeof(method_addr_p) * incount));
-    memset(status, 0, (sizeof(bmi_flag_t) * incount));
+    memset(status, 0, (sizeof(int) * incount));
 
     /* paranoia */
     memset(big_poll_fds, 0, (sizeof(struct pollfd) * SC_POLL_SIZE));

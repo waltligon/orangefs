@@ -26,7 +26,7 @@ int PINT_Process_request(PINT_Request_state *req,
 	PINT_Request_file_data *rfdata, PVFS_count32 *segmax,
 	PVFS_offset *offset_array, PVFS_size *size_array,
 	PVFS_offset *start_offset, PVFS_size *bytemax,
-	PVFS_boolean *eof_flag, PVFS_flag mode)
+	PVFS_boolean *eof_flag, int mode)
 {
 	void *temp_space = NULL;    /* temp copy of req state for size call */
 	PVFS_boolean seeking;       /* indicates we are seeking forward */
@@ -374,7 +374,7 @@ void PINT_Free_request_state (PINT_Request_state *req)
 PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 		PINT_Request_file_data *rfdata, PVFS_size *bytes, PVFS_size bytemax,
 		PVFS_count32 *segs, PVFS_count32 segmax, PVFS_offset *offset_array,
-		PVFS_size *size_array, PVFS_boolean *eof_flag, PVFS_flag mode)
+		PVFS_size *size_array, PVFS_boolean *eof_flag, int mode)
 {
 	PVFS_offset orig_offset;
 	PVFS_size   orig_size;

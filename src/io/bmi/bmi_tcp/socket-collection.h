@@ -45,7 +45,7 @@ int socket_collection_testglobal(socket_collection_p scp,
 				 int incount,
 				 int *outcount,
 				 method_addr_p * maps,
-				 bmi_flag_t * status,
+				 int * status,
 				 int poll_timeout);
 
 #endif /* __SOCKET_COLLECTION_H */
