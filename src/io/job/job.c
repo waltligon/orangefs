@@ -58,7 +58,6 @@ static gen_mutex_t dev_mutex = GEN_MUTEX_INITIALIZER;
  */
 static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t flow_cond = PTHREAD_COND_INITIALIZER;
-static pthread_cond_t trove_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t dev_cond = PTHREAD_COND_INITIALIZER;
 /* NOTE: the above conditions are protected by the same mutexes that
  * protect the queues
@@ -67,10 +66,6 @@ static pthread_cond_t dev_cond = PTHREAD_COND_INITIALIZER;
 /* code that the threads will run when initialized */
 static void *flow_thread_function(void *ptr);
 static pthread_t flow_thread_id;
-#ifdef __PVFS2_TROVE_SUPPORT__
-static void *trove_thread_function(void *ptr);
-static pthread_t trove_thread_id;
-#endif
 static void *dev_thread_function(void* ptr);
 static pthread_t dev_thread_id;
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -85,12 +80,6 @@ enum
 /* static arrays to use for testing lower level interfaces */
 static flow_descriptor *stat_flow_array[job_work_metric];
 
-#ifdef __PVFS2_TROVE_SUPPORT__
-static TROVE_op_id stat_trove_id_array[job_work_metric];
-static void *stat_trove_user_ptr_array[job_work_metric];
-static PVFS_error stat_trove_ds_state_array[job_work_metric];
-#endif
-
 static struct PINT_dev_unexp_info stat_dev_unexp_array[job_work_metric];
 
 /********************************************************
@@ -101,9 +90,6 @@ static int setup_queues(void);
 static void teardown_queues(void);
 static int do_one_work_cycle_flow(int *num_completed);
 static int do_one_work_cycle_dev_unexp(int *num_completed);
-#ifdef __PVFS2_TROVE_SUPPORT__
-static int do_one_work_cycle_trove(int *num_completed);
-#endif
 static int do_one_test_cycle_req_sched(void);
 static void fill_status(struct job_desc *jd,
 			void **returned_user_ptr_p,
@@ -124,6 +110,10 @@ static void bmi_thread_mgr_callback(void* data,
     PVFS_size actual_size,
     PVFS_error error_code);
 static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp);
+#ifdef __PVFS2_TROVE_SUPPORT__
+static void trove_thread_mgr_callback(void* data,
+    PVFS_error error_code);
+#endif
 #else /* __PVFS2_JOB_THREADED__ */
 static int do_one_work_cycle_all(int *num_completed,
 				 int wait_flag);
@@ -131,7 +121,12 @@ static int do_one_work_cycle_bmi(int *num_completed,
 				 int wait_flag);
 static int do_one_work_cycle_bmi_unexp(int *num_completed,
 				       int wait_flag);
-
+#ifdef __PVFS2_TROVE_SUPPORT__
+static int do_one_work_cycle_trove(int *num_completed);
+static TROVE_op_id stat_trove_id_array[job_work_metric];
+static void *stat_trove_user_ptr_array[job_work_metric];
+static PVFS_error stat_trove_ds_state_array[job_work_metric];
+#endif
 static bmi_op_id_t stat_bmi_id_array[job_work_metric];
 static bmi_error_code_t stat_bmi_error_code_array[job_work_metric];
 static bmi_size_t stat_bmi_actual_size_array[job_work_metric];
@@ -162,23 +157,10 @@ int job_initialize(int flags)
 	return(ret);
     }
 
-#ifdef __PVFS2_TROVE_SUPPORT__
-    /* ditto for trove */
-    ret = trove_open_context(/*FIXME: HACK*/9,&global_trove_context);
-    if (ret < 0)
-    {
-	PINT_flow_close_context(global_flow_context);
-        return ret;
-    }
-#endif
-
     ret = setup_queues();
     if (ret < 0)
     {
 	PINT_flow_close_context(global_flow_context);
-#ifdef __PVFS2_TROVE_SUPPORT__
-        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
-#endif
 	return (ret);
     }
 
@@ -188,7 +170,6 @@ int job_initialize(int flags)
     if (ret != 0)
     {
 	PINT_flow_close_context(global_flow_context);
-        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -201,21 +182,23 @@ int job_initialize(int flags)
     {
 	PINT_thread_mgr_bmi_stop();
 	PINT_flow_close_context(global_flow_context);
-        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = pthread_create(&trove_thread_id, NULL, trove_thread_function, NULL);
-    if (ret != 0)
+    ret = PINT_thread_mgr_trove_start();
+    if(ret != 0)
     {
 	PINT_thread_mgr_bmi_stop();
 	pthread_cancel(flow_thread_id);
 	PINT_flow_close_context(global_flow_context);
-        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
+    ret = PINT_thread_mgr_trove_getcontext(&global_trove_context);
+    /* this should never fail if thread startup succeeded */
+    assert(ret == 0);
+
 #endif
     ret = pthread_create(&dev_thread_id, NULL, dev_thread_function, NULL);
     if (ret != 0)
@@ -223,10 +206,9 @@ int job_initialize(int flags)
 	PINT_thread_mgr_bmi_stop();
 	pthread_cancel(flow_thread_id);
 #ifdef __PVFS2_TROVE_SUPPORT__
-	pthread_cancel(trove_thread_id);
+	PINT_thread_mgr_trove_stop();
 #endif
 	PINT_flow_close_context(global_flow_context);
-        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -238,11 +220,19 @@ int job_initialize(int flags)
     if(ret < 0)
     {
 	PINT_flow_close_context(global_flow_context);
-#ifdef __PVFS2_TROVE_SUPPORT__
-        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
-#endif
 	return(ret);
     }
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    /* ditto for trove */
+    ret = trove_open_context(/*FIXME: HACK*/9,&global_trove_context);
+    if (ret < 0)
+    {
+	PINT_flow_close_context(global_flow_context);
+	BMI_close_context(global_bmi_context);
+        return ret;
+    }
+#endif
 
 #endif /* __PVFS2_JOB_THREADED__ */
 
@@ -262,17 +252,17 @@ int job_finalize(void)
     PINT_thread_mgr_bmi_stop();
     pthread_cancel(flow_thread_id);
 #ifdef __PVFS2_TROVE_SUPPORT__
-    pthread_cancel(trove_thread_id);
+    PINT_thread_mgr_trove_stop();
 #endif
     pthread_cancel(dev_thread_id);
 #else /* __PVFS2_JOB_THREADED__ */
     BMI_close_context(global_bmi_context);
-#endif /* __PVFS2_JOB_THREADED__ */
-    PINT_flow_close_context(global_flow_context);
-
 #ifdef __PVFS2_TROVE_SUPPORT__
-    trove_close_context(/*FIXME: HACK*/9,global_trove_context);
+    trove_close_context(/* FIXME: HACK*/9,&global_trove_context);
 #endif
+#endif /* __PVFS2_JOB_THREADED__ */
+
+    PINT_flow_close_context(global_flow_context);
 
     teardown_queues();
 
@@ -376,9 +366,9 @@ int job_bmi_send(bmi_addr_t addr,
     jd->u.bmi.actual_size = size;
     jd->context_id = context_id;
 #if __PVFS2_JOB_THREADED__
-    jd->callback.fn = bmi_thread_mgr_callback;
-    jd->callback.data = (void*)jd;
-    user_ptr_internal = &jd->callback;
+    jd->bmi_callback.fn = bmi_thread_mgr_callback;
+    jd->bmi_callback.data = (void*)jd;
+    user_ptr_internal = &jd->bmi_callback;
 #else
     user_ptr_internal = jd;
 #endif
@@ -467,9 +457,9 @@ int job_bmi_send_list(bmi_addr_t addr,
     jd->u.bmi.actual_size = total_size;
     jd->context_id = context_id;
 #if __PVFS2_JOB_THREADED__
-    jd->callback.fn = bmi_thread_mgr_callback;
-    jd->callback.data = (void*)jd;
-    user_ptr_internal = &jd->callback;
+    jd->bmi_callback.fn = bmi_thread_mgr_callback;
+    jd->bmi_callback.data = (void*)jd;
+    user_ptr_internal = &jd->bmi_callback;
 #else
     user_ptr_internal = jd;
 #endif
@@ -555,9 +545,9 @@ int job_bmi_recv(bmi_addr_t addr,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 #if __PVFS2_JOB_THREADED__
-    jd->callback.fn = bmi_thread_mgr_callback;
-    jd->callback.data = (void*)jd;
-    user_ptr_internal = &jd->callback;
+    jd->bmi_callback.fn = bmi_thread_mgr_callback;
+    jd->bmi_callback.data = (void*)jd;
+    user_ptr_internal = &jd->bmi_callback;
 #else
     user_ptr_internal = jd;
 #endif
@@ -637,9 +627,9 @@ int job_bmi_recv_list(bmi_addr_t addr,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
 #if __PVFS2_JOB_THREADED__
-    jd->callback.fn = bmi_thread_mgr_callback;
-    jd->callback.data = (void*)jd;
-    user_ptr_internal = &jd->callback;
+    jd->bmi_callback.fn = bmi_thread_mgr_callback;
+    jd->bmi_callback.data = (void*)jd;
+    user_ptr_internal = &jd->bmi_callback;
 #else
     user_ptr_internal = jd;
 #endif
@@ -1116,6 +1106,7 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1129,11 +1120,19 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     jd->u.trove.actual_size = size;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_write_at(coll_id, handle, buffer,
 				 &jd->u.trove.actual_size, offset, flags,
-				 jd->u.trove.vtag, jd, global_trove_context,
+				 jd->u.trove.vtag, user_ptr_internal, 
+			   	 global_trove_context,
 				 &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -1165,9 +1164,6 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -1198,6 +1194,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1211,11 +1208,19 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     jd->u.trove.actual_size = size;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_read_at(coll_id, handle, buffer,
 				&jd->u.trove.actual_size, offset, flags,
-				jd->u.trove.vtag, jd, global_trove_context,
+				jd->u.trove.vtag, user_ptr_internal,
+				global_trove_context,
 				&(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -1247,9 +1252,6 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -1273,6 +1275,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
 {
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1284,9 +1287,16 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_bstream_flush(coll_id, handle, flags, jd,
+    ret = trove_bstream_flush(coll_id, handle, flags, user_ptr_internal,
 			      global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -1313,9 +1323,6 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -1345,6 +1352,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1357,11 +1365,18 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read(coll_id, handle, key_p, val_p, flags,
-			    jd->u.trove.vtag, jd, global_trove_context,
-			    &(jd->u.trove.id));
+			    jd->u.trove.vtag, user_ptr_internal, 
+			    global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1391,9 +1406,6 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -1424,6 +1436,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1436,10 +1449,18 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read_list(coll_id, handle, key_array,
-				 val_array, count, flags, jd->u.trove.vtag, jd,
+				 val_array, count, flags, jd->u.trove.vtag, 
+				 user_ptr_internal,
 				 global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -1470,9 +1491,6 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -1502,6 +1520,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1514,10 +1533,18 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_write(coll_id, handle, key_p, val_p, flags,
-			     jd->u.trove.vtag, jd, global_trove_context,
+			     jd->u.trove.vtag, user_ptr_internal, 
+			     global_trove_context,
 			     &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -1548,9 +1575,6 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -1573,6 +1597,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 {
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1584,9 +1609,16 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_keyval_flush(coll_id, handle, flags, jd,
+    ret = trove_keyval_flush(coll_id, handle, flags, user_ptr_internal,
                              global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -1615,9 +1647,6 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -1646,6 +1675,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1657,11 +1687,21 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
+
+
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr(coll_id,
 			       handle, &(jd->u.trove.attr), 0 /* flags */ ,
-			       jd, global_trove_context, &(jd->u.trove.id));
+			       user_ptr_internal, 
+			       global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1690,9 +1730,6 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -1721,6 +1758,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1732,10 +1770,18 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_setattr(coll_id, handle, ds_attr_p, 0 /* flags */ ,
-			       jd, global_trove_context, &(jd->u.trove.id));
+			       user_ptr_internal, global_trove_context, 
+			       &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1763,9 +1809,6 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -1834,6 +1877,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1846,10 +1890,17 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_remove(coll_id, handle, key_p, flags,
-			      jd->u.trove.vtag, jd, 
+			      jd->u.trove.vtag, user_ptr_internal, 
 			      global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -1880,9 +1931,6 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -1933,6 +1981,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1947,12 +1996,20 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     jd->u.trove.position = position;
     jd->u.trove.count = count;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate(coll_id, handle,
 			       &(jd->u.trove.position), key_array, val_array,
 			       &(jd->u.trove.count), flags, jd->u.trove.vtag,
-			       jd, global_trove_context, &(jd->u.trove.id));
+			       user_ptr_internal, 
+			       global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1984,9 +2041,6 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -2037,6 +2091,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2049,6 +2104,13 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.handle = 0;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_create(coll_id,
@@ -2056,7 +2118,8 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 			      &(jd->u.trove.handle),
 			      type,
 			      hint, TROVE_SYNC /* flags -- sync for now */ ,
-			      jd, global_trove_context, &(jd->u.trove.id));
+			      user_ptr_internal, 
+			      global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2086,9 +2149,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -2114,6 +2174,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2125,11 +2186,19 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_remove(coll_id,
 			      handle, TROVE_SYNC /* flags -- sync for now */ ,
-			      jd, global_trove_context, &(jd->u.trove.id));
+			      user_ptr_internal, 
+			      global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2158,9 +2227,6 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -2186,6 +2252,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2197,12 +2264,19 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_verify(coll_id,
 			      handle, &jd->u.trove.type, 
 			      TROVE_SYNC /* flags -- sync for now */ ,
-			      jd, global_trove_context, &(jd->u.trove.id));
+			      user_ptr_internal, global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2231,9 +2305,6 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -2259,6 +2330,7 @@ int job_trove_fs_create(char *collname,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2270,9 +2342,17 @@ int job_trove_fs_create(char *collname,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_collection_create(collname, new_coll_id, jd, &(jd->u.trove.id));
+    ret = trove_collection_create(collname, new_coll_id, user_ptr_internal, 
+	&(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2301,9 +2381,6 @@ int job_trove_fs_create(char *collname,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -2345,6 +2422,7 @@ int job_trove_fs_lookup(char *collname,
      */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2356,10 +2434,17 @@ int job_trove_fs_lookup(char *collname,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_collection_lookup(collname, &(jd->u.trove.fsid), jd,
-				  &(jd->u.trove.id));
+    ret = trove_collection_lookup(collname, &(jd->u.trove.fsid), 
+	user_ptr_internal, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2411,6 +2496,7 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2422,10 +2508,17 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_seteattr(coll_id, key_p, val_p, flags,
-				    jd, global_trove_context,
+				    user_ptr_internal, global_trove_context,
 				    &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -2455,9 +2548,6 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -2485,6 +2575,7 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -2496,10 +2587,17 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_geteattr(coll_id, key_p, val_p, flags,
-				    jd, global_trove_context,
+				    user_ptr_internal, global_trove_context,
 				    &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -2529,9 +2627,6 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&trove_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&trove_mutex);
 
     return (0);
@@ -3493,6 +3588,36 @@ static int do_one_work_cycle_bmi(int *num_completed,
 #endif /* __PVFS2_JOB_THREADED__ */
 
 #ifdef __PVFS2_JOB_THREADED__
+/* trove_thread_mgr_callback()
+ *
+ * callback function executed by the thread manager for Trove when a Trove 
+ * job completes
+ *
+ * no return value
+ */
+static void trove_thread_mgr_callback(void* data, 
+    PVFS_error error_code)
+{
+    struct job_desc* tmp_desc = (struct job_desc*)data; 
+
+    /* set job descriptor fields and put into completion queue */
+    tmp_desc->u.trove.state = error_code;
+    gen_mutex_lock(&completion_mutex);
+    job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	tmp_desc);
+    /* set completed flag while holding queue lock */
+    tmp_desc->completed_flag = 1;
+    gen_mutex_unlock(&completion_mutex);
+
+    trove_pending_count--;
+
+    /* wake up anyone waiting for completion */
+    pthread_cond_signal(&completion_cond);
+    return;
+}
+#endif
+
+#ifdef __PVFS2_JOB_THREADED__
 /* bmi_thread_mgr_callback()
  *
  * callback function executed by the thread manager for BMI when a BMI
@@ -3520,7 +3645,7 @@ static void bmi_thread_mgr_callback(void* data,
 
     /* wake up anyone waiting for completion */
     pthread_cond_signal(&completion_cond);
-;
+
     return;
 }
 
@@ -3663,6 +3788,7 @@ static int do_one_work_cycle_flow(int *num_completed)
     return (0);
 }
 
+#ifndef __PVFS2_JOB_THREADED__
 #ifdef __PVFS2_TROVE_SUPPORT__
 /* do_one_work_cycle_trove()
  *
@@ -3735,6 +3861,7 @@ static int do_one_work_cycle_trove(int *num_completed)
 
     return(0);
 }
+#endif
 #endif
 
 /* fill_status()
@@ -3855,65 +3982,6 @@ static void *flow_thread_function(void *ptr)
 
     return (NULL);
 }
-
-#ifdef __PVFS2_TROVE_SUPPORT__
-/* trove_thread_function()
- *
- * function executed by the thread in charge of trove
- */
-static void *trove_thread_function(void *ptr)
-{
-    int trove_pending_flag;
-    int num_completed;
-    int ret = -1;
-
-    while (1)
-    {
-	/* figure out if there is any trove work to do */
-	gen_mutex_lock(&trove_mutex);
-	if(trove_pending_count > 0)
-	    trove_pending_flag = 1;
-	else
-	    trove_pending_flag = 0;
-	gen_mutex_unlock(&trove_mutex);
-
-	num_completed = 0;
-	if (trove_pending_flag)
-	{
-	    ret = do_one_work_cycle_trove(&num_completed);
-	    if (ret < 0)
-	    {
-		/* set an error flag to get propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	}
-	else
-	{
-	    /* nothing to do; block on condition */
-	    gen_mutex_lock(&trove_mutex);
-	    ret = pthread_cond_wait(&trove_cond, &trove_mutex);
-	    gen_mutex_unlock(&trove_mutex);
-	    if (ret != ETIMEDOUT && ret != EINTR && ret != 0)
-	    {
-		/* set an error flag to get propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = -ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	}
-
-	if (num_completed > 0)
-	{
-	    /* signal anyone blocking on completion queue */
-	    pthread_cond_signal(&completion_cond);
-	}
-    }
-
-    return (NULL);
-}
-#endif
 
 /* dev_thread_function()
  *

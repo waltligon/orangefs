@@ -86,7 +86,8 @@ struct job_desc
     PVFS_aint status_user_tag;  /* user supplied tag */
     int completed_flag;		/* has the job finished? */
     job_context_id context_id;  /* context */
-    struct PINT_thread_mgr_bmi_callback callback;  /* callback information */
+    struct PINT_thread_mgr_bmi_callback bmi_callback;  /* callback information */
+    struct PINT_thread_mgr_trove_callback trove_callback;  /* callback information */
 
     /* union of information for lower level interfaces */
     union
