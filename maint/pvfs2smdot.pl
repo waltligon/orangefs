@@ -48,6 +48,8 @@ sub spit_out_header()
     printf "digraph state { {\n";
 }
 
+$beginning = 1;
+
 # spit_out_state() - prints out line defining state
 #
 # parameters are state name, function name (or nested state), and a
@@ -57,15 +59,29 @@ sub spit_out_state
 {
     my($sn, $fn, $nested, $ending) = @_;
 
-    if ($ending){
+    if($beginning) {
+	$fill_color = "green";
+    }
+    else {
+	$fill_color = "red";
+    }
+
+    if ($ending or $beginning){
 	$node_style = "style = filled, ";
+	$beginning = 0;
     }
     else{
 	$node_style = "";
     }
 
-    if ($nested) { printf "%s [%s shape = record, label = \"%s\"];\n", $sn, $node_style, $fn; }
-    else         { printf "%s [%s shape = ellipse, label = \"%s\"];\n", $sn, $node_style, $fn; }
+    if ($nested) { 
+	printf "%s [%s shape = record, fillcolor = %s, label = \"%s\"];\n",
+	    $sn, $node_style, $fill_color, $fn; 
+    }
+    else         { 
+	printf "%s [%s shape = ellipse, fillcolor = %s, label = \"%s\"];\n", 
+	    $sn, $node_style, $fill_color, $fn; 
+    }
 }
 
 # spit_out_transition() - prints out dot line describing transition
