@@ -21,6 +21,9 @@ void gen_return_code(char *return_code);
 void gen_new_state(char *new_state);
 void gen_state_end(void);
 
+int yylex(void);
+void yyerror(char *);
+
 %}
 
 %union{
