@@ -432,6 +432,16 @@ struct PVFS_servreq_statfs
     PVFS_fs_id fs_id;		    /* file system */
 };
 
+#define PINT_SERVREQ_STATFS_FILL(__req,		\
+				__creds,	\
+				__fsid)		\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_STATFS;		\
+    (__req).credentials = (__creds);		\
+    (__req).u.truncate.fs_id = (__fsid);	\
+} while (0)
+
 struct PVFS_servresp_statfs
 {
     PVFS_statfs stat;

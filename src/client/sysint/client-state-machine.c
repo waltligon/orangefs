@@ -94,6 +94,9 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 	case PVFS_SYS_TRUNCATE:
 	    sm_p->current_state = pvfs2_client_truncate_sm.state_machine +1;
 	    break;
+	case PVFS_MGMT_STATFS_ALL:
+	    sm_p->current_state = pvfs2_client_mgmt_statfs_all_sm.state_machine +1;
+	    break;
 	default:
 	    assert(0);
     }

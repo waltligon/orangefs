@@ -185,6 +185,15 @@ struct PINT_client_mgmt_setparam_all_sm
     int64_t value;
 };
 
+struct PINT_client_mgmt_statfs_all_sm
+{
+    PVFS_fs_id fs_id;
+    PVFS_statfs* statfs_array;
+    int incount; 
+    int* outcount;
+    int* overflow_flag;
+};
+
 struct PINT_client_mgmt_noop_sm
 {
     char* host;
@@ -249,6 +258,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_mgmt_setparam_all_sm setparam_all;
 	struct PINT_client_mgmt_noop_sm noop;
 	struct PINT_client_truncate_sm  truncate;
+	struct PINT_client_mgmt_statfs_all_sm statfs_all;
     } u;
 } PINT_client_sm;
 
@@ -269,7 +279,8 @@ enum {
     PVFS_SYS_FLUSH   = 7,
     PVFS_SYS_TRUNCATE= 8,
     PVFS_MGMT_SETPARAM_ALL = 9,
-    PVFS_MGMT_NOOP   = 10
+    PVFS_MGMT_NOOP   = 10,
+    PVFS_MGMT_STATFS_ALL = 11
 };
 
 /* prototypes of helper functions */
@@ -317,6 +328,7 @@ extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_all_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_all_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_noop_sm;
 extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 
