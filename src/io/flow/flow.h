@@ -69,12 +69,8 @@ typedef struct flow_endpoint flow_endpoint;
 enum flow_state
 {
     FLOW_INITIAL = 1,
-    FLOW_SVC_READY = 2,
-    FLOW_TRANSMITTING = 4,
-    FLOW_COMPLETE = 8,
-    FLOW_ERROR = 16,
-    FLOW_SRC_ERROR = 32,
-    FLOW_DEST_ERROR = 64
+    FLOW_TRANSMITTING = 2,
+    FLOW_COMPLETE = 4,
 };
 
 /* supported getinfo types */
@@ -136,10 +132,6 @@ struct flow_descriptor
     PINT_Request_result result;
 };
 typedef struct flow_descriptor flow_descriptor;
-
-
-#define FLOW_FINISH_MASK  (FLOW_COMPLETE | FLOW_ERROR | FLOW_SRC_ERROR |\
- FLOW_DEST_ERROR)
 
 /********************************************************************
  * flow interface functions
