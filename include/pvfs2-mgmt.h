@@ -225,6 +225,20 @@ int PVFS_mgmt_remove_dirent(
     char *entry,
     PVFS_credentials *credentials);
 
+int PVFS_imgmt_create_dirent(
+    PVFS_object_ref parent_ref,
+    char *entry,
+    PVFS_handle entry_handle,
+    PVFS_credentials *credentials,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+
+int PVFS_mgmt_create_dirent(
+    PVFS_object_ref parent_ref,
+    char *entry,
+    PVFS_handle entry_handle,
+    PVFS_credentials *credentials);
+
 int PVFS_imgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
     PVFS_handle *out_dirdata_handle,
@@ -236,7 +250,6 @@ int PVFS_mgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
     PVFS_handle *out_dirdata_handle,
     PVFS_credentials *credentials);
-
 #endif /* __PVFS2_MGMT_H */
 
 /*

@@ -547,6 +547,9 @@ static int crdirent_cleanup(PINT_server_op *s_op,
 static int crdirent_set_error_code(
     PINT_server_op *s_op, job_status_s *js_p)
 {
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "crdirent_set_error_code got called", js_p->error_code);
+
     /* the test to make sure that a file doesn't exist should be
      * "successful" if the entry was not found.
      */

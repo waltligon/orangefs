@@ -218,11 +218,13 @@ int PINT_req_sched_target_handle(
 	*fs_id = req->u.remove.fs_id;
 	return (0);
     case PVFS_SERV_MGMT_REMOVE_OBJECT:
+        req->flags |= PVFS_SERVER_REQ_ADMIN_MODE;
 	*readonly_flag = 0;
 	*handle = req->u.mgmt_remove_object.handle;
 	*fs_id = req->u.mgmt_remove_object.fs_id;
 	return (0);
     case PVFS_SERV_MGMT_REMOVE_DIRENT:
+        req->flags |= PVFS_SERVER_REQ_ADMIN_MODE;
 	*readonly_flag = 0;
 	*handle = req->u.mgmt_remove_dirent.handle;
 	*fs_id = req->u.mgmt_remove_dirent.fs_id;
