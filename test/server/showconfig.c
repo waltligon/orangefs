@@ -16,7 +16,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
     {
         fprintf(stderr,"File system name: %s\n",fs->file_system_name);
         fprintf(stderr,"FS Collection ID: %d\n",fs->coll_id);
-        fprintf(stderr,"FS Root Handle  : %d\n",fs->root_handle);
+        fprintf(stderr,"FS Root Handle  : %Ld\n",fs->root_handle);
 
         fprintf(stderr,"\t--- Meta Server(s) for %s (%d total):\n",
                 fs->file_system_name,llist_count(fs->meta_handle_ranges));
@@ -121,6 +121,10 @@ int main(int argc, char **argv)
             (int)serverconfig.server_config_buflen);
     fprintf(stderr,"initial unexp requests   : %d\n",
             serverconfig.initial_unexpected_requests);
+    fprintf(stderr,"configured log file      : %s\n",
+            serverconfig.logfile);
+    fprintf(stderr,"event logging mask string: %s\n",
+            serverconfig.event_logging);
 
     fprintf(stderr,"\n--- Host Aliases:\n");
     cur = serverconfig.host_aliases;
@@ -153,11 +157,11 @@ int main(int argc, char **argv)
     fprintf(stderr,"\n--- Analyzing filesystem configuration\n\n");
     if (PINT_server_config_is_valid_configuration(&serverconfig))
     {
-        fprintf(stderr,"\nOK: File system is VALID\n");
+        fprintf(stderr,"\nOK: Configuration file is VALID\n");
     }
     else
     {
-        fprintf(stderr,"\nERROR: File system is INVALID\n");
+        fprintf(stderr,"\nERROR: Configuration file is INVALID\n");
     }
 
     PINT_server_config_release(&serverconfig);

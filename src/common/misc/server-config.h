@@ -42,9 +42,9 @@ typedef struct host_handle_mapping_s
 
 typedef struct filesystem_configuration_s
 {
-    TROVE_coll_id coll_id;
     char *file_system_name;
-    int  root_handle;                 /* FIXME: should be 64 bit?             */
+    PVFS_fs_id coll_id;
+    PVFS_handle  root_handle;
     struct llist *meta_handle_ranges; /* ptrs are type host_handle_mapping_s* */
     struct llist *data_handle_ranges; /* ptrs are type host_handle_mapping_s* */
 } filesystem_configuration_s;
@@ -60,6 +60,8 @@ typedef struct server_configuration_s
     ssize_t server_config_buflen;   /* the server.conf file length      */
     char *server_config_buf;        /* the server.conf file contents    */
     int  initial_unexpected_requests;
+    char *logfile;
+    char *event_logging;
     int  configuration_context;
     struct llist *host_aliases;     /* ptrs are type host_alias_s               */
     struct llist *file_systems;     /* ptrs are type filesystem_configuration_s */
@@ -98,7 +100,7 @@ int PINT_server_config_is_valid_configuration(
 
 int PINT_server_config_is_valid_collection_id(
     struct server_configuration_s *config_s,
-    TROVE_coll_id coll_id);
+    PVFS_fs_id fs_id);
 
 int PINT_server_config_has_fs_config_info(
     struct server_configuration_s *config_s,

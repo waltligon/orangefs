@@ -17,11 +17,12 @@
 #include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
-#include "pvfs2-storage.h"
+#include "pvfs2.h"
 #include "job.h"
 #include "gossip.h"
 #include "extent-utils.h"
 #include "mkspace.h"
+#include "pvfs2-config.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_storage_space);
@@ -38,6 +39,8 @@ static DOTCONF_CB(exit_dhranges_context);
 static DOTCONF_CB(get_unexp_req);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_filesystem_name);
+static DOTCONF_CB(get_logfile);
+static DOTCONF_CB(get_event_logging_list);
 static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(get_range_list);
@@ -54,6 +57,9 @@ static int cache_config_files(
 static int is_populated_filesystem_configuration(
     struct filesystem_configuration_s *fs);
 static int is_root_handle_in_my_range(
+    struct server_configuration_s *config_s,
+    struct filesystem_configuration_s *fs);
+static int is_root_handle_in_a_meta_range(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
 static int is_valid_filesystem_configuration(
@@ -94,10 +100,12 @@ static const configoption_t options[] =
     {"<DataHandleRanges>",ARG_NONE, enter_dhranges_context,NULL,CTX_ALL},
     {"</DataHandleRanges>",ARG_NONE, exit_dhranges_context,NULL,CTX_ALL},
     {"Range",ARG_LIST, get_range_list,NULL,CTX_ALL},
-    {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
-    {"RootHandle",ARG_INT, get_root_handle,NULL,CTX_ALL},
-    {"FS_Name",ARG_STR, get_filesystem_name,NULL,CTX_ALL},
+    {"RootHandle",ARG_STR, get_root_handle,NULL,CTX_ALL},
+    {"Name",ARG_STR, get_filesystem_name,NULL,CTX_ALL},
     {"CollectionID",ARG_INT, get_filesystem_collid,NULL,CTX_ALL},
+    {"LogFile",ARG_STR, get_logfile,NULL,CTX_ALL},
+    {"EventLogging",ARG_LIST, get_event_logging_list,NULL,CTX_ALL},
+    {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
     LAST_OPTION
 };
 
@@ -128,15 +136,7 @@ int PINT_server_config(
 
     /* static global assignment */
     config_s = config_obj;
-
-    config_s->host_id = NULL;
-    config_s->storage_path = NULL;
-    config_s->host_aliases = NULL;
-    config_s->file_systems = NULL;
-    config_s->fs_config_buf = NULL;
-    config_s->fs_config_buflen = 0;
-    config_s->server_config_buf = NULL;
-    config_s->server_config_buflen = 0;
+    memset(config_s, 0, sizeof(struct server_configuration_s));
 
     if (cache_config_files(global_config_filename, server_config_filename))
     {
@@ -410,12 +410,57 @@ DOTCONF_CB(exit_dhranges_context)
 
 DOTCONF_CB(get_unexp_req)
 {
-    if (config_s->configuration_context != DEFAULTS_CONFIG)
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
     {
-        gossip_lerr("UnexpectedRequests Tag can only be in a Defaults block");
+        gossip_lerr("UnexpectedRequests Tag can only be in a "
+                    "Defaults or Global block");
         return NULL;
     }
     config_s->initial_unexpected_requests = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_logfile)
+{
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        gossip_lerr("LogFile Tag can only be in a Defaults "
+                    "or Global block");
+        return NULL;
+    }
+    config_s->logfile = strdup(cmd->data.str);
+    return NULL;
+}
+
+DOTCONF_CB(get_event_logging_list)
+{
+    int i = 0, len = 0;
+    char buf[512] = {0};
+    char *ptr = buf;
+
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        gossip_lerr("EventLogging Tag can only be in a "
+                    "Defaults or Global block");
+        return NULL;
+    }
+
+    if (config_s->event_logging != NULL)
+    {
+        len = strlen(config_s->event_logging);
+        strncpy(ptr,config_s->event_logging,len);
+        ptr += (len * sizeof(char));
+        free(config_s->event_logging);
+    }
+    for(i = 0; i < cmd->arg_count; i++)
+    {
+        strncat(ptr, cmd->data.list[i], 512 - len);
+        len += strlen(cmd->data.list[i]);
+    }
+    config_s->event_logging = strdup(buf);
     return NULL;
 }
 
@@ -431,7 +476,13 @@ DOTCONF_CB(get_root_handle)
     fs_conf = (struct filesystem_configuration_s *)
         llist_head(config_s->file_systems);
     assert(fs_conf);
-    fs_conf->root_handle = cmd->data.value;
+#ifdef HAVE_STRTOULL
+        fs_conf->root_handle = (PVFS_handle)strtoull(
+            cmd->data.str, NULL, 10);
+#else
+        fs_conf->root_handle = (PVFS_handle)strtoul(
+            cmd->data.str, NULL, 10);
+#endif
     return NULL;
 }
 
@@ -441,7 +492,7 @@ DOTCONF_CB(get_filesystem_name)
 
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("FS_Name Tags can only be within Filesystem tags");
+        gossip_lerr("Name Tags can only be within Filesystem tags");
         return NULL;
     }
     fs_conf = (struct filesystem_configuration_s *)
@@ -471,7 +522,7 @@ DOTCONF_CB(get_filesystem_collid)
         gossip_lerr("WARNING: Overwriting %d with %d\n",
                     (int)fs_conf->coll_id,(int)cmd->data.value);
     }
-    fs_conf->coll_id = (TROVE_coll_id)cmd->data.value;
+    fs_conf->coll_id = (PVFS_fs_id)cmd->data.value;
     return NULL;
 }
 
@@ -655,6 +706,18 @@ void PINT_server_config_release(struct server_configuration_s *config_s)
             config_s->server_config_buf = NULL;
         }
 
+        if (config_s->logfile)
+        {
+            free(config_s->logfile);
+            config_s->logfile = NULL;
+        }
+
+        if (config_s->event_logging)
+        {
+            free(config_s->event_logging);
+            config_s->event_logging = NULL;
+        }
+
         /* free all filesystem objects */
         llist_free(config_s->file_systems,free_filesystem);
 
@@ -759,6 +822,9 @@ static int is_root_handle_in_my_range(
             assert(cur_h_mapping->alias_mapping->bmi_address);
             assert(cur_h_mapping->handle_range);
 
+            fprintf(stderr, "CURRENT META SERVER IS %s\n",
+                    cur_h_mapping->alias_mapping->host_alias);
+
             cur_host_id = cur_h_mapping->alias_mapping->bmi_address;
             if (!cur_host_id)
             {
@@ -792,14 +858,73 @@ static int is_root_handle_in_my_range(
     return ret;
 }
 
+static int is_root_handle_in_a_meta_range(
+    struct server_configuration_s *config,
+    struct filesystem_configuration_s *fs)
+{
+    int ret = 0;
+    struct llist *cur = NULL;
+    struct llist *extent_list = NULL;
+    char *cur_host_id = (char *)0;
+    host_handle_mapping_s *cur_h_mapping = NULL;
+
+    if (config && is_populated_filesystem_configuration(fs))
+    {
+        /*
+          check if the root handle is within one of the
+          specified meta host's handle ranges for this fs;
+          a root handle can't exist in a data handle range!
+        */
+        cur = fs->meta_handle_ranges;
+        while(cur)
+        {
+            cur_h_mapping = llist_head(cur);
+            if (!cur_h_mapping)
+            {
+                break;
+            }
+            assert(cur_h_mapping->alias_mapping);
+            assert(cur_h_mapping->alias_mapping->host_alias);
+            assert(cur_h_mapping->alias_mapping->bmi_address);
+            assert(cur_h_mapping->handle_range);
+
+            cur_host_id = cur_h_mapping->alias_mapping->bmi_address;
+            if (!cur_host_id)
+            {
+                gossip_err("Invalid host ID for alias %s.\n",
+                           cur_h_mapping->alias_mapping->host_alias);
+                break;
+            }
+
+            extent_list = PINT_create_extent_list(
+                cur_h_mapping->handle_range);
+            if (!extent_list)
+            {
+                gossip_err("Failed to create extent list.\n");
+                break;
+            }
+
+            ret = PINT_handle_in_extent_list(
+                extent_list,fs->root_handle);
+            PINT_release_extent_list(extent_list);
+            if (ret == 1)
+            {
+                break;
+            }
+            cur = llist_next(cur);
+        }
+    }
+    return ret;
+}
+
 static int is_valid_filesystem_configuration(
     struct server_configuration_s *config,
     struct filesystem_configuration_s *fs)
 {
-    int ret = is_root_handle_in_my_range(config,fs);
+    int ret = is_root_handle_in_a_meta_range(config,fs);
     if (ret == 0)
     {
-        gossip_err("RootHandle (%d) is NOT within the meta handle "
+        gossip_err("RootHandle (%Ld) is NOT within the meta handle "
                    "ranges specified for this filesystem (%s).\n",
                    fs->root_handle,fs->file_system_name);
     }
@@ -1386,7 +1511,7 @@ int PINT_server_config_is_valid_configuration(
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     
-    if (config_s)
+    if (config_s && config_s->logfile && config_s->event_logging)
     {
         cur = config_s->file_systems;
         while(cur)
@@ -1414,7 +1539,7 @@ int PINT_server_config_is_valid_configuration(
 */
 int PINT_server_config_is_valid_collection_id(
     struct server_configuration_s *config_s,
-    TROVE_coll_id coll_id)
+    PVFS_fs_id fs_id)
 {
     int ret = 0;
     struct llist *cur = NULL;
@@ -1430,7 +1555,7 @@ int PINT_server_config_is_valid_collection_id(
             {
                 break;
             }
-            if (cur_fs->coll_id == coll_id)
+            if (cur_fs->coll_id == fs_id)
             {
                 ret = 1;
                 break;
@@ -1483,7 +1608,7 @@ int PINT_server_config_pvfs2_mkspace(
     struct server_configuration_s *config)
 {
     int ret = 1;
-    int root_handle = 0;
+    PVFS_handle root_handle = 0;
     int create_collection_only = 0;
     struct llist *cur = NULL;
     char *cur_handle_range = (char *)0;

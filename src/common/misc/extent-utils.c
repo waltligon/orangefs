@@ -65,8 +65,8 @@ struct llist *PINT_create_extent_list(char *extent_str)
  */
 int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
 {
-    return (((int64_t)handle > ext->first-1) &&
-            ((int64_t)handle < ext->last+1));
+    return ((handle > ext->first-1) &&
+            (handle < ext->last+1));
 }
 
 /* PINT_handle_in_extent_list()
@@ -80,8 +80,9 @@ int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
  * otherwise.
  *
  */
-int PINT_handle_in_extent_list(struct llist *extent_list,
-                               PVFS_handle handle)
+int PINT_handle_in_extent_list(
+    struct llist *extent_list,
+    PVFS_handle handle)
 {
     int ret = 0;
     struct llist *cur = NULL;

@@ -7,8 +7,11 @@
 /* The number of bytes in a void *.  */
 #undef SIZEOF_VOID_P
 
-/* Define if you have the strnlen function.  */
+/* Define if you have the GNU extended strnlen function.  */
 #undef HAVE_STRNLEN
+
+/* Define if you have the C99 conformant strtoull function.  */
+#undef HAVE_STRTOULL
 
 /* Define if you have the <malloc.h> header file.  */
 #undef HAVE_MALLOC_H

@@ -169,6 +169,7 @@ fi
 
 dnl if we use functions that might not be on every platform, add them here
 AC_CHECK_FUNCS(strnlen)
+AC_CHECK_FUNCS(strtoull)
 
 dnl if we use headers that might not be on every platform, add them here
 AC_CHECK_HEADERS(malloc.h)
