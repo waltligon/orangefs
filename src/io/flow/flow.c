@@ -74,17 +74,17 @@ int PINT_flow_initialize(
 	struct flowproto_ops** tmp_flowproto_ops = NULL;
 
 	/* bring in the flowproto interfaces that we need */
-#ifdef __STATIC_FLOWPROTO_DEFAULT__
-	extern struct flowproto_ops default_flowproto_ops;
-#endif /* __STATIC_FLOWPROTO_DEFAULT__ */
+#ifdef __STATIC_FLOWPROTO_TEMPLATE__
+	extern struct flowproto_ops flowproto_template_ops;
+#endif /* __STATIC_FLOWPROTO_TEMPLATE__ */
 #ifdef __STATIC_FLOWPROTO_BMI_TROVE__
 	extern struct flowproto_ops flowproto_bmi_trove_ops;
 #endif /* __STATIC_FLOWPROTO_BMI_TROVE__ */
 
 	static struct flowproto_ops* static_flowprotos[] = {
-#ifdef __STATIC_FLOWPROTO_DEFAULT__
-		&default_flowproto_ops,
-#endif /* __STATIC_FLOWPROTO_DEFAULT__ */
+#ifdef __STATIC_FLOWPROTO_TEMPLATE__
+		&flowproto_template_ops,
+#endif /* __STATIC_FLOWPROTO_TEMPLATE__ */
 #ifdef __STATIC_FLOWPROTO_BMI_TROVE__
 		&flowproto_bmi_trove_ops,
 #endif /* __STATIC_FLOWPROTO_BMI_TROVE__ */

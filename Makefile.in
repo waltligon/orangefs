@@ -19,7 +19,7 @@ LDFLAGS = @LDFLAGS@
 LD = gcc
 CFLAGS +=\
  -D__STATIC_METHOD_BMI_TCP__\
- -D__STATIC_FLOWPROTO_DEFAULT__\
+ -D__STATIC_FLOWPROTO_TEMPLATE__\
  -D__STATIC_FLOWPROTO_BMI_TROVE__\
  -Wconversion -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include
 LDFLAGS += -L lib
