@@ -136,7 +136,7 @@ void PINT_event_get_masks(int* event_on, int32_t* api_mask, int32_t* op_mask)
  * returns 0 on success, -PVFS_error on failure
  */
 void __PINT_event_timestamp(
-    enum PINT_event_api api,
+    enum PVFS_event_api api,
     int32_t operation,
     int64_t value,
     PVFS_id_gen_t id,
@@ -199,7 +199,7 @@ void PINT_event_retrieve(
     /* fill in remainder of array with invalid flag */
     for(i=cur_index; i<count; i++)
     {
-	event_array[i].flags = PINT_EVENT_FLAG_INVALID;
+	event_array[i].flags = PVFS_EVENT_FLAG_INVALID;
     }
 
     return;

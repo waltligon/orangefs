@@ -28,7 +28,7 @@ void PINT_event_retrieve(
     struct PVFS_mgmt_event* event_array,
     int count);
 void __PINT_event_timestamp(
-    enum PINT_event_api api,
+    enum PVFS_event_api api,
     int32_t operation,
     int64_t value,
     PVFS_id_gen_t id,
