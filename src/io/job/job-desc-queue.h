@@ -84,7 +84,7 @@ struct job_desc
     enum job_type type;		/* type of job */
     job_id_t job_id;		/* job interface identifier */
     void *job_user_ptr;		/* user pointer */
-    PVFS_aint status_user_tag;  /* user supplied tag */
+    job_aint status_user_tag;   /* user supplied tag */
     int completed_flag;		/* has the job finished? */
     job_context_id context_id;  /* context */
     struct PINT_thread_mgr_bmi_callback bmi_callback;  /* callback information */
