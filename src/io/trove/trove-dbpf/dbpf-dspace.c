@@ -1240,6 +1240,7 @@ static int dbpf_dspace_test(
         {
 	    *returned_user_ptr_p = cur_op->op.user_ptr;
 	}
+
 	/* catch ops that we log */
 	switch(cur_op->op.type)
 	{

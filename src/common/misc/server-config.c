@@ -1493,7 +1493,7 @@ char *PINT_config_get_merged_handle_range_str(
     {
         merged_range = strdup(mrange);
     }
-    else
+    else if (drange)
     {
         merged_range = strdup(drange);
     }
