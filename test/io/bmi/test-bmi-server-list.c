@@ -218,6 +218,8 @@ int main(int argc, char **argv)	{
 	/* turn off debugging stuff */
 	gossip_disable();
 
+	free(user_opts->hostid);
+	free(user_opts);
 
 	return(0);
 }
