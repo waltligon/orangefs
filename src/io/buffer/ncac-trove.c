@@ -286,7 +286,7 @@ int NCAC_check_ioreq(struct extent *extent)
     ret = trove_dspace_test(coll_id, op_id, context_id, &count, NULL, NULL, &state, TROVE_DEFAULT_TEST_TIMEOUT);
 
     if ( ret > 0 ) {
-    	fprintf(stderr, "++++++++++++NCAC_check_ioreq: finished %Ld\n", op_id);
+    	fprintf(stderr, "++++++++++++NCAC_check_ioreq: finished %Ld\n", Ld(op_id));
         extent->ioreq = INVAL_IOREQ;
     }
 
