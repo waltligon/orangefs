@@ -40,118 +40,118 @@ int line = 1;
 
 int main(int argc, char **argv)
 {
-	initialize();
-	parse_args(argc, argv);
-	gen_init();
-	yyparse();
-	finalize();
-	return 0;
+    initialize();
+    parse_args(argc, argv);
+    gen_init();
+    yyparse();
+    finalize();
+    return 0;
 }
 
 static void initialize()
 {
-	init_symbol_table();
+    init_symbol_table();
 }
 
 static void parse_args(int argc, char **argv)
 {
-	int c;
-	int file_name_size;
-	char *file_name;
-	//int digit_optind = 0;
-	while(1)
-	{
-		//int this_option_optind = optind ? optind : 1;
-		int option_index = 0;
-		static struct option long_options[] = {
-			/* {"option_name", has_arg, *flag, val}, */
-			{"option_name", 0, NULL, 0},
-			{0, 0, 0, 0}
-		};
-		c = getopt_long ( argc, argv, "lo:", long_options, &option_index);
-		if (c == -1)
-			break;
-		switch (c) {
-			case 0 : /* a long option */
-				break;
+    int c;
+    int file_name_size;
+    char *file_name;
+    //int digit_optind = 0;
+    while(1)
+    {
+	//int this_option_optind = optind ? optind : 1;
+	int option_index = 0;
+	static struct option long_options[] = {
+	    /* {"option_name", has_arg, *flag, val}, */
+	    {"option_name", 0, NULL, 0},
+	    {0, 0, 0, 0}
+	};
+	c = getopt_long ( argc, argv, "lo:", long_options, &option_index);
+	if (c == -1)
+	    break;
+	switch (c) {
+	    case 0 : /* a long option */
+		break;
 
-			case 'l' : /* turn on listings */
-				list_file = fopen("c.lst","w");
-				list_flag = 1;
-				break;
+	    case 'l' : /* turn on listings */
+		list_file = fopen("c.lst","w");
+		list_flag = 1;
+		break;
 
-			default:
-				fprintf(stderr,"%s: undefined option %c given\n", argv[0], c);
-		}
+	    default:
+		fprintf(stderr,"%s: undefined option %c given\n", argv[0], c);
 	}
-	/* first non-option argument should be input file with .sm suffix */
-	if (optind == argc)
+    }
+    /* first non-option argument should be input file with .sm suffix */
+    if (optind == argc)
+    {
+	/* input file name missing */
+	fprintf(stderr, "usage: %s [-l] input_file.sm [output_file.c]\n", argv[0]);
+	exit(-1);
+    }
+    /* we have an input file argument */
+    /* let's see if it has the suffix */
+    file_name = argv[optind];
+    file_name_size = strlen(file_name) + 1;
+    if (file_name_size <= 4 || strcmp(&file_name[file_name_size-4], ".sm"))
+    {
+	/* input file name has wrong suffix */
+	fprintf(stderr, "usage: %s [-l] input_file.sm [output_file.c]\n", argv[0]);
+	exit(-1);
+    }
+    /* open input file as stdin */
+    if (!freopen(file_name, "r", stdin))
+    {
+	/* error opening input file */
+	perror("opening input file");
+	exit(-1);
+    }
+    if (argc == optind + 1) {
+	/* construct output file name from input file name */
+	file_name = malloc(file_name_size);
+	strcpy (file_name, argv[optind]);
+	file_name[file_name_size-3] = 'c';
+	file_name[file_name_size-2] = 0;
+	/* open output file */
+	if (!(out_file = fopen(file_name, "w")))
 	{
-		/* input file name missing */
-		fprintf(stderr, "usage: %s [-l] input_file.sm [output_file.c]\n", argv[0]);
-		exit(-1);
+	    /* error opening output file */
+	    perror("opening output file");
+	    exit(-1);
 	}
-	/* we have an input file argument */
-	/* let's see if it has the suffix */
-	file_name = argv[optind];
-	file_name_size = strlen(file_name) + 1;
-	if (file_name_size <= 4 || strcmp(&file_name[file_name_size-4], ".sm"))
+	free(file_name);
+    }
+    else {
+	if (!(out_file = fopen(argv[optind+1], "w")))
 	{
-		/* input file name has wrong suffix */
-		fprintf(stderr, "usage: %s [-l] input_file.sm [output_file.c]\n", argv[0]);
-		exit(-1);
+	    /* error opening output file */
+	    perror("opening output file");
+	    exit(-1);
 	}
-	/* open input file as stdin */
-	if (!freopen(file_name, "r", stdin))
-	{
-		/* error opening input file */
-		perror("opening input file");
-		exit(-1);
-	}
-	if (argc == optind + 1) {
-	    /* construct output file name from input file name */
-	    file_name = malloc(file_name_size);
-	    strcpy (file_name, argv[optind]);
-	    file_name[file_name_size-3] = 'c';
-	    file_name[file_name_size-2] = 0;
-	    /* open output file */
-	    if (!(out_file = fopen(file_name, "w")))
-	    {
-		/* error opening output file */
-		perror("opening output file");
-		exit(-1);
-	    }
-	    free(file_name);
-	}
-	else {
-	    if (!(out_file = fopen(argv[optind+1], "w")))
-	    {
-		/* error opening output file */
-		perror("opening output file");
-		exit(-1);
-	    }
-	}
-	/* check for any extra arguments */
-	if (argc > optind + 2)
-	{
-		/* report we are ignoring them */
-		fprintf(stderr, "usage: %s [-l] input_file.sm [output_file.c]\n", argv[0]);
-		fprintf(stderr, "ignoring extra arguments\n");
-	}
+    }
+    /* check for any extra arguments */
+    if (argc > optind + 2)
+    {
+	/* report we are ignoring them */
+	fprintf(stderr, "usage: %s [-l] input_file.sm [output_file.c]\n", argv[0]);
+	fprintf(stderr, "ignoring extra arguments\n");
+    }
 }
 
 static void finalize(void)
 {
-	fclose(out_file);
-	if (list_flag)
-	{
-		fclose(list_file);
-	}
+    fclose(out_file);
+    if (list_flag)
+    {
+	fclose(list_file);
+    }
 }
 
 void yyerror(char *s)
 {
-	fprintf(stderr,"syntax error line %d: %s\n", line, s);
+    fprintf(stderr,"syntax error line %d: %s\n", line, s);
 }
 
 void yywrap(void)
@@ -160,8 +160,16 @@ void yywrap(void)
 
 void produce_listing(int line, char *listing)
 {
-	/* fprintf(stderr, "produce_listing\n"); */
-	if (list_flag)
-		fprintf(list_file, "[%d]\t%s\n", line, listing);
+    /* fprintf(stderr, "produce_listing\n"); */
+    if (list_flag)
+	fprintf(list_file, "[%d]\t%s\n", line, listing);
 }
 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
