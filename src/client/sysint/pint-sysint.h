@@ -78,7 +78,7 @@ typedef struct
     PVFS_size size;                           /* PVFS object size */
     struct timeval tstamp;  /* timestamp for consistency */
     int size_flag;	    /*flag so we know if the size is valid*/
-} pinode, *pinode_p;
+} pinode, *pinode_p, PINT_pinode;
 
 
 /* Max No. of Entries in the cache */

@@ -28,13 +28,19 @@ static job_context_id pint_client_sm_context;
 
 /* values greater than zero are usable here */
 enum {
-    REMOVE_DCACHE_HIT = 1
+    REMOVE_DCACHE_HIT = 1,
+    REMOVE_PCACHE_HIT = 2
 };
 
 static int remove_init(PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_lookup_failure(PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_recv_lookup_resp(PINT_client_sm *sm_p, job_status_s *js_p);
+
+static int remove_post_getattr_sendrecv(PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_getattr_failure(PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_recv_getattr_resp(PINT_client_sm *sm_p, job_status_s *js_p);
+
 static int remove_cleanup(PINT_client_sm *sm_p, job_status_s *js_p);
 
 /* all stuff used in test function */
@@ -51,7 +57,10 @@ machine pvfs2_client_remove_sm(init,
 			       cleanup,
 			       post_lookup_sendrecv,
 			       lookup_failure,
-			       recv_lookup_resp)
+			       recv_lookup_resp,
+			       post_getattr_sendrecv,
+			       getattr_failure,
+			       recv_getattr_resp)
 {
     state init
 	{
@@ -63,7 +72,8 @@ machine pvfs2_client_remove_sm(init,
 	{
 	    run remove_post_lookup_sendrecv;
 	    success => recv_lookup_resp;
-	    REMOVE_DCACHE_HIT => cleanup;
+	    REMOVE_DCACHE_HIT => post_getattr_sendrecv;
+	    REMOVE_PCACHE_HIT => cleanup;
 	    default => lookup_failure;
 	}
 
@@ -76,6 +86,26 @@ machine pvfs2_client_remove_sm(init,
     state recv_lookup_resp
 	{
 	    run remove_recv_lookup_resp;
+	    success => post_getattr_sendrecv;
+	    default => cleanup;
+	}
+
+    state post_getattr_sendrecv
+	{
+	    run remove_post_getattr_sendrecv;
+	    success => recv_getattr_resp;
+	    default => getattr_failure;
+	}
+
+    state getattr_failure
+	{
+	    run remove_getattr_failure;
+	    default => cleanup;
+	}
+
+    state recv_getattr_resp
+	{
+	    run remove_recv_getattr_resp;
 	    default => cleanup;
 	}
 
@@ -272,6 +302,52 @@ static int PINT_serv_prepare_reqresp(PVFS_pinode_reference object_ref,
     return 0;
 }
 
+static int PINT_serv_decode_resp(void *encoded_resp_p,
+				 struct PINT_decoded_msg *decoded_resp_p,
+				 bmi_addr_t *svr_addr_p,
+				 int actual_resp_sz,
+				 struct PVFS_server_resp **resp_out_pp)
+{
+    int ret;
+
+    /* decode response */
+    ret = PINT_decode(encoded_resp_p,
+		      PINT_DECODE_RESP,
+		      decoded_resp_p, /* holds data on decoded resp */
+		      *svr_addr_p,
+		      actual_resp_sz);
+    if (ret < 0) {
+	assert(0);
+    }
+
+    /* point a reasonably typed pointer at the response data */
+    *resp_out_pp = (struct PVFS_server_resp *) decoded_resp_p->buffer;
+
+    return 0;
+}
+
+static int PINT_serv_free_reqresp_resources(struct PINT_encoded_msg *encoded_req_p,
+					    void *encoded_resp_p,
+					    struct PINT_decoded_msg *decoded_resp_p,
+					    bmi_addr_t *svr_addr_p,
+					    int max_msg_sz)
+{
+    PINT_encode_release(encoded_req_p,
+			PINT_ENCODE_REQ);
+
+    /* sm_p->req doesn't go anywhere; we'll use it again. */
+
+    PINT_decode_release(decoded_resp_p,
+			PINT_DECODE_RESP);
+
+    BMI_memfree(*svr_addr_p,
+		encoded_resp_p,
+		max_msg_sz,
+		BMI_RECV);
+
+    return 0;
+}
+
 /****************************************************************/
 
 /* remove_init()
@@ -299,8 +375,11 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
 
     gossip_debug(CLIENT_DEBUG, "remove state: post_lookup_sendrecv\n");
 
-    /* check and see if we have the pinode for the object in
-     * our pinode cache already.
+    /* check and see if we have the handle for the object in
+     * our directory cache already.
+     *
+     * dcache doesn't have a concept of a lock on an entry; maybe
+     * it should though?
      */
     ret = PINT_dcache_lookup(sm_p->u.remove.object_name,
 			     sm_p->u.remove.parent_ref,
@@ -310,9 +389,33 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
 	return -1;
     }
     else if (ret == 0) {
+	PINT_pinode *pinode_p;
+
 	/* match in dcache; no need for lookup */
-	js_p->error_code = REMOVE_DCACHE_HIT;
-	return 1;
+	gossip_debug(CLIENT_DEBUG, "remove: dcache hit\n");
+
+	/* check to see if we have attributes for the object in
+	 * our pinode cache already.
+	 */
+	/* TODO: MAKE PINT_PCACHE_LOOKUP RETURNS MORE STANDARD */
+	/* TODO: MOVE THIS DOWN INTO THE GETATTR STATE!!! */
+	ret = PINT_pcache_lookup(sm_p->u.remove.object_ref,
+				 &pinode_p);
+	if (ret == PCACHE_LOOKUP_SUCCESS) {
+	    /* got our attributes; let's get to work */
+	    gossip_debug(CLIENT_DEBUG, "remove: pcache hit\n");
+
+	    sm_p->pcache_lock = 1;
+	    sm_p->object_pinode_p = pinode_p;
+
+	    js_p->error_code = REMOVE_PCACHE_HIT;
+	    return 1;
+	}				 
+	else {
+	    /* did hit dcache, but need to get attributes */
+	    js_p->error_code = REMOVE_DCACHE_HIT;
+	    return 1;
+	}
     }
 
     /* otherwise we need to perform the lookup */
@@ -352,12 +455,12 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
     }
 
     /* fill in lookup request (macro in pvfs2-req-proto.h) */
-    PINT_SERV_LOOKUP_PATH_FILL(sm_p->req,
-			       *sm_p->cred_p,
-			       sm_p->u.remove.object_name,
-			       sm_p->u.remove.parent_ref.fs_id,
-			       sm_p->u.remove.parent_ref.handle,
-			       PVFS_ATTR_COMMON_ALL);
+    PINT_SERVREQ_LOOKUP_PATH_FILL(sm_p->req,
+				  *sm_p->cred_p,
+				  sm_p->u.remove.object_name,
+				  sm_p->u.remove.parent_ref.fs_id,
+				  sm_p->u.remove.parent_ref.handle,
+				  PVFS_ATTR_COMMON_ALL);
 
     /* This function:
      * - maps object to server
@@ -404,7 +507,7 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
 			    session_tag,
 			    sm_p->encoded_req.buffer_type,
 			    1,
-			    sm_p, /* user pointer -- used to get to next state */
+			    sm_p, /* user pointer, used to get to next state */
 			    &send_status, /* only for immediate completion */
 			    &send_id, /* could in theory be used to unpost */
 			    pint_client_sm_context);
@@ -451,18 +554,15 @@ static int remove_recv_lookup_resp(PINT_client_sm *sm_p,
      * was the response.
      */
 
-    /* decode response */
-    ret = PINT_decode(sm_p->encoded_resp_p,
-		      PINT_DECODE_RESP,
-		      &decoded_resp, /* holds data on decoded resp */
-		      sm_p->svr_addr,
-		      js_p->actual_size);
+    /* decode; resp_p will point to response */
+    ret = PINT_serv_decode_resp(sm_p->encoded_resp_p,
+				&decoded_resp,
+				&sm_p->svr_addr,
+				js_p->actual_size,
+				&resp_p);
     if (ret < 0) {
 	assert(0);
     }
-
-    /* point a reasonably typed pointer at the response data */
-    resp_p = (struct PVFS_server_resp *) decoded_resp.buffer;
 
     /* check status of response */
     if (resp_p->status != 0) {
@@ -478,21 +578,15 @@ static int remove_recv_lookup_resp(PINT_client_sm *sm_p,
     gossip_debug(CLIENT_DEBUG, "lookup completed (handle = 0x%08Lx)\n",
 		 sm_p->u.remove.object_ref.handle);
 
-    /* free resources */
-    /* TODO: CHECK RETURN VALUES IN HERE */
-    PINT_encode_release(&sm_p->encoded_req,
-			PINT_ENCODE_REQ);
-
-    /* sm_p->req doesn't go anywhere; we'll use it again. */
-
-    PINT_decode_release(&decoded_resp,
-			PINT_DECODE_RESP);
-
-    BMI_memfree(sm_p->svr_addr,
-		sm_p->encoded_resp_p,
-		sm_p->max_msg_sz,
-		BMI_RECV);
-
+    /* free all the resources that we used to send and receive. */
+    ret = PINT_serv_free_reqresp_resources(&sm_p->encoded_req,
+					   sm_p->encoded_resp_p,
+					   &decoded_resp,
+					   &sm_p->svr_addr,
+					   sm_p->max_msg_sz);
+    if (ret != 0) {
+	assert(0);
+    }
 
     /* check permissions */
 
@@ -500,14 +594,182 @@ static int remove_recv_lookup_resp(PINT_client_sm *sm_p,
      * Q: should we check that they are empty?
      */
 
-    /* check that we have necessary metadata -- maybe do getattr? */
+    /* TODO: check that we have necessary metadata from lookup */
 
     return 1;
 }
 
+/* remove_post_getattr_sendrecv()
+ *
+ * Q: DO WE WANT TO REMOVE THE DIRECTORY ENTRY BEFORE THIS???
+ */
+static int remove_post_getattr_sendrecv(PINT_client_sm *sm_p,
+					job_status_s *js_p)
+{
+    int ret;
+    PVFS_msg_tag_t session_tag;
+    job_status_s send_status, recv_status;
+    job_id_t send_id, recv_id;
+
+    gossip_debug(CLIENT_DEBUG, "remove state: post_getattr_sendrecv\n");
+
+    /* do parameter checking */
+
+    /* mark that we have two messages to receive */
+    sm_p->comp_ct = 2;
+
+    /* fill in getattr request */
+    PINT_SERVREQ_GETATTR_FILL(sm_p->req,
+			      *sm_p->cred_p,
+			      sm_p->u.remove.object_ref.fs_id,
+			      sm_p->u.remove.object_ref.handle,
+			      PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_DFILES);
+    
+    /* This function:
+     * - maps object to server
+     * - encodes the request
+     * - calculates the max. response size
+     * - allocates memory for that response
+     * - gets a session tag
+     */
+    ret = PINT_serv_prepare_reqresp(sm_p->u.remove.parent_ref,
+				    &sm_p->req,
+				    &sm_p->encoded_req,
+				    &sm_p->encoded_resp_p,
+				    &sm_p->svr_addr,
+				    &sm_p->max_msg_sz,
+				    &session_tag);
+    if (ret != 0) {
+	assert(0);
+    }
+
+    /* post receive of response */
+    ret = job_bmi_recv(sm_p->svr_addr,
+		       sm_p->encoded_resp_p,
+		       sm_p->max_msg_sz,
+		       session_tag,
+		       BMI_PRE_ALLOC,
+		       sm_p, /* user pointer -- used to get to next state */
+		       &recv_status, /* only for immediate completion */
+		       &recv_id, /* could theoretically be used to unpost */
+		       pint_client_sm_context);
+    if (ret < 0) {
+	assert(0);
+    }
+    else if (ret == 1) {
+	assert(0);
+    }
+    assert(ret == 0); /* just to see that we don't get odd values */
+
+    /* post send of request */
+    ret = job_bmi_send_list(sm_p->encoded_req.dest,
+			    sm_p->encoded_req.buffer_list,
+			    sm_p->encoded_req.size_list,
+			    sm_p->encoded_req.list_count,
+			    sm_p->encoded_req.total_size,
+			    session_tag,
+			    sm_p->encoded_req.buffer_type,
+			    1,
+			    sm_p, /* user pointer, used to get to next state */
+			    &send_status, /* only for immediate completion */
+			    &send_id, /* could in theory be used to unpost */
+			    pint_client_sm_context);
+    if (ret < 0) {
+	assert(0);
+    }
+    else if (ret == 1) {
+	/* send completed immediately; decrement the completion counter */
+	gossip_debug(CLIENT_DEBUG, "remove: getattr send completed immediately.\n");
+	/* TODO: CHECK THE STATUS!!! */
+	assert(send_status.error_code == 0);
+	sm_p->comp_ct--;
+	assert(sm_p->comp_ct == 1);
+    }
+
+    /* TODO: keep up with job ids, so we can match later. */
+
+    return 0;
+}
+
+/* remove_recv_getattr_resp()
+ */
+static int remove_recv_getattr_resp(PINT_client_sm *sm_p,
+				    job_status_s *js_p)
+{
+    int ret;
+    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
+    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
+
+    gossip_debug(CLIENT_DEBUG, "remove state: recv_getattr_resp\n");
+
+    /* we may or may not have previously completed either operation.
+     * here we check to see if there are additional operations that
+     * must complete successfully before we can continue.  if the
+     * counter hits zero, we know we've gotten our data and can
+     * continue.
+     *
+     * otherwise we return 0; we will get called again when the next
+     * bmi job completes.
+     */
+    if (--sm_p->comp_ct > 0) return 0;
+    assert(sm_p->comp_ct == 0);
+
+    /* in the success case we can assume that the last thing we received
+     * was the response.
+     */
+
+    /* decode; resp_p will point to response */
+    ret = PINT_serv_decode_resp(sm_p->encoded_resp_p,
+				&decoded_resp,
+				&sm_p->svr_addr,
+				js_p->actual_size,
+				&resp_p);
+    if (ret < 0) {
+	assert(0);
+    }
+
+
+    /* check status of response */
+    if (resp_p->status != 0) {
+	gossip_err("error: remove sm: status = %d on getattr msg\n",
+		   resp_p->status);
+	assert(0);
+    }
+
+    /* pull out the data that we wanted */
+
+    /* TODO: POPULATE THE PCACHE? */
+
+    gossip_debug(CLIENT_DEBUG, "getattr completed (handle = 0x%08Lx)\n",
+		 sm_p->u.remove.object_ref.handle);
+
+    ret = PINT_serv_free_reqresp_resources(&sm_p->encoded_req,
+					   sm_p->encoded_resp_p,
+					   &decoded_resp,
+					   &sm_p->svr_addr,
+					   sm_p->max_msg_sz);
+    if (ret != 0) {
+	assert(0);
+    }
+
+    /* check permissions */
+
+    /* Q: what do we do with directories?
+     * Q: should we check that they are empty?
+     */
+
+    /* TODO: check that we have necessary metadata from lookup */
+
+    return 1;
+}
+
+/* remove_post_rmdirent_sendrecv()
+ */
 static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
+    gossip_debug(CLIENT_DEBUG, "remove state: post_rmdirent_sendrecv\n");
+
     /* post rmdirent send and receive */
 
     /* NOTE: same issue with posting as in lookup case. */
@@ -584,6 +846,13 @@ static int remove_cleanup(PINT_client_sm *sm_p,
      */
     sm_p->status = *js_p;
 
+    /* if we have a locked pcache entry, release it */
+    if (sm_p->pcache_lock) {
+	assert(sm_p->pcache_lock == 1);
+
+	PINT_pcache_lookup_rls(sm_p->object_pinode_p);
+    }
+
     /* mark operation as complete */
     sm_p->op_complete = 1;
 
@@ -604,6 +873,29 @@ static int remove_lookup_failure(PINT_client_sm *sm_p,
      * SOLUTION: add job_id to the job_status structure, keep up with
      * them in the PINT_client_sm structure so we can tell the
      * difference.
+     */
+
+    return 1;
+}
+
+/* remove_getattr_failure()
+ */
+static int remove_getattr_failure(PINT_client_sm *sm_p,
+				  job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "remove state: getattr_failure\n");
+
+    /* TODO: unpost operations that are still in progress, once we can. */
+
+    /* ISSUE: can't tell which thing completed (with an error).
+     *
+     * SOLUTION: add job_id to the job_status structure, keep up with
+     * them in the PINT_client_sm structure so we can tell the
+     * difference.
+     */
+
+    /* Q: CAN WE HANDLE ALL THE SEND/RECV PAIRS FAILURE CASES WITH ONE
+     * STATE?
      */
 
     return 1;

@@ -15,6 +15,7 @@
 #include "PINT-reqproto-encode.h"
 #include "job.h"
 #include "trove.h"
+#include "pcache.h"
 
 #define PINT_STATE_STACK_SIZE 3
 
@@ -47,6 +48,9 @@ typedef struct PINT_client_sm_s {
     int comp_ct; /* used to keep up with completion of multiple
 		  * jobs for some some states; typically set and
 		  * then decremented to zero as jobs complete */
+
+    int pcache_lock; /* used to indicate that we have a lock to release */
+    PINT_pinode *object_pinode_p;
 
     /* req and encoded_req are needed to send a request */
     struct PVFS_server_req req;

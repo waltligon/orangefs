@@ -120,6 +120,20 @@ struct PVFS_servreq_getattr
     uint32_t attrmask;		    /* mask of desired attributes */
 };
 
+#define PINT_SERVREQ_GETATTR_FILL(__req,	\
+				  __creds,	\
+				  __fsid,	\
+				  __handle,	\
+				  __amask)	\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_GETATTR;		\
+    (__req).credentials = (__creds);		\
+    (__req).u.getattr.fs_id = (__fsid);		\
+    (__req).u.getattr.handle = (__handle);	\
+    (__req).u.getattr.attrmask = (__amask);	\
+} while (0)
+
 struct PVFS_servresp_getattr
 {
     PVFS_object_attr attr;	    /* attributes */
@@ -151,12 +165,12 @@ struct PVFS_servreq_lookup_path
     uint32_t attrmask;
 };
 
-#define PINT_SERV_LOOKUP_PATH_FILL(__req,		\
-				   __creds,		\
-				   __path,		\
-				   __fsid,		\
-				   __handle,		\
-				   __amask)		\
+#define PINT_SERVREQ_LOOKUP_PATH_FILL(__req,		\
+				      __creds,		\
+				      __path,		\
+				      __fsid,		\
+				      __handle,		\
+				      __amask)		\
 do {							\
     memset(&(__req), 0, sizeof(__req));			\
     (__req).op = PVFS_SERV_LOOKUP_PATH;			\
