@@ -168,7 +168,7 @@ static int test_mkdir(int nullCase)
 {
     PVFS_pinode_reference parent_refn;
     uint32_t attrmask;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_sysresp_mkdir resp_mkdir;
 
     int ret = -2;

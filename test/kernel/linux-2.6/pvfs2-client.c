@@ -240,7 +240,7 @@ static int service_mkdir_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_mkdir response;
     PVFS_pinode_reference parent_refn;

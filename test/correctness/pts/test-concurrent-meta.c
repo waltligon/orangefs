@@ -205,7 +205,7 @@ static int create_dir2(char *name, int fs_id)
 {
     PVFS_pinode_reference parent_refn;
     uint32_t attrmask;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_sysresp_mkdir resp_mkdir;
 
     int ret = -2;

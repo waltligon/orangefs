@@ -19,6 +19,7 @@
 
 #include "llist.h"
 #include "pvfs2-sysint.h"
+#include "pvfs2-attr.h"
 #include "gen-locks.h"
 
 

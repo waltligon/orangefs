@@ -27,7 +27,7 @@ extern struct server_configuration_s g_server_config;
  * returns 0 on success, -errno on failure
  */
 int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn, 
-                        PVFS_object_attr attr, 
+                        PVFS_sys_attr attr, 
                         PVFS_credentials credentials, PVFS_sysresp_mkdir *resp)
 {
     struct PVFS_server_req req_p;		/* server request */
@@ -128,7 +128,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     req_p.credentials = credentials;
     req_p.u.mkdir.requested_handle = 0;
     req_p.u.mkdir.fs_id = parent_refn.fs_id;
-    req_p.u.mkdir.attr = attr;
+    PINT_CONVERT_ATTR(&req_p.u.mkdir.attr, &attr);
     /* filter to make sure the caller passed in a reasonable attr mask */
     req_p.u.mkdir.attr.mask &= PVFS_ATTR_SYS_ALL_NOSIZE;
 
@@ -254,10 +254,13 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     /* Fill up the pinode */
     pinode_ptr->pinode_ref.handle = entry.handle;
     pinode_ptr->pinode_ref.fs_id = parent_refn.fs_id;
-    pinode_ptr->attr = attr;
-    /* filter to make sure mask is reasonable */
-    pinode_ptr->attr.mask &= PVFS_ATTR_COMMON_ALL;
+    
+    PINT_CONVERT_ATTR(&(pinode_ptr->attr), &attr);
+    /* filter to make sure the caller passed in a reasonable attr mask */
+    pinode_ptr->attr.mask &= PVFS_ATTR_SYS_ALL_NOSIZE;
+
     /* set the object type */
+    pinode_ptr->attr.mask |= PVFS_ATTR_COMMON_TYPE;
     pinode_ptr->attr.objtype = PVFS_TYPE_DIRECTORY;
 
     /* Fill in the timestamps */

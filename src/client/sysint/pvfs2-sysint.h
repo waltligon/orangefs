@@ -14,7 +14,6 @@
 #endif
 
 #include "pvfs2-types.h"
-#include "pvfs2-attr.h"
 #include "pvfs-request.h"
 
 /* TODO: note that this should be a derived value eventually.  For
@@ -278,7 +277,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 		PVFS_credentials credentials);
 int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn, 
-		PVFS_object_attr attr, 
+		PVFS_sys_attr attr, 
 		PVFS_credentials credentials, PVFS_sysresp_mkdir *resp);
 int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token, 
 		int pvfs_dirent_incount, PVFS_credentials credentials, 

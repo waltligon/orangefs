@@ -73,7 +73,7 @@ int create_dir(PVFS_pinode_reference parent_refn, char *name,
                PVFS_pinode_reference *out_refn)
 {
     int ret = -1;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_mkdir resp_mkdir;
 
