@@ -38,7 +38,7 @@ static int pvfs2_create(
 
     if (inode)
     {
-        dir->i_nlink++;
+        inode->i_nlink++;
         ret = 0;
     }
     return ret;
@@ -190,14 +190,7 @@ static int pvfs2_link(
     struct inode *dir,
     struct dentry *dentry)
 {
-/*     struct inode *inode = pvfs2_create_entry( */
-/*         dir, dentry, mode, PVFS2_VFS_OP_LINK); */
-
     pvfs2_print("pvfs2: pvfs2_link called\n");
-/*     if (dir->i_nlink >= PVFS2_LINK_MAX) */
-/*     { */
-/* 	return -EMLINK; */
-/*     } */
     return -ENOSYS;
 }
 
@@ -213,7 +206,6 @@ static int pvfs2_unlink(
     if (ret == 0)
     {
         inode->i_ctime = dir->i_ctime;
-	inode->i_nlink--;
     }
     return ret;
 }
@@ -279,7 +271,6 @@ static int pvfs2_rmdir(
         if (ret == 0)
         {
             inode->i_size = 0;
-            inode->i_nlink--;
             dir->i_nlink--;
         }
     }

@@ -98,7 +98,7 @@ static void pvfs2_put_inode(
                 (int)inode->i_nlink);
 
     /* set nlink to 0 to allow the inode to be freed */
-    inode->i_nlink = 0;
+/*     inode->i_nlink = 0; */
 
     if (atomic_read(&inode->i_count) == 1)
     {
