@@ -228,6 +228,27 @@ discussion of problems on the mailing lists we ensure that the discussion is
 archived and that everyone has a chance to respond.
 
 %
+% Problems and Solutions
+%
+
+\section{Problems and Solutions}
+This section covers error conditions you might encounter, what they might mean,
+and how to fix them.
+
+\subsection{When I try to mount, I get 'wrong fs type, bad option, bad
+superblock...'}
+
+First, make 100\% sure you typed the mount command correctly. As discussed in the PVFS2 quickstart, a mount command will look like this:
+\begin{verbatim}
+prompt# mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2
+\end{verbatim}
+
+This error could also mean a pvfs2-client process is not running, either
+because it was not started before the mount command, or died at some point. If
+you can reliably (or even intermittently) cause the pvfs2-client to exit
+abnormally, please send a report to the developers.
+
+%
 % PERFORMANCE
 %
 \section{Performance}
