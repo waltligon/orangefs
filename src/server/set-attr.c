@@ -13,12 +13,19 @@
 #include "pvfs2-attr.h"
 #include "job-consist.h"
 
-static int setattr_init(state_action_struct *s_op, job_status_s *ret);
-static int setattr_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int setattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret);
-static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret);
-static int setattr_send_bmi(state_action_struct *s_op, job_status_s *ret);
-static int setattr_release_posted_job(state_action_struct *s_op, job_status_s *ret);
+enum {
+    STATE_METAFILE = 7,
+};
+
+static int setattr_init(PINT_server_op *s_op, job_status_s *ret);
+static int setattr_cleanup(PINT_server_op *s_op, job_status_s *ret);
+static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret);
+static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret);
+static int setattr_write_metafile_datafile_handles(PINT_server_op *s_op, job_status_s *ret);
+static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_s *ret);
+static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret);
+static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
+static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret);
 void setattr_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -33,7 +40,15 @@ PINT_state_machine_s setattr_req_s =
 
 %%
 
-machine set_attr(init, cleanup, getobj_attrib, setobj_attrib, send_bmi, release)
+machine set_attr(init,
+		 cleanup,
+		 getobj_attrib,
+		 verify_attribs,
+		 write_metafile_datafile_handles,
+		 write_metafile_distribution,
+		 setobj_attrib,
+		 send_bmi,
+		 release)
 {
 	state init
 	{
@@ -44,7 +59,29 @@ machine set_attr(init, cleanup, getobj_attrib, setobj_attrib, send_bmi, release)
 	state getobj_attrib
 	{
 		run setattr_getobj_attribs;
-		default => setobj_attrib;
+		default => verify_attribs;
+	}
+
+	state verify_attribs
+	{
+		run setattr_verify_attribs;
+		STATE_METAFILE => write_metafile_datafile_handles;
+		success        => setobj_attrib;
+		default        => send_bmi;
+	}
+
+	state write_metafile_datafile_handles
+        {
+		run setattr_write_metafile_datafile_handles;
+		success => write_metafile_distribution;
+		default => send_bmi;
+	}
+
+	state write_metafile_distribution
+        {
+		run setattr_write_metafile_distribution;
+		success => setobj_attrib;
+		default => send_bmi;
 	}
 
 	state setobj_attrib
@@ -106,14 +143,33 @@ void setattr_init_state_machine(void)
  */
 
 
-static int setattr_init(state_action_struct *s_op, job_status_s *ret)
+static int setattr_init(PINT_server_op *s_op, job_status_s *ret)
 {
-
+    PVFS_object_attr *a_p;
     int job_post_ret;
 
-    s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+    gossip_debug(SERVER_DEBUG, "setattr state: init\n");
 
+    /* Dale noted that if ATTR_TYPE is set, the object might have just been
+     * created and we might want to just skip this.  But he wasn't sure.
+     */
+
+    a_p = &s_op->req->u.setattr.attr;
+
+    gossip_debug(SERVER_DEBUG,
+		 "  attributes from request = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		 a_p->owner,
+		 a_p->group,
+		 a_p->perms,
+		 a_p->objtype);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  setting attributes for fs_id = 0x%x, handle = 0x%08Lx\n",
+		 s_op->req->u.setattr.fs_id,
+		 s_op->req->u.setattr.handle);
+
+    /* allocate space for holding read attributes */
+    /* TODO: MOVE THIS INTO A SETATTR-SPECIFIC SCRATCH SPACE IN THE S_OP STRUCTURE */
     s_op->val.buffer = (void *) malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 
     /* post a scheduler job */
@@ -140,44 +196,96 @@ static int setattr_init(state_action_struct *s_op, job_status_s *ret)
  *           
  */
 
-static int setattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret)
+static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
-    job_id_t i;
+    job_id_t j_id;
 
-    /* 
-       If ATTR_TYPE is set, assume that the object was just created.
-       Therefore the keyval space does not exist. =)
-TODO: Can I do that?  dw
+
+    gossip_debug(SERVER_DEBUG, "setattr state: getobj_attribs\n");
+
+    /* Dale noted that if ATTR_TYPE is set, the object might have just been
+     * created and we might want to just skip this.  But he wasn't sure.
      */
 
+    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-#if 0
-    if (s_op->req->u.setattr.attrmask & ATTR_TYPE)
-    {
-	gossip_debug(SERVER_DEBUG,"Returning 1\n");
-	return(1);
-    }
-    else
-    {
-#endif
-	job_post_ret = job_trove_keyval_read(s_op->req->u.setattr.fs_id,
-		s_op->req->u.setattr.handle,
-		&(s_op->key),
-		&(s_op->val),
-		0,
-		NULL,
-		s_op,
-		ret,
-		&i);
-#if 0
-    }
-#endif
+    gossip_debug(SERVER_DEBUG,
+		 "  reading attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.setattr.fs_id,
+		 s_op->req->u.setattr.handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
 
+    job_post_ret = job_trove_keyval_read(s_op->req->u.setattr.fs_id,
+					 s_op->req->u.setattr.handle,
+					 &(s_op->key),
+					 &(s_op->val),
+					 0,
+					 NULL,
+					 s_op,
+					 ret,
+					 &j_id);
     return(job_post_ret);
-
 }
+
+
+/*
+ * Function: setattr_verify_attribs
+ *
+ * Notes:
+ * - attributes were placed in s_op->val.buffer by setattr_getobj_attribs()
+ *   - we free this buffer here rather than later on
+ */
+static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
+{
+    PVFS_object_attr *a_p;
+
+    gossip_debug(SERVER_DEBUG, "setattr state: verify_attribs\n");
+
+    a_p = (PVFS_object_attr *) s_op->val.buffer;
+
+    if (ret->error_code != 0) {
+	gossip_debug(SERVER_DEBUG,
+		     "  previous keyval read had an error (new metafile?); data is useless\n");
+    }
+    else {
+	gossip_debug(SERVER_DEBUG,
+		     "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		     a_p->owner,
+		     a_p->group,
+		     a_p->perms,
+		     a_p->objtype);
+    }
+
+    /* TODO: LOOK AT ATTRIBUTE MASK, SET UP s_op->req->u.setattr.attr for writing
+     * in next step
+     */
+
+    /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
+    if ((ret->error_code != 0 && s_op->req->u.setattr.attr.objtype == PVFS_TYPE_METAFILE) || a_p->objtype == PVFS_TYPE_METAFILE)
+    {
+	free(s_op->val.buffer);
+	gossip_debug(SERVER_DEBUG,
+		     "  handle 0x%08Lx refers to a metafile\n",
+		     s_op->req->u.setattr.handle);
+	ret->error_code = STATE_METAFILE;
+    }
+    else {
+	free(s_op->val.buffer);
+	gossip_debug(SERVER_DEBUG,
+		     "  handle 0x%08Lx refers to something other than a metafile\n",
+		     s_op->req->u.setattr.handle);
+	ret->error_code = 0;
+    }
+    
+    return 1;
+}
+
 
 /*
  * Function: setattr_setobj_attribs
@@ -190,79 +298,152 @@ TODO: Can I do that?  dw
  * Synopsis: 
  *           
  */
-
-static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
+static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
 {
 
+    PVFS_object_attr *a_p;
+    int job_post_ret=0;
+    job_id_t j_id;
+
+    gossip_debug(SERVER_DEBUG, "setattr state: setobj_attribs\n");
+
+    a_p = &s_op->req->u.setattr.attr;
+
+    gossip_debug(SERVER_DEBUG,
+		 "  attrs to write = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		 a_p->owner,
+		 a_p->group,
+		 a_p->perms,
+		 a_p->objtype);
+
+    /* set up key and value structure for keyval write */
+    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+
+    s_op->val.buffer    = &s_op->req->u.setattr.attr;
+    s_op->val.buffer_sz = sizeof(struct PVFS_object_attr);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.setattr.fs_id,
+		 s_op->req->u.setattr.handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
+
+    job_post_ret = job_trove_keyval_write(
+					  s_op->req->u.setattr.fs_id,
+					  s_op->req->u.setattr.handle,
+					  &(s_op->key),
+					  &(s_op->val),
+					  TROVE_SYNC /* flags */,
+					  NULL,
+					  s_op,
+					  ret,
+					  &j_id);
+    return(job_post_ret);
+}
+
+
+/*
+ * Function: setattr_write_metafile_datafile_handles
+ */
+static int setattr_write_metafile_datafile_handles(PINT_server_op *s_op, job_status_s *ret)
+{
     /*PVFS_object_attr *old_attr;*/
     int job_post_ret=0;
-    job_id_t i;
+    job_id_t j_id;
 
-#if 0
-    /* TODO: Check Credentials here */
-    if (s_op->val.buffer)
-	old_attr = s_op->val.buffer;
-    else
-#endif
+    gossip_debug(SERVER_DEBUG, "setattr state: write_metafile_datafile_handles\n");
 
-	free(s_op->val.buffer);
-    s_op->val.buffer = &(s_op->req->u.setattr.attr);
-    /* From here, we check the mask of the attributes. */
+    /* we should have at least one datafile... */
+    assert(s_op->req->u.setattr.attr.u.meta.nr_datafiles > 0);
 
-#if 0 // Harish changed it!
-    if(s_op->req->u.setattr.attrmask & ATTR_UID)
-	old_attr->owner = s_op->req->u.setattr.attr.owner;
+    /* set up key and value structure for keyval write */
+    s_op->key.buffer    = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
 
-    if(s_op->req->u.setattr.attrmask & ATTR_GID)
-	old_attr->group = s_op->req->u.setattr.attr.group;
+    gossip_debug(SERVER_DEBUG,
+		 "  metafile has %d datafiles associated with it\n",
+		 s_op->req->u.setattr.attr.u.meta.nr_datafiles);
 
-    if(s_op->req->u.setattr.attrmask & ATTR_PERM)
-	old_attr->perms = s_op->req->u.setattr.attr.perms;
+    s_op->val.buffer    = s_op->req->u.setattr.attr.u.meta.dfh;
+    s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
 
-    if(s_op->req->u.setattr.attrmask & ATTR_ATIME)
-	old_attr->atime = s_op->req->u.setattr.attr.atime;
+    gossip_debug(SERVER_DEBUG,
+		 "  writing datafile handles (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.setattr.fs_id,
+		 s_op->req->u.setattr.handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
 
-    if(s_op->req->u.setattr.attrmask & ATTR_CTIME)
-	old_attr->ctime = s_op->req->u.setattr.attr.ctime;
-
-    if(s_op->req->u.setattr.attrmask & ATTR_MTIME)
-	old_attr->mtime = s_op->req->u.setattr.attr.mtime;
-
-    if(s_op->req->u.setattr.attrmask & ATTR_TYPE)
-	old_attr->objtype = s_op->req->u.setattr.attr.objtype;
-
-    /* TODO: What to do about these unions, inc. the one with a ptr.
-     *	TODO:	Also what about ATTR_SIZE?? 
-     */
-
-    if(s_op->req->u.setattr.attrmask & ATTR_META)
-	old_attr->u.meta = s_op->req->u.setattr.attr.u.meta;
-
-    if(s_op->req->u.setattr.attrmask & ATTR_DATA)
-	old_attr->u.data = s_op->req->u.setattr.attr.u.data;
-
-    if(s_op->req->u.setattr.attrmask & ATTR_DIR)
-	old_attr->u.dir = s_op->req->u.setattr.attr.u.dir;
-
-    if(s_op->req->u.setattr.attrmask & ATTR_SYM)
-	old_attr->u.sym = s_op->req->u.setattr.attr.u.sym;
-#endif
-
-
-    gossip_debug(SERVER_DEBUG,"Writing trove values\n");
-    job_post_ret = job_trove_keyval_write(
-	    s_op->req->u.setattr.fs_id,
-	    s_op->req->u.setattr.handle,
-	    &(s_op->key),
-	    &(s_op->val),
-	    TROVE_SYNC /* flags */,
-	    NULL,
-	    s_op,
-	    ret,
-	    &i);
+    job_post_ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
+					  s_op->req->u.setattr.handle,
+					  &(s_op->key),
+					  &(s_op->val),
+					  TROVE_SYNC /* flags */,
+					  NULL,
+					  s_op,
+					  ret,
+					  &j_id);
 
     return(job_post_ret);
 
+}
+
+/*
+ * Function: setattr_write_metafile_distribution
+ */
+static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_s *ret)
+{
+    /*PVFS_object_attr *old_attr;*/
+    int job_post_ret=0;
+    job_id_t j_id;
+
+    gossip_debug(SERVER_DEBUG, "setattr state: write_metafile_distribution\n");
+
+#if 0
+    /* distribution should take up non-negative space :) */
+    assert(s_op->req->u.setattr.attr.u.meta.dist_size >= 0);
+#endif
+
+    /* set up key and value structure for keyval write */
+    s_op->key.buffer    = Trove_Common_Keys[METAFILE_DIST_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
+
+    gossip_debug(SERVER_DEBUG,
+		 "  metafile distribution size = %Ld\n",
+		 s_op->req->u.setattr.attr.u.meta.dist_size);
+
+    s_op->val.buffer    = s_op->req->u.setattr.attr.u.meta.dist;
+    s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.meta.dist_size;
+
+    gossip_debug(SERVER_DEBUG,
+		 "  writing distribution (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.setattr.fs_id,
+		 s_op->req->u.setattr.handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
+
+#if 0
+    job_post_ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
+					  s_op->req->u.setattr.handle,
+					  &(s_op->key),
+					  &(s_op->val),
+					  TROVE_SYNC /* flags */,
+					  NULL,
+					  s_op,
+					  ret,
+					  &j_id);
+    return(job_post_ret);
+#else
+    return 1;
+#endif
 }
 
 /*
@@ -277,7 +458,7 @@ static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
  *           
  */
 
-static int setattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
+static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
@@ -356,7 +537,7 @@ static int setattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
 
-static int setattr_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
@@ -382,7 +563,7 @@ static int setattr_release_posted_job(state_action_struct *s_op, job_status_s *r
  */
 
 
-static int setattr_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int setattr_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
 
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);

@@ -227,7 +227,7 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
     s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_object_attr);
 
     gossip_debug(SERVER_DEBUG,
-		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf =  0x%08x (%d))\n",
+		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
 		 s_op->req->u.lookup_path.fs_id,
 		 handle,
 		 (char *) s_op->u.lookup.k_a->buffer,
