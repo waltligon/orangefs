@@ -47,6 +47,7 @@ static ssize_t pvfs2_file_read(
     struct pvfs_bufmap_desc* desc;
     int ret = -1;
     char* current_buf = buf;
+    loff_t original_offset = *offset;
 
     pvfs2_print("pvfs2: pvfs2_file_read called on %s\n",
 		file->f_dentry->d_name.name);
@@ -58,6 +59,9 @@ static ssize_t pvfs2_file_read(
 		    "kmem_cache_alloc failed!\n");
 	return -ENOMEM;
     }
+
+    new_op->upcall.type = PVFS2_VFS_OP_FILE_READ;
+    /* TODO: how do I tell it what file I want to work on? */
 
     while(total_count < count)
     {
@@ -71,7 +75,9 @@ static ssize_t pvfs2_file_read(
 	ret = pvfs_bufmap_get(&desc);
 	if(ret < 0)
 	{
+	    *offset = original_offset;
 	    op_release(new_op);
+	    pvfs2_error("pvfs2: error: pvfs_bufmap_get() failure.\n");
 	    return(ret);
 	}
     
@@ -81,27 +87,56 @@ static ssize_t pvfs2_file_read(
 	else
 	    each_count = count - total_count;
 
-	/* TODO: how do I tell it what file I want to work on? */
-	new_op->upcall.type = PVFS2_VFS_OP_FILE_READ;
 	new_op->upcall.req.read.buf = desc->uaddr;
 	new_op->upcall.req.read.count = each_count;
 	new_op->upcall.req.read.offset = *offset;
 
-	/* TODO: submit upcall */
-	/* TODO: wait for downcall */
-	/* TODO: we need a way for the downcall to report if the read was
-	 * short (EOF, etc.) - if so, then don't copy so much, and fall out of 
-	 * loop...
-	 */
+	/* post req and wait for response */
+	add_op_to_request_list(new_op);
+	if((ret = wait_for_matching_downcall(new_op)) != 0)
+	{
+	    /* TODO: I don't know what to do here... */
+	    printk("pvfs2: pvfs2_file_read -- wait failed (%x).  "
+		   "op invalidated (not really)\n", ret);
+	    pvfs_bufmap_put(desc);
+	    op_release(new_op);
+	    /* TODO: return error, or how much we read so far?  what
+	     * does error returned from wait_for_matching_downcall()
+	     * mean?
+	     */
+	    *offset = original_offset;
+	    return(ret);
+	}
+	
+	if(new_op->downcall.status != 0)
+	{
+	    pvfs_bufmap_put(desc);
+	    op_release(new_op);
+	    *offset = original_offset;
+	    pvfs2_error("pvfs2: error: read downcall status.\n");
+	    return(new_op->downcall.status);
+	}
 
 	/* copy data out to application */
-	pvfs_bufmap_copy_to_user(current_buf, desc, each_count);
+	if(new_op->downcall.resp.read.amt_read)
+	{
+	    pvfs_bufmap_copy_to_user(current_buf, desc,
+		new_op->downcall.resp.read.amt_read);
+	}
 
 	pvfs_bufmap_put(desc);
 
-	current_buf += each_count;
-	*offset += each_count;
-	total_count += each_count;
+	current_buf += new_op->downcall.resp.read.amt_read;
+	*offset += new_op->downcall.resp.read.amt_read;
+	total_count += new_op->downcall.resp.read.amt_read;
+
+	/* if we got a short read, fall out and return what we
+	 * got so far
+	 */
+	if(new_op->downcall.resp.read.amt_read < each_count)
+	{
+	    break;
+	}
     }
 
     op_release(new_op);
