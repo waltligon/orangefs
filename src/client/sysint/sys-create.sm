@@ -114,7 +114,7 @@ machine pvfs2_client_create_sm(
 
     state dspace_create_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => datafiles_setup_msgpair_array;
         default => dspace_create_failure;
     }
@@ -154,7 +154,7 @@ machine pvfs2_client_create_sm(
 
     state create_setattr_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => crdirent_setup_msgpair;
         default => create_setattr_failure;
     }
@@ -174,7 +174,7 @@ machine pvfs2_client_create_sm(
 
     state crdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => cleanup;
         default => crdirent_failure;
     }
@@ -520,6 +520,13 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = create_create_comp_fn;
 
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -545,6 +552,8 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
 
     /* allocate msgarray and set msgarray_count */
+    if (sm_p->msgarray != &(sm_p->msgpair))
+	    free(sm_p->msgarray);
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
         malloc(sm_p->u.create.num_data_files *
                sizeof(PINT_client_sm_msgpair_state));
@@ -680,6 +689,16 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* in the single message case (formerly msgpair), msgarray points to the
+     * single statically allocated msgpair member.  so free only if dynamically
+     * allocated */
+    if (sm_p->msgarray != &(sm_p->msgpair) )
+	free(sm_p->msgarray);
+
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -729,6 +748,16 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* in the single message case (formerly msgpair), msgarray points to the
+     * single statically allocated msgpair member.  so free only if dynamically
+     * allocated */
+    if (sm_p->msgarray != &(sm_p->msgpair) )
+	free(sm_p->msgarray);
+
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count =1;
+
     return 1;
 }
 
@@ -771,7 +800,10 @@ static int create_delete_handles_setup_msgpair_array(
         return 1;
     }
 
-    if (sm_p->msgarray)
+    /* in the single message case (formerly msgpair), msgarray points to the
+     * single statically allocated msgpair member.  so free only if dynamically
+     * allocated */
+    if (sm_p->msgarray != &(sm_p->msgpair))
     {
         free(sm_p->msgarray);
     }
@@ -881,7 +913,11 @@ static int create_cleanup(PINT_client_sm *sm_p,
         PVFS_Dist_free(sm_p->u.create.dist);
     }
 
-    if (sm_p->msgarray)
+
+    /* in the single message case (formerly msgpair), msgarray points to the
+     * single statically allocated msgpair member.  so free only if dynamically
+     * allocated */
+    if (sm_p->msgarray != &(sm_p->msgpair))
     {
         free(sm_p->msgarray);
     }

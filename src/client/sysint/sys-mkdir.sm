@@ -87,7 +87,7 @@ machine pvfs2_client_mkdir_sm(init,
 
     state mkdir_msg_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => mkdir_crdirent_setup_msgpair;
         default => mkdir_msg_failure;
     }
@@ -107,7 +107,7 @@ machine pvfs2_client_mkdir_sm(init,
 
     state mkdir_crdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => cleanup;
         default => mkdir_crdirent_failure;
     }
@@ -308,6 +308,10 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_msg_comp_fn;
 
+    /* 'msgpairarray' can process 'msgpair' */
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -355,6 +359,11 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* make 'msgpairarray' process 'msgpair' requests */
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 

@@ -96,7 +96,7 @@ machine pvfs2_client_symlink_sm(init,
 
     state dspace_create_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => crdirent_setup_msgpair;
         default => dspace_create_failure;
     }
@@ -116,7 +116,7 @@ machine pvfs2_client_symlink_sm(init,
 
     state crdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => symlink_setattr_setup_msgpair;
         default => crdirent_failure;
     }
@@ -136,7 +136,7 @@ machine pvfs2_client_symlink_sm(init,
 
     state symlink_setattr_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => cleanup;
         default => symlink_setattr_failure;
     }
@@ -359,6 +359,10 @@ static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_create_comp_fn;
 
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -407,6 +411,15 @@ static int symlink_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* in the single message case (formerly msgpair), msgarray points to the
+     * single statically allocated msgpair member.  so free only if dynamically
+     * allocated */
+    if (sm_p->msgarray != &(sm_p->msgpair) )
+	free(sm_p->msgarray);
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -463,6 +476,16 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* in the single message case (formerly msgpair), msgarray points to the
+     * single statically allocated msgpair member.  so free only if dynamically
+     * allocated */
+    if (sm_p->msgarray != &(sm_p->msgpair) )
+	free(sm_p->msgarray);
+
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -489,7 +512,7 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
     /* fill in outgoing response fields */
     sm_p->u.sym.sym_resp->ref = symlink_ref;
 
-    if (sm_p->msgarray)
+    if (sm_p->msgarray != &(sm_p->msgpair))
     {
         free(sm_p->msgarray);
     }

@@ -17,7 +17,6 @@ CSRC := \
 
 SMSRC := \
 	msgpairarray.sm \
-	msgpair.sm \
 	getattr-acache.sm \
 	lookup-ncache.sm \
 	sys-getattr.sm \

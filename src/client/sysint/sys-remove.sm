@@ -102,7 +102,7 @@ machine pvfs2_client_remove_sm(init,
 
     state rmdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => getattr_setup_msgpair;
         MSGPAIR_RETURN_SUCCESS => getattr_setup_msgpair;
         default => rmdirent_failure;
@@ -146,7 +146,7 @@ machine pvfs2_client_remove_sm(init,
 
     state check_dir_contents_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => object_remove_setup_msgpair;
         default => check_dir_contents_failure;
     }
@@ -186,7 +186,7 @@ machine pvfs2_client_remove_sm(init,
 
     state object_remove_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => cleanup;
         MSGPAIR_RETURN_SUCCESS => cleanup;
         default => object_remove_failure;
@@ -207,7 +207,7 @@ machine pvfs2_client_remove_sm(init,
 
     state crdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => cleanup;
         MSGPAIR_RETURN_SUCCESS => cleanup;
         default => crdirent_failure;
@@ -365,6 +365,11 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+    
     return 1;
 }
 
@@ -477,6 +482,11 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -544,6 +554,11 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -633,6 +648,11 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -690,6 +710,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 	gossip_lerr("Error: failed to resolve server addresses.\n");
 	js_p->error_code = ret;
     }
+
     return 1;
 }
 
@@ -723,6 +744,17 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
+
+    /* in the single message case (formerly msgpair), msgarray points to the
+     * single statically allocated msgpair member.  so free only if dynamically
+     * allocated */
+    if (sm_p->msgarray != &(sm_p->msgpair) )
+	free (sm_p->msgarray);
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+
     return 1;    
 }
 
@@ -743,8 +775,10 @@ static int remove_cleanup(PINT_client_sm *sm_p,
 	PINT_acache_release(sm_p->pinode);
     }
 
-    if (sm_p->msgarray)
-    {
+    /* in the single message case (formerly msgpair), msgarray points to the
+     * single statically allocated msgpair member.  so free only if dynamically
+     * allocated */
+    if (sm_p->msgarray != &(sm_p->msgpair) ) {
         free(sm_p->msgarray);
         sm_p->msgarray = NULL;
     }

@@ -78,7 +78,7 @@ machine pvfs2_client_setattr_sm(init,
 
     state setattr_msg_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => cleanup;
         default => setattr_msg_failure;
     }
@@ -263,6 +263,11 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 

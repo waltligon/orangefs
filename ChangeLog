@@ -5,7 +5,7 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.1.4pre1
 ===============
--
+- scrap msgpair.  use one-element msgpairarray instead.
 
 
 pvfs2-0.1.3

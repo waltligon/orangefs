@@ -78,7 +78,7 @@ machine pvfs2_client_readdir_sm(init,
 
     state readdir_msg_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => cleanup;
         default => readdir_msg_failure;
     }
@@ -231,6 +231,12 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = readdir_msg_comp_fn;
     msg_p->svr_addr = server_addr;
+
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 

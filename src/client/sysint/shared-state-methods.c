@@ -54,6 +54,11 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -101,6 +106,11 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 

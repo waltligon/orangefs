@@ -122,7 +122,7 @@ machine pvfs2_client_rename_sm(init,
 
     state rename_crdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => rename_rmdirent_setup_msgpair;
         default => rename_crdirent_failure;
     }
@@ -142,7 +142,7 @@ machine pvfs2_client_rename_sm(init,
 
     state rename_rmdirent_xfer_msgpair
     {
-        jump pvfs2_client_msgpair_sm;
+        jump pvfs2_client_msgpairarray_sm;
         success => cleanup;
         default => rename_rmdirent_failure;
     }
@@ -500,7 +500,8 @@ static int rename_get_attrs_setup_msgpair_array(
     js_p->error_code = 0;
 
     /* free the previously allocated lookup msgs */
-    free(sm_p->msgarray);
+    if (sm_p->msgarray != &(sm_p->msgpair))
+	free(sm_p->msgarray);
 
     /* allocate msgarray and set msgarray_count */
     sm_p->msgarray_count = 2;
@@ -599,7 +600,8 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting crdirent req\n");
 
     assert(sm_p->msgarray);
-    free(sm_p->msgarray);
+    if (sm_p->msgarray != &(sm_p->msgpair)) 
+	free(sm_p->msgarray);
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -631,6 +633,11 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -696,6 +703,13 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+    
+    /* let 'msgpairarray' handle the 'msgpair' case */
+    if (sm_p->msgarray != msg_p)
+	    free (sm_p->msgarray);
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     return 1;
 }
 
@@ -734,6 +748,13 @@ static int rename_cleanup(PINT_client_sm *sm_p,
     sm_p->error_code = js_p->error_code;
 
     sm_p->op_complete = 1;
+
+    /* in the single message case (formerly msgpair), msgarray points to the
+     * single statically allocated msgpair member.  so free only if dynamically
+     * allocated */
+    if (sm_p->msgarray != &(sm_p->msgpair) )
+	free(sm_p->msgarray);
+
     return 0;
 }
 
