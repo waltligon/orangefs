@@ -309,8 +309,9 @@ int main(int argc, char **argv)	{
 		/* check for completion of data payload recv */
 		do
 		{
-			ret = BMI_test(server_ops[0], &outcount, &error_code,
-			&actual_size, NULL, 10, context);
+			fprintf(stderr, "Calling testcontext().\n");
+			ret = BMI_testcontext(1, &(server_ops[0]), &outcount, 
+				&error_code, &actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0) 

@@ -83,6 +83,14 @@ int BMI_gm_testsome(int incount,
 		    void **user_ptr_array,
 		    int max_idle_time_ms,
 		    bmi_context_id context_id);
+int BMI_gm_testcontext(int incount,
+    bmi_op_id_t * out_id_array,
+    int *outcount,
+    bmi_error_code_t * error_code_array,
+    bmi_size_t * actual_size_array,
+    void **user_ptr_array,
+    int max_idle_time_ms,
+    bmi_context_id context_id);
 int BMI_gm_testunexpected(int incount,
 			  int *outcount,
 			  struct method_unexpected_info *info,
@@ -107,7 +115,7 @@ struct bmi_method_ops bmi_gm_ops = {
     BMI_gm_post_recv,
     BMI_gm_test,
     BMI_gm_testsome,
-    NULL,
+    BMI_gm_testcontext,
     BMI_gm_testunexpected,
     BMI_gm_method_addr_lookup,
     NULL,
@@ -1039,7 +1047,7 @@ int BMI_gm_test(bmi_op_id_t id,
 
     if(gm_op_data->complete)
     {
-	/* TODO: assert that it is in the correct context */
+	assert(query_op->context_id == context_id);
 	op_list_remove(query_op);
 	if(user_ptr != NULL)
 	{
@@ -1091,7 +1099,7 @@ int BMI_gm_testsome(int incount,
 	    gm_op_data = query_op->method_data;
 	    if(gm_op_data->complete)
 	    {
-		/* TODO: assert that it is in the right context */
+		assert(query_op->context_id == context_id);
 		op_list_remove(query_op);
 		error_code_array[*outcount] = query_op->error_code;
 		actual_size_array[*outcount] = query_op->actual_size;
@@ -1102,6 +1110,52 @@ int BMI_gm_testsome(int incount,
 		(*outcount)++;
 	    }
 	}
+    }
+
+    return(0);
+}
+
+
+/* BMI_gm_testcontext()
+ *
+ * Checks to see if any operations from the specified context have
+ * completed
+ *
+ * returns 0 on success, -errno on failure
+ */
+int BMI_gm_testcontext(int incount,
+    bmi_op_id_t * out_id_array,
+    int *outcount,
+    bmi_error_code_t * error_code_array,
+    bmi_size_t * actual_size_array,
+    void **user_ptr_array,
+    int max_idle_time_ms,
+    bmi_context_id context_id)
+{
+    int ret = -1;
+    method_op_p query_op = NULL;
+
+    /* do some ``real work'' here */
+    ret = gm_do_work(max_idle_time_ms*1000);
+    if (ret < 0)
+    {
+	return (ret);
+    }
+
+    *outcount = 0;
+
+    while((*outcount < incount) && (query_op = 
+	op_list_shownext(completion_array[context_id])))
+    {
+	assert(query_op->context_id == context_id);
+	op_list_remove(query_op);
+	error_code_array[*outcount] = query_op->error_code;
+	actual_size_array[*outcount] = query_op->actual_size;
+	out_id_array[*outcount] = query_op->op_id;
+	if(user_ptr_array != NULL)
+	    user_ptr_array[*outcount] = query_op->user_ptr;
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
     }
 
     return(0);
