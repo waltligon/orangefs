@@ -227,6 +227,10 @@ static int io_release(state_action_struct *s_op, job_status_s *ret)
 
 	gossip_ldebug(SERVER_DEBUG, "IO: io_release() executed.\n");
 
+	/* let go of our encoded buffer */
+	PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP, 0);
+
+	/* tell the scheduler that we are done with this operation */
 	job_post_ret = job_req_sched_release(s_op->scheduled_id,
 													  s_op,
 													  ret,
