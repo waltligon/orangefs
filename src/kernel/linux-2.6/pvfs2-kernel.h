@@ -700,8 +700,8 @@ do {                                                                 \
 #define pvfs2_recalc_sigpending() recalc_sigpending(current)
 #define pvfs2_d_splice_alias(dentry, inode) d_add(dentry, inode)
 #define pvfs2_kernel_readpage block_read_full_page
-#define pvfs2_set_page_reserved SetPageReserved
-#define pvfs2_clear_page_reserved ClearPageReserved
+#define pvfs2_set_page_reserved(page) SetPageReserved(page)
+#define pvfs2_clear_page_reserved(page) ClearPageReserved(page)
 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
@@ -727,8 +727,8 @@ do                                                \
 #define pvfs2_recalc_sigpending recalc_sigpending
 #define pvfs2_d_splice_alias(dentry, inode) d_splice_alias(inode, dentry)
 #define pvfs2_kernel_readpage mpage_readpage
-#define pvfs2_set_page_reserved do {} while(0)
-#define pvfs2_clear_page_reserved do {} while(0)
+#define pvfs2_set_page_reserved(page) do {} while(0)
+#define pvfs2_clear_page_reserved(page) do {} while(0)
 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
