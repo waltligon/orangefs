@@ -2,8 +2,10 @@ DIR := src/common/misc
 LIBSRC += $(DIR)/server-config.c \
           $(DIR)/str-utils.c \
 	  $(DIR)/extent-utils.c \
-	  $(DIR)/errno-mapping.c
+	  $(DIR)/errno-mapping.c \
+	  $(DIR)/mkspace.c
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/str-utils.c \
 	     $(DIR)/extent-utils.c \
-	     $(DIR)/errno-mapping.c
+	     $(DIR)/errno-mapping.c \
+	     $(DIR)/mkspace.c
