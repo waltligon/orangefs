@@ -679,7 +679,7 @@ static int handlelist_find_handle(PVFS_handle handle, int *server_idx_p)
     for (i = 0; i < handlelist_server_count; i++) {
 	int j;
 
-	for (j = 0; i < handlelist_used[i]; j++) {
+	for (j = 0; j < handlelist_used[i]; j++) {
 	    if (handlelist_list[i][j] == handle) {
 		*server_idx_p = i;
 		return 0;
