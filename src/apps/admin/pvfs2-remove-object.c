@@ -137,15 +137,10 @@ static options_t *parse_args(int argc, char **argv)
           do_parent:
                 tmp_opts->parent_handle =
                     (PVFS_handle)strtoull(optarg, NULL,10);
-                fprintf(stderr, "Sorry, this [parent] option is not "
-                        "currently supported at this time\n");
 		break;
             case 'd':
           do_dirent:
                 snprintf(tmp_opts->dirent_name, PATH_MAX, optarg);
-                fprintf(stderr, "Sorry, this [dirent] option is not "
-                        "currently supported at this time\n");
-                exit(1);
                 break;
 	    case 'f':
           do_fsid:
@@ -225,10 +220,22 @@ int main(int argc, char **argv)
 
     PVFS_util_gen_credentials(&credentials);
 
-    ret = PVFS_mgmt_remove_object(ref, &credentials);
-    if (ret)
+    if (user_opts->remove_object_only)
     {
-        PVFS_perror("PVFS_mgmt_remove_object", ret);
+        ret = PVFS_mgmt_remove_object(ref, &credentials);
+        if (ret)
+        {
+            PVFS_perror("PVFS_mgmt_remove_object", ret);
+        }
+    }
+    else
+    {
+        ret = PVFS_mgmt_remove_dirent(ref, user_opts->dirent_name,
+                                      &credentials);
+        if (ret)
+        {
+            PVFS_perror("PVFS_mgmt_remove_dirent", ret);
+        }
     }
     return ret;
 }

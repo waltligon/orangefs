@@ -1476,6 +1476,10 @@ static void init_req_table(void)
                     PINT_SERVER_CHECK_NONE, 
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED,
                     &pvfs2_mgmt_remove_object_sm);
+            OP_CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, "mgmt-remove-dirent",
+                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+                    &pvfs2_mgmt_remove_dirent_sm);
             OP_CASE(PVFS_SERV_IO, "io",
                     PINT_SERVER_CHECK_NONE, 
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_io_sm);

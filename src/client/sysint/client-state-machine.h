@@ -125,6 +125,11 @@ struct PINT_client_setattr_sm
     PVFS_sys_attr sys_attr; /* input parameter */
 };
 
+struct PINT_client_mgmt_remove_dirent_sm
+{
+    char *entry;
+};
+
 typedef struct
 {
     /* the index of the current context (in the context array) */
@@ -412,6 +417,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_mgmt_event_mon_list_sm event_mon_list;
 	struct PINT_client_mgmt_iterate_handles_list_sm iterate_handles_list;
 	struct PINT_client_mgmt_get_dfile_array_sm get_dfile_array;
+        struct PINT_client_mgmt_remove_dirent_sm mgmt_remove_dirent;
 	struct PINT_server_get_config_sm get_config;
     } u;
 } PINT_client_sm;

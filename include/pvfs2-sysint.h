@@ -405,6 +405,18 @@ int PVFS_mgmt_remove_object(
     PVFS_object_ref object_ref, 
     PVFS_credentials *credentials);
 
+int PVFS_imgmt_remove_dirent(
+    PVFS_object_ref parent_ref,
+    char *entry,
+    PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+int PVFS_mgmt_remove_dirent(
+    PVFS_object_ref parent_ref,
+    char *entry,
+    PVFS_credentials *credentials);
+
 #endif
 
 /*
