@@ -29,7 +29,7 @@ static int pvfs2_create(
     struct nameidata *nd)
 {
     struct inode *inode =
-	pvfs2_create_entry(dir, dentry, mode, PVFS2_VFS_OP_CREATE);
+	pvfs2_create_entry(dir, dentry, NULL, mode, PVFS2_VFS_OP_CREATE);
 
     return (inode ? 0 : -1);
 }
@@ -164,12 +164,14 @@ static int pvfs2_symlink(
     struct dentry *dentry,
     const char *symname)
 {
-/*     struct inode *inode = pvfs2_create_entry( */
-/*         dir, dentry, mode, PVFS2_VFS_OP_SYMLINK); */
-/*     return (inode ? 0 : -1); */
+    int mode = 755;
+    struct inode *inode = NULL;
 
     pvfs2_print("pvfs2: pvfs2_symlink called\n");
-    return 0;
+
+    inode = pvfs2_create_entry(
+        dir, dentry, symname, mode, PVFS2_VFS_OP_SYMLINK);
+    return (inode ? 0 : -1);
 }
 
 static int pvfs2_mknod(
@@ -189,7 +191,7 @@ static int pvfs2_mkdir(
 {
     int ret = -1;
     struct inode *inode =
-	pvfs2_create_entry(dir, dentry, mode, PVFS2_VFS_OP_MKDIR);
+	pvfs2_create_entry(dir, dentry, NULL, mode, PVFS2_VFS_OP_MKDIR);
 
     if (inode)
     {

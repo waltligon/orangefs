@@ -28,7 +28,13 @@ typedef struct
 
 typedef struct
 {
+    PVFS_pinode_reference refn;
+} pvfs2_symlink_response_t;
+
+typedef struct
+{
     PVFS_sys_attr attributes;
+    char link_target[PVFS2_NAME_LEN];
 } pvfs2_getattr_response_t;
 
 /* the setattr response is a blank downcall */
@@ -65,6 +71,7 @@ typedef struct
 	pvfs2_io_response_t io;
 	pvfs2_lookup_response_t lookup;
 	pvfs2_create_response_t create;
+	pvfs2_symlink_response_t sym;
 	pvfs2_getattr_response_t getattr;
 /* 	pvfs2_setattr_response_t setattr; */
 /*      pvfs2_remove_response_t remove; */

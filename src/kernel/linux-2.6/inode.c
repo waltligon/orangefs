@@ -15,6 +15,7 @@
 #include "pvfs2-kernel.h"
 
 extern struct file_operations pvfs2_file_operations;
+extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 
@@ -199,6 +200,11 @@ struct inode *pvfs2_get_custom_inode(
         {
 	    inode->i_op = &pvfs2_file_inode_operations;
 	    inode->i_fop = &pvfs2_file_operations;
+        }
+        else if (mode & S_IFLNK)
+        {
+            inode->i_op = &pvfs2_symlink_inode_operations;
+            inode->i_fop = NULL;
         }
         else if (mode & S_IFDIR)
         {

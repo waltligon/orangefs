@@ -19,6 +19,7 @@ extern spinlock_t pvfs2_request_list_lock;
 
 extern struct inode_operations pvfs2_file_inode_operations;
 extern struct file_operations pvfs2_file_operations;
+extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 extern struct dentry_operations pvfs2_dentry_operations;
@@ -45,15 +46,20 @@ int pvfs2_gen_credentials(
     return ret;
 }
 
+/* NOTE: symname is ignored unless the inode is a sym link */
 static inline int copy_attributes_to_inode(
     struct inode *inode,
-    PVFS_sys_attr *attrs)
+    PVFS_sys_attr *attrs,
+    char *symname)
 {
     int ret = -1;
     int perm_mode = 0;
+    pvfs2_inode_t *pvfs2_inode = NULL;
 
     if (inode && attrs)
     {
+        pvfs2_inode = PVFS2_I(inode);
+
         if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
             (attrs->mask & PVFS_ATTR_SYS_SIZE))
             inode->i_size = (off_t)attrs->size;
@@ -114,9 +120,27 @@ static inline int copy_attributes_to_inode(
 	    break;
 	case PVFS_TYPE_SYMLINK:
 	    inode->i_mode |= S_IFLNK;
-	    inode->i_op = &pvfs2_file_inode_operations;
-	    inode->i_fop = &pvfs2_file_operations;
-	    ret = 0;
+	    inode->i_op = &pvfs2_symlink_inode_operations;
+	    inode->i_fop = NULL;
+
+            /* copy the link target string to the inode private data */
+            if (pvfs2_inode && symname)
+            {
+                if (pvfs2_inode->link_target)
+                {
+                    kfree(pvfs2_inode->link_target);
+                    pvfs2_inode->link_target = NULL;
+                }
+                pvfs2_inode->link_target = kmalloc(
+                    (strlen(symname) + 1), GFP_KERNEL);
+                if (pvfs2_inode->link_target)
+                {
+                    strcpy(pvfs2_inode->link_target, symname);
+                }
+                pvfs2_print("Copied attr link target %s\n",
+                            pvfs2_inode->link_target);
+            }
+            ret = 0;
 	    break;
 	default:
 	    pvfs2_error("pvfs2: copy_attributes_to_inode: got invalid "
@@ -188,9 +212,14 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
     }
 }
 
+/*
+  NOTE: in kernel land, we never use the
+  sys_attr->link_target for anything, so don't bother
+  copying it into the sys_attr object here
+*/
 static inline int copy_attributes_from_inode(
     struct inode *inode,
-    PVFS_sys_attr * attrs,
+    PVFS_sys_attr *attrs,
     struct iattr *iattr)
 {
     int ret = -1;
@@ -312,9 +341,9 @@ int pvfs2_inode_getattr(
 	/* check what kind of goodies we got */
 	if (new_op->downcall.status > -1)
 	{
-	    /* translate the retrieved attributes into the inode */
-	    if (!copy_attributes_to_inode
-		(inode, &new_op->downcall.resp.getattr.attributes))
+            if (!copy_attributes_to_inode
+		(inode, &new_op->downcall.resp.getattr.attributes,
+                 new_op->downcall.resp.getattr.link_target))
 	    {
                 pvfs2_print("got good attributes (perms %d); "
                             "inode is good to go\n",
@@ -559,19 +588,111 @@ static inline struct inode *pvfs2_create_dir(
     return inode;
 }
 
+static inline struct inode *pvfs2_create_symlink(
+    struct inode *dir,
+    struct dentry *dentry,
+    const char *symname,
+    int mode)
+{
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    pvfs2_kernel_op_t *new_op = NULL;
+    pvfs2_inode_t *parent = PVFS2_I(dir);
+    pvfs2_inode_t *pvfs2_inode = NULL;
+    struct inode *inode =
+	pvfs2_get_custom_inode(dir->i_sb, (S_IFLNK | mode), 0);
+
+    if (inode)
+    {
+	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+	if (!new_op)
+	{
+	    return NULL;
+	}
+	new_op->upcall.type = PVFS2_VFS_OP_SYMLINK;
+	if (parent && parent->refn.handle && parent->refn.fs_id)
+	{
+	    new_op->upcall.req.sym.parent_refn = parent->refn;
+	}
+	else
+	{
+	    new_op->upcall.req.sym.parent_refn.handle =
+		pvfs2_ino_to_handle(dir->i_ino);
+	    new_op->upcall.req.sym.parent_refn.fs_id =
+		PVFS2_SB(dir->i_sb)->fs_id;
+	}
+        copy_attributes_from_inode(
+            inode, &new_op->upcall.req.sym.attributes, NULL);
+	strncpy(new_op->upcall.req.sym.entry_name,
+		dentry->d_name.name, PVFS2_NAME_LEN);
+	strncpy(new_op->upcall.req.sym.target,
+		symname, PVFS2_NAME_LEN);
+
+        service_operation_with_timeout_retry(
+            new_op, "pvfs2_symlink_file", retries);
+
+	pvfs2_print("Symlink Got PVFS2 handle %Lu on fsid %d\n",
+                    new_op->downcall.resp.sym.refn.handle,
+                    new_op->downcall.resp.sym.refn.fs_id);
+
+	/*
+	   set the inode private data here, and set the
+	   inode number here
+	 */
+	if (new_op->downcall.status > -1)
+	{
+	    inode->i_ino =
+		pvfs2_handle_to_ino(
+                    new_op->downcall.resp.sym.refn.handle);
+	    pvfs2_print("Assigned inode new number of %d\n",
+                        (int)inode->i_ino);
+
+	    pvfs2_inode = PVFS2_I(inode);
+	    pvfs2_inode->refn = new_op->downcall.resp.sym.refn;
+
+	    /*
+	       set up the dentry operations to make sure that our
+	       pvfs2 specific dentry operations take effect.
+
+	       this is exploited by defining a revalidate method to
+	       be called each time a lookup is done to avoid the
+	       natural caching effect of the vfs.  unfortunately,
+	       client side caching isn't good for consistency across
+	       nodes ;-)
+	     */
+	    dentry->d_op = &pvfs2_dentry_operations;
+
+	    /* finally, add dentry with this new inode to the dcache */
+	    d_add(dentry, inode);
+	}
+	else
+	{
+	  error_exit:
+	    pvfs2_error("pvfs2_symlink_file: An error occurred; "
+                        "removing created inode\n");
+	    iput(inode);
+	    inode = NULL;
+	}
+
+	/* when request is serviced properly, free req op struct */
+	op_release(new_op);
+    }
+    return inode;
+}
+
 /*
   create a pvfs2 entry; returns a properly populated inode
   pointer on success; NULL on failure
 
   if op_type is PVFS_VFS_OP_CREATE, a file is created
   if op_type is PVFS_VFS_OP_MKDIR, a directory is created
-
-  TODO:
   if op_type is PVFS_VFS_OP_SYMLINK, a symlink is created
+
+  symname should be null unless mode is PVFS_VFS_OP_SYMLINK
 */
 struct inode *pvfs2_create_entry(
     struct inode *dir,
     struct dentry *dentry,
+    const char *symname,
     int mode,
     int op_type)
 {
@@ -583,8 +704,8 @@ struct inode *pvfs2_create_entry(
 	    return pvfs2_create_file(dir, dentry, mode);
 	case PVFS2_VFS_OP_MKDIR:
 	    return pvfs2_create_dir(dir, dentry, mode);
-/*         case PVFS2_VFS_OP_LINK: */
-/*         case PVFS2_VFS_OP_SYMLINK: */
+        case PVFS2_VFS_OP_SYMLINK:
+            return pvfs2_create_symlink(dir, dentry, symname, mode);
 	default:
 	    pvfs2_error("pvfs2_create_entry got a bad "
                         "op_type (%d)\n", op_type);

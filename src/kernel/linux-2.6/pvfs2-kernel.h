@@ -91,9 +91,10 @@ typedef struct
 typedef struct
 {
     PVFS_pinode_reference refn;
-    PVFS_ds_position readdir_token;	/* REMOVE ME; unused */
+    PVFS_ds_position readdir_token;
+    char *link_target;
     struct inode vfs_inode;
-} pvfs2_inode_t;		/* RENAME THIS TO pvfs2_inode_info */
+} pvfs2_inode_t;
 
 /* per superblock private pvfs2 info */
 typedef struct
@@ -226,6 +227,7 @@ int pvfs2_inode_setattr(
 struct inode *pvfs2_create_entry(
     struct inode *dir,
     struct dentry *dentry,
+    const char *symname,
     int mode,
     int op_type);
 

@@ -304,8 +304,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
       path will be handed all the way back up to the caller via
       the PVFS_sys_attr object.  caller must free it.
     */
-    if ((resp_p->u.getattr.attr.objtype == PVFS_TYPE_SYMLINK) &&
-        (resp_p->u.getattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET))
+    if (resp_p->u.getattr.attr.objtype == PVFS_TYPE_SYMLINK)
     {
         assert(resp_p->u.getattr.attr.u.sym.target_path_len > 0);
         assert(resp_p->u.getattr.attr.u.sym.target_path);
@@ -316,6 +315,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
         {
             return -PVFS_ENOMEM;
         }
+        resp_p->u.getattr.attr.mask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
     /*

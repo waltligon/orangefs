@@ -157,6 +157,61 @@ static int service_create_request(
     return ret;
 }
 
+static int service_symlink_request(
+    PVFS_sysresp_init *init_response,
+    pvfs2_upcall_t *in_upcall,
+    pvfs2_downcall_t *out_downcall)
+{
+    int ret = 1;
+    PVFS_sysresp_symlink response;
+    PVFS_pinode_reference parent_refn;
+    PVFS_sys_attr *attrs = NULL;
+
+    if (init_response && in_upcall && out_downcall)
+    {
+        memset(&response,0,sizeof(PVFS_sysresp_symlink));
+        memset(out_downcall,0,sizeof(pvfs2_downcall_t));
+
+        attrs = &in_upcall->req.sym.attributes;
+	attrs->atime = attrs->mtime = attrs->ctime = 
+	    time(NULL);
+
+        parent_refn = in_upcall->req.sym.parent_refn;
+
+        gossip_debug(
+            CLIENT_DEBUG,
+            "Got a symlink request from %s (fsid %d | parent %Lu) to %s\n",
+            in_upcall->req.sym.entry_name,parent_refn.fs_id,
+            parent_refn.handle, in_upcall->req.sym.target);
+
+        ret = PVFS_sys_symlink(in_upcall->req.sym.entry_name, parent_refn,
+                               in_upcall->req.sym.target, *attrs,
+                               in_upcall->credentials, &response);
+        if (ret < 0)
+        {
+            gossip_err("Failed to symlink %s to %s under %Lu on "
+                       "fsid %d!\n", in_upcall->req.sym.entry_name,
+                       in_upcall->req.sym.target,
+                       parent_refn.handle, parent_refn.fs_id);
+            gossip_err("Symlink returned error code %d\n",ret);
+
+            /* we need to send a blank response */
+            out_downcall->type = PVFS2_VFS_OP_SYMLINK;
+            out_downcall->status = -1;
+            out_downcall->resp.sym.refn.handle = 0;
+            out_downcall->resp.sym.refn.fs_id = 0;
+        }
+        else
+        {
+            out_downcall->type = PVFS2_VFS_OP_SYMLINK;
+            out_downcall->status = 0;
+            out_downcall->resp.sym.refn = response.pinode_refn;
+            ret = 0;
+        }
+    }
+    return ret;
+}
+
 static int service_io_request(
     PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
@@ -205,7 +260,6 @@ static int service_getattr_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    uint32_t attrmask = PVFS_ATTR_SYS_ALL;
     PVFS_sysresp_getattr response;
 
     if (init_response && in_upcall && out_downcall)
@@ -219,7 +273,8 @@ static int service_getattr_request(
             in_upcall->req.getattr.refn.fs_id,
             in_upcall->req.getattr.refn.handle);
 
-        ret = PVFS_sys_getattr(in_upcall->req.getattr.refn, attrmask,
+        ret = PVFS_sys_getattr(in_upcall->req.getattr.refn,
+                               PVFS_ATTR_SYS_ALL,
                                in_upcall->credentials, &response);
         if (ret < 0)
         {
@@ -237,6 +292,23 @@ static int service_getattr_request(
             out_downcall->type = PVFS2_VFS_OP_GETATTR;
             out_downcall->status = 0;
             out_downcall->resp.getattr.attributes = response.attr;
+
+            /*
+              free allocated attr memory if required; to
+              avoid copying the embedded link_target string inside
+              the sys_attr object passed down into the vfs, we
+              explicitly copy the link target (if any) into a
+              reserved string space in the getattr downcall object
+            */
+            if (response.attr.objtype == PVFS_TYPE_SYMLINK)
+            {
+                assert(response.attr.link_target);
+
+                snprintf(out_downcall->resp.getattr.link_target,
+                         PVFS2_NAME_LEN, "%s", response.attr.link_target);
+
+                free(response.attr.link_target);
+            }
             ret = 0;
         }
     }
@@ -614,6 +686,9 @@ int main(int argc, char **argv)
 		break;
 	    case PVFS2_VFS_OP_CREATE:
 		service_create_request(&init_response,&upcall,&downcall);
+		break;
+	    case PVFS2_VFS_OP_SYMLINK:
+		service_symlink_request(&init_response,&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_GETATTR:
 		service_getattr_request(&init_response,&upcall,&downcall);

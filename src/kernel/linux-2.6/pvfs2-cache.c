@@ -147,6 +147,7 @@ static void pvfs2_inode_cache_ctor(
 
 	pvfs2_inode->refn.handle = 0;
 	pvfs2_inode->refn.fs_id = 0;
+        pvfs2_inode->link_target = NULL;
 
 	/*
 	   inode_init_once is from inode.c;

@@ -34,6 +34,14 @@ typedef struct
 
 typedef struct
 {
+    char entry_name[PVFS2_NAME_LEN];
+    PVFS_pinode_reference parent_refn;
+    char target[PVFS2_NAME_LEN];
+    PVFS_sys_attr attributes;
+} pvfs2_symlink_request_t;
+
+typedef struct
+{
     PVFS_pinode_reference refn;
 } pvfs2_getattr_request_t;
 
@@ -73,6 +81,7 @@ typedef struct
 	pvfs2_io_request_t io;
 	pvfs2_lookup_request_t lookup;
 	pvfs2_create_request_t create;
+	pvfs2_symlink_request_t sym;
 	pvfs2_getattr_request_t getattr;
 	pvfs2_setattr_request_t setattr;
 	pvfs2_remove_request_t remove;
