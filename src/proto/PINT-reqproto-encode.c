@@ -46,7 +46,7 @@ int PINT_encode_initialize(void)
     *((int32_t*)&(le_bytefield_table.generic_header[0])) = 
 	htobmi32(PVFS_RELEASE_NR);
     *((int32_t*)&(le_bytefield_table.generic_header[4])) = 
-	htobmi32(PINT_ENC_DIRECT);
+	htobmi32(PINT_ENC_LE_BFIELD);
 
     return(0);
 }
