@@ -243,9 +243,10 @@ struct PINT_client_mgmt_setparam_list_sm
     PVFS_fs_id fs_id;
     enum PVFS_server_param param;
     int64_t value;
-    PVFS_id_gen_t* addr_array;
+    PVFS_id_gen_t *addr_array;
     int count;
-    int64_t* old_value_array;
+    int64_t *old_value_array;
+    int *root_check_status_array;
 };
 
 struct PINT_client_mgmt_statfs_list_sm
