@@ -158,6 +158,7 @@ static void pvfs2_inode_cache_ctor(
 	 */
 	inode_init_once(&pvfs2_inode->vfs_inode);
 	pvfs2_inode->vfs_inode.i_version = 1;
+	pvfs2_inode->vfs_inode.i_blksize = pvfs_bufmap_size_query();
     }
 }
 

@@ -213,6 +213,11 @@ int wait_for_matching_downcall(
     pvfs2_kernel_op_t * op);
 
 /****************************
+ * defined in pvfs2-bufmap.c
+ ****************************/
+int pvfs_bufmap_size_query(void);
+
+/****************************
  * defined in pvfs2-utils.c
  ****************************/
 int pvfs2_gen_credentials(

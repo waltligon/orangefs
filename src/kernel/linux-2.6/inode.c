@@ -192,7 +192,6 @@ struct inode *pvfs2_get_custom_inode(
 	inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 	inode->i_uid = current->uid;
 	inode->i_gid = current->gid;
-	inode->i_blksize = PAGE_CACHE_SIZE;
 	inode->i_blocks = 1;
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 

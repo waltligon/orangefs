@@ -60,6 +60,9 @@ static inline int copy_attributes_to_inode(
     {
         pvfs2_inode = PVFS2_I(inode);
 
+        /* arbitrarily set the inode block size */
+        inode->i_blksize =  pvfs_bufmap_size_query();
+
         if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
             (attrs->mask & PVFS_ATTR_SYS_SIZE))
         {

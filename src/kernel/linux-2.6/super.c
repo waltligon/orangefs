@@ -16,9 +16,7 @@
 extern struct file_system_type pvfs2_fs_type;
 extern struct dentry_operations pvfs2_dentry_operations;
 extern struct inode *pvfs2_get_custom_inode(
-    struct super_block *sb,
-    int mode,
-    dev_t dev);
+    struct super_block *sb, int mode, dev_t dev);
 
 extern kmem_cache_t *pvfs2_inode_cache;
 
@@ -105,9 +103,9 @@ static int pvfs2_statfs(
     struct kstatfs *buf)
 {
     buf->f_type = sb->s_magic;
-    buf->f_bsize = sb->s_blocksize;
+    buf->f_bsize = pvfs_bufmap_size_query();
     buf->f_namelen = PVFS2_NAME_LEN;
-    buf->f_blocks = buf->f_bfree = buf->f_bavail = 100000;
+    buf->f_blocks = buf->f_bfree = buf->f_bavail = 1000000;
     buf->f_files = buf->f_ffree = 100;
     return 0;
 }
