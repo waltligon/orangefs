@@ -125,7 +125,7 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
 		  enum job_flags flags,
 		  job_context_id context_id);
 
-int job_bmi_cancel(job_id_t * id,
+int job_bmi_cancel(job_id_t id,
 		   job_context_id context_id);
 
 /* unexpected device receive */
@@ -423,7 +423,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 			    job_context_id context_id);
 
 int job_trove_dspace_cancel(PVFS_fs_id coll_id,
-			    job_id_t * id,
+			    job_id_t id,
 			    job_context_id context_id);
 
 /* create a new file system */

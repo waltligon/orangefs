@@ -669,10 +669,29 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
  * returns 0 on succcess, 1 on immediate completion, and -errno on
  * failure
  */
-int job_bmi_cancel(job_id_t * id,
-		   job_context_id context_id)
+int job_bmi_cancel(job_id_t id, job_context_id context_id)
 {
-    return(-1);
+    struct job_desc* query = NULL;
+    int ret = -1;
+
+    gen_mutex_lock(&completion_mutex);
+
+    query = id_gen_fast_lookup(id);
+    if(query->completed_flag)
+    {
+	/* job has already completed, no cancellation needed */
+	gen_mutex_unlock(&completion_mutex);
+	return(0);
+    }
+
+    /* tell thread mgr to cancel operation.  This will result in normal
+     * completion path through thread mgr callbacks; no more work to do here */
+    ret = PINT_thread_mgr_bmi_cancel(query->u.bmi.id,
+	&(query->bmi_callback));
+
+    gen_mutex_unlock(&completion_mutex);
+
+    return(ret);
 }
 
 
@@ -2527,7 +2546,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_dspace_cancel(PVFS_fs_id coll_id,
-			    job_id_t * id,
+			    job_id_t id,
 			    job_context_id context_id)
 {
     return(-1);
