@@ -30,7 +30,30 @@
 int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     enum PVFS_sys_io_type type)
 {
+    pinode* pinode_ptr = NULL;
+    PVFS_bitfield attr_mask = 0;
+    int ret = -1;
 
+    /* find a pinode for the target file */
+
+    /* TODO: what should the attr_mask be set to? */
+    attr_mask = ATTR_BASIC;
+    ret = phelper_get_pinode(req->pinode_refn, &pinode_ptr,
+	attr_mask, req->credentials);
+    if(ret < 0)
+    {
+	/* TODO: handle this error */
+	gossip_lerr("foo");
+	return(-1);
+    }
+
+    /* at this point, we need to have a list of handles and
+     * distribution information 
+     * - the dist we can make up for now
+     * - however, we need to get the datafile handle from somewhere...
+     *   - for now, I could just create one directly in the test program
+     *     pass its handle in?
+     */
 
     return(-ENOSYS);
 #if 0
