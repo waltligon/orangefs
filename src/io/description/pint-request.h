@@ -7,8 +7,8 @@
 #ifndef __PINT_REQUEST_H
 #define __PINT_REQUEST_H
 
+#include "pint-distribution.h"
 #include <pvfs2-types.h>
-#include <pvfs-distribution.h>
 
 /* modes for PINT_Process_request  and PINT_Distribute */
 #define PINT_SERVER                000001

@@ -7,7 +7,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "pvfs-distribution.h"
+#include "pint-distribution.h"
+#include "pint-dist-utils.h"
 #include "pvfs2-types.h"
 #include "pvfs2-dist-basic.h"
 
@@ -56,16 +57,6 @@ static PVFS_size logical_file_size(void* params,
     return psizes[0];
 }
 
-static void encode(void* params, void *buffer)
-{
-    memcpy(buffer, params, sizeof(PVFS_basic_params));
-}
-
-static void decode(void* params, void *buffer)
-{
-	memcpy(params, buffer, sizeof(PVFS_basic_params));
-}
-
 static void encode_lebf(char **pptr, void* params)
 {
 }
@@ -76,14 +67,14 @@ static void decode_lebf(char **pptr, void* params)
 
 static PVFS_basic_params basic_params;
 
-static PVFS_Dist_methods basic_methods = {
+static PINT_dist_methods basic_methods = {
     logical_to_physical_offset,
     physical_to_logical_offset,
     next_mapped_offset,
     contiguous_length,
     logical_file_size,
-    encode,
-    decode,
+    PINT_dist_default_get_num_dfiles,
+    PINT_dist_default_set_param,
     encode_lebf,
     decode_lebf,
 };
@@ -96,16 +87,12 @@ PINT_dist basic_dist = {
     &basic_methods
 };
 
-#ifdef MODULE
-
-void init_module()
-{
-    PVFS_register_distribution(&basic_dist);
-}
-
-void cleanup_module()
-{
-    PVFS_unregister_distribution(PVFS_DIST_BASIC_NAME);
-}
-
-#endif
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */

@@ -11,7 +11,6 @@
 #include <pvfs2-types.h>
 #include <pvfs2-debug.h>
 #include <pint-request.h>
-#include <pvfs-distribution.h>
 #include <pint-distribution.h>
 
 /* this macro is only used in this file to add a segment to the

@@ -8,7 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
-#include "pvfs-distribution.h"
+#include "pint-distribution.h"
+#include "pint-dist-utils.h"
 #include "pvfs2-types.h"
 #include "pvfs2-dist-simple-stripe.h"
 
@@ -30,11 +31,11 @@ static PVFS_offset logical_to_physical_offset (void* params,
     leftover = logical_offset - full_stripes * dparam->strip_size * server_ct;
     if(leftover >= server_nr*dparam->strip_size)
     {
-	     /* if so, tack that on to the physical offset as well */
-	     if(leftover < (server_nr + 1) * dparam->strip_size)
-	         ret_offset += leftover - (server_nr * dparam->strip_size);
-	     else
-	         ret_offset += dparam->strip_size;
+        /* if so, tack that on to the physical offset as well */
+        if(leftover < (server_nr + 1) * dparam->strip_size)
+            ret_offset += leftover - (server_nr * dparam->strip_size);
+        else
+            ret_offset += dparam->strip_size;
     }
     return(ret_offset);
 }
@@ -119,18 +120,6 @@ static PVFS_size logical_file_size(void* params,
     return max;
 }  
 
-static void encode(void* params, void *buffer)
-{
-    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
-    memcpy(buffer, dparam, sizeof(PVFS_simple_stripe_params));
-}
-
-static void decode (void* params, void *buffer)
-{
-    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
-    memcpy(dparam, buffer, sizeof(PVFS_simple_stripe_params));
-}
-
 static void encode_lebf(char **pptr, void* params)
 {
     PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
@@ -147,14 +136,14 @@ static PVFS_simple_stripe_params simple_stripe_params = {
 	65536 /* stripe size */
 };
 
-static PVFS_Dist_methods simple_stripe_methods = {
+static PINT_dist_methods simple_stripe_methods = {
     logical_to_physical_offset,
     physical_to_logical_offset,
     next_mapped_offset,
     contiguous_length,
     logical_file_size,
-    encode,
-    decode,
+    PINT_dist_default_get_num_dfiles,
+    PINT_dist_default_set_param,
     encode_lebf,
     decode_lebf,
 };
@@ -167,16 +156,13 @@ PINT_dist simple_stripe_dist = {
     &simple_stripe_methods
 };
 
-#ifdef MODULE
 
-void init_module()
-{
-	 PVFS_register_distribution(&simple_stripe_dist);
-}
-
-void cleanup_module()
-{
-	 PVFS_unregister_distribution(PVFS_DIST_SIMPLE_STRIPE_NAME);
-}
-
-#endif
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */

@@ -2,16 +2,16 @@ DIR := src/io/description
 LIBSRC += \
 	$(DIR)/pvfs-request.c \
 	$(DIR)/pint-request.c \
-	$(DIR)/pvfs-distribution.c \
 	$(DIR)/pint-distribution.c \
+	$(DIR)/pint-dist-utils.c \
 	$(DIR)/dist-basic.c \
 	$(DIR)/dist-simple-stripe.c
 
 SERVERSRC += \
 	$(DIR)/pvfs-request.c \
 	$(DIR)/pint-request.c \
-	$(DIR)/pvfs-distribution.c \
 	$(DIR)/pint-distribution.c \
+	$(DIR)/pint-dist-utils.c \
 	$(DIR)/dist-basic.c \
 	$(DIR)/dist-simple-stripe.c
 
