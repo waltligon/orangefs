@@ -707,6 +707,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
     int i, ret;
     int matched_msgpair = 0, matched_flow = 0, matched_ack = 0, recv_match = -1;
     job_id_t tmp_id;
+    PINT_client_sm_msgpair_state *msg_p;
 
     gossip_debug(CLIENT_DEBUG, "io state: datafile_complete\n");
 
@@ -724,8 +725,8 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	if(js_p->status_user_tag < sm_p->msgarray_count)
 	{
 	    /* first N user tags are for receives */
-	    PINT_client_sm_msgpair_state *msg_p = 
-		&sm_p->msgarray[js_p->status_user_tag];
+	    i = js_p->status_user_tag;
+	    msg_p = &sm_p->msgarray[i];
 	    matched_msgpair = 1;
 	    recv_match = js_p->status_user_tag;
 	    msg_p->recv_id     = 0;
@@ -736,8 +737,8 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	else if(js_p->status_user_tag < (sm_p->msgarray_count*2))
 	{
 	    /* second N user tags are for sends */
-	    PINT_client_sm_msgpair_state *msg_p = 
-		&sm_p->msgarray[js_p->status_user_tag - sm_p->msgarray_count];
+	    i = js_p->status_user_tag - sm_p->msgarray_count;
+	    msg_p = &sm_p->msgarray[i];
 	    matched_msgpair = 1;
 	    msg_p->send_id     = 0;
 	    msg_p->send_status = *js_p;
@@ -773,7 +774,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
      * state machine state that we used for this receive job (recv_match).
      */
     if (recv_match != -1) {
-	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[recv_match];
 	struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
 	struct PVFS_server_resp *resp_p; /* response structure (decoded) */
 
