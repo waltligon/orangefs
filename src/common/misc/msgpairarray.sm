@@ -333,7 +333,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 
 	    gossip_err("Send error: cancelling recv.\n");
 
-	    PINT_client_bmi_cancel(msg_p->recv_id);
+	    job_bmi_cancel(msg_p->recv_id, sm_p->msgarray_params.job_context);
 	    
 	    /* we still have to wait for recv completion, so just decrement
 	     * comp_ct by one and keep going
@@ -412,7 +412,7 @@ static int msgpairarray_complete(PARENT_SM *sm_p,
 	    /* we got a receive error, but send is still pending.  Cancel
 	     * the send
 	     */
-	    PINT_client_bmi_cancel(msg_p->send_id);
+	    job_bmi_cancel(msg_p->send_id, sm_p->msgarray_params.job_context);
 	}
     }
     else
@@ -432,7 +432,7 @@ static int msgpairarray_complete(PARENT_SM *sm_p,
 	    /* we got a send error, but recv is still pending.  Cancel
 	     * the recv 
 	     */
-	    PINT_client_bmi_cancel(msg_p->recv_id);
+	    job_bmi_cancel(msg_p->recv_id, sm_p->msgarray_params.job_context);
 	}
     }
 

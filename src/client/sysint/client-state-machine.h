@@ -500,8 +500,6 @@ enum
     PVFS_DEV_UNEXPECTED            = 300
 };
 
-int PINT_client_bmi_cancel(job_id_t id);
-
 int PINT_client_io_cancel(job_id_t id);
 
 /* internal non-blocking helper methods */

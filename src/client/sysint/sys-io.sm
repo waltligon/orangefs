@@ -690,7 +690,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             */
             gossip_err("Send error: canceling recv.\n");
 
-            PINT_client_bmi_cancel(msg->recv_id);
+	    job_bmi_cancel(msg->recv_id, pint_client_sm_context);
             cur_ctx->msg_send_in_progress = 0;
             sm_p->u.io.msgpair_completion_count--;
 

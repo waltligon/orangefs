@@ -381,17 +381,6 @@ int PINT_sys_dev_unexp(
     return ret;
 }
 
-/* PINT_client_bmi_cancel()
- *
- * wrapper function for job_bmi_cancel
- *
- * returns 0 on success, -PVFS_error on failure
- */
-int PINT_client_bmi_cancel(job_id_t id)
-{
-    return job_bmi_cancel(id, pint_client_sm_context);
-}
-
 /* PINT_client_io_cancel()
  *
  * cancels in progress I/O operations
