@@ -653,8 +653,13 @@ provided here for your convenience:
 gil:/usr/src/pvfs2# ./configure --with-kernel=/usr/src/linux-2.6.0
 \end{verbatim}
 
-After this command is issued, build the PVFS2 source tree if it has
-not yet been built.
+Note that you can often find a kernel source tree (or a symlink to the
+right place) at /lib/modules/`uname -r`/build2.  For example, if you were
+running the default Fedora 3 kernel (linux-2.6.9-1.667) you would find the
+kernel tree in \texttt{/lib/modules/2.6.9-1.667/build}.
+
+After this configure command is issued, build the PVFS2 source tree if it
+has not yet been built.
 
 Building the 2.6.x kernel module requires an extra step.  Since
 current kernels require writing a few files in the kernel source
