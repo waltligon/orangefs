@@ -15,6 +15,8 @@
 #include <bench-args.h>
 #include <bench-mem.h>
 
+#define ITERATIONS 1000
+
 static int bmi_server(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
 	enum bmi_buffer_type buffer_type, double* wtime, bmi_context_id context);
@@ -60,8 +62,8 @@ int main( int argc, char *argv[])
 	}
 
 	/* setup MPI buffers */
-	ret = alloc_buffers(&mpi_send_bufs, 1000, opts.message_len);
-	ret += alloc_buffers(&mpi_recv_bufs, 1000, opts.message_len);
+	ret = alloc_buffers(&mpi_send_bufs, ITERATIONS, opts.message_len);
+	ret += alloc_buffers(&mpi_recv_bufs, ITERATIONS, opts.message_len);
 	if(ret < 0)
 	{
 		fprintf(stderr, "alloc_buffers() failure.\n");
@@ -72,9 +74,9 @@ int main( int argc, char *argv[])
 	if(opts.flags & BMI_ALLOCATE_MEMORY)
 	{
 		buffer_type = BMI_PRE_ALLOC;
-		ret = BMI_alloc_buffers(&bmi_send_bufs, 1000, opts.message_len,
+		ret = BMI_alloc_buffers(&bmi_send_bufs, ITERATIONS, opts.message_len,
 			bmi_peer_array[0], BMI_SEND);
-		ret += BMI_alloc_buffers(&bmi_recv_bufs, 1000, opts.message_len,
+		ret += BMI_alloc_buffers(&bmi_recv_bufs, ITERATIONS, opts.message_len,
 			bmi_peer_array[0], BMI_RECV);
 		if(ret < 0)
 		{
@@ -85,8 +87,8 @@ int main( int argc, char *argv[])
 	else
 	{
 		buffer_type = BMI_EXT_ALLOC;
-		ret = alloc_buffers(&bmi_send_bufs, 1000, opts.message_len);
-		ret += alloc_buffers(&bmi_recv_bufs, 1000, opts.message_len);
+		ret = alloc_buffers(&bmi_send_bufs, ITERATIONS, opts.message_len);
+		ret += alloc_buffers(&bmi_recv_bufs, ITERATIONS, opts.message_len);
 		if(ret < 0)
 		{
 			fprintf(stderr, "alloc_buffers() failure.\n");
@@ -162,26 +164,29 @@ int main( int argc, char *argv[])
 	if(world_rank == 0)
 	{
 		bench_args_dump(&opts);
+		printf("number of iterations: %d\n", ITERATIONS);
+		printf("all times measure round trip in seconds unless otherwise noted\n");
+		printf("\"ave\" field is computed as (total time)/iterations\n");
 		printf("%d\t%f\t%f\t(size,total,ave)", mpi_recv_bufs.size, 
-			mpi_time, (mpi_time/1000));
+			mpi_time, (mpi_time/ITERATIONS));
 		printf(" mpi client\n");
 	}
 	else
 	{
 		printf("%d\t%f\t%f\t(size,total,ave)", mpi_recv_bufs.size, 
-			mpi_time, (mpi_time/1000));
+			mpi_time, (mpi_time/ITERATIONS));
 		printf(" mpi server\n");
 	}
 	if(world_rank == 0)
 	{
 		printf("%d\t%f\t%f\t(size,total,ave)", bmi_recv_bufs.size, 
-			bmi_time, (bmi_time/1000));
+			bmi_time, (bmi_time/ITERATIONS));
 		printf(" bmi client\n");
 	}
 	else
 	{
 		printf("%d\t%f\t%f\t(size,total,ave)", bmi_recv_bufs.size, 
-			bmi_time, (bmi_time/1000));
+			bmi_time, (bmi_time/ITERATIONS));
 		printf(" bmi server\n");
 	}
 
@@ -227,7 +232,7 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 	MPI_Barrier(MPI_COMM_WORLD);
 	time1 = MPI_Wtime();
 
-	for(i=0; i<1000; i++)
+	for(i=0; i<ITERATIONS; i++)
 	{
 		/* set buffer to use */
 		if(opts->flags & REUSE_BUFFERS)
@@ -302,7 +307,7 @@ static int bmi_client(struct bench_options* opts, struct mem_buffers*
 
 	MPI_Barrier(MPI_COMM_WORLD);
 	time1 = MPI_Wtime();
-	for(i=0; i<1000; i++)
+	for(i=0; i<ITERATIONS; i++)
 	{
 		/* set buffer to use */
 		if(opts->flags & REUSE_BUFFERS)
@@ -375,7 +380,7 @@ static int mpi_server(struct bench_options* opts, struct mem_buffers*
 
 	MPI_Barrier(MPI_COMM_WORLD);
 	time1 = MPI_Wtime();
-	for(i=0; i<1000; i++)
+	for(i=0; i<ITERATIONS; i++)
 	{
 		/* set buffer to use */
 		if(opts->flags & REUSE_BUFFERS)
@@ -447,7 +452,7 @@ static int mpi_client(struct bench_options* opts, struct mem_buffers*
 	
 	MPI_Barrier(MPI_COMM_WORLD);
 	time1 = MPI_Wtime();
-	for(i=0; i<1000; i++)
+	for(i=0; i<ITERATIONS; i++)
 	{
 		/* set buffer to use */
 		if(opts->flags & REUSE_BUFFERS)
