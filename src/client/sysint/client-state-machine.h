@@ -75,9 +75,7 @@ typedef struct PINT_client_sm {
     union PINT_state_array_values *current_state; /* xxx */
     union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
 
-#if 0
-    int op; /* NOTE: THIS IS A HACK AND IS NOT REALLY NEEDED BY CLIENT. */
-#endif
+    int op; /* holds pvfs system operation type, defined up above */
 
     /* CLIENT SM VALUES */
     int op_complete; /* used to indicate that the operation as a 
@@ -99,9 +97,6 @@ typedef struct PINT_client_sm {
     /* msgpair array ptr used when operations can be performed concurrently.
      * obviously this has to be allocated within the upper-level state
      * machine.  used with msgpairs substate typically.
-     *
-     * Q: DO WE WANT TO GET RID OF msgpair ABOVE AND FORCE INTO JUST
-     *    USING THIS?  I DON'T THINK SO...
      */
     int msgarray_count;
     PINT_client_sm_msgpair_state *msgarray;
@@ -113,9 +108,16 @@ typedef struct PINT_client_sm {
 } PINT_client_sm;
 
 /* prototypes of post/test functions */
-int PINT_client_state_machine_post(PINT_client_sm *sm_p);
+int PINT_client_state_machine_post(PINT_client_sm *sm_p, int pvfs_sys_op);
 int PINT_client_state_machine_test(void);
 
+/* used with post call to tell the system what state machine to use
+ * when processing a new PINT_client_sm structure.
+ */
+enum {
+    PVFS_SYS_REMOVE  = 1,
+    PVFS_SYS_GETATTR = 2
+};
 
 /* prototypes of helper functions */
 int PINT_serv_prepare_msgpair(PVFS_pinode_reference object_ref,
@@ -149,6 +151,7 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
+extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;

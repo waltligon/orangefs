@@ -6,9 +6,14 @@
 
 /* pvfs2_client_getattr_pcache_sm
  *
- * The purpose of this state machine is to obtain attributes for an
+ * The purpose of this state machine is to obtain simple attributes for an
  * object.  These attributes could come from a local cache (the pcache)
  * or be obtained from a remote server.
+ *
+ * This state machine is *not* appropriate for use, in itself, as a getattr
+ * replacement.  This is mostly because it doesn't handle returning datafile
+ * handles or grabbing sizes of objects.  That's ok; we only need that stuff
+ * in a couple of specific cases, and those will be handled elsewhere.
  *
  * This state machine uses the msgpair structure in the PINT_client_sm
  * structure in order to perform the message passing.  It assumes that this
@@ -81,6 +86,8 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
      * so we reset it here.
      */
     js_p->error_code = 0;
+
+    /* check input parameters */
 
     /* TODO: check pcache to see if we have an entry.  if so, set
      * up a fake, decoded response structure with the results so that

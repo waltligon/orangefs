@@ -21,6 +21,7 @@ LIBSRC += \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
 	$(DIR)/sys-remove.c \
+	$(DIR)/sys-getattr.c \
 	$(DIR)/msgpair.c \
 	$(DIR)/msgpairarray.c \
 	$(DIR)/lookup-dcache.c \

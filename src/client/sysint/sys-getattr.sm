@@ -1,0 +1,205 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "state-machine-fns.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+
+#include "pinode-helper.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+
+extern job_context_id pint_client_sm_context;
+
+enum {
+    GETATTR_USE_FAST_PATH = 1
+};
+
+/* state function prototypes */
+static int getattr_check_parameters(PINT_client_sm *sm_p,
+			  job_status_s *js_p);
+static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+						job_status_s *js_p);
+static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
+					  job_status_s *js_p);
+static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
+						       job_status_s *js_p);
+static int getattr_datafile_getattr_failure(PINT_client_sm *sm_p,
+					    job_status_s *js_p);
+static int getattr_cleanup(PINT_client_sm *sm_p,
+			   job_status_s *js_p);
+
+/* completion function prototypes */
+
+%%
+
+machine pvfs2_client_getattr_sm(check_parameters,
+				getattr_pcache_fast_path,
+				object_getattr_setup_msgpair,
+				object_getattr_xfer_msgpair,
+				object_getattr_failure,
+				datafile_getattr_setup_msgpairarray,
+				datafile_getattr_xfer_msgpairarray,
+				datafile_getattr_failure,
+				cleanup)
+{
+    state check_parameters {
+	run getattr_check_parameters;
+	GETATTR_USE_FAST_PATH => getattr_pcache_fast_path;
+	success => object_getattr_setup_msgpair;
+	default => cleanup;
+    }
+    state getattr_pcache_fast_path {
+	jump pvfs2_client_getattr_pcache_sm;
+	success => cleanup;
+	default => cleanup;
+    }
+
+    state object_getattr_setup_msgpair {
+	run getattr_object_getattr_setup_msgpair;
+	success => object_getattr_xfer_msgpair;
+	default => cleanup;
+    }
+    state object_getattr_xfer_msgpair {
+	jump pvfs2_client_msgpair_sm;
+	success => datafile_getattr_setup_msgpairarray;
+	default => object_getattr_failure;
+    }
+    state object_getattr_failure {
+	run getattr_object_getattr_failure;
+	default => cleanup;
+    }
+
+    state datafile_getattr_setup_msgpairarray {
+	run getattr_datafile_getattr_setup_msgpairarray;
+	success => datafile_getattr_xfer_msgpairarray;
+	default => cleanup;
+    }
+    state datafile_getattr_xfer_msgpairarray {
+	jump pvfs2_client_msgpairarray_sm;
+	success => cleanup;
+	default => datafile_getattr_failure;
+    }
+    state datafile_getattr_failure {
+	run getattr_datafile_getattr_failure;
+	default => cleanup;
+    }
+    
+    state cleanup {
+	run getattr_cleanup;
+	default => check_parameters;
+    }
+}
+
+%%
+
+/* PVFS_sys_getattr()
+ */
+int PVFS_sys_getattr2(PVFS_pinode_reference pinode_refn,
+		      uint32_t attrmask, 
+		      PVFS_credentials credentials,
+		      PVFS_sysresp_getattr *resp)
+{
+    int ret;
+    PINT_client_sm *sm_p;
+    PVFS_error error;
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_sys_remove entered\n");
+
+    /* do parameter checking here, then assume things are ok below.
+     * assert()s are still ok of course :).
+     */
+    if (resp == NULL) return -PVFS_EINVAL;
+
+    /* build PINT_client_sm structure */
+    /* TODO: KEEP A CACHE OF THESE AROUND SO WE'RE NOT ALWAYS MALLOC'ING? */
+    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    if (sm_p == NULL) return -PVFS_ENOMEM;
+
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    sm_p->cred_p = &credentials;
+#if 0
+    sm_p->u.getattr.object_ref = xxx; /* KEEP IN msgpair one? */
+#endif
+
+    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_GETATTR);
+    assert(ret == 0);
+
+    while (!sm_p->op_complete && ret == 0) {
+	ret = PINT_client_state_machine_test();
+    }
+    assert(ret == 0);
+
+    error = sm_p->error_code;
+
+    free(sm_p);
+    return error;
+}
+
+
+/*******************************************************************/
+
+static int getattr_check_parameters(PINT_client_sm *sm_p,
+				    job_status_s *js_p)
+{
+    return 1;
+}
+
+static int getattr_pcache_fast_path(PINT_client_sm *sm_p,
+				    job_status_s *js_p)
+{
+    return 1;
+}
+
+static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+						job_status_s *js_p)
+{
+    return 1;
+}
+
+static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
+					  job_status_s *js_p)
+{
+    return 1;
+}
+
+static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
+						       job_status_s *js_p)
+{
+    return 1;
+}
+
+static int getattr_datafile_getattr_failure(PINT_client_sm *sm_p,
+					    job_status_s *js_p)
+{
+    return 1;
+}
+
+static int getattr_cleanup(PINT_client_sm *sm_p,
+			   job_status_s *js_p)
+{
+    return 1;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

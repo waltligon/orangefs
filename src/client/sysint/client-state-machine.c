@@ -34,7 +34,8 @@ static job_id_t job_id_array[MAX_RETURNED_JOBS];
 static void *client_sm_p_array[MAX_RETURNED_JOBS];
 static job_status_s job_status_array[MAX_RETURNED_JOBS];
 
-int PINT_client_state_machine_post(PINT_client_sm *sm_p)
+int PINT_client_state_machine_post(PINT_client_sm *sm_p,
+				   int pvfs_sys_op)
 {
     int ret;
     job_status_s js;
@@ -48,11 +49,21 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p)
 	got_context = 1;
     }
 
-    /* mark operation as unfinished */
+    /* save operation type; mark operation as unfinished */
+    sm_p->op = pvfs_sys_op;
     sm_p->op_complete = 0;
 
     /* figure out what function needs to be called first */
-    sm_p->current_state = pvfs2_client_remove_sm.state_machine + 1;
+    /* TODO: maybe make this a table lookup instead?  later... */
+    switch (pvfs_sys_op) {
+	case PVFS_SYS_REMOVE:
+	    sm_p->current_state = pvfs2_client_remove_sm.state_machine + 1;
+	    break;
+	case PVFS_SYS_GETATTR:
+	    sm_p->current_state = pvfs2_client_getattr_sm.state_machine + 1;
+	default:
+	    assert(0);
+    }
 
     /* clear job status structure */
     memset(&js, 0, sizeof(js));

@@ -152,9 +152,9 @@ machine pvfs2_client_remove_sm(init,
 
 %%
 
-int PVFS_sys_remove2(char *object_name,
-		     PVFS_pinode_reference parent_ref, 
-		     PVFS_credentials credentials)
+int PVFS_sys_remove(char *object_name,
+		    PVFS_pinode_reference parent_ref, 
+		    PVFS_credentials credentials)
 {
     int ret;
     PINT_client_sm *sm_p;
@@ -182,7 +182,7 @@ int PVFS_sys_remove2(char *object_name,
 		 "PVFS_sys_remove calling PINT_client_state_machine_post()\n");
 
     /* do something to kick off processing */
-    ret = PINT_client_state_machine_post(sm_p);
+    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_REMOVE);
     assert(ret == 0);
 
     /* while !done call progress function */
