@@ -17,12 +17,7 @@
 
 extern PINT_encoding_table_values_s contig_buffer_table;
 
-PINT_encoding_table_values_s *PINT_encoding_table[ENCODING_TABLE_SIZE] =
-{
-    &contig_buffer_table,
-    NULL, // XDR?
-    NULL
-};
+PINT_encoding_table_values_s *PINT_encoding_table[ENCODING_TABLE_SIZE] = {NULL};
 
 /* PINT_encode_initialize()
  *
@@ -32,6 +27,9 @@ PINT_encoding_table_values_s *PINT_encoding_table[ENCODING_TABLE_SIZE] =
  */
 int PINT_encode_initialize(void)
 {
+    PINT_encoding_table[PINT_ENC_DIRECT] = &contig_buffer_table;
+    contig_buffer_table.init_fun();
+
     return(0);
 }
 
@@ -44,19 +42,6 @@ int PINT_encode_initialize(void)
 void PINT_encode_finalize(void)
 {
     return;
-}
-
-
-/* PINT_encode_init()
- */
-int PINT_encode_init(void)
-{
-    int i=0;
-    while(i++<ENCODING_TABLE_SIZE)
-	if(PINT_encoding_table[i])
-	    if(!PINT_encoding_table[i]->op)
-		(PINT_encoding_table[i]->init_fun)();
-    return 0;
 }
 
 
@@ -75,7 +60,7 @@ int PINT_encode(
 		enum PINT_encoding_type enc_type
 		)
 {
-    int ret=0;
+    int ret = -1;
     target_msg->dest = target_addr;
     target_msg->enc_type = enc_type;
 
@@ -175,9 +160,11 @@ void PINT_encode_release(
 			 struct PINT_encoded_msg* input_buffer,
 			 enum PINT_encode_msg_type input_type
 			 )
-{
-    PINT_encoding_table[input_buffer->enc_type]->op->encode_release(input_buffer,
-						  input_type);
+{ 
+    PINT_encoding_table[input_buffer->enc_type]->op->encode_release(
+	input_buffer, input_type);
+
+    return;
 }
 
 /* PINT_decode_release()
@@ -192,8 +179,10 @@ void PINT_decode_release(
 			 enum PINT_encode_msg_type input_type
 			 )
 {
-    PINT_encoding_table[input_buffer->enc_type]->op->decode_release(input_buffer,
-						  input_type);
+    PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
+	input_buffer, input_type);
+    
+    return;
 }
 
 
