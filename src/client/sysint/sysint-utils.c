@@ -375,7 +375,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	serv_req.op = PVFS_SERV_GETCONFIG;
 	serv_req.rsize = sizeof(struct PVFS_server_req);
 	serv_req.credentials = creds;
-	serv_req.u.getconfig.max_strsize = PVFS_MAX_CONFIG_SIZE;
+	serv_req.u.getconfig.config_buf_size = PVFS_MAX_CONFIG_SIZE;
 
 	gossip_ldebug(CLIENT_DEBUG,"asked for fs name = %s\n",
                       mntent_p->service_name);
@@ -451,16 +451,16 @@ static int server_parse_config(struct server_configuration_s *config,
             return ret;
         }
 
-        assert(!response->fs_config_buf[response->fs_config_buflen - 1]);
-        assert(!response->server_config_buf[response->server_config_buflen - 1]);
+        assert(!response->fs_config_buf[response->fs_config_buf_size - 1]);
+        assert(!response->server_config_buf[response->server_config_buf_size - 1]);
 
         if (write(fs_fd,response->fs_config_buf,
-                  (response->fs_config_buflen - 1)) ==
-            (response->fs_config_buflen - 1))
+                  (response->fs_config_buf_size - 1)) ==
+            (response->fs_config_buf_size - 1))
         {
             if (write(server_fd,response->server_config_buf,
-                      (response->server_config_buflen - 1)) ==
-                (response->server_config_buflen - 1))
+                      (response->server_config_buf_size - 1)) ==
+                (response->server_config_buf_size - 1))
             {
                 ret = PINT_server_config(config, fs_template, server_template);
             }

@@ -158,11 +158,11 @@ int do_encode_resp(
 		target_msg->buffer_type = BMI_EXT_ALLOC;
 
 		target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
-		target_msg->size_list[1] = response->u.getconfig.fs_config_buflen;
-		target_msg->size_list[2] = response->u.getconfig.server_config_buflen;
+		target_msg->size_list[1] = response->u.getconfig.fs_config_buf_size;
+		target_msg->size_list[2] = response->u.getconfig.server_config_buf_size;
 		target_msg->total_size = target_msg->size_list[0] +
-                    response->u.getconfig.fs_config_buflen +
-                    response->u.getconfig.server_config_buflen;
+                    response->u.getconfig.fs_config_buf_size +
+                    response->u.getconfig.server_config_buf_size;
 
 		target_msg->buffer_list[0] = response;
 		target_msg->buffer_list[1] = response->u.getconfig.fs_config_buf;

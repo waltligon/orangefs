@@ -186,19 +186,25 @@ struct PVFS_servresp_readdir
     uint32_t dirent_count;	    /* # of entries retrieved */
 };
 
+/* getconfig ***************************************************/
+/* - retrieves initial configuration information from server */
 
-/* Getconfig */
 struct PVFS_servreq_getconfig
 {
-    uint32_t max_strsize;	/* Expected size of string */
+    /* maximum allowed size of configuration information to retrieve */
+    uint32_t config_buf_size;
 };
 
 struct PVFS_servresp_getconfig
 {
-    uint32_t fs_config_buflen;	/* length of fs configuration file contents */
-    char* fs_config_buf;	/* fs configuration file contents */
-    uint32_t server_config_buflen;	/* length of fs configuration file contents */
-    char* server_config_buf;	/* fs configuration file contents */
+    /* fs config data */
+    char *fs_config_buf;
+    /* size of fs config data */
+    uint32_t fs_config_buf_size;
+    /* server config data */
+    char *server_config_buf;
+    /* size of server specific config data */
+    uint32_t server_config_buf_size;
 };
 
 /* allocate */
