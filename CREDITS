@@ -17,6 +17,7 @@ Nathan Poznick <poznick@conwaycorp.net>
    detailed bug reporting and analysis
    fixed permissions on newly created dirs using pvfs2-mkdir
    misc formatting patches
+   misc warning removals
 
 Murali Vilayannur <vilayann@mcs.anl.gov>
 -- testing and development

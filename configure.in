@@ -18,8 +18,8 @@ CONFIGURE_TIME=`date -u +"%F@%T"`
 PVFS2_MAJOR=0
 PVFS2_MINOR=7
 PVFS2_SUB=0
-dnl PVFS2_PRE=""
-PVFS2_PRE="pre1-$CONFIGURE_TIME"
+PVFS2_PRE=""
+dnl PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
 AM_INIT_AUTOMAKE(pvfs2, $PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE)
 
@@ -41,6 +41,86 @@ AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
 AC_CHECK_PROG(HAVE_FIND, find, yes, no)
 AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
+
+dnl a mechanism to turn off threads in the client library
+AC_MSG_CHECKING([for client library thread safety support])
+AC_ARG_ENABLE(disable-thread-safety,
+[  --disable-thread-safety Disables thread safety in the client library],
+[if test "x$enableval" = "xno" ; then
+    LIBCFLAGS="$LIBCFLAGS -D__GEN_NULL_LOCKING__"
+    THREAD_LIB=""
+    AC_MSG_RESULT(no)
+fi],
+[   LIBCFLAGS="$LIBCFLAGS -D__GEN_POSIX_LOCKING__"
+    THREAD_LIB="-lpthread"
+    AC_MSG_RESULT(yes) ])
+
+AC_SUBST(LIBCFLAGS)
+AC_SUBST(THREAD_LIB)
+
+dnl a mechanism to turn off perf counters
+AC_ARG_ENABLE(perf-counters,
+[  --disable-perf-counters Disables pvfs2-server performance counters],
+[if test "x$enableval" = "xno" ; then
+    CFLAGS="$CFLAGS -D__PVFS2_DISABLE_PERF_COUNTERS__"
+fi]
+,)
+
+dnl a mechanism to turn off disk I/O for testing/debugging
+AC_ARG_ENABLE(disk-io,
+[  --disable-disk-io       Disables pvfs2-server disk I/O (for testing)],
+[if test "x$enableval" = "xno" ; then
+    CFLAGS="$CFLAGS -D__PVFS2_DISABLE_DISK_IO__"
+fi]
+,)
+
+dnl a mechanism to turn on mmap-readahead caching (for kernel interface)
+MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
+AC_ARG_ENABLE(mmap-racache,
+[  --disable-mmap-racache  Disables mmap-readahead in kernel interface],
+[if test "x$enableval" = "xno" ; then
+    MMAP_RA_CACHE=""
+fi]
+,)
+AC_SUBST(MMAP_RA_CACHE)
+
+dnl a function to check if we have the required gtk stuff for the
+dnl karma gui
+test_for_karma()
+{
+  AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+  if test "x$HAVE_PKGCONFIG" = "xyes" ; then
+     AC_MSG_CHECKING([for gtk2.0 (for karma gui)])
+     if `pkg-config --exists gtk+-2.0` ; then
+        AC_MSG_RESULT(yes)
+        GTKLIBS=`pkg-config --libs gtk+-2.0`
+        GTKCFLAGS=`pkg-config --cflags gtk+-2.0`
+
+        AC_SUBST(GTKLIBS)
+        AC_SUBST(GTKCFLAGS)
+        BUILD_KARMA="1"
+        AC_SUBST(BUILD_KARMA)
+     else
+        AC_MSG_RESULT(no)
+     fi
+  fi
+}
+
+dnl optionally disable building the karma gui
+AC_ARG_ENABLE(karma,
+[  --disable-karma         Disables optional gui.  (Enabled by default)],
+[ if test "x$enableval" = "xyes" ; then
+      test_for_karma
+   fi
+],
+[test_for_karma]
+)
+
+dnl shared or static client library (see --enable-shared below)
+AC_ARG_ENABLE(static,
+[  --disable-static        Do not build static client library],
+[build_static=$enableval], [build_static=yes])
+AC_SUBST(build_static)
 
 dnl NOTE: removing the linux-gnu host check for now; we may want to put it back
 dnl before releaseing any code, though...  -Phil
@@ -247,80 +327,6 @@ QUIET_COMPILE=1)
 
 AC_SUBST(QUIET_COMPILE)
 
-dnl a mechanism to turn off threads in the client library
-AC_MSG_CHECKING([for client library thread safety support])
-AC_ARG_ENABLE(disable-thread-safety,
-[  --disable-thread-safety Disables thread safety in the client library],
-[if test "x$enableval" = "xno" ; then
-    LIBCFLAGS="$LIBCFLAGS -D__GEN_NULL_LOCKING__"
-    THREAD_LIB=""
-    AC_MSG_RESULT(no)
-fi],
-[   LIBCFLAGS="$LIBCFLAGS -D__GEN_POSIX_LOCKING__"
-    THREAD_LIB="-lpthread"
-    AC_MSG_RESULT(yes) ])
-
-AC_SUBST(LIBCFLAGS)
-AC_SUBST(THREAD_LIB)
-
-dnl a mechanism to turn off perf counters
-AC_ARG_ENABLE(perf-counters,
-[  --disable-perf-counters Disables pvfs2-server performance counters],
-[if test "x$enableval" = "xno" ; then
-    CFLAGS="$CFLAGS -D__PVFS2_DISABLE_PERF_COUNTERS__"
-fi]
-,)
-
-dnl a mechanism to turn off disk I/O for testing/debugging
-AC_ARG_ENABLE(disk-io,
-[  --disable-disk-io       Disables pvfs2-server disk I/O (for testing)],
-[if test "x$enableval" = "xno" ; then
-    CFLAGS="$CFLAGS -D__PVFS2_DISABLE_DISK_IO__"
-fi]
-,)
-
-dnl a mechanism to turn on mmap-readahead caching (for kernel interface)
-MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
-AC_ARG_ENABLE(mmap-racache,
-[  --disable-mmap-racache  Disables mmap-readahead in kernel interface],
-[if test "x$enableval" = "xno" ; then
-    MMAP_RA_CACHE=""
-fi]
-,)
-AC_SUBST(MMAP_RA_CACHE)
-
-dnl a function to check if we have the required gtk stuff for the
-dnl karma gui
-test_for_karma()
-{
-  AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
-  if test "x$HAVE_PKGCONFIG" = "xyes" ; then
-     AC_MSG_CHECKING([for gtk2.0 (for karma gui)])
-     if `pkg-config --exists gtk+-2.0` ; then
-        AC_MSG_RESULT(yes)
-        GTKLIBS=`pkg-config --libs gtk+-2.0`
-        GTKCFLAGS=`pkg-config --cflags gtk+-2.0`
-
-        AC_SUBST(GTKLIBS)
-        AC_SUBST(GTKCFLAGS)
-        BUILD_KARMA="1"
-        AC_SUBST(BUILD_KARMA)
-     else
-        AC_MSG_RESULT(no)
-     fi
-  fi
-}
-
-dnl optionally disable building the karma gui
-AC_ARG_ENABLE(karma,
-[  --disable-karma         Disables optional gui.  (Enabled by default)],
-[ if test "x$enableval" = "xyes" ; then
-      test_for_karma
-   fi
-],
-[test_for_karma]
-)
-
 dnl optionally enable use of epoll() on Linux instead of poll()
 AC_ARG_ENABLE(epoll,
 [  --enable-epoll          Enables use of epoll for TCP/IP polling],
@@ -340,11 +346,7 @@ dnl shared or static client library
 AC_ARG_ENABLE(shared,
 [  --enable-shared         Build shared client library],
 [build_shared=$enableval], [build_shared=no])
-AC_ARG_ENABLE(static,
-[  --disable-static        Do not build static client library],
-[build_static=$enableval], [build_static=yes])
 AC_SUBST(build_shared)
-AC_SUBST(build_static)
 
 dnl See if CC is a GNU compiler.  This may require a real test in future
 dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.  First
