@@ -6,6 +6,7 @@ LOCALTESTSRC := \
 	$(DIR)/trove-mkdir.c \
 	$(DIR)/trove-mkfs.c \
 	$(DIR)/trove-rm.c \
+	$(DIR)/test-listio.c \
 	$(DIR)/trove-touch.c
 
 TESTSRC += $(LOCALTESTSRC)

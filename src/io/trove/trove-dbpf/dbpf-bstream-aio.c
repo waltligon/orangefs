@@ -119,11 +119,12 @@ int dbpf_bstream_listio_convert(
 	    cur_stream_off  = stream_offset_array[sct];
 	}
 
-#if 1
+#if 0
 	aiocb_print(cur_aiocb_ptr);
 #endif
 	/* point to next aiocb */
-	cur_aiocb_ptr = &aiocb_array[++act];
+	act++;
+	cur_aiocb_ptr = &aiocb_array[act];
     }
 
     *aiocb_count_p = act; /* return the number actually used */
@@ -146,14 +147,26 @@ int dbpf_bstream_listio_convert(
 
 static void aiocb_print(struct aiocb *ptr)
 {
+    static char lio_write[]     = "LIO_WRITE";
+    static char lio_read[]      = "LIO_READ";
+    static char lio_nop[]       = "LOP_NOP";
+    static char sigev_none[]    = "SIGEV_NONE";
+    static char invalid_value[] = "invalid value";
+    char *opcode, sigev;
+
+    opcode = (ptr->aio_lio_opcode == LIO_WRITE) ? lio_write :
+	(ptr->aio_lio_opcode == LIO_READ) ? lio_read :
+	(ptr->aio_lio_opcode == LIO_NOP) ? lio_nop : invalid_value;
+    sigev = (ptr->aio_sigevent.sigev_notify == SIGEV_NONE) ? sigev_none : invalid_value;
+
     printf("aio_fildes = %d, aio_offset = %d, aio_buf = %x, aio_nbytes = %d, aio_reqprio = %d, aio_lio_opcode = %s, aio_sigevent.sigev_notify = %s\n",
 	   ptr->aio_fildes,
 	   (int) ptr->aio_offset,
 	   (unsigned int) ptr->aio_buf,
 	   ptr->aio_nbytes,
 	   ptr->aio_reqprio,
-	   (ptr->aio_lio_opcode == LIO_WRITE) ? "LIO_WRITE" : (ptr->aio_lio_opcode == LIO_READ) ? "LIO_READ" : (ptr->aio_lio_opcode == LIO_NOP) ? "LIO_NOP" : "invalid value",
-	   (ptr->aio_sigevent.sigev_notify == SIGEV_NONE) ? "SIGEV_NONE" : "invalid value");
+	   opcode,
+	   sigev);
 }
 
 /*

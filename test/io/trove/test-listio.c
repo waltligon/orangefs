@@ -133,7 +133,10 @@ int main(int argc, char **argv)
 	memset(mybuffer, 0, TEST_SIZE);
 
 	mem_offset_array[1] = mybuffer;
-	
+
+	/********************************/
+	trove_finalize();
+#if 0	
 	ret = trove_bstream_write_list(coll_id,
 				       parent_handle,
 				       mem_offset_array,
@@ -152,8 +155,10 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "listio write failed\n");
 	    return -1;
 	}
+#endif
 	return 0;
 }
+
 
 int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p)
 {
