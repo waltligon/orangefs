@@ -20,6 +20,7 @@ static char collection[PATH_MAX] = "fs-foo";
 static int verbose = 0;
 static int new_coll_id = 9;
 static int new_root_handle = 7;
+static char ranges[PATH_MAX] = "1047000-1049000";
 
 static int parse_args(int argc, char **argv);
 
@@ -115,6 +116,17 @@ int main(int argc, char **argv)
 			 "%s: info: created collection '%s'.\n",
 			 argv[0],
 			 collection);
+
+    /* we have a three-step process for starting trove:
+     * initialize, collection_lookup, collection_setinfo */
+    ret = trove_collection_setinfo(coll_id, TROVE_COLLECTION_HANDLE_RANGES, 
+	    ranges);
+    if (ret < 0)
+    {
+	fprintf(stderr, "%s: Error adding handle ranges\n", argv[0]);
+	return -1;
+    }
+
 
     /* create a dataspace to hold the root directory */
     /* Q: what should the bitmask be? */
@@ -243,7 +255,7 @@ static int parse_args(int argc, char **argv)
 {
     int c;
 
-    while ((c = getopt(argc, argv, "s:c:i:r:v")) != EOF) {
+    while ((c = getopt(argc, argv, "s:c:i:r:R:v")) != EOF) {
 	switch (c) {
 	    case 's':
 		strncpy(storage_space, optarg, PATH_MAX);
@@ -253,8 +265,13 @@ static int parse_args(int argc, char **argv)
 		break;
 	    case 'i':
 		new_coll_id = atoi(optarg);
+		break;
 	    case 'r':
 		new_root_handle = atoi(optarg);
+		break;
+	    case 'R':
+		strncpy(ranges,optarg, PATH_MAX);
+		break;
 	    case 'v':
 		verbose = 1;
 		break;
