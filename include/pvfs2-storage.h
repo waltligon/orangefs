@@ -38,15 +38,6 @@ struct PVFS_vtag_s
 };
 typedef struct PVFS_vtag_s PVFS_vtag;
 
-/* Bit values of flags for various dspace operations */
-/* TODO: do we use a flag to get a vtag back or do we use VTAG_RETURN? */
-enum
-{
-    DSPACE_SYNC = 1,		/* sync storage on completion of operation */
-    DSPACE_PREALLOC = 2,	/* preallocate space (for resize op only) */
-    DSPACE_CALC_VTAG = 4,	/* calculate and return a vtag (?) */
-};
-
 /* dataspace attributes that are not explicitly stored within the
  * dataspace itself.
  *
