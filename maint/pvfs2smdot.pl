@@ -55,10 +55,17 @@ sub spit_out_header()
 #
 sub spit_out_state
 {
-    my($sn, $fn, $nested) = @_;
+    my($sn, $fn, $nested, $ending) = @_;
 
-    if ($nested) { printf "%s [shape = record, label = \"%s\"];\n", $sn, $fn; }
-    else         { printf "%s [shape = ellipse, label = \"%s\"];\n", $sn, $fn; }
+    if ($ending){
+	$node_style = "style = filled, ";
+    }
+    else{
+	$node_style = "";
+    }
+
+    if ($nested) { printf "%s [%s shape = record, label = \"%s\"];\n", $sn, $node_style, $fn; }
+    else         { printf "%s [%s shape = ellipse, label = \"%s\"];\n", $sn, $node_style, $fn; }
 }
 
 # spit_out_transition() - prints out dot line describing transition
@@ -101,6 +108,7 @@ while (1) {
 		exit -1;
 	    }
 	    $token = next_token();
+	    $ending = 0;
 	    $state = 1;
 	    last SWITCH;
 	}
@@ -116,20 +124,13 @@ while (1) {
 	    last SWITCH;
 	}
 	if ($state == 2) {
-	    if ($token eq "jump") {
-		$sub_state_name = next_token();
-		chop $sub_state_name;
-		spit_out_state($state_name, $sub_state_name, 1);
-	    }
-	    elsif ($token eq "run") {
-		$fn_name = next_token();
-		chop $fn_name;
-		spit_out_state($state_name, $fn_name, 0);
-	    }
-	    else {
+	    $target_type = $token;
+	    if(($target_type ne "jump") and ($target_type ne "run")) {
 		printf "state 2, expected \"jump\" or \"run\", got \"%s\"\n", $token;
 		exit -1;
 	    }
+	    $target_name = next_token();
+	    chop $target_name;
 
 	    $token = next_token();
 	    $state = 3;
@@ -137,7 +138,15 @@ while (1) {
 	}
 	if ($state == 3) {
 	    if ($token eq "}") {
+		#    delay describing the state until we have looked at 
+		# at all of the transitions, so we can describe it fully
 		$token = next_token();
+		if ($target_type eq "jump") {
+		    spit_out_state($state_name, $target_name, 1, $ending);
+		}
+		elsif ($target_type eq "run") {
+		    spit_out_state($state_name, $target_name, 0, $ending);
+		}
 		$state = 4;
 	    }
 	    else {
@@ -149,7 +158,15 @@ while (1) {
 		}
 		$next_state_name = next_token();
 		chop $next_state_name;
-		spit_out_transition($state_name, $transition_label, $next_state_name);
+		# skip drawing transition at completion of state machine
+		if(($next_state_name ne "terminate") and
+		   ($next_state_name ne "return")) {
+		    spit_out_transition($state_name, $transition_label, $next_state_name);
+		}
+		# instead, mark it as an ending state
+		else {
+		    $ending = 1;
+		}
 		$token = next_token();
 		$state = 3;
 	    }
