@@ -432,6 +432,36 @@ static int draw(void)
 	assert(ret == 0);
 	SDL_FreeSurface(text);
 
+	/* key */
+	text_rect.x = 4;
+	text_rect.y = screen->h - text->h - 4;
+	text_rect.w = text->h;
+	SDL_FillRect(screen, &text_rect, SDL_MapRGB(screen->format,
+	    0xcc, 0x0, 0x0));
+	sprintf(scratch_string, "read bandwidth, MB/s");
+	text = TTF_RenderText_Shaded(font, scratch_string, font_color, black_color);
+	assert(text);
+	text_rect.x = text_rect.x + text_rect.w + 4;
+	text_rect.w = text->w;
+	ret = SDL_BlitSurface(text, NULL, screen, &text_rect);
+	assert(ret == 0);
+	SDL_FreeSurface(text);
+
+	text_rect.x = text_rect.x + text_rect.w + 16;
+	text_rect.w = text->h;
+	SDL_FillRect(screen, &text_rect, SDL_MapRGB(screen->format,
+	    0x0, 0x0, 0xcc));
+	sprintf(scratch_string, "write bandwidth, MB/s");
+	text = TTF_RenderText_Shaded(font, scratch_string, font_color, black_color);
+	assert(text);
+	text_rect.x = text_rect.x + text_rect.w + 4;
+	text_rect.w = text->w;
+	ret = SDL_BlitSurface(text, NULL, screen, &text_rect);
+	assert(ret == 0);
+	SDL_FreeSurface(text);
+
+
+
 
 	for(i=0; i<pint_vis_shared.io_count; i++)
 	{
