@@ -56,10 +56,8 @@ struct PVFS_sys_mntent
 /* describes file distribution parameters */
 struct PVFS_sys_dist_s
 {
-    /* empty for now; this is just a stub so that we can start getting the
-     * arguments right on existing system interface functions
-     */
-    void* dist_params;
+    const char* name;
+    void* params;
 };
 typedef struct PVFS_sys_dist_s PVFS_sys_dist;
 
