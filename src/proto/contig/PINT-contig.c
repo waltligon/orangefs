@@ -94,6 +94,10 @@ int do_encode_calc_max_size(
 	    size += (PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT
 		* sizeof(struct PVFS_mgmt_perf_stat));
 	    break;
+	case PVFS_SERV_MGMT_EVENT_MON:
+	    size += (PVFS_REQ_LIMIT_MGMT_EVENT_MON_COUNT
+		* sizeof(struct PVFS_mgmt_event));
+	    break;
 	case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	    size += (PVFS_REQ_LIMIT_MGMT_ITERATE_HANDLES_COUNT
 		* sizeof(PVFS_handle));

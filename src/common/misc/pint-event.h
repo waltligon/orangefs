@@ -7,7 +7,9 @@
 #ifndef __PINT_EVENT_H
 #define __PINT_EVENT_H
 
-#include <pvfs2-types.h>
+#include "pvfs2-types.h"
+#include "pvfs2-mgmt.h"
+#include "gen-locks.h"
 
 /* TODO: put this somewhere else? read from config file? */
 #define PINT_EVENT_DEFAULT_RING_SIZE 2000
@@ -61,6 +63,9 @@ int PINT_event_initialize(int ring_size);
 void PINT_event_finalize(void);
 void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask);
 void PINT_event_get_masks(int* event_on, int32_t* api_mask, int32_t* op_mask);
+void PINT_event_retrieve(
+    struct PVFS_mgmt_event* event_array,
+    int count);
 void __PINT_event_timestamp(
     enum PINT_event_api api,
     int32_t operation,
