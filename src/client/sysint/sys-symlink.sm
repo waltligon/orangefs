@@ -561,6 +561,13 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
+    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
+    {
+        free(sm_p->msgarray);
+    }
+    sm_p->msgarray = msg_p;
+    sm_p->msgarray_count = 1;
+
     ret = PINT_bucket_map_to_server(&metafile_server_addr,
                                     sm_p->u.sym.symlink_handle,
                                     sm_p->parent_ref.fs_id);
@@ -585,17 +592,8 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
                  "metafile handle %Lu\n", Lu(msg_p->handle));
-
-    if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
-    {
-        free(sm_p->msgarray);
-    }
-    sm_p->msgarray = msg_p;
-    sm_p->msgarray_count = 1;
-
     return 1;
 }
-
 
 static int symlink_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
