@@ -392,7 +392,8 @@ int pvfs2_inode_getattr(
                     (int)atomic_read(&inode->i_count));
 
         service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_inode_getattr", retries, error_exit);
+            new_op, "pvfs2_inode_getattr", retries, error_exit,
+            get_interruptible_flag(inode));
 
 	/* check what kind of goodies we got */
 	if (new_op->downcall.status > -1)
@@ -453,7 +454,8 @@ int pvfs2_inode_setattr(
             inode, &new_op->upcall.req.setattr.attributes, iattr);
 
         service_operation_with_timeout_retry(
-            new_op, "pvfs2_inode_setattr", retries);
+            new_op, "pvfs2_inode_setattr", retries,
+            get_interruptible_flag(inode));
 
         pvfs2_print("Setattr Got PVFS2 status value of %d\n",
                     new_op->downcall.status);
@@ -509,7 +511,8 @@ static inline struct inode *pvfs2_create_file(
 		dentry->d_name.name, PVFS2_NAME_LEN);
 
         service_operation_with_timeout_retry(
-            new_op, "pvfs2_create_file", retries);
+            new_op, "pvfs2_create_file", retries,
+            get_interruptible_flag(inode));
 
 	pvfs2_print("Create Got PVFS2 handle %Lu on fsid %d\n",
                     new_op->downcall.resp.create.refn.handle,
@@ -551,7 +554,7 @@ static inline struct inode *pvfs2_create_file(
 	else
 	{
 	  error_exit:
-	    pvfs2_error("pvfs2_create_file: An error occurred; "
+	    pvfs2_print("pvfs2_create_file: An error occurred; "
                         "removing created inode\n");
 	    iput(inode);
             inode = NULL;
@@ -611,7 +614,8 @@ static inline struct inode *pvfs2_create_dir(
                     "with type %d\n", new_op->upcall.type);
 
         service_operation_with_timeout_retry(
-            new_op, "pvfs2_create_dir", retries);
+            new_op, "pvfs2_create_dir", retries,
+            get_interruptible_flag(inode));
 
 	/* check what kind of goodies we got */
 	pvfs2_print("Mkdir Got PVFS2 handle %Lu on fsid %d\n",
@@ -710,7 +714,8 @@ static inline struct inode *pvfs2_create_symlink(
 		symname, PVFS2_NAME_LEN);
 
         service_operation_with_timeout_retry(
-            new_op, "pvfs2_symlink_file", retries);
+            new_op, "pvfs2_symlink_file", retries,
+            get_interruptible_flag(inode));
 
 	pvfs2_print("Symlink Got PVFS2 handle %Lu on fsid %d\n",
                     new_op->downcall.resp.sym.refn.handle,
@@ -841,7 +846,8 @@ int pvfs2_remove_entry(
 		dentry->d_name.name, PVFS2_NAME_LEN);
 
         service_operation_with_timeout_retry(
-            new_op, "pvfs2_remove_entry", retries);
+            new_op, "pvfs2_remove_entry", retries,
+            get_interruptible_flag(inode));
 
 	/*
 	   the remove has no downcall members to retrieve, but
@@ -890,7 +896,8 @@ int pvfs2_truncate_inode(
     new_op->upcall.req.truncate.size = (PVFS_size)size;
 
     service_operation_with_timeout_retry(
-        new_op, "pvfs2_truncate_inode", retries);
+        new_op, "pvfs2_truncate_inode", retries,
+        get_interruptible_flag(inode));
 
     /*
       the truncate has no downcall members to retrieve, but
@@ -925,6 +932,9 @@ int pvfs2_kernel_error_code_convert(
             break;
         case -PVFS_ENOSPC:
             ret = -ENOSPC;
+            break;
+        case -PVFS_ENOENT:
+            ret = -ENOENT;
             break;
         case 0:
             ret = 0;

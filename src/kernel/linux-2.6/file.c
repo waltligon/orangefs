@@ -130,7 +130,8 @@ ssize_t pvfs2_inode_read(
 	new_op->upcall.req.io.offset = *offset;
 
         service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_inode_read", retries, error_exit);
+            new_op, "pvfs2_inode_read", retries, error_exit,
+            get_interruptible_flag(inode));
 
 	if (new_op->downcall.status != 0)
 	{
@@ -279,7 +280,8 @@ static ssize_t pvfs2_file_write(
         }
 
         service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_file_write", retries, error_exit);
+            new_op, "pvfs2_file_write", retries, error_exit,
+            get_interruptible_flag(inode));
 
 	if (new_op->downcall.status != 0)
 	{

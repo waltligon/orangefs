@@ -146,7 +146,8 @@ static int pvfs2_statfs(
     new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->coll_id;
 
     service_operation_with_timeout_retry(
-        new_op, "pvfs2_statfs", retries);
+        new_op, "pvfs2_statfs", retries,
+        PVFS2_SB(sb)->mnt_options.intr);
 
     if (new_op->downcall.status > -1)
     {

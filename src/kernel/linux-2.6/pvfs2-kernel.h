@@ -150,7 +150,8 @@ typedef struct
 
   the intr option is inspired by the nfs intr option that interrupts
   the operation in progress if a signal is received if set, and
-  ignores the signal otherwise.  THIS IS NOT YET SUPPORTED.
+  ignores the signal otherwise.
+  FIXME: THIS IS NOT YET SUPPORTED.
 */
 typedef struct
 {
@@ -221,9 +222,9 @@ do {                                                          \
                             &(op->tag));                      \
 } while(0)
 
-#define service_operation(op, method)                         \
+#define service_operation(op, method, intr)                   \
 add_op_to_request_list(op);                                   \
-ret = wait_for_matching_downcall(new_op);                     \
+ret = wait_for_matching_downcall(new_op, intr);               \
 if (ret != PVFS2_WAIT_SUCCESS)                                \
 {                                                             \
     if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                    \
@@ -238,28 +239,28 @@ if (ret != PVFS2_WAIT_SUCCESS)                                \
   tries to service the operation and will retry on timeout
   failure up to num times (num MUST be a numeric lvalue).
 */
-#define service_operation_with_timeout_retry(op, method, num) \
-wait_for_op:                                                  \
- add_op_to_request_list(op);                                  \
- ret = wait_for_matching_downcall(op);                        \
- if (ret != PVFS2_WAIT_SUCCESS)                               \
- {                                                            \
-     if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))      \
-     {                                                        \
-         pvfs2_print("pvfs2: %s -- timeout; requeing op\n",   \
-                     method);                                 \
-         goto wait_for_op;                                    \
-     }                                                        \
-     else                                                     \
-     {                                                        \
-         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
-         {                                                    \
-             pvfs2_error("pvfs2: %s -- wait timed out (%x).  "\
-                         "aborting retry attempts.\n",        \
-                         method,ret);                         \
-         }                                                    \
-         goto error_exit;                                     \
-     }                                                        \
+#define service_operation_with_timeout_retry(op, method, num, intr)\
+wait_for_op:                                                       \
+ add_op_to_request_list(op);                                       \
+ ret = wait_for_matching_downcall(op, intr);                       \
+ if (ret != PVFS2_WAIT_SUCCESS)                                    \
+ {                                                                 \
+     if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))           \
+     {                                                             \
+         pvfs2_print("pvfs2: %s -- timeout; requeing op\n",        \
+                     method);                                      \
+         goto wait_for_op;                                         \
+     }                                                             \
+     else                                                          \
+     {                                                             \
+         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                    \
+         {                                                         \
+             pvfs2_error("pvfs2: %s -- wait timed out (%x).  "     \
+                         "aborting retry attempts.\n",             \
+                         method,ret);                              \
+         }                                                         \
+         goto error_exit;                                          \
+     }                                                             \
  }
 
 /*
@@ -272,29 +273,29 @@ wait_for_op:                                                  \
   NOTE: used in namei.c:lookup, file.c:pvfs2_inode_read, and
   file.c:pvfs2_file_write
 */
-#define service_error_exit_op_with_timeout_retry(op,meth,num,e)\
-wait_for_op:                                                   \
- add_op_to_request_list(op);                                   \
- ret = wait_for_matching_downcall(op);                         \
- if (ret != PVFS2_WAIT_SUCCESS)                                \
- {                                                             \
-     if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))       \
-     {                                                         \
-         pvfs2_print("pvfs2: %s -- timeout; requeing op\n",    \
-                     meth);                                    \
-         goto wait_for_op;                                     \
-     }                                                         \
-     else                                                      \
-     {                                                         \
-         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                \
-         {                                                     \
-             pvfs2_error("pvfs2: %s -- wait timed out (%x).  " \
-                         "aborting retry attempts.\n",         \
-                         meth,ret);                            \
-         }                                                     \
-         e = 1;                                                \
-         goto error_exit;                                      \
-     }                                                         \
+#define service_error_exit_op_with_timeout_retry(op,meth,num,e, intr)\
+wait_for_op:                                                         \
+ add_op_to_request_list(op);                                         \
+ ret = wait_for_matching_downcall(op, intr);                         \
+ if (ret != PVFS2_WAIT_SUCCESS)                                      \
+ {                                                                   \
+     if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))             \
+     {                                                               \
+         pvfs2_print("pvfs2: %s -- timeout; requeing op\n",          \
+                     meth);                                          \
+         goto wait_for_op;                                           \
+     }                                                               \
+     else                                                            \
+     {                                                               \
+         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                      \
+         {                                                           \
+             pvfs2_error("pvfs2: %s -- wait timed out (%x).  "       \
+                         "aborting retry attempts.\n",               \
+                         meth,ret);                                  \
+         }                                                           \
+         e = 1;                                                      \
+         goto error_exit;                                            \
+     }                                                               \
  }
 
 /*
@@ -337,6 +338,9 @@ do {                                                            \
     *offset = original_offset;                                  \
 } while(0)
 
+#define get_interruptible_flag(inode)                           \
+(PVFS2_SB(inode->i_sb)->mnt_options.intr)
+
 /****************************
  * defined in pvfs2-cache.c
  ****************************/
@@ -359,7 +363,7 @@ void pvfs2_inode_cache_finalize(
  * defined in waitqueue.c
  ****************************/
 int wait_for_matching_downcall(
-    pvfs2_kernel_op_t * op);
+    pvfs2_kernel_op_t * op, int interruptible);
 
 /****************************
  * defined in inode.c

@@ -138,7 +138,8 @@ static int pvfs2_readdir(
         }
 
         service_operation_with_timeout_retry(
-            new_op, "pvfs2_readdir", retries);
+            new_op, "pvfs2_readdir", retries,
+            get_interruptible_flag(dentry->d_inode));
 
 	/* need to check downcall.status value */
 	pvfs2_print("Readdir downcall status is %d (dirent_count "

@@ -132,7 +132,8 @@ struct dentry *pvfs2_lookup(
 	    dentry->d_name.name, PVFS2_NAME_LEN);
 
     service_error_exit_op_with_timeout_retry(
-        new_op, "pvfs2_lookup", retries, error_exit);
+        new_op, "pvfs2_lookup", retries, error_exit,
+        PVFS2_SB(dir->i_sb)->mnt_options.intr);
 
     /* check what kind of goodies we got */
     pvfs2_print("Lookup Got PVFS2 handle %Lu on fsid %d\n",
@@ -357,7 +358,8 @@ static int pvfs2_rename(
 	    new_dentry->d_name.name, PVFS2_NAME_LEN);
 
     service_operation_with_timeout_retry(
-        new_op, "pvfs2_rename", retries);
+        new_op, "pvfs2_rename", retries,
+        get_interruptible_flag(old_dentry->d_inode));
 
     /*
       nothing's returned; just return the exit status
