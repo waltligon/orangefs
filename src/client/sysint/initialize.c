@@ -35,10 +35,17 @@ static char* build_flow_module_list(pvfs_mntlist* mntlist);
  * Initializes the PVFS system interface and any necessary internal data
  * structures.  Must be called before any other system interface function.
  *
+ * the default_debug_mask is used if not overridden by the PVFS2_DEBUGMASK
+ * environment variable at run-time.  allowable string formats of the
+ * env variable are the same as the EventLogging line in the server
+ * configuration file.
+ *
  * returns 0 on success, -errno on failure
  */
 
-int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
+int PVFS_sys_initialize(
+    pvfs_mntlist mntent_list,
+    int default_debug_mask,
     PVFS_sysresp_init *resp)
 {
     int ret = -1, i, j;
@@ -50,6 +57,8 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     int num_method_ptr_list, max_method_ptr_list;
     char *method_list = 0;
     char *flowproto_list = NULL;
+    char *debug_mask_str = NULL;
+    int debug_mask = 0;
 
     enum {
 	NONE_INIT_FAIL = 0,
@@ -62,19 +71,16 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 	DCACHE_INIT_FAIL,
 	BUCKET_INIT_FAIL,
 	GET_CONFIG_INIT_FAIL
-    } init_fail = NONE_INIT_FAIL; /* used for cleanup in the event of failures */
+    } init_fail = NONE_INIT_FAIL;
 
-    /* setup gossip */
     gossip_enable_stderr();
-    if (!debug_mask) {
-	char *cp = getenv("GOSSIP_DEBUG");
-	if (cp)
-	    debug_mask = strtoul(cp, 0, 0);
-    }
-    if(debug_mask)
-    {
-	gossip_set_debug_mask(1,debug_mask);
-    }
+
+    debug_mask_str = getenv("PVFS2_DEBUGMASK");
+    debug_mask = (debug_mask_str ?
+                  PVFS_debug_eventlog_to_mask(debug_mask_str) :
+                  default_debug_mask);
+
+    gossip_set_debug_mask(1,debug_mask);
 
     /* make sure we were given sane arguments */
     if ((mntent_list.ptab_array == NULL) || (resp == NULL))
