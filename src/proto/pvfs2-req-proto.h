@@ -68,33 +68,19 @@ struct PVFS_servreq_remove
  * returned in generic server response structure
  */
 
-/* getattr
- *
- */
+/* getattr ****************************************************/
+/* - retreives attributes based on mask of PVFS_ATTR_XXX values */
+
 struct PVFS_servreq_getattr
 {
-    PVFS_handle handle;
-    PVFS_fs_id fs_id;
-    uint32_t attrmask;
+    PVFS_handle handle;		    /* handle of target object */
+    PVFS_fs_id fs_id;		    /* file system */
+    uint32_t attrmask;		    /* mask of desired attributes */
 };
 
 struct PVFS_servresp_getattr
 {
-    PVFS_object_attr attr;
-};
-
-/* geteattr
- *
- */
-struct PVFS_servreq_geteattr
-{
-    PVFS_handle handle;
-    PVFS_fs_id fs_id;
-};
-
-struct PVFS_servresp_geteattr
-{
-
+    PVFS_object_attr attr;	    /* attributes */
 };
 
 /* setattr
@@ -300,7 +286,6 @@ struct PVFS_server_req
 	struct PVFS_servreq_setattr setattr;
 	struct PVFS_servreq_mkdir mkdir;
 	struct PVFS_servreq_readdir readdir;
-	struct PVFS_servreq_geteattr geteattr;
 	struct PVFS_servreq_seteattr seteattr;
 	struct PVFS_servreq_lookup_path lookup_path;
 	struct PVFS_servreq_createdirent crdirent;
@@ -324,7 +309,6 @@ struct PVFS_server_resp
 	struct PVFS_servresp_getattr getattr;
 	struct PVFS_servresp_mkdir mkdir;
 	struct PVFS_servresp_readdir readdir;
-	struct PVFS_servresp_geteattr geteattr;
 	struct PVFS_servresp_seteattr seteattr;
 	struct PVFS_servresp_lookup_path lookup_path;
 	struct PVFS_servresp_rmdirent rmdirent;
