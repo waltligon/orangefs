@@ -64,6 +64,7 @@ static struct server_configuration_s server_config;
  * after all threads complete and are no longer blocking.
  */
 static int signal_recvd_flag = 0;
+static pid_t server_controlling_pid = 0;
 
 /* this is used externally by some server state machines */
 job_context_id server_job_context = -1;
@@ -119,6 +120,8 @@ int main(int argc, char **argv)
     int ret = -1, debug_mask = 0;
     char *fs_conf = NULL, *server_conf = NULL;
     int siglevel = 0;
+
+    server_controlling_pid = getpid();
 
 #ifdef WITH_MTRACE
     mtrace();
@@ -872,6 +875,11 @@ static int server_shutdown(
  */
 static void server_sig_handler(int sig)
 {
+    if (getpid() != server_controlling_pid)
+    {
+        return;
+    }
+
     if(sig != SIGSEGV)
     {
 	gossip_err("PVFS2 server: got signal: %d, server_status_flag: %d\n", 
