@@ -16,33 +16,6 @@
 #define PINT_DIST_NAME_SZ 15
 
 #ifdef DIST_MODULE
-typedef struct PVFS_Dist_params PVFS_Dist_params;
-#else
-typedef void PVFS_Dist_params;
-#endif
-
-/* this struct is used to define a distribution to PVFS */
-
-typedef struct PVFS_Dist_methods {
-	PVFS_offset (*logical_to_physical_offset) (PVFS_Dist_params *dparam,
-			uint32_t iod_num, uint32_t iod_count,
-			PVFS_offset logical_offset);
-	PVFS_offset (*physical_to_logical_offset) (PVFS_Dist_params *dparam,
-			uint32_t iod_num, uint32_t iod_count,
-			PVFS_offset physical_offset);
-	PVFS_offset (*next_mapped_offset) (PVFS_Dist_params *dparam,
-			uint32_t iod_num, uint32_t iod_count,
-			PVFS_offset logical_offset);
-	PVFS_size (*contiguous_length) (PVFS_Dist_params *dparam,
-			uint32_t iod_num, uint32_t iod_count,
-			PVFS_offset physical_offset);
-	PVFS_size (*logical_file_size) (PVFS_Dist_params *dparam,
-			uint32_t iod_count, PVFS_size *psizes);
-	void (*encode) (PVFS_Dist_params *dparam, void *buffer);
-	void (*decode) (PVFS_Dist_params *dparam, void *buffer);
-} PVFS_Dist_methods;
-
-#ifdef MODULE
 
 /* these functions must be defined by a distribution module */
 

@@ -132,7 +132,12 @@ void PINT_Dist_decode(struct PVFS_Dist *dist, void *buffer)
 	dist->dist_name = (char *)(dist) + (int)(dist->dist_name);
 	dist->params = (struct PVFS_Dist_params *)
 		((char *)(dist) + (int)(dist->params));
+	/* set methods */
 	dist->methods = NULL;
+	if (PINT_Dist_lookup(dist)) {
+	    gossip_err("%s: lookup dist failed\n", __func__);
+	    exit(1);
+	}
 }
 
 void PINT_Dist_dump(PVFS_Dist *dist)

@@ -72,6 +72,14 @@ static void decode (PVFS_Dist_params *dparam, void *buffer)
 	memcpy(dparam, buffer, sizeof(PVFS_Dist_params));
 }
 
+static void encode_lebf(char **pptr, PVFS_Dist_params *dparam)
+{
+}
+
+static void decode_lebf(char **pptr, PVFS_Dist_params *dparam)
+{
+}
+
 static PVFS_Dist_params default_params;
 
 static PVFS_Dist_methods default_methods = {
@@ -81,12 +89,14 @@ static PVFS_Dist_methods default_methods = {
 	contiguous_length,
 	logical_file_size,
 	encode,
-	decode
+	decode,
+	encode_lebf,
+	decode_lebf,
 };
 
 PVFS_Dist default_dist = {
 	"default_dist",
-	13, /* name size */
+	roundup8(13), /* name size */
 	0, /* param size */
 	&default_params,
 	&default_methods

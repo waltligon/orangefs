@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include <pvfs2-types.h>
 
 #include <simple-stripe.h>
@@ -137,6 +138,16 @@ static void decode (PVFS_Dist_params *dparam, void *buffer)
 	memcpy(dparam, buffer, sizeof(PVFS_Dist_params));
 }
 
+static void encode_lebf(char **pptr, PVFS_Dist_params *dparam)
+{
+    encode_PVFS_size(pptr, &dparam->strip_size);
+}
+
+static void decode_lebf(char **pptr, PVFS_Dist_params *dparam)
+{
+    decode_PVFS_size(pptr, &dparam->strip_size);
+}
+
 static PVFS_Dist_params simple_stripe_params = {
 	65536 /* stripe size */
 };
@@ -148,13 +159,15 @@ static PVFS_Dist_methods simple_stripe_methods = {
 	contiguous_length,
 	logical_file_size,
 	encode,
-	decode
+	decode,
+	encode_lebf,
+	decode_lebf,
 };
 
 PVFS_Dist simple_stripe_dist = {
 	"simple_stripe",
-	14, /* name size */
-	sizeof(struct PVFS_Dist_params), /* param size */
+	roundup8(14), /* name size */
+	roundup8(sizeof(struct PVFS_Dist_params)), /* param size */
 	&simple_stripe_params,
 	&simple_stripe_methods
 };

@@ -66,6 +66,11 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 
     /* setup gossip */
     gossip_enable_stderr();
+    if (!debug_mask) {
+	char *cp = getenv("GOSSIP_DEBUG");
+	if (cp)
+	    debug_mask = strtoul(cp, 0, 0);
+    }
     if(debug_mask)
     {
 	gossip_set_debug_mask(1,debug_mask);

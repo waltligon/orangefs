@@ -39,7 +39,8 @@ PVFS_Dist *PVFS_Dist_create(char *name)
 			new_dist->params =
 				(PVFS_Dist_params *)(((char *)(new_dist + 1)) + old_dist.name_size);
 			memcpy(new_dist->params, old_dist.params, old_dist.param_size);
-			new_dist->methods = NULL; /* can look 'em up later */
+			/* copy in methods now */
+			new_dist->methods = old_dist.methods;
 			return (new_dist);
 		}
 		/* memory allocation failed */
@@ -63,7 +64,7 @@ int PVFS_Dist_free(PVFS_Dist *dist)
 	return -1;
 }
 
-PVFS_Dist *PVFS_Dist_copy(PVFS_Dist *dist)
+PVFS_Dist *PVFS_Dist_copy(const PVFS_Dist *dist)
 {
 	int dist_size;
 	PVFS_Dist *new_dist;
@@ -77,13 +78,16 @@ PVFS_Dist *PVFS_Dist_copy(PVFS_Dist *dist)
 	if (new_dist)
 	{
 		memcpy(new_dist, dist, dist_size);
-		return (new_dist);
+		/* fixup pointers to new space */
+		new_dist->dist_name
+		  = (char *) new_dist + roundup8(sizeof(*new_dist));
+		new_dist->params
+		  = (void *)(new_dist->dist_name + roundup8(new_dist->name_size));
 	}
-	/* memory allocation failed */
-	return NULL;
+	return (new_dist);
 }
 
-int PVFS_Dist_getparams(void *buf, PVFS_Dist *dist)
+int PVFS_Dist_getparams(void *buf, const PVFS_Dist *dist)
 {
 	if (!dist || !buf)
 	{
@@ -93,7 +97,7 @@ int PVFS_Dist_getparams(void *buf, PVFS_Dist *dist)
 	return 0;
 }
 
-int PVFS_Dist_setparams(PVFS_Dist *dist, void *buf)
+int PVFS_Dist_setparams(PVFS_Dist *dist, const void *buf)
 {
 	if (!dist || !buf)
 	{
