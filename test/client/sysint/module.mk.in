@@ -5,7 +5,8 @@ TEST_REALSYSINT_DIR := src/client/unix-io
 
 TEST_SYSINT_DIR_SRC += \
 	$(DIR)/client.c\
-	$(DIR)/test-pint-bucket.c\
+	$(DIR)/pcache-test.c\
+	$(DIR)/test-pint-bucket.c
 	$(DIR)/test-pint-dcache.c
 
 MISCSRC += \
