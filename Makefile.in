@@ -99,7 +99,7 @@ LD = gcc
 LDFLAGS += -L lib 
 LIBS += @LIBS@ -lpvfs2
 VISCFLAGS = @VISCFLAGS@
-VISLIBS = @VISLIBS@
+VISLIBS = @VISLIBS@ -lSDL_ttf
 # for Solaris:
 # LIBS += -lsocket -lnsl
 

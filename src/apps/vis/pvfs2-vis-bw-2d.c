@@ -9,8 +9,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <assert.h>
 
 #include <SDL.h>
+#include <SDL_ttf.h>
 
 #include "pvfs2.h"
 #include "pvfs2-vis.h"
@@ -198,12 +200,34 @@ static int draw(void)
     double** read_bw_matrix;
     double** write_bw_matrix;
     double peak;
+    TTF_Font *font;
+    SDL_Surface *text;
+    char scratch_string[256];
+    SDL_Color font_color = {0xcc, 0xcc, 0xcc, 0};
+    SDL_Color black_color = {0x0, 0x0, 0x0, 0};
+    SDL_Rect text_rect;
 
     ret = SDL_Init(SDL_INIT_VIDEO);
-    if(ret < 0)
+    if(ret != 0)
     {
 	fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
 	return(-1);
+    }
+
+    ret = TTF_Init();
+    if(ret != 0)
+    {
+	fprintf(stderr, "TTF_Init: %s\n", TTF_GetError());
+	SDL_Quit();
+	return(-1);
+    }
+
+    font = TTF_OpenFont("ganymede.ttf", 16);
+    if(!font)
+    {
+	fprintf(stderr, "TTF_Openfont: %s\n", TTF_GetError());
+	TTF_Quit();
+	SDL_Quit();
     }
 	
     screen = SDL_SetVideoMode(user_opts->width, ((user_opts->width * 3)/4), 
@@ -211,6 +235,7 @@ static int draw(void)
     if(!screen)
     {
 	fprintf(stderr, "SDL_SetVideoMode: %s\n", SDL_GetError());
+	TTF_Quit();
 	SDL_Quit();
 	return(-1);
     }
@@ -225,6 +250,7 @@ static int draw(void)
     if(!read_bws)
     {
 	perror("malloc");
+	TTF_Quit();
 	SDL_Quit();
 	return(-1);
     }
@@ -235,6 +261,7 @@ static int draw(void)
     if(!read_bw_matrix)
     {
 	perror("malloc");
+	TTF_Quit();
 	SDL_Quit();
 	return(-1);
     }
@@ -245,6 +272,7 @@ static int draw(void)
 	if(!read_bw_matrix[i])
 	{
 	    perror("malloc");
+	    TTF_Quit();
 	    SDL_Quit();
 	    return(-1);
 	}
@@ -282,8 +310,9 @@ static int draw(void)
     {
 	if(check_for_exit())
 	{
-	    return(0);
+	    TTF_Quit();
 	    SDL_Quit();
+	    return(0);
 	}
 
 	pthread_mutex_lock(&pint_vis_mutex);
@@ -292,6 +321,7 @@ static int draw(void)
 	if(check_for_exit() || pint_vis_error)
 	{
 	    pthread_mutex_unlock(&pint_vis_mutex);
+	    TTF_Quit();
 	    SDL_Quit();
 	    return(0);
 	}
@@ -334,23 +364,35 @@ static int draw(void)
 	    }
 	}
 
+	/* draw a border */
+	scratch.h = screen->h - TOP_BORDER - BOTTOM_BORDER;
+	scratch.w = screen->w - SIDE_BORDER*2;
+	scratch.y = TOP_BORDER+2;
+	scratch.x = SIDE_BORDER;
+	SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
+	    0xcc, 0xcc, 0xcc));
+	scratch.h -= 4;
+	scratch.w -= 4;
+	scratch.x += 2;
+	scratch.y += 2;
+	SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
+	    0x0, 0x0, 0x0));
+
+	/* label some parts of the graph */
+	sprintf(scratch_string, "%.1f", max_bw);
+	text = TTF_RenderText_Shaded(font, scratch_string, font_color, black_color);
+	assert(text);
+	text_rect.x = 2;
+	text_rect.y = 2;
+	text_rect.w = text->w;
+	text_rect.h = text->h;
+	ret = SDL_BlitSurface(text, NULL, screen, &text_rect);
+	assert(ret == 0);
+	SDL_FreeSurface(text);
+
 	for(i=0; i<pint_vis_shared.io_count; i++)
 	{
 	    S_LOCK();
-
-	    /* draw a border */
-	    scratch.h = screen->h - TOP_BORDER - BOTTOM_BORDER;
-	    scratch.w = screen->w - SIDE_BORDER*2;
-	    scratch.y = TOP_BORDER+2;
-	    scratch.x = SIDE_BORDER;
-	    SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
-		0xcc, 0xcc, 0xcc));
-	    scratch.h -= 4;
-	    scratch.w -= 4;
-	    scratch.x += 2;
-	    scratch.y += 2;
-	    SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
-		0x0, 0x0, 0x0));
 
 	    /* read bw bar */
 	    bw = read_bw_matrix[i][stat_depth];
@@ -407,6 +449,7 @@ static int draw(void)
 	SDL_Flip(screen);
     }
 
+    TTF_Quit();
     SDL_Quit();
     return(0);
 }
