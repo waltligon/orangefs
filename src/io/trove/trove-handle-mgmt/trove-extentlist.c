@@ -379,14 +379,24 @@ int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist,
  * struct TROVE_handle_extentlist *reference		is the querent sufficiently older 
  * 					than this one?
  */
-int extentlist_endured_purgatory(struct TROVE_handle_extentlist *querent, struct TROVE_handle_extentlist *reference) {
-    /* NOTE: do we want milisecond resolution here?  */
-    return ( (querent->timestamp.tv_sec - reference->timestamp.tv_sec) > s_extentlist_purgatory.tv_sec);
+int extentlist_endured_purgatory(
+    struct TROVE_handle_extentlist *querent,
+    struct TROVE_handle_extentlist *reference)
+{
+    int reuse_seconds_remaining = (int)
+        (querent->timestamp.tv_sec - reference->timestamp.tv_sec);
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "handle re-use time remaining "
+                 "is %d seconds (re-use time is %d)\n",
+                 reuse_seconds_remaining,
+                 (int)s_extentlist_purgatory.tv_sec);
+
+    return (reuse_seconds_remaining > s_extentlist_purgatory.tv_sec);
 }
 
 int extentlist_set_purgatory(struct timeval * timeout)
 {
-    assert(timeout->tv_sec >= 0);
+    assert(timeout->tv_sec > -1);
     s_extentlist_purgatory = *timeout;
     return 0;
 }

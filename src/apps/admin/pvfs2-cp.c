@@ -149,7 +149,11 @@ int main (int argc, char ** argv)
 		buffer_size, &credentials);
 	if (ret != current_size)
 	{
-	    fprintf(stderr, "Error: short write\n");
+	    if (ret == -1) {
+		perror("generic_write");
+	    } else {
+		fprintf(stderr, "Error in write\n");
+	    }
 	    ret = -1;
 	    goto main_out;
 	}

@@ -174,7 +174,14 @@ static void usage(int argc, char** argv)
 
     while((mask = PVFS_debug_get_next_debug_keyword(i++)) != NULL)
     {
-        fprintf(stderr,"\t%s  ",mask);
+        if (strlen(mask) < 6)
+        {
+            fprintf(stderr,"\t%s  \t",mask);
+        }
+        else
+        {
+            fprintf(stderr,"\t%s  ",mask);
+        }
         if ((i % 4) == 0)
             fprintf(stderr,"\n");
     }

@@ -26,8 +26,6 @@
 #include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-bstream.h"
-#include "dbpf-keyval.h"
-#include "dbpf-dspace.h"
 #include "dbpf-thread.h"
 #include "dbpf-attr-cache.h"
 #include "trove-ledger.h"
@@ -283,9 +281,7 @@ static int dbpf_initialize(char *stoname,
         return -1;
     }
 
-    dbpf_dspace_dbcache_initialize();
     dbpf_open_cache_initialize();
-    dbpf_keyval_dbcache_initialize();
 
     return dbpf_thread_initialize();
 }
@@ -298,8 +294,6 @@ static int dbpf_finalize(void)
 
     dbpf_thread_finalize();
     dbpf_open_cache_finalize();
-    dbpf_keyval_dbcache_finalize();
-    dbpf_dspace_dbcache_finalize();
     dbpf_attr_cache_finalize();
 
     dbpf_collection_clear_registered();

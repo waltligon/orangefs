@@ -177,7 +177,13 @@ int trove_ledger_handle_free(struct handle_ledger *hl, TROVE_handle handle)
     else 
 	extentlist_addextent(&(hl->recently_freed_list), handle, handle);
 
-    if (extentlist_endured_purgatory(&(hl->recently_freed_list), &(hl->overflow_list)) ) {
+    /* don't even bother checking the timeouts until the free_list starts
+     * running out */
+    if (hl->free_list.num_handles > hl->cutoff) {
+	return 0;
+    }
+    if (extentlist_endured_purgatory(&(hl->recently_freed_list), 
+		&(hl->overflow_list)) ) {
 	handle_recycle(hl);
     }
     return 0;

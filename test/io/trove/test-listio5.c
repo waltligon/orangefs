@@ -15,6 +15,7 @@
 #include <malloc.h>
 
 #include "trove.h"
+#include "gossip.h"
 
 #define ROOT_HANDLE_STRING "root_handle"
 
@@ -72,6 +73,9 @@ int main(int argc, char **argv)
 
         TROVE_extent cur_extent;
         TROVE_handle_extent_array extent_array;
+
+        gossip_enable_stderr();
+        gossip_set_debug_mask(1, GOSSIP_TROVE_DEBUG);
 
 	/*************************************************************/
 	/* initialization stuff */
@@ -266,6 +270,9 @@ int main(int argc, char **argv)
 
         trove_close_context(coll_id, trove_context);
 	trove_finalize();
+
+        gossip_disable();
+
 	return 0;
 }
 

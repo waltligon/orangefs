@@ -54,6 +54,13 @@ int main(int argc, char **argv)
 
     umask(027);
 
+    signal(SIGHUP,  client_sig_handler);
+    signal(SIGINT,  client_sig_handler);
+    signal(SIGPIPE, client_sig_handler);
+    signal(SIGILL,  client_sig_handler);
+    signal(SIGTERM, client_sig_handler);
+    signal(SIGSEGV, client_sig_handler);
+
     if (!opts.foreground)
     {
         if (opts.verbose)
@@ -72,14 +79,6 @@ int main(int argc, char **argv)
             exit(1);
         }
     }
-
-    signal(SIGHUP,  client_sig_handler);
-    signal(SIGINT,  client_sig_handler);
-    signal(SIGPIPE, client_sig_handler);
-    signal(SIGILL,  client_sig_handler);
-    signal(SIGTERM, client_sig_handler);
-    signal(SIGSEGV, client_sig_handler);
-
     return monitor_pvfs2_client(&opts);
 }
 
@@ -141,6 +140,12 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 printf("Waiting on child with pid %d\n", (int)new_pid);
             }
+
+            for(fd = getdtablesize(); fd > -1; fd--)
+            {
+                close(fd);
+            }
+
             wpid = waitpid(new_pid, &ret, 0);
             assert(wpid != -1);
 
@@ -211,10 +216,6 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 close(fd);
             }
-
-            freopen("/dev/null", "r", stdin);
-            freopen("/dev/null", "w", stdout);
-            freopen("/dev/null", "w", stderr);
 
             ret = execvp(opts->path, NULL);
             fprintf(stderr, "Could not exec %s, errno is %d\n",
