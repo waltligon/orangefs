@@ -67,6 +67,19 @@ void PVFS_util_gen_credentials(
     credentials->gid = getgid();
 }
 
+int PVFS_util_get_umask(void)
+{
+    static int mask = 0, set = 0;
+
+    if (set == 0)
+    {
+        mask = (int)umask(0);
+        umask(mask);
+        set = 1;
+    }
+    return mask;
+}
+
 PVFS_credentials *PVFS_util_dup_credentials(
     PVFS_credentials *credentials)
 {
@@ -1164,6 +1177,8 @@ void PINT_release_pvfstab(void)
     gen_mutex_unlock(&s_stat_tab_mutex);
     return;
 }
+
+
 
 /*
  * Local variables:

@@ -49,12 +49,14 @@ typedef struct pvfs2_file_object_s {
     PVFS_fs_id fs_id;
     PVFS_object_ref ref;
     char pvfs2_path[PVFS_NAME_MAX];	
-    char user_path[PVFS_NAME_MAX];	
+    char user_path[PVFS_NAME_MAX];
     PVFS_sys_attr attr;
+    PVFS_permissions perms;
 } pvfs2_file_object;
 
 typedef struct unix_file_object_s {
     int fd;
+    int mode;
     char path[NAME_MAX];
 } unix_file_object;
 
@@ -78,9 +80,37 @@ static size_t generic_read(file_object *src, char *buffer,
 	int64_t offset, size_t count, PVFS_credentials *credentials);
 static size_t generic_write(file_object *dest, char *buffer, 
 	int64_t offset, size_t count, PVFS_credentials *credentials);
-static int generic_cleanup(file_object *obj);
-void make_attribs(PVFS_sys_attr *attr, PVFS_credentials *credentials, 
-	int nr_datafiles);
+static int generic_cleanup(file_object *src, file_object *dest,
+                           PVFS_credentials *credentials);
+static void make_attribs(PVFS_sys_attr *attr,
+                         PVFS_credentials *credentials, 
+                         int nr_datafiles, int mode);
+
+static int convert_pvfs2_perms_to_mode(PVFS_permissions perms)
+{
+    int ret = 0, i = 0;
+    static int modes[9] =
+    {
+        S_IXOTH, S_IWOTH, S_IROTH,
+        S_IXGRP, S_IWGRP, S_IRGRP,
+        S_IXUSR, S_IWUSR, S_IRUSR
+    };
+    static int pvfs2_modes[9] =
+    {
+        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
+        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
+        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
+    };
+
+    for(i = 0; i < 9; i++)
+    {
+        if (perms & pvfs2_modes[i])
+        {
+            ret |= modes[i];
+        }
+    }
+    return ret;
+}
 
 int main (int argc, char ** argv)
 {
@@ -122,7 +152,7 @@ int main (int argc, char ** argv)
     }
 
     ret = generic_open(&dest, &credentials, user_opts->num_datafiles,
-	    user_opts->srcfile, OPEN_DEST);
+                       user_opts->srcfile, OPEN_DEST);
 
     if (ret < 0)
     {
@@ -169,8 +199,7 @@ int main (int argc, char ** argv)
     ret = 0;
 
 main_out:
-    generic_cleanup(&src);
-    generic_cleanup(&dest);
+    generic_cleanup(&src, &dest, &credentials);
     PVFS_sys_finalize();
     free(user_opts);
     return(ret);
@@ -376,45 +405,50 @@ static int resolve_filename(file_object *obj, char *filename)
  */
 
 static int generic_open(file_object *obj, PVFS_credentials *credentials,
-	int nr_datafiles, char *srcname, int open_type)
+                        int nr_datafiles, char *srcname, int open_type)
 {
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;
+    PVFS_sysresp_getattr resp_getattr;
     PVFS_sysresp_create resp_create;
     PVFS_object_ref parent_ref;
     int ret = -1;
     char *entry_name;		    /* name of the pvfs2 file */
     char str_buf[PVFS_NAME_MAX];    /* basename of pvfs2 file */
 
-
     if (obj->fs_type == UNIX_FILE)
     {
-	stat(obj->ufs.path, &stat_buf);
+        memset(&stat_buf, 0, sizeof(struct stat));
+
+        stat(obj->ufs.path, &stat_buf);
 	if (open_type == OPEN_SRC)
 	{
-	    if (S_ISDIR(stat_buf.st_mode)) 
+	    if (S_ISDIR(stat_buf.st_mode))
 	    {
 		fprintf(stderr, "Source cannot be a directory\n");
 		return(-1);
 	    }
 	    obj->ufs.fd = open(obj->ufs.path, O_RDONLY);
+            obj->ufs.mode = (int)stat_buf.st_mode;
 	}
 	else
 	{
 	    if (S_ISDIR(stat_buf.st_mode))
 	    {
-		if (srcname != NULL)
+		if (srcname)
+                {
 		    strncat(obj->ufs.path, basename(srcname), NAME_MAX);
+                }
 		else
 		{
-		    fprintf(stderr, 
-			    "cannot find name for destination. giving up\n");
+		    fprintf(stderr, "cannot find name for "
+                            "destination. giving up\n");
 		    return(-1);
 		}
 	    }
 
-	    obj->ufs.fd = open(obj->ufs.path, 
-		    O_WRONLY|O_CREAT|O_LARGEFILE, 0777);
+	    obj->ufs.fd = open(obj->ufs.path,
+                               O_WRONLY|O_CREAT|O_LARGEFILE, 0666);
 	}
 	if (obj->ufs.fd < 0)
 	{
@@ -437,13 +471,15 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	    /* can only perform this special case if we know srcname */
 	    if (srcname == NULL)
 	    {
-		fprintf(stderr, "unable to guess filename in toplevel PVFS2\n");
+		fprintf(stderr, "unable to guess filename in "
+                        "toplevel PVFS2\n");
 		return -1;
 	    }
 
 	    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 	    ret = PVFS_sys_lookup(obj->pvfs2.fs_id, obj->pvfs2.pvfs2_path,
-		    credentials, &resp_lookup, PVFS2_LOOKUP_LINK_FOLLOW);
+                                  credentials, &resp_lookup,
+                                  PVFS2_LOOKUP_LINK_FOLLOW);
 	    if (ret < 0)
 	    {
 		PVFS_perror("PVFS_sys_lookup", ret);
@@ -511,8 +547,32 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 
 	memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 	ret = PVFS_sys_ref_lookup(parent_ref.fs_id, entry_name,
-		parent_ref, credentials, &resp_lookup, 
-		PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                                  parent_ref, credentials, &resp_lookup,
+                                  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+
+        if ((ret == 0) && (open_type == OPEN_SRC))
+        {
+            memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
+            ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL,
+                                   credentials, &resp_getattr);
+            if (ret)
+            {
+                fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",
+                        entry_name);
+                return -1;
+            }
+
+            if (resp_getattr.attr.objtype == PVFS_TYPE_SYMLINK)
+            {
+                free(resp_getattr.attr.link_target);
+                resp_getattr.attr.link_target = NULL;
+            }
+            obj->pvfs2.perms = resp_getattr.attr.perms;
+            memcpy(&obj->pvfs2.attr, &resp_getattr.attr,
+                   sizeof(PVFS_sys_attr));
+            obj->pvfs2.attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+        }
+
 	/* at this point, we have looked up the file in the parent directory.
 	 * . If we found something, and we are the SRC, then we're done. 
 	 * . We will maintain the semantic of pvfs2-import and refuse to
@@ -541,10 +601,16 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 		return (-1);
 	    } 
 	    else 
-	    { 
-		make_attribs(&(obj->pvfs2.attr), credentials, nr_datafiles);
+	    {
+                memset(&stat_buf, 0, sizeof(struct stat));
+
+                /* preserve permissions doing a unix => pvfs2 copy */
+                stat(srcname, &stat_buf);
+		make_attribs(&(obj->pvfs2.attr), credentials, nr_datafiles,
+                             (int)stat_buf.st_mode);
 		ret = PVFS_sys_create(entry_name, parent_ref, 
-			obj->pvfs2.attr, credentials, NULL, &resp_create);
+                                      obj->pvfs2.attr, credentials,
+                                      NULL, &resp_create);
 		if (ret < 0)
 		{
 		    PVFS_perror("PVFS_sys_create", ret); 
@@ -557,27 +623,58 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
     return 0;
 }
 
-static int generic_cleanup(file_object *obj)
+static int generic_cleanup(file_object *src, file_object *dest,
+                           PVFS_credentials *credentials)
 {
-    if (obj->fs_type == UNIX_FILE && obj->ufs.fd != -1)
-	    close(obj->ufs.fd);
+    /* preserve permissions doing a pvfs2 => unix copy */
+    if ((src->fs_type != UNIX_FILE) &&
+        ((dest->fs_type == UNIX_FILE) && (dest->ufs.fd != -1)))
+    {
+        fchmod(dest->ufs.fd,
+               convert_pvfs2_perms_to_mode(src->pvfs2.perms));
+    }
+
+    /* preserve permissions doing a unix => unix copy */
+    if ((src->fs_type == UNIX_FILE) &&
+        ((dest->fs_type == UNIX_FILE) && (dest->ufs.fd != -1)))
+    {
+        fchmod(dest->ufs.fd, src->ufs.mode);
+    }
+
+    /* preserve permissions doing a pvfs2 => pvfs2 copy */
+    if ((src->fs_type != UNIX_FILE) && (dest->fs_type != UNIX_FILE))
+    {
+        PVFS_sys_setattr(dest->pvfs2.ref, src->pvfs2.attr, credentials);
+    }
+
+    if ((src->fs_type == UNIX_FILE) && (src->ufs.fd != -1))
+    {
+        close(src->ufs.fd);
+    }
+
+    if ((dest->fs_type == UNIX_FILE) && (dest->ufs.fd != -1))
+    {
+        close(dest->ufs.fd);
+    }
     return 0;
 }
 
-void make_attribs(PVFS_sys_attr *attr, PVFS_credentials *credentials, 
-	int nr_datafiles)
+void make_attribs(PVFS_sys_attr *attr, PVFS_credentials *credentials,
+                  int nr_datafiles, int mode)
 {
     attr->owner = credentials->uid; 
     attr->group = credentials->gid;
-    attr->perms = PVFS_U_WRITE|PVFS_U_READ;
+    attr->perms = PVFS2_translate_mode(mode);
     attr->atime = time(NULL);
     attr->mtime = attr->atime;
     attr->ctime = attr->atime;
     attr->mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     attr->dfile_count = nr_datafiles;
-    if(attr->dfile_count > 0)
-	attr->mask |= PVFS_ATTR_SYS_DFILE_COUNT;
 
+    if (attr->dfile_count > 0)
+    {
+	attr->mask |= PVFS_ATTR_SYS_DFILE_COUNT;
+    }
 }    
 
 /*

@@ -15,6 +15,7 @@
 #include <linux/types.h>
 #else
 #include <stdint.h>
+#include <sys/stat.h>
 #endif /* __KERNEL__ */
 
 #ifndef INT32_MAX

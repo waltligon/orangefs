@@ -703,7 +703,7 @@ do                                                \
     sys_attr.mtime = (PVFS_time)CURRENT_TIME;     \
     sys_attr.ctime = (PVFS_time)CURRENT_TIME;     \
     sys_attr.size = 0;                            \
-    sys_attr.perms = pvfs2_translate_mode(mode);  \
+    sys_attr.perms = PVFS2_translate_mode(mode);  \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
@@ -729,7 +729,7 @@ do                                                \
     sys_attr.mtime = (PVFS_time)tspec.tv_sec;     \
     sys_attr.ctime = (PVFS_time)tspec.tv_sec;     \
     sys_attr.size = 0;                            \
-    sys_attr.perms = pvfs2_translate_mode(mode);  \
+    sys_attr.perms = PVFS2_translate_mode(mode);  \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
@@ -740,36 +740,6 @@ do                                                \
 /************************************
  * misc convenience functions
  ************************************/
-static inline int pvfs2_translate_mode(int mode)
-{
-    int ret = 0, i = 0;
-    static int modes[9] =
-    {
-        S_IXOTH, S_IWOTH, S_IROTH,
-        S_IXGRP, S_IWGRP, S_IRGRP,
-        S_IXUSR, S_IWUSR, S_IRUSR
-    };
-    static int pvfs2_modes[9] =
-    {
-        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
-        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
-        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
-    };
-
-    for(i = 0; i < 9; i++)
-    {
-        if (mode & modes[i])
-        {
-            ret |= pvfs2_modes[i];
-        }
-        else
-        {
-            ret &= ~pvfs2_modes[i];
-        }
-    }
-    return ret;
-}
-
 static inline int pvfs2_internal_revalidate(
     struct inode *inode)
 {

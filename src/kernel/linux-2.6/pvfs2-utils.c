@@ -204,7 +204,7 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
     int mode,
     PVFS_sys_attr *attrs)
 {
-    attrs->perms = pvfs2_translate_mode(mode);
+    attrs->perms = PVFS2_translate_mode(mode);
     attrs->mask |= PVFS_ATTR_SYS_PERM;
 
     pvfs2_print("mode is %d | translated perms is %d\n", mode,

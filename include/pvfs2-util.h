@@ -32,6 +32,9 @@ typedef struct PVFS_util_tab_s PVFS_util_tab;
 void PVFS_util_gen_credentials(
     PVFS_credentials *credentials);
 
+/* returns the currently set umask */
+int PVFS_util_get_umask(void);
+
 /*
   shallow copies the credentials into a newly allocated returned
   credential object.  returns NULL on failure.
@@ -47,11 +50,11 @@ int PVFS_util_copy_sys_attr(
 
 void PVFS_util_release_sys_attr(PVFS_sys_attr *attr);
 
+int PVFS_util_init_defaults(void);
+
 /* client side config file / option management */
 const PVFS_util_tab* PVFS_util_parse_pvfstab(
     const char* tabfile);
-int PVFS_util_init_defaults(
-    void);
 int PVFS_util_resolve(
     const char* local_path,
     PVFS_fs_id* out_fs_id,
@@ -114,6 +117,32 @@ static inline int PVFS_util_object_to_sys_attr_mask(
         sys_mask |= PVFS_ATTR_SYS_LNK_TARGET;
     }
     return sys_mask;
+}
+
+static inline int PVFS2_translate_mode(int mode)
+{
+    int ret = 0, i = 0;
+    static int modes[9] =
+    {
+        S_IXOTH, S_IWOTH, S_IROTH,
+        S_IXGRP, S_IWGRP, S_IRGRP,
+        S_IXUSR, S_IWUSR, S_IRUSR
+    };
+    static int pvfs2_modes[9] =
+    {
+        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
+        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
+        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
+    };
+
+    for(i = 0; i < 9; i++)
+    {
+        if (mode & modes[i])
+        {
+            ret |= pvfs2_modes[i];
+        }
+    }
+    return ret;
 }
 
 #endif /* __PVFS2_UTIL_H */
