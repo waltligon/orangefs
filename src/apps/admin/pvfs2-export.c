@@ -40,7 +40,6 @@ int main(int argc, char **argv)
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_lookup resp_lookup;
-    PVFS_sysreq_io req_io;
     PVFS_sysresp_io resp_io;
     struct options* user_opts = NULL;
     int i = 0;
@@ -55,6 +54,9 @@ int main(int argc, char **argv)
     PVFS_fs_id lk_fs_id;
     char* lk_name;
     PVFS_credentials credentials;
+    pinode_reference pinode_refn;
+    PVFS_Request io_req;
+    int buffer_size;
 
     gossip_enable_stderr();
 
@@ -175,14 +177,12 @@ int main(int argc, char **argv)
 	goto main_out;
     }
 
-    req_io.pinode_refn = resp_lookup.pinode_refn;
-    req_io.credentials = credentials;
-    req_io.buffer = buffer;
-    req_io.buffer_size = user_opts->buf_size;
+    pinode_refn = resp_lookup.pinode_refn;
+    buffer_size = user_opts->buf_size;
     blocklength = user_opts->buf_size;
     displacement = 0;
     ret = PVFS_Request_indexed(1, &blocklength, &displacement,
-	PVFS_BYTE, &req_io.io_req);
+	PVFS_BYTE, &io_req);
     if(ret < 0)
     {
 	fprintf(stderr, "Error: PVFS_Request_indexed failure.\n");
@@ -191,7 +191,8 @@ int main(int argc, char **argv)
     }
 
     time1 = Wtime();
-    while((ret = PVFS_sys_read(&req_io, &resp_io)) == 0 &&
+    while((ret = PVFS_sys_read(pinode_refn, io_req,
+                buffer, buffer_size, credentials, &resp_io)) == 0 &&
 	resp_io.total_completed > 0)
     {
 	current_size = resp_io.total_completed;
@@ -212,7 +213,7 @@ int main(int argc, char **argv)
 	/* setup I/O description */
 	displacement = total_written;
 	ret = PVFS_Request_indexed(1, &blocklength,
-	    &displacement, PVFS_BYTE, &req_io.io_req);
+	    &displacement, PVFS_BYTE, &io_req);
 	if(ret < 0)
 	{
 	    fprintf(stderr, "Error: PVFS_Request_indexed failure.\n");

@@ -15,7 +15,6 @@ int main(int argc,char **argv)
 	PVFS_sysresp_init resp_init;
 	PVFS_sysresp_lookup resp_lk;
 	PVFS_sysresp_create resp_cr;
-	PVFS_sysreq_io req_io;
 	PVFS_sysresp_io resp_io;
 	char *filename;
 	int name_sz;
@@ -32,6 +31,10 @@ int main(int argc,char **argv)
 	pinode_reference parent_refn;
 	uint32_t attrmask;
 	PVFS_object_attr attr;
+	pinode_reference pinode_refn;
+	PVFS_Request io_req;
+	void* buffer;
+	int buffer_size;
 
 	gossip_enable_stderr();
 	gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -144,15 +147,15 @@ int main(int argc,char **argv)
 			return(-1);
 		}
 
-		req_io.pinode_refn.fs_id = fs_id;
-		req_io.pinode_refn.handle = resp_cr.pinode_refn.handle;
+		pinode_refn.fs_id = fs_id;
+		pinode_refn.handle = resp_cr.pinode_refn.handle;
 	}
 	else
 	{
 		printf("IO-TEST: lookup succeeded; performing I/O on existing file.\n");
 
-		req_io.pinode_refn.fs_id = fs_id;
-		req_io.pinode_refn.handle = resp_lk.pinode_refn.handle;
+		pinode_refn.fs_id = fs_id;
+		pinode_refn.handle = resp_lk.pinode_refn.handle;
 	}
 
 	/**************************************************************
@@ -160,22 +163,23 @@ int main(int argc,char **argv)
 	 */
 
 	printf("IO-TEST: performing write on handle: %ld, fs: %d\n",
-		(long)req_io.pinode_refn.handle, (int)req_io.pinode_refn.fs_id);
+		(long)pinode_refn.handle, (int)pinode_refn.fs_id);
 
-	req_io.credentials.uid = 100;
-	req_io.credentials.gid = 100;
-	req_io.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
-	req_io.buffer = io_buffer;
-	req_io.buffer_size = io_size*sizeof(int);
+	credentials.uid = 100;
+	credentials.gid = 100;
+	credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
+	buffer = io_buffer;
+	buffer_size = io_size*sizeof(int);
 
-	ret = PVFS_Request_contiguous(io_size*sizeof(int), PVFS_BYTE, &(req_io.io_req));
+	ret = PVFS_Request_contiguous(io_size*sizeof(int), PVFS_BYTE, &(io_req));
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_Request_contiguous() failure.\n");
 		return(-1);
 	}
 
-	ret = PVFS_sys_write(&req_io, &resp_io);
+	ret = PVFS_sys_write(pinode_refn, io_req, buffer, buffer_size, 
+				credentials, &resp_io);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_sys_write() failure.\n");
@@ -190,8 +194,9 @@ int main(int argc,char **argv)
 
 	/* verify */
 	printf("IO-TEST: performing read on handle: %ld, fs: %d\n",
-		(long)req_io.pinode_refn.handle, (int)req_io.pinode_refn.fs_id);
-	ret = PVFS_sys_read(&req_io, &resp_io);
+		(long)pinode_refn.handle, (int)pinode_refn.fs_id);
+	ret = PVFS_sys_read(pinode_refn, io_req, buffer, buffer_size, 
+				credentials, &resp_io);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_sys_read() failure.\n");

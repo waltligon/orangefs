@@ -211,15 +211,6 @@ struct PVFS_sysresp_readlink_s {
 typedef struct PVFS_sysresp_readlink_s PVFS_sysresp_readlink;
 
 /* read/write */
-struct PVFS_sysreq_io_s {
-	pinode_reference pinode_refn;
-	PVFS_credentials credentials;
-	PVFS_Request io_req;
-	void* buffer;
-	int buffer_size;
-};
-typedef struct PVFS_sysreq_io_s PVFS_sysreq_io;
-
 struct PVFS_sysresp_io_s {
 	PVFS_size total_completed;
 };
@@ -323,7 +314,6 @@ struct PVFS_system_req_s {
 		PVFS_sysreq_mkdir mkdir;
 		PVFS_sysreq_remove remove;
 		PVFS_sysreq_rename rename;
-		PVFS_sysreq_io io;
 		PVFS_sysreq_lock lock;
 		PVFS_sysreq_unlock unlock;
 		PVFS_sysreq_statfs statfs;
@@ -372,13 +362,6 @@ enum PVFS_sys_io_type
 	PVFS_SYS_IO_WRITE
 };
 
-struct PVFS_sysreq_truncate_s {
-	pinode_reference pinode_refn;
-	PVFS_size size;
-	PVFS_credentials credentials;
-};
-typedef struct PVFS_sysreq_truncate_s PVFS_sysreq_truncate;
-
 /* PVFS System Request Prototypes
  *
  * That's fine, except that we KNOW that this interface is just a
@@ -409,10 +392,11 @@ int PVFS_sys_symlink(PVFS_fs_id fs_id, char* name, char* target,
 		PVFS_credentials credentials, PVFS_sysresp_symlink *resp);
 int PVFS_sys_readlink(pinode_reference pinode_refn, 
 		PVFS_credentials credentials, PVFS_sysresp_readlink *resp);
-int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp, 
-	enum PVFS_sys_io_type type);
-#define PVFS_sys_read(x,y) PVFS_sys_io(x,y,PVFS_SYS_IO_READ)
-#define PVFS_sys_write(x,y) PVFS_sys_io(x,y,PVFS_SYS_IO_WRITE)
+int PVFS_sys_io(pinode_reference pinode_refn, PVFS_Request io_req, 
+		void* buffer, int buffer_size, PVFS_credentials credentials, 
+		PVFS_sysresp_io *resp, enum PVFS_sys_io_type type);
+#define PVFS_sys_read(x1, x2, x3, x4, x5, y) PVFS_sys_io(x1, x2, x3, x4, x5, y,PVFS_SYS_IO_READ)
+#define PVFS_sys_write(x1, x2, x3, x4, x5, y) PVFS_sys_io(x1, x2, x3, x4, x5, y,PVFS_SYS_IO_WRITE)
 int PVFS_sys_allocate(pinode_reference pinode_refn, PVFS_size size);
 int PVFS_sys_truncate(pinode_reference pinode_refn, PVFS_size size, 
 			PVFS_credentials credentials);

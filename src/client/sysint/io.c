@@ -42,9 +42,14 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     int array_size,
     PVFS_msg_tag_t* op_tag_array,
     PVFS_object_attr* attr_p,
-    PVFS_sysreq_io* req,
+    pinode_reference pinode_refn, /* FGS replaced PVFS_sys_io request */
+    PVFS_Request io_req,
+    void* buffer, 
+    int buffer_size, 
+    PVFS_credentials credentials, /* end changed by frank */
     enum PVFS_sys_io_type type,
     enum PVFS_flowproto_type flow_type);
+
 static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
     struct PVFS_server_req_s* req_array,
     bmi_size_t max_resp_size,
@@ -61,8 +66,9 @@ static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
-    enum PVFS_sys_io_type type)
+int PVFS_sys_io(pinode_reference pinode_refn, PVFS_Request io_req, 
+                void* buffer, int buffer_size, PVFS_credentials credentials,
+		PVFS_sysresp_io *resp, enum PVFS_sys_io_type type)
 {
     pinode* pinode_ptr = NULL;
     uint32_t attr_mask = 0;
@@ -96,16 +102,16 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 
     /* find a pinode for the target file */
     attr_mask = ATTR_BASIC|ATTR_META;
-    ret = phelper_get_pinode(req->pinode_refn, &pinode_ptr,
-	attr_mask, req->credentials);
+    ret = phelper_get_pinode(pinode_refn, &pinode_ptr,
+	attr_mask, credentials);
     if(ret < 0)
     {
 	return(ret);
     }
 
     /* check permissions */
-    ret = check_perms(pinode_ptr->attr, req->credentials.perms,
-	req->credentials.uid, req->credentials.gid);
+    ret = check_perms(pinode_ptr->attr, credentials.perms,
+	credentials.uid, credentials.gid);
     if(ret < 0)
     {
 	return(-EACCES);
@@ -133,7 +139,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
      * contact everyone, just the servers that hold the parts of
      * the file that we are interested in.
      */
-    req_state = PINT_New_request_state(req->io_req);
+    req_state = PINT_New_request_state(io_req);
     if(!req_state)
     {
 	phelper_release_pinode(pinode_ptr);
@@ -223,7 +229,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	ret = PINT_bucket_map_to_server(
 	    &(addr_array[i]),
 	    target_handle_array[i],
-	    req->pinode_refn.fs_id);
+	    pinode_refn.fs_id);
 	if(ret < 0)
 	{
 	    phelper_release_pinode(pinode_ptr);
@@ -234,9 +240,9 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	/* fill in the I/O request */
 	req_array[i].op = PVFS_SERV_IO;
 	req_array[i].rsize = sizeof(struct PVFS_server_req_s);
-	req_array[i].credentials = req->credentials;
+	req_array[i].credentials = credentials;
 	req_array[i].u.io.handle = target_handle_array[i];
-	req_array[i].u.io.fs_id = req->pinode_refn.fs_id;
+	req_array[i].u.io.fs_id = pinode_refn.fs_id;
 	req_array[i].u.io.flow_type = flow_type;
 	/* TODO: this is silly */
 	for(j=0; j<pinode_ptr->attr.u.meta.nr_datafiles; j++)
@@ -249,7 +255,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	}
 	req_array[i].u.io.iod_count =
 	    pinode_ptr->attr.u.meta.nr_datafiles;
-	req_array[i].u.io.io_req = req->io_req;
+	req_array[i].u.io.io_req = io_req;
 	req_array[i].u.io.io_dist = pinode_ptr->attr.u.meta.dist;
 	if(type == PVFS_SYS_IO_READ)
 	    req_array[i].u.io.io_type = PVFS_IO_READ;
@@ -269,7 +275,11 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	target_handle_count,
 	op_tag_array,
 	&pinode_ptr->attr,
-	req,
+	pinode_refn, /* FGS replaced PVFS_sys_io request */
+	io_req,
+	buffer, 
+	buffer_size, 
+	credentials, /* end changed by frank */
 	type,
 	flow_type);
     if(ret < 0)
@@ -430,7 +440,11 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     int array_size,
     PVFS_msg_tag_t* op_tag_array,
     PVFS_object_attr* attr_p,
-    PVFS_sysreq_io* req,
+    pinode_reference pinode_refn, /* FGS replaced PVFS_sys_io request */
+    PVFS_Request io_req,
+    void* buffer, 
+    int buffer_size, 
+    PVFS_credentials credentials, /* end changed by frank */
     enum PVFS_sys_io_type type,
     enum PVFS_flowproto_type flow_type)
 {
@@ -681,7 +695,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		flow_array[i]->file_data->iod_num = req_array[i].u.io.iod_num;
 		flow_array[i]->file_data->iod_count =
 		    attr_p->u.meta.nr_datafiles;
-		flow_array[i]->request = req->io_req;
+		flow_array[i]->request = io_req;
 		flow_array[i]->flags = 0;
 		flow_array[i]->tag = op_tag_array[i];
 		flow_array[i]->user_ptr = NULL;
@@ -693,15 +707,15 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		    flow_array[i]->src.endpoint_id = BMI_ENDPOINT;
 		    flow_array[i]->src.u.bmi.address = addr_array[i];
 		    flow_array[i]->dest.endpoint_id = MEM_ENDPOINT;
-		    flow_array[i]->dest.u.mem.size = req->buffer_size;
-		    flow_array[i]->dest.u.mem.buffer = req->buffer;
+		    flow_array[i]->dest.u.mem.size = buffer_size;
+		    flow_array[i]->dest.u.mem.buffer = buffer;
 		}
 		else
 		{
 		    flow_array[i]->file_data->extend_flag = 1;
 		    flow_array[i]->src.endpoint_id = MEM_ENDPOINT;
-		    flow_array[i]->src.u.mem.size = req->buffer_size;
-		    flow_array[i]->src.u.mem.buffer = req->buffer;
+		    flow_array[i]->src.u.mem.size = buffer_size;
+		    flow_array[i]->src.u.mem.buffer = buffer;
 		    flow_array[i]->dest.endpoint_id = BMI_ENDPOINT;
 		    flow_array[i]->dest.u.bmi.address = addr_array[i];
 		}

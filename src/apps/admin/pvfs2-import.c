@@ -42,7 +42,6 @@ int main(int argc, char **argv)
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_create resp_create;
-    PVFS_sysreq_io req_io;
     PVFS_sysresp_io resp_io;
     struct options* user_opts = NULL;
     int i = 0;
@@ -59,6 +58,9 @@ int main(int argc, char **argv)
     uint32_t attrmask;
     PVFS_object_attr attr;
     PVFS_credentials credentials;
+    pinode_reference pinode_refn;
+    PVFS_Request io_req;
+    int buffer_size;
 
     gossip_enable_stderr();
 
@@ -192,19 +194,17 @@ int main(int argc, char **argv)
 	goto main_out;
     }
 
-    req_io.pinode_refn = resp_create.pinode_refn;
-    req_io.credentials = credentials;
-    req_io.buffer = buffer;
+    pinode_refn = resp_create.pinode_refn;
 
     time1 = Wtime();
     while((current_size = read(src_fd, buffer, user_opts->buf_size)) > 0)
     {
 	/* setup I/O description */
-	req_io.buffer_size = current_size;
+	buffer_size = current_size;
 	blocklength = current_size;
 	displacement = total_written;
 	ret = PVFS_Request_indexed(1, &blocklength,
-	    &displacement, PVFS_BYTE, &req_io.io_req);
+	    &displacement, PVFS_BYTE, &io_req);
 	if(ret < 0)
 	{
 	    fprintf(stderr, "Error: PVFS_Request_indexed failure.\n");
@@ -213,7 +213,8 @@ int main(int argc, char **argv)
 	}
 
 	/* write out the data */
-	ret = PVFS_sys_write(&req_io, &resp_io);
+	ret = PVFS_sys_write(pinode_refn, io_req, buffer, buffer_size, 
+			    credentials, &resp_io);
 	if(ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_write", ret);
