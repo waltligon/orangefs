@@ -144,6 +144,11 @@ static inline int dbpf_queued_op_try_get(TROVE_op_id id,
 
     q_op_p = id_gen_fast_lookup(id);
 
+    if (!q_op_p)
+    {
+        return DBPF_QUEUED_OP_INVALID;
+    }
+
     /* NOTE: all we really need is atomic read/write to the state variable. */
     gen_mutex_lock(&q_op_p->mutex);
     state = q_op_p->op.state;
