@@ -74,6 +74,9 @@ State Machine:
   tasks.  look at the other server state machines to see how things
   should go: that's the best documetnation so far.
 
+  Declare this new state machine in pvfs2-server.h with the other server
+  operation state machines.
+
   
 Everything Else:
 
@@ -90,20 +93,22 @@ Everything Else:
   PVFS_server_resp (if necessary).
 
 
-  For many operations, -TROVE_ENOENT is ok (e.g. flushing a keyval when
-  the keyval space has not been created on disk, or setting attributes
-  on a file that didn't have atributes previously).  If your operation
-  is like that, modifly prelude_perm_check and add it to the list of
-  operations for which TROVE_ENOENT is ok.   If you haven't figured out
-  what it means to 'check permissions' for your operation, add it
-  towards the bottom of the function with the other oddball operations.
+  For many operations, -TROVE_ENOENT is ok (e.g. operations on datafiles
+  [because we do not store attributes with datafiles], flushing a keyval
+  when the keyval space has not been created on disk, or setting
+  attributes on a file that didn't have atributes previously).  If your
+  operation is like that, modifly prelude_perm_check and add it to the
+  list of operations for which TROVE_ENOENT is ok.   If you haven't
+  figured out what it means to 'check permissions' for your operation,
+  add it towards the bottom of the function with the other oddball
+  operations.
 
   Help out the debugging helper functions by adding a text
   representation of your operation to PINT_map_server_op_to_string()
 
   The server will not know how to handle the new operation until you've
   addded it along with the other operations in
-  PINT_state_table_initialize().
+  server_state_table_initialize().
 
   If your operation needs data from the request structure (and most of
   them do), modify PINT_req_sched_target_handle to make the apropriate
@@ -126,3 +131,4 @@ TESTING
   it to the list of targets to build in module.mk.in
 
 
+# vim: tw=72
