@@ -59,6 +59,9 @@ static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
     int* error_code_array,
     int array_size);
 
+static int io_find_target_dfiles(PVFS_Request io_req, pinode* pinode_ptr, 
+    PVFS_handle* target_handle_array, int* target_handle_count);
+
 /* PVFS_sys_io()
  *
  * performs a read or write operation.  PVFS_sys_read() and
@@ -87,13 +90,6 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     PVFS_msg_tag_t* op_tag_array = NULL;
     /* TODO: might want hooks to set this from app. level later */
     enum PVFS_flowproto_type flow_type = FLOWPROTO_ANY;
-
-    struct PINT_Request_state* req_state = NULL;
-    PINT_Request_file_data tmp_file_data;
-    int32_t segmax = 1;
-    PVFS_size bytemax = 1;
-    PVFS_offset offset = 0;
-    PVFS_boolean eof_flag = 0;
 
     if((type != PVFS_SYS_IO_READ) && (type != PVFS_SYS_IO_WRITE))
     {
@@ -144,53 +140,18 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
      * contact everyone, just the servers that hold the parts of
      * the file that we are interested in.
      */
-    req_state = PINT_New_request_state(io_req);
-    if(!req_state)
+    ret = io_find_target_dfiles(io_req, pinode_ptr, target_handle_array,
+	&target_handle_count);
+    if(ret < 0)
     {
 	phelper_release_pinode(pinode_ptr);
-	ret = -ENOMEM;
 	goto sys_io_out;
     }
-    for(i=0; i<pinode_ptr->attr.u.meta.dfile_count; i++)
-    {
-	/* NOTE: we don't have to give an accurate file size here,
-	 * as long as we set the extend flag to tell the I/O req
-	 * processor to continue past eof if needed
-	 */
-	tmp_file_data.fsize = 0;  
-	tmp_file_data.dist = pinode_ptr->attr.u.meta.dist;
-	tmp_file_data.iod_num = i;
-	tmp_file_data.iod_count = pinode_ptr->attr.u.meta.dfile_count;
-	tmp_file_data.extend_flag = 1;
-
-	bytemax = 1;
-	segmax = 1;
-	offset = 0;
-	eof_flag = 0;
-
-	ret = PINT_Process_request(req_state, &tmp_file_data,
-	    &segmax, NULL, NULL, &offset, &bytemax, &eof_flag,
-	    PINT_CKSIZE);
-	if(ret < 0)
-	{
-	    phelper_release_pinode(pinode_ptr);
-	    goto sys_io_out;
-	}
-
-	/* did we find that any data belongs to this handle? */
-	if(bytemax)
-	{
-	    target_handle_array[target_handle_count] =
-		pinode_ptr->attr.u.meta.dfile_array[i]; 
-	    target_handle_count++;
-	}
-    }
-    PINT_Free_request_state(req_state);
-    req_state = NULL;
 
     if (target_handle_count == 0) {
 	/* not necessarily an error: we might have gotten a 
 	 * zero-byte request.  that's fine.. less work for us! */
+	phelper_release_pinode(pinode_ptr);
 	resp->total_completed = 0;
 	goto sys_io_out;
     }
@@ -419,10 +380,75 @@ sys_io_out:
 	free(target_handle_array);
     if(flow_array)
 	free(flow_array);
-    if(req_state)
-	PINT_Free_request_state(req_state);
 
     return(ret);
+}
+
+/* io_find_target_dfiles()
+ *
+ * determines what subset of the datafiles actually contain data that we
+ * are interested in for this request
+ *
+ * returns 0 on success, -errno on failure
+ *
+ * TODO: make this step more efficient 
+ */
+static int io_find_target_dfiles(PVFS_Request io_req, pinode* pinode_ptr, 
+    PVFS_handle* target_handle_array, int* target_handle_count)
+{
+    struct PINT_Request_state* req_state = NULL;
+    PINT_Request_file_data tmp_file_data;
+    int32_t segmax = 1;
+    PVFS_size bytemax = 1;
+    PVFS_offset offset = 0;
+    PVFS_boolean eof_flag = 0;
+    int i = 0;
+    int ret = -1;
+
+    *target_handle_count = 0;
+
+    req_state = PINT_New_request_state(io_req);
+    if(!req_state)
+    {
+	return(-ENOMEM);
+    }
+    for(i=0; i<pinode_ptr->attr.u.meta.dfile_count; i++)
+    {
+	/* NOTE: we don't have to give an accurate file size here,
+	 * as long as we set the extend flag to tell the I/O req
+	 * processor to continue past eof if needed
+	 */
+	tmp_file_data.fsize = 0;  
+	tmp_file_data.dist = pinode_ptr->attr.u.meta.dist;
+	tmp_file_data.iod_num = i;
+	tmp_file_data.iod_count = pinode_ptr->attr.u.meta.dfile_count;
+	tmp_file_data.extend_flag = 1;
+
+	bytemax = 1;
+	segmax = 1;
+	offset = 0;
+	eof_flag = 0;
+
+	ret = PINT_Process_request(req_state, &tmp_file_data,
+	    &segmax, NULL, NULL, &offset, &bytemax, &eof_flag,
+	    PINT_CKSIZE);
+	if(ret < 0)
+	{
+	    PINT_Free_request_state(req_state);
+	    return(ret);
+	}
+
+	/* did we find that any data belongs to this handle? */
+	if(bytemax)
+	{
+	    target_handle_array[*target_handle_count] =
+		pinode_ptr->attr.u.meta.dfile_array[i]; 
+	    (*target_handle_count)++;
+	}
+    }
+    PINT_Free_request_state(req_state);
+
+    return(0);
 }
 
 /* io_req_ack_flow_array()
