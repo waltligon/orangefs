@@ -327,7 +327,29 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 			       void *user_ptr,
 			       TROVE_op_id *out_op_id_p)
 {
-    return -1;
+    struct dbpf_queued_op *q_op_p;
+    struct dbpf_collection *coll_p;
+
+    coll_p = my_coll_p;
+    if (coll_p == NULL) return -1;
+
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL) return -1;
+
+    /* initialize all the common members */
+    dbpf_queued_op_init(q_op_p,
+			DSPACE_GETATTR,
+			handle,
+			coll_p,
+			dbpf_dspace_setattr_op_svc,
+			user_ptr);
+
+    /* initialize op-specific members */
+    q_op_p->op.u.d_getattr.attr_p = ds_attr_p;
+
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    return 0;
 }
 
 /* dbpf_dspace_setattr()
@@ -365,8 +387,69 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 
 static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 {
+    int ret;
+    DB *db_p;
+    DBT key, data;
     TROVE_ds_storedattr_s s_attr;
+
+    db_p = op_p->coll_p->ds_db;
+    if (db_p == NULL) goto return_error;
+
+    memset(&key, 0, sizeof(key));
+    key.data = &op_p->handle;
+    key.size = sizeof(TROVE_handle);
     
+    memset(&data, 0, sizeof(data));
+    data.data = &s_attr;
+    data.size = sizeof(s_attr);
+
+    trove_ds_attr_to_stored((*op_p->u.d_setattr.attr_p), s_attr);
+
+    if ((ret = db_p->put(db_p, NULL, &key, &data, 0)) == 0)
+	printf("db: %s: key stored.\n", (char *)key.data);
+    else {
+	db_p->err(db_p, ret, "DB->put");
+	goto return_error;
+    }
+
+    return 1; /* done */
+    
+return_error:
+    return -1;
+}
+
+static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
+{
+    int ret;
+    DB *db_p;
+    DBT key, data;
+    TROVE_ds_storedattr_s s_attr;
+    TROVE_size b_size = 0, k_size = 0;
+
+    db_p = op_p->coll_p->ds_db;
+    if (db_p == NULL) goto return_error;
+
+    memset(&key, 0, sizeof(key));
+    key.data = &op_p->handle;
+    key.size = sizeof(TROVE_handle);
+    
+    memset(&data, 0, sizeof(data));
+    data.data = &s_attr;
+    data.size = data.ulen = sizeof(s_attr);
+    data.flags |= DB_DBT_USERMEM;
+
+    if ((ret = db_p->get(db_p, NULL, &key, &data, 0)) == 0)
+	printf("db: %s: key stored.\n", (char *)key.data);
+    else {
+	db_p->err(db_p, ret, "DB->put");
+	goto return_error;
+    }
+
+    trove_ds_stored_to_attr(s_attr, (*op_p->u.d_setattr.attr_p), b_size, k_size);
+
+    return 1; /* done */
+    
+return_error:
     return -1;
 }
 

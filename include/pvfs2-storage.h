@@ -88,14 +88,14 @@ struct PVFS_ds_storedattr
 };
 typedef struct PVFS_ds_storedattr PVFS_ds_storedattr_s;
 
-#define PVFS_ds_attr_to_stored(__from, __to)	\
-do {						\
-    (__from) = (PVFS_ds_storedattr_s) (__to);	\
+#define PVFS_ds_attr_to_stored(__from, __to)	        \
+do {						        \
+    (__to) = * ((PVFS_ds_storedattr_s *) &(__from));	\
 } while (0);
 
 #define PVFS_ds_stored_to_attr(__from, __to, __b_size, __k_size)	\
 do {									\
-    (PVFS_ds_storedattr_s) (__to) = (__from);				\
+    * ((PVFS_ds_storedattr_s *) &(__to)) = (__from);			\
     (__to).b_size = (__b_size);						\
     (__to).k_size = (__k_size);						\
 } while (0);
