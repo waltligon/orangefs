@@ -408,8 +408,10 @@ static int remove_helper_cleanup(PINT_client_sm *sm_p,
 
     if (js_p->error_code)
     {
-        PVFS_perror_gossip("remove_helper_cleanup error",
-                           js_p->error_code);
+        char buf[64] = {0};
+        PVFS_strerror_r(js_p->error_code, buf, 64);
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "remove_helper_cleanup error: %s\n", buf);
     }
     return 1;
 }
