@@ -289,17 +289,17 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 	
 	gossip_ldebug(SERVER_DEBUG, "IO: io_start_flow() executed.\n");
 
-	s_op->flow_d = PINT_flow_alloc();
-	if(!s_op->flow_d)
+	s_op->u.io.flow_d = PINT_flow_alloc();
+	if(!s_op->u.io.flow_d)
 	{
 		/* critical error, jump to next error state */
 		ret->error_code = -ENOMEM;
 		return(1);
 	}
 
-	s_op->flow_d->file_data =
+	s_op->u.io.flow_d->file_data =
 		(PINT_Request_file_data*)malloc(sizeof(PINT_Request_file_data));
-	if(!s_op->flow_d->file_data)
+	if(!s_op->u.io.flow_d->file_data)
 	{
 		/* critical error, jump to next error state */
 		ret->error_code = -ENOMEM;
@@ -310,38 +310,38 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 	 * that we sent in the previous state, other details come from
 	 * request
 	 */
-	s_op->flow_d->file_data->fsize = s_op->resp->u.io.bstream_size;
-	s_op->flow_d->file_data->dist = s_op->req->u.io.io_dist;
-	s_op->flow_d->file_data->iod_num = s_op->req->u.io.iod_num;
-	s_op->flow_d->file_data->iod_count = s_op->req->u.io.iod_count;
+	s_op->u.io.flow_d->file_data->fsize = s_op->resp->u.io.bstream_size;
+	s_op->u.io.flow_d->file_data->dist = s_op->req->u.io.io_dist;
+	s_op->u.io.flow_d->file_data->iod_num = s_op->req->u.io.iod_num;
+	s_op->u.io.flow_d->file_data->iod_count = s_op->req->u.io.iod_count;
 
 	/* on writes, we allow the bstream to be extended at EOF */
 	if(s_op->req->u.io.io_type == PVFS_IO_WRITE)
-		s_op->flow_d->file_data->extend_flag = 1;
+		s_op->u.io.flow_d->file_data->extend_flag = 1;
 	else
-		s_op->flow_d->file_data->extend_flag = 0;
+		s_op->u.io.flow_d->file_data->extend_flag = 0;
 
-	s_op->flow_d->request = s_op->req->u.io.io_req;
-	s_op->flow_d->flags = 0;
-	s_op->flow_d->tag = s_op->tag;
-	s_op->flow_d->user_ptr = NULL;
+	s_op->u.io.flow_d->request = s_op->req->u.io.io_req;
+	s_op->u.io.flow_d->flags = 0;
+	s_op->u.io.flow_d->tag = s_op->tag;
+	s_op->u.io.flow_d->user_ptr = NULL;
 
 	/* set endpoints depending on type of io requested */
 	if(s_op->req->u.io.io_type == PVFS_IO_WRITE)
 	{
-		s_op->flow_d->src.endpoint_id = BMI_ENDPOINT;
-		s_op->flow_d->src.u.bmi.address = s_op->addr;
-		s_op->flow_d->dest.endpoint_id = TROVE_ENDPOINT;
-		s_op->flow_d->dest.u.trove.handle = s_op->req->u.io.handle;
-		s_op->flow_d->dest.u.trove.coll_id = s_op->req->u.io.fs_id;
+		s_op->u.io.flow_d->src.endpoint_id = BMI_ENDPOINT;
+		s_op->u.io.flow_d->src.u.bmi.address = s_op->addr;
+		s_op->u.io.flow_d->dest.endpoint_id = TROVE_ENDPOINT;
+		s_op->u.io.flow_d->dest.u.trove.handle = s_op->req->u.io.handle;
+		s_op->u.io.flow_d->dest.u.trove.coll_id = s_op->req->u.io.fs_id;
 	}
 	else if(s_op->req->u.io.io_type == PVFS_IO_READ)
 	{
-		s_op->flow_d->src.endpoint_id = TROVE_ENDPOINT;
-		s_op->flow_d->src.u.trove.handle = s_op->req->u.io.handle;
-		s_op->flow_d->src.u.trove.coll_id = s_op->req->u.io.fs_id;
-		s_op->flow_d->dest.endpoint_id = BMI_ENDPOINT;
-		s_op->flow_d->dest.u.bmi.address = s_op->addr;
+		s_op->u.io.flow_d->src.endpoint_id = TROVE_ENDPOINT;
+		s_op->u.io.flow_d->src.u.trove.handle = s_op->req->u.io.handle;
+		s_op->u.io.flow_d->src.u.trove.coll_id = s_op->req->u.io.fs_id;
+		s_op->u.io.flow_d->dest.endpoint_id = BMI_ENDPOINT;
+		s_op->u.io.flow_d->dest.u.bmi.address = s_op->addr;
 	}
 	else
 	{
@@ -354,7 +354,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 
 	/* start the flow! */
 	err = job_flow(
-		s_op->flow_d,
+		s_op->u.io.flow_d,
 		s_op,
 		ret,
 		&tmp_id,
@@ -416,13 +416,13 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *ret)
 	gossip_ldebug(SERVER_DEBUG, "IO: io_cleanup() executed.\n");
 	/* Free the encoded message if necessary! */
 
-	if(s_op->flow_d)
+	if(s_op->u.io.flow_d)
 	{
-		if(s_op->flow_d->file_data)
+		if(s_op->u.io.flow_d->file_data)
 		{
-			free(s_op->flow_d->file_data);
+			free(s_op->u.io.flow_d->file_data);
 		}
-		PINT_flow_free(s_op->flow_d);
+		PINT_flow_free(s_op->u.io.flow_d);
 	}
 
 	/* let go of our encoded response buffer, 
@@ -498,7 +498,7 @@ static int io_send_completion_ack(PINT_server_op *s_op,
 
 	/* fill in response -- status field is the only generic one we should have to set */
 	s_op->resp->status = ret->error_code;
-	s_op->resp->u.write_completion.total_completed = s_op->flow_d->total_transfered;
+	s_op->resp->u.write_completion.total_completed = s_op->u.io.flow_d->total_transfered;
 
 	err = PINT_encode(
 		s_op->resp, 

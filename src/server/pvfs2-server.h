@@ -74,6 +74,10 @@ struct PINT_server_getconfig_op {
     int strsize; /* used to hold string lengths during getconfig processing */
 };
 
+struct PINT_server_io_op {
+    flow_descriptor* flow_d;
+};
+    
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -104,7 +108,6 @@ typedef struct PINT_server_op
     struct BMI_unexpected_info unexp_bmi_buff;
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
-    flow_descriptor* flow_d;
     union {
 	/* request-specific scratch spaces for use during processing */
 	struct PINT_server_getconfig_op getconfig;
@@ -113,6 +116,7 @@ typedef struct PINT_server_op
 	struct PINT_server_readdir_op   readdir;
 	struct PINT_server_remove_op    remove;
 	struct PINT_server_rmdirent_op  rmdirent;
+	struct PINT_server_io_op	io;
     } u; /* TODO: RENAME TO 'scratch' */
 } PINT_server_op;
 
