@@ -1894,10 +1894,11 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 	 */
 
 	/* see if the flow is being aborted */
-	if(actual_size == 0)
+	if(actual_size != flow_data->bmi_total_size)
 	{
-		gossip_ldebug(FLOW_PROTO_DEBUG, "Warning: flow aborted by peer.\n");
-		flow_d->state = FLOW_COMPLETE_SHORT;
+		/* TODO: handle this */
+		gossip_lerr("Error: unimplemented condition encountered.\n");
+		exit(-1);
 		return;
 	}
 
@@ -2251,14 +2252,13 @@ static void bmi_completion_bmi_to_trove(bmi_error_code_t error_code,
 	flow_data->total_filled += flow_data->fill_buffer_used;
 	flow_data->fill_buffer_state = BUF_READY_TO_SWAP;
 
-	/* if the message was short, then we have to rewind the stream to
-	 * it's previous point, plus the amount received so we start
-	 * processing at the right place next time.
-	 */
-	if(actual_size < flow_data->bmi_total_size)
+	/* see if the flow is being aborted */
+	if(actual_size != flow_data->bmi_total_size)
 	{
-		flow_data->dup_req_offset = flow_data->old_dup_req_offset +
-			actual_size;
+		/* TODO: handle this */
+		gossip_lerr("Error: unimplemented condition encountered.\n");
+		exit(-1);
+		return;
 	}
 
 	/* check the trove side to determine overall state */
