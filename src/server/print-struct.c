@@ -61,7 +61,7 @@ void display_pvfs_structure(void *s,int r)
 				break;
 			case PVFS_SERV_REMOVE:
 				printf("Remove Request Structure\n");
-				printf("Handle: %lld\n",p->u.remove.handle);
+				printf("Handle: %Ld\n",p->u.remove.handle);
 				printf("FSid: %d\n",p->u.remove.fs_id);
 				break;
 			case PVFS_SERV_IO:
@@ -70,13 +70,13 @@ void display_pvfs_structure(void *s,int r)
 				break;
 			case PVFS_SERV_GETATTR:
 				printf("Get Attrib Request Struct\n");
-				printf("Handle: %lld\n",p->u.getattr.handle);
+				printf("Handle: %Ld\n",p->u.getattr.handle);
 				printf("FSid: %d\n",p->u.getattr.fs_id);
 				printf("AttrMsk: %Xh\n",p->u.getattr.attrmask);
 				break;
 			case PVFS_SERV_SETATTR:
 				printf("Set Attrib Request Struct\n");
-				printf("Handle: %lld\n",p->u.setattr.handle);
+				printf("Handle: %Ld\n",p->u.setattr.handle);
 				printf("FSid: %d\n",p->u.setattr.fs_id);
 				printf("Attribs:\n");
 				dump_attribs(p->u.setattr.attr);
@@ -85,7 +85,7 @@ void display_pvfs_structure(void *s,int r)
 				printf("Lookup Path Request Struct\n");
 				printf("Path: %s\n",p->u.lookup_path.path);
 				printf("FSid: %d\n",p->u.lookup_path.fs_id);
-				printf("Start Handle: %lld\n",p->u.lookup_path.starting_handle);
+				printf("Start Handle: %Ld\n",p->u.lookup_path.starting_handle);
 				printf("Bitmask: %Xh\n",p->u.lookup_path.attrmask);
 				break;
 			case PVFS_SERV_MKDIR:
@@ -99,20 +99,20 @@ void display_pvfs_structure(void *s,int r)
 				break;
 			case PVFS_SERV_RMDIR:
 				printf("Remove Dir Req\n");
-				printf("Handle: %lld\n",p->u.rmdir.handle);
+				printf("Handle: %Ld\n",p->u.rmdir.handle);
 				printf("FSid: %d\n",p->u.rmdir.fs_id);
 				break;
 			case PVFS_SERV_CREATEDIRENT:
 				printf("Create Dirent Req\n");
 				printf("Name: %s\n",p->u.crdirent.name);
-				printf("New Handle: %lld\n",p->u.crdirent.new_handle);
-				printf("Parent Handle: %lld\n",p->u.crdirent.parent_handle);
+				printf("New Handle: %Ld\n",p->u.crdirent.new_handle);
+				printf("Parent Handle: %Ld\n",p->u.crdirent.parent_handle);
 				printf("FSid: %d\n",p->u.crdirent.fs_id);
 				break;
 			case PVFS_SERV_RMDIRENT:
 				printf("Remove Dir Entry Req\n");
 				printf("Entry: %s\n",p->u.rmdirent.entry);
-				printf("Parent Handle: %lld\n",p->u.rmdirent.parent_handle);
+				printf("Parent Handle: %Ld\n",p->u.rmdirent.parent_handle);
 				printf("FSid: %d\n",p->u.rmdirent.fs_id);
 				break;
 			case PVFS_SERV_GETCONFIG:
@@ -138,31 +138,31 @@ void display_pvfs_structure(void *s,int r)
 				break;
 			case PVFS_SERV_CREATE:
 				printf("Create Resp Structure\n");
-				printf("Bucket: %lld\n",p->u.create.handle);
+				printf("Bucket: %Ld\n",p->u.create.handle);
 				break;
 			case PVFS_SERV_LOOKUP_PATH:
 				printf("Lookup Path Resp Struct\n");
 				printf("Handle Array (Total: %d)\n",p->u.lookup_path.count);
 					while(i++<p->u.lookup_path.count)
 					{
-						printf("%d\t%lld\n",i,p->u.lookup_path.handle_array[i-1]);
+						printf("%d\t%Ld\n",i,p->u.lookup_path.handle_array[i-1]);
 						printf("Attribs:\n");
 						dump_attribs(p->u.lookup_path.attr_array[i-1]);
 					}
 				break;
 			case PVFS_SERV_MKDIR:
 				printf("Mkdir Resp\n");
-				printf("Handle: %lld\n",p->u.mkdir.handle);
+				printf("Handle: %Ld\n",p->u.mkdir.handle);
 				break;
 			case PVFS_SERV_RMDIRENT:
 				printf("Remove Dir Entry Resp\n");
-				printf("Entry Handle: %lld\n",p->u.rmdirent.entry_handle);
+				printf("Entry Handle: %Ld\n",p->u.rmdirent.entry_handle);
 				break;
 			case PVFS_SERV_GETCONFIG:
 				printf("Get Config Resp\n");
 				printf("FSid: %d\n",p->u.getconfig.fs_id);
-				printf("Root Handle: %lld\n",p->u.getconfig.root_handle);
-				printf("MaskBits: %lld\n",p->u.getconfig.maskbits);
+				printf("Root Handle: %Ld\n",p->u.getconfig.root_handle);
+				printf("MaskBits: %Ld\n",p->u.getconfig.maskbits);
 				printf("MetaServer Count: %d\n",p->u.getconfig.meta_server_count);
 				printf("MetaServer Map: %s\n",p->u.getconfig.meta_server_mapping);
 				printf("IOServer Count: %d\n",p->u.getconfig.io_server_count);

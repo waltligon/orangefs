@@ -165,7 +165,7 @@ int main(int argc, char **argv) {
 		server_shutdown(server_level_init,ret,0);
 	}
 
-	ret = trove_collection_lookup("gen2",&coll_id,NULL,NULL);
+	ret = trove_collection_lookup("fs-foo",&coll_id,NULL,NULL);
 
 	server_level_init++;
 		

@@ -87,6 +87,7 @@ STATE_FXN_HEAD(create_init)
 
 	int job_post_ret;
 	job_id_t i;
+	printf("Dspace CR\n");
 
 	job_post_ret = job_trove_dspace_create(s_op->req->u.create.fs_id,
 														s_op->req->u.create.bucket,

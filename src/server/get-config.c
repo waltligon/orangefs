@@ -110,6 +110,7 @@ STATE_FXN_HEAD(getconfig_init)
 	server_configuration_s *user_opts;
 	int err = 1;
 
+	printf("init\n");
 	user_opts = get_server_config_struct();
 	
 	/* Set up the values we have in our Config Struct user_opts */
@@ -158,6 +159,7 @@ STATE_FXN_HEAD(getconfig_job_trove)
 	int job_post_ret;
 	job_id_t i;
 
+	printf("trove\n");
 	job_post_ret = job_trove_fs_lookup(s_op->req->u.getconfig.fs_name,s_op,ret,&i);
 
 	STATE_FXN_RET(job_post_ret);
@@ -181,6 +183,7 @@ STATE_FXN_HEAD(getconfig_build_bmi_error)
 	{
 	//PINT_server_op *s_op = (PINT_server_op *) b;
 
+	printf("err\n");
 	s_op->resp->status = ret->error_code;
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
@@ -209,12 +212,15 @@ STATE_FXN_HEAD(getconfig_build_bmi_error)
 STATE_FXN_HEAD(getconfig_build_bmi_good_msg)
 	{
 	//PINT_server_op *s_op = (PINT_server_op *) b;
+	int jpret;
 
+	printf("Root Handle: %Ld\n",ret->handle);
 	s_op->resp->u.getconfig.root_handle = ret->handle;
 	s_op->resp->u.getconfig.fs_id = ret->coll_id;
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + s_op->strsize;
-
-	STATE_FXN_RET(PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type));
+	jpret = PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+	printf("list_count: %d\n",s_op->encoded.list_count);
+	STATE_FXN_RET(1);
 
 	}
 
@@ -236,6 +242,8 @@ STATE_FXN_HEAD(getconfig_job_bmi_send)
 	int job_post_ret;
 	job_id_t i;
 
+	printf("send\n");
+	printf("%d\n",s_op->encoded.list_count);
 	if(s_op->encoded.list_count == 1)
 	{
 	job_post_ret = job_bmi_send(s_op->addr,
@@ -273,6 +281,7 @@ STATE_FXN_HEAD(getconfig_job_bmi_send)
 STATE_FXN_HEAD(getconfig_cleanup)
 	{
 	//PINT_server_op *s_op = (PINT_server_op *) b;
+	printf("1\n");
 
 	/* TODO: What do we free? */
 	if (s_op->resp->u.getconfig.meta_server_mapping)

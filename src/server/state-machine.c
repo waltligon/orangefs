@@ -159,11 +159,8 @@ int PINT_state_machine_init(void)
 
 	int i=0;
 	while (i++ < SERVER_REQ_ARRAY_SIZE)
-	{
 		if(PINT_state_array[i-1])
 			(PINT_state_array[i-1]->init_fun)();
-		printf("%d\n",i-1);
-	}
 	return(0);
 	
 }
