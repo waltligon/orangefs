@@ -39,53 +39,6 @@ enum PVFS_server_op
  */
 };
 
-/* Metaserver status structure */
-struct PVFS_mserv_stat_s
-{
-    uint32_t filetotal;
-    /* What else do we need here ??? */
-};
-typedef struct PVFS_mserv_stat_s PVFS_mserv_stat;
-
-/* I/O server status structure */
-/* TODO: Are the block statistics in bytes ??? */
-struct PVFS_ioserv_stat_s
-{
-    PVFS_size blksize;		/* filesystem block size */
-    int64_t blkfree;	/* number of free blocks */
-    int64_t blktotal;	/* total no. of blocks available */
-    uint32_t filetotal;	/* Max no. of files */
-    uint32_t filefree;	/* no. of free files */
-};
-typedef struct PVFS_ioserv_stat_s PVFS_ioserv_stat;
-
-/* Statfs structure */
-struct PVFS_serv_statfs_s
-{
-    union
-    {
-	PVFS_mserv_stat mstat;
-	PVFS_ioserv_stat iostat;
-    }
-    u;
-};
-typedef struct PVFS_serv_statfs_s PVFS_serv_statfs;
-
-/* Server statfs */
-struct PVFS_servreq_statfs_s
-{
-    int server_type;
-    PVFS_fs_id fs_id;
-};
-typedef struct PVFS_servreq_statfs_s PVFS_servreq_statfs;
-
-struct PVFS_servresp_statfs_s
-{
-    int server_type;
-    PVFS_serv_statfs stat;
-};
-typedef struct PVFS_servresp_statfs_s PVFS_servresp_statfs;
-
 /* create
  *
  */
@@ -398,7 +351,6 @@ struct PVFS_server_req_s
 	PVFS_servreq_setattr setattr;
 	PVFS_servreq_mkdir mkdir;
 	PVFS_servreq_readdir readdir;
-	PVFS_servreq_statfs statfs;
 	PVFS_servreq_geteattr geteattr;
 	PVFS_servreq_seteattr seteattr;
 	PVFS_servreq_lookup_path lookup_path;
@@ -424,7 +376,6 @@ struct PVFS_server_resp_s
 	PVFS_servresp_getattr getattr;
 	PVFS_servresp_mkdir mkdir;
 	PVFS_servresp_readdir readdir;
-	PVFS_servresp_statfs statfs;
 	PVFS_servresp_geteattr geteattr;
 	PVFS_servresp_seteattr seteattr;
 	PVFS_servresp_lookup_path lookup_path;
