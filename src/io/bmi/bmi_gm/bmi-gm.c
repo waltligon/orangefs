@@ -979,8 +979,6 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
     key.method_addr_yes = 1;
     key.msg_tag = tag;
     key.msg_tag_yes = 1;
-    key.mode_mask = mode;
-    key.mode_mask_yes = 1;
 
     query_op = op_list_search(op_list_array[IND_NEED_RECV_POST], &key);
     if (query_op)
