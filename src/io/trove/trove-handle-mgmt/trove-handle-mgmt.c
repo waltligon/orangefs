@@ -155,7 +155,7 @@ static handle_ledger_t *get_or_add_handle_ledger(TROVE_coll_id coll_id)
     struct qlist_head *hash_link = NULL;
 
     /* search for a matching entry */
-    hash_link = qhash_search(s_fsid_to_ledger_table,&coll_id);
+    hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
     if (hash_link)
     {
         /* return it if it exists */
@@ -172,7 +172,7 @@ static handle_ledger_t *get_or_add_handle_ledger(TROVE_coll_id coll_id)
             if (ledger->ledger)
             {
                 qhash_add(s_fsid_to_ledger_table,
-                          &coll_id,&ledger->hash_link);
+                          &(coll_id),&(ledger->hash_link));
             }
             else
             {
@@ -218,6 +218,8 @@ static int hash_fsid_compare(void *key, struct qlist_head *link)
     TROVE_coll_id *real_fsid = (TROVE_coll_id *)key;
 
     ledger = qlist_entry(link, handle_ledger_t, hash_link);
+    assert(ledger);
+
     if (ledger->coll_id == *real_fsid)
     {
         return(1);
@@ -283,7 +285,7 @@ TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
     struct qlist_head *hash_link = NULL;
     TROVE_handle handle = (TROVE_handle)0;
 
-    hash_link = qhash_search(s_fsid_to_ledger_table,&coll_id);
+    hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
     if (hash_link)
     {
         ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
@@ -301,7 +303,7 @@ int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
     handle_ledger_t *ledger = NULL;
     struct qlist_head *hash_link = NULL;
 
-    hash_link = qhash_search(s_fsid_to_ledger_table,&coll_id);
+    hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
     if (hash_link)
     {
         ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
@@ -315,10 +317,31 @@ int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
 
 int trove_handle_mgmt_finalize()
 {
-    /* FIXME: clean up all ledger objects and wrappers */
+    int i;
+    handle_ledger_t *ledger = NULL;
+    struct qlist_head *hash_link = NULL;
+
+    /*
+      this is an exhaustive and slow iterate.  speed this up
+      if 'finalize' is something that will be done frequently.
+    */
+    for (i = 0; i < s_fsid_to_ledger_table->table_size; i++)
+    {
+        hash_link = qhash_search(s_fsid_to_ledger_table,&(i));
+        if (hash_link)
+        {
+            ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+            assert(ledger);
+            assert(ledger->ledger);
+
+            trove_handle_ledger_free(ledger->ledger);
+            free(ledger);
+        }
+    }
+    qhash_finalize(s_fsid_to_ledger_table);
+    s_fsid_to_ledger_table = NULL;
     return 0;
 }
-
 
 /*
  * Local variables:
