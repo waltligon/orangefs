@@ -359,13 +359,25 @@ static int create_getattr_comp_fn(void *v_p,
     }
 
     /*
-      if our response is good, and it's not a pcache hit,
-      copy it here for insertion into the pcache on cleanup
+      if our parent directory attributes are good, and not present
+      int the pcache, put them in the pcache now
     */
     if (!sm_p->pcache_hit)
     {
+        PINT_pinode *pinode =
+            PINT_pcache_lookup(sm_p->u.create.parent_ref);
+        if (!pinode)
+        {
+            pinode = PINT_pcache_pinode_alloc();
+            assert(pinode);
+        }
+        pinode->refn = sm_p->u.getattr.object_ref;
+        pinode->size = 0;
+
         PINT_pcache_object_attr_deep_copy(
-            &sm_p->pcache_attr, &resp_p->u.getattr.attr);
+            &pinode->attr, &resp_p->u.getattr.attr);
+
+        PINT_pcache_set_valid(pinode);
     }
     return 0;
 }
@@ -786,7 +798,7 @@ static int create_setattr_failure(PINT_client_sm *sm_p,
 static int create_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
 {
-    PINT_pinode *pinode = NULL;
+/*     PINT_pinode *pinode = NULL; */
     PVFS_pinode_reference metafile_ref;
 
     gossip_debug(CLIENT_DEBUG, "create state: cleanup\n");
@@ -797,19 +809,19 @@ static int create_cleanup(PINT_client_sm *sm_p,
     metafile_ref.handle = sm_p->u.create.metafile_handle;
     metafile_ref.fs_id = sm_p->u.create.parent_ref.fs_id;
 
-    pinode = PINT_pcache_lookup(metafile_ref);
-    if (!pinode)
-    {
-        pinode = PINT_pcache_pinode_alloc();
-        assert(pinode);
-    }
-    pinode->refn = metafile_ref;
-    PINT_pcache_object_attr_deep_copy(
-        &pinode->attr, &sm_p->pcache_attr);
-    PINT_pcache_object_attr_deep_free(
-        &sm_p->pcache_attr);
+/*     pinode = PINT_pcache_lookup(metafile_ref); */
+/*     if (!pinode) */
+/*     { */
+/*         pinode = PINT_pcache_pinode_alloc(); */
+/*         assert(pinode); */
+/*     } */
+/*     pinode->refn = metafile_ref; */
+/*     PINT_pcache_object_attr_deep_copy( */
+/*         &pinode->attr, &sm_p->pcache_attr); */
+/*     PINT_pcache_object_attr_deep_free( */
+/*         &sm_p->pcache_attr); */
 
-    PINT_pcache_set_valid(pinode);
+/*     PINT_pcache_set_valid(pinode); */
 
     /* fill in outgoing response fields */
     sm_p->u.create.create_resp->pinode_refn = metafile_ref;
