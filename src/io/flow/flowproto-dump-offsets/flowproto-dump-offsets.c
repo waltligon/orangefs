@@ -352,13 +352,20 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
     PVFS_boolean eof_flag;
     PVFS_size bytemax;
     PVFS_count32 segmax;
+    int i;
 
+    flow_d->total_transfered = 0;
+
+    gossip_err("DUMP OFFSETS %p: MEMORY to BMI.\n", flow_d);
+    gossip_err("*********************************************\n");
     do
     {
 	eof_flag = 0;
 	segmax = MAX_REGIONS;
 	bytemax = DEFAULT_BUFFER_SIZE;
 
+	gossip_err("DUMP OFFSETS %p: PINT_Process_request().\n",
+	    flow_d);
 	ret = PINT_Process_request(flow_d->request_state, 
 	    flow_d->file_data,
 	    &segmax,
@@ -369,7 +376,28 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 	    &eof_flag,
 	    PINT_CLIENT);
 
+	if(ret < 0)
+	{
+	    flow_d->state = FLOW_ERROR;
+	    flow_d->error_code = ret;
+	    return;
+	}
+
+	gossip_err("DUMP OFFSETS %p: bytemax: %ld, segmax: %ld\n",
+	    flow_d, (long)bytemax, (long)segmax);
+	for(i=0; i<segmax; i++)
+	{
+	    gossip_err(
+	    "DUMP OFFSETS %p: seg: %d, mem offset: %ld, size: %ld\n", 
+		flow_d, i, ((long)offset_array[i] +
+		(long)flow_d->src.u.mem.buffer), (long)size_array[i]);
+	}
+
+	flow_d->total_transfered += bytemax;
+
     } while (flow_d->current_req_offset != -1 && ret >= 0);
+
+    flow_d->state = FLOW_COMPLETE;
 
     return;
 }
@@ -382,6 +410,58 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
  */
 static void service_bmi_to_mem(flow_descriptor * flow_d)
 {
+    int ret = -1;
+    PVFS_offset offset_array[MAX_REGIONS];
+    PVFS_size size_array[MAX_REGIONS];
+    PVFS_boolean eof_flag;
+    PVFS_size bytemax;
+    PVFS_count32 segmax;
+    int i;
+
+    flow_d->total_transfered = 0;
+
+    gossip_err("DUMP OFFSETS %p: BMI to MEMORY.\n", flow_d);
+    gossip_err("*********************************************\n");
+    do
+    {
+	eof_flag = 0;
+	segmax = MAX_REGIONS;
+	bytemax = DEFAULT_BUFFER_SIZE;
+
+	gossip_err("DUMP OFFSETS %p: PINT_Process_request().\n",
+	    flow_d);
+	ret = PINT_Process_request(flow_d->request_state, 
+	    flow_d->file_data,
+	    &segmax,
+	    offset_array,
+	    size_array,
+	    &flow_d->current_req_offset,
+	    &bytemax,
+	    &eof_flag,
+	    PINT_CLIENT);
+
+	if(ret < 0)
+	{
+	    flow_d->state = FLOW_ERROR;
+	    flow_d->error_code = ret;
+	    return;
+	}
+
+	gossip_err("DUMP OFFSETS %p: bytemax: %ld, segmax: %ld\n",
+	    flow_d, (long)bytemax, (long)segmax);
+	for(i=0; i<segmax; i++)
+	{
+	    gossip_err(
+	    "DUMP OFFSETS %p: seg: %d, mem offset: %ld, size: %ld\n", 
+		flow_d, i, ((long)offset_array[i] +
+		(long)flow_d->src.u.mem.buffer), (long)size_array[i]);
+	}
+
+	flow_d->total_transfered += bytemax;
+
+    } while (flow_d->current_req_offset != -1 && ret >= 0);
+
+    flow_d->state = FLOW_COMPLETE;
 
     return;
 }
@@ -394,6 +474,57 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
  */
 static void service_bmi_to_trove(flow_descriptor * flow_d)
 {
+    int ret = -1;
+    PVFS_offset offset_array[MAX_REGIONS];
+    PVFS_size size_array[MAX_REGIONS];
+    PVFS_boolean eof_flag;
+    PVFS_size bytemax;
+    PVFS_count32 segmax;
+    int i;
+
+    flow_d->total_transfered = 0;
+
+    gossip_err("DUMP OFFSETS %p: BMI to TROVE.\n", flow_d);
+    gossip_err("*********************************************\n");
+    do
+    {
+	eof_flag = 0;
+	segmax = MAX_REGIONS;
+	bytemax = DEFAULT_BUFFER_SIZE;
+
+	gossip_err("DUMP OFFSETS %p: PINT_Process_request().\n",
+	    flow_d);
+	ret = PINT_Process_request(flow_d->request_state, 
+	    flow_d->file_data,
+	    &segmax,
+	    offset_array,
+	    size_array,
+	    &flow_d->current_req_offset,
+	    &bytemax,
+	    &eof_flag,
+	    PINT_SERVER);
+
+	if(ret < 0)
+	{
+	    flow_d->state = FLOW_ERROR;
+	    flow_d->error_code = ret;
+	    return;
+	}
+
+	gossip_err("DUMP OFFSETS %p: bytemax: %ld, segmax: %ld\n",
+	    flow_d, (long)bytemax, (long)segmax);
+	for(i=0; i<segmax; i++)
+	{
+	    gossip_err(
+	    "DUMP OFFSETS %p: seg: %d, file offset: %ld, size: %ld\n", 
+		flow_d, i, (long)offset_array[i], (long)size_array[i]);
+	}
+
+	flow_d->total_transfered += bytemax;
+
+    } while (flow_d->current_req_offset != -1 && ret >= 0);
+
+    flow_d->state = FLOW_COMPLETE;
 
     return;
 }
@@ -406,6 +537,57 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
  */
 static void service_trove_to_bmi(flow_descriptor * flow_d)
 {
+    int ret = -1;
+    PVFS_offset offset_array[MAX_REGIONS];
+    PVFS_size size_array[MAX_REGIONS];
+    PVFS_boolean eof_flag;
+    PVFS_size bytemax;
+    PVFS_count32 segmax;
+    int i;
+
+    flow_d->total_transfered = 0;
+
+    gossip_err("DUMP OFFSETS %p: TROVE to BMI.\n", flow_d);
+    gossip_err("*********************************************\n");
+    do
+    {
+	eof_flag = 0;
+	segmax = MAX_REGIONS;
+	bytemax = DEFAULT_BUFFER_SIZE;
+
+	gossip_err("DUMP OFFSETS %p: PINT_Process_request().\n",
+	    flow_d);
+	ret = PINT_Process_request(flow_d->request_state, 
+	    flow_d->file_data,
+	    &segmax,
+	    offset_array,
+	    size_array,
+	    &flow_d->current_req_offset,
+	    &bytemax,
+	    &eof_flag,
+	    PINT_SERVER);
+
+	if(ret < 0)
+	{
+	    flow_d->state = FLOW_ERROR;
+	    flow_d->error_code = ret;
+	    return;
+	}
+
+	gossip_err("DUMP OFFSETS %p: bytemax: %ld, segmax: %ld\n",
+	    flow_d, (long)bytemax, (long)segmax);
+	for(i=0; i<segmax; i++)
+	{
+	    gossip_err(
+	    "DUMP OFFSETS %p: seg: %d, file offset: %ld, size: %ld\n", 
+		flow_d, i, (long)offset_array[i], (long)size_array[i]);
+	}
+
+	flow_d->total_transfered += bytemax;
+
+    } while (flow_d->current_req_offset != -1 && ret >= 0);
+
+    flow_d->state = FLOW_COMPLETE;
 
     return;
 }
