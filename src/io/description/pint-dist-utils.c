@@ -128,12 +128,18 @@ int PINT_dist_register_param_offset(const char* dist_name,
         buf = malloc(new_table_size * sizeof(PINT_dist_param_offset));
         if (0 != buf)
         {
-            memcpy(buf, PINT_dist_param_table,
-                   PINT_dist_param_table_size * sizeof(PINT_dist_param_offset));
+            if(PINT_dist_param_table_size)
+            {
+                memcpy(buf, PINT_dist_param_table,
+                       PINT_dist_param_table_size * sizeof(PINT_dist_param_offset));
+            }
             memset(buf + PINT_dist_param_table_size, 0,
                    PINT_dist_param_table_alloc_inc * sizeof(PINT_dist_param_offset));
 
-            free(PINT_dist_param_table);
+            if(PINT_dist_param_table_size)
+            {
+                free(PINT_dist_param_table);
+            }
             PINT_dist_param_table_size = new_table_size;
             PINT_dist_param_table = buf;
         }
