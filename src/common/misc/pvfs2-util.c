@@ -152,9 +152,9 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
 	    /* config server and fs name are a special case, take one 
 	     * string and split it in half on "/" delimiter
 	     */
+	    *last_slash = '\0';
 	    strcpy(pvfstab_p->ptab_array[i].pvfs_config_server,
                    tmp_ent->mnt_fsname);
-	    *last_slash = '\0';
 	    last_slash++;
 	    pvfstab_p->ptab_array[i].pvfs_fs_name = strdup(last_slash);
             if (!pvfstab_p->ptab_array[i].pvfs_fs_name)
