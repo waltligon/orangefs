@@ -17,8 +17,7 @@
 #define BUFMAP_PAGE_COUNT (PVFS2_BUFMAP_TOTAL_SIZE/PAGE_SIZE)
 #define PAGES_PER_DESC (PVFS2_BUFMAP_DEFAULT_DESC_SIZE/PAGE_SIZE)
 
-static atomic_t bufmap_init = ATOMIC_INIT(0);
-static DECLARE_WAIT_QUEUE_HEAD(bufmap_init_waitq);
+static int bufmap_init = 0;
 
 static struct page** bufmap_page_array = NULL;
 static void** bufmap_kaddr_array = NULL;
@@ -42,7 +41,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     int i;
     int offset = 0;
 
-    if(atomic_read(&bufmap_init) == 1)
+    if(bufmap_init == 1)
     {
 	return(-EALREADY);
     }
@@ -143,8 +142,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	offset += PAGES_PER_DESC;
     }
 
-    atomic_set(&bufmap_init,1);
-    wake_up_interruptible(&bufmap_init_waitq);
+    bufmap_init = 1;
 
     return(0);
 }
@@ -162,7 +160,7 @@ void pvfs_bufmap_finalize(void)
 
     pvfs2_print("pvfs2_bufmap_finalize: called\n");
 
-    if(atomic_read(&bufmap_init) == 0)
+    if(bufmap_init == 0)
     {
         pvfs2_print("pvfs2_bufmap_finalize: not yet initialized; returning\n");
 	return;
@@ -175,7 +173,7 @@ void pvfs_bufmap_finalize(void)
     kfree(bufmap_page_array);
     kfree(bufmap_kaddr_array);
 
-    atomic_set(&bufmap_init,0);
+    bufmap_init = 0;
 
     pvfs2_print("pvfs2_bufmap_finalize: exited normally\n");
     return;
@@ -270,22 +268,6 @@ int pvfs_bufmap_copy_to_user(void* to, int buffer_index,
     int index = 0;
     void* offset = to;
     struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
-    int interrupted;
-
-    if(atomic_read(&bufmap_init) == 0)
-    {
-	interrupted = wait_event_interruptible_timeout(
-	    bufmap_init_waitq, 
-	    (atomic_read(&bufmap_init) == 1),
-	    (10*HZ));
-	if(!interrupted)
-	{
-	    if(signal_pending(current))
-		return(-EINTR);
-	    else
-		return(-ETIMEDOUT);
-	}
-    }
     
     while(amt_copied < size)
     {
@@ -312,22 +294,6 @@ int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index,
     int index = 0;
     void* offset = to;
     struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
-    int interrupted;
-
-    if(atomic_read(&bufmap_init) == 0)
-    {
-	interrupted = wait_event_interruptible_timeout(
-	    bufmap_init_waitq, 
-	    (atomic_read(&bufmap_init) == 1),
-	    (10*HZ));
-	if(!interrupted)
-	{
-	    if(signal_pending(current))
-		return(-EINTR);
-	    else
-		return(-ETIMEDOUT);
-	}
-    }
 
     while(amt_copied < size)
     {
@@ -360,22 +326,6 @@ int pvfs_bufmap_copy_from_user(int buffer_index, void* from,
     int index = 0;
     void* offset = from;
     struct pvfs_bufmap_desc* to = &desc_array[buffer_index];
-    int interrupted;
-
-    if(atomic_read(&bufmap_init) == 0)
-    {
-	interrupted = wait_event_interruptible_timeout(
-	    bufmap_init_waitq, 
-	    (atomic_read(&bufmap_init) == 1),
-	    (10*HZ));
-	if(!interrupted)
-	{
-	    if(signal_pending(current))
-		return(-EINTR);
-	    else
-		return(-ETIMEDOUT);
-	}
-    }
 
     while(amt_copied < size)
     {
