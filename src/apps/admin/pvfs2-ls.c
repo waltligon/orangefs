@@ -297,6 +297,10 @@ void print_entry_attr(
     {
         size = (PVFS_size)strlen(attr->link_target);
     }
+    else if (attr->objtype == PVFS_TYPE_DIRECTORY)
+    {
+        size = (PVFS_size)4096;
+    }
 
     if (opts->list_human_readable)
     {
