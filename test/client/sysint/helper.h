@@ -18,6 +18,7 @@
 #define MAX_NUM_DIRENTS    512
 #define MAX_PVFS_PATH_LEN  512
 
+#include "pint-sysint.h"
 #include "str_utils.h"
 
 /* make uid, gid and perms passed in later */
