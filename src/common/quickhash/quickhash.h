@@ -3,6 +3,9 @@
  * See COPYING in top-level directory.
  */
 
+#ifndef QUICKHASH_H
+#define QUICKHASH_H
+
 #include<quicklist.h>
 
 struct qhash_table
@@ -29,3 +32,5 @@ void qhash_add(
 	struct qhash_table* table,
 	void* key,
 	struct qlist_head* link);
+
+#endif /* QUICKHASH_H */
