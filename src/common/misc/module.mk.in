@@ -1,3 +1,5 @@
 DIR := src/common/misc
-LIBSRC += $(DIR)/str_utils.c
-SERVERSRC += $(DIR)/str_utils.c
+LIBSRC += $(DIR)/str_utils.c \
+	$(DIR)/errno-mapping.c
+SERVERSRC += $(DIR)/str_utils.c \
+	$(DIR)/errno-mapping.c
