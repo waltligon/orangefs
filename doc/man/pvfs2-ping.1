@@ -1,0 +1,59 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH PVFS2-PING 1 "SEPTEMBER 2003"  PVFS2 "PVFS2 Manuals"
+.SH NAME
+pvfs2-ping \- Check if all servers in a PVFS2 volume are running
+.SH SYNOPSIS
+.B pvfs2-ping
+.I MOUNTPOINT
+
+.SH DESCRIPTION
+Check if all servers in the PVFS2 volume at
+.I MOUNTPOINT
+are running.  
+.B pvfs2-ping 
+will go through several phases
+.br
+Checking pvfstab
+.RS
+finds the first pvfs2tab file acording to the usual rules and displays the
+initial server, the storage name, and the local mount point.
+.RE
+Initialization
+.RS
+talks to the initial server and gets PVFS2 configuration information.  Displays
+the meta servers and the data servers, as well as on which port they are
+running 
+.RE
+Verify Response
+.RS
+verifies all servers in the PVFS2 volume respond to requests
+.RE
+Identifier Consistency
+.RS
+Makes sure all servers agree that the file-system identifier for the filesystem
+is the same on all servers
+.RE
+Root Handle Check
+.RS
+Makes sure that only one server owns the file system's root handle
+
+.SH ENVIRONMENT
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate 
+.IR pvfs2tab
+file
+
+.SH BUGS
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH AUTHOR
+The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
+.SH "SEE ALSO"
+.BR pvfs2-server (1),
+.BR pvfs2-statfs (1),
+.BR pvfs2-ping (1),
+.BR pvfs2-import (1),
+.BR pvfs2-export (1),
+.BR pvfs2-genconfig (1),
+.BR pvfs2tab(5)
