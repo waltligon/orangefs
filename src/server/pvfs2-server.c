@@ -116,6 +116,9 @@ int main(int argc, char **argv)
 
     server_status_flag |= SERVER_GOSSIP_INIT;
 
+    gossip_debug(SERVER_DEBUG, "PVFS2 Server version %s starting.\n",
+		 PVFS2_VERSION);
+
     /* Determine initial server configuration, looking at both command line
      * arguments and the configuration file.
      */
