@@ -55,6 +55,8 @@ struct PVFS_ds_attributes
     PVFS_gid gid;
     PVFS_permissions mode;
     PVFS_time ctime;
+    PVFS_time mtime;
+    PVFS_time atime;
     /* NOTE: PUT NON-STORED AT THE BOTTOM!!! */
     PVFS_size b_size;		/* bstream size */
     PVFS_size k_size;		/* keyval size; # of keys */
@@ -70,6 +72,8 @@ struct PVFS_ds_storedattr
     PVFS_gid gid;
     PVFS_permissions mode;
     PVFS_time ctime;
+    PVFS_time mtime;
+    PVFS_time atime;
 };
 typedef struct PVFS_ds_storedattr PVFS_ds_storedattr_s;
 
