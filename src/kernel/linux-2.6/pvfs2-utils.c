@@ -631,7 +631,7 @@ static inline struct inode *pvfs2_create_dir(
 	    dentry->d_op = &pvfs2_dentry_operations;
 
 	    /* finally, add dentry with this new inode to the dcache */
-	    d_add(dentry, inode);
+	    d_instantiate(dentry, inode);
 	}
 	else
 	{
@@ -722,7 +722,7 @@ static inline struct inode *pvfs2_create_symlink(
 	    dentry->d_op = &pvfs2_dentry_operations;
 
 	    /* finally, add dentry with this new inode to the dcache */
-	    d_add(dentry, inode);
+	    d_instantiate(dentry, inode);
 	}
 	else
 	{

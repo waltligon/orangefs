@@ -58,22 +58,22 @@ struct dentry *pvfs2_lookup(
       create.  normally this results in an expensive failed
       lookup; we're avoiding that here.
     */
-    if (nd && (nd->flags & LOOKUP_CREATE) &&
-        !(nd->flags & LOOKUP_CONTINUE))
-    {
-        pvfs2_print("pvfs2: pvfs2_lookup -- skipping operation "
-                    "based on create intent\n");
-        return NULL;
-    }
+/*     if (nd && (nd->flags & LOOKUP_CREATE) && */
+/*         !(nd->flags & LOOKUP_CONTINUE)) */
+/*     { */
+/*         pvfs2_print("pvfs2: pvfs2_lookup -- skipping operation " */
+/*                     "based on create intent\n"); */
+/*         return NULL; */
+/*     } */
 
     /* same thing for an exclusive open */
-    if (nd && (nd->flags & LOOKUP_OPEN) &&
-        (nd->intent.open.flags & O_EXCL))
-    {
-        pvfs2_print("pvfs2: pvfs2_lookup -- skipping operation "
-                    "based on excl open intent\n");
-        return NULL;
-    }
+/*     if (nd && (nd->flags & LOOKUP_OPEN) && */
+/*         (nd->intent.open.flags & O_EXCL)) */
+/*     { */
+/*         pvfs2_print("pvfs2: pvfs2_lookup -- skipping operation " */
+/*                     "based on excl open intent\n"); */
+/*         return NULL; */
+/*     } */
 
     if (dentry->d_name.len > PVFS2_NAME_LEN)
     {

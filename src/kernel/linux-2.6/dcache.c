@@ -21,17 +21,17 @@ int pvfs2_d_revalidate(
 
     pvfs2_print("pvfs2: pvfs2_d_revalidate called\n");
 
-    if (nd && (nd->flags == LOOKUP_FOLLOW) &&
-        (!nd->flags & LOOKUP_CREATE))
-    {
-        pvfs2_print("pvfs2_d_revalidate: Trusting intent; "
-                    "skipping getattr\n");
-        ret = 1;
-    }
-    else if (inode)
-    {
+/*     if (nd && (nd->flags == LOOKUP_FOLLOW) && */
+/*         (!nd->flags & LOOKUP_CREATE)) */
+/*     { */
+/*         pvfs2_print("pvfs2_d_revalidate: Trusting intent; " */
+/*                     "skipping getattr\n"); */
+/*         ret = 1; */
+/*     } */
+/*     else if (inode) */
+/*     { */
 	ret = ((pvfs2_inode_getattr(inode) == 0) ? 1 : 0);
-    }
+/*     } */
     return ret;
 }
 
