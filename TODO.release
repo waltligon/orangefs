@@ -36,3 +36,5 @@ Stuff to do for the first friendly-user release:
 . quickstart guide
 
 . implement statfs
+
+. pick a license and apply it to all of the code

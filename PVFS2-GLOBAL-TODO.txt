@@ -14,25 +14,25 @@ server operations:
   - iostatfs?
   
 - unfinished:
-  **** general error handling
-  **** retrieving size in getattr for datafiles
+  - general error handling
 
 general server functionality:
 ====================================================================
-**** attributes (permissions, etc.) on datafiles
-**** defining "on disk" format for metadata
-**** getting multiple servers working (io + metadata)
-**** finishing file system semantics documentation
+- attributes (permissions, etc.) on datafiles
+- defining "on disk" format for metadata
+  - short term goal of using dspace attribs for storing pvfs2 object attribs
+- getting multiple servers working (io + metadata)
+- finishing file system semantics documentation
 - don't forget to define semantics for access times
-**** access control, general security model
+- access control, general security model
 - better error handling when unsupported request received
 - making server run as background daemon
 - testing multiple meta servers
 
 request scheduler:
 ====================================================================
-**** more generic implementation
-**** smarter concurrency rules
+- more generic implementation
+- smarter concurrency rules
 
 system interface functionality:
 ====================================================================
@@ -41,9 +41,9 @@ system interface functionality:
   - statfs
 
 - unfinished:
-  **** thread safety
-  **** way to pass in consistency semantics (timeout values, etc.)
-  **** using a state machine for I/O operations
+  - thread safety
+  - way to pass in consistency semantics (timeout values, etc.)
+  - state machine implementations for all functions
 
 user interfaces:
 ====================================================================
@@ -55,7 +55,6 @@ kernel/vfs interface
 - 2.4.x pvfs-kernel implementation
   - quick modification of existing pvfs-kernel and/or full rewrite
 - 2.6.x pvfs2-kernel implementation
-  - implement memory mapping operations through vfs
   - properly handle vfs interruption cases (signals)
   - get fsid/root handle information at mount time
   - use /etc/fstab mount interface for volume info
@@ -81,8 +80,7 @@ performance tuning:
 
 request encoding:
 ====================================================================
-**** defining an on-the-wire request format
-**** heterogeneous platform support
+- finish "real" wire encoding scheme
 
 error codes:
 ====================================================================
@@ -102,7 +100,9 @@ I/O path:
 
 I/O description:
 ====================================================================
-**** how to free request descriptions and distribution structures
+- how to free request descriptions and distribution structures
+- how to copy dist information
+- how to encode io descriptions and dist for wire protocol
 
 correctness/performance testing
 ====================================================================
