@@ -55,7 +55,7 @@ static int read_dirs(PVFS_pinode_reference refn,
     /* call readdir */
     printf("Calling readdir with handle %Ld and fsid %d\n",refn.handle,refn.fs_id);
     printf("ndirs is %d\n",ndirs);
-    ret = PVFS_sys_readdir(refn, PVFS2_READDIR_START, ndirs,
+    ret = PVFS_sys_readdir(refn, PVFS_READDIR_START, ndirs,
                            credentials, &resp_readdir);
     if (ret < 0)
     {

@@ -21,12 +21,6 @@
 
 #define HANDLE_BATCH 1000
 
-/* TODO: this is a hack, define this stuff nicely somewhere that can
- * stay in sync with trove
- */
-#define PVFS_ITERATE_START (INT_MAX-1)
-#define PVFS_ITERATE_END (INT_MAX-2)
-
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif

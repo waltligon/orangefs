@@ -70,6 +70,9 @@ typedef struct PVFS_handle_extent_array_s PVFS_handle_extent_array;
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL ((PVFS_handle)0) /* invalid object handle */
 #define PVFS_OP_NULL ((id_gen_t)0)        /* invalid op id for I/O subsystems */
+#define PVFS_ITERATE_START (INT32_MAX - 1)
+#define PVFS_ITERATE_END   (INT32_MAX - 2)
+#define PVFS_READDIR_START PVFS_ITERATE_START
 
 /* permission bits */
 #define PVFS_O_EXECUTE	(1 << 0)

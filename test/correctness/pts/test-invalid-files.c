@@ -222,7 +222,7 @@ static int test_readdir(int testcase)
     }
 
     pinode_refn = resp_lookup.pinode_refn;
-    token = PVFS2_READDIR_START;
+    token = PVFS_READDIR_START;
     pvfs_dirent_incount = 1;
 
     credentials.uid = 100;

@@ -486,7 +486,7 @@ int main(int argc,char **argv)
 
 	pinode_refn.handle = resp_look.pinode_refn.handle;
 	pinode_refn.fs_id = fs_id;
-	token = PVFS2_READDIR_START;
+	token = PVFS_READDIR_START;
 	pvfs_dirent_incount = 6;
 	credentials.uid = 100;
 	credentials.gid = 100;

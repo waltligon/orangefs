@@ -104,7 +104,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
 
     pinode_refn.handle = lk_response.pinode_refn.handle;
     pinode_refn.fs_id = init_response->fsid_list[0];
-    token = PVFS2_READDIR_START;
+    token = PVFS_READDIR_START;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
     credentials.uid = 100;
     credentials.gid = 100;

@@ -113,10 +113,10 @@ static int pvfs2_readdir(
 	   "." and ".." entries that we added above.
 
 	   so the proper pvfs2 position is (pos - 2), except where
-	   pos == 0.  In that case, pos is PVFS2_READDIR_START.
+	   pos == 0.  In that case, pos is PVFS_READDIR_START.
 	 */
 	new_op->upcall.req.readdir.token =
-	    (pos == 2 ? PVFS2_READDIR_START : (PVFS_ds_position) (pos - 2));
+	    (pos == 2 ? PVFS_READDIR_START : (PVFS_ds_position) (pos - 2));
 
         service_operation_with_timeout_retry(
             new_op, "pvfs2_readdir", retries);

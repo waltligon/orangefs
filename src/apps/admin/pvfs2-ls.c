@@ -519,7 +519,7 @@ int do_list(
     {
         memset(&rd_response,0,sizeof(PVFS_sysresp_readdir));
         if (PVFS_sys_readdir(pinode_refn,
-                             (!token ? PVFS2_READDIR_START : token),
+                             (!token ? PVFS_READDIR_START : token),
                              pvfs_dirent_incount, credentials, &rd_response))
         {
             fprintf(stderr,"readdir failed\n");

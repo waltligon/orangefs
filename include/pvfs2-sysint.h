@@ -16,12 +16,6 @@
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
 
-/* TODO: note that this should be a derived value eventually.  For
- * now it is hard coded to match the definition of
- * TROVE_ITERATE_START in trove.h
- */
-#define PVFS2_READDIR_START (INT_MAX-1)
-
 /* attributes */
 struct PVFS_sys_attr_s
 {

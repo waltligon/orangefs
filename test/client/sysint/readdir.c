@@ -78,7 +78,7 @@ int main(int argc,char **argv)
         do
         {
             memset(&resp_readdir,0,sizeof(PVFS_sysresp_readdir));
-            ret = PVFS_sys_readdir(pinode_refn, (!token ? PVFS2_READDIR_START :
+            ret = PVFS_sys_readdir(pinode_refn, (!token ? PVFS_READDIR_START :
                                                  token), pvfs_dirent_incount, 
                                    credentials, &resp_readdir);
             if (ret < 0)
