@@ -35,6 +35,11 @@ this: (type)((BMI_byte)buffer + offset)
 General (non critical)
 -----------------------
 
+consider changing the way the testXXX functions are implemented in
+both modules, so that they do not do work with timeout > 0 if the
+desired operation is already completed.  Right now both could
+potentially stall before grabbing a completed operation...
+
 do a better implementation of the testsome and testunexpected
 functions, so that they are more clever about multiplexing between
 multiple modules and splitting up the max_idle_time (right now
