@@ -145,8 +145,6 @@ CFLAGS += -D__STATIC_METHOD_BMI_TCP__
 #CFLAGS += -D__STATIC_FLOWPROTO_BMI_TROVE__
   # enable new style Flow BMI/Trove protocol
 CFLAGS += -D__STATIC_FLOWPROTO_MULTIQUEUE__
-  # enable Flow protocol that hooks to ncac cache
-#CFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
   # flags used by request encoding test harness
 CFLAGS += -DUSE_BMI_MSGS=1
   # turn on large file support by default
@@ -206,6 +204,9 @@ GCC_CFLAGS := -Wall -Wstrict-prototypes -pipe
 SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 -D__PVFS2_TROVE_THREADED__ @MISC_TROVE_FLAGS@ \
 -D__PVFS2_TROVE_SUPPORT__
+
+# server side flow protocol connecting BMI with NCAC cache
+SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
 SERVERLIBS = -lrt -lpthread -lpvfs2-server @LIBS@ 
 # the client libraries are not threaded (at the moment at least)
