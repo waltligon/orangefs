@@ -74,14 +74,8 @@ static inline void clean_up_interrupted_operation(
    PVFS2_WAIT_SIGNAL_RECVD
     - sleep interrupted (signal recv'd) the op observes no state
       change.
-
-   if the 'interruptible' flag is set, the operation will be
-   interrupted on any signal received by the calling process.  if it
-   is NOT set, we interrupt only on SIGINT, SIGQUIT, and SIGKILL.
-   FIXME: THIS IS NOT YET SUPPORTED.
 */
-int wait_for_matching_downcall(
-    pvfs2_kernel_op_t * op, int interruptible)
+int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
 {
     int ret = PVFS2_WAIT_ERROR;
     DECLARE_WAITQUEUE(wait_entry, current);

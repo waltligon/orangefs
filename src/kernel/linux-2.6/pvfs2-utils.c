@@ -973,6 +973,36 @@ void pvfs2_make_bad_inode(struct inode *inode)
     make_bad_inode(inode);
 }
 
+/* this code is based on linux/net/sunrpc/clnt.c:rpc_clnt_sigmask */
+void mask_blocked_signals(sigset_t *orig_sigset)
+{
+    unsigned long sigallow = sigmask(SIGKILL);
+    unsigned long irqflags = 0;
+    struct k_sigaction *action = current->sighand->action;
+
+    sigallow |= ((action[SIGINT-1].sa.sa_handler == SIG_DFL) ?
+                 sigmask(SIGINT) : 0);
+    sigallow |= ((action[SIGQUIT-1].sa.sa_handler == SIG_DFL) ?
+                 sigmask(SIGQUIT) : 0);
+
+    spin_lock_irqsave(&current->sighand->siglock, irqflags);
+    *orig_sigset = current->blocked;
+    siginitsetinv(&current->blocked, sigallow & ~orig_sigset->sig[0]);
+    recalc_sigpending();
+    spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+}
+
+/* this code is based on linux/net/sunrpc/clnt.c:rpc_clnt_sigunmask */
+void unmask_blocked_signals(sigset_t *orig_sigset)
+{
+    unsigned long irqflags = 0;
+
+    spin_lock_irqsave(&current->sighand->siglock, irqflags);
+    current->blocked = *orig_sigset;
+    recalc_sigpending();
+    spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4
