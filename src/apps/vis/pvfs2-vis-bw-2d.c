@@ -52,6 +52,7 @@ struct drawbar
 {
     SDL_Rect full;
     SDL_Rect bar;
+    SDL_Rect peak;
 };
 
 int main(int argc, char **argv)	
@@ -183,6 +184,7 @@ static int draw(void)
     SDL_Rect scratch;
     double** read_bw_matrix;
     double** write_bw_matrix;
+    double peak;
 
     ret = SDL_Init(SDL_INIT_VIDEO);
     if(ret < 0)
@@ -252,11 +254,15 @@ static int draw(void)
 	read_bws[i].full.w = channel_width;
 	read_bws[i].bar = read_bws[i].full;
 	read_bws[i].bar.h = 1;
+	read_bws[i].peak = read_bws[i].full;
+	read_bws[i].peak.h = 1;
 
 	write_bws[i].full = read_bws[i].full;
 	write_bws[i].bar = read_bws[i].bar;
+	write_bws[i].peak = read_bws[i].peak;
 	write_bws[i].full.x += channel_width+2;
 	write_bws[i].bar.x += channel_width+2;
+	write_bws[i].peak.x += channel_width+2;
     }
 
     while(1)
@@ -282,18 +288,32 @@ static int draw(void)
 	{
 	    for(j=0; j<pint_vis_shared.io_depth; j++)
 	    {
-		read_bw_matrix[i][j] = 
-		    ((double)pint_vis_shared.io_perf_matrix[i][j].read * 1000.0)/
-		    (double)(pint_vis_shared.io_end_time_ms_array[i] -
-		    pint_vis_shared.io_perf_matrix[i][j].start_time_ms);
+		if(j!=stat_depth)
+		{
+		    read_bw_matrix[i][j] = 
+			((double)pint_vis_shared.io_perf_matrix[i][j].read * 1000.0)/
+			(double)(pint_vis_shared.io_perf_matrix[i][j+1].start_time_ms -
+			pint_vis_shared.io_perf_matrix[i][j].start_time_ms);
+		    write_bw_matrix[i][j] = 
+			((double)pint_vis_shared.io_perf_matrix[i][j].write * 1000.0)/
+			(double)(pint_vis_shared.io_perf_matrix[i][j+1].start_time_ms -
+			pint_vis_shared.io_perf_matrix[i][j].start_time_ms);
+		}
+		else
+		{
+		    read_bw_matrix[i][j] = 
+			((double)pint_vis_shared.io_perf_matrix[i][j].read * 1000.0)/
+			(double)(pint_vis_shared.io_end_time_ms_array[i] -
+			pint_vis_shared.io_perf_matrix[i][j].start_time_ms);
+		    write_bw_matrix[i][j] = 
+			((double)pint_vis_shared.io_perf_matrix[i][j].write * 1000.0)/
+			(double)(pint_vis_shared.io_end_time_ms_array[i] -
+			pint_vis_shared.io_perf_matrix[i][j].start_time_ms);
+		}
 		read_bw_matrix[i][j] = read_bw_matrix[i][j] 
 		    / (double)(1024.0*1024.0);
 		if(read_bw_matrix[i][j] > max_bw)
 		    max_bw = read_bw_matrix[i][j] + .5;
-		write_bw_matrix[i][j] = 
-		    ((double)pint_vis_shared.io_perf_matrix[i][j].write * 1000.0)/
-		    (double)(pint_vis_shared.io_end_time_ms_array[i] -
-		    pint_vis_shared.io_perf_matrix[i][j].start_time_ms);
 		write_bw_matrix[i][j] = write_bw_matrix[i][j] 
 		    / (double)(1024.0*1024.0);
 		if(write_bw_matrix[i][j] > max_bw)
@@ -319,7 +339,7 @@ static int draw(void)
 	    SDL_FillRect(screen, &scratch, SDL_MapRGB(screen->format,
 		0x0, 0x0, 0x0));
 
-	    /* compute height of each bar, and draw it */
+	    /* read bw bar */
 	    bw = read_bw_matrix[i][stat_depth];
 	    read_bws[i].bar.h = read_bws[i].full.h * (bw/max_bw);
 	    if(read_bws[i].bar.h > read_bws[i].full.h)
@@ -328,6 +348,22 @@ static int draw(void)
 	    SDL_FillRect(screen, &read_bws[i].bar,
 		SDL_MapRGB(screen->format, 0xcc, 0x0, 0x0));
 
+	    /* find the peak */
+	    peak = 0;
+	    for(j=0; j<pint_vis_shared.io_depth; j++)
+	    {
+		if(read_bw_matrix[i][j] > peak)
+		    peak = read_bw_matrix[i][j];
+	    }
+	    read_bws[i].peak.h = read_bws[i].full.h * (peak/max_bw);
+	    if(read_bws[i].peak.h > read_bws[i].full.h)
+		read_bws[i].peak.h = read_bws[i].full.h;
+	    read_bws[i].peak.y = TOP_BORDER + read_bws[i].full.h - read_bws[i].peak.h;
+	    read_bws[i].peak.h = 3;
+	    SDL_FillRect(screen, &read_bws[i].peak,
+		SDL_MapRGB(screen->format, 0xee, 0x55, 0x55));
+
+	    /* write bw bar */
 	    bw = write_bw_matrix[i][stat_depth];
 	    write_bws[i].bar.h = write_bws[i].full.h * (bw/max_bw);
 	    if(write_bws[i].bar.h > write_bws[i].full.h)
@@ -335,6 +371,21 @@ static int draw(void)
 	    write_bws[i].bar.y = TOP_BORDER + write_bws[i].full.h - write_bws[i].bar.h;
 	    SDL_FillRect(screen, &write_bws[i].bar,
 		SDL_MapRGB(screen->format, 0x0, 0x0, 0xcc));
+
+	    /* find the peak */
+	    peak = 0;
+	    for(j=0; j<pint_vis_shared.io_depth; j++)
+	    {
+		if(write_bw_matrix[i][j] > peak)
+		    peak = write_bw_matrix[i][j];
+	    }
+	    write_bws[i].peak.h = write_bws[i].full.h * (peak/max_bw);
+	    if(write_bws[i].peak.h > write_bws[i].full.h)
+		write_bws[i].peak.h = write_bws[i].full.h;
+	    write_bws[i].peak.y = TOP_BORDER + write_bws[i].full.h - write_bws[i].peak.h;
+	    write_bws[i].peak.h = 3;
+	    SDL_FillRect(screen, &write_bws[i].peak,
+		SDL_MapRGB(screen->format, 0x55, 0x55, 0xee));
 
 	    S_UNLOCK();
 	}
