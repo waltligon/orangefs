@@ -251,6 +251,7 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	case PVFS_SERV_MKDIR:
 	case PVFS_SERV_GETCONFIG:
 	case PVFS_SERV_FLUSH:
+	case PVFS_SERV_MGMT_NOOP:
 	    js_p->error_code = 0;
 	    break;
 

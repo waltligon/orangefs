@@ -31,9 +31,11 @@ typedef struct PINT_client_sm_msgpair_state_s {
      * should be filled in prior to going into the msgpair code path.
      */
 
-    /* fs_id and handle used to map to server */
+    /* fs_id and handle to be operated on, if available */
+
     PVFS_fs_id fs_id;
     PVFS_handle handle;
+
     /* comp_fn called after successful reception and decode of respone,
      * if the msgpair state machine is used for processing.
      */

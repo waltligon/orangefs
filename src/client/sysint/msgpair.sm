@@ -12,6 +12,7 @@
  * The following elements of the PINT_client_sm_msgpair_state
  * must be valid prior to entering this state machine:
  * - req (unencoded request of some type)
+ * - srv_addr
  * - fs_id
  * - handle
  * - comp_fn
@@ -86,16 +87,16 @@ nested machine pvfs2_client_msgpair_sm(post,
  * - req (unencoded request)
  * - fs_id
  * - handle
+ * - srv_addr
  *
  * This state performs the following operations:
- * (1) map fs_id/handle to a server
- * (2) encodes request
- * (3) calculates maximum response size
- * (4) allocates BMI memory for response data (encoded)
- * (5) gets a session tag for the pair of messages
- * (6) posts the receive of the response
- * (7) posts the send of the request
- * (8) stores job ids for later matching
+ * (1) encodes request
+ * (2) calculates maximum response size
+ * (3) allocates BMI memory for response data (encoded)
+ * (4) gets a session tag for the pair of messages
+ * (5) posts the receive of the response
+ * (6) posts the send of the request
+ * (7) stores job ids for later matching
  *
  */
 static int msgpair_post(PINT_client_sm *sm_p,
@@ -118,18 +119,6 @@ static int msgpair_post(PINT_client_sm *sm_p,
     /* NOTE: THIS IS REPLICATED IN PINT_SERV_PREPARE_MSGPAIR();
      * WE SHOULD GET RID OF ONE OF THEM OR SOMETHING...
      */
-
-    /* determine server address from fs_id/handle pair.
-     * this is needed prior to encoding.
-     */
-    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
-				    msg_p->handle,
-				    msg_p->fs_id);
-    if (ret != 0) {
-	gossip_err("msgpair_post: failure mapping to server\n");
-	assert(ret < 0); /* return value range check */
-	assert(0); /* placeholder until we have real error handling */
-    }
 
     /* encode request. fills in encoded_req.
      */

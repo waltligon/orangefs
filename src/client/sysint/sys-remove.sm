@@ -234,6 +234,8 @@ static int remove_init(PINT_client_sm *sm_p,
 static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
+    int ret = -1;
+
     gossip_debug(CLIENT_DEBUG, "remove state: getattr_setup_msgpair\n");
 
     /* parameter range checks */
@@ -251,6 +253,15 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.fs_id   = sm_p->u.remove.object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.remove.object_ref.handle;
     sm_p->msgpair.comp_fn = remove_getattr_comp_fn;
+    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
+	sm_p->msgpair.handle,
+	sm_p->msgpair.fs_id);
+    if(ret != 0)
+    {
+	gossip_err("Error: failure mapping to server.\n");
+	assert(ret < 0); /* return value range check */
+	assert(0); /* TODO: real error handling */
+    }
 
     js_p->error_code = 0;
     return 1;
@@ -341,6 +352,8 @@ static int remove_getattr_comp_fn(void *v_p,
 static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
+    int ret = -1;
+
     /* NOTE:  we remove the dirent first because this gets the
      * object out of the system fastest.
      */
@@ -358,6 +371,15 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.fs_id   = sm_p->u.remove.parent_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.remove.parent_ref.handle;
     sm_p->msgpair.comp_fn = remove_rmdirent_comp_fn;
+    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
+	sm_p->msgpair.handle,
+	sm_p->msgpair.fs_id);
+    if(ret != 0)
+    {
+	gossip_err("Error: failure mapping to server.\n");
+	assert(ret < 0); /* return value range check */
+	assert(0); /* TODO: real error handling */
+    }
 
     return 1;
 }
@@ -460,6 +482,8 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
 					      job_status_s *js_p)
 {
+    int ret = -1;
+
     gossip_debug(CLIENT_DEBUG, "remove state: object_remove_setup_msgpair\n");
 
     /* fill in remove request */
@@ -472,6 +496,15 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.fs_id   = sm_p->u.remove.object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.remove.object_ref.handle;
     sm_p->msgpair.comp_fn = NULL;
+    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
+	sm_p->msgpair.handle,
+	sm_p->msgpair.fs_id);
+    if(ret != 0)
+    {
+	gossip_err("Error: failure mapping to server.\n");
+	assert(ret < 0); /* return value range check */
+	assert(0); /* TODO: real error handling */
+    }
 
     return 1;    
 }

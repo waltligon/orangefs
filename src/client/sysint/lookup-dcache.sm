@@ -18,6 +18,7 @@
  * - req (unencoded lookup request)
  * - fs_id
  * - handle
+ * - svr_addr
  * - comp_fn - called to pull attributes out of decoded response and store
  *   them in the appropriate place for the state machine jumping to this one
  *   (e.g. copies object handle out in the remove case)
