@@ -236,22 +236,20 @@ If your clients are writing out gigantic checkpoint files or reading in
 huge datasets, then use more servers.
 
 It is entirely possible to run PVFS2 servers on the same nodes doing
-computation. In most cases, however, you will see better performance if 
-you have some portion of your cluster dedicated to IO and another portion
-dedicated to computation.
+computation. In most cases, however, you will see better performance
+if you have some portion of your cluster dedicated to IO and another
+portion dedicated to computation.
 
 
 \subsection{Can PVFS2 servers listen on two network interfaces simultaneously (i.e. multihome)?}
 
-PVFS2 servers currently listen on one interface at a time.  Multihome
-support, where a PVFS2 server can accept connections from several
-network interfaces, would be helpful in many situations.  We plan to
-implement this feature in the future.
+Yes!  PVFS2 servers can listen on more than one interface at a time.
+Multihome support was added shortly before the PVFS2 1.0 release.
 
 \subsection{How can I automount PVFS2 volumes?}
 
-The Linux automounter needs some help dealing with PVFS2's resource strings.  A
-typical mount command (on Linux 2.6) would look like this:
+The Linux automounter needs some help dealing with PVFS2's resource
+strings.  A typical mount command (on Linux 2.6) would look like this:
 
 \begin{verbatim}
 	mount -t pvfs2 tcp://server0:3334/pvfs2-fs /mnt/pvfs2
@@ -395,6 +393,44 @@ see if your distribution has an updated glibc package.  RHEL3, for
 example, will exhibit this behavior with glibc-2.3.2-95.6, but not
 with the updated glibc-2.3.2-95.20 package.
 
+\subsection{I'm running Redhat and the pvfs2-server can't be killed! What's wrong?}
+
+On some Redhat systems, for compatibility reasons, the pvfs2-server
+program is actually a script that wraps the installed pvfs2-server
+binary.  We do this ONLY if we detect that PVFS2 is being installed on
+a system with an NPTL implementation that we're incompatible with.
+Specifically, the script exports the LD\_ASSUME\_KERNEL=2.2.5
+environment variable and value to avoid using the NPTL at run-time.
+The script quite literally exports this variable and then runs the
+installed pvfs2-server binary which is named
+\texttt{pvfs2-server.bin}.  So to properly shutdown or kill the
+pvfs2-server application once it's running, you need to issue a
+\texttt{killall pvfs2-server.bin} command instead of the more common
+\texttt{killall pvfs2-server} command.
+
+\subsection{Why do you single out Redhat users?  What's so different
+  about Redhat than other distributions?}
+
+Some Redhat versions (and probably some other less popular
+distributions) use a heavily modified Linux 2.4.x kernel.  Due to the
+changes made in the memory manager and signal handling, our default
+Linux 2.4.x kernel module will not even compile!  We have
+compatibility code that can mend the differences in place, but we have
+to be able to detect that you're running such a system.  Our configure
+script tries hard to determine which version you're running and
+matches it against a known list.  If you suspect you need this fix and
+our script does not properly detect it, please send mail to the
+mailing list and include the contents of your /etc/redhat-release
+file.
+
+In addition, some Redhat versions ship with an NPTL (threading
+library) implementation that PVFS2 is not compatible with.  We cannot
+explain why the errors we're seeing are occuring, as they appear to be
+in glibc and the threading library itself.  In short, we disable the
+use of the NPTL on these few Redhat systems.  It should be noted that
+we are fully compatible with other distributions that ship NPTL
+libraries (such as Gentoo and Debian/unstable).
+
 %
 % PERFORMANCE
 %
@@ -506,44 +542,6 @@ findings on the PVFS2 lists.
 If you're looking for a quick suggestion for a local file system type
 to use, we suggest ext3 with ``journal data writeback'' option as a
 reasonable choice.
-
-\subsection{I'm running Redhat and the pvfs2-server can't be killed! What's wrong?}
-
-On some Redhat systems, for compatibility reasons, the pvfs2-server
-program is actually a script that wraps the installed pvfs2-server
-binary.  We do this ONLY if we detect that PVFS2 is being installed on
-a system with an NPTL implementation that we're incompatible with.
-Specifically, the script exports the LD_ASSUME_KERNEL=2.2.5
-environment variable and value to avoid using the NPTL at run-time.
-The script quite literally exports this variable and then runs the
-installed pvfs2-server binary which is named
-\texttt{pvfs2-server.bin}.  So to properly shutdown or kill the
-pvfs2-server application once it's running, you need to issue a
-\texttt{killall pvfs2-server.bin} command instead of the more common
-\texttt{killall pvfs2-server} command.
-
-\subsection{Why do you single out Redhat users?  What's so different
-  about Redhat than other distributions?}
-
-Some Redhat versions (and probably some other less popular
-distributions) use a heavily modified Linux 2.4.x kernel.  Due to the
-changes made in the memory manager and signal handling, our default
-Linux 2.4.x kernel module will not even compile!  We have
-compatibility code that can mend the differences in place, but we have
-to be able to detect that you're running such a system.  Our configure
-script tries hard to determine which version you're running and
-matches it against a known list.  If you suspect you need this fix and
-our script does not properly detect it, please send mail to the
-mailing list and include the contents of your /etc/redhat-release
-file.
-
-In addition, some Redhat versions ship with an NPTL (threading
-library) implementation that PVFS2 is not compatible with.  We cannot
-explain why the errors we're seeing are occuring, as they appear to be
-in glibc and the threading library itself.  In short, we disable the
-use of the NPTL on these few Redhat systems.  It should be noted that
-we are fully compatible with other distributions that ship NPTL
-libraries (such as Gentoo and Debian/unstable).
 
 %
 % REDUNDANCY
