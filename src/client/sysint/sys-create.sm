@@ -500,8 +500,8 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->comp_fn = create_crdirent_comp_fn;
 
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
-                                    msg_p->handle,
-                                    msg_p->fs_id);
+                                    sm_p->parent_ref.handle,
+                                    sm_p->parent_ref.fs_id);
     if (ret < 0)
     {
         gossip_err("Failed to get meta server information\n");
@@ -578,7 +578,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 	assert(0); /* TODO: real error handling */
     }
     
-    /* for each datafile, post a send/recv pair for the create */
+    /* for each datafile, prepare to post a create send/recv pair */
     for(i = 0; i < sm_p->u.create.num_data_files; i++)
     {
         PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
@@ -597,18 +597,8 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
         msg_p->handle =
             sm_p->u.create.io_handle_extent_array[i].extent_array[0].first;
         msg_p->comp_fn = create_datafiles_comp_fn;
+        msg_p->svr_addr = sm_p->u.create.data_server_addrs[i];
     }
-
-    /* fill in the address of each server to contact */
-    ret = PINT_serv_msgpairarray_resolve_addrs(
-        sm_p->msgarray_count, sm_p->msgarray);
-    if (ret < 0)
-    {
-        gossip_err("Error: failed to resolve server addresses.\n");
-        js_p->error_code = ret;
-        return 1;
-    }
-
     return 1;
 }
 

@@ -287,7 +287,9 @@ static int lookup_check_completion(PINT_client_sm *sm_p,
 
     /*
       if there are no more segments, we've finished properly
-      at this point; if not, we've encountered an error
+      at this point; if not, we hit one of two cases:
+      1) error, bad lookup,
+      2) need to query another meta server
     */
     if (sm_p->u.lookup.num_segments == 0)
     {

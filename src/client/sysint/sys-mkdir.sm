@@ -282,11 +282,6 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     /* clear error field in job */
     js_p->error_code = 0;
 
-    /*
-      Determine the initial metaserver and the appropriate
-      handle range for a new dir.  This extent array of
-      handles should NOT be freed.
-    */
     ret = PINT_bucket_get_next_meta(
         sm_p->server_config, sm_p->parent_ref.fs_id,
         &sm_p->u.mkdir.meta_server_addr,
@@ -338,16 +333,6 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     /* clear error field in job */
     js_p->error_code = 0;
 
-    /* get meta server to create dir entry on */
-    ret = PINT_bucket_map_to_server(&sm_p->u.mkdir.meta_server_addr,
-                                    sm_p->parent_ref.handle,
-                                    sm_p->parent_ref.fs_id);
-    if (ret < 0)
-    {
-        gossip_err("Failed to get meta server information\n");
-        assert(0);
-    }
-
     gossip_debug(CLIENT_DEBUG," mkdir: posting crdirent req\n");
 
     msg_p = &sm_p->msgpair;
@@ -365,9 +350,14 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->handle = sm_p->u.mkdir.metafile_handle;
     msg_p->comp_fn = mkdir_crdirent_comp_fn;
 
-    /* we've already resolved the appropriate meta server */
-    msg_p->svr_addr = sm_p->u.mkdir.meta_server_addr;
-
+    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+                                    sm_p->parent_ref.handle,
+                                    sm_p->parent_ref.fs_id);
+    if (ret < 0)
+    {
+        gossip_err("Failed to get meta server information\n");
+        assert(0);
+    }
     return 1;
 }
 
