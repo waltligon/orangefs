@@ -458,6 +458,17 @@ ifdef BUILD_VIS
 all: vis
 endif
 
+# build linux-2.6 kernel module if requested
+LINUX_KERNEL_SRC = @LINUX_KERNEL_SRC@
+ifneq (,$(LINUX_KERNEL_SRC))
+all: kernel
+endif
+
+# Can't use the actual file target since we don't know how to figure out
+# dependencies---only the kernel source tree can do that.
+.PHONY: kernel
+kernel:
+	@$(MAKE) --no-print-directory -C src/kernel/linux-2.6
 
 # target for building MPI-IO test programs 
 mpiiotests: $(MPIIOTESTS)
@@ -726,7 +737,7 @@ docsclean:
 	rm -f $(DOCSPS) $(DOCSPDF) $(DOCSCRUFT)
 
 # top rule for cleaning up tree
-clean: 
+clean:: 
 ifdef QUIET_COMPILE
 	@echo "  CLEAN"
 	@rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
@@ -748,6 +759,11 @@ else
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
 		src/server/pvfs2-server-server.o $(MPIIOTESTS) \
 		src/apps/karma/karma
+endif
+
+ifneq (,$(LINUX_KERNEL_SRC))
+clean::
+	@$(MAKE) --no-print-directory -C src/kernel/linux-2.6 clean
 endif
 
 # builds a tarball of the source tree suitable for distribution

@@ -308,7 +308,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA PACKAGE VERSION ACLOCAL AUTOCONF AUTOMAKE AUTOHEADER MAKEINFO SET_MAKE PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os MISC_TROVE_FLAGS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP SRC_TOP_LEVEL BUILD_TOP_LEVEL LINUX_KERNEL_SRC ENABLE_COVERAGE QUIET_COMPILE HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_shared build_static HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX INTELC GNUC GM_HOME BUILD_GM IB_HOME BUILD_IB MPICC BUILD_MPI MPI_INTELC MPI_GNUC BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA PACKAGE VERSION ACLOCAL AUTOCONF AUTOMAKE AUTOHEADER MAKEINFO SET_MAKE PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os MISC_TROVE_FLAGS CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP LINUX_KERNEL_SRC BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_shared build_static HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX INTELC GNUC GM_HOME BUILD_GM IB_HOME BUILD_IB MPICC BUILD_MPI MPI_INTELC MPI_GNUC BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -3679,13 +3679,45 @@ fi;
 # Check whether --with-kernel or --without-kernel was given.
 if test "${with_kernel+set}" = set; then
   withval="$with_kernel"
-  LINUX_KERNEL_SRC="$withval"
+  if test x$withval = xyes -o x$withval = x ; then
+    	{ { echo "$as_me:$LINENO: error: --with-kernel must be given the path to your kernel source." >&5
+echo "$as_me: error: --with-kernel must be given the path to your kernel source." >&2;}
+   { (exit 1); exit 1; }; }
+    fi
+    if ! test -d $withval ; then
+    	{ { echo "$as_me:$LINENO: error: The --with-kernel path $withval is not a directory." >&5
+echo "$as_me: error: The --with-kernel path $withval is not a directory." >&2;}
+   { (exit 1); exit 1; }; }
+    fi
+    if ! test -r $withval/include/linux/version.h ; then
+	{ { echo "$as_me:$LINENO: error: The kernel source tree must have been configured." >&5
+echo "$as_me: error: The kernel source tree must have been configured." >&2;}
+   { (exit 1); exit 1; }; }
+    fi
+    vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/version.h`
+    if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
+	{ { echo "$as_me:$LINENO: error: The kernel source tree does not appear to be 2.6" >&5
+echo "$as_me: error: The kernel source tree does not appear to be 2.6" >&2;}
+   { (exit 1); exit 1; }; }
+    fi
+    # At least up through 2.6.3 need to write .__modpost.cmd; this might get
+    # fixed in the future.
+    if ! test -w $withval ; then
+	{ { echo "$as_me:$LINENO: error: You must have write permissions to the kernel source tree." >&5
+echo "$as_me: error: You must have write permissions to the kernel source tree." >&2;}
+   { (exit 1); exit 1; }; }
+    fi
+    LINUX_KERNEL_SRC="$withval"
+
 else
   LINUX_KERNEL_SRC=""
 fi;
 
-BUILD_TOP_LEVEL=`pwd`
-SRC_TOP_LEVEL=$srcdir
+BUILD_ABSOLUTE_TOP=`pwd`
+SRC_RELATIVE_TOP=$srcdir
+SRC_ABSOLUTE_TOP=`cd $srcdir ; pwd`
+
+
 
 
 
@@ -7892,9 +7924,10 @@ s,@EXEEXT@,$EXEEXT,;t t
 s,@OBJEXT@,$OBJEXT,;t t
 s,@CPP@,$CPP,;t t
 s,@EGREP@,$EGREP,;t t
-s,@SRC_TOP_LEVEL@,$SRC_TOP_LEVEL,;t t
-s,@BUILD_TOP_LEVEL@,$BUILD_TOP_LEVEL,;t t
 s,@LINUX_KERNEL_SRC@,$LINUX_KERNEL_SRC,;t t
+s,@BUILD_ABSOLUTE_TOP@,$BUILD_ABSOLUTE_TOP,;t t
+s,@SRC_RELATIVE_TOP@,$SRC_RELATIVE_TOP,;t t
+s,@SRC_ABSOLUTE_TOP@,$SRC_ABSOLUTE_TOP,;t t
 s,@ENABLE_COVERAGE@,$ENABLE_COVERAGE,;t t
 s,@QUIET_COMPILE@,$QUIET_COMPILE,;t t
 s,@HAVE_PKGCONFIG@,$HAVE_PKGCONFIG,;t t

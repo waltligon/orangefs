@@ -125,15 +125,42 @@ AC_ARG_WITH(mpe,
 dnl
 dnl Enables the kernel module to build if the appropriate
 dnl linux-2.6.x path is specified
+dnl Make sure this is a usable kernel source tree too.
 dnl
 AC_ARG_WITH(kernel,
-[  --with-kernel=src_path  Build pvfs2 kernel module against specified src (2.6.x only).], LINUX_KERNEL_SRC="$withval",LINUX_KERNEL_SRC="")
+[  --with-kernel=src_path  Build pvfs2 kernel module against specified src (2.6.x only).],
+    if test x$withval = xyes -o x$withval = x ; then
+    	AC_MSG_ERROR(--with-kernel must be given the path to your kernel source.)
+    fi
+    if ! test -d $withval ; then
+    	AC_MSG_ERROR(The --with-kernel path $withval is not a directory.)
+    fi
+    if ! test -r $withval/include/linux/version.h ; then
+	AC_MSG_ERROR(The kernel source tree must have been configured.)
+    fi
+    vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
+    if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
+	AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
+    fi
+    # At least up through 2.6.3 need to write .__modpost.cmd; this might get
+    # fixed in the future.
+    if ! test -w $withval ; then
+	AC_MSG_ERROR(You must have write permissions to the kernel source tree.)
+    fi
+    LINUX_KERNEL_SRC="$withval"
+    , LINUX_KERNEL_SRC="")
 
-BUILD_TOP_LEVEL=`pwd`
-SRC_TOP_LEVEL=$srcdir
-AC_SUBST(SRC_TOP_LEVEL)
-AC_SUBST(BUILD_TOP_LEVEL)
+dnl PAV configuration needs absolute location of source and build.
+dnl Linux-2.6 module needs absolute location of source, and uses the
+dnl relative location for soft links for out-of-tree builds.
+BUILD_ABSOLUTE_TOP=`pwd`
+SRC_RELATIVE_TOP=$srcdir
+SRC_ABSOLUTE_TOP=`cd $srcdir ; pwd`
+
 AC_SUBST(LINUX_KERNEL_SRC)
+AC_SUBST(BUILD_ABSOLUTE_TOP)
+AC_SUBST(SRC_RELATIVE_TOP)
+AC_SUBST(SRC_ABSOLUTE_TOP)
 
 dnl More options
 AC_ARG_ENABLE(fast,

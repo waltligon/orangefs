@@ -12,6 +12,10 @@ pvfs2-0.1.2pre1
     - simplify state machine
 - add shared and static libraries build options
 - honor PVFS2_DEBUGFILE environment variable in client
+- Kernel module builds:
+    - build the module with everything else, if configured
+    - clean up properly
+    - work out-of-tree
 
 
 pvfs2-0.1.1
