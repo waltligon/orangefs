@@ -150,10 +150,6 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	resp->attr = ack_p->u.getattr.attr;
 	if (resp->attr.objtype == ATTR_META)
 	{
-#if 0
-	    /* REMOVED BY PHIL, the datafile information returned
-	     * in getattr isn't right yet
-	     */
 	    if(resp->attr.u.meta.nr_datafiles > 0)
 	    {
 		assert(ack_p->u.getattr.attr.u.meta.dfh != NULL);
@@ -169,7 +165,6 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 			ack_p->u.getattr.attr.u.meta.dfh, 
 			resp->attr.u.meta.nr_datafiles * sizeof(PVFS_handle));
 	    }
-#endif
 	}
 	
 	/* TODO: copy extended attributes just like normal attr */
