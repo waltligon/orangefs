@@ -61,7 +61,10 @@ BUILD_GM = @BUILD_GM@
 BUILD_IB = @BUILD_IB@
 BUILD_MPI = @BUILD_MPI@
 MPICC = @MPICC@
-QUIET_COMPILE = @QUIET_COMPILE@
+# override default quiet mode with "make V=1"
+ifndef V
+  QUIET_COMPILE = @QUIET_COMPILE@
+endif
 
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
