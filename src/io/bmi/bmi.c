@@ -436,12 +436,12 @@ int BMI_post_sendunexpected(bmi_op_id_t* id, bmi_addr_t dest, void* buffer,
  * returns 0 on success, -errno on failure
  */
 int BMI_test(bmi_op_id_t id, int* outcount, bmi_error_code_t* error_code, 
-	bmi_size_t* actual_size, void** user_ptr, int timeout_ms)
+	bmi_size_t* actual_size, void** user_ptr, int max_idle_time_ms)
 {
 	struct method_op* target_op = NULL;
 	int ret = -1;
 
-	if(timeout_ms < 0)
+	if(max_idle_time_ms < 0)
 		return(-EINVAL);
 
 	gen_mutex_lock(&interface_mutex);
@@ -456,7 +456,7 @@ int BMI_test(bmi_op_id_t id, int* outcount, bmi_error_code_t* error_code,
 	}
 
 	ret = active_method_table[target_op->addr->method_type]->BMI_meth_test(id,
-		outcount, error_code, actual_size, user_ptr, timeout_ms);
+		outcount, error_code, actual_size, user_ptr, max_idle_time_ms);
 	gen_mutex_unlock(&interface_mutex);
 	return(ret);
 }
@@ -472,11 +472,11 @@ int BMI_test(bmi_op_id_t id, int* outcount, bmi_error_code_t* error_code,
 int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 	index_array, bmi_error_code_t* error_code_array, 
 	bmi_size_t* actual_size_array,
-	void** user_ptr_array, int timeout_ms)
+	void** user_ptr_array, int max_idle_time_ms)
 {
 	int ret = -1;
 
-	if(timeout_ms < 0)
+	if(max_idle_time_ms < 0)
 		return(-EINVAL);
 
 	gen_mutex_lock(&interface_mutex);
@@ -485,7 +485,7 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 
 	ret = active_method_table[0]->BMI_meth_testsome(incount,
 		id_array, outcount, index_array, error_code_array, 
-		actual_size_array, user_ptr_array, timeout_ms);
+		actual_size_array, user_ptr_array, max_idle_time_ms);
 	if(ret < 0)
 	{
 		gen_mutex_unlock(&interface_mutex);
@@ -500,7 +500,7 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 	index_array, bmi_error_code_t* error_code_array, 
 	bmi_size_t* actual_size_array,
-	void** user_ptr_array, int timeout_ms)
+	void** user_ptr_array, int max_idle_time_ms)
 {
 	/* this is not going to be pretty :( */
 
@@ -518,9 +518,9 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 	int final_index = 0;
 	struct method_op* target_op = NULL;
 	int ret = -1;
-	int timeout_per_method = 0;
+	int idle_per_method = 0;
 
-	if(timeout_ms < 0)
+	if(max_idle_time_ms < 0)
 		return(-EINVAL);
 
 	gen_mutex_lock(&interface_mutex);
@@ -530,11 +530,11 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 	memset(sub_incount, 0, active_method_count*sizeof(int));
 
 	/* TODO: do something more clever here */
-	if(timeout_ms)
+	if(max_idle_time_ms)
 	{
-		timeout_per_method = timeout_ms / active_method_count;
-		if(!timeout_per_method)
-			timeout_per_method = 1;
+		idle_per_method = max_idle_time_ms / active_method_count;
+		if(!idle_per_method)
+			idle_per_method = 1;
 	}
 
 	/* look at each op */
@@ -564,7 +564,7 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 			ret = active_method_table[i]->BMI_meth_testsome(sub_incount[i],
 				sub_id_array[i], &sub_outcount, sub_index_array[i], 
 				sub_error_code_array[i], sub_actual_size_array[i], 
-				sub_user_ptr_array[i], timeout_per_method);
+				sub_user_ptr_array[i], idle_per_method);
 			if(ret < 0)
 			{
 				/* can't recover from this */
@@ -605,7 +605,7 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
  * returns 0 on success, -errno on failure
  */
 int BMI_testunexpected(int incount, int* outcount, struct
-	unexpected_info* info_array, int timeout_ms)
+	unexpected_info* info_array, int max_idle_time_ms)
 {
 	int i = 0;
 	int ret = -1;
@@ -613,9 +613,9 @@ int BMI_testunexpected(int incount, int* outcount, struct
 	int tmp_outcount = 0;
 	struct method_unexpected_info sub_info[incount];
 	ref_st_p tmp_ref = NULL;
-	int timeout_per_method = 0;
+	int idle_per_method = 0;
 
-	if(timeout_ms < 0)
+	if(max_idle_time_ms < 0)
 		return(-EINVAL);
 
 	gen_mutex_lock(&interface_mutex);
@@ -623,11 +623,11 @@ int BMI_testunexpected(int incount, int* outcount, struct
 	*outcount = 0;
 
 	/* TODO: do something more clever here */
-	if(timeout_ms)
+	if(max_idle_time_ms)
 	{
-		timeout_per_method = timeout_ms / active_method_count;
-		if(!timeout_per_method)
-			timeout_per_method = 1;
+		idle_per_method = max_idle_time_ms / active_method_count;
+		if(!idle_per_method)
+			idle_per_method = 1;
 	}
 
 	while(position < incount && i<active_method_count)
@@ -635,7 +635,7 @@ int BMI_testunexpected(int incount, int* outcount, struct
 		ret = 
 			active_method_table[i]->BMI_meth_testunexpected((incount-position),
 			&tmp_outcount, (&(sub_info[position])),
-			timeout_per_method);
+			idle_per_method);
 		if(ret < 0)
 		{
 			/* can't recover from this */
