@@ -260,7 +260,7 @@ int main(
     /* fill in flow details */
     flow_d->src.endpoint_id = BMI_ENDPOINT;
     flow_d->src.u.bmi.address = request_info.addr;
-    flow_d->dest.endpoint_id = CACHE_ENDPOINT;
+    flow_d->dest.endpoint_id = TROVE_ENDPOINT;
     flow_d->dest.u.trove.handle = file_handle;
     flow_d->dest.u.trove.coll_id = coll_id;
 

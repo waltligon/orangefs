@@ -68,7 +68,7 @@ int main(
     }
 
     /* initialize the flow interface */
-    ret = PINT_flow_initialize("flowproto_bmi_cache", 0);
+    ret = PINT_flow_initialize("flowproto_multiqueue", 0);
     if (ret < 0)
     {
 	fprintf(stderr, "flow init failure.\n");
