@@ -121,7 +121,7 @@ int main(int argc, char **argv)
 	perror("malloc");
 	return(-1);
     }
-    for(i=0; i<HISTORY; i++)
+    for(i=0; i<io_server_count; i++)
     {
 	perf_matrix[i] = (struct PVFS_mgmt_perf_stat*)malloc(
 	    HISTORY*sizeof(struct PVFS_mgmt_perf_stat));
