@@ -1,7 +1,7 @@
 #!/bin/bash
 
-killall -9 pvfs2-client pvfs2-client-core
 umount /tmp/mnt
+killall -TERM pvfs2-client
 
 rmmod pvfs2
 
