@@ -130,9 +130,20 @@ dnl if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
 dnl else AC_MSG_RESULT(yes)
 dnl fi
 
-dnl check for tagged redhat release, as we have to use different
-dnl kernel code for their 2.4.x kernels to work
-dnl
+dnl some redhat 2.4 kernels have a lot of 2.6 features, so we need to take
+dnl special measures to accomodate those hacked kernels.  However, we do not
+dnl need to take these workarounds if someone is building a stock kernel.org
+dnl kernel.  
+
+set_redhat24=0
+use_redhat24=0
+
+AC_ARG_ENABLE([redhat24],
+[  --enable-redhat24 Enable workaround for building against redhat 2.4 kernel], 
+    if test "$enableval" = no ; then use_redhat24=0; fi
+    set_redhat24=1
+)
+
 dnl We check for the following redhat tags, as they all have similarly
 dnl modified 2.4.x kernels
 dnl
@@ -142,6 +153,7 @@ RHTAG3="Red Hat Enterprise Linux AS release 3"
 RHTAG4="Red Hat Enterprise Linux ES release 3"
 RHTAG5="Red Hat Linux Advanced Server release 2.1AS"
 RHTAG6="Fedora Core release 1 (Yarrow)"
+
 
 REDHAT_RELEASE=""
 if test -f /etc/redhat-release; then
@@ -153,8 +165,20 @@ if test -f /etc/redhat-release; then
        test "x`echo $REDHAT_REL | cut -b 1-37`" = "x$RHTAG4" ||
        test "x`echo $REDHAT_REL | cut -b 1-43`" = "x$RHTAG5" ||
        test "x`echo $REDHAT_REL | cut -b 1-30`" = "x$RHTAG6" ; then
-       REDHAT_RELEASE="-DREDHAT_RELEASE_9"
        AC_MSG_RESULT(yes)
+       if test "$set_redhat24" = 0 ; then
+           AC_MSG_ERROR([
+    you appear to be configuring pvfs2 on a redhat distribution which
+    ships with a heavily modified 2.4 kernel.  We need more
+    information before we can proceed.  If you are configuring the
+    pvfs2 module for a redhat kernel, re-run configure with the
+    --enable-redhat24 option.  If you are configuring the pvfs2 module
+    for a kernel.org (unmondified) kernel, then re-run
+    configure with the --disable-redhat24 option.])
+       fi
+       if test "$use_redhat24_workaround" = 1 ; then
+           REDHAT_RELEASE="-DREDHAT_RELEASE_9"
+       fi
     else
        AC_MSG_RESULT(no)
     fi
@@ -779,6 +803,13 @@ if test "x$THREAD_LIB" = "x" ; then
 else
    AC_MSG_RESULT([PVFS2 configured for a thread-safe client library : yes])
 fi
+
+if test "x$REDHAT_RELEASE" = "x"; then
+   AC_MSG_RESULT([PVFS2 will use workaround for redhat 2.4 kernels  : no])
+else
+   AC_MSG_RESULT([PVFS2 will use workaround for redhat 2.4 kernels  : yes])
+fi
+
 
 AC_MSG_RESULT()
 AC_MSG_RESULT([PVFS2 version string: $PVFS2_VERSION])
