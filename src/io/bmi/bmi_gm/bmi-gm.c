@@ -1122,8 +1122,12 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	*id = query_op->op_id;
 	query_op->context_id = context_id;
 
-	/* TODO: handle this more gracefully later... */
-	assert(query_op->actual_size <= expected_size);
+	if(query_op->actual_size > expected_size)
+	{
+	    gossip_lerr("Error: message ordering violation;\n");
+	    gossip_lerr("Error: message too large for next buffer.\n");
+	    return(-EPROTO);
+	}
 
 	/* we found the operation in progress. */
 	if (query_op->mode == GM_MODE_REND)
@@ -3051,8 +3055,14 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
     {
 	op_list_remove(active_method_op);
 
-	/* TODO: clean up from this gracefully */
-	assert(active_method_op->expected_size >= ctrl_actual_size);
+	if(ctrl_actual_size > active_method_op->expected_size)
+	{
+	    gossip_lerr("Error: message ordering violation;\n");
+	    gossip_lerr("Error: message too large for next buffer.\n");
+	    /* TODO: handle this better */
+	    return(-EPROTO);
+	}
+
 	/* store remote side's op_id */
 	gm_op_data = active_method_op->method_data;
 	gm_op_data->peer_op_id = ctrl_op_id;
