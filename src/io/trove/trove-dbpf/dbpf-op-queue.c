@@ -31,10 +31,10 @@ extern pthread_cond_t dbpf_op_incoming_cond;
  *
  * Note: this leaves open the possibility that someone might somehow
  * get a pointer to this operation and try to look at the state while
- * it is transitioning from OP_IN_SERVICE to OP_DEQUEUED.  However,
- * in order to do that they would need to get that pointer before we
- * lock the queue and use it afterwards, which is erroneous.  So we're
- * not going to try to protect against that.
+ * it is transitioning from OP_IN_SERVICE to OP_DEQUEUED.  However, in
+ * order to do that they would need to get that pointer before we lock
+ * the queue and use it afterwards, which is erroneous.  So we're not
+ * going to try to protect against that.
  */
 void dbpf_queued_op_put_and_dequeue(dbpf_queued_op_t *q_op_p)
 {
@@ -108,50 +108,55 @@ dbpf_queued_op_t *dbpf_op_queue_shownext(dbpf_op_queue_p op_queue)
 
 /* dbpf_queued_op_try_get()
  *
- * Given an op_id, we look up the queued op structure.  We then determine
- * if the op is already in service (being worked on by another thread).
- * If it isn't, we mark it as in service and return it.
+ * Given an op_id, we look up the queued op structure.  We then
+ * determine if the op is already in service (being worked on by
+ * another thread).  If it isn't, we mark it as in service and return
+ * it.
  *
- * We're letting the caller have direct access to the queued op structure for
- * performance reasons.  They shouldn't be mucking with the state or the
- * next/prev pointers.  Perhaps some structure reorganization is in order to
- * make that more clear?
+ * We're letting the caller have direct access to the queued op
+ * structure for performance reasons.  They shouldn't be mucking with
+ * the state or the next/prev pointers.  Perhaps some structure
+ * reorganization is in order to make that more clear?
  *
- * Returns one of DBPF_QUEUED_OP_INVALID, DBPF_QUEUED_OP_BUSY, or DBPF_QUEUED_OP_SUCCESS.
+ * Returns one of DBPF_QUEUED_OP_INVALID, DBPF_QUEUED_OP_BUSY, or
+ * DBPF_QUEUED_OP_SUCCESS.
  */
 int dbpf_queued_op_try_get(
     TROVE_op_id id,
     dbpf_queued_op_t **q_op_pp)
 {
-    int state;
+    int state = 0;
     dbpf_queued_op_t *q_op_p = NULL;
 
     q_op_p = id_gen_fast_lookup(id);
-
     if (!q_op_p)
     {
         return DBPF_QUEUED_OP_INVALID;
     }
 
-    /* NOTE: all we really need is atomic read/write to the state variable. */
     gen_mutex_lock(&q_op_p->mutex);
     state = q_op_p->op.state;
-    if (state == OP_QUEUED) q_op_p->op.state = OP_IN_SERVICE;
+    if (state == OP_QUEUED)
+    {
+        q_op_p->op.state = OP_IN_SERVICE;
+    }
     gen_mutex_unlock(&q_op_p->mutex);
 
-    assert(state == OP_QUEUED || state == OP_COMPLETED);
+    assert((state == OP_QUEUED) || (state == OP_COMPLETED));
 
-    if (state == OP_QUEUED) {
+    if (state == OP_QUEUED)
+    {
 	*q_op_pp = q_op_p;
 	return DBPF_QUEUED_OP_SUCCESS;
     }
-    else return DBPF_QUEUED_OP_BUSY;
+    return DBPF_QUEUED_OP_BUSY;
 }
 
 /* dbpf_queued_op_put()
  *
- * Given a q_op_p, we lock the queued op.  If "completed" is nonzero, we mark the
- * state of the operation as completed.  Otherwise we mark it as queued.
+ * Given a q_op_p, we lock the queued op.  If "completed" is nonzero,
+ * we mark the state of the operation as completed.  Otherwise we mark
+ * it as queued.
  */
 void dbpf_queued_op_put(dbpf_queued_op_t *q_op_p, int completed)
 {
@@ -187,8 +192,8 @@ TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
 
 /* dbpf_queued_op_queue_nolock()
  *
- * same as dbpf_queued_op_queue(), but assumes dbpf_op_queue_mutex already
- * held
+ * same as dbpf_queued_op_queue(), but assumes dbpf_op_queue_mutex
+ * already held
  */
 TROVE_op_id dbpf_queued_op_queue_nolock(dbpf_queued_op_t *q_op_p)
 {
@@ -211,7 +216,6 @@ TROVE_op_id dbpf_queued_op_queue_nolock(dbpf_queued_op_t *q_op_p)
 
     return tmp_id;
 }
-
 
 /* dbpf_queued_op_dequeue()
  *

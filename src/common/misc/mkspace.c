@@ -183,7 +183,7 @@ int pvfs2_mkspace(
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(collection, &coll_id, NULL, &op_id);
-    if (ret != -1)
+    if (ret == 1)
     {
 	mkspace_print(verbose, "warning: collection lookup succeeded "
                       "before it should; aborting!\n");
@@ -646,21 +646,22 @@ int pvfs2_rmspace(
                   collection);
 
     ret = trove_collection_remove(collection, NULL, &op_id);
-
     mkspace_print(
         verbose, "PVFS2 Collection %s removed %s\n", collection,
-        ((ret != -1) ? "successfully" : "with errors"));
+        (((ret == 1) || (ret == -TROVE_ENOENT)) ? "successfully" :
+         "with errors"));
 
     if (!remove_collection_only)
     {
         ret = trove_storage_remove(storage_space, NULL, &op_id);
-        mkspace_print(verbose, "PVFS2 Storage Space %s removed %s\n",
-                      storage_space, ((ret != -1) ? "successfully" :
-                                      "with errors"));
+        mkspace_print(
+            verbose, "PVFS2 Storage Space %s removed %s\n",
+            storage_space, (((ret == 1) || (ret == -TROVE_ENOENT)) ?
+                            "successfully" : "with errors"));
 
         /*
-          we should be doing a trove finalize here, but for now
-          we can't because it will fail horribly during the sync/close
+          we should be doing a trove finalize here, but for now we
+          can't because it will fail horribly during the sync/close
           calls to files that we've just removed.
      
           an extra flag to finalize, or a static var in the dbpf-mgmt

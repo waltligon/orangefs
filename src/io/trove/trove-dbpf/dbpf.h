@@ -68,7 +68,7 @@ extern "C" {
  PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
  PVFS_EVENT_FLAG_END)
 
-#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)	         \
+#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)                 \
 do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
 
 #define STO_ATTRIB_DBNAME "storage_attributes.db"
@@ -353,30 +353,31 @@ struct dbpf_op
     TROVE_context_id context_id;
     union
     {
-	/* all the op types go in here; structs are all
-	 * defined just below the prototypes for the functions.
-	 */
-	struct dbpf_dspace_create_op          d_create;
-	/* struct dbpf_dspace_remove_op d_remove; -- EMPTY */
-	struct dbpf_dspace_iterate_handles_op d_iterate_handles;
-	struct dbpf_dspace_verify_op          d_verify;
-	struct dbpf_dspace_getattr_op         d_getattr;
-	struct dbpf_dspace_setattr_op         d_setattr;
-	struct dbpf_bstream_rw_at_op          b_read_at;
-	struct dbpf_bstream_rw_at_op          b_write_at;
-	struct dbpf_bstream_rw_list_op        b_rw_list;
-	struct dbpf_bstream_resize_op         b_resize;
-	struct dbpf_keyval_read_op            k_read;
-	struct dbpf_keyval_write_op           k_write;
-	struct dbpf_keyval_remove_op          k_remove;
-	struct dbpf_keyval_iterate_op         k_iterate;
-	struct dbpf_keyval_read_list_op       k_read_list;
+        /* all the op types go in here; structs are all
+         * defined just below the prototypes for the functions.
+         */
+        struct dbpf_dspace_create_op d_create;
+        struct dbpf_dspace_iterate_handles_op d_iterate_handles;
+        struct dbpf_dspace_verify_op d_verify;
+        struct dbpf_dspace_getattr_op d_getattr;
+        struct dbpf_dspace_setattr_op d_setattr;
+        struct dbpf_bstream_rw_at_op b_read_at;
+        struct dbpf_bstream_rw_at_op b_write_at;
+        struct dbpf_bstream_rw_list_op b_rw_list;
+        struct dbpf_bstream_resize_op b_resize;
+        struct dbpf_keyval_read_op k_read;
+        struct dbpf_keyval_write_op k_write;
+        struct dbpf_keyval_remove_op k_remove;
+        struct dbpf_keyval_iterate_op k_iterate;
+        struct dbpf_keyval_read_list_op k_read_list;
     } u;
 };
 
 /* collection registration functions implemented in dbpf-collection.c */
-void dbpf_collection_register(struct dbpf_collection *coll_p);
-struct dbpf_collection *dbpf_collection_find_registered(TROVE_coll_id coll_id);
+void dbpf_collection_register(
+    struct dbpf_collection *coll_p);
+struct dbpf_collection *dbpf_collection_find_registered(
+    TROVE_coll_id coll_id);
 void dbpf_collection_clear_registered(void);
 
 /* function for mapping db errors to trove errors */
@@ -395,33 +396,34 @@ void dbpf_error_report(const char *errpfx, char *msg);
 #define DBPF_RESIZE ftruncate
 #define DBPF_FSTAT  fstat
 
-#define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret, error)\
-do {                                                           \
-    if (dbpf_op_ptr->flags & TROVE_SYNC)                       \
-    {                                                          \
-	if ((ret = DBPF_SYNC(fd)) != 0)                        \
-        {                                                      \
-            gossip_err("aio fd [%d] sync failed: %s\n",fd,     \
-                       db_strerror(ret));                      \
-	    error = -trove_errno_to_trove_error(ret);          \
-	}                                                      \
-        gossip_debug(                                          \
-          GOSSIP_TROVE_DEBUG,"aio fd [%d] sync called "        \
-          "servicing op type %s\n", fd,                        \
-          dbpf_op_type_to_str(dbpf_op_ptr->type));             \
-    }                                                          \
+#define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret)  \
+do {                                                      \
+    if (dbpf_op_ptr->flags & TROVE_SYNC)                  \
+    {                                                     \
+        if ((ret = DBPF_SYNC(fd)) != 0)                   \
+        {                                                 \
+            gossip_err("aio fd [%d] sync failed: %s\n",fd,\
+                       db_strerror(ret));                 \
+            ret = -trove_errno_to_trove_error(errno);     \
+        }                                                 \
+        gossip_debug(                                     \
+          GOSSIP_TROVE_DEBUG,"aio fd [%d] sync called "   \
+          "servicing op type %s\n", fd,                   \
+          dbpf_op_type_to_str(dbpf_op_ptr->type));        \
+    }                                                     \
 } while(0)
 
 #define DBPF_ERROR_SYNC_IF_NECESSARY(dbpf_op_ptr, fd)\
 do {                                                 \
     if (dbpf_op_ptr->flags & TROVE_SYNC)             \
     {                                                \
-	if ((ret = DBPF_SYNC(fd)) != 0)              \
+        if ((ret = DBPF_SYNC(fd)) != 0)              \
         {                                            \
             gossip_err("fd [%d] sync failed: %s\n",  \
                        fd, db_strerror(ret));        \
+            ret = -trove_errno_to_trove_error(errno);\
             goto return_error;                       \
-	}                                            \
+        }                                            \
         gossip_debug(                                \
           GOSSIP_TROVE_DEBUG,"fd [%d] sync called "  \
           "servicing op type %s\n", fd,              \
@@ -433,13 +435,13 @@ do {                                                 \
 do {                                                   \
     if (dbpf_op_ptr->flags & TROVE_SYNC)               \
     {                                                  \
-	if ((ret = db_ptr->sync(db_ptr, 0)) != 0)      \
+        if ((ret = db_ptr->sync(db_ptr, 0)) != 0)      \
         {                                              \
             gossip_err("db_p->sync failed: %s\n",      \
                        db_strerror(ret));              \
-	    error = -dbpf_db_error_to_trove_error(ret);\
-	    goto return_error;                         \
-	}                                              \
+            ret = -dbpf_db_error_to_trove_error(ret);  \
+            goto return_error;                         \
+        }                                              \
         gossip_debug(                                  \
           GOSSIP_TROVE_DEBUG,"db_p->sync called "      \
           "servicing op type %s\n",                    \
@@ -467,6 +469,8 @@ do {                                                         \
 }
 #endif
 
+#endif
+
 /*
  * Local variables:
  *  c-indent-level: 4
@@ -475,5 +479,3 @@ do {                                                         \
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-
-#endif

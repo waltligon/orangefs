@@ -38,14 +38,14 @@ void dbpf_queued_op_init(
 
     INIT_QLIST_HEAD(&q_op_p->link);
     gen_mutex_init(&q_op_p->mutex);
-    q_op_p->state         = 0;
-    q_op_p->op.type       = type;
-    q_op_p->op.state      = OP_NOT_QUEUED;
-    q_op_p->op.handle     = handle;
-    q_op_p->op.coll_p     = coll_p;
-    q_op_p->op.svc_fn     = svc_fn;
-    q_op_p->op.user_ptr   = user_ptr;
-    q_op_p->op.flags      = flags;
+    q_op_p->state = 0;
+    q_op_p->op.type = type;
+    q_op_p->op.state = OP_NOT_QUEUED;
+    q_op_p->op.handle = handle;
+    q_op_p->op.coll_p = coll_p;
+    q_op_p->op.svc_fn = svc_fn;
+    q_op_p->op.user_ptr = user_ptr;
+    q_op_p->op.flags = flags;
     q_op_p->op.context_id = context_id;
 
     id_gen_fast_register(&q_op_p->op.id, q_op_p);

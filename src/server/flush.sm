@@ -134,8 +134,8 @@ static int flush_check_type(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int flush_keyval_flush(PINT_server_op *s_op, job_status_s *js_p)
 {
-    int ret = - 1;
-    job_id_t i;
+    int ret = -1;
+    job_id_t tmp_id;
 
     PINT_STATE_DEBUG("kflush");
 
@@ -149,7 +149,7 @@ static int flush_keyval_flush(PINT_server_op *s_op, job_status_s *js_p)
         s_op,
         0,
         js_p,
-        &i,
+        &tmp_id,
         server_job_context);
 
     return ret;

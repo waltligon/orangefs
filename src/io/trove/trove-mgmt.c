@@ -13,22 +13,18 @@
 #include "trove-handle-mgmt/trove-handle-mgmt.h"
 
 /* currently we only have one method for these tables to refer to */
-struct TROVE_mgmt_ops    *mgmt_method_table[1];
-struct TROVE_dspace_ops  *dspace_method_table[1];
-struct TROVE_keyval_ops  *keyval_method_table[1];
+struct TROVE_mgmt_ops *mgmt_method_table[1];
+struct TROVE_dspace_ops *dspace_method_table[1];
+struct TROVE_keyval_ops *keyval_method_table[1];
 struct TROVE_bstream_ops *bstream_method_table[1];
 struct TROVE_context_ops *context_method_table[1];
 
 /* currently DBPF is our only implementation */
-extern struct TROVE_mgmt_ops    dbpf_mgmt_ops;
-extern struct TROVE_dspace_ops  dbpf_dspace_ops;
-extern struct TROVE_keyval_ops  dbpf_keyval_ops;
+extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
+extern struct TROVE_dspace_ops dbpf_dspace_ops;
+extern struct TROVE_keyval_ops dbpf_keyval_ops;
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
 extern struct TROVE_context_ops dbpf_context_ops;
-
-/* NOTE: the collection get/set info/eattr functions are automatically 
- * generated.
- */
 
 /* trove_init_mutex, trove_init_status
  *
@@ -42,50 +38,48 @@ extern struct TROVE_context_ops dbpf_context_ops;
 static gen_mutex_t trove_init_mutex = GEN_MUTEX_INITIALIZER;
 static int trove_init_status = 0;
 
-/* Returns -1 on failure (already initialized), 1 on success.  This is in
- * keeping with the "1 is immediate succcess" semantic for return values used
- * throughout trove.
+/* Returns -TROVE_EALREADY on failure (already initialized), 1 on
+ * success.  This is in keeping with the "1 is immediate succcess"
+ * semantic for return values used throughout trove.
  */
 int trove_initialize(char *stoname,
-		     TROVE_ds_flags flags,
-		     char **method_name_p,
-		     int method_id)
+                     TROVE_ds_flags flags,
+                     char **method_name_p,
+                     int method_id)
 {
-    int ret = -1;
+    int ret = -TROVE_EALREADY;
     char *ret_method_name_p = NULL;
 
-    ret = gen_mutex_lock(&trove_init_mutex);
-    assert(ret == 0);
-
+    gen_mutex_lock(&trove_init_mutex);
     if (trove_init_status)
     {
-	gen_mutex_unlock(&trove_init_mutex);
-	return -1;
+        gen_mutex_unlock(&trove_init_mutex);
+        return ret;
     }
 
     ret = trove_handle_mgmt_initialize();
     if (ret == -1)
     {
-	return ret;
+        return ret;
     }
 
-    mgmt_method_table[0]    = &dbpf_mgmt_ops;
-    dspace_method_table[0]  = &dbpf_dspace_ops;
-    keyval_method_table[0]  = &dbpf_keyval_ops;
+    mgmt_method_table[0] = &dbpf_mgmt_ops;
+    dspace_method_table[0] = &dbpf_dspace_ops;
+    keyval_method_table[0] = &dbpf_keyval_ops;
     bstream_method_table[0] = &dbpf_bstream_ops;
     context_method_table[0] = &dbpf_context_ops;
 
     /*
       for each underlying method, call its initialize function.
-      initialize can fail if storage name isn't valid, but we want those
-      op pointers to be right either way.
+      initialize can fail if storage name isn't valid, but we want
+      those op pointers to be right either way.
     */
     ret = dbpf_mgmt_ops.initialize(stoname, flags, &ret_method_name_p, 0);
     if (ret >= 0)
     {
-	free(ret_method_name_p);
-	ret = 1;
-	trove_init_status = 1;
+        free(ret_method_name_p);
+        ret = 1;
+        trove_init_status = 1;
     }
     gen_mutex_unlock(&trove_init_mutex);
     return ret;
@@ -93,16 +87,17 @@ int trove_initialize(char *stoname,
 
 int trove_finalize(void)
 {
-    int ret;
+    int ret = -TROVE_EALREADY;
 
-    ret = gen_mutex_lock(&trove_init_mutex);
-    assert (!ret);
-    if (!trove_init_status) {
-	gen_mutex_unlock(&trove_init_mutex);
-	return -1;
+    gen_mutex_lock(&trove_init_mutex);
+    if (!trove_init_status)
+    {
+        gen_mutex_unlock(&trove_init_mutex);
+        return ret;
     }
-    else {
-	trove_init_status = 0;
+    else
+    {
+        trove_init_status = 0;
     }
 
     ret = mgmt_method_table[0]->finalize();
@@ -111,123 +106,84 @@ int trove_finalize(void)
 
     gen_mutex_unlock(&trove_init_mutex);
 
-    if (ret < 0) return ret;
-    else return 1;
+    return ((ret < 0) ? ret : 1);
 }
 
 int trove_storage_create(char *stoname,
-			 void *user_ptr,
-			 TROVE_op_id *out_op_id_p)
+                         void *user_ptr,
+                         TROVE_op_id *out_op_id_p)
 {
-    int ret;
+    int ret = mgmt_method_table[0]->storage_create(
+        stoname, user_ptr, out_op_id_p);
 
-    ret = mgmt_method_table[0]->storage_create(stoname,
-					       user_ptr,
-					       out_op_id_p);
-    if (ret < 0) return ret;
-
-    return 1;
+    return ((ret < 0) ? ret : 1);
 }
 
 
 int trove_storage_remove(char *stoname,
-			 void *user_ptr,
-			 TROVE_op_id *out_op_id_p)
+                         void *user_ptr,
+                         TROVE_op_id *out_op_id_p)
 {
-    int ret;
+    int ret = mgmt_method_table[0]->storage_remove(
+        stoname, user_ptr, out_op_id_p);
 
-    ret = mgmt_method_table[0]->storage_remove(stoname,
-					       user_ptr,
-					       out_op_id_p);
-    if (ret < 0) return ret;
-
-    return 1;
+    return ((ret < 0) ? ret : 1);
 }
 
-int trove_collection_create(
-			    /* char *stoname, */
-			    char *collname,
-			    TROVE_coll_id new_coll_id,
-			    void *user_ptr,
-			    TROVE_op_id *out_op_id_p)
+int trove_collection_create(char *collname,
+                            TROVE_coll_id new_coll_id,
+                            void *user_ptr,
+                            TROVE_op_id *out_op_id_p)
 {
-    int ret;
+    int ret = -TROVE_EINVAL;
 
-    if(new_coll_id == TROVE_COLL_ID_NULL)
+    if (new_coll_id == TROVE_COLL_ID_NULL)
     {
-	gossip_err("Error: invalid collection ID requested.\n");
-	return(-TROVE_EINVAL);
+        gossip_err("Error: invalid collection ID requested.\n");
+        return ret;
     }
 
-    /* TODO: HOW DO I KNOW WHAT METHOD TO USE??? */
+    ret = mgmt_method_table[0]->collection_create(
+        collname, new_coll_id, user_ptr, out_op_id_p);
 
-    ret = mgmt_method_table[0]->collection_create(collname,
-						  new_coll_id,
-						  user_ptr,
-						  out_op_id_p);
-    if (ret < 0) return ret;
-
-    return 1;
+    return ((ret < 0) ? ret : 1);
 }
 
-int trove_collection_remove(
-			    /* char *stoname, */
-			    char *collname,
-			    void *user_ptr,
-			    TROVE_op_id *out_op_id_p)
+int trove_collection_remove(char *collname,
+                            void *user_ptr,
+                            TROVE_op_id *out_op_id_p)
 {
-    int ret;
+    int ret = mgmt_method_table[0]->collection_remove(
+        collname, user_ptr, out_op_id_p);
 
-    /* TODO: HOW DO I KNOW WHAT METHOD TO USE??? */
-    ret = mgmt_method_table[0]->collection_remove(collname,
-						  user_ptr,
-						  out_op_id_p);
-    if (ret < 0) return ret;
-
-    return 1;
+    return ((ret < 0) ? ret : 1);
 }
 
-int trove_collection_lookup(
-			    /* char *stoname, */
-			    char *collname,
-			    TROVE_coll_id *coll_id_p,
-			    void *user_ptr,
-			    TROVE_op_id *out_op_id_p)
+int trove_collection_lookup(char *collname,
+                            TROVE_coll_id *coll_id_p,
+                            void *user_ptr,
+                            TROVE_op_id *out_op_id_p)
 {
-    int ret;
+    int ret = mgmt_method_table[0]->collection_lookup(
+        collname, coll_id_p, user_ptr, out_op_id_p);
 
-    /* TODO: HOW DO I KNOW WHAT METHOD TO USE??? */
-
-    ret = mgmt_method_table[0]->collection_lookup(collname,
-						  coll_id_p,
-						  user_ptr,
-						  out_op_id_p);
-    if (ret < 0) return ret;
-    return 1;
+    return ((ret < 0) ? ret : 1);
 }
 
 int trove_collection_iterate(TROVE_ds_position *inout_position_p,
-			     TROVE_keyval_s *name_array,
-			     TROVE_coll_id *coll_id_array,
-			     int *inout_count_p,
-			     TROVE_ds_flags flags,
-			     TROVE_vtag_s *vtag,
-			     void *user_ptr,
-			     TROVE_op_id *out_op_id_p)
+                             TROVE_keyval_s *name_array,
+                             TROVE_coll_id *coll_id_array,
+                             int *inout_count_p,
+                             TROVE_ds_flags flags,
+                             TROVE_vtag_s *vtag,
+                             void *user_ptr,
+                             TROVE_op_id *out_op_id_p)
 {
-    int ret;
+    int ret = mgmt_method_table[0]->collection_iterate(
+        inout_position_p, name_array, coll_id_array, inout_count_p,
+        flags, vtag, user_ptr, out_op_id_p);
 
-    ret = mgmt_method_table[0]->collection_iterate(inout_position_p,
-						   name_array,
-						   coll_id_array,
-						   inout_count_p,
-						   flags,
-						   vtag,
-						   user_ptr,
-						   out_op_id_p);
-
-    if (ret < 0) return ret;
-    return 1;
+    return ((ret < 0) ? ret : 1);
 }
 
 int trove_open_context(

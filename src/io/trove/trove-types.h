@@ -101,6 +101,9 @@ typedef PVFS_object_ref            TROVE_object_ref;
 #define TROVE_EREMOTEIO       (PVFS_EREMOTEIO | PVFS_ERROR_TROVE)
 #define TROVE_ENOMEDIUM       (PVFS_ENOMEDIUM | PVFS_ERROR_TROVE)
 #define TROVE_EMEDIUMTYPE     (PVFS_EMEDIUMTYPE | PVFS_ERROR_TROVE)
+#define TROVE_ECANCEL         (PVFS_ECANCEL | PVFS_ERROR_TROVE)
+
+#endif
 
 /*
  * Local variables:
@@ -110,5 +113,3 @@ typedef PVFS_object_ref            TROVE_object_ref;
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-
-#endif

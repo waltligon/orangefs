@@ -24,10 +24,10 @@ extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 #ifdef __PVFS2_TROVE_THREADED__
-pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
 static pthread_t dbpf_thread;
 static int dbpf_thread_running = 0;
+pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
 #endif
 
 int dbpf_thread_initialize(void)
@@ -35,7 +35,10 @@ int dbpf_thread_initialize(void)
     int ret = 0;
 #ifdef __PVFS2_TROVE_THREADED__
     ret = -1;
-    
+
+    pthread_cond_init(&dbpf_op_incoming_cond, NULL);
+    pthread_cond_init(&dbpf_op_completed_cond, NULL);
+
     dbpf_thread_running = 1;
     ret = pthread_create(&dbpf_thread, NULL,
                          dbpf_thread_function, NULL);
@@ -50,7 +53,6 @@ int dbpf_thread_initialize(void)
         gossip_debug(
             GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
     }
-
 #endif
     return ret;
 }

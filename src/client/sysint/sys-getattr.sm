@@ -313,8 +313,7 @@ static int getattr_object_getattr_comp_fn(
                               &resp_p->u.getattr.attr);
     }
 
-    attr = (sm_p->acache_hit ?
-            &sm_p->pinode->attr :
+    attr = (sm_p->acache_hit ? &sm_p->pinode->attr :
             &resp_p->u.getattr.attr);
     assert(attr);
 
@@ -446,9 +445,7 @@ static int getattr_datafile_getattr_setup_msgpairarray(
 
     js_p->error_code = 0;
 
-    attr = (sm_p->acache_hit ?
-            &sm_p->pinode->attr :
-            &sm_p->acache_attr);
+    attr = (sm_p->acache_hit ? &sm_p->pinode->attr : &sm_p->acache_attr);
     assert(attr);
 
     sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
@@ -473,7 +470,7 @@ static int getattr_datafile_getattr_setup_msgpairarray(
     sm_p->msgarray_count = attr->u.meta.dfile_count;
 
     /* for each datafile, post a send/recv pair to obtain the size */
-    for (i=0; i < sm_p->msgarray_count; i++)
+    for(i = 0; i < sm_p->msgarray_count; i++)
     {
         PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
         assert(msg_p);

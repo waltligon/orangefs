@@ -35,7 +35,7 @@ enum
 /* TROVE operation flags */
 enum
 {
-    TROVE_SYNC   = 1,
+    TROVE_SYNC = 1,
     TROVE_ATOMIC = 2,
     TROVE_FORCE_REQUESTED_HANDLE = 4
 };
@@ -50,6 +50,7 @@ enum
     TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
     TROVE_COLLECTION_ATTR_CACHE_INITIALIZE
 };
+#endif
 
 /*
  * Local variables:
@@ -59,5 +60,3 @@ enum
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-
-#endif

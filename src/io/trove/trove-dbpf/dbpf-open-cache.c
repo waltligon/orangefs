@@ -162,7 +162,8 @@ int dbpf_open_cache_get(
     gen_mutex_lock(&cache_mutex);
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	"dbpf_open_cache_get: type: %d\n", (int)type);
+	"dbpf_open_cache_get: type: %d | create_flag: %d\n",
+                 (int)type, create_flag);
 
     /* check already opened objects first, reuse ref if possible */
     qlist_for_each(tmp_link, &used_list)
@@ -528,13 +529,14 @@ static int open_fd(
     char filename[PATH_MAX] = {0};
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                 "dbpf_open_cache open_fd: opening fd %Lu (%Lx).\n",
-                 Lu(handle), Lu(handle));
+                 "dbpf_open_cache open_fd: opening fd %Lu, create: %d\n",
+                 Lu(handle), create_flag);
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
 			      my_storage_p->name, coll_id, Lu(handle));
 
     *fd = DBPF_OPEN(filename, O_RDWR, 0);
+
     if ((*fd < 0) && (errno == ENOENT) && create_flag)
     {
 	*fd = DBPF_OPEN(filename, O_RDWR|O_CREAT|O_EXCL, TROVE_DB_MODE);

@@ -578,7 +578,8 @@ int dbpf_attr_cache_insert(
             }
 
             cache_elem->key = key;
-            memcpy(&(cache_elem->attr), attr, sizeof(TROVE_ds_attributes));
+            memcpy(&(cache_elem->attr), attr,
+                   sizeof(TROVE_ds_attributes));
             if (!already_exists)
             {
                 qhash_add(
