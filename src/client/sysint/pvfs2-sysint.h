@@ -336,10 +336,6 @@ struct PVFS_sysresp_statfs_s {
 typedef struct PVFS_sysresp_statfs_s PVFS_sysresp_statfs;
 
 /* config */
-struct PVFS_sysreq_config_s {
-	PVFS_handle handle;
-};
-typedef struct PVFS_sysreq_config_s PVFS_sysreq_config;
 
 struct PVFS_sysresp_config_s {
 	/* config info... */
@@ -364,11 +360,6 @@ struct PVFS_sysresp_readdir_s {
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
 
 /* hint */
-struct PVFS_sysreq_hint_s {
-	/* ??? */
-};
-typedef struct PVFS_sysreq_hint_s PVFS_sysreq_hint;
-
 struct PVFS_sysresp_hint_s {
 	/* ??? */
 };
@@ -384,12 +375,8 @@ typedef struct PVFS_sysreq_truncate_s PVFS_sysreq_truncate;
 
 /* no data returned in truncate response */
 
-/* extension */
-struct PVFS_sysreq_extension_s {
-	/* ??? */
-};
-typedef struct PVFS_sysreq_extension_s PVFS_sysreq_extension;
 
+/* extension */
 struct PVFS_sysresp_extension_s {
 	/* ??? */
 };
@@ -417,10 +404,7 @@ struct PVFS_system_req_s {
 		PVFS_sysreq_lock lock;
 		PVFS_sysreq_unlock unlock;
 		PVFS_sysreq_statfs statfs;
-		PVFS_sysreq_config config;
 		PVFS_sysreq_readdir readdir;
-		PVFS_sysreq_hint hint;
-		PVFS_sysreq_extension extension;
 	} u;
 };
 
@@ -496,9 +480,8 @@ int PVFS_sys_duplicate(PVFS_sysreq_duplicate *req,PVFS_sysresp_duplicate *resp);
 int PVFS_sys_lock(PVFS_sysreq_lock *req, PVFS_sysresp_lock *resp);
 int PVFS_sys_unlock(PVFS_sysreq_unlock *req);
 int PVFS_sys_statfs(PVFS_sysreq_statfs *req, PVFS_sysresp_statfs *resp);
-int PVFS_sys_config(PVFS_sysreq_config *req, PVFS_sysresp_config *resp);
-int PVFS_sys_hint(PVFS_sysreq_hint *req, PVFS_sysresp_hint *resp);
-int PVFS_sys_extension(PVFS_sysreq_extension *req,
-PVFS_sysresp_extension *resp);
+int PVFS_sys_config(PVFS_handle handle, PVFS_sysresp_config *resp);
+int PVFS_sys_hint(int undefined,  PVFS_sysresp_hint *resp);
+int PVFS_sys_extension(int undefined, PVFS_sysresp_extension *resp);
 
 #endif
