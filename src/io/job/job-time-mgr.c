@@ -91,7 +91,11 @@ int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
     struct qlist_head* prev;
     struct qlist_head* next;
 
-    assert(timeout_sec > 0);
+    if(timeout_sec == JOB_TIMEOUT_INF)
+    {
+	/* do nothing */
+	return(0);
+    }
 
     gettimeofday(&tv, NULL);
 
@@ -141,6 +145,7 @@ int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
 
     /* add the job descriptor onto the correct bucket */
     qlist_add_tail(&jd->job_time_link, &tmp_bucket->jd_queue);
+    jd->time_bucket = tmp_bucket;
 
     gen_mutex_unlock(&bucket_mutex);
 

@@ -24,6 +24,7 @@
 #include "pint-dev.h"
 #include "id-generator.h"
 #include "pint-event.h"
+#include "job-time-mgr.h"
 
 #define JOB_EVENT_START(__op, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_JOB, __op, 0, __id, \
@@ -317,7 +318,7 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_SEND;
 
-    return (0);
+    return(job_time_mgr_add(jd, timeout_sec));
 }
 
 
@@ -413,8 +414,7 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     *id = jd->job_id;
     bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_SEND;
-
-    return (0);
+    return(job_time_mgr_add(jd, timeout_sec));
 }
 
 /* job_bmi_recv()
@@ -493,8 +493,7 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_RECV;
 
-    return (0);
-
+    return(job_time_mgr_add(jd, timeout_sec));
 }
 
 
@@ -579,8 +578,7 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_RECV;
 
-    return (0);
-
+    return(job_time_mgr_add(jd, timeout_sec));
 }
 
 /* job_bmi_unexp()
@@ -3646,6 +3644,7 @@ static void fill_status(struct job_desc *jd,
     switch (jd->type)
     {
     case JOB_BMI:
+	job_time_mgr_rem(jd);
 	status->error_code = jd->u.bmi.error_code;
 	status->actual_size = jd->u.bmi.actual_size;
 	break;
