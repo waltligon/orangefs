@@ -263,7 +263,30 @@ int dbpf_attr_cache_ds_attr_update_cached_data(
     return ret;
 }
 
-int dbpf_attr_cache_ds_attr_pair_fetch_cached_data(
+int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
+    TROVE_handle key, PVFS_size b_size)
+{
+    int ret = -1;
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
+
+    cache_elem = dbpf_attr_cache_elem_lookup(key);
+    if (cache_elem)
+    {
+        gen_mutex_lock(s_dbpf_attr_mutex);
+        if (cache_elem)
+        {
+            cache_elem->attr.b_size = b_size;
+            gossip_debug(DBPF_ATTRCACHE_DEBUG, "Updating "
+                         "cached b_size for key %Lu\n",
+                         Lu(key));
+            ret = 0;
+        }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
+    }
+    return ret;
+}
+
+int dbpf_attr_cache_ds_attr_fetch_cached_data(
     TROVE_handle key, TROVE_ds_attributes *target_ds_attr)
 {
     int ret = -1;

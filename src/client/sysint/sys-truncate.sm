@@ -116,8 +116,8 @@ machine pvfs2_client_truncate_sm(check_parameters,
 %%
 
 int PVFS_sys_truncate(PVFS_pinode_reference pinode_ref,
-			PVFS_size size,
-			PVFS_credentials credentials)
+                      PVFS_size size,
+                      PVFS_credentials credentials)
 {
     int ret; 
     PINT_client_sm *sm_p;
@@ -209,9 +209,8 @@ static int truncate_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
  * the client should only be working with metafiles, so anything else is an
  * error... hey, prove me wrong and i'll change it 
  *
- * truncate on a directory has no meaning
+ * truncate on other object types is an error (EINVAL)
  */
-
 static int truncate_object_getattr_comp_fn(
     void *v_p,
     struct PVFS_server_resp *resp_p,
@@ -229,7 +228,8 @@ static int truncate_object_getattr_comp_fn(
     /* if we get an error, just return immediately, don't try to
      * actually fill anything in.
      */
-    if (resp_p->status != 0) {
+    if (resp_p->status != 0)
+    {
 	return resp_p->status;
     }
 
@@ -279,7 +279,8 @@ static int truncate_object_getattr_comp_fn(
 		      = PVFS_Dist_copy(r_attr_p->u.meta.dist);
                 if (!sm_p->u.truncate.distribution)
                 {
-                    return -ENOMEM;
+                    sm_p->error_code = -PVFS_ENOMEM;
+                    return 1;
                 }
 		sm_p->u.truncate.dist_size = r_attr_p->u.meta.dist_size;
             }
@@ -295,28 +296,29 @@ static int truncate_object_getattr_comp_fn(
             assert(sm_p->u.truncate.distribution);
 	    return 0;
         }
-	/* no idea what truncate means on these things, so do nothing */
+	/*
+          return -PVFS_EINVAL since you can't truncate
+          the following types of objects
+        */
 	case PVFS_TYPE_DIRECTORY:
 	case PVFS_TYPE_SYMLINK:
 	case PVFS_TYPE_DATAFILE:
 	case PVFS_TYPE_DIRDATA:
 	default:
-	    gossip_err("error: truncate_object_getattr_comp_fn: unhandled object type\n");
-	    assert(0);
-    } /* end of switch() */
-    return -PVFS_EINVAL; /* should not get here */
+            break;
+    }
+    sm_p->error_code = -PVFS_EINVAL;
+    return 1;
 }
 
 
 /* not really sure what to do here...  */
 static int truncate_object_getattr_failure(PINT_client_sm *sm_p,
-					job_status_s *js_p)
+                                           job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
-		 "(%p) truncate state: object_getattr_failure\n",
-		 sm_p);
-    assert(0);
-
+    gossip_debug(
+        CLIENT_DEBUG,
+        "(%p) truncate state: object_getattr_failure\n", sm_p);
     return 1;
 }
 

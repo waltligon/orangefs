@@ -584,7 +584,6 @@ return_ok:
     return 1;
 
 return_error:
-
     *op_p->u.d_iterate_handles.count_p = i; 
     gossip_err("dbpf_dspace_iterate_handles_op_svc: %s\n",
                db_strerror(ret));
@@ -718,7 +717,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     /* fast path cache hit; skips queueing */
-    if (dbpf_attr_cache_ds_attr_pair_fetch_cached_data(
+    if (dbpf_attr_cache_ds_attr_fetch_cached_data(
             handle, ds_attr_p) == 0)
     {
         gossip_debug(TROVE_DEBUG, "fast path attr cache hit on %Lu"
