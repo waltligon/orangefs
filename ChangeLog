@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-0.6.2pre1
+===============
+- 
+
+
 pvfs2-0.6.1
 ===========
 - misc. updates to msgpairarray and associated tools to allow for
