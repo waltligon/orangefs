@@ -5,6 +5,9 @@
 #include "pint-sysint-utils.h"
 #include "server-config.h"
 
+/* reference to the main window, for popups etc. */
+extern GtkWidget *main_window;
+
 /* setting window title (from karma.c) */
 void gui_set_title(char *title);
 
@@ -90,6 +93,9 @@ extern GtkListStore *gui_comm_fslist;
 GtkWidget *gui_details_setup(void);
 void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
 			int server_stat_ct);
+GtkWidget *gui_details_view_new(GtkListStore **list_p,
+				GtkTreeViewColumn **col,
+				gint sortable);
 
 /* status page interface (status.c) */
 GtkWidget *gui_status_setup(void);

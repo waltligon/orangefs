@@ -68,6 +68,12 @@ static gint gui_status_graph_expose_callback(GtkWidget *drawing_area,
 static gint gui_status_graph_configure_callback(GtkWidget *drawing_area,
 						GdkEvent *event,
 						gpointer graph_state_ptr);
+static gint gui_status_graph_button_press_callback(GtkWidget *drawing_area,
+						   GdkEventButton *event,
+						   gpointer graph_state_ptr);
+
+static void gui_status_server_popup(struct PVFS_mgmt_server_stat *svr_stat,
+				    int svr_index);
 
 /* gui_status_setup()
  *
@@ -350,6 +356,7 @@ static GtkWidget *gui_status_graph_setup(gint width,
 {
     int i;
     GtkWidget *hbox;
+    gint events;
 
     /* create frame and vbox */
     g_state->frame = gtk_frame_new("");
@@ -399,6 +406,15 @@ static GtkWidget *gui_status_graph_setup(gint width,
     g_signal_connect(G_OBJECT(g_state->drawing_area),
 		     "expose_event",
 		     G_CALLBACK(gui_status_graph_expose_callback),
+		     (gpointer) g_state);
+
+    events = gtk_widget_get_events(GTK_WIDGET(g_state->drawing_area));
+    events |= GDK_BUTTON_PRESS_MASK;
+    gtk_widget_set_events(GTK_WIDGET(g_state->drawing_area), events);
+
+    g_signal_connect(G_OBJECT(g_state->drawing_area),
+		     "button_press_event",
+		     G_CALLBACK(gui_status_graph_button_press_callback),
 		     (gpointer) g_state);
 
     return g_state->frame;
@@ -480,3 +496,112 @@ static gint gui_status_graph_expose_callback(GtkWidget *drawing_area,
     return 0;
 }
 
+static gint gui_status_graph_button_press_callback(GtkWidget *drawing_area,
+						   GdkEventButton *event,
+						   gpointer graph_state_ptr)
+{
+    gint i, width, height, graphwidth, graphoffset, barspace, barheight;
+    gint topspace = 20;
+    struct gui_status_graph_state *g_state;
+    struct PVFS_mgmt_server_stat *svr_stat;
+    int svr_stat_ct;
+
+    g_state = (struct gui_status_graph_state *) graph_state_ptr;
+
+    assert(g_state != NULL);
+    assert(g_state->drawing_area == drawing_area);
+
+    /* ignore anything that isn't a double-click */
+    if (event->type != GDK_2BUTTON_PRESS) return 0;
+
+    /* calculate bar placement */
+    width  = drawing_area->allocation.width;
+    height = drawing_area->allocation.height;
+    graphwidth  = (int) (0.8 * (float) width);
+    graphoffset = (width - graphwidth) / 2;
+    barspace = (gint) (((float) ((height - topspace) / g_state->nr_bars)) *
+		       0.30);
+    barheight = ((height-topspace) - g_state->nr_bars*barspace) /
+	g_state->nr_bars;
+    assert(barheight > 0);
+
+    /* aesthetics: limit maximum bar height */
+    if (barheight > (height - topspace) / 8) {
+	barheight = (height - topspace) / 8;
+    }
+
+    i = (((gint) event->y) - topspace) / (barheight + barspace);
+    if (i >= g_state->nr_bars)
+    {
+	return 0; /* button press past bars */
+    }
+    else if (((gint) event->y) - topspace - (i * (barheight+barspace)) >
+	     barheight)
+    {
+	return 0; /* button press in space after a legitimate bar */
+    }
+
+    /* button was pressed on bar i */
+
+    /* currently we display bars in server order, so no mapping necessary */
+    gui_comm_stats_retrieve(&svr_stat, &svr_stat_ct);
+
+    /* if # of servers just changed, just ignore the click for now */
+    if (svr_stat_ct != g_state->nr_bars) return 0;
+
+    gui_status_server_popup(svr_stat, i);
+
+    return 0;
+}
+
+static void gui_status_server_popup(struct PVFS_mgmt_server_stat *svr_stat,
+				    int svr_index)
+{
+    GtkWidget *dialog, *label, *frame, *table;
+    char buf[64];
+
+    dialog = gtk_dialog_new_with_buttons("Server Details",
+					 GTK_WINDOW(main_window),
+					 GTK_DIALOG_DESTROY_WITH_PARENT,
+					 GTK_STOCK_OK,
+					 GTK_RESPONSE_NONE,
+					 NULL);
+    g_signal_connect_swapped(GTK_OBJECT(dialog), 
+			     "response", 
+			     G_CALLBACK(gtk_widget_destroy),
+			     GTK_OBJECT(dialog));
+
+    /* format data for presentation */
+    frame = gtk_frame_new(svr_stat[svr_index].bmi_address);
+    gtk_frame_set_label_align(GTK_FRAME(frame), 0.0, 0.0);
+    
+    table = gtk_table_new(2, 5, 1);
+    gtk_container_add(GTK_CONTAINER(frame), table);
+
+    label = gtk_label_new("Space Available/Total:");
+    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
+    gtk_table_attach_defaults(GTK_TABLE(table), label, 0, 1, 0, 1);
+   
+    label = gtk_label_new("Memory Available/Total:");
+    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
+    gtk_table_attach_defaults(GTK_TABLE(table), label, 0, 1, 1, 2);
+
+    label = gtk_label_new("Handles Available/Total:");
+    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
+    gtk_table_attach_defaults(GTK_TABLE(table), label, 0, 1, 2, 3);
+
+    label = gtk_label_new("Uptime:");
+    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
+    gtk_table_attach(GTK_TABLE(table), label, 0, 1, 3, 4,
+		     0, GTK_FILL|GTK_EXPAND, 0, 0);
+
+    label = gtk_label_new("Server Type:");
+    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_RIGHT);
+    gtk_table_attach_defaults(GTK_TABLE(table), label, 0, 1, 4, 5);
+
+    gtk_container_add(GTK_CONTAINER(GTK_DIALOG(dialog)->vbox),
+		      frame);
+    gtk_widget_show_all(dialog);
+
+    return;
+}

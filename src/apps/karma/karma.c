@@ -10,7 +10,7 @@
 static gint status_timer_callback(gpointer data);
 static gint traffic_timer_callback(gpointer data);
 
-static GtkWidget *main_window;
+GtkWidget *main_window;
 
 static gint delete_event(GtkWidget *widget,
 			 GdkEvent  *event,

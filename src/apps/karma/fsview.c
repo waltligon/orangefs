@@ -70,7 +70,7 @@ void gui_fsview_popup(void)
 
     /* drop the view in a container and go to town */
     dialog = gtk_dialog_new_with_buttons("Select File System",
-					 GTK_WINDOW_TOPLEVEL,
+					 GTK_WINDOW(main_window),
 					 GTK_DIALOG_DESTROY_WITH_PARENT,
 					 GTK_STOCK_OK,
 					 GTK_RESPONSE_OK,
