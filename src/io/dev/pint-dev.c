@@ -274,7 +274,11 @@ int PINT_dev_test_unexpected(
 	}
 	
 	magic = (int32_t*)buffer;
+#if (WORDS_BIGENDIAN == 1)
+	tag = (int64_t*)((unsigned long)buffer);
+#else
 	tag = (int64_t*)((unsigned long)buffer + sizeof(int32_t));
+#endif
 
 	assert(*magic == pdev_magic);
 
