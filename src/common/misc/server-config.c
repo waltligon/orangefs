@@ -107,7 +107,7 @@ static const configoption_t options[] =
     {"Range",ARG_LIST, get_range_list,NULL,CTX_ALL},
     {"RootHandle",ARG_STR, get_root_handle,NULL,CTX_ALL},
     {"Name",ARG_STR, get_filesystem_name,NULL,CTX_ALL},
-    {"CollectionID",ARG_INT, get_filesystem_collid,NULL,CTX_ALL},
+    {"ID",ARG_INT, get_filesystem_collid,NULL,CTX_ALL},
     {"LogFile",ARG_STR, get_logfile,NULL,CTX_ALL},
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,CTX_ALL},
     {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
@@ -607,7 +607,7 @@ DOTCONF_CB(get_filesystem_collid)
 
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("CollectionID Tags can only be within Filesystem tags");
+        gossip_lerr("ID Tags can only be within Filesystem tags");
         return NULL;
     }
     fs_conf = (struct filesystem_configuration_s *)
