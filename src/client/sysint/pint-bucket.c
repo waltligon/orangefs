@@ -392,7 +392,7 @@ int PINT_bucket_get_root_handle(
             {
                 break;
             }
-            if (fsid = (PVFS_fs_id)cur_fs->coll_id)
+            if (fsid == (PVFS_fs_id)cur_fs->coll_id)
             {
                 *fh_root = (PVFS_handle)cur_fs->root_handle;
                 ret = 0;
