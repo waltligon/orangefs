@@ -45,6 +45,12 @@ struct bmi_unexp_desc
     struct BMI_unexpected_info *info;
 };
 
+/* describes unexpected dev operations */
+struct dev_unexp_desc
+{
+    struct PINT_dev_unexp_info* info;
+};
+
 /* describes flows */
 struct flow_desc
 {
@@ -65,7 +71,8 @@ enum job_type
     JOB_BMI_UNEXP,
     JOB_TROVE,
     JOB_FLOW,
-    JOB_REQ_SCHED
+    JOB_REQ_SCHED,
+    JOB_DEV_UNEXP
 };
 
 /* describes a job, which may be one of several types */
@@ -85,6 +92,7 @@ struct job_desc
 	struct bmi_unexp_desc bmi_unexp;
 	struct flow_desc flow;
 	struct req_sched_desc req_sched;
+	struct dev_unexp_desc dev_unexp;
     }
     u;
 

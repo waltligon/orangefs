@@ -38,11 +38,14 @@ static int bmi_pending_count = 0;
 static trove_id_queue_p trove_inflight_queue = NULL;
 static int trove_pending_count = 0;
 static int flow_pending_count = 0;
+static job_desc_q_p dev_unexp_queue = NULL;
+static int dev_unexp_pending_count = 0;
 /* mutex locks for each queue */
 static gen_mutex_t completion_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t bmi_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t trove_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t flow_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t dev_mutex = GEN_MUTEX_INITIALIZER;
 /* NOTE: all of the bmi queues and counts are protected by the same
  * mutex (bmi_mutex)
  */
@@ -55,6 +58,7 @@ static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t bmi_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t flow_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t trove_cond = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t dev_cond = PTHREAD_COND_INITIALIZER;
 /* NOTE: the above conditions are protected by the same mutexes that
  * protect the queues
  */
@@ -66,6 +70,8 @@ static void *flow_thread_function(void *foo);
 static pthread_t flow_thread_id;
 static void *trove_thread_function(void *foo);
 static pthread_t trove_thread_id;
+static void *dev_thread_function(void* foo);
+static pthread_t dev_thread_id;
 #endif /* __PVFS2_JOB_THREADED__ */
 
 /* number of jobs to test for at once inside of do_one_work_cycle() */
@@ -90,6 +96,8 @@ static PVFS_vtag stat_trove_vtag_array[job_work_metric];
 static void *stat_trove_user_ptr_array[job_work_metric];
 static PVFS_error stat_trove_ds_state_array[job_work_metric];
 
+static struct PINT_dev_unexp_info stat_dev_unexp_array[job_work_metric];
+
 /********************************************************
  * function prototypes
  */
@@ -101,6 +109,7 @@ static int do_one_work_cycle_bmi(int *num_completed,
 static int do_one_work_cycle_bmi_unexp(int *num_completed,
 				       int wait_flag);
 static int do_one_work_cycle_flow(int *num_completed);
+static int do_one_work_cycle_dev_unexp(int *num_completed);
 static int do_one_work_cycle_trove(int *num_completed);
 static int do_one_test_cycle_req_sched(void);
 static void fill_status(struct job_desc *jd,
@@ -2845,8 +2854,9 @@ static int setup_queues(void)
 
     bmi_unexp_queue = job_desc_q_new();
     trove_inflight_queue = trove_id_queue_new();
+    dev_unexp_queue = job_desc_q_new();
 
-    if (!bmi_unexp_queue || !trove_inflight_queue)
+    if (!bmi_unexp_queue || !trove_inflight_queue || !dev_unexp_queue)
     {
 	/* cleanup any that were initialized */
 	teardown_queues();
@@ -2868,6 +2878,8 @@ static void teardown_queues(void)
 	job_desc_q_cleanup(bmi_unexp_queue);
     if (trove_inflight_queue)
 	trove_id_queue_cleanup(trove_inflight_queue);
+    if (dev_unexp_queue)
+	job_desc_q_cleanup(dev_unexp_queue);
 
     return;
 }
@@ -3114,6 +3126,65 @@ static int do_one_work_cycle_bmi_unexp(int *num_completed,
 
     return (0);
 }
+
+/* do_one_work_cycle_dev_unexp()
+ *
+ * performs one job work cycle, just on pending device operations 
+ * (checks to see which jobs are pending, tests those that need it, etc)
+ *
+ * returns 0 on success, -errno on failure
+ */
+static int do_one_work_cycle_dev_unexp(int *num_completed)
+{
+    int ret = -1;
+    struct job_desc *tmp_desc = NULL;
+    int incount, outcount;
+    int i = 0;
+
+    /* the first thing to do is to find out how many unexpected
+     * operations we are allowed to look for right now
+     */
+    gen_mutex_lock(&dev_mutex);
+    if(dev_unexp_pending_count > job_work_metric)
+	incount = job_work_metric;
+    else
+	incount = dev_unexp_pending_count;
+    gen_mutex_unlock(&dev_mutex);
+
+    ret = PINT_dev_test_unexpected(incount, &outcount, 
+	stat_dev_unexp_array, 10);
+
+    if (ret < 0)
+    {
+	/* critical failure */
+	/* TODO: can I clean up anything else here? */
+	gossip_lerr("Error: critical device failure.\n");
+	return (ret);
+    }
+
+    for (i = 0; i < outcount; i++)
+    {
+	/* remove the operation from the pending dev_unexp queue */
+	gen_mutex_lock(&dev_mutex);
+	tmp_desc = job_desc_q_shownext(dev_unexp_queue);
+	job_desc_q_remove(tmp_desc);
+	dev_unexp_pending_count--;
+	gen_mutex_unlock(&dev_mutex);
+	/* set appropriate fields and store incompleted queue */
+	*(tmp_desc->u.dev_unexp.info) = stat_dev_unexp_array[i];
+	gen_mutex_lock(&completion_mutex);
+	/* set completed flag while holding queue lock */
+	tmp_desc->completed_flag = 1;
+	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	    tmp_desc);
+	gen_mutex_unlock(&completion_mutex);
+
+    }
+
+    *num_completed = outcount;
+    return (0);
+}
+
 
 /* do_one_work_cycle_flow()
  *
@@ -3494,6 +3565,64 @@ static void *trove_thread_function(void *foo)
 
     return (NULL);
 }
+
+/* dev_thread_function()
+ *
+ * function executed by the thread in charge of the device interface
+ */
+static void *dev_thread_function(void *foo)
+{
+    int dev_unexp_pending_flag;
+    int num_completed;
+    int ret = -1;
+
+    while (1)
+    {
+	/* see if there is any device work to do */
+	gen_mutex_lock(&dev_mutex);
+	if(dev_unexp_pending_count > 0)
+	    dev_unexp_pending_flag = 1;
+	else
+	    dev_unexp_pending_flag = 0;
+	gen_mutex_unlock(&dev_mutex);
+
+	num_completed = 0;
+	if(dev_unexp_pending_flag)
+	{
+	    ret = do_one_work_cycle_dev_unexp(&num_completed);
+	    if(ret < 0)
+	    {
+		/* set an error flag to be propigated out later */
+		gen_mutex_lock(&completion_mutex);
+		completion_error = ret;
+		gen_mutex_unlock(&completion_mutex);
+	    }
+	}
+	else
+	{
+	    /* nothing to do; block on condition */
+	    gen_mutex_lock(&dev_mutex);
+	    ret = pthread_cond_wait(&dev_cond, &dev_mutex);
+	    gen_mutex_unlock(&dev_mutex);
+	    if (ret != ETIMEDOUT && ret != EINTR && ret != 0)
+	    {
+		/* set an error flag to get propigated out later */
+		gen_mutex_lock(&completion_mutex);
+		completion_error = -ret;
+		gen_mutex_unlock(&completion_mutex);
+	    }
+	}
+
+	if (num_completed > 0)
+	{
+	    /* signal anyone blocking on completion queue */
+	    pthread_cond_signal(&completion_cond);
+	}
+    }
+
+    return (NULL);
+}
+
 
 #endif /* __PVFS2_JOB_THREADED__ */
 

@@ -32,7 +32,7 @@ int PINT_dev_initialize(
 void PINT_dev_finalize(void);
 
 int PINT_dev_test_unexpected(
-	int intcount,
+	int incount,
 	int* outcount,
 	struct PINT_dev_unexp_info* info_array,
 	int max_idle_time);
