@@ -4,14 +4,8 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/dcache.h>
-#include <linux/pagemap.h>
-#include "pvfs2-types.h"
 #include "pvfs2-kernel.h"
+#include "pvfs2-types.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-bufmap.h"
@@ -85,10 +79,10 @@ static inline int copy_attributes_to_inode(
             rounded_up_size =
                 (inode_size + (4096 - (inode_size % 4096)));
 
-            spin_lock(&inode->i_lock);
+            pvfs2_lock_inode(inode);
             inode->i_bytes = inode_size;
             inode->i_blocks = (unsigned long)(rounded_up_size / 512);
-            spin_unlock(&inode->i_lock);
+            pvfs2_unlock_inode(inode);
 
             /*
               NOTE: make sure all the places we're called from have
@@ -104,19 +98,25 @@ static inline int copy_attributes_to_inode(
         }
         else
         {
-            spin_lock(&inode->i_lock);
+            pvfs2_lock_inode(inode);
             inode->i_bytes = PAGE_CACHE_SIZE;
             inode->i_blocks = (unsigned long)(PAGE_CACHE_SIZE / 512);
-            spin_unlock(&inode->i_lock);
+            pvfs2_unlock_inode(inode);
 
             inode->i_size = PAGE_CACHE_SIZE;
         }
 
         inode->i_uid = attrs->owner;
         inode->i_gid = attrs->group;
+#ifdef PVFS2_LINUX_KERNEL_2_4
+        inode->i_atime = (time_t)attrs->atime;
+        inode->i_mtime = (time_t)attrs->mtime;
+        inode->i_ctime = (time_t)attrs->ctime;
+#else
         inode->i_atime.tv_sec = (time_t)attrs->atime;
         inode->i_mtime.tv_sec = (time_t)attrs->mtime;
         inode->i_ctime.tv_sec = (time_t)attrs->ctime;
+#endif
 
         inode->i_mode = 0;
 
@@ -281,6 +281,25 @@ static inline int copy_attributes_from_inode(
             attrs->group = inode->i_gid;
         attrs->mask |= PVFS_ATTR_SYS_GID;
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+        if (iattr && (iattr->ia_valid & ATTR_ATIME))
+            attrs->atime = (PVFS_time)iattr->ia_atime;
+        else
+            attrs->atime = (PVFS_time)inode->i_atime;
+        attrs->mask |= PVFS_ATTR_SYS_ATIME;
+
+        if (iattr && (iattr->ia_valid & ATTR_MTIME))
+            attrs->mtime = (PVFS_time)iattr->ia_mtime;
+        else
+            attrs->mtime = (PVFS_time)inode->i_mtime;
+        attrs->mask |= PVFS_ATTR_SYS_MTIME;
+
+        if (iattr && (iattr->ia_valid & ATTR_CTIME))
+            attrs->ctime = (PVFS_time)iattr->ia_ctime;
+        else
+            attrs->ctime = (PVFS_time)inode->i_ctime;
+        attrs->mask |= PVFS_ATTR_SYS_CTIME;
+#else
         if (iattr && (iattr->ia_valid & ATTR_ATIME))
             attrs->atime = (PVFS_time)iattr->ia_atime.tv_sec;
         else
@@ -298,7 +317,7 @@ static inline int copy_attributes_from_inode(
         else
             attrs->ctime = (PVFS_time)inode->i_ctime.tv_sec;
         attrs->mask |= PVFS_ATTR_SYS_CTIME;
-
+#endif
         if (iattr && (iattr->ia_valid & ATTR_SIZE))
             attrs->size = iattr->ia_size;
         else
@@ -427,8 +446,8 @@ int pvfs2_inode_setattr(
 
         new_op->upcall.type = PVFS2_VFS_OP_SETATTR;
         new_op->upcall.req.setattr.refn = pvfs2_inode->refn;
-        if ((new_op->upcall.req.setattr.refn.handle == (PVFS_handle)0) &&
-            (new_op->upcall.req.setattr.refn.fs_id == (PVFS_fs_id)0))
+        if ((new_op->upcall.req.setattr.refn.handle == PVFS_HANDLE_NULL) &&
+            (new_op->upcall.req.setattr.refn.fs_id == PVFS_FS_ID_NULL))
         {
             struct super_block *sb = inode->i_sb;
             new_op->upcall.req.lookup.parent_refn.handle =
@@ -1009,18 +1028,18 @@ void mask_blocked_signals(sigset_t *orig_sigset)
 {
     unsigned long sigallow = sigmask(SIGKILL);
     unsigned long irqflags = 0;
-    struct k_sigaction *action = current->sighand->action;
+    struct k_sigaction *action = pvfs2_current_sigaction;
 
     sigallow |= ((action[SIGINT-1].sa.sa_handler == SIG_DFL) ?
                  sigmask(SIGINT) : 0);
     sigallow |= ((action[SIGQUIT-1].sa.sa_handler == SIG_DFL) ?
                  sigmask(SIGQUIT) : 0);
 
-    spin_lock_irqsave(&current->sighand->siglock, irqflags);
+    spin_lock_irqsave(&pvfs2_current_signal_lock, irqflags);
     *orig_sigset = current->blocked;
     siginitsetinv(&current->blocked, sigallow & ~orig_sigset->sig[0]);
-    recalc_sigpending();
-    spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+    pvfs2_recalc_sigpending();
+    spin_unlock_irqrestore(&pvfs2_current_signal_lock, irqflags);
 }
 
 /* this code is based on linux/net/sunrpc/clnt.c:rpc_clnt_sigunmask */
@@ -1028,10 +1047,10 @@ void unmask_blocked_signals(sigset_t *orig_sigset)
 {
     unsigned long irqflags = 0;
 
-    spin_lock_irqsave(&current->sighand->siglock, irqflags);
+    spin_lock_irqsave(&pvfs2_current_signal_lock, irqflags);
     current->blocked = *orig_sigset;
-    recalc_sigpending();
-    spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
+    pvfs2_recalc_sigpending();
+    spin_unlock_irqrestore(&pvfs2_current_signal_lock, irqflags);
 }
 
 /*

@@ -4,12 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <asm/atomic.h>
-#include <linux/wait.h>
 #include "pvfs2-kernel.h"
 
 /* a cache for pvfs2 upcall/downcall operations */
@@ -51,10 +45,6 @@ static void op_cache_ctor(
         /* preemptively fill in the upcall credentials */
         pvfs2_gen_credentials(&op->upcall.credentials);
     }
-    else
-    {
-        pvfs2_error("WARNING!! op_ctor called without ctor flag\n");
-    }
 }
 
 void op_cache_initialize(void)
@@ -66,7 +56,7 @@ void op_cache_initialize(void)
 				 op_cache_ctor, NULL);
     if (!op_cache)
     {
-	panic("Cannot create pvfs2_op_cache\n");
+	pvfs2_panic("Cannot create pvfs2_op_cache\n");
     }
 
     /* initialize our atomic tag counter */
@@ -77,11 +67,7 @@ void op_cache_finalize(void)
 {
     if (kmem_cache_destroy(op_cache) != 0)
     {
-#ifdef PVFS2_KERNEL_DEBUG
-	panic("Failed to destroy pvfs2_op_cache\n");
-#else
-        pvfs2_error("Failed to destroy pvfs2_op_cache\n");
-#endif
+	pvfs2_panic("Failed to destroy pvfs2_op_cache\n");
     }
 }
 
@@ -111,14 +97,14 @@ static void dev_req_cache_ctor(
 
 void dev_req_cache_initialize(void)
 {
-    dev_req_cache = kmem_cache_create("pvfs2_dev_req_cache",
+    dev_req_cache = kmem_cache_create("pvfs2_devreqcache",
 				      MAX_ALIGNED_DEV_REQ_DOWNSIZE,
 				      0,
                                       PVFS2_CACHE_CREATE_FLAGS,
 				      dev_req_cache_ctor, NULL);
     if (!dev_req_cache)
     {
-	panic("Cannot create pvfs2_dev_req_cache\n");
+	pvfs2_panic("Cannot create pvfs2_dev_req_cache\n");
     }
 }
 
@@ -126,11 +112,7 @@ void dev_req_cache_finalize(void)
 {
     if (kmem_cache_destroy(dev_req_cache) != 0)
     {
-#ifdef PVFS2_KERNEL_DEBUG
-	panic("Failed to destroy pvfs2_dev_req_cache\n");
-#else
-	pvfs2_error("Failed to destroy pvfs2_dev_req_cache\n");
-#endif
+	pvfs2_panic("Failed to destroy pvfs2_devreqcache\n");
     }
 }
 
@@ -147,15 +129,17 @@ static void pvfs2_inode_cache_ctor(
 
         pvfs2_inode_initialize(pvfs2_inode);
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
 	/*
-	   inode_init_once is from inode.c;
-	   it's normally run when an inode is allocated by the
-	   system's inode slab allocator.  we call it here since
-	   we're overloading the system's inode allocation with
-	   this routine, thus we have to init vfs inodes manually
-	 */
+	   inode_init_once is from 2.6.x's inode.c; it's normally run
+	   when an inode is allocated by the system's inode slab
+	   allocator.  we call it here since we're overloading the
+	   system's inode allocation with this routine, thus we have
+	   to init vfs inodes manually
+        */
 	inode_init_once(&pvfs2_inode->vfs_inode);
 	pvfs2_inode->vfs_inode.i_version = 1;
+#endif
     }
     else
     {
@@ -187,7 +171,7 @@ void pvfs2_inode_cache_initialize(void)
                                           pvfs2_inode_cache_dtor);
     if (!pvfs2_inode_cache)
     {
-	panic("Cannot create pvfs2_inode_cache\n");
+	pvfs2_panic("Cannot create pvfs2_inode_cache\n");
     }
 }
 
@@ -195,11 +179,7 @@ void pvfs2_inode_cache_finalize(void)
 {
     if (kmem_cache_destroy(pvfs2_inode_cache) != 0)
     {
-#ifdef PVFS2_KERNEL_DEBUG
-	panic("Failed to destroy pvfs2_inode_cache\n");
-#else
-	pvfs2_error("Failed to destroy pvfs2_inode_cache\n");
-#endif
+	pvfs2_panic("Failed to destroy pvfs2_inode_cache\n");
     }
 }
 

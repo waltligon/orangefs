@@ -9,8 +9,6 @@
 
 #include "pvfs2-sysint.h"
 
-#define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
-
 typedef struct
 {
     int buf_index;

@@ -4,20 +4,9 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/fs.h>
-#include <linux/wait.h>
-#include <linux/module.h>
-#include <linux/moduleparam.h>
-#include <linux/vermagic.h>
 #include "pvfs2-kernel.h"
 
 extern struct file_operations pvfs2_devreq_file_operations;
-
-extern struct super_block *pvfs2_get_sb(
-    struct file_system_type *fst, int flags,
-    const char *devname, void *data);
 
 extern void pvfs2_kill_sb(struct super_block *sb);
 
@@ -28,6 +17,24 @@ static int hash_compare(void *key, struct qhash_head *link);
 /*************************************
  * global variables declared here
  *************************************/
+
+/* the size of the hash tables for ops in progress */
+static int hash_table_size = 509;
+
+#ifdef PVFS2_LINUX_KERNEL_2_4
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("PVFS2 Development Team");
+MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
+/*
+  for 2.4.x nfs exporting, we need to add fsid=# to the /etc/exports
+  file rather than using the FS_REQUIRES_DEV flag
+*/
+DECLARE_FSTYPE(pvfs2_fs_type, "pvfs2", pvfs2_get_sb, 0);
+
+MODULE_PARM(hash_table_size, "i");
+
+#else /* !PVFS2_LINUX_KERNEL_2_4 */
+
 struct file_system_type pvfs2_fs_type =
 {
     .name = "pvfs2",
@@ -42,6 +49,10 @@ struct file_system_type pvfs2_fs_type =
 */
     .fs_flags = FS_REQUIRES_DEV
 };
+
+module_param(hash_table_size, int, 0);
+
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 /* the assigned character device major number */
 static int pvfs2_dev_major = 0;
@@ -61,10 +72,6 @@ struct semaphore devreq_semaphore;
   list
 */
 struct semaphore request_semaphore;
-
-/* the size of the hash tables for ops in progress */
-static int hash_table_size = 509;
-module_param(hash_table_size, int, 0);
 
 /* hash table for storing operations waiting for matching downcall */
 struct qhash_table *htable_ops_in_progress = NULL;
@@ -169,7 +176,7 @@ static void __exit pvfs2_exit(void)
 static int hash_func(void *key, int table_size)
 {
     unsigned long tmp = 0;
-    unsigned long *real_tag = (unsigned long *) key;
+    unsigned long *real_tag = (unsigned long *)key;
     tmp += (*(real_tag));
     tmp = tmp % table_size;
     return ((int) tmp);
@@ -177,13 +184,11 @@ static int hash_func(void *key, int table_size)
 
 static int hash_compare(void *key, struct qhash_head *link)
 {
-    pvfs2_kernel_op_t *op = NULL;
-    unsigned long *real_tag = (unsigned long *) key;
+    unsigned long *real_tag = (unsigned long *)key;
+    pvfs2_kernel_op_t *op =
+        qhash_entry(link, pvfs2_kernel_op_t, list);
 
-    op = qhash_entry(link, pvfs2_kernel_op_t, list);
-
-    /* use unlikely here since most hash compares will fail */
-    if (unlikely(op->tag == *real_tag))
+    if (op->tag == *real_tag)
     {
 	return (1);
     }

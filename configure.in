@@ -150,6 +150,29 @@ AC_ARG_WITH(kernel,
     LINUX_KERNEL_SRC="$withval"
     , LINUX_KERNEL_SRC="")
 
+dnl
+dnl Enables the kernel module to build if the appropriate
+dnl linux-2.4.x path is specified
+dnl Make sure this is a usable kernel source tree too.
+dnl
+AC_ARG_WITH(kernel24,
+[  --with-kernel24=src_path  Build pvfs2 kernel module against 2.4.x src],
+    if test x$withval = xyes -o x$withval = x ; then
+    	AC_MSG_ERROR(--with-kernel24 must be given the path to your kernel 2.4.x source.)
+    fi
+    if ! test -d $withval ; then
+    	AC_MSG_ERROR(The --with-kernel path $withval is not a directory.)
+    fi
+    if ! test -r $withval/include/linux/version.h ; then
+	AC_MSG_ERROR(The kernel source tree must have been configured.)
+    fi
+    vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
+    if ! grep -q UTS_RELEASE..2\\.4\\. $withval/include/linux/version.h ; then
+	AC_MSG_ERROR(The kernel source tree does not appear to be 2.4)
+    fi
+    LINUX24_KERNEL_SRC="$withval"
+    , LINUX24_KERNEL_SRC="")
+
 dnl PAV configuration needs absolute location of source and build.
 dnl Linux-2.6 module needs absolute location of source, and uses the
 dnl relative location for soft links for out-of-tree builds.
@@ -158,6 +181,7 @@ SRC_RELATIVE_TOP=$srcdir
 SRC_ABSOLUTE_TOP=`cd $srcdir ; pwd`
 
 AC_SUBST(LINUX_KERNEL_SRC)
+AC_SUBST(LINUX24_KERNEL_SRC)
 AC_SUBST(BUILD_ABSOLUTE_TOP)
 AC_SUBST(SRC_RELATIVE_TOP)
 AC_SUBST(SRC_ABSOLUTE_TOP)
@@ -501,7 +525,7 @@ module.mk
 src/apps/admin/module.mk
 src/apps/karma/module.mk
 src/apps/vis/module.mk
-src/apps/kernel/linux-2.6/module.mk
+src/apps/kernel/linux/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
 src/io/trove/trove-dbpf/module.mk
@@ -533,6 +557,7 @@ src/server/request-scheduler/module.mk
 src/client/sysint/module.mk
 src/proto/contig/module.mk
 src/kernel/linux-2.6/Makefile
+src/kernel/linux-2.4/Makefile
 doc/module.mk
 doc/coding/module.mk
 doc/design/module.mk

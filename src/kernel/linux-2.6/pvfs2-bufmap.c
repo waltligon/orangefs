@@ -4,12 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/mm.h>
-#include <linux/pagemap.h>
-#include <asm/uaccess.h>
-
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 #include "pint-dev-shared.h"

@@ -3,19 +3,21 @@
 ###############################################################
 # LIST OF TARGETS WHICH MAY BE USED WHEN RUNNING MAKE:
 #
-# all        default rule; builds libs, server, and test programs
-# clean      cleans up files
-# distclean  _really_ cleans up; returns to pristine tree
-# docs       builds documentation in docs subdirectory
-# docsclean  cleans up documentation files
-# admintools builds admin tools
-# kernapps   builds userland helper programs for kernel driver 
-# statecomp  builds only the statecomp component
-# cscope     generates information for cscope utility
-# tags       generates tags file for use by editors
-# codecheck  checks source code for nonconformance to our std.
-# kmod       builds kernel module
-# kmod_install installs kernel module in default system module location
+# all            default rule; builds libs, server, and test programs
+# clean          cleans up files
+# distclean      _really_ cleans up; returns to pristine tree
+# docs           builds documentation in docs subdirectory
+# docsclean      cleans up documentation files
+# admintools     builds admin tools
+# kernapps       builds userland helper programs for kernel driver 
+# statecomp      builds only the statecomp component
+# cscope         generates information for cscope utility
+# tags           generates tags file for use by editors
+# codecheck      checks source code for nonconformance to our std.
+# kmod           builds 2.6.x kernel module
+# kmod24         builds 2.4.x kernel module
+# kmod_install   installs 2.6.x module in default module location
+# kmod24_install installs 2.4.x module in default module location
 # 
 # NOTE: you can also specify any single object or executable to
 #    build by providing its name (including the relative path) as the
@@ -451,6 +453,14 @@ kmod:
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.6
 endif
 
+# Build linux-2.4 kernel module if requested.
+LINUX24_KERNEL_SRC = @LINUX24_KERNEL_SRC@
+ifneq (,$(LINUX24_KERNEL_SRC))
+.PHONY: kmod24
+kmod24:
+	@$(MAKE) --no-print-directory -C src/kernel/linux-2.4
+endif
+
 # Just like dir, but strip the slash off the end, to be pretty.
 dirname = $(patsubst %/,%,$(dir $(1)))
 
@@ -695,6 +705,11 @@ clean::
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.6 clean
 endif
 
+ifneq (,$(LINUX24_KERNEL_SRC))
+clean::
+	@$(MAKE) --no-print-directory -C src/kernel/linux-2.4 clean
+endif
+
 # builds a tarball of the source tree suitable for distribution
 dist: $(SERVERGENSRC) $(SMCGEN) $(TROVE_AUTOGEN_FILES) cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
@@ -703,6 +718,7 @@ dist: $(SERVERGENSRC) $(SMCGEN) $(TROVE_AUTOGEN_FILES) cleaner
 cleaner: clean
 	rm -f tags
 	rm -f src/kernel/linux-2.6/Makefile
+	rm -f src/kernel/linux-2.4/Makefile
 	rm -f maint/mpi-depend.sh
 	rm -f examples/pvfs2-server.rc
 	rm -rf autom4te*.cache
@@ -859,3 +875,13 @@ kmod_install:
 	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(KMOD_DIR)
 endif
 
+ifneq (,$(LINUX24_KERNEL_SRC))
+
+KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX24_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
+KMOD_DIR := /lib/modules/$(KERNEL_VERS)/kernel/fs
+
+.PHONY: kmod24_install
+kmod24_install:
+	install -d $(KMOD_DIR)
+	install -m 755 src/kernel/linux-2.4/pvfs2.o $(KMOD_DIR)
+endif

@@ -4,12 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <asm/uaccess.h>
-#include <linux/uio.h>
-#include <linux/sched.h>
 #include "pvfs2-kernel.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
@@ -56,14 +50,20 @@ static int pvfs2_devreq_open(
     pvfs2_print("pvfs2_devreq_open: trying to open\n");
 
     down(&devreq_semaphore);
-    if ((open_access_count == 0) && try_module_get(pvfs2_fs_type.owner))
+
+    if (open_access_count == 0)
     {
-	ret = generic_file_open(inode, file);
-	if (ret == 0)
-	{
-	    open_access_count++;
+        ret = generic_file_open(inode, file);
+        if (ret == 0)
+        {
+#ifdef PVFS2_LINUX_KERNEL_2_4
+            MOD_INC_USE_COUNT;
+#else
+            ret = (try_module_get(pvfs2_fs_type.owner) ? 0 : 1);
+#endif
+            open_access_count++;
             device_owner = current;
-	}
+        }
     }
     else
     {
@@ -355,7 +355,11 @@ static int pvfs2_devreq_release(
     open_access_count--;
     device_owner = NULL;
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    MOD_DEC_USE_COUNT;
+#else
     module_put(pvfs2_fs_type.owner);
+#endif
 
     /*
       prune dcache here to get rid of entries that may no longer exist
@@ -442,13 +446,23 @@ static int pvfs2_devreq_ioctl(
     return -ENOSYS;
 }
 
+
 struct file_operations pvfs2_devreq_file_operations =
 {
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    owner:   THIS_MODULE,
+    read : pvfs2_devreq_read,
+    writev : pvfs2_devreq_writev,
+    open : pvfs2_devreq_open,
+    release : pvfs2_devreq_release,
+    ioctl : pvfs2_devreq_ioctl
+#else
     .read = pvfs2_devreq_read,
     .writev = pvfs2_devreq_writev,
     .open = pvfs2_devreq_open,
     .release = pvfs2_devreq_release,
     .ioctl = pvfs2_devreq_ioctl
+#endif
 };
 
 /*

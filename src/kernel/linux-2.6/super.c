@@ -4,14 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <asm/atomic.h>
-#include <linux/pagemap.h>
-#include <linux/statfs.h>
-#include <linux/buffer_head.h>
 #include "pvfs2-kernel.h"
 
 extern struct file_system_type pvfs2_fs_type;
@@ -24,6 +16,8 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
 
+extern void pvfs2_kill_sb(struct super_block *sb);
+
 /* list for storing pvfs2 specific superblocks in use */
 LIST_HEAD(pvfs2_superblocks);
 
@@ -33,8 +27,13 @@ spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
 static int parse_mount_options(
     char *option_str, struct super_block *sb, int silent)
 {
-    char *options = option_str;
+    char *ptr = option_str;
     pvfs2_sb_info_t *pvfs2_sb = NULL;
+    int i = 0, j = 0, num_keywords = 0, got_device = 0;
+
+    static char *keywords[] = {"intr"};
+    static int num_possible_keywords = 1;
+    static char options[PVFS2_MAX_NUM_OPTIONS][PVFS2_MAX_MOUNT_OPT_LEN];
 
     if (!silent)
     {
@@ -42,25 +41,73 @@ static int parse_mount_options(
         pvfs2_print(" %s\n", options);
     }
 
-    if (options && sb)
+    if (options && sb && PVFS2_SB(sb))
     {
+        memset(options, 0,
+               (PVFS2_MAX_NUM_OPTIONS * PVFS2_MAX_MOUNT_OPT_LEN));
+
         pvfs2_sb = PVFS2_SB(sb);
         memset(&pvfs2_sb->mnt_options, 0, sizeof(pvfs2_mount_options_t));
 
-        if (strncmp(options, "intr", 4) == 0)
+        while(ptr && (*ptr != '\0'))
         {
-            if (!silent)
+            options[num_keywords][j++] = *ptr;
+
+            if ((*ptr == ',') || (*ptr == '\0'))
             {
-                pvfs2_print("pvfs2: mount option intr specified\n");
+                options[num_keywords][j] = '\0';
+                num_keywords++;
+                j = 0;
             }
-            pvfs2_sb->mnt_options.intr = 1;
+        }
+
+        for(i = 0; i < num_keywords; i++)
+        {
+            for(j = 0; j < num_possible_keywords; j++)
+            {
+                if (strcmp(options[i], keywords[j]) == 0)
+                {
+                    if (strncmp(ptr, "intr", 4) == 0)
+                    {
+                        if (!silent)
+                        {
+                            pvfs2_print("pvfs2: mount option "
+                                        "intr specified\n");
+                        }
+                        pvfs2_sb->mnt_options.intr = 1;
+                    }
+                }
+                else
+                {
+                    /* assume we have a device name */
+                    if (got_device == 0)
+                    {
+                        strncpy(PVFS2_SB(sb)->devname, options[i],
+                                strlen(options[i]));
+                        got_device = 1;
+                    }
+                    else
+                    {
+                        pvfs2_error("pvfs2: multiple device names "
+                                    "specified: ignoring %s\n",
+                                    options[i]);
+                    }
+                }
+            }
         }
     }
-
-    /* parsed mount options are optional; always return success */
+    /*
+      in 2.4.x, we require a devname in the options; in 2.6.x, parsed
+      mount options are optional; always return success
+    */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    return (got_device ? 0 : 1);
+#else
     return 0;
+#endif
 }
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
 static struct inode *pvfs2_alloc_inode(struct super_block *sb)
 {
     struct inode *new_inode = NULL;
@@ -126,14 +173,69 @@ static void pvfs2_read_inode(
     }
 }
 
-/* called on sync ; make sure data is safe */
-static void pvfs2_write_inode(
-    struct inode *inode,
-    int do_sync)
+#else /* !PVFS2_LINUX_KERNEL_2_4 */
+
+static void pvfs2_read_inode(
+    struct inode *inode)
 {
-    pvfs2_print("pvfs2_write_inode: called (inode = %d)\n",
-		(int)inode->i_ino);
+    pvfs2_inode_t *pvfs2_inode = NULL;
+
+    pvfs2_print("pvfs2: pvfs2_read_inode called (inode = %lu | "
+                "ct = %d)\n", inode->i_ino,
+                (int)atomic_read(&inode->i_count));
+
+    if (inode->u.generic_ip)
+    {
+	pvfs2_panic("Found an initialized inode in pvfs2_read_inode! "
+                    "Should not have been initialized?\n");
+	return;
+    }
+
+    /* Here we allocate the PVFS2 specific inode structure */
+    pvfs2_inode = kmem_cache_alloc(pvfs2_inode_cache,
+                                   PVFS2_CACHE_ALLOC_FLAGS);
+    if (pvfs2_inode)
+    {
+	pvfs2_inode_initialize(pvfs2_inode);
+	inode->u.generic_ip = pvfs2_inode;
+	pvfs2_inode->vfs_inode = inode;
+    }
+    else
+    {
+	pvfs2_error("Could not allocate pvfs2_inode from "
+                    "pvfs2_inode_cache\n");
+	pvfs2_make_bad_inode(inode);
+	return;
+    }
+
+    /* Need to do a getattr() on the inode */
+    if (pvfs2_inode_getattr(inode) != 0)
+    {
+	/* flag any I/O errors */
+	pvfs2_make_bad_inode(inode);
+    }
 }
+
+static void pvfs2_clear_inode(struct inode *inode)
+{
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+
+    pvfs2_print("pvfs2_clear_inode called (ino %u | ct = %d | "
+                "nlink = %d | pvfs2_inode = %p\n", (unsigned int)
+                inode->i_ino, (int)atomic_read(&inode->i_count),
+                (int)inode->i_nlink, pvfs2_inode);
+
+    if (pvfs2_inode)
+    {
+        pvfs2_inode_finalize(pvfs2_inode);
+        kmem_cache_free(pvfs2_inode_cache, pvfs2_inode);
+    }
+    inode->u.generic_ip = NULL;
+
+    pvfs2_print("pvfs2_clear_inode finished\n");
+}
+
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 /* called when the VFS removes this inode from the inode cache */
 static void pvfs2_put_inode(
@@ -150,17 +252,31 @@ static void pvfs2_put_inode(
     }
 }
 
+/* called on sync ; make sure data is safe */
+static void pvfs2_write_inode(
+    struct inode *inode,
+    int do_sync)
+{
+    pvfs2_print("pvfs2_write_inode: called (inode = %d)\n",
+		(int)inode->i_ino);
+}
+
 /*
   NOTE: information filled in here is typically
   reflected in the output of 'df'
 */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+static int pvfs2_statfs(
+    struct super_block *sb,
+    struct statfs *buf)
+#else
 static int pvfs2_statfs(
     struct super_block *sb,
     struct kstatfs *buf)
+#endif
 {
     int ret = -1, retries = 5;
     pvfs2_kernel_op_t *new_op = NULL;
-    struct statfs tmp_statfs;
 
     pvfs2_print("pvfs2_statfs: called on sb %p (fs_id is %d)\n",
                 sb, (int)(PVFS2_SB(sb)->fs_id));
@@ -187,16 +303,7 @@ static int pvfs2_statfs(
 
         buf->f_type = sb->s_magic;
         buf->f_bsize = sb->s_blocksize;
-        buf->f_frsize = 1024;
         buf->f_namelen = PVFS2_NAME_LEN;
-
-        pvfs2_print("sizeof(kstatfs)=%d\n",sizeof(struct kstatfs));
-        pvfs2_print("sizeof(kstatfs->f_blocks)=%d\n",
-                    sizeof(buf->f_blocks));
-        pvfs2_print("sizeof(statfs)=%d\n",sizeof(struct statfs));
-        pvfs2_print("sizeof(statfs->f_blocks)=%d\n",
-                    sizeof(tmp_statfs.f_blocks));
-        pvfs2_print("sizeof(sector_t)=%d\n",sizeof(sector_t));
 
         buf->f_blocks = (sector_t)
             new_op->downcall.resp.statfs.blocks_total;
@@ -209,32 +316,50 @@ static int pvfs2_statfs(
         buf->f_ffree = (sector_t)
             new_op->downcall.resp.statfs.files_avail;
 
-        if ((sizeof(struct statfs) != sizeof(struct kstatfs)) &&
-            (sizeof(tmp_statfs.f_blocks) == 4))
+#ifndef PVFS2_LINUX_KERNEL_2_4
+        do
         {
-            /*
-              in this case, we need to truncate the values here to be
-              no bigger than the max 4 byte long value because the
-              kernel will return an overflow if it's larger otherwise.
-              see vfs_statfs_native in open.c for the actual overflow
-              checks made.
-            */
-            buf->f_blocks &= 0x00000000FFFFFFFFULL;
-            buf->f_bfree &= 0x00000000FFFFFFFFULL;
-            buf->f_bavail &= 0x00000000FFFFFFFFULL;
-            buf->f_files &= 0x00000000FFFFFFFFULL;
-            buf->f_ffree &= 0x00000000FFFFFFFFULL;
+            struct statfs tmp_statfs;
 
-            pvfs2_print("pvfs2_statfs (T) got %ld files total | "
-                        "%ld files_avail\n", buf->f_files, buf->f_ffree);
-        }
-        else
-        {
-            pvfs2_print("pvfs2_statfs (N) got %lu files total | "
-                        "%lu files_avail\n", buf->f_files, buf->f_ffree);
-        }
+            buf->f_frsize = 1024;
 
-        ret = new_op->downcall.status;
+            pvfs2_print("sizeof(kstatfs)=%d\n",sizeof(struct kstatfs));
+            pvfs2_print("sizeof(kstatfs->f_blocks)=%d\n",
+                        sizeof(buf->f_blocks));
+            pvfs2_print("sizeof(statfs)=%d\n",sizeof(struct statfs));
+            pvfs2_print("sizeof(statfs->f_blocks)=%d\n",
+                        sizeof(tmp_statfs.f_blocks));
+            pvfs2_print("sizeof(sector_t)=%d\n",sizeof(sector_t));
+
+            if ((sizeof(struct statfs) != sizeof(struct kstatfs)) &&
+                (sizeof(tmp_statfs.f_blocks) == 4))
+            {
+                /*
+                  in this case, we need to truncate the values here to
+                  be no bigger than the max 4 byte long value because
+                  the kernel will return an overflow if it's larger
+                  otherwise.  see vfs_statfs_native in open.c for the
+                  actual overflow checks made.
+                */
+                buf->f_blocks &= 0x00000000FFFFFFFFULL;
+                buf->f_bfree &= 0x00000000FFFFFFFFULL;
+                buf->f_bavail &= 0x00000000FFFFFFFFULL;
+                buf->f_files &= 0x00000000FFFFFFFFULL;
+                buf->f_ffree &= 0x00000000FFFFFFFFULL;
+                
+                pvfs2_print("pvfs2_statfs (T) got %ld files total | "
+                            "%ld files_avail\n", buf->f_files,
+                            buf->f_ffree);
+            }
+            else
+            {
+                pvfs2_print("pvfs2_statfs (N) got %lu files total | "
+                            "%lu files_avail\n", buf->f_files,
+                            buf->f_ffree);
+            }
+        } while(0);
+#endif
+        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
     }
 
   error_exit:
@@ -294,7 +419,6 @@ int pvfs2_remount(
         pvfs2_print("pvfs2_remount: mount got return value of %d\n", ret);
         if (ret)
         {
-            sb = ERR_PTR(ret);
             goto error_exit;
         }
 
@@ -318,6 +442,15 @@ int pvfs2_remount(
 
 struct super_operations pvfs2_s_ops =
 {
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    read_inode : pvfs2_read_inode,
+    statfs : pvfs2_statfs,
+    write_inode : pvfs2_write_inode,
+    remount_fs : pvfs2_remount,
+    put_super : pvfs2_kill_sb,
+    clear_inode: pvfs2_clear_inode,
+    put_inode: pvfs2_put_inode,
+#else
     .drop_inode = generic_delete_inode,
     .alloc_inode = pvfs2_alloc_inode,
     .destroy_inode = pvfs2_destroy_inode,
@@ -325,8 +458,142 @@ struct super_operations pvfs2_s_ops =
     .write_inode = pvfs2_write_inode,
     .put_inode = pvfs2_put_inode,
     .statfs = pvfs2_statfs,
-    .remount_fs = pvfs2_remount,
+    .remount_fs = pvfs2_remount
+#endif
 };
+
+#ifdef PVFS2_LINUX_KERNEL_2_4
+
+struct super_block* pvfs2_get_sb(
+    struct super_block *sb,
+    void *data,
+    int silent)
+{
+    struct inode *root = NULL;
+    struct dentry *root_dentry = NULL;
+    pvfs2_kernel_op_t *new_op = NULL;
+    char *dev_name = NULL;
+    int ret = -EINVAL;
+
+    MOD_INC_USE_COUNT;
+
+    if (!data || !sb)
+    {
+	if (!silent)
+        {
+	    pvfs2_print("pvfs2_get_sb: no data parameter!\n");
+	}
+	goto error_exit;
+    }
+    else
+    {
+	/* alloc and init our private pvfs2 sb info */
+	sb->u.generic_sbp = kmalloc(
+            sizeof(pvfs2_sb_info_t), PVFS2_GFP_FLAGS);
+
+	if (!PVFS2_SB(sb))
+	{
+	    goto error_exit;
+	}
+	memset(sb->u.generic_sbp, 0, sizeof(pvfs2_sb_info_t));
+	PVFS2_SB(sb)->sb = sb;
+
+        if (parse_mount_options(data, sb, silent))
+        {
+	    goto error_exit;
+        }
+	dev_name = PVFS2_SB(sb)->devname;
+    }
+
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    if (!new_op)
+    {
+	goto error_exit;
+    }
+    new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
+    strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
+	    dev_name, PVFS_MAX_SERVER_ADDR_LEN);
+
+    pvfs2_print("Attempting PVFS2 Mount via host %s\n",
+		new_op->upcall.req.fs_mount.pvfs2_config_server);
+
+    service_operation(new_op, "pvfs2_get_sb", 0);
+    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+
+    pvfs2_error("pvfs2_get_sb: mount returned %d\n", ret);
+    if (ret)
+    {
+	goto error_exit;
+    }
+
+    if ((new_op->downcall.resp.fs_mount.fs_id == PVFS_FS_ID_NULL) ||
+	(new_op->downcall.resp.fs_mount.root_handle ==
+	 PVFS_HANDLE_NULL))
+    {
+	pvfs2_error("ERROR: Retrieved null fs_id or root_handle\n");
+	goto error_exit;
+    }
+    PVFS2_SB(sb)->root_handle = new_op->downcall.resp.fs_mount.root_handle;
+    PVFS2_SB(sb)->fs_id = new_op->downcall.resp.fs_mount.fs_id;
+    PVFS2_SB(sb)->id = new_op->downcall.resp.fs_mount.id;
+
+    sb->s_magic = PVFS2_MAGIC;
+    sb->s_op = &pvfs2_s_ops;
+    sb->s_type = &pvfs2_fs_type;
+
+    sb->s_blocksize = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
+    sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
+    sb->s_maxbytes = MAX_LFS_FILESIZE;
+
+    /* alloc and initialize our root directory inode */
+    root = pvfs2_get_custom_inode(
+        sb, (S_IFDIR | 0755), 0, PVFS2_SB(sb)->root_handle);
+    if (!root)
+    {
+	goto error_exit;
+    }
+    PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
+
+    /* allocates and places root dentry in dcache */
+    root_dentry = d_alloc_root(root);
+    if (!root_dentry)
+    {
+	iput(root);
+	goto error_exit;
+    }
+    root_dentry->d_op = &pvfs2_dentry_operations;
+    sb->s_root = root_dentry;
+
+    /* finally, add this sb to our list of known pvfs2 sb's */
+    add_pvfs2_sb(sb);
+
+    if (new_op)
+    {
+	op_release(new_op);
+    }
+    return sb;
+
+  error_exit:
+    pvfs2_error("Could not succeed getting a super-block "
+                "for the mount request %d\n", ret);
+    if (sb)
+    {
+	if (sb->u.generic_sbp != NULL)
+        {
+	    kfree(sb->u.generic_sbp);
+        }
+    }
+
+    if (new_op)
+    {
+        op_release(new_op);
+    }
+
+    MOD_DEC_USE_COUNT;
+    return NULL;
+}
+
+#else /* !PVFS2_LINUX_KERNEL_2_4 */
 
 static struct export_operations pvfs2_export_ops = {};
 
@@ -485,6 +752,7 @@ struct super_block *pvfs2_get_sb(
     }
     return sb;
 }
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 void pvfs2_kill_sb(
     struct super_block *sb)
@@ -500,6 +768,7 @@ void pvfs2_kill_sb(
     /* remove the sb from our list of pvfs2 specific sb's */
     remove_pvfs2_sb(sb);
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
     /* prune dcache based on sb */
     shrink_dcache_sb(sb);
 
@@ -511,10 +780,16 @@ void pvfs2_kill_sb(
     {
         dput(sb->s_root);
     }
+#endif
 
     /* free the pvfs2 superblock private data */
     kfree(PVFS2_SB(sb));
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    sb->u.generic_sbp = NULL;
+
+    MOD_DEC_USE_COUNT;
+#endif
     pvfs2_print("pvfs2_kill_sb: returning normally\n");
 }
 

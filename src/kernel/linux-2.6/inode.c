@@ -4,14 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/mpage.h>
-#include <linux/buffer_head.h>
-#include <linux/backing-dev.h>
-#include <linux/pagemap.h>
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
@@ -32,19 +24,30 @@ extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 
+
+#ifdef PVFS2_LINUX_KERNEL_2_4
+static int pvfs2_get_blocks(
+    struct inode *inode,
+    sector_t lblock,
+    unsigned long max_blocks,
+    struct page *page)
+#else
 static int pvfs2_get_blocks(
     struct inode *inode,
     sector_t lblock,
     unsigned long max_blocks,
     struct buffer_head *bh_result,
     int create)
+#endif
 {
     int ret = -EIO;
     uint32_t max_block = 0;
     ssize_t bytes_read = 0;
     void *page_data = NULL;
-    struct page *page = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+#ifndef PVFS2_LINUX_KERNEL_2_4
+    struct page *page = NULL;
+#endif
 
     /*
       FIXME:
@@ -93,7 +96,9 @@ static int pvfs2_get_blocks(
         return -EIO;
     }
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
     page = bh_result->b_page;
+#endif
     page_data = kmap(page);
 
     /*
@@ -175,17 +180,19 @@ static int pvfs2_get_blocks(
             ClearPageError(page);
         }
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
         bh_result->b_data = page_data;
         bh_result->b_size = blocksize;
 
         map_bh(bh_result, inode->i_sb, lblock);
         set_buffer_uptodate(bh_result);
-
+#endif
         ret = 0;
     }
     return ret;
 }
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_get_block(
     struct inode *ip,
     sector_t lblock,
@@ -195,15 +202,44 @@ static int pvfs2_get_block(
     pvfs2_print("pvfs2: pvfs2_get_block called\n");
     return pvfs2_get_blocks(ip, lblock, 1, bh_result, create);
 }
+#endif
 
 static int pvfs2_readpage(
     struct file *file,
     struct page *page)
 {
-    pvfs2_print("pvfs2: pvfs2_readpage called with page %p\n",page);
-    return mpage_readpage(page, pvfs2_get_block);
+    int ret = 0;
+
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    struct inode *inode = NULL;
+    sector_t offset;
+
+    pvfs2_print("pvfs2_readpage called with page %p\n",page);
+    atomic_inc(&page->count);
+    set_bit(PG_locked, &page->flags);
+    clear_bit(PG_uptodate, &page->flags);
+    clear_bit(PG_error, &page->flags);
+
+    offset = (page->index) << PAGE_CACHE_SHIFT;
+    inode = page->mapping->host;
+
+    pvfs2_lock_kernel();
+    ret = pvfs2_get_blocks(inode, offset, 1, page);
+    pvfs2_unlock_kernel();
+
+    UnlockPage(page);
+    __free_page(page);
+
+#else
+
+    pvfs2_print("pvfs2_readpage called with page %p\n",page);
+    ret = mpage_readpage(page, pvfs2_get_block);
+
+#endif
+    return ret;
 }
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_readpages(
     struct file *file,
     struct address_space *mapping,
@@ -231,18 +267,23 @@ static int pvfs2_releasepage(struct page *page, int foo)
     return 0;
 }
 
-struct address_space_operations pvfs2_address_operations =
-{
-    .readpage = pvfs2_readpage,
-    .readpages = pvfs2_readpages,
-    .invalidatepage = pvfs2_invalidatepage,
-    .releasepage = pvfs2_releasepage,
-};
-
 struct backing_dev_info pvfs2_backing_dev_info =
 {
     .ra_pages = 0,
     .memory_backed = 1 /* does not contribute to dirty memory */
+};
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
+
+struct address_space_operations pvfs2_address_operations =
+{
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    readpage : pvfs2_readpage
+#else
+    .readpage = pvfs2_readpage,
+    .readpages = pvfs2_readpages,
+    .invalidatepage = pvfs2_invalidatepage,
+    .releasepage = pvfs2_releasepage
+#endif
 };
 
 void pvfs2_truncate(struct inode *inode)
@@ -284,6 +325,24 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     return ret;
 }
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+int pvfs2_revalidate(struct dentry *dentry)
+{
+    int ret = 0;
+    struct inode *inode = (dentry ? dentry->d_inode : NULL);
+
+    pvfs2_lock_kernel();
+    ret = pvfs2_inode_getattr(inode);
+    pvfs2_unlock_kernel();
+
+    if (ret)
+    {
+        /* assume an I/O error and flag inode as bad */
+        pvfs2_make_bad_inode(inode);
+    }
+    return ret;
+}
+#else
 int pvfs2_getattr(
     struct vfsmount *mnt,
     struct dentry *dentry,
@@ -306,12 +365,19 @@ int pvfs2_getattr(
     }
     return ret;
 }
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 struct inode_operations pvfs2_file_inode_operations =
 {
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    truncate : pvfs2_truncate,
+    setattr : pvfs2_setattr,
+    revalidate : pvfs2_revalidate
+#else
     .truncate = pvfs2_truncate,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr
+#endif
 };
 
 struct inode *pvfs2_get_custom_inode(
@@ -334,13 +400,15 @@ struct inode *pvfs2_get_custom_inode(
 	pvfs2_inode = PVFS2_I(inode);
 	if (!pvfs2_inode)
         {
-            panic("pvfs2_get_custom_inode: PRIVATE DATA NOT ALLOCATED\n");
+            iput(inode);
+            pvfs2_panic("pvfs2_get_custom_inode: PRIVATE "
+                        "DATA NOT ALLOCATED\n");
             return NULL;
         }
 	else
         {
-	    pvfs2_inode->refn.handle = 0;
-	    pvfs2_inode->refn.fs_id = 0;
+	    pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
+	    pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
         }
 	pvfs2_print("pvfs2_get_custom_inode: inode %p allocated\n  "
 		    "(pvfs2_inode is %p | sb is %p)\n", inode,
@@ -349,7 +417,9 @@ struct inode *pvfs2_get_custom_inode(
 	inode->i_mode = mode;
         inode->i_mapping->host = inode;
 	inode->i_mapping->a_ops = &pvfs2_address_operations;
+#ifndef PVFS2_LINUX_KERNEL_2_4
 	inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
+#endif
 	inode->i_uid = current->fsuid;
 	inode->i_gid = current->fsgid;
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;

@@ -4,13 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/namei.h>
-#include <linux/pagemap.h>
-#include <linux/smp_lock.h>
 #include "pvfs2-kernel.h"
 
 extern kmem_cache_t *op_cache;
@@ -24,11 +17,18 @@ extern struct dentry_operations pvfs2_dentry_operations;
   called with a negative dentry, so we need to hook it up with a newly
   allocated inode
 */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+static int pvfs2_create(
+    struct inode *dir,
+    struct dentry *dentry,
+    int mode)
+#else
 static int pvfs2_create(
     struct inode *dir,
     struct dentry *dentry,
     int mode,
     struct nameidata *nd)
+#endif
 {
     int ret = -EINVAL;
     struct inode *inode = NULL;
@@ -42,10 +42,16 @@ static int pvfs2_create(
     return (inode ? 0 : ret);
 }
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+struct dentry *pvfs2_lookup(
+    struct inode *dir,
+    struct dentry *dentry)
+#else
 struct dentry *pvfs2_lookup(
     struct inode *dir,
     struct dentry *dentry,
     struct nameidata *nd)
+#endif
 {
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     struct inode *inode = NULL;
@@ -55,6 +61,7 @@ struct dentry *pvfs2_lookup(
 
     pvfs2_print("pvfs2_lookup called on %s\n", dentry->d_name.name);
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
     /*
       we can skip doing anything knowing that the intent is to
       create.  normally this results in an expensive failed
@@ -76,6 +83,7 @@ struct dentry *pvfs2_lookup(
                     "based on excl open intent\n");
         return NULL;
     }
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
     if (dentry->d_name.len > PVFS2_NAME_LEN)
     {
@@ -90,6 +98,9 @@ struct dentry *pvfs2_lookup(
     }
     new_op->upcall.type = PVFS2_VFS_OP_LOOKUP;
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    new_op->upcall.req.lookup.sym_follow = PVFS2_LOOKUP_LINK_NO_FOLLOW;
+#else
     /*
       if we're at a symlink, should we follow it? never attempt to
       follow negative dentries
@@ -98,6 +109,7 @@ struct dentry *pvfs2_lookup(
         ((nd && (nd->flags & LOOKUP_FOLLOW) &&
           (dentry->d_inode != NULL)) ?
          PVFS2_LOOKUP_LINK_FOLLOW : PVFS2_LOOKUP_LINK_NO_FOLLOW);
+#endif
 
     if (dir)
     {
@@ -162,7 +174,8 @@ struct dentry *pvfs2_lookup(
 
 	    /* update dentry/inode pair into dcache */
 	    dentry->d_op = &pvfs2_dentry_operations;
-            d_splice_alias(inode, dentry);
+
+            pvfs2_d_splice_alias(dentry, inode);
 
             pvfs2_print("Lookup success (inode ct = %d)\n",
                         (int)atomic_read(&inode->i_count));
@@ -254,6 +267,7 @@ static int pvfs2_symlink(
     return (inode ? 0 : ret);
 }
 
+#if 0
 static int pvfs2_mknod(
     struct inode *dir,
     struct dentry *dentry,
@@ -263,6 +277,7 @@ static int pvfs2_mknod(
     pvfs2_print("pvfs2: pvfs2_mknod called\n");
     return 0;
 }
+#endif
 
 static int pvfs2_mkdir(
     struct inode *dir,
@@ -290,13 +305,19 @@ static int pvfs2_rmdir(
     int ret = -ENOTEMPTY;
     struct inode *inode = dentry->d_inode;
 
-    dentry->d_inode->i_nlink--;
+    /* FIXME: is this necessary? */
+    if (!d_unhashed(dentry))
+    {
+	return -EBUSY;
+    }
 
     ret = pvfs2_unlink(dir, dentry);
     if (ret == 0)
     {
+        dentry->d_inode->i_nlink--;
         inode->i_size = 0;
         dir->i_nlink--;
+        dir->i_mtime = dir->i_ctime = CURRENT_TIME;
     }
     return ret;
 }
@@ -407,11 +428,29 @@ static int pvfs2_rename(
   error_exit:
     op_release(new_op);
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    if (ret == 0)
+    {
+        d_move(old_dentry, new_dentry);
+    }
+#endif
     return ret;
 }
 
 struct inode_operations pvfs2_dir_inode_operations =
 {
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    create : pvfs2_create,
+    lookup : pvfs2_lookup,
+    link : pvfs2_link,
+    unlink : pvfs2_unlink,
+    symlink : pvfs2_symlink,
+    mkdir : pvfs2_mkdir,
+    rmdir : pvfs2_rmdir,
+    rename : pvfs2_rename,
+    setattr : pvfs2_setattr,
+    revalidate : pvfs2_revalidate
+#else
     .create = pvfs2_create,
     .lookup = pvfs2_lookup,
     .link = pvfs2_link,
@@ -419,10 +458,10 @@ struct inode_operations pvfs2_dir_inode_operations =
     .symlink = pvfs2_symlink,
     .mkdir = pvfs2_mkdir,
     .rmdir = pvfs2_rmdir,
-    .mknod = pvfs2_mknod,
     .rename = pvfs2_rename,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr
+#endif
 };
 
 /*

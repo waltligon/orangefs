@@ -4,14 +4,23 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/namei.h>
 #include "pvfs2-kernel.h"
 
 /* should return 1 if dentry can still be trusted, else 0 */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+int pvfs2_d_revalidate(
+    struct dentry *dentry,
+    int flags)
+{
+    struct inode *inode = (dentry ? dentry->d_inode : NULL);
+
+    pvfs2_print("pvfs2_d_revalidate: called on dentry %p\n", dentry);
+
+    return pvfs2_internal_revalidate(inode);
+}
+
+#else
+
 int pvfs2_d_revalidate(
     struct dentry *dentry,
     struct nameidata *nd)
@@ -28,16 +37,14 @@ int pvfs2_d_revalidate(
                     "skipping getattr\n");
         ret = 1;
     }
-    else if (inode)
+    else
     {
-        ret = ((pvfs2_inode_getattr(inode) == 0) ? 1 : 0);
-        if (ret == 0)
-        {
-            pvfs2_make_bad_inode(inode);
-        }
+        ret = pvfs2_internal_revalidate(inode);
     }
     return ret;
 }
+
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 /*
   to propagate an error, return a value < 0, as this causes
@@ -72,9 +79,6 @@ struct dentry_operations pvfs2_dentry_operations =
     .d_revalidate = pvfs2_d_revalidate,
     .d_hash = pvfs2_d_hash,
     .d_compare = pvfs2_d_compare,
-/*     .d_delete = pvfs2_d_delete, */
-/*     .d_release = pvfs2_d_release, */
-/*     .d_iput = pvfs2_d_iput */
 };
 
 /*

@@ -4,13 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
-#include <asm/atomic.h>
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
@@ -46,34 +39,38 @@ int pvfs2_file_open(
 
     inode->i_mapping->host = inode;
     inode->i_mapping->a_ops = &pvfs2_address_operations;
+#ifndef PVFS2_LINUX_KERNEL_2_4
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
+#endif
 
+    pvfs2_lock_kernel();
     if (S_ISDIR(inode->i_mode))
     {
-        return dcache_dir_open(inode, file);
+        ret = dcache_dir_open(inode, file);
     }
-
-    /*
-      if the file's being opened for append mode, set the file pos to
-      the end of the file when we retrieve the size (which we must
-      forcefully do here in this case, afaict atm)
-    */
-    if (file->f_flags & O_APPEND)
+    else
     {
-        ret = pvfs2_inode_getattr(inode);
-        if (ret)
+        /*
+          if the file's being opened for append mode, set the file pos
+          to the end of the file when we retrieve the size (which we
+          must forcefully do here in this case, afaict atm)
+        */
+        if (file->f_flags & O_APPEND)
         {
-            pvfs2_print("pvfs2_file_open getattr error: %d\n", ret);
-            return ret;
+            ret = pvfs2_inode_getattr(inode);
+            if (ret == 0)
+            {
+                file->f_pos = inode->i_size;
+            }
         }
-        file->f_pos = inode->i_size;
-    }
 
-    /*
-      fs/open.c: returns 0 after enforcing large file support if
-      running on a 32 bit system w/o O_LARGFILE flag
-    */
-    ret = generic_file_open(inode, file);
+        /*
+          fs/open.c: returns 0 after enforcing large file support if
+          running on a 32 bit system w/o O_LARGFILE flag
+        */
+        ret = generic_file_open(inode, file);
+    }
+    pvfs2_unlock_kernel();
 
     pvfs2_print("pvfs2_file_open returning normally: %d\n", ret);
     return ret;
@@ -207,10 +204,9 @@ ssize_t pvfs2_inode_read(
     }
 
     /*
-      NOTE: for this special case, op is freed
-      by devreq_writev and *not* here.
+      NOTE: for this special case, op is freed by devreq_writev and
+      *not* here.
     */
-
     return(total_count); 
 }
 
@@ -386,7 +382,9 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     */
     inode->i_mapping->host = inode;
     inode->i_mapping->a_ops = &pvfs2_address_operations;
+#ifndef PVFS2_LINUX_KERNEL_2_4
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
+#endif
 
     /* and clear any associated pages in the page cache (if any) */
     if (inode->i_data.nrpages)
@@ -395,7 +393,7 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     }
 
     /* have the vfs enforce readonly mmap support for us */
-    return generic_file_readonly_mmap(file, vma);
+    return pvfs2_generic_file_readonly_mmap(file, vma);
 }
 
 /*
@@ -446,35 +444,44 @@ int pvfs2_fsync(
 loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
 {
     int ret = -EINVAL;
-    struct inode *inode = (file->f_mapping->host ? file->f_mapping->host :
-                           file->f_dentry->d_inode);
+    struct inode *inode = file->f_dentry->d_inode;
+
     if (!inode)
     {
         pvfs2_error("pvfs2_file_llseek: invalid inode (NULL)\n");
         return ret;
     }
 
-/*     if (inode->i_size == 0) */
-/*     { */
-/*         /\* revalidate the inode's file size *\/ */
-/*         ret = pvfs2_inode_getattr(inode); */
-/*         if (ret) */
-/*         { */
-/*             pvfs2_make_bad_inode(inode); */
-/*             return ret; */
-/*         } */
-/*     } */
+    if (origin == PVFS2_SEEK_END)
+    {
+        /* revalidate the inode's file size */
+        ret = pvfs2_inode_getattr(inode);
+        if (ret)
+        {
+            pvfs2_make_bad_inode(inode);
+            return ret;
+        }
+    }
 
     pvfs2_print("pvfs2_file_llseek: int offset is %d | origin is %d | "
                 "inode size is %lu\n", (int)offset, origin,
                 (unsigned long)file->f_dentry->d_inode->i_size);
 
     return generic_file_llseek(file, offset, origin);
-/*     return remote_llseek(file, offset, origin); */
 }
 
 struct file_operations pvfs2_file_operations =
 {
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    llseek : pvfs2_file_llseek,
+    read : pvfs2_file_read,
+    write : pvfs2_file_write,
+    ioctl : pvfs2_ioctl,
+    mmap : pvfs2_file_mmap,
+    open : pvfs2_file_open,
+    release : pvfs2_file_release,
+    fsync : pvfs2_fsync
+#else
     .llseek = pvfs2_file_llseek,
     .read = pvfs2_file_read,
     .write = pvfs2_file_write,
@@ -483,6 +490,7 @@ struct file_operations pvfs2_file_operations =
     .open = pvfs2_file_open,
     .release = pvfs2_file_release,
     .fsync = pvfs2_fsync
+#endif
 };
 
 /*

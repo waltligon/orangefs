@@ -4,11 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/pagemap.h>
 #include "pvfs2-kernel.h"
 #include "pvfs2-sysint.h"
 
@@ -192,10 +187,17 @@ static int pvfs2_readdir(
 
 struct file_operations pvfs2_dir_operations =
 {
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    read : generic_read_dir,
+    readdir : pvfs2_readdir,
+    open : pvfs2_file_open,
+    release : pvfs2_file_release
+#else
     .read = generic_read_dir,
     .readdir = pvfs2_readdir,
     .open = pvfs2_file_open,
     .release = pvfs2_file_release
+#endif
 };
 
 /*

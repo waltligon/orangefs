@@ -4,11 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/fs.h>
-#include <linux/wait.h>
 #include "pvfs2-kernel.h"
 
 extern struct list_head pvfs2_request_list;

@@ -8,22 +8,75 @@
 #define __PVFS2KERNEL_H
 
 #include <linux/config.h>
-#include <linux/fs.h>
+
+#ifdef PVFS2_LINUX_KERNEL_2_4
+
+#define __NO_VERSION__
+#include <linux/version.h>
+#ifdef CONFIG_MODVERSIONS
+#include <linux/modversions.h>
+#endif
+
+#ifndef HAVE_SECTOR_T
+typedef unsigned long sector_t;
+#endif
+
+#else /* !(PVFS2_LINUX_KERNEL_2_4) */
+
+#include <linux/moduleparam.h>
+#include <linux/vermagic.h>
+#include <linux/statfs.h>
+#include <linux/buffer_head.h>
+#include <linux/backing-dev.h>
+#include <linux/mpage.h>
+#include <linux/namei.h>
+
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
+
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/fs.h>
+#include <asm/uaccess.h>
+#include <linux/uio.h>
+#include <linux/sched.h>
+#include <linux/mm.h>
+#include <asm/atomic.h>
+#include <linux/smp_lock.h>
+#include <linux/wait.h>
+#include <linux/dcache.h>
+#include <linux/pagemap.h>
 
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("PVFS2 Development Team");
 MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
+#endif
+
+#define pvfs2_error printk
 
 #ifdef PVFS2_KERNEL_DEBUG
 #define pvfs2_print printk
+#define pvfs2_panic(msg)                                       \
+do {                                                           \
+    pvfs2_error("BUG! Please contact pvfs2-developers@beowulf-"\
+                "underground.org\n");                          \
+    panic(msg);                                                \
+} while(0)
 #else
 #define pvfs2_print(...)
+#define pvfs2_panic(msg)                                       \
+do {                                                           \
+    pvfs2_error("BUG! Please contact pvfs2-developers@beowulf-"\
+                "underground.org\n");                          \
+    pvfs2_error(msg);                                          \
+} while(0)
 #endif
-#define pvfs2_error printk
 
 #ifdef PVFS2_KERNEL_DEBUG
 #define MAX_SERVICE_WAIT_IN_SECONDS       10
@@ -37,6 +90,9 @@ MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
 #define PVFS2_DEVREQ_MAGIC             0x20030529
 #define PVFS2_LINK_MAX                 0x000000FF
 #define PVFS2_OP_RETRY_COUNT           0x00000005
+#define PVFS2_SEEK_END                 0x00000002
+#define PVFS2_MAX_NUM_OPTIONS          0x00000004
+#define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
 
 #define MAX_DEV_REQ_UPSIZE (sizeof(int32_t) +   \
 sizeof(int64_t) + sizeof(pvfs2_upcall_t))
@@ -136,7 +192,11 @@ typedef struct
     PVFS_object_ref refn;
     PVFS_ds_position readdir_token_adjustment;
     char *link_target;
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    struct inode *vfs_inode;
+#else
     struct inode vfs_inode;
+#endif
     sector_t last_failed_block_index_read;
 } pvfs2_inode_t;
 
@@ -186,13 +246,21 @@ typedef struct
 static inline pvfs2_inode_t *PVFS2_I(
     struct inode *inode)
 {
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    return (pvfs2_inode_t *)inode->u.generic_ip;
+#else
     return container_of(inode, pvfs2_inode_t, vfs_inode);
+#endif
 }
 
 static inline pvfs2_sb_info_t *PVFS2_SB(
     struct super_block *sb)
 {
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    return (pvfs2_sb_info_t *)sb->u.generic_sbp;
+#else
     return (pvfs2_sb_info_t *)sb->s_fs_info;
+#endif
 }
 
 /****************************
@@ -222,6 +290,17 @@ int wait_for_matching_downcall(
 /****************************
  * defined in super.c
  ****************************/
+#ifdef PVFS2_LINUX_KERNEL_2_4
+struct super_block* pvfs2_get_sb(
+    struct super_block *sb,
+    void *data,
+    int silent);
+#else
+struct super_block *pvfs2_get_sb(
+    struct file_system_type *fst, int flags,
+    const char *devname, void *data);
+#endif
+
 int pvfs2_remount(
     struct super_block *sb,
     int *flags,
@@ -240,21 +319,29 @@ int pvfs2_setattr(
     struct dentry *dentry,
     struct iattr *iattr);
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+int pvfs2_revalidate(
+    struct dentry *dentry);
+#else
 int pvfs2_getattr(
     struct vfsmount *mnt,
     struct dentry *dentry,
     struct kstat *kstat);
+#endif
 
 /****************************
  * defined in namei.c
  ****************************/
+#ifdef PVFS2_LINUX_KERNEL_2_4
+struct dentry *pvfs2_lookup(
+    struct inode *dir,
+    struct dentry *dentry);
+#else
 struct dentry *pvfs2_lookup(
     struct inode *dir,
     struct dentry *dentry,
     struct nameidata *nd);
-
-int pvfs2_empty_dir(
-    struct dentry *dentry);
+#endif
 
 /****************************
  * defined in pvfs2-utils.c
@@ -563,6 +650,43 @@ do {                                                                 \
     spin_unlock(&pvfs2_superblocks_lock);                            \
 } while(0)
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+#define pvfs2_lock_kernel() lock_kernel()
+#define pvfs2_unlock_kernel() unlock_kernel()
+#define pvfs2_lock_inode(inode) do {} while(0)
+#define pvfs2_unlock_inode(inode) do {} while(0)
+#define pvfs2_generic_file_readonly_mmap generic_file_mmap
+#define pvfs2_current_signal_lock current->sigmask_lock
+#define pvfs2_current_sigaction current->sig->action
+#define pvfs2_recalc_sigpending() recalc_sigpending(current)
+#define pvfs2_d_splice_alias(dentry, inode) d_add(dentry, inode)
+
+#define fill_default_sys_attrs(sys_attr,type,mode)\
+do                                                \
+{                                                 \
+    sys_attr.owner = current->fsuid;              \
+    sys_attr.group = current->fsgid;              \
+    sys_attr.atime = (PVFS_time)CURRENT_TIME;     \
+    sys_attr.mtime = (PVFS_time)CURRENT_TIME;     \
+    sys_attr.ctime = (PVFS_time)CURRENT_TIME;     \
+    sys_attr.size = 0;                            \
+    sys_attr.perms = mode;                        \
+    sys_attr.objtype = type;                      \
+    sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
+} while(0)
+
+#else /* !(PVFS2_LINUX_KERNEL_2_4) */
+
+#define pvfs2_lock_kernel() do {} while(0)
+#define pvfs2_unlock_kernel() do {} while(0)
+#define pvfs2_lock_inode(inode) spin_lock(&inode->i_lock)
+#define pvfs2_unlock_inode(inode) spin_unlock(&inode->i_lock)
+#define pvfs2_generic_file_readonly_mmap generic_file_readonly_mmap
+#define pvfs2_current_signal_lock current->sighand->siglock
+#define pvfs2_current_sigaction current->sighand->action
+#define pvfs2_recalc_sigpending recalc_sigpending
+#define pvfs2_d_splice_alias(dentry, inode) d_splice_alias(inode, dentry)
+
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
@@ -577,6 +701,75 @@ do                                                \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
+
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
+
+
+/************************************
+ * misc convenience functions
+ ************************************/
+static inline int pvfs2_internal_revalidate(
+    struct inode *inode)
+{
+    int ret = 0;
+    if (inode)
+    {
+        ret = ((pvfs2_inode_getattr(inode) == 0) ? 1 : 0);
+        if (ret == 0)
+        {
+            pvfs2_make_bad_inode(inode);
+        }
+    }
+    return ret;
+}
+
+#ifdef PVFS2_LINUX_KERNEL_2_4
+/*
+  based on code from 2.6.x's fs/libfs.c with required macro support
+  from include/linux/list.h
+*/
+static inline int simple_positive(struct dentry *dentry)
+{
+    return dentry->d_inode && !d_unhashed(dentry);
+}
+
+#define list_for_each_entry(pos, head, member)             \
+for (pos = list_entry((head)->next, typeof(*pos), member), \
+  prefetch(pos->member.next);                              \
+  &pos->member != (head);                                  \
+  pos = list_entry(pos->member.next, typeof(*pos), member),\
+  prefetch(pos->member.next))
+
+static inline int simple_empty(struct dentry *dentry)
+{
+    struct dentry *child;
+    int ret = 0;
+    spin_lock(&dcache_lock);
+    list_for_each_entry(child, &dentry->d_subdirs, d_child)
+        if (simple_positive(child))
+            goto out;
+    ret = 1;
+out:
+    spin_unlock(&dcache_lock);
+    return ret;
+}
+
+/* based on linux kernel 2.6.x fs.h routines not included in 2.4.x */
+static inline void i_size_write(struct inode *inode, loff_t i_size)
+{
+    inode->i_size = i_size;
+}
+
+static inline loff_t i_size_read(struct inode *inode)
+{
+    return inode->i_size;
+}
+
+static inline ino_t parent_ino(struct dentry *dentry)
+{
+    return dentry->d_parent->d_inode->i_ino;
+}
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 
 #endif /* __PVFS2KERNEL_H */
