@@ -185,14 +185,10 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     /* invalidate pinode entry's size on write if pinode exists */
     if (sm_p->pcache_hit && (io_type == PVFS_IO_WRITE))
     {
-        int tmp = sm_p->pinode->attr.mask;
-
         /* invalidate the size attribute in the pinode */
         sm_p->pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
         sm_p->pinode->size = 0;
 
-        fprintf(stderr,"DOING AN I/O SETVALID (old = %d | new = %d)\n",
-                tmp, sm_p->pinode->attr.mask);
         PINT_pcache_set_valid(sm_p->pinode);
         PINT_pcache_release(sm_p->pinode);
         sm_p->pcache_hit = 0;
