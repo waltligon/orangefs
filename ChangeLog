@@ -18,6 +18,7 @@ pvfs2-1.1.0pre1
   <dbeilloi@mc.com>)
 - gossip: avoid double-timestamp in debug and error messages
 - feature-test for kernel routines i_size_write, i_size_read, and parent_ino
+- recover better from server failures
 
 
 pvfs2-1.0.1
