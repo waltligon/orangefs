@@ -86,6 +86,11 @@ could stream a huge number of such messages to use up memory buffers
 on a system if the receiver was not posting receives or checking for
 unexpected messages fast enough.
 
+do I need to clean up things in the completion_array[] at finalize
+time?  applies to both GM and TCP modules, maybe to flow and job stuff
+as well - actually, should probably just call close_context from
+upper level before shutting down modules
+
 TCP module:
 -----------------------
 

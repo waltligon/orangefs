@@ -7,7 +7,6 @@
 /* GM implementation of a BMI method */
 
 /* TODO: implement contexts */
-/* TODO: implement max idle time */
 /* TODO: implement test context */
 
 #include <errno.h>
@@ -127,7 +126,7 @@ enum
     /* be careful changing these indexes!  op list searches rely on these
      * numerical values.
      */
-    NUM_INDICES = 10,
+    NUM_INDICES = 9,
     IND_NEED_SEND_TOK_HI_CTRLACK = 0,
     IND_NEED_SEND_TOK_LOW = 1,
     IND_NEED_SEND_TOK_HI_CTRL = 2,
@@ -136,8 +135,7 @@ enum
     IND_RECVING = 5,
     IND_NEED_RECV_POST = 6,
     IND_NEED_CTRL_MATCH = 7,
-    IND_COMPLETE = 8,
-    IND_COMPLETE_RECV_UNEXP = 9
+    IND_COMPLETE_RECV_UNEXP = 8
 };
 
 /* buffer status indicator */
@@ -150,8 +148,10 @@ enum
 
 /* internal operations lists */
 static op_list_p op_list_array[NUM_INDICES] = { NULL, NULL, NULL, NULL,
-    NULL, NULL, NULL, NULL, NULL, NULL
+    NULL, NULL, NULL, NULL, NULL
 };
+
+static op_list_p completion_array[BMI_MAX_CONTEXTS] = {NULL};
 
 /* GM message modes */
 enum
@@ -270,7 +270,8 @@ static int gm_post_send_check_resource(bmi_op_id_t * id,
 				       bmi_msg_tag_t tag,
 				       bmi_flag_t mode,
 				       bmi_flag_t buffer_status,
-				       void *user_ptr);
+				       void *user_ptr,
+				       bmi_context_id context_id);
 static void ctrl_req_callback(struct gm_port *port,
 			      void *context,
 			      gm_status_t status);
@@ -774,14 +775,14 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 	return (gm_post_send_check_resource(id, dest, buffer, size,
 					    tag,
 					    GM_MODE_IMMED,
-					    buffer_status, user_ptr));
+					    buffer_status, user_ptr, context_id));
     }
     else
     {
 	/* 3 way rendezvous mode */
 	return (gm_post_send_check_resource(id, dest, buffer, size,
 					    tag, GM_MODE_REND,
-					    buffer_status, user_ptr));
+					    buffer_status, user_ptr, context_id));
     }
 }
 
@@ -848,7 +849,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 
     return (gm_post_send_check_resource(id, dest, buffer, size,
 					tag, GM_MODE_UNEXP,
-					buffer_status, user_ptr));
+					buffer_status, user_ptr, context_id));
 }
 
 
@@ -920,6 +921,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
     {
 	gm_addr_data = query_op->addr->method_data;
 	*id = query_op->op_id;
+	query_op->context_id = context_id;
 
 	/* TODO: handle this more gracefully later... */
 	assert(query_op->actual_size <= expected_size);
@@ -993,6 +995,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	new_method_op->expected_size = expected_size;
 	new_method_op->actual_size = 0;
 	new_method_op->msg_tag = tag;
+	new_method_op->context_id = context_id;
 	/* TODO: make sure this is ok */
 	new_method_op->mode = 0;
 	gm_op_data = new_method_op->method_data;
@@ -1154,7 +1157,13 @@ int BMI_gm_testunexpected(int incount,
  */
 int BMI_gm_open_context(bmi_context_id context_id)
 {
-    /* TODO: implement this later */
+    /* start a new queue for tracking completions in this context */
+    completion_array[context_id] = op_list_new();
+    if (!completion_array[context_id])
+    {
+	return(-ENOMEM);
+    }
+
     return(0);
 }
 
@@ -1166,7 +1175,9 @@ int BMI_gm_open_context(bmi_context_id context_id)
  */
 void BMI_gm_close_context(bmi_context_id context_id)
 {
-    /* TODO: implement this later */
+    /* tear down completion queue for this context */
+    op_list_cleanup(completion_array[context_id]);
+
     return;
 }
 
@@ -1268,7 +1279,7 @@ static int gm_post_send_check_resource(bmi_op_id_t * id,
 				       bmi_msg_tag_t tag,
 				       bmi_flag_t mode,
 				       bmi_flag_t buffer_status,
-				       void *user_ptr)
+				       void *user_ptr, bmi_context_id context_id)
 {
     method_op_p new_method_op = NULL;
     int ret = -1;
@@ -1299,6 +1310,7 @@ static int gm_post_send_check_resource(bmi_op_id_t * id,
     new_method_op->msg_tag = tag;
     gossip_ldebug(BMI_DEBUG_GM, "Tag: %d.\n", (int) tag);
     new_method_op->mode = mode;
+    new_method_op->context_id = context_id;
 
     gm_data = dest->method_data;
     gm_op_data = new_method_op->method_data;
@@ -1474,7 +1486,7 @@ static void ctrl_put_callback(struct gm_port *port,
 	gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
-	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
     }
@@ -1486,7 +1498,7 @@ static void ctrl_put_callback(struct gm_port *port,
 	gossip_lerr("Error value: %d\n", (int) status);
 	op_list_remove(my_op);
 	my_op->error_code = -EPROTO;
-	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
     }
@@ -1494,7 +1506,7 @@ static void ctrl_put_callback(struct gm_port *port,
     /* operation is now complete */
     op_list_remove(my_op);
     my_op->error_code = 0;
-    op_list_add(op_list_array[IND_COMPLETE], my_op);
+    op_list_add(completion_array[my_op->context_id], my_op);
     gm_op_data->complete = 1;
 
     gossip_ldebug(BMI_DEBUG_GM, "Finished ctrl_put_callback().\n");
@@ -1535,7 +1547,7 @@ static void immed_send_callback(struct gm_port *port,
 	gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
-	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
     }
@@ -1547,7 +1559,7 @@ static void immed_send_callback(struct gm_port *port,
 	gossip_lerr("Error value: %d\n", (int) status);
 	op_list_remove(my_op);
 	my_op->error_code = -EPROTO;
-	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
     }
@@ -1562,7 +1574,7 @@ static void immed_send_callback(struct gm_port *port,
     /* let it hang around in the receiving queue until we get a control
      * message back from the target that indicates that we can continue.
      */
-    op_list_add(op_list_array[IND_COMPLETE], my_op);
+    op_list_add(completion_array[my_op->context_id], my_op);
     gm_op_data->complete = 1;
 
     gossip_ldebug(BMI_DEBUG_GM, "Finished immed_send_callback().\n");
@@ -1601,7 +1613,7 @@ static void ctrl_req_callback(struct gm_port *port,
 	gossip_lerr("Error: GM TIMEOUT!  Not handled...\n");
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
-	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
     }
@@ -1613,7 +1625,7 @@ static void ctrl_req_callback(struct gm_port *port,
 	gossip_lerr("Error value: %d\n", (int) status);
 	op_list_remove(my_op);
 	my_op->error_code = -EPROTO;
-	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
     }
@@ -1978,6 +1990,7 @@ static int immed_recv_handler(bmi_size_t actual_size,
     new_method_op->msg_tag = msg_tag;
     new_method_op->mode = GM_MODE_IMMED;
     new_method_op->buffer = buffer;
+    new_method_op->context_id = -1;
 
     /* queue up until user posts matching receive */
     op_list_add(op_list_array[IND_NEED_RECV_POST], new_method_op);
@@ -2127,12 +2140,9 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 					  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
 		op_list_remove(query_op);
 		query_op->actual_size = ctrl_copy.u.immed.actual_size;
-		/* TODO: test this path in cases where receiver
-		 * thought that this would be rendezvous mode
-		 */ 
 		query_op->error_code = 0;
 		gm_op_data = query_op->method_data;
-		op_list_add(op_list_array[IND_COMPLETE], query_op);
+		op_list_add(completion_array[query_op->context_id], query_op);
 		gm_op_data->complete = 1;
 		ret = 0;
 	    }
@@ -2230,7 +2240,7 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
 
     /* done */
     query_op->error_code = 0;
-    op_list_add(op_list_array[IND_COMPLETE], query_op);
+    op_list_add(completion_array[query_op->context_id], query_op);
     gm_op_data->complete = 1;
     return;
 }
@@ -2325,7 +2335,7 @@ static void send_data_buffer(method_op_p mop)
 	    bmi_gm_unuse_interval((unsigned long) mop->buffer, pinned_size);
 	    /* TODO: handle this better */
 	    mop->error_code = -ENOMEM;
-	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
 	}
@@ -2338,7 +2348,7 @@ static void send_data_buffer(method_op_p mop)
 	    gossip_lerr("Error: could not register memory.\n");
 	    /* TODO: handle this better */
 	    mop->error_code = -ENOMEM;
-	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
 	}
@@ -2352,7 +2362,7 @@ static void send_data_buffer(method_op_p mop)
 	{
 	    gossip_lerr("Error: gm_dma_malloc().\n");
 	    mop->error_code = -ENOMEM;
-	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
 	}
@@ -2420,7 +2430,7 @@ static void prepare_for_recv(method_op_p mop)
 		 (int) mop->actual_size, (int) pinned_size);
 	    /* TODO: handle this error better */
 	    mop->error_code = -ENOMEM;
-	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
 	}
@@ -2433,7 +2443,7 @@ static void prepare_for_recv(method_op_p mop)
 	    gossip_lerr("Error: could not register memory.\n");
 	    /* TODO: handle this better */
 	    mop->error_code = -ENOMEM;
-	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
 	}
@@ -2448,7 +2458,7 @@ static void prepare_for_recv(method_op_p mop)
 	    gossip_lerr("Error: gm_dma_malloc().\n");
 	    /* TODO: handle this better */
 	    mop->error_code = -ENOMEM;
-	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    op_list_add(completion_array[mop->context_id], mop);
 	    gm_op_data->complete = 1;
 	    return;
 	}
@@ -2510,7 +2520,7 @@ static void ctrl_ack_callback(struct gm_port *port,
 	gossip_lerr("Error: GM TIMEOUT!  Not handled.\n");
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
-	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
     }
@@ -2522,7 +2532,7 @@ static void ctrl_ack_callback(struct gm_port *port,
 	gossip_lerr("Error value: %d\n", (int) status);
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
-	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
     }
@@ -2581,7 +2591,7 @@ static void data_send_callback(struct gm_port *port,
 	gossip_lerr("Error: GM TIMEOUT!  Not handled.\n");
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
-	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
     }
@@ -2593,7 +2603,7 @@ static void data_send_callback(struct gm_port *port,
 	gossip_lerr("Error: GM return value: %d.\n", (int) status);
 	op_list_remove(my_op);
 	my_op->error_code = -EPROTO;
-	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
     }
@@ -2718,6 +2728,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 	active_method_op->expected_size = 0;
 	active_method_op->msg_tag = ctrl_tag;
 	active_method_op->mode = GM_MODE_REND;
+	active_method_op->context_id = -1;
 	gm_op_data = active_method_op->method_data;
 	gm_op_data->peer_op_id = ctrl_op_id;
 
