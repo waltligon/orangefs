@@ -11,26 +11,15 @@ general
 
 - make post functions avoid allocating a job descriptor if they
   immediately complete (right now, we allocate one whether its
-  needed or not, really) 
-
-- go back to everywhere that BMI_testXXX is called and do the
-  right thing with the timeout flag (for now it is simply set to
-  10 or 0 milliseconds in different cases)
-
-- figure out if vtag field should come from trove test() or if it
-  comes from the pointer passed in at post time
+  needed or not, really) - actually, may be best to just make sure that 
+  job descriptors are cached rather than malloc'd on every call
 
 - bring example programs back up to speed
-
-- be sure to turn off mutex locks for non-threaded version
 
 - once unpost() is fully supported, attempt to unpost any pending
   operations at finalize time
 
 - handle timeout / unpost situations
-
-- consider using callback approach to limit number of threads (one per
-  resource, rather than per API)
 
 - make thread condition signalling more efficient (maybe try to avoid
   waking up testing processes unless something they were looking for
@@ -38,6 +27,3 @@ general
 
 - make job API thread safe (needed eventually for thread safe system
   interface API?
-
-- make a client side build that doesn't include trove (and also doesn't
-  need -ldb or -lpthread)

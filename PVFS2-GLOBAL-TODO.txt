@@ -70,8 +70,6 @@ kernel/vfs interface
 
 system installation:
 ====================================================================
-- make install target
-- reducing number of headers required for installation
 - quickstart guide
 
 performance tuning:
@@ -103,12 +101,10 @@ I/O path:
 - buffer cache on top of trove
 - optimizing small reads and writes (packing data into req/ack messages)
 - native GM flowprotocol
-- threads in trove?
 - general optimizations (lock granularity, immediate completion, etc.)
 - ability to unpost, correct use of timeouts, preposting operations
 - semantics of short read and write operations
 - bmi_tcp scalability and robustness
-- improve job thread layout
 - add functionality to the job interface that lets you submit a 
   null job and have it pop out some specific amount of time later; to be
   used by a state machine to periodically gather statistics

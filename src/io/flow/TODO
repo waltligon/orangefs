@@ -32,6 +32,3 @@ flowproto bmi_trove stuff:
 
 - handle corner cases (look for "TODO" entries in code); mostly error
   conditions and short I/O conditions that we can't clean up right now
-
-- create client side build target that doesn't include trove stuff (and
-  also doesn't need ldb or lpthread)
