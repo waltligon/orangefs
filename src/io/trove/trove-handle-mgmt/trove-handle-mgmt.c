@@ -103,8 +103,11 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                         break;
                     }
 		    /* remove handle from trove-handle-mgmt */
-		    trove_handle_remove(ledger, handles[i]);
-
+		    ret = trove_handle_remove(ledger, handles[i]);
+		    if (ret != 0){
+			printf("could not remove handle %Ld\n", handles[i]);
+			break;
+		    }
 #if 0
                     else
                     {
@@ -267,13 +270,15 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
             {
                 /* assert the internal ledger struct is valid */
                 assert(ledger->ledger);
+		
+		/* tell trove what are our valid ranges */
+		ret = trove_map_handle_ranges(coll_id,extent_list, 
+			ledger->ledger);
+		if (ret != 0) return ret;
 
-                if (trove_check_handle_ranges(coll_id,extent_list,
-                                              ledger->ledger) == 0)
-                {
-                    ret = trove_map_handle_ranges(coll_id,extent_list,
-                                                  ledger->ledger);
-                }
+                ret = trove_check_handle_ranges(coll_id,extent_list, 
+			ledger->ledger);
+		if (ret != 0) return ret;
             }
             PINT_release_extent_list(extent_list);
         }
