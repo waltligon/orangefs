@@ -86,7 +86,8 @@ static int pvfs2_readdir(
 	    return -ENOMEM;
 	}
 	new_op->upcall.type = PVFS2_VFS_OP_READDIR;
-	if (pvfs2_inode && pvfs2_inode->refn.handle && pvfs2_inode->refn.fs_id)
+	if (pvfs2_inode && pvfs2_inode->refn.handle &&
+            pvfs2_inode->refn.fs_id)
 	{
 	    new_op->upcall.req.readdir.refn = pvfs2_inode->refn;
 	}
