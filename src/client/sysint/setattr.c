@@ -21,13 +21,13 @@
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
 
-/* PVFS_sys_setattr()
+/* PVFS_sys_setattr_old() : DEPRECATED -- see sys-setattr.sm
  *
  * sets attributes for a particular PVFS file 
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_setattr(
+int PVFS_sys_setattr_old(
     PVFS_pinode_reference pinode_refn,
     PVFS_sys_attr attr,
     PVFS_credentials credentials)

@@ -26,6 +26,7 @@ SMSRC := \
 	getattr-pcache.sm \
 	msgpair.sm \
 	sys-getattr.sm \
+	sys-setattr.sm \
 	sys-truncate.sm \
 	lookup-dcache.sm \
 	msgpairarray.sm \

@@ -23,34 +23,20 @@ int sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                            job_status_s *js_p);
 int sm_common_parent_getattr_failure(PINT_client_sm *sm_p,
                                      job_status_s *js_p);
-int sm_common_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
-                                          job_status_s *js_p);
-int sm_common_dspace_create_failure(PINT_client_sm *sm_p,
-                                    job_status_s *js_p);
-int sm_common_crdirent_setup_msgpair(PINT_client_sm *sm_p,
+int sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+                                           job_status_s *js_p);
+int sm_common_object_getattr_failure(PINT_client_sm *sm_p,
                                      job_status_s *js_p);
-int sm_common_crdirent_failure(PINT_client_sm *sm_p,
-                               job_status_s *js_p);
-int sm_common_setattr_setup_msgpair(PINT_client_sm *sm_p,
-                                    job_status_s *js_p);
-int sm_common_setattr_failure(PINT_client_sm *sm_p,
-                              job_status_s *js_p);
 
 /*
   shared/common msgpair completion functions
 */
-int sm_common_getattr_comp_fn(void *v_p,
-                              struct PVFS_server_resp *resp_p,
-                              int index);
-int sm_common_create_comp_fn(void *v_p,
-                             struct PVFS_server_resp *resp_p,
-                             int index);
-int sm_common_crdirent_comp_fn(void *v_p,
-                               struct PVFS_server_resp *resp_p,
-                               int index);
-int sm_common_setattr_comp_fn(void *v_p,
-                              struct PVFS_server_resp *resp_p,
-                              int index);
+int sm_common_directory_getattr_comp_fn(void *v_p,
+                                        struct PVFS_server_resp *resp_p,
+                                        int index);
+int sm_common_object_getattr_comp_fn(void *v_p,
+                                     struct PVFS_server_resp *resp_p,
+                                     int index);
 
 #endif /* __SHARED_STATE_METHODS_H */
 

@@ -138,6 +138,12 @@ struct PINT_client_getattr_sm {
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
 };
 
+/* PINT_client_setattr_sm */
+struct PINT_client_setattr_sm {
+    PVFS_pinode_reference refn;           /* input parameter */
+    PVFS_sys_attr         *sys_attr;      /* input parameter */
+};
+
 /* PINT_client_io_sm
  *
  * Data specific to I/O operations on the client side.
@@ -290,7 +296,14 @@ typedef struct PINT_client_sm {
     int msgarray_count;
     PINT_client_sm_msgpair_state *msgarray;
 
+    /*
+      internal pinode references; used in conjunction with
+      the sm_common state machine routines, or otherwise as
+      scratch pinode references during sm processing
+    */
+    PVFS_pinode_reference object_ref;
     PVFS_pinode_reference parent_ref;
+
     PVFS_credentials *cred_p;
     union
     {
@@ -299,6 +312,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_mkdir_sm mkdir;
 	struct PINT_client_symlink_sm sym;
 	struct PINT_client_getattr_sm getattr;
+	struct PINT_client_setattr_sm setattr;
 	struct PINT_client_io_sm io;
 	struct PINT_client_flush_sm flush;
 	struct PINT_client_readdir_sm readdir;
@@ -329,6 +343,7 @@ enum {
     PVFS_SYS_FLUSH   = 7,
     PVFS_SYS_TRUNCATE= 8,
     PVFS_SYS_READDIR = 9,
+    PVFS_SYS_SETATTR = 10,
     PVFS_MGMT_SETPARAM_LIST = 70,
     PVFS_MGMT_NOOP   = 71,
     PVFS_MGMT_STATFS_LIST = 72,
@@ -380,6 +395,7 @@ extern struct PINT_state_machine_s pvfs2_client_create_sm;
 extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
