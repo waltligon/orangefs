@@ -130,6 +130,21 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
 	return -PVFS_EINVAL;
     }
 
+    /* look for zero byte operations */
+    if(PINT_REQUEST_TOTAL_BYTES(mem_req) == 0)
+    {
+	gossip_ldebug(CLIENT_DEBUG, "Warning: 0 byte I/O operation attempted.\n");
+	resp_p->total_completed = 0;
+	return(0);
+    }
+    if(PINT_REQUEST_TOTAL_BYTES(file_req) == 0)
+    {
+	gossip_ldebug(CLIENT_DEBUG, "Warning: 0 byte I/O operation attempted.\n");
+	resp_p->total_completed = 0;
+	return(0);
+    }
+	
+
     /* allocate and build PINT_client_sm structure */
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
     if (sm_p == NULL) return -PVFS_ENOMEM;
