@@ -353,6 +353,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
      */
 sys_io_out:
     
+    if(op_tag_array)
+	free(op_tag_array);
     if(addr_array)
 	free(addr_array);
     if(req_array)
@@ -740,6 +742,8 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 
 array_out:
 
+    if(step_array)
+	free(step_array);
     if(req_encoded_array)
 	free(req_encoded_array);
     if(status_array)
