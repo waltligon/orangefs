@@ -118,6 +118,7 @@ int BMI_sockio_brecv(int s,
 	  int len)
 {
     int oldfl, ret, comp = len;
+    int olderrno;
     oldfl = fcntl(s, F_GETFL, 0);
     if (oldfl & O_NONBLOCK)
 	fcntl(s, F_SETFL, oldfl & (~O_NONBLOCK));
@@ -129,6 +130,9 @@ int BMI_sockio_brecv(int s,
 	{
 	    if (errno == EINTR)
 		goto brecv_restart;
+	    olderrno = errno;
+	    fcntl(s, F_SETFL, oldfl|O_NONBLOCK);
+	    errno = olderrno;
 	    return (-1);
 	}
 	if (!ret)
@@ -137,12 +141,14 @@ int BMI_sockio_brecv(int s,
 	     * like this behavior, so we're going to return -1 w/an EPIPE
 	     * instead.
 	     */
+	    fcntl(s, F_SETFL, oldfl|O_NONBLOCK);
 	    errno = EPIPE;
 	    return (-1);
 	}
 	comp -= ret;
 	buf += ret;
     }
+    fcntl(s, F_SETFL, oldfl|O_NONBLOCK);
     return (len - comp);
 }
 
@@ -151,11 +157,7 @@ int BMI_sockio_nbrecv(int s,
 	   void *buf,
 	   int len)
 {
-    int oldfl, ret, comp = len;
-
-    oldfl = fcntl(s, F_GETFL, 0);
-    if (!(oldfl & O_NONBLOCK))
-	fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
+    int ret, comp = len;
 
     while (comp)
     {
@@ -194,11 +196,7 @@ int BMI_sockio_nbrecv(int s,
  */
 int BMI_sockio_nbpeek(int s, void* buf, int len)
 {
-    int oldfl, ret, comp = len;
-
-    oldfl = fcntl(s, F_GETFL, 0);
-    if (!(oldfl & O_NONBLOCK))
-	fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
+    int ret, comp = len;
 
     while (comp)
     {
@@ -233,6 +231,7 @@ int BMI_sockio_bsend(int s,
 	  int len)
 {
     int oldfl, ret, comp = len;
+    int olderrno;
     oldfl = fcntl(s, F_GETFL, 0);
     if (oldfl & O_NONBLOCK)
 	fcntl(s, F_SETFL, oldfl & (~O_NONBLOCK));
@@ -244,11 +243,15 @@ int BMI_sockio_bsend(int s,
 	{
 	    if (errno == EINTR)
 		goto bsend_restart;
+	    olderrno = errno;
+	    fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
+	    errno = olderrno;
 	    return (-1);
 	}
 	comp -= ret;
 	buf += ret;
     }
+    fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
     return (len - comp);
 }
 
@@ -259,10 +262,7 @@ int BMI_sockio_nbsend(int s,
 	   void *buf,
 	   int len)
 {
-    int oldfl, ret, comp = len;
-    oldfl = fcntl(s, F_GETFL, 0);
-    if (!(oldfl & O_NONBLOCK))
-	fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
+    int ret, comp = len;
 
     while (comp)
     {
@@ -288,10 +288,7 @@ int BMI_sockio_nbvector(int s,
 	    int count, 
 	    int recv_flag)
 {
-    int oldfl, ret;
-    oldfl = fcntl(s, F_GETFL, 0);
-    if (!(oldfl & O_NONBLOCK))
-	fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
+    int ret;
 
     /* NOTE: this function is different from the others that will
      * keep making the I/O system call until EWOULDBLOCK is encountered; we 
@@ -340,11 +337,7 @@ int BMI_sockio_nbsendfile(int s,
 	       int off,
 	       int len)
 {
-    int oldfl, ret, comp = len, myoff;
-
-    oldfl = fcntl(s, F_GETFL, 0);
-    if (!(oldfl & O_NONBLOCK))
-	fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
+    int ret, comp = len, myoff;
 
     while (comp)
     {
