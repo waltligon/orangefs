@@ -40,6 +40,8 @@ static void usage(int argc, char** argv);
 static void print_mntent(struct pvfs_mntent_s* entry);
 static int print_config(struct server_configuration_s* conf,
     PVFS_fs_id fsid);
+static int noop_all_servers(struct server_configuration_s* conf,
+    PVFS_fs_id fsid);
 
 int main(int argc, char **argv)
 {
@@ -127,10 +129,109 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    printf("\n(3) Verifying that all servers are responding...\n");
+
+    ret = noop_all_servers(&g_server_config, cur_fs);
+    if(ret < 0)
+    {
+	PVFS_perror("noop_all_servers", ret);
+	fprintf(stderr, "Failure: could not communicate with one of the servers.\n");
+	return(-1);
+    }
+
 
     PVFS_sys_finalize();
 
     return(ret);
+}
+
+
+/* noop_all_servers()
+ *
+ * sends a noop to all servers listed in the config file 
+ *
+ * returns -PVFS_error on failure, 0 on success
+ */
+static int noop_all_servers(struct server_configuration_s* conf,
+    PVFS_fs_id fsid)
+{
+    struct qlist_head* hash_link = NULL;
+    char* server_bmi_str = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    struct llist* tmp_server = NULL;
+    struct host_handle_mapping_s *cur_mapping = NULL;
+    PVFS_credentials creds;
+    int ret = -1;
+
+    creds.uid = getuid();
+    creds.gid = getgid();
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
+    if(!hash_link)
+    {
+	fprintf(stderr, "Failure: could not find fsid %d in configuration.\n",
+	    (int)fsid);
+	return(-PVFS_EINVAL);
+    }
+
+    cur_config_cache =
+	qlist_entry(hash_link, struct config_fs_cache_s,
+		    hash_link);
+    tmp_server = cur_config_cache->fs->meta_handle_ranges;
+    if(!tmp_server)
+    {
+	fprintf(stderr, "Failure: could not find meta servers in configuration.\n");
+	return(-PVFS_EINVAL);
+    }
+
+    printf("\n   meta servers (duplicates are normal):\n");
+    while((cur_mapping = llist_head(tmp_server)))
+    {
+	tmp_server = llist_next(tmp_server);
+
+	server_bmi_str = PINT_config_get_host_addr_ptr(
+	    conf,cur_mapping->alias_mapping->host_alias);
+	printf("   %s ", server_bmi_str);
+	ret = PVFS_mgmt_noop(creds, server_bmi_str);
+	if(ret == 0)
+	{
+	    printf("Ok\n");
+	}
+	else
+	{
+	    printf("Failure!\n");
+	    return(ret);
+	}
+    }
+
+    tmp_server = cur_config_cache->fs->data_handle_ranges;
+    if(!tmp_server)
+    {
+	fprintf(stderr, "Failure: could not find data servers in configuration.\n");
+	return(-PVFS_EINVAL);
+    }
+
+    printf("\n   data servers (duplicates are normal):\n");
+    while((cur_mapping = llist_head(tmp_server)))
+    {
+	tmp_server = llist_next(tmp_server);
+
+	server_bmi_str = PINT_config_get_host_addr_ptr(
+	    conf,cur_mapping->alias_mapping->host_alias);
+	printf("   %s ", server_bmi_str);
+	ret = PVFS_mgmt_noop(creds, server_bmi_str);
+	if(ret == 0)
+	{
+	    printf("Ok\n");
+	}
+	else
+	{
+	    printf("Failure!\n");
+	    return(ret);
+	}
+    }
+
+    return(0);
 }
 
 
@@ -167,7 +268,7 @@ static int print_config(struct server_configuration_s* conf,
 	return(-PVFS_EINVAL);
     }
 
-    printf("\n   meta servers (duplicates are Ok):\n");
+    printf("\n   meta servers (duplicates are normal):\n");
     while((cur_mapping = llist_head(tmp_server)))
     {
 	tmp_server = llist_next(tmp_server);
@@ -184,7 +285,7 @@ static int print_config(struct server_configuration_s* conf,
 	return(-PVFS_EINVAL);
     }
 
-    printf("\n   data servers (duplicates are Ok):\n");
+    printf("\n   data servers (duplicates are normal):\n");
     while((cur_mapping = llist_head(tmp_server)))
     {
 	tmp_server = llist_next(tmp_server);
