@@ -863,7 +863,7 @@ static int server_shutdown(
     if (status & SERVER_STATE_MACHINE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "* halting state machine processor ... ");
+                     "* halting state machine processor   ... ");
 	PINT_state_machine_halt();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
@@ -871,7 +871,7 @@ static int server_shutdown(
     if (status & SERVER_EVENT_INIT)
     {
 	gossip_debug(GOSSIP_SERVER_DEBUG,
-		"* halting event profiling interface    ...");
+                     "* halting event profiling interface ... ");
 	PINT_event_finalize();
 	gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
@@ -879,7 +879,7 @@ static int server_shutdown(
     if (status & SERVER_PERF_COUNTER_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "* halting performance interface   ... ");
+                     "* halting performance interface     ... ");
 	PINT_perf_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
@@ -887,7 +887,7 @@ static int server_shutdown(
     if (status & SERVER_REQ_SCHED_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "* halting request scheduler       ... ");
+                     "* halting request scheduler         ... ");
 	PINT_req_sched_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
@@ -900,7 +900,7 @@ static int server_shutdown(
     if (status & SERVER_JOB_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "* halting job interface           ... ");
+                     "* halting job interface             ... ");
 	job_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
@@ -908,7 +908,7 @@ static int server_shutdown(
     if (status & SERVER_TROVE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "* halting storage interface       ... ");
+                     "* halting storage interface         ... ");
 	trove_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
@@ -916,7 +916,7 @@ static int server_shutdown(
     if (status & SERVER_FLOW_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "* halting flow interface          ... ");
+                     "* halting flow interface            ... ");
 	PINT_flow_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
@@ -924,7 +924,7 @@ static int server_shutdown(
     if (status & SERVER_BMI_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "* halting bmi interface           ... ");
+                     "* halting bmi interface             ... ");
 	BMI_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
@@ -932,7 +932,7 @@ static int server_shutdown(
     if (status & SERVER_ENCODER_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "* halting encoder interface       ... ");
+                     "* halting encoder interface         ... ");
 	PINT_encode_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
