@@ -161,8 +161,8 @@ static int pvfs2_readdir(
             /*
               NOTE: we can't do the retries with the token_adjustment
               in use because an rm -rf will cause all kinds of
-              problems since the dir is changin as it's being read and
-              we don't want retries in that case.
+              problems since the dir is changing as it's being read
+              and we don't want retries in that case.
             */
             if (pvfs2_inode->directory_version == 0)
             {
