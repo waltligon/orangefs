@@ -4,7 +4,6 @@ LIBSRC += \
 	$(DIR)/create.c \
 	$(DIR)/finalize.c \
 	$(DIR)/getattr.c \
-	$(DIR)/getconfig.c \
 	$(DIR)/initialize.c \
 	$(DIR)/lookup.c \
 	$(DIR)/mkdir.c \
