@@ -556,7 +556,13 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 
         if (resp_attr->mask & PVFS_ATTR_META_DIST)
         {
-            assert(resp_attr->u.meta.dist);
+            if(resp_attr->u.meta.dist == 0) {
+                gossip_err("Found dist of 0 for handle %Lu,%d\n",
+                        Lu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
+                PVFS_perror("Metafile getattr_setup_resp",js_p->error_code);
+                js_p->error_code = -PVFS_EIO;
+                return 1;
+            }
             PINT_dist_decode(resp_attr->u.meta.dist, NULL);
             gossip_debug(GOSSIP_GETATTR_DEBUG,
                          "  also returning dist size of %d\n",
