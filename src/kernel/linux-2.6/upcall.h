@@ -101,7 +101,6 @@ typedef struct
 typedef struct
 {
     char pvfs2_config_server[PVFS_MAX_SERVER_ADDR_LEN];
-    char options[PVFS2_MAX_MOUNT_OPT_LEN];
 } pvfs2_fs_mount_request_t;
 
 typedef struct

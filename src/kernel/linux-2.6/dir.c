@@ -106,7 +106,7 @@ static int pvfs2_readdir(
 	    new_op->upcall.req.readdir.refn.handle =
 		pvfs2_ino_to_handle(dentry->d_inode->i_ino);
 	    new_op->upcall.req.readdir.refn.fs_id =
-		PVFS2_SB(dentry->d_inode->i_sb)->coll_id;
+		PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
 	}
 	new_op->upcall.req.readdir.max_dirent_count = MAX_DIRENT_COUNT;
 

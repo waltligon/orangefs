@@ -32,6 +32,37 @@ LIST_HEAD(pvfs2_superblocks);
 /* used to protect the above superblock list */
 spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
 
+static int parse_mount_options(
+    char *option_str, struct super_block *sb, int silent)
+{
+    char *options = option_str;
+    pvfs2_sb_info_t *pvfs2_sb = NULL;
+
+    if (!silent)
+    {
+        pvfs2_print("pvfs2: parse_mount_options called with:\n");
+        pvfs2_print(" %s\n", options);
+    }
+
+    if (options && sb)
+    {
+        pvfs2_sb = PVFS2_SB(sb);
+        memset(&pvfs2_sb->mnt_options, 0, sizeof(pvfs2_mount_options_t));
+
+        if (strncmp(options, "intr", 4) == 0)
+        {
+            if (!silent)
+            {
+                pvfs2_print("pvfs2: mount option intr specified\n");
+            }
+            pvfs2_sb->mnt_options.intr = 1;
+        }
+    }
+
+    /* parsed mount options are optional; always return success */
+    return 0;
+}
+
 static struct inode *pvfs2_alloc_inode(
     struct super_block *sb)
 {
@@ -137,7 +168,7 @@ static int pvfs2_statfs(
     struct statfs tmp_statfs;
 
     pvfs2_print("pvfs2_: pvfs2_statfs called on sb %p "
-                "(fs_id is %d)\n", sb, (int)(PVFS2_SB(sb)->coll_id));
+                "(fs_id is %d)\n", sb, (int)(PVFS2_SB(sb)->fs_id));
 
     new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!new_op)
@@ -146,7 +177,7 @@ static int pvfs2_statfs(
 	return ret;
     }
     new_op->upcall.type = PVFS2_VFS_OP_STATFS;
-    new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->coll_id;
+    new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->fs_id;
 
     service_operation_with_timeout_retry(
         new_op, "pvfs2_statfs", retries,
@@ -237,6 +268,15 @@ int pvfs2_remount(
 
     if (sb && PVFS2_SB(sb))
     {
+        if (data)
+        {
+            ret = parse_mount_options(data, sb, 1);
+            if (ret)
+            {
+                return ret;
+            }
+        }
+
         new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
         if (!new_op)
         {
@@ -248,14 +288,6 @@ int pvfs2_remount(
 
         pvfs2_print("Attempting PVFS2 Remount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
-
-        if (data)
-        {
-            strncpy(new_op->upcall.req.fs_mount.options,
-                    (char *)data, PVFS2_MAX_MOUNT_OPT_LEN);
-            pvfs2_print("Got mount options: %s\n",
-                        new_op->upcall.req.fs_mount.options);
-        }
 
         service_operation(new_op, "pvfs2_fs_mount", 0);
         ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
@@ -273,6 +305,11 @@ int pvfs2_remount(
           superblock to a particular mount entry
         */
         PVFS2_SB(sb)->id = new_op->downcall.resp.fs_mount.id;
+
+        if (data)
+        {
+            strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
+        }
 
       error_exit:
         op_release(new_op);
@@ -292,107 +329,7 @@ struct super_operations pvfs2_s_ops =
     .remount_fs = pvfs2_remount,
 };
 
-static struct export_operations pvfs2_export_ops = { };
-
-static int parse_mount_options(
-    char *option_str, struct super_block *sb, int silent)
-{
-    int ret = -EINVAL;
-    char *options = option_str;
-    pvfs2_sb_info *pvfs2_sb = NULL;
-
-    if (!silent)
-    {
-        pvfs2_print("pvfs2: parse_mount_options called with:\n");
-        pvfs2_print(" %s\n", options);
-    }
-
-    if (options && sb)
-    {
-        pvfs2_sb = PVFS2_SB(sb);
-        memset(&pvfs2_sb->mnt_options, 0, sizeof(pvfs2_mount_options_t));
-
-        if (!options || (strncmp(options, "coll_id=", 8) != 0))
-        {
-            pvfs2_error("pvfs2: Invalid coll_id specification %s\n",
-                        option_str);
-            return ret;
-        }
-        options += 8;
-        pvfs2_sb->mnt_options.coll_id =
-            simple_strtoul(options, &options, 0);
-
-        if (*options && (*options != ','))
-        {
-            pvfs2_error("pvfs2: Invalid coll_id specification %s\n",
-                        option_str);
-            return ret;
-        }
-
-        if (*options == ',')
-        {
-            options++;
-        }
-
-        if (!options || (strncmp(options, "root_handle=", 12) != 0))
-        {
-            pvfs2_print("pvfs2: Invalid root_handle specification\n");
-            return ret;
-        }
-        options += 12;
-        pvfs2_sb->mnt_options.root_handle =
-            simple_strtoul(options, &options, 0);
-
-        if (*options == ',')
-        {
-            options++;
-        }
-
-        if (!options || (strncmp(options, "id=", 3) != 0))
-        {
-            pvfs2_print("pvfs2: Invalid id specification\n");
-            return ret;
-        }
-        options += 3;
-        pvfs2_sb->id = simple_strtoul(options, &options, 0);
-
-        if (*options == ',')
-        {
-            options++;
-        }
-
-        /* handle misc trailing mount options here */
-        if (options && (strncmp(options, "intr", 4) == 0))
-        {
-            if (!silent)
-            {
-                pvfs2_print("pvfs2: mount option intr specified\n");
-            }
-            pvfs2_sb->mnt_options.intr = 1;
-        }
-
-        if ((pvfs2_sb->mnt_options.coll_id == 0) ||
-            (pvfs2_sb->mnt_options.root_handle == 0))
-        {
-            pvfs2_error("pvfs2: Invalid coll_id or root_handle "
-                        "specification: %s\n", option_str);
-            return ret;
-        }
-        else
-        {
-            if (!silent)
-            {
-                pvfs2_print(
-                    "pvfs2: got coll_id %d | root_handle %Lu | id %d | "
-                    "intr? %s\n", (int)pvfs2_sb->mnt_options.coll_id,
-                    Lu(pvfs2_sb->mnt_options.root_handle), pvfs2_sb->id,
-                    (pvfs2_sb->mnt_options.intr ? "yes" : "no"));
-            }
-            ret = 0;
-        }
-    }
-    return ret;
-}
+static struct export_operations pvfs2_export_ops = {};
 
 int pvfs2_fill_sb(
     struct super_block *sb,
@@ -402,25 +339,30 @@ int pvfs2_fill_sb(
     int ret = -EINVAL;
     struct inode *root = NULL;
     struct dentry *root_dentry = NULL;
+    pvfs2_mount_sb_info_t *mount_sb_info = (pvfs2_mount_sb_info_t *)data;
 
     /* alloc and init our private pvfs2 sb info */
-    sb->s_fs_info = kmalloc(sizeof(pvfs2_sb_info), PVFS2_GFP_FLAGS);
+    sb->s_fs_info = kmalloc(sizeof(pvfs2_sb_info_t), PVFS2_GFP_FLAGS);
     if (!PVFS2_SB(sb))
     {
-	return -ENOMEM;
+        return -ENOMEM;
     }
-    memset(sb->s_fs_info, 0, sizeof(pvfs2_sb_info));
+    memset(sb->s_fs_info, 0, sizeof(pvfs2_sb_info_t));
     PVFS2_SB(sb)->sb = sb;
 
-    pvfs2_print("About to parse mount options %s\n",(char *)data);
-    ret = parse_mount_options((char *)data, sb, silent);
-    if (ret)
-    {
-        return ret;
-    }
+    PVFS2_SB(sb)->root_handle = mount_sb_info->root_handle;
+    PVFS2_SB(sb)->fs_id = mount_sb_info->fs_id;
+    PVFS2_SB(sb)->id = mount_sb_info->id;
 
-    PVFS2_SB(sb)->root_handle = PVFS2_SB(sb)->mnt_options.root_handle;
-    PVFS2_SB(sb)->coll_id = PVFS2_SB(sb)->mnt_options.coll_id;
+    if (mount_sb_info->data)
+    {
+        ret = parse_mount_options(
+            (char *)mount_sb_info->data, sb, silent);
+        if (ret)
+        {
+            return ret;
+        }
+    }
 
     sb->s_magic = PVFS2_MAGIC;
     sb->s_op = &pvfs2_s_ops;
@@ -430,13 +372,6 @@ int pvfs2_fill_sb(
     sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
-    if (!silent)
-    {
-        pvfs2_print("pvfs2: pvfs2_fill_sb -- sb max bytes is %llu (%d)\n",
-                    (unsigned long long)sb->s_maxbytes,
-                    (int)sb->s_maxbytes);
-    }
-
     /* alloc and initialize our root directory inode */
     root = pvfs2_get_custom_inode(sb, (S_IFDIR | 0755), 0);
     if (!root)
@@ -445,7 +380,7 @@ int pvfs2_fill_sb(
     }
     root->i_ino = (ino_t)PVFS2_SB(sb)->root_handle;
     PVFS2_I(root)->refn.handle = PVFS2_SB(sb)->root_handle;
-    PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->coll_id;
+    PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
 
     /* allocates and places root dentry in dcache */
     root_dentry = d_alloc_root(root);
@@ -470,7 +405,9 @@ struct super_block *pvfs2_get_sb(
     int ret = -EINVAL;
     struct super_block *sb = ERR_PTR(-EINVAL);
     pvfs2_kernel_op_t *new_op = NULL;
-    char buf[PVFS2_MAX_MOUNT_OPT_LEN];
+    pvfs2_mount_sb_info_t mount_sb_info;
+
+    pvfs2_print("pvfs2_get_sb: called with devname %s\n", devname);
 
     if (devname)
     {
@@ -486,14 +423,6 @@ struct super_block *pvfs2_get_sb(
         pvfs2_print("Attempting PVFS2 Mount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-        if (data)
-        {
-            strncpy(new_op->upcall.req.fs_mount.options,
-                    (char *)data, PVFS2_MAX_MOUNT_OPT_LEN);
-            pvfs2_print("Got mount options: %s\n",
-                        new_op->upcall.req.fs_mount.options);
-        }
-
         service_operation(new_op, "pvfs2_fs_mount", 0);
         ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
@@ -504,50 +433,50 @@ struct super_block *pvfs2_get_sb(
             goto error_exit;
         }
 
-        if (data)
+        if ((new_op->downcall.resp.fs_mount.fs_id == PVFS_FS_ID_NULL) ||
+            (new_op->downcall.resp.fs_mount.root_handle ==
+             PVFS_HANDLE_NULL))
         {
-            snprintf(buf, PVFS2_MAX_MOUNT_OPT_LEN,
-                     "coll_id=%d,root_handle=%Lu,id=%d,%s",
-                     new_op->downcall.resp.fs_mount.fs_id,
-                     new_op->downcall.resp.fs_mount.root_handle,
-                     new_op->downcall.resp.fs_mount.id,
-                     (char *)data);
-        }
-        else
-        {
-            snprintf(buf, PVFS2_MAX_MOUNT_OPT_LEN,
-                     "coll_id=%d,root_handle=%Lu,id=%d",
-                     new_op->downcall.resp.fs_mount.fs_id,
-                     new_op->downcall.resp.fs_mount.root_handle,
-                     new_op->downcall.resp.fs_mount.id);
+            pvfs2_error("ERROR: Retrieved null fs_id or root_handle\n");
+            sb = ERR_PTR(-EINVAL);
+            goto error_exit;
         }
 
-        pvfs2_print("Formatted mount options are: %s\n", buf);
-        sb = get_sb_nodev(fst, flags, buf, pvfs2_fill_sb);
+        /* fill in temporary structure passed to fill_sb method */
+        mount_sb_info.data = data;
+        mount_sb_info.root_handle =
+            new_op->downcall.resp.fs_mount.root_handle;
+        mount_sb_info.fs_id = new_op->downcall.resp.fs_mount.fs_id;
+        mount_sb_info.id = new_op->downcall.resp.fs_mount.id;
 
-        /* on successful mount, store the devname and data used */
-        if (data)
+        /*
+          the mount_sb_info structure looks odd, but it's used because
+          the private sb info isn't allocated until we call
+          pvfs2_fill_sb, yet we have the info we need to fill it with
+          here.  so we store it temporarily and pass all of the info
+          to fill_sb where it's properly copied out
+        */
+        sb = get_sb_nodev(
+            fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
+
+        if (sb && !IS_ERR(sb) && (PVFS2_SB(sb)))
         {
-            strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
-        }
-        strncpy(PVFS2_SB(sb)->devname, devname, PVFS_MAX_SERVER_ADDR_LEN);
+            /* on successful mount, store the devname and data used */
+            strncpy(PVFS2_SB(sb)->devname, devname,
+                    PVFS_MAX_SERVER_ADDR_LEN);
+            if (data)
+            {
+                strncpy(PVFS2_SB(sb)->data, data,
+                        PVFS2_MAX_MOUNT_OPT_LEN);
+            }
 
-        /* add this sb to our list of known pvfs2 sb's */
-        add_pvfs2_sb(sb);
+            /* finally, add this sb to our list of known pvfs2 sb's */
+            add_pvfs2_sb(sb);
+        }
     }
     else
     {
-        sb = get_sb_nodev(fst, flags, data, pvfs2_fill_sb);
-
-        /* on successful mount, store the devname and data used */
-        if (data)
-        {
-            strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
-        }
-        strncpy(PVFS2_SB(sb)->devname, devname, PVFS_MAX_SERVER_ADDR_LEN);
-
-        /* add this sb to our list of known pvfs2 sb's */
-        add_pvfs2_sb(sb);
+        pvfs2_error("ERROR: device name not specified.\n");
     }
 
   error_exit:

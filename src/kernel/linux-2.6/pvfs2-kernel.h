@@ -143,19 +143,12 @@ typedef struct
 /*
   these are the available mount options that we accept:
 
-  for now, the root handle and collection id are specified as mount
-  options.  it may seem extraneous since we have these stored in the
-  sb private info, but this is mostly for compatibility in case one
-  day these are not passed as mount options.
-
   the intr option (if set) is inspired by the nfs intr option that
   interrupts the operation in progress if a signal is received, and
   ignores the signal otherwise (if not set).
 */
 typedef struct
 {
-    PVFS_handle root_handle;
-    PVFS_fs_id coll_id;
     int intr;
 } pvfs2_mount_options_t;
 
@@ -163,7 +156,7 @@ typedef struct
 typedef struct
 {
     PVFS_handle root_handle;
-    PVFS_fs_id coll_id;
+    PVFS_fs_id fs_id;
     int id;
     pvfs2_mount_options_t mnt_options;
     char data[PVFS2_MAX_MOUNT_OPT_LEN];
@@ -171,7 +164,20 @@ typedef struct
     struct super_block *sb;
 
     struct list_head list;
-} pvfs2_sb_info;
+} pvfs2_sb_info_t;
+
+/*
+  a temporary structure used only for sb mount time that groups the
+  mount time data provided along with a private superblock structure
+  that is allocated before a 'kernel' superblock is allocated.
+*/
+typedef struct
+{
+    void *data;
+    PVFS_handle root_handle;
+    PVFS_fs_id fs_id;
+    int id;
+} pvfs2_mount_sb_info_t;
 
 /*
   NOTE: See Documentation/filesystems/porting for information
@@ -183,10 +189,10 @@ static inline pvfs2_inode_t *PVFS2_I(
     return container_of(inode, pvfs2_inode_t, vfs_inode);
 }
 
-static inline pvfs2_sb_info *PVFS2_SB(
+static inline pvfs2_sb_info_t *PVFS2_SB(
     struct super_block *sb)
 {
-    return (pvfs2_sb_info *)sb->s_fs_info;
+    return (pvfs2_sb_info_t *)sb->s_fs_info;
 }
 
 /****************************
@@ -493,11 +499,11 @@ do {                                                                 \
 #define remove_pvfs2_sb(sb)                                          \
 do {                                                                 \
     struct list_head *tmp = NULL;                                    \
-    pvfs2_sb_info *pvfs2_sb = NULL;                                  \
+    pvfs2_sb_info_t *pvfs2_sb = NULL;                                \
                                                                      \
     spin_lock(&pvfs2_superblocks_lock);                              \
     list_for_each(tmp, &pvfs2_superblocks) {                         \
-        pvfs2_sb = list_entry(tmp, pvfs2_sb_info, list);             \
+        pvfs2_sb = list_entry(tmp, pvfs2_sb_info_t, list);           \
         if (pvfs2_sb && (pvfs2_sb->sb == sb)) {                      \
             pvfs2_print("Removing SB %p from pvfs2 superblocks\n",   \
                         pvfs2_sb);                                   \

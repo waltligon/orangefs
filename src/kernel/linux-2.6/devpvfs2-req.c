@@ -386,7 +386,7 @@ static int pvfs2_devreq_ioctl(
         {
             int ret = 0;
             struct list_head *tmp = NULL;
-            pvfs2_sb_info *pvfs2_sb = NULL;
+            pvfs2_sb_info_t *pvfs2_sb = NULL;
 
             pvfs2_print("ioctl: pvfs_dev_remount_all called\n");
 
@@ -397,7 +397,7 @@ static int pvfs2_devreq_ioctl(
               upcall/downcall waiting.
             */
             list_for_each(tmp, &pvfs2_superblocks) {
-                pvfs2_sb = list_entry(tmp, pvfs2_sb_info, list);
+                pvfs2_sb = list_entry(tmp, pvfs2_sb_info_t, list);
                 if (pvfs2_sb && (pvfs2_sb->sb))
                 {
                     pvfs2_print("Remounting SB %p\n", pvfs2_sb);

@@ -111,7 +111,7 @@ struct dentry *pvfs2_lookup(
             new_op->upcall.req.lookup.parent_refn.handle =
                 pvfs2_ino_to_handle(dir->i_ino);
             new_op->upcall.req.lookup.parent_refn.fs_id =
-                PVFS2_SB(sb)->coll_id;
+                PVFS2_SB(sb)->fs_id;
         }
     }
     else
@@ -125,7 +125,7 @@ struct dentry *pvfs2_lookup(
 	new_op->upcall.req.lookup.parent_refn.handle =
 	    PVFS2_SB(sb)->root_handle;
 	new_op->upcall.req.lookup.parent_refn.fs_id =
-	    PVFS2_SB(sb)->coll_id;
+	    PVFS2_SB(sb)->fs_id;
     }
     strncpy(new_op->upcall.req.lookup.d_name,
 	    dentry->d_name.name, PVFS2_NAME_LEN);
@@ -350,7 +350,7 @@ static int pvfs2_rename(
         new_op->upcall.req.rename.old_parent_refn.handle =
 	    PVFS2_SB(sb)->root_handle;
         new_op->upcall.req.rename.old_parent_refn.fs_id =
-	    PVFS2_SB(sb)->coll_id;
+	    PVFS2_SB(sb)->fs_id;
     }
 
     /* do the same for the new parent */
@@ -366,7 +366,7 @@ static int pvfs2_rename(
         new_op->upcall.req.rename.new_parent_refn.handle =
 	    PVFS2_SB(sb)->root_handle;
         new_op->upcall.req.rename.new_parent_refn.fs_id =
-	    PVFS2_SB(sb)->coll_id;
+	    PVFS2_SB(sb)->fs_id;
     }
     strncpy(new_op->upcall.req.rename.d_old_name,
 	    old_dentry->d_name.name, PVFS2_NAME_LEN);
