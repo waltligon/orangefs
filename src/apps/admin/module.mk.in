@@ -7,13 +7,14 @@ ADMINSRC := \
 	$(DIR)/pvfs2-set-mode.c \
 	$(DIR)/pvfs2-set-eventmask.c \
 	$(DIR)/pvfs2-export.c \
-        $(DIR)/pvfs2-ls.c \
-        $(DIR)/pvfs2-ping.c \
-        $(DIR)/pvfs2-rm.c \
-        $(DIR)/pvfs2-statfs.c \
+	$(DIR)/pvfs2-ls.c \
+	$(DIR)/pvfs2-ping.c \
+	$(DIR)/pvfs2-rm.c \
+	$(DIR)/pvfs2-statfs.c \
 	$(DIR)/pvfs2-perf-mon-example.c \
 	$(DIR)/pvfs2-event-mon-example.c \
 	$(DIR)/pvfs2-mkdir.c \
+	$(DIR)/pvfs2-chmod.c \
 	$(DIR)/pvfs2-fs-dump.c\
 	$(DIR)/pvfs2-cp.c
 
