@@ -74,19 +74,16 @@ sub create_sessionfile {
     return(0);
 }
 
-sub uniq(@) {
-    return if (!@_);
-    my $entry = shift;
-    while (@_) {
-        my $next = $_[0];
-        if ($entry ne $next) {
-            last;
-        }
-        shift;
+sub uniq(@)
+{
+    my %seen = ();
+    my @tmp_uniq;
+    my $item;
+    foreach $item (@_) {
+	push(@tmp_uniq, $item) unless $seen{$item}++;
     }
-    return $entry, &uniq(@_);
+    return(@tmp_uniq);
 }
-
 
 # executes "$_[1]" instances of remote-execing command "$_[0]" (rsh or ssh),
 # giving up after "$_[2]" seconds.  The remote machine will execute "$_[3]".  
