@@ -139,7 +139,7 @@ dnl More options
 AC_ARG_ENABLE(fast,
 [  --enable-fast           Disable optional debugging, enable optimizations.],
 CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG",
-CFLAGS="$CFLAGS -g"
+FLAGS=${CFLAGS:-"-g"}
 )
 
 AC_ARG_ENABLE(profiling,
