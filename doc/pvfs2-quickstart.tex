@@ -818,6 +818,30 @@ drwxr-xr-x    3 root     root            0 Aug 15 13:21 ..
 -rw-r--r--    1 root     root       330526 Aug 15 13:30 foo
 \end{verbatim}
 
+\subsection{Unmounting and stopping PVFS2 on a client}
+
+While this is a quick \emph{start} guide, knowing how to cleanly shut
+things down can be helpful too!
+
+Unmounting a PVFS2 volume is as simple as using ``umount'':
+\begin{verbatim}
+gil:~# umount /mnt/pvfs2
+gil:~# mount | grep pvfs2
+\end{verbatim}
+
+After all PVFS2 volumes have been unmounted, it is safe to kill the
+pvfs2-client:
+\begin{verbatim}
+gil:~# killall pvfs2-client
+\end{verbatim}
+
+Waiting a few seconds after killing the pvfs2-client will ensure that
+everything has terminated properly.  Once the pvfs2-client has been
+killed, it is safe to remove the PVFS2 kernel module:
+\begin{verbatim}
+gil:~# rmmod pvfs2
+\end{verbatim}
+
 \appendix
 
 \section{Notes on running PVFS2 without root access}
