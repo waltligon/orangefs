@@ -1,0 +1,11 @@
+[Config]
+MPICHBINDIR=/home/USER/testing/DATE/work/mpich2/bin/
+PVFS2BINDIR=/home/USER/testing/DATE/work/INSTALL-pvfs2/bin/
+PVFS2TABFILE=/tmp/pvfs2-pav/pvfs2tab
+PAVDIR=/home/USER/testing/DATE/work/pvfs2/test/common/pav/
+MOUNTPOINT=/tmp/pvfs2-pav-mount
+EMAIL=pcarns@parl.clemson.edu
+
+[Tests]
+TEST2=./simple.sh
+

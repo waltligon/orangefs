@@ -1,0 +1,29 @@
+#!/bin/sh
+
+#PBS -N PVFS2TEST
+#PBS -l walltime=1:00:00
+
+# Change into the working directory
+cd $PBS_O_WORKDIR
+# Set the path to match the path of the submitter
+PATH=$PBS_O_PATH
+
+############################
+#Change these variables if you want
+#to name your config files something
+#else.
+CONFIGFILE="CONFIG"
+PAVCONFIG="PAVCONFIG"
+NODEFILE="nodes.conf"
+
+cat $PBS_NODEFILE>/home/USER/testing/DATE/work/$NODEFILE
+cd $PBS_O_WORKDIR
+
+mpdboot --rsh=rsh --file=$HOME/nightly/nodes.conf
+
+# TODO: send email if this doesn't work too!
+./pvfs2tests.py $CONFIGFILE $PAVCONFIG /home/USER/testing/DATE/work/$NODEFILE
+
+mpdallexit
+
+exit 0
