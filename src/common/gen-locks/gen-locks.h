@@ -45,7 +45,7 @@
 /* this is especially important for development in which case the locks
  * should really be enabled in order to verify proper operation 
  */
-#if !defined(__GEN_NULL_LOCKING__) 
+#if !defined(__GEN_NULL_LOCKING__) && !defined(__GEN_POSIX_LOCKING__) 
 	#define __GEN_POSIX_LOCKING__
 #endif
 

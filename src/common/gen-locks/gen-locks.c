@@ -28,6 +28,7 @@
 
 #include <stdlib.h>
 #include <errno.h>
+#include <pthread.h>
 
 #include "gen-locks.h"
 
@@ -42,7 +43,7 @@
  *
  * returns 0 on success, -1 and sets errno on failure.
  */
-int gen_posix_mutex_lock(gen_mutex_t* mut){
+int gen_posix_mutex_lock(pthread_mutex_t* mut){
 	return(pthread_mutex_lock(mut));
 }
 
@@ -54,35 +55,35 @@ int gen_posix_mutex_lock(gen_mutex_t* mut){
  *
  * returns 0 on success, -1 and sets errno on failure
  */
-int gen_posix_mutex_unlock(gen_mutex_t* mut){
+int gen_posix_mutex_unlock(pthread_mutex_t* mut){
 	return(pthread_mutex_unlock(mut));
 }
 
 
 /*
- * gen_mutex_trylock()
+ * pthread_mutex_trylock()
  *
  * nonblocking attempt to acquire a lock.
  *
  * returns 0 on success, -1 and sets errno on failure, sets errno to EBUSY
  * if it cannot obtain the lock
  */
-int gen_posix_mutex_trylock(gen_mutex_t* mut){
+int gen_posix_mutex_trylock(pthread_mutex_t* mut){
 	return(pthread_mutex_trylock(mut));
 }
 
 /*
  * gen_mutex_build()
  *
- * allocates storage for and initializes a new gen_mutex_t
+ * allocates storage for and initializes a new pthread_mutex_t
  *
  * returns a pointer to the new mutex on success, NULL on failure.
  */
-gen_mutex_t* gen_posix_mutex_build(void){
+pthread_mutex_t* gen_posix_mutex_build(void){
 
-	gen_mutex_t * mutex_p = NULL;
+	pthread_mutex_t * mutex_p = NULL;
 
-	mutex_p = (gen_mutex_t*)malloc(sizeof(gen_mutex_t));
+	mutex_p = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
 	if(!mutex_p){
 		return(NULL);
 	}
@@ -101,7 +102,7 @@ gen_mutex_t* gen_posix_mutex_build(void){
  *
  * returns 0 on success, -errno on failure.
  */
-int gen_posix_mutex_destroy(gen_mutex_t* mut){
+int gen_posix_mutex_destroy(pthread_mutex_t* mut){
 
 	if(!mut){
 		return(-EINVAL);

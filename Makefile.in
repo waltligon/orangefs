@@ -17,9 +17,13 @@ CC = @CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LD = gcc
-CFLAGS += -Wconversion -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include
+CFLAGS += -D__STATIC_METHOD_BMI_TCP__ -Wconversion -Wall\
+ -Wstrict-prototypes -pipe -I $(srcdir)/include
 LDFLAGS += -L lib
 LIBS += -lpvfs2
+# here we differentiate cflags between some components
+LIBCFLAGS = -D__GEN_NULL_LOCKING__
+SERVERCFLAGS = -D__GEN_POSIX_LOCKING__
 # add all module directories into include path
 CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 
@@ -73,10 +77,10 @@ lib/libpvfs2.a: $(LIBOBJS)
 # FIRST OR NOT...SHOULD LEARN THE MATCHING RULES BETTER.
 #
 %-server.o: %.c
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $(SERVERCFLAGS) $(CFLAGS) $< -c -o $@
 
 %.o: %.c
-	$(CC) $(CFLAGS) $< -c -o $@
+	$(CC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
 
 $(TESTS): %: %.o $(LIBRARIES)
 

@@ -1,0 +1,9 @@
+DIR := src/io/bmi/bmi_tcp
+LIBSRC += \
+	$(DIR)/bmi_tcp.c \
+	$(DIR)/socket_collection.c\
+	$(DIR)/sockio.c
+SERVERSRC += \
+	$(DIR)/bmi_tcp.c \
+	$(DIR)/socket_collection.c\
+	$(DIR)/sockio.c

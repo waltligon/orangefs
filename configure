@@ -2149,7 +2149,7 @@ else
 echo "${ECHO_T}no" >&6
 fi
 
-ac_config_files="$ac_config_files Makefile src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk test/io/trove/module.mk test/common/quicklist/module.mk test/common/id-generator/module.mk test/common/gossip/module.mk test/common/gen-locks/module.mk"
+ac_config_files="$ac_config_files Makefile src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk test/io/trove/module.mk test/common/quicklist/module.mk test/common/id-generator/module.mk test/common/gossip/module.mk test/common/gen-locks/module.mk test/io/bmi/module.mk"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -2466,13 +2466,17 @@ do
   "src/common/id-generator/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/common/id-generator/module.mk" ;;
   "src/common/gossip/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/common/gossip/module.mk" ;;
   "src/common/gen-locks/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/common/gen-locks/module.mk" ;;
+  "src/common/llist/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/common/llist/module.mk" ;;
+  "src/io/bmi/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/bmi/module.mk" ;;
+  "src/io/bmi/bmi_tcp/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_tcp/module.mk" ;;
   "test/io/trove/module.mk" ) CONFIG_FILES="$CONFIG_FILES test/io/trove/module.mk" ;;
   "test/common/quicklist/module.mk" ) CONFIG_FILES="$CONFIG_FILES test/common/quicklist/module.mk" ;;
   "test/common/id-generator/module.mk" ) CONFIG_FILES="$CONFIG_FILES test/common/id-generator/module.mk" ;;
   "test/common/gossip/module.mk" ) CONFIG_FILES="$CONFIG_FILES test/common/gossip/module.mk" ;;
   "test/common/gen-locks/module.mk" ) CONFIG_FILES="$CONFIG_FILES test/common/gen-locks/module.mk" ;;
+  "test/io/bmi/module.mk" ) CONFIG_FILES="$CONFIG_FILES test/io/bmi/module.mk" ;;
   "pvfs2-config.h" ) CONFIG_HEADERS="$CONFIG_HEADERS pvfs2-config.h" ;;
-  *) { { echo "$as_me:2475: error: invalid argument: $ac_config_target" >&5
+  *) { { echo "$as_me:2479: error: invalid argument: $ac_config_target" >&5
 echo "$as_me: error: invalid argument: $ac_config_target" >&2;}
    { (exit 1); exit 1; }; };;
   esac
@@ -2691,7 +2695,7 @@ done; }
   esac
 
   if test x"$ac_file" != x-; then
-    { echo "$as_me:2694: creating $ac_file" >&5
+    { echo "$as_me:2698: creating $ac_file" >&5
 echo "$as_me: creating $ac_file" >&6;}
     rm -f "$ac_file"
   fi
@@ -2709,7 +2713,7 @@ echo "$as_me: creating $ac_file" >&6;}
       -) echo $tmp/stdin ;;
       [\\/$]*)
          # Absolute (can't be DOS-style, as IFS=:)
-         test -f "$f" || { { echo "$as_me:2712: error: cannot find input file: $f" >&5
+         test -f "$f" || { { echo "$as_me:2716: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          echo $f;;
@@ -2722,7 +2726,7 @@ echo "$as_me: error: cannot find input file: $f" >&2;}
            echo $srcdir/$f
          else
            # /dev/null tree
-           { { echo "$as_me:2725: error: cannot find input file: $f" >&5
+           { { echo "$as_me:2729: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          fi;;
@@ -2783,7 +2787,7 @@ for ac_file in : $CONFIG_HEADERS; do test "x$ac_file" = x: && continue
   * )   ac_file_in=$ac_file.in ;;
   esac
 
-  test x"$ac_file" != x- && { echo "$as_me:2786: creating $ac_file" >&5
+  test x"$ac_file" != x- && { echo "$as_me:2790: creating $ac_file" >&5
 echo "$as_me: creating $ac_file" >&6;}
 
   # First look for the input files in the build tree, otherwise in the
@@ -2794,7 +2798,7 @@ echo "$as_me: creating $ac_file" >&6;}
       -) echo $tmp/stdin ;;
       [\\/$]*)
          # Absolute (can't be DOS-style, as IFS=:)
-         test -f "$f" || { { echo "$as_me:2797: error: cannot find input file: $f" >&5
+         test -f "$f" || { { echo "$as_me:2801: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          echo $f;;
@@ -2807,7 +2811,7 @@ echo "$as_me: error: cannot find input file: $f" >&2;}
            echo $srcdir/$f
          else
            # /dev/null tree
-           { { echo "$as_me:2810: error: cannot find input file: $f" >&5
+           { { echo "$as_me:2814: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          fi;;
@@ -2924,7 +2928,7 @@ cat >>$CONFIG_STATUS <<\EOF
   rm -f $tmp/in
   if test x"$ac_file" != x-; then
     if cmp -s $ac_file $tmp/config.h 2>/dev/null; then
-      { echo "$as_me:2927: $ac_file is unchanged" >&5
+      { echo "$as_me:2931: $ac_file is unchanged" >&5
 echo "$as_me: $ac_file is unchanged" >&6;}
     else
       ac_dir=`$as_expr X"$ac_file" : 'X\(.*[^/]\)//*[^/][^/]*/*$' \| \
