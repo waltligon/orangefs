@@ -109,6 +109,7 @@ int main(int argc, char **argv)
 {
     int ret = -1, debug_mask = 0;
     char *fs_conf = NULL, *server_conf = NULL;
+    int siglevel = 0;
 
 #ifdef WITH_MTRACE
     mtrace();
@@ -236,7 +237,8 @@ int main(int argc, char **argv)
 
 	if (signal_recvd_flag != 0)
 	{
-	    ret = signal_recvd_flag;
+	    ret = 0;
+	    siglevel = signal_recvd_flag;
 	    goto server_shutdown;
 	}
 
@@ -328,7 +330,7 @@ int main(int argc, char **argv)
     }
 
   server_shutdown:
-    server_shutdown(server_status_flag, ret, 0);
+    server_shutdown(server_status_flag, ret, siglevel);
     return -1;	/* Should never get here */
 } /* end of main() */
 
@@ -754,6 +756,12 @@ static int server_shutdown(
     PINT_server_status_flag status,
     int ret, int siglevel)
 {
+    if(siglevel == SIGSEGV)
+    {
+	gossip_err("SIGSEGV: skipping cleanup; exit now!\n");
+	exit(-1);
+    }
+
     if (status & SERVER_STATE_MACHINE_INIT)
 	PINT_state_machine_halt();
 
@@ -801,8 +809,11 @@ static int server_shutdown(
  */
 static void server_sig_handler(int sig)
 {
-    gossip_err("PVFS2 server: got signal: %d, server_status_flag: %d\n", 
-	sig, (int)server_status_flag);
+    if(sig != SIGSEGV)
+    {
+	gossip_err("PVFS2 server: got signal: %d, server_status_flag: %d\n", 
+	    sig, (int)server_status_flag);
+    }
 
     /* short circuit non critical signals here */
     if(sig == SIGPIPE)
@@ -817,11 +828,6 @@ static void server_sig_handler(int sig)
 	 * and shut down before we can handle this cleanly
 	 */
 	gossip_err("SIGHUP: pvfs2-server cannot restart; shutting down instead.\n");
-    }
-    if(sig == SIGSEGV)
-    {
-	gossip_err("SIGSEGV: skipping cleanup; exit now!\n");
-	exit(-1);
     }
 
     /* set the signal_recvd_flag on critical errors to cause the server to 
