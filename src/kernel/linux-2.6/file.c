@@ -375,6 +375,13 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     pvfs2_print("pvfs2_file_mmap: called on %s\n",
                 (file ? (char *)file->f_dentry->d_name.name :
                  (char *)"Unknown"));
+
+    /* we don't support mmap writes, or SHARED mmaps at all */
+    if ((vma->vm_flags & VM_SHARED) || (vma->vm_flags & VM_MAYSHARE))
+    {
+        return -EINVAL;
+    }
+
     /*
       for mmap on pvfs2, make sure we use pvfs2 specific address
       operations by explcitly setting the operations

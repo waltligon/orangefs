@@ -222,9 +222,8 @@ static PINT_pinode *acache_internal_lookup(PVFS_object_ref refn)
 
   NOTE: if a pinode is returned, it is returned with the lock held.
   That means no one else can use it before the lock is released (in
-  release, or set_valid);
-  if status is specified, the pinode status will be filled to avoid
-  calling the status method after this call
+  release, or set_valid).  if status is specified, the pinode status
+  will be filled to avoid calling the status method after this call
 */
 PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn, int *status)
 {
@@ -249,7 +248,7 @@ PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn, int *status)
 
     if (pinode)
     {
-        gen_mutex_lock(pinode->mutex);
+        gen_mutex_trylock(pinode->mutex);
         assert(pinode->flag = PINODE_INTERNAL_FLAG_HASHED);
         pinode->ref_cnt++;
         if (status)
@@ -533,37 +532,14 @@ static void pinode_invalidate(PINT_pinode *pinode)
 
 static int pinode_status(PINT_pinode *pinode)
 {
-    struct timeval now;
     int ret = PINODE_STATUS_INVALID;
 
     acache_debug("pinode_status entered\n");
 
-    /* if we don't have the lock, get it */
     gen_mutex_trylock(pinode->mutex);
-    ret = pinode->status;
-    if (ret == PINODE_STATUS_VALID)
-    {
-        ret = PINODE_STATUS_INVALID;
-        if (pinode->ref_cnt > 0)
-        {
-            if (gettimeofday(&now, NULL) == 0)
-            {
-                ret = (((pinode->time_stamp.tv_sec < now.tv_sec) ||
-                        ((pinode->time_stamp.tv_sec == now.tv_sec) &&
-                         (pinode->time_stamp.tv_usec < now.tv_usec))) ?
-                       PINODE_STATUS_EXPIRED : PINODE_STATUS_VALID);
-            }
-        }
-    }
-
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "pinode [%Lu] entry status: %s\n",
-                 Lu(pinode->refn.handle), get_status_str(ret));
-
-    if (ret == PINODE_STATUS_EXPIRED)
-    {
-        pinode->ref_cnt--;
-    }
+    ret = acache_internal_status(pinode);
     gen_mutex_unlock(pinode->mutex);
+
     acache_debug("pinode_status exited\n");
     return ret;
 }
