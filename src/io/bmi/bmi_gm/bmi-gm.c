@@ -235,6 +235,7 @@ struct ctrl_put
 struct ctrl_msg
 {
     bmi_flag_t ctrl_type;
+    uint32_t magic_nr;
     union
     {
 	struct ctrl_req req;
@@ -881,6 +882,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 	/* Immediate mode stuff */
 	new_ctrl_msg = (struct ctrl_msg *) (buffer + size);
 	new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
+	new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
 	new_ctrl_msg->u.immed.actual_size = size;
 	new_ctrl_msg->u.immed.msg_tag = tag;
 	return (gm_post_send_build_op(id, dest, buffer, size,
@@ -974,6 +976,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
 	/* Immediate mode stuff */
 	new_ctrl_msg = (struct ctrl_msg *) (new_buffer + total_size);
 	new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
+	new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
 	new_ctrl_msg->u.immed.actual_size = total_size;
 	new_ctrl_msg->u.immed.msg_tag = tag;
 	buffer_status = GM_BUF_METH_ALLOC;
@@ -1068,6 +1071,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     /* Immediate mode stuff */
     new_ctrl_msg = (struct ctrl_msg *) (new_buffer + total_size);
     new_ctrl_msg->ctrl_type = CTRL_UNEXP_TYPE;
+    new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
     new_ctrl_msg->u.immed.actual_size = total_size;
     new_ctrl_msg->u.immed.msg_tag = tag;
     return (gm_post_send_build_op(id, dest, new_buffer, total_size,
@@ -1134,6 +1138,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
     /* Immediate mode stuff */
     new_ctrl_msg = (struct ctrl_msg *) (buffer + size);
     new_ctrl_msg->ctrl_type = CTRL_UNEXP_TYPE;
+    new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
     new_ctrl_msg->u.immed.actual_size = size;
     new_ctrl_msg->u.immed.msg_tag = tag;
 
@@ -2019,6 +2024,7 @@ static void initiate_put_announcement(method_op_p mop)
     my_ctrl = bmi_gm_bufferpool_get(ctrl_send_pool);
 
     my_ctrl->ctrl_type = CTRL_PUT_TYPE;
+    my_ctrl->magic_nr = BMI_MAGIC_NR;
     my_ctrl->u.put.receiver_op_id = gm_op_data->peer_op_id;
     /* keep up with this buffer in the op structure */
     gm_op_data->freeable_ctrl_buffer = my_ctrl;
@@ -2056,6 +2062,7 @@ static void initiate_send_rend(method_op_p mop)
     my_ctrl = bmi_gm_bufferpool_get(ctrl_send_pool);
 
     my_ctrl->ctrl_type = CTRL_REQ_TYPE;
+    my_ctrl->magic_nr = BMI_MAGIC_NR;
     my_ctrl->u.req.actual_size = mop->actual_size;
     my_ctrl->u.req.msg_tag = mop->msg_tag;
     my_ctrl->u.req.sender_op_id = mop->op_id;
@@ -2675,6 +2682,16 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 				       sizeof(struct ctrl_msg));
     }
 
+    /* check magic */
+    if(ctrl_copy.magic_nr != BMI_MAGIC_NR)
+    {
+	gossip_err("Error: bad magic in bmi_gm message.\n");
+	gm_provide_receive_buffer(local_port,
+				  gm_ntohp(poll_event->recv.buffer),
+				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
+	return(0);
+    }
+
     /* repost buffer ASAP unless we need to copy data out of it */
     if(ctrl_copy.ctrl_type != CTRL_IMMED_TYPE && 
 	ctrl_copy.ctrl_type != CTRL_UNEXP_TYPE)
@@ -3157,6 +3174,7 @@ static void prepare_for_recv(method_op_p mop)
     new_ctrl = bmi_gm_bufferpool_get(ctrl_send_pool);
 
     new_ctrl->ctrl_type = CTRL_ACK_TYPE;
+    new_ctrl->magic_nr = BMI_MAGIC_NR;
     new_ctrl->u.ack.sender_op_id = gm_op_data->peer_op_id;
     new_ctrl->u.ack.receiver_op_id = mop->op_id;
     /* doing this to avoid a warning about type size mismatch */
@@ -3259,6 +3277,7 @@ static void prepare_for_recv_list(method_op_p mop)
     new_ctrl = bmi_gm_bufferpool_get(ctrl_send_pool);
 
     new_ctrl->ctrl_type = CTRL_ACK_TYPE;
+    new_ctrl->magic_nr = BMI_MAGIC_NR;
     new_ctrl->u.ack.sender_op_id = gm_op_data->peer_op_id;
     new_ctrl->u.ack.receiver_op_id = mop->op_id;
     /* doing this to avoid a warning about type size mismatch */
