@@ -1,4 +1,4 @@
 DIR := test/io/dev
 
 TESTSRC += \
-	$(DIR)/test-dev.c
+	$(DIR)/dev-test.c
