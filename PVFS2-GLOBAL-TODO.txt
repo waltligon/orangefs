@@ -23,6 +23,7 @@ general server functionality:
 **** defining "on disk" format for metadata
 **** getting multiple servers working (io + metadata)
 **** finishing file system semantics documentation
+- don't forget to define semantics for access times
 **** access control, general security model
 - better error handling when unsupported request received
 - making server run as background daemon
