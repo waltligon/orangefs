@@ -171,7 +171,7 @@ int main(int argc, char **argv)
 	if(offset != -1)
 	{
 		fprintf(stderr, "\nAIEEEeee!  Why doesn't the client side set req processing offset to -1?.\n");
-		fprintf(stderr, "... the server stopped correctly after this many bytes");
+		fprintf(stderr, "... the server stopped correctly after this many bytes\n");
 	}
 	return 0;
 }
