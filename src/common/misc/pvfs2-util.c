@@ -366,6 +366,8 @@ int PVFS_util_remove_dir_prefix(
 	return ret;
     }
 
+    while (pathname[1] == '/') pathname++;
+
     prefix_len = strlen(prefix);
     pathname_len = strlen(pathname);
 
