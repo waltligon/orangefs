@@ -354,7 +354,7 @@ int extentlist_handle_remove(struct TROVE_handle_extentlist *elist,
 	    old_e->last  = last_handle;
 	    avlinsert(&(elist->index), old_e);
 	}
-	else if (old_e->last == handle) {
+	else if (last_handle == handle) {
 	    old_e->first = key_handle;
 	    old_e->last  = last_handle - 1;
 	    avlinsert(&(elist->index), old_e);
