@@ -25,6 +25,7 @@
 #include "bmi-byteswap.h"
 #include "id-generator.h"
 #include "pint-event.h"
+#include "gen-locks.h"
 
 #define BMI_EVENT_START(__op, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, 0, __id, \
@@ -33,6 +34,8 @@
 #define BMI_EVENT_END(__op, __size, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, __size, __id, \
  PVFS_EVENT_FLAG_END)
+
+static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 
 /* function prototypes */
 int BMI_tcp_initialize(method_addr_p listen_addr,
@@ -360,6 +363,8 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 	return (-EINVAL);
     }
 
+    gen_mutex_lock(&interface_mutex);
+
     /* zero out our parameter structure and fill it in */
     memset(&tcp_method_params, 0, sizeof(struct method_params));
     tcp_method_params.method_id = method_id;
@@ -411,6 +416,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 	goto initialize_failure;
     }
 
+    gen_mutex_unlock(&interface_mutex);
     gossip_ldebug(BMI_DEBUG_TCP, "TCP/IP module successfully initialized.\n");
     return (0);
 
@@ -428,6 +434,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
     {
 	BMI_socket_collection_finalize(tcp_socket_collection_p);
     }
+    gen_mutex_unlock(&interface_mutex);
     return (tmp_errno);
 }
 
@@ -441,6 +448,8 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 int BMI_tcp_finalize(void)
 {
     int i = 0;
+
+    gen_mutex_lock(&interface_mutex);
 
     /* shut down our listen addr, if we have one */
     if ((tcp_method_params.method_flags & BMI_INIT_SERVER)
@@ -470,6 +479,7 @@ int BMI_tcp_finalize(void)
      * all of the method addresses (this will close any open sockets)
      */
     gossip_ldebug(BMI_DEBUG_TCP, "TCP/IP module finalized.\n");
+    gen_mutex_unlock(&interface_mutex);
     return (0);
 }
 
@@ -601,6 +611,8 @@ int BMI_tcp_set_info(int option,
     int ret = -1;
     method_addr_p tmp_addr = NULL;
 
+    gen_mutex_lock(&interface_mutex);
+
     switch (option)
     {
 
@@ -624,6 +636,7 @@ int BMI_tcp_set_info(int option,
 	break;
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -636,18 +649,23 @@ int BMI_tcp_set_info(int option,
 int BMI_tcp_get_info(int option,
 		     void *inout_parameter)
 {
+    gen_mutex_lock(&interface_mutex);
+
     switch (option)
     {
     case BMI_CHECK_MAXSIZE:
 	*((int *) inout_parameter) = TCP_MODE_REND_LIMIT;
+	gen_mutex_unlock(&interface_mutex);
 	return(0);
 	break;
     default:
 	gossip_ldebug(BMI_DEBUG_TCP, "TCP hint %d not implemented.\n", option);
+	gen_mutex_unlock(&interface_mutex);
 	return(0);
 	break;
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return (-ENOSYS);
 }
 
@@ -692,6 +710,8 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
     my_header.size = size;
     my_header.magic_nr = BMI_MAGIC_NR;
 
+    gen_mutex_lock(&interface_mutex);
+
     ret = BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_type, my_header,
 				      user_ptr, context_id);
@@ -700,6 +720,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, size, *id);
 
+    gen_mutex_unlock(&interface_mutex);
     return(ret);
 }
 
@@ -736,6 +757,8 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
     my_header.size = size;
     my_header.magic_nr = BMI_MAGIC_NR;
 
+    gen_mutex_lock(&interface_mutex);
+
     ret = BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_type, my_header,
 				      user_ptr, context_id);
@@ -744,6 +767,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, size, *id);
 
+    gen_mutex_unlock(&interface_mutex);
     return(ret);
 }
 
@@ -784,6 +808,8 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 	return (-EINVAL);
     }
 
+    gen_mutex_lock(&interface_mutex);
+
     ret = tcp_post_recv_generic(id, src, &buffer, &expected_size,
 				1, expected_size, actual_size,
 				buffer_type, tag,
@@ -794,6 +820,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *actual_size, *id);
 
+    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -817,10 +844,13 @@ int BMI_tcp_test(bmi_op_id_t id,
 
     assert(query_op != NULL);
 
+    gen_mutex_lock(&interface_mutex);
+
     /* do some ``real work'' here */
     ret = tcp_do_work(max_idle_time);
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
@@ -843,6 +873,7 @@ int BMI_tcp_test(bmi_op_id_t id,
 	(*outcount)++;
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return (0);
 }
 
@@ -866,10 +897,13 @@ int BMI_tcp_testsome(int incount,
     method_op_p query_op = NULL;
     int i;
 
+    gen_mutex_lock(&interface_mutex);
+
     /* do some ``real work'' here */
     ret = tcp_do_work(max_idle_time);
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
@@ -904,6 +938,7 @@ int BMI_tcp_testsome(int incount,
 	}
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return(0);
 }
 
@@ -922,10 +957,13 @@ int BMI_tcp_testunexpected(int incount,
     int ret = -1;
     method_op_p query_op = NULL;
 
+    gen_mutex_lock(&interface_mutex);
+
     /* do some ``real work'' here */
     ret = tcp_do_work(max_idle_time);
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
@@ -947,6 +985,7 @@ int BMI_tcp_testunexpected(int incount,
 	dealloc_tcp_method_op(query_op);
 	(*outcount)++;
     }
+    gen_mutex_unlock(&interface_mutex);
     return (0);
 }
 
@@ -971,10 +1010,13 @@ int BMI_tcp_testcontext(int incount,
 
     *outcount = 0;
 
+    gen_mutex_lock(&interface_mutex);
+
     /* do some ``real work'' here */
     ret = tcp_do_work(max_idle_time);
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
@@ -1000,6 +1042,7 @@ int BMI_tcp_testcontext(int incount,
 	(*outcount)++;
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return(0);
 }
 
@@ -1049,6 +1092,8 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
     my_header.size = total_size;
     my_header.magic_nr = BMI_MAGIC_NR;
 
+    gen_mutex_lock(&interface_mutex);
+
     ret = BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_type,
 				      my_header, user_ptr, context_id);
@@ -1057,6 +1102,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, *id);
 
+    gen_mutex_unlock(&interface_mutex);
     return(ret);
 }
 
@@ -1087,6 +1133,8 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 	return (-EINVAL);
     }
 
+    gen_mutex_lock(&interface_mutex);
+
     ret = tcp_post_recv_generic(id, src, buffer_list, size_list,
 				list_count, total_expected_size,
 				total_actual_size, buffer_type, tag, user_ptr,
@@ -1097,6 +1145,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *total_actual_size, *id);
 
+    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -1136,6 +1185,8 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
     my_header.size = total_size;
     my_header.magic_nr = BMI_MAGIC_NR;
 
+    gen_mutex_lock(&interface_mutex);
+
     ret = BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_type,
 				      my_header, user_ptr, context_id);
@@ -1144,6 +1195,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
     if(ret == 1)
 	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, *id);
 
+    gen_mutex_unlock(&interface_mutex);
     return(ret);
 }
 
@@ -1157,13 +1209,17 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 int BMI_tcp_open_context(bmi_context_id context_id)
 {
 
+    gen_mutex_lock(&interface_mutex);
+
     /* start a new queue for tracking completions in this context */
     completion_array[context_id] = op_list_new();
     if (!completion_array[context_id])
     {
+	gen_mutex_unlock(&interface_mutex);
 	return(-ENOMEM);
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return(0);
 }
 
@@ -1177,9 +1233,12 @@ int BMI_tcp_open_context(bmi_context_id context_id)
 void BMI_tcp_close_context(bmi_context_id context_id)
 {
     
+    gen_mutex_lock(&interface_mutex);
+
     /* tear down completion queue for this context */
     op_list_cleanup(completion_array[context_id]);
 
+    gen_mutex_unlock(&interface_mutex);
     return;
 }
 

@@ -5,15 +5,18 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.3 2003-10-23 14:59:56 pw Exp $
+ * $Id: ib.c,v 1.4 2003-12-09 19:24:39 pcarns Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
 #include <src/common/quicklist/quicklist.h>
 #include <src/io/bmi/bmi-method-support.h>
+#include <src/common/gen-locks/gen-locks.h>
 #include <vapi.h>
 #include <vapi_common.h>
 #include "ib.h"
+
+static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 
 /* alloc space for shared variables */
 bmi_size_t EAGER_BUF_PAYLOAD __hidden;
@@ -763,6 +766,8 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
     ib_method_addr_t *ibmap = remote_map->method_data;
     int i;
 
+    gen_mutex_lock(&interface_mutex);
+
     /* alloc and build new sendq structure */
     sq = Malloc(sizeof(*sq));
     sq->type = TYPE_SEND;
@@ -801,6 +806,7 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
     /* unexpected messages must fit inside an eager message */
     if (is_unexpected && sq->buflist.tot_len > EAGER_BUF_PAYLOAD) {
 	free(sq);
+	gen_mutex_unlock(&interface_mutex);
 	return -EINVAL;
     }
 
@@ -821,6 +827,7 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 
     /* and start sending it if possible */
     encourage_send(sq, 0);
+    gen_mutex_unlock(&interface_mutex);
     return 0;
 }
 
@@ -858,8 +865,10 @@ BMI_ib_post_sendunexpected(bmi_op_id_t *id, struct method_addr *remote_map,
     ib_method_addr_t *ibmap = remote_map->method_data;
 
     debug(2, "%s: len %d tag %d", __func__, (int) size, tag);
+    gen_mutex_lock(&interface_mutex);
     if (!ibmap->c)
 	ib_tcp_client_connect(ibmap, remote_map);
+    gen_mutex_unlock(&interface_mutex);
     /* references here will not be saved after this func returns */
     return generic_post_send(id, remote_map, 0, &buffer, &size, size, tag,
       user_ptr, context_id, 1);
@@ -876,8 +885,10 @@ BMI_ib_post_sendunexpected_list(bmi_op_id_t *id, struct method_addr *remote_map,
     debug(2, "%s: listlen %d tag %d", __func__, list_count, tag);
     if (list_count < 1)
 	error("%s: list count must be positive", __func__);
+    gen_mutex_lock(&interface_mutex);
     if (!ibmap->c)
 	ib_tcp_client_connect(ibmap, remote_map);
+    gen_mutex_unlock(&interface_mutex);
     /* references here will not be saved after this func returns */
     return generic_post_send(id, remote_map, list_count, buffers, sizes,
       total_size, tag, user_ptr, context_id, 1);
@@ -898,6 +909,7 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
     list_t *l;
     int i;
     
+    gen_mutex_lock(&interface_mutex);
     /* XXX: maybe check recvq first, just an optimization... */
 
     /* check to see if matching recv is in the queue */
@@ -990,6 +1002,7 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 	else
 	    rq->state = RQ_RTS_WAITING_CTS_BUFFER;
     }
+    gen_mutex_unlock(&interface_mutex);
 }
 
 static int
@@ -1033,6 +1046,7 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *error_code,
     ib_send_t *sq;
     int ret = 0;
 
+    gen_mutex_lock(&interface_mutex);
     /* poke cq */
     (void) check_cq();
     process_cq();
@@ -1083,6 +1097,7 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *error_code,
 	}
     }
     *outcount = ret;
+    gen_mutex_unlock(&interface_mutex);
     return ret;
 }
 
@@ -1097,6 +1112,7 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 {
     list_t *l, *lnext;
 
+    gen_mutex_lock(&interface_mutex);
     /* poke cq */
     (void) check_cq();
     process_cq();
@@ -1151,6 +1167,7 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 	    encourage_recv(rq, 0);
 	}
     }
+    gen_mutex_unlock(&interface_mutex);
     return 0;
 }
 
@@ -1166,6 +1183,7 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
     int new_cqe;
     list_t *l;
 
+    gen_mutex_lock(&interface_mutex);
     /*
      * Check CQ, then look for the first unexpected message.
      */
@@ -1197,6 +1215,7 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 
   out:
     *outcount = ret;
+    gen_mutex_unlock(&interface_mutex);
     return ret;
 }
 

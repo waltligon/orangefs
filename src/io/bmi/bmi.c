@@ -19,13 +19,14 @@
 static int active_method_count = 0;
 static struct bmi_method_ops **active_method_table = NULL;
 static ref_list_p cur_ref_list = NULL;
-static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 
 static int split_string_list(char ***tokens,
 			     const char *comma_list);
 
 /* array to keep up with active contexts */
 static int context_array[BMI_MAX_CONTEXTS] = { 0 };
+static gen_mutex_t context_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t ref_mutex = GEN_MUTEX_INITIALIZER;
 
 #if defined(__STATIC_METHOD_BMI_TCP__) \
   + defined(__STATIC_METHOD_BMI_GM__) \
@@ -86,8 +87,6 @@ int BMI_initialize(const char *method_list,
     {
 	return (-EINVAL);
     }
-
-    gen_mutex_lock(&interface_mutex);
 
     /* separate out the method list */
     active_method_count = split_string_list(&requested_methods, method_list);
@@ -186,7 +185,6 @@ int BMI_initialize(const char *method_list,
 	free(requested_methods);
     }
 
-    gen_mutex_unlock(&interface_mutex);
     return (0);
 
   bmi_initialize_failure:
@@ -224,7 +222,6 @@ int BMI_initialize(const char *method_list,
     }
     active_method_count = 0;
 
-    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -397,8 +394,6 @@ int BMI_finalize(void)
 {
     int i = -1;
 
-    gen_mutex_lock(&interface_mutex);
-
     /* attempt to shut down active methods */
     for (i = 0; i < active_method_count; i++)
     {
@@ -411,7 +406,6 @@ int BMI_finalize(void)
     /* (side effect: destroys all method addresses as well) */
     ref_list_cleanup(cur_ref_list);
 
-    gen_mutex_unlock(&interface_mutex);
     return (0);
 }
 
@@ -429,7 +423,7 @@ int BMI_open_context(bmi_context_id* context_id)
     int i,j;
     int ret = -1;
 
-    gen_mutex_lock(&interface_mutex);
+    gen_mutex_lock(&context_mutex);
 
     /* find an unused context id */
     for(context_index=0; context_index<BMI_MAX_CONTEXTS; context_index++)
@@ -443,7 +437,7 @@ int BMI_open_context(bmi_context_id* context_id)
     if(context_index >= BMI_MAX_CONTEXTS)
     {
 	/* we don't have any more available! */
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&context_mutex);
 	return(-EBUSY);
     }
 
@@ -467,7 +461,7 @@ int BMI_open_context(bmi_context_id* context_id)
 
 out:
 
-    gen_mutex_unlock(&interface_mutex);
+    gen_mutex_unlock(&context_mutex);
     return(ret);
 }
 
@@ -482,11 +476,11 @@ void BMI_close_context(bmi_context_id context_id)
 {
     int i;
 
-    gen_mutex_lock(&interface_mutex);
+    gen_mutex_lock(&context_mutex);
 
     if(!context_array[context_id])
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&context_mutex);
 	return;
     }
 
@@ -497,7 +491,7 @@ void BMI_close_context(bmi_context_id context_id)
     }
     context_array[context_id] = 0;
 
-    gen_mutex_unlock(&interface_mutex);
+    gen_mutex_unlock(&context_mutex);
     return;
 }
 
@@ -525,23 +519,22 @@ int BMI_post_recv(bmi_op_id_t * id,
 	"BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld\n", (long)src,
 	(long)buffer, (long)expected_size);
 
-    gen_mutex_lock(&interface_mutex);
-
     *id = 0;
 
+    gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, src);
     if (!tmp_ref)
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&ref_mutex);
 	return (-EPROTO);
     }
+    gen_mutex_unlock(&ref_mutex);
 
     ret = tmp_ref->interface->BMI_meth_post_recv(id, tmp_ref->method_addr,
 						 buffer, expected_size,
 						 actual_size,
 						 buffer_type, tag,
 						 user_ptr, context_id);
-    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -568,22 +561,21 @@ int BMI_post_send(bmi_op_id_t * id,
 	"BMI_post_send: addr: %ld, offset: 0x%lx, size: %ld\n", (long)dest,
 	(long)buffer, (long)size);
 
-    gen_mutex_lock(&interface_mutex);
-
     *id = 0;
 
+    gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, dest);
     if (!tmp_ref)
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&ref_mutex);
 	return (-EPROTO);
     }
+    gen_mutex_unlock(&ref_mutex);
 
     ret = tmp_ref->interface->BMI_meth_post_send(id, tmp_ref->method_addr,
 						 buffer, size,
 						 buffer_type, tag,
 						 user_ptr, context_id);
-    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -610,16 +602,16 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 	"BMI_post_sendunexpected: addr: %ld, offset: 0x%lx, size: %ld\n", 
 	(long)dest, (long)buffer, (long)size);
 
-    gen_mutex_lock(&interface_mutex);
-
     *id = 0;
 
+    gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, dest);
     if (!tmp_ref)
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&ref_mutex);
 	return (-EPROTO);
     }
+    gen_mutex_unlock(&ref_mutex);
 
     ret = tmp_ref->interface->BMI_meth_post_sendunexpected(id,
 							   tmp_ref->method_addr,
@@ -627,7 +619,6 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 							   buffer_type, tag,
 							   user_ptr,
 							   context_id);
-    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -652,14 +643,11 @@ int BMI_test(bmi_op_id_t id,
     if (max_idle_time_ms < 0)
 	return (-EINVAL);
 
-    gen_mutex_lock(&interface_mutex);
-
     *outcount = 0;
 
     target_op = id_gen_fast_lookup(id);
     if (target_op->op_id != id)
     {
-	gen_mutex_unlock(&interface_mutex);
 	return (-EINVAL);
     }
 
@@ -670,7 +658,6 @@ int BMI_test(bmi_op_id_t id,
 									   user_ptr,
 									   max_idle_time_ms,
 									   context_id);
-    gen_mutex_unlock(&interface_mutex);
     /* return 1 if anything completed */
     if (ret == 0 && *outcount == 1)
     {
@@ -702,8 +689,6 @@ int BMI_testsome(int incount,
     if (max_idle_time_ms < 0)
 	return (-EINVAL);
 
-    gen_mutex_lock(&interface_mutex);
-
     *outcount = 0;
 
     ret = active_method_table[0]->BMI_meth_testsome(incount,
@@ -716,11 +701,9 @@ int BMI_testsome(int incount,
 						    context_id);
     if (ret < 0)
     {
-	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
-    gen_mutex_unlock(&interface_mutex);
     /* return 1 if anything completed */
     if (ret == 0 && *outcount > 0)
     {
@@ -764,8 +747,6 @@ int BMI_testsome(int incount,
     tmp_id_array = (bmi_op_id_t*)malloc(incount*sizeof(bmi_op_id_t));
     if(!tmp_id_array)
 	return(-ENOMEM);
-
-    gen_mutex_lock(&interface_mutex);
 
     /* iterate over each active method */
     for(i=0; i<active_method_count; i++)
@@ -814,16 +795,12 @@ int BMI_testsome(int incount,
 	    {
 		/* can't recover from this... */
 		gossip_lerr("Error: critical BMI_testsome failure.\n");
-		gen_mutex_unlock(&interface_mutex);
 		free(tmp_id_array);
 		return(ret);
 	    }
 	    *outcount += tmp_outcount;
 	}
     }
-
-
-    gen_mutex_unlock(&interface_mutex);
 
     free(tmp_id_array);
 
@@ -857,8 +834,6 @@ int BMI_testunexpected(int incount,
     if (max_idle_time_ms < 0)
 	return (-EINVAL);
 
-    gen_mutex_lock(&interface_mutex);
-
     *outcount = 0;
 
     /* TODO: do something more clever here */
@@ -879,7 +854,6 @@ int BMI_testunexpected(int incount,
 	{
 	    /* can't recover from this */
 	    gossip_lerr("Error: critical BMI_testunexpected failure.\n");
-	    gen_mutex_unlock(&interface_mutex);
 	    return (ret);
 	}
 	position += tmp_outcount;
@@ -893,17 +867,18 @@ int BMI_testunexpected(int incount,
 	info_array[i].buffer = sub_info[i].buffer;
 	info_array[i].size = sub_info[i].size;
 	info_array[i].tag = sub_info[i].tag;
+	gen_mutex_lock(&ref_mutex);
 	tmp_ref = ref_list_search_method_addr(cur_ref_list, sub_info[i].addr);
 	if (!tmp_ref)
 	{
 	    /* yeah, right */
 	    gossip_lerr("Error: critical BMI_testunexpected failure.\n");
-	    gen_mutex_unlock(&interface_mutex);
+	    gen_mutex_unlock(&ref_mutex);
 	    return (-EPROTO);
 	}
+	gen_mutex_unlock(&ref_mutex);
 	info_array[i].addr = tmp_ref->bmi_addr;
     }
-    gen_mutex_unlock(&interface_mutex);
     /* return 1 if anything completed */
     if (ret == 0 && *outcount > 0)
     {
@@ -936,8 +911,6 @@ int BMI_testcontext(int incount,
 
     if (max_idle_time_ms < 0)
 	return (-EINVAL);
-
-    gen_mutex_lock(&interface_mutex);
 
     *outcount = 0;
 
@@ -981,7 +954,6 @@ int BMI_testcontext(int incount,
 	{
 	    /* can't recover from this */
 	    gossip_lerr("Error: critical BMI_testcontext failure.\n");
-	    gen_mutex_unlock(&interface_mutex);
 	    return (ret);
 	}
 	position += tmp_outcount;
@@ -989,7 +961,6 @@ int BMI_testcontext(int incount,
 	i++;
     }
 
-    gen_mutex_unlock(&interface_mutex);
     /* return 1 if anything completed */
     if (ret == 0 && *outcount > 0)
     {
@@ -1013,18 +984,17 @@ const char* BMI_addr_rev_lookup(bmi_addr_t addr)
     ref_st_p tmp_ref = NULL;
     char* tmp_str = NULL;
 
-    gen_mutex_lock(&interface_mutex);
-
     /* find a reference that matches this address */
+    gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, addr);
     if (!tmp_ref)
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&ref_mutex);
 	return (NULL);
     }
+    gen_mutex_unlock(&ref_mutex);
     
     tmp_str = tmp_ref->id_string;
-    gen_mutex_unlock(&interface_mutex);
 
     return(tmp_str);
 }
@@ -1042,20 +1012,19 @@ void *BMI_memalloc(bmi_addr_t addr,
     void *new_buffer = NULL;
     ref_st_p tmp_ref = NULL;
 
-    gen_mutex_lock(&interface_mutex);
-
     /* find a reference that matches this address */
+    gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, addr);
     if (!tmp_ref)
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&ref_mutex);
 	return (NULL);
     }
+    gen_mutex_unlock(&ref_mutex);
 
     /* allocate the buffer using the method's mechanism */
     new_buffer = tmp_ref->interface->BMI_meth_memalloc(size, send_recv);
 
-    gen_mutex_unlock(&interface_mutex);
     return (new_buffer);
 }
 
@@ -1073,20 +1042,19 @@ int BMI_memfree(bmi_addr_t addr,
     ref_st_p tmp_ref = NULL;
     int ret = -1;
 
-    gen_mutex_lock(&interface_mutex);
-
     /* find a reference that matches this address */
+    gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, addr);
     if (!tmp_ref)
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&ref_mutex);
 	return (-EINVAL);
     }
+    gen_mutex_unlock(&ref_mutex);
 
     /* free the memory */
     ret = tmp_ref->interface->BMI_meth_memfree(buffer, size, send_recv);
 
-    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -1104,8 +1072,6 @@ int BMI_set_info(bmi_addr_t addr,
     int i = 0;
     ref_st_p tmp_ref = NULL;
 
-    gen_mutex_lock(&interface_mutex);
-
     /* if the addr is NULL, then the set_info should apply to all
      * available methods.
      */
@@ -1113,7 +1079,6 @@ int BMI_set_info(bmi_addr_t addr,
     {
 	if (!active_method_table)
 	{
-	    gen_mutex_unlock(&interface_mutex);
 	    return (-EINVAL);
 	}
 	for (i = 0; i < active_method_count; i++)
@@ -1125,25 +1090,24 @@ int BMI_set_info(bmi_addr_t addr,
 	    if (ret < 0)
 	    {
 		gossip_lerr("Error: failure on set_info to method: %d\n", i);
-		gen_mutex_unlock(&interface_mutex);
 		return (ret);
 	    }
 	}
-	gen_mutex_unlock(&interface_mutex);
 	return (0);
     }
 
     /* find a reference that matches this address */
+    gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, addr);
     if (!tmp_ref)
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&ref_mutex);
 	return (-EINVAL);
     }
+    gen_mutex_unlock(&ref_mutex);
 
     /* pass along the set_info to the method */
     ret = tmp_ref->interface->BMI_meth_set_info(option, inout_parameter);
-    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -1163,20 +1127,16 @@ int BMI_get_info(bmi_addr_t addr,
     int ret = 0;
     ref_st_p tmp_ref = NULL;
 
-    gen_mutex_lock(&interface_mutex);
-
     switch (option)
     {
 	/* check to see if the interface is initialized */
     case BMI_CHECK_INIT:
 	if (active_method_count > 0)
 	{
-	    gen_mutex_unlock(&interface_mutex);
 	    return (0);
 	}
 	else
 	{
-	    gen_mutex_unlock(&interface_mutex);
 	    return (-ENETDOWN);
 	}
 	break;
@@ -1187,7 +1147,6 @@ int BMI_get_info(bmi_addr_t addr,
 		active_method_table[i]->BMI_meth_get_info(option, &tmp_maxsize);
 	    if (ret < 0)
 	    {
-		gen_mutex_unlock(&interface_mutex);
 		return (ret);
 	    }
 	    if (i == 0)
@@ -1203,20 +1162,20 @@ int BMI_get_info(bmi_addr_t addr,
 	}
 	break;
     case BMI_GET_METH_ADDR:
+	gen_mutex_lock(&ref_mutex);
 	tmp_ref = ref_list_search_addr(cur_ref_list, addr);
 	if(!tmp_ref)
 	{
-	    gen_mutex_unlock(&interface_mutex);
+	    gen_mutex_unlock(&ref_mutex);
 	    return (-EINVAL);
 	}
+	gen_mutex_unlock(&ref_mutex);
 	*((void**) inout_parameter) = tmp_ref->method_addr;
 	break;
     default:
-	gen_mutex_unlock(&interface_mutex);
 	return (-ENOSYS);
 	break;
     }
-    gen_mutex_unlock(&interface_mutex);
     return (0);
 }
 
@@ -1263,20 +1222,19 @@ int BMI_addr_lookup(bmi_addr_t * new_addr,
 	return(-ENAMETOOLONG);
     }
 
-    gen_mutex_lock(&interface_mutex);
-
     /* set the addr to zero in case we fail */
     *new_addr = 0;
 
     /* First we want to check to see if this host has already been
      * discovered! */
+    gen_mutex_lock(&ref_mutex);
     new_ref = ref_list_search_str(cur_ref_list, id_string);
+    gen_mutex_unlock(&ref_mutex);
 
     if (new_ref)
     {
 	/* we found it. */
 	*new_addr = new_ref->bmi_addr;
-	gen_mutex_unlock(&interface_mutex);
 	return (0);
     }
 
@@ -1297,7 +1255,6 @@ int BMI_addr_lookup(bmi_addr_t * new_addr,
     {
 	gossip_err("Error: could not resolve id_string!\n");
 	gossip_lerr("Error: no BMI methods could resolve: %s\n", id_string);
-	gen_mutex_unlock(&interface_mutex);
 	return (-ENOPROTOOPT);
     }
 
@@ -1321,10 +1278,11 @@ int BMI_addr_lookup(bmi_addr_t * new_addr,
     new_ref->interface = active_method_table[i];
 
     /* keep up with the reference and we are done */
+    gen_mutex_lock(&ref_mutex);
     ref_list_add(cur_ref_list, new_ref);
+    gen_mutex_unlock(&ref_mutex);
 
     *new_addr = new_ref->bmi_addr;
-    gen_mutex_unlock(&interface_mutex);
     return (0);
 
   bmi_addr_lookup_failure:
@@ -1336,15 +1294,9 @@ int BMI_addr_lookup(bmi_addr_t * new_addr,
 
     if (new_ref)
     {
-	if (new_ref->bmi_addr)
-	{
-	    /* attempt a remove; we don't care if it fails */
-	    ref_list_rem(cur_ref_list, new_ref->bmi_addr);
-	}
 	dealloc_ref_st(new_ref);
     }
 
-    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -1387,16 +1339,16 @@ int BMI_post_send_list(bmi_op_id_t * id,
     }
 #endif
 
-    gen_mutex_lock(&interface_mutex);
-
     *id = 0;
 
+    gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, dest);
     if (!tmp_ref)
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&ref_mutex);
 	return (-EPROTO);
     }
+    gen_mutex_unlock(&ref_mutex);
 
     if (tmp_ref->interface->BMI_meth_post_send_list)
     {
@@ -1408,14 +1360,12 @@ int BMI_post_send_list(bmi_op_id_t * id,
 							  buffer_type, tag,
 							  user_ptr,
 							  context_id);
-	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
     gossip_lerr("Error: method doesn't implement send_list.\n");
     gossip_lerr("Error: send_list emulation not yet available.\n");
 
-    gen_mutex_unlock(&interface_mutex);
     return (-ENOSYS);
 }
 
@@ -1460,17 +1410,16 @@ int BMI_post_recv_list(bmi_op_id_t * id,
     }
 #endif
 
-
-    gen_mutex_lock(&interface_mutex);
-
     *id = 0;
 
+    gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, src);
     if (!tmp_ref)
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&ref_mutex);
 	return (-EPROTO);
     }
+    gen_mutex_unlock(&ref_mutex);
 
     if (tmp_ref->interface->BMI_meth_post_recv_list)
     {
@@ -1483,14 +1432,12 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 							  buffer_type, tag,
 							  user_ptr,
 							  context_id);
-	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
     gossip_lerr("Error: method doesn't implement recv_list.\n");
     gossip_lerr("Error: recv_list emulation not yet available.\n");
 
-    gen_mutex_unlock(&interface_mutex);
     return (-ENOSYS);
 }
 
@@ -1533,16 +1480,16 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
     }
 #endif
 
-    gen_mutex_lock(&interface_mutex);
-
     *id = 0;
 
+    gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, dest);
     if (!tmp_ref)
     {
-	gen_mutex_unlock(&interface_mutex);
+	gen_mutex_unlock(&ref_mutex);
 	return (-EPROTO);
     }
+    gen_mutex_unlock(&ref_mutex);
 
     if (tmp_ref->interface->BMI_meth_post_send_list)
     {
@@ -1557,14 +1504,12 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 								    tag,
 								    user_ptr,
 								    context_id);
-	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
     gossip_lerr("Error: method doesn't implement sendunexpected_list.\n");
     gossip_lerr("Error: send_list emulation not yet available.\n");
 
-    gen_mutex_unlock(&interface_mutex);
     return (-ENOSYS);
 }
 

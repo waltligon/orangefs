@@ -24,9 +24,12 @@
 #include "bmi-gm-bufferpool.h"
 #include "pvfs2-config.h"
 #include "id-generator.h"
+#include "gen-locks.h"
 #ifdef ENABLE_GM_REGCACHE
 #include "bmi-gm-regcache.h"
 #endif
+
+static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 
 /* function prototypes */
 int BMI_gm_initialize(method_addr_p listen_addr,
@@ -408,6 +411,8 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 	return (-EINVAL);
     }
 
+    gen_mutex_lock(&interface_mutex);
+
     GM_IMMED_LENGTH = gm_max_length_for_size(GM_IMMED_SIZE) -
 	sizeof(struct ctrl_msg);
 
@@ -437,6 +442,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     if (gm_ret != GM_SUCCESS)
     {
 	gossip_lerr("Error: gm_init() failure.\n");
+	gen_mutex_unlock(&interface_mutex);
 	return (-EPROTO);
     }
 
@@ -542,6 +548,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 		  GM_MODE_IMMED_LIMIT);
 
     gossip_ldebug(BMI_DEBUG_GM, "GM module successfully initialized.\n");
+    gen_mutex_unlock(&interface_mutex);
     return (0);
 
   gm_initialize_failure:
@@ -571,6 +578,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 
     gm_finalize();
     gossip_lerr("Error: BMI_gm_initialize failure.\n");
+    gen_mutex_unlock(&interface_mutex);
     return (ret);
 
 }
@@ -586,6 +594,7 @@ int BMI_gm_finalize(void)
 {
     int i = 0;
 
+    gen_mutex_lock(&interface_mutex);
     /* note that this forcefully shuts down operations */
     for (i = 0; i < NUM_INDICES; i++)
     {
@@ -609,6 +618,7 @@ int BMI_gm_finalize(void)
     gm_close(local_port);
     /* shut down the gm system */
     gm_finalize();
+    gen_mutex_unlock(&interface_mutex);
     gossip_ldebug(BMI_DEBUG_GM, "GM module finalized.\n");
     return (0);
 }
@@ -671,6 +681,7 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
     /* now chop off the port information and parse the rest */
     *delim = '\0';
 
+    gen_mutex_lock(&interface_mutex);
     if (strncmp(gm_string, local_tag, strlen(local_tag)) == 0)
     {
 	new_addr->local_addr = 1;
@@ -684,6 +695,7 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
 		gm_string);
 	    dealloc_method_addr(new_addr);
 	    free(gm_string);
+	    gen_mutex_unlock(&interface_mutex);
 	    return (NULL);
 	}
     }
@@ -691,6 +703,7 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
     free(gm_string);
     /* keep up with the address here */
     gm_addr_add(&gm_addr_list, new_addr);
+    gen_mutex_unlock(&interface_mutex);
     return (new_addr);
 }
 
@@ -712,6 +725,7 @@ void *BMI_gm_memalloc(bmi_size_t size,
      */
     void *new_buffer = NULL;
 
+    gen_mutex_lock(&interface_mutex);
     if (send_recv == BMI_RECV)
     {
 	if (size <= GM_IMMED_LENGTH)
@@ -744,6 +758,7 @@ void *BMI_gm_memalloc(bmi_size_t size,
 	new_buffer = NULL;
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return (new_buffer);
 }
 
@@ -758,6 +773,7 @@ int BMI_gm_memfree(void *buffer,
 		   bmi_size_t size,
 		   enum bmi_op_type send_recv)
 {
+    gen_mutex_lock(&interface_mutex);
     if (send_recv == BMI_RECV)
     {
 	if (size <= GM_IMMED_LENGTH)
@@ -775,10 +791,12 @@ int BMI_gm_memfree(void *buffer,
     }
     else
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (-EINVAL);
     }
 
     buffer = NULL;
+    gen_mutex_unlock(&interface_mutex);
     return (0);
 }
 
@@ -843,6 +861,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
     void *new_buffer = NULL;
     struct ctrl_msg *new_ctrl_msg = NULL;
     bmi_size_t buffer_size = 0;
+    int ret = -1;
 
     gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_send called.\n");
 
@@ -855,6 +874,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 	return (-EMSGSIZE);
     }
 
+    gen_mutex_lock(&interface_mutex);
     if (buffer_type != BMI_PRE_ALLOC)
     {
 	if (size <= GM_IMMED_LENGTH)
@@ -867,6 +887,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 							     long) buffer_size);
 	    if (!new_buffer)
 	    {
+		gen_mutex_unlock(&interface_mutex);
 		gossip_lerr("Error: gm_dma_malloc failure.\n");
 		return (-ENOMEM);
 	    }
@@ -892,17 +913,21 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 	new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
 	new_ctrl_msg->u.immed.actual_size = size;
 	new_ctrl_msg->u.immed.msg_tag = tag;
-	return (gm_post_send_build_op(id, dest, buffer, size,
+	ret = gm_post_send_build_op(id, dest, buffer, size,
 					    tag,
 					    GM_MODE_IMMED,
-					    buffer_status, user_ptr, context_id));
+					    buffer_status, user_ptr, context_id);
+	gen_mutex_unlock(&interface_mutex);
+	return(ret);
     }
     else
     {
 	/* 3 way rendezvous mode */
-	return (gm_post_send_build_op(id, dest, buffer, size,
+	ret = gm_post_send_build_op(id, dest, buffer, size,
 					    tag, GM_MODE_REND,
-					    buffer_status, user_ptr, context_id));
+					    buffer_status, user_ptr, context_id);
+	gen_mutex_unlock(&interface_mutex);
+	return(ret);
     }
 }
 
@@ -959,6 +984,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
 	return (-EMSGSIZE);
     }
 
+    gen_mutex_lock(&interface_mutex);
     if (total_size <= GM_IMMED_LENGTH)
     {
 	/* pad enough room for a ctrl structure */
@@ -970,6 +996,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
 	if (!new_buffer)
 	{
 	    gossip_lerr("Error: gm_dma_malloc failure.\n");
+	    gen_mutex_unlock(&interface_mutex);
 	    return (-ENOMEM);
 	}
 
@@ -987,16 +1014,20 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
 	new_ctrl_msg->u.immed.actual_size = total_size;
 	new_ctrl_msg->u.immed.msg_tag = tag;
 	buffer_status = GM_BUF_METH_ALLOC;
-	return (gm_post_send_build_op(id, dest, new_buffer, total_size,
+	ret = gm_post_send_build_op(id, dest, new_buffer, total_size,
 					    tag,
 					    GM_MODE_IMMED,
-					    buffer_status, user_ptr, context_id));
+					    buffer_status, user_ptr, context_id);
+	gen_mutex_unlock(&interface_mutex);
+	return(ret);
     }
     else
     {
-	return(gm_post_send_build_op_list(id, dest, buffer_list, 
+	ret = gm_post_send_build_op_list(id, dest, buffer_list, 
 	    size_list, list_count, total_size, tag, GM_MODE_REND, 
-	    buffer_status, user_ptr, context_id));
+	    buffer_status, user_ptr, context_id);
+	gen_mutex_unlock(&interface_mutex);
+	return(ret);
     }
 
 }
@@ -1059,11 +1090,14 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     /* pad enough room for a ctrl structure */
     buffer_size = sizeof(struct ctrl_msg) + total_size;
 
+    gen_mutex_lock(&interface_mutex);
+
     /* create a new buffer and copy */
     new_buffer = (void *) gm_dma_malloc(local_port, (unsigned
 						     long) buffer_size);
     if (!new_buffer)
     {
+	gen_mutex_unlock(&interface_mutex);
 	gossip_lerr("Error: gm_dma_malloc failure.\n");
 	return (-ENOMEM);
     }
@@ -1081,11 +1115,12 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
     new_ctrl_msg->u.immed.actual_size = total_size;
     new_ctrl_msg->u.immed.msg_tag = tag;
-    return (gm_post_send_build_op(id, dest, new_buffer, total_size,
+    ret = gm_post_send_build_op(id, dest, new_buffer, total_size,
 					tag,
 					GM_MODE_UNEXP,
-					buffer_status, user_ptr, context_id));
-
+					buffer_status, user_ptr, context_id);
+    gen_mutex_unlock(&interface_mutex);
+    return(ret);
 }
 
 
@@ -1120,6 +1155,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 	return (-EMSGSIZE);
     }
 
+    gen_mutex_lock(&interface_mutex);
     if (buffer_type != BMI_PRE_ALLOC)
     {
 	/* pad enough room for a ctrl structure */
@@ -1131,6 +1167,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 	if (!new_buffer)
 	{
 	    gossip_lerr("Error: gm_dma_malloc failure.\n");
+	    gen_mutex_unlock(&interface_mutex);
 	    return (-ENOMEM);
 	}
 	memcpy(new_buffer, buffer, size);
@@ -1149,9 +1186,11 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
     new_ctrl_msg->u.immed.actual_size = size;
     new_ctrl_msg->u.immed.msg_tag = tag;
 
-    return (gm_post_send_build_op(id, dest, buffer, size,
+    ret = gm_post_send_build_op(id, dest, buffer, size,
 					tag, GM_MODE_UNEXP,
-					buffer_status, user_ptr, context_id));
+					buffer_status, user_ptr, context_id);
+    gen_mutex_unlock(&interface_mutex);
+    return(ret);
 }
 
 
@@ -1205,9 +1244,11 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
     /* push work first; use this as an opportunity to make sure that the
      * receive keeps buffers moving as quickly as possible
      */
+    gen_mutex_lock(&interface_mutex);
     ret = gm_do_work(0);
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
@@ -1232,6 +1273,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	{
 	    gossip_lerr("Error: message ordering violation;\n");
 	    gossip_lerr("Error: message too large for next buffer.\n");
+	    gen_mutex_unlock(&interface_mutex);
 	    return(-EPROTO);
 	}
 
@@ -1294,6 +1336,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	new_method_op = alloc_gm_method_op();
 	if (!new_method_op)
 	{
+	    gen_mutex_unlock(&interface_mutex);
 	    return (-ENOMEM);
 	}
 	*id = new_method_op->op_id;
@@ -1317,6 +1360,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	ret = 0;
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
 
@@ -1386,12 +1430,14 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     if(total_expected_size > GM_IMMED_LENGTH)
 	buffer_status = GM_BUF_METH_REG;
 
+    gen_mutex_lock(&interface_mutex);
     /* push work first; use this as an opportunity to make sure that the
      * receive keeps buffers moving as quickly as possible
      */
     ret = gm_do_work(0);
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
@@ -1414,6 +1460,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
 	{
 	    gossip_lerr("Error: message ordering violation;\n");
 	    gossip_lerr("Error: message too large for next buffer.\n");
+	    gen_mutex_unlock(&interface_mutex);
 	    return(-EPROTO);
 	}
 
@@ -1497,6 +1544,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
 	new_method_op = alloc_gm_method_op();
 	if (!new_method_op)
 	{
+	    gen_mutex_unlock(&interface_mutex);
 	    return (-ENOMEM);
 	}
 	*id = new_method_op->op_id;
@@ -1525,7 +1573,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
 	ret = 0;
     }
 
-
+    gen_mutex_unlock(&interface_mutex);
     return(ret);
 }
 
@@ -1548,10 +1596,12 @@ int BMI_gm_test(bmi_op_id_t id,
     method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
     struct gm_op *gm_op_data = query_op->method_data;
 
+    gen_mutex_lock(&interface_mutex);
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
@@ -1569,6 +1619,7 @@ int BMI_gm_test(bmi_op_id_t id,
 	(*outcount)++;
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return (0);
 }
 
@@ -1594,10 +1645,12 @@ int BMI_gm_testsome(int incount,
     method_op_p query_op;
     struct gm_op *gm_op_data;
 
+    gen_mutex_lock(&interface_mutex);
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
@@ -1622,6 +1675,7 @@ int BMI_gm_testsome(int incount,
 	}
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return(0);
 }
 
@@ -1645,10 +1699,12 @@ int BMI_gm_testcontext(int incount,
     int ret = -1;
     method_op_p query_op = NULL;
 
+    gen_mutex_lock(&interface_mutex);
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
@@ -1668,6 +1724,7 @@ int BMI_gm_testcontext(int incount,
 	(*outcount)++;
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return(0);
 }
 
@@ -1686,10 +1743,12 @@ int BMI_gm_testunexpected(int incount,
     int ret = -1;
     method_op_p query_op = NULL;
 
+    gen_mutex_lock(&interface_mutex);
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
 
@@ -1709,6 +1768,7 @@ int BMI_gm_testunexpected(int incount,
 	(*outcount)++;
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return (0);
 }
 
@@ -1721,13 +1781,16 @@ int BMI_gm_testunexpected(int incount,
  */
 int BMI_gm_open_context(bmi_context_id context_id)
 {
+    gen_mutex_lock(&interface_mutex);
     /* start a new queue for tracking completions in this context */
     completion_array[context_id] = op_list_new();
     if (!completion_array[context_id])
     {
+	gen_mutex_unlock(&interface_mutex);
 	return(-ENOMEM);
     }
 
+    gen_mutex_unlock(&interface_mutex);
     return(0);
 }
 
@@ -1739,9 +1802,11 @@ int BMI_gm_open_context(bmi_context_id context_id)
  */
 void BMI_gm_close_context(bmi_context_id context_id)
 {
+    gen_mutex_lock(&interface_mutex);
     /* tear down completion queue for this context */
     op_list_cleanup(completion_array[context_id]);
 
+    gen_mutex_unlock(&interface_mutex);
     return;
 }
 
