@@ -48,12 +48,6 @@ do{						\
 int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
     PVFS_credentials credentials, PVFS_object_attr *out_attr);
 
-/* Bucket related info */
-typedef struct {
-    PVFS_handle bucket_st;
-    PVFS_handle bucket_end;
-} bucket_info;
-
 /* maps bmi address to handle ranges/extents */
 typedef struct bmi_host_extent_table_s
 {
@@ -78,56 +72,10 @@ typedef struct config_fs_cache_s
     struct llist *data_server_cursor;
 } config_fs_cache_s;
 
-/* send_info */
-typedef struct 
-{
-    bmi_addr_t addr;
-    void *buffer;
-    bmi_size_t size;
-    bmi_size_t expected_size;
-    bmi_msg_tag_t tag;
-    int flag;
-    int unexpected;
-    void *user_ptr;
-    job_status_s *status_p;
-    job_id_t *id;
-    int *failure;
-    PVFS_error errval;
-} post_info;
-
-/* Error_stats */
-struct error_stats
-{
-    int failure;
-    int id;
-    int num_pending;
-};
-
-
-/* PVFS Object - File name + Collection ID */
-
-/* PVFStab parameters */
-
-/* Public Interface */
-void free_pvfstab_entry(pvfs_mntlist *e_p);
-int sysjob_free(bmi_addr_t server,void *tmp_job,bmi_size_t size,const int op,
-		int (*func)(void *,int));
-void job_postack(post_info *rinfo);
-void job_postreq(post_info *sinfo);
-void job_waitblock(job_id_t *id_array,
-		   int pending,
-		   void **user_ptr_array,
-		   job_status_s *status_array,
-		   int *failure);
-int server_getconfig(pvfs_mntlist mntent_list);
 int get_next_path(char *path, char **newpath, int skip);
 int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid);
-
 int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
                 PVFS_credentials cred,PVFS_pinode_reference *entry);
-
-int get_path_element(char *path, char** segment, int element);
-
 int PINT_server_get_config(
     struct server_configuration_s *config,
     pvfs_mntlist mntent_list);

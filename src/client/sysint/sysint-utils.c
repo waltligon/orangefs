@@ -329,27 +329,6 @@ int check_perms(PVFS_object_attr attr,
     return(ret);
 }
 
-/* sysjob_free
- *  
- * frees job associated data structures
- *
- * returns 0 on success, -errno on failure
- * 
- */
-int sysjob_free(bmi_addr_t server,
-		void *tmp_job,
-		bmi_size_t size,
-		const int op,
-		int (*func)(void *,int))
-{
-    /* Call the respective free function */
-    if (func)
-	(*func)(tmp_job,0);
-    if (tmp_job)
-	BMI_memfree(server,tmp_job,size,op);
-
-    return(0);
-}
 
 /* PINT_server_get_config()
  *
