@@ -33,3 +33,10 @@ The AVL tree used in the handle management code is from Georg Kraml
 	Georg Kraml                         georg@ads.tuwien.ac.at
 	Inst. f. Computergraphik, TU Wien   (+431) 58801/18629
 	Favoritenstr. 9-11, A1040 Wien      Sprechstunde Fr 14:00-15:00
+
+We use Lukas Schroeder's LGPLed dotconf (http://www.azzit.de/dotconf/) to parse
+pvfs2 config files
+
+Mark Veltzer introduced us to the single makefile approach we now use in pvfs2
+
+Dan Nurmi started work on the PTS back when the P stood for pvfs-1
