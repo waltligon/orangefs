@@ -156,7 +156,8 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
      */
     /* also, we aren't storing any attributes with datafiles yet */
     if((js_p->error_code == -TROVE_ENOENT) && 
-	(s_op->req->op == PVFS_SERV_SETATTR || s_op->req->op == PVFS_SERV_IO))
+	(s_op->req->op == PVFS_SERV_SETATTR || s_op->req->op == PVFS_SERV_IO ||
+         s_op->req->op == PVFS_SERV_GETATTR))
     {
 	js_p->error_code = 0;
     }
@@ -182,12 +183,20 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
     {
 	/* things that need read permissions */
 	case PVFS_SERV_GETATTR:
+            /* a datafile will have a 0 mask value here */
+            if (s_op->attr.mask == 0)
+            {
+                js_p->error_code = 0;
+                break;
+            }
+            else
+                /* drop through to check mode */
 	case PVFS_SERV_READDIR:
 	    /* TODO: figure out something cleaner looking than using 
 	     * PVFS_U_READ here to indicate we need read access; its 
 	     * misleading
 	     */
-	    js_p->error_code = check_mode(&(s_op->attr), 
+	    js_p->error_code = check_mode(&(s_op->attr),
 		s_op->req->credentials.uid,
 		s_op->req->credentials.gid,
 		PVFS_U_READ);

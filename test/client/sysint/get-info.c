@@ -84,7 +84,8 @@ int main(int argc,char **argv)
 	// Fill in the handle 
 	pinode_refn.handle = resp_look.pinode_refn.handle;
 	pinode_refn.fs_id = fs_id;
-	attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+/* 	attrmask = PVFS_ATTR_SYS_ALL_NOSIZE; */
+        attrmask = PVFS_ATTR_SYS_ALL;
 
 	// Use it 
 	ret = PVFS_sys_getattr(pinode_refn, attrmask, credentials, resp_gattr);

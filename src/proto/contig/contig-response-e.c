@@ -138,7 +138,6 @@ int do_encode_resp(
                 }
             }
 	}
-	/* not a metafile */
 	else
 	{
 	    target_msg->size_list[0] =

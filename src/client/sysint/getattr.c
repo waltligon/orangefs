@@ -48,7 +48,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     PINT_CONVERT_ATTR(&(resp->attr), &tmp_attr, PVFS_ATTR_COMMON_ALL);
     
     /* TODO: this is temporary */
-    if(attrmask & PVFS_ATTR_SYS_SIZE)
+    if (attrmask & PVFS_ATTR_SYS_SIZE)
     {
 	gossip_err("WARNING: PVFS_sys_getattr() can't really calculate size.\n");
 	gossip_err("WARNING: PVFS_sys_getattr() reporting size = 0.\n");
@@ -92,7 +92,7 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     PVFS_Dist *dist = NULL;
     PVFS_size total_filesize;
     int num_data_servers;
-    int i;
+    int i, can_compute_size = 0;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -134,7 +134,10 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		}
 		else
 		{
-		    /* if we don't care about size in our request, we're done already */
+		    /*
+                      if we don't care about size in our request,
+                      we're done already
+                    */
 		    *out_attr = entry_pinode->attr;
 		    PINT_pcache_lookup_rls(entry_pinode);
 		    return (0);
@@ -146,7 +149,7 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		ret = PINT_pcache_pinode_alloc( &entry_pinode );
 		if (ret < 0)
 		{
-			failure = NONE_FAILURE; /* nothing to dealloc, but still need to fail in error */
+			failure = NONE_FAILURE;
 			goto return_error;
 		}
 		entry_pinode->pinode_ref.handle = entry.handle;
@@ -165,14 +168,21 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
         req_p.credentials = credentials;
 	req_p.u.getattr.handle = entry.handle;
 	req_p.u.getattr.fs_id = entry.fs_id;
-	/* filter out aggregate size mask in the getattr request */
-	req_p.u.getattr.attrmask = attrmask & ~PVFS_ATTR_SYS_SIZE;
+        req_p.u.getattr.attrmask = attrmask;
+        /*
+          append all meta info flags if size is requested since
+          we'll need that information to compute the size
+        */
+        if (attrmask & PVFS_ATTR_SYS_SIZE)
+        {
+            req_p.u.getattr.attrmask |= PVFS_ATTR_META_ALL;            
+        }
 
-	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
-	    PINT_CLIENT_ENC_TYPE);
+	max_msg_sz = PINT_encode_calc_max_size(
+            PINT_ENCODE_RESP, req_p.op, PINT_CLIENT_ENC_TYPE);
 
-	/* Make a server getattr request */
-	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp, op_tag);
+	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+                            &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
 		failure = SEND_REQ_FAILURE;
@@ -227,22 +237,28 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		PINT_Dist_decode(out_attr->u.meta.dist, NULL);
 	    }
 	}
+
+        /*
+          determine if the size was requested, and if we have the
+          appropriate meta information to compute it
+        */
+        if ((attrmask & PVFS_ATTR_SYS_SIZE) &&
+            (out_attr->objtype == PVFS_TYPE_METAFILE) &&
+            (out_attr->mask & PVFS_ATTR_META_ALL))
+        {
+            can_compute_size = 1;
+        }
 	
 	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
-	    &encoded_resp, op_tag);
+                         &encoded_resp, op_tag);
 
-	/* do size calculations here? */
-
-	if (attrmask & PVFS_ATTR_SYS_SIZE)
+	if (can_compute_size)
 	{
-	    /*only do this if you want the size*/
-
 	    /* TODO: things to do to get the size:
 	     * 1). send a getattr message to each server that has a datafile
 	     * 2). call the dist code to figure out if a server has sparse
 	     *	data written
 	     */
-
 	    num_data_servers = entry_pinode->attr.u.meta.dfile_count;
 
 	    size_array = malloc(num_data_servers * sizeof(PVFS_size));
@@ -253,19 +269,18 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	    }
 
 	    /* we need to send one getattr to each server for each datafile*/
-
 	    data_files = out_attr->u.meta.dfile_array;
 	    dist = out_attr->u.meta.dist;
 	    req_p.op = PVFS_SERV_GETATTR;
 	    req_p.credentials = credentials;
-	    req_p.u.getattr.attrmask = PVFS_ATTR_DATA_SIZE;
+	    req_p.u.getattr.attrmask =
+                ((attrmask | PVFS_ATTR_DATA_SIZE) & ~PVFS_ATTR_META_ALL);
 	    req_p.u.getattr.fs_id = entry.fs_id;
-
-	    /* TODO: come back and unserialize this */
 
 	    for(i = 0; i < num_data_servers; i++)
 	    {
-		ret = PINT_bucket_map_to_server(&serv_addr,data_files[i],entry.fs_id);
+		ret = PINT_bucket_map_to_server(
+                    &serv_addr, data_files[i], entry.fs_id);
 		if (ret < 0)
 		{
 		    failure = MAP_SERVER_FAILURE;
@@ -274,11 +289,14 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 
 		req_p.u.getattr.handle = data_files[i];
 
-		max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
-		    PINT_CLIENT_ENC_TYPE);
+		max_msg_sz = PINT_encode_calc_max_size(
+                    PINT_ENCODE_RESP, req_p.op, PINT_CLIENT_ENC_TYPE);
 
-		/* Make a server getattr request */
-		ret = PINT_send_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp, op_tag);
+		gossip_lerr("GETATTR: TRYING TO COMPUTE SIZE (fsid %d, "
+                            "handle %Ld | server %p).\n", req_p.u.getattr.fs_id,
+                            req_p.u.getattr.handle, serv_addr);
+		ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+                                    &decoded, &encoded_resp, op_tag);
 		if (ret < 0)
 		{
 		    failure = SEND_REQ_FAILURE;
@@ -294,6 +312,8 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		    goto return_error;
 		}
 
+                fprintf(stderr,"Got Filesize of %Ld\n",
+                        ack_p->u.getattr.attr.u.data.size);
 		size_array[i] = ack_p->u.getattr.attr.u.data.size;
 	    }
 
@@ -304,16 +324,13 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	    ret = PINT_Dist_lookup(dist);
 	    if (ret < 0)
 	    {
-		
 		goto return_error;
 	    }
 
-	    total_filesize = (dist->methods->logical_file_size)(dist->params, 
-						num_data_servers, 
-						size_array);
+	    total_filesize = (dist->methods->logical_file_size)
+                (dist->params, num_data_servers, size_array);
 
-	    /*TODO: stick this in a size somewhere .. wtf?*/
-	    /*out_attr->u.meta.size = total_filesize;*/
+	    out_attr->u.data.size = total_filesize;
 
 	    entry_pinode->size = total_filesize;
 	    entry_pinode->size_flag = SIZE_VALID;

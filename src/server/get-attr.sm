@@ -13,11 +13,13 @@
 
 enum {
     STATE_METAFILE = 7,
+    STATE_DATAFILE = 8,
 };
 
 
 static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p);
+static int getattr_read_datafile_size(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_metafile_distribution_if_required(
@@ -34,6 +36,7 @@ machine pvfs2_get_attr_sm(prelude,
 		 setup_resp,
 		 final_response,
 		 verify_attribs,
+		 read_datafile_size,
 		 read_metafile_datafile_handles_if_required,
 		 read_metafile_distribution_if_required)
 {
@@ -47,7 +50,14 @@ machine pvfs2_get_attr_sm(prelude,
 	state verify_attribs
 	{
 		run getattr_verify_attribs;
+                STATE_DATAFILE => read_datafile_size;
 		STATE_METAFILE => read_metafile_datafile_handles_if_required;
+		default => setup_resp;
+	}
+
+	state read_datafile_size
+	{
+		run getattr_read_datafile_size;
 		default => setup_resp;
 	}
 
@@ -95,8 +105,6 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     /* copy basic attributes structure into response */
     s_op->resp.u.getattr.attr = s_op->attr;
-
-    a_p = (PVFS_object_attr *) s_op->val.buffer;
     a_p = &s_op->resp.u.getattr.attr;
 
     gossip_debug(SERVER_DEBUG,
@@ -109,13 +117,14 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 		 (long long)a_p->mtime,
 		 (long long)a_p->ctime);
 
-    /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
-    if ((s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_METAFILE) ||
-        a_p->objtype == PVFS_TYPE_METAFILE)
+    js_p->error_code = 0;
+
+    if (a_p->objtype == PVFS_TYPE_METAFILE)
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a metafile\n",
 		     s_op->req->u.getattr.handle);
+
 	js_p->error_code = STATE_METAFILE;
 
         if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
@@ -130,16 +139,65 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
             /* TODO: keep distribution size in here too */
         }
     }
-    else
+    else if (a_p->objtype == PVFS_TYPE_DATAFILE)
     {
 	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
-                     "something other than a metafile\n",
+                     "a directory. doing nothing special\n",
 		     s_op->req->u.getattr.handle);
     }
+    else if (a_p->objtype == PVFS_TYPE_DIRECTORY)
+    {
+	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
+                     "a directory. doing nothing special\n",
+		     s_op->req->u.getattr.handle);
+    }
+    else if (a_p->objtype == PVFS_TYPE_DIRDATA)
+    {
+	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
+                     "a dirdata object. doing nothing special\n",
+		     s_op->req->u.getattr.handle);
+    }
+    else if (a_p->objtype == PVFS_TYPE_SYMLINK)
+    {
+	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
+                     "a symlink. doing nothing special\n",
+		     s_op->req->u.getattr.handle);
+    }
+    else
+    {
+	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to something "
+                     "other than a metafile\n\t-- assuming datafile!\n",
+		     s_op->req->u.getattr.handle);
 
-    js_p->error_code = 0;
+        a_p->objtype = PVFS_TYPE_DATAFILE;
+        a_p->mask |= PVFS_ATTR_SYS_SIZE;
+        a_p->mask |= PVFS_ATTR_DATA_ALL;
+
+        js_p->error_code = STATE_DATAFILE;
+    }
     return 1;
 }
+
+/* getattr_read_datafile_size
+ */
+static int getattr_read_datafile_size(PINT_server_op *s_op, job_status_s* js_p)
+{
+    int ret;
+    job_id_t tmp_id;
+
+    gossip_debug(SERVER_DEBUG, "getattr state: "
+                 "getattr_read_datafile_size\n");
+
+    ret = job_trove_dspace_getattr(s_op->req->u.getattr.fs_id,
+                                   s_op->req->u.getattr.handle,
+                                   s_op,
+                                   js_p,
+                                   &tmp_id,
+                                   PINT_server_job_context);
+
+    return ret;
+}
+
 
 /* getattr_read_metafile_datafile_handles_if_required
  */
@@ -153,12 +211,14 @@ static int getattr_read_metafile_datafile_handles_if_required(
     gossip_debug(SERVER_DEBUG, "getattr state: "
                  "read_metafile_datafile_handles_if_required\n");
 
+    /* if we don't need to fill in the dfiles, skip them */
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
     {
-        /* if we don't need to fill in the dfiles, skip them */
+        gossip_debug(SERVER_DEBUG, "skipping data handle read\n");
         js_p->error_code = 0;
         return 1;
     }
+
     dfile_count = s_op->resp.u.getattr.attr.u.meta.dfile_count;
 
     s_op->key.buffer    = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
@@ -213,9 +273,13 @@ static int getattr_read_metafile_distribution_if_required(
     int ret;
     job_id_t i;
 
+    gossip_debug(SERVER_DEBUG, "getattr state: "
+                 "read_metafile_distribution_if_required\n");
+
+    /* if we don't need to fill in the distribution, skip it */
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DIST))
     {
-        /* if we don't need to fill in the distribution, skip it */
+        gossip_debug(SERVER_DEBUG, "skipping data handle read\n");
         js_p->error_code = 0;
         return 1;
     }
@@ -293,6 +357,24 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 	gossip_debug(SERVER_DEBUG,
 		     "  also returning %d datafile handles\n",
 		     a_p->u.meta.dfile_count);
+    }
+
+    if ((a_p->objtype == PVFS_TYPE_DATAFILE) &&
+        (a_p->mask & PVFS_ATTR_SYS_SIZE))
+    {
+        if (js_p->error_code != 0)
+        {
+            gossip_err("*** dspace size read failed.\n");
+        }
+        else
+        {
+            /* assign properly retrieved size value to response */
+            a_p->u.data.size = js_p->ds_attr.b_size;
+
+            gossip_debug(SERVER_DEBUG,
+                         "  also returning file size of %Ld\n",
+                         a_p->u.data.size);
+        }
     }
 
     gossip_debug(SERVER_DEBUG,
