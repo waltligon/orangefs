@@ -554,7 +554,6 @@ static void trove_read_callback_fn(void *user_ptr,
 	if(q_item->seq == flow_data->next_seq_to_send)
 	{
 	    flow_data->dest_pending++;
-	    assert(q_item->buffer_used);
 	    ret = BMI_post_send(&tmp_id,
 		q_item->parent->dest.u.bmi.address,
 		q_item->buffer,
