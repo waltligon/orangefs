@@ -47,7 +47,7 @@ int main(int argc,char **argv)
         return ret;
     }
 
-    if (PINT_remove_base_dir(old_filename, old_buf, PVFS_SEGMENT_MAX))
+    if (PVFS_util_remove_base_dir(old_filename, old_buf, PVFS_SEGMENT_MAX))
     {
         if (old_filename[0] != '/')
         {
@@ -59,7 +59,7 @@ int main(int argc,char **argv)
     }
     printf("Old filename is %s\n", old_buf);
 
-    if (PINT_remove_base_dir(new_filename, new_buf, PVFS_SEGMENT_MAX))
+    if (PVFS_util_remove_base_dir(new_filename, new_buf, PVFS_SEGMENT_MAX))
     {
         if (new_filename[0] != '/')
         {

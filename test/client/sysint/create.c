@@ -45,7 +45,7 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    if (PINT_remove_base_dir(filename,str_buf,256))
+    if (PVFS_util_remove_base_dir(filename,str_buf,256))
     {
         if (filename[0] != '/')
         {

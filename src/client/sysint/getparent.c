@@ -9,6 +9,7 @@
 #include "pvfs2-sysint.h"
 #include "str-utils.h"
 #include "gossip.h"
+#include "pvfs2-util.h"
 
 int PVFS_sys_getparent(PVFS_fs_id fs_id, char *entry_name, 
 	PVFS_credentials credentials, PVFS_sysresp_getparent *resp)
@@ -38,7 +39,7 @@ int PVFS_sys_getparent(PVFS_fs_id fs_id, char *entry_name,
     }
     resp->parent_refn = resp_look.pinode_refn;
 
-    if (PINT_remove_base_dir(entry_name,file_buf,PVFS_SEGMENT_MAX))
+    if (PVFS_util_remove_base_dir(entry_name,file_buf,PVFS_SEGMENT_MAX))
     {
 	gossip_err("invalid filename: %s\n", entry_name);
 	return -1;

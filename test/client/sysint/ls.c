@@ -130,7 +130,7 @@ int do_list(
         if (getattr_response.attr.objtype == PVFS_TYPE_METAFILE)
         {
             char segment[128] = {0};
-            PINT_remove_base_dir(name, segment, 128);
+            PVFS_util_remove_base_dir(name, segment, 128);
             print_entry_attr(segment, &getattr_response.attr);
             return 0;
         }

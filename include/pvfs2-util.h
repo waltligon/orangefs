@@ -18,6 +18,10 @@ void PVFS_util_pvfstab_mntlist_free(pvfs_mntlist* e_p);
 /* path management */
 int PVFS_util_lookup_parent(char *filename, PVFS_fs_id fs_id, 
     PVFS_credentials credentials, PVFS_handle* handle);
+int PVFS_util_remove_base_dir(char *pathname, char *out_dir, 
+    int out_max_len);
+int PVFS_util_remove_dir_prefix(char *pathname, char* prefix, char *out_path, 
+    int out_max_len);
 
 #endif /* __PVFS2_UTIL_H */
 

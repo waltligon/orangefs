@@ -91,7 +91,7 @@ int main(int argc, char **argv)
      */
     for(i=0; i<mnt.nr_entry; i++)
     {
-	ret = PINT_remove_dir_prefix(user_opts->srcfile,
+	ret = PVFS_util_remove_dir_prefix(user_opts->srcfile,
 	    mnt.ptab_p[i].local_mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
@@ -119,7 +119,7 @@ int main(int argc, char **argv)
     }
 
     /* get the absolute path on the pvfs2 file system */
-    if (PINT_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
+    if (PVFS_util_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
     {
         if (pvfs_path[0] != '/')
         {
