@@ -6,6 +6,8 @@ TEST_REALSYSINT_DIR := src/client/unix-io
 TEST_SYSINT_DIR_SRC += \
 	$(DIR)/client.c\
 	$(DIR)/lookup.c\
+	$(DIR)/mkdir.c\
+	$(DIR)/rmdir.c\
 	$(DIR)/path-test.c\
 	$(DIR)/create.c\
 	$(DIR)/readdir.c\
