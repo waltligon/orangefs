@@ -15,6 +15,9 @@
 #include "pint-dev-shared.h"
 
 static int bufmap_init = 0;
+static struct page** bufmap_page_array = NULL;
+static void** bufmap_kaddr_array = NULL;
+static int bufmap_page_count = 0;
 
 /* pvfs_bufmap_initialize()
  *
@@ -24,12 +27,94 @@ static int bufmap_init = 0;
  */
 int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 {
+    int ret = -1;
+    int i;
+
     if(bufmap_init)
 	return(-EALREADY);
 
+    /* check the alignment and see if the caller was nice to us */
+    if(PAGE_ALIGN((unsigned long)user_desc->ptr) != 
+	(unsigned long)user_desc->ptr)
+    {
+	printk("pvfs2: error: memory alignment (front).\n");
+	return(-EINVAL);
+    }
+    if(PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->size)) != 
+	(unsigned long)(user_desc->ptr + user_desc->size))
+    {
+	printk("pvfs2: error: memory alignment (back).\n");
+	return(-EINVAL);
+    }
+
+    bufmap_page_count = user_desc->size / PAGE_SIZE;
+
+    /* allocate storage to track our page mappings */
+    bufmap_page_array = 
+	(struct page**)kmalloc(bufmap_page_count*sizeof(struct page*), 
+	GFP_KERNEL);
+    if(!bufmap_page_array)
+    {
+	return(-ENOMEM);
+    }
+
+    bufmap_kaddr_array =
+	(void**)kmalloc(bufmap_page_count*sizeof(void*),
+	GFP_KERNEL);
+    if(!bufmap_kaddr_array)
+    {
+	kfree(bufmap_page_array);
+	return(-ENOMEM);
+    }
+
+    /* map the pages */
+    down_read(&current->mm->mmap_sem);
+
+    ret = get_user_pages(
+	current,
+	current->mm,
+	(unsigned long)user_desc->ptr,
+	bufmap_page_count,
+	1,
+	0,
+	bufmap_page_array,
+	NULL);
+
+    up_read(&current->mm->mmap_sem);
+
+    if(ret < 0)
+    {
+	kfree(bufmap_page_array);
+	kfree(bufmap_kaddr_array);
+	return(ret);
+    }
+
+    /* in theory we could run with what we got, but I will just treat it
+     * as an error for simplicity's sake right now
+     */
+    if(ret < bufmap_page_count)
+    {
+	pvfs2_error("pvfs2: error: asked for %d pages, only got %d.\n",
+	    bufmap_page_count, ret);
+	for(i=0; i<ret; i++)
+	{
+	    page_cache_release(bufmap_page_array[i]);
+	}
+	kfree(bufmap_page_array);
+	kfree(bufmap_kaddr_array);
+	return(-ENOMEM);
+    }
+
+    /* get kernel space pointers for each page */
+    for(i=0; i<bufmap_page_count; i++)
+    {
+	bufmap_kaddr_array[i] = kmap(bufmap_page_array[i]);
+    }
+
+    /* TODO: still need to setup seperate descriptors */
+
     bufmap_init = 1;
 
-    pvfs2_error("Error: function not implemented.\n");
     return(0);
 }
 
@@ -42,12 +127,24 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
  */
 void pvfs_bufmap_finalize(void)
 {
+    int i;
+
     if(!bufmap_init)
     {
 	return;
     }
 
-    pvfs2_error("Error: function not implemented.\n");
+    for(i=0; i<bufmap_page_count; i++)
+    {
+	page_cache_release(bufmap_page_array[i]);
+    }
+    kfree(bufmap_page_array);
+    kfree(bufmap_kaddr_array);
+
+    /* TODO: clean up descriptors */
+
+    bufmap_init = 0;
+
     return;
 }
 
@@ -60,7 +157,7 @@ void pvfs_bufmap_finalize(void)
  */
 int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc)
 {
-    pvfs2_error("Error: function not implemented.\n");
+    pvfs2_error("pvfs2: error: function not implemented.\n");
     return(-ENOSYS);
 }
 
@@ -72,7 +169,7 @@ int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc)
  */
 void pvfs_bufmap_put(struct pvfs_bufmap_desc* desc)
 {
-    pvfs2_error("Error: function not implemented.\n");
+    pvfs2_error("pvfs2: error: function not implemented.\n");
     return;
 }
 
@@ -85,7 +182,7 @@ void pvfs_bufmap_put(struct pvfs_bufmap_desc* desc)
  */
 int pvfs_bufmap_size_query(void)
 {
-    pvfs2_error("Error: function not implemented.\n");
+    pvfs2_error("pvfs2: error: function not implemented.\n");
     return(-ENOSYS);
 }
 
@@ -98,7 +195,7 @@ int pvfs_bufmap_size_query(void)
 int pvfs_bufmap_copy_to_user(void* to, struct pvfs_bufmap_desc* from,
     int size)
 {
-    pvfs2_error("Error: function not implemented.\n");
+    pvfs2_error("pvfs2: error: function not implemented.\n");
     return(-ENOSYS);
 }
 
@@ -111,7 +208,7 @@ int pvfs_bufmap_copy_to_user(void* to, struct pvfs_bufmap_desc* from,
 int pvfs_bufmap_copy_from_user(struct pvfs_bufmap_desc* to, void* from,
     int size)
 {
-    pvfs2_error("Error: function not implemented.\n");
+    pvfs2_error("pvfs2: error: function not implemented.\n");
     return(-ENOSYS);
 }
 
