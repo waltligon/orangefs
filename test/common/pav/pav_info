@@ -25,17 +25,23 @@ foreach $key (keys(%config)) {
 	    system("rm $config{'COMP_NODEFILE'}");
 	    open FH, ">$config{'COMP_NODEFILE'}" 
 		or die "Couldn't open $config{'COMP_NODEFILE'}";
-	    for ($i=0; $i<@$aref-1; $i++) {
-		print FH "$aref->[$i]\n";	    
+	    if (@$aref > 0)  # leave empty if no compute nodes
+	    {
+		for ($i=0; $i<@$aref-1; $i++) {
+		    print FH "$aref->[$i]\n";	    
+		}
+		print FH "$aref->[$i]\n";
 	    }
-	    print FH "$aref->[$i]\n";
 	    close FH;
 	}
 
-	for ($i=0; $i<@$aref-1; $i++) {
-	    print "$aref->[$i],";
+	if (@$aref > 0)  # leave empty if no compute nodes
+	{
+	    for ($i=0; $i<@$aref-1; $i++) {
+		print "$aref->[$i],";
+	    }
+	    print "$aref->[$i]\n";
 	}
-	print "$aref->[$i]\n";
     } else {
 	print "$key=$config{$key}\n";
     }
