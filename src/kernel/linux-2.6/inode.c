@@ -58,8 +58,9 @@ static int pvfs2_get_blocks(
     const uint32_t blocksize = PAGE_CACHE_SIZE;  /* inode->i_blksize */
     const uint32_t blockbits = PAGE_CACHE_SHIFT; /* inode->i_blkbits */
 
-    pvfs2_print("pvfs2: pvfs2_get_blocks called for lblock %d\n",
-                (int)lblock);
+    pvfs2_print("pvfs2: pvfs2_get_blocks called for lblock %d "
+                "(create flag is %s)\n", (int)lblock,
+                (create ? "set" : "clear"));
 
     page = bh_result->b_page;
     page_data = kmap(page);
@@ -162,11 +163,23 @@ static int pvfs2_writepages(
     return mpage_writepages(mapping, wbc, pvfs2_get_block);
 }
 
+static int pvfs2_sync_page(struct page *page)
+{
+    pvfs2_print("pvfs2: pvfs2_sync_page called on page %p\n", page);
+    return 0;
+}
+
 static int pvfs2_readpage(
     struct file *file,
     struct page *page)
 {
-    pvfs2_print("pvfs2: pvfs2_readpage called\n");
+    pvfs2_print("pvfs2: pvfs2_readpage called with page %p\n",page);
+
+
+/*     block_invalidatepage(page, 0); */
+/*     truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0); */
+
+
     /*
       NOTE: if not using mpage support, we need to drop
       the page lock here before returning
@@ -194,12 +207,58 @@ static int pvfs2_prepare_write(
     return nobh_prepare_write(page, from, to, pvfs2_get_block);
 }
 
+static int pvfs2_set_page_dirty(struct page *page)
+{
+    pvfs2_print("pvfs2: pvfs2_set_page_dirty called\n");
+
+    set_page_dirty(page);
+    return 0;
+}
+
+static int pvfs2_commit_write(
+    struct file *file,
+    struct page *page,
+    unsigned offset,
+    unsigned to)
+{
+    struct inode *inode = page->mapping->host;
+
+    /* FIXME: inode->i_blkbits != PAGE_CACHE_SHIFT */
+    loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
+
+    pvfs2_print("pvfs2: pvfs2_commit_write called\n");
+
+    if (pos > inode->i_size)
+    {
+        i_size_write(inode, pos);
+    }
+    set_page_dirty(page);
+    return 0;
+}
+
 static sector_t pvfs2_bmap(
     struct address_space *mapping,
     sector_t block)
 {
     pvfs2_print("pvfs2: pvfs2_bmap called\n");
     return generic_block_bmap(mapping, block, pvfs2_get_block);
+}
+
+static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
+{
+    pvfs2_print("pvfs2: pvfs2_invalidatepage called on page %p "
+                "(offset is %lu)\n", page, offset);
+
+/*     ClearPageUptodate(page); */
+/*     ClearPageMappedToDisk(page); */
+    return 0;
+}
+
+static int pvfs2_releasepage(struct page *page, int foo)
+{
+    pvfs2_print("pvfs2: pvfs2_releasepage called on page %p\n", page);
+    try_to_free_buffers(page);
+    return 0;
 }
 
 static int pvfs2_direct_IO(
@@ -217,27 +276,35 @@ static int pvfs2_direct_IO(
 			      offset, nr_segs, pvfs2_get_blocks, NULL);
 }
 
-struct address_space_operations pvfs2_aops =
+struct address_space_operations pvfs2_address_operations =
 {
     .readpage = pvfs2_readpage,
     .readpages = pvfs2_readpages,
     .writepage = pvfs2_writepage,
     .writepages = pvfs2_writepages,
-    .sync_page = block_sync_page,
+    .sync_page = pvfs2_sync_page,
     .prepare_write = pvfs2_prepare_write,
-    .commit_write = generic_commit_write,
+    .commit_write = pvfs2_commit_write,
+    .set_page_dirty = pvfs2_set_page_dirty,
     .bmap = pvfs2_bmap,
-/*     .invalidate = pvfs2_invalidatepage, */
-/*     .releasepage = pvfs2_releasepage, */
+    .invalidatepage = pvfs2_invalidatepage,
+    .releasepage = pvfs2_releasepage,
     .direct_IO = pvfs2_direct_IO
 };
 
-static struct backing_dev_info pvfs2_backing_dev_info =
+struct backing_dev_info pvfs2_backing_dev_info =
 {
     .ra_pages = 8,     /* no readahead for now */
     .memory_backed = 0
 };
 
+void pvfs2_truncate(struct inode *inode)
+{
+    pvfs2_print("pvfs2: pvfs2_truncate called on inode %d\n",
+                (int)inode->i_ino);
+    block_truncate_page(
+        inode->i_mapping, inode->i_size, pvfs2_get_block);
+}
 
 int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 {
@@ -261,7 +328,7 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 
 struct inode_operations pvfs2_file_inode_operations =
 {
-/*     .truncate = pvfs2_truncate, */
+    .truncate = pvfs2_truncate,
 /*     .setxattr = pvfs2_setxattr, */
 /*     .getxattr = pvfs2_getxattr, */
 /*     .listxattr = pvfs2_listxattr, */
@@ -300,7 +367,7 @@ struct inode *pvfs2_get_custom_inode(
 		    pvfs2_inode, inode->i_sb);
 
 	inode->i_mode = mode;
-	inode->i_mapping->a_ops = &pvfs2_aops;
+	inode->i_mapping->a_ops = &pvfs2_address_operations;
 	inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 	inode->i_uid = current->uid;
 	inode->i_gid = current->gid;

@@ -56,6 +56,7 @@ static inline int copy_attributes_to_inode(
     int ret = -1;
     int perm_mode = 0;
     pvfs2_inode_t *pvfs2_inode = NULL;
+    loff_t inode_size = 0;
 
     if (inode && attrs)
     {
@@ -81,22 +82,32 @@ static inline int copy_attributes_to_inode(
             (attrs->mask & PVFS_ATTR_SYS_SIZE))
         {
             spin_lock(&inode->i_lock);
-            inode->i_size = (loff_t)attrs->size;
             inode->i_bytes = (unsigned short)attrs->size;
 
             /* FIXME: inode->i_blksize != PAGE_CACHE_SIZE */
             inode->i_blocks = (unsigned long)
-                ((inode->i_size / PAGE_CACHE_SIZE) + 1);
+                ((inode_size / PAGE_CACHE_SIZE) + 1);
             spin_unlock(&inode->i_lock);
+
+            inode_size = (loff_t)attrs->size;
+            i_size_write(inode, inode_size);
+
+            /*
+              truncate this inode's page cache entries every
+              time we get a different size value.
+
+              clear all pages?
+            */
+            vmtruncate(inode, inode_size);
         }
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
                  (symname != NULL))
         {
-            inode->i_size = strlen(symname);
+            i_size_write(inode, (loff_t)strlen(symname));
         }
         else
         {
-            inode->i_size = 0;
+            i_size_write(inode, 0);
         }
 
 	inode->i_uid = attrs->owner;
@@ -248,7 +259,11 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
 /*
   NOTE: in kernel land, we never use the
   sys_attr->link_target for anything, so don't bother
-  copying it into the sys_attr object here
+  copying it into the sys_attr object here.
+
+  For our usage of this method (i.e. create/mkdir/setattr),
+  we never need the size field from the inode, so don't
+  copy it either.
 */
 static inline int copy_attributes_from_inode(
     struct inode *inode,

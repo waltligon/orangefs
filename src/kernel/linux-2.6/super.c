@@ -11,6 +11,7 @@
 #include <asm/atomic.h>
 #include <linux/pagemap.h>
 #include <linux/statfs.h>
+#include <linux/buffer_head.h>
 #include "pvfs2-kernel.h"
 
 extern struct file_system_type pvfs2_fs_type;

@@ -17,10 +17,10 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 
 /* shared file/dir operations defined in file.c */
-extern int pvfs2_open(
+extern int pvfs2_file_open(
     struct inode *inode,
     struct file *file);
-extern int pvfs2_release(
+extern int pvfs2_file_release(
     struct inode *inode,
     struct file *file);
 
@@ -169,8 +169,8 @@ struct file_operations pvfs2_dir_operations = {
     .read = generic_read_dir,
     .readdir = pvfs2_readdir,
     .llseek = generic_file_llseek,
-    .open = pvfs2_open,
-    .release = pvfs2_release
+    .open = pvfs2_file_open,
+    .release = pvfs2_file_release
 };
 
 /*

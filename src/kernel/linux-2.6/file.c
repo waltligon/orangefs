@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
+#include <linux/mm.h>
 #include <linux/slab.h>
 #include <asm/atomic.h>
 #include "pvfs2-kernel.h"
@@ -20,13 +21,16 @@ extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 
-int pvfs2_open(
+extern struct address_space_operations pvfs2_address_operations;
+extern struct backing_dev_info pvfs2_backing_dev_info;
+
+
+int pvfs2_file_open(
     struct inode *inode,
     struct file *file)
 {
-    pvfs2_print("pvfs2: pvfs2_open called on %s (inode is %p)\n",
-		file->f_dentry->d_name.name, inode);
-
+    pvfs2_print("pvfs2: pvfs2_file_open called on %s (inode is %d)\n",
+		file->f_dentry->d_name.name, (int)inode->i_ino);
     if (S_ISDIR(inode->i_mode))
     {
 	return dcache_dir_open(inode, file);
@@ -271,26 +275,43 @@ int pvfs2_ioctl(
 
 static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
-    pvfs2_print("pvfs2: pvfs2_mmap called\n");
-/*     return generic_file_mmap(file, vma); */
+    struct inode *inode = file->f_dentry->d_inode;
 
-    /* use readonly since we don't currently implement writepage */
-    return generic_file_readonly_mmap(file, vma);
+    pvfs2_print("pvfs2: pvfs2_mmap called\n");
+
+    /*
+      for mmap on pvfs2, make sure we use pvfs2 specific
+      address operations by explcitly setting the operations
+    */
+    inode->i_mapping->a_ops = &pvfs2_address_operations;
+    inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
+
+    /* and clear any associated pages in the page cache (if any) */
+    truncate_inode_pages(inode->i_mapping, 0);
+
+    return generic_file_mmap(file, vma);
 }
 
 /*
   NOTE: gets called when all files are closed.  not when
   each file is closed. (i.e. last reference to an opened file)
 */
-int pvfs2_release(
+int pvfs2_file_release(
     struct inode *inode,
     struct file *file)
 {
-    pvfs2_print("pvfs2: pvfs2_release called\n");
+    pvfs2_print("pvfs2: pvfs2_file_release called\n");
     if (S_ISDIR(inode->i_mode))
     {
 	return dcache_dir_close(inode, file);
     }
+
+    /*
+      remove all associated inode pages from the page cache;
+      this forces an expensive refresh of data for
+      the next caller of mmap (or 'get_block' accesses)
+    */
+    truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0);
     return 0;
 }
 
@@ -303,7 +324,8 @@ int pvfs2_fsync(
     return 0;
 }
 
-struct file_operations pvfs2_file_operations = {
+struct file_operations pvfs2_file_operations =
+{
 /*
   if .llseek is overriden, we must acquire lock as described
   in Documentation/filesystems/Locking
@@ -315,8 +337,8 @@ struct file_operations pvfs2_file_operations = {
     .aio_write = generic_file_aio_write,
     .ioctl = pvfs2_ioctl,
     .mmap = pvfs2_file_mmap,
-    .open = pvfs2_open,
-    .release = pvfs2_release,
+    .open = pvfs2_file_open,
+    .release = pvfs2_file_release,
     .fsync = pvfs2_fsync,
     .readv = generic_file_readv,
     .writev = generic_file_writev,
