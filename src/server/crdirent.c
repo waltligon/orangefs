@@ -367,7 +367,7 @@ static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_
 	    s_op->req->u.crdirent.parent_handle,
 	    &(s_op->key),
 	    &(s_op->val),
-	    0,
+	    TROVE_SYNC,
 	    ret->vtag,
 	    s_op,
 	    ret,
@@ -406,7 +406,7 @@ static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_
     job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
 	    s_op->req->u.crdirent.parent_handle,
 	    0x00000000, /* TODO: Change this */
-	    ATTR_DIR,
+	    PVFS_TYPE_DIRECTORY,
 	    NULL,
 	    s_op,
 	    ret,
@@ -466,7 +466,7 @@ static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
 	    h,
 	    &(s_op->key),
 	    &(s_op->val),
-	    0,
+	    TROVE_SYNC,
 	    ret->vtag, /* This needs to change for vtags */
 	    s_op,      /* Or is that right? dw */
 	    ret,

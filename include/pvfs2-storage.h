@@ -10,7 +10,7 @@
 #ifndef __PVFS2_STORAGE_H
 #define __PVFS2_STORAGE_H
 
-#include <pvfs2-types.h>
+#include "pvfs2-types.h"
 
 /************************************************************
  * Types and structures specific to the storage interface
@@ -30,7 +30,7 @@ enum {
     PVFS_TYPE_DATAFILE  = 256,
     PVFS_TYPE_DIRECTORY = 512,
     PVFS_TYPE_SYMLINK   = 1024,
-    PVFS_TYPE_OTHER     = 8192
+    PVFS_TYPE_DIRDATA   = 8192
 };
 
 /* unique identifiers associated with dataspace operations */
@@ -110,19 +110,13 @@ do {									\
 } while (0);
 
 /* key descriptors for use in key/value spaces */
-struct PVFS_ds_key
-{
-    /* TODO: not really defined yet */
-    char* name; 
-    int32_t length; /* NOTE: Should include NULL terminator on strings */
-};
-typedef struct PVFS_ds_key PVFS_ds_key_s;
 
 struct PVFS_ds_keyval
 {
     /* TODO: not really defined yet */
     void   *buffer;
-    int32_t buffer_sz;
+    int32_t buffer_sz; /* size of memory region pointed to by buffer */
+    int32_t read_sz; /* size of data read into buffer (only valid after a read) */
 };
 typedef struct PVFS_ds_keyval PVFS_ds_keyval_s;
 

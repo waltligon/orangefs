@@ -291,7 +291,7 @@ static int rmdirent_rmdirent(state_action_struct *s_op, job_status_s *ret)
 	    s_op->req->u.rmdirent.fs_id,
 	    h,
 	    &(s_op->key),
-	    0,
+	    TROVE_SYNC,
 	    bs,
 	    s_op,
 	    ret,

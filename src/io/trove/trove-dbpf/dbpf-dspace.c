@@ -275,8 +275,7 @@ return_error:
     return -1;
 }
 
-int dbpf_dspace_iterate_handles(
-                                TROVE_coll_id coll_id,
+int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
                                 TROVE_ds_position *position_p,
                                 TROVE_handle *handle_array,
                                 int *inout_count_p,
@@ -753,7 +752,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 
 	    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle); /* release the db right away */
 	    if (ret == 0) {
-		k_size = (TROVE_size) k_stat_p->bt_nkeys;
+		k_size = (TROVE_size) k_stat_p->bt_ndata;
 		free(k_stat_p);
 	    }
 	    else goto return_error;

@@ -140,7 +140,7 @@ static int dbpf_collection_geteattr(TROVE_coll_id coll_id,
 	return -1;
     }
 
-    /* TODO: return the actual size somehow */
+    val_p->read_sz = db_data.size; /* return the actual size */
 
     return 1;
 }

@@ -257,8 +257,8 @@ static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
 	    s_op->req->u.setattr.handle,
 	    &(s_op->key),
 	    &(s_op->val),
-	    0,
-	    bs, 
+	    TROVE_SYNC /* flags */,
+	    bs,
 	    s_op,
 	    ret,
 	    &i);

@@ -199,7 +199,7 @@ static int mkdir_setattrib(state_action_struct *s_op, job_status_s *ret)
 	    s_op->resp->u.mkdir.handle,
 	    &(s_op->key),
 	    &(s_op->val),
-	    0,
+	    TROVE_SYNC,
 	    j,
 	    s_op,
 	    ret,

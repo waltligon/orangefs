@@ -1,7 +1,8 @@
 DIR := src/apps/admin
 
 ADMINSRC := \
-	$(DIR)/pvfs2-mkspace.c
+	$(DIR)/pvfs2-mkspace.c \
+	$(DIR)/pvfs2-showcoll.c
 
 ADMINLIBS := -ldb -lrt -lpthread
 

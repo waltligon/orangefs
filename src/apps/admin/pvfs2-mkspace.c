@@ -123,7 +123,7 @@ int main(int argc, char **argv)
     ret = trove_dspace_create(coll_id,
 			      &root_handle,
 			      0xffffffff,
-			      2, /* TYPE; FIX!!! */
+			      PVFS_TYPE_DIRECTORY,
 			      NULL,
 			      TROVE_SYNC,
 			      NULL,
@@ -181,11 +181,12 @@ int main(int argc, char **argv)
 	return -1;
     }
 
+    /* create dataspace to hold directory entries */
     ent_handle = root_handle - 1; /* just put something in here */
     ret = trove_dspace_create(coll_id,
 			      &ent_handle,
 			      0xffffffff,
-			      2, /* TYPE; FIX!!! */
+			      PVFS_TYPE_DIRDATA,
 			      NULL,
 			      TROVE_SYNC,
 			      NULL,

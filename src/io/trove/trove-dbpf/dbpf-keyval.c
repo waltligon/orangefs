@@ -334,8 +334,7 @@ static int dbpf_keyval_validate(
 
 /* dbpf_keyval_iterate()
  */
-static int dbpf_keyval_iterate(
-			       TROVE_coll_id coll_id,
+static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
 			       TROVE_handle handle,
 			       TROVE_ds_position *position_p,
 			       TROVE_keyval_s *key_array,
@@ -469,7 +468,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	data.size = data.ulen = op_p->u.k_iterate.val_array[0].buffer_sz;
 	data.flags |= DB_DBT_USERMEM;
 
-	/* position the cursor and grab the first key/value pair */
+	/* position the cursor */
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
 	if (ret == DB_NOTFOUND) goto return_ok;
 	else if (ret != 0) goto return_error;
@@ -490,6 +489,9 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
 	if (ret == DB_NOTFOUND) goto return_ok;
 	else if (ret != 0) goto return_error;
+
+	op_p->u.k_iterate.key_array[i].read_sz = key.size;
+	op_p->u.k_iterate.val_array[i].read_sz = data.size;
     }
     
 return_ok:
