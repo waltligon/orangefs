@@ -25,8 +25,6 @@
 struct fp_queue_item
 {
     void* buffer;
-    int refcount;
-    int seq_num;
     PVFS_size size_list[MAX_REGIONS];
     PVFS_offset offset_list[MAX_REGIONS];
     PINT_Request_result result;
@@ -63,6 +61,8 @@ struct fp_private_data
 static int fp_multiqueue_id = -1;
 static bmi_context_id global_bmi_context = -1;
 static TROVE_context_id global_trove_context = -1;
+static gen_mutex_t completion_mutex = GEN_MUTEX_INITIALIZER;
+static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
 static QLIST_HEAD(completion_queue); 
 
 static void bmi_recv_callback_fn(void *user_ptr,
@@ -153,7 +153,20 @@ int fp_multiqueue_getinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter)
 {
-    return (-PVFS_ENOSYS);
+    int* type;
+
+    switch(option)
+    {
+	case FLOWPROTO_TYPE_QUERY:
+	    type = parameter;
+	    if(*type == FLOWPROTO_MULTIQUEUE)
+		return(0);
+	    else
+		return(-PVFS_ENOPROTOOPT);
+	default:
+	    return(-PVFS_ENOSYS);
+	    break;
+    }
 }
 
 int fp_multiqueue_setinfo(flow_descriptor * flow_d,
@@ -242,11 +255,38 @@ int fp_multiqueue_find_serviceable(flow_descriptor ** flow_d_array,
 				  int *count,
 				  int max_idle_time_ms)
 {
-    return (-PVFS_ENOSYS);
+    int incount = *count;
+    struct fp_private_data* tmp_data;
+
+    *count = 0;
+
+    gen_mutex_lock(&completion_mutex);
+	/* see if anything has completed */
+	if(qlist_empty(&completion_queue))
+	{
+	    pthread_cond_wait(&completion_cond, &completion_mutex);
+	}
+
+	/* run down queue, pulling out anything we can find */
+        while(*count < incount && !qlist_empty(&completion_queue))
+	{
+	    tmp_data = qlist_entry(completion_queue.next,
+		struct fp_private_data,
+		list_link);
+	    qlist_del(&tmp_data->list_link);
+	    flow_d_array[*count] = tmp_data->parent;
+	    (*count)++;
+	}
+
+    gen_mutex_unlock(&completion_mutex);
+
+    return (0);
 }
 
 int fp_multiqueue_service(flow_descriptor * flow_d)
 {
+    /* should never get here; this protocol skips the scheduler for now */
+    assert(0);
     return (-PVFS_ENOSYS);
 }
 
@@ -259,7 +299,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
     PVFS_id_gen_t tmp_id;
 
-    /* TODO: real error handling */
+    /* TODO: error handling */
     assert(error_code == 0);
 
     /* remove from current queue */
@@ -320,7 +360,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 static void trove_read_callback_fn(void *user_ptr,
 		           PVFS_error error_code)
 {
-    /* TODO: real error handling */
+    /* TODO: error handling */
     assert(error_code == 0);
 
     /* TODO: fill this in */
@@ -333,7 +373,7 @@ static void bmi_send_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code)
 {
-    /* TODO: real error handling */
+    /* TODO: error handling */
     assert(error_code == 0);
 
     /* TODO: fill this in */
@@ -350,7 +390,7 @@ static void trove_write_callback_fn(void *user_ptr,
     int ret;
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
 
-    /* TODO: real error handling */
+    /* TODO: error handling */
     assert(error_code == 0);
 
     /* if this was the last operation, then mark the flow as done */
@@ -358,9 +398,11 @@ static void trove_write_callback_fn(void *user_ptr,
     {
 	q_item->parent->total_transfered += q_item->result.bytes;
 	q_item->parent->state = FLOW_COMPLETE;
+	gen_mutex_lock(&completion_mutex);
 	qlist_add_tail(&(flow_data->list_link), 
 	    &completion_queue);
-	/* TODO: signal a condition variable? */
+	pthread_cond_signal(&completion_cond);
+	gen_mutex_unlock(&completion_mutex);
 	/* TODO: call cleanup function */
 	return;
     }
