@@ -1877,6 +1877,7 @@ static int tcp_do_work_recv(method_addr_p map)
 
 	gossip_ldebug(BMI_DEBUG_TCP, "Received new message; mode: %d.\n", 
 		(int)new_header.mode);
+	gossip_ldebug(BMI_DEBUG_TCP, "tag: %d\n", (int)new_header.tag);
 
 	if(new_header.mode == TCP_MODE_UNEXP)
 	{
