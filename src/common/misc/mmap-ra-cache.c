@@ -132,7 +132,7 @@ int pvfs2_mmap_ra_cache_get_block(
             assert(cache_elem);
 
             if ((cache_elem->data_sz > (offset + len)) &&
-                (cache_elem->data_invalid == 0))
+                !cache_elem->data_invalid)
             {
                 gossip_debug(
                     GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "

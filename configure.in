@@ -128,7 +128,7 @@ dnl linux-2.6.x path is specified
 dnl Make sure this is a usable kernel source tree too.
 dnl
 AC_ARG_WITH(kernel,
-[  --with-kernel=src_path  Build pvfs2 kernel module against 2.6.x src],
+[  --with-kernel=srcpath   Build pvfs2 kernel module against 2.6.x src],
     if test x$withval = xyes -o x$withval = x ; then
     	AC_MSG_ERROR(--with-kernel must be given the path to your kernel source.)
     fi
@@ -156,7 +156,7 @@ dnl linux-2.4.x path is specified
 dnl Make sure this is a usable kernel source tree too.
 dnl
 AC_ARG_WITH(kernel24,
-[  --with-kernel24=src_path  Build pvfs2 kernel module against 2.4.x src],
+[  --with-kernel24=srcpath Build pvfs2 kernel module against 2.4.x src],
     if test x$withval = xyes -o x$withval = x ; then
     	AC_MSG_ERROR(--with-kernel24 must be given the path to your kernel 2.4.x source.)
     fi
@@ -171,6 +171,12 @@ AC_ARG_WITH(kernel24,
 	AC_MSG_ERROR(The kernel source tree does not appear to be 2.4)
     fi
     k24_minor_ver=`echo $vers | cut -b 26- | sed -n 's/\"//p'`
+    orig_k24_minor_ver=$k24_minor_ver
+    tmp_k24_minor_ver=`echo $orig_k24_minor_ver | grep -`
+    if ! test "x$tmp_k24_minor_ver" = "x"; then
+       tmp_k24_minor_ver=`echo $k24_minor_ver | sed -n 's/-/\n/p' | head -n 1`
+       k24_minor_ver=$tmp_k24_minor_ver
+    fi
     LINUX24_KERNEL_SRC="$withval" LINUX24_KERNEL_MINOR_VER="$k24_minor_ver"
     , LINUX24_KERNEL_SRC="" LINUX24_KERNEL_MINOR_VER="")
 
@@ -272,7 +278,7 @@ test_for_karma()
 
 dnl optionally disable building the karma gui
 AC_ARG_ENABLE(karma,
-[  --disable-karma        Disables optional gui.  (Enabled by default)],
+[  --disable-karma         Disables optional gui.  (Enabled by default)],
 [ if test x$enableval = xyes; then
       test_for_karma
    fi
@@ -331,7 +337,7 @@ AC_SUBST(INTELC)
 AC_SUBST(GNUC)
 
 AC_ARG_WITH(efence,
-[  --with-efence=<path>        Use electric fence for malloc debugging.],
+[  --with-efence=<path>    Use electric fence for malloc debugging.],
 	if test x$withval != xyes ; then
 		LDFLAGS="${LDFLAGS} -L$withval"
 	fi

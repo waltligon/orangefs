@@ -373,25 +373,22 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     pvfs2_print("pvfs2: pvfs2_mmap called on %s\n",
                 (file ? (char *)file->f_dentry->d_name.name :
                  (char *)"Unknown"));
-
     /*
-      for mmap on pvfs2, make sure we use pvfs2 specific
-      address operations by explcitly setting the operations
+      for mmap on pvfs2, make sure we use pvfs2 specific address
+      operations by explcitly setting the operations
     */
     inode->i_mapping->host = inode;
     inode->i_mapping->a_ops = &pvfs2_address_operations;
-#ifndef PVFS2_LINUX_KERNEL_2_4
+
+    /* have the kernel enforce readonly mmap support for us */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    vma->vm_flags &= ~VM_MAYWRITE;
+    return generic_file_mmap(file, vma);
+#else
+    /* backing_dev_info isn't present on 2.4.x */
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
+    return generic_file_readonly_mmap(file, vma);
 #endif
-
-    /* and clear any associated pages in the page cache (if any) */
-    if (inode->i_data.nrpages)
-    {
-        truncate_inode_pages(inode->i_mapping, 0);
-    }
-
-    /* have the vfs enforce readonly mmap support for us */
-    return pvfs2_generic_file_readonly_mmap(file, vma);
 }
 
 /*

@@ -651,13 +651,14 @@ do {                                                                 \
 } while(0)
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
+#define get_block_block_type long
 #define pvfs2_lock_inode(inode) do {} while(0)
 #define pvfs2_unlock_inode(inode) do {} while(0)
-#define pvfs2_generic_file_readonly_mmap generic_file_mmap
 #define pvfs2_current_signal_lock current->sigmask_lock
 #define pvfs2_current_sigaction current->sig->action
 #define pvfs2_recalc_sigpending() recalc_sigpending(current)
 #define pvfs2_d_splice_alias(dentry, inode) d_add(dentry, inode)
+#define pvfs2_kernel_readpage block_read_full_page
 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
@@ -675,13 +676,14 @@ do                                                \
 
 #else /* !(PVFS2_LINUX_KERNEL_2_4) */
 
+#define get_block_block_type sector_t
 #define pvfs2_lock_inode(inode) spin_lock(&inode->i_lock)
 #define pvfs2_unlock_inode(inode) spin_unlock(&inode->i_lock)
-#define pvfs2_generic_file_readonly_mmap generic_file_readonly_mmap
 #define pvfs2_current_signal_lock current->sighand->siglock
 #define pvfs2_current_sigaction current->sighand->action
 #define pvfs2_recalc_sigpending recalc_sigpending
 #define pvfs2_d_splice_alias(dentry, inode) d_splice_alias(inode, dentry)
+#define pvfs2_kernel_readpage mpage_readpage
 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \

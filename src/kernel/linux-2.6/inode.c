@@ -25,30 +25,19 @@ extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
-static int pvfs2_get_blocks(
-    struct inode *inode,
-    sector_t lblock,
-    unsigned long max_blocks,
-    struct page *page)
-#else
 static int pvfs2_get_blocks(
     struct inode *inode,
     sector_t lblock,
     unsigned long max_blocks,
     struct buffer_head *bh_result,
     int create)
-#endif
 {
     int ret = -EIO;
     uint32_t max_block = 0;
     ssize_t bytes_read = 0;
+    struct page *page = NULL;
     void *page_data = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-#ifndef PVFS2_LINUX_KERNEL_2_4
-    struct page *page = NULL;
-#endif
-
     /*
       FIXME:
       We're faking our inode block size to be PAGE_CACHE_SIZE
@@ -95,17 +84,15 @@ static int pvfs2_get_blocks(
         return -EIO;
     }
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
     page = bh_result->b_page;
-#endif
     page_data = kmap(page);
 
     /*
-      NOTE: this unsafely *assumes* that the size stored in
-      the inode is accurate.
+      NOTE: this unsafely *assumes* that the size stored in the inode
+      is accurate.
 
-      make sure we're not looking for a page block past the
-      end of this file;
+      make sure we're not looking for a page block past the end of
+      this file;
     */
     max_block = ((inode->i_size / blocksize) + 1);
     if (page->index < max_block)
@@ -115,22 +102,20 @@ static int pvfs2_get_blocks(
 
         /*
           NOTE: This is conceptually backwards.  we could be
-          implementing the file_read as generic_file_read and
-          doing the actual i/o here (via readpage).
+          implementing the file_read as generic_file_read and doing
+          the actual i/o here (via readpage).
 
-          The main reason it's not like that now is because
-          of the mismatch of page cache size and the inode
-          blocksize that we're using.  It's more efficient in
-          the general case to use the larger blocksize for
-          reading/writing.  For now it seems that this call
-          can *only* handle reads of PAGE_CACHE_SIZE blocks.
+          The main reason it's not like that now is because of the
+          mismatch of page cache size and the inode blocksize that
+          we're using.  It's more efficient in the general case to use
+          the larger blocksize for reading/writing.  For now it seems
+          that this call can *only* handle reads of PAGE_CACHE_SIZE
+          blocks.
 
-          set the readahead size to be the entire file size
-          so that subsequent calls have the opportunity to
-          be cache hits;
-          when we're at the last block, we need to pass the
-          special readahead value to allow a cache flush
-          to occur in userspace
+          set the readahead size to be the entire file size so that
+          subsequent calls have the opportunity to be cache hits; when
+          we're at the last block, we need to pass the special
+          readahead value to allow a cache flush to occur in userspace
         */
         bytes_read = pvfs2_inode_read(
             inode, page_data, blocksize, &blockptr_offset, 0,
@@ -163,6 +148,7 @@ static int pvfs2_get_blocks(
         memset(page_data, 0, blocksize);
     }
 
+    /* takes care of potential aliasing */
     flush_dcache_page(page);
     kunmap(page);
 
@@ -179,10 +165,14 @@ static int pvfs2_get_blocks(
             ClearPageError(page);
         }
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
         bh_result->b_data = page_data;
-        bh_result->b_size = blocksize;
+        bh_result->b_size = bytes_read;
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+        set_bit(BH_Mapped, &(bh_result)->b_state);
+        mark_buffer_uptodate(bh_result, 1);
+        bh_result->b_blocknr = lblock;
+#else
         map_bh(bh_result, inode->i_sb, lblock);
         set_buffer_uptodate(bh_result);
 #endif
@@ -191,49 +181,23 @@ static int pvfs2_get_blocks(
     return ret;
 }
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_get_block(
     struct inode *ip,
-    sector_t lblock,
+    get_block_block_type lblock,
     struct buffer_head *bh_result,
     int create)
 {
-    pvfs2_print("pvfs2: pvfs2_get_block called\n");
+    pvfs2_print("pvfs2_get_block called with block %lu\n",
+                (unsigned long)lblock);
     return pvfs2_get_blocks(ip, lblock, 1, bh_result, create);
 }
-#endif
 
 static int pvfs2_readpage(
     struct file *file,
     struct page *page)
 {
-    int ret = 0;
-
-#ifdef PVFS2_LINUX_KERNEL_2_4
-    struct inode *inode = NULL;
-    sector_t offset;
-
     pvfs2_print("pvfs2_readpage called with page %p\n",page);
-    atomic_inc(&page->count);
-    set_bit(PG_locked, &page->flags);
-    clear_bit(PG_uptodate, &page->flags);
-    clear_bit(PG_error, &page->flags);
-
-    offset = (page->index) << PAGE_CACHE_SHIFT;
-    inode = page->mapping->host;
-
-    ret = pvfs2_get_blocks(inode, offset, 1, page);
-
-    UnlockPage(page);
-    __free_page(page);
-
-#else
-
-    pvfs2_print("pvfs2_readpage called with page %p\n",page);
-    ret = mpage_readpage(page, pvfs2_get_block);
-
-#endif
-    return ret;
+    return pvfs2_kernel_readpage(page, pvfs2_get_block);
 }
 
 #ifndef PVFS2_LINUX_KERNEL_2_4
@@ -243,13 +207,13 @@ static int pvfs2_readpages(
     struct list_head *pages,
     unsigned nr_pages)
 {
-    pvfs2_print("pvfs2: pvfs2_readpages called\n");
+    pvfs2_print("pvfs2_readpages called\n");
     return mpage_readpages(mapping, pages, nr_pages, pvfs2_get_block);
 }
 
 static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 {
-    pvfs2_print("pvfs2: pvfs2_invalidatepage called on page %p "
+    pvfs2_print("pvfs2_invalidatepage called on page %p "
                 "(offset is %lu)\n", page, offset);
 
     ClearPageUptodate(page);
@@ -259,7 +223,7 @@ static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
 
 static int pvfs2_releasepage(struct page *page, int foo)
 {
-    pvfs2_print("pvfs2: pvfs2_releasepage called on page %p\n", page);
+    pvfs2_print("pvfs2_releasepage called on page %p\n", page);
     try_to_free_buffers(page);
     return 0;
 }
@@ -327,6 +291,8 @@ int pvfs2_revalidate(struct dentry *dentry)
 {
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
+
+    pvfs2_print("pvfs2_revalidate: called on %s\n", dentry->d_name.name);
 
     ret = pvfs2_inode_getattr(inode);
     if (ret)
