@@ -31,10 +31,10 @@ Stuff to do for the first friendly-user release:
 
 . server log to a file and run in background
 
-. more config file options:
-  - default gossip mask (server)
-  - run in foreground/background
-  - log file options
+DONE . more config file options:
+DONE  - default gossip mask (server)
+DONE  - run in foreground/background
+DONE  - log file options
 
 . pick a license and apply it to all of the code
 
