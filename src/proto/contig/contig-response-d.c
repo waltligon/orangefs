@@ -44,6 +44,7 @@ DECODE_RESP_HEAD(do_decode_resp)
 			return 0;
 
 		default:
+			return 0;
 	}
 	return -1;
 }
