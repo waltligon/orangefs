@@ -138,6 +138,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 static void cleanup_buffers(struct fp_private_data* flow_data);
 static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
     q_item, struct fp_private_data* flow_data);
+static int cancel_pending_bmi(struct qlist_head* list);
 
 
 /* interface prototypes */
@@ -1412,7 +1413,6 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
     q_item, struct fp_private_data* flow_data)
 {
-    struct qlist_head* tmp_link;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
 	"flowproto-multiqueue error cleanup path.\n");
@@ -1426,27 +1426,52 @@ static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
 	qlist_del(&q_item->list_link);
 	flow_data->cleanup_pending_count = 0;
 
-	/* TODO: remember to count chains with multiple trove ops per queue
-	 * entry 
-	 */
-
-	/* count how many other operations are pending on this flow */
-	qlist_for_each(tmp_link, &flow_data->dest_list)
+	/* cleanup depending on what endpoints are in use */
+	if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
+	    flow_data->parent->dest.endpoint_id == MEM_ENDPOINT)
 	{
-	    q_item = qlist_entry(tmp_link, struct fp_queue_item,
-		list_link);
-	    flow_data->cleanup_pending_count++;
-	}
-	qlist_for_each(tmp_link, &flow_data->src_list)
-	{
-	    q_item = qlist_entry(tmp_link, struct fp_queue_item,
-		list_link);
-	    flow_data->cleanup_pending_count++;
-	}
+	    flow_data->cleanup_pending_count += 
+		cancel_pending_bmi(&flow_data->src_list);
 
-	gossip_err(
-	    "Error: flow protocol assertion, leaving %d operations stranded.\n", 
-	    flow_data->cleanup_pending_count);
+	    /* TODO: fill this in */
+	}
+	else if(flow_data->parent->src.endpoint_id == MEM_ENDPOINT &&
+	    flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
+	{
+	    flow_data->cleanup_pending_count += 
+		cancel_pending_bmi(&flow_data->dest_list);
+
+	    /* TODO: fill this in */
+	}
+	else if(flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
+	    flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
+	{
+	    flow_data->cleanup_pending_count += 
+		cancel_pending_bmi(&flow_data->dest_list);
+
+	    /* TODO: remember to count chains with multiple trove ops per 
+	     * queue entry, may need more than "posted_id" field to track
+	     * them all 
+	     */
+	    /* TODO: fill this in */
+	}
+	else if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
+	    flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
+	{
+	    flow_data->cleanup_pending_count += 
+		cancel_pending_bmi(&flow_data->src_list);
+
+	    /* TODO: remember to count chains with multiple trove ops per 
+	     * queue entry, may need more than "posted_id" field to track
+	     * them all 
+	     */
+	    /* TODO: fill this in */
+	}
+	else
+	{
+	    /* impossible condition */
+	    assert(0);
+	}
 
 	/* TODO: finish filling this in */
 	assert(0);
@@ -1455,6 +1480,35 @@ static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
     /* TODO: finish filling this in */
     assert(0);
     return;
+}
+
+
+/* cancel_pending_bmi()
+ *
+ * cancels any pending bmi operations on the given queue list
+ *
+ * returns the number of operations that were canceled 
+ */
+static int cancel_pending_bmi(struct qlist_head* list)
+{
+    struct qlist_head* tmp_link;
+    struct fp_queue_item* q_item = NULL;
+
+    /* run down the chain of pending operations */
+    qlist_for_each(tmp_link, list)
+    {
+	q_item = qlist_entry(tmp_link, struct fp_queue_item,
+	    list_link);
+	/* TODO: fill this in */
+
+	/* TODO: do something about the fact that not all of the BMI
+	 * operations on the list were necessarily posted; see use of "seq"
+	 * and "next_seq_to_send" elsewhere in code
+	 */
+    }
+
+    assert(0);
+    return (0);
 }
 
 /*
