@@ -3084,9 +3084,9 @@ fi
 
 echo "$as_me:$LINENO: checking for client library thread safety support" >&5
 echo $ECHO_N "checking for client library thread safety support... $ECHO_C" >&6
-# Check whether --enable-disable-thread-safety or --disable-disable-thread-safety was given.
-if test "${enable_disable_thread_safety+set}" = set; then
-  enableval="$enable_disable_thread_safety"
+# Check whether --enable-thread-safety or --disable-thread-safety was given.
+if test "${enable_thread_safety+set}" = set; then
+  enableval="$enable_thread_safety"
   if test "x$enableval" = "xno" ; then
     LIBCFLAGS="$LIBCFLAGS -D__GEN_NULL_LOCKING__"
     THREAD_LIB=""
@@ -3108,11 +3108,13 @@ if test "${enable_server+set}" = set; then
   enableval="$enable_server"
   if test "x$enableval" = "xyes" ; then
     BUILD_SERVER=1
+    NEED_BERKELEY_DB=yes
 else
     BUILD_SERVER=""
 fi
 else
   BUILD_SERVER=1
+    NEED_BERKELEY_DB=yes
 fi;
 
 
@@ -4586,7 +4588,7 @@ fi
 
 fi;
 
-
+if test "x$NEED_BERKELEY_DB" = "xyes" ; then
 
 # Check whether --with-db or --without-db was given.
 if test "${with_db+set}" = set; then
@@ -4594,13 +4596,13 @@ if test "${with_db+set}" = set; then
   LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="${CFLAGS} -I$withval/include"
 fi;
 
-echo "$as_me:$LINENO: checking for db library" >&5
+    echo "$as_me:$LINENO: checking for db library" >&5
 echo $ECHO_N "checking for db library... $ECHO_C" >&6
-oldlibs=$LIBS
-for lib in db4  db3  db  notfound; do
-       LIBS="${oldlibs} -l$lib"
-       DB_LIB="-l$lib"
-       cat >conftest.$ac_ext <<_ACEOF
+    oldlibs=$LIBS
+    for lib in db4  db3  db  notfound; do
+           LIBS="${oldlibs} -l$lib"
+           DB_LIB="-l$lib"
+           cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -4644,46 +4646,46 @@ sed 's/^/| /' conftest.$ac_ext >&5
 fi
 rm -f conftest.err conftest.$ac_objext \
       conftest$ac_exeext conftest.$ac_ext
-done
-LIBS=$oldlibs
-if test "x$lib" == "xnotfound" ; then
-       { { echo "$as_me:$LINENO: error: could not find DB libraries" >&5
+    done
+        LIBS=$oldlibs
+    if test "x$lib" == "xnotfound" ; then
+           { { echo "$as_me:$LINENO: error: could not find DB libraries" >&5
 echo "$as_me: error: could not find DB libraries" >&2;}
    { (exit 1); exit 1; }; }
-else
-       echo "$as_me:$LINENO: result: $lib" >&5
+    else
+           echo "$as_me:$LINENO: result: $lib" >&5
 echo "${ECHO_T}$lib" >&6
-fi
+    fi
 
 
 
-echo "$as_me:$LINENO: checking for dbenv parameter to DB error callback function" >&5
+                echo "$as_me:$LINENO: checking for dbenv parameter to DB error callback function" >&5
 echo $ECHO_N "checking for dbenv parameter to DB error callback function... $ECHO_C" >&6
-oldcflags=$CFLAGS
-CFLAGS="$CFLAGS -Werror"
-cat >conftest.$ac_ext <<_ACEOF
+    oldcflags=$CFLAGS
+    CFLAGS="$CFLAGS -Werror"
+    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-#include <db.h>
+    #include <db.h>
 
-void error_callback_fn(const DB_ENV *dbenv,
-                       const char *prefix,
-                       const char *message)
-{
-    return;
-}
+    void error_callback_fn(const DB_ENV *dbenv,
+                           const char *prefix,
+                           const char *message)
+    {
+        return;
+    }
 
 int
 main ()
 {
 
-DB *db;
+    DB *db;
 
-db->set_errcall(db, error_callback_fn);
+    db->set_errcall(db, error_callback_fn);
 
   ;
   return 0;
@@ -4717,43 +4719,43 @@ cat >>confdefs.h <<\_ACEOF
 #define HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK 1
 _ACEOF
 
-have_dbenv_parameter_to_db_error_callback=yes
+    have_dbenv_parameter_to_db_error_callback=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
 echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
-have_dbenv_parameter_to_db_error_callback=no
+    have_dbenv_parameter_to_db_error_callback=no
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-if test "x$have_dbenv_parameter_to_db_error_callback" = "xyes" ; then
-                echo "$as_me:$LINENO: checking if third parameter to error callback function is const" >&5
+    if test "x$have_dbenv_parameter_to_db_error_callback" = "xyes" ; then
+                                echo "$as_me:$LINENO: checking if third parameter to error callback function is const" >&5
 echo $ECHO_N "checking if third parameter to error callback function is const... $ECHO_C" >&6
-    cat >conftest.$ac_ext <<_ACEOF
+        cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-    #include <db.h>
+        #include <db.h>
 
-    void error_callback_fn(const DB_ENV *dbenv,
-                           const char *prefix,
-                           char *message)
-    {
-        return;
-    }
+        void error_callback_fn(const DB_ENV *dbenv,
+                               const char *prefix,
+                               char *message)
+        {
+            return;
+        }
 
 int
 main ()
 {
 
-    DB *db;
+        DB *db;
 
-    db->set_errcall(db, error_callback_fn);
+        db->set_errcall(db, error_callback_fn);
 
   ;
   return 0;
@@ -4795,31 +4797,31 @@ _ACEOF
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
+    fi
 
-CFLAGS=$oldcflags
+    CFLAGS=$oldcflags
 
-echo "$as_me:$LINENO: checking for txnid parameter to DB stat function" >&5
+        echo "$as_me:$LINENO: checking for txnid parameter to DB stat function" >&5
 echo $ECHO_N "checking for txnid parameter to DB stat function... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-#include <db.h>
+    #include <db.h>
 
 int
 main ()
 {
 
-int ret;
-DB *db;
-DB_TXN *txnid;
-u_int32_t flags;
+    int ret;
+    DB *db;
+    DB_TXN *txnid;
+    u_int32_t flags;
 
-ret = db->stat(db, txnid, NULL, flags);
+    ret = db->stat(db, txnid, NULL, flags);
 
   ;
   return 0;
@@ -4853,39 +4855,39 @@ cat >>confdefs.h <<\_ACEOF
 #define HAVE_TXNID_PARAMETER_TO_DB_STAT 1
 _ACEOF
 
-have_txnid_param_to_stat=yes
+    have_txnid_param_to_stat=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
 echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
-have_txnid_param_to_stat=no
+    have_txnid_param_to_stat=no
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-if test "x$have_txnid_param_to_stat" = "xno" ; then
+    if test "x$have_txnid_param_to_stat" = "xno" ; then
 
-    echo "$as_me:$LINENO: checking for four-parameter DB stat" >&5
+        echo "$as_me:$LINENO: checking for four-parameter DB stat" >&5
 echo $ECHO_N "checking for four-parameter DB stat... $ECHO_C" >&6
-    cat >conftest.$ac_ext <<_ACEOF
+        cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-    #include <db.h>
+        #include <db.h>
 
 int
 main ()
 {
 
-    int ret;
-    DB *db;
-    u_int32_t flags;
+        int ret;
+        DB *db;
+        u_int32_t flags;
 
-    ret = db->stat(db, NULL, NULL, flags);
+        ret = db->stat(db, NULL, NULL, flags);
 
   ;
   return 0;
@@ -4927,33 +4929,33 @@ echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
+    fi
 
-echo "$as_me:$LINENO: checking for txnid parameter to DB open function" >&5
+        echo "$as_me:$LINENO: checking for txnid parameter to DB open function" >&5
 echo $ECHO_N "checking for txnid parameter to DB open function... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-#include <db.h>
+    #include <db.h>
 
 int
 main ()
 {
 
-int ret;
-DB *db;
-DB_TXN *txnid;
-char *file;
-char *database;
-DBTYPE type;
-u_int32_t flags;
-int mode;
+    int ret;
+    DB *db;
+    DB_TXN *txnid;
+    char *file;
+    char *database;
+    DBTYPE type;
+    u_int32_t flags;
+    int mode;
 
-ret = db->open(db, txnid, file, database, type, flags, mode);
+    ret = db->open(db, txnid, file, database, type, flags, mode);
 
   ;
   return 0;
@@ -4996,22 +4998,22 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-echo "$as_me:$LINENO: checking for DB_DIRTY_READ flag" >&5
+        echo "$as_me:$LINENO: checking for DB_DIRTY_READ flag" >&5
 echo $ECHO_N "checking for DB_DIRTY_READ flag... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-#include <db.h>
+    #include <db.h>
 
 int
 main ()
 {
 
-u_int32_t flags = DB_DIRTY_READ;
+    u_int32_t flags = DB_DIRTY_READ;
 
   ;
   return 0;
@@ -5053,6 +5055,8 @@ echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+# end of NEED_BERKELEY_DB section
 
 GM_HOME=
 
@@ -8265,8 +8269,8 @@ echo "${ECHO_T}PVFS2 configured for a thread-safe client library : yes" >&6
 fi
 
 if test "x$REDHAT_RELEASE" = "x"; then
-   echo "$as_me:$LINENO: result: PVFS2 will use workaround for redhat 2.4 kernels  : no" >&5
-echo "${ECHO_T}PVFS2 will use workaround for redhat 2.4 kernels  : no" >&6
+   echo "$as_me:$LINENO: result: PVFS2 will use workaround for redhat 2.4 kernels  :  no" >&5
+echo "${ECHO_T}PVFS2 will use workaround for redhat 2.4 kernels  :  no" >&6
 else
    echo "$as_me:$LINENO: result: PVFS2 will use workaround for redhat 2.4 kernels  : yes" >&5
 echo "${ECHO_T}PVFS2 will use workaround for redhat 2.4 kernels  : yes" >&6
@@ -8276,8 +8280,8 @@ if test "x$BUILD_SERVER" = "x1"; then
    echo "$as_me:$LINENO: result: PVFS2 server will be built                        : yes" >&5
 echo "${ECHO_T}PVFS2 server will be built                        : yes" >&6
 else
-   echo "$as_me:$LINENO: result: PVFS2 server will be built                        : no" >&5
-echo "${ECHO_T}PVFS2 server will be built                        : no" >&6
+   echo "$as_me:$LINENO: result: PVFS2 server will be built                        :  no" >&5
+echo "${ECHO_T}PVFS2 server will be built                        :  no" >&6
 
 fi
 
