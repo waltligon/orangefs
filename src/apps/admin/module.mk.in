@@ -4,7 +4,8 @@ ADMINSRC := \
 	$(DIR)/pvfs2-import.c \
 	$(DIR)/pvfs2-set-debugmask.c \
 	$(DIR)/pvfs2-export.c \
-        $(DIR)/pvfs2-ls.c
+        $(DIR)/pvfs2-ls.c \
+        $(DIR)/pvfs2-ping.c
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \
