@@ -504,3 +504,14 @@ static int io_send_completion_ack(PINT_server_op *s_op,
  
 	return(err);
 }
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
+

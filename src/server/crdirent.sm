@@ -691,6 +691,7 @@ static int crdirent_cleanup(PINT_server_op *s_op,
 
 /*
  * Local variables:
+ *  mode: c
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:

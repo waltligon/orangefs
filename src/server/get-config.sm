@@ -185,6 +185,7 @@ static int getconfig_cleanup(PINT_server_op *s_op, job_status_s *ret)
 
 /*
  * Local variables:
+ *  mode: c
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
