@@ -47,8 +47,8 @@ static struct {
  */
 static void lebf_initialize(void)
 {
-    struct PVFS_server_req req;
-    struct PVFS_server_resp resp;
+    struct PVFS_server_req req = {0};
+    struct PVFS_server_resp resp = {0};
     int i;
     int reqsize, respsize;
     int noreq;
