@@ -28,7 +28,9 @@ enum flow_endpoint_type
 {
     BMI_ENDPOINT = 1,
     TROVE_ENDPOINT = 2,
-    MEM_ENDPOINT = 3
+    MEM_ENDPOINT = 3,
+    CACHE_ENDPOINT = 4
+    
 };
 
 /* describes BMI endpoints */
