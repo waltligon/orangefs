@@ -334,23 +334,29 @@ sub split_machines {
 
     my $count=0;
 
+    # let's try something....if for whatever reason we cannot open NODEFILE,
+    # let's assume it had one entry: localhost
+
     if (!open(FH, $href->{'NODEFILE'})) {
-	print STDERR "ERROR: cannot open nodefile $href->{NODEFILE}\n";
-	return(2);
-    }
-    
-
-    while(<FH>) {
-	chomp;
-	if (/^#/ || !$_) {
-	    next;
-	}
-	my $line = $_;
-
-	@nodelist = (@nodelist, $line);	
+	print STDOUT "WARNING: cannot open nodefile $href->{NODEFILE}\n";
+	print STDOUT "WARNING: using default 'localhost'\n";
 	$count++;
+	@nodelist = ("localhost");
+    } else {
+
+	    while(<FH>) {
+		chomp;
+		if (/^#/ || !$_) {
+		    next;
+		}
+		my $line = $_;
+
+		@nodelist = (@nodelist, $line);	
+		$count++;
+	    }
+	    close(FH);
     }
-    close(FH);
+
 
     if ($count < ($href->{'IONCOUNT'} + $href->{'UNIQUEMETA'} * $href->{'METACOUNT'})) {
 	print STDERR "ERROR: requested more server nodes than are available\n";
