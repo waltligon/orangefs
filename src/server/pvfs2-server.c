@@ -333,7 +333,6 @@ static int server_setup_process_environment(int background)
 
     if (background) {
 	int ret;
-	char fn[] = "/tmp/pvfs2-server.log"; /* placeholder */
 
 	/* become a daemon, redirect log to file */
 	ret = fork();
@@ -359,9 +358,11 @@ static int server_setup_process_environment(int background)
 	 * ELSE HE SUGGESTS FOR RANDOM PLATFORMS.
 	 */
 
-	ret = gossip_enable_file(fn, "a");
+        assert(server_config.logfile != NULL);
+	ret = gossip_enable_file(server_config.logfile, "a");
 	if (ret < 0) {
-	    gossip_lerr("error opening log file\n");
+	    gossip_lerr("error opening log file %s\n",
+                        server_config.logfile);
 	    exit(3); /* couldn't open log! */
 	}
     }
