@@ -818,7 +818,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
             PVFS_strerror_r(ret, buf, 64);
 
             gossip_err("process_context_recv_and_post_flow "
-                       "failed: %s (%d remaining msgpairs)", buf,
+                       "failed: %s (%d remaining msgpairs)\n", buf,
                        sm_p->u.io.msgpair_completion_count);
 
             js_p->error_code = ret;

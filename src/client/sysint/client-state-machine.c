@@ -141,13 +141,19 @@ static inline int cancelled_io_jobs_are_pending(PINT_client_sm *sm_p)
       cancelled contextual jobs within that I/O operation will be
       popping out of the testcontext calls (in our testsome() or
       test()).  to avoid passing out the same completed op mutliple
-      time, do not add the operation to the completion list until all
+      times, do not add the operation to the completion list until all
       cancellations on the I/O operation are accounted for
     */
     assert(sm_p);
-    assert(sm_p->u.io.total_cancellations_remaining > 0);
 
-    sm_p->u.io.total_cancellations_remaining--;
+    /*
+      this *can* possibly be 0 in the case that the I/O has already
+      completed and no job cancellation were issued at I/O cancel time
+    */
+    if (sm_p->u.io.total_cancellations_remaining > 0)
+    {
+        sm_p->u.io.total_cancellations_remaining--;
+    }
 
     gossip_debug(
         GOSSIP_IO_DEBUG, "(%p) cancelled_io_jobs_are_pending: %d "
@@ -421,6 +427,12 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
      */
     sm_p->op_cancelled = 1;
 
+    /*
+      don't return an error if nothing is cancelled, because
+      everything may have completed already
+    */
+    ret = 0;
+
     /* now run through and cancel the outstanding jobs */
     for(i = 0; i < sm_p->u.io.datafile_count; i++)
     {
@@ -429,7 +441,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
 
         if (cur_ctx->msg_send_in_progress)
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG,  "[%d] Posting "
+            gossip_debug(GOSSIP_IO_DEBUG,  "[%d] Posting "
                          "cancellation of type: BMI Send "
                          "(Request)\n",i);
 
@@ -445,7 +457,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
 
         if (cur_ctx->msg_recv_in_progress)
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG,  "[%d] Posting "
+            gossip_debug(GOSSIP_IO_DEBUG,  "[%d] Posting "
                          "cancellation of type: BMI Recv "
                          "(Response)\n",i);
 
@@ -461,7 +473,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
 
         if (cur_ctx->flow_in_progress)
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
+            gossip_debug(GOSSIP_IO_DEBUG,
                          "[%d] Posting cancellation of type: FLOW\n",i);
 
             ret = job_flow_cancel(
@@ -476,7 +488,7 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
 
         if (cur_ctx->write_ack_in_progress)
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG,  "[%d] Posting "
+            gossip_debug(GOSSIP_IO_DEBUG,  "[%d] Posting "
                          "cancellation of type: BMI Recv "
                          "(Write Ack)\n",i);
 
