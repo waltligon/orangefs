@@ -35,15 +35,8 @@
 /* the block size to report in statfs */
 #define STATFS_DEFAULT_BLOCKSIZE  1024
 
-/*
-  set extraordinarily long acache timeout value (ms) so
-  that the attributes of files can be cached for a long
-  time; the system interface calls are responsible for
-  flushing the acache when appropriate.  For now, there
-  may be some inconsistencies, but this will be cleaned
-  up as the system interface is changed in time.
-*/
-#define ACACHE_TIMEOUT_MS 6000000
+/* small default attribute cache timeout; effectively disabled */
+#define ACACHE_TIMEOUT_MS 1
 
 static int service_lookup_request(
     PVFS_sysresp_init *init_response,
