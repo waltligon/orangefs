@@ -67,6 +67,7 @@ extern PINT_state_machine_s crdirent_req_s;
 extern PINT_state_machine_s mkdir_req_s;
 extern PINT_state_machine_s readdir_req_s;
 extern PINT_state_machine_s lookup_req_s;
+extern PINT_state_machine_s io_req_s;
 
 /* DALE - fill in the rest of these please - WBL */
 PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
@@ -75,7 +76,7 @@ PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
 	NULL,
 	&create_req_s,     /* create */
 	NULL,
-	NULL,
+	&io_req_s,         /* io */
 	NULL,					  /* 5 */
 	NULL,
 	&getattr_req_s,    /* get attrib */
