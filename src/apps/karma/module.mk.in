@@ -1,0 +1,9 @@
+DIR := src/apps/karma
+
+KARMASRC += \
+    $(DIR)/comm.c \
+    $(DIR)/karma.c \
+    $(DIR)/menu.c \
+    $(DIR)/messages.c \
+    $(DIR)/prep.c \
+    $(DIR)/status.c

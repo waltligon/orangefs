@@ -192,7 +192,7 @@ AC_ARG_WITH(db,
 	[  --with-db=<dir>         Location of installed DB package (default=/usr)],
 	LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="${CFLAGS} -I$withval/include")
 
-AC_MSG_CHECKING("for db library")
+AC_MSG_CHECKING([for db library])
 oldlibs=$LIBS
 for lib in db4  db3  db  notfound; do
 	LIBS="${oldlibs} -l$lib"
@@ -386,6 +386,24 @@ else
    AC_MSG_RESULT(no)
 fi
 
+dnl Check for GTK2.0; require pkg-config to find
+AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+if test x$HAVE_PKGCONFIG = xyes ; then
+   AC_MSG_CHECKING([for gtk2.0 (for karma gui)])
+   if `pkg-config --exists gtk+-2.0` ; then
+      AC_MSG_RESULT(yes)
+      GTKLIBS=`pkg-config --libs gtk+-2.0`
+      GTKCFLAGS=`pkg-config --cflags gtk+-2.0`
+
+      AC_SUBST(GTKLIBS)
+      AC_SUBST(GTKCFLAGS)
+      BUILD_KARMA="1"
+   else
+      AC_MSG_RESULT(no)
+   fi
+fi
+AC_SUBST(BUILD_KARMA)
+
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in src/apps src/io src/common src/client src/kernel test/common \
@@ -398,6 +416,7 @@ dnl    makefile includes
 AC_OUTPUT(Makefile
 module.mk
 src/apps/admin/module.mk
+src/apps/karma/module.mk
 src/apps/vis/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
@@ -459,3 +478,7 @@ maint/mpi-depend.sh
 examples/pvfs2-server.rc
 )
 
+# print a summary of the configuration after all the junky output
+if test x$BUILD_KARMA = x1 ; then
+	echo PVFS2 "configured to build karma gui."
+fi

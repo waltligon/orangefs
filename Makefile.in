@@ -62,6 +62,7 @@ BUILD_GM = @BUILD_GM@
 BUILD_IB = @BUILD_IB@
 BUILD_MPI = @BUILD_MPI@
 BUILD_VIS = @BUILD_VIS@
+BUILD_KARMA = @BUILD_KARMA@
 MPICC = @MPICC@
 GNUC = @GNUC@
 MPI_GNUC = @MPI_GNUC@
@@ -100,6 +101,8 @@ LDFLAGS += -L lib
 LIBS += @LIBS@ -lpvfs2
 VISCFLAGS = @VISCFLAGS@
 VISLIBS = @VISLIBS@ -lSDL_ttf
+GTKCFLAGS = @GTKCFLAGS@
+GTKLIBS = @GTKLIBS@
 # for Solaris:
 # LIBS += -lsocket -lnsl
 
@@ -184,6 +187,9 @@ LIBS += -lpthread
 VISCFLAGS += $(CFLAGS)
 VISLIBS += $(LIBS)
 
+KARMACFLAGS = $(CFLAGS) $(GTKCFLAGS)
+KARMALIBS = $(LIBS) $(GTKLIBS)
+
 ################################################################
 # enable GM if configure detected it
 
@@ -258,6 +264,8 @@ VISSRC :=
 # VISMISCSRC is a collection of sources that must be built into objects for 
 #    visualization tools
 VISMISCSRC :=
+# KARMASRC is source for the karma gui
+KARMASRC :=
 # files generated as part of the build that should be deleted on "make clean"
 CLEANFILES :=
 # files created by trove-autogen.pl
@@ -270,8 +278,12 @@ TROVE_AUTOGEN_FILES :=
 SERVER := src/server/pvfs2-server
 # LIBRARIES is a list of the pvfs2 client libraries
 LIBRARIES := lib/libpvfs2.a
+# KARMA is the karma gui, if we are building it
+ifdef BUILD_KARMA
+	KARMA := src/apps/karma/karma
+endif
 # default rule builds server, library, and test programs
-all: $(SERVER) $(LIBRARIES) tests admintools
+all: $(SERVER) $(KARMA) $(LIBRARIES) tests admintools
 
 ################################################################
 # Makefile includes
@@ -344,8 +356,14 @@ MPIIOTESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIIOTESTSRC)))
 VISOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISSRC)))
 # VISS is a list of visualization program executables
 VISS := $(patsubst %.c,%, $(filter %.c, $(VISSRC)))
-# TESTDEPENDS is a list of dependency files for visualization programs
+# VISDEPENDS is a list of dependency files for visualization programs
 VISDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISSRC)))
+
+# KARMAOBJS, KARMADEPENDS for the karma gui (requires gtk2.0)
+ifdef BUILD_KARMA
+	KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
+	KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
+endif
 
 # VISMISCOBJS is a list of misc. vis objects not in the above categories
 VISMISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISMISCSRC)))
@@ -372,6 +390,9 @@ DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
 endif
 ifdef BUILD_VIS
 DEPENDS += $(VISDEPENDS) $(VISMISCDEPENDS)
+endif
+ifdef BUILD_KARMA
+DEPENDS += $(KARMADEPENDS)
 endif
 
 # CLEANFILES is a list of generated files that need to be removed at
@@ -470,6 +491,25 @@ endif
 else
 	@echo Error: libraries needed by vis tools not detected.
 	@false
+endif
+
+# rule for building karma gui and its objects
+ifdef BUILD_KARMA
+$(KARMA): $(KARMAOBJS) $(LIBRARIES)
+ifdef QUIET_COMPILE
+	@echo "  LD		$@"
+	@$(LD) $(LDFLAGS) $(KARMALIBS) $^ -o $@
+else
+	$(LD) $(LDFLAGS) $(KARMALIBS) $^ -o $@
+endif
+
+$(KARMAOBJS): %.o: %.c
+ifdef QUIET_COMPILE
+	@echo "  CC		$@"
+	@$(CC) $(KARMACFLAGS) $< -c -o $@
+else 
+	$(CC) $(KARMACFLAGS) $< -c -o $@
+endif
 endif
 
 # rule for building MPI objects
@@ -648,8 +688,9 @@ ifdef QUIET_COMPILE
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
-		$(VISMISCDEPENDS)\
-		src/server/pvfs2-server-server.o $(MPIIOTESTS)
+		$(VISMISCDEPENDS) $(KARMAOBJS) \
+		src/server/pvfs2-server-server.o $(MPIIOTESTS) \
+		src/apps/karma/karma
 else
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
 		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) $(MPIMISCOBJS)\
@@ -657,8 +698,9 @@ else
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
-		$(VISMISCDEPENDS)\
-		src/server/pvfs2-server-server.o $(MPIIOTESTS)
+		$(VISMISCDEPENDS) $(KARMAOBJS) \
+		src/server/pvfs2-server-server.o $(MPIIOTESTS) \
+		src/apps/karma/karma
 endif
 
 # builds a tarball of the source tree suitable for distribution
@@ -717,6 +759,15 @@ else
 	@echo generating vis dependency file $@.
 endif
 	@$(srcdir)/maint/depend.sh `dirname $*` $(VISCFLAGS) $< > $@
+
+# rule for generating dependency files for karma
+$(KARMADEPENDS): %.d: %.c
+ifdef QUIET_COMPILE
+	@echo "  DEP		$@"
+else
+	@echo generating karma dependency file $@.
+endif
+	@$(srcdir)/maint/depend.sh `dirname $*` $(KARMACFLAGS) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c
