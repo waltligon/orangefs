@@ -22,8 +22,7 @@ typedef struct
 {
     int initialized;
     int num_test_files;
-    const PVFS_util_tab* tab;
-    PVFS_sysresp_init resp_init;
+    PVFS_fs_id fs_id;
 } pvfs_helper_t;
 
 /*

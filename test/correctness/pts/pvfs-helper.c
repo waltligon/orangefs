@@ -12,29 +12,24 @@ int initialize_sysint(void)
 
     memset(&pvfs_helper,0,sizeof(pvfs_helper));
 
-    pvfs_helper.tab = PVFS_util_parse_pvfstab(NULL);
-    if (pvfs_helper.tab)
+    ret = PVFS_util_init_defaults();
+    if(ret < 0)
     {
-        /* init the system interface */
-        ret = PVFS_sys_initialize(*pvfs_helper.tab, 0,
-                                  &pvfs_helper.resp_init);
-        if(ret > -1)
-        {
-            pvfs_helper.initialized = 1;
-            pvfs_helper.num_test_files = NUM_TEST_FILES;
-            ret = 0;
-        }
-        else
-        {
-            fprintf(stderr, "Error: PVFS_sys_initialize() "
-                    "failure. = %d\n", ret);
-        }
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return(ret);
     }
-    else
+
+    ret = PVFS_util_get_default_fsid(&pvfs_helper.fs_id);
+    if(ret < 0)
     {
-        fprintf(stderr, "Error: PVFS_util_parse_pvfstab() failure.\n");
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return(ret);
     }
-    return ret;
+
+    pvfs_helper.initialized = 1;
+    pvfs_helper.num_test_files = NUM_TEST_FILES;
+
+    return 0;
 }
 
 int finalize_sysint(void)

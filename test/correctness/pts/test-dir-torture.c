@@ -91,7 +91,7 @@ int test_dir_torture(MPI_Comm * comm,
         return -1;
     }
 
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
     get_root(fs_id, &root_refn);
 
     /*

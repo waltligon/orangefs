@@ -48,7 +48,7 @@ int build_nested_path(int levels, char *format, int rank, int test_symlinks)
         snprintf(PATH_LOOKUP_BASE_DIR, 64, "d%sr%d",
                  format, rank);
 
-        cur_fs_id = pvfs_helper.resp_init.fsid_list[0];
+        cur_fs_id = pvfs_helper.fs_id;
 
         /* look up the root handle */
         ret = PVFS_sys_lookup(

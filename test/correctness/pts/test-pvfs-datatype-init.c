@@ -51,7 +51,7 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
         snprintf(filename,PVFS_NAME_MAX,"%s%.5drank%d",
                  TEST_FILE_PREFIX,i,myid);
 
-        ret = PVFS_sys_lookup(pvfs_helper.resp_init.fsid_list[0],
+        ret = PVFS_sys_lookup(pvfs_helper.fs_id,
                               filename, credentials, &resp_lk,
                               PVFS2_LOOKUP_LINK_NO_FOLLOW);
         if (ret < 0)
@@ -59,7 +59,7 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
             debug_printf("init: lookup failed.  creating new file.\n");
 
             /* get root handle */
-            ret = PVFS_sys_lookup(pvfs_helper.resp_init.fsid_list[0],
+            ret = PVFS_sys_lookup(pvfs_helper.fs_id,
                                   "/", credentials, &resp_lk,
                                   PVFS2_LOOKUP_LINK_NO_FOLLOW);
             if ((ret < 0) || (!resp_lk.pinode_refn.handle))

@@ -260,7 +260,7 @@ int test_concurrent_meta(MPI_Comm * comm,
         debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
         return -1;
     }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     /* right now, the system interface isn't threadsafe, so we just want to run with one process. */
     if (rank == 0)

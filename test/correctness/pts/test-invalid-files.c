@@ -46,7 +46,7 @@ static int test_lookup(int testcase)
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
 	return -1;
     }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -80,7 +80,7 @@ static int test_getattr(int testcase)
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
 	return -1;
     }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -149,7 +149,7 @@ static int test_mkdir(int testcase)
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
 	return -1;
     }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -216,7 +216,7 @@ static int test_readdir(int testcase)
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
 	return -1;
     }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -279,7 +279,7 @@ static int test_create(int testcase)
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
 	return -1;
     }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, "/", credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -335,7 +335,7 @@ static int test_remove(int testcase)
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
 	return -1;
     }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -421,7 +421,7 @@ static int test_read(int testcase)
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
 	return -1;
     }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -481,7 +481,7 @@ static int test_write(int testcase)
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
 	return -1;
     }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -529,7 +529,7 @@ static int init_file(void)
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
 	return -1;
     }
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     //get root
     ret = PVFS_sys_lookup(fs_id, "/", credentials,

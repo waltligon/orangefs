@@ -148,7 +148,7 @@ int test_dir_operations(MPI_Comm * comm,
 	    printf("System initialization error\n");
 	    return (-1);
 	}
-	fs_id = pvfs_helper.resp_init.fsid_list[0];
+	fs_id = pvfs_helper.fs_id;
 	printf("fs_id: %d\n", fs_id);
     }
 

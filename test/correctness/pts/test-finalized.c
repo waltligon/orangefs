@@ -47,7 +47,7 @@ static int test_lookup(void)
 	return -1;
     }
     PVFS_sys_finalize();
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -82,7 +82,7 @@ static int test_getattr(void)
 	return -1;
     }
     PVFS_sys_finalize();
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -138,7 +138,7 @@ static int test_mkdir(void)
 	return -1;
     }
     PVFS_sys_finalize();
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -194,7 +194,7 @@ static int test_readdir(void)
 	return -1;
     }
     PVFS_sys_finalize();
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     credentials.uid = 100;
     credentials.gid = 100;
@@ -259,7 +259,7 @@ static int test_create(void)
 	return -1;
     }
     PVFS_sys_finalize();
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, "/", credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -301,7 +301,7 @@ static int test_remove(void)
 	return -1;
     }
     PVFS_sys_finalize();
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -376,7 +376,7 @@ static int test_read(void)
 	return -1;
     }
     PVFS_sys_finalize();
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -425,7 +425,7 @@ static int test_write(void)
 	return -1;
     }
     PVFS_sys_finalize();
-    fs_id = pvfs_helper.resp_init.fsid_list[0];
+    fs_id = pvfs_helper.fs_id;
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);

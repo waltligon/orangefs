@@ -135,7 +135,7 @@ int test_lookup_bench(MPI_Comm * comm,
             return -1;
         }
 
-	fs_id = pvfs_helper.resp_init.fsid_list[0];
+	fs_id = pvfs_helper.fs_id;
 	if (fs_id < 0)
 	{
 	    printf("System initialization error\n");

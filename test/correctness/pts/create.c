@@ -158,7 +158,6 @@ int test_create(MPI_Comm * comm,
 		char *buf,
 		void *params)
 {
-    int ret = -1;
     const PVFS_util_tab* tab;
     generic_params *myparams = (generic_params *) params;
     char name[PVFS_NAME_MAX];
@@ -181,7 +180,7 @@ int test_create(MPI_Comm * comm,
     for (i = 0; i < myparams->mode; i++)
     {
 	snprintf(name, PVFS_NAME_MAX, "%d-%d-testfile", i, rank);
-	nerrs += create_file(pvfs_helper.resp_init.fsid_list[0],
+	nerrs += create_file(pvfs_helper.fs_id,
                              myparams->path, name);
     }
     return (nerrs);
