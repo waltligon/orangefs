@@ -3,7 +3,6 @@ TEST_IO_JOB_DIR := test/io/job
 
 TEST_IO_JOB_DIR_SRC := \
 	$(DIR)/job-client-example.c \
-	$(DIR)/job-flow-server.c \
 	$(DIR)/job-server-example.c \
 	$(DIR)/req-sched-job-test.c \
 	$(DIR)/trove-job-create-toy.c \
@@ -14,6 +13,7 @@ TEST_IO_JOB_DIR_SRC := \
 	$(DIR)/job-dev-test.c \
 	$(DIR)/thread-bench2.c \
 	$(DIR)/thread-bench3.c
+#	$(DIR)/job-flow-server.c 
 
 MISCSRC += $(DIR)/job-help.c
 
