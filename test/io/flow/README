@@ -24,3 +24,10 @@ to prepare trove for running these tests.
 The following programs are broken at this time, please do not use:
 wire-harness-server
 wire-harness-client
+
+to use a different flow protocol:
+============================
+- modify the PINT_flow_initialize() calls to reflect the correct
+  module name
+- set the flow descriptor "type" field to the correct PVFS_flowproto_type
+  value from pvfs2-types.h
