@@ -13,6 +13,7 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/remove.c\
 	$(DIR)/rename.c\
 	$(DIR)/find.c \
+	$(DIR)/ls.c \
 	$(DIR)/path-test.c\
 	$(DIR)/create.c\
 	$(DIR)/truncate.c\
