@@ -1098,6 +1098,10 @@ int PVFS_util_copy_mntent(
             return -PVFS_ENOMEM;
         }
 
+        memset(dest_mntent->pvfs_config_servers, 0,
+               dest_mntent->num_pvfs_config_servers *
+               sizeof(*dest_mntent->pvfs_config_servers));
+
         for(i = 0; i < dest_mntent->num_pvfs_config_servers; i++)
         {
             dest_mntent->pvfs_config_servers[i] =
