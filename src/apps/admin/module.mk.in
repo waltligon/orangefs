@@ -1,6 +1,7 @@
 DIR := src/apps/admin
 
 ADMINSRC := \
+	$(DIR)/pvfs2-check-config.c \
 	$(DIR)/pvfs2-import.c \
 	$(DIR)/pvfs2-set-debugmask.c \
 	$(DIR)/pvfs2-set-mode.c \
