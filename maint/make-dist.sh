@@ -1,0 +1,109 @@
+#!/bin/bash
+#
+# custom script for building a pvfs2 distribution
+#
+# this should only be run from a freshly exported pvfs2
+# tagged release version, or a cvs checkout; a working
+# directory will leave local changes in the distribution
+#
+
+if test -z $1; then
+    echo "No source directory specified"
+    echo "Usage: make_dist.sh <src dir> <version string>"
+    exit 1
+fi
+
+if test -z $2; then
+    echo "No version string specified"
+    echo "Usage: make_dist.sh <src dir> <version string>"
+    exit 1
+fi
+
+SRCDIR="$1"
+PVFS2_VERSION="$2"
+
+if test "x$SRCDIR" = "x."; then
+    SRCDIR=`pwd`
+    echo "Assuming top-level source directory is $SRCDIR"
+fi
+
+STARTDIR=`pwd`
+TARGETBASE="pvfs2-$PVFS2_VERSION"
+TARGETDIR="/tmp/$TARGETBASE"
+TARFILE_NAME="$SRCDIR/pvfs2-$PVFS2_VERSION.tar"
+TARBALL_NAME="$SRCDIR/pvfs2-$PVFS2_VERSION.tar.gz"
+TAR=`which tar`
+GZIP=`which gzip`
+
+if test -z $TAR; then
+    echo "The required tar program is not in your path; aborting"
+    exit 1
+fi
+
+if test -z $GZIP; then
+    echo "The required gzip program is not in your path; aborting"
+    exit 1
+fi
+
+##################
+# start processing
+##################
+make clean
+make docs
+
+if test -d $TARGETDIR; then
+    rm -rf $TARGETDIR
+fi
+mkdir $TARGETDIR
+
+cp -f --no-dereference -R $SRCDIR/* $TARGETDIR
+
+cd $TARGETDIR
+
+# clean out cvs directories and other cruft
+for f in `find . | grep CVS`; do rm -rf $f; done
+for f in `find . | grep \#`;  do rm -rf $f; done
+for f in `find . | grep \~`;  do rm -rf $f; done
+for f in `find . -name *.o`;  do rm -rf $f; done
+for f in `find . -name core`; do rm -rf $f; done
+
+# make sure the cleaned up directory exists
+cd /tmp
+if ! test -d "./$TARGETBASE"; then
+    echo "Newly created target directory doesn't exist; aborting"
+    exit 1
+fi
+
+# tar up the cleaned up directory
+tar c "./$TARGETBASE" > $TARFILE_NAME 2> /dev/null
+
+if ! test -f $TARFILE_NAME; then
+    echo "Newly created tarfile does not exist!"
+    echo "Error creating tarfile $TARBALL_NAME; aborting"
+    exit 1
+fi
+
+# if a tarball already exists, remove it before creating a new one
+if test -f $TARBALL_NAME; then
+    rm -f $TARBALL_NAME
+fi
+
+# gzip the newly created tarfile
+gzip $TARFILE_NAME
+
+if ! test -f "$TARBALL_NAME"; then
+    echo "Newly created tarball does not exist!"
+    echo "Error creating tarball $TARBALL_NAME; aborting"
+    exit 1
+fi
+
+rm -rf $TARGETDIR
+
+cd $STARTDIR
+
+if test -f "$TARBALL_NAME"; then
+    echo "Distribution file is ready at:"
+    echo "$TARBALL_NAME"
+fi
+
+exit 0

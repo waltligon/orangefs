@@ -73,7 +73,7 @@ endif
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean tests distclean docs docsclean cscope tags codecheck statecomp admintools
+.PHONY: all clean tests dist distclean docs docsclean cscope tags codecheck statecomp admintools
 
 ################################################################
 # Find project subdirectories
@@ -492,11 +492,15 @@ docsclean:
 # top rule for cleaning up tree
 clean: docsclean
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
-		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)  $(SERVER) $(MPIMISCOBJS)\
+		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) $(MPIMISCOBJS)\
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		src/server/pvfs2-server-server.o $(MPIIOTESTS)
+
+# builds a tarball of the source tree suitable for distribution
+dist:	clean
+	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
 
 # _really_ clean the tree; should go back to pristine state
 distclean: clean
