@@ -1009,6 +1009,40 @@ int PINT_server_config_is_valid_collection_id(
 }
 
 /*
+  returns 1 if the config object has information on the specified
+  filesystem; 0 otherwise
+*/
+int PINT_server_config_has_fs_config_info(
+    struct server_configuration_s *config_s, char *fs_name)
+{
+    int ret = 0;
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+
+    if (config_s && fs_name)
+    {
+        cur = config_s->file_systems;
+        while(cur)
+        {
+            cur_fs = llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
+            assert(cur_fs->file_system_name);
+            if (strcmp(cur_fs->file_system_name,fs_name) == 0)
+            {
+                ret = 1;
+                break;
+            }
+            cur = llist_next(cur);
+        }
+    }
+    return ret;
+}
+
+
+/*
   vim:set ts=4:
   vim:set shiftwidth=4:
 */

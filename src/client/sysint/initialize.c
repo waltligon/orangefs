@@ -209,27 +209,17 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
  */
 static int server_get_config(pvfs_mntlist mntent_list)
 {
-    int ret = -1;
-    struct PVFS_server_req_s *req_p = NULL;
-    struct PVFS_server_resp_s *ack_p = NULL;
+    int ret = -1, i = 0;
     bmi_addr_t serv_addr;
-    int i = 0, name_sz = 0;
+    struct PVFS_server_req_s serv_req;
+    struct PVFS_server_resp_s *serv_resp = NULL;
     PVFS_credentials creds;
     struct PINT_decoded_msg decoded;
     void* encoded_resp;
     PVFS_size max_msg_sz;
+    pvfs_mntent *mntent_p = NULL;
+    struct fsconfig_s *fsinfo_p = NULL;;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
-
-    enum {
-	NONE_FAIL = 0,
-	LOOKUP_FAIL,
-	ALLOC_NAME_FAIL,
-    } failure = NONE_FAIL;
-
-    req_p = (struct PVFS_server_req_s *) malloc(sizeof(struct PVFS_server_req_s));
-    if (req_p == NULL) {
-	assert(0);
-    }
 
     /* TODO: Fill up the credentials information */
 
@@ -238,71 +228,81 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_GETCONFIG) 
 	+ (2 * MAX_STRING_SIZE);
 
-    /* Process all entries in pvfstab */
-    for (i = 0; i < mntent_list.nr_entry; i++) 
+    /*
+      for each entry in the pvfstab, attempt to query the server for
+      getconfig information.  discontinue loop when we have info.
+    */
+    for (i = 0; i < mntent_list.nr_entry; i++)
     {
-	pvfs_mntent *mntent_p = &mntent_list.ptab_p[i];
-	struct fsconfig_s *fsinfo_p;
+	mntent_p = &mntent_list.ptab_p[i];
 
    	/* Obtain the metaserver to send the request */
 	ret = BMI_addr_lookup(&serv_addr, mntent_p->meta_addr);
 	if (ret < 0)
 	{
-	    failure = LOOKUP_FAIL;
-	    goto return_error;
+            gossip_ldebug(CLIENT_DEBUG,"Failed to resolve BMI "
+                          "address %s\n",mntent_p->meta_addr);
+            return 1;
 	}
 
 	/* Set up the request for getconfig */
-	name_sz = strlen(mntent_p->service_name) + 1;
-
-	req_p->op = PVFS_SERV_GETCONFIG;
-	req_p->rsize = sizeof(struct PVFS_server_req_s) + name_sz;
-	req_p->credentials = creds;
-	req_p->u.getconfig.max_strsize = MAX_STRING_SIZE;
+        memset(&serv_req,0,sizeof(struct PVFS_server_req_s));
+	serv_req.op = PVFS_SERV_GETCONFIG;
+	serv_req.rsize = sizeof(struct PVFS_server_req_s);
+	serv_req.credentials = creds;
+	serv_req.u.getconfig.max_strsize = MAX_STRING_SIZE;
 
 	gossip_ldebug(CLIENT_DEBUG,"asked for fs name = %s\n",
                       mntent_p->service_name);
 
 	/* send the request and receive an acknowledgment */
-	ret = PINT_send_req(serv_addr, req_p, max_msg_sz,
-	    &decoded, &encoded_resp, op_tag);
-	if (ret < 0) {
+	ret = PINT_send_req(serv_addr, &serv_req, max_msg_sz,
+                            &decoded, &encoded_resp, op_tag);
+	if (ret < 0)
+        {
             gossip_ldebug(CLIENT_DEBUG,"PINT_send_req failed\n");
-	    goto return_error;
+            return 1;
 	}
+	serv_resp = (struct PVFS_server_resp_s *) decoded.buffer;
 
-	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
-
-	/* Use data from response to update global tables */
-	fsinfo_p = &server_config.fs_info[i];
-
-        if (server_parse_config(&(ack_p->u.getconfig)))
+        if (server_parse_config(&(serv_resp->u.getconfig)))
         {
             gossip_ldebug(CLIENT_DEBUG,"Failed to getconfig from host "
                           "%s\n",mntent_p->meta_addr);
 
             /* let go of any resources consumed by PINT_send_req() */
-            PINT_release_req(serv_addr, req_p, max_msg_sz, &decoded,
+            PINT_release_req(serv_addr, &serv_req, max_msg_sz, &decoded,
                              &encoded_resp, op_tag);
             continue;
         }
 
         /* FIXME: hacked in for backward compatibility */
+	fsinfo_p = &server_config.fs_info[i];
 	fsinfo_p->fh_root         = g_server_config.root_handle;
 	fsinfo_p->fsid            = 9;
 
 	/* let go of any resources consumed by PINT_send_req() */
-	PINT_release_req(serv_addr, req_p, max_msg_sz, &decoded,
-	    &encoded_resp, op_tag);
+	PINT_release_req(serv_addr, &serv_req, max_msg_sz, &decoded,
+                         &encoded_resp, op_tag);
         break;
     }
 
+    /* verify that each pvfstab entry is valid according to the server */
+    for (i = 0; i < mntent_list.nr_entry; i++)
+    {
+	mntent_p = &mntent_list.ptab_p[i];
+
+        /* make sure we valid information about this fs */
+        if (PINT_server_config_has_fs_config_info(
+                &g_server_config,mntent_p->service_name) == 0)
+        {
+            gossip_ldebug(CLIENT_DEBUG,"Error:  Cannot retrieve "
+                          "information about pvfstab entry %s\n",
+                          mntent_p->meta_addr);
+            return 1;
+        }
+    }
     return(0); 
-
-
-    /* TODO: FIX UP ERROR HANDLING; NEEDS TO BE REVIEWED TOTALLY */
- return_error:
-    return -1;
 }	  
 
 static int server_parse_config(PVFS_servresp_getconfig *response)

@@ -47,12 +47,6 @@ int do_decode_req(
 
     switch(((struct PVFS_server_req_s *)char_ptr)->op)
     {
-	case PVFS_SERV_GETCONFIG:
-	    /* update the pointer to fs_name string */
-	    char_ptr += sizeof( struct PVFS_server_req_s );
-/* 	    dec_msg->u.getconfig.fs_name = char_ptr; */
-	    return(0);
-
 	case PVFS_SERV_LOOKUP_PATH:
 	    char_ptr += sizeof( struct PVFS_server_req_s );
 	    dec_msg->u.lookup_path.path = char_ptr;
@@ -132,6 +126,7 @@ int do_decode_req(
 	case PVFS_SERV_REMOVE:
 	case PVFS_SERV_TRUNCATE:
 	case PVFS_SERV_ALLOCATE:
+	case PVFS_SERV_GETCONFIG:
 	    return(0);
 
 	case PVFS_SERV_IOSTATFS: /*haven't been implemented yet*/
