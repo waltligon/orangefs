@@ -156,10 +156,13 @@ static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p)
     char buf[64] = {0};
     PINT_STATE_DEBUG("{k,b}check_error");
 
-    PVFS_strerror_r(js_p->error_code, buf, 64);
+    if (js_p->error_code != 0)
+    {
+        PVFS_strerror_r(js_p->error_code, buf, 64);
 
-    gossip_err("failed to flush handle %Lu: %s\n",
-               Lu(s_op->req->u.flush.handle), buf);
+        gossip_err("failed to flush handle %Lu: %s\n",
+                   Lu(s_op->req->u.flush.handle), buf);
+    }
     return 1;
 }
 
