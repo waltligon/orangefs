@@ -152,7 +152,7 @@ int run_tests(config *myconfig) {
       fprintf(stderr, "PTS: -------------------------------------------\n");
     }
     if (myconfig->testqueue[index].test_param_init != NULL) {
-      params = run_param((void *)myconfig->testqueue[index].test_param_init, myconfig->testqueue[index].test_params);
+      params = run_param(myconfig->testqueue[index].test_param_init, myconfig->testqueue[index].test_params);
       if (params == NULL) {
 	printf("ERROR: cannot setup params\n");
       }
@@ -160,7 +160,7 @@ int run_tests(config *myconfig) {
 
     if (myconfig->testqueue[index].test_func != NULL) {
 
-      rc = run_test((void *)myconfig->testqueue[index].test_func, &newcomm,
+      rc = run_test(myconfig->testqueue[index].test_func, &newcomm,
 		    myconfig->myid, buf, params);
       free(params);
     } else {
@@ -200,12 +200,12 @@ int run_tests(config *myconfig) {
   return(0);
 }
 
-int run_test(int(*test)(void *, int, void *,void *), MPI_Comm *mycomm,
-	     int myid, char *buf, void *params) {
+int run_test(int(*test)(MPI_Comm *comm, int rank, char *buf, void *params),
+  MPI_Comm *mycomm, int myid, char *buf, void *params) {
   return(test(mycomm, myid, buf, params));
 }
 
-void *run_param(void *(*param)(void *), char *buf) {
+void *run_param(void *(*param)(char *), char *buf) {
   return(param(buf));
 }
 
@@ -226,7 +226,7 @@ int init_config(config *myconfig) {
   /* the test_param_init should point to generic_param_init */
   for (i=0; i<MAX_DISTINCT_TESTS; i++) {
     myconfig->testpool[i].test_func = NULL;
-    myconfig->testpool[i].test_param_init = (void *)generic_param_parser;
+    myconfig->testpool[i].test_param_init = generic_param_parser;
     myconfig->testpool[i].test_name = NULL;
     myconfig->testpool[i].test_params = NULL;
     myconfig->testpool[i].test_index = i;
@@ -303,9 +303,7 @@ int parse_configfile(config *myconfig) {
 	pindex = lookup_test(myconfig, linebuf);
 	//	printf("pindex %d\n", pindex);
 	strindex++;
-	//      rawparams = malloc(strlen(strindex)+1);
-	rawparams = malloc(4096);
-	strncpy(rawparams, strindex, strlen(strindex));
+	rawparams = strdup(strindex);
 	
 	if (pindex < 0) {
 	  fprintf(stderr, "parse error, test '%s' not found internally\n", linebuf);

@@ -9,8 +9,8 @@
 
 /* pts.c structs */
 typedef struct pts_test_t {
-  void *test_func;
-  void *test_param_init;
+  int (*test_func)(MPI_Comm *comm, int rank, char *buf, void *params);
+  void *(*test_param_init)(char *);
   char *test_name;
   char *test_params;
   int test_index;
@@ -34,9 +34,9 @@ int parse_configfile(config *);
 void usage(void);
 void pts_debug(char *, ...);
 int run_tests(config *);
-int run_test(int(*test)(void *, int, void *, void *), MPI_Comm *, int,
-	     char *, void *);
-void *run_param(void *(*param)(void *), char *);
+int run_test(int(*test)(MPI_Comm *comm, int rank, char *buf, void *params),
+  MPI_Comm *, int, char *, void *);
+void *run_param(void *(*param)(char *), char *);
 char *str_malloc(const char *);
 
 int sync_config(config *myconfig);

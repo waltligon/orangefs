@@ -26,8 +26,9 @@ the following form:
 See the file 'sample.conf' for a sample config file that runs a few
 included tests.  Once all is set up, a command resembling the following will execute the test suite:
 
-mpirun -np 2 -machinefile <somemachines> ./pts -conf sample.conf If
-you are only running tests that execute on one host, you can run pts
+mpirun -np 2 -machinefile <somemachines> ./pts -conf sample.conf
+
+If you are only running tests that execute on one host, you can run pts
 without mpirun.
 
 
@@ -131,8 +132,8 @@ simply add an 'entry' for your new test.  Following is how we would
 add the test_simple_mkdir test from above:
 
 
-  myconfig->testpool[TEST_SIMPLE_MKDIR].test_func = (void *)test_simple_mkdir;	
-  myconfig->testpool[TEST_SIMPLE_MKDIR].test_param_init = (void *)test_simple_mkdir_param_init;
+  myconfig->testpool[TEST_SIMPLE_MKDIR].test_func = test_simple_mkdir;	
+  myconfig->testpool[TEST_SIMPLE_MKDIR].test_param_init = test_simple_mkdir_param_init;
   myconfig->testpool[TEST_SIMPLE_MKDIR].test_name = str_malloc("test_simple_mkdir");
 
 'test_name' should be the 'test name' part of your config file entry

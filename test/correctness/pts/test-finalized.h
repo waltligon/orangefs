@@ -1,6 +1,9 @@
 #ifndef INCLUDE_FINALIZED_H
 #define INCLUDE_FINALIZED_H
 
-void *test_finalized(char * stuff);
+int test_finalized(MPI_Comm * comm,
+		   int rank,
+		   char *buf,
+		   void *rawparams);
 
 #endif
