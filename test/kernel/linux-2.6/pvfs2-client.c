@@ -40,7 +40,6 @@ static int service_lookup_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    PVFS_credentials credentials;
     PVFS_sysresp_lookup response;
     PVFS_pinode_reference parent_refn;
 
@@ -48,9 +47,6 @@ static int service_lookup_request(
     {
         memset(&response,0,sizeof(PVFS_sysresp_lookup));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
-
-        credentials.uid = 100;
-        credentials.gid = 100;
 
         printf("Got a lookup request for %s (fsid %d | parent %Ld)\n",
                in_upcall->req.lookup.d_name,
@@ -61,7 +57,7 @@ static int service_lookup_request(
 
         ret = PVFS_sys_ref_lookup(parent_refn.fs_id,
                                   in_upcall->req.lookup.d_name,
-                                  parent_refn, credentials,
+                                  parent_refn, in_upcall->credentials,
                                   &response);
         if (ret < 0)
         {
@@ -93,7 +89,6 @@ static int service_create_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    PVFS_credentials credentials;
     PVFS_sysresp_create response;
     PVFS_pinode_reference parent_refn;
     PVFS_sys_attr *attrs = NULL;
@@ -107,9 +102,6 @@ static int service_create_request(
 	attrs->atime = attrs->mtime = attrs->ctime = 
 	    time(NULL);
 
-        credentials.uid = attrs->owner;
-        credentials.gid = attrs->group;
-
         parent_refn = in_upcall->req.create.parent_refn;
 
         printf("Got a create request for %s (fsid %d | parent %Ld)\n",
@@ -117,7 +109,7 @@ static int service_create_request(
                parent_refn.handle);
 
         ret = PVFS_sys_create(in_upcall->req.create.d_name, parent_refn,
-                              *attrs, credentials, &response);
+                              *attrs, in_upcall->credentials, &response);
         if (ret < 0)
         {
             fprintf(stderr,"Failed to create %s under %Ld on fsid %d!\n",
@@ -366,7 +358,6 @@ static int service_readdir_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    PVFS_credentials credentials;
     PVFS_sysresp_readdir response;
     PVFS_pinode_reference refn;
 
@@ -375,10 +366,6 @@ static int service_readdir_request(
         memset(&response,0,sizeof(PVFS_sysresp_readdir));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-        credentials.uid = 100;
-        credentials.gid = 100;
-        credentials.perms = 511;
-
         refn = in_upcall->req.readdir.refn;
 
         printf("Got a readdir request for fsid %d | parent %Ld\n",
@@ -386,7 +373,7 @@ static int service_readdir_request(
 
         ret = PVFS_sys_readdir(refn, in_upcall->req.readdir.token,
                                in_upcall->req.readdir.max_dirent_count,
-                               credentials, &response);
+                               in_upcall->credentials, &response);
         if (ret < 0)
         {
             fprintf(stderr,"Failed to readdir under %Ld on fsid %d!\n",
