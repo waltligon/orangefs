@@ -219,7 +219,9 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 	 * the file size.
 	 */
 	attrmask &= ~PVFS_ATTR_SYS_SIZE;
+
 	attrmask |= (PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST);
+        attrmask |= PVFS_ATTR_DATA_SIZE;
     }
 
     if (attrmask & PVFS_ATTR_SYS_LNK_TARGET)
@@ -501,7 +503,13 @@ static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
                sm_p->u.getattr.object_ref.handle,
                sm_p->u.getattr.object_ref.fs_id);
 
-    assert(0);
+    /* ENOENT is a legal failure; for now others will die */
+    if (js_p->error_code != -PVFS_ENOENT)
+    {
+        gossip_err("getattr: Failed with error code %d\n",
+                   js_p->error_code);
+        assert(0);
+    }
 
     return 1;
 }
@@ -631,7 +639,13 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 
         if (amask & PVFS_ATTR_META_DIST)
         {
-            if (!sm_p->pcache_hit)
+            /*
+              recompute size if it's not a pcache hit, or if it is
+              a pcache hit on an entry that no longer has a valid size
+            */
+            if (!sm_p->pcache_hit ||
+                (sm_p->pcache_hit &&
+                 !(sm_p->pinode->attr.mask & PVFS_ATTR_DATA_SIZE)))
             {
                 ret = PINT_Dist_lookup(sm_p->u.getattr.dist_p);
                 if (ret < 0)
@@ -712,7 +726,12 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
                 release_required = 0;
             }
             pinode->refn = sm_p->u.getattr.object_ref;
-            pinode->size = s_attr_p->size;
+
+            if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
+            {
+                pinode->size = s_attr_p->size;
+                pinode->attr.mask |= PVFS_ATTR_DATA_SIZE;
+            }
 
             PINT_pcache_object_attr_deep_copy(
                 &pinode->attr, &sm_p->pcache_attr);

@@ -206,6 +206,12 @@ int PVFS_sys_remove(char *object_name,
     /* save our return value */
     error = sm_p->error_code;
 
+    /* flush any matching pinode entries (if any) */
+    if (sm_p->pcache_hit)
+    {
+        PINT_pcache_invalidate(sm_p->u.remove.object_ref);
+    }
+
     /* clean up after ourselves */
     free(sm_p);
     return error;

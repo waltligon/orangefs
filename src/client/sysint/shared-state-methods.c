@@ -169,12 +169,14 @@ int sm_common_getattr_comp_fn(void *v_p,
     */
     if (!sm_p->pcache_hit)
     {
+        int release_required = 1;
         PINT_pinode *pinode =
             PINT_pcache_lookup(sm_p->u.getattr.object_ref);
         if (!pinode)
         {
             pinode = PINT_pcache_pinode_alloc();
             assert(pinode);
+            release_required = 0;
         }
         pinode->refn = sm_p->u.getattr.object_ref;
         pinode->size = ((attr->mask & PVFS_ATTR_DATA_ALL) ?
@@ -184,7 +186,11 @@ int sm_common_getattr_comp_fn(void *v_p,
             &pinode->attr, &resp_p->u.getattr.attr);
 
         PINT_pcache_set_valid(pinode);
-        PINT_pcache_release(pinode);
+
+        if (release_required)
+        {
+            PINT_pcache_release(pinode);
+        }
     }
     return 0;
 }

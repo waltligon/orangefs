@@ -109,7 +109,10 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
     {
         /*
           make sure pinode is not expired, and that it
-          has all attribute info fields requested
+          has all attribute info fields requested;
+
+          NOTE that the req attrmask has been tampered with by
+          sys-getattr.sm.
         */
         if (PINT_pcache_pinode_status(sm_p->pinode) == PINODE_STATUS_VALID)
         {
@@ -123,7 +126,25 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
             trimmed_mask = sm_p->msgpair.req.u.getattr.attrmask;
             if (sm_p->pinode->attr.objtype == PVFS_TYPE_METAFILE)
             {
-                trimmed_mask &= (PVFS_ATTR_META_ALL | PVFS_ATTR_SYS_ALL);
+                /*
+                  if a size was requested, we also need to match
+                  the data size related bits when checking attrs;
+
+                  PVFS_ATTR_DATA_SIZE was specially added by
+                  sys-getattr.sm setup msgpair if size is requested.
+                */
+                if (trimmed_mask & PVFS_ATTR_DATA_SIZE)
+                {
+                    trimmed_mask &= (PVFS_ATTR_META_ALL |
+                                     PVFS_ATTR_DATA_SIZE |
+                                     PVFS_ATTR_COMMON_ALL);
+                }
+                else
+                {
+                    trimmed_mask &= (PVFS_ATTR_META_ALL |
+                                     PVFS_ATTR_COMMON_ALL);
+                }
+
                 if (trimmed_mask == sm_p->pinode->attr.mask)
                 {
                     goto cache_hit;
@@ -131,7 +152,7 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
             }
             else if (sm_p->pinode->attr.objtype == PVFS_TYPE_SYMLINK)
             {
-                trimmed_mask &= (PVFS_ATTR_SYMLNK_ALL | PVFS_ATTR_SYS_ALL);
+                trimmed_mask &= (PVFS_ATTR_SYMLNK_ALL | PVFS_ATTR_COMMON_ALL);
                 if (trimmed_mask == sm_p->pinode->attr.mask)
                 {
                     goto cache_hit;
@@ -141,10 +162,9 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
             {
                 goto cache_hit;
             }
-            else
-            {
-                goto cache_miss;
-            }
+
+            /* if we get here, we've got a cache miss */
+            goto cache_miss;
 
           cache_hit:
             gossip_debug(PCACHE_DEBUG, "pcache: pcache hit\n"); 
@@ -165,14 +185,12 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
             return 1;
         }
       cache_miss:
-        gossip_debug(
-            PCACHE_DEBUG, "pcache: invalid pcache miss (%d != %d)\n",
-            sm_p->u.getattr.attrmask, sm_p->pinode->attr.mask);
+        gossip_debug(PCACHE_DEBUG, "pcache: invalid pcache miss\n");
+        sm_p->pcache_hit = 0;
         PINT_pcache_release(sm_p->pinode);
     }
-    gossip_debug(PCACHE_DEBUG,"pcache: clean pcache miss(%d)\n",
-                 sm_p->u.getattr.attrmask); 
-
+    gossip_debug(PCACHE_DEBUG, "pcache: clean pcache miss\n");
+    
     js_p->error_code = GETATTR_PCACHE_MISS;
     return 1;
 }
