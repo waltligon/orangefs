@@ -500,16 +500,6 @@ enum
     PVFS_DEV_UNEXPECTED            = 300
 };
 
-/* prototypes of helper functions */
-int PINT_serv_prepare_msgpair(
-    PVFS_object_ref object_ref,
-    struct PVFS_server_req *req_p,
-    struct PINT_encoded_msg *encoded_req_out_p,
-    void **encoded_resp_out_pp,
-    PVFS_BMI_addr_t *svr_addr_p,
-    int *max_resp_sz_out_p,
-    PVFS_msg_tag_t *session_tag_out_p);
-
 int PINT_serv_decode_resp(
     PVFS_fs_id fs_id,
     void *encoded_resp_p,
