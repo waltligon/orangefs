@@ -29,6 +29,7 @@
 /* this condition is only included for dependency building step; will not
  * actually compile cleanly
  */
+#define __SM_CHECK_DEP
 #include "client-state-machine.h"
 #include "pvfs2-server.h"
 #endif

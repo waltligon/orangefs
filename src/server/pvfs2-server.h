@@ -19,6 +19,11 @@
 #include "PINT-reqproto-encode.h"
 #include "msgpairarray.h"
 
+/* skip everything except #includes if __SM_CHECK_DEP is already defined; this
+ * allows us to get the dependencies right for msgpairarray.sm which relies
+ * on conflicting headers for dependency information
+ */
+#ifndef __SM_CHECK_DEP
 
 extern job_context_id server_job_context;
 
@@ -379,5 +384,6 @@ int server_state_machine_start_noreq(PINT_server_op* new_op);
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
 
+#endif /* __SM_CHECK_DEP */ 
 #endif /* __PVFS_SERVER_H */
 

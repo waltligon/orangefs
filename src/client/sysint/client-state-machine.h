@@ -22,6 +22,12 @@
 #include "id-generator.h"
 #include "msgpairarray.h"
 
+/* skip everything except #includes if __SM_CHECK_DEP is already defined; this
+ * allows us to get the dependencies right for msgpairarray.sm which relies
+ * on conflicting headers for dependency information
+ */
+#ifndef __SM_CHECK_DEP
+
 #define PINT_STATE_STACK_SIZE 3
 
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
@@ -583,7 +589,9 @@ extern struct PINT_state_machine_s pvfs2_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_acache_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
-#endif
+
+#endif /* __SM_CHECK_DEP */
+#endif /* __PVFS2_CLIENT_STATE_MACHINE_H */
 
 /*
  * Local variables:
