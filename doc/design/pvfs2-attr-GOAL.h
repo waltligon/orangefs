@@ -51,8 +51,8 @@ struct PVFS_object_attr_s
     PVFS_time atime;
     PVFS_time mtime;
     PVFS_time ctime;
+    uint32_t attr_mask; /* indicates which fields are currently valid */
     PVFS_ds_type objtype;
-	 uint32_t attr_mask; /* indicates which fields are currently valid */
     union
     {
 	PVFS_metafile_attr meta;

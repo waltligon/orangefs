@@ -129,7 +129,6 @@ struct PVFS_servreq_mkdir
     PVFS_handle requested_handle;
     PVFS_fs_id fs_id;		    /* file system */
     PVFS_object_attr attr;	    /* initial attributes */
-    uint32_t attrmask;		    /* attribute mask */
 };
 
 struct PVFS_servresp_mkdir
