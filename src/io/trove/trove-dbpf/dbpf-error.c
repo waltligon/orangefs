@@ -14,10 +14,15 @@
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value)
 {
     /* values greater than zero are errno values */
-    if (db_error_value > 0) return trove_errno_to_trove_error(db_error_value);
-    else if (db_error_value == 0) return 0; /* no mapping */
+    if (db_error_value > 0)
+    {
+        return trove_errno_to_trove_error(db_error_value);
+    }
 
-    switch (db_error_value) {
+    switch (db_error_value)
+    {
+        case 0:
+            return 0;
 	case DB_NOTFOUND:
 	case DB_KEYEMPTY:
 	    return TROVE_ENOENT;

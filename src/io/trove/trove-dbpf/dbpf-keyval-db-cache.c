@@ -81,7 +81,7 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 				   TROVE_handle handle)
 {
     int i = 0, ret = -TROVE_EINVAL, keyval_cached = 0;
-    char filename[PATH_MAX] = {0}, db_name[PATH_MAX] = {0};
+    char filename[PATH_MAX] = {0};
     DB *db_p = NULL;
 
     for (i = 0; i < DBCACHE_ENTRIES; i++)
@@ -116,16 +116,13 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
         keyval_cached = 1;
     }
 
-    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
-                           my_storage_p->name, coll_id);
-
-    __DBPF_GET_KEYVAL_DBNAME(db_name, PATH_MAX, my_storage_p->name,
-                             coll_id, Lu(handle));
+    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name,
+                           coll_id, handle);
 
     ret = db_create(&db_p, NULL, 0);
     assert(ret == 0);
 
-    ret = db_p->remove(db_p, filename, db_name, 0);
+    ret = db_p->remove(db_p, filename, NULL, 0);
     switch (ret)
     {
         case 0:
@@ -168,7 +165,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 				DB **db_pp)
 {
     int i = 0, ret = -TROVE_EINVAL, error = 0;
-    char filename[PATH_MAX] = {0}, db_name[PATH_MAX] = {0};
+    char filename[PATH_MAX] = {0};
     DB *db_p = NULL;
     int got_db = 0;
 
@@ -236,11 +233,8 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	assert(i != DBCACHE_ENTRIES);
     }
 
-    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
-                           my_storage_p->name, coll_id);
-
-    __DBPF_GET_KEYVAL_DBNAME(db_name, PATH_MAX,
-                             my_storage_p->name, coll_id, Lu(handle));
+    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name,
+                           coll_id, handle);
 
     ret = db_create(&(keyval_db_cache[i].db_p), NULL, 0);
     if (ret != 0)
@@ -269,7 +263,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
                      NULL,
 #endif
 		     filename,
-		     db_name,
+		     NULL,
 		     DB_UNKNOWN,
 		     TROVE_DB_OPEN_FLAGS,
 		     0);
@@ -283,7 +277,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
                          NULL,
 #endif
 			 filename,
-                         db_name,
+                         NULL,
 			 TROVE_DB_TYPE,
 			 TROVE_DB_CREATE_FLAGS,
 			 TROVE_DB_MODE);

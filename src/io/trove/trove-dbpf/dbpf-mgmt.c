@@ -257,7 +257,6 @@ static int dbpf_initialize(char *stoname,
     int error;
     struct dbpf_storage *sto_p = NULL;
 
-    gossip_err("STONAME: %s\n", stoname);
     if (!method_name_p)
     {
         gossip_err("dbpf_initialize failure: invalid method name ptr\n");
@@ -427,11 +426,11 @@ static int dbpf_collection_create(char *collname,
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
 {
-    int ret, error, i;
-    TROVE_handle zero = 0;
+    int ret = -TROVE_EINVAL, error = 0, i = 0;
+    TROVE_handle zero = TROVE_HANDLE_NULL;
     struct dbpf_storage *sto_p;
     struct dbpf_collection_db_entry db_data;
-    DB *db_p;
+    DB *db_p = NULL;
     DBT key, data;
     struct stat dirstat;
     char path_name[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
@@ -439,7 +438,7 @@ static int dbpf_collection_create(char *collname,
     if (my_storage_p == NULL)
     {
         gossip_err("Invalid storage name specified\n");
-        return -1;
+        return ret;
     }
     sto_p = my_storage_p;
     
@@ -459,7 +458,7 @@ static int dbpf_collection_create(char *collname,
 	gossip_debug(GOSSIP_TROVE_DEBUG, "coll %s already exists with "
                      "coll_id %d, len = %d.\n",
                      collname, db_data.coll_id, data.size);
-	return -1;
+        return -dbpf_db_error_to_trove_error(ret);
     }
 
     memset(&db_data, 0, sizeof(db_data));
@@ -474,14 +473,14 @@ static int dbpf_collection_create(char *collname,
     if (ret)
     {
 	gossip_err("dbpf_collection_create: %s\n", db_strerror(ret));
-        return -1;
+        return -dbpf_db_error_to_trove_error(ret);
     }
     
     ret = sto_p->coll_db->sync(sto_p->coll_db, 0);
     if (ret)
     {
 	gossip_err("dbpf_collection_create: %s\n", db_strerror(ret));
-        return -1;
+        return -dbpf_db_error_to_trove_error(ret);
     }
 
     DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, sto_p->name);
@@ -489,7 +488,7 @@ static int dbpf_collection_create(char *collname,
     if (ret < 0 && errno != ENOENT)
     {
         gossip_err("stat failed on storage directory %s\n", path_name);
-	return -1;
+        return -dbpf_db_error_to_trove_error(ret);
     }
     else if (ret < 0)
     {
@@ -497,7 +496,7 @@ static int dbpf_collection_create(char *collname,
 	if (ret != 0)
         {
             gossip_err("mkdir failed on storage directory %s\n", path_name);
-	    return -1;
+            return -dbpf_db_error_to_trove_error(ret);
 	}
     }
     
@@ -506,7 +505,7 @@ static int dbpf_collection_create(char *collname,
     if (ret != 0)
     {
         gossip_err("mkdir failed on collection directory %s\n", path_name);
-        return -1;
+        return -dbpf_db_error_to_trove_error(ret);
     }
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
@@ -518,14 +517,14 @@ static int dbpf_collection_create(char *collname,
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on attrib db %s\n", path_name);
-            return -1;
+            return -dbpf_db_error_to_trove_error(ret);
         }
 
         db_p = dbpf_db_open(path_name, &error);
         if (db_p == NULL)
         {
             gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
-            return -error;
+            return -dbpf_db_error_to_trove_error(error);
         }
     }
 
@@ -545,7 +544,7 @@ static int dbpf_collection_create(char *collname,
     {
 	gossip_err("db_p->put failed writing trove-dbpf version "
                    "string: %s\n", db_strerror(ret));
-        return -1;
+        return -dbpf_db_error_to_trove_error(ret);
     }
 
     gossip_debug(
@@ -565,7 +564,7 @@ static int dbpf_collection_create(char *collname,
     {
 	gossip_err("db_p->put failed writing initial handle value: %s\n",
                    db_strerror(ret));
-        return -1;
+        return -dbpf_db_error_to_trove_error(ret);
     }
     db_p->sync(db_p, 0);
     db_p->close(db_p, 0);
@@ -578,7 +577,7 @@ static int dbpf_collection_create(char *collname,
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on %s\n", path_name);
-            return -1;
+            return -dbpf_db_error_to_trove_error(ret);
         }
     }
     else
@@ -591,7 +590,18 @@ static int dbpf_collection_create(char *collname,
     if (ret != 0)
     {
         gossip_err("mkdir failed on keyval directory %s\n", path_name);
-        return -1;
+        return -dbpf_db_error_to_trove_error(ret);
+    }
+
+    for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
+    {
+        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
+        if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
+        {
+            gossip_err("mkdir failed on keyval bucket directory %s\n",
+                       dir);
+            return -dbpf_db_error_to_trove_error(errno);
+        }
     }
 
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
@@ -599,7 +609,7 @@ static int dbpf_collection_create(char *collname,
     if (ret != 0)
     {
         gossip_err("mkdir failed on bstream directory %s\n", path_name);
-        return -1;
+        return -dbpf_db_error_to_trove_error(ret);
     }
 
     for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
@@ -609,7 +619,7 @@ static int dbpf_collection_create(char *collname,
         {
             gossip_err("mkdir failed on bstream bucket directory %s\n",
                        dir);
-            return -1;
+            return -dbpf_db_error_to_trove_error(errno);
         }
     }
     return 1;
@@ -620,13 +630,18 @@ static int dbpf_collection_remove(char *collname,
 				  TROVE_op_id *out_op_id_p)
 {
     char path_name[PATH_MAX];
-    struct dbpf_storage *sto_p;
+    struct dbpf_storage *sto_p = NULL;
     struct dbpf_collection_db_entry db_data;
     DBT key, data;
-    int ret, i = 0;
+    int ret = -TROVE_EINVAL, i = 0;
     DIR *current_dir = NULL;
     struct dirent *current_dirent = NULL;
     char dir[PATH_MAX] = {0}, tmp_path[PATH_MAX] = {0};
+
+    if (!collname)
+    {
+        return ret;
+    }
 
     sto_p = my_storage_p;
 
@@ -643,7 +658,7 @@ static int dbpf_collection_remove(char *collname,
     if (ret != 0)
     {
         sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
-        return -1;
+        return -dbpf_db_error_to_trove_error(ret);
     }
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
@@ -692,21 +707,48 @@ static int dbpf_collection_remove(char *collname,
         }
         rmdir(dir);
     }
-    rmdir(path_name);
 
-    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
-                           sto_p->name, db_data.coll_id);
-    if (unlink(path_name) != 0)
+    if (rmdir(path_name) != 0)
     {
-        gossip_err("failure removing dbname file %s\n", path_name);
+        gossip_err("failure removing bstream directory %s\n", path_name);
         goto collection_remove_failure;
     }
 
     DBPF_GET_KEYVAL_DIRNAME(path_name, PATH_MAX,
-                            sto_p->name, db_data.coll_id);
+                           sto_p->name, db_data.coll_id);
+    for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
+    {
+        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
+
+        /* remove all bstream files in this bucket directory */
+        current_dir = opendir(dir);
+        if (current_dir)
+        {
+            while((current_dirent = readdir(current_dir)))
+            {
+                if ((strcmp(current_dirent->d_name, ".") == 0) ||
+                    (strcmp(current_dirent->d_name, "..") == 0))
+                {
+                    continue;
+                }
+                snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
+                         current_dirent->d_name);
+                assert(current_dirent->d_type == DT_REG);
+                if (unlink(tmp_path) != 0)
+                {
+                    gossip_err("failure removing keyval entry\n");
+                    closedir(current_dir);
+                    goto collection_remove_failure;
+                }
+            }
+            closedir(current_dir);
+        }
+        rmdir(dir);
+    }
+
     if (rmdir(path_name) != 0)
     {
-        gossip_err("failure removing dirname directory %s\n", path_name);
+        gossip_err("failure removing keyval directory %s\n", path_name);
         goto collection_remove_failure;
     }
 
@@ -721,6 +763,7 @@ static int dbpf_collection_remove(char *collname,
     return ret;
 
   collection_remove_failure:
+
     return -1;
 }
 

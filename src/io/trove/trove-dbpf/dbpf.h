@@ -17,7 +17,7 @@ extern "C" {
 #include "gen-locks.h"
 
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
-#define TROVE_DBPF_VERSION_VALUE                                  "0.0.2"
+#define TROVE_DBPF_VERSION_VALUE                                  "0.0.1"
 #define LAST_HANDLE_STRING                                  "last_handle"
 #define ROOT_HANDLE_STRING                                  "root_handle"
 
@@ -36,7 +36,7 @@ extern "C" {
 #define TROVE_DB_MODE                                                 0644
 #define TROVE_DB_TYPE                                             DB_BTREE
 #define TROVE_DB_OPEN_FLAGS        (TROVE_DB_DIRTY_READ | TROVE_DB_THREAD)
-#define TROVE_DB_CREATE_FLAGS  (DB_CREATE | TROVE_DB_OPEN_FLAGS)
+#define TROVE_DB_CREATE_FLAGS            (DB_CREATE | TROVE_DB_OPEN_FLAGS)
 
 /*
   for more efficient host filesystem accesses, we have a simple
@@ -124,17 +124,11 @@ do {                                                                     \
 } while (0)
 
 /* arguments are: buf, path_max, stoname, collid, handle */
-#define DBPF_GET_KEYVAL_DBNAME(__b, __pm, __stoname, __cid)              \
-do {                                                                     \
-  snprintf(__b, __pm, "/%s/%08x/%s/pvfs2-keyvals", __stoname,            \
-           __cid, KEYVAL_DIRNAME);                                       \
-} while (0)
-
-#define __DBPF_GET_KEYVAL_DBNAME(__b, __pm, __stoname, __cid, __handle)  \
-do {                                                                     \
-  snprintf(__b, __pm, "/%s/%08x/%s/%.8Lu/%08Lx.keyval", __stoname,       \
-           __cid, KEYVAL_DIRNAME,                                        \
-           DBPF_KEYVAL_GET_BUCKET(__handle, __cid), Lu(__handle));       \
+#define DBPF_GET_KEYVAL_DBNAME(__b, __pm, __stoname, __cid, __handle)\
+do {                                                                 \
+  snprintf(__b, __pm, "/%s/%08x/%s/%.8Lu/%08Lx.keyval", __stoname,   \
+           __cid, KEYVAL_DIRNAME,                                    \
+           DBPF_KEYVAL_GET_BUCKET(__handle, __cid), Lu(__handle));   \
 } while (0)
 
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
