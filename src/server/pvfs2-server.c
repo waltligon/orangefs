@@ -298,11 +298,11 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
 	goto state_init_failed;
     }
 
-    /* initialize Server State Machine */
-    ret = PINT_state_machine_init();
+    /* initialize table of state machines */
+    ret = PINT_state_table_initialize();
     if (ret < 0)
     {
-	gossip_err("Error initializing state_machine interface: %s\n",
+	gossip_err("Error initializing state machine table: %s\n",
 		strerror(-ret));
 	*server_level_init = SHUTDOWN_HIGH_LEVEL_INTERFACE;
 	goto state_init_failed;
@@ -491,8 +491,7 @@ int main(int argc, char **argv)
 		    goto server_shutdown;
 		}
 #endif
-		ret = PINT_state_machine_initialize_unexpected(s_op,
-			&job_status_structs[i]);
+		ret = PINT_state_machine_start(s_op, &job_status_structs[i]);
 	    }
 	    
 	    /* 

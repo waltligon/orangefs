@@ -68,9 +68,9 @@ enum {
 #define SM_NESTED_STATE 1
 
 /* Prototypes for functions provided by user */
-int PINT_state_machine_initialize_unexpected(struct PINT_OP_STATE *, job_status_s *ret);
-int PINT_state_machine_completion(struct PINT_OP_STATE *);
-int PINT_state_machine_init(void);
+int PINT_state_machine_start(struct PINT_OP_STATE *, job_status_s *ret);
+int PINT_state_machine_complete(struct PINT_OP_STATE *);
+int PINT_state_table_initialize(void);
 
 /* NOTE: All other function prototypes are defined in state-machine-fns.h */
 

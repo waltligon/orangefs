@@ -463,7 +463,7 @@ static int lookup_cleanup(PINT_server_op *s_op,
     /* free dynamically allocated parts of non-encoded response */
     free(s_op->resp.u.lookup_path.handle_array);
 
-    return(PINT_state_machine_completion(s_op));
+    return(PINT_state_machine_complete(s_op));
 }
 
 /*

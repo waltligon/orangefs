@@ -23,27 +23,17 @@ extern struct PINT_state_machine_s pvfs2_remove_sm;
 extern struct PINT_state_machine_s pvfs2_rmdirent_sm;
 
 /* table of state machines, indexed based on PVFS_server_op enumeration */
-/* NOTE: this table is initialized at run time in PINT_state_machine_init() */
+/* NOTE: this table is setup at run time in PINT_state_table_initialize() */
 struct PINT_state_machine_s *PINT_server_op_table[PVFS_MAX_SERVER_OP+1] = {NULL};
 
-/* 
- * Function: PINT_state_machine_initialize_unexpected(s_op,ret)
+/* PINT_state_machine_start()
  *
- * Params:   PINT_server_op *s_op
- *           job_status_s *ret
- *    
- * Returns:  int
- * 
- * Synopsis: Intialize request structure, first location, and call
- *           respective init function.
+ * initializes fields in the s_op structure and begins execution of
+ * the appropriate state machine
  *
- * Initialization:
- * - sets s_op->op, addr, tag
- * - allocates space for s_op->resp and memset()s it to zero
- * - points s_op->req to s_op->decoded.buffer
+ * returns 0 on success, -errno on failure
  */
-int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
-					     job_status_s *ret)
+int PINT_state_machine_start(PINT_server_op *s_op, job_status_s *ret)
 {
     int retval = -1;
 
@@ -76,7 +66,7 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
     return ((s_op->current_state->state_action))(s_op,ret);
 }
 
-/* PINT_state_machine_completion()
+/* PINT_state_machine_complete()
  *
  * function to be called at the completion of state machine execution;
  * it frees up any resources associated with the state machine that were
@@ -85,7 +75,7 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
  *
  * returns 0
  */
-int PINT_state_machine_completion(PINT_server_op *s_op)
+int PINT_state_machine_complete(PINT_server_op *s_op)
 {
     /* release the decoding of the unexpected request */
     PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
@@ -99,14 +89,14 @@ int PINT_state_machine_completion(PINT_server_op *s_op)
     return(0);
 }
 
-/* Function: PINT_state_machine_init(void)
-   Params: None
-   Returns: True
-   Synopsis: This function is used to initialize the state machine 
-	 for operation.  Calls each machine's initi function if specified.
+/* PINT_state_table_initialize()
+ *
+ * sets up a table of state machines that can be located with
+ * PINT_state_machine_locate()
+ *
+ * returns 0 on success, -errno on failure
  */
-
-int PINT_state_machine_init(void)
+int PINT_state_table_initialize(void)
 {
 
     /* fill in indexes for each supported request type */

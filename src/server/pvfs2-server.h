@@ -115,31 +115,33 @@ struct PINT_server_setattr_op
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
- *
- * This structure is allocated and memset() to zero in PINT_server_cp_bmi_unexp().
- * s_op->op is set to BMI_UNEXP at that time, but reset in intialize_unexpected.
  */
 typedef struct PINT_server_op
 {
-    /* STATE MACHINE VALUES */
-    int op; /* op == req->op after initialize_unexpected */
-    int stackptr; /* stack of contexts for nested state machines */
-    union PINT_state_array_values *current_state; /* initialized in initialize_unexpected */
+    enum PVFS_server_op op;  /* type of operation that we are servicing */
+    /* the following fields are used in state machine processing to keep
+     * track of the current state
+     */
+    int stackptr;
+    union PINT_state_array_values *current_state; 
     union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE]; 
 
-    /* SERVER-SPECIFIC VALUES */
-    job_id_t scheduled_id; /* holds id from request scheduler so we can release it later */
+    /* holds id from request scheduler so we can release it later */
+    job_id_t scheduled_id; 
 
-    PVFS_ds_keyval key, val; /* generic structures used in most server operations */
+    /* generic structures used in most server operations */
+    PVFS_ds_keyval key, val; 
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
 
-    bmi_addr_t addr; /* set in initialize_unexpected */
-    bmi_msg_tag_t tag; /* set in initialize_unexpected */
-    struct PVFS_server_req *req; /* req == decoded.buffer after initialize_unexpected */
-    /* note: resp.op == req->op after initialize_unexpected */
-    struct PVFS_server_resp resp; 
+    bmi_addr_t addr;   /* address of client that contacted us */
+    bmi_msg_tag_t tag; /* operation tag */
+    /* information about unexpected message that initiated this operation */
     struct BMI_unexpected_info unexp_bmi_buff;
+    /* decoded request and response structures */
+    struct PVFS_server_req *req; 
+    struct PVFS_server_resp resp; 
+    /* encoded request and response structures */
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
     union {

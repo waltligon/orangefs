@@ -417,7 +417,7 @@ static int remove_cleanup(PINT_server_op *s_op,
 {
     gossip_debug(SERVER_DEBUG, "(%p) remove state: cleanup\n", s_op);
 
-    return(PINT_state_machine_completion(s_op));
+    return(PINT_state_machine_complete(s_op));
 }
 
 /*
