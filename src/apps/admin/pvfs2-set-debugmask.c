@@ -70,7 +70,7 @@ int main(int argc, char **argv)
     PVFS_util_gen_credentials(&creds);
 
     ret = PVFS_mgmt_setparam_all(
-        cur_fs, creds, PVFS_SERV_PARAM_GOSSIP_MASK,
+        cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
         user_opts->debug_mask, NULL, NULL /* detailed errors */);
 
     PVFS_sys_finalize();

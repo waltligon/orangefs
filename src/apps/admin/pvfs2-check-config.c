@@ -49,11 +49,17 @@ static int compare_configs(const char* master_config,
 /**
  * Populate the given config with the server's data
  */
-static int get_config( PVFS_BMI_addr_t* server_addr,
-                       struct PVFS_sys_mntent* mnt_entry,
-                       char** fs_config_buf,
-                       char** server_config_buf)
+static int get_config(PVFS_BMI_addr_t* server_addr,
+                      struct PVFS_sys_mntent* mnt_entry,
+                      char** fs_config_buf,
+                      char** server_config_buf)
 {
+#if 0
+/*
+  FIXME: this breaks the intended sysint usage -- rewrite using the
+  sysint calls, rather than the internals of; find a better way to
+  'persist' the configs, or work it into the exposed api
+*/
     int rc;
     PINT_client_sm* sm_p = NULL;
     PVFS_credentials creds;
@@ -97,7 +103,7 @@ static int get_config( PVFS_BMI_addr_t* server_addr,
     free(sm_p->u.get_config.fs_config_buf);
     free(sm_p->u.get_config.server_config_buf);
     free(sm_p);
-    
+#endif    
     return 0;        
 }
 
@@ -128,19 +134,20 @@ int main(int argc, char **argv)
     mnt = PVFS_util_parse_pvfstab(0);
     if (0 != mnt)
     {
-        int num_mnt_entries;
-        int i;
+        int num_mnt_entries = 0, i = 0;
 
         /* Iterate over all fsid's */
         num_mnt_entries = mnt->mntent_count;
         for (i = 0; i < num_mnt_entries; ++i)
         {
             PVFS_fs_id fs_id;
-            PVFS_credentials creds;
             PVFS_BMI_addr_t* server_addrs;
             int server_count;
             char* master_fs_conf = 0;
             int j;
+            PVFS_credentials creds;
+
+            PVFS_util_gen_credentials(&creds);
 
             /* Current fs id */
             rc = PVFS_sys_fs_add(&mnt->mntent_array[i]);
@@ -152,8 +159,7 @@ int main(int argc, char **argv)
             fs_id = mnt->mntent_array[i].fs_id;
             
             /* Retrieve the list of all servers for the fs id*/
-            PVFS_util_gen_credentials(&creds);
-            rc = PVFS_mgmt_count_servers(fs_id, creds, PVFS_MGMT_IO_SERVER,
+            rc = PVFS_mgmt_count_servers(fs_id, &creds, PVFS_MGMT_IO_SERVER,
                                          &server_count);
 
             if (0 != rc)
@@ -162,7 +168,7 @@ int main(int argc, char **argv)
                 break;
             }
             server_addrs = malloc(server_count * sizeof(PVFS_BMI_addr_t));
-            rc = PVFS_mgmt_get_server_array(fs_id, creds, PVFS_MGMT_IO_SERVER,
+            rc = PVFS_mgmt_get_server_array(fs_id, &creds, PVFS_MGMT_IO_SERVER,
                                             server_addrs, &server_count);
             if (0 != rc)
             {

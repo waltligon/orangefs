@@ -32,7 +32,7 @@ static PVFS_handle simple_lookup_name(char *name,
 
     PVFS_util_gen_credentials(&credentials);
 
-    ret = PVFS_sys_lookup(fs_id, name, credentials,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
                           &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {

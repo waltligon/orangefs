@@ -148,8 +148,7 @@ int gui_comm_setup(void)
 			   -1);
     }
 
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
     /* print message indicating what file system we are monitoring */
     snprintf(msgbuf,
@@ -206,7 +205,7 @@ void gui_comm_set_active_fs(char *contact_server,
     cur_fsid = new_fsid;
 
     ret = PVFS_mgmt_count_servers(cur_fsid,
-				  creds,
+				  &creds,
 				  PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
 				  &outcount);
     if (ret < 0)
@@ -244,7 +243,7 @@ void gui_comm_set_active_fs(char *contact_server,
 	malloc(outcount * sizeof(PVFS_BMI_addr_t));
     internal_addr_ct = outcount;
     ret = PVFS_mgmt_get_server_array(cur_fsid,
-				     creds,
+				     &creds,
 				     PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
 				     internal_addrs,
 				     &outcount);
@@ -327,7 +326,7 @@ static int gui_comm_stats_collect(void)
     assert(internal_addr_ct == internal_stat_ct);
 
     ret = PVFS_mgmt_statfs_list(cur_fsid,
-				creds,
+				&creds,
 				internal_stats,
 				internal_addrs,
 				internal_stat_ct,
@@ -346,7 +345,7 @@ static int gui_comm_stats_collect(void)
 		     64,
 		     "Server %s not responding.",
 		     PVFS_mgmt_map_addr(cur_fsid,
-					creds,
+					&creds,
 					internal_details->error[i].addr,
 					&dummy));
 	    gui_message_new(msgbuf);
@@ -370,7 +369,7 @@ static int gui_comm_perf_collect(void)
 
 #ifndef FAKE_PERF
     ret = PVFS_mgmt_perf_mon_list(cur_fsid,
-				  creds,
+				  &creds,
 				  internal_perf,
 				  internal_end_time_ms,
 				  internal_addrs,
@@ -392,7 +391,7 @@ static int gui_comm_perf_collect(void)
 		     64,
 		     "Server %s not responding.",
 		     PVFS_mgmt_map_addr(cur_fsid,
-					creds,
+					&creds,
 					internal_details->error[i].addr,
 					&dummy));
 	    gui_message_new(msgbuf);

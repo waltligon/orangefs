@@ -69,7 +69,7 @@ int main(int argc, char **argv)
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
-    ret = PVFS_util_lookup_parent(filename, cur_fs, credentials, 
+    ret = PVFS_util_lookup_parent(filename, cur_fs, &credentials, 
                                   &parent_refn.handle);
     if(ret < 0)
     {
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_symlink(entry_name, parent_refn, target,
-                           attr, credentials, &resp_sym);
+                           attr, &credentials, &resp_sym);
     if (ret < 0)
     {
         printf("symlink failed with errcode = %d\n", ret);

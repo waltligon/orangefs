@@ -153,18 +153,19 @@ machine pvfs2_client_mkdir_sm(
 
 %%
 
-int PVFS_sys_mkdir(
+int PVFS_isys_mkdir(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    PVFS_credentials credentials,
-    PVFS_sysresp_mkdir *resp)
+    PVFS_credentials *credentials,
+    PVFS_sysresp_mkdir *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_mkdir entered\n");
 
     if ((object_name == NULL) || (resp == NULL))
     {
@@ -190,7 +191,7 @@ int PVFS_sys_mkdir(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = &credentials;
+    sm_p->cred_p = credentials;
     sm_p->u.mkdir.object_name = object_name;
     sm_p->parent_ref = parent_ref;
     sm_p->u.mkdir.sys_attr = &attr;
@@ -201,33 +202,36 @@ int PVFS_sys_mkdir(
                  "under parent handle %Lu on fs %d\n", object_name,
                  Lu(parent_ref.handle), parent_ref.fs_id);
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_MKDIR);
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_MKDIR, op_id, user_ptr);
+}
+
+int PVFS_sys_mkdir(
+    char *object_name,
+    PVFS_object_ref parent_ref,
+    PVFS_sys_attr attr,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_mkdir *resp)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir entered\n");
+
+    ret = PVFS_isys_mkdir(object_name, parent_ref, attr,
+                          credentials, resp, &op_id, NULL);
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-        free(sm_p);
-        return ret;
+        gossip_lerr("PVFS_isys_mkdir call failed\n");
+        error = ret;
+        goto exit_path;
     }
+    PVFS_sys_wait(op_id, "mkdir", error, ret);
 
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir calling "
-                     "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
-    }
+  exit_path:
 
-    if (ret)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
-    }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir completed\n");
-
-    error = sm_p->error_code;
-
-    free(sm_p);
+    PVFS_sys_release(op_id);
     return error;
 }
 
@@ -388,12 +392,18 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
-    PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
-                               *sm_p->cred_p,
-                               sm_p->u.mkdir.object_name,
-                               sm_p->u.mkdir.metafile_handle,
-                               sm_p->parent_ref.handle,
-                               sm_p->parent_ref.fs_id);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "hooking dirent %s (%Lu) under "
+                 "parent handle %Lu\n", sm_p->u.mkdir.object_name,
+                 Lu(sm_p->u.mkdir.metafile_handle),
+                 Lu(sm_p->parent_ref.handle));
+
+    PINT_SERVREQ_CRDIRENT_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->u.mkdir.object_name,
+        sm_p->u.mkdir.metafile_handle,
+        sm_p->parent_ref.handle,
+        sm_p->parent_ref.fs_id);
 
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
@@ -410,7 +420,6 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         js_p->error_code = ret;
     }
 
-    /* make 'msgpairarray' process 'msgpair' requests */
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;
 
@@ -424,11 +433,7 @@ static int mkdir_crdirent_failure(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: crdirent_failure\n");
 
-    if (js_p->error_code == -PVFS_EEXIST)
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir crdirent failed: "
-                     "dirent already exists!\n");
-    }
+    PVFS_perror_gossip("mkdir crdirent failed", js_p->error_code);
     return 1;
 }
 
@@ -511,6 +516,10 @@ static int mkdir_cleanup(PINT_client_sm *sm_p,
 
         js_p->error_code = MKDIR_RETRY;
         return 1;
+    }
+    else
+    {
+        PVFS_perror_gossip("mkdir failed with error", sm_p->error_code);
     }
 
     sm_p->op_complete = 1;

@@ -75,13 +75,13 @@ int main(int argc, char **argv)
     if(!user_opts->op_mask || !user_opts->api_mask)
     {
 	/* turn off event logging */
-	ret = PVFS_mgmt_setparam_all(cur_fs, creds, 
+	ret = PVFS_mgmt_setparam_all(cur_fs, &creds, 
 	    PVFS_SERV_PARAM_EVENT_ON, 0, NULL, NULL);
     }
     else
     {
 	/* set mask */
-	ret = PVFS_mgmt_setparam_all(cur_fs, creds, 
+	ret = PVFS_mgmt_setparam_all(cur_fs, &creds, 
 	    PVFS_SERV_PARAM_EVENT_MASKS, 
 	    (int64_t)(((int64_t)user_opts->op_mask << 32) 
 		+ user_opts->api_mask),
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 	}
 
 	/* turn on event logging */
-	ret = PVFS_mgmt_setparam_all(cur_fs, creds, 
+	ret = PVFS_mgmt_setparam_all(cur_fs, &creds, 
 	    PVFS_SERV_PARAM_EVENT_ON, 1, NULL, NULL);
     }
 

@@ -16,7 +16,7 @@
 
 int PVFS_sys_statfs(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_sysresp_statfs* resp)
 {
     int num_servers = 0;
@@ -41,11 +41,8 @@ int PVFS_sys_statfs(
 	return(-PVFS_ENOMEM);
     }
 
-    ret = PVFS_mgmt_statfs_all(
-	fs_id,
-	credentials,
-	stat_array,
-	&num_servers, NULL);
+    ret = PVFS_mgmt_statfs_all(fs_id, credentials,
+                               stat_array, &num_servers, NULL);
     if (ret < 0)
     {
 	free(stat_array);

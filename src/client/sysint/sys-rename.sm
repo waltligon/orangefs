@@ -227,24 +227,25 @@ machine pvfs2_client_rename_sm(
 
 %%
 
-/* PVFS_sys_rename()
+/* PVFS_isys_rename()
  *
  * Renames an 'old' entry to a 'new' entry.
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_rename(
+int PVFS_isys_rename(
     char *old_entry,
     PVFS_object_ref old_parent_ref,
     char *new_entry,
     PVFS_object_ref new_parent_ref,
-    PVFS_credentials credentials)
+    PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_rename entered\n");
 
     if ((old_entry == NULL) || (new_entry == NULL))
     {
@@ -264,7 +265,7 @@ int PVFS_sys_rename(
         return -PVFS_ENAMETOOLONG;
     }
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
         return -PVFS_ENOMEM;
@@ -273,17 +274,17 @@ int PVFS_sys_rename(
 
     /*
       this state machine has several hardcoded 2's around because
-      we're dealing with 1 'old' entry, 1 'old' handle,
-      1 'old' parent handle, 1 'new' entry, 1 'new' handle, and
-      1 'new' parent handle.
-      the index of 0 deals with the 'old'; index 1 deals with the 'new'.
+      we're dealing with 1 'old' entry, 1 'old' handle, 1 'old' parent
+      handle, 1 'new' entry, 1 'new' handle, and 1 'new' parent
+      handle.  the index of 0 deals with the 'old'; index 1 deals with
+      the 'new'.
 
-      I've used this arguably confusing array notation so that we
-      can do old/new lookups and parent getattrs in parallel using
-      the msgarrays rather than doing a longer sequence of
-      serial msgpairs.
+      I've used this arguably confusing array notation so that we can
+      do old/new lookups and parent getattrs in parallel using the
+      msgarrays rather than doing a longer sequence of serial
+      msgpairs.
     */
-    sm_p->cred_p = &credentials;
+    sm_p->cred_p = credentials;
     sm_p->u.rename.entries[0] = old_entry;
     sm_p->u.rename.entries[1] = new_entry;
     sm_p->u.rename.parent_refns[0] = old_parent_ref;
@@ -298,35 +299,36 @@ int PVFS_sys_rename(
         Lu(old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
         Lu(new_parent_ref.handle), new_parent_ref.fs_id);
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_RENAME);
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_RENAME, op_id, user_ptr);
+}
+
+int PVFS_sys_rename(
+    char *old_entry,
+    PVFS_object_ref old_parent_ref,
+    char *new_entry,
+    PVFS_object_ref new_parent_ref,
+    PVFS_credentials *credentials)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename entered\n");
+
+    ret = PVFS_isys_rename(old_entry, old_parent_ref, new_entry,
+                           new_parent_ref, credentials, &op_id, NULL);
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-        free(sm_p);
-        return ret;
+        gossip_lerr("PVFS_isys_rename call failed\n");
+        error = ret;
+        goto exit_path;
     }
+    PVFS_sys_wait(op_id, "rename", error, ret);
 
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename calling "
-                     "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
-    }
+  exit_path:
 
-    if (ret)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
-    }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename completed\n");
-
-    error = (sm_p->u.rename.stored_error_code ?
-	sm_p->u.rename.stored_error_code :
-	sm_p->error_code);
-
-    free(sm_p);
+    PVFS_sys_release(op_id);
     return error;
 }
 

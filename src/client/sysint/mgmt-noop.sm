@@ -53,15 +53,16 @@ machine pvfs2_client_mgmt_noop_sm(setup_msgpair,
 
 %%
 
-int PVFS_mgmt_noop(PVFS_fs_id fs_id,
-                   PVFS_credentials credentials,
-                   PVFS_BMI_addr_t addr)
+int PVFS_imgmt_noop(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t addr,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr)
 {
-    int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_imgmt_noop entered\n");
 
     sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (!sm_p)
@@ -70,7 +71,7 @@ int PVFS_mgmt_noop(PVFS_fs_id fs_id,
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = &credentials;
+    sm_p->cred_p = credentials;
     sm_p->msgpair.fs_id = fs_id;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgpair.svr_addr = addr;
@@ -78,33 +79,33 @@ int PVFS_mgmt_noop(PVFS_fs_id fs_id,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop calling "
                  "PINT_client_state_machine_post()\n");
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_NOOP);
-    if (ret < 0)
-    {
-        gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-        free(sm_p);
-        return ret;
-    }
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_MGMT_NOOP, op_id, user_ptr);
+}
 
-    while (!sm_p->op_complete && (ret == 0))
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop calling "
-                     "PINT_client_state_machine_test()\n");
-        ret = PINT_client_state_machine_test();
-    }
+int PVFS_mgmt_noop(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t addr)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_mgmt_op_id op_id;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop entered\n");
+
+    ret = PVFS_imgmt_noop(fs_id, credentials, addr, &op_id, NULL);
     if (ret)
     {
-        gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-        free(sm_p);
-        return ret;
+        gossip_lerr("Error: PVFS_imgmt_noop call failed\n");
+        error = ret;
+        goto exit_path;
     }
+    PVFS_mgmt_wait(op_id, "noop", error, ret);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop completed\n");
+  exit_path:
 
-    error = sm_p->error_code;
-
-    free(sm_p);
+    PVFS_mgmt_release(op_id);
     return error;
 }
 

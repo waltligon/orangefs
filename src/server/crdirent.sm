@@ -141,7 +141,7 @@ static int crdirent_validate(PINT_server_op *s_op,
     assert(s_op->req->u.crdirent.parent_handle != 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-	    "  got crdirent for %s (with handle 0x%08Lx) in 0x%08Lx\n",
+	    "  got crdirent for %s (with handle %Lu) in %Lu\n",
 	    s_op->req->u.crdirent.name,
 	    Lu(s_op->req->u.crdirent.new_handle),
 	    Lu(s_op->req->u.crdirent.parent_handle));

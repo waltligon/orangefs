@@ -43,7 +43,7 @@ static int test_lookup(void)
 
     PVFS_util_gen_credentials(&credentials);
 
-    ret = PVFS_sys_lookup(fs_id, name, credentials,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
                           &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     return ret;
 }
@@ -72,7 +72,7 @@ static int test_getattr(void)
     PVFS_util_gen_credentials(&credentials);
 
     if ((ret = PVFS_sys_lookup(
-             fs_id, name, credentials,
+             fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
@@ -82,7 +82,7 @@ static int test_getattr(void)
     pinode_refn = resp_lookup.ref;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
-    ret = PVFS_sys_getattr(pinode_refn, attrmask, credentials, &resp_getattr);
+    ret = PVFS_sys_getattr(pinode_refn, attrmask, &credentials, &resp_getattr);
     return ret;
 }
 
@@ -119,7 +119,7 @@ static int test_mkdir(void)
 
     PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
-             fs_id, name, credentials,
+             fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
@@ -134,7 +134,7 @@ static int test_mkdir(void)
     attr.atime = attr.ctime = attr.mtime = 
 	time(NULL);
 
-    ret = PVFS_sys_mkdir(name, parent_refn, attr, credentials, &resp_mkdir);
+    ret = PVFS_sys_mkdir(name, parent_refn, attr, &credentials, &resp_mkdir);
     return ret;
 }
 
@@ -166,7 +166,7 @@ static int test_readdir(void)
 
     PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
-             fs_id, name, credentials,
+             fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
@@ -178,7 +178,7 @@ static int test_readdir(void)
     pvfs_dirent_incount = 1;
 
     ret =
-	PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,
+	PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, &credentials,
 			 &resp_readdir);
     return ret;
 }
@@ -209,7 +209,7 @@ static int test_create(void)
 
     fs_id = 9;
 
-    ret = PVFS_sys_lookup(fs_id, "/", credentials,
+    ret = PVFS_sys_lookup(fs_id, "/", &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -218,7 +218,7 @@ static int test_create(void)
     }
 
     ret =
-	PVFS_sys_create(filename, resp_look.ref, attr, credentials,
+	PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
 			NULL, &resp_create);
     return ret;
 }
@@ -244,14 +244,14 @@ static int test_remove(void)
 
     fs_id = 9;
 
-    ret = PVFS_sys_lookup(fs_id, filename, credentials,
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
 	return (-1);
     }
-    ret = PVFS_sys_remove(filename, resp_look.ref, credentials);
+    ret = PVFS_sys_remove(filename, resp_look.ref, &credentials);
     return ret;
 }
 
@@ -310,7 +310,7 @@ static int test_read(void)
 
     fs_id = 9;
 
-    ret = PVFS_sys_lookup(fs_id, filename, credentials,
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -319,7 +319,7 @@ static int test_read(void)
     }
 
     ret =
-	PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer, NULL, credentials,
+	PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer, NULL, &credentials,
 		      &resp_io);
     return ret;
 }
@@ -350,7 +350,7 @@ static int test_write(void)
 
     fs_id = 9;
 
-    ret = PVFS_sys_lookup(fs_id, filename, credentials,
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -359,7 +359,7 @@ static int test_write(void)
     }
 
     ret =
-	PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer, NULL, credentials,
+	PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer, NULL, &credentials,
 		       &resp_io);
     return ret;
 }

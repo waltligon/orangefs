@@ -30,7 +30,7 @@ static int create_file(PVFS_fs_id fs_id,
 
     PVFS_util_gen_credentials(&credentials);
 
-    ret = PVFS_sys_lookup(fs_id, dirname, credentials,
+    ret = PVFS_sys_lookup(fs_id, dirname, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -46,7 +46,7 @@ static int create_file(PVFS_fs_id fs_id,
 
     memset(&resp_create,0,sizeof(resp_create));
     ret = PVFS_sys_create(filename, resp_look.ref,
-                          attr, credentials, NULL, &resp_create);
+                          attr, &credentials, NULL, &resp_create);
     if (ret < 0)
     {
 	printf("create failed with errcode = %d\n", ret);
@@ -54,7 +54,7 @@ static int create_file(PVFS_fs_id fs_id,
     }
 
     ret = PVFS_sys_getattr(resp_create.ref, attr.mask,
-                           credentials, &resp_getattr);
+                           &credentials, &resp_getattr);
     if (ret < 0)
     {
 	printf("getattr failed with errcode = %d\n", ret);

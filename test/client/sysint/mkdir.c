@@ -62,7 +62,7 @@ int main(int argc,char **argv)
     PVFS_util_gen_credentials(&credentials);
 
     entry_name = str_buf;
-    ret = PVFS_util_lookup_parent(dirname, cur_fs, credentials, 
+    ret = PVFS_util_lookup_parent(dirname, cur_fs, &credentials, 
                                   &parent_refn.handle);
     if(ret < 0)
     {
@@ -78,7 +78,7 @@ int main(int argc,char **argv)
 	time(NULL);
 
     ret = PVFS_sys_mkdir(entry_name, parent_refn, attr, 
-                         credentials, &resp_mkdir);
+                         &credentials, &resp_mkdir);
     if (ret < 0)
     {
         printf("mkdir failed\n");

@@ -107,7 +107,7 @@ int main(int argc, char **argv)
     attr.dfile_count = max_dfiles;
     attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
 
-    ret = PVFS_util_lookup_parent(basename, cur_fs, credentials, 
+    ret = PVFS_util_lookup_parent(basename, cur_fs, &credentials, 
                                   &parent_refn.handle);
     if(ret < 0)
     {
@@ -119,13 +119,13 @@ int main(int argc, char **argv)
     /* do one big one to prime connections if needed */
     sprintf(entry_name, "%s%d", str_buf, 0);
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			  credentials, NULL, &resp_create);
+			  &credentials, NULL, &resp_create);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_create", ret);
 	return(-1);
     }
-    ret = PVFS_sys_remove(entry_name, parent_refn, credentials);
+    ret = PVFS_sys_remove(entry_name, parent_refn, &credentials);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_remove", ret);
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
 	    attr.dfile_count = i+1;
 	    start_time = Wtime();
 	    ret = PVFS_sys_create(entry_name, parent_refn, attr,
-				  credentials, NULL, &resp_create);
+				  &credentials, NULL, &resp_create);
 	    end_time = Wtime();
 	    if (ret < 0)
 	    {
@@ -153,7 +153,7 @@ int main(int argc, char **argv)
 	for(j=0; j<iters; j++)
 	{
 	    sprintf(entry_name, "%s%d", str_buf, j);
-	    ret = PVFS_sys_remove(entry_name, parent_refn, credentials);
+	    ret = PVFS_sys_remove(entry_name, parent_refn, &credentials);
 	    if(ret < 0)
 	    {
 		PVFS_perror("PVFS_sys_remove", ret);

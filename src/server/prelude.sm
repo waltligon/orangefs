@@ -230,10 +230,9 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	     * PVFS_U_WRITE here to indicate we need write access; its 
 	     * misleading
 	     */
-	    js_p->error_code = check_mode(&(s_op->attr), 
-		s_op->req->credentials.uid,
-		s_op->req->credentials.gid,
-		PVFS_U_WRITE);
+	    js_p->error_code = check_mode(
+                &(s_op->attr), s_op->req->credentials.uid,
+                s_op->req->credentials.gid, PVFS_U_WRITE);
 	    break;
 	/* special case: we only check permissions on setattr if it 
 	 * already has attributes

@@ -98,7 +98,7 @@ int main(
     name = filename;
 
     PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, credentials,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
 			  &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     /* TODO: really we probably want to look for a specific error code,
      * like maybe ENOENT?
@@ -110,7 +110,7 @@ int main(
 	/* get root handle */
 	name = "/";
 
-	ret = PVFS_sys_lookup(fs_id, name, credentials,
+	ret = PVFS_sys_lookup(fs_id, name, &credentials,
 			      &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
 	if (ret < 0)
 	{
@@ -130,7 +130,7 @@ int main(
 	entry_name = &(filename[1]);	/* leave off slash */
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      credentials, NULL, &resp_cr);
+			      &credentials, NULL, &resp_cr);
 	if (ret < 0)
 	{
 	    fprintf(stderr, "Error: PVFS_sys_create() failure.\n");
@@ -168,7 +168,7 @@ int main(
     }
 
     ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, mem_req,
-			 credentials, &resp_io);
+			 &credentials, &resp_io);
     if (ret < 0)
     {
 	fprintf(stderr, "Error: PVFS_sys_write() failure.\n");
@@ -185,7 +185,7 @@ int main(
     printf("IO-TEST: performing read on handle: %ld, fs: %d\n",
 	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
     ret = PVFS_sys_read(pinode_refn, file_req, 0, buffer, mem_req,
-			credentials, &resp_io);
+			&credentials, &resp_io);
     if (ret < 0)
     {
 	fprintf(stderr, "Error: PVFS_sys_read() failure.\n");
@@ -220,7 +220,7 @@ int main(
     }
 
     /* now that we've done some i/o, flush the data to disk */
-    ret = PVFS_sys_flush(pinode_refn, credentials);
+    ret = PVFS_sys_flush(pinode_refn, &credentials);
     if (ret < 0)
     {
 	fprintf(stderr, "Error: PVFS_sys_flush() error.\n");

@@ -17,6 +17,21 @@
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
 
+/*
+  PVFS_{i}sys_remove takes the following steps:
+
+  - rmdirent the entry from the parent directory
+  - getattr on the object to be removed
+  - if the object is a directory
+    - check if the dir is empty
+    - if so, continue
+    - if not, crdirent the previously rmdirent'd
+      entry and return -PVFS_ENOTEMPTY
+  - if the object is a metafile
+    - remove all associated data files
+  - remove the actual object specified
+*/
+
 extern job_context_id pint_client_sm_context;
 
 enum
@@ -140,29 +155,17 @@ machine pvfs2_client_remove_sm(
 
 %%
 
-/*
-  PVFS_sys_remove takes the following steps:
-
-  - rmdirent the entry from the parent directory
-  - getattr on the object to be removed
-  - if the object is a directory
-    - check if the dir is empty
-    - if so, continue
-    - if not, crdirent the previously rmdirent'd
-      entry and return -PVFS_ENOTEMPTY
-  - if the object is a metafile
-    - remove all associated data files
-  - remove the actual object specified
-*/
-int PVFS_sys_remove(char *object_name,
-		    PVFS_object_ref parent_ref, 
-		    PVFS_credentials credentials)
+int PVFS_isys_remove(
+    char *object_name,
+    PVFS_object_ref parent_ref, 
+    PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_remove entered\n");
 
     if (object_name == NULL)
     {
@@ -176,7 +179,7 @@ int PVFS_sys_remove(char *object_name,
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = &credentials;
+    sm_p->cred_p = credentials;
     sm_p->u.remove.object_name = object_name;
     sm_p->parent_ref  = parent_ref;
     sm_p->u.remove.stored_error_code = 0;
@@ -188,41 +191,34 @@ int PVFS_sys_remove(char *object_name,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove calling "
                  "PINT_client_state_machine_post()\n");
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_REMOVE);
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_REMOVE, op_id, user_ptr);
+}
+
+int PVFS_sys_remove(
+    char *object_name,
+    PVFS_object_ref parent_ref, 
+    PVFS_credentials *credentials)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove entered\n");
+
+    ret = PVFS_isys_remove(object_name, parent_ref,
+                           credentials, &op_id, NULL);
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-        free(sm_p);
-        return ret;
+        gossip_lerr("PVFS_isys_remove call failed\n");
+        error = ret;
+        goto exit_path;
     }
+    PVFS_sys_wait(op_id, "remove", error, ret);
 
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove calling "
-                     "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
-    }
+  exit_path:
 
-    if (ret)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
-    }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove completed\n");
-
-    error = (sm_p->u.remove.stored_error_code ?
-             sm_p->u.remove.stored_error_code :
-             sm_p->error_code);
-
-    /* flush any matching pinode entries (if any) */
-    if (sm_p->acache_hit)
-    {
-        PINT_acache_invalidate(sm_p->object_ref);
-    }
-
-    free(sm_p);
+    PVFS_sys_release(op_id);
     return error;
 }
 
@@ -457,9 +453,9 @@ static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
 
     sm_p->u.remove.stored_error_code = js_p->error_code;
     PVFS_perror_gossip("Error: could not replace directory entry!",
-	js_p->error_code);
+                       js_p->error_code);
     gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
-	"may lead to inconsistent state.\n");
+               "may lead to inconsistent state.\n");
     gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
 
     return 1;

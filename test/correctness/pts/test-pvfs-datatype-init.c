@@ -60,7 +60,7 @@ int test_pvfs_datatype_init(
                  TEST_FILE_PREFIX,i,myid);
 
         ret = PVFS_sys_lookup(pvfs_helper.fs_id,
-                              filename, credentials, &resp_lk,
+                              filename, &credentials, &resp_lk,
                               PVFS2_LOOKUP_LINK_NO_FOLLOW);
         if (ret < 0)
         {
@@ -68,7 +68,7 @@ int test_pvfs_datatype_init(
 
             /* get root handle */
             ret = PVFS_sys_lookup(pvfs_helper.fs_id,
-                                  "/", credentials, &resp_lk,
+                                  "/", &credentials, &resp_lk,
                                   PVFS2_LOOKUP_LINK_NO_FOLLOW);
             if ((ret < 0) || (!resp_lk.ref.handle))
             {
@@ -86,7 +86,7 @@ int test_pvfs_datatype_init(
 		time(NULL);
 
             ret = PVFS_sys_create(&(filename[1]),resp_lk.ref,
-                                  attr, credentials, NULL, &resp_cr);
+                                  attr, &credentials, NULL, &resp_cr);
             if ((ret < 0) || (!resp_cr.ref.handle))
             {
                 debug_printf("Error: PVFS_sys_create() failure.\n");

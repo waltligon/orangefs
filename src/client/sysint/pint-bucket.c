@@ -93,6 +93,7 @@ int PINT_bucket_finalize(void)
                 cur_config_cache->fs = NULL;
                 PINT_llist_free(cur_config_cache->bmi_host_extent_tables,
                                 free_host_extent_table);
+                free(cur_config_cache);
             }
         } while(hash_link);
     }

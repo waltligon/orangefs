@@ -27,9 +27,7 @@ static int mgmt_statfs_list_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
 static int statfs_list_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 %%
 
@@ -60,38 +58,40 @@ machine pvfs2_client_mgmt_statfs_list_sm(
 
 %%
 
-int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
-			  PVFS_credentials credentials,
-			  struct PVFS_mgmt_server_stat *stat_array,
-			  PVFS_BMI_addr_t *addr_array,
-			  int count,
-			  PVFS_error_details *details)
+int PVFS_imgmt_statfs_list(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    struct PVFS_mgmt_server_stat *stat_array,
+    PVFS_BMI_addr_t *addr_array,
+    int count,
+    PVFS_error_details *details,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr)
 {
-    int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_imgmt_statfs_list entered\n");
 
     if ((count < 1) || !stat_array || !addr_array)
     {
 	return -PVFS_EINVAL;
     }
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
-	error = -PVFS_ENOMEM;
-	goto cleanup;
+        return -PVFS_ENOMEM;
     }
 
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = &credentials;
-    sm_p->u.statfs_list.fs_id      = fs_id;
+    sm_p->cred_p = credentials;
+    sm_p->u.statfs_list.fs_id = fs_id;
     sm_p->u.statfs_list.stat_array = stat_array;
-    sm_p->u.statfs_list.count      = count;
+    sm_p->u.statfs_list.count = count;
     sm_p->u.statfs_list.addr_array = addr_array;
+    sm_p->u.statfs_list.details = details;
 
     memset(sm_p->u.statfs_list.stat_array, 0,
            (count * sizeof(struct PVFS_mgmt_server_stat)));
@@ -101,79 +101,46 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
         count * sizeof(PINT_client_sm_msgpair_state));
     if (sm_p->msgarray == NULL)
     {
-	error = -PVFS_ENOMEM;
-	goto cleanup;
-    }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
-                 "PINT_client_state_machine_post()\n");
-
-    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_STATFS_LIST);
-    if (ret < 0)
-    {
-	PVFS_perror_gossip("Error: PINT_client_state_machine_post() "
-                    "failure.\n",ret);
-	error = ret;
-	goto cleanup;
-    }
-
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
-                     "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
-    }
-
-    if (ret < 0)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	error = ret;
-	goto cleanup;
-    }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list completed\n");
-
-    error = sm_p->error_code;
-
-    /* store server-specific errors if requested and present */
-    if ((error != 0) && (details != NULL))
-    {
-	int i, errct = 0;
-
-	details->count_exceeded = 0;
-
-	for (i=0; i < count; i++)
-        {
-	    if (sm_p->msgarray[i].op_status != 0)
-	    {
-		if (errct < details->count_allocated)
-		{
-		    details->error[errct].error = sm_p->msgarray[i].op_status;
-		    details->error[errct].addr  = sm_p->msgarray[i].svr_addr;
-		    errct++;
-		}
-		else
-		{
-		    details->count_exceeded = 1;
-		}
-	    }
-	}
-	details->count_used = errct;
-
-	error = -PVFS_EDETAIL;
-    }
-
- cleanup:
-
-    if (sm_p->msgarray != NULL)
-    {
-        free(sm_p->msgarray);
-    }
-
-    if (sm_p != NULL)
-    {
         free(sm_p);
+        return -PVFS_ENOMEM;
     }
+
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_MGMT_STATFS_LIST, op_id, user_ptr);
+}
+
+int PVFS_mgmt_statfs_list(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    struct PVFS_mgmt_server_stat *stat_array,
+    PVFS_BMI_addr_t *addr_array,
+    int count,
+    PVFS_error_details *details)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_mgmt_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list entered\n");
+
+    ret = PVFS_imgmt_statfs_list(
+        fs_id, credentials, stat_array, addr_array, count,
+        details, &op_id, NULL);
+
+    if (ret)
+    {
+        gossip_lerr("Error: PVFS_imgmt_statfs_list call failed\n");
+        error = ret;
+        goto exit_path;
+    }
+    PVFS_mgmt_wait(op_id, "statfs_list", error, ret);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_mgmt_statfs_list completed\n");
+
+  exit_path:
+
+    PVFS_mgmt_release(op_id);
     return error;
 }
 
@@ -209,7 +176,42 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
 static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
                                     job_status_s *js_p)
 {
-    sm_p->error_code  = js_p->error_code;
+    int i = 0, errct = 0;
+    PVFS_error error = js_p->error_code;
+
+    /* store server-specific errors if requested and present */
+    if ((error != 0) && (sm_p->u.statfs_list.details != NULL))
+    {
+	sm_p->u.statfs_list.details->count_exceeded = 0;
+
+	for(i = 0; i < sm_p->u.statfs_list.count; i++)
+        {
+	    if (sm_p->msgarray[i].op_status != 0)
+	    {
+		if (errct < sm_p->u.statfs_list.details->count_allocated)
+		{
+		    sm_p->u.statfs_list.details->error[errct].error =
+                        sm_p->msgarray[i].op_status;
+		    sm_p->u.statfs_list.details->error[errct].addr =
+                        sm_p->msgarray[i].svr_addr;
+		    errct++;
+		}
+		else
+		{
+		    sm_p->u.statfs_list.details->count_exceeded = 1;
+		}
+	    }
+	}
+	sm_p->u.statfs_list.details->count_used = errct;
+	error = -PVFS_EDETAIL;
+    }
+
+    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
+    {
+	free(sm_p->msgarray);
+    }
+
+    sm_p->error_code  = error;
     sm_p->op_complete = 1;
 
     return 0;
@@ -241,7 +243,7 @@ static int statfs_list_comp_fn(void *v_p,
             resp_stat->handles_available_count;
 
 	sm_stat->bmi_address = PVFS_mgmt_map_addr(
-            sm_p->u.statfs_list.fs_id, *sm_p->cred_p,
+            sm_p->u.statfs_list.fs_id, sm_p->cred_p,
             sm_p->msgarray[i].svr_addr, &sm_stat->server_type);
 	assert(sm_stat->bmi_address);
 

@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     PVFS_util_gen_credentials(&creds);
 
     /* count how many I/O servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, creds, PVFS_MGMT_IO_SERVER,
+    ret = PVFS_mgmt_count_servers(cur_fs, &creds, PVFS_MGMT_IO_SERVER,
 	&io_server_count);
     if(ret < 0)
     {
@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     creds,
+				     &creds,
 				     PVFS_MGMT_IO_SERVER,
 				     addr_array,
 				     &io_server_count);
@@ -148,7 +148,7 @@ int main(int argc, char **argv)
     while (1)
     {
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
-				      creds,
+				      &creds,
 				      perf_matrix, 
 				      end_time_ms_array,
 				      addr_array,
@@ -167,7 +167,7 @@ int main(int argc, char **argv)
 	for (i=0; i < io_server_count; i++)
 	{
 	    printf("\nread:  %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, creds,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
 	    for (j=0; j < HISTORY; j++)
 	    {
 		/* only print valid measurements */
@@ -195,7 +195,7 @@ int main(int argc, char **argv)
 	    }
 
 	    printf("\nwrite: %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, creds,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
 
 	    for (j=0; j < HISTORY; j++)
 	    {
@@ -226,7 +226,7 @@ int main(int argc, char **argv)
             printf("\n\nPVFS2 metadata op statistics (# of operations):\n");
             printf("==================================================");
             printf("\nread:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, creds,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {
@@ -238,7 +238,7 @@ int main(int argc, char **argv)
 	    }
 
             printf("\nwrite:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, creds,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {

@@ -96,31 +96,31 @@ enum
 
 int PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     int server_type,
     int* count);
 
 int PVFS_mgmt_get_server_array(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     int server_type,
     PVFS_BMI_addr_t *addr_array,
     int* inout_count_p);
 
 int PVFS_mgmt_noop(
     PVFS_fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_BMI_addr_t addr);
 
 const char* PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_BMI_addr_t addr,
     int* server_type);
 
 int PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     enum PVFS_server_param param,
     int64_t value,
     PVFS_BMI_addr_t *addr_array,
@@ -130,7 +130,7 @@ int PVFS_mgmt_setparam_list(
 
 int PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     enum PVFS_server_param param,
     int64_t value,
     int64_t* old_value_array,
@@ -138,7 +138,7 @@ int PVFS_mgmt_setparam_all(
 
 int PVFS_mgmt_statfs_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     struct PVFS_mgmt_server_stat *stat_array,
     PVFS_BMI_addr_t *addr_array,
     int count,
@@ -146,14 +146,14 @@ int PVFS_mgmt_statfs_list(
 
 int PVFS_mgmt_statfs_all(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     struct PVFS_mgmt_server_stat *stat_array,
     int* inout_count_p,
     PVFS_error_details *details);
 
 int PVFS_mgmt_perf_mon_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     struct PVFS_mgmt_perf_stat** perf_matrix,
     uint64_t* end_time_ms_array,
     PVFS_BMI_addr_t *addr_array,
@@ -164,7 +164,7 @@ int PVFS_mgmt_perf_mon_list(
 
 int PVFS_mgmt_event_mon_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     struct PVFS_mgmt_event **event_matrix,
     PVFS_BMI_addr_t *addr_array,
     int server_count,
@@ -172,12 +172,12 @@ int PVFS_mgmt_event_mon_list(
     PVFS_error_details *details);
 
 int PVFS_mgmt_toggle_admin_mode(
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     int on_flag);
 
 int PVFS_mgmt_iterate_handles_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_handle **handle_matrix,
     int* handle_count_array,
     PVFS_ds_position *position_array,
@@ -187,7 +187,7 @@ int PVFS_mgmt_iterate_handles_list(
 
 int PVFS_mgmt_get_dfile_array(
     PVFS_object_ref ref,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_handle *dfile_array,
     int dfile_count);
 

@@ -25,10 +25,11 @@ static int mgmt_get_dfile_array_cleanup(
 
 %%
 
-machine pvfs2_client_mgmt_get_dfile_array_sm(getattr_setup_msgpair,
-                                             getattr_xfer_msgpair,
-                                             getattr_failure,
-                                             cleanup)
+machine pvfs2_client_mgmt_get_dfile_array_sm(
+    getattr_setup_msgpair,
+    getattr_xfer_msgpair,
+    getattr_failure,
+    cleanup)
 {
     state getattr_setup_msgpair
     {
@@ -59,17 +60,19 @@ machine pvfs2_client_mgmt_get_dfile_array_sm(getattr_setup_msgpair,
 
 %%
 
-int PVFS_mgmt_get_dfile_array(
+int PVFS_imgmt_get_dfile_array(
     PVFS_object_ref ref,
-    PVFS_credentials credentials,
-    PVFS_handle * dfile_array,
-    int dfile_count)
+    PVFS_credentials *credentials,
+    PVFS_handle *dfile_array,
+    int dfile_count,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PVFS_mgmt_get_dfile_array entered\n");
+                 "PVFS_imgmt_get_dfile_array entered\n");
 
     if (!dfile_array)
     {
@@ -83,43 +86,43 @@ int PVFS_mgmt_get_dfile_array(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = &credentials;
+    sm_p->cred_p = credentials;
     sm_p->object_ref = ref;
     sm_p->u.get_dfile_array.dfile_array = dfile_array;
     sm_p->u.get_dfile_array.dfile_count = dfile_count;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_get_dfile_array calling "
-                 "PINT_client_state_machine_post()\n");
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_MGMT_GET_DFILE_ARRAY, op_id, user_ptr);
+}
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_GET_DFILE_ARRAY);
-    if (ret < 0)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-	free(sm_p);
-	return(ret);
-    }
-
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_get_dfile_array "
-                     "calling PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
-    }
-
-    if (ret < 0)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
-    }
+int PVFS_mgmt_get_dfile_array(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    PVFS_handle *dfile_array,
+    int dfile_count)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_mgmt_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PVFS_mgmt_get_dfile_array completed\n");
+                 "PVFS_mgmt_get_dfile_array entered\n");
 
-    ret = sm_p->error_code;
+    ret = PVFS_imgmt_get_dfile_array(
+        ref, credentials, dfile_array, dfile_count, &op_id, NULL);
 
-    free(sm_p);
-    return (ret);
+    if (ret)
+    {
+        gossip_lerr("Error: PVFS_imgmt_get_dfile_array call failed\n");
+        error = ret;
+        goto exit_path;
+    }
+    PVFS_mgmt_wait(op_id, "get_dfile_array", error, ret);
+
+  exit_path:
+
+    PVFS_mgmt_release(op_id);
+    return error;
 }
 
 

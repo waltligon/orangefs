@@ -23,9 +23,10 @@ snprintf(fname, max_len, (slash ? "/%s%dr%d" : "%s%dr%d"),\
 #define RELATIVE_SYMLINK_NAME "rl"
 #define ABSOLUTE_SYMLINK_NAME "al"
 
-static int build_nested_path(int levels, char *format, int rank, int test_symlinks)
+static int build_nested_path(
+    int levels, char *format, int rank, int test_symlinks)
 {
-    int ret = -1, i = 0;
+    int ret = -1, i = 0, stored_error = 0;
     char cur_filename[64] = {0}, tmp_buf[PVFS_NAME_MAX] = {0};
     PVFS_fs_id cur_fs_id = 0;
     PVFS_sys_attr attr;
@@ -41,6 +42,8 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
     PVFS_object_ref *asymlink_refns = NULL;
     char **absolute_paths = NULL;
 
+    PVFS_util_gen_credentials(&credentials);
+
     if (levels && format)
     {
         snprintf(PATH_LOOKUP_BASE_DIR, 64, "d%sr%d",
@@ -49,9 +52,8 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
         cur_fs_id = pvfs_helper.fs_id;
 
         /* look up the root handle */
-        PVFS_util_gen_credentials(&credentials);
         ret = PVFS_sys_lookup(
-            cur_fs_id, "/", credentials, &lookup_resp,
+            cur_fs_id, "/", &credentials, &lookup_resp,
             PVFS2_LOOKUP_LINK_NO_FOLLOW);
         if (ret < 0)
         {
@@ -74,7 +76,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                 PATH_LOOKUP_BASE_DIR, Lu(root_refn.handle),
                 root_refn.fs_id);
         ret = PVFS_sys_mkdir(PATH_LOOKUP_BASE_DIR, root_refn,
-                             attr, credentials, &mkdir_resp);
+                             attr, &credentials, &mkdir_resp);
         if (ret < 0)
         {
             fprintf(stderr," PVFS_sys_mkdir failed to create "
@@ -105,7 +107,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                     parent_refn.fs_id);
 
             ret = PVFS_sys_mkdir(cur_filename, parent_refn, attr,
-                                 credentials, &mkdir_resp);
+                                 &credentials, &mkdir_resp);
             if (ret < 0)
             {
                 fprintf(stderr," PVFS_sys_mkdir failed to create "
@@ -148,7 +150,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
             /* first do a relative lookup */
             ret = PVFS_sys_ref_lookup(
                 parent_refn.fs_id, cur_filename,
-                parent_refn, credentials,
+                parent_refn, &credentials,
                 &lookup_resp, PVFS2_LOOKUP_LINK_NO_FOLLOW);
             if (ret < 0)
             {
@@ -170,7 +172,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                     absolute_paths[i]);
 #endif
             ret = PVFS_sys_lookup(cur_fs_id, absolute_paths[i],
-                                  credentials, &lookup_resp,
+                                  &credentials, &lookup_resp,
                                   PVFS2_LOOKUP_LINK_NO_FOLLOW);
             if (ret < 0)
             {
@@ -224,7 +226,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                 parent_refn.fs_id, cur_filename);
         ret = PVFS_sys_symlink(
             RELATIVE_SYMLINK_NAME, parent_refn, cur_filename,
-            attr, credentials, &symlink_resp);
+            attr, &credentials, &symlink_resp);
         if (ret < 0)
         {
             PVFS_perror("Failed to create symlink ", ret);
@@ -240,7 +242,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                 parent_refn.fs_id, absolute_paths[i]);
         ret = PVFS_sys_symlink(
             ABSOLUTE_SYMLINK_NAME, parent_refn, absolute_paths[i],
-            attr, credentials, &symlink_resp);
+            attr, &credentials, &symlink_resp);
         if (ret < 0)
         {
             PVFS_perror("Failed to create symlink ", ret);
@@ -269,7 +271,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
             fprintf(stderr,"Looking up rsymlink %d [UNFOLLOWED] "
                     "\t\t... ", i);
             ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
-                                  credentials, &lookup_resp,
+                                  &credentials, &lookup_resp,
                                   PVFS2_LOOKUP_LINK_NO_FOLLOW);
             if (ret < 0)
             {
@@ -296,7 +298,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
             fprintf(stderr,"Looking up rsymlink %d [  FOLLOWED] "
                     "\t\t... ", i);
             ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
-                                  credentials, &lookup_resp,
+                                  &credentials, &lookup_resp,
                                   PVFS2_LOOKUP_LINK_FOLLOW);
             if (ret < 0)
             {
@@ -330,7 +332,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
             fprintf(stderr,"Looking up asymlink %d [UNFOLLOWED] "
                     "\t\t... ", i);
             ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
-                                  credentials, &lookup_resp,
+                                  &credentials, &lookup_resp,
                                   PVFS2_LOOKUP_LINK_NO_FOLLOW);
             if (ret < 0)
             {
@@ -357,7 +359,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
             fprintf(stderr,"Looking up asymlink %d [  FOLLOWED] "
                     "\t\t... ", i);
             ret = PVFS_sys_lookup(cur_fs_id, tmp_buf,
-                                  credentials, &lookup_resp,
+                                  &credentials, &lookup_resp,
                                   PVFS2_LOOKUP_LINK_FOLLOW);
             if (ret < 0)
             {
@@ -394,6 +396,8 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
     }
 
   cleanup:
+    stored_error = ret;
+
     if (absolute_paths)
     {
         for(i = (levels - 1); i > -1; i--)
@@ -409,7 +413,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
             fprintf(stderr,"Removing path %s under %Lu,%d \t\t... ",
                     cur_filename, Lu(parent_refn.handle),
                     parent_refn.fs_id);
-            ret = PVFS_sys_remove(cur_filename, parent_refn, credentials);
+            ret = PVFS_sys_remove(cur_filename, parent_refn, &credentials);
             fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));
             if (ret)
             {
@@ -422,7 +426,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                         RELATIVE_SYMLINK_NAME, Lu(parent_refn.handle),
                         parent_refn.fs_id);
                 ret = PVFS_sys_remove(RELATIVE_SYMLINK_NAME,
-                                      parent_refn, credentials);
+                                      parent_refn, &credentials);
                 fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));
                 if (ret)
                 {
@@ -433,7 +437,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                         ABSOLUTE_SYMLINK_NAME, Lu(parent_refn.handle),
                         parent_refn.fs_id);
                 ret = PVFS_sys_remove(ABSOLUTE_SYMLINK_NAME,
-                                      parent_refn, credentials);
+                                      parent_refn, &credentials);
                 fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));
                 if (ret)
                 {
@@ -443,7 +447,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
         }
         free(absolute_paths);
     }
-    ret = PVFS_sys_remove(PATH_LOOKUP_BASE_DIR, root_refn, credentials);
+    ret = PVFS_sys_remove(PATH_LOOKUP_BASE_DIR, root_refn, &credentials);
     if (ret)
     {
         PVFS_perror("Top-level Path removal error ", ret);
@@ -456,7 +460,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
     {
         free(lookup_refns);
     }
-    return ret;
+    return stored_error;
 }
 
 int test_path_lookup(MPI_Comm *comm __unused, int rank, char *buf __unused, void *params __unused)

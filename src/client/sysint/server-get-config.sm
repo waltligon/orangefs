@@ -29,16 +29,15 @@ static int server_parse_config(
     uint32_t server_config_buf_size);
 
 /* state function prototypes */
-static int server_get_config_setup_msgpair(PINT_client_sm *sm_p,
-                                          job_status_s *js_p);
-static int server_get_config_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p);
+static int server_get_config_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int server_get_config_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int server_get_config_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int server_get_config_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int i);
 
-static int server_get_config_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p);
-static int server_get_config_comp_fn(void *v_p,
-			       struct PVFS_server_resp *resp_p,
-			       int i);
 %%
 
 machine pvfs2_server_get_config_sm(
@@ -75,19 +74,19 @@ machine pvfs2_server_get_config_sm(
 
   returns 0 on success, -errno on error
 */
-
-int PINT_server_get_config(struct server_configuration_s *config,
-			    struct PVFS_sys_mntent* mntent_p)
+int PINT_server_get_config(
+    struct server_configuration_s *config,
+    struct PVFS_sys_mntent* mntent_p)
 {
     int ret = -PVFS_EINVAL;
-
     PINT_client_sm *sm_p = NULL;
     PVFS_error error = 0;
-
     PVFS_credentials creds;
     struct filesystem_configuration_s* cur_fs = NULL;
+    PVFS_sys_op_id op_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_server_get_config entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PINT_server_get_config entered\n");
 
     if (!config || !mntent_p)
     {
@@ -96,13 +95,13 @@ int PINT_server_get_config(struct server_configuration_s *config,
 
     PVFS_util_gen_credentials(&creds);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,"asked for fs name = %s\n",
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "asked for fs name = %s\n",
                  mntent_p->pvfs_fs_name);
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
-	error = -PVFS_ENOMEM;
+        return -PVFS_ENOMEM;
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
@@ -112,49 +111,36 @@ int PINT_server_get_config(struct server_configuration_s *config,
     sm_p->cred_p = &creds;
     sm_p->u.get_config.mntent = mntent_p;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_server_get_config calling "
-                 "PINT_client_state_machine_post()\n");
-
-    ret = PINT_client_state_machine_post(sm_p, PVFS_SERVER_GET_CONFIG);
-    if (ret < 0)
+    ret = PINT_client_state_machine_post(
+        sm_p, PVFS_SERVER_GET_CONFIG, &op_id, NULL);
+    if (ret)
     {
-	PVFS_perror_gossip("Error: PINT_client_state_machine_post() "
-                    "failure.\n",ret);
-	error = ret;
-	goto cleanup;
+        gossip_lerr("PINT_client_state_machine_post call failed\n");
+        error = ret;
+        goto exit_path;
+    }
+    PVFS_sys_wait(op_id, "[non isys] get_config", error, ret);
+
+    if (error)
+    {
+	goto exit_path;
     }
 
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_server_get_config calling "
-                     "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
-    }
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PINT_server_get_config completed\n");
 
-    if (ret < 0)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	error = ret;
-	goto cleanup;
-    }
+    ret = server_parse_config(
+        config,  sm_p->u.get_config.fs_config_buf,
+        sm_p->u.get_config.fs_config_buf_size,
+        sm_p->u.get_config.server_config_buf,
+        sm_p->u.get_config.server_config_buf_size);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_server_get_config completed\n");
-
-    error = sm_p->error_code;
-
-    if (error != 0)
-	goto cleanup;
-
-    ret = server_parse_config(config, 
-	    sm_p->u.get_config.fs_config_buf,
-	    sm_p->u.get_config.fs_config_buf_size,
-	    sm_p->u.get_config.server_config_buf,
-	    sm_p->u.get_config.server_config_buf_size);
     if (ret)
     {
 	gossip_err("Failed to get_config from host %s\n",
-		mntent_p->pvfs_config_server); 
-	return -PVFS_ENODEV;
+                   mntent_p->pvfs_config_server); 
+	error = -PVFS_ENODEV;
+        goto exit_path;
     }
 
     cur_fs = PINT_config_find_fs_name(config, mntent_p->pvfs_fs_name);
@@ -175,20 +161,23 @@ int PINT_server_get_config(struct server_configuration_s *config,
                    "have\n write permissions in the current "
                    "directory or in the /tmp directory\n\n");
 
-	return(-PVFS_ENODEV);
+	error = -PVFS_ENODEV;
+        goto exit_path;
     }
+
     mntent_p->fs_id = cur_fs->coll_id;
     cur_fs->flowproto = mntent_p->flowproto;
     cur_fs->encoding = mntent_p->encoding;
 
- cleanup:
+  exit_path:
 
-    if (sm_p != NULL && 0 == sm_p->u.get_config.persist_config_buffers)
+    if (sm_p && !sm_p->u.get_config.persist_config_buffers)
     {
 	free(sm_p->u.get_config.fs_config_buf);
 	free(sm_p->u.get_config.server_config_buf);
-        free(sm_p);
     }
+
+    PVFS_sys_release(op_id);
     return error;
 }
 
@@ -290,8 +279,7 @@ static int server_get_config_setup_msgpair(PINT_client_sm *sm_p,
 	return ret;
     }
 
-    PINT_SERVREQ_GETCONFIG_FILL(msg_p->req,
-	    *sm_p->cred_p);
+    PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p);
 
     msg_p->fs_id = PVFS_FS_ID_NULL;
     msg_p->handle = PVFS_HANDLE_NULL;

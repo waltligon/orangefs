@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         ret = PVFS_sys_lookup(cur_fs, pvfs_path,
-                              credentials, &resp_lookup,
+                              &credentials, &resp_lookup,
                               PVFS2_LOOKUP_LINK_FOLLOW);
         if (ret < 0)
         {
@@ -152,7 +152,7 @@ int main(int argc, char **argv)
             goto main_out;
         }
 
-        ret = PVFS_util_lookup_parent(pvfs_path, cur_fs, credentials, 
+        ret = PVFS_util_lookup_parent(pvfs_path, cur_fs, &credentials, 
                                       &parent_ref.handle);
         if(ret < 0)
         {
@@ -182,7 +182,7 @@ int main(int argc, char **argv)
 
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_ref_lookup(parent_ref.fs_id, entry_name,
-                              parent_ref, credentials, &resp_lookup,
+                              parent_ref, &credentials, &resp_lookup,
                               PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret == 0)
     {
@@ -193,7 +193,7 @@ int main(int argc, char **argv)
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
     ret = PVFS_sys_create(entry_name, parent_ref, attr,
-                          credentials, NULL, &resp_create);
+                          &credentials, NULL, &resp_create);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_create", ret);
@@ -230,7 +230,7 @@ int main(int argc, char **argv)
 	/* write out the data */
 	ret = PVFS_sys_write(ref, file_req,
                              total_written, buffer, mem_req, 
-                             credentials, &resp_io);
+                             &credentials, &resp_io);
 	if(ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_write", ret);

@@ -61,7 +61,7 @@ int main(int argc,char **argv)
 
     memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
-    ret = PVFS_sys_lookup(fs_id, filename, credentials,
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_lk, follow_link);
     if (ret < 0)
     {

@@ -19,8 +19,9 @@
 #include "job.h"
 #include "gossip.h"
 #include "pvfs2-util.h"
+#include "id-generator.h"
 
-#define MAX_RETURNED_JOBS   32
+#define MAX_RETURNED_JOBS   256
 
 job_context_id pint_client_sm_context;
 
@@ -31,11 +32,18 @@ static int job_count = 0;
 
 int PINT_client_state_machine_post(
     PINT_client_sm *sm_p,
-    int pvfs_sys_op)
+    int pvfs_sys_op,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr /* in */)
 {
     int ret = -PVFS_EINVAL;
     job_status_s js;
     static int got_context = 0;
+
+    if (!sm_p)
+    {
+        return ret;
+    }
 
     if (got_context == 0)
     {
@@ -45,6 +53,7 @@ int PINT_client_state_machine_post(
     }
 
     /* save operation type; mark operation as unfinished */
+    sm_p->user_ptr = user_ptr;
     sm_p->op = pvfs_sys_op;
     sm_p->op_complete = 0;
 
@@ -157,6 +166,11 @@ int PINT_client_state_machine_post(
     /* note: job_status_s pointed to by js_p is ok to use after
      * we return regardless of whether or not we finished.
      */
+
+    if (op_id)
+    {
+        ret = id_gen_safe_register(op_id, (void *)sm_p);
+    }
     return ret;
 }
 
@@ -185,12 +199,80 @@ int PINT_client_bmi_cancel(job_id_t id)
     return(job_bmi_cancel(id, pint_client_sm_context));
 }
 
-int PINT_client_state_machine_test(void)
+int PINT_client_state_machine_test(
+    PVFS_sys_op_id op_id,
+    int *error_code)
 {
     int ret = -PVFS_EINVAL, i = 0;
-    PINT_client_sm *sm_p = NULL;
-    
+    PINT_client_sm *sm_p, *tmp_sm_p = NULL;
+
     job_count = MAX_RETURNED_JOBS;
+
+    if (!op_id || !error_code)
+    {
+        return ret;
+    }
+
+    sm_p = id_gen_safe_lookup(op_id);
+    if (!sm_p)
+    {
+        return ret;
+    }
+    assert(sm_p);
+
+    if (sm_p->op_complete)
+    {
+        *error_code = sm_p->error_code;
+        return 0;
+    }
+
+    /* TODO: this isn't thread safe... */
+    ret = job_testcontext(job_id_array,
+			  &job_count, /* in/out parameter */
+			  client_sm_p_array,
+			  job_status_array,
+			  100, /* timeout? */
+			  pint_client_sm_context);
+    assert(ret > -1);
+
+    /* do as much as we can on every job that has completed */
+    for(i = 0; i < job_count; i++)
+    {
+	tmp_sm_p = (PINT_client_sm *)client_sm_p_array[i];
+
+        do
+        {
+            ret = PINT_state_machine_next(tmp_sm_p, &job_status_array[i]);
+
+        } while (ret == 1);
+
+        /* (ret < 0) indicates a problem from the job system
+         * itself; the return value of the underlying operation
+         * is kept in the job status structure.
+         */
+        assert(ret == 0);
+    }
+
+    if (sm_p->op_complete)
+    {
+        *error_code = sm_p->error_code;
+    }
+    return 0;
+}
+
+int PINT_client_state_machine_testsome(PVFS_sys_op_id *op_id_array,
+                                       int *op_count) /* in/out */
+{
+    int ret = -PVFS_EINVAL, i = 0, count = 0;
+    int limit = (*op_count - 1);
+    PINT_client_sm *sm_p = NULL;
+
+    job_count = MAX_RETURNED_JOBS;
+
+    if (!op_id_array || !op_count)
+    {
+        return ret;
+    }
 
     /* TODO: this isn't thread safe... */
     ret = job_testcontext(job_id_array,
@@ -212,14 +294,24 @@ int PINT_client_state_machine_test(void)
 
         } while (ret == 1);
 
-	if (ret < 0)
+        /* (ret < 0) indicates a problem from the job system
+         * itself; the return value of the underlying operation
+         * is kept in the job status structure.
+         */
+        assert(ret == 0);
+
+        if (sm_p->op_complete)
         {
-	    /* (ret < 0) indicates a problem from the job system
-	     * itself; the return value of the underlying operation
-	     * is kept in the job status structure.
-	     */
-	}
+            op_id_array[count++] = sm_p->sys_op_id;
+            if (count > limit)
+            {
+                break;
+            }
+        }
     }
+
+    *op_count = count;
+
     return 0;
 }
 
@@ -230,26 +322,28 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 			  int actual_resp_sz,
 			  struct PVFS_server_resp **resp_out_pp)
 {
-    int server_type = 0;
-    PVFS_credentials creds;
-    int ret = PINT_decode(encoded_resp_p, PINT_DECODE_RESP,
-                          decoded_resp_p, /* holds data on decoded resp */
-                          *svr_addr_p, actual_resp_sz);
+    int ret = -1, server_type = 0;
+    PVFS_credentials *creds = NULL;
+
+    ret = PINT_decode(encoded_resp_p, PINT_DECODE_RESP,
+                      decoded_resp_p, /* holds data on decoded resp */
+                      *svr_addr_p, actual_resp_sz);
     if (ret > -1)
     {
         *resp_out_pp = (struct PVFS_server_resp *)decoded_resp_p->buffer;
 	if ((*resp_out_pp)->op == PVFS_SERV_PROTO_ERROR)
 	{
-            PVFS_util_gen_credentials(&creds);
-
 	    gossip_err("Error: server does not seem to understand "
                        "the protocol that this client is using.\n");
 	    gossip_err("   Please check server logs for more "
                        "information.\n");
 	    if (fs_id != PVFS_FS_ID_NULL)
 	    {
+                creds = PVFS_util_alloc_credentials();
+                assert(creds);
                 const char *server_string = PVFS_mgmt_map_addr(
                     fs_id, creds, *svr_addr_p, &server_type);
+                free(creds);
 		gossip_err("   Server: %s.\n", server_string);
 	    }
 	    else

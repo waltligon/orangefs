@@ -61,6 +61,21 @@ void PVFS_util_gen_credentials(
     credentials->gid = getgid();
 }
 
+/* NOTE: caller must free */
+PVFS_credentials *PVFS_util_alloc_credentials(void)
+{
+    PVFS_credentials *credentials = (PVFS_credentials *)malloc(
+        sizeof(PVFS_credentials));
+    if (credentials)
+    {
+        memset(credentials, 0, sizeof(PVFS_credentials));
+        credentials->uid = getuid();
+        credentials->gid = getgid();
+    }
+    return credentials;
+}
+
+
 /* PVFS_util_parse_pvfstab()
  *
  * parses either the file pointed to by the PVFS2TAB_FILE env
@@ -784,7 +799,7 @@ int PVFS_util_init_defaults(void)
 int PVFS_util_lookup_parent(
     char *filename,
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_handle * handle)
 {
     char buf[PVFS_SEGMENT_MAX] = { 0 };

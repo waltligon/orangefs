@@ -109,8 +109,8 @@ int pvfs2_vis_start(char* path, int update_interval)
     creds.gid = getgid();
 
     /* count how many I/O servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, creds, PVFS_MGMT_IO_SERVER,
-	&io_server_count);
+    ret = PVFS_mgmt_count_servers(cur_fs, &creds, PVFS_MGMT_IO_SERVER,
+                                  &io_server_count);
     if(ret < 0)
     {
 	return(ret);
@@ -157,7 +157,7 @@ int pvfs2_vis_start(char* path, int update_interval)
 	return -PVFS_ENOMEM;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     creds,
+				     &creds,
 				     PVFS_MGMT_IO_SERVER,
 				     addr_array,
 				     &io_server_count);
@@ -173,7 +173,7 @@ int pvfs2_vis_start(char* path, int update_interval)
     {
 	memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
-				      creds,
+				      &creds,
 				      perf_matrix, 
 				      end_time_ms_array,
 				      addr_array,
@@ -288,7 +288,7 @@ static void *poll_for_updates(void *args)
     while (1)
     {
 	ret = PVFS_mgmt_perf_mon_list(fs,
-				      credentials,
+				      &credentials,
 				      tmp_matrix, 
 				      end_time_ms_array,
 				      addr_array,

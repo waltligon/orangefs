@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 
     /* count how many I/O servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs,
-				  creds,
+				  &creds,
 				  PVFS_MGMT_IO_SERVER,
 				  &io_server_count);
     if (ret < 0)
@@ -112,7 +112,7 @@ int main(int argc, char **argv)
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     creds,
+				     &creds,
 				     PVFS_MGMT_IO_SERVER,
 				     addr_array,
 				     &io_server_count);
@@ -124,7 +124,7 @@ int main(int argc, char **argv)
 
     /* grap current events */
     ret = PVFS_mgmt_event_mon_list(cur_fs,
-				   creds,
+				   &creds,
 				   event_matrix,
 				   addr_array, 
 				   io_server_count,

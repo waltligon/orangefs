@@ -55,7 +55,7 @@ static int read_dirs(PVFS_object_ref refn,
            Ld(refn.handle), refn.fs_id);
     printf("ndirs is %d\n",ndirs);
     ret = PVFS_sys_readdir(refn, PVFS_READDIR_START, ndirs,
-                           credentials, &resp_readdir);
+                           &credentials, &resp_readdir);
     if (ret < 0)
     {
 	printf("readdir failed with errcode = %d\n", ret);

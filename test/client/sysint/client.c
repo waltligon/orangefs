@@ -72,7 +72,7 @@ int main(
 
     /* lookup the root handle */
     printf("looking up the root handle for fsid = %d\n", fs_id);
-    ret = PVFS_sys_lookup(fs_id, name, credentials,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
 			  &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -122,7 +122,7 @@ int main(
 
     // call create 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			  credentials, NULL, resp_create);
+			  &credentials, NULL, resp_create);
     if (ret < 0)
     {
 	printf("create failed with errcode = %d\n", ret);
@@ -202,7 +202,7 @@ int main(
     name[0] = '/';
     memcpy(name + 1, filename, strlen(filename) + 1);
 
-    ret = PVFS_sys_lookup(fs_id, name, credentials,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
 			  resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -479,7 +479,7 @@ int main(
 
     // call readdir 
     ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
-			   credentials, resp_readdir);
+			   &credentials, resp_readdir);
     if (ret < 0)
     {
 	printf("readdir failed with errcode = %d\n", ret);

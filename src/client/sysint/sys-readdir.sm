@@ -98,41 +98,42 @@ machine pvfs2_client_readdir_sm(init,
 
 %%
 
-int PVFS_sys_readdir(
+int PVFS_isys_readdir(
     PVFS_object_ref ref,
     PVFS_ds_position token, 
     int pvfs_dirent_incount,
-    PVFS_credentials credentials,
-    PVFS_sysresp_readdir *resp)
+    PVFS_credentials *credentials,
+    PVFS_sysresp_readdir *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_readdir entered\n");
 
     if ((pvfs_dirent_incount > PVFS_REQ_LIMIT_DIRENT_COUNT) ||
         (resp == NULL))
     {
-        gossip_lerr("Error: PVFS_sys_readdir unable to handle request "
+        gossip_lerr("PVFS_isys_readdir unable to handle request "
                     "for %d entries.\n", pvfs_dirent_incount);
         return ret;
     }
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
         return -PVFS_ENOMEM;
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = &credentials;
+    sm_p->cred_p = credentials;
     sm_p->u.readdir.pos_token = token;
     sm_p->u.readdir.dirent_limit = pvfs_dirent_incount;
     sm_p->u.readdir.readdir_resp = resp;
     /*
-      set the parent ref to the passed in dir ref
-      only for using the sm_common method for getattr
+      set the parent ref to the passed in dir ref only for using the
+      sm_common method for getattr
     */
     sm_p->parent_ref = ref;
     sm_p->u.readdir.object_ref = ref;
@@ -141,33 +142,36 @@ int PVFS_sys_readdir(
                  "%Lu on fs %d\n", Lu(ref.handle),
                  ref.fs_id);
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_READDIR);
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_READDIR, op_id, user_ptr);
+}
+
+int PVFS_sys_readdir(
+    PVFS_object_ref ref,
+    PVFS_ds_position token, 
+    int pvfs_dirent_incount,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_readdir *resp)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir entered\n");
+
+    ret = PVFS_isys_readdir(ref, token, pvfs_dirent_incount,
+                            credentials, resp, &op_id, NULL);
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-        free(sm_p);
-        return ret;
+        gossip_lerr("PVFS_isys_readdir call failed\n");
+        error = ret;
+        goto exit_path;
     }
+    PVFS_sys_wait(op_id, "readdir", error, ret);
 
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir calling "
-                     "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
-    }
+  exit_path:
 
-    if (ret)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
-    }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir completed\n");
-
-    error = sm_p->error_code;
-
-    free(sm_p);
+    PVFS_sys_release(op_id);
     return error;
 }
 

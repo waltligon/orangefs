@@ -25,6 +25,7 @@ typedef struct PVFS_util_tab_s PVFS_util_tab;
 /* client side default credential generation */
 void PVFS_util_gen_credentials(
     PVFS_credentials *credentials);
+PVFS_credentials *PVFS_util_alloc_credentials(void);
 
 /* client side config file / option management */
 const PVFS_util_tab* PVFS_util_parse_pvfstab(
@@ -49,7 +50,7 @@ void PVFS_sys_free_mntent(
 int PVFS_util_lookup_parent(
     char *filename,
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_handle * handle);
 int PVFS_util_remove_base_dir(
     char *pathname,

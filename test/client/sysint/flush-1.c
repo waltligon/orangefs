@@ -69,7 +69,7 @@ int main(int argc, char **argv)
 	time(NULL);
 
     PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_util_lookup_parent(filename, cur_fs, credentials, 
+    ret = PVFS_util_lookup_parent(filename, cur_fs, &credentials, 
                                   &parent_refn.handle);
     if(ret < 0)
     {
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                credentials, NULL, &resp_create);
+                &credentials, NULL, &resp_create);
     if (ret < 0)
     {
         printf("create failed with errcode = %d\n", ret);
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
     printf("--create--\n"); 
     printf("Handle: %Ld\n",Ld(resp_create.ref.handle));
 
-    ret = PVFS_sys_flush(resp_create.ref, credentials);
+    ret = PVFS_sys_flush(resp_create.ref, &credentials);
     if (ret < 0)
     {
 	    printf("flush failed with errcode = %d\n", ret);

@@ -48,7 +48,7 @@ static int test_lookup(void)
 
     PVFS_util_gen_credentials(&credentials);
 
-    ret = PVFS_sys_lookup(-1, name, credentials,
+    ret = PVFS_sys_lookup(-1, name, &credentials,
                           &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     return ret;
 }
@@ -82,7 +82,7 @@ static int test_getattr(int testcase)
     PVFS_util_gen_credentials(&credentials);
 
     if ((ret = PVFS_sys_lookup(
-             fs_id, name, credentials,
+             fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
@@ -97,12 +97,12 @@ static int test_getattr(int testcase)
     case 0:
 	pinode_refn.handle = -1;
 	ret =
-	    PVFS_sys_getattr(pinode_refn, attrmask, credentials, &resp_getattr);
+	    PVFS_sys_getattr(pinode_refn, attrmask, &credentials, &resp_getattr);
 	break;
     case 1:
 	pinode_refn.fs_id = -1;
 	ret =
-	    PVFS_sys_getattr(pinode_refn, attrmask, credentials, &resp_getattr);
+	    PVFS_sys_getattr(pinode_refn, attrmask, &credentials, &resp_getattr);
 	break;
     default:
 	fprintf(stderr, "error, invlaid test case\n");
@@ -148,7 +148,7 @@ static int test_mkdir(int testcase)
 
     PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
-             fs_id, name, credentials,
+             fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
@@ -167,11 +167,11 @@ static int test_mkdir(int testcase)
     {
     case 0:
 	parent_refn.handle = -1;
-	ret = PVFS_sys_mkdir(name, parent_refn, attr, credentials, &resp_mkdir);
+	ret = PVFS_sys_mkdir(name, parent_refn, attr, &credentials, &resp_mkdir);
 	break;
     case 1:
 	parent_refn.fs_id = -1;
-	ret = PVFS_sys_mkdir(name, parent_refn, attr, credentials, &resp_mkdir);
+	ret = PVFS_sys_mkdir(name, parent_refn, attr, &credentials, &resp_mkdir);
 	break;
     default:
 	fprintf(stderr, "Error - no more cases\n");
@@ -212,7 +212,7 @@ static int test_readdir(int testcase)
 
     PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
-             fs_id, name, credentials,
+             fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
 	fprintf(stderr, "lookup failed %d\n", ret);
@@ -229,13 +229,13 @@ static int test_readdir(int testcase)
 	pinode_refn.handle = -1;
 	ret =
 	    PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
-			     credentials, &resp_readdir);
+			     &credentials, &resp_readdir);
 	break;
     case 1:
 	pinode_refn.fs_id = -1;
 	ret =
 	    PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
-			     credentials, &resp_readdir);
+			     &credentials, &resp_readdir);
 	break;
     }
     return ret;
@@ -275,7 +275,7 @@ static int test_create(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    ret = PVFS_sys_lookup(fs_id, "/", credentials,
+    ret = PVFS_sys_lookup(fs_id, "/", &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -288,13 +288,13 @@ static int test_create(int testcase)
     case 0:
 	resp_look.ref.handle = -1;
 	ret =
-	    PVFS_sys_create(filename, resp_look.ref, attr, credentials,
+	    PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
 			    NULL, &resp_create);
 	break;
     case 1:
 	resp_look.ref.fs_id = -1;
 	ret =
-	    PVFS_sys_create(filename, resp_look.ref, attr, credentials,
+	    PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
 			    NULL, &resp_create);
 	break;
     default:
@@ -330,7 +330,7 @@ static int test_remove(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    ret = PVFS_sys_lookup(fs_id, filename, credentials,
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -341,11 +341,11 @@ static int test_remove(int testcase)
     {
     case 0:
 	resp_look.ref.handle = -1;
-	ret = PVFS_sys_remove(filename, resp_look.ref, credentials);
+	ret = PVFS_sys_remove(filename, resp_look.ref, &credentials);
 	break;
     case 1:
 	resp_look.ref.fs_id = -1;
-	ret = PVFS_sys_remove(filename, resp_look.ref, credentials);
+	ret = PVFS_sys_remove(filename, resp_look.ref, &credentials);
 	break;
     default:
 	fprintf(stderr, "Error: invalid case number \n");
@@ -415,7 +415,7 @@ static int test_read(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    ret = PVFS_sys_lookup(fs_id, filename, credentials,
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -429,13 +429,13 @@ static int test_read(int testcase)
 	resp_lk.ref.handle = -1;
 	ret =
 	    PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer, req_mem,
-			  credentials, &resp_io);
+			  &credentials, &resp_io);
 	break;
     case 1:
 	resp_lk.ref.fs_id = -1;
 	ret =
 	    PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer, req_mem,
-			  credentials, &resp_io);
+			  &credentials, &resp_io);
 	break;
     }
     return ret;
@@ -474,7 +474,7 @@ static int test_write(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    ret = PVFS_sys_lookup(fs_id, filename, credentials,
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -488,13 +488,13 @@ static int test_write(int testcase)
 	resp_lk.ref.handle = -1;
 	ret =
 	    PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer, req_mem,
-			   credentials, &resp_io);
+			   &credentials, &resp_io);
 	break;
     case 1:
 	resp_lk.ref.fs_id = -1;
 	ret =
 	    PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer, req_mem,
-			   credentials, &resp_io);
+			   &credentials, &resp_io);
 	break;
     }
     return ret;
@@ -528,7 +528,7 @@ static int init_file(void)
     fs_id = pvfs_helper.fs_id;
 
     //get root
-    ret = PVFS_sys_lookup(fs_id, "/", credentials,
+    ret = PVFS_sys_lookup(fs_id, "/", &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -536,7 +536,7 @@ static int init_file(void)
 	return (-1);
     }
 
-    return PVFS_sys_create(filename, resp_look.ref, attr, credentials,
+    return PVFS_sys_create(filename, resp_look.ref, attr, &credentials,
 			   NULL, &resp_create);
 
 }

@@ -39,7 +39,7 @@ static int lookup(char *name, int fs_id)
 
     PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
-             fs_id, name, credentials,
+             fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
@@ -69,7 +69,7 @@ static int getattr(char *name, int fs_id)
 
     PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
-             fs_id, name, credentials,
+             fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
@@ -79,7 +79,7 @@ static int getattr(char *name, int fs_id)
     pinode_refn = resp_lookup.ref;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
-    ret = PVFS_sys_getattr(pinode_refn, attrmask, credentials, &resp_getattr);
+    ret = PVFS_sys_getattr(pinode_refn, attrmask, &credentials, &resp_getattr);
 
     return ret;
 }
@@ -102,14 +102,14 @@ static int remove_file_dir(char *name, int fs_id)
 
     PVFS_util_gen_credentials(&credentials);
 
-    ret = PVFS_sys_lookup(fs_id, name, credentials,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
         return (-1);
     }
-    ret = PVFS_sys_remove(name, resp_look.ref, credentials);
+    ret = PVFS_sys_remove(name, resp_look.ref, &credentials);
 
     return ret;
 }
@@ -138,7 +138,7 @@ static int list_dir(char *test_dir, int fs_id)
     PVFS_util_gen_credentials(&credentials);
 
     if ((ret = PVFS_sys_lookup(
-             fs_id, test_dir, credentials,
+             fs_id, test_dir, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
@@ -150,7 +150,7 @@ static int list_dir(char *test_dir, int fs_id)
     pvfs_dirent_incount = 1;
 
     ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
-                             credentials, &resp_readdir);
+                             &credentials, &resp_readdir);
 
     return ret;
 }
@@ -182,7 +182,7 @@ static int create_file(char *filename, char *directory, int fs_id)
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
 
-    ret = PVFS_sys_lookup(fs_id, directory, credentials,
+    ret = PVFS_sys_lookup(fs_id, directory, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -191,7 +191,7 @@ static int create_file(char *filename, char *directory, int fs_id)
     }
 
     ret = PVFS_sys_create(filename, resp_look.ref,
-                          attr, credentials, NULL, &resp_create);
+                          attr, &credentials, NULL, &resp_create);
    return ret;
 }
 
@@ -215,7 +215,7 @@ static int create_dir2(char *name, int fs_id)
 
     PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
-             fs_id, "/", credentials,
+             fs_id, "/", &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
@@ -230,7 +230,7 @@ static int create_dir2(char *name, int fs_id)
     attr.atime = attr.mtime = attr.ctime =
 	time(NULL);
 
-    ret = PVFS_sys_mkdir(name, parent_refn, attr, credentials, &resp_mkdir);
+    ret = PVFS_sys_mkdir(name, parent_refn, attr, &credentials, &resp_mkdir);
     return ret;
 }
 

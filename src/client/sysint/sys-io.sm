@@ -158,20 +158,24 @@ machine pvfs2_client_io_sm(
 
 %%
 
-int PVFS_sys_io(PVFS_object_ref ref,
-                PVFS_Request file_req,
-                PVFS_offset file_req_offset,
-                void *buffer,
-                PVFS_Request mem_req,
-                PVFS_credentials credentials,
-                PVFS_sysresp_io *resp_p,
-                enum PVFS_io_type io_type)
+int PVFS_isys_io(
+    PVFS_object_ref ref,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    void *buffer,
+    PVFS_Request mem_req,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_io *resp_p,
+    enum PVFS_io_type io_type,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_error error;
     struct filesystem_configuration_s* cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_io entered\n");
 
     if (resp_p == NULL)
     {
@@ -211,7 +215,7 @@ int PVFS_sys_io(PVFS_object_ref ref,
     }
 
     memset(sm_p, 0, sizeof(*sm_p));
-    sm_p->cred_p = &credentials;
+    sm_p->cred_p = credentials;
     sm_p->object_ref = ref;
     sm_p->u.io.io_type = io_type;
     sm_p->u.io.file_req = file_req;
@@ -235,43 +239,39 @@ int PVFS_sys_io(PVFS_object_ref ref,
     sm_p->u.io.session_tag_array = NULL;
     sm_p->u.io.ackarray = NULL;
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_IO);
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_IO, op_id, user_ptr);
+}
+
+int PVFS_sys_io(
+    PVFS_object_ref ref,
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    void *buffer,
+    PVFS_Request mem_req,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_io *resp_p,
+    enum PVFS_io_type io_type)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_io entered\n");
+
+    ret = PVFS_isys_io(ref, file_req, file_req_offset, buffer, mem_req,
+                       credentials, resp_p, io_type, &op_id, NULL);
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-        free(sm_p);
-        return ret;
+        gossip_lerr("PVFS_isys_io call failed\n");
+        error = ret;
+        goto exit_path;
     }
+    PVFS_sys_wait(op_id, "io", error, ret);
 
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_io calling "
-                     "PINT_client_state_machine_test()\n");
-        ret = PINT_client_state_machine_test();
-    }
+  exit_path:
 
-    if (ret)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
-    }
-
-    error = sm_p->error_code;
-
-    /* invalidate acache entry's size on write if entry exists */
-    if (sm_p->acache_hit && (io_type == PVFS_IO_WRITE))
-    {
-        /* invalidate the size attribute in the pinode */
-        sm_p->pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
-        sm_p->pinode->size = 0;
-
-        PINT_acache_set_valid(sm_p->pinode);
-        PINT_acache_release(sm_p->pinode);
-        sm_p->acache_hit = 0;
-    }
-    free(sm_p);
-
+    PVFS_sys_release(op_id);
     return error;
 }
 

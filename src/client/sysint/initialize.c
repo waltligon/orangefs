@@ -197,8 +197,9 @@ int PVFS_sys_initialize(int default_debug_mask)
         goto error_exit;
     }
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_CLIENT_JOB_TIMER);
-    if(ret < 0)
+    ret = PINT_client_state_machine_post(
+        sm_p, PVFS_CLIENT_JOB_TIMER, NULL, NULL);
+    if (ret < 0)
     {
 	gossip_lerr("Error posting job timer.\n");
 	goto error_exit;

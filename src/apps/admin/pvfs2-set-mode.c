@@ -70,7 +70,7 @@ int main(int argc, char **argv)
     PVFS_util_gen_credentials(&creds);
 
     ret = PVFS_mgmt_setparam_all(cur_fs,
-				 creds,
+				 &creds,
 				 PVFS_SERV_PARAM_MODE,
 				 user_opts->mode,
 				 NULL,

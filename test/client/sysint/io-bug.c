@@ -103,7 +103,7 @@ int main(
     name = filename;
 
     PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, credentials,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
 			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
     /* TODO: really we probably want to look for a specific error code,
      * like maybe ENOENT?
@@ -114,7 +114,7 @@ int main(
 
 	/* get root handle */
 	name = "/";
-	ret = PVFS_sys_lookup(fs_id, name, credentials,
+	ret = PVFS_sys_lookup(fs_id, name, &credentials,
 			      &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
 	if (ret < 0)
 	{
@@ -136,7 +136,7 @@ int main(
 	entry_name = &(filename[1]);	/* leave off slash */
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      credentials, NULL, &resp_cr);
+			      &credentials, NULL, &resp_cr);
 	if (ret < 0)
 	{
 	    fprintf(stderr, "Error: PVFS_sys_create() failure.\n");
@@ -182,7 +182,7 @@ int main(
                      off_array2, PVFS_BYTE, &file_req);
 
     ret = PVFS_sys_write(pinode_refn, file_req, 0, PVFS_BOTTOM, mem_req,
-			 credentials, &resp_io);
+			 &credentials, &resp_io);
     if (ret < 0)
     {
 	fprintf(stderr, "Error: PVFS_sys_write() failure.\n");

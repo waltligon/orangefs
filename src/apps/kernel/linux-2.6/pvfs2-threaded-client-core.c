@@ -118,7 +118,7 @@ static int service_lookup_request(
 
         ret = PVFS_sys_ref_lookup(parent_refn.fs_id,
                                   in_upcall->req.lookup.d_name,
-                                  parent_refn, in_upcall->credentials,
+                                  parent_refn, &in_upcall->credentials,
                                   &response,
                                   in_upcall->req.lookup.sym_follow);
         if (ret < 0)
@@ -175,7 +175,7 @@ static int service_create_request(
             Lu(parent_refn.handle));
 
         ret = PVFS_sys_create(in_upcall->req.create.d_name, parent_refn,
-                              *attrs, in_upcall->credentials, NULL, &response);
+                              *attrs, &in_upcall->credentials, NULL, &response);
         if (ret < 0)
         {
             /*
@@ -195,7 +195,7 @@ static int service_create_request(
                 ret = PVFS_sys_ref_lookup(parent_refn.fs_id,
                                           in_upcall->req.create.d_name,
                                           parent_refn,
-                                          in_upcall->credentials,
+                                          &in_upcall->credentials,
                                           &lk_response,
                                           PVFS2_LOOKUP_LINK_NO_FOLLOW);
                 if (ret != 0)
@@ -264,7 +264,7 @@ static int service_symlink_request(
 
         ret = PVFS_sys_symlink(in_upcall->req.sym.entry_name, parent_refn,
                                in_upcall->req.sym.target, *attrs,
-                               in_upcall->credentials, &response);
+                               &in_upcall->credentials, &response);
         if (ret < 0)
         {
             gossip_err("Failed to symlink %s to %s under %Lu on "
@@ -349,7 +349,7 @@ static int service_io_readahead_request(
 
 	ret = PVFS_sys_io(
             in_upcall->req.io.refn, file_req, 0,
-	    tmp_buf, mem_req, in_upcall->credentials, &response,
+	    tmp_buf, mem_req, &in_upcall->credentials, &response,
             in_upcall->req.io.io_type);
 	if (ret < 0)
 	{
@@ -450,7 +450,7 @@ static int service_io_request(
 
 	ret = PVFS_sys_io(
             in_upcall->req.io.refn, file_req, in_upcall->req.io.offset, 
-	    buf, mem_req, in_upcall->credentials, &response,
+	    buf, mem_req, &in_upcall->credentials, &response,
             in_upcall->req.io.io_type);
 
         amt_completed = (size_t)response.total_completed;
@@ -492,7 +492,7 @@ static int service_getattr_request(
 
         ret = PVFS_sys_getattr(in_upcall->req.getattr.refn,
                                PVFS_ATTR_SYS_ALL,
-                               in_upcall->credentials, &response);
+                               &in_upcall->credentials, &response);
         if (ret < 0)
         {
             gossip_err("failed to getattr handle %Lu on fsid %d!\n",
@@ -552,7 +552,7 @@ static int service_setattr_request(
 
         ret = PVFS_sys_setattr(in_upcall->req.setattr.refn,
                                in_upcall->req.setattr.attributes,
-                               in_upcall->credentials);
+                               &in_upcall->credentials);
         if (ret < 0)
         {
             gossip_err("failed to setattr handle %Lu on fsid %d!\n",
@@ -594,7 +594,7 @@ static int service_remove_request(
             parent_refn.fs_id, Lu(parent_refn.handle));
 
         ret = PVFS_sys_remove(in_upcall->req.remove.d_name,
-                              parent_refn, in_upcall->credentials);
+                              parent_refn, &in_upcall->credentials);
         if (ret < 0)
         {
             gossip_err("Failed to remove %s under handle %Lu "
@@ -645,7 +645,7 @@ static int service_mkdir_request(
             Lu(parent_refn.handle));
 
         ret = PVFS_sys_mkdir(in_upcall->req.mkdir.d_name, parent_refn,
-                             *attrs, in_upcall->credentials, &response);
+                             *attrs, &in_upcall->credentials, &response);
         if (ret < 0)
         {
             gossip_err("Failed to mkdir %s under %Lu on fsid %d!\n",
@@ -693,7 +693,7 @@ static int service_readdir_request(
 
         ret = PVFS_sys_readdir(refn, in_upcall->req.readdir.token,
                                in_upcall->req.readdir.max_dirent_count,
-                               in_upcall->credentials, &response);
+                               &in_upcall->credentials, &response);
         if (ret < 0)
         {
             gossip_err("Failed to readdir under %Lu on fsid %d!\n",
@@ -770,7 +770,7 @@ static int service_rename_request(
                               in_upcall->req.rename.old_parent_refn,
                               in_upcall->req.rename.d_new_name,
                               in_upcall->req.rename.new_parent_refn,
-                              in_upcall->credentials);
+                              &in_upcall->credentials);
         if (ret < 0)
         {
             gossip_err("Failed to rename %s to %s\n",
@@ -809,7 +809,7 @@ static int service_statfs_request(
                      in_upcall->req.statfs.fs_id);
 
         ret = PVFS_sys_statfs(in_upcall->req.statfs.fs_id,
-                              in_upcall->credentials,
+                              &in_upcall->credentials,
                               &resp_statfs);
         if (ret < 0)
         {
@@ -868,7 +868,7 @@ static int service_truncate_request(
 
         ret = PVFS_sys_truncate(in_upcall->req.truncate.refn,
                                 in_upcall->req.truncate.size,
-                                in_upcall->credentials);
+                                &in_upcall->credentials);
         if (ret < 0)
         {
             gossip_err("Failed to truncate %Lu on %d\n",

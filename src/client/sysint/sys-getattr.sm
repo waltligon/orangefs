@@ -129,16 +129,18 @@ machine pvfs2_client_getattr_sm(object_getattr_setup_msgpair,
 
 %%
 
-int PVFS_sys_getattr(PVFS_object_ref ref,
-		     uint32_t              attrmask, 
-		     PVFS_credentials      credentials,
-		     PVFS_sysresp_getattr *resp_p)
+int PVFS_isys_getattr(
+    PVFS_object_ref ref,
+    uint32_t attrmask, 
+    PVFS_credentials *credentials,
+    PVFS_sysresp_getattr *resp_p,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_getattr entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_getattr entered\n");
 
     if (resp_p == NULL)
     {
@@ -160,36 +162,41 @@ int PVFS_sys_getattr(PVFS_object_ref ref,
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->error_code = 0;
-    sm_p->cred_p = &credentials;
+    sm_p->cred_p = credentials;
     sm_p->u.getattr.object_ref     = ref;
     sm_p->u.getattr.attrmask       = attrmask;
     sm_p->u.getattr.getattr_resp_p = resp_p;
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_GETATTR);
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_GETATTR, op_id, user_ptr);
+}
+
+
+int PVFS_sys_getattr(
+    PVFS_object_ref ref,
+    uint32_t attrmask, 
+    PVFS_credentials *credentials,
+    PVFS_sysresp_getattr *resp_p)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_getattr entered\n");
+
+    ret = PVFS_isys_getattr(ref, attrmask, credentials,
+                            resp_p, &op_id, NULL);
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-        free(sm_p);
-        return ret;
+        gossip_lerr("Error: PVFS_isys_getattr call failed\n");
+        error = ret;
+        goto exit_path;
     }
+    PVFS_sys_wait(op_id, "getattr", error, ret);
 
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_getattr calling "
-                     "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
-    }
+  exit_path:
 
-    if (ret)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
-    }
-
-    error = sm_p->error_code;
-
-    free(sm_p);
+    PVFS_sys_release(op_id);
     return error;
 }
 

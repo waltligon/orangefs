@@ -81,7 +81,7 @@ int main(int argc, char **argv)
     }
 
     PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, credentials,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
 			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret == -PVFS_ENOENT)
     {
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 	printf("IO-TEST: lookup failed; creating new file.\n");
 
         memset(&gp_resp, 0, sizeof(PVFS_sysresp_getparent));
-	ret = PVFS_sys_getparent(fs_id, name, credentials, &gp_resp);
+	ret = PVFS_sys_getparent(fs_id, name, &credentials, &gp_resp);
 	if (ret < 0)
 	{
             PVFS_perror("PVFS_sys_getparent failed", ret);
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
         assert(entry_name);
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      credentials, NULL, &resp_cr);
+			      &credentials, NULL, &resp_cr);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_create() failure", ret);
@@ -154,7 +154,7 @@ int main(int argc, char **argv)
     }
 
     ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, mem_req,
-			 credentials, &resp_io);
+			 &credentials, &resp_io);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_write failure", ret);
@@ -172,7 +172,7 @@ int main(int argc, char **argv)
 	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
 
     ret = PVFS_sys_read(pinode_refn, file_req, 0, buffer, mem_req,
-			credentials, &resp_io);
+			&credentials, &resp_io);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_read failure", ret);
@@ -208,7 +208,7 @@ int main(int argc, char **argv)
 
     /* test out some of the mgmt functionality */
     ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_NOSIZE,
-			   credentials, &resp_getattr);
+			   &credentials, &resp_getattr);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_getattr", ret);
@@ -225,7 +225,7 @@ int main(int argc, char **argv)
 	return (-1);
     }
 
-    ret = PVFS_mgmt_get_dfile_array(pinode_refn, credentials,
+    ret = PVFS_mgmt_get_dfile_array(pinode_refn, &credentials,
 				    dfile_array, resp_getattr.attr.dfile_count);
     if (ret < 0)
     {

@@ -14,7 +14,7 @@
 int PVFS_sys_getparent(
     PVFS_fs_id fs_id,
     char *entry_name,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_sysresp_getparent *resp)
 {
     int ret = -PVFS_EINVAL;

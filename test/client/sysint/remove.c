@@ -57,7 +57,7 @@ int main(int argc,char **argv)
     entry_name = str_buf;
 
     PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_util_lookup_parent(filename, cur_fs, credentials,
+    ret = PVFS_util_lookup_parent(filename, cur_fs, &credentials,
                                   &parent_refn.handle);
     if(ret < 0)
     {
@@ -66,7 +66,7 @@ int main(int argc,char **argv)
     }
     parent_refn.fs_id = cur_fs;
 
-    ret = PVFS_sys_remove(entry_name, parent_refn, credentials);
+    ret = PVFS_sys_remove(entry_name, parent_refn, &credentials);
     if (ret < 0)
     {
         PVFS_perror("remove failed ", ret);

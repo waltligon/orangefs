@@ -217,7 +217,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 			   &msg_p->recv_id,
 			   pint_client_sm_context,
 			   PVFS2_CLIENT_JOB_TIMEOUT);
-	if(ret == 0)
+	if (ret == 0)
 	{
 	    /* perform a quick test to see if the recv failed before posting
 	     * the send; if it reports an error quickly then we can save the
@@ -234,11 +234,15 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	     * without errors; we haven't sent the request yet!
 	     */
 	    assert(ret < 0 || msg_p->recv_status.error_code != 0);
-	    if(ret < 0)
+	    if (ret < 0)
+            {
 		PVFS_perror_gossip("Post of receive failed", ret);
+            }
 	    else
+            {
 		PVFS_perror_gossip("Receive immediately failed",
 			    msg_p->recv_status.error_code);
+            }
 
 	    msg_p->recv_id = 0;
 	    msg_p->send_id = 0;

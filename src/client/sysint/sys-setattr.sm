@@ -98,20 +98,21 @@ machine pvfs2_client_setattr_sm(init,
 
 %%
 
-int PVFS_sys_setattr(
+int PVFS_isys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    PVFS_credentials credentials)
+    PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_setattr entered\n");
 
     /*
-      make sure the caller didn't set invalid mask bits;
-      in particular, note that you can't set size here
+      make sure the caller didn't set invalid mask bits; in
+      particular, note that you can't set size here
     */
     if ((attr.mask & ~PVFS_ATTR_SYS_ALL_SETABLE) != 0)
     {
@@ -127,7 +128,7 @@ int PVFS_sys_setattr(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = &credentials;
+    sm_p->cred_p = credentials;
     sm_p->object_ref = ref;
     sm_p->u.setattr.refn = ref;
     sm_p->u.setattr.sys_attr = &attr;
@@ -136,33 +137,34 @@ int PVFS_sys_setattr(
                  "on fs %d\n", Lu(ref.handle),
                  ref.fs_id);
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_SETATTR);
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_SETATTR, op_id, user_ptr);
+}
+
+
+int PVFS_sys_setattr(
+    PVFS_object_ref ref,
+    PVFS_sys_attr attr,
+    PVFS_credentials *credentials)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr entered\n");
+
+    ret = PVFS_isys_setattr(ref, attr, credentials, &op_id, NULL);
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-        free(sm_p);
-        return ret;
+        gossip_lerr("PVFS_isys_setattr call failed\n");
+        error = ret;
+        goto exit_path;
     }
+    PVFS_sys_wait(op_id, "setattr", error, ret);
 
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr calling "
-                     "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
-    }
+  exit_path:
 
-    if (ret)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
-    }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr completed\n");
-
-    error = sm_p->error_code;
-
-    free(sm_p);
+    PVFS_sys_release(op_id);
     return error;
 }
 

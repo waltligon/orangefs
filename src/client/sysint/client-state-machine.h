@@ -269,6 +269,7 @@ struct PINT_client_mgmt_setparam_list_sm
     int count;
     int64_t *old_value_array;
     int *root_check_status_array;
+    PVFS_error_details *details;
 };
 
 struct PINT_client_mgmt_statfs_list_sm
@@ -277,6 +278,7 @@ struct PINT_client_mgmt_statfs_list_sm
     struct PVFS_mgmt_server_stat* stat_array;
     int count; 
     PVFS_id_gen_t* addr_array;
+    PVFS_error_details *details;
 };
 
 struct PINT_client_mgmt_perf_mon_list_sm
@@ -288,6 +290,7 @@ struct PINT_client_mgmt_perf_mon_list_sm
     int history_count; 
     PVFS_id_gen_t* addr_array;
     uint32_t* next_id_array;
+    PVFS_error_details *details;
 };
 
 struct PINT_client_mgmt_event_mon_list_sm
@@ -297,6 +300,7 @@ struct PINT_client_mgmt_event_mon_list_sm
     int server_count; 
     int event_count; 
     PVFS_id_gen_t* addr_array;
+    PVFS_error_details *details;
 };
 
 struct PINT_client_mgmt_iterate_handles_list_sm
@@ -307,6 +311,7 @@ struct PINT_client_mgmt_iterate_handles_list_sm
     PVFS_handle** handle_matrix;
     int* handle_count_array;
     PVFS_ds_position* position_array;
+    PVFS_error_details *details;
 };
 
 struct PINT_client_mgmt_get_dfile_array_sm
@@ -374,6 +379,10 @@ typedef struct PINT_client_sm {
     int datafile_count;
     PVFS_handle *datafile_handles;
 
+    /* used internally by client-state-machine.c */
+    PVFS_sys_op_id sys_op_id;
+    void *user_ptr;
+
     PVFS_credentials *cred_p;
     union
     {
@@ -399,9 +408,21 @@ typedef struct PINT_client_sm {
     } u;
 } PINT_client_sm;
 
-/* prototypes of post/test functions */
-int PINT_client_state_machine_post(PINT_client_sm *sm_p, int pvfs_sys_op);
-int PINT_client_state_machine_test(void);
+/* sysint post/test functions */
+int PINT_client_state_machine_post(
+    PINT_client_sm *sm_p,
+    int pvfs_sys_op,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+int PINT_client_state_machine_test(
+    PVFS_sys_op_id op_id,
+    int *error_code);
+
+int PINT_client_state_machine_testsome(
+    PVFS_sys_op_id *op_id_array,
+    int *op_count); /* in/out */
+
 
 /* used with post call to tell the system what state machine to use
  * when processing a new PINT_client_sm structure.
@@ -431,29 +452,32 @@ enum {
 };
 
 /* prototypes of helper functions */
-int PINT_serv_prepare_msgpair(PVFS_object_ref object_ref,
-			      struct PVFS_server_req *req_p,
-			      struct PINT_encoded_msg *encoded_req_out_p,
-			      void **encoded_resp_out_pp,
-			      PVFS_BMI_addr_t *svr_addr_p,
-			      int *max_resp_sz_out_p,
-			      PVFS_msg_tag_t *session_tag_out_p);
+int PINT_serv_prepare_msgpair(
+    PVFS_object_ref object_ref,
+    struct PVFS_server_req *req_p,
+    struct PINT_encoded_msg *encoded_req_out_p,
+    void **encoded_resp_out_pp,
+    PVFS_BMI_addr_t *svr_addr_p,
+    int *max_resp_sz_out_p,
+    PVFS_msg_tag_t *session_tag_out_p);
 
-int PINT_serv_decode_resp(PVFS_fs_id fs_id,
-			  void *encoded_resp_p,
-			  struct PINT_decoded_msg *decoded_resp_p,
-			  PVFS_BMI_addr_t *svr_addr_p,
-			  int actual_resp_sz,
-			  struct PVFS_server_resp **resp_out_pp);
+int PINT_serv_decode_resp(
+    PVFS_fs_id fs_id,
+    void *encoded_resp_p,
+    struct PINT_decoded_msg *decoded_resp_p,
+    PVFS_BMI_addr_t *svr_addr_p,
+    int actual_resp_sz,
+    struct PVFS_server_resp **resp_out_pp);
 
-int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
-				     void *encoded_resp_p,
-				     struct PINT_decoded_msg *decoded_resp_p,
-				     PVFS_BMI_addr_t *svr_addr_p,
-				     int max_resp_sz);
+int PINT_serv_free_msgpair_resources(
+    struct PINT_encoded_msg *encoded_req_p,
+    void *encoded_resp_p,
+    struct PINT_decoded_msg *decoded_resp_p,
+    PVFS_BMI_addr_t *svr_addr_p,
+    int max_resp_sz);
 
-/* TODO: is this the right name for this function? */
-int PINT_serv_msgpairarray_resolve_addrs(int count, 
+int PINT_serv_msgpairarray_resolve_addrs(
+    int count, 
     PINT_client_sm_msgpair_state* msgarray);
 
 int PINT_client_bmi_cancel(job_id_t id);
@@ -465,6 +489,47 @@ int PINT_client_bmi_cancel(job_id_t id);
 #endif
 
 #include "state-machine.h"
+
+/* misc helper macros */
+#define PVFS_client_wait_internal(op_id, op_name, error, ret, ts)        \
+do {                                                                     \
+    PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);  \
+    assert(sm_p);                                                        \
+                                                                         \
+    while (!sm_p->op_complete && (ret == 0))                             \
+    {                                                                    \
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_i%s_%s calling "         \
+                     "PINT_client_state_machine_test()\n", ts, op_name); \
+        ret = PINT_client_state_machine_test(op_id, &error);             \
+    }                                                                    \
+                                                                         \
+    if (ret)                                                             \
+    {                                                                    \
+        gossip_lerr("PINT_client_state_machine_test() failure.\n");      \
+        error = ret;                                                     \
+        goto exit_path;                                                  \
+    }                                                                    \
+    error = sm_p->error_code;                                            \
+                                                                         \
+} while(0)
+
+#define PVFS_sys_wait(op_id, op_name, error, ret)            \
+PVFS_client_wait_internal(op_id, op_name, error, ret, "sys")
+
+#define PVFS_mgmt_wait(op_id, op_name, error, ret)           \
+PVFS_client_wait_internal(op_id, op_name, error, ret, "mgmt")
+
+#define PVFS_sys_release(op_id)                                          \
+do {                                                                     \
+    PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);  \
+    if (sm_p)                                                            \
+    {                                                                    \
+        id_gen_safe_unregister(op_id);                                   \
+        free(sm_p);                                                      \
+    }                                                                    \
+} while(0)
+
+#define PVFS_mgmt_release(op_id) PVFS_sys_release(op_id)
 
 /* misc helper methods */
 struct server_configuration_s *PINT_get_server_config_struct(

@@ -55,7 +55,7 @@ int main(int argc,char **argv)
     name[0] = '/';
     name[1] = '\0';
     printf("looking up the root handle for fsid = %d\n", fs_id);
-    ret = PVFS_sys_lookup(fs_id, name, credentials,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -71,7 +71,7 @@ int main(int argc,char **argv)
     name = filename;
 
     PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, credentials,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
                           &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -84,7 +84,7 @@ int main(int argc,char **argv)
     pinode_refn.handle = resp_lk.ref.handle;
     pinode_refn.fs_id = resp_lk.ref.fs_id;
 
-    ret = PVFS_sys_truncate(pinode_refn, size, credentials);
+    ret = PVFS_sys_truncate(pinode_refn, size, &credentials);
     if (ret < 0)
     {
         printf("truncate failed with errcode = %d\n",ret);

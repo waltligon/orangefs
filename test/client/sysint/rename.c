@@ -74,7 +74,7 @@ int main(int argc,char **argv)
     PVFS_util_gen_credentials(&credentials);
 
     old_entry = old_buf;
-    ret = PVFS_util_lookup_parent(old_filename, cur_fs, credentials,
+    ret = PVFS_util_lookup_parent(old_filename, cur_fs, &credentials,
                                   &old_parent_refn.handle);
     if(ret < 0)
     {
@@ -83,7 +83,7 @@ int main(int argc,char **argv)
     }
     old_parent_refn.fs_id = cur_fs;
     new_entry = new_buf;
-    ret = PVFS_util_lookup_parent(new_filename, cur_fs, credentials,
+    ret = PVFS_util_lookup_parent(new_filename, cur_fs, &credentials,
 	&new_parent_refn.handle);
     if(ret < 0)
     {
@@ -93,7 +93,7 @@ int main(int argc,char **argv)
     new_parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_rename(old_entry, old_parent_refn, new_entry, 
-			new_parent_refn, credentials);
+			new_parent_refn, &credentials);
     if (ret < 0)
     {
         printf("rename failed with errcode = %d\n",ret);

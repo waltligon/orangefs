@@ -227,8 +227,7 @@ static int initialize_context(
         if ((pathlen > (PVFS_REQ_LIMIT_PATH_NAME_BYTES - 1)) ||
             (num_segments > PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
         {
-            gossip_err("Error: Filename %s is too long\n",
-                       pathname);
+            gossip_err("Filename %s is too long\n", pathname);
             return -PVFS_ENAMETOOLONG;
         }
 
@@ -456,19 +455,20 @@ static void finalize_context(
 
 /****************************************************************/
 
-int PVFS_sys_ref_lookup(
+int PVFS_isys_ref_lookup(
     PVFS_fs_id fs_id,
     char* relative_pathname,
     PVFS_object_ref parent,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
-    int follow_link)
+    int follow_link,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_ref_lookup entered\n");
 
     if ((relative_pathname == NULL) || (resp == NULL))
     {
@@ -485,7 +485,7 @@ int PVFS_sys_ref_lookup(
                  relative_pathname, Lu(parent.handle));
 
     memset(sm_p, 0, sizeof(PINT_client_sm));
-    sm_p->cred_p = &credentials;
+    sm_p->cred_p = credentials;
     sm_p->u.lookup.orig_pathname = relative_pathname;
     sm_p->u.lookup.starting_refn = parent;
     sm_p->u.lookup.lookup_resp = resp;
@@ -503,39 +503,47 @@ int PVFS_sys_ref_lookup(
         return ret;
     }
 
-    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_LOOKUP);
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_LOOKUP, op_id, user_ptr);
+}
+
+
+int PVFS_sys_ref_lookup(
+    PVFS_fs_id fs_id,
+    char* relative_pathname,
+    PVFS_object_ref parent,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_lookup *resp,
+    int follow_link)
+{
+    int ret = -PVFS_EINVAL;
+    PVFS_error error;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
+
+    ret = PVFS_isys_ref_lookup(
+        fs_id, relative_pathname, parent, credentials, resp,
+        follow_link, &op_id, resp);
+
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-        free(sm_p);
-        return ret;
+        gossip_lerr("PVFS_isys_ref_lookup call failed\n");
+        error = ret;
+        goto exit_path;
     }
+    PVFS_sys_wait(op_id, "lookup", error, ret);
 
-    while (!sm_p->op_complete && (ret == 0))
-    {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_lookup calling "
-                     "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
-    }
+  exit_path:
 
-    if (ret)
-    {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
-    }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup completed\n");
-
-    error = sm_p->error_code;
-
-    free(sm_p);
+    PVFS_sys_release(op_id);
     return error;
 }
 
+/* NOTE: no non-blocking equivalent for now */
 int PVFS_sys_lookup(
     PVFS_fs_id fs_id, char* name,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int follow_link)
 {

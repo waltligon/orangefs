@@ -46,7 +46,7 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
 
     PVFS_util_gen_credentials(&credentials);
     if (PVFS_sys_getattr(pinode_refn, attrmask,
-                         credentials, &getattr_response))
+                         &credentials, &getattr_response))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
                 "(fs_id is %d)\n",Lu(handle),fs_id);
@@ -92,7 +92,7 @@ int directory_walk(PVFS_fs_id cur_fs,
     name = full_path;
 
     PVFS_util_gen_credentials(&credentials);
-    if (PVFS_sys_lookup(cur_fs, name, credentials,
+    if (PVFS_sys_lookup(cur_fs, name, &credentials,
                         &lk_response, PVFS2_LOOKUP_LINK_FOLLOW))
     {
         fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
@@ -113,7 +113,7 @@ int directory_walk(PVFS_fs_id cur_fs,
         if (PVFS_sys_readdir(pinode_refn,
                              (!token ? PVFS_READDIR_START : token),
                              pvfs_dirent_incount,
-                             credentials, &rd_response))
+                             &credentials, &rd_response))
         {
             fprintf(stderr,"Failed to perform readdir operation\n");
             return 1;

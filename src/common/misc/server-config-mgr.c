@@ -295,6 +295,7 @@ int PINT_server_config_mgr_remove_config(
               but we free them here
             */
             PINT_config_release(config->server_config);
+            free(config->server_config);
 
             gen_mutex_unlock(config->server_config_mutex);
             gen_mutex_destroy(config->server_config_mutex);

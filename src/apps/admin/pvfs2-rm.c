@@ -98,7 +98,7 @@ int main(int argc, char **argv)
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         rc = PVFS_sys_lookup(cur_fs,
                              pvfs_path,
-                             credentials,
+                             &credentials,
                              &resp_lookup,
                              PVFS2_LOOKUP_LINK_NO_FOLLOW);
         if (0 != rc)
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
         
         /* Remove file */
         parent_ref = resp_lookup.ref;
-        rc = PVFS_sys_remove(filename, parent_ref, credentials);
+        rc = PVFS_sys_remove(filename, parent_ref, &credentials);
 
         if ( 0 != rc )
         {

@@ -124,7 +124,7 @@ int main(int argc, char **argv)
     lk_name[0] = '/';
     strcpy(&(lk_name[1]), str_buf);
 
-    ret = PVFS_sys_lookup(lk_fs_id, lk_name, credentials,
+    ret = PVFS_sys_lookup(lk_fs_id, lk_name, &credentials,
                           &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if(ret < 0)
     {
@@ -157,7 +157,7 @@ int main(int argc, char **argv)
 
     time1 = Wtime();
     while((ret = PVFS_sys_read(ref, file_req, total_written,
-                buffer, mem_req, credentials, &resp_io)) == 0 &&
+                buffer, mem_req, &credentials, &resp_io)) == 0 &&
 	resp_io.total_completed > 0)
     {
 	current_size = resp_io.total_completed;

@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 
     printf("about to lookup %s\n", filename);
 
-    ret = PVFS_sys_lookup(fs_id, filename, credentials,
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
     printf("about to getattr on %s\n", filename);
 
     ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_SETABLE,
-                           credentials, &resp_getattr);
+                           &credentials, &resp_getattr);
     if (ret < 0)
     {
         printf("getattr failed with errcode = %d\n", ret);
@@ -102,7 +102,7 @@ int main(int argc, char **argv)
 
     printf("about to setattr on %s\n", filename);
 
-    ret = PVFS_sys_setattr(pinode_refn, resp_getattr.attr, credentials);
+    ret = PVFS_sys_setattr(pinode_refn, resp_getattr.attr, &credentials);
     if (ret < 0)
     {
         fprintf(stderr, "setattr failed with errcode = %d\n", ret);

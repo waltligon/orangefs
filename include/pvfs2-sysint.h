@@ -15,9 +15,13 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
+#include "id-generator.h"
 
-/* non-blocking operation handle */
-typedef PVFS_id_gen_t sysint_op_id_t;
+/* non-blocking sysint operation handle */
+typedef PVFS_id_gen_t PVFS_sys_op_id;
+
+/* non-blocking mgmt operation handle */
+typedef PVFS_id_gen_t PVFS_mgmt_op_id;
 
 /* attributes */
 struct PVFS_sys_attr_s
@@ -183,78 +187,155 @@ int PVFS_sys_finalize(
 #define PVFS2_LOOKUP_LINK_NO_FOLLOW 0
 #define PVFS2_LOOKUP_LINK_FOLLOW    1
 
+int PVFS_sys_iref_lookup(
+    PVFS_fs_id fs_id,
+    char *relative_pathname,
+    PVFS_object_ref parent_ref,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_lookup * resp,
+    int follow_link,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
 int PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,
     char *relative_pathname,
     PVFS_object_ref parent_ref,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_sysresp_lookup * resp,
     int follow_link);
 
 int PVFS_sys_lookup(
     PVFS_fs_id fs_id,
     char *name,
-    PVFS_credentials credentials,
+    PVFS_credentials *credentials,
     PVFS_sysresp_lookup * resp,
     int follow_link);
+
+int PVFS_isys_getattr(
+    PVFS_object_ref ref,
+    uint32_t attrmask,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_getattr *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 
 int PVFS_sys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask,
-    PVFS_credentials credentials,
-    PVFS_sysresp_getattr * resp);
+    PVFS_credentials *credentials,
+    PVFS_sysresp_getattr *resp);
+
+int PVFS_isys_setattr(
+    PVFS_object_ref ref,
+    PVFS_sys_attr attr,
+    PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 
 int PVFS_sys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    PVFS_credentials credentials);
+    PVFS_credentials *credentials);
+
+int PVFS_isys_mkdir(
+    char *entry_name,
+    PVFS_object_ref parent_ref,
+    PVFS_sys_attr attr,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_mkdir *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 
 int PVFS_sys_mkdir(
     char *entry_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    PVFS_credentials credentials,
-    PVFS_sysresp_mkdir * resp);
+    PVFS_credentials *credentials,
+    PVFS_sysresp_mkdir *resp);
+
+int PVFS_isys_readdir(
+    PVFS_object_ref ref,
+    PVFS_ds_position token,
+    int pvfs_dirent_incount,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_readdir *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 
 int PVFS_sys_readdir(
     PVFS_object_ref ref,
     PVFS_ds_position token,
     int pvfs_dirent_incount,
-    PVFS_credentials credentials,
-    PVFS_sysresp_readdir * resp);
+    PVFS_credentials *credentials,
+    PVFS_sysresp_readdir *resp);
+
+int PVFS_isys_create(
+    char *entry_name,
+    PVFS_object_ref ref,
+    PVFS_sys_attr attr,
+    PVFS_credentials *credentials,
+    PVFS_sys_dist *dist,
+    PVFS_sysresp_create *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 
 int PVFS_sys_create(
     char *entry_name,
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    PVFS_credentials credentials,
-    PVFS_sys_dist* dist,
-    PVFS_sysresp_create * resp);
+    PVFS_credentials *credentials,
+    PVFS_sys_dist *dist,
+    PVFS_sysresp_create *resp);
+
+int PVFS_isys_remove(
+    char *entry_name,
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 
 int PVFS_sys_remove(
     char *entry_name,
     PVFS_object_ref ref,
-    PVFS_credentials credentials);
+    PVFS_credentials *credentials);
 
 int PVFS_sys_rename(
     char *old_entry,
     PVFS_object_ref old_parent_ref,
     char *new_entry,
     PVFS_object_ref new_parent_ref,
-    PVFS_credentials credentials);
+    PVFS_credentials *credentials);
+
+int PVFS_isys_symlink(
+    char *entry_name,
+    PVFS_object_ref parent_ref,
+    char *target,
+    PVFS_sys_attr attr,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_symlink *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 
 int PVFS_sys_symlink(
     char *entry_name,
     PVFS_object_ref parent_ref,
     char *target,
     PVFS_sys_attr attr,
-    PVFS_credentials credentials,
-    PVFS_sysresp_symlink * resp);
+    PVFS_credentials *credentials,
+    PVFS_sysresp_symlink *resp);
 
-int PVFS_sys_readlink(
+int PVFS_isys_io(
     PVFS_object_ref ref,
-    PVFS_credentials credentials,
-    PVFS_sysresp_readlink * resp);
+    PVFS_Request file_req,
+    PVFS_offset file_req_offset,
+    void *buffer,
+    PVFS_Request mem_req,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_io *resp,
+    enum PVFS_io_type type,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 
 int PVFS_sys_io(
     PVFS_object_ref ref,
@@ -262,8 +343,8 @@ int PVFS_sys_io(
     PVFS_offset file_req_offset,
     void *buffer,
     PVFS_Request mem_req,
-    PVFS_credentials credentials,
-    PVFS_sysresp_io * resp,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_io *resp,
     enum PVFS_io_type type);
 
 #define PVFS_sys_read(x1,x2,x3,x4,x5,x6,y) \
@@ -272,35 +353,49 @@ PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ)
 #define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y) \
 PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE)
 
+int PVFS_isys_truncate(
+    PVFS_object_ref ref,
+    PVFS_size size,
+    PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
 int PVFS_sys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
-    PVFS_credentials credentials);
+    PVFS_credentials *credentials);
 
 int PVFS_sys_getparent(
     PVFS_fs_id fs_id,
     char *entry_name,
-    PVFS_credentials credentials,
-    PVFS_sysresp_getparent * resp);
+    PVFS_credentials *credentials,
+    PVFS_sysresp_getparent *resp);
+
+int PVFS_isys_flush(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 
 int PVFS_sys_flush(
     PVFS_object_ref ref,
-    PVFS_credentials credentials);
+    PVFS_credentials *credentials);
 
 int PVFS_sys_statfs(
     PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
-    PVFS_sysresp_statfs* resp);
+    PVFS_credentials *credentials,
+    PVFS_sysresp_statfs *resp);
 
-PVFS_sys_dist* PVFS_sys_dist_lookup(const char* dist_identifier);
+PVFS_sys_dist* PVFS_sys_dist_lookup(
+    const char* dist_identifier);
 
-int PVFS_sys_dist_free(PVFS_sys_dist* dist);
+int PVFS_sys_dist_free(
+    PVFS_sys_dist* dist);
 
 int PVFS_sys_dist_setparam(
     PVFS_sys_dist* dist,
     const char* param,
     void* value);
-
 
 #endif
 

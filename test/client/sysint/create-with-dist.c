@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
-    PVFS_sys_dist* dist;
+    PVFS_sys_dist *dist = NULL;
 
     if (argc != 2)
     {
@@ -68,7 +68,7 @@ int main(int argc, char **argv)
     attr.atime = attr.ctime = attr.mtime = 
 	time(NULL);
 
-    ret = PVFS_util_lookup_parent(filename, cur_fs, credentials, 
+    ret = PVFS_util_lookup_parent(filename, cur_fs, &credentials, 
                                   &parent_refn.handle);
     if(ret < 0)
     {
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
     }
     
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          credentials, dist, &resp_create);
+                          &credentials, dist, &resp_create);
     if (ret < 0)
     {
         PVFS_perror("create failed with errcode", ret);
