@@ -174,10 +174,10 @@ int main(int argc, char **argv)
 	flow_d->file_req = req;
 	flow_d->tag = 0;
 	flow_d->user_ptr = NULL;
+	flow_d->aggregate_size = TEST_SIZE;
 
 	/* fill in flow details */
 	flow_d->src.endpoint_id = MEM_ENDPOINT;
-	flow_d->src.u.mem.size = TEST_SIZE;
 	flow_d->src.u.mem.buffer = mybuffer;
 	flow_d->dest.endpoint_id = BMI_ENDPOINT;
 	flow_d->dest.u.bmi.address = server_addr;

@@ -47,7 +47,6 @@ int main(int argc, char **argv)
 	PVFS_Dist* io_dist = NULL;
 	PINT_Request* encode_file_req = NULL;
 	PVFS_Dist* encode_io_dist = NULL;
-	int commit_index = 0;
 	void* memory_buffer;
 	PVFS_size io_size = 10*1024*1024; /* 10 M transfer */
 	bmi_context_id context;
@@ -148,8 +147,7 @@ int main(int argc, char **argv)
 	encode_file_req = 
 		(PINT_Request*)((char*)req + sizeof(struct wire_harness_req));
 	
-	commit_index = 0;
-	ret = PINT_Request_commit(encode_file_req, file_req, &commit_index);
+	ret = PINT_Request_commit(encode_file_req, file_req);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: request commit failure.\n");
@@ -388,8 +386,7 @@ static int run_io_operation(
 
 	if (req->op == WIRE_HARNESS_WRITE) {
 	    flow_d->src.endpoint_id = MEM_ENDPOINT;
-	    flow_d->src.u.mem.size = memory_buffer_size;
-		 flow_d->src.u.mem.buffer = memory_buffer;
+	    flow_d->src.u.mem.buffer = memory_buffer;
 	    
 	    /* server endpoint */
 	    flow_d->dest.endpoint_id = BMI_ENDPOINT;
@@ -402,8 +399,7 @@ static int run_io_operation(
 	    flow_d->src.u.bmi.address = server_addr;
 
 	    flow_d->dest.endpoint_id = MEM_ENDPOINT;
-	    flow_d->dest.u.mem.size = memory_buffer_size;
-		 flow_d->dest.u.mem.buffer = memory_buffer;
+	    flow_d->dest.u.mem.buffer = memory_buffer;
 	}
 
 	/* run the flow */

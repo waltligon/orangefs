@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 
 	/* set debugging level */
 	gossip_enable_stderr();
-	gossip_set_debug_mask(0, FLOW_PROTO_DEBUG);
+	gossip_set_debug_mask(1, BMI_DEBUG_ALL);
 
 	/* start up BMI */
 	ret = BMI_initialize("bmi_tcp", "tcp://NULL:3335", BMI_INIT_SERVER);
@@ -101,7 +101,6 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-
 	/******************************************************/
 	/* setup communicaton stuff */
 
@@ -142,10 +141,10 @@ int main(int argc, char **argv)
 	flow_d->file_req = req;
 	flow_d->tag = 0;
 	flow_d->user_ptr = NULL;
+	flow_d->aggregate_size = TEST_SIZE;
 
 	/* fill in flow details */
 	flow_d->dest.endpoint_id = MEM_ENDPOINT;
-	flow_d->dest.u.mem.size = TEST_SIZE;
 	flow_d->dest.u.mem.buffer = mybuffer;
 	flow_d->src.endpoint_id = BMI_ENDPOINT;
 	flow_d->src.u.bmi.address = request_info.addr;
@@ -180,7 +179,9 @@ int main(int argc, char **argv)
 	{
 		if(((int*)mybuffer)[i] != i)
 		{
-			fprintf(stderr, "Failed Verification!!! (step 1)\n");
+			fprintf(stderr, "buffer verify failure, offset: %d\n",
+			    i);
+			fprintf(stderr, "expected: %d, got %d.\n", i, ((int*)mybuffer)[i]);
 		}
 	}
 
