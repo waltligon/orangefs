@@ -206,6 +206,7 @@ int main(int argc, char **argv)	{
 
 	free(user_opts->hostid);
 	free(user_opts->method);
+	free(user_opts->name);
 	free(user_opts);
 
 	return(0);
