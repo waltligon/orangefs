@@ -12,9 +12,6 @@ necessarily take any action right away.
 
 convert PVFS to new error code scheme 
 
-make sure all control messages (TCP and GM) are network encoded somehow
-to work across different architectures
-
 General (portability)
 -----------------------
 
@@ -105,17 +102,6 @@ network encoding of the header.
 Audit code and check for EINTR on _all_ system calls.  This was burning
 me on a poll() call recently.
 
-Note what behavior is for segments now (never send more than one
-segment at a time per test in list calls).  This should be
-optimized later (see below).
-
-Come back later and implement send list and recv list optimization
-of using readv and writev.  Probably requires checking buffer
-space on socket before calling to avoid handling partical
-completion of list stuff on nonblocking socket (maybe use blocking
-readv or writev if buffers big enough, would avoid nasty cleanup
-and probably not really block)
-
 There are more oportunities for immediate completion on receives
 (specifically, look at the end of tcp_post_recv_rend() when we add to the
 completion queue, and the bottom of tcp_post_recv_eager()).
@@ -155,6 +141,9 @@ when it is safe to kill sockets.
 
 GM module:
 -----------------------
+
+make sure all control messages are network encoded somehow
+to work across different architectures
 
 clean up use of qlist (in particular, make use of
 qlist_for_each_safe() when appropriate)
