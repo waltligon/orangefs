@@ -122,6 +122,7 @@ SERVERLIBS = @LIBS@ -ldb -lrt -lpthread -lpvfs2-server
 # No longer trye!  The new pcache now requires locks
 # This is hack and should be fixed.
 LIBCFLAGS = -D__GEN_POSIX_LOCKING__
+LIBS += -lpthread
 
 ################################################################
 # enable GM if configure detected it

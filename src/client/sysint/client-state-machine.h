@@ -102,9 +102,6 @@ struct PINT_client_getattr_sm {
     uint32_t              dist_size;
     PVFS_size            *size_array;     /* from datafile attribs */
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
-    int                  pcache_hit;      /* set on pcache hit */
-    PVFS_object_attr     pcache_attr;     /* copy of getattr response */
-    PVFS_size            pcache_size;     /* cached size value */
 };
 
 /* PINT_client_io_sm
@@ -182,8 +179,9 @@ typedef struct PINT_client_sm {
 		  * jobs for some some states; typically set and
 		  * then decremented to zero as jobs complete */
 
-    int pcache_lock; /* used to indicate that we have a lock to release */
-    PINT_pinode *object_pinode_p;
+    int pcache_hit; /* set if pinode was from pcache */
+    PINT_pinode *pinode; /* filled in on pcache hit */
+    PVFS_object_attr pcache_attr; /* a scratch attr space */
 
     /* generic msgpair used with msgpair substate */
     PINT_client_sm_msgpair_state msgpair;

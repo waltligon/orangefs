@@ -261,68 +261,90 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 					  struct PVFS_server_resp *resp_p,
 					  int index)
 {
-    int need_datafiles = 1;
+    int need_datafiles = 0;
+    PVFS_object_attr *attr = NULL;
 
     /* this is a little kludge to get around some struct definition
      * issues in the headers.  maybe fix later?
      */
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    
+
     assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
 
     /* if we get an error, just return immediately, don't try to
      * actually fill anything in.
      */
-    if (resp_p->status != 0) {
+    if (resp_p->status != 0)
+    {
 	return resp_p->status;
     }
 
-    if (resp_p->u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
+    /*
+      if we got a metafile that didn't get a cache hit *and* we
+      need the size, that should be only time we're going to have
+      to do a full data file fetch.  (that's expensive)
+    */
+    if ((resp_p->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) &&
+        (!sm_p->pcache_hit) &&
+        (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE))
     {
-        /* if we can't locate this metafile in the pcache */
-        if (!sm_p->u.getattr.pcache_hit)
-        {
-            /*
-              copy the PVFS_object_attr from the response
-              for later storage in the pcache (getattr_cleanup)
-            */
-            PINT_pcache_object_attr_deep_copy(
-                &sm_p->u.getattr.pcache_attr, &resp_p->u.getattr.attr);
-        }
-        else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
-        {
-            need_datafiles = 0;
-        }
+        need_datafiles = 1;
     }
 
-    /* copy in the attributes from the response
+    /*
+      if we didn't get a cache hit, we're making a
+      copy of the attributes here so that we can add
+      a pcache entry later in cleanup.
+    */
+    if (!sm_p->pcache_hit)
+    {
+        PINT_pcache_object_attr_deep_copy(
+            &sm_p->pcache_attr, &resp_p->u.getattr.attr);
+    }
+
+    /*
+      if we got a cache hit, use those attributes, other use the
+      real server replied attrs
+    */
+    attr = (sm_p->pcache_hit ?
+            &sm_p->pinode->attr :
+            &resp_p->u.getattr.attr);
+    assert(attr);
+
+    /* transform the attributes from the response
      *
      * Note: the structure in sm_p is a PVFS_sys_attr, while the data returned
      * is in a PVFS_object_attr.  So some translation is necessary.
      */
-    sm_p->u.getattr.getattr_resp_p->attr.owner = resp_p->u.getattr.attr.owner;
-    sm_p->u.getattr.getattr_resp_p->attr.group = resp_p->u.getattr.attr.group;
-    sm_p->u.getattr.getattr_resp_p->attr.perms = resp_p->u.getattr.attr.perms;
-    sm_p->u.getattr.getattr_resp_p->attr.atime = resp_p->u.getattr.attr.atime;
-    sm_p->u.getattr.getattr_resp_p->attr.mtime = resp_p->u.getattr.attr.mtime;
-    sm_p->u.getattr.getattr_resp_p->attr.ctime = resp_p->u.getattr.attr.ctime;
-    sm_p->u.getattr.getattr_resp_p->attr.mask  = resp_p->u.getattr.attr.mask;
+    sm_p->u.getattr.getattr_resp_p->attr.owner = attr->owner;
+    sm_p->u.getattr.getattr_resp_p->attr.group = attr->group;
+    sm_p->u.getattr.getattr_resp_p->attr.perms = attr->perms;
+    sm_p->u.getattr.getattr_resp_p->attr.atime = attr->atime;
+    sm_p->u.getattr.getattr_resp_p->attr.mtime = attr->mtime;
+    sm_p->u.getattr.getattr_resp_p->attr.ctime = attr->ctime;
+    sm_p->u.getattr.getattr_resp_p->attr.mask  = attr->mask;
     sm_p->u.getattr.getattr_resp_p->attr.size  = 0;
+    sm_p->u.getattr.getattr_resp_p->attr.objtype = attr->objtype;
 
-    sm_p->u.getattr.getattr_resp_p->attr.objtype = resp_p->u.getattr.attr.objtype;
+    /* on cache hit, we can skip all of the copying below;  joy! */
+    if (sm_p->pcache_hit)
+    {
+        return 0;
+    }
+
     switch (resp_p->u.getattr.attr.objtype)
     {
 	case PVFS_TYPE_METAFILE:
-	    if (sm_p->msgpair.req.u.getattr.attrmask & PVFS_ATTR_META_DIST) {
-		PVFS_object_attr *r_attr_p = &resp_p->u.getattr.attr;
-
+	    if (sm_p->msgpair.req.u.getattr.attrmask & PVFS_ATTR_META_DIST)
+            {
 		/* sanity checks */
-		assert(r_attr_p->mask & PVFS_ATTR_META_DIST);
-		assert(r_attr_p->u.meta.dist_size > 0);
+		assert(attr->mask & PVFS_ATTR_META_DIST);
+		assert(attr->u.meta.dist_size > 0);
 		
 		gossip_debug(CLIENT_DEBUG,
-			     "getattr_object_getattr_comp_fn: copying %d bytes of dist.\n",
-			     r_attr_p->u.meta.dist_size);
+                             "getattr_object_getattr_comp_fn: "
+                             "copying %d bytes of dist.\n",
+                             attr->u.meta.dist_size);
 
 		/* here we make a copy of the distribution information.
 		 *
@@ -338,7 +360,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		assert(sizeof(int) == sizeof(char *)); /* dist time bomb */
 
 		sm_p->u.getattr.dist_p =
-		    (PVFS_Dist *) malloc(r_attr_p->u.meta.dist_size);
+		    (PVFS_Dist *) malloc(attr->u.meta.dist_size);
 		if (sm_p->u.getattr.dist_p == NULL) {
 		    assert(0);
 		    return -PVFS_ENOMEM;
@@ -348,7 +370,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		 * our new space.
 		 */
 		PINT_Dist_encode(sm_p->u.getattr.dist_p,
-				 r_attr_p->u.meta.dist);
+				 attr->u.meta.dist);
 
 		/* this does an in-place decoding of the distribution.  now
 		 * we have a decoded version where we want it.
@@ -359,24 +381,23 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 				 NULL);
 
 		/* save the size too */
-		sm_p->u.getattr.dist_size = r_attr_p->u.meta.dist_size;
+		sm_p->u.getattr.dist_size = attr->u.meta.dist_size;
 
 		/* nothing special about our return value here */
 	    }
-	    if (sm_p->msgpair.req.u.getattr.attrmask & PVFS_ATTR_META_DFILES) {
-		PVFS_object_attr *r_attr_p = &resp_p->u.getattr.attr;
-
+	    if (sm_p->msgpair.req.u.getattr.attrmask & PVFS_ATTR_META_DFILES)
+            {
 		/* need to save datafile handles to calculate file size;
 		 * redirect us to those states.
 		 */
 		
 		/* sanity checks */
-		assert(r_attr_p->mask & PVFS_ATTR_META_DFILES);
-		assert(r_attr_p->u.meta.dfile_count > 0);
+		assert(attr->mask & PVFS_ATTR_META_DFILES);
+		assert(attr->u.meta.dfile_count > 0);
 		
 		gossip_debug(CLIENT_DEBUG,
 			     "getattr_object_getattr_comp_fn: %d datafiles.\n",
-			     r_attr_p->u.meta.dfile_count);
+			     attr->u.meta.dfile_count);
 		
 		/* save the datafile handles prior to freeing up the
 		 * buffers we used for messages.  we could keep them around
@@ -384,14 +405,15 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		 * it is likely that this stuff will be stuck in the pcache
 		 * anyway, so we'll be able to just reference it from there.
 		 */
-		sm_p->u.getattr.datafile_handles = (PVFS_handle *) malloc(r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
+		sm_p->u.getattr.datafile_handles = (PVFS_handle *)
+                    malloc(attr->u.meta.dfile_count * sizeof(PVFS_handle));
 		if (sm_p->u.getattr.datafile_handles == NULL) {
 		    assert(0);
 		}
-		sm_p->u.getattr.datafile_count = r_attr_p->u.meta.dfile_count;
+		sm_p->u.getattr.datafile_count = attr->u.meta.dfile_count;
 		memcpy(sm_p->u.getattr.datafile_handles,
-		   r_attr_p->u.meta.dfile_array,
-		   r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
+		   attr->u.meta.dfile_array,
+		   attr->u.meta.dfile_count * sizeof(PVFS_handle));
 
                 if (need_datafiles == 0)
                 {
@@ -422,7 +444,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 	case PVFS_TYPE_DIRDATA:
 	    /* fall through */
 	default:
-	    gossip_err("error: getattr_object_getattr_comp_fn: unhandled object type\n");
+	    gossip_err("error: getattr_object_getattr_comp_fn: "
+                       "unhandled object type\n");
 	    assert(0);
     } /* end of switch() */
 
@@ -554,20 +577,23 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
     uint32_t amask;
     PVFS_sys_attr *s_attr_p = &sm_p->u.getattr.getattr_resp_p->attr;
 
-    gossip_debug(CLIENT_DEBUG, "(%p) getattr state: getattr_cleanup\n", sm_p);
+    gossip_debug(CLIENT_DEBUG,
+                 "(%p) getattr state: getattr_cleanup\n", sm_p);
 
-    if (js_p->error_code == 0) {
+    if (js_p->error_code == 0)
+    {
 	/* calculate size of file if necessary */
-	s_attr_p->size = 0;
+	assert(s_attr_p->size == 0);
 
 	amask = s_attr_p->mask; /* from object getattr */
 
         if (amask & PVFS_ATTR_META_DIST)
         {
-            if (!sm_p->u.getattr.pcache_hit)
+            if (!sm_p->pcache_hit)
             {
                 ret = PINT_Dist_lookup(sm_p->u.getattr.dist_p);
-                if (ret < 0) {
+                if (ret < 0)
+                {
                     assert(0);
                 }
 
@@ -579,7 +605,7 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             }
             else
             {
-                s_attr_p->size = sm_p->u.getattr.pcache_size;
+                s_attr_p->size = sm_p->pinode->size;
             }
         }
 
@@ -607,11 +633,12 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 	}
 
         /*
-          only free memory if we didn't get a cache hit;
-          in that case, we're referencing memory inside the
-          pcache entries
+          only free dist and dfile memory if we didn't get a
+          cache hit;  if we got a pcache hit, we're referencing
+          memory inside the pcache entries, so no allocations we
+          made
         */
-        if (!sm_p->u.getattr.pcache_hit)
+        if (!sm_p->pcache_hit)
         {
             if ((amask & PVFS_ATTR_META_DFILES) &&
                 (sm_p->u.getattr.datafile_handles != NULL)) {
@@ -624,8 +651,7 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
         }
 
         /* add entry to pcache if not already present */
-        if (!sm_p->u.getattr.pcache_hit &&
-            (sm_p->u.getattr.pcache_attr.objtype == PVFS_TYPE_METAFILE))
+        if (!sm_p->pcache_hit)
         {
             PINT_pinode *pinode =
                 PINT_pcache_lookup(sm_p->u.getattr.object_ref);
@@ -638,12 +664,12 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             pinode->size = s_attr_p->size;
 
             PINT_pcache_object_attr_deep_copy(
-                &pinode->attr, &sm_p->u.getattr.pcache_attr);
+                &pinode->attr, &sm_p->pcache_attr);
             PINT_pcache_object_attr_deep_free(
-                &sm_p->u.getattr.pcache_attr);
+                &sm_p->pcache_attr);
 
             PINT_pcache_set_valid(pinode);
-            sm_p->u.getattr.pcache_hit = 0;
+            sm_p->pcache_hit = 0;
         }
     }
 

@@ -217,15 +217,17 @@ void PINT_pcache_invalidate(PVFS_pinode_reference refn)
 {
     PINT_pinode *pinode = NULL;
 
-    assert(s_pcache_initialized);
-    pinode = PINT_pcache_lookup(refn);
-
     pcache_debug("PINT_pcache_invalidate entered\n");
+    assert(s_pcache_initialized);
 
+    pinode = PINT_pcache_lookup(refn);
     if (pinode)
     {
         /* drop the ref count we picked up in lookup */
         pinode->ref_cnt--;
+
+        /* forcefully expire the entry */
+        pinode->status = PINODE_STATUS_EXPIRED;
 
         /* we should have the lock at this point */
         gen_mutex_unlock(pinode->mutex);

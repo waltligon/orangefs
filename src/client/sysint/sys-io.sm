@@ -155,10 +155,13 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
 
     error = sm_p->error_code;
 
-    free(sm_p);
-
     /* flush pcache entry, if any */
-    PINT_pcache_invalidate(pinode_ref);
+    if (sm_p->pcache_hit)
+    {
+        PINT_pcache_invalidate(pinode_ref);
+        sm_p->pcache_hit = 0;
+    }
+    free(sm_p);
 
     return error;
 }
@@ -219,13 +222,6 @@ static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
  * the getattr state machine and then modified.  However, I'm not sure if
  * there is a good way to generalize this.
  *
- * Q: MAYBE WE SHOULD JUST PUT A COMMON PVFS_object_attr IN THE PINT_client_sm
- *    STRUCTURE AND USE THAT IN ALL CASES?  IT WOULD MAKE FOR AN UGLIER
- *    STRUCTURE BUT OVERALL CLEANER CODE I THINK. -- RobR
- *
- *    ACTUALLY, IF WE GOT THE PINODE CACHE STUFF WORKING WE COULD JUST RETURN
- *    A PINODE REFERENCE AND BE DONE WITH IT; THAT WOULD PROBABLY BE BEST.
- *
  * Returns 0 for metafiles, error for all the other types.
  */
 static int io_object_getattr_comp_fn(void *v_p,
@@ -238,86 +234,97 @@ static int io_object_getattr_comp_fn(void *v_p,
      * issues in the headers.  maybe fix later?
      */
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    
-    /* sanity checks: this is a getattr response and has a valid
-     * type field
-     */
+
     assert(resp_p->op == PVFS_SERV_GETATTR);
-    assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_COMMON_TYPE);
 
     /* if we get an error, just return immediately, don't try to
      * actually fill anything in.
      */
-    if (resp_p->status != 0) {
+    if (resp_p->status != 0)
+    {
 	return resp_p->status;
     }
 
-    if (resp_p->u.getattr.attr.objtype != PVFS_TYPE_METAFILE) {
+    r_attr_p = (sm_p->pcache_hit ?
+                &sm_p->pinode->attr :
+                &resp_p->u.getattr.attr);
+
+    /* sanity checks */
+    assert(r_attr_p->mask & PVFS_ATTR_COMMON_TYPE);
+    assert(r_attr_p->mask & PVFS_ATTR_META_DIST);
+    assert(r_attr_p->u.meta.dist_size > 0);
+    assert(r_attr_p->mask & PVFS_ATTR_META_DFILES);
+    assert(r_attr_p->u.meta.dfile_count > 0);
+
+    if (r_attr_p->objtype != PVFS_TYPE_METAFILE)
+    {
 	/* invalid type - we only do I/O on files */
 	return -PVFS_EINVAL;
     }
 
-    r_attr_p = &resp_p->u.getattr.attr;
+    if (!sm_p->pcache_hit)
+    {
+        /* here we make a copy of the distribution information. */
+        gossip_debug(CLIENT_DEBUG,
+                     "io_object_getattr_comp_fn: copying %d bytes "
+                     "of dist.\n", r_attr_p->u.meta.dist_size);
 
-    /* sanity checks */
-    assert(r_attr_p->mask & PVFS_ATTR_META_DIST);
-    assert(r_attr_p->u.meta.dist_size > 0);
+        sm_p->u.io.dist_p = (PVFS_Dist *)
+            malloc(r_attr_p->u.meta.dist_size);
+        if (sm_p->u.io.dist_p == NULL)
+        {
+            assert(0);
+            return -PVFS_ENOMEM;
+        }
+
+        /* this encodes the previously decoded distribution into
+         * our new space.
+         */
+        PINT_Dist_encode(sm_p->u.io.dist_p, r_attr_p->u.meta.dist);
+
+        /* this does an in-place decoding of the distribution.  now
+         * we have a decoded version where we want it.
+         *
+         * NOTE: we need to free this later.
+         */
+        PINT_Dist_decode(sm_p->u.io.dist_p, NULL);
+
+        /* save the size too */
+        sm_p->u.io.dist_size = r_attr_p->u.meta.dist_size;
+
+        gossip_debug(CLIENT_DEBUG,
+                     "io_object_getattr_comp_fn: %d datafiles.\n",
+                     r_attr_p->u.meta.dfile_count);
 		
-    gossip_debug(CLIENT_DEBUG,
-		 "io_object_getattr_comp_fn: copying %d bytes of dist.\n",
-		 r_attr_p->u.meta.dist_size);
-
-    /* here we make a copy of the distribution information.
-     *
-     * KLUDGE: there is no copy function for distributions
-     * right now, so we do this nasty thing.
-     */
-
-    sm_p->u.io.dist_p = (PVFS_Dist *) malloc(r_attr_p->u.meta.dist_size);
-    if (sm_p->u.io.dist_p == NULL) {
-	assert(0);
-	return -PVFS_ENOMEM;
+        /* save the datafile handles prior to freeing up the
+         * buffers we used for messages.  we could keep them around
+         * i suppose, but we're not going to do that for now.  later
+         * it is likely that this stuff will be stuck in the pcache
+         * anyway, so we'll be able to just reference it from there.
+         */
+        sm_p->u.io.datafile_handles = (PVFS_handle *)
+            malloc(r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
+        if (sm_p->u.io.datafile_handles == NULL)
+        {
+            assert(0);
+        }
+        sm_p->u.io.datafile_count = r_attr_p->u.meta.dfile_count;
+        memcpy(sm_p->u.io.datafile_handles,
+               r_attr_p->u.meta.dfile_array,
+               r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
     }
+    else
+    {
+        /* fast path; no copying needed */
+        assert(sm_p->pinode);
 
-    /* this encodes the previously decoded distribution into
-     * our new space.
-     */
-    PINT_Dist_encode(sm_p->u.io.dist_p, r_attr_p->u.meta.dist);
-
-    /* this does an in-place decoding of the distribution.  now
-     * we have a decoded version where we want it.
-     *
-     * NOTE: we need to free this later.
-     */
-    PINT_Dist_decode(sm_p->u.io.dist_p, NULL);
-
-    /* save the size too */
-    sm_p->u.io.dist_size = r_attr_p->u.meta.dist_size;
-
-    /* sanity checks */
-    assert(r_attr_p->mask & PVFS_ATTR_META_DFILES);
-    assert(r_attr_p->u.meta.dfile_count > 0);
-
-    gossip_debug(CLIENT_DEBUG,
-		 "io_object_getattr_comp_fn: %d datafiles.\n",
-		 r_attr_p->u.meta.dfile_count);
-		
-    /* save the datafile handles prior to freeing up the
-     * buffers we used for messages.  we could keep them around
-     * i suppose, but we're not going to do that for now.  later
-     * it is likely that this stuff will be stuck in the pcache
-     * anyway, so we'll be able to just reference it from there.
-     */
-    sm_p->u.io.datafile_handles =
-	(PVFS_handle *) malloc(r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
-    if (sm_p->u.io.datafile_handles == NULL) {
-	assert(0);
+        sm_p->u.io.dist_p = sm_p->pinode->attr.u.meta.dist;
+        sm_p->u.io.dist_size = sm_p->pinode->attr.u.meta.dist_size;
+        sm_p->u.io.datafile_handles =
+            sm_p->pinode->attr.u.meta.dfile_array;
+        sm_p->u.io.datafile_count =
+            sm_p->pinode->attr.u.meta.dfile_count;        
     }
-    sm_p->u.io.datafile_count = r_attr_p->u.meta.dfile_count;
-    memcpy(sm_p->u.io.datafile_handles,
-	   r_attr_p->u.meta.dfile_array,
-	   r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
-
     return 0;
 } /* io_object_getattr_comp_fn */
 
@@ -506,7 +513,10 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     /*
      * Swap the new list in for the old one, freeing the old list.
      */
-    free(iosm_p->datafile_handles);
+    if (!sm_p->pcache_hit)
+    {
+        free(iosm_p->datafile_handles);
+    }
     iosm_p->datafile_handles = target_datafile_array;
     iosm_p->datafile_count   = target_datafile_count;
     
@@ -1138,7 +1148,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 
     /* free the rest of the resources:
      * - msgpairarray
-     * - datafile handle array
+     * - datafile handle array (if allocated)
      * - flow descriptor pointer array
      * - file data array
      * - flow id array
@@ -1147,7 +1157,11 @@ static int io_analyze_results(PINT_client_sm *sm_p,
      * - ackarray
      */
     free(sm_p->msgarray);
-    free(sm_p->u.io.datafile_handles);
+
+    if (!sm_p->pcache_hit)
+    {
+        free(sm_p->u.io.datafile_handles);
+    }
     free(sm_p->u.io.flow_array);
     free(sm_p->u.io.flow_id_array);
     free(sm_p->u.io.flow_status_array);

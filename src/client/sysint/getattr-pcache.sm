@@ -81,8 +81,6 @@ nested machine pvfs2_client_getattr_pcache_sm(lookup,
 static int getattr_pcache_lookup(PINT_client_sm *sm_p,
 				 job_status_s *js_p)
 {
-    PINT_pinode *pinode = NULL;
-
     gossip_debug(CLIENT_DEBUG, "getattr_pcache state: lookup\n");
 
     /* we don't know what this is set to prior to this function,
@@ -92,7 +90,7 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
 
     /* check input parameters */
 
-    /* TODO: check pcache to see if we have an entry.  if so, set
+    /* The idea is to check pcache to see if we have an entry.  if so, set
      * up a fake, decoded response structure with the results so that
      * we can then call the comp_fn to copy data out of the response
      * and into the PINT_client_sm structure.
@@ -102,24 +100,38 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
      * necessary.  Or we can tailor the pcache to store in response
      * format all the time...
      */
-    pinode = PINT_pcache_lookup(sm_p->u.getattr.object_ref);
-    if (pinode && PINT_pcache_pinode_status(pinode) == PINODE_STATUS_VALID)
+    assert(sm_p->pinode == NULL);
+    sm_p->pinode = PINT_pcache_lookup(sm_p->u.getattr.object_ref);
+    if (sm_p->pinode)
     {
-        if (pinode->attr.mask == sm_p->msgpair.req.u.getattr.attrmask)
+        /*
+          make sure pinode is not expired, and that it
+          has all attribute info fields requested
+        */
+        if (PINT_pcache_pinode_status(sm_p->pinode) == PINODE_STATUS_VALID)
         {
-            /* build a fake response, call the completion function on it */
-            struct PVFS_server_resp fake_resp;
-            fake_resp.op = PVFS_SERV_GETATTR;
-            fake_resp.status = 0;
-            PINT_pcache_object_attr_deep_copy(
-                &fake_resp.u.getattr.attr, &pinode->attr);
+            if (((sm_p->pinode->attr.objtype == PVFS_TYPE_METAFILE) &&
+                 (sm_p->pinode->attr.mask ==
+                  sm_p->msgpair.req.u.getattr.attrmask)) ||
+                (sm_p->pinode->attr.objtype == PVFS_TYPE_DIRECTORY))
+            {
+                /* build a fake response for completion */
+                struct PVFS_server_resp fake_resp;
+                fake_resp.op = PVFS_SERV_GETATTR;
+                fake_resp.status = 0;
 
-            sm_p->u.getattr.pcache_hit = 1;
-            sm_p->u.getattr.pcache_size = pinode->size;
-            sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
-            PINT_pcache_release(pinode);
-            return 1;
+                /*
+                  skip the deep fill (i.e. copy) of attributes
+                  on cache hit.  by setting the pcache_hit flag,
+                  getattr won't try to read those attributes out
+                */
+                sm_p->pcache_hit = 1;
+                sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
+                PINT_pcache_release(sm_p->pinode);
+                return 1;
+            }
         }
+        PINT_pcache_release(sm_p->pinode);
     }
 
     js_p->error_code = GETATTR_PCACHE_MISS;
