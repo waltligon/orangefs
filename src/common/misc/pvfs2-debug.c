@@ -53,7 +53,6 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "remove", GOSSIP_REMOVE_DEBUG },
     { "getattr", GOSSIP_GETATTR_DEBUG },
     { "readdir", GOSSIP_READDIR_DEBUG },
-    { "open_cache", GOSSIP_DBPF_OPEN_CACHE_DEBUG }, 
     { "io", GOSSIP_IO_DEBUG },
     { "open_cache", GOSSIP_DBPF_OPEN_CACHE_DEBUG }, 
     { "permissions", GOSSIP_PERMISSIONS_DEBUG }, 
