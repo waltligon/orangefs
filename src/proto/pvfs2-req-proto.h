@@ -67,8 +67,8 @@ typedef struct PVFS_mserv_stat_s PVFS_mserv_stat;
 struct PVFS_ioserv_stat_s
 {
     PVFS_size blksize;		/* filesystem block size */
-    PVFS_count64 blkfree;	/* number of free blocks */
-    PVFS_count64 blktotal;	/* total no. of blocks available */
+    int64_t blkfree;	/* number of free blocks */
+    int64_t blktotal;	/* total no. of blocks available */
     PVFS_count32 filetotal;	/* Max no. of files */
     PVFS_count32 filefree;	/* no. of free files */
 };
