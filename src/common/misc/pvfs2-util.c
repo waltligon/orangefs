@@ -15,286 +15,142 @@
 #include "str-utils.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
+#include "mntent.h"
+#include "assert.h"
 
-#define PARSER_MAX_LINE_LENGTH 255
-
-/* Function Prototypes */
-static int mntlist_new(
-    int num_mnts,
-    pvfs_mntlist * mntlist_ptr);
-
-/* Function: PVFS_util_parse_pvfstab
+/* PVFS_util_parse_pvfstab()
  *
- * parses the PVFS fstab file
+ * parses either the file pointed to by the PVFS2TAB_FILE env variable,
+ * or /etc/fstab, or /etc/pvfs2tab or ./pvfs2tab to extract pvfs2 mount 
+ * entries.
  *
- * returns 0 on success, -1 on error
+ * example entry:
+ * tcp://localhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 defaults 0 0
+ *
+ * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_util_parse_pvfstab(
-    char *filename,
-    pvfs_mntlist * pvfstab_p)
+int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
 {
-    FILE *tab;
-    char * pvfstab_env;
-    char line[PARSER_MAX_LINE_LENGTH];
-    int index = 0, ret = 0, lines = 0;
-    size_t linelen = 0;
-    int i = 0, start = 0, end = 0, num_slashes_seen = 0;
+    FILE* mnt_fp = NULL;
+    int file_count = 4;
+    char* file_list[4] = {NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab"};
+    char* targetfile = NULL;
+    struct mntent* tmp_ent;
+    int i;
+    int slashcount = 0;
+    char* slash = NULL;
+    char* last_slash = NULL;
 
-    if ( (pvfstab_env = getenv("PVFS2TAB_FILE")) != NULL) 
+    /* safety */
+    pvfstab_p->ptab_count = 0;
+
+    /* first check for environment variable override */
+    file_list[0] = getenv("PVFS2TAB_FILE");
+
+    /* scan our prioritized list of tab files in order, stop when we find
+     * one that has at least one pvfs2 entry
+     */
+    for(i=0; (i<file_count && !targetfile); i++)
     {
-	tab = fopen(pvfstab_env, "rb");
-	if (tab == NULL)
+	mnt_fp = setmntent(file_list[i], "r");
+	if(mnt_fp)
 	{
-	    return (-1);
+	    while((tmp_ent = getmntent(mnt_fp)))
+	    {
+		if(strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
+		{
+		    targetfile = file_list[i];
+		    pvfstab_p->ptab_count++;
+		}
+	    }
+	    endmntent(mnt_fp);
 	}
-    } 
-    else if (filename == NULL)
-    {
-	/* if we didn't get a filename, just look in the current dir for
-	 * a file named "pvfstab"
-	 */
+    }
 
-	tab = fopen("pvfstab", "rb");
-	if (tab == NULL)
+    /* print some debugging information */
+    if(!targetfile)
+    {
+	gossip_lerr("Error: could not find any pvfs2 tabfile entries.\n");
+	return(-PVFS_ENOENT);
+    }
+    gossip_debug(CLIENT_DEBUG, "Using pvfs2 tab file: %s\n", targetfile);
+
+    /* allocate array of entries */
+    pvfstab_p->ptab_array = (struct pvfs_mntent*)malloc(pvfstab_p->ptab_count *
+	sizeof(struct pvfs_mntent));
+    if(!pvfstab_p->ptab_array)
+	return(-PVFS_ENOMEM);
+
+    /* reopen our chosen fstab file */
+    mnt_fp = setmntent(targetfile, "r");
+    /* this shouldn't fail - we just opened it earlier */
+    assert(mnt_fp);
+
+    /* scan through looking for every pvfs2 entry */
+    i = 0;
+    while((tmp_ent = getmntent(mnt_fp)))
+    {
+	if(strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
 	{
-	    return (-1);
-	}
-    }
-    else
-    {
-	tab = fopen(filename, "rb");
-	if (tab == NULL)
-	{
-	    return (errno);
-	}
-    }
-
-    /* Count the number of lines */
-    while (fgets(line, PARSER_MAX_LINE_LENGTH, tab) != NULL)
-    {
-	/* ignore any blank lines */
-	linelen = strlen(line);
-	if (linelen > 1) {
-	    /* ignore comment lines, like fstab */
-	    for (i=0; i<linelen; i++)
-		if (!isspace(line[i]))
-		    break;
-	    if (i < linelen && line[i] == '#')
-		continue;
-	    lines++;
-	}
-    }
-    if ((ret = mntlist_new(lines, pvfstab_p) < 0))
-    {
-	fclose(tab);
-	return (-1);
-    }
-
-    fseek(tab, 0, SEEK_SET);
-
-    /* Fill in the mount structure */
-    /* Get a line from the pvstab file */
-    while (fgets(line, PARSER_MAX_LINE_LENGTH, tab) != NULL)
-    {
-	/* Is the line blank? */
-	linelen = strlen(line);
-	if (linelen > 1)
-	{
-	    /* ignore comment lines, like fstab */
-	    for (i=0; i<linelen; i++)
-		if (!isspace(line[i]))
-		    break;
-	    if (i < linelen && line[i] == '#')
-		continue;
-
-	    /* 'pvfs-tcp://user:port/' */
-	    //sscanf("pvfs-%s://%s:%d/%s")
-	    for (i = 0; i < linelen; i++)
+	    /* sanity check */
+	    slash = tmp_ent->mnt_fsname;
+	    slashcount = 0;
+	    while((slash = index(slash, '/')))
 	    {
-		if (line[i] == '-')
-		{
-		    start = i + 1;
-		    break;
-		}
+		slash++;
+		slashcount++;
 	    }
 
-	    num_slashes_seen = 0;
-	    for (i = start; i < linelen; i++)
-	    {
-		if (line[i] == '/')
-		{
-		    num_slashes_seen++;
-		    if (num_slashes_seen > 2)
-		    {
-			end = i;
-			break;
-		    }
-		}
-	    }
-	    if (end - start < 0)
-	    {
-		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
-		ret = -EINVAL;
-		goto metaaddr_failure;
-	    }
-	    pvfstab_p->ptab_p[index].meta_addr = malloc(end - start + 1);
-	    if (pvfstab_p->ptab_p[index].meta_addr == NULL)
-	    {
-		ret = -ENOMEM;
-		goto metaaddr_failure;
-	    }
-	    memcpy(pvfstab_p->ptab_p[index].meta_addr, &line[start],
-		   end - start);
-	    pvfstab_p->ptab_p[index].meta_addr[end - start] = '\0';
+	    /* find a reference point in the string */
+	    last_slash = rindex(tmp_ent->mnt_fsname, '/');
 
-	    start = end + 1;	/*skip the '/' character */
-	    for (i = start; i < linelen; i++)
+	    if(slashcount != 3)
 	    {
-		if ((line[i] == ' ') || (line[i] == '\t'))
-		{
-		    end = i;
-		    break;
-		}
+		gossip_lerr("Error: invalid tab file entry: %s\n",
+		    tmp_ent->mnt_fsname);
+		endmntent(mnt_fp);
+		return(-PVFS_EINVAL);
+	    }
+	
+	    /* allocate room for our copies of the strings */
+	    pvfstab_p->ptab_array[i].pvfs_config_server = 
+		(char*)malloc(strlen(tmp_ent->mnt_fsname) + 1);
+	    pvfstab_p->ptab_array[i].mnt_dir = 
+		(char*)malloc(strlen(tmp_ent->mnt_dir) + 1);
+	    pvfstab_p->ptab_array[i].mnt_opts = 
+		(char*)malloc(strlen(tmp_ent->mnt_opts) + 1);
+
+	    /* bail if any mallocs failed */
+	    if(!pvfstab_p->ptab_array[i].pvfs_config_server
+		|| !pvfstab_p->ptab_array[i].mnt_dir
+		|| !pvfstab_p->ptab_array[i].mnt_opts)
+	    {
+		endmntent(mnt_fp);
+		return(-PVFS_EINVAL);
 	    }
 
-	    if (end - start < 0)
-	    {
-		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
-		ret = -EINVAL;
-		goto servmnt_failure;
-	    }
-	    pvfstab_p->ptab_p[index].service_name = malloc(end - start + 1);
-	    if (pvfstab_p->ptab_p[index].service_name == NULL)
-	    {
-		ret = -ENOMEM;
-		goto servmnt_failure;
-	    }
-	    memcpy(pvfstab_p->ptab_p[index].service_name, &line[start],
-		   end - start);
-	    pvfstab_p->ptab_p[index].service_name[end - start] = '\0';
-	    start = end + 1;
-	    for (i = start; i < linelen; i++)
-	    {
-		if ((line[i] == ' ') || (line[i] == '\t'))
-		{
-		    end = i;
-		    break;
-		}
-	    }
+	    /* make our own copy of parameters of interest */
 
-	    if (end - start < 0)
-	    {
-		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
-		ret = -EINVAL;
-		goto localmnt_failure;
-	    }
-	    pvfstab_p->ptab_p[index].local_mnt_dir = malloc(end - start + 1);
-	    if (pvfstab_p->ptab_p[index].local_mnt_dir == NULL)
-	    {
-		ret = -ENOMEM;
-		goto localmnt_failure;
-	    }
-	    memcpy(pvfstab_p->ptab_p[index].local_mnt_dir, &line[start],
-		   end - start);
-	    pvfstab_p->ptab_p[index].local_mnt_dir[end - start] = '\0';
-	    start = end + 1;
-	    for (i = start; i < linelen; i++)
-	    {
-		if ((line[i] == ' ') || (line[i] == '\t'))
-		{
-		    end = i;
-		    break;
-		}
-	    }
+	    /* config server and fs name are a special case, take one 
+	     * string and split it in half on "/" delimiter
+	     */
+	    strcpy(pvfstab_p->ptab_array[i].pvfs_config_server,
+		tmp_ent->mnt_fsname);
+	    *last_slash = '\0';
+	    last_slash++;
+	    pvfstab_p->ptab_array[i].pvfs_fs_name = last_slash;
 
-	    if (end - start < 0)
-	    {
-		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
-		ret = -EINVAL;
-		goto fstype_failure;
-	    }
-	    pvfstab_p->ptab_p[index].fs_type = malloc(end - start + 1);
-	    if (pvfstab_p->ptab_p[index].fs_type == NULL)
-	    {
-		ret = -ENOMEM;
-		goto fstype_failure;
-	    }
-	    memcpy(pvfstab_p->ptab_p[index].fs_type, &line[start], end - start);
-	    pvfstab_p->ptab_p[index].fs_type[end - start] = '\0';
-	    start = end + 1;
-	    for (i = start; i < linelen; i++)
-	    {
-		if ((line[i] == ' ') || (line[i] == '\t'))
-		{
-		    end = i;
-		    break;
-		}
-	    }
+	    /* mnt_dir and mnt_opts are verbatim copies */
+	    strcpy(pvfstab_p->ptab_array[i].mnt_dir,
+		tmp_ent->mnt_dir);
+	    strcpy(pvfstab_p->ptab_array[i].mnt_opts,
+		tmp_ent->mnt_opts);
 
-	    if (end - start < 0)
-	    {
-		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
-		ret = -EINVAL;
-		goto opt1_failure;
-	    }
-	    pvfstab_p->ptab_p[index].opt1 = malloc(end - start + 1);
-	    if (pvfstab_p->ptab_p[index].opt1 == NULL)
-	    {
-		ret = -ENOMEM;
-		goto opt1_failure;
-	    }
-	    memcpy(pvfstab_p->ptab_p[index].opt1, &line[start], end - start);
-	    pvfstab_p->ptab_p[index].opt1[end - start] = '\0';
-	    start = end + 1;
-	    for (i = start; i < linelen; i++)
-	    {
-		if ((line[i] == ' ') || (line[i] == '\t') || line[i] == '\n' || line[i] == '\0')
-		{
-		    end = i;
-		    break;
-		}
-	    }
-
-	    if (end - start < 0)
-	    {
-		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
-		ret = -EINVAL;
-		goto opt2_failure;
-	    }
-	    pvfstab_p->ptab_p[index].opt2 = malloc(end - start + 1);
-	    if (pvfstab_p->ptab_p[index].opt2 == NULL)
-	    {
-		ret = -ENOMEM;
-		goto opt2_failure;
-	    }
-	    memcpy(pvfstab_p->ptab_p[index].opt2, &line[start], end - start);
-	    pvfstab_p->ptab_p[index].opt2[end - start] = '\0';
-
-	    /* Increment the counter */
-	    index++;
-
+	    i++;
 	}
     }
 
-    /* Close the pvfstab file */
-    fclose(tab);
-
-    return (0);
-
-/* TODO: if we hit these error cases, we're going to need to free() whatever
- * we were able to malloc before we encountered whatever error happened.
- */
-
-  metaaddr_failure:
-  servmnt_failure:
-  localmnt_failure:
-  fstype_failure:
-  opt1_failure:
-  opt2_failure:
-    fclose(tab);
-    PVFS_util_pvfstab_mntlist_free(pvfstab_p);
-    return (ret);
-
+    return(0);
 }
 
 /* PVFS_util_pvfstab_mntlist_free
@@ -303,29 +159,19 @@ int PVFS_util_parse_pvfstab(
  *
  * does not return anything
  */
-void PVFS_util_pvfstab_mntlist_free(
+void PVFS_util_free_pvfstab(
     pvfs_mntlist * e_p)
 {
     int i = 0;
-    pvfs_mntlist *mnts = e_p;
 
-    for (i = 0; i < mnts->nr_entry; i++)
+    for(i=0; i<e_p->ptab_count; i++)
     {
-	if (mnts->ptab_p[i].meta_addr)
-	    free(mnts->ptab_p[i].meta_addr);
-	if (mnts->ptab_p[i].service_name)
-	    free(mnts->ptab_p[i].service_name);
-	if (mnts->ptab_p[i].local_mnt_dir)
-	    free(mnts->ptab_p[i].local_mnt_dir);
-	if (mnts->ptab_p[i].fs_type)
-	    free(mnts->ptab_p[i].fs_type);
-	if (mnts->ptab_p[i].opt1)
-	    free(mnts->ptab_p[i].opt1);
-	if (mnts->ptab_p[i].opt2)
-	    free(mnts->ptab_p[i].opt2);
+	free(e_p->ptab_array[i].pvfs_config_server);
+	free(e_p->ptab_array[i].mnt_dir);
+	free(e_p->ptab_array[i].mnt_opts);
     }
-    free(mnts->ptab_p);
 
+    free(e_p->ptab_array);
 }
 
 /* PVFS_util_lookup_parent()
@@ -534,29 +380,6 @@ int PVFS_util_remove_dir_prefix(
 
     /* copy out appropriate part of pathname */
     strcpy(out_path, &(pathname[cut_index]));
-    return (0);
-}
-
-/***********************/
-
-/* mntlist_new
- *
- * allocates memory for an array of pvfs mount entries
- *
- * returns 0 on success, -1 on failure
- */
-static int mntlist_new(
-    int num_mnts,
-    pvfs_mntlist * mntlist_ptr)
-{
-    mntlist_ptr->nr_entry = num_mnts;
-    mntlist_ptr->ptab_p = malloc(num_mnts * sizeof(pvfs_mntent));
-    if (!mntlist_ptr->ptab_p)
-    {
-	return (-ENOMEM);
-    }
-    memset(mntlist_ptr->ptab_p, 0, num_mnts * sizeof(pvfs_mntent));
-
     return (0);
 }
 

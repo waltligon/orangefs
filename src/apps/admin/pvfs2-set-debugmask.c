@@ -22,8 +22,6 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define DEFAULT_TAB "/etc/pvfs2tab"
-
 struct options
 {
     char* mnt_point;
@@ -57,19 +55,19 @@ int main(int argc, char **argv)
     }
 
     /* look at pvfstab */
-    if(PVFS_util_parse_pvfstab(DEFAULT_TAB, &mnt))
+    if(PVFS_util_parse_pvfstab(&mnt))
     {
-        fprintf(stderr, "Error: failed to parse pvfstab %s.\n", DEFAULT_TAB);
+        fprintf(stderr, "Error: failed to parse pvfstab.\n");
         return(-1);
     }
 
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i=0; i<mnt.nr_entry; i++)
+    for(i=0; i<mnt.ptab_count; i++)
     {
 	ret = PVFS_util_remove_dir_prefix(user_opts->mnt_point,
-	    mnt.ptab_p[i].local_mnt_dir, pvfs_path, PVFS_NAME_MAX);
+	    mnt.ptab_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
 	    mnt_index = i;
@@ -79,8 +77,8 @@ int main(int argc, char **argv)
 
     if(mnt_index == -1)
     {
-	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab %s\n", 
-	    user_opts->mnt_point, DEFAULT_TAB);
+	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
+	    user_opts->mnt_point);
 	return(-1);
     }
 
@@ -100,6 +98,7 @@ int main(int argc, char **argv)
     ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_GOSSIP_MASK,
 	user_opts->debug_mask);
 
+    PVFS_util_free_pvfstab(&mnt);
     PVFS_sys_finalize();
 
     return(ret);
@@ -208,7 +207,6 @@ static void usage(int argc, char** argv)
             fprintf(stderr,"\n");
     }
 
-    fprintf(stderr, "\nNote: this utility reads /etc/pvfs2tab for file system configuration.\n");
     return;
 }
 

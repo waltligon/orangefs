@@ -74,7 +74,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     }
 
     /* make sure we were given sane arguments */
-    if ((mntent_list.ptab_p == NULL) || (resp == NULL))
+    if ((mntent_list.ptab_array == NULL) || (resp == NULL))
     {
 	ret = -EINVAL;
 	init_fail = NONE_INIT_FAIL;
@@ -93,9 +93,9 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     num_method_ptr_list = 0;
     max_method_ptr_list = 0;
     method_ptr_list = 0;
-    for (i=0; i<mntent_list.nr_entry; i++) {
+    for (i=0; i<mntent_list.ptab_count; i++) {
 	const char *meth_name = BMI_method_from_scheme(
-	  mntent_list.ptab_p[i].meta_addr);
+	  mntent_list.ptab_array[i].pvfs_config_server);
 	for (j=0; j<num_method_ptr_list; j++) {
 	    if (method_ptr_list[j] == meth_name)
 		break;
@@ -133,6 +133,14 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 	    strcat(method_list, method_ptr_list[i]);
 	}
 	free(method_ptr_list);
+    }
+
+    if(method_list == NULL)
+    {
+	gossip_err("Error: failed to parse BMI method names from tab file entries.\n");
+	ret = -EINVAL;
+	init_fail = BMI_INIT_FAIL;
+	goto return_error;
     }
 
     /* Initialize BMI */

@@ -83,7 +83,7 @@ int main(int argc,char **argv)
 	memcpy(&(filename[1]), argv[1], (name_sz-1));
 
 	/* parse pvfstab */
-	ret = PVFS_util_parse_pvfstab(NULL,&mnt);
+	ret = PVFS_util_parse_pvfstab(&mnt);
 	if (ret < 0)
 	{
 		fprintf(stderr, "Error: parse_pvfstab() failure.\n");

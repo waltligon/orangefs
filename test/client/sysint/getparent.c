@@ -31,7 +31,7 @@ int main(int argc,char **argv)
 	printf("lookup up path %s\n", argv[1]);
 
 	/* Parse PVFStab */
-	ret = PVFS_util_parse_pvfstab(NULL,&mnt);
+	ret = PVFS_util_parse_pvfstab(&mnt);
 	if (ret < 0)
 	{
 		printf("Parsing error\n");

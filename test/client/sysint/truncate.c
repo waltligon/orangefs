@@ -34,7 +34,7 @@ int main(int argc,char **argv)
 
     sscanf(argv[2],"%lld",&trunc_size);
 
-    if (PVFS_util_parse_pvfstab(NULL,&mnt))
+    if (PVFS_util_parse_pvfstab(&mnt))
     {
         printf("Failed to parse pvfstab\n");
         return ret;

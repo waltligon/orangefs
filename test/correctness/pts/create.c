@@ -164,7 +164,7 @@ int test_create(MPI_Comm * comm,
     int i, nerrs = 0;
 
     /* Parse PVFStab */
-    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
+    ret = PVFS_util_parse_pvfstab(&mnt);
     if (ret < 0)
     {
 	printf("Parsing error\n");

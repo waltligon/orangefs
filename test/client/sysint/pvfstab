@@ -1,1 +1,0 @@
-pvfs-tcp://localhost:3334/pvfs2-fs /mnt/pvfs pvfs 0 0 

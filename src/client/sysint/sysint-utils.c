@@ -365,7 +365,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
     struct PINT_decoded_msg decoded;
     void* encoded_resp;
     PVFS_size max_msg_sz;
-    pvfs_mntent *mntent_p = NULL;
+    struct pvfs_mntent *mntent_p = NULL;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
     int found_one_good=0;	/* do we have at least one valid filesystem? */
 
@@ -379,16 +379,16 @@ int PINT_server_get_config(struct server_configuration_s *config,
       for each entry in the pvfstab, attempt to query the server for
       getconfig information.  discontinue loop when we have info.
     */
-    for (i = 0; i < mntent_list.nr_entry; i++)
+    for (i = 0; i < mntent_list.ptab_count; i++)
     {
-	mntent_p = &mntent_list.ptab_p[i];
+	mntent_p = &mntent_list.ptab_array[i];
 
    	/* Obtain the metaserver to send the request */
-	ret = BMI_addr_lookup(&serv_addr, mntent_p->meta_addr);
+	ret = BMI_addr_lookup(&serv_addr, mntent_p->pvfs_config_server);
 	if (ret < 0)
 	{
             gossip_ldebug(CLIENT_DEBUG,"Failed to resolve BMI "
-                          "address %s\n",mntent_p->meta_addr);
+                          "address %s\n",mntent_p->pvfs_config_server);
 	    continue;
 	}
 
@@ -398,7 +398,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	serv_req.credentials = creds;
 
 	gossip_ldebug(CLIENT_DEBUG,"asked for fs name = %s\n",
-                      mntent_p->service_name);
+                      mntent_p->pvfs_fs_name);
 
 	/* send the request and receive an acknowledgment */
 	ret = PINT_send_req(serv_addr, &serv_req, max_msg_sz,
@@ -413,7 +413,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
         if (server_parse_config(config,&(serv_resp->u.getconfig)))
         {
             gossip_ldebug(CLIENT_DEBUG,"Failed to getconfig from host "
-                          "%s\n",mntent_p->meta_addr);
+                          "%s\n",mntent_p->pvfs_config_server);
 
             /* let go of any resources consumed by PINT_send_req() */
             PINT_release_req(serv_addr, &serv_req, max_msg_sz, &decoded,
@@ -428,17 +428,17 @@ int PINT_server_get_config(struct server_configuration_s *config,
     }
 
     /* verify that each pvfstab entry is valid according to the server */
-    for (i = 0; i < mntent_list.nr_entry; i++)
+    for (i = 0; i < mntent_list.ptab_count; i++)
     {
-	mntent_p = &mntent_list.ptab_p[i];
+	mntent_p = &mntent_list.ptab_array[i];
 
         /* make sure we valid information about this fs */
         if (PINT_config_has_fs_config_info(
-						  config,mntent_p->service_name) == 0)
+						  config,mntent_p->pvfs_fs_name) == 0)
         {
             gossip_ldebug(CLIENT_DEBUG,"Warning:  Cannot retrieve "
                           "information about pvfstab entry %s\n",
-                          mntent_p->meta_addr);
+                          mntent_p->pvfs_config_server);
             continue;
         } else
 	    found_one_good=1;

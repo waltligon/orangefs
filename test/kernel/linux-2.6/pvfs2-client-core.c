@@ -594,7 +594,7 @@ int main(int argc, char **argv)
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init init_response;
 
-    if (PVFS_util_parse_pvfstab(NULL,&mnt))
+    if (PVFS_util_parse_pvfstab(&mnt))
     {
         fprintf(stderr, "Error parsing pvfstab!\n");
         return 1;

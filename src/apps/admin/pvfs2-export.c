@@ -20,8 +20,6 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define DEFAULT_TAB "/etc/pvfs2tab"
-
 /* optional parameters, filled in by parse_args() */
 struct options
 {
@@ -82,9 +80,9 @@ int main(int argc, char **argv)
     }
 
     /* look at pvfstab */
-    if(PVFS_util_parse_pvfstab(DEFAULT_TAB, &mnt))
+    if(PVFS_util_parse_pvfstab(&mnt))
     {
-        fprintf(stderr, "Error: failed to parse pvfstab %s.\n", DEFAULT_TAB);
+        fprintf(stderr, "Error: failed to parse pvfstab.\n");
 	close(dest_fd);
         return(-1);
     }
@@ -92,10 +90,10 @@ int main(int argc, char **argv)
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i=0; i<mnt.nr_entry; i++)
+    for(i=0; i<mnt.ptab_count; i++)
     {
 	ret = PVFS_util_remove_dir_prefix(user_opts->srcfile,
-	    mnt.ptab_p[i].local_mnt_dir, pvfs_path, PVFS_NAME_MAX);
+	    mnt.ptab_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
 	    mnt_index = i;
@@ -105,8 +103,8 @@ int main(int argc, char **argv)
 
     if(mnt_index == -1)
     {
-	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab %s\n", 
-	    user_opts->srcfile, DEFAULT_TAB);
+	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
+	    user_opts->srcfile);
 	close(dest_fd);
 	return(-1);
 
@@ -219,8 +217,8 @@ int main(int argc, char **argv)
     printf("********************************************************\n");
     printf("Source path (local): %s\n", user_opts->srcfile);
     printf("Source path (PVFS2 file system): %s\n", pvfs_path);
-    printf("File system name: %s\n", mnt.ptab_p[mnt_index].service_name);
-    printf("Initial config server: %s\n", mnt.ptab_p[mnt_index].meta_addr);
+    printf("File system name: %s\n", mnt.ptab_array[mnt_index].pvfs_fs_name);
+    printf("Initial config server: %s\n", mnt.ptab_array[mnt_index].pvfs_config_server);
     printf("********************************************************\n");
     printf("Bytes written: %ld\n", (long)total_written);
     printf("Elapsed time: %f seconds\n", (time2-time1));
@@ -233,6 +231,7 @@ int main(int argc, char **argv)
 main_out:
 
     PVFS_sys_finalize();
+    PVFS_util_free_pvfstab(&mnt);
 
     if(dest_fd > 0)
 	close(dest_fd);
@@ -308,7 +307,6 @@ static void usage(int argc, char** argv)
     fprintf(stderr, 
 	"Usage: %s [-b buffer_size] pvfs2_src_file unix_dest_file\n", 
 	argv[0]); 
-    fprintf(stderr, "\n      Note: this utility reads /etc/pvfs2tab for file system configuration.\n");
     return;
 }
 

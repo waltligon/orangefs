@@ -13,9 +13,8 @@
 
 /* client side config file / option management */
 int PVFS_util_parse_pvfstab(
-    char *filename,
     pvfs_mntlist * mnt);
-void PVFS_util_pvfstab_mntlist_free(
+void PVFS_util_free_pvfstab(
     pvfs_mntlist * e_p);
 
 /* path management */

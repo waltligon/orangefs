@@ -18,7 +18,7 @@ int main(int argc,char **argv)
 	pvfs_mntlist mnt = {0,NULL};
 
 	/* Parse PVFStab */
-	ret = PVFS_util_parse_pvfstab(NULL,&mnt);
+	ret = PVFS_util_parse_pvfstab(&mnt);
 	if (ret < 0)
 	{
 		printf("Parsing error\n");
@@ -40,6 +40,8 @@ int main(int argc,char **argv)
 		printf("finalizing sysint failed with errcode = %d\n", ret);
 		return (-1);
 	}
+
+	PVFS_util_free_pvfstab(&mnt);
 
 	return(0);
 }

@@ -66,40 +66,19 @@ struct PVFS_statfs_s {
 };
 typedef struct PVFS_statfs_s PVFS_statfs;
 
-/*
- * Here's the format of the pvfstab file that the client expects:
- *
- * FORMAT:
- * BMI_ADDRESS/SERVICE_NAME LOCAL_MNT_DIR FILESYSTEM_TYPE OPT1 OPT2
- *
- * EXAMPLE:
- * pvfs-tcp://localhost:3334/pvfs1 /mnt/pvfs pvfs 0 0
- *
- * where:
- * BMI_ADDRESS = "pvfs-tcp://localhost:3334"
- * SERVICE_NAME = "pvfs1"
- * LOCAL_MNT_DIR = "/mnt/pvfs"
- * OPT1 = "0"
- * OPT2 = "0"
- * 
- * we must have atleast one line for every pvfs filesystem type the client 
- * mounts.
- */
-
-/* PVFStab parameters */
-struct pvfs_mntent_s {
-   char* meta_addr; /* metaserver address */
-   char* service_name; /* Service name for the remote pvfs filesystem */
-   char* local_mnt_dir;/* Local mount point */
-   char* fs_type;    /* Type of filesystem - pvfs */
-   char* opt1;    /* Mount Option */
-   char* opt2;    /* Mount Option */
+/* PVFS2 tab file entries */
+struct pvfs_mntent
+{
+    char* pvfs_config_server;	/* address of server with config info */
+    char* pvfs_fs_name;		/* name of PVFS2 file system */
+    char* mnt_dir;		/* local mount path */
+    char* mnt_opts;		/* full option list */
 };
-typedef struct pvfs_mntent_s pvfs_mntent;
 
-struct pvfs_mntlist_s {
-  int nr_entry; /* Number of entries in PVFStab */
-  pvfs_mntent *ptab_p;
+struct pvfs_mntlist_s
+{
+    int ptab_count;		/* number of tab file entries */
+    struct pvfs_mntent *ptab_array;	/* array of entries */
 };
 typedef struct pvfs_mntlist_s pvfs_mntlist;
 

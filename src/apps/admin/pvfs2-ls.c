@@ -25,8 +25,6 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define DEFAULT_TAB "/etc/pvfs2tab"
-
 #define KILOBYTE                1024
 #define MEGABYTE   (1024 * KILOBYTE)
 #define GIGABYTE   (1024 * MEGABYTE)
@@ -117,21 +115,21 @@ int main(int argc, char **argv)
     }
 
     /* look at pvfstab */
-    if (PVFS_util_parse_pvfstab(DEFAULT_TAB, &mnt))
+    if (PVFS_util_parse_pvfstab(&mnt))
     {
-        fprintf(stderr, "Error: failed to parse pvfstab %s.\n", DEFAULT_TAB);
+        fprintf(stderr, "Error: failed to parse pvfstab.\n");
         return(-1);
     }
 
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i = 0; i < mnt.nr_entry; i++)
+    for(i = 0; i < mnt.ptab_count; i++)
     {
         if (user_opts->num_starts == 0)
         {
             snprintf(current_dir,PVFS_NAME_MAX,"%s/",
-                     mnt.ptab_p[i].local_mnt_dir);
+                     mnt.ptab_array[i].mnt_dir);
             user_opts->start[0] = current_dir;
             user_opts->num_starts = 1;
         }
@@ -140,7 +138,7 @@ int main(int argc, char **argv)
         {
             memset(pvfs_path[j],0,PVFS_NAME_MAX);
             ret = PVFS_util_remove_dir_prefix(
-                user_opts->start[j], mnt.ptab_p[i].local_mnt_dir,
+                user_opts->start[j], mnt.ptab_array[i].mnt_dir,
                 pvfs_path[j], PVFS_NAME_MAX);
             if (ret == 0)
             {
@@ -178,7 +176,7 @@ int main(int argc, char **argv)
         else
         {
             fprintf(stderr, "Error: could not find filesystem for %s in "
-                    "pvfstab %s\n", user_opts->start[j], DEFAULT_TAB);
+                    "pvfstab\n", user_opts->start[j]);
         }
 	return(-1);
 
@@ -207,6 +205,7 @@ int main(int argc, char **argv)
         }
     }
 
+    PVFS_util_free_pvfstab(&mnt);
     PVFS_sys_finalize();
 
     return(ret);
@@ -754,8 +753,6 @@ static void usage(int argc, char** argv)
     fprintf(stderr,"      --help     display this help and exit\n");
     fprintf(stderr,"      --version  output version information "
             "and exit\n");
-    fprintf(stderr, "\n      Note: this utility reads /etc/pvfs2tab "
-            "for file system configuration.\n");
     return;
 }
 

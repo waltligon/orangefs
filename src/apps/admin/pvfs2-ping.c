@@ -32,8 +32,6 @@ extern struct qhash_table *PINT_fsid_config_cache_table;
 #define PVFS2_VERSION "Unknown"
 #endif
 
-#define DEFAULT_TAB "/etc/pvfs2tab"
-
 struct options
 {
     char* fs_path_hack;
@@ -42,7 +40,7 @@ struct options
 
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
-static void print_mntent(struct pvfs_mntent_s* entry);
+static void print_mntent(struct pvfs_mntent* entry);
 static int print_config(struct server_configuration_s* conf,
     PVFS_fs_id fsid);
 static int noop_all_servers(struct server_configuration_s* conf,
@@ -70,25 +68,24 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    printf("\n(1) Searching for %s in %s...\n", user_opts->fs_path_real,
-	DEFAULT_TAB);
+    printf("\n(1) Searching for %s in pvfstab...\n", user_opts->fs_path_real);
 
     /* look at pvfstab */
-    ret = PVFS_util_parse_pvfstab(DEFAULT_TAB, &mnt);
+    ret = PVFS_util_parse_pvfstab(&mnt);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_parse_pvfstab", ret);
-        fprintf(stderr, "Failure: could not parse pvfstab %s.\n", DEFAULT_TAB);
+        fprintf(stderr, "Failure: could not parse pvfstab.\n");
         return(-1);
     }
 
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i=0; i<mnt.nr_entry; i++)
+    for(i=0; i<mnt.ptab_count; i++)
     {
 	ret = PVFS_util_remove_dir_prefix(user_opts->fs_path_hack,
-	    mnt.ptab_p[i].local_mnt_dir, pvfs_path, PVFS_NAME_MAX);
+	    mnt.ptab_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
 	    mnt_index = i;
@@ -98,19 +95,19 @@ int main(int argc, char **argv)
 
     if(mnt_index == -1)
     {
-	fprintf(stderr, "Failure: could not find filesystem for %s in pvfstab %s\n", 
-	    user_opts->fs_path_real, DEFAULT_TAB);
+	fprintf(stderr, "Failure: could not find filesystem for %s in pvfstab\n", 
+	    user_opts->fs_path_real);
 	return(-1);
     }
 
     /* initialize only one file system, regardless of how many are present
      * in the pvfs2tab file 
      */
-    mnt.ptab_p = &mnt.ptab_p[mnt_index];
-    mnt.nr_entry = 1;
+    mnt.ptab_array = &mnt.ptab_array[mnt_index];
+    mnt.ptab_count = 1;
     mnt_index = 0;
 
-    print_mntent(mnt.ptab_p);
+    print_mntent(mnt.ptab_array);
 
     creds.uid = getuid();
     creds.gid = getgid();
@@ -375,11 +372,11 @@ static int print_config(struct server_configuration_s* conf,
  *
  * no return value
  */
-static void print_mntent(struct pvfs_mntent_s* entry)
+static void print_mntent(struct pvfs_mntent* entry)
 {
-    printf("\n   Initial server: %s\n", entry->meta_addr);
-    printf("   Storage name: %s\n", entry->service_name);
-    printf("   Local mount point: %s\n", entry->local_mnt_dir);
+    printf("\n   Initial server: %s\n", entry->pvfs_config_server);
+    printf("   Storage name: %s\n", entry->pvfs_fs_name);
+    printf("   Local mount point: %s\n", entry->mnt_dir);
     return;
 }
 
@@ -478,7 +475,6 @@ static void usage(int argc, char** argv)
     fprintf(stderr, "Example: %s /mnt/pvfs2\n",
 	argv[0]);
 
-    fprintf(stderr, "\nNote: this utility reads /etc/pvfs2tab for file system configuration.\n");
     return;
 }
 

@@ -187,7 +187,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (PVFS_util_parse_pvfstab(NULL,&mnt))
+    if (PVFS_util_parse_pvfstab(&mnt))
     {
         fprintf(stderr,"Error parsing pvfstab!\n");
         return 1;

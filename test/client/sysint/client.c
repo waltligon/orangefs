@@ -62,7 +62,7 @@ int main(int argc,char **argv)
 */
 
 	/* Parse PVFStab */
-	ret = PVFS_util_parse_pvfstab(NULL,&mnt);
+	ret = PVFS_util_parse_pvfstab(&mnt);
 	if (ret < 0)
 	{
 		printf("Parsing error\n");
