@@ -97,7 +97,6 @@ int main(int argc,char **argv)
 		}
 
 		/* create new file */
-		req_cr.entry_name = &(filename[1]); /* leave off / */
 
 		/* TODO: I'm not setting the attribute mask... not real sure
 		 * what's supposed to happen there */
@@ -105,9 +104,13 @@ int main(int argc,char **argv)
 		req_cr.attr.group = 0;
 		req_cr.attr.perms = U_WRITE|U_READ;
 		req_cr.attr.u.meta.nr_datafiles = 1;
+		req_cr.attr.u.meta.dist = NULL;
 		req_cr.parent_refn.handle = resp_lk.pinode_refn.handle;
 		req_cr.parent_refn.fs_id = req_lk.fs_id;
-		req_cr.attr.u.meta.dist = NULL;
+		req_cr.entry_name = &(filename[1]); /* leave off slash */
+		req_cr.credentials.uid = 0;
+		req_cr.credentials.gid = 0;
+		req_cr.credentials.perms = U_WRITE|U_READ;
 
 		ret = PVFS_sys_create(&req_cr, &resp_cr);
 		if(ret < 0)
@@ -124,7 +127,7 @@ int main(int argc,char **argv)
 		printf("Lookup succeeded; performing I/O on existing file.\n");
 
 		req_io.pinode_refn.fs_id = req_lk.fs_id;
-		req_io.pinode_refn.handle = resp_cr.pinode_refn.handle;
+		req_io.pinode_refn.handle = resp_lk.pinode_refn.handle;
 	}
 
 	/**************************************************************
