@@ -85,7 +85,7 @@ dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
 dnl    freeing with the mtrace tool
 AC_ARG_WITH(mtrace,
-[  --with-mtrace           Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE to output file name).],
+[  --with-mtrace           Use mtrace (must set MALLOC_TRACE to output file)],
 CFLAGS="$CFLAGS -include mcheck.h"
 AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
 )
@@ -111,7 +111,7 @@ AC_ARG_WITH(pablo,
 
 dnl use MPE profiling library 
 AC_ARG_WITH(mpe,
-[  --with-mpe=path       Use MPE profiling library installed in "path"],
+[  --with-mpe=path         Use MPE profiling library installed in "path"],
     if test x$withval = xyes ; then
     	AC_MSG_ERROR(--with-mpe must be given a pathname)
     else
@@ -128,7 +128,7 @@ dnl linux-2.6.x path is specified
 dnl Make sure this is a usable kernel source tree too.
 dnl
 AC_ARG_WITH(kernel,
-[  --with-kernel=src_path  Build pvfs2 kernel module against specified src (2.6.x only).],
+[  --with-kernel=src_path  Build pvfs2 kernel module against 2.6.x src],
     if test x$withval = xyes -o x$withval = x ; then
     	AC_MSG_ERROR(--with-kernel must be given the path to your kernel source.)
     fi
@@ -169,16 +169,18 @@ CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG",
 FLAGS=${CFLAGS:-"-g"}
 )
 
-AC_ARG_ENABLE(profiling,
-[  --enable-profiling      Enable profiling (using gprof).                     *** not yet working ***],
-CFLAGS="$CFLAGS -pg -fprofile-arcs",
-)
-
-AC_ARG_ENABLE(coverage,
-[  --enable-coverage       Enable coverage analysis (disables optimizations).  *** not yet working ***],
-[ CFLAGS="$CFLAGS -g -pg -ftest-coverage -O0"
-ENABLE_COVERAGE=1 ],
-)
+dnl Options that are not yet working
+dnl --------------------------------
+dnl AC_ARG_ENABLE(profiling,
+dnl [  --enable-profiling      Enable profiling (using gprof).                     *** not yet working ***],
+dnl CFLAGS="$CFLAGS -pg -fprofile-arcs",
+dnl )
+dnl 
+dnl AC_ARG_ENABLE(coverage,
+dnl [  --enable-coverage       Enable coverage analysis (disables optimizations).  *** not yet working ***],
+dnl [ CFLAGS="$CFLAGS -g -pg -ftest-coverage -O0"
+dnl ENABLE_COVERAGE=1 ],
+dnl )
 
 AC_SUBST(ENABLE_COVERAGE)
 
@@ -188,7 +190,7 @@ CFLAGS="$CFLAGS -Wall -O2 -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpoi
 
 dnl Check if user actually wants to see all our build output (compiles, links, etc.).
 AC_ARG_ENABLE(verbose-build,
-[  --enable-verbose-build  Enables full output during build process (compiles, etc.).],
+[  --enable-verbose-build  Enables full output during build process],
 ,
 QUIET_COMPILE=1)
 
@@ -209,6 +211,16 @@ AC_ARG_ENABLE(disk-io,
     CFLAGS="$CFLAGS -D__PVFS2_DISABLE_DISK_IO__"
 fi]
 ,)
+
+dnl a mechanism to turn off mmap-readahead caching (for kernel interface)
+MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
+AC_ARG_ENABLE(mmap-racache,
+[  --disable-mmap-racache  Disables mmap-readahead in vfs interface],
+[if test x$enableval = xno; then
+    MMAP_RA_CACHE=""
+fi]
+,)
+AC_SUBST(MMAP_RA_CACHE)
 
 dnl optionally disable building the karma gui
 AC_ARG_ENABLE(karma,
@@ -241,11 +253,11 @@ CFLAGS="$CFLAGS -D__PVFS2_SEGV_BACKTRACE__"
 
 dnl shared or static client library
 AC_ARG_ENABLE(shared,
-  AC_HELP_STRING([--enable-shared], [Build shared client library]),
-              [build_shared=$enableval], [build_shared=no])
+[  --enable-shared         Build shared client library],
+[build_shared=$enableval], [build_shared=no])
 AC_ARG_ENABLE(static,
-  AC_HELP_STRING([--disable-static], [Do not build static client library]),
-              [build_static=$enableval], [build_static=yes])
+[  --disable-static        Do not build static client library],
+[build_static=$enableval], [build_static=yes])
 AC_SUBST(build_shared)
 AC_SUBST(build_static)
 

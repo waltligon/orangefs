@@ -26,12 +26,12 @@ extern struct address_space_operations pvfs2_address_operations;
 extern struct backing_dev_info pvfs2_backing_dev_info;
 
 
-#define wake_up_device_for_return(op)           \
-do {                                            \
-spin_lock(&op->lock);                           \
-op->io_completed = 1;                           \
-spin_unlock(&op->lock);                         \
-wake_up_interruptible(&op->io_completion_waitq);\
+#define wake_up_device_for_return(op)             \
+do {                                              \
+  spin_lock(&op->lock);                           \
+  op->io_completed = 1;                           \
+  spin_unlock(&op->lock);                         \
+  wake_up_interruptible(&op->io_completion_waitq);\
 } while(0)
 
 
@@ -386,13 +386,14 @@ int pvfs2_file_release(
     }
 
     /*
-      remove all associated inode pages from the page cache;
-      this forces an expensive refresh of data for
-      the next caller of mmap (or 'get_block' accesses)
+      remove all associated inode pages from the page cache and mmap
+      readahead cache (if any); this forces an expensive refresh of
+      data for the next caller of mmap (or 'get_block' accesses)
     */
     if (file->f_dentry->d_inode &&
         file->f_dentry->d_inode->i_mapping)
     {
+        clear_inode_mmap_ra_cache(file->f_dentry->d_inode);
         truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0);
         i_size_write(file->f_dentry->d_inode, 0);
     }
@@ -453,7 +454,8 @@ struct file_operations pvfs2_file_operations =
     .mmap = pvfs2_file_mmap,
     .open = pvfs2_file_open,
     .release = pvfs2_file_release,
-    .fsync = pvfs2_fsync};
+    .fsync = pvfs2_fsync
+};
 
 /*
  * Local variables:

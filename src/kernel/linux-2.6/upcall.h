@@ -94,6 +94,11 @@ typedef struct
 
 typedef struct
 {
+    PVFS_pinode_reference refn;
+} pvfs2_mmap_ra_cache_flush_t;
+
+typedef struct
+{
     int type;
     PVFS_credentials credentials;
 
@@ -111,6 +116,7 @@ typedef struct
 	pvfs2_rename_request_t rename;
         pvfs2_statfs_request_t statfs;
         pvfs2_truncate_request_t truncate;
+        pvfs2_mmap_ra_cache_flush_t ra_cache_flush;
     } req;
 } pvfs2_upcall_t;
 

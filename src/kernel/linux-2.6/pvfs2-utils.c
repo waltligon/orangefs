@@ -908,11 +908,44 @@ int pvfs2_truncate_inode(
     pvfs2_print("pvfs2: pvfs2_truncate got return value of %d\n",ret);
 
   error_exit:
-    /* when request is serviced properly, free req op struct */
     op_release(new_op);
 
     return ret;
 }
+
+#ifdef USE_MMAP_RA_CACHE
+int pvfs2_flush_mmap_racache(struct inode *inode)
+{
+    int ret = -EINVAL;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    pvfs2_kernel_op_t *new_op = NULL;
+
+    pvfs2_print("pvfs2: pvfs2_flush_mmap_racache %d: "
+                "Handle is %Lu | fs_id %d\n",(int)inode->i_ino,
+                pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
+
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    if (!new_op)
+    {
+        return -ENOMEM;
+    }
+    new_op->upcall.type = PVFS2_VFS_MMAP_RA_FLUSH;
+    new_op->upcall.req.ra_cache_flush.refn = pvfs2_inode->refn;
+
+    service_operation(new_op, "pvfs2_flush_mmap_racache",
+                      get_interruptible_flag(inode));
+
+    ret = new_op->downcall.status;
+
+    pvfs2_print("pvfs2: pvfs2_flush_mmap_racache got "
+                "return value of %d\n",ret);
+
+  error_exit:
+    op_release(new_op);
+
+    return ret;
+}
+#endif
 
 int pvfs2_kernel_error_code_convert(
     int pvfs2_error_code)

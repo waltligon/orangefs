@@ -24,9 +24,6 @@
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-util.h"
 
-/* comment out to disable the mmap readahead cache */
-#define USE_MMAP_RA_CACHE
-
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
 #endif
@@ -842,6 +839,35 @@ static int service_truncate_request(
     return ret;
 }
 
+#ifdef USE_MMAP_RA_CACHE
+static int pvfs2_flush_mmap_racache(
+    pvfs2_upcall_t *in_upcall,
+    pvfs2_downcall_t *out_downcall)
+{
+    int ret = 1;
+
+    if (in_upcall && out_downcall)
+    {
+        memset(out_downcall,0,sizeof(pvfs2_downcall_t));
+
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG,
+            "Got a mmap racache flush request for %Lu under fsid %d\n",
+            Lu(in_upcall->req.ra_cache_flush.refn.handle),
+            in_upcall->req.ra_cache_flush.refn.fs_id);
+
+        /* flush cached data if any */
+        pvfs2_mmap_ra_cache_flush(in_upcall->req.io.refn);
+
+        /* we need to send a blank success response */
+        out_downcall->type = PVFS2_VFS_MMAP_RA_FLUSH;
+        out_downcall->status = 0;
+        ret = 0;
+    }
+    return ret;
+}
+#endif
+
 int write_device_response(
     void *buffer_list,
     int *size_list,
@@ -1033,6 +1059,11 @@ int main(int argc, char **argv)
 	    case PVFS2_VFS_OP_TRUNCATE:
 		service_truncate_request(&upcall, &downcall);
 		break;
+#ifdef USE_MMAP_RA_CACHE
+            case PVFS2_VFS_MMAP_RA_FLUSH:
+                pvfs2_flush_mmap_racache(&upcall, &downcall);
+                break;
+#endif
 	    case PVFS2_VFS_OP_INVALID:
 	    default:
 		gossip_err("Got an unrecognized vfs operation of "

@@ -111,6 +111,7 @@ VISCFLAGS = @VISCFLAGS@
 VISLIBS = @VISLIBS@ -lSDL_ttf
 GTKCFLAGS = @GTKCFLAGS@
 GTKLIBS = @GTKLIBS@
+MMAP_RA_CACHE = @MMAP_RA_CACHE@
 # for Solaris:
 # LIBS += -lsocket -lnsl
 
@@ -227,6 +228,11 @@ endif
 
 # Use these same cflags for the mpi test codes.
 MPICFLAGS := $(CFLAGS)
+
+# enable mmap-readahead cache (unless disabled by configure)
+ifdef MMAP_RA_CACHE
+CFLAGS += @MMAP_RA_CACHE@
+endif
 
 # Add gcc-specific flags if we know it is a gnu compiler.
 ifdef GNUC

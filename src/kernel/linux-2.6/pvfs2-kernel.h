@@ -272,6 +272,10 @@ void mask_blocked_signals(
 void unmask_blocked_signals(
     sigset_t *orig_sigset);
 
+#ifdef USE_MMAP_RA_CACHE
+int pvfs2_flush_mmap_racache(
+    struct inode *inode);
+#endif
 
 /************************************
  * misc convenience macros
@@ -444,6 +448,18 @@ do {                                                      \
 
 #define get_interruptible_flag(inode)                     \
 (PVFS2_SB(inode->i_sb)->mnt_options.intr)
+
+#ifdef USE_MMAP_RA_CACHE
+#define clear_inode_mmap_ra_cache(inode)                  \
+do {                                                      \
+  pvfs2_print("calling clear_inode_mmap_ra_cache on %d\n",\
+              (int)inode->i_ino);                         \
+  pvfs2_flush_mmap_racache(inode);                        \
+  pvfs2_print("clear_inode_mmap_ra_cache finished\n");    \
+} while(0)
+#else
+#define clear_inode_mmap_ra_cache(inode)
+#endif /* USE_MMAP_RA_CACHE */
 
 
 #endif /* __PVFS2KERNEL_H */
