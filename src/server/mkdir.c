@@ -314,6 +314,7 @@ static int mkdir_cleanup(state_action_struct *s_op, job_status_s *ret)
 /* TODO: fix comment block */
 static int mkdir_error(state_action_struct *s_op, job_status_s *ret)
 {
+    s_op->resp->u.mkdir.handle = 0;
     ret->error_code = -1;
     return(1);
 }
