@@ -95,8 +95,10 @@ int main(int argc, char **argv)	{
 	my_req->rsize = sizeof(struct PVFS_server_req_s);
 	my_req->credentials.uid = 0;
 	my_req->credentials.gid = 0;
-	/* TODO: fill below fields in with the correct values */
 	my_req->credentials.perms = U_WRITE | U_READ;  
+
+	/* io specific fields */
+	/* TODO: need more stuff here */
 	my_req->u.io.fs_id = 9;
 	my_req->u.io.handle = user_opts->bucket;
 
