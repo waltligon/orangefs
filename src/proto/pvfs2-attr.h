@@ -51,7 +51,7 @@ struct PVFS_datafile_attr_s
     PVFS_size size;
 };
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
-endecode_fields_1(PVFS_datafile_attr, PVFS_size, size);
+endecode_fields_1(PVFS_datafile_attr, PVFS_size, size)
 
 /* attributes specific to directory objects */
 struct PVFS_directory_attr_s
@@ -69,7 +69,7 @@ struct PVFS_symlink_attr_s
 typedef struct PVFS_symlink_attr_s PVFS_symlink_attr;
 endecode_fields_2(PVFS_symlink_attr,
   uint32_t, target_path_len,
-  string, target_path);
+  string, target_path)
 
 /* generic attributes; applies to all objects */
 struct PVFS_object_attr

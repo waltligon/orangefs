@@ -105,7 +105,7 @@ struct PVFS_handle_extent_s
 typedef struct PVFS_handle_extent_s PVFS_handle_extent;
 endecode_fields_2(PVFS_handle_extent,
   PVFS_handle, first,
-  PVFS_handle, last);
+  PVFS_handle, last)
 
 /* an array of contiguous ranges of handles */
 struct PVFS_handle_extent_array_s
@@ -116,7 +116,7 @@ struct PVFS_handle_extent_array_s
 typedef struct PVFS_handle_extent_array_s PVFS_handle_extent_array;
 endecode_fields_0a(PVFS_handle_extent_array,
   uint32_t, extent_count,
-  PVFS_handle_extent, extent_array);
+  PVFS_handle_extent, extent_array)
 
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL ((PVFS_handle)0) /* invalid object handle */
@@ -216,7 +216,7 @@ endecode_fields_8(
     uint64_t, ram_free_bytes,
     uint64_t, uptime_seconds,
     uint64_t, handles_available_count,
-    uint64_t, handles_total_count);
+    uint64_t, handles_total_count)
 
 /* pinode reference (uniquely refers to a single pinode) */
 struct PVFS_pinode_reference_s
@@ -233,7 +233,7 @@ struct PVFS_credentials_s
     PVFS_gid gid;
 };
 typedef struct PVFS_credentials_s PVFS_credentials;
-endecode_fields_2(PVFS_credentials, PVFS_uid, uid, PVFS_gid, gid);
+endecode_fields_2(PVFS_credentials, PVFS_uid, uid, PVFS_gid, gid)
 
 /* directory entry */
 #define PVFS_NAME_MAX    256	/* max length of PVFS filename */
@@ -244,7 +244,7 @@ struct PVFS_dirent_s
     PVFS_handle handle;
 };
 typedef struct PVFS_dirent_s PVFS_dirent;
-endecode_fields_2(PVFS_dirent, here_string, d_name, PVFS_handle, handle);
+endecode_fields_2(PVFS_dirent, here_string, d_name, PVFS_handle, handle)
 
 /* these are predefined server parameters that can be manipulated
  * through the mgmt interface

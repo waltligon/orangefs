@@ -46,7 +46,7 @@ endecode_fields_7_struct(
     int64_t, write,
     int64_t, read,
     int64_t, metadata_write,
-    int64_t, metadata_read);
+    int64_t, metadata_read)
 
 /* low level information about individual server level objects */
 struct PVFS_mgmt_dspace_info
@@ -64,7 +64,7 @@ endecode_fields_6_struct(PVFS_mgmt_dspace_info,
   PVFS_ds_type, type,
   PVFS_size, b_size,
   PVFS_size, k_size,
-  PVFS_handle, dirdata_handle);
+  PVFS_handle, dirdata_handle)
 
 /* individual datapoint from event monitoring */
 struct PVFS_mgmt_event
@@ -84,7 +84,7 @@ endecode_fields_7_struct(PVFS_mgmt_event,
     PVFS_id_gen_t, id,
     int32_t, flags,
     int32_t, tv_sec,
-    int32_t, tv_usec);
+    int32_t, tv_usec)
 
 /* values which may be or'd together in the flags field above */
 enum
