@@ -17,11 +17,9 @@
 
 static int getconfig_cleanup(PINT_server_op *s_op, job_status_s *ret);
 static int getconfig_job_bmi_send(PINT_server_op *s_op, job_status_s *ret);
-static int getconfig_job_trove(PINT_server_op *s_op, job_status_s *ret);
 static int getconfig_init(PINT_server_op *s_op, job_status_s *ret);
 void getconfig_init_state_machine(void);
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
 #if 0
@@ -35,18 +33,11 @@ PINT_state_machine_s getconfig_req_s =
 
 %%
 
-machine get_config(init, trove, bmi_send, cleanup)
+machine get_config(init, bmi_send, cleanup)
 {
 	state init
 	{
 		run getconfig_init;
-		success => trove;
-		default => bmi_send;
-	}
-
-	state trove
-	{
-		run getconfig_job_trove;
 		default => bmi_send;
 	}
 
@@ -116,50 +107,6 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
     s_op->resp->u.getconfig.server_config_buf =
         (PVFS_string)user_opts->server_config_buf;
 
-    /* FIXME: Remove below lookup since we no longer have to
-       query for the root handle (it's already in config object */
-
-    /* Set up the key/val pair for trove to get root handle */
-    s_op->key.buffer = Trove_Common_Keys[ROOT_HANDLE_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[ROOT_HANDLE_KEY].size;
-    s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(TROVE_handle)));
-
-    return(job_post_ret);
-}
-
-/*
- * Function: getconfig_job_trove
- *
- * Params:   server_op *b, 
- *           job_status_s *ret
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  void
- *
- * Synopsis: Submit a job to the trove interface 
- *           requesting root handle and fs_id
- *           
- */
-
-static int getconfig_job_trove(PINT_server_op *s_op, job_status_s *ret)
-{
-    int job_post_ret = 1;
-/*     job_id_t i; */
-
-    /*job_post_ret = job_trove_fs_lookup(s_op->req->u.getconfig.fs_name,s_op,ret,&i);*/
-
-/*     job_post_ret = job_trove_fs_geteattr(s_op->resp->u.getconfig.fs_id, */
-/* 	    &(s_op->key), */
-/* 	    &(s_op->val), */
-/* 	    0, */
-/* 	    s_op, */
-/* 	    ret, */
-/* 	    &i, */
-/* 	    PINT_server_job_context); */
-
     return(job_post_ret);
 }
 
@@ -192,7 +139,6 @@ static int getconfig_job_bmi_send(PINT_server_op *s_op, job_status_s *ret)
 #if 0
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + s_op->u.getconfig.strsize;
 #endif
-/* 	s_op->resp->u.getconfig.root_handle = *((TROVE_handle *)s_op->val.buffer); */
     }
     else
     {
