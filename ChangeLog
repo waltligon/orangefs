@@ -30,8 +30,7 @@ pvfs2-0.0.8
 - kernel and client side i/o path improvements that now gracefully handle
   errors such as the case of i/o happening on a file that is removed by
   another process
-- implemented a previously unimplemented kernel method (inode:getattr) and
-  now issue a setattr call on successful writes
+- implemented a previously unimplemented kernel method (inode:getattr)
 - pvfs2-client command line parsing bug fix (no longer crashes on invalid
   args)
 - improvements to several test programs (in test/client/sysint)
