@@ -97,10 +97,6 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 	    return(ret);
 	case PVFS_SERV_PARAM_EVENT_ON:
 	    ret = 0;
-	    if(s_op->req->u.mgmt_setparam.value)
-		ret = PINT_event_initialize(PINT_EVENT_DEFAULT_RING_SIZE);
-	    else
-		PINT_event_finalize();
 	    PINT_event_get_masks(&old_event_on, &old_api_mask, &old_op_mask);
 	    PINT_event_set_masks(
 		(int)s_op->req->u.mgmt_setparam.value,

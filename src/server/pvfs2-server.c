@@ -37,6 +37,7 @@
 #include "server-config.h"
 #include "quicklist.h"
 #include "pint-perf-counter.h"
+#include "pint-event.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -748,6 +749,14 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_PERF_COUNTER_INIT;
 #endif
 
+    ret = PINT_event_initialize(PINT_EVENT_DEFAULT_RING_SIZE);
+    if (ret < 0)
+    {
+	gossip_err("Error initializing event interface.\n");
+	return (ret);
+    }
+    *server_status_flag |= SERVER_EVENT_INIT;
+
     return ret;
 }
 
@@ -842,6 +851,14 @@ static int server_shutdown(
                      "* halting state machine processor ... ");
 	PINT_state_machine_halt();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
+    }
+
+    if (status & SERVER_EVENT_INIT)
+    {
+	gossip_debug(GOSSIP_SERVER_DEBUG,
+		"* halting event profiling interface    ...");
+	PINT_event_finalize();
+	gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
 
     if (status & SERVER_PERF_COUNTER_INIT)

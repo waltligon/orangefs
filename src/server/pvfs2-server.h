@@ -61,6 +61,7 @@ typedef enum
     SERVER_SIGNAL_HANDLER_INIT = (1 << 11),
     SERVER_JOB_OBJS_ALLOCATED  = (1 << 12),
     SERVER_PERF_COUNTER_INIT   = (1 << 13),
+    SERVER_EVENT_INIT          = (1 << 14),
 } PINT_server_status_flag;
 
 /* struct PINT_server_lookup_op
