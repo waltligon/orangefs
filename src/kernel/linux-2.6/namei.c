@@ -97,9 +97,9 @@ static struct dentry *pvfs2_lookup(
         new_op, "pvfs2_lookup", retries);
 
     /* check what kind of goodies we got */
-    printk("Lookup Got PVFS2 handle %Ld on fsid %d\n",
-	   new_op->downcall.resp.lookup.refn.handle,
-	   new_op->downcall.resp.lookup.refn.fs_id);
+    pvfs2_print("Lookup Got PVFS2 handle %Ld on fsid %d\n",
+                new_op->downcall.resp.lookup.refn.handle,
+                new_op->downcall.resp.lookup.refn.fs_id);
 
     /* lookup inode matching name (or add if not there) */
     if (new_op->downcall.status > -1)
@@ -119,7 +119,7 @@ static struct dentry *pvfs2_lookup(
 	}
 	else
 	{
-	    printk("FIXME: Invalid pvfs2 private data\n");
+	    pvfs2_error("FIXME: Invalid pvfs2 private data\n");
 	}
     }
 
@@ -138,7 +138,7 @@ static int pvfs2_link(
 /*     struct inode *inode = pvfs2_create_entry( */
 /*         dir, dentry, mode, PVFS2_VFS_OP_LINK); */
 
-    printk("pvfs2: pvfs2_link called\n");
+    pvfs2_print("pvfs2: pvfs2_link called\n");
     if (dir->i_nlink >= PVFS2_LINK_MAX)
     {
 	return -EMLINK;
@@ -168,7 +168,7 @@ static int pvfs2_symlink(
 /*         dir, dentry, mode, PVFS2_VFS_OP_SYMLINK); */
 /*     return (inode ? 0 : -1); */
 
-    printk("pvfs2: pvfs2_symlink called\n");
+    pvfs2_print("pvfs2: pvfs2_symlink called\n");
     return 0;
 }
 
@@ -178,7 +178,7 @@ static int pvfs2_mknod(
     int mode,
     dev_t rdev)
 {
-    printk("pvfs2: pvfs2_mknod called\n");
+    pvfs2_print("pvfs2: pvfs2_mknod called\n");
     return 0;
 }
 
@@ -217,7 +217,7 @@ static int pvfs2_rename(
     struct inode *new_dir,
     struct dentry *new_dentry)
 {
-    printk("pvfs2: pvfs2_rename called\n");
+    pvfs2_print("pvfs2: pvfs2_rename called\n");
     return 0;
 }
 
@@ -229,7 +229,7 @@ static int pvfs2_rename(
 */
 /* static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd) */
 /* { */
-/*     printk("pvfs2: pvfs2_follow_link called on %s\n", */
+/*     pvfs2_print("pvfs2: pvfs2_follow_link called on %s\n", */
 /*            dentry->d_name.name); */
 /*     return 1; */
 /* } */

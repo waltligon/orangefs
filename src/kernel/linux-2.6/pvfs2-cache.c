@@ -89,8 +89,8 @@ void op_release(
 {
     pvfs2_kernel_op_t *pvfs2_op = (pvfs2_kernel_op_t *) op;
 
-    /* need to free specific upcall/downcall fields here */
-    printk("Freeing OP with tag %lu\n", pvfs2_op->tag);
+    /* need to free specific upcall/downcall fields here (if any) */
+    pvfs2_print("Freeing OP with tag %lu\n", pvfs2_op->tag);
 
     kmem_cache_free(op_cache, op);
 }

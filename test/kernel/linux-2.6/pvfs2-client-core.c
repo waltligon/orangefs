@@ -528,6 +528,9 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    gossip_enable_stderr();
+    gossip_set_debug_mask(0, CLIENT_DEBUG);
+
     /*
       set extraordinarily long pcache timeout value (ms) so
       that the attributes of files can be cached for a long

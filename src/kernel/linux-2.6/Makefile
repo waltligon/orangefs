@@ -6,7 +6,7 @@ PVFS2_SRC_DIR=$(PWD)/../../../
 EXTRA_CFLAGS=-I$(PVFS2_SRC_DIR)/src/io/description/ -I$(PVFS2_SRC_DIR)/src/io/dev/ -I$(PVFS2_SRC_DIR)/include/ -I$(PVFS2_SRC_DIR)/src/client/sysint/ -I$(PVFS2_SRC_DIR)/src/common/quicklist/ -I$(PVFS2_SRC_DIR)/src/common/quickhash/ -I$(PVFS2_SRC_DIR)/src/proto/
 
 # uncomment the following line for debugging output
-EXTRA_CFLAGS += -DPVFS2_KERNEL_DEBUG
+#EXTRA_CFLAGS += -DPVFS2_KERNEL_DEBUG
 
 obj-m += pvfs2.o
 
