@@ -21,10 +21,10 @@
 
 extern job_context_id pint_client_sm_context;
 
-#define GET_CURRENT_SEGMENT()                                             \
-&(sm_p->u.lookup.contexts[sm_p->u.lookup.current_context].segments[       \
+#define GET_CURRENT_SEGMENT()                                            \
+&(sm_p->u.lookup.contexts[sm_p->u.lookup.current_context].segments[      \
 sm_p->u.lookup.contexts[sm_p->u.lookup.current_context].current_segment])
-#define GET_CURRENT_CONTEXT()                                             \
+#define GET_CURRENT_CONTEXT()                                            \
 &(sm_p->u.lookup.contexts[sm_p->u.lookup.current_context])
 
 enum

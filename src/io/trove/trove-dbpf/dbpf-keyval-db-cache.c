@@ -273,6 +273,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 			 TROVE_DB_TYPE,
 			 TROVE_DB_CREATE_FLAGS,
 			 TROVE_DB_MODE);
+
         gossip_debug(GOSSIP_TROVE_DEBUG, "done\n");
 
         /* this can easily happen if the server is out of disk space */
