@@ -1596,7 +1596,29 @@ int BMI_gm_test(bmi_op_id_t id,
     method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
     struct gm_op *gm_op_data = query_op->method_data;
 
+    *outcount = 0;
+
     gen_mutex_lock(&interface_mutex);
+
+    if(gm_op_data->complete)
+    {
+	assert(query_op->context_id == context_id);
+	op_list_remove(query_op);
+	if(user_ptr != NULL)
+	{
+	    (*user_ptr) = query_op->user_ptr;
+	}
+	(*error_code) = query_op->error_code;
+	(*actual_size) = query_op->actual_size;
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
+    }
+    if(*outcount)
+    {
+        gen_mutex_unlock(&interface_mutex);
+        return(0);
+    }
+
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
@@ -1645,7 +1667,36 @@ int BMI_gm_testsome(int incount,
     method_op_p query_op;
     struct gm_op *gm_op_data;
 
+    *outcount = 0;
+
     gen_mutex_lock(&interface_mutex);
+
+    for(i=0; i<incount; i++)
+    {
+	if(id_array[i])
+	{
+	    query_op = (method_op_p)id_gen_safe_lookup(id_array[i]);
+	    gm_op_data = query_op->method_data;
+	    if(gm_op_data->complete)
+	    {
+		assert(query_op->context_id == context_id);
+		op_list_remove(query_op);
+		error_code_array[*outcount] = query_op->error_code;
+		actual_size_array[*outcount] = query_op->actual_size;
+		index_array[*outcount] = i;
+		if (user_ptr_array != NULL)
+		    user_ptr_array[*outcount] = query_op->user_ptr;
+		dealloc_gm_method_op(query_op);
+		(*outcount)++;
+	    }
+	}
+    }
+    if(*outcount)
+    {
+        gen_mutex_unlock(&interface_mutex);
+        return(0);
+    }
+
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
@@ -1765,7 +1816,29 @@ int BMI_gm_testunexpected(int incount,
     int ret = -1;
     method_op_p query_op = NULL;
 
+    *outcount = 0;
+
     gen_mutex_lock(&interface_mutex);
+
+    while ((*outcount < incount) &&
+	   (query_op =
+	    op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
+    {
+	info[*outcount].error_code = query_op->error_code;
+	info[*outcount].addr = query_op->addr;
+	info[*outcount].buffer = query_op->buffer;
+	info[*outcount].size = query_op->actual_size;
+	info[*outcount].tag = query_op->msg_tag;
+	op_list_remove(query_op);
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
+    }
+    if(*outcount)
+    {
+        gen_mutex_unlock(&interface_mutex);
+        return(0);
+    }
+
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
@@ -1773,8 +1846,6 @@ int BMI_gm_testunexpected(int incount,
 	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
-
-    *outcount = 0;
 
     while ((*outcount < incount) &&
 	   (query_op =
