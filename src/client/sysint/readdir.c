@@ -83,8 +83,8 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
 	req_p.u.readdir.token = token;
 	req_p.u.readdir.dirent_count = pvfs_dirent_incount;
 
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op)
-			+ pvfs_dirent_incount * sizeof(PVFS_dirent);
+	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op, 
+	    PINT_CLIENT_ENC_TYPE);
 
 	/*send the readdir request to the server*/
 

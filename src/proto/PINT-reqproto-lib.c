@@ -174,20 +174,6 @@ void PINT_decode_release(
 }
 
 
-/* PINT_get_encoded_generic_ack_sz(int type, int op)
- *
- * frees all resources associated with a message that has been
- * decoded
- *
- * returns size of encoded generic ack.
- */
-int PINT_get_encoded_generic_ack_sz(
-				    enum PINT_encoding_type type,
-				    int op)
-{
-    return(PINT_encoding_table[type]->op->encode_gen_ack_sz(op));
-}
-
 /* PINT_encode_calc_max_size()
  *
  * calculates maximum size of the encoded version of a protocol message.

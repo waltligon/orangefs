@@ -127,10 +127,8 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	/* filter out aggregate size mask in the getattr request */
 	req_p.u.getattr.attrmask = attrmask & ~PVFS_ATTR_SYS_SIZE;
 
-	/* TODO: use some sane value for this, I dunno what to put --Phil */
-	gossip_lerr("KLUDGE: guessing at max size of getattr response.\n");
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op)
-	    + 1000;
+	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
+	    PINT_CLIENT_ENC_TYPE);
 
 	/* Make a server getattr request */
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp, op_tag);
@@ -234,9 +232,8 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 
 		req_p.u.getattr.handle = data_files[i];
 
-		/* TODO: use some sane value for this, I dunno what to put --Phil */
-		gossip_lerr("KLUDGE: guessing at max size of getattr response.\n");
-		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + 1000;
+		max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
+		    PINT_CLIENT_ENC_TYPE);
 
 		/* Make a server getattr request */
 		ret = PINT_send_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp, op_tag);

@@ -38,7 +38,8 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	char *server = NULL;
 	PVFS_pinode_reference entry;
 	PVFS_size handlesize = 0;
-	bmi_size_t max_msg_sz = PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_SETATTR);
+	bmi_size_t max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
+	    PVFS_SERV_SETATTR, PINT_CLIENT_ENC_TYPE);
 	struct PINT_decoded_msg decoded;
 	void* encoded_resp;
 	PVFS_msg_tag_t op_tag = get_next_session_tag();

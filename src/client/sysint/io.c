@@ -19,6 +19,7 @@
 #include <pint-servreq.h>
 #include <pint-bucket.h>
 #include <PINT-reqproto-encode.h>
+#include "pint-sysint.h"
 
 extern job_context_id PVFS_sys_job_context;
 
@@ -239,7 +240,8 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     ret = io_req_ack_flow_array(
 	addr_array,
 	req_array,
-	PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO),
+	PINT_encode_calc_max_size(PINT_ENCODE_RESP, PVFS_SERV_IO,
+	    PINT_CLIENT_ENC_TYPE),
 	resp_encoded_array,
 	resp_decoded_array,
 	flow_array,
@@ -285,7 +287,8 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     io_release_req_ack_flow_array(
 	addr_array,
 	req_array,
-	PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO),
+	PINT_encode_calc_max_size(PINT_ENCODE_RESP, PVFS_SERV_IO,
+	    PINT_CLIENT_ENC_TYPE),
 	resp_encoded_array,
 	resp_decoded_array,
 	flow_array,
@@ -303,8 +306,8 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	/* wait for all of the final acks */
 	ret = PINT_recv_ack_array(
 	    addr_array,
-	    PINT_get_encoded_generic_ack_sz(0,
-		PVFS_SERV_WRITE_COMPLETION),
+	    PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
+		PVFS_SERV_WRITE_COMPLETION, PINT_CLIENT_ENC_TYPE),
 	    resp_encoded_array,
 	    resp_decoded_array,
 	    error_code_array,
@@ -331,8 +334,8 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	/* release resources */
 	PINT_release_ack_array(
 	    addr_array,
-	    PINT_get_encoded_generic_ack_sz(0,
-		PVFS_SERV_WRITE_COMPLETION),
+	    PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
+		PVFS_SERV_WRITE_COMPLETION, PINT_CLIENT_ENC_TYPE),
 	    resp_encoded_array,
 	    resp_decoded_array,
 	    error_code_array,
@@ -723,7 +726,8 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 
 		ret = PINT_decode(resp_encoded_array[i], PINT_DECODE_RESP,
 		    &(resp_decoded_array[i]), addr_array[i],
-		    PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO));
+		    PINT_encode_calc_max_size(PINT_ENCODE_RESP, PVFS_SERV_IO,
+			PINT_CLIENT_ENC_TYPE));
 		if(ret < 0)
 		{
 		    error_code_array[i] = ret;

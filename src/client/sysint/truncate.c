@@ -100,7 +100,8 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size,
 	    goto return_error;
 	}
 
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
+	    req_p.op, PINT_CLIENT_ENC_TYPE);
 
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp, op_tag);
 	if (ret < 0)

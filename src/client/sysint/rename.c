@@ -129,7 +129,8 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
     req_p.u.crdirent.fs_id = new_parent_refn.fs_id;
 
     /* create requests get a generic response */
-    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+    max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op, 
+	PINT_CLIENT_ENC_TYPE);
 
     op_tag = get_next_session_tag();
 

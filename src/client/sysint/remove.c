@@ -110,7 +110,8 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	req_p.credentials = credentials;
 	req_p.u.remove.handle = pinode_ptr->pinode_ref.handle;
 	req_p.u.remove.fs_id = parent_refn.fs_id;
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op, 
+	    PINT_CLIENT_ENC_TYPE);
 
 	op_tag = get_next_session_tag();
 
@@ -194,7 +195,8 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	    req_p.op = PVFS_SERV_REMOVE;
 	    req_p.credentials = credentials;
 	    req_p.u.remove.fs_id = parent_refn.fs_id;
-	    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+	    max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op, 
+		PINT_CLIENT_ENC_TYPE);
 
 	    ioserv_count = pinode_ptr->attr.u.meta.dfile_count;
 

@@ -38,8 +38,6 @@ typedef struct PINT_encoding_functions
     void (*decode_release) (
 	struct PINT_decoded_msg * msg,
 	enum PINT_encode_msg_type input_type);
-    int ( *encode_gen_ack_sz) (
-	int);
     int (*encode_calc_max_size) (
 	enum PINT_encode_msg_type input_type,
 	enum PVFS_server_op op_type);

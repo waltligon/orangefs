@@ -180,7 +180,8 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 
 	req_p.u.create.object_type = PVFS_TYPE_METAFILE;
 
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
+	    PINT_CLIENT_ENC_TYPE);
 
 	op_tag = get_next_session_tag();
 	/* send the server request */
@@ -322,7 +323,8 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	req_p.u.create.object_type = PVFS_TYPE_DATAFILE;
 
 	/* create requests get a generic response */
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
+	    PINT_CLIENT_ENC_TYPE);
 
 	/* NOTE: if we need to rollback data file creation, the first valid
 	 * handle to remove would be i - 1 (as long as i < 0).
@@ -402,7 +404,8 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	req_p.u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
 	req_p.u.setattr.attr.mask |= PVFS_ATTR_META_DFILES;
 
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
+	    PINT_CLIENT_ENC_TYPE);
 
 	op_tag = get_next_session_tag();
 
@@ -494,7 +497,8 @@ return_error:
 		req_p.op = PVFS_SERV_REMOVE;
 		req_p.credentials = credentials;
 		req_p.u.remove.fs_id = parent_refn.fs_id;
-		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+		max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
+		    PINT_CLIENT_ENC_TYPE);
 
 		for(i = 0;i < last_handle_created; i++)
 		{
@@ -525,7 +529,8 @@ return_error:
 		req_p.u.rmdirent.parent_handle = parent_refn.handle;
 		req_p.u.rmdirent.fs_id = parent_refn.fs_id;
 		req_p.u.rmdirent.entry = entry_name;
-		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+		max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
+		    PINT_CLIENT_ENC_TYPE);
 		op_tag = get_next_session_tag();
 		old_ret = ret;
                 ret = PINT_send_req(serv_addr2, &req_p, max_msg_sz,
@@ -542,7 +547,8 @@ return_error:
 		req_p.credentials = credentials;
 		req_p.u.remove.handle = entry.handle;
 		req_p.u.remove.fs_id = entry.fs_id;
-		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+		max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
+		    PINT_CLIENT_ENC_TYPE);
 		op_tag = get_next_session_tag();
 		old_ret = ret;
                 ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,

@@ -148,7 +148,8 @@ int PVFS_sys_ref_lookup(
 	name_sz = strlen(path) + 1;
 	req_p.op     = PVFS_SERV_LOOKUP_PATH;
 	req_p.credentials = credentials;
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + num_segments_remaining * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
+	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
+	    PINT_CLIENT_ENC_TYPE);
 	gossip_debug(CLIENT_DEBUG,
 		      "  expecting ack of %d bytes (%d segment(s))\n",
 		      max_msg_sz,

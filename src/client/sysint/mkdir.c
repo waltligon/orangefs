@@ -129,7 +129,8 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     req_p.u.mkdir.attr.mask |= PVFS_ATTR_COMMON_TYPE;
     req_p.u.mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;
 
-    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+    max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op, 
+	PINT_CLIENT_ENC_TYPE);
 
     /* send the server request */
 
@@ -297,7 +298,8 @@ return_error:
 	    req_p.u.remove.handle = entry.handle;
 	    req_p.u.remove.fs_id = entry.fs_id;
 
-	    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+	    max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op, 
+		PINT_CLIENT_ENC_TYPE);
 	    op_tag = get_next_session_tag();
 	    ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
                                 &decoded, &encoded_resp, op_tag);

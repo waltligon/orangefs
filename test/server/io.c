@@ -82,11 +82,12 @@ int main(int argc, char **argv)	{
 	 */
 
 	/* figure out how big of an ack to post */
-	my_ack_size = PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO);
-	create_ack_size = PINT_get_encoded_generic_ack_sz(0,
-		PVFS_SERV_CREATE);
-	remove_ack_size = PINT_get_encoded_generic_ack_sz(0,
-		PVFS_SERV_REMOVE);
+	my_ack_size = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
+	    PVFS_SERV_IO, PINT_ENC_DIRECT);
+	create_ack_size = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
+	    PVFS_SERV_CREATE, PINT_ENC_DIRECT);
+	remove_ack_size = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
+	    PVFS_SERV_REMOVE, PINT_ENC_DIRECT);
 
 	/* create storage for all of the acks */
 	my_ack = malloc(my_ack_size);

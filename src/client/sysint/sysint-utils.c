@@ -81,7 +81,8 @@ int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
         req_p.u.lookup_path.attrmask = PVFS_ATTR_COMMON_ALL;
 
 	/*expecting exactly one segment to come back (maybe attribs)*/
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
+	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
+	    req_p.op, PINT_CLIENT_ENC_TYPE);
 
         ret = PINT_bucket_map_to_server(&serv_addr, parent.handle, parent.fs_id);
         if (ret < 0)
@@ -352,10 +353,8 @@ int PINT_server_get_config(struct server_configuration_s *config,
 
     /* TODO: Fill up the credentials information */
 
-    /* TODO: IS THIS A REASONABLE MAXIMUM MESSAGE SIZE?  I HAVE NO IDEA */
-    max_msg_sz = 
-	PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_GETCONFIG) 
-	+ (2 * PVFS_REQ_LIMIT_CONFIG_FILE_BYTES);
+    max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
+	PVFS_SERV_GETCONFIG, PINT_CLIENT_ENC_TYPE);
 
     /*
       for each entry in the pvfstab, attempt to query the server for

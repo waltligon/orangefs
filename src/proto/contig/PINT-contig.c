@@ -36,8 +36,6 @@ void do_decode_rel(
 void do_encode_rel(
     struct PINT_encoded_msg *msg,
     enum PINT_encode_msg_type input_type);
-int do_encode_gen_ack_sz(
-    int);
 int do_encode_calc_max_size(
     enum PINT_encode_msg_type input_type,
     enum PVFS_server_op op_type);
@@ -51,7 +49,6 @@ PINT_encoding_functions_s contig_buffer_functions = {
     do_decode_resp,
     do_encode_rel,
     do_decode_rel,
-    do_encode_gen_ack_sz,
     do_encode_calc_max_size
 };
 
@@ -60,12 +57,6 @@ PINT_encoding_table_values_s contig_buffer_table = {
     "Contiguous",
     init_contig
 };
-
-int do_encode_gen_ack_sz(
-    int op)
-{
-    return sizeof(struct PVFS_server_resp) + ENCODED_HEADER_SIZE;
-}
 
 void init_contig(
     void)
