@@ -1,10 +1,10 @@
 DIR := test/io/flow
 
-TEST_IO_FLOW_DIR_SRC := \
-	$(DIR)/test-harness-server.c\
-	$(DIR)/test-harness-client.c\
-	$(DIR)/test-harness-client-from-trove.c\
-	$(DIR)/test-harness-server-trove.c
+TEST_IO_FLOW_DIR_SRC := 
+#	$(DIR)/test-harness-server.c
+#	$(DIR)/test-harness-client.c
+#	$(DIR)/test-harness-client-from-trove.c
+#	$(DIR)/test-harness-server-trove.c
 #	$(DIR)/wire-harness-server.c\
 #	$(DIR)/wire-harness-client.c
 

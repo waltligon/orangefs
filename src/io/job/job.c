@@ -36,7 +36,6 @@
 
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
-static FLOW_context_id global_flow_context = -1;
 #ifdef __PVFS2_TROVE_SUPPORT__
 static TROVE_context_id global_trove_context = -1;
 #endif
@@ -66,15 +65,12 @@ static gen_mutex_t dev_mutex = GEN_MUTEX_INITIALIZER;
  * work to do and waking them when work is available 
  */
 static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
-static pthread_cond_t flow_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t dev_cond = PTHREAD_COND_INITIALIZER;
 /* NOTE: the above conditions are protected by the same mutexes that
  * protect the queues
  */
 
 /* code that the threads will run when initialized */
-static void *flow_thread_function(void *ptr);
-static pthread_t flow_thread_id;
 static void *dev_thread_function(void* ptr);
 static pthread_t dev_thread_id;
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -86,9 +82,6 @@ enum
     thread_wait_timeout = 10000	/* usecs */
 };
 
-/* static arrays to use for testing lower level interfaces */
-static flow_descriptor *stat_flow_array[job_work_metric];
-
 static struct PINT_dev_unexp_info stat_dev_unexp_array[job_work_metric];
 
 /********************************************************
@@ -97,7 +90,6 @@ static struct PINT_dev_unexp_info stat_dev_unexp_array[job_work_metric];
 
 static int setup_queues(void);
 static void teardown_queues(void);
-static int do_one_work_cycle_flow(int *num_completed);
 static int do_one_work_cycle_dev_unexp(int *num_completed);
 static int do_one_test_cycle_req_sched(void);
 static void fill_status(struct job_desc *jd,
@@ -120,6 +112,7 @@ static void bmi_thread_mgr_callback(void* data,
 static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp);
 static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
+static void flow_callback(flow_descriptor* flow_d);
 #ifndef __PVFS2_JOB_THREADED__
 static int do_one_work_cycle_all(void);
 #endif
@@ -138,17 +131,9 @@ int job_initialize(int flags)
 {
     int ret = -1;
 
-    /* ditto for flows */
-    ret = PINT_flow_open_context(&global_flow_context);
-    if(ret < 0)
-    {
-	return(ret);
-    }
-
     ret = setup_queues();
     if (ret < 0)
     {
-	PINT_flow_close_context(global_flow_context);
 	return (ret);
     }
 
@@ -156,7 +141,6 @@ int job_initialize(int flags)
     ret = PINT_thread_mgr_bmi_start();
     if (ret != 0)
     {
-	PINT_flow_close_context(global_flow_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -165,21 +149,10 @@ int job_initialize(int flags)
     assert(ret == 0);
 
 #ifdef __PVFS2_JOB_THREADED__
-    ret = pthread_create(&flow_thread_id, NULL, flow_thread_function, NULL);
-    if (ret != 0)
-    {
-	PINT_thread_mgr_bmi_stop();
-	PINT_flow_close_context(global_flow_context);
-	teardown_queues();
-	return (-ret);
-    }
-
     ret = pthread_create(&dev_thread_id, NULL, dev_thread_function, NULL);
     if (ret != 0)
     {
 	PINT_thread_mgr_bmi_stop();
-	pthread_cancel(flow_thread_id);
-	PINT_flow_close_context(global_flow_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -191,10 +164,8 @@ int job_initialize(int flags)
     {
 	PINT_thread_mgr_bmi_stop();
 #ifdef __PVFS2_JOB_THREADED__
-	pthread_cancel(flow_thread_id);
 	pthread_cancel(dev_thread_id);
 #endif
-	PINT_flow_close_context(global_flow_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -222,11 +193,8 @@ int job_finalize(void)
 #endif
 
 #ifdef __PVFS2_JOB_THREADED__
-    pthread_cancel(flow_thread_id);
     pthread_cancel(dev_thread_id);
 #endif
-
-    PINT_flow_close_context(global_flow_context);
 
     teardown_queues();
 
@@ -1095,9 +1063,10 @@ int job_flow(flow_descriptor * flow_d,
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     flow_d->user_ptr = jd;
+    flow_d->callback = flow_callback;
 
     /* post the flow */
-    ret = PINT_flow_post(flow_d, global_flow_context);
+    ret = PINT_flow_post(flow_d);
     if (ret < 0)
     {
 	out_status_p->error_code = ret;
@@ -1121,9 +1090,6 @@ int job_flow(flow_descriptor * flow_d,
     gen_mutex_lock(&flow_mutex);
     *id = jd->job_id;
     flow_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&flow_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&flow_mutex);
 
     JOB_EVENT_START(PVFS_EVENT_FLOW, *id);
@@ -3596,52 +3562,6 @@ static int do_one_work_cycle_dev_unexp(int *num_completed)
     return (0);
 }
 
-
-/* do_one_work_cycle_flow()
- *
- * performs one job work cycle, just on pending flow operations 
- * (checks to see which jobs are pending, tests those that need it, etc)
- *
- * returns 0 on success, -errno on failure
- */
-static int do_one_work_cycle_flow(int *num_completed)
-{
-    int ret = -1;
-    struct job_desc *tmp_desc = NULL;
-    int incount, outcount;
-    int i = 0;
-
-    incount = job_work_metric;
-
-    ret = PINT_flow_testcontext(incount, stat_flow_array, &outcount,
-	10, global_flow_context);
-    if (ret < 0)
-    {
-	/* critical failure */
-	/* TODO: can I clean up anything else here? */
-	gossip_lerr("Error: critical Flow failure.\n");
-	return (ret);
-    }
-
-    for (i = 0; i < outcount; i++)
-    {
-	/* remove the operation from the pending flow queue */
-	tmp_desc = (struct job_desc *) stat_flow_array[i]->user_ptr;
-	/* place in completed queue */
-	gen_mutex_lock(&completion_mutex);
-	/* set completed flag while holding queue lock */
-	tmp_desc->completed_flag = 1;
-	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
-	    tmp_desc);
-	gen_mutex_unlock(&completion_mutex);
-    }
-
-    flow_pending_count -= outcount;
-
-    *num_completed = outcount;
-    return (0);
-}
-
 /* fill_status()
  *
  * fills in the completion status based on the given job descriptor
@@ -3703,63 +3623,6 @@ static void fill_status(struct job_desc *jd,
 }
 
 #ifdef __PVFS2_JOB_THREADED__
-
-/* flow_thread_function()
- *
- * function executed by the thread in charge of flows
- */
-static void *flow_thread_function(void *ptr)
-{
-    int flow_pending_flag;
-    int num_completed;
-    int ret = -1;
-
-    while (1)
-    {
-	/* figure out if there is any flow work to do */
-	gen_mutex_lock(&flow_mutex);
-	if(flow_pending_count > 0)
-	    flow_pending_flag = 1;
-	else
-	    flow_pending_flag = 0;
-	gen_mutex_unlock(&flow_mutex);
-
-	num_completed = 0;
-	if (flow_pending_flag)
-	{
-	    ret = do_one_work_cycle_flow(&num_completed);
-	    if (ret < 0)
-	    {
-		/* set an error flag to get propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	}
-	else
-	{
-	    /* nothing to do; block on condition */
-	    gen_mutex_lock(&flow_mutex);
-	    ret = pthread_cond_wait(&flow_cond, &flow_mutex);
-	    gen_mutex_unlock(&flow_mutex);
-	    if (ret != ETIMEDOUT && ret != EINTR && ret != 0)
-	    {
-		/* set an error flag to get propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = -ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	}
-
-	if (num_completed > 0)
-	{
-	    /* signal anyone blocking on completion queue */
-	    pthread_cond_signal(&completion_cond);
-	}
-    }
-
-    return (NULL);
-}
 
 /* dev_thread_function()
  *
@@ -3996,13 +3859,6 @@ static int do_one_work_cycle_all(void)
 	PINT_thread_mgr_trove_push(10);
 #endif
 
-    if(flow_pending_count)
-    {
-	ret = do_one_work_cycle_flow(&num_completed);
-	if(ret < 0)
-	    return(ret);
-    }
-
     if(dev_unexp_pending_count)
     {
 	ret = do_one_work_cycle_dev_unexp(&num_completed);
@@ -4013,6 +3869,34 @@ static int do_one_work_cycle_all(void)
     return(0);
 }
 #endif
+
+/* flow_callback()
+ *
+ * function to be called upon completion of flows
+ *
+ * no return value
+ */
+static void flow_callback(flow_descriptor* flow_d)
+{
+    struct job_desc* tmp_desc = (struct job_desc*)flow_d->user_ptr; 
+
+    /* set job descriptor fields and put into completion queue */
+    gen_mutex_lock(&completion_mutex);
+    job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	tmp_desc);
+    /* set completed flag while holding queue lock */
+    tmp_desc->completed_flag = 1;
+    gen_mutex_unlock(&completion_mutex);
+
+    flow_pending_count--;
+
+#ifdef __PVFS2_JOB_THREADED__
+    /* wake up anyone waiting for completion */
+    pthread_cond_signal(&completion_cond);
+#endif
+
+    return;
+}
 
 /*
  * Local variables:

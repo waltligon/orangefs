@@ -83,9 +83,6 @@ enum flow_getinfo_option
     FLOWPROTO_TYPE_QUERY = 1
 };
 
-/* context id type */
-typedef PVFS_context_id FLOW_context_id;
-
 #define FLOW_MAX_CONTEXTS 16
 
 /********************************************************************
@@ -96,6 +93,9 @@ struct flow_descriptor
 {
 	/**********************************************************/
     /* fields that can be set publicly before posting */
+
+    /* function to be triggered upon completion */
+    void(*callback)(struct flow_descriptor* flow_d);
 
     struct flow_endpoint src;	/* src endpoint */
     struct flow_endpoint dest;	/* dest endpoint */
@@ -126,11 +126,10 @@ struct flow_descriptor
 	/***********************************************************/
     /* fields reserved strictly for internal use */
 
-    FLOW_context_id context_id; /* which context the flow belongs to */
     int flowproto_id;		/* identifies which protocol owns this */
-    int priority;	/* priority of this flow */
-    struct qlist_head sched_queue_link;	/* used by scheduler */
     void *flow_protocol_data;	/* used by flow protocols */
+    /* called upon completion before callback */
+    void(*release)(struct flow_descriptor* flow_d);
 
     PINT_Request_state *file_req_state;
     PINT_Request_state *mem_req_state;
@@ -158,37 +157,9 @@ void PINT_flow_reset(flow_descriptor * flow_d);
 
 void PINT_flow_free(flow_descriptor * flow_d);
 
-int PINT_flow_open_context(FLOW_context_id* context_id);
-
-void PINT_flow_close_context(FLOW_context_id context_id);
-
-int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id);
+int PINT_flow_post(flow_descriptor * flow_d);
 
 int PINT_flow_unpost(flow_descriptor * flow_d);
-
-int PINT_flow_setpriority(flow_descriptor * flow_d,
-			  int priority);
-
-int PINT_flow_getpriority(flow_descriptor * flow_d,
-			  int * priority);
-
-int PINT_flow_test(flow_descriptor * flow_d,
-		   int *outcount,
-		   int max_idle_time_ms,
-		   FLOW_context_id context_id);
-
-int PINT_flow_testsome(int incount,
-		       flow_descriptor ** flow_array,
-		       int *outcount,
-		       int *index_array,
-		       int max_idle_time_ms,
-		       FLOW_context_id context_id);
-
-int PINT_flow_testcontext(int incount,
-			flow_descriptor ** flow_array,
-			int *outcount,
-			int max_idle_time_ms,
-			FLOW_context_id context_id);
 
 int PINT_flow_setinfo(flow_descriptor * flow_d,
 		      int option,

@@ -1,9 +1,9 @@
 DIR := src/io/flow
 LIBSRC += \
 	$(DIR)/flow.c \
-	$(DIR)/flow-ref.c \
-	$(DIR)/flow-queue.c
+	$(DIR)/flow-ref.c 
+#	$(DIR)/flow-queue.c
 SERVERSRC += \
 	$(DIR)/flow.c \
-	$(DIR)/flow-ref.c \
-	$(DIR)/flow-queue.c
+	$(DIR)/flow-ref.c 
+#	$(DIR)/flow-queue.c

@@ -26,10 +26,6 @@ struct flowproto_ops
 			      int option,
 			      void *parameter);
     int (*flowproto_post) (flow_descriptor * flow_d);
-    int (*flowproto_find_serviceable) (flow_descriptor ** flow_d_array,
-				 int *count,
-				 int max_idle_time_ms);
-    int (*flowproto_service) (flow_descriptor * flow_d);
 };
 
 /* used to query protocols to determine which endpoint pairs are

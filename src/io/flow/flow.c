@@ -20,14 +20,6 @@
 #include "flow.h"
 #include "flowproto-support.h"
 #include "flow-ref.h"
-#include "flow-queue.h"
-
-/* internal queues */
-/* note: a flow can exist in at most one of these queues at a time */
-static flow_queue_p completion_queue_array[FLOW_MAX_CONTEXTS] = {NULL};
-static flow_queue_p transmitting_queue;
-static flow_queue_p need_svc_queue;
-static flow_queue_p scheduled_queue;
 
 /* mutex lock used to prevent more than one process from entering the
  * interface at a time
@@ -41,22 +33,9 @@ static struct flowproto_ops **active_flowproto_table = NULL;
 /* mappings of flow endpoints to the correct protocol */
 static flow_ref_p flow_mapping = NULL;
 
-static int do_one_work_cycle(int *num_completed,
-			     int max_idle_time_ms);
 static void flow_release(flow_descriptor * flow_d);
-static void default_scheduler(void);
 static int split_string_list(char ***tokens,
 			     const char *comma_list);
-
-static int setup_flow_queues(void);
-static int teardown_flow_queues(void);
-
-/* tunable parameters */
-enum
-{
-    /* number of flows we are willing to check at once (per protocol) */
-    CHECKGLOBAL_COUNT = 5
-};
 
 /* PINT_flow_initialize()
  *
@@ -164,13 +143,6 @@ int PINT_flow_initialize(const char *flowproto_list,
 	goto PINT_flow_initialize_failure;
     }
 
-    /* setup queues */
-    ret = setup_flow_queues();
-    if (ret < 0)
-    {
-	goto PINT_flow_initialize_failure;
-    }
-
     /* initialize all of the flow protocols */
     for (i = 0; i < active_flowproto_count; i++)
     {
@@ -262,8 +234,6 @@ int PINT_flow_finalize(void)
 
     flow_ref_cleanup(flow_mapping);
 
-    teardown_flow_queues();
-
     gen_mutex_unlock(&interface_mutex);
     return (0);
 }
@@ -307,7 +277,6 @@ void PINT_flow_reset(flow_descriptor * flow_d)
     flow_d->aggregate_size = -1;
     flow_d->state = FLOW_INITIAL;
     flow_d->type = FLOWPROTO_DEFAULT;
-    INIT_QLIST_HEAD(&(flow_d->sched_queue_link));
 
     return;
 }
@@ -325,75 +294,6 @@ void PINT_flow_free(flow_descriptor * flow_d)
 }
 
 
-/* PINT_flow_open_context()
- *
- * opens up a new flow context
- *
- * returns 0 on success, -errno on failure
- */
-int PINT_flow_open_context(FLOW_context_id* context_id)
-{
-    int context_index;
-
-    gen_mutex_lock(&interface_mutex);
-
-    /* find an unused context id */
-    for(context_index=0; context_index<FLOW_MAX_CONTEXTS; context_index++)
-    {
-	if(completion_queue_array[context_index] == NULL)
-	{
-	    break;
-	}
-    }
-
-    if(context_index >= FLOW_MAX_CONTEXTS)
-    {
-	/* we don't have any more available! */
-	gen_mutex_unlock(&interface_mutex);
-	return(-EBUSY);
-    }
-
-    /* create a new completion queue for the context */
-    completion_queue_array[context_index] = flow_queue_new();
-    if(!completion_queue_array[context_index])
-    {
-	gen_mutex_unlock(&interface_mutex);
-	return(-ENOMEM);
-    }
-
-    *context_id = context_index;
-    gen_mutex_unlock(&interface_mutex);
-    return(0);
-}
-
-
-/* PINT_flow_close_context()
- *
- * shuts down a context previously created with open_context()
- *
- * no return value
- */
-void PINT_flow_close_context(FLOW_context_id context_id)
-{
-
-    gen_mutex_lock(&interface_mutex);
-
-    if(!completion_queue_array[context_id])
-    {
-	gen_mutex_unlock(&interface_mutex);
-	return;
-    }
-
-    flow_queue_cleanup(completion_queue_array[context_id]);
-
-    completion_queue_array[context_id] = NULL;
-
-    gen_mutex_unlock(&interface_mutex);
-    return;
-
-}
-
-
 /* PINT_flow_post()
  * 
  * Posts a flow descriptor to the flow interface so that it may be
@@ -401,13 +301,14 @@ void PINT_flow_close_context(FLOW_context_id context_id)
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
+int PINT_flow_post(flow_descriptor * flow_d)
 {
     int flowproto_id = -1;
     int ret = -1;
     int i;
     int type = flow_d->type;
 
+    assert(flow_d->callback);
     /* sanity check; if the caller doesn't provide a memory datatype,
      * then the must at least indicate the aggregate size to transfer
      */
@@ -417,8 +318,6 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
 
     /* NOTE: if an error occurs here, then we will normally just return
      * -errno and _not_ set any error codes in the flow descriptor.
-     * It doesn't seem safe to modify it because  we don't really gain 
-     * control of the flow until this function completes successfully.
      */
 
     /* search for match to specified flow protocol type */
@@ -437,19 +336,15 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
 
     if (flowproto_id < 0)
     {
-	flow_release(flow_d);
 	gen_mutex_unlock(&interface_mutex);
 	gossip_err("Error: requested flow protocol %d, which doesn't appear to be loaded.\n", (int)type);
 	return (-ENOPROTOOPT);
     }
 
-    flow_d->context_id = context_id;
-
     /* setup the request processing states */
     flow_d->file_req_state = PINT_New_request_state(flow_d->file_req);
     if (!flow_d->file_req_state)
     {
-	flow_release(flow_d);
 	gen_mutex_unlock(&interface_mutex);
 	return (-EINVAL);
     }
@@ -460,50 +355,17 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
 	flow_d->mem_req_state = PINT_New_request_state(flow_d->mem_req);
 	if (!flow_d->mem_req_state)
 	{
-	    flow_release(flow_d);
 	    gen_mutex_unlock(&interface_mutex);
 	    return (-EINVAL);
 	}
     }
 
+    flow_d->release = flow_release;
+
     /* post the flow to the flow protocol level */
     ret = active_flowproto_table[flowproto_id]->flowproto_post(flow_d);
-    if (ret < 0)
-    {
-	flow_release(flow_d);
-	gen_mutex_unlock(&interface_mutex);
-	return (ret);
-    }
-
-    /* put the flow in the correct queue based on the results of the
-     * post() function
-     */
-    if (flow_d->state & FLOW_FINISH_MASK)
-    {
-	/* TODO: this is a temporary hack, don't autocomplete multiqueue flows */
-	if(flow_d->type == FLOWPROTO_MULTIQUEUE)
-	    flow_queue_add(transmitting_queue, flow_d);
-	else
-	    flow_queue_add(completion_queue_array[flow_d->context_id], flow_d);
-    }
-    else if (flow_d->state == FLOW_TRANSMITTING)
-    {
-	flow_queue_add(transmitting_queue, flow_d);
-    }
-    else if (flow_d->state == FLOW_SVC_READY)
-    {
-	flow_queue_add(need_svc_queue, flow_d);
-    }
-    else
-    {
-	gossip_lerr("Error: Inconsistent state.\n");
-	flow_release(flow_d);
-	gen_mutex_unlock(&interface_mutex);
-	return (-EPROTO);
-    }
-
     gen_mutex_unlock(&interface_mutex);
-    return (0);
+    return (ret);
 }
 
 
@@ -519,222 +381,6 @@ int PINT_flow_unpost(flow_descriptor * flow_d)
     gossip_lerr("function not implemented.\n");
     gen_mutex_unlock(&interface_mutex);
     return (-ENOSYS);
-}
-
-
-/* PINT_flow_setpriority()
- *
- * sets the priority level of a flow.  May be safely called before or
- * after the flow is posted.
- *
- * returns 0 on success, -errno on failure
- */
-int PINT_flow_setpriority(flow_descriptor * flow_d,
-			  int priority)
-{
-    gen_mutex_lock(&interface_mutex);
-    gossip_lerr("function not implemented.\n");
-    gen_mutex_unlock(&interface_mutex);
-    return (-ENOSYS);
-}
-
-/* PINT_flow_getpriority()
- *
- * Checks the priority level of a particular flow
- *
- * returns 0 on success, -errno on failure
- */
-int PINT_flow_getpriority(flow_descriptor * flow_d,
-			  int * priority)
-{
-    gen_mutex_lock(&interface_mutex);
-    gossip_lerr("function not implemented.\n");
-    gen_mutex_unlock(&interface_mutex);
-    return (-ENOSYS);
-}
-
-/* PINT_flow_test()
- *
- * Check for completion of a particular flow; is allowed to do work or
- * briefly block within function
- *
- * returns 0 on success, -errno on failure
- */
-int PINT_flow_test(flow_descriptor * flow_d,
-		   int *outcount,
-		   int max_idle_time_ms,
-		   FLOW_context_id context_id)
-{
-    int ret = -1;
-    int num_completed;
-
-    assert(flow_d != 0);
-
-    *outcount = 0;
-
-    gen_mutex_lock(&interface_mutex);
-
-    if(flow_d->state & FLOW_FINISH_MASK)
-    {
-	flow_queue_remove(flow_d);
-	flow_release(flow_d);
-	*outcount = 1;
-	gen_mutex_unlock(&interface_mutex);
-	return(1);
-    }
-
-    /* push on work for one round */
-    ret = do_one_work_cycle(&num_completed, max_idle_time_ms);
-
-    if (ret < 0)
-    {
-	gen_mutex_unlock(&interface_mutex);
-	return (ret);
-    }
-    if (num_completed == 0)
-    {
-	/* don't bother scanning the completion queue again */
-	gen_mutex_unlock(&interface_mutex);
-	return (0);
-    }
-
-    if(flow_d->state & FLOW_FINISH_MASK)
-    {
-	flow_queue_remove(flow_d);
-	flow_release(flow_d);
-	*outcount = 1;
-	gen_mutex_unlock(&interface_mutex);
-	return(1);
-    }
-
-    gen_mutex_unlock(&interface_mutex);
-    return(0);
-}
-
-
-/* PINT_flow_testsome()
- *
- * Check for completion of any of a specified set of
- * flows; is allowed to do work or briefly block within function
- *
- * returns 0 on success, -errno on failure
- */
-int PINT_flow_testsome(int incount,
-		       flow_descriptor ** flow_array,
-		       int *outcount,
-		       int *index_array,
-		       int max_idle_time_ms,
-		       FLOW_context_id context_id)
-{
-    int ret = -1;
-    int num_completed;
-    int i;
-
-    gen_mutex_lock(&interface_mutex);
-
-    *outcount = 0;
-
-    for(i=0; i<incount; i++)
-    {
-	if(flow_array[i] && (flow_array[i]->state & FLOW_FINISH_MASK))
-	{
-	    index_array[*outcount] = i;
-	    (*outcount)++;
-	    flow_queue_remove(flow_array[i]);
-	    flow_release(flow_array[i]);
-	}
-    }
-
-    /* go ahead and return if we found anything the caller wanted */
-    if((*outcount) > 0)
-    {
-	gen_mutex_unlock(&interface_mutex);
-	return(1);
-    }
-
-    /* push on work for one round */
-    ret = do_one_work_cycle(&num_completed, max_idle_time_ms);
-
-    if (ret < 0)
-    {
-	gen_mutex_unlock(&interface_mutex);
-	return (ret);
-    }
-    if (num_completed == 0)
-    {
-	/* don't bother checking completion queue again */
-	gen_mutex_unlock(&interface_mutex);
-	return (0);
-    }
-
-    *outcount = 0;
-
-    for(i=0; i<incount; i++)
-    {
-	if(flow_array[i] && (flow_array[i]->state & FLOW_FINISH_MASK))
-	{
-	    index_array[*outcount] = i;
-	    (*outcount)++;
-	    flow_queue_remove(flow_array[i]);
-	    flow_release(flow_array[i]);
-	}
-    }
-
-    gen_mutex_unlock(&interface_mutex);
-    if((*outcount) > 0)
-	return(1);
-    else
-	return(0);
-}
-
-
-/* PINT_flow_testcontext()
- * 
- * Check for completion of any flows in progress for the
- * flow interface; is allowed to do work or briefly block within
- * function.  This may return unexpected flows as well.
- *
- * returns 0 on success, -errno on failure
- */
-int PINT_flow_testcontext(int incount,
-			flow_descriptor ** flow_array,
-			int *outcount,
-			int max_idle_time_ms,
-			FLOW_context_id context_id)
-{
-    flow_descriptor *flow_d = NULL;
-    int num_completed = 0;
-    int ret = -1;
-
-    gen_mutex_lock(&interface_mutex);
-
-    *outcount = 0;
-
-    assert(completion_queue_array[context_id] != NULL);
-    /* do some work if the completion queue is empty */
-    if (flow_queue_empty(completion_queue_array[context_id]))
-    {
-	ret = do_one_work_cycle(&num_completed, max_idle_time_ms);
-	if (ret < 0)
-	{
-	    return (ret);
-	}
-    }
-
-    while (*outcount < incount && (flow_d =
-				   flow_queue_shownext(completion_queue_array[context_id])))
-    {
-	flow_array[*outcount] = flow_d;
-	flow_queue_remove(flow_d);
-	flow_release(flow_d);
-	(*outcount)++;
-    }
-
-    gen_mutex_unlock(&interface_mutex);
-    if (*outcount > 0)
-	return (1);
-    else
-	return (0);
 }
 
 
@@ -775,170 +421,8 @@ int PINT_flow_getinfo(flow_descriptor * flow_d,
  * Internal helper functions
  */
 
-/* do_one_work_cycle() 
- *
- * performs one flow work cycle (iterating through flow queue,
- * scheduling, etc.)
- *
- */
-static int do_one_work_cycle(int *num_completed,
-			     int max_idle_time_ms)
-{
-    flow_descriptor *flow_array[CHECKGLOBAL_COUNT];
-    int tmp_count = 0;
-    int i = 0;
-    int j = 0;
-    int ret = -1;
-    flow_descriptor *tmp_flow = NULL;
-
-    *num_completed = 0;
-
-    /* divide up the idle time if necessary */
-    /* TODO: do something more clever here later */
-    if (max_idle_time_ms)
-    {
-	max_idle_time_ms = max_idle_time_ms / active_flowproto_count;
-	if (!max_idle_time_ms)
-	    max_idle_time_ms = 1;
-    }
-
-    /* what should happen here? */
-    /* 1) service flows that are currently transmitting, and move any to
-     * need_svc or completion queues as needed
-     * 2) apply scheduling filter to need_svc queue to generate scheduled
-     * queue
-     * 3) service each of the flows in the scheduled queue in order
-     */
-
-    gossip_ldebug(FLOW_DEBUG, "do_one_work_cycle checking.\n");
-    /* find serviceable flows from each protocol */
-    for (i = 0; i < active_flowproto_count; i++)
-    {
-	tmp_count = CHECKGLOBAL_COUNT;
-	ret = active_flowproto_table[i]->flowproto_find_serviceable(flow_array,
-							      &tmp_count,
-							      max_idle_time_ms);
-	if (ret < 0)
-	{
-	    /* no good way to clean this up */
-	    gossip_lerr("Error: Critical failure.\n");
-	    return (ret);
-	}
-
-	/* handle flows (by completing or preparing for service) */
-	for (j = 0; j < tmp_count; j++)
-	{
-	    if (flow_array[j]->state & FLOW_FINISH_MASK)
-	    {
-		/* move the flow to the completion queue */
-		flow_queue_remove(flow_array[j]);
-
-		flow_queue_add(
-		    completion_queue_array[flow_array[j]->context_id], 
-		    flow_array[j]);
-	    }
-	    else if (flow_array[j]->state == FLOW_SVC_READY)
-	    {
-		/* move the flow to the need service queue */
-		flow_queue_remove(flow_array[j]);
-
-		flow_queue_add(need_svc_queue, flow_array[j]);
-	    }
-	    else
-	    {
-		/* we should not get here */
-		gossip_lerr("Error: inconsistent state!\n");
-		return (ret);
-	    }
-	}
-    }
-
-    gossip_ldebug(FLOW_DEBUG, "do_one_work_cycle scheduling.\n");
-    /* schedule the next round of service */
-    default_scheduler();
-
-    gossip_ldebug(FLOW_DEBUG, "do_one_work_cycle servicing.\n");
-    /* go through and service each scheduled flow in order */
-    while ((tmp_flow = flow_queue_shownext(scheduled_queue)))
-    {
-	ret =
-	    active_flowproto_table[tmp_flow->flowproto_id]->
-	    flowproto_service(tmp_flow);
-	if (ret < 0)
-	{
-	    /* no good way to clean this up */
-	    gossip_lerr("Error: Critical failure.\n");
-	    return (ret);
-	}
-	/* take the flow out of this queue */
-	flow_queue_remove(tmp_flow);
-	/* put the flow in the correct queue based on the result */
-	if (tmp_flow->state & FLOW_FINISH_MASK)
-	{
-	    flow_queue_add(completion_queue_array[tmp_flow->context_id], tmp_flow);
-	}
-	else if (tmp_flow->state == FLOW_SVC_READY)
-	{
-	    flow_queue_add(need_svc_queue, tmp_flow);
-	}
-	else if (tmp_flow->state == FLOW_TRANSMITTING)
-	{
-	    flow_queue_add(transmitting_queue, tmp_flow);
-	}
-	else
-	{
-	    /* can't recover from this */
-	    gossip_lerr("Error: invalid state reached.\n");
-	    return (-EPROTO);
-	}
-
-    }
-
-    gossip_ldebug(FLOW_DEBUG, "do_one_work_cycle done.\n");
-    return (0);
-}
-
-/* setup_queues()
- *
- * puts all global internal queues into their initial state
- *
- * returns 0 on success, -errno on failure
- */
-static int setup_flow_queues(void)
-{
-    transmitting_queue = flow_queue_new();
-    need_svc_queue = flow_queue_new();
-    scheduled_queue = flow_queue_new();
-
-    if (!transmitting_queue || !need_svc_queue || !scheduled_queue)
-    {
-	if (transmitting_queue)
-	    flow_queue_cleanup(transmitting_queue);
-	if (need_svc_queue)
-	    flow_queue_cleanup(need_svc_queue);
-	if (scheduled_queue)
-	    flow_queue_cleanup(scheduled_queue);
-	return (-ENOMEM);
-    }
-
-    return (0);
-}
-
-/* teardown_queues()
- *
- * shuts down all global internal queues
- *
- * returns 0 on success, -errno on failure
- */
-static int teardown_flow_queues(void)
-{
-    flow_queue_cleanup(transmitting_queue);
-    flow_queue_cleanup(need_svc_queue);
-    flow_queue_cleanup(scheduled_queue);
-
-    return (0);
-}
-
+/* TODO: we need to do this from the flow protocol level now */
+/* TODO: or else incorporate it into callback */
 /* flow_release()
  *
  * releases any resources associated with a flow before returning it to
@@ -956,37 +440,6 @@ static void flow_release(flow_descriptor * flow_d)
 
     return;
 }
-
-/* default_scheduler()
- *
- * responsible for making scheduling decisions.  It scans the need_svc
- * queue, picks the flows it thinks should be serviced, and moves them
- * to the scheduled queue (in whatever order it deems fit).  
- * NOTE: this one is just a placeholder.  It blindly moves _everything_
- * to the scheduled queue.
- *
- * no return value
- */
-static void default_scheduler(void)
-{
-    flow_descriptor *tmp_flow = NULL;
-
-    /* manually go through the entire queue and move it to the scheduled
-     * queue 
-     */
-    while ((tmp_flow = flow_queue_shownext(need_svc_queue)))
-    {
-	/* move the flow */
-	flow_queue_remove(tmp_flow);
-	/* NOTE: I don't have to lock the scheduled queue, because the
-	 * calling process can't touch it directly.
-	 */
-	flow_queue_add(scheduled_queue, tmp_flow);
-
-    }
-
-    return;
-};
 
 
 /*
