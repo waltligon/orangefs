@@ -59,28 +59,30 @@ static inline void clean_up_interrupted_operation(
 }
 
 /*
-  sleeps on waitqueue waiting for matching downcall
-  for some amount of time and then wakes up.
+  sleeps on waitqueue waiting for matching downcall for some amount of
+  time and then wakes up.
 
-  NOTE: when this call returns to the caller, the specified
-  op will no longer be on any list or htable.
+  NOTE: when this call returns to the caller, the specified op will no
+  longer be on any list or htable.
 
   return values and op status changes:
 
-  -1 - an error occurred; op status unknown
-   0 - success; everything ok.
-       the op state will be marked as serviced
-   1 - timeout reached (before downcall recv'd)
-       the caller has the choice of either requeueing the op
-       or failing the operation when this occurs.
-       the op observes no state change.
-   2 - sleep interrupted (signal recv'd)
-       the op observes no state change.
+  PVFS2_WAIT_ERROR
+    - an error occurred; op status unknown
+  PVFS2_WAIT_SUCCESS
+    - success; everything ok.  the op state will be marked as serviced
+  PVFS2_WAIT_TIMEOUT_REACHED
+    - timeout reached (before downcall recv'd) the caller has the
+      choice of either requeueing the op or failing the operation when
+      this occurs.  the op observes no state change.
+   PVFS2_WAIT_SIGNAL_RECVD
+    - sleep interrupted (signal recv'd) the op observes no state
+      change.
 */
 int wait_for_matching_downcall(
     pvfs2_kernel_op_t * op)
 {
-    int ret = -1;
+    int ret = PVFS2_WAIT_ERROR;
     DECLARE_WAITQUEUE(wait_entry, current);
 
     spin_lock(&op->lock);
@@ -95,7 +97,7 @@ int wait_for_matching_downcall(
 	if (op->op_state == PVFS2_VFS_STATE_SERVICED)
 	{
 	    spin_unlock(&op->lock);
-	    ret = 0;
+	    ret = PVFS2_WAIT_SUCCESS;
 	    break;
 	}
 	spin_unlock(&op->lock);
@@ -107,7 +109,7 @@ int wait_for_matching_downcall(
 	    {
                 pvfs2_print("*** operation timed out\n");
                 clean_up_interrupted_operation(op);
-		ret = 1;
+		ret = PVFS2_WAIT_TIMEOUT_REACHED;
 		break;
 	    }
 	    continue;
@@ -115,7 +117,7 @@ int wait_for_matching_downcall(
 
         pvfs2_print("*** operation interrupted by signal\n");
         clean_up_interrupted_operation(op);
-	ret = 2;
+	ret = PVFS2_WAIT_SIGNAL_RECVD;
 	break;
     }
     set_current_state(TASK_RUNNING);

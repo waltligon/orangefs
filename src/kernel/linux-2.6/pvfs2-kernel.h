@@ -84,6 +84,11 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 #define PVFS2_VFS_STATE_INPROGR        0x00FF0002
 #define PVFS2_VFS_STATE_SERVICED       0x00FF0003
 
+/* defines used for wait_for_matching_downcall return values */
+#define PVFS2_WAIT_ERROR               0xFFFFFFFF
+#define PVFS2_WAIT_SUCCESS             0x00000000
+#define PVFS2_WAIT_TIMEOUT_REACHED     0x00000001
+#define PVFS2_WAIT_SIGNAL_RECVD        0x00000002
 
 /************************************
  * pvfs2 kernel memory related flags
@@ -197,10 +202,14 @@ do {                                                          \
 
 #define service_operation(op, method)                         \
 add_op_to_request_list(op);                                   \
-if ((ret = wait_for_matching_downcall(new_op)) != 0)          \
+ret = wait_for_matching_downcall(new_op);                     \
+if (ret != PVFS2_WAIT_SUCCESS)                                \
 {                                                             \
-    pvfs2_error("pvfs2: %s -- wait failed (%x).\n",           \
-                method,ret);                                  \
+    if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                    \
+    {                                                         \
+        pvfs2_error("pvfs2: %s -- wait timed out (%x).  "     \
+                    "aborting attempt.\n", method,ret);       \
+    }                                                         \
     goto error_exit;                                          \
 }
 
@@ -211,9 +220,10 @@ if ((ret = wait_for_matching_downcall(new_op)) != 0)          \
 #define service_operation_with_timeout_retry(op, method, num) \
 wait_for_op:                                                  \
  add_op_to_request_list(op);                                  \
- if ((ret = wait_for_matching_downcall(op)) != 0)             \
+ ret = wait_for_matching_downcall(op);                        \
+ if (ret != PVFS2_WAIT_SUCCESS)                               \
  {                                                            \
-     if ((ret == 1) && (--num))                               \
+     if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))      \
      {                                                        \
          pvfs2_print("pvfs2: %s -- timeout; requeing op\n",   \
                      method);                                 \
@@ -221,8 +231,12 @@ wait_for_op:                                                  \
      }                                                        \
      else                                                     \
      {                                                        \
-         pvfs2_error("pvfs2: %s -- wait failed (%x).\n",      \
-                     method,ret);                             \
+         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
+         {                                                    \
+             pvfs2_error("pvfs2: %s -- wait timed out (%x).  "\
+                         "aborting retry attempts.\n",        \
+                         method,ret);                         \
+         }                                                    \
          goto error_exit;                                     \
      }                                                        \
  }
@@ -237,36 +251,40 @@ wait_for_op:                                                  \
   NOTE: used in namei.c:lookup, file.c:pvfs2_inode_read, and
   file.c:pvfs2_file_write
 */
-#define service_error_exit_op_with_timeout_retry(op,meth,num,e) \
-wait_for_op:                                                    \
- add_op_to_request_list(op);                                    \
- if ((ret = wait_for_matching_downcall(op)) != 0)               \
- {                                                              \
-     if ((ret == 1) && (--num))                                 \
-     {                                                          \
-         pvfs2_print("pvfs2: %s -- timeout; requeing op\n",     \
-                     meth);                                     \
-         goto wait_for_op;                                      \
-     }                                                          \
-     else                                                       \
-     {                                                          \
-         pvfs2_error("pvfs2: %s -- wait failed (%x).\n",        \
-                     meth,ret);                                 \
-         e = 1;                                                 \
-         goto error_exit;                                       \
-     }                                                          \
+#define service_error_exit_op_with_timeout_retry(op,meth,num,e)\
+wait_for_op:                                                   \
+ add_op_to_request_list(op);                                   \
+ ret = wait_for_matching_downcall(op);                         \
+ if (ret != PVFS2_WAIT_SUCCESS)                                \
+ {                                                             \
+     if ((ret == PVFS2_WAIT_TIMEOUT_REACHED) && (--num))       \
+     {                                                         \
+         pvfs2_print("pvfs2: %s -- timeout; requeing op\n",    \
+                     meth);                                    \
+         goto wait_for_op;                                     \
+     }                                                         \
+     else                                                      \
+     {                                                         \
+         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                \
+         {                                                     \
+             pvfs2_error("pvfs2: %s -- wait timed out (%x).  " \
+                         "aborting retry attempts.\n",         \
+                         meth,ret);                            \
+         }                                                     \
+         e = 1;                                                \
+         goto error_exit;                                      \
+     }                                                         \
  }
 
 /*
   by design, our vfs i/o errors need to be handled in one of two ways,
   depending on where the error occured.
 
-
   if the error happens in the waitqueue code because we either timed
   out or a signal was raised while waiting, we need to kill the
   device_owner and free the op manually.  this is done to avoid having
-  the device start writing to our shared bufmap pages without us
-  expecting it.
+  the device start writing application data to our shared bufmap pages
+  without us expecting it.
 
   if a pvfs2 sysint level error occured and i/o has been completed,
   there is no need to kill the device_owner, as the user has finished
@@ -274,31 +292,29 @@ wait_for_op:                                                    \
   this case, we wake up the device normally so that it may free the
   op, as normal.
 
-  this macro handle both of these cases, depending on which error
+  this macro handles both of these cases, depending on which error
   happened based on information known in context.  the only reason
   this is a macro is because both read and write cases need the exact
   same handling code.
 */
 #define handle_io_error()                                       \
 do {                                                            \
-if (error_exit)                                                 \
-{                                                               \
-    ret = -EIO;                                                 \
-    kill_device_owner();                                        \
-    op_release(new_op);                                         \
-}                                                               \
-else                                                            \
-{                                                               \
-    ret = ((new_op->downcall.status == -PVFS_ENOENT) ?          \
-           -ENOENT : -EIO);                                     \
+    if (error_exit)                                             \
+    {                                                           \
+        ret = -EIO;                                             \
+        kill_device_owner();                                    \
+        op_release(new_op);                                     \
+    }                                                           \
+    else                                                        \
+    {                                                           \
+        ret = ((new_op->downcall.status == -PVFS_ENOENT) ?      \
+               -ENOENT : -EIO);                                 \
+        *offset = original_offset;                              \
+        wake_up_device_for_return(new_op);                      \
+    }                                                           \
+    pvfs_bufmap_put(buffer_index);                              \
     *offset = original_offset;                                  \
-    wake_up_device_for_return(new_op);                          \
-}                                                               \
-pvfs_bufmap_put(buffer_index);                                  \
-*offset = original_offset;                                      \
 } while(0)
-
-
 
 /****************************
  * defined in pvfs2-cache.c
