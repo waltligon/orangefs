@@ -57,7 +57,7 @@ static int hash_compare(
  * global variables declared here
  *************************************/
 
-/* the assigned device major number */
+/* the assigned character device major number */
 static int pvfs2_dev_major = 0;
 
 /* the pvfs2 memory caches (see pvfs2-cache.c) */

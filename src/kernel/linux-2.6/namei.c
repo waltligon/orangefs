@@ -200,6 +200,7 @@ static int pvfs2_unlink(
     {
         inode->i_ctime = dir->i_ctime;
 	inode->i_nlink--;
+	dir->i_nlink--;
         /* mark_inode_dirty(inode); */
     }
     return ret;

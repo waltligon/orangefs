@@ -133,10 +133,10 @@ static int pvfs2_statfs(
 
     if (new_op->downcall.status > -1)
     {
-        pvfs2_print("pvfs2_statfs got %lu blocks available | "
-                    "%lu blocks total\n",
-                    new_op->downcall.resp.statfs.blocks_avail,
-                    new_op->downcall.resp.statfs.blocks_total);
+        pvfs2_print("pvfs2_statfs got %Ld blocks available | "
+                    "%Ld blocks total\n",
+                    Ld(new_op->downcall.resp.statfs.blocks_avail),
+                    Ld(new_op->downcall.resp.statfs.blocks_total));
 
         /*
           re-assign superblock blocksize based on statfs blocksize:

@@ -192,11 +192,11 @@ static int pvfs2_writepages(
     return 0;
 }
 
-/* static int pvfs2_sync_page(struct page *page) */
-/* { */
-/*     pvfs2_print("pvfs2: pvfs2_sync_page called on page %p\n", page); */
-/*     return 0; */
-/* } */
+static int pvfs2_sync_page(struct page *page)
+{
+    pvfs2_print("pvfs2: pvfs2_sync_page called on page %p\n", page);
+    return 0;
+}
 
 static int pvfs2_readpage(
     struct file *file,
@@ -294,6 +294,7 @@ struct address_space_operations pvfs2_address_operations =
     .readpages = pvfs2_readpages,
     .writepage = pvfs2_writepage,
     .writepages = pvfs2_writepages,
+    .sync_page = pvfs2_sync_page,
 /*     .prepare_write = pvfs2_prepare_write, */
 /*     .commit_write = generic_commit_write, */
     .set_page_dirty = pvfs2_set_page_dirty,
@@ -305,7 +306,7 @@ struct address_space_operations pvfs2_address_operations =
 
 struct backing_dev_info pvfs2_backing_dev_info =
 {
-    .ra_pages = 8,
+    .ra_pages = 0,
     .memory_backed = 0
 };
 
@@ -357,7 +358,9 @@ struct inode *pvfs2_get_custom_inode(
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    pvfs2_print("pvfs2_get_custom_inode: called (sb is %p)\n", sb);
+    pvfs2_print("pvfs2_get_custom_inode: called (sb is %p | "
+                "MAJOR(dev)=%u | MINOR(dev)=%u)\n",
+                sb, MAJOR(dev), MINOR(dev));
 
     inode = new_inode(sb);
     if (inode)
@@ -388,6 +391,7 @@ struct inode *pvfs2_get_custom_inode(
         inode->i_blksize = PAGE_CACHE_SIZE;
         inode->i_blkbits = PAGE_CACHE_SHIFT;
         inode->i_blocks = 0;
+        inode->i_rdev = dev;
 
         if (mode & S_IFREG)
         {
