@@ -1082,6 +1082,18 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
         {
 	    *returned_user_ptr_p = cur_op->op.user_ptr;
 	}
+	/* catch ops that we log */
+	switch(cur_op->op.type)
+	{
+	    case BSTREAM_READ_LIST:
+		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+	        break;
+	    case BSTREAM_WRITE_LIST:
+		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+		break;
+	    default:
+		break;
+	}
 	dbpf_queued_op_put_and_dequeue(cur_op);
 	dbpf_queued_op_free(cur_op);
 	return 1;
@@ -1148,6 +1160,19 @@ int dbpf_dspace_testcontext(
         {
             *user_ptr_p = cur_op->op.user_ptr;
         }
+	/* catch ops that we log */
+	switch(cur_op->op.type)
+	{
+	    case BSTREAM_READ_LIST:
+		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+		break;
+	    case BSTREAM_WRITE_LIST:
+		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+		break;
+	    default:
+		break;
+	}
+
         dbpf_queued_op_free(cur_op);
 
         if (++out_count < limit)
@@ -1289,6 +1314,18 @@ static int dbpf_dspace_testsome(
             {
                 *returned_user_ptr_p = cur_op->op.user_ptr;
             }
+	    /* catch ops that we log */
+	    switch(cur_op->op.type)
+	    {
+		case BSTREAM_READ_LIST:
+		    DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+		    break;
+		case BSTREAM_WRITE_LIST:
+		    DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
+		    break;
+		default:
+		    break;
+	    }
             dbpf_queued_op_free(cur_op);
         }
         ret = ((state == OP_COMPLETED) ? 1 : 0);
