@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "gossip.h"
 #include "quicklist.h"
@@ -18,7 +19,7 @@
 #include "trove.h"
 #include "thread-mgr.h"
     
-#define BUFFERS_PER_FLOW 4
+#define BUFFERS_PER_FLOW 12
 #define BUFFER_SIZE (256*1024)
 #define MAX_REGIONS 8
 
@@ -270,14 +271,34 @@ int fp_multiqueue_find_serviceable(flow_descriptor ** flow_d_array,
 {
     int incount = *count;
     struct fp_private_data* tmp_data;
+	 int ret;
+	 struct timeval base;
+	 struct timespec pthread_timeout;
 
     *count = 0;
 
     gen_mutex_lock(&completion_mutex);
 	/* see if anything has completed */
 	if(qlist_empty(&completion_queue))
+	{	
+	/* figure out how long to wait */
+	gettimeofday(&base, NULL);
+	pthread_timeout.tv_sec = base.tv_sec + max_idle_time_ms / 1000;
+	pthread_timeout.tv_nsec = base.tv_usec * 1000 + 
+	    ((max_idle_time_ms % 1000) * 1000000);
+	if (pthread_timeout.tv_nsec > 1000000000)
 	{
-	    pthread_cond_wait(&completion_cond, &completion_mutex);
+	    pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
+	    pthread_timeout.tv_sec++;
+	}
+
+	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex, &pthread_timeout);
+
+	if(ret == ETIMEDOUT)
+	{
+	gen_mutex_unlock(&completion_mutex);
+	return(0);
+	}
 	}
 
 	/* run down queue, pulling out anything we can find */
