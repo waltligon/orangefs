@@ -17,6 +17,9 @@ if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
 else AC_MSG_RESULT(yes)
 fi
 
+dnl Check byte ordering
+AC_C_BIGENDIAN
+
 dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
 dnl    freeing with the mtrace tool
