@@ -29,6 +29,7 @@ enum PVFS_flowproto_type
 typedef int64_t PVFS_handle;
 typedef int32_t PVFS_fs_id;
 typedef int32_t PVFS_ds_position;
+typedef int32_t PVFS_ds_flags;
 
 /* basic types used within metadata */
 typedef uint32_t PVFS_uid;

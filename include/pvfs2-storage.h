@@ -40,9 +40,6 @@ typedef int64_t PVFS_ds_id;
 /* the state of completed operations */
 typedef int32_t PVFS_ds_state;
 
-/* flags used to modify the behavior of operations */
-typedef int32_t PVFS_ds_flags;
-
 /* Bit values of flags for various dspace operations */
 /* TODO: do we use a flag to get a vtag back or do we use VTAG_RETURN? */
 enum
