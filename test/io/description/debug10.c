@@ -18,6 +18,23 @@
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
 
+int result1 [] = {
+   0 , 65536,
+   262144 , 4096,
+   -1
+};
+
+void prtres(int *result)
+{
+   int *p = result;
+   printf("Result should be:\n");
+   while (*p != -1)
+   {
+      printf("\t%d\t%d\n",*p, *(p+1));
+      p+=2;
+   }
+}
+
 int main(int argc, char **argv)
 {
 	int i;
@@ -59,13 +76,18 @@ int main(int argc, char **argv)
 	seg1.segs = 0;
 
    /* Turn on debugging */
-	 gossip_enable_stderr();
-	 gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG); 
+	/* gossip_enable_stderr();*/
+	/* gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG); */
 
 	/* skipping logical bytes */
 	// PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512);
 	// PINT_REQUEST_STATE_SET_FINAL(rs1,(6 * 1024) + 512);
 	
+	printf("\n************************************\n");
+	printf("One request in CLIENT mode size 266240 contiguous server 0 of 4\n");
+	printf("Simple stripe, default stripe size (64K)\n");
+	printf("Offset 0M, file size 0, extend flag\n");
+	printf("MemReq size 266240 contiguous \n");
 	printf("\n************************************\n");
 	do
 	{
@@ -96,6 +118,7 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** request done.\n");
+		prtres(result1);
 	}
 
 	return 0;

@@ -130,6 +130,11 @@ int main(int argc, char **argv)
 	/* gossip_set_debug_mask(1,REQUEST_DEBUG); */
 
 	printf("\n************************************\n");
+	printf("Four requests in SERVER mode 4 each contiguous servers 0-3 of 4\n");
+	printf("Simple stripe, default stripe size (64K)\n");
+	printf("Each from offset 0, file size 0, extend flag\n");
+	printf("Server 0\n");
+	printf("\n************************************\n");
 	do
 	{
 		seg1.bytes = 0;
@@ -173,8 +178,11 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** first request done.\n");
+		printf("Result should be:\t0\t1048576\n");
 	}
 
+	printf("\n************************************\n");
+	printf("Server 1\n");
 	printf("\n************************************\n");
 	do
 	{
@@ -217,8 +225,11 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs2))
 	{
 		printf("**** second request done.\n");
+		printf("Result should be:\t0\t1048576\n");
 	}
 
+	printf("\n************************************\n");
+	printf("Server 2\n");
 	printf("\n************************************\n");
 	do
 	{
@@ -261,9 +272,12 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs3))
 	{
 		printf("**** third request done.\n");
+		printf("Result should be:\t0\t1048576\n");
 	}
 
 
+	printf("\n************************************\n");
+	printf("Server 3\n");
 	printf("\n************************************\n");
 	do
 	{
@@ -306,6 +320,7 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs4))
 	{
 		printf("**** fourth request done.\n");
+		printf("Result should be:\t0\t1048576\n");
 	}
 
 

@@ -18,6 +18,25 @@
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
 
+int result1 [] = {
+   31232 , 512,
+   40960 , 1024,
+   51200 , 1024,
+   61440 , 512,
+   -1
+};
+
+void prtres(int *result)
+{
+   int *p = result;
+   printf("Result should be:\n");
+   while (*p != -1)
+   {
+      printf("\t%d\t%d\n",*p, *(p+1));
+      p+=2;
+   }
+}
+
 int main(int argc, char **argv)
 {
 	int i;
@@ -61,6 +80,11 @@ int main(int argc, char **argv)
 	PINT_REQUEST_STATE_SET_FINAL(rs1,(6 * 1024) + 512);
 	
 	printf("\n************************************\n");
+	printf("One request in SERVER mode size 20*1K stride 10K server 0 of 8\n");
+	printf("Simple stripe, default stripe size (64K)\n");
+	printf("Offset 0, file size 10000000, extend flag\n");
+	printf("Start 3K+512 end 6K+512\n");
+	printf("\n************************************\n");
 	do
 	{
 		seg1.bytes = 0;
@@ -90,6 +114,7 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** request done.\n");
+		prtres(result1);
 	}
 
 	return 0;

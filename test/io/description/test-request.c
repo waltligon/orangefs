@@ -11,6 +11,9 @@
 #include <pvfs2-debug.h>
 
 #include <pint-distribution.h>
+#include <pvfs-distribution.h>
+#include <pint-request.h>
+#include <pvfs-request.h>
 
 extern PVFS_Distribution default_dist;
 

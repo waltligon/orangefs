@@ -32,6 +32,9 @@ int PVFS_Request_hindexed(int32_t count, int32_t *blocklengths,
 int PVFS_Request_struct(int32_t count, int32_t *blocklengths,
 		PVFS_size *displacements, PVFS_Request *oldreqs, PVFS_Request *newreq);
 
+int PVFS_Request_resized(PVFS_Request oldreq, PVFS_offset lb,
+                PVFS_size extent, PVFS_Request *newreq);
+
 int PVFS_Address(void* location, PVFS_offset *address);
 
 int PVFS_Request_extent(PVFS_Request request, PVFS_size *extent);

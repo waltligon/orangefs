@@ -19,6 +19,62 @@
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
 
+int result1 [] = {
+	65536, 65536,
+	196608, 65536,
+	327680, 65536,
+	458752, 65536,
+	589824, 65536,
+	720896, 65536,
+	851968, 65536,
+	983040, 65536,
+	1114112, 65536,
+	1245184, 65536,
+	1376256, 65536,
+	1507328, 65536,
+	1638400, 65536,
+	1769472, 65536,
+	1900544, 65536,
+	2031616, 65536,
+	-1
+};
+
+int result2 [] = {
+	2162688, 65536,
+	2293760, 65536,
+	2424832, 65536,
+	2555904, 65536,
+	2686976, 65536,
+	2818048, 65536,
+	2949120, 65536,
+	3080192, 65536,
+	3211264, 65536,
+	3342336, 65536,
+	3473408, 65536,
+	3604480, 65536,
+	3735552, 65536,
+	3866624, 65536,
+	3997696, 65536,
+	4128768, 65536,
+	-1
+};
+
+int result3 [] = {
+	 4259840, 65536,
+	-1
+};
+
+void prtres(int *result)
+{
+	int *p = result;
+	printf("Result should be:\n");
+	while (*p != -1)
+	{
+		printf("\t%d\t%d\n",*p, *(p+1));
+		p+=2;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	int i;
@@ -78,7 +134,7 @@ int main(int argc, char **argv)
 
 	/* set up file data for each server */
 	PINT_dist_initialize();
-	rf1.server_nr = 0;
+	rf1.server_nr = 1;
 	rf1.server_ct = 2;
 	rf1.fsize = 0;
 	rf1.dist = PINT_dist_create("simple_stripe");
@@ -97,6 +153,10 @@ int main(int argc, char **argv)
 	/* gossip_enable_stderr(); */
 	/* gossip_set_debug_mask(1,REQUEST_DEBUG); */
 
+	printf("\n************************************\n");
+	printf("One request in CLIENT mode size 4390228 contiguous server 0 of 2\n");
+	printf("Simple stripe, default stripe size (64K)\n");
+	printf("Offset 20M, file size 0, extend flag\n");
 	printf("\n************************************\n");
 	do
 	{
@@ -138,6 +198,9 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** first request done.\n");
+		prtres(result1);
+		prtres(result2);
+		prtres(result3);
 	}
 
 	return 0;

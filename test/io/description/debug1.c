@@ -88,6 +88,10 @@ int main(int argc, char **argv)
 	gossip_set_debug_mask(1,REQUEST_DEBUG); */
 
 	printf("\n************************************\n");
+	printf("Two requests in SERVER mode 10M each contiguous server 0 of 1\n");
+	printf("Simple stripe, default stripe size (64K)\n");
+	printf("First from offset 0, file size 0, extend flag\n");
+	printf("\n************************************\n");
 	do
 	{
 		seg1.bytes = 0;
@@ -117,6 +121,10 @@ int main(int argc, char **argv)
 	{
 		printf("**** first request done.\n");
 	}
+	printf("Result should be:\n\t0\t4194304\n\t4194304\t4194304\n\t8388608\t2097152\n\n");
+	printf("Final file size should be 10485760\n");
+	printf("\n************************************\n");
+	printf("Second from offset 10M, file size 10M, extend flag\n");
 	printf("\n************************************\n");
 	do
 	{
@@ -147,6 +155,8 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs2))
 	{
 		printf("**** second request done.\n");
+	printf("Result should be:\n\t10485760\t4194304\n\t14680064\t4194304\n\t18874368\t2097152\n\n");
+	printf("Final file size should be 20971520\n");
 	}
 
 	return 0;

@@ -18,6 +18,86 @@
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
 
+int result1 [] = {
+	0, 65536,
+	196608, 65536,
+	393216, 65536,
+	589824, 65536,
+	786432, 65536,
+	983040, 65536,
+	1179648, 65536,
+	1376256, 65536,
+	1572864, 65536,
+	1769472, 65536,
+	1966080, 65536,
+	2162688, 65536,
+	2359296, 65536,
+	2555904, 65536,
+	2752512, 65536,
+	2949120, 65536,
+	-1
+};
+
+int result2 [] = {
+	3145728, 65536,
+	3342336, 65536,
+	3538944, 65536,
+	3735552, 65536,
+	3932160, 65536,
+	4128768, 65536,
+	4325376, 65536,
+	4521984, 65536,
+	4718592, 65536,
+	4915200, 65536,
+	5111808, 65536,
+	5308416, 65536,
+	5505024, 65536,
+	5701632, 65536,
+	5898240, 65536,
+	6094848, 65536,
+	-1
+};
+
+int result3 [] = {
+	6291456, 65536,
+	6488064, 65536,
+	6684672, 65536,
+	6881280, 65536,
+	7077888, 65536,
+	7274496, 65536,
+	7471104, 65536,
+	7667712, 65536,
+	7864320, 65536,
+	8060928, 65536,
+	8257536, 65536,
+	8454144, 65536,
+	8650752, 65536,
+	8847360, 65536,
+	9043968, 65536,
+	9240576, 65536,
+	-1
+};
+
+int result4 [] = {
+	9437184, 65536,
+	9633792, 65536,
+	9830400, 65536,
+	10027008, 65536,
+	10223616, 65536,
+	-1
+};
+
+void prtres(int *result)
+{  
+	int *p = result;
+	printf("Result should be:\n");
+	while (*p != -1)
+	{
+	   printf("\t%d\t%d\n",*p, *(p+1));
+	   p+=2; 
+	}
+}   
+
 int main(int argc, char **argv)
 {
 	int i;
@@ -75,6 +155,11 @@ int main(int argc, char **argv)
 	// gossip_set_debug_mask(1,REQUEST_DEBUG); 
 
 	printf("\n************************************\n");
+	printf("Two requests 10M each contiguous from offset 0 server 0 of 3\n");
+	printf("Simple stripe, default stripe size (64K)\n");
+	printf("First in SERVER mode, file size 8454144, no extend flag\n");
+	printf("\n************************************\n");
+
 	do
 	{
 		seg1.bytes = 0;
@@ -104,8 +189,11 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** first request done.\n");
+		printf("Result should be:\n\t0\t3538944\n");
 	}
 
+	printf("\n************************************\n");
+	printf("Second in CLIENT mode, file size 8454144, no extend flag\n");
 	printf("\n************************************\n");
 	do
 	{
@@ -136,6 +224,10 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs2))
 	{
 		printf("**** second request done.\n");
+		prtres(result1);
+		prtres(result2);
+		prtres(result3);
+		prtres(result4);
 	}
 
 	return 0;

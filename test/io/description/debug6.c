@@ -59,6 +59,11 @@ int main(int argc, char **argv)
 /*******************************************************************/
 
 	fprintf(stderr, "\n************************************\n");
+	printf("One request in CLIENT mode size 10M contiguous server 0 of 1\n");
+	printf("Simple stripe, default stripe size (64K)\n");
+	printf("Offset 0, file size 0, extend flag\n");
+	printf("testing process limits 4M and return code\n");
+	printf("\n************************************\n");
 
 	/* process request */
 	retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_CLIENT);
@@ -84,6 +89,7 @@ int main(int argc, char **argv)
 	{
 		fprintf(stderr, "AAAIIIEEEEE!  Why am I done?\n");
 	}
+	printf("Expected Results:\n\t0\t4194304\n");
 
 	return 0;
 }

@@ -210,9 +210,10 @@ int PINT_Process_request(PINT_Request_state *req,
 		/* NULL ereq indicates current type is packed bytes */
 		/* current type is contiguous because its size equals ub minus lb */
 		else if ((req->cur[req->lvl].rq->ereq == NULL ||
-				req->cur[req->lvl].rq->aggregate_size ==
+				(req->cur[req->lvl].rq->aggregate_size ==
 				(req->cur[req->lvl].rqbase->ub -
-					req->cur[req->lvl].rqbase->lb)) &&
+					req->cur[req->lvl].rqbase->lb) &&
+				req->cur[req->lvl].rq->ereq->num_contig_chunks == 1)) &&
 				req->cur[req->lvl].rq == req->cur[req->lvl].rqbase)
 		{
 			gossip_debug(GOSSIP_REQUEST_DEBUG,"\tbasic type or contiguous data\n");
@@ -225,7 +226,8 @@ int PINT_Process_request(PINT_Request_state *req,
 		/* subtype is contiguous because its size equals its ub minus lb */
 		else if (req->cur[req->lvl].rq->ereq->aggregate_size ==
 				(req->cur[req->lvl].rq->ereq->ub -
-				req->cur[req->lvl].rq->ereq->lb))
+				req->cur[req->lvl].rq->ereq->lb) &&
+				req->cur[req->lvl].rq->ereq->num_contig_chunks == 1)
 		{
 			gossip_debug(GOSSIP_REQUEST_DEBUG,"\tsubtype is contiguous\n");
 			contig_offset = req->cur[req->lvl].chunk_offset +
