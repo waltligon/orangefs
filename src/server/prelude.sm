@@ -105,8 +105,8 @@ static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
 static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = -1;
-    PVFS_handle target_handle = 0;
-    PVFS_fs_id target_fs_id = 0;
+    PVFS_handle target_handle = PVFS_HANDLE_NULL;
+    PVFS_fs_id target_fs_id = PVFS_FS_ID_NULL;
     job_id_t tmp_id;
     int readonly_flag;
 
@@ -121,6 +121,9 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
         s_op->req, 0, &target_handle, &target_fs_id, &readonly_flag);
     if (ret < 0)
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "PINT_req_sched_target_handle "
+                     "returned %d ret, skipping getattr on handle %Lu\n",
+                     ret, Lu(target_handle));
 	js_p->error_code = ret;
 	return(1);
     }
@@ -128,7 +131,7 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
     /* if the handle is 0, that indicates that the request does not
      * operate on a specific handle, so there is nothing we can do here
      */
-    if (target_handle == 0)
+    if (target_handle == PVFS_HANDLE_NULL)
     {
 	js_p->error_code = 0;
 	return(1);
@@ -138,6 +141,9 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
      * information 
      */
     memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
+                 "for handle %Lu\n", Lu(target_handle));
 
     ret = job_trove_dspace_getattr(
         target_fs_id, target_handle, s_op, &(s_op->ds_attr),
