@@ -210,6 +210,7 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 	 * datafile handles and know what function to call to get
 	 * the file size.
 	 */
+	attrmask &= ~(PVFS_ATTR_SYS_SIZE);
 	attrmask |= PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST;
     }
 
@@ -224,6 +225,9 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.getattr.object_ref.handle;
     sm_p->msgpair.comp_fn = getattr_object_getattr_comp_fn;
+
+    gossip_debug(CLIENT_DEBUG, "attrmask being passed to server: ");
+    PINT_attrmask_print(CLIENT_DEBUG, attrmask);
 
     /* drop through and jump to getattr_pcache state machine */
     return 1;
@@ -332,7 +336,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 	    if (sm_p->msgpair.req.u.getattr.attrmask & PVFS_ATTR_META_DFILES) {
 		PVFS_object_attr *r_attr_p = &resp_p->u.getattr.attr;
 
-		/* need to save datafile handles and remove them;
+		/* need to save datafile handles to calculate file size;
 		 * redirect us to those states.
 		 */
 		
@@ -415,6 +419,9 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
     /* allocate memory for datafile message pairs, resulting sizes
      *
      * all this will need to be freed later.
+     *
+     * TODO: CAN WE MAKE THE GETATTR COMP_FN FILL THIS STUFF IN AND AVOID
+     *       SOME EXTRA MALLOCS? -- RobR
      */
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
 	malloc(sm_p->u.getattr.datafile_count * sizeof(PINT_client_sm_msgpair_state));
