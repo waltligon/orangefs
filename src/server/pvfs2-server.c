@@ -621,7 +621,7 @@ static int server_initialize_subsystems(
             ret = trove_collection_setinfo(
                 cur_fs->coll_id, trove_context, 
                 TROVE_COLLECTION_HANDLE_TIMEOUT,
-                (void *)&cur_fs->handle_purgatory);
+                (void *)&cur_fs->handle_recycle_timeout_sec);
             if (ret < 0)
             {
                 gossip_lerr("Error setting handle timeout\n");

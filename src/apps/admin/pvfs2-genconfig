@@ -217,7 +217,8 @@ sub emit_filesystem
     print $target "\t</DataHandleRanges>\n";
 
     print $target "\t<StorageHints>\n";
-    print $target "\t\tHandlePurgatory $handle_purgatory\n";
+    print $target "\t\tHandleRecycleTimeoutSecs $handle_recycle_timeout_seconds\n";
+    print $target "\t\tTroveSyncMode sync\n";
     print $target "\t\tAttrCacheKeywords datafile_handles,metafile_dist\n";
     print $target "\t\tAttrCacheKeywords dir_ent, symlink_target\n";
     print $target "\t\tAttrCacheSize 1031\n";
@@ -564,9 +565,9 @@ $logfile = get_logfile();
 $storage = get_storage();
 $logging = get_logging();
 
-# could prompt for handle purgatory time, but it is probably best if we pick a
+# could prompt for handle recycle time, but it is probably best if we pick a
 # reasonable value w/o prompting
-$handle_purgatory = 50;
+$handle_recycle_timeout_seconds = 50;
 
 # ----------------------------------------------------------
 # now that we have all the info, emit the configuration data
@@ -583,7 +584,8 @@ if (!$opt_quiet) {
     }
 }
 
-emit_defaults($output_target, $num_unexp_reqs, $bmi_module, $handle_purgatory);
+emit_defaults($output_target, $num_unexp_reqs,
+              $bmi_module, $handle_recycle_timeout_seconds);
 #emit_aliases($output_target, $num_nodes);
 emit_aliases($output_target);
 emit_filesystem($output_target, "pvfs2-fs", 9, 1048576);

@@ -60,6 +60,7 @@ typedef struct filesystem_configuration_s
 
     /* ptrs are type host_handle_mapping_s* */
     PINT_llist *meta_handle_ranges;
+
     /* ptrs are type host_handle_mapping_s* */
     PINT_llist *data_handle_ranges;
 
@@ -67,14 +68,14 @@ typedef struct filesystem_configuration_s
     enum PVFS_encoding_type encoding;   /* encoding used for messages */
 
     /*
-      misc storage hints
-      NOTE: will need to be a union later depending
-      on which trove storage backends are available
+      misc storage hints.  may need to be a union later depending on
+      which trove storage backends are available
     */
-    struct timeval handle_purgatory;
+    struct timeval handle_recycle_timeout_sec;
     char *attr_cache_keywords;
     int attr_cache_size;
     int attr_cache_max_num_elems;
+    int trove_sync_mode;
 
     /* the following fields will be used to cache arrays of
      * unique physical server addresses, of particular use to the 
@@ -160,6 +161,9 @@ PINT_llist *PINT_config_get_filesystems(
 #ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(struct server_configuration_s *config);
 int PINT_config_pvfs2_rmspace(struct server_configuration_s *config);
+int PINT_config_get_trove_sync_mode(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id);
 #endif
 
 /*

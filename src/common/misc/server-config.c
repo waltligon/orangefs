@@ -15,7 +15,6 @@
 #include <ctype.h>
 
 #include "dotconf.h"
-#include "trove.h"
 #include "server-config.h"
 #include "pvfs2.h"
 #include "job.h"
@@ -49,10 +48,11 @@ static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
-static DOTCONF_CB(get_handle_purgatory);
+static DOTCONF_CB(get_handle_recycle_timeout_seconds);
 static DOTCONF_CB(get_attr_cache_keywords_list);
 static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
+static DOTCONF_CB(get_trove_sync_mode);
 
 /* internal helper functions */
 static int is_valid_alias(char *str);
@@ -91,6 +91,7 @@ static int build_extent_array(
 static int is_root_handle_in_my_range(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
+static int trove_sync_mode_to_enum(char *sync_mode);
 #endif
 
 static struct server_configuration_s *config_s = NULL;
@@ -122,10 +123,12 @@ static const configoption_t options[] =
     {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,CTX_ALL},
     {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,CTX_ALL},
     {"FlowModules",ARG_LIST, get_flow_module_list,NULL,CTX_ALL},
-    {"HandlePurgatory",ARG_INT,get_handle_purgatory,NULL,CTX_ALL},
+    {"HandleRecycleTimeoutSecs", ARG_INT,
+     get_handle_recycle_timeout_seconds, NULL, CTX_ALL},
     {"AttrCacheKeywords",ARG_LIST, get_attr_cache_keywords_list,NULL,CTX_ALL},
     {"AttrCacheSize",ARG_INT, get_attr_cache_size, NULL,CTX_ALL},
     {"AttrCacheMaxNumElems",ARG_INT,get_attr_cache_max_num_elems,NULL,CTX_ALL},
+    {"TroveSyncMode",ARG_STR, get_trove_sync_mode, NULL, CTX_ALL},
     LAST_OPTION
 };
 
@@ -245,13 +248,13 @@ DOTCONF_CB(get_pvfs_server_id)
 {
     if (config_s->configuration_context != GLOBAL_CONFIG)
     {
-        gossip_lerr("HostID Tag can only be in the Global context");
+        gossip_err("HostID Tag can only be in the Global context");
         return NULL;
     }
     if (config_s->host_id)
     {
-        gossip_lerr("WARNING: HostID value being overwritten (from "
-                    "%s to %s).\n",config_s->host_id,cmd->data.str);
+        gossip_err("WARNING: HostID value being overwritten (from "
+                   "%s to %s).\n",config_s->host_id,cmd->data.str);
         free(config_s->host_id);
     }
     config_s->host_id = strdup(cmd->data.str);
@@ -262,12 +265,12 @@ DOTCONF_CB(get_storage_space)
 {
     if (config_s->configuration_context != GLOBAL_CONFIG)
     {
-        gossip_lerr("StorageSpace Tag can only be in the Global context");
+        gossip_err("StorageSpace Tag can only be in the Global context");
         return NULL;
     }
     if (config_s->storage_path)
     {
-        gossip_lerr("WARNING: StorageSpace value being overwritten.\n");
+        gossip_err("WARNING: StorageSpace value being overwritten.\n");
         free(config_s->storage_path);
     }
     config_s->storage_path = strdup(cmd->data.str);
@@ -278,7 +281,7 @@ DOTCONF_CB(enter_defaults_context)
 {
     if (config_s->configuration_context != GLOBAL_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have Defaults tag here\n");
+        gossip_err("Error in context.  Cannot have Defaults tag here\n");
         return NULL;
     }
     config_s->configuration_context = DEFAULTS_CONFIG;
@@ -289,7 +292,7 @@ DOTCONF_CB(exit_defaults_context)
 {
     if (config_s->configuration_context != DEFAULTS_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have /Defaults tag here\n");
+        gossip_err("Error in context.  Cannot have /Defaults tag here\n");
         return NULL;
     }
     config_s->configuration_context = GLOBAL_CONFIG;
@@ -300,7 +303,7 @@ DOTCONF_CB(enter_aliases_context)
 {
     if (config_s->configuration_context != GLOBAL_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have Aliases tag here\n");
+        gossip_err("Error in context.  Cannot have Aliases tag here\n");
         return NULL;
     }
     config_s->configuration_context = ALIASES_CONFIG;
@@ -311,7 +314,7 @@ DOTCONF_CB(exit_aliases_context)
 {
     if (config_s->configuration_context != ALIASES_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have /Aliases tag here\n");
+        gossip_err("Error in context.  Cannot have /Aliases tag here\n");
         return NULL;
     }
     config_s->configuration_context = GLOBAL_CONFIG;
@@ -324,14 +327,14 @@ DOTCONF_CB(enter_filesystem_context)
 
     if (config_s->host_aliases == NULL)
     {
-        gossip_lerr("Error in context.  Filesystem tag cannot "
-                    "be declared before an Aliases tag.\n");
+        gossip_err("Error in context.  Filesystem tag cannot "
+                   "be declared before an Aliases tag.\n");
         return NULL;
     }
 
     if (config_s->configuration_context != GLOBAL_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have Filesystem tag here\n");
+        gossip_err("Error in context.  Cannot have Filesystem tag here\n");
         return NULL;
     }
 
@@ -342,6 +345,8 @@ DOTCONF_CB(enter_filesystem_context)
 
     /* fill any fs defaults here */
     fs_conf->flowproto = FLOWPROTO_DEFAULT;
+    fs_conf->encoding = ENCODING_DEFAULT;
+    fs_conf->trove_sync_mode = TROVE_SYNC;
 
     if (!config_s->file_systems)
     {
@@ -359,7 +364,7 @@ DOTCONF_CB(exit_filesystem_context)
 
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have /Filesystem tag here\n");
+        gossip_err("Error in context.  Cannot have /Filesystem tag here\n");
         return NULL;
     }
 
@@ -373,9 +378,9 @@ DOTCONF_CB(exit_filesystem_context)
     */
     if (!is_populated_filesystem_configuration(fs_conf))
     {
-        gossip_lerr("Error: Filesystem configuration is invalid!\n");
-        gossip_lerr("Possible Error in context.  Cannot have /Filesystem "
-                    "tag before all filesystem attributes are declared\n");
+        gossip_err("Error: Filesystem configuration is invalid!\n");
+        gossip_err("Possible Error in context.  Cannot have /Filesystem "
+                   "tag before all filesystem attributes are declared\n");
         return NULL;
     }
 
@@ -387,8 +392,8 @@ DOTCONF_CB(enter_storage_hints_context)
 {
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot "
-                    "have StorageHints tag here\n");
+        gossip_err("Error in context.  Cannot "
+                   "have StorageHints tag here\n");
         return NULL;
     }
     config_s->configuration_context = STORAGEHINTS_CONFIG;
@@ -399,8 +404,8 @@ DOTCONF_CB(exit_storage_hints_context)
 {
     if (config_s->configuration_context != STORAGEHINTS_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot "
-                    "have /StorageHints tag here\n");
+        gossip_err("Error in context.  Cannot "
+                   "have /StorageHints tag here\n");
         return NULL;
     }
     config_s->configuration_context = FILESYSTEM_CONFIG;
@@ -412,8 +417,8 @@ DOTCONF_CB(enter_mhranges_context)
 {
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have "
-                    "MetaHandleRanges tag here\n");
+        gossip_err("Error in context.  Cannot have "
+                   "MetaHandleRanges tag here\n");
         return NULL;
     }
     config_s->configuration_context = META_HANDLERANGES_CONFIG;
@@ -426,8 +431,8 @@ DOTCONF_CB(exit_mhranges_context)
 
     if (config_s->configuration_context != META_HANDLERANGES_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have "
-                    "/MetaHandleRanges tag here\n");
+        gossip_err("Error in context.  Cannot have "
+                   "/MetaHandleRanges tag here\n");
         return NULL;
     }
 
@@ -437,8 +442,8 @@ DOTCONF_CB(exit_mhranges_context)
 
     if (!fs_conf->meta_handle_ranges)
     {
-        gossip_lerr("Error! No valid mhandle ranges added to %s\n",
-                    fs_conf->file_system_name);
+        gossip_err("Error! No valid mhandle ranges added to %s\n",
+                   fs_conf->file_system_name);
     }
     config_s->configuration_context = FILESYSTEM_CONFIG;
     return NULL;
@@ -448,8 +453,8 @@ DOTCONF_CB(enter_dhranges_context)
 {
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have "
-                    "DataHandleRanges tag here\n");
+        gossip_err("Error in context.  Cannot have "
+                   "DataHandleRanges tag here\n");
         return NULL;
     }
     config_s->configuration_context = DATA_HANDLERANGES_CONFIG;
@@ -462,8 +467,8 @@ DOTCONF_CB(exit_dhranges_context)
 
     if (config_s->configuration_context != DATA_HANDLERANGES_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have "
-                    "/DataHandleRanges tag here\n");
+        gossip_err("Error in context.  Cannot have "
+                   "/DataHandleRanges tag here\n");
         return NULL;
     }
 
@@ -473,8 +478,8 @@ DOTCONF_CB(exit_dhranges_context)
 
     if (!fs_conf->data_handle_ranges)
     {
-        gossip_lerr("Error! No valid dhandle ranges added to %s\n",
-                    fs_conf->file_system_name);
+        gossip_err("Error! No valid dhandle ranges added to %s\n",
+                   fs_conf->file_system_name);
     }
     config_s->configuration_context = FILESYSTEM_CONFIG;
     return NULL;
@@ -485,8 +490,8 @@ DOTCONF_CB(get_unexp_req)
     if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
         (config_s->configuration_context != GLOBAL_CONFIG))
     {
-        gossip_lerr("UnexpectedRequests Tag can only be in a "
-                    "Defaults or Global block");
+        gossip_err("UnexpectedRequests Tag can only be in a "
+                   "Defaults or Global block");
         return NULL;
     }
     config_s->initial_unexpected_requests = cmd->data.value;
@@ -498,8 +503,8 @@ DOTCONF_CB(get_perf_update_interval)
     if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
         (config_s->configuration_context != GLOBAL_CONFIG))
     {
-        gossip_lerr("PerfUpdateInterval Tag can only be in a "
-                    "Defaults or Global block");
+        gossip_err("PerfUpdateInterval Tag can only be in a "
+                   "Defaults or Global block");
         return NULL;
     }
     config_s->perf_update_interval = cmd->data.value;
@@ -511,8 +516,8 @@ DOTCONF_CB(get_logfile)
     if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
         (config_s->configuration_context != GLOBAL_CONFIG))
     {
-        gossip_lerr("LogFile Tag can only be in a Defaults "
-                    "or Global block");
+        gossip_err("LogFile Tag can only be in a Defaults "
+                   "or Global block");
         return NULL;
     }
     config_s->logfile = strdup(cmd->data.str);
@@ -528,8 +533,8 @@ DOTCONF_CB(get_event_logging_list)
     if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
         (config_s->configuration_context != GLOBAL_CONFIG))
     {
-        gossip_lerr("EventLogging Tag can only be in a "
-                    "Defaults or Global block");
+        gossip_err("EventLogging Tag can only be in a "
+                   "Defaults or Global block");
         return NULL;
     }
 
@@ -558,8 +563,8 @@ DOTCONF_CB(get_flow_module_list)
     if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
         (config_s->configuration_context != GLOBAL_CONFIG))
     {
-        gossip_lerr("FlowModules Tag can only be in a "
-                    "Defaults or Global block");
+        gossip_err("FlowModules Tag can only be in a "
+                   "Defaults or Global block");
         return NULL;
     }
 
@@ -589,8 +594,8 @@ DOTCONF_CB(get_bmi_module_list)
     if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
         (config_s->configuration_context != GLOBAL_CONFIG))
     {
-        gossip_lerr("BMIModules Tag can only be in a "
-                    "Defaults or Global block");
+        gossip_err("BMIModules Tag can only be in a "
+                   "Defaults or Global block");
         return NULL;
     }
 
@@ -610,14 +615,14 @@ DOTCONF_CB(get_bmi_module_list)
     return NULL;
 }
 
-DOTCONF_CB(get_handle_purgatory)
+DOTCONF_CB(get_handle_recycle_timeout_seconds)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
 
     if (config_s->configuration_context != STORAGEHINTS_CONFIG)
     {
-        gossip_lerr("HandlePurgatory Tag can only be in a "
-                    "StorageHints block");
+        gossip_err("HandleRecycleTimeoutSecs Tag can only be in a "
+                   "StorageHints block");
         return NULL;
     }
 
@@ -625,13 +630,15 @@ DOTCONF_CB(get_handle_purgatory)
         PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
-    if (fs_conf->handle_purgatory.tv_sec)
+    if (fs_conf->handle_recycle_timeout_sec.tv_sec)
     {
-        gossip_lerr("WARNING: Overwriting %d with %d\n",
-                    (int)fs_conf->handle_purgatory.tv_sec,
-                    (int)cmd->data.value);
+        gossip_err("WARNING: Overwriting %d with %d\n",
+                   (int)fs_conf->handle_recycle_timeout_sec.tv_sec,
+                   (int)cmd->data.value);
     }
-    fs_conf->handle_purgatory.tv_sec = (int)cmd->data.value;
+    fs_conf->handle_recycle_timeout_sec.tv_sec = (int)cmd->data.value;
+    fs_conf->handle_recycle_timeout_sec.tv_usec = 0;
+
     return NULL;
 }
 
@@ -644,8 +651,8 @@ DOTCONF_CB(get_attr_cache_keywords_list)
 
     if (config_s->configuration_context != STORAGEHINTS_CONFIG)
     {
-        gossip_lerr("AttrCacheKeywords Tag can only be in a "
-                    "Filesystem block");
+        gossip_err("AttrCacheKeywords Tag can only be in a "
+                   "Filesystem block");
         return NULL;
     }
 
@@ -680,8 +687,8 @@ DOTCONF_CB(get_attr_cache_size)
 
     if (config_s->configuration_context != STORAGEHINTS_CONFIG)
     {
-        gossip_lerr("AttrCacheSize Tag can only be in a "
-                    "StorageHints block");
+        gossip_err("AttrCacheSize Tag can only be in a "
+                   "StorageHints block");
         return NULL;
     }
 
@@ -691,9 +698,9 @@ DOTCONF_CB(get_attr_cache_size)
 
     if (fs_conf->attr_cache_size)
     {
-        gossip_lerr("WARNING: Overwriting %d with %d\n",
-                    fs_conf->attr_cache_size,
-                    (int)cmd->data.value);
+        gossip_err("WARNING: Overwriting %d with %d\n",
+                   fs_conf->attr_cache_size,
+                   (int)cmd->data.value);
     }
     fs_conf->attr_cache_size = (int)cmd->data.value;
     return NULL;
@@ -705,8 +712,8 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
 
     if (config_s->configuration_context != STORAGEHINTS_CONFIG)
     {
-        gossip_lerr("AttrCacheMaxNumElems Tag can only be in a "
-                    "StorageHints block");
+        gossip_err("AttrCacheMaxNumElems Tag can only be in a "
+                   "StorageHints block");
         return NULL;
     }
 
@@ -716,11 +723,32 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
 
     if (fs_conf->attr_cache_max_num_elems)
     {
-        gossip_lerr("WARNING: Overwriting %d with %d\n",
-                    fs_conf->attr_cache_max_num_elems,
-                    (int)cmd->data.value);
+        gossip_err("WARNING: Overwriting %d with %d\n",
+                   fs_conf->attr_cache_max_num_elems,
+                   (int)cmd->data.value);
     }
     fs_conf->attr_cache_max_num_elems = (int)cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_trove_sync_mode)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
+    {
+        gossip_err("TroveSyncMode Tag can only be in a "
+                   "StorageHints block");
+        return NULL;
+    }
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    fs_conf->trove_sync_mode = trove_sync_mode_to_enum(cmd->data.str);
+#endif
     return NULL;
 }
 
@@ -730,7 +758,7 @@ DOTCONF_CB(get_root_handle)
 
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("RootHandle Tag can only be in a Filesystem block");
+        gossip_err("RootHandle Tag can only be in a Filesystem block");
         return NULL;
     }
     fs_conf = (struct filesystem_configuration_s *)
@@ -752,15 +780,15 @@ DOTCONF_CB(get_filesystem_name)
 
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("Name Tags can only be within Filesystem tags");
+        gossip_err("Name Tags can only be within Filesystem tags");
         return NULL;
     }
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
     if (fs_conf->file_system_name)
     {
-        gossip_lerr("WARNING: Overwriting %s with %s\n",
-                    fs_conf->file_system_name,cmd->data.str);
+        gossip_err("WARNING: Overwriting %s with %s\n",
+                   fs_conf->file_system_name,cmd->data.str);
     }
     fs_conf->file_system_name = strdup(cmd->data.str);
     return NULL;
@@ -772,15 +800,15 @@ DOTCONF_CB(get_filesystem_collid)
 
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("ID Tags can only be within Filesystem tags");
+        gossip_err("ID Tags can only be within Filesystem tags");
         return NULL;
     }
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
     if (fs_conf->coll_id)
     {
-        gossip_lerr("WARNING: Overwriting %d with %d\n",
-                    (int)fs_conf->coll_id,(int)cmd->data.value);
+        gossip_err("WARNING: Overwriting %d with %d\n",
+                   (int)fs_conf->coll_id,(int)cmd->data.value);
     }
     fs_conf->coll_id = (PVFS_fs_id)cmd->data.value;
     return NULL;
@@ -792,8 +820,8 @@ DOTCONF_CB(get_alias_list)
 
     if (config_s->configuration_context != ALIASES_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have Alias "
-                    "outside of Aliases context\n");
+        gossip_err("Error in context.  Cannot have Alias "
+                   "outside of Aliases context\n");
         return NULL;
     }
     assert(cmd->arg_count == 2);
@@ -821,8 +849,8 @@ DOTCONF_CB(get_range_list)
     if ((config_s->configuration_context != META_HANDLERANGES_CONFIG) &&
         (config_s->configuration_context != DATA_HANDLERANGES_CONFIG))
     {
-        gossip_lerr("Error in context.  Cannot have Range keyword "
-                    "outside of [Meta|Data]HandleRanges context\n");
+        gossip_err("Error in context.  Cannot have Range keyword "
+                   "outside of [Meta|Data]HandleRanges context\n");
         return NULL;
     }
 
@@ -853,9 +881,9 @@ DOTCONF_CB(get_range_list)
                     *handle_range_list, cmd->data.list[i-1]);
                 if (!handle_mapping)
                 {
-                    gossip_lerr("Error: Alias %s allocation failed; "
-                                "aborting alias handle range addition!\n",
-                                cmd->data.list[i-1]);
+                    gossip_err("Error: Alias %s allocation failed; "
+                               "aborting alias handle range addition!\n",
+                               cmd->data.list[i-1]);
                     return NULL;
                 }
 
@@ -902,13 +930,13 @@ DOTCONF_CB(get_range_list)
             }
             else
             {
-                gossip_lerr("Error in handle range description.\n %s is "
+                gossip_err("Error in handle range description.\n %s is "
                             "invalid input data!\n",cmd->data.list[i]);
             }
         }
         else
         {
-            gossip_lerr("Error! %s is an unrecognized alias\n",
+            gossip_err("Error! %s is an unrecognized alias\n",
                         cmd->data.list[i]);
         }
     }
@@ -1057,7 +1085,6 @@ static int is_populated_filesystem_configuration(
              fs->meta_handle_ranges && fs->data_handle_ranges &&
              fs->root_handle) ? 1 : 0);
 }
-
 
 static int is_root_handle_in_a_meta_range(
     struct server_configuration_s *config,
@@ -1629,8 +1656,7 @@ static int cache_config_files(
 
     if ((fd = open(my_server_fn,O_RDONLY)) == -1)
     {
-        gossip_err("Failed to open fs config file %s.\n",
-                   my_server_fn);
+        gossip_err("Failed to open fs config file %s.\n", my_server_fn);
         goto error_exit;
     }
 
@@ -2069,6 +2095,47 @@ int PINT_config_pvfs2_rmspace(
     }
     return ret;
 }
+
+/*
+  given a string, return a trove operation flag.
+
+  valid mappings and return values:
+  sync = 1 (TROVE_SYNC)
+  nosync = 0
+
+  returns TROVE_SYNC if input string is unrecognized.
+*/
+static int trove_sync_mode_to_enum(char *sync_mode)
+{
+    int ret = TROVE_SYNC;
+
+    if (sync_mode)
+    {
+        if (strcasecmp(sync_mode, "nosync") == 0)
+        {
+            ret = 0;
+        }
+    }
+    return ret;
+}
+
+/*
+  returns the sync mode for the specified fs_id if valid; TROVE_SYNC
+  otherwise
+*/
+int PINT_config_get_trove_sync_mode(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config)
+    {
+        fs_conf = PINT_config_find_fs_id(config_s, fs_id);
+    }
+    return (fs_conf ? fs_conf->trove_sync_mode : TROVE_SYNC);
+}
+
 #endif
 
 /*
