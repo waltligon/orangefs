@@ -35,19 +35,20 @@ typedef struct
 static void usage(int argc, char **argv)
 {
     fprintf(stderr, "Usage: %s [OPTION] ...\n\n", argv[0]);
-    fprintf(stderr, "-h, --help                display this help "
+    fprintf(stderr, "-h, --help                  display this help "
             "information and exit\n");
-    fprintf(stderr, "-v, --version             display version "
+    fprintf(stderr, "-v, --version               display version "
             "information and exit\n");
-    fprintf(stderr, "-f, --fsid=<fs_id>        use the specified "
+    fprintf(stderr, "-f, --fsid=<fs_id>          use the specified "
             "fs_id for the specified handle\n");
-    fprintf(stderr, "-o, --object=<handle>     remove the specified "
+    fprintf(stderr, "-o, --object=<handle>       remove the specified "
             "object handle\n");
-    fprintf(stderr, "-p, --parent=<handle>     use the specified parent "
-            "handle\n\t\t\t   (requires -d, or --dirent option)\n");
-    fprintf(stderr, "-d, --dirent=<entry_name> use the specified dirent "
-            "name\n\t\t\t   (requires -p, or --parent option)\n");
-    fprintf(stderr, "\nNOTE:  The -f option must ALWAYS be specified\n");
+    fprintf(stderr, "-p, --parent=<handle>       use the specified parent "
+            "handle\n\t\t\t\t(requires -d, or --dirent option)\n");
+    fprintf(stderr, "-d, --dirent=<entry_name>   use the specified dirent "
+            "name\n\t\t\t\t(requires -p, or --parent option)\n");
+    fprintf(stderr, "\nNOTE:  The -f, or --fsid option must ALWAYS "
+            "be specified\n");
 }
 
 static options_t *parse_args(int argc, char **argv)
@@ -136,12 +137,14 @@ static options_t *parse_args(int argc, char **argv)
           do_parent:
                 tmp_opts->parent_handle =
                     (PVFS_handle)strtoull(optarg, NULL,10);
+                fprintf(stderr, "Sorry, this [parent] option is not "
+                        "currently supported at this time\n");
 		break;
             case 'd':
           do_dirent:
                 snprintf(tmp_opts->dirent_name, PATH_MAX, optarg);
-                fprintf(stderr, "Sorry, this option is not currently "
-                        "supported at this time\n");
+                fprintf(stderr, "Sorry, this [dirent] option is not "
+                        "currently supported at this time\n");
                 exit(1);
                 break;
 	    case 'f':
