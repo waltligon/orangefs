@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+#include <string.h>
 #include <stdlib.h>
 #include <sys/time.h>
 
@@ -55,6 +56,7 @@ int PINT_event_initialize(int ring_size)
 	gen_mutex_unlock(&event_mutex);
 	return(-PVFS_ENOMEM);
     }
+    memset(ts_ring, 0, ring_size*sizeof(struct PVFS_mgmt_event));
 
     ts_head = 0;
     ts_tail = 0;
@@ -187,7 +189,7 @@ void PINT_event_retrieve(
     gen_mutex_lock(&event_mutex);
 
     /* copy out any events from the ring buffer */
-    while(ts_tail != ts_head && cur_index < count)
+    while(tmp_tail != ts_head && cur_index < count)
     {
 	event_array[cur_index] = ts_ring[tmp_tail];
 	tmp_tail = (tmp_tail+1)%ts_ring_size;

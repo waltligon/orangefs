@@ -17,6 +17,7 @@
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-event.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -42,13 +43,11 @@ int main(int argc, char **argv)
     int mnt_index = -1;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_sysresp_init resp_init;
-    int i;
+    int i,j;
     PVFS_credentials creds;
     int io_server_count;
     struct PVFS_mgmt_event** event_matrix;
     PVFS_id_gen_t* addr_array;
-
-    fprintf(stderr, "WARNING: this tool is still under development.\n");
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -152,7 +151,25 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* TODO: print something out? */
+    printf("# (server number) (api) (operation) (value) (id) (flags) (sec) (usec)\n");
+    for(i=0; i<io_server_count; i++)
+    {
+	for(j=0; j<EVENT_DEPTH; j++)
+	{
+	    if((event_matrix[i][j].flags & PVFS_EVENT_FLAG_INVALID) == 0)
+	    {
+		printf("%d %d %d %Ld %Ld %d %d %d\n", 
+		    i, 
+		    (int)event_matrix[i][j].api,
+		    (int)event_matrix[i][j].operation,
+		    (long long)event_matrix[i][j].value,
+		    (long long)event_matrix[i][j].id,
+		    (int)event_matrix[i][j].flags,
+		    (int)event_matrix[i][j].tv_sec,
+		    (int)event_matrix[i][j].tv_usec);
+	    }
+	}
+    }
 
     PVFS_sys_finalize();
 

@@ -17,17 +17,17 @@
 enum PVFS_event_api
 {
     PVFS_EVENT_API_JOB =   (1 << 0),
-    PVFS_EVENT_API_BMI =   (1 << 2),
-    PVFS_EVENT_API_TROVE = (1 << 3)
+    PVFS_EVENT_API_BMI =   (1 << 1),
+    PVFS_EVENT_API_TROVE = (1 << 2)
 };
 
 /* what kind of event */
 enum PVFS_event_flag
 {
-    PVFS_EVENT_FLAG_NONE = 0,
-    PVFS_EVENT_FLAG_START = 1,
-    PVFS_EVENT_FLAG_END = 2,
-    PVFS_EVENT_FLAG_INVALID = 3
+    PVFS_EVENT_FLAG_NONE =  0,
+    PVFS_EVENT_FLAG_START = (1 << 0),
+    PVFS_EVENT_FLAG_END =   (1 << 1),
+    PVFS_EVENT_FLAG_INVALID = (1 << 2)
 };
 
 /* what kind of operation, seperate list for each API */
