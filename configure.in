@@ -108,6 +108,23 @@ AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_OPEN, 1,
 Define if DB open function takes a txnid parameter),
 AC_MSG_RESULT(no))
 
+dnl configure options for GM install path
+AC_ARG_WITH(gm,--with-gm=<dir>           Location of the GM binary tree
+(default=/opt/gm),GM_HOME="$withval",GM_HOME="/opt/gm")
+
+AC_SUBST(GM_HOME)
+
+dnl look for GM headers
+CPPFLAGS_OLD="$CPPFLAGS"
+CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include"
+AC_CHECK_HEADER(gm.h,
+	AC_DEFINE(HAVE_GM, 1, Define if GM is present)
+	BUILD_GM="1"
+	)
+CPPFLAGS="$CPPFLAGS_OLD"
+
+AC_SUBST(BUILD_GM)
+
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 install -d src/apps src/io src/common src/client test/common test/io test/client doc test/correctness/pts

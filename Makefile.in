@@ -54,6 +54,7 @@ INSTALL = @INSTALL@
 # TODO: should probably check for bison and flex in configure
 BISON = bison
 FLEX = flex
+BUILD_GM = @BUILD_GM@
 
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
@@ -99,6 +100,13 @@ CFLAGS += -I .
 CFLAGS += -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include
   # add all module directories into include path
 CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
+
+  # add GM path into include path
+ifdef BUILD_GM
+	CFLAGS += -I @GM_HOME@/include
+	LDFLAGS += -L @GM_HOME@/lib
+	LIBS += -lgm
+endif
 
 ################################################################
 # Setup component specific flags
