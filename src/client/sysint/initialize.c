@@ -141,7 +141,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     }
 
     /* FIXME: get this value from config file? */
-    PINT_pcache_set_timeout(30000);
+    PINT_pcache_set_timeout(60000);
 
     /* Initialize the directory cache */
     ret = PINT_dcache_initialize();
@@ -153,7 +153,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     }	
 
     /* FIXME: get this value from config file? */
-    PINT_dcache_set_timeout(30000);
+    PINT_dcache_set_timeout(60000);
 
     /* Get configuration parameters from server */
     ret = PINT_server_get_config(&g_server_config,mntent_list);

@@ -38,6 +38,7 @@
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
+#include "pvfs2-util.h"
 
 #include "pinode-helper.h"
 #include "pint-dcache.h"
@@ -260,6 +261,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 					  struct PVFS_server_resp *resp_p,
 					  int index)
 {
+    int need_datafiles = 1;
+
     /* this is a little kludge to get around some struct definition
      * issues in the headers.  maybe fix later?
      */
@@ -274,6 +277,73 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 	return resp_p->status;
     }
 
+    if (resp_p->u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
+    {
+        /* if we can't locate this metafile in the pcache */
+        if (!sm_p->u.getattr.pcache_hit)
+        {
+            /*
+              copy the PVFS_object_attr from the response
+              for later storage in the pcache (getattr_cleanup)
+            */
+            PINT_pcache_object_attr_deep_copy(
+                &sm_p->u.getattr.pcache_attr, &resp_p->u.getattr.attr);
+        }
+        else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
+        {
+            /*
+              the idea here is that if we got a metafile cache hit,
+              let's go all the way and try to retrieve cached
+              data file attributes all at once
+            */
+            int max = MAX_NUM_CACHED_DFILE_COUNT, i = 0;
+            int dfile_count = resp_p->u.getattr.attr.u.meta.dfile_count;
+
+            /* attempt to pull out all datafiles from the cache */
+            assert(dfile_count < MAX_NUM_CACHED_DFILE_COUNT);
+
+            need_datafiles = PINT_pcache_retrieve_datafile_attrs(
+                resp_p->u.getattr.attr, sm_p->u.getattr.object_ref.fs_id,
+                sm_p->u.getattr.scratch_attrs, &max);
+
+            /*
+              if all datafiles were retrieved, fill in all required
+              internal information so that the size can be computed
+              properly in getattr_cleanup method
+            */
+            if (max == dfile_count)
+            {
+                sm_p->u.getattr.size_array = (PVFS_size *)malloc(
+                    dfile_count * sizeof(PVFS_size));
+                assert(sm_p->u.getattr.size_array);
+
+                for(i = 0; i < dfile_count; i++)
+                {
+                    sm_p->u.getattr.size_array[i] =
+                        sm_p->u.getattr.scratch_attrs[i]->u.data.size;
+                }
+
+                if (sm_p->u.getattr.getattr_resp_p->attr.mask &
+                    PVFS_ATTR_META_DFILES)
+                {
+                    sm_p->u.getattr.datafile_count =
+                        resp_p->u.getattr.attr.u.meta.dfile_count;
+                    sm_p->u.getattr.datafile_handles =
+                        resp_p->u.getattr.attr.u.meta.dfile_array;
+                    assert(sm_p->u.getattr.datafile_handles);
+                }
+
+                if (sm_p->u.getattr.getattr_resp_p->attr.mask &
+                    PVFS_ATTR_META_DIST)
+                {
+                    sm_p->u.getattr.dist_p =
+                        resp_p->u.getattr.attr.u.meta.dist;
+                    sm_p->u.getattr.dist_size = 
+                        resp_p->u.getattr.attr.u.meta.dist_size;
+                }
+            }
+        }
+    }
 
     /* copy in the attributes from the response
      *
@@ -373,14 +443,21 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		   r_attr_p->u.meta.dfile_array,
 		   r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
 
-		if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE) {
-		    /* if caller asked for the size, then we need to go get
-		     * the datafile sizes
+                if (need_datafiles == 0)
+                {
+                    /*
+                      if we've retrieved all attributes for the datafile
+                      handles from cache, skip the expensive retrieval
+                    */
+                    return 0;
+                }
+		else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
+                {
+		    /* if caller asked for the size, AND we couldn't
+                     * retrieve them from the pcache, then we need to
+                     * go get the datafile sizes
 		     */
 		    return GETATTR_NEED_DATAFILE_SIZES;
-		}
-		else {
-		    return 0;
 		}
 	    }
 	    else return 0;
@@ -508,6 +585,30 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
 		 resp_p->u.getattr.attr.u.data.size);
     sm_p->u.getattr.size_array[index] = resp_p->u.getattr.attr.u.data.size;
 
+    /*
+      blindly add the newly retrieved sized entry to the pcache;
+      we should really be checking if it exists already and updating
+      that entry instead of what we're doing here.
+    */
+    PINT_pinode *pinode = NULL;
+
+    if (PINT_pcache_pinode_alloc(&pinode) < 0)
+    {
+        assert(0);
+    }
+    pinode->pinode_ref.handle =
+        sm_p->u.getattr.pcache_attr.u.meta.dfile_array[index];
+    pinode->pinode_ref.fs_id = sm_p->u.getattr.object_ref.fs_id;
+
+    PINT_pcache_object_attr_deep_copy(
+        &pinode->attr, &resp_p->u.getattr.attr);
+
+    if (PINT_pcache_insert(pinode) < 0)
+    {
+        PINT_pcache_pinode_dealloc(pinode);
+        assert(0);
+    }
+
     return 0;
 }
 
@@ -549,16 +650,8 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
         }
 
 	/* redo the mask */
-	s_attr_p->mask = 0;
+	s_attr_p->mask = PVFS_util_object_to_sys_attr_mask(s_attr_p->mask);
 
-	if (amask & PVFS_ATTR_COMMON_UID)   s_attr_p->mask |= PVFS_ATTR_SYS_UID;
-	if (amask & PVFS_ATTR_COMMON_GID)   s_attr_p->mask |= PVFS_ATTR_SYS_GID;
-	if (amask & PVFS_ATTR_COMMON_PERM)  s_attr_p->mask |= PVFS_ATTR_SYS_PERM;
-	if (amask & PVFS_ATTR_COMMON_ATIME) s_attr_p->mask |= PVFS_ATTR_SYS_ATIME;
-	if (amask & PVFS_ATTR_COMMON_CTIME) s_attr_p->mask |= PVFS_ATTR_SYS_CTIME;
-	if (amask & PVFS_ATTR_COMMON_MTIME) s_attr_p->mask |= PVFS_ATTR_SYS_MTIME;
-	if (amask & PVFS_ATTR_COMMON_TYPE)  s_attr_p->mask |= PVFS_ATTR_SYS_TYPE;
-    
 	/* we know we grabbed the size if they asked for it */
 	if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE) {
 	    s_attr_p->mask |= PVFS_ATTR_SYS_SIZE;
@@ -569,8 +662,8 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 	/* free all the memory we allocated, which could include:
 	 * - size array
 	 * - msgpair array
-	 * - datafile handle array
-	 * - distribution description
+	 * - datafile handle array (if not from pcache)
+	 * - distribution description (if not from pcache)
 	 */
 	if (sm_p->u.getattr.size_array != NULL) {
 	    free(sm_p->u.getattr.size_array);
@@ -578,17 +671,48 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 	if (sm_p->msgarray != NULL) {
 	    free(sm_p->msgarray);
 	}
-	if ((amask & PVFS_ATTR_META_DFILES) &&
-            (sm_p->u.getattr.datafile_handles != NULL)) {
-	    free(sm_p->u.getattr.datafile_handles);
-	}
-	if ((amask & PVFS_ATTR_META_DIST) &&
-            (sm_p->u.getattr.dist_p != NULL)) {
-	    free(sm_p->u.getattr.dist_p);
-	}
 
-	/* TODO: POPULATE PINODE CACHE? */
+        /*
+          only free memory if we didn't get a cache hit;
+          in that case, we're referencing memory inside the
+          pcache entries
+        */
+        if (!sm_p->u.getattr.pcache_hit)
+        {
+            if ((amask & PVFS_ATTR_META_DFILES) &&
+                (sm_p->u.getattr.datafile_handles != NULL)) {
+                free(sm_p->u.getattr.datafile_handles);
+            }
+            if ((amask & PVFS_ATTR_META_DIST) &&
+                (sm_p->u.getattr.dist_p != NULL)) {
+                free(sm_p->u.getattr.dist_p);
+            }
+        }
+
+        /* add entry to pcache if not already present */
+        if (!sm_p->u.getattr.pcache_hit &&
+            (sm_p->u.getattr.pcache_attr.objtype == PVFS_TYPE_METAFILE))
+        {
+            PINT_pinode *pinode = NULL;
+
+            if (PINT_pcache_pinode_alloc(&pinode) < 0)
+            {
+                assert(0);
+            }
+            pinode->pinode_ref = sm_p->u.getattr.object_ref;
+            PINT_pcache_object_attr_deep_copy(
+                &pinode->attr, &sm_p->u.getattr.pcache_attr);
+            /* deep destroy the pcache_attr here */
+
+            if (PINT_pcache_insert(pinode) < 0)
+            {
+                PINT_pcache_pinode_dealloc(pinode);
+                assert(0);
+            }
+            sm_p->u.getattr.pcache_hit = 0;
+        }
     }
+
     /* mark operation as complete */
     sm_p->op_complete = 1;
 

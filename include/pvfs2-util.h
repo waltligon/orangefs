@@ -34,6 +34,42 @@ int PVFS_util_remove_dir_prefix(
     char *out_path,
     int out_max_len);
 
+/* generic attribute conversion */
+static inline int PVFS_util_object_to_sys_attr_mask(int obj_mask)
+{
+    int sys_mask = 0;
+
+    if (obj_mask & PVFS_ATTR_COMMON_UID)
+    {
+        sys_mask |= PVFS_ATTR_SYS_UID;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_GID)
+    {
+        sys_mask |= PVFS_ATTR_SYS_GID;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_PERM)
+    {
+        sys_mask |= PVFS_ATTR_SYS_PERM;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_ATIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_ATIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_CTIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_CTIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_MTIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_MTIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_TYPE)
+    {
+        sys_mask |= PVFS_ATTR_SYS_TYPE;
+    }
+    return sys_mask;
+}
+
 #endif /* __PVFS2_UTIL_H */
 
 /*

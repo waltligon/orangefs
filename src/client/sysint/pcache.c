@@ -18,7 +18,6 @@
 #if PINT_ENABLE_PCACHE
 static int PINT_pcache_get_lru(void);
 static int PINT_pcache_add_pinode(pinode *pnode);
-static void PINT_pcache_merge_pinode(pinode *p1,pinode *p2);
 static int check_expiry(pinode *pnode);
 static void PINT_pcache_rotate_pinode(int item);
 static void PINT_pcache_remove_element(int item);
@@ -279,7 +278,7 @@ int PINT_pcache_insert(pinode *pnode)
 	 * the older one 
 	 */
 	pvfs_pcache.element[entry].ref_count++;
-	PINT_pcache_merge_pinode(pvfs_pcache.element[entry].pnode,pnode);
+        pvfs_pcache.element[entry].pnode = pnode;
 	PINT_pcache_rotate_pinode(entry);
 	PINT_pcache_update_pinode_timestamp(pvfs_pcache.element[entry].pnode);
     }
@@ -306,10 +305,6 @@ int PINT_pcache_insert_rls(pinode *pnode)
  *
  * returns PCACHE_LOOKUP_FAILURE on failure and
  * returns PCACHE_LOOKUP_SUCCESS on success
- *
- * if the pcache element is present but expired, the outgoing
- * pinode_ptr is still filled out, and PCACHE_LOOKUP_FAILURE
- * is returned
  */
 int PINT_pcache_lookup(PVFS_pinode_reference refn, pinode **pinode_ptr)
 {
@@ -616,27 +611,6 @@ static void PINT_pcache_rotate_pinode(int item)
 }
 
 
-/* PINT_pcache_merge_pinode
- *
- * merges pinodes based on timestamps
- *
- * returns nothing
- */
-static void PINT_pcache_merge_pinode(pinode *p1, pinode *p2)
-{
-	/* Check the attribute timestamps to see which
-	 * pinode is the latest 
-	 */
-	if ((p1->tstamp.tv_sec > p2->tstamp.tv_sec) ||
-            ((p1->tstamp.tv_sec == p2->tstamp.tv_sec) &&
-             (p1->tstamp.tv_usec > p2->tstamp.tv_usec)))
-	{
-		p2->attr = p1->attr;
-	}
-
-	/*TODO: when merging pinodes, what happens to the size? */
-}
-
 /* PINT_pcache_add_pinode
  *
  * adds pinode to cache and updates cache variables
@@ -656,7 +630,7 @@ static int PINT_pcache_add_pinode(pinode *pnode)
     /* Adding the element to the cache */
     pvfs_pcache.element[new].status = STATUS_USED;
     pvfs_pcache.element[new].ref_count++;
-    pvfs_pcache.element[new].pnode = pnode;	
+    pvfs_pcache.element[new].pnode = pnode;
     pvfs_pcache.element[new].prev = BAD_LINK;
     pvfs_pcache.element[new].next = pvfs_pcache.top;
 
@@ -689,6 +663,153 @@ static int PINT_pcache_update_pinode_timestamp(pinode* item)
     return ret;
 }
 
+/* similar to pinode-helper.c:phelper_fill_attr */
+int PINT_pcache_object_attr_deep_copy(
+    PVFS_object_attr *dest,
+    PVFS_object_attr *src)
+{
+    int ret = -1;
+    PVFS_size df_array_size = 0;
+
+    if (dest && src)
+    {
+	if (src->mask & PVFS_ATTR_COMMON_UID)
+        {
+            dest->owner = src->owner;
+        }
+	if (src->mask & PVFS_ATTR_COMMON_GID)
+        {
+            dest->group = src->group;
+        }
+	if (src->mask & PVFS_ATTR_COMMON_PERM)
+        {
+            dest->perms = src->perms;
+        }
+	if (src->mask & PVFS_ATTR_COMMON_ATIME)
+        {
+            dest->atime = src->atime;
+        }
+	if (src->mask & PVFS_ATTR_COMMON_CTIME)
+        {
+            dest->ctime = src->ctime;
+        }
+        if (src->mask & PVFS_ATTR_COMMON_MTIME)
+        {
+            dest->mtime = src->mtime;
+        }
+	if (src->mask & PVFS_ATTR_COMMON_TYPE)
+        {
+            dest->objtype = src->objtype;
+        }
+
+        if (src->mask & PVFS_ATTR_DATA_SIZE)
+        {
+            dest->u.data.size = src->u.data.size;
+        }
+
+	if (src->mask & PVFS_ATTR_META_DFILES)
+	{
+            dest->u.meta.dfile_array = NULL;
+            dest->u.meta.dfile_count = src->u.meta.dfile_count;
+            df_array_size = src->u.meta.dfile_count *
+                sizeof(PVFS_handle);
+
+            if (df_array_size)
+            {
+		if (dest->u.meta.dfile_array)
+                {
+                    free(dest->u.meta.dfile_array);
+                }
+		dest->u.meta.dfile_array =
+                    (PVFS_handle *)malloc(df_array_size);
+		if (!dest->u.meta.dfile_array)
+		{
+			return(-ENOMEM);
+		}
+		memcpy(dest->u.meta.dfile_array,
+                       src->u.meta.dfile_array, df_array_size);
+            }
+	}
+
+	if (src->mask & PVFS_ATTR_META_DIST)
+	{
+            dest->u.meta.dist_size = src->u.meta.dist_size;
+
+            gossip_lerr("WARNING: packing distribution to memcpy it.\n");
+            if (dest->u.meta.dist)
+            {
+                /* FIXME: memory leak */
+                gossip_lerr("WARNING: need to free old dist, "
+                            "but I don't know how.\n");
+            }
+            dest->u.meta.dist = malloc(src->u.meta.dist_size);
+            if(dest->u.meta.dist == NULL)
+            {
+                return(-ENOMEM);
+            }
+            PINT_Dist_encode(dest->u.meta.dist, src->u.meta.dist);
+            PINT_Dist_decode(dest->u.meta.dist, NULL);
+        }
+
+	/* add mask to existing values */
+	dest->mask |= src->mask;
+
+        ret = 0;
+    }
+    return ret;
+}
+
+/*
+  given a meta_attr and fs_id, pull out all data attrs from the
+  pcache that we can and fill in out_attrs by making the array
+  point to each entry's attr object.  these should not be freed
+  by the caller.
+
+  returns 0 if all datafiles were pulled from the pcache;
+  return 1 otherwise
+*/
+int PINT_pcache_retrieve_datafile_attrs(
+    PVFS_object_attr meta_attr,
+    PVFS_fs_id fs_id,
+    PVFS_object_attr **out_attrs,
+    int *in_out_num_attrs)
+{
+    int ret = 1, i = 0, limit = 0;
+    PINT_pinode *pinode = NULL;
+    PVFS_pinode_reference refn;
+
+    if (out_attrs && in_out_num_attrs && (*in_out_num_attrs))
+    {
+        limit = *in_out_num_attrs;
+        *in_out_num_attrs = 0;
+
+        assert(meta_attr.objtype == PVFS_TYPE_METAFILE);
+
+        refn.fs_id = fs_id;
+        for(i = 0; i < meta_attr.u.meta.dfile_count; i++)
+        {
+            refn.handle = meta_attr.u.meta.dfile_array[i];
+            if (PINT_pcache_lookup(refn, &pinode) == PCACHE_LOOKUP_FAILURE)
+            {
+                break;
+            }
+            else
+            {
+                out_attrs[i] = &pinode->attr;
+            }
+
+            if (i == limit)
+            {
+                break;
+            }
+        }
+        *in_out_num_attrs = i;
+
+        ret = (((i == limit) ||
+                (i == meta_attr.u.meta.dfile_count)) ? 0 : 1);
+    }
+    return ret;
+}
 
 #endif
 
