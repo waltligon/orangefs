@@ -679,6 +679,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 		PINT_SERVER);
 	    /* TODO: error handling */ 
 	    assert(ret >= 0);
+	    assert(result_tmp->result.bytes);
 	    
 	    old_result_tmp = result_tmp;
 	    result_tmp = result_tmp->next;
@@ -1162,6 +1163,7 @@ static void trove_write_callback_fn(void *user_ptr,
 		&q_item->parent->file_data,
 		&result_tmp->result,
 		PINT_SERVER);
+	    assert(result_tmp->result.bytes);
 	    /* TODO: error handling */ 
 	    assert(ret >= 0);
 	    
