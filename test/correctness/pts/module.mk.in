@@ -4,13 +4,13 @@ TEST_PTS_SRC := $(DIR)/pts.c
 
 TEST_PTS_MISC := \
 	$(DIR)/create.c \
-	$(DIR)/generic_parser.c \
-	$(DIR)/pvfs_helper.c \
-	$(DIR)/test_pvfs_datatype_init.c \
-	$(DIR)/test_pvfs_datatype_contig.c \
-	$(DIR)/test_pvfs_datatype_vector.c \
-	$(DIR)/test_pvfs_datatype_hvector.c \
-	$(DIR)/test_dir_torture.c
+	$(DIR)/generic-parser.c \
+	$(DIR)/pvfs-helper.c \
+	$(DIR)/test-pvfs-datatype-init.c \
+	$(DIR)/test-pvfs-datatype-contig.c \
+	$(DIR)/test-pvfs-datatype-vector.c \
+	$(DIR)/test-pvfs-datatype-hvector.c \
+	$(DIR)/test-dir-torture.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 

@@ -6,12 +6,12 @@
 #include <generic.h>
 
 /* include all test specific header files */
-#include <test_create.h>
-#include <test_dir_torture.h>
-#include <test_pvfs_datatype_init.h>
-#include <test_pvfs_datatype_contig.h>
-#include <test_pvfs_datatype_vector.h>
-#include <test_pvfs_datatype_hvector.h>
+#include <test-create.h>
+#include <test-dir-torture.h>
+#include <test-pvfs-datatype-init.h>
+#include <test-pvfs-datatype-contig.h>
+#include <test-pvfs-datatype-vector.h>
+#include <test-pvfs-datatype-hvector.h>
 
 enum test_types { 
     TEST_CREATE,

@@ -1,4 +1,4 @@
-#include "pvfs_helper.h"
+#include "pvfs-helper.h"
 
 pvfs_helper_t pvfs_helper;
 

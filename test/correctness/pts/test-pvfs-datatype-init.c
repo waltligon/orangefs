@@ -1,5 +1,5 @@
-#include "pvfs_helper.h"
-#include <test_pvfs_datatype_init.h>
+#include "pvfs-helper.h"
+#include <test-pvfs-datatype-init.h>
 #include <stdio.h>
 
 extern pvfs_helper_t pvfs_helper;
