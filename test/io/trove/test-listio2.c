@@ -41,7 +41,7 @@ enum {
 
 char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
-char path_to_file[PATH_SIZE] = "/bar";
+char path_to_file[PATH_SIZE] = "/baz";
 TROVE_handle requested_file_handle = 4095;
 
 int main(int argc, char **argv)	
@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 	TROVE_size mem_size_array[4] = { 5*MB, 5*MB, 5*MB, 5*MB };
 	int mem_count = 4;
 	TROVE_offset stream_offset_array[4] = { 0,0,0,0 };
-	TROVE_size stream_size_array[4] = { 5*MB, 5*MB, 5*MB, 5*MB };
+	TROVE_size stream_size_array[4] = { 0, 0, 0, 0 };
 	int stream_count = 4;
 	TROVE_size output_size;
 	void *user_ptr_array[1] = { (char *) 13 };
@@ -165,18 +165,25 @@ int main(int argc, char **argv)
             return(-1);
         }
 
-	memset(mybuffer, 0xFF, TEST_SIZE);
-	memset(verify_buffer, 0xDE, TEST_SIZE);
-
 	mem_offset_array[0] = mybuffer;
-	mem_offset_array[1] = (mem_offset_array[0] + 5*MB);
-	mem_offset_array[2] = (mem_offset_array[1] + 5*MB);
-	mem_offset_array[3] = (mem_offset_array[2] + 5*MB);
+	mem_offset_array[2] = (mem_offset_array[0] + 5*MB);
+	mem_offset_array[1] = (mem_offset_array[2] + 5*MB);
+	mem_offset_array[3] = (mem_offset_array[1] + 5*MB);
+
+	memset(mem_offset_array[0], 0xF0, 5*MB);
+	memset(mem_offset_array[1], 0xF1, 5*MB);
+	memset(mem_offset_array[2], 0xF2, 5*MB);
+	memset(mem_offset_array[3], 0xF3, 5*MB);
 
 	target_mem_offset_array[0] = verify_buffer;
-	target_mem_offset_array[1] = (target_mem_offset_array[0] + 5*MB);
-	target_mem_offset_array[2] = (target_mem_offset_array[1] + 5*MB);
-	target_mem_offset_array[3] = (target_mem_offset_array[2] + 5*MB);
+	target_mem_offset_array[2] = (target_mem_offset_array[0] + 5*MB);
+	target_mem_offset_array[1] = (target_mem_offset_array[2] + 5*MB);
+	target_mem_offset_array[3] = (target_mem_offset_array[1] + 5*MB);
+
+	memset(target_mem_offset_array[0], 0xD0, 5*MB);
+	memset(target_mem_offset_array[1], 0xD1, 5*MB);
+	memset(target_mem_offset_array[2], 0xD2, 5*MB);
+	memset(target_mem_offset_array[3], 0xD3, 5*MB);
 
 	/********************************/
 
@@ -230,11 +237,17 @@ int main(int argc, char **argv)
         {
             if (mybuffer[i] != verify_buffer[i])
             {
-                fprintf(stderr,"data mismatch at index %d\n",i);
+                fprintf(stderr,"data mismatch at index %d (%x != %x)\n",
+                        i,mybuffer[i],verify_buffer[i]);
                 test_failed = 1;
                 break;
             }
+/*             fprintf(stderr,"data match at index %d (%x == %x)\n", */
+/*                     i,mybuffer[i],verify_buffer[i]); */
         }
+
+        free(mybuffer);
+        free(verify_buffer);
 
         fprintf(stderr,"This bstream listio test %s\n",
                 (test_failed ? "failed miserably" : "passed"));
