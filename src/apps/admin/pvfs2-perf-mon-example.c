@@ -193,7 +193,7 @@ int main(int argc, char **argv)
 		/* shortcut if measurement is zero */
 		if(perf_matrix[i][j].read == 0)
 		{
-		    printf("       0.0 ");
+		    printf("\t0.0");
 		    continue;
 		}
 
@@ -207,7 +207,7 @@ int main(int argc, char **argv)
 		bw = ((float)perf_matrix[i][j].read * 1000.0)/ 
 		    (float)(next_time - perf_matrix[i][j].start_time_ms);
 		bw = bw / (float)(1024.0*1024.0);
-		printf("%10f ", bw);
+		printf("\t%10f", bw);
 	    }
 
 	    printf("\nwrite: %-30s ", PVFS_mgmt_map_addr(cur_fs, creds,
@@ -221,7 +221,7 @@ int main(int argc, char **argv)
 		/* shortcut if measurement is zero */
 		if(perf_matrix[i][j].write == 0)
 		{
-		    printf("       0.0 ");
+		    printf("\t0.0");
 		    continue;
 		}
 
@@ -235,15 +235,42 @@ int main(int argc, char **argv)
 		bw = ((float)perf_matrix[i][j].write * 1000.0)/ 
 		    (float)(next_time - perf_matrix[i][j].start_time_ms);
 		bw = bw / (float)(1024.0*1024.0);
-		printf("%10f ", bw);
+		printf("\t%10f", bw);
 	    }
-	    printf("\ntimestep:                             ");
+
+            printf("\n\nPVFS2 metadata op statistics (# of operations):\n");
+            printf("==================================================");
+            printf("\nread:  %-30s ",
+                   PVFS_mgmt_map_addr(cur_fs, creds,
+                                      addr_array[i], &tmp_type));
+	    for(j = 0; j < HISTORY; j++)
+	    {
+		if (!perf_matrix[i][j].valid_flag)
+                {
+		    break;
+                }
+		printf("\t%Lu", Lu(perf_matrix[i][j].metadata_read));
+	    }
+
+            printf("\nwrite:  %-30s ",
+                   PVFS_mgmt_map_addr(cur_fs, creds,
+                                      addr_array[i], &tmp_type));
+	    for(j = 0; j < HISTORY; j++)
+	    {
+		if (!perf_matrix[i][j].valid_flag)
+                {
+		    break;
+                }
+		printf("\t%Lu", Lu(perf_matrix[i][j].metadata_write));
+	    }
+
+	    printf("\ntimestep:\t\t\t");
 	    for(j=0; j<HISTORY; j++)
 	    {
 		if(!perf_matrix[i][j].valid_flag)
 		    break;
 
-		printf("%10u ", (unsigned)perf_matrix[i][j].id);
+		printf("\t%u", (unsigned)perf_matrix[i][j].id);
 	    }
 	    printf("\n");
 	}

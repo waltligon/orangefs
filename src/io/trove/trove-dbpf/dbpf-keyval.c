@@ -319,10 +319,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     return error;
 }
 
-/* dbpf_keyval_remove()
- */
-static int dbpf_keyval_remove(
-			      TROVE_coll_id coll_id,
+static int dbpf_keyval_remove(TROVE_coll_id coll_id,
 			      TROVE_handle handle,
 			      TROVE_keyval_s *key_p,
 			      TROVE_ds_flags flags,
@@ -346,7 +343,7 @@ static int dbpf_keyval_remove(
         return -TROVE_ENOMEM;
     }
 
-    /* initialaze common members */
+    /* initialize common members */
     dbpf_queued_op_init(q_op_p,
 			KEYVAL_REMOVE_KEY,
 			handle,

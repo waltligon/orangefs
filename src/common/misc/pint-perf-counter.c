@@ -74,7 +74,8 @@ void PINT_perf_finalize(void)
  *
  * no return value
  */
-void __PINT_perf_count(enum PINT_perf_count_keys key, 
+void __PINT_perf_count(
+    enum PINT_perf_count_keys key, 
     int64_t value,
     enum PINT_perf_ops op)
 {
@@ -82,10 +83,13 @@ void __PINT_perf_count(enum PINT_perf_count_keys key,
     switch(op)
     {
 	case PINT_PERF_ADD:
-	    perf_count_matrix[key][perf_count_head] += value;
+            perf_count_matrix[key][perf_count_head] += value;
 	    break;
 	case PINT_PERF_SUB:
 	    perf_count_matrix[key][perf_count_head] -= value;
+	    break;
+	case PINT_PERF_SET:
+            perf_count_matrix[key][perf_count_head] = value;
 	    break;
 	default:
 	    assert(0);
@@ -94,6 +98,21 @@ void __PINT_perf_count(enum PINT_perf_count_keys key,
     gen_mutex_unlock(&perf_mutex);
 
     return;
+}
+
+static inline int64_t find_high_water_mark(int key)
+{
+    int64_t hwm = 0;
+    int j = PINT_PERF_HISTORY_SIZE;
+
+    while(--j > -1)
+    {
+        if (perf_count_matrix[key][j] > hwm)
+        {
+            hwm = perf_count_matrix[key][j];
+        }
+    }
+    return hwm;
 }
 
 /* PINT_perf_rollover()
@@ -105,9 +124,11 @@ void __PINT_perf_count(enum PINT_perf_count_keys key,
  */
 void PINT_perf_rollover(void)
 {
-    int i;
+    int i = 0;
     uint32_t old_id;
     struct timeval tv;
+    static int64_t metadata_read_hwm = 0;
+    static int64_t metadata_write_hwm = 0;
 
     gen_mutex_lock(&perf_mutex);
 
@@ -120,10 +141,30 @@ void PINT_perf_rollover(void)
     if(perf_count_tail == perf_count_head)
 	perf_count_tail = (perf_count_tail+1)%PINT_PERF_HISTORY_SIZE;
 
+
+    /* update metadata read/write high water marks */
+    metadata_read_hwm = find_high_water_mark(PINT_PERF_METADATA_READ);
+    metadata_write_hwm = find_high_water_mark(PINT_PERF_METADATA_WRITE);
+
     /* zero out everything in the current counter set */
-    for(i=0; i<=PINT_PERF_COUNT_KEY_MAX; i++)
+    for(i = 0; i <= PINT_PERF_COUNT_KEY_MAX; i++)
     {
-	perf_count_matrix[i][perf_count_head] = 0;
+        /*
+          but never zero metadata op counts; instead, set them all to
+          the respective high water mark
+        */
+        if (i == PINT_PERF_METADATA_WRITE)
+        {
+            perf_count_matrix[i][perf_count_head] = metadata_write_hwm;
+        }
+        else if (i == PINT_PERF_METADATA_READ)
+        {
+            perf_count_matrix[i][perf_count_head] = metadata_read_hwm;
+        }
+        else
+        {
+            perf_count_matrix[i][perf_count_head] = 0;
+        }
     }
 
     /* move to next id */
@@ -142,7 +183,7 @@ void PINT_perf_rollover(void)
 /* PINT_perf_retrieve()
  *
  * fills in an array of performance statistics, beginning with next_id
- * (which is updated before the call returns).  
+ * (which is updated before the call returns).
  *
  * no return value
  */
@@ -174,10 +215,14 @@ void PINT_perf_retrieve(
 	perf_array[tmp_index].id = perf_count_id[tmp_tail];
 	perf_array[tmp_index].start_time_ms 
 	    = perf_count_start_times_ms[tmp_tail];
-	perf_array[tmp_index].write 
+	perf_array[tmp_index].write
 	    = perf_count_matrix[PINT_PERF_WRITE][tmp_tail];
-	perf_array[tmp_index].read 
+	perf_array[tmp_index].read
 	    = perf_count_matrix[PINT_PERF_READ][tmp_tail];
+	perf_array[tmp_index].metadata_write
+	    = perf_count_matrix[PINT_PERF_METADATA_WRITE][tmp_tail];
+	perf_array[tmp_index].metadata_read
+	    = perf_count_matrix[PINT_PERF_METADATA_READ][tmp_tail];
 
 	tmp_tail = (tmp_tail+1)%PINT_PERF_HISTORY_SIZE;
 	tmp_index++;

@@ -14,8 +14,8 @@
 #include <assert.h>
 
 #include "gossip.h"
+#include "pint-perf-counter.h"
 #include "pint-event.h"
-#include "trove.h"
 #include "trove-internal.h"
 #include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
@@ -40,6 +40,43 @@ extern gen_mutex_t dbpf_op_queue_mutex;
 #endif
 
 #define DBPF_FSTAT fstat
+
+static int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
+
+static inline void organize_post_op_statistics(
+    enum dbpf_op_type op_type, TROVE_op_id op_id)
+{
+    switch(op_type)
+    {
+        case KEYVAL_WRITE:
+        case KEYVAL_REMOVE_KEY:
+        case KEYVAL_WRITE_LIST:
+        case KEYVAL_FLUSH:
+        case DSPACE_CREATE:
+        case DSPACE_REMOVE:
+        case DSPACE_SETATTR:
+            UPDATE_PERF_METADATA_WRITE();
+            break;
+        case KEYVAL_READ:
+        case KEYVAL_READ_LIST:
+        case KEYVAL_VALIDATE:
+        case KEYVAL_ITERATE:
+        case KEYVAL_ITERATE_KEYS:
+        case DSPACE_ITERATE_HANDLES:
+        case DSPACE_VERIFY:
+        case DSPACE_GETATTR:
+            UPDATE_PERF_METADATA_READ();
+            break;
+        case BSTREAM_READ_LIST:
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, op_id); 
+            break;
+        case BSTREAM_WRITE_LIST:
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, op_id); 
+            break;
+        default:
+            break;
+    }
+}
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
@@ -715,6 +752,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
                      "(dfile_count=%d | dist_size=%d)\n", Lu(handle),
                      ds_attr_p->dfile_count, ds_attr_p->dist_size);
 #endif
+        UPDATE_PERF_METADATA_READ();
         return 1;
     }
 
@@ -1243,20 +1281,8 @@ static int dbpf_dspace_test(
 	    *returned_user_ptr_p = cur_op->op.user_ptr;
 	}
 
-	/* catch ops that we log */
-	switch(cur_op->op.type)
-	{
-	    case BSTREAM_READ_LIST:
-		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
-	        break;
-	    case BSTREAM_WRITE_LIST:
-		DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, cur_op->op.id); 
-		break;
-	    default:
-		break;
-	}
+        organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
 	dbpf_queued_op_free(cur_op);
-
         return 1;
     }
 
@@ -1309,18 +1335,8 @@ static int dbpf_dspace_test(
         {
 	    *returned_user_ptr_p = cur_op->op.user_ptr;
 	}
-	/* catch ops that we log */
-	switch(cur_op->op.type)
-	{
-	    case BSTREAM_READ_LIST:
-		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
-	        break;
-	    case BSTREAM_WRITE_LIST:
-		DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, cur_op->op.id); 
-		break;
-	    default:
-		break;
-	}
+
+        organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
 	dbpf_queued_op_put_and_dequeue(cur_op);
 	dbpf_queued_op_free(cur_op);
 	return 1;
@@ -1419,19 +1435,8 @@ int dbpf_dspace_testcontext(
         {
             *user_ptr_p = cur_op->op.user_ptr;
         }
-	/* catch ops that we log */
-	switch(cur_op->op.type)
-	{
-	    case BSTREAM_READ_LIST:
-		DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
-		break;
-	    case BSTREAM_WRITE_LIST:
-		DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, cur_op->op.id); 
-		break;
-	    default:
-		break;
-	}
 
+        organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
         dbpf_queued_op_free(cur_op);
 
 	out_count++;
@@ -1537,18 +1542,7 @@ static int dbpf_dspace_testsome(
             {
                 *returned_user_ptr_p = cur_op->op.user_ptr;
             }
-	    /* catch ops that we log */
-	    switch(cur_op->op.type)
-	    {
-		case BSTREAM_READ_LIST:
-		    DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, cur_op->op.id); 
-		    break;
-		case BSTREAM_WRITE_LIST:
-		    DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, cur_op->op.id); 
-		    break;
-		default:
-		    break;
-	    }
+            organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
             dbpf_queued_op_free(cur_op);
         }
         ret = (((state == OP_COMPLETED) ||

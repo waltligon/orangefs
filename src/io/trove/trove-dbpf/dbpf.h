@@ -370,6 +370,19 @@ void dbpf_error_report(const char *errpfx, char *msg);
 
 extern struct dbpf_storage *my_storage_p;
 
+extern int64_t s_dbpf_metadata_writes, s_dbpf_metadata_reads;
+#define UPDATE_PERF_METADATA_READ()                         \
+do {                                                        \
+    PINT_perf_count(PINT_PERF_METADATA_READ,                \
+                    ++s_dbpf_metadata_reads, PINT_PERF_SET);\
+} while(0)
+
+#define UPDATE_PERF_METADATA_WRITE()                         \
+do {                                                         \
+    PINT_perf_count(PINT_PERF_METADATA_WRITE,                \
+                    ++s_dbpf_metadata_writes, PINT_PERF_SET);\
+} while(0)
+
 #if defined(__cplusplus)
 }
 #endif

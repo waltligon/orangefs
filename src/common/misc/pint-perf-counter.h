@@ -15,14 +15,17 @@
 enum PINT_perf_count_keys
 {
     PINT_PERF_WRITE = 0,
-    PINT_PERF_READ = 1
+    PINT_PERF_READ = 1,
+    PINT_PERF_METADATA_WRITE = 2,
+    PINT_PERF_METADATA_READ = 3
 };
-#define PINT_PERF_COUNT_KEY_MAX 1
+#define PINT_PERF_COUNT_KEY_MAX 3
 
 enum PINT_perf_ops
 {
     PINT_PERF_ADD = 0,
-    PINT_PERF_SUB = 1
+    PINT_PERF_SUB = 1,
+    PINT_PERF_SET = 2,
 };
 
 int PINT_perf_initialize(void);

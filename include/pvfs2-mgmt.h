@@ -35,13 +35,18 @@ struct PVFS_mgmt_perf_stat
     uint64_t start_time_ms; /* start time of perf set, ms since epoch */
     int64_t write;	    /* bytes written */
     int64_t read;	    /* bytes read */
+    int64_t metadata_write; /* # of modifying metadata ops */
+    int64_t metadata_read;  /* # of non-modifying metadata ops */
 };
-endecode_fields_5_struct(PVFS_mgmt_perf_stat,
-  int32_t, valid_flag,
-  uint32_t, id,
-  uint64_t, start_time_ms,
-  int64_t, write,
-  int64_t, read);
+endecode_fields_7_struct(
+    PVFS_mgmt_perf_stat,
+    int32_t, valid_flag,
+    uint32_t, id,
+    uint64_t, start_time_ms,
+    int64_t, write,
+    int64_t, read,
+    int64_t, metadata_write,
+    int64_t, metadata_read);
 
 /* low level information about individual server level objects */
 struct PVFS_mgmt_dspace_info
