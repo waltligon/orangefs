@@ -177,6 +177,7 @@ test/server/request-scheduler/module.mk
 test/correctness/pts/module.mk
 doc/coding/module.mk
 doc/design/module.mk
+doc/random/module.mk
 )
 
 
