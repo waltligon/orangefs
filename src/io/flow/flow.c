@@ -63,7 +63,7 @@ int PINT_flow_initialize(const char *flowproto_list,
     extern struct flowproto_ops flowproto_dump_offsets_ops;
 #endif /* __STATIC_FLOWPROTO_DUMP_OFFSETS__ */
 #ifdef __STATIC_FLOWPROTO_BMI_CACHE__
-    extern struct flowproto_ops flowproto_bmi_cache_ops;
+    extern struct flowproto_ops fp_bmi_cache_ops;
 #endif /* __STATIC_FLOWPROTO_BMI_CACHE__ */
 #ifdef __STATIC_FLOWPROTO_MULTIQUEUE__
     extern struct flowproto_ops fp_multiqueue_ops;
@@ -80,7 +80,7 @@ int PINT_flow_initialize(const char *flowproto_list,
 	&flowproto_dump_offsets_ops,
 #endif				/* __STATIC_FLOWPROTO_DUMP_OFFSETS__ */
 #ifdef __STATIC_FLOWPROTO_BMI_CACHE__
-	&flowproto_bmi_cache_ops,
+	&fp_bmi_cache_ops,
 #endif				/* __STATIC_FLOWPROTO_BMI_CACHE__ */
 #ifdef __STATIC_FLOWPROTO_MULTIQUEUE__
 	&fp_multiqueue_ops,

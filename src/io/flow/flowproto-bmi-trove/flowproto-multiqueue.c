@@ -111,21 +111,21 @@ static void cleanup_buffers(struct fp_private_data* flow_data);
 
 
 /* interface prototypes */
-int fp_multiqueue_initialize(int flowproto_id);
+static int fp_multiqueue_initialize(int flowproto_id);
 
-int fp_multiqueue_finalize(void);
+static int fp_multiqueue_finalize(void);
 
-int fp_multiqueue_getinfo(flow_descriptor * flow_d,
+static int fp_multiqueue_getinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter);
 
-int fp_multiqueue_setinfo(flow_descriptor * flow_d,
+static int fp_multiqueue_setinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter);
 
-int fp_multiqueue_post(flow_descriptor * flow_d);
+static int fp_multiqueue_post(flow_descriptor * flow_d);
 
-char fp_multiqueue_name[] = "flowproto_multiqueue";
+static char fp_multiqueue_name[] = "flowproto_multiqueue";
 
 struct flowproto_ops fp_multiqueue_ops = {
     fp_multiqueue_name,

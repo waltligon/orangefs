@@ -127,7 +127,7 @@ struct fp_private_data
 #define PRIVATE_FLOW(target_flow)\
     ((struct fp_private_data*)(target_flow->flow_protocol_data))
 
-static int fp_multiqueue_id = -1;
+static int fp_bmi_cache_id = -1;
 static bmi_context_id global_bmi_context = -1;
 
 static TROVE_context_id global_trove_context = -1;
@@ -177,39 +177,39 @@ static int bmi_cache_init_cache_req(struct fp_queue_item *qitem, int op);
 
 
 /* interface prototypes */
-int fp_multiqueue_initialize(int flowproto_id);
+static int fp_bmi_cache_initialize(int flowproto_id);
 
-int fp_multiqueue_finalize(void);
+static int fp_bmi_cache_finalize(void);
 
-int fp_multiqueue_getinfo(flow_descriptor * flow_d,
+static int fp_bmi_cache_getinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter);
 
-int fp_multiqueue_setinfo(flow_descriptor * flow_d,
+static int fp_bmi_cache_setinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter);
 
-int fp_multiqueue_post(flow_descriptor * flow_d);
+static int fp_bmi_cache_post(flow_descriptor * flow_d);
 
 
-char fp_multiqueue_name[] = "flowproto_bmi_cache";
+static char fp_bmi_cache_name[] = "flowproto_bmi_cache";
 
-struct flowproto_ops fp_multiqueue_ops = {
-    fp_multiqueue_name,
-    fp_multiqueue_initialize,
-    fp_multiqueue_finalize,
-    fp_multiqueue_getinfo,
-    fp_multiqueue_setinfo,
-    fp_multiqueue_post
+struct flowproto_ops fp_bmi_cache_ops = {
+    fp_bmi_cache_name,
+    fp_bmi_cache_initialize,
+    fp_bmi_cache_finalize,
+    fp_bmi_cache_getinfo,
+    fp_bmi_cache_setinfo,
+    fp_bmi_cache_post
 };
 
-/* fp_multiqueue_initialize()
+/* fp_bmi_cache_initialize()
  *
  * starts up the flow protocol
  *
  * returns 0 on succes, -PVFS_error on failure
  */
-int fp_multiqueue_initialize(int flowproto_id)
+int fp_bmi_cache_initialize(int flowproto_id)
 {
     int ret = -1;
 
@@ -228,18 +228,18 @@ int fp_multiqueue_initialize(int flowproto_id)
     PINT_thread_mgr_trove_getcontext(&global_trove_context);
 #endif
 
-    fp_multiqueue_id = flowproto_id;
+    fp_bmi_cache_id = flowproto_id;
 
     return(0);
 }
 
-/* fp_multiqueue_finalize()
+/* fp_bmi_cache_finalize()
  *
  * shuts down the flow protocol
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int fp_multiqueue_finalize(void)
+int fp_bmi_cache_finalize(void)
 {
     PINT_thread_mgr_bmi_stop();
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -248,13 +248,13 @@ int fp_multiqueue_finalize(void)
     return (0);
 }
 
-/* fp_multiqueue_getinfo()
+/* fp_bmi_cache_getinfo()
  *
  * retrieves runtime parameters from flow protocol
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int fp_multiqueue_getinfo(flow_descriptor * flow_d,
+int fp_bmi_cache_getinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter)
 {
@@ -274,26 +274,26 @@ int fp_multiqueue_getinfo(flow_descriptor * flow_d,
     }
 }
 
-/* fp_multiqueue_setinfo()
+/* fp_bmi_cache_setinfo()
  *
  * sets runtime parameters in flow protocol
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int fp_multiqueue_setinfo(flow_descriptor * flow_d,
+int fp_bmi_cache_setinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter)
 {
     return (-PVFS_ENOSYS);
 }
 
-/* fp_multiqueue_post()
+/* fp_bmi_cache_post()
  *
  * posts a flow descriptor to begin work
  *
  * returns 0 on success, 1 on immediate completion, -PVFS_error on failure
  */
-int fp_multiqueue_post(flow_descriptor * flow_d)
+int fp_bmi_cache_post(flow_descriptor * flow_d)
 {
 	struct fp_private_data* flow_data = NULL;
 	int ret;
