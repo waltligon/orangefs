@@ -51,21 +51,20 @@ enum {
 
 typedef enum
 {
-    STATUS_UNKNOWN = 0,            /* default value                      */
-    DEALLOC_INIT_MEMORY,           /* de-alloc any memory we have        */
-    SHUTDOWN_GOSSIP_INTERFACE,     /* turn off gossip interface          */
-    SHUTDOWN_ENCODE_INTERFACE,     /* turn off protocol encoder          */
-    SHUTDOWN_BMI_INTERFACE,        /* turn off bmi interface             */
-    SHUTDOWN_FLOW_INTERFACE,       /* turn off flow interface            */
-    SHUTDOWN_STORAGE_INTERFACE,    /* turn off storage interface         */
-    SHUTDOWN_JOB_INTERFACE,        /* turn off job interface             */
-    SHUTDOWN_HIGH_LEVEL_INTERFACE, /* turn off high level interface      */
-    STATE_MACHINE_HALT,            /* state machine failure              */
-    CHECK_DEPS_QUEUE,              /* Check Deps/ Queue                  */
-    UNEXPECTED_BMI_FAILURE,        /* BMI unexpected failure             */
-    UNEXPECTED_POSTINIT_FAILURE,   /* running fine; failed in while loop */
-    UNEXPECTED_LOOP_END,           /* outside of while loop in main()    */
-} PINT_server_status_code;
+    SERVER_DEFAULT_INIT        = 0,
+    SERVER_GOSSIP_INIT         = (1 << 0),
+    SERVER_CONFIG_INIT         = (1 << 1),
+    SERVER_ENCODER_INIT        = (1 << 2),
+    SERVER_BMI_INIT            = (1 << 3),
+    SERVER_TROVE_INIT          = (1 << 4),
+    SERVER_FLOW_INIT           = (1 << 5),
+    SERVER_JOB_INIT            = (1 << 6),
+    SERVER_JOB_CTX_INIT        = (1 << 7),
+    SERVER_REQ_SCHED_INIT      = (1 << 8),
+    SERVER_STATE_MACHINE_INIT  = (1 << 9),
+    SERVER_BMI_UNEXP_POST_INIT = (1 << 10),
+    SERVER_SIGNAL_HANDLER_INIT = (1 << 11),
+} PINT_server_status_flag;
 
 /* struct PINT_server_lookup_op
  *
