@@ -11,6 +11,7 @@
 
 #define GUI_COMM_PERF_HISTORY 5
 #undef FAKE_STATS
+#undef FAKE_PERF
 
 /* statistics data structures */
 static pvfs_mntlist mnt = {0, NULL};
@@ -42,6 +43,28 @@ static struct PVFS_mgmt_server_stat fake_stats[] = {
     { 9, 1048576, 2*1048576, 1024, 512, 102, 1024, 8192, "node4", 1 }
 };
 static int fake_stat_ct = sizeof(fake_stats) / sizeof(*fake_stats);
+#endif
+
+#ifdef FAKE_PERF
+static struct gui_traffic_raw_data fake_perf[] = {
+    { 100*1048576, 0, 100, 10, 1020 },
+    { 120*1048576, 0, 100, 10, 1020 },
+    { 80*1048576, 0, 100, 10, 1020 },
+    { 10, 100*1048576, 0, 100, 1020 },
+    { 100, 130*1048576, 10, 1023, 1020 },
+    { 10*1048576, 0, 637, 20, 1020 },
+    { 140*1048576, 0, 1300, 20, 1020 },
+    { 1*1048576, 0, 100, 123, 1020 },
+    { 10, 64*1048576, 0, 2100, 1020 },
+    { 100, 137*1048576, 10, 523, 1020 },
+    { 100*1048576, 0, 100, 10, 1020 },
+    { 120*1048576, 0, 100, 10, 1020 },
+    { 80*1048576, 0, 100, 10, 1020 },
+    { 10, 100*1048576, 0, 100, 1020 },
+    { 30*1048576, 40*1048576, 2110, 4023, 1020 },
+    { 60*1048576, 130*1048576, 1230, 723, 1020 }
+};
+static int fake_perf_ct = sizeof(fake_perf) / sizeof(*fake_perf);
 #endif
 
 /* internal fn prototypes */
@@ -289,6 +312,7 @@ static int gui_comm_perf_collect(void)
 {
     int ret;
 
+#ifndef FAKE_PERF
     ret = PVFS_mgmt_perf_mon_list(cur_fsid,
 				  creds,
 				  internal_perf,
@@ -301,6 +325,7 @@ static int gui_comm_perf_collect(void)
 	PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
 	return -1;
     }
+#endif
 
     return 0;
 }
@@ -314,6 +339,11 @@ int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
 {
     int ret, svr, idx;
 
+#ifdef FAKE_PERF
+    *svr_traffic = fake_perf;
+    *svr_traffic_ct = fake_perf_ct;
+    return 0;
+#else
     ret = gui_comm_perf_collect();
     if (ret != 0) return ret;
 
@@ -365,4 +395,5 @@ int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
     *svr_traffic    = visible_perf;
     *svr_traffic_ct = internal_addr_ct;
     return 0;
+#endif
 }

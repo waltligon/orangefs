@@ -79,8 +79,8 @@ static gint gui_traffic_graph_visibility_callback(GtkWidget *drawing_area,
 GtkWidget *gui_traffic_setup(void)
 {
     int i;
-    gint width = 900, height = 400;
-    GtkWidget *vbox, *hbox;
+    gint width = 850, height = 450;
+    GtkWidget *vbox, *labelvbox, *hbox;
 
     /* initialize gui_traffic_graph structure */
     gui_traffic_graph.drawing_area = NULL;
@@ -95,22 +95,21 @@ GtkWidget *gui_traffic_setup(void)
     vbox = gtk_vbox_new(FALSE, 0);
     gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
 
-    /* add in io main label */
-    gui_traffic_graph.io_label = gtk_label_new("I/O Bandwidth (MB/sec)");
+    hbox = gtk_hbox_new(FALSE, 0);
     gtk_box_pack_start(GTK_BOX(vbox),
-		       gui_traffic_graph.io_label,
+		       hbox,
 		       FALSE, TRUE, 0);
 
-    /* create hbox, drop in vbox, add in io labels */
-    hbox = gtk_hbox_new(TRUE, 0);
-    gtk_container_set_border_width(GTK_CONTAINER(hbox), 1);
-    gtk_box_pack_start(GTK_BOX(vbox), hbox, TRUE, FALSE, 0);
+    /* create vbox, drop in hbox, add in io labels */
+    labelvbox = gtk_vbox_new(TRUE, 0);
+    gtk_container_set_border_width(GTK_CONTAINER(labelvbox), 1);
+    gtk_box_pack_start(GTK_BOX(hbox), labelvbox, TRUE, FALSE, 0);
     
     for (i=0; i < GUI_TRAFFIC_GRAPH_NR_TICS; i++) {
 	gui_traffic_graph.xaxis_io_label[i] = gtk_label_new("");
-	gtk_box_pack_start(GTK_BOX(hbox),
-			   gui_traffic_graph.xaxis_io_label[i],
-			   TRUE, TRUE, 0);
+	gtk_box_pack_end(GTK_BOX(labelvbox),
+			 gui_traffic_graph.xaxis_io_label[i],
+			 TRUE, TRUE, 0);
     }
 
     /* add in drawing area */
@@ -118,27 +117,40 @@ GtkWidget *gui_traffic_setup(void)
     gtk_widget_set_size_request(GTK_WIDGET(gui_traffic_graph.drawing_area),
 				width,
 				height);
-    gtk_box_pack_start(GTK_BOX(vbox),
+    gtk_box_pack_start(GTK_BOX(hbox),
 		       gui_traffic_graph.drawing_area,
 		       TRUE, TRUE, 0);
 
-    /* create hbox, drop in vbox, add in meta labels */
-    hbox = gtk_hbox_new(TRUE, 0);
-    gtk_container_set_border_width(GTK_CONTAINER(hbox), 1);
-    gtk_box_pack_start(GTK_BOX(vbox), hbox, TRUE, FALSE, 0);
+    /* create vbox, drop in hbox, add in meta labels */
+    labelvbox = gtk_vbox_new(TRUE, 0);
+    gtk_container_set_border_width(GTK_CONTAINER(labelvbox), 1);
+    gtk_box_pack_start(GTK_BOX(hbox), labelvbox, TRUE, FALSE, 0);
     
     for (i=0; i < GUI_TRAFFIC_GRAPH_NR_TICS; i++) {
 	gui_traffic_graph.xaxis_meta_label[i] = gtk_label_new("");
-	gtk_box_pack_start(GTK_BOX(hbox),
-			   gui_traffic_graph.xaxis_meta_label[i],
-			   TRUE, TRUE, 0);
+	gtk_box_pack_end(GTK_BOX(labelvbox),
+			 gui_traffic_graph.xaxis_meta_label[i],
+			 TRUE, TRUE, 0);
     }
 
-    /* add in meta main label */
-    gui_traffic_graph.meta_label = gtk_label_new("Metadata Operations (Kops/sec)");
-    gtk_box_pack_start(GTK_BOX(vbox),
-		       gui_traffic_graph.meta_label,
+    hbox = gtk_hbox_new(FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), hbox, TRUE, FALSE, 0);
+
+    /* add in io main label */
+    gui_traffic_graph.io_label = gtk_label_new("I/O Bandwidth ()");
+    gtk_label_set_justify(GTK_LABEL(gui_traffic_graph.io_label),
+			  GTK_JUSTIFY_LEFT);
+    gtk_box_pack_start(GTK_BOX(hbox),
+		       gui_traffic_graph.io_label,
 		       FALSE, TRUE, 0);
+
+    /* add in meta main label */
+    gui_traffic_graph.meta_label = gtk_label_new("Metadata Ops ()");
+    gtk_label_set_justify(GTK_LABEL(gui_traffic_graph.meta_label),
+			  GTK_JUSTIFY_RIGHT);
+    gtk_box_pack_end(GTK_BOX(hbox),
+		     gui_traffic_graph.meta_label,
+		     FALSE, TRUE, 0);
 
     /* zero axis history values */
     gui_traffic_graph.io_max   = 0.0;
@@ -154,7 +166,7 @@ GtkWidget *gui_traffic_setup(void)
 		     G_CALLBACK(gui_traffic_graph_expose_callback),
 		     NULL);
 #if 0
-    g_signal_connect(G_OBJECT(vbox),
+    g_signal_connect(G_OBJECT(hbox),
 		     "visibility_event",
 		     G_CALLBACK(gui_traffic_graph_visibility_callback),
 		     NULL);
@@ -211,8 +223,8 @@ void gui_traffic_graph_update(struct gui_traffic_graph_data *data)
  */
 static void gui_traffic_graph_draw(void)
 {
-    int i, graphwidth, graphoffset, barheight, svrspace,
-	topspace = 20, bottomspace = 20;
+    int i, graphheight, graphoffset, barwidth, svrspace,
+	leftspace = 20, rightspace = 20;
     char *io_string, *meta_string;
     gint width, height;
     float tmp, max_magnitude, max_r, max_w, max_rm, max_wm, max_m, max_bw;
@@ -236,21 +248,21 @@ static void gui_traffic_graph_draw(void)
     /* drop out early if no data */
     if (gui_traffic_graph.svr_ct == 0) return;
 
-    /* aesthetics: getting the graphwidth just right to match labels */
-    graphwidth = (int) (0.91 * (float) width);
-    graphoffset = (width - graphwidth) / 2;
+    /* aesthetics: getting the graphheight just right to match labels */
+    graphheight = (int) (0.90 * (float) height);
+    graphoffset = (height - graphheight) / 2;
 
-    svrspace = (int) ((float) ((height - topspace - bottomspace) /
+    svrspace = (int) ((float) ((width - leftspace - rightspace) /
 				   gui_traffic_graph.svr_ct));
 
     /* aesthetics: limit maximum svrspace */
-    if (svrspace > (height - topspace - bottomspace) / 6) {
-	svrspace = (height - topspace - bottomspace) / 6;
+    if (svrspace > (width - leftspace - rightspace) / 6) {
+	svrspace = (width - leftspace - rightspace) / 6;
     }
 
-    barheight = (int) (0.8 * (float) svrspace  / 4.0);
+    barwidth = (int) (0.8 * (float) svrspace  / 4.0);
 
-    assert(barheight > 0);
+    assert(barwidth > 0);
 
     max_r  = gui_traffic_graph.read[0];
     max_w  = gui_traffic_graph.write[0];
@@ -275,6 +287,7 @@ static void gui_traffic_graph_draw(void)
      * - saving previous maximums and using a weighted average to
      *   keep from decreasing axis maximum too quickly
      * - forcing the axis maximum to be a power of 10
+     *   - well, not exactly.
      *
      * Note: this works in conjunction with prep.c code that
      *       keeps the divisor fixed for a longer period so our
@@ -286,18 +299,20 @@ static void gui_traffic_graph_draw(void)
     else {
 	gui_traffic_graph.io_max = 0.8 * gui_traffic_graph.io_max +
 	    0.2 * max_bw;
-	max_bw = gui_traffic_graph.io_max;
+	tmp = gui_traffic_graph.io_max;
     }
-    if (max_bw < 1.0) {
+    if (tmp < 1.0) {
 	max_magnitude = 1.0;
     }
     else {
-	tmp = max_bw * 1.1;
 	max_magnitude = 10.0;
 	while (tmp / 10.0 > 1.0) {
 	    tmp = tmp / 10.0;
 	    max_magnitude = max_magnitude * 10.0;
 	}
+    }
+    if (max_magnitude > gui_traffic_graph.io_max * 5.0) {
+	max_magnitude = max_magnitude / 5.0;
     }
     max_bw = max_magnitude;
 
@@ -307,18 +322,20 @@ static void gui_traffic_graph_draw(void)
     else {
 	gui_traffic_graph.meta_max = 0.8 * gui_traffic_graph.meta_max +
 	    0.2 * max_m;
-	max_m = gui_traffic_graph.meta_max;
+	tmp = gui_traffic_graph.meta_max;
     }
-    if (max_m < 1.0) {
+    if (tmp < 1.0) {
 	max_magnitude = 1.0;
     }
     else {
-	tmp = max_m * 1.1;
 	max_magnitude = 10.0;
 	while (tmp / 10.0 > 1.0) {
 	    tmp = tmp / 10.0;
 	    max_magnitude = max_magnitude * 10.0;
 	}
+    }
+    if (max_magnitude > gui_traffic_graph.meta_max * 5.0) {
+	max_magnitude = max_magnitude / 5.0;
     }
     max_m = max_magnitude;
 
@@ -341,38 +358,38 @@ static void gui_traffic_graph_draw(void)
     /* draw in top and bottom tic marks */
     gdk_draw_line(gui_traffic_graph.pixmap,
 		  gui_traffic_graph.drawing_area->style->black_gc,
-		  graphoffset, 5,
-		  graphwidth + graphoffset, 5);
+		  5, graphoffset,
+		  5, graphheight + graphoffset);
     gdk_draw_line(gui_traffic_graph.pixmap,
 		  gui_traffic_graph.drawing_area->style->black_gc,
-		  graphoffset, height - 6,
-		  graphwidth + graphoffset, height - 6);
+		  width - 6, graphoffset,
+		  width - 6, graphheight + graphoffset);
 
     for (i=0; i < GUI_TRAFFIC_GRAPH_NR_TICS; i++) {
-	int xpos = (i * graphwidth) / (GUI_TRAFFIC_GRAPH_NR_TICS-1) +
+	int ypos = (i * graphheight) / (GUI_TRAFFIC_GRAPH_NR_TICS-1) +
 	    graphoffset;
 
 	gdk_draw_line(gui_traffic_graph.pixmap,
 		      gui_traffic_graph.drawing_area->style->black_gc,
-		      xpos, 0,
-		      xpos, 10);
+		      0, ypos,
+		      10, ypos);
 	gdk_draw_line(gui_traffic_graph.pixmap,
 		      gui_traffic_graph.drawing_area->style->black_gc,
-		      xpos, height - 11,
-		      xpos, height - 1);
+		      width - 11, ypos,
+		      width - 1, ypos);
     }
 
     /* redraw rectangles that are the bars themselves */
     for (i=0; i < gui_traffic_graph.svr_ct; i++) {
-	int rlen = (int) (((float) graphwidth) *
+	int rlen = (int) (((float) graphheight) *
 			  (gui_traffic_graph.read[i] / max_bw));
-	int wlen = (int) (((float) graphwidth) *
+	int wlen = (int) (((float) graphheight) *
 			  (gui_traffic_graph.write[i] / max_bw));
-	int mrlen = (int) (((float) graphwidth) *
+	int mrlen = (int) (((float) graphheight) *
 			   (gui_traffic_graph.rmeta[i] / max_m));
-	int mwlen = (int) (((float) graphwidth) *
+	int mwlen = (int) (((float) graphheight) *
 			   (gui_traffic_graph.wmeta[i] / max_m));
-	int ystart = i * svrspace + topspace;
+	int xstart = i * svrspace + leftspace;
 
 	/* aesthetics: always draw something */
 	if (rlen == 0) rlen = 1;
@@ -383,34 +400,34 @@ static void gui_traffic_graph_draw(void)
 	gdk_draw_rectangle(gui_traffic_graph.pixmap,
 			   gui_traffic_graph.orange_gc,
 			   TRUE,
-			   graphoffset,
-			   ystart,
-			   rlen,
-			   barheight);
+			   xstart,
+			   graphoffset + graphheight - rlen,
+			   barwidth,
+			   rlen);
 
 	gdk_draw_rectangle(gui_traffic_graph.pixmap,
 			   gui_traffic_graph.blue_gc,
 			   TRUE,
-			   graphoffset,
-			   ystart + barheight,
-			   wlen,
-			   barheight);
+			   xstart + barwidth,
+			   graphoffset + graphheight - wlen,
+			   barwidth,
+			   wlen);
 
 	gdk_draw_rectangle(gui_traffic_graph.pixmap,
 			   gui_traffic_graph.green_gc,
 			   TRUE,
-			   graphoffset,
-			   ystart + 2 * barheight,
-			   mrlen,
-			   barheight);
+			   xstart + 2 * barwidth,
+			   graphoffset + graphheight - mrlen,
+			   barwidth,
+			   mrlen);
 
 	gdk_draw_rectangle(gui_traffic_graph.pixmap,
 			   gui_traffic_graph.purple_gc,
 			   TRUE,
-			   graphoffset,
-			   ystart + 3 * barheight,
-			   mwlen,
-			   barheight);
+			   xstart + 3 * barwidth,
+			   graphoffset + graphheight - mwlen,
+			   barwidth,
+			   mwlen);
     }
 
     /* force a redraw */

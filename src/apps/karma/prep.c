@@ -261,6 +261,7 @@ void gui_traffic_data_prepare(struct gui_traffic_raw_data *raw,
 	if (write_rate > max_rate) max_rate = write_rate;
 	if (read_rate > max_rate)  max_rate = read_rate;
 
+	/* keep historical data to limit rate of change of units/divisor */
 	if (hist_max_io < max_rate) hist_max_io = max_rate;
 	else hist_max_io = 0.8 * hist_max_io + 0.2 * max_rate;
     }
@@ -269,7 +270,7 @@ void gui_traffic_data_prepare(struct gui_traffic_raw_data *raw,
 
     snprintf(graph->io_label,
 	     64,
-	     "I/O Bandwidth (orange = read, blue = write, %s/sec)",
+	     "I/O Bandwidth (%s/sec)\norange = read, blue = write",
 	     units);
 
     /* adjust for units */
@@ -303,7 +304,7 @@ void gui_traffic_data_prepare(struct gui_traffic_raw_data *raw,
 
     snprintf(graph->meta_label,
 	     64,
-	     "Metadata Ops (green = read, purple = modify, %s/sec)",
+	     "Metadata Ops (%s/sec)\ngreen = read, purple = modify",
 	     units);
 
     for (i=0; i < svr_ct; i++) {
