@@ -7,7 +7,7 @@ exec_prefix=@exec_prefix@
 exec_prefix_set=no
 
 usage="\
-Usage: pvfs2-config [--prefix[=DIR]] [--exec-prefix[=DIR]] [--version] [--cflags] [--libs] [--static-libs]"
+Usage: pvfs2-config [--prefix[=DIR]] [--exec-prefix[=DIR]] [--version] [--cflags] [--libs] [--static-libs] [--serverlibs] [--static-serverlibs]"
 
 if test $# -eq 0; then
       echo "${usage}" 1>&2
@@ -46,6 +46,17 @@ while test $# -gt 0; do
       ;;
     --libs|--static-libs)
 	libflags="-L@libdir@ -lpvfs2 @LIBS@ @THREAD_LIB@" 
+	if [ x"@BUILD_GM@" = x"1" ]; then
+		libflags="$libflags -L@GM_HOME@/lib -lgm"
+	fi
+	if [ x"@BUILD_IB@" = x"1" ]; then
+		libflags="$libflags -L@IB_HOME@/lib -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
+	fi
+
+	echo $libflags
+	;;
+    --serverlibs|--static-serverlibs)
+	libflags="-L@libdir@ -lrt -lpthread -lpvfs2-server @LIBS@ @DB_LIB@" 
 	if [ x"@BUILD_GM@" = x"1" ]; then
 		libflags="$libflags -L@GM_HOME@/lib -lgm"
 	fi
