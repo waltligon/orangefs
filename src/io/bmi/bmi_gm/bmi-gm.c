@@ -286,6 +286,7 @@ struct gm_op
     void *tmp_xfer_buffer;
     uint8_t complete; /* indicates when operation is completed */
     uint8_t list_flag; /* indicates this is a list operation */
+    uint8_t cancelled; /* indicates operation has been cancelled */
 };
 
 /* the local port that we are communicating on */
@@ -2271,6 +2272,7 @@ static void ctrl_put_callback(struct gm_port *port,
 
     /* free up ctrl message buffer */
     bmi_gm_bufferpool_put(ctrl_send_pool, gm_op_data->freeable_ctrl_buffer);
+    gm_op_data->freeable_ctrl_buffer = NULL;
 
     /* give back a send token */
     gm_free_send_token(local_port, GM_HIGH_PRIORITY);
@@ -2416,6 +2418,7 @@ static void ctrl_req_callback(struct gm_port *port,
     /* free up ctrl message buffer */
     gm_op_data = my_op->method_data;
     bmi_gm_bufferpool_put(ctrl_send_pool, gm_op_data->freeable_ctrl_buffer);
+    gm_op_data->freeable_ctrl_buffer = NULL;
 
     /* see if the receiver couldn't keep up */
     if (status == GM_SEND_TIMED_OUT)
@@ -2444,6 +2447,16 @@ static void ctrl_req_callback(struct gm_port *port,
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
+    }
+
+    if(gm_op_data->cancelled)
+    {
+        /* this operation has been cancelled; don't do any further work */
+	op_list_remove(my_op);
+        my_op->error_code = -PVFS_ECANCEL;
+	op_list_add(completion_array[my_op->context_id], my_op);
+	gm_op_data->complete = 1;
+        return;
     }
 
     /* golden! */
@@ -3175,6 +3188,13 @@ static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
 
     /* find the matching operation */
     query_op = id_gen_safe_lookup(ctrl_op_id);
+
+    if(!query_op)
+    {
+        /* the op is gone; probably canceled.  Just return. */
+        return;
+    }
+
     op_list_remove(query_op);
     gm_op_data = query_op->method_data;
     gm_op_data->remote_ptr = remote_ptr;
@@ -3550,6 +3570,7 @@ static void ctrl_ack_callback(struct gm_port *port,
     /* free up ctrl message buffer */
     gm_op_data = my_op->method_data;
     bmi_gm_bufferpool_put(ctrl_send_pool, gm_op_data->freeable_ctrl_buffer);
+    gm_op_data->freeable_ctrl_buffer = NULL;
 
     /* see if the receiver couldn't keep up */
     if (status == GM_SEND_TIMED_OUT)
@@ -3824,23 +3845,27 @@ int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
     /* easy case: is the operation already completed? */
     if(gm_op_data->complete)
     {
+        gossip_debug(GOSSIP_BMI_DEBUG_GM, "BMI_gm_cancel: complete case.\n");
         /* do nothing */
 	gen_mutex_unlock(&interface_mutex);
 	return(0);
     }
 
-    /* next easiest case; if it is a send that is blocking on resources and
-     * therefore hasn't transmitted anything yet */
+    /* send case */
     if(query_op->send_recv == BMI_SEND)
     {
-        /* must run queue to find out */
+        /* find out if we are blocking on resource usage and haven't sent 
+         * anything yet
+         */
         memset(&key, 0, sizeof(struct op_list_search_key));
         key.op_id = query_op->op_id;
         key.op_id_yes = 1;
-
         tmp_op = op_list_search(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], &key);
         if(tmp_op)
         {
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: nothing sent yet.\n");
+            /* nothing sent yet; clean up and move to comp. queue */
             assert(tmp_op == query_op);
             op_list_remove(query_op);
             if (gm_op_data->buffer_status == GM_BUF_METH_ALLOC)
@@ -3854,18 +3879,94 @@ int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
 	    gen_mutex_unlock(&interface_mutex);
             return(0);
         }
-    }
 
-    /* if we fall to here working on an immediate send, then it must be in
-     * progress already.  GM will make sure the op completes (in error or
-     * otherwise) on its own, so there isn't anything to do here but wait for 
-     * it to finish by natural methods
-     */
-    if(query_op->send_recv == BMI_SEND && 
-        (query_op->mode == GM_MODE_IMMED || query_op->mode == GM_MODE_UNEXP))
-    {
-	gen_mutex_unlock(&interface_mutex);
-        return(0);
+        /* see if the send is literally in flight (waiting on a gm callback) */
+        /* may be immediate mode, unexp mode, or rend mode during req or
+         * done message
+         */
+        tmp_op = op_list_search(op_list_array[IND_SENDING], &key);
+        if(tmp_op)
+        {
+            assert(tmp_op == query_op);
+            if(query_op->mode == GM_MODE_IMMED ||
+                query_op->mode == GM_MODE_UNEXP)
+            {
+                gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                    "BMI_gm_cancel: sending immed msg.\n");
+                /* op is practically done; just wait for GM callback to 
+                 * trigger and transition it to completion queue */ 
+                gen_mutex_unlock(&interface_mutex);
+                return(0);
+            }
+            else if(gm_op_data->freeable_ctrl_buffer &&
+                (gm_op_data->freeable_ctrl_buffer->ctrl_type == CTRL_PUT_TYPE))
+            {
+                /* op is practically done; just wait for GM callback to 
+                 * trigger and transition it to completion queue */ 
+                gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                    "BMI_gm_cancel: sending put msg.\n");
+                gen_mutex_unlock(&interface_mutex);
+                return(0);
+            }
+            else if(gm_op_data->freeable_ctrl_buffer &&
+                (gm_op_data->freeable_ctrl_buffer->ctrl_type == CTRL_REQ_TYPE))
+            {
+                /* waiting on ctrl req callback */
+                /* mark op as being in a cancelled state and handle it in
+                 * req callback and ack handler
+                 */
+                gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                    "BMI_gm_cancel: sending req msg.\n");
+                gm_op_data->cancelled = 1;
+                gen_mutex_unlock(&interface_mutex);
+                return(0);
+            }
+            else
+            {
+                gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                    "BMI_gm_cancel: sending payload.\n");
+                /* waiting on data send callback */
+                /* nothing sane to do here except let it try to finish.  If
+                 * the data send callback triggers with successful status,
+                 * then we should try to announce the put so the other end 
+                 * can release the buffer.  If it errors, then we are done.
+                 */
+                gen_mutex_unlock(&interface_mutex);
+                return(0);
+            }
+        }
+        
+        /* see if we are waiting on a token for a put msg */
+        tmp_op = op_list_search(op_list_array[IND_NEED_SEND_TOK_HI_PUT], &key);
+        if(tmp_op)
+        {
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: waiting on put token.\n");
+            assert(tmp_op == query_op);
+            /* nothing to do here; operation is practically finished and we
+             * should make a best effort to tell the receiver it can 
+             * release the buffer
+             */
+            gen_mutex_unlock(&interface_mutex);
+            return(0);
+        }
+        
+        /* see if we are waiting on a token for the data payload */
+        tmp_op = op_list_search(op_list_array[IND_NEED_SEND_TOK_LOW], &key);
+        if(tmp_op)
+        {
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: waiting on data payload token.\n");
+            assert(tmp_op == query_op);
+
+            /* no payload sent yet, clean up and get out */
+            op_list_remove(query_op);
+            query_op->error_code = -PVFS_ECANCEL;
+            op_list_add(completion_array[query_op->context_id], query_op);
+            gm_op_data->complete = 1;
+            gen_mutex_unlock(&interface_mutex);
+            return(0);
+        }
     }
 
     /* easy case for recv: have not been contacted yet */
