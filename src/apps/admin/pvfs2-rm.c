@@ -14,6 +14,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
@@ -28,17 +29,16 @@ struct options
     int force;
     int recursive;
     uint32_t num_files;
-    char** filenames;
+    char **filenames;
 };
 
-static struct options* parse_args(int argc, char* argv[]);
-static void usage(int argc, char** argv);
+static struct options *parse_args(int argc, char **argv);
+static void usage(int argc, char **argv);
 
 int main(int argc, char **argv)
 {
-    int ret = -1;
-    int i;
-    struct options* user_opts = NULL;
+    int ret = -1, i = 0;
+    struct options *user_opts = NULL;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     {
         int rc;
         int num_segs;
-        char* working_file = user_opts->filenames[i];
+        char *working_file = user_opts->filenames[i];
         char directory[PVFS_NAME_MAX];
         char filename[PVFS_SEGMENT_MAX];
 
@@ -77,57 +77,52 @@ int main(int argc, char **argv)
         rc = PINT_get_path_element(working_file, num_segs - 1,
                                    filename, PVFS_SEGMENT_MAX);
 
-        if (0 != rc)
+        if (rc)
         {
             fprintf(stderr, "Unknown path format: %s\n", working_file);
             ret = -1;
             break;
         }
 
-        rc = PVFS_util_resolve(directory,
-                               &cur_fs,
-                               pvfs_path,
-                               PVFS_NAME_MAX);
-        if (0 != rc)
+        rc = PVFS_util_resolve(directory, &cur_fs,
+                               pvfs_path, PVFS_NAME_MAX);
+        if (rc)
         {
             PVFS_perror("PVFS_util_resolve", rc);
             ret = -1;
             break;
         }
 
-        /* Lookup files directory */
         credentials.uid = getuid();
         credentials.gid = getuid();
+
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-        rc = PVFS_sys_lookup(cur_fs,
-                             pvfs_path,
-                             &credentials,
-                             &resp_lookup,
-                             PVFS2_LOOKUP_LINK_NO_FOLLOW);
-        if (0 != rc)
+        rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
+                             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+        if (rc)
         {
             PVFS_perror("PVFS_sys_lookup", rc);
             ret = -1;
             break;
         }
-        
-        /* Remove file */
+
         parent_ref = resp_lookup.ref;
         rc = PVFS_sys_remove(filename, parent_ref, &credentials);
-
-        if ( 0 != rc )
+        if (rc)
         {
-            fprintf(stderr, "Error: An error occurred while removing %s\n",
-                    working_file);
+            fprintf(stderr, "Error: An error occurred while "
+                    "removing %s\n", working_file);
             PVFS_perror("PVFS_sys_remove", rc);
             ret = -1;
             break;
         }
     }
-    
+
+    PVFS_sys_finalize();
+    free(user_opts);
+
     return ret;
 }
-
 
 /* parse_args()
  *
@@ -135,49 +130,43 @@ int main(int argc, char **argv)
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static struct options* parse_args(int argc, char* argv[])
+static struct options* parse_args(int argc, char **argv)
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
-    char flags[] = "rf?";
     int one_opt = 0;
+    char flags[] = "rf?";
+    struct options *tmp_opts = NULL;
 
-    struct options* tmp_opts = NULL;
-
-    /* create storage for the command line options */
-    tmp_opts = (struct options*)malloc(sizeof(struct options));
-    if(!tmp_opts){
-	return(NULL);
+    tmp_opts = (struct options *)malloc(sizeof(struct options));
+    if(!tmp_opts)
+    {
+	return NULL;
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
-    /* fill in defaults */
     tmp_opts->force = 0;
     tmp_opts->recursive = 0;
     tmp_opts->filenames = 0;
 
-    /* look at command line arguments */
     while((one_opt = getopt(argc, argv, flags)) != EOF)
     {
-	switch(one_opt){
+	switch(one_opt)
+        {
 	    case('f'):
 		fprintf(stderr, "Error: force option not supported.\n");
 		free(tmp_opts);
-		return(NULL);
-		break;
+		return NULL;
 	    case('r'):
-		fprintf(stderr, "Error: recursive option not supported.\n");
+		fprintf(stderr, "Error: recursive option not "
+                        "supported.\n");
 		free(tmp_opts);
-		return(NULL);
-		break;
+		return NULL;
 	    case('?'):
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
 	}
     }
 
-    if(optind < argc)
+    if (optind < argc)
     {
         int i = 0;
         tmp_opts->num_files = argc - optind;
@@ -194,15 +183,13 @@ static struct options* parse_args(int argc, char* argv[])
 	usage(argc, argv);
 	exit(EXIT_FAILURE);
     }
-
-    return(tmp_opts);
+    return tmp_opts;
 }
 
 
-static void usage(int argc, char** argv)
+static void usage(int argc, char **argv)
 {
     fprintf(stderr, "Usage: %s [-rf] pvfs2_filename[s]\n", argv[0]);
-    return;
 }
 
 /*
