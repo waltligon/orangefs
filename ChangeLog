@@ -21,6 +21,13 @@ pvfs2-0.0.7pre2
 - removed extra berkeley db error reporting since it's not integrated with
   our gossip error reporting system.  can now be explicitly enabled using
   a new configure option --with-berkdb-debug
+- fixes to state machine compiler to workaround hangs on some machines
+- new scripts in maint/build for building and testing PVFS2
+- better balancing (randomization) of metadata server selection when
+  creating new files and directories
+- various error msg cleanups (in several components)
+- mutex locking improvements, allowing support for NPTL thread
+  implementations and also improving performance for some operations
 
 
 pvfs2-0.0.6
