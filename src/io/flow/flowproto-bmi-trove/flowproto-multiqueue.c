@@ -53,6 +53,7 @@ struct fp_private_data
     flow_descriptor* parent;
     struct fp_queue_item prealloc_array[BUFFERS_PER_FLOW];
     struct qlist_head list_link;
+    PVFS_size total_bytes_processed;
     int next_seq;
     int next_seq_to_send;
     gen_mutex_t flow_mutex;
@@ -508,6 +509,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	}while(bytes_processed < BUFFER_SIZE && 
 	    !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
+	flow_data->total_bytes_processed += bytes_processed;
+
 	/* TODO: what if we recv less than expected? */
 	ret = BMI_post_recv(&tmp_id,
 	    q_item->parent->src.u.bmi.address,
@@ -666,7 +669,9 @@ static void bmi_send_callback_fn(void *user_ptr,
     flow_data->parent->total_transfered += actual_size;
 
     /* if this was the last operation, then mark the flow as done */
-    if(flow_data->parent->total_transfered == flow_data->parent->aggregate_size)
+    if(flow_data->parent->total_transfered ==
+	flow_data->total_bytes_processed &&
+	PINT_REQUEST_DONE(flow_data->parent->file_req_state))
     {
 	q_item->parent->state = FLOW_COMPLETE;
 	gen_mutex_lock(&completion_mutex);
@@ -748,6 +753,8 @@ static void bmi_send_callback_fn(void *user_ptr,
     }while(bytes_processed < BUFFER_SIZE && 
 	!PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
+    flow_data->total_bytes_processed += bytes_processed;
+
     /* nothing to do */
     if(bytes_processed == 0)
     {
@@ -825,7 +832,9 @@ static void trove_write_callback_fn(void *user_ptr,
     q_item->result_chain_count = 0;
 
     /* if this was the last operation, then mark the flow as done */
-    if(flow_data->parent->total_transfered == flow_data->parent->aggregate_size)
+    if(flow_data->parent->total_transfered ==
+	flow_data->total_bytes_processed &&
+	PINT_REQUEST_DONE(flow_data->parent->file_req_state))
     {
 	q_item->parent->state = FLOW_COMPLETE;
 	gen_mutex_lock(&completion_mutex);
@@ -909,6 +918,8 @@ static void trove_write_callback_fn(void *user_ptr,
 	    bytes_processed += old_result_tmp->result.bytes;
 	}while(bytes_processed < BUFFER_SIZE && 
 	    !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+
+	flow_data->total_bytes_processed += bytes_processed;
 
 	if(bytes_processed == 0)
 	{
