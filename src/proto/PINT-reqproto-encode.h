@@ -11,6 +11,7 @@
 #ifndef __PINT_REQUEST_ENCODE_H
 #define __PINT_REQUEST_ENCODE_H
 
+#include "pvfs2-req-proto.h"
 #include "bmi.h"
 
 /* supported encoding types */
@@ -121,6 +122,16 @@ int PINT_get_encoded_generic_ack_sz(
 			 int op
 			 );
 
+/* PINT_encode_calc_max_size()
+ *
+ * calculates maximum size of the encoded version of a protocol message.
+ *
+ * returns max size of encoded buffer on success, -errno on failure
+ */
+int PINT_encode_calc_max_size(
+    enum PINT_encode_msg_type input_type,
+    enum PVFS_server_op op_type,
+    enum PINT_encoding_type enc_type);
 
 #endif /* __PINT_REQUEST_ENCODE_H */
 
