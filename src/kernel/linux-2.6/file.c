@@ -120,11 +120,25 @@ ssize_t pvfs2_inode_read(
 	    pvfs2_error("pvfs2_inode_read: error: io downcall status.\n");
 
           error_exit:
-	    ret = new_op->downcall.status;
-            kill_device_owner();
-            op_release(new_op);
-	    pvfs_bufmap_put(buffer_index);
+            /*
+              FIXME: do a better I/O return code translation.  We
+              can't do this until the sys-io sm returns meaningful
+              error codes (other than the two below).
+
+              NOTE:
+              DO NOT kill the device owner in this case, as the I/O
+              has already been completed so there's no danger.  Also,
+              DO NOT free the op, since this code path relies on the
+              devreq code to free it.  signal it normally before
+              returning the error code.
+            */
+	    ret = ((new_op->downcall.status == -PVFS_ENOENT) ?
+                   -ENOENT : -EIO);
 	    *offset = original_offset;
+            wake_up_device_for_return(new_op);
+            pvfs_bufmap_put(buffer_index);
+	    pvfs2_error("pvfs2_inode_read: returning error code %d\n",
+                        ret);
 	    return(ret);
 	}
 

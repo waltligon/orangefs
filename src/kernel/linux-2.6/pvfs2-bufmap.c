@@ -40,8 +40,11 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     int i;
     int offset = 0;
 
+    pvfs2_print("pvfs2_bufmap_initialize: called\n");
+
     if(bufmap_init == 1)
     {
+	pvfs2_error("pvfs2: error: bufmap already initialized.\n");
 	return(-EALREADY);
     }
 
@@ -137,6 +140,8 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     }
 
     bufmap_init = 1;
+
+    pvfs2_print("pvfs2_bufmap_initialize: exiting normally\n");
     return(0);
 }
 
@@ -167,7 +172,7 @@ void pvfs_bufmap_finalize(void)
 
     bufmap_init = 0;
 
-    pvfs2_print("pvfs2_bufmap_finalize: exited normally\n");
+    pvfs2_print("pvfs2_bufmap_finalize: exiting normally\n");
     return;
 }
 

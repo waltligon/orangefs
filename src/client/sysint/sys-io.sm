@@ -230,12 +230,8 @@ static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     if(ret != 0)
     {
 	gossip_err("Error: failure mapping to server.\n");
-	assert(ret < 0); /* return value range check */
-	assert(0); /* TODO: real error handling */
+        js_p->error_code = -PVFS_EINVAL;
     }
-
-
-    /* drop through and jump to getattr_acache state machine */
     return 1;
 }
 
@@ -320,7 +316,6 @@ static int io_object_getattr_comp_fn(void *v_p,
         sm_p->u.io.dist_p = PVFS_Dist_copy(r_attr_p->u.meta.dist);
         if (sm_p->u.io.dist_p == NULL)
         {
-            assert(0);
             return -PVFS_ENOMEM;
         }
         sm_p->u.io.dist_size = r_attr_p->u.meta.dist_size;
@@ -337,10 +332,7 @@ static int io_object_getattr_comp_fn(void *v_p,
          */
         sm_p->u.io.datafile_handles = (PVFS_handle *)
             malloc(r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
-        if (sm_p->u.io.datafile_handles == NULL)
-        {
-            assert(0);
-        }
+        assert(sm_p->u.io.datafile_handles);
         sm_p->u.io.datafile_count = r_attr_p->u.meta.dfile_count;
         memcpy(sm_p->u.io.datafile_handles,
                r_attr_p->u.meta.dfile_array,
@@ -400,20 +392,15 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
      * TODO: make the Dist interface make sense.
      */
     ret = PINT_Dist_lookup(iosm_p->dist_p);
-    if (ret != 0) {
-	assert(0);
-    }
+    assert(ret == 0);
 
     target_datafile_array =
 	(PVFS_handle *) malloc(iosm_p->datafile_count * sizeof(PVFS_handle));
-    if (target_datafile_array == NULL) {
-	assert(0);
-    }
+    assert(target_datafile_array);
+
     iosm_p->datafile_index_array = (int*)malloc(iosm_p->datafile_count *
 	sizeof(int));
-    if(iosm_p->datafile_index_array == NULL) {
-	assert(0);
-    }
+    assert(iosm_p->datafile_index_array);
 
     ret = io_find_target_datafiles(iosm_p->mem_req,
 				   iosm_p->file_req,
@@ -424,11 +411,10 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 				   target_datafile_array,
 				   iosm_p->datafile_index_array,
 				   &target_datafile_count);
-    if (ret != 0) {
-	assert(0);
-    }
+    assert(ret == 0);
 
-    if (target_datafile_count == 0) {
+    if (target_datafile_count == 0)
+    {
 	/* no data?  ok... */
 	/* TODO: catch this earlier or something. */
 	js_p->error_code = IO_NO_DATA;
@@ -442,9 +428,8 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     /* set up space for msgarrray */
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
 	malloc(target_datafile_count * sizeof(PINT_client_sm_msgpair_state));
-    if (sm_p->msgarray == 0) {
-	assert(0);
-    }
+    assert(sm_p->msgarray);
+
     sm_p->msgarray_count = target_datafile_count;
 
     /* set up space for flows */
@@ -453,9 +438,8 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     /* flow descriptor array */
     iosm_p->flow_array = (flow_descriptor *)
 	malloc(target_datafile_count * sizeof(flow_descriptor));
-    if (iosm_p->flow_array == NULL) {
-	assert(0);
-    }
+    assert(iosm_p->flow_array);
+
     /* set each flow descriptor to initial values */
     for(i=0; i<target_datafile_count; i++)
     {
@@ -465,16 +449,12 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     /* flow status array */
     iosm_p->flow_status_array = (job_status_s *)
 	malloc(target_datafile_count * sizeof(job_status_s));
-    if (iosm_p->flow_status_array == NULL) {
-	assert(0);
-    }
+    assert(iosm_p->flow_status_array);
 
     /* session tag array */
     iosm_p->session_tag_array = (PVFS_msg_tag_t *)
 	malloc(target_datafile_count * sizeof(PVFS_msg_tag_t));
-    if (iosm_p->session_tag_array == NULL) {
-	assert(0);
-    }
+    assert(iosm_p->session_tag_array);
 
     /* set up space for final ack if we're writing */
     if (iosm_p->io_type == PVFS_IO_WRITE) {
@@ -482,9 +462,8 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 	iosm_p->ack_comp_ct = 0;
 	iosm_p->ackarray = (PINT_client_sm_recv_state *)
 	    malloc(target_datafile_count * sizeof(PINT_client_sm_recv_state));
-	if (iosm_p->ackarray == NULL) {
-	    assert(0);
-	}
+	assert(iosm_p->ackarray);
+
 	memset(iosm_p->ackarray, 0,
 	    target_datafile_count*sizeof(PINT_client_sm_recv_state));
     }
@@ -589,10 +568,10 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 	ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
 					msg_p->handle,
 					msg_p->fs_id);
-	if (ret != 0) {
+	if (ret != 0)
+        {
 	    gossip_lerr("bucket map to server failed; probably invalid svr_addr\n");
-	    assert(ret < 0); /* return value range check */
-	    assert(0); /* placeholder until we have real error handling */
+            js_p->error_code = -PVFS_EINVAL;
 	}
 
 	/* encode request. fills in encoded_req.
@@ -602,7 +581,8 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 			  &msg_p->encoded_req,
 			  msg_p->svr_addr,
 			  sm_p->u.io.encoding);
-	if (ret != 0) {
+	if (ret != 0)
+        {
 	    gossip_lerr("pint_encode failed\n");
 	    assert(ret < 0); /* return value range check */
 	    assert(0); /* placeholder until we have real error handling */
@@ -617,9 +597,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 	msg_p->encoded_resp_p = BMI_memalloc(msg_p->svr_addr,
 					     msg_p->max_resp_sz,
 					     BMI_RECV);
-	if (msg_p->encoded_resp_p == NULL) {
-	    assert(0);
-	}
+	assert(msg_p->encoded_resp_p);
 
 	/* get session tag to associate with send and receive.
 	 * session tag is kept in io part of client state machine
@@ -816,10 +794,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 						   &decoded_resp,
 						   &msg_p->svr_addr,
 						   msg_p->max_resp_sz);
-	    if (ret != 0) {
-		assert(ret < 0); /* return value range check */
-		assert(0); /* placeholder */
-	    }
+            assert(ret == 0);
 
 	    return 0;
 	}
@@ -867,10 +842,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 						   &decoded_resp,
 						   &msg_p->svr_addr,
 						   msg_p->max_resp_sz);
-	    if (ret != 0) {
-		assert(ret < 0); /* return value range check */
-		assert(0); /* placeholder */
-	    }
+            assert(ret == 0);
 
 	    /* NOTE: NO USING RESP_P AFTER WE FREE THE RESOURCES */
 	    resp_p = NULL;
@@ -910,9 +882,8 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 		    BMI_memalloc(msg_p->svr_addr,
 				 iosm_p->ackarray[recv_match].max_resp_sz,
 				 BMI_RECV);
-		if (iosm_p->ackarray[recv_match].encoded_resp_p == NULL) {
-		    assert(0);
-		}
+		assert(iosm_p->ackarray[recv_match].encoded_resp_p);
+
 		ret = job_bmi_recv(msg_p->svr_addr,
 				   iosm_p->ackarray[recv_match].encoded_resp_p,
 				   iosm_p->ackarray[recv_match].max_resp_sz,
@@ -923,12 +894,9 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 				   &iosm_p->ackarray[recv_match].recv_status,
 				   &iosm_p->ackarray[recv_match].recv_id,
 				   pint_client_sm_context);
-		if (ret < 0) {
+		if (ret < 0)
+                {
 		    gossip_lerr("post of write ack failed\n");
-		    assert(0);
-		}
-		else if (ret == 1) {
-		    /* should never happen -- cannot get response before flow? */
 		    assert(0);
 		}
 		assert(ret == 0);
@@ -1036,13 +1004,19 @@ static int io_object_getattr_failure(PINT_client_sm *sm_p,
     gossip_debug(CLIENT_DEBUG,
 		 "(%p) io state: io_object_getattr_failure\n",
 		 sm_p);
-    assert(0);
 
+    /*
+      NOTE:
+      this can easily happen if we're doing I/O on a file that
+      was removed by another process
+    */
+    if (js_p->error_code == 0)
+    {
+        js_p->error_code = -PVFS_ENOENT;
+    }
     return 1;
 }
 
-/* io_analyze_results()
- */
 static int io_analyze_results(PINT_client_sm *sm_p,
 			      job_status_s *js_p)
 {
@@ -1053,10 +1027,17 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 		 "(%p) io state: analyze_results\n",
 		 sm_p);
 
-    if (js_p->error_code != IO_DATAFILE_TRANSFERS_COMPLETE) {
+    if (js_p->error_code != IO_DATAFILE_TRANSFERS_COMPLETE)
+    {
 	/* some sort of error occurred early on */
+        if (js_p->error_code == 0)
+        {
+            js_p->error_code = -PVFS_EIO;
+        }
+        error = js_p->error_code;
     }
-    else {
+    else
+    {
 	/* it's possible that some error occurred still.  look through
 	 * all the messages, reporting errors, saving the first one to
 	 * return, and adding up the size of the transfer (just in case
@@ -1141,9 +1122,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 						    &msg_p->svr_addr,
 						    iosm_p->ackarray[i].recv_status.actual_size,
 						    &resp_p);
-			if (ret != 0) {
-			    assert(0);
-			}
+                        assert(ret == 0);
 			gossip_debug(CLIENT_DEBUG,
 				     "  %Ld bytes written to %d.\n",
 				     Ld(resp_p->u.write_completion.total_completed),
