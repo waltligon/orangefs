@@ -4,8 +4,11 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.13 2003-08-08 15:10:13 walt Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.14 2003-08-12 13:16:50 walt Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.13  2003/08/08 15:10:13  walt
+// fixed bug in commit routine
+//
 // Revision 1.12  2003/08/07 20:15:39  walt
 //  updated commit code - works better now, but has another recursive
 //  routine in it - clean that up another day
@@ -412,7 +415,7 @@ int PVFS_Request_commit(PVFS_Request *reqp)
 	}
 	       
 	/* Allocate memory for contiguous region */
-	if(req->num_nested_req > 0)
+	if(PINT_REQUEST_NEST_SIZE(req) > 0)
 	{
 		region = (PVFS_Request)malloc(PINT_REQUEST_PACK_SIZE(req));
 		if (region == NULL)
@@ -455,11 +458,12 @@ int PVFS_Request_free(PVFS_Request *req)
 		*req = NULL;
 		return PVFS_SUCCESS;
 	}
-	if ((*req)->committed)
+	if (PINT_REQUEST_IS_PACKED(*req))
 	{
 		/* these are contiguous and have no external refs */
 		free(*req);
 		*req = NULL;
+		gossip_debug(REQUEST_DEBUG,"free packed request\n");
 		return PVFS_SUCCESS;
 	}
 	/* this deals with the sreq chain */
@@ -471,12 +475,14 @@ int PVFS_Request_free(PVFS_Request *req)
 		/* this is a little awkward but it works */
 		reqp_next = reqp->sreq;
 		free(reqp);
+		gossip_debug(REQUEST_DEBUG,"free sreq linked request\n");
 		reqp = reqp_next;
 	}
 	/* now deal with the main struct */
 	PVFS_Request_free(&((*req)->ereq));
 	free(*req);
 	*req = NULL;
+	gossip_debug(REQUEST_DEBUG,"free unpacked request\n");
 	return PVFS_SUCCESS;
 }
 

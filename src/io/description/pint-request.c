@@ -774,8 +774,8 @@ int PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 	if (depth == 0)
 	{
 		gossip_debug(REQUEST_DEBUG,"clearing tree\n");
-		/* this does not get the 'd' but that's OK */
-		strncpy((char *)(region+(region->num_nested_req+1)),"committed",8);
+		/* this indicates the region is packed */
+		region->num_nested_req *= -1;
 		PINT_Do_clear_commit(region);
 	}
 
@@ -791,7 +791,7 @@ int PINT_Request_encode(struct PINT_Request *req)
 	int r;
 	if (!PINT_REQUEST_IS_PACKED(req))
 		return -1;
-	for (r = 0; r < req->num_nested_req; r++)
+	for (r = 0; r < PINT_REQUEST_NEST_SIZE(req); r++)
 	{
 		if (req[r].ereq)
 			(int)(req[r].ereq) = req[r].ereq - &(req[0]);
@@ -813,7 +813,7 @@ int PINT_Request_decode(struct PINT_Request *req)
 	int r;
 	if (!PINT_REQUEST_IS_PACKED(req))
 		return -1;
-	for (r = 0; r < req->num_nested_req; r++)
+	for (r = 0; r < PINT_REQUEST_NEST_SIZE(req); r++)
 	{
 		if ((int)(req[r].ereq) == -1)
 			req[r].ereq = NULL;
@@ -833,7 +833,7 @@ void PINT_Dump_packed_request(PINT_Request *req)
 	int i;
 	if (!PINT_REQUEST_IS_PACKED(req))
 		return;
-	for (i = 0; i < req->num_nested_req+1; i++)
+	for (i = 0; i < PINT_REQUEST_NEST_SIZE(req)+1; i++)
 	{
 		PINT_Dump_request(req+i);
 	}
