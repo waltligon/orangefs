@@ -18,7 +18,6 @@ static int mkdir_setattrib(state_action_struct *s_op, job_status_s *ret);
 static int mkdir_release(state_action_struct *s_op, job_status_s *ret);
 static int mkdir_send_bmi(state_action_struct *s_op, job_status_s *ret);
 static int mkdir_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int mkdir_fill_handle(state_action_struct *s_op, job_status_s *ret);
 static int mkdir_error(state_action_struct *s_op, job_status_s *ret);
 static int mkdir_critical_error(state_action_struct *s_op, job_status_s *ret);
 void mkdir_init_state_machine(void);
@@ -34,7 +33,7 @@ PINT_state_machine_s mkdir_req_s =
 
 %%
 
-machine mkdir(init, create, set_attrib, fill_handle, release, send, err_msg, critical_error, cleanup)
+machine mkdir(init, create, set_attrib, release, send, err_msg, critical_error, cleanup)
 {
 	state init
 	{
@@ -53,16 +52,10 @@ machine mkdir(init, create, set_attrib, fill_handle, release, send, err_msg, cri
 	state set_attrib
 	{
 		run mkdir_setattrib;
-		success => fill_handle;
+		success => release;
 		default => err_msg;
 	}
 	
-	state fill_handle
-	{
-	    run mkdir_fill_handle;
-	    default => release;
-	}
-
 	state release
 	{
 		run mkdir_release;
@@ -318,16 +311,6 @@ static int mkdir_cleanup(state_action_struct *s_op, job_status_s *ret)
 
 }
 
-/* TODO: fix comment block */
-static int mkdir_fill_handle(state_action_struct *s_op, job_status_s *ret)
-{
-    /* if the error_code *isn't* zero, we should be in a different state */
-    assert(ret->error_code == 0);
-    s_op->resp->u.mkdir.handle = ret->handle;
-
-    return(1);
-}
-    
 /* TODO: fix comment block */
 static int mkdir_error(state_action_struct *s_op, job_status_s *ret)
 {
