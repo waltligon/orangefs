@@ -93,6 +93,11 @@ typedef struct PINT_client_sm_s {
     } u;
 } PINT_client_sm;
 
+/* prototypes of post/test functions */
+int PINT_client_state_machine_post(PINT_client_sm *sm_p);
+int PINT_client_state_machine_test(void);
+
+
 /* prototypes of helper functions */
 int PINT_serv_prepare_msgpair(PVFS_pinode_reference object_ref,
 			      struct PVFS_server_req *req_p,

@@ -7,7 +7,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include "pvfs2-client-state-machine.h"
+#include "client-state-machine.h"
 #include "state-machine-fns.h"
 #include "pvfs2-debug.h"
 #include "job.h"
@@ -25,6 +25,98 @@
 #include "PINT-reqproto-encode.h"
 
 job_context_id pint_client_sm_context;
+
+extern PINT_state_machine pvfs2_client_remove_sm;
+
+/* all stuff used in test function */
+enum {
+    MAX_RETURNED_JOBS = 32
+};
+static job_id_t job_id_array[MAX_RETURNED_JOBS];
+static void *client_sm_p_array[MAX_RETURNED_JOBS];
+static job_status_s job_status_array[MAX_RETURNED_JOBS];
+
+int PINT_client_state_machine_post(PINT_client_sm *sm_p)
+{
+    int ret;
+    job_status_s js;
+
+    static int got_context = 0;
+
+    /* TODO: MOVE THIS INTO THE INITIALIZE OR SOMETHING. */
+    if (got_context == 0) {
+	/* get a context for our state machine operations */
+	job_open_context(&pint_client_sm_context);
+	got_context = 1;
+    }
+
+    /* mark operation as unfinished */
+    sm_p->op_complete = 0;
+
+    /* figure out what function needs to be called first */
+    sm_p->current_state = pvfs2_client_remove_sm.state_machine + 1;
+
+    /* clear job status structure */
+    memset(&js, 0, sizeof(js));
+
+    /* call function, continue calling as long as we get immediate
+     * success.
+     */
+    ret = sm_p->current_state->state_action(sm_p, &js);
+    while (ret == 1) {
+	/* PINT_state_machine_next() calls next function and
+	 * returns the result.
+	 */
+	ret = PINT_state_machine_next(sm_p, &js);
+    }
+
+    /* note: job_status_s pointed to by js_p is ok to use after
+     * we return regardless of whether or not we finished.
+     */
+    return ret;
+}
+
+int PINT_client_state_machine_test(void)
+{
+    int ret, i;
+    int job_count = MAX_RETURNED_JOBS;
+
+    PINT_client_sm *sm_p;
+
+    /* discover what jobs have completed */
+    ret = job_testcontext(job_id_array,
+			  &job_count, /* in/out parameter */
+			  client_sm_p_array,
+			  job_status_array,
+			  100, /* timeout? */
+			  pint_client_sm_context);
+    if (ret < 0) {
+	assert(0);
+    }
+
+    /* do as much as we can on every job that has completed */
+    for (i=0; i < job_count; i++) {
+	sm_p = (PINT_client_sm *) client_sm_p_array[i];
+
+	ret = PINT_state_machine_next(sm_p,
+				      &job_status_array[i]);
+	while (ret == 1) {
+	    /* PINT_state_machine_next() calls next function and
+	     * returns the result.
+	     */
+	    ret = PINT_state_machine_next(sm_p,
+					  &job_status_array[i]);
+	}
+	if (ret < 0) {
+	    /* (ret < 0) indicates a problem from the job system
+	     * itself; the return value of the underlying operation
+	     * is kept in the job status structure.
+	     */
+	}
+    }
+
+    return 0;
+}
 
 /* PINT_serv_prepare_msgpair()
  *
