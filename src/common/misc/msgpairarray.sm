@@ -419,7 +419,7 @@ static int msgpairarray_complete(PARENT_SM *sm_p,
 {
     gossip_debug(GOSSIP_MSGPAIR_DEBUG,
       "%s: sm %p status_user_tag %d msgarray_count %d\n",
-      __func__, sm_p, js_p->status_user_tag, sm_p->msgarray_count);
+      __func__, sm_p, (int) js_p->status_user_tag, sm_p->msgarray_count);
 
 
     /* match operation with something in the msgpair array */
