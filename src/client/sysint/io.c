@@ -58,7 +58,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     PVFS_msg_tag_t op_tag = get_next_session_tag();
     int target_handle_count = 0;
     PVFS_handle* target_handle_array = NULL;
-    int total_errors;
+    int total_errors = 0;
 
     struct PINT_Request_state* req_state = NULL;
     PINT_Request_file_data tmp_file_data;

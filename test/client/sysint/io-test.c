@@ -179,8 +179,6 @@ int main(int argc,char **argv)
 	 * once reading back actually works */
 	memset(io_buffer, 0, io_size*sizeof(int));
 
-	sleep(5);
-
 	/* verify */
 	printf("IO-TEST: performing read on handle: %ld, fs: %d\n",
 		(long)req_io.pinode_refn.handle, (int)req_io.pinode_refn.fs_id);

@@ -20,6 +20,8 @@
 static int io_init(state_action_struct *s_op, job_status_s *ret);
 static int io_get_size(state_action_struct *s_op, job_status_s *ret);
 static int io_send_ack(state_action_struct *s_op, job_status_s *ret);
+static int io_send_completion_ack(state_action_struct *s_op, 
+	job_status_s *ret);
 static int io_start_flow(state_action_struct *s_op, job_status_s *ret);
 static int io_release(state_action_struct *s_op, job_status_s *ret);
 static int io_cleanup(state_action_struct *s_op, job_status_s *ret);
@@ -46,7 +48,7 @@ PINT_state_machine_s io_req_s =
 %%
 
 machine io(init, get_size, send_positive_ack, send_negative_ack, 
-	start_flow, cleanup, release)
+	start_flow, cleanup, release, send_completion_ack)
 {
 	state init
 	{
@@ -77,6 +79,12 @@ machine io(init, get_size, send_positive_ack, send_negative_ack,
 	state start_flow
 	{
 		run io_start_flow;
+		default => send_completion_ack;
+	}
+
+	state send_completion_ack
+	{
+		run io_send_completion_ack;
 		default => release;
 	}
 
@@ -442,4 +450,80 @@ static int io_cleanup(state_action_struct *s_op, job_status_s *ret)
 #endif
 
 	return(0);
+}
+
+/*
+ * Function: io_send_completion_ack()
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *ret
+ *
+ * Pre:      flow is completed so that we can report its status
+ *
+ * Post:     if this is a write, response has been sent to client
+ *           if this is a read, do nothing
+ *            
+ * Returns:  int
+ *
+ * Synopsis: fills in a response to the I/O request, encodes it,
+ *           and sends it to the client via BMI.  Note that it may
+ *           send either positive or negative acknowledgements.
+ *           
+ */
+static int io_send_completion_ack(state_action_struct *s_op, 
+	job_status_s *ret)
+{
+	int err = -1;
+	job_id_t tmp_id;
+	
+	gossip_ldebug(SERVER_DEBUG, "IO: io_send_completion_ack() executed.\n");
+
+	/* we only send this trailing ack if we are working on a write
+	 * operation; otherwise just cut out early
+	 */
+	if(s_op->req->u.io.io_type == PVFS_IO_READ)
+	{
+		ret->error_code = 0;
+		return(1);
+	}
+
+	s_op->resp->status = ret->error_code;
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+	s_op->resp->u.write_completion.total_completed = 
+		s_op->flow_d->total_transfered;
+
+	err = PINT_encode(
+		s_op->resp, 
+		PINT_ENCODE_RESP, 
+		&(s_op->encoded),
+		s_op->addr,
+		s_op->enc_type);
+
+	if(err < 0)
+	{
+		/* critical error prior to job posting */
+		gossip_lerr("Server: IO SM: PINT_encode() failure.\n");
+		/* handle by setting error code in job status structure and
+		 * returning 1
+		 */
+		ret->error_code = err;
+		return(1);
+	}
+	else
+	{
+		err = job_bmi_send_list(
+			s_op->addr,
+			s_op->encoded.buffer_list,
+			s_op->encoded.size_list,
+			s_op->encoded.list_count,
+			s_op->encoded.total_size,
+			s_op->tag,
+			s_op->encoded.buffer_flag,
+			0,
+			s_op,
+			ret,
+			&tmp_id);
+	}
+ 
+	return(err);
 }
