@@ -357,7 +357,7 @@ int PINT_pcache_object_attr_deep_copy(
                     (PVFS_handle *)malloc(df_array_size);
 		if (!dest->u.meta.dfile_array)
 		{
-			return(-ENOMEM);
+                    return(-ENOMEM);
 		}
 		memcpy(dest->u.meta.dfile_array,
                        src->u.meta.dfile_array, df_array_size);
@@ -372,8 +372,28 @@ int PINT_pcache_object_attr_deep_copy(
             {
                 PVFS_Dist_free(dest->u.meta.dist);
             }
-            dest->u.meta.dist = PVFS_Dist_copy(src->u.meta.dist);
-            dest->u.meta.dist_size = src->u.meta.dist_size;
+            /*
+              FIXME: Replace with PVFS_Dist_copy, which
+              causes problems when used here
+            */
+            dest->u.meta.dist = (PVFS_Dist *)
+                malloc(src->u.meta.dist_size);
+            if (dest->u.meta.dist == NULL)
+            {
+                return(-ENOMEM);
+            }
+
+            /* this encodes the previously decoded distribution into
+             * our new space.
+             */
+            PINT_Dist_encode(dest->u.meta.dist, src->u.meta.dist);
+
+            /* this does an in-place decoding of the distribution.  now
+             * we have a decoded version where we want it.
+             *
+             * NOTE: we need to free this later.
+             */
+            PINT_Dist_decode(dest->u.meta.dist, NULL);
         }
 
 	/* add mask to existing values */
