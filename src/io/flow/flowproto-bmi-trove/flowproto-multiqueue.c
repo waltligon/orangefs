@@ -257,6 +257,8 @@ static int fp_multiqueue_setinfo(flow_descriptor * flow_d,
 
 static int fp_multiqueue_post(flow_descriptor * flow_d);
 
+static int fp_multiqueue_cancel(flow_descriptor * flow_d);
+
 static char fp_multiqueue_name[] = "flowproto_multiqueue";
 
 struct flowproto_ops fp_multiqueue_ops = {
@@ -266,7 +268,7 @@ struct flowproto_ops fp_multiqueue_ops = {
     fp_multiqueue_getinfo,
     fp_multiqueue_setinfo,
     fp_multiqueue_post,
-    NULL
+    fp_multiqueue_cancel
 };
 
 /* fp_multiqueue_initialize()
@@ -351,6 +353,28 @@ int fp_multiqueue_setinfo(flow_descriptor * flow_d,
 			       void *parameter)
 {
     return (-PVFS_ENOSYS);
+}
+
+/* fp_multiqueue_cancel()
+ *
+ * cancels a previously posted flow
+ *
+ * returns 0 on success, 1 on immediate completion, -PVFS_error on failure
+ */
+int fp_multiqueue_cancel(flow_descriptor * flow_d)
+{
+    struct fp_private_data* flow_data = PRIVATE_FLOW(flow_d);
+
+    gen_mutex_lock(flow_data->parent->flow_mutex);
+    /* if the flow is already marked as complete, then there is nothing to do */
+    if(flow_d->state != FLOW_COMPLETE)
+    {
+	assert(flow_d->state == FLOW_TRANSMITTING);
+	handle_io_error(-PVFS_EINTR, NULL, flow_data);
+    }
+    gen_mutex_unlock(flow_data->parent->flow_mutex);
+
+    return(0);
 }
 
 /* fp_multiqueue_post()
@@ -1595,7 +1619,10 @@ static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
 	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
 	    "flowproto-multiqueue first failure.\n");
 	flow_data->parent->error_code = error_code;
-	qlist_del(&q_item->list_link);
+	if(q_item)
+	{
+	    qlist_del(&q_item->list_link);
+	}
 	flow_data->cleanup_pending_count = 0;
 
 	/* cleanup depending on what endpoints are in use */
