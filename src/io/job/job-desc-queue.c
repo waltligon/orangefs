@@ -228,6 +228,9 @@ void job_desc_q_dump(job_desc_q_p jdqp)
 	case JOB_REQ_SCHED_TIMER:
 	    gossip_err("    type: JOB_REQ_SCHED_TIMER.\n");
 	    break;
+	case JOB_NULL:
+	    gossip_err("    type: JOB_NULL.\n");
+	    break;
 	}
     }
 

@@ -70,6 +70,12 @@ struct req_sched_desc
     int error_code;
 };
 
+/* passes along error code for null jobs */
+struct null_info_desc
+{
+    int error_code;
+};
+
 enum job_type
 {
     JOB_BMI = 1,
@@ -78,7 +84,8 @@ enum job_type
     JOB_FLOW,
     JOB_REQ_SCHED,
     JOB_DEV_UNEXP,
-    JOB_REQ_SCHED_TIMER
+    JOB_REQ_SCHED_TIMER,
+    JOB_NULL
 };
 
 /* describes a job, which may be one of several types */
@@ -103,6 +110,7 @@ struct job_desc
 	struct flow_desc flow;
 	struct req_sched_desc req_sched;
 	struct dev_unexp_desc dev_unexp;
+	struct null_info_desc null_info;
     }
     u;
 

@@ -2978,6 +2978,48 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     return (0);
 }
 
+/* job_null()
+ *
+ * post null job; can be used to trigger asynchronous state transitions
+ * without doing any underlying work
+ *
+ * returns 0 on success, -PVFS_error on failure
+ * NOTE: immediate completion not allowed here
+ */
+int job_null(
+    int error_code,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id)
+{
+    struct job_desc *jd = NULL;
+
+    jd = alloc_job_desc(JOB_NULL);
+    if (!jd)
+    {
+	return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->u.null_info.error_code = error_code;
+
+    gen_mutex_lock(&completion_mutex);
+    job_desc_q_add(completion_queue_array[jd->context_id], 
+	jd);
+    /* set completed flag while holding queue lock */
+    jd->completed_flag = 1;
+#ifdef __PVFS2_JOB_THREADED__
+    /* wake up anyone waiting for completion */
+    pthread_cond_signal(&completion_cond);
+#endif
+    gen_mutex_unlock(&completion_mutex);
+
+    return(0);
+}
+
 
 /* job_test()
  *
@@ -3756,6 +3798,9 @@ static void fill_status(struct job_desc *jd,
 	break;
     case JOB_REQ_SCHED_TIMER:
 	status->error_code = jd->u.req_sched.error_code;
+	break;
+    case JOB_NULL:
+	status->error_code = jd->u.null_info.error_code;
 	break;
     }
 
