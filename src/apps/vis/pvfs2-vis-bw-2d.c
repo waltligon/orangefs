@@ -30,6 +30,8 @@ struct options
     int mnt_point_set;
     int width;
     int width_set;
+    int update_interval;
+    int update_interval_set;
 };
 
 static int draw(void);
@@ -68,7 +70,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    ret = pvfs2_vis_start(user_opts->mnt_point);
+    ret = pvfs2_vis_start(user_opts->mnt_point, user_opts->update_interval);
     if(ret < 0)
     {
 	PVFS_perror("pvfs2_vis_start", ret);
@@ -96,7 +98,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "vm:w:";
+    char flags[] = "vm:w:i:";
     int one_opt = 0;
     int len = 0;
 
@@ -147,13 +149,24 @@ static struct options* parse_args(int argc, char* argv[])
 		}
 		tmp_opts->width_set = 1;
 		break;
+	    case('i'):
+		ret = sscanf(optarg, "%d", &tmp_opts->update_interval);
+		if(ret < 1)
+		{
+		    free(tmp_opts);
+		    return(NULL);
+		}
+		tmp_opts->update_interval_set = 1;
+		break;
+
 	    case('?'):
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
 	}
     }
 
-    if(!tmp_opts->mnt_point_set || !tmp_opts->width_set)
+    if(!tmp_opts->mnt_point_set || !tmp_opts->width_set || 
+	!tmp_opts->update_interval_set)
     {
 	free(tmp_opts);
 	return(NULL);
@@ -401,9 +414,9 @@ static int draw(void)
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s -m [fs_mount_point] -w [width in pixels]\n",
+    fprintf(stderr, "Usage  : %s -m [fs_mount_point] -w [width in pixels] -i [update interval (msecs)]\n",
 	argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -w 800\n",
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -w 800 -i 1000\n",
 	argv[0]);
     return;
 }

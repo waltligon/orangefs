@@ -11,13 +11,13 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <pthread.h>
+#include <time.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 #include "pvfs2-vis.h"
 
 #define HISTORY 5
-#define FREQUENCY 1
 
 struct poll_thread_args{
     PVFS_fs_id fs;
@@ -28,6 +28,7 @@ struct poll_thread_args{
     uint64_t* end_time_ms_array;
     int server_count;
     int history_count;
+    struct timespec req;
 };
 
 struct pvfs2_vis_buffer pint_vis_shared;
@@ -63,7 +64,7 @@ int pvfs2_vis_stop(void)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int pvfs2_vis_start(char* path)
+int pvfs2_vis_start(char* path, int update_interval)
 {
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
@@ -80,6 +81,10 @@ int pvfs2_vis_start(char* path)
     PVFS_id_gen_t* addr_array;
     int done = 0;
     struct poll_thread_args* args;
+    struct timespec req;
+
+    req.tv_sec = update_interval/1000;
+    req.tv_nsec = (update_interval%1000)*1000*1000;
 
     /* allocate storage to convey information to thread */
     args = (struct poll_thread_args*)malloc(sizeof(struct poll_thread_args));
@@ -202,7 +207,7 @@ int pvfs2_vis_start(char* path)
 		    done = 0;
 	    }
 	}
-	sleep(FREQUENCY);
+	nanosleep(&req, NULL);
     }
 
     /* populate the shared performance data */
@@ -246,6 +251,7 @@ int pvfs2_vis_start(char* path)
     args->end_time_ms_array = end_time_ms_array;
     args->server_count = io_server_count;
     args->history_count = HISTORY;
+    args->req = req;
 
     /* launch thread */
     ret = pthread_create(&poll_thread_id, NULL, poll_for_updates, args);
@@ -282,6 +288,7 @@ static void* poll_for_updates(void* args)
     uint64_t* end_time_ms_array = tmp_args->end_time_ms_array;
     int server_count = tmp_args->server_count;
     int history_count = tmp_args->history_count;
+    struct timespec req = tmp_args->req;
 
     while(1)
     {
@@ -343,7 +350,7 @@ static void* poll_for_updates(void* args)
 	}
 	pthread_mutex_unlock(&pint_vis_mutex);
 
-	sleep(FREQUENCY);
+	nanosleep(&req, NULL);
     }
 
     return(NULL);

@@ -17,7 +17,7 @@ struct pvfs2_vis_buffer
     uint64_t* io_end_time_ms_array;
 };
 
-int pvfs2_vis_start(char* path);
+int pvfs2_vis_start(char* path, int update_interval);
 int pvfs2_vis_stop(void);
 
 extern struct pvfs2_vis_buffer pint_vis_shared;

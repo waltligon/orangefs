@@ -42,7 +42,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    ret = pvfs2_vis_start(user_opts->mnt_point);
+    ret = pvfs2_vis_start(user_opts->mnt_point, 1000);
     if(ret < 0)
     {
 	PVFS_perror("pvfs2_vis_start", ret);
