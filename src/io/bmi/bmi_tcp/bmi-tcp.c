@@ -242,6 +242,9 @@ int BMI_tcp_initialize(method_addr_p listen_addr, bmi_flag_t
 	tcp_method_params.mode_unexp_limit = TCP_MODE_UNEXP_LIMIT;
 	tcp_method_params.method_flags = init_flags;
 
+	/* zero our completion hash table */
+	completion_hash = (struct qhash_table*)0;
+
 	if(init_flags & BMI_INIT_SERVER)
 	{
 		/* hang on to our local listening address if needed */
@@ -338,7 +341,10 @@ int BMI_tcp_finalize(void)
 		}
 	}
 
-	qhash_finalize(completion_hash);
+	if (completion_hash)
+	{
+		qhash_finalize(completion_hash);
+	}
 
 	/* get rid of socket collection */
 	if(tcp_socket_collection_p)
