@@ -10,17 +10,18 @@
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "str-utils.h"
+#include "llist.h"
 
-struct PINT_llist *PINT_create_extent_list(
+PINT_llist *PINT_create_extent_list(
     char *extent_str);
 int PINT_handle_in_extent(
     PVFS_handle_extent *ext,
     PVFS_handle handle);
 int PINT_handle_in_extent_list(
-    struct PINT_llist *extent_list,
+    PINT_llist *extent_list,
     PVFS_handle handle);
 void PINT_release_extent_list(
-    struct PINT_llist *extent_list);
+    PINT_llist *extent_list);
 
 #endif /* __EXTENT_UTILS_H */
 

@@ -9,7 +9,7 @@
 
 void print_filesystem_configuration(struct filesystem_configuration_s *fs)
 {
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct host_handle_mapping_s *cur_h_mapping = NULL;
 
     if (fs)
@@ -84,7 +84,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
 
 int main(int argc, char **argv)
 {
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct server_configuration_s serverconfig;
     struct host_alias_s *cur_alias;
     struct filesystem_configuration_s *cur_fs = NULL;

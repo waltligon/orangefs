@@ -105,7 +105,7 @@ int PINT_handle_load_mapping(
     struct filesystem_configuration_s *fs)
 {
     int ret = -EINVAL;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct config_fs_cache_s *cur_config_fs_cache = NULL;
     struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
@@ -315,7 +315,7 @@ int PINT_bucket_get_physical(
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    struct PINT_llist* tmp_server = NULL;
+    PINT_llist* tmp_server = NULL;
     bmi_addr_t tmp_bmi_addr;
     int dup_flag = 0;
     int i;
@@ -500,7 +500,7 @@ int PINT_bucket_get_server_name(
     PVFS_fs_id fsid)
 {
     int ret = -EINVAL;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;

@@ -73,7 +73,7 @@ static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
     char *alias);
 static struct host_handle_mapping_s *get_or_add_handle_mapping(
-    struct PINT_llist *list,
+    PINT_llist *list,
     char *alias);
 static char *merge_handle_range_strs(
     char *range1,
@@ -651,7 +651,7 @@ DOTCONF_CB(get_range_list)
     int i = 0, is_new_handle_mapping = 0;
     struct filesystem_configuration_s *fs_conf = NULL;
     struct host_handle_mapping_s *handle_mapping = NULL;
-    struct PINT_llist **handle_range_list = NULL;
+    PINT_llist **handle_range_list = NULL;
 
     if ((config_s->configuration_context != META_HANDLERANGES_CONFIG) &&
         (config_s->configuration_context != DATA_HANDLERANGES_CONFIG))
@@ -830,7 +830,7 @@ void PINT_config_release(struct server_configuration_s *config_s)
 static int is_valid_alias(char *str)
 {
     int ret = 0;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct host_alias_s *cur_alias;
 
     if (str)
@@ -899,8 +899,8 @@ static int is_root_handle_in_a_meta_range(
     struct filesystem_configuration_s *fs)
 {
     int ret = 0;
-    struct PINT_llist *cur = NULL;
-    struct PINT_llist *extent_list = NULL;
+    PINT_llist *cur = NULL;
+    PINT_llist *extent_list = NULL;
     char *cur_host_id = (char *)0;
     host_handle_mapping_s *cur_h_mapping = NULL;
 
@@ -1030,7 +1030,7 @@ static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
     char *alias)
 {
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct host_alias_s *ret = NULL;
     struct host_alias_s *cur_alias = NULL;
 
@@ -1059,10 +1059,10 @@ static host_alias_s *find_host_alias_ptr_by_alias(
 }
 
 static struct host_handle_mapping_s *get_or_add_handle_mapping(
-    struct PINT_llist *list,
+    PINT_llist *list,
     char *alias)
 {
-    struct PINT_llist *cur = list;
+    PINT_llist *cur = list;
     struct host_handle_mapping_s *ret = NULL;
     struct host_handle_mapping_s *handle_mapping = NULL;
 
@@ -1182,7 +1182,7 @@ char *PINT_config_get_host_addr_ptr(
     char *alias)
 {
     char *ret = (char *)0;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct host_alias_s *cur_alias = NULL;
 
     if (config_s && alias)
@@ -1225,7 +1225,7 @@ char *PINT_config_get_host_alias_ptr(
     char *bmi_address)
 {
     char *ret = (char *)0;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct host_alias_s *cur_alias = NULL;
 
     if (config_s && bmi_address)
@@ -1501,7 +1501,7 @@ static char *get_handle_range_str(
 {
     char *ret = (char *)0;
     char *my_alias = (char *)0;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct host_handle_mapping_s *cur_h_mapping = NULL;
 
     if (config_s && config_s->host_id && fs)
@@ -1544,7 +1544,7 @@ int PINT_config_is_valid_configuration(
     struct server_configuration_s *config_s)
 {
     int ret = 0, fs_count = 0;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     
     if (config_s && config_s->logfile && config_s->event_logging && config_s->bmi_modules)
@@ -1578,7 +1578,7 @@ int PINT_config_is_valid_collection_id(
     PVFS_fs_id fs_id)
 {
     int ret = 0;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
 
     if (config_s)
@@ -1610,7 +1610,7 @@ struct filesystem_configuration_s* PINT_config_find_fs_name(
     struct server_configuration_s *config_s,
     char *fs_name)
 {
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
 
     if (config_s && fs_name)
@@ -1646,7 +1646,7 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
     struct server_configuration_s* config_s,
     PVFS_fs_id fs_id)
 {
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
 
     if (config_s)
@@ -1682,7 +1682,7 @@ int PINT_config_pvfs2_mkspace(
     int ret = 1;
     PVFS_handle root_handle = 0;
     int create_collection_only = 0;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     char *cur_handle_range = (char *)0;
     filesystem_configuration_s *cur_fs = NULL;
 
@@ -1761,8 +1761,8 @@ static int is_root_handle_in_my_range(
     struct filesystem_configuration_s *fs)
 {
     int ret = 0;
-    struct PINT_llist *cur = NULL;
-    struct PINT_llist *extent_list = NULL;
+    PINT_llist *cur = NULL;
+    PINT_llist *extent_list = NULL;
     char *cur_host_id = (char *)0;
     host_handle_mapping_s *cur_h_mapping = NULL;
 

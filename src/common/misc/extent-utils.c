@@ -28,10 +28,10 @@
  * the extent_str is invalid, or an error occurs
  *
  */
-struct PINT_llist *PINT_create_extent_list(char *extent_str)
+PINT_llist *PINT_create_extent_list(char *extent_str)
 {
     PVFS_handle_extent cur_extent, *new_extent = NULL;
-    struct PINT_llist *extent_list = NULL;
+    PINT_llist *extent_list = NULL;
     int status = 0;
 
     if (extent_str)
@@ -72,7 +72,7 @@ int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
 /* PINT_handle_in_extent_list()
  *
  * Parameters:
- * struct PINT_llist *extent_list   - PINT_llist of extent structures
+ * PINT_llist *extent_list   - PINT_llist of extent structures
  * PVFS_handle                 - a handle
  *
  * Returns 1 if the specified handle is within any of the
@@ -81,11 +81,11 @@ int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
  *
  */
 int PINT_handle_in_extent_list(
-    struct PINT_llist *extent_list,
+    PINT_llist *extent_list,
     PVFS_handle handle)
 {
     int ret = 0;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     PVFS_handle_extent *cur_extent = NULL;
 
     if (extent_list)
@@ -112,12 +112,12 @@ int PINT_handle_in_extent_list(
 /* PINT_release_extent_list()
  *
  * Parameters:
- * struct PINT_llist *extent_list   - PINT_llist of extent structures
+ * PINT_llist *extent_list   - PINT_llist of extent structures
  *
  * Frees extent objects within the specified extent_list if any.
  *
  */
-void PINT_release_extent_list(struct PINT_llist *extent_list)
+void PINT_release_extent_list(PINT_llist *extent_list)
 {
     if (extent_list)
     {

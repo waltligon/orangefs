@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     int i = 0, j = 0, k = 0, n = 0, num_file_systems = 0;
     pvfs_mntlist mnt = {0,NULL};
     struct server_configuration_s server_config;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     int fs_ids[MAX_NUM_FS] = {0};
     int num_meta_servers = 0, num_data_servers = 0;

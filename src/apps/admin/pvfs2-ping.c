@@ -226,7 +226,7 @@ static int noop_all_servers(struct server_configuration_s* conf,
     struct qlist_head* hash_link = NULL;
     char* server_bmi_str = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    struct PINT_llist* tmp_server = NULL;
+    PINT_llist* tmp_server = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     PVFS_credentials creds;
     int ret = -1;
@@ -315,7 +315,7 @@ static int print_config(struct server_configuration_s* conf,
     struct qlist_head* hash_link = NULL;
     char* server_bmi_str = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    struct PINT_llist* tmp_server = NULL;
+    PINT_llist* tmp_server = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
 
     hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));

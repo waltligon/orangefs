@@ -50,7 +50,7 @@ static int hash_fsid_compare(void *key, struct qlist_head *link);
  */
 static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                                      TROVE_context_id context_id,
-                                     struct PINT_llist *extent_list,
+                                     PINT_llist *extent_list,
                                      struct handle_ledger *ledger)
 {
     int ret = -1, i = 0, count = 0, op_count = 0;
@@ -120,11 +120,11 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
     return ret;
 }
 
-static int trove_map_handle_ranges( struct PINT_llist *extent_list,
+static int trove_map_handle_ranges( PINT_llist *extent_list,
                                    struct handle_ledger *ledger)
 {
     int ret = -1;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     PVFS_handle_extent *cur_extent = NULL;
     int64_t total_handles=0;
 
@@ -255,7 +255,7 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
                             char *handle_range_str)
 {
     int ret = -1;
-    struct PINT_llist *extent_list = NULL;
+    PINT_llist *extent_list = NULL;
     handle_ledger_t *ledger = NULL;
 
     if (handle_range_str)

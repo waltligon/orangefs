@@ -449,7 +449,7 @@ static int server_initialize_subsystems(
     int ret = 0;
     char *method_name = NULL;
     char *cur_merged_handle_range = NULL;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
     TROVE_context_id trove_context = -1;
 

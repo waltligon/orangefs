@@ -44,7 +44,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     int ret = -1, i, j;
     int num_file_systems = 0;
     gen_mutex_t *mt_config = NULL;
-    struct PINT_llist *cur = NULL;
+    PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     const char **method_ptr_list;
     int num_method_ptr_list, max_method_ptr_list;
