@@ -94,6 +94,7 @@ static int server_parse_cmd_line_args(int argc, char **argv);
 static void server_state_table_initialize(void);
 static int server_state_machine_start(
     PINT_server_op *s_op, job_status_s *ret);
+static int server_state_machine_start_noreq(enum PVFS_server_op op);
 
 /* main()
  */
@@ -205,6 +206,14 @@ int main(int argc, char **argv)
     if (ret < 0)
     {
 	gossip_err("Error: Could not initialize server; aborting.\n");
+	goto server_shutdown;
+    }
+
+    /* kick off performance update state machine */
+    ret = server_state_machine_start_noreq(PVFS_SERV_PERF_UPDATE);
+    if(ret < 0)
+    {
+	gossip_lerr("Error: failed to start perf update state machine.\n");
 	goto server_shutdown;
     }
 
@@ -851,6 +860,63 @@ static int server_state_machine_start(
     return ((s_op->current_state->state_action))(s_op,ret);
 }
 
+/* static int server_state_machine_start_noreq()
+ * 
+ * similar in purpose to server_state_machine_start(), except that it
+ * kicks off a state machine instance without first receiving a 
+ * client side request
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int server_state_machine_start_noreq(enum PVFS_server_op op)
+{
+    PINT_server_op* tmp_s_op;
+    job_status_s tmp_status;
+    int ret = -1;
+
+    /* create a new op structure */
+    tmp_s_op = (PINT_server_op*)malloc(sizeof(PINT_server_op));
+    if(!tmp_s_op)
+    {
+	return(-PVFS_ENOMEM);
+    }
+    memset(tmp_s_op, 0, sizeof(PINT_server_op));
+    tmp_s_op->op = op; 
+
+    /* find the state machine for this op type */
+    tmp_s_op->current_state = PINT_state_machine_locate(tmp_s_op);
+    if(!tmp_s_op->current_state)
+    {
+	gossip_lerr("Error: failed to start state machine.\n");
+	return(-PVFS_ENOSYS);
+    }
+    tmp_status.error_code = 0;
+
+    /* execute first state */
+    ret = tmp_s_op->current_state->state_action(tmp_s_op, 
+	&tmp_status);
+    if(ret < 0)
+    {
+	gossip_lerr("Error: failed to start state machine.\n");
+	return(ret);
+    }
+
+    /* continue as long as states are immediately completing */
+    while(ret == 1)
+    {
+	ret = PINT_state_machine_next(tmp_s_op, &tmp_status);
+    };
+    if (ret < 0)
+    {
+	gossip_lerr("Error: unhandled state machine processing "
+		    "error (most likely an unhandled job error).\n");
+	/* TODO: handle this properly */
+	assert(0);
+    }
+
+    return(0);
+}
+
 /* server_state_table_initialize()
  *
  * sets up a table of state machines that can be located with
@@ -878,6 +944,7 @@ static void server_state_table_initialize(void)
     PINT_server_op_table[PVFS_SERV_MGMT_SETPARAM] = &pvfs2_setparam_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_NOOP]     = &pvfs2_noop_sm;
     PINT_server_op_table[PVFS_SERV_STATFS]	  = &pvfs2_statfs_sm;
+    PINT_server_op_table[PVFS_SERV_PERF_UPDATE]	  = &pvfs2_perf_update_sm;
 }
 
 /* server_state_machine_complete()

@@ -40,7 +40,8 @@ enum PVFS_server_op
     PVFS_SERV_FLUSH = 14,
     PVFS_SERV_MGMT_SETPARAM = 15,
     PVFS_SERV_MGMT_NOOP = 16,
-    PVFS_SERV_STATFS = 17
+    PVFS_SERV_STATFS = 17,
+    PVFS_SERV_PERF_UPDATE = 18  /* _not_ a real request */
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
      * if you add a new operation to this list
      */
@@ -52,7 +53,7 @@ enum PVFS_server_op
      * PVFS_SERV_EXTENSION
      */
 };
-#define PVFS_MAX_SERVER_OP 17
+#define PVFS_MAX_SERVER_OP 18
 
 /* max number of jobs the server is able to manage at a time */
 #define PVFS_SERVER_MAX_JOBS  512

@@ -256,6 +256,7 @@ int PINT_req_sched_target_handle(
 	return (0);
 	break;
     case PVFS_SERV_WRITE_COMPLETION:
+    case PVFS_SERV_PERF_UPDATE:
 	/* these should never show up here */
 	return (-EINVAL);
 	break;

@@ -300,6 +300,7 @@ int do_encode_resp(
 	return 0;
     /* invalid responses: */
     case PVFS_SERV_INVALID:
+    case PVFS_SERV_PERF_UPDATE:
 	assert(0);
 	gossip_lerr("Error: response type %d is invalid.\n",
 	    (int)response->op);

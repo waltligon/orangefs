@@ -238,6 +238,9 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 	case PVFS_SERV_STATFS:
 	    ret_ptr = "statfs";
 	    break;
+	case PVFS_SERV_PERF_UPDATE:
+	    ret_ptr = "perf_update";
+	    break;
     }
     return(ret_ptr);
 }
@@ -251,7 +254,7 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
  */
 #define PINT_STATE_DEBUG(fn_name)				\
     gossip_debug(SERVER_DEBUG, "(%p) %s state: %s\n", s_op,	\
-    PINT_map_server_op_to_string(s_op->req->op), fn_name);
+    PINT_map_server_op_to_string(s_op->op), fn_name);
 
 /* Globals for Server Interface */
 
@@ -273,6 +276,7 @@ extern struct PINT_state_machine_s pvfs2_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_setparam_sm;
 extern struct PINT_state_machine_s pvfs2_noop_sm;
 extern struct PINT_state_machine_s pvfs2_statfs_sm;
+extern struct PINT_state_machine_s pvfs2_perf_update_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_prelude_sm;

@@ -118,6 +118,7 @@ int do_decode_resp(
 
     /* invalid response types: */
     case PVFS_SERV_INVALID:
+    case PVFS_SERV_PERF_UPDATE:
 	assert(0);
 	gossip_lerr("Error: response type %d is invalid.\n", 
 	    (int)response->op);

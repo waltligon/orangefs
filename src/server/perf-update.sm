@@ -1,0 +1,99 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+
+#include "pvfs2-server.h"
+
+/* how often (in milliseconds) we update */
+#define PVFS2_PERF_UPDATE_INTERVAL 1000 
+
+static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p);
+static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p);
+
+%%
+
+machine pvfs2_perf_update_sm(do_work, error)
+{
+	state do_work 
+	{
+		run perf_update_do_work;
+		success => do_work;
+		default => error;
+	}
+
+	state error 
+	{
+		run perf_update_error;
+		default => do_work;
+	}
+}
+
+%%
+
+/* perf_update_error()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p)
+{
+    PINT_STATE_DEBUG("error");
+    gossip_err("Error: stopping server performance monitoring.\n");
+
+    /* TODO: what else needs to be cleaned up here? */
+
+    return(server_state_machine_complete(s_op));
+}
+
+/* perf_update_do_work()
+ *
+ * resets counters, updates metrices, etc- this is intended to be called
+ * repeatedly on a regular interval
+ */
+static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
+{
+    struct timeval tv;
+    job_id_t tmp_id;
+
+#if 0
+    PINT_STATE_DEBUG("do_work");
+#endif
+    /* TODO: fill this in */
+
+    gettimeofday(&tv, NULL);
+#if 0
+    gossip_debug(SERVER_DEBUG, "current time: %ld secs, %ld usecs.\n", 
+	(long)tv.tv_sec, (long)tv.tv_usec);
+#endif
+	
+    /* post another timer */
+    return(job_req_sched_post_timer(PVFS2_PERF_UPDATE_INTERVAL,
+	s_op,
+	0,
+	js_p,
+	&tmp_id,
+	server_job_context));
+}
+
+
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */
+
