@@ -768,6 +768,7 @@ static int server_initialize_subsystems(
 static int server_setup_signal_handlers(void)
 {
     struct sigaction new_action;
+    struct sigaction ign_action;
 #ifdef __PVFS2_SEGV_BACKTRACE__
     struct sigaction segv_action;
 
@@ -781,17 +782,26 @@ static int server_setup_signal_handlers(void)
     sigemptyset (&new_action.sa_mask);
     new_action.sa_flags = 0;
 
-    sigaction (SIGPIPE, &new_action, NULL);
+    ign_action.sa_handler = SIG_IGN;
+    sigemptyset (&ign_action.sa_mask);
+    ign_action.sa_flags = 0;
+
+    /* catch these */
     sigaction (SIGILL, &new_action, NULL);
     sigaction (SIGTERM, &new_action, NULL);
     sigaction (SIGHUP, &new_action, NULL);
-    sigaction (SIGUSR1, &new_action, NULL);
-    sigaction (SIGUSR2, &new_action, NULL);
+    sigaction (SIGINT, &new_action, NULL);
+    sigaction (SIGQUIT, &new_action, NULL);
 #ifdef __PVFS2_SEGV_BACKTRACE__
     sigaction (SIGSEGV, &segv_action, NULL);
 #else
     sigaction (SIGSEGV, &new_action, NULL);
 #endif
+
+    /* ignore these */
+    sigaction (SIGPIPE, &ign_action, NULL);
+    sigaction (SIGUSR1, &ign_action, NULL);
+    sigaction (SIGUSR2, &ign_action, NULL);
 
     return 0;
 }
@@ -951,6 +961,8 @@ static int server_shutdown(
 
 static void server_sig_handler(int sig)
 {
+    struct sigaction new_action;
+
     if (getpid() != server_controlling_pid)
     {
         return;
@@ -962,14 +974,6 @@ static void server_sig_handler(int sig)
                    "%d\n", sig, (int)server_status_flag);
     }
 
-    /* short circuit non critical signals here */
-    if (sig == SIGPIPE || sig == SIGUSR1 || sig == SIGUSR2)
-    {
-	/* reset handler and continue processing */
-	gossip_err("PVFS2 server: continuing.\n");
-	return;
-    }
-
     if (sig == SIGHUP)
     {
 	/* TODO: fix this, need to clean up server initialization
@@ -978,6 +982,12 @@ static void server_sig_handler(int sig)
 	gossip_err("SIGHUP: pvfs2-server cannot restart; "
                    "shutting down instead.\n");
     }
+
+    /* ignore further invocations of this signal */
+    new_action.sa_handler = SIG_IGN;
+    sigemptyset(&new_action.sa_mask);
+    new_action.sa_flags = 0;
+    sigaction (sig, &new_action, NULL);
 
     /* set the signal_recvd_flag on critical errors to cause the
      * server to exit gracefully on the next work cycle
