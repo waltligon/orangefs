@@ -872,7 +872,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
         else
         {
             gossip_debug(
-                GOSSIP_IO_DEBUG, "*** %d msgpairs completions "
+                GOSSIP_IO_DEBUG, "*** %d msgpair completions "
                 "pending\n", sm_p->u.io.msgpair_completion_count);
         }
         return 0;
@@ -1058,7 +1058,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
          (ret == -ECONNRESET) || (ret == -PVFS_EPROTO)) &&
         (sm_p->u.io.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
     {
-        if (sm_p->acache_hit || sm_p->pinode)
+        if (sm_p->acache_hit)
         {
             PINT_acache_release(sm_p->pinode);
             sm_p->acache_hit = 0;
@@ -1287,13 +1287,12 @@ static inline int build_context_flow(
     cur_ctx->flow_desc.type = sm_p->u.io.flowproto_type;
     cur_ctx->flow_desc.user_ptr = NULL;
 
-    gossip_debug(
-        GOSSIP_IO_DEBUG, "    bstream_size = %Ld, datafile_nr = "
-        "%d, datafile_ct = %d\n\tfile_req_off = %Ld\n",
-        Ld(cur_ctx->flow_desc.file_data.fsize),
-        cur_ctx->flow_desc.file_data.server_nr,
-        cur_ctx->flow_desc.file_data.server_ct,
-        Ld(cur_ctx->flow_desc.file_req_offset));
+    gossip_debug(GOSSIP_IO_DEBUG, "   bstream_size = %Ld, datafile "
+                 "nr=%d, ct=%d\n\t\t\tfile_req_off = %Ld\n",
+                 Ld(cur_ctx->flow_desc.file_data.fsize),
+                 cur_ctx->flow_desc.file_data.server_nr,
+                 cur_ctx->flow_desc.file_data.server_ct,
+                 Ld(cur_ctx->flow_desc.file_req_offset));
 
     if (sm_p->u.io.io_type == PVFS_IO_READ)
     {
@@ -1650,8 +1649,8 @@ static int io_find_target_datafiles(
             handle_index_array[(*handle_index_out_count)++] = i;
 
             gossip_debug(GOSSIP_IO_DEBUG, "%s: "
-                         "datafile %d might have some data (out_count "
-                         "is %d).\n", __func__, i, *handle_index_out_count);
+                         "datafile[%d] might have data (out=%d)\n",
+                         __func__, i, *handle_index_out_count);
         }
     }
     PINT_Free_request_state(req_state);

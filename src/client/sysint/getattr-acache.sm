@@ -95,7 +95,6 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
     int status = 0;
     PVFS_object_ref object_ref;
 
-    assert(sm_p->pinode == NULL);
     js_p->error_code = 0;
 
     object_ref.handle = sm_p->msgpair.handle;
