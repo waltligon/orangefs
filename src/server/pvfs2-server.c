@@ -258,8 +258,7 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
     /* Below, we initially post BMI unexpected msg buffers =) */
     for (i = 0; i < user_opts.initial_unexpected_requests; i++)
     {
-        /* ARE THESE SUPPOSED TO BE UNINITIALIZED??? -N.M. */
-	ret = initialize_new_server_op(&job_status_structs[0]);
+	ret = initialize_new_server_op(&job_status_structs[i]);
 	if (ret < 0)
 	{
 	    *server_level_init = CHECK_DEPS_QUEUE;
@@ -350,6 +349,14 @@ int main(int argc,
     if (ret < 0)
     {
 	gossip_err("Error: Could not start server; aborting.\n");
+	server_level_init = DEALLOC_INIT_MEMORY;
+	goto server_shutdown;
+    }
+
+    if (MAX_JOBS < user_opts.initial_unexpected_requests)
+    {
+	gossip_err("Error: initial_unexpected request value is too "
+                   "large; aborting.\n");
 	server_level_init = DEALLOC_INIT_MEMORY;
 	goto server_shutdown;
     }
