@@ -2,41 +2,37 @@ Stuff to do for the first friendly-user release:
 (all other todo items are in PVFS2-GLOBAL-TODO.txt)
 ----------------------------------------------------------
 
-. pick a license and apply to all of the code (Phil start discussion)
-
-DONE . get rid of dependencies on -lrt and -lpthread for client side
-  components (Phil)
-
-NEEDS TESTING . config file utility
-
 . quickstart guide
-
-DONE (thanks phil) . mpich2 and pvfs2 cannot be built together (Rob L.)
-
-NEEDS TESTING . handle more error cases in kernel module
-      (ctrl-c, timeouts, pvfs2-client death, etc.) (Neill)
-
-DONE . pvfs2-set-debugmask for runtime gossip settings, (Phil)
-
-NEEDS TESTING . pvfs2-ls
-
-NEEDS TESTING . pvfs2-ping
 
 . a real 'make install'
   - how do we want to handle building and installing vfs stuff?
     other than that, it seems like this item is done already...
-
-DONE . server log to a file and run in background
-
-DONE . more config file options:
-DONE  - default gossip mask (server)
-DONE  - run in foreground/background
-DONE  - log file options
-
-. discontig in file support for ROMIO (Rob L.)
 
 . status document
   - good examples to look at in code
   - stuff thats known to be broken
   - stuff thats almost done, but not enabled
   - open issues
+
+NEEDS TESTING . config file utility
+
+NEEDS TESTING . handle more error cases in kernel module
+      (ctrl-c, timeouts, pvfs2-client death, etc.) (Neill)
+
+NEEDS TESTING . pvfs2-ls
+
+NEEDS TESTING . pvfs2-ping
+
+DONE . server log to a file and run in background
+DONE . more config file options:
+DONE  - default gossip mask (server)
+DONE  - run in foreground/background
+DONE  - log file options
+DONE . pvfs2-set-debugmask for runtime gossip settings, (Phil)
+DONE (thanks phil) . mpich2 and pvfs2 cannot be built together (Rob L.)
+DONE . pick a license and apply to all of the code (Phil start discussion)
+DONE . get rid of dependencies on -lrt and -lpthread for client side components (Phil)
+
+. discontig in file support for ROMIO (Rob L.)
+
+
