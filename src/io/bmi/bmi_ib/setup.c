@@ -6,10 +6,11 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.8 2004-03-17 20:10:35 pw Exp $
+ * $Id: setup.c,v 1.9 2004-04-15 18:33:04 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>  /* ntohs et al */
 #include <arpa/inet.h>   /* inet_ntoa */
@@ -19,8 +20,9 @@
 #include <src/io/bmi/bmi-method-callback.h>
 /* ib includes */
 #include <vapi.h>
+#include <vapi_common.h>  /* VAPI_event_(record|syndrome)_sym */
 #include <evapi.h>
-#include <wrap_common.h>
+#include <wrap_common.h>  /* reinit_mosal externs */
 /* bmi ib private header */
 #include "ib.h"
 
@@ -55,8 +57,8 @@ static void init_connection_modify_qp(VAPI_qp_hndl_t qp,
 /*
  * Build new conneciton.
  */
-ib_connection_t *
-ib_new_connection(int s, int is_server)
+static ib_connection_t *
+ib_new_connection(int s, const char *peername, int is_server)
 {
     ib_connection_t *c;
     int i, ret;
@@ -67,6 +69,7 @@ ib_new_connection(int s, int is_server)
 
     /* build new connection */
     c = Malloc(sizeof(*c));
+    c->peername = strdup(peername);
 
     /* fill send and recv free lists and buf heads */
     c->eager_send_buf_contig = Malloc(EAGER_BUF_NUM * EAGER_BUF_SIZE);
@@ -422,10 +425,8 @@ void
 ib_close_connection(ib_connection_t *c)
 {
     int ret;
-    ib_method_addr_t *ibmap = c->remote_map->method_data;
 
-    debug(2, "%s: closing connection to %s:%d", __func__, ibmap->hostname,
-      ibmap->port);
+    debug(2, "%s: closing connection to %s", __func__, c->peername);
     ret = VAPI_destroy_qp(nic_handle, c->qp_ack);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_destroy_qp ack", __func__);
@@ -443,6 +444,7 @@ ib_close_connection(ib_connection_t *c)
     free(c->eager_send_buf_head_contig);
     free(c->eager_recv_buf_head_contig);
     free(c->remote_map);
+    free(c->peername);
     qlist_del(&c->list);
 }
 
@@ -534,6 +536,7 @@ void
 ib_tcp_client_connect(ib_method_addr_t *ibmap, struct method_addr *remote_map)
 {
     int s;
+    char peername[2048];
     struct hostent *hp;
     struct sockaddr_in skin;
     
@@ -547,16 +550,17 @@ ib_tcp_client_connect(ib_method_addr_t *ibmap, struct method_addr *remote_map)
     skin.sin_family = hp->h_addrtype;
     memcpy(&skin.sin_addr, hp->h_addr_list[0], hp->h_length);
     skin.sin_port = htons(ibmap->port);
+    sprintf(peername, "%s:%d", ibmap->hostname, ibmap->port);
   retry:
     if (connect(s, (struct sockaddr *) &skin, sizeof(skin)) < 0) {
 	if (errno == EINTR)
 	    goto retry;
 	else
-	    error_errno("%s: connect to server %s:%d", __func__,
-	      ibmap->hostname, ibmap->port);
+	    error_errno("%s: connect to server %s", __func__, peername);
     }
-    ibmap->c = ib_new_connection(s, 0);
+    ibmap->c = ib_new_connection(s, peername, 0);
     ibmap->c->remote_map = remote_map;
+
     if (close(s) < 0)
 	error_errno("%s: close sock", __func__);
 }
@@ -615,15 +619,22 @@ ib_tcp_server_check_new_connections(void)
 	    error_errno("%s: accept listen sock", __func__);
     } else {
 	int ret;
-	ib_connection_t *c = ib_new_connection(s, 1);
+	char peername[2048];
+	ib_connection_t *c;
+
 	char *hostname = strdup(inet_ntoa(ssin.sin_addr));
 	int port = ntohs(ssin.sin_port);
+	sprintf(peername, "%s:%d", hostname, port);
+
+	c = ib_new_connection(s, peername, 1);
 	c->remote_map = ib_alloc_method_addr(c, hostname, port);
 	/* register this address with the method control layer */
 	ret = bmi_method_addr_reg_callback(c->remote_map);
 	if (ret < 0)
 	    error_xerrno(ret, "%s: bmi_method_addr_reg_callback", __func__);
-	debug(2, "%s: accepted new connection at server", __func__);
+
+	debug(2, "%s: accepted new connection %s at server", __func__,
+	  c->peername);
 	if (close(s) < 0)
 	    error_errno("%s: close new sock", __func__);
 
@@ -672,8 +683,9 @@ async_event_handler(VAPI_hca_hndl_t nic_handle_in __attribute__((unused)),
 	debug(2, "%s: caught send queue drained", __func__);
 	async_event_handler_waiting_drain = 0;
     } else
-	error("%s: event type %d, syndrome %d, qp or cq handle 0x%lx",
-	  __func__, e->type, e->syndrome, e->modifier.qp_hndl);
+	error("%s: event %s, syndrome %s, qp or cq or port 0x%lx",
+	  __func__, VAPI_event_record_sym(e->type),
+	  VAPI_event_syndrome_sym(e->syndrome), e->modifier.qp_hndl);
 }
 
 /*
@@ -908,6 +920,9 @@ ib_mem_register(ib_buflist_t *buflist, int send_or_recv_type)
 	    buflist->lkey[i] = mrw_out.l_key;
 	else
 	    buflist->rkey[i] = mrw_out.r_key;
+	debug(4, "%s: %d addr %Lx size %Ld %s %x", __func__, i, mrw.start,
+	  mrw.size, send_or_recv_type == TYPE_SEND ? "lkey" : "rkey",
+	  send_or_recv_type == TYPE_SEND ? mrw_out.l_key : mrw_out.r_key);
     }
 }
 
@@ -920,6 +935,10 @@ ib_mem_deregister(ib_buflist_t *buflist)
 	int ret = VAPI_deregister_mr(nic_handle, buflist->mr_handle[i]);
 	if (ret < 0)
 	    error_verrno(ret, "%s: VAPI_deregister_mr %d", __func__, i);
+	debug(4, "%s: %d addr %Lx size %Ld lkey %x rkey %x", __func__, i,
+	  int64_from_ptr(buflist->buf.send[i]), buflist->len[i],
+	  buflist->lkey ? buflist->lkey[i] : 0,
+	  buflist->rkey ? buflist->rkey[i] : 0);
     }
     free(buflist->mr_handle);
     if (buflist->lkey)

@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.7 2004-03-17 20:10:26 pw Exp $
+ * $Id: ib.c,v 1.8 2004-04-15 18:33:04 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -45,30 +45,6 @@ static void encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh,
   u_int32_t byte_len);
 static void encourage_recv_incoming_cts_ack(ib_recv_t *rq);
 static void encourage_recv_to_send_cts(ib_recv_t *rq);
-
-/*
- * Look through this CTS message to determine the owning sq.  Works
- * using the mop_id which was sent during the RTS, now returned to us.
- */
-static ib_send_t *
-find_cts_owner(msg_header_cts_t *mh_cts)
-{
-    ib_send_t *sq = 0;
-    list_t *l;
-
-    /* we sent him our sq->mop_id->op_id, go looking for that */
-    qlist_for_each(l, &sendq) {
-	ib_send_t *sqt = (ib_send_t *) l;
-	if (sqt->mop->op_id == (bmi_op_id_t) mh_cts->rts_mop_id) {
-	    sq = sqt;
-	    break;
-	}
-    }
-    if (!sq)
-	error("%s: mop_id %Lx in CTS message not found", __func__,
-	  mh_cts->rts_mop_id);
-    return sq;
-}
 
 /*
  * Wander through single completion queue, pulling off messages and
@@ -113,8 +89,8 @@ check_cq(void)
 
 		assert(desc.imm_data_valid, "%s: immediate data is not valid",
 		  __func__);
-		debug(2, "%s: acknowledgment message, buf %d",
-		  __func__, bufnum);
+		debug(2, "%s: acknowledgment message %s buf %d",
+		  __func__, bh->c->peername, bufnum);
 		/* maybe this is okay?  --pw, 6 mar 04 */
 		assert(bufnum == bh->num, "%s: ack out of sequence, got %d"
 		  " in descriptor for buffer %d", __func__, bufnum, bh->num);
@@ -137,8 +113,9 @@ check_cq(void)
 		 */
 		msg_header_t *mh = bh->buf;
 
-		debug(2, "%s: found len %d at bufnum %d type %s",
-		  __func__, byte_len, bh->num, msg_type_name(mh->type));
+		debug(2, "%s: found len %d at %s bufnum %d type %s",
+		  __func__, byte_len, bh->c->peername, bh->num,
+		  msg_type_name(mh->type));
 		if (mh->type == MSG_CTS) {
 		    /* incoming CTS messages go to the send engine */
 		    debug(2, "%s: found cts message", __func__);
@@ -290,18 +267,37 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
     msg_header_cts_t *mh_cts;
     ib_send_t *sq;
     u_int32_t want;
+    list_t *l;
 
     mh = bh->buf;
     mh_cts = (void *)(mh + 1);
-    sq = find_cts_owner(mh_cts);
+
+    /*
+     * Look through this CTS message to determine the owning sq.  Works
+     * using the mop_id which was sent during the RTS, now returned to us.
+     */
+    sq = 0;
+    qlist_for_each(l, &sendq) {
+	ib_send_t *sqt = (ib_send_t *) l;
+	debug(8, "%s: looking for op_id 0x%Lx, consider 0x%Lx", __func__,
+	  mh_cts->rts_mop_id, sqt->mop->op_id);
+	if (sqt->mop->op_id == (bmi_op_id_t) mh_cts->rts_mop_id) {
+	    sq = sqt;
+	    break;
+	}
+    }
+    if (!sq)
+	error("%s: mop_id %Lx in CTS message not found", __func__,
+	  mh_cts->rts_mop_id);
 
     debug(2, "%s: sq %p %s bh %p len %u", __func__,
       sq, sq_state_name(sq->state), bh, byte_len);
     assert(sq->state == SQ_WAITING_CTS,
       "%s: wrong send state %s", __func__, sq_state_name(sq->state));
 
-    /* message, cts content, list of buffers and lengths */
-    want = sizeof(*mh) + sizeof(*mh_cts) + mh_cts->buflist_num * (8+4+4);
+    /* message; cts content; list of buffers, lengths, and keys */
+    want = sizeof(*mh) + sizeof(*mh_cts)
+      + mh_cts->buflist_num * MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE;
     assert(byte_len == want,
       "%s: wrong message size for CTS, got %u, want %u", __func__,
       byte_len, want);
@@ -435,7 +431,8 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 	rq->rts_mop_id = mh_rts->mop_id;
 
 	/* ack his rts for simplicity */
-	debug(2, "%s: rq %p refill our recv and ack his RTS", __func__, rq);
+	debug(2, "%s: rq %p ack RTS from %s opid 0x%Lx", __func__,
+	  rq, c->peername, rq->rts_mop_id);
 	post_rr(c, bh);
 	post_sr_ack(c, bh);
 
@@ -514,8 +511,8 @@ send_cts(ib_recv_t *rq)
     u_int32_t post_len;
     int i;
 
-    debug(2, "%s: sending on an rq, offering to recv len %Ld", __func__,
-      Ld(rq->buflist.tot_len));
+    debug(2, "%s: rq %p, offering to recv %s opid 0x%Lx len %Ld",
+      __func__, rq, rq->c->peername, rq->rts_mop_id, Ld(rq->buflist.tot_len));
 
     bh = qlist_try_del_head(&rq->c->eager_send_buf_free);
     if (!bh) {
@@ -567,18 +564,19 @@ post_sr(const buf_head_t *bh, u_int32_t len)
     VAPI_sg_lst_entry_t sg;
     VAPI_sr_desc_t sr;
     int ret;
+    const ib_connection_t *c = bh->c;
 
-    debug(2, "%s: bh %d len %u", __func__, bh->num, len);
+    debug(2, "%s: %s bh %d len %u", __func__, c->peername, bh->num, len);
     sg.addr = int64_from_ptr(bh->buf);
     sg.len = len;
-    sg.lkey = bh->c->eager_send_lkey;
+    sg.lkey = c->eager_send_lkey;
 
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_SEND;
     sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
     sr.sg_lst_p = &sg;
     sr.sg_lst_len = 1;
-    ret = VAPI_post_sr(nic_handle, bh->c->qp, &sr);
+    ret = VAPI_post_sr(nic_handle, c->qp, &sr);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_post_sr", __func__);
 }
@@ -593,7 +591,7 @@ post_rr(const ib_connection_t *c, buf_head_t *bh)
     VAPI_rr_desc_t rr;
     int ret;
 
-    debug(2, "%s: bh %d", __func__, bh->num);
+    debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
     sg.addr = int64_from_ptr(bh->buf);
     sg.len = EAGER_BUF_SIZE;
     sg.lkey = c->eager_recv_lkey;
@@ -619,7 +617,7 @@ post_sr_ack(const ib_connection_t *c, const buf_head_t *bh)
     VAPI_sr_desc_t sr;
     int ret;
 
-    debug(2, "%s: bh %d", __func__, bh->num);
+    debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_SEND_WITH_IMM;
     sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
@@ -649,7 +647,7 @@ post_rr_ack(const ib_connection_t *c, const buf_head_t *bh)
     VAPI_rr_desc_t rr;
     int ret;
 
-    debug(2, "%s: bh %d", __func__, bh->num);
+    debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
     memset(&rr, 0, sizeof(rr));
     rr.opcode = VAPI_RECEIVE;
     rr.id = int64_from_ptr(bh);
@@ -699,6 +697,8 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	sr.r_key = recv_rkey[recv_index];
 	sr.sg_lst_len = 0;
 	recv_bytes_needed = recv_lenp[recv_index];
+	debug(4, "%s: chunk to %s remote addr %Lx rkey %x",
+	  __func__, sq->c->peername, sr.remote_addr, sr.r_key);
 	while (recv_bytes_needed > 0) {
 	    /* consume from send buflist to fill this one receive */
 	    u_int32_t send_bytes_offered
@@ -712,6 +712,13 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	      + send_offset;
 	    sg_tmp_array[sr.sg_lst_len].len = this_bytes;
 	    sg_tmp_array[sr.sg_lst_len].lkey = sq->buflist.lkey[send_index];
+
+	    debug(4, "%s: chunk %d local addr %Lx len %d lkey %x",
+	      __func__, sr.sg_lst_len,
+	      sg_tmp_array[sr.sg_lst_len].addr,
+	      sg_tmp_array[sr.sg_lst_len].len,
+	      sg_tmp_array[sr.sg_lst_len].lkey);
+
 	    ++sr.sg_lst_len;
 	    if ((int)sr.sg_lst_len > sg_max_len)
 		error("%s: send buflist len %d bigger than max %d", __func__,
@@ -720,6 +727,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	    send_offset += this_bytes;
 	    if (send_offset == sq->buflist.len[send_index]) {
 		++send_index;
+		send_offset = 0;
 		if (send_index == sq->buflist.num) {
 		    done = 1;
 		    break;  /* short send */
@@ -730,7 +738,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 
 	/* done with the one we were just working on, is this the last recv? */
 	++recv_index;
-	if (++recv_index == (int)mh_cts->buflist_num)
+	if (recv_index == (int)mh_cts->buflist_num)
 	    done = 1;
 
 	/* either filled the recv or exhausted the send */

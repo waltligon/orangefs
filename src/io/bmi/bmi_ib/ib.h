@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.3 2004-03-07 02:14:57 pw Exp $
+ * $Id: ib.h,v 1.4 2004-04-15 18:33:04 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -28,8 +28,11 @@ struct S_buf_head;
  */
 typedef struct {
     list_t list;
+
     /* connection management */
     struct method_addr *remote_map;
+    char *peername;  /* string representation of remote_map */
+
     /* ib local params */
     VAPI_qp_hndl_t qp;
     VAPI_qp_hndl_t qp_ack;
@@ -248,11 +251,11 @@ typedef struct {
      *   u_int32_t key[1..buflist_num]
      */
 } msg_header_cts_t;
+#define MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE (8 + 4 + 4)
 
 /*
  * Internal functions in setup.c used by ib.c
  */
-extern ib_connection_t *ib_new_connection(int s, int is_server);
 extern void ib_close_connection(ib_connection_t *c);
 extern void ib_tcp_client_connect(ib_method_addr_t *ibmap,
   struct method_addr *remote_map);
@@ -346,7 +349,7 @@ extern bmi_size_t EAGER_BUF_PAYLOAD;
  * Debugging macros.
  */
 #if 1
-#define DEBUG_LEVEL 8
+#define DEBUG_LEVEL 6
 #define debug(lvl,fmt,args...) \
     do { \
 	if (lvl <= DEBUG_LEVEL) \
