@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
+#include <sys/uio.h>
 #include <assert.h>
 
 #include "pvfs2-types.h"
@@ -29,6 +30,7 @@ static int parse_devices(const char* targetfile, const char* devname,
 static int pdev_fd = -1;
 static int32_t pdev_magic;
 static int32_t pdev_max_upsize;
+static int32_t pdev_max_downsize;
 
 /* PINT_dev_initialize()
  *
@@ -80,6 +82,13 @@ int PINT_dev_initialize(
 	return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
     }
     ret = ioctl(pdev_fd, PVFS_DEV_GET_MAX_UPSIZE, &pdev_max_upsize);
+    if(ret < 0)
+    {
+	gossip_err("Error: ioctl() failure.\n");
+	close(pdev_fd);
+	return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+    }
+    ret = ioctl(pdev_fd, PVFS_DEV_GET_MAX_DOWNSIZE, &pdev_max_downsize);
     if(ret < 0)
     {
 	gossip_err("Error: ioctl() failure.\n");
@@ -274,8 +283,45 @@ int PINT_dev_write_list(
 	enum PINT_dev_buffer_type buffer_type,
 	id_gen_t tag)
 {
-    gossip_lerr("Error: function not implemented.\n");
-    return(-(PVFS_ENOSYS|PVFS_ERROR_DEV));
+    struct iovec io_array[8];
+    int io_count = 2;
+    int i;
+    int ret = -1;
+    
+    /* lets be reasonable about list size :) */
+    /* two vecs are taken up by magic nr and tag */
+    assert(list_count < 7);
+
+    /* even though we are ignoring the buffer_type for now, 
+     * make sure that the caller set it to a sane value 
+     */
+    assert(buffer_type == PINT_DEV_EXT_ALLOC || 
+	buffer_type == PINT_DEV_PRE_ALLOC);
+
+    if(total_size > pdev_max_downsize)
+    {
+	return(-(PVFS_EMSGSIZE|PVFS_ERROR_DEV));
+    }
+
+    io_array[0].iov_base = &pdev_magic;
+    io_array[0].iov_len = sizeof(int32_t);
+    io_array[1].iov_base = &tag;
+    io_array[1].iov_len = sizeof(int64_t);
+
+    for(i=0; i<list_count; i++)
+    {
+	io_array[i+2].iov_base = buffer_list[i];
+	io_array[i+2].iov_len = size_list[i];
+	io_count++;
+    }
+
+    ret = writev(pdev_fd, io_array, io_count);
+    if(ret < 0)
+    {
+	return(-(PVFS_EIO|PVFS_ERROR_DEV));
+    }
+
+    return(0);
 }
 
 /* PINT_dev_memalloc()
