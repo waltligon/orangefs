@@ -104,11 +104,7 @@ int PINT_encode(void* input_buffer,
 	case ENCODING_LE_BFIELD:
 	    if (input_type == PINT_ENCODE_REQ)
 	    {
-		/* overwrite flags on the way through */
 		struct PVFS_server_req* tmp_req = input_buffer;
-		tmp_req->flags = 0;
-		if(g_admin_mode)
-		    tmp_req->flags += PVFS_SERVER_REQ_ADMIN_MODE;
 		ENCODE_EVENT_START(PVFS_EVENT_API_ENCODE_REQ,
 		    tmp_req->op, tmp_req);
 		ret =  PINT_encoding_table[enc_type]->op->encode_req(

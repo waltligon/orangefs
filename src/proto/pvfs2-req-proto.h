@@ -58,6 +58,13 @@ enum PVFS_server_op
 };
 #define PVFS_MAX_SERVER_OP 28
 
+/*
+ * These ops must fail unless the server is in admin mode.
+ */
+#define PVFS_SERV_IS_MGMT_OP(x) \
+    ((x) == PVFS_SERV_MGMT_REMOVE_OBJECT \
+  || (x) == PVFS_SERV_MGMT_REMOVE_DIRENT)
+
 /* a private internal type */
 typedef struct
 {
@@ -1125,7 +1132,6 @@ struct PVFS_server_req
 {
     enum PVFS_server_op op;
     PVFS_credentials credentials;
-    int32_t flags;
     union
     {
         struct PVFS_servreq_create create;
@@ -1152,10 +1158,21 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_get_dirdata_handle mgmt_get_dirdata_handle;
     } u;
 };
-endecode_fields_2_struct(
-    PVFS_server_req,
-    enum, op,
-    PVFS_credentials, credentials)
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+/* insert padding to ensure the union starts on an aligned boundary */
+static inline void
+encode_PVFS_server_req(char **pptr, const struct PVFS_server_req *x) {
+    encode_enum(pptr, &x->op);
+    *pptr += 4;
+    encode_PVFS_credentials(pptr, &x->credentials);
+}
+static inline void
+decode_PVFS_server_req(char **pptr, struct PVFS_server_req *x) {
+    decode_enum(pptr, &x->op);
+    *pptr += 4;
+    decode_PVFS_credentials(pptr, &x->credentials);
+}
+#endif
 
 /* server response *********************************************/
 /* - generic response with union of all op specific structs */

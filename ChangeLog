@@ -57,6 +57,7 @@ pvfs2-0.7.0pre1
   that appear when statfs is called while trove operations are in progress
 - added utility functions for measuring elapsed wall, system, and user time
   between specified points in code
+- fix glaring alignment failure in PVFS_server_req
 
 
 pvfs2-0.6.5
