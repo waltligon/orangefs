@@ -261,9 +261,16 @@ int PINT_Process_request(PINT_Request_state *req,
 			continue;
 		}
 		/* set this up for client processing */
-		if (PINT_IS_CLIENT(mode) && mem)
+		if (PINT_IS_CLIENT(mode))
 		{
-			result->offset_array[result->segs] = mem->type_offset;
+			if (mem)
+			{
+				result->offset_array[result->segs] = mem->type_offset;
+			}
+			else /* default mem type of contig memory */
+			{
+				result->offset_array[result->segs] = req->type_offset;
+			}
 		}
 		/*** BEFORE CALLING DISTRIBUTE ***/
 #if 0
