@@ -143,16 +143,14 @@ int PINT_server_get_config(struct server_configuration_s *config,
 
         if (server_parse_config(config,&(serv_resp->u.getconfig)))
         {
-            gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Failed to getconfig from host "
-                          "%s\n",mntent_p->pvfs_config_server);
+            gossip_err("Failed to getconfig from host %s\n",
+                       mntent_p->pvfs_config_server);
 
-            /* let go of any resources consumed by PINT_send_req() */
             PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
                              &decoded, &encoded_resp, op_tag);
             continue;
         }
 
-	/* let go of any resources consumed by PINT_send_req() */
 	PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
                          &decoded, &encoded_resp, op_tag);
         break;
@@ -167,19 +165,20 @@ int PINT_server_get_config(struct server_configuration_s *config,
         cur_fs = PINT_config_find_fs_name(config, mntent_p->pvfs_fs_name);
         if (!cur_fs)
         {
-            gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Warning:  Cannot retrieve "
-                          "information about pvfstab entry %s\n",
-                          mntent_p->pvfs_config_server);
+            gossip_err("Warning:\n Cannot retrieve information about "
+                       "pvfstab entry %s\n",
+                       mntent_p->pvfs_config_server);
 
             /*
               if the device has no space left on it, we can't save
               the config file for parsing and get a failure; make
               a note of that possibility here
             */
-            gossip_ldebug(GOSSIP_CLIENT_DEBUG,
-                          "If you're sure that your pvfstab "
-                          "file contains valid information, please make "
-                          "sure that you are not out of disk space\n");
+            gossip_err("\nHINTS: If you're sure that your pvfstab file "
+                       "contains valid information,\n please make sure "
+                       "that you are not out of disk space and that you "
+                       "have\n write permissions in the current "
+                       "directory or in the /tmp directory\n\n");
             continue;
         }
         else
@@ -204,20 +203,43 @@ int PINT_server_get_config(struct server_configuration_s *config,
 static int server_parse_config(struct server_configuration_s *config,
                                struct PVFS_servresp_getconfig *response)
 {
-    int ret = 1;
+    int ret = 1, template_index = 1;
     int fs_fd = 0, server_fd = 0;
-    char fs_template[] = ".__pvfs_fs_configXXXXXX";
-    char server_template[] = ".__pvfs_server_configXXXXXX";
+    char fs_template_array[2][32] =
+    {
+        "/tmp/.__pvfs_fs_configXXXXXX",
+        ".__pvfs_fs_configXXXXXX"
+    };
+    char server_template_array[2][32] =
+    {
+        "/tmp/.__pvfs_server_configXXXXXX",
+        ".__pvfs_server_configXXXXXX"
+    };
+    char *fs_template = NULL;
+    char *server_template = NULL;
 
     if (config && response)
     {
         assert(response->fs_config_buf);
         assert(response->server_config_buf);
 
-        fs_fd = mkstemp(fs_template);
-        if (fs_fd == -1)
+        while(1)
         {
-            return ret;
+            assert(template_index > -1);
+            fs_template = fs_template_array[template_index];
+            server_template = server_template_array[template_index];
+
+            fs_fd = mkstemp(fs_template);
+            if (fs_fd != -1)
+            {
+                break;
+            }
+            else if ((--template_index) < 0)
+            {
+                gossip_err("Error: Cannot create temporary "
+                           "configuration files!\n");
+                return ret;
+            }
         }
 
         server_fd = mkstemp(server_template);
