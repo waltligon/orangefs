@@ -225,7 +225,7 @@ int do_encode_resp(
 	    target_msg->size_list[1] = response->u.readdir.dirent_count 
 		* sizeof(PVFS_dirent);
 	    target_msg->size_list[2] = header_size;
-	    target_msg->total_size = target_msg->size_list[0] + target_msg->size_list[1];
+	    target_msg->total_size = target_msg->size_list[0] + target_msg->size_list[1] + header_size;
 
 	    target_msg->buffer_list[0] = response;
 	    target_msg->buffer_list[1] = response->u.readdir.dirent_array;
