@@ -44,7 +44,7 @@
   may be some inconsistencies, but this will be cleaned
   up as the system interface is changed in time.
 */
-#define PCACHE_TIMEOUT_MS 6000000
+#define PCACHE_TIMEOUT_MS 1/*6000000*/
 
 static int service_lookup_request(
     PVFS_sysresp_init *init_response,
@@ -478,8 +478,9 @@ static int service_readdir_request(
 
         gossip_debug(
             CLIENT_DEBUG,
-            "Got a readdir request for fsid %d | parent %Lu\n",
-            refn.fs_id, refn.handle);
+            "Got a readdir request for fsid %d | parent %Lu "
+            "(token is %d)\n", refn.fs_id, refn.handle,
+            in_upcall->req.readdir.token);
 
         ret = PVFS_sys_readdir(refn, in_upcall->req.readdir.token,
                                in_upcall->req.readdir.max_dirent_count,
@@ -638,6 +639,49 @@ static int service_statfs_request(
             out_downcall->resp.statfs.files_avail =
                 resp_statfs.statfs_buf.handles_available_count;
 
+            ret = 0;
+        }
+    }
+    return ret;
+}
+
+static int service_truncate_request(
+    PVFS_sysresp_init *init_response,
+    pvfs2_upcall_t *in_upcall,
+    pvfs2_downcall_t *out_downcall)
+{
+    int ret = 1;
+
+    if (init_response && in_upcall && out_downcall)
+    {
+        memset(out_downcall,0,sizeof(pvfs2_downcall_t));
+
+        gossip_debug(
+            CLIENT_DEBUG,
+            "Got a truncate request for %Lu under fsid %d to be "
+            "size %Lu\n", in_upcall->req.truncate.refn.handle,
+            in_upcall->req.truncate.refn.fs_id,
+            in_upcall->req.truncate.size);
+
+        ret = PVFS_sys_truncate(in_upcall->req.truncate.refn,
+                                in_upcall->req.truncate.size,
+                                in_upcall->credentials);
+        if (ret < 0)
+        {
+            gossip_err("Failed to truncate %Lu on %d\n",
+                       in_upcall->req.truncate.refn.handle,
+                       in_upcall->req.truncate.refn.fs_id);
+            gossip_err("Truncate returned error code %d\n", ret);
+
+            /* we need to send a blank error response */
+            out_downcall->type = PVFS2_VFS_OP_TRUNCATE;
+            out_downcall->status = ret;
+        }
+        else
+        {
+            /* we need to send a blank success response */
+            out_downcall->type = PVFS2_VFS_OP_TRUNCATE;
+            out_downcall->status = 0;
             ret = 0;
         }
     }
@@ -831,6 +875,9 @@ int main(int argc, char **argv)
 		break;
 	    case PVFS2_VFS_OP_STATFS:
 		service_statfs_request(&init_response, &upcall, &downcall);
+		break;
+	    case PVFS2_VFS_OP_TRUNCATE:
+		service_truncate_request(&init_response, &upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_INVALID:
 	    default:

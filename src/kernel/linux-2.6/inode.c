@@ -309,8 +309,9 @@ struct backing_dev_info pvfs2_backing_dev_info =
 
 void pvfs2_truncate(struct inode *inode)
 {
-    pvfs2_print("pvfs2: pvfs2_truncate called on inode %d\n",
-                (int)inode->i_ino);
+    pvfs2_print("pvfs2: pvfs2_truncate called on inode %d "
+                "with size %d\n",(int)inode->i_ino,(int)inode->i_size);
+
     block_truncate_page(
         inode->i_mapping, inode->i_size, pvfs2_get_block);
 }

@@ -455,26 +455,32 @@ void PINT_pcache_object_attr_deep_free(PVFS_object_attr *attr)
 {
     if (attr)
     {
-        if (attr->mask & PVFS_ATTR_META_DFILES)
+        if (attr->objtype == PVFS_TYPE_METAFILE)
         {
-            if (attr->u.meta.dfile_array)
+            if (attr->mask & PVFS_ATTR_META_DFILES)
             {
-                free(attr->u.meta.dfile_array);
+                if (attr->u.meta.dfile_array)
+                {
+                    free(attr->u.meta.dfile_array);
+                }
+            }
+            if (attr->mask & PVFS_ATTR_META_DIST)
+            {
+                if (attr->u.meta.dist)
+                {
+                    PVFS_Dist_free(attr->u.meta.dist);
+                }
             }
         }
-        if (attr->mask & PVFS_ATTR_META_DIST)
+        else if (attr->objtype == PVFS_TYPE_SYMLINK)
         {
-            if (attr->u.meta.dist)
+            if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
             {
-                PVFS_Dist_free(attr->u.meta.dist);
-            }
-        }
-        if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
-        {
-            if ((attr->u.sym.target_path_len > 0) &&
-                attr->u.sym.target_path)
-            {
-                free(attr->u.sym.target_path);
+                if ((attr->u.sym.target_path_len > 0) &&
+                    attr->u.sym.target_path)
+                {
+                    free(attr->u.sym.target_path);
+                }
             }
         }
     }

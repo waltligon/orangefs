@@ -75,6 +75,10 @@ typedef struct
     unsigned long files_avail;
 } pvfs2_statfs_response_t;
 
+/* the truncate response is a blank downcall */
+typedef struct
+{
+} pvfs2_truncate_response_t;
 
 typedef struct
 {
@@ -94,6 +98,7 @@ typedef struct
 	pvfs2_readdir_response_t readdir;
 /*      pvfs2_rename_response_t rename; */
 	pvfs2_statfs_response_t statfs;
+/* 	pvfs2_truncate_response_t truncate; */
     } resp;
 } pvfs2_downcall_t;
 

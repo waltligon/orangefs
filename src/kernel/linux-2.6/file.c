@@ -256,6 +256,12 @@ static ssize_t pvfs2_file_write(
 	{
 	    break;
 	}
+
+        /* adjust inode size if applicable */
+        if ((*offset + count) > inode->i_size)
+        {
+            i_size_write(inode, (*offset + count));
+        }
     }
 
     op_release(new_op);

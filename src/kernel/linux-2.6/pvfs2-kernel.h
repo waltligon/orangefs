@@ -254,6 +254,9 @@ int pvfs2_remove_entry(
     struct inode *dir,
     struct dentry *dentry);
 
+int pvfs2_truncate_inode(
+    struct inode *inode,
+    loff_t size);
 
 #endif /* __PVFS2KERNEL_H */
 

@@ -51,7 +51,7 @@ static int pvfs2_readlink(struct dentry *dentry, char *buffer, int buflen)
 */
 static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-    printk("pvfs2_follow_link called on inode %d\n",
+    pvfs2_print("pvfs2: pvfs2_follow_link called on inode %d\n",
                 (int)dentry->d_inode->i_ino);
     return 0;
 }

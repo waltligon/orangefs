@@ -86,6 +86,12 @@ typedef struct
 
 typedef struct
 {
+    PVFS_pinode_reference refn;
+    PVFS_size size;
+} pvfs2_truncate_request_t;
+
+typedef struct
+{
     int type;
     PVFS_credentials credentials;
 
@@ -102,6 +108,7 @@ typedef struct
 	pvfs2_readdir_request_t readdir;
 	pvfs2_rename_request_t rename;
         pvfs2_statfs_request_t statfs;
+        pvfs2_truncate_request_t truncate;
     } req;
 } pvfs2_upcall_t;
 

@@ -23,6 +23,7 @@
 #define PVFS2_VFS_OP_SYMLINK           0xFF000009
 #define PVFS2_VFS_OP_RENAME            0xFF00000A
 #define PVFS2_VFS_OP_STATFS            0xFF00000B
+#define PVFS2_VFS_OP_TRUNCATE          0xFF00000C
 
 /* misc constants */
 #define PVFS2_NAME_LEN                 0x000000FF

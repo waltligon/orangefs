@@ -91,20 +91,6 @@ static inline int copy_attributes_to_inode(
 
             inode_size = (loff_t)attrs->size;
             i_size_write(inode, inode_size);
-
-            /*
-              NOTE:
-              we may want to truncate this inode's page
-              cache entries every time we get a different
-              size value (or always?).
-
-              why clear all pages?
-              the motivation for clearing all is that the
-              file may have changed quite a bit from the time
-              of the last getattr, so here's one place
-              to make sure it's as up to date as possible.
-            */
-/*             vmtruncate(inode, inode_size); */
         }
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
                  (symname != NULL))
@@ -266,10 +252,6 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
   NOTE: in kernel land, we never use the
   sys_attr->link_target for anything, so don't bother
   copying it into the sys_attr object here.
-
-  For our usage of this method (i.e. create/mkdir/setattr),
-  we never need the size field from the inode, so don't
-  copy it either.
 */
 static inline int copy_attributes_from_inode(
     struct inode *inode,
@@ -314,6 +296,12 @@ static inline int copy_attributes_from_inode(
         else
             attrs->ctime = (PVFS_time)inode->i_ctime.tv_sec;
         attrs->mask |= PVFS_ATTR_SYS_CTIME;
+
+        if (iattr && (iattr->ia_valid & ATTR_SIZE))
+            attrs->size = iattr->ia_size;
+        else
+            attrs->size = inode->i_size;
+        attrs->mask |= PVFS_ATTR_SYS_SIZE;
 
         if (iattr && (iattr->ia_valid & ATTR_MODE))
             convert_attribute_mode_to_pvfs_sys_attr(
@@ -374,7 +362,7 @@ int pvfs2_inode_getattr(
 	/*
 	   post a getattr request here;
 	   make dentry valid if getattr passes
-	 */
+        */
 	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
 	if (!new_op)
 	{
@@ -452,14 +440,36 @@ int pvfs2_inode_setattr(
         pvfs2_print("Setattr Got PVFS2 status value of %d\n",
                     new_op->downcall.status);
 
-        /* on success, truncate unnecessary page cache entries */
-/*         vmtruncate(inode, inode->i_size); */
-
       error_exit:
         ret = new_op->downcall.status;
 
 	/* when request is serviced properly, free req op struct */
 	op_release(new_op);
+
+        /*
+          on setattr success, if the file has changed in
+          size, truncate it now
+        */
+        if (ret == 0)
+        {
+            if (iattr && (iattr->ia_valid & ATTR_SIZE) &&
+                (iattr->ia_size != inode->i_size))
+            {
+                pvfs2_print("Forcing truncate from %d to %d\n",
+                            (int)inode->i_size, (int)iattr->ia_size);
+                ret = pvfs2_truncate_inode(inode, iattr->ia_size);
+                if (ret == 0)
+                {
+                    i_size_write(inode, iattr->ia_size);
+                }
+            }
+            else
+            {
+                pvfs2_print("Forcing size truncate to %d\n",
+                            (int)inode->i_size);
+                ret = pvfs2_truncate_inode(inode, inode->i_size);
+            }
+        }
     }
     return ret;
 }
@@ -825,6 +835,53 @@ int pvfs2_remove_entry(
     }
     return ret;
 }
+
+int pvfs2_truncate_inode(
+    struct inode *inode,
+    loff_t size)
+{
+    int ret = -1, retries = 5;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    pvfs2_kernel_op_t *new_op = NULL;
+
+    pvfs2_print("pvfs2: pvfs2_truncate_inode %d: "
+                "Handle is %Lu | fs_id %d | size is %lu\n",
+                (int)inode->i_ino, pvfs2_inode->refn.handle,
+                pvfs2_inode->refn.fs_id, (unsigned long)size);
+
+    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+    if (!new_op)
+    {
+        return -ENOMEM;
+    }
+    new_op->upcall.type = PVFS2_VFS_OP_TRUNCATE;
+    new_op->upcall.req.truncate.refn = pvfs2_inode->refn;
+    new_op->upcall.req.truncate.size = (PVFS_size)size;
+
+    service_operation_with_timeout_retry(
+        new_op, "pvfs2_remove_entry", retries);
+
+    /*
+      the truncate has no downcall members to retrieve, but
+      the status value tells us if it went through ok or not
+    */
+    ret = new_op->downcall.status;
+
+    pvfs2_print("pvfs2: pvfs2_truncate got return value of %d\n",ret);
+
+    if (ret == 0)
+    {
+        /* on success, make sure the page cache is also truncated */
+        vmtruncate(inode, size);
+    }
+
+  error_exit:
+    /* when request is serviced properly, free req op struct */
+    op_release(new_op);
+
+    return ret;
+}
+
 
 /*
  * Local variables:

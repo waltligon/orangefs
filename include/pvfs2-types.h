@@ -7,7 +7,16 @@
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#if (BITS_PER_LONG == 32)
+#define INT32_MAX INT_MAX
+#else
+#define INT32_MAX (int32_t)(1 << 31)
+#endif /* (BIT_PER_LONG == 32) */
+#else
 #include <stdint.h>
+#endif /* __KERNEL__ */
 
 /* basic types used throughout code */
 typedef uint8_t PVFS_boolean;

@@ -38,7 +38,8 @@ static int pvfs2_readdir(
     void *dirent,
     filldir_t filldir)
 {
-    int pos = 0, ret = 0, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = 0, retries = PVFS2_OP_RETRY_COUNT;
+    PVFS_ds_position pos = 0;
     ino_t ino = 0;
     struct dentry *dentry = file->f_dentry;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -55,10 +56,10 @@ static int pvfs2_readdir(
     }
 
     /* pick up from where we left off */
-    pos = file->f_pos;
+    pos = (PVFS_ds_position)file->f_pos;
 
     pvfs2_print("pvfs2: pvfs2_readdir called on %s (pos = %d)\n",
-		dentry->d_name.name, pos);
+		dentry->d_name.name, (int)pos);
 
     switch (pos)
     {
@@ -114,9 +115,9 @@ static int pvfs2_readdir(
 
 	   so the proper pvfs2 position is (pos - 2), except where
 	   pos == 0.  In that case, pos is PVFS_READDIR_START.
-	 */
+        */
 	new_op->upcall.req.readdir.token =
-	    (pos == 2 ? PVFS_READDIR_START : (PVFS_ds_position) (pos - 2));
+            (pos == 2 ? PVFS_READDIR_START : (pos - 2));
 
         service_operation_with_timeout_retry(
             new_op, "pvfs2_readdir", retries);
