@@ -205,6 +205,11 @@ struct method_params
 };
 typedef struct method_params method_params_st, *method_params_p;
 
+struct method_drop_addr_query
+{
+    struct method_addr* addr;
+    int response;
+};
 
 /***********************************************************
  * utility functions provided for use by the network methods 

@@ -655,12 +655,33 @@ int BMI_tcp_set_info(int option,
 int BMI_tcp_get_info(int option,
 		     void *inout_parameter)
 {
+    struct method_drop_addr_query* query;
+    struct tcp_addr* tcp_addr_data;
+
     gen_mutex_lock(&interface_mutex);
 
     switch (option)
     {
     case BMI_CHECK_MAXSIZE:
 	*((int *) inout_parameter) = TCP_MODE_REND_LIMIT;
+	gen_mutex_unlock(&interface_mutex);
+	return(0);
+	break;
+    case BMI_DROP_ADDR_QUERY:
+	query = (struct method_drop_addr_query*)inout_parameter;
+	tcp_addr_data=query->addr->method_data;
+	/* only suggest that we discard the address if we have experienced
+	 * an error and there is no way to reconnect
+	 */
+	if(tcp_addr_data->addr_error != 0 &&
+	    tcp_addr_data->dont_reconnect == 1)
+	{
+	    query->response = 1;
+	}
+	else
+	{
+	    query->response = 0;
+	}
 	gen_mutex_unlock(&interface_mutex);
 	return(0);
 	break;
@@ -2072,7 +2093,10 @@ static int tcp_shutdown_addr(method_addr_p map)
 {
 
     struct tcp_addr *tcp_addr_data = map->method_data;
-    close(tcp_addr_data->socket);
+    if (tcp_addr_data->socket > -1)
+    {
+	close(tcp_addr_data->socket);
+    }
     tcp_addr_data->socket = -1;
     tcp_addr_data->not_connected = 1;
 

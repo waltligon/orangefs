@@ -48,12 +48,15 @@ enum bmi_buffer_type
 /* BMI get_info and set_info options */
 enum
 {
-    BMI_DROP_ADDR = 1,
-    BMI_CHECK_INIT = 2,
-    BMI_CHECK_MAXSIZE = 3,
-    BMI_GET_METH_ADDR = 4,
-    BMI_INC_ADDR_REF = 5,
-    BMI_DEC_ADDR_REF = 6
+    BMI_DROP_ADDR = 1,         /* ask a module to discard an address */
+    BMI_CHECK_INIT = 2,        /* see if a module is initialized */
+    BMI_CHECK_MAXSIZE = 3,     /* check the max msg size a module allows */
+    BMI_GET_METH_ADDR = 4,     /* kludge to return void* pointer to
+                                * underlying module address */
+    BMI_INC_ADDR_REF = 5,      /* increment address reference count */
+    BMI_DEC_ADDR_REF = 6,      /* decrement address reference count */
+    BMI_DROP_ADDR_QUERY = 7,   /* ask a module if it thinks an address
+                                * should be discarded */
 };
 
 /* mappings from PVFS errors to BMI errors */

@@ -1054,6 +1054,31 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	tmp_ref->ref_count--;
 	assert(tmp_ref->ref_count >= 0);
 
+	/* TODO: work on this later; too buggy right now */
+#if 0
+	if(tmp_ref->ref_count == 0)
+	{
+	    struct method_drop_addr_query query;
+	    query.response = 0;
+	    query.addr = tmp_ref->method_addr;
+	    /* reference count is zero; ask module if it wants us to discard
+	     * the address; TCP will tell us to drop addresses for which the
+	     * socket has died with no possibility of reconnect 
+	     */
+	    ret = tmp_ref->interface->BMI_meth_get_info(BMI_DROP_ADDR_QUERY,
+		&query);
+	    if(ret == 0 && query.response == 1)
+	    {
+		/* kill the address */
+		gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+		    "bmi discarding address: %Lu\n", Lu(addr));
+		tmp_ref->interface->BMI_meth_set_info(BMI_DROP_ADDR,
+		    tmp_ref->method_addr);
+		ref_list_rem(cur_ref_list, addr);
+		dealloc_ref_st(tmp_ref);
+	    }
+	}
+#endif
 	gen_mutex_unlock(&ref_mutex);
 	return(0);
     }

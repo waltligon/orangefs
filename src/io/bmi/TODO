@@ -17,6 +17,9 @@ this: (type)((BMI_byte)buffer + offset)
 General (non critical)
 -----------------------
 
+implement a mechanism to occasionally (or maybe if resources get low) scan
+addresses with a reference count of 0 to see if any of them can be discarded
+
 reimplement reference-list.c using a hash table instead of linked
 list, to cut down on search time during addr lookups (maybe use
 multiple hash tables to search on sepeate keys)
