@@ -89,7 +89,7 @@ CC = @CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LD = gcc
-LDFLAGS += -L lib
+LDFLAGS += -L lib -L@DB_PATH@/lib
 LIBS += @LIBS@ -lpvfs2
 # for Solaris:
 # LIBS += -lsocket -lnsl
