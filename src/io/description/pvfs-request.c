@@ -42,9 +42,9 @@ static struct PINT_Request PINT_UNSIGNED_SHORT =
     { 0, 1, 0, 1, 2, 0, 2, 1, 1, 0, 0, -1, NULL, NULL };
 PVFS_Request PVFS_UNSIGNED_SHORT = &PINT_UNSIGNED_SHORT;
 
-static struct PINT_Request PINT_UNSIGNED =
+static struct PINT_Request PINT_UNSIGNED_INT =
     { 0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 0, -1, NULL, NULL };
-PVFS_Request PVFS_UNSIGNED = &PINT_UNSIGNED;
+PVFS_Request PVFS_UNSIGNED_INT = &PINT_UNSIGNED_INT;
 
 static struct PINT_Request PINT_UNSIGNED_LONG =
     { 0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 0, -1, NULL, NULL };
