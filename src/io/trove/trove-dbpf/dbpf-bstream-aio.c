@@ -58,17 +58,16 @@ int dbpf_bstream_listio_convert(
     TROVE_offset cur_stream_off;
     struct aiocb *cur_aiocb_ptr;
 
-    if ((lio_state == NULL) || (lio_state->mem_ct == 0))
-    {
+    if (lio_state == NULL) {
 	mct             = 0;
 	sct             = 0;
-	cur_mem_size    = mem_size_array[mct];
-	cur_mem_off     = mem_offset_array[mct++];
-	cur_stream_size = stream_size_array[sct];
-	cur_stream_off  = stream_offset_array[sct++];
+	cur_mem_size    = mem_size_array[0];
+	cur_mem_off     = mem_offset_array[0];
+	cur_stream_size = stream_size_array[0];
+	cur_stream_off  = stream_offset_array[0];
     }
-    else
-    {
+    else {
+        /* load state */
 	mct             = lio_state->mem_ct;
 	sct             = lio_state->stream_ct;
 	cur_mem_size    = lio_state->cur_mem_size;
@@ -80,10 +79,8 @@ int dbpf_bstream_listio_convert(
 
     /* _POSIX_AIO_LISTIO_MAX */
 
-    /* a usage assumption is that these two counts are always equal*/
-    assert(mem_count == stream_count);
-
-    while (act < *aiocb_count_p)
+    while (act < *aiocb_count_p && 
+	   mct < mem_count) /* don't need to check sct too; see assumptions */
     {
 	/* fill in all values that are independent of which region is smaller */
 	cur_aiocb_ptr->aio_fildes     = fd;
@@ -93,39 +90,39 @@ int dbpf_bstream_listio_convert(
 	cur_aiocb_ptr->aio_lio_opcode = op_type;
 	cur_aiocb_ptr->aio_sigevent.sigev_notify = SIGEV_NONE;
 
-        /* optimistically consume both mem and stream regions */
-        cur_aiocb_ptr->aio_nbytes = cur_mem_size;
+	if (cur_mem_size == cur_stream_size) {
+	    /* consume both mem and stream regions */
+	    cur_aiocb_ptr->aio_nbytes = cur_mem_size;
 
-        /* don't need to check sct too; see assumptions */
-        if (mct < mem_count)
-        {
-            /* update local copies of array values */
-            if (cur_mem_size == cur_stream_size)
+	    /* update local copies of array values */
+            if (++mct < mem_count)
             {
-                cur_mem_size = mem_size_array[++mct];
+                cur_mem_size = mem_size_array[mct];
                 cur_mem_off  = mem_offset_array[mct];
                 cur_stream_size = stream_size_array[++sct];
                 cur_stream_off  = stream_offset_array[sct];
             }
-            else if (cur_mem_size < cur_stream_size)
-            {
-                cur_stream_size -= cur_mem_size;
-                cur_stream_off  += cur_mem_size;
-                cur_mem_size = mem_size_array[++mct];
-                cur_mem_off  = mem_offset_array[mct];
-            }
-            else /* (cur_mem_size > cur_stream_size) */
-            {
-                /* consume stream region and update mem region */
-                cur_aiocb_ptr->aio_nbytes = cur_stream_size;
+	}
+	else if (cur_mem_size < cur_stream_size) {
+	    /* consume mem region and update stream region */
+	    cur_aiocb_ptr->aio_nbytes = cur_mem_size;
 
-                /* update local copies of array values */
-                cur_mem_size -= cur_stream_size;
-                cur_mem_off  += cur_stream_size;
-                cur_stream_size = stream_size_array[++sct];
-                cur_stream_off  = stream_offset_array[sct];
-            }
-        }
+	    /* update local copies of array values */
+	    cur_stream_size -= cur_mem_size;
+	    cur_stream_off  += cur_mem_size;
+	    cur_mem_size = mem_size_array[++mct];
+	    cur_mem_off  = mem_offset_array[mct];
+	}
+	else /* cur_mem_size > cur_stream_size */ {
+	    /* consume stream region and update mem region */
+	    cur_aiocb_ptr->aio_nbytes = cur_stream_size;
+
+	    /* update local copies of array values */
+	    cur_mem_size -= cur_stream_size;
+	    cur_mem_off  += cur_stream_size;
+	    cur_stream_size = stream_size_array[++sct];
+	    cur_stream_off  = stream_offset_array[sct];
+	}
 
 #if 0
 	aiocb_print(cur_aiocb_ptr);
@@ -133,20 +130,13 @@ int dbpf_bstream_listio_convert(
 	/* point to next aiocb */
 	act++;
 	cur_aiocb_ptr = &aiocb_array[act];
-
-        if (mct >= mem_count)
-        {
-            break;
-        }
     }
 
     *aiocb_count_p = act; /* return the number actually used */
     
-    if (mct < mem_count)
-    {
+    if (mct < mem_count) {
 	/* haven't processed all of list regions */
-	if (lio_state != NULL)
-        {
+	if (lio_state != NULL) {
 	    /* save state */
 	    lio_state->mem_ct          = mct;
 	    lio_state->stream_ct       = sct;
@@ -157,7 +147,7 @@ int dbpf_bstream_listio_convert(
 	}
 	return 0;
     }
-    return 1;
+    else return 1;
 }
 
 #if 0
