@@ -5,8 +5,14 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.1.3pre1
 ===============
-- 
-
+- added event logging to request encoder, server state machines, and most
+  job calls
+- some changes to the event logging mask system
+- some new test programs for event logging
+- fix flow protocol handling of zero byte request processing results
+- moved pvfs2-client* to src/apps/kernel/linux-2.6
+- add an independent configure and make setup for test subdirectory
+- removed all dependencies on test subdirectory from src subdirectory
 
 pvfs2-0.1.2
 ===========
