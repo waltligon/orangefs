@@ -20,7 +20,10 @@ struct wire_harness_req
 {
 	PVFS_fs_id fs_id;    /* file system or collection id */
 	PVFS_handle handle;  /* data space handle */
+	int op;              /* read or write */
+#if 0
 	PVFS_io_op op;       /* read or write */
+#endif
 
 	int32_t io_req_size; /* how big is the trailing info? */
 	int32_t dist_size;
