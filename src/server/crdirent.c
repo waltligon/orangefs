@@ -338,6 +338,8 @@ static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_
 	*((PVFS_handle *)s_op->val.buffer) = ret->handle;
 	s_op->val.buffer_sz = sizeof(PVFS_handle);
 
+	gossip_debug(SERVER_DEBUG,"Kv write %lld, %lld\n",s_op->req->u.crdirent.parent_handle,*(PVFS_handle *) s_op->val.buffer);
+
 	/* adds the k/v space */
 	job_post_ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
 													  s_op->req->u.crdirent.parent_handle,
@@ -425,6 +427,8 @@ static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
 	 * from trove.
 	 */
 	h = *((PVFS_handle *)s_op->val.buffer);
+	gossip_debug(SERVER_DEBUG,"Handle: %lld\n",h);
+	free(s_op->val.buffer);
 	
 	/* this is the name for the parent entry */
 	s_op->key.buffer = &(s_op->req->u.crdirent.name);
@@ -469,7 +473,7 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	int job_post_ret=0;
 	job_id_t i;
 
-	gossip_ldebug(SERVER_DEBUG,"send Fxn for crdirent\n");
+	gossip_ldebug(SERVER_DEBUG,"send Fxn for crdirent %d\n",ret->error_code);
 
 	s_op->resp->status = ret->error_code;
 
@@ -493,6 +497,7 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 		/* set it back */
 		((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
 	}
+	gossip_ldebug(SERVER_DEBUG,"jpr: %d\n",job_post_ret);
 	assert(job_post_ret == 0);
 
 	job_post_ret = job_bmi_send(s_op->addr,
@@ -556,11 +561,6 @@ static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret)
 
 /* TODO: FREE Encoded message! */
 	
-	if(s_op->val.buffer)
-	{
-		free(s_op->val.buffer);
-	}
-
 	if(s_op->resp)
 	{
 		free(s_op->resp);

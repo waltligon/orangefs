@@ -18,6 +18,7 @@ static int readdir_cleanup(state_action_struct *s_op, job_status_s *ret);
 static int readdir_kvread(state_action_struct *s_op, job_status_s *ret);
 static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret);
 static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret);
+static int readdir_unpost_req(state_action_struct *s_op, job_status_s *ret);
 void readdir_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -31,17 +32,23 @@ PINT_state_machine_s readdir_req_s =
 
 %%
 
-machine readdir(init, kvspace, kvread, send, cleanup)
+machine readdir(init, kvspace, kvread, send, unpost, cleanup)
 {
 	state init
 	{
 		run readdir_init;
-		default => kvspace;
+		default => kvread;
 	}
 
 	state send
 	{
 		run readdir_send_bmi;
+		default => unpost;
+	}
+
+	state unpost
+	{
+		run readdir_unpost_req;
 		default => cleanup;
 	}
 
@@ -54,13 +61,13 @@ machine readdir(init, kvspace, kvread, send, cleanup)
 	state kvspace
 	{
 		run readdir_get_kvspace;
-		success => kvread;
 		default => send;
 	}
 	
 	state kvread
 	{
 		run readdir_kvread;
+		success => kvspace;
 		default => send;
 	}
 }
@@ -173,12 +180,12 @@ static int readdir_kvread(state_action_struct *s_op, job_status_s *ret)
 	job_id_t i;
 	PVFS_vtag_s vtag;
 
-	gossip_ldebug(SERVER_DEBUG,"Kvread\n");
+	gossip_ldebug(SERVER_DEBUG,"Kvread %lld\n",s_op->req->u.readdir.handle);
 	s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
 	s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
-	job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
-													 s_op->req->u.crdirent.parent_handle,
+	job_post_ret = job_trove_keyval_read(s_op->req->u.readdir.fs_id,
+													 s_op->req->u.readdir.handle,
 													 &(s_op->key),
 													 &(s_op->val),
 													 0,
@@ -249,6 +256,8 @@ static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	int job_post_ret;
 	job_id_t i;
 
+	gossip_debug(SERVER_DEBUG,"Kvsend -- %d\n",ret->error_code);
+	gossip_debug(SERVER_DEBUG,"Kvsend -- %d\n",ret->count);
 	s_op->resp->status = ret->error_code;
 
 	s_op->resp->u.readdir.pvfs_dirent_count = ret->count;
@@ -263,7 +272,6 @@ static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 		/* set it back */
 		((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
 	}
-	gossip_ldebug(SERVER_DEBUG,"%d\n",s_op->encoded.list_count);
 	assert(s_op->encoded.list_count == 1);
 	job_post_ret = job_bmi_send(s_op->addr,
 										 s_op->encoded.buffer_list[0],
@@ -278,6 +286,36 @@ static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	return(job_post_ret);
 	
 }
+
+
+/*
+ * Function: readdir_unpost_req
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *ret
+ *
+ * Pre:      We are done!
+ *
+ * Post:     We need to let the next operation go.
+ *
+ * Returns:  int
+ *
+ * Synopsis: Free the job from the scheduler to allow next job to proceed.
+ */
+
+static int readdir_unpost_req(state_action_struct *s_op, job_status_s *ret)
+{
+
+	int job_post_ret=0;
+	job_id_t i;
+
+	job_post_ret = job_req_sched_release(s_op->scheduled_id,
+			s_op,
+			ret,
+			&i);
+	return job_post_ret;
+}
+
 
 
 

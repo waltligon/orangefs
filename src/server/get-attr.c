@@ -245,7 +245,6 @@ static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *r
 													  ret,
 													  &i);
 	return job_post_ret;
-	return 1;
 }
 
 
