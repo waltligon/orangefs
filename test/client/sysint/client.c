@@ -43,6 +43,7 @@ int main(int argc,char **argv)
 	}
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 	
+#if 0
 	/* test the lookup function */
 	/*Alloc memory and fill the structures*/
 	
@@ -80,7 +81,7 @@ int main(int argc,char **argv)
 	printf("Handle:%ld\n", (long int)resp_lk->pinode_refn.handle);
 	printf("FSID:%ld\n", (long int)resp_lk->pinode_refn.fs_id);
 
-#if 0
+#endif
 	// test the setattr function 
 	//	Alloc memory and fill the structures
 	printf("SETATTR HERE===>\n");
@@ -92,8 +93,8 @@ int main(int argc,char **argv)
 	}
 	
 	// fill in the handle 
-	req_sattr->pinode_refn.handle = 420;//resp_lk->pinode_refn.handle;
-	req_sattr->pinode_refn.fs_id = 1;
+	req_sattr->pinode_refn.handle = 1048574;//resp_lk->pinode_refn.handle;
+	req_sattr->pinode_refn.fs_id = 9;
 	req_sattr->attrmask = ATTR_BASIC;
 	req_sattr->attr.owner = 12345;
 	req_sattr->attr.group = 56789;
@@ -115,9 +116,6 @@ int main(int argc,char **argv)
 	printf("gid:%d\n",req_sattr->attr.group);
 	printf("permissions:%d\n",req_sattr->attr.perms);
 		
-
-	// Init the system interface 
-	// Getattr test 
 
 	// Test the getattr function 
 	//	Alloc memory and fill the structures 
@@ -157,6 +155,7 @@ int main(int argc,char **argv)
 	printf("gid:%d\n",resp_gattr->attr.group);
 	printf("permissions:%d\n",resp_gattr->attr.perms);
 	
+#if 0
 	// close it down
 	ret = PVFS_sys_finalize();
 

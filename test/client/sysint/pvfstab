@@ -1,1 +1,1 @@
-pvfs-tcp://ecstasy.parl.clemson.edu:3334/pvfs /mnt/pvfs pvfs 0 0 
+pvfs-tcp://speed.parl.clemson.edu:3335/pvfs /mnt/pvfs pvfs 0 0 
