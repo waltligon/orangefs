@@ -911,7 +911,7 @@ int BMI_tcp_testcontext(int incount,
     }
 
     /* pop as many items off of the completion queue as we can */
-    while((*outcount < incount) && (query_op == 
+    while((*outcount < incount) && (query_op = 
 	op_list_shownext(completion_array[context_id]))) 
     {
 	assert(query_op->context_id == context_id);
