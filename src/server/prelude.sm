@@ -167,9 +167,11 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	/* convert to a PVFS error code; we don't have any special semantics
 	 * for error codes at this particular spot, so just remove trove mask
 	 */
-	js_p->error_code = -js_p->error_code;
-	js_p->error_code &= ~PVFS_ERROR_TROVE;
-	js_p->error_code = -js_p->error_code;
+	/* NOTE: the negative signs are necessary because the bit masking
+	 * loses the sign, unfortunately
+	 */
+	js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
+	assert(js_p->error_code < 0);
 	return(1);
     }
 	
