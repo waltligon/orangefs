@@ -1723,7 +1723,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 
 	    query_op->amt_complete += ret;
 	}
-
+	assert(query_op->amt_complete <= query_op->actual_size);
 	if (query_op->amt_complete == query_op->actual_size)
 	{
 	    /* we are done */
@@ -2304,6 +2304,7 @@ static int work_on_send_op(method_op_p my_method_op,
 
     gossip_ldebug(BMI_DEBUG_TCP, "Sent: %d bytes of data.\n", ret);
     my_method_op->amt_complete += ret;
+    assert(my_method_op->amt_complete <= my_method_op->actual_size);
 
     if (my_method_op->amt_complete == my_method_op->actual_size)
     {
@@ -2367,6 +2368,7 @@ static int work_on_recv_op(method_op_p my_method_op)
     }
 
     my_method_op->amt_complete += ret;
+    assert(my_method_op->amt_complete <= my_method_op->actual_size);
 
     if (my_method_op->amt_complete == my_method_op->actual_size)
     {
@@ -2650,6 +2652,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 
     gossip_ldebug(BMI_DEBUG_TCP, "Sent: %d bytes of data.\n", ret);
     amt_complete = ret;
+    assert(amt_complete <= my_header.size);
     if (amt_complete == my_header.size)
     {
 	/* we are already done */
@@ -2678,9 +2681,28 @@ static int payload_progress(int s, void** buffer_list, bmi_size_t*
     bmi_size_t* current_index_complete, enum bmi_op_type send_recv)
 {
     int i;
-    int count;
+    int count = 0;
     int ret;
     int completed;
+    /* used for finding the stopping point on short receives */
+    int final_index = list_count-1;
+    bmi_size_t final_size = size_list[list_count-1];
+    bmi_size_t sum = 0;
+
+    if(send_recv == BMI_RECV)
+    {
+	/* find out if we should stop short in list processing */
+	for(i=0; i<list_count; i++)
+	{
+	    sum += size_list[i];
+	    if(sum >= total_size)
+	    {
+		final_index = i;
+		final_size = size_list[i] - (sum-total_size);
+		break;
+	    }
+	}
+    }
 
     assert(list_count > *list_index);
 
@@ -2691,17 +2713,32 @@ static int payload_progress(int s, void** buffer_list, bmi_size_t*
     }
 
     /* setup vector */
-    stat_io_vector[0].iov_len = 
-	size_list[*list_index] - *current_index_complete;
     stat_io_vector[0].iov_base = 
 	(char*)buffer_list[*list_index] + *current_index_complete;
-    for(i = (*list_index + 1); i < list_count; i++)
+    count = 1;
+    if(final_index == 0)
     {
-	stat_io_vector[(i-*list_index)].iov_len = size_list[i];
-	stat_io_vector[(i-*list_index)].iov_base = buffer_list[i];
+	stat_io_vector[0].iov_len = final_size - *current_index_complete;
     }
-
-    count = list_count - *list_index;
+    else
+    {
+	stat_io_vector[0].iov_len = 
+	    size_list[*list_index] - *current_index_complete;
+	for(i = (*list_index + 1); i < list_count; i++)
+	{
+	    stat_io_vector[(i-*list_index)].iov_base = buffer_list[i];
+	    count++;
+	    if(i == final_index)
+	    {
+		stat_io_vector[(i-*list_index)].iov_len = final_size;
+		break;
+	    }
+	    else
+	    {
+		stat_io_vector[(i-*list_index)].iov_len = size_list[i];
+	    }
+	}
+    }
 
     assert(count > 0);
     if(send_recv == BMI_RECV)
