@@ -34,8 +34,6 @@
 #define NONBLOCKING_FLAG	0
 #define BLOCKING_FLAG		1
 
-#define CACHE_ENDPOINT	1
-
 #define BMI_TO_CACHE 	0
 #define CACHE_TO_BMI	1
 
@@ -301,8 +299,8 @@ int fp_bmi_cache_post(flow_descriptor * flow_d)
 
     /* on the server side: only two possible types */
     assert( (flow_d->src.endpoint_id == BMI_ENDPOINT && 
-	     flow_d->dest.endpoint_id == CACHE_ENDPOINT) ||
-	    (flow_d->src.endpoint_id == CACHE_ENDPOINT &&
+	     flow_d->dest.endpoint_id == TROVE_ENDPOINT) ||
+	    (flow_d->src.endpoint_id == TROVE_ENDPOINT &&
 	     flow_d->dest.endpoint_id == BMI_ENDPOINT) );
 
     flow_data = (struct fp_private_data*)malloc(sizeof(struct fp_private_data));
@@ -351,7 +349,7 @@ int fp_bmi_cache_post(flow_descriptor * flow_d)
      * are driven by callbacks.
      */
 
-    if(flow_d->src.endpoint_id == CACHE_ENDPOINT &&
+    if(flow_d->src.endpoint_id == TROVE_ENDPOINT &&
        flow_d->dest.endpoint_id == BMI_ENDPOINT)
     {
 	/* CACHE --> BMI flow: read from cache, then send to the 
@@ -391,7 +389,7 @@ int fp_bmi_cache_post(flow_descriptor * flow_d)
 
     }
     else if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
-	    flow_d->dest.endpoint_id == CACHE_ENDPOINT)
+	    flow_d->dest.endpoint_id == TROVE_ENDPOINT)
     {
 	/* BMI--->CACHE flow: (1) init requests; (2) check progress;
 	 * later all progress checks are driven by callbacks;
