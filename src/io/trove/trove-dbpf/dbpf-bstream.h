@@ -32,28 +32,6 @@ int dbpf_bstream_listio_convert(
 				struct bstream_listio_state *lio_state
 				);
 
-/* bstream-fd-cache functions */
-void dbpf_bstream_fdcache_initialize(void);
-
-void dbpf_bstream_fdcache_finalize(void);
-
-enum {
-    DBPF_BSTREAM_FDCACHE_ERROR = -1,
-    DBPF_BSTREAM_FDCACHE_BUSY = 0,
-    DBPF_BSTREAM_FDCACHE_SUCCESS = 1
-};
-
-int dbpf_bstream_fdcache_try_remove(TROVE_coll_id coll_id,
-				    TROVE_handle handle);
-
-int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
-				 TROVE_handle handle,
-				 int create_flag,
-				 int *fd);
-
-void dbpf_bstream_fdcache_put(TROVE_coll_id coll_id,
-			      TROVE_handle handle);
-
 #if defined(__cplusplus)
 }
 #endif
