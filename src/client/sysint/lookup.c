@@ -17,11 +17,7 @@
 #include "PINT-reqproto-encode.h"
 #include "str-utils.h"
 
-#define REQ_ENC_FORMAT 0
-/* TODO: figure out the maximum number of handles a given metafile can have*/
-#define MAX_HANDLES_PER_METAFILE 10
-
-/* PVFS_sys_lookup()
+/* PVFS_sys_ref_lookup()
  *
  * steps in lookup
  * --------------
@@ -64,12 +60,11 @@
  * SIDE EFFECTS:
  * 1). All [p|d]cache entries that we resolve are added to the [p|d]cache
  *
- * SPECIAL CASES:
- * 1). If the user passes in "/" we return the root handle.
- *
  */
-int PVFS_sys_lookup(
-    PVFS_fs_id fs_id, char* name,
+int PVFS_sys_ref_lookup(
+    PVFS_fs_id fs_id,
+    char* relative_pathname,
+    PVFS_pinode_reference parent,
     PVFS_credentials credentials,
     PVFS_sysresp_lookup *resp)
 {
@@ -86,7 +81,7 @@ int PVFS_sys_lookup(
     char segment[MAX_SEGMENT_LEN] = {0};
     bmi_addr_t serv_addr;
     int total_segments = 0, num_segments_remaining = 0;
-    PVFS_pinode_reference entry, parent;
+    PVFS_pinode_reference entry;
 
     enum {
 	NONE_FAILURE = 0,
@@ -101,7 +96,7 @@ int PVFS_sys_lookup(
     } failure = NONE_FAILURE;
 
     /* make sure lookup was given sane arguments */
-    if(name == NULL)
+    if(relative_pathname == NULL)
     {
 	ret = -EINVAL;
 	failure = NONE_FAILURE;
@@ -109,32 +104,11 @@ int PVFS_sys_lookup(
     }
 
     /*print args to make sure we're sane*/
-    gossip_ldebug(CLIENT_DEBUG,"req->\n\tname: %s\n\tfs_id: %d\n\tcredentials:\n\t\tuid: %d\n\t\tgid: %d\n\t\tperms: %d\n",name,fs_id, credentials.uid, credentials.gid, credentials.perms);
-
-    /* NOTE: special case is that we're doing a lookup on the root handle (which
-     * we got during the getconfig) so we want to check to see if we're looking
-     * up "/"; if so, then get the root handle from the bucket table interface
-     * and return
-     */
-    parent.fs_id = fs_id;
-
-    ret = PINT_bucket_get_root_handle(fs_id,&parent.handle);
-    if (ret < 0)
-    {
-	failure = GET_PARENT_FAILURE;
-	return(ret);
-    }
-
-    if (!strcmp(name, "/"))
-    {
-	resp->pinode_refn.handle = parent.handle;
-	resp->pinode_refn.fs_id = fs_id;
-	return(0);
-    }
+    gossip_ldebug(CLIENT_DEBUG,"req->\n\tname: %s\n\tfs_id: %d\n\tcredentials:\n\t\tuid: %d\n\t\tgid: %d\n\t\tperms: %d\n",relative_pathname,fs_id, credentials.uid, credentials.gid, credentials.perms);
 
     /* Get  the total number of segments */
     total_segments = num_segments_remaining =
-        PINT_string_count_segments(name);
+        PINT_string_count_segments(relative_pathname);
 
     /* make sure we're asking for something reasonable */
     if (num_segments_remaining < 1)
@@ -146,7 +120,7 @@ int PVFS_sys_lookup(
 
     /* do dcache lookups here to shorten the path as much as possible */
 
-    name_sz = strlen(name) + 1;
+    name_sz = strlen(relative_pathname) + 1;
     path = (char *)malloc(name_sz);
     if (path == NULL)
     {
@@ -154,7 +128,7 @@ int PVFS_sys_lookup(
         ret = -ENOMEM;
         goto return_error;
     }
-    memcpy(path, name, name_sz);
+    memcpy(path, relative_pathname, name_sz);
 
     /* traverse the path as much as we can via the dcache */
 
@@ -312,7 +286,7 @@ int PVFS_sys_lookup(
 	/*get rid of the old path*/
 
 	/* get the next chunk of the path to send */
-	ret = get_next_path(name,&path,total_segments - num_segments_remaining);
+	ret = get_next_path(relative_pathname,&path,total_segments - num_segments_remaining);
 	if (ret < 0)
 	{
 	    failure = GET_NEXT_PATHSEG_FAILURE;
@@ -352,6 +326,59 @@ return_error:
 	    break;
     }
     return(ret);
+}
+
+/* PVFS_sys_lookup()
+ *
+ * See documentation for PVFS_sys_ref_lookup.
+ *
+ * SPECIAL CASES:
+ * 1). If the user passes in "/" we return the root handle.
+ *
+ */
+int PVFS_sys_lookup(
+    PVFS_fs_id fs_id, char* name,
+    PVFS_credentials credentials,
+    PVFS_sysresp_lookup *resp)
+{
+    int ret = -EINVAL;
+    PVFS_pinode_reference parent;
+
+    if (name && resp)
+    {
+        parent.fs_id = fs_id;
+
+        ret = PINT_bucket_get_root_handle(fs_id,&parent.handle);
+        if (ret < 0)
+        {
+            return ret;
+        }
+
+        /* NOTE: special case is that we're doing a lookup of the root
+         * handle (which we got during the getconfig) so we want to check
+         * to see if we're looking up "/"; if so, then get the root handle
+         * from the bucket table interface and return
+         */
+        if (!strcmp(name, "/"))
+        {
+            resp->pinode_refn.handle = parent.handle;
+            resp->pinode_refn.fs_id = fs_id;
+            ret = 0;
+        }
+        else
+        {
+            /*
+              strip off leading slash (if any) and lookup the rest
+              of the path.  NOTE: If it's always an error to not
+              have a leading slash, we should check that above
+              without doing this function call.
+            */
+            char *path = ((name[0] == '/') ? &name[1] : name);
+            ret = PVFS_sys_ref_lookup(fs_id, path, parent,
+                                      credentials, resp);
+        }
+    }
+    return ret;
 }
 
 /*
