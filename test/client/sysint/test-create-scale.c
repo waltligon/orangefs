@@ -11,6 +11,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <time.h>
+#include <stdlib.h>
 
 #include "client.h"
 #include "pvfs2-util.h"

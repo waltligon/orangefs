@@ -20,23 +20,21 @@
 #include "gossip.h"
 #include "pvfs2-util.h"
 
+#define MAX_RETURNED_JOBS   32
+
 job_context_id pint_client_sm_context;
 
-enum
-{
-    MAX_RETURNED_JOBS = 32
-};
 static job_id_t job_id_array[MAX_RETURNED_JOBS];
 static void *client_sm_p_array[MAX_RETURNED_JOBS];
 static job_status_s job_status_array[MAX_RETURNED_JOBS];
 static int job_count = 0;
 
-int PINT_client_state_machine_post(PINT_client_sm *sm_p,
-				   int pvfs_sys_op)
+int PINT_client_state_machine_post(
+    PINT_client_sm *sm_p,
+    int pvfs_sys_op)
 {
-    int ret;
+    int ret = -PVFS_EINVAL;
     job_status_s js;
-
     static int got_context = 0;
 
     if (got_context == 0)
@@ -53,74 +51,92 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
     switch (pvfs_sys_op)
     {
 	case PVFS_SYS_REMOVE:
-	    sm_p->current_state = pvfs2_client_remove_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_remove_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_CREATE:
-	    sm_p->current_state = pvfs2_client_create_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_create_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_MKDIR:
-	    sm_p->current_state = pvfs2_client_mkdir_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_mkdir_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_SYMLINK:
-	    sm_p->current_state = pvfs2_client_symlink_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_symlink_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_READDIR:
-	    sm_p->current_state = pvfs2_client_readdir_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_readdir_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_LOOKUP:
-	    sm_p->current_state = pvfs2_client_lookup_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_lookup_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_RENAME:
-	    sm_p->current_state = pvfs2_client_rename_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_rename_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_GETATTR:
-	    sm_p->current_state = pvfs2_client_getattr_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_getattr_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_SETATTR:
-	    sm_p->current_state = pvfs2_client_setattr_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_setattr_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_IO:
-	    sm_p->current_state = pvfs2_client_io_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_io_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_FLUSH:
-	    sm_p->current_state = pvfs2_client_flush_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_flush_sm.state_machine + 1);
 	    break;
 	case PVFS_MGMT_SETPARAM_LIST:
-	    sm_p->current_state = pvfs2_client_mgmt_setparam_list_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_mgmt_setparam_list_sm.state_machine + 1);
 	    break;
 	case PVFS_MGMT_NOOP:
-	    sm_p->current_state = pvfs2_client_mgmt_noop_sm.state_machine + 1;
+	    sm_p->current_state =
+                (pvfs2_client_mgmt_noop_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_TRUNCATE:
-	    sm_p->current_state = pvfs2_client_truncate_sm.state_machine +1;
+	    sm_p->current_state =
+                (pvfs2_client_truncate_sm.state_machine + 1);
 	    break;
 	case PVFS_MGMT_STATFS_LIST:
-	    sm_p->current_state = pvfs2_client_mgmt_statfs_list_sm.state_machine +1;
+	    sm_p->current_state =
+                (pvfs2_client_mgmt_statfs_list_sm.state_machine + 1);
 	    break;
 	case PVFS_MGMT_PERF_MON_LIST:
-	    sm_p->current_state = pvfs2_client_mgmt_perf_mon_list_sm.state_machine +1;
+	    sm_p->current_state =
+                (pvfs2_client_mgmt_perf_mon_list_sm.state_machine + 1);
 	    break;
 	case PVFS_MGMT_EVENT_MON_LIST:
-	    sm_p->current_state = pvfs2_client_mgmt_event_mon_list_sm.state_machine +1;
+	    sm_p->current_state =
+                (pvfs2_client_mgmt_event_mon_list_sm.state_machine + 1);
 	    break;
 	case PVFS_MGMT_ITERATE_HANDLES_LIST:
-	    sm_p->current_state 
-		= pvfs2_client_mgmt_iterate_handles_list_sm.state_machine +1;
+	    sm_p->current_state = 
+                (pvfs2_client_mgmt_iterate_handles_list_sm.state_machine + 1);
 	    break;
 	case PVFS_MGMT_GET_DFILE_ARRAY:
-	    sm_p->current_state 
-		= pvfs2_client_mgmt_get_dfile_array_sm.state_machine +1;
+	    sm_p->current_state =
+                (pvfs2_client_mgmt_get_dfile_array_sm.state_machine + 1);
 	    break;
 	case PVFS_SERVER_GET_CONFIG:
-	    sm_p->current_state 
-		= pvfs2_server_get_config_sm.state_machine +1;
+	    sm_p->current_state =
+                (pvfs2_server_get_config_sm.state_machine + 1);
 	    break;
 	case PVFS_CLIENT_JOB_TIMER:
-	    sm_p->current_state 
-		= pvfs2_client_job_timer_sm.state_machine +1;
+	    sm_p->current_state =
+                (pvfs2_client_job_timer_sm.state_machine + 1);
 	    break;
 	default:
-	    assert(0);
+            gossip_lerr("FIXME: Unrecognized sysint operation!\n");
+            return ret;
     }
 
     /* clear job status structure */
@@ -130,7 +146,8 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
      * success.
      */
     ret = sm_p->current_state->state_action(sm_p, &js);
-    while (ret == 1) {
+    while (ret == 1)
+    {
 	/* PINT_state_machine_next() calls next function and
 	 * returns the result.
 	 */
@@ -145,9 +162,9 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 
 /* PINT_client_bmi_cancel()
  *
- * wrapper function for job_bmi_cancel that handles race conditions of jobs
- * that have completed in the job_testcontext() loop but have not yet
- * triggered a state transition
+ * wrapper function for job_bmi_cancel that handles race conditions of
+ * jobs that have completed in the job_testcontext() loop but have not
+ * yet triggered a state transition
  *
  * returns 0 on success, -PVFS_error on failure
  */
@@ -168,11 +185,10 @@ int PINT_client_bmi_cancel(job_id_t id)
     return(job_bmi_cancel(id, pint_client_sm_context));
 }
 
-
 int PINT_client_state_machine_test(void)
 {
-    int ret, i;
-    PINT_client_sm *sm_p;
+    int ret = -PVFS_EINVAL, i = 0;
+    PINT_client_sm *sm_p = NULL;
     
     job_count = MAX_RETURNED_JOBS;
 
@@ -186,26 +202,24 @@ int PINT_client_state_machine_test(void)
     assert(ret > -1);
 
     /* do as much as we can on every job that has completed */
-    for (i=0; i < job_count; i++) {
-	sm_p = (PINT_client_sm *) client_sm_p_array[i];
+    for(i = 0; i < job_count; i++)
+    {
+	sm_p = (PINT_client_sm *)client_sm_p_array[i];
 
-	ret = PINT_state_machine_next(sm_p,
-				      &job_status_array[i]);
-	while (ret == 1) {
-	    /* PINT_state_machine_next() calls next function and
-	     * returns the result.
-	     */
-	    ret = PINT_state_machine_next(sm_p,
-					  &job_status_array[i]);
-	}
-	if (ret < 0) {
+        do
+        {
+            ret = PINT_state_machine_next(sm_p, &job_status_array[i]);
+
+        } while (ret == 1);
+
+	if (ret < 0)
+        {
 	    /* (ret < 0) indicates a problem from the job system
 	     * itself; the return value of the underlying operation
 	     * is kept in the job status structure.
 	     */
 	}
     }
-
     return 0;
 }
 
@@ -216,34 +230,33 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 			  int actual_resp_sz,
 			  struct PVFS_server_resp **resp_out_pp)
 {
-    const char* server_string;
-    int server_type;
+    int server_type = 0;
     PVFS_credentials creds;
-
     int ret = PINT_decode(encoded_resp_p, PINT_DECODE_RESP,
                           decoded_resp_p, /* holds data on decoded resp */
                           *svr_addr_p, actual_resp_sz);
     if (ret > -1)
     {
         *resp_out_pp = (struct PVFS_server_resp *)decoded_resp_p->buffer;
-	if((*resp_out_pp)->op == PVFS_SERV_PROTO_ERROR)
+	if ((*resp_out_pp)->op == PVFS_SERV_PROTO_ERROR)
 	{
-	    gossip_err("Error: server does not seem to understand the protocol "
-	    "that this client is using.\n");
-	    gossip_err("   Please check server logs for more information.\n");
-	    if(fs_id != PVFS_FS_ID_NULL)
+            PVFS_util_gen_credentials(&creds);
+
+	    gossip_err("Error: server does not seem to understand "
+                       "the protocol that this client is using.\n");
+	    gossip_err("   Please check server logs for more "
+                       "information.\n");
+	    if (fs_id != PVFS_FS_ID_NULL)
 	    {
-		PVFS_util_gen_credentials(&creds);
-		server_string = PVFS_mgmt_map_addr(fs_id,
-						   creds,
-						   *svr_addr_p,
-						   &server_type);
+                const char *server_string = PVFS_mgmt_map_addr(
+                    fs_id, creds, *svr_addr_p, &server_type);
 		gossip_err("   Server: %s.\n", server_string);
 	    }
 	    else
 	    {
-		gossip_err("   Server: unknown; probably an error contacting "
-		"server listed in pvfs2tab file.\n");
+		gossip_err("   Server: unknown; probably an error "
+                           "contacting server listed in pvfs2tab "
+                           "file.\n");
 	    }
 	    return(-EPROTONOSUPPORT);
 	}
@@ -276,42 +289,38 @@ int PINT_serv_free_msgpair_resources(
 
 /* PINT_serv_msgpair_array_resolve_addrs()
  *
- * fills in BMI address of server for each entry in the msgpair array, 
+ * fills in BMI address of server for each entry in the msgpair array,
  * based on the handle and fsid
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_serv_msgpairarray_resolve_addrs(int count, 
-    PINT_client_sm_msgpair_state* msgarray)
+int PINT_serv_msgpairarray_resolve_addrs(
+    int count, PINT_client_sm_msgpair_state *msgarray)
 {
-    int i;
-    int ret = -1;
+    int i = 0;
+    int ret = -PVFS_EINVAL;
 
-    assert(count > 0);
-
-    for (i=0; i < count; i++)
+    if ((count > 0) && msgarray)
     {
-	PINT_client_sm_msgpair_state *msg_p = &msgarray[i];
-
-	/* determine server address from fs_id/handle pair.
-	 * this is needed prior to encoding.
-	 */
-	ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
-					msg_p->handle,
-					msg_p->fs_id);
-	if (ret != 0)
+        for(i = 0; i < count; i++)
         {
-	    gossip_lerr("bucket map to server failed; "
-                        "probably invalid svr_addr\n");
-	    assert(ret < 0); /* return value range check */
-	    return(ret);
-	}
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     " mapped handle %Lu to server %Ld\n",
-                     Lu(msg_p->handle), Ld(msg_p->svr_addr));
+            PINT_client_sm_msgpair_state *msg_p = &msgarray[i];
+            assert(msg_p);
+
+            ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+                                            msg_p->handle,
+                                            msg_p->fs_id);
+            if (ret != 0)
+            {
+                gossip_err("Failed to map server address to handle\n");
+                break;
+            }
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+                         " mapped handle %Lu to server %Ld\n",
+                         Lu(msg_p->handle), Ld(msg_p->svr_addr));
+        }
     }
-    
-    return(0);
+    return ret;
 }
 
 /*
