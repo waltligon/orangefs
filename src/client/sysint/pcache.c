@@ -6,6 +6,7 @@
  */
 
 #include <pcache.h>
+#include <assert.h>
 
 static int PINT_pcache_get_next_free(void);
 static int PINT_pcache_add_pinode(pinode *pnode);
@@ -265,7 +266,9 @@ static int PINT_pcache_get_next_free(void)
 	/* Check if free element exists? */
 	if (pvfs_pcache.free == -1)
 	{
+		assert(pvfs_pcache.bottom != -1);
 		free = pvfs_pcache.bottom;
+
 		/* Replace at bottom of cache */
 		/* Assumption is that LRU element is at bottom */
 		pvfs_pcache.bottom = pvfs_pcache.element[free].prev;

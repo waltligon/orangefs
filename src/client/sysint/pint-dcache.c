@@ -7,6 +7,7 @@
 /* PVFS directory cache implementation */
 
 #include <pint-dcache.h>
+#include <assert.h>
 
 /* Dcache Entry */
 struct dcache_entry_s {
@@ -357,6 +358,7 @@ static int dcache_get_next_free(void)
 	/* Check if free element exists */
 	if (cache->free == -1)
 	{
+		assert(cache->bottom != -1);
 		free = cache->bottom;
 		/* Replace at bottom of cache */
 		/* Assumption is that LRU element is at bottom */
