@@ -2,17 +2,17 @@ DIR := src/server
 
 # automatically generated c files
 SERVERGENSRC := \
-	$(DIR)/lookup.src.c \
-	$(DIR)/create.src.c \
-	$(DIR)/crdirent.src.c \
-	$(DIR)/set-attr.src.c \
-	$(DIR)/mkdir.src.c \
-	$(DIR)/get-attr.src.c \
-	$(DIR)/readdir.src.c \
-	$(DIR)/get-config.src.c \
-	$(DIR)/remove.src.c \
-	$(DIR)/rmdirent.src.c \
-	$(DIR)/io.src.c
+	$(DIR)/lookup.c \
+	$(DIR)/create.c \
+	$(DIR)/crdirent.c \
+	$(DIR)/set-attr.c \
+	$(DIR)/mkdir.c \
+	$(DIR)/get-attr.c \
+	$(DIR)/readdir.c \
+	$(DIR)/get-config.c \
+	$(DIR)/remove.c \
+	$(DIR)/rmdirent.c \
+	$(DIR)/io.c
 
 # "normal" c files
 SERVERSRC += \
@@ -26,5 +26,5 @@ LIBSRC += \
 	$(DIR)/print-struct.c
 
 # rule for automatically generated source files
-$(SERVERGENSRC): %.src.c: %.c src/common/statecomp/statecomp
-	src/common/statecomp/statecomp -o $@ < $<
+$(SERVERGENSRC): %.c: %.sm src/common/statecomp/statecomp
+	src/common/statecomp/statecomp $<
