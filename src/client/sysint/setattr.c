@@ -28,7 +28,9 @@
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
+int PVFS_sys_setattr(pinode_reference pinode_refn, PVFS_object_attr attr,
+                uint32_t attrmask, PVFS_credentials credentials, 
+                PVFS_attr_extended extended)
 {
 	struct PVFS_server_req_s req_p;			/* server request */
 	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
@@ -36,7 +38,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	pinode *pinode_ptr = NULL;
 	bmi_addr_t serv_addr;		/* PVFS address type structure */
 	char *server = NULL;
-	uint32_t mask = req->attrmask;
+	uint32_t mask = attrmask;
 	pinode_reference entry;
 	PVFS_size handlesize = 0;
 	bmi_size_t max_msg_sz = PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_SETATTR);
@@ -58,8 +60,8 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 		return (-EINVAL);
 
 	/* Fill in pinode reference */
-	entry.handle = req->pinode_refn.handle;
-	entry.fs_id = req->pinode_refn.fs_id;
+	entry.handle = pinode_refn.handle;
+	entry.fs_id = pinode_refn.fs_id;
 	
 	/* Lookup the entry...may or may not exist in the cache */
 
@@ -69,7 +71,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	{
 		pinode_was_in_cache = 0;
 		mask = mask | ATTR_BASIC;	
-		ret = phelper_get_pinode(entry, &pinode_ptr, mask, req->credentials);
+		ret = phelper_get_pinode(entry, &pinode_ptr, mask, credentials);
 		if (ret < 0)
 		{
 		    failure = PCACHE_LOOKUP_FAILURE;
@@ -89,10 +91,10 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 
 	/* Create the server request */
 	req_p.op = PVFS_SERV_SETATTR;
-	req_p.credentials = req->credentials;
-	if (req->attr.objtype == PVFS_TYPE_METAFILE)
+	req_p.credentials = credentials;
+	if (attr.objtype == PVFS_TYPE_METAFILE)
 	{
-	    handlesize = req->attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
+	    handlesize = attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
 	}
 	else
 	{
@@ -102,7 +104,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = entry.fs_id;
 	req_p.u.setattr.attrmask = mask;
-	req_p.u.setattr.attr = req->attr;
+	req_p.u.setattr.attr = attr;
 
 	/* Make a server setattr request */	
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
@@ -127,7 +129,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
             &encoded_resp, op_tag);
 
 	/* Modify pinode to reflect changed attributes */
-	ret = modify_pinode(pinode_ptr,req->attr,req->attrmask);
+	ret = modify_pinode(pinode_ptr,attr,attrmask);
 	if (ret < 0)
 	{
 		failure = PINODE_REMOVE_FAILURE;

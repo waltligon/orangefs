@@ -153,14 +153,6 @@ struct PVFS_sysresp_getattr_s {
 typedef struct PVFS_sysresp_getattr_s PVFS_sysresp_getattr;
 
 /* setattr */
-struct PVFS_sysreq_setattr_s {
-	pinode_reference pinode_refn;
-	PVFS_object_attr attr;
-	uint32_t attrmask;
-	PVFS_credentials credentials;
-	PVFS_attr_extended extended;
-};
-typedef struct PVFS_sysreq_setattr_s PVFS_sysreq_setattr;
 /* no data returned in setattr response */
 
 /* mkdir */
@@ -376,7 +368,6 @@ struct PVFS_system_req_s {
 	int32_t req_tag; /* Tag to group reqs+acks */
 	int32_t verno;	  /* Version number */
 	union {
-		PVFS_sysreq_setattr setattr;
 		PVFS_sysreq_mkdir mkdir;
 		PVFS_sysreq_create create;
 		PVFS_sysreq_remove remove;
@@ -449,7 +440,9 @@ int PVFS_sys_lookup(PVFS_fs_id fs_id, char* name, PVFS_credentials
 				credentials, PVFS_sysresp_lookup *resp);
 int PVFS_sys_getattr(pinode_reference pinode_refn, uint32_t attrmask, 
 		PVFS_credentials credentials, PVFS_sysresp_getattr *resp);
-int PVFS_sys_setattr(PVFS_sysreq_setattr *req);
+int PVFS_sys_setattr(pinode_reference pinode_refn, PVFS_object_attr attr,
+		uint32_t attrmask, PVFS_credentials credentials, 
+		PVFS_attr_extended extended);
 int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp);
 int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp);
 int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp);
