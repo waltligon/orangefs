@@ -175,8 +175,8 @@ so that more than one BMI application can run per node.  Probably
 best if we automatically chose ports, like the GM sockets and
 mpich code does now.
 
-Settle on the best gm xfer method and make it the default in
-autoconf.
+note that only the ENABLE_GM_BUFPOOL memory buffering method supports
+list operations!
 
 Benchmarking:
 -----------------------
