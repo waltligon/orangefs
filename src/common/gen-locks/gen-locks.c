@@ -1,4 +1,10 @@
 /*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
+/*
  * copyright (c) 2001 Clemson University, all rights reserved.
  *
  * Written by Phil Carns.
@@ -43,8 +49,10 @@
  *
  * returns 0 on success, -1 and sets errno on failure.
  */
-int gen_posix_mutex_init(pthread_mutex_t* mut){
-	return(pthread_mutex_init(mut, NULL));
+int gen_posix_mutex_init(
+    pthread_mutex_t * mut)
+{
+    return (pthread_mutex_init(mut, NULL));
 }
 
 /*
@@ -54,8 +62,10 @@ int gen_posix_mutex_init(pthread_mutex_t* mut){
  *
  * returns 0 on success, -1 and sets errno on failure.
  */
-int gen_posix_mutex_lock(pthread_mutex_t* mut){
-	return(pthread_mutex_lock(mut));
+int gen_posix_mutex_lock(
+    pthread_mutex_t * mut)
+{
+    return (pthread_mutex_lock(mut));
 }
 
 
@@ -66,8 +76,10 @@ int gen_posix_mutex_lock(pthread_mutex_t* mut){
  *
  * returns 0 on success, -1 and sets errno on failure
  */
-int gen_posix_mutex_unlock(pthread_mutex_t* mut){
-	return(pthread_mutex_unlock(mut));
+int gen_posix_mutex_unlock(
+    pthread_mutex_t * mut)
+{
+    return (pthread_mutex_unlock(mut));
 }
 
 
@@ -79,8 +91,10 @@ int gen_posix_mutex_unlock(pthread_mutex_t* mut){
  * returns 0 on success, -1 and sets errno on failure, sets errno to EBUSY
  * if it cannot obtain the lock
  */
-int gen_posix_mutex_trylock(pthread_mutex_t* mut){
-	return(pthread_mutex_trylock(mut));
+int gen_posix_mutex_trylock(
+    pthread_mutex_t * mut)
+{
+    return (pthread_mutex_trylock(mut));
 }
 
 /*
@@ -90,19 +104,23 @@ int gen_posix_mutex_trylock(pthread_mutex_t* mut){
  *
  * returns a pointer to the new mutex on success, NULL on failure.
  */
-pthread_mutex_t* gen_posix_mutex_build(void){
+pthread_mutex_t *gen_posix_mutex_build(
+    void)
+{
 
-	pthread_mutex_t * mutex_p = NULL;
+    pthread_mutex_t *mutex_p = NULL;
 
-	mutex_p = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-	if(!mutex_p){
-		return(NULL);
-	}
-	if((pthread_mutex_init(mutex_p, NULL)) < 0){
-		free(mutex_p);
-		return(NULL);
-	}
-	return(mutex_p);
+    mutex_p = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t));
+    if (!mutex_p)
+    {
+	return (NULL);
+    }
+    if ((pthread_mutex_init(mutex_p, NULL)) < 0)
+    {
+	free(mutex_p);
+	return (NULL);
+    }
+    return (mutex_p);
 }
 
 
@@ -113,14 +131,25 @@ pthread_mutex_t* gen_posix_mutex_build(void){
  *
  * returns 0 on success, -errno on failure.
  */
-int gen_posix_mutex_destroy(pthread_mutex_t* mut){
+int gen_posix_mutex_destroy(
+    pthread_mutex_t * mut)
+{
 
-	if(!mut){
-		return(-EINVAL);
-	}
-	pthread_mutex_destroy(mut);
-	free(mut);
+    if (!mut)
+    {
+	return (-EINVAL);
+    }
+    pthread_mutex_destroy(mut);
+    free(mut);
 
-	return(0);
+    return (0);
 }
 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

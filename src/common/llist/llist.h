@@ -18,25 +18,52 @@
 /* STRUCTURES */
 typedef struct llist llist, *llist_p;
 
-struct llist {
-	void *item;
-	llist_p next;
+struct llist
+{
+    void *item;
+    llist_p next;
 };
 
 /* PROTOTYPES */
-llist_p llist_new(void);
-int llist_empty(llist_p);
-int llist_add_to_head(llist_p, void *);
-int llist_add_to_tail(llist_p, void *);
-int llist_doall(llist_p, int (*fn)(void *));
-int llist_doall_arg(llist_p l_p, int (*fn)(void *item, void *arg), void *arg);
-void llist_free(llist_p, void (*fn)(void*));
-void *llist_search(llist_p, void *, int (*comp)(void *, void *));
-void *llist_rem(llist_p, void *, int (*comp)(void *, void *));
-void *llist_head(llist_p);
-void *llist_tail(llist_p);
-int llist_count(llist_p l_p);
-llist_p llist_next(llist_p entry);
+llist_p llist_new(
+    void);
+int llist_empty(
+    llist_p);
+int llist_add_to_head(
+    llist_p,
+    void *);
+int llist_add_to_tail(
+    llist_p,
+    void *);
+int llist_doall(
+    llist_p,
+    int (*fn) (void *));
+int llist_doall_arg(
+    llist_p l_p,
+    int (*fn) (void *item,
+	       void *arg),
+    void *arg);
+void llist_free(
+    llist_p,
+    void (*fn) (void *));
+void *llist_search(
+    llist_p,
+    void *,
+    int (*comp) (void *,
+		 void *));
+void *llist_rem(
+    llist_p,
+    void *,
+    int (*comp) (void *,
+		 void *));
+void *llist_head(
+    llist_p);
+void *llist_tail(
+    llist_p);
+int llist_count(
+    llist_p l_p);
+llist_p llist_next(
+    llist_p entry);
 
 
 #endif
@@ -48,4 +75,4 @@ llist_p llist_next(llist_p entry);
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  * End:
- */ 
+ */
