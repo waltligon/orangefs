@@ -40,10 +40,8 @@ int main(int argc, char **argv)
 {
     int ret = -1;
     PVFS_fs_id cur_fs;
-    const PVFS_util_tab* tab; 
     struct options *user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_sysresp_init resp_init;
     PVFS_sysresp_statfs resp_statfs;
     int i,j;
     PVFS_credentials creds;
@@ -63,19 +61,10 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* look at pvfstab */
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
-    {
-        fprintf(stderr, "Error: failed to parse pvfstab.\n");
-        return(-1);
-    }
-
-    memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
+    ret = PVFS_util_init_defaults();
     if(ret < 0)
     {
-	PVFS_perror("PVFS_sys_initialize", ret);
+	PVFS_perror("PVFS_util_init_defaults", ret);
 	return(-1);
     }
 

@@ -30,30 +30,19 @@ struct options
     int debug_mask_set;
 };
 
-static struct options* parse_args(int argc, char* argv[],
-                                  const PVFS_util_tab *mnt);
+static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 
 int main(int argc, char **argv)
 {
     int ret = -1;
     PVFS_fs_id cur_fs;
-    const PVFS_util_tab* tab;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_sysresp_init resp_init;
     PVFS_credentials creds;
 
-    /* look at pvfstab */
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
-    {
-        fprintf(stderr, "Error: failed to parse pvfstab.\n");
-        return(-1);
-    }
-
     /* look at command line arguments */
-    user_opts = parse_args(argc, argv, tab);
+    user_opts = parse_args(argc, argv);
     if(!user_opts)
     {
 	fprintf(stderr, "Error: failed to parse command line arguments.\n");
@@ -61,11 +50,10 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
+    ret = PVFS_util_init_defaults();
     if(ret < 0)
     {
-	PVFS_perror("PVFS_sys_initialize", ret);
+	PVFS_perror("PVFS_util_init_defaults", ret);
 	return(-1);
     }
 
@@ -97,8 +85,7 @@ int main(int argc, char **argv)
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static struct options* parse_args(int argc, char* argv[], const
-    PVFS_util_tab *mnt)
+static struct options* parse_args(int argc, char* argv[])
 {
     /* getopt stuff */
     extern char* optarg;
@@ -163,18 +150,10 @@ static struct options* parse_args(int argc, char* argv[], const
     tmp_opts->debug_mask = PVFS_debug_eventlog_to_mask(argv[argc-1]);
     tmp_opts->debug_mask_set = 1;
 
-    /* typical case of just a single tab entry requires no -m argument */
-    if (!tmp_opts->mnt_point_set) {
-	if (mnt->mntent_count == 1) {
-	    /* see dirty hack above */
-	    char *x = malloc(strlen(mnt->mntent_array[0].mnt_dir) + 2);
-	    if (!x)
-		return 0;
-	    strcpy(x, mnt->mntent_array[0].mnt_dir);
-	    strcat(x, "/");
-	    tmp_opts->mnt_point = x;
-	} else
-	    return 0;
+    if(!tmp_opts->mnt_point_set)
+    {
+	free(tmp_opts);
+	return(NULL);
     }
 
     return(tmp_opts);

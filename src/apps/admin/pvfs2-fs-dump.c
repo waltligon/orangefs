@@ -104,16 +104,11 @@ int main(int argc, char **argv)
 {
     int ret = -1;
     PVFS_fs_id cur_fs;
-    const PVFS_util_tab* tab;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_credentials creds;
     int server_count;
     PVFS_BMI_addr_t *addr_array;
-    PVFS_sysresp_init init_resp;
-#if 0
-    PVFS_sysresp_statfs statfs_resp;
-#endif
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -124,20 +119,11 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    /* look at pvfstab */
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
+    ret = PVFS_util_init_defaults();
+    if(ret < 0)
     {
-        fprintf(stderr, "Error: failed to parse pvfstab.\n");
-        return -1;
-    }
-
-    memset(&init_resp, 0, sizeof(init_resp));
-    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &init_resp);
-    if (ret != 0)
-    {
-	PVFS_perror("PVFS_sys_initialize", ret);
-	return -1;
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return(-1);
     }
 
     /* translate local path into pvfs2 relative path */

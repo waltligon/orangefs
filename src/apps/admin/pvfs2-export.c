@@ -38,8 +38,6 @@ int main(int argc, char **argv)
     char str_buf[PVFS_NAME_MAX] = {0};
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_fs_id cur_fs;
-    const PVFS_util_tab* tab;
-    PVFS_sysresp_init resp_init;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_io resp_io;
     struct options* user_opts = NULL;
@@ -77,21 +75,10 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* look at pvfstab */
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
-    {
-        fprintf(stderr, "Error: failed to parse pvfstab.\n");
-	close(dest_fd);
-        return(-1);
-    }
-
-    memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
+    ret = PVFS_util_init_defaults();
     if(ret < 0)
     {
-	PVFS_perror("PVFS_sys_initialize", ret);
-	close(dest_fd);
+	PVFS_perror("PVFS_util_init_defaults", ret);
 	return(-1);
     }
 
