@@ -10,6 +10,8 @@
 #include <time.h>
 #include <assert.h>
 #include <errno.h>
+#include <sys/resource.h>
+#include <unistd.h>
 
 #include "gossip.h"
 #include "pint-dev.h"
@@ -770,6 +772,7 @@ int main(int argc, char **argv)
     void* buffer_list[MAX_LIST_SIZE];
     int size_list[MAX_LIST_SIZE];
     int list_size = 0, total_size = 0;
+    struct rlimit lim = {0,0};
 
     job_context_id context;
 
@@ -784,6 +787,14 @@ int main(int argc, char **argv)
 
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init init_response;
+
+    /* set rlimit to prevent core files */
+    ret = setrlimit(RLIMIT_CORE, &lim);
+    if(ret < 0)
+    {
+	perror("rlimit");
+	fprintf(stderr, "continuing...\n");
+    }
 
     if (PVFS_util_parse_pvfstab(&mnt))
     {
