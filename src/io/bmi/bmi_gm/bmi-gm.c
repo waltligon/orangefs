@@ -797,7 +797,21 @@ int BMI_gm_set_info(int option,
 int BMI_gm_get_info(int option,
 		    void *inout_parameter)
 {
-    return (-ENOSYS);
+    int ret = -1;
+
+    switch (option)
+    {
+    case BMI_CHECK_MAXSIZE:
+	*((int *) inout_parameter) = GM_MODE_REND_LIMIT;
+	ret = 0;
+    default:
+	gossip_ldebug(BMI_DEBUG_TCP, 
+	    "BMI GM hint %d not implemented.\n", option);
+	ret = 0;
+    break;
+    }
+
+    return (ret);
 }
 
 
