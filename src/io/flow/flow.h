@@ -159,7 +159,7 @@ void PINT_flow_free(flow_descriptor * flow_d);
 
 int PINT_flow_post(flow_descriptor * flow_d);
 
-int PINT_flow_unpost(flow_descriptor * flow_d);
+int PINT_flow_cancel(flow_descriptor * flow_d);
 
 int PINT_flow_setinfo(flow_descriptor * flow_d,
 		      int option,

@@ -369,17 +369,15 @@ int PINT_flow_post(flow_descriptor * flow_d)
 }
 
 
-/* PINT_flow_unpost()
+/* PINT_flow_cancel()
  * 
- * Aborts a previously posted flow.  
+ * attempts to cancel a previously posted (but not yet completed) flow
  *
- * returns 0 on success, -errno on failure
+ * returns 0 on successful attempt, -errno on failure
  */
-int PINT_flow_unpost(flow_descriptor * flow_d)
+int PINT_flow_cancel(flow_descriptor * flow_d)
 {
-    gen_mutex_lock(&interface_mutex);
     gossip_lerr("function not implemented.\n");
-    gen_mutex_unlock(&interface_mutex);
     return (-ENOSYS);
 }
 
