@@ -84,7 +84,6 @@ int main(int argc,char **argv)
 	// Fill in the handle 
 	pinode_refn.handle = resp_look.pinode_refn.handle;
 	pinode_refn.fs_id = fs_id;
-/* 	attrmask = PVFS_ATTR_SYS_ALL_NOSIZE; */
         attrmask = PVFS_ATTR_SYS_ALL;
 
 	// Use it 
@@ -105,6 +104,7 @@ int main(int argc,char **argv)
 	printf("atime       : %s", ctime((time_t *)&resp_gattr->attr.atime));
 	printf("mtime       : %s", ctime((time_t *)&resp_gattr->attr.mtime));
 	printf("ctime       : %s", ctime((time_t *)&resp_gattr->attr.ctime));
+        printf("file size   : %Ld\n", resp_gattr->attr.size);
 	printf("handle type : ");
 
 	switch(resp_gattr->attr.objtype)
@@ -119,16 +119,13 @@ int main(int argc,char **argv)
 		printf("unknown object type!\n");
 		break;
 	}
-	
 
-	//close it down
 	ret = PVFS_sys_finalize();
 	if (ret < 0)
 	{
 		printf("finalizing sysint failed with errcode = %d\n", ret);
 		return (-1);
 	}
-
 	free(resp_gattr);
 
 	free(filename);

@@ -35,7 +35,8 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     /* make sure that the caller asked for valid fields */
     if((attrmask & ~PVFS_ATTR_SYS_ALL) != 0)
     {
-	gossip_lerr("Error: PVFS_sys_getattr(): attempted to get invalid attributes.\n");
+	gossip_lerr("Error: PVFS_sys_getattr(): attempted to "
+                    "get invalid attributes.\n");
 	return(-EINVAL);
     }
 
@@ -46,16 +47,18 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     }
 
     PINT_CONVERT_ATTR(&(resp->attr), &tmp_attr, PVFS_ATTR_COMMON_ALL);
-    
-    /* TODO: this is temporary */
+
     if (attrmask & PVFS_ATTR_SYS_SIZE)
     {
-	gossip_err("WARNING: PVFS_sys_getattr() can't really calculate size.\n");
-	gossip_err("WARNING: PVFS_sys_getattr() reporting size = 0.\n");
-	resp->attr.size = 0;
-	resp->attr.mask |= PVFS_ATTR_SYS_SIZE;
+        resp->attr.size = tmp_attr.u.data.size;
+        resp->attr.mask |= PVFS_ATTR_SYS_SIZE;
+        resp->attr.mask |= PVFS_ATTR_DATA_ALL;
     }
-
+    else
+    {
+        resp->attr.size = 0;
+        resp->attr.mask |= PVFS_ATTR_SYS_SIZE;
+    }
     return(0);
 }
 
@@ -273,8 +276,7 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	    dist = out_attr->u.meta.dist;
 	    req_p.op = PVFS_SERV_GETATTR;
 	    req_p.credentials = credentials;
-	    req_p.u.getattr.attrmask =
-                ((attrmask | PVFS_ATTR_DATA_SIZE) & ~PVFS_ATTR_META_ALL);
+	    req_p.u.getattr.attrmask = PVFS_ATTR_DATA_SIZE;
 	    req_p.u.getattr.fs_id = entry.fs_id;
 
 	    for(i = 0; i < num_data_servers; i++)
@@ -292,9 +294,6 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		max_msg_sz = PINT_encode_calc_max_size(
                     PINT_ENCODE_RESP, req_p.op, PINT_CLIENT_ENC_TYPE);
 
-		gossip_lerr("GETATTR: TRYING TO COMPUTE SIZE (fsid %d, "
-                            "handle %Ld | server %p).\n", req_p.u.getattr.fs_id,
-                            req_p.u.getattr.handle, serv_addr);
 		ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
                                     &decoded, &encoded_resp, op_tag);
 		if (ret < 0)
@@ -312,15 +311,12 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		    goto return_error;
 		}
 
-                fprintf(stderr,"Got Filesize of %Ld\n",
-                        ack_p->u.getattr.attr.u.data.size);
 		size_array[i] = ack_p->u.getattr.attr.u.data.size;
 	    }
 
 	    /* now call the distribution code for this data so we can figure
 	     * out what the true filesize is.
 	     */
-
 	    ret = PINT_Dist_lookup(dist);
 	    if (ret < 0)
 	    {

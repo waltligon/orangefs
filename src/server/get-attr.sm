@@ -372,7 +372,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
             a_p->u.data.size = js_p->ds_attr.b_size;
 
             gossip_debug(SERVER_DEBUG,
-                         "  also returning file size of %Ld\n",
+                         "  also returning data size of %Ld\n",
                          a_p->u.data.size);
         }
     }
