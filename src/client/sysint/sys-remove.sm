@@ -24,7 +24,8 @@ enum
     REMOVE_MUST_REMOVE_DATAFILES = 1,
     REMOVE_MUST_CHECK_DIR_CONTENTS,
     MSGPAIR_RETURN_SUCCESS,
-    RMDIRENT_RETRY
+    RMDIRENT_RETRY,
+    CRDIRENT_RETRY
 };
 
 static int remove_init(
@@ -43,17 +44,17 @@ static int remove_datafile_remove_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_rmdirent_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_rmdirent_timer(
+static int remove_generic_timer(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_rmdirent_retry_or_fail(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_crdirent_retry_or_fail(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_object_remove_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_object_remove_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_crdirent_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_crdirent_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int remove_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
@@ -84,6 +85,8 @@ machine pvfs2_client_remove_sm(init,
 			       rmdirent_xfer_msgpair,
 			       rmdirent_retry_or_fail,
 			       rmdirent_timer,
+			       crdirent_timer,
+			       crdirent_retry_or_fail,
 			       object_remove_setup_msgpair,
 			       object_remove_xfer_msgpair,
 			       object_remove_failure,
@@ -119,9 +122,22 @@ machine pvfs2_client_remove_sm(init,
         default => cleanup;
     }
 
+    state crdirent_retry_or_fail
+    {
+        run remove_crdirent_retry_or_fail;
+	CRDIRENT_RETRY => crdirent_timer;
+        default => cleanup;
+    }
+
+    state crdirent_timer
+    {
+        run remove_generic_timer;
+        default => crdirent_setup_msgpair;
+    }
+
     state rmdirent_timer
     {
-        run remove_rmdirent_timer;
+        run remove_generic_timer;
         default => rmdirent_setup_msgpair;
     }
 
@@ -213,7 +229,7 @@ machine pvfs2_client_remove_sm(init,
     {
         run remove_crdirent_setup_msgpair;
         success => crdirent_xfer_msgpair;
-        default => crdirent_failure;
+        default => crdirent_retry_or_fail;
     }
 
     state crdirent_xfer_msgpair
@@ -221,13 +237,7 @@ machine pvfs2_client_remove_sm(init,
         jump pvfs2_client_msgpairarray_sm;
         success => cleanup;
         MSGPAIR_RETURN_SUCCESS => cleanup;
-        default => crdirent_failure;
-    }
-
-    state crdirent_failure
-    {
-        run remove_crdirent_failure;
-        default => cleanup;
+        default => crdirent_retry_or_fail;
     }
 
     state cleanup
@@ -809,7 +819,7 @@ static int remove_getattr_failure(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: getattr_failure\n");
 
     gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
-    "may lead to inconsistent state.\n");
+	"may lead to inconsistent state.\n");
     gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
     js_p->error_code = 0;
 
@@ -832,12 +842,12 @@ static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int remove_rmdirent_timer(PINT_client_sm *sm_p,
+static int remove_generic_timer(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: rmdirent_timer\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: generic_timer\n");
 
     return job_req_sched_post_timer(
 	PVFS2_CLIENT_RETRY_DELAY,
@@ -847,6 +857,41 @@ static int remove_rmdirent_timer(PINT_client_sm *sm_p,
 	&tmp_id,
 	pint_client_sm_context);
 }
+
+static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
+				   job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: crdirent_retry_or_fail\n");
+
+    /* try again (up to a point) if we get a comm. failure. */
+    if((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
+	(sm_p->u.remove.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+    {
+	sm_p->u.remove.retry_count++;
+	js_p->error_code = CRDIRENT_RETRY;
+	return(1);
+    }
+
+    if(js_p->error_code == -PVFS_EEXIST && sm_p->u.remove.retry_count > 0)
+    {
+	/* assume everything worked out ok and we got the right directory
+	 * entry back.  there was just a transient network problem along the
+	 * way
+	 */
+	js_p->error_code = 0;
+	return(1);
+    }
+
+    sm_p->u.remove.stored_error_code = js_p->error_code;
+    PVFS_perror_gossip("Error: could not replace directory entry!",
+	js_p->error_code);
+    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
+	"may lead to inconsistent state.\n");
+    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
+
+    return 1;
+}
+
 
 static int remove_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
@@ -872,7 +917,7 @@ static int remove_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 	 * directories, for example.
 	 */
 	 gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
-	 "may lead to inconsistent state.\n");
+	    "may lead to inconsistent state.\n");
 	 gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
 	 js_p->error_code = 0;
 	 return(1);
@@ -880,13 +925,6 @@ static int remove_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 
     /* any other errors we just preserve and pass along to the next state */
 
-    return 1;
-}
-
-static int remove_crdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: crdirent_failure\n");
     return 1;
 }
 
