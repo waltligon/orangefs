@@ -8,6 +8,8 @@
 
 #include "karma.h"
 
+#undef FAKE_STATS
+
 static pvfs_mntlist mnt = {0, NULL};
 static struct PVFS_mgmt_server_stat *visible_stats = NULL;
 static struct PVFS_mgmt_server_stat *internal_stats = NULL;
@@ -18,6 +20,17 @@ GtkListStore *gui_comm_fslist;
 
 static PVFS_credentials creds;
 static PVFS_fs_id cur_fsid = -1;
+
+#ifdef FAKE_STATS
+static struct PVFS_mgmt_server_stat fake_stats[] = {
+    { 9, 1048576, 2*1048576, 2048, 1024, 102, 4096, 8192, "node0", 3 },
+    { 9, 524288, 2*1048576, 1024, 512, 500, 256, 8192, "node2", 3 },
+    { 9, 524288, 2*1048576, 2048, 512, 102, 512, 1024, "node1", 1 },
+    { 9, 1048576, 2*1048576, 1024, 256, 302, 4096, 8192, "node3", 2 },
+    { 9, 1048576, 2*1048576, 1024, 512, 102, 1024, 8192, "node4", 1 }
+};
+static int fake_stat_ct = sizeof(fake_stats) / sizeof(*fake_stats);
+#endif
 
 /* internal fn prototypes */
 static int gui_comm_stats_collect(void);
@@ -121,6 +134,9 @@ void gui_comm_set_active_fs(char *contact_server,
     int ret, outcount;
     char msgbuf[80];
 
+#ifdef FAKE_STATS
+    return;
+#else
     snprintf(msgbuf, 80, "Karma: %s/%s", contact_server, fs_name);
     gui_set_title(msgbuf);
 
@@ -147,7 +163,7 @@ void gui_comm_set_active_fs(char *contact_server,
     internal_stats   = (struct PVFS_mgmt_server_stat *)
 	malloc(outcount * sizeof(struct PVFS_mgmt_server_stat));
     internal_stat_ct = outcount;
-
+#endif
 }
 
 /* gui_comm_stats_retrieve(**svr_stat, *svr_stat_ct)
@@ -164,6 +180,11 @@ int gui_comm_stats_retrieve(struct PVFS_mgmt_server_stat **svr_stat,
 {
     int ret;
 
+#ifdef FAKE_STATS
+    *svr_stat = fake_stats;
+    *svr_stat_ct = fake_stat_ct;
+    return 0;
+#else
     /* for now, call gui_comm_stats_collect() to get new data */
     ret = gui_comm_stats_collect();
     if (ret != 0) return ret;
@@ -182,6 +203,7 @@ int gui_comm_stats_retrieve(struct PVFS_mgmt_server_stat **svr_stat,
     *svr_stat_ct = visible_stat_ct;
 
     return 0;
+#endif
 }
 
 /* gui_comm_stats_collect()
@@ -195,6 +217,9 @@ static int gui_comm_stats_collect(void)
     int ret, outcount;
     PVFS_id_gen_t *addr_array;
 
+#ifdef FAKE_STATS
+    return 0;
+#else
     addr_array = (PVFS_id_gen_t*) malloc(internal_stat_ct * sizeof(PVFS_id_gen_t));
     if (!addr_array)
     {
@@ -226,6 +251,6 @@ static int gui_comm_stats_collect(void)
     }
 
     free(addr_array);
-
+#endif
     return 0;
 }
