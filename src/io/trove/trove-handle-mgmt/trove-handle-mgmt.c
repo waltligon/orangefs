@@ -45,7 +45,7 @@ static int hash_fsid_compare(void *key, struct qlist_head *link);
  * extent_list: llist of legal handle ranges/extents
  * ledger: a book-keeping ledger object
  *
- * returns on success; -1 otherwise
+ * returns 0 on success; -1 otherwise
  */
 static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                                      struct llist *extent_list,
@@ -77,6 +77,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                 printf("trove_dspace_iterate_handles failed\n");
                 return -1;
             }
+
+            ret = 0;
 
             if (count > 0)
             {
@@ -256,7 +258,7 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
                 assert(ledger->ledger);
 
                 if (trove_check_handle_ranges(coll_id,extent_list,
-                                              ledger->ledger))
+                                              ledger->ledger) == 0)
                 {
                     ret = trove_map_handle_ranges(coll_id,extent_list,
                                                   ledger->ledger);
