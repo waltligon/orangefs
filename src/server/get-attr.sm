@@ -125,25 +125,30 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 		     "  handle 0x%08Lx refers to a metafile\n",
 		     s_op->req->u.getattr.handle);
 
-	js_p->error_code = STATE_METAFILE;
+        gossip_debug(SERVER_DEBUG, " dspace has dfile_count of %d\n",
+                     s_op->attr.u.meta.dfile_count);
+        gossip_debug(SERVER_DEBUG, " dspace has dist size of %d\n",
+                     s_op->attr.u.meta.dist_size);
 
-        if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+        if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
         {
-            /* save # of datafiles so we know the size for reading later */
-            s_op->resp.u.getattr.attr.u.meta.dfile_count =
-                a_p->u.meta.dfile_count;
-
-            /* TODO: put in real error handling for this condition: */
-            assert(s_op->resp.u.getattr.attr.u.meta.dfile_count 
-                   < PVFS_REQ_LIMIT_DFILE_COUNT);
-            /* TODO: keep distribution size in here too */
+            /* copy over the dfile count for reading later */
+            a_p->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
         }
+        if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DIST)
+        {
+            /* copy over the dist size for reading later */
+            a_p->u.meta.dist_size = s_op->attr.u.meta.dist_size;
+        }
+
+	js_p->error_code = STATE_METAFILE;
     }
     else if (a_p->objtype == PVFS_TYPE_DATAFILE)
     {
 	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
-                     "a datafile. doing nothing special\n",
-		     s_op->req->u.getattr.handle);
+                     "a datafile.\n", s_op->req->u.getattr.handle);
+
+        js_p->error_code = STATE_DATAFILE;
     }
     else if (a_p->objtype == PVFS_TYPE_DIRECTORY)
     {
@@ -219,7 +224,12 @@ static int getattr_read_metafile_datafile_handles_if_required(
         return 1;
     }
 
-    dfile_count = s_op->resp.u.getattr.attr.u.meta.dfile_count;
+    dfile_count = s_op->attr.u.meta.dfile_count;
+
+    gossip_debug(SERVER_DEBUG, " request has dfile_count of %d | dspace has %d\n",
+                 s_op->resp.u.getattr.attr.u.meta.dfile_count,
+                 s_op->attr.u.meta.dfile_count);
+
 
     /* verify that the retrieved dfile count is sane */
     if ((dfile_count < 1) || (dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT))
@@ -238,7 +248,8 @@ static int getattr_read_metafile_datafile_handles_if_required(
     s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_DFILES;
 
     /* NOTE: ALLOCATING MEMORY HERE */
-    s_op->resp.u.getattr.attr.u.meta.dfile_array = malloc(dfile_count * sizeof(PVFS_handle));
+    s_op->resp.u.getattr.attr.u.meta.dfile_array =
+        malloc(dfile_count * sizeof(PVFS_handle));
     if(!s_op->resp.u.getattr.attr.u.meta.dfile_array)
     {
 	js_p->error_code = -PVFS_ENOMEM;

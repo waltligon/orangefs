@@ -99,8 +99,8 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     gossip_debug(SERVER_DEBUG, "setattr state: verify_attribs\n");
 
-    a_p = (PVFS_object_attr *)&s_op->attr;
-    req_a_p = (PVFS_object_attr *)&s_op->req->u.setattr.attr;
+    a_p = &s_op->attr;
+    req_a_p = &s_op->req->u.setattr.attr;
 
     gossip_debug(SERVER_DEBUG, "  attrs read from dspace = "
 		 "(owner = %d, group = %d, perms = %o, type = %d)\n",
@@ -143,6 +143,39 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a metafile\n",
 		     s_op->req->u.setattr.handle);
+
+	gossip_debug(SERVER_DEBUG, " ** dspace has dfile count of %d | "
+                     "request has dfile count of %d\n",
+                     a_p->u.meta.dfile_count, req_a_p->u.meta.dfile_count);
+	gossip_debug(SERVER_DEBUG, " ** dspace has dist size of %d | "
+                     "request has dist size of %d\n",
+                     a_p->u.meta.dist_size, req_a_p->u.meta.dist_size);
+
+        /* copy the dfile count before writing this object */
+        if (req_a_p->mask & PVFS_ATTR_META_DFILES)
+        {
+            gossip_debug(SERVER_DEBUG," *** using dfile_count of %d\n",
+                         req_a_p->u.meta.dfile_count);
+            a_p->u.meta.dfile_count = req_a_p->u.meta.dfile_count;
+        }
+        else
+        {
+            gossip_debug(SERVER_DEBUG," *** ignoring dfile_count of %d\n",
+                         req_a_p->u.meta.dfile_count);
+        }
+
+        /* copy the dist size before writing this object */
+        if (req_a_p->mask & PVFS_ATTR_META_DIST)
+        {
+            gossip_debug(SERVER_DEBUG," *** using dist_size of %d\n",
+                         req_a_p->u.meta.dist_size);
+            a_p->u.meta.dist_size = req_a_p->u.meta.dist_size;
+        }
+        else
+        {
+            gossip_debug(SERVER_DEBUG," *** ignoring dist_size of %d\n",
+                         req_a_p->u.meta.dist_size);
+        }
 	js_p->error_code = STATE_METAFILE;
     }
     else if (((req_a_p->objtype == PVFS_TYPE_DATAFILE) ||
@@ -197,34 +230,63 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
-
+    PVFS_object_attr *dspace_a_p;
     PVFS_object_attr *a_p;
     int ret=0;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "setattr state: setobj_attribs\n");
 
+    dspace_a_p = &s_op->attr;
     a_p = &s_op->req->u.setattr.attr;
 
+    /* filter out anything besides common attributes before writing */
+    a_p->mask &= PVFS_ATTR_COMMON_ALL;
+
+    gossip_debug(SERVER_DEBUG, " request has dfile_count of %d | dspace has %d\n",
+                 s_op->req->u.setattr.attr.u.meta.dfile_count,
+                 s_op->attr.u.meta.dfile_count);
+    gossip_debug(SERVER_DEBUG, " writing count of %d to disk\n",
+                 dspace_a_p->u.meta.dfile_count);
+
+    /*
+      we have the attribs stored in the dspace, as well as the
+      requested attribs to store.  overwrite the ones that are
+      setable and specified by the mask value in the request.
+    */
+    if (a_p->mask & PVFS_ATTR_COMMON_UID)
+        dspace_a_p->owner = a_p->owner;
+    if (a_p->mask & PVFS_ATTR_COMMON_GID)
+        dspace_a_p->group = a_p->group;
+    if (a_p->mask & PVFS_ATTR_COMMON_PERM)
+        dspace_a_p->perms = a_p->perms;
+    if (a_p->mask & PVFS_ATTR_COMMON_ATIME)
+        dspace_a_p->atime = a_p->atime;
+    if (a_p->mask & PVFS_ATTR_COMMON_CTIME)
+        dspace_a_p->ctime = a_p->ctime;
+    if (a_p->mask & PVFS_ATTR_COMMON_MTIME)
+        dspace_a_p->mtime = a_p->mtime;
+    if (a_p->mask & PVFS_ATTR_COMMON_TYPE)
+        dspace_a_p->objtype = a_p->objtype;
+
     gossip_debug(SERVER_DEBUG,
-		 "  attrs to write = (owner = %d, group = %d, perms = %o, type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
-		 a_p->owner,
-		 a_p->group,
-		 a_p->perms,
-		 a_p->objtype,
-		 (long long)a_p->atime,
-		 (long long)a_p->mtime,
-		 (long long)a_p->ctime);
+                 "  attrs to write = (owner = %d, group = %d, "
+                 "perms = %o, type = %d, atime = %lld, mtime = %lld, "
+                 "ctime = %lld)\n",
+		 dspace_a_p->owner,
+		 dspace_a_p->group,
+		 dspace_a_p->perms,
+		 dspace_a_p->objtype,
+		 (long long)dspace_a_p->atime,
+		 (long long)dspace_a_p->mtime,
+		 (long long)dspace_a_p->ctime);
 
     /* set up key and value structure for keyval write */
     s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-    s_op->val.buffer    = &s_op->req->u.setattr.attr;
+    s_op->val.buffer    = dspace_a_p;
     s_op->val.buffer_sz = sizeof(struct PVFS_object_attr);
-
-    /* filter out anything besides common attributes before writing */
-    s_op->req->u.setattr.attr.mask &= PVFS_ATTR_COMMON_ALL;
 
     gossip_debug(SERVER_DEBUG,
 		 "  writing attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
@@ -258,16 +320,20 @@ static int setattr_write_metafile_datafile_handles_if_required(
     int ret = 0, dfile_count = 0;
     job_id_t j_id;
 
-    /* if we don't need to write the dfiles, skip them */
-/*     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)) */
-/*     { */
-/*         gossip_debug(SERVER_DEBUG, "skipping data handle write\n"); */
-/*         js_p->error_code = 0; */
-/*         return 1; */
-/*     } */
-
     gossip_debug(SERVER_DEBUG, "setattr state: "
                  "write_metafile_datafile_handles_if_required\n");
+
+    /* if we don't need to write the dfiles, skip them */
+    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES))
+    {
+        gossip_debug(SERVER_DEBUG, "skipping data handle write\n");
+        js_p->error_code = 0;
+        return 1;
+    }
+
+    gossip_debug(SERVER_DEBUG, " request has dfile_count of %d | dspace has %d\n",
+                 s_op->req->u.setattr.attr.u.meta.dfile_count,
+                 s_op->attr.u.meta.dfile_count);
 
     /* verify that the requested dfile count is sane */
     dfile_count = s_op->req->u.setattr.attr.u.meta.dfile_count;
@@ -289,7 +355,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
 		 s_op->req->u.setattr.attr.u.meta.dfile_count);
 
     s_op->val.buffer    = s_op->req->u.setattr.attr.u.meta.dfile_array;
-    s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.meta.dfile_count * sizeof(PVFS_handle);
+    s_op->val.buffer_sz = dfile_count * sizeof(PVFS_handle);
 
     gossip_debug(SERVER_DEBUG,
 		 "  writing datafile handles (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
@@ -301,15 +367,15 @@ static int setattr_write_metafile_datafile_handles_if_required(
 		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
-					  s_op->req->u.setattr.handle,
-					  &(s_op->key),
-					  &(s_op->val),
-					  TROVE_SYNC /* flags */,
-					  NULL,
-					  s_op,
-					  js_p,
-					  &j_id,
-					  PINT_server_job_context);
+                                 s_op->req->u.setattr.handle,
+                                 &(s_op->key),
+                                 &(s_op->val),
+                                 TROVE_SYNC /* flags */,
+                                 NULL,
+                                 s_op,
+                                 js_p,
+                                 &j_id,
+                                 PINT_server_job_context);
 
     return ret;
 }
@@ -327,12 +393,12 @@ static int setattr_write_metafile_distribution_if_required(
     gossip_debug(SERVER_DEBUG, "setattr state: write_metafile_distribution\n");
 
     /* if we don't need to fill in the distribution, skip it */
-/*     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)) */
-/*     { */
-/*         gossip_debug(SERVER_DEBUG, "skipping distribution write\n"); */
-/*         js_p->error_code = 0; */
-/*         return 1; */
-/*     } */
+    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
+    {
+        gossip_debug(SERVER_DEBUG, "skipping distribution write\n");
+        js_p->error_code = 0;
+        return 1;
+    }
 
     /* distribution should take up non-negative space :) */
     assert(s_op->req->u.setattr.attr.u.meta.dist_size >= 0);

@@ -91,7 +91,6 @@ int main(int argc, char **argv)
     printf("atime       : %s", ctime((time_t *)&resp_getattr.attr.atime));
     printf("mtime       : %s", ctime((time_t *)&resp_getattr.attr.mtime));
     printf("ctime       : %s", ctime((time_t *)&resp_getattr.attr.ctime));
-    printf("file size   : %Ld\n", resp_getattr.attr.size);
 
     /* take the retrieved attributes and update the access time */
     resp_getattr.attr.atime = time(NULL);

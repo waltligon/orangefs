@@ -70,8 +70,9 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 	if ((ret == PCACHE_LOOKUP_FAILURE) || (pinode_ptr == NULL))
 	{
 		pinode_was_in_cache = 0;
+
 		ret = phelper_get_pinode(entry, &pinode_ptr,
-		    PVFS_ATTR_COMMON_ALL, credentials);
+                                         PVFS_ATTR_COMMON_ALL, credentials);
 		if ((ret < 0) || (pinode_ptr == NULL))
 		{
 		    failure = PCACHE_LOOKUP_FAILURE;
@@ -105,14 +106,22 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 
         if (attr.objtype == PVFS_TYPE_METAFILE)
         {
-            req_p.u.setattr.attr.u.meta.dfile_count =
-                pinode_ptr->attr.u.meta.dfile_count;
-            req_p.u.setattr.attr.u.meta.dfile_array =
-                pinode_ptr->attr.u.meta.dfile_array;
-            req_p.u.setattr.attr.u.meta.dist =
-                pinode_ptr->attr.u.meta.dist;
-            req_p.u.setattr.attr.u.meta.dist_size =
-                pinode_ptr->attr.u.meta.dist_size;
+            if (attr.mask & PVFS_ATTR_META_DFILES)
+            {
+                req_p.u.setattr.attr.u.meta.dfile_count =
+                    pinode_ptr->attr.u.meta.dfile_count;
+                req_p.u.setattr.attr.u.meta.dfile_array =
+                    pinode_ptr->attr.u.meta.dfile_array;
+                req_p.u.setattr.attr.mask |= PVFS_ATTR_META_DFILES;
+            }
+            if (attr.mask & PVFS_ATTR_META_DIST)
+            {
+                req_p.u.setattr.attr.u.meta.dist =
+                    pinode_ptr->attr.u.meta.dist;
+                req_p.u.setattr.attr.u.meta.dist_size =
+                    pinode_ptr->attr.u.meta.dist_size;
+                req_p.u.setattr.attr.mask |= PVFS_ATTR_META_DIST;
+            }
         }
 
 	/* Make a server setattr request */	

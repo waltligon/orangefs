@@ -179,7 +179,7 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
         */
         if (attrmask & PVFS_ATTR_SYS_SIZE)
         {
-            req_p.u.getattr.attrmask |= PVFS_ATTR_META_ALL;            
+            req_p.u.getattr.attrmask |= PVFS_ATTR_META_ALL;
         }
 
 	max_msg_sz = PINT_encode_calc_max_size(
