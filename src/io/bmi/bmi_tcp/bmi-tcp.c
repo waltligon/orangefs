@@ -160,9 +160,6 @@ static int enqueue_operation(op_list_p target_list,
 			     bmi_size_t expected_size);
 static int tcp_cleanse_addr(method_addr_p map);
 static int tcp_shutdown_addr(method_addr_p map);
-static int test_done_unexpected(int incount,
-				int *outcount,
-				struct method_unexpected_info *info);
 static int tcp_do_work(int max_idle_time);
 static int tcp_do_work_error(method_addr_p map);
 static int tcp_do_work_recv(method_addr_p map);
@@ -822,6 +819,7 @@ int BMI_tcp_testunexpected(int incount,
 			   int max_idle_time)
 {
     int ret = -1;
+    method_op_p query_op = NULL;
 
     /* do some ``real work'' here */
     ret = tcp_do_work(max_idle_time);
@@ -830,9 +828,25 @@ int BMI_tcp_testunexpected(int incount,
 	return (ret);
     }
 
-    ret = test_done_unexpected(incount, outcount, info);
+    *outcount = 0;
 
-    return (ret);
+    /* go through the completed/unexpected list as long as we are finding 
+     * stuff and we have room in the info array for it
+     */
+    while ((*outcount < incount) &&
+	   (query_op =
+	    op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
+    {
+	info[*outcount].error_code = query_op->error_code;
+	info[*outcount].addr = query_op->addr;
+	info[*outcount].buffer = query_op->buffer;
+	info[*outcount].size = query_op->actual_size;
+	info[*outcount].tag = query_op->msg_tag;
+	op_list_remove(query_op);
+	dealloc_tcp_method_op(query_op);
+	(*outcount)++;
+    }
+    return (0);
 }
 
 
@@ -1676,48 +1690,6 @@ static int tcp_shutdown_addr(method_addr_p map)
 
     return (0);
 }
-
-
-/* test_done_unexpected()
- * 
- * nonblocking check to see if any unexpected operations have completed.
- * The ops may be in the complete or error state.
- *
- * returns 0 on success, -errno on failure
- */
-static int test_done_unexpected(int incount,
-				int *outcount,
-				struct method_unexpected_info *info)
-{
-    method_op_p query_op = NULL;
-    struct op_list_search_key key;
-
-    *outcount = 0;
-
-    /* search for done or error unexpected ops */
-    memset(&key, 0, sizeof(struct op_list_search_key));
-    /* TODO: this could be optimized since we don't have any search
-     * paramters.
-     */
-
-    /* go through the completed list as long as we are finding stuff and 
-     * we have room in the info array for it
-     */
-    while ((*outcount < incount) &&
-	   (query_op =
-	    op_list_search(op_list_array[IND_COMPLETE_RECV_UNEXP], &key)))
-    {
-	info[*outcount].error_code = query_op->error_code;
-	info[*outcount].addr = query_op->addr;
-	info[*outcount].buffer = query_op->buffer;
-	info[*outcount].size = query_op->actual_size;
-	info[*outcount].tag = query_op->msg_tag;
-	op_list_remove(query_op);
-	dealloc_tcp_method_op(query_op);
-	(*outcount)++;
-    }
-    return (0);
-};
 
 
 /* tcp_do_work()
