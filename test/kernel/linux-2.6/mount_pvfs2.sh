@@ -5,9 +5,9 @@ if [ "`echo $PATH | grep -c /usr/src/modtools/sbin`" = "0" ]; then
    . ~/.bashrc
 fi
 
-if [ "`lsmod | grep -c pvfs2`" = "0" ]; then
+if [ "`/sbin/lsmod | grep -c pvfs2`" = "0" ]; then
    echo "Loading the pvfs2 module"
-   insmod ../../../src/kernel/linux-2.6/pvfs2.o $1
+   /sbin/insmod ../../../src/kernel/linux-2.6/pvfs2.o $1
 fi
 
 CUR_DEV="pvfs2-flow"
