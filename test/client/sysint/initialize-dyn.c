@@ -7,20 +7,48 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "client.h"
 #include "pvfs2-util.h"
 
 #define MAX_NUM_MNT  3
 
-/*
-  works with a pvfs2tab file that looks like:
+static int copy_mntent(
+    struct PVFS_sys_mntent *dest_mntent,
+    struct PVFS_sys_mntent *src_mntent)
+{
+    int ret = -PVFS_ENOMEM;
 
-tcp://localhost:3334/pvfs2-volume1 /mnt/pvfs pvfs2 encoding=le_bfield 0 0
-tcp://localhost:3334/pvfs2-volume2 /mnt/pvfs2 pvfs2 encoding=le_bfield 0 0
-tcp://localhost:3334/pvfs2-volume3 /mnt/pvfs3 pvfs2 encoding=le_bfield 0 0
+    if (dest_mntent && src_mntent)
+    {
+        memset(dest_mntent, 0, sizeof(struct PVFS_sys_mntent));
 
-  and of course with a running server that has these volumes initialized.
-*/
+        dest_mntent->pvfs_config_server =
+            strdup(src_mntent->pvfs_config_server);
+        assert(dest_mntent->pvfs_config_server);
+
+        dest_mntent->pvfs_fs_name = strdup(src_mntent->pvfs_fs_name);
+        assert(dest_mntent->pvfs_fs_name);
+
+        if (src_mntent->mnt_dir)
+        {
+            dest_mntent->mnt_dir = strdup(src_mntent->mnt_dir);
+            assert(dest_mntent->mnt_dir);
+        }
+        if (src_mntent->mnt_opts)
+        {
+            dest_mntent->mnt_opts = strdup(src_mntent->mnt_opts);
+            assert(dest_mntent->mnt_opts);
+        }
+        dest_mntent->flowproto = src_mntent->flowproto;
+        dest_mntent->encoding = src_mntent->encoding;
+        dest_mntent->fs_id = src_mntent->fs_id;
+
+        /* TODO: memory allocation error handling */
+        ret = 0;
+    }
+    return ret;
+}
 
 int main(int argc, char **argv)
 {
@@ -28,23 +56,45 @@ int main(int argc, char **argv)
     int i = 0;
     char buf[PVFS_NAME_MAX] = {0};
     PVFS_fs_id fs_id = PVFS_FS_ID_NULL;
-    struct PVFS_sys_mntent mntent[MAX_NUM_MNT] =
-    {
-        { "tcp://localhost:3334", "pvfs2-volume1", 0, 0, 9,
-          "/mnt/pvfs", "default" },
-        { "tcp://localhost:3334", "pvfs2-volume2", 0, 0, 10,
-          "/mnt/pvfs2", "default" },
-        { "tcp://localhost:3334", "pvfs2-volume3", 0, 0, 11,
-          "/mnt/pvfs3", "default" },
-    };
+    struct PVFS_sys_mntent *mntent = NULL;
 
-    ret = PVFS_util_init_defaults();
-    if (ret < 0)
+    const PVFS_util_tab* tab = PVFS_util_parse_pvfstab(NULL);
+    if (!tab)
     {
-	PVFS_perror("PVFS_util_init_defaults", ret);
-	return (-1);
+        gossip_err(
+            "Error: failed to find any pvfs2 file systems in the "
+            "standard system tab files.\n");
+        return(-PVFS_ENOENT);
     }
 
+    /* initialize pvfs system interface */
+    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
+    if (ret < 0)
+    {
+        return(ret);
+    }
+
+    /* add in any file systems we found in the fstab */
+    for(i = 0; i < tab->mntent_count; i++)
+    {
+        ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
+        if (ret != 0)
+        {
+            PVFS_perror("Invalid fs information in pvfstab file", ret);
+            return ret;
+        }
+    }
+
+    /* copy all mount ents for our own usage */
+    mntent = (struct PVFS_sys_mntent *)malloc(
+        tab->mntent_count * sizeof(struct PVFS_sys_mntent));
+    assert(mntent);
+
+    for(i = 0; i < tab->mntent_count; i++)
+    {
+        ret = copy_mntent(&mntent[i], &tab->mntent_array[i]);
+        assert(ret == 0);
+    }
     printf("*** All defaults initialized\n");
 
     /* make sure we can resolve all mnt points */

@@ -1274,7 +1274,8 @@ void PINT_release_pvfstab(void)
     for (j = 0; j < s_stat_tab_array[
              PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
     {
-        if (s_stat_tab_array[i].mntent_array[j].fs_id !=
+        if (s_stat_tab_array[
+                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id !=
             PVFS_FS_ID_NULL)
         {
             PVFS_sys_free_mntent(
