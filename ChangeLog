@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-0.1.2pre1
+===============
+-
+
+
 pvfs2-0.1.1
 ===========
 - can now specify Trove sync behavior when setting up PVFS2 volumes w/ pav
