@@ -41,10 +41,6 @@ do{						\
     (dest)->mask = ((src)->mask & attrmask);	\
 }while(0)
 
-/* TODO: this function is a hack- will be removed later */
-int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
-    PVFS_credentials credentials, PVFS_object_attr *out_attr);
-
 /* maps bmi address to handle ranges/extents */
 typedef struct bmi_host_extent_table_s
 {

@@ -1,12 +1,10 @@
 DIR := src/client/sysint
-# old getattr still needed by phelper_get_pinode used through rename
+
 CSRC := \
 	$(DIR)/finalize.c \
 	$(DIR)/initialize.c \
 	$(DIR)/acache.c \
 	$(DIR)/ncache.c \
-	$(DIR)/getattr.c \
-	$(DIR)/pinode-helper.c \
 	$(DIR)/server-send-req.c \
 	$(DIR)/pint-sysint-utils.c \
 	$(DIR)/pint-bucket.c \
