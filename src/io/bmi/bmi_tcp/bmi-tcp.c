@@ -334,6 +334,13 @@ int BMI_tcp_finalize(void)
 {
 	int i = 0;
 	
+	/* shut down our listen addr, if we have one */
+	if((tcp_method_params.method_flags & BMI_INIT_SERVER)
+		&& tcp_method_params.listen_addr)
+	{
+		dealloc_tcp_method_addr(tcp_method_params.listen_addr);
+	}
+
 	/* note that this forcefully shuts down operations */
 	for(i=0; i<NUM_INDICES; i++)
 	{
@@ -407,14 +414,14 @@ method_addr_p BMI_tcp_method_addr_lookup(const char* id_string)
 	ret = sscanf((delim+1), "%d", &(tcp_addr_data->port));
 	if(ret != 1){
 		gossip_lerr("Error: malformed tcp address.\n");
-		dealloc_method_addr(new_addr);
+		dealloc_tcp_method_addr(new_addr);
 		free(tcp_string);
 		return(NULL);
 	}
 
 	hostname = (char*)malloc((delim - tcp_string + 1));
 	if(!hostname){
-		dealloc_method_addr(new_addr);
+		dealloc_tcp_method_addr(new_addr);
 		free(tcp_string);
 		return(NULL);
 	}
@@ -829,7 +836,7 @@ void tcp_forget_addr(method_addr_p map, int dealloc_flag)
 	tcp_cleanse_addr(map);
 	if(dealloc_flag)
 	{
-		dealloc_method_addr(map);
+		dealloc_tcp_method_addr(map);
 	}
 	return;
 };
@@ -861,6 +868,9 @@ static void dealloc_tcp_method_addr(method_addr_p map){
 			close(tcp_addr_data->socket);
 		}
 	}
+
+	if(tcp_addr_data->hostname)
+		free(tcp_addr_data->hostname);
 	
 	dealloc_method_addr(map);
 
