@@ -24,7 +24,6 @@
 #include <state-machine.h>
 #include <server-config.h>
 #include <pvfs2-server.h>
-#include <server-queue.h>
 
 #endif
 

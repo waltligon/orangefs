@@ -52,7 +52,6 @@
 #include <state-machine.h>
 #include <server-config.h>
 #include <pvfs2-server.h>
-#include <server-queue.h>
 
 /* Internal Globals */
 
@@ -84,17 +83,20 @@ int main(int argc, char **argv) {
 	int i = 0;
 	int tempWhile = 0;
 	int postBMIFlag = 0;
+
+#ifdef DEBUG 
 	int TEMP_CHECK_OUT = 10;
 	int TEMP_JOBS_COMPLETE = 0;
+#endif
 
+	int out_count = 0 ;
+	PINT_server_op *s_op = NULL;
+	char *method_name = NULL;
 	job_id_t job_id_array[MAX_JOBS];
-	void *my_user_ptrs[MAX_JOBS];
-	job_status_s status_jobs[MAX_JOBS];
-	int out_count;
-	PINT_server_op *s_op;
-	char *method_name;
+	void *completed_job_pointers[MAX_JOBS]; 
+	job_status_s job_status_structs[MAX_JOBS];
 	
-	struct unexpected_info* temp_buff;
+	struct unexpected_info* temp_buff = NULL;
 
 	/* Insert Temp Trove Stuff Here */
 
@@ -107,7 +109,8 @@ int main(int argc, char **argv) {
 	gossip_set_debug_mask(1,SERVER_DEBUG);
 
 	/* Sanity Check 1. Make sure we are root */
-	if (getuid() != 0 && geteuid() != 0){
+	if (getuid() != 0 && geteuid() != 0)
+	{
 		gossip_err("WARNING: Server should be run as root\n");
 	}
 
@@ -145,9 +148,10 @@ int main(int argc, char **argv) {
 
 	gossip_debug(SERVER_DEBUG,"BMI Init Complete\n");
 
-#if 0
-	ret = PINT_flow_initialize(NULL,0);
-	if(ret < 0){
+	/* initialize the flow interface */
+	ret = PINT_flow_initialize("flowproto_bmi_trove", 0);
+	if(ret < 0)
+	{
 		gossip_err("Flow_initialize Failed: %s\n",strerror(-ret));
 		server_shutdown(server_level_init,user_opts,ret,0);
 	}
@@ -156,25 +160,22 @@ int main(int argc, char **argv) {
 
 	gossip_debug(SERVER_DEBUG,"Flow Init Complete\n");
 
-#endif
-
+	/* initialize Trove Interface */
 	ret = trove_initialize(user_opts->storage_path,0,&method_name,0);
 	if(ret < 0){
 		gossip_err("Trove Init Failed: %s\n",strerror(-ret));
 		server_shutdown(server_level_init,ret,0);
 	}
 
+	/* TODO: Update this to use filesystems in config file. */
 	ret = trove_collection_lookup("fs-foo",&coll_id,NULL,NULL);
 
 	server_level_init++;
 		
 	gossip_debug(SERVER_DEBUG,"Storage Init Complete\n");
 
-	/* Initialize the job interface 
-	 * see dir ../io/job 
-	 */
-
-   ret = job_initialize(0); /* job.c */
+	/* initialize Job Interface */
+   ret = job_initialize(0);
 	if(ret < 0)
 	{
 		gossip_err("Error initializing job interface: %s\n", strerror(-ret));
@@ -185,7 +186,7 @@ int main(int argc, char **argv) {
 
 	gossip_debug(SERVER_DEBUG,"Job Init Complete\n");
 
-	/* Now init the Server State Machine */
+	/* initialize Server State Machine */
 	ret = PINT_state_machine_init(); /* state_machine.c:68 */
 	if(ret < 0)
 	{
@@ -197,34 +198,10 @@ int main(int argc, char **argv) {
 
 	gossip_debug(SERVER_DEBUG,"State Machine Init Complete\n");
 
-#if 0
-	/* Yah... so seriously... this most likely is not needed anymore...
-	 * see the consistency doc for more details
-	 */
-	ret = PINT_server_queue_init();
-	if(ret < 0)
-	{
-		gossip_err("Error initializing Server Queue/Dependancy interface: %s\n", strerror(-ret));
-		server_shutdown(server_level_init,ret,0);
-	}
-
-	server_level_init++;
-
-	gossip_debug(SERVER_DEBUG,"Server Queue Init Complete\n");
-#endif
-
-	
-	/* Below, we would init post BMI unexpected msg buffers =) */
-	/* TODO:  You need to malloc unexpected_info, keep track of it
-	 * by user_ptr in job_post.
-	 * also malloc job_status_s
-	 * the only time job_status is used is when a job completes immediately¸
-	 * so why alloc so many?  why not use what we have already in our waitworld array?
-	 */
-
+	/* Below, we initially post BMI unexpected msg buffers =) */
 	for(i=0; i<user_opts->initial_unexpected_requests; i++)
 	{
-		ret = PINT_server_cp_bmi_unexp(s_op,&status_jobs[0]);
+		ret = PINT_server_cp_bmi_unexp(s_op,&job_status_structs[0]);
 		if (ret < 0) 
 		{
 			PINT_server_get_bmi_unexp_err(ret);
@@ -234,10 +211,10 @@ int main(int argc, char **argv) {
 		}
 		if (ret == 1)
 		{
-			ret = PINT_state_machine_initialize_unexpected(s_op,&status_jobs[i]); 
+			ret = PINT_state_machine_initialize_unexpected(s_op,&job_status_structs[i]); 
 			while(ret == 1)
 			{
-				ret = PINT_state_machine_next(my_user_ptrs[i],&status_jobs[i]);
+				ret = PINT_state_machine_next(completed_job_pointers[i],&job_status_structs[i]);
 			}
 			gossip_debug(SERVER_DEBUG,"BMI_unexp Completed\n");
 		}
@@ -280,7 +257,7 @@ int main(int argc, char **argv) {
 		{
 			server_shutdown(server_level_init,SIGNAL_RECVD,0);
 		}
-      ret = job_waitworld(job_id_array,&out_count,my_user_ptrs,status_jobs);
+      ret = job_waitworld(job_id_array,&out_count,completed_job_pointers,job_status_structs);
 		if(ret < 0)
 		{
 			gossip_lerr("FREAK OUT.\n");
@@ -291,7 +268,7 @@ int main(int argc, char **argv) {
 		
 		for(i=0;i<out_count;i++) 
 		{
-			s_op = (PINT_server_op *) my_user_ptrs[i];
+			s_op = (PINT_server_op *) completed_job_pointers[i];
 			if(s_op->op == BMI_UNEXP)
 			{
 
@@ -301,23 +278,23 @@ doWorkUnexp:
 					server_shutdown(server_level_init,-1,0);
 #endif
 
-				ret = PINT_state_machine_initialize_unexpected(s_op,&status_jobs[i]); 
+				ret = PINT_state_machine_initialize_unexpected(s_op,&job_status_structs[i]); 
 				postBMIFlag = 1;
 
 			}
 			else 
 			{
-				ret = PINT_state_machine_next(s_op,&status_jobs[i]);
+				ret = PINT_state_machine_next(s_op,&job_status_structs[i]);
 			}
 			while(ret == 1)
 			{
-				ret = PINT_state_machine_next(s_op,&status_jobs[i]);
+				ret = PINT_state_machine_next(s_op,&job_status_structs[i]);
 			}
 
 			if(ret < 0)
 			{
 				gossip_lerr("Error on job %d, Return Code: %d\n",i,ret);
-				exit(-1);
+				server_shutdown(server_level_init+1,1,0);
 			/* if ret < 0 oh no... job mechanism died */
 			/* TODO: fix taht */
 			}
@@ -325,7 +302,7 @@ doWorkUnexp:
 			{
 				gossip_debug(SERVER_DEBUG,"Posting Another BMI Job\n");
 				postBMIFlag = 0;
-				ret = PINT_server_cp_bmi_unexp(s_op,&status_jobs[i]);
+				ret = PINT_server_cp_bmi_unexp(s_op,&job_status_structs[i]);
 				if(ret == 1)
 				{
 					goto doWorkUnexp;
@@ -336,7 +313,8 @@ doWorkUnexp:
 
 	}
 	gossip_debug(SERVER_DEBUG,"Bailing out of While loop: tempWhile = %d\n",tempWhile);
-	return(server_shutdown(server_level_init+1,1,0));
+	server_shutdown(server_level_init+1,1,0);
+	return -1; /* Should never get here */
 	
 }
 

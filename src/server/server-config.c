@@ -25,12 +25,15 @@ static DOTCONF_CB(get_gm_path);
 static DOTCONF_CB(get_metaserver_list);
 static DOTCONF_CB(get_storage_space);
 static DOTCONF_CB(get_ioserver_list);
+static DOTCONF_CB(get_filesystem_name);
+static DOTCONF_CB(get_increment_filesystems);
 
 static const configoption_t options[] = {
 	{"HostID",ARG_STR, get_pvfs_server_id,NULL,CTX_ALL},
 	{"BMI_TCP_Path",ARG_STR, get_tcp_path,NULL,CTX_ALL},
 	{"BMI_GM_Path",ARG_STR, get_gm_path,NULL,CTX_ALL},
 	{"StorageSpace",ARG_STR, get_storage_space,NULL,CTX_ALL},
+	{"<FileSystem>",ARG_STR, get_increment_filesystems,NULL,CTX_ALL},
 	{"MetaServerList",ARG_LIST, get_metaserver_list,NULL,CTX_ALL},
 	{"IoServerList",ARG_LIST, get_ioserver_list,NULL,CTX_ALL},
 	{"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
@@ -62,6 +65,9 @@ struct server_configuration_s *server_config(int argc, char **argv)
 
 	config_s = (server_configuration_s *) malloc(sizeof(server_configuration_s));
 	memset(config_s,0,sizeof(server_configuration_s));
+
+	/* Lets support a max of PINT_SERVER_MAX_FILESYSTEMS */
+	config_s->file_system_names = (char *) malloc(sizeof(char *)*PINT_SERVER_MAX_FILESYSTEMS)
 
 	configfile = dotconf_create(argv[1] ? argv[1] : "simple.conf",
 					options, NULL, CASE_INSENSITIVE);

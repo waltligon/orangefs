@@ -70,7 +70,7 @@ extern PINT_state_machine_s lookup_req_s;
 
 PINT_state_machine_s *PINT_state_array[SERVER_REQ_ARRAY_SIZE] =
 {
-	NULL, /* 0 */
+	NULL,               /* 0 */
 	NULL,
 	&create_req_s,
 	NULL,
@@ -99,40 +99,43 @@ PINT_state_machine_s *PINT_state_array[SERVER_REQ_ARRAY_SIZE] =
 
 
 
-/* Function: PINT_state_machine_initialize_unexpected(s_op,ret)
-   Params:   PINT_server_op *s_op
-	          job_status_s *ret
-   Returns:  int
-   Synopsis: Intialize request structure, first location, and call
-	          respective init function.
-				 
+/* 
+ * Function: PINT_state_machine_initialize_unexpected(s_op,ret)
+ *
+ * Params:   PINT_server_op *s_op
+ *           job_status_s *ret
+ *    
+ * Returns:  int
+ * 
+ * Synopsis: Intialize request structure, first location, and call
+ *           respective init function.
+ * 			 
  */
-int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op, job_status_s *ret)
+int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_status_s *ret)
 {
-	struct PINT_decoded_msg buffer;
+	struct PINT_decoded_msg decoded_message;
 
 	PINT_decode(s_op->unexp_bmi_buff->buffer,
 					PINT_ENCODE_REQ,
-					&buffer,
+					&decoded_message,
 					s_op->unexp_bmi_buff->addr,
 					s_op->unexp_bmi_buff->size,
 					&(s_op->enc_type));
 
-	s_op->req  = (struct PVFS_server_req_s *) buffer.buffer;
+	s_op->req  = (struct PVFS_server_req_s *) decoded_message.buffer;
 	assert(s_op->req != 0);
 	s_op->addr = s_op->unexp_bmi_buff->addr;
 	s_op->tag  = s_op->unexp_bmi_buff->tag;
 	s_op->op   = s_op->req->op;
-	s_op->location.index = PINT_state_machine_locate(s_op);
-	if(!s_op->location.index)
+	s_op->current_state.next_state = PINT_state_machine_locate(s_op);
+	if(!s_op->current_state.next_state)
 	{
 		gossip_err("System not init for function\n");
 		return(-1);
 	}
-	s_op->resp = (struct PVFS_server_resp_s *) \
-		BMI_memalloc(s_op->addr,
-				sizeof(struct PVFS_server_resp_s),
-				BMI_SEND_BUFFER);
+
+	/* TODO:  This would be a good place for caching!!! */
+	s_op->resp = (struct PVFS_server_resp_s *) malloc(sizeof(struct PVFS_server_resp_s));
 
 	if (!s_op->resp)
 	{
@@ -144,7 +147,7 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op, job_status_s 
 
 	s_op->resp->op = s_op->req->op;
 
-	return(((s_op->location.index - 1)->handler)(s_op,ret));
+	return(((s_op->current_state.next_state)->state_action)(s_op,ret));
 
 }
 
@@ -187,11 +190,11 @@ int PINT_state_machine_halt(void)
 				  back to server_daemon.c's while loop.
  */
 
-int PINT_state_machine_next(PINT_server_op *s,job_status_s *r)
+int PINT_state_machine_next(state_action_struct *s,job_status_s *r)
 {
 
    int code_val = r->error_code; 
-	PINT_state_array_values *loc = s->location.index;
+	PINT_state_array_values *loc = s->current_state.next_state+1;
 
 	/* loc is set to the proper return value
 	 * update s struct for change
@@ -202,7 +205,7 @@ int PINT_state_machine_next(PINT_server_op *s,job_status_s *r)
 	 * we are ready to start our comparisons.  
 	 */
 
-	while (loc->retVal != code_val && loc->retVal != DEFAULT_ERROR) 
+	while (loc->return_value != code_val && loc->return_value != DEFAULT_ERROR) 
 		loc += 2;
 
 	/* Update the server_op struct to reflect the new location */
@@ -211,14 +214,14 @@ int PINT_state_machine_next(PINT_server_op *s,job_status_s *r)
 	 *	      value possibility of the function.
 	 */
 
-	s->location.index = (loc + 1)->index + 1;
+	s->current_state.next_state = (loc + 1)->next_state;
 
 	/* Call the next function.
 	 * NOTE: the function will return back to the original while loop
 	 *       in server_daemon.c
 	 */
 
-	return(((s->location.index - 1)->handler)(s,r));
+	return(((s->current_state.next_state)->state_action)(s,r));
 
 }
 
@@ -232,7 +235,7 @@ int PINT_state_machine_next(PINT_server_op *s,job_status_s *r)
 				 We should also add in some "text" backup if necessary
  */
 
-PINT_state_array_values *PINT_state_machine_locate(PINT_server_op *s_op)
+PINT_state_array_values *PINT_state_machine_locate(state_action_struct *s_op)
 {
 
 	gossip_debug(SERVER_DEBUG,"Locating State machine for %d\n",s_op->op);
@@ -240,7 +243,7 @@ PINT_state_array_values *PINT_state_machine_locate(PINT_server_op *s_op)
 	{
 		/* Return the first return value possible from the init function... =) */
 		gossip_debug(SERVER_DEBUG,"Found State Machine %d\n",s_op->op);
-		return(((PINT_state_array_values *)PINT_state_array[s_op->op]->state_machine)[0].index + 1);
+		return(((PINT_state_array_values *)PINT_state_array[s_op->op]->state_machine)[0].next_state);
 	}
 	gossip_err("State machine not found for operation %d\n",s_op->op);
 	return(NULL);

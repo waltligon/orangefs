@@ -20,29 +20,17 @@
 #include <PINT-reqproto-encode.h>
 #include <pack.h>
 
-#define set_fun(i,j,k) do {\
-	i.state_machine[j].handler = k;\
-} while(0)
-
-#define set_ret(i,j,k) do {\
-	i.state_machine[j].retVal = k;\
-} while(0)
-
-#define set_ptr(i,j,k) do {\
-	i.state_machine[j].index = &(i.state_machine[k]);\
-} while(0)
-
-#define STATE_FXN_HEAD(__name)	int __name(PINT_server_op *s_op, job_status_s *ret)
+#define STATE_FXN_HEAD(__name)	int __name(state_action_struct *s_op, job_status_s *ret)
 
 #define STATE_FXN_RET(__name) return(__name);
 
-typedef struct PINT_server_op handler_structure;
+typedef struct PINT_server_op state_action_struct;
 
 union PINT_state_array_values
 {
-	int retVal;
-	int (*handler)(handler_structure*,job_status_s*);
-	union PINT_state_array_values *index;
+	int (*state_action)(state_action_struct*,job_status_s*);
+	int return_value;
+	union PINT_state_array_values *next_state;
 };
 
 typedef union PINT_state_array_values PINT_state_array_values;
@@ -74,9 +62,9 @@ typedef struct PINT_state_machine_s
 
 int PINT_state_machine_init(void);
 int PINT_state_machine_halt(void);
-int PINT_state_machine_next(handler_structure*,job_status_s *r);
-PINT_state_array_values *PINT_state_machine_locate(handler_structure*);
-int PINT_state_machine_initialize_unexpected(handler_structure*, job_status_s *ret);
+int PINT_state_machine_next(state_action_struct*,job_status_s *r);
+PINT_state_array_values *PINT_state_machine_locate(state_action_struct*);
+int PINT_state_machine_initialize_unexpected(state_action_struct*, job_status_s *ret);
 
 #include <pvfs2-server.h>
 

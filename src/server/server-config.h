@@ -5,6 +5,7 @@
 #define GLOBALCONFIG 1
 #define IOSERVERCONFIG 2
 #define METASERVERCONFIG 4
+#define PINT_SERVER_MAX_FILESYSTEMS 5
 
 typedef struct server_configuration_s {
    char *host_id;
@@ -16,6 +17,9 @@ typedef struct server_configuration_s {
 	int  count_meta_servers;
 	int  count_io_servers;
    int  initial_unexpected_requests;
+	int  number_filesystems;
+	char **file_system_names;
+	TROVE_coll_id *coll_ids;
    int configuration_context;
 } server_configuration_s;
 
