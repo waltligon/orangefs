@@ -10,7 +10,10 @@
 
 #include <pint-sysint.h>
 
-#define PVFS2_MAX_DCACHE_ENTRIES 64
+#define PINT_DCACHE_MAX_ENTRIES 64
+
+/* TODO: replace later with real value from trove */
+#define PINT_DCACHE_HANDLE_INVALID 0
 
 /* Dcache Entry */
 struct dcache_entry_s {
@@ -30,7 +33,7 @@ struct dcache_t {
 
 /* Cache Management structure */
 struct dcache {
-	struct dcache_t element[PVFS2_MAX_DCACHE_ENTRIES];
+	struct dcache_t element[PINT_DCACHE_MAX_ENTRIES];
 	int count;
 	int16_t top;
 	int16_t free;

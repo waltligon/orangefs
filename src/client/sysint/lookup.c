@@ -104,7 +104,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	}
 	/* No errors */
 	/* Was entry in cache? */
-	if (entry.handle == -1)
+	if (entry.handle == PINT_DCACHE_HANDLE_INVALID)
 	{
 	    /* Entry not in dcache */
 

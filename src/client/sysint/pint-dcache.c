@@ -45,7 +45,7 @@ int dcache_lookup(struct dcache *cache,char *name,pinode_reference parent,
 	gen_mutex_lock(cache->mt_lock);
 
 	/* No match found */
-	entry->handle = -1;	
+	entry->handle = PINT_DCACHE_HANDLE_INVALID;	
 	
 	/* Search the cache */
 	for(i = cache->top; i != -1;)
@@ -202,10 +202,10 @@ int dcache_initialize(struct dcache *cache)
 	cache->bottom = -1;
 	cache->free = 0;
 	/* Form the link between the cache elements */
-	for(i = 0;i < PVFS2_MAX_DCACHE_ENTRIES; i++)
+	for(i = 0;i < PINT_DCACHE_MAX_ENTRIES; i++)
 	{
 		cache->element[i].prev = i - 1;
-		if ((i + 1) == PVFS2_MAX_DCACHE_ENTRIES)
+		if ((i + 1) == PINT_DCACHE_MAX_ENTRIES)
 			cache->element[i].next = -1;
 		else
 			cache->element[i].next = i + 1;

@@ -80,7 +80,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 		}
 	}	
 	/* Do only if pinode reference exists */
-	if (entry.handle > 0)
+	if (entry.handle != PINT_DCACHE_HANDLE_INVALID)
 	{
 		/* Search in pinode cache */
 		ret = pcache_lookup(&pvfs_pcache,entry,pinode_ptr);

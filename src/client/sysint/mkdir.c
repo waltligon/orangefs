@@ -73,7 +73,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 		}
 	}	
 	/* Do only if pinode exists */
-	if (entry.handle > 0)
+	if (entry.handle != PINT_DCACHE_HANDLE_INVALID)
 	{
 		/* Search in pinode cache */
 		ret = pcache_lookup(&pvfs_pcache,entry,pinode_ptr);
