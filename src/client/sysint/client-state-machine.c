@@ -169,7 +169,7 @@ int PINT_client_state_machine_post(
 
     if (op_id)
     {
-        ret = id_gen_safe_register(op_id, (void *)sm_p);
+        ret = PINT_id_gen_safe_register(op_id, (void *)sm_p);
     }
     return ret;
 }
@@ -213,7 +213,7 @@ int PINT_client_state_machine_test(
         return ret;
     }
 
-    sm_p = id_gen_safe_lookup(op_id);
+    sm_p = PINT_id_gen_safe_lookup(op_id);
     if (!sm_p)
     {
         return ret;

@@ -15,7 +15,6 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
-#include "id-generator.h"
 
 /* non-blocking sysint operation handle */
 typedef PVFS_id_gen_t PVFS_sys_op_id;

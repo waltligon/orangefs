@@ -18,6 +18,7 @@
 #include "job.h"
 #include "trove.h"
 #include "acache.h"
+#include "id-generator.h"
 
 #define PINT_STATE_STACK_SIZE 3
 
@@ -423,6 +424,25 @@ int PINT_client_state_machine_testsome(
     PVFS_sys_op_id *op_id_array,
     int *op_count); /* in/out */
 
+/* exposed wrappers around the id-generator code */
+static inline int PINT_id_gen_safe_register(
+    PVFS_sys_op_id *new_id,
+    void *item)
+{
+    return id_gen_safe_register(new_id, item);
+}
+
+static inline void *PINT_id_gen_safe_lookup(
+    PVFS_sys_op_id id)
+{
+    return id_gen_safe_lookup(id);
+}
+
+static inline int PINT_id_gen_safe_unregister(
+    PVFS_sys_op_id id)
+{
+    return id_gen_safe_unregister(id);
+}
 
 /* used with post call to tell the system what state machine to use
  * when processing a new PINT_client_sm structure.
@@ -524,7 +544,7 @@ do {                                                                     \
     PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);  \
     if (sm_p)                                                            \
     {                                                                    \
-        id_gen_safe_unregister(op_id);                                   \
+        PINT_id_gen_safe_unregister(op_id);                              \
         free(sm_p);                                                      \
     }                                                                    \
 } while(0)
