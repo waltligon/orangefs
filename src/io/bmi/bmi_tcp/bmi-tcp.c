@@ -2339,31 +2339,24 @@ static int work_on_send_op(method_op_p my_method_op,
 static int work_on_recv_op(method_op_p my_method_op)
 {
 
-    void *working_buf = NULL;
     int ret = -1;
     struct tcp_addr *tcp_addr_data = my_method_op->addr->method_data;
     struct tcp_op *tcp_op_data = my_method_op->method_data;
-    bmi_size_t cur_recv_size = 0;
-    bmi_size_t max_recv_size = 0;
 
     if (my_method_op->actual_size != 0)
     {
 	/* now let's try to recv some actual data */
-	max_recv_size = my_method_op->actual_size - my_method_op->amt_complete;
-	cur_recv_size =
-	    my_method_op->size_list[my_method_op->list_index]
-	    - my_method_op->cur_index_complete;
-	if (cur_recv_size > max_recv_size)
-	{
-	    cur_recv_size = max_recv_size;
-	}
-	working_buf =
-	    (void *) (my_method_op->buffer_list[my_method_op->list_index] +
-		      my_method_op->cur_index_complete);
-	ret = nbrecv(tcp_addr_data->socket, working_buf, cur_recv_size);
+	ret = payload_progress(tcp_addr_data->socket,
+	    my_method_op->buffer_list,
+	    my_method_op->size_list,
+	    my_method_op->list_count,
+	    my_method_op->actual_size,
+	    &(my_method_op->list_index),
+	    &(my_method_op->cur_index_complete),
+	    BMI_RECV);
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: nbrecv: %s\n", strerror(errno));
+	    gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
 	    tcp_forget_addr(my_method_op->addr, 0);
 	    return (0);
 	}
@@ -2374,7 +2367,6 @@ static int work_on_recv_op(method_op_p my_method_op)
     }
 
     my_method_op->amt_complete += ret;
-    my_method_op->cur_index_complete += ret;
 
     if (my_method_op->amt_complete == my_method_op->actual_size)
     {
@@ -2403,16 +2395,7 @@ static int work_on_recv_op(method_op_p my_method_op)
 	}
     }
 
-    /* update indices for next time through */
-    if (my_method_op->cur_index_complete ==
-	my_method_op->size_list[my_method_op->list_index])
-    {
-	my_method_op->cur_index_complete = 0;
-	my_method_op->list_index++;
-    }
-
     return (0);
-
 }
 
 
@@ -2731,6 +2714,8 @@ static int payload_progress(int s, void** buffer_list, bmi_size_t*
     }
 
     /* if error or nothing done, return now */
+    if(ret == 0)
+	return(0);
     if(ret <= 0)
 	return(-errno);
 
