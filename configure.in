@@ -97,8 +97,10 @@ dnl
 AC_ARG_WITH(kernel,
 [  --with-kernel=src_path  Build pvfs2 kernel module against specified src (2.6.x only).], LINUX_KERNEL_SRC="$withval",LINUX_KERNEL_SRC="")
 
-SRC_TOP_LEVEL=`pwd`
+BUILD_TOP_LEVEL=`pwd`
+SRC_TOP_LEVEL=$srcdir
 AC_SUBST(SRC_TOP_LEVEL)
+AC_SUBST(BUILD_TOP_LEVEL)
 AC_SUBST(LINUX_KERNEL_SRC)
 
 dnl More options
@@ -425,6 +427,7 @@ test/proto/module.mk
 test/server/module.mk
 test/server/request-scheduler/module.mk
 test/correctness/pts/module.mk
+test/common/pav/configfile.sample
 test/kernel/linux-2.6/module.mk
 doc/coding/module.mk
 doc/design/module.mk
