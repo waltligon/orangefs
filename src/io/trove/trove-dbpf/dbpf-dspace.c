@@ -676,7 +676,7 @@ static int dbpf_dspace_testsome(
 			       ds_id_array[i],
 			       &tmp_count,
 			       &vtag_array[i], /* TODO: this doesn't seem right! */
-			       (returned_user_ptr_array != NULL) ? returned_user_ptr_array[i] : NULL,
+			       (returned_user_ptr_array != NULL) ? &returned_user_ptr_array[i] : NULL,
 			       &state_array[out_count]);
 	
 	if (ret != 0) {
