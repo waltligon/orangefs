@@ -713,8 +713,6 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
 	}
     }
 
-    PINT_thread_mgr_bmi_unexp_handler(bmi_thread_mgr_unexp_handler);
-
     /* if we fall through to this point, then there were not any
      * uenxpected receive's available; queue up to test later 
      */
@@ -723,6 +721,8 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     job_desc_q_add(bmi_unexp_queue, jd);
     bmi_unexp_pending_count++;
     gen_mutex_unlock(&bmi_unexp_mutex);
+
+    PINT_thread_mgr_bmi_unexp_handler(bmi_thread_mgr_unexp_handler);
 
     return (0);
 }
@@ -827,8 +827,6 @@ int job_dev_unexp(
         }
     }
 
-    PINT_thread_mgr_dev_unexp_handler(dev_thread_mgr_unexp_handler);
-
     /* if we fall through to this point, then there were not any
      * uenxpected receive's available (or none requested); queue up to
      * test later
@@ -838,6 +836,8 @@ int job_dev_unexp(
     job_desc_q_add(dev_unexp_queue, jd);
     dev_unexp_pending_count++;
     gen_mutex_unlock(&dev_unexp_mutex);
+
+    PINT_thread_mgr_dev_unexp_handler(dev_thread_mgr_unexp_handler);
 
     return (0);
 }
