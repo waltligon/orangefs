@@ -138,6 +138,14 @@ typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
 /* truncate */
 /* no data returned in truncate response */
 
+/* statfs */
+struct PVFS_sysresp_statfs_s
+{
+    PVFS_statfs statfs_buf;
+    int server_count;
+};
+typedef struct PVFS_sysresp_statfs_s PVFS_sysresp_statfs;
+
 struct PVFS_sysresp_getparent_s
 {
     PVFS_pinode_reference parent_refn;
@@ -264,6 +272,11 @@ int PVFS_sys_getparent(
 int PVFS_sys_flush(
     PVFS_pinode_reference pinode_refn,
     PVFS_credentials credentials);
+
+int PVFS_sys_statfs(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    PVFS_sysresp_statfs* resp);
 
 #endif
 

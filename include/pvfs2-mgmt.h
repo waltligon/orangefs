@@ -21,6 +21,19 @@ int PVFS_mgmt_noop(
     PVFS_credentials credentials,
     char* host);
 
+int PVFS_mgmt_count_servers(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    int* count);
+
+int PVFS_mgmt_statfs_all(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    int incount,
+    int* outcount,
+    int* overflow_flag,
+    PVFS_statfs* statfs_array);
+
 #endif /* __PVFS2_MGMT_H */
 
 /*

@@ -18,7 +18,8 @@ CSRC := \
 	$(DIR)/pint-bucket.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
-	$(DIR)/shared-state-methods.c
+	$(DIR)/shared-state-methods.c \
+	$(DIR)/mgmt-count-servers.c
 
 SMSRC := \
 	getattr-pcache.sm \
