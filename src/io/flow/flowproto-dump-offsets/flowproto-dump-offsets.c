@@ -369,7 +369,6 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
     gossip_err("*********************************************\n");
     do
     {
-	tmp_result.eof_flag = 0;
 	tmp_result.bytes = 0;
 	tmp_result.segs = 0;
 
@@ -442,7 +441,6 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
     gossip_err("*********************************************\n");
     do
     {
-	tmp_result.eof_flag = 0;
 	tmp_result.bytes = 0;
 	tmp_result.segs = 0;
 
@@ -514,7 +512,6 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
     gossip_err("*********************************************\n");
     do
     {
-	tmp_result.eof_flag = 0;
 	tmp_result.bytes = 0;
 	tmp_result.segs = 0;
 
@@ -586,7 +583,6 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
     gossip_err("*********************************************\n");
     do
     {
-	tmp_result.eof_flag = 0;
 	tmp_result.bytes = 0;
 	tmp_result.segs = 0;
 

@@ -788,7 +788,6 @@ static int buffer_setup_bmi_to_mem(flow_descriptor * flow_d)
     flow_d->result.size_array = flow_data->bmi_size_list;
     flow_d->result.bytemax = flow_data->max_buffer_size;
     flow_d->result.segmax = MAX_REGIONS;
-    flow_d->result.eof_flag = 0;
     flow_d->result.bytes = 0;
     flow_d->result.segs = 0;
     ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
@@ -882,7 +881,6 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
     flow_d->result.size_array = flow_data->bmi_size_list;
     flow_d->result.bytemax = flow_data->max_buffer_size;
     flow_d->result.segmax = MAX_REGIONS;
-    flow_d->result.eof_flag = 0;
     flow_d->result.bytes = 0;
     flow_d->result.segs = 0;
     ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
@@ -946,7 +944,6 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
 		flow_d->result.bytemax = flow_data->max_buffer_size -
 		    intermediate_offset;
 		flow_d->result.segmax = MAX_REGIONS;
-		flow_d->result.eof_flag = 0;
 		flow_d->result.bytes = 0;
 		flow_d->result.segs = 0;
 		ret  = PINT_Process_request(flow_d->io_req_state, 
@@ -1123,7 +1120,6 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
     flow_d->result.size_array = flow_data->trove_size_list;
     flow_d->result.bytemax = flow_data->max_buffer_size;
     flow_d->result.segmax = MAX_REGIONS;
-    flow_d->result.eof_flag = 0;
     flow_d->result.bytes = 0;
     flow_d->result.segs = 0;
     ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
@@ -1449,7 +1445,6 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	flow_d->result.size_array = flow_data->trove_size_list;
 	flow_d->result.bytemax = flow_data->drain_buffer_stepsize;
 	flow_d->result.segmax = MAX_REGIONS;
-	flow_d->result.eof_flag = 0;
 	flow_d->result.bytes = 0;
 	flow_d->result.segs = 0;
 	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
@@ -1489,7 +1484,6 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	    flow_d->result.size_array = NULL;
 	    flow_d->result.bytemax = flow_data->bmi_total_size;
 	    flow_d->result.segmax = INT_MAX;
-	    flow_d->result.eof_flag = 0;
 	    flow_d->result.bytes = 0;
 	    flow_d->result.segs = 0;
 	    ret  = PINT_Process_request(flow_data->dup_io_req_state, 
@@ -1645,7 +1639,6 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	    flow_d->result.size_array = flow_data->trove_size_list;
 	    flow_d->result.bytemax = flow_data->fill_buffer_stepsize;
 	    flow_d->result.segmax = MAX_REGIONS;
-	    flow_d->result.eof_flag = 0;
 	    flow_d->result.bytes = 0;
 	    flow_d->result.segs = 0;
 	    ret  = PINT_Process_request(flow_d->io_req_state, 
@@ -2012,7 +2005,6 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 		flow_d->result.size_array = flow_data->bmi_size_list;
 		flow_d->result.bytemax = flow_data->bmi_total_size;
 		flow_d->result.segmax = MAX_REGIONS;
-		flow_d->result.eof_flag = 0;
 		flow_d->result.bytes = 0;
 		flow_d->result.segs = 0;
 
@@ -2161,7 +2153,6 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 	flow_d->result.size_array = flow_data->trove_size_list;
 	flow_d->result.bytemax = flow_data->fill_buffer_stepsize;
 	flow_d->result.segmax = MAX_REGIONS;
-	flow_d->result.eof_flag = 0;
 	flow_d->result.bytes = 0;
 	flow_d->result.segs = 0;
 	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
@@ -2378,7 +2369,6 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 	flow_d->result.size_array = flow_data->trove_size_list;
 	flow_d->result.bytemax = flow_data->drain_buffer_stepsize;
 	flow_d->result.segmax = MAX_REGIONS;
-	flow_d->result.eof_flag = 0;
 	flow_d->result.bytes = 0;
 	flow_d->result.segs = 0;
 	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
