@@ -257,7 +257,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
                          a_p->objtype, s_op->req->u.setattr.attr.objtype);
 
             /* set an error to bail out of set-attr processing */
-            ret->error_code = 1;
+            ret->error_code = -1;
             return 1;
         }
     }

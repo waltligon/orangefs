@@ -109,10 +109,9 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 	    goto return_error;
 	}
 
+	/* make sure the actual operation suceeded */
 	ack_p = (struct PVFS_server_resp *) decoded.buffer;
-
-	/* make sure the actual IO suceeded */
-	if (ack_p->status < 0 )
+	if (ack_p->status < 0)
 	{
 	    ret = ack_p->status;
 	    failure = PINODE_REMOVE_FAILURE;

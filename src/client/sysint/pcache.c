@@ -146,7 +146,10 @@ int PINT_pcache_finalize(void)
 	/* Deallocate the pinodes */
 	for(i = 0; i < PINT_PCACHE_MAX_ENTRIES; i++)
 	{
+            if (pvfs_pcache.element[i].pnode)
+            {
 		PINT_pcache_pinode_dealloc(pvfs_pcache.element[i].pnode);
+            }
 	}
 	/* TODO: does a mutex need to go here?*/
 	/* Release the mutex */
