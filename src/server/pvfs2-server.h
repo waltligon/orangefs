@@ -91,9 +91,9 @@ typedef struct PINT_server_op
     int enc_type;
     job_id_t scheduled_id; /* holds id from request scheduler so we can release it later */
 
-    PVFS_ds_keyval_s key, val; /* generic structures used in most server operations */
-    PVFS_ds_keyval_s *key_a;
-    PVFS_ds_keyval_s *val_a;
+    PVFS_ds_keyval key, val; /* generic structures used in most server operations */
+    PVFS_ds_keyval *key_a;
+    PVFS_ds_keyval *val_a;
 
     bmi_addr_t addr; /* set in initialize_unexpected */
     bmi_msg_tag_t tag; /* set in initialize_unexpected */

@@ -4,9 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-/* This file contains the declarations and types for the PVFS 
- * storage interface
- */
 #ifndef __PVFS2_STORAGE_H
 #define __PVFS2_STORAGE_H
 
@@ -15,6 +12,17 @@
 /************************************************************
  * Types and structures specific to the storage interface
  */
+
+/* key/value descriptors */
+struct PVFS_ds_keyval_s
+{
+    void *buffer;
+    /* size of memory region pointed to by buffer */
+    int32_t buffer_sz;
+    /* size of data read into buffer (only valid after a read) */
+    int32_t read_sz;
+};
+typedef struct PVFS_ds_keyval_s PVFS_ds_keyval;
 
 /* contiguous range of handles */
 struct PVFS_handle_extent_s
@@ -98,17 +106,6 @@ do {									\
     (__to).b_size = (__b_size);						\
     (__to).k_size = (__k_size);						\
 } while (0);
-
-/* key descriptors for use in key/value spaces */
-
-struct PVFS_ds_keyval
-{
-    /* TODO: not really defined yet */
-    void *buffer;
-    int32_t buffer_sz;		/* size of memory region pointed to by buffer */
-    int32_t read_sz;		/* size of data read into buffer (only valid after a read) */
-};
-typedef struct PVFS_ds_keyval PVFS_ds_keyval_s;
 
 #endif /* __PVFS2_STORAGE_H */
 

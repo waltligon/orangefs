@@ -20,7 +20,7 @@ typedef PVFS_coll_id         TROVE_coll_id;
 typedef PVFS_ds_type         TROVE_ds_type;
 typedef PVFS_vtag_s          TROVE_vtag_s;
 typedef PVFS_ds_flags        TROVE_ds_flags;
-typedef PVFS_ds_keyval_s     TROVE_keyval_s;
+typedef PVFS_ds_keyval       TROVE_keyval_s;
 typedef PVFS_ds_position     TROVE_ds_position;
 typedef PVFS_ds_attributes_s TROVE_ds_attributes_s;
 typedef PVFS_ds_storedattr_s TROVE_ds_storedattr_s;
