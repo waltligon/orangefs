@@ -45,8 +45,8 @@ int main(int argc, char **argv)
 	rs2 = PINT_New_request_state(r2);
 
 	/* set up file data for first request */
-	rf1.iod_num = 0;
-	rf1.iod_count = 3;
+	rf1.server_nr = 0;
+	rf1.server_ct = 3;
 	rf1.fsize = 8454144;
 	rf1.dist = PVFS_Dist_create("simple_stripe");
 	rf1.extend_flag = 0;
@@ -55,8 +55,8 @@ int main(int argc, char **argv)
 	/* file data for second request is the same, except the file
 	 * will have grown by 10M 
 	 */
-	rf2.iod_num = 0;
-	rf2.iod_count = 3;
+	rf2.server_nr = 0;
+	rf2.server_ct = 3;
 	rf2.fsize = 8454144;
 	rf2.dist = PVFS_Dist_create("simple_stripe");
 	rf2.extend_flag = 0;

@@ -237,8 +237,8 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
 	 */
 	s_op->u.io.flow_d->file_data.fsize = s_op->resp.u.io.bstream_size;
 	s_op->u.io.flow_d->file_data.dist = s_op->req->u.io.io_dist;
-	s_op->u.io.flow_d->file_data.iod_num = s_op->req->u.io.iod_num;
-	s_op->u.io.flow_d->file_data.iod_count = s_op->req->u.io.iod_count;
+	s_op->u.io.flow_d->file_data.server_nr = s_op->req->u.io.server_nr;
+	s_op->u.io.flow_d->file_data.server_ct = s_op->req->u.io.server_ct;
 
 	/* on writes, we allow the bstream to be extended at EOF */
 	if(s_op->req->u.io.io_type == PVFS_IO_WRITE)

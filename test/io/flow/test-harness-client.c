@@ -151,8 +151,8 @@ int main(
 
     /* file data */
     flow_d->file_data.fsize = TEST_SIZE;
-    flow_d->file_data.iod_num = 0;
-    flow_d->file_data.iod_count = 1;
+    flow_d->file_data.server_nr = 0;
+    flow_d->file_data.server_ct = 1;
     flow_d->file_data.extend_flag = 0;
     flow_d->file_data.dist = PVFS_Dist_create("default_dist");
     if (!flow_d->file_data.dist)

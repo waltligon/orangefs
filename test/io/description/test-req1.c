@@ -42,8 +42,8 @@ int main(int argc, char **argv)
 	rs = PINT_New_request_state(r1);
 
 	/* set up file data */
-	rf.iod_num = 0;
-	rf.iod_count = 2;
+	rf.server_nr = 0;
+	rf.server_ct = 2;
 	rf.fsize = 10000000;
 
 	/* grab a distribution */

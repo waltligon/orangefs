@@ -603,9 +603,9 @@ struct PVFS_servreq_io
     enum PVFS_flowproto_type flow_type;
 
     /* relative number of this I/O server in distribution */
-    uint32_t iod_num;
+    uint32_t server_nr;
     /* total number of I/O servers involved in distribution */
-    uint32_t iod_count;
+    uint32_t server_ct;
 
     /* distribution */
     PVFS_Dist *io_dist;
@@ -622,8 +622,8 @@ struct PVFS_servreq_io
     encode_PVFS_fs_id(pptr, &(x)->fs_id); \
     encode_enum(pptr, &(x)->io_type); \
     encode_enum(pptr, &(x)->flow_type); \
-    encode_uint32_t(pptr, &(x)->iod_num); \
-    encode_uint32_t(pptr, &(x)->iod_count); \
+    encode_uint32_t(pptr, &(x)->server_nr); \
+    encode_uint32_t(pptr, &(x)->server_ct); \
     encode_PVFS_Dist(pptr, &(x)->io_dist); \
     { \
     /* XXX: linearize into a fresh buffer, encode it, then throw it away;
@@ -643,8 +643,8 @@ struct PVFS_servreq_io
     decode_PVFS_fs_id(pptr, &(x)->fs_id); \
     decode_enum(pptr, &(x)->io_type); \
     decode_enum(pptr, &(x)->flow_type); \
-    decode_uint32_t(pptr, &(x)->iod_num); \
-    decode_uint32_t(pptr, &(x)->iod_count); \
+    decode_uint32_t(pptr, &(x)->server_nr); \
+    decode_uint32_t(pptr, &(x)->server_ct); \
     decode_PVFS_Dist(pptr, &(x)->io_dist); \
     decode_int32_t(pptr, &numreq); \
     (x)->file_req = decode_malloc((numreq + 1) * sizeof(*(x)->file_req)); \
@@ -678,8 +678,8 @@ do {						\
     (__req).u.io.handle        = (__handle);	\
     (__req).u.io.io_type       = (__io_type);	\
     (__req).u.io.flow_type     = (__flow_type);	\
-    (__req).u.io.iod_num       = (__datafile_nr);	\
-    (__req).u.io.iod_count     = (__datafile_ct);	\
+    (__req).u.io.server_nr       = (__datafile_nr);	\
+    (__req).u.io.server_ct     = (__datafile_ct);	\
     (__req).u.io.io_dist       = (__io_dist);	\
     (__req).u.io.file_req        = (__file_req);	\
     (__req).u.io.file_req_offset = (__file_req_off);	\

@@ -136,8 +136,8 @@ typedef struct PINT_Request_result {
 
 typedef struct PINT_Request_file_data {
 	PVFS_size    fsize;			/* actual size of local storage object */
-	uint32_t     iod_num;		/* ordinal number of THIS server for this file */
-	uint32_t     iod_count;		/* number of servers for this file */
+	uint32_t     server_nr;		/* ordinal number of THIS server for this file */
+	uint32_t     server_ct;		/* number of servers for this file */
 	PVFS_Dist    *dist;			/* dist struct for the file */
 	PVFS_boolean extend_flag;	/* if zero, file will not be extended */
 } PINT_Request_file_data;

@@ -57,8 +57,8 @@ int main(int argc, char **argv)
 	rs1p = PINT_New_request_state(r1);
 
 	/* set up file data for request */
-	rf1.iod_num = 0;
-	rf1.iod_count = 2;
+	rf1.server_nr = 0;
+	rf1.server_ct = 2;
 	rf1.fsize = 6000;
 	rf1.dist = PVFS_Dist_create("simple_stripe");
 	rf1.extend_flag = 0;

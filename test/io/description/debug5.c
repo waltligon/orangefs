@@ -41,15 +41,15 @@ int main(int argc, char **argv)
 	rs1 = PINT_New_request_state(r1);
 	rs2 = PINT_New_request_state(r2);
 
-	rf1.iod_num = 0;
-	rf1.iod_count = 3;
+	rf1.server_nr = 0;
+	rf1.server_ct = 3;
 	rf1.fsize = 8454144;
 	rf1.dist = PVFS_Dist_create("simple_stripe");
 	rf1.extend_flag = 0;
 	PINT_Dist_lookup(rf1.dist);
 
-	rf2.iod_num = 1;
-	rf2.iod_count = 3;
+	rf2.server_nr = 1;
+	rf2.server_ct = 3;
 	rf2.fsize = 8454144;
 	rf2.dist = PVFS_Dist_create("simple_stripe");
 	rf2.extend_flag = 0;

@@ -569,21 +569,21 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 	}
 	/* find next logical offset on this server */
    loff = (*rfdata->dist->methods->next_mapped_offset)
-			(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, offset);
+			(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, offset);
 	/* make sure loff is still within requested region */
    while ((diff = loff - offset) < size)
    {
 		gossip_debug(REQUEST_DEBUG,"\t\tbegin iteration loff: %lld\n", Ld(loff));
 		/* find physical offset for this loff */
       poff = (*rfdata->dist->methods->logical_to_physical_offset)
-				(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, loff);
+				(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, loff);
 		/* find how much of requested region remains after loff */
       sz = size - diff;
 		/* find how much data after loff/poff is on this server */
       fraglen = (*rfdata->dist->methods->contiguous_length)
-				(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, poff);
+				(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, poff);
 		/* compare that amount to amount of data in requested region */
-      if (sz > fraglen && rfdata->iod_count != 1)
+      if (sz > fraglen && rfdata->server_ct != 1)
 		{
 			/* frag extends beyond this strip */
 			gossip_debug(REQUEST_DEBUG,"\t\tfrag extends beyond strip\n");
@@ -661,7 +661,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
       offset = loff;
 		/* find next logical offset on this server */
       loff = (*rfdata->dist->methods->next_mapped_offset)
-				(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, offset);
+				(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, offset);
 		gossip_debug(REQUEST_DEBUG,"\t\tend iteration\n");
 		/* see if we are finished */
 		if (result->bytes >= result->bytemax ||
@@ -679,7 +679,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 	/* find physical offset for this loff */
 	gossip_debug(REQUEST_DEBUG,"\t\t\tnext loff: %lld ", Ld(loff));
    poff = (*rfdata->dist->methods->logical_to_physical_offset)
-			(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, loff);
+			(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, loff);
 	gossip_debug(REQUEST_DEBUG,"next poff: %lld\n", Ld(poff));
 	if (poff >= rfdata->fsize && !rfdata->extend_flag)
 	{

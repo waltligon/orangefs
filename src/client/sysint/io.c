@@ -222,11 +222,11 @@ int PVFS_sys_io_old(PVFS_pinode_reference pinode_refn, PVFS_Request file_req,
 	{
 	    if(target_handle_array[i] == pinode_ptr->attr.u.meta.dfile_array[j])
 	    {
-		req_array[i].u.io.iod_num = j;
+		req_array[i].u.io.server_nr = j;
 		break;
 	    }
 	}
-	req_array[i].u.io.iod_count =
+	req_array[i].u.io.server_ct =
 	    pinode_ptr->attr.u.meta.dfile_count;
 	req_array[i].u.io.file_req = file_req;
 	req_array[i].u.io.file_req_offset = file_req_offset;
@@ -423,8 +423,8 @@ static int io_find_target_dfiles(PVFS_Request file_req, PVFS_offset file_req_off
 	 */
 	tmp_file_data.fsize = 0;  
 	tmp_file_data.dist = pinode_ptr->attr.u.meta.dist;
-	tmp_file_data.iod_num = i;
-	tmp_file_data.iod_count = pinode_ptr->attr.u.meta.dfile_count;
+	tmp_file_data.server_nr = i;
+	tmp_file_data.server_ct = pinode_ptr->attr.u.meta.dfile_count;
 	tmp_file_data.extend_flag = 1;
 
 	/* if a file datatype offset was specified, go ahead and skip ahead 
@@ -762,8 +762,8 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		    tmp_resp->u.io.bstream_size;
 		flow_array[i]->file_data->dist =
 		    attr_p->u.meta.dist;
-		flow_array[i]->file_data->iod_num = req_array[i].u.io.iod_num;
-		flow_array[i]->file_data->iod_count =
+		flow_array[i]->file_data->server_nr = req_array[i].u.io.server_nr;
+		flow_array[i]->file_data->server_ct =
 		    attr_p->u.meta.dfile_count;
 		flow_array[i]->file_req = file_req;
 		flow_array[i]->file_req_offset = file_req_offset;

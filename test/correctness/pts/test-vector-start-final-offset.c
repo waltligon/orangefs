@@ -55,8 +55,8 @@ int test_vec_start_final(void){
     rs1 = PINT_New_request_state(r1);
                                                                                 
     /* set up file data for request */
-    rf1.iod_num = 0;
-    rf1.iod_count = 8;
+    rf1.server_nr = 0;
+    rf1.server_ct = 8;
     rf1.fsize = 10000000;
     rf1.dist = PVFS_Dist_create("simple_stripe");
     rf1.extend_flag = 1;

@@ -73,8 +73,8 @@ int test_request(void){
     rs2 = PINT_New_request_state(r2);
                                                                                 
     /* set up file data for first request */
-    rf1.iod_num = 0;
-    rf1.iod_count = 1;
+    rf1.server_nr = 0;
+    rf1.server_ct = 1;
     rf1.fsize = 0;
     rf1.dist = PVFS_Dist_create("simple_stripe");
     rf1.extend_flag = 1;
@@ -83,8 +83,8 @@ int test_request(void){
     /* file data for second request is the same, except the file
      * will have grown by 10M
      */
-    rf2.iod_num = 0;
-    rf2.iod_count = 1;
+    rf2.server_nr = 0;
+    rf2.server_ct = 1;
     rf2.fsize = 10*1024*1024;
     rf2.dist = PVFS_Dist_create("simple_stripe");
     rf2.extend_flag = 1;

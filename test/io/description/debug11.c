@@ -43,8 +43,8 @@ int main(int argc, char **argv)
 	rs2 = PINT_New_request_state(r2);
 
 	/* set up file data for request */
-	rf1.iod_num = 0;
-	rf1.iod_count = 4;
+	rf1.server_nr = 0;
+	rf1.server_ct = 4;
 	rf1.fsize = 6000;
 	rf1.dist = PVFS_Dist_create("simple_stripe");
 	rf1.extend_flag = 0;

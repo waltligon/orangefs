@@ -79,8 +79,8 @@ main(int argc, char **argv)
 	req1.sreq = NULL;
 
 	reqs = PINT_New_request_state(&req1);
-	rfdata.iod_num = 0;
-	rfdata.iod_count = 2;
+	rfdata.server_nr = 0;
+	rfdata.server_ct = 2;
 	rfdata.fsize = 10000000;
 	rfdata.dist = PINT_lookup_distribution("simple stripe");
 	dparm.strip_size = 1024;

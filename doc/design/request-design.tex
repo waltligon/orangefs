@@ -386,8 +386,8 @@ whether the end of the request is at or beyond the end of file.
 \begin{verbatim}
    typedef struct PINT_Request_file_data {
       PVFS_size    fsize;     /* actual size of local storage object */
-      int32_t iod_num;   /* ordinal number of THIS server for this file */
-      int32_t iod_count; /* number of servers for this file */
+      int32_t server_nr;   /* ordinal number of THIS server for this file */
+      int32_t server_ct; /* number of servers for this file */
       PVFS_Distribution *dist;
       PVFS_Dist_parm    *dparm;
       PVFS_boolean      extend_flag;
@@ -478,8 +478,8 @@ do_a_request(PINT_Request *req,
    PVFS_boolean eof_flag;
 
    reqs = PINT_New_request_state(req);
-   rfdata.iod_num = 0;
-   rfdata.iod_count = 1;
+   rfdata.server_nr = 0;
+   rfdata.server_ct = 1;
    rfdata.fsize = 10000000;
    rfdata.dist = dist
    rfdata.dparm = dparm

@@ -68,7 +68,7 @@ a request.
 
 \begin{verbatim}
    	PVFS_offset logical_to_physical_offset (PVFS_Dist_parm *dparm,
-        		uint32_t iod_num, uint32_t iod_count,
+        		uint32_t server_nr, uint32_t server_ct,
          	PVFS_offset logical_offset);
 \end{verbatim}
 
@@ -79,7 +79,7 @@ logical offset does not map to a physical offset on that server.
 
 \begin{verbatim}
    	PVFS_offset physical_to_logical_offset (PVFS_Dist_parm *dparm,
-         	uint32_t iod_num, uint32_t iod_count,
+         	uint32_t server_nr, uint32_t server_ct,
          	PVFS_offset physical_offset);
 \end{verbatim}
 
@@ -89,7 +89,7 @@ assumed to be on the current PVFS server.
 
 \begin{verbatim}
    	PVFS_offset next_mapped_offset (PVFS_Dist_parm *dparm,
-         	uint32_t iod_num, uint32_t iod_count,
+         	uint32_t server_nr, uint32_t server_ct,
          	PVFS_offset logical_offset);
 \end{verbatim}
 
@@ -99,7 +99,7 @@ PVFS server.  Returns a logical offset.
 
 \begin{verbatim}
    	PVFS_size contiguous_length (PVFS_Dist_parm *dparm,
-         	uint32_t iod_num, uint32_t iod_count,
+         	uint32_t server_nr, uint32_t server_ct,
          	PVFS_offset physical_offset);
 \end{verbatim}
 
@@ -115,8 +115,8 @@ PVFS distribution processing pseudo code:
    PVFS_size size;          // size of requested data
    int req_type;            // type of read A_READ or A_WRITE
    PVFS_Dist_parm *d_p;     // point to file distribution parameter structure
-	uint32_t iod_num;    // number of iods data distributed on
-	uint32_t iod_count;  // ordinal number this iod
+	uint32_t server_nr;    // number of iods data distributed on
+	uint32_t server_ct;  // ordinal number this iod
 	PVFS_distribution *dist; // distribution methods
 
 	// LOCALS
@@ -126,10 +126,10 @@ PVFS distribution processing pseudo code:
    PVFS_size   sz;
    PVFS_size   fraglen;
 
-   loff = (*dist->next_mapped_offset) (d_p, iod_num, iod_count, offset);
+   loff = (*dist->next_mapped_offset) (d_p, server_nr, server_ct, offset);
    while ((diff = loff - offset) < size)
    {
-      poff = (*dist->logical_to_physical_offset)(d_p,iod_num,iod_count,loff);
+      poff = (*dist->logical_to_physical_offset)(d_p,server_nr,server_ct,loff);
       sz = size - diff;
       if (poff+sz > m_p->fsize && req_type==A_READ) // check for append 
       {
@@ -142,7 +142,7 @@ PVFS distribution processing pseudo code:
             return(1);
          }
       }
-      fraglen = (*dist->contiguous_length) (d_p, iod_num, iod_count, poff);
+      fraglen = (*dist->contiguous_length) (d_p, server_nr, server_ct, poff);
       if (sz <= fraglen || m_p->pcount == 1) // all in 1 block
       {
          create_segment (poff, sz);
@@ -156,7 +156,7 @@ PVFS distribution processing pseudo code:
       loff  += fraglen;
       size  -= loff - offset;
       offset = loff;
-      loff = (*dist->next_mapped_offset) (d_p, iod_num, iod_count, offset);
+      loff = (*dist->next_mapped_offset) (d_p, server_nr, server_ct, offset);
    }
 \end{verbatim}
 
@@ -178,16 +178,16 @@ method entries are registration functions are defined as follows:
    	char *dist_name;
    	int param_size;
    	PVFS_offset (*logical_to_physical_offset) (PVFS_Dist_parm *dparm,
-        		uint32_t iod_num, uint32_t iod_count,
+        		uint32_t server_nr, uint32_t server_ct,
          	PVFS_offset logical_offset);
    	PVFS_offset (*physical_to_logical_offset) (PVFS_Dist_parm *dparm,
-         	uint32_t iod_num, uint32_t iod_count,
+         	uint32_t server_nr, uint32_t server_ct,
          	PVFS_offset physical_offset);
    	PVFS_offset (*next_mapped_offset) (PVFS_Dist_parm *dparm,
-         	uint32_t iod_num, uint32_t iod_count,
+         	uint32_t server_nr, uint32_t server_ct,
          	PVFS_offset logical_offset);
    	PVFS_size (*contiguous_length) (PVFS_Dist_parm *dparm,
-         	uint32_t iod_num, uint32_t iod_count,
+         	uint32_t server_nr, uint32_t server_ct,
          	PVFS_offset physical_offset);
 	};
 

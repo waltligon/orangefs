@@ -831,8 +831,8 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    /* TODO: MACRO TO FILL THIS IN? */
 	    fl_p->file_data.fsize     = resp_p->u.io.bstream_size;
 	    fl_p->file_data.dist      = iosm_p->dist_p;
-	    fl_p->file_data.iod_num   = iosm_p->datafile_index_array[recv_match];
-	    fl_p->file_data.iod_count = iosm_p->datafile_count;
+	    fl_p->file_data.server_nr   = iosm_p->datafile_index_array[recv_match];
+	    fl_p->file_data.server_ct = iosm_p->datafile_count;
 
 	    /* this is the file datatype */
 	    fl_p->file_req        = iosm_p->file_req;
@@ -843,8 +843,8 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    gossip_debug(CLIENT_DEBUG,
 			 "    bstream_size = %Ld, datafile_nr = %d, datafile_ct = %d, file_req_off = %Ld\n",
 			 Ld(fl_p->file_data.fsize),
-			 fl_p->file_data.iod_num,
-			 fl_p->file_data.iod_count,
+			 fl_p->file_data.server_nr,
+			 fl_p->file_data.server_ct,
 			 Ld(fl_p->file_req_offset));
 
 	    /* session tag, same as the one used in the send/recv */
@@ -1240,7 +1240,7 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
     }
 
     tmp_file_data.dist = dist_p;
-    tmp_file_data.iod_count = input_handle_count;
+    tmp_file_data.server_ct = input_handle_count;
     tmp_file_data.extend_flag = 1;
 
     for (i=0; i < input_handle_count; i++)
@@ -1250,7 +1250,7 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
 	 * processor to continue past eof if needed
 	 */
 	tmp_file_data.fsize = 0;  
-	tmp_file_data.iod_num = i;
+	tmp_file_data.server_nr = i;
 
 	PINT_REQUEST_STATE_RESET(req_state);
 	PINT_REQUEST_STATE_RESET(mem_req_state);
