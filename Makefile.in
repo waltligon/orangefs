@@ -13,6 +13,11 @@ INSTALL = @INSTALL@
 #
 MODULES := $(shell find . -iname "*.mk" | sed -e 's/^.\///;s/module.mk//')
 
+# TODO: fix this up later.  Maybe it should be LEX and YACC, but we
+# don't really support those...
+BISON = bison
+FLEX = flex
+
 CC = @CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
@@ -39,6 +44,18 @@ CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 # try to find a better way to take care of it.
 #
 SRCFILES := src/io/trove/trove-autogen.c
+#
+# CLEANFILES is a list of generated files that need to be removed at
+# "make clean" time.  This is just for special case files that aren't
+# cleaned up by our normal rules.
+#
+CLEANFILES :=\
+ src/common/statecomp/statecomp\
+ src/common/statecomp/*.o \
+ src/common/statecomp/scanner.c \
+ src/common/statecomp/parser.c \
+ src/common/statecomp/parser.h 
+
 LIBRARIES := lib/libpvfs2.a
 TESTSRC :=
 LIBSRC :=
@@ -113,7 +130,7 @@ docsclean:
 
 clean: docsclean
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
-		$(LIBRARIES) $(DEPENDS) 
+		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)
 
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;

@@ -1,0 +1,10 @@
+DIR := src/common/statecomp
+
+$(DIR)/statecomp: $(DIR)/statecomp.o $(DIR)/parser.o $(DIR)/scanner.o $(DIR)/symbol.o $(DIR)/emalloc.o $(DIR)/codegen.o $(DIR)/stringtbl.o
+	$(LD) $^ $(LDFLAGS) -o $@
+
+$(DIR)/parser.c: $(DIR)/parser.y
+	$(BISON) -d $< -o $@
+
+$(DIR)/scanner.c: $(DIR)/scanner.l
+	$(FLEX) -d -o$@ $<
