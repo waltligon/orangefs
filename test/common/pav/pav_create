@@ -147,8 +147,6 @@ sub create_pvfs2config
     	$cmd .= " --notrovesync";
     }
 
-    print "calling genconfig with $cmd\n";
-
     $rc = system($cmd);
     return 0;
     
