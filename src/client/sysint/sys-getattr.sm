@@ -217,9 +217,9 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 	attrmask |= PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST;
     }
 
-    if (attrmask & PVFS_ATTR_SYS_LNKTARGET)
+    if (attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
-        attrmask &= ~(PVFS_ATTR_SYS_LNKTARGET);
+        attrmask &= ~(PVFS_ATTR_SYS_LNK_TARGET);
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
