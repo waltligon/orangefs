@@ -47,10 +47,18 @@ system interface functionality:
 
 user interfaces:
 ====================================================================
-- pvfs-kernel implementation
-  - quick modification of existing pvfs-kernel and/or full rewrite
 - ROMIO module
 - pvfs_XXX interface?
+
+kernel/vfs interface
+====================================================================
+- 2.4.x pvfs-kernel implementation
+  - quick modification of existing pvfs-kernel and/or full rewrite
+- 2.6.x pvfs2-kernel implementation
+  - imlement memory mapping operations through vfs
+  - properly handle vfs interruption cases (signals)
+  - get fsid/root handle information at mount time
+  - use /etc/fstab mount interface for volume info
 
 system installation:
 ====================================================================
