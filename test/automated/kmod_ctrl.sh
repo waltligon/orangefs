@@ -23,6 +23,7 @@ insmod_kmmod() {
 }
 #unload the module
 rmmod_kmmod() {
+  sleep 3
   sudo /sbin/rmmod pvfs2
   if [ $? != 0 ] ; then
     echo "Error removing the kernel module. Aborting."
