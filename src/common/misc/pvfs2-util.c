@@ -412,10 +412,12 @@ int PVFS_util_remove_dir_prefix(
 	if (strncmp(prefix, pathname, prefix_len) == 0)
 	{
 	    /* apparent match; see if next element is a slash */
-	    if (pathname[prefix_len] != '/')
+	    if (pathname[prefix_len] != '/' && pathname[prefix_len] != '\0')
 		return (-ENOENT);
 
 	    /* this was indeed a match */
+	    /* in the case of no trailing slash cut_index will point to the end
+	     * of "prefix" (NULL).   */
 	    cut_index = prefix_len;
 	}
 	else
@@ -430,8 +432,13 @@ int PVFS_util_remove_dir_prefix(
     if ((1 + strlen(&(pathname[cut_index]))) > out_max_len)
 	return (-ENAMETOOLONG);
 
-    /* copy out appropriate part of pathname */
-    strcpy(out_path, &(pathname[cut_index]));
+    /* try to handle the case of no trailing slash */
+    if (pathname[cut_index] == '\0') 
+	out_path[0]='/';
+    else
+	/* copy out appropriate part of pathname */
+	strcpy(out_path, &(pathname[cut_index]));
+
     return (0);
 }
 
