@@ -400,7 +400,7 @@ AC_ARG_WITH(kernel24,
        tmp_k24_minor_ver=`echo $k24_minor_ver | cut -d- -f1`
        k24_minor_ver=$tmp_k24_minor_ver
     fi
-    LINUX24_KERNEL_SRC="$withval" LINUX24_KERNEL_MINOR_VER="$k24_minor_ver"
+    LINUX24_KERNEL_SRC="$withval" LINUX24_KERNEL_MINOR_VER="`echo $k24_minor_ver| cut -d'.' -f 1`"
     , LINUX24_KERNEL_SRC="" LINUX24_KERNEL_MINOR_VER="")
 
 
