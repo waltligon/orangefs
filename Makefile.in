@@ -129,6 +129,8 @@ lib/libpvfs2.a: $(LIBOBJS)
 
 $(TESTS): %: %.o $(LIBRARIES)
 
+statecomp: src/common/statecomp/statecomp
+	
 cscope:
 	find $(srcdir) -iname "*.[ch]" > $(srcdir)/cscope.files
 	( cd $(srcdir); cscope -be -i $(srcdir)/cscope.files )
@@ -151,11 +153,13 @@ distclean: clean
 # running make clean or make distclean
 #
 # NOTE: there should be a way to combine these lines...
+ifneq ($(MAKECMDGOALS),statecomp)
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(MAKECMDGOALS),distclean)
 ifneq ($(MAKECMDGOALS),docs)
 ifneq ($(MAKECMDGOALS),cscope)
 -include $(DEPENDS)
+endif
 endif
 endif
 endif
