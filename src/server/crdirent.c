@@ -404,7 +404,7 @@ static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_
     job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
 	    s_op->req->u.crdirent.parent_handle,
 	    0x00000000, /* TODO: Change this */
-	    PVFS_TYPE_DIRECTORY,
+	    PVFS_TYPE_DIRDATA,
 	    NULL,
 	    s_op,
 	    ret,
