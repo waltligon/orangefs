@@ -74,6 +74,8 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s* js_p)
     struct server_configuration_s *user_opts = get_server_config_struct();
     assert(user_opts);
 
+    PINT_STATE_DEBUG("init");
+
     /* TODO: handle this properly later */
     assert(user_opts->fs_config_buflen <= PVFS_REQ_LIMIT_CONFIG_FILE_BYTES);
     assert(user_opts->server_config_buflen <= PVFS_REQ_LIMIT_CONFIG_FILE_BYTES);
@@ -109,6 +111,7 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s* js_p)
 
 static int getconfig_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
+    PINT_STATE_DEBUG("cleanup");
     return(PINT_state_machine_complete(s_op));
 }
 

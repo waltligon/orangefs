@@ -98,7 +98,7 @@ static int readdir_verify_directory_metadata(PINT_server_op *s_op,
 {
     PVFS_object_attr *a_p;
 
-    gossip_debug(SERVER_DEBUG, "readdir state: verify_directory_metadata\n");
+    PINT_STATE_DEBUG("verify_directory_metadata");
 
     a_p = &s_op->attr;
 
@@ -137,7 +137,7 @@ static int readdir_read_dirdata_handle(PINT_server_op *s_op,
     int ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "readdir state: read_dirdata handle\n");
+    PINT_STATE_DEBUG("read_dirdata_handle");
 
     s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
@@ -189,7 +189,7 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
     int ret;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "readdir state: iterate_on_entries\n");
+    PINT_STATE_DEBUG("iterate_on_entries");
 
     /* TODO: handle this error properly */
     assert(s_op->req->u.readdir.dirent_count <= PVFS_REQ_LIMIT_DIRENT_COUNT);
@@ -253,7 +253,7 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
 static int readdir_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
 
-    gossip_debug(SERVER_DEBUG, "readdir state: setup_resp\n");
+    PINT_STATE_DEBUG("setup_resp");
 
     if (js_p->error_code == STATE_ENOTDIR) {
 
@@ -297,8 +297,7 @@ static int readdir_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 static int readdir_cleanup(PINT_server_op *s_op,
 			   job_status_s* js_p)
 {
-
-    gossip_debug(SERVER_DEBUG, "readdir state: cleanup\n");
+    PINT_STATE_DEBUG("cleanup");
 
     /* free dynamically allocated space */
     if (s_op->key_a) free(s_op->key_a);

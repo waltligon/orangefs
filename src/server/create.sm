@@ -77,6 +77,8 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
     int ret;
     job_id_t i;
 
+    PINT_STATE_DEBUG("create");
+
     ret = job_trove_dspace_create(s_op->req->u.create.fs_id,
 	    &s_op->req->u.create.handle_extent_array,
 	    s_op->req->u.create.object_type,
@@ -95,6 +97,8 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
+    PINT_STATE_DEBUG("setup_resp");
+
     if(js_p->error_code == 0)
     {
 	gossip_debug(SERVER_DEBUG, "Handle created: %lld\n", js_p->handle);
@@ -125,6 +129,8 @@ static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int create_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
+    PINT_STATE_DEBUG("cleanup");
+
     return(PINT_state_machine_complete(s_op));
 }
 

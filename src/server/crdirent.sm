@@ -124,7 +124,7 @@ static int crdirent_validate(PINT_server_op *s_op,
 {
     char *ptr;
 
-    gossip_debug(SERVER_DEBUG, "crdirent state: validate\n");
+    PINT_STATE_DEBUG("validate");
 
     /* verify input values -- some of this should be caught as legitimate errors later! */
     assert(s_op->req->u.crdirent.name != NULL);
@@ -194,7 +194,7 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
     int ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "crdirent state: gethandle\n");
+    PINT_STATE_DEBUG("read_directory_entry_handle");
 
     /* TODO: MAKE THIS AN ERROR CHECK INSTEAD LATER */
     assert(s_op->attr.mask & PVFS_ATTR_COMMON_TYPE);
@@ -247,7 +247,7 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
     PVFS_handle_extent extent;
     PVFS_handle_extent_array extent_array;
 
-    gossip_debug(SERVER_DEBUG, "crdirent state: create_dirdata_dspace\n");
+    PINT_STATE_DEBUG("create_dirdata_dspace");
 
     gossip_debug(SERVER_DEBUG, "  creating dspace (coll_id = 0x%x)\n",
 		 s_op->req->u.crdirent.fs_id);
@@ -291,7 +291,7 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
     int ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "crdirent state: write_dirdata_handle\n");
+    PINT_STATE_DEBUG("write_dirdata_handle");
 
     /* TODO CHECK ERROR CODE */
 
@@ -350,7 +350,7 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
     int ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "crdirent state: write_directory_entry\n");
+    PINT_STATE_DEBUG("write_directory_entry");
 
     /* This buffer came from one of two places, either phase two of creating the
      * directory space when we wrote the value back to trove, or from the initial read
@@ -409,7 +409,7 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
     int ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "crdirent state: check_exist_directory_entry\n");
+    PINT_STATE_DEBUG("check_exist_directory_entry");
 
     /* This buffer came from one of two places, either phase two of creating the
      * directory space when we wrote the value back to trove, or from the initial read
@@ -461,7 +461,7 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
 static int crdirent_handle_eexist(PINT_server_op *s_op,
 					  job_status_s* js_p)
 {
-    gossip_debug(SERVER_DEBUG, "crdirent state: handle_eexist\n");
+    PINT_STATE_DEBUG("handle_eexist");
 
     js_p->error_code = -PVFS_EEXIST;
     return(1);
@@ -475,6 +475,7 @@ static int crdirent_handle_eexist(PINT_server_op *s_op,
 static int crdirent_cleanup(PINT_server_op *s_op,
 			    job_status_s* js_p)
 {
+    PINT_STATE_DEBUG("cleanup");
     return(PINT_state_machine_complete(s_op));
 }
 

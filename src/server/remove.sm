@@ -164,7 +164,7 @@ machine pvfs2_remove_sm(prelude,
 static int remove_check_object_type(PINT_server_op *s_op,
 				       job_status_s* js_p)
 {
-    gossip_debug(SERVER_DEBUG, "(%p) remove state: check_object_type\n", s_op);
+    PINT_STATE_DEBUG("check_object_type");
 
     if(s_op->attr.mask == 0)
     {
@@ -193,9 +193,9 @@ static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
     int ret;
     job_id_t j_id;
 
-    js_p->error_code = 0;
+    PINT_STATE_DEBUG("fallback_to_dspace_getattr");
 
-    gossip_debug(SERVER_DEBUG, "(%p) remove state: fallback_to_dspace_getattr\n", s_op);
+    js_p->error_code = 0;
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading dspace attributes (coll_id = 0x%x, handle = 0x%08Lx)\n",
@@ -218,8 +218,7 @@ static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
 static int remove_verify_dspace_attributes(PINT_server_op *s_op,
 					   job_status_s* js_p)
 {
-
-    gossip_debug(SERVER_DEBUG, "(%p) remove state: verify_dspace_attributes\n", s_op);
+    PINT_STATE_DEBUG("verify_dspace_attributes");
 
     if (js_p->error_code != 0) {
 	gossip_debug(SERVER_DEBUG,
@@ -263,7 +262,7 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
 {
     PVFS_object_attr *a_p;
 
-    gossip_debug(SERVER_DEBUG, "(%p) remove state: verify_object_metadata\n", s_op);
+    PINT_STATE_DEBUG("verify_object_metadata");
 
     a_p = &s_op->attr;
     
@@ -300,7 +299,7 @@ static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
     int ret;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "(%p) remove state: read_dirdata_handle\n", s_op);
+    PINT_STATE_DEBUG("try_to_read_dirdata_handle");
 
     /* set up key and value structures for reading the dirdata handle */
     s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
@@ -343,7 +342,7 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
     int ret;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "(%p) remove state: remove_dspace\n", s_op);
+    PINT_STATE_DEBUG("remove_dirdata_dspace");
 
     gossip_debug(SERVER_DEBUG,
 		 "  removing dirdata dspace 0x%08Lx\n",
@@ -370,7 +369,7 @@ static int remove_remove_dspace(PINT_server_op *s_op,
     int ret;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "(%p) remove state: remove_dspace\n", s_op);
+    PINT_STATE_DEBUG("remove_dspace");
 
     ret = job_trove_dspace_remove(s_op->req->u.remove.fs_id,
 					   s_op->req->u.remove.handle,
@@ -391,7 +390,7 @@ static int remove_remove_dspace(PINT_server_op *s_op,
 static int remove_cleanup(PINT_server_op *s_op,
 			  job_status_s* js_p)
 {
-    gossip_debug(SERVER_DEBUG, "(%p) remove state: cleanup\n", s_op);
+    PINT_STATE_DEBUG("cleanup");
 
     return(PINT_state_machine_complete(s_op));
 }

@@ -114,7 +114,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(PINT_
     int ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "rmdirent state: verify_parent_metadata_and_read_directory_entry_handle\n");
+    PINT_STATE_DEBUG("verify_parent_metadata_and_read_directory_entry_handle");
 
     /* set up key and value structures to read directory entry */
     s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
@@ -158,7 +158,7 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
     int ret;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "rmdirent state: read_directory_entry\n");
+    PINT_STATE_DEBUG("read_directory_entry");
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading from dirent handle = 0x%08Lx, name = %s\n",
@@ -201,6 +201,8 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
 static int rmdirent_read_directory_entry_failure(PINT_server_op *s_op,
 						 job_status_s *js_p)
 {
+    PINT_STATE_DEBUG("read_directory_entry_failure");
+
     switch (js_p->error_code) {
 	case -TROVE_ENOENT:
 	    js_p->error_code = -PVFS_ENOENT;
@@ -227,7 +229,7 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s* j
     int ret;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "rmdirent state: remove_directory_entry\n");
+    PINT_STATE_DEBUG("remove_directory_entry");
 
     /* set up key and structure for keyval remove */
     s_op->key.buffer    = s_op->req->u.rmdirent.entry;
@@ -268,6 +270,8 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s* j
 static int rmdirent_remove_directory_entry_failure(PINT_server_op *s_op,
 						   job_status_s *js_p)
 {
+    PINT_STATE_DEBUG("remove_directory_entry_failure");
+
     assert(js_p->error_code != -TROVE_ENOENT); /* sanity check */
 	    
     switch (js_p->error_code) {
@@ -292,8 +296,7 @@ static int rmdirent_remove_directory_entry_failure(PINT_server_op *s_op,
  */
 static int rmdirent_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
-
-    gossip_debug(SERVER_DEBUG, "rmdirent state: setup_resp\n");
+    PINT_STATE_DEBUG("setup_resp");
 
     /* Set the handle if it was removed */
     if(js_p->error_code == 0) {
@@ -331,6 +334,8 @@ static int rmdirent_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
+    PINT_STATE_DEBUG("cleanup");
+
     return(PINT_state_machine_complete(s_op));
 }
 

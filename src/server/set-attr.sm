@@ -97,7 +97,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
     PVFS_object_attr *a_p, *req_a_p;
 
-    gossip_debug(SERVER_DEBUG, "setattr state: verify_attribs\n");
+    PINT_STATE_DEBUG("verify_attribs");
 
     a_p = &s_op->attr;
     req_a_p = &s_op->req->u.setattr.attr;
@@ -235,7 +235,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
     int ret=0;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "setattr state: setobj_attribs\n");
+    PINT_STATE_DEBUG("setobj_attribs");
 
     dspace_a_p = &s_op->attr;
     a_p = &s_op->req->u.setattr.attr;
@@ -320,8 +320,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
     int ret = 0, dfile_count = 0;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "setattr state: "
-                 "write_metafile_datafile_handles_if_required\n");
+    PINT_STATE_DEBUG("write_metafile_datafile_handles_if_needed");
 
     /* if we don't need to write the dfiles, skip them */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES))
@@ -390,7 +389,7 @@ static int setattr_write_metafile_distribution_if_required(
     int ret=0;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "setattr state: write_metafile_distribution\n");
+    PINT_STATE_DEBUG("write_metafile_distribution_if_required");
 
     /* if we don't need to fill in the distribution, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
@@ -453,8 +452,7 @@ static int setattr_write_metafile_distribution_if_required(
  */
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-
-    gossip_debug(SERVER_DEBUG, "setattr state: setattr_cleanup\n");
+    PINT_STATE_DEBUG("setattr_cleanup");
  
     return(PINT_state_machine_complete(s_op));
 }

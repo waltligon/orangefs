@@ -103,7 +103,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
     PVFS_object_attr *a_p;
 
-    gossip_debug(SERVER_DEBUG, "getattr state: verify_attribs\n");
+    PINT_STATE_DEBUG("verify_attribs");
 
     /* copy basic attributes structure into response */
     s_op->resp.u.getattr.attr = s_op->attr;
@@ -195,8 +195,7 @@ static int getattr_read_datafile_size(PINT_server_op *s_op, job_status_s* js_p)
     int ret;
     job_id_t tmp_id;
 
-    gossip_debug(SERVER_DEBUG, "getattr state: "
-                 "getattr_read_datafile_size\n");
+    PINT_STATE_DEBUG("read_datafile_size");
 
     ret = job_trove_dspace_getattr(s_op->req->u.getattr.fs_id,
                                    s_op->req->u.getattr.handle,
@@ -218,8 +217,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
     int ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "getattr state: "
-                 "read_metafile_datafile_handles_if_required\n");
+    PINT_STATE_DEBUG("read_metafile_datafile_handles_if_required");
 
     /* if we don't need to fill in the dfiles, skip them */
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
@@ -296,8 +294,7 @@ static int getattr_read_metafile_distribution_if_required(
     int ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "getattr state: "
-                 "read_metafile_distribution_if_required\n");
+    PINT_STATE_DEBUG("read_metafile_distribution_if_required");
 
     /* if we don't need to fill in the distribution, skip it */
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DIST))
@@ -350,7 +347,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
     PVFS_object_attr *a_p;
 
-    gossip_debug(SERVER_DEBUG, "getattr state: setup_resp\n");
+    PINT_STATE_DEBUG("setup_resp");
 
     a_p = &s_op->resp.u.getattr.attr;
     
@@ -432,8 +429,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-
-    gossip_debug(SERVER_DEBUG, "getattr state: cleanup\n");
+    PINT_STATE_DEBUG("cleanup");
 
     /*
       if this is a metafile, we may have allocated space

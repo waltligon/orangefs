@@ -130,7 +130,7 @@ static int lookup_init(PINT_server_op *s_op,
 {
     char *ptr;
 
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_init\n");
+    PINT_STATE_DEBUG("init");
 
     /* fill in the lookup portion of the PINT_server_op */
     /* NOTE: it would be nice if we just decoded into this in the first place. */
@@ -179,7 +179,7 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
     job_id_t j_id;
     PVFS_handle handle;
 
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_object_metadata\n");
+    PINT_STATE_DEBUG("read_object_metadata");
 
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
@@ -240,7 +240,7 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
     int ret;
     PVFS_object_attr *a_p;
 
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_verify_object_metadata\n");
+    PINT_STATE_DEBUG("verify_object_metadata");
 
     if (s_op->u.lookup.seg_nr == 0) a_p = &s_op->u.lookup.base_attr;
     else                            a_p = &s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.seg_nr - 1];
@@ -303,7 +303,7 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op,
     int ret;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_directory_entry_handle\n");
+    PINT_STATE_DEBUG("read_directory_entry_handle");
 
     /* initialize keyval prior to read call
      *
@@ -356,7 +356,7 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
     int ret;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_directory_entry\n");
+    PINT_STATE_DEBUG("read_directory_entry");
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading from dirent handle = 0x%08Lx, segment = %s\n",
@@ -397,7 +397,7 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
  */
 static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_setup_resp\n");
+    PINT_STATE_DEBUG("setup_resp");
 
     if (js_p->error_code != 0 && js_p->error_code != STATE_NOMORESEGS && js_p->error_code != STATE_ENOTDIR)
     {
@@ -457,7 +457,7 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 static int lookup_cleanup(PINT_server_op *s_op,
 			  job_status_s* js_p)
 {
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_cleanup\n");
+    PINT_STATE_DEBUG("cleanup");
     
     /* free dynamically allocated parts of non-encoded response */
     free(s_op->resp.u.lookup_path.handle_array);
