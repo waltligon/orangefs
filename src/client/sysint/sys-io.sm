@@ -165,6 +165,7 @@ static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					   job_status_s *js_p)
 {
     uint32_t attrmask;
+    int ret = -1;
 
     gossip_debug(CLIENT_DEBUG,
 		 "(%p) io state: io_object_getattr_setup_msgpair\n",
@@ -185,6 +186,16 @@ static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.fs_id = sm_p->u.io.object_ref.fs_id;
     sm_p->msgpair.handle = sm_p->u.io.object_ref.handle;
     sm_p->msgpair.comp_fn = io_object_getattr_comp_fn;
+    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
+	sm_p->msgpair.handle,
+	sm_p->msgpair.fs_id);
+    if(ret != 0)
+    {
+	gossip_err("Error: failure mapping to server.\n");
+	assert(ret < 0); /* return value range check */
+	assert(0); /* TODO: real error handling */
+    }
+
 
     /* drop through and jump to getattr_pcache state machine */
     return 1;
