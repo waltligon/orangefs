@@ -48,6 +48,8 @@ int main(int argc, char **argv)
     int run_index = 0;
     char tmp_buf[512];
     double tmp_time;
+    double first_time = 0;
+    int counter = 0;
 
     if(argc != 2)
 	usage(argc, argv);
@@ -109,6 +111,12 @@ int main(int argc, char **argv)
 	    data_array[cur_index].processed = 1;
 	    continue;
 	}
+
+	if(first_time == 0)
+	{
+	    first_time = (double)data_array[cur_index].sec + 
+		(double)data_array[cur_index].usec / 1000000;
+	}
 	
 	/* found a starting time; lets look for the matching end time */
 	for(run_index=cur_index; run_index < array_size; run_index++)
@@ -122,6 +130,8 @@ int main(int argc, char **argv)
 		data_array[run_index].id == data_array[cur_index].id)
 	    {
 		/* printf("match.\n"); */
+		printf("%d\t", counter);
+		counter++;
 		data_array[run_index].processed = 1;
 		printf("%d\t%d_%d\t", data_array[cur_index].server,
 		    data_array[cur_index].api,
@@ -132,11 +142,13 @@ int main(int argc, char **argv)
 		    printf("%Ld\t", data_array[run_index].value);
 		tmp_time = (double)data_array[cur_index].sec + 
 		    (double)data_array[cur_index].usec / 1000000;
+		tmp_time = tmp_time - first_time;
 		printf("%f\t%f\t", tmp_time, tmp_time);
 
 		/* again; end time */
 		tmp_time = (double)data_array[run_index].sec + 
 		    (double)data_array[run_index].usec / 1000000;
+		tmp_time = tmp_time - first_time;
 		printf("%f\n", tmp_time);
 
 		break;
