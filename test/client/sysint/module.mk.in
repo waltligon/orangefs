@@ -1,6 +1,6 @@
 DIR := test/client/sysint
 
-TEST_SYSINT_DIR_SRC += \
+TESTSRC += \
 	$(DIR)/client.c\
 	$(DIR)/lookup.c\
 	$(DIR)/dcache-torture.c\
@@ -25,15 +25,3 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/io-test-offset.c \
 	$(DIR)/initialize.c \
 	$(DIR)/getparent.c
-
-TESTSRC += $(TEST_SYSINT_DIR_SRC)
-
-LOCALTESTS := $(patsubst %.c,%, $(TEST_SYSINT_DIR_SRC))
-$(LOCALTESTS): %: %.o
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(LIBS) -o $@
-else
-	$(LD) $< $(LDFLAGS) $(LIBS) -o $@
-endif
-

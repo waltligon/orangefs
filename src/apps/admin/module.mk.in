@@ -22,11 +22,3 @@ else
 	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 endif
 
-# the rest of the tools
-$(ADMINTOOLS): %: %.o
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(LIBS) -o $@
-else
-	$(LD) $< $(LDFLAGS) $(LIBS) -o $@
-endif
