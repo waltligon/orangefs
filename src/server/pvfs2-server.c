@@ -1436,7 +1436,7 @@ struct server_configuration_s *get_server_config_struct(void)
  */
 static void init_req_table(void)
 {
-    int i;
+    enum PVFS_server_op i;
 
     memset(PINT_server_req_table, 0, (PVFS_MAX_SERVER_OP+1)*sizeof(struct
 	PINT_server_req_params));
