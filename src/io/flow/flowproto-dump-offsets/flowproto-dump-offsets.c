@@ -397,7 +397,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 
 	flow_d->total_transfered += tmp_result.bytes;
 
-    } while (PINT_REQUEST_STATE_OFFSET(flow_d->file_req_state) != -1 && ret >= 0);
+    } while (!PINT_REQUEST_DONE(flow_d->file_req_state, &tmp_result) && ret >= 0);
 
     flow_d->state = FLOW_COMPLETE;
 
@@ -457,7 +457,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
 
 	flow_d->total_transfered += tmp_result.bytes;
 
-    } while (PINT_REQUEST_STATE_OFFSET(flow_d->file_req_state) != -1 && ret >= 0);
+    } while (!PINT_REQUEST_DONE(flow_d->file_req_state, &tmp_result) && ret >= 0);
 
     flow_d->state = FLOW_COMPLETE;
 
@@ -517,7 +517,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 
 	flow_d->total_transfered += tmp_result.bytes;
 
-    } while (PINT_REQUEST_STATE_OFFSET(flow_d->file_req_state) != -1 && ret >= 0);
+    } while (!PINT_REQUEST_DONE(flow_d->file_req_state, &tmp_result) && ret >= 0);
 
     flow_d->state = FLOW_COMPLETE;
 
@@ -577,7 +577,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 
 	flow_d->total_transfered += tmp_result.bytes;
 
-    } while (PINT_REQUEST_STATE_OFFSET(flow_d->file_req_state) != -1 && ret >= 0);
+    } while (!PINT_REQUEST_DONE(flow_d->file_req_state, &tmp_result) && ret >= 0);
 
     flow_d->state = FLOW_COMPLETE;
 
