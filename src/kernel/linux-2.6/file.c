@@ -308,9 +308,7 @@ static ssize_t pvfs2_file_write(
 
     if (total_count)
     {
-        /* on a successful write, update the attributes */
         inode->i_atime = CURRENT_TIME;
-        ret = pvfs2_inode_setattr(inode, NULL);
     }
     return(total_count);
 }
