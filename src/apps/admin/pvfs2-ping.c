@@ -121,6 +121,7 @@ int main(int argc, char **argv)
 
     cur_fs = resp_init.fsid_list[mnt_index];
 
+    /* dump some key parts of the config file */
     ret = print_config(&g_server_config, cur_fs);
     if(ret < 0)
     {
@@ -131,6 +132,7 @@ int main(int argc, char **argv)
 
     printf("\n(3) Verifying that all servers are responding...\n");
 
+    /* send noop to everyone */
     ret = noop_all_servers(&g_server_config, cur_fs);
     if(ret < 0)
     {
@@ -142,6 +144,10 @@ int main(int argc, char **argv)
     printf("\n(4) Verifying that fsid %ld is acceptable to all servers...\n",
 	(long)cur_fs);
 
+    /* check that the fsid exists on all of the servers */
+    /* TODO: we need a way to get information out about which server fails
+     * in error cases here 
+     */
     ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_FSID_CHECK,
 	(int64_t)cur_fs);
     if(ret < 0)
@@ -149,8 +155,10 @@ int main(int argc, char **argv)
 	PVFS_perror("PVFS_mgmt_setparam_all", ret);
 	fprintf(stderr, "Failure: not all servers accepted fsid %ld\n", 
 	    (long)cur_fs);
+	fprintf(stderr, "TODO: need a way to tell which servers couldn't find the fs_id...\n");
 	return(-1);
     }
+    printf("\n   Ok; all servers understand fs_id %ld\n", (long)cur_fs);
 
     PVFS_sys_finalize();
 

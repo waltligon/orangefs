@@ -9,11 +9,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <assert.h>
 
 #include "pvfs2-server.h"
 
 static int setparam_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int setparam_work(PINT_server_op *s_op, job_status_s* js_p);
+static int check_fs_id(PVFS_fs_id fs_id);
 
 %%
 
@@ -53,7 +55,6 @@ machine pvfs2_setparam_sm(prelude, work, final_response, cleanup)
  */
 static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 {
-
     PINT_STATE_DEBUG("work");
 
     switch(s_op->req->u.mgmt_setparam.param)
@@ -66,6 +67,10 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 	    gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",
 		(int)s_op->req->u.mgmt_setparam.param);
 	    js_p->error_code = -PVFS_ENOSYS;
+	    return(1);
+	case PVFS_SERV_PARAM_FSID_CHECK:
+	    js_p->error_code = 
+		check_fs_id((PVFS_fs_id)s_op->req->u.mgmt_setparam.value);
 	    return(1);
     }
 
@@ -87,6 +92,67 @@ static int setparam_cleanup(PINT_server_op *s_op, job_status_s* js_p)
     return(server_state_machine_complete(s_op));
 }
 
+
+/* check_fs_id()
+ *
+ * checks to see if a given fs id is valid
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int check_fs_id(PVFS_fs_id fs_id)
+{
+    /* TODO: if collection_iterate() ever becomes an asynchronous function
+     * we will have to do this differently
+     */
+    int count = 1;
+    int ret = -1;
+    TROVE_ds_position pos = TROVE_ITERATE_START;
+    TROVE_keyval_s name;
+    TROVE_coll_id tmp_coll;
+    TROVE_op_id tmp_id;
+
+    name.buffer = malloc(PVFS_NAME_MAX);
+    if(!name.buffer)
+	return(-PVFS_ENOMEM);
+    name.buffer_sz = PVFS_NAME_MAX;
+
+    while(count == 1)
+    {
+	ret = trove_collection_iterate(&pos,
+	    &name,
+	    &tmp_coll,
+	    &count,
+	    0,
+	    0,
+	    NULL,
+	    &tmp_id);
+	if(ret == 0)
+	{
+	    assert(0);
+	    gossip_lerr("Error: unexpected trove behavior.\n");
+	    return(-PVFS_EINVAL);
+	}
+	
+	if(ret < 0)
+	{
+	    return(ret);
+	}
+
+	gossip_debug(SERVER_DEBUG, "looking for fs_id: %ld, found %ld.\n",
+	    (long)fs_id, (long)tmp_coll);
+
+	if(count > 0 && tmp_coll == fs_id)
+	{
+	    /* we found a matching collection */
+	    return(0);
+	}
+    }
+
+    /* if we fall through to this point, then trove apparently doesn't know
+     * about the collection that we are looking for 
+     */
+    return(-PVFS_ENOENT);
+}
 
 /*
  * Local variables:
