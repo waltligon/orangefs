@@ -193,7 +193,7 @@ int job_flow(flow_descriptor * flow_d,
 	     job_id_t * id,
 	     job_context_id context_id);
 
-int job_flow_cancel(flow_descriptor * flow_d);
+int job_flow_cancel(job_id_t id, job_context_id context_id);
 
 /* storage byte stream write */
 int job_trove_bstream_write_at(PVFS_fs_id coll_id,

@@ -1114,14 +1114,16 @@ int job_flow(flow_descriptor * flow_d,
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
  */
-int job_flow_cancel(flow_descriptor * flow_d)
+int job_flow_cancel(job_id_t id, job_context_id context_id)
 {
-    struct job_desc* tmp_desc = (struct job_desc*)flow_d->user_ptr; 
+    struct job_desc* query = NULL;
     int ret = -1;
 
     gen_mutex_lock(&completion_mutex);
 
-    if(tmp_desc->completed_flag)
+    query = id_gen_fast_lookup(id);
+
+    if(query->completed_flag)
     {
 	/* job has already completed, no cancellation needed */
 	gen_mutex_unlock(&completion_mutex);
@@ -1132,7 +1134,7 @@ int job_flow_cancel(flow_descriptor * flow_d)
      * occur; no more work to do here.  NOTE: flow checks for races against
      * flow descriptors for which the callback process has already started
      */
-    ret = PINT_flow_cancel(flow_d);
+    ret = PINT_flow_cancel(query->u.flow.flow_d);
 
     gen_mutex_unlock(&completion_mutex);
 
