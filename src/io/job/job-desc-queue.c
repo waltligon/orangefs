@@ -254,11 +254,13 @@ void job_desc_q_dump(job_desc_q_p jdqp)
 	{
 		tmp_entry = qlist_entry(tmp_link, struct job_desc,
 			job_desc_q_link);
-		gossip_err("  id: %ld.\n", (long)tmp_entry->job_id);
+		gossip_err("  job id: %ld.\n", (long)tmp_entry->job_id);
 		switch(tmp_entry->type)
 		{
 			case JOB_BMI:
 				gossip_err("    type: JOB_BMI.\n");
+				gossip_err("    bmi_id: %ld.\n",
+					(long)tmp_entry->u.bmi.id);
 				break;
 			case JOB_BMI_UNEXP:
 				gossip_err("    type: JOB_BMI_UNEXP.\n");
