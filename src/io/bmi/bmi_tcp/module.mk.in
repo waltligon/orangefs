@@ -1,9 +1,18 @@
+BUILD_EPOLL = @BUILD_EPOLL@
 DIR := src/io/bmi/bmi_tcp
 LIBSRC += \
 	$(DIR)/bmi-tcp.c \
-	$(DIR)/socket-collection.c\
 	$(DIR)/sockio.c
+
 SERVERSRC += \
 	$(DIR)/bmi-tcp.c \
-	$(DIR)/socket-collection.c\
 	$(DIR)/sockio.c
+
+ifdef BUILD_EPOLL
+LIBSRC += $(DIR)/socket-collection-epoll.c
+SERVERSRC += $(DIR)/socket-collection-epoll.c
+else
+LIBSRC += $(DIR)/socket-collection.c
+SERVERSRC += $(DIR)/socket-collection.c
+endif
+

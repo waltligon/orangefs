@@ -65,6 +65,7 @@ BUILD_GM = @BUILD_GM@
 BUILD_IB = @BUILD_IB@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
+BUILD_EPOLL = @BUILD_EPOLL@
 GNUC = @GNUC@
 INTELC = @INTELC@
 # override default quiet mode with "make V=1"

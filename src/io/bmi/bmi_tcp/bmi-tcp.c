@@ -19,7 +19,11 @@
 #include "bmi-method-support.h"
 #include "bmi-method-callback.h"
 #include "bmi-tcp-addressing.h"
+#ifdef __PVFS2_USE_EPOLL__
+#include "socket-collection-epoll.h"
+#else
 #include "socket-collection.h"
+#endif
 #include "op-list.h"
 #include "gossip.h"
 #include "sockio.h"
@@ -1373,7 +1377,6 @@ void tcp_forget_addr(method_addr_p map,
     method_addr_p tmp_addr;
     int tmp_status;
 
-    tcp_shutdown_addr(map);
     if (tcp_socket_collection_p)
     {
 	BMI_socket_collection_remove(tcp_socket_collection_p, map);
@@ -1383,6 +1386,7 @@ void tcp_forget_addr(method_addr_p map,
 	BMI_socket_collection_testglobal(tcp_socket_collection_p,
 	    0, &tmp_outcount, &tmp_addr, &tmp_status, 0, &interface_mutex);
     }
+    tcp_shutdown_addr(map);
     tcp_cleanse_addr(map, error_code);
     tcp_addr_data->addr_error = error_code;
     if (dealloc_flag)
