@@ -1,1 +1,1 @@
-pvfs-tcp://speed.parl.clemson.edu:3000/pvfs /mnt/pvfs pvfs 0 0 
+pvfs-tcp://localhost:3334/pvfs /mnt/pvfs pvfs 0 0 

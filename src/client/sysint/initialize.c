@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "pcache.h"
+#include "pint-bucket.h"
 #include "pint-dcache.h"
 #include "config-manage.h"
 #include "pvfs2-sysint.h"
@@ -110,23 +111,22 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
 	printf("Error initializing directory cache\n");
 	goto return_error;	
     }	
-    /* TODO: Uncomment both these functions */
-    /* Allocate memory for the global configuration structures */
-    /*server_config.nr_fs = mntent_list.nr_entry;
-      server_config.fs_info = (fsconfig *)malloc(mntent_list.nr_entry\
-      * sizeof(fsconfig));
-      if (!server_config.fs_info)
-      {
-      printf("Error in allocating configuration parameters\n");
-      ret = -ENOMEM;
-      goto config_alloc_failure;
-      }*/
+
+    server_config.nr_fs = mntent_list.nr_entry;
+    server_config.fs_info = (fsconfig *)malloc(mntent_list.nr_entry * sizeof(fsconfig));
+    if (server_config.fs_info == NULL)
+    {
+	assert(0);
+	printf("Error in allocating configuration parameters\n");
+	ret = -ENOMEM;
+	goto return_error;
+    }
 
     /* Grab the mutex - serialize all writes to server_config */
     gen_mutex_lock(&mt_config);	
 	
     /* Initialize the configuration management interface */
-    ret = PINT_bucket_initialize(mntent_list);
+    ret = PINT_bucket_initialize();
     if (ret < 0)
     {
 	init_fail = BUCKET_INIT_FAIL;
@@ -259,6 +259,11 @@ static int server_get_config(pvfs_mntlist mntent_list)
 
 	metalen = strlen(ack_p->u.getconfig.meta_server_mapping);
 	iolen   = strlen(ack_p->u.getconfig.io_server_mapping);
+
+	printf("meta: %s\nio: %s\n",
+	       ack_p->u.getconfig.meta_server_mapping,
+	       ack_p->u.getconfig.io_server_mapping);
+
 	/* How to get the size of metaserver list in ack? */
 	/* NOTE: PVFS_string == char *, SO I HAVE DOUBTS ABOUT THIS LINE!!! -- ROB */
 	fsinfo_p->meta_serv_array = (PVFS_string *) malloc(fsinfo_p->meta_serv_count * sizeof(PVFS_string));
@@ -277,7 +282,8 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	for(j = 0; j < fsinfo_p->meta_serv_count; j++) 
 	{
 	    k = start;
-	    while (ack_p->u.getconfig.meta_server_mapping[k] != ' ' && k < metalen) k++;
+	    while (ack_p->u.getconfig.meta_server_mapping[k] != '-' && k < metalen) k++;
+	    start = k;
 	    fsinfo_p->meta_serv_array[j] = (PVFS_string) malloc(k - start + 1);
 	    if (fsinfo_p->meta_serv_array[j] == NULL)
 	    {
@@ -309,8 +315,9 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	{
 	    k = start;
 	    /* CHANGE THE SPACE BELOW TO A DASH SO IT WOULD SKIP pvfs- */
-	    while (ack_p->u.getconfig.io_server_mapping[k] != ' ' && k < iolen) k++;
+	    while (ack_p->u.getconfig.io_server_mapping[k] != '-' && k < iolen) k++;
 	    /* ASSIGN start = k TO SKIP pvfs- */
+	    start = k;
 	    fsinfo_p->io_serv_array[j] = (PVFS_string)malloc(k - start + 1);
 	    if (fsinfo_p->io_serv_array[j] == NULL)
 	    {
@@ -428,7 +435,9 @@ static int server_send_req(bmi_addr_t addr,
     /* free encoded_resp buffer */
     ret = BMI_memfree(addr, encoded_resp, max_msg_sz, BMI_RECV_BUFFER);
     assert(ret == 0);
-    
+
+    *ack_pp = (struct PVFS_server_resp_s *) decoded.buffer;
+    return 0;
  return_error:
     return -1;
 }
@@ -442,10 +451,3 @@ static int server_send_req(bmi_addr_t addr,
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-
-
-
-
-
-
-
