@@ -49,13 +49,6 @@ int pvfs2_mkspace(
         fprintf(stderr,"Handle Ranges: %s\n",handle_ranges);
     }
 
-    ret = trove_open_context(&trove_context);
-    if (ret < 0)
-    {
-        fprintf(stderr,"trove_open_context() failure.\n");
-        return -1;
-    }
-
     new_root_handle = (PVFS_handle)root_handle;
 
     /*
@@ -137,6 +130,13 @@ int pvfs2_mkspace(
     if (verbose)
     {
         fprintf(stderr,"info: created collection '%s'.\n",collection);
+    }
+
+    ret = trove_open_context(&trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr,"trove_open_context() failure.\n");
+        return -1;
     }
 
     /* we have a three-step process for starting trove:
