@@ -273,12 +273,14 @@ static void *dev_thread_function(void *ptr)
 	ret = PINT_dev_test_unexpected(
             incount, &outcount, stat_dev_unexp_array, timeout);
 
-	if(ret < 0)
+	if (ret < 0)
 	{
-	    /* critical failure */
-	    /* TODO: how to handle this? */
-	    gossip_lerr("Error: critical device failure.\n");
-	    assert(0);
+            PVFS_perror_gossip("critical device failure", ret);
+#ifdef __PVFS2_JOB_THREADED__
+            gossip_err("dev_thread_function thread terminating\n");
+            break;
+#endif
+            return NULL;
 	}
 
 	/* execute callback function for each completed unexpected message */

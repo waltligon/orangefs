@@ -251,8 +251,10 @@ int PINT_dev_test_unexpected(
 
         if (!(pfd.revents & POLLIN))
         {
-            gossip_err("PINT_dev_test_unexpected poll revent is %d",
-                       pfd.revents);
+            if (pfd.revents & POLLNVAL)
+            {
+                return -(PVFS_EBADF|PVFS_ERROR_DEV);
+            }
             continue;
         }
 
