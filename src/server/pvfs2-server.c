@@ -49,7 +49,13 @@ static struct server_configuration_s user_opts;
    after all threads complete and are no longer blocking */
 static int signal_recvd_flag;
 
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
+PINT_server_trove_keys_s Trove_Common_Keys[] = {
+    {"root_handle", 12},
+    {"metadata", 9},
+    {"dir_ent", 8},
+    {"datafile_handles", 17},
+    {"metafile_dist", 14}
+};
 
 /* Prototypes */
 static int initialize_interfaces(

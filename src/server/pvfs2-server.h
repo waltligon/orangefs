@@ -19,6 +19,23 @@ enum
     MAX_JOBS = 10 /* also defined in a config file, but nice to have */
 };
 
+
+/* used to keep a random, but handy, list of keys around */
+typedef struct PINT_server_trove_keys
+{
+	char *key;
+	int size;
+} PINT_server_trove_keys_s;
+
+enum {
+    ROOT_HANDLE_KEY      = 0,
+    METADATA_KEY         = 1,
+    DIR_ENT_KEY          = 2,
+    METAFILE_HANDLES_KEY = 3,
+    METAFILE_DIST_KEY    = 4,
+    KEYVAL_ARRAY_SIZE    = 6
+};
+
 typedef enum
 {
     STATUS_UNKNOWN = 0,            /* default value                      */
