@@ -178,8 +178,8 @@ static void aio_progress_notification(sigval_t sig)
         op_p->u.b_rw_list.sigev.sigev_value.sival_ptr = (void *)cur_op;
 
         /*
-          if we didn't use the entire array,
-          mark the unused ones with LIO_NOPs
+          if we didn't use the entire array, mark the unused ones with
+          LIO_NOPs
         */
         for(i = aiocb_inuse_count;
             i < op_p->u.b_rw_list.aiocb_array_count; i++)
@@ -281,7 +281,8 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
     
-    ret = DBPF_READ(tmp_ref.fd, op_p->u.b_read_at.buffer, op_p->u.b_read_at.size);
+    ret = DBPF_READ(tmp_ref.fd, op_p->u.b_read_at.buffer,
+                    op_p->u.b_read_at.size);
     if (ret < 0)
     {
         goto return_error;
@@ -445,9 +446,8 @@ static int dbpf_bstream_flush(TROVE_coll_id coll_id,
     
     return 0;
 }
-/* dbpf_bstream_flush_op_svc
- * returns 1 on completion, -1 on error, 0 on not done
- */
+
+/* returns 1 on completion, -1 on error, 0 on not done */
 static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
 {
     int ret, error, got_fd = 0;

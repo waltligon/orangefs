@@ -725,10 +725,6 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
     return 0;
 }
 
-/* dbpf_keyval_read_list_op_svc()
- *
- * Service a queued keyval read operation.
- */
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
 {
     int i, error, ret, got_db = 0;

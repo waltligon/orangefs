@@ -84,9 +84,6 @@ static host_alias_s *find_host_alias_ptr_by_alias(
 static struct host_handle_mapping_s *get_or_add_handle_mapping(
     PINT_llist *list,
     char *alias);
-static char *merge_handle_range_strs(
-    char *range1,
-    char *range2);
 static int build_extent_array(
     char *handle_range_str,
     PVFS_handle_extent_array *handle_extent_array);
@@ -927,9 +924,8 @@ DOTCONF_CB(get_range_list)
                 }
                 else
                 {
-                    char *new_handle_range = merge_handle_range_strs(
-                        handle_mapping->handle_range,
-                        cmd->data.list[i]);
+                    char *new_handle_range = PINT_merge_handle_range_strs(
+                        handle_mapping->handle_range, cmd->data.list[i]);
                     free(handle_mapping->handle_range);
                     handle_mapping->handle_range = new_handle_range;
 
@@ -1444,28 +1440,6 @@ static struct host_handle_mapping_s *get_or_add_handle_mapping(
     return ret;
 }
 
-static char *merge_handle_range_strs(
-    char *range1,
-    char *range2)
-{
-    char *merged_range = NULL;
-
-    if (range1 && range2)
-    {
-        int rlen1 = strlen(range1) * sizeof(char) + 1;
-        int rlen2 = strlen(range2) * sizeof(char) + 1;
-
-        /*
-          2 bytes bigger since we need a tz null and
-          space for the additionally inserted comma
-        */
-        merged_range = (char *)malloc(rlen1 + rlen2);
-        snprintf(merged_range, rlen1 + rlen2, "%s,%s",
-                 range1,range2);
-    }
-    return merged_range;
-}
-
 static int build_extent_array(
     char *handle_range_str,
     PVFS_handle_extent_array *handle_extent_array)
@@ -1736,7 +1710,7 @@ char *PINT_config_get_merged_handle_range_str(
 
     if (mrange && drange)
     {
-        merged_range = merge_handle_range_strs(mrange,drange);
+        merged_range = PINT_merge_handle_range_strs(mrange, drange);
     }
     else if (mrange)
     {
@@ -2249,7 +2223,7 @@ int PINT_config_pvfs2_mkspace(
     PVFS_handle root_handle = 0;
     int create_collection_only = 0;
     PINT_llist *cur = NULL;
-    char *cur_handle_range = (char *)0;
+    char *cur_meta_handle_range, *cur_data_handle_range = NULL;
     filesystem_configuration_s *cur_fs = NULL;
 
     if (config)
@@ -2263,27 +2237,25 @@ int PINT_config_pvfs2_mkspace(
                 break;
             }
 
-            /* check if we've got a meta handle range */
-            cur_handle_range =
-                PINT_config_get_meta_handle_range_str(
-                    config, cur_fs);
-            if (!cur_handle_range)
+            cur_meta_handle_range = PINT_config_get_meta_handle_range_str(
+                config, cur_fs);
+            cur_data_handle_range = PINT_config_get_data_handle_range_str(
+                config, cur_fs);
+
+            /*
+              make sure have either a meta or data handle range (or
+              both).  if we have no handle range, the config is
+              broken.
+            */
+            if (!cur_meta_handle_range && !cur_data_handle_range)
             {
-                /* if not, check if we've got a data handle range */
-                cur_handle_range =
-                    PINT_config_get_data_handle_range_str(
-                        config, cur_fs);
-                if (!cur_handle_range)
-                {
-                    /* if we have no handle range, the config is broken */
-                    gossip_err("Could not find handle range for host %s\n",
-                               config->host_id);
-                    gossip_err("Please make sure that the host names in "
-                               "%s and %s are consistent\n",
-                               config->fs_config_filename,
-                               config->server_config_filename);
-                    break;
-                }
+                gossip_err("Could not find handle range for host %s\n",
+                           config->host_id);
+                gossip_err("Please make sure that the host names in "
+                           "%s and %s are consistent\n",
+                           config->fs_config_filename,
+                           config->server_config_filename);
+                break;
             }
 
             /*
@@ -2291,26 +2263,25 @@ int PINT_config_pvfs2_mkspace(
               if it is, we're responsible for creating it on disk when
               creating the storage space
             */
-            root_handle = (is_root_handle_in_my_range(config,cur_fs) ?
+            root_handle = (is_root_handle_in_my_range(config, cur_fs) ?
                            cur_fs->root_handle : PVFS_HANDLE_NULL);
 
             /*
-              for the first fs/collection we encounter, create
-              the storage space if it doesn't exist.
+              for the first fs/collection we encounter, create the
+              storage space if it doesn't exist.
             */
             gossip_debug(
                 GOSSIP_SERVER_DEBUG,"\n*****************************\n");
             gossip_debug(
-                GOSSIP_SERVER_DEBUG,"Creating new PVFS2 %s\n",
+                GOSSIP_SERVER_DEBUG, "Creating new PVFS2 %s\n",
                 (create_collection_only ? "collection" :
                  "storage space"));
-            ret = pvfs2_mkspace(config->storage_path,
-                                cur_fs->file_system_name,
-                                cur_fs->coll_id,
-                                root_handle,
-                                cur_handle_range,
-                                create_collection_only,
-                                1);
+
+            ret = pvfs2_mkspace(
+                config->storage_path, cur_fs->file_system_name,
+                cur_fs->coll_id, root_handle, cur_meta_handle_range,
+                cur_data_handle_range, create_collection_only, 1);
+
             gossip_debug(
                 GOSSIP_SERVER_DEBUG,"\n*****************************\n");
 

@@ -19,6 +19,7 @@
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "server-config.h"
+#include "str-utils.h"
 #include "extent-utils.h"
 
 static char *dir_ent_string = "dir_ent";
@@ -39,7 +40,8 @@ int pvfs2_mkspace(
     char *collection,
     TROVE_coll_id coll_id,
     TROVE_handle root_handle,
-    char *handle_ranges,
+    char *meta_handle_ranges,
+    char *data_handle_ranges,
     int create_collection_only,
     int verbose)
 {
@@ -48,19 +50,23 @@ int pvfs2_mkspace(
     TROVE_handle new_root_handle, ent_handle;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
-    char *method_name = NULL;
     TROVE_ds_attributes_s attr;
     TROVE_handle_extent cur_extent;
     TROVE_handle_extent_array extent_array;
     TROVE_context_id trove_context = -1;
+    char *method_name = NULL;
+    char *merged_handle_ranges = NULL;
 
     mkspace_print(verbose,"Storage space: %s\n",storage_space);
     mkspace_print(verbose,"Collection   : %s\n",collection);
     mkspace_print(verbose,"ID           : %d\n",coll_id);
     mkspace_print(verbose,"Root Handle  : %Lu\n",Lu(root_handle));
-    mkspace_print(verbose,"Handle Ranges: %s\n",handle_ranges);
+    mkspace_print(verbose,"Meta Handles : %s\n",
+                  (meta_handle_ranges ? meta_handle_ranges : "NONE"));
+    mkspace_print(verbose,"Data Handles : %s\n",
+                  (data_handle_ranges ? data_handle_ranges : "NONE"));
 
-    new_root_handle = (TROVE_handle)root_handle;
+    new_root_handle = root_handle;
 
     /*
       if we're only creating a collection inside an existing
@@ -127,11 +133,7 @@ int pvfs2_mkspace(
 	return -1;
     }
 
-    if (verbose)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "info: created collection '%s'.\n",collection);
-    }
+    mkspace_print(verbose, "info: created collection '%s'.\n",collection);
 
     ret = trove_open_context(coll_id, &trove_context);
     if (ret < 0)
@@ -140,14 +142,36 @@ int pvfs2_mkspace(
         return -1;
     }
 
+    /* merge the specified ranges to pass to the handle allocator */
+    if (meta_handle_ranges && data_handle_ranges)
+    {
+        merged_handle_ranges = PINT_merge_handle_range_strs(
+            meta_handle_ranges, data_handle_ranges);
+    }
+    else if (meta_handle_ranges)
+    {
+        merged_handle_ranges = strdup(meta_handle_ranges);
+    }
+    else
+    {
+        merged_handle_ranges = strdup(data_handle_ranges);
+    }
+
+    if (!merged_handle_ranges)
+    {
+        gossip_err("Failed to merge the handle range!  Format invalid\n");
+        return -1;
+    }
+
     /*
-      we have a three-step process for starting trove:
-      initialize, collection_lookup, collection_setinfo
-    */
-    ret = trove_collection_setinfo(coll_id,
-                                   trove_context,
-                                   TROVE_COLLECTION_HANDLE_RANGES,
-                                   handle_ranges);
+      set the trove handle ranges; this initializes the handle
+      allocator with the ranges we were told to use
+    */ 
+    ret = trove_collection_setinfo(
+        coll_id, trove_context, TROVE_COLLECTION_HANDLE_RANGES,
+        merged_handle_ranges);
+
+    free(merged_handle_ranges);
     if (ret < 0)
     {
 	mkspace_print(verbose, "Error adding handle ranges\n");
@@ -155,26 +179,21 @@ int pvfs2_mkspace(
     }
 
     /*
-      if a root_handle is specified, 1) create a dataspace to
-      hold the root directory 2) create the dspace for dir
-      entries, 3) set attributes on the dspace
+      if a root_handle is specified, 1) create a dataspace to hold the
+      root directory 2) create the dspace for dir entries, 3) set
+      attributes on the dspace
     */
-    if (new_root_handle != (TROVE_handle)0)
+    if (new_root_handle != TROVE_HANDLE_NULL)
     {
         cur_extent.first = cur_extent.last = new_root_handle;
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
 
         ret = trove_dspace_create(
-            coll_id,
-            &extent_array,
-            &new_root_handle,
-            PVFS_TYPE_DIRECTORY,
-            NULL,
+            coll_id, &extent_array, &new_root_handle,
+            PVFS_TYPE_DIRECTORY, NULL,
             (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
-            NULL,
-            trove_context,
-            &op_id);
+            NULL, trove_context, &op_id);
 
         while (ret == 0)
         {
@@ -183,18 +202,15 @@ int pvfs2_mkspace(
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
-        if (ret != 1 && state != 0)
+        if ((ret != 1) && (state != 0))
         {
             mkspace_print(verbose,
                           "dspace create (for root dir) failed.\n");
             return -1;
         }
 
-        if (verbose)
-        {
-            mkspace_print(verbose,"info: created root directory "
-                          "with handle %Lu.\n", Lu(new_root_handle));
-        }
+        mkspace_print(verbose,"info: created root directory "
+                      "with handle %Lu.\n", Lu(new_root_handle));
 
         /* set collection attribute for root handle */
         key.buffer = root_handle_string;
@@ -209,6 +225,7 @@ int pvfs2_mkspace(
                                     &count, NULL, NULL, &state,
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
+
         if (ret < 0)
         {
             gossip_err("error: collection seteattr (for root handle) "
@@ -221,9 +238,7 @@ int pvfs2_mkspace(
         attr.uid = getuid();
         attr.gid = getgid();
         attr.mode = 0777;
-	attr.atime = time(NULL);
-	attr.ctime = time(NULL);
-	attr.mtime = time(NULL);
+	attr.atime = attr.ctime = attr.mtime = time(NULL);
         attr.type = PVFS_TYPE_DIRECTORY;
 
         ret = trove_dspace_setattr(
@@ -244,11 +259,65 @@ int pvfs2_mkspace(
             return -1;
         }
 
-        /*
-          create a dataspace to hold directory entries; a handle value
-          of TROVE_HANDLE_NULL leaves the allocation to trove.
-        */
         cur_extent.first = cur_extent.last = TROVE_HANDLE_NULL;
+        /*
+          create a dataspace to hold directory entries; if we have a
+          meta handle range, use that one of those ranges (being
+          careful to make sure the range has enough space for an
+          allocation) to allocate a dataspace to hold directory
+          entries.  if we don't have a meta handle range, use
+          TROVE_HANDLE_NULL which tells the allocator to use any
+          handle available
+        */
+        if (meta_handle_ranges)
+        {
+            PINT_llist *cur = NULL;
+            TROVE_handle_extent *tmp_extent = NULL;
+            PINT_llist *extent_list = PINT_create_extent_list(
+                meta_handle_ranges);
+
+            cur = extent_list;
+            while(cur)
+            {
+                tmp_extent = PINT_llist_head(cur);
+                if (!tmp_extent)
+                {
+                    break;
+                }
+
+                /*
+                  allow any handle range in this list that can allow
+                  at least the single handle allocation to pass.  a
+                  range of 1 is ok, so long as it's not the root
+                  handle that was previously allocated above
+                */
+                if (((tmp_extent->last - tmp_extent->first) > 0) ||
+                    ((tmp_extent->last > 0) &&
+                     (tmp_extent->last == tmp_extent->first) &&
+                     (tmp_extent->last != new_root_handle)))
+                {
+                    cur_extent.first = tmp_extent->first;
+                    cur_extent.last = tmp_extent->last;
+                    break;
+                }
+                cur = PINT_llist_next(cur);
+            }
+            PINT_release_extent_list(extent_list);
+        }
+
+        if ((cur_extent.first == TROVE_HANDLE_NULL) &&
+            (cur_extent.last == TROVE_HANDLE_NULL))
+        {
+            gossip_err("No valid meta handle ranges available! "
+                       "Using a default\n");
+        }
+        else
+        {
+            mkspace_print(
+                verbose, "Using meta handle range %Lu-%Lu for dirent "
+                "dspace\n", Lu(cur_extent.first), Lu(cur_extent.last));
+        }
+
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
 
@@ -263,21 +332,18 @@ int pvfs2_mkspace(
                                     TROVE_DEFAULT_TEST_TIMEOUT);
         }
 
-        if (ret != 1 && state != 0)
+        if ((ret != 1) && (state != 0))
         {
             gossip_err("dspace create (for dirent storage) failed.\n");
             return -1;
         }
 
-        if (verbose)
-        {
-            mkspace_print(verbose,"info: created dspace for dirents "
-                          "with handle %Lu.\n", Lu(ent_handle));
-        }
+        mkspace_print(verbose, "info: created dspace for dirents "
+                      "with handle %Lu\n", Lu(ent_handle));
 
-        key.buffer    = dir_ent_string;
+        key.buffer = dir_ent_string;
         key.buffer_sz = strlen(dir_ent_string) + 1;
-        val.buffer    = &ent_handle;
+        val.buffer = &ent_handle;
         val.buffer_sz = sizeof(TROVE_handle);
 
         ret = trove_keyval_write(
@@ -298,11 +364,8 @@ int pvfs2_mkspace(
             return -1;
         }
 
-        if (verbose)
-        {
-            mkspace_print(verbose, "info: wrote attributes for "
-                          "root directory.\n");
-        }
+        mkspace_print(
+            verbose, "info: wrote attributes for root directory.\n");
     }
 
     if (trove_context != -1)
@@ -311,13 +374,10 @@ int pvfs2_mkspace(
     }
     trove_finalize();
 
-    if (verbose)
-    {
-        mkspace_print(verbose, "collection created:\n"
-                      "\troot handle = %Lu, coll id = %d, "
-                      "root string = \"%s\"\n",
-                      Lu(root_handle), coll_id, root_handle_string);
-    }
+    mkspace_print(verbose, "collection created:\n"
+                  "\troot handle = %Lu, coll id = %d, "
+                  "root string = \"%s\"\n",
+                  Lu(root_handle), coll_id, root_handle_string);
     return 0;
 }
 
@@ -346,30 +406,21 @@ int pvfs2_rmspace(
         trove_is_initialized = 1;
     }
 
-    if (verbose)
-    {
-        mkspace_print(verbose, "Attempting to remove collection %s\n",
-                      collection);
-    }
+    mkspace_print(verbose, "Attempting to remove collection %s\n",
+                  collection);
 
     ret = trove_collection_remove(collection, NULL, &op_id);
-    if (verbose)
-    {
-        mkspace_print(
-            verbose, "PVFS2 Collection %s removed %s\n", collection,
-            ((ret != -1) ? "successfully" : "with errors"));
-    }
+
+    mkspace_print(
+        verbose, "PVFS2 Collection %s removed %s\n", collection,
+        ((ret != -1) ? "successfully" : "with errors"));
 
     if (!remove_collection_only)
     {
         ret = trove_storage_remove(storage_space, NULL, &op_id);
-        if (verbose)
-        {
-            gossip_debug(GOSSIP_SERVER_DEBUG,
-                         "PVFS2 Storage Space %s removed %s\n",
-                         storage_space,
-                         ((ret != -1) ? "successfully" : "with errors"));
-        }
+        mkspace_print(verbose, "PVFS2 Storage Space %s removed %s\n",
+                      storage_space, ((ret != -1) ? "successfully" :
+                                      "with errors"));
 
         /*
           we should be doing a trove finalize here, but for now

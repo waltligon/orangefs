@@ -744,9 +744,17 @@ int PINT_cached_config_get_server_handle_count(
 
             if (!strcmp(cur_host_extent_table->bmi_address, server_addr_str))
             {
-                PINT_extent_list_count_total(
-                    cur_host_extent_table->extent_list, &tmp_count);
-                *handle_count += tmp_count;
+                tmp_count = PINT_extent_list_count_total(
+                    cur_host_extent_table->extent_list);
+
+                if (tmp_count > -1)
+                {
+                    *handle_count += tmp_count;
+                }
+                else
+                {
+                    return tmp_count;
+                }
             }
             cur = PINT_llist_next(cur);
         }

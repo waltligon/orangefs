@@ -591,6 +591,25 @@ int PINT_remove_dir_prefix(
     return (0);
 }
 
+char *PINT_merge_handle_range_strs(char *range1, char *range2)
+{
+    char *merged_range = NULL;
+
+    if (range1 && range2)
+    {
+        int rlen1 = strlen(range1) * sizeof(char) + 1;
+        int rlen2 = strlen(range2) * sizeof(char) + 1;
+        /*
+          2 bytes bigger since we need a tz null and space for the
+          additionally inserted comma
+        */
+        merged_range = (char *)malloc(rlen1 + rlen2);
+        snprintf(merged_range, rlen1 + rlen2, "%s,%s",
+                 range1,range2);
+    }
+    return merged_range;
+}
+
 #ifndef HAVE_STRNLEN
 /* a naive implementation of strnlen for systems w/o glibc */
 size_t strnlen(const char *s, size_t limit)

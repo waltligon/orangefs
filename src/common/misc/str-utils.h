@@ -45,6 +45,9 @@ int PINT_remove_dir_prefix(
     const char *prefix,
     char *out_path,
     int out_max_len);
+char *PINT_merge_handle_range_strs(
+    char *range1,
+    char *range2);
 
 #ifndef HAVE_STRNLEN
 size_t strnlen(const char *s, size_t limit);

@@ -1190,8 +1190,8 @@ static int dbpf_mkpath(char *pathname, mode_t mode)
     return 0;
 }
 
-/* Internal function for creating first instances of the databases for a
- * db plus files storage region.
+/* Internal function for creating first instances of the databases for
+ * a db plus files storage region.
  */
 static int dbpf_db_create(char *dbname)
 {
@@ -1222,7 +1222,7 @@ static int dbpf_db_create(char *dbname)
 	return -1;
     }
 
-/* DB_RECNUM makes it easier to iterate through every key in chunks */
+    /* DB_RECNUM makes it easier to iterate through every key in chunks */
     if (( ret =  db_p->set_flags(db_p, DB_RECNUM)) ) {
 	    db_p->err(db_p, ret, "%s: set_flags", dbname);
 	    return -1;
