@@ -25,6 +25,9 @@ int PVFS_sys_statfs(
     int ret = -1;
     struct PVFS_mgmt_server_stat* stat_array = NULL;
     int i;
+    int num_io_servers = 0;
+    PVFS_size min_bytes_available = 0;
+    PVFS_size min_bytes_total = 0;
 
     /* first, determine how many servers are in the file system */
     ret = PVFS_mgmt_count_servers(fs_id, credentials, &num_servers);
@@ -62,19 +65,28 @@ int PVFS_sys_statfs(
 
     /* aggregate statistics down into one statfs structure */
 
-    /* TODO: this is all wrong!
-     * need to put in a better free size calculation that takes into 
-     * account which servers are I/O servers, and what the default 
-     * distribution is?  Need to think about this some more...
-     */
     resp->statfs_buf.fs_id = fs_id;
     resp->statfs_buf.bytes_available = 0;
     resp->statfs_buf.bytes_total = 0;
     for(i=0; i<num_servers; i++)
     {
-	resp->statfs_buf.bytes_available += stat_array[i].bytes_available;
-	resp->statfs_buf.bytes_total += stat_array[i].bytes_total;
+	if(stat_array[i].flags & PVFS_MGMT_IO_SERVER)
+	{
+	    num_io_servers++;
+	    if(min_bytes_available == 0 || 
+		min_bytes_available > stat_array[i].bytes_available)
+	    {
+		min_bytes_available = stat_array[i].bytes_available;
+	    }
+	    if(min_bytes_total == 0 || 
+		min_bytes_total > stat_array[i].bytes_total)
+	    {
+		min_bytes_total = stat_array[i].bytes_total;
+	    }
+	}
     }
+    resp->statfs_buf.bytes_available = min_bytes_available*num_io_servers;
+    resp->statfs_buf.bytes_total = min_bytes_total*num_io_servers;
     resp->server_count = num_servers;
 
     free(stat_array);
