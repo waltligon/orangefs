@@ -72,6 +72,7 @@ int PINT_pcache_lookup_rls(pinode *pinode_ptr);
 int PINT_pcache_insert(pinode *pnode);
 int PINT_pcache_insert_rls(pinode *pnode);
 int PINT_pcache_remove(PVFS_pinode_reference refn,pinode **item);
+void PINT_pcache_flush_reference(PVFS_pinode_reference refn);
 int PINT_pcache_pinode_alloc(pinode **pnode);
 void PINT_pcache_pinode_dealloc(pinode *pnode);
 int PINT_pcache_get_timeout(void);

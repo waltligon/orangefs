@@ -386,6 +386,7 @@ int PINT_pcache_remove(PVFS_pinode_reference refn, pinode **item)
 		{
                     /* trying to remove an item someone hasn't released */
 		    pvfs_pcache.element[i].status = STATUS_SHOULD_DELETE;
+                    gen_mutex_unlock(pvfs_pcache.mt_lock);
 		    return -1;
 		}
 	    }
@@ -395,6 +396,37 @@ int PINT_pcache_remove(PVFS_pinode_reference refn, pinode **item)
 #endif
     return(0);
 }
+
+void PINT_pcache_flush_reference(PVFS_pinode_reference refn)
+{
+#if PINT_ENABLE_PCACHE
+    int i = 0;
+
+    gen_mutex_lock(pvfs_pcache.mt_lock);
+    for(i = pvfs_pcache.top; i != BAD_LINK; i = pvfs_pcache.element[i].next)
+    {
+	if (pvfs_pcache.element[i].pnode != NULL)
+	{
+            if (is_equal(&refn, &pvfs_pcache.element[i].pnode->pinode_ref))
+	    {
+		/* don't delete if somebody else is looking at this copy too */
+		if (pvfs_pcache.element[i].ref_count != 1)
+		{
+		    PINT_pcache_remove_element(i);
+		}
+		else
+		{
+                    /* trying to remove an item someone hasn't released */
+		    pvfs_pcache.element[i].status = STATUS_SHOULD_DELETE;
+                    break;
+		}
+	    }
+	}
+    }
+    gen_mutex_unlock(pvfs_pcache.mt_lock);
+#endif
+}
+
 
 /* from this point on, its all static helper functions */
 #if PINT_ENABLE_PCACHE
@@ -774,7 +806,9 @@ int PINT_pcache_retrieve_datafile_attrs(
     PVFS_object_attr **out_attrs,
     int *in_out_num_attrs)
 {
-    int ret = 1, i = 0, limit = 0;
+    int ret = 1;
+#if PINT_ENABLE_PCACHE
+    int i = 0, limit = 0;
     PINT_pinode *pinode = NULL;
     PVFS_pinode_reference refn;
 
@@ -808,6 +842,7 @@ int PINT_pcache_retrieve_datafile_attrs(
         ret = (((i == limit) ||
                 (i == meta_attr.u.meta.dfile_count)) ? 0 : 1);
     }
+#endif
     return ret;
 }
 
