@@ -64,6 +64,12 @@ int trove_initialize(char *stoname,
     mtrace();
 #endif
 
+    /* initialize the handle management interface */
+    ret = trove_handle_mgmt_initialize();
+    if ( ret == -1 ) {
+	return ret;
+    }
+
     /* for each underlying method, call its initialize function */
 
     /* currently all we have is dbpf */
@@ -88,8 +94,6 @@ int trove_initialize(char *stoname,
 	trove_init_status = 1;
     }
 
-    /* initialize the handle management interface */
-    ret = trove_handle_mgmt_initialize();
 
     gen_mutex_unlock(&trove_init_mutex);
     return ret;
