@@ -47,15 +47,27 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	return(-1);
     }
 
-    /* at this point, we need to have a list of handles and
-     * distribution information 
+    /* check permissions */
+    ret = check_perms(pinode_ptr->attr, req->credentials.perms,
+	req->credentials.uid, req->credentials.gid);
+    if(ret < 0)
+    {
+	/* TODO: handle this error */
+	gossip_lerr("foo");
+	return(-1);
+    }
+
+    /* at this point, we need to have a list of handles, count of the
+     * number of handles, and distribution information 
      * - the dist we can make up for now
-     * - however, we need to get the datafile handle from somewhere...
+     * - however, we need to get a datafile handle from somewhere...
      *   - for now, I could just create one directly in the test program
      *     pass its handle in?
      */
 
     return(-ENOSYS);
+
+
 #if 0
 	struct PVFS_server_req_s req_p;	 	/* server request */
 	struct PVFS_server_resp_s *ack_p = NULL; /* server response */
