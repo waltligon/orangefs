@@ -26,6 +26,48 @@
 #include "gen-locks.h"
 #include "pint-perf-counter.h"
 
+/* These #defines are special hacks for isolating network performance
+ * from disk performance when benchmarking- don't turn this stuff
+ * on unless you really know what you are doing
+ */
+#ifdef __PVFS2_DISABLE_DISK_IO__
+#ifdef __PVFS2_TROVE_SUPPORT__
+/* write_hack()
+ * 
+ * this function truncates a file if we write beyond eof, since we don't
+ * have a true write to extend the file
+ */
+static int write_hack(TROVE_coll_id coll_id, TROVE_handle handle, TROVE_size 
+    old_size, TROVE_size new_size, TROVE_op_id* tmp_id, 
+    TROVE_context_id context_id, void* user_ptr)
+{
+    if(new_size < old_size)
+	return(1);
+
+    return(trove_bstream_resize(coll_id, handle, &new_size, 0, NULL, user_ptr,
+	context_id, tmp_id));
+};
+#endif
+
+/* replacements for bstream_read/write_list that don't do any I/O, but
+ * do adjust the file size if necessary
+ */
+#define TROVE_BSTREAM_READ_LIST(__coll_id, __handle, __mem_offset_array,\
+  __mem_size_array, __mem_count, __stream_offset_array, __stream_size_array,\
+  __stream_count, __out_size_p, __flags, __vtag, __user_ptr, __context_id,\
+  __out_op_id_p) 1; *(__out_size_p) = flow_data->trove_total_size
+#define TROVE_BSTREAM_WRITE_LIST(__coll_id, __handle, __mem_offset_array,\
+  __mem_size_array, __mem_count, __stream_offset_array, __stream_size_array,\
+  __stream_count, __out_size_p, __flags, __vtag, __user_ptr, __context_id,\
+  __out_op_id_p) write_hack(__coll_id, __handle, flow_d->file_data.fsize,\
+  (__stream_size_array[__stream_count-1]+__stream_offset_array[__stream_count-1]),\
+  __out_op_id_p, __context_id, __user_ptr); flow_data->drain_buffer_stepsize = \
+  flow_data->trove_total_size
+#else
+#define TROVE_BSTREAM_READ_LIST trove_bstream_read_list
+#define TROVE_BSTREAM_WRITE_LIST trove_bstream_write_list
+#endif
+
 /**********************************************************
  * interface prototypes 
  */
@@ -1646,7 +1688,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 		      "about to call trove_bstream_write_list().\n");
 	tmp_offset = flow_data->drain_buffer + flow_data->drain_buffer_offset;
 #ifdef __PVFS2_TROVE_SUPPORT__
-	ret = trove_bstream_write_list(flow_d->dest.u.trove.coll_id,
+	ret = TROVE_BSTREAM_WRITE_LIST(flow_d->dest.u.trove.coll_id,
 				       flow_d->dest.u.trove.handle,
 				       &(tmp_offset),
 				       &(flow_data->trove_total_size), 1,
@@ -1823,7 +1865,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 		      "about to call trove_bstream_read_list().\n");
 	tmp_offset = flow_data->fill_buffer + flow_data->fill_buffer_offset;
 #ifdef __PVFS2_TROVE_SUPPORT__
-	ret = trove_bstream_read_list(flow_d->src.u.trove.coll_id,
+	ret = TROVE_BSTREAM_READ_LIST(flow_d->src.u.trove.coll_id,
 				      flow_d->src.u.trove.handle, &(tmp_offset),
 				      &(flow_data->trove_total_size), 1,
 				      flow_data->trove_offset_list,
@@ -2444,6 +2486,7 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 	flow_d->state = FLOW_SRC_ERROR;
 	flow_d->error_code = error_code;
 	/* TODO: cleanup properly */
+	PVFS_perror_gossip("trove_completion_bmi_to_trove", error_code);
 	gossip_lerr("Error: unimplemented condition encountered.\n");
 	exit(-1);
 	return;
