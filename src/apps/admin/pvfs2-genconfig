@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -w
 #
 #  (C) 2001 Clemson University and The University of Chicago
 #
@@ -72,7 +72,7 @@ sub prompt_word
 
 sub tcp_parse_hostlist
 {
-    my($inputline, $port, $i, $foo, @parse, $numinodes, $arrayline);
+    my($inputline, $port, $i, $foo, @parse, $arrayline);
     my($prefix, $count, @temparray, @inodes, $numinodes);
     $inputline = $_[0];
     $port = $_[1];
@@ -102,23 +102,23 @@ sub tcp_parse_hostlist
 	# expand parsed input that contains brackets
 	if ($parse[$i] =~ /{/) {
 	    @arrayline = split(/[{}, ]+/, $parse[$i]);
-	    $prefix = @arrayline[0];
+	    $prefix = $arrayline[0];
 	    $count = @arrayline - 1;
 	    for ($j = 1; $j <= $count; $j++) { 
-		if (@arrayline[$j] =~ /-/) {
+		if ($arrayline[$j] =~ /-/) {
 		    @temparray = split(/-/, $arrayline[$j]);
-		    for ($k = @temparray[0]; $k <= @temparray[1]; $k++) {
-			@inodes[$numinodes] = $arrayline[0].$k;
+		    for ($k = $temparray[0]; $k <= $temparray[1]; $k++) {
+			$inodes[$numinodes] = $arrayline[0].$k;
 			$numinodes++;
 		    }	
 		} else { 
-		    @inodes[$numinodes] = $arrayline[0].$arrayline[$j];
+		    $inodes[$numinodes] = $arrayline[0].$arrayline[$j];
 		    $numinodes++;
 		}	
 	    }
 	}
 	else {
-	    @inodes[$numinodes] = $parse[$i];
+	    $inodes[$numinodes] = $parse[$i];
 	    $numinodes++;
 	}
     }
@@ -157,7 +157,7 @@ sub emit_aliases
     print $target "\n<Aliases>\n";
     for($i = 0; $i <= $#union_aliases; $i++)
     {
-        print $target "\tAlias @union_aliases[$i] @union_bmi[$i]\n";
+        print $target "\tAlias $union_aliases[$i] $union_bmi[$i]\n";
     }
     print $target "</Aliases>\n";
 }
@@ -269,9 +269,6 @@ else
     }
 }
 
-@server_addrs = undef;
-@server_aliases = undef;
-
 #$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
 $num_unexp_reqs = 10;
 
@@ -328,15 +325,15 @@ foreach(@io_aliases,@meta_aliases){
 # tack on BMI style notation
 for($i=0; $i <= $#io_aliases; $i++)
 {
-    @io_bmi[$i] = "tcp://@io_aliases[$i]:$port";
+    $io_bmi[$i] = "tcp://$io_aliases[$i]:$port";
 }
 for($i=0; $i <= $#meta_aliases; $i++)
 {
-    @meta_bmi[$i] = "tcp://@meta_aliases[$i]:$port";
+    $meta_bmi[$i] = "tcp://$meta_aliases[$i]:$port";
 }
 for($i=0; $i <= $#union_aliases; $i++)
 {
-    @union_bmi[$i] = "tcp://@union_aliases[$i]:$port";
+    $union_bmi[$i] = "tcp://$union_aliases[$i]:$port";
 }
 
 $bmi_module = "bmi_tcp";
@@ -404,7 +401,8 @@ if ($using_stdout == 1)
 }
 
 emit_defaults($output_target, $num_unexp_reqs, $bmi_module, $handle_purgatory);
-emit_aliases($output_target, $num_nodes);
+#emit_aliases($output_target, $num_nodes);
+emit_aliases($output_target);
 emit_filesystem($output_target, "pvfs2-fs", 9, 1048576);
 
 # close fs.conf
