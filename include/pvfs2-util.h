@@ -46,9 +46,10 @@ void PVFS_util_release_credentials(
     PVFS_credentials *credentials);
 
 int PVFS_util_copy_sys_attr(
-    PVFS_sys_attr *dest, PVFS_sys_attr *src);
-
-void PVFS_util_release_sys_attr(PVFS_sys_attr *attr);
+    PVFS_sys_attr *dest_attr,
+    PVFS_sys_attr *src_attr);
+void PVFS_util_release_sys_attr(
+    PVFS_sys_attr *attr);
 
 int PVFS_util_init_defaults(void);
 
@@ -62,11 +63,16 @@ int PVFS_util_resolve(
     int out_fs_path_max);
 int PVFS_util_get_default_fsid(
     PVFS_fs_id* out_fs_id);
+
 int PVFS_util_add_dynamic_mntent(
     struct PVFS_sys_mntent *mntent);
 int PVFS_util_remove_internal_mntent(
     struct PVFS_sys_mntent *mntent);
-void PVFS_sys_free_mntent(
+
+int PVFS_util_copy_mntent(
+    struct PVFS_sys_mntent *dest_mntent,
+    struct PVFS_sys_mntent *src_mntent);
+void PVFS_util_free_mntent(
     struct PVFS_sys_mntent *mntent);
 
 void PVFS_util_make_size_human_readable(

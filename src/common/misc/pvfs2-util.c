@@ -53,10 +53,6 @@ static int parse_encoding_string(
     const char *cp,
     enum PVFS_encoding_type *et);
 
-static int copy_mntent(
-    struct PVFS_sys_mntent *dest_mntent,
-    struct PVFS_sys_mntent *src_mntent);
-
 void PVFS_util_gen_credentials(
     PVFS_credentials *credentials)
 {
@@ -106,30 +102,32 @@ void PVFS_util_release_credentials(
 }
 
 int PVFS_util_copy_sys_attr(
-    PVFS_sys_attr *dest, PVFS_sys_attr *src)
+    PVFS_sys_attr *dest_attr, PVFS_sys_attr *src_attr)
 {
     int ret = -PVFS_EINVAL;
 
-    if (src && dest)
+    if (src_attr && dest_attr)
     {
-        dest->owner = src->owner;
-        dest->group = src->group;
-        dest->perms = src->perms;
-        dest->atime = src->atime;
-        dest->mtime = src->mtime;
-        dest->ctime = src->ctime;
-        dest->dfile_count = src->dfile_count;
-        dest->objtype = src->objtype;
-        dest->mask = src->mask;
+        dest_attr->owner = src_attr->owner;
+        dest_attr->group = src_attr->group;
+        dest_attr->perms = src_attr->perms;
+        dest_attr->atime = src_attr->atime;
+        dest_attr->mtime = src_attr->mtime;
+        dest_attr->ctime = src_attr->ctime;
+        dest_attr->dfile_count = src_attr->dfile_count;
+        dest_attr->objtype = src_attr->objtype;
+        dest_attr->mask = src_attr->mask;
 
-        if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
-            (src->objtype == PVFS_TYPE_SYMLINK) && src->link_target)
+        if ((src_attr->mask & PVFS_ATTR_COMMON_TYPE) &&
+            (src_attr->objtype == PVFS_TYPE_SYMLINK) &&
+            src_attr->link_target)
         {
-            dest->link_target = strdup(src->link_target);
-            if (!dest->link_target)
+            dest_attr->link_target = strdup(src_attr->link_target);
+            if (!dest_attr->link_target)
             {
                 ret = -PVFS_ENOMEM;
             }
+            ret = 0;
         }
     }
     return ret;
@@ -586,8 +584,8 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             {
                 current_mnt = &s_stat_tab_array[
                     PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i];
-                copy_mntent(&tmp_mnt_array[i], current_mnt);
-                PVFS_sys_free_mntent(current_mnt);
+                PVFS_util_copy_mntent(&tmp_mnt_array[i], current_mnt);
+                PVFS_util_free_mntent(current_mnt);
             }
 
             /* finally, swap the mntent arrays */
@@ -603,7 +601,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
         current_mnt = &s_stat_tab_array[
             PVFS2_DYNAMIC_TAB_INDEX].mntent_array[new_index];
 
-        ret = copy_mntent(current_mnt, mntent);
+        ret = PVFS_util_copy_mntent(current_mnt, mntent);
 
         s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count++;
 
@@ -704,10 +702,11 @@ int PVFS_util_remove_internal_mntent(
 
                 if (current_mnt->fs_id == mntent->fs_id)
                 {
-                    PVFS_sys_free_mntent(current_mnt);
+                    PVFS_util_free_mntent(current_mnt);
                     continue;
                 }
-                copy_mntent(&tmp_mnt_array[new_count++], current_mnt);
+                PVFS_util_copy_mntent(
+                    &tmp_mnt_array[new_count++], current_mnt);
             }
 
             /* finally, swap the mntent arrays */
@@ -724,7 +723,7 @@ int PVFS_util_remove_internal_mntent(
               array here.  since this is the case, we also free the
               array since we know it's now empty.
             */
-            PVFS_sys_free_mntent(
+            PVFS_util_free_mntent(
                 &s_stat_tab_array[found_index].mntent_array[0]);
             free(s_stat_tab_array[found_index].mntent_array);
             s_stat_tab_array[found_index].mntent_array = NULL;
@@ -1018,23 +1017,30 @@ static int parse_flowproto_string(
     }
 
     if (!strcmp(flow, "bmi_trove"))
+    {
         *flowproto = FLOWPROTO_BMI_TROVE;
+    }
     else if (!strcmp(flow, "dump_offsets"))
+    {
         *flowproto = FLOWPROTO_DUMP_OFFSETS;
+    }
     else if (!strcmp(flow, "bmi_cache"))
+    {
         *flowproto = FLOWPROTO_BMI_CACHE;
+    }
     else if (!strcmp(flow, "multiqueue"))
+    {
         *flowproto = FLOWPROTO_MULTIQUEUE;
+    }
     else
     {
         gossip_err("Error: unrecognized flowproto option: %s\n", flow);
         return (-PVFS_EINVAL);
     }
-
-    return (0);
+    return 0;
 }
 
-void PVFS_sys_free_mntent(
+void PVFS_util_free_mntent(
     struct PVFS_sys_mntent *mntent)
 {
     if (mntent)
@@ -1071,49 +1077,104 @@ void PVFS_sys_free_mntent(
     }    
 }
 
-static int copy_mntent(
+int PVFS_util_copy_mntent(
     struct PVFS_sys_mntent *dest_mntent,
     struct PVFS_sys_mntent *src_mntent)
 {
-    int ret = -PVFS_ENOMEM;
+    int ret = -PVFS_EINVAL, i = 0;
 
     if (dest_mntent && src_mntent)
     {
-        int i;
-
         memset(dest_mntent, 0, sizeof(struct PVFS_sys_mntent));
 
         dest_mntent->num_pvfs_config_servers =
             src_mntent->num_pvfs_config_servers;
+
         dest_mntent->pvfs_config_servers =
             malloc(dest_mntent->num_pvfs_config_servers *
-            sizeof(*dest_mntent->pvfs_config_servers));
-        assert(dest_mntent->pvfs_config_servers);
-        for (i=0; i<dest_mntent->num_pvfs_config_servers; i++) {
+                   sizeof(*dest_mntent->pvfs_config_servers));
+        if (!dest_mntent)
+        {
+            return -PVFS_ENOMEM;
+        }
+
+        for(i = 0; i < dest_mntent->num_pvfs_config_servers; i++)
+        {
             dest_mntent->pvfs_config_servers[i] =
                 strdup(src_mntent->pvfs_config_servers[i]);
-            assert(dest_mntent->pvfs_config_servers[i]);
+            if (!dest_mntent->pvfs_config_servers[i])
+            {
+                ret = -PVFS_ENOMEM;
+                goto error_exit;
+            }
         }
 
         dest_mntent->pvfs_fs_name = strdup(src_mntent->pvfs_fs_name);
-        assert(dest_mntent->pvfs_fs_name);
+        if (!dest_mntent->pvfs_fs_name)
+        {
+            ret = -PVFS_ENOMEM;
+            goto error_exit;
+        }
 
         if (src_mntent->mnt_dir)
         {
             dest_mntent->mnt_dir = strdup(src_mntent->mnt_dir);
-            assert(dest_mntent->mnt_dir);
+            if (!dest_mntent->mnt_dir)
+            {
+                ret = -PVFS_ENOMEM;
+                goto error_exit;
+            }
         }
+
         if (src_mntent->mnt_opts)
         {
             dest_mntent->mnt_opts = strdup(src_mntent->mnt_opts);
-            assert(dest_mntent->mnt_opts);
+            if (!dest_mntent->mnt_opts)
+            {
+                ret = -PVFS_ENOMEM;
+                goto error_exit;
+            }
         }
+
         dest_mntent->flowproto = src_mntent->flowproto;
         dest_mntent->encoding = src_mntent->encoding;
         dest_mntent->fs_id = src_mntent->fs_id;
+    }
+    return 0;
 
-        /* TODO: memory allocation error handling */
-        ret = 0;
+  error_exit:
+
+    for(i = 0; i < dest_mntent->num_pvfs_config_servers; i++)
+    {
+        if (dest_mntent->pvfs_config_servers[i])
+        {
+            free(dest_mntent->pvfs_config_servers[i]);
+            dest_mntent->pvfs_config_servers[i] = NULL;
+        }
+    }
+
+    if (dest_mntent->pvfs_config_servers)
+    {
+        free(dest_mntent->pvfs_config_servers);
+        dest_mntent->pvfs_config_servers = NULL;
+    }
+
+    if (dest_mntent->pvfs_fs_name)
+    {
+        free(dest_mntent->pvfs_fs_name);
+        dest_mntent->pvfs_fs_name = NULL;
+    }
+
+    if (dest_mntent->mnt_dir)
+    {
+        free(dest_mntent->mnt_dir);
+        dest_mntent->mnt_dir = NULL;
+    }
+
+    if (dest_mntent->mnt_opts)
+    {
+        free(dest_mntent->mnt_opts);
+        dest_mntent->mnt_opts = NULL;
     }
     return ret;
 }
@@ -1196,7 +1257,7 @@ void PINT_release_pvfstab(void)
             if (s_stat_tab_array[i].mntent_array[j].fs_id !=
                 PVFS_FS_ID_NULL)
             {
-                PVFS_sys_free_mntent(
+                PVFS_util_free_mntent(
                     &s_stat_tab_array[i].mntent_array[j]);
             }
         }
@@ -1211,7 +1272,7 @@ void PINT_release_pvfstab(void)
                 PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id !=
             PVFS_FS_ID_NULL)
         {
-            PVFS_sys_free_mntent(
+            PVFS_util_free_mntent(
                 &s_stat_tab_array[
                     PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j]);
         }

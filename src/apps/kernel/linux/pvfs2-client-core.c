@@ -844,7 +844,7 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
         vfs_request->out_downcall.resp.fs_mount.id = dynamic_mount_id++;
     }
 
-    PVFS_sys_free_mntent(&mntent);
+    PVFS_util_free_mntent(&mntent);
 
     write_inlined_device_response(vfs_request);
     return 0;
@@ -894,7 +894,7 @@ static int service_fs_umount_request(vfs_request_t *vfs_request)
         vfs_request->out_downcall.status = 0;
     }
 
-    PVFS_sys_free_mntent(&mntent);
+    PVFS_util_free_mntent(&mntent);
 
     write_inlined_device_response(vfs_request);
     return 0;
