@@ -101,8 +101,8 @@ static inline int copy_attributes_to_inode(
 	    ret = 0;
 	    break;
 	default:
-	    printk("pvfs2: copy_attributes_to_inode: got invalid "
-		   "attribute type %d\n", attrs->objtype);
+	    pvfs2_error("pvfs2: copy_attributes_to_inode: got invalid "
+                        "attribute type %d\n", attrs->objtype);
 	}
     }
     return ret;
@@ -259,16 +259,16 @@ int pvfs2_inode_getattr(
 	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
 	if (!new_op)
 	{
-	    printk("pvfs2: pvfs2_inode_getattr -- "
-		   "kmem_cache_alloc failed!\n");
+	    pvfs2_error("pvfs2: pvfs2_inode_getattr -- "
+                        "kmem_cache_alloc failed!\n");
 	    return ret;
 	}
 	new_op->upcall.type = PVFS2_VFS_OP_GETATTR;
 	new_op->upcall.req.getattr.refn = pvfs2_inode->refn;
 
 	/* need to check downcall.status value */
-	printk("Trying Getattr on handle %Ld on fsid %d\n",
-	       pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
+	pvfs2_print("Trying Getattr on handle %Ld on fsid %d\n",
+                    pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
 
 	/* post req and wait for request to be serviced here */
 	add_op_to_request_list(new_op);
@@ -280,8 +280,8 @@ int pvfs2_inode_getattr(
 	       For now, wait_for_matching_downcall just doesn't
 	       put anything on the invalidated list.
 	     */
-	    printk("pvfs2: pvfs2_inode_getattr -- wait failed (%x). "
-		   "op invalidated (not really)\n", ret);
+	    pvfs2_error("pvfs2: pvfs2_inode_getattr -- wait failed (%x). "
+                        "op invalidated (not really)\n", ret);
 	    goto error_exit;
 	}
 
@@ -297,7 +297,8 @@ int pvfs2_inode_getattr(
 	    }
 	}
       error_exit:
-	printk("Op with tag %lu was serviced; freeing\n", new_op->tag);
+	pvfs2_print("Op with tag %lu was serviced; freeing\n",
+                    new_op->tag);
 	op_release(new_op);
     }
     return ret;
@@ -340,7 +341,7 @@ int pvfs2_inode_setattr(
 	       For now, wait_for_matching_downcall just doesn't
 	       put anything on the invalidated list.
 	     */
-	    pvfs2_print("pvfs2: pvfs2_inode_setattr -- wait failed. "
+	    pvfs2_error("pvfs2: pvfs2_inode_setattr -- wait failed. "
                         "op invalidated (not really)\n");
 	}
 
@@ -350,7 +351,8 @@ int pvfs2_inode_setattr(
         ret = new_op->downcall.status;
 
 	/* when request is serviced properly, free req op struct */
-	pvfs2_print("Op with tag %lu was serviced; freeing\n", new_op->tag);
+	pvfs2_print("Op with tag %lu was serviced; freeing\n",
+                    new_op->tag);
 	op_release(new_op);
     }
     return ret;
@@ -402,14 +404,14 @@ static inline struct inode *pvfs2_create_file(
 	       For now, wait_for_matching_downcall just doesn't
 	       put anything on the invalidated list.
 	     */
-	    printk("pvfs2: pvfs2_create_file -- wait failed. "
-		   "op invalidated (not really)\n");
+	    pvfs2_error("pvfs2: pvfs2_create_file -- wait failed. "
+                        "op invalidated (not really)\n");
 	    goto cleanup_inode;
 	}
 
-	printk("Create Got PVFS2 handle %Ld on fsid %d\n",
-	       new_op->downcall.resp.create.refn.handle,
-	       new_op->downcall.resp.create.refn.fs_id);
+	pvfs2_print("Create Got PVFS2 handle %Ld on fsid %d\n",
+                    new_op->downcall.resp.create.refn.handle,
+                    new_op->downcall.resp.create.refn.fs_id);
 
 	/*
 	   set the inode private data here, and set the
@@ -418,8 +420,10 @@ static inline struct inode *pvfs2_create_file(
 	if (new_op->downcall.status > -1)
 	{
 	    inode->i_ino =
-		pvfs2_handle_to_ino(new_op->downcall.resp.create.refn.handle);
-	    printk("Assigned inode new number of %d\n", (int) inode->i_ino);
+		pvfs2_handle_to_ino(
+                    new_op->downcall.resp.create.refn.handle);
+	    pvfs2_print("Assigned inode new number of %d\n",
+                        (int)inode->i_ino);
 
 	    pvfs2_inode = PVFS2_I(inode);
 	    pvfs2_inode->refn = new_op->downcall.resp.create.refn;
@@ -442,14 +446,15 @@ static inline struct inode *pvfs2_create_file(
 	else
 	{
 	  cleanup_inode:
-	    printk("pvfs2_create_file: An error occurred; "
-		   "removing created inode\n");
+	    pvfs2_error("pvfs2_create_file: An error occurred; "
+                        "removing created inode\n");
 	    iput(inode);
 	    inode = NULL;
 	}
 
 	/* when request is serviced properly, free req op struct */
-	printk("Op with tag %lu was serviced; freeing\n", new_op->tag);
+	pvfs2_print("Op with tag %lu was serviced; freeing\n",
+                    new_op->tag);
 	op_release(new_op);
     }
     return inode;
@@ -471,7 +476,8 @@ static inline struct inode *pvfs2_create_dir(
 	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
 	if (!new_op)
 	{
-	    printk("pvfs2: pvfs2_create_dir -- kmem_cache_alloc failed!\n");
+	    pvfs2_error("pvfs2: pvfs2_create_dir -- "
+                        "kmem_cache_alloc failed!\n");
 	    return NULL;
 	}
 	new_op->upcall.type = PVFS2_VFS_OP_MKDIR;
@@ -491,8 +497,8 @@ static inline struct inode *pvfs2_create_dir(
 	strncpy(new_op->upcall.req.mkdir.d_name,
 		dentry->d_name.name, PVFS2_NAME_LEN);
 
-	printk("pvfs2: pvfs2_create_dir op initialized with type %d\n",
-	       new_op->upcall.type);
+	pvfs2_print("pvfs2: pvfs2_create_dir op initialized "
+                    "with type %d\n", new_op->upcall.type);
 
 	/* post req and wait for request to be serviced here */
 	add_op_to_request_list(new_op);
@@ -504,17 +510,17 @@ static inline struct inode *pvfs2_create_dir(
 	       For now, wait_for_matching_downcall just doesn't
 	       put anything on the invalidated list.
 	     */
-	    printk("pvfs2: pvfs2_create_dir -- wait failed. "
-		   "op invalidated (not really)\n");
+	    pvfs2_error("pvfs2: pvfs2_create_dir -- wait failed. "
+                        "op invalidated (not really)\n");
 
 	    goto cleanup_inode;
 	}
 
 	/* check what kind of goodies we got */
 	/* need to check downcall.status value */
-	printk("Mkdir Got PVFS2 handle %Ld on fsid %d\n",
-	       new_op->downcall.resp.mkdir.refn.handle,
-	       new_op->downcall.resp.mkdir.refn.fs_id);
+	pvfs2_print("Mkdir Got PVFS2 handle %Ld on fsid %d\n",
+                    new_op->downcall.resp.mkdir.refn.handle,
+                    new_op->downcall.resp.mkdir.refn.fs_id);
 
 	/*
 	   set the inode private data here, and set the
@@ -524,7 +530,8 @@ static inline struct inode *pvfs2_create_dir(
 	{
 	    inode->i_ino =
 		pvfs2_handle_to_ino(new_op->downcall.resp.mkdir.refn.handle);
-	    printk("Assigned inode new number of %d\n", (int) inode->i_ino);
+	    pvfs2_print("Assigned inode new number of %d\n",
+                        (int) inode->i_ino);
 
 	    pvfs2_inode = PVFS2_I(inode);
 	    pvfs2_inode->refn = new_op->downcall.resp.mkdir.refn;
@@ -547,14 +554,15 @@ static inline struct inode *pvfs2_create_dir(
 	else
 	{
 	  cleanup_inode:
-	    printk("pvfs2_create_dir: An error occurred; "
-		   "removing created inode\n");
+	    pvfs2_error("pvfs2_create_dir: An error occurred; "
+                        "removing created inode\n");
 	    iput(inode);
 	    inode = NULL;
 	}
 
 	/* when request is serviced properly, free req op struct */
-	printk("Op with tag %lu was serviced; freeing\n", new_op->tag);
+	pvfs2_print("Op with tag %lu was serviced; freeing\n",
+                    new_op->tag);
 	op_release(new_op);
     }
     return inode;
@@ -587,7 +595,8 @@ struct inode *pvfs2_create_entry(
 /*         case PVFS2_VFS_OP_LINK: */
 /*         case PVFS2_VFS_OP_SYMLINK: */
 	default:
-	    printk("pvfs2_create_entry got a bad " "op_type (%d)\n", op_type);
+	    pvfs2_error("pvfs2_create_entry got a bad "
+                        "op_type (%d)\n", op_type);
 	}
     }
     return NULL;
@@ -604,8 +613,9 @@ int pvfs2_remove_entry(
 
     if (inode && parent)
     {
-	printk("pvfs2: pvfs2_remove_entry: Parent is %Ld | fs_id %d\n",
-	       parent->refn.handle, parent->refn.fs_id);
+	pvfs2_print("pvfs2: pvfs2_remove_entry: Parent is %Ld | "
+                    "fs_id %d\n", parent->refn.handle,
+                    parent->refn.fs_id);
 	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
 	if (!new_op)
 	{
@@ -637,8 +647,8 @@ int pvfs2_remove_entry(
 	       For now, wait_for_matching_downcall just doesn't
 	       put anything on the invalidated list.
 	     */
-	    printk("pvfs2: pvfs2_unlink -- wait failed (%x).  "
-		   "op invalidated (not really)\n", ret);
+	    pvfs2_error("pvfs2: pvfs2_unlink -- wait failed (%x).  "
+                        "op invalidated (not really)\n", ret);
 	    goto error_exit;
 	}
 
