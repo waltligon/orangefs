@@ -597,7 +597,6 @@ static struct options* parse_args(int argc, char* argv[])
         {0,0,0,0}
     };
 
-    /* create storage for the command line options */
     tmp_opts = (struct options*)malloc(sizeof(struct options));
     if (!tmp_opts)
     {
@@ -605,7 +604,6 @@ static struct options* parse_args(int argc, char* argv[])
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
-    /* look at command line arguments */
     while((ret = getopt_long(argc, argv, "hvndGoAaigl",
                              long_opts, &option_index)) != -1)
     {

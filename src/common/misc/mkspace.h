@@ -9,6 +9,9 @@
 
 #include "trove.h"
 
+#define PVFS2_MKSPACE_GOSSIP_VERBOSE 1
+#define PVFS2_MKSPACE_STDERR_VERBOSE 2
+
 int pvfs2_mkspace(
     char *storage_space,
     char *collection,

@@ -596,14 +596,15 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
     while (handlelist_return_handle(&handle, &server_idx) == 0) {
 	if (dot_fmt)
 	{
-	    printf("\tH0x%08Lx [shape=record, color=red, label = \"{(unknown) | 0x%08Lx (%d)}\"];\n",
+	    printf("\tH%Lu [shape=record, color=red, label = \"{(unknown) "
+                   "| %Lu (%d)}\"];\n",
 		   Lu(handle),
 		   Lu(handle),
 		   server_idx);
 	}
 	else
 	{
-	    printf("\t%s: 0x%08Lx\n",
+	    printf("\t%s: %Lu\n",
 		   PVFS_mgmt_map_addr(cur_fs,
 				      creds,
 				      addr_array[server_idx],
@@ -789,14 +790,14 @@ static void print_root_entry(PVFS_handle handle,
 {
     if (dot_fmt)
     {
-	printf("\tH0x%08Lx [shape = record, fillcolor = grey, style = filled, label = \"{/ | 0x%08Lx (%d)}\"];\n",
+	printf("\tH%Lu [shape = record, fillcolor = grey, style = filled, label = \"{/ | %Lu (%d)}\"];\n",
 	       Lu(handle),
 	       Lu(handle),
 	       server_idx);
     }
     else
     {
-	printf("file = <root>, handle = 0x%08Lx, type = %d, server = %d\n",
+	printf("file = <root>, handle = %Lu, type = %d, server = %d\n",
 	       Lu(handle),
 	       PVFS_TYPE_DIRECTORY,
 	       server_idx);
@@ -826,20 +827,20 @@ static void print_entry(char *name,
     if (dot_fmt)
     {
 	/* always show connector */
-	printf("\tH0x%08Lx -> H0x%08Lx [style = bold];\n",
+	printf("\tH%Lu -> H%Lu [style = bold];\n",
 	       Lu(parent_handle),
 	       Lu(handle));
 	switch (objtype) {
 	    case PVFS_TYPE_DIRECTORY:
-		printf("\tH0x%08Lx [shape = record, fillcolor = grey, style = filled, label = \"{%s/ | 0x%08Lx (%d)}\"];\n",
+		printf("\tH%Lu [shape = record, fillcolor = grey, style = filled, label = \"{%s/ | %Lu (%d)}\"];\n",
 		       Lu(handle), name, Lu(handle), server_idx);
 		break;
 	    case PVFS_TYPE_METAFILE:
-		printf("\tH0x%08Lx [shape = record, fillcolor = aquamarine, style = filled, label = \"{%s | 0x%08Lx (%d)}\"];\n",
+		printf("\tH%Lu [shape = record, fillcolor = aquamarine, style = filled, label = \"{%s | %Lu (%d)}\"];\n",
 		       Lu(handle), name, Lu(handle), server_idx);
 		break;
 	    case PVFS_TYPE_DATAFILE:
-		printf("\tH0x%08Lx [shape = ellipse, fillcolor = violet, style = filled, label =\"0x%08Lx (%d)\"];\n",
+		printf("\tH%Lu [shape = ellipse, fillcolor = violet, style = filled, label =\"%Lu (%d)\"];\n",
 		       Lu(handle), Lu(handle), server_idx);
 		break;
 	    case PVFS_TYPE_DIRDATA:
@@ -854,13 +855,13 @@ static void print_entry(char *name,
     {
 	switch (objtype) {
 	    case PVFS_TYPE_DATAFILE:
-		printf("handle = 0x%08Lx, type = %d, server = %d\n",
+		printf("handle = %Lu, type = %d, server = %d\n",
 		       Lu(handle),
 		       objtype,
 		       server_idx);
 		break;
 	    default:
-		printf("file = %s, handle = 0x%08Lx, type = %d, server = %d\n",
+		printf("file = %s, handle = %Lu, type = %d, server = %d\n",
 		       name,
 		       Lu(handle),
 		       objtype,

@@ -19,83 +19,273 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-static int verbose = 0;
-static int new_coll_id = 9;
-static int new_root_handle = 1048576;
-static char ranges[PATH_MAX] = "1047000-1049000";
-static char collection[PATH_MAX] = "pvfs2-fs";
-static char storage_space[PATH_MAX] = "/tmp/pvfs2-test-space";
+typedef struct
+{
+    int use_defaults;
+    int verbose;
+    int coll_id;
+    int root_handle;
+    int collection_only;
+    int delete_storage;
+    char ranges[PATH_MAX];
+    char collection[PATH_MAX];
+    char storage_space[PATH_MAX];
+} options_t;
 
-static void print_help(char *progname);
-static int parse_args(int argc, char **argv);
+static int default_verbose = 0;
+static int default_coll_id = 9;
+static int default_root_handle = 1048576;
+static int default_collection_only = 0;
+static char default_ranges[PATH_MAX] = "4-4294967297";
+static char default_collection[PATH_MAX] = "pvfs2-fs";
+static char default_storage_space[PATH_MAX] = "/pvfs2-storage-space";
+
+static void print_help(char *progname, options_t *opts);
+
+static int parse_args(int argc, char **argv, options_t *opts)
+{
+    int ret = 0, option_index = 0;
+    char *cur_option = NULL;
+    static struct option long_opts[] =
+    {
+        {"help",0,0,0},
+        {"version",0,0,0},
+        {"verbose",0,0,0},
+        {"defaults",0,0,0},
+        {"storage-space",1,0,0},
+        {"coll-id",1,0,0},
+        {"coll-name",1,0,0},
+        {"root-handle",1,0,0},
+        {"delete-storage",0,0,0},
+        {"handle-range",1,0,0},
+        {"add-coll",0,0,0},
+        {0,0,0,0}
+    };
+
+    if (argc == 1)
+    {
+        print_help(argv[0], opts);
+        exit(1);
+    }
+
+    while ((ret = getopt_long(argc, argv, "s:c:i:r:R:vVhadD",
+                              long_opts, &option_index)) != -1)
+    {
+	switch (ret)
+        {
+            case 0:
+                cur_option = (char *)long_opts[option_index].name;
+
+                if (strcmp("help", cur_option) == 0)
+                {
+                    goto do_help;
+                }
+                else if (strcmp("version", cur_option) == 0)
+                {
+                    goto do_version;
+                }
+                else if (strcmp("verbose", cur_option) == 0)
+                {
+                    goto do_verbose;
+                }
+                else if (strcmp("storage-space", cur_option) == 0)
+                {
+                    goto do_storage_space;
+                }
+                else if (strcmp("coll-id", cur_option) == 0)
+                {
+                    goto do_collection_id;
+                }
+                else if (strcmp("coll-name", cur_option) == 0)
+                {
+                    goto do_collection_name;
+                }
+                else if (strcmp("root-handle", cur_option) == 0)
+                {
+                    goto do_root_handle;
+                }
+                else if (strcmp("handle-range", cur_option) == 0)
+                {
+                    goto do_handle_range;
+                }
+                else if (strcmp("add-coll", cur_option) == 0)
+                {
+                    goto do_add_collection;
+                }
+                else if (strcmp("defaults", cur_option) == 0)
+                {
+                    goto do_defaults;
+                }
+                else if (strcmp("delete-storage", cur_option) == 0)
+                {
+                    goto do_delete_storage;
+                }
+                else
+                {
+                    print_help(argv[0], opts);
+                    exit(1);
+                }
+	    case 'a':
+          do_add_collection:
+		opts->collection_only = 1;
+		break;
+	    case 'c':
+          do_collection_name:
+		strncpy(opts->collection, optarg, PATH_MAX);
+		break;
+            case 'd':
+          do_defaults:
+                opts->use_defaults = 1;
+                break;
+            case 'h':
+          do_help:
+                print_help(argv[0], opts);
+                exit(0);
+	    case 'i':
+          do_collection_id:
+		opts->coll_id = atoi(optarg);
+		break;
+	    case 'r':
+          do_root_handle:
+		opts->root_handle = atoi(optarg);
+		break;
+	    case 'R':
+          do_handle_range:
+		strncpy(opts->ranges, optarg, PATH_MAX);
+		break;
+	    case 's':
+          do_storage_space:
+		strncpy(opts->storage_space, optarg, PATH_MAX);
+		break;
+	    case 'v':
+          do_verbose:
+		opts->verbose = PVFS2_MKSPACE_STDERR_VERBOSE;
+		break;
+            case 'V':
+          do_version:
+                fprintf(stderr,"%s\n",PVFS2_VERSION);
+                exit(0);
+            case 'D':
+          do_delete_storage:
+                opts->delete_storage = 1;
+                break;
+	    case '?':
+                fprintf(stderr, "%s: error: unrecognized "
+                        "option '%c'.\n", argv[0], ret);
+	    default:
+                print_help(argv[0], opts);
+		return -1;
+	}
+    }
+    return 0;
+}
+
+static void print_options(options_t *opts)
+{
+    if (opts)
+    {
+        printf("\tuse all defaults    : %s\n",
+               (opts->use_defaults ? "yes" : "no"));
+        printf("\tdelete storage      : %s\n",
+               (opts->delete_storage ? "yes" : "no"));
+        printf("\tverbose             : %s\n",
+               (opts->verbose ? "ON" : "OFF"));
+        printf("\troot handle         : %d\n", opts->root_handle);
+        printf("\tcollection-only mode: %s\n",
+               (opts->collection_only ? "ON" : "OFF"));
+        printf("\tcollection id       : %d\n", opts->coll_id);
+        printf("\tcollection name     : %s\n", opts->collection);
+        printf("\thandle ranges       : %s\n", opts->ranges);
+        printf("\tstorage space       : %s\n", opts->storage_space);
+    }
+}
+
+static void print_help(char *progname, options_t *opts)
+{
+    fprintf(stderr,"usage: %s [OPTION]...\n", progname);
+    fprintf(stderr,"Create a pvfs2 storage space with a single "
+            "collection, or\n");
+    fprintf(stderr,"add a new collection to an existing storage "
+            "space.\n\n");
+    fprintf(stderr,"The following arguments can be used to "
+           "customize your volume:\n");
+
+    fprintf(stderr,"  -a, --add-coll             "
+            "used to add a collection only\n");
+    fprintf(stderr,"  -c, --coll-name            "
+            "create collection with the speciifed name\n");
+    fprintf(stderr,"  -d, --defaults             "
+            "use all default options (see below)\n");
+    fprintf(stderr,"  -D, --delete-storage       "
+            "REMOVE the storage space (unrecoverable!)\n");
+    fprintf(stderr,"  -h, --help                 "
+            "show this help listing\n");
+    fprintf(stderr,"  -i [id], --coll-id=[id]    "
+            "create collection with the specified id\n");
+    fprintf(stderr,"  -r, --root-handle          "
+            "create collection with the specified root handle\n");
+    fprintf(stderr,"  -R, --handle-range         "
+            "create collection with the specified handle range\n");
+    fprintf(stderr,"  -s, --storage-space        "
+            "create storage space at the specified location\n");
+    fprintf(stderr,"  -v, --verbose              "
+            "operate in verbose mode\n");
+    fprintf(stderr,"  -V, --version              "
+            "print version information and exit\n");
+
+    fprintf(stderr,"\nIf the -d or --defaults option is used, the "
+            "following options will be used:\n");
+    print_options(opts);
+}
 
 int main(int argc, char **argv)
 {
-    if (parse_args(argc, argv) < 0)
+    int ret = -1;
+    options_t opts;
+    memset(&opts, 0, sizeof(options_t));
+
+    opts.verbose = default_verbose;
+    opts.coll_id = default_coll_id;
+    opts.root_handle = default_root_handle;
+    opts.collection_only = default_collection_only;
+    strncpy(opts.ranges, default_ranges, PATH_MAX);
+    strncpy(opts.collection, default_collection, PATH_MAX);
+    strncpy(opts.storage_space, default_storage_space, PATH_MAX);
+
+    if (parse_args(argc, argv, &opts))
     {
 	fprintf(stderr,"%s: error: argument parsing failed; "
                 "aborting!\n",argv[0]);
 	return -1;
     }
-    return pvfs2_mkspace(storage_space,
-                         collection,
-                         new_coll_id,
-                         new_root_handle,
-                         ranges,
-                         0,
-                         verbose);
-}
 
-static void print_help(char *progname)
-{
-    fprintf(stderr,"%s version %s\n", progname, PVFS2_VERSION);
-    fprintf(stderr,"usage: %s [-s storage_space] [-c collection_name] "
-            "[-i coll_id] [-r root_handle] [-R handle_range] [-v]\n",
-            progname);
-    fprintf(stderr, "\tdefault storage space is '%s'.\n", storage_space);
-    fprintf(stderr, "\tdefault initial collection is '%s'.\n", collection);
-    fprintf(stderr, "\tdefault collection id is '%d'.\n", new_coll_id);
-    fprintf(stderr, "\tdefault root handle is '%d'.\n", new_root_handle);
-    fprintf(stderr, "\tdefault handle range is '%s'.\n", ranges);
-    fprintf(stderr, "\t'-v' turns on verbose output.\n");
-}
-
-static int parse_args(int argc, char **argv)
-{
-    int c;
-
-    while ((c = getopt(argc, argv, "s:c:i:r:R:vh")) != EOF) {
-	switch (c) {
-	    case 's':
-		strncpy(storage_space, optarg, PATH_MAX);
-		break;
-	    case 'c': /* collection */
-		strncpy(collection, optarg, PATH_MAX);
-		break;
-	    case 'i':
-		new_coll_id = atoi(optarg);
-		break;
-	    case 'r':
-		new_root_handle = atoi(optarg);
-		break;
-	    case 'R':
-		strncpy(ranges,optarg, PATH_MAX);
-		break;
-	    case 'v':
-		verbose = 1;
-		break;
-            case 'h':
-                print_help(argv[0]);
-                break;
-	    case '?':
-                fprintf(stderr, "%s: error: unrecognized "
-                        "option '%c'.\n", argv[0], c);
-	    default:
-                print_help(argv[0]);
-		return -1;
-	}
+    if (opts.use_defaults)
+    {
+        opts.verbose = default_verbose;
+        opts.coll_id = default_coll_id;
+        opts.root_handle = default_root_handle;
+        opts.collection_only = default_collection_only;
+        strncpy(opts.ranges, default_ranges, PATH_MAX);
+        strncpy(opts.collection, default_collection, PATH_MAX);
+        strncpy(opts.storage_space, default_storage_space, PATH_MAX);
     }
-    return 0;
+
+    print_options(&opts);
+
+    if (opts.delete_storage)
+    {
+        ret = pvfs2_rmspace(opts.storage_space, opts.collection,
+                            opts.coll_id, opts.collection_only,
+                            opts.verbose);
+    }
+    else
+    {
+        ret = pvfs2_mkspace(opts.storage_space, opts.collection,
+                            opts.coll_id, opts.root_handle,
+                            opts.ranges, opts.collection_only,
+                            opts.verbose);
+    }
+    return ret;
 }
 
 /*

@@ -24,6 +24,16 @@
 static char *dir_ent_string = "dir_ent";
 static char *root_handle_string = "root_handle";
 
+
+#define mkspace_print(v, format, f...)       \
+do {                                         \
+ if (v == PVFS2_MKSPACE_GOSSIP_VERBOSE)      \
+   gossip_debug(SERVER_DEBUG, format, ##f);  \
+ else if (v == PVFS2_MKSPACE_STDERR_VERBOSE) \
+   fprintf(stderr,format, ##f);              \
+} while(0)
+
+
 int pvfs2_mkspace(
     char *storage_space,
     char *collection,
@@ -44,14 +54,11 @@ int pvfs2_mkspace(
     TROVE_handle_extent_array extent_array;
     TROVE_context_id trove_context = -1;
 
-    if (verbose)
-    {
-        gossip_debug(SERVER_DEBUG,"Storage space: %s\n",storage_space);
-        gossip_debug(SERVER_DEBUG,"Collection   : %s\n",collection);
-        gossip_debug(SERVER_DEBUG,"ID           : %d\n",coll_id);
-        gossip_debug(SERVER_DEBUG,"Root Handle  : %Lu\n",Lu(root_handle));
-        gossip_debug(SERVER_DEBUG,"Handle Ranges: %s\n",handle_ranges);
-    }
+    mkspace_print(verbose,"Storage space: %s\n",storage_space);
+    mkspace_print(verbose,"Collection   : %s\n",collection);
+    mkspace_print(verbose,"ID           : %d\n",coll_id);
+    mkspace_print(verbose,"Root Handle  : %Lu\n",Lu(root_handle));
+    mkspace_print(verbose,"Handle Ranges: %s\n",handle_ranges);
 
     new_root_handle = (TROVE_handle)root_handle;
 
@@ -89,18 +96,15 @@ int pvfs2_mkspace(
 	return -1;
     }
 
-    if (verbose)
-    {
-        gossip_debug(SERVER_DEBUG,"info: created storage space '%s'.\n",
-                storage_space);
-    }
+    mkspace_print(verbose,"info: created storage space '%s'.\n",
+                  storage_space);
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(collection, &coll_id, NULL, &op_id);
     if (ret != -1)
     {
-	gossip_debug(SERVER_DEBUG, "error: collection lookup succeeded "
-                     "before it should; aborting!\n");
+	mkspace_print(verbose, "warning: collection lookup succeeded "
+                      "before it should; aborting!\n");
 	trove_finalize();
 	return -1;
     }
@@ -109,8 +113,8 @@ int pvfs2_mkspace(
     ret = trove_collection_create(collection, coll_id, NULL, &op_id);
     if (ret != 1)
     {
-	gossip_debug(SERVER_DEBUG,"error: collection create failed for "
-                "collection '%s'.\n",collection);
+	mkspace_print(verbose,"error: collection create failed for "
+                      "collection '%s'.\n",collection);
 	return -1;
     }
 
@@ -118,8 +122,8 @@ int pvfs2_mkspace(
     ret = trove_collection_lookup(collection, &coll_id, NULL, &op_id);
     if (ret != 1)
     {
-	gossip_debug(SERVER_DEBUG,"error: collection lookup failed for "
-                "collection '%s' after create.\n",collection);
+	mkspace_print(verbose,"error: collection lookup failed for "
+                      "collection '%s' after create.\n",collection);
 	return -1;
     }
 
@@ -132,7 +136,7 @@ int pvfs2_mkspace(
     ret = trove_open_context(coll_id, &trove_context);
     if (ret < 0)
     {
-        gossip_debug(SERVER_DEBUG,"trove_open_context() failure.\n");
+        mkspace_print(verbose,"trove_open_context() failure.\n");
         return -1;
     }
 
@@ -146,7 +150,7 @@ int pvfs2_mkspace(
                                    handle_ranges);
     if (ret < 0)
     {
-	gossip_debug(SERVER_DEBUG, "Error adding handle ranges\n");
+	mkspace_print(verbose, "Error adding handle ranges\n");
 	return -1;
     }
 
@@ -181,15 +185,15 @@ int pvfs2_mkspace(
 
         if (ret != 1 && state != 0)
         {
-            gossip_debug(SERVER_DEBUG,
-                         "dspace create (for root dir) failed.\n");
+            mkspace_print(verbose,
+                          "dspace create (for root dir) failed.\n");
             return -1;
         }
 
         if (verbose)
         {
-            gossip_debug(SERVER_DEBUG,"info: created root directory "
-                         "with handle %Lu.\n", Lu(new_root_handle));
+            mkspace_print(verbose,"info: created root directory "
+                          "with handle %Lu.\n", Lu(new_root_handle));
         }
 
         /* set collection attribute for root handle */
@@ -267,8 +271,8 @@ int pvfs2_mkspace(
 
         if (verbose)
         {
-            gossip_debug(SERVER_DEBUG,"info: created dspace for dirents "
-                         "with handle %Lu.\n", Lu(ent_handle));
+            mkspace_print(verbose,"info: created dspace for dirents "
+                          "with handle %Lu.\n", Lu(ent_handle));
         }
 
         key.buffer    = dir_ent_string;
@@ -296,8 +300,8 @@ int pvfs2_mkspace(
 
         if (verbose)
         {
-            gossip_debug(SERVER_DEBUG,
-                         "info: wrote attributes for root directory.\n");
+            mkspace_print(verbose, "info: wrote attributes for "
+                          "root directory.\n");
         }
     }
 
@@ -309,10 +313,10 @@ int pvfs2_mkspace(
 
     if (verbose)
     {
-        gossip_debug(SERVER_DEBUG, "collection created:\n"
-                     "\troot handle = %Lu, coll id = %d, "
-                     "root string = \"%s\"\n",
-                     Lu(root_handle), coll_id, root_handle_string);
+        mkspace_print(verbose, "collection created:\n"
+                      "\troot handle = %Lu, coll id = %d, "
+                      "root string = \"%s\"\n",
+                      Lu(root_handle), coll_id, root_handle_string);
     }
     return 0;
 }
@@ -344,16 +348,16 @@ int pvfs2_rmspace(
 
     if (verbose)
     {
-        gossip_debug(SERVER_DEBUG,
-                     "Attempting to remove collection %s\n", collection);
+        mkspace_print(verbose, "Attempting to remove collection %s\n",
+                      collection);
     }
 
     ret = trove_collection_remove(collection, NULL, &op_id);
     if (verbose)
     {
-        gossip_debug(SERVER_DEBUG,
-                     "PVFS2 Collection %s removed %s\n", collection,
-                     ((ret != -1) ? "successfully" : "with errors"));
+        mkspace_print(
+            verbose, "PVFS2 Collection %s removed %s\n", collection,
+            ((ret != -1) ? "successfully" : "with errors"));
     }
 
     if (!remove_collection_only)
