@@ -27,7 +27,7 @@ struct options{
 	char* hostid;       /* host identifier */
 };
 
-#if 1
+#if 0
 /* for testing eager mode */
 #define MSG1_SIZE 1024
 #define MSG2_SIZE 2048

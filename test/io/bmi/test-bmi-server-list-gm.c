@@ -121,7 +121,6 @@ int main(int argc, char **argv)	{
 	}
 	memset(my_ack, 0, sizeof(struct server_ack));
 
-#if 1
 	/* create 2 buffers to recv into */
 	recv_buffer1 = BMI_memalloc(client_addr, (my_req->size/2), 
 		BMI_RECV_BUFFER);
@@ -135,16 +134,6 @@ int main(int argc, char **argv)	{
 	buffer_list[1] = recv_buffer2;
 	size_list[0] = my_req->size/2;
 	size_list[1] = my_req->size - (my_req->size/2);
-#else
-	recv_buffer1 = BMI_memalloc(client_addr, (my_req->size), 
-		BMI_RECV_BUFFER);
-	recv_buffer2 = (void*)((long)recv_buffer1 + (long)my_req->size/2);
-	if(!recv_buffer1)
-	{
-		fprintf(stderr, "BMI_memalloc() failed.\n");
-		return(-1);
-	}
-#endif
 
 	/* post the ack */
 	ret = BMI_post_send(&(server_ops[1]), client_addr, my_ack, 
@@ -172,14 +161,9 @@ int main(int argc, char **argv)	{
 	}
 
 	/* post the recv */
-#if 1
 	ret = BMI_post_recv_list(&(server_ops[0]), client_addr, buffer_list, 
 		size_list, 2, my_req->size, &actual_size, BMI_PRE_ALLOC, 0, NULL,
 		context);
-#else
-	ret = BMI_post_recv(&(server_ops[0]), client_addr, recv_buffer1, 
-		my_req->size, &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
-#endif
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_recv_failure.\n");
