@@ -190,7 +190,6 @@ int PVFS_mgmt_count_servers(
  * returns 0 on success, -PVFS_error on failure
  */
 int PVFS_mgmt_toggle_admin_mode(
-    PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     int on_flag)
 {

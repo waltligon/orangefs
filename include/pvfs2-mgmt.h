@@ -102,7 +102,6 @@ int PVFS_mgmt_perf_mon_list(
     int history_count);
 
 int PVFS_mgmt_toggle_admin_mode(
-    PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     int on_flag);
 
