@@ -40,11 +40,6 @@ enum job_flags
 	JOB_NO_IMMED_COMPLETE = 1
 };
 
-/* TODO: remove this #define and rename the _HACK function to its
- * rightful name, when the server code is ready for the change 
- */
-#define job_bmi_unexp(a,b,c,d) job_bmi_unexp_HACK(a,b,c,d,0)
-
 /******************************************************************
  * management functions 
  */
@@ -111,7 +106,7 @@ int job_bmi_recv_list(
 	job_id_t* id);
 
 /* unexpected network receive */
-int job_bmi_unexp_HACK(
+int job_bmi_unexp(
 	struct BMI_unexpected_info* bmi_unexp_d,
 	void* user_ptr,
 	job_status_s* out_status_p,

@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 
 
 	/* post a job for unexpected receive */
-	ret = job_bmi_unexp(&req_info, NULL, &status1, &job_id);
+	ret = job_bmi_unexp(&req_info, NULL, &status1, &job_id, 0);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_unexp() failure.\n");

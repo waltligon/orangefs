@@ -251,15 +251,6 @@ int main(int argc, char **argv) {
 			PINT_server_get_bmi_unexp_err(ret);
 			server_shutdown(server_level_init,ret,0);
 		} /* fi */
-		if (ret == 1)
-		{
-			ret = PINT_state_machine_initialize_unexpected(s_op,&job_status_structs[i]); 
-			while(ret == 1)
-			{
-				ret = PINT_state_machine_next(completed_job_pointers[i],&job_status_structs[i]);
-			}
-			gossip_debug(SERVER_DEBUG,"BMI_unexp Completed\n");
-		} /* fi */
 	} /* End of BMI Unexpected Requests rof */
 
 	server_level_init++;
@@ -313,8 +304,6 @@ int main(int argc, char **argv) {
 			s_op = (PINT_server_op *) completed_job_pointers[i];
 			if(s_op->op == BMI_UNEXP)
 			{
-
-doWorkUnexp:
 #ifdef DEBUG
 				if(Temp_Jobs_Complete_Debug++ == Temp_Check_Out_Debug)
 					server_shutdown(server_level_init,-1,0);
@@ -344,9 +333,15 @@ doWorkUnexp:
 			{
 				postBMIFlag = 0;
 				ret = PINT_server_cp_bmi_unexp(s_op,&job_status_structs[i]);
-				if(ret == 1)
+				if(ret < 0)
 				{
-					goto doWorkUnexp;
+					/* TODO: do something here, the return value was
+					 * not being checked for failure before.  I just
+					 * put something here to make it exit for the
+					 * moment.  -Phil
+					 */
+					gossip_lerr("Error: NOT HANDLED.\n");
+					exit(-1);
 				}
 			}
 
@@ -517,15 +512,27 @@ int PINT_server_cp_bmi_unexp(PINT_server_op *serv_op, job_status_s *temp_stat)
 		return(-2);
 	}
 
-	ret = job_bmi_unexp(serv_op->unexp_bmi_buff,serv_op,temp_stat,&jid);
+	/* TODO:
+	 * Consider optimizations later, so that we don't have to
+	 * disable immediate completion.  See the mailing list thread
+	 * started here:
+	 *
+	 * http://www.beowulf-underground.org/pipermail/pvfs2-internal/2003-February/000305.html
+	 * 
+	 * At the moment, the server cannot handle immediate completion
+	 * in this part of the code.
+	 * -Phil
+	 */
+	ret = job_bmi_unexp(serv_op->unexp_bmi_buff,
+		serv_op,
+		temp_stat,
+		&jid,
+		JOB_NO_IMMED_COMPLETE);
 	if(ret < 0)
 	{
 		return(-4);
 	}
-	if(ret == 1)
-	{
-		// WE NEED TO submit to check dep;
-	}
+
 	return(0);
 }
 
