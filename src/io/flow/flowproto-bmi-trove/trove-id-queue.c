@@ -232,7 +232,6 @@ int trove_id_queue_query(trove_id_queue_p queue,
     {
 	if(!qlist_empty(&(queue[i].trove_id_queue)))
 	{
-	    *query_offset = i+1;
 	    qlist_for_each(iterator, &(queue[i].trove_id_queue))
 	    {
 		tmp_entry = qlist_entry(iterator, struct trove_id_entry,
@@ -240,11 +239,13 @@ int trove_id_queue_query(trove_id_queue_p queue,
 		array[current_index] = tmp_entry->trove_id;
 		current_index++;
 		if(current_index == *count)
-		    return(0);
+		    break;
 	    }
+	    *query_offset = i+1;
+	    *count = current_index;
+	    *coll_id = queue[i].coll_id;
+	    return(0);
 	}
-	*count = current_index;
-	return(0);
     }
 
     return(-EAGAIN);

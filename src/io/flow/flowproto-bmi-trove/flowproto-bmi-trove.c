@@ -9,13 +9,14 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "gossip.h"
 #include "trove-types.h"
 #include "flow.h"
 #include "flowproto-support.h"
 #include "quicklist.h"
-#include "op-id-queue.h"
+#include "trove-id-queue.h"
 #include "trove-proto.h"
 #include "pvfs-request.h"
 
@@ -97,9 +98,6 @@ static int flowproto_bmi_trove_id = -1;
 /* max number of discontig regions we will handle at once */
 #define MAX_REGIONS 16
 
-/* TODO: this is temporary */
-static PVFS_fs_id HACK_global_fsid = -1;
-
 /* bmi context */
 static bmi_context_id global_bmi_context = -1;
 
@@ -118,7 +116,8 @@ static int bmi_pending_count = 0;
 static PVFS_ds_id *trove_op_array = NULL;
 static int trove_op_array_len = 0;
 /* continuously updated list of trove ops in flight */
-static op_id_queue_p trove_inflight_queue;
+static trove_id_queue_p trove_inflight_queue;
+static int trove_pending_count = 0;
 
 /* queue of flows that that have either completed or need service but 
  * have not yet been passed back by flow_proto_checkXXX()
@@ -285,7 +284,7 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
     }
 
     /* setup our queues to track low level operations */
-    trove_inflight_queue = op_id_queue_new();
+    trove_inflight_queue = trove_id_queue_new();
     if (!trove_inflight_queue)
     {
 	BMI_close_context(global_bmi_context);
@@ -311,7 +310,7 @@ int flowproto_bmi_trove_finalize(void)
     }
     trove_op_array_len = 0;
 
-    op_id_queue_cleanup(trove_inflight_queue);
+    trove_id_queue_cleanup(trove_inflight_queue);
 
     BMI_close_context(global_bmi_context);
 
@@ -440,6 +439,8 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     int incount = *count;
     PVFS_ds_id *trove_op_array = NULL;
     int split_idle_time_ms = max_idle_time_ms;
+    int query_offset = 0;
+    PVFS_coll_id tmp_coll_id;
 
     /* TODO: do something more clever with the max_idle_time_ms
      * argument.  For now we just split it evenly among the
@@ -463,16 +464,8 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     {
 	return (-ENOMEM);
     }
-
-    ret = op_id_queue_query(trove_inflight_queue, trove_op_array, &trove_count,
-			    TROVE_OP_ID);
-    if (ret < 0)
-    {
-	return (ret);
-    }
-
     /* divide up the idle time if we need to */
-    if (max_idle_time_ms && bmi_pending_count && trove_count)
+    if (max_idle_time_ms && bmi_pending_count && trove_pending_count)
     {
 	split_idle_time_ms = max_idle_time_ms / 2;
 	if (!split_idle_time_ms)
@@ -511,45 +504,58 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     }
 
     /* manage in flight trove operations */
-    if (trove_count > 0)
+    if (trove_pending_count > 0)
     {
-	trove_error_code_array = alloca(sizeof(PVFS_ds_state) * trove_count);
-	trove_index_array = alloca(sizeof(int) * trove_count);
-	trove_usrptr_array = alloca(sizeof(void *) * trove_count);
-	if (!trove_error_code_array || !trove_index_array ||
-	    !trove_usrptr_array)
+	trove_count = incount;
+	while((ret = trove_id_queue_query(trove_inflight_queue, trove_op_array, 
+	    &trove_count, &query_offset, &tmp_coll_id)) == 0)
 	{
-	    return (-ENOMEM);
-	}
-
-	/* test for completion */
-	ret = trove_dspace_testsome(HACK_global_fsid, trove_op_array,
-				    &trove_count, trove_index_array, NULL,
-				    trove_usrptr_array, trove_error_code_array);
-	if (ret < 0)
-	{
-	    /* TODO: cleanup properly */
-	    gossip_lerr("Error: unimplemented condition encountered.\n");
-	    exit(-1);
-	    return (ret);
-	}
-
-	/* handle each completed trove operation */
-	for (i = 0; i < trove_count; i++)
-	{
-	    active_flowd = trove_completion(trove_error_code_array[i],
-					    trove_usrptr_array[i]);
-	    op_id_queue_del(trove_inflight_queue,
-			    &trove_op_array[trove_index_array[i]], TROVE_OP_ID);
-
-	    /* put flows into done_checking_queue if needed */
-	    if (active_flowd->state & FLOW_FINISH_MASK ||
-		active_flowd->state == FLOW_SVC_READY)
+	    /* TODO: this is stupid.  Make these fixed size arrays */
+	    trove_error_code_array = malloc(sizeof(PVFS_ds_state) * trove_count);
+	    trove_index_array = malloc(sizeof(int) * trove_count);
+	    trove_usrptr_array = malloc(sizeof(void *) * trove_count);
+	    if (!trove_error_code_array || !trove_index_array ||
+		!trove_usrptr_array)
 	    {
-		qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
-			       &done_checking_queue);
+		return (-ENOMEM);
 	    }
+
+	    /* test for completion */
+	    ret = trove_dspace_testsome(tmp_coll_id, trove_op_array,
+					&trove_count, trove_index_array, NULL,
+					trove_usrptr_array, trove_error_code_array);
+	    if (ret < 0)
+	    {
+		/* TODO: cleanup properly */
+		gossip_lerr("Error: unimplemented condition encountered.\n");
+		exit(-1);
+		return (ret);
+	    }
+
+	    /* handle each completed trove operation */
+	    for (i = 0; i < trove_count; i++)
+	    {
+		active_flowd = trove_completion(trove_error_code_array[i],
+						trove_usrptr_array[i]);
+		trove_id_queue_del(trove_inflight_queue,
+				trove_op_array[trove_index_array[i]], 
+				tmp_coll_id);
+		trove_pending_count--;
+
+		/* put flows into done_checking_queue if needed */
+		if (active_flowd->state & FLOW_FINISH_MASK ||
+		    active_flowd->state == FLOW_SVC_READY)
+		{
+		    qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
+				   &done_checking_queue);
+		}
+	    }
+	    trove_count = incount;
+	    free(trove_error_code_array);
+	    free(trove_index_array);
+	    free(trove_usrptr_array);
 	}
+	assert(ret == -EAGAIN);    
     }
 
     /* collect flows out of the done_checking_queue and return */
@@ -1180,14 +1186,12 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 	     flow_d->dest.endpoint_id == BMI_ENDPOINT)
     {
 	flow_data->type = TROVE_TO_BMI;
-	HACK_global_fsid = flow_d->src.u.trove.coll_id;
 	ret = buffer_setup_trove_to_bmi(flow_d);
     }
     else if (flow_d->src.endpoint_id == BMI_ENDPOINT &&
 	     flow_d->dest.endpoint_id == TROVE_ENDPOINT)
     {
 	flow_data->type = BMI_TO_TROVE;
-	HACK_global_fsid = flow_d->dest.u.trove.coll_id;
 	ret = buffer_setup_bmi_to_trove(flow_d);
     }
     else
@@ -1512,8 +1516,9 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	    flow_d->state = FLOW_TRANSMITTING;
 	    flow_data->drain_buffer_state = BUF_DRAINING;
 	    /* keep up with the trove id */
-	    if ((ret = op_id_queue_add(trove_inflight_queue,
-				       &flow_data->trove_id, TROVE_OP_ID)) < 0)
+	    if ((ret = trove_id_queue_add(trove_inflight_queue,
+				       flow_data->trove_id,
+				       flow_d->dest.u.trove.coll_id)) < 0)
 	    {
 		/* lost track of the id */
 		flow_d->state = FLOW_ERROR;
@@ -1522,6 +1527,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 		gossip_lerr("Error: unimplemented condition encountered.\n");
 		exit(-1);
 	    }
+	    trove_pending_count++;
 	}
 	else
 	{
@@ -1680,8 +1686,9 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	    flow_d->state = FLOW_TRANSMITTING;
 	    flow_data->fill_buffer_state = BUF_FILLING;
 	    /* keep up with the trove id */
-	    if ((ret = op_id_queue_add(trove_inflight_queue,
-				       &flow_data->trove_id, TROVE_OP_ID)) < 0)
+	    if ((ret = trove_id_queue_add(trove_inflight_queue,
+				       flow_data->trove_id,
+				       flow_d->src.u.trove.coll_id)) < 0)
 	    {
 		/* lost track of the id */
 		flow_d->state = FLOW_ERROR;
@@ -1690,6 +1697,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 		gossip_lerr("Error: unimplemented condition encountered.\n");
 		exit(-1);
 	    }
+	    trove_pending_count++;
 	}
 	else
 	{
