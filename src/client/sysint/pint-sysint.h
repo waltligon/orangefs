@@ -18,7 +18,6 @@
 #include <pvfs2-attr.h>
 #include <gossip.h>
 #include <job.h>
-#include <job-client-helper.h>
 #include <bmi.h>
 #include <pvfs2-sysint.h>
 
