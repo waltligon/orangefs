@@ -12,3 +12,4 @@ else
 	$(srcdir)/maint/trove-autogen.pl < $< > $@
 endif
 
+CLEANFILES += $(DIR)/trove-autogen.c
