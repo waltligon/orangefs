@@ -826,9 +826,18 @@ int pvfs2_remove_entry(
 	   the status value tells us if it went through ok or not
 	 */
 	ret = new_op->downcall.status;
-        if (ret == -PVFS_ENOTEMPTY)
+        switch(ret)
         {
-            ret = -ENOTEMPTY;
+            case -PVFS_ENOTEMPTY:
+                ret = -ENOTEMPTY;
+                break;
+            case 0:
+                /*
+                  adjust the readdir token if in fact we're
+                  in the middle of a readdir for this directory
+                */
+                parent->readdir_token_adjustment++;
+                break;
         }
 
       error_exit:

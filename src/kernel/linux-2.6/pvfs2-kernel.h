@@ -129,7 +129,7 @@ typedef struct
 typedef struct
 {
     PVFS_pinode_reference refn;
-    PVFS_ds_position readdir_token;
+    PVFS_ds_position readdir_token_adjustment;
     char *link_target;
     struct inode vfs_inode;
     sector_t last_failed_block_index_read;

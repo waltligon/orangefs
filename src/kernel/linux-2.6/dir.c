@@ -48,6 +48,15 @@ static int pvfs2_readdir(
 
     pos = (PVFS_ds_position)file->f_pos;
 
+    /*
+      reset the token adjustment when starting to read a directory
+      from the beginning
+    */
+    if (pos == 0)
+    {
+        pvfs2_inode->readdir_token_adjustment = 0;
+    }
+
     pvfs2_print("pvfs2: pvfs2_readdir called on %s (pos = %d)\n",
 		dentry->d_name.name, (int)pos);
 
@@ -106,9 +115,25 @@ static int pvfs2_readdir(
 
 	   so the proper pvfs2 position is (pos - 2), except where
 	   pos == 0.  In that case, pos is PVFS_READDIR_START.
+
+           the token adjustment is for the case where files or
+           directories are being removed between calls to readdir.
+           while we're progressing through the directory, our issued
+           upcall offset needs to be adjusted less the number of
+           objects in this directory that were removed.
         */
 	new_op->upcall.req.readdir.token =
             (pos == 2 ? PVFS_READDIR_START : (pos - 2));
+        if (new_op->upcall.req.readdir.token != PVFS_READDIR_START)
+        {
+            new_op->upcall.req.readdir.token -=
+                pvfs2_inode->readdir_token_adjustment;
+            if (new_op->upcall.req.readdir.token == 0)
+            {
+                new_op->upcall.req.readdir.token =
+                    PVFS_READDIR_START;
+            }
+        }
 
         service_operation_with_timeout_retry(
             new_op, "pvfs2_readdir", retries);
@@ -122,9 +147,6 @@ static int pvfs2_readdir(
 	    int i = 0, len = 0;
 	    ino_t current_ino = 0;
 	    char *current_entry = NULL;
-
-	    /* store the position token */
-	    pvfs2_inode->readdir_token = new_op->downcall.resp.readdir.token;
 
 	    for (i = 0; i < new_op->downcall.resp.readdir.dirent_count; i++)
 	    {
