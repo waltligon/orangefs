@@ -225,7 +225,6 @@ static int pvfs2_symlink(
 
     if (inode)
     {
-        dir->i_nlink++;
         ret = 0;
     }
     return ret;
