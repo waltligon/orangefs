@@ -41,7 +41,9 @@ static int lookup(char *name, int fs_id)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    if ((ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup)) < 0)
+    if ((ret = PVFS_sys_lookup(
+             fs_id, name, credentials,
+             &resp_lookup, LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
         return ret;
@@ -70,7 +72,9 @@ static int getattr(char *name, int fs_id)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    if ((ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup)) < 0)
+    if ((ret = PVFS_sys_lookup(
+             fs_id, name, credentials,
+             &resp_lookup, LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
         return ret;
@@ -103,7 +107,8 @@ static int remove_file_dir(char *name, int fs_id)
     credentials.uid = 100;
     credentials.gid = 100;
 
-    ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_look);
+    ret = PVFS_sys_lookup(fs_id, name, credentials,
+                          &resp_look, LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
@@ -137,7 +142,9 @@ static int list_dir(char *test_dir, int fs_id)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    if ((ret = PVFS_sys_lookup(fs_id, test_dir, credentials, &resp_lookup)) < 0)
+    if ((ret = PVFS_sys_lookup(
+             fs_id, test_dir, credentials,
+             &resp_lookup, LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
         return -1;
@@ -178,7 +185,8 @@ static int create_file(char *filename, char *directory, int fs_id)
     credentials.uid = 100;
     credentials.gid = 100;
 
-    ret = PVFS_sys_lookup(fs_id, directory, credentials, &resp_look);
+    ret = PVFS_sys_lookup(fs_id, directory, credentials,
+                          &resp_look, LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
@@ -211,7 +219,9 @@ static int create_dir2(char *name, int fs_id)
 
     credentials.uid = 100;
     credentials.gid = 100;
-    if ((ret = PVFS_sys_lookup(fs_id, "/", credentials, &resp_lookup)) < 0)
+    if ((ret = PVFS_sys_lookup(
+             fs_id, "/", credentials,
+             &resp_lookup, LOOKUP_LINK_NO_FOLLOW)) < 0)
     {
         fprintf(stderr, "lookup failed %d\n", ret);
         return -1;

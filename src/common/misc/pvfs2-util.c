@@ -254,7 +254,8 @@ int PVFS_util_lookup_parent(
 	return (-EINVAL);
     }
 
-    ret = PVFS_sys_lookup(fs_id, buf, credentials, &resp_look);
+    ret = PVFS_sys_lookup(fs_id, buf, credentials,
+                          &resp_look, LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
 	gossip_err("Lookup failed on %s\n", buf);

@@ -56,7 +56,8 @@ int main(int argc, char **argv)
 
     printf("about to lookup %s\n", filename);
 
-    ret = PVFS_sys_lookup(fs_id, filename, credentials, &resp_look);
+    ret = PVFS_sys_lookup(fs_id, filename, credentials,
+                          &resp_look, LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
         fprintf(stderr, "Lookup failed with errcode = %d\n", ret);

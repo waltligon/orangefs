@@ -168,18 +168,37 @@ int PVFS_sys_initialize(
 int PVFS_sys_finalize(
     void);
 
+/*
+  NOTE: the following values are to be used by
+  PVFS_sys(.*)_lookup as the "follow_link" argument.
+
+  All symlinks are resolved if they are part of a
+  longer pathname. (i.e. partial path symlink resolution)
+
+  These values dictate what to do when the final object
+  looked up is a symlink.  Using LOOKUP_LINK_NO_FOLLOW,
+  the symlink object (i.e. handle) will be returned.
+  Using LOOKUP_LINK_FOLLOW, the symlink target will be
+  continue to be resolved until a non symlink object type
+  is resolved -- and this resolved object will be returned
+*/
+#define LOOKUP_LINK_NO_FOLLOW 0
+#define LOOKUP_LINK_FOLLOW    1
+
 int PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,
     char *relative_pathname,
     PVFS_pinode_reference parent,
     PVFS_credentials credentials,
-    PVFS_sysresp_lookup * resp);
+    PVFS_sysresp_lookup * resp,
+    int follow_link);
 
 int PVFS_sys_lookup(
     PVFS_fs_id fs_id,
     char *name,
     PVFS_credentials credentials,
-    PVFS_sysresp_lookup * resp);
+    PVFS_sysresp_lookup * resp,
+    int follow_link);
 
 int PVFS_sys_getattr(
     PVFS_pinode_reference pinode_refn,

@@ -69,7 +69,8 @@ static int service_lookup_request(
         ret = PVFS_sys_ref_lookup(parent_refn.fs_id,
                                   in_upcall->req.lookup.d_name,
                                   parent_refn, in_upcall->credentials,
-                                  &response);
+                                  &response,
+                                  in_upcall->req.lookup.sym_follow);
         if (ret < 0)
         {
             gossip_debug(
@@ -146,7 +147,8 @@ static int service_create_request(
                                           in_upcall->req.create.d_name,
                                           parent_refn,
                                           in_upcall->credentials,
-                                          &lk_response);
+                                          &lk_response,
+                                          LOOKUP_LINK_NO_FOLLOW);
                 if (ret != 0)
                 {
                     gossip_err("lookup on existing file failed; "

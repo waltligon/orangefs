@@ -52,14 +52,16 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
                  TEST_FILE_PREFIX,i,myid);
 
         ret = PVFS_sys_lookup(pvfs_helper.resp_init.fsid_list[0],
-                              filename, credentials, &resp_lk);
+                              filename, credentials, &resp_lk,
+                              LOOKUP_LINK_NO_FOLLOW);
         if (ret < 0)
         {
             debug_printf("init: lookup failed.  creating new file.\n");
 
             /* get root handle */
             ret = PVFS_sys_lookup(pvfs_helper.resp_init.fsid_list[0],
-                                  "/", credentials, &resp_lk);
+                                  "/", credentials, &resp_lk,
+                                  LOOKUP_LINK_NO_FOLLOW);
             if ((ret < 0) || (!resp_lk.pinode_refn.handle))
             {
                 debug_printf("Error: PVFS_sys_lookup() failed to find "

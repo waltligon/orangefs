@@ -121,7 +121,8 @@ int do_list(
     credentials.uid = 0;
     credentials.gid = 0;
 
-    if (PVFS_sys_lookup(fs_id, name, credentials, &lk_response))
+    if (PVFS_sys_lookup(fs_id, name, credentials,
+                        &lk_response, LOOKUP_LINK_NO_FOLLOW))
     {
         fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
                 start_dir,init_response->fsid_list[0]);

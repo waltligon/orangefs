@@ -42,7 +42,8 @@ int test_pvfs_datatype_vector(MPI_Comm *mycomm, int myid, char *buf, void *param
 
         memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
         ret = PVFS_sys_lookup(pvfs_helper.resp_init.fsid_list[0],
-                              filename, credentials, &resp_lk);
+                              filename, credentials, &resp_lk,
+                              LOOKUP_LINK_NO_FOLLOW);
         if (ret < 0)
         {
             debug_printf("test_pvfs_datatype_vector: lookup failed "

@@ -23,6 +23,7 @@ int main(int argc,char **argv)
 	char *filename;
 	int name_sz;
 	int ret = -1;
+        int follow_link = LOOKUP_LINK_NO_FOLLOW;
 	pvfs_mntlist mnt = {0,NULL};
 	PVFS_fs_id fs_id;
 	char* name;
@@ -33,9 +34,17 @@ int main(int argc,char **argv)
 
 	if (argc != 2)
 	{
-		printf("USAGE: %s /path/to/lookup\n", argv[0]);
-                return 1;
+            if ((argc == 3) && (atoi(argv[2]) == 1))
+            {
+                follow_link = LOOKUP_LINK_FOLLOW;
+                goto lookup_continue;
+            }
+            printf("USAGE: %s /path/to/lookup [ 1 ]\n", argv[0]);
+            printf(" -- if '1' is the last argument, links "
+                   "will be followed\n");
+            return 1;
 	}
+  lookup_continue:
 	name_sz = strlen(argv[1]) + 1; /*include null terminator*/
 	filename = malloc(name_sz);
         assert(filename);
@@ -64,7 +73,8 @@ int main(int argc,char **argv)
 	name[1] = '\0';
 	fs_id = resp_init.fsid_list[0];
 	printf("looking up the root handle for fsid = %d\n", fs_id);
-	ret = PVFS_sys_lookup(fs_id, name, credentials,&resp_look);
+	ret = PVFS_sys_lookup(fs_id, name, credentials,
+                              &resp_look, LOOKUP_LINK_NO_FOLLOW);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
@@ -80,7 +90,8 @@ int main(int argc,char **argv)
 	credentials.uid = 100;
 	credentials.gid = 100;
 
-	ret = PVFS_sys_lookup(fs_id, filename, credentials, &resp_lk);
+	ret = PVFS_sys_lookup(fs_id, filename, credentials,
+                              &resp_lk, follow_link);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);

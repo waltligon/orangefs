@@ -418,7 +418,8 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     PVFS_sysresp_getattr getattr_resp;
     PVFS_pinode_reference pref;
 
-    PVFS_sys_lookup(cur_fs, "/", creds, &lookup_resp);
+    PVFS_sys_lookup(cur_fs, "/", creds,
+                    &lookup_resp, LOOKUP_LINK_NO_FOLLOW);
     /* lookup_resp.pinode_refn.handle gets root handle */
     pref = lookup_resp.pinode_refn;
 

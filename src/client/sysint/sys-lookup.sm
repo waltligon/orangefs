@@ -126,7 +126,8 @@ int PVFS_sys_ref_lookup(
     char* relative_pathname,
     PVFS_pinode_reference parent,
     PVFS_credentials credentials,
-    PVFS_sysresp_lookup *resp)
+    PVFS_sysresp_lookup *resp,
+    int follow_link)
 {
     int ret = -PVFS_EINVAL, pathlen = 0, num_segments = 0;
     PINT_client_sm *sm_p = NULL;
@@ -171,6 +172,7 @@ int PVFS_sys_ref_lookup(
     sm_p->u.lookup.orig_pathname = relative_pathname;
     sm_p->u.lookup.starting_refn = parent;
     sm_p->u.lookup.lookup_resp = resp;
+    sm_p->u.lookup.follow_link = follow_link;
     sm_p->u.lookup.num_segments = num_segments;
     sm_p->u.lookup.remaining_pathname = (char *)
         malloc(sizeof(char) * PVFS_SEGMENT_MAX);
@@ -209,7 +211,8 @@ int PVFS_sys_ref_lookup(
 int PVFS_sys_lookup(
     PVFS_fs_id fs_id, char* name,
     PVFS_credentials credentials,
-    PVFS_sysresp_lookup *resp)
+    PVFS_sysresp_lookup *resp,
+    int follow_link)
 {
     int ret = -EINVAL;
     PVFS_pinode_reference parent;
@@ -246,7 +249,7 @@ int PVFS_sys_lookup(
             */
             char *path = ((name[0] == '/') ? &name[1] : name);
             ret = PVFS_sys_ref_lookup(fs_id, path, parent,
-                                      credentials, resp);
+                                      credentials, resp, follow_link);
         }
     }
     return ret;
@@ -272,6 +275,7 @@ static int lookup_check_completion(PINT_client_sm *sm_p,
     gossip_debug(CLIENT_DEBUG,
                  "lookup state: lookup_check_completion\n");
 
+
     /*
       at this point we hit one of several cases:
       1) the lookup_msg_comp_fn saw a symlink and we need to
@@ -280,7 +284,7 @@ static int lookup_check_completion(PINT_client_sm *sm_p,
       3) need to query another meta server to continue resolution
       4) error, bad lookup (entry cannot be resolved)
     */
-    if (sm_p->u.lookup.resolve_symlink)
+    if (sm_p->u.lookup.resolve_symlink == LOOKUP_LINK_FOLLOW)
     {
         js_p->error_code = LOOKUP_SYMLINK;
         sm_p->u.lookup.resolve_symlink = 0;
@@ -492,7 +496,6 @@ static int lookup_msg_comp_fn(void *v_p,
             sm_p->u.lookup.symlink_refn.handle =
                 resp_p->u.lookup_path.handle_array[
                     resp_p->u.lookup_path.handle_count - 1];
-
             /* FIXME: assuming fs_id same as starting point */
             sm_p->u.lookup.symlink_refn.fs_id =
                 sm_p->u.lookup.starting_refn.fs_id;
@@ -515,11 +518,16 @@ static int lookup_msg_comp_fn(void *v_p,
             }
 
             /*
-              given the pinode_refn of the current symlink, our
               check_completion routine will take care of the rest
               as long as we set this flag
             */
-            sm_p->u.lookup.resolve_symlink = 1;
+            sm_p->u.lookup.resolve_symlink = sm_p->u.lookup.follow_link;
+            if (sm_p->u.lookup.resolve_symlink == LOOKUP_LINK_NO_FOLLOW)
+            {
+                /* store final symlink refn into respose */
+                sm_p->u.lookup.lookup_resp->pinode_refn =
+                    sm_p->u.lookup.symlink_refn;
+            }
             return 1;
         }
 
@@ -627,12 +635,6 @@ static int lookup_msg_comp_fn(void *v_p,
               resp_p->u.lookup_path.handle_count) &&
              (resp_p->u.lookup_path.attr_count > 0))
     {
-        /*
-          if we've hit a symlink, just set the resolve_symlink flag
-          so that the check_completion routine knows what to do.
-          otherwise if we haven't hit a symlink, overwrite the remaining
-          pathname with the newly remaining pathname.
-        */
         if (resp_p->u.lookup_path.attr_array[
                 resp_p->u.lookup_path.attr_count - 1].objtype ==
             PVFS_TYPE_SYMLINK)

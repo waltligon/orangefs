@@ -200,6 +200,7 @@ struct PINT_client_lookup_sm {
     char                         *orig_pathname;/* input parameter */
     PVFS_pinode_reference        starting_refn; /* input parameter */
     PVFS_sysresp_lookup          *lookup_resp;  /* in/out parameter*/
+    int                          follow_link;   /* input paramter */
     int                          num_segments;
     char                         *remaining_pathname;
     PVFS_pinode_reference        remaining_starting_refn;

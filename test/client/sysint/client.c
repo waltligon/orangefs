@@ -83,7 +83,8 @@ int main(int argc,char **argv)
 	name[1] = '\0';
 	fs_id = resp_init.fsid_list[0];
 	printf("looking up the root handle for fsid = %d\n", fs_id);
-	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_look);
+	ret = PVFS_sys_lookup(fs_id, name, credentials,
+                              &resp_look, LOOKUP_LINK_NO_FOLLOW);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
@@ -216,7 +217,8 @@ int main(int argc,char **argv)
 	name[0] = '/';
 	memcpy(name + 1,filename,strlen(filename) + 1 );
 
-	ret = PVFS_sys_lookup(fs_id, name, credentials, resp_lk);
+	ret = PVFS_sys_lookup(fs_id, name, credentials,
+                              resp_lk, LOOKUP_LINK_NO_FOLLOW);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);

@@ -103,7 +103,8 @@ int main(int argc,char **argv)
 	credentials.uid = getuid();
 	credentials.gid = getgid();
 
-	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lk);
+	ret = PVFS_sys_lookup(fs_id, name, credentials,
+                              &resp_lk, LOOKUP_LINK_NO_FOLLOW);
 	/* TODO: really we probably want to look for a specific error code,
 	 * like maybe ENOENT?
 	 */
@@ -117,7 +118,8 @@ int main(int argc,char **argv)
 		credentials.uid = getuid();
 		credentials.gid = getgid();
 
-		ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lk);
+		ret = PVFS_sys_lookup(fs_id, name, credentials,
+                                      &resp_lk, LOOKUP_LINK_NO_FOLLOW);
 		if(ret < 0)
 		{
 			fprintf(stderr, "Error: PVFS_sys_lookup() failed to find root handle.\n");

@@ -32,7 +32,8 @@ int create_file(PVFS_fs_id fs_id,
     credentials.uid = getuid();
     credentials.gid = getgid();
 
-    ret = PVFS_sys_lookup(fs_id, dirname, credentials, &resp_look);
+    ret = PVFS_sys_lookup(fs_id, dirname, credentials,
+                          &resp_look, LOOKUP_LINK_NO_FOLLOW);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);

@@ -447,7 +447,8 @@ int do_list(
     credentials.gid = 0;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
-    if (PVFS_sys_lookup(fs_id, name, credentials, &lk_response))
+    if (PVFS_sys_lookup(fs_id, name, credentials,
+                        &lk_response, LOOKUP_LINK_NO_FOLLOW))
     {
         fprintf(stderr, "%s: %s: No such file or directory\n",
                 process_name, name);
