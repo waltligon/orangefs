@@ -1865,6 +1865,8 @@ int process_vfs_requests(void)
 int main(int argc, char **argv)
 {
     int ret = 0, i = 0;
+    time_t start_time;
+    struct tm *local_time = NULL;
 
 #ifndef STANDALONE_RUN_MODE
     struct rlimit lim = {0,0};
@@ -1902,6 +1904,16 @@ int main(int argc, char **argv)
     {
         return ret;
     }
+
+    start_time = time(NULL);
+    local_time = localtime(&start_time);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "***************************************************\n"
+                 " %s starting at %.4d-%.2d-%.2d %.2d:%.2d\n"
+                 "***************************************************\n",
+                 argv[0], (local_time->tm_year + 1900),
+                 local_time->tm_mon, local_time->tm_mday,
+                 local_time->tm_hour, local_time->tm_min);
 
 #ifdef USE_MMAP_RA_CACHE
     pvfs2_mmap_ra_cache_initialize();
