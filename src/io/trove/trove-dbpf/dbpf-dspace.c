@@ -16,18 +16,22 @@
 #include <trove.h>
 #include <trove-internal.h>
 #include <dbpf.h>
+#include <dbpf-dspace.h>
 #include <dbpf-op-queue.h>
 #include <trove-ledger.h>
 
 /* TODO: move both of these into header file? */
 extern struct dbpf_collection *my_coll_p;
-extern TROVE_handle dbpf_last_handle;
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
+static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
 
-/* TODO: should this have a ds_attributes with it? */
+/* dbpf_dspace_create()
+ *
+ * TODO: should this have a ds_attributes with it?
+ */
 int dbpf_dspace_create(TROVE_coll_id coll_id,
 		       TROVE_handle *handle_p,
 		       TROVE_handle bitmask,
@@ -36,30 +40,68 @@ int dbpf_dspace_create(TROVE_coll_id coll_id,
 		       void *user_ptr,
 		       TROVE_op_id *out_op_id_p)
 {
-    int ret;
+    struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
-    TROVE_ds_storedattr_s s_attr;
-    TROVE_handle new_handle;
-    DBT key, data;
-    
-    /* TODO: search for collection using coll_id */
+
     coll_p = my_coll_p;
     if (coll_p == NULL) return -1;
 
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL) return -1;
+
+    /* initialize all the common members */
+    dbpf_queued_op_init(q_op_p,
+			DSPACE_CREATE,
+			*handle_p,
+			coll_p,
+			dbpf_dspace_remove_op_svc,
+			user_ptr);
+
+    /* no op-specific members here */
+    q_op_p->op.u.d_create.out_handle_p = handle_p;
+    q_op_p->op.u.d_create.bitmask      = bitmask;
+    q_op_p->op.u.d_create.type         = type;
+
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    return 0;
+}
+
+int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
+{
+    int ret;
+    TROVE_ds_storedattr_s s_attr;
+    TROVE_handle new_handle;
+    DBT key, data;
+    DB *db_p;
+    
+    /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
+    ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
+    switch (ret) {
+	case DBPF_DSPACE_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_DSPACE_DBCACHE_BUSY:
+	    return 0; /* try again later */
+	case DBPF_DSPACE_DBCACHE_SUCCESS:
+	    /* drop through */
+    }
+
     /* TODO: REDO BUCKETS!!!! */
-    new_handle = trove_handle_get(coll_p->free_handles, *handle_p, bitmask);
+    new_handle = trove_handle_alloc(op_p->coll_p->free_handles,
+				    op_p->handle,
+				    op_p->u.d_create.bitmask);
     
     printf("new handle = %Lu (%Lx).\n", new_handle, new_handle);
 
-    s_attr.type = type;
+    s_attr.type = op_p->u.d_create.type;
 
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
     key.data = &new_handle;
     key.size = sizeof(new_handle);
-    
+
     /* check to see if handle is already used */
-    ret = coll_p->ds_db->get(coll_p->ds_db, NULL, &key, &data, 0);
+    ret = db_p->get(db_p, NULL, &key, &data, 0);
     if (ret == 0) {
 	printf("handle already exists...\n");
 	return -1;
@@ -74,73 +116,115 @@ int dbpf_dspace_create(TROVE_coll_id coll_id,
     data.size = sizeof(s_attr);
     
     /* create new dataspace entry */
-    ret = coll_p->ds_db->put(coll_p->ds_db, NULL, &key, &data, 0);
+    ret = db_p->put(db_p, NULL, &key, &data, 0);
     if (ret != 0) {
-	return -1;
+	goto return_error;
     }
     
     /* always sync to ensure that data made it to the disk */
-    if ((ret = coll_p->ds_db->sync(coll_p->ds_db, 0)) != 0) {
-	return -1;
+    if ((ret = db_p->sync(db_p, 0)) != 0) {
+	goto return_error;
     }
     
     printf("created new dspace with above handle.\n");
     
-    *handle_p = new_handle;
-    dbpf_last_handle++;
+    *op_p->u.d_create.out_handle_p = new_handle;
     return 1;
+
+return_error:
+    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    return -1;
 }
 
 /* dbpf_dspace_remove()
- * XXX: maybe make this an op_svc()?
  */
 static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 			      TROVE_handle handle,
 			      void *user_ptr,
 			      TROVE_op_id *out_op_id_p)
 {
-	int ret;
-	struct dbpf_collection *coll_p;
-	DBT key;
+    struct dbpf_queued_op *q_op_p;
+    struct dbpf_collection *coll_p;
 
-	/* TODO: search for collection using coll_id */
-	coll_p = my_coll_p;
-	if (coll_p == NULL) return -1;
+    coll_p = my_coll_p;
+    if (coll_p == NULL) return -1;
 
-	/* whereas dspace_create has to do handle-making steps, we already know
-	 * the handle we want to wack */
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL) return -1;
 
-	memset(&key, 0, sizeof(key));
-	key.data = &handle;
-	key.size = sizeof(handle);
+    /* initialize all the common members */
+    dbpf_queued_op_init(q_op_p,
+			DSPACE_REMOVE,
+			handle,
+			coll_p,
+			dbpf_dspace_remove_op_svc,
+			user_ptr);
 
-	/* XXX: no steps taken to ensure it's empty... */
-	ret = coll_p->ds_db->del(coll_p->ds_db, NULL, &key, 0);
-	switch (ret) {
-		case 0:
-			printf("removed dataspace with handle %Ld\n", handle);
-			break;
-		case DB_NOTFOUND:
-			printf("tried to remove non-existant dataspace\n");
-			return -1;
-			break;
-		default:
-			coll_p->ds_db->err(coll_p->ds_db, ret, "dbpf_dspace_remove");
-			return -1;
-	}
+    /* no op-specific members here */
 
-	/* always sync to ensure that data made it to the disk */
-	if ( (ret = coll_p->ds_db->sync(coll_p->ds_db, 0)) != 0) {
-		coll_p->ds_db->err(coll_p->ds_db, ret, "dbpf_dspace_remove");
-		return -1;
-	}
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
-	/* return handle to free list */
-	trove_handle_put(coll_p->free_handles, handle);
-
-	return 1;
-
+    return 0;
 }
+
+/* dbpf_dspace_remove_op_svc()
+ */
+static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
+{
+    int ret;
+    DBT key;
+    DB *db_p;
+
+    /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
+    ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
+    switch (ret) {
+	case DBPF_DSPACE_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_DSPACE_DBCACHE_BUSY:
+	    return 0; /* try again later */
+	case DBPF_DSPACE_DBCACHE_SUCCESS:
+	    /* drop through */
+    }
+
+    /* whereas dspace_create has to do handle-making steps, we already know
+     * the handle we want to wack
+     */
+
+    memset(&key, 0, sizeof(key));
+    key.data = &op_p->handle;
+    key.size = sizeof(TROVE_handle);
+
+    /* XXX: no steps taken to ensure it's empty... */
+    ret = db_p->del(db_p, NULL, &key, 0);
+    switch (ret) {
+	case DB_NOTFOUND:
+	    printf("tried to remove non-existant dataspace\n");
+	    goto return_error;
+	default:
+	    db_p->err(db_p, ret, "dbpf_dspace_remove");
+	    goto return_error;
+	case 0:
+	    printf("removed dataspace with handle %Ld\n", op_p->handle);
+	    /* drop through */
+    }
+
+    /* always sync to ensure that data made it to the disk */
+    if ( (ret = db_p->sync(db_p, 0)) != 0) {
+	db_p->err(db_p, ret, "dbpf_dspace_remove");
+	goto return_error;
+    }
+
+    /* return handle to free list */
+    trove_handle_free(op_p->coll_p->free_handles, op_p->handle);
+    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    return 1;
+
+return_error:
+    trove_handle_free(op_p->coll_p->free_handles, op_p->handle);
+    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    return -1;
+}
+
 int dbpf_dspace_iterate_handles(
                                 TROVE_coll_id coll_id,
                                 TROVE_ds_position *position_p,
@@ -190,14 +274,23 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     TROVE_ds_storedattr_s s_attr;
     TROVE_handle dummy_handle;
 
-    db_p = op_p->coll_p->ds_db;
-    if (db_p == NULL) goto return_error;
- 
     if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END) {
+	/* already hit end of keyval space; return 1 */
 	*op_p->u.d_iterate_handles.count_p = 0;
 	return 1;
     }
 
+    /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
+    ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
+    switch (ret) {
+	case DBPF_DSPACE_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_DSPACE_DBCACHE_BUSY:
+	    return 0; /* try again later */
+	case DBPF_DSPACE_DBCACHE_SUCCESS:
+	    /* drop through */
+    }
+ 
     /* get a cursor */
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
     if (ret != 0) goto return_error;
@@ -296,16 +389,13 @@ return_ok:
     /* 'position' points us to the record we just read, or is set to END */
 
     *op_p->u.d_iterate_handles.count_p = i;
-
-    ret = dbc_p->c_close(dbc_p);
-    if (ret != 0) return -1;
+    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return 1;
 
 return_error:
     fprintf(stderr, "dbpf_dspace_iterate_handles_op_svc: %s\n", db_strerror(ret));
     *op_p->u.d_iterate_handles.count_p = i; 
-    dbc_p->c_close(dbc_p); /* don't check error -- we're returning an error anyway. */
-
+    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return -1;
 }
 
@@ -398,8 +488,16 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
 
-    db_p = op_p->coll_p->ds_db;
-    if (db_p == NULL) goto return_error;
+    /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
+    ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
+    switch (ret) {
+	case DBPF_DSPACE_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_DSPACE_DBCACHE_BUSY:
+	    return 0; /* try again later */
+	case DBPF_DSPACE_DBCACHE_SUCCESS:
+	    /* drop through */
+    }
 
     memset(&key, 0, sizeof(key));
     key.data = &op_p->handle;
@@ -420,11 +518,13 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     }
     /* always sync to ensure that data made it to the disk */
     if ((ret = db_p->sync(db_p, 0)) != 0) {
-	return -1;
+	goto return_error;
     }
+    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return 1; /* done */
     
 return_error:
+    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return -1;
 }
 
@@ -436,8 +536,16 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     TROVE_ds_storedattr_s s_attr;
     TROVE_size b_size = 0, k_size = 0;
 
-    db_p = op_p->coll_p->ds_db;
-    if (db_p == NULL) goto return_error;
+    /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
+    ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
+    switch (ret) {
+	case DBPF_DSPACE_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_DSPACE_DBCACHE_BUSY:
+	    return 0; /* try again later */
+	case DBPF_DSPACE_DBCACHE_SUCCESS:
+	    /* drop through */
+    }
 
     memset(&key, 0, sizeof(key));
     key.data = &op_p->handle;
@@ -458,9 +566,11 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 
     trove_ds_stored_to_attr(s_attr, (*op_p->u.d_setattr.attr_p), b_size, k_size);
 
+    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return 1; /* done */
     
 return_error:
+    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return -1;
 }
 

@@ -31,8 +31,8 @@ void trove_handle_ledger_free(struct handle_ledger *hl);
 
 /* handle_get,put - obtain, return a handle from/to a particular handle ledger.
  */
-TROVE_handle trove_handle_get(struct handle_ledger *hl, TROVE_handle requested_handle, TROVE_handle bitmask);
-int trove_handle_put(struct handle_ledger *hl, TROVE_handle handle);
+TROVE_handle trove_handle_alloc(struct handle_ledger *hl, TROVE_handle requested_handle, TROVE_handle bitmask);
+int trove_handle_free(struct handle_ledger *hl, TROVE_handle handle);
 
 /*
  * Local variables:

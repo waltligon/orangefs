@@ -20,8 +20,15 @@ void dbpf_dspace_dbcache_initialize(void);
 
 void dbpf_dspace_dbcache_finalize(void);
 
-DB *dbpf_dspace_dbcache_get(TROVE_coll_id coll_id,
-			    int create_flag);
+enum {
+    DBPF_DSPACE_DBCACHE_ERROR = -1,
+    DBPF_DSPACE_DBCACHE_BUSY = 0,
+    DBPF_DSPACE_DBCACHE_SUCCESS = 1
+};
+
+int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
+				int create_flag,
+				DB **db_pp);
 
 void dbpf_dspace_dbcache_put(TROVE_coll_id coll_id);
 

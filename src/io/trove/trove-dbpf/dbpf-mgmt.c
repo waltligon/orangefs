@@ -34,7 +34,6 @@ char dbpf_method_name[] = "dbpf";
 
 struct dbpf_collection *my_coll_p = NULL;
 struct dbpf_storage *my_storage_p = NULL;
-TROVE_handle dbpf_last_handle = 0;
 
 /* Internally used only */
 static struct dbpf_storage *dbpf_storage_lookup(char *stoname);
@@ -174,6 +173,7 @@ static int dbpf_initialize(
     
     *method_name_p = new_method_name;
     
+    dbpf_dspace_dbcache_initialize();
     dbpf_bstream_fdcache_initialize();
     dbpf_keyval_dbcache_initialize();
     
@@ -191,6 +191,7 @@ static int dbpf_finalize(void)
 
     dbpf_bstream_fdcache_finalize();
     dbpf_keyval_dbcache_finalize();
+    dbpf_dspace_dbcache_finalize();
 
     return 1;
 }
