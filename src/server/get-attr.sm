@@ -16,16 +16,16 @@ enum {
 };
 
 
-static int getattr_init(PINT_server_op *s_op, job_status_s *ret);
-static int getattr_cleanup(PINT_server_op *s_op, job_status_s *ret);
-static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret);
-static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
-static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret);
-static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret);
+static int getattr_init(PINT_server_op *s_op, job_status_s* js_p);
+static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
+static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s* js_p);
+static int getattr_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
+static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *ret);
+    PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *ret);
+    PINT_server_op *s_op, job_status_s* js_p);
 void getattr_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -98,7 +98,7 @@ machine pvfs2_get_attr_sm(init,
  * Function: getattr_init
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
@@ -109,22 +109,22 @@ machine pvfs2_get_attr_sm(init,
  */
 
 
-static int getattr_init(PINT_server_op *s_op, job_status_s *ret)
+static int getattr_init(PINT_server_op *s_op, job_status_s* js_p)
 {
 
-    int job_post_ret;
+    int ret;
 
     gossip_debug(SERVER_DEBUG, "getattr state: init\n");
 
     s_op->resp->op = s_op->req->op;
 
-    job_post_ret = job_req_sched_post(s_op->req,
+    ret = job_req_sched_post(s_op->req,
 				      s_op,
-				      ret,
+				      js_p,
 				      &(s_op->scheduled_id),
 				      PINT_server_job_context);
 
-    return(job_post_ret);
+    return(ret);
 
 }
 
@@ -133,7 +133,7 @@ static int getattr_init(PINT_server_op *s_op, job_status_s *ret)
  * Function: getattr_getobj_attrib
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
@@ -142,9 +142,9 @@ static int getattr_init(PINT_server_op *s_op, job_status_s *ret)
  *           
  */
 
-static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
+static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "getattr state: getobj_attribs\n");
@@ -165,22 +165,22 @@ static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
 					 s_op->req->u.getattr.handle,
 					 &(s_op->key),
 					 &(s_op->val),
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &i,
 					 PINT_server_job_context);
-    return(job_post_ret);
+    return(ret);
 }
 
 /* getattr_verify_attribs
  */
-static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
+static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
     PVFS_object_attr *a_p;
 
@@ -192,7 +192,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
     a_p = (PVFS_object_attr *) s_op->val.buffer;
     a_p = &s_op->resp->u.getattr.attr;
 
-    if (ret->error_code != 0)
+    if (js_p->error_code != 0)
     {
 	gossip_debug(SERVER_DEBUG, "  previous keyval read had "
                      "an error (new metafile?); data is useless\n");
@@ -211,14 +211,14 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
     }
 
     /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
-    if ((ret->error_code != 0 &&
+    if ((js_p->error_code != 0 &&
          s_op->resp->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) ||
         a_p->objtype == PVFS_TYPE_METAFILE)
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a metafile\n",
 		     s_op->req->u.getattr.handle);
-	ret->error_code = STATE_METAFILE;
+	js_p->error_code = STATE_METAFILE;
 
         if (s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
         {
@@ -232,7 +232,7 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
             /* TODO: keep distribution size in here too */
         }
     }
-    else if (ret->error_code == 0)
+    else if (js_p->error_code == 0)
     {
 	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
                      "something other than a metafile\n",
@@ -251,10 +251,10 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
 /* getattr_read_metafile_datafile_handles_if_required
  */
 static int getattr_read_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *ret)
+    PINT_server_op *s_op, job_status_s* js_p)
 {
     int dfile_count;
-    int job_post_ret;
+    int ret;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "getattr state: "
@@ -263,7 +263,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
     {
         /* if we don't need to fill in the dfiles, skip them */
-        ret->error_code = 0;
+        js_p->error_code = 0;
         return 1;
     }
     dfile_count = s_op->resp->u.getattr.attr.u.meta.dfile_count;
@@ -281,7 +281,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
     s_op->resp->u.getattr.attr.u.meta.dfile_array = malloc(dfile_count * sizeof(PVFS_handle));
     if(!s_op->resp->u.getattr.attr.u.meta.dfile_array)
     {
-	ret->error_code = -PVFS_ENOMEM;
+	js_p->error_code = -PVFS_ENOMEM;
 	return(1);
     }
 
@@ -298,32 +298,32 @@ static int getattr_read_metafile_datafile_handles_if_required(
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
 					 s_op->req->u.getattr.handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &i,
 					 PINT_server_job_context);
 
-    return job_post_ret;
+    return ret;
 }
 
 /* getattr_read_metafile_distribution_if_required
  */
 static int getattr_read_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *ret)
+    PINT_server_op *s_op, job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t i;
 
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DIST))
     {
         /* if we don't need to fill in the distribution, skip it */
-        ret->error_code = 0;
+        js_p->error_code = 0;
         return 1;
     }
 
@@ -341,31 +341,31 @@ static int getattr_read_metafile_distribution_if_required(
 	malloc(s_op->resp->u.getattr.attr.u.meta.dist_size);
     if(!s_op->resp->u.getattr.attr.u.meta.dist)
     {
-	ret->error_code = -PVFS_ENOMEM;
+	js_p->error_code = -PVFS_ENOMEM;
 	return(1);
     }
 
     s_op->val.buffer    = s_op->resp->u.getattr.attr.u.meta.dist;
     s_op->val.buffer_sz = s_op->resp->u.getattr.attr.u.meta.dist_size;
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
 					 s_op->req->u.getattr.handle,
 					 &(s_op->key),
 					 &(s_op->val),
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &i,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
  * Function: getattr_send_bmi
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
@@ -373,10 +373,10 @@ static int getattr_read_metafile_distribution_if_required(
  *           
  */
 
-static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
+static int getattr_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
 {
     PVFS_object_attr *a_p;
-    int job_post_ret=0;
+    int ret=0;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "getattr state: send_bmi\n");
@@ -407,7 +407,7 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
       fill in response -- status field is the only generic
       one we should have to set
     */
-    s_op->resp->status = ret->error_code;
+    s_op->resp->status = js_p->error_code;
 
     if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
         (a_p->mask & PVFS_ATTR_META_DFILES))
@@ -421,18 +421,18 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 		 "  sending status %d\n",
 		 s_op->resp->status);
 
-    job_post_ret = PINT_encode(s_op->resp,
+    ret = PINT_encode(s_op->resp,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
 			       s_op->decoded.enc_type);
 
-    assert(job_post_ret == 0);
+    assert(ret == 0);
 
     /* Post message */
 #ifndef PVFS2_SERVER_DEBUG_BMI
 
-    job_post_ret = job_bmi_send_list(
+    ret = job_bmi_send_list(
 				     s_op->addr,
 				     s_op->encoded.buffer_list,
 				     s_op->encoded.size_list,
@@ -442,13 +442,13 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 				     s_op->encoded.buffer_type,
 				     0,
 				     s_op, 
-				     ret, 
+				     js_p, 
 				     &i,
 				     PINT_server_job_context);
 
 #else
 
-    job_post_ret = job_bmi_send(
+    ret = job_bmi_send(
 				s_op->addr,
 				s_op->encoded.buffer_list[0],
 				s_op->encoded.total_size,
@@ -456,12 +456,12 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 				s_op->encoded.buffer_type,
 				0,
 				s_op,
-				ret,
+				js_p,
 				&i);
 
 #endif
 
-    return(job_post_ret);
+    return(ret);
 
 }
 
@@ -470,7 +470,7 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
  * Function: getattr_release_posted_job
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      We are done!
  *
@@ -481,18 +481,18 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
 
-static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
+static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s* js_p)
 {
 
-    int job_post_ret=0;
+    int ret=0;
     job_id_t i;
 
-    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+    ret = job_req_sched_release(s_op->scheduled_id,
 	    s_op,
-	    ret,
+	    js_p,
 	    &i,
 	    PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -500,7 +500,7 @@ static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
  * Function: getattr_cleanup
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      Memory has been allocated
  *
@@ -513,7 +513,7 @@ static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
  */
 
 
-static int getattr_cleanup(PINT_server_op *s_op, job_status_s *ret)
+static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
 
     gossip_debug(SERVER_DEBUG, "getattr state: cleanup\n");

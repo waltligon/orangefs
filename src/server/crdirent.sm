@@ -12,18 +12,18 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 
-static int crdirent_init(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_read_directory_entry_handle(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_read_parent_metadata(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_verify_parent_metadata(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_write_directory_entry(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_check_exist_directory_entry(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_handle_eexist(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_create_dirdata_dspace(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_write_dirdata_handle(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_send_bmi(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_cleanup(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_release(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_init(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_read_directory_entry_handle(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_read_parent_metadata(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_verify_parent_metadata(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_write_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_check_exist_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_handle_eexist(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_create_dirdata_dspace(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_write_dirdata_handle(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_release(PINT_server_op *s_op, job_status_s* js_p);
 void crdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -140,9 +140,9 @@ machine pvfs2_crdirent_sm(init,
  *
  */
 static int crdirent_init(PINT_server_op *s_op,
-			 job_status_s *ret)
+			 job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     char *ptr;
 
     gossip_debug(SERVER_DEBUG, "crdirent state: init\n");
@@ -172,18 +172,18 @@ static int crdirent_init(PINT_server_op *s_op,
 	    gossip_lerr("crdirent: error: invalid unprintable character (value = 0x%x) in name; sending error response.\n",
 			(int) *ptr);
 	}
-	ret->error_code = ERROR_BADNAME;
+	js_p->error_code = ERROR_BADNAME;
 	s_op->scheduled_id = 0;
 	return 1;
     }
 
     /* post a scheduler job */
-    job_post_ret = job_req_sched_post(s_op->req,
+    ret = job_req_sched_post(s_op->req,
 				      s_op,
-				      ret,
+				      js_p,
 				      &(s_op->scheduled_id),
 				      PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -194,10 +194,10 @@ static int crdirent_init(PINT_server_op *s_op,
  *           that the credentials are valid.
  */
 static int crdirent_read_parent_metadata(PINT_server_op *s_op,
-					 job_status_s *ret)
+					 job_status_s* js_p)
 {
 
-    int job_post_ret;
+    int ret;
     job_id_t i;
 
     gossip_ldebug(SERVER_DEBUG,"crdirent state: read_parent_metadata\n");
@@ -220,24 +220,24 @@ static int crdirent_read_parent_metadata(PINT_server_op *s_op,
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
 					 s_op->req->u.crdirent.parent_handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &i,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
  * Function: crdirent_verify_parent_metadata
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      s_op->val.buffer is a valid PVFS_object_attr structure
  *
@@ -251,7 +251,7 @@ static int crdirent_read_parent_metadata(PINT_server_op *s_op,
  *           
  */
 static int crdirent_verify_parent_metadata(PINT_server_op *s_op,
-					   job_status_s *ret)
+					   job_status_s* js_p)
 {
     PVFS_object_attr *a_p;
 
@@ -270,7 +270,7 @@ static int crdirent_verify_parent_metadata(PINT_server_op *s_op,
     /* TODO: MAKE THIS AN ERROR CHECK INSTEAD LATER */
     assert(s_op->u.crdirent.parent_attr.objtype == PVFS_TYPE_DIRECTORY);
 
-    /*IF THEY don't have permission, set ret->error_code to -ENOPERM!*/
+    /*IF THEY don't have permission, set js_p->error_code to -ENOPERM!*/
 
     return 1;
 }
@@ -280,7 +280,7 @@ static int crdirent_verify_parent_metadata(PINT_server_op *s_op,
  * Function: crdirent_read_directory_entry_handle
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      s_op->u.crdirent.parent_handle is handle of directory
  *
@@ -304,9 +304,9 @@ static int crdirent_verify_parent_metadata(PINT_server_op *s_op,
  *           
  */
 static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
-						job_status_s *ret)
+						job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "crdirent state: gethandle\n");
@@ -319,29 +319,29 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
     s_op->val.buffer    = &s_op->u.crdirent.dirent_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
 					 s_op->req->u.crdirent.parent_handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &i,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
  * Function: crdirent_create_dirdata_dspace
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
- * Pre:      ret->handle = NULL
- *           ret->error_code < 0
+ * Pre:      js_p->handle = NULL
+ *           js_p->error_code < 0
  *
- * Post:     ret->handle contains a new handle for a k/v space
+ * Post:     js_p->handle contains a new handle for a k/v space
  *
  * Returns:  int
  *
@@ -351,9 +351,9 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
  *           it in part two.
  */
 static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
-					  job_status_s *ret)
+					  job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t i;
     PVFS_handle_extent extent;
     PVFS_handle_extent_array extent_array;
@@ -368,26 +368,26 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
     extent_array.extent_count = 1;
     extent_array.extent_array = &extent;
 
-    job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
+    ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
 					   &extent_array,
 					   PVFS_TYPE_DIRDATA,
 					   NULL,
 					   s_op,
-					   ret,
+					   js_p,
 					   &i,
 					   PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
  * Function: crdirent_write_dirdata_handle
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
- * Pre:      ret->handle is the new directory entry k/v space
+ * Pre:      js_p->handle is the new directory entry k/v space
  *
- * Post:     ret->handle is stored in the original k/v space for the
+ * Post:     js_p->handle is stored in the original k/v space for the
  *           parent handle.
  *
  * Returns:  int
@@ -397,9 +397,9 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
  *           
  */
 static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
-					 job_status_s *ret)
+					 job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "crdirent state: write_dirdata_handle\n");
@@ -410,8 +410,8 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
     s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
-    /* the last state was create_dirdata_dspace, so handle is in ret->handle. save it. */
-    s_op->u.crdirent.dirent_handle = ret->handle;
+    /* the last state was create_dirdata_dspace, so handle is in js_p->handle. save it. */
+    s_op->u.crdirent.dirent_handle = js_p->handle;
 
     /* get the handle out of the crdirent scratch space */
     s_op->val.buffer    = &s_op->u.crdirent.dirent_handle;
@@ -422,17 +422,17 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
 		 s_op->u.crdirent.dirent_handle,
 		 s_op->req->u.crdirent.parent_handle);
 
-    job_post_ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
+    ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
 					  s_op->req->u.crdirent.parent_handle,
 					  &s_op->key,
 					  &s_op->val,
 					  TROVE_SYNC,
 					  NULL,
 					  s_op,
-					  ret,
+					  js_p,
 					  &i,
 					  PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -440,7 +440,7 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
  * Function: crdirent_write_directory_entry
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      s_op->u.crdirent.dirent_handle is the directory entry k/v space
  *           s_op->req->u.crdirent.name != NULL
@@ -456,9 +456,9 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
  */
 
 static int crdirent_write_directory_entry(PINT_server_op *s_op,
-					  job_status_s *ret)
+					  job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "crdirent state: write_directory_entry\n");
@@ -481,24 +481,24 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
 		 s_op->req->u.crdirent.new_handle,
 		 s_op->u.crdirent.dirent_handle);
 
-    job_post_ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
+    ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
 					  s_op->u.crdirent.dirent_handle,
 					  &s_op->key,
 					  &s_op->val,
 					  TROVE_SYNC,
 					  NULL,
 					  s_op,
-					  ret,
+					  js_p,
 					  &i,
 					  PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
  * Function: crdirent_check_exist_directory_entry
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      s_op->u.crdirent.dirent_handle is the directory entry k/v space
  *           s_op->req->u.crdirent.name != NULL
@@ -515,9 +515,9 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
  */
 
 static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
-					  job_status_s *ret)
+					  job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "crdirent state: check_exist_directory_entry\n");
@@ -540,17 +540,17 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
 		 s_op->req->u.crdirent.new_handle,
 		 s_op->u.crdirent.dirent_handle);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
 					  s_op->u.crdirent.dirent_handle,
 					  &s_op->key,
 					  &s_op->val,
 					  TROVE_SYNC,
 					  NULL,
 					  s_op,
-					  ret,
+					  js_p,
 					  &i,
 					  PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -558,10 +558,10 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
  * Function: crdirent_handle_eexist
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      crdirent_check_exist_directory entry has returned with successful return
- *           code (ret->error_code == 0)
+ *           code (js_p->error_code == 0)
  *
  * Post:     sets an appropriate return value (-EEXIST?) to send back to the client
  *
@@ -570,11 +570,11 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
  * Synopsis: this state doesn't do anything except set the error code
  */
 static int crdirent_handle_eexist(PINT_server_op *s_op,
-					  job_status_s *ret)
+					  job_status_s* js_p)
 {
     gossip_debug(SERVER_DEBUG, "crdirent state: handle_eexist\n");
 
-    ret->error_code = -PVFS_EEXIST;
+    js_p->error_code = -PVFS_EEXIST;
     return(1);
 }
 
@@ -583,7 +583,7 @@ static int crdirent_handle_eexist(PINT_server_op *s_op,
  * Function: crdirent_bmi_send
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      NONE
  *
@@ -598,26 +598,26 @@ static int crdirent_handle_eexist(PINT_server_op *s_op,
  */
 
 static int crdirent_send_bmi(PINT_server_op *s_op,
-			     job_status_s *ret)
+			     job_status_s* js_p)
 {
-    int job_post_ret=0;
+    int ret=0;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "crdirent state: send_bmi\n");
 
     /* fill in response -- status field is the only generic one we should have to set */
-    s_op->resp->status = ret->error_code;
+    s_op->resp->status = js_p->error_code;
 
     /* Encode the message */
-    job_post_ret = PINT_encode(s_op->resp,
+    ret = PINT_encode(s_op->resp,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
 			       s_op->decoded.enc_type);
 
-    assert(job_post_ret == 0);
+    assert(ret == 0);
 
-    job_post_ret = job_bmi_send_list(s_op->addr,
+    ret = job_bmi_send_list(s_op->addr,
 				     s_op->encoded.buffer_list,
 				     s_op->encoded.size_list,
 				     s_op->encoded.list_count,
@@ -626,17 +626,17 @@ static int crdirent_send_bmi(PINT_server_op *s_op,
 				     s_op->encoded.buffer_type,
 				     0,
 				     s_op, 
-				     ret, 
+				     js_p, 
 				     &i,
 				     PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
  * Function: crdirent_release
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      We are done!
  *
@@ -648,10 +648,10 @@ static int crdirent_send_bmi(PINT_server_op *s_op,
  */
 
 static int crdirent_release(PINT_server_op *s_op,
-				       job_status_s *ret)
+				       job_status_s* js_p)
 {
 
-    int job_post_ret=0;
+    int ret=0;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "crdirent state: release\n");
@@ -661,12 +661,12 @@ static int crdirent_release(PINT_server_op *s_op,
 	return 1;
     }
     else {
-	job_post_ret = job_req_sched_release(s_op->scheduled_id,
+	ret = job_req_sched_release(s_op->scheduled_id,
 					     s_op,
-					     ret,
+					     js_p,
 					     &i,
 					     PINT_server_job_context);
-	return job_post_ret;
+	return ret;
     }
 }
 
@@ -677,7 +677,7 @@ static int crdirent_release(PINT_server_op *s_op,
  */
 
 static int crdirent_cleanup(PINT_server_op *s_op,
-			    job_status_s *ret)
+			    job_status_s* js_p)
 {
     gossip_debug(SERVER_DEBUG, "crdirent state: crdirent_cleanup\n");
 

@@ -12,14 +12,14 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 
-static int rmdirent_init(PINT_server_op *s_op, job_status_s *ret);
-static int rmdirent_read_parent_metadata(PINT_server_op *s_op, job_status_s *ret);
-static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(PINT_server_op *s_op, job_status_s *ret);
-static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s *ret);
-static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s *ret);
-static int rmdirent_read_directory_entry(PINT_server_op *s_op, job_status_s *ret);
-static int rmdirent_release_job(PINT_server_op *s_op, job_status_s *ret);
-static int rmdirent_send_bmi(PINT_server_op *s_op, job_status_s *ret);
+static int rmdirent_init(PINT_server_op *s_op, job_status_s* js_p);
+static int rmdirent_read_parent_metadata(PINT_server_op *s_op, job_status_s* js_p);
+static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(PINT_server_op *s_op, job_status_s* js_p);
+static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
+static int rmdirent_read_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
+static int rmdirent_release_job(PINT_server_op *s_op, job_status_s* js_p);
+static int rmdirent_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
 void rmdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -93,18 +93,18 @@ machine pvfs2_rmdirent_sm(init,
 /*
  * Function: rmdirent_init
  */
-static int rmdirent_init(PINT_server_op *s_op, job_status_s *ret)
+static int rmdirent_init(PINT_server_op *s_op, job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
 
     gossip_debug(SERVER_DEBUG, "rmdirent state: init\n");
 
-    job_post_ret = job_req_sched_post(s_op->req,
+    ret = job_req_sched_post(s_op->req,
 				      s_op,
-				      ret,
+				      js_p,
 				      &(s_op->scheduled_id),
 				      PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 
 }
 
@@ -116,9 +116,9 @@ static int rmdirent_init(PINT_server_op *s_op, job_status_s *ret)
  *           TODO: Semantics here!
  */
 static int rmdirent_read_parent_metadata(PINT_server_op *s_op,
-					 job_status_s *ret)
+					 job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "rmdirent state: read_parent_metadata\n");
@@ -140,17 +140,17 @@ static int rmdirent_read_parent_metadata(PINT_server_op *s_op,
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
 					 s_op->req->u.rmdirent.parent_handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 
 }
 
@@ -166,9 +166,9 @@ static int rmdirent_read_parent_metadata(PINT_server_op *s_op,
  *           
  */
 static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(PINT_server_op *s_op,
-									   job_status_s *ret)
+									   job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "rmdirent state: verify_parent_metadata_and_read_directory_entry_handle\n");
@@ -192,17 +192,17 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(PINT_
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
 					 s_op->req->u.rmdirent.parent_handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &i,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /* Function: rmdirent_read_directory_entry
@@ -212,9 +212,9 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(PINT_
  * it.
  */
 static int rmdirent_read_directory_entry(PINT_server_op *s_op,
-					 job_status_s *ret)
+					 job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "rmdirent state: read_directory_entry\n");
@@ -234,17 +234,17 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
     s_op->val.buffer    = &s_op->u.rmdirent.entry_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
 					 s_op->u.rmdirent.dirdata_handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -254,9 +254,9 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
  * the dirdata object.
  *           
  */
-static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s *ret)
+static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "rmdirent state: remove_directory_entry\n");
@@ -270,16 +270,16 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s *r
 		 s_op->req->u.rmdirent.entry,
 		 s_op->u.rmdirent.dirdata_handle);
 
-    job_post_ret = job_trove_keyval_remove(s_op->req->u.rmdirent.fs_id,
+    ret = job_trove_keyval_remove(s_op->req->u.rmdirent.fs_id,
 					   s_op->u.rmdirent.dirdata_handle,
 					   &s_op->key,
 					   TROVE_SYNC,
 					   NULL,
 					   s_op,
-					   ret,
+					   js_p,
 					   &j_id,
 					   PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -292,18 +292,18 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s *r
  *           
  */
 static int rmdirent_send_bmi(PINT_server_op *s_op,
-			     job_status_s *ret)
+			     job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "rmdirent state: send_bmi\n");
 
     /* fill in response -- status field is the only generic one we should have to set */
-    s_op->resp->status = ret->error_code;
+    s_op->resp->status = js_p->error_code;
 
     /* Set the handle if it was removed */
-    if(ret->error_code == 0) {
+    if(js_p->error_code == 0) {
 	/* we return the handle from the directory entry in the response */
 	s_op->resp->u.rmdirent.entry_handle = s_op->u.rmdirent.entry_handle;
 	gossip_debug(SERVER_DEBUG,
@@ -316,14 +316,14 @@ static int rmdirent_send_bmi(PINT_server_op *s_op,
     }
 
     /* Encode the message */
-    job_post_ret = PINT_encode(s_op->resp,
+    ret = PINT_encode(s_op->resp,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
 			       s_op->decoded.enc_type);
-    assert(job_post_ret == 0);
+    assert(ret == 0);
 
-    job_post_ret = job_bmi_send_list(s_op->addr,
+    ret = job_bmi_send_list(s_op->addr,
 				     s_op->encoded.buffer_list,
 				     s_op->encoded.size_list,
 				     s_op->encoded.list_count,
@@ -332,10 +332,10 @@ static int rmdirent_send_bmi(PINT_server_op *s_op,
 				     s_op->encoded.buffer_type,
 				     0,
 				     s_op, 
-				     ret, 
+				     js_p, 
 				     &j_id,
 				     PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -344,19 +344,19 @@ static int rmdirent_send_bmi(PINT_server_op *s_op,
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
 
-static int rmdirent_release_job(PINT_server_op *s_op, job_status_s *ret)
+static int rmdirent_release_job(PINT_server_op *s_op, job_status_s* js_p)
 {
-    int job_post_ret=0;
+    int ret=0;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "rmdirent state: release_job\n");
 
-    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+    ret = job_req_sched_release(s_op->scheduled_id,
 					 s_op,
-					 ret,
+					 js_p,
 					 &i,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -364,7 +364,7 @@ static int rmdirent_release_job(PINT_server_op *s_op, job_status_s *ret)
  * Function: rmdirent_cleanup
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      None
  *
@@ -375,7 +375,7 @@ static int rmdirent_release_job(PINT_server_op *s_op, job_status_s *ret)
  * Synopsis: free memory and return
  *           
  */
-static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s *ret)
+static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
 
     gossip_debug(SERVER_DEBUG, "rmdirent state: cleanup\n");

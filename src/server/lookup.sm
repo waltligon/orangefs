@@ -22,14 +22,14 @@ enum
     STATE_NOMORESEGS = 23
 };
 
-static int lookup_init(PINT_server_op *s_op, job_status_s *ret);
-static int lookup_cleanup(PINT_server_op *s_op, job_status_s *ret);
-static int lookup_verify_object_metadata(PINT_server_op *s_op, job_status_s *ret);
-static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret);
-static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret);
-static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s *ret);
-static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s *ret);
-static int lookup_release_job(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_init(PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_verify_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_send_response(PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_release_job(PINT_server_op *s_op, job_status_s* js_p);
 void lookup_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -124,9 +124,9 @@ machine pvfs2_lookup_sm(init,
  *
  */
 static int lookup_init(PINT_server_op *s_op,
-		       job_status_s *ret)
+		       job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     char *ptr;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_init\n");
@@ -141,7 +141,7 @@ static int lookup_init(PINT_server_op *s_op,
 	PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT) {
 	gossip_err("  invalid path %s (bad segment count); sending error response\n",
 		   s_op->req->u.lookup_path.path);
-	ret->error_code = -PVFS_ENOTDIR;
+	js_p->error_code = -PVFS_ENOTDIR;
     }
 
     /* allocate memory
@@ -155,13 +155,13 @@ static int lookup_init(PINT_server_op *s_op,
     ptr += s_op->u.lookup.seg_ct * sizeof(PVFS_handle);
     s_op->resp->u.lookup_path.attr_array = (PVFS_object_attr *) ptr;
 
-    job_post_ret = job_req_sched_post(s_op->req,
+    ret = job_req_sched_post(s_op->req,
 				      s_op,
-				      ret,
+				      js_p,
 				      &(s_op->scheduled_id),
 				      PINT_server_job_context);
 
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -177,9 +177,9 @@ static int lookup_init(PINT_server_op *s_op,
  * Posts the keyval read to trove.
  */
 static int lookup_read_object_metadata(PINT_server_op *s_op,
-				       job_status_s *ret)
+				       job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
     PVFS_handle handle;
 
@@ -210,17 +210,17 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
 					 handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -239,9 +239,9 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
  * immediately.
  */
 static int lookup_verify_object_metadata(PINT_server_op *s_op,
-					 job_status_s *ret)
+					 job_status_s* js_p)
 {
-    int seg_ret;
+    int ret;
     PVFS_object_attr *a_p;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_verify_object_metadata\n");
@@ -261,7 +261,7 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
     /* if we hit a metafile, we are done */
     if (a_p->objtype == PVFS_TYPE_METAFILE) {
 	gossip_debug(SERVER_DEBUG, "  object is a metafile; halting lookup and sending response\n");
-	ret->error_code = STATE_ENOTDIR;
+	js_p->error_code = STATE_ENOTDIR;
 	return 1;
     }
 
@@ -269,15 +269,15 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
     if (s_op->u.lookup.seg_nr == s_op->u.lookup.seg_ct) {
 	gossip_debug(SERVER_DEBUG,
 		     "  no more segments in path; sending response\n");
-	ret->error_code = STATE_NOMORESEGS;
+	js_p->error_code = STATE_NOMORESEGS;
 	return 1;
     }
 
     /* find the segment that we should look up in the directory */
-    seg_ret = PINT_string_next_segment(s_op->req->u.lookup_path.path,
+    ret = PINT_string_next_segment(s_op->req->u.lookup_path.path,
 				       &s_op->u.lookup.segp,
 				       &s_op->u.lookup.segstate);
-    assert(seg_ret == 0);
+    assert(ret == 0);
 
     gossip_debug(SERVER_DEBUG,
 		 "  object is a datafile; will be looking for handle for segment %s in a bit\n",
@@ -301,10 +301,10 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
  * Posts the keyval read to trove.
  */
 static int lookup_read_directory_entry_handle(PINT_server_op *s_op,
-					      job_status_s *ret)
+					      job_status_s* js_p)
 {
     TROVE_handle handle;
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_directory_entry_handle\n");
@@ -327,17 +327,17 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op,
     s_op->val.buffer    = &s_op->u.lookup.dirent_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
 					 handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -355,9 +355,9 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op,
  * Posts the keyval read to trove.
  */
 static int lookup_read_directory_entry(PINT_server_op *s_op,
-				       job_status_s *ret)
+				       job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_directory_entry\n");
@@ -381,17 +381,17 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
      */
     s_op->u.lookup.seg_nr++;
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
 					 s_op->u.lookup.dirent_handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -407,14 +407,14 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
  * Posts send to BMI.
  */
 static int lookup_send_response(PINT_server_op *s_op,
-				job_status_s *ret)
+				job_status_s* js_p)
 {
-    int encode_ret, job_post_ret;
+    int encode_ret, ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_send_response\n");
 
-    if (ret->error_code != 0 && ret->error_code != STATE_NOMORESEGS && ret->error_code != STATE_ENOTDIR)
+    if (js_p->error_code != 0 && js_p->error_code != STATE_NOMORESEGS && js_p->error_code != STATE_ENOTDIR)
     {
 #if 0
 	/* as mentioned in lookup_read_directory_entry, on error seg_nr
@@ -427,7 +427,7 @@ static int lookup_send_response(PINT_server_op *s_op,
 	/* TODO: think about this some more; I think the logic upstream is 
 	 * broken.  For now we should just call this a complete failure. -Phil
 	 */
-	s_op->resp->status = ret->error_code;
+	s_op->resp->status = js_p->error_code;
 	s_op->resp->u.lookup_path.handle_count = 0;
 	s_op->resp->u.lookup_path.attr_count = 0;
     }
@@ -452,7 +452,7 @@ static int lookup_send_response(PINT_server_op *s_op,
     assert(encode_ret == 0);
 
     /* Post message */
-    job_post_ret = job_bmi_send_list(s_op->addr,
+    ret = job_bmi_send_list(s_op->addr,
 				     s_op->encoded.buffer_list,
 				     s_op->encoded.size_list,
 				     s_op->encoded.list_count,
@@ -461,10 +461,10 @@ static int lookup_send_response(PINT_server_op *s_op,
 				     s_op->encoded.buffer_type,
 				     0,
 				     s_op, 
-				     ret, 
+				     js_p, 
 				     &j_id,
 				     PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -476,20 +476,20 @@ static int lookup_send_response(PINT_server_op *s_op,
  * Posts release request to job scheduler.
  */
 static int lookup_release_job(PINT_server_op *s_op,
-			      job_status_s *ret)
+			      job_status_s* js_p)
 {
 
-    int job_post_ret=0;
+    int ret=0;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG,"lookup state: lookup_release_job\n");
 
-    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+    ret = job_req_sched_release(s_op->scheduled_id,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -512,7 +512,7 @@ static int lookup_release_job(PINT_server_op *s_op,
  * indicating that this state machine is finished.           
  */
 static int lookup_cleanup(PINT_server_op *s_op,
-			  job_status_s *ret)
+			  job_status_s* js_p)
 {
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_cleanup\n");
     

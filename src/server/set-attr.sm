@@ -14,17 +14,17 @@ enum {
     STATE_METAFILE = 7,
 };
 
-static int setattr_init(PINT_server_op *s_op, job_status_s *ret);
-static int setattr_cleanup(PINT_server_op *s_op, job_status_s *ret);
-static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret);
-static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret);
+static int setattr_init(PINT_server_op *s_op, job_status_s* js_p);
+static int setattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
+static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_write_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *ret);
+    PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_write_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *ret);
-static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret);
-static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
-static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret);
+    PINT_server_op *s_op, job_status_s* js_p);
+static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p);
+static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s* js_p);
+static int setattr_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
 void setattr_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -107,17 +107,17 @@ machine pvfs2_set_attr_sm(init,
  * Function: setattr_init
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
  * Synopsis: 
  *           
  */
-static int setattr_init(PINT_server_op *s_op, job_status_s *ret)
+static int setattr_init(PINT_server_op *s_op, job_status_s* js_p)
 {
     PVFS_object_attr *a_p;
-    int job_post_ret;
+    int ret;
 
     gossip_debug(SERVER_DEBUG, "setattr state: init\n");
 
@@ -140,13 +140,13 @@ static int setattr_init(PINT_server_op *s_op, job_status_s *ret)
 		 s_op->req->u.setattr.handle);
 
     /* post a scheduler job */
-    job_post_ret = job_req_sched_post(s_op->req,
+    ret = job_req_sched_post(s_op->req,
 	    s_op,
-	    ret,
+	    js_p,
 	    &(s_op->scheduled_id),
 	    PINT_server_job_context);
 
-    return(job_post_ret);
+    return(ret);
 
 }
 
@@ -155,17 +155,17 @@ static int setattr_init(PINT_server_op *s_op, job_status_s *ret)
  * Function: setattr_getobj_attrib
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
  * Synopsis: 
  */
 
-static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
+static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
 
-    int job_post_ret=0;
+    int ret=0;
     job_id_t j_id;
 
 
@@ -190,17 +190,17 @@ static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.setattr.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.setattr.fs_id,
 					 s_op->req->u.setattr.handle,
 					 &(s_op->key),
 					 &(s_op->val),
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return(job_post_ret);
+    return(ret);
 }
 
 
@@ -211,7 +211,7 @@ static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
  * - attributes were placed in s_op->val.buffer by setattr_getobj_attribs()
  *   - we free this buffer here rather than later on
  */
-static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
+static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
     PVFS_object_attr *a_p, *req_a_p;
 
@@ -220,7 +220,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
     a_p = (PVFS_object_attr *)&s_op->u.setattr.attr;
     req_a_p = (PVFS_object_attr *)&s_op->req->u.setattr.attr;
 
-    if (ret->error_code != 0)
+    if (js_p->error_code != 0)
     {
 	gossip_debug(SERVER_DEBUG, "  previous keyval read had an "
                      "error (new metafile?); data is useless\n");
@@ -235,7 +235,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
 		     a_p->objtype);
     }
 
-    if (ret->error_code == 0)
+    if (js_p->error_code == 0)
     {
 	gossip_debug(SERVER_DEBUG, "  attrs read from request = "
                      "(owner = %d, group = %d, perms = %o, type = %d)\n",
@@ -259,7 +259,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
                          a_p->objtype, s_op->req->u.setattr.attr.objtype);
 
             /* set an error to bail out of set-attr processing */
-            ret->error_code = -1;
+            js_p->error_code = -1;
             return 1;
         }
     }
@@ -269,21 +269,21 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
      */
 
     /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
-    if ((ret->error_code != 0) &&
+    if ((js_p->error_code != 0) &&
         ((req_a_p->objtype == PVFS_TYPE_METAFILE) ||
          (a_p->objtype == PVFS_TYPE_METAFILE)))
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a metafile\n",
 		     s_op->req->u.setattr.handle);
-	ret->error_code = STATE_METAFILE;
+	js_p->error_code = STATE_METAFILE;
     }
     else
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to something other than "
                      "a metafile\n", s_op->req->u.setattr.handle);
-	ret->error_code = 0;
+	js_p->error_code = 0;
     }
     return 1;
 }
@@ -293,18 +293,18 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
  * Function: setattr_setobj_attribs
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
  * Synopsis: 
  *           
  */
-static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
+static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
 
     PVFS_object_attr *a_p;
-    int job_post_ret=0;
+    int ret=0;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "setattr state: setobj_attribs\n");
@@ -340,17 +340,17 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
+    ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
 					  s_op->req->u.setattr.handle,
 					  &s_op->key,
 					  &s_op->val,
 					  TROVE_SYNC /* flags */,
 					  NULL,
 					  s_op,
-					  ret,
+					  js_p,
 					  &j_id,
 					  PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -358,16 +358,16 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
  * Function: setattr_write_metafile_datafile_handles_if_required
  */
 static int setattr_write_metafile_datafile_handles_if_required(
-    PINT_server_op *s_op, job_status_s *ret)
+    PINT_server_op *s_op, job_status_s* js_p)
 {
     /*PVFS_object_attr *old_attr;*/
-    int job_post_ret=0;
+    int ret=0;
     job_id_t j_id;
 
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES))
     {
         /* if we don't need to write the dfiles, skip them */
-        ret->error_code = 0;
+        js_p->error_code = 0;
         return 1;
     }
 
@@ -397,28 +397,28 @@ static int setattr_write_metafile_datafile_handles_if_required(
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
+    ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
 					  s_op->req->u.setattr.handle,
 					  &(s_op->key),
 					  &(s_op->val),
 					  TROVE_SYNC /* flags */,
 					  NULL,
 					  s_op,
-					  ret,
+					  js_p,
 					  &j_id,
 					  PINT_server_job_context);
 
-    return job_post_ret;
+    return ret;
 }
 
 /*
  * Function: setattr_write_metafile_distribution_if_required
  */
 static int setattr_write_metafile_distribution_if_required(
-    PINT_server_op *s_op, job_status_s *ret)
+    PINT_server_op *s_op, job_status_s* js_p)
 {
     /*PVFS_object_attr *old_attr;*/
-    int job_post_ret=0;
+    int ret=0;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "setattr state: write_metafile_distribution\n");
@@ -426,7 +426,7 @@ static int setattr_write_metafile_distribution_if_required(
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
     {
         /* if we don't need to fill in the distribution, skip it */
-        ret->error_code = 0;
+        js_p->error_code = 0;
         return 1;
     }
 
@@ -457,24 +457,24 @@ static int setattr_write_metafile_distribution_if_required(
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
+    ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
 					  s_op->req->u.setattr.handle,
 					  &(s_op->key),
 					  &(s_op->val),
 					  TROVE_SYNC /* flags */,
 					  NULL,
 					  s_op,
-					  ret,
+					  js_p,
 					  &j_id,
 					  PINT_server_job_context);
-    return(job_post_ret);
+    return(ret);
 }
 
 /*
  * Function: setattr_send_bmi
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
@@ -482,27 +482,27 @@ static int setattr_write_metafile_distribution_if_required(
  *           
  */
 
-static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
+static int setattr_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
 {
-    int job_post_ret=0;
+    int ret=0;
     job_id_t i;
 
     gossip_ldebug(SERVER_DEBUG, "setattr state: setattr_send_bmi\n");
 
     /* fill in response -- status field is the only generic one we should have to set */
-    s_op->resp->status = ret->error_code;
+    s_op->resp->status = js_p->error_code;
 
-    gossip_debug(SERVER_DEBUG,"  returning Status %d\n",ret->error_code);
+    gossip_debug(SERVER_DEBUG,"  returning Status %d\n",js_p->error_code);
 
-    job_post_ret = PINT_encode(s_op->resp,
+    ret = PINT_encode(s_op->resp,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
 			       s_op->decoded.enc_type);
-    assert(job_post_ret == 0);
+    assert(ret == 0);
     
     /* Post message */
-    job_post_ret = job_bmi_send_list(
+    ret = job_bmi_send_list(
 				     s_op->addr,
 				     s_op->encoded.buffer_list,
 				     s_op->encoded.size_list,
@@ -512,10 +512,10 @@ static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 				     s_op->encoded.buffer_type,
 				     0,
 				     s_op, 
-				     ret, 
+				     js_p, 
 				     &i,
 				     PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 
 }
 
@@ -523,7 +523,7 @@ static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
  * Function: setattr_release_posted_job
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      We are done!
  *
@@ -534,32 +534,32 @@ static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
 
-static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
+static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s* js_p)
 {
 
-    int job_post_ret=0;
+    int ret=0;
     job_id_t i;
 
-    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+    ret = job_req_sched_release(s_op->scheduled_id,
 					 s_op,
-					 ret,
+					 js_p,
 					 &i,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
  * Function: setattr_cleanup
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
  * Synopsis: free memory and return
  *           
  */
-static int setattr_cleanup(PINT_server_op *s_op, job_status_s *ret)
+static int setattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
 
     gossip_debug(SERVER_DEBUG, "setattr state: setattr_cleanup\n");

@@ -17,14 +17,14 @@ enum {
     STATE_ENOTDIR = 7
 };
 
-static int readdir_init(PINT_server_op *s_op, job_status_s *ret);
-static int readdir_cleanup(PINT_server_op *s_op, job_status_s *ret);
-static int readdir_read_dirdata_handle(PINT_server_op *s_op, job_status_s *ret);
-static int readdir_iterate_on_entries(PINT_server_op *s_op, job_status_s *ret);
-static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret);
-static int readdir_release(PINT_server_op *s_op, job_status_s *ret);
-static int readdir_verify_directory_metadata(PINT_server_op *s_op, job_status_s *ret);
-static int readdir_read_directory_metadata(PINT_server_op *s_op, job_status_s *ret);
+static int readdir_init(PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_read_dirdata_handle(PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_iterate_on_entries(PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_release(PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_verify_directory_metadata(PINT_server_op *s_op, job_status_s* js_p);
+static int readdir_read_directory_metadata(PINT_server_op *s_op, job_status_s* js_p);
 void readdir_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -100,29 +100,29 @@ machine pvfs2_readdir_sm(init,
  * Function: readdir_init
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
  * Synopsis: Allocate Memory for readdir.dirent_count
  *           
  */
-static int readdir_init(PINT_server_op *s_op, job_status_s *ret)
+static int readdir_init(PINT_server_op *s_op, job_status_s* js_p)
 {
 
-    int job_post_ret;
+    int ret;
 
     gossip_debug(SERVER_DEBUG, "readdir state: init\n");
 
     s_op->key_a = NULL; /* we're going to use this to point to an allocated region later, so initialize it now. */
 
-    job_post_ret = job_req_sched_post(s_op->req,
+    ret = job_req_sched_post(s_op->req,
 				      s_op,
-				      ret,
+				      js_p,
 				      &(s_op->scheduled_id),
 				      PINT_server_job_context);
 
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -135,9 +135,9 @@ static int readdir_init(PINT_server_op *s_op, job_status_s *ret)
  * Posts the keyval read to trove.
  */
 static int readdir_read_directory_metadata(PINT_server_op *s_op,
-					   job_status_s *ret)
+					   job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "readdir state: read_directory_metadata\n");
@@ -157,17 +157,17 @@ static int readdir_read_directory_metadata(PINT_server_op *s_op,
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.readdir.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.readdir.fs_id,
 					 s_op->req->u.readdir.handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -180,7 +180,7 @@ static int readdir_read_directory_metadata(PINT_server_op *s_op,
  * immediately.
  */
 static int readdir_verify_directory_metadata(PINT_server_op *s_op,
-					     job_status_s *ret)
+					     job_status_s* js_p)
 {
     PVFS_object_attr *a_p;
 
@@ -197,7 +197,7 @@ static int readdir_verify_directory_metadata(PINT_server_op *s_op,
 
     if (a_p->objtype != PVFS_TYPE_DIRECTORY) {
 	gossip_debug(SERVER_DEBUG, "  object is not a directory; halting readdir and sending response\n");
-	ret->error_code = STATE_ENOTDIR;
+	js_p->error_code = STATE_ENOTDIR;
 	return 1;
     }
 
@@ -211,7 +211,7 @@ static int readdir_verify_directory_metadata(PINT_server_op *s_op,
  * Function: readdir_read_dirdata_handle
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
@@ -219,9 +219,9 @@ static int readdir_verify_directory_metadata(PINT_server_op *s_op,
  *           
  */
 static int readdir_read_dirdata_handle(PINT_server_op *s_op,
-				       job_status_s *ret)
+				       job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "readdir state: read_dirdata handle\n");
@@ -242,24 +242,24 @@ static int readdir_read_dirdata_handle(PINT_server_op *s_op,
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.readdir.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.readdir.fs_id,
 					 s_op->req->u.readdir.handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &i,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
  * Function: readdir_iterate_on_entries
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
@@ -268,12 +268,12 @@ static int readdir_read_dirdata_handle(PINT_server_op *s_op,
  * NOTE: allocates a big chunk of memory, pointed to by s_op->key_a!
  */
 static int readdir_iterate_on_entries(PINT_server_op *s_op,
-				      job_status_s *ret)
+				      job_status_s* js_p)
 {
     int j;
     int memory_size, kv_array_size;
     char *memory_buffer;
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "readdir state: iterate_on_entries\n");
@@ -317,7 +317,7 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
 		 (long long)s_op->req->u.readdir.token,
 		 s_op->req->u.readdir.dirent_count);
 
-    job_post_ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,
+    ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,
 					    s_op->u.readdir.dirent_handle,
 					    s_op->req->u.readdir.token,
 					    s_op->key_a,
@@ -326,10 +326,10 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
 					    0,
 					    NULL,
 					    s_op,
-					    ret, 
+					    js_p, 
 					    &j_id,
 					    PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -337,41 +337,41 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
  * Function: readdir_bmi_send
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
  * Synopsis: Assembles the directory space entries... and ships them off 
  *           
  */
-static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
+static int readdir_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
 {
-    int encode_ret, job_post_ret;
+    int encode_ret, ret;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "readdir state: send_bmi\n");
 
     /* fill in response -- status field is the only generic one we should have to set */
-    if (ret->error_code == STATE_ENOTDIR) {
+    if (js_p->error_code == STATE_ENOTDIR) {
 
 	gossip_debug(SERVER_DEBUG,
 		     "  handle didn't refer to a directory\n");
 
 	s_op->resp->status = -PVFS_EINVAL;
     }
-    else if (ret->error_code != 0) {
+    else if (js_p->error_code != 0) {
 	/* for now let's assume this is an "empty" directory */
 
 	gossip_debug(SERVER_DEBUG,
 		     "  error code = %d; assuming empty directory\n",
-		     ret->error_code);
+		     js_p->error_code);
 
 	s_op->resp->status = 0;
 	s_op->resp->u.readdir.dirent_count = 0;
     }
     else {
 	s_op->resp->status = 0;
-	s_op->resp->u.readdir.dirent_count = ret->count;
+	s_op->resp->u.readdir.dirent_count = js_p->count;
     }
 
     encode_ret = PINT_encode(s_op->resp,
@@ -383,7 +383,7 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
     assert(encode_ret == 0);
 
     /* Post message */
-    job_post_ret = job_bmi_send_list(
+    ret = job_bmi_send_list(
 				     s_op->addr,
 				     s_op->encoded.buffer_list,
 				     s_op->encoded.size_list,
@@ -393,10 +393,10 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 				     s_op->encoded.buffer_type,
 				     0,
 				     s_op,
-				     ret,
+				     js_p,
 				     &i,
 				     PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -404,7 +404,7 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
  * Function: readdir_release
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      We are done!
  *
@@ -414,20 +414,20 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
  *
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
-static int readdir_release(PINT_server_op *s_op, job_status_s *ret)
+static int readdir_release(PINT_server_op *s_op, job_status_s* js_p)
 {
 
-    int job_post_ret=0;
+    int ret=0;
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "readdir state: release\n");
 
-    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+    ret = job_req_sched_release(s_op->scheduled_id,
 					 s_op,
-					 ret,
+					 js_p,
 					 &i,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -435,7 +435,7 @@ static int readdir_release(PINT_server_op *s_op, job_status_s *ret)
  * Function: readdir_cleanup
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Returns:  int
  *
@@ -443,7 +443,7 @@ static int readdir_release(PINT_server_op *s_op, job_status_s *ret)
  *           
  */
 static int readdir_cleanup(PINT_server_op *s_op,
-			   job_status_s *ret)
+			   job_status_s* js_p)
 {
 
     gossip_debug(SERVER_DEBUG, "readdir state: cleanup\n");

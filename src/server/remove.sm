@@ -57,17 +57,17 @@ enum {
     STATE_TYPE_DIRECTORY = 1
 };
 
-static int remove_init(PINT_server_op *s_op, job_status_s *ret);
-static int remove_read_object_metadata(PINT_server_op *s_op, job_status_s *ret);
-static int remove_verify_object_metadata(PINT_server_op *s_op, job_status_s *ret);
-static int remove_cleanup(PINT_server_op *s_op, job_status_s *ret);
-static int remove_remove_dspace(PINT_server_op *s_op, job_status_s *ret);
-static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op, job_status_s *ret);
-static int remove_remove_dirdata_dspace(PINT_server_op *s_op, job_status_s *ret);
-static int remove_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
-static int remove_send_response(PINT_server_op *s_op, job_status_s *ret);
-static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op, job_status_s *ret);
-static int remove_verify_dspace_attributes(PINT_server_op *s_op, job_status_s *ret);
+static int remove_init(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_read_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_verify_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_cleanup(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_remove_dspace(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_remove_dirdata_dspace(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_release_posted_job(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_send_response(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_verify_dspace_attributes(PINT_server_op *s_op, job_status_s* js_p);
 void remove_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -168,19 +168,19 @@ machine pvfs2_remove_sm(init,
  * Post operation to request scheduler.
  */
 static int remove_init(PINT_server_op *s_op,
-		       job_status_s *ret)
+		       job_status_s* js_p)
 {
 
-    int job_post_ret;
+    int ret;
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: init\n", s_op);
 
-    job_post_ret = job_req_sched_post(s_op->req,
+    ret = job_req_sched_post(s_op->req,
 				      s_op,
-				      ret,
+				      js_p,
 				      &(s_op->scheduled_id),
 				      PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -191,9 +191,9 @@ static int remove_init(PINT_server_op *s_op,
  *
  */
 static int remove_read_object_metadata(PINT_server_op *s_op,
-				       job_status_s *ret)
+				       job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: read_object_metadata\n", s_op);
@@ -214,17 +214,17 @@ static int remove_read_object_metadata(PINT_server_op *s_op,
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.remove.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.remove.fs_id,
 					 s_op->req->u.remove.handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -237,9 +237,9 @@ static int remove_read_object_metadata(PINT_server_op *s_op,
  * Note: PVFS_ds_attributes structure is returned in the job_status_s (member ds_attr).
  */
 static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
-					     job_status_s *ret)
+					     job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: fallback_to_dspace_getattr\n", s_op);
@@ -249,13 +249,13 @@ static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
 		 s_op->req->u.remove.fs_id,
 		 s_op->req->u.remove.handle);
 
-    job_post_ret = job_trove_dspace_getattr(s_op->req->u.remove.fs_id,
+    ret = job_trove_dspace_getattr(s_op->req->u.remove.fs_id,
 					    s_op->req->u.remove.handle,
 					    s_op, /* user ptr */
-					    ret,
+					    js_p,
 					    &j_id,
 					    PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -266,18 +266,18 @@ static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
  */
 
 static int remove_verify_dspace_attributes(PINT_server_op *s_op,
-					   job_status_s *ret)
+					   job_status_s* js_p)
 {
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: verify_dspace_attributes\n", s_op);
 
-    if (ret->error_code != 0) {
+    if (js_p->error_code != 0) {
 	gossip_debug(SERVER_DEBUG,
 		     "  previous dspace getattr had an error; data is useless\n");
-	ret->error_code = -PVFS_EINVAL;
+	js_p->error_code = -PVFS_EINVAL;
     }
     else {
-	PVFS_ds_attributes *a_p = &ret->ds_attr;
+	PVFS_ds_attributes *a_p = &js_p->ds_attr;
 
 	gossip_debug(SERVER_DEBUG,
 		     "  attrs read from dspace = (..., type = %d)\n",
@@ -315,7 +315,7 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op,
  */
 
 static int remove_verify_object_metadata(PINT_server_op *s_op,
-					 job_status_s *ret)
+					 job_status_s* js_p)
 {
     PVFS_object_attr *a_p;
 
@@ -333,7 +333,7 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
     /* TODO: CHECK PERMISSIONS */
 
     if (a_p->objtype == PVFS_TYPE_DIRECTORY) {
-	ret->error_code = STATE_TYPE_DIRECTORY;
+	js_p->error_code = STATE_TYPE_DIRECTORY;
 	
 	gossip_debug(SERVER_DEBUG,
 		     "  type is directory; removing dirdata object before removing directory itself.\n");
@@ -350,9 +350,9 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
  *
  */
 static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
-					     job_status_s *ret)
+					     job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: read_dirdata_handle\n", s_op);
@@ -373,17 +373,17 @@ static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.remove.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.remove.fs_id,
 					 s_op->req->u.remove.handle,
 					 &s_op->key,
 					 &s_op->val,
 					 0,
 					 NULL,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -393,9 +393,9 @@ static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
  * read_dirdata_handle state.
  */
 static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
-					job_status_s *ret)
+					job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: remove_dspace\n", s_op);
@@ -404,13 +404,13 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
 		 "  removing dirdata dspace 0x%08Lx\n",
 		 s_op->u.remove.dirdata_handle);
 
-    job_post_ret = job_trove_dspace_remove(s_op->req->u.remove.fs_id,
+    ret = job_trove_dspace_remove(s_op->req->u.remove.fs_id,
 					   s_op->u.remove.dirdata_handle,
 					   s_op,
-					   ret,
+					   js_p,
 					   &j_id,
 					   PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -420,20 +420,20 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
  * (which was verified in previous states).
  */
 static int remove_remove_dspace(PINT_server_op *s_op,
-				job_status_s *ret)
+				job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: remove_dspace\n", s_op);
 
-    job_post_ret = job_trove_dspace_remove(s_op->req->u.remove.fs_id,
+    ret = job_trove_dspace_remove(s_op->req->u.remove.fs_id,
 					   s_op->req->u.remove.handle,
 					   s_op,
-					   ret,
+					   js_p,
 					   &j_id,
 					   PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -441,7 +441,7 @@ static int remove_remove_dspace(PINT_server_op *s_op,
  * Function: remove_bmi_response
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Send acknowledgement back to client that job has been completed
  * (possibly in error).
@@ -450,18 +450,18 @@ static int remove_remove_dspace(PINT_server_op *s_op,
  * successfully removed, but I don't see the point in that.  dropped.  -- rob
  */
 static int remove_send_response(PINT_server_op *s_op,
-				job_status_s *ret)
+				job_status_s* js_p)
 {
 
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: send_response\n", s_op);
 
     /* fill in response -- status field is the only generic one we should have to set */
-    s_op->resp->status = ret->error_code;
+    s_op->resp->status = js_p->error_code;
 
-    if(ret->error_code == 0) 
+    if(js_p->error_code == 0) 
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  successfully removed dspace 0x%08Lx\n",
@@ -474,14 +474,14 @@ static int remove_send_response(PINT_server_op *s_op,
     }
 
     /* Encode the message */
-    job_post_ret = PINT_encode(s_op->resp,
+    ret = PINT_encode(s_op->resp,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
 			       s_op->decoded.enc_type);
-    assert(job_post_ret == 0);
+    assert(ret == 0);
 
-    job_post_ret = job_bmi_send_list(s_op->addr,
+    ret = job_bmi_send_list(s_op->addr,
 				     s_op->encoded.buffer_list,
 				     s_op->encoded.size_list,
 				     s_op->encoded.list_count,
@@ -490,10 +490,10 @@ static int remove_send_response(PINT_server_op *s_op,
 				     s_op->encoded.buffer_type,
 				     0,
 				     s_op, 
-				     ret, 
+				     js_p, 
 				     &j_id,
 				     PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 /*
@@ -502,19 +502,19 @@ static int remove_send_response(PINT_server_op *s_op,
  * Notify request scheduling system that this request has been completed.
  */
 static int remove_release_posted_job(PINT_server_op *s_op,
-				     job_status_s *ret)
+				     job_status_s* js_p)
 {
-    int job_post_ret;
+    int ret;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: release_posted_job\n", s_op);
 
-    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+    ret = job_req_sched_release(s_op->scheduled_id,
 					 s_op,
-					 ret,
+					 js_p,
 					 &j_id,
 					 PINT_server_job_context);
-    return job_post_ret;
+    return ret;
 }
 
 
@@ -525,7 +525,7 @@ static int remove_release_posted_job(PINT_server_op *s_op,
  * we're done processing.
  */
 static int remove_cleanup(PINT_server_op *s_op,
-			  job_status_s *ret)
+			  job_status_s* js_p)
 {
 
     gossip_debug(SERVER_DEBUG, "(%p) remove state: cleanup\n", s_op);

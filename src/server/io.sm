@@ -16,14 +16,14 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 
-static int io_init(PINT_server_op *s_op, job_status_s *ret);
-static int io_get_size(PINT_server_op *s_op, job_status_s *ret);
-static int io_send_ack(PINT_server_op *s_op, job_status_s *ret);
+static int io_init(PINT_server_op *s_op, job_status_s* js_p);
+static int io_get_size(PINT_server_op *s_op, job_status_s* js_p);
+static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p);
 static int io_send_completion_ack(PINT_server_op *s_op, 
-	job_status_s *ret);
-static int io_start_flow(PINT_server_op *s_op, job_status_s *ret);
-static int io_release(PINT_server_op *s_op, job_status_s *ret);
-static int io_cleanup(PINT_server_op *s_op, job_status_s *ret);
+	job_status_s* js_p);
+static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p);
+static int io_release(PINT_server_op *s_op, job_status_s* js_p);
+static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 void io_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -100,7 +100,7 @@ machine pvfs2_io_sm(init, get_size, send_positive_ack, send_negative_ack,
  * Function: io_init()
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      a properly formatted request structure.
  *
@@ -111,27 +111,27 @@ machine pvfs2_io_sm(init, get_size, send_positive_ack, send_negative_ack,
  * Synopsis: posts the operation to the request scheduler
  *           
  */
-static int io_init(PINT_server_op *s_op, job_status_s *ret)
+static int io_init(PINT_server_op *s_op, job_status_s* js_p)
 {
-	int job_post_ret;
+	int ret;
 	
 	gossip_ldebug(SERVER_DEBUG, "IO: io_init() executed.\n");
 
 	/* post a scheduler job */
-	job_post_ret = job_req_sched_post(s_op->req,
+	ret = job_req_sched_post(s_op->req,
 												 s_op,
-												 ret,
+												 js_p,
 												 &(s_op->scheduled_id),
 												 PINT_server_job_context);
 
-	return(job_post_ret);
+	return(ret);
 }
 
 /*
  * Function: io_get_size()
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      operation has been scheduled.
  *
@@ -144,7 +144,7 @@ static int io_init(PINT_server_op *s_op, job_status_s *ret)
  *           intend to operate on 
  *           
  */
-static int io_get_size(PINT_server_op *s_op, job_status_s *ret)
+static int io_get_size(PINT_server_op *s_op, job_status_s* js_p)
 {
 	int err = -1;
 	job_id_t tmp_id;
@@ -155,7 +155,7 @@ static int io_get_size(PINT_server_op *s_op, job_status_s *ret)
 		s_op->req->u.io.fs_id,
 		s_op->req->u.io.handle,
 		s_op,
-		ret,
+		js_p,
 		&tmp_id,
 		PINT_server_job_context);
 	
@@ -167,7 +167,7 @@ static int io_get_size(PINT_server_op *s_op, job_status_s *ret)
  * Function: io_send_ack()
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      error code has been set in job status for us to
  *           report to client
@@ -181,7 +181,7 @@ static int io_get_size(PINT_server_op *s_op, job_status_s *ret)
  *           send either positive or negative acknowledgements.
  *           
  */
-static int io_send_ack(PINT_server_op *s_op, job_status_s *ret)
+static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
 {
 	int err = -1;
 	job_id_t tmp_id;
@@ -192,8 +192,8 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *ret)
 	 * starting the I/O transfer, or else report an error if we
 	 * failed to get the size, or failed for permission reasons
 	 */
-	s_op->resp->status = ret->error_code;
-	s_op->resp->u.io.bstream_size = ret->ds_attr.b_size;
+	s_op->resp->status = js_p->error_code;
+	s_op->resp->u.io.bstream_size = js_p->ds_attr.b_size;
 
 	err = PINT_encode(
 		s_op->resp, 
@@ -209,7 +209,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *ret)
 		/* handle by setting error code in job status structure and
 		 * returning 1
 		 */
-		ret->error_code = err;
+		js_p->error_code = err;
 		return(1);
 	}
 	else
@@ -224,7 +224,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *ret)
 			s_op->encoded.buffer_type,
 			0,
 			s_op,
-			ret,
+			js_p,
 			&tmp_id,
 			PINT_server_job_context);
 	}
@@ -236,7 +236,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *ret)
  * Function: io_start_flow()
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      all of the previous steps have succeeded, so that we
  *           are ready to actually perform the I/O
@@ -250,7 +250,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *ret)
  *           carry out the data transfer
  *           
  */
-static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
+static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
 {
 	int err = -1;
 	job_id_t tmp_id;
@@ -261,7 +261,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 	if(!s_op->u.io.flow_d)
 	{
 		/* critical error, jump to next error state */
-		ret->error_code = -PVFS_ENOMEM;
+		js_p->error_code = -PVFS_ENOMEM;
 		return(1);
 	}
 
@@ -270,7 +270,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 	if(!s_op->u.io.flow_d->file_data)
 	{
 		/* critical error, jump to next error state */
-		ret->error_code = -PVFS_ENOMEM;
+		js_p->error_code = -PVFS_ENOMEM;
 		return(1);
 	}
 
@@ -317,7 +317,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 	{
 		/* critical error; jump out of state */
 		gossip_lerr("Server: IO SM: unknown IO type requested.\n");
-		ret->error_code = -PVFS_EINVAL;
+		js_p->error_code = -PVFS_EINVAL;
 		return(1);
 	}
 
@@ -326,7 +326,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 	err = job_flow(
 		s_op->u.io.flow_d,
 		s_op,
-		ret,
+		js_p,
 		&tmp_id,
 		PINT_server_job_context);
 
@@ -338,7 +338,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
  * Function: io_release()
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      we are done with all steps necessary to service
  *           request
@@ -349,28 +349,28 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
  *
  * Synopsis: releases the operation from the scheduler
  */
-static int io_release(PINT_server_op *s_op, job_status_s *ret)
+static int io_release(PINT_server_op *s_op, job_status_s* js_p)
 {
 
-	int job_post_ret=0;
+	int ret=0;
 	job_id_t i;
 
 	gossip_ldebug(SERVER_DEBUG, "IO: io_release() executed.\n");
 
 	/* tell the scheduler that we are done with this operation */
-	job_post_ret = job_req_sched_release(s_op->scheduled_id,
+	ret = job_req_sched_release(s_op->scheduled_id,
 													  s_op,
-													  ret,
+													  js_p,
 													  &i,
 													  PINT_server_job_context);
-	return job_post_ret;
+	return ret;
 }
 
 /*
  * Function: io_cleanup()
  *
  * Params:   server_op *b, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      all jobs done, simply need to clean up
  *
@@ -381,7 +381,7 @@ static int io_release(PINT_server_op *s_op, job_status_s *ret)
  * Synopsis: free up any buffers associated with the operation,
  *           including any encoded or decoded protocol structures
  */
-static int io_cleanup(PINT_server_op *s_op, job_status_s *ret)
+static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
 	gossip_ldebug(SERVER_DEBUG, "IO: io_cleanup() executed.\n");
 	/* Free the encoded message if necessary! */
@@ -433,7 +433,7 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *ret)
  * Function: io_send_completion_ack()
  *
  * Params:   server_op *s_op, 
- *           job_status_s *ret
+ *           job_status_s* js_p
  *
  * Pre:      flow is completed so that we can report its status
  *
@@ -448,7 +448,7 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *ret)
  *           
  */
 static int io_send_completion_ack(PINT_server_op *s_op, 
-	job_status_s *ret)
+	job_status_s* js_p)
 {
 	int err = -1;
 	job_id_t tmp_id;
@@ -460,12 +460,12 @@ static int io_send_completion_ack(PINT_server_op *s_op,
 	 */
 	if(s_op->req->u.io.io_type == PVFS_IO_READ)
 	{
-		ret->error_code = 0;
+		js_p->error_code = 0;
 		return(1);
 	}
 
 	/* fill in response -- status field is the only generic one we should have to set */
-	s_op->resp->status = ret->error_code;
+	s_op->resp->status = js_p->error_code;
 	s_op->resp->u.write_completion.total_completed = s_op->u.io.flow_d->total_transfered;
 
 	err = PINT_encode(
@@ -482,7 +482,7 @@ static int io_send_completion_ack(PINT_server_op *s_op,
 		/* handle by setting error code in job status structure and
 		 * returning 1
 		 */
-		ret->error_code = err;
+		js_p->error_code = err;
 		return(1);
 	}
 	else
@@ -497,7 +497,7 @@ static int io_send_completion_ack(PINT_server_op *s_op,
 			s_op->encoded.buffer_type,
 			0,
 			s_op,
-			ret,
+			js_p,
 			&tmp_id,
 			PINT_server_job_context);
 	}
