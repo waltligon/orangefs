@@ -1508,10 +1508,10 @@ RHTAG6="Fedora Core release 1 (Yarrow)"
 
 
 REDHAT_RELEASE=""
-if test -f ${HOME}/redhat-release; then
+if test -f /etc/redhat-release; then
     echo $ac_n "checking for tagged Redhat releases (must patch)""... $ac_c" 1>&6
 echo "configure:1514: checking for tagged Redhat releases (must patch)" >&5
-    REDHAT_REL=`cat ${HOME}/redhat-release`
+    REDHAT_REL=`cat /etc/redhat-release`
     if test "x`echo $REDHAT_REL | cut -b 1-23`" = "x$RHTAG1" ||
        test "x`echo $REDHAT_REL | cut -b 1-37`" = "x$RHTAG2" ||
        test "x`echo $REDHAT_REL | cut -b 1-37`" = "x$RHTAG3" ||
