@@ -4,6 +4,8 @@
  * See COPYING in top-level directory.
  */
 
+#include "pvfs2-config.h"
+
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
@@ -14,7 +16,9 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#ifdef HAVE_NETDB_H
 #include <netdb.h>
+#endif
 #include <sys/poll.h>
 #include <sys/uio.h>
 
@@ -31,19 +35,7 @@
 
 int BMI_sockio_new_sock()
 {
-    static int p_num = -1;	/* set to tcp protocol # on first call */
-    struct protoent *pep;
-
-    if (p_num == -1)
-    {
-	if ((pep = getprotobyname("tcp")) == NULL)
-	{
-	    perror("Kernel does not support tcp");
-	    return (-1);
-	}
-	p_num = pep->p_proto;
-    }
-    return (socket(AF_INET, SOCK_STREAM, p_num));
+    return(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
 }
 
 int BMI_sockio_bind_sock(int sockd,
@@ -374,10 +366,7 @@ int BMI_sockio_set_tcpopt(int s,
 	       int optname,
 	       int val)
 {
-    struct protoent* p = getprotobyname("tcp");
-    if(!p)
-	return(-1);
-    if (setsockopt(s, p->p_proto, optname, &val, sizeof(val)) == -1)
+    if (setsockopt(s, IPPROTO_TCP, optname, &val, sizeof(val)) == -1)
 	return (-1);
     else
 	return (val);

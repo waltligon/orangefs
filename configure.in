@@ -708,6 +708,7 @@ AC_FUNC_GETMNTENT
 dnl if we use headers that might not be on every platform, add them here
 AC_CHECK_HEADERS(malloc.h)
 AC_CHECK_HEADERS(mntent.h)
+AC_CHECK_HEADERS(netdb.h)
 
 dnl this is a special case, used to key off options controlling gossip
 dnl   backtrace capability
