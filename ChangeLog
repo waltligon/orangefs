@@ -3,8 +3,8 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.1.2pre1
-===============
+pvfs2-0.1.2
+===========
 - BMI IB module:
     - fix bug resulting in mixed-up connections
     - clean up incoming message processing
