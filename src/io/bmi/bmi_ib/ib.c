@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.10 2004-04-26 18:15:49 neill Exp $
+ * $Id: ib.c,v 1.11 2004-04-30 16:27:34 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -1062,7 +1062,7 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    if (user_ptr)
 		*user_ptr = sq->mop->user_ptr;
 	    qlist_del(&sq->list);
-            id_gen_safe_unregister(mop->op_id);
+	    id_gen_safe_unregister(sq->mop->op_id);
 	    free(sq->mop);
 	    free(sq);
 	    return 1;
@@ -1105,6 +1105,7 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 		*outid = rq->mop->op_id;
 		if (user_ptr)
 		    *user_ptr = rq->mop->user_ptr;
+		id_gen_safe_unregister(rq->mop->op_id);
 		free(rq->mop);
 	    }
 	    qlist_del(&rq->list);
