@@ -302,7 +302,7 @@ static int readdir_cleanup(PINT_server_op *s_op,
     /* free dynamically allocated space */
     if (s_op->key_a) free(s_op->key_a);
 
-    return(PINT_state_machine_complete(s_op));
+    return(server_state_machine_complete(s_op));
 }
 
 

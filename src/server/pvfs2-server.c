@@ -11,11 +11,9 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/vfs.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
-#include <rpc/rpc.h>
 #include <assert.h>
 #include <getopt.h>
 
@@ -34,8 +32,13 @@
 #include "server-config.h"
 #include "quicklist.h"
 
-/* Internal Globals */
 job_context_id PINT_server_job_context = -1;
+
+/* Lookup table for determining what state machine to use when a
+ * new request is received.
+ */
+static struct PINT_state_machine_s *PINT_server_op_table[PVFS_MAX_SERVER_OP+1] =
+{NULL};
 
 static int server_create_storage_space = 0;
 
@@ -43,11 +46,12 @@ static int server_create_storage_space = 0;
 static PINT_server_status_code server_level_init;
 
 /* All parameters read in from the configuration file */
-static struct server_configuration_s user_opts;
+static struct server_configuration_s server_config;
 
 /* A flag to stop the main loop from processing and handle the signal 
-   after all threads complete and are no longer blocking */
-static int signal_recvd_flag;
+ * after all threads complete and are no longer blocking.
+ */
+static int signal_recvd_flag = 0;
 
 PINT_server_trove_keys_s Trove_Common_Keys[] = {
     {"root_handle", 12},
@@ -57,36 +61,323 @@ PINT_server_trove_keys_s Trove_Common_Keys[] = {
     {"metafile_dist", 14}
 };
 
-/* Prototypes */
-static int initialize_interfaces(
-    PINT_server_status_code *server_level_init);
+/* These three are used continuously in our wait loop.  They could
+ * be relatively large, so rather than allocate them on the stack,
+ * we'll make them globals.
+ */
+static job_id_t     server_job_id_array[PVFS_SERVER_MAX_JOBS];
+static void        *server_completed_job_p_array[PVFS_SERVER_MAX_JOBS];
+static job_status_s server_job_status_array[PVFS_SERVER_MAX_JOBS];
 
-static int initialize_signal_handlers(void);
-
-static int initialize_server_state(
-    PINT_server_status_code *server_level_init,
-    PINT_server_op *s_op, 
-    job_status_s *job_status_structs);
-
-static int server_init(void);
-
-static int server_shutdown(
-    PINT_server_status_code level,
-    int ret,
-    int sig);
-
-static void *sig_handler(int sig);
-
-static int initialize_new_server_op(job_status_s * ret);
+/* Prototypes for internal functions */
+static int server_initialize(PINT_server_status_code *server_level_init,
+			     job_status_s *job_status_structs);
+static int server_initialize_subsystems(PINT_server_status_code *server_level_init);
+static int server_setup_signal_handlers(void);
+static int server_setup_process_environment(int background);
+static int server_shutdown(PINT_server_status_code level,
+			   int ret,
+			   int sig);
+static void *server_sig_handler(int sig);
+static int server_post_unexpected_recv(job_status_s * ret);
 static int server_parse_cmd_line_args(int argc, char **argv);
 
+static void server_state_table_initialize(void);
+static int server_state_machine_start(PINT_server_op *s_op, job_status_s *ret);
 
-/*
-  Initializes the bmi, flow, trove, and job interfaces.
-  returns < 0 on error and sets the passed in server status code
-  to the appropriate value for proper server shutdown.
-*/
-static int initialize_interfaces(PINT_server_status_code *server_level_init)
+/* main()
+ */
+int main(int argc, char **argv)
+{
+    int ret;
+
+    /* Passed to server shutdown function */
+    server_level_init = STATUS_UNKNOWN;
+
+    /* Enable the gossip interface to send out stderr and set an initial
+     * debug mask so that we can output errors at startup.
+     */
+    gossip_enable_stderr();
+    gossip_set_debug_mask(1, SERVER_DEBUG);
+
+    /* Determine initial server configuration, looking at both command line
+     * arguments and the configuration file.
+     */
+    if (server_parse_cmd_line_args(argc, argv) != 0) {
+	goto server_shutdown;
+    }
+    if (PINT_server_config(&server_config, argv[optind], argv[optind + 1]))
+    {
+	gossip_err("Fatal Error: This server requires a valid "
+                   "configuration for operation.\nPlease check your "
+                   "configuration setting.  Server aborting.\n");
+	goto server_shutdown;
+    }
+
+    /* Verify that our configuration makes sense. */
+    if (!PINT_server_config_is_valid_configuration(&server_config))
+    {
+	gossip_err("Error: Invalid configuration; aborting.\n");
+	goto server_shutdown;
+    }
+
+    /* If we were directed to create a storage space, do so and then
+     * exit.
+     */
+    if (server_create_storage_space)
+    {
+        ret = PINT_server_config_pvfs2_mkspace(&server_config);
+	exit(ret);
+    }
+
+    /* TODO: JUST ALLOCATE THE JOB STRUCTURES DYNAMICALLY */
+    if (server_config.initial_unexpected_requests > PVFS_SERVER_MAX_JOBS)
+    {
+	gossip_err("Error: initial_unexpected request value is too "
+                   "large; aborting.\n");
+	server_level_init = DEALLOC_INIT_MEMORY;
+	goto server_shutdown;
+    }
+
+    /* Initialize the server (many many steps) */
+    ret = server_initialize(&server_level_init,
+			    server_job_status_array);
+    if (ret < 0)
+    {
+	gossip_err("Error: Could not initialize server; aborting.\n");
+	goto server_shutdown;
+    }
+    server_level_init = UNEXPECTED_POSTINIT_FAILURE;
+
+    /* Initialization complete; process server requests indefinitely. */
+    for (;;)
+    {
+	int i, comp_ct = PVFS_SERVER_MAX_JOBS;
+
+	if (signal_recvd_flag != 0)
+	{
+	    ret = signal_recvd_flag;
+	    goto server_shutdown;
+	}
+
+	/* TODO: use a named default value for the timeout eventually */
+	ret = job_testcontext(server_job_id_array,
+			      &comp_ct,
+			      server_completed_job_p_array,
+			      server_job_status_array,
+			      100, /* timeout, in unknown units :) */
+			      PINT_server_job_context);
+	if (ret < 0)
+	{
+	    gossip_lerr("FREAK OUT.\n");
+	    exit(-1);
+	}
+
+	/* Loop through the completed jobs and handle whatever comes next. */
+	for (i = 0; i < comp_ct; i++)
+	{
+	    int unexpected_msg = 0;
+	    PINT_server_op *s_op = server_completed_job_p_array[i];;
+
+	    /* Completed jobs might be ongoing, or might be new (unexpected)
+	     * ones.  We handle the first step of either type here.
+	     */
+	    if (s_op->op == BMI_UNEXP)
+	    {
+		unexpected_msg = 1;
+		ret = server_state_machine_start(s_op,
+						 &server_job_status_array[i]);
+	    }
+	    else {
+		/* NOTE: PINT_state_machine_next() is a function that is
+		 * shared with the client-side state machine processing,
+		 * so it is defined in the src/common directory.
+		 */
+		ret = PINT_state_machine_next(s_op, &server_job_status_array[i]);
+	    }
+
+	    /* Either of the above might have completed immediately (ret == 1).
+	     * While the job continues to complete immediately, we continue to
+	     * service it.
+	     */
+	       
+            while (ret == 1)
+            {
+                ret = PINT_state_machine_next(s_op, &server_job_status_array[i]);
+            }
+
+	    /* The job has either hit an error case, or has hit a point where it
+	     * could no longer continue.
+	     */
+
+	    if (ret < 0)
+	    {
+		/* Job did in fact have an error */
+
+		gossip_lerr("Error on job %d, Return Code: %d\n", i, ret);
+		server_level_init = UNEXPECTED_LOOP_END;
+		ret = 1;
+		goto server_shutdown;
+		/* if ret < 0 oh no... job mechanism died */
+		/* TODO: fix this */
+	    }
+
+	    if (unexpected_msg)
+	    {
+		/* If this was a new (unexpected) job, we need to post a
+		 * replacement unexpected job so that we can continue to 
+		 * receive incoming requests.
+		 */
+
+		ret = server_post_unexpected_recv(&server_job_status_array[i]);
+		if (ret < 0)
+		{
+		    /* TODO: do something here, the return value was
+		     * not being checked for failure before.  I just
+		     * put something here to make it exit for the
+		     * moment.  -Phil
+		     */
+		    gossip_lerr("Error: NOT HANDLED.\n");
+		    exit(1);
+		}
+	    }
+	} /* ... for i < comp_ct */
+    }
+
+    server_level_init = UNEXPECTED_LOOP_END;
+
+  server_shutdown:
+    server_shutdown(server_level_init, ret, 0);
+    return -1;	/* Should never get here */
+} /* end of main() */
+
+/* server_initialize()
+ *
+ * Handles:
+ * - backgrounding, redirecting logging
+ * - initializing all the subsystems (BMI, Trove, etc.)
+ * - setting up the state table used to map new requests to
+ *   state machines
+ * - allocating and posting the initial unexpected message jobs
+ * - setting up signal handlers
+ */
+static int server_initialize(PINT_server_status_code *server_level_init,
+			     job_status_s *job_status_structs)
+{
+    int ret = 0, i = 0;
+
+    /* Handle backgrounding, setting up working directory, and so on. */
+    ret = server_setup_process_environment(0);	
+    if (ret < 0)
+    {
+	gossip_err("Error: Could not start server; aborting.\n");
+	*server_level_init = DEALLOC_INIT_MEMORY;
+	goto state_init_failed;
+    }
+
+    /* Initialize the bmi, flow, trove and job interfaces */
+    ret = server_initialize_subsystems(server_level_init);
+    if (ret < 0)
+    {
+	gossip_err("Error: Could not initialize server interfaces; "
+                   "aborting.\n");
+	goto state_init_failed;
+    }
+
+    /* Initialize table of state machines (no return value) */
+    server_state_table_initialize();
+
+    /* Post starting set of BMI unexpected msg buffers */
+    for (i = 0; i < server_config.initial_unexpected_requests; i++)
+    {
+	ret = server_post_unexpected_recv(&job_status_structs[i]);
+	if (ret < 0)
+	{
+	    *server_level_init = CHECK_DEPS_QUEUE;
+	    goto state_init_failed;
+	}
+    }
+
+    *server_level_init = UNEXPECTED_BMI_FAILURE;
+
+    ret = server_setup_signal_handlers();
+
+    gossip_debug(SERVER_DEBUG, "Initialization completed successfully.\n");
+
+  state_init_failed:
+    return ret;
+}
+
+/* server_setup_process_environment()
+ *
+ * Handles:
+ * - chdir() to / to prevent busy file systems
+ * - setting known umask
+ * - possibly backgrounding
+ *   - fork(), setsid(), etc.
+ *   - redirecting gossip output to file
+ *
+ * Returns 0 on success.
+ */
+static int server_setup_process_environment(int background)
+{
+
+    chdir("/");  /* avoid busy file systems */
+    umask(0077); /* let's have a deterministic umask too */
+
+    if (background) {
+	int ret;
+	char fn[] = "/tmp/pvfs2-server.log"; /* placeholder */
+
+	assert(0);
+
+	/* become a daemon, redirect log to file */
+
+	ret = fork();
+	if (ret < 0) {
+	    exit(1); /* couldn't fork?!? */
+	}
+
+	ret = setsid();
+	if (ret < 0) {
+	    exit(2);
+	}
+
+	/* TODO: LOOK OVER STEVEN'S TEXT ON DAEMONIZING, DO WHATEVER
+	 * ELSE HE SUGGESTS FOR RANDOM PLATFORMS.
+	 */
+
+	if (ret > 0) exit(0); /* parent goes away */
+	
+	ret = gossip_enable_file(fn, "a");
+	if (ret < 0) exit(3); /* couldn't open log! */
+    }
+    else {
+	/* stay in the foreground, direct log to stderr */
+
+	/* note: gossip has already been directed to stderr
+	 *       at this point; nothing to do?
+	 */
+    }
+
+    return 0;
+}
+
+/* server_initialize_subsystems()
+ *
+ * This:
+ * - initializes encoding/decoding subsystem
+ * - initializes BMI
+ * - initializes Trove
+ *   - gets a context from Trove
+ *   - finds the collection IDs for all file systems
+ *   - tells Trove what handles are to be used for each file system (collection)
+ * - initializes the flow subsystem
+ * - initializes the job subsystem
+ *   - gets a job context
+ * - initialize the request scheduler
+ */
+static int server_initialize_subsystems(PINT_server_status_code *server_level_init)
 {
     int ret = 0;
     char *method_name = NULL;
@@ -104,17 +395,19 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 	goto interface_init_failed;
     }
 
-    printf("Passing in %s\n",user_opts.host_id);
-    ret = BMI_initialize("bmi_tcp", user_opts.host_id, BMI_INIT_SERVER);
+    printf("Passing %s to BMI as listen address.\n",server_config.host_id);
+
+    /* initialize BMI */
+    ret = BMI_initialize("bmi_tcp", server_config.host_id, BMI_INIT_SERVER);
     if (ret < 0)
     {
 	gossip_err("BMI_initialize Failed: %s\n", strerror(-ret));
 	*server_level_init = SHUTDOWN_ENCODE_INTERFACE;
 	goto interface_init_failed;
     }
-    gossip_debug(SERVER_DEBUG, "BMI Init Complete\n");
 
-    ret = trove_initialize(user_opts.storage_path, 0, &method_name, 0);
+    /* initialize Trove */
+    ret = trove_initialize(server_config.storage_path, 0, &method_name, 0);
     if (ret < 0)
     {
 	gossip_err("Trove Init Failed: %s\n", strerror(-ret));
@@ -123,7 +416,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
         {
             gossip_err("\n*****************************\n");
             gossip_err("Invalid Storage Space: %s\n\n",
-		       user_opts.storage_path);
+		       server_config.storage_path);
             gossip_err("Storage initialization failed.  The most "
 		       "common reason\nfor this is that the storage space "
 		       "has not yet been\ncreated or is located on a "
@@ -136,7 +429,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 	goto interface_init_failed;
     }
 
-    cur = user_opts.file_systems;
+    cur = server_config.file_systems;
     while(cur)
     {
         cur_fs = llist_head(cur);
@@ -145,7 +438,9 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
             break;
         }
         ret = trove_collection_lookup(cur_fs->file_system_name,
-                                      &(cur_fs->coll_id),NULL,NULL);
+                                      &(cur_fs->coll_id),
+				      NULL,
+				      NULL);
 	if (ret < 0)
 	{
 	    gossip_lerr("Error initializing filesystem %s\n",
@@ -159,31 +454,27 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
         assert(ret == 0);
 
         /*
-          get a range string that combines all handles for both meta
-          and data ranges specified in the config file.
-
-          the server isn't concerned with what allocation of handles
-          are meta and which are data at this level, so we lump them
-          all together and hand them to trove-handle-mgmt.
-        */
+         * get a range string that combines all handles for both meta
+         * and data ranges specified in the config file.
+         *
+         * the server isn't concerned with what allocation of handles
+         * are meta and which are data at this level, so we lump them
+         * all together and hand them to trove-handle-mgmt.
+         */
         cur_merged_handle_range =
-            PINT_server_config_get_merged_handle_range_str(
-                &user_opts,cur_fs);
-
-        gossip_debug(SERVER_DEBUG, "Using handles:\n  %s\n",
-                     cur_merged_handle_range);
+            PINT_server_config_get_merged_handle_range_str(&server_config, cur_fs);
 
         /*
-          error out if we're not configured to house either a
-          meta or data handle range at all.
-        */
+         * error out if we're not configured to house either a
+         * meta or data handle range at all.
+	 */
         if (!cur_merged_handle_range)
         {
 	    gossip_lerr("Error: Invalid handle range for host %s "
                         "(alias %s) specified in file system %s\n",
-                        user_opts.host_id,
-                        PINT_server_config_get_host_alias_ptr(
-                            &user_opts,user_opts.host_id),
+                        server_config.host_id,
+                        PINT_server_config_get_host_alias_ptr(&server_config,
+							      server_config.host_id),
                         cur_fs->file_system_name);
 	    goto interface_init_failed;
         }
@@ -191,16 +482,23 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
         {
             /* add configured merged handle range for this host/fs */
             ret = trove_collection_setinfo(
-                cur_fs->coll_id,0,
-                TROVE_COLLECTION_HANDLE_RANGES,
-                (void *)cur_merged_handle_range);
+					   cur_fs->coll_id,0,
+					   TROVE_COLLECTION_HANDLE_RANGES,
+					   (void *)cur_merged_handle_range);
             if (ret < 0)
             {
                 gossip_lerr("Error adding handle range %s to "
-                            "filesystem %s\n",cur_merged_handle_range,
+                            "filesystem %s\n",
+			    cur_merged_handle_range,
                             cur_fs->file_system_name);
                 goto interface_init_failed;
             }
+
+	    gossip_debug(SERVER_DEBUG, "File system %s using handles: %s\n",
+			 cur_fs->file_system_name,
+			 cur_merged_handle_range);
+
+
             free(cur_merged_handle_range);
         }
 
@@ -212,18 +510,16 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     gossip_debug(SERVER_DEBUG, "Storage Init Complete (non-threaded)\n");
 #endif
     gossip_debug(SERVER_DEBUG, "%d filesystem(s) initialized\n",
-                 llist_count(user_opts.file_systems));
+                 llist_count(server_config.file_systems));
 
     /* initialize the flow interface */
-    ret =
-	PINT_flow_initialize("flowproto_bmi_trove,flowproto_dump_offsets", 0);
+    ret = PINT_flow_initialize("flowproto_bmi_trove,flowproto_dump_offsets", 0);
     if (ret < 0)
     {
 	gossip_err("Flow_initialize Failed: %s\n", strerror(-ret));
 	*server_level_init = SHUTDOWN_FLOW_INTERFACE;
 	goto interface_init_failed;
     }
-    gossip_debug(SERVER_DEBUG, "Flow Init Complete\n");
 
     /* initialize Job Interface */
     ret = job_initialize(0);
@@ -235,90 +531,12 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     }
     
     ret = job_open_context(&PINT_server_job_context);
-    if(ret < 0)
+    if (ret < 0)
     {
 	gossip_err("Error opening job context.\n");
 	*server_level_init = SHUTDOWN_JOB_INTERFACE;
 	goto interface_init_failed;
     }
-
-    gossip_debug(SERVER_DEBUG, "Job Init Complete\n");
-
-  interface_init_failed:
-    return ret;
-}
-
-
-/* Registers signal handlers. returns < 0 on error. */
-static int initialize_signal_handlers(void)
-{
-    int ret = 1;
-
-    /* Register Signals */
-    signal(SIGHUP, (void *) sig_handler);
-    signal(SIGILL, (void *) sig_handler);
-#if 0
-/* #ifdef USE_SIGACTION */
-    act.sa_handler = (void *) sig_handler;
-    act.sa_mask = 0;
-    act.sa_flags = 0;
-    if (sigaction(SIGHUP, &act, NULL) < 0)
-    {
-	gossip_err("Error Registering Signal SIGHUP.\nProgram Terminating.\n");
-	goto sh_init_failed;
-    }
-    if (sigaction(SIGSEGV, &act, NULL) < 0)
-    {
-	gossip_err("Error Registering Signal SIGSEGV.\nProgram Terminating.\n");
-	goto sh_init_failed;
-    }
-    if (sigaction(SIGPIPE, &act, NULL) < 0)
-    {
-	gossip_err("Error Registering Signal SIGPIPE.\nProgram Terminating.\n");
-	goto sh_init_failed;
-    }
-/* #else */
-    signal(SIGSEGV, (void *) sig_handler);
-    signal(SIGPIPE, (void *) sig_handler);
-
-  sh_init_failed:
-#endif
-    ret = 0;
-    return ret;
-}
-
-
-/*
-  Initializes the server interfaces, state machine, req scheduler,
-  posts the bmi unexpected buffers, and registers signal handlers.
-  returns < 0 on error and sets the passed in server status code
-  to the appropriate value for proper server shutdown.
-*/
-static int initialize_server_state(PINT_server_status_code *server_level_init,
-                                   PINT_server_op *s_op,
-				   job_status_s *job_status_structs)
-{
-    int ret = 0, i = 0;
-
-    /* initialize the bmi, flow, trove and job interfaces */
-    ret = initialize_interfaces(server_level_init);
-    if (ret < 0)
-    {
-	gossip_err("Error: Could not initialize server interfaces; "
-                   "aborting.\n");
-	goto state_init_failed;
-    }
-
-    /* initialize table of state machines */
-    ret = PINT_state_table_initialize();
-    if (ret < 0)
-    {
-	gossip_err("Error initializing state machine table: %s\n",
-		strerror(-ret));
-	*server_level_init = SHUTDOWN_HIGH_LEVEL_INTERFACE;
-	goto state_init_failed;
-    }
-    gossip_debug(SERVER_DEBUG, "State Machine Init Complete\n");
 
     /* initialize Server Request Scheduler */
     ret = PINT_req_sched_initialize();
@@ -327,272 +545,31 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
 	gossip_err("Error initializing Request Scheduler interface: %s\n",
 		strerror(-ret));
 	*server_level_init = STATE_MACHINE_HALT;
-	goto state_init_failed;
+	goto interface_init_failed;
     }
-    gossip_debug(SERVER_DEBUG, "Request Scheduler Init Complete\n");
 
-    /* Below, we initially post BMI unexpected msg buffers =) */
-    for (i = 0; i < user_opts.initial_unexpected_requests; i++)
-    {
-	ret = initialize_new_server_op(&job_status_structs[i]);
-	if (ret < 0)
-	{
-	    *server_level_init = CHECK_DEPS_QUEUE;
-	    goto state_init_failed;
-	}
-    }	/* End of BMI Unexpected Requests rof */
-    gossip_debug(SERVER_DEBUG, "All BMI_unexp Posted\n");
-
-    *server_level_init = UNEXPECTED_BMI_FAILURE;
-
-    ret = initialize_signal_handlers();
-
-  state_init_failed:
+interface_init_failed:
     return ret;
 }
 
-
-int main(int argc, char **argv)
+/* server_setup_signal_handlers()
+ */
+static int server_setup_signal_handlers(void)
 {
-    /* Used to check completion of interface initializations */
     int ret = 1;
 
-    /* Inside for loop variable */
-    int i = 0;
+    /* Register Signals */
+    signal(SIGHUP, (void *) server_sig_handler);
+    signal(SIGILL, (void *) server_sig_handler);
 
-    /* Flag used to post new BMI Unexpected messages */
-    int postBMIFlag = 0;
-
-    /* Total number of jobs from job_wait_world */
-    int out_count = 0;
-
-    /* Used for user_pointers that come out of job_wait_world */
-    PINT_server_op *s_op = NULL;
-
-    /* Job ID Array used in job_wait_world */
-    job_id_t job_id_array[MAX_JOBS];
-
-    /* User Pointer Array used in job_wait_world */
-    void *completed_job_pointers[MAX_JOBS];
-
-    /* Status Structures used in job_wait_world */
-    job_status_s job_status_structs[MAX_JOBS];
-
-    /* Passed to server shutdown function */
-    server_level_init = STATUS_UNKNOWN;
-
-    /* When we get a signal, we are thread based, so we need to make
-       sure that one, the parent has the signal, and two, none of the 
-       threads are blocking on a semaphore.  Yet another cool error
-       found and resolved.  dw
-     */
-    signal_recvd_flag = 0;
-
-    /* Enable the gossip interface. */
-    gossip_enable_stderr();
-    gossip_set_debug_mask(1, SERVER_DEBUG);
-
-    /* Sanity Check 1. Make sure we are root */
-    if ((getuid() != 0) && (geteuid() != 0))
-    {
-	gossip_err("WARNING: Server should be run as root\n");
-    }
-
-    /* 
-     *      Read configuration options...
-     * function located in server_config.c
-     */
-    if (server_parse_cmd_line_args(argc, argv) != 0) {
-	goto server_shutdown;
-    }
-    if (PINT_server_config(&user_opts, argv[optind], argv[optind + 1]))
-    {
-	gossip_err("Fatal Error: This server requires a valid "
-                   "configuration for operation.\nPlease check your "
-                   "configuration setting.  Server aborting.\n");
-	goto server_shutdown;
-    }
-
-    /* make sure the configuration file is valid */
-    if (!PINT_server_config_is_valid_configuration(&user_opts))
-    {
-	gossip_err("Error: Invalid configuration; aborting.\n");
-	goto server_shutdown;
-    }
-
-    /* check if we need to create a storage space and exit */
-    if (server_create_storage_space)
-    {
-        return PINT_server_config_pvfs2_mkspace(&user_opts);
-    }
-
-    /* perform initial steps to run as a server  */
-    ret = server_init();	
-    if (ret < 0)
-    {
-	gossip_err("Error: Could not start server; aborting.\n");
-	server_level_init = DEALLOC_INIT_MEMORY;
-	goto server_shutdown;
-    }
-
-    if (MAX_JOBS < user_opts.initial_unexpected_requests)
-    {
-	gossip_err("Error: initial_unexpected request value is too "
-                   "large; aborting.\n");
-	server_level_init = DEALLOC_INIT_MEMORY;
-	goto server_shutdown;
-    }
-
-    ret = initialize_server_state(&server_level_init,s_op, job_status_structs);
-    if (ret < 0)
-    {
-	gossip_err("Error: Could not initialize server; aborting.\n");
-	goto server_shutdown;
-    }
-    server_level_init = UNEXPECTED_POSTINIT_FAILURE;
-
-    /* The do work forever loop. */
-    while (1)
-    {
-	out_count = MAX_JOBS;
-	if (signal_recvd_flag != 0)
-	{
-	    ret = signal_recvd_flag;
-	    goto server_shutdown;
-	}
-	/* TODO: use a named default value for the timeout eventually */
-	ret = job_testcontext(job_id_array, &out_count,
-		completed_job_pointers, job_status_structs, 100,
-		PINT_server_job_context);
-	if (ret < 0)
-	{
-	    gossip_lerr("FREAK OUT.\n");
-	    exit(-1);
-	}
-
-	for (i = 0; i < out_count; i++)
-	{
-	    s_op = (PINT_server_op *) completed_job_pointers[i];
-
-	    /* 
-	       There are two possibilities here.
-	       1.  The operation is a new request (Unexpected).  We will
-	           fall into the if() loop.
-
-	       2.  The operation was previously posted to the job
-	           interface.  We need to continue operation on this.
-		   We do not need to perform the additional unexpected 
-		   message overhead.
-	     */
-	    ret = 1;
-
-	    /* Case 1.  Unexpected message overhead.*/
-	    if (s_op->op == BMI_UNEXP)
-	    {
-		postBMIFlag = 1;
-		ret = PINT_state_machine_start(s_op, &job_status_structs[i]);
-	    }
-	    
-	    /* 
-	       Right here, both case 1 and case 2 merge.  
-	       
-	       If the operation was originally case 1, then ret reflects 
-	       the completion of the first state for the respective operation.
-	       NOTE: that ret can now be <= 0.
-
-	       Otherwise, ret has not been altered from the original 
-	       assignment of 1.  Therefore will will enter this loop and perform
-	       work on this request.
-	    */
-	       
-            while (ret == 1)
-            {
-                ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
-            }
-
-	    if (ret < 0)
-	    {
-		gossip_lerr("Error on job %d, Return Code: %d\n", i, ret);
-		server_level_init = UNEXPECTED_LOOP_END;
-		ret = 1;
-		goto server_shutdown;
-		/* if ret < 0 oh no... job mechanism died */
-		/* TODO: fix this */
-	    }
-
-	    if (postBMIFlag) /* unexpected message */
-	    {
-		postBMIFlag = 0;
-		ret = initialize_new_server_op(&job_status_structs[i]);
-		if (ret < 0)
-		{
-		    /* TODO: do something here, the return value was
-		     * not being checked for failure before.  I just
-		     * put something here to make it exit for the
-		     * moment.  -Phil
-		     */
-		    gossip_lerr("Error: NOT HANDLED.\n");
-		    exit(-1);
-		}
-	    }
-	} /* ... for i < out_count */
-    } /* ... while (1) */
-    server_level_init = UNEXPECTED_LOOP_END;
-
-  server_shutdown:
-    server_shutdown(server_level_init, ret, 0);
-    return -1;	/* Should never get here */
+    ret = 0;
+    return ret;
 }
 
-
-/* server_init()
+/* server_shutdown()
  *
- * performs initialization steps for server program
- *
- * returns 0 on success, -errno on failure
+ * Tries to figure out what has been done so far and clean things up.
  */
-
-static int server_init(void)
-{
-#ifdef DEBUG
-    char logname[] = "/tmp/pvfs_server.log";
-    int logfd;
-#endif
-
-    /* create a child process to continue execution */
-#if 0
-    ret = fork();
-    if (ret < 0)
-    {
-	return (-errno);
-    }
-    if (ret > 0)
-    {
-	exit(0);	/* kill the parent */
-    }
-
-    setsid();	/* Become the parent */
-    umask(0);
-#endif
-    chdir("/");	/* avoid busy filesystems */
-
-    /* Now we need a log file...          
-     * 
-     * NOTE: Will not run if DEBUG is set 
-     */
-#ifdef DEBUG
-    gossip_ldebug(SERVER_DEBUG, "Log Init\n");
-    gossip_enable_file("/tmp/pvfsServer.log", "a");
-#else
-    gossip_debug(SERVER_DEBUG, "Logging was skipped b/c DEBUG Flag set\n"
-                 "Output will be displayed onscreen\n");
-#endif
-
-    return (0);
-}
-
-/* For fatal errors, and SIG */
-
 static int server_shutdown(PINT_server_status_code level,
 			   int ret,
 			   int siglevel)
@@ -629,7 +606,7 @@ static int server_shutdown(PINT_server_status_code level,
 	gossip_disable();
     case DEALLOC_INIT_MEMORY:
 	/* De-alloc any memory we have */
-        PINT_server_config_release(&user_opts);
+        PINT_server_config_release(&server_config);
     case STATUS_UNKNOWN:
     default:
 	if (siglevel == 0)
@@ -643,41 +620,20 @@ static int server_shutdown(PINT_server_status_code level,
 
 }
 
-/* Signal Handling */
-
-static void *sig_handler(int sig)
+/* server_sig_handler()
+ */
+static void *server_sig_handler(int sig)
 {
     gossip_debug(SERVER_DEBUG, "Got Signal %d... Level...%d\n",
-	    sig, (int)server_level_init);
+		 sig,
+		 (int)server_level_init);
     signal_recvd_flag = sig;
-#if 0
-    if (sig == SIGSEGV)
-    {
-	exit(-1);
-    }
-    else if (sig == 1)
-    {
-	exit(server_shutdown(server_level_init, 0, 0));
-	/* if we get a restart, what to do now? */
-    }
-#ifndef USE_SIGACTION
-    signal(sig, (void *) sig_handler);
-#endif
-    if (sig == SIGPIPE)
-    {
-	return (0);
-    }
-    exit(-1);
-#endif
     return NULL;
 
 }
 
-struct server_configuration_s *get_server_config_struct(void)
-{
-    return &user_opts;
-}
-
+/* server_parse_cmd_line_args()
+ */
 static int server_parse_cmd_line_args(int argc, char **argv)
 {
     int opt;
@@ -701,7 +657,18 @@ static int server_parse_cmd_line_args(int argc, char **argv)
     return 0;
 }
 
-static int initialize_new_server_op(job_status_s *temp_stat)
+/* server_post_unexpected_recv()
+ *
+ * Allocates space for an unexpected BMI message and posts this.
+ *
+ * Returns 0 on success, < 0 on error.
+ *
+ * TODO:
+ * - FIX RETURN VALUE TO BE MORE HELPFUL
+ * - INVESTIGATE KEEPING A FIXED NUMBER OF PINT_SERVER_OPS AROUND TO AVOID
+ *   MALLOC/FREE
+ */
+static int server_post_unexpected_recv(job_status_s *temp_stat)
 {
     int ret;
     job_id_t j_id;
@@ -741,8 +708,111 @@ static int initialize_new_server_op(job_status_s *temp_stat)
 	free(s_op);
 	return -1; /* TODO: ????????? */
     }
+
     return 0;
 }
+
+/* server_state_machine_start()
+ *
+ * initializes fields in the s_op structure and begins execution of
+ * the appropriate state machine
+ *
+ * returns 0 on success, -errno on failure
+ */
+static int server_state_machine_start(PINT_server_op *s_op, job_status_s *ret)
+{
+    int retval = -1;
+
+    retval = PINT_decode(s_op->unexp_bmi_buff.buffer,
+		PINT_ENCODE_REQ,
+		&s_op->decoded,
+		s_op->unexp_bmi_buff.addr,
+		s_op->unexp_bmi_buff.size);
+    if(retval < 0)
+    {
+	return(retval);
+    }
+
+    s_op->req  = (struct PVFS_server_req *) s_op->decoded.buffer;
+    assert(s_op->req != NULL);
+
+    s_op->addr = s_op->unexp_bmi_buff.addr;
+    s_op->tag  = s_op->unexp_bmi_buff.tag;
+    s_op->op   = s_op->req->op;
+    s_op->current_state = PINT_state_machine_locate(s_op);
+
+    if(!s_op->current_state)
+    {
+	gossip_err("System not init for function\n");
+	return(-1);
+    }
+
+    s_op->resp.op = s_op->req->op;
+
+    return ((s_op->current_state->state_action))(s_op,ret);
+}
+
+/* server_state_table_initialize()
+ *
+ * sets up a table of state machines that can be located with
+ * PINT_state_machine_locate()
+ *
+ */
+static void server_state_table_initialize(void)
+{
+
+    /* fill in indexes for each supported request type */
+    PINT_server_op_table[PVFS_SERV_INVALID]       = NULL;
+    PINT_server_op_table[PVFS_SERV_CREATE]        = &pvfs2_create_sm;
+    PINT_server_op_table[PVFS_SERV_REMOVE]        = &pvfs2_remove_sm;
+    PINT_server_op_table[PVFS_SERV_IO]            = &pvfs2_io_sm;
+    PINT_server_op_table[PVFS_SERV_GETATTR]       = &pvfs2_get_attr_sm;
+    PINT_server_op_table[PVFS_SERV_SETATTR]       = &pvfs2_set_attr_sm;
+    PINT_server_op_table[PVFS_SERV_LOOKUP_PATH]   = &pvfs2_lookup_sm;
+    PINT_server_op_table[PVFS_SERV_CREATEDIRENT]  = &pvfs2_crdirent_sm;
+    PINT_server_op_table[PVFS_SERV_RMDIRENT]      = &pvfs2_rmdirent_sm;
+    PINT_server_op_table[PVFS_SERV_MKDIR]         = &pvfs2_mkdir_sm;
+    PINT_server_op_table[PVFS_SERV_READDIR]       = &pvfs2_readdir_sm;
+    PINT_server_op_table[PVFS_SERV_GETCONFIG]     = &pvfs2_get_config_sm;
+    PINT_server_op_table[PVFS_SERV_FLUSH]	  = &pvfs2_flush_sm;
+    PINT_server_op_table[PVFS_SERV_MGMT_SETPARAM] = &pvfs2_setparam_sm;
+}
+
+/* server_state_machine_complete()
+ *
+ * function to be called at the completion of state machine execution;
+ * it frees up any resources associated with the state machine that were
+ * allocated before the state machine started executing.  Also returns
+ * appropriate return value to make the state machine stop transitioning
+ *
+ * returns 0
+ *
+ * TODO: keep a pool of state structures, and just return this one to the
+ *       pool here.
+ */
+int server_state_machine_complete(PINT_server_op *s_op)
+{
+    /* release the decoding of the unexpected request */
+    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
+
+    /* free the buffer that the unexpected request came in on */
+    free(s_op->unexp_bmi_buff.buffer);
+
+    /* free the operation structure itself */
+    free(s_op);
+
+    return 0;
+}
+
+/* get_server_config_struct()
+ *
+ * Note: used externally
+ */
+struct server_configuration_s *get_server_config_struct(void)
+{
+    return &server_config;
+}
+
 
 /*
  * Local variables:

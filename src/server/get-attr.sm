@@ -450,7 +450,7 @@ static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
             free(s_op->resp.u.getattr.attr.u.meta.dist);
     }
 
-    return(PINT_state_machine_complete(s_op));
+    return(server_state_machine_complete(s_op));
 }
 
 /*

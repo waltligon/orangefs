@@ -21,5 +21,4 @@ SERVERGENSRC := \
 # "normal" c files
 SERVERSRC += \
 	$(DIR)/pvfs2-server.c \
-	$(DIR)/server-state-machine.c \
 	$(SERVERGENSRC)

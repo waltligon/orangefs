@@ -178,7 +178,8 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
 static int mkdir_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
     PINT_STATE_DEBUG("cleanup");
-    return(PINT_state_machine_complete(s_op));
+
+    return(server_state_machine_complete(s_op));
 }
 
 /* TODO: fix comment block */

@@ -26,7 +26,7 @@ enum
 {
     PVFS2_DEBUG_SERVER = 32,
     BMI_UNEXP = 999, /* Give the Server the idea of what BMI_Unexpected Ops are */
-    MAX_JOBS = 10 /* also defined in a config file, but nice to have */
+    PVFS_SERVER_MAX_JOBS = 10 /* also defined in a config file, but nice to have */
 };
 
 
@@ -244,6 +244,22 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 
 /* Globals for Server Interface */
 
+
+/* server operation state machines */
+extern struct PINT_state_machine_s pvfs2_get_config_sm;
+extern struct PINT_state_machine_s pvfs2_get_attr_sm;
+extern struct PINT_state_machine_s pvfs2_set_attr_sm;
+extern struct PINT_state_machine_s pvfs2_create_sm;
+extern struct PINT_state_machine_s pvfs2_crdirent_sm;
+extern struct PINT_state_machine_s pvfs2_mkdir_sm;
+extern struct PINT_state_machine_s pvfs2_readdir_sm;
+extern struct PINT_state_machine_s pvfs2_lookup_sm;
+extern struct PINT_state_machine_s pvfs2_io_sm;
+extern struct PINT_state_machine_s pvfs2_remove_sm;
+extern struct PINT_state_machine_s pvfs2_rmdirent_sm;
+extern struct PINT_state_machine_s pvfs2_flush_sm;
+extern struct PINT_state_machine_s pvfs2_setparam_sm;
+
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;
@@ -254,6 +270,10 @@ struct server_configuration_s *get_server_config_struct(void);
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_server_op
 #define PINT_OP_STATE_TABLE PINT_server_op_table
+
+/* exported state machine resource reclamation function */
+int server_state_machine_complete(PINT_server_op *s_op);
+
 
 #include "state-machine.h"
 

@@ -392,7 +392,7 @@ static int remove_cleanup(PINT_server_op *s_op,
 {
     PINT_STATE_DEBUG("cleanup");
 
-    return(PINT_state_machine_complete(s_op));
+    return(server_state_machine_complete(s_op));
 }
 
 /*

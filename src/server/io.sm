@@ -368,7 +368,7 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 		PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 	}
 
-	return(PINT_state_machine_complete(s_op));
+	return(server_state_machine_complete(s_op));
 }
 
 /*
