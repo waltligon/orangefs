@@ -7,6 +7,8 @@ pvfs2-1.1.0pre1
 ===============
 - network protocol: more 64-bit alignment fixes
 - build: hide karma details in its module.mk
+- build: remove duplicate commands used for QUIET_COMPILE
+- build: fix test configure library detection
 -
 
 

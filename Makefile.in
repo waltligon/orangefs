@@ -68,9 +68,22 @@ BUILD_KARMA = @BUILD_KARMA@
 BUILD_EPOLL = @BUILD_EPOLL@
 GNUC = @GNUC@
 INTELC = @INTELC@
-# override default quiet mode with "make V=1"
-ifndef V
-  QUIET_COMPILE = @QUIET_COMPILE@
+# configure default is silent, unless --enable-verbose-build in
+# which case QUIET_COMPILE will _not_ be defined.  Further allow
+# silence to be overriden with "make V=1".
+QUIET_COMPILE = @QUIET_COMPILE@
+ifdef V
+    QUIET_COMPILE = 0
+endif
+
+ifeq ($(QUIET_COMPILE),1)
+  # say a one-line description of the action, do not echo the command
+  Q=@echo
+  E=@
+else
+  # do not say the short Q lines, but do echo the entire command
+  Q=@echo >/dev/null
+  E=
 endif
 
 # build which client libs
@@ -496,88 +509,49 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 
 # rule for building the pvfs2 server
 $(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a 
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $^ -o $@ $(LDFLAGS) $(SERVERLIBS)
-else
-	$(LD) $^ -o $@ $(LDFLAGS) $(SERVERLIBS)
-endif
+	$(Q) "  LD		$@"
+	$(E)$(LD) $^ -o $@ $(LDFLAGS) $(SERVERLIBS)
 
 # special rules for admin tools which also require server components
 $(ADMINTOOLS_SERVER): %: %.o
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
-else
-	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
-endif
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 
 # rule for building the pvfs2 library
 lib/libpvfs2.a: $(LIBOBJS)
-ifdef QUIET_COMPILE
-	@echo "  RANLIB	$@"
-	@$(INSTALL) -d lib
-	@ar rcs $@ $(LIBOBJS)
-else
-	$(INSTALL) -d lib
-	ar rcs $@ $(LIBOBJS)
-endif
+	$(Q) "  RANLIB	$@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(LIBOBJS)
 
 # rule for building the _multithreaded_ pvfs2 library
 lib/libpvfs2-threaded.a: $(LIBTHREADEDOBJS)
-ifdef QUIET_COMPILE
-	@echo "  RANLIBTHREADED	$@"
-	@$(INSTALL) -d lib
-	@ar rcs $@ $(LIBTHREADEDOBJS)
-else
-	$(INSTALL) -d lib
-	ar rcs $@ $(LIBTHREADEDOBJS)
-endif
+	$(Q) "  RANLIBTHREADED	$@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(LIBTHREADEDOBJS)
 
 # rule for building the pvfs2 library
 lib/libpvfs2.so: $(LIBPICOBJS)
-ifdef QUIET_COMPILE
-	@echo "  LDSO		$@"
-	@$(INSTALL) -d lib
-	@$(LDSHARED) -o $@ $(LIBPICOBJS)
-else
-	$(INSTALL) -d lib
-	$(LDSHARED) -o $@ $(LIBPICOBJS)
-endif
+	$(Q) "  LDSO		$@"
+	$(E)$(INSTALL) -d lib
+	$(E)$(LDSHARED) -o $@ $(LIBPICOBJS)
 
 # rule for building the pvfs2 _multithreaded_ library
 lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
-ifdef QUIET_COMPILE
-	@echo "  LDSO		$@"
-	@$(INSTALL) -d lib
-	@$(LDSHARED) -o $@ $(LIBTHREADEDPICOBJS)
-else
-	$(INSTALL) -d lib
-	$(LDSHARED) -o $@ $(LIBTHREADEDPICOBJS)
-endif
-
+	$(Q) "  LDSO		$@"
+	$(E)$(INSTALL) -d lib
+	$(E)$(LDSHARED) -o $@ $(LIBTHREADEDPICOBJS)
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
-ifdef QUIET_COMPILE
-	@echo "  RANLIB	$@"
-	@$(INSTALL) -d lib
-	@ar rcs $@ $(SERVEROBJS)
-else
-	$(INSTALL) -d lib
-	ar rcs $@ $(SERVEROBJS)
-endif
-
+	$(Q) "  RANLIB	$@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(SERVEROBJS)
 
 # rule for building vis objects
 $(VISOBJS): %.o: %.c
 ifdef BUILD_VIS
-ifdef QUIET_COMPILE
-	@echo "  CC		$@"
-	@$(CC) $(VISCFLAGS) $< -c -o $@
-else
-	$(CC) $(VISCFLAGS) $< -c -o $@
-endif
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(VISCFLAGS) $< -c -o $@
 else
 	@echo Error: libraries needed by vis tools not detected.
 	@false
@@ -586,23 +560,15 @@ endif
 # rule for building karma gui and its objects
 ifdef BUILD_KARMA
 $(KARMA): $(KARMAOBJS) $(LIBRARIES)
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $(KARMAOBJS) -o $@ $(LDFLAGS) $(LIBS) $(call modldflags,$<)
-else
-	$(LD) $(KARMAOBJS) -o $@ $(LDFLAGS) $(LIBS) $(call modldflags,$<)
-endif
+	$(Q) "  LD		$@"
+	$(E)$(LD) $(KARMAOBJS) -o $@ $(LDFLAGS) $(LIBS) $(call modldflags,$<)
 endif
 
 # rule for building vis misc. objects
 $(VISMISCOBJS): %.o: %.c
 ifdef BUILD_VIS
-ifdef QUIET_COMPILE
-	@echo "  CC		$@"
-	@$(CC) $(VISCFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(CC) $(VISCFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(VISCFLAGS) $(call modcflags,$<) $< -c -o $@
 else
 	@echo Error: libraries needed by vis tools not detected.
 	@false
@@ -610,92 +576,52 @@ endif
 
 # rule for building vis executables from object files
 $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $^ $(LDFLAGS) $(VISLIBS) -o $@
-else
-	$(LD) $^ $(LDFLAGS) $(VISLIBS) -o $@
-endif
+	$(Q) "  LD		$@"
+	$(E)$(LD) $^ $(LDFLAGS) $(VISLIBS) -o $@
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $(LDFLAGS) $< $(LIBS) -o $@
-else
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
-endif
+	$(Q) "  LD		$@"
+	$(E)$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 # rule for building server objects
 %-server.o: %.c
-ifdef QUIET_COMPILE
-	@echo "  CC		$@"
-	@$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # default rule for building objects for threaded library
 %-threaded.o: %.c
-ifdef QUIET_COMPILE
-	@echo "  CC		$@"
-	@$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # rule for building shared objects for threaded library
 %-threaded.po: %.c
-ifdef QUIET_COMPILE
-	@echo "  CCPIC		$@"
-	@$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
+	$(Q) "  CCPIC		$@"
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # default rule for building objects 
 %.o: %.c
-ifdef QUIET_COMPILE
-	@echo "  CC		$@"
-	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # rule for building shared objects 
 %.po: %.c
-ifdef QUIET_COMPILE
-	@echo "  CCPIC		$@"
-	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
+	$(Q) "  CCPIC		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # handy rule to generate cpp-output file, for debugging
 .PHONY: FORCE
 %-server.i: %.c FORCE
-ifdef QUIET_COMPILE
-	@echo "  CPP		$@"
-	@$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
-else
-	$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
-endif
+	$(Q) "  CPP		$@"
+	$(E)$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
 
 %.i: %.c FORCE
-ifdef QUIET_COMPILE
-	@echo "  CPP		$@"
-	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
-else
-	$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
-endif
+	$(Q) "  CPP		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
 
 %-threaded.i: %.c FORCE
-ifdef QUIET_COMPILE
-	@echo "  CPP		$@"
-	@$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
-else
-	$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
-endif
+	$(Q) "  CPP		$@"
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
 
 # all applications depend on the pvfs2 library
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
@@ -735,9 +661,8 @@ docsclean:
 
 # top rule for cleaning up tree
 clean:: 
-ifdef QUIET_COMPILE
-	@echo "  CLEAN"
-	@rm -f $(LIBOBJS) $(SERVEROBJS) $(MISCOBJS) \
+	$(Q) "  CLEAN"
+	$(E)rm -f $(LIBOBJS) $(SERVEROBJS) $(MISCOBJS) \
 		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
@@ -746,17 +671,6 @@ ifdef QUIET_COMPILE
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
 		src/server/pvfs2-server-server.o \
 		src/apps/karma/karma
-else
-	rm -f $(LIBOBJS) $(SERVEROBJS) $(MISCOBJS) \
-		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) \
-		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
-		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-		$(KERNAPPOBJS) $(KERNAPPS) \
-		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
-		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
-		src/server/pvfs2-server-server.o \
-		src/apps/karma/karma
-endif
 
 ifneq (,$(LINUX_KERNEL_SRC))
 clean::
@@ -811,21 +725,13 @@ nodep:; @:
 
 # rule for generating dependency files for vis code
 $(VISDEPENDS) $(VISMISCDEPENDS): %.d: %.c
-ifdef QUIET_COMPILE
-	@echo "  DEP		$@"
-else
-	@echo generating vis dependency file $@.
-endif
-	@$(srcdir)/maint/depend.sh `dirname $*` $(VISCFLAGS) $(call modcflags,$<) $< > $@
+	$(Q) "  DEP		$@"
+	$(E)$(srcdir)/maint/depend.sh `dirname $*` $(VISCFLAGS) $(call modcflags,$<) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c
-ifdef QUIET_COMPILE
-	@echo "  DEP		$@"
-	@$(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
-else
-	$(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
-endif
+	$(Q) "  DEP		$@"
+	$(E)$(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
 
 # default rules for building documents in .tex format:
 # TODO: these documentation rules are a big hack!
@@ -843,12 +749,8 @@ ifndef DIST_RELEASE
 # rule for automatically generated source files
 # NOTE: this rule is disabled in release snapshots
 %.c: %.sm src/common/statecomp/statecomp
-ifdef QUIET_COMPILE
-	@echo "  SMC		$@"
-	@src/common/statecomp/statecomp $< $@
-else
-	src/common/statecomp/statecomp $< $@
-endif
+	$(Q) "  SMC		$@"
+	$(E)src/common/statecomp/statecomp $< $@
 endif
 
 # if this is not a distribution tarball, then drop some example
@@ -858,35 +760,21 @@ ifndef DIST_RELEASE
 all: src/server/simple.conf src/server/server.conf-localhost
 endif
 src/server/simple.conf src/server/server.conf-localhost: src/apps/admin/pvfs2-genconfig
-ifdef QUIET_COMPILE
-	@echo "  GENCONFIG     $@"
-	@$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
+	$(Q) "  GENCONFIG     $@"
+	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
  --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
  --storage /tmp/pvfs2-test-space --logging "server,network,storage,flow" \
  --quiet src/server/simple.conf src/server/server.conf
-else
-	$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
- --storage /tmp/pvfs2-test-space --logging "server,network,storage,flow" \
- --quiet src/server/simple.conf src/server/server.conf
-endif
 
 # whether this is a distribution tarball or not, drop some config files
 # into the "examples" subdir of the build dir
 all: examples/fs.conf examples/server.conf-localhost
 examples/fs.conf examples/server.conf-localhost: src/apps/admin/pvfs2-genconfig
-ifdef QUIET_COMPILE
-	@echo "  GENCONFIG     $@"
-	@$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
+	$(Q) "  GENCONFIG     $@"
+	$(E)$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
  --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
  --storage /tmp/pvfs2-test-space \
  --quiet examples/fs.conf examples/server.conf
-else
-	$(srcdir)/src/apps/admin/pvfs2-genconfig --protocol tcp --port 3334 \
- --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
- --storage /tmp/pvfs2-test-space \
- --quiet examples/fs.conf examples/server.conf
-endif
 
 install_doc:
 	install -d $(mandir)/man1

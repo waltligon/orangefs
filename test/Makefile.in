@@ -21,8 +21,19 @@ INTELC = @INTELC@
 MPI_GNUC = @MPI_GNUC@
 MPI_INTELC = @MPI_INTELC@
 # override default quiet mode with "make V=1"
-ifndef V
-  QUIET_COMPILE = @QUIET_COMPILE@
+QUIET_COMPILE = @QUIET_COMPILE@
+ifdef V
+    QUIET_COMPILE = 0
+endif
+
+ifeq ($(QUIET_COMPILE),1)
+  # say a one-line description of the action, do not echo the command
+  Q=@echo
+  E=@
+else
+  # do not say the short Q lines, but do echo the entire command
+  Q=@echo >/dev/null
+  E=
 endif
 
 # some of the test programs require the use of the pvfs2 server library;
@@ -237,12 +248,8 @@ endif
 # rule for building MPI objects
 $(MPITESTOBJS): %.o: %.c
 ifdef BUILD_MPI
-ifdef QUIET_COMPILE
-	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
+	$(Q) "  MPICC		$@"
+	$(E)$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
 	@echo   in order to enable compilation of MPI programs.
@@ -252,12 +259,8 @@ endif
 # rule for building MPI-IO objects
 $(MPIIOTESTOBJS): %.o: %.c
 ifdef BUILD_MPI
-ifdef QUIET_COMPILE
-	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
+	$(Q) "  MPICC		$@"
+	$(E)$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
 	@echo   in order to enable compilation of MPI programs.
@@ -267,12 +270,8 @@ endif
 # rule for building MPI misc. objects
 $(MPIMISCOBJS): %.o: %.c
 ifdef BUILD_MPI
-ifdef QUIET_COMPILE
-	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
+	$(Q) "  MPICC		$@"
+	$(E)$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
 	@echo   in order to enable compilation of MPI programs.
@@ -281,40 +280,24 @@ endif
 
 # rule for building MPI executables from object files
 $(MPITESTS): %: %.o $(MPIMISCOBJS) $(LIBRARIES)
-ifdef QUIET_COMPILE
-	@echo "  MPILD		$@"
-	@$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
-else
-	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
-endif
+	$(Q) "  MPILD		$@"
+	$(E)$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
 
 # rule for building MPI-IO executables from object files
 # note: add a $(MPIMISCOBJS) prereq if we build multi-object tests someday
 $(MPIIOTESTS): %: %.o $(LIBRARIES)
-ifdef QUIET_COMPILE
-	@echo "  MPILD		$@"
-	@$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
-else
-	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
-endif
+	$(Q) "  MPILD		$@"
+	$(E)$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $(LDFLAGS) $< $(LIBS) -o $@
-else
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
-endif
+	$(Q) "  LD		$@"
+	$(E)$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 # default rule for building objects 
 %.o: %.c
-ifdef QUIET_COMPILE
-	@echo "  CC		$@"
-	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # all test programs depend on the pvfs2 library
 $(TESTS): %: %.o $(LIBRARIES)
@@ -335,18 +318,11 @@ tags:
 
 # top rule for cleaning up tree
 clean:: 
-ifdef QUIET_COMPILE
-	@echo "  CLEAN"
-	@rm -f $(TESTOBJS) $(MISCOBJS) $(TESTS)\
+	$(Q) "  CLEAN"
+	$(E)rm -f $(TESTOBJS) $(MISCOBJS) $(TESTS)\
 		$(DEPENDS) $(CLEANFILES) $(MPIMISCOBJS)\
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS)\
 		$(MPIIOTESTS)
-else
-	@rm -f $(TESTOBJS) $(MISCOBJS) $(TESTS)\
-		$(DEPENDS) $(CLEANFILES) $(MPIMISCOBJS)\
-		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS)\
-		$(MPIIOTESTS)
-endif
 
 # some stuff that is cleaned in both distclean and dist targets
 cleaner: clean
@@ -377,30 +353,18 @@ nodep:; @:
 # note: mpi-depend.sh is automatically generated, so it is in
 #       the build directory already.
 $(MPITESTDEPENDS) $(MPIMISCDEPENDS): %.d: %.c
-ifdef QUIET_COMPILE
-	@echo "  DEP		$@"
-else
-	@echo generating mpitest dependency file $@.
-endif
-	@sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $(call modcflags,$<) $< > $@
+	$(Q) "  DEP		$@"
+	$(E)sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $(call modcflags,$<) $< > $@
 
 # rule for generating dependency files for karma
 $(KARMADEPENDS): %.d: %.c
-ifdef QUIET_COMPILE
-	@echo "  DEP		$@"
-else
-	@echo generating karma dependency file $@.
-endif
-	@$(pvfs2_srcdir)/maint/depend.sh `dirname $*` $(KARMACFLAGS) $(call modcflags,$<) $< > $@
+	$(Q) "  DEP		$@"
+	$(E)$(pvfs2_srcdir)/maint/depend.sh `dirname $*` $(KARMACFLAGS) $(call modcflags,$<) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c
-ifdef QUIET_COMPILE
-	@echo "  DEP		$@"
-	@$(pvfs2_srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
-else
-	$(pvfs2_srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
-endif
+	$(Q) "  DEP		$@"
+	$(E)$(pvfs2_srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
 
 install:: 
 	install -d @PVFS2_TOP_PREFIX@/bin

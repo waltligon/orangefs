@@ -7,12 +7,8 @@ SERVERSRC += \
 #disable the rule below if this is a release snapshot
 ifndef DIST_RELEASE
 $(DIR)/trove-autogen.c: $(DIR)/trove-proto.h maint/trove-autogen.pl
-ifdef QUIET_COMPILE
-	@echo "  GEN		$@"
-	@$(srcdir)/maint/trove-autogen.pl < $< > $@
-else
-	$(srcdir)/maint/trove-autogen.pl < $< > $@
-endif
+	$(Q) "  GEN		$@"
+	$(E)$(srcdir)/maint/trove-autogen.pl < $< > $@
 endif
 
 TROVE_AUTOGEN_FILES += $(DIR)/trove-autogen.c

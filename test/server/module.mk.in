@@ -4,9 +4,5 @@ TESTSRC += \
 	$(DIR)/showconfig.c
 
 test/server/showconfig: test/server/showconfig.o lib/libpvfs2-server.a
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $^ $(LDFLAGS) $(SERVERLIBS) -o $@
-else
-	$(LD) $^ $(LDFLAGS) $(SERVERLIBS) -o $@
-endif
+	$(Q) "  LD		$@"
+	$(E)$(LD) $^ $(LDFLAGS) $(SERVERLIBS) -o $@

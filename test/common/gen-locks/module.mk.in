@@ -7,21 +7,13 @@ TESTSRC += \
 # for the null locking example, we want to set the right defines at
 # compile time
 $(DIR)/test-null-lock.o: $(DIR)/test-null-lock.c
-ifdef QUIET_COMPILE
-	@echo "  CC		$@"
-	@$(CC) $< $(CFLAGS) -D__GEN_NULL_LOCKING__ -c -o $@
-else
-	$(CC) $< $(CFLAGS) -D__GEN_NULL_LOCKING__ -c -o $@
-endif
+	$(Q) "  CC		$@"
+	$(E)$(CC) $< $(CFLAGS) -D__GEN_NULL_LOCKING__ -c -o $@
 
 # for the pthread locking example, we use default defines (and thus
 # stick with the implicit compile rule), but we need to add an extra lib
 # when linking
 $(DIR)/test-pthread-lock: $(DIR)/test-pthread-lock.o
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(LIBS) -lpthread -o $@
-else
-	$(LD) $< $(LDFLAGS) $(LIBS) -lpthread -o $@
-endif
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(LIBS) -lpthread -o $@
 

@@ -23,9 +23,5 @@ MODCFLAGS_$(DIR) = -I$(pvfs2_srcdir)/test/io/trove
 
 LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_JOB_DIR_SRC))
 $(LOCALTESTS): %: %.o $(TEST_IO_JOB_DIR)/job-help.o
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $< $(TEST_IO_JOB_DIR)/job-help.o $(LDFLAGS) $(SERVERLIBS) -o $@
-else
-	$(LD) $< $(TEST_IO_JOB_DIR)/job-help.o $(LDFLAGS) $(SERVERLIBS) -o $@
-endif
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(TEST_IO_JOB_DIR)/job-help.o $(LDFLAGS) $(SERVERLIBS) -o $@

@@ -27,7 +27,7 @@ AC_SUBST(SRC_ABSOLUTE_TOP)
 dnl Check if user actually wants to see all our build output (compiles, links, etc.).
 AC_ARG_ENABLE(verbose-build,
 [  --enable-verbose-build  Enables full output during build process],
-,
+QUIET_COMPILE=0,
 QUIET_COMPILE=1)
 
 AC_SUBST(QUIET_COMPILE)
@@ -117,9 +117,6 @@ dnl make sure we actually were supplied all of the PVFS2 components we need
 AC_CHECK_HEADER(pvfs2-config.h, ,
     AC_MSG_ERROR("could not find pvfs2-config.h... must specify path to PVFS2 src with --with-pvfs2-src")
     )
-AC_CHECK_LIB(pvfs2, PVFS_sys_create, ,
-    AC_MSG_ERROR("could not find libpvfs2... must specify path to PVFS2 installation or build tree with --with-pvfs2 or --with-pvfs2-src ${LDFLAGS}"), -lpthread
-    )
 
 dnl ask pvfs2-config to tell us what libraries to use for client and server
 dnl tests
@@ -128,6 +125,11 @@ SERVERLIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --se
 PVFS2_TOP_PREFIX=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --prefix`
 AC_SUBST(SERVERLIBS)
 AC_SUBST(PVFS2_TOP_PREFIX)
+
+dnl make sure the libs exist and work
+AC_CHECK_LIB(pvfs2, PVFS_sys_create, ,
+    AC_MSG_ERROR("could not find libpvfs2... must specify path to PVFS2 installation or build tree with --with-pvfs2-build")
+    )
 
 MPI_INTELC=
 MPI_GNUC=

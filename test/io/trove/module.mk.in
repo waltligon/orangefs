@@ -23,12 +23,8 @@ TESTSRC += $(LOCALTESTSRC)
 
 LOCALTESTS := $(patsubst %.c,%, $(LOCALTESTSRC))
 $(LOCALTESTS): %: %.o
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
-else
-	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
-endif
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 
 # get listio declarations
 MODCFLAGS_$(DIR)/test-listio-aio-convert.c = -I$(pvfs2_srcdir)/src/io/trove/trove-dbpf
