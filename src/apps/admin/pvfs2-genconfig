@@ -357,6 +357,8 @@ sub gm_get_port
 }
 sub get_ionames
 {
+	my($ioline);
+	$ioline ='';
 	if (!$opt_quiet) {
 		print "Next you must list the hostnames of the machines that will act as\n";
 		print "I/O servers.  Acceptable syntax is \"node1, node2, ...\" or \"node{#-#,#,#}\".\n";
@@ -376,6 +378,8 @@ sub get_ionames
 
 sub get_metanames
 {
+	my($metaline);
+	$metaline = '';
 	if (!$opt_quiet) {
 		print "Now list the hostnames of the machines that will act as Metadata\n";
 		print "servers.  This list may or may not overlap with the I/O server list.\n";
@@ -588,10 +592,8 @@ for($i = 0; $i <= $#union_aliases; $i++)
     # and open server.conf files
     if ($using_stdout == 0)
     {
-        $output_target = FILEOUT + $i + 10;
-
         $filename = "$ARGV[1]-$union_aliases[$i]";
-        unless (open($output_target, ">", $filename))
+        unless (open(FILEOUT, ">", $filename))
         {
             print STDERR "Can't open specified file $ARGV[1]: $!\n";
             return;
@@ -601,7 +603,7 @@ for($i = 0; $i <= $#union_aliases; $i++)
 
     if ($using_stdout == 0)
     {
-        close($output_target);
+        close(FILEOUT);
     }
 }
 print "Done.\n";
