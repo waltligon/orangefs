@@ -11,6 +11,7 @@
 #include "pvfs2-types.h"
 #include "pint-perf-counter.h"
 #include "gossip.h"
+#include "gen-locks.h"
 
 /* TODO: maybe this should just be malloc'd? */
 /* TODO: maybe dimensions should be reversed?  look at which dimension is
@@ -22,6 +23,8 @@ static uint64_t perf_count_start_times_ms[PINT_PERF_HISTORY_SIZE];
 static int perf_count_head = 0;
 static int perf_count_tail = 0;
 
+static gen_mutex_t perf_mutex = GEN_MUTEX_INITIALIZER;
+
 /* PINT_perf_initialize()
  *
  * initializes performance monitoring subsystem
@@ -31,6 +34,8 @@ static int perf_count_tail = 0;
 int PINT_perf_initialize(void)
 {
     struct timeval tv;
+
+    gen_mutex_lock(&perf_mutex);
 
     /* zero out counters */
     memset(perf_count_matrix, 0, 
@@ -46,6 +51,7 @@ int PINT_perf_initialize(void)
     perf_count_start_times_ms[perf_count_head] = tv.tv_sec*1000 +
 	tv.tv_usec/1000;
 
+    gen_mutex_unlock(&perf_mutex);
     return(0);
 }
 
@@ -72,6 +78,7 @@ void PINT_perf_count(enum PINT_perf_count_keys key,
     int64_t value,
     enum PINT_perf_ops op)
 {
+    gen_mutex_lock(&perf_mutex);
     switch(op)
     {
 	case PINT_PERF_ADD:
@@ -84,6 +91,7 @@ void PINT_perf_count(enum PINT_perf_count_keys key,
 	    assert(0);
 	    break;
     }
+    gen_mutex_unlock(&perf_mutex);
 
     return;
 }
@@ -101,6 +109,8 @@ void PINT_perf_rollover(void)
     uint32_t old_id;
     struct timeval tv;
 
+    gen_mutex_lock(&perf_mutex);
+
     old_id = perf_count_id[perf_count_head];
 
     /* shift head of performance counters */
@@ -111,7 +121,7 @@ void PINT_perf_rollover(void)
 	perf_count_tail = (perf_count_tail+1)%PINT_PERF_HISTORY_SIZE;
 
     /* zero out everything in the current counter set */
-    for(i=0; i<PINT_PERF_COUNT_KEY_MAX; i++)
+    for(i=0; i<=PINT_PERF_COUNT_KEY_MAX; i++)
     {
 	perf_count_matrix[i][perf_count_head] = 0;
     }
@@ -123,6 +133,8 @@ void PINT_perf_rollover(void)
     gettimeofday(&tv, NULL);
     perf_count_start_times_ms[perf_count_head] = 
 	tv.tv_sec*1000 + tv.tv_usec/1000;
+
+    gen_mutex_unlock(&perf_mutex);
 
     return;
 }
@@ -142,6 +154,8 @@ void PINT_perf_retrieve(
 {
     int tmp_tail;
     int tmp_index = 0;
+
+    gen_mutex_lock(&perf_mutex);
 
     tmp_tail = perf_count_tail;
 
@@ -179,6 +193,9 @@ void PINT_perf_retrieve(
     /* update next_id to what the client should ask for next */
     *next_id = perf_count_id[tmp_tail];
     *end_time_ms = perf_count_start_times_ms[tmp_tail];
+
+    gen_mutex_unlock(&perf_mutex);
+
     return;
 }
 
