@@ -1188,6 +1188,8 @@ static int io_find_target_datafiles(PVFS_Request io_req,
 	    memset(&tmp_result, 0, sizeof(PINT_Request_result));
 	    tmp_result.bytemax = io_req_offset;
 	    tmp_result.segmax = INT_MAX;
+	    /* TODO: this is a a hack for now */
+	    tmp_file_data.fsize = INT64_MAX;
 
 	    /* PINT_Process_request() returns number of bytes processed */
 	    ret = PINT_Process_request(req_state,
@@ -1210,6 +1212,7 @@ static int io_find_target_datafiles(PVFS_Request io_req,
 	memset(&tmp_result, 0, sizeof(PINT_Request_result));
 	tmp_result.bytemax = 1;
 	tmp_result.segmax = 1;
+	tmp_file_data.fsize = 0;  
 
 	/* PINT_Process_request() returns number of bytes processed */
 	ret = PINT_Process_request(req_state,

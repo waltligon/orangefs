@@ -1289,7 +1289,7 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 	tmp_result.segmax = INT_MAX;
 	tmp_result.bytemax = flow_d->io_req_offset;
 	ret = PINT_Process_request(flow_d->io_req_state, NULL,
-	    flow_d->file_data, &flow_d->result, PINT_CKSIZE_LOGICAL_SKIP);
+	    flow_d->file_data, &tmp_result, PINT_CKSIZE_LOGICAL_SKIP);
 	if(ret < 0)
 	{
 	    free(flow_data);
