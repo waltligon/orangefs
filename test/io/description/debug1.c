@@ -74,7 +74,6 @@ int main(int argc, char **argv)
 	seg1.bytemax = BYTEMAX;
 	seg1.segs = 0;
 	seg1.bytes = 0;
-	seg1.eof_flag = 0;
 
 	seg2.offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
 	seg2.size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
@@ -82,7 +81,6 @@ int main(int argc, char **argv)
 	seg2.bytemax = BYTEMAX;
 	seg2.segs = 0;
 	seg2.bytes = 0;
-	seg2.eof_flag = 0;
 
    /* Turn on debugging */
 	/* gossip_enable_stderr();
@@ -107,14 +105,14 @@ int main(int argc, char **argv)
 			}
 		}
 
-	} while(!PINT_REQUEST_STATE_DONE(rs1) && retval >= 0);
+	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0);
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
 	printf("final file size %lld\n", rf1.fsize);
-	if(PINT_REQUEST_STATE_DONE(rs1))
+	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** first request done.\n");
 	}
@@ -137,7 +135,7 @@ int main(int argc, char **argv)
 			}
 		}
 
-	} while(!PINT_REQUEST_STATE_DONE(rs2) && retval >= 0);
+	} while(!PINT_REQUEST_DONE(rs2) && retval >= 0);
 	
 	if(retval < 0)
 	{
@@ -145,7 +143,7 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 	printf("final file size %lld\n", rf2.fsize);
-	if(PINT_REQUEST_STATE_DONE(rs2))
+	if(PINT_REQUEST_DONE(rs2))
 	{
 		printf("**** second request done.\n");
 	}

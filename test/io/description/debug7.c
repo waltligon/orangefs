@@ -49,7 +49,6 @@ int main(int argc, char **argv)
 	seg1.size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
 	seg1.bytemax = BYTEMAX;
 	seg1.segmax = SEGMAX;
-	seg1.eof_flag = 0;
 	seg1.bytes = 0;
 	seg1.segs = 0;
 
@@ -62,21 +61,12 @@ int main(int argc, char **argv)
 
 	PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512);
 	
-	/* this test not needed */
-	if(PINT_REQUEST_STATE_OFFSET(rs1) == -1)
-	{
-	    printf("bytes: %d\n", (int)seg1.bytes);
-	    printf("CRAP, we hit state == -1\n");
-	    return(-1);
-	}
-
 	/* need to reset bytemax before we contrinue */
 	/*seg1.bytemax = BYTEMAX;*/
 
 	printf("\n************************************\n");
 	do
 	{
-		seg1.eof_flag = 0;
 		seg1.bytes = 0;
 		seg1.segs = 0;
 
@@ -94,14 +84,14 @@ int main(int argc, char **argv)
 			}
 		}
 
-	} while(!PINT_REQUEST_STATE_DONE(rs1) && retval >= 0);
+	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_DONE(rs1))
+	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** request done.\n");
 	}

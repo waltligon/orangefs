@@ -73,8 +73,11 @@ typedef struct PINT_Request_state {
 	PVFS_offset  type_offset;  /* logical offset within request type */
 	PVFS_offset  target_offset;/* first type offset to process */
 	PVFS_offset  final_offset; /* last type offset to process */
-	PVFS_offset  file_offset;	/* last file offset in previous call to process */
-	PVFS_offset  start_offset;	/* first file offset in next call to process - probably obsolete because not used */
+#if 0
+	PVFS_offset  file_offset;	/* last file offset in previous call to process*/
+	PVFS_offset  start_offset;
+#endif
+	PVFS_boolean eof_flag;     /* is file at end of flile */
 } PINT_Request_state;           
 /* NOTE - I think buf_offset is superceded by type_offset
  * and start_offset can be completely replced with last_offset
@@ -89,7 +92,6 @@ typedef struct PINT_Request_result {
 	int32_t      segs;         /* number of segments output */
 	PVFS_size    bytemax;      /* maximum number of bytes to output */
 	PVFS_size    bytes;        /* number of bytes output */
-	PVFS_boolean eof_flag;     /* is file at end of flile */
 } PINT_Request_result;
 
 typedef struct PINT_Request_file_data {
@@ -117,6 +119,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset,
 		PINT_Request_file_data *rfdata,
 		PINT_Request_state *mem,
 		PINT_Request_result *result,
+		PVFS_boolean *eof_flag,
 		int mode);
 
 /* pack request from node into a contiguous buffer pointed to by region */
@@ -155,13 +158,15 @@ int PINT_Request_decode(struct PINT_Request *req);
 #define PINT_REQUEST_TOTAL_BYTES(reqp)\
 	((reqp)->aggregate_size)
 
+#if 0
 /* returns the start_offset */
 #define PINT_REQUEST_STATE_OFFSET(reqp)\
-	((reqp)->start_offset)
+ 	((reqp)->start_offset)
 
 /* sets the start_offset to the given value */
 #define PINT_REQUEST_STATE_SET_OFFSET(reqp,val)\
-	((reqp)->start_offset) = (val)
+ 	((reqp)->start_offset) = (val)
+#endif
 
 /* sets the target_offset to the given value */
 #define PINT_REQUEST_STATE_SET_TARGET(reqp,val)\
@@ -178,7 +183,8 @@ int PINT_Request_decode(struct PINT_Request *req);
 	((reqp)->lvl) = 0;\
 	((reqp)->bytes) = 0;\
 	((reqp)->type_offset) = 0;\
-	((reqp)->file_offset) = 0;\
+/*	((reqp)->file_offset) = 0;*/\
+	((reqp)->eof_flag) = 0;\
 	((reqp)->cur[0].el) = 0;\
 	((reqp)->cur[0].rq) = ((reqp)->cur[0].rqbase);\
 	((reqp)->cur[0].blk) = 0;\
@@ -190,23 +196,17 @@ int PINT_Request_decode(struct PINT_Request *req);
 #define PINT_REQUEST_STATE_RESET(reqp)\
 	do {\
 	PINT_REQUEST_STATE_RST(reqp);\
-	PINT_REQUEST_STATE_SET_OFFSET((reqp),0);\
+/*	PINT_REQUEST_STATE_SET_OFFSET((reqp),0);*/\
 	}while(0)
 
 /* checks to see if you have run out of request */
-#define PINT_REQUEST_STATE_DONE(reqp)\
+#define PINT_REQUEST_DONE(reqp)\
 	(((reqp)->type_offset >= (reqp)->final_offset) ||\
-	 ((reqp)->start_offset == -1))
+	 ((reqp)->eof_flag))
 
 /* checks to see if you have hit EOF */
-#define PINT_REQUEST_RESULT_DONE(resp)\
-	  (resp)->eof_flag
-
-/* checks to see if you have run out of request or segments or bytes 
- * or hit EOF */
-#define PINT_REQUEST_DONE(reqp,resp)\
-	(PINT_REQUEST_STATE_DONE(reqp) ||\
-	 PINT_REQUEST_RESULT_DONE(resp))
+#define PINT_REQUEST_EOF(reqp)\
+	  (reqp)->eof_flag
 
 /* set ref count of request to 1
  * never modify a refcount below zero

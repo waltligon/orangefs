@@ -126,7 +126,6 @@ int main(int argc, char **argv)
 	seg1.bytemax = BYTEMAX;
 	seg1.segs = 0;
 	seg1.bytes = 0;
-	seg1.eof_flag = 0;
 
    /* Turn on debugging */
 	/* gossip_enable_stderr(); */
@@ -135,7 +134,6 @@ int main(int argc, char **argv)
 	printf("\n************************************\n");
 	do
 	{
-		seg1.eof_flag = 0;
 		seg1.bytes = 0;
 		seg1.segs = 0;
 
@@ -145,7 +143,7 @@ int main(int argc, char **argv)
 		 */
 		retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
 
-		if(!PINT_REQUEST_STATE_DONE(rs1))
+		if(!PINT_REQUEST_DONE(rs1))
 		{
 			fprintf(stderr, "IEEE! reporting more work to do when I should really be done...\n");
 		}
@@ -167,14 +165,14 @@ int main(int argc, char **argv)
 
 
 
-	} while(!PINT_REQUEST_STATE_DONE(rs1) && retval >= 0); 
+	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0); 
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_DONE(rs1))
+	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** first request done.\n");
 	}
@@ -182,7 +180,6 @@ int main(int argc, char **argv)
 	printf("\n************************************\n");
 	do
 	{
-		seg1.eof_flag = 0;
 		seg1.bytes = 0;
 		seg1.segs = 0;
 
@@ -192,7 +189,7 @@ int main(int argc, char **argv)
 		 */
 		retval = PINT_Process_request(rs2, NULL, &rf2, &seg1, PINT_SERVER);
 
-		if(!PINT_REQUEST_STATE_DONE(rs2))
+		if(!PINT_REQUEST_DONE(rs2))
 		{
 			fprintf(stderr, "IEEE! reporting more work to do when I should really be done...\n");
 		}
@@ -212,14 +209,14 @@ int main(int argc, char **argv)
 			}
 		}
 
-	} while(!PINT_REQUEST_STATE_OFFSET(rs2) && retval >= 0);
+	} while(!PINT_REQUEST_DONE(rs2) && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_DONE(rs2))
+	if(PINT_REQUEST_DONE(rs2))
 	{
 		printf("**** second request done.\n");
 	}
@@ -227,7 +224,6 @@ int main(int argc, char **argv)
 	printf("\n************************************\n");
 	do
 	{
-		seg1.eof_flag = 0;
 		seg1.bytes = 0;
 		seg1.segs = 0;
 
@@ -237,7 +233,7 @@ int main(int argc, char **argv)
 		 */
 		retval = PINT_Process_request(rs3, NULL, &rf3, &seg1, PINT_SERVER);
 
-		if(!PINT_REQUEST_STATE_DONE(rs3))
+		if(!PINT_REQUEST_DONE(rs3))
 		{
 			fprintf(stderr, "IEEE! reporting more work to do when I should really be done...\n");
 		}
@@ -257,14 +253,14 @@ int main(int argc, char **argv)
 			}
 		}
 
-	} while(PINT_REQUEST_STATE_OFFSET(rs3) != -1 && retval >= 0);
+	} while(!PINT_REQUEST_DONE(rs3) && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_OFFSET(rs3) == -1)
+	if(PINT_REQUEST_DONE(rs3))
 	{
 		printf("**** third request done.\n");
 	}
@@ -273,7 +269,6 @@ int main(int argc, char **argv)
 	printf("\n************************************\n");
 	do
 	{
-		seg1.eof_flag = 0;
 		seg1.bytes = 0;
 		seg1.segs = 0;
 
@@ -283,7 +278,7 @@ int main(int argc, char **argv)
 		 */
 		retval = PINT_Process_request(rs4, NULL, &rf4, &seg1, PINT_SERVER);
 
-		if(!PINT_REQUEST_STATE_DONE(rs4))
+		if(!PINT_REQUEST_DONE(rs4))
 		{
 			fprintf(stderr, "IEEE! reporting more work to do when I should really be done...\n");
 		}
@@ -303,14 +298,14 @@ int main(int argc, char **argv)
 			}
 		}
 
-	} while(!PINT_REQUEST_STATE_DONE(rs4) && retval >= 0);
+	} while(!PINT_REQUEST_DONE(rs4) && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_DONE(rs4))
+	if(PINT_REQUEST_DONE(rs4))
 	{
 		printf("**** fourth request done.\n");
 	}

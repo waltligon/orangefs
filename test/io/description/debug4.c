@@ -67,7 +67,6 @@ int main(int argc, char **argv)
 	seg1.size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
 	seg1.bytemax = BYTEMAX;
 	seg1.segmax = SEGMAX;
-	seg1.eof_flag = 0;
 	seg1.bytes = 0;
 	seg1.segs = 0;
 
@@ -78,7 +77,6 @@ int main(int argc, char **argv)
 	printf("\n************************************\n");
 	do
 	{
-		seg1.eof_flag = 0;
 		seg1.bytes = 0;
 		seg1.segs = 0;
 
@@ -96,14 +94,14 @@ int main(int argc, char **argv)
 			}
 		}
 
-	} while(!PINT_REQUEST_STATE_DONE(rs1) && retval >= 0);
+	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_DONE(rs1))
+	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** first request done.\n");
 	}
@@ -111,7 +109,6 @@ int main(int argc, char **argv)
 	printf("\n************************************\n");
 	do
 	{
-		seg1.eof_flag = 0;
 		seg1.bytes = 0;
 		seg1.segs = 0;
 
@@ -129,14 +126,14 @@ int main(int argc, char **argv)
 			}
 		}
 
-	} while(!PINT_REQUEST_STATE_DONE(rs2) && retval >= 0);
+	} while(!PINT_REQUEST_DONE(rs2) && retval >= 0);
 	
 	if(retval < 0)
 	{
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_OFFSET(rs2))
+	if(PINT_REQUEST_DONE(rs2))
 	{
 		printf("**** second request done.\n");
 	}

@@ -93,12 +93,14 @@ int PINT_Process_request(PINT_Request_state *req,
 	}
 	/* initialize some variables */
 	retval = 0;
+#if 0
 	if (req->start_offset == -1)
 	{
 		/* this indicates we already finished the request */
 		gossip_lerr("PINT_Process_request: start offset -1!\n");
 		return 0;
 	}
+#endif
 	if (PINT_EQ_CKSIZE(mode)) /* be must be exact here */
 	{
 		/* request for a size check - do not alter request state */
@@ -113,16 +115,19 @@ int PINT_Process_request(PINT_Request_state *req,
 				req->cur,(sizeof(PINT_reqstack)*req->cur->rqbase->depth));
 		req->cur = (PINT_reqstack *)(temp_space + sizeof(PINT_Request_state));
 	}
+#if 0
 	gossip_debug(REQUEST_DEBUG,"\tstart_offset == %lld\n", req->start_offset);
 	gossip_debug(REQUEST_DEBUG,"\tfile_offset == %lld\n", req->file_offset);
+#endif
 	/* check to see if we are picking up where we left off */
-	if (req->lvl < 0 || req->start_offset < req->file_offset)
+	if (req->lvl < 0 /*|| req->start_offset < req->file_offset */)
 	{
 		gossip_debug(REQUEST_DEBUG,
-				"\trequested start_offset before current offset\n");
+				"\tRequest state level < 0 - resetting request state\n");
 		/* reinitialize the request state to zero */
 		PINT_REQUEST_STATE_RST(req);
 	}
+#if 0
 	/* deal with seeking over some bytes (file offset) */
 	if (req->start_offset > req->file_offset)
 	{
@@ -135,11 +140,12 @@ int PINT_Process_request(PINT_Request_state *req,
 		/* here we prevent external setting of SEEKING */
 		PINT_CLR_SEEKING(mode);
 	}
+#endif
 	/* deal with skipping over some bytes (type offset) */
 	if (req->target_offset > req->type_offset)
 	{
 		gossip_debug(REQUEST_DEBUG,"\tskipping ahead to target_offset\n");
-		/* find start_offset in request structure */
+		/* find starting offset in request structure */
 		PINT_SET_LOGICAL_SKIP(mode);
 	}
 	else
@@ -231,6 +237,7 @@ int PINT_Process_request(PINT_Request_state *req,
 			result->offset_array[result->segs] = req->type_offset;
 		}
 		/*** BEFORE CALLING DISTRIBUTE ***/
+#if 0
 		if (PINT_IS_SEEKING(mode))
 		{
 			gossip_debug(REQUEST_DEBUG,"\tprocess seek\n");
@@ -258,7 +265,9 @@ int PINT_Process_request(PINT_Request_state *req,
 						"\tskipping whole block rv:%lld\n", retval);
 			}
 		}
-		else if (PINT_IS_LOGICAL_SKIP(mode))
+		else 
+#endif
+			if (PINT_IS_LOGICAL_SKIP(mode))
 		{
 			gossip_debug(REQUEST_DEBUG,"\tprocess logical skip\n");
 			if (req->type_offset + contig_size >= req->target_offset)
@@ -272,21 +281,21 @@ int PINT_Process_request(PINT_Request_state *req,
 				retval = contig_size;
 			}
 			/* does this need to be here - or should it be elsewhere */
-			result->eof_flag = (rfdata->fsize <= req->type_offset) &&
+			req->eof_flag = (rfdata->fsize <= req->type_offset) &&
 				!(rfdata->extend_flag);
 		}
 		/*** CALLING DISTRIBUTE - OR WHATEVER ***/
 		else /* not logical skip or seeking */
 		{
+			PVFS_size sz = contig_size; /* don't modify contig_size here */
 			/* stop at final offset */
-			if (req->type_offset + contig_size > req->final_offset)
+			if (req->type_offset + sz > req->final_offset)
 			{
-				contig_size = req->final_offset - req->type_offset;
+				sz = req->final_offset - req->type_offset;
 			}
 			/* memreq mode doesn't do distribution */
 			if (PINT_IS_MEMREQ(mode))
 			{
-				PVFS_size sz = contig_size;
 				/* check for too many bytes or segs */
 				if (result->bytes + sz >= result->bytemax )
 				{
@@ -299,8 +308,8 @@ int PINT_Process_request(PINT_Request_state *req,
 			{
 				/* we process the whole thing at once */
 				gossip_debug(REQUEST_DEBUG,"\tcalling distribute\n");
-				retval = PINT_Distribute(contig_offset, contig_size,
-						rfdata, mem, result, mode);
+				retval = PINT_Distribute(contig_offset, sz,
+						rfdata, mem, result, &req->eof_flag, mode);
 			}
 		}
 		/*** AFTER CALLING DISTRIBUTE ***/
@@ -310,6 +319,7 @@ int PINT_Process_request(PINT_Request_state *req,
 		{
 			/* no so record the bytes processed */
 			req->bytes += retval;
+#if 0
 			if (PINT_IS_SEEKING(mode))
 			{
 				/* now starting processing for real */
@@ -318,7 +328,9 @@ int PINT_Process_request(PINT_Request_state *req,
 						"\texiting seek because distribute indicates done\n");
 				continue;
 			}
-			else if (PINT_IS_LOGICAL_SKIP(mode))
+			else
+#endif
+				if (PINT_IS_LOGICAL_SKIP(mode))
 			{
 				/* now starting processing for real */
 				PINT_CLR_LOGICAL_SKIP(mode);
@@ -391,7 +403,8 @@ int PINT_Process_request(PINT_Request_state *req,
 			break;
 		}
 	} /* this is the end of the while loop */
-	if (req->lvl < 0 /*|| result->eof_flag*/)
+#if 0
+	if (req->lvl < 0 /*|| req->eof_flag*/)
 	{
 		req->start_offset = -1;
 	}
@@ -403,11 +416,12 @@ int PINT_Process_request(PINT_Request_state *req,
 				(req->cur[req->lvl].rq->stride * req->cur[req->lvl].blk)) +
 				req->bytes;
 	}
+#endif
 	gossip_debug(REQUEST_DEBUG,"\tdone ");
-	gossip_debug(REQUEST_DEBUG,"sg %d sm %d by %lld bm %lld so %lld to %lld fo %lld eof %d\n",
+	gossip_debug(REQUEST_DEBUG,"sg %d sm %d by %lld bm %lld ta %lld to %lld fo %lld eof %d\n",
 			result->segs, result->segmax, result->bytes, result->bytemax,
-			req->start_offset, req->type_offset, req->final_offset,
-			result->eof_flag);
+			req->target_offset, req->type_offset, req->final_offset,
+			req->eof_flag);
 	if (PINT_EQ_CKSIZE(mode)) /* must be exact here */
 	{
 		/* restore request state */
@@ -433,8 +447,9 @@ struct PINT_Request_state *PINT_New_request_state (PINT_Request *request)
 	req->type_offset = 0;
 	req->target_offset = 0;
 	req->final_offset = request->aggregate_size;
-	req->file_offset = 0;
-	req->start_offset = 0;
+/*	req->file_offset = 0; */
+/*	req->start_offset = 0; */
+	req->eof_flag = 0;
 	/* we assume null request is a contiguous byte range depth 1 */
 	if (request)
 	{
@@ -489,7 +504,7 @@ void PINT_Free_request_state (PINT_Request_state *req)
  */
 PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 		PINT_Request_file_data *rfdata, PINT_Request_state *mem,
-		PINT_Request_result *result, int mode)
+		PINT_Request_result *result, PVFS_boolean *eof_flag, int mode)
 {
 	PVFS_offset orig_offset;
 	PVFS_size   orig_size;
@@ -508,7 +523,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 			rfdata->fsize, rfdata->extend_flag);
 	orig_offset = offset;
 	orig_size = size;
-	result->eof_flag = 0;
+	*eof_flag = 0;
 	if ((!PINT_IS_CKSIZE(mode) && (result->segs >= result->segmax)) ||
 			result->bytes >= result->bytemax || size == 0)
 	{
@@ -561,7 +576,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 				gossip_debug(REQUEST_DEBUG,
 						"\t\thit end of file: po %lld sz %lld fsz %lld\n",
 						poff, sz, rfdata->fsize);
-				result->eof_flag = 1;
+				*eof_flag = 1;
 				sz = rfdata->fsize - poff;
 				if (sz <= 0)
 				{
@@ -629,7 +644,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 	if (poff >= rfdata->fsize && !rfdata->extend_flag)
 	{
 		/* end of file - thus end of request */
-		result->eof_flag = 1;
+		*eof_flag = 1;
 		gossip_debug(REQUEST_DEBUG,"\t\t\t[return value] %lld (EOF)\n",
 				orig_size);
 		return orig_size;
@@ -637,7 +652,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 	if (loff >= orig_offset + orig_size)
 	{
 		gossip_debug(REQUEST_DEBUG,"\t\t\t(return value) %lld", orig_size);
-		if (result->eof_flag)
+		if (*eof_flag)
 			gossip_debug(REQUEST_DEBUG," (EOF)\n");
 		else
 			gossip_debug(REQUEST_DEBUG,"\n");
@@ -647,7 +662,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 	{
 		gossip_debug(REQUEST_DEBUG,"\t\t\treturn value %lld",
 				offset - orig_offset);
-		if (result->eof_flag)
+		if (*eof_flag)
 			gossip_debug(REQUEST_DEBUG," (EOF)\n");
 		else
 			gossip_debug(REQUEST_DEBUG,"\n");

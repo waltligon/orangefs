@@ -48,7 +48,6 @@ int main(int argc, char **argv)
 	seg1.size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
 	seg1.bytemax = BYTEMAX;
 	seg1.segmax = SEGMAX;
-	seg1.eof_flag = 0;
 	seg1.bytes = 0;
 	seg1.segs = 0;
 
@@ -67,8 +66,6 @@ int main(int argc, char **argv)
 	if(retval >= 0)
 	{
 		fprintf(stderr, "results of PINT_Process_request(PINT_CLIENT):\n");
-		fprintf(stderr, "req proc offset: %d\n",
-				(int)PINT_REQUEST_STATE_OFFSET(rs1));
 		printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
 		for(i=0; i<seg1.segs; i++)
 		{
@@ -83,7 +80,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
 		return(-1);
 	}
-	if(PINT_REQUEST_STATE_DONE(rs1))
+	if(PINT_REQUEST_DONE(rs1))
 	{
 		fprintf(stderr, "AAAIIIEEEEE!  Why am I done?\n");
 	}
