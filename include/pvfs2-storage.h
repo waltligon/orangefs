@@ -35,6 +35,7 @@ typedef struct PVFS_handle_extent_s PVFS_handle_extent;
 /* vtag; contents not yet defined */
 struct PVFS_vtag_s
 {
+    /* undefined */
 };
 typedef struct PVFS_vtag_s PVFS_vtag;
 

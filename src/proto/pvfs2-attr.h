@@ -24,33 +24,24 @@ struct PVFS_metafile_attr_s
 };
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 
-/* DataFile
- *
- */
+/* attributes specific to datafile objects */
 struct PVFS_datafile_attr_s
 {
-    /* May be used by I/O server to report size of datafile
-     * to metaserver to help in total file size calculation 
-     */
     PVFS_size size;
 };
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
 
-/* Directory
- *
- */
+/* attributes specific to directory objects */
 struct PVFS_directory_attr_s
 {
-    PVFS_handle dfh;
+    /* undefined */
 };
 typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
-/* Symlink
- *
- */
+/* attributes specific to symlinks */
 struct PVFS_symlink_attr_s
 {
-    /*char* target; */
+    /* undefined */
 };
 typedef struct PVFS_symlink_attr_s PVFS_symlink_attr;
 
