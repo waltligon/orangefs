@@ -5,7 +5,9 @@ PVFS2 Release ChangeLog
 
 pvfs2-1.1.0pre1
 ===============
-- 
+- network protocol: more 64-bit alignment fixes
+- build: hide karma details in its module.mk
+-
 
 
 pvfs2-1.0.1
