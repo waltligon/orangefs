@@ -69,6 +69,9 @@ AC_ARG_ENABLE(coverage,
 CFLAGS="$CFLAGS -fprofile-arcs -ftest-coverage -O0",
 )
 
+AC_ARG_ENABLE(strict,[--enable-strict - Turn on strict debugging with gcc],
+CFLAGS="$CFLAGS -Wall -O2 -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast")
+
 dnl Check if user actually wants to see all our build output (compiles, links, etc.).
 AC_ARG_ENABLE(verbose-build,
 [  --enable-verbose-build         Enables full output during build process (compiles, etc.).],
