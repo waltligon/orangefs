@@ -60,7 +60,7 @@ struct dbpf_storage {
 struct dbpf_dspace_attr {
     TROVE_coll_id coll_id;
     TROVE_ds_type type;
-    TROVE_ds_attributes_s ext;
+    TROVE_ds_attributes_s ext; /* things we got from outside here. rename outer struct? */
 };
 
 /* struct dbpf_collection
