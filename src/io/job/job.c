@@ -37,7 +37,7 @@ static job_desc_q_p bmi_unexp_queue = NULL;
 static int bmi_unexp_pending_count = 0;
 static int bmi_pending_count = 0;
 static job_desc_q_p trove_queue = NULL;
-static job_desc_q_p flow_queue = NULL;
+static int flow_pending_count = 0;
 static job_desc_q_p req_sched_queue = NULL;
 static job_desc_q_p req_sched_inprogress_queue = NULL;
 /* mutex locks for each queue */
@@ -88,7 +88,6 @@ static struct BMI_unexpected_info stat_bmi_unexp_array[job_work_metric];
 static void *stat_bmi_user_ptr_array[job_work_metric];
 
 static flow_descriptor *stat_flow_array[job_work_metric];
-static int stat_flow_index_array[job_work_metric];
 
 static PVFS_ds_id stat_trove_id_array[job_work_metric];
 static int stat_trove_index_array[job_work_metric];
@@ -785,7 +784,7 @@ int job_flow(flow_descriptor * flow_d,
     /* queue up the job desc. for later completion */
     gen_mutex_lock(&flow_mutex);
     *id = jd->job_id;
-    job_desc_q_add(flow_queue, jd);
+    flow_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&flow_cond);
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -2629,13 +2628,11 @@ static int setup_queues(void)
     completion_queue = job_desc_q_new();
     bmi_unexp_queue = job_desc_q_new();
     trove_queue = job_desc_q_new();
-    flow_queue = job_desc_q_new();
     req_sched_queue = job_desc_q_new();
     req_sched_inprogress_queue = job_desc_q_new();
 
     if (!completion_queue || !bmi_unexp_queue ||
-	!trove_queue || !flow_queue || !req_sched_queue ||
-	!req_sched_inprogress_queue)
+	!trove_queue || !req_sched_queue || !req_sched_inprogress_queue)
     {
 	/* cleanup any that were initialized */
 	teardown_queues();
@@ -2659,8 +2656,6 @@ static void teardown_queues(void)
 	job_desc_q_cleanup(bmi_unexp_queue);
     if (trove_queue)
 	job_desc_q_cleanup(trove_queue);
-    if (flow_queue)
-	job_desc_q_cleanup(flow_queue);
     if (req_sched_queue)
 	job_desc_q_cleanup(req_sched_queue);
     if (req_sched_inprogress_queue)
@@ -2693,20 +2688,23 @@ static int do_one_work_cycle_all(int *num_completed,
      * pending
      */
     gen_mutex_lock(&bmi_mutex);
-    if(bmi_pending_count > 0)
-	bmi_pending_flag = 1;
-    else
-	bmi_pending_flag = 0;
-    if(bmi_unexp_pending_count > 0)
-	bmi_unexp_pending_flag = 1;
-    else
-	bmi_unexp_pending_flag = 0;
+	if(bmi_pending_count > 0)
+	    bmi_pending_flag = 1;
+	else
+	    bmi_pending_flag = 0;
+	if(bmi_unexp_pending_count > 0)
+	    bmi_unexp_pending_flag = 1;
+	else
+	    bmi_unexp_pending_flag = 0;
     gen_mutex_unlock(&bmi_mutex);
     gen_mutex_lock(&flow_mutex);
-    flow_pending_flag = !job_desc_q_empty(flow_queue);
+	if(flow_pending_count > 0)
+	    flow_pending_flag = 1;
+	else
+	    flow_pending_flag = 0;
     gen_mutex_unlock(&flow_mutex);
     gen_mutex_lock(&trove_mutex);
-    trove_pending_flag = !job_desc_q_empty(trove_queue);
+	trove_pending_flag = !job_desc_q_empty(trove_queue);
     gen_mutex_unlock(&trove_mutex);
 
     /* count the number of interfaces with jobs pending */
@@ -2913,32 +2911,15 @@ static int do_one_work_cycle_bmi_unexp(int *num_completed,
  */
 static int do_one_work_cycle_flow(int *num_completed)
 {
-    int offset = 0;
     int ret = -1;
     struct job_desc *tmp_desc = NULL;
     int incount, outcount;
     int i = 0;
 
-    stat_flow_array[0] = NULL;
-    /* collect the set of flow operations to test on */
-    gen_mutex_lock(&flow_mutex);
-    /* keep pulling entries until we wrap around */
-    while ((offset < job_work_metric) &&
-	   (tmp_desc = job_desc_q_shownext(flow_queue)) &&
-	   (tmp_desc->u.flow.flow_d != stat_flow_array[0]))
-    {
-	/* remove job; add back to end later */
-	job_desc_q_remove(tmp_desc);
-	stat_flow_array[offset] = tmp_desc->u.flow.flow_d;
-	offset++;
-	job_desc_q_add(flow_queue, tmp_desc);
-    }
-    gen_mutex_unlock(&flow_mutex);
-    incount = offset;
+    incount = job_work_metric;
 
-    ret = PINT_flow_testsome(incount, stat_flow_array, &outcount,
-			     stat_flow_index_array, 10,
-			     global_flow_context);
+    ret = PINT_flow_testcontext(incount, stat_flow_array, &outcount,
+	10, global_flow_context);
     if (ret < 0)
     {
 	/* critical failure */
@@ -2950,12 +2931,7 @@ static int do_one_work_cycle_flow(int *num_completed)
     for (i = 0; i < outcount; i++)
     {
 	/* remove the operation from the pending flow queue */
-	tmp_desc = (struct
-		    job_desc *) stat_flow_array[stat_flow_index_array[i]]->
-	    user_ptr;
-	gen_mutex_lock(&flow_mutex);
-	job_desc_q_remove(tmp_desc);
-	gen_mutex_unlock(&flow_mutex);
+	tmp_desc = (struct job_desc *) stat_flow_array[i]->user_ptr;
 	/* place in completed queue */
 	gen_mutex_lock(&completion_mutex);
 	/* set completed flag while holding queue lock */
@@ -3201,7 +3177,10 @@ static void *flow_thread_function(void *foo)
     {
 	/* figure out if there is any flow work to do */
 	gen_mutex_lock(&flow_mutex);
-	flow_pending_flag = !job_desc_q_empty(flow_queue);
+	if(flow_pending_count > 0)
+	    flow_pending_flag = 1;
+	else
+	    flow_pending_flag = 0;
 	gen_mutex_unlock(&flow_mutex);
 
 	num_completed = 0;
