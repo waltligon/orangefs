@@ -21,9 +21,10 @@ static int bufmap_init = 0;
 static struct page** bufmap_page_array = NULL;
 static void** bufmap_kaddr_array = NULL;
 
-/* list of available descriptors, and lock to protect it */
-static LIST_HEAD(desc_list);
-static spinlock_t desc_list_lock = SPIN_LOCK_UNLOCKED;
+/* array to track usage of buffer descriptors */
+int buffer_index_array[PVFS2_BUFMAP_DESC_COUNT] = {0};
+static spinlock_t buffer_index_lock = SPIN_LOCK_UNLOCKED;
+
 static struct pvfs_bufmap_desc desc_array[PVFS2_BUFMAP_DESC_COUNT];
 static DECLARE_WAIT_QUEUE_HEAD(bufmap_waitq);
 
@@ -139,7 +140,6 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	desc_array[i].array_count = PAGES_PER_DESC;
 	desc_array[i].uaddr = user_desc->ptr +
 	    (i*PAGES_PER_DESC*PAGE_SIZE);
-	list_add_tail(&(desc_array[i].list_link), &desc_list);
 	offset += PAGES_PER_DESC;
     }
 
@@ -186,10 +186,11 @@ void pvfs_bufmap_finalize(void)
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc)
+int pvfs_bufmap_get(int* buffer_index)
 {
     int ret = -1;
     DECLARE_WAITQUEUE(my_wait, current);
+    int i;
 
     add_wait_queue_exclusive(&bufmap_waitq, &my_wait);
 
@@ -198,18 +199,24 @@ int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc)
 	set_current_state(TASK_INTERRUPTIBLE);
 
 	/* check for available desc */
-	spin_lock(&desc_list_lock);
-	if(!list_empty(&desc_list))
+	spin_lock(&buffer_index_lock);
+	for(i=0; i<PVFS2_BUFMAP_DESC_COUNT; i++)
 	{
-	    /* we have a buf desc ready; pull it out and return immediately */
-	    *desc = list_entry(desc_list.next, struct pvfs_bufmap_desc,
-		list_link);
-	    list_del(&((*desc)->list_link));
-	    spin_unlock(&desc_list_lock);
-	    ret = 0;
+	    if(buffer_index_array[i] == 0)
+	    {
+		buffer_index_array[i] = 1;
+		*buffer_index = i;
+		ret = 0;
+		break;
+	    }
+	}
+	spin_unlock(&buffer_index_lock);
+
+	/* if we acquired a buffer, then break out of while */
+	if(ret == 0)
+	{
 	    break;
 	}
-	spin_unlock(&desc_list_lock);
 
 	/* TODO: figure out which signals to look for */
 	if(signal_pending(current))
@@ -234,12 +241,12 @@ int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc)
  *
  * no return value
  */
-void pvfs_bufmap_put(struct pvfs_bufmap_desc* desc)
+void pvfs_bufmap_put(int buffer_index)
 {
     /* put the desc back on the queue */
-    spin_lock(&desc_list_lock);
-    list_add_tail(&(desc->list_link), &desc_list);
-    spin_unlock(&desc_list_lock);
+    spin_lock(&buffer_index_lock);
+    buffer_index_array[buffer_index] = 0;
+    spin_unlock(&buffer_index_lock);
 
     /* wake up anyone who may be sleeping on the queue */
     wake_up_interruptible(&bufmap_waitq);
@@ -253,13 +260,14 @@ void pvfs_bufmap_put(struct pvfs_bufmap_desc* desc)
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_copy_to_user(void* to, struct pvfs_bufmap_desc* from,
+int pvfs_bufmap_copy_to_user(void* to, int buffer_index,
     int size)
 {
     int amt_copied = 0;
     int amt_this = 0;
     int index = 0;
     void* offset = to;
+    struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
 
     while(amt_copied < size)
     {
@@ -278,19 +286,46 @@ int pvfs_bufmap_copy_to_user(void* to, struct pvfs_bufmap_desc* from,
     return(0);
 }
 
+int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index,
+    int size)
+{
+    int amt_copied = 0;
+    int amt_this = 0;
+    int index = 0;
+    void* offset = to;
+    struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
+
+    while(amt_copied < size)
+    {
+	if((size - amt_copied) > PAGE_SIZE)
+	    amt_this = PAGE_SIZE;
+	else
+	    amt_this = size - amt_copied;
+	
+	memcpy(offset, from->kaddr_array[index], amt_this);
+
+	offset += amt_this;
+	amt_copied += amt_this;
+	index++;
+    }
+
+    return(0);
+}
+
 /* pvfs2_bufmap_copy_from_user()
  *
  * copies data from a user space address to a mapped buffer
  *
  * returns 0 on success, -errno on failure
  */
-int pvfs_bufmap_copy_from_user(struct pvfs_bufmap_desc* to, void* from,
+int pvfs_bufmap_copy_from_user(int buffer_index, void* from,
     int size)
 {
     int amt_copied = 0;
     int amt_this = 0;
     int index = 0;
     void* offset = from;
+    struct pvfs_bufmap_desc* to = &desc_array[buffer_index];
 
     while(amt_copied < size)
     {

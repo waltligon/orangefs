@@ -26,14 +26,17 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc);
 
 void pvfs_bufmap_finalize(void);
 
-int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc);
+int pvfs_bufmap_get(int* buffer_index);
 
-void pvfs_bufmap_put(struct pvfs_bufmap_desc* desc);
+void pvfs_bufmap_put(int buffer_index);
 
-int pvfs_bufmap_copy_from_user(struct pvfs_bufmap_desc* to, void* from,
+int pvfs_bufmap_copy_from_user(int buffer_index, void* from,
     int size);
 
-int pvfs_bufmap_copy_to_user(void* to, struct pvfs_bufmap_desc* from,
+int pvfs_bufmap_copy_to_user(void* to, int buffer_index,
+    int size);
+
+int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index,
     int size);
 
 #endif /* __PVFS2_BUFMAP_H */

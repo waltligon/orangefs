@@ -53,7 +53,7 @@ ssize_t pvfs2_inode_read(
     size_t each_count = 0;
     size_t total_count = 0;
     pvfs2_kernel_op_t *new_op = NULL;
-    struct pvfs_bufmap_desc* desc;
+    int buffer_index = -1;
     char* current_buf = buf;
     loff_t original_offset = *offset;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
@@ -77,7 +77,7 @@ ssize_t pvfs2_inode_read(
 	 * it may speed things up in the common case more if we kept one
 	 * buffer the whole time; need to measure performance difference
 	 */
-	ret = pvfs_bufmap_get(&desc);
+	ret = pvfs_bufmap_get(&buffer_index);
 	if(ret < 0)
 	{
 	    *offset = original_offset;
@@ -92,7 +92,7 @@ ssize_t pvfs2_inode_read(
 	else
 	    each_count = count - total_count;
 
-	new_op->upcall.req.io.buf = desc->uaddr;
+	new_op->upcall.req.io.buf_index = buffer_index;
 	new_op->upcall.req.io.count = each_count;
 	new_op->upcall.req.io.offset = *offset;
 
@@ -102,7 +102,7 @@ ssize_t pvfs2_inode_read(
 	{
           error_exit:
             kill_device_owner();
-	    pvfs_bufmap_put(desc);
+	    pvfs_bufmap_put(buffer_index);
 	    ret = new_op->downcall.status;
 	    op_release(new_op);
 	    *offset = original_offset;
@@ -116,22 +116,18 @@ ssize_t pvfs2_inode_read(
             if (copy_to_user)
             {
                 pvfs_bufmap_copy_to_user(
-                    current_buf, desc,
+                    current_buf, buffer_index,
                     new_op->downcall.resp.io.amt_complete);
             }
             else
             {
-                /*
-                  NOTE: assumes size is PAGE_SIZE -- which
-                  should be okay since we're being called from
-                  get block if we're here
-                */
-                memcpy(current_buf, desc->kaddr_array[0],
-                       new_op->downcall.resp.io.amt_complete);
+		pvfs_bufmap_copy_to_kernel(
+                    current_buf, buffer_index,
+                    new_op->downcall.resp.io.amt_complete);
             }
 	}
 
-	pvfs_bufmap_put(desc);
+	pvfs_bufmap_put(buffer_index);
 
 	current_buf += new_op->downcall.resp.io.amt_complete;
 	*offset += new_op->downcall.resp.io.amt_complete;
@@ -170,7 +166,7 @@ static ssize_t pvfs2_file_write(
     size_t each_count = 0;
     size_t total_count = 0;
     pvfs2_kernel_op_t *new_op = NULL;
-    struct pvfs_bufmap_desc* desc = NULL;
+    int buffer_index = -1;
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     char* current_buf = (char*)buf;
     loff_t original_offset = *offset;
@@ -202,7 +198,7 @@ static ssize_t pvfs2_file_write(
 	 * it may speed things up in the common case more if we kept one
 	 * buffer the whole time; need to measure performance difference
 	 */
-	ret = pvfs_bufmap_get(&desc);
+	ret = pvfs_bufmap_get(&buffer_index);
 	if(ret < 0)
 	{
 	    *offset = original_offset;
@@ -215,12 +211,12 @@ static ssize_t pvfs2_file_write(
 	each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
 
-	new_op->upcall.req.io.buf = desc->uaddr;
+	new_op->upcall.req.io.buf_index = buffer_index;
 	new_op->upcall.req.io.count = each_count;
 	new_op->upcall.req.io.offset = *offset;
 
 	/* copy data from application */
-	pvfs_bufmap_copy_from_user(desc, current_buf, each_count);
+	pvfs_bufmap_copy_from_user(buffer_index, current_buf, each_count);
 
         service_operation_with_timeout_retry(
             new_op, "pvfs2_file_write", retries);
@@ -229,7 +225,7 @@ static ssize_t pvfs2_file_write(
 	{
           error_exit:
             kill_device_owner();
-	    pvfs_bufmap_put(desc);
+	    pvfs_bufmap_put(buffer_index);
 	    ret = new_op->downcall.status;
 	    op_release(new_op);
 	    *offset = original_offset;
@@ -237,7 +233,7 @@ static ssize_t pvfs2_file_write(
 	    return(ret);
 	}
 
-	pvfs_bufmap_put(desc);
+	pvfs_bufmap_put(buffer_index);
 
 	current_buf += new_op->downcall.resp.io.amt_complete;
 	*offset += new_op->downcall.resp.io.amt_complete;
