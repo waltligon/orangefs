@@ -422,7 +422,7 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 	
-	printf("IO Ack: bstream_size: %d\n",
+	printf("Datafile size before I/O: %d\n",
 		(int)io_dec_ack->u.io.bstream_size);
 
 	/**************************************************
@@ -460,6 +460,9 @@ int main(int argc, char **argv)	{
 	{
 		return(-1);
 	}
+
+	printf("Amount of data written: %d\n",
+		(int)flow_d->total_transfered);
 
 	PINT_flow_free(flow_d);
 
