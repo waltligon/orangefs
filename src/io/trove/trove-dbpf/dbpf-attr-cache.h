@@ -15,11 +15,10 @@
   the maximum number of keyval pairs that can be
   automatically cached; pick a reasonable default
 */
-#define DBPF_ATTR_CACHE_MAX_NUM_KEYVALS                 4
+#define DBPF_ATTR_CACHE_MAX_NUM_KEYVALS                 8
 
 #define DBPF_ATTR_CACHE_DEFAULT_SIZE                  511
 #define DBPF_ATTR_CACHE_DEFAULT_MAX_NUM_CACHE_ELEMS  1024
-
 
 typedef struct
 {
@@ -43,7 +42,14 @@ typedef struct
     int num_keyval_pairs;
 } dbpf_attr_cache_elem_t;
 
-/* all methods return 0 on success; -1 on failure unless noted */
+
+/***********************************************
+ * dbpf-attr-cache generic methods
+ *
+ * all methods return 0 on success; -1 on failure
+ * (unless noted)
+ *
+ ***********************************************/
 
 /*
   - table size is the hash table size
@@ -67,6 +73,14 @@ TROVE_ds_attributes *dbpf_attr_cache_lookup(TROVE_handle key);
 /* returns the cached element object on success; NULL on failure */
 dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key);
 
+int dbpf_attr_cache_insert(TROVE_handle key, TROVE_ds_attributes *attr);
+int dbpf_attr_cache_remove(TROVE_handle key);
+int dbpf_attr_cache_finalize(void);
+
+
+/***********************************************
+ * dbpf-attr-cache keyval related methods
+ ***********************************************/
 /*
   given a cached elem and a keyval key, return associated
   data if cached; NULL otherwise
@@ -94,11 +108,9 @@ int dbpf_attr_cache_keyval_pair_fetch_cached_data(
     void *target_data, int *target_data_sz);
 
 
-int dbpf_attr_cache_insert(TROVE_handle key, TROVE_ds_attributes *attr);
-int dbpf_attr_cache_remove(TROVE_handle key);
-int dbpf_attr_cache_finalize(void);
-
-/* trove setinfo hooks */
+/***********************************************
+ * dbpf-attr-cache to trove setinfo hooks
+ ***********************************************/
 int dbpf_attr_cache_set_keywords(char *keywords);
 int dbpf_attr_cache_set_size(int cache_size);
 int dbpf_attr_cache_set_max_num_elems(int max_num_elems);

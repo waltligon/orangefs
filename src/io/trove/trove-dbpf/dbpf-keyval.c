@@ -141,19 +141,17 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
                      "warning: keyval read error (get() failed on "
                      "handle %Lu and key: %s)\n", Lu(op_p->handle),
                      (char *)key.data);
-/* 	db_p->err(db_p, ret, "DB->get in dbpf_keyval_read_op_svc"); */
 	error = -dbpf_db_error_to_trove_error(ret);
 
 	goto return_error;
     }
 
     op_p->u.k_read.val.read_sz = data.size;
-    assert(op_p->u.k_read.val.buffer_sz == op_p->u.k_read.val.read_sz);
 
     /* cache this data in the attr cache if we can */
     if (dbpf_attr_cache_elem_set_data_based_on_key(
             op_p->handle, op_p->u.k_read.key.buffer,
-            op_p->u.k_read.val.buffer, op_p->u.k_read.val.buffer_sz))
+            op_p->u.k_read.val.buffer, data.size))
     {
         gossip_debug(
             DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
@@ -414,14 +412,16 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
     return 1;
 
  return_error:
-    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    if (got_db)
+    {
+        dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    }
     return error;
 }
 
 /* dbpf_keyval_validate()
  */
-static int dbpf_keyval_validate(
-				TROVE_coll_id coll_id,
+static int dbpf_keyval_validate(TROVE_coll_id coll_id,
 				TROVE_handle handle,
 				TROVE_ds_flags flags,
 				TROVE_vtag_s *vtag,

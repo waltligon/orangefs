@@ -655,6 +655,11 @@ DOTCONF_CB(get_attr_cache_keywords_list)
         len = strlen(fs_conf->attr_cache_keywords);
         strncpy(ptr,fs_conf->attr_cache_keywords,len);
         ptr += (len * sizeof(char));
+        if (*(ptr-1) != ',')
+        {
+            *ptr = ',';
+            ptr++;
+        }
         free(fs_conf->attr_cache_keywords);
     }
     for(i = 0; i < cmd->arg_count; i++)

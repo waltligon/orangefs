@@ -29,6 +29,10 @@ static int s_cacheable_keyword_array_size = 0;
 
 int dbpf_attr_cache_set_keywords(char *keywords)
 {
+    assert(keywords);
+    gossip_debug(DBPF_ATTRCACHE_DEBUG, "Setting dbpf_attr_cache "
+                 "keywords to:\n%s\n", keywords);
+
     if (s_cacheable_keywords)
     {
         free(s_cacheable_keywords);
