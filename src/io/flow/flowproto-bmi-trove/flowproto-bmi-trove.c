@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <limits.h>
+#include <unistd.h>
 
 #include "gossip.h"
 #include "trove-types.h"
@@ -442,6 +443,9 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     int split_idle_time_ms = max_idle_time_ms;
     int query_offset = 0;
     PVFS_fs_id tmp_coll_id;
+    PVFS_error scratch_error_code_array[BMI_TEST_SIZE];
+    int scratch_index_array[BMI_TEST_SIZE];
+    char scratch_usrptr_array[BMI_TEST_SIZE * SIZEOF_VOID_P];
 
     /* TODO: do something more clever with the max_idle_time_ms
      * argument.  For now we just split it evenly among the
@@ -511,17 +515,25 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 	while((ret = trove_id_queue_query(trove_inflight_queue, trove_op_array, 
 	    &trove_count, &query_offset, &tmp_coll_id)) == 0)
 	{
-	    /* TODO: this is stupid.  Make these fixed size arrays */
-	    trove_error_code_array = malloc(sizeof(PVFS_error) * trove_count);
-	    trove_index_array = malloc(sizeof(int) * trove_count);
-	    trove_usrptr_array = malloc(sizeof(void *) * trove_count);
-	    if (!trove_error_code_array || !trove_index_array ||
-		!trove_usrptr_array)
-	    {
-		return (-ENOMEM);
-	    }
+            if (trove_count < BMI_TEST_SIZE)
+            {
+                trove_error_code_array = scratch_error_code_array;
+                trove_index_array = scratch_index_array;
+                trove_usrptr_array = (void *)scratch_usrptr_array;
+            }
+            else
+            {
+                trove_error_code_array =
+                    malloc(sizeof(PVFS_error) * trove_count);
+                trove_index_array = malloc(sizeof(int) * trove_count);
+                trove_usrptr_array = malloc(sizeof(void *) * trove_count);
+                if (!trove_error_code_array || !trove_index_array ||
+                    !trove_usrptr_array)
+                {
+                    return (-ENOMEM);
+                }
+            }
 
-	    /* test for completion */
 	    ret = trove_dspace_testsome(tmp_coll_id, trove_op_array,
 					&trove_count, trove_index_array, NULL,
 					trove_usrptr_array, trove_error_code_array);
@@ -533,28 +545,39 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 		return (ret);
 	    }
 
-	    /* handle each completed trove operation */
-	    for (i = 0; i < trove_count; i++)
-	    {
-		active_flowd = trove_completion(trove_error_code_array[i],
-						trove_usrptr_array[i]);
-		trove_id_queue_del(trove_inflight_queue,
-				trove_op_array[trove_index_array[i]], 
-				tmp_coll_id);
-		trove_pending_count--;
+            if (trove_count == 0)
+            {
+                usleep(100);
+            }
+            else
+            {
+                /* handle each completed trove operation */
+                for (i = 0; i < trove_count; i++)
+                {
+                    active_flowd = trove_completion(trove_error_code_array[i],
+                                                    trove_usrptr_array[i]);
+                    trove_id_queue_del(trove_inflight_queue,
+                                       trove_op_array[trove_index_array[i]], 
+                                       tmp_coll_id);
+                    trove_pending_count--;
 
-		/* put flows into done_checking_queue if needed */
-		if (active_flowd->state & FLOW_FINISH_MASK ||
-		    active_flowd->state == FLOW_SVC_READY)
-		{
-		    qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
-				   &done_checking_queue);
-		}
-	    }
+                    /* put flows into done_checking_queue if needed */
+                    if (active_flowd->state & FLOW_FINISH_MASK ||
+                        active_flowd->state == FLOW_SVC_READY)
+                    {
+                        qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
+                                       &done_checking_queue);
+                    }
+                }
+            }
 	    trove_count = incount;
-	    free(trove_error_code_array);
-	    free(trove_index_array);
-	    free(trove_usrptr_array);
+
+            if (trove_error_code_array != scratch_error_code_array)
+            {
+                free(trove_error_code_array);
+                free(trove_index_array);
+                free(trove_usrptr_array);
+            }
 	}
 	assert(ret == -EAGAIN);    
     }
