@@ -50,15 +50,10 @@ static int trove_pending_count = 0;
 static int flow_pending_count = 0;
 static job_desc_q_p dev_unexp_queue = NULL;
 static int dev_unexp_pending_count = 0;
-/* mutex locks for each queue */
+/* locks for internal queues */
+static gen_mutex_t bmi_unexp_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t dev_unexp_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t completion_mutex = GEN_MUTEX_INITIALIZER;
-static gen_mutex_t bmi_mutex = GEN_MUTEX_INITIALIZER;
-static gen_mutex_t trove_mutex = GEN_MUTEX_INITIALIZER;
-static gen_mutex_t flow_mutex = GEN_MUTEX_INITIALIZER;
-static gen_mutex_t dev_mutex = GEN_MUTEX_INITIALIZER;
-/* NOTE: all of the bmi queues and counts are protected by the same
- * mutex (bmi_mutex)
- */
 
 #ifdef __PVFS2_JOB_THREADED__
 static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
@@ -315,10 +310,8 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     /* if we fall to this point, the job did not immediately complete and
      * we must queue up to test it later 
      */
-    gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
     bmi_pending_count++;
-    gen_mutex_unlock(&bmi_mutex);
 
     return (0);
 }
@@ -409,10 +402,8 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     /* if we fall to this point, the job did not immediately complete and
      * we must queue up to test it later 
      */
-    gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
     bmi_pending_count++;
-    gen_mutex_unlock(&bmi_mutex);
 
     return (0);
 }
@@ -487,10 +478,8 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     /* if we fall to this point, the job did not immediately complete and
      * we must queue up to test it later 
      */
-    gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
     bmi_pending_count++;
-    gen_mutex_unlock(&bmi_mutex);
 
     return (0);
 
@@ -569,10 +558,8 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     /* if we fall to this point, the job did not immediately complete and
      * we must queue up to test it later 
      */
-    gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
     bmi_pending_count++;
-    gen_mutex_unlock(&bmi_mutex);
 
     return (0);
 
@@ -650,11 +637,11 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     /* if we fall through to this point, then there were not any
      * uenxpected receive's available; queue up to test later 
      */
-    gen_mutex_lock(&bmi_mutex);
+    gen_mutex_lock(&bmi_unexp_mutex);
     *id = jd->job_id;
     job_desc_q_add(bmi_unexp_queue, jd);
     bmi_unexp_pending_count++;
-    gen_mutex_unlock(&bmi_mutex);
+    gen_mutex_unlock(&bmi_unexp_mutex);
 
     PINT_thread_mgr_bmi_unexp_handler(bmi_thread_mgr_unexp_handler);
 
@@ -732,11 +719,11 @@ int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
     /* if we fall through to this point, then there were not any
      * uenxpected receive's available; queue up to test later 
      */
-    gen_mutex_lock(&dev_mutex);
+    gen_mutex_lock(&dev_unexp_mutex);
     *id = jd->job_id;
     job_desc_q_add(dev_unexp_queue, jd);
     dev_unexp_pending_count++;
-    gen_mutex_unlock(&dev_mutex);
+    gen_mutex_unlock(&dev_unexp_mutex);
 
     PINT_thread_mgr_dev_unexp_handler(dev_thread_mgr_unexp_handler);
 
@@ -1076,10 +1063,8 @@ int job_flow(flow_descriptor * flow_d,
     }
 
     /* queue up the job desc. for later completion */
-    gen_mutex_lock(&flow_mutex);
     *id = jd->job_id;
     flow_pending_count++;
-    gen_mutex_unlock(&flow_mutex);
 
     JOB_EVENT_START(PVFS_EVENT_FLOW, *id);
 
@@ -1180,10 +1165,8 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -1268,10 +1251,8 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -1339,10 +1320,8 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -1422,10 +1401,8 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -1507,10 +1484,8 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -1591,10 +1566,8 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -1663,10 +1636,8 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -1744,10 +1715,8 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     /* if we fall to this point, the job did not immediately complete and
      * we must queue up to test it later 
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -1825,10 +1794,8 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     /* if we fall to this point, the job did not immediately complete and
      * we must queue up to test it later 
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -1907,10 +1874,8 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     /* if we fall to this point, the job did not immediately complete and
      * we must queue up to test it later 
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
     gossip_lerr("Error: unimplemented.\n");
@@ -2011,10 +1976,8 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -2122,10 +2085,8 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -2210,10 +2171,8 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -2336,10 +2295,8 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -2415,10 +2372,8 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -2494,10 +2449,8 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -2585,10 +2538,8 @@ int job_trove_fs_create(char *collname,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -2753,10 +2704,8 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -2832,10 +2781,8 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
      */
-    gen_mutex_lock(&trove_mutex);
     *id = jd->job_id;
     trove_pending_count++;
-    gen_mutex_unlock(&trove_mutex);
 
     return (0);
 }
@@ -3506,12 +3453,12 @@ static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp)
     struct job_desc* tmp_desc = NULL; 
 
     /* remove the operation from the pending bmi_unexp queue */
-    gen_mutex_lock(&bmi_mutex);
+    gen_mutex_lock(&bmi_unexp_mutex);
     tmp_desc = job_desc_q_shownext(bmi_unexp_queue);
     assert(tmp_desc != NULL);	/* TODO: fix this */
     job_desc_q_remove(tmp_desc);
     bmi_unexp_pending_count--;
-    gen_mutex_unlock(&bmi_mutex);
+    gen_mutex_unlock(&bmi_unexp_mutex);
     /* set appropriate fields and store in completed queue */
     *(tmp_desc->u.bmi_unexp.info) = *unexp;
     gen_mutex_lock(&completion_mutex);
@@ -3544,12 +3491,12 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
     struct job_desc* tmp_desc = NULL; 
 
     /* remove the operation from the pending dev_unexp queue */
-    gen_mutex_lock(&dev_mutex);
+    gen_mutex_lock(&dev_unexp_mutex);
     tmp_desc = job_desc_q_shownext(dev_unexp_queue);
     assert(tmp_desc != NULL);	/* TODO: fix this */
     job_desc_q_remove(tmp_desc);
     dev_unexp_pending_count--;
-    gen_mutex_unlock(&dev_mutex);
+    gen_mutex_unlock(&dev_unexp_mutex);
     /* set appropriate fields and store in completed queue */
     *(tmp_desc->u.dev_unexp.info) = *unexp;
     gen_mutex_lock(&completion_mutex);
