@@ -394,7 +394,6 @@ lookup & yes & yes \\
 getattr & yes & yes \\           
 setattr & yes &  no \\ 
 mkdir & yes & no \\         
-rmdir & yes & no \\
 readdir & yes & no \\
 statfs & no & no \\
 create & yes & no \\
@@ -826,22 +825,6 @@ the new directory
 \item send an RMDIR request to cleanup directory that was previously
 created
 \end{itemize}
-\end{itemize}
-
-\subsubsection{rmdir}
-
-Removes a directory.
-
-\begin{itemize}
-\item find pinode for parent (lookup if needed)
-\item revalidate parent
-\item issue a RMDIRENT request to remove directory entry in parent
-\item issue a RMDIR request to meta server to destroy metadata object
-\begin{itemize}
-\item if RMDIR fails, send a MKDIRENT to replace directory entry in
-parent that was previously destroyed
-\end{itemize}
-\item destroy old pinode
 \end{itemize}
 
 \subsubsection{readdir}

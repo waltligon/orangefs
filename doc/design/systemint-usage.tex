@@ -190,7 +190,6 @@ The object creation, query, and destruction operations are
 \item getattr
 \item setattr
 \item mkdir
-\item rmdir
 \item create
 \item remove
 \item rename
@@ -581,33 +580,6 @@ pinode\_refn & pinode\_reference & pinode reference of created directory
 
 The function returns 0 on success and the negative of the error number
 on failure.
-
-\subsubsection{PVFS\_sys\_rmdir(
-PVFS\_sysreq\_rmdir *req
-)}
-
-Remove the specified directory. The request structure is shown in table.
- \ref{tab:reqrmdir}. No response structure is returned to the caller
-function.
-
-\begin{table}[H]
-\begin{tabular}{|l|l|l|}
-\hline
-Field & Type & Description \\
-\hline
-\hline
-entry\_name & PVFS\_string &  name of directory to be removed \\
-\hline
-parent\_refn & pinode\_reference & pinode reference of parent directory \\ 
-\hline
-credentials & PVFS\_credentials & uid, gid, permissions \\
-\hline
-\end{tabular}
-\caption{struct pvfs\_sysreq\_rmdir}\label{tab:reqrmdir}
-\end{table}
-
-The function returns 0 on success and the negative of the error
-number on failure.
 
 \subsubsection{PVFS\_sys\_create(
 PVFS\_sysreq\_create *req,

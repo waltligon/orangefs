@@ -675,32 +675,6 @@ There may be a more compact representation that we can pursue later.
 \end{itemize}
 
 
-\subsection{Rmdir}
-
-Removes a directory.  Outlined in table \ref{tab:reqrmdir}.
-
-\begin{table}[H]
-\begin{tabular}{|l|l|l|}
-\hline
-Field & Type & Description \\
-\hline
-\hline
-handle & PVFS\_handle & handle of directory to remove\\
-\hline
-fs\_id & PVFS\_fs\_id & fs id of file system containing directory\\
-\hline
-\end{tabular}
-\caption{struct PVFS\_servreq\_rmdir\_s \label{tab:reqrmdir}}
-\end{table}
-
-Issues:
-\begin{itemize}
-\item \emph{NOTE:} Even though there is no specific response structure
-for the rmdir request, we must still receive a generic response
-structure in order to verify the status of the operation from the server.
-\item do we really need a special rmdir as opposed to just using remove?
-\end{itemize}
-
 \subsection{Rmdirent}
 
 Removes a directory entry\footnote{The entry field is new here,
