@@ -1,8 +1,5 @@
 # Top level makefile for pvfs2
 
-# going to call it BUILD_SERVER
-#
-
 ###############################################################
 # LIST OF TARGETS WHICH MAY BE USED WHEN RUNNING MAKE:
 #
@@ -69,6 +66,7 @@ BUILD_IB = @BUILD_IB@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_EPOLL = @BUILD_EPOLL@
+BUILD_SERVER = @BUILD_SERVER@
 GNUC = @GNUC@
 INTELC = @INTELC@
 # configure default is silent, unless --enable-verbose-build in

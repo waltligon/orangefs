@@ -58,6 +58,16 @@ fi],
 AC_SUBST(LIBCFLAGS)
 AC_SUBST(THREAD_LIB)
 
+dnl a mechanism to disable building the PVFS2 server
+AC_ARG_ENABLE(server,
+[  --disable-server Disables building of PVFS2 server],
+[if test "x$enableval" = "xyes" ; then
+    BUILD_SERVER=1
+else
+    BUILD_SERVER=0
+fi],BUILD_SERVER=1)
+AC_SUBST(BUILD_SERVER)
+
 dnl a mechanism to turn off perf counters
 AC_ARG_ENABLE(perf-counters,
 [  --disable-perf-counters Disables pvfs2-server performance counters],
@@ -825,6 +835,13 @@ if test "x$REDHAT_RELEASE" = "x"; then
    AC_MSG_RESULT([PVFS2 will use workaround for redhat 2.4 kernels  : no])
 else
    AC_MSG_RESULT([PVFS2 will use workaround for redhat 2.4 kernels  : yes])
+fi
+
+if test "x$BUILD_SERVER" = "x1"; then
+   AC_MSG_RESULT([PVFS2 server will be built                        : yes])
+else
+   AC_MSG_RESULT([PVFS2 server will be built                        : no])
+
 fi
 
 
