@@ -12,10 +12,11 @@ use Getopt::Long;
 # ugly global variables for option parsing
 my $opt_protocol = '';
 my $opt_port = '';
-my @opt_hostnames = ();
+my @opt_ioservers = ();
+my @opt_metaservers = ();
 my $opt_logfile = '';
 my $opt_storage = '';
-my $opt_verbose = '';
+my $opt_quiet = '';
 
 sub get_user_input
 {
@@ -250,7 +251,7 @@ sub usage
     print "     --metaservers <STRING>         hostnames of meta servers\n";
     print "     --logfile     <STRING>         logfile location\n";
     print "     --storage     <STRING>         storage space location\n";
-    print "     --verbose                      increase verbosity\n\n";
+    print "     --quiet                        run silently\n\n";
 
     print "The two arguments specify the names of the configuration files\n";
     print " that will be written.  This utility will create one fs.conf file.\n";
@@ -267,6 +268,126 @@ sub usage
     exit;
 }
 
+sub print_welcome
+{
+	if (!$opt_quiet) {
+		print "**********************************************************************\n";
+		print "\tWelcome to the PVFS2 Configuration Generator:\n\n";
+		print "This interactive script will generate configuration files suitable\n";
+		print "for use with a new PVFS2 file system.  Please see the PVFS2 quickstart\n";
+		print "guide for details.\n\n";
+		print "**********************************************************************\n";
+	}
+}
+
+sub get_nettype
+{
+	if (!$opt_quiet) {
+		# get network type
+		print "\n";
+		print "You must first select the network protocol that your file system will use.\n";
+		print "The only currently supported options are \"tcp\", \"gm\", and \"ib\".\n";
+	}
+	if ($opt_protocol) {
+		$type = $opt_protocol;
+	} else {
+		$type = prompt_word("Enter protocol type [Default is tcp]: ","tcp");
+	}
+	return $type;
+}
+
+sub get_logfile
+{
+	if (!$opt_quiet) {
+		print "Choose a file for each server to write log messages to.\n";
+	}
+	if ($opt_logfile) {
+		$logfile = $opt_logfile;
+	} else {
+		$logfile = prompt_word("Enter log file location [Default is /tmp/pvfs2-server.log]: ","/tmp/pvfs2-server.log");
+	}
+	return $logfile;
+}
+
+sub get_storage
+{
+	if (!$opt_quiet) {
+		print "Choose a directory for each server to store data in.\n";
+	}
+	if ($opt_storage) {
+		$storage = $opt_storage;
+	} else {
+		$storage = prompt_word("Enter directory name: [Default is /tmp/pvfs2-storage-space]: ","/tmp/pvfs2-storage-space");
+	}
+	return $storage;
+}
+		
+
+
+# get host port
+sub tcp_get_port
+{
+	if (!$opt_quiet) { 
+		print "Choose a TCP/IP port for the servers to listen on.  Note that this\n";
+		print "script assumes that all servers will use the same port number.\n";
+	}
+	if ($opt_port) {
+		$port = $opt_port;
+	} else {
+		$port = prompt_num("Enter port number [Default is 3334]: ","3334");
+	}
+	return  $port;
+}
+
+sub tcp_get_ionames
+{
+	if (!$opt_quiet) {
+		print "Next you must list the hostnames of the machines that will act as\n";
+		print "I/O servers.  Acceptable syntax is \"node1, node2, ...\" or \"node{#-#,#,#}\".\n";
+	}
+	if (@opt_ioservers) {
+		foreach $server (@opt_ioservers) {
+			$ioline = $ioline . $server;
+		}
+	} else {
+		$ioline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
+	}
+
+	@io_aliases = tcp_parse_hostlist($ioline, $port);
+	@io_aliases = sort @io_aliases;
+	return @io_aliases;
+}
+
+sub tcp_get_metanames
+{
+	if (!$opt_quiet) {
+		print "Now list the hostnames of the machines that will act as Metadata\n";
+		print "servers.  This list may or may not overlap with the I/O server list.\n";
+	}
+	if (@opt_metaservers) {
+		foreach $server (@opt_metaservers) {
+			$metaline = $metaline . $server;
+		}
+	} else {
+		$metaline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
+	}
+	@meta_aliases = tcp_parse_hostlist($metaline, $port);
+	@meta_aliases = sort @meta_aliases;
+
+	return @meta_aliases;
+}
+
+# bmi_tcp_mung(): makes bmi strings of the form tcp://host:port
+sub bmi_tcp_mung
+{
+	my($port, @bmi_array);
+	$port = pop @_;
+	for ($i=0; $i <= $#_; $i++) {
+		$bmi_array[$i] = "tcp://$_[$i]:$port";
+	}
+	return @bmi_array;
+}
+
 # ---------------------
 # entry point of script
 # ---------------------
@@ -274,18 +395,19 @@ sub usage
 my $using_stdout = 0;
 my $show_help = '';
 
-GetOptions('protocol=s' => \$opt_protocol,
-	   'port=i'     => \$opt_port,
-	   'hostnames=s' => \@opt_hostnames,
-	   'logfile=s'  => \$opt_logfile,
-	   'storage=s'  => \$opt_storage,
-	   'help'        => \$show_help,
-	   'verbose'    => \$opt_verbose,
-	   '-'		=> \$using_stdout);
+$opt_quiet = 0;
+GetOptions('protocol=s'    => \$opt_protocol,
+	   'port=i'        => \$opt_port,
+	   'ioservers=s'   => \@opt_ioservers,
+	   'metaservers=s' => \@opt_metaservers,
+	   'logfile=s'     => \$opt_logfile,
+	   'storage=s'     => \$opt_storage,
+	   'help'          => \$show_help,
+	   'quiet!'        => \$opt_quiet,
+	   '-'		   => \$using_stdout);
 
 if($show_help) {
 	usage();
-	return;
 }
 
 if ($using_stdout) {
@@ -308,18 +430,9 @@ else
 #$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
 $num_unexp_reqs = 10;
 
-print "**********************************************************************\n";
-print "\tWelcome to the PVFS2 Configuration Generator:\n\n";
-print "This interactive script will generate configuration files suitable\n";
-print "for use with a new PVFS2 file system.  Please see the PVFS2 quickstart\n";
-print "guide for details.\n\n";
-print "**********************************************************************\n";
-
-# get network type
-print "\n";
-print "You must first select the network protocol that your file system will use.\n";
-print "The only currently supported options are \"tcp\" and \"gm\".\n";
-$type = prompt_word("Enter protocol type [Default is tcp]: ","tcp");
+print_welcome();
+$type = get_nettype();
+	
 
 if (!($type =~ /tcp/))
 {
@@ -328,28 +441,9 @@ if (!($type =~ /tcp/))
     exit 1;
 }
 
-# TODO: this section of the script assumes tcp, break into seperate function
-###################################
-
-# get host port
-print "Choose a TCP/IP port for the servers to listen on.  Note that this\n";
-print "script assumes that all servers will use the same port number.\n";
-$port = prompt_num("Enter port number [Default is 3334]: ","3334");
-
-# get host names
-print "Next you must list the hostnames of the machines that will act as\n";
-print "I/O servers.  Acceptable syntax is \"node1, node2, ...\" or \"node{#-#,#,#}\".\n";
-$ioline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
-
-@io_aliases = tcp_parse_hostlist($ioline, $port);
-@io_aliases = sort @io_aliases;
-
-print "Now list the hostnames of the machines that will act as Metadata\n";
-print "servers.  This list may or may not overlap with the I/O server list.\n";
-$metaline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
-
-@meta_aliases = tcp_parse_hostlist($metaline, $port);
-@meta_aliases = sort @meta_aliases;
+$port = tcp_get_port();
+@io_aliases = tcp_get_ionames();
+@meta_aliases = tcp_get_metanames();
 
 my %nonunion_aliases = ();
 foreach(@io_aliases,@meta_aliases){
@@ -359,27 +453,20 @@ foreach(@io_aliases,@meta_aliases){
 @union_aliases = sort @union_aliases;
 
 # tack on BMI style notation
-for($i=0; $i <= $#io_aliases; $i++)
-{
-    $io_bmi[$i] = "tcp://$io_aliases[$i]:$port";
-}
-for($i=0; $i <= $#meta_aliases; $i++)
-{
-    $meta_bmi[$i] = "tcp://$meta_aliases[$i]:$port";
-}
-for($i=0; $i <= $#union_aliases; $i++)
-{
-    $union_bmi[$i] = "tcp://$union_aliases[$i]:$port";
-}
+@io_bmi = bmi_tcp_mung(@io_aliases, $port);
+@meta_bmi = bmi_tcp_mung(@meta_aliases, $port);
+@union_bmi = bmi_tcp_mung(@union_aliases, $port);
 
 $bmi_module = "bmi_tcp";
 
 ###################################
 # end of tcp specific section
 
-print "Configured a total of ", ($#union_bmi + 1), " servers:\n";
-print "", ($#io_bmi + 1), " of them are I/O servers.\n";
-print "", ($#meta_bmi + 1), " of them are Metadata servers.\n";
+if (!$opt_quiet) {
+	print "Configured a total of ", ($#union_bmi + 1), " servers:\n";
+	print "", ($#io_bmi + 1), " of them are I/O servers.\n";
+	print "", ($#meta_bmi + 1), " of them are Metadata servers.\n";
+}
 
 if($#meta_aliases != 0)
 {
@@ -387,38 +474,35 @@ if($#meta_aliases != 0)
     exit 1;
 }
 
-$verify_svr_flag = prompt_word("Would you like to verify server list (y/n) [Default is n]? ","n");
+if (!$opt_quiet) {
 
-if($verify_svr_flag eq "y" or $verify_svr_flag eq "yes")
-{
-    print "****** I/O servers:\n";
-    foreach(@io_bmi)
-    {
-	print "$_\n";
-    }
-    print "\n****** Metadata servers:\n";
-    foreach(@meta_bmi)
-    {
-	print "$_\n";
-    }
-    my $ok_flag = prompt_word("Does this look ok (y/n) [Default is y]? ","y");
-    if(!($ok_flag eq "y" or $ok_flag eq "yes"))
-    {
-	print "Aborting...\n";
-	exit 1;
-    }
+	$verify_svr_flag = prompt_word("Would you like to verify server list (y/n) [Default is n]? ","n");
+
+	if($verify_svr_flag eq "y" or $verify_svr_flag eq "yes")
+	{
+	    print "****** I/O servers:\n";
+	    foreach(@io_bmi)
+	    {
+		print "$_\n";
+	    }
+	    print "\n****** Metadata servers:\n";
+	    foreach(@meta_bmi)
+	    {
+		print "$_\n";
+	    }
+	    my $ok_flag = prompt_word("Does this look ok (y/n) [Default is y]? ","y");
+	    if(!($ok_flag eq "y" or $ok_flag eq "yes"))
+	    {
+		print "Aborting...\n";
+		exit 1;
+	    }
+	}
 }
 
-# logfile location
-print "Choose a file for each server to write log messages to.\n";
 
-$logfile = prompt_word("Enter log file location [Default is /tmp/pvfs2-server.log]: ","/tmp/pvfs2-server.log");
+$logfile = get_logfile();
+$storage = get_storage();
 
-print "Choose a directory for each server to store data in.\n";
-
-$storage = prompt_word("Enter directory name: [Default is /tmp/pvfs2-storage-space]: ","/tmp/pvfs2-storage-space");
-
-#
 # could prompt for handle purgatory time, but it is probably best if we pick a
 # reasonable value w/o prompting
 $handle_purgatory = 50;
