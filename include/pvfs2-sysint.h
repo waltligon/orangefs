@@ -55,7 +55,7 @@ struct PVFS_sys_mntent
 /* describes file distribution parameters */
 struct PVFS_sys_dist_s
 {
-    const char* name;
+    char* name;
     void* params;
 };
 typedef struct PVFS_sys_dist_s PVFS_sys_dist;
