@@ -590,9 +590,9 @@ ifdef BUILD_KARMA
 $(KARMA): $(KARMAOBJS) $(LIBRARIES)
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $^ -o $@ $(LDFLAGS) $(KARMALIBS)
+	@$(LD) $(KARMAOBJS) -o $@ $(LDFLAGS) $(KARMALIBS)
 else
-	$(LD) $^ -o $@ $(LDFLAGS) $(KARMALIBS)
+	$(LD) $(KARMAOBJS) -o $@ $(LDFLAGS) $(KARMALIBS)
 endif
 
 $(KARMAOBJS): %.o: %.c
@@ -725,6 +725,7 @@ cscope:
 # some known scripts
 tags:
 	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include . \
+	    $(srcdir)/src/kernel/linux-2.6 \
 	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
 	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig \
 	) | ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
