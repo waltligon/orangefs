@@ -19,103 +19,57 @@ int create_file(PVFS_fs_id fs_id,
 		char *dirname,
 		char *filename)
 {
-
-    PVFS_sysreq_lookup req_look;
-    PVFS_sysresp_lookup resp_look;
-    PVFS_sysreq_create *req_create = NULL;
-    PVFS_sysresp_create *resp_create = NULL;
-    PVFS_sysreq_getattr req_getattr;
-    PVFS_sysresp_getattr resp_getattr;
     int ret;
+    uint32_t attrmask;
+    PVFS_object_attr attr;
+    PVFS_credentials credentials;
+    PVFS_sysresp_lookup resp_look;
+    PVFS_sysresp_create resp_create;
+    PVFS_sysresp_getattr resp_getattr;
 
-    /* lookup the root handle */
-    req_look.credentials.perms = 1877;
-    req_look.name = strdup(dirname);
-    req_look.fs_id = fs_id;
-    ret = PVFS_sys_lookup(&req_look, &resp_look);
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 1877;
+
+    ret = PVFS_sys_lookup(fs_id, dirname, credentials, &resp_look);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
 	return (-1);
     }
-    free(req_look.name);
 
-    /* test create */
-    req_create = (PVFS_sysreq_create *) malloc(sizeof(PVFS_sysreq_create));
-    if (!req_create)
-    {
-	printf("Error in malloc\n");
-	return (-1);
-    }
-    resp_create = (PVFS_sysresp_create *) malloc(sizeof(PVFS_sysresp_create));
-    if (!resp_create)
-    {
-	printf("Error in malloc\n");
-	return (-1);
-    }
+/*     attrmask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID | PVFS_ATTR_SYS_PERM); */
+    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+    attr.owner = 100;
+    attr.group = 100;
+    attr.perms = 1877;
+    attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
+    attr.objtype = PVFS_TYPE_METAFILE;
+    attr.u.meta.nr_datafiles = 4;
+    attr.u.meta.dist = NULL;
 
-    // Fill in the create info 
-    req_create->entry_name = strdup(filename);
-    if (!req_create->entry_name)
-    {
-	printf("Error in malloc\n");
-	return (-1);
-    }
-    req_create->attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
-    req_create->attr.owner = 100;
-    req_create->attr.group = 100;
-    req_create->attr.perms = 1877;
-    req_create->attr.atime = req_create->attr.mtime = req_create->attr.ctime = 0xdeadbeef;
-
-    req_create->credentials.uid = 100;
-    req_create->credentials.gid = 100;
-    req_create->credentials.perms = 1877;
-
-    req_create->attr.u.meta.nr_datafiles = 4;
-
-    req_create->parent_refn.handle = resp_look.pinode_refn.handle;
-    req_create->parent_refn.fs_id = req_look.fs_id;
-
-
-    /* Fill in the dist -- NULL means the system interface used the 
-     * "default_dist" as the default
-     */
-    req_create->attr.u.meta.dist = NULL;
-
-    // call create 
-    ret = PVFS_sys_create(req_create, resp_create);
+    memset(&resp_create,0,sizeof(resp_create));
+    ret = PVFS_sys_create(filename, resp_look.pinode_refn,
+                          attrmask, attr, credentials, &resp_create);
     if (ret < 0)
     {
 	printf("create failed with errcode = %d\n", ret);
 	return (-1);
     }
 
-    req_getattr.pinode_refn.handle = resp_create->pinode_refn.handle;
-    req_getattr.pinode_refn.fs_id = fs_id;
-    req_getattr.attrmask = ATTR_META;
-    /* passing this stuff to the server at one point would make it
-     * segfault: it's not a propper getattr request, but segfaulting is a
-     * bit extreme */
-#if 0
-    req_getattr.credentials.uid = 100;
-    req_getattr.credentials.gid = 100;
-    req_getattr.credentials.perms = 1877;
-#endif
-    ret = PVFS_sys_getattr(&req_getattr, &resp_getattr);
+    ret = PVFS_sys_getattr(resp_create.pinode_refn, attrmask,
+                           credentials, &resp_getattr);
     if (ret < 0)
     {
 	printf("getattr failed with errcode = %d\n", ret);
 	return (-1);
     }
-    ret = compare_attribs(req_create->attr, resp_getattr.attr);
+    ret = compare_attribs(attr, resp_getattr.attr);
     if (ret < 0)
     {
 	printf("file created has incorrect attributes\n");
 	return -1;
     }
-    free(req_create->entry_name);
-    free(req_create);
-    free(resp_create);
     return 0;
 }
 

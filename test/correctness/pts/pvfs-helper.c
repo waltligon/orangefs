@@ -46,20 +46,15 @@ int initialize_sysint(void)
 
 PVFS_handle get_root(PVFS_fs_id fs_id)
 {
-    PVFS_sysreq_lookup req_look;
-    PVFS_sysresp_lookup resp_look;
     int ret = -1;
+    PVFS_credentials credentials;
+    PVFS_sysresp_lookup resp_look;
 
-    memset(&req_look, 0, sizeof(req_look));
-    memset(&req_look, 0, sizeof(resp_look));
+    memset(&resp_look, 0, sizeof(resp_look));
 
-    req_look.credentials.perms = 1877;
-    req_look.name = malloc(2);  /*null terminator included */
-    req_look.name[0] = '/';
-    req_look.name[1] = '\0';
-    req_look.fs_id = fs_id;
-    printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
-    ret = PVFS_sys_lookup(&req_look, &resp_look);
+    credentials.perms = 1877;
+    printf("looking up the root handle for fsid = %d\n", fs_id);
+    ret = PVFS_sys_lookup(fs_id, "/", credentials, &resp_look);
     if (ret < 0)
     {
         printf("Lookup failed with errcode = %d\n", ret);
@@ -71,39 +66,32 @@ PVFS_handle get_root(PVFS_fs_id fs_id)
 /*
  * simple helper to make a pvfs2 directory
  *
- * parent:   handle of parent directory
- * fs_id:    fsid of filesystem on which parent dir exists
- * name:     name of directory to create
- *
  * returns a handle to the new directory
  *          -1 if some error happened
  */
-PVFS_handle create_dir(PVFS_handle parent,
-                       PVFS_fs_id fs_id,
-                       char *name)
+PVFS_handle create_dir(PVFS_pinode_reference parent_refn,
+                       PVFS_fs_id fs_id, char *name)
 {
-    PVFS_sysreq_mkdir req_mkdir;
+    int ret = -1;
+    uint32_t attrmask;
+    PVFS_object_attr attr;
+    PVFS_credentials credentials;
     PVFS_sysresp_mkdir resp_mkdir;
 
-    int ret = -1;
+    memset(&resp_mkdir, 0, sizeof(resp_mkdir));
 
-    memset(&req_mkdir, 0, sizeof(req_mkdir));
-    memset(&resp_mkdir, 0, sizeof(req_mkdir));
+    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+    attr.owner = 100;
+    attr.group = 100;
+    attr.perms = 1877;
+    attr.objtype = PVFS_TYPE_DIRECTORY;
 
+    credentials.perms = 1877;
+    credentials.uid = 100;
+    credentials.gid = 100;
 
-    req_mkdir.entry_name = name;
-    req_mkdir.parent_refn.handle = parent;
-    req_mkdir.parent_refn.fs_id = fs_id;
-    req_mkdir.attrmask = ATTR_BASIC;
-    req_mkdir.attr.owner = 100;
-    req_mkdir.attr.group = 100;
-    req_mkdir.attr.perms = 1877;
-    req_mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;
-    req_mkdir.credentials.perms = 1877;
-    req_mkdir.credentials.uid = 100;
-    req_mkdir.credentials.gid = 100;
-
-    ret = PVFS_sys_mkdir(&req_mkdir, &resp_mkdir);
+    ret = PVFS_sys_mkdir(name, parent_refn, attrmask,
+                         attr, credentials, &resp_mkdir);
     if (ret < 0)
     {
         printf("mkdir failed\n");
@@ -115,31 +103,20 @@ PVFS_handle create_dir(PVFS_handle parent,
 /*
  * simple helper to remove a pvfs2 file
  *
- * parent:   handle of parent directory
- * fs_id:    fsid of filesystem on which parent dir exists
- * name:     name of file to remove
- *
  * returns 0 on success.
  *          -1 if some error happened.
  */
-int remove_file(PVFS_handle parent,
-                       PVFS_fs_id fs_id,
-                       char *name)
+int remove_file(PVFS_pinode_reference parent_refn,
+                PVFS_fs_id fs_id, char *name)
 {
-    PVFS_sysreq_remove req_remove;
-
     int ret = -1;
+    PVFS_credentials credentials;
 
-    memset(&req_remove, 0, sizeof(PVFS_sysreq_remove));
+    credentials.perms = 1877;
+    credentials.uid = 100;
+    credentials.gid = 100;
 
-    req_remove.entry_name = name;
-    req_remove.parent_refn.handle = parent;
-    req_remove.parent_refn.fs_id = fs_id;
-    req_remove.credentials.perms = 1877;
-    req_remove.credentials.uid = 100;
-    req_remove.credentials.gid = 100;
-
-    ret = PVFS_sys_remove(&req_remove);
+    ret = PVFS_sys_remove(name, parent_refn, credentials);
     if (ret < 0)
     {
         printf("remove failed\n");
@@ -151,74 +128,38 @@ int remove_file(PVFS_handle parent,
 /*
  * simple helper to remove a pvfs2 dir
  *
- * parent:   handle of parent directory
- * fs_id:    fsid of filesystem on which parent dir exists
- * name:     name of dir to remove
- *
  * returns 0 on success.
  *          -1 if some error happened.
  */
-int remove_dir(PVFS_handle parent,
-                       PVFS_fs_id fs_id,
-                       char *name)
+int remove_dir(PVFS_pinode_reference parent_refn,
+               PVFS_fs_id fs_id, char *name)
 {
-    PVFS_sysreq_remove req_remove;
-
-    int ret = -1;
-
-    memset(&req_remove, 0, sizeof(PVFS_sysreq_remove));
-
-    req_remove.entry_name = name;
-    req_remove.parent_refn.handle = parent;
-    req_remove.parent_refn.fs_id = fs_id;
-    req_remove.credentials.perms = 1877;
-    req_remove.credentials.uid = 100;
-    req_remove.credentials.gid = 100;
-
-    ret = PVFS_sys_remove(&req_remove);
-    if (ret < 0)
-    {
-        printf("remove failed\n");
-        return ret;
-    }
-    return 0;
+    return remove_file(parent_refn,fs_id,name);
 }
 
 /*
  * simple helper to lookup a handle given a filename
  *
- * parent:   handle of parent directory
- * fs_id:    fsid of filesystem on which parent dir exists
- * name:     name of directory to create
- *
  * returns a handle to the new directory
  *          -1 if some error happened
  */
-PVFS_handle lookup_name(char *name,
-                       PVFS_fs_id fs_id)
+PVFS_handle lookup_name(char *name, PVFS_fs_id fs_id)
 {
-    PVFS_sysreq_lookup req_lookup;
+    int ret = -1;
+    PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lookup;
 
-    int ret = -1;
+    memset(&resp_lookup, 0, sizeof(resp_lookup));
 
-    memset(&req_lookup, 0, sizeof(req_lookup));
-    memset(&resp_lookup, 0, sizeof(req_lookup));
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
 
-
-    req_lookup.name = name;
-    req_lookup.fs_id = fs_id;
-    req_lookup.credentials.uid = 100;
-    req_lookup.credentials.gid = 100;
-    req_lookup.credentials.perms = U_WRITE|U_READ;
-
-    ret = PVFS_sys_lookup(&req_lookup,&resp_lookup);
+    ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup);
     if (ret < 0)
     {
        printf("Lookup failed with errcode = %d\n", ret);
        return(-1);
     }
-
     return (PVFS_handle) resp_lookup.pinode_refn.handle;
 }
-

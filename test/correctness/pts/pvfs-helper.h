@@ -30,9 +30,16 @@ typedef struct
 
 /* these are some helper functions that are implemented in pvfs-helper.c */
 
-PVFS_handle create_dir(PVFS_handle parent,
-                       PVFS_fs_id fs_id,
-                       char *name);
+PVFS_handle create_dir(PVFS_pinode_reference parent_refn,
+                       PVFS_fs_id fs_id, char *name);
+
+int remove_file(PVFS_pinode_reference parent_refn,
+                PVFS_fs_id fs_id, char *name);
+
+int remove_dir(PVFS_pinode_reference parent_refn,
+               PVFS_fs_id fs_id, char *name);
+
+PVFS_handle lookup_name(char *name, PVFS_fs_id fs_id);
 
 PVFS_handle get_root(PVFS_fs_id fs_id);
 
