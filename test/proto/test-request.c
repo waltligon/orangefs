@@ -41,7 +41,7 @@ void arrow(int direction)
 void print_request(struct PVFS_server_req *my_req, int direction)
 {
 	int i;
-        // print shit
+
 	arrow(direction);
         printf("======================================\n");
 	arrow(direction);
