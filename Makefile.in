@@ -1,5 +1,7 @@
 srcdir = @srcdir@
 VPATH = $(srcdir)
+SHELL = @SHELL@
+INSTALL = @INSTALL@
 
 .SUFFIXES:
 .PHONY: all clean tests distclean
@@ -11,8 +13,11 @@ VPATH = $(srcdir)
 #
 MODULES := $(shell find . -iname "*.mk" | sed -e 's/^.\///;s/module.mk//')
 
+CC = @CC@
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@
 LD = gcc
-CFLAGS += -Wall -pipe -g -I $(srcdir)/include
+CFLAGS += -Wall -pipe -I $(srcdir)/include
 LDFLAGS += -L lib
 LIBS += -lpvfs2
 # add all module directories into include path
@@ -43,7 +48,7 @@ TESTS := $(patsubst %.c,%, $(filter %.c, $(TESTSRC)))
 tests: $(TESTS)
 
 lib/libpvfs2.a: $(LIBOBJS)
-	install -d lib
+	$(INSTALL) -d lib
 	ar rcs $@ $(LIBOBJS)
 
 # NEW DEFAULT RULE FOR BUILDING EXECUTABLES FROM .O FILES
