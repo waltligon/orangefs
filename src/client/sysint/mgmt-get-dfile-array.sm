@@ -25,47 +25,55 @@ extern job_context_id pint_client_sm_context;
 
 /* values greater than zero are usable here */
 /* TODO: this is a hack, duplicated in msgpair.sm, sort out later... */
-enum {
+enum
+{
     MSGPAIR_RETURN_SUCCESS = 2
 };
 
 /* state function prototypes */
-static int mgmt_get_dfile_array_getattr_setup_msgpair(PINT_client_sm *sm_p,
-					job_status_s *js_p);
-static int mgmt_get_dfile_array_getattr_failure(PINT_client_sm *sm_p,
-				  job_status_s *js_p);
+static int mgmt_get_dfile_array_getattr_setup_msgpair(
+    PINT_client_sm * sm_p,
+    job_status_s * js_p);
+static int mgmt_get_dfile_array_getattr_failure(
+    PINT_client_sm * sm_p,
+    job_status_s * js_p);
 
-static int mgmt_get_dfile_array_cleanup(PINT_client_sm *sm_p,
-			  job_status_s *js_p);
+static int mgmt_get_dfile_array_cleanup(
+    PINT_client_sm * sm_p,
+    job_status_s * js_p);
 
 /* completion function prototypes */
-static int getattr_comp_fn(void *v_p,
-				  struct PVFS_server_resp *resp_p,
-				  int i);
+static int getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i);
 
 %%
 
 machine pvfs2_client_mgmt_get_dfile_array_sm(getattr_setup_msgpair,
-			       getattr_xfer_msgpair,
-			       getattr_failure,
-			       cleanup)
+					       getattr_xfer_msgpair,
+					       getattr_failure, cleanup)
 {
-    state getattr_setup_msgpair {
+    state getattr_setup_msgpair
+    {
 	run mgmt_get_dfile_array_getattr_setup_msgpair;
 	success => getattr_xfer_msgpair;
 	default => getattr_failure;
     }
-    state getattr_xfer_msgpair {
+    state getattr_xfer_msgpair
+    {
 	jump pvfs2_client_getattr_pcache_sm;
 	success => cleanup;
 	MSGPAIR_RETURN_SUCCESS => cleanup;
 	default => getattr_failure;
     }
-    state getattr_failure {
+    state getattr_failure
+    {
 	run mgmt_get_dfile_array_getattr_failure;
 	default => cleanup;
     }
-    state cleanup {
+    state cleanup
+    {
 	run mgmt_get_dfile_array_cleanup;
 	default => getattr_setup_msgpair;
     }
@@ -76,7 +84,7 @@ machine pvfs2_client_mgmt_get_dfile_array_sm(getattr_setup_msgpair,
 int PVFS_mgmt_get_dfile_array(
     PVFS_pinode_reference pinode_refn,
     PVFS_credentials credentials,
-    PVFS_handle* dfile_array,
+    PVFS_handle * dfile_array,
     int dfile_count)
 {
     int ret;
@@ -87,13 +95,14 @@ int PVFS_mgmt_get_dfile_array(
     /* do parameter checking here, then assume things are ok below.
      * assert()s are still ok of course :).
      */
-    if (!dfile_array) 
+    if (!dfile_array)
 	return -PVFS_EINVAL;
 
     /* build PINT_client_sm structure */
     /* TODO: KEEP A CACHE OF THESE AROUND SO WE'RE NOT ALWAYS MALLOC'ING? */
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
-    if (sm_p == NULL) return -PVFS_ENOMEM;
+    if (sm_p == NULL)
+	return -PVFS_ENOMEM;
 
     memset(sm_p, 0, sizeof(*sm_p));
 
@@ -103,14 +112,15 @@ int PVFS_mgmt_get_dfile_array(
     sm_p->u.get_dfile_array.dfile_count = dfile_count;
 
     gossip_debug(CLIENT_DEBUG,
-	"PVFS_mgmt_get_dfile_array calling PINT_client_state_machine_post()\n");
+		 "PVFS_mgmt_get_dfile_array calling PINT_client_state_machine_post()\n");
 
     /* do something to kick off processing */
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_GET_DFILE_ARRAY);
     assert(ret == 0);
 
     /* while !done call progress function */
-    while (!sm_p->op_complete && ret == 0) {
+    while (!sm_p->op_complete && ret == 0)
+    {
 	gossip_debug(CLIENT_DEBUG,
 		     "PVFS_mgmt_get_dfile_array calling PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
@@ -125,7 +135,7 @@ int PVFS_mgmt_get_dfile_array(
 
     /* clean up after ourselves */
     free(sm_p);
-    return(ret);
+    return (ret);
 }
 
 
@@ -134,12 +144,14 @@ int PVFS_mgmt_get_dfile_array(
 /* mgmt_get_dfile_array_getattr_setup_msgpair()
  *
  */
-static int mgmt_get_dfile_array_getattr_setup_msgpair(PINT_client_sm *sm_p,
-					job_status_s *js_p)
+static int mgmt_get_dfile_array_getattr_setup_msgpair(
+    PINT_client_sm * sm_p,
+    job_status_s * js_p)
 {
     int ret = -1;
 
-    gossip_debug(CLIENT_DEBUG, "mgmt_get_dfile_array state: getattr_setup_msgpair\n");
+    gossip_debug(CLIENT_DEBUG,
+		 "mgmt_get_dfile_array state: getattr_setup_msgpair\n");
 
     /* parameter range checks */
     /* TODO: do we have some defined values to check for here? */
@@ -151,20 +163,19 @@ static int mgmt_get_dfile_array_getattr_setup_msgpair(PINT_client_sm *sm_p,
 			      *sm_p->cred_p,
 			      sm_p->u.get_dfile_array.pinode_refn.fs_id,
 			      sm_p->u.get_dfile_array.pinode_refn.handle,
-			      PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_DFILES);
-    
+			      PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_DFILES);
+
     /* fill in msgpair structure components */
-    sm_p->msgpair.fs_id   = sm_p->u.get_dfile_array.pinode_refn.fs_id;
-    sm_p->msgpair.handle  = sm_p->u.get_dfile_array.pinode_refn.handle;
+    sm_p->msgpair.fs_id = sm_p->u.get_dfile_array.pinode_refn.fs_id;
+    sm_p->msgpair.handle = sm_p->u.get_dfile_array.pinode_refn.handle;
     sm_p->msgpair.comp_fn = getattr_comp_fn;
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
-	sm_p->msgpair.handle,
-	sm_p->msgpair.fs_id);
-    if(ret != 0)
+				    sm_p->msgpair.handle, sm_p->msgpair.fs_id);
+    if (ret != 0)
     {
 	gossip_err("Error: failure mapping to server.\n");
-	assert(ret < 0); /* return value range check */
-	assert(0); /* TODO: real error handling */
+	assert(ret < 0);	/* return value range check */
+	assert(0);	/* TODO: real error handling */
     }
 
     js_p->error_code = 0;
@@ -181,18 +192,20 @@ static int mgmt_get_dfile_array_getattr_setup_msgpair(PINT_client_sm *sm_p,
  * Return value is returned in job status, so it affects the
  * resulting state coming back from the nested state machine.
  */
-static int getattr_comp_fn(void *v_p,
-				  struct PVFS_server_resp *resp_p,
-				  int index)
+static int getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    
-    assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
+
+    assert(resp_p->op == PVFS_SERV_GETATTR);	/* sanity check */
 
     /* if we get an error, just return immediately, don't try to
      * actually fill anything in.
      */
-    if (resp_p->status != 0) {
+    if (resp_p->status != 0)
+    {
 	return resp_p->status;
     }
 
@@ -202,26 +215,27 @@ static int getattr_comp_fn(void *v_p,
     /* sanity checks */
     assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_META_DFILES);
     assert(resp_p->u.getattr.attr.u.meta.dfile_count > 0);
- 
+
     /* TODO: be nicer about this */
-    assert(resp_p->u.getattr.attr.u.meta.dfile_count <= 
-	sm_p->u.get_dfile_array.dfile_count);
+    assert(resp_p->u.getattr.attr.u.meta.dfile_count <=
+	   sm_p->u.get_dfile_array.dfile_count);
 
     /* copy out dfile count and array */
-    sm_p->u.get_dfile_array.dfile_count = 
+    sm_p->u.get_dfile_array.dfile_count =
 	resp_p->u.getattr.attr.u.meta.dfile_count;
 
-    memcpy(sm_p->u.get_dfile_array.dfile_array,	
-	resp_p->u.getattr.attr.u.meta.dfile_array,
-	(resp_p->u.getattr.attr.u.meta.dfile_count*sizeof(PVFS_handle)));
+    memcpy(sm_p->u.get_dfile_array.dfile_array,
+	   resp_p->u.getattr.attr.u.meta.dfile_array,
+	   (resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle)));
 
-    return(0);
+    return (0);
 }
 
 /* mgmt_get_dfile_array_cleanup()
  */
-static int mgmt_get_dfile_array_cleanup(PINT_client_sm *sm_p,
-			  job_status_s *js_p)
+static int mgmt_get_dfile_array_cleanup(
+    PINT_client_sm * sm_p,
+    job_status_s * js_p)
 {
     gossip_debug(CLIENT_DEBUG, "mgmt_get_dfile_array state: cleanup\n");
 
@@ -244,8 +258,9 @@ static int mgmt_get_dfile_array_cleanup(PINT_client_sm *sm_p,
 
 /* mgmt_get_dfile_array_getattr_failure()
  */
-static int mgmt_get_dfile_array_getattr_failure(PINT_client_sm *sm_p,
-				  job_status_s *js_p)
+static int mgmt_get_dfile_array_getattr_failure(
+    PINT_client_sm * sm_p,
+    job_status_s * js_p)
 {
     gossip_debug(CLIENT_DEBUG, "mgmt_get_dfile_array state: getattr_failure\n");
 
