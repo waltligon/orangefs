@@ -14,8 +14,6 @@
 #include <sys/vfs.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <linux/types.h>
-#include <linux/dirent.h>
 #include <signal.h>
 #include <rpc/rpc.h>
 #include <assert.h>

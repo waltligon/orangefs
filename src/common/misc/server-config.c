@@ -9,8 +9,6 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <linux/types.h>
-#include <linux/dirent.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <assert.h>
