@@ -361,8 +361,8 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 
 		ret = bmi_cache_request_init(flow_data, CACHE_TO_BMI);
 		if ( ret < 0 ) {
-			PVFS_perror_gossip("bmi_cache_request_init error: 
-					error_code", ret);
+			PVFS_perror_gossip("bmi_cache_request_init error: "
+                                           "error_code", ret);
 			return ret;
 		}
 
@@ -375,8 +375,8 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 						CACHE_TO_BMI );
 		if ( ret < 0 )
 		{
-			PVFS_perror_gossip("bmi_cache_progress_check error: 
-					error_code", ret);
+			PVFS_perror_gossip("bmi_cache_progress_check error: "
+                                           "error_code", ret);
 			return ret;
 		}
 
@@ -403,8 +403,8 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 
 		ret = bmi_cache_request_init(flow_data, BMI_TO_CACHE);
 		if ( ret < 0 ) {
-			PVFS_perror_gossip("bmi_cache_request_init error: 
-						error_code", ret);
+			PVFS_perror_gossip("bmi_cache_request_init error: "
+                                           "error_code", ret);
 			return ret;
 		}
 
@@ -418,8 +418,8 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 					BMI_TO_CACHE);
 		if ( ret < 0 )
 		{
-			PVFS_perror_gossip("bmi_cache_progress_check error: 
-						error_code", ret);
+			PVFS_perror_gossip("bmi_cache_progress_check error: "
+                                           "error_code", ret);
 			return ret;
 		}
 
@@ -577,8 +577,8 @@ check_again:
 		if ( q_item->int_state == INT_REQ_INIT )
 		{
 			/* wrong state */
-			PVFS_perror_gossip("bmi_cache_progress_check error: 
-					wrong internal state:error code", -1);
+			PVFS_perror_gossip("bmi_cache_progress_check error: "
+                                           "wrong internal state:error code", -1);
 
 			if ( mutex_flag )
 				gen_mutex_unlock(&flow_data->flow_mutex);
@@ -707,8 +707,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
 	/* TODO: error handling */
 	if ( ret < 0 ) {
-		PVFS_perror_gossip("bmi_recv_callback_fn:
-		     error from  bmi_cache_release_cache_src:error_code", ret);
+		PVFS_perror_gossip("bmi_recv_callback_fn: "
+                                   "error from  bmi_cache_release_cache_src:error_code", ret);
 		gen_mutex_unlock(&flow_data->flow_mutex);
 		return;
 	}
@@ -730,8 +730,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
 						BMI_TO_CACHE);
 		if ( ret < 0 )
 		{
-			PVFS_perror_gossip("bmi_recv_callback_fn:
-			  error from bmi_cache_progress_check:error_code", ret);
+			PVFS_perror_gossip("bmi_recv_callback_fn: "
+                                           "error from bmi_cache_progress_check:error_code", ret);
 			gen_mutex_unlock(&flow_data->flow_mutex);
 			return;
 		}
@@ -925,8 +925,8 @@ static void bmi_send_callback_fn(void *user_ptr,
 
 	/* TODO: error handling */
 	if ( ret < 0 ) {
-		PVFS_perror_gossip("bmi_send_callback_fn: 
-			from bmi_cache_release_cache_src:error_code", ret);
+		PVFS_perror_gossip("bmi_send_callback_fn: "
+                                   "from bmi_cache_release_cache_src:error_code", ret);
 		gen_mutex_unlock(&flow_data->flow_mutex);
 		return;
 	}
@@ -952,8 +952,8 @@ static void bmi_send_callback_fn(void *user_ptr,
 						CACHE_TO_BMI );
 		if ( ret < 0 )
 		{
-			PVFS_perror_gossip("bmi_send_callback_fn: 
-				from bmi_cache_progress_check:error_code", ret);
+			PVFS_perror_gossip("bmi_send_callback_fn: "
+                                           "from bmi_cache_progress_check:error_code", ret);
 			gen_mutex_unlock(&flow_data->flow_mutex);
 			return;
 		}
