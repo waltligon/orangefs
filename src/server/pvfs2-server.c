@@ -453,6 +453,10 @@ static int server_setup_process_environment(int background)
 	}
         assert(new_pid == getpid());
 
+        freopen("/dev/null", "r", stdin);
+        freopen("/dev/null", "w", stdout);
+        freopen("/dev/null", "w", stderr);
+
         assert(server_config.logfile != NULL);
 	if (gossip_enable_file(server_config.logfile, "a") < 0)
         {
