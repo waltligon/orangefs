@@ -6,6 +6,11 @@ PVFS2 Release ChangeLog
 pvfs2-0.7.0pre1
 ===============
 - added a pvfs2-config tool to help user programs compiling with pvfs2
+- new PAV option (COMPUTENODES_LAST) that controls whether compute nodes are
+  chosen first or last out of the total set of nodes available
+- fix locking bug introduced in 0.6.3 that shows up when trove is used
+  without aio callbacks
+- explicitly name invalid msg tag value (0)
 
 
 pvfs2-0.6.3
