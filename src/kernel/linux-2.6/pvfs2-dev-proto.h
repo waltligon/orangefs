@@ -20,6 +20,7 @@
 #define PVFS2_VFS_OP_REMOVE            0xFF000006
 #define PVFS2_VFS_OP_MKDIR             0xFF000007
 #define PVFS2_VFS_OP_READDIR           0xFF000008
+#define PVFS2_VFS_OP_SETATTR           0xFF000009
 
 /* misc constants */
 #define PVFS2_NAME_LEN                 0x000000FF

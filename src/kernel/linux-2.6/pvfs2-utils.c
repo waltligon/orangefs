@@ -195,10 +195,82 @@ int pvfs2_inode_setattr(
     struct inode *inode,
     struct iattr *iattr)
 {
-    int ret = -1;
+    int ret = -1, perm_mode = 0;
+    PVFS_sys_attr *attrs = NULL;
+    pvfs2_kernel_op_t *new_op = NULL;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_error("FIXME: SKIPPING SETATTR: DOING NOTHING!\n");
+    if (inode)
+    {
+	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+	if (!new_op)
+	{
+	    return -1;
+	}
 
+	new_op->upcall.type = PVFS2_VFS_OP_SETATTR;
+        new_op->upcall.req.setattr.refn = pvfs2_inode->refn;
+
+        /* fill in all attributes that we're interested in */
+        attrs = &new_op->upcall.req.setattr.attributes;
+        attrs->owner = inode->i_uid;
+        attrs->group = inode->i_gid;
+        attrs->atime = (PVFS_time)inode->i_atime.tv_sec;
+        attrs->mtime = (PVFS_time)inode->i_mtime.tv_sec;
+        attrs->ctime = (PVFS_time)inode->i_ctime.tv_sec;
+
+        perm_mode = inode->i_mode;
+
+        if (perm_mode & S_IXOTH)
+            attrs->perms |= PVFS_O_EXECUTE;
+        if (perm_mode & S_IWOTH)
+            attrs->perms |= PVFS_O_WRITE;
+        if (perm_mode & S_IROTH)
+            attrs->perms |= PVFS_O_READ;
+
+        if (perm_mode & S_IXGRP)
+            attrs->perms |= PVFS_G_EXECUTE;
+        if (perm_mode & S_IWGRP)
+            attrs->perms |= PVFS_G_WRITE;
+        if (perm_mode & S_IRGRP)
+            attrs->perms |= PVFS_G_READ;
+
+        if (perm_mode & S_IXUSR)
+            attrs->perms |= PVFS_U_EXECUTE;
+        if (perm_mode & S_IWUSR)
+            attrs->perms |= PVFS_U_WRITE;
+        if (perm_mode & S_IRUSR)
+            attrs->perms |= PVFS_U_READ;
+
+        /* set mask to reflect all values, but defintely NOT
+           the object type since we're ignoring that (and
+           safely can)
+        */
+        attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
+
+	/* post req and wait for request to be serviced here */
+	add_op_to_request_list(new_op);
+	if (wait_for_matching_downcall(new_op) != 0)
+	{
+	    /*
+	       NOTE: we can't free the op here unless we're SURE
+	       it wasn't put on the invalidated list.
+	       For now, wait_for_matching_downcall just doesn't
+	       put anything on the invalidated list.
+	     */
+	    printk("pvfs2: pvfs2_inode_setattr -- wait failed. "
+		   "op invalidated (not really)\n");
+	}
+
+        printk("Setattr Got PVFS2 status value of %d\n",
+               new_op->downcall.status);
+
+        ret = new_op->downcall.status;
+
+	/* when request is serviced properly, free req op struct */
+	printk("Op with tag %lu was serviced; freeing\n", new_op->tag);
+	op_release(new_op);
+    }
     return ret;
 }
 

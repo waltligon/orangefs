@@ -7,6 +7,9 @@
 #ifndef __UPCALL_H
 #define __UPCALL_H
 
+/* TODO: we might want to try to avoid this inclusion  */
+#include "pvfs2-sysint.h"
+
 typedef struct
 {
     char *buf;
@@ -42,6 +45,12 @@ typedef struct
 
 typedef struct
 {
+    PVFS_pinode_reference refn;
+    PVFS_sys_attr attributes;
+} pvfs2_setattr_request_t;
+
+typedef struct
+{
     PVFS_pinode_reference parent_refn;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_remove_request_t;
@@ -59,7 +68,6 @@ typedef struct
     int max_dirent_count;
 } pvfs2_readdir_request_t;
 
-
 typedef struct
 {
     int type;
@@ -71,6 +79,7 @@ typedef struct
 	pvfs2_lookup_request_t lookup;
 	pvfs2_create_request_t create;
 	pvfs2_getattr_request_t getattr;
+	pvfs2_setattr_request_t setattr;
 	pvfs2_remove_request_t remove;
 	pvfs2_mkdir_request_t mkdir;
 	pvfs2_readdir_request_t readdir;

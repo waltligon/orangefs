@@ -215,7 +215,7 @@ static int service_getattr_request(
         credentials.gid = 100;
         credentials.perms = 511;
 
-        printf("got a getattr request for fsid %d | handle %ld\n",
+        printf("got a getattr request for fsid %d | handle %Ld\n",
                in_upcall->req.getattr.refn.fs_id,
                in_upcall->req.getattr.refn.handle);
 
@@ -223,7 +223,7 @@ static int service_getattr_request(
                                credentials, &response);
         if (ret < 0)
         {
-            fprintf(stderr,"failed to getattr handle %ld on fsid %d!\n",
+            fprintf(stderr,"failed to getattr handle %Ld on fsid %d!\n",
                     in_upcall->req.getattr.refn.handle,
                     in_upcall->req.getattr.refn.fs_id);
             fprintf(stderr,"getattr returned error code %d\n",ret);
@@ -237,6 +237,52 @@ static int service_getattr_request(
             out_downcall->type = PVFS2_VFS_OP_GETATTR;
             out_downcall->status = 0;
             out_downcall->resp.getattr.attributes = response.attr;
+            ret = 0;
+        }
+    }
+    return ret;
+}
+
+static int service_setattr_request(
+    PVFS_sysresp_init *init_response,
+    pvfs2_upcall_t *in_upcall,
+    pvfs2_downcall_t *out_downcall)
+{
+    int ret = 1;
+    PVFS_credentials credentials;
+
+    if (init_response && in_upcall && out_downcall)
+    {
+        memset(out_downcall,0,sizeof(pvfs2_downcall_t));
+
+        credentials.uid = in_upcall->req.setattr.attributes.owner;
+        credentials.gid = in_upcall->req.setattr.attributes.group;
+        credentials.perms = in_upcall->req.setattr.attributes.perms;
+
+        printf("got a setattr request for fsid %d | handle %Ld\n",
+               in_upcall->req.setattr.refn.fs_id,
+               in_upcall->req.setattr.refn.handle);
+
+        printf("ATTR MASK IS %d\n",in_upcall->req.setattr.attributes.mask);
+
+        ret = PVFS_sys_setattr(in_upcall->req.setattr.refn,
+                               in_upcall->req.setattr.attributes,
+                               credentials);
+        if (ret < 0)
+        {
+            fprintf(stderr,"failed to setattr handle %Ld on fsid %d!\n",
+                    in_upcall->req.setattr.refn.handle,
+                    in_upcall->req.setattr.refn.fs_id);
+            fprintf(stderr,"setattr returned error code %d\n",ret);
+
+            /* we need to send a blank response */
+            out_downcall->type = PVFS2_VFS_OP_SETATTR;
+            out_downcall->status = -1;
+        }
+        else
+        {
+            out_downcall->type = PVFS2_VFS_OP_SETATTR;
+            out_downcall->status = 0;
             ret = 0;
         }
     }
@@ -276,13 +322,13 @@ static int service_remove_request(
             fprintf(stderr,"Remove returned error code %d\n",ret);
 
             /* we need to send a blank error response */
-            out_downcall->type = PVFS2_VFS_OP_GETATTR;
+            out_downcall->type = PVFS2_VFS_OP_REMOVE;
             out_downcall->status = -1;
         }
         else
         {
             /* we need to send a blank success response */
-            out_downcall->type = PVFS2_VFS_OP_GETATTR;
+            out_downcall->type = PVFS2_VFS_OP_REMOVE;
             out_downcall->status = 0;
             ret = 0;
         }
@@ -597,6 +643,9 @@ int main(int argc, char **argv)
 		break;
 	    case PVFS2_VFS_OP_GETATTR:
 		service_getattr_request(&init_response,&upcall,&downcall);
+		break;
+	    case PVFS2_VFS_OP_SETATTR:
+		service_setattr_request(&init_response,&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_REMOVE:
 		service_remove_request(&init_response,&upcall,&downcall);

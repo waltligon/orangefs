@@ -36,6 +36,11 @@ typedef struct
     PVFS_sys_attr attributes;
 } pvfs2_getattr_response_t;
 
+/* the setattr response is a blank downcall */
+typedef struct
+{
+} pvfs2_setattr_response_t;
+
 /* the remove response is a blank downcall */
 typedef struct
 {
@@ -67,7 +72,8 @@ typedef struct
 	pvfs2_lookup_response_t lookup;
 	pvfs2_create_response_t create;
 	pvfs2_getattr_response_t getattr;
-/*         pvfs2_remove_response_t remove; */
+/* 	pvfs2_setattr_response_t setattr; */
+/*      pvfs2_remove_response_t remove; */
 	pvfs2_mkdir_response_t mkdir;
 	pvfs2_readdir_response_t readdir;
     } resp;
