@@ -68,11 +68,6 @@ void PINT_release_req_array(bmi_addr_t* addr_array,
     int* error_code_array,
     int array_size);
 
-int PINT_flow_array(
-    flow_descriptor** flow_array,
-    int* error_code_array,
-    int array_size);
-
 int PINT_send_req(bmi_addr_t addr,
     struct PVFS_server_req_s *req_p,
     bmi_size_t max_resp_size,

@@ -30,6 +30,19 @@
  * servers failed, etc.)
  */
 
+static int io_req_ack_flow_array(bmi_addr_t* addr_array,
+    struct PVFS_server_req_s* req_array,
+    bmi_size_t max_resp_size,
+    void** resp_encoded_array,
+    struct PINT_decoded_msg* resp_decoded_array,
+    flow_descriptor** flow_array,
+    int* error_code_array,
+    int array_size,
+    PVFS_msg_tag_t* op_tag_array,
+    PVFS_object_attr* attr_p,
+    PVFS_sysreq_io* req,
+    enum PVFS_sys_io_type type);
+
 /* PVFS_sys_io()
  *
  * performs a read or write operation.  PVFS_sys_read() and
@@ -48,7 +61,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     struct PVFS_server_resp_s* tmp_resp = NULL;
     void** resp_encoded_array = NULL;
     struct PINT_decoded_msg* resp_decoded_array = NULL;
-    PINT_Request_file_data* file_data_array = NULL;
     int* error_code_array = NULL;
     flow_descriptor** flow_array = NULL;
     int i;
@@ -86,13 +98,10 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	return(-EACCES);
     }
 
-    gossip_err("WARNING: kludging distribution in PINT_sys_io().\n");
-
-    /* TODO: do I need to do this here? */
     ret = PINT_Dist_lookup(pinode_ptr->attr.u.meta.dist);
     if(ret < 0)
     {
-	goto out;
+	goto sys_io_out;
     }
 
     target_handle_array =
@@ -101,7 +110,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     if(!target_handle_array)
     {
 	ret = -errno;
-	goto out;
+	goto sys_io_out;
     }
 
     /* find out which handles must be included to service this
@@ -113,7 +122,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     if(!req_state)
     {
 	ret = -ENOMEM;
-	goto out;
+	goto sys_io_out;
     }
     for(i=0; i<pinode_ptr->attr.u.meta.nr_datafiles; i++)
     {
@@ -132,7 +141,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    PINT_CKSIZE);
 	if(ret < 0)
 	{
-	    goto out;
+	    goto sys_io_out;
 	}
 
 	/* did we find that any data belongs to this handle? */
@@ -146,7 +155,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     PINT_Free_request_state(req_state);
     req_state = NULL;
 
-    /* stuff for request array */
+    /* create storage for book keeping information */
     addr_array = (bmi_addr_t*)malloc(target_handle_count *
 	sizeof(bmi_addr_t));
     req_array = (struct PVFS_server_req_s*)
@@ -157,8 +166,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     resp_decoded_array = (struct PINT_decoded_msg*)
 	malloc(target_handle_count * 
 	sizeof(struct PINT_decoded_msg));
-
-    /* stuff for both request array and flow array */
     error_code_array = (int*)malloc(target_handle_count *
 	sizeof(int));
     memset(error_code_array, 0, (target_handle_count*sizeof(int)));
@@ -170,8 +177,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     }
 
     /* stuff for running flows */
-    file_data_array = (PINT_Request_file_data*)malloc(
-	target_handle_count*sizeof(PINT_Request_file_data));
     flow_array = (flow_descriptor**)malloc(target_handle_count *
 	sizeof(flow_descriptor*));
     if(flow_array)
@@ -179,11 +184,11 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    sizeof(flow_descriptor*)));
 	
     if(!addr_array || !req_array || !resp_encoded_array ||
-	!resp_decoded_array || !error_code_array || 
-	!file_data_array || !flow_array)
+	!resp_decoded_array || !error_code_array || !flow_array)
     {
 	ret = -ENOMEM;
-	goto out;
+	gossip_lerr("Error: out of memory.\n");
+	goto sys_io_out;
     }
 
     /* setup the I/O request to each data server */
@@ -196,7 +201,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    req->pinode_refn.fs_id);
 	if(ret < 0)
 	{
-	    goto out;
+	    gossip_lerr("Error: can't map to server.\n");
+	    goto sys_io_out;
 	}
 
 	/* fill in the I/O request */
@@ -216,90 +222,27 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    req_array[i].u.io.io_type = PVFS_IO_WRITE;
     }
    
-    /* send the I/O requests on their way */
-    ret = PINT_send_req_array(
+    /* run the I/O series for each server */
+    ret = io_req_ack_flow_array(
 	addr_array,
 	req_array,
 	PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO),
 	resp_encoded_array,
 	resp_decoded_array,
+	flow_array,
 	error_code_array,
 	target_handle_count,
-	op_tag_array);
+	op_tag_array,
+	&pinode_ptr->attr,
+	req,
+	type);
     if(ret < 0)
     {
-	goto out;
+	gossip_lerr("Error: io_req_ack_flow_array() failure.\n");
+	goto sys_io_out;
     }
 
-    /* set an error code for each negative ack that we received */
-    for(i=0; i<target_handle_count; i++)
-    {
-	tmp_resp = (struct
-	    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
-	if(!(error_code_array[i]) && tmp_resp->status)
-	    error_code_array[i] = tmp_resp->status;
-    }
-
-    /* setup a flow for each I/O server that gave us a positive
-     * response
-     */
-    for(i=0; i<target_handle_count; i++)
-    {
-	tmp_resp = (struct
-	    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
-	if(!(error_code_array[i]))
-	{
-	    flow_array[i] = PINT_flow_alloc();
-	    if(!flow_array[i])
-	    {
-		error_code_array[i] = -ENOMEM;
-		continue;
-	    }
-	    flow_array[i]->file_data = &(file_data_array[i]);
-	    flow_array[i]->file_data->fsize =
-		tmp_resp->u.io.bstream_size;
-	    flow_array[i]->file_data->dist =
-		pinode_ptr->attr.u.meta.dist;
-	    flow_array[i]->file_data->iod_num = i;
-	    flow_array[i]->file_data->iod_count =
-		pinode_ptr->attr.u.meta.nr_datafiles;
-	    flow_array[i]->request = req->io_req;
-	    flow_array[i]->flags = 0;
-	    flow_array[i]->tag = op_tag_array[i];
-	    flow_array[i]->user_ptr = NULL;
-
-	    if(type == PVFS_SYS_IO_READ)
-	    {
-		flow_array[i]->file_data->extend_flag = 0;
-		flow_array[i]->src.endpoint_id = BMI_ENDPOINT;
-		flow_array[i]->src.u.bmi.address = addr_array[i];
-		flow_array[i]->dest.endpoint_id = MEM_ENDPOINT;
-		flow_array[i]->dest.u.mem.size = req->buffer_size;
-		flow_array[i]->dest.u.mem.buffer = req->buffer;
-	    }
-	    else
-	    {
-		flow_array[i]->file_data->extend_flag = 1;
-		flow_array[i]->src.endpoint_id = MEM_ENDPOINT;
-		flow_array[i]->src.u.mem.size = req->buffer_size;
-		flow_array[i]->src.u.mem.buffer = req->buffer;
-		flow_array[i]->dest.endpoint_id = BMI_ENDPOINT;
-		flow_array[i]->dest.u.bmi.address = addr_array[i];
-	    }
-	}
-    }
-
-    /* actually run any flows that are needed */
-    /* NOTE: we don't have to check if any flows are necessary or
-     * not; this function will exit without doing anything if no
-     * flows are runnable
-     */
-    ret = PINT_flow_array(flow_array, error_code_array,
-	target_handle_count);
-    if(ret < 0)
-    {
-	goto out;
-    }
+    /****************************************************************/
 
     /* if this was a write operation, then we need to wait for a
      * final ack from the data servers indicating the status of
@@ -319,7 +262,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    op_tag_array);
 	if(ret < 0)
 	{
-	    goto out;
+	    gossip_lerr("Error: ack array failure.\n");
+	    goto sys_io_out;
 	}
 
 	/* set an error code for each negative ack that we received */
@@ -346,6 +290,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	if(error_code_array[i])
 	{
 	    total_errors ++;
+	    gossip_lerr("Error: EIO.\n");
 	    ret = -EIO;
 	}
 	else
@@ -370,7 +315,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     /* drop through and pass out return value, successful cases go
      * through here also
      */
-out:
+sys_io_out:
     
     if(addr_array)
 	free(addr_array);
@@ -382,8 +327,6 @@ out:
 	free(resp_decoded_array);
     if(error_code_array)
 	free(error_code_array);
-    if(file_data_array)
-	free(file_data_array);
     if(target_handle_array)
 	free(target_handle_array);
     if(flow_array)
@@ -401,6 +344,388 @@ out:
 
     return(ret);
 }
+
+/* io_req_ack_flow_array()
+ *
+ * TODO: use timeouts rather than infinite blocking
+ * TODO: try to avoid mallocing so much 
+ *
+ * Carries out the three steps of sending a request, receiving and
+ * acknowledgement, and running a flow for N servers
+ *
+ * NOTE: this function will skip an indices with a nonzero
+ * error_code_array entry; so remember to zero it out before
+ * calling if needed.
+ *
+ * returns 0 on success, -errno on failure
+ */
+static int io_req_ack_flow_array(bmi_addr_t* addr_array,
+    struct PVFS_server_req_s* req_array,
+    bmi_size_t max_resp_size,
+    void** resp_encoded_array,
+    struct PINT_decoded_msg* resp_decoded_array,
+    flow_descriptor** flow_array,
+    int* error_code_array,
+    int array_size,
+    PVFS_msg_tag_t* op_tag_array,
+    PVFS_object_attr* attr_p,
+    PVFS_sysreq_io* req,
+    enum PVFS_sys_io_type type)
+{
+    int i;
+    int ret = -1;
+    struct PINT_encoded_msg* req_encoded_array = NULL;
+    job_id_t* id_array = NULL;
+    job_status_s* status_array = NULL;
+    int* index_array = NULL;
+    int count;
+    int need_to_test = 0;
+    PINT_Request_file_data* file_data_array = NULL;
+    struct PVFS_server_resp_s* tmp_resp = NULL;
+    int recvs_to_complete = 0;
+    int flows_to_complete = 0;
+    int flows_to_post = 0;
+    int* step_array = NULL;
+    enum io_step
+    {
+	STEP_INIT,
+	STEP_RECV,
+	STEP_DONE,
+    };
+
+    /* allocate some bookkeeping fields */
+    req_encoded_array = (struct PINT_encoded_msg*)malloc(array_size *
+	sizeof(struct PINT_encoded_msg));
+    status_array = (job_status_s*)malloc(2 * array_size *
+	sizeof(job_status_s));
+    index_array = (int*)malloc(2 * array_size * sizeof(int));
+    id_array = (job_id_t*)malloc(2 * array_size * sizeof(job_id_t));
+    file_data_array = (PINT_Request_file_data*)malloc(
+	array_size*sizeof(PINT_Request_file_data));
+    step_array = (int*)malloc(array_size * sizeof(int));
+
+    if(!req_encoded_array || !status_array || !id_array ||
+	!index_array || !file_data_array || !step_array)
+    {
+	ret = -ENOMEM;
+	gossip_lerr("Error: out of memory.\n");
+	goto array_out;
+    }
+
+    /* clear some of the arrays for safety */
+    memset(resp_encoded_array, 0, (array_size*sizeof(void*)));
+    memset(req_encoded_array, 0, (array_size*sizeof(struct
+	PINT_encoded_msg)));
+    memset(resp_decoded_array, 0, (array_size*sizeof(struct
+	PINT_decoded_msg)));
+    for(i=0; i<array_size; i++)
+    {
+        step_array[i] = STEP_INIT;
+    }
+
+    /* encode all of the requests */
+    for(i=0; i<array_size; i++)
+    {
+	if(!(error_code_array[i]))
+	{
+	    ret = PINT_encode(&(req_array[i]), PINT_ENCODE_REQ,
+		&(req_encoded_array[i]), addr_array[i], REQ_ENC_FORMAT);
+	    if(ret < 0)
+	    {
+		error_code_array[i] = ret;
+	    }
+	}
+    }
+
+    /* post a bunch of sends */
+    /* keep up with job ids, and the number of immediate completions */
+    memset(id_array, 0, (2 * array_size * sizeof(job_id_t)));
+    for(i=0; i<array_size; i++)
+    {
+	if(!(error_code_array[i]))
+	{
+	    ret = job_bmi_send_list(
+		req_encoded_array[i].dest, 
+		req_encoded_array[i].buffer_list,
+		req_encoded_array[i].size_list,
+		req_encoded_array[i].list_count,
+		req_encoded_array[i].total_size,
+		op_tag_array[i],
+		req_encoded_array[i].buffer_flag,
+		1,
+		NULL,
+		&(status_array[i]),
+		&(id_array[i]));
+	    if(ret < 0)
+	    {
+		/* immediate error */
+		error_code_array[i] = ret;
+		id_array[i] = 0;
+	    }
+	    else if (ret == 1)
+	    {
+		/* immediate completion */
+		error_code_array[i] = status_array[i].error_code;
+		id_array[i] = 0;
+	    }
+	    else
+	    {
+		need_to_test++;
+	    }
+	}
+    }
+
+    /* see if anything needs to be tested for completion */
+    if(need_to_test)
+    {
+	count = array_size;
+	ret = job_testsome(id_array, &count, index_array, NULL,
+	    status_array, -1);
+	if(ret < 0)
+	{
+	    /* TODO: there is no real way cleanup from this right now */
+	    gossip_lerr(
+		"Error: io_req_ack_flow_array() critical failure.\n");
+	    exit(-1);
+	}
+	    
+	/* all sends are complete now, fill in error codes */
+	for(i=0; i<count; i++)
+	{
+	    error_code_array[index_array[i]] =
+		status_array[i].error_code;
+	}
+    }
+
+    /* release request encodings */
+    for(i=0; i<array_size; i++)
+    {
+	if(req_encoded_array[i].total_size)
+	{
+	    PINT_encode_release(&(req_encoded_array[i]),
+		PINT_ENCODE_REQ, REQ_ENC_FORMAT);
+	}
+    }
+
+    /* allocate room for responses */
+    for(i=0; i<array_size; i++)
+    {
+	if(!(error_code_array[i]))
+	{
+	    resp_encoded_array[i] = BMI_memalloc(addr_array[i], max_resp_size,
+		BMI_RECV_BUFFER);
+	    if(!resp_encoded_array[i])
+	    {
+		error_code_array[i] = -ENOMEM;
+	    }
+	}
+    }
+
+    /*****************************************************/
+
+    /* post a bunch of receives */
+    /* keep up with job ids and the number of immediate completions */
+    memset(id_array, 0, (2 * array_size * sizeof(job_id_t)));
+    need_to_test = 0;
+    for(i=0; i<array_size; i++)
+    {
+	/* skip servers that have already experienced communication
+	 * failure 
+	 */
+	if(!(error_code_array[i]))
+	{
+	    ret = job_bmi_recv(
+		addr_array[i],
+		resp_encoded_array[i], 
+		max_resp_size, 
+		op_tag_array[i],
+		BMI_PRE_ALLOC,
+		NULL, 
+		&(status_array[i]), 
+		&(id_array[i]));
+	    if(ret < 0)
+	    {
+		/* immediate error */
+		error_code_array[i] = ret;
+		id_array[i] = 0;
+	    }
+	    else if (ret == 1)
+	    {
+		/* immediate completion */
+		error_code_array[i] = status_array[i].error_code;
+		id_array[i] = 0;
+		step_array[i] = STEP_RECV;
+	    }
+	    else
+	    {
+		need_to_test++;
+	    }
+	}
+    }
+
+    recvs_to_complete = need_to_test;
+    flows_to_complete = 0;
+    flows_to_post = 0;
+    for(i=0; i<array_size; i++)
+    {
+	if(step_array[i] == STEP_RECV && !error_code_array[i])
+	    flows_to_post++;
+    }
+
+    while(recvs_to_complete || flows_to_post || flows_to_complete)
+    {
+	/* post any flows that we can */
+	for(i=0; i<array_size; i++)
+	{
+	    if(step_array[i] == STEP_RECV && !error_code_array[i])
+	    {
+		flows_to_post--;
+
+		ret = PINT_decode(resp_encoded_array[i], PINT_DECODE_RESP,
+		    &(resp_decoded_array[i]), addr_array[i],
+		    PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO),
+		    NULL);
+		if(ret < 0)
+		{
+		    error_code_array[i] = ret;
+		    continue;
+		}
+
+		tmp_resp = (struct
+		    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
+		if(tmp_resp->status)
+		{
+		    /* don't post a flow; we got a negative ack */
+		    error_code_array[i] = tmp_resp->status;
+		    continue;
+		}
+
+		flow_array[i] = PINT_flow_alloc();
+		if(!flow_array[i])
+		{
+		    /* don't post a flow; we are out of memory */
+		    error_code_array[i] = -ENOMEM;
+		    continue;
+		}
+
+		/* setup a flow */
+		flow_array[i]->file_data = &(file_data_array[i]);
+		flow_array[i]->file_data->fsize =
+		    tmp_resp->u.io.bstream_size;
+		flow_array[i]->file_data->dist =
+		    attr_p->u.meta.dist;
+		flow_array[i]->file_data->iod_num = i;
+		flow_array[i]->file_data->iod_count =
+		    attr_p->u.meta.nr_datafiles;
+		flow_array[i]->request = req->io_req;
+		flow_array[i]->flags = 0;
+		flow_array[i]->tag = op_tag_array[i];
+		flow_array[i]->user_ptr = NULL;
+
+		if(type == PVFS_SYS_IO_READ)
+		{
+		    flow_array[i]->file_data->extend_flag = 0;
+		    flow_array[i]->src.endpoint_id = BMI_ENDPOINT;
+		    flow_array[i]->src.u.bmi.address = addr_array[i];
+		    flow_array[i]->dest.endpoint_id = MEM_ENDPOINT;
+		    flow_array[i]->dest.u.mem.size = req->buffer_size;
+		    flow_array[i]->dest.u.mem.buffer = req->buffer;
+		}
+		else
+		{
+		    flow_array[i]->file_data->extend_flag = 1;
+		    flow_array[i]->src.endpoint_id = MEM_ENDPOINT;
+		    flow_array[i]->src.u.mem.size = req->buffer_size;
+		    flow_array[i]->src.u.mem.buffer = req->buffer;
+		    flow_array[i]->dest.endpoint_id = BMI_ENDPOINT;
+		    flow_array[i]->dest.u.bmi.address = addr_array[i];
+		}
+
+		ret = job_flow(
+		    flow_array[i],
+		    NULL,
+		    &(status_array[0]),
+		    &(id_array[i+array_size]));
+		if(ret < 0)
+		{
+		    error_code_array[i] = ret;
+		    id_array[i+array_size] = 0;
+		}
+		else if(ret == 1)
+		{
+		    error_code_array[i] = status_array[0].error_code;
+		    id_array[i+array_size] = 0;
+		}
+		else
+		{
+		    flows_to_complete++;
+		}
+		/* last step, regardless of if the flow completed
+		 * or not
+		 */
+		step_array[i] = STEP_DONE;
+	    }
+	}
+
+	/* test to see what's finished */
+	if(recvs_to_complete || flows_to_complete)
+	{
+	    count = array_size * 2;
+	    ret = job_testsome(id_array, &count, index_array, NULL,
+		status_array, 1);
+	    if(ret < 0)
+	    {
+		/* TODO: there is no real way cleanup from this right now */
+		gossip_lerr(
+		    "Error: io_req_ack_flow_array() critical failure.\n");
+		exit(-1);
+	    }
+	    
+	    /* handle whatever finished */
+	    for(i=0; i<count; i++)
+	    {
+		/* see if it was a flow */
+		if(index_array[i] >= array_size)
+		{
+		    step_array[index_array[i]-array_size] = STEP_DONE;
+		    error_code_array[index_array[i]-array_size] = 
+			status_array[i].error_code;
+		    id_array[index_array[i]] = 0;
+		    flows_to_complete--;
+		}
+		/* otherwise, a recv completed */
+		else
+		{
+		    step_array[index_array[i]] = STEP_RECV;
+		    error_code_array[index_array[i]] = 
+			status_array[i].error_code;
+		    id_array[index_array[i]] = 0;
+		    recvs_to_complete--;
+		    if(!status_array[i].error_code)
+			flows_to_post++;
+		}
+	    }
+	}
+    }
+
+    ret = 0;
+
+array_out:
+
+    if(req_encoded_array)
+	free(req_encoded_array);
+    if(status_array)
+	free(status_array);
+    if(id_array)
+	free(id_array);
+    if(index_array)
+	free(index_array);
+    if(file_data_array)
+	free(file_data_array);
+
+    return(ret);
+}
+
 
 /*
  * Local variables:
