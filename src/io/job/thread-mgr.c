@@ -597,8 +597,9 @@ int PINT_thread_mgr_trove_getcontext(PVFS_context_id *context)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_thread_mgr_trove_cancel(PVFS_id_gen_t id, PVFS_fs_id fs_id,
-    void* user_ptr)
+int PINT_thread_mgr_trove_cancel(PVFS_id_gen_t id,
+				 PVFS_fs_id fs_id,
+				 void* user_ptr)
 {
     int i;
     int ret;

@@ -338,13 +338,12 @@ int PINT_dev_release_unexpected(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_dev_write_list(
-	void** buffer_list,
-	int* size_list,
-	int list_count,
-	int total_size,
-	enum PINT_dev_buffer_type buffer_type,
-	PVFS_id_gen_t tag)
+int PINT_dev_write_list(void **buffer_list,
+			int *size_list,
+			int list_count,
+			int total_size,
+			enum PINT_dev_buffer_type buffer_type,
+			PVFS_id_gen_t tag)
 {
     struct iovec io_array[8];
     int io_count = 2;
@@ -361,7 +360,7 @@ int PINT_dev_write_list(
     assert(buffer_type == PINT_DEV_EXT_ALLOC || 
 	buffer_type == PINT_DEV_PRE_ALLOC);
 
-    if(total_size > pdev_max_downsize)
+    if (total_size > pdev_max_downsize)
     {
 	return(-(PVFS_EMSGSIZE|PVFS_ERROR_DEV));
     }
@@ -371,7 +370,7 @@ int PINT_dev_write_list(
     io_array[1].iov_base = &tag;
     io_array[1].iov_len = sizeof(int64_t);
 
-    for(i=0; i<list_count; i++)
+    for (i=0; i<list_count; i++)
     {
 	io_array[i+2].iov_base = buffer_list[i];
 	io_array[i+2].iov_len = size_list[i];
@@ -379,7 +378,7 @@ int PINT_dev_write_list(
     }
 
     ret = writev(pdev_fd, io_array, io_count);
-    if(ret < 0)
+    if (ret < 0)
     {
 	return(-(PVFS_EIO|PVFS_ERROR_DEV));
     }
@@ -393,11 +392,10 @@ int PINT_dev_write_list(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_dev_write(
-	void* buffer,
-	int size,
-	enum PINT_dev_buffer_type buffer_type,
-	PVFS_id_gen_t tag)
+int PINT_dev_write(void *buffer,
+		   int size,
+		   enum PINT_dev_buffer_type buffer_type,
+		   PVFS_id_gen_t tag)
 {
     return(PINT_dev_write_list(&buffer, &size, 1, size, buffer_type, tag));
 }
@@ -408,7 +406,7 @@ int PINT_dev_write(
  *
  * returns pointer to buffer on success, NULL on failure
  */
-void* PINT_dev_memalloc(int size)
+void *PINT_dev_memalloc(int size)
 {
     /* no optimizations yet */
     return(malloc(size));
@@ -440,53 +438,56 @@ static int setup_dev_entry(const char* dev_name)
     struct stat dev_stat;
 
     ret = parse_devices("/proc/devices", "pvfs2-req", &majornum);
-    if(ret < 0){
+    if (ret < 0)
+    {
 	gossip_err("Error: unable to parse device file.\n");
-	return(-1);
+	return -1;
     }
 
-    if(majornum == -1)
+    if (majornum == -1)
     {
 	gossip_err("Error: could not setup device %s.\n", dev_name);
 	gossip_err("Error: did you remember to load the kernel module?\n");
-	return(-1);
+	return -1;
     }
 
-    if(!access(dev_name, F_OK))
+    if (!access(dev_name, F_OK))
     {
 	/* device file already exists */
 	ret = stat(dev_name, &dev_stat);
-	if(ret != 0)
+	if (ret != 0)
 	{
 	    gossip_err("Error: could not stat %s.\n", dev_name);
-	    return(-1);
+	    return -1;
 	}
-	if(S_ISCHR(dev_stat.st_mode) && (major(dev_stat.st_rdev) == majornum))
+	if (S_ISCHR(dev_stat.st_mode) && (major(dev_stat.st_rdev) == majornum))
 	{
 	    /* the device file already has the correct major number; we're done */
-	    return(0);
+	    return 0;
 	}
 	else
 	{
 	    /* the device file is incorrect; unlink it */
 	    ret = unlink(dev_name);
-	    if(ret != 0)
+	    if (ret != 0)
 	    {
 		gossip_err("Error: could not unlink old %s\n", dev_name);
-		return(-1);
+		return -1;
 	    }
 	}
     }
 
     /* if we hit this point, then we need to create a new device file */
-    ret = mknod(dev_name, (S_IFCHR | S_IRUSR | S_IWUSR) , makedev(majornum, 0));
-    if(ret != 0)
+    ret = mknod(dev_name,
+		(S_IFCHR | S_IRUSR | S_IWUSR),
+		makedev(majornum, 0));
+    if (ret != 0)
     {
 	gossip_err("Error: could not create new %s device entry.\n", dev_name);
-	return(-1);
+	return -1;
     }
 
-    return(0);
+    return 0;
 }
 
 /* parse_devices()
@@ -497,8 +498,9 @@ static int setup_dev_entry(const char* dev_name)
  *
  * returns 0 on successs, -1 on failure
  */
-static int parse_devices(const char* targetfile, const char* devname, 
-    int* majornum)
+static int parse_devices(const char *targetfile,
+			 const char *devname, 
+			 int *majornum)
 {
     char line_buf[256];
     char dev_buf[256];
@@ -511,19 +513,20 @@ static int parse_devices(const char* targetfile, const char* devname,
 
     /* open up the file to parse */
     devfile = fopen(targetfile, "r");
-    if(!devfile){
+    if (!devfile)
+    {
 	gossip_err("Error: could not open %s.\n", targetfile);
-	return(-1);
+	return -1;
     }
 
     /* scan every line until we get a match or end of file */
-    while(fgets(line_buf, sizeof(line_buf), devfile))
+    while (fgets(line_buf, sizeof(line_buf), devfile))
     {
 	/* sscanf is safe here as long as the target string is at least 
 	 * as large as the source 
 	 */
 	ret = sscanf(line_buf, " %d %s ", &major_buf, dev_buf);
-	if(ret == 2)
+	if (ret == 2)
 	{
 	    /* this line is the correct format; see if it matches the devname */
 	    if(strncmp(devname, dev_buf, sizeof(dev_buf)) == 0)
@@ -538,7 +541,7 @@ static int parse_devices(const char* targetfile, const char* devname,
 
     fclose(devfile);
 
-    return(0);
+    return 0;
 }
 
 /*

@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     struct PVFS_mgmt_perf_stat** perf_matrix;
     uint64_t* end_time_ms_array;
     uint32_t* next_id_array;
-    PVFS_id_gen_t* addr_array;
+    PVFS_BMI_addr_t *addr_array;
     int tmp_type;
     uint64_t next_time;
     float bw;
@@ -123,68 +123,77 @@ int main(int argc, char **argv)
     }
     for(i=0; i<io_server_count; i++)
     {
-	perf_matrix[i] = (struct PVFS_mgmt_perf_stat*)malloc(
-	    HISTORY*sizeof(struct PVFS_mgmt_perf_stat));
-	if(!perf_matrix[i])
+	perf_matrix[i] = (struct PVFS_mgmt_perf_stat *)
+	    malloc(HISTORY * sizeof(struct PVFS_mgmt_perf_stat));
+	if (perf_matrix[i] == NULL)
 	{
 	    perror("malloc");
-	    return(-1);
+	    return -1;
 	}
     }
 
     /* allocate an array to keep up with what iteration of statistics
      * we need from each server 
      */
-    next_id_array = (uint32_t*)malloc(io_server_count*sizeof(uint32_t));
-    if(!next_id_array)
+    next_id_array = (uint32_t *) malloc(io_server_count * sizeof(uint32_t));
+    if (next_id_array == NULL)
     {
 	perror("malloc");
-	return(-1);
+	return -1;
     }
     memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
 
     /* allocate an array to keep up with end times from each server */
-    end_time_ms_array = (uint64_t*)malloc(io_server_count*sizeof(uint64_t));
-    if(!end_time_ms_array)
+    end_time_ms_array = (uint64_t *)malloc(io_server_count * sizeof(uint64_t));
+    if (end_time_ms_array == NULL)
     {
 	perror("malloc");
-	return(-1);
+	return -1;
     }
 
     /* build a list of servers to talk to */
-    addr_array = (PVFS_id_gen_t*)malloc(io_server_count*sizeof(PVFS_id_gen_t));
-    if(!addr_array)
+    addr_array = (PVFS_BMI_addr_t *)
+	malloc(io_server_count * sizeof(PVFS_BMI_addr_t));
+    if (addr_array == NULL)
     {
 	perror("malloc");
-	return(-1);
+	return -1;
     }
-    ret = PVFS_mgmt_get_server_array(cur_fs, creds, PVFS_MGMT_IO_SERVER,
-	addr_array, &io_server_count);
-    if(ret < 0)
+    ret = PVFS_mgmt_get_server_array(cur_fs,
+				     creds,
+				     PVFS_MGMT_IO_SERVER,
+				     addr_array,
+				     &io_server_count);
+    if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array", ret);
-	return(-1);
+	return -1;
     }
 
     /* loop for ever, grabbing stats at regular intervals */
-    while(1)
+    while (1)
     {
-	ret = PVFS_mgmt_perf_mon_list(cur_fs, creds, perf_matrix, 
-	    end_time_ms_array, addr_array, next_id_array, io_server_count, 
-	    HISTORY);
-	if(ret < 0)
+	ret = PVFS_mgmt_perf_mon_list(cur_fs,
+				      creds,
+				      perf_matrix, 
+				      end_time_ms_array,
+				      addr_array,
+				      next_id_array,
+				      io_server_count, 
+				      HISTORY);
+	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
-	    return(-1);
+	    return -1;
 	}
 
 	printf("\nPVFS2 I/O server bandwith statistics (MB/sec):\n");
 	printf("==================================================\n");
-	for(i=0; i<io_server_count; i++)
+	for (i=0; i < io_server_count; i++)
 	{
-	    printf("\nread:  %-30s ", PVFS_mgmt_map_addr(cur_fs, creds,
-		addr_array[i], &tmp_type));
-	    for(j=0; j<HISTORY; j++)
+	    printf("\nread:  %-30s ",
+		   PVFS_mgmt_map_addr(cur_fs, creds,addr_array[i], &tmp_type));
+	    for (j=0; j < HISTORY; j++)
 	    {
 		/* only print valid measurements */
 		if(!perf_matrix[i][j].valid_flag)
@@ -198,7 +207,7 @@ int main(int argc, char **argv)
 		}
 
 		/* figure out what time interval to use */
-		if(j == (HISTORY-1) || !perf_matrix[i][j+1].valid_flag)
+		if (j == (HISTORY-1) || !perf_matrix[i][j+1].valid_flag)
 		    next_time = end_time_ms_array[i];
 		else
 		    next_time = perf_matrix[i][j+1].start_time_ms;
@@ -210,23 +219,24 @@ int main(int argc, char **argv)
 		printf("\t%10f", bw);
 	    }
 
-	    printf("\nwrite: %-30s ", PVFS_mgmt_map_addr(cur_fs, creds,
-		addr_array[i], &tmp_type));
-	    for(j=0; j<HISTORY; j++)
+	    printf("\nwrite: %-30s ",
+		   PVFS_mgmt_map_addr(cur_fs, creds,addr_array[i], &tmp_type));
+
+	    for (j=0; j < HISTORY; j++)
 	    {
 		/* only print valid measurements */
-		if(!perf_matrix[i][j].valid_flag)
+		if (!perf_matrix[i][j].valid_flag)
 		    break;
 
 		/* shortcut if measurement is zero */
-		if(perf_matrix[i][j].write == 0)
+		if (perf_matrix[i][j].write == 0)
 		{
 		    printf("\t0.0");
 		    continue;
 		}
 
 		/* figure out what time interval to use */
-		if(j == (HISTORY-1) || !perf_matrix[i][j+1].valid_flag)
+		if (j == (HISTORY-1) || !perf_matrix[i][j+1].valid_flag)
 		    next_time = end_time_ms_array[i];
 		else
 		    next_time = perf_matrix[i][j+1].start_time_ms;
@@ -241,8 +251,8 @@ int main(int argc, char **argv)
             printf("\n\nPVFS2 metadata op statistics (# of operations):\n");
             printf("==================================================");
             printf("\nread:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, creds,
-                                      addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, creds,addr_array[i], &tmp_type));
+
 	    for(j = 0; j < HISTORY; j++)
 	    {
 		if (!perf_matrix[i][j].valid_flag)
@@ -253,8 +263,8 @@ int main(int argc, char **argv)
 	    }
 
             printf("\nwrite:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, creds,
-                                      addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, creds,addr_array[i], &tmp_type));
+
 	    for(j = 0; j < HISTORY; j++)
 	    {
 		if (!perf_matrix[i][j].valid_flag)
@@ -299,18 +309,20 @@ static struct options* parse_args(int argc, char* argv[])
     int one_opt = 0;
     int len = 0;
 
-    struct options* tmp_opts = NULL;
+    struct options *tmp_opts = NULL;
     int ret = -1;
 
     /* create storage for the command line options */
-    tmp_opts = (struct options*)malloc(sizeof(struct options));
-    if(!tmp_opts){
+    tmp_opts = (struct options *) malloc(sizeof(struct options));
+    if(tmp_opts == NULL)
+    {
 	return(NULL);
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, flags)) != EOF){
+    while((one_opt = getopt(argc, argv, flags)) != EOF)
+    {
 	switch(one_opt)
         {
             case('v'):
@@ -343,7 +355,7 @@ static struct options* parse_args(int argc, char* argv[])
 	}
     }
 
-    if(!tmp_opts->mnt_point_set)
+    if (!tmp_opts->mnt_point_set)
     {
 	free(tmp_opts);
 	return(NULL);
@@ -353,13 +365,11 @@ static struct options* parse_args(int argc, char* argv[])
 }
 
 
-static void usage(int argc, char** argv)
+static void usage(int argc, char **argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-m fs_mount_point]\n",
-	argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
-	argv[0]);
+    fprintf(stderr, "Usage  : %s [-m fs_mount_point]\n", argv[0]);
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n", argv[0]);
     return;
 }
 
@@ -371,4 +381,3 @@ static void usage(int argc, char** argv)
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-

@@ -130,35 +130,35 @@ int job_bmi_cancel(job_id_t * id,
 
 /* unexpected device receive */
 int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
-    void* user_ptr,
-    job_aint status_user_tag,
-    job_status_s * out_status_p,
-    job_id_t* id,
-    job_context_id context_id);
+		  void* user_ptr,
+		  job_aint status_user_tag,
+		  job_status_s * out_status_p,
+		  job_id_t* id,
+		  job_context_id context_id);
 
 /* device write */
 int job_dev_write(void* buffer,
-    int size,
-    PVFS_id_gen_t tag,
-    enum PINT_dev_buffer_type buffer_type,
-    void* user_ptr,
-    job_aint status_user_tag,
-    job_status_s * out_status_p,
-    job_id_t * id,
-    job_context_id context_id);
+		  int size,
+		  PVFS_id_gen_t tag,
+		  enum PINT_dev_buffer_type buffer_type,
+		  void* user_ptr,
+		  job_aint status_user_tag,
+		  job_status_s * out_status_p,
+		  job_id_t * id,
+		  job_context_id context_id);
 
 /* device write list */
 int job_dev_write_list(void** buffer_list,
-    int* size_list,
-    int list_count,
-    int total_size,
-    PVFS_id_gen_t tag,
-    enum PINT_dev_buffer_type buffer_type,
-    void* user_ptr,
-    job_aint status_user_tag,
-    job_status_s* out_status_p,
-    job_id_t* id,
-    job_context_id context_id);
+		       int* size_list,
+		       int list_count,
+		       int total_size,
+		       PVFS_id_gen_t tag,
+		       enum PINT_dev_buffer_type buffer_type,
+		       void* user_ptr,
+		       job_aint status_user_tag,
+		       job_status_s* out_status_p,
+		       job_id_t* id,
+		       job_context_id context_id);
 
 /* request scheduler post */
 int job_req_sched_post(struct PVFS_server_req *in_request,
@@ -378,16 +378,16 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 
 /* iterates through all handles in a collection */
 int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
-    PVFS_ds_position position,
-    PVFS_handle* handle_array,
-    int count,
-    PVFS_ds_flags flags,
-    PVFS_vtag* vtag,
-    void* user_ptr,
-    job_aint status_user_tag,
-    job_status_s* out_status_p,
-    job_id_t* id,
-    job_context_id context_id);
+				     PVFS_ds_position position,
+				     PVFS_handle* handle_array,
+				     int count,
+				     PVFS_ds_flags flags,
+				     PVFS_vtag* vtag,
+				     void* user_ptr,
+				     job_aint status_user_tag,
+				     job_status_s* out_status_p,
+				     job_id_t* id,
+				     job_context_id context_id);
 
 /* create a new data space object */
 int job_trove_dspace_create(PVFS_fs_id coll_id,

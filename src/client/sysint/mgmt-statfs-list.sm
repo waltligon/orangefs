@@ -59,7 +59,7 @@ machine pvfs2_client_mgmt_statfs_list_sm(
 int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 			  PVFS_credentials credentials,
 			  struct PVFS_mgmt_server_stat *stat_array,
-			  PVFS_id_gen_t *addr_array,
+			  PVFS_BMI_addr_t *addr_array,
 			  int *error_array,
 			  int count)
 {
@@ -71,7 +71,7 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 
     if (count < 1 || !stat_array || !addr_array)
     {
-	return(-PVFS_EINVAL);
+	return -PVFS_EINVAL;
     }
 
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
@@ -116,7 +116,7 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 	goto cleanup;
     }
 
-    while(!sm_p->op_complete && ret == 0)
+    while (!sm_p->op_complete && ret == 0)
     {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
                      "PINT_client_state_machine_test()\n");

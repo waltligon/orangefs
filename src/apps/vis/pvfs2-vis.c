@@ -19,13 +19,14 @@
 
 #define HISTORY 5
 
-struct poll_thread_args{
+struct poll_thread_args
+{
     PVFS_fs_id fs;
     PVFS_credentials credentials;
-    PVFS_id_gen_t* addr_array;
-    struct PVFS_mgmt_perf_stat** tmp_matrix;
-    uint32_t* next_id_array;
-    uint64_t* end_time_ms_array;
+    PVFS_BMI_addr_t *addr_array;
+    struct PVFS_mgmt_perf_stat **tmp_matrix;
+    uint32_t *next_id_array;
+    uint64_t *end_time_ms_array;
     int server_count;
     int history_count;
     struct timespec req;
@@ -78,7 +79,7 @@ int pvfs2_vis_start(char* path, int update_interval)
     uint32_t* next_id_array;
     struct PVFS_mgmt_perf_stat** perf_matrix;
     uint64_t* end_time_ms_array;
-    PVFS_id_gen_t* addr_array;
+    PVFS_BMI_addr_t *addr_array;
     int done = 0;
     struct poll_thread_args* args;
     struct timespec req;
@@ -160,50 +161,60 @@ int pvfs2_vis_start(char* path, int update_interval)
      * we need from each server 
      */
     next_id_array = (uint32_t*)malloc(io_server_count*sizeof(uint32_t));
-    if(!next_id_array)
+    if (next_id_array == NULL)
     {
-	return(-PVFS_ENOMEM);
+	return -PVFS_ENOMEM;
     }
-    memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
-    end_time_ms_array = (uint64_t*)malloc(io_server_count*sizeof(uint64_t));
-    if(!end_time_ms_array)
+    memset(next_id_array, 0, io_server_count * sizeof(uint32_t));
+
+    end_time_ms_array = (uint64_t *) malloc(io_server_count*sizeof(uint64_t));
+    if (end_time_ms_array == NULL)
     {
-	return(-PVFS_ENOMEM);
+	return -PVFS_ENOMEM;
     }
 
     /* build a list of servers to talk to */
-    addr_array = (PVFS_id_gen_t*)malloc(io_server_count*sizeof(PVFS_id_gen_t));
-    if(!addr_array)
+    addr_array = (PVFS_BMI_addr_t *)
+	malloc(io_server_count * sizeof(PVFS_BMI_addr_t));
+    if (addr_array == NULL)
     {
-	return(-PVFS_ENOMEM);
+	return -PVFS_ENOMEM;
     }
-    ret = PVFS_mgmt_get_server_array(cur_fs, creds, PVFS_MGMT_IO_SERVER,
-	addr_array, &io_server_count);
-    if(ret < 0)
+    ret = PVFS_mgmt_get_server_array(cur_fs,
+				     creds,
+				     PVFS_MGMT_IO_SERVER,
+				     addr_array,
+				     &io_server_count);
+    if (ret < 0)
     {
-	return(ret);
+	return ret;
     }
 
     /* loop for a little bit, until we have 5 measurements queued up from each
      * server
      */
-    while(!done)
+    while (!done)
     {
 	memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
-	ret = PVFS_mgmt_perf_mon_list(cur_fs, creds, perf_matrix, 
-	    end_time_ms_array, addr_array, next_id_array, io_server_count, 
-	    HISTORY);
-	if(ret < 0)
+	ret = PVFS_mgmt_perf_mon_list(cur_fs,
+				      creds,
+				      perf_matrix, 
+				      end_time_ms_array,
+				      addr_array,
+				      next_id_array,
+				      io_server_count, 
+				      HISTORY);
+	if (ret < 0)
 	{
-	    return(ret);
+	    return ret;
 	}
 
 	done = 1;
-	for(i=0; i<io_server_count; i++)
+	for (i=0; i < io_server_count; i++)
 	{
-	    for(j=0; j<HISTORY; j++)
+	    for (j=0; j < HISTORY; j++)
 	    {
-		if(!perf_matrix[i][j].valid_flag)
+		if (!perf_matrix[i][j].valid_flag)
 		    done = 0;
 	    }
 	}
@@ -217,30 +228,37 @@ int pvfs2_vis_start(char* path, int update_interval)
     /* allocate a 2 dimensional array for statistics */
     pint_vis_shared.io_perf_matrix = (struct PVFS_mgmt_perf_stat**)malloc(
 	io_server_count*sizeof(struct PVFS_mgmt_perf_stat*));
-    if(!pint_vis_shared.io_perf_matrix)
+    if (pint_vis_shared.io_perf_matrix == NULL)
     {
-	return(-PVFS_ENOMEM);
+	return -PVFS_ENOMEM;
     }
-    for(i=0; i<io_server_count; i++)
+    for (i=0; i < io_server_count; i++)
     {
-	pint_vis_shared.io_perf_matrix[i] = (struct PVFS_mgmt_perf_stat*)malloc(
-	    HISTORY*sizeof(struct PVFS_mgmt_perf_stat));
-	if(!pint_vis_shared.io_perf_matrix[i])
+	pint_vis_shared.io_perf_matrix[i] = (struct PVFS_mgmt_perf_stat *)
+	    malloc(HISTORY * sizeof(struct PVFS_mgmt_perf_stat));
+	if (pint_vis_shared.io_perf_matrix[i] == NULL)
 	{
-	    return(-PVFS_ENOMEM);
+	    return -PVFS_ENOMEM;
 	}
     }
-    pint_vis_shared.io_end_time_ms_array = (uint64_t*)malloc(
-	io_server_count*sizeof(uint64_t));
+
+    pint_vis_shared.io_end_time_ms_array = (uint64_t *)
+	malloc(io_server_count * sizeof(uint64_t));
+    if (pint_vis_shared.io_end_time_ms_array == NULL)
+    {
+	return -PVFS_ENOMEM;
+    }
 
     /* fill in first statistics */
     for(i=0; i<io_server_count; i++)
     {
-	memcpy(pint_vis_shared.io_perf_matrix[i], perf_matrix[i], HISTORY*
-	    sizeof(struct PVFS_mgmt_perf_stat));
+	memcpy(pint_vis_shared.io_perf_matrix[i],
+	       perf_matrix[i],
+	       HISTORY * sizeof(struct PVFS_mgmt_perf_stat));
     }
-    memcpy(pint_vis_shared.io_end_time_ms_array, end_time_ms_array,
-	io_server_count*sizeof(uint64_t));
+    memcpy(pint_vis_shared.io_end_time_ms_array,
+	   end_time_ms_array,
+	   io_server_count * sizeof(uint64_t));
 
     /* setup arguments to pass to monitoring thread */
     args->fs = cur_fs;
@@ -255,12 +273,12 @@ int pvfs2_vis_start(char* path, int update_interval)
 
     /* launch thread */
     ret = pthread_create(&poll_thread_id, NULL, poll_for_updates, args);
-    if(ret != 0)
+    if (ret != 0)
     {
-	return(ret);
+	return ret;
     }
 
-    return(0);
+    return 0;
 }
 
 /* poll_for_updates()
@@ -273,7 +291,7 @@ int pvfs2_vis_start(char* path, int update_interval)
  *
  * returns NULL, setting pint_vis_error if an error occurred
  */
-static void* poll_for_updates(void* args)
+static void *poll_for_updates(void *args)
 {
     struct poll_thread_args* tmp_args = (struct poll_thread_args*)args;
     int ret;
@@ -282,7 +300,7 @@ static void* poll_for_updates(void* args)
     int new_flag = 0;
     PVFS_fs_id fs = tmp_args->fs;
     PVFS_credentials credentials = tmp_args->credentials;
-    PVFS_id_gen_t* addr_array = tmp_args->addr_array;
+    PVFS_BMI_addr_t *addr_array = tmp_args->addr_array;
     struct PVFS_mgmt_perf_stat** tmp_matrix = tmp_args->tmp_matrix;
     uint32_t* next_id_array = tmp_args->next_id_array;
     uint64_t* end_time_ms_array = tmp_args->end_time_ms_array;
@@ -290,60 +308,66 @@ static void* poll_for_updates(void* args)
     int history_count = tmp_args->history_count;
     struct timespec req = tmp_args->req;
 
-    while(1)
+    while (1)
     {
-	ret = PVFS_mgmt_perf_mon_list(fs, credentials, tmp_matrix, 
-	    end_time_ms_array, addr_array, next_id_array, server_count, 
-	    history_count);
-	if(ret < 0)
+	ret = PVFS_mgmt_perf_mon_list(fs,
+				      credentials,
+				      tmp_matrix, 
+				      end_time_ms_array,
+				      addr_array,
+				      next_id_array,
+				      server_count, 
+				      history_count);
+	if (ret < 0)
 	{
 	    pint_vis_error = ret;
 	    poll_thread_id = -1;
 	    PVFS_perror_gossip("PVFS_mgmt_perf_mon_list", ret);
 	    pthread_cond_signal(&pint_vis_cond);
 	    pthread_mutex_unlock(&pint_vis_mutex);
-	    return(NULL);
+
+	    return NULL;
 	}
 
 	new_flag = 0;
 
 	pthread_mutex_lock(&pint_vis_mutex);
-	for(i=0; i<server_count; i++)
+	for (i=0; i < server_count; i++)
 	{
 	    new_count = 0;
-	    for(j=0; j<history_count; j++)
+	    for (j=0; j < history_count; j++)
 	    {
-		if(tmp_matrix[i][j].valid_flag)
+		if (tmp_matrix[i][j].valid_flag)
 		{
 		    new_count++;
 		    new_flag = 1;
 		}
 	    }
-	    if(new_count > 0)
+	    if (new_count > 0)
 	    {
 		/* if we hit this point, we need to shift one or more
 		 * new measurements into position
 		 */
-		for(k=new_count; k<history_count; k++)
+		for (k=new_count; k < history_count; k++)
 		{
 		    /* move old ones over */
-		    pint_vis_shared.io_perf_matrix[i][k-new_count]
-			= pint_vis_shared.io_perf_matrix[i][k];
+		    pint_vis_shared.io_perf_matrix[i][k-new_count] =
+			pint_vis_shared.io_perf_matrix[i][k];
 		}
-		for(k=(history_count-new_count); k<history_count; k++)
+		for (k=(history_count-new_count); k<history_count; k++)
 		{
 		    /* drop new ones in */
 		    pint_vis_shared.io_perf_matrix[i][k] = 
 			tmp_matrix[i][k-(history_count-new_count)];
 		}
 		/* update end time */
-		pint_vis_shared.io_end_time_ms_array[i] 
-		    = end_time_ms_array[i];
+		pint_vis_shared.io_end_time_ms_array[i] =
+		    end_time_ms_array[i];
 
 	    }
 	}
 
-	if(new_flag)
+	if (new_flag)
 	{
 	    pthread_cond_signal(&pint_vis_cond);
 	}
@@ -352,7 +376,7 @@ static void* poll_for_updates(void* args)
 	nanosleep(&req, NULL);
     }
 
-    return(NULL);
+    return NULL;
 }
 
 

@@ -31,8 +31,8 @@ struct options
     int human_readable;
 };
 
-static struct options* parse_args(int argc, char* argv[]);
-static void usage(int argc, char** argv);
+static struct options *parse_args(int argc, char *argv[]);
+static void usage(int argc, char **argv);
 
 #define SCRATCH_LEN 16
 
@@ -41,16 +41,16 @@ int main(int argc, char **argv)
     int ret = -1;
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
-    struct options* user_opts = NULL;
+    struct options *user_opts = NULL;
     int mnt_index = -1;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_statfs resp_statfs;
     int i,j;
     PVFS_credentials creds;
-    struct PVFS_mgmt_server_stat* stat_array = NULL;
+    struct PVFS_mgmt_server_stat *stat_array = NULL;
     int outcount;
-    PVFS_id_gen_t* addr_array;
+    PVFS_BMI_addr_t *addr_array;
     int server_type;
     char scratch_size[SCRATCH_LEN] = {0};
     char scratch_total[SCRATCH_LEN] = {0};
@@ -153,42 +153,52 @@ int main(int argc, char **argv)
     printf("to look for problematic servers.\n");
 
     /* now call management functions to determine per-server statistics */
-    stat_array = (struct PVFS_mgmt_server_stat*)malloc(resp_statfs.server_count
-	* sizeof(struct PVFS_mgmt_server_stat));
-    if(!stat_array)
+    stat_array = (struct PVFS_mgmt_server_stat *)
+	malloc(resp_statfs.server_count* sizeof(struct PVFS_mgmt_server_stat));
+    if (stat_array == NULL)
     {
 	perror("malloc");
-	return(-1);
+	return -1;
     }
 
-    for(j=0; j<2; j++)
+    for (j=0; j<2; j++)
     {
-	if(j==0)
+	if (j==0)
+	{
 	    server_type = PVFS_MGMT_META_SERVER;
+	}
 	else
+	{
 	    server_type = PVFS_MGMT_IO_SERVER;
+	}
 
-	ret = PVFS_mgmt_count_servers(cur_fs, creds, server_type,
-	    &outcount);
-	if(ret < 0)
+	ret = PVFS_mgmt_count_servers(cur_fs,
+				      creds,
+				      server_type,
+				      &outcount);
+	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_count_servers", ret);
-	    return(-1);
+	    return -1;
 	}
 
-	addr_array = (PVFS_id_gen_t*)malloc(outcount*sizeof(PVFS_id_gen_t));
-	if(!addr_array)
+	addr_array = (PVFS_BMI_addr_t *)
+	    malloc(outcount * sizeof(PVFS_BMI_addr_t));
+	if (addr_array == NULL)
 	{
 	    perror("malloc");
-	    return(-1);
+	    return -1;
 	}
 
-	ret = PVFS_mgmt_get_server_array(cur_fs, creds, server_type,
-	    addr_array, &outcount);
-	if(ret < 0)
+	ret = PVFS_mgmt_get_server_array(cur_fs,
+					 creds,
+					 server_type,
+					 addr_array,
+					 &outcount);
+	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_get_server_array", ret);
-	    return(-1);
+	    return -1;
 	}
 
 	ret = PVFS_mgmt_statfs_list(cur_fs,
@@ -197,20 +207,24 @@ int main(int argc, char **argv)
 				    addr_array,
 				    NULL, /* error array */
 				    outcount);
-	if(ret < 0)
+	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_statfs_list", ret);
-	    return(-1);
+	    return -1;
 	}
 
-	if(j==0)
+	if (j==0)
+	{
 	    printf("\nmeta server statistics:\n");
+	}
 	else
+	{
 	    printf("\nI/O server statistics:\n");
+	}
 
 	printf("---------------------------------------\n\n");
 
-	for(i=0; i<outcount; i++)
+	for(i=0; i < outcount; i++)
 	{
 	    printf("server: %s\n", stat_array[i].bmi_address);
 
@@ -218,10 +232,12 @@ int main(int argc, char **argv)
             {
 		PVFS_util_make_size_human_readable(
 			(long long)stat_array[i].ram_total_bytes,
-			scratch_size, SCRATCH_LEN);
+			scratch_size,
+			SCRATCH_LEN);
 		PVFS_util_make_size_human_readable(
 			(long long)stat_array[i].ram_free_bytes,
-			scratch_total, SCRATCH_LEN);
+			scratch_total,
+			SCRATCH_LEN);
 		printf("\tRAM total        : %s\n", scratch_size);
 		printf("\tRAM free         : %s\n", scratch_total);
                 printf("\tuptime           : %d hours, %.2d minutes\n",
@@ -290,28 +306,30 @@ int main(int argc, char **argv)
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static struct options* parse_args(int argc, char* argv[])
+static struct options* parse_args(int argc, char *argv[])
 {
     /* getopt stuff */
-    extern char* optarg;
+    extern char *optarg;
     extern int optind, opterr, optopt;
     char flags[] = "hvm:";
     int one_opt = 0;
     int len = 0;
 
-    struct options* tmp_opts = NULL;
+    struct options *tmp_opts = NULL;
     int ret = -1;
 
     /* create storage for the command line options */
-    tmp_opts = (struct options*)malloc(sizeof(struct options));
-    if(!tmp_opts){
-	return(NULL);
+    tmp_opts = (struct options *) malloc(sizeof(struct options));
+    if (tmp_opts == NULL)
+    {
+	return NULL;
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, flags)) != EOF){
-	switch(one_opt)
+    while ((one_opt = getopt(argc, argv, flags)) != EOF)
+    {
+	switch (one_opt)
         {
             case('v'):
                 printf("%s\n", PVFS2_VERSION);
@@ -321,17 +339,19 @@ static struct options* parse_args(int argc, char* argv[])
 		break;
 	    case('m'):
 		len = strlen(optarg)+1;
-		tmp_opts->mnt_point = (char*)malloc(len+1);
-		if(!tmp_opts->mnt_point)
+		tmp_opts->mnt_point = (char *) malloc(len + 1);
+		if (tmp_opts->mnt_point == NULL)
 		{
 		    free(tmp_opts);
-		    return(NULL);
+		    return NULL;
 		}
 		memset(tmp_opts->mnt_point, 0, len+1);
 		ret = sscanf(optarg, "%s", tmp_opts->mnt_point);
-		if(ret < 1){
+		if (ret < 1)
+		{
+		    free(tmp_opts->mnt_point);
 		    free(tmp_opts);
-		    return(NULL);
+		    return NULL;
 		}
 		/* TODO: dirty hack... fix later.  The remove_dir_prefix()
 		 * function expects some trailing segments or at least
@@ -349,10 +369,10 @@ static struct options* parse_args(int argc, char* argv[])
     if(!tmp_opts->mnt_point_set)
     {
 	free(tmp_opts);
-	return(NULL);
+	return NULL;
     }
 
-    return(tmp_opts);
+    return tmp_opts;
 }
 
 

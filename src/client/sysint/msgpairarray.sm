@@ -215,7 +215,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	    msg_p->send_id = 0;
 
 	    if (msg_p->send_status.error_code != 0) {
-		gossip_err("msgarray bad send; should cancel recv\n");
+		gossip_err("msgarray send post failed; should cancel recv\n");
 	    }
 
 	    /* decrement our count, since send is already done.
@@ -245,7 +245,7 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
     /* the first N tags are receives, the second N are sends */
     assert(js_p->status_user_tag < sm_p->msgarray_count*2); /* sanity check */
 
-    if(js_p->status_user_tag < sm_p->msgarray_count)
+    if (js_p->status_user_tag < sm_p->msgarray_count)
     {
 	PINT_client_sm_msgpair_state *msg_p = 
 	    &sm_p->msgarray[js_p->status_user_tag];

@@ -1327,7 +1327,7 @@ void tcp_forget_addr(method_addr_p map,
 	BMI_socket_collection_remove(tcp_socket_collection_p, map);
     }
     tcp_cleanse_addr(map, error_code);
-    tcp_addr_data->error_code = error_code;
+    tcp_addr_data->addr_error = error_code;
     if (dealloc_flag)
     {
 	dealloc_tcp_method_addr(map);
@@ -1518,11 +1518,11 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     {
 	return (-EINVAL);
     }
-    if(tcp_addr_data->error_code)
+    if(tcp_addr_data->addr_error)
     {
 	/* this address is bad, don't try to do anything with it */
 	gossip_err("Warning: BMI communication attempted on an address in failure mode.\n");
-	return(tcp_addr_data->error_code);
+	return(tcp_addr_data->addr_error);
     }
 
     /* is there already a socket? */
@@ -1769,11 +1769,11 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     int i;
 
     tcp_addr_data = src->method_data;
-    if(tcp_addr_data->error_code)
+    if(tcp_addr_data->addr_error)
     {
 	/* this address is bad, don't try to do anything with it */
 	gossip_err("Warning: BMI communication attempted on an address in failure mode.\n");
-	return(tcp_addr_data->error_code);
+	return(tcp_addr_data->addr_error);
     }
 
     /* lets make sure that the message hasn't already been fully

@@ -227,7 +227,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     PVFS_credentials creds;
     int ret = -1;
     int count;
-    PVFS_id_gen_t* addr_array;
+    PVFS_BMI_addr_t* addr_array;
     int i;
     int tmp;
  
@@ -235,32 +235,33 @@ static int noop_all_servers(PVFS_fs_id fsid)
     creds.gid = getgid();
 
     printf("\n   meta servers:\n");
-    ret = PVFS_mgmt_count_servers(
-        fsid, creds, PVFS_MGMT_META_SERVER, &count);
+    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_META_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
-	return(ret);
+	return ret;
     }
-    addr_array = (PVFS_id_gen_t*)malloc(count*sizeof(PVFS_id_gen_t));
-    if (!addr_array)
+    addr_array = (PVFS_BMI_addr_t *) malloc(count * sizeof(PVFS_BMI_addr_t));
+    if (addr_array == NULL)
     {
 	perror("malloc");
-	return(-PVFS_ENOMEM);
+	return -PVFS_ENOMEM;
     }
 
-    ret = PVFS_mgmt_get_server_array(fsid, creds, PVFS_MGMT_META_SERVER,
-                                     addr_array, &count);
+    ret = PVFS_mgmt_get_server_array(fsid,
+				     creds,
+				     PVFS_MGMT_META_SERVER,
+                                     addr_array,
+				     &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
-	return(ret);
+	return ret;
     }
 
-    for(i = 0; i < count; i++)
+    for (i = 0; i < count; i++)
     {
-	printf("   %s ", PVFS_mgmt_map_addr(
-                   fsid, creds, addr_array[i], &tmp));
+	printf("   %s ", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
 	ret = PVFS_mgmt_noop(fsid, creds, addr_array[i]);
 	if (ret == 0)
 	{
@@ -269,35 +270,37 @@ static int noop_all_servers(PVFS_fs_id fsid)
 	else
 	{
 	    printf("Failure!\n");
-	    return(ret);
+	    return ret;
 	}
     }
     free(addr_array);
 
     printf("\n   data servers:\n");
-    ret = PVFS_mgmt_count_servers(
-        fsid, creds, PVFS_MGMT_IO_SERVER, &count);
+    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_IO_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
-	return(ret);
+	return ret;
     }
-    addr_array = (PVFS_id_gen_t*)malloc(count*sizeof(PVFS_id_gen_t));
-    if (!addr_array)
+    addr_array = (PVFS_BMI_addr_t *) malloc(count * sizeof(PVFS_BMI_addr_t));
+    if (addr_array == NULL)
     {
 	perror("malloc");
-	return(-PVFS_ENOMEM);
+	return -PVFS_ENOMEM;
     }
 
-    ret = PVFS_mgmt_get_server_array(
-        fsid, creds, PVFS_MGMT_IO_SERVER, addr_array, &count);
+    ret = PVFS_mgmt_get_server_array(fsid,
+				     creds,
+				     PVFS_MGMT_IO_SERVER,
+				     addr_array,
+				     &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
-	return(ret);
+	return ret;
     }
 
-    for(i = 0; i < count; i++)
+    for (i = 0; i < count; i++)
     {
 	printf("   %s ",
                PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
@@ -309,7 +312,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
 	else
 	{
 	    printf("Failure!\n");
-	    return(ret);
+	    return ret;
 	}
     }
     free(addr_array);
@@ -331,61 +334,68 @@ static int print_config(PVFS_fs_id fsid)
     int ret = -1;
     int tmp;
     int count;
-    PVFS_id_gen_t* addr_array;
+    PVFS_BMI_addr_t *addr_array;
  
     creds.uid = getuid();
     creds.gid = getgid();
 
     printf("\n   meta servers:\n");
-    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_META_SERVER,
-	&count);
+    ret = PVFS_mgmt_count_servers(fsid,
+				  creds,
+				  PVFS_MGMT_META_SERVER,
+				  &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
-	return(ret);
+	return ret;
     }
-    addr_array = (PVFS_id_gen_t*)malloc(count*sizeof(PVFS_id_gen_t));
-    if (!addr_array)
+    addr_array = (PVFS_BMI_addr_t *)malloc(count * sizeof(PVFS_BMI_addr_t));
+    if (addr_array == NULL)
     {
 	perror("malloc");
-	return(-PVFS_ENOMEM);
+	return -PVFS_ENOMEM;
     }
 
-    ret = PVFS_mgmt_get_server_array(fsid, creds, PVFS_MGMT_META_SERVER,
-	addr_array, &count);
+    ret = PVFS_mgmt_get_server_array(fsid,
+				     creds,
+				     PVFS_MGMT_META_SERVER,
+				     addr_array,
+				     &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
-	return(ret);
+	return ret;
     }
 
-    for(i=0; i<count; i++)
+    for (i=0; i<count; i++)
     {
 	printf("   %s\n", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
     }
     free(addr_array);
 
     printf("\n   data servers:\n");
-    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_IO_SERVER,
-	&count);
+    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_IO_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
-	return(ret);
+	return ret;
     }
-    addr_array = (PVFS_id_gen_t*)malloc(count*sizeof(PVFS_id_gen_t));
-    if (!addr_array)
+    addr_array = (PVFS_BMI_addr_t *)malloc(count * sizeof(PVFS_BMI_addr_t));
+    if (addr_array == NULL)
     {
 	perror("malloc");
-	return(-PVFS_ENOMEM);
+	return -PVFS_ENOMEM;
     }
 
-    ret = PVFS_mgmt_get_server_array(fsid, creds, PVFS_MGMT_IO_SERVER,
-	addr_array, &count);
+    ret = PVFS_mgmt_get_server_array(fsid,
+				     creds,
+				     PVFS_MGMT_IO_SERVER,
+				     addr_array,
+				     &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
-	return(ret);
+	return ret;
     }
 
     for(i=0; i<count; i++)
@@ -394,7 +404,7 @@ static int print_config(PVFS_fs_id fsid)
     }
     free(addr_array);
 
-    return(0);
+    return 0;
 }
 
 /* print_mntent()
@@ -405,8 +415,9 @@ static int print_config(PVFS_fs_id fsid)
  */
 static void print_mntent(struct pvfs_mntent *entries, int num_entries)
 {
-    int i = 0;
-    for(i = 0; i < num_entries; i++)
+    int i;
+
+    for (i = 0; i < num_entries; i++)
     {
         printf("\n   PVFS2 server: %s\n", entries[i].pvfs_config_server);
         printf("   Storage name: %s\n", entries[i].pvfs_fs_name);
@@ -440,17 +451,17 @@ static struct options* parse_args(int argc, char* argv[])
     }
 
     /* create storage for the command line options */
-    tmp_opts = (struct options*)malloc(sizeof(struct options));
-    if (!tmp_opts)
+    tmp_opts = (struct options *) malloc(sizeof(struct options));
+    if (tmp_opts == NULL)
     {
 	return(NULL);
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, flags)) != EOF)
+    while ((one_opt = getopt(argc, argv, flags)) != EOF)
     {
-	switch(one_opt)
+	switch (one_opt)
         {
             case('v'):
                 printf("%s\n", PVFS2_VERSION);
@@ -462,13 +473,13 @@ static struct options* parse_args(int argc, char* argv[])
 		if (!tmp_opts->mnt_point)
 		{
 		    free(tmp_opts);
-		    return(NULL);
+		    return NULL;
 		}
 		memset(tmp_opts->mnt_point, 0, len+1);
 		ret = sscanf(optarg, "%s", tmp_opts->mnt_point);
 		if (ret < 1){
 		    free(tmp_opts);
-		    return(NULL);
+		    return NULL;
 		}
 		/* TODO: dirty hack... fix later.  The remove_dir_prefix()
 		 * function expects some trailing segments or at least
@@ -491,18 +502,18 @@ static struct options* parse_args(int argc, char* argv[])
     /* get the path of the file system, this one has a trailing slash
      * tacked on, see comment below for why 
      */
-    tmp_opts->fs_path_hack = (char*)malloc(strlen(argv[argc-1]) + 2);
-    if (!tmp_opts->fs_path_hack)
+    tmp_opts->fs_path_hack = (char *) malloc(strlen(argv[argc-1]) + 2);
+    if (tmp_opts->fs_path_hack == NULL)
     {
 	free(tmp_opts);
-	return(NULL);
+	return NULL;
     }
     ret = sscanf(argv[argc-1], "%s", tmp_opts->fs_path_hack);
     if (ret < 1)
     {
 	free(tmp_opts->fs_path_hack);
 	free(tmp_opts);
-	return(NULL);
+	return NULL;
     }
     /* TODO: this is a hack... fix later.  The remove_dir_prefix()
      * function expects some trailing segments or at least a slash
@@ -511,12 +522,12 @@ static struct options* parse_args(int argc, char* argv[])
     strcat(tmp_opts->fs_path_hack, "/");
     
     /* also preserve the real path, to use in print statements elsewhre */
-    tmp_opts->fs_path_real = (char*)malloc(strlen(argv[argc-1]) + 2);
-    if (!tmp_opts->fs_path_real)
+    tmp_opts->fs_path_real = (char *) malloc(strlen(argv[argc-1]) + 2);
+    if (tmp_opts->fs_path_real == NULL)
     {
 	free(tmp_opts->fs_path_hack);
 	free(tmp_opts);
-	return(NULL);
+	return NULL;
     }
     ret = sscanf(argv[argc-1], "%s", tmp_opts->fs_path_real);
     if (ret < 1)
@@ -524,7 +535,7 @@ static struct options* parse_args(int argc, char* argv[])
 	free(tmp_opts->fs_path_hack);
 	free(tmp_opts->fs_path_real);
 	free(tmp_opts);
-	return(NULL);
+	return NULL;
     }
  
     return(tmp_opts);
@@ -534,10 +545,8 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "%s version %s\n\n", argv[0], PVFS2_VERSION);
-    fprintf(stderr, "Usage  : %s -m file_system_path\n",
-	argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
-	argv[0]);
+    fprintf(stderr, "Usage  : %s -m file_system_path\n", argv[0]);
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n", argv[0]);
     return;
 }
 
@@ -549,4 +558,3 @@ static void usage(int argc, char** argv)
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-

@@ -26,7 +26,7 @@ struct tcp_addr
 {
     method_addr_p map;		/* points back to generic address */
     /* stores error code for addresses that are broken for some reason */
-    int error_code;		
+    int addr_error;		
     char *hostname;
     char *ipaddr;
     bmi_port_t port;

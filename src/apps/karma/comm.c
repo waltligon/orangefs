@@ -21,7 +21,7 @@ static int *internal_errors = NULL;
 static int visible_stat_ct;
 static int internal_stat_ct;
 
-static PVFS_id_gen_t *internal_addrs = NULL;
+static PVFS_BMI_addr_t *internal_addrs = NULL;
 static int internal_addr_ct;
 
 /* performance data structures */
@@ -209,11 +209,12 @@ void gui_comm_set_active_fs(char *contact_server,
     internal_stat_ct = outcount;
 
     /* save addresses of servers */
-    if (internal_addrs != NULL) {
+    if (internal_addrs != NULL)
+    {
 	free(internal_addrs);
     }
-    internal_addrs = (PVFS_id_gen_t *)
-	malloc(outcount * sizeof(PVFS_id_gen_t));
+    internal_addrs = (PVFS_BMI_addr_t *)
+	malloc(outcount * sizeof(PVFS_BMI_addr_t));
     internal_addr_ct = outcount;
     ret = PVFS_mgmt_get_server_array(cur_fsid,
 				     creds,

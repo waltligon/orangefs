@@ -240,12 +240,11 @@ void PINT_event_get_masks(int* event_on, int32_t* api_mask, int32_t* op_mask)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-void __PINT_event_timestamp(
-    enum PVFS_event_api api,
-    int32_t operation,
-    int64_t value,
-    PVFS_id_gen_t id,
-    int8_t flags)
+void __PINT_event_timestamp(enum PVFS_event_api api,
+			    int32_t operation,
+			    int64_t value,
+			    PVFS_id_gen_t id,
+			    int8_t flags)
 {
     gen_mutex_lock(&event_mutex);
 
@@ -264,12 +263,11 @@ void __PINT_event_timestamp(
     return;
 }
 
-void __PINT_event_default(
-	enum PVFS_event_api api,
-	int32_t operation,
-	int64_t value,
-	PVFS_id_gen_t id,
-	int8_t flags)
+void __PINT_event_default(enum PVFS_event_api api,
+			  int32_t operation,
+			  int64_t value,
+			  PVFS_id_gen_t id,
+			  int8_t flags)
 {
     struct timeval tv;
 
@@ -295,12 +293,11 @@ void __PINT_event_default(
 
 #ifdef HAVE_PABLO
 /* enter a pablo trace into the log */
-void __PINT_event_pablo(
-	enum PVFS_event_api api,
-	int32_t operation,
-	int64_t value,
-	PVFS_id_gen_t id,
-	int8_t flags)
+void __PINT_event_pablo(enum PVFS_event_api api,
+			int32_t operation,
+			int64_t value,
+			PVFS_id_gen_t id,
+			int8_t flags)
 {
     /* TODO: this can all go once there is a nice "enum to string" function */
     char description[100];
@@ -338,12 +335,11 @@ void __PINT_event_pablo(
 #endif
 
 #if defined(HAVE_MPE)
-void __PINT_event_mpe(
-    enum PVFS_event_api api,
-    int32_t operation,
-    int64_t value,
-    PVFS_id_gen_t id,
-    int8_t flags)
+void __PINT_event_mpe(enum PVFS_event_api api,
+		      int32_t operation,
+		      int64_t value,
+		      PVFS_id_gen_t id,
+		      int8_t flags)
 {
     switch(api) {
 	case PVFS_EVENT_API_BMI:
@@ -375,9 +371,8 @@ void __PINT_event_mpe(
  *
  * no return value
  */
-void PINT_event_retrieve(
-    struct PVFS_mgmt_event* event_array,
-    int count)
+void PINT_event_retrieve(struct PVFS_mgmt_event* event_array,
+			 int count)
 {
     int tmp_tail = ts_tail;
     int cur_index = 0;
@@ -412,4 +407,3 @@ void PINT_event_retrieve(
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-

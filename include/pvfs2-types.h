@@ -31,6 +31,8 @@ typedef int32_t PVFS_error;
 typedef int64_t PVFS_offset;
 typedef int64_t PVFS_size;
 typedef int64_t PVFS_id_gen_t;
+typedef int64_t PVFS_BMI_addr_t;
+
 #define encode_PVFS_error encode_int32_t
 #define decode_PVFS_error decode_int32_t
 #define encode_PVFS_offset encode_int64_t

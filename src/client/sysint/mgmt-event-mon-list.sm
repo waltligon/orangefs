@@ -55,13 +55,12 @@ machine pvfs2_client_mgmt_event_mon_list_sm(
 
 %%
 
-int PVFS_mgmt_event_mon_list(
-    PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
-    struct PVFS_mgmt_event** event_matrix,
-    PVFS_id_gen_t* addr_array,
-    int server_count,
-    int event_count)
+int PVFS_mgmt_event_mon_list(PVFS_fs_id fs_id,
+			     PVFS_credentials credentials,
+			     struct PVFS_mgmt_event** event_matrix,
+			     PVFS_BMI_addr_t *addr_array,
+			     int server_count,
+			     int event_count)
 {
     int ret;
     PINT_client_sm *sm_p;
@@ -92,12 +91,12 @@ int PVFS_mgmt_event_mon_list(
 
     /* do something to kick off processing */
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_EVENT_MON_LIST);
-    if(ret < 0)
+    if (ret < 0)
     {
 	/* this should not fail under normal conditions */
 	assert(0);
 	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-	return(ret);
+	return ret;
     }
 
     /* while !done call progress function */
@@ -106,10 +105,10 @@ int PVFS_mgmt_event_mon_list(
                      "calling PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-    if(ret < 0)
+    if (ret < 0)
     {
 	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	return(ret);
+	return ret;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -124,7 +123,7 @@ int PVFS_mgmt_event_mon_list(
 }
 
 static int mgmt_event_mon_list_setup_msgpair(PINT_client_sm *sm_p,
-					job_status_s *js_p)
+					     job_status_s *js_p)
 {
     int i;
     PINT_client_sm_msgpair_state *msg_p;
@@ -136,24 +135,24 @@ static int mgmt_event_mon_list_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgarray_count = sm_p->u.event_mon_list.server_count;
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
     malloc((sm_p->msgarray_count)*sizeof(PINT_client_sm_msgpair_state));
-    if(!sm_p->msgarray)
+    if (sm_p->msgarray == NULL)
     {
 	js_p->error_code = -PVFS_ENOMEM;
-	return(1);
+	return 1;
     }
 
     /* setup msgpair array */
-    for(i=0; i<sm_p->msgarray_count; i++)
+    for (i=0; i < sm_p->msgarray_count; i++)
     {
 	msg_p = &sm_p->msgarray[i];
 
 	PINT_SERVREQ_MGMT_EVENT_MON_FILL(msg_p->req,
-	    *sm_p->cred_p,
-	    sm_p->u.event_mon_list.event_count);
+					 *sm_p->cred_p,
+					 sm_p->u.event_mon_list.event_count);
 
-	msg_p->fs_id = sm_p->u.event_mon_list.fs_id;
-	msg_p->handle = PVFS_HANDLE_NULL;
-	msg_p->comp_fn = event_mon_list_comp_fn;
+	msg_p->fs_id    = sm_p->u.event_mon_list.fs_id;
+	msg_p->handle   = PVFS_HANDLE_NULL;
+	msg_p->comp_fn  = event_mon_list_comp_fn;
 	msg_p->svr_addr = sm_p->u.event_mon_list.addr_array[i];
     }
 
@@ -163,22 +162,23 @@ static int mgmt_event_mon_list_setup_msgpair(PINT_client_sm *sm_p,
 }
 
 static int mgmt_event_mon_list_cleanup(PINT_client_sm *sm_p,
-			  job_status_s *js_p)
+				       job_status_s *js_p)
 {
-    if(sm_p->msgarray)
+    if (sm_p->msgarray)
 	free(sm_p->msgarray);
 
-    sm_p->error_code = js_p->error_code;
+    sm_p->error_code  = js_p->error_code;
     sm_p->op_complete = 1;
 
-    return(0);
+    return 0;
 }
 
-static int event_mon_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
-    int i)
+static int event_mon_list_comp_fn(void* v_p,
+				  struct PVFS_server_resp* resp_p,
+				  int i)
 {
     int j = 0;
-    PINT_client_sm* sm_p = (PINT_client_sm*)v_p;
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 
     /* if this particular request was successful, then store the 
      * performance information in an array to be returned to caller
@@ -186,26 +186,26 @@ static int event_mon_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
     if(sm_p->msgarray[i].op_status == 0)
     {
 	memcpy(sm_p->u.event_mon_list.event_matrix[i],
-	    resp_p->u.mgmt_event_mon.event_array,
-	    resp_p->u.mgmt_event_mon.event_count
-	    *sizeof(struct PVFS_mgmt_event));
+	       resp_p->u.mgmt_event_mon.event_array,
+	       resp_p->u.mgmt_event_mon.event_count
+	       * sizeof(struct PVFS_mgmt_event));
     }
  
     /* if this is the last response, check all of the status values and 
      * return error code if any requests failed 
      */
-    if(i == (sm_p->msgarray_count -1))
+    if (i == (sm_p->msgarray_count -1))
     {
-	for(j=0; j<sm_p->msgarray_count; j++)
+	for (j=0; j<sm_p->msgarray_count; j++)
 	{
-	    if(sm_p->msgarray[j].op_status != 0)
+	    if (sm_p->msgarray[j].op_status != 0)
 	    {
-		return(sm_p->msgarray[j].op_status);
+		return sm_p->msgarray[j].op_status;
 	    }
 	}
     }
    
-    return(0);
+    return 0;
 }
 
 /*

@@ -29,12 +29,11 @@
  *
  * returns 0 on success, -errno on failure
  */
-static inline int id_gen_fast_register(
-    PVFS_id_gen_t * new_id,
-    void *item)
+static inline int id_gen_fast_register(PVFS_id_gen_t * new_id,
+				       void *item)
 {
     if (!item)
-	return (-EINVAL);
+	return -PVFS_EINVAL;
 
 #if SIZEOF_VOID_P == 8
     *new_id = (int64_t) item;
@@ -54,11 +53,10 @@ static inline int id_gen_fast_register(
  *
  * returns pointer to data on success, NULL on failure
  */
-static inline void *id_gen_fast_lookup(
-    PVFS_id_gen_t id)
+static inline void *id_gen_fast_lookup(PVFS_id_gen_t id)
 {
     if (!id)
-	return (NULL);
+	return NULL;
 
 #if SIZEOF_VOID_P == 8
     return (void *) id;
