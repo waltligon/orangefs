@@ -27,11 +27,11 @@ static void destroy_event(GtkWidget *widget,
 static GtkWidget *get_notebook_pages(GtkWidget *window)
 {
     GtkWidget *notebook;
-    GtkWidget *statslabel;
+    GtkWidget *statslabel, *detailslabel;
 #if 0
     GtkWidget *summarylabel, *perflabel;
 #endif
-    GtkWidget *statspage;
+    GtkWidget *statspage, *detailspage;
 
     notebook = gtk_notebook_new();
 
@@ -44,9 +44,11 @@ static GtkWidget *get_notebook_pages(GtkWidget *window)
     statspage = gui_status_setup();
     gtk_notebook_append_page(GTK_NOTEBOOK(notebook), statspage, statslabel);
 
-#if 0
-    perflabel = gtk_label_new("Perf");
-#endif
+    detailslabel = gtk_label_new("Details");
+    detailspage = gui_details_setup();
+    gtk_notebook_append_page(GTK_NOTEBOOK(notebook),
+			     detailspage,
+			     detailslabel);
 
     return notebook;
 }
@@ -83,11 +85,11 @@ int main(int   argc,
 
     menubar = gui_menu_setup(main_window);
 
+    if (gui_comm_setup()) return 1;
+
     notepagesframe = get_notebook_pages(main_window);
 
     messageframe = gui_message_setup();
-
-    if (gui_comm_setup()) return 1;
 
     /* create vbox, drop in menus, notepages, and message window */
     main_vbox = gtk_vbox_new(FALSE, 0);
@@ -131,6 +133,8 @@ gint timer_callback(gpointer data)
 	gui_status_graph_update(i,
 				&graph_data[i]);
     }
+
+    gui_details_update(svr_stat, svr_stat_ct);
 
     return 1; /* schedule it again */
 }

@@ -2,6 +2,7 @@
 
 #include "karma.h"
 
+static int gui_message_initialized = 0;
 static GtkTextBuffer *messagebuffer;
 static GtkTextIter    iter;
 
@@ -30,6 +31,8 @@ GtkWidget *gui_message_setup(void)
 
     gtk_container_add(GTK_CONTAINER(scrollwindow), textview);
 
+    gui_message_initialized = 1;
+
     return messageframe;
 }
 
@@ -39,8 +42,12 @@ GtkWidget *gui_message_setup(void)
  */
 void gui_message_new(char *message)
 {
-    gtk_text_buffer_insert(messagebuffer,
-			   &iter,
-			   message,
-			   -1);
+    if (gui_message_initialized) {
+	gtk_text_buffer_insert(messagebuffer,
+			       &iter,
+			       message,
+			       -1);
+    }
+
+    /* drop messages sent before initialization for now */
 }

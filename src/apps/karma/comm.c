@@ -71,7 +71,7 @@ int gui_comm_setup(void)
         cur_fs_id = PINT_config_get_fs_id_by_fs_name(
             PINT_get_server_config_struct(),
             mnt.ptab_array[i].pvfs_fs_name);
-        assert(cur_fs_id != (PVFS_fs_id)0);
+        assert(cur_fs_id != (PVFS_fs_id) 0);
 
 	gtk_list_store_set(gui_comm_fslist,
 			   &iter,

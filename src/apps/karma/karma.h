@@ -45,6 +45,11 @@ void gui_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
 		      int svr_stat_ct,
 		      struct gui_graph_data **out_graph_data);
 
+/* details page interface */
+GtkWidget *gui_details_setup(void);
+void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
+			int server_stat_ct);
+
 /* status page interface */
 GtkWidget *gui_status_setup(void);
 

@@ -11,9 +11,7 @@ void gui_fsview_popup(void)
     GtkWidget *fsview;
     GtkTreeViewColumn *col;
     GtkCellRenderer *renderer;
-
     GtkTreeSelection *selection;
-
     GtkWidget *dialog;
 
     fsview = gtk_tree_view_new();
@@ -86,13 +84,6 @@ void gui_fsview_popup(void)
 		     "response",
 		     G_CALLBACK(gui_fsview_response),
 		     fsview);
-
-#if 0
-    g_signal_connect_swapped(GTK_OBJECT(dialog),
-			     "response",
-			     G_CALLBACK(gui_fsview_response),
-			     GTK_OBJECT(dialog));
-#endif
 
     gtk_widget_show_all(dialog);
 

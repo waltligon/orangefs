@@ -7,4 +7,5 @@ KARMASRC += \
     $(DIR)/messages.c \
     $(DIR)/prep.c \
     $(DIR)/fsview.c \
+    $(DIR)/details.c \
     $(DIR)/status.c
