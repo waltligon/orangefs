@@ -160,8 +160,11 @@ int main(int argc, char **argv)	{
 	}
 
 	/* post a recv for the server acknowledgement */
-	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
-		sizeof(struct server_ack), &actual_size, BMI_PRE_ALLOC, 0, 
+	buffer_list[0] = my_ack;
+	size_list[0] = sizeof(struct server_ack);
+
+	ret = BMI_post_recv_list(&(client_ops[0]), server_addr, buffer_list, 
+		size_list, 1, sizeof(struct server_ack), &actual_size, BMI_PRE_ALLOC, 0, 
 		in_test_user_ptr, context);
 	if(ret < 0)
 	{
