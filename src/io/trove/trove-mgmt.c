@@ -12,14 +12,14 @@
 #include "gen-locks.h"
 #include "trove-handle-mgmt.h"
 
-/* Currently we only have one method for these tables to refer to */
+/* currently we only have one method for these tables to refer to */
 struct TROVE_mgmt_ops    *mgmt_method_table[1];
 struct TROVE_dspace_ops  *dspace_method_table[1];
 struct TROVE_keyval_ops  *keyval_method_table[1];
 struct TROVE_bstream_ops *bstream_method_table[1];
 struct TROVE_context_ops *context_method_table[1];
 
-/* Currently DBPF is our only implementation */
+/* currently DBPF is our only implementation */
 extern struct TROVE_mgmt_ops    dbpf_mgmt_ops;
 extern struct TROVE_dspace_ops  dbpf_dspace_ops;
 extern struct TROVE_keyval_ops  dbpf_keyval_ops;
@@ -66,6 +66,9 @@ int trove_initialize(char *stoname,
 #ifdef WITH_MTRACE
     mtrace();
 #endif
+
+    gossip_enable_stderr();
+    gossip_set_debug_mask(1, TROVE_GOSSIP_DEBUG);
 
     /* initialize the handle management interface */
     ret = trove_handle_mgmt_initialize();
@@ -121,7 +124,10 @@ int trove_finalize(void)
 
     ret = trove_handle_mgmt_finalize();
 
+    gossip_disable();
+
     gen_mutex_unlock(&trove_init_mutex);
+
     if (ret < 0) return ret;
     else return 1;
 }

@@ -29,6 +29,8 @@ typedef PVFS_ds_storedattr         TROVE_ds_storedattr_s;
 typedef PVFS_error                 TROVE_ds_state;
 typedef PVFS_context_id            TROVE_context_id;
 
+#define TROVE_HANDLE_NULL          (TROVE_handle)0
+
 #define trove_ds_attr_to_stored PVFS_ds_attr_to_stored
 #define trove_ds_stored_to_attr PVFS_ds_stored_to_attr
 

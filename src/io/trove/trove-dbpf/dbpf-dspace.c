@@ -13,6 +13,7 @@
 #include <malloc.h>
 #include <assert.h>
 
+#include "gossip.h"
 #include "trove.h"
 #include "trove-internal.h"
 #include "trove-ledger.h"
@@ -61,7 +62,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
 			DSPACE_CREATE,
-			(handle_p ? *handle_p : (TROVE_handle)0),
+			(handle_p ? *handle_p : TROVE_HANDLE_NULL),
 			coll_p,
 			dbpf_dspace_create_op_svc,
 			user_ptr,
@@ -131,9 +132,8 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             */
             new_handle = cur_extent.first;
             trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
-#if 0
-            printf("new_handle was FORCED to be %Ld\n", new_handle);
-#endif
+            gossip_debug(TROVE_GOSSIP_DEBUG,
+                         "new_handle was FORCED to be %Ld\n", new_handle);
         }
         else if (cur_extent.first == 0)
         {
@@ -155,19 +155,18 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             &op_p->u.d_create.extent_array);
     }
 
-#if 0
-    printf("[%d extents] -- new_handle is %Ld (cur_extent is %Ld - %Ld)\n",
-           op_p->u.d_create.extent_array.extent_count,
-           new_handle, cur_extent.first, cur_extent.last);
-#endif
+    gossip_debug(TROVE_GOSSIP_DEBUG, "[%d extents] -- new_handle is %Ld "
+                 "(cur_extent is %Ld - %Ld)\n",
+                 op_p->u.d_create.extent_array.extent_count,
+                 new_handle, cur_extent.first, cur_extent.last);
 
     /*
       if we got a zero handle, we're either completely out
       of handles -- or else something terrible has happened
     */
-    if (new_handle == (TROVE_handle)0)
+    if (new_handle == TROVE_HANDLE_NULL)
     {
-	printf("Error: handle allocator returned a zero handle.\n");
+	gossip_err("Error: handle allocator returned a zero handle.\n");
         return -TROVE_EINVAL;
     }
 
@@ -186,11 +185,11 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     /* check to see if handle is already used */
     ret = db_p->get(db_p, NULL, &key, &data, 0);
     if (ret == 0) {
-	printf("handle already exists...\n");
+	gossip_debug(TROVE_GOSSIP_DEBUG, "handle already exists...\n");
 	return -1;
     }
     if (ret != DB_NOTFOUND) {
-	printf("some other error in dspace create.\n");
+	gossip_err("error in dspace create (db_p->get failed).\n");
 	return -1;
     }
     
@@ -273,7 +272,6 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
 	    got_db = 1;
-	    /* drop through */
 	    break;
     }
 
@@ -289,7 +287,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     ret = db_p->del(db_p, NULL, &key, 0);
     switch (ret) {
 	case DB_NOTFOUND:
-	    printf("tried to remove non-existant dataspace\n");
+	    gossip_err("tried to remove non-existant dataspace\n");
 	    error = -TROVE_ENOENT;
 	    goto return_error;
 	default:
@@ -297,10 +295,8 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    error = -1;
 	    goto return_error;
 	case 0:
-#if 0
-	    printf("removed dataspace with handle 0x%08Lx\n", op_p->handle);
-#endif
-	    /* drop through */
+	    gossip_debug(TROVE_GOSSIP_DEBUG, "removed dataspace with "
+                         "handle 0x%08Lx\n", op_p->handle);
 	    break;
     }
 
@@ -325,7 +321,8 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
      * NOTE: this is not a fatal error; this might have never been created.
      */
     ret = dbpf_bstream_fdcache_try_remove(op_p->coll_p->coll_id, op_p->handle);
-    switch (ret) {
+    switch (ret)
+    {
 	case DBPF_BSTREAM_FDCACHE_BUSY:
 	    assert(0);
 	case DBPF_BSTREAM_FDCACHE_ERROR:
@@ -366,7 +363,7 @@ int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
 			DSPACE_ITERATE_HANDLES,
-			(TROVE_handle) 0, /* handle -- ignored in this case */
+			TROVE_HANDLE_NULL, /* handle -- ignored in this case */
 			coll_p,
 			dbpf_dspace_iterate_handles_op_svc,
 			user_ptr,
@@ -410,7 +407,6 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
 	    got_db = 1;
-	    /* drop through */
 	    break;
     }
  
@@ -432,16 +428,13 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
      * of the database (first record) when used with DB_NEXT, so
      * we don't need to position with DB_FIRST.
      */
-    if (*op_p->u.d_iterate_handles.position_p != TROVE_ITERATE_START) {
+    if (*op_p->u.d_iterate_handles.position_p != TROVE_ITERATE_START)
+    {
 	/* we need to position the cursor before we can read new entries.
 	 * we will go ahead and read the first entry as well, so that we
 	 * can use the same loop below to read the remainder in this or
 	 * the above case.
 	 */
-
-#if 0
-	printf("setting position\n");
-#endif
 
 	/* set position */
 	assert(sizeof(recno) < sizeof(dummy_handle));
@@ -460,39 +453,37 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
 	if (ret == DB_NOTFOUND) goto return_ok;
 	if (ret != 0) goto return_error;
-
-#if 0
-	printf("handle at recno = %Ld\n", dummy_handle);
-#endif
     }
 
     /* read handles until we run out of handles or space in buffer */
-    for (i = 0; i < *op_p->u.d_iterate_handles.count_p; i++) {
-	memset(&key, 0, sizeof(key));
-	key.data = &op_p->u.d_iterate_handles.handle_array[i];
-	key.size = key.ulen = sizeof(TROVE_handle);
-	key.flags |= DB_DBT_USERMEM;
+    for (i = 0; i < *op_p->u.d_iterate_handles.count_p; i++)
+    {
+        memset(&key, 0, sizeof(key));
+        key.data = &op_p->u.d_iterate_handles.handle_array[i];
+        key.size = key.ulen = sizeof(TROVE_handle);
+        key.flags |= DB_DBT_USERMEM;
 
-	memset(&data, 0, sizeof(data));
-	data.data = &s_attr;
-	data.size = data.ulen = sizeof(s_attr);
-	data.flags |= DB_DBT_USERMEM;
-	    
-	ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-	if (ret == DB_NOTFOUND) goto return_ok;
-	else if (ret != 0) {
-	    printf("c_get failed on iteration %d\n", i);
-	    goto return_error;
-	}
+        memset(&data, 0, sizeof(data));
+        data.data = &s_attr;
+        data.size = data.ulen = sizeof(s_attr);
+        data.flags |= DB_DBT_USERMEM;
+
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
+        if (ret == DB_NOTFOUND)
+        {
+            goto return_ok;
+        }
+        else if (ret != 0)
+        {
+            gossip_err("c_get failed on iteration %d\n", i);
+            goto return_error;
+        }
     }
 
 return_ok:
     if (ret == DB_NOTFOUND) {
 	/* if we ran off the end of the database, return TROVE_ITERATE_END */
 	*op_p->u.d_iterate_handles.position_p = TROVE_ITERATE_END;
-#if 0
-	printf("returning done!\n");
-#endif
     }
     else {
 	/* get the record number to return.
@@ -510,8 +501,15 @@ return_ok:
 	data.flags |= DB_DBT_USERMEM;
 
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
-	if (ret == DB_NOTFOUND) printf("iterate -- notfound\n");
-	else if (ret != 0) printf("iterate -- some other failure @ recno\n");
+	if (ret == DB_NOTFOUND)
+        {
+            gossip_debug(TROVE_GOSSIP_DEBUG, "iterate -- notfound\n");
+        }
+	else if (ret != 0)
+        {
+            gossip_debug(TROVE_GOSSIP_DEBUG, "iterate -- some other "
+                         "failure @ recno\n");
+        }
 
 	*op_p->u.d_iterate_handles.position_p = recno;
     }
@@ -531,7 +529,7 @@ return_ok:
     return 1;
 
 return_error:
-    fprintf(stderr, "dbpf_dspace_iterate_handles_op_svc: %s\n", db_strerror(ret));
+    gossip_err("dbpf_dspace_iterate_handles_op_svc: %s\n", db_strerror(ret));
     *op_p->u.d_iterate_handles.count_p = i; 
     if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return -1;
@@ -706,12 +704,11 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     /* initialize op-specific members */
     q_op_p->op.u.d_setattr.attr_p = ds_attr_p;
 
-#if 0
-    printf("storing attributes (1), uid = %d, mode = %d, type = %d\n",
-	   (int) ds_attr_p->uid,
-	   (int) ds_attr_p->mode,
-	   (int) ds_attr_p->type);
-#endif
+    gossip_debug(TROVE_GOSSIP_DEBUG, "storing attributes (1), "
+                 "uid = %d, mode = %d, type = %d\n",
+                 (int) ds_attr_p->uid,
+                 (int) ds_attr_p->mode,
+                 (int) ds_attr_p->type);
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
@@ -747,9 +744,11 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 
     trove_ds_attr_to_stored((*op_p->u.d_setattr.attr_p), s_attr);
 
-#if 0   
-    printf("storing attributes (2), uid = %d, mode = %d, type = %d\n", (int) s_attr.uid, (int) s_attr.mode, (int) s_attr.type);
-#endif
+    gossip_debug(TROVE_GOSSIP_DEBUG, "storing attributes (2), "
+                 "uid = %d, mode = %d, type = %d\n",
+                 (int) s_attr.uid,
+                 (int) s_attr.mode,
+                 (int) s_attr.type);
 
     ret = db_p->put(db_p, NULL, &key, &data, 0);
     if (ret != 0) {
@@ -863,9 +862,11 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	goto return_error;
     }
 
-#if 0
-    printf("reading attributes (1), uid = %d, mode = %d, type = %d\n", (int) s_attr.uid, (int) s_attr.mode, (int) s_attr.type);
-#endif
+    gossip_debug(TROVE_GOSSIP_DEBUG, "reading attributes (1), "
+                 "uid = %d, mode = %d, type = %d\n",
+                 (int) s_attr.uid,
+                 (int) s_attr.mode,
+                 (int) s_attr.type);
 
     trove_ds_stored_to_attr(s_attr, (*op_p->u.d_setattr.attr_p), b_size, k_size);
 
@@ -940,7 +941,8 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
      * this code will do the trick and is a lot faster and shorter.
      */
 
-    if (ret != 0) {
+    if (ret != 0)
+    {
 	/* operation is done and we are telling the caller;
 	 * ok to pull off queue now.
 	 *
@@ -951,24 +953,22 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 
 	*state_p = (ret == 1) ? 0 : ret;
 
-	if (returned_user_ptr_p != NULL) {
+	if (returned_user_ptr_p != NULL)
+        {
 	    *returned_user_ptr_p = q_op_p->op.user_ptr;
 	}
 	dbpf_queued_op_put_and_dequeue(q_op_p);
 	dbpf_queued_op_free(q_op_p);
-#if 0
-	printf("dbpf_dspace_test returning success.\n");
-#endif
+	gossip_debug(TROVE_GOSSIP_DEBUG,
+                     "dbpf_dspace_test returning success.\n");
 	return 1;
     }
-    else {
-	dbpf_queued_op_put(q_op_p, 0);
-#if 0
-	printf("dbpf_dspace_test returning no progress.\n");
-	sleep(1);
-#endif
-	return 0;
-    }
+
+    dbpf_queued_op_put(q_op_p, 0);
+    gossip_debug(TROVE_GOSSIP_DEBUG,
+                 "dbpf_dspace_test returning no progress.\n");
+    sleep(1);
+    return 0;
 }
 
 /* dbpf_dspace_testsome()
