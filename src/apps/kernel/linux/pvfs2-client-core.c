@@ -145,8 +145,7 @@ do {                                                          \
     list_size = 1;                                            \
     ret = write_device_response(                              \
         buffer_list,size_list,list_size, total_size,          \
-        (PVFS_id_gen_t)vfs_request->info.tag,                 \
-        &vfs_request->op_id,                                  \
+        vfs_request->info.tag, &vfs_request->op_id,           \
         &vfs_request->jstat, s_client_dev_context);           \
     if (ret < 0)                                              \
     {                                                         \
@@ -1647,7 +1646,7 @@ int process_vfs_requests(void)
 
                     ret = write_device_response(
                         buffer_list,size_list,list_size, total_size,
-                        (PVFS_id_gen_t)vfs_request->info.tag,
+                        vfs_request->info.tag,
                         &vfs_request->op_id, &vfs_request->jstat,
                         s_client_dev_context);
 

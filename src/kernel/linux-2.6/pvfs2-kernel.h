@@ -182,7 +182,7 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 typedef struct
 {
     int op_state;
-    unsigned long tag;
+    int64_t tag;
 
     pvfs2_upcall_t upcall;
     pvfs2_downcall_t downcall;
