@@ -99,7 +99,7 @@ int fp_multiqueue_find_serviceable(flow_descriptor ** flow_d_array,
 
 int fp_multiqueue_service(flow_descriptor * flow_d);
 
-char fp_multiqueue_name[] = "fp_multiqueue";
+char fp_multiqueue_name[] = "flowproto_multiqueue";
 
 struct flowproto_ops fp_multiqueue_ops = {
     fp_multiqueue_name,
@@ -298,6 +298,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
     int ret;
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
     PVFS_id_gen_t tmp_id;
+    PVFS_size tmp_actual_size;
 
     /* TODO: error handling */
     assert(error_code == 0);
@@ -352,6 +353,47 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	/* immediate completion; trigger callback ourselves */
 	trove_write_callback_fn(q_item, 0);
     }
+
+    /* do we need to repost another recv? */
+    /* be careful about lock order */
+    gen_mutex_lock(&flow_data->src_mutex);
+    gen_mutex_lock(&flow_data->empty_mutex);
+
+    if(qlist_empty(&flow_data->src_list) && !qlist_empty(&flow_data->empty_list))
+    {
+	q_item = qlist_entry(flow_data->empty_list.next,
+	    struct fp_queue_item, list_link);
+	qlist_del(&q_item->list_link);
+	qlist_add_tail(&q_item->list_link, &flow_data->src_list);
+
+	gen_mutex_unlock(&flow_data->empty_mutex);
+	gen_mutex_unlock(&flow_data->src_mutex);
+
+	ret = BMI_post_recv(&tmp_id,
+	    q_item->parent->src.u.bmi.address,
+	    q_item->buffer,
+	    BUFFER_SIZE,
+	    &tmp_actual_size,
+	    BMI_PRE_ALLOC,
+	    q_item->parent->tag,
+	    &q_item->bmi_callback,
+	    global_bmi_context);
+	
+	/* TODO: error handling */
+	assert(ret >= 0);
+
+	if(ret == 1)
+	{
+	    /* immediate completion; trigger callback ourselves */
+	    bmi_recv_callback_fn(q_item, tmp_actual_size, 0);
+	}
+    }
+    else
+    {
+	gen_mutex_unlock(&flow_data->empty_mutex);
+	gen_mutex_unlock(&flow_data->src_mutex);
+    }
+
 	
     return;
 }
