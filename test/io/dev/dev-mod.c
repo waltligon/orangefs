@@ -95,14 +95,14 @@ static void __exit pdev_exit(void)
 
 int pdev_open(struct inode *inode, struct file *filp)
 {
-    printk("pdev: pdev_open()\n");
+    printk("PDEV: pdev_open()\n");
     MOD_INC_USE_COUNT;
     return(0);
 }
 
 int pdev_release(struct inode *inode, struct file *filp)
 {
-    printk("pdev: pdev_release()\n");
+    printk("PDEV: pdev_release()\n");
     MOD_DEC_USE_COUNT;
     return(0);
 }
@@ -112,7 +112,7 @@ int pdev_ioctl(struct inode *inode,
 		  unsigned int command, 
 		  unsigned long arg)
 {
-    printk("pdev: pdev_ioctl()\n");
+    printk("PDEV: pdev_ioctl()\n");
 
     switch(command)
     {
@@ -137,6 +137,8 @@ ssize_t	pdev_read(struct file *filp, char * buf, size_t size, loff_t *offp)
     char test_string[] = "Hello world.";
     int64_t test_tag = 5;
     void* tmp_buf = buf;
+
+    printk("PDEV: pdev_read()\n");
 
     if(size < (strlen(test_string) + 1 + sizeof(int32_t) + sizeof(int64_t)))
     {
@@ -166,6 +168,8 @@ ssize_t	pdev_writev(struct file *filp, const struct iovec* iov,
     int64_t* tag;
     char* payload = NULL;
 
+    printk("PDEV: pdev_writev()\n");
+
     /* for simplicity's sake, lets always dump to a contiguous buffer and 
      * then pull the message apart- logic is a bit complicated for handling 
      * iovec directly 
@@ -180,7 +184,7 @@ ssize_t	pdev_writev(struct file *filp, const struct iovec* iov,
 	if(iov[i].iov_len > remaining)
 	    return(-EMSGSIZE);
 	copy_from_user(offset, iov[i].iov_base, iov[i].iov_len);
-	remaining += iov[i].iov_len;
+	remaining -= iov[i].iov_len;
 	offset = (void*)((unsigned long)offset + iov[i].iov_len);
     }
 
@@ -189,7 +193,11 @@ ssize_t	pdev_writev(struct file *filp, const struct iovec* iov,
     tag = (int64_t*)((unsigned long)buffer + sizeof(int32_t));
     payload = (char*)((unsigned long)tag + sizeof(int64_t));
 
-    printk("Got payload: %s\n", payload);
+    if(*magic != pdev_magic)
+	return(-EINVAL);
+
+    printk("PDEV: magic: %d, tag: %d, payload: %s\n", (int)*magic, (int)*tag, 
+	payload);
 
     kfree(buffer);
 

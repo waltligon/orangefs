@@ -324,6 +324,21 @@ int PINT_dev_write_list(
     return(0);
 }
 
+/* PINT_dev_write()
+ *
+ * writes a buffer into the device
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_dev_write(
+	void* buffer,
+	int size,
+	enum PINT_dev_buffer_type buffer_type,
+	id_gen_t tag)
+{
+    return(PINT_dev_write_list(&buffer, &size, 1, size, buffer_type, tag));
+}
+
 /* PINT_dev_memalloc()
  *
  * allocates a memory buffer optimized for transfer into the device

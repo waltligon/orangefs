@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "gossip.h"
 #include "pint-dev.h"
@@ -15,6 +16,10 @@ int main(int argc, char **argv)
     int ret = 1;
     int outcount = 0;
     struct PINT_dev_unexp_info unexp_array[2];
+    char buf1[] = "Hello ";
+    char buf2[] = "World.";
+    void* buffer_list[2];
+    int size_list[2];
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
     if(ret < 0)
@@ -54,6 +59,29 @@ int main(int argc, char **argv)
 
     PINT_dev_release_unexpected(&unexp_array[0]);
     PINT_dev_release_unexpected(&unexp_array[1]);
+
+    /* try writing a message */
+    ret = PINT_dev_write(buf1, (strlen(buf1) + 1), PINT_DEV_EXT_ALLOC,
+	7);
+    if(ret != 0)
+    {
+	fprintf(stderr, "Error: PINT_dev_write().\n");
+	return(-1);
+    }
+
+    /* try writing a list message */
+    buffer_list[0] = buf1;
+    buffer_list[1] = buf2;
+    size_list[0] = strlen(buf1);
+    size_list[1] = strlen(buf1) + 1;
+
+    ret = PINT_dev_write_list(buffer_list, size_list, 2, (strlen(buf1) +
+	strlen(buf2) + 1), PINT_DEV_EXT_ALLOC, 7);
+    if(ret != 0)
+    {
+	fprintf(stderr, "Error: PINT_dev_write_list().\n");
+	return(-1);
+    }
 
     PINT_dev_finalize();
 

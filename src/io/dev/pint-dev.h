@@ -48,8 +48,11 @@ int PINT_dev_write_list(
 	enum PINT_dev_buffer_type buffer_type,
 	id_gen_t tag);
 
-#define PINT_dev_write(buf, size, type, tag)\
- PINT_dev_write_list(&buf, &size, 1, size, type, tag)
+int PINT_dev_write(
+	void* buffer,
+	int size,
+	enum PINT_dev_buffer_type buffer_type,
+	id_gen_t tag);
 
 void* PINT_dev_memalloc(int size);
 
