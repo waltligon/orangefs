@@ -3203,21 +3203,24 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
 
 #endif /* ENABLE_GM_BUFCOPY */
 #ifdef ENABLE_GM_BUFPOOL
-	    copy_buffer = gm_op_data->tmp_xfer_buffer;
-	    total_copied = 0;
-	    for(i=0; i<query_op->list_count; i++)
-	    {
-		if(total_copied == query_op->actual_size)
-		    break;
+            if(!gm_op_data->cancelled)
+            {
+                copy_buffer = gm_op_data->tmp_xfer_buffer;
+                total_copied = 0;
+                for(i=0; i<query_op->list_count; i++)
+                {
+                    if(total_copied == query_op->actual_size)
+                        break;
 
-		copy_size = query_op->actual_size - total_copied;
-		if(copy_size > query_op->size_list[i])
-		    copy_size = query_op->size_list[i];
+                    copy_size = query_op->actual_size - total_copied;
+                    if(copy_size > query_op->size_list[i])
+                        copy_size = query_op->size_list[i];
 
-		memcpy(query_op->buffer_list[i], copy_buffer, copy_size);
-		copy_buffer = (void*)((long)copy_buffer + (long)copy_size);
-		total_copied += copy_size;
-	    }
+                    memcpy(query_op->buffer_list[i], copy_buffer, copy_size);
+                    copy_buffer = (void*)((long)copy_buffer + (long)copy_size);
+                    total_copied += copy_size;
+                }
+            }
 	    bmi_gm_bufferpool_put(io_pool, gm_op_data->tmp_xfer_buffer);
 #endif /* ENABLE_GM_BUFPOOL */
 	}
@@ -3237,8 +3240,11 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
 	    gm_dma_free(local_port, gm_op_data->tmp_xfer_buffer);
 #endif /* ENABLE_GM_BUFCOPY */
 #ifdef ENABLE_GM_BUFPOOL
-	    memcpy(query_op->buffer, gm_op_data->tmp_xfer_buffer,
-		   query_op->actual_size);
+            if(!gm_op_data->cancelled)
+            {
+                memcpy(query_op->buffer, gm_op_data->tmp_xfer_buffer,
+                       query_op->actual_size);
+            }
 	    bmi_gm_bufferpool_put(io_pool, gm_op_data->tmp_xfer_buffer);
 #endif /* ENABLE_GM_BUFPOOL */
 	}
