@@ -45,43 +45,39 @@ static int create_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
 /* completion function prototypes */
-static int create_create_comp_fn(void *v_p,
-                                 struct PVFS_server_resp *resp_p,
-                                 int index);
-static int create_datafiles_comp_fn(void *v_p,
-                                    struct PVFS_server_resp *resp_p,
-                                    int index);
-static int create_setattr_comp_fn(void *v_p,
-                                  struct PVFS_server_resp *resp_p,
-                                  int index);
-static int create_crdirent_comp_fn(void *v_p,
-                                   struct PVFS_server_resp *resp_p,
-                                   int index);
-static int create_delete_handles_comp_fn(void *v_p,
-                                         struct PVFS_server_resp *resp_p,
-                                         int index);
+static int create_create_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+static int create_datafiles_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+static int create_setattr_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+static int create_crdirent_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+static int create_delete_handles_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 %%
 
-machine pvfs2_client_create_sm(init,
-			       create_parent_getattr_setup_msgpair,
-			       create_parent_getattr_xfer_msgpair,
-			       create_parent_getattr_failure,
-			       dspace_create_setup_msgpair,
-			       dspace_create_xfer_msgpair,
-			       dspace_create_failure,
-                               datafiles_setup_msgpair_array,
-                               datafiles_xfer_msgpair_array,
-                               datafiles_failure,
-                               create_setattr_setup_msgpair,
-                               create_setattr_xfer_msgpair,
-                               create_setattr_failure,
-			       crdirent_setup_msgpair,
-			       crdirent_xfer_msgpair,
-			       crdirent_failure,
-                               delete_handles_setup_msgpair_array,
-                               delete_handles_xfer_msgpair_array,
-			       cleanup)
+machine pvfs2_client_create_sm(
+    init,
+    create_parent_getattr_setup_msgpair,
+    create_parent_getattr_xfer_msgpair,
+    create_parent_getattr_failure,
+    dspace_create_setup_msgpair,
+    dspace_create_xfer_msgpair,
+    dspace_create_failure,
+    datafiles_setup_msgpair_array,
+    datafiles_xfer_msgpair_array,
+    datafiles_failure,
+    create_setattr_setup_msgpair,
+    create_setattr_xfer_msgpair,
+    create_setattr_failure,
+    crdirent_setup_msgpair,
+    crdirent_xfer_msgpair,
+    crdirent_failure,
+    delete_handles_setup_msgpair_array,
+    delete_handles_xfer_msgpair_array,
+    cleanup)
 {
     state init
     {
@@ -521,6 +517,7 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = create_create_comp_fn;
 
     return 1;
@@ -617,6 +614,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
         msg_p->fs_id = sm_p->parent_ref.fs_id;
         msg_p->handle =
             sm_p->u.create.io_handle_extent_array[i].extent_array[0].first;
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = create_datafiles_comp_fn;
         msg_p->svr_addr = sm_p->u.create.data_server_addrs[i];
     }
@@ -671,6 +669,7 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->u.create.metafile_handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_setattr_comp_fn;
 
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
@@ -719,6 +718,7 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->u.create.metafile_handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_crdirent_comp_fn;
 
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
@@ -812,6 +812,7 @@ static int create_delete_handles_setup_msgpair_array(
 
             msg_p->fs_id = sm_p->parent_ref.fs_id;
             msg_p->handle = sm_p->u.create.metafile_handle;
+            msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
             msg_p->svr_addr = metafile_server_addr;
 
@@ -828,6 +829,7 @@ static int create_delete_handles_setup_msgpair_array(
 
             msg_p->fs_id = sm_p->parent_ref.fs_id;
             msg_p->handle = sm_p->u.create.datafile_handles[i];
+            msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
             msg_p->svr_addr = sm_p->u.create.data_server_addrs[i];
 

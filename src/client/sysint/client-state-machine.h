@@ -24,21 +24,22 @@
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
 
-/* NOTE:
+/*
  * This structure holds everything that we need for the state of a
  * message pair.  We need arrays of these in some cases, so it's
  * convenient to group it like this.
  *
  */
-typedef struct PINT_client_sm_msgpair_state_s {
-    /* NOTE: these top three elements: fs_id, handle, and comp_fn,
-     * should be filled in prior to going into the msgpair code path.
+typedef struct PINT_client_sm_msgpair_state_s
+{
+    /* NOTE: fs_id, handle, retry flag, and comp_fn, should be filled
+     * in prior to going into the msgpair code path.
      */
-
-    /* fs_id and handle to be operated on, if available */
-
     PVFS_fs_id fs_id;
     PVFS_handle handle;
+
+    /* should be either PVFS_MSGPAIR_RETRY, or PVFS_MSGPAIR_NO_RETRY*/
+    int retry_flag;
 
     /* comp_fn called after successful reception and decode of respone,
      * if the msgpair state machine is used for processing.

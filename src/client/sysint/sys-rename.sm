@@ -41,23 +41,14 @@ static int rename_rmdirent_failure(
 static int rename_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
-/* completion function prototypes */
 static int rename_lookups_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int rename_get_attrs_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int rename_crdirent_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int rename_rmdirent_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 %%
 
@@ -471,6 +462,7 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
         /* fill in msgpair structure components */
         msg_p->fs_id = sm_p->u.rename.parent_refns[i].fs_id;
         msg_p->handle = sm_p->u.rename.parent_refns[i].handle;
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = rename_lookups_comp_fn;
 
         ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
@@ -555,6 +547,7 @@ static int rename_get_attrs_setup_msgpair_array(
         /* fill in msgpair structure components */
         msg_p->fs_id = current_fs_id;
         msg_p->handle = current_handle;
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = rename_get_attrs_comp_fn;
 
         ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
@@ -627,6 +620,7 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_crdirent_comp_fn;
 
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
@@ -691,6 +685,7 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->u.rename.parent_refns[0].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[0].handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_rmdirent_comp_fn;
 
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,

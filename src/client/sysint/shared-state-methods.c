@@ -43,6 +43,7 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->parent_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->parent_ref.handle;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = PINT_sm_common_directory_getattr_comp_fn;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
@@ -87,8 +88,9 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
         (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL));
 
     /* fill in msgpair structure components */
-    sm_p->msgpair.fs_id   = sm_p->object_ref.fs_id;
-    sm_p->msgpair.handle  = sm_p->object_ref.handle;
+    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
+    sm_p->msgpair.handle = sm_p->object_ref.handle;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = PINT_sm_common_object_getattr_comp_fn;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,

@@ -29,11 +29,8 @@ static int setattr_msg_failure(
 static int setattr_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
-/* completion function prototypes */
 static int setattr_msg_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 %%
 
@@ -255,6 +252,7 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->u.setattr.refn.fs_id;
     msg_p->handle = sm_p->u.setattr.refn.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = setattr_msg_comp_fn;
 
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,

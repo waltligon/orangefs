@@ -155,6 +155,13 @@ int PVFS_sys_finalize(
     void);
 
 /*
+  the following values are to be used by the struct
+  PINT_client_sm_msgpair_state_s message's retry_flag variable
+*/
+#define PVFS_MSGPAIR_RETRY          0xFE
+#define PVFS_MSGPAIR_NO_RETRY       0xFF
+
+/*
   NOTE: the following values are to be used by
   PVFS_sys(.*)_lookup as the "follow_link" argument.
 

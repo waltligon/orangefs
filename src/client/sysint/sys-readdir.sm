@@ -29,11 +29,8 @@ static int readdir_msg_failure(
 static int readdir_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
-/* completion function prototypes */
 static int readdir_msg_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 %%
 
@@ -231,8 +228,8 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->u.readdir.object_ref.fs_id;
     msg_p->handle = sm_p->u.readdir.object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = readdir_msg_comp_fn;
-
     msg_p->svr_addr = server_addr;
     return 1;
 }

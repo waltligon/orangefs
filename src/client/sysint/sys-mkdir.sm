@@ -33,15 +33,10 @@ static int mkdir_crdirent_failure(
 static int mkdir_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
-/* completion function prototypes */
 static int mkdir_msg_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int mkdir_crdirent_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 %%
 
@@ -310,6 +305,7 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_msg_comp_fn;
 
     return 1;
@@ -348,6 +344,7 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->u.mkdir.metafile_handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_crdirent_comp_fn;
 
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,

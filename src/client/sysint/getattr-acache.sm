@@ -51,28 +51,31 @@
 #include "acache.h"
 #include "PINT-reqproto-encode.h"
 
-enum {
+enum
+{
     GETATTR_ACACHE_MISS = 1
 };
 
-static int getattr_acache_lookup(PINT_client_sm *sm_p,
-				 job_status_s *js_p);
+static int getattr_acache_lookup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 %%
 
 nested machine pvfs2_client_getattr_acache_sm(lookup,
 					      xfer_msgpair)
 {
-    state lookup {
-	run getattr_acache_lookup;
-	success => return;
-	GETATTR_ACACHE_MISS => xfer_msgpair;
-	default => return;
+    state lookup
+    {
+        run getattr_acache_lookup;
+        success => return;
+        GETATTR_ACACHE_MISS => xfer_msgpair;
+        default => return;
     }
 
-    state xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
-	default => return;
+    state xfer_msgpair
+    {
+        jump pvfs2_client_msgpair_sm;
+        default => return;
     }
 }
 
@@ -80,14 +83,14 @@ nested machine pvfs2_client_getattr_acache_sm(lookup,
 
 
 /* The idea is to check acache to see if we have an entry.  if so, set
- * up a fake, decoded response structure with the results so that
- * we can then call the comp_fn to copy data out of the response
- * and into the PINT_client_sm structure.
+ * up a fake, decoded response structure with the results so that we
+ * can then call the comp_fn to copy data out of the response and into
+ * the PINT_client_sm structure.
  *
  * This is a little inefficient I suppose, but it's the most general
  * way to accomplish this.  We can optimize later if it seems
- * necessary.  Or we can tailor the acache to store in response
- * format all the time...
+ * necessary.  Or we can tailor the acache to store in response format
+ * all the time...
  */
 static int getattr_acache_lookup(PINT_client_sm *sm_p,
 				 job_status_s *js_p)
@@ -100,9 +103,6 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
     /* check input parameters */
     assert(sm_p->pinode == NULL);
 
-    /* we don't know what this is set to prior to this function,
-     * so we reset it here.
-     */
     js_p->error_code = 0;
 
     sm_p->pinode = PINT_acache_lookup(sm_p->u.getattr.object_ref);

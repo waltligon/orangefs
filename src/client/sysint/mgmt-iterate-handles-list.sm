@@ -13,13 +13,15 @@
 extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
-static int mgmt_iterate_handles_list_setup_msgpair(PINT_client_sm *sm_p,
-						   job_status_s *js_p);
-static int mgmt_iterate_handles_list_cleanup(PINT_client_sm *sm_p,
-					     job_status_s *js_p);
-static int iterate_handles_list_comp_fn(void *v_p,
-					struct PVFS_server_resp *resp_p,
-					int i);
+static int mgmt_iterate_handles_list_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int mgmt_iterate_handles_list_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+
+static int iterate_handles_list_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i);
 
 %%
 
@@ -65,8 +67,8 @@ int PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
 				   PVFS_BMI_addr_t *addr_array,
 				   int server_count)
 {
-    int ret;
-    PINT_client_sm *sm_p;
+    int ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -75,11 +77,14 @@ int PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
     if (server_count < 1 || !handle_matrix || !position_array 
 	|| !handle_count_array || !addr_array)
     {
-	return -PVFS_EINVAL;
+	return ret;
     }
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
-    if (sm_p == NULL) return -PVFS_ENOMEM;
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
 
     memset(sm_p, 0, sizeof(*sm_p));
 
@@ -104,8 +109,7 @@ int PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
 	return ret;
     }
 
-    /* while !done call progress function */
-    while (!sm_p->op_complete && ret == 0)
+    while (!sm_p->op_complete && (ret == 0))
     {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_iterate_handles_list "
                      "calling PINT_client_state_machine_test()\n");
@@ -132,8 +136,7 @@ int PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
 static int mgmt_iterate_handles_list_setup_msgpair(PINT_client_sm * sm_p,
 						   job_status_s * js_p)
 {
-    int i;
-    int j;
+    int i = 0, j = 0;
     PINT_client_sm_msgpair_state *msg_p;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "iterate_handles_list state: "
@@ -171,9 +174,10 @@ static int mgmt_iterate_handles_list_setup_msgpair(PINT_client_sm * sm_p,
 		sm_p->u.iterate_handles_list.handle_count_array[i],
 		sm_p->u.iterate_handles_list.position_array[i]);
 	    j++;
-	    msg_p->fs_id    = sm_p->u.iterate_handles_list.fs_id;
-	    msg_p->handle   = PVFS_HANDLE_NULL;
-	    msg_p->comp_fn  = iterate_handles_list_comp_fn;
+	    msg_p->fs_id = sm_p->u.iterate_handles_list.fs_id;
+	    msg_p->handle = PVFS_HANDLE_NULL;
+	    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+	    msg_p->comp_fn = iterate_handles_list_comp_fn;
 	    msg_p->svr_addr = sm_p->u.iterate_handles_list.addr_array[i];
 	}
     }

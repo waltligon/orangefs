@@ -100,8 +100,8 @@ int PVFS_sys_truncate(PVFS_object_ref ref,
     if ((ref.fs_id == PVFS_FS_ID_NULL) ||
         (ref.handle == PVFS_HANDLE_NULL))
     {
-	gossip_lerr("Invalid pinode reference\n");
-	return ret;
+        gossip_lerr("Invalid pinode reference\n");
+        return ret;
     }
 
     sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
@@ -118,23 +118,23 @@ int PVFS_sys_truncate(PVFS_object_ref ref,
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_TRUNCATE);
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+        gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
         free(sm_p);
         return ret;
     }
 
     while (!sm_p->op_complete && (ret == 0))
     {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_truncate calling "
+       gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_truncate calling "
                      "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
+       ret = PINT_client_state_machine_test();
     }
 
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
+        gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+        free(sm_p);
+        return(ret);
     }
 
     error = sm_p->error_code;
@@ -144,7 +144,7 @@ int PVFS_sys_truncate(PVFS_object_ref ref,
 }
 
 static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
-						job_status_s *js_p)
+                                                job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr = NULL;
@@ -152,7 +152,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     PVFS_size new_dfile_size = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-	    "(%p) truncate state: datafile_setup_msgpairarray\n", sm_p);
+            "(%p) truncate state: datafile_setup_msgpairarray\n", sm_p);
 
     js_p->error_code = 0;
 
@@ -179,21 +179,21 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 
     for (i = 0; i < attr->u.meta.dfile_count; i++)
     {
-	msg_p = &sm_p->msgarray[i];
+        msg_p = &sm_p->msgarray[i];
 
-	gossip_debug(
+        gossip_debug(
             GOSSIP_CLIENT_DEBUG,
             "  datafile_truncate: client requests %Ld: resizing %Ld",
             Ld(sm_p->u.truncate.size),
             Lu(attr->u.meta.dfile_array[i]));
 
-	new_dfile_size = 
+        new_dfile_size = 
             attr->u.meta.dist->methods->logical_to_physical_offset(
                 attr->u.meta.dist->params, i, attr->u.meta.dfile_count,
                 sm_p->u.truncate.size);
 
-	gossip_debug(GOSSIP_CLIENT_DEBUG,
-		" to %Ld bytes\n", Ld(new_dfile_size));
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                " to %Ld bytes\n", Ld(new_dfile_size));
 
         PINT_SERVREQ_TRUNCATE_FILL(
             msg_p->req,
@@ -202,13 +202,14 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
             new_dfile_size,
             attr->u.meta.dfile_array[i]);
 
-	/*
+        /*
           no callback. the status will be in the generic response
           structure
         */
-	msg_p->fs_id = sm_p->object_ref.fs_id;
-	msg_p->handle = attr->u.meta.dfile_array[i];
-	msg_p->comp_fn = NULL;
+        msg_p->fs_id = sm_p->object_ref.fs_id;
+        msg_p->handle = attr->u.meta.dfile_array[i];
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = NULL;
     }
 
     /* fill in address of each server to contact */
@@ -216,7 +217,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         sm_p->msgarray_count, sm_p->msgarray);
     if (ret)
     {
-	gossip_err("Error: failed to resolve server addresses.\n");
+        gossip_err("Error: failed to resolve server addresses.\n");
         js_p->error_code = ret;
     }
     return 1;
@@ -226,12 +227,12 @@ static int truncate_datafile_failure(PINT_client_sm *sm_p,
                                      job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-	    "(%p) truncate state: datafile_failure\n", sm_p);
+            "(%p) truncate state: datafile_failure\n", sm_p);
     return 1;
 }
 
 static int truncate_cleanup(PINT_client_sm *sm_p,
-			    job_status_s *js_p)
+                            job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) truncate state: "
                  "truncate_cleanup\n", sm_p);

@@ -48,39 +48,40 @@
 #include "ncache.h"
 #include "PINT-reqproto-encode.h"
 
-enum {
+enum
+{
     LOOKUP_NCACHE_MISS = 1
 };
 
-static int lookup_ncache_lookup(PINT_client_sm *sm_p,
-				job_status_s *js_p);
+static int lookup_ncache_lookup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 %%
 
 nested machine pvfs2_client_lookup_ncache_sm(lookup,
 					     xfer_msgpair)
 {
-    state lookup {
-	run lookup_ncache_lookup;
-	success => return;
-	LOOKUP_NCACHE_MISS => xfer_msgpair;
-	default => return;
+    state lookup
+    {
+        run lookup_ncache_lookup;
+        success => return;
+        LOOKUP_NCACHE_MISS => xfer_msgpair;
+        default => return;
     }
 
-    state xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
-	default => return;
+    state xfer_msgpair
+    {
+        jump pvfs2_client_msgpair_sm;
+        default => return;
     }
 }
 
 %%
 
-/* lookup_ncache_lookup()
- */
 static int lookup_ncache_lookup(PINT_client_sm *sm_p,
 				job_status_s *js_p)
 {
-    int ret;
+    int ret = -PVFS_EINVAL;
     PVFS_object_ref parent_ref, object_ref;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_ncache state: lookup\n");

@@ -158,9 +158,10 @@ static int mgmt_event_mon_list_setup_msgpair(PINT_client_sm *sm_p,
             *sm_p->cred_p,
             sm_p->u.event_mon_list.event_count);
 
-        msg_p->fs_id    = sm_p->u.event_mon_list.fs_id;
-        msg_p->handle   = PVFS_HANDLE_NULL;
-        msg_p->comp_fn  = event_mon_list_comp_fn;
+        msg_p->fs_id = sm_p->u.event_mon_list.fs_id;
+        msg_p->handle = PVFS_HANDLE_NULL;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = event_mon_list_comp_fn;
         msg_p->svr_addr = sm_p->u.event_mon_list.addr_array[i];
     }
     return 1;

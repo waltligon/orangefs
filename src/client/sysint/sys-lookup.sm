@@ -65,14 +65,9 @@ static int lookup_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
 static int lookup_segment_lookup_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
-
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int lookup_segment_getattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 /* helper function prototypes */
 static int initialize_context(
@@ -641,6 +636,7 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
 
     msg_p->fs_id = cur_seg->seg_starting_refn.fs_id;
     msg_p->handle = cur_seg->seg_starting_refn.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_segment_lookup_comp_fn;
 
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
@@ -743,6 +739,7 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     msg_p->fs_id = cur_seg->seg_resolved_refn.fs_id;
     msg_p->handle = cur_seg->seg_resolved_refn.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_segment_getattr_comp_fn;
 
     if (PINT_bucket_map_to_server(&msg_p->svr_addr,

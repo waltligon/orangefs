@@ -432,8 +432,9 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
             PINT_REQUEST_TOTAL_BYTES(iosm_p->mem_req));
 
         /* fill in msgpair structure components */
-        msg_p->fs_id   = sm_p->object_ref.fs_id;
-        msg_p->handle  = target_datafile_array[i];
+        msg_p->fs_id = sm_p->object_ref.fs_id;
+        msg_p->handle = target_datafile_array[i];
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = NULL;
     }
 

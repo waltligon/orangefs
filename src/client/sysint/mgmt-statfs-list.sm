@@ -21,13 +21,15 @@
 extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
-static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
-                                          job_status_s *js_p);
-static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
-                                    job_status_s *js_p);
-static int statfs_list_comp_fn(void *v_p,
-			       struct PVFS_server_resp *resp_p,
-			       int index);
+static int mgmt_statfs_list_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int mgmt_statfs_list_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+
+static int statfs_list_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index);
 
 %%
 
@@ -36,21 +38,23 @@ machine pvfs2_client_mgmt_statfs_list_sm(
     xfer_msgpair,
     cleanup)
 {
-
-    state setup_msgpair {
-	run mgmt_statfs_list_setup_msgpair;
-	success => xfer_msgpair;
-	default => cleanup;
+    state setup_msgpair
+    {
+        run mgmt_statfs_list_setup_msgpair;
+        success => xfer_msgpair;
+        default => cleanup;
     }
 
-    state xfer_msgpair {
-	jump pvfs2_client_msgpairarray_sm;
-	default => cleanup;
+    state xfer_msgpair
+    {
+        jump pvfs2_client_msgpairarray_sm;
+        default => cleanup;
     }
 
-    state cleanup {
-	run mgmt_statfs_list_cleanup;
-	default => terminate;
+    state cleanup
+    {
+        run mgmt_statfs_list_cleanup;
+        default => terminate;
     }
 }
 
@@ -63,13 +67,13 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 			  int *error_array,
 			  int count)
 {
-    int ret, i;
-    PINT_client_sm *sm_p;
+    int ret = -PVFS_EINVAL, i = 0;
+    PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list entered\n");
 
-    if (count < 1 || !stat_array || !addr_array)
+    if ((count < 1) || !stat_array || !addr_array)
     {
 	return -PVFS_EINVAL;
     }
@@ -90,12 +94,11 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
     sm_p->u.statfs_list.addr_array = addr_array;
 
     memset(sm_p->u.statfs_list.stat_array, 0,
-           count * sizeof(struct PVFS_mgmt_server_stat));
+           (count * sizeof(struct PVFS_mgmt_server_stat)));
 
-    /* allocate msgarray space here, so we have it when operation completes */
     sm_p->msgarray_count = count;
-    sm_p->msgarray       = (PINT_client_sm_msgpair_state *)
-	malloc(count * sizeof(PINT_client_sm_msgpair_state));
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
+        count * sizeof(PINT_client_sm_msgpair_state));
     if (sm_p->msgarray == NULL)
     {
 	error = -PVFS_ENOMEM;
@@ -108,15 +111,13 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_STATFS_LIST);
     if (ret < 0)
     {
-	/* this should not fail under normal conditions */
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-	assert(0);
-
+	PVFS_perror("Error: PINT_client_state_machine_post() "
+                    "failure.\n",ret);
 	error = ret;
 	goto cleanup;
     }
 
-    while (!sm_p->op_complete && ret == 0)
+    while (!sm_p->op_complete && (ret == 0))
     {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list calling "
                      "PINT_client_state_machine_test()\n");
@@ -134,28 +135,35 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 
     error = sm_p->error_code;
 
-    if ((error != 0) && (error_array != NULL)) {
+    if ((error != 0) && (error_array != NULL))
+    {
 	/* store server-specific errors in error_array */
-	for (i=0; i < count; i++) {
+	for (i=0; i < count; i++)
+        {
 	    error_array[i] = sm_p->msgarray[i].op_status;
 	}
 	error = -PVFS_EPARTIAL;
     }
 
  cleanup:
-    if (sm_p->msgarray != NULL) free(sm_p->msgarray);
-    if (sm_p != NULL) free(sm_p);
+
+    if (sm_p->msgarray != NULL)
+    {
+        free(sm_p->msgarray);
+    }
+
+    if (sm_p != NULL)
+    {
+        free(sm_p);
+    }
     return error;
 }
 
-
-/* mgmt_statfs_list_setup_msgpair()
- */
 static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
                                           job_status_s *js_p)
 {
     int i = 0;
-    PINT_client_sm_msgpair_state *msg_p;
+    PINT_client_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "statfs_list state: mgmt_statfs_list_setup_msgpair\n");
@@ -168,9 +176,10 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
 				 *sm_p->cred_p,
 				 sm_p->u.statfs_list.fs_id);
 
-	msg_p->fs_id    = sm_p->u.statfs_list.fs_id;
-	msg_p->handle   = PVFS_HANDLE_NULL;
-	msg_p->comp_fn  = statfs_list_comp_fn;
+	msg_p->fs_id = sm_p->u.statfs_list.fs_id;
+	msg_p->handle = PVFS_HANDLE_NULL;
+	msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+	msg_p->comp_fn = statfs_list_comp_fn;
 	msg_p->svr_addr = sm_p->u.statfs_list.addr_array[i];
     }
 
@@ -179,8 +188,6 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-/* mgmt_statfs_list_cleanup
- */
 static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
                                     job_status_s *js_p)
 {
@@ -190,17 +197,14 @@ static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
     return 0;
 }
 
-/* statfs_list_comp_fn
- */
 static int statfs_list_comp_fn(void *v_p,
 			       struct PVFS_server_resp *resp_p,
 			       int i)
 {
-    int j = 0;
+    int ret = -PVFS_EINVAL, j = 0;
     PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
-    int ret = -1;
 
-    /* if this particular request was successful, then store the 
+    /* if this particular request was successful, then store the
      * statfs information in an array to be returned to caller
      */
     if (sm_p->msgarray[i].op_status == 0)
@@ -209,36 +213,36 @@ static int statfs_list_comp_fn(void *v_p,
 	    &sm_p->u.statfs_list.stat_array[i];
 	PVFS_statfs *resp_stat = &resp_p->u.statfs.stat;
 
-	sm_stat->fs_id                   = resp_stat->fs_id;
-	sm_stat->bytes_available         = resp_stat->bytes_available;
-	sm_stat->bytes_total             = resp_stat->bytes_total;
-	sm_stat->ram_total_bytes         = resp_stat->ram_total_bytes;
-	sm_stat->ram_free_bytes          = resp_stat->ram_free_bytes;
-	sm_stat->uptime_seconds          = resp_stat->uptime_seconds;
-	sm_stat->handles_available_count = resp_stat->handles_available_count;
+	sm_stat->fs_id = resp_stat->fs_id;
+	sm_stat->bytes_available = resp_stat->bytes_available;
+	sm_stat->bytes_total = resp_stat->bytes_total;
+	sm_stat->ram_total_bytes = resp_stat->ram_total_bytes;
+	sm_stat->ram_free_bytes = resp_stat->ram_free_bytes;
+	sm_stat->uptime_seconds = resp_stat->uptime_seconds;
+	sm_stat->handles_available_count =
+            resp_stat->handles_available_count;
 
-	sm_stat->bmi_address = PVFS_mgmt_map_addr(sm_p->u.statfs_list.fs_id,
-						  *sm_p->cred_p,
-						  sm_p->msgarray[i].svr_addr, 
-						  &sm_stat->server_type);
-
-	/* the above should always succeed in this case */
+	sm_stat->bmi_address = PVFS_mgmt_map_addr(
+            sm_p->u.statfs_list.fs_id, *sm_p->cred_p,
+            sm_p->msgarray[i].svr_addr, &sm_stat->server_type);
 	assert(sm_stat->bmi_address);
 
-	/* TODO: WHY NOT JUST COPY OUT OF THE RESPONSE??? */
-	ret = PINT_bucket_get_server_handle_count(sm_stat->bmi_address,
-						  sm_p->u.statfs_list.fs_id,
-						  &sm_stat->handles_total_count);
-	/* this call should never fail here either */
-	assert(ret == 0);
+	ret = PINT_bucket_get_server_handle_count(
+            sm_stat->bmi_address, sm_p->u.statfs_list.fs_id,
+            &sm_stat->handles_total_count);
 
-	/* sanity check handle counts */
+        if (ret)
+        {
+            PVFS_perror("PINT_bucket_get_server_handle_count failed ",
+                        ret);
+            return ret;
+        }
 	assert(sm_stat->handles_total_count >=
 	       sm_stat->handles_available_count);
     }
  
-    /* if this is the last response, check all of the status values and 
-     * return error code if any requests failed 
+    /* if this is the last response, check all of the status values
+     * and return error code if any requests failed
      */
     if (i == (sm_p->msgarray_count -1))
     {
@@ -250,7 +254,6 @@ static int statfs_list_comp_fn(void *v_p,
 	    }
 	}
     }
-   
     return 0;
 }
 

@@ -55,23 +55,14 @@ static int remove_crdirent_failure(
 static int remove_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
-/* completion function prototypes */
 static int remove_getattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i);
+    void *v_p, struct PVFS_server_resp *resp_p, int i);
 static int remove_check_dir_contents_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i);
+    void *v_p, struct PVFS_server_resp *resp_p, int i);
 static int remove_rmdirent_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i);
+    void *v_p, struct PVFS_server_resp *resp_p, int i);
 static int remove_crdirent_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i);
+    void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 %%
 
@@ -361,8 +352,9 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
         PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_DFILES);
 
     /* fill in msgpair structure components */
-    sm_p->msgpair.fs_id   = sm_p->u.remove.object_ref.fs_id;
-    sm_p->msgpair.handle  = sm_p->u.remove.object_ref.handle;
+    sm_p->msgpair.fs_id = sm_p->u.remove.object_ref.fs_id;
+    sm_p->msgpair.handle = sm_p->u.remove.object_ref.handle;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgpair.comp_fn = remove_getattr_comp_fn;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
@@ -474,6 +466,7 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.remove.parent_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.remove.parent_ref.handle;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgpair.comp_fn = remove_rmdirent_comp_fn;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
@@ -540,6 +533,7 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.remove.parent_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.remove.object_ref.handle;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgpair.comp_fn = remove_crdirent_comp_fn;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
@@ -628,6 +622,7 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id   = sm_p->u.remove.object_ref.fs_id;
     msg_p->handle  = sm_p->u.remove.object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = remove_check_dir_contents_comp_fn;
 
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
@@ -683,6 +678,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 	/* fill in msgpair structure components */
 	msg_p->fs_id   = sm_p->u.remove.object_ref.fs_id;
 	msg_p->handle  = sm_p->u.remove.datafile_handles[i];
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
 	msg_p->comp_fn = NULL;
     }
 
@@ -716,6 +712,7 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.remove.object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.remove.object_ref.handle;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgpair.comp_fn = NULL;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,

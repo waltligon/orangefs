@@ -72,6 +72,7 @@ int PVFS_mgmt_noop(PVFS_fs_id fs_id,
 
     sm_p->cred_p = &credentials;
     sm_p->msgpair.fs_id = fs_id;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgpair.svr_addr = addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop calling "

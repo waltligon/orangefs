@@ -65,13 +65,9 @@ static int getattr_cleanup(
 
 /* completion function prototypes */
 static int getattr_object_getattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int getattr_datafile_getattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index);
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 %%
 
@@ -234,7 +230,7 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
         attrmask |= PVFS_ATTR_DATA_SIZE;
     }
 
-    if(attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
+    if (attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
 	attrmask |= PVFS_ATTR_META_DFILES;
     }
@@ -258,6 +254,7 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.getattr.object_ref.handle;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = getattr_object_getattr_comp_fn;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
@@ -536,8 +533,9 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
 				  PVFS_ATTR_DATA_SIZE);
 	
 	/* fill in msgpair structure components */
-	msg_p->fs_id   = sm_p->u.getattr.object_ref.fs_id;
-	msg_p->handle  = sm_p->u.getattr.datafile_handles[i];
+	msg_p->fs_id = sm_p->u.getattr.object_ref.fs_id;
+	msg_p->handle = sm_p->u.getattr.datafile_handles[i];
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
 	msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
     }
 
