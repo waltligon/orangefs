@@ -98,9 +98,16 @@ int do_decode_resp(
     case PVFS_SERV_IO:
     case PVFS_SERV_WRITE_COMPLETION:
     case PVFS_SERV_FLUSH:
+    case PVFS_SERV_MGMT_SETPARAM:
+    case PVFS_SERV_TRUNCATE:
 	return 0;
-    default:
-	return -1;
+
+    /* invalid response types: */
+    case PVFS_SERV_INVALID:
+	assert(0);
+	gossip_lerr("Error: response type %d is invalid.\n", 
+	    (int)response->op);
+	return(-ENOSYS);
     }
     return -1;
 }

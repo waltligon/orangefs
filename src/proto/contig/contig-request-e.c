@@ -402,6 +402,7 @@ int do_encode_req(
     case PVFS_SERV_REMOVE:
     case PVFS_SERV_TRUNCATE:
     case PVFS_SERV_FLUSH:
+    case PVFS_SERV_MGMT_SETPARAM:
 	/* XXX: is PVFS_SERV_FLUSH really 'self contained' ?*/
 	size = sizeof(struct PVFS_server_req) + PINT_ENC_GENERIC_HEADER_SIZE;
 	enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);
@@ -417,11 +418,17 @@ int do_encode_req(
 	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 	return (0);
-    default:
-	gossip_debug(REQUEST_DEBUG, "op: %d not defined\n", request->op);
-	target_msg = NULL;
-	return -1;
+
+    /* invalid request types */
+    case PVFS_SERV_INVALID:
+    case PVFS_SERV_WRITE_COMPLETION:
+	assert(0);
+	gossip_lerr("Error: request type %d is invalid.\n",
+	    (int)request->op);
+	return(-ENOSYS);
     }
+    assert(0);
+    return(-ENOSYS);
 }
 
 /*

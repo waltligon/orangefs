@@ -142,12 +142,20 @@ int do_decode_req(
     case PVFS_SERV_TRUNCATE:
     case PVFS_SERV_GETCONFIG:
     case PVFS_SERV_FLUSH:
+    case PVFS_SERV_MGMT_SETPARAM:
 	return (0);
-    default:
-        gossip_debug(REQUEST_DEBUG, "Unpacking Req Op: %d Not Supported\n",
-                     ((struct PVFS_server_req *) char_ptr)->op);
-	return -1;
+
+    /* invalid request types */
+    case PVFS_SERV_WRITE_COMPLETION:
+    case PVFS_SERV_INVALID:
+	assert(0);
+	gossip_lerr("Error: request type %d is invalid.\n", 
+	    (int)(((struct PVFS_server_req *) char_ptr)->op));
+	return(-ENOSYS);
     }
+
+    assert(0);
+    return(-ENOSYS);
 }
 
 /*

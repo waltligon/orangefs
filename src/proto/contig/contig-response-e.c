@@ -46,6 +46,8 @@ int do_encode_resp(
     case PVFS_SERV_REMOVE:
     case PVFS_SERV_CREATEDIRENT:
     case PVFS_SERV_WRITE_COMPLETION:
+    case PVFS_SERV_MGMT_SETPARAM:
+    case PVFS_SERV_TRUNCATE:
 	/* 
 	 *  There is an int64_t here...
 	 *  but handled correctly so far!
@@ -255,9 +257,12 @@ int do_encode_resp(
 	target_msg->buffer_list[2] = response->u.readdir.dirent_array;
 
 	return 0;
-
-    default:
-	return -1;
+    /* invalid responses: */
+    case PVFS_SERV_INVALID:
+	assert(0);
+	gossip_lerr("Error: response type %d is invalid.\n",
+	    (int)response->op);
+	return(-ENOSYS);
     }
     return -EINVAL;
 }
