@@ -130,4 +130,32 @@ int PINT_Request_decode(struct PINT_Request *req);
 #define PINT_REQUEST_TOTAL_BYTES(reqp)\
 	((reqp)->aggregate_size)
 
+/* set ref count of request to 1
+ * never modify a refcount below zero
+ */
+#define PINT_REQUEST_REFSET(reqp)\
+	do { \
+		if ((reqp)->refcount >= 0) \
+			(reqp)->refcount = 1; \
+	} while(0)
+
+/* increments ref count of request 
+ * never modify a refcount below zero
+ */
+#define PINT_REQUEST_REFINC(reqp)\
+	do { \
+		if ((reqp)->refcount >= 0) \
+			(reqp)->refcount++; \
+	} while(0)
+
+/* decrements ref count of request 
+ * never decrement below zero
+ * need to add function to recursively free request
+ */
+#define PINT_REQUEST_REFDEC(reqp)\
+	do { \
+		if ((reqp)->refcount > 0) \
+			(reqp)->refcount--; \
+	} while(0)
+
 #endif /* __PINT_REQUEST_H */

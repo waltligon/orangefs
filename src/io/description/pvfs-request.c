@@ -4,8 +4,11 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.6 2003-07-01 22:15:21 neill Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.7 2003-07-02 18:29:16 walt Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.6  2003/07/01 22:15:21  neill
+// Code didn't compile before this...I don't know if this is correct.
+//
 // Revision 1.5  2003/07/01 20:19:03  walt
 // added new mode to request processor to skip logical bytes
 // cleaned up mode code
@@ -46,6 +49,7 @@
 #include <pvfs2-types.h>
 #include <pint-request.h>
 #include <pvfs-request.h>
+#include <gossip.h>
 
 #define PVFS_SUCCESS 0
 #define PVFS_ERR_REQ -1
@@ -53,55 +57,55 @@
 /* elementary reqs */
 
 static struct PINT_Request PINT_CHAR =
-		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_CHAR = &PINT_CHAR;
 
 static struct PINT_Request PINT_SHORT =
-		{0, 1, 0, 1, 2, 0, 2, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 2, 0, 2, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_SHORT = &PINT_SHORT;
 
 static struct PINT_Request PINT_INT =
-		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_INT = &PINT_INT;
 
 static struct PINT_Request PINT_LONG =
-		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_LONG = &PINT_LONG;
 
 static struct PINT_Request PINT_UNSIGNED_CHAR =
-		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_UNSIGNED_CHAR = &PINT_UNSIGNED_CHAR;
 
 static struct PINT_Request PINT_UNSIGNED_SHORT =
-		{0, 1, 0, 1, 2, 0, 2, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 2, 0, 2, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_UNSIGNED_SHORT = &PINT_UNSIGNED_SHORT;
 
 static struct PINT_Request PINT_UNSIGNED =
-		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_UNSIGNED = &PINT_UNSIGNED;
 
 static struct PINT_Request PINT_UNSIGNED_LONG =
-		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_UNSIGNED_LONG = &PINT_UNSIGNED_LONG;
 
 static struct PINT_Request PINT_FLOAT =
-		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 4, 0, 4, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_FLOAT = &PINT_FLOAT;
 
 static struct PINT_Request PINT_DOUBLE =
-		{0, 1, 0, 1, 8, 0, 8, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 8, 0, 8, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_DOUBLE = &PINT_DOUBLE;
 
 static struct PINT_Request PINT_LONG_DOUBLE =
-		{0, 1, 0, 1, 8, 0, 8, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 8, 0, 8, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_LONG_DOUBLE = &PINT_LONG_DOUBLE;
 
 static struct PINT_Request PINT_BYTE =
-		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_BYTE = &PINT_BYTE;
 
 static struct PINT_Request PINT_PACKED =
-		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, NULL, NULL};
+		{0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, -1, NULL, NULL};
 PVFS_Request PVFS_PACKED = &PINT_PACKED;
 
 /* int PVFS_Request_extent(PVFS_Request request, PVFS_size *extent); */
@@ -158,7 +162,7 @@ int PVFS_Request_hvector(int32_t count, int32_t blocklength,
 	if (oldreq == NULL)
 		return PVFS_ERR_REQ;
 	PVFS_Request_extent(oldreq, &oldext);
-	oldreq->refcount++;
+	PINT_REQUEST_REFINC(oldreq);
 	*newreq = (PINT_Request *)malloc(sizeof(struct PINT_Request));
 	(*newreq)->sreq = NULL;
 	PINT_subreq(0, blocklength, stride, count, oldreq, oldext, newreq);
@@ -167,7 +171,7 @@ int PVFS_Request_hvector(int32_t count, int32_t blocklength,
 	{
 		(*newreq)->lb = (count - 1) * stride;
 	}
-	(*newreq)->refcount = 1;
+	PINT_REQUEST_REFSET(*newreq);
 	return PVFS_SUCCESS;
 }
 
@@ -180,7 +184,7 @@ int PVFS_Request_indexed(int32_t count, int32_t *blocklengths,
 	if (oldreq == NULL)
 		return PVFS_ERR_REQ;
 	PVFS_Request_extent(oldreq, &oldext);
-	oldreq->refcount++;
+	PINT_REQUEST_REFINC(oldreq);
 	while (count--)
 	{
 		dt = *newreq;
@@ -213,7 +217,7 @@ int PVFS_Request_indexed(int32_t count, int32_t *blocklengths,
 			}
 		}
 	}
-	(*newreq)->refcount = 1;
+	PINT_REQUEST_REFSET(*newreq);
 	return PVFS_SUCCESS;
 }
 
@@ -226,7 +230,7 @@ int PVFS_Request_hindexed(int32_t count, int32_t *blocklengths,
 	if (oldreq == NULL)
 		return PVFS_ERR_REQ;
 	PVFS_Request_extent(oldreq, &oldext);
-	oldreq->refcount++;
+	PINT_REQUEST_REFINC(oldreq);
 	while (count--)
 	{
 		dt = *newreq;
@@ -259,7 +263,7 @@ int PVFS_Request_hindexed(int32_t count, int32_t *blocklengths,
 			}
 		}
 	}
-	(*newreq)->refcount = 1;
+	PINT_REQUEST_REFSET(*newreq);
 	return PVFS_SUCCESS;
 }
 
@@ -281,7 +285,7 @@ int PVFS_Request_struct(int32_t count, int32_t *blocklengths,
 		(*newreq)->sreq = dt;
 		PINT_subreq(displacements[count], blocklengths[count],
 				0, 1, oldreqs[count], oldext, newreq);
-		oldreqs[count]->refcount++;
+		PINT_REQUEST_REFINC(oldreqs[count]);
 		/* calculate statistics like ub, lb, depth, etc. */
 		if ((*newreq)->sreq)
 		{
@@ -307,7 +311,7 @@ int PVFS_Request_struct(int32_t count, int32_t *blocklengths,
 			}
 		}
 	}
-	(*newreq)->refcount = 1;
+	PINT_REQUEST_REFSET(*newreq);
 	return PVFS_SUCCESS;
 }
 
@@ -349,7 +353,6 @@ int PVFS_Request_ub(PVFS_Request request, PVFS_size *displacement)
 	return PVFS_SUCCESS;
 }
 
-#if 0
 /* This function will take the request that points to all the 
  * contained types, separate out each of the types and then lay them out in a
  * contiguous region of memory. A pointer to this contiguous region will
@@ -362,17 +365,26 @@ int PVFS_Request_commit(PVFS_Request *reqp)
 
 	/* check pointer to pointer */
 	if (reqp == NULL)
+	{
+		gossip_lerr("PVFS_Request_commit: NULL pointer argument\n");
 		return PVFS_ERR_REQ;
+	}
 
 	req = *reqp;
 
 	/* now check the pointer */
 	if (req == NULL)
+	{
+		gossip_lerr("PVFS_Request_commit: pointer to NULL pointer argument\n");
 		return PVFS_ERR_REQ;
+	}
 
 	/* this is a committed request - can't re-commit */
 	if (req->committed)
+	{
+		gossip_lerr("PVFS_Request_commit: pointer to commited request\n");
 		return PVFS_ERR_REQ;
+	}
 	       
 	/* Allocate memory for contiguous region */
 	if(req->num_nested_req > 0)
@@ -380,8 +392,9 @@ int PVFS_Request_commit(PVFS_Request *reqp)
 		int index = 0;
 		region = (PVFS_Request)malloc(req->num_nested_req *
 				sizeof(struct PINT_Request));
-		if (region == NULL){
-			printf("Memory cannot be allocated\n");
+		if (region == NULL)
+		{
+			gossip_lerr("PVFS_Request_commit: Memory cannot be allocated\n");
 			return PVFS_ERR_REQ;
   		}   
 		/* pack the request */
@@ -392,7 +405,55 @@ int PVFS_Request_commit(PVFS_Request *reqp)
 	return PVFS_SUCCESS;
 }
 
-/*
+int PVFS_Request_free(PVFS_Request *req)
+{
+	PVFS_Request reqp;
+	if (req == NULL)
+	{
+		gossip_lerr("PVFS_Request_free: NULL pointer argument\n");
+		return PVFS_ERR_REQ;
+	}
+	if (*req == NULL)
+	{
+		gossip_lerr("PVFS_Request_free: pointer to NULL pointer argument\n");
+		return PVFS_ERR_REQ;
+	}
+	if ((*req)->refcount <= 0)
+	{
+		/* if refcount is 0 then it has already been freed */
+		/* if less than 0 it should not be freed */
+		return PVFS_SUCCESS;
+	}
+	PINT_REQUEST_REFDEC(*req);
+	if ((*req)->refcount > 0)
+	{
+		/* not ready to free this yet */
+		return PVFS_SUCCESS;
+	}
+	if ((*req)->committed)
+	{
+		/* these are contiguous and have no external refs */
+		free(*req);
+		return PVFS_SUCCESS;
+	}
+	/* this deals with the sreq chain */
+	reqp = (*req)->sreq;
+	while (reqp)
+	{
+		PVFS_Request reqp_next;
+		PVFS_Request_free(&(reqp->ereq));
+		/* this is a little awkward but it works */
+		reqp_next = reqp->sreq;
+		free(reqp);
+		reqp = reqp_next;
+	}
+	/* now deal with the main struct */
+	PVFS_Request_free(&((*req)->ereq));
+	free(*req);
+	return PVFS_SUCCESS;
+}
+
+#if 0
 int PVFS_Request_commit(PVFS_Request *request)
 {
 	if (request == NULL)
@@ -419,7 +480,6 @@ int PVFS_Pack_size(int incount, PVFS_Request request, PVFS_Comm comm, int *size)
 	*size = (request->size * incount) + PVFS_BSEND_OVERHEAD;
 	return PVFS_SUCCESS;
 }
-*/
 #endif
 
 void PVFS_Dump_request(PVFS_Request req)
