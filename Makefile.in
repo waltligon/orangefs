@@ -971,11 +971,13 @@ install:: install_doc
 	install -m 755 test/kernel/linux-2.6/pvfs2-client-core $(prefix)/sbin
 
 ifneq (,$(LINUX_KERNEL_SRC))
-install:: kmod_install
+
+KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
+KMOD_DIR := /lib/modules/$(KERNEL_VERS)/kernel/fs
 
 .PHONY: kmod_install
 kmod_install:
-	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(prefix)/sbin
+	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(KMOD_DIR)
 endif
 
 install_tests:
