@@ -30,13 +30,14 @@ extern gen_mutex_t *g_session_tag_mt_lock;
 
 typedef enum
 {
-    CLIENT_ENCODER_INIT = 0,
-    CLIENT_BMI_INIT     = (1 << 0),
-    CLIENT_FLOW_INIT    = (1 << 1),
-    CLIENT_JOB_INIT     = (1 << 2),
-    CLIENT_JOB_CTX_INIT = (1 << 3),
-    CLIENT_ACACHE_INIT  = (1 << 4),
-    CLIENT_NCACHE_INIT  = (1 << 5)
+    CLIENT_NO_INIT =      0,
+    CLIENT_ENCODER_INIT = (1 << 0),
+    CLIENT_BMI_INIT     = (1 << 1),
+    CLIENT_FLOW_INIT    = (1 << 2),
+    CLIENT_JOB_INIT     = (1 << 3),
+    CLIENT_JOB_CTX_INIT = (1 << 4),
+    CLIENT_ACACHE_INIT  = (1 << 5),
+    CLIENT_NCACHE_INIT  = (1 << 6)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -56,7 +57,7 @@ int PVFS_sys_initialize(int default_debug_mask)
 {
     int ret = -PVFS_EINVAL, debug_mask = 0;
     char *debug_mask_str = NULL, *debug_file = NULL;
-    PINT_client_status_flag client_status_flag;
+    PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
 
     gossip_enable_stderr();
 
