@@ -16,6 +16,7 @@
 
 struct bench_options
 {
+	int list_io_factor;
 	int flags;
 	int message_len;
 	int total_len;
