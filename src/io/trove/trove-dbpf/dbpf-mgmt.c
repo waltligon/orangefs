@@ -714,9 +714,6 @@ static int dbpf_collection_lookup(char *collname,
 
     dbpf_collection_register(coll_p);
 
-    /* XXX HARDCODED NAME FOR NOW... */
-    coll_p->free_handles = trove_handle_ledger_init(coll_p->coll_id, "admin-foo");
-
     /* fill in output parameter */
     *out_coll_id_p = coll_p->coll_id;
     return 1;
