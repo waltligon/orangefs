@@ -23,8 +23,6 @@
 #include "trove.h"
 #include "server-config.h"
 
-#define BKT_STR_SIZE 7
-
 job_context_id PVFS_sys_job_context = -1;
 
 /* pinode cache */
