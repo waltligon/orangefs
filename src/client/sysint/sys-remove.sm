@@ -658,7 +658,7 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     msg_p->fs_id   = sm_p->u.remove.object_ref.fs_id;
     msg_p->handle  = sm_p->u.remove.object_ref.handle;
-    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = remove_check_dir_contents_comp_fn;
 
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
@@ -831,7 +831,12 @@ static int remove_check_dir_contents_failure(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: remove_check_dir_contents_failure\n");
-    return 1;
+
+    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
+    "may lead to inconsistent state.\n");
+    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
+    js_p->error_code = 0;
+    return(1);
 }
 
 static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
