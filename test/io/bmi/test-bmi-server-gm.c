@@ -34,6 +34,7 @@ struct options{
 
 static struct options* parse_args(int argc, char* argv[]);
 
+#define BIG_SIZE 32000
 
 /**************************************************************/
 
@@ -51,6 +52,7 @@ int main(int argc, char **argv)	{
 	struct BMI_unexpected_info request_info;
 	bmi_size_t actual_size;
 	bmi_context_id context;
+	char big_buffer[BIG_SIZE];
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -150,6 +152,7 @@ int main(int argc, char **argv)	{
 		}
 	}
 
+	fprintf(stderr, "Receiving eager size message.\n");
 	/* post the recv */
 	ret = BMI_post_recv(&(server_ops[0]), client_addr, recv_buffer,
 		my_req->size, &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
@@ -182,7 +185,151 @@ int main(int argc, char **argv)	{
 			return(-1);
 		}
 	}
-	printf("Got: %s\n", (char*)recv_buffer);
+	fprintf(stderr, "Done.\n");
+
+	fprintf(stderr, "Receiving eager size message (SHORT).\n");
+	/* post the recv */
+	ret = BMI_post_recv(&(server_ops[0]), client_addr, recv_buffer,
+		my_req->size, &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_post_recv_failure.\n");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of data payload recv */
+		do
+		{
+			ret = BMI_test(server_ops[0], &outcount, &error_code,
+			&actual_size, NULL, 10, context);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0) 
+		{
+			fprintf(stderr, "data recv failed.\n");
+			return(-1);
+		}
+	}
+	else
+	{
+		if(actual_size == my_req->size)
+		{
+			printf("NOT short recv.\n");
+			return(-1);
+		}
+	}
+	fprintf(stderr, "Done (got %d instead of %d).\n", (int)actual_size, 
+		(int)my_req->size);
+
+	fprintf(stderr, "Receiving rendezvous size message.\n");
+	/* post the recv */
+	ret = BMI_post_recv(&(server_ops[0]), client_addr, big_buffer,
+		BIG_SIZE, &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_post_recv_failure.\n");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of data payload recv */
+		do
+		{
+			ret = BMI_test(server_ops[0], &outcount, &error_code,
+			&actual_size, NULL, 10, context);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0) 
+		{
+			fprintf(stderr, "data recv failed.\n");
+			return(-1);
+		}
+	}
+	else
+	{
+		if(actual_size != BIG_SIZE)
+		{
+			printf("Short recv.\n");
+			return(-1);
+		}
+	}
+	fprintf(stderr, "Done.\n");
+
+	fprintf(stderr, "Receiving rendezvous size message (SHORT).\n");
+	/* post the recv */
+	ret = BMI_post_recv(&(server_ops[0]), client_addr, big_buffer,
+		BIG_SIZE, &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_post_recv_failure.\n");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of data payload recv */
+		do
+		{
+			ret = BMI_test(server_ops[0], &outcount, &error_code,
+			&actual_size, NULL, 10, context);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0) 
+		{
+			fprintf(stderr, "data recv failed.\n");
+			return(-1);
+		}
+	}
+	else
+	{
+		if(actual_size == BIG_SIZE)
+		{
+			printf("NOT short recv.\n");
+			return(-1);
+		}
+	}
+	fprintf(stderr, "Done (got %d instead of %d).\n", (int)actual_size, 
+		(int)BIG_SIZE);
+
+	fprintf(stderr, "Receiving rendezvous size message (VERY SHORT).\n");
+	/* post the recv */
+	ret = BMI_post_recv(&(server_ops[0]), client_addr, big_buffer,
+		BIG_SIZE, &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_post_recv_failure.\n");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of data payload recv */
+		do
+		{
+			ret = BMI_test(server_ops[0], &outcount, &error_code,
+			&actual_size, NULL, 10, context);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0) 
+		{
+			fprintf(stderr, "data recv failed.\n");
+			return(-1);
+		}
+	}
+	else
+	{
+		if(actual_size == BIG_SIZE)
+		{
+			printf("NOT short recv.\n");
+			return(-1);
+		}
+	}
+	fprintf(stderr, "Done (got %d instead of %d).\n", (int)actual_size, 
+		(int)BIG_SIZE);
+
 
 	/* free up the message buffers */
 	BMI_memfree(client_addr, recv_buffer, my_req->size, BMI_RECV_BUFFER);

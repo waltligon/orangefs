@@ -35,6 +35,7 @@ struct options{
 
 static struct options* parse_args(int argc, char* argv[]);
 
+#define BIG_SIZE 32000
 
 /**************************************************************/
 
@@ -51,6 +52,7 @@ int main(int argc, char **argv)	{
 	void* send_buffer = NULL;
 	bmi_size_t actual_size;
 	bmi_context_id context;
+	char big_buffer[BIG_SIZE];
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -179,6 +181,7 @@ int main(int argc, char **argv)	{
 	}
 	sprintf((char*)send_buffer, "Hello World.\n");
 
+	fprintf(stderr, "Sending eager size message.\n");
 	/* send the data payload on its way */
 	ret = BMI_post_send(&(client_ops[0]), server_addr, send_buffer, 
 		user_opts->message_size, BMI_PRE_ALLOC, 0, NULL, context);
@@ -204,6 +207,122 @@ int main(int argc, char **argv)	{
 			return(-1);
 		}
 	}
+	fprintf(stderr, "Done.\n");
+
+	fprintf(stderr, "Sending eager size message (SHORT).\n");
+	/* send the data payload on its way */
+	ret = BMI_post_send(&(client_ops[0]), server_addr, send_buffer, 
+		user_opts->message_size-3, BMI_PRE_ALLOC, 0, NULL, context);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_post_send");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of data payload send */
+		do
+		{
+			ret = BMI_test(client_ops[0], &outcount, &error_code,
+				&actual_size, NULL, 10, context);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Data payload send failed.\n");
+			return(-1);
+		}
+	}
+	fprintf(stderr, "Done.\n");
+
+
+	fprintf(stderr, "Sending rendezvous size message.\n");
+	/* send the data payload on its way */
+	ret = BMI_post_send(&(client_ops[0]), server_addr, big_buffer, 
+		BIG_SIZE, BMI_PRE_ALLOC, 0, NULL, context);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_post_send");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of data payload send */
+		do
+		{
+			ret = BMI_test(client_ops[0], &outcount, &error_code,
+				&actual_size, NULL, 10, context);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Data payload send failed.\n");
+			return(-1);
+		}
+	}
+	fprintf(stderr, "Done.\n");
+
+	fprintf(stderr, "Sending rendezvous size message (SHORT).\n");
+	/* send the data payload on its way */
+	ret = BMI_post_send(&(client_ops[0]), server_addr, big_buffer, 
+		BIG_SIZE-30, BMI_PRE_ALLOC, 0, NULL, context);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_post_send");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of data payload send */
+		do
+		{
+			ret = BMI_test(client_ops[0], &outcount, &error_code,
+				&actual_size, NULL, 10, context);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Data payload send failed.\n");
+			return(-1);
+		}
+	}
+	fprintf(stderr, "Done.\n");
+
+	fprintf(stderr, "Sending rendezvous size message (VERY SHORT).\n");
+	/* send the data payload on its way */
+	ret = BMI_post_send(&(client_ops[0]), server_addr, big_buffer, 
+		300, BMI_PRE_ALLOC, 0, NULL, context);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_post_send");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of data payload send */
+		do
+		{
+			ret = BMI_test(client_ops[0], &outcount, &error_code,
+				&actual_size, NULL, 10, context);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Data payload send failed.\n");
+			return(-1);
+		}
+	}
+	fprintf(stderr, "Done.\n");
+
+
 
 	/* free up the message buffers */
 	BMI_memfree(server_addr, send_buffer, user_opts->message_size, 
@@ -250,7 +369,7 @@ static struct options* parse_args(int argc, char* argv[]){
 	}
 
 	/* fill in defaults (except for hostid) */
-	tmp_opts->message_size = 10000;
+	tmp_opts->message_size = 100;
 
 	/* look at command line arguments */
 	while((one_opt = getopt(argc, argv, flags)) != EOF){
