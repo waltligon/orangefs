@@ -15,6 +15,10 @@
 #include "pvfs2.h"
 #include "mkspace.h"
 
+#ifndef PVFS2_VERSION
+#define PVFS2_VERSION "Unknown"
+#endif
+
 static int verbose = 0;
 static int new_coll_id = 9;
 static int new_root_handle = 1048576;
@@ -44,6 +48,7 @@ int main(int argc, char **argv)
 
 static void print_help(char *progname)
 {
+    fprintf(stderr,"%s version %s\n", progname, PVFS2_VERSION);
     fprintf(stderr,"usage: %s [-s storage_space] [-c collection_name] "
             "[-i coll_id] [-r root_handle] [-R handle_range] [-v]\n",
             progname);

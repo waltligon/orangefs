@@ -28,6 +28,10 @@
 extern struct server_configuration_s g_server_config;
 extern struct qhash_table *PINT_fsid_config_cache_table;
 
+#ifndef PVFS2_VERSION
+#define PVFS2_VERSION "Unknown"
+#endif
+
 #define DEFAULT_TAB "/etc/pvfs2tab"
 
 struct options
@@ -390,7 +394,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "";
+    char flags[] = "v";
     int one_opt = 0;
 
     struct options* tmp_opts = NULL;
@@ -404,8 +408,13 @@ static struct options* parse_args(int argc, char* argv[])
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, flags)) != EOF){
-	switch(one_opt){
+    while((one_opt = getopt(argc, argv, flags)) != EOF)
+    {
+	switch(one_opt)
+        {
+            case('v'):
+                printf("%s\n", PVFS2_VERSION);
+                exit(0);
 	    case('?'):
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
@@ -463,7 +472,7 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
-    fprintf(stderr, "\n");
+    fprintf(stderr, "%s version %s\n\n", argv[0], PVFS2_VERSION);
     fprintf(stderr, "Usage  : %s file_system_path\n",
 	argv[0]);
     fprintf(stderr, "Example: %s /mnt/pvfs2\n",

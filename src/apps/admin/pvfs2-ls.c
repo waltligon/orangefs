@@ -21,8 +21,8 @@
 
 #include "pvfs2.h"
 
-#ifndef VERSION
-#define VERSION "0.0.1"
+#ifndef PVFS2_VERSION
+#define PVFS2_VERSION "Unknown"
 #endif
 
 #define DEFAULT_TAB "/etc/pvfs2tab"
@@ -627,7 +627,7 @@ static struct options* parse_args(int argc, char* argv[])
                 }
                 else if (strcmp("version", cur_option) == 0)
                 {
-                    printf("%s\n", VERSION);
+                    printf("%s\n", PVFS2_VERSION);
                     exit(0);
                 }
                 else if (strcmp("numeric-uid-gid", cur_option) == 0)

@@ -107,6 +107,8 @@ CFLAGS += -I .
 CFLAGS += -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include -I include
   # add all module directories into include path
 CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
+  # add package version information
+CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
 ################################################################
 # Setup component specific flags
@@ -422,7 +424,7 @@ clean: docsclean
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
 		$(LIBRARIES) $(DEPENDS) $(CLEANFILES)  $(SERVER) $(MPIMISCOBJS)\
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
-		$(ADMINOBJS) $(ADMINTOOLS) \
+		$(ADMINOBJS) $(ADMINTOOLS) $(ADMINTOOLS_SERVER) \
 		lib/libpvfs2-server.a
 
 # _really_ clean the tree; should go back to pristine state

@@ -32,6 +32,10 @@
 #include "server-config.h"
 #include "quicklist.h"
 
+#ifndef PVFS2_VERSION
+#define PVFS2_VERSION "Unknown"
+#endif
+
 /* Lookup table for determining what state machine to use when a
  * new request is received.
  */

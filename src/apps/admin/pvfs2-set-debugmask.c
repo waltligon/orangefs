@@ -18,6 +18,10 @@
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 
+#ifndef PVFS2_VERSION
+#define PVFS2_VERSION "Unknown"
+#endif
+
 #define DEFAULT_TAB "/etc/pvfs2tab"
 
 struct options
@@ -113,7 +117,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "m:";
+    char flags[] = "vm:";
     int one_opt = 0;
     int len = 0;
 
@@ -132,7 +136,11 @@ static struct options* parse_args(int argc, char* argv[])
 
     /* look at command line arguments */
     while((one_opt = getopt(argc, argv, flags)) != EOF){
-	switch(one_opt){
+	switch(one_opt)
+        {
+            case('v'):
+                printf("%s\n", PVFS2_VERSION);
+                exit(0);
 	    case('m'):
 		len = strlen(optarg)+1;
 		tmp_opts->mnt_point = (char*)malloc(len+1);
