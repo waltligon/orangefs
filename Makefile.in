@@ -65,7 +65,9 @@ BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 MPICC = @MPICC@
 GNUC = @GNUC@
+INTELC = @INTELC@
 MPI_GNUC = @MPI_GNUC@
+MPI_INTELC = @MPI_INTELC@
 # override default quiet mode with "make V=1"
 ifndef V
   QUIET_COMPILE = @QUIET_COMPILE@
@@ -128,6 +130,8 @@ CFLAGS += -I $(srcdir)/include -I include -I $(srcdir)
 CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
+  # special Intel cc options
+INTEL_CFLAGS := -Wall
   # special gcc options
 GCC_CFLAGS := -Wall -Wstrict-prototypes -pipe
 
@@ -221,6 +225,12 @@ MPICFLAGS := $(CFLAGS)
 # Add gcc-specific flags if we know it is a gnu compiler.
 ifdef GNUC
 CFLAGS += $(GCC_CFLAGS)
+endif
+ifdef INTELC
+CFLAGS += $(INTEL_CFLAGS)
+endif
+ifdef MPI_INTELC
+MPICFLAGS += $(INTEL_CFLAGS)
 endif
 ifdef MPI_GNUC
 MPICFLAGS += $(GCC_CFLAGS)
