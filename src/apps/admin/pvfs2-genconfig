@@ -1,0 +1,279 @@
+#!/usr/bin/perl
+#
+#  (C) 2001 Clemson University and The University of Chicago
+#
+#  See COPYING in top-level directory.
+#
+# generate a global pvfs2 configuration file based on user input
+#
+use Term::ReadLine;
+
+sub get_user_input
+{
+    my($term,$OUT,$prompt,$res);
+
+    $term = new Term::ReadLine 'pvfs2-genconfig';
+    $OUT = $term->OUT || STDOUT;
+    $prompt = $_[0];
+
+    $_ = $term->readline($prompt);
+    return $_;
+}
+
+sub valid_number
+{
+    my($num, $len, $i, $digit);
+
+    $num = $_[0];
+    $len = length($num);
+
+    for($i = 0; $i < $len; $i++)
+    {
+        $digit = substr($num,$i,1);
+        if (($digit < 0) || ($digit > 9))
+        {
+            return 0;
+        }
+    }
+    return (($len > 0) ? 1 : 0);
+}
+
+sub prompt_num
+{
+    my($prompt,$num);
+    $prompt = $_[0];
+    do
+    {
+        $num = get_user_input($prompt);
+    } while(!valid_number($num));
+    return $num;
+}
+
+sub prompt_word
+{
+    my($prompt);
+    $prompt = $_[0];
+    return get_user_input($prompt);
+}
+
+sub emit_defaults
+{
+    my($target,$num_unexp);
+    $target = $_[0];
+    $num_unexp = $_[1];
+
+    # remove quotes from logfile if any
+    if ($logfile =~ /\".*\"/)
+    {
+        $logfile =~ s/\"//g;
+    }
+
+    print $target "<Defaults>\n";
+    print $target "\tUnexpectedRequests $num_unexp\n";
+    print $target "\tLogFile $logfile\n";
+    print $target "\tEventLogging none\n";
+    print $target "</Defaults>\n";
+}
+
+sub emit_aliases
+{
+    my($target, $num_nodes);
+    $target = $_[0];
+    $num_nodes = $_[1];
+
+    if ($num_nodes < 1)
+    {
+        print "ERROR: Num nodes is invalid ($num_nodes)\n";
+        return;
+    }
+
+    print $target "\n<Aliases>\n";
+    for($i = 0; $i < $num_nodes; $i++)
+    {
+        print $target "\tAlias $server_aliases[$i] $server_addrs[$i]\n";
+    }
+    print $target "</Aliases>\n";
+}
+
+sub emit_filesystem
+{
+    my($target, $name, $fs_id, $root_handle, $num_nodes);
+    $target = $_[0];
+    $name = $_[1];
+    $fs_id = $_[2];
+    $root_handle = $_[3];
+    $num_nodes = $_[4];
+
+    if ($num_nodes < 1)
+    {
+        print "ERROR: Num nodes is invalid ($num_nodes)\n";
+        return;
+    }
+
+    # divide handle range space equally among servers (2^48 for now)
+    my($total_num_handles_available, $start, $end, $i, $step);
+    $total_num_handles_available = 281474976710656;
+
+    # since meta and data handle ranges must be split, increment
+    # num nodes for calculation purposes below
+    $step = ($total_num_handles_available / ($num_nodes + 1));
+
+    # pre-compute the single meta handle range
+    $start = 2^1;
+    $end = $step;
+
+    print $target "\n<Filesystem>\n";
+    print $target "\tName $name\n";
+    print $target "\tCollectionID $fs_id\n";
+    print $target "\tRootHandle $root_handle\n";
+    print $target "\t<MetaHandleRanges>\n";
+    print $target "\t\tRange $server_aliases[0] $start-$end\n";
+    print $target "\t</MetaHandleRanges>\n";
+    print $target "\t<DataHandleRanges>\n";
+
+    $i = (($num_nodes == 1) ? 0 : 1);
+    for($i; $i < $num_nodes; $i++)
+    {
+        $start = $end + 1;
+        $end += $step;
+        print $target "\t\tRange $server_aliases[$i] $start-$end\n";
+    }
+    print $target "\t</DataHandleRanges>\n";
+    print $target "</Filesystem>\n";
+}
+
+sub confirm
+{
+    my($prompt, $char, $valid_char);
+    $prompt = $_[0];
+    $valid_char = 0;
+    do
+    {
+        $char = prompt_word($prompt);
+        if (($char eq 'y') || ($char eq 'n'))
+        {
+            $valid_char = 1;
+        }
+    } while($valid_char == 0);
+
+    return (($char eq 'y') ? 1 : 0);
+}
+
+# ---------------------
+# entry point of script
+# ---------------------
+
+if (length(@ARGV) != 1)
+{
+    print "Usage: pvfs2-genconfig <output file>\n";
+    print "If <output file> is '-', output is directed to stdout\n";
+    exit;
+}
+
+if ($ARGV[0] eq "-")
+{
+    $output_target = STDOUT;
+}
+else
+{
+    $output_target = FILEOUT;
+    unless (open($output_target, ">", $ARGV[0]))
+    {
+        print STDERR "Can't open specified file $ARGV[0]: $!\n";
+        return;
+    }
+}
+
+@server_addrs = undef;
+@server_aliases = undef;
+
+#$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
+$num_unexp_reqs = 10;
+
+print "***************************************************************\n";
+print "\tWelcome to the PVFS2 Configuration Generator:\n\n";
+print "We're about to configure your nodes for use with PVFS2\n";
+print "First, we'll ask you information about the Metadata server.\n";
+print "After this, we'll ask about each of your I/O servers.\n";
+print "NOTE: If your metadata and I/O servers are the same physical\n";
+print "machine, you must answer 'y' when prompted below.\n";
+print "\n********************************************************\n";
+
+$num_nodes =
+    prompt_num("How many I/O nodes are in your pvfs2 cluster?  ");
+
+if ($num_nodes eq 1)
+{
+    my($tmp);
+
+    $tmp = confirm("Will your Metadata and I/O server be the same physical machine? [y/n] ");
+    if ($tmp eq 0)
+    {
+        # make space for separate meta server
+        $num_nodes++;
+    }
+}
+else
+{
+    # make space for separate meta server
+    $num_nodes++;
+}
+
+for($i = 0; $i < $num_nodes; $i++)
+{
+    my($server, $port, $type, $server_addr, $server_alias, $tmp);
+
+    if ($i == 0)
+    {
+        $server =
+            prompt_word("Enter Metadata host address (i.e. host.domain):  ");
+    }
+    else
+    {
+        $server =
+            prompt_word("Enter I/O host $i address (i.e. host.domain):  ");
+    }
+
+    # get host port
+    $port = prompt_num("Enter listening port for $server:  ");
+
+    # get protocol type
+    $type = prompt_word("Enter protocol type (i.e. tcp, gm, etc):  ");
+
+    # generate the bmi address and aliases
+    $server_addr = "$type://$server:$port";
+
+    # get server alias
+#    $server_alias = prompt_word("Enter an alias name for this server:  ");
+    $server_alias = "$server-alias$i";
+
+    print "Constructed server address of $server_addr\n";
+    print "\t(alias name is $server_alias)\n";
+
+    $tmp = confirm("Does this look correct? [y/n] ");
+    if ($tmp eq 0)
+    {
+        # dec loop counter to get input again for this host
+        $i--;
+    }
+    else
+    {
+        $server_addrs[$i] = $server_addr;
+        $server_aliases[$i] = $server_alias;
+    }
+}
+
+$logfile = prompt_word("Please specify a server logfile location:  ");
+
+# ----------------------------------------------------------
+# now that we have all the info, emit the configuration data
+# ----------------------------------------------------------
+
+# NOTE: we assume that server_aliases and server_addrs
+# arrays are properly populated from above
+
+emit_defaults($output_target, $num_unexp_reqs);
+emit_aliases($output_target, $num_nodes);
+emit_filesystem($output_target, "fs-foo", 9, 1048576, $num_nodes);
+
+print "Configuration written!\n";
