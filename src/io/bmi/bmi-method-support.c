@@ -101,7 +101,6 @@ struct method_addr *alloc_method_addr(bmi_flag_t method_type,
 	return (NULL);
     }
     memset(my_method_addr, 0, (ssize + payload_size));
-    my_method_addr->magic_nr = METHOD_ADDR_MAGIC;
     my_method_addr->method_type = method_type;
 
     my_method_addr->method_data = (char *) my_method_addr + ssize;

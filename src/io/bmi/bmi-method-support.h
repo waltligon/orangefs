@@ -26,11 +26,6 @@ enum
     BMI_OP_RECV
 };
 
-enum
-{
-    METHOD_ADDR_MAGIC = 1977
-};
-
 /* this is the generic address structure which contains adressing
  * information for every protocol we support.  The method routines
  * can look into the union to find necessary information for a given
@@ -38,7 +33,6 @@ enum
  */
 struct method_addr
 {
-    bmi_flag_t magic_nr;
     bmi_flag_t method_type;
     /* indicates if the address is on the local machine (usually for 
      * server listening) */
