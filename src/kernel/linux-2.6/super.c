@@ -187,7 +187,8 @@ static int pvfs2_remount(
     return 0;
 }
 
-struct super_operations pvfs2_s_ops = {
+struct super_operations pvfs2_s_ops =
+{
     .drop_inode = generic_delete_inode,
     .alloc_inode = pvfs2_alloc_inode,
     .destroy_inode = pvfs2_destroy_inode,

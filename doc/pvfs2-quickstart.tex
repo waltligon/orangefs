@@ -721,7 +721,7 @@ Now that the module is loaded, we can mount our PVFS2 file system (and
 verify that it's properly mounted) as follows:
 
 \begin{verbatim}
-gil:~# mount -t pvfs2 pvfs2 /mnt/pvfs2
+gil:~# mount -t pvfs2 pvfs2 /mnt/pvfs2 coll_id=9,root_handle=1048576
 gil:~# mount
 /dev/hda3 on / type ext3 (rw,errors=remount-ro)
 proc on /proc type proc (rw)
@@ -730,7 +730,10 @@ devpts on /dev/pts type devpts (rw,gid=5,mode=620)
 pvfs2 on /mnt/pvfs2 type pvfs2 (rw)
 \end{verbatim}
 
-NOTE:  You can use 'umount' to unmount the PVFS2 volume.
+NOTE: The coll_id and root_handle options MUST be specified, and the
+ordering must match the above example.  These values can be read from
+your configuration files.  Also, you can use 'umount' to unmount the
+PVFS2 volume.
 
 At this point, we need to start the PVFS2 server and the PVFS2 client
 applications before any VFS operations will operate properly on the
