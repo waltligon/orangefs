@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include "gossip.h"
 #include "trove-types.h"
@@ -21,6 +22,9 @@
 #include "trove-id-queue.h"
 #include "trove-proto.h"
 #include "pvfs2-request.h"
+#include "thread-mgr.h"
+#include "pthread.h"
+#include "gen-locks.h"
 
 /**********************************************************
  * interface prototypes 
@@ -108,14 +112,16 @@ static bmi_context_id global_bmi_context = -1;
 static TROVE_context_id global_trove_context = -1;
 #endif
 
+#define BMI_TEST_SIZE 8
 /* array of bmi ops in flight; filled in when needed to call
  * testcontext() 
  */
-#define BMI_TEST_SIZE 8
+#ifndef __PVFS2_JOB_THREADED__
 static bmi_op_id_t bmi_op_array[BMI_TEST_SIZE];
 static int bmi_error_code_array[BMI_TEST_SIZE];
 static void* bmi_usrptr_array[BMI_TEST_SIZE];
 static bmi_size_t bmi_actualsize_array[BMI_TEST_SIZE];
+#endif
 static int bmi_pending_count = 0;
 
 /* array of trove ops in flight; filled in when needed to call testsome()
@@ -130,6 +136,11 @@ static int trove_pending_count = 0;
  * have not yet been passed back by flow_proto_checkXXX()
  */
 static QLIST_HEAD(done_checking_queue);
+
+#ifdef __PVFS2_JOB_THREADED__
+static pthread_cond_t bmi_cond = PTHREAD_COND_INITIALIZER;
+static gen_mutex_t bmi_mutex = GEN_MUTEX_INITIALIZER;
+#endif
 
 /* this struct contains information associated with a flow that is
  * specific to this flow protocol, this one is for mem<->bmi ops
@@ -165,6 +176,9 @@ struct bmi_trove_flow_data
     /* ditto for trove */
     TROVE_op_id trove_id;
 
+    /* callback information if we are in threaded mode */
+    struct PINT_thread_mgr_bmi_callback callback;
+
     /* the remaining fields are only used in double buffering
      * situations 
      *********************************************************/
@@ -195,6 +209,9 @@ struct bmi_trove_flow_data
      */
     PINT_Request_state *dup_file_req_state;
     PINT_Request_state *dup_mem_req_state;
+
+    /* lock for serializing state changes */
+    gen_mutex_t mutex;
 };
 
 /****************************************************
@@ -220,9 +237,9 @@ static void service_mem_to_bmi(flow_descriptor * flow_d);
 static void service_trove_to_bmi(flow_descriptor * flow_d);
 static void service_bmi_to_trove(flow_descriptor * flow_d);
 static void service_bmi_to_mem(flow_descriptor * flow_d);
-static flow_descriptor *bmi_completion(bmi_error_code_t error_code,
+static flow_descriptor *bmi_completion(void *user_ptr,
 				       bmi_size_t actual_size,
-				       void *user_ptr);
+				       bmi_error_code_t error_code);
 static flow_descriptor *trove_completion(PVFS_error error_code,
 					 void *user_ptr);
 static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
@@ -239,6 +256,9 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 					  flow_descriptor * flow_d);
 static void trove_completion_bmi_to_trove(PVFS_error error_code,
 					  flow_descriptor * flow_d);
+static void bmi_callback(void *user_ptr,
+		         bmi_size_t actual_size,
+		         bmi_error_code_t error_code);
 #ifdef __PVFS2_TROVE_SUPPORT__
 static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d);
 static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d);
@@ -285,13 +305,26 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
 	return (-EINVAL);
     }
 
+#ifdef __PVFS2_JOB_THREADED__
+    /* take advantage of the thread that the job interface is
+     * going to use for BMI operations...
+     */
+    ret = PINT_thread_mgr_bmi_start();
+    if(ret < 0)
+    {
+	return(ret);
+    }
+    ret = PINT_thread_mgr_bmi_getcontext(&global_bmi_context);
+    /* TODO: this should never fail after a successful start */
+    assert(ret == 0);
+#else
     /* get a BMI context */
     ret = BMI_open_context(&global_bmi_context);
     if(ret < 0)
     {
-	BMI_close_context(global_bmi_context);
 	return(ret);
     }
+#endif /* __PVFS2_JOB_THREADED__ */
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     /* get a TROVE context */
@@ -334,7 +367,12 @@ int flowproto_bmi_trove_finalize(void)
 
     trove_id_queue_cleanup(trove_inflight_queue);
 
+#ifdef __PVFS2_JOB_THREADED__
+    PINT_thread_mgr_bmi_stop();
+#else
     BMI_close_context(global_bmi_context);
+#endif
+
 #ifdef __PVFS2_TROVE_SUPPORT__
     trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 #endif
@@ -460,7 +498,6 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     int scratch_index_array[BMI_TEST_SIZE];
     char scratch_usrptr_array[BMI_TEST_SIZE * SIZEOF_VOID_P];
     int trove_count = *count;
-    int bmi_outcount = 0;
     int ret = -1;
     int i = 0;
     flow_descriptor *active_flowd = NULL;
@@ -468,6 +505,12 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     int incount = *count;
     TROVE_op_id *trove_op_array = NULL;
     int split_idle_time_ms = max_idle_time_ms;
+#ifdef __PVFS2_JOB_THREADED__
+    struct timespec pthread_timeout;
+    struct timeval base;
+#else
+    int bmi_outcount = 0;
+#endif
 
     /* TODO: do something more clever with the max_idle_time_ms
      * argument.  For now we just split it evenly among the
@@ -491,6 +534,8 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     {
 	return (-ENOMEM);
     }
+
+#ifndef __PVFS2_JOB_THREADED__
     /* divide up the idle time if we need to */
     if (max_idle_time_ms && bmi_pending_count && trove_pending_count)
     {
@@ -516,10 +561,11 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 	/* handle each completed bmi operation */
 	for (i = 0; i < bmi_outcount; i++)
 	{
-	    active_flowd = bmi_completion(bmi_error_code_array[i],
+	    active_flowd = bmi_completion(bmi_usrptr_array[i],
 					  bmi_actualsize_array[i],
-					  bmi_usrptr_array[i]);
+					  bmi_error_code_array[i]);
 
+gen_mutex_lock(&(PRIVATE_FLOW(active_flowd)->mutex));
 	    /* put flows into done_checking_queue if needed */
 	    if (active_flowd->state & FLOW_FINISH_MASK ||
 		active_flowd->state == FLOW_SVC_READY)
@@ -527,8 +573,10 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 		qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
 			       &done_checking_queue);
 	    }
+gen_mutex_unlock(&(PRIVATE_FLOW(active_flowd)->mutex));
 	}
     }
+#endif
 
     /* manage in flight trove operations */
     if (trove_pending_count > 0)
@@ -562,7 +610,7 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 					trove_index_array, NULL,
 					trove_usrptr_array, 
 					trove_error_code_array,
-                                        TROVE_DEFAULT_TEST_TIMEOUT);
+                                        split_idle_time_ms);
 #endif
 	    if (ret < 0)
 	    {
@@ -588,6 +636,7 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
                                        tmp_coll_id);
                     trove_pending_count--;
 
+gen_mutex_lock(&(PRIVATE_FLOW(active_flowd)->mutex));
                     /* put flows into done_checking_queue if needed */
                     if (active_flowd->state & FLOW_FINISH_MASK ||
                         active_flowd->state == FLOW_SVC_READY)
@@ -595,6 +644,7 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
                         qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
                                        &done_checking_queue);
                     }
+gen_mutex_unlock(&(PRIVATE_FLOW(active_flowd)->mutex));
                 }
             }
 	    trove_count = incount;
@@ -608,6 +658,33 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 	}
 	assert(ret == -EAGAIN);    
     }
+
+#ifdef __PVFS2_JOB_THREADED__
+    /* if we are in threaded mode with callbacks, and there is no 
+     * trove work to do, then we will block briefly on a condition variable 
+     * to prevent busy spinning until the callback occurs
+     */
+    /* figure out how long to wait */
+    gettimeofday(&base, NULL);
+    pthread_timeout.tv_sec = base.tv_sec + max_idle_time_ms / 1000;
+    pthread_timeout.tv_nsec = base.tv_usec * 1000 + 
+	((max_idle_time_ms % 1000) * 1000000);
+    if (pthread_timeout.tv_nsec > 1000000000)
+    {
+	pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
+	pthread_timeout.tv_sec++;
+    }
+
+    gen_mutex_lock(&bmi_mutex);
+    ret = pthread_cond_timedwait(&bmi_cond, &bmi_mutex, &pthread_timeout);
+    gen_mutex_unlock(&bmi_mutex);
+    if(ret != 0 && ret != ETIMEDOUT)
+    {
+	/* TODO: handle this */
+	gossip_lerr("Error: unhandled pthread_cond_timedwait() failure.\n");
+	assert(0);
+    }
+#endif
 
     /* collect flows out of the done_checking_queue and return */
     *count = 0;
@@ -674,11 +751,13 @@ int flowproto_bmi_trove_service(flow_descriptor * flow_d)
 	break;
     }
 
+gen_mutex_lock(&(PRIVATE_FLOW(flow_d)->mutex));
     /* clean up before returning if the flow completed */
     if (flow_d->state & FLOW_FINISH_MASK)
     {
 	release_flow(flow_d);
     }
+gen_mutex_unlock(&(PRIVATE_FLOW(flow_d)->mutex));
 
     return (0);
 }
@@ -1227,6 +1306,8 @@ static int alloc_flow_data(flow_descriptor * flow_d)
     flow_d->flow_protocol_data = flow_data;
     flow_data->parent = flow_d;
 
+    gen_mutex_init(&flow_data->mutex);
+
     /* if a file datatype offset was specified, go ahead and skip ahead 
      * before doing anything else
      */
@@ -1320,7 +1401,9 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
     int ret = -1;
     enum bmi_buffer_type buffer_type;
+    void* user_ptr = flow_d;
 
+gen_mutex_lock(&flow_data->mutex);
     /* make sure BMI knows if we are using an intermediate buffer or not,
      * because those have been created with bmi_memalloc()
      */
@@ -1333,6 +1416,13 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 	buffer_type = BMI_EXT_ALLOC;
     }
 
+    flow_data->callback.fn = bmi_callback;
+    flow_data->callback.data = flow_d;
+#ifdef __PVFS2_JOB_THREADED__
+    user_ptr = &flow_data->callback;
+#endif
+gen_mutex_unlock(&flow_data->mutex);
+
     /* post list send */
     gossip_ldebug(FLOW_PROTO_DEBUG, "Posting send, total size: %ld\n",
 		  (long) flow_data->bmi_total_size);
@@ -1342,7 +1432,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 			     flow_data->bmi_size_list,
 			     flow_data->bmi_list_count,
 			     flow_data->bmi_total_size, buffer_type,
-			     flow_d->tag, flow_d, global_bmi_context);
+			     flow_d->tag, user_ptr, global_bmi_context);
     if (ret == 1)
     {
 	/* handle immediate completion */
@@ -1350,15 +1440,19 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
     }
     else if (ret == 0)
     {
+gen_mutex_lock(&flow_data->mutex);
 	/* successful post, need to test later */
 	bmi_pending_count++;
 	flow_d->state = FLOW_TRANSMITTING;
+gen_mutex_unlock(&flow_data->mutex);
     }
     else
     {
+gen_mutex_lock(&flow_data->mutex);
 	/* error posting operation */
 	flow_d->state = FLOW_DEST_ERROR;
 	flow_d->error_code = ret;
+gen_mutex_unlock(&flow_data->mutex);
     }
 
     return;
@@ -1375,10 +1469,18 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
     int ret = -1;
     PVFS_size actual_size = 0;
+    void* user_ptr = flow_d;
 
     /* we should be ready to post the next operation when we get to
      * this function 
      */
+
+gen_mutex_lock(&flow_data->mutex);
+    flow_data->callback.fn = bmi_callback;
+    flow_data->callback.data = flow_d;
+#ifdef __PVFS2_JOB_THREADED__
+    user_ptr = &flow_data->callback;
+#endif
 
     /* are we using an intermediate buffer? */
     if(!PINT_REQUEST_DONE(flow_d->file_req_state)
@@ -1394,7 +1496,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
 			    flow_d->src.u.bmi.address,
 			    flow_data->intermediate_buffer,
 			    flow_data->max_buffer_size, &actual_size,
-			    BMI_PRE_ALLOC, flow_d->tag, flow_d,
+			    BMI_PRE_ALLOC, flow_d->tag, user_ptr,
 			    global_bmi_context);
     }
     else
@@ -1404,6 +1506,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
 	{
 	    gossip_lerr("WARNING: encountered odd request state; assuming flow is done.\n");
 	    flow_d->state = FLOW_COMPLETE;
+gen_mutex_unlock(&flow_data->mutex);
 	    return;
 	}
 
@@ -1416,9 +1519,10 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
 				 flow_data->bmi_size_list,
 				 flow_data->bmi_list_count,
 				 flow_data->bmi_total_size, &actual_size,
-				 BMI_EXT_ALLOC, flow_d->tag, flow_d,
+				 BMI_EXT_ALLOC, flow_d->tag, user_ptr,
 				 global_bmi_context);
     }
+gen_mutex_unlock(&flow_data->mutex);
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "Recv post returned %d\n", ret);
 
@@ -1429,15 +1533,19 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
     }
     else if (ret == 0)
     {
+gen_mutex_lock(&flow_data->mutex);
 	/* successful post, need to test later */
 	bmi_pending_count++;
 	flow_d->state = FLOW_TRANSMITTING;
+gen_mutex_unlock(&flow_data->mutex);
     }
     else
     {
+gen_mutex_lock(&flow_data->mutex);
 	/* error posting operation */
 	flow_d->state = FLOW_SRC_ERROR;
 	flow_d->error_code = ret;
+gen_mutex_unlock(&flow_data->mutex);
     }
 
     return;
@@ -1457,9 +1565,11 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
     int ret = -1;
     char *tmp_offset;
     PVFS_size actual_size = 0;
+    void* user_ptr = flow_d;
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "service_bmi_to_trove() called.\n");
 
+gen_mutex_lock(&flow_data->mutex);
     /* first, swap buffers if we need to */
     if (flow_data->fill_buffer_state == BUF_READY_TO_SWAP &&
 	flow_data->drain_buffer_state == BUF_READY_TO_SWAP)
@@ -1498,6 +1608,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	    flow_d->state = FLOW_ERROR;
 	    flow_d->error_code = ret;
 	    /* no ops in flight, so we can just kick out error here */
+gen_mutex_unlock(&flow_data->mutex);
 	    return;
 	}
 
@@ -1518,6 +1629,12 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	}
 	else
 	{
+	    flow_data->callback.fn = bmi_callback;
+	    flow_data->callback.data = flow_d;
+#ifdef __PVFS2_JOB_THREADED__
+	    user_ptr = &flow_data->callback;
+#endif
+
 	    /* see how much more is in the pipe */
 	    flow_data->bmi_total_size = flow_data->max_buffer_size;
 
@@ -1547,11 +1664,13 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 				flow_d->src.u.bmi.address,
 				flow_data->fill_buffer,
 				flow_data->bmi_total_size, &actual_size,
-				BMI_PRE_ALLOC, flow_d->tag, flow_d,
+				BMI_PRE_ALLOC, flow_d->tag, user_ptr,
 				global_bmi_context);
 	    if (ret == 1)
 	    {
+gen_mutex_unlock(&flow_data->mutex);
 		bmi_completion_bmi_to_trove(0, actual_size, flow_d);
+gen_mutex_lock(&flow_data->mutex);
 	    }
 	    else if (ret == 0)
 	    {
@@ -1600,7 +1719,9 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	{
 	    /* handle immediate completion */
 	    /* this function will set the flow state */
+gen_mutex_unlock(&flow_data->mutex);
 	    trove_completion_bmi_to_trove(0, flow_d);
+gen_mutex_lock(&flow_data->mutex);
 	}
 	else if (ret == 0)
 	{
@@ -1633,6 +1754,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	}
     }
 
+gen_mutex_unlock(&flow_data->mutex);
     return;
 }
 
@@ -1649,9 +1771,11 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
     PVFS_size tmp_used;
     int ret = -1;
     char *tmp_offset;
+    void* user_ptr = flow_d;
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "service_trove_to_bmi() called.\n");
 
+gen_mutex_lock(&flow_data->mutex);
     /* first, swap buffers if we need to */
     if (flow_data->fill_buffer_state == BUF_READY_TO_SWAP &&
 	flow_data->drain_buffer_state == BUF_READY_TO_SWAP)
@@ -1690,6 +1814,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 		flow_d->state = FLOW_ERROR;
 		flow_d->error_code = ret;
 		/* no ops in flight, so we can just kick out error here */
+gen_mutex_unlock(&flow_data->mutex);
 		return;
 	    }
 	    flow_data->trove_list_count = flow_d->result.segs;
@@ -1713,17 +1838,25 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
     /* post a BMI operation if we can */
     if (flow_data->drain_buffer_state == BUF_READY_TO_DRAIN)
     {
+	flow_data->callback.fn = bmi_callback;
+	flow_data->callback.data = flow_d;
+#ifdef __PVFS2_JOB_THREADED__
+	user_ptr = &flow_data->callback;
+#endif
+
 	gossip_ldebug(FLOW_PROTO_DEBUG, "Posting send, total size: %ld\n",
 		      (long) flow_data->drain_buffer_used);
 	ret = BMI_post_send(&flow_data->bmi_id,
 			    flow_d->dest.u.bmi.address, flow_data->drain_buffer,
 			    flow_data->drain_buffer_used,
-			    BMI_PRE_ALLOC, flow_d->tag, flow_d,
+			    BMI_PRE_ALLOC, flow_d->tag, user_ptr,
 			    global_bmi_context);
 	if (ret == 1)
 	{
 	    /* handle immediate completion */
+gen_mutex_unlock(&flow_data->mutex);
 	    bmi_completion_trove_to_bmi(0, flow_d);
+gen_mutex_lock(&flow_data->mutex);
 	}
 	else if (ret == 0)
 	{
@@ -1743,6 +1876,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
     /* are we done? */
     if (flow_d->state == FLOW_COMPLETE)
     {
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -1776,7 +1910,9 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	{
 	    /* handle immediate completion */
 	    /* this function will set the flow state */
+gen_mutex_unlock(&flow_data->mutex);
 	    trove_completion_trove_to_bmi(0, flow_d);
+gen_mutex_lock(&flow_data->mutex);
 	}
 	else if (ret == 0)
 	{
@@ -1809,6 +1945,41 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	}
     }
 
+gen_mutex_unlock(&flow_data->mutex);
+    return;
+}
+
+/* bmi_callback()
+ *
+ * callback used upon completion of BMI operations handled by the 
+ * thread manager
+ *
+ * no return value
+ */
+static void bmi_callback(void *user_ptr,
+		         bmi_size_t actual_size,
+		         bmi_error_code_t error_code)
+{
+    flow_descriptor* flow_d = NULL;
+
+    bmi_pending_count--;
+
+    flow_d = bmi_completion(user_ptr, actual_size, error_code);
+
+gen_mutex_lock(&(PRIVATE_FLOW(flow_d)->mutex));
+    /* put flows into done_checking_queue if needed */
+    if (flow_d->state & FLOW_FINISH_MASK ||
+	flow_d->state == FLOW_SVC_READY)
+    {
+	qlist_add_tail(&(PRIVATE_FLOW(flow_d)->queue_link),
+		       &done_checking_queue);
+    }
+gen_mutex_unlock(&(PRIVATE_FLOW(flow_d)->mutex));
+
+    /* wake up anyone who may be sleeping in checkworld */
+#ifdef __PVFS2_JOB_THREADED__
+    pthread_cond_signal(&bmi_cond);
+#endif
     return;
 }
 
@@ -1819,9 +1990,10 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
  *
  * returns pointer to associated flow on success, NULL on failure
  */
-static flow_descriptor *bmi_completion(bmi_error_code_t error_code,
+static flow_descriptor *bmi_completion(void *user_ptr,
 				       bmi_size_t actual_size,
-				       void *user_ptr)
+				       bmi_error_code_t error_code)
+				       
 {
     flow_descriptor *flow_d = user_ptr;
 
@@ -1862,11 +2034,13 @@ static void bmi_completion_mem_to_bmi(bmi_error_code_t error_code,
     int ret = -1;
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
 
+gen_mutex_lock(&flow_data->mutex);
     if (error_code != 0)
     {
 	/* the bmi operation failed */
 	flow_d->state = FLOW_DEST_ERROR;
 	flow_d->error_code = error_code;
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -1878,6 +2052,7 @@ static void bmi_completion_mem_to_bmi(bmi_error_code_t error_code,
     if(PINT_REQUEST_DONE(flow_d->file_req_state))
     {
 	flow_d->state = FLOW_COMPLETE;
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -1891,6 +2066,7 @@ static void bmi_completion_mem_to_bmi(bmi_error_code_t error_code,
     }
 
     flow_d->state = FLOW_SVC_READY;
+gen_mutex_unlock(&flow_data->mutex);
     return;
 }
 
@@ -1905,11 +2081,13 @@ static void bmi_completion_trove_to_bmi(bmi_error_code_t error_code,
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
 
+gen_mutex_lock(&flow_data->mutex);
     if (error_code != 0)
     {
 	/* the bmi operation failed */
 	flow_d->state = FLOW_DEST_ERROR;
 	flow_d->error_code = error_code;
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -1927,6 +2105,7 @@ static void bmi_completion_trove_to_bmi(bmi_error_code_t error_code,
     {
 	flow_data->drain_buffer_state = BUF_DONE;
 	flow_d->state = FLOW_COMPLETE;
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -1936,6 +2115,7 @@ static void bmi_completion_trove_to_bmi(bmi_error_code_t error_code,
     else
 	flow_d->state = FLOW_SVC_READY;
 
+gen_mutex_unlock(&flow_data->mutex);
     return;
 }
 
@@ -1961,11 +2141,13 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 		  "bmi_completion_bmi_to_mem() handling error_code = %d\n",
 		  (int) error_code);
 
+gen_mutex_lock(&flow_data->mutex);
     if (error_code != 0)
     {
 	/* the bmi operation failed */
 	flow_d->state = FLOW_SRC_ERROR;
 	flow_d->error_code = error_code;
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -2047,6 +2229,7 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 		{
 		    flow_d->state = FLOW_DEST_ERROR;
 		    flow_d->error_code = error_code;
+gen_mutex_unlock(&flow_data->mutex);
 		    return;
 		}
 		flow_data->bmi_list_count = flow_d->result.segs;
@@ -2078,6 +2261,7 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
     if(PINT_REQUEST_DONE(flow_d->file_req_state))
     {
 	flow_d->state = FLOW_COMPLETE;
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -2089,9 +2273,12 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 	flow_d->state = FLOW_ERROR;
 	flow_d->error_code = ret;
     }
+    else
+    {
+	flow_d->state = FLOW_SVC_READY;
+    }
 
-    flow_d->state = FLOW_SVC_READY;
-
+gen_mutex_unlock(&flow_data->mutex);
     return;
 }
 
@@ -2108,6 +2295,7 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
     int ret = -1;
 
+gen_mutex_lock(&flow_data->mutex);
     if (error_code != 0)
     {
 	/* the trove operation failed */
@@ -2116,6 +2304,7 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 	/* TODO: cleanup properly */
 	gossip_lerr("Error: unimplemented condition encountered.\n");
 	exit(-1);
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -2193,6 +2382,7 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 	flow_d->state = FLOW_SVC_READY;
     }
 
+gen_mutex_unlock(&flow_data->mutex);
     return;
 }
 
@@ -2279,11 +2469,13 @@ static void bmi_completion_bmi_to_trove(bmi_error_code_t error_code,
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
 
+gen_mutex_lock(&flow_data->mutex);
     if (error_code != 0)
     {
 	/* the bmi operation failed */
 	flow_d->state = FLOW_DEST_ERROR;
 	flow_d->error_code = error_code;
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -2296,6 +2488,7 @@ static void bmi_completion_bmi_to_trove(bmi_error_code_t error_code,
 	/* TODO: handle this */
 	gossip_lerr("Error: unimplemented condition encountered.\n");
 	exit(-1);
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -2305,6 +2498,7 @@ static void bmi_completion_bmi_to_trove(bmi_error_code_t error_code,
     else
 	flow_d->state = FLOW_SVC_READY;
 
+gen_mutex_unlock(&flow_data->mutex);
     return;
 }
 
@@ -2321,6 +2515,7 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
     int ret;
 
+gen_mutex_lock(&flow_data->mutex);
     if (error_code != 0)
     {
 	/* the trove operation failed */
@@ -2329,6 +2524,7 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 	/* TODO: cleanup properly */
 	gossip_lerr("Error: unimplemented condition encountered.\n");
 	exit(-1);
+gen_mutex_unlock(&flow_data->mutex);
 	return;
     }
 
@@ -2408,6 +2604,7 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 	flow_d->state = FLOW_SVC_READY;
     }
 
+gen_mutex_unlock(&flow_data->mutex);
     return;
 }
 

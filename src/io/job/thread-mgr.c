@@ -108,7 +108,8 @@ static void *bmi_thread_function(void *ptr)
 	    tmp_callback = 
 		(struct PINT_thread_mgr_bmi_callback*)stat_bmi_user_ptr_array[i];
 	    /* sanity check */
-	    assert(tmp_callback->fn != 0);
+	    assert(tmp_callback != NULL);
+	    assert(tmp_callback->fn != NULL);
 	    tmp_callback->fn(tmp_callback->data, stat_bmi_actual_size_array[i],
 		stat_bmi_error_code_array[i]);
 	}
