@@ -30,6 +30,14 @@ typedef struct host_handle_mapping_s
 {
     struct host_alias_s *alias_mapping;
     char *handle_range;
+
+    /*
+      the handle_range above, represented as a
+      PVFS_handle_extent_array type.  This is a
+      convenient type for sending/receiving over
+      the wire on create/mkdir requests.
+    */
+    PVFS_handle_extent_array handle_extent_array;
 } host_handle_mapping_s;
 
 typedef struct filesystem_configuration_s

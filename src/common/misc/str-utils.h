@@ -8,6 +8,7 @@
 #define __STR_UTILS_H
 
 #include "pvfs2-types.h"
+#include "pvfs2-storage.h"
 
 int PINT_get_path_element(
     char *pathname,
@@ -35,8 +36,7 @@ int PINT_remove_dir_prefix(
     int out_max_len);
 int PINT_parse_handle_ranges(
     char *range, 
-    int *first, 
-    int *last, 
+    PVFS_handle_extent *out_extent,
     int *status);
 #endif
 /*

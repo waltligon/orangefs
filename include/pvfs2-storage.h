@@ -32,6 +32,15 @@ struct PVFS_handle_extent_s
 };
 typedef struct PVFS_handle_extent_s PVFS_handle_extent;
 
+/* an array of contiguous ranges of handles */
+struct PVFS_handle_extent_array_s
+{
+    int extent_count;
+    PVFS_handle_extent *extent_array;
+};
+typedef struct PVFS_handle_extent_array_s PVFS_handle_extent_array;
+
+
 /* vtag; contents not yet defined */
 struct PVFS_vtag_s
 {

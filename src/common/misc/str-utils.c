@@ -333,24 +333,30 @@ int PINT_remove_dir_prefix(char *pathname, char* prefix, char *out_path,
 
 /*
  * PINT_parse_handle_ranges:  the first time this is called, set 'status' to
- * zero.  get back the first range in the string in the 'first' and 'last'
- * variables.  keep calling PINT_parse_handle_ranges until it returns zero
+ * zero.  get back the first range in the string in the out_extent
+ * variable.  keep calling PINT_parse_handle_ranges until it returns zero
  *
- * range:   string representing our ranges
- * first:   (output) beginning of range
- * last:    (output) end of range
- * status:  (opaque) how far we are in the range string 
+ * range            :  string representing our ranges
+ * out_extent->first:  (output) beginning of range
+ * out_extent->last :  (output) end of range
+ * status           :  (opaque) how far we are in the range string 
  *
  * returns:
  *  0: no more ranges
  *  1: found a range.  look at 'first' and 'last' for the values
- *  -1: something bad happened
+ *  -1: something bad happened, possibly invalid arguments
  */
-int PINT_parse_handle_ranges(char *range, int *first, int *last, int *status)
+int PINT_parse_handle_ranges(
+    char *range, 
+    PVFS_handle_extent *out_extent,
+    int *status)
 { 
-    /* what started out as a "hm, maybe i can use strtoul to help parse this"
-     * turned into a lot harier parser than i had hoped. */
-    char *p, *endchar; 
+    char *p = NULL, *endchar = NULL;
+
+    if (!out_extent || !status)
+    {
+        return -1;
+    }
 
     p = range + *status;
 
@@ -361,7 +367,8 @@ int PINT_parse_handle_ranges(char *range, int *first, int *last, int *status)
        *endptr  (and  returns 0).  In particular, if *nptr is not
        `\0' but **endptr is `\0' on return, the entire string  is
        valid.  */ 
-    *first = *last = (int) strtoul(p, &endchar, 0);
+    out_extent->first = out_extent->last =
+        (PVFS_handle)strtoul(p, &endchar, 0);
     if ( p == endchar )  /* all done */
 	return 0; 
     /* strtoul eats leading space, but not trailing space.  take care of ws
@@ -372,7 +379,7 @@ int PINT_parse_handle_ranges(char *range, int *first, int *last, int *status)
 
     switch (*endchar) {
 	case '-': /* we got the first half of the range. grab 2nd half */
-	    *last = (int)strtoul(p, &endchar, 0);
+	    out_extent->last = (int)strtoul(p, &endchar, 0);
 	    /* again, skip trailing space ...*/
 	    while (isspace(*endchar)) endchar++;
 	    /* ... and the delimiter */ 

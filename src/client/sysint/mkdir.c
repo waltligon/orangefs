@@ -41,6 +41,8 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     void* encoded_resp;
     PVFS_msg_tag_t op_tag;
     bmi_size_t max_msg_sz;
+    int meta_handle_extent_array_len = 0;
+    PVFS_handle_extent *meta_handle_extent_array = NULL;
 
     enum {
 	NONE_FAILURE = 0,
@@ -106,9 +108,15 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 	goto return_error;
     }
 
-    /* Determine the initial metaserver for new file */
+    /*
+      Determine the initial metaserver and the appropriate
+      handle range for a new dir.  This extent array of
+      handles should NOT be freed.
+    */
     ret = PINT_bucket_get_next_meta(&g_server_config,
-                                    parent_refn.fs_id,&serv_addr1);
+                                    parent_refn.fs_id, &serv_addr1,
+                                    meta_handle_extent_array,
+                                    &meta_handle_extent_array_len);
     if (ret < 0)
     {
 	gossip_ldebug(CLIENT_DEBUG,"failed to get meta server\n");

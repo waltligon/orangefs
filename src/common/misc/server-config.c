@@ -72,6 +72,9 @@ static struct host_handle_mapping_s *get_or_add_handle_mapping(
 static char *merge_handle_range_strs(
     char *range1,
     char *range2);
+static int build_extent_array(
+    char *handle_range_str,
+    PVFS_handle_extent_array *handle_extent_array);
 
 static struct server_configuration_s *config_s = NULL;
 
@@ -556,10 +559,15 @@ DOTCONF_CB(get_range_list)
                 assert(handle_mapping->alias_mapping ==
                        find_host_alias_ptr_by_alias(config_s,
                                                     cmd->data.list[i-1]));
-                if (!handle_mapping->handle_range)
+                if (!handle_mapping->handle_range &&
+                    !handle_mapping->handle_extent_array.extent_array)
                 {
                     handle_mapping->handle_range =
                         strdup(cmd->data.list[i]);
+
+                    /* build the extent array, based on range */
+                    build_extent_array(handle_mapping->handle_range,
+                                       &handle_mapping->handle_extent_array);
                 }
                 else
                 {
@@ -568,6 +576,11 @@ DOTCONF_CB(get_range_list)
                         cmd->data.list[i]);
                     free(handle_mapping->handle_range);
                     handle_mapping->handle_range = new_handle_range;
+
+                    /* re-build the extent array, based on range */
+                    free(handle_mapping->handle_extent_array.extent_array);
+                    build_extent_array(handle_mapping->handle_range,
+                                       &handle_mapping->handle_extent_array);
                 }
 
                 if (is_new_handle_mapping)
@@ -807,6 +820,12 @@ static void free_host_handle_mapping(void *ptr)
         h_mapping->alias_mapping = NULL;
 
         free(h_mapping->handle_range);
+        h_mapping->handle_range = NULL;
+
+        free(h_mapping->handle_extent_array.extent_array);
+        h_mapping->handle_extent_array.extent_count = 0;
+        h_mapping->handle_extent_array.extent_array = NULL;
+
         free(h_mapping);
         h_mapping = NULL;
     }
@@ -818,8 +837,13 @@ static void free_host_alias(void *ptr)
     if (alias)
     {
         free(alias->host_alias);
+        alias->host_alias = NULL;
+
         free(alias->bmi_address);
+        alias->bmi_address = NULL;
+
         free(alias);
+        alias = NULL;
     }
 }
 
@@ -830,12 +854,14 @@ static void free_filesystem(void *ptr)
     if (fs)
     {
         free(fs->file_system_name);
+        fs->file_system_name = NULL;
 
         /* free all handle ranges */
         llist_free(fs->meta_handle_ranges,free_host_handle_mapping);
         llist_free(fs->data_handle_ranges,free_host_handle_mapping);
 
         free(fs);
+        fs = NULL;
     }
 }
 
@@ -932,6 +958,52 @@ static char *merge_handle_range_strs(
     }
     return merged_range;
 }
+
+static int build_extent_array(
+    char *handle_range_str,
+    PVFS_handle_extent_array *handle_extent_array)
+{
+    int i = 0, status = 0, num_extents = 0;
+    PVFS_handle_extent cur_extent;
+
+    if (handle_range_str && handle_extent_array)
+    {
+        /* first pass, find out how many extents there are total */
+        while(PINT_parse_handle_ranges(handle_range_str,
+                                       &cur_extent, &status))
+        {
+            num_extents++;
+        }
+
+        if (num_extents)
+        {
+            handle_extent_array->extent_count = num_extents;
+            handle_extent_array->extent_array = (PVFS_handle_extent *)
+                malloc(num_extents * sizeof(PVFS_handle_extent));
+            if (!handle_extent_array->extent_array)
+            {
+                gossip_err("Error: failed to alloc %d extents\n",
+                           handle_extent_array->extent_count);
+                return -1;
+            }
+            memset(handle_extent_array->extent_array,0,
+                   (num_extents * sizeof(PVFS_handle_extent)));
+
+            /* reset opaque handle parsing state for next iteration */
+            status = 0;
+
+            /* second pass, fill in the extent array */
+            while(PINT_parse_handle_ranges(handle_range_str,
+                                           &cur_extent, &status))
+            {
+                handle_extent_array->extent_array[i] = cur_extent;
+                i++;
+            }
+        }
+    }
+    return 0;
+}
+
 
 /*
  * Function: PINT_server_config_get_host_addr_ptr

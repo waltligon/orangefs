@@ -154,16 +154,23 @@ int PINT_handle_load_mapping(
 /* PINT_bucket_get_next_meta()
  *
  * returns the bmi address of the next server
- * that should be used to store a new piece of metadata.  This 
- * function is responsible for fairly distributing the metadata 
+ * that should be used to store a new piece of metadata.  This
+ * function is responsible for fairly distributing the metadata
  * storage responsibility to all servers.
+ *
+ * in addition, a handle range is returned as an array of extents
+ * that match the meta handle range configured for the returned
+ * meta server.  This array MUST NOT be freed by the caller, nor
+ * cached for later use.
  *
  * returns 0 on success, -errno on failure
  */
 int PINT_bucket_get_next_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
-    bmi_addr_t *meta_addr)
+    bmi_addr_t *meta_addr,
+    PVFS_handle_extent *out_handle_extent_array,
+    int *out_handle_extent_array_len)
 {
     int ret = -EINVAL;
     char *meta_server_bmi_str = NULL;
@@ -171,7 +178,7 @@ int PINT_bucket_get_next_meta(
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (config && meta_addr)
+    if (config && meta_addr && out_handle_extent_array_len)
     {
         hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
         if (hash_link)
@@ -198,6 +205,11 @@ int PINT_bucket_get_next_meta(
 
             meta_server_bmi_str = PINT_server_config_get_host_addr_ptr(
                 config,cur_mapping->alias_mapping->host_alias);
+
+            out_handle_extent_array =
+                cur_mapping->handle_extent_array.extent_array;
+            *out_handle_extent_array_len =
+                cur_mapping->handle_extent_array.extent_count;
 
             ret = BMI_addr_lookup(meta_addr,meta_server_bmi_str);
         }

@@ -30,24 +30,24 @@
  */
 struct llist *PINT_create_extent_list(char *extent_str)
 {
-    PVFS_handle_extent *cur_extent = NULL;
+    PVFS_handle_extent cur_extent, *new_extent = NULL;
     struct llist *extent_list = NULL;
-    int first = 0, last = 0, status = 0;
+    int status = 0;
 
     if (extent_str)
     {
         extent_list = llist_new();
         assert(extent_list);
 
-        while(PINT_parse_handle_ranges(extent_str,&first,&last,&status))
+        while(PINT_parse_handle_ranges(extent_str,&cur_extent,&status))
         {
-            cur_extent = malloc(sizeof(PVFS_handle_extent));
-            assert(cur_extent);
+            new_extent = malloc(sizeof(PVFS_handle_extent));
+            assert(new_extent);
 
-            cur_extent->first = (int64_t)first;
-            cur_extent->last = (int64_t)last;
+            new_extent->first = cur_extent.first;
+            new_extent->last = cur_extent.last;
 
-            llist_add_to_tail(extent_list,(void *)cur_extent);
+            llist_add_to_tail(extent_list,(void *)new_extent);
         }
     }
     return extent_list;

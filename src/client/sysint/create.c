@@ -43,6 +43,8 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	PVFS_msg_tag_t op_tag;
 	bmi_size_t max_msg_sz;
 	int old_ret = -1;
+        int meta_handle_extent_array_len = 0;
+        PVFS_handle_extent *meta_handle_extent_array = NULL;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -146,20 +148,28 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	if(io_serv_count > PVFS_REQ_LIMIT_DFILE_COUNT)
 	{
 	    io_serv_count = PVFS_REQ_LIMIT_DFILE_COUNT;
-	    gossip_ldebug(CLIENT_DEBUG, "Warning: reducing number of data files to PVFS_REQ_LIMIT_DFILE_COUNT.\n");
+	    gossip_ldebug(CLIENT_DEBUG, "Warning: reducing number of "
+                          "data files to PVFS_REQ_LIMIT_DFILE_COUNT.\n");
 	}
 
-	gossip_ldebug(CLIENT_DEBUG,"number of data files to create = %d\n",io_serv_count);
+	gossip_ldebug(CLIENT_DEBUG,"number of data files to create "
+                      "= %d\n",io_serv_count);
 
-	/* Determine the initial metaserver for new file */
+	/*
+          Determine the initial metaserver and the appropriate
+          handle range for a new file.  This extent array of
+          handles should NOT be freed.
+        */
 	ret = PINT_bucket_get_next_meta(&g_server_config,
                                         parent_refn.fs_id,
-                                        &serv_addr1);
+                                        &serv_addr1,
+                                        meta_handle_extent_array,
+                                        &meta_handle_extent_array_len);
 	if (ret < 0)
 	{
 	    failure = LOOKUP_SERVER_FAILURE;
 	    goto return_error;
-	}	
+	}
 	
 	/* send the create request for the meta file */
 	req_p.op = PVFS_SERV_CREATE;

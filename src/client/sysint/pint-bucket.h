@@ -7,8 +7,8 @@
 #ifndef __PINT_BUCKET_H
 #define __PINT_BUCKET_H
 
-/* FIXME: header in header */
 #include "pvfs2-types.h"
+#include "pvfs2-storage.h"
 #include "bmi.h"
 #include "dotconf.h"
 #include "trove.h"
@@ -29,7 +29,9 @@ int PINT_handle_load_mapping(
 int PINT_bucket_get_next_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
-    bmi_addr_t *meta_addr);
+    bmi_addr_t *meta_addr,
+    PVFS_handle_extent *out_handle_extent_array,
+    int *out_handle_extent_array_len);
 
 int PINT_bucket_get_next_io(
     struct server_configuration_s *config,

@@ -158,9 +158,6 @@ void job_waitblock(job_id_t *id_array,
 		   int *failure);
 int server_getconfig(pvfs_mntlist mntent_list);
 int get_next_path(char *path, char **newpath, int skip);
-#if 0
-int get_next_segment(char *inout,char **output,int *start);
-#endif
 int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid);
 
 int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
