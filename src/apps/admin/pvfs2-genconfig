@@ -22,6 +22,7 @@ my $opt_storage = '';
 my $opt_trovesync = '1';
 my $opt_quiet = '';
 my $opt_logging = '';
+my $opt_logstamp = '';
 
 sub get_user_input
 {
@@ -158,6 +159,7 @@ sub emit_defaults
     print $target "\tUnexpectedRequests $num_unexp\n";
     print $target "\tLogFile $logfile\n";
     print $target "\tEventLogging $logging\n";
+    print $target "\tLogStamp $logstamp\n";
     print $target "\tBMIModules $bmi_module\n";
     print $target "\tFlowModules flowproto_multiqueue\n";
     print $target "\tPerfUpdateInterval 1000\n";
@@ -281,6 +283,7 @@ sub usage
     print "     --metaservers <STRING>            hostnames of meta servers\n";
     print "     --logfile     <STRING>            logfile location\n";
     print "     --logging     <STRING>            debugging mask for log messages.\n";
+    print "     --logstamp    <STRING>            timestamp type for log messages (none,usec,datetime).\n";
     print "     --storage     <STRING>            storage space location\n";
     print "     --notrovesync                     sync metadata only upon request\n";
     print "     --quiet                           run silently\n\n";
@@ -341,6 +344,15 @@ sub get_logging
 	return $logging;
 }
 
+sub get_logstamp
+{
+	if ($opt_logstamp) {
+		$logstamp = $opt_logstamp;
+	} else {
+		$logstamp = "usec";
+	}
+	return $logstamp;
+}
 
 sub get_logfile
 {
@@ -506,6 +518,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
 	   'metaservers=s' => \@opt_metaservers,
 	   'logfile=s'     => \$opt_logfile,
 	   'logging=s'     => \$opt_logging,
+	   'logstamp=s'    => \$opt_logstamp,
 	   'storage=s'     => \$opt_storage,
 	   'help'          => \$show_help,
 	   'quiet!'        => \$opt_quiet,
@@ -606,6 +619,7 @@ if (!$opt_quiet) {
 $logfile = get_logfile();
 $storage = get_storage();
 $logging = get_logging();
+$logstamp = get_logstamp();
 
 # could prompt for handle recycle time, but it is probably best if we pick a
 # reasonable value w/o prompting

@@ -27,6 +27,16 @@
 /********************************************************************
  * Visible interface
  */
+
+/* what type of timestamp to place in msgs */
+enum gossip_logstamp
+{
+    GOSSIP_LOGSTAMP_NONE = 0,
+    GOSSIP_LOGSTAMP_USEC = 1,
+    GOSSIP_LOGSTAMP_DATETIME = 2
+};
+#define GOSSIP_LOGSTAMP_DEFAULT GOSSIP_LOGSTAMP_USEC
+
 int gossip_enable_syslog(
     int priority);
 int gossip_enable_stderr(
@@ -42,6 +52,8 @@ int gossip_set_debug_mask(
 int gossip_get_debug_mask(
     int *debug_on,
     uint64_t *mask);
+int gossip_set_logstamp(
+    enum gossip_logstamp ts);
 
 #ifdef GOSSIP_ENABLE_BACKTRACE
 void gossip_backtrace(void);

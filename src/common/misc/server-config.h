@@ -9,6 +9,7 @@
 
 #include "pvfs2-types.h"
 #include "src/common/llist/llist.h"
+#include "src/common/gossip/gossip.h"
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 #include "trove.h"
@@ -94,6 +95,7 @@ typedef struct server_configuration_s
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
     char *logfile;
+    enum gossip_logstamp logstamp_type; /* how to timestamp logs */
     char *event_logging;
     char *bmi_modules;              /* BMI modules                      */
     char *flow_modules;             /* Flow modules                     */

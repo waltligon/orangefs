@@ -24,6 +24,7 @@
 #include "pvfs2-config.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
+static DOTCONF_CB(get_logstamp);
 static DOTCONF_CB(get_storage_space);
 static DOTCONF_CB(enter_defaults_context);
 static DOTCONF_CB(exit_defaults_context);
@@ -130,6 +131,7 @@ static const configoption_t options[] =
     {"AttrCacheMaxNumElems",ARG_INT,get_attr_cache_max_num_elems,NULL,CTX_ALL},
     {"TroveSyncMeta",ARG_STR, get_trove_sync_meta, NULL, CTX_ALL},
     {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, CTX_ALL},
+    {"LogStamp",ARG_STR, get_logstamp,NULL,CTX_ALL},
     LAST_OPTION
 };
 
@@ -161,6 +163,9 @@ int PINT_parse_config(
     /* static global assignment */
     config_s = config_obj;
     memset(config_s, 0, sizeof(struct server_configuration_s));
+
+    /* set some global defaults for optional parameters */
+    config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
 
     if (cache_config_files(global_config_filename, server_config_filename))
     {
@@ -261,6 +266,38 @@ DOTCONF_CB(get_pvfs_server_id)
     config_s->host_id = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
+
+DOTCONF_CB(get_logstamp)
+{
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        gossip_err("Error: LogStamp tag can only be in a "
+                   "Defaults or Global block");
+        return NULL;
+    }
+
+    if(!strcmp(cmd->data.str, "none"))
+    {
+        config_s->logstamp_type = GOSSIP_LOGSTAMP_NONE;
+    }
+    else if(!strcmp(cmd->data.str, "usec"))
+    {
+        config_s->logstamp_type = GOSSIP_LOGSTAMP_USEC;
+    }
+    else if(!strcmp(cmd->data.str, "datetime"))
+    {
+        config_s->logstamp_type = GOSSIP_LOGSTAMP_DATETIME;
+    }
+    else
+    {
+        gossip_err("Error: LogStamp tag (if specified) must have one of the following values: none, usec, or datetime.\n");
+        return NULL;
+    }
+
+    return NULL;
+}
+
 
 DOTCONF_CB(get_storage_space)
 {

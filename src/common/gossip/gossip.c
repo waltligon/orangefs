@@ -55,13 +55,17 @@ static FILE *internal_log_file = NULL;
 /* syslog priority setting */
 static int internal_syslog_priority = LOG_USER;
 
+/* what type of timestamp to put on logs */
+static enum gossip_logstamp internal_logstamp = GOSSIP_LOGSTAMP_DEFAULT;
+
 /*****************************************************************
  * prototypes
  */
 static int gossip_disable_stderr(void);
 static int gossip_disable_file(void);
 
-static int gossip_debug_fp(FILE *fp, const char *format, va_list ap, int ts);
+static int gossip_debug_fp(FILE *fp, const char *format, va_list ap, enum
+gossip_logstamp ts);
 static int gossip_debug_syslog(
     const char *format,
     va_list ap);
@@ -224,6 +228,19 @@ int gossip_set_debug_mask(
     return 0;
 }
 
+/* gossip_set_logstamp()
+ *
+ * sets timestamp style for gossip messages
+ *
+ * returns 0 on success, -errno on failure
+ */
+int gossip_set_logstamp(
+    enum gossip_logstamp ts)
+{
+    internal_logstamp = ts;
+    return(0);
+}
+
 /* __gossip_debug_stub()
  * 
  * stub for gossip_debug that doesn't do anything; used when debugging
@@ -274,10 +291,10 @@ int __gossip_debug(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-        ret = gossip_debug_fp(stderr, format, ap, 1);
+        ret = gossip_debug_fp(stderr, format, ap, internal_logstamp);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_fp(internal_log_file, format, ap, 1);
+        ret = gossip_debug_fp(internal_log_file, format, ap, internal_logstamp);
         break;
     case GOSSIP_SYSLOG:
         ret = gossip_debug_syslog(format, ap);
@@ -315,10 +332,10 @@ int gossip_err(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-        ret = gossip_debug_fp(stderr, format, ap, 0);
+        ret = gossip_debug_fp(stderr, format, ap, internal_logstamp);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_fp(internal_log_file, format, ap, 0);
+        ret = gossip_debug_fp(internal_log_file, format, ap, internal_logstamp);
         break;
     case GOSSIP_SYSLOG:
         ret = gossip_err_syslog(format, ap);
@@ -391,7 +408,8 @@ static int gossip_debug_syslog(
  *
  * returns 0 on success, -errno on failure
  */
-static int gossip_debug_fp(FILE *fp, const char *format, va_list ap, int ts)
+static int gossip_debug_fp(FILE *fp, const char *format, va_list ap, enum
+gossip_logstamp ts)
 {
     char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;
     int bsize = sizeof(buffer);
@@ -399,13 +417,27 @@ static int gossip_debug_fp(FILE *fp, const char *format, va_list ap, int ts)
     struct timeval tv;
     time_t tp;
 
-    if (ts) {
-        gettimeofday(&tv, 0);
-        tp = tv.tv_sec;
-        strftime(bptr, 10, "[%H:%M:%S", localtime(&tp));
-        sprintf(bptr+9, ".%06ld] ", tv.tv_usec);
-        bptr += 18;
-        bsize -= 18;
+    switch(ts)
+    {
+        case GOSSIP_LOGSTAMP_USEC:
+            gettimeofday(&tv, 0);
+            tp = tv.tv_sec;
+            strftime(bptr, 10, "[%H:%M:%S", localtime(&tp));
+            sprintf(bptr+9, ".%06ld] ", tv.tv_usec);
+            bptr += 18;
+            bsize -= 18;
+            break;
+        case GOSSIP_LOGSTAMP_DATETIME:
+            gettimeofday(&tv, 0);
+            tp = tv.tv_sec;
+            strftime(bptr, 15, "[%m/%d %H:%M] ", localtime(&tp));
+            bptr += 14;
+            bsize -= 14;
+            break;
+        case GOSSIP_LOGSTAMP_NONE:
+            break;
+        default:
+            break;
     }
 
     ret = vsnprintf(bptr, bsize, format, ap);
