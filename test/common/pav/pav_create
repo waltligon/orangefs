@@ -334,6 +334,7 @@ sub split_machines {
     @compnodes = ();
 
     my $count=0;
+    my $node_index=0;
 
     # let's try something....if for whatever reason we cannot open NODEFILE,
     # let's assume it had one entry: localhost
@@ -366,17 +367,19 @@ sub split_machines {
     
     my $ionum = $href->{'IONCOUNT'};
     my $metanum = $href->{'METACOUNT'};
+    my $compnum = $count - $href->{'IONCOUNT'} - $href->{'METACOUNT'};
 
-    if ($href->{'UNIQUEMETA'}) {
-        for ($i=0; $i<$metanum; $i++) {
-		$metanodes[$i] = shift @nodelist;
-	}
-    } else {
-    	@metanodes = @nodelist[0..$metanum-1];
+    if (!$href->{'UNIQUEMETA'}) {
+	$compnum++;
     }
 
-    @ionodes = @nodelist[0..$ionum-1];
-    @compnodes = @nodelist[$ionum..$count-1];
+    @compnodes = @nodelist[$node_index..$compnum-1];
+    $node_index += $compnum;
+    @metanodes = @nodelist[$node_index..$node_index+$metanum-1];
+    if ($href->{'UNIQUEMETA'}) {
+	$node_index += $metanum;
+    }
+    @ionodes = @nodelist[$node_index..$node_index+$ionum-1];
     
     $href->{'MGR'} = \@metanodes;
     $href->{'IONODES'} = \@ionodes;
