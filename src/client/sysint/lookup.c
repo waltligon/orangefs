@@ -61,13 +61,11 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     int max_msg_sz, name_sz;
     struct PINT_decoded_msg decoded;
 
-    pinode *entry_pinode = NULL, *pinode_ptr = NULL;
-    char *server = NULL, *segment = NULL, *path = NULL;
+    pinode *pinode_ptr = NULL;
+    char *segment = NULL, *path = NULL;
     bmi_addr_t serv_addr;
     int total_segments = 0, num_segments_remaining = 0;
-    int start_path = 0, end_path = 0, path_len = 0;
     PVFS_handle final_handle = 0;
-    PVFS_bitfield attr_mask;
     pinode_reference entry, parent;
 
     /*print args to make sure we're sane*/
