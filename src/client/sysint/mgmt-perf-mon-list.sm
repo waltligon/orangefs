@@ -223,7 +223,7 @@ static int mgmt_perf_mon_list_cleanup(PINT_client_sm *sm_p,
 }
 
 static int perf_mon_list_comp_fn(void* v_p,
-				 struct PVFS_server_resp* resp_p,
+				 struct PVFS_server_resp *resp_p,
 				 int i)
 {
     int j = 0;

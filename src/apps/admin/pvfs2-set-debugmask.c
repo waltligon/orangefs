@@ -43,7 +43,7 @@ int main(int argc, char **argv)
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
-    if(!user_opts)
+    if (!user_opts)
     {
 	fprintf(stderr, "Error: failed to parse command line arguments.\n");
 	usage(argc, argv);
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     }
 
     ret = PVFS_util_init_defaults();
-    if(ret < 0)
+    if (ret < 0)
     {
 	PVFS_perror("PVFS_util_init_defaults", ret);
 	return(-1);
@@ -60,7 +60,7 @@ int main(int argc, char **argv)
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(user_opts->mnt_point,
         &cur_fs, pvfs_path, PVFS_NAME_MAX);
-    if(ret < 0)
+    if (ret < 0)
     {
 	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
 	    user_opts->mnt_point);
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 
     ret = PVFS_mgmt_setparam_all(
         cur_fs, creds, PVFS_SERV_PARAM_GOSSIP_MASK,
-        user_opts->debug_mask, NULL);
+        user_opts->debug_mask, NULL, NULL /* detailed errors */);
 
     PVFS_sys_finalize();
 

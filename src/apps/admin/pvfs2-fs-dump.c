@@ -170,7 +170,8 @@ int main(int argc, char **argv)
 				  (int64_t)PVFS_SERVER_ADMIN_MODE,
 				  addr_array,
 				  NULL,
-				  server_count);
+				  server_count,
+				  NULL /* detailed errors */);
     if (ret != 0)
     {
 	PVFS_perror("PVFS_mgmt_setparam_list", ret);
@@ -180,7 +181,8 @@ int main(int argc, char **argv)
 				(int64_t)PVFS_SERVER_NORMAL_MODE,
 				addr_array,
 				NULL,
-				server_count);
+				server_count,
+				NULL);
 	return(-1);
     }
 
@@ -215,7 +217,8 @@ int main(int argc, char **argv)
 	(int64_t)PVFS_SERVER_NORMAL_MODE,
 	addr_array,
 	NULL,
-	server_count);
+	server_count,
+	NULL);
 
     PVFS_sys_finalize();
 
@@ -244,7 +247,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
 				(int64_t)PVFS_SERVER_NORMAL_MODE,
 				addr_array,
 				NULL,
-				server_count);
+				server_count,
+				NULL);
 	return -1;
     }
 
@@ -263,7 +267,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
 				(int64_t)PVFS_SERVER_NORMAL_MODE,
 				addr_array,
 				NULL,
-				server_count);
+				server_count,
+				NULL);
 	return -1;
     }
 
@@ -336,7 +341,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
 				    (int64_t)PVFS_SERVER_NORMAL_MODE,
 				    addr_array,
 				    NULL,
-				    server_count);
+				    server_count,
+				    NULL);
 	    return -1;
 	}
 

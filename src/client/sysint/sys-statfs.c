@@ -45,7 +45,7 @@ int PVFS_sys_statfs(
 	fs_id,
 	credentials,
 	stat_array,
-	&num_servers);
+	&num_servers, NULL);
     if (ret < 0)
     {
 	free(stat_array);

@@ -128,7 +128,8 @@ int main(int argc, char **argv)
 				   event_matrix,
 				   addr_array, 
 				   io_server_count,
-				   EVENT_DEPTH);
+				   EVENT_DEPTH,
+				   NULL /* detailed errors */);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_event_mon_list", EVENT_DEPTH);

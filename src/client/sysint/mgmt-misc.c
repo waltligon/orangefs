@@ -52,7 +52,8 @@ const char* PVFS_mgmt_map_addr(PVFS_fs_id fs_id,
 int PVFS_mgmt_statfs_all(PVFS_fs_id fs_id,
 			 PVFS_credentials credentials,
 			 struct PVFS_mgmt_server_stat* stat_array,
-			 int* inout_count_p)
+			 int* inout_count_p,
+			 PVFS_error_details *details)
 {
     int ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t *addr_array = NULL;
@@ -101,8 +102,12 @@ int PVFS_mgmt_statfs_all(PVFS_fs_id fs_id,
 	return ret;
     }
     
-    ret = PVFS_mgmt_statfs_list(
-        fs_id, credentials, stat_array, addr_array, real_count, NULL);
+    ret = PVFS_mgmt_statfs_list(fs_id,
+				credentials,
+				stat_array,
+				addr_array,
+				real_count,
+				details);
 
     free(addr_array);
 
@@ -122,7 +127,8 @@ int PVFS_mgmt_setparam_all(
     PVFS_credentials credentials,
     enum PVFS_server_param param,
     int64_t value,
-    int64_t* old_value_array)
+    int64_t* old_value_array,
+    PVFS_error_details *details)
 {
     PVFS_BMI_addr_t *addr_array = NULL;
     int count = 0;
@@ -163,9 +169,14 @@ int PVFS_mgmt_setparam_all(
 	return ret;
     }
 
-    ret = PVFS_mgmt_setparam_list(
-        fs_id, credentials, param, value, addr_array,
-        old_value_array, count);
+    ret = PVFS_mgmt_setparam_list(fs_id,
+				  credentials,
+				  param,
+				  value,
+				  addr_array,
+				  old_value_array,
+				  count,
+				  details);
 
     free(addr_array);
 

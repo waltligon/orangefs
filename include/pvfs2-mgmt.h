@@ -125,14 +125,16 @@ int PVFS_mgmt_setparam_list(
     int64_t value,
     PVFS_BMI_addr_t *addr_array,
     int64_t* old_value_array,
-    int count);
+    int count,
+    PVFS_error_details *details);
 
 int PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     enum PVFS_server_param param,
     int64_t value,
-    int64_t* old_value_array);
+    int64_t* old_value_array,
+    PVFS_error_details *details);
 
 int PVFS_mgmt_statfs_list(
     PVFS_fs_id fs_id,
@@ -146,7 +148,8 @@ int PVFS_mgmt_statfs_all(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     struct PVFS_mgmt_server_stat *stat_array,
-    int* inout_count_p);
+    int* inout_count_p,
+    PVFS_error_details *details);
 
 int PVFS_mgmt_perf_mon_list(
     PVFS_fs_id fs_id,
@@ -165,7 +168,8 @@ int PVFS_mgmt_event_mon_list(
     struct PVFS_mgmt_event **event_matrix,
     PVFS_BMI_addr_t *addr_array,
     int server_count,
-    int event_count);
+    int event_count,
+    PVFS_error_details *details);
 
 int PVFS_mgmt_toggle_admin_mode(
     PVFS_credentials credentials,

@@ -69,7 +69,8 @@ int PVFS_mgmt_setparam_list(PVFS_fs_id fs_id,
 			    int64_t value,
 			    PVFS_BMI_addr_t *addr_array,
 			    int64_t *old_value_array,
-			    int count)
+			    int count,
+			    PVFS_error_details *details)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
@@ -79,13 +80,14 @@ int PVFS_mgmt_setparam_list(PVFS_fs_id fs_id,
 
     if (param == PVFS_SERV_PARAM_INVALID) 
     {
-	return ret;
+	return -PVFS_EINVAL;
     }
 
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
-	return -PVFS_ENOMEM;
+	error = -PVFS_ENOMEM;
+	goto cleanup;
     }
 
     memset(sm_p, 0, sizeof(*sm_p));
@@ -98,8 +100,18 @@ int PVFS_mgmt_setparam_list(PVFS_fs_id fs_id,
     sm_p->u.setparam_list.old_value_array = old_value_array;
     sm_p->u.setparam_list.count           = count;
 
+    sm_p->msgarray_count = count;
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
+        count * sizeof(PINT_client_sm_msgpair_state));
+    if (sm_p->msgarray == NULL)
+    {
+	error = -PVFS_ENOMEM;
+	goto cleanup;
+    }
+
     if (sm_p->u.setparam_list.root_check_status_array)
     {
+	/* ??? */
         free(sm_p->u.setparam_list.root_check_status_array);
         sm_p->u.setparam_list.root_check_status_array = NULL;
     }
@@ -117,7 +129,8 @@ int PVFS_mgmt_setparam_list(PVFS_fs_id fs_id,
     {
 	PVFS_perror("Error: PINT_client_state_machine_post() "
                     "failure.\n", ret);
-	return ret;
+	error = ret;
+	goto cleanup;
     }
 
     while (!sm_p->op_complete && (ret == 0))
@@ -130,7 +143,8 @@ int PVFS_mgmt_setparam_list(PVFS_fs_id fs_id,
     if (ret < 0)
     {
 	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	return ret;
+	error = ret;
+	goto cleanup;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_setparam_list completed\n");
@@ -138,8 +152,45 @@ int PVFS_mgmt_setparam_list(PVFS_fs_id fs_id,
     /* save our return value */
     error = sm_p->error_code;
 
-    /* clean up after ourselves */
-    free(sm_p);
+    /* store server-specific errors if requested and present */
+    if ((error != 0) && (details != NULL))
+    {
+	int i, errct = 0;
+
+	details->count_exceeded = 0;
+
+	for (i=0; i < count; i++)
+        {
+	    if (sm_p->msgarray[i].op_status != 0)
+	    {
+		if (errct < details->count_allocated)
+		{
+		    details->error[errct].error = sm_p->msgarray[i].op_status;
+		    details->error[errct].addr  = sm_p->msgarray[i].svr_addr;
+		    errct++;
+		}
+		else
+		{
+		    details->count_exceeded = 1;
+		}
+	    }
+	}
+	details->count_used = errct;
+
+	error = -PVFS_EDETAIL;
+    }
+
+ cleanup:
+    if (sm_p->msgarray != NULL)
+    {
+	free(sm_p->msgarray);
+    }
+
+    if (sm_p != NULL)
+    {
+	free(sm_p);
+    }
+
     return error;
 }
 
@@ -151,16 +202,6 @@ static int mgmt_setparam_list_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setparam_list state: "
                  "mgmt_setparam_list_setup_msgpair\n");
-
-    /* allocate memory for msgpair array */
-    sm_p->msgarray_count = sm_p->u.setparam_list.count;
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
-        sm_p->msgarray_count * sizeof(PINT_client_sm_msgpair_state));
-    if (sm_p->msgarray == NULL)
-    {
-	js_p->error_code = -PVFS_ENOMEM;
-	return 1;
-    }
 
     /* setup msgpair array */
     for (i=0; i < sm_p->msgarray_count; i++)
@@ -198,11 +239,6 @@ static int mgmt_setparam_list_setup_msgpair(PINT_client_sm *sm_p,
 static int mgmt_setparam_list_cleanup(PINT_client_sm *sm_p,
 				      job_status_s *js_p)
 {
-    if (sm_p->msgarray != NULL)
-    {
-	free(sm_p->msgarray);
-    }
-
     sm_p->error_code  = js_p->error_code;
     sm_p->op_complete = 1;
 
