@@ -279,7 +279,7 @@ between groups is 48 bytes (12 floats).
       stype = NULL
 \end{verbatim}
 
-Note that ub, lb, aggregate\_size, depth, and num\_contigu\_chunks always
+Note that ub, lb, aggregate\_size, depth, and num\_contig\_chunks always
 refers to the region
 represented down stream of the current PINT\_Request record, and not the
 whole region, however ub and lb are still expressed in terms of the
@@ -373,7 +373,7 @@ SEGMAX segment sizes.  These are passed to the PINT\_Process\_request function
 allong with an initialized PINT\_Request\_state, a PVFS\_Request, a
 PVFS\_Request\_file\_data struct which includes distribution, distribution
 parameters, metadata, and an EXTEND\_FLAG that indicates if the routine
-shoudl stop at the current idnf of file (if the value is zero) or should
+should stop at the current end of file (if the value is zero) or should
 extend the local file to the size needed to complete the request (if the
 value is non-zero) in the even that the file ends before the end of the
 request. A read will typically have a zero value and a write will
@@ -438,10 +438,10 @@ PINT\_Process\_request is called, the segmax, bytemax, and eof\_flag
 should be reset to the proper values, as the function returns results in
 these variables as well as taking inputs from them.  The offset and size
 arrays are overwritten each time PINT\_Process\_state is called.  The
-start\_offset variable is normally NOT reset between calls - as the
+start\_offset variable is normally NOT reset between calls as the
 caller normally wishes to continue translating the request from the
 point left off previously.  After completing the processing of the
-request, the caller is also responsible fo freeing the request state
+request, the caller is also responsible for freeing the request state
 structure with a call to PINT\_Free\_request.
 
 \begin{verbatim}
