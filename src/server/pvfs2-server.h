@@ -314,6 +314,7 @@ extern struct PINT_state_machine_s pvfs2_iterate_handles_sm;
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;
+extern struct PINT_state_machine_s pvfs2_check_entry_not_exist;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

@@ -33,7 +33,7 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-nested machine pvfs2_check_entry_not_exist(validate,
+nested machine pvfs2_check_entry_not_exist_sm(validate,
     read_directory_entry_handle, 
     create_dirdata_dspace,
     write_dirdata_handle,
@@ -95,7 +95,7 @@ machine pvfs2_crdirent_sm(prelude,
 
 	state check_not_exist
 	{
-		jump pvfs2_check_entry_not_exist;
+		jump pvfs2_check_entry_not_exist_sm;
 		success => write_directory_entry;
 		default => final_response;
 	}
