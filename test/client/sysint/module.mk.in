@@ -10,6 +10,7 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/mkdir.c\
 	$(DIR)/rmdir.c\
 	$(DIR)/remove.c\
+	$(DIR)/find.c \
 	$(DIR)/path-test.c\
 	$(DIR)/create.c\
 	$(DIR)/readdir.c\
