@@ -218,7 +218,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
     void* encoded_resp;
     PVFS_size max_msg_sz;
     pvfs_mntent *mntent_p = NULL;
-    struct fsconfig_s *fsinfo_p = NULL;;
+    struct fsconfig_s *fsinfo_p = NULL;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
 
     /* TODO: Fill up the credentials information */
