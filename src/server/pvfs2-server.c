@@ -1489,6 +1489,11 @@ static void init_req_table(void)
                     PINT_SERVER_CHECK_NONE, 
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED,
                     &pvfs2_mgmt_remove_dirent_sm);
+            OP_CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE,
+                    "mgmt-get-dirdata-handle",
+                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+                    &pvfs2_mgmt_get_dirdata_handle_sm);
             OP_CASE(PVFS_SERV_IO, "io",
                     PINT_SERVER_CHECK_NONE, 
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_io_sm);

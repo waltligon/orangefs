@@ -174,12 +174,15 @@ void dbpf_queued_op_put(dbpf_queued_op_t *q_op_p, int completed)
  */
 TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
 {
+    TROVE_op_id tmp_id = 0;
+
     gen_mutex_lock(&dbpf_op_queue_mutex);
 
     dbpf_op_queue_add(&dbpf_op_queue, q_op_p);
 
     gen_mutex_lock(&q_op_p->mutex);
     q_op_p->op.state = OP_QUEUED;
+    tmp_id = q_op_p->op.id;
     gen_mutex_unlock(&q_op_p->mutex);
 
     gen_mutex_unlock(&dbpf_op_queue_mutex);
@@ -191,7 +194,7 @@ TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
     */
     pthread_cond_signal(&dbpf_op_incoming_cond);
 #endif
-    return q_op_p->op.id;
+    return tmp_id;
 }
 
 /* dbpf_queued_op_dequeue()

@@ -49,13 +49,14 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_EVENT_MON = 23,
     PVFS_SERV_MGMT_REMOVE_OBJECT = 24,
     PVFS_SERV_MGMT_REMOVE_DIRENT = 25,
-    PVFS_SERV_JOB_TIMER = 26,    /* not a real protocol request */
-    PVFS_SERV_PROTO_ERROR = 27
+    PVFS_SERV_MGMT_GET_DIRDATA_HANDLE = 26,
+    PVFS_SERV_JOB_TIMER = 27,    /* not a real protocol request */
+    PVFS_SERV_PROTO_ERROR = 28
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define
      * (below) if you add a new operation to this list
      */
 };
-#define PVFS_MAX_SERVER_OP 27
+#define PVFS_MAX_SERVER_OP 28
 
 /* a private internal type */
 typedef struct
@@ -237,6 +238,38 @@ do {                                                  \
     (__req).u.mgmt_remove_dirent.handle = (__handle); \
     (__req).u.mgmt_remove_dirent.entry = (__entry);   \
 } while (0)
+
+/* mgmt_get_dirdata_handle */
+/* - used to retrieve the dirdata handle of the specified parent ref */
+struct PVFS_servreq_mgmt_get_dirdata_handle
+{
+    PVFS_handle handle;
+    PVFS_fs_id fs_id;
+};
+endecode_fields_2_struct(
+    PVFS_servreq_mgmt_get_dirdata_handle,
+    PVFS_handle, handle,
+    PVFS_fs_id, fs_id)
+
+#define PINT_SERVREQ_MGMT_GET_DIRDATA_HANDLE_FILL(__req,   \
+                                                  __creds, \
+                                                  __fsid,  \
+                                                  __handle)\
+do {                                                       \
+    memset(&(__req), 0, sizeof(__req));                    \
+    (__req).op = PVFS_SERV_MGMT_GET_DIRDATA_HANDLE;        \
+    (__req).credentials = (__creds);                       \
+    (__req).u.mgmt_get_dirdata_handle.fs_id = (__fsid);    \
+    (__req).u.mgmt_get_dirdata_handle.handle = (__handle); \
+} while (0)
+
+struct PVFS_servresp_mgmt_get_dirdata_handle
+{
+    PVFS_handle handle;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_mgmt_get_dirdata_handle,
+    PVFS_handle, handle)
 
 /* flush
  * - used to flush an object to disk */
@@ -1072,8 +1105,8 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_event_mon mgmt_event_mon;
         struct PVFS_servreq_mgmt_remove_object mgmt_remove_object;
         struct PVFS_servreq_mgmt_remove_dirent mgmt_remove_dirent;
-    }
-    u;
+        struct PVFS_servreq_mgmt_get_dirdata_handle mgmt_get_dirdata_handle;
+    } u;
 };
 endecode_fields_2_struct(
     PVFS_server_req,
@@ -1104,8 +1137,8 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_iterate_handles mgmt_iterate_handles;
         struct PVFS_servresp_mgmt_dspace_info_list mgmt_dspace_info_list;
         struct PVFS_servresp_mgmt_event_mon mgmt_event_mon;
-    }
-    u;
+        struct PVFS_servresp_mgmt_get_dirdata_handle mgmt_get_dirdata_handle;
+    } u;
 };
 endecode_fields_2_struct(
     PVFS_server_resp,

@@ -196,6 +196,11 @@ struct PINT_server_mgmt_remove_dirent_op
     PVFS_handle dirdata_handle;
 };
 
+struct PINT_server_mgmt_get_dirdata_op
+{
+    PVFS_handle dirdata_handle;
+};
+
 struct PINT_server_getconfig_op {
     int strsize; /* used to hold string lengths during getconfig processing */
 };
@@ -283,6 +288,8 @@ typedef struct PINT_server_op
 	struct PINT_server_flush_op	flush;
 	struct PINT_server_truncate_op  truncate;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
+        struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+
     } u;
 } PINT_server_op;
 
@@ -313,6 +320,7 @@ extern struct PINT_state_machine_s pvfs2_io_sm;
 extern struct PINT_state_machine_s pvfs2_remove_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_remove_object_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_remove_dirent_sm;
+extern struct PINT_state_machine_s pvfs2_mgmt_get_dirdata_handle_sm;
 extern struct PINT_state_machine_s pvfs2_rmdirent_sm;
 extern struct PINT_state_machine_s pvfs2_chdirent_sm;
 extern struct PINT_state_machine_s pvfs2_flush_sm;

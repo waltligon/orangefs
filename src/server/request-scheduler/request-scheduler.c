@@ -297,6 +297,10 @@ int PINT_req_sched_target_handle(
 	*handle = req->u.mgmt_dspace_info_list.handle_array[req_index];
 	*fs_id = req->u.mgmt_dspace_info_list.fs_id;
 	return (0);
+    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
+	*handle = req->u.mgmt_get_dirdata_handle.handle;
+	*fs_id = req->u.mgmt_get_dirdata_handle.fs_id;
+	return (0);
     case PVFS_SERV_STATFS:
 	*fs_id = req->u.statfs.fs_id;
 	return (0);

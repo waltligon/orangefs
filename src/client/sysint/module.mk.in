@@ -41,7 +41,8 @@ CLIENT_SMCGEN := \
 	$(DIR)/mgmt-iterate-handles-list.c \
 	$(DIR)/mgmt-get-dfile-array.c \
 	$(DIR)/mgmt-remove-object.c \
-	$(DIR)/mgmt-remove-dirent.c
+	$(DIR)/mgmt-remove-dirent.c \
+	$(DIR)/mgmt-get-dirdata-handle.c
 
 # track generated .c files that need to be removed during dist clean, etc.
 SMCGEN += $(CLIENT_SMCGEN)

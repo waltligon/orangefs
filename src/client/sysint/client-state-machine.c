@@ -303,6 +303,10 @@ int PINT_client_state_machine_post(
             sm_p->current_state =
                 (pvfs2_client_mgmt_remove_dirent_sm.state_machine + 1);
             break;
+        case PVFS_MGMT_GET_DIRDATA_HANDLE:
+            sm_p->current_state =
+                (pvfs2_client_mgmt_get_dirdata_handle_sm.state_machine + 1);
+            break;
 	case PVFS_SERVER_GET_CONFIG:
 	    sm_p->current_state =
                 (pvfs2_server_get_config_sm.state_machine + 1);

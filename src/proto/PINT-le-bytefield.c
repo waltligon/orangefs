@@ -299,6 +299,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_REMOVE, remove);
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
+	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
 	CASE(PVFS_SERV_IO, io);
 	CASE(PVFS_SERV_GETATTR, getattr);
 	CASE(PVFS_SERV_SETATTR, setattr);
@@ -395,6 +396,7 @@ static int lebf_encode_resp(
 	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
 	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
+	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -470,6 +472,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_REMOVE, remove);
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
+	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
 	CASE(PVFS_SERV_IO, io);
 	CASE(PVFS_SERV_GETATTR, getattr);
 	CASE(PVFS_SERV_SETATTR, setattr);
@@ -557,6 +560,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
 	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
 	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
+	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
 
         case PVFS_SERV_REMOVE:
@@ -658,6 +662,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_REMOVE:
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 	    case PVFS_SERV_MGMT_REMOVE_DIRENT:
+	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
 	    case PVFS_SERV_GETATTR:
 	    case PVFS_SERV_CRDIRENT:
 	    case PVFS_SERV_RMDIRENT:
@@ -726,6 +731,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_REMOVE:
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 	    case PVFS_SERV_MGMT_REMOVE_DIRENT:
+	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
 	    case PVFS_SERV_IO:
 	    case PVFS_SERV_SETATTR:
 	    case PVFS_SERV_CRDIRENT:

@@ -19,38 +19,38 @@
 
 extern job_context_id pint_client_sm_context;
 
-static int mgmt_remove_dirent_init(
+static int mgmt_get_dirdata_handle_init(
     PINT_client_sm *sm_p, job_status_s *js_p);
-static int mgmt_remove_dirent_setup_msgpair(
+static int mgmt_get_dirdata_handle_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
-static int mgmt_remove_dirent_cleanup(
+static int mgmt_get_dirdata_handle_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
-static int mgmt_remove_dirent_comp_fn(
+static int mgmt_get_dirdata_handle_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 %%
 
-machine pvfs2_client_mgmt_remove_dirent_sm(
+machine pvfs2_client_mgmt_get_dirdata_handle_sm(
     init,
-    remove_dirent_setup_msgpair,
-    remove_dirent_xfer_msgpair,
+    get_dirdata_handle_setup_msgpair,
+    get_dirdata_handle_xfer_msgpair,
     cleanup)
 {
     state init
     {
-        run mgmt_remove_dirent_init;
-        default => remove_dirent_setup_msgpair;
+        run mgmt_get_dirdata_handle_init;
+        default => get_dirdata_handle_setup_msgpair;
     }
 
-    state remove_dirent_setup_msgpair
+    state get_dirdata_handle_setup_msgpair
     {
-        run mgmt_remove_dirent_setup_msgpair;
-        success => remove_dirent_xfer_msgpair;
+        run mgmt_get_dirdata_handle_setup_msgpair;
+        success => get_dirdata_handle_xfer_msgpair;
         default => cleanup;
     }
 
-    state remove_dirent_xfer_msgpair
+    state get_dirdata_handle_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
         default => cleanup;
@@ -58,16 +58,16 @@ machine pvfs2_client_mgmt_remove_dirent_sm(
 
     state cleanup
     {
-        run mgmt_remove_dirent_cleanup;
+        run mgmt_get_dirdata_handle_cleanup;
         default => terminate;
     }
 }
 
 %%
 
-int PVFS_imgmt_remove_dirent(
+int PVFS_imgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
-    char *entry,
+    PVFS_handle *out_dirdata_handle,
     PVFS_credentials *credentials,
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
@@ -76,10 +76,10 @@ int PVFS_imgmt_remove_dirent(
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PVFS_imgmt_remove_dirent entered\n");
+                 "PVFS_imgmt_get_dirdata_handle entered\n");
 
     if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
-        (parent_ref.fs_id == PVFS_FS_ID_NULL))
+        (parent_ref.fs_id == PVFS_FS_ID_NULL) || !out_dirdata_handle)
     {
         gossip_err("invalid (NULL) required argument\n");
         return ret;
@@ -95,20 +95,19 @@ int PVFS_imgmt_remove_dirent(
     PINT_init_msgarray_params(&sm_p->msgarray_params);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->parent_ref = parent_ref;
-    sm_p->u.mgmt_remove_dirent.entry = entry;
+    sm_p->u.mgmt_get_dirdata_handle.dirdata_handle = out_dirdata_handle;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Trying to remove dirent %s under %Lu,%d\n",
-        sm_p->u.mgmt_remove_dirent.entry, Lu(parent_ref.handle),
-        parent_ref.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Trying to get dirdata object of parent "
+        "dir %Lu,%d\n", Lu(parent_ref.handle), parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
-        sm_p, PVFS_MGMT_REMOVE_DIRENT, op_id, user_ptr);
+        sm_p, PVFS_MGMT_GET_DIRDATA_HANDLE, op_id, user_ptr);
 }
 
-int PVFS_mgmt_remove_dirent(
+int PVFS_mgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
-    char *entry,
+    PVFS_handle *out_dirdata_handle,
     PVFS_credentials *credentials)
 {
     int ret = -PVFS_EINVAL;
@@ -116,18 +115,18 @@ int PVFS_mgmt_remove_dirent(
     PVFS_mgmt_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PVFS_mgmt_remove_dirent entered\n");
+                 "PVFS_mgmt_get_dirdata_handle entered\n");
 
-    ret = PVFS_imgmt_remove_dirent(
-        parent_ref, entry, credentials, &op_id, NULL);
+    ret = PVFS_imgmt_get_dirdata_handle(
+        parent_ref, out_dirdata_handle, credentials, &op_id, NULL);
     if (ret)
     {
-        PVFS_perror_gossip("PVFS_imgmt_remove_dirent call", ret);
+        PVFS_perror_gossip("PVFS_imgmt_get_dirdata_handle call", ret);
         error = ret;
     }
     else
     {
-        ret = PINT_mgmt_wait(op_id, "remove_dirent", &error);
+        ret = PINT_mgmt_wait(op_id, "get_dirdata_handle", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
@@ -139,18 +138,17 @@ int PVFS_mgmt_remove_dirent(
     return error;
 }
 
-/****************************************************************/
-
-static int mgmt_remove_dirent_init(
+static int mgmt_get_dirdata_handle_init(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_remove_dirent_init called\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "mgmt_get_dirdata_handle_init called\n");
 
     assert(js_p->error_code == 0);
     return 1;
 }
 
-static int mgmt_remove_dirent_setup_msgpair(
+static int mgmt_get_dirdata_handle_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
@@ -160,21 +158,20 @@ static int mgmt_remove_dirent_setup_msgpair(
 
     PINT_init_msgpair(sm_p, msg_p);
 
-    PINT_SERVREQ_MGMT_REMOVE_DIRENT_FILL(
+    PINT_SERVREQ_MGMT_GET_DIRDATA_HANDLE_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
-        sm_p->parent_ref.handle,
-        sm_p->u.mgmt_remove_dirent.entry);
+        sm_p->parent_ref.handle);
 
-    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing MGMT_REMOVE_DIRENT %s "
-                 "under %Lu,%d\n", sm_p->u.mgmt_remove_dirent.entry,
-                 Lu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "- doing MGMT_GET_DIRDATA_HANDLE "
+                 "under %Lu,%d\n", Lu(sm_p->parent_ref.handle),
+                 sm_p->parent_ref.fs_id);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-    msg_p->comp_fn = mgmt_remove_dirent_comp_fn;
+    msg_p->comp_fn = mgmt_get_dirdata_handle_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
@@ -187,29 +184,34 @@ static int mgmt_remove_dirent_setup_msgpair(
     return 1;
 }
 
-static int mgmt_remove_dirent_comp_fn(
+static int mgmt_get_dirdata_handle_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
 
-    assert(resp_p->op == PVFS_SERV_MGMT_REMOVE_DIRENT);
+    assert(resp_p->op == PVFS_SERV_MGMT_GET_DIRDATA_HANDLE);
 
     if (resp_p->status == 0)
     {
+        assert(sm_p->u.mgmt_get_dirdata_handle.dirdata_handle);
+
+        *sm_p->u.mgmt_get_dirdata_handle.dirdata_handle =
+            resp_p->u.mgmt_get_dirdata_handle.handle;
+
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG,
-            "  mgmt_remove_dirent_comp_fn: dirent %s under %Lu,%d "
-            "removed\n", sm_p->u.mgmt_remove_dirent.entry,
+            GOSSIP_CLIENT_DEBUG, "  mgmt_get_dirdata_handle_comp_fn: "
+            "got dirdata handle %Lu under %Lu,%d removed\n",
+            Lu(*sm_p->u.mgmt_get_dirdata_handle.dirdata_handle),
             Lu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
     }
     return resp_p->status;
 }
 
-static int mgmt_remove_dirent_cleanup(
+static int mgmt_get_dirdata_handle_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "mgmt_remove_dirent_cleanup called\n");
+                 "mgmt_get_dirdata_handle _cleanup called\n");
 
     sm_p->error_code = js_p->error_code;
 

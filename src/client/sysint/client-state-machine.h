@@ -130,6 +130,11 @@ struct PINT_client_mgmt_remove_dirent_sm
     char *entry;
 };
 
+struct PINT_client_mgmt_get_dirdata_handle_sm
+{
+    PVFS_handle *dirdata_handle;
+};
+
 typedef struct
 {
     /* the index of the current context (in the context array) */
@@ -418,6 +423,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_mgmt_iterate_handles_list_sm iterate_handles_list;
 	struct PINT_client_mgmt_get_dfile_array_sm get_dfile_array;
         struct PINT_client_mgmt_remove_dirent_sm mgmt_remove_dirent;
+        struct PINT_client_mgmt_get_dirdata_handle_sm mgmt_get_dirdata_handle;
 	struct PINT_server_get_config_sm get_config;
     } u;
 } PINT_client_sm;
@@ -505,6 +511,7 @@ enum
     PVFS_MGMT_EVENT_MON_LIST       = 76,
     PVFS_MGMT_REMOVE_OBJECT        = 77,
     PVFS_MGMT_REMOVE_DIRENT        = 78,
+    PVFS_MGMT_GET_DIRDATA_HANDLE   = 79,
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_DEV_UNEXPECTED            = 400
@@ -605,6 +612,8 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dfile_array_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_noop_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_remove_object_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_remove_dirent_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_handle_sm;
+
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_getattr_acache_sm;
