@@ -21,6 +21,7 @@ Murali Vilayannur <vilayann@mcs.anl.gov>
 -- testing and development
    initial linux 2.4.x prototype (before 2.6.x merge)
    initial 64-bit operation tag implementation (in kernel)
+   misc kernel code bug fixes
 
 Sven Marnach <sven@pvs.informatik.uni-heidelberg.de>
 -- fixed makefile LD selection and html docs target
