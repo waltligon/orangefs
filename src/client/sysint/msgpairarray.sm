@@ -289,6 +289,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	     * comp_ct by one and keep going
 	     */
 	    msg_p->op_status = msg_p->send_status.error_code;
+	    msg_p->send_id = 0;
 	    sm_p->msgarray[0].comp_ct--;
 	}
 	else if(ret == 1)
