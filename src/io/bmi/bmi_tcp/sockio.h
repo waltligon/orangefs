@@ -14,7 +14,7 @@
  * Defines which may be set at compile time to determine functionality:
  *
  * __USE_SENDFILE__ turns on the use of sendfile() in the library and
- * makes the nbsendfile function available to the application.
+ * makes the BMI_sockio_nbsendfile function available to the application.
  * Older glibc systems do not have this functionality so we leave it to
  * be turned on manually.
  */
@@ -27,51 +27,51 @@
 #include <netinet/in.h>
 #include <stdio.h>
 
-int new_sock(void);
-int bind_sock(int,
+int BMI_sockio_new_sock(void);
+int BMI_sockio_bind_sock(int,
 	      int);
-int connect_sock(int,
+int BMI_sockio_connect_sock(int,
 		 const char *,
 		 int);
-int init_sock(struct sockaddr *,
+int BMI_sockio_init_sock(struct sockaddr *,
 	      const char *,
 	      int);
-int brecv(int s,
+int BMI_sockio_brecv(int s,
 	  void *buf,
 	  int len);
-int nbrecv(int s,
+int BMI_sockio_nbrecv(int s,
 	   void *buf,
 	   int len);
-int bsend(int s,
+int BMI_sockio_bsend(int s,
 	  void *buf,
 	  int len);
-int nbsend(int s,
+int BMI_sockio_nbsend(int s,
 	   void *buf,
 	   int len);
-int nbvector(int s,
+int BMI_sockio_nbvector(int s,
 	    struct iovec* vector,
 	    int count,
 	    int recv_flag);
-int get_sockopt(int s,
+int BMI_sockio_get_sockopt(int s,
 		int optname);
-int set_tcpopt(int s,
+int BMI_sockio_set_tcpopt(int s,
 	       int optname,
 	       int val);
-int set_sockopt(int s,
+int BMI_sockio_set_sockopt(int s,
 		int optname,
 		int size);
-int nbpeek(int s,
+int BMI_sockio_nbpeek(int s,
 	   void* buf,
 	   int len);
 #ifdef __USE_SENDFILE__
-int nbsendfile(int s,
+int BMI_sockio_nbsendfile(int s,
 	       int f,
 	       int off,
 	       int len);
 #endif
 
-#define GET_RECVBUFSIZE(s) get_sockopt(s, SO_RCVBUF)
-#define GET_SENDBUFSIZE(s) get_sockopt(s, SO_SNDBUF)
+#define GET_RECVBUFSIZE(s) BMI_sockio_get_sockopt(s, SO_RCVBUF)
+#define GET_SENDBUFSIZE(s) BMI_sockio_get_sockopt(s, SO_SNDBUF)
 
 /* some OS's (ie. Linux 1.3.xx) can't handle buffer sizes of certain
  * sizes, and will hang up
@@ -81,14 +81,14 @@ int nbsendfile(int s,
 #define SET_RECVBUFSIZE(s, size)
 #define SET_SENDBUFSIZE(s, size)
 #else
-#define SET_RECVBUFSIZE(s, size) set_sockopt(s, SO_RCVBUF, size)
-#define SET_SENDBUFSIZE(s, size) set_sockopt(s, SO_SNDBUF, size)
+#define SET_RECVBUFSIZE(s, size) BMI_sockio_set_sockopt(s, SO_RCVBUF, size)
+#define SET_SENDBUFSIZE(s, size) BMI_sockio_set_sockopt(s, SO_SNDBUF, size)
 #endif
 
-#define GET_MINSENDSIZE(s) get_sockopt(s, SO_SNDLOWAT)
-#define GET_MINRECVSIZE(s) get_sockopt(s, SO_RCVLOWAT)
-#define SET_MINSENDSIZE(s, size) set_sockopt(s, SO_SNDLOWAT, size)
-#define SET_MINRECVSIZE(s, size) set_sockopt(s, SO_RCVLOWAT, size)
+#define GET_MINSENDSIZE(s) BMI_sockio_get_sockopt(s, SO_SNDLOWAT)
+#define GET_MINRECVSIZE(s) BMI_sockio_get_sockopt(s, SO_RCVLOWAT)
+#define SET_MINSENDSIZE(s, size) BMI_sockio_set_sockopt(s, SO_SNDLOWAT, size)
+#define SET_MINRECVSIZE(s, size) BMI_sockio_set_sockopt(s, SO_RCVLOWAT, size)
 
 /* BLOCKING / NONBLOCKING MACROS */
 

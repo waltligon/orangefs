@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.1 2003-08-26 19:07:14 pw Exp $
+ * $Id: setup.c,v 1.2 2003-09-09 16:12:46 pcarns Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -536,10 +536,10 @@ ib_tcp_client_connect(ib_method_addr_t *ibmap, struct method_addr *remote_map)
 {
     int s;
     
-    s = new_sock();
+    s = BMI_sockio_new_sock();
     if (s < 0)
 	error_errno("%s: create tcp socket", __func__);
-    if (connect_sock(s, ibmap->hostname, ibmap->port) < 0)
+    if (BMI_sockio_connect_sock(s, ibmap->hostname, ibmap->port) < 0)
 	error_errno("%s: connect to server %s:%d", __func__,
 	  ibmap->hostname, ibmap->port);
     ibmap->c = ib_new_connection(s, 0);
@@ -557,14 +557,14 @@ ib_tcp_server_init_listen_socket(struct method_addr *addr)
     int flags;
     ib_method_addr_t *ibc = addr->method_data;
 
-    listen_sock = new_sock();
+    listen_sock = BMI_sockio_new_sock();
     if (listen_sock < 0)
 	error_errno("%s: create tcp socket", __func__);
     flags = 1;
     if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &flags,
       sizeof(flags)) < 0)
 	error_errno("%s: setsockopt REUSEADDR", __func__);
-    if (bind_sock(listen_sock, ibc->port) < 0)
+    if (BMI_sockio_bind_sock(listen_sock, ibc->port) < 0)
 	error_errno("%s: bind tcp socket", __func__);
     if (listen(listen_sock, 1024) < 0)
 	error_errno("%s: listen tcp socket", __func__);

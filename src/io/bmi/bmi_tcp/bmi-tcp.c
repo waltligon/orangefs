@@ -1238,10 +1238,10 @@ static int tcp_server_init(void)
 
     /* create a socket */
     tcp_addr_data = tcp_method_params.listen_addr->method_data;
-    if ((tcp_addr_data->socket = new_sock()) < 0)
+    if ((tcp_addr_data->socket = BMI_sockio_new_sock()) < 0)
     {
 	tmp_errno = errno;
-	gossip_lerr("Error: new_sock: %s\n", strerror(tmp_errno));
+	gossip_lerr("Error: BMI_sockio_new_sock: %s\n", strerror(tmp_errno));
 	return (-tmp_errno);
     }
 
@@ -1253,13 +1253,13 @@ static int tcp_server_init(void)
     }
 
     /* setup for a fast restart to avoid bind addr in use errors */
-    set_sockopt(tcp_addr_data->socket, SO_REUSEADDR, 1);
+    BMI_sockio_set_sockopt(tcp_addr_data->socket, SO_REUSEADDR, 1);
 
     /* bind it to the appropriate port */
-    if (bind_sock(tcp_addr_data->socket, tcp_addr_data->port) < 0)
+    if (BMI_sockio_bind_sock(tcp_addr_data->socket, tcp_addr_data->port) < 0)
     {
 	tmp_errno = errno;
-	gossip_lerr("Error: bind_sock: %s\n", strerror(tmp_errno));
+	gossip_lerr("Error: BMI_sockio_bind_sock: %s\n", strerror(tmp_errno));
 	return (-tmp_errno);
     }
 
@@ -1368,7 +1368,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     }
 
     /* make a socket */
-    if ((tcp_addr_data->socket = new_sock()) < 0)
+    if ((tcp_addr_data->socket = BMI_sockio_new_sock()) < 0)
     {
 	tmp_errno = errno;
 	return (-tmp_errno);
@@ -1382,7 +1382,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     }
 
     /* turn of Nagle's algorithm */
-    if (set_tcpopt(tcp_addr_data->socket, TCP_NODELAY, 1) < 0)
+    if (BMI_sockio_set_tcpopt(tcp_addr_data->socket, TCP_NODELAY, 1) < 0)
     {
 	tmp_errno = errno;
 	gossip_lerr("Error: failed to set TCP_NODELAY option.\n");
@@ -1390,7 +1390,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	return (-tmp_errno);
     }
 
-    /* connect_sock will work with both ipaddr and hostname :) */
+    /* BMI_sockio_connect_sock will work with both ipaddr and hostname :) */
     if (tcp_addr_data->hostname)
     {
 	gossip_ldebug(BMI_DEBUG_TCP,
@@ -1398,7 +1398,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 		      tcp_addr_data->socket, tcp_addr_data->hostname,
 		      tcp_addr_data->port);
 	ret =
-	    connect_sock(tcp_addr_data->socket, tcp_addr_data->hostname,
+	    BMI_sockio_connect_sock(tcp_addr_data->socket, tcp_addr_data->hostname,
 			 tcp_addr_data->port);
     }
     else if (tcp_addr_data->ipaddr)
@@ -1406,7 +1406,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	gossip_ldebug(BMI_DEBUG_TCP, "Connect: socket=%d, ip=%s, port=%d\n",
 		      tcp_addr_data->socket, tcp_addr_data->ipaddr,
 		      tcp_addr_data->port);
-	ret = connect_sock(tcp_addr_data->socket,
+	ret = BMI_sockio_connect_sock(tcp_addr_data->socket,
 			   tcp_addr_data->ipaddr, tcp_addr_data->port);
     }
     else
@@ -1423,7 +1423,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	}
 	else
 	{
-	    gossip_lerr("Error: connect_sock: %s\n", strerror(errno));
+	    gossip_lerr("Error: BMI_sockio_connect_sock: %s\n", strerror(errno));
 	    return (-errno);
 	}
     }
@@ -2046,7 +2046,7 @@ static int tcp_do_work_recv(method_addr_p map)
      * It isn't worth the complication of reading only a partial message
      * header - we really want it atomically
      */
-    ret = nbpeek(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
+    ret = BMI_sockio_nbpeek(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < 0)
     {
 	tcp_forget_addr(map, 0);
@@ -2062,10 +2062,10 @@ static int tcp_do_work_recv(method_addr_p map)
     /* NOTE: we only allow a blocking call here because we peeked to see
      * if this amount of data was ready above.  
      */
-    ret = brecv(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
+    ret = BMI_sockio_brecv(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < TCP_ENC_HDR_SIZE)
     {
-	gossip_lerr("Error: brecv: %s\n", strerror(errno));
+	gossip_lerr("Error: BMI_sockio_brecv: %s\n", strerror(errno));
 	tcp_forget_addr(map, 0);
 	return (0);
     }
@@ -2261,11 +2261,11 @@ static int work_on_send_op(method_op_p my_method_op,
     if (my_method_op->env_amt_complete < TCP_ENC_HDR_SIZE)
     {
 	working_buf = &(tcp_op_data->env.enc_hdr[my_method_op->env_amt_complete]);
-	ret = nbsend(tcp_addr_data->socket, working_buf,
+	ret = BMI_sockio_nbsend(tcp_addr_data->socket, working_buf,
 		     (TCP_ENC_HDR_SIZE - my_method_op->env_amt_complete));
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: nbsend: %s\n", strerror(errno));
+	    gossip_lerr("Error: BMI_sockio_nbsend: %s\n", strerror(errno));
 	    tcp_forget_addr(my_method_op->addr, 0);
 	    return (0);
 	}
@@ -2478,7 +2478,7 @@ static int tcp_accept_init(int *socket)
     }
 
     /* we accepted a new connection.  turn off Nagle's algorithm. */
-    if (set_tcpopt(*socket, TCP_NODELAY, 1) < 0)
+    if (BMI_sockio_set_tcpopt(*socket, TCP_NODELAY, 1) < 0)
     {
 	tmp_errno = errno;
 	gossip_lerr("Error: failed to set TCP_NODELAY option.\n");
@@ -2635,11 +2635,11 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 
     /* send the message header first */
     tcp_addr_data = dest->method_data;
-    ret = nbsend(tcp_addr_data->socket, my_header.enc_hdr, TCP_ENC_HDR_SIZE);
+    ret = BMI_sockio_nbsend(tcp_addr_data->socket, my_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < 0)
     {
 	tmp_errno = errno;
-	gossip_lerr("Error: nbsend: %s\n", strerror(tmp_errno));
+	gossip_lerr("Error: BMI_sockio_nbsend: %s\n", strerror(tmp_errno));
 	tcp_forget_addr(dest, 0);
 	return (-tmp_errno);
     }
@@ -2777,11 +2777,11 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     assert(count > 0);
     if(send_recv == BMI_RECV)
     {
-	ret = nbvector(s, stat_io_vector, count, 1);
+	ret = BMI_sockio_nbvector(s, stat_io_vector, count, 1);
     }
     else
     {
-	ret = nbvector(s, stat_io_vector, count, 0);
+	ret = BMI_sockio_nbvector(s, stat_io_vector, count, 0);
     }
 
     /* if error or nothing done, return now */

@@ -20,7 +20,7 @@
 
 #include "sockio.h"
 
-int new_sock()
+int BMI_sockio_new_sock()
 {
     static int p_num = -1;	/* set to tcp protocol # on first call */
     struct protoent *pep;
@@ -37,7 +37,7 @@ int new_sock()
     return (socket(AF_INET, SOCK_STREAM, p_num));
 }
 
-int bind_sock(int sockd,
+int BMI_sockio_bind_sock(int sockd,
 	      int service)
 {
     struct sockaddr_in saddr;
@@ -56,13 +56,13 @@ int bind_sock(int sockd,
     return (sockd);
 }
 
-int connect_sock(int sockd,
+int BMI_sockio_connect_sock(int sockd,
 		 const char *name,
 		 int service)
 {
     struct sockaddr saddr;
 
-    if (init_sock(&saddr, name, service) != 0)
+    if (BMI_sockio_init_sock(&saddr, name, service) != 0)
 	return (-1);
   connect_sock_restart:
     if (connect(sockd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0)
@@ -74,7 +74,7 @@ int connect_sock(int sockd,
     return (sockd);
 }
 
-int init_sock(struct sockaddr *saddrp,
+int BMI_sockio_init_sock(struct sockaddr *saddrp,
 	      const char *name,
 	      int service)
 {
@@ -104,7 +104,7 @@ int init_sock(struct sockaddr *saddrp,
 /* Returns -1 if it cannot get all len bytes
  * and the # of bytes received otherwise
  */
-int brecv(int s,
+int BMI_sockio_brecv(int s,
 	  void *buf,
 	  int len)
 {
@@ -138,7 +138,7 @@ int brecv(int s,
 }
 
 /* nonblocking receive */
-int nbrecv(int s,
+int BMI_sockio_nbrecv(int s,
 	   void *buf,
 	   int len)
 {
@@ -175,7 +175,7 @@ int nbrecv(int s,
     return (len - comp);
 }
 
-/* nbpeek()
+/* BMI_sockio_nbpeek()
  *
  * performs a nonblocking check to see if the amount of data requested
  * is actually available in a socket.  Does not actually read the data
@@ -183,7 +183,7 @@ int nbrecv(int s,
  *
  * returns number of bytes available on succes, -1 on failure.
  */
-int nbpeek(int s, void* buf, int len)
+int BMI_sockio_nbpeek(int s, void* buf, int len)
 {
     int oldfl, ret, comp = len;
 
@@ -219,7 +219,7 @@ int nbpeek(int s, void* buf, int len)
 
 
 /* blocking send */
-int bsend(int s,
+int BMI_sockio_bsend(int s,
 	  void *buf,
 	  int len)
 {
@@ -246,7 +246,7 @@ int bsend(int s,
 
 /* nonblocking send */
 /* should always return 0 when nothing gets done! */
-int nbsend(int s,
+int BMI_sockio_nbsend(int s,
 	   void *buf,
 	   int len)
 {
@@ -274,7 +274,7 @@ int nbsend(int s,
 }
 
 /* nonblocking vector send */
-int nbvector(int s,
+int BMI_sockio_nbvector(int s,
 	    struct iovec* vector,
 	    int count, 
 	    int recv_flag)
@@ -326,7 +326,7 @@ int nbvector(int s,
  *
  * Returns -1 on error, amount of data written to socket on success.
  */
-int nbsendfile(int s,
+int BMI_sockio_nbsendfile(int s,
 	       int f,
 	       int off,
 	       int len)
@@ -358,7 +358,7 @@ int nbsendfile(int s,
 #endif
 
 /* routines to get and set socket options */
-int get_sockopt(int s,
+int BMI_sockio_get_sockopt(int s,
 		int optname)
 {
     int val, len = sizeof(val);
@@ -368,7 +368,7 @@ int get_sockopt(int s,
 	return (val);
 }
 
-int set_tcpopt(int s,
+int BMI_sockio_set_tcpopt(int s,
 	       int optname,
 	       int val)
 {
@@ -381,7 +381,7 @@ int set_tcpopt(int s,
 	return (val);
 }
 
-int set_sockopt(int s,
+int BMI_sockio_set_sockopt(int s,
 		int optname,
 		int val)
 {
