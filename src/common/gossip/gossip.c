@@ -402,7 +402,7 @@ static int gossip_debug_fp(FILE *fp, const char *format, va_list ap, int ts)
     if (ts) {
         gettimeofday(&tv, 0);
         tp = tv.tv_sec;
-        strftime(bptr, 2048, "[%H:%M:%S", localtime(&tp));
+        strftime(bptr, 10, "[%H:%M:%S", localtime(&tp));
         sprintf(bptr+9, ".%06ld] ", tv.tv_usec);
         bptr += 18;
         bsize -= 18;
