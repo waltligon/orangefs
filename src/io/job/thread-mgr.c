@@ -451,6 +451,10 @@ int PINT_thread_mgr_dev_stop(void)
 	pthread_join(dev_thread_id, NULL);
 #endif
     }
+    else
+    {
+        gen_mutex_unlock(&dev_mutex);
+    }
     return(0);
 }
 
@@ -538,6 +542,10 @@ int PINT_thread_mgr_trove_stop(void)
 	assert(0);
 #endif
     }
+    else
+    {
+        gen_mutex_unlock(&trove_mutex);
+    }
     return(0);
 }
 
@@ -561,6 +569,10 @@ int PINT_thread_mgr_bmi_stop(void)
 	pthread_join(bmi_thread_id, NULL);
 #endif
 	BMI_close_context(global_bmi_context);
+    }
+    else
+    {
+        gen_mutex_unlock(&bmi_mutex);
     }
     return(0);
 }
