@@ -10,8 +10,7 @@
 #include <assert.h>
 #include <sys/time.h>
 
-#include "trove-types.h"
-#include "trove-proto.h"
+#include "trove.h"
 #include "quickhash.h"
 #include "extent-utils.h"
 #include "trove-ledger.h"
