@@ -1,3 +1,1 @@
 DIR := src/common/quickhash
-LIBSRC += $(DIR)/quickhash.c
-SERVERSRC += $(DIR)/quickhash.c
