@@ -168,8 +168,8 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
                  PINT_map_server_op_to_string(s_op->req->op));
 
     /*
-      first we translate the dspace attributes into a more
-      convenient server use-able format.  i.e. a PVFS_object_attr
+      first we translate the dspace attributes into a more convenient
+      server use-able format.  i.e. a PVFS_object_attr
     */
     ds_attr = &(s_op->ds_attr);
     obj_attr = &(s_op->attr);
@@ -199,6 +199,14 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
 	return(1);
     }
+
+    gossip_debug(
+        GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
+        "attr mask %d\n\t(attr_uid_valid? %s, attr_owner = "
+        "%d, credentials_uid = %d)\n",
+        PINT_map_server_op_to_string(s_op->req->op), s_op->attr.mask,
+        ((s_op->attr.mask & PVFS_ATTR_COMMON_UID) ? "yes" :
+         "no"), s_op->attr.owner, s_op->req->credentials.uid);
 	
     switch(s_op->req->op)
     {
@@ -247,10 +255,9 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	     * PVFS_U_READ here to indicate we need read access; its 
 	     * misleading
 	     */
-	    js_p->error_code = check_mode(&(s_op->attr),
-		s_op->req->credentials.uid,
-		s_op->req->credentials.gid,
-		PVFS_U_READ);
+	    js_p->error_code = check_mode(
+                &(s_op->attr), s_op->req->credentials.uid,
+                s_op->req->credentials.gid, PVFS_U_READ);
 	    break;
 
 	/* things that need write permissions */
@@ -323,7 +330,12 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	    break;
     }
 
-    return(1);
+    gossip_debug(
+        GOSSIP_PERMISSIONS_DEBUG, "Final permission check for \"%s\" set "
+        "error code to %d\n", PINT_map_server_op_to_string(s_op->req->op),
+        js_p->error_code);
+
+    return 1;
 }
 
 
@@ -346,6 +358,9 @@ static int check_mode(
      */
     assert((attr->mask & perm_mask) == perm_mask);
 
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - check_mode called --- "
+                 "(uid=%d,gid=%d,mode=%d)\n", uid, gid, mode);
+
     /*
       give root permissions, no matter what.
 
@@ -355,28 +370,43 @@ static int check_mode(
       options to either honor the credentials of the request (like
       no_root_squash, etc) in the future
     */
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
+                 " - checking if owner (%d) is root ... ", attr->owner);
     if (attr->owner == 0)
     {
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
 	return 0;
     }
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
 
-    /* uid test */
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if owner (%d) "
+                 "is uid (%d)\n\tand perms (%d) matches mode (%d) ... ",
+                 attr->owner, uid, ((attr->perms >> 6) & mode), mode);
     if ((attr->owner == uid) && (((attr->perms >> 6) & mode) == mode))
     {
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
 	return 0;
     }
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
 
-    /* gid test */
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if group (%d) "
+                 "is gid (%d)\n\tand perms (%d) matches mode (%d) ... ",
+                 attr->group, gid, ((attr->perms >> 3) & mode), mode);
     if ((attr->group == gid) && (((attr->perms >> 3) & mode) == mode))
     {
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
 	return 0;
     }
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
 
-    /* other test */
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if perms (%d) "
+                 "matches mode (%d) ... ", (attr->perms & mode), mode);
     if ((attr->perms & mode) == mode)
     {
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
 	return 0;
     }
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
 
     /* access denied */
     return(-PVFS_EPERM);
