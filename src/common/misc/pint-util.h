@@ -25,6 +25,14 @@ do{                                             \
     (dest)->mask = ((src)->mask & attrmask);    \
 }while(0)
 
+struct PINT_time_marker_s
+{
+    struct timeval wtime; /* real time */
+    struct timeval utime; /* user time */
+    struct timeval stime; /* system time */
+};
+typedef struct PINT_time_marker_s PINT_time_marker;
+
 /* reserved tag values */
 #define PINT_MSG_TAG_INVALID 0
 
@@ -32,6 +40,12 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void);
 
 int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src);
 void PINT_free_object_attr(PVFS_object_attr *attr);
+void PINT_time_mark(PINT_time_marker* out_marker);
+void PINT_time_diff(PINT_time_marker mark1, 
+    PINT_time_marker mark2,
+    double* out_wtime_sec,
+    double* out_utime_sec,
+    double* out_stime_sec);
 
 #endif /* __PINT_UTIL_H */
 

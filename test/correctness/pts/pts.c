@@ -16,6 +16,7 @@
 
 /*pvfs2 functions we're calling (mostly gossip args)*/
 #include "pvfs2-debug.h"
+#include "pint-util.h"
 
 /* this is where all of the individual test prototypes are */
 #include "test-protos.h"
@@ -26,6 +27,8 @@ static config pts_config;
 int main(int argc, char **argv) {
   
   int numprocs, myid, rc, status;
+  PINT_time_marker marker1, marker2;
+  double wtime, stime, utime;
 
   MPI_Init(&argc,&argv);
   MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
@@ -77,10 +80,21 @@ int main(int argc, char **argv) {
   
   /* need to learn how to dup communicators ... should do that here*/
   
+  PINT_time_mark(&marker1);
   rc = run_tests(&pts_config);
+  PINT_time_mark(&marker2);
   
   fprintf(stderr, "%d: DONE RUNNING TESTS!\n", myid);
   //   MPI_Barrier(MPI_COMM_WORLD);
+  if(numprocs == 1)
+  {
+    PINT_time_diff(marker1, marker2, &wtime, &utime, &stime);
+    fprintf(stderr, "Elapsed time:\n");
+    fprintf(stderr, "----------------------\n");
+    fprintf(stderr, "   wall: %f\n", wtime);
+    fprintf(stderr, "   user: %f\n", utime);
+    fprintf(stderr, "   system: %f\n", stime);
+  }
   MPI_Finalize();
 
   exit(0);

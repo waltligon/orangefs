@@ -7,13 +7,51 @@
 /* This file includes definitions of common internal utility functions */
 
 #include <string.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <unistd.h>
 #include <assert.h>
+
 #include "pvfs2-types.h"
 #include "pint-util.h"
 #include "gen-locks.h"
 
 static int current_tag = 1;
 static gen_mutex_t current_tag_lock = GEN_MUTEX_INITIALIZER;
+
+void PINT_time_mark(PINT_time_marker* out_marker)
+{
+    struct rusage usage;
+
+    gettimeofday(&out_marker->wtime, NULL);
+    getrusage(RUSAGE_SELF, &usage);
+    out_marker->utime = usage.ru_utime;
+    out_marker->stime = usage.ru_stime;
+
+    return;
+}
+
+void PINT_time_diff(PINT_time_marker mark1, 
+    PINT_time_marker mark2,
+    double* out_wtime_sec,
+    double* out_utime_sec,
+    double* out_stime_sec)
+{
+    *out_wtime_sec = 
+        ((double)mark2.wtime.tv_sec + (double)(mark2.wtime.tv_usec) / 1000000)
+        -
+        ((double)mark1.wtime.tv_sec + (double)(mark1.wtime.tv_usec) / 1000000);
+    *out_stime_sec = 
+        ((double)mark2.stime.tv_sec + (double)(mark2.stime.tv_usec) / 1000000)
+        -
+        ((double)mark1.stime.tv_sec + (double)(mark1.stime.tv_usec) / 1000000);
+    *out_utime_sec = 
+        ((double)mark2.utime.tv_sec + (double)(mark2.utime.tv_usec) / 1000000)
+        -
+        ((double)mark1.utime.tv_sec + (double)(mark1.utime.tv_usec) / 1000000);
+
+    return;
+}
 
 PVFS_msg_tag_t PINT_util_get_next_tag(void)
 {
