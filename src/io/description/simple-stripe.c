@@ -72,21 +72,17 @@ static PVFS_size logical_file_size (PVFS_Dist_params *dparam,
 		uint32_t iod_count, PVFS_size *psizes)
 {
 	/* take the max of the max offset on each server */
-	PVFS_size max;
-	int s;
+	PVFS_size max = 0;
+	PVFS_size tmp_max = 0;
+	int s = 0;
 	if (!psizes)
 		return -1;
-	max = 0;
 	for (s = 0; s < iod_count; s++)
 	{
-		PVFS_size smax;
-		PVFS_size disp;
-		PVFS_size stripes;
-		stripes = psizes[s] / dparam->strip_size;
-		disp = psizes[s] % dparam->strip_size;
-		smax = disp + ((((stripes - 1) * iod_count) + s) * dparam->strip_size);
-		if (smax > max)
-			max = smax;
+		tmp_max = physical_to_logical_offset(dparam,
+			s, iod_count, psizes[s]);
+		if(tmp_max > max)
+			max = tmp_max;
 	}
 	return max;
 }  
