@@ -21,6 +21,7 @@
 #include "op-list.h"
 #include "gossip.h"
 #include "sockio.h"
+#include "bmi-byteswap.h"
 
 /* function prototypes */
 int BMI_tcp_initialize(method_addr_p listen_addr,

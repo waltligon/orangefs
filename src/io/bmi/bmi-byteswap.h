@@ -26,6 +26,8 @@
 #ifndef __BMI_BYTESWAP_H
 #define __BMI_BYTESWAP_H 
 
+#include "pvfs2-config.h"
+
 #ifndef __bswap_16
 /* Swap bytes in 16 bit value.  */
 #ifdef __GNUC__
@@ -87,8 +89,24 @@ __bswap_32 (unsigned int __bsx)
 	   }								      \
 	 __r.__ll; }))
 #else
+#ifdef WORDS_BIGENDIAN
 #error FIX ME: no 64 bit bswap routine for non GNUC preprocessor.
 #endif
+#endif
 #endif 
+
+#ifdef WORDS_BIGENDIAN
+#define htobmi16(x) __bswap_16(x)
+#define htobmi32(x) __bswap_32(x)
+#define htobmi64(x) __bswap_64(x)
+#else
+#define htobmi16(x) x
+#define htobmi32(x) x
+#define htobmi64(x) x
+#endif
+
+#define bmitoh16(x) htobmi16(x) 
+#define bmitoh32(x) htobmi32(x)
+#define bmitoh64(x) htobmi64(x)
 
 #endif /* __BMI_BYTESWAP_H */
