@@ -63,6 +63,7 @@ struct fp_private_data
     int dest_last_posted;
     int initial_posts;
     gen_mutex_t flow_mutex;
+    void* tmp_buffer_list[MAX_REGIONS];
 
     struct qlist_head src_list;
     struct qlist_head dest_list;
@@ -73,14 +74,14 @@ struct fp_private_data
 
 static int fp_multiqueue_id = -1;
 static bmi_context_id global_bmi_context = -1;
-static TROVE_context_id global_trove_context = -1;
 static gen_mutex_t completion_mutex = GEN_MUTEX_INITIALIZER;
+static QLIST_HEAD(completion_queue); 
 #ifdef __PVFS2_JOB_THREADED__
 static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
 #endif
-static QLIST_HEAD(completion_queue); 
 
 #ifdef __PVFS2_TROVE_SUPPORT__
+static TROVE_context_id global_trove_context = -1;
 static void bmi_recv_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code);
@@ -92,6 +93,9 @@ static void trove_read_callback_fn(void *user_ptr,
 static void trove_write_callback_fn(void *user_ptr,
 		           PVFS_error error_code);
 #endif
+static void mem_to_bmi_callback_fn(void *user_ptr,
+		         PVFS_size actual_size,
+		         PVFS_error error_code);
 static void cleanup_buffers(struct fp_private_data* flow_data);
 
 
@@ -144,6 +148,7 @@ int fp_multiqueue_initialize(int flowproto_id)
 	return(ret);
     PINT_thread_mgr_bmi_getcontext(&global_bmi_context);
 
+#ifdef __PVFS2_TROVE_SUPPORT__
     ret = PINT_thread_mgr_trove_start();
     if(ret < 0)
     {
@@ -151,6 +156,7 @@ int fp_multiqueue_initialize(int flowproto_id)
 	return(ret);
     }
     PINT_thread_mgr_trove_getcontext(&global_trove_context);
+#endif
 
     fp_multiqueue_id = flowproto_id;
 
@@ -166,7 +172,9 @@ int fp_multiqueue_initialize(int flowproto_id)
 int fp_multiqueue_finalize(void)
 {
     PINT_thread_mgr_bmi_stop();
+#ifdef __PVFS2_TROVE_SUPPORT__
     PINT_thread_mgr_trove_stop();
+#endif
     return (0);
 }
 
@@ -282,8 +290,9 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
     else if(flow_d->src.endpoint_id == MEM_ENDPOINT &&
 	flow_d->dest.endpoint_id == BMI_ENDPOINT)
     {
-	/* TODO: fill this in */
-	assert(0);
+	flow_data->prealloc_array[0].buffer = flow_d->src.u.mem.buffer;
+	flow_data->prealloc_array[0].bmi_callback.fn = mem_to_bmi_callback_fn;
+	mem_to_bmi_callback_fn(&(flow_data->prealloc_array[0]), 0, 0);
     }
 #ifdef __PVFS2_TROVE_SUPPORT__
     else if(flow_d->src.endpoint_id == TROVE_ENDPOINT &&
@@ -1008,14 +1017,16 @@ static void cleanup_buffers(struct fp_private_data* flow_data)
     {
 	if(flow_data->prealloc_array[i].buffer)
 	{
-	    if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT)
+	    if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
+		flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
 	    {
 		BMI_memfree(flow_data->parent->src.u.bmi.address,
 		    flow_data->prealloc_array[i].buffer,
 		    BUFFER_SIZE,
 		    BMI_RECV);
 	    }
-	    else
+	    else if(flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
+		flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
 	    {
 		BMI_memfree(flow_data->parent->dest.u.bmi.address,
 		    flow_data->prealloc_array[i].buffer,
@@ -1023,6 +1034,106 @@ static void cleanup_buffers(struct fp_private_data* flow_data)
 		    BMI_SEND);
 	    }
 	}
+    }
+
+    return;
+}
+
+/* mem_to_bmi_callback()
+ *
+ * function to be called upon completion of bmi operations in memory to
+ * bmi transfers
+ * 
+ * no return value
+ */
+static void mem_to_bmi_callback_fn(void *user_ptr,
+		         PVFS_size actual_size,
+		         PVFS_error error_code)
+{
+    struct fp_queue_item* q_item = user_ptr;
+    int ret;
+    struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
+    int i;
+    PVFS_id_gen_t tmp_id;
+
+    /* TODO: error handling */
+    if(error_code != 0)
+    {
+	PVFS_perror_gossip("bmi_recv_callback_fn error_code", error_code);
+	assert(0);
+    }
+
+    gen_mutex_lock(&flow_data->flow_mutex);
+    
+    /* are we done? */
+    if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
+    {
+	q_item->parent->state = FLOW_COMPLETE;
+	gen_mutex_lock(&completion_mutex);
+	qlist_add_tail(&(flow_data->list_link), 
+	    &completion_queue);
+#ifdef __PVFS2_JOB_THREADED__
+	pthread_cond_signal(&completion_cond);
+#endif
+	gen_mutex_unlock(&completion_mutex);
+	gen_mutex_unlock(&flow_data->flow_mutex);
+	return;
+    }
+
+    /* process request */
+    q_item->result_chain.result.offset_array = 
+	q_item->result_chain.offset_list;
+    q_item->result_chain.result.size_array = 
+	q_item->result_chain.size_list;
+    q_item->result_chain.result.bytemax = BUFFER_SIZE;
+    q_item->result_chain.result.bytes = 0;
+    q_item->result_chain.result.segmax = MAX_REGIONS;
+    q_item->result_chain.result.segs = 0;
+    q_item->result_chain.buffer_offset = NULL;
+    ret = PINT_Process_request(q_item->parent->file_req_state,
+	q_item->parent->mem_req_state,
+	&q_item->parent->file_data,
+	&q_item->result_chain.result,
+	PINT_SERVER);
+
+    /* TODO: error handling */ 
+    assert(ret >= 0);
+    /* TODO: handle highly discontiguous cases */
+    assert(q_item->result_chain.result.segs <= MAX_REGIONS);
+
+    if(q_item->result_chain.result.bytes == 0)
+    {	
+	gen_mutex_unlock(&flow_data->flow_mutex);
+	return;
+    }
+
+    /* convert offsets to memory addresses */
+    for(i=0; i<q_item->result_chain.result.segs; i++)
+    {
+	flow_data->tmp_buffer_list[i] = 
+	    (void*)(q_item->result_chain.result.offset_array[i] +
+	    q_item->buffer);
+    }
+
+    ret = BMI_post_send_list(&tmp_id,
+	q_item->parent->dest.u.bmi.address,
+	(const void**)flow_data->tmp_buffer_list,
+	q_item->result_chain.result.size_array,
+	q_item->result_chain.result.segs,
+	q_item->result_chain.result.bytes,
+	BMI_EXT_ALLOC,
+	q_item->parent->tag,
+	&q_item->bmi_callback,
+	global_bmi_context);
+    /* TODO: error handling */
+    assert(ret >= 0);
+
+    gen_mutex_unlock(&flow_data->flow_mutex);
+
+    if(ret == 1)
+    {
+	mem_to_bmi_callback_fn(q_item, 
+	    q_item->result_chain.result.bytes, 0);
     }
 
     return;

@@ -530,6 +530,8 @@ static int parse_flowproto_string(const char* input, enum PVFS_flowproto_type*
 	*flowproto = FLOWPROTO_DUMP_OFFSETS;
     else if(!strcmp(flow, "bmi_cache"))
 	*flowproto = FLOWPROTO_BMI_CACHE;
+    else if(!strcmp(flow, "multiqueue"))
+	*flowproto = FLOWPROTO_MULTIQUEUE;
     else
     {
 	gossip_err("Error: unrecognized flowproto option: %s\n", flow);
