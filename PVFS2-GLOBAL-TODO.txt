@@ -134,6 +134,8 @@ system management utilities
 
 documentation:
 ====================================================================
+- a way to export to html
+- faq
 - top level README/INSTALL files
 - put quickstart in a more obvious location
 - pvfs2-users list
