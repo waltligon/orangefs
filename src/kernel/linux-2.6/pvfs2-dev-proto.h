@@ -25,9 +25,7 @@
 #define PVFS2_NAME_LEN                 0x000000FF
 #define MAX_DIRENT_COUNT               0x00000020
 
-#include "pvfs2-types.h"
-#include "pvfs2-storage.h"
-#include "pvfs2-attr.h"
+#include "pvfs2.h"
 
 #include "upcall.h"
 #include "downcall.h"
