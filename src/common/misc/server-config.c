@@ -1643,8 +1643,8 @@ int PINT_config_pvfs2_mkspace(
               for the first fs/collection we encounter, create
               the storage space if it doesn't exist.
             */
-            fprintf(stderr,"\n*****************************\n");
-            fprintf(stderr,"Creating new PVFS2 %s\n",
+            gossip_debug(SERVER_DEBUG,"\n*****************************\n");
+            gossip_debug(SERVER_DEBUG,"Creating new PVFS2 %s\n",
                     (create_collection_only ? "collection" :
                      "storage space"));
             ret = pvfs2_mkspace(config->storage_path,
@@ -1654,7 +1654,7 @@ int PINT_config_pvfs2_mkspace(
                                 cur_handle_range,
                                 create_collection_only,
                                 1);
-            fprintf(stderr,"\n*****************************\n");
+            gossip_debug(SERVER_DEBUG,"\n*****************************\n");
 
             /*
               now that the storage space is created, set the
