@@ -884,6 +884,10 @@ static int bmi_send_callback_fn(void *user_ptr,
 	flow_data->dest_pending == 0 && 
 	flow_data->dest_last_posted)
     {
+	/* we are in trouble if more than one callback function thinks that
+	 * it can trigger completion
+	 */
+	assert(q_item->parent->state != FLOW_COMPLETE);
 	q_item->parent->state = FLOW_COMPLETE;
 	return(1);
     }
@@ -1065,6 +1069,10 @@ static void trove_write_callback_fn(void *user_ptr,
 	flow_data->total_bytes_processed &&
 	PINT_REQUEST_DONE(flow_data->parent->file_req_state))
     {
+	/* we are in trouble if more than one callback function thinks that
+	 * it can trigger completion
+	 */
+	assert(q_item->parent->state != FLOW_COMPLETE);
 	q_item->parent->state = FLOW_COMPLETE;
 	return;
     }
@@ -1293,6 +1301,10 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     /* are we done? */
     if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
     {
+	/* we are in trouble if more than one callback function thinks that
+	 * it can trigger completion
+	 */
+	assert(q_item->parent->state != FLOW_COMPLETE);
 	q_item->parent->state = FLOW_COMPLETE;
 	return;
     }
@@ -1380,6 +1392,10 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	/* go ahead and return if there is nothing to do */
 	if(q_item->result_chain.result.bytes == 0)
 	{	
+	    /* we are in trouble if more than one callback function thinks that
+	     * it can trigger completion
+	     */
+	    assert(q_item->parent->state != FLOW_COMPLETE);
 	    q_item->parent->state = FLOW_COMPLETE;
 	    return;
 	}
@@ -1508,6 +1524,10 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     /* are we done? */
     if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
     {
+	/* we are in trouble if more than one callback function thinks that
+	 * it can trigger completion
+	 */
+	assert(q_item->parent->state != FLOW_COMPLETE);
 	q_item->parent->state = FLOW_COMPLETE;
 	return;
     }
@@ -1570,6 +1590,10 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 	/* go ahead and return if there is nothing to do */
 	if(q_item->result_chain.result.bytes == 0)
 	{	
+	    /* we are in trouble if more than one callback function thinks that
+	     * it can trigger completion
+	     */
+	    assert(q_item->parent->state != FLOW_COMPLETE);
 	    q_item->parent->state = FLOW_COMPLETE;
 	    return;
 	}
@@ -1691,6 +1715,10 @@ static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
     {
 	/* we are finished, make sure error is marked and state is set */
 	assert(flow_data->parent->error_code);
+	/* we are in trouble if more than one callback function thinks that
+	 * it can trigger completion
+	 */
+	assert(flow_data->parent->state != FLOW_COMPLETE);
 	flow_data->parent->state = FLOW_COMPLETE;
     }
 
