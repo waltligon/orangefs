@@ -68,7 +68,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init);
 static int initialize_signal_handlers(void);
 static int initialize_server_state(PINT_server_status_code *server_level_init,
                                    PINT_server_op *s_op, 
-				   job_status_s *job_status_structs[]);
+				   job_status_s *job_status_structs);
 static int server_init(void);
 static int server_shutdown(PINT_server_status_code level,
 			   int ret,
@@ -195,7 +195,7 @@ static int initialize_signal_handlers(void)
 */
 static int initialize_server_state(PINT_server_status_code *server_level_init,
                                    PINT_server_op *s_op,
-				   job_status_s *job_status_structs[])
+				   job_status_s *job_status_structs)
 {
     int ret = 0, i = 0;
 
@@ -233,7 +233,7 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
     for (i = 0; i < user_opts->initial_unexpected_requests; i++)
     {
         /* ARE THESE SUPPOSED TO BE UNINITIALIZED??? -N.M. */
-	ret = PINT_server_cp_bmi_unexp(s_op, &((*job_status_structs)[0]));
+	ret = PINT_server_cp_bmi_unexp(s_op, &job_status_structs[0]);
 	if (ret < 0)
 	{
 	    PINT_server_get_bmi_unexp_err(ret);
@@ -332,12 +332,7 @@ int main(int argc,
 	goto server_shutdown;
     }
 
-    /* TODO: Why is this generating a warning??? Fix Me!
-     *       src/server/pvfs2-server.c: In function `main':
-     *       src/server/pvfs2-server.c:340: warning: passing arg 3 of `initialize_server_state' 
-     *       from incompatible pointer type
-     */
-    ret = initialize_server_state(&server_level_init,s_op,&job_status_structs);
+    ret = initialize_server_state(&server_level_init,s_op, job_status_structs);
     if (ret < 0)
     {
 	gossip_err("Error: Could not initialize server; aborting.\n");
