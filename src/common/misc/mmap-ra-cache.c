@@ -111,7 +111,7 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
 
 int pvfs2_mmap_ra_cache_get_block(
     PVFS_object_ref refn, PVFS_size offset,
-    PVFS_size len, void *dest)
+    PVFS_size len, void *dest, int *amt_returned)
 {
     int ret = -1;
     void *ptr = NULL;
@@ -130,25 +130,46 @@ int pvfs2_mmap_ra_cache_get_block(
 
             if (cache_elem->data_sz > (offset + len))
             {
-                gossip_debug(
-                    GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
-                    "got block at offset %Lu, len %Lu\n",
-                    Lu(offset), Lu(len));
+                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                             "mmap_ra_cache_get_block got block at "
+                             "offset %Lu, len %Lu\n",  Lu(offset),
+                             Lu(len));
 
                 ptr = (void *)((char *)(cache_elem->data + offset));
                 memcpy(dest, ptr, len);
 
+                if (amt_returned)
+                {
+                    *amt_returned = len;
+                }
                 ret = 0;
             }
             else
             {
+                int actual_len = ((offset + len) - cache_elem->data_sz);
+
                 gossip_debug(
                     GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
-                    "found block but offset/len are invalid\n");
-                gossip_debug(
-                    GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %Lu, "
-                    "offset is %Lu len is %Lu\n", Lu(cache_elem->data_sz),
-                    Lu(offset), Lu(len));
+                    "found block but offset/len [%Lu/%Lu] are "
+                    "invalid\n", Lu(offset), Lu(len));
+
+                if (actual_len > 0)
+                {
+                    gossip_debug(
+                        GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %Lu, "
+                        "offset is %Lu len is %Lu (filling partial %d "
+                        "bytes)\n", Lu(cache_elem->data_sz), Lu(offset),
+                        Lu(len), actual_len);
+
+                    ptr = (void *)((char *)(cache_elem->data + offset));
+                    memcpy(dest, ptr, actual_len);
+
+                    if (amt_returned)
+                    {
+                        *amt_returned = actual_len;
+                    }
+                    ret = 0;
+                }
             }
         }
         else

@@ -92,7 +92,7 @@ static ssize_t pvfs2_devreq_read(
         /* block until we have a request */
         DECLARE_WAITQUEUE(wait_entry, current);
 
-        add_wait_queue_exclusive(&pvfs2_request_list_waitq, &wait_entry);
+        add_wait_queue(&pvfs2_request_list_waitq, &wait_entry);
 
         while(1)
         {
@@ -461,15 +461,17 @@ static unsigned int pvfs2_devreq_poll(
 {
     int poll_revent_mask = 0;
 
-    poll_wait(file, &pvfs2_request_list_waitq, poll_table);
-
-    spin_lock(&pvfs2_request_list_lock);
-    if (!list_empty(&pvfs2_request_list))
+    if (open_access_count == 1)
     {
-        poll_revent_mask |= POLL_IN;
-    }
-    spin_unlock(&pvfs2_request_list_lock);
+        poll_wait(file, &pvfs2_request_list_waitq, poll_table);
 
+        spin_lock(&pvfs2_request_list_lock);
+        if (!list_empty(&pvfs2_request_list))
+        {
+            poll_revent_mask |= POLL_IN;
+        }
+        spin_unlock(&pvfs2_request_list_lock);
+    }
     return poll_revent_mask;
 }
 

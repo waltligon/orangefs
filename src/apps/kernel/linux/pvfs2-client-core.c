@@ -30,6 +30,7 @@
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
+#define MMAP_RA_MIN_THRESHOLD  76800
 #endif
 
 /*
@@ -938,7 +939,7 @@ static int post_io_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
 #ifdef USE_MMAP_RA_CACHE
-    int val = 0;
+    int val = 0, amt_returned = 0;
     void *buf = NULL;
 
     if (vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ)
@@ -953,16 +954,19 @@ static int post_io_request(vfs_request_t *vfs_request)
             {
 
                 gossip_debug(
-                    GOSSIP_MMAP_RCACHE_DEBUG,
-                    "checking for %d bytes at offset %lu in cache\n",
-                    vfs_request->in_upcall.req.io.count, (unsigned long)
-                    vfs_request->in_upcall.req.io.offset);
+                    GOSSIP_MMAP_RCACHE_DEBUG, "[%Lu,%d] checking"
+                    " for %d bytes at offset %lu in cache\n",
+                    Lu(vfs_request->in_upcall.req.io.refn.handle),
+                    vfs_request->in_upcall.req.io.refn.fs_id,
+                    vfs_request->in_upcall.req.io.count,
+                    (unsigned long)vfs_request->in_upcall.req.io.offset);
 
                 val = pvfs2_mmap_ra_cache_get_block(
                     vfs_request->in_upcall.req.io.refn,
                     vfs_request->in_upcall.req.io.offset,
                     vfs_request->in_upcall.req.io.count,
-                    vfs_request->io_tmp_buf);
+                    vfs_request->io_tmp_buf,
+                    &amt_returned);
 
                 if (val == 0)
                 {
@@ -973,7 +977,9 @@ static int post_io_request(vfs_request_t *vfs_request)
             }
         }
 
-        if (vfs_request->in_upcall.req.io.readahead_size > 0)
+        /* don't post a readahead request if the size is too small */
+        if (vfs_request->in_upcall.req.io.readahead_size >
+            MMAP_RA_MIN_THRESHOLD)
         {
             /* otherwise, check if we can post a readahead request here */
             ret = post_io_readahead_request(vfs_request);
@@ -1028,8 +1034,7 @@ static int post_io_request(vfs_request_t *vfs_request)
 
     vfs_request->out_downcall.type = PVFS2_VFS_OP_FILE_IO;
     vfs_request->out_downcall.status = 0;
-    vfs_request->out_downcall.resp.io.amt_complete =
-        vfs_request->in_upcall.req.io.count;
+    vfs_request->out_downcall.resp.io.amt_complete = amt_returned;
 
     /* get a shared kernel/userspace buffer for the I/O transfer */
     buf = PINT_dev_get_mapped_buffer(
@@ -1054,13 +1059,14 @@ static int service_mmap_ra_flush_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
+        GOSSIP_MMAP_RCACHE_DEBUG,
         "Got a mmap racache flush request for %Lu under fsid %d\n",
         Lu(vfs_request->in_upcall.req.ra_cache_flush.refn.handle),
         vfs_request->in_upcall.req.ra_cache_flush.refn.fs_id);
 
     /* flush associated cached data if any */
-    pvfs2_mmap_ra_cache_flush(vfs_request->in_upcall.req.io.refn);
+    pvfs2_mmap_ra_cache_flush(
+        vfs_request->in_upcall.req.ra_cache_flush.refn);
 
     /* we need to send a blank success response */
     vfs_request->out_downcall.type = PVFS2_VFS_OP_MMAP_RA_FLUSH;

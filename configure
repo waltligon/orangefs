@@ -36,7 +36,7 @@ ac_help="$ac_help
 ac_help="$ac_help
   --disable-disk-io       Disables pvfs2-server disk I/O (for testing)"
 ac_help="$ac_help
-  --disable-mmap-racache  Disables mmap-readahead in vfs interface"
+  --disable-mmap-racache  Disables mmap-readahead in kernel interface"
 ac_help="$ac_help
   --disable-karma         Disables optional gui.  (Enabled by default)"
 ac_help="$ac_help
@@ -588,8 +588,8 @@ ac_configure=$ac_aux_dir/configure # This should be Cygnus configure.
 
 CONFIGURE_TIME=`date -u +"%F@%T"`
 PVFS2_MAJOR=0
-PVFS2_MINOR=7
-PVFS2_SUB=0
+PVFS2_MINOR=6
+PVFS2_SUB=5
 PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
 am__api_version="1.4"

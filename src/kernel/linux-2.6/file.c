@@ -382,6 +382,9 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     inode->i_mapping->host = inode;
     inode->i_mapping->a_ops = &pvfs2_address_operations;
 
+    /* set the sequential readahead hint */
+    vma->vm_flags |= VM_SEQ_READ;
+
     /* have the kernel enforce readonly mmap support for us */
 #ifdef PVFS2_LINUX_KERNEL_2_4
     vma->vm_flags &= ~VM_MAYWRITE;

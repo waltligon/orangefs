@@ -112,8 +112,9 @@ static int pvfs2_get_blocks(
 
           set the readahead size to be the entire file size so that
           subsequent calls have the opportunity to be userspace read
-          cache hits; any readahead data the client pulls in is flused
-          (both from userspace and the page cache) on vfs file close
+          cache hits; any readahead data the client pulls in is
+          flushed (both from userspace and the page cache) on vfs file
+          close
         */
         bytes_read = pvfs2_inode_read(
             inode, page_data, blocksize, &blockptr_offset, 0,
@@ -227,7 +228,7 @@ static int pvfs2_releasepage(struct page *page, int foo)
 
 struct backing_dev_info pvfs2_backing_dev_info =
 {
-    .ra_pages = 0,
+    .ra_pages = 1024,
     .memory_backed = 1 /* does not contribute to dirty memory */
 };
 #endif /* PVFS2_LINUX_KERNEL_2_4 */

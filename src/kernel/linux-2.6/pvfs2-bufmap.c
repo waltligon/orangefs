@@ -48,28 +48,28 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     if (PAGE_ALIGN((unsigned long)user_desc->ptr) != 
         (unsigned long)user_desc->ptr)
     {
-        pvfs2_error("pvfs2: error: memory alignment (front).\n");
+        pvfs2_error("pvfs2 error: memory alignment (front).\n");
         goto init_failure;
     }
 
     if (PAGE_ALIGN(((unsigned long)user_desc->ptr + user_desc->size)) != 
         (unsigned long)(user_desc->ptr + user_desc->size))
     {
-        pvfs2_error("pvfs2: error: memory alignment (back).\n");
+        pvfs2_error("pvfs2 error: memory alignment (back).\n");
         goto init_failure;
     }
 
     if (user_desc->size != PVFS2_BUFMAP_TOTAL_SIZE)
     {
-        pvfs2_error("pvfs2: error: user provided an oddly "
+        pvfs2_error("pvfs2 error: user provided an oddly "
                     "sized buffer...\n");
         goto init_failure;
     }
 
     if ((PVFS2_BUFMAP_DEFAULT_DESC_SIZE % PAGE_SIZE) != 0)
     {
-        pvfs2_error("pvfs2: error: bufmap size not page size "
-                    "divisable.\n");
+        pvfs2_error("pvfs2 error: bufmap size not page size "
+                    "divisible.\n");
         goto init_failure;
     }
 

@@ -1268,6 +1268,11 @@ static inline int build_context_flow(
         return -PVFS_EINVAL;
     }
 
+    gossip_debug(GOSSIP_IO_DEBUG, "* mem req size is %Ld bytes, "
+                 "file_req size is %Ld bytes\n",
+                 Ld(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req)),
+                 Ld(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.file_req)));
+
     cur_ctx->flow_desc.file_data.fsize = resp->u.io.bstream_size;
     cur_ctx->flow_desc.file_data.dist = attr->u.meta.dist;
     cur_ctx->flow_desc.file_data.server_nr = cur_ctx->server_nr;

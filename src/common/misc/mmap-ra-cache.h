@@ -43,7 +43,7 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
 */
 int pvfs2_mmap_ra_cache_get_block(
     PVFS_object_ref refn, PVFS_size offset,
-    PVFS_size len, void *dest);
+    PVFS_size len, void *dest, int *amt_returned);
 
 int pvfs2_mmap_ra_cache_flush(PVFS_object_ref refn);
 
