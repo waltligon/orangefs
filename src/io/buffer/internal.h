@@ -82,18 +82,19 @@ typedef struct NCAC_dev NCAC_dev_t;
 
 
 struct NCAC_req{
-   int  id;
-   int  optype;
-   int  status;
-   int  error;
+   int              id;
+   int              optype;
+   int              status;
+   int              error;
    PVFS_fs_id   	coll_id;
    PVFS_handle  	handle;
    PVFS_context_id  context_id;
 
-   PVFS_size usrlen;
-   PVFS_size written;
-   char *usrbuf;
+   PVFS_size        usrlen;
+   PVFS_size        written;
+   char             *usrbuf;
 
+   PVFS_offset *foff;
    char ** cbufoff;
    PVFS_size *cbufsize;
    int *cbufflag;
@@ -114,7 +115,7 @@ struct NCAC_req{
 
    struct inode *mapping;
    struct aiovec *aiovec;
-   int ioreq;
+   PVFS_id_gen_t ioreq;
 
    int read_out;
    struct list_head list;
@@ -137,6 +138,8 @@ typedef struct NCAC_req NCAC_req_t;
 /* this is an inode-like structure for each
  * object <coll_id, handle>
  */
+#define MAX_INODE_NUM 	10000
+
 struct inode
 {
     NCAC_lock  lock;
@@ -154,7 +157,10 @@ struct inode
 
     struct aiovec aiovec;
     struct cache_stack *cache_stack;
+	struct inode *next;
 };
+
+extern struct inode *inode_arr[MAX_INODE_NUM];
 
 
 struct extent {
@@ -175,14 +181,19 @@ struct extent {
    struct extent *next;
    struct inode *mapping;
 
-   int  	ioreq;
-   struct extent *ioreq_next;
+   PVFS_id_gen_t  	ioreq;
 
+   /* for optimization. We can initiate one trove request for
+    * a list of extents. For doing that, all extents will share
+    * the same ioreq. If the ioreq is done, we follow ioreq_next
+    * to mark all other extents.
+    */
+   struct extent    *ioreq_next; 
 };
 
 
-
 #define MAX_DELT_REQ_NUM 10000
+
 
 
 #define NCAC_OK			0
@@ -232,8 +243,15 @@ int NCAC_rwjob_prepare(NCAC_req_t *ncac_req, NCAC_reply_t *reply );
 int NCAC_do_jobs(struct list_head *list, struct list_head *bufcomp_list, struct list_head * comp_list, NCAC_lock *lock);
 int NCAC_do_a_job(NCAC_req_t *req, struct list_head *list, struct list_head *bufcomp_list, struct list_head * comp_list, NCAC_lock *lock);
 
+#define NCAC_COMM_NOT_READY    0
+#define NCAC_READ_PREPARE   1
+#define NCAC_READING        2
+#define NCAC_READ_READY     3
+
 int NCAC_do_one_piece_read(NCAC_req_t *ncac_req, PVFS_offset pos,
-                           PVFS_size size, char **cbufoff,
+                           PVFS_size size, 
+                            PVFS_offset *foff,
+                            char **cbufoff,
                            PVFS_size *cbufsize, struct extent *cbufhash[],
                            int *cbufflag, int *cbufrcnt, int *cbufwcnt, int *cnt);
 

@@ -34,11 +34,11 @@ static inline int test_and_set_bit(int nr, unsigned long * addr)
 #define PG_writecomm		10	/* Write communication */
 #define PG_writepending		11	/* Write op pending */
 
-#define PG_referenced		12 
-#define PG_blank		13	/* Blank page */
+#define PG_readpreparing	12	/* Preparing for reading */
+#define PG_writepreparing	13	/* Preparing for writing */
 
-
-
+#define PG_referenced		14 
+#define PG_blank		    15	/* Blank page */
 
 /*
  * Manipulation of state flags
@@ -87,9 +87,17 @@ static inline int test_and_set_bit(int nr, unsigned long * addr)
 #define SetPageReadPending(page) set_bit(PG_readpending, &(page)->flags)
 #define ClearPageReadPending(page) clear_bit(PG_readpending, &(page)->flags)
 
+#define PageReadPreparing(page)	 test_bit(PG_readpreparing, &(page)->flags)
+#define SetPageReadPreparing(page) set_bit(PG_readpreparing, &(page)->flags)
+#define ClearPageReadPreparing(page) clear_bit(PG_readpreparing, &(page)->flags)
+
 #define PageWritePending(page)	 test_bit(PG_writepending, &(page)->flags)
 #define SetPageWritePending(page) set_bit(PG_writepending, &(page)->flags)
 #define ClearPageWritePending(page) clear_bit(PG_writepending, &(page)->flags)
+
+#define PageWritePreparing(page)	 test_bit(PG_writepreparing, &(page)->flags)
+#define SetPageWritePreparing(page) set_bit(PG_writepreparing, &(page)->flags)
+#define ClearPageWritePreparing(page) clear_bit(PG_writepreparing, &(page)->flags)
 
 #define PageClean(page)	 test_bit(PG_clean, &(page)->flags)
 #define SetPageClean(page) set_bit(PG_clean, &(page)->flags)

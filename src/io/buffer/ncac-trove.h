@@ -27,5 +27,8 @@ int do_read_for_rmw( PVFS_fs_id coll_id,
 					 int size, 
 					 int *ioreq);
 
+int init_io_read( PVFS_fs_id coll_id, PVFS_handle handle,
+        PVFS_context_id context, PVFS_offset foffset,
+        PVFS_size size, void *buf, PVFS_id_gen_t *ioreq);
 
 #endif  /* __CACHE_STORAGE_H */

@@ -17,6 +17,8 @@
 
 int NCAC_do_a_bufread_job(struct NCAC_req *ncac_req)
 {
+
+#if 0
     int ret;
     int seg, cnt;
     int rcomm=0;
@@ -28,7 +30,9 @@ int NCAC_do_a_bufread_job(struct NCAC_req *ncac_req)
     /* only one contiguous segment */
     if ( !ncac_req->offcnt ) { 
         ret = NCAC_do_one_piece_read( ncac_req, ncac_req->pos, 
-									  ncac_req->size, ncac_req->cbufoff, 
+									  ncac_req->size, 
+									  ncac_req->foff, 
+                                        ncac_req->cbufoff, 
 									  ncac_req->cbufsize, ncac_req->cbufhash,
  									  ncac_req->cbufflag, 
 									  ncac_req->cbufrcnt,
@@ -47,6 +51,7 @@ int NCAC_do_a_bufread_job(struct NCAC_req *ncac_req)
         for (seg = 0; seg < ncac_req->offcnt; seg ++) {
             ret = NCAC_do_one_piece_read( ncac_req, ncac_req->offvec[seg],
                                           ncac_req->sizevec[seg],
+									        ncac_req->foff + cnt, 
                                           ncac_req->cbufoff + cnt, 
                                           ncac_req->cbufsize + cnt, 
                                           ncac_req->cbufhash + cnt, 
@@ -95,6 +100,7 @@ int NCAC_do_a_bufread_job(struct NCAC_req *ncac_req)
 		}
 		
 	}
+#endif
 
     return 0;
 
@@ -103,6 +109,7 @@ int NCAC_do_a_bufread_job(struct NCAC_req *ncac_req)
 int NCAC_do_a_bufwrite_job(struct NCAC_req *ncac_req)
 {
 	
+#if 0
     int ret;
     int seg, cnt;
     int rcomm=0;
@@ -181,6 +188,7 @@ int NCAC_do_a_bufwrite_job(struct NCAC_req *ncac_req)
 		}
 		
 	}
+#endif
 
     return 0;
 }

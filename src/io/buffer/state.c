@@ -215,8 +215,9 @@ int NCAC_extent_done_access(NCAC_req_t *ncac_req)
 				NCAC_extent_read_comm_done (ncac_req->cbufhash[i]);
 				//DecReadCount(ncac_req->cbufhash[i]);
 				ncac_req->cbufhash[i]->rcmp++;
+				ncac_req->cbufhash[i]->reads--;
 			}
-      		}
+        }
   	}
 
 	if (ncac_req->optype == NCAC_WRITE)

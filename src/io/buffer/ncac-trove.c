@@ -271,7 +271,6 @@ int NCAC_check_ioreq(struct extent *extent)
     int count;
     int ret;
 
-
     op_id = extent->ioreq;
 
     if ( op_id == INVAL_IOREQ ) {
@@ -287,8 +286,8 @@ int NCAC_check_ioreq(struct extent *extent)
     ret = trove_dspace_test(coll_id, op_id, context_id, &count, NULL, NULL, &state, TROVE_DEFAULT_TEST_TIMEOUT);
 
     if ( ret > 0 ) {
-    	DPRINT("++++++++++++NCAC_check_ioreq: finished %Ld\n", op_id);
-	extent->ioreq = INVAL_IOREQ;
+    	fprintf(stderr, "++++++++++++NCAC_check_ioreq: finished %Ld\n", op_id);
+        extent->ioreq = INVAL_IOREQ;
     }
 
     return ret;
@@ -372,4 +371,29 @@ static inline void  offset_shorten( int s_cnt,
     *new_m_cnt = seg;
 
     return;
+}
+
+int init_io_read( PVFS_fs_id coll_id, PVFS_handle handle, 
+        PVFS_context_id context, PVFS_offset foffset, 
+        PVFS_size size, void *buf, TROVE_op_id *ioreq)
+{
+    void *user_ptr_array[1] = { (char *) 13 };
+    int ret;
+
+    ret = trove_bstream_read_at(coll_id,
+                               handle,
+                               buf,
+                                &size,
+                                foffset,
+                                  0, /* flags */
+                                  NULL, /* vtag */
+                                  user_ptr_array,
+                                  context,
+                                  ioreq);
+
+    if (ret < 0) {
+        NCAC_error("trove read at failed\n");
+        return -1;
+    }
+    return 0;
 }

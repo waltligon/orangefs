@@ -222,9 +222,7 @@ int cache_req_test(cache_request_t *request,
     else 
 		*flag = 0;
 
-
     return 0;
-
 }
 
 int cache_req_testsome(int count, 

@@ -15,7 +15,7 @@ extern int posix_memalign(void **memptr, size_t alignment, size_t size);
 
 /* global variable */
 NCAC_dev_t NCAC_dev;
-struct inode *inode_arr[1000];
+struct inode *inode_arr[MAX_INODE_NUM];
 
 static inline void init_free_extent_list(int num);
 static inline void init_free_req_list(int num);
@@ -76,7 +76,7 @@ int cache_init(NCAC_info_t *info)
     INIT_LIST_HEAD( &NCAC_dev.comp_list);
 
 
-    memset( inode_arr, 0, sizeof(struct inode*)*1000 );
+    memset( inode_arr, 0, sizeof(struct inode*)*MAX_INODE_NUM );
 
     NCAC_dev.get_value = radix_get_value;
     NCAC_dev.max_b     = RADIX_MAX_BITS;
