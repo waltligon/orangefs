@@ -7,6 +7,7 @@
 #ifndef __PVFS2_REQ_PROTO_H
 #define __PVFS2_REQ_PROTO_H
 
+#include "pvfs2-config.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
 #include "pvfs-distribution.h"
@@ -16,7 +17,8 @@
  * This is a base-10, 5 digit number, with one digit for the most
  * significant version number and two for the last two (e.g. 1.5.6 => 10506)
  */
-#define PVFS_RELEASE_NR 19901
+#define PVFS_RELEASE_NR (PVFS2_VERSION_MAJOR*10000\
+ + PVFS2_VERSION_MINOR*100 + PVFS2_VERSION_SUB)
 
 /* enumeration of supported server operations */
 enum PVFS_server_op

@@ -34,6 +34,15 @@
 /* Version number of package */
 #undef VERSION
 
+/* major version number */
+#undef PVFS2_VERSION_MAJOR
+
+/* minor version number */
+#undef PVFS2_VERSION_MINOR
+
+/* sub version number */
+#undef PVFS2_VERSION_SUB
+
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
 
