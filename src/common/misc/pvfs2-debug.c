@@ -11,7 +11,6 @@
 
 #include "pvfs2-debug.h"
 
-
 /* a private internal type */
 typedef struct 
 {
@@ -19,6 +18,11 @@ typedef struct
     int mask_val;
 } __keyword_mask_t;
 
+
+#define __DEBUG_ALL                                             \
+(TROVE_DEBUG | BMI_DEBUG_ALL | SERVER_DEBUG | CLIENT_DEBUG |    \
+JOB_DEBUG | REQUEST_DEBUG | REQ_SCHED_DEBUG | FLOW_PROTO_DEBUG |\
+FLOW_DEBUG | PCACHE_DEBUG | DIST_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -35,8 +39,11 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "flow", FLOW_DEBUG },
     { "pcache", PCACHE_DEBUG },
     { "distribution", DIST_DEBUG },
-    { "none", 0 }
+    { "verbose",  (__DEBUG_ALL & ~REQ_SCHED_DEBUG) },
+    { "none", 0x00000000 },
+    { "all",  __DEBUG_ALL }
 };
+#undef __DEBUG_ALL
 
 /*
   based on human readable keywords, translate them into
