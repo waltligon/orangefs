@@ -168,16 +168,13 @@ int job_initialize(int flags)
  */
 int job_finalize(void)
 {
-
     PINT_thread_mgr_bmi_stop();
     PINT_thread_mgr_dev_stop();
 #ifdef __PVFS2_TROVE_SUPPORT__
     PINT_thread_mgr_trove_stop();
 #endif
-
     teardown_queues();
-
-    return (0);
+    return 0;
 }
 
 

@@ -405,7 +405,9 @@ int PINT_thread_mgr_dev_stop(void)
 	assert(dev_thread_ref_count == 0); /* sanity check */
 	dev_thread_running = 0;
 #ifdef __PVFS2_JOB_THREADED__
+        gen_mutex_unlock(&dev_mutex);
 	pthread_join(dev_thread_id, NULL);
+        gen_mutex_lock(&dev_mutex);
 #endif
     }
     gen_mutex_unlock(&dev_mutex);
