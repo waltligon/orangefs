@@ -58,6 +58,7 @@ typedef struct PVFS_Dist {
 #define decode_PVFS_Dist(pptr,x) do { PVFS_Dist tmp_dist; PVFS_Dist *px; \
     extern int PINT_Dist_lookup(PVFS_Dist *dist); \
     decode_string(pptr, &tmp_dist.dist_name); \
+    tmp_dist.params = 0; \
     tmp_dist.methods = 0; \
     /* bizzare lookup function fills in most fields */ \
     PINT_Dist_lookup(&tmp_dist); \
