@@ -13,7 +13,7 @@
 
 typedef struct
 {
-    int stuff;
+    PVFS_size amt_read;
 } pvfs2_read_response_t;
 
 typedef struct

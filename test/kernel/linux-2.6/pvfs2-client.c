@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <assert.h>
+#include <errno.h>
 
 #include "gossip.h"
 #include "pint-dev.h"
@@ -145,6 +147,65 @@ static int service_create_request(
     return ret;
 }
 
+static int service_read_request(
+    PVFS_sysresp_init *init_response,
+    pvfs2_upcall_t *in_upcall,
+    pvfs2_downcall_t *out_downcall)
+{
+    int ret = 1;
+    PVFS_sysresp_io response;
+    PVFS_credentials credentials;
+    PVFS_Request io_req;
+    PVFS_size displacement = 0;
+    int32_t blocklength = 0;
+
+    if(init_response && in_upcall && out_downcall)
+    {
+        memset(&response,0,sizeof(PVFS_sysresp_io));
+        memset(out_downcall,0,sizeof(pvfs2_downcall_t));
+
+	credentials.uid = 100;
+	credentials.gid = 100;
+	credentials.perms = 511;
+
+	displacement = in_upcall->req.read.offset;
+	blocklength = in_upcall->req.read.count;
+
+	ret = PVFS_Request_indexed(1, &blocklength, &displacement,
+	    PVFS_BYTE, &io_req);
+	assert(ret == 0);
+
+	/* TODO: need to get pinode reference from somewhere */
+#if 0
+	ret = PVFS_sys_io(NEED_REF, io_req, 0, in_upcall->req.read.buf,
+	    in_upcall->req.read.count, credentials, &response,
+	    PVFS_SYS_IO_READ);
+	if(ret < 0)
+	{
+	    /* we need to send a blank response */
+	    out_downcall->type = PVFS2_VFS_OP_FILE_READ;
+	    /* TODO: what should this be set to? other examples do -1... */
+	    out_downcall->status = ret;
+	}
+	else
+	{
+	    out_downcall->type = PVFS2_VFS_OP_FILE_READ;
+	    out_downcall->status = 0;
+	    out_downcall->resp.read.amt_read = response.total_completed;
+	    ret = 0;
+	}
+#else
+	/* we need to send a blank response */
+	out_downcall->type = PVFS2_VFS_OP_FILE_READ;
+	/* TODO: is this right? set error both in ret and in status? */
+	/* maybe we don't even need a return value in these functions? */
+	out_downcall->status = -ENOSYS;
+	ret = -ENOSYS;
+#endif
+    }
+    return(ret);
+}
+
 static int service_getattr_request(
     PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
@@ -164,7 +225,7 @@ static int service_getattr_request(
         credentials.gid = 100;
         credentials.perms = 511;
 
-        printf("Got a getattr request for fsid %d | handle %Ld\n",
+        printf("got a getattr request for fsid %d | handle %ld\n",
                in_upcall->req.getattr.refn.fs_id,
                in_upcall->req.getattr.refn.handle);
 
@@ -172,10 +233,10 @@ static int service_getattr_request(
                                credentials, &response);
         if (ret < 0)
         {
-            fprintf(stderr,"Failed to getattr handle %Ld on fsid %d!\n",
+            fprintf(stderr,"failed to getattr handle %ld on fsid %d!\n",
                     in_upcall->req.getattr.refn.handle,
                     in_upcall->req.getattr.refn.fs_id);
-            fprintf(stderr,"Getattr returned error code %d\n",ret);
+            fprintf(stderr,"getattr returned error code %d\n",ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_GETATTR;
@@ -557,7 +618,7 @@ int main(int argc, char **argv)
 		service_readdir_request(&init_response,&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_FILE_READ:
-		/* do a file read */
+		service_read_request(&init_response, &upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_FILE_WRITE:
 		/* do a file write */
