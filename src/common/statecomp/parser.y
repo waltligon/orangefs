@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 #include "symbol.h"
-#include <../../server/state-comp.h>
+#include "state-comp.h"
 
 char *enter_string(char *);
 void gen_init(void);

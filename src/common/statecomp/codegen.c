@@ -5,7 +5,7 @@
  */
 
 #include <stdio.h>
-#include <../../server/state-comp.h>
+#include "state-comp.h"
 
 extern FILE *out_file;
 
