@@ -32,10 +32,6 @@ static int rename_lookups_setup_msgpair_array(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int rename_lookups_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
-static int rename_get_attrs_setup_msgpair_array(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int rename_get_attrs_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
 static int rename_crdirent_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int rename_crdirent_failure(
@@ -57,8 +53,6 @@ static int rename_cleanup(
 
 static int rename_lookups_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
-static int rename_get_attrs_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int rename_crdirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int rename_rmdirent_comp_fn(
@@ -73,9 +67,6 @@ machine pvfs2_client_rename_sm(
     rename_lookups_setup_msgpair_array,
     rename_lookups_xfer_msgpair_array,
     rename_lookups_failure,
-    rename_get_attrs_setup_msgpair_array,
-    rename_get_attrs_xfer_msgpair_array,
-    rename_get_attrs_failure,
     rename_crdirent_setup_msgpair,
     rename_crdirent_xfer_msgpair,
     rename_crdirent_failure,
@@ -106,34 +97,14 @@ machine pvfs2_client_rename_sm(
     state rename_lookups_xfer_msgpair_array
     {
         jump pvfs2_client_msgpairarray_sm;
-        success => rename_get_attrs_setup_msgpair_array;
+        success => rename_crdirent_setup_msgpair;
+        RENAME_CHDIRENT => rename_chdirent_setup_msgpair;
         default => rename_lookups_failure;
     }
 
     state rename_lookups_failure
     {
         run rename_lookups_failure;
-        default => cleanup;
-    }
-
-    state rename_get_attrs_setup_msgpair_array
-    {
-        run rename_get_attrs_setup_msgpair_array;
-        success => rename_get_attrs_xfer_msgpair_array;
-        default => rename_get_attrs_failure;
-    }
-
-    state rename_get_attrs_xfer_msgpair_array
-    {
-        jump pvfs2_client_msgpairarray_sm;
-        success => rename_crdirent_setup_msgpair;
-        RENAME_CHDIRENT => rename_chdirent_setup_msgpair;
-        default => rename_lookups_failure;
-    }
-
-    state rename_get_attrs_failure
-    {
-        run rename_get_attrs_failure;
         default => cleanup;
     }
 
@@ -393,53 +364,9 @@ static int rename_lookups_comp_fn(
           properly verified before changing anything
         */
         sm_p->u.rename.target_dirent_exists = 1;
-        return 0;
+        return RENAME_CHDIRENT;
     }
     return 0;
-}
-
-static int rename_get_attrs_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index)
-{
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "rename_get_attrs_comp_fn[%d]\n", index);
-
-    assert(resp_p->op == PVFS_SERV_GETATTR);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-
-    /*
-      index 0 has the attributes for the 'old' entry, and
-      index 1 has the attribtues for the 'new' parent entry.
-
-      we needed to do the 'old' entry lookup so that
-      we can check permissions/credentials of the caller
-
-      we needed to do the 'new' parent directory lookup so that
-      we make sure it exists -- which we know if we're here
-      on index 1
-    */
-    if (index == 0)
-    {
-        if (PINT_check_perms(
-                resp_p->u.getattr.attr,
-                resp_p->u.getattr.attr.perms,
-                sm_p->cred_p->uid, sm_p->cred_p->gid))
-        {
-            gossip_debug(
-                GOSSIP_CLIENT_DEBUG, " permission check failure "
-                "against %s directory\n", (index ? "new" : "old"));
-            return -PVFS_EPERM;
-        }
-    }
-    return (sm_p->u.rename.target_dirent_exists ? RENAME_CHDIRENT : 0);
 }
 
 static int rename_crdirent_comp_fn(void *v_p,
@@ -571,103 +498,6 @@ static int rename_lookups_failure(PINT_client_sm *sm_p,
 
     assert(sm_p->msgarray);
     free(sm_p->msgarray);
-    return 1;
-}
-
-static int rename_get_attrs_setup_msgpair_array(
-    PINT_client_sm *sm_p, job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL, i = 0;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
-                 "rename_get_attrs_setup_msgpair_array\n");
-
-    js_p->error_code = 0;
-
-    /* free the previously allocated lookup msgs */
-    if (sm_p->msgarray != &(sm_p->msgpair))
-	free(sm_p->msgarray);
-
-    /* allocate msgarray and set msgarray_count */
-    sm_p->msgarray_count = 2;
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
-        sm_p->msgarray_count * sizeof(PINT_client_sm_msgpair_state));
-    if (sm_p->msgarray == NULL)
-    {
-        gossip_err("rename: failed to allocate msgarray\n"); 
-        return -PVFS_ENOMEM;
-    }
-
-    /*
-      prepare to post the getattr send/recv pairs.  the idea here is
-      to issue a getattr request for the 'old' entry and the 'new'
-      parent directory in parallel
-    */
-    for(i = 0; i < 2; i++)
-    {
-        PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
-        PVFS_fs_id current_fs_id;
-        PVFS_handle current_handle;
-
-        /*
-          this looks weird because at i == 0, we're getting the
-          'old' entry, and at i == 1, we're getting the
-          'new' *parent* entry
-        */
-        current_fs_id = ((i == 0) ? sm_p->u.rename.refns[i].fs_id :
-                         sm_p->u.rename.parent_refns[i].fs_id);
-        current_handle = ((i == 0) ? sm_p->u.rename.refns[i].handle :
-                         sm_p->u.rename.parent_refns[i].handle);
-
-        gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "rename: posting getattr req %d "
-            "(%Lu | %d)\n",i, Lu(current_handle), current_fs_id);
-
-        PINT_SERVREQ_GETATTR_FILL(
-            msg_p->req,
-            *sm_p->cred_p,
-            current_fs_id,
-            current_handle,
-            PVFS_ATTR_COMMON_ALL);
-
-        /* fill in msgpair structure components */
-        msg_p->fs_id = current_fs_id;
-        msg_p->handle = current_handle;
-        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-        msg_p->comp_fn = rename_get_attrs_comp_fn;
-
-        ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
-                                        msg_p->handle,
-                                        msg_p->fs_id);
-        if (ret)
-        {
-            gossip_err("Failed to map meta server address\n");
-            js_p->error_code = ret;
-            break;
-        }
-    }
-    return 1;
-}
-
-static int rename_get_attrs_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
-                 "rename_get_attrs_failure\n");
-
-    assert(sm_p->msgarray);
-    free(sm_p->msgarray);
-
-    if (js_p->error_code == -PVFS_EPERM)
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
-                     "permission denied!\n");
-    }
-    else if (js_p->error_code == -PVFS_EEXIST)
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
-                     "dirent already exists!\n");
-    }
     return 1;
 }
 
