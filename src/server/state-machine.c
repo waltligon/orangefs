@@ -193,7 +193,7 @@ int PINT_state_machine_halt(void)
    Synopsis:  Runs through a list of return values to find the
 	           next function to call.  Calls that function.  Once
 				  that function is called, this one exits and we go
-				  back to server_daemon.c's while loop.
+				  back to pvfs2-server.c's while loop.
  */
 
 int PINT_state_machine_next(state_action_struct *s,job_status_s *r)
@@ -216,15 +216,19 @@ int PINT_state_machine_next(state_action_struct *s,job_status_s *r)
 		loc += 2;
 	}
 
-	/* Update the server_op struct to reflect the new location */
-	/* NOTE: This remains a pointer pointing to the first return
-	 *	      value possibility of the function.  */
+	/* To do nested states, we check to see if the selected return
+	 * value references a RETURN and if so we get the next state off
+	 * of a stack */
 
+	/* Update the server_op struct to reflect the new location */
 	s->current_state = (loc + 1)->next_state;
 
-	/* Call the next function.  NOTE: the function will return
-	 * back to the original while loop in server_daemon.c */
+	/* To do nested states, we check to see if the next state is
+	 * a nested state machine, and if so we push the return state
+	 * onto a stack */
 
+	/* Call the new state function then return to the while
+	 * loop in pvfs2-server.c */
 	return((s->current_state->state_action)(s,r));
 
 }
