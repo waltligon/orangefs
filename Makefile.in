@@ -121,9 +121,9 @@ INCLUDES := \
 # These should all be self explanatory; they are standard flags
 # for compiling and linking unless otherwise noted
 CC = @CC@
+LD = @CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
-LD = gcc
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LDFLAGS += -L lib 
