@@ -287,6 +287,10 @@ int PINT_req_sched_target_handle(
 	*fs_id = req->u.mgmt_iterate_handles.fs_id;
 	return (0);
 	break;
+    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+	*fs_id = req->u.mgmt_dspace_info_list.fs_id;
+	return (0);
+	break;
     case PVFS_SERV_STATFS:
 	*fs_id = req->u.statfs.fs_id;
 	return (0);

@@ -957,6 +957,10 @@ static void server_state_table_initialize(void)
     PINT_server_op_table[PVFS_SERV_MGMT_PERF_MON] = &pvfs2_perf_mon_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_ITERATE_HANDLES] 
 	= &pvfs2_iterate_handles_sm;
+#if 0
+    PINT_server_op_table[PVFS_SERV_MGMT_DSPACE_INFO_LIST] 
+    	= &pvfs2_dspace_info_list_sm;
+#endif
 }
 
 /* server_state_machine_complete()

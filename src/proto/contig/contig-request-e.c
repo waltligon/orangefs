@@ -136,6 +136,34 @@ int do_encode_req(
 	((struct PVFS_server_req *) enc_msg)->u.crdirent.name = NULL;
 	return (0);
 
+    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+
+	size = sizeof(struct PVFS_server_req) + PINT_ENC_GENERIC_HEADER_SIZE 
+	    + (request->u.mgmt_dspace_info_list.handle_count*sizeof(PVFS_handle));
+	enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);
+
+	if (enc_msg == NULL)
+	{
+	    return (-ENOMEM);
+	}
+	/* TODO: CAN WE JUST TACK THE BUFFER LIST ONTO THE END OF THE BMI_memalloc? */
+	target_msg->buffer_list[0] = enc_msg;
+	target_msg->size_list[0] = size;
+	target_msg->total_size = size;
+
+	memcpy(enc_msg, contig_buffer_table.generic_header,
+	    PINT_ENC_GENERIC_HEADER_SIZE);
+	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
+	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
+
+	/* copy array of handles */
+	memcpy(enc_msg + sizeof(struct PVFS_server_req),
+	       request->u.mgmt_dspace_info_list.handle_array, 
+	       request->u.mgmt_dspace_info_list.handle_count*sizeof(PVFS_handle));
+
+	return (0);
+
+
     case PVFS_SERV_RMDIRENT:
 	assert(request->u.rmdirent.entry != NULL);
 

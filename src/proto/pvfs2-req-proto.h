@@ -44,7 +44,8 @@ enum PVFS_server_op
     PVFS_SERV_STATFS = 17,
     PVFS_SERV_PERF_UPDATE = 18,  /* not a real protocol request */
     PVFS_SERV_MGMT_PERF_MON = 19,
-    PVFS_SERV_MGMT_ITERATE_HANDLES = 20
+    PVFS_SERV_MGMT_ITERATE_HANDLES = 20,
+    PVFS_SERV_MGMT_DSPACE_INFO_LIST = 21
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
      * if you add a new operation to this list
      */
@@ -56,7 +57,7 @@ enum PVFS_server_op
      * PVFS_SERV_EXTENSION
      */
 };
-#define PVFS_MAX_SERVER_OP 20
+#define PVFS_MAX_SERVER_OP 21
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
@@ -85,6 +86,7 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT 16
 /* max number of handles returned by mgmt iterate handles op */
 #define PVFS_REQ_LIMIT_MGMT_ITERATE_HANDLES_COUNT 1024
+#define PVFS_REQ_LIMIT_MGMT_DSPACE_INFO_LIST_COUNT 1024
 
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
@@ -602,7 +604,7 @@ struct PVFS_servresp_mgmt_perf_mon
 struct PVFS_servreq_mgmt_iterate_handles
 {
     PVFS_fs_id fs_id;
-    int handle_count;
+    int32_t handle_count;
     PVFS_ds_position position;
 };
 
@@ -626,6 +628,36 @@ struct PVFS_servresp_mgmt_iterate_handles
     PVFS_ds_position position;
     PVFS_handle* handle_array;
     int handle_count;
+};
+
+/* mgmt_dspace_info_list **************************************/
+/* - returns low level dspace information for a list of handles */
+
+struct PVFS_servreq_mgmt_dspace_info_list
+{
+    PVFS_fs_id fs_id;
+    PVFS_handle* handle_array;
+    int32_t handle_count;
+};
+
+#define PINT_SERVREQ_MGMT_DSPACE_INFO_LIST(__req,	\
+					__creds,\
+					__fs_id,\
+					__handle_array,\
+					__handle_count)\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_MGMT_DSPACE_INFO_LIST;\
+    (__req).credentials = (__creds);		\
+    (__req).u.mgmt_dspace_info_list.fs_id = (__fs_id); \
+    (__req).u.mgmt_dspace_info_list.handle_array = (__handle_array); \
+    (__req).u.mgmt_dspace_info_list.handle_count = (__handle_count); \
+} while (0)
+
+struct PVFS_servresp_mgmt_dspace_info_list
+{
+    struct PVFS_mgmt_dspace_info* dspace_info_array;
+    int32_t dspace_info_count;
 };
 
 /* server request *********************************************/
@@ -659,6 +691,7 @@ struct PVFS_server_req
 	struct PVFS_servreq_statfs statfs;
 	struct PVFS_servreq_mgmt_perf_mon mgmt_perf_mon;
 	struct PVFS_servreq_mgmt_iterate_handles mgmt_iterate_handles;
+	struct PVFS_servreq_mgmt_dspace_info_list mgmt_dspace_info_list;
     }
     u;
 };
@@ -684,6 +717,7 @@ struct PVFS_server_resp
 	struct PVFS_servresp_mgmt_setparam mgmt_setparam;
 	struct PVFS_servresp_mgmt_perf_mon mgmt_perf_mon;
 	struct PVFS_servresp_mgmt_iterate_handles mgmt_iterate_handles;
+	struct PVFS_servresp_mgmt_dspace_info_list mgmt_dspace_info_list;
     }
     u;
 };

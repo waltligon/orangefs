@@ -47,6 +47,10 @@ int do_decode_req(
 
     switch (((struct PVFS_server_req *) char_ptr)->op)
     {
+    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+	char_ptr += sizeof(struct PVFS_server_req);
+	dec_msg->u.mgmt_dspace_info_list.handle_array = (PVFS_handle*)char_ptr;
+	return(0);
     case PVFS_SERV_LOOKUP_PATH:
 	char_ptr += sizeof(struct PVFS_server_req);
 	dec_msg->u.lookup_path.path = char_ptr;

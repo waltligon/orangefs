@@ -344,6 +344,29 @@ int do_encode_resp(
 	target_msg->buffer_list[1] = response;
 	target_msg->buffer_list[2] = response->u.mgmt_iterate_handles.handle_array;
 	return 0;
+    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+
+	target_msg->size_list = malloc(3 * sizeof(PVFS_size));
+	target_msg->buffer_list = malloc(3 * sizeof(void *));
+	target_msg->list_count = 3;
+	target_msg->buffer_type = BMI_EXT_ALLOC;
+
+	/* If there was an error, we need to not send any trailing data */
+	if (response->status != 0)
+	    target_msg->list_count = 2;
+
+	target_msg->size_list[1] = sizeof(struct PVFS_server_resp);
+	target_msg->size_list[2] = response->u.mgmt_dspace_info_list.dspace_info_count
+	    * sizeof(struct PVFS_mgmt_dspace_info);
+	target_msg->size_list[0] = PINT_ENC_GENERIC_HEADER_SIZE;
+	target_msg->total_size =
+	    target_msg->size_list[0] + target_msg->size_list[1] + 
+	    target_msg->size_list[2];
+
+	target_msg->buffer_list[0] = contig_buffer_table.generic_header;
+	target_msg->buffer_list[1] = response;
+	target_msg->buffer_list[2] = response->u.mgmt_dspace_info_list.dspace_info_array;
+	return 0;
 
     /* invalid responses: */
     case PVFS_SERV_INVALID:

@@ -34,6 +34,17 @@ struct PVFS_mgmt_perf_stat
     int64_t read;	    /* bytes read */
 };
 
+/* low level information about individual server level objects */
+struct PVFS_mgmt_dspace_info
+{
+    PVFS_error error_code;	/* error code for this query */
+    PVFS_handle handle;		/* handle this struct refers to */
+    PVFS_ds_type type;		/* type of object */
+    PVFS_size b_size;		/* size of bstream (if applicable) */
+    PVFS_size k_size;		/* number of keyvals (if applicable) */
+    PVFS_handle dirdata_handle; /* directory data handle (if applicable) */
+};
+
 /* values which may be or'd together in the flags field above */
 enum
 {
