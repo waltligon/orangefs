@@ -18,6 +18,7 @@
 #include <pvfs-restart-server.h>
 #include <pvfs-stop-server.h>
 #include <null_params.h>
+#include <test-invlaid-files.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -69,6 +70,8 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[PVFS_RESTART_SERVER].test_name = str_malloc("pvfs_restart_server");
    myconfig->testpool[PVFS_STOP_SERVER].test_func = (void *)pvfs_stop_server;
    myconfig->testpool[PVFS_STOP_SERVER].test_name = str_malloc("pvfs_stop_server");
+   myconfig->testpool[TEST_INVALID_FILES].test_func = (void *)test_invalid_files;
+   myconfig->testpool[TEST_INVALID_FILES].test_name = str_malloc("test_invalid_files");
 }
 
 #endif

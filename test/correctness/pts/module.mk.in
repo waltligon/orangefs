@@ -16,7 +16,8 @@ TEST_PTS_MISC := \
 	$(DIR)/test-null-params.c \
 	$(DIR)/pvfs-restart-server.c \
 	$(DIR)/pvfs-stop-server.c \
-	$(DIR)/null-params-parser.c
+	$(DIR)/null-params-parser.c \
+	$(DIR)/test-invalid-files.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 
