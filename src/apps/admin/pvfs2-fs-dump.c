@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/time.h>
@@ -135,8 +134,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
     /* count how many servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs, creds, 

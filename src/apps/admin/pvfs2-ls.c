@@ -4,12 +4,10 @@
  * See COPYING in top-level directory.
  */
 
-#include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/time.h>
@@ -418,14 +416,11 @@ void print_entry(
         return;
     }
 
-    memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
-    memset(&credentials,0, sizeof(PVFS_credentials));
-
-    credentials.uid = getuid();
-    credentials.gid = getgid();
-
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
+
+    memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
+    PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                            credentials, &getattr_response);
@@ -456,10 +451,10 @@ int do_list(
     PVFS_ds_position token;
 
     name = start;
-    credentials.uid = getuid();
-    credentials.gid = getgid();
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
+    PVFS_util_gen_credentials(&credentials);
+
     if (PVFS_sys_lookup(fs_id, name, credentials,
                         &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW))
     {
@@ -471,11 +466,8 @@ int do_list(
     pinode_refn.handle = lk_response.pinode_refn.handle;
     pinode_refn.fs_id = fs_id;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
-    credentials.uid = getuid();
-    credentials.gid = getgid();
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
-
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                          credentials, &getattr_response) == 0)
     {

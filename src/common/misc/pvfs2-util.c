@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
@@ -41,6 +43,16 @@ static int parse_flowproto_string(
 static int parse_encoding_string(
     const char *cp,
     enum PVFS_encoding_type *et);
+
+void PVFS_util_gen_credentials(
+    PVFS_credentials *credentials)
+{
+    assert(credentials);
+
+    memset(credentials, 0, sizeof(PVFS_credentials));
+    credentials->uid = getuid();
+    credentials->gid = getgid();
+}
 
 /* PVFS_util_parse_pvfstab()
  *

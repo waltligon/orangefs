@@ -9,7 +9,6 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/time.h>
@@ -107,8 +106,7 @@ int main(int argc, char **argv)
 
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 
-    credentials.uid = getuid();
-    credentials.gid = getgid();
+    PVFS_util_gen_credentials(&credentials);
     lk_fs_id = cur_fs;
 
     /* TODO: this is awkward- the remove_base_dir() function

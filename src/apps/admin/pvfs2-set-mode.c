@@ -67,11 +67,10 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
-    ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_MODE,
-	user_opts->mode, NULL);
+    ret = PVFS_mgmt_setparam_all(
+        cur_fs, creds, PVFS_SERV_PARAM_MODE, user_opts->mode, NULL);
 
     PVFS_sys_finalize();
 

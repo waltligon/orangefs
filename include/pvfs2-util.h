@@ -20,6 +20,10 @@ struct PVFS_util_tab_s
 };
 typedef struct PVFS_util_tab_s PVFS_util_tab;
 
+/* client side default credential generation */
+void PVFS_util_gen_credentials(
+    PVFS_credentials *credentials);
+
 /* client side config file / option management */
 const PVFS_util_tab* PVFS_util_parse_pvfstab(
     const char* tabfile);

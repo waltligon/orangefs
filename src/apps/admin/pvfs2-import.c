@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/time.h>
@@ -98,9 +97,11 @@ int main(int argc, char **argv)
 	goto main_out;
     }
 
+    PVFS_util_gen_credentials(&credentials);
+
     entry_name = str_buf;
-    attr.owner = getuid(); 
-    attr.group = getgid();
+    attr.owner = credentials.uid; 
+    attr.group = credentials.gid;
     attr.perms = PVFS_U_WRITE|PVFS_U_READ;
     attr.atime = time(NULL);
     attr.mtime = attr.atime;
@@ -109,8 +110,6 @@ int main(int argc, char **argv)
     attr.dfile_count = user_opts->num_datafiles;
     if(attr.dfile_count > 0)
 	attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
-    credentials.uid = getuid();
-    credentials.gid = getgid();
 
     if (strcmp(pvfs_path,"/") == 0)
     {

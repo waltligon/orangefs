@@ -76,8 +76,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
     /* count how many I/O servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs, creds, PVFS_MGMT_IO_SERVER,

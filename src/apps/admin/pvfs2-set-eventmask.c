@@ -47,7 +47,8 @@ int main(int argc, char **argv)
     user_opts = parse_args(argc, argv);
     if(!user_opts)
     {
-	fprintf(stderr, "Error: failed to parse command line arguments.\n");
+	fprintf(stderr, "Error: failed to parse command "
+                "line arguments.\n");
 	usage(argc, argv);
 	return(-1);
     }
@@ -64,13 +65,12 @@ int main(int argc, char **argv)
         &cur_fs, pvfs_path, PVFS_NAME_MAX);
     if(ret < 0)
     {
-	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
-	    user_opts->mnt_point);
+	fprintf(stderr, "Error: could not find filesystem "
+                "for %s in pvfstab\n", user_opts->mnt_point);
 	return(-1);
     }
 
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
     if(!user_opts->op_mask || !user_opts->api_mask)
     {
@@ -201,10 +201,10 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-m fs_mount_point] [-a hex_api_mask] [-o hex_operation_mask]\n",
-	argv[0]);
+    fprintf(stderr, "Usage  : %s [-m fs_mount_point] "
+            "[-a hex_api_mask] [-o hex_operation_mask]\n", argv[0]);
     fprintf(stderr, "Example: %s -m /mnt/pvfs2 -a 0xFFFF -o 0xFFFF\n",
-	argv[0]);
+            argv[0]);
     return;
 }
 

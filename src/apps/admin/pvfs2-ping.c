@@ -33,7 +33,8 @@ struct options
 
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
-static void print_mntent(struct PVFS_sys_mntent *entries, int num_entries);
+static void print_mntent(
+    struct PVFS_sys_mntent *entries, int num_entries);
 static int print_config(PVFS_fs_id fsid);
 static int noop_all_servers(PVFS_fs_id fsid);
 
@@ -77,8 +78,9 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    printf("\n(3) Initializing each file system found in tab file: %s...\n\n",
-	tab->tabfile_name);
+    printf("\n(3) Initializing each file system found "
+           "in tab file: %s...\n\n", tab->tabfile_name);
+
     for(i=0; i<tab->mntent_count; i++)
     {
 	printf("   %s: ", tab->mntent_array[i].mnt_dir);
@@ -86,8 +88,8 @@ int main(int argc, char **argv)
 	if(ret < 0)
 	{
 	    printf("FAILURE!\n");
-	    fprintf(stderr, "Failure: could not initialize at least one of"
-		" the target file systems.\n");
+	    fprintf(stderr, "Failure: could not initialize at "
+                    "least one of the target file systems.\n");
 	    return(-1);
 	}
 	else
@@ -111,8 +113,7 @@ int main(int argc, char **argv)
 
     print_mntent(tab->mntent_array, tab->mntent_count);
 
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
     /* dump some key parts of the config file */
     ret = print_config(cur_fs);
@@ -130,25 +131,28 @@ int main(int argc, char **argv)
     if(ret < 0)
     {
 	PVFS_perror("noop_all_servers", ret);
-	fprintf(stderr, "Failure: could not communicate with one of the servers.\n");
+	fprintf(stderr, "Failure: could not communicate with "
+                "one of the servers.\n");
 	return(-1);
     }
 
-    printf("\n(6) Verifying that fsid %ld is accemntentle to all servers...\n",
-	(long)cur_fs);
+    printf("\n(6) Verifying that fsid %ld is acceptable "
+           "to all servers...\n",(long)cur_fs);
 
     /* check that the fsid exists on all of the servers */
     /* TODO: we need a way to get information out about which server fails
      * in error cases here 
      */
-    ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_FSID_CHECK,
-	(int64_t)cur_fs, NULL);
+    ret = PVFS_mgmt_setparam_all(
+        cur_fs, creds, PVFS_SERV_PARAM_FSID_CHECK,
+        (int64_t)cur_fs, NULL);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_setparam_all", ret);
 	fprintf(stderr, "Failure: not all servers accepted fsid %ld\n", 
 	    (long)cur_fs);
-	fprintf(stderr, "TODO: need a way to tell which servers couldn't find the fs_id...\n");
+	fprintf(stderr, "TODO: need a way to tell which "
+                "servers couldn't find the fs_id...\n");
 	return(-1);
     }
     printf("\n   Ok; all servers understand fs_id %ld\n", (long)cur_fs);
@@ -166,16 +170,18 @@ int main(int argc, char **argv)
     printf("\n   Root handle: %Lu\n", Lu(resp_lookup.pinode_refn.handle));
 
     /* check that only one server controls root handle */
-    /* TODO: we need a way to get information out about which server failed
-     * in error cases here 
+    /* TODO: we need a way to get information out about which server
+     * failed in error cases here
      */
-    ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_ROOT_CHECK,
+    ret = PVFS_mgmt_setparam_all(
+        cur_fs, creds, PVFS_SERV_PARAM_ROOT_CHECK,
 	(int64_t)resp_lookup.pinode_refn.handle, NULL);
 
     /* check for understood error values */
     if(ret == -PVFS_ENOENT)
     {
-	fprintf(stderr, "Failure: no servers claimed ownership of root handle.\n");
+	fprintf(stderr, "Failure: no servers claimed "
+                "ownership of root handle.\n");
 	return(-1);
     }
     if(ret == -PVFS_EALREADY)
@@ -196,10 +202,11 @@ int main(int argc, char **argv)
 
     PVFS_sys_finalize();
 
-    printf("=============================================================\n");
-
-    printf("\nThe PVFS filesystem at %s appears to be correctly configured.\n\n",
-	user_opts->fs_path_real);
+    printf("=========================================="
+           "===================\n");
+    printf("\nThe PVFS filesystem at %s appears to be "
+           "correctly configured.\n\n",
+           user_opts->fs_path_real);
 	
     return(ret);
 }
@@ -220,28 +227,26 @@ static int noop_all_servers(PVFS_fs_id fsid)
     int i;
     int tmp;
  
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
     printf("\n   meta servers:\n");
-    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_META_SERVER, &count);
+    ret = PVFS_mgmt_count_servers(
+        fsid, creds, PVFS_MGMT_META_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
 	return ret;
     }
-    addr_array = (PVFS_BMI_addr_t *) malloc(count * sizeof(PVFS_BMI_addr_t));
+    addr_array = (PVFS_BMI_addr_t *) malloc(
+        count * sizeof(PVFS_BMI_addr_t));
     if (addr_array == NULL)
     {
 	perror("malloc");
 	return -PVFS_ENOMEM;
     }
 
-    ret = PVFS_mgmt_get_server_array(fsid,
-				     creds,
-				     PVFS_MGMT_META_SERVER,
-                                     addr_array,
-				     &count);
+    ret = PVFS_mgmt_get_server_array(
+        fsid, creds, PVFS_MGMT_META_SERVER, addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -250,7 +255,8 @@ static int noop_all_servers(PVFS_fs_id fsid)
 
     for (i = 0; i < count; i++)
     {
-	printf("   %s ", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
+	printf("   %s ",
+               PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
 	ret = PVFS_mgmt_noop(fsid, creds, addr_array[i]);
 	if (ret == 0)
 	{
@@ -265,24 +271,23 @@ static int noop_all_servers(PVFS_fs_id fsid)
     free(addr_array);
 
     printf("\n   data servers:\n");
-    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_IO_SERVER, &count);
+    ret = PVFS_mgmt_count_servers(
+        fsid, creds, PVFS_MGMT_IO_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
 	return ret;
     }
-    addr_array = (PVFS_BMI_addr_t *) malloc(count * sizeof(PVFS_BMI_addr_t));
+    addr_array = (PVFS_BMI_addr_t *)malloc(
+        count * sizeof(PVFS_BMI_addr_t));
     if (addr_array == NULL)
     {
 	perror("malloc");
 	return -PVFS_ENOMEM;
     }
 
-    ret = PVFS_mgmt_get_server_array(fsid,
-				     creds,
-				     PVFS_MGMT_IO_SERVER,
-				     addr_array,
-				     &count);
+    ret = PVFS_mgmt_get_server_array(
+        fsid, creds, PVFS_MGMT_IO_SERVER, addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -325,31 +330,26 @@ static int print_config(PVFS_fs_id fsid)
     int count;
     PVFS_BMI_addr_t *addr_array;
  
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
     printf("\n   meta servers:\n");
-    ret = PVFS_mgmt_count_servers(fsid,
-				  creds,
-				  PVFS_MGMT_META_SERVER,
-				  &count);
+    ret = PVFS_mgmt_count_servers(
+        fsid, creds, PVFS_MGMT_META_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
 	return ret;
     }
-    addr_array = (PVFS_BMI_addr_t *)malloc(count * sizeof(PVFS_BMI_addr_t));
+    addr_array = (PVFS_BMI_addr_t *)malloc(
+        count * sizeof(PVFS_BMI_addr_t));
     if (addr_array == NULL)
     {
 	perror("malloc");
 	return -PVFS_ENOMEM;
     }
 
-    ret = PVFS_mgmt_get_server_array(fsid,
-				     creds,
-				     PVFS_MGMT_META_SERVER,
-				     addr_array,
-				     &count);
+    ret = PVFS_mgmt_get_server_array(
+        fsid, creds, PVFS_MGMT_META_SERVER, addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -358,29 +358,29 @@ static int print_config(PVFS_fs_id fsid)
 
     for (i=0; i<count; i++)
     {
-	printf("   %s\n", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
+	printf("   %s\n",
+               PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
     }
     free(addr_array);
 
     printf("\n   data servers:\n");
-    ret = PVFS_mgmt_count_servers(fsid, creds, PVFS_MGMT_IO_SERVER, &count);
+    ret = PVFS_mgmt_count_servers(
+        fsid, creds, PVFS_MGMT_IO_SERVER, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
 	return ret;
     }
-    addr_array = (PVFS_BMI_addr_t *)malloc(count * sizeof(PVFS_BMI_addr_t));
+    addr_array = (PVFS_BMI_addr_t *)malloc(
+        count * sizeof(PVFS_BMI_addr_t));
     if (addr_array == NULL)
     {
 	perror("malloc");
 	return -PVFS_ENOMEM;
     }
 
-    ret = PVFS_mgmt_get_server_array(fsid,
-				     creds,
-				     PVFS_MGMT_IO_SERVER,
-				     addr_array,
-				     &count);
+    ret = PVFS_mgmt_get_server_array(
+        fsid, creds, PVFS_MGMT_IO_SERVER, addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -389,7 +389,8 @@ static int print_config(PVFS_fs_id fsid)
 
     for(i=0; i<count; i++)
     {
-	printf("   %s\n", PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
+	printf("   %s\n",
+               PVFS_mgmt_map_addr(fsid, creds, addr_array[i], &tmp));
     }
     free(addr_array);
 

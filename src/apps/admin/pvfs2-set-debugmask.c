@@ -67,11 +67,11 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
-    ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_GOSSIP_MASK,
-	user_opts->debug_mask, NULL);
+    ret = PVFS_mgmt_setparam_all(
+        cur_fs, creds, PVFS_SERV_PARAM_GOSSIP_MASK,
+        user_opts->debug_mask, NULL);
 
     PVFS_sys_finalize();
 

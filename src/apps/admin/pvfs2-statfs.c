@@ -78,8 +78,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    creds.uid = getuid();
-    creds.gid = getgid();
+    PVFS_util_gen_credentials(&creds);
 
     /* gather normal statfs statistics from system interface */
     ret = PVFS_sys_statfs(cur_fs, creds, &resp_statfs);
@@ -140,10 +139,8 @@ int main(int argc, char **argv)
 	    server_type = PVFS_MGMT_IO_SERVER;
 	}
 
-	ret = PVFS_mgmt_count_servers(cur_fs,
-				      creds,
-				      server_type,
-				      &outcount);
+	ret = PVFS_mgmt_count_servers(
+            cur_fs, creds, server_type, &outcount);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_count_servers", ret);
@@ -158,23 +155,16 @@ int main(int argc, char **argv)
 	    return -1;
 	}
 
-	ret = PVFS_mgmt_get_server_array(cur_fs,
-					 creds,
-					 server_type,
-					 addr_array,
-					 &outcount);
+	ret = PVFS_mgmt_get_server_array(
+            cur_fs, creds, server_type, addr_array, &outcount);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_get_server_array", ret);
 	    return -1;
 	}
 
-	ret = PVFS_mgmt_statfs_list(cur_fs,
-				    creds,
-				    stat_array,
-				    addr_array,
-				    NULL, /* error array */
-				    outcount);
+	ret = PVFS_mgmt_statfs_list(
+            cur_fs, creds, stat_array, addr_array, NULL, outcount);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_statfs_list", ret);
