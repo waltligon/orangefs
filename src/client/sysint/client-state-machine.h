@@ -247,6 +247,7 @@ struct PINT_client_lookup_sm
     PVFS_object_ref starting_refn;    /* input parameter */
     PVFS_sysresp_lookup *lookup_resp; /* in/out parameter*/
     int follow_link;                  /* input parameter */
+    int skipped_final_resolution;
     int current_context;
     PINT_client_lookup_sm_ctx contexts[MAX_LOOKUP_CONTEXTS];
 };

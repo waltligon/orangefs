@@ -15,6 +15,9 @@ typedef struct
     char name[PVFS_SEGMENT_MAX];  /* segment name */
     PVFS_object_ref entry;        /* entry in parent */
     struct timeval tstamp_valid;  /* timestamp of validity period */
+    int abs_resolved;             /* if this entry is a symlink, is it
+                                     the resolved object, or the
+                                     symlink object itself? */
 } ncache_entry;
 
 struct ncache_t
@@ -53,6 +56,7 @@ static int ncache_update_dentry_timestamp(
     ncache_entry* entry); 
 static int ncache_add_dentry(
     char *name,
+    int abs_resolved,
     PVFS_object_ref parent,
     PVFS_object_ref entry);
 
@@ -68,12 +72,14 @@ static int s_pint_ncache_timeout_ms = PINT_NCACHE_TIMEOUT_MS;
 static inline int compare(
     struct ncache_t element,
     char *name,
+    int abs_resolved,
     PVFS_object_ref refn)
 {
     int ret = 0, len = 0;
 
     if ((element.dentry.parent.handle == refn.handle) &&
-        (element.dentry.parent.fs_id == refn.fs_id))
+        (element.dentry.parent.fs_id == refn.fs_id) &&
+        (element.dentry.abs_resolved == abs_resolved))
     {
         int len1 = strlen(name);
         int len2 = strlen(element.dentry.name);
@@ -119,6 +125,7 @@ static inline int check_dentry_expiry(struct timeval time_stamp)
  */
 int PINT_ncache_lookup(
     char *name,
+    int want_resolved,
     PVFS_object_ref parent,
     PVFS_object_ref *entry)
 {
@@ -131,15 +138,15 @@ int PINT_ncache_lookup(
     }
 
     gossip_debug(GOSSIP_NCACHE_DEBUG, "PINT_ncache_lookup called on "
-                 "segment %s\n\tunder %Lu,%d\n", name, Lu(parent.handle),
-                 parent.fs_id);
+                 "segment %s\n\tunder %Lu,%d [%d]\n", name,
+                 Lu(parent.handle), parent.fs_id, want_resolved);
 
     gen_mutex_lock(cache->mt_lock);
     entry->handle = PINT_NCACHE_HANDLE_INVALID;
 
     for(i = cache->top; i != BAD_LINK; i = cache->element[i].next)
     {
-        if (compare(cache->element[i],name,parent))
+        if (compare(cache->element[i],name,want_resolved,parent))
         {
             /* match found; check to see if it is still valid */
             ret = check_dentry_expiry(
@@ -242,6 +249,7 @@ static void ncache_rotate_dentry(int item)
  */
 int PINT_ncache_insert(
     char *name,
+    int abs_resolved,
     PVFS_object_ref entry,
     PVFS_object_ref parent)
 {
@@ -253,13 +261,13 @@ int PINT_ncache_insert(
 
     gossip_debug(
         GOSSIP_NCACHE_DEBUG, "PINT_ncache_insert: inserting segment "
-        "%s\n\t(%Lu,%d)\n\tunder parent (%Lu,%d)\n", name,
+        "%s\n\t(%Lu,%d) under parent (%Lu,%d) [%d]\n", name,
         Lu(entry.handle), entry.fs_id, Lu(parent.handle),
-        parent.fs_id);
+        parent.fs_id, abs_resolved);
 
     for (i = cache->top; i != BAD_LINK; i = cache->element[i].next)
     {
-        if (compare(cache->element[i],name,parent))
+        if (compare(cache->element[i],name,abs_resolved,parent))
         {
             entry_found = 1;
             index = i;
@@ -271,12 +279,12 @@ int PINT_ncache_insert(
     if (entry_found == 0)
     {
         /* Element not in cache, add it */
-        ncache_add_dentry(name,parent,entry);
+        ncache_add_dentry(name,abs_resolved,parent,entry);
     }
     else
     {
         /* move entry to the top of the list and update its timestamp */
-        gossip_debug(GOSSIP_NCACHE_DEBUG, "dache inserting entry "
+        gossip_debug(GOSSIP_NCACHE_DEBUG, "ncache: inserting entry "
                      "already present; timestamp update.\n");
 
         ncache_rotate_dentry(index);
@@ -301,6 +309,7 @@ int PINT_ncache_insert(
  */
 int PINT_ncache_remove(
     char *name,
+    int abs_resolved,
     PVFS_object_ref parent,
     int *item_found)
 {
@@ -320,7 +329,7 @@ int PINT_ncache_remove(
     gen_mutex_lock(cache->mt_lock);
     for(i = cache->top; i != BAD_LINK; i = cache->element[i].next)
     {
-        if (compare(cache->element[i],name,parent))
+        if (compare(cache->element[i],name,abs_resolved,parent))
         {
             ncache_remove_dentry(i);
 
@@ -427,6 +436,7 @@ void PINT_ncache_set_timeout(int max_timeout_ms)
  */
 static int ncache_add_dentry(
     char *name,
+    int abs_resolved,
     PVFS_object_ref parent,
     PVFS_object_ref entry)
 {
@@ -439,6 +449,7 @@ static int ncache_add_dentry(
     cache->element[new].status = STATUS_USED;
     cache->element[new].dentry.parent = parent;
     cache->element[new].dentry.entry = entry;
+    cache->element[new].dentry.abs_resolved = abs_resolved;
     memcpy(cache->element[new].dentry.name,name,size);
 
     /* set timestamp */
@@ -512,7 +523,7 @@ static void ncache_remove_dentry(int item)
     int prev = 0,next = 0;
 
     cache->element[item].status = STATUS_UNUSED;
-    memset(&cache->element[item].dentry.name, 0, PVFS_SEGMENT_MAX );
+    memset(&cache->element[item].dentry.name, 0, PVFS_SEGMENT_MAX);
     cache->count--;
 
     /* if there's exactly one item in the list, just get rid of it*/

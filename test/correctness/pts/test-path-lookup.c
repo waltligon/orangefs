@@ -114,6 +114,8 @@ static int build_nested_path(
                         "the directory %s\n", cur_filename);
                 goto cleanup;
             }
+            fprintf(stderr, "Got handle %Lu\n",
+                    Lu(mkdir_resp.ref.handle));
 
             /* grab refn of newly created directory */
             newdir_refns[i] = mkdir_resp.ref;
@@ -193,9 +195,11 @@ static int build_nested_path(
                 (lookup_refns[i].handle !=
                  lookup_resp.ref.handle))
             {
-                fprintf(stderr," PVFS_sys_ref_lookup and "
-                        "PVFS_sys_lookup returned different results "
-                        "when they should be the same!\n");
+                fprintf(stderr,"! PVFS_sys_ref_lookup and "
+                        "PVFS_sys_lookup returned different results\n"
+                        "\twhen they SHOULD BE THE SAME (%Lu != %Lu)!\n",
+                        Lu(lookup_refns[i].handle),
+                        Lu(lookup_resp.ref.handle));
                 goto cleanup;
             }
             parent_refn = lookup_resp.ref;
@@ -232,6 +236,7 @@ static int build_nested_path(
             PVFS_perror("Failed to create symlink ", ret);
             goto symlink_cleanup;
         }
+        fprintf(stderr, "Got handle %Lu\n", Lu(symlink_resp.ref.handle));
 
         /* stash the newly created relative symlink references created */
         rsymlink_refns[i] = symlink_resp.ref;
@@ -248,6 +253,7 @@ static int build_nested_path(
             PVFS_perror("Failed to create symlink ", ret);
             goto symlink_cleanup;
         }
+        fprintf(stderr, "Got handle %Lu\n", Lu(symlink_resp.ref.handle));
 
         /* stash the newly created absolute symlink references created */
         asymlink_refns[i] = symlink_resp.ref;

@@ -33,12 +33,13 @@ sm_p->u.lookup.contexts[sm_p->u.lookup.current_context].current_segment])
 
 enum
 {
-    LOOKUP_CONTINUE         = 2,
-    LOOKUP_TYPE_DIRECTORY   = 3,
-    LOOKUP_TYPE_METAFILE    = 4,
+    LOOKUP_CONTINUE = 2,
+    LOOKUP_TYPE_DIRECTORY = 3,
+    LOOKUP_TYPE_METAFILE = 4,
     LOOKUP_TYPE_RELATIVE_LN = 5,
     LOOKUP_TYPE_ABSOLUTE_LN = 6,
-    LOOKUP_TYPE_LN_NO_FOLLOW= 7
+    LOOKUP_TYPE_LN_NO_FOLLOW = 7,
+    LOOKUP_NCACHE_HIT_FASTPATH = 8
 };
 
 /* state function prototypes */
@@ -127,6 +128,7 @@ machine pvfs2_client_lookup_sm(
     state lookup_segment_verify_attr_present
     {
 	run lookup_segment_verify_attr_present;
+        LOOKUP_NCACHE_HIT_FASTPATH => lookup_cleanup;
         success => lookup_segment_check_attr_type;
         default => lookup_segment_getattr_setup_msgpair;
     }
@@ -510,10 +512,9 @@ int PVFS_isys_ref_lookup(
         sm_p, PVFS_SYS_LOOKUP, op_id, user_ptr);
 }
 
-
 int PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,
-    char* relative_pathname,
+    char *relative_pathname,
     PVFS_object_ref parent,
     PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
@@ -550,7 +551,7 @@ int PVFS_sys_ref_lookup(
 
 /* NOTE: no non-blocking equivalent for now */
 int PVFS_sys_lookup(
-    PVFS_fs_id fs_id, char* name,
+    PVFS_fs_id fs_id, char *name,
     PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
     int follow_link)
@@ -690,10 +691,18 @@ static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
       attempt to insert the resolved segment/object refn into the
       ncache if it wasn't a cache hit
     */
-    if (!sm_p->ncache_hit)
+    if (sm_p->ncache_hit)
     {
-        PINT_ncache_insert(cur_seg->seg_name, cur_seg->seg_resolved_refn,
-                           cur_seg->seg_starting_refn);
+        /*
+          on ncache hit, there's no need to fetch attrs because we're
+          trusting that the ncache inserted properly resolved
+          references; just fill in the response with the last resolved
+          object reference
+        */
+        sm_p->u.lookup.lookup_resp->ref = cur_seg->seg_resolved_refn;
+
+        js_p->error_code = LOOKUP_NCACHE_HIT_FASTPATH;
+        return 1;
     }
 
     /*
@@ -825,6 +834,8 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
             {
                 gossip_debug(GOSSIP_LOOKUP_DEBUG, "** skipping final "
                              "symlink resolution due to user request\n");
+
+                sm_p->u.lookup.skipped_final_resolution = 1;
                 js_p->error_code = LOOKUP_TYPE_LN_NO_FOLLOW;
             }
             else
@@ -941,7 +952,8 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
       fs_id that this lookup started with.
     */
     root_refn.fs_id = sm_p->u.lookup.starting_refn.fs_id;
-    ret = PINT_cached_config_get_root_handle(root_refn.fs_id, &root_refn.handle);
+    ret = PINT_cached_config_get_root_handle(
+        root_refn.fs_id, &root_refn.handle);
     assert(ret == 0);
 
     ret = initialize_context(sm_p->u.lookup.contexts,
@@ -1056,12 +1068,48 @@ static int lookup_cleanup(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_cleanup\n");
 
+    if (js_p->error_code == LOOKUP_NCACHE_HIT_FASTPATH)
+    {
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup fast path exiting\n");
+        js_p->error_code = 0;
+    }
+
     sm_p->error_code = js_p->error_code;
+
+    /*
+      on success, attempt to insert the resolved segment/object refn
+      into the ncache if it wasn't a cache hit AND we didn't just
+      resolve a symlink object, rather than a truly resolved object
+      (for now)
+    */
+    if ((js_p->error_code == 0) && (!sm_p->ncache_hit) &&
+        (!sm_p->u.lookup.skipped_final_resolution))
+    {
+        PINT_ncache_insert(sm_p->u.lookup.orig_pathname,
+                           0 /*sm_p->u.lookup.follow_link*/,
+                           sm_p->u.lookup.lookup_resp->ref,
+                           sm_p->u.lookup.starting_refn);
+    }
 
     /* clean up all used memory for this lookup */
     for(i = 0; i < MAX_LOOKUP_CONTEXTS; i++)
     {
         finalize_context(&sm_p->u.lookup.contexts[i]);
+    }
+
+    if (sm_p->error_code)
+    {
+        char buf[64] = {0};
+        PVFS_strerror_r(sm_p->error_code, buf, 64);
+        gossip_debug(
+            GOSSIP_LOOKUP_DEBUG, "Lookup failed to "
+            "resolve %s: %s\n", sm_p->u.lookup.orig_pathname, buf);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup resolved segment %s "
+                     "to %Lu\n", sm_p->u.lookup.orig_pathname,
+                     Lu(sm_p->u.lookup.lookup_resp->ref.handle));
     }
 
     /* mark operation as complete */
@@ -1088,7 +1136,7 @@ static int lookup_segment_lookup_comp_fn(
     if (resp_p->status != 0)
     {
         return resp_p->status;
-    }            
+    }
 
     assert(resp_p->u.lookup_path.handle_count);
 
@@ -1160,8 +1208,8 @@ static int lookup_segment_getattr_comp_fn(
 
     if (resp_p->status != 0)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, " getattr failed with code %d\n",
-                     resp_p->status);
+        gossip_debug(GOSSIP_CLIENT_DEBUG, " getattr failed with "
+                     "code %d\n", resp_p->status);
         return resp_p->status;
     }
 

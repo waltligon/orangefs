@@ -18,6 +18,7 @@
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
 #include "pint-util.h"
+#include "ncache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -489,10 +490,18 @@ static int mkdir_cleanup(PINT_client_sm *sm_p,
 
     if (sm_p->error_code == 0)
     {
-        sm_p->u.mkdir.mkdir_resp->ref.handle =
-            sm_p->u.mkdir.metafile_handle;
-        sm_p->u.mkdir.mkdir_resp->ref.fs_id =
-            sm_p->parent_ref.fs_id;
+        PVFS_object_ref directory_ref;
+
+        directory_ref.handle = sm_p->u.mkdir.metafile_handle;
+        directory_ref.fs_id = sm_p->parent_ref.fs_id;
+
+        sm_p->u.mkdir.mkdir_resp->ref.handle = directory_ref.handle;
+        sm_p->u.mkdir.mkdir_resp->ref.fs_id = directory_ref.fs_id;
+
+        /* insert newly created directory handle into the ncache */
+        PINT_ncache_insert(sm_p->u.mkdir.object_name,
+                           0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */,
+                           directory_ref, sm_p->parent_ref);
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.mkdir.retry_count < PVFS2_CLIENT_RETRY_LIMIT))

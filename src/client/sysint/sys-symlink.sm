@@ -18,6 +18,7 @@
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
 #include "pint-util.h"
+#include "ncache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -592,6 +593,11 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
 
         /* fill in outgoing response fields */
         sm_p->u.sym.sym_resp->ref = symlink_ref;
+
+        /* insert newly created symlink into the ncache */
+        PINT_ncache_insert(sm_p->u.sym.link_name,
+                           0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */,
+                           symlink_ref, sm_p->parent_ref);
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.sym.retry_count < PVFS2_CLIENT_RETRY_LIMIT))

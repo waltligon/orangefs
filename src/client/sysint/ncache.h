@@ -20,21 +20,24 @@
 #define PINT_NCACHE_HANDLE_INVALID 0
 
 int PINT_ncache_lookup(
-	char *name, 
-	PVFS_object_ref parent,
-	PVFS_object_ref *entry);
+        char *name,
+        int want_resolved,
+        PVFS_object_ref parent,
+        PVFS_object_ref *entry);
 
 int PINT_ncache_insert(
-	char *name, 
-	PVFS_object_ref entry,
-	PVFS_object_ref parent);
+        char *name, 
+        int abs_resolved,
+        PVFS_object_ref entry,
+        PVFS_object_ref parent);
 
 int PINT_ncache_flush(void);
 
 int PINT_ncache_remove(
-	char *name, 
-	PVFS_object_ref parent,
-	int *item_found);
+        char *name, 
+        int abs_resolved,
+        PVFS_object_ref parent,
+        int *item_found);
 
 int PINT_ncache_initialize(void);
 

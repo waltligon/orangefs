@@ -17,6 +17,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
+#include "ncache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -270,9 +271,10 @@ static int readdir_msg_comp_fn(void *v_p,
         resp_p->u.readdir.dirent_count;
     if (sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount > 0)
     {
-        int dirent_array_len =
+        int i = 0, dirent_array_len =
             (sizeof(PVFS_dirent) *
              sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount);
+        PVFS_object_ref tmp_ref;
 
         /* this dirent_array MUST be freed by caller */
         sm_p->u.readdir.readdir_resp->dirent_array =
@@ -281,6 +283,19 @@ static int readdir_msg_comp_fn(void *v_p,
 
         memcpy(sm_p->u.readdir.readdir_resp->dirent_array,
                resp_p->u.readdir.dirent_array, dirent_array_len);
+
+        /* insert all handles into the ncache while we have them */
+        tmp_ref.fs_id = sm_p->object_ref.fs_id;
+        for(i = 0;
+            i < sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount; i++)
+        {
+            tmp_ref.handle = resp_p->u.readdir.dirent_array[i].handle;
+
+            PINT_ncache_insert(
+                resp_p->u.readdir.dirent_array[i].d_name,
+                0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */, tmp_ref,
+                sm_p->object_ref);
+        }
     }
     gossip_debug(
         GOSSIP_READDIR_DEBUG, "*** Got %d directory entries\n",
