@@ -2,6 +2,8 @@
 
 #PBS -N PVFS2TEST
 #PBS -l walltime=1:00:00
+#PBS -o /tmp/PVFS2TEST.out.DATE
+#PBS -e /tmp/PVFS2TEST.err.DATE
 
 # Change into the working directory
 cd $PBS_O_WORKDIR
@@ -27,5 +29,8 @@ mpdboot --rsh=rsh --file=$HOME/nightly/nodes.conf
 ./pvfs2tests.py $CONFIGFILE $PAVCONFIG /home/USER/testing/DATE/work/$NODEFILE
 
 mpdallexit
+
+# cleanup scratch area
+rm -rf /home/USER/testing/DATE
 
 exit 0
