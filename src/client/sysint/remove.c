@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  */
 
-/* Remove Function Implementation */
+/* Remove Implementation */
 
 #include <assert.h>
 
@@ -41,7 +41,11 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 
 	enum {
 	    NONE_FAILURE = 0,
-	    LOOKUP_FAILURE,
+	    GET_PINODE_FAILURE,
+	    SERVER_LOOKUP_FAILURE,
+	    SEND_REQ_FAILURE,
+	    RECV_REQ_FAILURE,
+	    REMOVE_CACHE_FAILURE,
 	} failure = NONE_FAILURE;
 
 	/* lookup meta file */
@@ -51,7 +55,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 				req->credentials, &entry);
 	if (ret < 0)
 	{
-	    failure = LOOKUP_FAILURE;
+	    failure = GET_PINODE_FAILURE;
 	    goto return_error;
 	}
 
@@ -60,7 +64,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 			attr_mask, req->credentials );
 	if (ret < 0)
 	{
-	    failure = LOOKUP_FAILURE;
+	    failure = GET_PINODE_FAILURE;
 	    goto return_error;
 	}
 
@@ -69,14 +73,15 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 				req->credentials.uid, req->credentials.gid);
 	if (ret < 0)
 	{
-	    failure = LOOKUP_FAILURE;
+	    ret = (-EPERM);
+	    failure = GET_PINODE_FAILURE;
 	    goto return_error;
 	}
 
 	ret = PINT_bucket_map_to_server(&serv_addr, entry.handle, entry.fs_id);
 	if (ret < 0)
 	{
-	    failure = LOOKUP_FAILURE;
+	    failure = SERVER_LOOKUP_FAILURE;
 	    goto return_error;
 	}
 
@@ -93,7 +98,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
 	if (ret < 0)
 	{
-	    failure = LOOKUP_FAILURE;
+	    failure = SEND_REQ_FAILURE;
 	    goto return_error;
 	}
 
@@ -102,7 +107,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	if (ack_p->status < 0 )
 	{
 	    ret = ack_p->status;
-	    failure = LOOKUP_FAILURE;
+	    failure = RECV_REQ_FAILURE;
 	    goto return_error;
 	}
 
@@ -112,7 +117,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	ret = PINT_bucket_map_to_server(&serv_addr, req->parent_refn.handle, req->parent_refn.fs_id);
 	if (ret < 0)
 	{
-	    failure = LOOKUP_FAILURE;
+	    failure = SERVER_LOOKUP_FAILURE;
 	    goto return_error;
 	}
 
@@ -129,7 +134,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
 	if (ret < 0)
 	{
-	    failure = LOOKUP_FAILURE;
+	    failure = SEND_REQ_FAILURE;
 	    goto return_error;
 	}
 
@@ -138,7 +143,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	if (ack_p->status < 0 )
 	{
 	    ret = ack_p->status;
-	    failure = LOOKUP_FAILURE;
+	    failure = RECV_REQ_FAILURE;
 	    goto return_error;
 	}
 
@@ -174,14 +179,14 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	    ret = PINT_bucket_map_to_server(&serv_addr, req_p.u.remove.handle, req->parent_refn.fs_id);
 	    if (ret < 0)
 	    {
-		failure = LOOKUP_FAILURE;
+		failure = SERVER_LOOKUP_FAILURE;
 		goto return_error;
 	    }
 
 	    ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
 	    if (ret < 0)
 	    {
-		failure = LOOKUP_FAILURE;
+		failure = SEND_REQ_FAILURE;
 		goto return_error;
 	    }
 
@@ -190,7 +195,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	    if (ack_p->status < 0 )
 	    {
 		ret = ack_p->status;
-		failure = LOOKUP_FAILURE;
+		failure = RECV_REQ_FAILURE;
 		goto return_error;
 	    }
 
@@ -201,14 +206,16 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	ret = PINT_dcache_remove(req->entry_name,req->parent_refn,&items_found);
 	if (ret < 0)
 	{
-		goto return_error;
+	    failure = REMOVE_CACHE_FAILURE;
+	    goto return_error;
 	}
 
 	/* Remove from pinode cache */
 	ret = PINT_pcache_remove(entry,&item_ptr);
 	if (ret < 0)
 	{
-		goto return_error;
+	    failure = REMOVE_CACHE_FAILURE;
+	    goto return_error;
 	}
 
 	/* free the pinode that we removed from cache */
@@ -216,10 +223,22 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 
 	return(0);
 return_error:
-	switch(failure)
-	{
-	}
-	return(ret);
+
+    /* TODO: what exactly (if anything) do we want to roll back in case
+     * something gets fubar'ed while we're removing data/meta/dirent files?
+     */
+
+    switch(failure)
+    {
+	case RECV_REQ_FAILURE:
+	    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	case SEND_REQ_FAILURE:
+	case SERVER_LOOKUP_FAILURE:
+	case GET_PINODE_FAILURE:
+	case REMOVE_CACHE_FAILURE:
+	case NONE_FAILURE:
+    }
+    return(ret);
 }
 
 /*

@@ -4,13 +4,19 @@
  * See COPYING in top-level directory.
  */
 
-/* Read Directory Function Implementation */
+/* Read Directory Implementation */
 
-#include <pinode-helper.h>
-#include <pvfs2-sysint.h>
-#include <pint-sysint.h>
-#include <pint-servreq.h>
-#include <config-manage.h>
+#include "pinode-helper.h"
+#include "pvfs2-sysint.h"
+#include "pint-sysint.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-dcache.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+
+#define REQ_ENC_FORMAT 0
 
 /* PVFS_sys_readdir()
  *
@@ -20,90 +26,116 @@
  */
 int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 {
-	struct PVFS_server_req_s *req_job = NULL;		/* server request */
-	struct PVFS_server_resp_s *ack_job = NULL;	/* server response */
+	struct PVFS_server_req_s req_p;			/* server request */
+	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
 	int ret = -1;
-	pinode_p pinode_ptr = NULL;
-	bmi_addr_t serv_addr1;	/* PVFS address type structure */
-	char *server1 = NULL;
-	int cflags = 0,vflags = 0;
+	pinode *pinode_ptr = NULL;
+	bmi_addr_t serv_addr;	/* PVFS address type structure */
 	PVFS_bitfield attr_mask;
-	PVFS_servreq_readdir req_readdir;
+	struct PINT_decoded_msg decoded;
+	int max_msg_sz;
+
+	enum {
+	    NONE_FAILURE = 0,
+	    GET_PINODE_FAILURE,
+	    SERVER_LOOKUP_FAILURE,
+	    SEND_REQ_FAILURE,
+	    RECV_REQ_FAILURE,
+	    _FAILURE,
+	} failure = NONE_FAILURE;
 	
 	/* Revalidate directory handle */
 	/* Get the directory pinode */
-	vflags = 0;
 	attr_mask = ATTR_BASIC;
 	ret = phelper_get_pinode(req->pinode_refn,&pinode_ptr,
 			attr_mask, req->credentials);
 	if (ret < 0)
 	{
-		goto pinode_get_failure;
+	    failure = GET_PINODE_FAILURE;
+	    goto return_error;
 	}
-	/* Validate the pinode */
-	ret = phelper_validate_pinode(pinode_ptr,cflags,attr_mask,req->credentials);
-	if (ret < 0)
-	{
-			goto pinode_get_failure;
-	}
-	/* Free the pinode */
-	PINT_pcache_pinode_dealloc(pinode_ptr);
 
 	/* Read directory server request */
 
 	/* Query the BTI to get initial meta server */
-	ret = config_bt_map_bucket_to_server(&server1,req->pinode_refn.handle,\
+	ret = PINT_bucket_map_to_server(&serv_addr, req->pinode_refn.handle,
 	  		req->pinode_refn.fs_id);
 	if (ret < 0)
 	{
-		goto get_bucket_failure;
+	    failure = SERVER_LOOKUP_FAILURE;
+	    goto return_error;
 	}
-	ret = BMI_addr_lookup(&serv_addr1,server1);
-	if (ret < 0)
-	{
-		goto get_bucket_failure;
-	}
-	/* Deallocate allocated memory */
-	if (server1)
-		free(server1);
 
-	/* Fill in the parameters */
-	req_readdir.handle = req->pinode_refn.handle;
-	req_readdir.fs_id = req->pinode_refn.fs_id;
-	req_readdir.token = req->token;
-	req_readdir.pvfs_dirent_count = req->pvfs_dirent_incount;
-	 
-	/* server request */
-	ret = pint_serv_readdir(&req_job,&ack_job,&req_readdir,req->credentials,\
-			&serv_addr1); 
-	if (ret < 0)
-	{
-		goto readdir_failure;
-	}
-	/* New entry pinode reference */
-	resp->token = ack_job->u.readdir.token;
-	resp->pvfs_dirent_outcount = ack_job->u.readdir.pvfs_dirent_count;
-	memcpy(resp->dirent_array,ack_job->u.readdir.pvfs_dirent_array,\
-			sizeof(PVFS_dirent) * ack_job->u.readdir.pvfs_dirent_count);
+	/* send a readdir message to the server */
+	req_p.op = PVFS_SERV_READDIR;
+	req_p.credentials = req->credentials;
+	req_p.rsize = sizeof(struct PVFS_server_req_s);
+	req_p.u.readdir.handle = req->pinode_refn.handle;
+	req_p.u.readdir.fs_id = req->pinode_refn.fs_id;
+	req_p.u.readdir.token = req->token;
+	req_p.u.readdir.pvfs_dirent_count = req->pvfs_dirent_incount;
 
-	/* Free the jobs */
-	sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr1,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
+	max_msg_sz = sizeof(struct PVFS_server_resp_s) 
+			+ req->pvfs_dirent_incount * sizeof(PVFS_dirent);
+
+	/*send the readdir request to the server*/
+
+	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+        if (ret < 0)
+        {
+            failure = SEND_REQ_FAILURE;
+            goto return_error;
+        }
+
+        ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+        if (ack_p->status < 0 )
+        {
+            ret = ack_p->status;
+            failure = RECV_REQ_FAILURE;
+            goto return_error;
+        }
+
+	/*pass everything the server replied with back to the calling function*/
+	resp->token = ack_p->u.readdir.token;
+	resp->pvfs_dirent_outcount = ack_p->u.readdir.pvfs_dirent_count;
+	if ( 0 < ack_p->u.readdir.pvfs_dirent_count)
+	{
+	    memcpy(resp->dirent_array, ack_p->u.readdir.pvfs_dirent_array,
+		    sizeof(PVFS_dirent) * ack_p->u.readdir.pvfs_dirent_count);
+	}
+
+        PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 
 	return(0);
 
-readdir_failure:
-	sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr1,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
+return_error:
 
-get_bucket_failure:
-	if (server1)
-		free(server1);
+/* TODO: this error checking thing seems useless if there aren't any pointers.
+ * I don't have to free anything, so I just took this part out.
+ */
 
-pinode_get_failure:
-	/* Free the pinode */
-	if (pinode_ptr)
-		pcache_pinode_dealloc(pinode_ptr);
+#if 0
+    switch(failure)
+    {
+	case RECV_REQ_FAILURE:
+	case SEND_REQ_FAILURE:
+	case SERVER_LOOKUP_FAILURE:
+	case GET_PINODE_FAILURE:
+	case NONE_FAILURE:
+    }
 
-	return(ret);
+#endif
+
+    return(ret);
+
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
