@@ -36,7 +36,8 @@ int PINT_bucket_get_next_io(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     int num_servers,
-    bmi_addr_t *io_addr_array);
+    bmi_addr_t *io_addr_array,
+    PVFS_handle_extent_array *io_handle_extent_array);
 
 int PINT_bucket_get_physical(
     struct server_configuration_s *config,

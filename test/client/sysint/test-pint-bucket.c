@@ -46,7 +46,7 @@ extern job_context_id PVFS_sys_job_context;
  */
 int main(int argc, char **argv)	
 {
-    int i = 0, j = 0, k = 0, num_file_systems = 0;
+    int i = 0, j = 0, k = 0, n = 0, num_file_systems = 0;
     pvfs_mntlist mnt = {0,NULL};
     struct server_configuration_s server_config;
     struct llist *cur = NULL;
@@ -57,6 +57,7 @@ int main(int argc, char **argv)
     char server_name[MAX_BMI_ADDR_LEN] = {0};
     int test_handles_verified[NUM_TEST_HANDLES] = {0};
     PVFS_handle_extent_array meta_handle_extent_array;
+    PVFS_handle_extent_array data_handle_extent_array[NUM_DATA_SERVERS_TO_QUERY];
 
     if (PVFS_util_parse_pvfstab(NULL,&mnt))
     {
@@ -167,8 +168,9 @@ int main(int argc, char **argv)
             }
         }
 
-        if (PINT_bucket_get_next_io(&server_config,fs_ids[i],
-                                    NUM_DATA_SERVERS_TO_QUERY,d_addr))
+        if (PINT_bucket_get_next_io(&server_config, fs_ids[i],
+                                    NUM_DATA_SERVERS_TO_QUERY,
+                                    d_addr, data_handle_extent_array))
         {
             fprintf(stderr, "PINT_bucket_get_next_io failure.\n");
             return(-1);
@@ -179,7 +181,13 @@ int main(int argc, char **argv)
                    NUM_DATA_SERVERS_TO_QUERY);
             for(j = 0; j < NUM_DATA_SERVERS_TO_QUERY; j++)
             {
-                printf("I/O server %d addr: %lu\n",j,(long)d_addr[j]);
+                printf("I/O server  %d addr        : %lu\n",j,(long)d_addr[j]);
+                for(n = 0; n < data_handle_extent_array[j].extent_count; n++)
+                {
+                    printf("Data server %d handle range: %Lu-%Lu\n", n,
+                           data_handle_extent_array[j].extent_array[n].first,
+                           data_handle_extent_array[j].extent_array[n].last);
+                }
             }
         }
 

@@ -21,7 +21,7 @@
 #include "str-utils.h"
 
 int g_session_tag;
-gen_mutex_t *g_session_tag_mt_lock;
+gen_mutex_t *g_session_tag_mt_lock = NULL;
 struct server_configuration_s g_server_config;
 
 static int server_parse_config(
@@ -272,7 +272,17 @@ void debug_print_type(void* thing, int type)
 
 int get_next_session_tag(void)
 {
-    int ret = 0;
+    int ret = -1;
+
+    if (g_session_tag_mt_lock == NULL)
+    {
+        g_session_tag_mt_lock = gen_mutex_build();
+        if (g_session_tag_mt_lock == NULL)
+        {
+            return ret;
+        }
+    }
+
     /* grab a lock for this variable */
     gen_mutex_lock(g_session_tag_mt_lock);
 

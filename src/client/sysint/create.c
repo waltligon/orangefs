@@ -46,6 +46,7 @@ int PVFS_sys_create(
 	PVFS_msg_tag_t op_tag;
 	bmi_size_t max_msg_sz;
 	int old_ret = -1;
+        PVFS_handle_extent_array *io_handle_extent_array = NULL;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -154,6 +155,7 @@ int PVFS_sys_create(
 	 * data files- just go with the system default. 
 	 */
 	PINT_bucket_get_num_io( parent_refn.fs_id, &io_serv_count);
+
 	/* but make sure we don't exceed the request protocol limit */
 	if(io_serv_count > PVFS_REQ_LIMIT_DFILE_COUNT)
 	{
@@ -309,13 +311,25 @@ int PVFS_sys_create(
 	    goto return_error;
 	}
         memset(df_handle_array,0,io_serv_count*sizeof(PVFS_handle));
-	
+
+	/* we need one data handle range for each data file handle */
+        io_handle_extent_array = (PVFS_handle_extent_array *)
+            malloc(io_serv_count * sizeof(PVFS_handle_extent_array));
+        if (!io_handle_extent_array)
+        {
+            gossip_err("Cannot allocate handle extent array\n");
+            failure = PREIO3_CREATE_FAILURE;
+            goto return_error;
+        }
+
 	ret = PINT_bucket_get_next_io(&g_server_config,
                                       parent_refn.fs_id,
                                       io_serv_count,
-                                      bmi_addr_list);
+                                      bmi_addr_list,
+                                      io_handle_extent_array);
 	if (ret < 0)
 	{
+            gossip_err("Failed to get I/O server configuration\n");
 	    failure = PREIO3_CREATE_FAILURE;
 	    goto return_error;
 	}
@@ -346,41 +360,40 @@ int PVFS_sys_create(
 
 	for(i = 0;i < io_serv_count; i++)
 	{
-		/* Fill in the parameters */
-		PVFS_handle_extent cur_extent;
-                cur_extent.first = cur_extent.last = df_handle_array[i];
-		req_p.u.create.handle_extent_array.extent_count = 1;
-		req_p.u.create.handle_extent_array.extent_array = &cur_extent;
+            assert(io_handle_extent_array[i].extent_count > 0);
+            assert(io_handle_extent_array[i].extent_array);
 
-		op_tag = get_next_session_tag();
+            req_p.u.create.handle_extent_array.extent_count =
+                io_handle_extent_array[i].extent_count;
+            req_p.u.create.handle_extent_array.extent_array =
+                io_handle_extent_array[i].extent_array;
 
-		/* Server request */
-		ret = PINT_send_req(bmi_addr_list[i], &req_p, max_msg_sz,
-	            &decoded, &encoded_resp, op_tag);
-		if (ret < 0)
-		{
-		    /* if we fail then we assume no data file has been created
-		     * on the server
-		     */
-		    failure = IO_REQ_FAILURE;
-		    goto return_error;
-		}
+            op_tag = get_next_session_tag();
 
-		ack_p = (struct PVFS_server_resp *) decoded.buffer;
+            ret = PINT_send_req(bmi_addr_list[i], &req_p, max_msg_sz,
+                                &decoded, &encoded_resp, op_tag);
+            if (ret < 0)
+            {
+                /* if we fail then we assume no data file has been created
+                 * on the server
+                 */
+                failure = IO_REQ_FAILURE;
+                goto return_error;
+            }
 
-		/* make sure the operation didn't fail*/
-		if (ack_p->status < 0 )
-		{
-		    ret = ack_p->status;
-		    failure = IO_REQ_FAILURE;
-		    goto return_error;
-		}
+            ack_p = (struct PVFS_server_resp *) decoded.buffer;
+            if (ack_p->status < 0 )
+            {
+                ret = ack_p->status;
+                failure = IO_REQ_FAILURE;
+                goto return_error;
+            }
 
-		/* store the new handle here */
-		df_handle_array[i] = ack_p->u.create.handle;
+            /* store the new handle here */
+            df_handle_array[i] = ack_p->u.create.handle;
 
-		PINT_release_req(bmi_addr_list[i], &req_p, max_msg_sz, &decoded,
-		    &encoded_resp, op_tag);
+            PINT_release_req(bmi_addr_list[i], &req_p, max_msg_sz,
+                             &decoded, &encoded_resp, op_tag);
 	}
 
 	/* store all the handles to the files we've created in the metafile

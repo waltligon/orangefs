@@ -231,15 +231,16 @@ int PINT_bucket_get_next_io(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     int num_servers,
-    bmi_addr_t *io_addr_array)
+    bmi_addr_t *io_addr_array,
+    PVFS_handle_extent_array *io_handle_extent_array)
 {
-    int ret = -EINVAL;
+    int ret = -EINVAL, i = 0;
     char *data_server_bmi_str = (char *)0;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (config && num_servers && io_addr_array)
+    if (config && num_servers && io_addr_array && io_handle_extent_array)
     {
         hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
         if (hash_link)
@@ -273,6 +274,13 @@ int PINT_bucket_get_next_io(
                 {
                     break;
                 }
+
+                io_handle_extent_array[i].extent_count =
+                    cur_mapping->handle_extent_array.extent_count;
+                io_handle_extent_array[i].extent_array =
+                    cur_mapping->handle_extent_array.extent_array;
+
+                i++;
                 io_addr_array++;
                 num_servers--;
             }
