@@ -990,6 +990,67 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
     return (0);
 }
 
+/* job_req_sched_post_timer()
+ *
+ * posts a timer to the request scheduler
+ *
+ * returns 0 on success, -errno on failure, and 1 on immediate
+ * completion 
+ */
+int job_req_sched_post_timer(int msecs,
+		       void *user_ptr,
+		       PVFS_aint status_user_tag,
+		       job_status_s * out_status_p,
+		       job_id_t * id,
+		       job_context_id context_id)
+{
+    /* post a timer to the scheduler.  If it completes (or fails)
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue up
+     * a job_desc structure.        
+     */
+
+    struct job_desc *jd = NULL;
+    int ret = -1;
+
+    jd = alloc_job_desc(JOB_REQ_SCHED);
+    if (!jd)
+    {
+	return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+
+    ret = PINT_req_sched_post_timer(msecs, jd, &(jd->u.req_sched.id));
+
+    if (ret < 0)
+    {
+	/* error posting */
+	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
+	dealloc_job_desc(jd);
+	return (1);
+    }
+
+    if (ret == 1)
+    {
+	/* immediate completion */
+	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
+	dealloc_job_desc(jd);
+	return (1);
+    }
+
+    /* if we hit this point, job did not immediately complete-
+     * queue to test later
+     */
+    *id = jd->job_id;
+
+    return (0);
+}
+
+
 /* job_req_sched_release
  *
  * releases a request from the request scheduler
@@ -4091,8 +4152,8 @@ static void fill_status(struct job_desc *jd,
 	status->error_code = 0;
 	status->actual_size = jd->u.dev_unexp.info->size;
 	break;
-    default:
-	gossip_lerr("Error: Unimplemented!\n");
+    case JOB_REQ_SCHED_TIMER:
+	status->error_code = jd->u.req_sched.error_code;
 	break;
     }
 

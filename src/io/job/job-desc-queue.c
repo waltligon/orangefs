@@ -199,6 +199,9 @@ void job_desc_q_dump(job_desc_q_p jdqp)
 	case JOB_DEV_UNEXP:
 	    gossip_err("    type: JOB_DEV_UNEXP.\n");
 	    break;
+	case JOB_REQ_SCHED_TIMER:
+	    gossip_err("    type: JOB_REQ_SCHED_TIMER.\n");
+	    break;
 	}
     }
 

@@ -162,6 +162,13 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
 		       job_id_t * id,
 		       job_context_id context_id);
 
+int job_req_sched_post_timer(int msecs,
+		       void *user_ptr,
+		       PVFS_aint status_user_tag,
+		       job_status_s * out_status_p,
+		       job_id_t * id,
+		       job_context_id context_id);
+
 /* request scheduler release */
 int job_req_sched_release(job_id_t in_completed_id,
 			  void *user_ptr,

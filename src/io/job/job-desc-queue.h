@@ -74,7 +74,8 @@ enum job_type
     JOB_TROVE,
     JOB_FLOW,
     JOB_REQ_SCHED,
-    JOB_DEV_UNEXP
+    JOB_DEV_UNEXP,
+    JOB_REQ_SCHED_TIMER
 };
 
 /* describes a job, which may be one of several types */
