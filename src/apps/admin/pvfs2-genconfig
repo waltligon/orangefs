@@ -40,20 +40,32 @@ sub valid_number
 
 sub prompt_num
 {
-    my($prompt,$num);
+    my($prompt,$num,$default);
     $prompt = $_[0];
+    $default = $_[1];
     do
     {
         $num = get_user_input($prompt);
+        if (length($num) == 0)
+        {
+            return $default;
+        }
     } while(!valid_number($num));
     return $num;
 }
 
 sub prompt_word
 {
-    my($prompt);
+    my($prompt,$default,$val);
     $prompt = $_[0];
-    return get_user_input($prompt);
+    $default = $_[1];
+    
+    $val = get_user_input($prompt);
+    if (length($val) == 0)
+    {
+        $val = $default;
+    }
+    return $val;
 }
 
 sub emit_defaults
@@ -110,14 +122,13 @@ sub emit_filesystem
         return;
     }
 
-    # divide handle range space equally among servers (2^48 for now)
+    # divide handle range space equally among servers ((2^32)-1 for now)
     my($total_num_handles_available, $start, $end, $i, $step);
-    $total_num_handles_available = 281474976710656;
-
+    $total_num_handles_available = 4294967295;
 
     # since meta and data handle ranges must be split, increment
     # num nodes for calculation purposes below
-    $step = int(($total_num_handles_available / ($num_nodes + 1)));
+    $step = sprintf("%llu",($total_num_handles_available / ($num_nodes + 1)));
 
     # pre-compute the single meta handle range
     $start = 2^1;
@@ -135,7 +146,7 @@ sub emit_filesystem
     $i = (($num_nodes == 1) ? 0 : 1);
     for($i; $i < $num_nodes; $i++)
     {
-        $start = $end + 1;
+        $start = sprintf("%llu",($end + 1));
         $end += $step;
         print $target "\t\tRange $server_aliases[$i] $start-$end\n";
     }
@@ -161,7 +172,7 @@ sub confirm
     $valid_char = 0;
     do
     {
-        $char = prompt_word($prompt);
+        $char = prompt_word($prompt,"-");
         if (($char eq 'y') || ($char eq 'n'))
         {
             $valid_char = 1;
@@ -184,12 +195,16 @@ if ((@ARGV == 1) && ($ARGV[0] eq "-"))
 }
 elsif (@ARGV != 2)
 {
-    print "Usage: pvfs2-genconfig <fs.conf> <server.conf template>\n";
-    print "The server.conf template is used for generating server\n";
+    print "Usage: pvfs2-genconfig <fs.conf> <server-BASENAME.conf>\n\n";
+    print "The server-BASENAME.conf is a basename used for generating server\n";
     print "  specific configuration files.  One file will be generated\n";
     print "  for each server configured with this program.  The generated\n";
-    print "  filename will be based on the specified server.conf template\n";
-    print "NOTE: If <fs.conf> is '-', output is directed to stdout\n";
+    print "  filename will be based on the specified server-BASENAME.conf\n";
+    print "\nExample: issuing 'perl ./pvfs2-genconfig fs.conf MYSITE'\n";
+    print " Will generate a file called fs.conf and server specific\n";
+    print " files called server-MYSITE0.conf, server-MYSITE1.conf, etc.\n";
+    print "\nNOTE: If <fs.conf> is '-', output is directed to stdout\n";
+    print "      No files are written in this mode.\n";
     exit;
 }
 else
@@ -218,7 +233,7 @@ print "machine, you must answer 'y' when prompted below.\n";
 print "\n********************************************************\n";
 
 $num_nodes =
-    prompt_num("How many I/O nodes are in your pvfs2 cluster?  ");
+    prompt_num("How many I/O nodes are in your pvfs2 cluster? [Default is 1]  ","1");
 
 if ($num_nodes eq 1)
 {
@@ -241,28 +256,36 @@ for($i = 0; $i < $num_nodes; $i++)
 {
     my($server, $port, $type, $server_addr, $server_alias, $tmp);
 
+    # get protocol type
+    print "Available supported protocol types are tcp and gm\n";
+    $type = prompt_word("Enter protocol type [Default is tcp]: ","tcp");
+
+    if (!($type =~ /tcp/))
+    {
+        print "Sorry.  At this time, only the tcp protocol is configured\n";
+        print "for use with this configuration utility.\n";
+        exit 1;
+    }
+
     if ($i == 0)
     {
         $server =
-            prompt_word("Enter Metadata host address (i.e. host.domain):  ");
+            prompt_word("Enter Metadata host address [Default is localhost]: ", "localhost");
     }
     else
     {
         $server =
-            prompt_word("Enter I/O host $i address (i.e. host.domain):  ");
+            prompt_word("Enter I/O host $i address [Default is localhost]: ","localhost");
     }
 
     # get host port
-    $port = prompt_num("Enter listening port for $server:  ");
-
-    # get protocol type
-    $type = prompt_word("Enter protocol type (i.e. tcp, gm, etc):  ");
+    $port = prompt_num("Enter listening port for $server [Default is 3334]: ","3334");
 
     # generate the bmi address and aliases
     $server_addr = "$type://$server:$port";
 
     # get server alias
-#    $server_alias = prompt_word("Enter an alias name for this server:  ");
+#    $server_alias = prompt_word("Enter an alias name for this server: ");
     $server_alias = "$server-alias$i";
 
     print "Constructed server address of $server_addr\n";
@@ -281,7 +304,7 @@ for($i = 0; $i < $num_nodes; $i++)
     }
 }
 
-$logfile = prompt_word("Please specify a server logfile location:  ");
+$logfile = prompt_word("Please specify a server logfile location [Default is /tmp/pvfs2-server.log]: ","/tmp/pvfs2-server.log");
 
 # ----------------------------------------------------------
 # now that we have all the info, emit the configuration data
@@ -292,7 +315,7 @@ $logfile = prompt_word("Please specify a server logfile location:  ");
 
 emit_defaults($output_target, $num_unexp_reqs);
 emit_aliases($output_target, $num_nodes);
-emit_filesystem($output_target, "fs-foo", 9, 1048576, $num_nodes);
+emit_filesystem($output_target, "pvfs2-fs", 9, 1048576, $num_nodes);
 
 # close fs.conf
 if ($using_stdout == 0)
@@ -310,7 +333,7 @@ for($i = 0; $i < $num_nodes; $i++)
     {
         $output_target = FILEOUT + $i + 10;
 
-        $filename = "$ARGV[1]$i";
+        $filename = "server-$ARGV[1]$i.conf";
         unless (open($output_target, ">", $filename))
         {
             print STDERR "Can't open specified file $ARGV[1]: $!\n";
@@ -318,8 +341,8 @@ for($i = 0; $i < $num_nodes; $i++)
         }
     }
 
-    print "Please specify a storage location for host $server_addrs[$i]\n";
-    $storage = prompt_word("(e.g. /storage/node1): ");
+    print "Please specify a data storage location for host $server_addrs[$i]\n";
+    $storage = prompt_word("[Default is /tmp/pvfs2-storage-space]: ","/tmp/pvfs2-storage-space");
 
     emit_server_conf($output_target, $server_addrs[$i], $storage);
 

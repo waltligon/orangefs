@@ -28,6 +28,7 @@ extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 #ifdef __PVFS2_TROVE_THREADED__
 pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
 pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
+static gen_mutex_t *dbpf_interface_lock = NULL;
 static gen_mutex_t *dbpf_op_incoming_cond_mutex = NULL;
 static pthread_t dbpf_thread;
 static int dbpf_thread_running = 0;
@@ -39,7 +40,8 @@ int dbpf_thread_initialize(void)
 #ifdef __PVFS2_TROVE_THREADED__
     ret = -1;
     dbpf_op_incoming_cond_mutex = gen_mutex_build();
-    if (dbpf_op_incoming_cond_mutex)
+    dbpf_interface_lock = gen_mutex_build();
+    if (dbpf_op_incoming_cond_mutex && dbpf_interface_lock)
     {
         dbpf_thread_running = 1;
         ret = pthread_create(&dbpf_thread, NULL,
@@ -54,12 +56,15 @@ int dbpf_thread_finalize(void)
 {
     int ret = 0;
 #ifdef __PVFS2_TROVE_THREADED__
+    gen_mutex_lock(dbpf_interface_lock);
     dbpf_thread_running = 0;
     usleep(500);
     ret = pthread_cancel(dbpf_thread);
     pthread_cond_destroy(&dbpf_op_completed_cond);
     pthread_cond_destroy(&dbpf_op_incoming_cond);
     gen_mutex_destroy(dbpf_op_incoming_cond_mutex);
+    gen_mutex_unlock(dbpf_interface_lock);
+    gen_mutex_destroy(dbpf_interface_lock);
 #endif
     return ret;
 }
@@ -109,11 +114,13 @@ void *dbpf_thread_function(void *ptr)
                 wait_time.tv_sec++;
             }
 
+            gen_mutex_lock(dbpf_interface_lock);
             gen_mutex_lock(dbpf_op_incoming_cond_mutex);
             ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
                                          dbpf_op_incoming_cond_mutex,
                                          &wait_time);
             gen_mutex_unlock(dbpf_op_incoming_cond_mutex);
+            gen_mutex_unlock(dbpf_interface_lock);
         }
     }
 
