@@ -379,11 +379,6 @@ int main(int argc,
 		ret = PINT_state_machine_initialize_unexpected(s_op,
 			&job_status_structs[i]);
 	    }
-            do
-            {
-                ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
-            } while (ret == 1);
-
 	    if (ret < 0)
 	    {
 		gossip_lerr("Error on job %d, Return Code: %d\n", i, ret);
@@ -393,6 +388,12 @@ int main(int argc,
 		/* if ret < 0 oh no... job mechanism died */
 		/* TODO: fix this */
 	    }
+
+            do
+            {
+                ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
+            } while (ret == 1);
+
 	    if (postBMIFlag) /* unexpected message */
 	    {
 		postBMIFlag = 0;
