@@ -815,7 +815,6 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
     {
 	return (-EINVAL);
     }
-
     gen_mutex_lock(&interface_mutex);
 
     ret = tcp_post_recv_generic(id, src, &buffer, &expected_size,
@@ -2111,7 +2110,9 @@ static int tcp_do_work(int max_idle_time)
     {
 	req.tv_sec = 0;
 	req.tv_nsec = 1000;
+        gen_mutex_unlock(&interface_mutex);
 	nanosleep(&req, NULL);
+        gen_mutex_lock(&interface_mutex);
     }
 
     return (0);
