@@ -111,7 +111,7 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
 
     /* grab the FD (also increments a reference count) */
     /* TODO: CONSIDER PUTTING COLL_ID IN THE OP INSTEAD OF THE PTR */
-    fd = dbpf_bstream_fdcache_get(op_p->coll_p->coll_id, op_p->handle, 0);
+    dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &fd);
 
     /* we have a dataspace now, maybe a new one. */
     
@@ -191,7 +191,7 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
     int ret, fd;
 
     /* grab the FD (also increments a reference count) */
-    fd = dbpf_bstream_fdcache_get(op_p->coll_p->coll_id, op_p->handle, 1);
+    dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 1, &fd);
     
     /* we have a dataspace now, maybe a new one. */
     
@@ -376,8 +376,8 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.list_proc_state = LIST_PROC_INITIALIZED;
 
     /* get an FD so we can access the file; last parameter controls file creation */
-    fd = dbpf_bstream_fdcache_get(coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0);
-    if (fd < 0) {
+    ret = dbpf_bstream_fdcache_try_get(coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0, &fd);
+    if (ret < 0) {
 	dbpf_queued_op_free(q_op_p);
 	return -1;
     }

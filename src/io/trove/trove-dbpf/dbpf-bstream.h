@@ -38,9 +38,16 @@ void dbpf_bstream_fdcache_initialize(void);
 
 void dbpf_bstream_fdcache_finalize(void);
 
-int dbpf_bstream_fdcache_get(TROVE_coll_id coll_id,
-			     TROVE_handle handle,
-			     int create_flag);
+enum {
+    DBPF_BSTREAM_FDCACHE_ERROR = -1,
+    DBPF_BSTREAM_FDCACHE_BUSY = 0,
+    DBPF_BSTREAM_FDCACHE_SUCCESS = 1
+};
+
+int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
+				 TROVE_handle handle,
+				 int create_flag,
+				 int *fd);
 
 void dbpf_bstream_fdcache_put(TROVE_coll_id coll_id,
 			      TROVE_handle handle);

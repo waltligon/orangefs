@@ -75,9 +75,9 @@ int gen_posix_mutex_init(pthread_mutex_t* mut);
 	/* this stuff messes around just enough to prevent warnings */
 	typedef int gen_mutex_t;
 	#define GEN_MUTEX_INITIALIZER 0
-	#define gen_mutex_lock(m) do{}while(0)
-	#define gen_mutex_unlock(m) do{}while(0)
-	#define gen_mutex_trylock(m) do{}while(0)
+        static inline int gen_mutex_lock(gen_mutex_t *mutex_p) { return 0; }
+        static inline int gen_mutex_unlock(gen_mutex_t *mutex_p) { return 0; }
+        static inline int gen_mutex_trylock(gen_mutex_t *mutex_p) { return 0; }
 	#define gen_mutex_init(m) do{}while(0)
 	#define gen_mutex_build() (int*)malloc(sizeof(int))
 	#define gen_mutex_destroy(m) free(m)
