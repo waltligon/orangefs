@@ -137,8 +137,6 @@ int PINT_server_config(
 
     if (cache_config_files(global_config_filename, server_config_filename))
     {
-        gossip_err("Failed to read config files.  "
-                   "Please make sure they exist and are valid!\n");
         return 1;
     }
     assert(config_s->fs_config_buflen && config_s->fs_config_buf);
@@ -1126,72 +1124,82 @@ static int cache_config_files(
     my_server_fn = ((server_config_filename != NULL) ?
                     server_config_filename : "server.conf");
 
+  open_global_config:
     memset(&statbuf, 0, sizeof(struct stat));
     if (stat(my_global_fn, &statbuf) == 0)
     {
+        if (statbuf.st_size == 0)
+        {
+            gossip_err("Invalid global config file %s.  This "
+                       "file is 0 bytes in length!\n", my_global_fn);
+            goto error_exit;
+        }
         config_s->fs_config_filename = strdup(my_global_fn);
         config_s->fs_config_buflen = statbuf.st_size + 1;
     }
     else if (errno == ENOENT)
     {
-	gossip_err("Failed to find global config file %s; does "
-                   "not exist.\n",my_global_fn);
-	return 1;
+	gossip_err("Failed to find global config file %s.  This "
+                   "file does not exist!\n", my_global_fn);
+        goto error_exit;
     }
     else
     {
         assert(working_dir);
         snprintf(buf, 512, "%s/%s",working_dir, my_global_fn);
-        memset(&statbuf,0,sizeof(struct stat));
-        if (stat(buf,&statbuf) == 0)
-        {
-            config_s->fs_config_filename = strdup(buf);
-            config_s->fs_config_buflen = statbuf.st_size + 1;
-        }
+        my_global_fn = buf;
+        goto open_global_config;
     }
 
     if (!config_s->fs_config_filename ||
         (config_s->fs_config_buflen == 0))
     {
-        gossip_err("Failed to stat fs config file.  (0 file size?)\n");
-        return 1;
+        gossip_err("Failed to stat fs config file.  Please make sure that ");
+        gossip_err("the file %s\nexists, is not a zero file size, and has\n",
+                   config_s->fs_config_filename);
+        gossip_err("permissions suitable for opening and reading it.\n");
+        goto error_exit;
     }
 
+  open_server_config:
     memset(&statbuf,0,sizeof(struct stat));
     if (stat(my_server_fn, &statbuf) == 0)
     {
+        if (statbuf.st_size == 0)
+        {
+            gossip_err("Invalid server config file %s.  This "
+                       "file is 0 bytes in length!\n", my_server_fn);
+            goto error_exit;
+        }
         config_s->server_config_filename = strdup(my_server_fn);
         config_s->server_config_buflen = statbuf.st_size + 1;
     }
-    else if (errno == ENOENT) {
-	gossip_err("Failed to find server config file %s; does not exist.\n",
-		   my_server_fn);
-	return 1;
+    else if (errno == ENOENT)
+    {
+	gossip_err("Failed to find server config file %s.  This "
+                   "file does not exist!\n", my_server_fn);
+        goto error_exit;
     }
     else
     {
         assert(working_dir);
         snprintf(buf, 512, "%s/%s", working_dir, my_server_fn);
-        memset(&statbuf, 0, sizeof(struct stat));
-        if (stat(buf, &statbuf) == 0)
-        {
-            config_s->server_config_filename = strdup(buf);
-            config_s->server_config_buflen = statbuf.st_size + 1;
-        }
+        my_server_fn = buf;
+        goto open_server_config;
     }
 
     if (!config_s->server_config_filename ||
         (config_s->server_config_buflen == 0))
     {
         gossip_err("Failed to stat server config file.  (0 file size?)\n");
-        return 1;
+        goto error_exit;
     }
 
     if ((fd = open(my_global_fn, O_RDONLY)) == -1)
     {
         gossip_err("Failed to open fs config file %s.\n",
                    my_global_fn);
-        return 1;
+        goto error_exit;
     }
 
     config_s->fs_config_buf = (char *) malloc(config_s->fs_config_buflen);
@@ -1199,7 +1207,7 @@ static int cache_config_files(
     {
         gossip_err("Failed to allocate %d bytes for caching the fs "
                    "config file\n", config_s->fs_config_buflen);
-        return 1;
+        goto close_fd_fail;
     }
 
     memset(config_s->fs_config_buf, 0, config_s->fs_config_buflen);
@@ -1211,8 +1219,7 @@ static int cache_config_files(
         gossip_err("Failed to read fs config file %s (nread is %d)\n",
                    my_global_fn,
 		   nread);
-        close(fd);
-        return 1;
+        goto close_fd_fail;
     }
     close(fd);
 
@@ -1220,7 +1227,7 @@ static int cache_config_files(
     {
         gossip_err("Failed to open fs config file %s.\n",
                    my_server_fn);
-        return 1;
+        goto error_exit;
     }
 
     config_s->server_config_buf = (char *)
@@ -1229,7 +1236,7 @@ static int cache_config_files(
     {
         gossip_err("Failed to allocate %d bytes for caching the server "
                    "config file\n",config_s->server_config_buflen);
-        return 1;
+        goto close_fd_fail;
     }
 
     memset(config_s->server_config_buf, 0, config_s->server_config_buflen);
@@ -1241,11 +1248,17 @@ static int cache_config_files(
         gossip_err("Failed to read server config file %s (nread is %d)\n",
                    my_server_fn,
 		   nread);
-        close(fd);
-        return 1;
+        goto close_fd_fail;
     }
+
     close(fd);
     return 0;
+
+  close_fd_fail:
+    close(fd);
+
+  error_exit:
+    return 1;
 }
 
 static char *get_handle_range_str(
@@ -1317,7 +1330,6 @@ int PINT_server_config_is_valid_configuration(
 
             cur = llist_next(cur);
         }
-
         ret = ((ret == fs_count) ? 1 : 0);
     }
     return ret;
@@ -1426,19 +1438,21 @@ int PINT_server_config_pvfs2_mkspace(
             }
 
             /*
-              check if root handle is in our handle range.
-              if it is, we're responsible for creating
-              it on disk when creating the storage space
+              check if root handle is in our handle range for this fs.
+              if it is, we're responsible for creating it on disk when
+              creating the storage space
             */
             root_handle = (is_root_handle_in_my_range(config,cur_fs) ?
                            cur_fs->root_handle : 0);
 
             /*
-              for the first fs we encounter, create the storage space
-              if it doesn't exist.
+              for the first fs/collection we encounter, create
+              the storage space if it doesn't exist.
             */
             fprintf(stderr,"\n*****************************\n");
-            fprintf(stderr,"Creating new storage space\n");
+            fprintf(stderr,"Creating new PVFS2 %s\n",
+                    (create_collection_only ? "collection" :
+                     "storage space"));
             ret = pvfs2_mkspace(config->storage_path,
                                 cur_fs->file_system_name,
                                 cur_fs->coll_id,
@@ -1454,7 +1468,7 @@ int PINT_server_config_pvfs2_mkspace(
               calls to pvfs2_mkspace will not fail when it finds
               that the storage space already exists; this causes
               pvfs2_mkspace to only add the collection to the
-              already existing storage space
+              already existing storage space.
             */
             create_collection_only = 1;
 

@@ -387,7 +387,7 @@ int main(int argc, char **argv)
     gossip_set_debug_mask(1, SERVER_DEBUG);
 
     /* Sanity Check 1. Make sure we are root */
-    if (getuid() != 0 && geteuid() != 0)
+    if ((getuid() != 0) && (geteuid() != 0))
     {
 	gossip_err("WARNING: Server should be run as root\n");
     }
@@ -401,7 +401,9 @@ int main(int argc, char **argv)
     }
     if (PINT_server_config(&user_opts, argv[optind], argv[optind + 1]))
     {
-	gossip_err("Error: Could not read configuration; aborting.\n");
+	gossip_err("Fatal Error: This server requires a valid "
+                   "configuration for operation.\nPlease check your "
+                   "configuration setting.  Server aborting.\n");
 	goto server_shutdown;
     }
 
