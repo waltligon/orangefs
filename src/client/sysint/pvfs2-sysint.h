@@ -154,7 +154,7 @@ typedef struct PVFS_sysresp_lookup_s PVFS_sysresp_lookup;
 /* getattr */
 struct PVFS_sysreq_getattr_s {
 	pinode_reference pinode_refn;
-	PVFS_bitfield attrmask; /* things I'm interested in */
+	uint32_t attrmask; /* things I'm interested in */
 	PVFS_credentials credentials;
 };
 typedef struct PVFS_sysreq_getattr_s PVFS_sysreq_getattr;
@@ -169,7 +169,7 @@ typedef struct PVFS_sysresp_getattr_s PVFS_sysresp_getattr;
 struct PVFS_sysreq_setattr_s {
 	pinode_reference pinode_refn;
 	PVFS_object_attr attr;
-	PVFS_bitfield attrmask;
+	uint32_t attrmask;
 	PVFS_credentials credentials;
 	PVFS_attr_extended extended;
 };
@@ -181,7 +181,7 @@ struct PVFS_sysreq_mkdir_s {
 	char* entry_name; /* single segment */
 	pinode_reference parent_refn;
 	PVFS_object_attr attr;
-	PVFS_bitfield attrmask;
+	uint32_t attrmask;
 	PVFS_credentials credentials;
 };
 typedef struct PVFS_sysreq_mkdir_s PVFS_sysreq_mkdir;
@@ -196,7 +196,7 @@ struct PVFS_sysreq_create_s {
 	char* entry_name; /* single path segment */
 	pinode_reference parent_refn;
 	PVFS_object_attr attr;
-	PVFS_bitfield attrmask;
+	uint32_t attrmask;
 	PVFS_credentials credentials;
 };
 typedef struct PVFS_sysreq_create_s PVFS_sysreq_create;
@@ -235,7 +235,7 @@ struct PVFS_sysreq_symlink_s {
 	char* target;
 	PVFS_object_attr attr;
 	/* Q: should these bitmasks be part of the attr structure? */
-	PVFS_bitfield attrmask;
+	uint32_t attrmask;
 	PVFS_credentials credentials;
 };
 typedef struct PVFS_sysreq_symlink_s PVFS_sysreq_symlink;

@@ -37,7 +37,7 @@ static int server_parse_config(
  */
 
 int PINT_do_lookup (char* name,pinode_reference parent,
-		PVFS_bitfield mask,PVFS_credentials cred,pinode_reference *entry)
+		uint32_t mask,PVFS_credentials cred,pinode_reference *entry)
 {
 	struct PVFS_server_req_s req_p;             /* server request */
         struct PVFS_server_resp_s *ack_p = NULL;    /* server response */

@@ -34,7 +34,7 @@ typedef struct
 	gen_mutex_t *pinode_mutex;	  /* mutex lock */
 	char *object_name;           /* name of the PVFS object */
 	struct PVFS_object_attr attr;/* attributes of PVFS object */
-	PVFS_bitfield mask;			  /* attribute mask */
+	uint32_t mask;			  /* attribute mask */
 	PVFS_size size;				  /* PVFS object size */
 	struct timeval tstamp_handle;	  /* timestamp for handle consistency */
 	struct timeval tstamp_attr;	  /* timestamp for attribute consistency */

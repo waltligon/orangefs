@@ -51,7 +51,7 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
     pinode *new_parent_p = NULL, *old_entry_p = NULL;
     bmi_addr_t serv_addr;	/* PVFS address type structure */
     int name_sz = 0;
-    PVFS_bitfield attr_mask;
+    uint32_t attr_mask;
     pinode_reference old_entry;
     struct PINT_decoded_msg decoded;
     bmi_size_t max_msg_sz;

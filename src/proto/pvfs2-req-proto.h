@@ -159,7 +159,7 @@ struct PVFS_servreq_getattr_s
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
-    PVFS_bitfield attrmask;
+    uint32_t attrmask;
 };
 typedef struct PVFS_servreq_getattr_s PVFS_servreq_getattr;
 
@@ -195,7 +195,7 @@ struct PVFS_servreq_setattr_s
     PVFS_handle handle;
     PVFS_fs_id fs_id;
     PVFS_object_attr attr;
-    PVFS_bitfield attrmask;
+    uint32_t attrmask;
     PVFS_attr_extended extended;
 };
 typedef struct PVFS_servreq_setattr_s PVFS_servreq_setattr;
@@ -208,7 +208,7 @@ struct PVFS_servreq_lookup_path_s
     char* path;		/* full path to be traversed */
     PVFS_fs_id fs_id;		/* filesystem ID */
     PVFS_handle starting_handle;	/* handle of starting directory for path */
-    PVFS_bitfield attrmask;	/* mask to restrict the attributes to be 
+    uint32_t attrmask;	/* mask to restrict the attributes to be 
 				   fetched */
 };
 typedef struct PVFS_servreq_lookup_path_s PVFS_servreq_lookup_path;
@@ -228,7 +228,7 @@ struct PVFS_servreq_mkdir_s
     PVFS_handle requested_handle;
     PVFS_fs_id fs_id;
     PVFS_object_attr attr;
-    PVFS_bitfield attrmask;
+    uint32_t attrmask;
 };
 typedef struct PVFS_servreq_mkdir_s PVFS_servreq_mkdir;
 

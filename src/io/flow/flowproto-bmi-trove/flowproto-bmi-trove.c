@@ -37,11 +37,11 @@ int flowproto_bmi_trove_setinfo(flow_descriptor * flow_d,
 
 void *flowproto_bmi_trove_memalloc(flow_descriptor * flow_d,
 				   PVFS_size size,
-				   PVFS_bitfield send_recv_flag);
+				   int send_recv_flag);
 
 int flowproto_bmi_trove_memfree(flow_descriptor * flow_d,
 				void *buffer,
-				PVFS_bitfield send_recv_flag);
+				int send_recv_flag);
 
 int flowproto_bmi_trove_announce_flow(flow_descriptor * flow_d);
 
@@ -367,7 +367,7 @@ int flowproto_bmi_trove_setinfo(flow_descriptor * flow_d,
  */
 void *flowproto_bmi_trove_memalloc(flow_descriptor * flow_d,
 				   PVFS_size size,
-				   PVFS_bitfield send_recv_flag)
+				   int send_recv_flag)
 {
     return (NULL);
 }
@@ -380,7 +380,7 @@ void *flowproto_bmi_trove_memalloc(flow_descriptor * flow_d,
  */
 int flowproto_bmi_trove_memfree(flow_descriptor * flow_d,
 				void *buffer,
-				PVFS_bitfield send_recv_flag)
+				int send_recv_flag)
 {
     return (-ENOSYS);
 }

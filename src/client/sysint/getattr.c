@@ -36,7 +36,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
     struct timeval cur_time;
     PVFS_size *size_array = 0;
     pinode *entry_pinode = NULL;
-    PVFS_bitfield attr_mask = req->attrmask;
+    uint32_t attr_mask = req->attrmask;
     pinode_reference entry;
     struct PINT_decoded_msg decoded;
     int max_msg_sz = 0;

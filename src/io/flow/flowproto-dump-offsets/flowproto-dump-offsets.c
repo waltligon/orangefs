@@ -31,11 +31,11 @@ int flowproto_dump_offsets_setinfo(flow_descriptor * flow_d,
 
 void *flowproto_dump_offsets_memalloc(flow_descriptor * flow_d,
 				   PVFS_size size,
-				   PVFS_bitfield send_recv_flag);
+				   int send_recv_flag);
 
 int flowproto_dump_offsets_memfree(flow_descriptor * flow_d,
 				void *buffer,
-				PVFS_bitfield send_recv_flag);
+				int send_recv_flag);
 
 int flowproto_dump_offsets_announce_flow(flow_descriptor * flow_d);
 
@@ -198,7 +198,7 @@ int flowproto_dump_offsets_setinfo(flow_descriptor * flow_d,
  */
 void *flowproto_dump_offsets_memalloc(flow_descriptor * flow_d,
 				   PVFS_size size,
-				   PVFS_bitfield send_recv_flag)
+				   int send_recv_flag)
 {
     return (NULL);
 }
@@ -211,7 +211,7 @@ void *flowproto_dump_offsets_memalloc(flow_descriptor * flow_d,
  */
 int flowproto_dump_offsets_memfree(flow_descriptor * flow_d,
 				void *buffer,
-				PVFS_bitfield send_recv_flag)
+				int send_recv_flag)
 {
     return (-ENOSYS);
 }

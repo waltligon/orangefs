@@ -15,7 +15,7 @@ static int check_pinode_match(pinode *pnode,pinode *pinode_ptr);
 static int update_pinode(pinode *pnode,pinode *pinode_ptr);
 #endif
 static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr,\
-		PVFS_bitfield mask);
+		uint32_t mask);
 
 /* phelper_get_pinode
  *
@@ -24,7 +24,7 @@ static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr,\
  * returns 0 on success, -errno on failure
  */
 int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
-		PVFS_bitfield attrmask, PVFS_credentials credentials)
+		uint32_t attrmask, PVFS_credentials credentials)
 {
 
 	int ret = 0;
@@ -103,7 +103,7 @@ int phelper_release_pinode(pinode *pinode_ptr)
  *
  * returns 0 on success, -errno on failure
  */
-int phelper_refresh_pinode(PVFS_bitfield mask,pinode **pinode_ptr,
+int phelper_refresh_pinode(uint32_t mask,pinode **pinode_ptr,
 		pinode_reference pref, PVFS_credentials credentials)
 {
 	int ret = 0;
@@ -167,7 +167,7 @@ int phelper_refresh_pinode(PVFS_bitfield mask,pinode **pinode_ptr,
  *
  * returns 0 on success, -errno on failure
  */
-int phelper_validate_pinode(pinode *pnode,int flags,PVFS_bitfield mask,\
+int phelper_validate_pinode(pinode *pnode,int flags,uint32_t mask,\
 		PVFS_credentials credentials)
 {
 	struct timeval cur_time; /* Current time */
@@ -471,7 +471,7 @@ static int check_pinode_match(pinode *pnode,pinode *pinode_ptr)
  *
  * returns 0 on success, -errno on failure
  */
-int modify_pinode(pinode *node,PVFS_object_attr attr,PVFS_bitfield mask)
+int modify_pinode(pinode *node,PVFS_object_attr attr,uint32_t mask)
 {
 	PVFS_size dfh_size = 0;
 	/* Check mask and accordingly update the pinode */
@@ -523,7 +523,7 @@ int modify_pinode(pinode *node,PVFS_object_attr attr,PVFS_bitfield mask)
  *
  * returns 0 on success, -errno on error
  */
-static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, PVFS_bitfield mask)
+static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
 {
 	PVFS_count32 num_files = attr.u.meta.nr_datafiles;
 	PVFS_size size = num_files * sizeof(PVFS_handle);

@@ -27,11 +27,11 @@ int template_flowproto_setinfo(flow_descriptor * flow_d,
 
 void *template_flowproto_memalloc(flow_descriptor * flow_d,
 				  PVFS_size size,
-				  PVFS_bitfield send_recv_flag);
+				  int send_recv_flag);
 
 int template_flowproto_memfree(flow_descriptor * flow_d,
 			       void *buffer,
-			       PVFS_bitfield send_recv_flag);
+			       int send_recv_flag);
 
 int template_flowproto_announce_flow(flow_descriptor * flow_d);
 
@@ -82,14 +82,14 @@ int template_flowproto_setinfo(flow_descriptor * flow_d,
 
 void *template_flowproto_memalloc(flow_descriptor * flow_d,
 				  PVFS_size size,
-				  PVFS_bitfield send_recv_flag)
+				  int send_recv_flag)
 {
     return (NULL);
 }
 
 int template_flowproto_memfree(flow_descriptor * flow_d,
 			       void *buffer,
-			       PVFS_bitfield send_recv_flag)
+			       int send_recv_flag)
 {
     return (-ENOSYS);
 }

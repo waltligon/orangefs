@@ -65,7 +65,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     enum PVFS_sys_io_type type)
 {
     pinode* pinode_ptr = NULL;
-    PVFS_bitfield attr_mask = 0;
+    uint32_t attr_mask = 0;
     int ret = -1;
     bmi_addr_t* addr_array = NULL;
     struct PVFS_server_req_s* req_array = NULL;

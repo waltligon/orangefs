@@ -55,7 +55,7 @@ typedef struct
                                     uniquely identify a pinode */
     gen_mutex_t *pinode_mutex;        /* mutex lock */
     struct PVFS_object_attr attr;   /* attributes of PVFS object */
-    PVFS_bitfield mask;                       /* attribute mask */
+    uint32_t mask;                       /* attribute mask */
     PVFS_size size;                           /* PVFS object size */
     struct timeval tstamp;  /* timestamp for consistency */
     int size_flag;	    /*flag so we know if the size is valid*/
@@ -143,7 +143,7 @@ int get_next_segment(char *inout,char **output,int *start);
 #endif
 int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid);
 
-int PINT_do_lookup (char* name,pinode_reference parent,PVFS_bitfield mask,
+int PINT_do_lookup (char* name,pinode_reference parent,uint32_t mask,
                 PVFS_credentials cred,pinode_reference *entry);
 
 int get_path_element(char *path, char** segment, int element);

@@ -50,7 +50,7 @@ struct mem_endpoint_data
 {
     void *buffer;
     PVFS_size size;
-    PVFS_bitfield prealloc_flag;
+    int prealloc_flag;
 };
 
 struct flow_endpoint
@@ -89,7 +89,7 @@ struct flow_descriptor
 
     struct flow_endpoint src;	/* src endpoint */
     struct flow_endpoint dest;	/* dest endpoint */
-    PVFS_bitfield flags;	/* optional flags */
+    int flags;	/* optional flags */
     PVFS_msg_tag_t tag;		/* matching tag */
     void *user_ptr;		/* for use by caller */
     PINT_Request *request;	/* I/O request description */
@@ -101,7 +101,7 @@ struct flow_descriptor
 	/***********************************************************/
     /* fields that can be read publicly upon completion */
 
-    PVFS_bitfield state;	/* final state of flow */
+    int state;	/* final state of flow */
     PVFS_error error_code;	/* specific errno value if failure */
     PVFS_size total_transfered;	/* total amt. of data xfered */
 
@@ -110,7 +110,7 @@ struct flow_descriptor
 
     FLOW_context_id context_id; /* which context the flow belongs to */
     int flowproto_id;		/* identifies which protocol owns this */
-    PVFS_bitfield priority;	/* priority of this flow */
+    int priority;	/* priority of this flow */
     struct qlist_head sched_queue_link;	/* used by scheduler */
     void *flow_protocol_data;	/* used by flow protocols */
     PINT_Request_state *request_state;	/* req processor state */
@@ -151,7 +151,7 @@ enum
 
 
 int PINT_flow_initialize(const char *flowproto_list,
-			 PVFS_bitfield flags);
+			 int flags);
 
 int PINT_flow_finalize(void);
 
@@ -170,18 +170,18 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id);
 int PINT_flow_unpost(flow_descriptor * flow_d);
 
 int PINT_flow_setpriority(flow_descriptor * flow_d,
-			  PVFS_bitfield priority);
+			  int priority);
 
 int PINT_flow_getpriority(flow_descriptor * flow_d,
-			  PVFS_bitfield * priority);
+			  int * priority);
 
 void *PINT_flow_memalloc(flow_descriptor * flow_d,
 			 PVFS_size size,
-			 PVFS_bitfield send_recv_flag);
+			 int send_recv_flag);
 
 int PINT_flow_memfree(flow_descriptor * flow_d,
 		      void *buffer,
-		      PVFS_bitfield send_recv_flag);
+		      int send_recv_flag);
 
 int PINT_flow_test(flow_descriptor * flow_d,
 		   int *outcount,

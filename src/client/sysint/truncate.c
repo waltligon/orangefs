@@ -32,7 +32,7 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
     int ret = -1;
     pinode *pinode_ptr = NULL;
     bmi_addr_t serv_addr;	/* PVFS address type structure */
-    PVFS_bitfield attr_mask;
+    uint32_t attr_mask;
     struct PINT_decoded_msg decoded;
     void* encoded_resp;
     PVFS_msg_tag_t op_tag;

@@ -36,7 +36,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	pinode *pinode_ptr = NULL;
 	bmi_addr_t serv_addr;		/* PVFS address type structure */
 	char *server = NULL;
-	PVFS_bitfield mask = req->attrmask;
+	uint32_t mask = req->attrmask;
 	pinode_reference entry;
 	PVFS_size handlesize = 0;
 	bmi_size_t max_msg_sz = PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_SETATTR);

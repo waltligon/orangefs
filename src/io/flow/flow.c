@@ -68,7 +68,7 @@ enum
  * returns 0 on success, -errno on failure
  */
 int PINT_flow_initialize(const char *flowproto_list,
-			 PVFS_bitfield flags)
+			 int flags)
 {
     int ret = -1;
     int i = 0;
@@ -507,7 +507,7 @@ int PINT_flow_unpost(flow_descriptor * flow_d)
  * returns 0 on success, -errno on failure
  */
 int PINT_flow_setpriority(flow_descriptor * flow_d,
-			  PVFS_bitfield priority)
+			  int priority)
 {
     gen_mutex_lock(&interface_mutex);
     gossip_lerr("function not implemented.\n");
@@ -522,7 +522,7 @@ int PINT_flow_setpriority(flow_descriptor * flow_d,
  * returns 0 on success, -errno on failure
  */
 int PINT_flow_getpriority(flow_descriptor * flow_d,
-			  PVFS_bitfield * priority)
+			  int * priority)
 {
     gen_mutex_lock(&interface_mutex);
     gossip_lerr("function not implemented.\n");
@@ -540,7 +540,7 @@ int PINT_flow_getpriority(flow_descriptor * flow_d,
  */
 void *PINT_flow_memalloc(flow_descriptor * flow_d,
 			 PVFS_size size,
-			 PVFS_bitfield send_recv_flag)
+			 int send_recv_flag)
 {
     gossip_lerr("function not implemented.\n");
     return (NULL);
@@ -555,7 +555,7 @@ void *PINT_flow_memalloc(flow_descriptor * flow_d,
  */
 int PINT_flow_memfree(flow_descriptor * flow_d,
 		      void *buffer,
-		      PVFS_bitfield send_recv_flag)
+		      int send_recv_flag)
 {
     gossip_lerr("function not implemented.\n");
     return (-ENOSYS);
