@@ -163,8 +163,14 @@ int main(int argc, char **argv)
             }
             else
             {
-                printf("Next meta server addr: %lu (%d ranges)\n",
+                printf("\nNext meta server address  : %lu (%d meta ranges)\n",
                        (long)m_addr, meta_handle_extent_array.extent_count);
+                for(n = 0; n < meta_handle_extent_array.extent_count; n++)
+                {
+                    printf("Meta server %d handle range: %Lu-%Lu\n", j,
+                           meta_handle_extent_array.extent_array[n].first,
+                           meta_handle_extent_array.extent_array[n].last);
+                }
             }
         }
 
@@ -181,7 +187,9 @@ int main(int argc, char **argv)
                    NUM_DATA_SERVERS_TO_QUERY);
             for(j = 0; j < NUM_DATA_SERVERS_TO_QUERY; j++)
             {
-                printf("I/O server  %d addr        : %lu\n",j,(long)d_addr[j]);
+                printf("\nI/O server  %d address     : %lu (%d data ranges)\n",
+                       j,(long)d_addr[j],
+                       data_handle_extent_array[j].extent_count);
                 for(n = 0; n < data_handle_extent_array[j].extent_count; n++)
                 {
                     printf("Data server %d handle range: %Lu-%Lu\n", n,
