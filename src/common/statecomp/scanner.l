@@ -16,6 +16,20 @@
 /* avoid a warning since we do not use yyunput() */
 #define YY_NO_UNPUT
 
+/*
+  we're never interactive, so avoid isatty call that sometimes
+  fails due to occassional improper ioctl command mappings --
+  these can cause an infinite loop in statecomp execution.
+*/
+#define YY_NEVER_INTERACTIVE 1
+
+/*
+  this is a complete hack that stops the infinite read
+  loop that statecomp sometimes gets into on my setup
+*/
+#define yywrap() (fprintf(stderr,".\b") && yywrap())
+
+
 extern YYSTYPE yylval;
 
 extern FILE *out_file;
