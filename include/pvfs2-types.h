@@ -512,7 +512,7 @@ int32_t PVFS_get_errno_mapping(int32_t error)              \
     ret = PINT_errno_mapping[                              \
         PVFS_ERROR_CODE(((positive ? error : abs(error))) &\
                         (~(PVFS_ERROR_BIT)|                \
-                         ~(PVFS_ERROR_CLASS_BITS))];       \
+                         ~(PVFS_ERROR_CLASS_BITS)))];      \
     }                                                      \
     return (positive ? ret : -ret);                        \
 }                                                          \
