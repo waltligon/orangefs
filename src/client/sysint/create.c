@@ -394,6 +394,7 @@ int PVFS_sys_create(
 	req_p.u.setattr.attr.u.meta.dfile_array = df_handle_array;
 	req_p.u.setattr.attr.u.meta.dfile_count = io_serv_count;
 	req_p.u.setattr.attr.u.meta.dist = PVFS_Dist_create("simple_stripe");
+	req_p.u.setattr.attr.objtype = PVFS_TYPE_METAFILE;
 
 	gossip_ldebug(CLIENT_DEBUG,"\towner: %d\n\tgroup: %d\n\tperms: %d\n\tatime: %lld\n\tmtime: %lld\n\tctime: %lld\n\tobjtype: %d\n",
 		req_p.u.setattr.attr.owner, 
