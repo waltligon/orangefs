@@ -27,6 +27,10 @@ this: (type)((BMI_byte)buffer + offset)
 General (non critical)
 -----------------------
 
+reimplement reference-list.c using a hash table instead of linked
+list, to cut down on search time during addr lookups (maybe use
+multiple hash tables to search on sepeate keys)
+
 consider changing the way the testXXX functions are implemented in
 both modules, so that they do not do work with timeout > 0 if the
 desired operation is already completed.  Right now both could
