@@ -21,12 +21,13 @@
 #include "dbpf-dspace.h"
 #include "gossip.h"
 
-
-enum {
+enum
+{
     DBCACHE_ENTRIES = 2
 };
 
-struct dspace_dbcache_entry {
+struct dspace_dbcache_entry
+{
     int ref_ct; /* -1 == not a valid cache entry */
     gen_mutex_t mutex;
     TROVE_coll_id coll_id;
@@ -35,8 +36,6 @@ struct dspace_dbcache_entry {
 
 static struct dspace_dbcache_entry dspace_db_cache[DBCACHE_ENTRIES];
 
-/* dbpf_dspace_dbcache_initialize()
- */
 void dbpf_dspace_dbcache_initialize(void)
 {
     int i;
@@ -47,8 +46,6 @@ void dbpf_dspace_dbcache_initialize(void)
     }
 }
 
-/* dbpf_dspace_dbcache_finalize()
- */
 void dbpf_dspace_dbcache_finalize(void)
 {
     int i, ret;
@@ -79,9 +76,9 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 				int create_flag,
 				DB **db_pp)
 {
-    int i, ret;
-    char filename[PATH_MAX];
-    DB *db_p;
+    int i = 0, ret = -TROVE_EINVAL;
+    char filename[PATH_MAX] = {0};
+    DB *db_p = NULL;
 
     for (i=0; i < DBCACHE_ENTRIES; i++) {
 	if (!(ret = gen_mutex_trylock(&dspace_db_cache[i].mutex)) &&
@@ -129,7 +126,8 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 	if (i == DBCACHE_ENTRIES) assert(0);
     }
 
-    DBPF_GET_DS_ATTRIB_DBNAME(filename, PATH_MAX, my_storage_p->name, coll_id);
+    DBPF_GET_DS_ATTRIB_DBNAME(filename, PATH_MAX,
+                              my_storage_p->name, coll_id);
 
     ret = db_create(&(dspace_db_cache[i].db_p), NULL, 0);
     if (ret != 0) {
@@ -156,7 +154,7 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
         TROVE_DB_OPEN_FLAGS,
         0);
 
-    if (ret == ENOENT && create_flag != 0)
+    if ((ret == ENOENT) && (create_flag != 0))
     {
 	/* if no such DB and create_flag is set, try to create the DB */
 	ret = dspace_db_cache[i].db_p->open(
@@ -184,8 +182,6 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
     return DBPF_DSPACE_DBCACHE_SUCCESS;
 }
 
-/* dbpf_dspace_dbcache_put()
- */
 void dbpf_dspace_dbcache_put(TROVE_coll_id coll_id)
 {
     int i;

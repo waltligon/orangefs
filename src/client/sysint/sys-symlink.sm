@@ -438,12 +438,13 @@ static int symlink_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;
 
-    PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
-                               *sm_p->cred_p,
-                               sm_p->u.sym.link_name,
-                               sm_p->u.sym.symlink_handle,
-                               sm_p->parent_ref.handle,
-                               sm_p->parent_ref.fs_id);
+    PINT_SERVREQ_CRDIRENT_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->u.sym.link_name,
+        sm_p->u.sym.symlink_handle,
+        sm_p->parent_ref.handle,
+        sm_p->parent_ref.fs_id);
 
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->parent_ref.fs_id;

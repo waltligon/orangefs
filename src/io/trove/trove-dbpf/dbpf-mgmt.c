@@ -644,14 +644,14 @@ static int dbpf_collection_remove(char *collname,
                               sto_p->name, db_data.coll_id);
     if (unlink(path_name) != 0)
     {
-        gossip_err("failure removing dataspace attrib db");
+        gossip_err("failure removing dataspace attrib db\n");
     }
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, db_data.coll_id);
     if (unlink(path_name) != 0)
     {
-        gossip_err("failure removing collection attrib db");
+        gossip_err("failure removing collection attrib db\n");
         goto collection_remove_failure;
     }
     
@@ -677,7 +677,7 @@ static int dbpf_collection_remove(char *collname,
                 assert(current_dirent->d_type == DT_REG);
                 if (unlink(tmp_path) != 0)
                 {
-                    gossip_err("failure removing bstream entry");
+                    gossip_err("failure removing bstream entry\n");
                     closedir(current_dir);
                     goto collection_remove_failure;
                 }
@@ -692,7 +692,7 @@ static int dbpf_collection_remove(char *collname,
                            sto_p->name, db_data.coll_id);
     if (unlink(path_name) != 0)
     {
-        gossip_err("failure removing dbname file %s", path_name);
+        gossip_err("failure removing dbname file %s\n", path_name);
         goto collection_remove_failure;
     }
 
@@ -700,7 +700,7 @@ static int dbpf_collection_remove(char *collname,
                             sto_p->name, db_data.coll_id);
     if (rmdir(path_name) != 0)
     {
-        gossip_err("failure removing dirname directory %s", path_name);
+        gossip_err("failure removing dirname directory %s\n", path_name);
         goto collection_remove_failure;
     }
 
@@ -708,7 +708,7 @@ static int dbpf_collection_remove(char *collname,
                           sto_p->name, db_data.coll_id);
     if (rmdir(path_name) != 0)
     {
-        gossip_err("failure removing collection directory");
+        gossip_err("failure removing collection directory\n");
         goto collection_remove_failure;
     }
 
@@ -938,13 +938,14 @@ static int dbpf_collection_lookup(char *collname,
     {
 	/* really an error of some kind */
 	sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
-	gossip_debug(GOSSIP_TROVE_DEBUG, "lookup got error\n");
-	return -1;
+	gossip_debug(GOSSIP_TROVE_DEBUG, "lookup got error (%d)\n",ret);
+
+        return -dbpf_db_error_to_trove_error(ret);
     }
 
     /*
-      look to see if we have already registered
-      this collection; if so, return
+      look to see if we have already registered this collection; if
+      so, return
     */
     coll_p = dbpf_collection_find_registered(db_data.coll_id);
     if (coll_p != NULL)
@@ -954,14 +955,14 @@ static int dbpf_collection_lookup(char *collname,
     }
 
     /*
-      this collection hasn't been registered
-      already (ie. looked up before)
+      this collection hasn't been registered already (ie. looked up
+      before)
     */
-    coll_p = (struct dbpf_collection *)
-        malloc(sizeof(struct dbpf_collection));
+    coll_p = (struct dbpf_collection *)malloc(
+        sizeof(struct dbpf_collection));
     if (coll_p == NULL)
     {
-        return -1;
+        return -TROVE_ENOMEM;
     }
 
     coll_p->refct = 0;
@@ -971,7 +972,7 @@ static int dbpf_collection_lookup(char *collname,
     coll_p->name = strdup(collname);
     if (!coll_p->name)
     {
-        return -1;
+        return -TROVE_ENOMEM;
     }
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
@@ -979,7 +980,7 @@ static int dbpf_collection_lookup(char *collname,
     coll_p->ds_db = dbpf_db_open(path_name, &error);
     if (coll_p->ds_db == NULL)
     {
-        return -error;
+        return -dbpf_db_error_to_trove_error(error);
     }
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
@@ -987,7 +988,7 @@ static int dbpf_collection_lookup(char *collname,
     coll_p->coll_attr_db = dbpf_db_open(path_name, &error);
     if (coll_p->coll_attr_db == NULL)
     {
-        return -error;
+        return -dbpf_db_error_to_trove_error(error);
     }
 
     /* make sure the version matches the version we understand */
@@ -1005,7 +1006,7 @@ static int dbpf_collection_lookup(char *collname,
     {
         gossip_err("Failed to retrieve collection version: %s\n",
                    db_strerror(ret));
-        return -1;
+        return dbpf_db_error_to_trove_error(ret);
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "collection lookup: version is %s\n",
@@ -1017,7 +1018,7 @@ static int dbpf_collection_lookup(char *collname,
         gossip_err("This collection has version %s\n", trove_dbpf_version);
         gossip_err("This code understands version %s\n",
                    TROVE_DBPF_VERSION_VALUE);
-        return -1;
+        return -TROVE_EINVAL;
     }
 
     dbpf_collection_register(coll_p);

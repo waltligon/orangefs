@@ -108,6 +108,7 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                             "(out of bounds)\n", Lu(handles[i]));
                         return -1;
                     }
+
 		    /* remove handle from trove-handle-mgmt */
 		    ret = trove_handle_remove(ledger, handles[i]);
 		    if (ret != 0)

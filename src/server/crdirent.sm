@@ -425,13 +425,12 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
  * Params:   server_op *s_op, 
  *           job_status_s* js_p
  *
- * Pre:      s_op->u.crdirent.dirent_handle is the directory entry k/v space
- *           s_op->req->u.crdirent.name != NULL
- *           s_op->req->u.crdirent.new_handle != NULL
- *           ADD ASSERTS FOR THESE!
+ * Pre: s_op->u.crdirent.dirent_handle is the directory entry k/v space
+ *      s_op->req->u.crdirent.name != NULL
+ *      s_op->req->u.crdirent.new_handle != NULL
  *
- * Post:     tries to read a directory entry, so that we can check to see if it
- *           already exists or not
+ * Post: tries to read a directory entry, so that we can check to see
+ * if it already exists or not
  *
  * Returns:  int
  *
@@ -442,8 +441,8 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
 static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
                                                 job_status_s* js_p)
 {
-    int ret;
-    job_id_t i;
+    int ret = -PVFS_EINVAL;
+    job_id_t i = 0;
 
     PINT_STATE_DEBUG("check_exist_directory_entry");
 

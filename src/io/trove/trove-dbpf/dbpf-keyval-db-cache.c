@@ -67,7 +67,6 @@ void dbpf_keyval_dbcache_finalize(void)
 	}
 	if (keyval_db_cache[i].ref_ct >= 0)
         {
-	    /* close DB */
 	    ret = keyval_db_cache[i].db_p->close(
                 keyval_db_cache[i].db_p, 0);
             assert(ret == 0);
@@ -80,7 +79,6 @@ void dbpf_keyval_dbcache_finalize(void)
  * Returns 0 on success, or one of -TROVE_EBUSY, -TROVE_ENOENT, or
  * -TROVE_EPERM (for now).
  *
- * TODO: DO A BETTER JOB OF MAPPING ERRORS.
  */
 int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 				   TROVE_handle handle)
@@ -117,39 +115,40 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
         {
 	    gossip_debug(GOSSIP_TROVE_DEBUG, "db: close error\n");
 	}
-
-        DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
-                               my_storage_p->name, coll_id);
-
-        __DBPF_GET_KEYVAL_DBNAME(db_name, PATH_MAX, my_storage_p->name,
-                                 coll_id, Lu(handle));
-
-        ret = db_create(&(keyval_db_cache[i].db_p), NULL, 0);
-        assert(ret == 0);
-
-        ret = keyval_db_cache[i].db_p->remove(
-            keyval_db_cache[i].db_p, filename, db_name, 0);
-        switch (ret)
-        {
-            case 0:
-                break;
-            case EINVAL:
-                gossip_err("warning: invalid db file!\n");
-                ret = -TROVE_EINVAL;
-                break;
-            case ENOENT:
-                ret = -TROVE_ENOENT;
-                break;
-            default:
-                gossip_err("warning: unreliable error value %d\n", ret);
-                ret = -TROVE_EPERM;
-                break;
-        }
-
-	keyval_db_cache[i].ref_ct = -1;
-	keyval_db_cache[i].db_p   = NULL;
-	gen_mutex_unlock(&keyval_db_cache[i].mutex);
     }
+
+    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
+                           my_storage_p->name, coll_id);
+
+    __DBPF_GET_KEYVAL_DBNAME(db_name, PATH_MAX, my_storage_p->name,
+                             coll_id, Lu(handle));
+
+    ret = db_create(&(keyval_db_cache[i].db_p), NULL, 0);
+    assert(ret == 0);
+
+    ret = keyval_db_cache[i].db_p->remove(
+        keyval_db_cache[i].db_p, filename, db_name, 0);
+    switch (ret)
+    {
+        case 0:
+            break;
+        case EINVAL:
+            gossip_err("warning: invalid db file!\n");
+            ret = -TROVE_EINVAL;
+            break;
+        case ENOENT:
+            ret = -TROVE_ENOENT;
+            break;
+        default:
+            gossip_err("warning: unreliable error value %d\n", ret);
+            ret = -TROVE_EPERM;
+            break;
+    }
+
+    keyval_db_cache[i].ref_ct = -1;
+    keyval_db_cache[i].db_p   = NULL;
+    gen_mutex_unlock(&keyval_db_cache[i].mutex);
+
     return ret;
 }
 
@@ -159,7 +158,7 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
  * references to the same db, so this will never return BUSY.  That
  * might change at some later time.
  *
- * Returns 0 on success, or one of -TROVE_ENOENT, -TROVE_EBUSY, -TROVE_PERM.
+ * Returns 0 on success, -TROVE_errno on failure.
  *
  * TODO: DO A BETTER JOB OF MAPPING ERROR VALUES!
  *
@@ -170,7 +169,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 				int create_flag,
 				DB **db_pp)
 {
-    int i, ret, error;
+    int i = 0, ret = -TROVE_EINVAL, error = 0;
     char filename[PATH_MAX] = {0}, db_name[PATH_MAX] = {0};
     DB *db_p = NULL;
     int got_db = 0;
@@ -248,18 +247,19 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     ret = db_create(&(keyval_db_cache[i].db_p), NULL, 0);
     if (ret != 0)
     {
-	    gossip_lerr("dbpf_keyval_dbcache_get: %s\n", db_strerror(ret));
-	    error = -dbpf_db_error_to_trove_error(ret);
-	    goto return_error;
+        gossip_lerr("dbpf_keyval_dbcache_get: %s\n", db_strerror(ret));
+        error = -dbpf_db_error_to_trove_error(ret);
+        goto return_error;
     }
     else
     {
-	got_db =1;
+	got_db = 1;
     }
 
     db_p = keyval_db_cache[i].db_p;
     db_p->set_errpfx(db_p, "pvfs2");
     db_p->set_errcall(db_p, dbpf_error_report);
+
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
     if ((ret = db_p->set_flags(db_p, DB_RECNUM)))
     {
@@ -306,8 +306,8 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     }
     else if (ret != 0)
     {
-	    error = -dbpf_db_error_to_trove_error(ret);
-	    goto return_error;
+        error = -dbpf_db_error_to_trove_error(ret);
+        goto return_error;
     }
 
     keyval_db_cache[i].ref_ct  = 1;
@@ -322,7 +322,6 @@ failed_open_error:
      * can only be freed with db->close */
     if (got_db && (keyval_db_cache[i].db_p != NULL))
     {
-	/* ignore errors, since we are trying to clean up anyway */
 	keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
 	keyval_db_cache[i].ref_ct = -1;
 	keyval_db_cache[i].db_p = NULL;

@@ -323,8 +323,8 @@ static int getattr_read_symlink_target(
     s_op->key.buffer_sz = Trove_Common_Keys[SYMLINK_TARGET_KEY].size;
 
     /*
-      optimistically add mask value to indicate the
-      symlink target is filled (error_code is checked in next state
+      optimistically add mask value to indicate the symlink target is
+      filled (error_code is checked in next state)
     */
     s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_SYMLNK_TARGET;
 
@@ -578,6 +578,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
             gossip_err("Failed to retrieve symlink target path for "
                        "handle %Lu,%d\n",Lu(s_op->req->u.getattr.handle),
                        s_op->req->u.getattr.fs_id);
+            PVFS_perror("Symlink retrieval failure",js_p->error_code);
 
             js_p->error_code = -PVFS_EINVAL;
             return 1;
