@@ -323,9 +323,8 @@ int socket_collection_testglobal(socket_collection_p scp,
 	    /* error case */
 	    if (big_poll_fds[i].revents & ERRMASK)
 	    {
-		gossip_lerr("Error: poll error value: 0x%x\n",
-			    big_poll_fds[i].revents);
-		gossip_lerr("Error: on socket: %d\n", big_poll_fds[i].fd);
+		gossip_err("Error: bmi_tcp: poll error value: 0x%x, on socket: %d\n",
+			    big_poll_fds[i].revents, big_poll_fds[i].fd);
 		status[num_handled] += SC_ERROR_BIT;
 	    }
 	    if (big_poll_fds[i].revents & POLLIN)
