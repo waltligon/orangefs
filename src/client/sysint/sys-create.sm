@@ -285,6 +285,8 @@ static int create_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(CLIENT_DEBUG, "create state: getattr_setup_msgpair\n");
 
+    memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
+
     /* parameter range checks */
     assert(sm_p->u.create.parent_ref.fs_id != 0);
     assert(sm_p->u.create.parent_ref.handle != 0);
@@ -320,6 +322,7 @@ static int create_getattr_comp_fn(void *v_p,
                                   int index)
 {
     int ret = 0;
+    PVFS_object_attr *attr = NULL;
 
     /* this is a little kludge to get around some struct definition
      * issues in the headers.  maybe fix later?
@@ -339,23 +342,44 @@ static int create_getattr_comp_fn(void *v_p,
 	return resp_p->status;
     }
 
-    /* make sure the parent dir is in fact a directory */
-    if (resp_p->u.getattr.attr.objtype != PVFS_TYPE_DIRECTORY)
+    /*
+      if we didn't get a cache hit, we're making a
+      copy of the attributes here so that we can add
+      a pcache entry later in cleanup.
+    */
+    if (!sm_p->pcache_hit)
     {
-        gossip_err("Error: Parent is not a directory\n");
-	return -PVFS_ENOTDIR;
+        PINT_pcache_object_attr_deep_copy(
+            &sm_p->pcache_attr, &resp_p->u.getattr.attr);
     }
 
     /*
-      check permissions against parent directory to determine
-      if we're allowed to create a new entry there
+      if we got a cache hit, use those attributes,
+      otherwise use the real server replied attrs
     */
-    ret = check_perms(resp_p->u.getattr.attr, resp_p->u.getattr.attr.perms,
-                      sm_p->cred_p->uid, sm_p->cred_p->gid);
-    if (ret < 0)
+    attr = (sm_p->pcache_hit ?
+            &sm_p->pinode->attr :
+            &resp_p->u.getattr.attr);
+    assert(attr);
+
+    if (attr->objtype == PVFS_TYPE_DIRECTORY)
     {
-        gossip_err("Error: Permission failure\n");
-        return -PVFS_EPERM;
+        /*
+          check permissions against parent directory to determine
+          if we're allowed to create a new entry there
+        */
+        ret = check_perms(*attr, attr->perms,
+                          sm_p->cred_p->uid, sm_p->cred_p->gid);
+        if (ret < 0)
+        {
+            gossip_err("Error: Permission failure\n");
+            return -PVFS_EPERM;
+        }
+    }
+    else
+    {
+        gossip_err("Error: Parent is not a directory\n");
+	return -PVFS_ENOTDIR;
     }
 
     /*
@@ -365,14 +389,15 @@ static int create_getattr_comp_fn(void *v_p,
     if (!sm_p->pcache_hit)
     {
         PINT_pinode *pinode =
-            PINT_pcache_lookup(sm_p->u.create.parent_ref);
+            PINT_pcache_lookup(sm_p->u.getattr.object_ref);
         if (!pinode)
         {
             pinode = PINT_pcache_pinode_alloc();
             assert(pinode);
         }
         pinode->refn = sm_p->u.getattr.object_ref;
-        pinode->size = 0;
+        pinode->size = ((attr->mask & PVFS_ATTR_DATA_ALL) ?
+                        attr->u.data.size : 0);
 
         PINT_pcache_object_attr_deep_copy(
             &pinode->attr, &resp_p->u.getattr.attr);
@@ -655,6 +680,8 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     /* clear error field in job */
     js_p->error_code = 0;
 
+    memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
+
     /* allocate msgarray and set msgarray_count */
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
         malloc(sm_p->u.create.num_data_files *
@@ -767,13 +794,6 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
                               sm_p->u.create.num_data_files,
                               sm_p->u.create.dist);
 
-    /*
-      cache the converted attributes for later
-      insertion into the pcache (in cleanup)
-    */
-    PINT_pcache_object_attr_deep_copy(
-        &sm_p->pcache_attr, &msg_p->req.u.setattr.attr);
-
     /* fill in msgpair structure components */
     msg_p->fs_id = sm_p->u.create.parent_ref.fs_id;
     msg_p->handle = sm_p->u.create.metafile_handle;
@@ -798,7 +818,6 @@ static int create_setattr_failure(PINT_client_sm *sm_p,
 static int create_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
 {
-/*     PINT_pinode *pinode = NULL; */
     PVFS_pinode_reference metafile_ref;
 
     gossip_debug(CLIENT_DEBUG, "create state: cleanup\n");
@@ -808,20 +827,6 @@ static int create_cleanup(PINT_client_sm *sm_p,
     /* insert attributes for this new metafile into the pcache */
     metafile_ref.handle = sm_p->u.create.metafile_handle;
     metafile_ref.fs_id = sm_p->u.create.parent_ref.fs_id;
-
-/*     pinode = PINT_pcache_lookup(metafile_ref); */
-/*     if (!pinode) */
-/*     { */
-/*         pinode = PINT_pcache_pinode_alloc(); */
-/*         assert(pinode); */
-/*     } */
-/*     pinode->refn = metafile_ref; */
-/*     PINT_pcache_object_attr_deep_copy( */
-/*         &pinode->attr, &sm_p->pcache_attr); */
-/*     PINT_pcache_object_attr_deep_free( */
-/*         &sm_p->pcache_attr); */
-
-/*     PINT_pcache_set_valid(pinode); */
 
     /* fill in outgoing response fields */
     sm_p->u.create.create_resp->pinode_refn = metafile_ref;
@@ -841,10 +846,11 @@ static int create_cleanup(PINT_client_sm *sm_p,
         free(sm_p->u.create.datafile_handles);
     }
 
-    if (sm_p->u.create.dist)
-    {
-        PVFS_Dist_free(sm_p->u.create.dist);
-    }
+/* FIXME: Freeing this here seems to cause future lookups to fail */
+/*     if (sm_p->u.create.dist) */
+/*     { */
+/*         PVFS_Dist_free(sm_p->u.create.dist); */
+/*     } */
 
     if (sm_p->msgarray)
     {

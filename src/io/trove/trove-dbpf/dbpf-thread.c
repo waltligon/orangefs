@@ -58,7 +58,7 @@ int dbpf_thread_finalize(void)
 #ifdef __PVFS2_TROVE_THREADED__
     gen_mutex_lock(dbpf_interface_lock);
     dbpf_thread_running = 0;
-    usleep(500);
+    usleep(100);
     ret = pthread_cancel(dbpf_thread);
     pthread_cond_destroy(&dbpf_op_completed_cond);
     pthread_cond_destroy(&dbpf_op_incoming_cond);
@@ -119,9 +119,12 @@ void *dbpf_thread_function(void *ptr)
               in dbpf_thread_finalize above.  if that's the
               case, we want to make sure to not be in a timed
               wait.  we'll be cancelled and shouldn't return
-              while waiting for this lock.
+              while waiting for this lock.  If the lock is
+              acquired, test for cancellation.
             */
             gen_mutex_lock(dbpf_interface_lock);
+            pthread_testcancel();
+
             gen_mutex_lock(dbpf_op_incoming_cond_mutex);
             ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
                                          dbpf_op_incoming_cond_mutex,

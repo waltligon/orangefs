@@ -303,8 +303,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     }
 
     /*
-      if we got a cache hit, use those attributes, other use the
-      real server replied attrs
+      if we got a cache hit, use those attributes,
+      otherwise use the real server replied attrs
     */
     attr = (sm_p->pcache_hit ?
             &sm_p->pinode->attr :
@@ -464,8 +464,17 @@ static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
     gossip_debug(CLIENT_DEBUG,
 		 "(%p) getattr state: getattr_object_getattr_failure\n",
 		 sm_p);
-    assert(0);
 
+    if (js_p->error_code == -PVFS_EINVAL)
+    {
+        gossip_err("getattr: Failed to retrieve attrs of handle %Lu | %d\n",
+                   sm_p->u.getattr.object_ref.handle,
+                   sm_p->u.getattr.object_ref.fs_id);
+    }
+    else
+    {
+        assert(0);
+    }
     return 1;
 }
 
