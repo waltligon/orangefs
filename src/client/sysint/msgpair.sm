@@ -279,10 +279,13 @@ static int msgpair_completion_fn(PINT_client_sm *sm_p,
     }
 
     /* check status of response -- let errors pass though. */
-    if (resp_p->status != 0) {
-	gossip_err("notice: msgpair_completion_fn: response status non-zero (%d)\n",
-		   resp_p->status);
+    if (resp_p->status != 0)
+    {
+	gossip_debug(CLIENT_DEBUG, "notice: msgpair_completion_fn: "
+                   "response status non-zero (%d)\n", resp_p->status);
+#if 0
 	PVFS_perror_gossip("msgpair_completion_fn", resp_p->status);
+#endif
     }
 
     assert(resp_p->status <= 0); /* parameter range checking */

@@ -57,7 +57,6 @@ int main(int argc,char **argv)
 		printf("PVFS_sys_initialize() failure. = %d\n", ret);
 		return(ret);
 	}
-	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the root handle */
 	name = malloc(2);/*null terminator included*/
