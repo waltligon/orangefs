@@ -1187,7 +1187,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     int segs;
     PVFS_size total_size;
     enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
-    PVFS_size bytes_processed;
+    PVFS_size bytes_processed = 0;
     char *src_ptr, *dest_ptr;
     PVFS_size region_size;
     struct flow_descriptor* flow_d;

@@ -47,10 +47,10 @@ int main(int argc, char **argv)
     int cur_index = 0;
     int run_index = 0;
     char tmp_buf[512];
-    double tmp_time;
-    double first_time = 0;
-    double last_end_time = 0;
-    double total_empty = 0;
+    double tmp_time = 0.0f;
+    double first_time = 0.0f;
+    double last_end_time = 0.0f;
+    double total_empty = 0.0f;
     int counter = 0;
 
     if(argc != 2)

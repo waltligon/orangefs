@@ -200,7 +200,7 @@ int NCAC_extent_done_access(NCAC_req_t *ncac_req)
 	struct list_head *dirty_list = NULL;
 	struct cache_stack *cache;
 	int nr_dirty = 0;
-	int ret;
+	int ret = 0;
 
 	inode = ncac_req->mapping;
 

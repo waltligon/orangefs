@@ -157,7 +157,7 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 				 int create_flag,
 				 int *fd_p)
 {
-    int i, ret, fd, open_errno;
+    int i = 0, ret = 0, fd = 0, open_errno = 0;
     char filename[PATH_MAX];
 
 

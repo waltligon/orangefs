@@ -55,7 +55,7 @@ struct cache_descriptor
 };
 typedef struct cache_descriptor cache_desc_t;
 
-/* read request desccriptor: read request to the cache module.
+/* read/write request desccriptor: read request to the cache module.
  * If "buffer" is not NULL, the caller expects that the cache
  * module to place place data into it.
  */
@@ -77,32 +77,7 @@ struct cache_read_descriptor
     struct cache_hints chints; /* cache hints */
 };
 typedef struct cache_read_descriptor cache_read_desc_t;
-
-
-/* write request desccriptor: write request to the cache module.
- * If "buffer" is not NULL, the caller has put the written data
- * into it. 
- */
-
-struct cache_write_descriptor
-{
-    PVFS_fs_id  coll_id;  
-    PVFS_handle handle;  /* these two direct to the right object */
-	PVFS_context_id context_id;
-
-    /* support a list of regions */
-    int 	stream_array_count;   /* how many regions */
-    PVFS_offset	*stream_offset_array; /* region address in the object */
-    PVFS_size	*stream_size_array;   /* size in each region */
-
-    void 	*buffer; /* whether data comes from this buffer */
-    PVFS_size	len;	 /* how many data in the buffer */
-    
-    struct cache_hints chints; /* cache hints */
-};
-typedef struct cache_write_descriptor cache_write_desc_t;
-
-
+typedef struct cache_read_descriptor cache_write_desc_t;
 
 /* sync request: to sync all cached dirty data into disk. 
  * if "coll_id" is PVFS_FS_ANY and "handle" is PVFS_HNDL_ANY,

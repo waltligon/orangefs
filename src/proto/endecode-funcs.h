@@ -274,11 +274,11 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 #define endecode_fields_0aa_struct(name, tn1, n1, ta1, a1, tn2, n2, ta2, a2) \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##tn1(pptr, &x->n1); \
-    for (i=0; i<x->n1; i++) \
-	encode_##ta1(pptr, &(x)->a1[i]); \
+    for (i=0; i<x->n1; i++) { int n; n = i; \
+	encode_##ta1(pptr, &(x)->a1[n]); } \
     encode_##tn2(pptr, &x->n2); \
-    for (i=0; i<x->n2; i++) \
-	encode_##ta2(pptr, &(x)->a2[i]); \
+    for (i=0; i<x->n2; i++) { int n; n = i; \
+	encode_##ta2(pptr, &(x)->a2[n]); } \
 } \
 static inline void decode_##name(char **pptr, struct name *x) { int i; \
     decode_##tn1(pptr, &x->n1); \

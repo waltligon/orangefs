@@ -119,12 +119,12 @@ int NCAC_do_one_piece_read(NCAC_req_t *ncac_req, PVFS_offset pos,
                            PVFS_size size, char **cbufoff, 
                            PVFS_size *cbufsize, struct extent *cbufhash[],
                            int *cbufflag,
-						   int *cbufrcnt,
-						   int *cbufwcnt,
-						   int *cnt)
+                           int *cbufrcnt,
+                           int *cbufwcnt,
+                           int *cnt)
 {
     unsigned long index;
-	unsigned int offset, nr;
+    unsigned int offset = 0, nr = 0;
     struct extent *cached_ext;
     struct extent *extent;
     int error;
