@@ -60,22 +60,6 @@ int PVFS_util_remove_internal_mntent(
 void PVFS_sys_free_mntent(
     struct PVFS_sys_mntent *mntent);
 
-/* path management */
-int PVFS_util_lookup_parent(
-    char *filename,
-    PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
-    PVFS_handle * handle);
-int PVFS_util_remove_base_dir(
-    char *pathname,
-    char *out_dir,
-    int out_max_len);
-int PVFS_util_remove_dir_prefix(
-    const char *pathname,
-    const char *prefix,
-    char *out_path,
-    int out_max_len);
-
 /*
  * Split a pathname into a directory and a filename.    The substring
  * following the last "/" is designated as the filename.  If non-null

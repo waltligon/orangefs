@@ -84,8 +84,48 @@ int PINT_check_perms(
              (attr.owner == uid)) ? 0 : -1);
 }
 
+/* PINT_lookup_parent()
+ *
+ * given a pathname and an fsid, looks up the handle of the parent
+ * directory
+ *
+ * returns 0 on success, -PVFS_errno on failure
+ */
+int PINT_lookup_parent(
+    char *filename,
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_handle * handle)
+{
+    int ret = -PVFS_EINVAL;
+    char buf[PVFS_SEGMENT_MAX] = {0};
+    PVFS_sysresp_lookup resp_look;
 
+    memset(&resp_look, 0, sizeof(PVFS_sysresp_lookup));
 
+    if (PINT_get_base_dir(filename, buf, PVFS_SEGMENT_MAX))
+    {
+        if (filename[0] != '/')
+        {
+            gossip_err("Invalid dirname (no leading '/')\n");
+        }
+        gossip_err("cannot get parent directory of %s\n", filename);
+        *handle = PVFS_HANDLE_NULL;
+        return ret;
+    }
+
+    ret = PVFS_sys_lookup(fs_id, buf, credentials,
+                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
+    if (ret < 0)
+    {
+        gossip_err("Lookup failed on %s\n", buf);
+        *handle = PVFS_HANDLE_NULL;
+        return ret;
+    }
+
+    *handle = resp_look.ref.handle;
+    return 0;
+}
 
 /*
  * Local variables:

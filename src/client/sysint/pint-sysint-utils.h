@@ -98,6 +98,12 @@ struct server_configuration_s *PINT_get_server_config_struct(
 void PINT_put_server_config_struct(
     struct server_configuration_s *config);
 
+int PINT_lookup_parent(
+    char *filename,
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_handle * handle);
+
 /*
  * Local variables:
  *  c-indent-level: 4

@@ -12,6 +12,7 @@
 #include "client.h"
 #include "pvfs2-util.h"
 #include "str-utils.h"
+#include "pint-sysint-utils.h"
 
 int main(int argc, char **argv)
 {
@@ -47,7 +48,7 @@ int main(int argc, char **argv)
 	return (-1);
     }
 
-    if (PVFS_util_remove_base_dir(filename,str_buf,256))
+    if (PINT_remove_base_dir(filename,str_buf,256))
     {
         if (filename[0] != '/')
         {
@@ -69,8 +70,8 @@ int main(int argc, char **argv)
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
-    ret = PVFS_util_lookup_parent(filename, cur_fs, &credentials, 
-                                  &parent_refn.handle);
+    ret = PINT_lookup_parent(filename, cur_fs, &credentials, 
+                             &parent_refn.handle);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_lookup_parent", ret);

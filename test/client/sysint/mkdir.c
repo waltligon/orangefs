@@ -13,6 +13,7 @@
 
 #include "pvfs2-util.h"
 #include "str-utils.h"
+#include "pint-sysint-utils.h"
 
 int main(int argc,char **argv)
 {
@@ -46,7 +47,7 @@ int main(int argc,char **argv)
 	return (-1);
     }
 
-    if (PVFS_util_remove_base_dir(dirname,str_buf,256))
+    if (PINT_remove_base_dir(dirname,str_buf,256))
     {
         if (dirname[0] != '/')
         {
@@ -62,8 +63,8 @@ int main(int argc,char **argv)
     PVFS_util_gen_credentials(&credentials);
 
     entry_name = str_buf;
-    ret = PVFS_util_lookup_parent(dirname, cur_fs, &credentials, 
-                                  &parent_refn.handle);
+    ret = PINT_lookup_parent(dirname, cur_fs, &credentials, 
+                             &parent_refn.handle);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_lookup_parent", ret);

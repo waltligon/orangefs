@@ -18,6 +18,7 @@
 #include <getopt.h>
 
 #include "pvfs2.h"
+#include "str-utils.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -508,7 +509,7 @@ int do_list(
         {
             char segment[128] = {0};
             PVFS_sysresp_getparent getparent_resp;
-            PVFS_util_remove_base_dir(name, segment, 128);
+            PINT_remove_base_dir(name, segment, 128);
             if (strcmp(segment,"") == 0)
             {
                 snprintf(segment,128,"/");
