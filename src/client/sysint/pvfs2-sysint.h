@@ -352,8 +352,8 @@ int PVFS_sys_symlink(PVFS_fs_id fs_id, char* name, char* target,
 int PVFS_sys_readlink(PVFS_pinode_reference pinode_refn, 
 		PVFS_credentials credentials, PVFS_sysresp_readlink *resp);
 int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req, 
-		void* buffer, int buffer_size, PVFS_credentials credentials, 
-		PVFS_sysresp_io *resp, enum PVFS_sys_io_type type);
+		void* buffer, PVFS_size buffer_size, PVFS_credentials 
+		credentials, PVFS_sysresp_io *resp, enum PVFS_sys_io_type type);
 #define PVFS_sys_read(x1,x2,x3,x4,x5,y) PVFS_sys_io(x1,x2,x3,x4,x5,y,PVFS_SYS_IO_READ)
 #define PVFS_sys_write(x1,x2,x3,x4,x5,y) PVFS_sys_io(x1,x2,x3,x4,x5,y,PVFS_SYS_IO_WRITE)
 int PVFS_sys_allocate(PVFS_pinode_reference pinode_refn, PVFS_size size);
