@@ -935,9 +935,10 @@ static int post_io_readahead_request(vfs_request_t *vfs_request)
 
 static int post_io_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL, val = 0;
+    int ret = -PVFS_EINVAL;
 
 #ifdef USE_MMAP_RA_CACHE
+    int val = 0;
     void *buf = NULL;
 
     if (vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ)

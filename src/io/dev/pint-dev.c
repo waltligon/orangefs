@@ -306,9 +306,11 @@ int PINT_dev_test_unexpected(
         }
 
         /* make sure a payload is present */
-        if (ret < (sizeof(int32_t)+sizeof(int64_t)+1))
+        if (ret < (sizeof(int32_t) + sizeof(int64_t) + 1))
         {
-            gossip_err("Error: got short message from device.\n");
+            gossip_err("Error: short message from device "
+                       "(got %d bytes).\n", ret);
+
             ret = -(PVFS_EIO|PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }

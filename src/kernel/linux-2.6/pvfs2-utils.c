@@ -996,6 +996,19 @@ int pvfs2_kernel_error_code_convert(
     {
         return pvfs2_error_code;
     }
+
+    if (IS_PVFS_NON_ERRNO_ERROR(pvfs2_error_code))
+    {
+        int ret = -EPERM;
+        int index = PVFS_get_errno_mapping((int32_t)pvfs2_error_code);
+        switch(index)
+        {
+            case PVFS_ECANCEL:
+                ret = -EINTR;
+                break;
+        }
+        return ret;
+    }
     return (int)PVFS_get_errno_mapping((int32_t)pvfs2_error_code);
 }
 
