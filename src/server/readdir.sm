@@ -96,22 +96,6 @@ machine readdir_(init,
 
 %%
 
-#if 0
-/*
- * Function: readdir_init_state_machine
- *
- * Params:   void
- *
- * Returns:  PINT_state_array_values*
- *
- */
-void readdir_init_state_machine(void)
-{
-
-    readdir_req_s.state_machine = readdir;
-
-}
-#endif
 
 /*
  * Function: readdir_init

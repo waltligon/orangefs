@@ -47,25 +47,6 @@ machine get_config(init, bmi_send, cleanup)
 
 %%
 
-#if 0
-/*
- * Function: getconfig_init_state_machine
- *
- * Params:   void
- *
- * Returns:  PINT_state_array_values*
- *
- * Synopsis: Set up the state machine for get config and
- *           return a pointer to it.
- *           
- */
-
-void getconfig_init_state_machine(void)
-{
-    getconfig_req_s.state_machine = get_config;
-}
-#endif
-
 /*
  * Function: getconfig_init
  *

@@ -111,27 +111,6 @@ machine get_attr(init,
 
 %%
 
-#if 0
-/*
- * Function: getattr_init_state_machine
- *
- * Params:   void
- *
- * Returns:  PINT_state_array_values*
- *
- * Synopsis: Set up the state machine for get_attrib. 
- *           
- */
-
-
-void getattr_init_state_machine(void)
-{
-
-    getattr_req_s.state_machine = get_attr;
-
-}
-#endif
-
 /*
  * Function: getattr_init
  *

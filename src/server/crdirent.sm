@@ -131,29 +131,6 @@ machine crdirent(init,
 
 %%
 
-#if 0
-/*
- * Function: crdirent_init_state_machine
- *
- * Params:   void
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  void
- *
- * Synopsis: Point the state machine at the array produced by the
- * state-comp preprocessor for crdirent
- *           
- */
-
-void crdirent_init_state_machine(void)
-{
-    crdirent_req_s.state_machine = crdirent;
-}
-#endif
-
 /*
  * Function: crdirent_init
  *

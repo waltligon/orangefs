@@ -84,26 +84,6 @@ machine mkdir_(init, create, set_attrib, release, send, err_msg, critical_error,
 
 %%
 
-#if 0
-/*
- * Function: mkdir_init_state_machine
- *
- * Params:   void
- *
- * Returns:  PINT_state_array_values*
- *
- * Synopsis: Set up the state machine for mkdir. 
- *           
- */
-
-void mkdir_init_state_machine(void)
-{
-
-    mkdir_req_s.state_machine = mkdir;
-
-}
-#endif
-
 /*
  * Function: mkdir_init
  *
@@ -115,8 +95,6 @@ void mkdir_init_state_machine(void)
  * Synopsis: 
  *           
  */
-
-
 static int mkdir_init(PINT_server_op *s_op, job_status_s *ret)
 {
 

@@ -163,19 +163,6 @@ machine remove_(init,
 
 %%
 
-#if 0
-/*
- * Function: remove_init_state_machine
- *
- */
-
-void remove_init_state_machine(void)
-{
-    /* 'remove' collides with remove(3) */
-    remove_req_s.state_machine = remove_;
-}
-#endif
-
 /*
  * Function: remove_init
  *

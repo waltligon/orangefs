@@ -96,28 +96,6 @@ machine io(init, get_size, send_positive_ack, send_negative_ack,
 
 %%
 
-#if 0
-/*
- * Function: io_init_state_machine()
- *
- * Params:   void
- *
- * Pre:      None
- *
- * Post:     None
- *
- * Returns:  void
- *
- * Synopsis: Point the state machine at the array produced by the
- * state-comp preprocessor for request
- *           
- */
-void io_init_state_machine(void)
-{
-	io_req_s.state_machine = io;
-}
-#endif
-
 /*
  * Function: io_init()
  *

@@ -105,16 +105,6 @@ machine lookup(init,
 
 %%
 
-#if 0
-/*
- * Function: lookup_init_state_machine           
- */
-void lookup_init_state_machine(void)
-{
-    lookup_req_s.state_machine = lookup;
-}
-#endif
-
 /*
  * Function: lookup_init
  *
