@@ -160,6 +160,16 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
            new_handle, cur_extent.first, cur_extent.last);
 #endif
 
+    /*
+      if we got a zero handle, we're either completely out
+      of handles -- or else something terrible has happened
+    */
+    if (new_handle == (TROVE_handle)0)
+    {
+	printf("Error: handle allocator returned a zero handle.\n");
+        return -TROVE_EINVAL;
+    }
+
     s_attr.type = op_p->u.d_create.type;
 
     memset(&key, 0, sizeof(key));
