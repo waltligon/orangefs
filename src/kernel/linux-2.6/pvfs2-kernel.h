@@ -433,8 +433,8 @@ do {                                                      \
     }                                                     \
     else                                                  \
     {                                                     \
-        ret = ((new_op->downcall.status == -PVFS_ENOENT) ?\
-               -ENOENT : -EINTR);                         \
+        ret = pvfs2_kernel_error_code_convert(            \
+                 new_op->downcall.status);                \
         *offset = original_offset;                        \
         wake_up_device_for_return(new_op);                \
     }                                                     \
