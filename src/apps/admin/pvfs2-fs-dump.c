@@ -224,8 +224,6 @@ int main(int argc, char **argv)
     return(ret);
 }
 
-/* build_handlelist()
- */
 int build_handlelist(PVFS_fs_id cur_fs,
 		     PVFS_BMI_addr_t *addr_array,
 		     int server_count,
@@ -422,8 +420,6 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     return 0;
 }
 
-/* descend()
- */
 int descend(PVFS_fs_id cur_fs,
 	    PVFS_pinode_reference pref,
 	    PVFS_credentials creds,
@@ -670,9 +666,6 @@ static int handlelist_find_handle(PVFS_handle handle, int *server_idx_p)
     return -1;
 }
 
-/* handlelist_remove_handle()
- *
- */
 static void handlelist_remove_handle(PVFS_handle handle, int server_idx)
 {
     int i;

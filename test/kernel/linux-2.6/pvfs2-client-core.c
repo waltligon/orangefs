@@ -168,7 +168,7 @@ static int service_create_request(
                        in_upcall->req.create.d_name,
                        Lu(parent_refn.handle), parent_refn.fs_id);
             gossip_err("Create returned error code %d\n",ret);
-            PVFS_perror("File creation failed: ", ret);
+            PVFS_perror("File creation failed", ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_CREATE;
@@ -451,7 +451,7 @@ static int service_getattr_request(
                        Lu(in_upcall->req.getattr.refn.handle),
                        in_upcall->req.getattr.refn.fs_id);
             gossip_err("getattr returned error code %d\n",ret);
-            PVFS_perror("Getattr failed ", ret);
+            PVFS_perror("Getattr failed", ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_GETATTR;
@@ -553,7 +553,7 @@ static int service_remove_request(
                        "on fsid %d!\n", in_upcall->req.remove.d_name,
                        Lu(parent_refn.handle), parent_refn.fs_id);
             gossip_err("Remove returned error code %d\n",ret);
-            PVFS_perror("Remove failed ",ret);
+            PVFS_perror("Remove failed",ret);
 
             /* we need to send a blank error response */
             out_downcall->type = PVFS2_VFS_OP_REMOVE;

@@ -975,6 +975,9 @@ int pvfs2_kernel_error_code_convert(
         case -PVFS_EIO:
             ret = -EIO;
             break;
+        case -PVFS_EAGAIN:
+            ret = -EAGAIN;
+            break;
         case 0:
             ret = 0;
             break;
