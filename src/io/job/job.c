@@ -1105,7 +1105,7 @@ int job_flow(flow_descriptor * flow_d,
     flow_pending_count++;
     jd->event_type = PVFS_EVENT_FLOW;
 
-    return (0);
+    return(job_time_mgr_add(jd, timeout_sec));
 }
 
 /* job_flow_cancel()
@@ -3653,6 +3653,7 @@ static void fill_status(struct job_desc *jd,
 	status->actual_size = jd->u.bmi_unexp.info->size;
 	break;
     case JOB_FLOW:
+	job_time_mgr_rem(jd);
 	status->error_code = jd->u.flow.flow_d->error_code;
 	status->actual_size = jd->u.flow.flow_d->total_transfered;
 	break;
