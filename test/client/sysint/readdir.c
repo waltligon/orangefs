@@ -14,11 +14,11 @@ int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
 	PVFS_sysresp_lookup resp_look;
-	PVFS_sysresp_readdir *resp_readdir = NULL;
-	int ret = -1,i = 0, name_sz = 0;
+	PVFS_sysresp_readdir resp_readdir;
+	int ret = -1, i = 0;
 	pvfs_mntlist mnt = {0,NULL};
 	int max_dirents_returned = 25;
-	char* starting_point = NULL;
+	char starting_point[256] = "/";
 	PVFS_fs_id fs_id;
 	char* name;
 	PVFS_credentials credentials;
@@ -34,17 +34,11 @@ int main(int argc,char **argv)
 		case 3:
 			sscanf(argv[2], "%d", &max_dirents_returned);
 		case 2:
-			name_sz = strlen(argv[1]) + 1;
-			starting_point = malloc(name_sz);
-			memcpy(starting_point, argv[1], name_sz);
+			strncpy(starting_point, argv[1], 256);
 			break;
-		default:
-			name_sz = 2;
-			starting_point = malloc(name_sz);
-			starting_point[0] = '/';
-			starting_point[1] = '\0';
 	}
-	printf("no more than %d dirents should be returned\n",max_dirents_returned);
+	printf("no more than %d dirents should be returned per "
+               "iteration\n", max_dirents_returned);
 
 	/* Parse PVFStab */
 	ret = parse_pvfstab(NULL,&mnt);
@@ -64,24 +58,13 @@ int main(int argc,char **argv)
 	/* lookup the directory handle */
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = 1877;
+	credentials.perms = 511;
 	name = starting_point;
 	fs_id = resp_init.fsid_list[0];
 	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_look);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
-		free(starting_point);
-		return(-1);
-	}
-	/* print the handle */
-	/*printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);*/
-	
-
-	resp_readdir = (PVFS_sysresp_readdir *)malloc(sizeof(PVFS_sysresp_readdir));
-	if (resp_readdir == NULL)
-	{
-		printf("Error in malloc\n");
 		return(-1);
 	}
 
@@ -89,32 +72,38 @@ int main(int argc,char **argv)
 
 	pinode_refn.handle = resp_look.pinode_refn.handle;
 	pinode_refn.fs_id = fs_id;
-	token = PVFS2_READDIR_START;
 	pvfs_dirent_incount = max_dirents_returned;
 
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = 1877;
+	credentials.perms = 511;
 
-
-	/* call readdir */
-        memset(resp_readdir,0,sizeof(PVFS_sysresp_readdir));
-	ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, 
-				credentials,resp_readdir);
-	if (ret < 0)
-	{
+	token = 0;
+        do
+        {
+            memset(&resp_readdir,0,sizeof(PVFS_sysresp_readdir));
+            ret = PVFS_sys_readdir(pinode_refn, (!token ? PVFS2_READDIR_START :
+                                                 token), pvfs_dirent_incount, 
+                                   credentials, &resp_readdir);
+            if (ret < 0)
+            {
 		printf("readdir failed with errcode = %d\n", ret);
 		return(-1);
-	}
-	
-	printf("===>READDIR\n"); 
-	printf("Token:%ld\n",(long int)resp_readdir->token);
-	printf("Returned %d dirents\n",resp_readdir->pvfs_dirent_outcount);
-	for(i = 0;i < resp_readdir->pvfs_dirent_outcount;i++)
-	{
-		printf("name:%s\t%Ld\n",resp_readdir->dirent_array[i].d_name,
-				resp_readdir->dirent_array[i].handle);
-	}
+            }
+
+            for(i = 0; i < resp_readdir.pvfs_dirent_outcount; i++)
+            {
+                printf("name:%s\t%Ld\n",
+                       resp_readdir.dirent_array[i].d_name,
+                       resp_readdir.dirent_array[i].handle);
+            }
+            token += resp_readdir.pvfs_dirent_outcount;
+
+            /*allocated by the system interface*/
+            if (resp_readdir.pvfs_dirent_outcount)
+                free(resp_readdir.dirent_array);
+
+        } while(resp_readdir.pvfs_dirent_outcount != 0);
 
 	/*close it down*/
 	ret = PVFS_sys_finalize();
@@ -123,11 +112,6 @@ int main(int argc,char **argv)
 		printf("finalizing sysint failed with errcode = %d\n", ret);
 		return (-1);
 	}
-        if (resp_readdir->pvfs_dirent_outcount)
-            free(resp_readdir->dirent_array); /*allocated by the system interface*/
-	free(resp_readdir);		/* allocated by us */
-
-	free(starting_point);
 
 	gossip_disable();
 
