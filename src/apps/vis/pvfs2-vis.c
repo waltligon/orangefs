@@ -71,7 +71,6 @@ int pvfs2_vis_start(char* path, int update_interval)
     const PVFS_util_tab* tab;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i,j;
-    int mnt_index = -1;
     PVFS_sysresp_init resp_init;
     PVFS_credentials creds;
     int ret = -1;
@@ -101,25 +100,6 @@ int pvfs2_vis_start(char* path, int update_interval)
         return(-PVFS_ENOENT);
     }
 
-    /* see if the destination resides on any of the file systems
-     * listed in the pvfstab; find the pvfs fs relative path
-     */
-    for(i=0; i<tab->mntent_count; i++)
-    {
-	ret = PVFS_util_remove_dir_prefix(path,
-	    tab->mntent_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
-	if(ret == 0)
-	{
-	    mnt_index = i;
-	    break;
-	}
-    }
-
-    if(mnt_index == -1)
-    {
-	return(-PVFS_ENOENT);
-    }
-
     memset(&resp_init, 0, sizeof(resp_init));
     ret = PVFS_sys_initialize(*tab, 0, &resp_init);
     if(ret < 0)
@@ -127,7 +107,13 @@ int pvfs2_vis_start(char* path, int update_interval)
 	return(ret);
     }
 
-    cur_fs = resp_init.fsid_list[mnt_index];
+    /* translate local path into pvfs2 relative path */
+    ret = PVFS_util_resolve(path,
+        &cur_fs, pvfs_path, PVFS_NAME_MAX);
+    if(ret < 0)
+    {
+	return(-PVFS_ENOENT);
+    }
 
     creds.uid = getuid();
     creds.gid = getgid();
