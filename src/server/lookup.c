@@ -280,7 +280,7 @@ static int lookup_verify_directory_metadata(PINT_server_op *s_op, job_status_s *
     assert(a_p->objtype == PVFS_TYPE_DIRECTORY);
 
     gossip_debug(SERVER_DEBUG,
-		 "  dirent handle = 0x%08Lx, attrs = (owner = %d, group = %d, perms = %d, type = %d)\n",
+		 "  dirent handle = 0x%08Lx, attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
 		 s_op->u.lookup.dirent_handle,
 		 a_p->owner,
 		 a_p->group,
