@@ -48,7 +48,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
       should already exist in the tables.  in any other case, it needs
       to be added properly.
     */
-    ret = PVFS_util_add_internal_mntent(mntent);
+    ret = PVFS_util_add_dynamic_mntent(mntent);
     if (ret && (ret != -PVFS_EEXIST))
     {
         PVFS_perror("PVFS_util_add_mnt failed", ret);

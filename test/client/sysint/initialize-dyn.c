@@ -4,8 +4,8 @@
  * See COPYING in top-level directory.
  */
 
-#include <sys/time.h>
 #include <stdio.h>
+#include <sys/types.h>
 #include <stdlib.h>
 #include "client.h"
 #include "pvfs2-util.h"
@@ -59,8 +59,6 @@ int main(int argc, char **argv)
         }
     }
 
-    /* TODO: do something that will fail here */
-
     /* re-add the mount points */
     for(i = 0; i < MAX_NUM_MNT; i++)
     {
@@ -75,7 +73,33 @@ int main(int argc, char **argv)
         }
     }
 
-    /* TODO: do something that should pass again here */
+    /* re-remove the mount points */
+    for(i = 0; i < MAX_NUM_MNT; i++)
+    {
+        printf("Removing mount entry %d: %s\n",
+               i, mntent[i].mnt_dir);
+        ret = PVFS_sys_fs_remove(&mntent[i]);
+        if (ret)
+        {
+            printf("Failed to remove mount entry %d\n",i);
+            PVFS_perror("Error", ret);
+            break;
+        }
+    }
+
+    /* re-add the mount points */
+    for(i = 0; i < MAX_NUM_MNT; i++)
+    {
+        printf("Adding dynamic mount entry %d: %s\n",
+               i, mntent[i].mnt_dir);
+        ret = PVFS_sys_fs_add(&mntent[i]);
+        if (ret)
+        {
+            printf("Failed to add mount entry %d\n",i);
+            PVFS_perror("Error", ret);
+            break;
+        }
+    }
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

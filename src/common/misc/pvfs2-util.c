@@ -32,6 +32,7 @@
 
 #define PVFS2_MAX_TABFILES       8
 #define PVFS2_DYNAMIC_TAB_INDEX  (PVFS2_MAX_TABFILES - 1)
+#define PVFS2_DYNAMIC_TAB_NAME   "<DynamicTab>"
 
 static PVFS_util_tab s_stat_tab_array[PVFS2_MAX_TABFILES];
 static int s_stat_tab_count = 0;
@@ -353,19 +354,34 @@ int PVFS_util_get_default_fsid(PVFS_fs_id* out_fs_id)
         }
     }
 
+    /* check the dynamic tab area if we haven't found an fs yet */
+    for(j = 0; j < s_stat_tab_array[
+            PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+    {
+        *out_fs_id = s_stat_tab_array[
+            PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
+        if(*out_fs_id != PVFS_FS_ID_NULL)
+        {
+            gen_mutex_unlock(&s_stat_tab_mutex);
+            return(0);
+        }
+    }
+
     gen_mutex_unlock(&s_stat_tab_mutex);
     return(-PVFS_ENOENT);
 }
 
 /*
- * PVFS_util_add_internal_mntent()
+ * PVFS_util_add_dynamic_mntent()
  *
  * dynamically add mount information to our internally managed mount
- * tables (used for quick fs resolution using PVFS_util_resolve)
+ * tables (used for quick fs resolution using PVFS_util_resolve).
+ * dynamic mnt entries can only be added to a particular dynamic
+ * region of our book keeping, so they're the exception, not the rule.
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_util_add_internal_mntent(struct PVFS_sys_mntent *mntent)
+int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
 {
     int i = 0, j = 0, new_index = 0;
     int ret = -PVFS_EINVAL;
@@ -378,7 +394,7 @@ int PVFS_util_add_internal_mntent(struct PVFS_sys_mntent *mntent)
 
         /*
           we exhaustively scan to be sure this mnt entry doesn't exist
-          anywhere in our book keeping
+          anywhere in our book keeping; first scan the parsed regions
         */
         for(i = 0; i < s_stat_tab_count; i++)
         {
@@ -391,7 +407,7 @@ int PVFS_util_add_internal_mntent(struct PVFS_sys_mntent *mntent)
                 {
                     gossip_debug(
                         GOSSIP_CLIENT_DEBUG, "* Mount point %s already "
-                        "exists\n", current_mnt->mnt_dir);
+                        "exists [parsed]\n", current_mnt->mnt_dir);
 
                     gen_mutex_unlock(&s_stat_tab_mutex);
                     return -PVFS_EEXIST;
@@ -399,8 +415,24 @@ int PVFS_util_add_internal_mntent(struct PVFS_sys_mntent *mntent)
             }
         }
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "* Adding new dynamic mount "
-                     "point %s", mntent->mnt_dir);
+        /* check the dynamic region if we haven't found a match yet */
+        for(j = 0; j < s_stat_tab_array[
+                PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+        {
+            current_mnt = &(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].
+                            mntent_array[j]);
+
+            if ((current_mnt->fs_id == mntent->fs_id) &&
+                (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
+            {
+                gossip_debug(
+                    GOSSIP_CLIENT_DEBUG, "* Mount point %s already "
+                    "exists [dynamic]\n", current_mnt->mnt_dir);
+
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return -PVFS_EEXIST;
+            }
+        }
 
         /* copy the mntent to our table in the dynamic tab area */
         new_index = s_stat_tab_array[
@@ -408,6 +440,7 @@ int PVFS_util_add_internal_mntent(struct PVFS_sys_mntent *mntent)
 
         if (new_index == 0)
         {
+            /* allocate and initialize the dynamic tab object */
             s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array =
                 (struct PVFS_sys_mntent *)malloc(
                     sizeof(struct PVFS_sys_mntent));
@@ -415,14 +448,14 @@ int PVFS_util_add_internal_mntent(struct PVFS_sys_mntent *mntent)
             {
                 return -PVFS_ENOMEM;
             }
+            strncpy(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].tabfile_name,
+                    PVFS2_DYNAMIC_TAB_NAME, PVFS_NAME_MAX);
         }
         else
         {
             /* we need to re-alloc this guy to add a new array entry */
             tmp_mnt_array = (struct PVFS_sys_mntent *)malloc(
-                ((s_stat_tab_array[
-                      PVFS2_DYNAMIC_TAB_INDEX].mntent_count + 1) *
-                 sizeof(struct PVFS_sys_mntent)));
+                ((new_index + 1) * sizeof(struct PVFS_sys_mntent)));
             if (!tmp_mnt_array)
             {
                 return -PVFS_ENOMEM;
@@ -432,8 +465,7 @@ int PVFS_util_add_internal_mntent(struct PVFS_sys_mntent *mntent)
               copy all mntent entries into the new array, freeing the
               original entries
             */
-            for(i = 0; i < s_stat_tab_array[
-                    PVFS2_DYNAMIC_TAB_INDEX].mntent_count; i++)
+            for(i = 0; i < new_index; i++)
             {
                 current_mnt = &s_stat_tab_array[
                     PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i];
@@ -447,8 +479,9 @@ int PVFS_util_add_internal_mntent(struct PVFS_sys_mntent *mntent)
                 tmp_mnt_array;
         }
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "* New Index is %d\n",
-                     new_index);
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "* Adding new dynamic mount "
+                     "point %s [%d,%d]\n", mntent->mnt_dir,
+                     PVFS2_DYNAMIC_TAB_INDEX, new_index);
 
         current_mnt = &s_stat_tab_array[
             PVFS2_DYNAMIC_TAB_INDEX].mntent_array[new_index];
@@ -473,7 +506,7 @@ int PVFS_util_add_internal_mntent(struct PVFS_sys_mntent *mntent)
 int PVFS_util_remove_internal_mntent(
     struct PVFS_sys_mntent *mntent)
 {
-    int i = 0, j = 0, k = 0, new_count = 0, found = 0;
+    int i = 0, j = 0, new_count = 0, found = 0, found_index = 0;
     int ret = -PVFS_EINVAL;
     struct PVFS_sys_mntent *current_mnt = NULL;
     struct PVFS_sys_mntent *tmp_mnt_array = NULL;
@@ -494,9 +527,26 @@ int PVFS_util_remove_internal_mntent(
                 if ((current_mnt->fs_id == mntent->fs_id) &&
                     (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
                 {
+                    found_index = i;
                     found = 1;
                     goto mntent_found;
                 }
+            }
+        }
+
+        /* check the dynamic region if we haven't found a match yet */
+        for(j = 0; j < s_stat_tab_array[
+                PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+        {
+            current_mnt = &(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].
+                            mntent_array[j]);
+
+            if ((current_mnt->fs_id == mntent->fs_id) &&
+                (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
+            {
+                found_index = PVFS2_DYNAMIC_TAB_INDEX;
+                found = 1;
+                goto mntent_found;
             }
         }
 
@@ -507,16 +557,17 @@ int PVFS_util_remove_internal_mntent(
         }
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, "* Removing mount "
-                     "point %s [%d,%d]\n", current_mnt->mnt_dir, i, j);
+                     "point %s [%d,%d]\n", current_mnt->mnt_dir,
+                     found_index, j);
 
         /* remove the mntent from our table in the found tab area */
-        if ((s_stat_tab_array[i].mntent_count - 1) > 0)
+        if ((s_stat_tab_array[found_index].mntent_count - 1) > 0)
         {
             /*
               this is 1 minus the old count since there will be 1 less
               mnt entries after this call
             */
-            new_count = s_stat_tab_array[i].mntent_count - 1;
+            new_count = s_stat_tab_array[found_index].mntent_count - 1;
 
             /* we need to re-alloc this guy to remove the array entry */
             tmp_mnt_array = (struct PVFS_sys_mntent *)malloc(
@@ -531,10 +582,10 @@ int PVFS_util_remove_internal_mntent(
               original entries -- and skipping the one that we're
               trying to remove
             */
-            for(k = 0, new_count = 0;
-                k < s_stat_tab_array[i].mntent_count; k++)
+            for(i = 0, new_count = 0;
+                i < s_stat_tab_array[found_index].mntent_count; i++)
             {
-                current_mnt = &s_stat_tab_array[i].mntent_array[k];
+                current_mnt = &s_stat_tab_array[found_index].mntent_array[i];
 
                 if ((current_mnt->fs_id == mntent->fs_id) &&
                     (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
@@ -546,17 +597,17 @@ int PVFS_util_remove_internal_mntent(
             }
 
             /* finally, swap the mntent arrays */
-            free(s_stat_tab_array[i].mntent_array);
-            s_stat_tab_array[i].mntent_array = tmp_mnt_array;
+            free(s_stat_tab_array[found_index].mntent_array);
+            s_stat_tab_array[found_index].mntent_array = tmp_mnt_array;
 
-            s_stat_tab_array[i].mntent_count--;
+            s_stat_tab_array[found_index].mntent_count--;
             ret = 0;
         }
         else
         {
             /* special case: we're removing the last mnt entry here */
-            free_mntent(&s_stat_tab_array[i].mntent_array[j]);
-            s_stat_tab_array[i].mntent_count = 0;
+            free_mntent(&s_stat_tab_array[found_index].mntent_array[j]);
+            s_stat_tab_array[found_index].mntent_count = 0;
             ret = 0;
         }
         gen_mutex_unlock(&s_stat_tab_mutex);
@@ -586,10 +637,9 @@ int PVFS_util_resolve(
     {
         for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
         {
-            ret = PVFS_util_remove_dir_prefix(local_path,
-                s_stat_tab_array[i].mntent_array[j].mnt_dir,
-                out_fs_path,
-                out_fs_path_max);
+            ret = PVFS_util_remove_dir_prefix(
+                local_path, s_stat_tab_array[i].mntent_array[j].mnt_dir,
+                out_fs_path, out_fs_path_max);
             if(ret == 0)
             {
                 *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
@@ -604,6 +654,32 @@ int PVFS_util_resolve(
                 gen_mutex_unlock(&s_stat_tab_mutex);
                 return(0);
             }
+        }
+    }
+
+    /* check the dynamic tab area if we haven't resolved anything yet */
+    for(j = 0; j < s_stat_tab_array[
+            PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+    {
+        ret = PVFS_util_remove_dir_prefix(
+            local_path, s_stat_tab_array[
+                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
+            out_fs_path, out_fs_path_max);
+        if (ret == 0)
+        {
+            *out_fs_id = s_stat_tab_array[
+                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
+            if(*out_fs_id == PVFS_FS_ID_NULL)
+            {
+                gossip_err("Error: %s resides on a PVFS2 file system "
+                           "that has not yet been initialized.\n",
+                           local_path);
+
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return(-PVFS_ENXIO);
+            }
+            gen_mutex_unlock(&s_stat_tab_mutex);
+            return(0);
         }
     }
 
@@ -629,7 +705,8 @@ int PVFS_util_init_defaults(void)
     tab = PVFS_util_parse_pvfstab(NULL);
     if(!tab)
     {
-        gossip_err("Error: failed to find any pvfs2 file systems in the "
+        gossip_err(
+            "Error: failed to find any pvfs2 file systems in the "
             "standard system tab files.\n");
         return(-PVFS_ENOENT);
     }
@@ -651,7 +728,8 @@ int PVFS_util_init_defaults(void)
         }
         else
         {
-            gossip_err("WARNING: failed to initialize file system for mount "
+            gossip_err(
+                "WARNING: failed to initialize file system for mount "
                 "point %s in tab file %s\n", tab->mntent_array[i].mnt_dir,
                 tab->tabfile_name);
         }
@@ -663,7 +741,8 @@ int PVFS_util_init_defaults(void)
     }
     else
     {
-        gossip_err("ERROR: could not initialize any file systems in %s.\n",
+        gossip_err(
+            "ERROR: could not initialize any file systems in %s.\n",
             tab->tabfile_name);
         return(-PVFS_ENODEV);
     }
@@ -1135,10 +1214,7 @@ void PINT_release_pvfstab(void)
     {
         for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
-            free(s_stat_tab_array[i].mntent_array[j].pvfs_config_server);
-            free(s_stat_tab_array[i].mntent_array[j].mnt_dir);
-            free(s_stat_tab_array[i].mntent_array[j].mnt_opts);
-            free(s_stat_tab_array[i].mntent_array[j].pvfs_fs_name);
+            free_mntent(&s_stat_tab_array[i].mntent_array[j]);
         }
         free(s_stat_tab_array[i].mntent_array);
     }

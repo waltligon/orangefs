@@ -36,7 +36,7 @@ int PVFS_util_resolve(
     int out_fs_path_max);
 int PVFS_util_get_default_fsid(
     PVFS_fs_id* out_fs_id);
-int PVFS_util_add_internal_mntent(
+int PVFS_util_add_dynamic_mntent(
     struct PVFS_sys_mntent *mntent);
 int PVFS_util_remove_internal_mntent(
     struct PVFS_sys_mntent *mntent);
