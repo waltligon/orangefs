@@ -176,8 +176,10 @@ ssize_t pvfs2_inode_read(
         amt_complete = new_op->downcall.resp.io.amt_complete;
 
         /*
-          tell the device file owner waiting on I/O that
-          this read has completed and it can return now
+          tell the device file owner waiting on I/O that this read has
+          completed and it can return now.  in this exact case, on
+          wakeup the device will free the op, so we *cannot* touch it
+          after this.
         */
         wake_up_device_for_return(new_op);
 
@@ -224,6 +226,7 @@ static ssize_t pvfs2_file_write(
     size_t each_count = 0, total_count = 0;
     struct inode *inode = file->f_dentry->d_inode;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    size_t amt_complete = 0;
 
     pvfs2_print("pvfs2: pvfs2_file_write called on %s\n",
 		(file && file->f_dentry && file->f_dentry->d_name.name ?
@@ -299,29 +302,29 @@ static ssize_t pvfs2_file_write(
 	current_buf += new_op->downcall.resp.io.amt_complete;
 	*offset += new_op->downcall.resp.io.amt_complete;
 	total_count += new_op->downcall.resp.io.amt_complete;
+        amt_complete = new_op->downcall.resp.io.amt_complete;
 
         /* adjust inode size if applicable */
-        if ((original_offset + new_op->downcall.resp.io.amt_complete) >
-            inode->i_size)
+        if ((original_offset + amt_complete) > inode->i_size)
         {
-            i_size_write(inode, (original_offset +
-                                 new_op->downcall.resp.io.amt_complete));
+            i_size_write(inode, (original_offset + amt_complete));
         }
 
         /*
-          tell the device file owner waiting on I/O that
-          this read has completed and it can return now
+          tell the device file owner waiting on I/O that this read has
+          completed and it can return now.  in this exact case, on
+          wakeup the device will free the op, so we *cannot* touch it
+          after this.
         */
         wake_up_device_for_return(new_op);
 
 	pvfs_bufmap_put(buffer_index);
 
-	/* if we got a short write, fall out and return what we
-	 * got so far
-	 * TODO: define semantics here- kind of depends on pvfs2
+	/* if we got a short write, fall out and return what we got so
+	 * far TODO: define semantics here- kind of depends on pvfs2
 	 * semantics that don't really exist yet
 	 */
-	if (new_op->downcall.resp.io.amt_complete < each_count)
+	if (amt_complete < each_count)
 	{
 	    break;
 	}
