@@ -74,10 +74,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 {
     int ret = 0;
     char *method_name = NULL;
-/* uncomment when trove supports the TROVE_COLLECTION_HANDLE_RANGES */
-#if 0
     char *cur_handle_range = NULL;
-#endif
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
 
@@ -129,8 +126,6 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
                         cur_fs->file_system_name);
 	    goto interface_init_failed;
 	}
-/* uncomment when trove supports the TROVE_COLLECTION_HANDLE_RANGES */
-#if 0
         cur_handle_range =
             PINT_server_config_get_handle_range_str(&user_opts,cur_fs);
         assert(cur_handle_range);
@@ -144,7 +139,6 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
                         cur_handle_range,cur_fs->file_system_name);
 	    goto interface_init_failed;
         }
-#endif
         cur = llist_next(cur);
     }
     gossip_debug(SERVER_DEBUG, "Storage Init Complete\n");

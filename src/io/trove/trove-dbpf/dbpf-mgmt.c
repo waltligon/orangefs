@@ -27,6 +27,7 @@
 #include "dbpf-keyval.h"
 #include "dbpf-dspace.h"
 #include "trove-ledger.h"
+#include "trove-handle-mgmt.h"
 
 int dbpf_method_id = -1;
 char dbpf_method_name[] = "dbpf";
@@ -44,7 +45,6 @@ static int dbpf_mkpath(char *pathname, mode_t mode);
 /* dbpf_collection_getinfo()
  */
 static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
-				   TROVE_handle handle,
 				   int option,
 				   void *parameter)
 {
@@ -54,11 +54,18 @@ static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
 /* dbpf_collection_setinfo()
  */
 static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
-				   TROVE_handle handle,
 				   int option,
 				   void *parameter)
 {
-    return -1;
+    int ret = -1;
+
+    switch(option)
+    {
+        case TROVE_COLLECTION_HANDLE_RANGES:
+            ret = trove_set_handle_ranges(coll_id,(char *)parameter);
+            break;
+    }
+    return ret;
 }
 
 /* dbpf_collection_seteattr()
