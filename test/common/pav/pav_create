@@ -228,6 +228,7 @@ sub init {
 	       'BINDIR' => "/tmp/bin",
 	       'SERVER' => "pvfs2-server",
 	       'PINGPROG' => "pvfs2-ping",
+	       'GENCONFIG' => "pvfs2-genconfig",
 	       'PROGROOT' => "./",
 	       'COPYBINS' => 0
 	       );
