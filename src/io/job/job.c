@@ -34,6 +34,7 @@ static job_desc_q_p completion_queue = NULL;
 static int completion_error = 0;
 static job_desc_q_p bmi_queue = NULL;
 static job_desc_q_p bmi_unexp_queue = NULL;
+static int bmi_unexp_pending_count = 0;
 static job_desc_q_p trove_queue = NULL;
 static job_desc_q_p flow_queue = NULL;
 static job_desc_q_p req_sched_queue = NULL;
@@ -43,8 +44,8 @@ static gen_mutex_t completion_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t bmi_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t trove_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t flow_mutex = GEN_MUTEX_INITIALIZER;
-/* NOTE: both bmi_queue and bmi_unexp_queue are protected by the same
- * mutex (bmi_mutex); the queues are seperated for convenience 
+/* NOTE: all of the bmi queues and counts are protected by the same
+ * mutex (bmi_mutex)
  */
 /* NOTE: the req_sched queue doesn't have a mutex, because it
  * does not have a work thread
@@ -588,6 +589,7 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
     job_desc_q_add(bmi_unexp_queue, jd);
+    bmi_unexp_pending_count++;
 #ifdef __PVFS2_JOB_THREADED__
     pthread_cond_signal(&bmi_cond);
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -2683,7 +2685,10 @@ static int do_one_work_cycle_all(int *num_completed,
      */
     gen_mutex_lock(&bmi_mutex);
     bmi_pending_flag = !job_desc_q_empty(bmi_queue);
-    bmi_unexp_pending_flag = !job_desc_q_empty(bmi_unexp_queue);
+    if(bmi_unexp_pending_count > 0)
+	bmi_unexp_pending_flag = 1;
+    else
+	bmi_unexp_pending_flag = 0;
     gen_mutex_unlock(&bmi_mutex);
     gen_mutex_lock(&flow_mutex);
     flow_pending_flag = !job_desc_q_empty(flow_queue);
@@ -2851,7 +2856,6 @@ static int do_one_work_cycle_bmi_unexp(int *num_completed,
 {
     int incount, outcount;
     struct job_desc *tmp_desc;
-    struct job_desc *first_desc;
     int ret = -1;
     int i = 0;
 
@@ -2859,18 +2863,10 @@ static int do_one_work_cycle_bmi_unexp(int *num_completed,
      * operations we are allowed to look for right now
      */
     gen_mutex_lock(&bmi_mutex);
-    first_desc = job_desc_q_shownext(bmi_unexp_queue);
-    job_desc_q_remove(first_desc);
-    job_desc_q_add(bmi_unexp_queue, first_desc);
-    incount = 1;
-    while ((incount < job_work_metric) &&
-	   (tmp_desc = job_desc_q_shownext(bmi_unexp_queue)) &&
-	   (tmp_desc != first_desc))
-    {
-	job_desc_q_remove(tmp_desc);
-	job_desc_q_add(bmi_unexp_queue, tmp_desc);
-	incount++;
-    }
+    if(bmi_unexp_pending_count > job_work_metric)
+	incount = job_work_metric;
+    else
+	incount = bmi_unexp_pending_count;
     gen_mutex_unlock(&bmi_mutex);
 
     if (wait_flag)
@@ -2896,6 +2892,7 @@ static int do_one_work_cycle_bmi_unexp(int *num_completed,
 	gen_mutex_lock(&bmi_mutex);
 	tmp_desc = job_desc_q_shownext(bmi_unexp_queue);
 	job_desc_q_remove(tmp_desc);
+	bmi_unexp_pending_count--;
 	gen_mutex_unlock(&bmi_mutex);
 	/* set appropriate fields and store incompleted queue */
 	*(tmp_desc->u.bmi_unexp.info) = stat_bmi_unexp_array[i];
@@ -3116,7 +3113,10 @@ static void *bmi_thread_function(void *foo)
 	/* figure out what types of bmi jobs are pending */
 	gen_mutex_lock(&bmi_mutex);
 	bmi_pending_flag = !job_desc_q_empty(bmi_queue);
-	bmi_unexp_pending_flag = !job_desc_q_empty(bmi_unexp_queue);
+	if(bmi_unexp_pending_count > 0)
+	    bmi_unexp_pending_flag = 1;
+	else
+	    bmi_unexp_pending_flag = 0;
 	gen_mutex_unlock(&bmi_mutex);
 
 	num_bmi_completed = 0;
