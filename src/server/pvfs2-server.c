@@ -95,6 +95,10 @@ int main(int argc, char **argv)
 {
     int ret, debug_mask = 0;
 
+#ifdef WITH_MTRACE
+    mtrace();
+#endif
+
     /* Passed to server shutdown function */
     server_status_flag = SERVER_DEFAULT_INIT;
 

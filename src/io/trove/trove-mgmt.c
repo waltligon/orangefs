@@ -63,10 +63,6 @@ int trove_initialize(char *stoname,
 	return -1;
     }
 
-#ifdef WITH_MTRACE
-    mtrace();
-#endif
-
     /* initialize the handle management interface */
     ret = trove_handle_mgmt_initialize();
     if ( ret == -1 ) {
