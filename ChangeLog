@@ -3,8 +3,8 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.1.0pre1
-===============
+pvfs2-0.1.0
+===========
 - initial support for logging traces with both MPE and Pablo libraries
 - fix some warnings on x86-64
 - work around older Berkeley-DB versions w/o support for DB_DIRTY_READ
@@ -24,7 +24,7 @@ pvfs2-0.1.0pre1
   unsync'd operations to occur that reads from dirty memory (written but
   non-committed data) to help enhance performance 
 - graceful shutdown when server gets ctrl-c (SIGINT)
-- pvfs2-ls output bugfixes and better error reporting
+- pvfs2-ls output and argument bugfixes and better error reporting
 - handle allocator fix to no longer return invalid handles if no valid
   ranges have been registered
 - improved server version reporting and exit path (using --version/-v)

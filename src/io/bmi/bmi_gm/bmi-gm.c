@@ -2661,7 +2661,7 @@ static int receive_cycle(int timeout)
 void alarm_callback(void *context)
 {
     global_timeout_flag = 1;
-    gossip_lerr("Timer expired.\n");
+    gossip_debug(GOSSIP_BMI_DEBUG_GM, "Timer expired.\n");
     return;
 }
 
