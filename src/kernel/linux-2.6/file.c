@@ -48,6 +48,8 @@ static ssize_t pvfs2_file_read(
     int ret = -1;
     char* current_buf = buf;
     loff_t original_offset = *offset;
+    struct inode *inode = file->f_dentry->d_inode;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
     pvfs2_print("pvfs2: pvfs2_file_read called on %s\n",
 		file->f_dentry->d_name.name);
@@ -90,6 +92,7 @@ static ssize_t pvfs2_file_read(
 	new_op->upcall.req.read.buf = desc->uaddr;
 	new_op->upcall.req.read.count = each_count;
 	new_op->upcall.req.read.offset = *offset;
+	new_op->upcall.req.read.refn = pvfs2_inode->refn;
 
 	/* post req and wait for response */
 	add_op_to_request_list(new_op);

@@ -12,6 +12,7 @@ typedef struct
     char *buf;
     size_t count;
     loff_t offset;
+    PVFS_pinode_reference refn;
 } pvfs2_read_request_t;
 
 typedef struct
@@ -19,7 +20,7 @@ typedef struct
     char *buf;
     size_t count;
     loff_t *offset;
-    struct qstr *d_name;
+    PVFS_pinode_reference refn;
 } pvfs2_write_request_t;
 
 typedef struct
