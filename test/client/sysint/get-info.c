@@ -98,7 +98,7 @@ int main(int argc,char **argv)
 	printf("--getattr--\n"); 
 	printf("Handle      : %Ld\n", pinode_refn.handle);
 	printf("FSID        : %d\n", (int)pinode_refn.fs_id);
-	printf("mask        : %d\n", attrmask);
+	printf("mask        : %d\n", resp_gattr->attr.mask);
 	printf("uid         : %d\n", resp_gattr->attr.owner);
 	printf("gid         : %d\n", resp_gattr->attr.group);
 	printf("permissions : %d\n", resp_gattr->attr.perms);

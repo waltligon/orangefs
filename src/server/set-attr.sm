@@ -364,6 +364,8 @@ static int setattr_write_metafile_datafile_handles(PINT_server_op *s_op, job_sta
     gossip_debug(SERVER_DEBUG, "setattr state: write_metafile_datafile_handles\n");
 
     /* we should have at least one datafile... */
+#include <stdio.h>
+    fprintf(stderr,"GOT ATTRIBUTE MASK %d\n",s_op->req->u.setattr.attr.mask);
     assert(s_op->req->u.setattr.attr.u.meta.dfile_count > 0);
 
     /* set up key and value structure for keyval write */

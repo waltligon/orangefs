@@ -269,10 +269,11 @@ int do_encode_req(
 
 	if (request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
 	{
-	    /* negative datafiles? wtf ... */
-	    if (request->u.setattr.attr.u.meta.dfile_count >= 0)
+            if ((request->u.setattr.attr.u.meta.dfile_count > 0) &&
+                (request->u.setattr.attr.u.meta.dfile_count <
+                 PVFS_REQ_LIMIT_DFILE_COUNT) &&
+                (request->u.setattr.attr.u.meta.dfile_array != NULL));
 	    {
-		assert(request->u.setattr.attr.u.meta.dfile_array != NULL);
 		size +=
 		    request->u.setattr.attr.u.meta.dfile_count *
 		    sizeof(PVFS_handle);
@@ -310,19 +311,30 @@ int do_encode_req(
 	/* throw handles at the end for metadata files */
 	if (request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
 	{
-	    memcpy(enc_msg,
-		   request->u.setattr.attr.u.meta.dfile_array,
-		   request->u.setattr.attr.u.meta.dfile_count *
-		   sizeof(PVFS_handle));
+            if ((request->u.setattr.attr.u.meta.dfile_count > 0) &&
+                (request->u.setattr.attr.u.meta.dfile_count <
+                 PVFS_REQ_LIMIT_DFILE_COUNT) &&
+                (request->u.setattr.attr.u.meta.dfile_array != NULL));
+            {
+                memcpy(enc_msg,
+                       request->u.setattr.attr.u.meta.dfile_array,
+                       request->u.setattr.attr.u.meta.dfile_count *
+                       sizeof(PVFS_handle));
 
-	    enc_msg +=
-		request->u.setattr.attr.u.meta.dfile_count *
-		sizeof(PVFS_handle);
+                enc_msg +=
+                    request->u.setattr.attr.u.meta.dfile_count *
+                    sizeof(PVFS_handle);
+            }
+
 	    /*pack distribution information now */
-
-	    /* Q:we alloc'ed what the macro said the packed size was, is this enough? */
-	    PINT_Dist_encode(enc_msg, request->u.setattr.attr.u.meta.dist);
-
+            if (request->u.setattr.attr.u.meta.dist)
+            {
+                /*
+                  Q:we alloc'ed what the macro said the packed
+                  size was, is this enough?
+                */
+                PINT_Dist_encode(enc_msg, request->u.setattr.attr.u.meta.dist);
+            }
 	}
 	return (0);
     case PVFS_SERV_IO:

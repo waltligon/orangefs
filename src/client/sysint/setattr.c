@@ -94,11 +94,24 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 	req_p.credentials = credentials;
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = entry.fs_id;
+
 	/* let attributes fall through since PVFS_ATTR_SYS_xxx
 	 * mask values match PVFS_ATTR_COMMON_xxx mask values for
 	 * all of the attributes that are valid to set here
 	 */
-	PINT_CONVERT_ATTR(&req_p.u.setattr.attr, &attr);
+	PINT_CONVERT_ATTR(&req_p.u.setattr.attr, &attr,
+                          PVFS_ATTR_SYS_ALL_SETABLE);
+
+        /*
+          we don't have the dfile info anymore at this point;
+          clear it out here to avoid crashing the encoder
+        */
+        if (req_p.u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
+        {
+            req_p.u.setattr.attr.u.meta.dfile_count = 0;
+            req_p.u.setattr.attr.u.meta.dfile_array = NULL;
+            req_p.u.setattr.attr.u.meta.dist = NULL;
+        }
 
 	/* Make a server setattr request */	
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,

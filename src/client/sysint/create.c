@@ -387,7 +387,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = parent_refn.fs_id;
 
-	PINT_CONVERT_ATTR(&req_p.u.setattr.attr, &attr);
+	PINT_CONVERT_ATTR(&req_p.u.setattr.attr, &attr, PVFS_ATTR_COMMON_ALL);
 	req_p.u.setattr.attr.u.meta.dfile_array = df_handle_array;
 	req_p.u.setattr.attr.u.meta.dfile_count = io_serv_count;
 	req_p.u.setattr.attr.u.meta.dist = PVFS_Dist_create("simple_stripe");

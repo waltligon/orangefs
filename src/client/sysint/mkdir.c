@@ -139,7 +139,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
       handle value, but rather any valid one on that meta server.
     */
     req_p.u.mkdir.fs_id = parent_refn.fs_id;
-    PINT_CONVERT_ATTR(&req_p.u.mkdir.attr, &attr);
+    PINT_CONVERT_ATTR(&req_p.u.mkdir.attr, &attr, PVFS_ATTR_COMMON_ALL);
     /* filter to make sure the caller passed in a reasonable attr mask */
     req_p.u.mkdir.attr.mask &= PVFS_ATTR_SYS_ALL_NOSIZE;
 
@@ -266,7 +266,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     pinode_ptr->pinode_ref.handle = entry.handle;
     pinode_ptr->pinode_ref.fs_id = parent_refn.fs_id;
     
-    PINT_CONVERT_ATTR(&(pinode_ptr->attr), &attr);
+    PINT_CONVERT_ATTR(&(pinode_ptr->attr), &attr, PVFS_ATTR_COMMON_TYPE);
     /* filter to make sure the caller passed in a reasonable attr mask */
     pinode_ptr->attr.mask &= PVFS_ATTR_SYS_ALL_NOSIZE;
 

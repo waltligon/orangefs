@@ -23,8 +23,8 @@ int main(int argc, char **argv)
     PVFS_credentials credentials;
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_lookup resp_look;
+    PVFS_sysresp_getattr resp_getattr;
     PVFS_pinode_reference pinode_refn;
-    PVFS_sys_attr attr;
 
     gossip_enable_stderr();
     gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -53,15 +53,10 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    attr.owner = 100;
-    attr.group = 100;
-    attr.perms = (PVFS_U_WRITE | PVFS_U_READ);
-    attr.atime = attr.ctime = attr.mtime = time(NULL);
-    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-
-    credentials.uid = attr.owner;
-    credentials.gid = attr.group;
-    credentials.perms = attr.perms;
+    /* fake credentials here */
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = (PVFS_U_READ | PVFS_U_WRITE);
 
     fs_id = resp_init.fsid_list[0];
 
@@ -77,9 +72,39 @@ int main(int argc, char **argv)
     pinode_refn.handle = resp_look.pinode_refn.handle;
     pinode_refn.fs_id = fs_id;
 
+    gossip_ldebug(CLIENT_DEBUG,"about to getattr on %s\n", filename);
+
+    ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_SETABLE,
+                           credentials, &resp_getattr);
+    if (ret < 0)
+    {
+        printf("getattr failed with errcode = %d\n", ret);
+        return ret;
+    }
+
+    printf("Retrieved the following attributes\n");
+    printf("Handle      : %Ld\n", pinode_refn.handle);
+    printf("FSID        : %d\n", (int)pinode_refn.fs_id);
+    printf("mask        : %d\n", resp_getattr.attr.mask);
+    printf("uid         : %d\n", resp_getattr.attr.owner);
+    printf("gid         : %d\n", resp_getattr.attr.group);
+    printf("permissions : %d\n", resp_getattr.attr.perms);
+    printf("atime       : %s", ctime((time_t *)&resp_getattr.attr.atime));
+    printf("mtime       : %s", ctime((time_t *)&resp_getattr.attr.mtime));
+    printf("ctime       : %s", ctime((time_t *)&resp_getattr.attr.ctime));
+
+    /* take the retrieved attributes and update the access time */
+    resp_getattr.attr.atime = time(NULL);
+    resp_getattr.attr.mask &= ~ PVFS_ATTR_COMMON_TYPE;
+
+    /* use stored credentials here */
+    credentials.uid = resp_getattr.attr.owner;
+    credentials.gid = resp_getattr.attr.group;
+    credentials.perms = resp_getattr.attr.perms;
+
     gossip_ldebug(CLIENT_DEBUG,"about to setattr on %s\n", filename);
 
-    ret = PVFS_sys_setattr(pinode_refn, attr, credentials);
+    ret = PVFS_sys_setattr(pinode_refn, resp_getattr.attr, credentials);
     if (ret < 0)
     {
         gossip_err("setattr failed with errcode = %d\n", ret);
@@ -88,6 +113,17 @@ int main(int argc, char **argv)
     else
     {
         gossip_ldebug(CLIENT_DEBUG,"setattr returned success\n");
+
+        printf("Set the following attributes\n");
+        printf("Handle      : %Ld\n", pinode_refn.handle);
+        printf("FSID        : %d\n", (int)pinode_refn.fs_id);
+        printf("mask        : %d\n", resp_getattr.attr.mask);
+        printf("uid         : %d\n", resp_getattr.attr.owner);
+        printf("gid         : %d\n", resp_getattr.attr.group);
+        printf("permissions : %d\n", resp_getattr.attr.perms);
+        printf("atime       : %s", ctime((time_t *)&resp_getattr.attr.atime));
+        printf("mtime       : %s", ctime((time_t *)&resp_getattr.attr.mtime));
+        printf("ctime       : %s", ctime((time_t *)&resp_getattr.attr.ctime));
     }
 
     ret = PVFS_sys_finalize();

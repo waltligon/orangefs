@@ -30,6 +30,8 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     int ret = -1;
     PVFS_object_attr tmp_attr;
 
+    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+
     /* make sure that the caller asked for valid fields */
     if((attrmask & ~PVFS_ATTR_SYS_ALL) != 0)
     {
@@ -43,7 +45,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	return(ret);
     }
 
-    PINT_CONVERT_ATTR(&(resp->attr), &tmp_attr);
+    PINT_CONVERT_ATTR(&(resp->attr), &tmp_attr, PVFS_ATTR_COMMON_ALL);
     
     /* TODO: this is temporary */
     if(attrmask & PVFS_ATTR_SYS_SIZE)
@@ -189,11 +191,13 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	*out_attr = ack_p->u.getattr.attr;
 	if (out_attr->objtype == PVFS_TYPE_METAFILE)
 	{
-	    if(out_attr->u.meta.dfile_count > 0)
+	    if ((out_attr->mask & PVFS_ATTR_META_DFILES) &&
+                (out_attr->u.meta.dfile_count > 0))
 	    {
 		assert(ack_p->u.getattr.attr.u.meta.dfile_array != NULL);
 
-		out_attr->u.meta.dfile_array = malloc(out_attr->u.meta.dfile_count * sizeof(PVFS_handle));
+		out_attr->u.meta.dfile_array = malloc(
+                    out_attr->u.meta.dfile_count * sizeof(PVFS_handle));
 		if (out_attr->u.meta.dfile_array ==  NULL)
 		{
 		    ret = (-ENOMEM);
@@ -204,8 +208,10 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 			ack_p->u.getattr.attr.u.meta.dfile_array, 
 			out_attr->u.meta.dfile_count * sizeof(PVFS_handle));
 	    }
+
 	    /* TODO: make this better */
-	    if(out_attr->u.meta.dist_size > 0)
+	    if ((out_attr->mask & PVFS_ATTR_META_DIST) &&
+                (out_attr->u.meta.dist_size > 0))
 	    {
 		gossip_lerr("KLUDGE: packing dist to memcpy it.\n");
 		out_attr->u.meta.dist =

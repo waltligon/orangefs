@@ -77,7 +77,6 @@ int do_encode_resp(
 	 *  7.1.03 This is only true for 
 	 *  PVFS_metafile_attr.  DW
 	 */
-	// if (resp->u.getattr.objtype != METAFILE) ?? DW
 
 	/* This code is only good when there are no trailing pointers */
 	target_msg->size_list = malloc(sizeof(PVFS_size));
@@ -88,37 +87,56 @@ int do_encode_resp(
 	/* we may need to pack trailing data for metafiles */
 	if (response->u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
 	{
-	    char *pack_dest = NULL;
-	    /* make it big enough to hold datafiles and dist */
-	    target_msg->size_list[0] =
-		target_msg->total_size =
-		sizeof(struct PVFS_server_resp) + PINT_ENC_GENERIC_HEADER_SIZE 
-		+ response->u.getattr.attr.u.meta.dist_size
-		+ (response->u.getattr.attr.u.meta.dfile_count
-		   * sizeof(PVFS_handle));
-	    target_msg->buffer_list[0] =
-		BMI_memalloc(target_msg->dest,
-			     target_msg->total_size, BMI_SEND);
-	    pack_dest = (char *) target_msg->buffer_list[0]
-		+ PINT_ENC_GENERIC_HEADER_SIZE;
-	    /* copy in the datafiles */
-	    if (response->u.getattr.attr.u.meta.dfile_count > 0)
-	    {
-		pack_dest += sizeof(struct PVFS_server_resp);
-		memcpy(pack_dest,
-		       response->u.getattr.attr.u.meta.dfile_array,
-		       (response->u.getattr.attr.u.meta.dfile_count
-			* sizeof(PVFS_handle)));
-	    }
-	    /* copy in the distribution */
-	    if (response->u.getattr.attr.u.meta.dist_size > 0)
-	    {
-		pack_dest +=
-		    (response->u.getattr.attr.u.meta.dfile_count
-		     * sizeof(PVFS_handle));
-		PINT_Dist_encode(pack_dest,
-				 response->u.getattr.attr.u.meta.dist);
-	    }
+            char *pack_dest = NULL;
+
+            target_msg->total_size = sizeof(struct PVFS_server_resp) +
+                PINT_ENC_GENERIC_HEADER_SIZE;
+
+            if (response->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+            {
+                target_msg->total_size +=
+                    (response->u.getattr.attr.u.meta.dfile_count
+                     * sizeof(PVFS_handle));
+            }
+
+            if (response->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
+            {
+                target_msg->total_size +=
+                    response->u.getattr.attr.u.meta.dist_size;
+            }
+
+            target_msg->size_list[0] = target_msg->total_size;
+            target_msg->buffer_list[0] =
+                BMI_memalloc(target_msg->dest,
+                             target_msg->total_size, BMI_SEND);
+
+            pack_dest = (char *) target_msg->buffer_list[0]
+                + PINT_ENC_GENERIC_HEADER_SIZE;
+
+            if (response->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+            {
+                /* copy in the datafiles */
+                if (response->u.getattr.attr.u.meta.dfile_count > 0)
+                {
+                    pack_dest += sizeof(struct PVFS_server_resp);
+                    memcpy(pack_dest,
+                           response->u.getattr.attr.u.meta.dfile_array,
+                           (response->u.getattr.attr.u.meta.dfile_count
+                            * sizeof(PVFS_handle)));
+                }
+            }
+            if (response->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
+            {
+                /* copy in the distribution */
+                if (response->u.getattr.attr.u.meta.dist_size > 0)
+                {
+                    pack_dest +=
+                        (response->u.getattr.attr.u.meta.dfile_count
+                         * sizeof(PVFS_handle));
+                    PINT_Dist_encode(pack_dest,
+                                     response->u.getattr.attr.u.meta.dist);
+                }
+            }
 	}
 	/* not a metafile */
 	else

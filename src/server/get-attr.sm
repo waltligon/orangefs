@@ -22,8 +22,10 @@ static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret);
 static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
 static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret);
 static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret);
-static int getattr_read_metafile_datafile_handles(PINT_server_op *s_op, job_status_s *ret);
-static int getattr_read_metafile_distribution(PINT_server_op *s_op, job_status_s *ret);
+static int getattr_read_metafile_datafile_handles_if_required(
+    PINT_server_op *s_op, job_status_s *ret);
+static int getattr_read_metafile_distribution_if_required(
+    PINT_server_op *s_op, job_status_s *ret);
 void getattr_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -37,8 +39,8 @@ machine pvfs2_get_attr_sm(init,
 		 send_bmi,
 		 release,
 		 verify_attribs,
-		 read_metafile_datafile_handles,
-		 read_metafile_distribution)
+		 read_metafile_datafile_handles_if_required,
+		 read_metafile_distribution_if_required)
 {
 	state init
 	{
@@ -55,19 +57,19 @@ machine pvfs2_get_attr_sm(init,
 	state verify_attribs
 	{
 		run getattr_verify_attribs;
-		STATE_METAFILE => read_metafile_datafile_handles;
+		STATE_METAFILE => read_metafile_datafile_handles_if_required;
 		default => send_bmi;
 	}
 
-	state read_metafile_datafile_handles
+	state read_metafile_datafile_handles_if_required
 	{
-		run getattr_read_metafile_datafile_handles;
-		default => read_metafile_distribution;
+		run getattr_read_metafile_datafile_handles_if_required;
+		default => read_metafile_distribution_if_required;
 	}
 
-	state read_metafile_distribution
+	state read_metafile_distribution_if_required
 	{
-		run getattr_read_metafile_distribution;
+		run getattr_read_metafile_distribution_if_required;
 		default => send_bmi;
 	}
 
@@ -236,16 +238,24 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
     return 1;
 }
 
-/* getattr_read_metafile_datafile_handles
+/* getattr_read_metafile_datafile_handles_if_required
  */
-static int getattr_read_metafile_datafile_handles(PINT_server_op *s_op, job_status_s *ret)
+static int getattr_read_metafile_datafile_handles_if_required(
+    PINT_server_op *s_op, job_status_s *ret)
 {
     int dfile_count;
     int job_post_ret;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "getattr state: read_metafile_datafile_handles\n");
+    gossip_debug(SERVER_DEBUG, "getattr state: "
+                 "read_metafile_datafile_handles_if_required\n");
 
+    if (!(s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES))
+    {
+        /* if we don't need to fill in the dfiles, skip them */
+        ret->error_code = 0;
+        return 1;
+    }
     dfile_count = s_op->resp->u.getattr.attr.u.meta.dfile_count;
 
     s_op->key.buffer    = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
@@ -292,12 +302,20 @@ static int getattr_read_metafile_datafile_handles(PINT_server_op *s_op, job_stat
     return job_post_ret;
 }
 
-/* getattr_read_metafile_distribution
+/* getattr_read_metafile_distribution_if_required
  */
-static int getattr_read_metafile_distribution(PINT_server_op *s_op, job_status_s *ret)
+static int getattr_read_metafile_distribution_if_required(
+    PINT_server_op *s_op, job_status_s *ret)
 {
     int job_post_ret;
     job_id_t i;
+
+    if (!(s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST))
+    {
+        /* if we don't need to fill in the distribution, skip it */
+        ret->error_code = 0;
+        return 1;
+    }
 
     s_op->key.buffer    = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
@@ -356,9 +374,11 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
     a_p = &s_op->resp->u.getattr.attr;
     
     /* TODO: figure out if we need a different packing mechanism here */
-    if (a_p->objtype == PVFS_TYPE_METAFILE)
+    if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
+        (a_p->mask & PVFS_ATTR_META_DIST))
     {
-        gossip_err("KLUDGE: reading distribution on disk in network encoded format.\n");
+        gossip_err("KLUDGE: reading distribution on disk in "
+                   "network encoded format.\n");
         PINT_Dist_decode(a_p->u.meta.dist, NULL);
     }
 
@@ -373,10 +393,15 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 		 (long long)a_p->mtime,
 		 (long long)a_p->ctime);
 
-    /* fill in response -- status field is the only generic one we should have to set */
+    /*
+      fill in response -- status field is the only generic
+      one we should have to set
+    */
     s_op->resp->status = ret->error_code;
 
-    if (a_p->objtype == PVFS_TYPE_METAFILE) {
+    if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
+        (a_p->mask & PVFS_ATTR_META_DFILES))
+    {
 	gossip_debug(SERVER_DEBUG,
 		     "  also returning %d datafile handles\n",
 		     a_p->u.meta.dfile_count);
@@ -490,10 +515,17 @@ static int getattr_cleanup(PINT_server_op *s_op, job_status_s *ret)
     /* free encoded response */
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP);
 
-    /* if this is a metafile, we allocated space for the datafile handles; free that. */
-    if (s_op->resp->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) {
-	free(s_op->resp->u.getattr.attr.u.meta.dfile_array);
-	free(s_op->resp->u.getattr.attr.u.meta.dist);
+    /*
+      if this is a metafile, we may have allocated space
+      for the datafile handles; free that.
+    */
+    if (s_op->resp->u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
+    {
+        if (s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+            free(s_op->resp->u.getattr.attr.u.meta.dfile_array);
+
+        if (s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
+            free(s_op->resp->u.getattr.attr.u.meta.dist);
     }
 
     /* free response */

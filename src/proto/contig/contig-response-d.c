@@ -70,17 +70,23 @@ int do_decode_resp(
     case PVFS_SERV_GETATTR:
 	if (decoded_response->u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
 	{
-	    decoded_response->u.getattr.attr.u.meta.dfile_array =
-		(PVFS_handle *) (((char *) decoded_response)
-				 + sizeof(struct PVFS_server_resp));
-	    decoded_response->u.getattr.attr.u.meta.dist =
-		(PVFS_Dist *) (((char *) decoded_response)
-			       + sizeof(struct PVFS_server_resp)
-			       +
-			       (decoded_response->u.getattr.attr.u.meta.
-				dfile_count * sizeof(PVFS_handle)));
-	    PINT_Dist_decode(decoded_response->u.getattr.attr.u.meta.dist,
-			     NULL);
+            if (decoded_response->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+            {
+                decoded_response->u.getattr.attr.u.meta.dfile_array =
+                    (PVFS_handle *) (((char *) decoded_response)
+                                     + sizeof(struct PVFS_server_resp));
+                decoded_response->u.getattr.attr.u.meta.dist =
+                    (PVFS_Dist *) (((char *) decoded_response)
+                                   + sizeof(struct PVFS_server_resp)
+                                   +
+                                   (decoded_response->u.getattr.attr.u.meta.
+                                    dfile_count * sizeof(PVFS_handle)));
+            }
+            if (decoded_response->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
+            {
+                PINT_Dist_decode(decoded_response->u.getattr.attr.u.meta.dist,
+                                 NULL);
+            }
 	}
 	return 0;
     case PVFS_SERV_CREATE:
