@@ -319,7 +319,7 @@ typedef struct PINT_client_sm {
 			    * can determine what finally happened
 			    */
     int comp_ct; /* used to keep up with completion of multiple
-		  * jobs for some some states; typically set and
+		  * jobs for some states; typically set and
 		  * then decremented to zero as jobs complete */
 
     int ncache_hit; /* set if last segment lookup was from ncache */
@@ -335,7 +335,7 @@ typedef struct PINT_client_sm {
 
     /* msgpair array ptr used when operations can be performed concurrently.
      * obviously this has to be allocated within the upper-level state
-     * machine.  used with msgpairs substate typically.
+     * machine.  used with msgpairarray substate typically.
      */
     int msgarray_count;
     PINT_client_sm_msgpair_state *msgarray;

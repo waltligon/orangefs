@@ -562,6 +562,7 @@ static void gui_status_server_popup(struct PVFS_mgmt_server_stat *svr_stat,
     GtkWidget *dialog, *view;
     GtkListStore *list;
     GtkTreeViewColumn *col[GUI_DETAILS_TYPE+1];
+    GtkTreeSelection *selection;
     int svr_list[2];
 
     dialog = gtk_dialog_new_with_buttons("Server Details",
@@ -588,12 +589,18 @@ static void gui_status_server_popup(struct PVFS_mgmt_server_stat *svr_stat,
 			  svr_stat_ct,
 			  svr_list);
 
+    /* make it so that one cannot select things in the list */
+    selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(view));
+    gtk_tree_selection_set_mode(selection, GTK_SELECTION_NONE);
+
     /* unref list so it will be freed when view is destroyed */
     g_object_unref(list);
 
     /* drop contents into popup; display */
     gtk_container_add(GTK_CONTAINER(GTK_DIALOG(dialog)->vbox),
 		      view);
+
+    /* TODO: COME UP WITH SOME WAY TO KEEP LIST FROM STEALING FOCUS! */
     gtk_widget_show_all(dialog);
 
     return;

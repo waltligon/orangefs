@@ -2650,7 +2650,7 @@ static int tcp_do_work_error(method_addr_p map)
 
     if (tcp_addr_data->server_port)
     {
-	/* Ignore this and hope it goes away... we don't want to loose
+	/* Ignore this and hope it goes away... we don't want to lose
 	 * our local socket */
 	dealloc_tcp_method_addr(map);
 	gossip_lerr("Warning: error polling on server socket, continuing.\n");
