@@ -72,7 +72,7 @@ void yyerror(char *);
 
 %type <s> state_decl_list .state_decl_list. state_decl
 	  state_def state_def_list .state_def_list.
-	  transition transition_list state_machine target 
+	  transition transition_list state_machine target state_machine_list
 
 %start state_machine_list
 
