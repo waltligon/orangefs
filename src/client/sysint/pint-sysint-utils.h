@@ -79,10 +79,6 @@ int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
 int PINT_server_get_config(
     struct server_configuration_s *config,
     pvfs_mntlist mntent_list);
-int PINT_collect_physical_server_info(
-    PVFS_fs_id fs_id,
-    int* outcount,
-    struct PINT_bucket_server_info** info_array);
 
 /*
  * Local variables:

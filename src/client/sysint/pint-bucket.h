@@ -44,36 +44,6 @@ int PINT_bucket_get_next_io(
 #define PINT_BUCKET_META PVFS_MGMT_META_SERVER
 #define PINT_BUCKET_ALL (PINT_BUCKET_META|PINT_BUCKET_IO)
 
-/* TODO get rid of this stuff later */
-/******************************************************/
-struct PINT_bucket_server_info
-{
-    bmi_addr_t addr;
-    char* addr_string;
-    int server_type;
-};
-
-int PINT_bucket_get_physical(
-    struct server_configuration_s *config,
-    PVFS_fs_id fsid,
-    int incount,
-    int* outcount,
-    struct PINT_bucket_server_info* info_array,
-    int server_type);
-
-#define PINT_bucket_get_physical_meta(x1,x2,x3,x4,x5) \
-    PINT_bucket_get_physical(x1,x2,x3,x4,x5,PINT_BUCKET_META);
-#define PINT_bucket_get_physical_io(x1,x2,x3,x4,x5) \
-    PINT_bucket_get_physical(x1,x2,x3,x4,x5,PINT_BUCKET_IO);
-#define PINT_bucket_get_physical_all(x1,x2,x3,x4,x5) \
-    PINT_bucket_get_physical(x1,x2,x3,x4,x5,PINT_BUCKET_ALL);
-
-char* PINT_bucket_build_virt_server_list(
-    struct server_configuration_s *config,
-    PVFS_fs_id fsid,
-    int server_type);
-/******************************************************/
-
 const char* PINT_bucket_map_addr(
     struct server_configuration_s* config,
     PVFS_fs_id fsid,

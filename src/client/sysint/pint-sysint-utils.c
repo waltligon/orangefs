@@ -480,58 +480,6 @@ static int server_parse_config(struct server_configuration_s *config,
     return ret;
 }
 
-
-/* PINT_collect_physical_server_info()
- *
- * builds an array of BMI addresses, one for each physical server in the 
- * file system
- * NOTE: caller is responsible for freeing array
- *
- * returns 0 on success, -PVFS_error on failure
- */
-int PINT_collect_physical_server_info(
-    PVFS_fs_id fs_id,
-    int* outcount,
-    struct PINT_bucket_server_info** info_array)
-{
-    int ret = -1;
-    int num_meta = 0;
-    int num_io = 0;
-    int total_bound = 0;
-
-    /* calculate an upper bound on the number of servers present, by adding
-     * up count of all virtual meta and I/O servers 
-     */
-    ret = PINT_bucket_get_num_meta(fs_id, &num_meta);
-    if(ret < 0)
-    {
-	gossip_lerr("PINT_bucket_get_num_meta() failure.\n");
-	return(ret);
-    }
-    ret = PINT_bucket_get_num_io(fs_id, &num_io);
-    if(ret < 0)
-    {
-	gossip_lerr("PINT_bucket_get_num_io() failure.\n");
-	return(ret);
-    }
-
-    /* allocate space to store BMI addresses */
-    total_bound = num_io + num_meta;
-    *info_array = (struct PINT_bucket_server_info*)malloc(total_bound
-	*sizeof(struct PINT_bucket_server_info));
-    if(!*info_array)
-    {
-	return(-PVFS_ENOMEM);
-    }
-
-    /* map to actual server instances */
-    ret = PINT_bucket_get_physical_all(&g_server_config, 
-	fs_id, total_bound, outcount, *info_array);
-
-    return(ret);
-}
-
-
 /*
  * Local variables:
  *  c-indent-level: 4
