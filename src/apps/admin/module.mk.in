@@ -19,9 +19,9 @@ ADMINTOOLS_SERVER := $(patsubst %.c, %, $(ADMINSRC_SERVER))
 $(ADMINTOOLS_SERVER): %: %.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(LIBS) $(SERVERLIBS) -o $@
+	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 else
-	$(LD) $< $(LDFLAGS) $(LIBS) $(SERVERLIBS) -o $@
+	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 endif
 
 # the rest of the tools
