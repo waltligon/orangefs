@@ -72,6 +72,7 @@ for f in `find . -name "*.log"`; do rm -rf $f; done
 for f in `find . -name "*.toc"`; do rm -rf $f; done
 for f in `find . -name "*.aux"`; do rm -rf $f; done
 rm Makefile pvfs2-config.h PVFS2-GLOBAL-TODO.txt
+rm -rf test
 
 # dump some special options into the top level module.mk.in
 echo "DIST_RELEASE = 1" >> module.mk.in
