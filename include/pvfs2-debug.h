@@ -12,6 +12,7 @@
 #ifndef __PVFS2_DEBUG_H
 #define __PVFS2_DEBUG_H
 
+#ifndef __KERNEL__
 #include <string.h>
 
 enum
@@ -95,6 +96,7 @@ static inline int PVFS_debug_eventlog_to_mask(
     return mask;
 }
 
+#endif /* __KERNEL__ */
 #endif /* __PVFS2_DEBUG_H */
 
 /*
