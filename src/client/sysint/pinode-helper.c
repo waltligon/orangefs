@@ -100,8 +100,9 @@ int phelper_release_pinode(pinode *pinode_ptr)
  *
  * returns 0 on success, -errno on failure
  */
-int phelper_refresh_pinode(uint32_t mask,pinode **pinode_ptr,
-		PVFS_pinode_reference pref, PVFS_credentials credentials)
+int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
+                           PVFS_pinode_reference pref,
+                           PVFS_credentials credentials)
 {
 	int ret = 0;
 	PVFS_sysresp_getattr resp;
@@ -129,7 +130,7 @@ int phelper_refresh_pinode(uint32_t mask,pinode **pinode_ptr,
 	}
 	(*pinode_ptr)->pinode_ref.handle = pref.handle;
 	(*pinode_ptr)->pinode_ref.fs_id = pref.fs_id;
-	
+
 	ret = phelper_fill_attr(*pinode_ptr,resp.attr,mask);
 	if (ret < 0)
 	{
@@ -478,7 +479,9 @@ int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
 		ptr->attr.mtime = attr.mtime;
 
 	/* set distribution if needed */
-	if ((mask & PVFS_ATTR_META_DIST) && attr.u.meta.nr_datafiles > 0)
+	if ((mask & PVFS_ATTR_META_DIST) &&
+            (attr.objtype == PVFS_TYPE_METAFILE) &&
+            (attr.u.meta.nr_datafiles > 0))
 	{
 		if(ptr->attr.u.meta.dfh)
 			free(ptr->attr.u.meta.dfh);
@@ -492,7 +495,9 @@ int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
 	}
 
 	/* set datafile array if needed */
-	if((mask & PVFS_ATTR_META_DFILES) && attr.u.meta.dist_size > 0)
+	if ((mask & PVFS_ATTR_META_DFILES) &&
+            (attr.objtype == PVFS_TYPE_DATAFILE) &&
+            (attr.u.meta.dist_size > 0))
 	{
 		gossip_lerr("WARNING: packing distribution to memcpy it.\n");
 		if(ptr->attr.u.meta.dist)

@@ -61,7 +61,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     /* get the pinode of the parent so we can check permissions */
     attr_mask = PVFS_ATTR_COMMON_ALL;
     ret = phelper_get_pinode(parent_refn, &parent_ptr, attr_mask,
-				   credentials);
+                             credentials);
     if(ret < 0)
     {
 	/* parent pinode doesn't exist ?!? */
@@ -72,7 +72,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 
     /* check permissions in parent directory */
     ret = check_perms(parent_ptr->attr,credentials.perms,
-			credentials.uid, credentials.gid);
+                      credentials.uid, credentials.gid);
     if (ret < 0)
     {
 	phelper_release_pinode(parent_ptr);
@@ -89,6 +89,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     if (ret < 0 )
     {
 	/* there was an error, bail*/
+	gossip_ldebug(CLIENT_DEBUG,"dcache lookup failure\n");
 	failure = DCACHE_LOOKUP_FAILURE;
 	goto return_error;
     }
@@ -98,6 +99,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     if (entry.handle != PINT_DCACHE_HANDLE_INVALID)
     {
 	/* pinode already exists, should fail create with EXISTS*/
+	gossip_ldebug(CLIENT_DEBUG,"pinode already exists\n");
 	ret = (-EEXIST);
 	failure = DCACHE_LOOKUP_FAILURE;
 	goto return_error;
@@ -108,6 +110,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
                                     parent_refn.fs_id,&serv_addr1);
     if (ret < 0)
     {
+	gossip_ldebug(CLIENT_DEBUG,"failed to get meta server\n");
 	failure = LOOKUP_SERVER_FAILURE;
 	goto return_error;
     }
@@ -131,6 +134,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
                         &decoded, &encoded_resp, op_tag);
     if (ret < 0)
     {
+	gossip_ldebug(CLIENT_DEBUG,"failed to send mkdir request\n");
 	failure = LOOKUP_SERVER_FAILURE;
 	goto return_error;
     }
@@ -138,6 +142,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
     if (ack_p->status < 0 )
     {
+	gossip_ldebug(CLIENT_DEBUG,"mkdir response indicates failure\n");
 	ret = ack_p->status;
 	failure = MKDIR_MSG_FAILURE;
 	goto return_error;
@@ -155,14 +160,15 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     resp->pinode_refn.fs_id = entry.fs_id;
 
     PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
-	&encoded_resp, op_tag);
+                     &encoded_resp, op_tag);
 
     /* the all the dirents for files/directories are stored on whatever server
      * holds the parent handle */
     ret = PINT_bucket_map_to_server(&serv_addr2,parent_refn.handle,
-    parent_refn.fs_id);
+                                    parent_refn.fs_id);
     if (ret < 0)
     {
+	gossip_ldebug(CLIENT_DEBUG,"failed to map server\n");
 	failure = MKDIR_MSG_FAILURE;
 	goto return_error;
     }
@@ -196,6 +202,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
                         &decoded, &encoded_resp, op_tag);
     if (ret < 0)
     {
+	gossip_ldebug(CLIENT_DEBUG,"failed to send crdirent request\n");
 	failure = MKDIR_MSG_FAILURE;
 	goto return_error;
     }
@@ -207,7 +214,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 	/* this could fail for many reasons, EEXISTS will probbably be the
 	 * most common.
 	 */
-
+	gossip_ldebug(CLIENT_DEBUG,"crdirent response indicates failure\n");
 	ret = ack_p->status;
 	failure = CRDIRENT_MSG_FAILURE;
 	goto return_error;
@@ -220,6 +227,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     ret = PINT_dcache_insert(entry_name, entry, parent_refn);
     if (ret < 0)
     {
+	gossip_ldebug(CLIENT_DEBUG,"dcache insertion failure\n");
 	failure = DCACHE_INSERT_FAILURE;
 	goto return_error;
     }
@@ -227,6 +235,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     ret = PINT_pcache_pinode_alloc(&pinode_ptr);
     if (ret < 0)
     {
+	gossip_ldebug(CLIENT_DEBUG,"pcache pinode allocation failure\n");
 	failure = PCACHE_INSERT1_FAILURE;
 	goto return_error;
     }
@@ -241,6 +250,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     ret = phelper_fill_timestamps(pinode_ptr);
     if (ret < 0)
     {
+	gossip_ldebug(CLIENT_DEBUG,"pcache pinode timestamp failure\n");
 	failure = PCACHE_INSERT2_FAILURE;
 	goto return_error;
     }
@@ -248,6 +258,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     ret = PINT_pcache_insert(pinode_ptr);
     if (ret < 0)
     {
+	gossip_ldebug(CLIENT_DEBUG,"pcache pinode insertion failure\n");
 	failure = PCACHE_INSERT2_FAILURE;
 	goto return_error;
     }

@@ -12,7 +12,7 @@ int initialize_sysint(void)
     ret = parse_pvfstab(NULL,&pvfs_helper.mnt);
     if (ret > -1)
     {
-        gossip_disable();
+/*         gossip_disable(); */
 
         /* init the system interface */
         ret = PVFS_sys_initialize(pvfs_helper.mnt,
@@ -80,15 +80,15 @@ int create_dir(PVFS_pinode_reference parent_refn, char *name,
 
     memset(&resp_mkdir, 0, sizeof(resp_mkdir));
 
-    attrmask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID | PVFS_ATTR_SYS_PERM);
+    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
     attr.objtype = PVFS_TYPE_DIRECTORY;
 
-    credentials.perms = 1877;
     credentials.uid = 100;
     credentials.gid = 100;
+    credentials.perms = 1877;
 
     ret = PVFS_sys_mkdir(name, parent_refn, attrmask,
                          attr, credentials, &resp_mkdir);
