@@ -25,7 +25,16 @@ typedef struct PVFS_util_tab_s PVFS_util_tab;
 /* client side default credential generation */
 void PVFS_util_gen_credentials(
     PVFS_credentials *credentials);
-PVFS_credentials *PVFS_util_alloc_credentials(void);
+
+/*
+  shallow copies the credentials into a newly allocated returned
+  credential object.  returns NULL on failure.
+*/
+PVFS_credentials *PVFS_util_dup_credentials(
+    PVFS_credentials *credentials);
+
+void PVFS_util_release_credentials(
+    PVFS_credentials *credentials);
 
 /* client side config file / option management */
 const PVFS_util_tab* PVFS_util_parse_pvfstab(

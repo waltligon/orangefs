@@ -61,20 +61,30 @@ void PVFS_util_gen_credentials(
     credentials->gid = getgid();
 }
 
-/* NOTE: caller must free */
-PVFS_credentials *PVFS_util_alloc_credentials(void)
+PVFS_credentials *PVFS_util_dup_credentials(
+    PVFS_credentials *credentials)
 {
-    PVFS_credentials *credentials = (PVFS_credentials *)malloc(
-        sizeof(PVFS_credentials));
+    PVFS_credentials *ret = NULL;
+
     if (credentials)
     {
-        memset(credentials, 0, sizeof(PVFS_credentials));
-        credentials->uid = getuid();
-        credentials->gid = getgid();
+        ret = (PVFS_credentials *)malloc(sizeof(PVFS_credentials));
+        if (ret)
+        {
+            memcpy(ret, credentials, sizeof(PVFS_credentials));
+        }
     }
-    return credentials;
+    return ret;
 }
 
+void PVFS_util_release_credentials(
+    PVFS_credentials *credentials)
+{
+    if (credentials)
+    {
+        free(credentials);
+    }
+}
 
 /* PVFS_util_parse_pvfstab()
  *

@@ -113,7 +113,7 @@ int PVFS_isys_truncate(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = credentials;
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
     sm_p->u.truncate.size = size;
 
@@ -136,15 +136,20 @@ int PVFS_sys_truncate(
     ret = PVFS_isys_truncate(ref, size, credentials, &op_id, NULL);
     if (ret)
     {
-        gossip_lerr("PVFS_isys_truncate call failed\n");
+        PVFS_perror_gossip("PVFS_isys_truncate call", ret);
         error = ret;
-        goto exit_path;
     }
-    PVFS_sys_wait(op_id, "truncate", error, ret);
+    else
+    {
+        ret = PINT_sys_wait(op_id, "truncate", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
 
-  exit_path:
-
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 

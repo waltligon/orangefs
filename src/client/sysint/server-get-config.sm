@@ -105,21 +105,29 @@ int PINT_server_get_config(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
+    PINT_init_sysint_credentials(sm_p->cred_p, &creds);
+    sm_p->u.get_config.mntent = mntent_p;
+
     sm_p->msgarray_count = 1;
     sm_p->msgarray = &(sm_p->msgpair);
 
-    sm_p->cred_p = &creds;
-    sm_p->u.get_config.mntent = mntent_p;
-
     ret = PINT_client_state_machine_post(
         sm_p, PVFS_SERVER_GET_CONFIG, &op_id, NULL);
+
     if (ret)
     {
-        gossip_lerr("PINT_client_state_machine_post call failed\n");
+        PVFS_perror_gossip("PINT_client_state_machine_post call", ret);
         error = ret;
-        goto exit_path;
     }
-    PVFS_sys_wait(op_id, "[non isys] get_config", error, ret);
+    else
+    {
+        ret = PINT_sys_wait(op_id, "[non isys] get_config", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PINT_sys_wait call", ret);
+            error = ret;
+        }
+    }
 
     if (error)
     {
@@ -177,7 +185,7 @@ int PINT_server_get_config(
 	free(sm_p->u.get_config.server_config_buf);
     }
 
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 

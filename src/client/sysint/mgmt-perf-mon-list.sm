@@ -89,7 +89,7 @@ int PVFS_imgmt_perf_mon_list(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = credentials;
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.perf_mon_list.fs_id = fs_id;
     sm_p->u.perf_mon_list.perf_matrix = perf_matrix;
     sm_p->u.perf_mon_list.server_count = server_count;
@@ -104,6 +104,7 @@ int PVFS_imgmt_perf_mon_list(
         server_count * sizeof(PINT_client_sm_msgpair_state));
     if (sm_p->msgarray == NULL)
     {
+        PVFS_util_release_credentials(sm_p->cred_p);
         free(sm_p);
         return -PVFS_ENOMEM;
     }
@@ -137,18 +138,23 @@ int PVFS_mgmt_perf_mon_list(
 
     if (ret)
     {
-        gossip_lerr("PVFS_imgmt_perf_mon_list call failed\n");
+        PVFS_perror_gossip("PVFS_imgmt_perf_mon_list call", ret);
         error = ret;
-        goto exit_path;
     }
-    PVFS_mgmt_wait(op_id, "perf_mon_list", error, ret);
+    else
+    {
+        ret = PINT_mgmt_wait(op_id, "perf_mon_list", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+            error = ret;
+        }
+    }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_perf_mon_list completed\n");
 
-  exit_path:
-
-    PVFS_mgmt_release(op_id);
+    PINT_mgmt_release(op_id);
     return error;
 }
 

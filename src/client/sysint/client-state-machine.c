@@ -208,7 +208,7 @@ int PINT_client_state_machine_test(
 
     job_count = MAX_RETURNED_JOBS;
 
-    if (!op_id || !error_code)
+    if (!error_code)
     {
         return ret;
     }
@@ -315,6 +315,54 @@ int PINT_client_state_machine_testsome(PVFS_sys_op_id *op_id_array,
     return 0;
 }
 
+int PINT_client_wait_internal(
+    PVFS_sys_op_id op_id,
+    const char *in_op_str,
+    int *out_error,
+    const char *in_class_str)
+{
+    int ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
+
+    if (in_op_str && out_error && in_class_str)
+    {
+        sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);
+        assert(sm_p);
+
+        do
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_i%s_%s calling "
+                         "PINT_client_state_machine_test()\n",
+                         in_class_str, in_op_str);
+            ret = PINT_client_state_machine_test(op_id, out_error);
+
+        } while (!sm_p->op_complete && (ret == 0));
+
+        if (ret)
+        {
+            PVFS_perror_gossip("PINT_client_state_machine_test()", ret);
+        }
+        else
+        {
+            *out_error = sm_p->error_code;
+        }
+    }
+    return ret;
+}
+
+void PINT_sys_release(PVFS_sys_op_id op_id)
+{
+    PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);
+    if (sm_p)
+    {
+        PINT_id_gen_safe_unregister(op_id);
+
+        assert(sm_p->cred_p);
+        PVFS_util_release_credentials(sm_p->cred_p);
+        free(sm_p);
+    }
+}
+
 int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 			  void *encoded_resp_p,
 			  struct PINT_decoded_msg *decoded_resp_p,
@@ -323,7 +371,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 			  struct PVFS_server_resp **resp_out_pp)
 {
     int ret = -1, server_type = 0;
-    PVFS_credentials *creds = NULL;
+    PVFS_credentials creds;
 
     ret = PINT_decode(encoded_resp_p, PINT_DECODE_RESP,
                       decoded_resp_p, /* holds data on decoded resp */
@@ -333,18 +381,17 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
         *resp_out_pp = (struct PVFS_server_resp *)decoded_resp_p->buffer;
 	if ((*resp_out_pp)->op == PVFS_SERV_PROTO_ERROR)
 	{
+
 	    gossip_err("Error: server does not seem to understand "
                        "the protocol that this client is using.\n");
 	    gossip_err("   Please check server logs for more "
                        "information.\n");
+
+            PVFS_util_gen_credentials(&creds);
 	    if (fs_id != PVFS_FS_ID_NULL)
 	    {
-		const char *server_string;
-                creds = PVFS_util_alloc_credentials();
-                assert(creds);
-                server_string = PVFS_mgmt_map_addr(
-                    fs_id, creds, *svr_addr_p, &server_type);
-                free(creds);
+		const char *server_string = PVFS_mgmt_map_addr(
+                    fs_id, &creds, *svr_addr_p, &server_type);
 		gossip_err("   Server: %s.\n", server_string);
 	    }
 	    else

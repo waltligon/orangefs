@@ -71,7 +71,7 @@ int PVFS_imgmt_noop(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = credentials;
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->msgpair.fs_id = fs_id;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgpair.svr_addr = addr;
@@ -97,15 +97,20 @@ int PVFS_mgmt_noop(
     ret = PVFS_imgmt_noop(fs_id, credentials, addr, &op_id, NULL);
     if (ret)
     {
-        gossip_lerr("Error: PVFS_imgmt_noop call failed\n");
+        PVFS_perror_gossip("PVFS_imgmt_noop call", ret);
         error = ret;
-        goto exit_path;
     }
-    PVFS_mgmt_wait(op_id, "noop", error, ret);
+    else
+    {
+        ret = PINT_mgmt_wait(op_id, "noop", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+            error = ret;
+        }
+    }
 
-  exit_path:
-
-    PVFS_mgmt_release(op_id);
+    PINT_mgmt_release(op_id);
     return error;
 }
 

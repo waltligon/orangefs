@@ -213,9 +213,9 @@ int PVFS_isys_io(
     {
         return -PVFS_ENOMEM;
     }
-
     memset(sm_p, 0, sizeof(*sm_p));
-    sm_p->cred_p = credentials;
+
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
     sm_p->u.io.io_type = io_type;
     sm_p->u.io.file_req = file_req;
@@ -263,15 +263,20 @@ int PVFS_sys_io(
                        credentials, resp_p, io_type, &op_id, NULL);
     if (ret)
     {
-        gossip_lerr("PVFS_isys_io call failed\n");
+        PVFS_perror_gossip("PVFS_isys_io call", ret);
         error = ret;
-        goto exit_path;
     }
-    PVFS_sys_wait(op_id, "io", error, ret);
+    else
+    {
+        ret = PINT_sys_wait(op_id, "io", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
 
-  exit_path:
-
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 

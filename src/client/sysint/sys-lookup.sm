@@ -480,12 +480,9 @@ int PVFS_isys_ref_lookup(
     {
         return -PVFS_ENOMEM;
     }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %Lu)\n",
-                 relative_pathname, Lu(parent.handle));
-
     memset(sm_p, 0, sizeof(PINT_client_sm));
-    sm_p->cred_p = credentials;
+
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.lookup.orig_pathname = relative_pathname;
     sm_p->u.lookup.starting_refn = parent;
     sm_p->u.lookup.lookup_resp = resp;
@@ -499,9 +496,14 @@ int PVFS_isys_ref_lookup(
     {
         gossip_err("PVFS_sys_ref_lookup failed to init context "
                    "(path = %s)\n", relative_pathname);
+
+        PVFS_util_release_credentials(sm_p->cred_p);
         free(sm_p);
         return ret;
     }
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %Lu)\n",
+                 relative_pathname, Lu(parent.handle));
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_LOOKUP, op_id, user_ptr);
@@ -528,15 +530,20 @@ int PVFS_sys_ref_lookup(
 
     if (ret)
     {
-        gossip_lerr("PVFS_isys_ref_lookup call failed\n");
+        PVFS_perror_gossip("PVFS_isys_ref_lookup call", ret);
         error = ret;
-        goto exit_path;
     }
-    PVFS_sys_wait(op_id, "lookup", error, ret);
+    else
+    {
+        ret = PINT_sys_wait(op_id, "lookup", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
 
-  exit_path:
-
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 

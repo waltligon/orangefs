@@ -14,6 +14,7 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
+#include "pvfs2-util.h"
 #include "PINT-reqproto-encode.h"
 #include "job.h"
 #include "trove.h"
@@ -510,46 +511,35 @@ int PINT_client_bmi_cancel(job_id_t id);
 
 #include "state-machine.h"
 
-/* misc helper macros */
-#define PVFS_client_wait_internal(op_id, op_name, error, ret, ts)        \
-do {                                                                     \
-    PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);  \
-    assert(sm_p);                                                        \
-                                                                         \
-    while (!sm_p->op_complete && (ret == 0))                             \
-    {                                                                    \
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_i%s_%s calling "         \
-                     "PINT_client_state_machine_test()\n", ts, op_name); \
-        ret = PINT_client_state_machine_test(op_id, &error);             \
-    }                                                                    \
-                                                                         \
-    if (ret)                                                             \
-    {                                                                    \
-        gossip_lerr("PINT_client_state_machine_test() failure.\n");      \
-        error = ret;                                                     \
-        goto exit_path;                                                  \
-    }                                                                    \
-    error = sm_p->error_code;                                            \
-                                                                         \
+/* internal non-blocking helper methods */
+int PINT_client_wait_internal(
+    PVFS_sys_op_id op_id,
+    const char *in_op_str,
+    int *out_error,
+    const char *in_class_str);
+
+void PINT_sys_release(
+    PVFS_sys_op_id op_id);
+
+/* internal helper macros */
+#define PINT_sys_wait(op_id, in_op_str, out_error)            \
+PINT_client_wait_internal(op_id, in_op_str, out_error, "sys")
+
+#define PINT_mgmt_wait(op_id, in_op_str, out_error)           \
+PINT_client_wait_internal(op_id, in_op_str, out_error, "mgmt")
+
+#define PINT_mgmt_release(op_id) PINT_sys_release(op_id)
+
+#define PINT_init_sysint_credentials(sm_p_cred_p, user_cred_p)  \
+do {                                                            \
+    sm_p_cred_p = PVFS_util_dup_credentials(user_cred_p);       \
+    if (!sm_p_cred_p)                                           \
+    {                                                           \
+        gossip_lerr("Failed to copy user credentials\n");       \
+        free(sm_p);                                             \
+        return -PVFS_ENOMEM;                                    \
+    }                                                           \
 } while(0)
-
-#define PVFS_sys_wait(op_id, op_name, error, ret)            \
-PVFS_client_wait_internal(op_id, op_name, error, ret, "sys")
-
-#define PVFS_mgmt_wait(op_id, op_name, error, ret)           \
-PVFS_client_wait_internal(op_id, op_name, error, ret, "mgmt")
-
-#define PVFS_sys_release(op_id)                                          \
-do {                                                                     \
-    PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);  \
-    if (sm_p)                                                            \
-    {                                                                    \
-        PINT_id_gen_safe_unregister(op_id);                              \
-        free(sm_p);                                                      \
-    }                                                                    \
-} while(0)
-
-#define PVFS_mgmt_release(op_id) PVFS_sys_release(op_id)
 
 /* misc helper methods */
 struct server_configuration_s *PINT_get_server_config_struct(

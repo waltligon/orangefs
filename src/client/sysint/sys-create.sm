@@ -261,7 +261,7 @@ int PVFS_isys_create(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = credentials;
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.create.object_name = object_name;
     sm_p->parent_ref = parent_ref;
     sm_p->u.create.create_resp = resp;
@@ -322,15 +322,20 @@ int PVFS_sys_create(
                            dist, resp, &op_id, NULL);
     if (ret)
     {
-        gossip_lerr("PVFS_isys_create call failed\n");
+        PVFS_perror_gossip("PVFS_isys_create call", ret);
         error = ret;
-        goto exit_path;
     }
-    PVFS_sys_wait(op_id, "create", error, ret);
+    else
+    {
+        ret = PINT_sys_wait(op_id, "create", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
 
-  exit_path:
-
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 

@@ -161,16 +161,15 @@ int PVFS_isys_getattr(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->error_code = 0;
-    sm_p->cred_p = credentials;
-    sm_p->u.getattr.object_ref     = ref;
-    sm_p->u.getattr.attrmask       = attrmask;
+    sm_p->u.getattr.object_ref = ref;
+    sm_p->u.getattr.attrmask = attrmask;
     sm_p->u.getattr.getattr_resp_p = resp_p;
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_GETATTR, op_id, user_ptr);
 }
-
 
 int PVFS_sys_getattr(
     PVFS_object_ref ref,
@@ -188,15 +187,20 @@ int PVFS_sys_getattr(
                             resp_p, &op_id, NULL);
     if (ret)
     {
-        gossip_lerr("Error: PVFS_isys_getattr call failed\n");
+        PVFS_perror_gossip("PVFS_isys_getattr call", ret);
         error = ret;
-        goto exit_path;
     }
-    PVFS_sys_wait(op_id, "getattr", error, ret);
+    else
+    {
+        ret = PINT_sys_wait(op_id, "getattr", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
 
-  exit_path:
-
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 

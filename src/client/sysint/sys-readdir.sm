@@ -127,7 +127,7 @@ int PVFS_isys_readdir(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    sm_p->cred_p = credentials;
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.readdir.pos_token = token;
     sm_p->u.readdir.dirent_limit = pvfs_dirent_incount;
     sm_p->u.readdir.readdir_resp = resp;
@@ -163,15 +163,20 @@ int PVFS_sys_readdir(
                             credentials, resp, &op_id, NULL);
     if (ret)
     {
-        gossip_lerr("PVFS_isys_readdir call failed\n");
+        PVFS_perror_gossip("PVFS_isys_readdir call", ret);
         error = ret;
-        goto exit_path;
     }
-    PVFS_sys_wait(op_id, "readdir", error, ret);
+    else
+    {
+        ret = PINT_sys_wait(op_id, "readdir", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
 
-  exit_path:
-
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 

@@ -284,7 +284,7 @@ int PVFS_isys_rename(
       msgarrays rather than doing a longer sequence of serial
       msgpairs.
     */
-    sm_p->cred_p = credentials;
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.rename.entries[0] = old_entry;
     sm_p->u.rename.entries[1] = new_entry;
     sm_p->u.rename.parent_refns[0] = old_parent_ref;
@@ -320,15 +320,20 @@ int PVFS_sys_rename(
                            new_parent_ref, credentials, &op_id, NULL);
     if (ret)
     {
-        gossip_lerr("PVFS_isys_rename call failed\n");
+        PVFS_perror_gossip("PVFS_isys_rename call", ret);
         error = ret;
-        goto exit_path;
     }
-    PVFS_sys_wait(op_id, "rename", error, ret);
+    else
+    {
+        ret = PINT_sys_wait(op_id, "rename", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
 
-  exit_path:
-
-    PVFS_sys_release(op_id);
+    PINT_sys_release(op_id);
     return error;
 }
 
