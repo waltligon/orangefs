@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <sys/time.h>
 
 #include "pvfs2-types.h"
 #include "thread-mgr.h"
@@ -15,7 +16,7 @@
 #include "bmi.h"
 #include "trove.h"
 
-#define THREAD_MGR_TEST_COUNT 5
+#define THREAD_MGR_TEST_COUNT 20
 #define THREAD_MGR_TEST_TIMEOUT 10
 static int thread_mgr_test_timeout = THREAD_MGR_TEST_TIMEOUT;
 
@@ -142,11 +143,12 @@ static void *trove_thread_function(void *ptr)
 static void *bmi_thread_function(void *ptr)
 {
     int ret = -1;
-    int quick_flag = 0;
     int incount, outcount;
     int i=0;
     int test_timeout = thread_mgr_test_timeout;
     struct PINT_thread_mgr_bmi_callback *tmp_callback;
+    static struct timeval last_action;
+    struct timeval now;
 
 #ifdef __PVFS2_JOB_THREADED__
     while (bmi_thread_running)
@@ -182,8 +184,8 @@ static void *bmi_thread_function(void *ptr)
 	     * operations as we can handle to indicate that we should cycle
 	     * quickly 
 	     */
-	    if(outcount == THREAD_MGR_TEST_COUNT)
-		quick_flag = 1;
+	    if (outcount > 0)
+		gettimeofday(&last_action, 0);
 	}
 	else
 	{
@@ -191,15 +193,17 @@ static void *bmi_thread_function(void *ptr)
 	}
 
 	/* decide how long we are willing to wait on the main test call */
-	if(quick_flag)
-	{
-	    quick_flag = 0;
-	    test_timeout = 0;
+	gettimeofday(&now, 0);
+	now.tv_sec -= last_action.tv_sec;
+	now.tv_usec -= last_action.tv_usec;
+	if (now.tv_usec < 0) {
+	    --now.tv_sec;
+	    /* now.tv_usec += 1000000; */
 	}
-	else
-	{
+	if (now.tv_sec > 0)  /* 1 sec decay */
 	    test_timeout = thread_mgr_test_timeout;
-	}
+	else
+	    test_timeout = 0;  /* go immediate */
 
 	/* indicate that a test is in progress */
 	gen_mutex_lock(&bmi_test_mutex);
@@ -240,6 +244,8 @@ static void *bmi_thread_function(void *ptr)
 	    tmp_callback->fn(tmp_callback->data, stat_bmi_actual_size_array[i],
 		stat_bmi_error_code_array[i]);
 	}
+	if (bmi_test_count > 0)
+	    gettimeofday(&last_action, 0);
     }
 
     return (NULL);
