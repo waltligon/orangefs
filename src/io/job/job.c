@@ -3860,6 +3860,7 @@ static void fill_status(struct job_desc *jd,
 			job_status_s * status)
 {
     status->id = jd->job_id;
+    status->status_user_tag = jd->status_user_tag;
 
     if (returned_user_ptr_p)
     {
