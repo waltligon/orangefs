@@ -58,8 +58,8 @@ int main(int argc,char **argv)
                           &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
-        printf("Lookup failed with errcode = %d\n", ret);
-        return(-1);
+        PVFS_perror_gossip("Lookup failed", ret);
+        return -1;
     }
 
     printf("LOOKUP_RESPONSE===>\n\tresp_look.ref.handle = %Ld\n"
@@ -79,13 +79,13 @@ int main(int argc,char **argv)
                                &credentials, &resp_readdir);
         if (ret < 0)
         {
-            printf("readdir failed with errcode = %d\n", ret);
+            PVFS_perror_gossip("readdir failed", ret);
             return(-1);
         }
 
         for(i = 0; i < resp_readdir.pvfs_dirent_outcount; i++)
         {
-            printf("[%Lu]: %s\n",
+            printf("[%.8Lu]: %s\n",
                    Lu(resp_readdir.dirent_array[i].handle),
                    resp_readdir.dirent_array[i].d_name);
         }
@@ -109,8 +109,7 @@ int main(int argc,char **argv)
     ret = PVFS_sys_finalize();
     if (ret < 0)
     {
-        printf("finalizing sysint failed with errcode = %d\n", ret);
-        return (-1);
+        PVFS_perror_gossip("finalizing sysint failed", ret);
     }
-    return 0;
+    return ret;
 }

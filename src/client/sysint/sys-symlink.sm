@@ -227,11 +227,12 @@ int PVFS_isys_symlink(
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.sym.link_name = entry_name;
     sm_p->u.sym.link_target = target;
-    sm_p->parent_ref = parent_ref;
     sm_p->u.sym.sym_resp = resp;
     PVFS_util_copy_sys_attr(&sm_p->u.sym.sys_attr, &attr);
     sm_p->u.sym.stored_error_code = 0;
     sm_p->u.sym.retry_count = 0;
+    sm_p->parent_ref = parent_ref;
+    sm_p->ref_type = PVFS_TYPE_DIRECTORY;
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Symlinking %s under parent handle %Lu "

@@ -378,10 +378,14 @@ typedef struct PINT_client_sm
     /*
       internal pvfs_object references; used in conjunction with the
       sm_common state machine routines, or otherwise as scratch object
-      references during sm processing
+      references during sm processing.  if the ref_type_mask is set to
+      a non-zero value when the PINT_sm_common_*_getattr_setup_msgpair
+      method is called, a -PVFS_error will be triggered if the
+      attributes received are not of one of the the types specified
     */
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
+    PVFS_ds_type ref_type;
 
     /* used internally by client-state-machine.c */
     PVFS_sys_op_id sys_op_id;

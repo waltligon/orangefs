@@ -266,11 +266,12 @@ int PVFS_isys_create(
     PINT_init_msgarray_params(&sm_p->msgarray_params);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.create.object_name = object_name;
-    sm_p->parent_ref = parent_ref;
     sm_p->u.create.create_resp = resp;
     PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
+    sm_p->parent_ref = parent_ref;
+    sm_p->ref_type = PVFS_TYPE_DIRECTORY;
 
     if (dist)
     {

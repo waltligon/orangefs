@@ -34,14 +34,15 @@ static int readdir_msg_comp_fn(
 
 %%
 
-machine pvfs2_client_readdir_sm(init,
-                                readdir_getattr_setup_msgpair,
-                                readdir_getattr_xfer_msgpair,
-                                readdir_getattr_failure,
-                                readdir_msg_setup_msgpair,
-                                readdir_msg_xfer_msgpair,
-                                readdir_msg_failure,
-                                cleanup)
+machine pvfs2_client_readdir_sm(
+    init,
+    readdir_getattr_setup_msgpair,
+    readdir_getattr_xfer_msgpair,
+    readdir_getattr_failure,
+    readdir_msg_setup_msgpair,
+    readdir_msg_xfer_msgpair,
+    readdir_msg_failure,
+    cleanup)
 {
     state init
     {
@@ -51,7 +52,7 @@ machine pvfs2_client_readdir_sm(init,
 
     state readdir_getattr_setup_msgpair
     {
-        run PINT_sm_common_parent_getattr_setup_msgpair;
+        run PINT_sm_common_object_getattr_setup_msgpair;
         success => readdir_getattr_xfer_msgpair;
         default => readdir_getattr_failure;
     }
@@ -65,7 +66,7 @@ machine pvfs2_client_readdir_sm(init,
 
     state readdir_getattr_failure
     {
-        run PINT_sm_common_parent_getattr_failure;
+        run PINT_sm_common_object_getattr_failure;
         default => cleanup;
     }
 
@@ -132,16 +133,11 @@ int PVFS_isys_readdir(
     sm_p->u.readdir.pos_token = token;
     sm_p->u.readdir.dirent_limit = pvfs_dirent_incount;
     sm_p->u.readdir.readdir_resp = resp;
-    /*
-      set the parent ref to the passed in dir ref only for using the
-      sm_common method for getattr
-    */
-    sm_p->parent_ref = ref;
     sm_p->object_ref = ref;
+    sm_p->ref_type = PVFS_TYPE_DIRECTORY;
 
-    gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on parent handle "
-                 "%Lu on fs %d\n", Lu(ref.handle),
-                 ref.fs_id);
+    gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on handle "
+                 "%Lu on fs %d\n", Lu(ref.handle), ref.fs_id);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_READDIR, op_id, user_ptr);
@@ -236,7 +232,6 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
-        return 1;
     }
     return 1;
 }

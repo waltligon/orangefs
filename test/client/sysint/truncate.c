@@ -18,7 +18,6 @@ int main(int argc,char **argv)
     PVFS_sysresp_lookup resp_lk;
     PVFS_size trunc_size;
     PVFS_fs_id fs_id;
-    char* name;
     PVFS_credentials credentials;
     PVFS_object_ref pinode_refn;
     PVFS_size size;
@@ -51,28 +50,20 @@ int main(int argc,char **argv)
     }
 
     /* lookup the root handle */
-    name = malloc(2);/*null terminator included*/
-    name[0] = '/';
-    name[1] = '\0';
     printf("looking up the root handle for fsid = %d\n", fs_id);
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+    ret = PVFS_sys_lookup(fs_id, "/", &credentials,
+                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
 	return(-1);
     }
 
-    free(name);
-
-    /* test the lookup function */
     memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
-    name = filename;
-
     PVFS_util_gen_credentials(&credentials);
-    ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                          &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
+                          &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);

@@ -18,36 +18,42 @@
 #include <sys/sysinfo.h>
 #endif
 
-static int statfs_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p);
+static int statfs_cleanup(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int statfs_do_statfs(
+    PINT_server_op *s_op, job_status_s* js_p);
 
 %%
 
-machine pvfs2_statfs_sm(prelude, do_statfs, final_response, cleanup)
+machine pvfs2_statfs_sm(
+    prelude,
+    do_statfs,
+    final_response,
+    cleanup)
 {
-	state prelude
-	{
-		jump pvfs2_prelude_sm;
-		default => do_statfs;
-	}
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        default => do_statfs;
+    }
 
-	state do_statfs
-	{
-		run statfs_do_statfs;
-		default => final_response;
-	}
+    state do_statfs
+    {
+        run statfs_do_statfs;
+        default => final_response;
+    }
 
-	state final_response
-	{
-		jump pvfs2_final_response_sm;
-		default => cleanup;
-	}
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
 
-	state cleanup
-	{
-		run statfs_cleanup;
-		default => terminate;
-	}
+    state cleanup
+    {
+        run statfs_cleanup;
+        default => terminate;
+    }
 }
 
 %%
@@ -65,31 +71,34 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
 
     /* first try to gather handle statistics */
     ret = trove_handle_get_statistics(
-	s_op->req->u.statfs.fs_id,
-	&s_op->resp.u.statfs.stat.handles_available_count);
-    if(ret < 0)
+        s_op->req->u.statfs.fs_id,
+        &s_op->resp.u.statfs.stat.handles_available_count);
+
+    if (ret < 0)
     {
-	js_p->error_code = ret;
-	return(1);
+        js_p->error_code = ret;
+        return 1;
     }
+
     /* NOTE: we let the client side code compute this on its own */
     s_op->resp.u.statfs.stat.handles_total_count = 0;
 
     /* we need a context to be able to make the getinfo call */
     ret = trove_open_context(s_op->req->u.statfs.fs_id, &tmp_context);
-    if(ret < 0)
+    if (ret < 0)
     {
-	js_p->error_code = ret;
-	return(1);
+        js_p->error_code = ret;
+        return 1;
     }
 
-    ret = trove_collection_getinfo(s_op->req->u.statfs.fs_id, tmp_context,
-	PVFS_COLLECTION_STATFS, &(s_op->resp.u.statfs.stat));
+    ret = trove_collection_getinfo(
+        s_op->req->u.statfs.fs_id, tmp_context,
+        PVFS_COLLECTION_STATFS, &(s_op->resp.u.statfs.stat));
 
     /* close context regardless of whether getinfo was successful */
     trove_close_context(s_op->req->u.statfs.fs_id, tmp_context);
     
-    /* note, getinfo should always return immediately, no testing needed */
+    /* getinfo should always return immediately, no testing needed */
     assert(ret != 0);
 
 #ifdef HAVE_SYSINFO
@@ -112,16 +121,8 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
     s_op->resp.u.statfs.stat.uptime_seconds = 0;
 #endif
 
-    if (ret != 1)
-    {
-	js_p->error_code = ret;
-    }
-    else
-    {
-	js_p->error_code = 0;
-    }
-
-    return(1);
+    js_p->error_code = ((ret != 1) ? ret : 0);
+    return 1;
 }
 
 
@@ -146,4 +147,3 @@ static int statfs_cleanup(PINT_server_op *s_op, job_status_s* js_p)
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
-

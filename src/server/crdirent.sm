@@ -12,6 +12,8 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 
+#define INVALID_OBJECT 131
+
 static int crdirent_setup_op(
     PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_validate(
@@ -30,102 +32,113 @@ static int crdirent_cleanup(
     PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_set_error_code(
     PINT_server_op *s_op, job_status_s* js_p);
+static int validation_object_type_failure(
+    PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-nested machine pvfs2_check_entry_not_exist_sm(validate,
+nested machine pvfs2_check_entry_not_exist_sm(
+    validate,
     read_directory_entry_handle, 
     create_dirdata_dspace,
     write_dirdata_handle,
     check_exist_directory_entry,
-    set_error_code)
+    set_error_code,
+    validation_object_type_failure)
 {
-	state validate
-	{
-		run crdirent_validate;
-		success => read_directory_entry_handle;
-		default => return;
-	}
-	
-	state read_directory_entry_handle
-	{
-		run crdirent_read_directory_entry_handle;
-		success => check_exist_directory_entry;
-		default => create_dirdata_dspace;
-	}
+    state validate
+    {
+        run crdirent_validate;
+        success => read_directory_entry_handle;
+        INVALID_OBJECT => validation_object_type_failure;
+        default => return;
+    }
+        
+    state read_directory_entry_handle
+    {
+        run crdirent_read_directory_entry_handle;
+        success => check_exist_directory_entry;
+        default => create_dirdata_dspace;
+    }
 
-	state check_exist_directory_entry
-	{
-		run crdirent_check_exist_directory_entry;
-		default => set_error_code;
-	}
+    state check_exist_directory_entry
+    {
+        run crdirent_check_exist_directory_entry;
+        default => set_error_code;
+    }
 
-	state set_error_code
-	{
-		run crdirent_set_error_code;
-		default => return;
-	}
-	
-	state create_dirdata_dspace
-	{
-		run crdirent_create_dirdata_dspace;
-		success => write_dirdata_handle;
-		default => return;
-	}
+    state set_error_code
+    {
+        run crdirent_set_error_code;
+        default => return;
+    }
 
-	state write_dirdata_handle
-	{
-		run crdirent_write_dirdata_handle;
-		default => return;
-	}
+    state validation_object_type_failure
+    {
+        run validation_object_type_failure;
+        default => return;
+    }
+
+    state create_dirdata_dspace
+    {
+        run crdirent_create_dirdata_dspace;
+        success => write_dirdata_handle;
+        default => return;
+    }
+
+    state write_dirdata_handle
+    {
+        run crdirent_write_dirdata_handle;
+        default => return;
+    }
 }
 
 machine pvfs2_crdirent_sm(prelude,
-			  setup_op,
-			  check_not_exist,
-			  write_directory_entry,
-			  cleanup,
-			  final_response)
+                          setup_op,
+                          check_not_exist,
+                          write_directory_entry,
+                          cleanup,
+                          final_response)
 {
-	state prelude
-	{
-		jump pvfs2_prelude_sm;
-		success => setup_op;
-		default => final_response;
-	}
+        state prelude
+        {
+                jump pvfs2_prelude_sm;
+                success => setup_op;
+                default => final_response;
+        }
 
-	state setup_op
-	{
-		run crdirent_setup_op;
-		default => check_not_exist;
-	}
+        state setup_op
+        {
+                run crdirent_setup_op;
+                default => check_not_exist;
+        }
 
-	state check_not_exist
-	{
-		jump pvfs2_check_entry_not_exist_sm;
-		success => write_directory_entry;
-		default => final_response;
-	}
+        state check_not_exist
+        {
+                jump pvfs2_check_entry_not_exist_sm;
+                success => write_directory_entry;
+                default => final_response;
+        }
 
-	state write_directory_entry
-	{
-		run crdirent_write_directory_entry;
-		default => final_response;
-	}
+        state write_directory_entry
+        {
+                run crdirent_write_directory_entry;
+                default => final_response;
+        }
 
-	state final_response
-	{
-		jump pvfs2_final_response_sm;
-		default => cleanup;
-	}
+        state final_response
+        {
+                jump pvfs2_final_response_sm;
+                default => cleanup;
+        }
 
-	state cleanup
-	{
-		run crdirent_cleanup;
-		default => terminate;
-	}
+        state cleanup
+        {
+                run crdirent_cleanup;
+                default => terminate;
+        }
 }
 
 %%
@@ -136,7 +149,7 @@ machine pvfs2_crdirent_sm(prelude,
  * Synopsis: verifies that entry name is valid
  */
 static int crdirent_validate(PINT_server_op *s_op,
-			 job_status_s* js_p)
+                             job_status_s* js_p)
 {
     char *ptr;
 
@@ -148,10 +161,10 @@ static int crdirent_validate(PINT_server_op *s_op,
     assert(s_op->u.crdirent.parent_handle != 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-	    "  got crdirent for %s (with handle %Lu) in %Lu\n",
-	    s_op->u.crdirent.name,
-	    Lu(s_op->u.crdirent.new_handle),
-	    Lu(s_op->u.crdirent.parent_handle));
+            "  got crdirent for %s (with handle %Lu) in %Lu\n",
+            s_op->u.crdirent.name,
+            Lu(s_op->u.crdirent.new_handle),
+            Lu(s_op->u.crdirent.parent_handle));
 
     /* check for invalid characters in name */
     ptr = s_op->u.crdirent.name;
@@ -159,26 +172,37 @@ static int crdirent_validate(PINT_server_op *s_op,
 
     if (*ptr != '\0')
     {
-	/* found an invalid character -- report it and send error response */
-	if (*ptr == '/')
+        /* found an invalid character -- report it and send error response */
+        if (*ptr == '/')
         {
-	    gossip_lerr("crdirent: error: invalid '/' character "
+            gossip_lerr("crdirent: error: invalid '/' character "
                         "in name (%s); sending error response.\n",
-			s_op->u.crdirent.name);
-	}
-	else
+                        s_op->u.crdirent.name);
+        }
+        else
         {
-	    gossip_lerr("crdirent: error: invalid unprintable "
+            gossip_lerr("crdirent: error: invalid unprintable "
                         "character (value = 0x%x) in name; sending "
                         "error response.\n", (int) *ptr);
-	}
-	js_p->error_code = -PVFS_ENOENT;
-	s_op->scheduled_id = 0;
-	return 1;
+        }
+        js_p->error_code = -PVFS_ENOENT;
+        s_op->scheduled_id = 0;
+        return 1;
+    }
+
+    /* make sure we're dealing with a directory */
+    if (!(s_op->attr.mask & PVFS_ATTR_COMMON_TYPE) ||
+        !(s_op->attr.objtype == PVFS_TYPE_DIRECTORY))
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, " Cannot read dirent on "
+                     "a non-directory!  Returning error.\n");
+
+        js_p->error_code = INVALID_OBJECT;
+        return 1;
     }
 
     js_p->error_code = 0;
-    return(1);
+    return 1;
 }
 
 
@@ -198,28 +222,24 @@ static int crdirent_validate(PINT_server_op *s_op,
  * Synopsis: Given a directory handle, look up the handle used to store
  * directory entries for this directory.
  *
- *           Get the directory entry handle for the directory entry k/v space.
- *           Recall that directories have two key-val spaces, one of which is 
- *           synonymous with files where the metadata is stored.  The other
- *           space holds the filenames and their handles.  In this function, 
- *           we attempt to retrieve the handle for the filename/handle key/val
- *           space and if it does not exist, we need to create it.
+ * Get the directory entry handle for the directory entry k/v space.
+ * Recall that directories have two key-val spaces, one of which is
+ * synonymous with files where the metadata is stored.  The other
+ * space holds the filenames and their handles.  In this function, we
+ * attempt to retrieve the handle for the filename/handle key/val
+ * space and if it does not exist, we need to create it.
  *
- *           TODO: Semantics here of whether we want to create it here, or upon
- *                 the creation of the directory. 
+ * TODO: Semantics here of whether we want to create it here, or upon
+ * the creation of the directory.
  *           
  */
-static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
-						job_status_s* js_p)
+static int crdirent_read_directory_entry_handle(
+    PINT_server_op *s_op, job_status_s* js_p)
 {
     int ret;
     job_id_t i;
 
     PINT_STATE_DEBUG("read_directory_entry_handle");
-
-    /* TODO: MAKE THIS AN ERROR CHECK INSTEAD LATER */
-    assert(s_op->attr.mask & PVFS_ATTR_COMMON_TYPE);
-    assert(s_op->attr.objtype == PVFS_TYPE_DIRECTORY);
 
     /* get the key and key size out of our list of common keys */
     s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
@@ -245,6 +265,16 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
     return ret;
 }
 
+static int validation_object_type_failure(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: validation_object_"
+                 "type_failure called\n");
+
+    js_p->error_code = -PVFS_ENOTDIR;
+    return 1;
+}
+
 /*
  * Function: crdirent_create_dirdata_dspace
  *
@@ -264,7 +294,7 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
  *           it in part two.
  */
 static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
-					  job_status_s* js_p)
+                                          job_status_s* js_p)
 {
     int ret = -PVFS_ENOMEM;
     job_id_t i;
@@ -325,7 +355,7 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
  *           
  */
 static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
-					 job_status_s* js_p)
+                                         job_status_s* js_p)
 {
     int ret;
     job_id_t i;
@@ -390,7 +420,7 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
  *           space for directory handles.
  */
 static int crdirent_write_directory_entry(PINT_server_op *s_op,
-					  job_status_s* js_p)
+                                          job_status_s* js_p)
 {
     int ret;
     job_id_t i;
@@ -501,7 +531,7 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
  * cleans up any resources that were allocated and exits the state machine
  */
 static int crdirent_cleanup(PINT_server_op *s_op,
-			    job_status_s* js_p)
+                            job_status_s* js_p)
 {
     PINT_STATE_DEBUG("cleanup");
     return(server_state_machine_complete(s_op));
@@ -520,14 +550,14 @@ static int crdirent_set_error_code(
      */
     switch(js_p->error_code)
     {
-	case -TROVE_ENOENT:
-	    js_p->error_code = 0;
-	    break;
-	case 0:
-	    js_p->error_code = -PVFS_EEXIST;
-	    break;
-	default:
-	    break;
+        case -TROVE_ENOENT:
+            js_p->error_code = 0;
+            break;
+        case 0:
+            js_p->error_code = -PVFS_EEXIST;
+            break;
+        default:
+            break;
     }
     return(1);
 }

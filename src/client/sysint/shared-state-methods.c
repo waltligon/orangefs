@@ -66,6 +66,9 @@ int PINT_sm_common_parent_getattr_failure(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_sm_common_parent_getattr_failure\n");
+
+    PVFS_perror_gossip("PINT_sm_common_parent_getattr_failed",
+                       js_p->error_code);
     return 1;
 }
 
@@ -115,6 +118,9 @@ int PINT_sm_common_object_getattr_failure(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_sm_common_object_getattr_failure\n");
+
+    PVFS_perror_gossip("PINT_sm_common_object_getattr_failed",
+                       js_p->error_code);
     return 1;
 }
 
@@ -123,6 +129,7 @@ int PINT_sm_common_object_getattr_comp_fn(
     struct PVFS_server_resp *resp_p,
     int index)
 {
+    int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -134,10 +141,37 @@ int PINT_sm_common_object_getattr_comp_fn(
     sm_p->msgarray = NULL;
     sm_p->msgarray_count = 0;
 
+    /* check for an error from the server */
     if (resp_p->status)
     {
         PVFS_perror_gossip("Getattr failed", resp_p->status);
 	return resp_p->status;
+    }
+
+    /*
+      check if we are supposed to make sure this object is of a
+      particular type and return an error if it doesn't match.  this
+      is useful so that the client can know (in some cases) that it
+      can avoid issuing an operation to the server since it will pass
+      an error back anyway
+    */
+    if (sm_p->ref_type &&
+        (!(sm_p->ref_type & resp_p->u.getattr.attr.objtype)))
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "*** PINT_sm_common_object_"
+                     "getattr_comp_fn: Object type mismatch.\n Possibly "
+                     "saving network roundtrip by returning an error\n");
+
+        if (sm_p->ref_type == PVFS_TYPE_DIRECTORY)
+        {
+            ret = -PVFS_ENOTDIR;
+        }
+        else if (sm_p->ref_type == PVFS_TYPE_METAFILE)
+        {
+            ret = ((resp_p->u.getattr.attr.objtype ==
+                    PVFS_TYPE_DIRECTORY) ? -PVFS_EISDIR : -PVFS_EBADF);
+        }
+        return ret;
     }
 
     /*
