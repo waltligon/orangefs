@@ -6,7 +6,9 @@ PVFS2 Release ChangeLog
 pvfs2-0.6.3pre1
 ===============
 - added abilitity to negate log categories in PVFS_debug_eventlog_to_mask
-- 
+- added pvfs2-fsck
+- updated pvfs2-quickstart to better discuss client configuration
+-
 
 
 pvfs2-0.6.2
