@@ -30,42 +30,6 @@
 
 /*#define NUM_SERVER 10*/
 
-typedef enum {
-	PVFS_SYS_INVALID = 0,
-	PVFS_SYS_LOOKUP = 1,
-	PVFS_SYS_GETATTR = 2,
-	PVFS_SYS_SETATTR = 3,
-	PVFS_SYS_MKDIR = 4,
-	PVFS_SYS_RMDIR = 5, /* Q: leave out? */
-	PVFS_SYS_CREATE = 6,
-	PVFS_SYS_REMOVE = 7,
-	PVFS_SYS_RENAME = 8,
-	PVFS_SYS_SYMLINK = 9,
-	PVFS_SYS_READLINK = 10,
-	/* Q: function for removing a link?  REMOVE DOES IT ALL? */
-#if 0
-	PVFS_SYS_READ = 11,
-	PVFS_SYS_WRITE = 12,
-#endif
-	PVFS_SYS_ALLOCATE = 13,
-	PVFS_SYS_CLONE = 14,
-	PVFS_SYS_LOCK = 15,
-	PVFS_SYS_UNLOCK = 16,
-	PVFS_SYS_STATFS = 17,
-	PVFS_SYS_CONFIG = 18,
-	PVFS_SYS_HINT = 19,
-	PVFS_SYS_GETDIST = 20,
-	PVFS_SYS_CREATEDIRENT = 21,
-	PVFS_SYS_ADDDIRENT = 22,
-	PVFS_SYS_NEWDIRENT = 23,
-	PVFS_SYS_RMDIRENT = 24,
-	PVFS_SYS_REVLOOKUP = 25,
-	PVFS_SYS_READDIR = 26,
-	PVFS_SYS_TRUNCATE = 27,
-	PVFS_SYS_IO = 28,
-	PVFS_SYS_EXTENSION = 99,
-} PVFS_system_op;
-
 /* IO server stats */
 struct PVFS_io_stat_s {
 	/*PVFS_volume_id vid;*/
@@ -89,11 +53,6 @@ struct PVFS_statfs_s {
 	PVFS_io_stat iostat;
 };
 typedef struct PVFS_statfs_s PVFS_statfs;
-
-enum {
-	STRING = 1,
-	INT = 2
-};
 
 /*
  * Here's the format of the pvfstab file that the client expects:
@@ -261,7 +220,6 @@ typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
 /* PVFS system request structure
  */
 struct PVFS_system_req_s {
-	PVFS_system_op op;
 	int32_t req_tag; /* Tag to group reqs+acks */
 	int32_t verno;	  /* Version number */
 	union {
@@ -277,7 +235,6 @@ struct PVFS_system_req_s {
 /* PVFS system response structure
  */
 struct PVFS_system_resp_s {
-	PVFS_system_op op;
 	int32_t resp_tag; /* Tag to group reqs+acks */
 	int32_t verno;		/* Version number */
 	union {

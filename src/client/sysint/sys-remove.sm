@@ -1,0 +1,86 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "pvfs2-client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "gossip.h"
+
+/* from original remove.c */
+#include "pinode-helper.h"
+#include "pvfs2-sysint.h"
+#include "pint-sysint.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-dcache.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+
+static int remove_init(PINT_client_sm *sm, job_status_s *ret);
+static int remove_cleanup(PINT_client_sm *sm, job_status_s *ret);
+
+%%
+
+machine pvfs2_remove_sm(init,
+			cleanup)
+{
+    state init
+	{
+	    run remove_init;
+	    default => cleanup;
+	}
+
+    state cleanup
+	{
+	    run remove_cleanup;
+	    default => init;
+	}
+}
+
+%%
+
+int PVFS_sys_remove2(char* entry_name,
+		     PVFS_pinode_reference parent_refn, 
+		     PVFS_credentials credentials)
+{
+    
+}
+
+static int remove_init(PINT_client_sm *sm,
+		       job_status_s *ret)
+{
+    gossip_debug(CLIENT_DEBUG, "remove state: init\n");
+
+    /* do the request scheduler thing, if necessary */
+
+    return 1;
+}
+
+static int remove_lookup_object(PINT_client_sm *sm,
+				job_status_s *ret)
+{
+}
+
+static int remove_cleanup(PINT_client_sm *sm,
+			  job_status_s *ret)
+{
+    gossip_debug(CLIENT_DEBUG, "remove state: cleanup\n");
+
+    return 0;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

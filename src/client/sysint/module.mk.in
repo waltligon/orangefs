@@ -12,6 +12,7 @@ LIBSRC += \
 	$(DIR)/server-send-req.c \
 	$(DIR)/readdir.c \
 	$(DIR)/remove.c \
+	$(DIR)/sys-remove.c \
 	$(DIR)/rename.c \
 	$(DIR)/setattr.c \
 	$(DIR)/truncate.c \

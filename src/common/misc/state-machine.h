@@ -43,7 +43,7 @@
 
 union PINT_state_array_values
 {
-    int (*state_action)(struct PINT_OP_STATE *, job_status_s *);
+    int (*state_action)(PINT_OP_STATE *, job_status_s *);
     int return_value;
     int flag;
     void *nested_machine; /* NOTE: this is really a PINT_state_machine */

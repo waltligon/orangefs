@@ -21,6 +21,7 @@
 
 #define PINT_STATE_STACK_SIZE 8  /* size of stack for nested state machines */
 
+/* HACK!!! */
 typedef union PINT_state_array_values PINT_state_array_values;
 
 /* Some config values for the prototype pvfs2 server */
@@ -162,7 +163,7 @@ struct server_configuration_s *get_server_config_struct(void);
 #define PINT_OP_STATE       PINT_server_op
 #define PINT_OP_STATE_TABLE PINT_server_op_table
 
-#include <state-machine.h>
+#include "state-machine.h"
 
 /*
  * Local variables:

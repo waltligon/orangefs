@@ -450,7 +450,7 @@ endif
 # rule for automatically generated source files
 %.c: %.sm src/common/statecomp/statecomp
 ifdef QUIET_COMPILE
-	@echo "  SMC		$<"
+	@echo "  SMC		$@"
 	@src/common/statecomp/statecomp $< $@
 else
 	src/common/statecomp/statecomp $< $@
