@@ -17,7 +17,6 @@ enum {
     STATE_ENOTDIR = 7
 };
 
-static int readdir_init(PINT_server_op *s_op, job_status_s* js_p);
 static int readdir_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int readdir_read_dirdata_handle(PINT_server_op *s_op, job_status_s* js_p);
 static int readdir_iterate_on_entries(PINT_server_op *s_op, job_status_s* js_p);
@@ -25,14 +24,15 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
 static int readdir_release(PINT_server_op *s_op, job_status_s* js_p);
 static int readdir_verify_directory_metadata(PINT_server_op *s_op, job_status_s* js_p);
 static int readdir_read_directory_metadata(PINT_server_op *s_op, job_status_s* js_p);
-void readdir_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
+/* TODO: need error transition from prelude state */
+
 %%
 
-machine pvfs2_readdir_sm(init,
+machine pvfs2_readdir_sm(prelude,
 			 iterate_on_entries,
 			 read_dirdata_handle,
 			 read_directory_metadata,
@@ -41,9 +41,9 @@ machine pvfs2_readdir_sm(init,
 			 release,
 			 cleanup)
 {
-	state init
+	state prelude
 	{
-		run readdir_init;
+		jump pvfs2_prelude_sm;
 		default => read_directory_metadata;
 	}
 
@@ -89,41 +89,11 @@ machine pvfs2_readdir_sm(init,
 	state cleanup
 	{
 		run readdir_cleanup;
-		default => init;
+		default => prelude;
 	}
 }
 
 %%
-
-
-/*
- * Function: readdir_init
- *
- * Params:   server_op *s_op, 
- *           job_status_s* js_p
- *
- * Returns:  int
- *
- * Synopsis: Allocate Memory for readdir.dirent_count
- *           
- */
-static int readdir_init(PINT_server_op *s_op, job_status_s* js_p)
-{
-
-    int ret;
-
-    gossip_debug(SERVER_DEBUG, "readdir state: init\n");
-
-    s_op->key_a = NULL; /* we're going to use this to point to an allocated region later, so initialize it now. */
-
-    ret = job_req_sched_post(s_op->req,
-				      s_op,
-				      js_p,
-				      &(s_op->scheduled_id),
-				      PINT_server_job_context);
-
-    return ret;
-}
 
 
 /*

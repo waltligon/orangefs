@@ -12,7 +12,6 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 
-static int mkdir_init(PINT_server_op *s_op, job_status_s* js_p);
 static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p);
 static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p);
 static int mkdir_release(PINT_server_op *s_op, job_status_s* js_p);
@@ -20,14 +19,13 @@ static int mkdir_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
 static int mkdir_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int mkdir_error(PINT_server_op *s_op, job_status_s* js_p);
 static int mkdir_critical_error(PINT_server_op *s_op, job_status_s* js_p);
-void mkdir_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
 %%
 
-machine pvfs2_mkdir_sm(init,
+machine pvfs2_mkdir_sm(prelude,
 		       create,
 		       set_attrib,
 		       release,
@@ -36,9 +34,9 @@ machine pvfs2_mkdir_sm(init,
 		       critical_error,
 		       cleanup)
 {
-	state init
+	state prelude
 	{
-		run mkdir_init;
+		jump pvfs2_prelude_sm;
 		success => create;
 		default => err_msg;
 	}
@@ -85,39 +83,11 @@ machine pvfs2_mkdir_sm(init,
 	state cleanup
 	{
 		run mkdir_cleanup;
-		default => init;
+		default => prelude;
 	}
 }
 
 %%
-
-/*
- * Function: mkdir_init
- *
- * Params:   server_op *s_op, 
- *           job_status_s* js_p
- *
- * Returns:  int
- *
- * Synopsis: 
- *           
- */
-static int mkdir_init(PINT_server_op *s_op, job_status_s* js_p)
-{
-
-    int ret;
-
-    gossip_debug(SERVER_DEBUG, "mkdir state: init\n");
-
-    ret = job_req_sched_post(s_op->req,
-	    s_op,
-	    js_p,
-	    &(s_op->scheduled_id),
-	    PINT_server_job_context);
-
-    return(ret);
-
-}
 
 /*
  * Function: mkdir_create

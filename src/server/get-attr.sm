@@ -16,7 +16,6 @@ enum {
 };
 
 
-static int getattr_init(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s* js_p);
@@ -26,14 +25,15 @@ static int getattr_read_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_metafile_distribution_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
-void getattr_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
+/* TODO: need error transition from prelude */
+
 %%
 
-machine pvfs2_get_attr_sm(init,
+machine pvfs2_get_attr_sm(prelude,
 		 cleanup,
 		 getobj_attrib,
 		 send_bmi,
@@ -42,9 +42,9 @@ machine pvfs2_get_attr_sm(init,
 		 read_metafile_datafile_handles_if_required,
 		 read_metafile_distribution_if_required)
 {
-	state init
+	state prelude
 	{
-		run getattr_init;
+		jump pvfs2_prelude_sm;
 		default => getobj_attrib;
 	}
 
@@ -88,45 +88,11 @@ machine pvfs2_get_attr_sm(init,
 	state cleanup
 	{
 		run getattr_cleanup;
-		default => init;
+		default => prelude;
 	}
 }
 
 %%
-
-/*
- * Function: getattr_init
- *
- * Params:   server_op *b, 
- *           job_status_s* js_p
- *
- * Returns:  int
- *
- * Synopsis: We will need to allocate a buffer large enough to store the 
- *           attributes the client is requesting.  Also, schedule it for
- *           consistency semantics.
- *           
- */
-
-
-static int getattr_init(PINT_server_op *s_op, job_status_s* js_p)
-{
-
-    int ret;
-
-    gossip_debug(SERVER_DEBUG, "getattr state: init\n");
-
-    s_op->resp->op = s_op->req->op;
-
-    ret = job_req_sched_post(s_op->req,
-				      s_op,
-				      js_p,
-				      &(s_op->scheduled_id),
-				      PINT_server_job_context);
-
-    return(ret);
-
-}
 
 
 /*

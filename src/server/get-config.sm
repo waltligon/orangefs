@@ -17,17 +17,31 @@
 static int getconfig_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int getconfig_job_bmi_send(PINT_server_op *s_op, job_status_s* js_p);
 static int getconfig_init(PINT_server_op *s_op, job_status_s* js_p);
-void getconfig_init_state_machine(void);
+static int getconfig_release(PINT_server_op *s_op, job_status_s* js_p);
 
 extern job_context_id PINT_server_job_context;
 
+/* TODO: need error transition from prelude */
+
 %%
 
-machine pvfs2_get_config_sm(init, bmi_send, cleanup)
+machine pvfs2_get_config_sm(prelude, init, release, bmi_send, cleanup)
 {
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
+		default => init;
+	}
+
 	state init
 	{
 		run getconfig_init;
+		default => release;
+	}
+
+	state release
+	{
+		run getconfig_release;
 		default => bmi_send;
 	}
 
@@ -40,11 +54,29 @@ machine pvfs2_get_config_sm(init, bmi_send, cleanup)
 	state cleanup
 	{
 		run getconfig_cleanup;
-		default => init;
+		default => prelude;
 	}
 }
 
 %%
+
+/* getconfig_release()
+ *
+ * releases operation from request scheduler
+ */
+static int getconfig_release(PINT_server_op *s_op, job_status_s* js_p)
+{
+    int ret = -1;
+    job_id_t tmp_id;
+
+    ret = job_req_sched_release(s_op->scheduled_id,
+	s_op,
+	js_p,
+	&tmp_id,
+	PINT_server_job_context);
+
+    return(ret);
+}
 
 /*
  * Function: getconfig_init
@@ -65,7 +97,6 @@ machine pvfs2_get_config_sm(init, bmi_send, cleanup)
 
 static int getconfig_init(PINT_server_op *s_op, job_status_s* js_p)
 {
-    int ret = 1;
     struct server_configuration_s *user_opts = get_server_config_struct();
     assert(user_opts);
 
@@ -82,7 +113,8 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s* js_p)
     s_op->resp->u.getconfig.server_config_buf =
         (char*)user_opts->server_config_buf;
 
-    return(ret);
+    js_p->error_code = 0;
+    return(1);
 }
 
 /*

@@ -16,7 +16,6 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 
-static int io_init(PINT_server_op *s_op, job_status_s* js_p);
 static int io_get_size(PINT_server_op *s_op, job_status_s* js_p);
 static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p);
 static int io_send_completion_ack(PINT_server_op *s_op, 
@@ -24,7 +23,6 @@ static int io_send_completion_ack(PINT_server_op *s_op,
 static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p);
 static int io_release(PINT_server_op *s_op, job_status_s* js_p);
 static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-void io_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
@@ -34,18 +32,16 @@ extern job_context_id PINT_server_job_context;
  * read and write)
  */
 
-/* TODO: need some more states to do things like permissions and
- * access control?
- */
+/* TODO: need an error transition from prelude */
 
 %%
 
-machine pvfs2_io_sm(init, get_size, send_positive_ack, send_negative_ack, 
+machine pvfs2_io_sm(prelude, get_size, send_positive_ack, send_negative_ack, 
 	start_flow, cleanup, release, send_completion_ack)
 {
-	state init
+	state prelude
 	{
-		run io_init;
+		jump pvfs2_prelude_sm;
 		default => get_size;
 	}
 
@@ -90,42 +86,12 @@ machine pvfs2_io_sm(init, get_size, send_positive_ack, send_negative_ack,
 	state cleanup
 	{
 		run io_cleanup;
-		default => init;
+		default => prelude;
 	}
 }
 
 %%
 
-/*
- * Function: io_init()
- *
- * Params:   server_op *s_op, 
- *           job_status_s* js_p
- *
- * Pre:      a properly formatted request structure.
- *
- * Post:     s_op->scheduled_id filled in.
- *            
- * Returns:  int
- *
- * Synopsis: posts the operation to the request scheduler
- *           
- */
-static int io_init(PINT_server_op *s_op, job_status_s* js_p)
-{
-	int ret;
-	
-	gossip_ldebug(SERVER_DEBUG, "IO: io_init() executed.\n");
-
-	/* post a scheduler job */
-	ret = job_req_sched_post(s_op->req,
-												 s_op,
-												 js_p,
-												 &(s_op->scheduled_id),
-												 PINT_server_job_context);
-
-	return(ret);
-}
 
 /*
  * Function: io_get_size()

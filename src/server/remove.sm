@@ -19,7 +19,7 @@
  * PVFS2 object types: datafiles, metafiles, and directories.
  *
  * For a datafile, the path through the state machine looks like:
- * 1) init
+ * 1) prelude
  * 2) read_object_metadata (fails)
  * 3) fallback_to_dspace_getattr
  * 4) remove_dspace
@@ -28,7 +28,7 @@
  * 7) cleanup
  *
  * For a metafile, the path is:
- * 1) init
+ * 1) prelude
  * 2) read_object_metadata (completes)
  * 3) verify_object_metadata
  * 4) remove_dspace
@@ -37,7 +37,7 @@
  * 7) cleanup
  *
  * For a directory that has (or at one time had) entries, the path is:
- * 1) init
+ * 1) prelude
  * 2) read_object_metadata (completes)
  * 3) verify_object_metadata
  * 4) try_to_read_dirdata_handle
@@ -57,7 +57,6 @@ enum {
     STATE_TYPE_DIRECTORY = 1
 };
 
-static int remove_init(PINT_server_op *s_op, job_status_s* js_p);
 static int remove_read_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
 static int remove_verify_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
 static int remove_cleanup(PINT_server_op *s_op, job_status_s* js_p);
@@ -68,14 +67,15 @@ static int remove_release_posted_job(PINT_server_op *s_op, job_status_s* js_p);
 static int remove_send_response(PINT_server_op *s_op, job_status_s* js_p);
 static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op, job_status_s* js_p);
 static int remove_verify_dspace_attributes(PINT_server_op *s_op, job_status_s* js_p);
-void remove_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
+/* TODO: need error transition out of prelude state */
+
 %%
 
-machine pvfs2_remove_sm(init,
+machine pvfs2_remove_sm(prelude,
 			read_object_metadata,
 			verify_object_metadata,
 			fallback_to_dspace_getattr,
@@ -87,9 +87,9 @@ machine pvfs2_remove_sm(init,
 			release,
 			cleanup)
 {
-	state init
+	state prelude
 	{
-		run remove_init;
+		jump pvfs2_prelude_sm;
 		default => read_object_metadata;
 	}
 
@@ -156,32 +156,11 @@ machine pvfs2_remove_sm(init,
 	state cleanup
 	{
 		run remove_cleanup;
-		default => init;
+		default => prelude;
 	}
 }
 
 %%
-
-/*
- * Function: remove_init
- *
- * Post operation to request scheduler.
- */
-static int remove_init(PINT_server_op *s_op,
-		       job_status_s* js_p)
-{
-
-    int ret;
-
-    gossip_debug(SERVER_DEBUG, "(%p) remove state: init\n", s_op);
-
-    ret = job_req_sched_post(s_op->req,
-				      s_op,
-				      js_p,
-				      &(s_op->scheduled_id),
-				      PINT_server_job_context);
-    return ret;
-}
 
 /*
  * Function: remove_read_object_metadata

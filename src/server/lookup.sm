@@ -30,14 +30,16 @@ static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s* js_p)
 static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s* js_p);
 static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
 static int lookup_release_job(PINT_server_op *s_op, job_status_s* js_p);
-void lookup_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
+/* TODO: need error transition out of prelude state */
+
 %%
 
-machine pvfs2_lookup_sm(init,
+machine pvfs2_lookup_sm(prelude,
+			init,
 		        read_object_metadata,
 		        read_directory_entry_handle,
 		        read_directory_entry,
@@ -46,6 +48,12 @@ machine pvfs2_lookup_sm(init,
 			release,
 			cleanup)
 {
+    state prelude
+	{
+	    jump pvfs2_prelude_sm;
+	    default => init;
+	}
+
     state init
 	{
 	    run lookup_init;
@@ -98,7 +106,7 @@ machine pvfs2_lookup_sm(init,
     state cleanup
 	{
 	    run lookup_cleanup;
-	    default => init;
+	    default => prelude;
 	}
 }
 
@@ -117,8 +125,6 @@ machine pvfs2_lookup_sm(init,
  * Allocates memory for handle and attribute arrays that will be returned
  * in the response.
  *
- * Posts the request to the request scheduler.
- *
  * Note: memory is allocated as one big chunk, pointed to by
  * s_op->resp->u.lookup_path.handle_array.
  *
@@ -126,7 +132,6 @@ machine pvfs2_lookup_sm(init,
 static int lookup_init(PINT_server_op *s_op,
 		       job_status_s* js_p)
 {
-    int ret;
     char *ptr;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_init\n");
@@ -155,13 +160,8 @@ static int lookup_init(PINT_server_op *s_op,
     ptr += s_op->u.lookup.seg_ct * sizeof(PVFS_handle);
     s_op->resp->u.lookup_path.attr_array = (PVFS_object_attr *) ptr;
 
-    ret = job_req_sched_post(s_op->req,
-				      s_op,
-				      js_p,
-				      &(s_op->scheduled_id),
-				      PINT_server_job_context);
-
-    return ret;
+    js_p->error_code = 0;
+    return(1);
 }
 
 /*

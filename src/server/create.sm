@@ -19,6 +19,8 @@ static int create_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
 
 extern job_context_id PINT_server_job_context;
 
+/* TODO: need error transition from prelude */
+
 %%
 
 machine pvfs2_create_sm(prelude, create2, send, release, cleanup)

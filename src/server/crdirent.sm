@@ -12,7 +12,7 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 
-static int crdirent_init(PINT_server_op *s_op, job_status_s* js_p);
+static int crdirent_validate(PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_read_directory_entry_handle(PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_read_parent_metadata(PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_verify_parent_metadata(PINT_server_op *s_op, job_status_s* js_p);
@@ -24,7 +24,6 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op, job_status_s* js_
 static int crdirent_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_release(PINT_server_op *s_op, job_status_s* js_p);
-void crdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
@@ -33,9 +32,12 @@ enum {
     ERROR_BADNAME = 4
 };
 
+/* TODO: need error transition from prelude */
+
 %%
 
-machine pvfs2_crdirent_sm(init,
+machine pvfs2_crdirent_sm(prelude,
+			  validate,
 			  read_directory_entry_handle,
 			  read_parent_metadata,
 			  verify_parent_metadata,
@@ -48,9 +50,15 @@ machine pvfs2_crdirent_sm(init,
 			  check_exist_directory_entry,
 			  handle_eexist)
 {
-	state init
+	state prelude
 	{
-		run crdirent_init;
+		jump pvfs2_prelude_sm;
+		default => validate;
+	}
+
+	state validate
+	{
+		run crdirent_validate;
 		ERROR_BADNAME => send;
 		default => read_parent_metadata;
 	}
@@ -124,14 +132,14 @@ machine pvfs2_crdirent_sm(init,
 	state cleanup
 	{
 		run crdirent_cleanup;
-		default => init;
+		default => prelude;
 	}
 }
 
 %%
 
 /*
- * Function: crdirent_init
+ * Function: crdirent_validate
  *
  * Synopsis: This function sets up the buffers in preparation for
  *           the trove operation to get the attribute structure
@@ -139,13 +147,12 @@ machine pvfs2_crdirent_sm(init,
  *           the request scheduler for consistency.
  *
  */
-static int crdirent_init(PINT_server_op *s_op,
+static int crdirent_validate(PINT_server_op *s_op,
 			 job_status_s* js_p)
 {
-    int ret;
     char *ptr;
 
-    gossip_debug(SERVER_DEBUG, "crdirent state: init\n");
+    gossip_debug(SERVER_DEBUG, "crdirent state: validate\n");
 
     /* verify input values -- some of this should be caught as legitimate errors later! */
     assert(s_op->req->u.crdirent.name != NULL);
@@ -177,13 +184,8 @@ static int crdirent_init(PINT_server_op *s_op,
 	return 1;
     }
 
-    /* post a scheduler job */
-    ret = job_req_sched_post(s_op->req,
-				      s_op,
-				      js_p,
-				      &(s_op->scheduled_id),
-				      PINT_server_job_context);
-    return ret;
+    js_p->error_code = 0;
+    return(1);
 }
 
 

@@ -14,7 +14,6 @@ enum {
     STATE_METAFILE = 7,
 };
 
-static int setattr_init(PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
@@ -25,14 +24,15 @@ static int setattr_write_metafile_distribution_if_required(
 static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
-void setattr_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
+/* TODO: need error transition out of prelude state */
+
 %%
 
-machine pvfs2_set_attr_sm(init,
+machine pvfs2_set_attr_sm(prelude,
 			  cleanup,
 			  getobj_attrib,
 			  verify_attribs,
@@ -42,9 +42,9 @@ machine pvfs2_set_attr_sm(init,
 			  send_bmi,
 			  release)
 {
-	state init
+	state prelude
 	{
-		run setattr_init;
+		jump pvfs2_prelude_sm;
 		default => getobj_attrib;
 	}
 
@@ -97,58 +97,11 @@ machine pvfs2_set_attr_sm(init,
 	state cleanup
 	{
 		run setattr_cleanup;
-		default => init;
+		default => prelude;
 	}
 }
 
 %%
-
-/*
- * Function: setattr_init
- *
- * Params:   server_op *b, 
- *           job_status_s* js_p
- *
- * Returns:  int
- *
- * Synopsis: 
- *           
- */
-static int setattr_init(PINT_server_op *s_op, job_status_s* js_p)
-{
-    PVFS_object_attr *a_p;
-    int ret;
-
-    gossip_debug(SERVER_DEBUG, "setattr state: init\n");
-
-    /* Dale noted that if ATTR_TYPE is set, the object might have just been
-     * created and we might want to just skip this.  But he wasn't sure.
-     */
-
-    a_p = &s_op->req->u.setattr.attr;
-
-    gossip_debug(SERVER_DEBUG,
-		 "  attributes from request = (owner = %d, group = %d, perms = %o, type = %d)\n",
-		 a_p->owner,
-		 a_p->group,
-		 a_p->perms,
-		 a_p->objtype);
-
-    gossip_debug(SERVER_DEBUG,
-		 "  setting attributes for fs_id = 0x%x, handle = 0x%08Lx\n",
-		 s_op->req->u.setattr.fs_id,
-		 s_op->req->u.setattr.handle);
-
-    /* post a scheduler job */
-    ret = job_req_sched_post(s_op->req,
-	    s_op,
-	    js_p,
-	    &(s_op->scheduled_id),
-	    PINT_server_job_context);
-
-    return(ret);
-
-}
 
 
 /*
@@ -167,8 +120,20 @@ static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     int ret=0;
     job_id_t j_id;
+    PVFS_object_attr *a_p = &s_op->req->u.setattr.attr;
 
+    gossip_debug(SERVER_DEBUG,
+		 "  attributes from request = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		 a_p->owner,
+		 a_p->group,
+		 a_p->perms,
+		 a_p->objtype);
 
+    gossip_debug(SERVER_DEBUG,
+		 "  setting attributes for fs_id = 0x%x, handle = 0x%08Lx\n",
+		 s_op->req->u.setattr.fs_id,
+		 s_op->req->u.setattr.handle);
+    
     gossip_debug(SERVER_DEBUG, "setattr state: getobj_attribs\n");
 
     s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;

@@ -12,7 +12,6 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 
-static int rmdirent_init(PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_read_parent_metadata(PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s* js_p);
@@ -20,14 +19,15 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s* j
 static int rmdirent_read_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_release_job(PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
-void rmdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
+/* TODO: need error transition from prelude state */
+
 %%
 
-machine pvfs2_rmdirent_sm(init,
+machine pvfs2_rmdirent_sm(prelude,
 		 read_parent_metadata,
 		 verify_parent_metadata_and_read_directory_entry_handle,
 		 read_directory_entry,
@@ -36,9 +36,9 @@ machine pvfs2_rmdirent_sm(init,
 		 release,
 		 cleanup)
 {
-	state init
+	state prelude
 	{
-		run rmdirent_init;
+		jump pvfs2_prelude_sm;
 		default => read_parent_metadata;
 	}
 
@@ -84,29 +84,11 @@ machine pvfs2_rmdirent_sm(init,
 	state cleanup
 	{
 		run rmdirent_cleanup;
-		default => init;
+		default => prelude;
 	}
 }
 
 %%
-
-/*
- * Function: rmdirent_init
- */
-static int rmdirent_init(PINT_server_op *s_op, job_status_s* js_p)
-{
-    int ret;
-
-    gossip_debug(SERVER_DEBUG, "rmdirent state: init\n");
-
-    ret = job_req_sched_post(s_op->req,
-				      s_op,
-				      js_p,
-				      &(s_op->scheduled_id),
-				      PINT_server_job_context);
-    return ret;
-
-}
 
 /*
  * Function: rmdirent_read_parent_metadata
