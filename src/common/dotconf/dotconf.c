@@ -513,6 +513,20 @@ void dotconf_set_command(configfile_t *configfile, const configoption_t *option,
 			cmd->arg_count++;
 		}
 
+                if (cmd->arg_count == (CFG_VALUES - 1))
+                {
+                    fprintf(stderr,"\n*********************************\n");
+                    fprintf(stderr,"--  DotConf Parser Error  --\n");
+                    fprintf(stderr,"There's a good chance that "
+                            "there are missing arguments\nthat were not "
+                            "picked up because this parser is weak.\n");
+                    fprintf(stderr,"Please increase the defined CFG_VALUES "
+                            "value in dotconf.h\nbefore recompiling to "
+                            "avoid this error.  Program terminating.\n");
+                    fprintf(stderr,"\n*********************************\n");
+                    exit(1);
+                }
+
 		skip_whitespace(&args, eob - args, 0);
 
 		if (cmd->arg_count && cmd->data.list[cmd->arg_count-1] && *args)
