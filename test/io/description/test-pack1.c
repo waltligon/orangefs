@@ -11,13 +11,13 @@ int main(int argc, char **argv)
 
 	/* build a request */
 	PVFS_Request_vector(16, 4, 64, PVFS_DOUBLE, &r);
-	PVFS_Dump_request(r);
+	PINT_Dump_request(r);
 
 	/* pack the request */
 	r_size = PINT_REQUEST_PACK_SIZE(r);
 	r_packed = (struct PINT_Request *)malloc(r_size);
 	PINT_Request_commit(r_packed, r);
-	PVFS_Dump_request(r_packed);
+	PINT_Dump_request(r_packed);
 
 	/* now prepare for sending on wire */
 	PINT_Request_encode(r_packed);
@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 		PINT_Request_decode(r2);
 
 		/* for now we'll just dump the request */
-		PVFS_Dump_request(r2);
+		PINT_Dump_request(r2);
 
 		/* we're done */
 		free(r2);

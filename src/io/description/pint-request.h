@@ -134,6 +134,9 @@ int PINT_Request_encode(struct PINT_Request *req);
 /* decode packed request in place after receiving from wire */
 int PINT_Request_decode(struct PINT_Request *req);
 
+void PINT_Dump_packed_request(struct PINT_request *req);
+void PINT_Dump_request(struct PINT_request *req);
+
 /********* macros for accessing key fields in a request *********/
 
 /* returns the number of bytes used by a contiguous packing of the

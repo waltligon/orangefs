@@ -4,8 +4,12 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.12 2003-08-07 20:15:39 walt Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.13 2003-08-08 15:10:13 walt Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.12  2003/08/07 20:15:39  walt
+//  updated commit code - works better now, but has another recursive
+//  routine in it - clean that up another day
+//
 // Revision 1.11  2003/07/23 12:40:22  neill
 // replaced some DIST_DEBUG lines I've added and gossipified some more request
 // related printfs
@@ -504,24 +508,3 @@ int PVFS_Pack_size(int incount, PVFS_Request request, PVFS_Comm comm, int *size)
 	return PVFS_SUCCESS;
 }
 #endif
-
-void PVFS_Dump_request(PVFS_Request req)
-{
-	gossip_debug(REQUEST_DEBUG,"**********************\n");
-	gossip_debug(REQUEST_DEBUG,"address:\t%x\n",(unsigned int)req);
-	gossip_debug(REQUEST_DEBUG,"offset:\t\t%d\n",(int)req->offset);
-	gossip_debug(REQUEST_DEBUG,"num_ereqs:\t%d\n",(int)req->num_ereqs);
-	gossip_debug(REQUEST_DEBUG,"num_blocks:\t%d\n",(int)req->num_blocks);
-	gossip_debug(REQUEST_DEBUG,"stride:\t\t%d\n",(int)req->stride);
-	gossip_debug(REQUEST_DEBUG,"ub:\t\t%d\n",(int)req->ub);
-	gossip_debug(REQUEST_DEBUG,"lb:\t\t%d\n",(int)req->lb);
-	gossip_debug(REQUEST_DEBUG,"agg_size:\t%d\n",(int)req->aggregate_size);
-	gossip_debug(REQUEST_DEBUG,"num_chunk:\t%d\n",(int)req->num_contig_chunks);
-	gossip_debug(REQUEST_DEBUG,"depth:\t\t%d\n",(int)req->depth);
-	gossip_debug(REQUEST_DEBUG,"num_nest:\t%d\n",(int)req->num_nested_req);
-	gossip_debug(REQUEST_DEBUG,"commit:\t\t%d\n",(int)req->committed);
-	gossip_debug(REQUEST_DEBUG,"refcount:\t\t%d\n",(int)req->refcount);
-	gossip_debug(REQUEST_DEBUG,"ereq:\t\t%x\n",(int)req->ereq);
-	gossip_debug(REQUEST_DEBUG,"sreq:\t\t%x\n",(int)req->sreq);
-	gossip_debug(REQUEST_DEBUG,"**********************\n");
-}

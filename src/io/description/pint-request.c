@@ -241,6 +241,12 @@ int PINT_Process_request(PINT_Request_state *req,
 		else
 		{
 			gossip_debug(REQUEST_DEBUG,"\tgoing to next level %d\n",req->lvl+1);
+			if (!req->cur[req->lvl].rq->ereq ||
+					req->lvl+1 >= req->cur[0].rqbase->depth)
+			{
+				gossip_lerr("PINT_Process_request exceeded request depth - possibly corrupted request or request state\n");
+				return -1;
+			}
 			req->cur[req->lvl+1].el = 0;
 			req->cur[req->lvl+1].maxel = req->cur[req->lvl].rq->num_ereqs;
 			req->cur[req->lvl+1].rq = req->cur[req->lvl].rq->ereq;
@@ -731,18 +737,23 @@ int PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 	if(node == NULL)
 		return -1;
   
+	gossip_debug(REQUEST_DEBUG,"commit node %x\n", node);
+
 	/* this node was previously committed */
 	if (node->committed)
 	{
+		gossip_debug(REQUEST_DEBUG,"previously commited %d\n", node->committed);
 		return node->committed; /* should contain the index */
 	}
 
 	/* Copy node to contiguous region */
+	gossip_debug(REQUEST_DEBUG,"node stored at %d\n", *index);
 	memcpy(&region[*index], node, sizeof(struct PINT_Request));
 	*index = *index + 1;
 
 	/* Update ereq so that the relative positions are maintained */
 	child_index = PINT_Do_Request_commit(region, node->ereq, index, depth+1);
+	gossip_debug(REQUEST_DEBUG,"child at %d\n", child_index);
 	if (child_index == -1)
 		region[start_index].ereq = NULL;
 	else
@@ -754,6 +765,7 @@ int PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 
 	/* Update sreq so that the relative positions are maintained */
 	child_index = PINT_Do_Request_commit(region, node->sreq, index, depth+1);
+	gossip_debug(REQUEST_DEBUG,"sibling at %d\n", child_index);
 	if (child_index == -1)
 		region[start_index].sreq = NULL;
 	else
@@ -761,13 +773,14 @@ int PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 
 	if (depth == 0)
 	{
+		gossip_debug(REQUEST_DEBUG,"clearing tree\n");
 		/* this does not get the 'd' but that's OK */
 		strncpy((char *)(region+(region->num_nested_req+1)),"committed",8);
 		PINT_Do_clear_commit(region);
 	}
 
 	/* Return the index of the committed struct */ 
-	return *index; 
+	return start_index; 
 }
 
 /* This function converts pointers to array indexes for transport
@@ -814,3 +827,35 @@ int PINT_Request_decode(struct PINT_Request *req)
 	return 0;
 }
     
+
+void PINT_Dump_packed_request(PVFS_Request req)
+{
+	int i;
+	if (!PINT_REQUEST_IS_PACKED(req))
+		return;
+	for (i = 0; i < req->num_nested_req+1; i++)
+	{
+		PINT_Dump_request(req+i);
+	}
+}
+
+void PINT_Dump_request(PVFS_Request req)
+{
+	gossip_debug(REQUEST_DEBUG,"**********************\n");
+	gossip_debug(REQUEST_DEBUG,"address:\t%x\n",(unsigned int)req);
+	gossip_debug(REQUEST_DEBUG,"offset:\t\t%d\n",(int)req->offset);
+	gossip_debug(REQUEST_DEBUG,"num_ereqs:\t%d\n",(int)req->num_ereqs);
+	gossip_debug(REQUEST_DEBUG,"num_blocks:\t%d\n",(int)req->num_blocks);
+	gossip_debug(REQUEST_DEBUG,"stride:\t\t%d\n",(int)req->stride);
+	gossip_debug(REQUEST_DEBUG,"ub:\t\t%d\n",(int)req->ub);
+	gossip_debug(REQUEST_DEBUG,"lb:\t\t%d\n",(int)req->lb);
+	gossip_debug(REQUEST_DEBUG,"agg_size:\t%d\n",(int)req->aggregate_size);
+	gossip_debug(REQUEST_DEBUG,"num_chunk:\t%d\n",(int)req->num_contig_chunks);
+	gossip_debug(REQUEST_DEBUG,"depth:\t\t%d\n",(int)req->depth);
+	gossip_debug(REQUEST_DEBUG,"num_nest:\t%d\n",(int)req->num_nested_req);
+	gossip_debug(REQUEST_DEBUG,"commit:\t\t%d\n",(int)req->committed);
+	gossip_debug(REQUEST_DEBUG,"refcount:\t\t%d\n",(int)req->refcount);
+	gossip_debug(REQUEST_DEBUG,"ereq:\t\t%x\n",(int)req->ereq);
+	gossip_debug(REQUEST_DEBUG,"sreq:\t\t%x\n",(int)req->sreq);
+	gossip_debug(REQUEST_DEBUG,"**********************\n");
+}
