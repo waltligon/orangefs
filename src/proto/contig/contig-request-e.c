@@ -31,13 +31,17 @@ ENCODE_REQ_HEAD(do_encode_req)
 		case PVFS_SERV_GETCONFIG:
 			if (!request->u.getconfig.fs_name)
 			{
+				printf("invalid string passed\n");
 				return (-EINVAL);
 			}
+			printf("geting string len\n");
 			name_sz = strlen( request->u.getconfig.fs_name );
-			size = sizeof( struct PVFS_server_req_s ) + name_sz + 1 + header_size;
-			enc_msg = BMI_memalloc( target_msg->dest, size, BMI_SEND_BUFFER );
+			size = sizeof( struct PVFS_server_req_s ) + name_sz + 1;
+			printf("total space: %d str len: %d header: %d struct: %d\n", size, name_sz, header_size, sizeof(struct PVFS_server_req_s));
+			enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t) (size + header_size), BMI_SEND_BUFFER );
 			if (!enc_msg)
 			{
+				printf("unable to malloc = %d bytes\n", size);
 				return (-ENOMEM);
 			}
 			target_msg->buffer_list = (void*) malloc(sizeof(void *));
@@ -46,14 +50,18 @@ ENCODE_REQ_HEAD(do_encode_req)
 			target_msg->total_size = size;
 			memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
+			printf("copying strings now\n");
         		/* copy a null terminated string to another */
-        		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.getconfig.fs_name, name_sz);
+        		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.getconfig.fs_name, (size_t) name_sz);
+			printf("copying terminator\n");
         		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ) + name_sz , "\0", 1 );
 
 			/* make pointer since we're sending it over the wire and don't want 
 			 * random memory referenced on the other side */
 
+			printf("updating pointer\n");
 			((struct PVFS_server_req_s *)enc_msg)->u.getconfig.fs_name = NULL;
+			printf("done\n");
 			return (0);
 
 		case PVFS_SERV_LOOKUP_PATH:
@@ -62,8 +70,8 @@ ENCODE_REQ_HEAD(do_encode_req)
 				return (-EINVAL);
 			}
 			name_sz = strlen( request->u.lookup_path.path );
-			size = sizeof( struct PVFS_server_req_s ) + name_sz + 1 + header_size;
-                	enc_msg = BMI_memalloc( target_msg->dest, size, BMI_SEND_BUFFER );
+			size = sizeof( struct PVFS_server_req_s ) + name_sz + 1;
+                	enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER );
 			if (!enc_msg)
 			{
 				return (-ENOMEM);
@@ -75,7 +83,7 @@ ENCODE_REQ_HEAD(do_encode_req)
 			memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
         		/* copy a null terminated string to another */
-        		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.lookup_path.path, name_sz);
+        		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.lookup_path.path, (size_t)name_sz);
         		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ) + name_sz , "\0", 1 );
 
 			/* make pointer since we're sending it over the wire and don't want 
@@ -90,8 +98,8 @@ ENCODE_REQ_HEAD(do_encode_req)
 				return (-EINVAL);
 			}
 			name_sz = strlen( request->u.crdirent.name );
-			size = sizeof( struct PVFS_server_req_s ) + name_sz + 1 + header_size;
-                	enc_msg = BMI_memalloc( target_msg->dest, size, BMI_SEND_BUFFER );
+			size = sizeof( struct PVFS_server_req_s ) + name_sz + 1;
+                	enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER );
 			if (!enc_msg)
 			{
 				return (-ENOMEM);
@@ -103,7 +111,7 @@ ENCODE_REQ_HEAD(do_encode_req)
 			memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
         		/* copy a null terminated string to another */
-        		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.crdirent.name, name_sz);
+        		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.crdirent.name, (size_t)name_sz);
         		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ) + name_sz , "\0", 1 );
 
 			/* make pointer since we're sending it over the wire and don't want 
@@ -118,8 +126,8 @@ ENCODE_REQ_HEAD(do_encode_req)
 				return (-EINVAL);
 			}
 			name_sz = strlen( request->u.rmdirent.entry );
-			size = sizeof( struct PVFS_server_req_s ) + name_sz + 1 + header_size;
-                	enc_msg = BMI_memalloc( target_msg->dest, size, BMI_SEND_BUFFER );
+			size = sizeof( struct PVFS_server_req_s ) + name_sz + 1;
+                	enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER );
 			if (!enc_msg)
 			{
 				return (-ENOMEM);
@@ -131,7 +139,7 @@ ENCODE_REQ_HEAD(do_encode_req)
 			memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
 
         		/* copy a null terminated string to another */
-        		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.rmdirent.entry, name_sz);
+        		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.rmdirent.entry, (size_t)name_sz);
         		strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ) + name_sz , "\0", 1 );
 
 			/* make pointer since we're sending it over the wire and don't want 
@@ -141,7 +149,7 @@ ENCODE_REQ_HEAD(do_encode_req)
 			return (0);
 
 		case PVFS_SERV_MKDIR:
-			size = sizeof( struct PVFS_server_req_s ) + sizeof( struct PVFS_object_attr ) + header_size;
+			size = sizeof( struct PVFS_server_req_s ) + sizeof( struct PVFS_object_attr );
 
 			/* if we're mkdir'ing a meta file, we need to alloc space for the attributes */
 			if ( request->u.mkdir.attr.objtype == ATTR_META )
@@ -152,7 +160,7 @@ ENCODE_REQ_HEAD(do_encode_req)
 			/* TODO: come back and alloc the right spaces for 
 			 * distributions cause they're going to change */
 
-                	enc_msg = BMI_memalloc( target_msg->dest, size, BMI_SEND_BUFFER );
+                	enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER );
 			if (!enc_msg)
 			{
 				return (-ENOMEM);
@@ -179,7 +187,7 @@ ENCODE_REQ_HEAD(do_encode_req)
 			return (0);
 
 		case PVFS_SERV_SETATTR:
-			size = sizeof( struct PVFS_server_req_s ) + sizeof( struct PVFS_object_attr ) + header_size;
+			size = sizeof( struct PVFS_server_req_s ) + sizeof( struct PVFS_object_attr );
 
 			/* if we're mkdir'ing a meta file, we need to alloc space for the attributes */
 			if ( request->u.setattr.attr.objtype == ATTR_META )
@@ -195,7 +203,7 @@ ENCODE_REQ_HEAD(do_encode_req)
 			/* TODO: come back and alloc the right spaces for 
 			 * distributions and eattribs cause they're going to change */
 
-                	enc_msg = BMI_memalloc( target_msg->dest, size, BMI_SEND_BUFFER );
+                	enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER );
 			if (!enc_msg)
 			{
 				return (-ENOMEM);
@@ -234,8 +242,8 @@ ENCODE_REQ_HEAD(do_encode_req)
 		case PVFS_SERV_REMOVE:
 		case PVFS_SERV_TRUNCATE:
 		case PVFS_SERV_ALLOCATE:
-			size = sizeof( struct PVFS_server_req_s ) + header_size;
-			enc_msg = BMI_memalloc( target_msg->dest, size, BMI_SEND_BUFFER ) ;
+			size = sizeof( struct PVFS_server_req_s );
+			enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER ) ;
 			if (!enc_msg)
 			{
 				return (-ENOMEM);
