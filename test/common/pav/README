@@ -4,7 +4,7 @@ Idea:
 
 This package is meant to help with the setup and shutdown of PVFS
 volumes.  It was written with the intent of making the testing of such
-volumes simple, since testing PVFS volumes often times involves the
+volumes simple, since testing PVFS volumes often involves the
 time consuming process of making changes to PVFS server code, pushing
 the compiled binaries out to server nodes, setting up PVFS server
 config files, and finally starting the iod and mgr processes.  The pav
@@ -16,6 +16,14 @@ duration of their job.  Sysadmins like the author also use the package
 to push out new versions of PVFS code onto their cluster wide PVFS
 resource.
 
+Typically, PAV is used in two environments.  In one case, a user has a
+handful of workstations.  Using PAV, he can get a mulit-server PVFS2
+volume up and running and quickly start testing.  In the other common
+case, the user requests an allocation of nodes on a cluster.  With PAV,
+the allocation is split into "io nodes" and "compute nodes".  PVFS2
+servers run on the io nodes while the application runs on the compute
+nodes.  This split keeps the application nodes from perturbing the io
+nodes and should yield more consistent results.
 
 Using pav:
 
