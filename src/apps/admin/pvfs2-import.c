@@ -77,14 +77,14 @@ int main(int argc, char **argv)
     {
 	if(PVFS_ERROR_CLASS(-ret))
 	{
-	    fprintf(stderr, "Error: PVFS_sys_initialize: %s.\n", 
+	    fprintf(stderr, "Error: PVFS_sys_initialize(): %s.\n", 
 		strerror(PVFS_ERROR_TO_ERRNO(-ret)));
 	}
 	else
 	{
 	    fprintf(stderr, 
 		"Warning: PVFS_sys_initialize() returned a non PVFS2 error code:\n");
-	    fprintf(stderr, "Error: PVFS_sys_initialize: %s.\n", 
+	    fprintf(stderr, "Error: PVFS_sys_initialize(): %s.\n", 
 		strerror(-ret));
 	}
         return(-1);
@@ -139,14 +139,14 @@ int main(int argc, char **argv)
     {
 	if(PVFS_ERROR_CLASS(-ret))
 	{
-	    fprintf(stderr, "Error: PVFS_sys_create: %s.\n", 
+	    fprintf(stderr, "Error: PVFS_sys_create(): %s.\n", 
 		strerror(PVFS_ERROR_TO_ERRNO(-ret)));
 	}
 	else
 	{
 	    fprintf(stderr, 
 		"Warning: PVFS_sys_create() returned a non PVFS2 error code:\n");
-	    fprintf(stderr, "Error: PVFS_sys_create: %s.\n", 
+	    fprintf(stderr, "Error: PVFS_sys_create(): %s.\n", 
 		strerror(-ret));
 	}
 	PVFS_sys_finalize();
@@ -160,14 +160,14 @@ int main(int argc, char **argv)
     {
 	if(PVFS_ERROR_CLASS(-ret))
 	{
-	    fprintf(stderr, "Error: PVFS_sys_finalize: %s.\n", 
+	    fprintf(stderr, "Error: PVFS_sys_finalize(): %s.\n", 
 		strerror(PVFS_ERROR_TO_ERRNO(-ret)));
 	}
 	else
 	{
 	    fprintf(stderr, 
 		"Warning: PVFS_sys_finalize() returned a non PVFS2 error code:\n");
-	    fprintf(stderr, "Error: PVFS_sys_finalize: %s.\n", 
+	    fprintf(stderr, "Error: PVFS_sys_finalize(): %s.\n", 
 		strerror(-ret));
 	}
 	return(-1);
