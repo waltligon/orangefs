@@ -779,8 +779,14 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     }
     q_op_p->op.u.b_rw_list.fd = fd;
 
-    /* if this attr is in the dbpf attr cache, remove it */
-    dbpf_attr_cache_remove(handle);
+    /*
+      if we're doing an i/o write, remove the cached
+      attribute for this handle if it's present
+    */
+    if (opcode == LIO_WRITE)
+    {
+        dbpf_attr_cache_remove(handle);
+    }
 
 #ifndef __PVFS2_TROVE_AIO_THREADED__
 
