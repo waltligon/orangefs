@@ -20,11 +20,6 @@
  * Removed Status Queue. (see job_check_consistency)
  * Added Signal Handlers
  * 
- * 
- * Jan 2002
- *
- * This is a basic server.  It will not do any work at this stage.
- * This is meant to be a basic framework.
  */ 
 
 #include <errno.h>
@@ -48,6 +43,7 @@
 #include <pvfs2-debug.h>
 #include <pvfs2-storage.h>
 #include <PINT-reqproto-encode.h>
+#include <request-scheduler.h>
 
 #include <state-machine.h>
 #include <server-config.h>
@@ -55,17 +51,17 @@
 
 /* Internal Globals */
 
-/* TODO:  I am making the server_level_init global for signal handling...
- *        Do we want to do the same for the user_opts? */
-
-/****************************************/
-/* TODO:  SUPPORT GM AND TCP for BMI!!! */
-/****************************************/
-
+/* For the switch statement to know what interfaces to shutdown */
 static int server_level_init;
-static struct server_configuration_s *user_opts;
-static int SIGNAL_RECVD;
 
+/* All parameters read in from the configuration file */
+static struct server_configuration_s *user_opts;
+
+/* A flag to stop the main loop from processing and handle the signal 
+	after all threads complete and are no longer blocking */
+static int signal_recvd_flag;
+
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 /* Prototypes */
 
@@ -75,36 +71,55 @@ static void *sig_handler(int sig);
 int PINT_server_cp_bmi_unexp(PINT_server_op *s_op, job_status_s *ret);
 void PINT_server_get_bmi_unexp_err(int ret);
 
-/* Functions  */
 
 int main(int argc, char **argv) {
 
+	/* Used to check completion of interface initializations */
 	int ret = -1;
-	int i = 0;
-	int tempWhile = 0;
-	int postBMIFlag = 0;
 
-#ifdef DEBUG 
-	int TEMP_CHECK_OUT = 10;
-	int TEMP_JOBS_COMPLETE = 0;
-#endif
+	/* Inside for loop variable */
+	int i = 0;  
 
-	int out_count = 0 ;
+	/* Flag used to post new BMI Unexpected messages */
+	int postBMIFlag = 0; 
+
+	/* Total number of jobs from job_wait_world */
+	int out_count = 0;  
+
+	/* Used for user_pointers that come out of job_wait_world */
 	PINT_server_op *s_op = NULL;
-	char *method_name = NULL;
+
+	/* Job ID Array used in job_wait_world */
 	job_id_t job_id_array[MAX_JOBS];
+
+	/* User Pointer Array used in job_wait_world */
 	void *completed_job_pointers[MAX_JOBS]; 
+
+	/* Status Structures used in job_wait_world */
 	job_status_s job_status_structs[MAX_JOBS];
 	
-	struct unexpected_info* temp_buff = NULL;
-
 	/* Insert Temp Trove Stuff Here */
 
-	TROVE_coll_id coll_id;
+	char *method_name = NULL;
 
-	SIGNAL_RECVD = 0;
-	server_level_init = 0; /* Used for shutdown function */
+#ifdef DEBUG 
+	int Temp_Check_Out_Debug = 10;
+	int Temp_Jobs_Complete_Debug = 0;
+#endif
 
+	/* Begin Main */
+
+	/* When we get a signal, we are thread based, so we need to make
+	   sure that one, the parent has the signal, and two, none of the 
+	   threads are blocking on a semaphore.  Yet another cool error
+		found and resolved.  dw
+	 */
+	signal_recvd_flag = 0; 
+
+	/* Used for shutdown function */
+	server_level_init = 0; 
+
+	/* Enable the gossip interface. */
 	gossip_enable_stderr();
 	gossip_set_debug_mask(1,SERVER_DEBUG);
 
@@ -114,10 +129,11 @@ int main(int argc, char **argv) {
 		gossip_err("WARNING: Server should be run as root\n");
 	}
 
-	/* Read configuration options...
+	/* 
+	 *	Read configuration options...
 	 * function located in server_config.c
 	 */
-	user_opts = server_config(argc,argv);  /* server_config.c:53 */
+	user_opts = PINT_server_config(argc,argv);  /* server_config.c:53 */
 
 	if(!user_opts)
 	{
@@ -161,18 +177,33 @@ int main(int argc, char **argv) {
 	gossip_debug(SERVER_DEBUG,"Flow Init Complete\n");
 
 	/* initialize Trove Interface */
+	
 	ret = trove_initialize(user_opts->storage_path,0,&method_name,0);
 	if(ret < 0){
 		gossip_err("Trove Init Failed: %s\n",strerror(-ret));
 		server_shutdown(server_level_init,ret,0);
 	}
 
-	/* TODO: Update this to use filesystems in config file. */
-	ret = trove_collection_lookup("fs-foo",&coll_id,NULL,NULL);
+	/* Uses filesystems in config file. */
+	for(i=0;i<user_opts->number_filesystems;i++)
+	{
+		ret = trove_collection_lookup(user_opts->file_systems[i]->file_system_name,
+												&(user_opts->file_systems[i]->coll_id),
+												NULL,
+												NULL);
+		if(ret < 0)
+		{
+			gossip_lerr("Error initializing filesystem %s\n",
+					user_opts->file_systems[i]->file_system_name);
+			server_shutdown(server_level_init,ret,0);
+		}
+	}
+
 
 	server_level_init++;
 		
 	gossip_debug(SERVER_DEBUG,"Storage Init Complete\n");
+	gossip_debug(SERVER_DEBUG,"%d filesystems initialized\n",i);
 
 	/* initialize Job Interface */
    ret = job_initialize(0);
@@ -198,6 +229,19 @@ int main(int argc, char **argv) {
 
 	gossip_debug(SERVER_DEBUG,"State Machine Init Complete\n");
 
+
+	/* initialize Server Request Scheduler */
+	ret = PINT_req_sched_initialize();
+	if(ret < 0)
+	{
+		gossip_err("Error initializing Request Scheduler interface: %s\n", strerror(-ret));
+		server_shutdown(server_level_init,ret,0);
+	}
+
+	server_level_init++;
+
+	gossip_debug(SERVER_DEBUG,"Request Scheduler Init Complete\n");
+
 	/* Below, we initially post BMI unexpected msg buffers =) */
 	for(i=0; i<user_opts->initial_unexpected_requests; i++)
 	{
@@ -205,10 +249,8 @@ int main(int argc, char **argv) {
 		if (ret < 0) 
 		{
 			PINT_server_get_bmi_unexp_err(ret);
-			if(ret == -4)
-				free(temp_buff);
 			server_shutdown(server_level_init,ret,0);
-		}
+		} /* fi */
 		if (ret == 1)
 		{
 			ret = PINT_state_machine_initialize_unexpected(s_op,&job_status_structs[i]); 
@@ -217,8 +259,9 @@ int main(int argc, char **argv) {
 				ret = PINT_state_machine_next(completed_job_pointers[i],&job_status_structs[i]);
 			}
 			gossip_debug(SERVER_DEBUG,"BMI_unexp Completed\n");
-		}
+		} /* fi */
 	} /* End of BMI Unexpected Requests rof */
+
 	server_level_init++;
 	gossip_debug(SERVER_DEBUG,"All BMI_unexp Posted\n");
 
@@ -226,7 +269,7 @@ int main(int argc, char **argv) {
 	signal(SIGHUP, (void *)sig_handler);
 	signal(SIGILL, (void *)sig_handler);
 #if 0
-//#ifdef USE_SIGACTION
+/* #ifdef USE_SIGACTION */
 	act.sa_handler = (void *)sig_handler;
 	act.sa_mask = 0;
 	act.sa_flags = 0;
@@ -245,17 +288,18 @@ int main(int argc, char **argv) {
 		gossip_err("Error Registering Signal SIGPIPE.\nProgram Terminating.\n");
 		server_shutdown(server_level_init,ret,0);
 	}
-//#else
+/* #else */
 	signal(SIGSEGV, (void *)sig_handler);
 	signal(SIGPIPE, (void *)sig_handler);
 #endif
 
-	while(1)   /* The do work forever loop. */
+	/* The do work forever loop. */
+	while(1)   
 	{
 		out_count = MAX_JOBS;
-		if (SIGNAL_RECVD != 0)
+		if (signal_recvd_flag != 0)
 		{
-			server_shutdown(server_level_init,SIGNAL_RECVD,0);
+			server_shutdown(server_level_init,signal_recvd_flag,0);
 		}
       ret = job_waitworld(job_id_array,&out_count,completed_job_pointers,job_status_structs);
 		if(ret < 0)
@@ -263,9 +307,7 @@ int main(int argc, char **argv) {
 			gossip_lerr("FREAK OUT.\n");
 			exit(-1);
 		}
-		if(out_count !=0)
-			gossip_debug(SERVER_DEBUG,"Outcount: %d\n",out_count);
-		
+
 		for(i=0;i<out_count;i++) 
 		{
 			s_op = (PINT_server_op *) completed_job_pointers[i];
@@ -274,7 +316,7 @@ int main(int argc, char **argv) {
 
 doWorkUnexp:
 #ifdef DEBUG
-				if(TEMP_JOBS_COMPLETE++ == TEMP_CHECK_OUT)
+				if(Temp_Jobs_Complete_Debug++ == Temp_Check_Out_Debug)
 					server_shutdown(server_level_init,-1,0);
 #endif
 
@@ -300,7 +342,6 @@ doWorkUnexp:
 			}
 			if(postBMIFlag)
 			{
-				gossip_debug(SERVER_DEBUG,"Posting Another BMI Job\n");
 				postBMIFlag = 0;
 				ret = PINT_server_cp_bmi_unexp(s_op,&job_status_structs[i]);
 				if(ret == 1)
@@ -312,7 +353,6 @@ doWorkUnexp:
 		}
 
 	}
-	gossip_debug(SERVER_DEBUG,"Bailing out of While loop: tempWhile = %d\n",tempWhile);
 	server_shutdown(server_level_init+1,1,0);
 	return -1; /* Should never get here */
 	
@@ -423,7 +463,7 @@ static int server_shutdown(int level,int ret,int siglevel) {
 static void *sig_handler(int sig) 
 {
 	gossip_debug(SERVER_DEBUG,"Got Signal %d... Level...%d\n",sig,server_level_init);
-	SIGNAL_RECVD=sig;
+	signal_recvd_flag=sig;
 #if 0
 	if(sig == SIGSEGV)
 	{
@@ -456,13 +496,19 @@ int PINT_server_cp_bmi_unexp(PINT_server_op *serv_op, job_status_s *temp_stat)
 {
 	job_id_t jid;
 	int ret;
+	char *mem_calc_ptr;
 
-	serv_op = (PINT_server_op *) malloc(sizeof(PINT_server_op));
+	serv_op = (PINT_server_op *) malloc(sizeof(PINT_server_op)+sizeof(void *));
 	if(!serv_op)
 	{
 		return(-1);
 	}
+
 	serv_op->op = BMI_UNEXP;
+
+
+	mem_calc_ptr = (char *) serv_op;
+	serv_op->encoded.buffer_list = (void *) mem_calc_ptr + sizeof(PINT_server_op);
 
 	serv_op->unexp_bmi_buff = (struct unexpected_info *) malloc(sizeof(struct unexpected_info));
 	if(!serv_op->unexp_bmi_buff)

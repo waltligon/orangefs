@@ -25,7 +25,7 @@ static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret);
 static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *ret);
 void crdirent_init_state_machine(void);
 
-extern PINT_server_trove_keys_s *Trove_Common_Keys;
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 PINT_state_machine_s crdirent_req_s = 
 {
@@ -163,11 +163,14 @@ static int crdirent_init(state_action_struct *s_op, job_status_s *ret)
 	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 	
 	/* post a scheduler job */
+#if 0
 	job_post_ret = job_req_sched_post(s_op->req,
 												 s_op,
 												 ret,
 												 &(s_op->scheduled_id));
 	return(job_post_ret);
+#endif
+	return 1;
 }
 
 /*
@@ -467,12 +470,10 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 	int job_post_ret=0;
 	job_id_t i;
-	void *a[1];
 
 	gossip_ldebug(SERVER_DEBUG,"send Fxn for crdirent\n");
 
 	s_op->resp->status = ret->error_code;
-	s_op->encoded.buffer_list = a[0];
 
 	/* Set the ack IF it was created */
 	if(ret->error_code == 0) 
@@ -521,11 +522,13 @@ static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *
 	int job_post_ret=0;
 	job_id_t i;
 
+#if 0
 	job_post_ret = job_req_sched_release(s_op->scheduled_id,
 													  s_op,
 													  ret,
 													  &i);
 	return job_post_ret;
+#endif 
 }
 
 /*

@@ -123,7 +123,6 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 					s_op->unexp_bmi_buff->addr,
 					s_op->unexp_bmi_buff->size,
 					&(s_op->enc_type));
-
 	s_op->req  = (struct PVFS_server_req_s *) decoded_message.buffer;
 	assert(s_op->req != NULL);
 
@@ -132,16 +131,20 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 	s_op->op   = s_op->req->op;
 	s_op->current_state = PINT_state_machine_locate(s_op);
 
+	/* Walt said this code does not need to be here anymore */
+#if 0
+
 	/* What is happening here!!! 
 		Right now, we are pointing to the pointer of the first state.... 
 		We need to follow that pointer down one. By dereferencing this pointer, we are where we 
+	   should be! TODO: WHY IS THIS NOW NECESSARY????  dw
 		
 		-- More explanation:  Ok, so in gdb, without this line of code below, there is a pointer
 		   that is to ST_init which itself is that generated array.  So it looks like what has 
 			happened is there is another layer of pointers... but I will find out once I fix this 
 			request scheduler problem
+	*/
 		
-	   should be! TODO: WHY IS THIS NOW NECESSARY????  dw*/
 
 	/********************************************************************************/
 	/******************************   WARNING  **************************************/
@@ -153,6 +156,7 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 	/********************************************************************************/
 	/****************************** /WARNING ****************************************/
 	/********************************************************************************/
+#endif
 
 
 	if(!s_op->current_state)
@@ -160,7 +164,6 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 		gossip_err("System not init for function\n");
 		return(-1);
 	}
-
 	/* TODO:  This would be a good place for caching!!! */
 	s_op->resp = (struct PVFS_server_resp_s *) malloc(sizeof(struct PVFS_server_resp_s));
 
@@ -195,10 +198,7 @@ int PINT_state_machine_init(void)
 		if(PINT_server_op_table[i])
 		{
 			(PINT_server_op_table[i]->init_fun)();
-			printf("i: %d\n",i);
 		}
-		else
-			printf("Failed on i:%d\n",i);
 	}
 	return(0);
 	
@@ -270,17 +270,13 @@ int PINT_state_machine_next(state_action_struct *s,job_status_s *r)
 PINT_state_array_values *PINT_state_machine_locate(state_action_struct *s_op)
 {
 
-	gossip_debug(SERVER_DEBUG,"Locating State machine for %d\n",s_op->op);
 	/* do we need to check for s_op->op out of range?  - WBL */
 	if(PINT_server_op_table[s_op->op] != NULL)
 	{
 		/* Return the first return value possible from the init function... =) */
-		gossip_debug(SERVER_DEBUG,"Found State Machine %d\n",s_op->op);
 		return PINT_server_op_table[s_op->op]->state_machine;
 	}
 	gossip_err("State machine not found for operation %d\n",s_op->op);
 	return(NULL);
 	
 }
-
-

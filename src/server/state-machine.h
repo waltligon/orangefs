@@ -19,7 +19,6 @@
 #include <pvfs2-debug.h>
 #include <pvfs2-storage.h>
 #include <PINT-reqproto-encode.h>
-#include <pack.h>
 
 typedef struct PINT_server_op state_action_struct;
 

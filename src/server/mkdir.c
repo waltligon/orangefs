@@ -18,7 +18,7 @@ static int mkdir_send_bmi(state_action_struct *s_op, job_status_s *ret);
 static int mkdir_setattrib(state_action_struct *s_op, job_status_s *ret);
 void mkdir_init_state_machine(void);
 
-extern PINT_server_trove_keys_s *Trove_Common_Keys;
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 PINT_state_machine_s mkdir_req_s = 
 {

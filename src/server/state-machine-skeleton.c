@@ -19,7 +19,7 @@ static int request_release_posted_job(state_action_struct *s_op, job_status_s *r
 static int request_cleanup(state_action_struct *s_op, job_status_s *ret);
 void request_init_state_machine(void);
 
-extern PINT_server_trove_keys_s *Trove_Common_Keys;
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 PINT_state_machine_s request_req_s = 
 {

@@ -20,7 +20,7 @@ static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *r
 static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret);
 void getattr_init_state_machine(void);
 
-extern PINT_server_trove_keys_s *Trove_Common_Keys;
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 PINT_state_machine_s getattr_req_s = 
 {
@@ -110,12 +110,15 @@ static int getattr_init(state_action_struct *s_op, job_status_s *ret)
 
 	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 
+#if 0
 	job_post_ret = job_req_sched_post(s_op->req,
 												 s_op,
 												 ret,
 												 &(s_op->scheduled_id));
 	
 	return(job_post_ret);
+#endif
+	return 1;
 	
 }
 
@@ -171,10 +174,6 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	
 	int job_post_ret=0;
 	job_id_t i;
-	void *a[1];
-
-	/* Set up a little array. yay */
-	s_op->encoded.buffer_list = a[0];
 
 	/* This comes from the trove operation.  Note, this operation is still
 	 * valid even though the operation may have failed.
@@ -240,11 +239,14 @@ static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *r
 	int job_post_ret=0;
 	job_id_t i;
 
+#if 0
 	job_post_ret = job_req_sched_release(s_op->scheduled_id,
 													  s_op,
 													  ret,
 													  &i);
 	return job_post_ret;
+#endif
+	return 1;
 }
 
 

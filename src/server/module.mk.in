@@ -21,7 +21,6 @@ SERVERSRC += \
 
 # added to the library so that test programs will work
 LIBSRC += \
-	$(DIR)/pack.c \
 	$(DIR)/print-struct.c
 
 # rule for automatically generated source files

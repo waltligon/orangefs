@@ -23,8 +23,9 @@ static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret);
 static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret);
 static int lookup_key_val(state_action_struct *s_op, job_status_s *ret);
 void lookup_init_state_machine(void);
+/* TODO: Release Scheduled Job */
 
-extern PINT_server_trove_keys_s *Trove_Common_Keys;
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 PINT_state_machine_s lookup_req_s = 
 {
@@ -112,9 +113,6 @@ void lookup_init_state_machine(void)
  * Returns:  int
  *
  * Synopsis: Allocate all memory.  Should we just malloc one big region?
- *           Considering how much you guys are confused already, why put
- *           more pointers?
- *           TODO: Right now, this does not work!!!!
  *           
  */
 
@@ -203,9 +201,12 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 	 *	is stored in the same place.  So, lets use the starting handle...
 	 *
 	 */
-
-	s_op->val.buffer = &(s_op->req->u.lookup_path.starting_handle);
-	s_op->val.buffer_sz = sizeof(PVFS_handle);
+	s_op->strsize = strlen(s_op->req->u.lookup_path.path);
+	if(index(s_op->req->u.lookup_path.path)-s_op->req->u.lookup_path.path == 0)
+	{
+		s_op->req->u.lookup_path.path++;
+		s_op->strsize--;
+	}
 
 	job_post_ret = job_req_sched_post(s_op->req,
 												 s_op,
@@ -239,13 +240,13 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret = -1;
+	int job_post_ret = 1;
 
-	/* I HAVE NO IDEA WHAT THIS DOES  not my code... dw*/
-#if 0
 	job_id_t i;
 	int k;
+	char *end_of_path;
 	int meta_data_flag,directory_handle_flag; //used to tell us that we have the data
+	PVFS_vtag_s vtag;
 
 	meta_data_flag=directory_handle_flag=0;
 
@@ -289,16 +290,20 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 			gossip_lerr("We did not get both... fix it\n");
 		}
 	}
-	if(s_op->req->u.lookup_path.path)
+	/* TODO: Better way of doing this??? */
+	if(s_op->strsize)
 	{
-		s_op->key.buffer = strtok(s_op->req->u.lookup_path.path,path_delim);
-		if(!(s_op->key.buffer_sz = strlen(s_op->key.buffer)))
-		{
-			s_op->key.buffer = strtok(s_op->req->u.lookup_path.path,path_delim);
-			s_op->key.buffer_sz = strlen(s_op->key_a[2].buffer);
-		}
+		end_of_path = index(s_op->req->u.lookup_path.path,'/');
+		if(end_of_path)
+			end_of_path[0] = '\0';
+		else
+			if(strlen(s_op->req->u.lookup_path.path)) // there is something there
+		s_op->key.buffer = s_op->req->u.lookup_path.path;
+		s_op->key.buffer_sz = strlen(s_op->key.buffer)
+		s_op->u.lookup_path.path+=strlen(s_op->key.buffer)+1;
+		s_op->strsize-=strlen(s_op->key.buffer)+1;
 	}
-#endif
+	printf("Looking up %s\n",(char *)s_op->key.buffer);
 
 	gossip_ldebug(SERVER_DEBUG,"check returning: %d\n",job_post_ret);
 	return(job_post_ret);
@@ -317,7 +322,7 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Encode and send
  *           
  */
 
@@ -354,6 +359,16 @@ static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret)
 
 	gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space\n");
 	
+	job_post_ret = job_trove_key_val_read(
+														s_op->req->u.lookup_path.fs_id,
+														s_op->req->u.lookup_path.starting_handle,
+														&(s_op->key),
+														&(s_op->val),
+														0,
+														vtag,
+														s_op,
+														ret,
+														&i);
 	return(job_post_ret);
 
 }
@@ -383,16 +398,16 @@ static int lookup_key_val(state_action_struct *s_op, job_status_s *ret)
 	PVFS_vtag_s bs;
 
 	job_post_ret = job_trove_keyval_iterate(s_op->req->u.lookup_path.fs_id,
-			s_op->req->u.lookup_path.starting_handle,
-			1,
-			s_op->key_a,
-			s_op->val_a,
-			2,
-			0,
-			bs,
-			s_op,
-			ret,
-			&i);
+														 s_op->req->u.lookup_path.starting_handle,
+														 1,
+														 s_op->key_a,
+														 s_op->val_a,
+														 5,
+														 0,
+														 bs,
+														 s_op,
+														 ret,
+														 &i);
 
 	return(job_post_ret);
 
@@ -421,33 +436,7 @@ static int lookup_cleanup(state_action_struct *s_op, job_status_s *ret)
 
 	if(s_op->key_a)
 	{
-		if(s_op->key_a[0].buffer)
-			free(s_op->key_a[0].buffer);
-		if(s_op->key_a[1].buffer)
-			free(s_op->key_a[1].buffer);
-		if(s_op->key_a[2].buffer)
-			free(s_op->key_a[2].buffer);
 		free(s_op->key_a);
-	}
-
-	if(s_op->val_a)
-	{
-		if(s_op->val_a[0].buffer)
-			free(s_op->val_a[0].buffer);
-		if(s_op->val_a[1].buffer)
-			free(s_op->val_a[1].buffer);
-		if(s_op->val_a[2].buffer)
-			free(s_op->val_a[2].buffer);
-		free(s_op->val_a);
-	}
-
-	if(s_op->resp->u.lookup_path.handle_array)
-	{
-		free(s_op->resp->u.lookup_path.handle_array);
-	}
-	if(s_op->resp->u.lookup_path.attr_array)
-	{
-		free(s_op->resp->u.lookup_path.attr_array);
 	}
 
 	if(s_op->resp)

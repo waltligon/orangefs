@@ -17,9 +17,10 @@ static int setattr_cleanup(state_action_struct *s_op, job_status_s *ret);
 static int setattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret);
 static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret);
 static int setattr_send_bmi(state_action_struct *s_op, job_status_s *ret);
+static int setattr_release_posted_job(state_action_struct *s_op, job_status_s *ret);
 void setattr_init_state_machine(void);
 
-extern PINT_server_trove_keys_s *Trove_Common_Keys;
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 PINT_state_machine_s setattr_req_s = 
 {
@@ -28,9 +29,10 @@ PINT_state_machine_s setattr_req_s =
 	setattr_init_state_machine
 };
 
+
 %%
 
-machine set_attr(init, cleanup, getobj_attrib, setobj_attrib, send_bmi)
+machine set_attr(init, cleanup, getobj_attrib, setobj_attrib, send_bmi, release)
 {
 	state init
 	{
@@ -53,6 +55,12 @@ machine set_attr(init, cleanup, getobj_attrib, setobj_attrib, send_bmi)
 	state send_bmi
 	{
 		run setattr_send_bmi;
+		default => release;
+	}
+
+	state release
+	{
+		run setattr_release_posted_job;
 		default => cleanup;
 	}
 
@@ -101,10 +109,12 @@ static int setattr_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
-	job_id_t i;
 
 	s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
 	s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+
+	gossip_debug(SERVER_DEBUG,"%s:%d\n",Trove_Common_Keys[METADATA_KEY].key,Trove_Common_Keys[METADATA_KEY].size);
+	/*gossip_debug(SERVER_DEBUG,"%s:%d\n",s_op->key.buffer,s_op->key.buffer_sz);*/
 
 	s_op->val.buffer = (void *) malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 	
@@ -191,16 +201,15 @@ static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
 	int job_post_ret=0;
 	job_id_t i;
 
+#if 0
 	/* TODO: Check Credentials here */
 	if (s_op->val.buffer)
 		old_attr = s_op->val.buffer;
 	else
-		old_attr = (PVFS_object_attr *) malloc(sizeof(PVFS_object_attr));
+#endif
 	
-	/* For now... overwrite the initial structure. */
-
-	memcpy(old_attr,&(s_op->req->u.setattr.attr),sizeof(PVFS_object_attr));
-
+	free(s_op->val.buffer);
+	s_op->val.buffer = &(s_op->req->u.setattr.attr);
 	/* From here, we check the mask of the attributes. */
 
 #if 0 // Harish changed it!
@@ -243,6 +252,7 @@ static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
 #endif
 
 
+	gossip_debug(SERVER_DEBUG,"Writing trove values\n");
 	job_post_ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
 													 s_op->req->u.setattr.handle,
 													 &(s_op->key),
@@ -252,6 +262,7 @@ static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
 													 s_op,      /* Or is that right? dw */
 													 ret,
 													 &i);
+	gossip_debug(SERVER_DEBUG,"Writing trove values\n");
 	
 	return(job_post_ret);
 
@@ -275,6 +286,7 @@ static int setattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	int job_post_ret=0;
 	job_id_t i;
 
+	gossip_debug(SERVER_DEBUG,"Writing trove values\n");
 	/* Prepare the message */
 	
 	s_op->resp->u.generic.handle = s_op->req->u.setattr.handle;
@@ -295,6 +307,34 @@ static int setattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
 	return(job_post_ret);
 
+}
+
+/*
+ * Function: setattr_release_posted_job
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *ret
+ *
+ * Pre:      We are done!
+ *
+ * Post:     We need to let the next operation go.
+ *
+ * Returns:  int
+ *
+ * Synopsis: Free the job from the scheduler to allow next job to proceed.
+ */
+
+static int setattr_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+{
+
+	int job_post_ret=0;
+	job_id_t i;
+
+	job_post_ret = job_req_sched_release(s_op->scheduled_id,
+													  s_op,
+													  ret,
+													  &i);
+	return job_post_ret;
 }
 
 /*

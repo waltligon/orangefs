@@ -20,7 +20,7 @@ static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret);
 static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret);
 void readdir_init_state_machine(void);
 
-extern PINT_server_trove_keys_s *Trove_Common_Keys;
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 PINT_state_machine_s readdir_req_s = 
 {
@@ -121,12 +121,15 @@ static int readdir_init(state_action_struct *s_op, job_status_s *ret)
 	s_op->resp->u.readdir.pvfs_dirent_array = (PVFS_dirent *)
 		malloc(s_op->req->u.readdir.pvfs_dirent_count*sizeof(PVFS_dirent));
 
+#if 0
 	job_post_ret = job_req_sched_post(s_op->req,
 												 s_op,
 												 ret,
 												 &(s_op->scheduled_id));
 
 	return(job_post_ret);
+#endif
+	return 1;
 	
 }
 

@@ -183,10 +183,8 @@ static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
 	int job_post_ret=0;
 	job_id_t i;
-	void *a[1];
 
 	s_op->resp->status = ret->error_code;
-	s_op->encoded.buffer_list = a[0];
 
 	/* Set the handle IF it was created */
 	if(ret->error_code == 0) 
