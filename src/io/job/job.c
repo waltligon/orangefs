@@ -38,7 +38,6 @@ static int bmi_unexp_pending_count = 0;
 static int bmi_pending_count = 0;
 static job_desc_q_p trove_queue = NULL;
 static int flow_pending_count = 0;
-static job_desc_q_p req_sched_queue = NULL;
 static job_desc_q_p req_sched_inprogress_queue = NULL;
 /* mutex locks for each queue */
 static gen_mutex_t completion_mutex = GEN_MUTEX_INITIALIZER;
@@ -700,7 +699,6 @@ int job_req_sched_post(struct PVFS_server_req_s *in_request,
      * queue to test later
      */
     *id = jd->job_id;
-    job_desc_q_add(req_sched_queue, jd);
 
     return (0);
 }
@@ -764,7 +762,6 @@ int job_req_sched_release(job_id_t in_completed_id,
      * queue to test later
      */
     *out_id = jd->job_id;
-    job_desc_q_add(req_sched_queue, jd);
 
     return (0);
 }
@@ -2686,11 +2683,10 @@ static int setup_queues(void)
     completion_queue = job_desc_q_new();
     bmi_unexp_queue = job_desc_q_new();
     trove_queue = job_desc_q_new();
-    req_sched_queue = job_desc_q_new();
     req_sched_inprogress_queue = job_desc_q_new();
 
     if (!completion_queue || !bmi_unexp_queue ||
-	!trove_queue || !req_sched_queue || !req_sched_inprogress_queue)
+	!trove_queue || !req_sched_inprogress_queue)
     {
 	/* cleanup any that were initialized */
 	teardown_queues();
@@ -2714,8 +2710,6 @@ static void teardown_queues(void)
 	job_desc_q_cleanup(bmi_unexp_queue);
     if (trove_queue)
 	job_desc_q_cleanup(trove_queue);
-    if (req_sched_queue)
-	job_desc_q_cleanup(req_sched_queue);
     if (req_sched_inprogress_queue)
 	job_desc_q_cleanup(req_sched_inprogress_queue);
 
@@ -3367,7 +3361,6 @@ static int do_one_test_cycle_req_sched(void)
     {
 	/* remove operation from queue */
 	tmp_desc = (struct job_desc *) user_ptr_array[i];
-	job_desc_q_remove(tmp_desc);
 	/* set appropriate fields and place in completed queue */
 	tmp_desc->u.req_sched.error_code = error_code_array[i];
 	gen_mutex_lock(&completion_mutex);
