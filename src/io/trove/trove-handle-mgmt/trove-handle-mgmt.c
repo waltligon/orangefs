@@ -80,8 +80,15 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
 
             ret = 0;
 
+            /* look for special case of a blank fs */
+            if ((count == 1) && (handles[i] == 0))
+            {
+                return ret;
+            }
+
             if (count > 0)
             {
+
                 for(i = 0; i != count; i++)
                 {
                     /* check every item in our range list */
