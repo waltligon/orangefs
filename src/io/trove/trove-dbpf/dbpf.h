@@ -387,7 +387,12 @@ void dbpf_collection_clear_registered(void);
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
 
 /* db error reporting callback function; defined in dbpf-mgmt.c */
-void dbpf_error_report(const char *errpfx, char *msg);
+void dbpf_error_report(
+#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
+		       const DB_ENV *dbenv,
+#endif
+		       const char *errpfx,
+		       char *msg);
 
 #define DBPF_OPEN   open
 #define DBPF_WRITE  write

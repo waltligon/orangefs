@@ -40,7 +40,12 @@ extern int dbpf_thread_initialize(void);
 
 struct dbpf_storage *my_storage_p = NULL;
 
-void dbpf_error_report(const char *errpfx, char *msg)
+void dbpf_error_report(
+#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
+		       const DB_ENV *dbenv,
+#endif
+		       const char *errpfx,
+		       char *msg)
 {
 #ifdef BERKDB_ERROR_REPORTING
     char buf[512] = {0};

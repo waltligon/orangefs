@@ -10,6 +10,9 @@
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
+/* Define if DB error callback function takes dbenv parameter */
+#undef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
+
 /* Define if db library has DB_DIRTY_READ flag */
 #undef HAVE_DB_DIRTY_READ
 

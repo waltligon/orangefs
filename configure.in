@@ -456,6 +456,29 @@ dnl try: http://www.sleepycat.com/download/index.shtml
 dnl or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm))
 dnl       )
 
+dnl Test to check for DB_ENV variable to error callback fn
+AC_MSG_CHECKING(for dbenv parameter to DB error callback function)
+oldcflags=$CFLAGS
+CFLAGS="$CFLAGS -Werror"
+AC_TRY_COMPILE([
+#include <db.h>
+
+void error_callback_fn(const DB_ENV *dbenv,
+                       const char *prefix,
+                       const char *message)
+{
+    return;
+}
+], [
+DB *db;
+
+db->set_errcall(db, error_callback_fn);
+], AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK, 1,
+Define if DB error callback function takes dbenv parameter),
+AC_MSG_RESULT(no))
+CFLAGS=$oldcflags
+
 dnl Test to check for txnid parameter to DB stat (DB 4.3.xx+)
 AC_MSG_CHECKING(for txnid parameter to DB stat function)
 AC_TRY_COMPILE([
