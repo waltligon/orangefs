@@ -46,7 +46,6 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     pinode *entry_pinode = NULL;
     PVFS_pinode_reference entry;
     struct PINT_decoded_msg decoded;
-    uint32_t attr_mask;
     int max_msg_sz = 0;
     int pinode_exists_in_cache = 0;
     void* encoded_resp;
@@ -64,14 +63,6 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	    MALLOC_DFH_FAILURE,
 	    PCACHE_INSERT_FAILURE,
 	} failure = NONE_FAILURE;
-
-	/* Let's check if size is to be fetched here, If so
-	 * somehow ensure that dist is returned as part of 
-	 * attributes - is this the way we want this to be done?
-	 */
-
-	if (attrmask & PVFS_ATTR_SYS_SIZE)
-		attr_mask |= PVFS_ATTR_META_ALL;
 
 	/* Fill in pinode reference */ 
 	entry.handle = pinode_refn.handle;
@@ -139,7 +130,8 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
 	req_p.u.getattr.handle = entry.handle;
 	req_p.u.getattr.fs_id = entry.fs_id;
-	req_p.u.getattr.attrmask = attrmask;
+	/* filter out aggregate size mask in the getattr request */
+	req_p.u.getattr.attrmask = attrmask & ~PVFS_ATTR_SYS_SIZE;
 
 	/* TODO: use some sane value for this, I dunno what to put --Phil */
 	gossip_lerr("KLUDGE: guessing at max size of getattr response.\n");
