@@ -3109,7 +3109,7 @@ if test "${enable_server+set}" = set; then
   if test "x$enableval" = "xyes" ; then
     BUILD_SERVER=1
 else
-    BUILD_SERVER=0
+    BUILD_SERVER=""
 fi
 else
   BUILD_SERVER=1

@@ -64,7 +64,7 @@ AC_ARG_ENABLE(server,
 [if test "x$enableval" = "xyes" ; then
     BUILD_SERVER=1
 else
-    BUILD_SERVER=0
+    BUILD_SERVER=""
 fi],BUILD_SERVER=1)
 AC_SUBST(BUILD_SERVER)
 

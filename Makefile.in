@@ -304,10 +304,14 @@ SMCGEN :=
 ################################################################
 # Top level (default) targets
 
-# SERVER_STUB is a wrapper script that export the LD_ASSUME_KERNEL variable for REDHAT releases
+ifdef BUILD_SERVER
+# SERVER_STUB is a wrapper script that export the LD_ASSUME_KERNEL
+# variable for REDHAT releases
 SERVER_STUB := src/server/pvfs2-server-stub
 # SERVER is the pvfs2 server
 SERVER := src/server/pvfs2-server
+endif
+
 # LIBRARIES is a list of the pvfs2 client libraries
 LIBRARIES :=
 ifeq ($(build_shared),yes)
@@ -756,11 +760,14 @@ ifdef BUILD_KARMA
 endif
 
 	install -d $(prefix)/sbin
-ifeq ($(REDHAT_RELEASE),)
+
+ifdef BUILD_SERVER
+    ifeq ($(REDHAT_RELEASE),)
 	install -m 755 $(SERVER) $(prefix)/sbin
-else
+    else
 	install -m 755 $(srcdir)/$(SERVER_STUB) $(prefix)/sbin/pvfs2-server
 	install -m 755 $(SERVER) $(prefix)/sbin/pvfs2-server.bin
+    endif
 endif
 	install -m 755 $(KERNAPPS) $(prefix)/sbin
 
