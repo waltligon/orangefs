@@ -122,7 +122,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
             fprintf(stderr,"Storage initialization failed.  The most "
                     "common reason\nfor this is that the storage space "
                     "has not yet been\ncreated or is located on a "
-                    "partition that has no yet\nbeen mounted.  "
+                    "partition that has not yet\nbeen mounted.  "
                     "If you'd like to create the storage space,\n"
                     "re-run this program with a -f appended to the end "
                     "of\nthe command line.\n");
