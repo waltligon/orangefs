@@ -36,8 +36,13 @@ extern fsconfig_array server_config;
 
 extern gen_mutex_t *g_session_tag_mt_lock;
 
-static int server_get_config(pvfs_mntlist mntent_list);
-static int server_parse_config(PVFS_servresp_getconfig *response);
+static int server_get_config(
+    struct server_configuration_s *config,
+    pvfs_mntlist mntent_list);
+
+static int server_parse_config(
+    struct server_configuration_s *config,
+    PVFS_servresp_getconfig *response);
 
 /* PVFS_sys_initialize()
  *
@@ -135,9 +140,8 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
     }
     memset(server_config.fs_info, 0, mntent_list.nr_entry * sizeof(fsconfig));
 
-
     /* Get configuration parameters from server */
-    ret = server_get_config(mntent_list);
+    ret = server_get_config(&g_server_config,mntent_list);
     if (ret < 0)
     {
 	init_fail = GET_CONFIG_INIT_FAIL;
@@ -233,7 +237,8 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 /* server_get_config()
  *
  */
-static int server_get_config(pvfs_mntlist mntent_list)
+static int server_get_config(struct server_configuration_s *config,
+                             pvfs_mntlist mntent_list)
 {
     int ret = -1, i = 0;
     bmi_addr_t serv_addr;
@@ -290,7 +295,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	}
 	serv_resp = (struct PVFS_server_resp_s *) decoded.buffer;
 
-        if (server_parse_config(&(serv_resp->u.getconfig)))
+        if (server_parse_config(config,&(serv_resp->u.getconfig)))
         {
             gossip_ldebug(CLIENT_DEBUG,"Failed to getconfig from host "
                           "%s\n",mntent_p->meta_addr);
@@ -314,7 +319,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 
         /* make sure we valid information about this fs */
         if (PINT_server_config_has_fs_config_info(
-                &g_server_config,mntent_p->service_name) == 0)
+                config,mntent_p->service_name) == 0)
         {
             gossip_ldebug(CLIENT_DEBUG,"Error:  Cannot retrieve "
                           "information about pvfstab entry %s\n",
@@ -323,9 +328,10 @@ static int server_get_config(pvfs_mntlist mntent_list)
         }
     }
     return(0); 
-}	  
+}
 
-static int server_parse_config(PVFS_servresp_getconfig *response)
+static int server_parse_config(struct server_configuration_s *config,
+                               PVFS_servresp_getconfig *response)
 {
     int ret = 1;
     int fs_fd = 0, server_fd = 0;
@@ -333,7 +339,7 @@ static int server_parse_config(PVFS_servresp_getconfig *response)
     char server_template[] = ".__pvfs_server_configXXXXXX";
     char *args[3] = { NULL, fs_template, server_template };
 
-    if (response)
+    if (config && response)
     {
         assert(response->fs_config_buf);
         assert(response->server_config_buf);
@@ -362,7 +368,7 @@ static int server_parse_config(PVFS_servresp_getconfig *response)
                       (response->server_config_buflen - 1)) ==
                 (response->server_config_buflen - 1))
             {
-                ret = PINT_server_config(&g_server_config,3,args);
+                ret = PINT_server_config(config,3,args);
             }
         }
         close(fs_fd);
