@@ -20,6 +20,7 @@
 #include "trove.h"
 #include "server-config.h"
 #include "llist.h"
+#include "extent-utils.h"
 
 /*
 FIXME:
@@ -59,7 +60,9 @@ int PINT_bucket_initialize(void)
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     char *cur_h_range = (char *)0;
+    struct llist *extent_list = NULL;
 
+    int i = 0;
     cur = g_server_config.file_systems;
     while(cur)
     {
@@ -72,6 +75,7 @@ int PINT_bucket_initialize(void)
             &g_server_config,cur_fs);
         assert(cur_h_range);
 
+        /* extent_list = PINT_create_extent_list(cur_h_range); */
         /* FIXME: this is all hacked atm */
         /* if (do_something_cool(cur_fs,cur_h_range)) break; */
         ret = 0;
