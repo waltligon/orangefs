@@ -384,10 +384,15 @@ int PINT_server_get_config(struct server_configuration_s *config,
                             &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
         {
-            gossip_ldebug(CLIENT_DEBUG,"PINT_send_req failed\n");
+            gossip_lerr("Error: PINT_send_req failed\n");
 	    continue;
 	}
 	serv_resp = (struct PVFS_server_resp *) decoded.buffer;
+	if(serv_resp->status != 0)
+	{
+	    PVFS_perror_gossip("Error: getconfig request denied", serv_resp->status);
+	    continue;
+	}
 
         if (server_parse_config(config,&(serv_resp->u.getconfig)))
         {
@@ -428,7 +433,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
     if (found_one_good)
 	return(0); 
     else
-	return -1;
+	return(-PVFS_ENOENT);
 }
 
 static int server_parse_config(struct server_configuration_s *config,
