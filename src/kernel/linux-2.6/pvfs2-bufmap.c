@@ -183,7 +183,7 @@ int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc)
     int ret = -1;
     DECLARE_WAITQUEUE(my_wait, current);
 
-    add_wait_queue(&bufmap_waitq, &my_wait);
+    add_wait_queue_exclusive(&bufmap_waitq, &my_wait);
 
     while(1)
     {
@@ -210,6 +210,8 @@ int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc)
 	    ret = -EINTR;
 	    break;
 	}
+
+	schedule();
     }
 
     set_current_state(TASK_RUNNING);
