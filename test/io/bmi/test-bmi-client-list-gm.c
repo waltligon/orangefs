@@ -27,10 +27,17 @@ struct options{
 	char* hostid;       /* host identifier */
 };
 
+#if 0
+/* for testing eager mode */
 #define MSG1_SIZE 1024
 #define MSG2_SIZE 2048
 #define MSG3_SIZE 3072
-
+#else
+/* for testing rendezvous mode */
+#define MSG1_SIZE (1024*8)
+#define MSG2_SIZE (2048*8)
+#define MSG3_SIZE (3072*8)
+#endif
 /**************************************************************
  * Internal utility functions
  */
