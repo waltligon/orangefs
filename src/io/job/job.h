@@ -19,6 +19,8 @@
 typedef id_gen_t job_id_t;
 typedef PVFS_context_id job_context_id;
 
+#define JOB_MAX_CONTEXTS 16
+
 /* used to report the status of jobs upon completion */
 typedef struct job_status
 {

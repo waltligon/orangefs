@@ -75,6 +75,7 @@ struct job_desc
     job_id_t job_id;		/* job interface identifier */
     void *job_user_ptr;		/* user pointer */
     int completed_flag;		/* has the job finished? */
+    job_context_id context_id;  /* context */
 
     /* union of information for lower level interfaces */
     union

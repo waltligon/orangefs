@@ -31,7 +31,7 @@ static bmi_context_id global_bmi_context = -1;
 static FLOW_context_id global_flow_context = -1;
 
 /* queues of pending jobs */
-static job_desc_q_p completion_queue = NULL;
+static job_desc_q_p completion_queue_array[JOB_MAX_CONTEXTS] = {NULL};
 static int completion_error = 0;
 static job_desc_q_p bmi_unexp_queue = NULL;
 static int bmi_unexp_pending_count = 0;
@@ -111,10 +111,12 @@ static int completion_query_some(job_id_t * id_array,
 				 int *out_index_array,
 				 void **returned_user_ptr_array,
 				 job_status_s * out_status_array_p);
-static int completion_query_world(job_id_t * out_id_array_p,
+static int completion_query_context(job_id_t * out_id_array_p,
 				  int *inout_count_p,
 				  void **returned_user_ptr_array,
-				  job_status_s * out_status_array_p);
+				  job_status_s *
+				  out_status_array_p,
+				  job_context_id context_id);
 
 #ifndef __PVFS2_JOB_THREADED__
 static int do_one_work_cycle_all(int *num_completed,
@@ -223,10 +225,34 @@ int job_finalize(void)
  */
 int job_open_context(job_context_id* context_id)
 {
-    gossip_lerr("Warning: executing job_open_context() stub.\n");
-    *context_id = 0;
+    int context_index;
+
+    /* find an unused context id */
+    for(context_index=0; context_index<JOB_MAX_CONTEXTS; context_index++)
+    {
+	if(completion_queue_array[context_index] == NULL)
+	{
+	    break;
+	}
+    }
+
+    if(context_index >= JOB_MAX_CONTEXTS)
+    {
+	/* we don't have any more available! */
+	return(-EBUSY);
+    }
+
+    /* create a new completion queue for the context */
+    completion_queue_array[context_index] = job_desc_q_new();
+    if(!completion_queue_array[context_index])
+    {
+	return(-ENOMEM);
+    }
+
+    *context_id = context_index;
     return(0);
 }
+
 
 /* job_close_context()
  *
@@ -236,7 +262,15 @@ int job_open_context(job_context_id* context_id)
  */
 void job_close_context(job_context_id context_id)
 {
-    gossip_lerr("Warning: executing job_close_context() stub.\n");
+    if(!completion_queue_array[context_id])
+    {
+	return;
+    }
+
+    job_desc_q_cleanup(completion_queue_array[context_id]);
+
+    completion_queue_array[context_id] = NULL;
+
     return;
 }
 
@@ -276,6 +310,7 @@ int job_bmi_send(bmi_addr_t addr,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = size;
+    jd->context_id = context_id;
 
     /* post appropriate type of send */
     if (!send_unexpected)
@@ -360,6 +395,7 @@ int job_bmi_send_list(bmi_addr_t addr,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = total_size;
+    jd->context_id = context_id;
 
     /* post appropriate type of send */
     if (!send_unexpected)
@@ -442,6 +478,7 @@ int job_bmi_recv(bmi_addr_t addr,
 	return (-ENOMEM);
     }
     jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
 
     ret = BMI_post_recv(&(jd->u.bmi.id), addr, buffer, size,
 			&(jd->u.bmi.actual_size), buffer_flag, tag, jd,
@@ -517,6 +554,7 @@ int job_bmi_recv_list(bmi_addr_t addr,
 	return (-ENOMEM);
     }
     jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
 
     ret = BMI_post_recv_list(&(jd->u.bmi.id), addr, buffer_list,
 			     size_list, list_count, total_expected_size,
@@ -588,6 +626,7 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi_unexp.info = bmi_unexp_d;
+    jd->context_id = context_id;
 
    /*********************************************************
 	 * TODO: consider optimizations later, so that we avoid
@@ -668,6 +707,7 @@ int job_req_sched_post(struct PVFS_server_req_s *in_request,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.req_sched.post_flag = 1;
+    jd->context_id = context_id;
 
     ret = PINT_req_sched_post(in_request, jd, &(jd->u.req_sched.id));
 
@@ -726,6 +766,7 @@ int job_req_sched_release(job_id_t in_completed_id,
 	return (-errno);
     }
     jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
 
     match_jd = id_gen_fast_lookup(in_completed_id);
 
@@ -788,6 +829,7 @@ int job_flow(flow_descriptor * flow_d,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.flow.flow_d = flow_d;
+    jd->context_id = context_id;
     flow_d->user_ptr = jd;
 
     /* post the flow */
@@ -859,6 +901,7 @@ int job_trove_bstream_write_at(PVFS_coll_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.actual_size = size;
     jd->u.trove.vtag = vtag;
+    jd->context_id = context_id;
 
     ret = trove_bstream_write_at(coll_id, handle, buffer,
 				 &jd->u.trove.actual_size, offset, flags,
@@ -936,6 +979,7 @@ int job_trove_bstream_read_at(PVFS_coll_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.actual_size = size;
     jd->u.trove.vtag = vtag;
+    jd->context_id = context_id;
 
     ret = trove_bstream_read_at(coll_id, handle, buffer,
 				&jd->u.trove.actual_size, offset, flags,
@@ -1011,6 +1055,7 @@ int job_trove_keyval_read(PVFS_coll_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
+    jd->context_id = context_id;
 
     ret = trove_keyval_read(coll_id, handle, key_p, val_p, flags,
 			    jd->u.trove.vtag, jd, &(jd->u.trove.id));
@@ -1085,6 +1130,7 @@ int job_trove_keyval_read_list(PVFS_coll_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
+    jd->context_id = context_id;
 
     ret = trove_keyval_read_list(coll_id, handle, key_array,
 				 val_array, count, flags, jd->u.trove.vtag, jd,
@@ -1159,6 +1205,7 @@ int job_trove_keyval_write(PVFS_coll_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
+    jd->context_id = context_id;
 
     ret = trove_keyval_write(coll_id, handle, key_p, val_p, flags,
 			     jd->u.trove.vtag, jd, &(jd->u.trove.id));
@@ -1227,6 +1274,7 @@ int job_trove_dspace_getattr(PVFS_coll_id coll_id,
 	return (-errno);
     }
     jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
 
     ret = trove_dspace_getattr(coll_id,
 			       handle, &(jd->u.trove.attr), 0 /* flags */ ,
@@ -1296,6 +1344,7 @@ int job_trove_dspace_setattr(PVFS_coll_id coll_id,
 	return (-errno);
     }
     jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
 
     ret = trove_dspace_setattr(coll_id, handle, ds_attr_p, 0 /* flags */ ,
 			       jd, &(jd->u.trove.id));
@@ -1406,6 +1455,7 @@ int job_trove_keyval_remove(PVFS_coll_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
+    jd->context_id = context_id;
 
     ret = trove_keyval_remove(coll_id, handle, key_p, flags,
 			      jd->u.trove.vtag, jd, &(jd->u.trove.id));
@@ -1502,6 +1552,7 @@ int job_trove_keyval_iterate(PVFS_coll_id coll_id,
     jd->u.trove.vtag = vtag;
     jd->u.trove.position = position;
     jd->u.trove.count = count;
+    jd->context_id = context_id;
 
     ret = trove_keyval_iterate(coll_id, handle,
 			       &(jd->u.trove.position), key_array, val_array,
@@ -1601,6 +1652,7 @@ int job_trove_dspace_create(PVFS_coll_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.handle = handle;
+    jd->context_id = context_id;
 
     ret = trove_dspace_create(coll_id,
 			      &(jd->u.trove.handle),
@@ -1673,6 +1725,7 @@ int job_trove_dspace_remove(PVFS_coll_id coll_id,
 	return (-errno);
     }
     jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
 
     ret = trove_dspace_remove(coll_id,
 			      handle, TROVE_SYNC /* flags -- sync for now */ ,
@@ -1759,6 +1812,7 @@ int job_trove_fs_create(char *collname,
 	return (-errno);
     }
     jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
 
     ret = trove_collection_create(collname, new_coll_id, jd, &(jd->u.trove.id));
 
@@ -1839,6 +1893,7 @@ int job_trove_fs_lookup(char *collname,
 	return (-errno);
     }
     jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
 
     ret = trove_collection_lookup(collname, &(jd->u.trove.fsid), jd,
 				  &(jd->u.trove.id));
@@ -1910,6 +1965,7 @@ int job_trove_fs_seteattr(PVFS_coll_id coll_id,
 	return (-errno);
     }
     jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
 
     ret = trove_collection_seteattr(coll_id, key_p, val_p, flags,
 				    jd, &(jd->u.trove.id));
@@ -1979,6 +2035,7 @@ int job_trove_fs_geteattr(PVFS_coll_id coll_id,
 	return (-errno);
     }
     jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
 
     ret = trove_collection_geteattr(coll_id, key_p, val_p, flags,
 				    jd, &(jd->u.trove.id));
@@ -2539,9 +2596,10 @@ int job_testcontext(job_id_t * out_id_array_p,
     /* check before we do anything else to see if the completion queue
      * has anything in it
      */
-    ret = completion_query_world(out_id_array_p,
+    ret = completion_query_context(out_id_array_p,
 				 inout_count_p,
-				 returned_user_ptr_array, out_status_array_p);
+				 returned_user_ptr_array,
+				 out_status_array_p, context_id);
     /* return here on error or completion */
     if (ret < 0)
 	return (ret);
@@ -2602,10 +2660,11 @@ int job_testcontext(job_id_t * out_id_array_p,
 	else
 	{
 	    /* check queue now to see if anything is done */
-	    ret = completion_query_world(out_id_array_p,
+	    ret = completion_query_context(out_id_array_p,
 					 inout_count_p,
 					 returned_user_ptr_array,
-					 out_status_array_p);
+					 out_status_array_p,
+					 context_id);
 	    /* return here on error or completion */
 	    if (ret < 0)
 		return (ret);
@@ -2626,10 +2685,11 @@ int job_testcontext(job_id_t * out_id_array_p,
 	if (num_completed > 0)
 	{
 	    /* check queue now to see if anything is done */
-	    ret = completion_query_world(out_id_array_p,
+	    ret = completion_query_context(out_id_array_p,
 					 inout_count_p,
 					 returned_user_ptr_array,
-					 out_status_array_p);
+					 out_status_array_p,
+					 context_id);
 	    /* return here on error or completion */
 	    if (ret < 0)
 		return (ret);
@@ -2676,11 +2736,10 @@ int job_testcontext(job_id_t * out_id_array_p,
 static int setup_queues(void)
 {
 
-    completion_queue = job_desc_q_new();
     bmi_unexp_queue = job_desc_q_new();
     trove_queue = job_desc_q_new();
 
-    if (!completion_queue || !bmi_unexp_queue || !trove_queue)
+    if (!bmi_unexp_queue || !trove_queue)
     {
 	/* cleanup any that were initialized */
 	teardown_queues();
@@ -2698,8 +2757,6 @@ static int setup_queues(void)
 static void teardown_queues(void)
 {
 
-    if (completion_queue)
-	job_desc_q_cleanup(completion_queue);
     if (bmi_unexp_queue)
 	job_desc_q_cleanup(bmi_unexp_queue);
     if (trove_queue)
@@ -2871,7 +2928,8 @@ static int do_one_work_cycle_bmi(int *num_completed,
 	tmp_desc->u.bmi.error_code = stat_bmi_error_code_array[i];
 	tmp_desc->u.bmi.actual_size = stat_bmi_actual_size_array[i];
 	gen_mutex_lock(&completion_mutex);
-	job_desc_q_add(completion_queue, tmp_desc);
+	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	    tmp_desc);
 	/* set completed flag while holding queue lock */
 	tmp_desc->completed_flag = 1;
 	gen_mutex_unlock(&completion_mutex);
@@ -2937,7 +2995,8 @@ static int do_one_work_cycle_bmi_unexp(int *num_completed,
 	gen_mutex_lock(&completion_mutex);
 	/* set completed flag while holding queue lock */
 	tmp_desc->completed_flag = 1;
-	job_desc_q_add(completion_queue, tmp_desc);
+	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	    tmp_desc);
 	gen_mutex_unlock(&completion_mutex);
     }
 
@@ -2980,7 +3039,8 @@ static int do_one_work_cycle_flow(int *num_completed)
 	gen_mutex_lock(&completion_mutex);
 	/* set completed flag while holding queue lock */
 	tmp_desc->completed_flag = 1;
-	job_desc_q_add(completion_queue, tmp_desc);
+	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	    tmp_desc);
 	gen_mutex_unlock(&completion_mutex);
     }
 
@@ -3054,7 +3114,8 @@ static int do_one_work_cycle_trove(int *num_completed)
 	gen_mutex_lock(&completion_mutex);
 	/* set completed flag while holding queue lock */
 	tmp_desc->completed_flag = 1;
-	job_desc_q_add(completion_queue, tmp_desc);
+	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	    tmp_desc);
 	gen_mutex_unlock(&completion_mutex);
     }
 
@@ -3358,7 +3419,8 @@ static int do_one_test_cycle_req_sched(void)
 	gen_mutex_lock(&completion_mutex);
 	/* set completed flag while holding queue lock */
 	tmp_desc->completed_flag = 1;
-	job_desc_q_add(completion_queue, tmp_desc);
+	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	    tmp_desc);
 	gen_mutex_unlock(&completion_mutex);
     }
 
@@ -3424,10 +3486,12 @@ static int completion_query_some(job_id_t * id_array,
 }
 
 /* TODO: fill in comment */
-static int completion_query_world(job_id_t * out_id_array_p,
+static int completion_query_context(job_id_t * out_id_array_p,
 				  int *inout_count_p,
 				  void **returned_user_ptr_array,
-				  job_status_s * out_status_array_p)
+				  job_status_s *
+				  out_status_array_p,
+				  job_context_id context_id)
 {
     struct job_desc *query;
     int incount = *inout_count_p;
@@ -3440,7 +3504,8 @@ static int completion_query_world(job_id_t * out_id_array_p,
 	return (completion_error);
     }
     while (*inout_count_p < incount && (query =
-					job_desc_q_shownext(completion_queue)))
+					job_desc_q_shownext(
+					completion_queue_array[context_id])))
     {
 	if (returned_user_ptr_array)
 	{
