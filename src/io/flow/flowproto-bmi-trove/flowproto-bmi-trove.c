@@ -1122,7 +1122,11 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 	}
     }
 
-    if(flow_d->aggregate_size)
+#if 0
+    /* TODO: why is this here? it seems to duplicate what happens in 
+     * alloc_flow_data() 
+     */
+    if(flow_d->aggregate_size > -1)
     {
 	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
 	    flow_d->aggregate_size+flow_d->file_req_offset);
@@ -1133,7 +1137,7 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 	    flow_d->file_req_offset +
 	    PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
     }
-
+#endif
 
     /* if a file datatype offset was specified, go ahead and skip ahead 
      * before doing anything else
@@ -1145,7 +1149,7 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
     }
 
     /* set boundaries on file datatype based on mem datatype or aggregate size */
-    if(flow_d->aggregate_size)
+    if(flow_d->aggregate_size > -1)
     {
 	PINT_REQUEST_STATE_SET_FINAL(flow_data->dup_file_req_state,
 	    flow_d->aggregate_size+flow_d->file_req_offset);
@@ -1323,7 +1327,7 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 	    flow_d->file_req_offset);
 
     /* set boundaries on file datatype based on mem datatype or aggregate size */
-    if(flow_d->aggregate_size)
+    if(flow_d->aggregate_size > -1)
     {
 	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
 	    flow_d->aggregate_size+flow_d->file_req_offset);
