@@ -36,13 +36,11 @@ static inline int id_gen_fast_register(
     if (!item)
 	return (-EINVAL);
 
-#if SIZEOF_VOID_P == 4
-    *new_id = 0;
-    *new_id += (int32_t) item;
-#elif SIZEOF_VOID_P == 8
+#if SIZEOF_VOID_P == 8
     *new_id = (int64_t) item;
 #else
-    #error "Unsupported Architecture..."
+    *new_id = 0;
+    *new_id += (int32_t) item;
 #endif
 
     return (0);
@@ -64,13 +62,11 @@ static inline void *id_gen_fast_lookup(
     if (!id)
 	return (NULL);
 
-#if SIZEOF_VOID_P == 4
-    little_int += id;
-    return ((void *) little_int);
-#elif SIZEOF_VOID_P == 8
+#if SIZEOF_VOID_P == 8
     return ((void *) id);
 #else
-    #error "Unsupported Architecture..."
+    little_int += id;
+    return ((void *) little_int);
 #endif
 }
 
