@@ -154,11 +154,17 @@ int PINT_sm_common_directory_getattr_comp_fn(
     {
         PINT_acache_object_attr_deep_copy(
             &sm_p->acache_attr, &resp_p->u.getattr.attr);
-    }
+    }    
+    /* TODO: FIX THIS! */
+    /* resp_p->u.getattr.attr.objtype is not always initialized in this
+     * path; may confuse PINT_acache_object_attr_deep_free()
+     */
+#if 0
     else
     {
         PINT_SERVRESP_GETATTR_FREE(resp_p);
     }
+#endif
 
     /*
       if we got a cache hit, use those attributes, otherwise use the
@@ -259,6 +265,7 @@ int PINT_sm_common_object_getattr_comp_fn(
     {
         PINT_SERVRESP_GETATTR_FREE(resp_p);
     }
+
     return 0;
 }
 

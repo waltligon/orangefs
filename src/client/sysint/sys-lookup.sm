@@ -1175,7 +1175,11 @@ static int lookup_segment_getattr_comp_fn(
         &(cur_seg->seg_attr),
         &(resp_p->u.getattr.attr));
 
+    /* TODO: FIX THIS! */ 
+    /* causes memory corruption (freeing a bad address) */
+#if 0
     PINT_SERVRESP_GETATTR_FREE(resp_p);
+#endif
     return 0;
 }
 
