@@ -12,7 +12,11 @@
 #ifndef __PVFS2_DEBUG_H
 #define __PVFS2_DEBUG_H
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
 #include <stdint.h>
+#endif
 
 #define GOSSIP_NO_DEBUG                (uint64_t)0
 #define GOSSIP_BMI_DEBUG_TCP           ((uint64_t)1 << 0)
