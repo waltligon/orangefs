@@ -2760,6 +2760,9 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
 {
     method_op_p query_op = NULL;
     struct gm_op *gm_op_data = NULL;
+    void* copy_buffer;
+    bmi_size_t copy_size, total_copied;
+    int i;
 
     /* find the matching operation */
     query_op = id_gen_fast_lookup(ctrl_op_id);
@@ -2769,24 +2772,63 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
     /* let go of the buffer if we need to */
     if (gm_op_data->buffer_status == GM_BUF_METH_REG)
     {
+	if(gm_op_data->list_flag)
+	{
 #ifdef ENABLE_GM_REGCACHE
-	bmi_gm_unuse_interval((unsigned long) query_op->buffer,
-			      query_op->actual_size);
+	    /* we don't handle this yet */
+	    assert(0);
+
 #endif /* ENABLE_GM_REGCACHE */
 #ifdef ENABLE_GM_REGISTER
-	gm_deregister_memory(local_port, query_op->buffer,
-			     query_op->actual_size);
+	    /* we don't handle this yet */
+	    assert(0);
+
 #endif /* ENABLE_GM_REGISTER */
 #ifdef ENABLE_GM_BUFCOPY
-	memcpy(query_op->buffer, gm_op_data->tmp_xfer_buffer,
-	       query_op->actual_size);
-	gm_dma_free(local_port, gm_op_data->tmp_xfer_buffer);
+	    /* we don't handle this yet */
+	    assert(0);
+
 #endif /* ENABLE_GM_BUFCOPY */
 #ifdef ENABLE_GM_BUFPOOL
-	memcpy(query_op->buffer, gm_op_data->tmp_xfer_buffer,
-	       query_op->actual_size);
-	bmi_gm_bufferpool_put(io_pool, gm_op_data->tmp_xfer_buffer);
+	    copy_buffer = gm_op_data->tmp_xfer_buffer;
+	    total_copied = 0;
+	    for(i=0; i<query_op->list_count; i++)
+	    {
+		if(total_copied == query_op->actual_size)
+		    break;
+
+		copy_size = query_op->actual_size - total_copied;
+		if(copy_size > query_op->size_list[i])
+		    copy_size = query_op->size_list[i];
+
+		memcpy(query_op->buffer_list[i], copy_buffer, copy_size);
+		copy_buffer = (void*)((long)copy_buffer + (long)copy_size);
+		total_copied += copy_size;
+	    }
+	    bmi_gm_bufferpool_put(io_pool, gm_op_data->tmp_xfer_buffer);
 #endif /* ENABLE_GM_BUFPOOL */
+	}
+	else
+	{
+#ifdef ENABLE_GM_REGCACHE
+	    bmi_gm_unuse_interval((unsigned long) query_op->buffer,
+				  query_op->actual_size);
+#endif /* ENABLE_GM_REGCACHE */
+#ifdef ENABLE_GM_REGISTER
+	    gm_deregister_memory(local_port, query_op->buffer,
+				 query_op->actual_size);
+#endif /* ENABLE_GM_REGISTER */
+#ifdef ENABLE_GM_BUFCOPY
+	    memcpy(query_op->buffer, gm_op_data->tmp_xfer_buffer,
+		   query_op->actual_size);
+	    gm_dma_free(local_port, gm_op_data->tmp_xfer_buffer);
+#endif /* ENABLE_GM_BUFCOPY */
+#ifdef ENABLE_GM_BUFPOOL
+	    memcpy(query_op->buffer, gm_op_data->tmp_xfer_buffer,
+		   query_op->actual_size);
+	    bmi_gm_bufferpool_put(io_pool, gm_op_data->tmp_xfer_buffer);
+#endif /* ENABLE_GM_BUFPOOL */
+	}
     }
 
     /* done */
@@ -3380,7 +3422,10 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 	    else
 	    {
 #endif /* ENABLE_GM_BUFPOOL */
-		prepare_for_recv(active_method_op);
+		if(gm_op_data->list_flag)
+		    prepare_for_recv_list(active_method_op);
+		else
+		    prepare_for_recv(active_method_op);
 		ret = 0;
 #ifdef ENABLE_GM_BUFPOOL
 	    }
