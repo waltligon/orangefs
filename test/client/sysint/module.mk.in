@@ -21,6 +21,7 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/test-pint-bucket.c \
 	$(DIR)/test-pint-dcache.c \
 	$(DIR)/io-test.c \
+	$(DIR)/io-test-offset.c \
 	$(DIR)/getparent.c
 
 MISCSRC += \
