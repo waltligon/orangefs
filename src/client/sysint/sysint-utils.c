@@ -49,6 +49,9 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
             ADD_PCACHE_FAILURE,
         } failure = NONE_FAILURE;
 
+	if (name == NULL)  /* how do we look up a null name? */
+	    return -ENOENT;
+
         name_sz = strlen(name) + 1; /*include the null terminator*/
 
         req_p.op = PVFS_SERV_LOOKUP_PATH;
