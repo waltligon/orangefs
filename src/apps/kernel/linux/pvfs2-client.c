@@ -221,7 +221,8 @@ static int monitor_pvfs2_client(options_t *opts)
                 close(fd);
             }
 
-            ret = execlp(opts->path, "-a", opts->acache_timeout, NULL);
+            ret = execlp(opts->path, PVFS2_CLIENT_CORE_NAME, "-a",
+                         opts->acache_timeout, NULL);
             fprintf(stderr, "Could not exec %s, errno is %d\n",
                     opts->path, errno);
             exit(1);
