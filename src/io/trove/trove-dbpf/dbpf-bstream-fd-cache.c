@@ -156,7 +156,7 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 				 int create_flag,
 				 int *fd_p)
 {
-    int i, ret, fd;
+    int i, ret, fd, open_errno;
     char filename[PATH_MAX];
 
 
@@ -239,6 +239,7 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 	}
     }
     else if (fd < 0) {
+	open_errno = errno;
 	goto return_error;
     }
 
@@ -254,7 +255,8 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 
  return_error:
     gen_mutex_unlock(&bstream_fd_cache[i].mutex);
-    return DBPF_BSTREAM_FDCACHE_ERROR;
+    /* return DBPF_BSTREAM_FDCACHE_ERROR; */
+    return -trove_errno_to_trove_error(open_errno);
 }
 
 /* dbpf_bstream_fdcache_put()
