@@ -329,10 +329,18 @@ int flowproto_bmi_trove_getinfo(flow_descriptor * flow_d,
 				int option,
 				void *parameter)
 {
+    int* type;
+
     switch (option)
     {
     case FLOWPROTO_SUPPORT_QUERY:
 	return (check_support(parameter));
+    case FLOWPROTO_TYPE_QUERY:
+	type = parameter;
+	if(*type == FLOWPROTO_BMI_TROVE)
+	    return(0);
+	else
+	    return(-ENOPROTOOPT);
     default:
 	return (-ENOSYS);
 	break;
@@ -1068,7 +1076,6 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
  */
 static int check_support(struct flowproto_type_support *type)
 {
-
     /* bmi to memory */
     if (type->src_endpoint_id == BMI_ENDPOINT &&
 	type->dest_endpoint_id == MEM_ENDPOINT)

@@ -289,6 +289,7 @@ void PINT_flow_reset(flow_descriptor * flow_d)
 
     flow_d->flowproto_id = -1;
     flow_d->state = FLOW_INITIAL;
+    flow_d->type = FLOWPROTO_ANY;
     INIT_QLIST_HEAD(&(flow_d->sched_queue_link));
 
     return;
@@ -387,6 +388,8 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
 {
     int flowproto_id = -1;
     int ret = -1;
+    int i;
+    int type = flow_d->type;
 
     gen_mutex_lock(&interface_mutex);
 
@@ -397,8 +400,29 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
      */
 
     /* figure out who should handle this flow */
-    flowproto_id = map_endpoints_to_flowproto(flow_d->src.endpoint_id,
-					      flow_d->dest.endpoint_id);
+    if(flow_d->type == FLOWPROTO_ANY)
+    {
+	/* just find the first proto that understands these endpoints */
+	flowproto_id = map_endpoints_to_flowproto(flow_d->src.endpoint_id,
+	     				      flow_d->dest.endpoint_id);
+    }
+    else
+    {
+	/* user requested a specific type of proto; search for match */
+	for(i=0; i<active_flowproto_count; i++)
+	{
+	    ret =
+		active_flowproto_table[i]->flowproto_getinfo(NULL,
+		FLOWPROTO_TYPE_QUERY,
+		&type);
+	    if(ret >= 0)
+	    {
+		flowproto_id = i;
+		break;
+	    }
+	}
+    }
+
     if (flowproto_id < 0)
     {
 	flow_release(flow_d);

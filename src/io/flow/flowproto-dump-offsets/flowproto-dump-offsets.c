@@ -162,10 +162,18 @@ int flowproto_dump_offsets_getinfo(flow_descriptor * flow_d,
 				int option,
 				void *parameter)
 {
+    int* type;
+
     switch (option)
     {
     case FLOWPROTO_SUPPORT_QUERY:
 	return (check_support(parameter));
+    case FLOWPROTO_TYPE_QUERY:
+	type = parameter;
+	if(*type == FLOWPROTO_DUMP_OFFSETS)
+	    return(0);
+	else
+	    return(-ENOPROTOOPT);
     default:
 	return (-ENOSYS);
 	break;

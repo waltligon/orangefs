@@ -19,6 +19,16 @@
 #include "pvfs2-storage.h"
 
 /********************************************************************
+ * supported flowprotocols for manual selection
+ */
+enum flowproto_type
+{
+    FLOWPROTO_ANY = 1,
+    FLOWPROTO_BMI_TROVE = 2,
+    FLOWPROTO_DUMP_OFFSETS = 3
+};
+
+/********************************************************************
  * endpoint structure 
  */
 
@@ -69,7 +79,8 @@ typedef struct flow_endpoint flow_endpoint;
 /* supported getinfo types */
 enum
 {
-    FLOWPROTO_SUPPORT_QUERY = 1
+    FLOWPROTO_SUPPORT_QUERY = 1,
+    FLOWPROTO_TYPE_QUERY = 2
 };
 
 /* context id type */
@@ -94,6 +105,8 @@ struct flow_descriptor
     PINT_Request *request;	/* I/O request description */
     /* information about the file that we are accessing */
     PINT_Request_file_data *file_data;
+    /* can be used to force use of specific flow protocol */
+    enum flowproto_type type;        
 
 	/***********************************************************/
     /* fields that can be read publicly upon completion */
