@@ -40,6 +40,7 @@ enum
     GOSSIP_REMOVE_DEBUG =           (1 << 22),
     GOSSIP_GETATTR_DEBUG =          (1 << 23),
     GOSSIP_READDIR_DEBUG =          (1 << 24),
+    GOSSIP_IO_DEBUG =               (1 << 25),
 
     GOSSIP_BMI_DEBUG_ALL = GOSSIP_BMI_DEBUG_TCP +
     GOSSIP_BMI_DEBUG_CONTROL + GOSSIP_BMI_DEBUG_GM +

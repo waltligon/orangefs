@@ -152,7 +152,6 @@ struct PINT_client_setattr_sm {
  */
 struct PINT_client_io_sm {
     /* input parameters */
-    PVFS_pinode_reference object_ref;
     enum PVFS_io_type     io_type;
     PVFS_Request          file_req;
     PVFS_offset           file_req_offset;

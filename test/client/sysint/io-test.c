@@ -261,7 +261,7 @@ int main(
     }
     for (i = 0; i < resp_getattr.attr.dfile_count; i++)
     {
-	printf("0x%08Lx\n", Lu(dfile_array[i]));
+	printf("%Lu\n", Lu(dfile_array[i]));
     }
 
 	/**************************************************************
