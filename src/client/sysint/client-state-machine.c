@@ -771,8 +771,11 @@ PVFS_error PINT_client_wait_internal(
 
         do
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_i%s_%s calling "
-                         "test()\n", in_class_str, in_op_str);
+            /*
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+              "%s: PVFS_i%s_%s calling test()\n",
+              __func__, in_class_str, in_op_str);
+            */
             ret = PINT_client_state_machine_test(op_id, out_error);
 
         } while (!sm_p->op_complete && (ret == 0));
