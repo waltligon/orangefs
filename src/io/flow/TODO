@@ -22,20 +22,12 @@ general stuff:
   (would be faster to keep static buffers for some of that anyway if
   possible)
 
-- contrive some test cases that would force the use of the CKSIZE
-  mode of PINT_Process_request().  This would mainly require a
-  data layout that causes the number of segments per flow cycle to
-  exceed the maximum that I am willing to handle.
-
 - figure out points at which zero byte messages should be sent to try
   to abort flow
   - in particular, make sure that we can handle receiving a zero
 	 byte message in bmi to mem case.
 
 - implement unpost()
-
-- look into idea of hash table in place of completion queue (see
-  bmi_tcp implementation in BMI)
 
 - NOTE: we can assume that every flow will be preceded by an ack from
   the server.  This means that we already know how much can be
@@ -55,8 +47,6 @@ flowproto bmi_trove stuff:
   clever about multiplexing between bmi/trove and dividing up the
   max_idle_time.
 
-- use trove testsome() once it is implemented
-
 - think about queue/array layout for op id's a little more.
   Is there any reason why we can't maintain an array the whole time
   rather than converting between list and array?
@@ -65,12 +55,6 @@ flowproto bmi_trove stuff:
   handy feature (on server write operation case) when there is a
   large buffer with too many discontig regions to do in one list
   from request processor
-
-- on client read operation case, if we run into a limit on the max
-  number of discontig segments, we should just do a big contiguous
-  receive and memcpy out to regions.  This keeps us from having to
-  handle arbitrarily large lists on bmi recv, and also may even be
-  faster in cases of extremely discontiguous regions.
 
 - signal I/O error by sending 0 byte message.  This means receiver
   should shut down because no other data is coming.
