@@ -12,6 +12,7 @@
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
+#include "str-utils.h"
 
 #include "pinode-helper.h"
 #include "pint-dcache.h"

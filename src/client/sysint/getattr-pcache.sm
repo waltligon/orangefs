@@ -12,8 +12,8 @@
  *
  * This state machine uses the msgpair structure in the PINT_client_sm
  * structure in order to perform the message passing.  It assumes that this
- * has been previously set up by the state machine above this one.  In particular
- * the following fields of the msgpair structure must be filled in:
+ * has been previously set up by the state machine above this one.  In
+ * particular the following fields of the msgpair structure must be filled in:
  * - req (unencoded getattr request)
  * - fs_id
  * - handle
@@ -23,6 +23,13 @@
  *
  * This state machine in turns jumps to the pvfs2_client_msgpair_sm to perform
  * messaging, if necessary.
+ *
+ * NOTE: the comp_fn can cause a non-zero error_code to be passed back up from
+ *       the msgpair state machine and through this state machine back to the
+ *       one that jumped to here.  so be aware!
+ *
+ * TODO: if we fail to get attributes on something, we should try to ensure
+ *       that the dcache is cleared of any entries pertaining to that object.
  */
 
 #include <string.h>
@@ -37,8 +44,6 @@
 #include "pint-servreq.h"
 #include "pcache.h"
 #include "PINT-reqproto-encode.h"
-
-extern job_context_id pint_client_sm_context;
 
 enum {
     GETATTR_PCACHE_MISS = 1

@@ -156,11 +156,14 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 
 #include "state-machine.h"
 
+/* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
+
+/* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;
 extern struct PINT_state_machine_s pvfs2_client_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_pcache_sm;
-
+extern struct PINT_state_machine_s pvfs2_client_lookup_dcache_sm;
 
 /*
  * Local variables:

@@ -25,6 +25,7 @@
 #include "client-state-machine.h"
 #include "state-machine-fns.h"
 #include "pvfs2-debug.h"
+#include "pint-bucket.h"
 #include "job.h"
 #include "gossip.h"
 #include "pint-servreq.h"
