@@ -1163,6 +1163,8 @@ static int alloc_flow_data(flow_descriptor* flow_d)
 	if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
 		flow_d->dest.endpoint_id == MEM_ENDPOINT)
 	{
+		/* TODO: this isn't the right test... */
+#if 0
 		/* sanity check the mem buffer */
 		if(flow_d->request->ub > flow_d->dest.u.mem.size)
 		{
@@ -1170,12 +1172,15 @@ static int alloc_flow_data(flow_descriptor* flow_d)
 			free(flow_data);
 			return(-EINVAL);
 		}
+#endif
 		flow_data->type = BMI_TO_MEM;
 		ret = buffer_setup_bmi_to_mem(flow_d);
 	}
 	else if(flow_d->src.endpoint_id == MEM_ENDPOINT &&
 		flow_d->dest.endpoint_id == BMI_ENDPOINT)
 	{
+		/* TODO: this isn't the right test... */
+#if 0
 		/* sanity check the mem buffer */
 		if(flow_d->request->ub > flow_d->src.u.mem.size)
 		{
@@ -1183,6 +1188,7 @@ static int alloc_flow_data(flow_descriptor* flow_d)
 			free(flow_data);
 			return(-EINVAL);
 		}
+#endif
 		flow_data->type = MEM_TO_BMI;
 		ret = buffer_setup_mem_to_bmi(flow_d);
 	}
@@ -1403,6 +1409,16 @@ static void service_bmi_to_trove(flow_descriptor* flow_d)
 			/* no ops in flight, so we can just kick out error here */
 			return;
 		}
+#if 0
+		gossip_err("FOO1: current_req_offset: %d\n",
+			(int)flow_d->current_req_offset);
+		gossip_err("FOO1: trove_list_count: %d\n",
+			(int)flow_data->trove_list_count);
+		gossip_err("FOO1: trove_offset_list[0]: %d\n", 
+			(int)flow_data->trove_offset_list[0]);
+		gossip_err("FOO1: trove_size_list[0]: %d\n", 
+			(int)flow_data->trove_size_list[0]);
+#endif
 		
 		if(flow_data->drain_buffer_stepsize !=
 			flow_data->drain_buffer_used)
@@ -2333,6 +2349,17 @@ static void trove_completion_bmi_to_trove(PVFS_ds_state error_code,
 			flow_d->error_code = ret;
 			exit(-1);
 		}
+#if 0
+		gossip_err("FOO2: current_req_offset: %d\n",
+			(int)flow_d->current_req_offset);
+		gossip_err("FOO2: trove_list_count: %d\n",
+			(int)flow_data->trove_list_count);
+		gossip_err("FOO2: trove_offset_list[0]: %d\n", 
+			(int)flow_data->trove_offset_list[0]);
+		gossip_err("FOO2: trove_size_list[0]: %d\n", 
+			(int)flow_data->trove_size_list[0]);
+#endif
+
 		/* set the state so that the next service will cause a post */
 		flow_data->drain_buffer_state = BUF_READY_TO_DRAIN;
 		/* we can go into SVC_READY state regardless of the BMI buffer
