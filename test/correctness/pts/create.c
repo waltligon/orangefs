@@ -17,7 +17,6 @@
 #define ATTR_MTIME 32
 #define ATTR_TYPE 2048
 
-void gen_rand_str(int len, char** gen_str);
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
 /* files, directories, tree of directories */
