@@ -45,6 +45,8 @@ struct options
     int num_starts;
 };
 
+static char *process_name = NULL;
+
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 static void print_entry(
@@ -66,6 +68,8 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     int mnt_index = -1;
     char current_dir[PVFS_NAME_MAX] = {0};
+
+    process_name = argv[0];
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -121,8 +125,26 @@ int main(int argc, char **argv)
 
     if (mnt_index == -1)
     {
-	fprintf(stderr, "Error: could not find filesystem for %s in "
-                "pvfstab %s\n", user_opts->start[j], DEFAULT_TAB);
+        /* try to determine the reason for this failure */
+        for(j = 0; j < user_opts->num_starts; j++)
+        {
+            if ((pvfs_path[j] == NULL) || (strlen(pvfs_path[j]) == 0))
+            {
+                break;
+            }
+        }
+
+        /* check for the case where a bogus path was requested */
+        if (j != user_opts->num_starts)
+        {
+            fprintf(stderr, "%s: %s: No such file or directory\n",
+                    process_name, user_opts->start[j]);
+        }
+        else
+        {
+            fprintf(stderr, "Error: could not find filesystem for %s in "
+                    "pvfstab %s\n", user_opts->start[j], DEFAULT_TAB);
+        }
 	return(-1);
 
     }
@@ -141,13 +163,9 @@ int main(int argc, char **argv)
         {
             printf("%s:\n", pvfs_path[i]);
         }
-        ret = do_list(&resp_init, pvfs_path[i], user_opts);
-        if (ret < 0)
-        {
-            PVFS_perror("do_list", ret);
-            ret = -1;
-            goto main_out;
-        }
+
+        do_list(&resp_init, pvfs_path[i], user_opts);
+
         if (user_opts->num_starts > 1)
         {
             printf("\n");
@@ -356,8 +374,8 @@ int do_list(
 
     if (PVFS_sys_lookup(fs_id, name, credentials, &lk_response))
     {
-        fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
-                name, init_response->fsid_list[0]);
+        fprintf(stderr, "%s: %s: No such file or directory\n",
+                process_name, name);
         return -1;
     }
 
