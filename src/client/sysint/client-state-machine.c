@@ -104,6 +104,10 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 	    sm_p->current_state 
 		= pvfs2_client_mgmt_iterate_handles_list_sm.state_machine +1;
 	    break;
+	case PVFS_MGMT_GET_DFILE_ARRAY:
+	    sm_p->current_state 
+		= pvfs2_client_mgmt_get_dfile_array_sm.state_machine +1;
+	    break;
 	default:
 	    assert(0);
     }

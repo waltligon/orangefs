@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "pvfs2-util.h"
+#include "pvfs2-mgmt.h"
 
 int main(int argc,char **argv)
 {
@@ -37,6 +38,8 @@ int main(int argc,char **argv)
 	PVFS_Request mem_req;
 	void* buffer;
 	int buffer_size;
+	PVFS_sysresp_getattr resp_getattr;
+	PVFS_handle* dfile_array = NULL;
 
 	if (argc != 2)
 	{
@@ -223,6 +226,38 @@ int main(int argc,char **argv)
 		{
 			printf("IO-TEST: no errors found.\n");
 		}
+	}
+
+	/* test out some of the mgmt functionality */
+	ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_NOSIZE,
+	    credentials, &resp_getattr);
+	if(ret < 0)
+	{
+	    PVFS_perror("PVFS_sys_getattr", ret);
+	    return(-1);
+	}
+
+	printf("Target file had %d datafiles:\n", 
+	    resp_getattr.attr.dfile_count);
+
+	dfile_array = (PVFS_handle*)malloc(resp_getattr.attr.dfile_count
+	    * sizeof(PVFS_handle));
+	if(!dfile_array)
+	{
+	    perror("malloc");
+	    return(-1);
+	}
+
+	ret = PVFS_mgmt_get_dfile_array(pinode_refn, credentials,
+	    dfile_array, resp_getattr.attr.dfile_count);
+	if(ret < 0)
+	{
+	    PVFS_perror("PVFS_mgmt_get_dfile_array", ret);
+	    return(-1);
+	}
+	for(i=0; i<resp_getattr.attr.dfile_count; i++)
+	{
+	    printf("0x%08Lx\n", dfile_array[i]);
 	}
 
 	/**************************************************************

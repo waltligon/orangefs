@@ -216,6 +216,12 @@ struct PINT_client_mgmt_iterate_handles_list_sm
     PVFS_ds_position* position_array;
 };
 
+struct PINT_client_mgmt_get_dfile_array_sm
+{
+    PVFS_pinode_reference pinode_refn;
+    PVFS_handle* dfile_array;
+    int dfile_count;
+};
 
 struct PINT_client_truncate_sm {
     PVFS_pinode_reference	object_ref;	/* input parameter */
@@ -278,6 +284,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_mgmt_statfs_list_sm statfs_list;
 	struct PINT_client_mgmt_perf_mon_list_sm perf_mon_list;
 	struct PINT_client_mgmt_iterate_handles_list_sm iterate_handles_list;
+	struct PINT_client_mgmt_get_dfile_array_sm get_dfile_array;
     } u;
 } PINT_client_sm;
 
@@ -301,7 +308,8 @@ enum {
     PVFS_MGMT_NOOP   = 10,
     PVFS_MGMT_STATFS_LIST = 11,
     PVFS_MGMT_PERF_MON_LIST = 12,
-    PVFS_MGMT_ITERATE_HANDLES_LIST = 13
+    PVFS_MGMT_ITERATE_HANDLES_LIST = 13,
+    PVFS_MGMT_GET_DFILE_ARRAY = 14
 };
 
 /* prototypes of helper functions */
@@ -352,6 +360,7 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_perf_mon_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_iterate_handles_list_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dfile_array_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_noop_sm;
 extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 

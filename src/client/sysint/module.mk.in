@@ -38,7 +38,8 @@ SMSRC := \
 	sys-flush.sm \
 	sys-symlink.sm \
 	mgmt-perf-mon-list.sm \
-	mgmt-iterate-handles-list.sm
+	mgmt-iterate-handles-list.sm \
+	mgmt-get-dfile-array.sm
 
 SMCGEN := $(patsubst %.sm,$(DIR)/%.c,$(SMSRC))
 

@@ -116,6 +116,12 @@ int PVFS_mgmt_iterate_handles_list(
     PVFS_id_gen_t* addr_array,
     int server_count);
 
+int PVFS_mgmt_get_dfile_array(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_credentials credentials,
+    PVFS_handle* dfile_array,
+    int dfile_count);
+
 #endif /* __PVFS2_MGMT_H */
 
 /*
