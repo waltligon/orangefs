@@ -44,11 +44,14 @@ extern gen_mutex_t *g_session_tag_mt_lock;
 int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     PVFS_sysresp_init *resp)
 {
-    int ret = -1, i = 0;
+    int ret = -1, i, j;
     int num_file_systems = 0;
     gen_mutex_t *mt_config = NULL;
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
+    const char **method_ptr_list;
+    int num_method_ptr_list, max_method_ptr_list;
+    char *method_list = 0;
 
     enum {
 	NONE_INIT_FAIL = 0,
@@ -86,15 +89,62 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 	goto return_error;
     }
 
+    /* Parse the method types from the mntent_list */
+    num_method_ptr_list = 0;
+    max_method_ptr_list = 0;
+    method_ptr_list = 0;
+    for (i=0; i<mntent_list.nr_entry; i++) {
+	const char *meth_name = BMI_method_from_scheme(
+	  mntent_list.ptab_p[i].meta_addr);
+	for (j=0; j<num_method_ptr_list; j++) {
+	    if (method_ptr_list[j] == meth_name)
+		break;
+	}
+	if (j == num_method_ptr_list && meth_name) {  /* ignore unknown ones */
+	    if (num_method_ptr_list == max_method_ptr_list) {
+		const char **x = method_ptr_list;
+		max_method_ptr_list += 2;
+		method_ptr_list = malloc(
+		  max_method_ptr_list * sizeof(*method_ptr_list));
+		if (!method_ptr_list) {
+		    init_fail = BMI_INIT_FAIL;
+		    ret = -ENOMEM;
+		    goto return_error;
+		}
+		if (x) {
+		    memcpy(method_ptr_list, x,
+		      num_method_ptr_list * sizeof(*method_ptr_list));
+		    free(x);
+		}
+	    }
+	    method_ptr_list[num_method_ptr_list] = meth_name;
+	    ++num_method_ptr_list;
+	}
+    }
+    if (num_method_ptr_list) {
+	j = num_method_ptr_list;  /* intervening , and ending \0 */
+	for (i=0; i<num_method_ptr_list; i++)
+	    j += strlen(method_ptr_list[i]);
+	method_list = malloc(j * sizeof(char));
+	method_list[0] = 0;
+	for (i=0; i<num_method_ptr_list; i++) {
+	    if (i > 0)
+		strcat(method_list, ",");
+	    strcat(method_list, method_ptr_list[i]);
+	}
+	free(method_ptr_list);
+    }
+
     /* Initialize BMI */
-    /*TODO: change this so it parses the bmi module from the pvfstab file*/
-    ret = BMI_initialize("bmi_tcp",NULL,0);
+    ret = BMI_initialize(method_list,NULL,0);
     if (ret < 0)
     {
 	init_fail = BMI_INIT_FAIL;
 	gossip_ldebug(CLIENT_DEBUG,"BMI initialize failure\n");
 	goto return_error;
     }
+    if (method_list)
+	free(method_list);
 
     /* initialize bmi session identifier, TODO: DOCUMENT THIS */
     g_session_tag_mt_lock = gen_mutex_build();
@@ -201,6 +251,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
       2) store fs ids into resp object
     */
     cur = g_server_config.file_systems;
+    i = 0;
     while(cur && (i < num_file_systems))
     {
         cur_fs = llist_head(cur);
