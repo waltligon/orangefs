@@ -38,6 +38,8 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	int items_found = 0, i = 0;
 	struct PINT_decoded_msg decoded;
 	bmi_size_t max_msg_sz;
+	void* encoded_resp;
+	PVFS_msg_tag_t op_tag;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -94,8 +96,11 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	req_p.u.remove.handle = pinode_ptr->pinode_ref.handle;
 	req_p.u.remove.fs_id = req->parent_refn.fs_id;
 
+	op_tag = get_next_session_tag();
+
 	/* dead man walking */
-	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+            &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
 	    failure = SEND_REQ_FAILURE;
@@ -111,7 +116,8 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	    goto return_error;
 	}
 
-	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+            &encoded_resp, op_tag);
 
 	/* rmdirent the dir entry */
 	ret = PINT_bucket_map_to_server(&serv_addr, req->parent_refn.handle, req->parent_refn.fs_id);
@@ -130,8 +136,11 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	req_p.u.rmdirent.parent_handle = req->parent_refn.handle;
 	req_p.u.rmdirent.fs_id = req->parent_refn.fs_id;
 
+	op_tag = get_next_session_tag();
+
 	/* dead man walking */
-	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+            &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
 	    failure = SEND_REQ_FAILURE;
@@ -155,7 +164,8 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 
 	assert(ack_p->u.rmdirent.entry_handle == pinode_ptr->pinode_ref.handle);
 
-	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+            &encoded_resp, op_tag);
 
 	/* send remove messages to each of the data file servers */
 	
@@ -183,7 +193,10 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 		goto return_error;
 	    }
 
-	    ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	    op_tag = get_next_session_tag();
+
+	    ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+		&decoded, &encoded_resp, op_tag);
 	    if (ret < 0)
 	    {
 		failure = SEND_REQ_FAILURE;
@@ -199,7 +212,8 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 		goto return_error;
 	    }
 
-	    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+		&encoded_resp, op_tag);
 	}
 
 	/* Remove the dentry from the dcache */
@@ -231,7 +245,8 @@ return_error:
     switch(failure)
     {
 	case RECV_REQ_FAILURE:
-	    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+		&encoded_resp, op_tag);
 	case SEND_REQ_FAILURE:
 	case SERVER_LOOKUP_FAILURE:
 	case GET_PINODE_FAILURE:

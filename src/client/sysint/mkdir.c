@@ -39,6 +39,8 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
     pinode_reference entry;
     int attr_mask;
     struct PINT_decoded_msg decoded;
+    void* encoded_resp;
+    PVFS_msg_tag_t op_tag;
     bmi_size_t max_msg_sz;
 
     enum {
@@ -119,7 +121,10 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 
     /* send the server request */
 
-    ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz, &decoded);
+    op_tag = get_next_session_tag();
+
+    ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
+	&decoded, &encoded_resp, op_tag);
     if (ret < 0)
     {
 	failure = LOOKUP_SERVER_FAILURE;
@@ -145,7 +150,8 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
     resp->pinode_refn.handle = entry.handle;
     resp->pinode_refn.fs_id = entry.fs_id;
 
-    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+    PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
+	&encoded_resp, op_tag);
 
     /* the all the dirents for files/directories are stored on whatever server
      * holds the parent handle */
@@ -177,8 +183,10 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 
     /* max response size is the same as the previous request */
 
+    op_tag = get_next_session_tag();
     /* Make server request */
-    ret = PINT_server_send_req(serv_addr2, &req_p, max_msg_sz, &decoded);
+    ret = PINT_send_req(serv_addr2, &req_p, max_msg_sz,
+	&decoded, &encoded_resp, op_tag);
     if (ret < 0)
     {
 	failure = MKDIR_MSG_FAILURE;
@@ -196,7 +204,8 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	goto return_error;
     }
 
-    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+    PINT_release_req(serv_addr2, &req_p, max_msg_sz, &decoded,
+	&encoded_resp, op_tag);
 
     /* add the new directory to the dcache and pinode caches */
     ret = PINT_dcache_insert(req->entry_name, entry, req->parent_refn);
@@ -261,14 +270,19 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	    req_p.u.rmdir.fs_id = entry.fs_id;
 
 	    max_msg_sz = sizeof(struct PVFS_server_resp_s);
-	    ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz,&decoded);
-	    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	    op_tag = get_next_session_tag();
+	    ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
+		&decoded, &encoded_resp, op_tag);
+	    PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
+		&encoded_resp, op_tag);
 
 	case MKDIR_MSG_FAILURE:
 	    gossip_ldebug(CLIENT_DEBUG,"MKDIR_MSG_FAILURE\n");
+	    /*op_tag should still be valid if the pointer is non-null*/
 	    if (decoded.buffer != NULL)
-		PINT_decode_release(&decoded, PINT_DECODE_RESP,
-						REQ_ENC_FORMAT);
+		PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
+		    &encoded_resp, op_tag);
+
 	case LOOKUP_SERVER_FAILURE:
 	    gossip_ldebug(CLIENT_DEBUG,"LOOKUP_SERVER_FAILURE\n");
 

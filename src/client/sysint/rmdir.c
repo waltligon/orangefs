@@ -31,11 +31,13 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
     struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
     int ret = -1;
     pinode *pinode_ptr = NULL, *item_ptr = NULL;
-    bmi_addr_t serv_addr1, serv_addr2;	/* PVFS address type structure */
+    bmi_addr_t serv_addr;	/* PVFS address type structure */
     int name_sz = 0, items_found, attr_mask;
     pinode_reference entry;
     struct PINT_decoded_msg decoded;
     bmi_size_t max_msg_sz;
+    void* encoded_resp;
+    PVFS_msg_tag_t op_tag;
 
     enum{
 	NONE_FAILURE = 0,
@@ -75,7 +77,7 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
 	goto return_error;
     }
 
-    ret = PINT_bucket_map_to_server(&serv_addr1, entry.handle, entry.fs_id);
+    ret = PINT_bucket_map_to_server(&serv_addr, entry.handle, entry.fs_id);
     if (ret < 0)
     {
 	failure = SERVER_LOOKUP_FAILURE;
@@ -93,9 +95,11 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
     req_p.u.rmdir.handle = pinode_ptr->pinode_ref.handle;
     req_p.u.rmdir.fs_id = req->parent_refn.fs_id;
 
-    /* dead man walking */
+    op_tag = get_next_session_tag();
 
-    ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz, &decoded);
+    /* dead man walking */
+    ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+	&decoded, &encoded_resp, op_tag);
     if (ret < 0)
     {
 	failure = SEND_REQ_FAILURE;
@@ -111,10 +115,11 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
 	goto return_error;
     }
 
-    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+	&encoded_resp, op_tag);
 
     /* rmdirent the dir entry */
-    ret = PINT_bucket_map_to_server(&serv_addr2, req->parent_refn.handle, req->parent_refn.fs_id);
+    ret = PINT_bucket_map_to_server(&serv_addr, req->parent_refn.handle, req->parent_refn.fs_id);
     if (ret < 0)
     {
 	failure = SERVER_LOOKUP_FAILURE;
@@ -131,7 +136,10 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
     req_p.u.rmdirent.fs_id = req->parent_refn.fs_id;
 
     /* dead man walking */
-    ret = PINT_server_send_req(serv_addr2, &req_p, max_msg_sz, &decoded);
+    op_tag = get_next_session_tag();
+
+    ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+	&decoded, &encoded_resp, op_tag);
     if (ret < 0)
     {
 	failure = SEND_REQ_FAILURE;
@@ -155,7 +163,8 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
 
     assert(ack_p->u.rmdirent.entry_handle == pinode_ptr->pinode_ref.handle);
 
-    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+	&encoded_resp, op_tag);
 
     /* Remove the dentry from the dcache */
     ret = PINT_dcache_remove(req->entry_name,req->parent_refn,&items_found);
@@ -187,7 +196,8 @@ return_error:
     {
 	case RECV_REQ_FAILURE:
 	    gossip_ldebug(CLIENT_DEBUG,"RECV_REQ_FAILURE\n");
-	    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+		&encoded_resp, op_tag);
 	case SEND_REQ_FAILURE:
 	    gossip_ldebug(CLIENT_DEBUG,"SEND_REQ_FAILURE\n");
 	case SERVER_LOOKUP_FAILURE:
