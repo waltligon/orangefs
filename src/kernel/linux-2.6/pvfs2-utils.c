@@ -966,9 +966,9 @@ void pvfs2_make_bad_inode(struct inode *inode)
         inode->i_ino)
     {
         /*
-          if this occurs, the pvfs2-client-core was killed and we need
-          to secretly remount the file system to restore the dynamic
-          mount tables in the client
+          if this occurs, the pvfs2-client-core was killed but we
+          can't afford to lose the inode operations and such
+          associated with the root handle in any case
         */
         pvfs2_print("*** NOT making bad root inode %lu\n", inode->i_ino);
     }
