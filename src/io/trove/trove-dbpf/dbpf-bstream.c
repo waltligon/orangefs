@@ -1103,10 +1103,8 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
             }
             else if (ret != EINPROGRESS)
             {
-                gossip_debug(GOSSIP_TROVE_DEBUG, "error %d (%s) from "
-                             "aio_error/aio_return on block %d; "
-                             "skipping\n", ret, strerror(ret), i);
-
+                gossip_err("%s: aio_error on block %d, skipping: %s\n",
+                           __func__, i, strerror(ret));
                 ret = -trove_errno_to_trove_error(ret);
                 goto final_aio_cleanup;
             }
