@@ -409,7 +409,6 @@ int pvfs2_fsync(
     int datasync)
 {
     pvfs2_print("pvfs2: pvfs2_fsync called\n");
-
     return 0;
 }
 

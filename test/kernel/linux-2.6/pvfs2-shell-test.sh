@@ -15,9 +15,11 @@
 # runtime options
 #####################################
 
-# comment out to disable categories of tests
+# Fully comment out to disable categories of tests
+# DO NOT just set the value to be 0
 ENABLE_DIRECTORY_TESTS=1
 ENABLE_IO_TESTS=1
+ENABLE_EXECUTE_TESTS=1
 ENABLE_COMPILE_TESTS=1
 ENABLE_PERMISSION_TESTS=1
 
@@ -544,6 +546,47 @@ io_test2()
     return 0
 }
 
+#####################################
+# simple execute test functions
+#####################################
+
+# execute a file on pvfs2 multiple times in parallel
+#
+#   the idea is that one will finish before the other
+#   causing the page cache to be flushed in pvfs2.
+#   this forces the second one still running to re-read
+#   the missing pages, but is an interesting case to test for.
+#   this also could be seen using make -j3 on a pvfs2 volume.
+execute_test1()
+{
+    echo ""
+    echo "******************************************"
+    echo "* RUNNING EXECUTE TEST 1"
+    echo "******************************************"
+
+    setup_testdir $PVFS2_TESTDIR
+
+    PVFS2_LS="$PVFS2_TESTDIR/ls"
+
+    LS=`which ls`
+    if ! test -x $LS; then
+        echo "Failed to find ls program: Execute test FAILED."
+    fi
+
+    # make sure ls will be running from the pvfs2 volume
+    cp $LS $PVFS2_LS
+
+    CMD="eval $PVFS2_LS & $PVFS2_LS & $PVFS2_LS & $PVFS2_LS & $PVFS2_LS"
+    timestamp "Running 'ls' multiple times at once" "$CMD"
+
+    remove_testdir $PVFS2_TESTDIR
+
+    echo ""
+    echo "******************************************"
+    echo "* PASSED EXECUTE TEST 1"
+    echo "******************************************"
+    return 0
+}
 
 #####################################
 # simple compilation test functions
@@ -716,6 +759,10 @@ if ! test -z "$ENABLE_IO_TESTS"; then
     io_test1
 
     io_test2
+fi
+
+if ! test -z "$ENABLE_EXECUTE_TESTS"; then
+    execute_test1
 fi
 
 if ! test -z "$ENABLE_COMPILE_TESTS"; then
