@@ -19,18 +19,15 @@
 #include <pvfs2-debug.h>
 #include <pvfs2-storage.h>
 #include <PINT-reqproto-encode.h>
-
-typedef struct PINT_server_op PINT_server_op;
+#include <pvfs2-server.h>
 
 union PINT_state_array_values
 {
-	int (*state_action)(PINT_server_op*,job_status_s*);
+	int (*state_action)(struct PINT_server_op *, job_status_s *);
 	int return_value;
 	int flag;
 	union PINT_state_array_values *next_state;
 };
-
-typedef union PINT_state_array_values PINT_state_array_values;
 
 enum {
 	JMP_NOT_READY = 99,

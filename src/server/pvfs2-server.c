@@ -28,9 +28,9 @@
 #include "PINT-reqproto-encode.h"
 #include "request-scheduler.h"
 
+#include "pvfs2-server.h"
 #include "state-machine.h"
 #include "server-config.h"
-#include "pvfs2-server.h"
 
 #include "quicklist.h"
 

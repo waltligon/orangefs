@@ -7,6 +7,8 @@
 #ifndef __PVFS2_SERVER_H
 #define __PVFS2_SERVER_H
 
+typedef union PINT_state_array_values PINT_state_array_values;
+
 /* Some config values for the prototype pvfs2 server */
 enum
 {
