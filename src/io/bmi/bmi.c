@@ -14,14 +14,12 @@
 #include "reference-list.h"
 #include "op-list.h"
 #include "gen-locks.h"
+#include "str-utils.h"
 #include "id-generator.h"
 
 static int active_method_count = 0;
 static struct bmi_method_ops **active_method_table = NULL;
 static ref_list_p cur_ref_list = NULL;
-
-static int split_string_list(char ***tokens,
-			     const char *comma_list);
 
 /* array to keep up with active contexts */
 static int context_array[BMI_MAX_CONTEXTS] = { 0 };
@@ -96,7 +94,8 @@ int BMI_initialize(const char *method_list,
     if(method_list)
     {
 	/* separate out the method list */
-	active_method_count = split_string_list(&requested_methods, method_list);
+	active_method_count = PINT_split_string_list(
+            &requested_methods, method_list);
 	if (active_method_count < 1)
 	{
 	    gossip_lerr("Error: bad method list.\n");
@@ -116,17 +115,15 @@ int BMI_initialize(const char *method_list,
     }
 
     /* create a table to keep up with the active methods */
-    active_method_table =
-	(struct bmi_method_ops **) malloc(active_method_count *
-					  sizeof(struct bmi_method_ops *));
+    active_method_table = (struct bmi_method_ops **)malloc(
+        active_method_count * sizeof(struct bmi_method_ops *));
     if (!active_method_table)
     {
 	ret = bmi_errno_to_pvfs(-ENOMEM);
 	goto bmi_initialize_failure;
     }
-    memset(active_method_table, 0, active_method_count * sizeof(struct
-								bmi_method_ops
-								*));
+    memset(active_method_table, 0,
+           active_method_count * sizeof(struct bmi_method_ops *));
 
     /* find the interface for each requested method and load it into the
      * active table
@@ -181,9 +178,8 @@ int BMI_initialize(const char *method_list,
 	    {
 		/* this is a bit of a hack */
 		new_addr->method_type = i;
-		ret =
-		    active_method_table[i]->BMI_meth_initialize(new_addr, i,
-								flags);
+		ret = active_method_table[i]->BMI_meth_initialize(
+                    new_addr, i, flags);
 	    }
 	    else
 	    {
@@ -192,7 +188,8 @@ int BMI_initialize(const char *method_list,
 	}
 	else
 	{
-	    ret = active_method_table[i]->BMI_meth_initialize(NULL, i, flags);
+	    ret = active_method_table[i]->BMI_meth_initialize(
+                NULL, i, flags);
 	}
 	if (ret < 0)
 	{
@@ -294,7 +291,8 @@ int BMI_initialize(const char *module_string,
     }
 
     /* separate out the module list */
-    active_method_count = split_string_list(&modules, module_string);
+    active_method_count = PINT_split_string_list(
+        &modules, module_string);
     if (active_method_count < 1)
     {
 	gossip_lerr("Error: bad module list.\n");
@@ -303,9 +301,8 @@ int BMI_initialize(const char *module_string,
     }
 
     /* create a table to keep up with the method modules */
-    active_method_table =
-	(struct bmi_method_ops **) malloc(active_method_count *
-					  sizeof(struct bmi_method_ops *));
+    active_method_table = (struct bmi_method_ops **)malloc(
+        active_method_count * sizeof(struct bmi_method_ops *));
     if (!active_method_table)
     {
 	ret = bmi_errno_to_pvfs(-ENOMEM);
@@ -324,8 +321,8 @@ int BMI_initialize(const char *module_string,
 	}
 	dlerror();
 
-	active_method_table[i] = (struct bmi_method_ops *) dlsym(meth_mod,
-								 "method_interface");
+	active_method_table[i] = (struct bmi_method_ops *)
+            dlsym(meth_mod, "method_interface");
 	mod_error = dlerror();
 	if (mod_error)
 	{
@@ -354,9 +351,8 @@ int BMI_initialize(const char *module_string,
 	    {
 		/* this is a bit of a hack */
 		new_addr->method_type = i;
-		ret =
-		    active_method_table[i]->BMI_meth_initialize(new_addr, i,
-								flags);
+		ret = active_method_table[i]->BMI_meth_initialize(
+                    new_addr, i, flags);
 	    }
 	    else
 	    {
@@ -365,7 +361,8 @@ int BMI_initialize(const char *module_string,
 	}
 	else
 	{
-	    ret = active_method_table[i]->BMI_meth_initialize(NULL, i, flags);
+	    ret = active_method_table[i]->BMI_meth_initialize(
+                NULL, i, flags);
 	}
 	if (ret < 0)
 	{
@@ -474,13 +471,18 @@ int BMI_open_context(bmi_context_id* context_id)
     /* tell all of the modules about the new context */
     for (i = 0; i < active_method_count; i++)
     {
-	ret = active_method_table[i]->BMI_meth_open_context(context_index);
+	ret = active_method_table[i]->BMI_meth_open_context(
+            context_index);
 	if(ret < 0)
 	{
-	    /* one of them failed; kill this context in the previous modules */
+	    /*
+              one of them failed; kill this context in the previous
+              modules
+            */
 	    for(j=(i-1); i>-1; i++)
 	    {
-		active_method_table[i]->BMI_meth_close_context(context_index);
+		active_method_table[i]->BMI_meth_close_context(
+                    context_index);
 	    }
 	    goto out;
 	}
@@ -546,8 +548,8 @@ int BMI_post_recv(bmi_op_id_t * id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-	"BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld\n", (long)src,
-	(long)buffer, (long)expected_size);
+                 "BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld\n",
+                 (long)src, (long)buffer, (long)expected_size);
 
     *id = 0;
 
@@ -560,11 +562,9 @@ int BMI_post_recv(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    ret = tmp_ref->interface->BMI_meth_post_recv(id, tmp_ref->method_addr,
-						 buffer, expected_size,
-						 actual_size,
-						 buffer_type, tag,
-						 user_ptr, context_id);
+    ret = tmp_ref->interface->BMI_meth_post_recv(
+        id, tmp_ref->method_addr, buffer, expected_size, actual_size,
+        buffer_type, tag, user_ptr, context_id);
     return (ret);
 }
 
@@ -588,8 +588,8 @@ int BMI_post_send(bmi_op_id_t * id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-	"BMI_post_send: addr: %ld, offset: 0x%lx, size: %ld\n", (long)dest,
-	(long)buffer, (long)size);
+                 "BMI_post_send: addr: %ld, offset: 0x%lx, size: %ld\n",
+                 (long)dest, (long)buffer, (long)size);
 
     *id = 0;
 
@@ -602,10 +602,9 @@ int BMI_post_send(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    ret = tmp_ref->interface->BMI_meth_post_send(id, tmp_ref->method_addr,
-						 buffer, size,
-						 buffer_type, tag,
-						 user_ptr, context_id);
+    ret = tmp_ref->interface->BMI_meth_post_send(
+        id, tmp_ref->method_addr, buffer, size, buffer_type, tag,
+        user_ptr, context_id);
     return (ret);
 }
 
@@ -643,12 +642,9 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    ret = tmp_ref->interface->BMI_meth_post_sendunexpected(id,
-							   tmp_ref->method_addr,
-							   buffer, size,
-							   buffer_type, tag,
-							   user_ptr,
-							   context_id);
+    ret = tmp_ref->interface->BMI_meth_post_sendunexpected(
+        id, tmp_ref->method_addr, buffer, size, buffer_type, tag,
+        user_ptr, context_id);
     return (ret);
 }
 
@@ -678,17 +674,16 @@ int BMI_test(bmi_op_id_t id,
     target_op = id_gen_fast_lookup(id);
     assert(target_op->op_id == id);
 
-    ret = active_method_table[target_op->addr->method_type]->BMI_meth_test(id,
-									   outcount,
-									   error_code,
-									   actual_size,
-									   user_ptr,
-									   max_idle_time_ms,
-									   context_id);
+    ret = active_method_table[
+        target_op->addr->method_type]->BMI_meth_test(
+            id, outcount, error_code, actual_size, user_ptr,
+            max_idle_time_ms, context_id);
+
     /* return 1 if anything completed */
     if (ret == 0 && *outcount == 1)
     {
-	gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "BMI_test completing: %Lu\n", Lu(id));
+	gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                     "BMI_test completing: %Lu\n", Lu(id));
 	return (1);
     }
     return (ret);
@@ -719,14 +714,10 @@ int BMI_testsome(int incount,
 
     *outcount = 0;
 
-    ret = active_method_table[0]->BMI_meth_testsome(incount,
-						    id_array, outcount,
-						    index_array,
-						    error_code_array,
-						    actual_size_array,
-						    user_ptr_array,
-						    max_idle_time_ms,
-						    context_id);
+    ret = active_method_table[0]->BMI_meth_testsome(
+        incount, id_array, outcount, index_array,
+        error_code_array, actual_size_array, user_ptr_array,
+        max_idle_time_ms, context_id);
     if (ret < 0)
     {
 	return (ret);
@@ -788,7 +779,8 @@ int BMI_testsome(int incount,
 	{
 	    if(id_array[j])
 	    {
-		query_op = (struct method_op*)id_gen_fast_lookup(id_array[j]);
+		query_op = (struct method_op*)
+                    id_gen_fast_lookup(id_array[j]);
 		assert(query_op->op_id == id_array[j]);
 		if(query_op->addr->method_type == i)
 		{
@@ -875,10 +867,9 @@ int BMI_testunexpected(int incount,
 
     while (position < incount && i < active_method_count)
     {
-	ret =
-	    active_method_table[i]->
-	    BMI_meth_testunexpected((incount - position), &tmp_outcount,
-				    (&(sub_info[position])), idle_per_method);
+	ret = active_method_table[i]->BMI_meth_testunexpected(
+            (incount - position), &tmp_outcount,
+            (&(sub_info[position])), idle_per_method);
 	if (ret < 0)
 	{
 	    /* can't recover from this */
@@ -897,7 +888,8 @@ int BMI_testunexpected(int incount,
 	info_array[i].size = sub_info[i].size;
 	info_array[i].tag = sub_info[i].tag;
 	gen_mutex_lock(&ref_mutex);
-	tmp_ref = ref_list_search_method_addr(cur_ref_list, sub_info[i].addr);
+	tmp_ref = ref_list_search_method_addr(
+            cur_ref_list, sub_info[i].addr);
 	if (!tmp_ref)
 	{
 	    /* yeah, right */
@@ -919,7 +911,8 @@ int BMI_testunexpected(int incount,
 
 /* BMI_testcontext()
  * 
- * Checks to see if any messages from the specified context have completed.
+ * Checks to see if any messages from the specified context have
+ * completed.
  *
  * returns 0 on success, -errno on failure
  */
@@ -955,29 +948,27 @@ int BMI_testcontext(int incount,
     {
 	if(user_ptr_array)
 	{
-	    ret =
-		active_method_table[i]->
-		BMI_meth_testcontext((incount - position), 
-					(&(out_id_array[position])),
-					&tmp_outcount,
-					(&(error_code_array[position])), 
-					(&(actual_size_array[position])),
-					(&(user_ptr_array[position])),
-					idle_per_method,
-					context_id);
+	    ret = active_method_table[i]->BMI_meth_testcontext(
+                (incount - position), 
+                (&(out_id_array[position])),
+                &tmp_outcount,
+                (&(error_code_array[position])), 
+                (&(actual_size_array[position])),
+                (&(user_ptr_array[position])),
+                idle_per_method,
+                context_id);
 	}
 	else
 	{
-	    ret =
-		active_method_table[i]->
-		BMI_meth_testcontext((incount - position), 
-					(&(out_id_array[position])),
-					&tmp_outcount,
-					(&(error_code_array[position])), 
-					(&(actual_size_array[position])),
-					NULL,
-					idle_per_method,
-					context_id);
+	    ret = active_method_table[i]->BMI_meth_testcontext(
+                (incount - position), 
+                (&(out_id_array[position])),
+                &tmp_outcount,
+                (&(error_code_array[position])), 
+                (&(actual_size_array[position])),
+                NULL,
+                idle_per_method,
+                context_id);
 	}
 	if (ret < 0)
 	{
@@ -1117,13 +1108,13 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	}
 	for (i = 0; i < active_method_count; i++)
 	{
-	    ret =
-		active_method_table[i]->BMI_meth_set_info(option,
-							  inout_parameter);
+	    ret = active_method_table[i]->BMI_meth_set_info(
+                option, inout_parameter);
 	    /* we bail out if even a single set_info fails */
 	    if (ret < 0)
 	    {
-		gossip_lerr("Error: failure on set_info to method: %d\n", i);
+		gossip_lerr(
+                    "Error: failure on set_info to method: %d\n", i);
 		return (ret);
 	    }
 	}
@@ -1177,8 +1168,8 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
     case BMI_CHECK_MAXSIZE:
 	for (i = 0; i < active_method_count; i++)
 	{
-	    ret =
-		active_method_table[i]->BMI_meth_get_info(option, &tmp_maxsize);
+	    ret = active_method_table[i]->BMI_meth_get_info(
+                option, &tmp_maxsize);
 	    if (ret < 0)
 	    {
 		return (ret);
@@ -1272,14 +1263,14 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 	return (0);
     }
 
-    /* Now we will run through each method looking for one that responds
-     * successfully.  It is assumed that they are already listed in order
-     * of preference
+    /* Now we will run through each method looking for one that
+     * responds successfully.  It is assumed that they are already
+     * listed in order of preference
      */
     i = 0;
-    while (i < active_method_count && !(meth_addr =
-					active_method_table[i]->
-					BMI_meth_method_addr_lookup(id_string)))
+    while ((i < active_method_count) &&
+           !(meth_addr = active_method_table[i]->
+             BMI_meth_method_addr_lookup(id_string)))
     {
 	i++;
     }
@@ -1288,7 +1279,8 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     if (!meth_addr)
     {
 	gossip_err("Error: could not resolve id_string!\n");
-	gossip_lerr("Error: no BMI methods could resolve: %s\n", id_string);
+	gossip_lerr("Error: no BMI methods could resolve: %s\n",
+                    id_string);
 	return (bmi_errno_to_pvfs(-ENOPROTOOPT));
     }
 
@@ -1323,7 +1315,8 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 
     if (meth_addr)
     {
-	active_method_table[i]->BMI_meth_set_info(BMI_DROP_ADDR, meth_addr);
+	active_method_table[i]->BMI_meth_set_info(
+            BMI_DROP_ADDR, meth_addr);
     }
 
     if (new_ref)
@@ -1386,14 +1379,11 @@ int BMI_post_send_list(bmi_op_id_t * id,
 
     if (tmp_ref->interface->BMI_meth_post_send_list)
     {
-	ret = tmp_ref->interface->BMI_meth_post_send_list(id,
-							  tmp_ref->method_addr,
-							  buffer_list,
-							  size_list, list_count,
-							  total_size,
-							  buffer_type, tag,
-							  user_ptr,
-							  context_id);
+	ret = tmp_ref->interface->BMI_meth_post_send_list(
+            id, tmp_ref->method_addr, buffer_list, size_list,
+            list_count, total_size, buffer_type, tag, user_ptr,
+            context_id);
+
 	return (ret);
     }
 
@@ -1409,6 +1399,9 @@ int BMI_post_send_list(bmi_op_id_t * id,
  * like BMI_post_recv(), except that the dest buffer is 
  * replaced by a list of (possibly non contiguous) buffers
  *
+ * "total_expected_size" is the sum of the size list
+ * "total_actual_size" is the aggregate amt that was received
+ *
  * returns 0 on success, 1 on immediate successful completion,
  * -errno on failure
  */
@@ -1417,9 +1410,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 		       void *const *buffer_list,
 		       const bmi_size_t *size_list,
 		       int list_count,
-		       /* "total_expected_size" is the sum of the size list */
 		       bmi_size_t total_expected_size,
-		       /* "total_actual_size" is the aggregate amt that was received */
 		       bmi_size_t * total_actual_size,
 		       enum bmi_buffer_type buffer_type,
 		       bmi_msg_tag_t tag,
@@ -1457,15 +1448,11 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 
     if (tmp_ref->interface->BMI_meth_post_recv_list)
     {
-	ret = tmp_ref->interface->BMI_meth_post_recv_list(id,
-							  tmp_ref->method_addr,
-							  buffer_list,
-							  size_list, list_count,
-							  total_expected_size,
-							  total_actual_size,
-							  buffer_type, tag,
-							  user_ptr,
-							  context_id);
+	ret = tmp_ref->interface->BMI_meth_post_recv_list(
+            id, tmp_ref->method_addr, buffer_list, size_list,
+            list_count, total_expected_size, total_actual_size,
+            buffer_type, tag, user_ptr, context_id);
+
 	return (ret);
     }
 
@@ -1481,6 +1468,8 @@ int BMI_post_recv_list(bmi_op_id_t * id,
  * like BMI_post_sendunexpected(), except that the source buffer is 
  * replaced by a list of (possibly non contiguous) buffers
  *
+ * "total_size" is the sum of the size list
+ *
  * returns 0 on success, 1 on immediate successful completion,
  * -errno on failure
  */
@@ -1489,7 +1478,6 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 const void *const *buffer_list,
 				 const bmi_size_t *size_list,
 				 int list_count,
-				 /* "total_size" is the sum of the size list */
 				 bmi_size_t total_size,
 				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
@@ -1503,8 +1491,9 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
     int i;
 
     gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-	"BMI_post_sendunexpected_list: addr: %ld, count: %d, total_size: %ld\n", 
-	(long)dest, list_count, (long)total_size);
+	"BMI_post_sendunexpected_list: addr: %ld, count: %d, "
+                 "total_size: %ld\n",  (long)dest, list_count,
+                 (long)total_size);
 
     for(i=0; i<list_count; i++)
     {
@@ -1527,17 +1516,11 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 
     if (tmp_ref->interface->BMI_meth_post_send_list)
     {
-	ret = tmp_ref->interface->BMI_meth_post_sendunexpected_list(id,
-								    tmp_ref->
-								    method_addr,
-								    buffer_list,
-								    size_list,
-								    list_count,
-								    total_size,
-								    buffer_type,
-								    tag,
-								    user_ptr,
-								    context_id);
+	ret = tmp_ref->interface->BMI_meth_post_sendunexpected_list(
+            id, tmp_ref->method_addr, buffer_list, size_list,
+            list_count, total_size, buffer_type, tag, user_ptr,
+            context_id);
+
 	return (ret);
     }
 
@@ -1550,9 +1533,9 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 
 /* BMI_cancel()
  *
- * attempts to cancel a pending operation that has not yet completed; caller
- * must still test to gather error code after calling this function even if
- * it returns 0
+ * attempts to cancel a pending operation that has not yet completed;
+ * caller must still test to gather error code after calling this
+ * function even if it returns 0
  *
  * returns 0 on success, -errno on failure
  */
@@ -1562,20 +1545,22 @@ int BMI_cancel(bmi_op_id_t id,
     struct method_op *target_op = NULL;
     int ret = -1;
 
-    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "bmi canceling: %Lu\n", Lu(id));
+    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                 "bmi canceling: %Lu\n", Lu(id));
 
     target_op = id_gen_fast_lookup(id);
     assert(target_op->op_id == id);
 
     if(active_method_table[target_op->addr->method_type]->BMI_meth_cancel)
     {
-	ret =
-	active_method_table[target_op->addr->method_type]->BMI_meth_cancel(id,
-	context_id);
+	ret = active_method_table[
+            target_op->addr->method_type]->BMI_meth_cancel(
+                id, context_id);
     }
     else
     {
-	gossip_err("Error: BMI_cancel() unimplemented for this module.\n");
+	gossip_err("Error: BMI_cancel() unimplemented "
+                   "for this module.\n");
 	ret = bmi_errno_to_pvfs(-ENOSYS);
     }
 
@@ -1597,8 +1582,8 @@ int bmi_method_addr_reg_callback(method_addr_p map)
 {
     ref_st_p new_ref = NULL;
 
-    /* NOTE: we are trusting the method to make sure that we really don't
-     * know about the address yet.  No verification done here.
+    /* NOTE: we are trusting the method to make sure that we really
+     * don't know about the address yet.  No verification done here.
      */
 
     /* create a new reference structure */
@@ -1608,99 +1593,19 @@ int bmi_method_addr_reg_callback(method_addr_p map)
 	return (bmi_errno_to_pvfs(-ENOMEM));
     }
 
-    /* fill in the details */
+    /*
+      fill in the details; we don't have an id string for this one.
+    */
     new_ref->method_addr = map;
-    new_ref->id_string = NULL;	/* we don't have an id string for this one. */
+    new_ref->id_string = NULL;
 
-    /* check the method_type from the method_addr pointer to know which
-     * interface to use */
+    /* check the method_type from the method_addr pointer to know
+     * which interface to use */
     new_ref->interface = active_method_table[map->method_type];
 
     /* add the reference structure to the list */
     ref_list_add(cur_ref_list, new_ref);
 
-    return (0);
-}
-
-
-/************************************************************
- * Internal utility functions
- */
-
-/*
- * split_string_list()
- *
- * separates a comma delimited list of items into an array of strings
- *
- * returns the number of strings successfully parsed
- */
-static int split_string_list(char ***tokens,
-			     const char *comma_list)
-{
-
-    const char *holder = NULL;
-    const char *holder2 = NULL;
-    const char *end = NULL;
-    int tokencount = 1;
-    int i = -1;
-
-    if (!comma_list || !tokens)
-    {
-	return (0);
-    }
-
-    /* count how many commas we have first */
-    holder = comma_list;
-    while ((holder = index(holder, ',')))
-    {
-	tokencount++;
-	holder++;
-    }
-
-    /* allocate pointers for each */
-    *tokens = (char **) malloc(sizeof(char **));
-    if (!(*tokens))
-    {
-	return 0;
-    }
-
-    /* copy out all of the tokenized strings */
-    holder = comma_list;
-    end = comma_list + strlen(comma_list);
-    for (i = 0; i < tokencount; i++)
-    {
-	holder2 = index(holder, ',');
-	if (!holder2)
-	{
-	    holder2 = end;
-	}
-	(*tokens)[i] = (char *) malloc((holder2 - holder) + 1);
-	if (!(*tokens)[i])
-	{
-	    goto failure;
-	}
-	strncpy((*tokens)[i], holder, (holder2 - holder));
-	(*tokens)[i][(holder2 - holder)] = '\0';
-	holder = holder2 + 1;
-
-    }
-
-    return (tokencount);
-
-  failure:
-
-    /* free up any memory we allocated if we failed */
-    if (*tokens)
-    {
-	for (i = 0; i < tokencount; i++)
-	{
-	    if ((*tokens)[i])
-	    {
-		free((*tokens)[i]);
-	    }
-	}
-	free(*tokens);
-    }
     return (0);
 }
 
@@ -1769,12 +1674,10 @@ case err: bmi_errno = BMI_##err; break
         __CASE(EHOSTDOWN);
         __CASE(EHOSTUNREACH);
         __CASE(EALREADY);
+#undef __CASE
     }
     return bmi_errno;
-
-#undef __CASE
 }
-
 
 /*
  * Local variables:

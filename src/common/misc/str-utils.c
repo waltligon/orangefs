@@ -336,6 +336,82 @@ int PINT_get_next_path(char *path, char **newpath, int skip)
     return(0);
 }
 
+/*
+ * PINT_split_string_list()
+ *
+ * separates a comma delimited list of items into an array of strings
+ *
+ * returns the number of strings successfully parsed
+ */
+int PINT_split_string_list(char ***tokens, const char *comma_list)
+{
+
+    const char *holder = NULL;
+    const char *holder2 = NULL;
+    const char *end = NULL;
+    int tokencount = 1;
+    int i = -1;
+
+    if (!comma_list || !tokens)
+    {
+	return (0);
+    }
+
+    /* count how many commas we have first */
+    holder = comma_list;
+    while ((holder = index(holder, ',')))
+    {
+	tokencount++;
+	holder++;
+    }
+
+    /* allocate pointers for each */
+    *tokens = (char **) malloc(sizeof(char **));
+    if (!(*tokens))
+    {
+	return 0;
+    }
+
+    /* copy out all of the tokenized strings */
+    holder = comma_list;
+    end = comma_list + strlen(comma_list);
+    for (i = 0; i < tokencount; i++)
+    {
+	holder2 = index(holder, ',');
+	if (!holder2)
+	{
+	    holder2 = end;
+	}
+	(*tokens)[i] = (char *) malloc((holder2 - holder) + 1);
+	if (!(*tokens)[i])
+	{
+	    goto failure;
+	}
+	strncpy((*tokens)[i], holder, (holder2 - holder));
+	(*tokens)[i][(holder2 - holder)] = '\0';
+	holder = holder2 + 1;
+
+    }
+
+    return (tokencount);
+
+  failure:
+
+    /* free up any memory we allocated if we failed */
+    if (*tokens)
+    {
+	for (i = 0; i < tokencount; i++)
+	{
+	    if ((*tokens)[i])
+	    {
+		free((*tokens)[i]);
+	    }
+	}
+	free(*tokens);
+    }
+    return (0);
+}
+
 #ifndef HAVE_STRNLEN
 /* a naive implementation of strnlen for systems w/o glibc */
 size_t strnlen(const char *s, size_t limit)

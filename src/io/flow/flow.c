@@ -17,6 +17,7 @@
 #include "quicklist.h"
 #include "gossip.h"
 #include "gen-locks.h"
+#include "str-utils.h"
 #include "flow.h"
 #include "flowproto-support.h"
 #include "flow-ref.h"
@@ -34,8 +35,6 @@ static struct flowproto_ops **active_flowproto_table = NULL;
 static flow_ref_p flow_mapping = NULL;
 
 static void flow_release(flow_descriptor * flow_d);
-static int split_string_list(char ***tokens,
-			     const char *comma_list);
 
 /* PINT_flow_initialize()
  *
@@ -98,8 +97,8 @@ int PINT_flow_initialize(const char *flowproto_list,
     if(flowproto_list)
     {
 	/* seperate out the list of flowprotos to activate */
-	active_flowproto_count = split_string_list(&requested_flowprotos,
-						   flowproto_list);
+	active_flowproto_count = PINT_split_string_list(
+            &requested_flowprotos, flowproto_list);
 	if (active_flowproto_count < 1)
 	{
 	    gossip_lerr("Error: bad flow protocol list.\n");
@@ -488,84 +487,6 @@ static void flow_release(flow_descriptor * flow_d)
 	PINT_Free_request_state(flow_d->mem_req_state);
 
     return;
-}
-
-
-/*
- * split_string_list()
- *
- * separates a comma delimited list of items into an array of strings
- *
- * returns the number of strings successfully parsed
- */
-static int split_string_list(char ***tokens,
-			     const char *comma_list)
-{
-
-    const char *holder = NULL;
-    const char *holder2 = NULL;
-    const char *end = NULL;
-    int tokencount = 1;
-    int i = -1;
-
-    if (!comma_list || !tokens)
-    {
-	return (0);
-    }
-
-    /* count how many commas we have first */
-    holder = comma_list;
-    while ((holder = index(holder, ',')))
-    {
-	holder++;
-	tokencount++;
-    }
-
-    /* allocate pointers for each */
-    *tokens = (char **) malloc(tokencount * sizeof(char **));
-    if (!(*tokens))
-    {
-	return 0;
-    }
-
-    /* copy out all of the tokenized strings */
-    holder = comma_list;
-    end = comma_list + strlen(comma_list) + 1;
-    for (i = 0; i < tokencount; i++)
-    {
-	holder2 = index(holder, ',');
-	if (!holder2)
-	{
-	    holder2 = end;
-	}
-	(*tokens)[i] = (char *) malloc((holder2 - holder) + 1);
-	if (!(*tokens)[i])
-	{
-	    goto failure;
-	}
-	strncpy((*tokens)[i], holder, (holder2 - holder));
-	(*tokens)[i][(holder2 - holder)] = '\0';
-	holder = holder2 + 1;
-
-    }
-
-    return (tokencount);
-
-  failure:
-
-    /* free up any memory we allocated if we failed */
-    if (*tokens)
-    {
-	for (i = 0; i < tokencount; i++)
-	{
-	    if ((*tokens)[i])
-	    {
-		free((*tokens)[i]);
-	    }
-	}
-	free(*tokens);
-    }
-    return (0);
 }
 
 /*
