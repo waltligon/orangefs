@@ -141,6 +141,8 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
 #ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(
     struct server_configuration_s *config);
+int PINT_config_pvfs2_rmspace(
+    struct server_configuration_s *config);
 #endif
 
 /*

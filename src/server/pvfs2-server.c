@@ -62,6 +62,7 @@ static int signal_recvd_flag = 0;
 /* this is used externally by some server state machines */
 job_context_id server_job_context = -1;
 
+static int server_remove_storage_space = 0;
 static int server_create_storage_space = 0;
 static int server_background = 1;
 
@@ -162,6 +163,15 @@ int main(int argc, char **argv)
     gossip_set_debug_mask(1, debug_mask);
     gossip_debug(SERVER_DEBUG,"Logging %s (mask %d)\n",
                  server_config.event_logging, debug_mask);
+
+    /* If we were directed to remove a collection, do so and then
+     * exit.
+     */
+    if (server_remove_storage_space)
+    {
+        ret = PINT_config_pvfs2_rmspace(&server_config);
+	exit(ret);
+    }
 
     /* If we were directed to create a storage space, do so and then
      * exit.
@@ -767,8 +777,10 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 {
     int opt;
 
-    while ((opt = getopt(argc, argv,"fhd")) != EOF) {
+    while ((opt = getopt(argc, argv,"rfhd")) != EOF) {
 	switch (opt) {
+            case 'r':
+                server_remove_storage_space = 1;
 	    case 'f':
 		server_create_storage_space = 1;
 		break;
@@ -782,6 +794,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 		gossip_err("pvfs2-server: [-hdf] <global_config_file> <server_config_file>\n\n"
 			   "\t-h will show this message\n"
 			   "\t-d will keep the server in the foreground\n"
+			   "\t-r will cause server to remove file system storage and exit\n"
 			   "\t-f will cause server to create file system storage and exit\n"
 			   );
 		return 1;

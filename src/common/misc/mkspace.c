@@ -344,3 +344,50 @@ int pvfs2_mkspace(
     return 0;
 }
 
+int pvfs2_rmspace(
+    char *storage_space,
+    char *collection,
+    TROVE_coll_id coll_id,
+    int remove_collection_only,
+    int verbose)
+{
+    int ret = -1;
+    char *method_name = NULL;
+    TROVE_op_id op_id;
+
+    /* try to initialize; fails if storage space isn't there? */
+    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    if (ret == -1)
+    {
+        gossip_err("error: storage space %s already "
+                   "exists; aborting!\n",storage_space);
+        return -1;
+    }
+
+    if (verbose)
+    {
+        gossip_debug(SERVER_DEBUG,
+                     "Attempting to remove collection %s\n", collection);
+    }
+
+    ret = trove_collection_remove(collection, NULL, &op_id);
+    if (verbose)
+    {
+        gossip_debug(SERVER_DEBUG,
+                     "PVFS2 Collection %s removed %s\n", collection,
+                     ((ret != -1) ? "successfully" : "with errors"));
+    }
+
+    if (!remove_collection_only)
+    {
+        ret = trove_storage_remove(storage_space, NULL, &op_id);
+        if (verbose)
+        {
+            gossip_debug(
+                SERVER_DEBUG, "PVFS2 Storage Space %s removed %s\n",
+                storage_space,
+                ((ret != -1) ? "successfully" : "with errors"));
+        }
+    }
+    return ret;
+}

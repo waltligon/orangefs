@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <sys/vfs.h>
+#include <dirent.h>
 
 #include "trove.h"
 #include "trove-internal.h"
@@ -223,17 +224,21 @@ static int dbpf_initialize(char *stoname,
     struct dbpf_storage *sto_p;
     
     sto_p = dbpf_storage_lookup(stoname, &error);
-    if (sto_p == NULL) return -1;
+    if (sto_p == NULL)
+    {
+        return -1;
+    }
     
     my_storage_p = sto_p;
     
     dbpf_method_id = method_id;
     
     new_method_name = (char *) malloc(sizeof(dbpf_method_name));
-    if (new_method_name == NULL) return -1;
-    
+    if (new_method_name == NULL)
+    {
+        return -1;
+    }
     strcpy(new_method_name, dbpf_method_name);
-    
     *method_name_p = new_method_name;
     
     dbpf_dspace_dbcache_initialize();
@@ -302,7 +307,6 @@ static int dbpf_storage_create(char *stoname,
     int ret;
     char path_name[PATH_MAX];
 
-
     DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, stoname);
     ret = dbpf_mkpath(path_name, 0755);
     if (ret != 0) return -1;
@@ -327,15 +331,35 @@ static int dbpf_storage_remove(char *stoname,
     char path_name[PATH_MAX];
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
-    unlink(path_name);
-    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
-    unlink(path_name);
-
-    /* TODO: REMOVE ALL THE OTHER FILES!!! */
 #if 0
-    gossip_debug(TROVE_DEBUG, "databases for storage space removed.\n");
+    gossip_debug(TROVE_DEBUG, "Removing %s\n", path_name);
 #endif
+    if (unlink(path_name) != 0)
+    {
+        goto storage_remove_failure;
+    }
+
+    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
+#if 0
+    gossip_debug(TROVE_DEBUG, "Removing %s\n", path_name);
+#endif
+    if (unlink(path_name) != 0)
+    {
+        goto storage_remove_failure;
+    }
+
+    DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, stoname);
+    if (rmdir(path_name) != 0)
+    {
+        perror("failure removing storage space");
+        goto storage_remove_failure;
+    }
+
+    gossip_debug(TROVE_DEBUG, "databases for storage space removed.\n");
     return 1;
+
+  storage_remove_failure:
+    return -1;
 }
 
 /* dbpf_collection_create()
@@ -516,11 +540,13 @@ static int dbpf_collection_remove(char *collname,
 				  TROVE_op_id *out_op_id_p)
 {
     char path_name[PATH_MAX];
-
     struct dbpf_storage *sto_p;
     struct dbpf_collection_db_entry db_data;
     DBT key, data;
-    int ret;
+    int ret, i = 0;
+    DIR *current_dir = NULL;
+    struct dirent *current_dirent = NULL;
+    char dir[PATH_MAX] = {0}, tmp_path[PATH_MAX] = {0};
 
     /* to get the path, need to get handle from name */
 
@@ -542,24 +568,111 @@ static int dbpf_collection_remove(char *collname,
 	    return -1;
     }
 
-    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, db_data.coll_id);
-    unlink(path_name);
+    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
+                              sto_p->name, db_data.coll_id);
+    if (unlink(path_name) != 0)
+    {
+        perror("failure removing dataspace attrib db");
+        goto collection_remove_failure;
+    }
 
-    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, db_data.coll_id);
-    unlink(path_name);
+    DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
+                                sto_p->name, db_data.coll_id);
+    if (unlink(path_name) != 0)
+    {
+        perror("failure removing collection attrib db");
+        goto collection_remove_failure;
+    }
     
-    /* TODO: REMOVE ALL BSTREAM AND KEYVAL FILES */
-    DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, db_data.coll_id);
+    DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX,
+                             sto_p->name, db_data.coll_id);
+    for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
+    {
+        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
+
+        /* remove all bstream files in this bucket directory */
+        current_dir = opendir(dir);
+        if (current_dir)
+        {
+            while((current_dirent = readdir(current_dir)))
+            {
+                if ((strcmp(current_dirent->d_name, ".") == 0) ||
+                    (strcmp(current_dirent->d_name, "..") == 0))
+                {
+                    continue;
+                }
+                snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
+                         current_dirent->d_name);
+#if 0
+                gossip_debug(TROVE_DEBUG, "Removing bstream entry %s\n",
+                             tmp_path);
+#endif
+                assert(current_dirent->d_type == DT_REG);
+                if (unlink(tmp_path) != 0)
+                {
+                    perror("failure removing bstream entry");
+                    goto collection_remove_failure;
+                }
+            }
+            closedir(current_dir);
+        }
+        /* remove the now empty bstream bucket directory */
+        rmdir(dir);
+    }
     rmdir(path_name);
 
     DBPF_GET_KEYVAL_DIRNAME(path_name, PATH_MAX, sto_p->name, db_data.coll_id);
+    for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
+    {
+        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
+
+        /* remove all keyval files in this bucket directory */
+        current_dir = opendir(dir);
+        if (current_dir)
+        {
+            while((current_dirent = readdir(current_dir)))
+            {
+                if ((strcmp(current_dirent->d_name, ".") == 0) ||
+                    (strcmp(current_dirent->d_name, "..") == 0))
+                {
+                    continue;
+                }
+                snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
+                         current_dirent->d_name);
+#if 0
+                gossip_debug(TROVE_DEBUG, "Removing keyval entry %s\n",
+                             tmp_path);
+#endif
+                assert(current_dirent->d_type == DT_REG);
+                if (unlink(tmp_path) != 0)
+                {
+                    perror("failure removing keyval entry");
+                    goto collection_remove_failure;
+                }
+            }
+            closedir(current_dir);
+        }
+        /* remove the now empty keyval bucket directory */
+        rmdir(dir);
+    }
     rmdir(path_name);
+
+    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
+                          sto_p->name, db_data.coll_id);
+    if (rmdir(path_name) != 0)
+    {
+        perror("failure removing collection directory");
+        goto collection_remove_failure;
+    }
 
 #if 0
     gossip_debug(TROVE_DEBUG, "databases and directories for collection removed.\n");
 #endif
 
-    return 1;
+    return ret;
+
+  collection_remove_failure:
+    return -1;
 }
 
 /* dbpf_collection_iterate()

@@ -1693,6 +1693,69 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__
+static int is_root_handle_in_my_range(
+    struct server_configuration_s *config,
+    struct filesystem_configuration_s *fs)
+{
+    int ret = 0;
+    PINT_llist *cur = NULL;
+    PINT_llist *extent_list = NULL;
+    char *cur_host_id = (char *)0;
+    host_handle_mapping_s *cur_h_mapping = NULL;
+
+    if (config && is_populated_filesystem_configuration(fs))
+    {
+        /*
+          check if the root handle is within one of the
+          specified meta host's handle ranges for this fs;
+          a root handle can't exist in a data handle range!
+        */
+        cur = fs->meta_handle_ranges;
+        while(cur)
+        {
+            cur_h_mapping = PINT_llist_head(cur);
+            if (!cur_h_mapping)
+            {
+                break;
+            }
+            assert(cur_h_mapping->alias_mapping);
+            assert(cur_h_mapping->alias_mapping->host_alias);
+            assert(cur_h_mapping->alias_mapping->bmi_address);
+            assert(cur_h_mapping->handle_range);
+
+            cur_host_id = cur_h_mapping->alias_mapping->bmi_address;
+            if (!cur_host_id)
+            {
+                gossip_err("Invalid host ID for alias %s.\n",
+                           cur_h_mapping->alias_mapping->host_alias);
+                break;
+            }
+
+            /* only check if this is *our* range */
+            if (strcmp(config->host_id,cur_host_id) == 0)
+            {
+                extent_list = PINT_create_extent_list(
+                    cur_h_mapping->handle_range);
+                if (!extent_list)
+                {
+                    gossip_err("Failed to create extent list.\n");
+                    break;
+                }
+
+                ret = PINT_handle_in_extent_list(
+                    extent_list,fs->root_handle);
+                PINT_release_extent_list(extent_list);
+                if (ret == 1)
+                {
+                    break;
+                }
+            }
+            cur = PINT_llist_next(cur);
+        }
+    }
+    return ret;
+}
+
 /*
   create a storage space based on configuration settings object
   with the particular host settings local to the caller
@@ -1777,63 +1840,40 @@ int PINT_config_pvfs2_mkspace(
     return ret;
 }
 
-static int is_root_handle_in_my_range(
-    struct server_configuration_s *config,
-    struct filesystem_configuration_s *fs)
+/*
+  remove a storage space based on configuration settings object
+  with the particular host settings local to the caller
+*/
+int PINT_config_pvfs2_rmspace(
+    struct server_configuration_s *config)
 {
-    int ret = 0;
+    int ret = 1;
+    int remove_collection_only = 0;
     PINT_llist *cur = NULL;
-    PINT_llist *extent_list = NULL;
-    char *cur_host_id = (char *)0;
-    host_handle_mapping_s *cur_h_mapping = NULL;
+    filesystem_configuration_s *cur_fs = NULL;
 
-    if (config && is_populated_filesystem_configuration(fs))
+    if (config)
     {
-        /*
-          check if the root handle is within one of the
-          specified meta host's handle ranges for this fs;
-          a root handle can't exist in a data handle range!
-        */
-        cur = fs->meta_handle_ranges;
+        cur = config->file_systems;
         while(cur)
         {
-            cur_h_mapping = PINT_llist_head(cur);
-            if (!cur_h_mapping)
+            cur_fs = PINT_llist_head(cur);
+            if (!cur_fs)
             {
                 break;
             }
-            assert(cur_h_mapping->alias_mapping);
-            assert(cur_h_mapping->alias_mapping->host_alias);
-            assert(cur_h_mapping->alias_mapping->bmi_address);
-            assert(cur_h_mapping->handle_range);
 
-            cur_host_id = cur_h_mapping->alias_mapping->bmi_address;
-            if (!cur_host_id)
-            {
-                gossip_err("Invalid host ID for alias %s.\n",
-                           cur_h_mapping->alias_mapping->host_alias);
-                break;
-            }
+            gossip_debug(SERVER_DEBUG,"\n*****************************\n");
+            gossip_debug(SERVER_DEBUG,"Removing existing PVFS2 %s\n",
+                    (remove_collection_only ? "collection" :
+                     "storage space"));
+            ret = pvfs2_rmspace(config->storage_path,
+                                cur_fs->file_system_name,
+                                cur_fs->coll_id,
+                                remove_collection_only,
+                                1);
+            gossip_debug(SERVER_DEBUG,"\n*****************************\n");
 
-            /* only check if this is *our* range */
-            if (strcmp(config->host_id,cur_host_id) == 0)
-            {
-                extent_list = PINT_create_extent_list(
-                    cur_h_mapping->handle_range);
-                if (!extent_list)
-                {
-                    gossip_err("Failed to create extent list.\n");
-                    break;
-                }
-
-                ret = PINT_handle_in_extent_list(
-                    extent_list,fs->root_handle);
-                PINT_release_extent_list(extent_list);
-                if (ret == 1)
-                {
-                    break;
-                }
-            }
             cur = PINT_llist_next(cur);
         }
     }

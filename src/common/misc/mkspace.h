@@ -18,4 +18,11 @@ int pvfs2_mkspace(
     int create_collection_only,
     int verbose);
 
+int pvfs2_rmspace(
+    char *storage_space,
+    char *collection,
+    TROVE_coll_id coll_id,
+    int remove_collection_only,
+    int verbose);
+
 #endif /* __MKSPACE_H */
