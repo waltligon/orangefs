@@ -14,7 +14,9 @@ LOCALTESTSRC := \
 	$(DIR)/trove-import.c \
 	$(DIR)/trove-export.c \
 	$(DIR)/trove-touch.c \
-	$(DIR)/trove-create-stress.c
+	$(DIR)/trove-create-stress.c \
+	$(DIR)/test-listio-aio-convert.c
+	
 
 TESTSRC += $(LOCALTESTSRC)
 
