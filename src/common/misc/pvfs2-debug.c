@@ -53,8 +53,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "getattr", GOSSIP_GETATTR_DEBUG },
     { "readdir", GOSSIP_READDIR_DEBUG },
     { "io", GOSSIP_IO_DEBUG },
-    { "verbose",  (__DEBUG_ALL & (~GOSSIP_REQ_SCHED_DEBUG |
-                                  ~GOSSIP_TROVE_OP_DEBUG)) },
+    { "verbose",  __DEBUG_ALL & ~GOSSIP_REQ_SCHED_DEBUG
+                              & ~GOSSIP_TROVE_OP_DEBUG },
     { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }
 };
