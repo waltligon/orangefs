@@ -18,7 +18,7 @@ typedef PVFS_offset          TROVE_offset;
 typedef PVFS_ds_id           TROVE_op_id;
 typedef PVFS_coll_id         TROVE_coll_id;
 typedef PVFS_ds_type         TROVE_ds_type;
-typedef PVFS_vtag_s          TROVE_vtag_s;
+typedef PVFS_vtag            TROVE_vtag_s;
 typedef PVFS_ds_flags        TROVE_ds_flags;
 typedef PVFS_ds_keyval       TROVE_keyval_s;
 typedef PVFS_ds_position     TROVE_ds_position;

@@ -32,6 +32,12 @@ struct PVFS_handle_extent_s
 };
 typedef struct PVFS_handle_extent_s PVFS_handle_extent;
 
+/* vtag; contents not yet defined */
+struct PVFS_vtag_s
+{
+};
+typedef struct PVFS_vtag_s PVFS_vtag;
+
 
 /* unique identifier for each collection that is managed by the storage
  * interface within a specific storage space
@@ -52,13 +58,6 @@ enum
     DSPACE_PREALLOC = 2,	/* preallocate space (for resize op only) */
     DSPACE_CALC_VTAG = 4,	/* calculate and return a vtag (?) */
 };
-
-/* vtag */
-struct PVFS_vtag
-{
-    int foo;			/* TODO: we haven't defined what vtags look like yet */
-};
-typedef struct PVFS_vtag PVFS_vtag_s;
 
 /* dataspace attributes that are not explicitly stored within the
  * dataspace itself.
