@@ -487,6 +487,17 @@ int get_next_path(char *path, char **newpath, int skip)
     return(0);
 }
 
+#ifndef HAVE_STRNLEN
+/* a naive implementation of strnlen for systems w/o glibc */
+size_t strnlen(const char *s, size_t limit)
+{
+   size_t len = 0;
+   while ((len < limit) && (*s++))
+     len++;
+   return len;
+}
+#endif
+
 /*
  * Local variables:
  *  c-indent-level: 4

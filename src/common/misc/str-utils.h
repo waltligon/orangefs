@@ -9,6 +9,7 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
+#include "pvfs2-config.h"
 
 int PINT_get_path_element(
     char *pathname,
@@ -38,6 +39,11 @@ int PINT_parse_handle_ranges(
     char *range, 
     PVFS_handle_extent *out_extent,
     int *status);
+
+#ifndef HAVE_STRNLEN
+size_t strnlen(const char *s, size_t limit);
+#endif
+
 #endif
 /*
  * Local variables:
