@@ -1586,7 +1586,8 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	/* TODO: make this a debug rather than error message once we have
 	 * tested this out enough
 	 */
-	gossip_err("Warning: BMI attempting reconnect.\n");
+        gossip_debug(GOSSIP_BMI_DEBUG_TCP, "%s: attempting reconnect.\n",
+          __func__);
 	tcp_addr_data->addr_error = 0;
 	assert(tcp_addr_data->socket < 0);
 	tcp_addr_data->not_connected = 1;
@@ -2817,9 +2818,13 @@ static int tcp_do_work_error(method_addr_p map)
 
     /* perform a read on the socket so that we can get a real errno */
     ret = read(tcp_addr_data->socket, &buf, sizeof(int));
-    tmp_errno = errno;
+    if (ret == 0)
+        tmp_errno = EPIPE;  /* report other side closed socket with this */
+    else
+        tmp_errno = errno;
 
-    gossip_err("Error: bmi_tcp: %s\n", strerror(tmp_errno));
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Error: bmi_tcp: %s\n",
+      strerror(tmp_errno));
 
     if (tcp_addr_data->server_port)
     {
