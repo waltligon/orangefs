@@ -150,8 +150,8 @@ do {                                                          \
         &vfs_request->jstat, s_client_dev_context);           \
     if (ret < 0)                                              \
     {                                                         \
-        gossip_err("write_device_response failed (tag=%lu)\n",\
-                   (unsigned long)vfs_request->info.tag);     \
+        gossip_err("write_device_response failed (tag=%Ld)\n",\
+                   vfs_request->info.tag);                    \
     }                                                         \
     vfs_request->was_handled_inline = 1;                      \
 } while(0)
@@ -163,19 +163,19 @@ static void client_core_sig_handler(int signum)
 
 static int hash_key(void *key, int table_size)
 {
-    unsigned long tag = *((unsigned long *)key);
+    PVFS_id_gen_t tag = *((PVFS_id_gen_t *)key);
     return (tag % table_size);
 }
 
 static int hash_key_compare(void *key, struct qlist_head *link)
 {
     vfs_request_t *vfs_request = NULL;
-    unsigned long tag = *((unsigned long *)key);
+    PVFS_id_gen_t tag = *((PVFS_id_gen_t *)key);
 
     vfs_request = qlist_entry(link, vfs_request_t, hash_link);
     assert(vfs_request);
 
-    return (((unsigned long)vfs_request->info.tag == tag) ? 1 : 0);
+    return ((vfs_request->info.tag == tag) ? 1 : 0);
 }
 
 static int initialize_ops_in_progress_table(void)
@@ -200,15 +200,15 @@ static int add_op_to_op_in_progress_table(
                   (void *)(&vfs_request->info.tag),
                   &vfs_request->hash_link);
 #if 0
-        gossip_err("HASHED TAG %lu to REQ %p\n",
-                   (unsigned long)vfs_request->info.tag, vfs_request);
+        gossip_err("HASHED TAG %Ld to REQ %p\n",
+                   vfs_request->info.tag, vfs_request);
 #endif
         ret = 0;
     }
     return ret;
 }
 
-static int cancel_op_in_progress(unsigned long tag)
+static int cancel_op_in_progress(PVFS_id_gen_t tag)
 {
     int ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
@@ -217,13 +217,13 @@ static int cancel_op_in_progress(unsigned long tag)
     gossip_debug(GOSSIP_CLIENT_DEBUG, "cancel_op_in_progress called\n");
 
     hash_link = qhash_search(
-        s_ops_in_progress_table, (void *)&tag);
+        s_ops_in_progress_table, (void *)(&tag));
     if (hash_link)
     {
         vfs_request = qhash_entry(
             hash_link, vfs_request_t, hash_link);
         assert(vfs_request);
-        assert((unsigned long)vfs_request->info.tag == tag);
+        assert(vfs_request->info.tag == tag);
         /*
           for now, cancellation is ONLY support on I/O operations,
           so assert that this is an I/O operation
@@ -231,7 +231,7 @@ static int cancel_op_in_progress(unsigned long tag)
         assert(vfs_request->in_upcall.type == PVFS2_VFS_OP_FILE_IO);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG, "cancelling I/O req %p "
-                     "from tag %lu\n", vfs_request, tag);
+                     "from tag %Ld\n", vfs_request, tag);
 
         ret = PINT_client_io_cancel(vfs_request->op_id);
         if (ret < 0)
@@ -247,7 +247,7 @@ static int cancel_op_in_progress(unsigned long tag)
     else
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "op in progress cannot "
-                     "be found (tag = %lu)\n", tag);
+                     "be found (tag = %Ld)\n", tag);
     }
     return ret;
 }
@@ -258,12 +258,13 @@ static int is_op_in_progress(vfs_request_t *vfs_request)
     struct qlist_head *hash_link = NULL;
     vfs_request_t *tmp_request = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "is_op_in_progress called\n");
-
     assert(vfs_request);
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "is_op_in_progress called on "
+                 "tag %Ld\n", vfs_request->info.tag);
+
     hash_link = qhash_search(
-        s_ops_in_progress_table, (void *)&vfs_request->info.tag);
+        s_ops_in_progress_table, (void *)(&vfs_request->info.tag));
     if (hash_link)
     {
         tmp_request = qhash_entry(
@@ -295,8 +296,8 @@ static int remove_op_from_op_in_progress_table(
             assert(tmp_vfs_request);
             assert(tmp_vfs_request == vfs_request);
 #if 0
-            gossip_err("UNHASHED TAG %lu FROM REQ %p\n",
-                       (unsigned long)vfs_request->info.tag, vfs_request);
+            gossip_err("UNHASHED TAG %Ld FROM REQ %p\n",
+                       vfs_request->info.tag, vfs_request);
 #endif
             ret = 0;
         }
@@ -1355,11 +1356,9 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Got device request message: "
-        "size: %d, tag: %lu, payload: %p, op_type: %d\n",
-        vfs_request->info.size,
-        (unsigned long)vfs_request->info.tag,
-        vfs_request->info.buffer,
-        vfs_request->in_upcall.type);
+        "size: %d, tag: %Ld, payload: %p, op_type: %d\n",
+        vfs_request->info.size, vfs_request->info.tag,
+        vfs_request->info.buffer, vfs_request->in_upcall.type);
 
     if (vfs_request->info.size >= sizeof(pvfs2_upcall_t))
     {
@@ -1400,9 +1399,9 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
     if (is_op_in_progress(vfs_request))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, " Ignoring upcall of type %x "
-                     "that's already in progress (tag=%lu)\n",
+                     "that's already in progress (tag=%Ld)\n",
                      vfs_request->in_upcall.type,
-                     (unsigned long)vfs_request->info.tag);
+                     vfs_request->info.tag);
 
         ret = OP_IN_PROGRESS;
         goto repost_op;
@@ -1508,6 +1507,9 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
                 */
                 vfs_request->is_dev_unexp = 0;
                 ret = add_op_to_op_in_progress_table(vfs_request);
+#if 0
+                assert(is_op_in_progress(vfs_request));
+#endif
             }
         }
         break;
@@ -1655,8 +1657,8 @@ int process_vfs_requests(void)
                     if (ret < 0)
                     {
                         gossip_err(
-                            "write_device_response failed (tag=%lu)\n",
-                            (unsigned long)vfs_request->info.tag);
+                            "write_device_response failed (tag=%Ld)\n",
+                            vfs_request->info.tag);
                     }
                 }
                 else
