@@ -3,13 +3,74 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.6.5pre1
-===============
-- broke several server state machines into multiple nested machines 
-- some PAV cleanups, including support for a larger number of meta servers
-  than io servers
-- update k_size (number of keyvals) in dspace attr cache when the number of
-  keyvals on disk changes
+pvfs2-0.6.5
+===========
+- broke several server state machines into multiple nested machines
+- some PAV cleanups, including support for a larger number of meta
+  servers than io servers
+- update k_size (number of keyvals) in dspace attr cache when the
+  number of keyvals on disk changes
+- replaced all vfs 64 bit operation tags to be unsigned
+- replaced pint-dev code to work with 64 bit unsigned tags
+- moved all op initialization out of the constructor and into the
+  op_alloc routine
+- fixed tag cancellation upcall/method to use a 64 bit tag, rather
+  than an unsigned long
+- added a PVFS_util method to get the current system and return it as
+  a valid PVFS_time type
+- added arguments to the crdirent/chdirent/rmdirent operations that
+  now can take optional parent atime/mtime/ctime fields
+- added support on server *dirent operations that update the parent
+  time attributes (if specified) on successful completion of the
+  *dirent operation; null/zero time fields are not modified
+- modified sys-create/sys-mkdir/sys-symlink/sys-rename/sys-remove to
+  work with the new operations properly; in general,
+  create/remove/rename operations updates the mtime and ctime of the
+  parent directory, which is now properly supported
+- moved some common server side attribute handling code into a macro
+  to make it re-useable across several server state machines
+- updated en{de}coding of modified operations
+- remove sync calls on readonly trove operations
+- added sanity check to kernel's device poll; makes sure the device is
+  opened by only one user before returning valid results
+- make the device's request list waitqueue non-exclusive, since poll
+  waits as well
+- some formatting changes on kernel error reporting
+- added mmap-ra-cache support for partial cache fills on incomplete
+  requests; misc mmap-ra-cache enhancements
+- cast setparam values to uint64_t rather than int64_t in admin utils
+- remove trove sync call on server side root handle check
+- modify server side remove state machine to check the k_size of the
+  dirdata object being removed if it's a directory to report early
+  back to the client that the directory is not empty (if it's not)
+- remove the readdir checks in the client remove path now that the
+  server-side remove can tell us directly if a directory is not empty
+- modified PVFS specific error routines to print the value of
+  unrecognized error codes if encountered
+- fixed memory leak on check_fs_id setparam
+- fixed 64bit compile warnings (AMD64/Opteron)
+- split msgpair debugging into it's own class (no longer part of
+'client')
+- break out clientcore debugging into its own debugging mask
+- fixed trove error codes
+- give trove flush and resize operations the ability to create the
+  bstream they're working with if it doesn't exist instead of
+  returning an error
+- fixed bug in (threaded) trove that did not properly reinitialize
+  condition variables after the first finalize
+- improvements to the storage space and collection removal code
+- extensive trove cleanups and cruft removal
+- check for error codes when doing server side getattr and reading
+  metafile information; stop processing if an error is reached
+- invalidate attr cache on write_at calls (never used)
+- changed pvfs2-showcoll coll_id prints from hex to decimal
+- kernel changes:
+  - enable kernel readahead hints on mmap/execution (i.e. sequential)
+  - initialize kernel module's request_list_waitq at declaration time
+  - put large print statement into a macro for convenience
+  - make all bufmap allocations GFP_KERNEL, regardless of highmem usage
+  - use add_waitqueue_exclusive for the io_completion_waitq entries
+  - clear random readahead hint on mmap
 
 
 pvfs2-0.6.4
