@@ -290,10 +290,12 @@ int pvfs2_fill_sb(
     {
 	return -ENOMEM;
     }
-
     root->i_ino = (ino_t)root_handle;
-    PVFS2_SB(sb)->fs_id = (PVFS_fs_id)coll_id;
-    PVFS2_SB(sb)->handle = (PVFS_handle)root_handle;
+    PVFS2_I(root)->refn.handle = (PVFS_handle)root_handle;
+    PVFS2_I(root)->refn.fs_id = (PVFS_fs_id)coll_id;
+
+    PVFS2_SB(sb)->handle = PVFS2_I(root)->refn.handle;
+    PVFS2_SB(sb)->fs_id = PVFS2_I(root)->refn.fs_id;
 
     /* allocates and places root dentry in dcache */
     root_dentry = d_alloc_root(root);
