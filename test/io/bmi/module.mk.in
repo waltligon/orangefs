@@ -22,7 +22,8 @@ LOCAL_MPIMISCSRC := \
 LOCAL_MPITESTSRC += \
 	$(DIR)/driver-latency.c \
 	$(DIR)/driver-bw-multi.c \
-	$(DIR)/driver-simple.c
+	$(DIR)/driver-simple.c \
+	$(DIR)/driver-fs-read.c
 
 MPIMISCSRC += $(LOCAL_MPIMISCSRC)
 
