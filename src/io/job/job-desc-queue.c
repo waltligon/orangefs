@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 #include "job-desc-queue.h"
 #include "gossip.h"
@@ -112,6 +113,7 @@ void job_desc_q_cleanup(job_desc_q_p jdqp)
 void job_desc_q_add(job_desc_q_p jdqp,
 		    struct job_desc *desc)
 {
+    assert(jdqp != NULL);
     /* note that we are adding to tail to preserve fifo order */
     qlist_add_tail(&(desc->job_desc_q_link), jdqp);
     return;

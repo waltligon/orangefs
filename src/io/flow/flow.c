@@ -736,6 +736,7 @@ int PINT_flow_testcontext(int incount,
 
     *outcount = 0;
 
+    assert(completion_queue_array[context_id] != NULL);
     /* do some work if the completion queue is empty */
     if (flow_queue_empty(completion_queue_array[context_id]))
     {
