@@ -23,8 +23,6 @@ void flow_queue_add(flow_queue_p fqp,
 void flow_queue_remove(struct flow_descriptor *desc);
 int flow_queue_empty(flow_queue_p fqp);
 struct flow_descriptor *flow_queue_shownext(flow_queue_p fqp);
-flow_descriptor *flow_queue_search(flow_queue_p fqp,
-				   flow_descriptor * flow_d);
 
 #endif /* __FLOW_QUEUE_H */
 
