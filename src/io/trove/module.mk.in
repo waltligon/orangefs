@@ -5,5 +5,5 @@ LIBSRC += \
 	$(DIR)/trove-autogen.c
 
 $(DIR)/trove-autogen.c: $(DIR)/trove-proto.h maint/trove-autogen.pl
-	$(srcdir)/maint/trove-autogen.pl < $< > $(srcdir)/$@
+	$(srcdir)/maint/trove-autogen.pl < $< > $@
 

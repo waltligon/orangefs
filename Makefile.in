@@ -29,7 +29,7 @@ LIBRARIES := lib/libpvfs2.a
 TESTSRC :=
 LIBSRC  :=
 
-all: $(SRCFILES) $(LIBRARIES) tests
+all: $(LIBRARIES) tests
 # all: $(LIBRARIES) tests
 
 include $(patsubst %, %/module.mk, $(MODULES))
@@ -57,12 +57,12 @@ $(TESTS): %: %.o $(LIBRARIES)
 
 clean:
 	rm -f $(LIBOBJS) $(TESTOBJS) $(TESTS) $(LIBRARIES) \
-		$(DEPENDS) $(srcdir)/src/io/trove/trove-autogen.c
+		$(DEPENDS) src/io/trove/trove-autogen.c
 
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;
 
 -include $(patsubst %.o,%.d, $(LIBOBJS))
 
-%.d: %.c
+%.d: %.c $(SRCFILES)
 	$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@
