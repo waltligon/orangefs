@@ -1,0 +1,33 @@
+Stuff to do for the first friendly-user release:
+
+. mpich2 and pvfs2 cannot be built together
+  XXX: more detailed error report
+
+. use fstab to describe pvfs2 volumes
+
+. config file utility
+
+. more admin tools (pvfs2-ls, pvfs2-rm, pvfs2-statfs, etc.) that
+  follow model of pvfs2-import and pvfs2-export
+
+. pvfs2-ping
+
+. header cleanup, maybe library cleanup
+
+. a real 'make install'
+
+. figure out why io (through VFS and everything) is slow
+  XXX: probably part of this is just implementing sysint function
+  as state machine
+
+. server log to a file and run in background
+
+. config file support for gossip mask levels
+
+. implement server support for resize
+
+. memory datatype processing (for romio noncontiguous requests)
+
+. quickstart guide
+
+. implement statfs
