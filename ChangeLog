@@ -3,8 +3,8 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.0.9pre1
-===============
+pvfs2-0.0.9
+============
 - added karma administration (new gtk+ gui) for interactive
   monitoring of pvfs2 servers (statistics and performance)
 - fix support for creating/using/removing multiple collections
