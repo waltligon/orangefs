@@ -42,30 +42,6 @@ struct PVFS_sys_attr_s
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 
-/* IO server stats */
-struct PVFS_io_stat_s {
-	/*PVFS_volume_id vid;*/
-	PVFS_size blksize;
-	uint32_t blkfree;
-	uint32_t blktotal;
-	uint32_t filetotal;
-	uint32_t filefree;
-};
-typedef struct PVFS_io_stat_s PVFS_io_stat;
-
-/* Meta server stats */
-struct PVFS_meta_stat_s {
-	uint32_t filetotal;
-};
-typedef struct PVFS_meta_stat_s PVFS_meta_stat;
-
-/* statfs structure -- used in system interface only (?) */
-struct PVFS_statfs_s {
-	PVFS_meta_stat mstat;
-	PVFS_io_stat iostat;
-};
-typedef struct PVFS_statfs_s PVFS_statfs;
-
 /* PVFS2 tab file entries */
 struct pvfs_mntent
 {
@@ -141,40 +117,6 @@ struct PVFS_sysresp_io_s {
 };
 typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 
-/* allocate */
-/* Q: SHOULD THIS BE A TRUNCATE INSTEAD? */
-/* no data returned in allocate response */
-
-/* Duplicate (only on a file) */
-struct PVFS_sysresp_duplicate_s {
-	PVFS_pinode_reference pinode_refn; /* handle,fs id of new file */
-};
-typedef struct PVFS_sysresp_duplicate_s PVFS_sysresp_duplicate;
-
-/* lock */
-struct PVFS_sysresp_lock_s {
-	PVFS_pinode_reference pinode_refn; 
-	/* lock id? */
-	/* region actually locked? */
-};
-typedef struct PVFS_sysresp_lock_s PVFS_sysresp_lock;
-
-/* unlock */
-/* no data returned in unlock response */
-
-/* statfs */
-struct PVFS_sysresp_statfs_s {
-	PVFS_statfs statfs;
-};
-typedef struct PVFS_sysresp_statfs_s PVFS_sysresp_statfs;
-
-/* config */
-
-struct PVFS_sysresp_config_s {
-	/* config info... */
-};
-typedef struct PVFS_sysresp_config_s PVFS_sysresp_config;
-
 /* readdir */
 struct PVFS_sysresp_readdir_s {
 	PVFS_ds_position token;  
@@ -183,21 +125,8 @@ struct PVFS_sysresp_readdir_s {
 };
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
 
-/* hint */
-struct PVFS_sysresp_hint_s {
-	/* ??? */
-};
-typedef struct PVFS_sysresp_hint_s PVFS_sysresp_hint;
-
 /* truncate */
 /* no data returned in truncate response */
-
-
-/* extension */
-struct PVFS_sysresp_extension_s {
-	/* ??? */
-};
-typedef struct PVFS_sysresp_extension_s PVFS_sysresp_extension;
 
 struct PVFS_sysresp_getparent_s {
 	PVFS_pinode_reference parent_refn;
@@ -209,7 +138,6 @@ typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
  */
 struct PVFS_system_resp_s {
 	int32_t resp_tag; /* Tag to group reqs+acks */
-	int32_t verno;		/* Version number */
 	union {
 		PVFS_sysresp_lookup lookup;
 		PVFS_sysresp_getattr getattr;
@@ -218,13 +146,7 @@ struct PVFS_system_resp_s {
 		PVFS_sysresp_symlink symlink;
 		PVFS_sysresp_readlink readlink;
 		PVFS_sysresp_io io;
-		PVFS_sysresp_duplicate duplicate;
-		PVFS_sysresp_lock lock;
-		PVFS_sysresp_statfs statfs;
-		PVFS_sysresp_config config;
 		PVFS_sysresp_readdir readdir;
-		PVFS_sysresp_hint hint;
-		PVFS_sysresp_extension extension;
 	} u;
 };
 
@@ -333,47 +255,10 @@ PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ)
 #define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y) \
 PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE)
 
-int PVFS_sys_allocate(
-    PVFS_pinode_reference pinode_refn,
-    PVFS_size size);
-
 int PVFS_sys_truncate(
     PVFS_pinode_reference pinode_refn,
     PVFS_size size, 
     PVFS_credentials credentials);
-
-int PVFS_sys_duplicate(
-    PVFS_fs_id fs_id,
-    PVFS_pinode_reference old_reference, 
-    char* new_entry,
-    PVFS_pinode_reference new_parent_reference, 
-    PVFS_sysresp_duplicate *resp);
-
-int PVFS_sys_lock(
-    PVFS_pinode_reference pinode_refn,
-    PVFS_credentials credentials,
-    PVFS_sysresp_lock *resp);
-
-int PVFS_sys_unlock(
-    PVFS_pinode_reference pinode_refn,
-    PVFS_credentials credentials);
-
-int PVFS_sys_statfs(
-    PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
-    PVFS_sysresp_statfs *resp);
-
-int PVFS_sys_config(
-    PVFS_handle handle,
-    PVFS_sysresp_config *resp);
-
-int PVFS_sys_hint(
-    int undefined,
-    PVFS_sysresp_hint *resp);
-
-int PVFS_sys_extension(
-    int undefined,
-    PVFS_sysresp_extension *resp);
 
 int PVFS_sys_getparent(
     PVFS_fs_id fs_id,
