@@ -546,6 +546,7 @@ module.mk
 src/apps/admin/module.mk
 src/apps/karma/module.mk
 src/apps/vis/module.mk
+src/apps/kernel/linux-2.6/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
 src/io/trove/trove-dbpf/module.mk

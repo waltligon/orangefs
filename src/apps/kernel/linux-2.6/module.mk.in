@@ -1,0 +1,15 @@
+DIR := src/apps/kernel/linux-2.6
+
+TESTSRC += \
+	$(DIR)/pvfs2-client-core.c \
+	$(DIR)/pvfs2-threaded-client-core.c \
+	$(DIR)/pvfs2-client.c
+
+# get kernel interface defines, and sysint client.h
+MODCFLAGS_$(DIR)/pvfs2-client-core.c = \
+  -I$(srcdir)/src/kernel/linux-2.6 \
+  -I$(srcdir)/test/client/sysint
+
+MODCFLAGS_$(DIR)/pvfs2-threaded-client-core.c = \
+  -I$(srcdir)/src/kernel/linux-2.6 \
+  -I$(srcdir)/test/client/sysint
