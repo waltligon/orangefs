@@ -199,11 +199,15 @@ struct inode *pvfs2_get_custom_inode(
         {
 	    inode->i_op = &pvfs2_file_inode_operations;
 	    inode->i_fop = &pvfs2_file_operations;
+
+            inode->i_blksize = pvfs_bufmap_size_query();
         }
         else if (mode & S_IFLNK)
         {
             inode->i_op = &pvfs2_symlink_inode_operations;
             inode->i_fop = NULL;
+
+            inode->i_blksize = 0;
         }
         else if (mode & S_IFDIR)
         {
@@ -212,6 +216,8 @@ struct inode *pvfs2_get_custom_inode(
 
 	    /* dir inodes start with i_nlink == 2 (for "." entry) */
 	    inode->i_nlink++;
+
+            inode->i_blksize = PAGE_CACHE_SIZE;
         }
         else
         {
