@@ -127,14 +127,34 @@ void BMI_tcp_close_context(bmi_context_id context_id);
 
 char BMI_tcp_method_name[] = "bmi_tcp";
 
+/* size of encoded message header */
+#define TCP_ENC_HDR_SIZE 24
+
 /* structure internal to tcp for use as a message header */
 struct tcp_msg_header
 {
+    uint32_t magic_nr;          /* magic number */
     uint32_t mode;		/* eager, rendezvous, etc. */
     bmi_msg_tag_t tag;		/* user specified message tag */
     bmi_size_t size;		/* length of trailing message */
-    uint32_t magic_nr;          /* magic number */
+    char enc_hdr[TCP_ENC_HDR_SIZE];  /* encoded version of header info */
 };
+
+#define BMI_TCP_ENC_HDR(hdr)						\
+    do {								\
+	*((uint32_t*)&((hdr).enc_hdr[0])) = htobmi32((hdr).magic_nr);	\
+	*((uint32_t*)&((hdr).enc_hdr[4])) = htobmi32((hdr).mode);	\
+	*((uint64_t*)&((hdr).enc_hdr[8])) = htobmi64((hdr).tag);	\
+	*((uint64_t*)&((hdr).enc_hdr[16])) = htobmi64((hdr).size);	\
+    } while(0)						    
+
+#define BMI_TCP_DEC_HDR(hdr)						\
+    do {								\
+	(hdr).magic_nr = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[0])));	\
+	(hdr).mode = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[4])));	\
+	(hdr).tag = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[8])));	\
+	(hdr).size = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[16])));	\
+    } while(0)						    
 
 /* enumerate states that we care about */
 enum bmi_tcp_state
@@ -1994,7 +2014,6 @@ static int tcp_do_work_recv(method_addr_p map)
     struct op_list_search_key key;
     struct tcp_msg_header new_header;
     struct tcp_addr *tcp_addr_data = map->method_data;
-    int header_size = sizeof(struct tcp_msg_header);
     struct tcp_op *tcp_op_data = NULL;
 
     /* figure out if this is a new connection */
@@ -2027,13 +2046,13 @@ static int tcp_do_work_recv(method_addr_p map)
      * It isn't worth the complication of reading only a partial message
      * header - we really want it atomically
      */
-    ret = nbpeek(tcp_addr_data->socket, &new_header, header_size);
+    ret = nbpeek(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < 0)
     {
 	tcp_forget_addr(map, 0);
 	return (0);
     }
-    if (ret < header_size)
+    if (ret < TCP_ENC_HDR_SIZE)
     {
 	/* header not ready yet */
 	return (0);
@@ -2043,13 +2062,16 @@ static int tcp_do_work_recv(method_addr_p map)
     /* NOTE: we only allow a blocking call here because we peeked to see
      * if this amount of data was ready above.  
      */
-    ret = brecv(tcp_addr_data->socket, &new_header, header_size);
-    if (ret < header_size)
+    ret = brecv(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
+    if (ret < TCP_ENC_HDR_SIZE)
     {
 	gossip_lerr("Error: brecv: %s\n", strerror(errno));
 	tcp_forget_addr(map, 0);
 	return (0);
     }
+
+    /* decode the header */
+    BMI_TCP_DEC_HDR(new_header);
 
     /* so we have the header. now what?  These are the possible
      * scenarios:
@@ -2097,7 +2119,7 @@ static int tcp_do_work_recv(method_addr_p map)
 	active_method_op->actual_size = new_header.size;
 	active_method_op->expected_size = 0;
 	active_method_op->amt_complete = 0;
-	active_method_op->env_amt_complete = header_size;
+	active_method_op->env_amt_complete = TCP_ENC_HDR_SIZE;
 	active_method_op->msg_tag = new_header.tag;
 	active_method_op->buffer = new_buffer;
 	active_method_op->mode = TCP_MODE_UNEXP;
@@ -2138,7 +2160,7 @@ static int tcp_do_work_recv(method_addr_p map)
 
 	/* we found a match.  go work on it and return */
 	op_list_remove(active_method_op);
-	active_method_op->env_amt_complete = header_size;
+	active_method_op->env_amt_complete = TCP_ENC_HDR_SIZE;
 	active_method_op->actual_size = new_header.size;
 	op_list_add(op_list_array[IND_RECV_INFLIGHT], active_method_op);
 	return (work_on_recv_op(active_method_op));
@@ -2175,7 +2197,7 @@ static int tcp_do_work_recv(method_addr_p map)
     active_method_op->actual_size = new_header.size;
     active_method_op->expected_size = 0;
     active_method_op->amt_complete = 0;
-    active_method_op->env_amt_complete = header_size;
+    active_method_op->env_amt_complete = TCP_ENC_HDR_SIZE;
     active_method_op->msg_tag = new_header.tag;
     active_method_op->buffer = new_buffer;
     active_method_op->mode = new_header.mode;
@@ -2215,7 +2237,6 @@ static int work_on_send_op(method_op_p my_method_op,
     void *working_buf = NULL;
     struct tcp_addr *tcp_addr_data = my_method_op->addr->method_data;
     struct tcp_op *tcp_op_data = my_method_op->method_data;
-    int msg_header_size = sizeof(struct tcp_msg_header);
 
     *blocked_flag = 1;
 
@@ -2237,12 +2258,11 @@ static int work_on_send_op(method_op_p my_method_op,
     }
 
     /* ok- have we sent the message envelope yet? */
-    if (my_method_op->env_amt_complete < msg_header_size)
+    if (my_method_op->env_amt_complete < TCP_ENC_HDR_SIZE)
     {
-	working_buf = (void *) ((long) (&(tcp_op_data->env)) +
-				(long) my_method_op->env_amt_complete);
+	working_buf = &(tcp_op_data->env.enc_hdr[my_method_op->env_amt_complete]);
 	ret = nbsend(tcp_addr_data->socket, working_buf,
-		     (msg_header_size - my_method_op->env_amt_complete));
+		     (TCP_ENC_HDR_SIZE - my_method_op->env_amt_complete));
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: nbsend: %s\n", strerror(errno));
@@ -2255,7 +2275,7 @@ static int work_on_send_op(method_op_p my_method_op,
     /* if we didn't finish the envelope, just leave the op in the queue
      * for later.
      */
-    if (my_method_op->env_amt_complete < msg_header_size)
+    if (my_method_op->env_amt_complete < TCP_ENC_HDR_SIZE)
     {
 	tcp_op_data->tcp_op_state = BMI_TCP_INPROGRESS;
 	return (0);
@@ -2546,7 +2566,6 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     int tmp_errno = 0;
     bmi_size_t amt_complete = 0;
     struct op_list_search_key key;
-    int msg_header_size = sizeof(struct tcp_msg_header);
 
     /* Three things can happen here:
      * a) another op is already in queue for the address, so we just
@@ -2564,6 +2583,9 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     /* NOTE: we also don't care what the buffer_type says, TCP could care
      * less what buffers it is using.
      */
+
+    /* encode the message header */
+    BMI_TCP_ENC_HDR(my_header);
 
     /* the first thing we must do is find out if another send is queued
      * up for this address so that we don't mess up our ordering.    */
@@ -2612,7 +2634,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 
     /* send the message header first */
     tcp_addr_data = dest->method_data;
-    ret = nbsend(tcp_addr_data->socket, &my_header, msg_header_size);
+    ret = nbsend(tcp_addr_data->socket, my_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < 0)
     {
 	tmp_errno = errno;
@@ -2620,7 +2642,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	tcp_forget_addr(dest, 0);
 	return (-tmp_errno);
     }
-    if (ret < msg_header_size)
+    if (ret < TCP_ENC_HDR_SIZE)
     {
 	/* header send not completed */
 	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
@@ -2661,7 +2683,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     /* queue up the remainder */
     ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 			    dest, buffer_list, size_list, list_count,
-			    amt_complete, sizeof(struct tcp_msg_header), 1, id,
+			    amt_complete, TCP_ENC_HDR_SIZE, 1, id,
 			    BMI_TCP_INPROGRESS, my_header, user_ptr,
 			    list_stub_flag, my_header.size, 0,
 			    context_id);
