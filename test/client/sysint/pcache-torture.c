@@ -6,137 +6,144 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <assert.h>
 
+#include "pvfs2-debug.h"
 #include "pcache.h"
 #include "gossip.h"
 
-#define ENTRIES_TO_ADD 60
+#define ENTRIES_TO_ADD           512
+#define DEFAULT_TIMEOUT_SECONDS    2
 
 int main(int argc, char **argv)	
 {
-	int ret = -1;
-	int i;
-	int entries_to_add;
-	pinode *pinode1, *pinode2, *pinode3;
-	PVFS_pinode_reference test_ref;
+    int timeout = DEFAULT_TIMEOUT_SECONDS;
+    int ret = -1, i = 0;
+    int entries_to_add = 0;
+    PINT_pinode *pinode1 = NULL, *pinode2 = NULL;
+    PVFS_pinode_reference tmp;
 
-	if (argc == 2)
-	{
-		sscanf(argv[1], "%d", &entries_to_add);
-	}
-	else
-	{
-		entries_to_add = ENTRIES_TO_ADD;
-	}
+    if (argc == 2)
+    {
+        sscanf(argv[1], "%d", &entries_to_add);
+    }
+    else
+    {
+        entries_to_add = ENTRIES_TO_ADD;
+    }
 
-	gossip_enable_stderr();
-	gossip_set_debug_mask(1, PCACHE_DEBUG);
+    gossip_enable_stderr();
+    gossip_set_debug_mask(1, PCACHE_DEBUG);
 
-	/* initialize the cache */
-	ret = PINT_pcache_initialize();
-	if(ret < 0)
-	{
-		gossip_err("pcache_initialize() failure.\n");
-		return(-1);
-	}
+    /* initialize the cache */
+    ret = PINT_pcache_initialize();
+    if(ret < 0)
+    {
+        gossip_err("pcache_initialize() failure.\n");
+        return(-1);
+    }
 
-        PINT_pcache_set_timeout(5000);
+    PINT_pcache_set_timeout(timeout * 1000);
 
-	for(i = 0; i < entries_to_add; i++)
-	{
-		/* alloc the new pinode */
-		ret = PINT_pcache_pinode_alloc( &pinode1 );
-		if(ret < 0)
-		{
-			gossip_err("Error: failed to insert entry.\n");
-			return(-1);
-		}
-		pinode1->pinode_ref.handle = i;
-		pinode1->pinode_ref.fs_id = i+1000;
-		ret = PINT_pcache_insert( pinode1 );
-		if( ret < 0 )
-		{
-			gossip_err("Error: failed to insert entry %d.\n",i);
-			PINT_pcache_pinode_dealloc( pinode1 );
-                        break;
-		}
-		ret = PINT_pcache_insert_rls( pinode1 );
-		if( ret < 0 )
-		{
-			gossip_err("Error: insert_rls failed %d.\n",i);
-                        break;
-		}
-		pinode1 = NULL;
-	}
+    for(i = 0; i < entries_to_add; i++)
+    {
+        tmp.handle = (PVFS_handle)i;
+        tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        if (i == entries_to_add)
+        pinode1 = PINT_pcache_lookup(tmp);
+        assert(pinode1 == NULL);
+
+        pinode1 = PINT_pcache_pinode_alloc();
+        assert(pinode1);
+
+        pinode1->refn = tmp;
+
+        PINT_pcache_set_valid(pinode1);
+    }
+
+    if (i == entries_to_add)
+    {
+        gossip_debug(PCACHE_DEBUG, "Added %d entries to pcache\n", i);
+    }
+
+    for(i = 0; i < entries_to_add; i++)
+    {
+        tmp.handle = (PVFS_handle)i;
+        tmp.fs_id = (PVFS_fs_id)(i + 1000);
+
+        pinode2 = PINT_pcache_lookup(tmp);
+        assert(pinode2);
+
+        if (PINT_pcache_pinode_status(pinode2) != PINODE_STATUS_VALID)
         {
-            gossip_debug(PCACHE_DEBUG, "Added %d entries to pcache\n", i);
+            gossip_err("(1) Failure: lookup returned %Ld when it "
+                       "should've returned %Ld.\n",
+                       pinode2->refn.handle, tmp.handle);
+        }
+    }
+
+    /* sleep to make sure all entries expired */
+    gossip_debug(PCACHE_DEBUG," Sleeping for %d seconds\n",timeout);
+    sleep(timeout);
+
+    for(i = 0; i < entries_to_add; i++)
+    {
+        tmp.handle = (PVFS_handle)i;
+        tmp.fs_id = (PVFS_fs_id)(i + 1000);
+
+        pinode2 = PINT_pcache_lookup(tmp);
+        assert(pinode2);
+
+        if (PINT_pcache_pinode_status(pinode2) == PINODE_STATUS_VALID)
+        {
+            gossip_err("(2) Failure: lookup returned %Ld when it "
+                       "should've been expired.\n",
+                       pinode2->refn.handle);
         }
 
-	for(i = 0; i < entries_to_add; i++)
-	{
-		test_ref.handle = i;
-		test_ref.fs_id = i + 1000;
-		ret = PINT_pcache_lookup(test_ref, &pinode2);
-		if(ret == PCACHE_LOOKUP_FAILURE)
-		{
-			if (i > (entries_to_add - PINT_PCACHE_MAX_ENTRIES))
-			{
-				/*should have a valid handle*/
-				gossip_err("Failure: lookup didn't return anything when it should have returned the pinode for %lld.\n", test_ref.handle);
-			}
-		}
-		else
-		{
-			if (i >= entries_to_add - PINT_PCACHE_MAX_ENTRIES)
-			{
-				if (test_ref.handle != pinode2->pinode_ref.handle)
-				{
-					gossip_err("Failure: lookup returned %lld when it should've returned %lld.\n", pinode2->pinode_ref.handle, test_ref.handle );
-                                        break;
-				}
-			}
-			else
-			{
-				/*these should be cache misses*/
-				gossip_err("Failure: lookup returned %lld when it shouldn't have returned anything (iter %d).\n", pinode2->pinode_ref.handle, i);
-                                break;
-			}
-			ret = PINT_pcache_lookup_rls(pinode2);
-			if( ret < 0 )
-			{
-				gossip_err("Error: lookup_rls failed %d.\n",i);
-                                break;
-			}
-		}
-	}
+        /* make them once again valid here before dropping the ref */
+        PINT_pcache_set_valid(pinode2);
+        PINT_pcache_release(pinode2);
+    }
 
-        if (i == entries_to_add)
+    /* again make sure entries are all valid */
+    for(i = 0; i < entries_to_add; i++)
+    {
+        tmp.handle = (PVFS_handle)i;
+        tmp.fs_id = (PVFS_fs_id)(i + 1000);
+
+        pinode2 = PINT_pcache_lookup(tmp);
+        assert(pinode2);
+
+        if (PINT_pcache_pinode_status(pinode2) != PINODE_STATUS_VALID)
         {
-            gossip_debug(PCACHE_DEBUG, "All expected lookups were ok\n");
+            gossip_err("(3) Failure: lookup returned %Ld when it "
+                       "should've returned %Ld.\n",
+                       pinode2->refn.handle, tmp.handle);
         }
 
-	/*remove all entries */
-	for(i = 0; i < entries_to_add;i++)
-	{
-		test_ref.handle = i;
-		test_ref.fs_id = i + 1000;
-		ret = PINT_pcache_remove(test_ref, &pinode3);
-		if(ret < 0)
-		{
-			gossip_err("Error: pcache_remove() did not find %d in the cache.\n", i);
-			continue;
-		}
-		PINT_pcache_pinode_dealloc(pinode3);
-	}
+        /*
+          explicitly make all pinode entries invalid
+          here (note, invalidate drops the ref)
+        */
+        PINT_pcache_invalidate(tmp);
+    }
 
-	/* finalize the cache */
-	ret = PINT_pcache_finalize();
-	if(ret < 0)
-	{
-		gossip_err("pcache_finalize() failure.\n");
-		return(-1);
-	}
-	return(0);
+    if (i == entries_to_add)
+    {
+        gossip_debug(PCACHE_DEBUG, "All expected lookups were ok\n");
+    }
+
+    /* drop initial references */
+    for(i = 0; i < entries_to_add; i++)
+    {
+        tmp.handle = (PVFS_handle)i;
+        tmp.fs_id = (PVFS_fs_id)(i + 1000);
+
+        PINT_pcache_release_refn(tmp);
+    }
+
+    PINT_pcache_finalize();
+
+    return 0;
 }

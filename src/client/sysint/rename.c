@@ -40,14 +40,17 @@ extern pcache pvfs_pcache;
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn, 
-                        char* new_entry, PVFS_pinode_reference new_parent_refn, 
-                        PVFS_credentials credentials)
+int PVFS_sys_rename(
+    char* old_entry,
+    PVFS_pinode_reference old_parent_refn, 
+    char* new_entry,
+    PVFS_pinode_reference new_parent_refn, 
+    PVFS_credentials credentials)
 {
     struct PVFS_server_req req_p;		/* server request */
     struct PVFS_server_resp *ack_p = NULL;	/* server response */
     int ret = -1;
-    pinode *new_parent_p = NULL, *old_entry_p = NULL;
+    PINT_pinode *new_parent_p = NULL, *old_entry_p = NULL;
     bmi_addr_t serv_addr;	/* PVFS address type structure */
     uint32_t attr_mask;
     PVFS_pinode_reference old_entry_refn;

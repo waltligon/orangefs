@@ -779,33 +779,39 @@ gen_mutex_lock(&(PRIVATE_FLOW(flow_d)->mutex));
  */
 static void release_flow(flow_descriptor * flow_d)
 {
-    struct bmi_trove_flow_data *tmp_data = PRIVATE_FLOW(flow_d);
+    struct bmi_trove_flow_data *tmp_data = NULL;
 
-    switch (tmp_data->type)
+    if (flow_d)
     {
-    case BMI_TO_MEM:
-	buffer_teardown_bmi_to_mem(flow_d);
-	break;
-    case MEM_TO_BMI:
-	buffer_teardown_mem_to_bmi(flow_d);
-	break;
-    case TROVE_TO_BMI:
-	buffer_teardown_trove_to_bmi(flow_d);
-	break;
-    case BMI_TO_TROVE:
-	buffer_teardown_bmi_to_trove(flow_d);
-	break;
-    default:
-	gossip_lerr("Error: Unknown/unimplemented endpoint combination.\n");
-	flow_d->state = FLOW_ERROR;
-	flow_d->error_code = -EINVAL;
-	break;
+        tmp_data = PRIVATE_FLOW(flow_d);
+        assert(tmp_data);
+
+        switch (tmp_data->type)
+        {
+            case BMI_TO_MEM:
+                buffer_teardown_bmi_to_mem(flow_d);
+                break;
+            case MEM_TO_BMI:
+                buffer_teardown_mem_to_bmi(flow_d);
+                break;
+            case TROVE_TO_BMI:
+                buffer_teardown_trove_to_bmi(flow_d);
+                break;
+            case BMI_TO_TROVE:
+                buffer_teardown_bmi_to_trove(flow_d);
+                break;
+            default:
+                gossip_lerr("Error: Unknown/unimplemented "
+                            "endpoint combination.\n");
+                flow_d->state = FLOW_ERROR;
+                flow_d->error_code = -EINVAL;
+                break;
     }
 
-    /* free flowproto data */
-    free(flow_d->flow_protocol_data);
-    flow_d->flow_protocol_data = NULL;
-
+        /* free flowproto data */
+        free(flow_d->flow_protocol_data);
+        flow_d->flow_protocol_data = NULL;
+    }
     return;
 }
 

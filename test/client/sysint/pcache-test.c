@@ -1,10 +1,11 @@
 #include "pcache.h"
 #include "pcache-test.h"
 
-void print_pinode(pinode *toprint);
+/* void print_pinode(pinode *toprint); */
 
 int main(int argc,char* argv[])
 {
+#if 0
 	pinode *pinode1, *pinode2, *pinode3, *test_pinode = NULL;
 	int ret;
 
@@ -142,9 +143,11 @@ int main(int argc,char* argv[])
 
 	gossip_disable();
 
+#endif
 	return(0);
 }
 
+#if 0
 void print_pinode(pinode *toprint)
 {
 	printf("============printing=pnode=========\n");
@@ -169,4 +172,4 @@ void print_pinode(pinode *toprint)
 	printf("pinode.tstamp.tv_usec = %d\n", (int)toprint->tstamp.tv_usec);
 	printf("===================================\n");
 }
-
+#endif

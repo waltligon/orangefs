@@ -26,15 +26,18 @@ extern struct server_configuration_s g_server_config;
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
-                PVFS_sys_attr attr,
-                PVFS_credentials credentials, PVFS_sysresp_create *resp)
+int PVFS_sys_create(
+    char* entry_name,
+    PVFS_pinode_reference parent_refn,
+    PVFS_sys_attr attr,
+    PVFS_credentials credentials,
+    PVFS_sysresp_create *resp)
 {
 	struct PVFS_server_req req_p;			/* server request */
 	struct PVFS_server_resp *ack_p = NULL;	/* server response */
 	int ret = -1, io_serv_count = 0, i = 0;
 	int attr_mask, last_handle_created = 0;
-	pinode *parent_ptr = NULL, *pinode_ptr = NULL;
+	PINT_pinode *parent_ptr = NULL, *pinode_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2,*bmi_addr_list = NULL;
 	PVFS_handle *df_handle_array = NULL;
 	PVFS_pinode_reference entry;
@@ -83,15 +86,16 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 
         /* get the pinode of the parent so we can check permissions */
         attr_mask = PVFS_ATTR_COMMON_ALL;
-        ret = phelper_get_pinode(parent_refn, &parent_ptr, attr_mask, 
-				    credentials);
-        if(ret < 0)
+        ret = phelper_get_pinode(parent_refn, &parent_ptr,
+                                 attr_mask, credentials);
+        if (ret < 0)
         {
 	    /* parent pinode doesn't exist ?!? */
 	    gossip_ldebug(CLIENT_DEBUG,"unable to get pinode for parent\n");
 	    failure = PCACHE_LOOKUP_FAILURE;
 	    goto return_error;
 	}
+        assert(parent_ptr);
 
 	/* check permissions in parent directory */
 	ret = check_perms(parent_ptr->attr, parent_ptr->attr.perms,
@@ -220,8 +224,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	 * the calling function
 	 */
 
-	resp->pinode_refn.handle = entry.handle;
-	resp->pinode_refn.fs_id = parent_refn.fs_id;
+	resp->pinode_refn = entry;
 
 	PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
             &encoded_resp, op_tag);
@@ -452,39 +455,18 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	    goto return_error;
 	}
 
-	/* Allocate the pinode */
-	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
-	if (ret < 0)
-	{
-	    failure = PCACHE_INSERT1_FAILURE;
-	    goto return_error;
-	}
-	/* Fill up the pinode */
-	pinode_ptr->pinode_ref.handle = entry.handle;
-	pinode_ptr->pinode_ref.fs_id = parent_refn.fs_id;
+        pinode_ptr = PINT_pcache_lookup(entry);
+        if (!pinode_ptr)
+        {
+            pinode_ptr = PINT_pcache_pinode_alloc();
+            assert(pinode_ptr);
+        }
+	pinode_ptr->refn = entry;
 	pinode_ptr->attr = req_p.u.setattr.attr;
-	/* set the object type */
 	pinode_ptr->attr.objtype = PVFS_TYPE_METAFILE;
 	pinode_ptr->attr.mask |= PVFS_ATTR_COMMON_TYPE;
 
-	/* Fill in the timestamps */
-
-	ret = phelper_fill_timestamps(pinode_ptr);
-	if (ret < 0)
-	{
-	    failure = PCACHE_INSERT2_FAILURE;
-	    goto return_error;
-	}
-	/* Add pinode to the cache */
-	ret = PINT_pcache_insert(pinode_ptr);
-	if (ret < 0)
-	{
-	    failure = PCACHE_INSERT2_FAILURE;
-	    goto return_error;
-	}	
-
-	PINT_pcache_insert_rls(pinode_ptr);
-
+        PINT_pcache_set_valid(pinode_ptr);
   	return(0); 
 
 return_error:
@@ -492,7 +474,6 @@ return_error:
 	{
 	    case PCACHE_INSERT2_FAILURE:
 		gossip_ldebug(CLIENT_DEBUG,"PCACHE_INSERT2_FAILURE\n");
-		PINT_pcache_pinode_dealloc(pinode_ptr);
 	    case PCACHE_INSERT1_FAILURE:
 		gossip_ldebug(CLIENT_DEBUG,"PCACHE_INSERT1_FAILURE\n");
 	    case DCACHE_INSERT_FAILURE:

@@ -158,7 +158,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     free(sm_p);
 
     /* flush pcache entry, if any */
-    PINT_pcache_flush_reference(pinode_ref);
+    PINT_pcache_invalidate(pinode_ref);
 
     return error;
 }

@@ -22,14 +22,17 @@
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token, 
-                        int pvfs_dirent_incount, PVFS_credentials credentials,
-			PVFS_sysresp_readdir *resp)
+int PVFS_sys_readdir(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_ds_position token, 
+    int pvfs_dirent_incount,
+    PVFS_credentials credentials,
+    PVFS_sysresp_readdir *resp)
 {
 	struct PVFS_server_req req_p;			/* server request */
 	struct PVFS_server_resp *ack_p = NULL;	/* server response */
 	int ret = -1;
-	pinode *pinode_ptr = NULL;
+	PINT_pinode *pinode_ptr = NULL;
 	bmi_addr_t serv_addr;	/* PVFS address type structure */
 	struct PINT_decoded_msg decoded;
 	void* encoded_resp;
@@ -55,7 +58,7 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
 	/* Revalidate directory handle */
 	/* Get the directory pinode */
 	ret = phelper_get_pinode(pinode_refn,&pinode_ptr,
-			PVFS_ATTR_COMMON_ALL, credentials);
+                                 PVFS_ATTR_COMMON_ALL, credentials);
 	if (ret < 0)
 	{
 	    failure = GET_PINODE_FAILURE;

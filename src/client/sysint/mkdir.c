@@ -33,7 +33,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     struct PVFS_server_req req_p;		/* server request */
     struct PVFS_server_resp *ack_p = NULL;	/* server response */
     int ret = -1;
-    pinode *pinode_ptr = NULL, *parent_ptr = NULL;
+    PINT_pinode *pinode_ptr = NULL, *parent_ptr = NULL;
     bmi_addr_t serv_addr1, serv_addr2;	/* PVFS address type structure */
     PVFS_pinode_reference entry;
     int attr_mask;
@@ -254,17 +254,13 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 	goto return_error;
     }
 
-    ret = PINT_pcache_pinode_alloc(&pinode_ptr);
-    if (ret < 0)
+    pinode_ptr = PINT_pcache_lookup(entry);
+    if (!pinode_ptr)
     {
-	gossip_ldebug(CLIENT_DEBUG,"pcache pinode allocation failure\n");
-	failure = PCACHE_INSERT1_FAILURE;
-	goto return_error;
+        pinode_ptr = PINT_pcache_pinode_alloc();
+        assert(pinode_ptr);
     }
-
-    /* Fill up the pinode */
-    pinode_ptr->pinode_ref.handle = entry.handle;
-    pinode_ptr->pinode_ref.fs_id = parent_refn.fs_id;
+    pinode_ptr->refn = entry;
     
     PINT_CONVERT_ATTR(&(pinode_ptr->attr), &attr, PVFS_ATTR_COMMON_TYPE);
     /* filter to make sure the caller passed in a reasonable attr mask */
@@ -274,24 +270,8 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     pinode_ptr->attr.mask |= PVFS_ATTR_COMMON_TYPE;
     pinode_ptr->attr.objtype = PVFS_TYPE_DIRECTORY;
 
-    /* Fill in the timestamps */
-    ret = phelper_fill_timestamps(pinode_ptr);
-    if (ret < 0)
-    {
-	gossip_ldebug(CLIENT_DEBUG,"pcache pinode timestamp failure\n");
-	failure = PCACHE_INSERT2_FAILURE;
-	goto return_error;
-    }
-    /* Add pinode to the cache */
-    ret = PINT_pcache_insert(pinode_ptr);
-    if (ret < 0)
-    {
-	gossip_ldebug(CLIENT_DEBUG,"pcache pinode insertion failure\n");
-	failure = PCACHE_INSERT2_FAILURE;
-	goto return_error;
-    }
-
-    ret = PINT_pcache_insert_rls(pinode_ptr);
+    PINT_pcache_set_valid(pinode_ptr);
+    PINT_pcache_release(pinode_ptr);
 
     return(0);
 
@@ -300,7 +280,6 @@ return_error:
     {
 	case PCACHE_INSERT2_FAILURE:
 	    gossip_ldebug(CLIENT_DEBUG,"PCACHE_INSERT2_FAILURE\n");
-	    PINT_pcache_pinode_dealloc(pinode_ptr);
 
 	case PCACHE_INSERT1_FAILURE:
 	    gossip_ldebug(CLIENT_DEBUG,"PCACHE_INSERT1_FAILURE\n");

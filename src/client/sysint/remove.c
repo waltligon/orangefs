@@ -33,7 +33,7 @@ int PVFS_sys_remove_old(char* entry_name,
     struct PVFS_server_req req_p;		    /* server request */
     struct PVFS_server_resp *ack_p = NULL;    /* server response */
     int ret = -1, ioserv_count = 0;
-    pinode *pinode_ptr = NULL, *item_ptr = NULL;
+    PINT_pinode *pinode_ptr = NULL, *item_ptr = NULL;
     bmi_addr_t serv_addr;	/* PVFS address type structure */
     int name_sz = 0;
     PVFS_pinode_reference entry;
@@ -62,7 +62,7 @@ int PVFS_sys_remove_old(char* entry_name,
     
     /* get the pinode for the thing we're deleting */
     ret = phelper_get_pinode(entry, &pinode_ptr,
-			     PVFS_ATTR_COMMON_ALL, credentials );
+			     PVFS_ATTR_COMMON_ALL, credentials);
     if (ret < 0)
     {
 	failure = GET_PINODE_FAILURE;
@@ -112,7 +112,7 @@ int PVFS_sys_remove_old(char* entry_name,
     /* send remove message to the meta file */
     req_p.op = PVFS_SERV_REMOVE;
     req_p.credentials = credentials;
-    req_p.u.remove.handle = pinode_ptr->pinode_ref.handle;
+    req_p.u.remove.handle = pinode_ptr->refn.handle;
     req_p.u.remove.fs_id = parent_refn.fs_id;
     max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op, 
 					   PINT_CLIENT_ENC_TYPE);
@@ -188,7 +188,7 @@ int PVFS_sys_remove_old(char* entry_name,
      * meta file)
      */
 
-    assert(ack_p->u.rmdirent.entry_handle == pinode_ptr->pinode_ref.handle);
+    assert(ack_p->u.rmdirent.entry_handle == pinode_ptr->refn.handle);
 
     PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 		     &encoded_resp, op_tag);
@@ -254,16 +254,7 @@ int PVFS_sys_remove_old(char* entry_name,
 	goto return_error;
     }
 
-    /* Remove from pinode cache */
-    ret = PINT_pcache_remove(entry,&item_ptr);
-    if (ret < 0)
-    {
-	failure = REMOVE_CACHE_FAILURE;
-	goto return_error;
-    }
-
-    /* free the pinode that we removed from cache */
-    PINT_pcache_pinode_dealloc(item_ptr);
+    PINT_pcache_release(item_ptr);
 
     return(0);
  return_error:

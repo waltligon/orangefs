@@ -45,7 +45,7 @@ int PINT_do_lookup(char* name,
     int ret = -1, name_sz = 0;
     struct PINT_decoded_msg decoded;
     bmi_addr_t serv_addr;
-    pinode *pinode_ptr = NULL;
+    PINT_pinode *pinode_ptr = NULL;
     void* encoded_resp;
     PVFS_msg_tag_t op_tag;
     bmi_size_t max_msg_sz = 0;
@@ -137,15 +137,12 @@ int PINT_do_lookup(char* name,
 
     /*in the event of a successful lookup, we need to add this to the pcache too*/
 
-    ret = PINT_pcache_pinode_alloc(&pinode_ptr);
-    if (ret < 0)
+    pinode_ptr = PINT_pcache_lookup(*entry);
+    if (!pinode_ptr)
     {
-	ret = -ENOMEM;
-	failure = INVAL_LOOKUP_FAILURE;
-	goto return_error;
+        pinode_ptr = PINT_pcache_pinode_alloc();
+        assert(pinode_ptr);
     }
-
-    /* Fill in the timestamps */
     ret = phelper_fill_timestamps(pinode_ptr);
     if (ret < 0)
     {
@@ -154,21 +151,14 @@ int PINT_do_lookup(char* name,
     }
 
     /* Set the size timestamp - size was not fetched */
-    pinode_ptr->size_flag = SIZE_INVALID;
-    pinode_ptr->pinode_ref.handle = ack_p->u.lookup_path.handle_array[0];
-    pinode_ptr->pinode_ref.fs_id = parent.fs_id;
+    pinode_ptr->refn.handle = ack_p->u.lookup_path.handle_array[0];
+    pinode_ptr->refn.fs_id = parent.fs_id;
     pinode_ptr->attr = ack_p->u.lookup_path.attr_array[0];
     /* filter to make sure we set a reasonable mask here */
     pinode_ptr->attr.mask &= PVFS_ATTR_COMMON_ALL;
 
-    /* Add to the pinode list */
-    ret = PINT_pcache_insert(pinode_ptr);
-    if (ret < 0)
-    {
-	failure = ADD_PCACHE_FAILURE;
-	goto return_error;
-    }
-    PINT_pcache_insert_rls(pinode_ptr);
+    PINT_pcache_set_valid(pinode_ptr);
+    PINT_pcache_release(pinode_ptr);
 
     PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 		     &encoded_resp, op_tag);
@@ -179,7 +169,6 @@ int PINT_do_lookup(char* name,
     switch(failure)
     {
         case ADD_PCACHE_FAILURE:
-            PINT_pcache_pinode_dealloc(pinode_ptr);
         case INVAL_LOOKUP_FAILURE:
         case SEND_REQ_FAILURE:
 	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,

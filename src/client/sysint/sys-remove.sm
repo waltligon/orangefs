@@ -14,11 +14,11 @@
 #include "gossip.h"
 #include "str-utils.h"
 
+#include "pcache.h"
 #include "pinode-helper.h"
 #include "pint-dcache.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
-#include "pcache.h"
 #include "PINT-reqproto-encode.h"
 
 extern job_context_id pint_client_sm_context;
@@ -526,7 +526,7 @@ static int remove_cleanup(PINT_client_sm *sm_p,
     if (sm_p->pcache_lock) {
 	assert(sm_p->pcache_lock == 1);
 
-	PINT_pcache_lookup_rls(sm_p->object_pinode_p);
+	PINT_pcache_release(sm_p->object_pinode_p);
     }
 
     /* free dynamically allocated resouces */

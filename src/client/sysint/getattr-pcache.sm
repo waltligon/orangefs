@@ -102,8 +102,8 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
      * necessary.  Or we can tailor the pcache to store in response
      * format all the time...
      */
-    if (PINT_pcache_lookup(sm_p->u.getattr.object_ref, &pinode) ==
-        PCACHE_LOOKUP_SUCCESS)
+    pinode = PINT_pcache_lookup(sm_p->u.getattr.object_ref);
+    if (pinode && PINT_pcache_pinode_status(pinode) == PINODE_STATUS_VALID)
     {
         if (pinode->attr.mask == sm_p->msgpair.req.u.getattr.attrmask)
         {
@@ -117,6 +117,7 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
             sm_p->u.getattr.pcache_hit = 1;
             sm_p->u.getattr.pcache_size = pinode->size;
             sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
+            PINT_pcache_release(pinode);
             return 1;
         }
     }

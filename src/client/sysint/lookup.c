@@ -76,7 +76,7 @@ int PVFS_sys_ref_lookup(
     PVFS_msg_tag_t op_tag;
     struct PINT_decoded_msg decoded;
 
-    pinode *pinode_ptr = NULL;
+    PINT_pinode *pinode_ptr = NULL;
     char *path = NULL;
     char segment[PVFS_SEGMENT_MAX] = {0};
     bmi_addr_t serv_addr;
@@ -223,17 +223,13 @@ int PVFS_sys_ref_lookup(
 		failure = DCACHE_INSERT_FAILURE;
 		goto return_error;
 	    }
-	    /* Add to pinode cache */
-	    ret = PINT_pcache_pinode_alloc(&pinode_ptr); 	
-	    if (ret < 0)
-	    {
-		failure = PCACHE_ALLOC_FAILURE;
-		ret = -ENOMEM;
-		goto return_error;
-	    }
-	    /* Fill the pinode */
-	    pinode_ptr->pinode_ref.handle = entry.handle;
-	    pinode_ptr->pinode_ref.fs_id = entry.fs_id;
+            pinode_ptr = PINT_pcache_lookup(entry);
+            if (!pinode_ptr)
+            {
+                pinode_ptr = PINT_pcache_pinode_alloc();
+                assert(pinode_ptr);
+            }
+	    pinode_ptr->refn = entry;
 
 	    /* TODO: this logic is kinda busted... -PHIL */
 	    if (i >= ack_p->u.lookup_path.attr_count)
@@ -261,26 +257,8 @@ int PVFS_sys_ref_lookup(
 		failure = CHECK_PERMS_FAILURE;
 		goto return_error;
 	    }
-
-	    /* Fill in the timestamps */
-	    ret = phelper_fill_timestamps(pinode_ptr);
-	    if (ret < 0)
-	    {
-		failure = CHECK_PERMS_FAILURE;
-		goto return_error;
-	    }
-					
-	    /* Set the size timestamp - size was not fetched */
-	    pinode_ptr->size_flag = SIZE_INVALID;
-
-	    /* Add to the pinode list */
-	    ret = PINT_pcache_insert(pinode_ptr);
-	    if (ret < 0)
-	    {
-		failure = CHECK_PERMS_FAILURE;
-		goto return_error;
-	    }
-	    PINT_pcache_insert_rls(pinode_ptr);
+            PINT_pcache_set_valid(pinode_ptr);
+            PINT_pcache_release(pinode_ptr);
 	}
 
 	PINT_release_req(serv_addr, &req_p, max_msg_sz,
@@ -322,8 +300,6 @@ return_error:
     switch(failure)
     {
 	case CHECK_PERMS_FAILURE:
-	    if (pinode_ptr != NULL)
-		PINT_pcache_pinode_alloc(&pinode_ptr); 	
 	case PCACHE_ALLOC_FAILURE:
 	case DCACHE_INSERT_FAILURE:
 	case RECV_REQ_FAILURE:
@@ -360,9 +336,10 @@ int PVFS_sys_lookup(
 
     if (name && resp)
     {
+        parent.handle = 0;
         parent.fs_id = fs_id;
 
-        ret = PINT_bucket_get_root_handle(fs_id,&parent.handle);
+        ret = PINT_bucket_get_root_handle(parent.fs_id,&parent.handle);
         if (ret < 0)
         {
             return ret;

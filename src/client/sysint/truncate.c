@@ -6,7 +6,6 @@
 
 /* Truncate Implementation */
 
-#include "pinode-helper.h"
 #include "pvfs2-sysint.h"
 #include "pint-sysint.h"
 #include "pint-dcache.h"
@@ -14,6 +13,7 @@
 #include "pint-dcache.h"
 #include "pint-bucket.h"
 #include "pcache.h"
+#include "pinode-helper.h"
 #include "PINT-reqproto-encode.h"
 
 /* PVFS_sys_truncate()
@@ -23,13 +23,15 @@
  *	truncate to the specified physical size
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size, 
-                        PVFS_credentials credentials)
+int PVFS_sys_truncate(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_size size, 
+    PVFS_credentials credentials)
 {
     struct PVFS_server_req req_p;			/* server request */
     struct PVFS_server_resp *ack_p = NULL;	/* server response */
     int ret = -1;
-    pinode *pinode_ptr = NULL;
+    PINT_pinode *pinode_ptr = NULL;
     bmi_addr_t serv_addr;	/* PVFS address type structure */
     uint32_t attr_mask;
     struct PINT_decoded_msg decoded;
@@ -50,8 +52,8 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size,
 
     /* Get the directory pinode -- don't retrieve the size */
     attr_mask = PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL;
-    ret = phelper_get_pinode(pinode_refn,&pinode_ptr, attr_mask, 
-				credentials);
+    ret = phelper_get_pinode(pinode_refn, &pinode_ptr,
+                             attr_mask, credentials);
     if (ret < 0)
     {
 	failure = NONE_FAILURE;

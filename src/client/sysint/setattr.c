@@ -27,13 +27,15 @@
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
-                PVFS_credentials credentials)
+int PVFS_sys_setattr(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_sys_attr attr,
+    PVFS_credentials credentials)
 {
 	struct PVFS_server_req req_p;			/* server request */
 	struct PVFS_server_resp *ack_p = NULL;	/* server response */
 	int ret = -1;
-	pinode *pinode_ptr = NULL;
+	PINT_pinode *pinode_ptr = NULL;
 	bmi_addr_t serv_addr;		/* PVFS address type structure */
 	char *server = NULL;
 	PVFS_pinode_reference entry;
@@ -66,8 +68,8 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 	
 	/* Lookup the entry...may or may not exist in the cache */
 
-	ret = PINT_pcache_lookup(entry, &pinode_ptr);
-	if ((ret == PCACHE_LOOKUP_FAILURE) || (pinode_ptr == NULL))
+	pinode_ptr = PINT_pcache_lookup(entry);
+	if (PINT_pcache_pinode_status(pinode_ptr) != PINODE_STATUS_VALID)
 	{
 		pinode_was_in_cache = 0;
 
@@ -152,15 +154,8 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 		failure = PINODE_REMOVE_FAILURE;
 		goto return_error;
 	}
-
-	if (pinode_was_in_cache)
-	{
-	    PINT_pcache_lookup_rls(pinode_ptr);
-	}
-	else
-	{
-	    phelper_release_pinode(pinode_ptr);
-	}
+        PINT_pcache_set_valid(pinode_ptr);
+        phelper_release_pinode(pinode_ptr);
 
 	return(0);
 
@@ -177,17 +172,9 @@ return_error:
 		if (server != NULL)
 		    free(server);
 
-		if (pinode_was_in_cache)
-		{
-		    PINT_pcache_lookup_rls(pinode_ptr);
-		}
-		else
-		{
-		    phelper_release_pinode(pinode_ptr);
-		}
+                phelper_release_pinode(pinode_ptr);
 
 	    case PCACHE_LOOKUP_FAILURE:
-		PINT_pcache_pinode_dealloc(pinode_ptr);
 
 	    case NONE_FAILURE:
 	    break;

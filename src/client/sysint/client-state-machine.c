@@ -7,12 +7,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include "client-state-machine.h"
-#include "state-machine-fns.h"
-#include "pvfs2-debug.h"
-#include "job.h"
-#include "gossip.h"
-
 /* from original remove.c */
 #include "pinode-helper.h"
 #include "pvfs2-sysint.h"
@@ -23,6 +17,12 @@
 #include "pint-bucket.h"
 #include "pcache.h"
 #include "PINT-reqproto-encode.h"
+
+#include "client-state-machine.h"
+#include "state-machine-fns.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
 
 job_context_id pint_client_sm_context;
 

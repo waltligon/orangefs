@@ -11,6 +11,7 @@
  * DEFINE ALL THE STRUCTURES WE NEED BEFORE WE INCLUDE IT.
  */
 
+#include "pvfs2-sysint.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "PINT-reqproto-encode.h"
@@ -101,9 +102,9 @@ struct PINT_client_getattr_sm {
     uint32_t              dist_size;
     PVFS_size            *size_array;     /* from datafile attribs */
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
-    int                  pcache_hit;     /* set on pcache hit */
-    PVFS_object_attr     pcache_attr;    /* copy of getattr response */
-    PVFS_size            pcache_size;    /* cached size value */
+    int                  pcache_hit;      /* set on pcache hit */
+    PVFS_object_attr     pcache_attr;     /* copy of getattr response */
+    PVFS_size            pcache_size;     /* cached size value */
 };
 
 /* PINT_client_io_sm

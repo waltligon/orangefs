@@ -10,6 +10,9 @@
 #include "mpi.h"
 #include "pts.h"
 #include "pvfs2-util.h"
+#include "pvfs-helper.h"
+
+extern pvfs_helper_t pvfs_helper;
 
 int compare_attribs(PVFS_sys_attr attr1,
 		    PVFS_sys_attr attr2);
@@ -154,7 +157,6 @@ int test_create(MPI_Comm * comm,
 		char *buf,
 		void *params)
 {
-    PVFS_sysresp_init resp_init;
     int ret = -1;
     pvfs_mntlist mnt = { 0, NULL };
     generic_params *myparams = (generic_params *) params;
@@ -169,28 +171,18 @@ int test_create(MPI_Comm * comm,
 	return (-1);
     }
 
-    /*Init the system interface */
-    ret = PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init);
-    if (ret < 0)
+    if (!pvfs_helper.initialized && initialize_sysint())
     {
-	printf("PVFS_sys_initialize() failure. = %d\n", ret);
-	return (ret);
+        printf("System initialization error\n");
+        return (-1);
     }
 
     for (i = 0; i < myparams->mode; i++)
     {
 	snprintf(name, PVFS_NAME_MAX, "%d-%d-testfile", i, rank);
-	nerrs += create_file(resp_init.fsid_list[0], myparams->path, name);
+	nerrs += create_file(pvfs_helper.resp_init.fsid_list[0],
+                             myparams->path, name);
     }
-
-    //close it down
-    ret = PVFS_sys_finalize();
-    if (ret < 0)
-    {
-	printf("finalizing sysint failed with errcode = %d\n", ret);
-	return (-1);
-    }
-
     return (nerrs);
 }
 

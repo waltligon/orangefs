@@ -10,86 +10,54 @@
 #include "pvfs2-sysint.h"
 #include "pint-servreq.h"
 
-static int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
-		PVFS_pinode_reference pref,PVFS_credentials credentials);
+static int phelper_refresh_pinode(
+    uint32_t mask,
+    PINT_pinode **pinode_p,
+    PVFS_pinode_reference pref,
+    PVFS_credentials credentials);
 
 
-/* phelper_get_pinode
- *
- * fetches a pinode 
- *
- * returns 0 on success, -errno on failure
- */
-int phelper_get_pinode(PVFS_pinode_reference pref, pinode **pinode_ptr,
-		uint32_t attrmask, PVFS_credentials credentials)
+int phelper_get_pinode(
+    PVFS_pinode_reference pref,
+    PINT_pinode **pinode_p,
+    uint32_t attrmask,
+    PVFS_credentials credentials)
 {
-	int ret = 0;
-	
-	/* Does pinode exist? */
-	ret = PINT_pcache_lookup(pref, pinode_ptr);
+    int ret = 0, pinode_valid = 0;
 
-	if (ret == PCACHE_LOOKUP_FAILURE)
-	{
-		/* Pinode does not exist in cache */
-		ret = phelper_refresh_pinode(attrmask, pinode_ptr, pref,
-				credentials);
-		if (ret < 0)
-		{
-			goto pinode_refresh_failure;	
-		}
+    *pinode_p = PINT_pcache_lookup(pref);
+    if (*pinode_p != NULL)
+    {
+        pinode_valid = (PINT_pcache_pinode_status(*pinode_p) ==
+                        PINODE_STATUS_VALID);
+        if (!pinode_valid)
+        {
+            pinode_valid =
+                (((*pinode_p)->attr.mask & attrmask) != attrmask);
+        }
+    }
 
-		ret = PINT_pcache_insert(*pinode_ptr);
-		if (ret < 0)
-		{
-			goto pinode_insert_failure;	
-		}
-		PINT_pcache_insert_rls(*pinode_ptr);
-	}
-	else 
-	{
-		/* Pinode does exist */
+    if (!pinode_valid)
+    {
+        ret = phelper_refresh_pinode(
+            attrmask, pinode_p, pref, credentials);
+        if (ret < 0)
+        {
+            goto pinode_refresh_failure;	
+        }
+        PINT_pcache_set_valid(*pinode_p);
+    }
+    return 0;
 
-		if (((*pinode_ptr)->attr.mask & attrmask) != attrmask)
-		{ 
-			/* All the requested values are not contained in the pinode 
-			 * hence need to be fetched 
-			 */
-			memset(*pinode_ptr,0,sizeof(pinode));	
-			/* Fill the pinode - already allocated */
-			ret = phelper_refresh_pinode( attrmask,
-						     pinode_ptr ,pref,
-						     credentials);
-			if (ret < 0)
-			{
-				/* can't release before we do pinode refresh */
-				PINT_pcache_lookup_rls(*pinode_ptr);
-				goto pinode_refresh_failure;
-			}
-
-			/* we still have one reference to this from refresh */
-			PINT_pcache_lookup_rls(*pinode_ptr);
-
-			/*its already in the cache so we don't need to update it*/
-		}
-	}
-
-	return(0);
-	
-pinode_insert_failure:
-pinode_refresh_failure:
-	return(ret);
+  pinode_refresh_failure:
+    PINT_pcache_release(*pinode_p);
+    return ret;
 }
 
-/* phelper_release_pinode
- *
- * let the pcache know that we're done with this pinode, so its safe to be 
- * reused/deallocated/etc if neccessary.
- *
- * returns 0 on success, -errno on failure
- */
-int phelper_release_pinode(pinode *pinode_ptr)
+int phelper_release_pinode(PINT_pinode *pinode)
 {
-	return PINT_pcache_lookup_rls(pinode_ptr);
+    PINT_pcache_release(pinode);
+    return 0;
 }
 
 /* phelper_refresh_pinode
@@ -99,51 +67,33 @@ int phelper_release_pinode(pinode *pinode_ptr)
  *
  * returns 0 on success, -errno on failure
  */
-static int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
-                           PVFS_pinode_reference pref,
-                           PVFS_credentials credentials)
+static int phelper_refresh_pinode(
+    uint32_t mask,
+    PINT_pinode **pinode_ptr,
+    PVFS_pinode_reference pref,
+    PVFS_credentials credentials)
 {
-	int ret = 0;
-	PVFS_object_attr tmp_attr;
+    int ret = 0;
+    PVFS_object_attr tmp_attr;
 
-	ret = PINT_sys_getattr(pref, mask, credentials, &tmp_attr);
-	if (ret < 0)
-	{
-		return(ret);
-	}
+    assert(pinode_ptr);
 
-	/* we just added this to the cache, do a lookup to get the pointer to
-	 * the pinode we just added to the cache
-	 */
+    ret = PINT_sys_getattr(pref, mask, credentials, &tmp_attr);
+    if (ret < 0)
+    {
+        return ret;
+    }
 
-	ret = PINT_pcache_lookup(pref, pinode_ptr);
-	if (ret == PCACHE_LOOKUP_FAILURE)
-	{
-		/* we just added this, so if we get here maybe caching is off?*/
-		ret = PINT_pcache_pinode_alloc(pinode_ptr);
-		if (ret < 0)
-		{
-			ret = -ENOMEM;
-			return(ret);
-		}
-	}
-	(*pinode_ptr)->pinode_ref.handle = pref.handle;
-	(*pinode_ptr)->pinode_ref.fs_id = pref.fs_id;
+    /* getattr placed entry in pcache */
+    *pinode_ptr = PINT_pcache_lookup(pref);
+    assert(*pinode_ptr);
 
-	ret = phelper_fill_attr(*pinode_ptr,tmp_attr);
-	if (ret < 0)
-	{
-		return(ret);
-	}
-
-	/* Fill the pinode with timestamp info */
-	ret = phelper_fill_timestamps(*pinode_ptr);
-	if (ret < 0)
-	{
-		return(ret);
-	}
-
-	return(0);
+    ret = phelper_fill_attr(*pinode_ptr, tmp_attr);
+    if (ret < 0)
+    {
+        return ret;
+    }
+    return 0;
 }
 
 
@@ -153,36 +103,37 @@ static int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
  *
  * returns 0 on success, -errno on failure
  */
-int phelper_fill_timestamps(pinode *pnode)
+int phelper_fill_timestamps(PINT_pinode *pnode)
 {
-	int ret = 0;
-	struct timeval cur_time;
-	long value = 0;
+#if 0
+    int ret = 0;
+    struct timeval cur_time;
+    long value = 0;
 
-	/* Get the time */
-	ret = gettimeofday(&cur_time,NULL);
-	if (ret < 0)
-	{
-		return(-1);	
-	}
-	/* Initialize the timestamps */
-	memset(&(pnode->tstamp),0,sizeof(struct timeval));
+    /* Get the time */
+    ret = gettimeofday(&cur_time,NULL);
+    if (ret < 0)
+    {
+        return(-1);	
+    }
+    /* Initialize the timestamps */
+    memset(&(pnode->tstamp),0,sizeof(struct timeval));
 
-	/* Update timestamp */
-	/* Check for sum of usecs adding an extra second */
-	value = cur_time.tv_usec + handle_to.tv_usec;
-	if (value >= 1000000)
-	{
-		pnode->tstamp.tv_usec = value % 1000000;
-		pnode->tstamp.tv_sec = cur_time.tv_sec + handle_to.tv_sec + 1;
-	}
-	else
-	{
-		pnode->tstamp.tv_usec = value;
-		pnode->tstamp.tv_sec = cur_time.tv_sec + handle_to.tv_sec;
-	}
-
-	return(0);
+    /* Update timestamp */
+    /* Check for sum of usecs adding an extra second */
+    value = cur_time.tv_usec + handle_to.tv_usec;
+    if (value >= 1000000)
+    {
+        pnode->tstamp.tv_usec = value % 1000000;
+        pnode->tstamp.tv_sec = cur_time.tv_sec + handle_to.tv_sec + 1;
+    }
+    else
+    {
+        pnode->tstamp.tv_usec = value;
+        pnode->tstamp.tv_sec = cur_time.tv_sec + handle_to.tv_sec;
+    }
+#endif
+    return(0);
 }
 
 
@@ -194,7 +145,7 @@ int phelper_fill_timestamps(pinode *pnode)
  *
  * returns 0 on success, -errno on error
  */
-int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr)
+int phelper_fill_attr(PINT_pinode *ptr, PVFS_object_attr attr)
 {
 	PVFS_size df_array_size = 0;
 

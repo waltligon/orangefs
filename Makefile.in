@@ -118,7 +118,10 @@ SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 SERVERLIBS = @LIBS@ -ldb -lrt -lpthread -lpvfs2-server
 # the client libraries are not threaded (at the moment at least)
 #    and therefore can disable locking in the I/O subsystems
-LIBCFLAGS = -D__GEN_NULL_LOCKING__
+#LIBCFLAGS = -D__GEN_NULL_LOCKING__
+# No longer trye!  The new pcache now requires locks
+# This is hack and should be fixed.
+LIBCFLAGS = -D__GEN_POSIX_LOCKING__
 
 ################################################################
 # enable GM if configure detected it

@@ -22,6 +22,7 @@
 #include "bmi.h"
 #include "pvfs2-sysint.h"
 #include "gen-locks.h"
+#include "pcache.h"
 
 #include "dotconf.h"
 #include "trove.h"
@@ -46,43 +47,6 @@ do{						\
 /* TODO: this function is a hack- will be removed later */
 int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
     PVFS_credentials credentials, PVFS_object_attr *out_attr);
-
-enum
-{
-    SIZE_INVALID = 0,
-    SIZE_VALID = 1
-};
-
-/* Update Pinode Flags
- * Mention specific timestamps to be updated
- */
-#define HANDLE_TSTAMP 1
-#define ATTR_TSTAMP 2
-#define SIZE_TSTAMP 4
-/* Revalidate handle/attributes? */
-#define HANDLE_VALIDATE 2	/* Indicate handle is to be revalidated */
-#define ATTR_VALIDATE 4		/* Indicate attributes are to be revalidated */
-#define SIZE_VALIDATE 8		/* Indicates size is to be revalidated */
-
-/* PCache Flags */
-#define SEARCH_NO_FETCH 1/* Check only if pinode is present,don't fill it up */
-
-/* Pinode structure */
-typedef struct
-{
-    PVFS_pinode_reference pinode_ref; /* pinode reference - entity to
-
-                                    uniquely identify a pinode */
-    gen_mutex_t *pinode_mutex;        /* mutex lock */
-    struct PVFS_object_attr attr;   /* attributes of PVFS object */
-    PVFS_size size;                           /* PVFS object size */
-    struct timeval tstamp;  /* timestamp for consistency */
-    int size_flag;	    /*flag so we know if the size is valid*/
-} pinode, *pinode_p, PINT_pinode;
-
-
-/* Max No. of Entries in the cache */
-#define MAX_ENTRIES 64 /* 32k entries for the cache */
 
 /* Bucket related info */
 typedef struct {

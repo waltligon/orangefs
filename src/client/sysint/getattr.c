@@ -85,13 +85,11 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     int ret = -1;
     bmi_addr_t serv_addr;	            /* PVFS address type structure */ 
     char *server = NULL;
-    struct timeval cur_time;
     PVFS_size *size_array = 0;
-    pinode *entry_pinode = NULL;
+    PINT_pinode *entry_pinode = NULL;
     PVFS_pinode_reference entry;
     struct PINT_decoded_msg decoded;
     int max_msg_sz = 0;
-    int pinode_exists_in_cache = 0;
     void* encoded_resp;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
     PVFS_handle *data_files = NULL;
@@ -108,60 +106,16 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	    PCACHE_INSERT_FAILURE,
 	} failure = NONE_FAILURE;
 
-	/* Fill in pinode reference */ 
 	entry.handle = pinode_refn.handle;
 	entry.fs_id = pinode_refn.fs_id;
 
-	/* do we have a valid copy? 
-	 * if any of the attributes are stale, or absent then we need to 
-	 * retrive a fresh copy.
-	 */
-	ret = PINT_pcache_lookup(entry, &entry_pinode);
-	if (ret  == PCACHE_LOOKUP_SUCCESS)
+	entry_pinode = PINT_pcache_lookup(entry);
+        if (!entry_pinode)
         {
-		*out_attr = entry_pinode->attr;
-		if (attrmask & PVFS_ATTR_SYS_SIZE)
-		{
-			/* if we want the size, and its valid, then return now */
-			if (entry_pinode->size_flag == SIZE_VALID)
-			{
-			    /* TODO: making too many assumptions here */
-			    *out_attr = entry_pinode->attr;
-			    PINT_pcache_lookup_rls(entry_pinode);
-			    return (0);
-			}
-
-			/* if the pinode already exists in the cache, we need
-			 * to remember this so we can update fields instead
-			 * of adding it again.
-			 */
-			pinode_exists_in_cache = 1;
-			/* if the size isn't valid, continue with the getattr*/
-		}
-		else
-		{
-		    /*
-                      if we don't care about size in our request,
-                      we're done already
-                    */
-		    *out_attr = entry_pinode->attr;
-		    PINT_pcache_lookup_rls(entry_pinode);
-		    return (0);
-		}
+            entry_pinode = PINT_pcache_pinode_alloc();
+            assert(entry_pinode);
         }
-	else
-	{
-		/* setup new pinode that we'll add to the cache */
-		ret = PINT_pcache_pinode_alloc( &entry_pinode );
-		if (ret < 0)
-		{
-			failure = NONE_FAILURE;
-			goto return_error;
-		}
-		entry_pinode->pinode_ref.handle = entry.handle;
-		entry_pinode->pinode_ref.fs_id = entry.fs_id;
-		entry_pinode->size_flag = SIZE_INVALID;
-	}
+        entry_pinode->refn = entry;
 
 	ret = PINT_bucket_map_to_server(&serv_addr,entry.handle,entry.fs_id);
         if (ret < 0)
@@ -343,42 +297,8 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	    out_attr->u.data.size = total_filesize;
 
 	    entry_pinode->size = total_filesize;
-	    entry_pinode->size_flag = SIZE_VALID;
 	}
-	else
-	{
-	    /* if we get everything but the size, the updated pinode timestamp
-	     * doesn't have anything to do with the size.
-	     */
-	    entry_pinode->size_flag = SIZE_INVALID;
-	}
-
-	ret = gettimeofday(&cur_time,NULL);
-	if (ret < 0)
-	{
-		failure = PCACHE_INSERT_FAILURE;
-		goto return_error;
-	}
-	/* Set the size timestamp */
-	phelper_fill_timestamps(entry_pinode);
-
-	if (pinode_exists_in_cache == 0)
-	{
-	    /* Add to cache  */
-	    ret = PINT_pcache_insert(entry_pinode);
-	    if (ret < 0)
-	    {
-		failure = PCACHE_INSERT_FAILURE;
-		goto return_error;
-	    }
-	    gossip_debug(CLIENT_DEBUG, "GETATTR:  ADDING TO PCACHE\n");
-	    PINT_pcache_insert_rls(entry_pinode);
-	}
-	else
-	{
-	    PINT_pcache_lookup_rls(entry_pinode);
-	    gossip_debug(CLIENT_DEBUG, "GETATTR:   NOT ADDING TO PCACHE\n");
-	}
+        PINT_pcache_set_valid(entry_pinode);
 
 	/* Free memory allocated for name */
 	if (size_array)
@@ -392,12 +312,9 @@ return_error:
 	{
 		case PCACHE_INSERT_FAILURE:
 		    free(out_attr->u.meta.dfile_array);
-		    PINT_pcache_insert_rls(entry_pinode);
 		case MALLOC_DFH_FAILURE:
 		case SEND_REQ_FAILURE:
 		case MAP_SERVER_FAILURE:
-		    if (pinode_exists_in_cache)
-			PINT_pcache_lookup_rls(entry_pinode);
 		    if (ack_p)
 			PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 				&encoded_resp, op_tag);
