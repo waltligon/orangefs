@@ -260,9 +260,6 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
     dspace_a_p = &s_op->attr;
     a_p = &s_op->req->u.setattr.attr;
 
-    /* filter out anything besides common attributes before writing */
-    a_p->mask &= PVFS_ATTR_COMMON_ALL;
-
     if (a_p->mask & PVFS_ATTR_META_DFILES)
     {
         gossip_debug(
@@ -299,11 +296,16 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
     if (a_p->mask & PVFS_ATTR_COMMON_TYPE)
     {
         dspace_a_p->objtype = a_p->objtype;
-        if (a_p->objtype == PVFS_TYPE_METAFILE)
+        if ((a_p->objtype == PVFS_TYPE_METAFILE) && (a_p->mask &
+	    PVFS_ATTR_META_DIST))
         {
-            dspace_a_p->u.meta.dfile_count = a_p->u.meta.dfile_count;
             dspace_a_p->u.meta.dist_size = a_p->u.meta.dist_size;
         }
+        if ((a_p->objtype == PVFS_TYPE_METAFILE) && (a_p->mask &
+	    PVFS_ATTR_META_DFILES))
+        {
+            dspace_a_p->u.meta.dfile_count = a_p->u.meta.dfile_count;
+	}
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
