@@ -167,7 +167,8 @@ void *PINT_dev_get_mapped_buffer(
     return ((desc && desc->ptr &&
              ((buffer_index > -1) &&
               (buffer_index < PVFS2_BUFMAP_DESC_COUNT))) ?
-            (desc->ptr + (buffer_index * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)) :
+            ((char *)desc->ptr +
+             (buffer_index * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)) :
             NULL);
 }
 

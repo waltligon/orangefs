@@ -6,81 +6,7 @@
 #include "server-config.h"
 #include "gossip.h"
 
-
-void print_filesystem_configuration(struct filesystem_configuration_s *fs)
-{
-    PINT_llist *cur = NULL;
-    struct host_handle_mapping_s *cur_h_mapping = NULL;
-
-    if (fs)
-    {
-        fprintf(stderr,"File system name: %s\n",fs->file_system_name);
-        fprintf(stderr,"FS Collection ID: %d\n",fs->coll_id);
-        fprintf(stderr,"FS Root Handle  : %Lu\n",Lu(fs->root_handle));
-
-        fprintf(stderr,"\t--- Meta Server(s) for %s (%d total):\n",
-                fs->file_system_name,PINT_llist_count(fs->meta_handle_ranges));
-        cur = fs->meta_handle_ranges;
-        while(cur)
-        {
-            cur_h_mapping = PINT_llist_head(cur);
-            if (!cur_h_mapping)
-            {
-                break;
-            }
-            fprintf(stderr,"\t  %s\n",
-                    cur_h_mapping->alias_mapping->host_alias);
-            cur = PINT_llist_next(cur);
-        }
-
-        fprintf(stderr,"\t--- Data Server(s) for %s (%d total):\n",
-                fs->file_system_name,PINT_llist_count(fs->data_handle_ranges));
-        cur = fs->data_handle_ranges;
-        while(cur)
-        {
-            cur_h_mapping = PINT_llist_head(cur);
-            if (!cur_h_mapping)
-            {
-                break;
-            }
-            fprintf(stderr,"\t  %s\n",
-                    cur_h_mapping->alias_mapping->host_alias);
-            cur = PINT_llist_next(cur);
-        }
-
-        fprintf(stderr,"\t--- Meta Handle Mappings for %s:\n",
-                fs->file_system_name);
-        cur = fs->meta_handle_ranges;
-        while(cur)
-        {
-            cur_h_mapping = PINT_llist_head(cur);
-            if (!cur_h_mapping)
-            {
-                break;
-            }
-            fprintf(stderr,"\t  %s has handle range %s\n",
-                    cur_h_mapping->alias_mapping->host_alias,
-                    cur_h_mapping->handle_range);
-            cur = PINT_llist_next(cur);
-        }
-
-        fprintf(stderr,"\t--- Data Handle Mappings for %s:\n",
-                fs->file_system_name);
-        cur = fs->data_handle_ranges;
-        while(cur)
-        {
-            cur_h_mapping = PINT_llist_head(cur);
-            if (!cur_h_mapping)
-            {
-                break;
-            }
-            fprintf(stderr,"\t  %s has handle range %s\n",
-                    cur_h_mapping->alias_mapping->host_alias,
-                    cur_h_mapping->handle_range);
-            cur = PINT_llist_next(cur);
-        }
-    }
-}
+void print_filesystem_configuration(struct filesystem_configuration_s *fs);
 
 int main(int argc, char **argv)
 {
@@ -168,6 +94,81 @@ int main(int argc, char **argv)
 
     gossip_disable();
     return 0;
+}
+
+void print_filesystem_configuration(struct filesystem_configuration_s *fs)
+{
+    PINT_llist *cur = NULL;
+    struct host_handle_mapping_s *cur_h_mapping = NULL;
+
+    if (fs)
+    {
+        fprintf(stderr,"File system name: %s\n",fs->file_system_name);
+        fprintf(stderr,"FS Collection ID: %d\n",fs->coll_id);
+        fprintf(stderr,"FS Root Handle  : %Lu\n",Lu(fs->root_handle));
+
+        fprintf(stderr,"\t--- Meta Server(s) for %s (%d total):\n",
+                fs->file_system_name,PINT_llist_count(fs->meta_handle_ranges));
+        cur = fs->meta_handle_ranges;
+        while(cur)
+        {
+            cur_h_mapping = PINT_llist_head(cur);
+            if (!cur_h_mapping)
+            {
+                break;
+            }
+            fprintf(stderr,"\t  %s\n",
+                    cur_h_mapping->alias_mapping->host_alias);
+            cur = PINT_llist_next(cur);
+        }
+
+        fprintf(stderr,"\t--- Data Server(s) for %s (%d total):\n",
+                fs->file_system_name,PINT_llist_count(fs->data_handle_ranges));
+        cur = fs->data_handle_ranges;
+        while(cur)
+        {
+            cur_h_mapping = PINT_llist_head(cur);
+            if (!cur_h_mapping)
+            {
+                break;
+            }
+            fprintf(stderr,"\t  %s\n",
+                    cur_h_mapping->alias_mapping->host_alias);
+            cur = PINT_llist_next(cur);
+        }
+
+        fprintf(stderr,"\t--- Meta Handle Mappings for %s:\n",
+                fs->file_system_name);
+        cur = fs->meta_handle_ranges;
+        while(cur)
+        {
+            cur_h_mapping = PINT_llist_head(cur);
+            if (!cur_h_mapping)
+            {
+                break;
+            }
+            fprintf(stderr,"\t  %s has handle range %s\n",
+                    cur_h_mapping->alias_mapping->host_alias,
+                    cur_h_mapping->handle_range);
+            cur = PINT_llist_next(cur);
+        }
+
+        fprintf(stderr,"\t--- Data Handle Mappings for %s:\n",
+                fs->file_system_name);
+        cur = fs->data_handle_ranges;
+        while(cur)
+        {
+            cur_h_mapping = PINT_llist_head(cur);
+            if (!cur_h_mapping)
+            {
+                break;
+            }
+            fprintf(stderr,"\t  %s has handle range %s\n",
+                    cur_h_mapping->alias_mapping->host_alias,
+                    cur_h_mapping->handle_range);
+            cur = PINT_llist_next(cur);
+        }
+    }
 }
 
 /*
