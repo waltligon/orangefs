@@ -30,7 +30,7 @@ typedef struct job_status
     PVFS_vtag *vtag;		/* most trove operations */
     PVFS_ds_position position;	/* iterate, iterate_keys */
     PVFS_handle handle;		/* dspace_create */
-    PVFS_ds_attributes_s ds_attr;	/* getattr */
+    PVFS_ds_attributes ds_attr;	/* getattr */
     PVFS_ds_type type;		/* dspace_verify */
     PVFS_fs_id coll_id;		/* fs_lookup */
     int count;			/* keyval_iterate */
@@ -211,7 +211,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 /* write generic dspace attributes */
 int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
-			     PVFS_ds_attributes_s * ds_attr_p,
+			     PVFS_ds_attributes * ds_attr_p,
 			     void *user_ptr,
 			     job_status_s * out_status_p,
 			     job_id_t * id,

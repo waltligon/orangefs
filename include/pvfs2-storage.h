@@ -46,7 +46,7 @@ typedef struct PVFS_vtag_s PVFS_vtag;
  * sent across the wire/to the user vs. what is stored in trove?  Is that
  * already done?
  */
-struct PVFS_ds_attributes
+struct PVFS_ds_attributes_s
 {
     PVFS_fs_id fs_id;		/* REQUIRED */
     PVFS_handle handle;		/* REQUIRED */
@@ -61,9 +61,9 @@ struct PVFS_ds_attributes
     PVFS_size b_size;		/* bstream size */
     PVFS_size k_size;		/* keyval size; # of keys */
 };
-typedef struct PVFS_ds_attributes PVFS_ds_attributes_s;
+typedef struct PVFS_ds_attributes_s PVFS_ds_attributes;
 
-struct PVFS_ds_storedattr
+struct PVFS_ds_storedattr_s
 {
     PVFS_fs_id fs_id;
     PVFS_handle handle;
@@ -75,16 +75,16 @@ struct PVFS_ds_storedattr
     PVFS_time mtime;
     PVFS_time atime;
 };
-typedef struct PVFS_ds_storedattr PVFS_ds_storedattr_s;
+typedef struct PVFS_ds_storedattr_s PVFS_ds_storedattr;
 
 #define PVFS_ds_attr_to_stored(__from, __to)	        \
 do {						        \
-    (__to) = * ((PVFS_ds_storedattr_s *) &(__from));	\
+    (__to) = * ((PVFS_ds_storedattr *) &(__from));	\
 } while (0);
 
 #define PVFS_ds_stored_to_attr(__from, __to, __b_size, __k_size)	\
 do {									\
-    * ((PVFS_ds_storedattr_s *) &(__to)) = (__from);			\
+    * ((PVFS_ds_storedattr *) &(__to)) = (__from);			\
     (__to).b_size = (__b_size);						\
     (__to).k_size = (__k_size);						\
 } while (0);

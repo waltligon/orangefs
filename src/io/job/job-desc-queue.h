@@ -35,7 +35,7 @@ struct trove_desc
     PVFS_error state;
     PVFS_handle handle;
     PVFS_ds_position position;
-    PVFS_ds_attributes_s attr;
+    PVFS_ds_attributes attr;
     int count;
 };
 

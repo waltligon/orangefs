@@ -257,7 +257,7 @@ static int remove_read_object_metadata(PINT_server_op *s_op,
  * unable to find the metadata as a keyval.
  * Metadata will be read into the remove scratch space (s_op->u.remove.object_attr).
  *
- * Note: PVFS_ds_attributes_s structure is returned in the job_status_s (member ds_attr).
+ * Note: PVFS_ds_attributes structure is returned in the job_status_s (member ds_attr).
  */
 static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
 					     job_status_s *ret)
@@ -300,7 +300,7 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op,
 	ret->error_code = -EINVAL;
     }
     else {
-	struct PVFS_ds_attributes *a_p = &ret->ds_attr;
+	PVFS_ds_attributes *a_p = &ret->ds_attr;
 
 	gossip_debug(SERVER_DEBUG,
 		     "  attrs read from dspace = (..., type = %d)\n",
