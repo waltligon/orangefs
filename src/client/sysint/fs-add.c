@@ -15,6 +15,7 @@
 #include "ncache.h"
 #include "pint-bucket.h"
 #include "pvfs2-sysint.h"
+#include "pvfs2-util.h"
 #include "pint-sysint-utils.h"
 #include "gen-locks.h"
 #include "pint-servreq.h"
@@ -34,11 +35,25 @@ gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
  */
 int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
     struct filesystem_configuration_s* cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
 
     gen_mutex_lock(&mt_config);
+
+    /*
+      add the mntent to the internal mount tables; it's okay if it's
+      already there, as the return value will tell us and we can
+      ignore it.  in short, if the mntent was from a pvfstab file, it
+      should already exist in the tables.  in any other case, it needs
+      to be added properly.
+    */
+    ret = PVFS_util_add_internal_mntent(mntent);
+    if (ret && (ret != -PVFS_EEXIST))
+    {
+        PVFS_perror("PVFS_util_add_mnt failed", ret);
+        goto error_exit;
+    }
 
     /* get exclusive access to the (global) server config object */
     server_config = PINT_get_server_config_struct();
@@ -59,7 +74,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
 
     /* load the mapping of handles to servers */
     ret = PINT_handle_load_mapping(server_config, cur_fs);
-    if(ret < 0)
+    if (ret < 0)
     {
         PVFS_perror("PINT_handle_load_mapping failed", ret);
         goto error_exit;
@@ -74,6 +89,26 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
     if (server_config)
     {
         PINT_put_server_config_struct(server_config);
+    }
+    return ret;
+}
+
+/* PVFS_sys_fs_add()
+ *
+ * tells the system interface to dynamically "unmount" a mounted file
+ * system
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_sys_fs_remove(struct PVFS_sys_mntent* mntent)
+{
+    int ret = -PVFS_EINVAL;
+
+    if (mntent)
+    {
+        gen_mutex_lock(&mt_config);
+        ret = PVFS_util_remove_internal_mntent(mntent);
+        gen_mutex_unlock(&mt_config);
     }
     return ret;
 }

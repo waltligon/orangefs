@@ -30,7 +30,8 @@
 #include <mntent.h>
 #endif
 
-#define PVFS2_MAX_TABFILES 8
+#define PVFS2_MAX_TABFILES       8
+#define PVFS2_DYNAMIC_TAB_INDEX  (PVFS2_MAX_TABFILES - 1)
 
 static PVFS_util_tab s_stat_tab_array[PVFS2_MAX_TABFILES];
 static int s_stat_tab_count = 0;
@@ -43,6 +44,13 @@ static int parse_flowproto_string(
 static int parse_encoding_string(
     const char *cp,
     enum PVFS_encoding_type *et);
+
+static void free_mntent(
+    struct PVFS_sys_mntent *mntent);
+
+static int copy_mntent(
+    struct PVFS_sys_mntent *dest_mntent,
+    struct PVFS_sys_mntent *src_mntent);
 
 void PVFS_util_gen_credentials(
     PVFS_credentials *credentials)
@@ -124,7 +132,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
         }
     }
 
-    assert(s_stat_tab_count < PVFS2_MAX_TABFILES);
+    assert(s_stat_tab_count < PVFS2_DYNAMIC_TAB_INDEX);
 
     /* scan our prioritized list of tab files in order, stop when we
      * find one that has at least one pvfs2 entry
@@ -317,23 +325,24 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     return (NULL);
 }
 
-/* PVFS_util_get_deault_fsid()
+/* PVFS_util_get_default_fsid()
  *
- * fills in the fs identifier for the first active file system that the
- * library knows about.  Useful for test programs or admin tools that need 
- * default file system to access if the user has not specified one
+ * fills in the fs identifier for the first active file system that
+ * the library knows about.  Useful for test programs or admin tools
+ * that need default file system to access if the user has not
+ * specified one
  *
  * returns 0 on success, -PVFS_error on failure
  */
 int PVFS_util_get_default_fsid(PVFS_fs_id* out_fs_id)
 {
-    int i, j;
+    int i = 0, j = 0;
 
     gen_mutex_lock(&s_stat_tab_mutex);
 
-    for (i=0; i < s_stat_tab_count; i++)
+    for(i = 0; i < s_stat_tab_count; i++)
     {
-        for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
+        for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
             *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
             if(*out_fs_id != PVFS_FS_ID_NULL)
@@ -346,6 +355,213 @@ int PVFS_util_get_default_fsid(PVFS_fs_id* out_fs_id)
 
     gen_mutex_unlock(&s_stat_tab_mutex);
     return(-PVFS_ENOENT);
+}
+
+/*
+ * PVFS_util_add_internal_mntent()
+ *
+ * dynamically add mount information to our internally managed mount
+ * tables (used for quick fs resolution using PVFS_util_resolve)
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_util_add_internal_mntent(struct PVFS_sys_mntent *mntent)
+{
+    int i = 0, j = 0, new_index = 0;
+    int ret = -PVFS_EINVAL;
+    struct PVFS_sys_mntent *current_mnt = NULL;
+    struct PVFS_sys_mntent *tmp_mnt_array = NULL;
+
+    if (mntent)
+    {
+        gen_mutex_lock(&s_stat_tab_mutex);
+
+        /*
+          we exhaustively scan to be sure this mnt entry doesn't exist
+          anywhere in our book keeping
+        */
+        for(i = 0; i < s_stat_tab_count; i++)
+        {
+            for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
+            {
+                current_mnt = &(s_stat_tab_array[i].mntent_array[j]);
+
+                if ((current_mnt->fs_id == mntent->fs_id) &&
+                    (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
+                {
+                    gossip_debug(
+                        GOSSIP_CLIENT_DEBUG, "* Mount point %s already "
+                        "exists\n", current_mnt->mnt_dir);
+
+                    gen_mutex_unlock(&s_stat_tab_mutex);
+                    return -PVFS_EEXIST;
+                }
+            }
+        }
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "* Adding new dynamic mount "
+                     "point %s", mntent->mnt_dir);
+
+        /* copy the mntent to our table in the dynamic tab area */
+        new_index = s_stat_tab_array[
+            PVFS2_DYNAMIC_TAB_INDEX].mntent_count;
+
+        if (new_index == 0)
+        {
+            s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array =
+                (struct PVFS_sys_mntent *)malloc(
+                    sizeof(struct PVFS_sys_mntent));
+            if (!s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array)
+            {
+                return -PVFS_ENOMEM;
+            }
+        }
+        else
+        {
+            /* we need to re-alloc this guy to add a new array entry */
+            tmp_mnt_array = (struct PVFS_sys_mntent *)malloc(
+                ((s_stat_tab_array[
+                      PVFS2_DYNAMIC_TAB_INDEX].mntent_count + 1) *
+                 sizeof(struct PVFS_sys_mntent)));
+            if (!tmp_mnt_array)
+            {
+                return -PVFS_ENOMEM;
+            }
+
+            /*
+              copy all mntent entries into the new array, freeing the
+              original entries
+            */
+            for(i = 0; i < s_stat_tab_array[
+                    PVFS2_DYNAMIC_TAB_INDEX].mntent_count; i++)
+            {
+                current_mnt = &s_stat_tab_array[
+                    PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i];
+                copy_mntent(&tmp_mnt_array[i], current_mnt);
+                free_mntent(current_mnt);
+            }
+
+            /* finally, swap the mntent arrays */
+            free(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array);
+            s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array =
+                tmp_mnt_array;
+        }
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "* New Index is %d\n",
+                     new_index);
+
+        current_mnt = &s_stat_tab_array[
+            PVFS2_DYNAMIC_TAB_INDEX].mntent_array[new_index];
+
+        ret = copy_mntent(current_mnt, mntent);
+
+        s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count++;
+
+        gen_mutex_unlock(&s_stat_tab_mutex);
+    }
+    return ret;
+}
+
+/*
+ * PVFS_util_remove_internal_mntent()
+ *
+ * dynamically remove mount information from our internally managed
+ * mount tables.
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_util_remove_internal_mntent(
+    struct PVFS_sys_mntent *mntent)
+{
+    int i = 0, j = 0, k = 0, new_count = 0, found = 0;
+    int ret = -PVFS_EINVAL;
+    struct PVFS_sys_mntent *current_mnt = NULL;
+    struct PVFS_sys_mntent *tmp_mnt_array = NULL;
+
+    if (mntent)
+    {
+        gen_mutex_lock(&s_stat_tab_mutex);
+
+        /*
+          we exhaustively scan to be sure this mnt entry *does* exist
+          somewhere in our book keeping
+        */
+        for(i = 0; i < s_stat_tab_count; i++)
+        {
+            for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
+            {
+                current_mnt = &(s_stat_tab_array[i].mntent_array[j]);
+                if ((current_mnt->fs_id == mntent->fs_id) &&
+                    (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
+                {
+                    found = 1;
+                    goto mntent_found;
+                }
+            }
+        }
+
+      mntent_found:
+        if (!found)
+        {
+            return -PVFS_EINVAL;
+        }
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "* Removing mount "
+                     "point %s [%d,%d]\n", current_mnt->mnt_dir, i, j);
+
+        /* remove the mntent from our table in the found tab area */
+        if ((s_stat_tab_array[i].mntent_count - 1) > 0)
+        {
+            /*
+              this is 1 minus the old count since there will be 1 less
+              mnt entries after this call
+            */
+            new_count = s_stat_tab_array[i].mntent_count - 1;
+
+            /* we need to re-alloc this guy to remove the array entry */
+            tmp_mnt_array = (struct PVFS_sys_mntent *)malloc(
+                (new_count * sizeof(struct PVFS_sys_mntent)));
+            if (!tmp_mnt_array)
+            {
+                return -PVFS_ENOMEM;
+            }
+
+            /*
+              copy all mntent entries into the new array, freeing the
+              original entries -- and skipping the one that we're
+              trying to remove
+            */
+            for(k = 0, new_count = 0;
+                k < s_stat_tab_array[i].mntent_count; k++)
+            {
+                current_mnt = &s_stat_tab_array[i].mntent_array[k];
+
+                if ((current_mnt->fs_id == mntent->fs_id) &&
+                    (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
+                {
+                    free_mntent(current_mnt);
+                    continue;
+                }
+                copy_mntent(&tmp_mnt_array[new_count++], current_mnt);
+            }
+
+            /* finally, swap the mntent arrays */
+            free(s_stat_tab_array[i].mntent_array);
+            s_stat_tab_array[i].mntent_array = tmp_mnt_array;
+
+            s_stat_tab_array[i].mntent_count--;
+            ret = 0;
+        }
+        else
+        {
+            /* special case: we're removing the last mnt entry here */
+            free_mntent(&s_stat_tab_array[i].mntent_array[j]);
+            s_stat_tab_array[i].mntent_count = 0;
+            ret = 0;
+        }
+        gen_mutex_unlock(&s_stat_tab_mutex);
+    }
+    return ret;
 }
 
 /* PVFS_util_resolve()
@@ -361,12 +577,12 @@ int PVFS_util_resolve(
     char* out_fs_path,
     int out_fs_path_max)
 {
-    int i,j;
-    int ret = -1;
+    int i = 0, j = 0;
+    int ret = -PVFS_EINVAL;
 
     gen_mutex_lock(&s_stat_tab_mutex);
 
-    for (i=0; i < s_stat_tab_count; i++)
+    for(i=0; i < s_stat_tab_count; i++)
     {
         for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
         {
@@ -789,6 +1005,61 @@ static int parse_flowproto_string(
     }
 
     return (0);
+}
+
+static void free_mntent(
+    struct PVFS_sys_mntent *mntent)
+{
+    if (mntent)
+    {
+        if (mntent->pvfs_config_server)
+        {
+            free(mntent->pvfs_config_server);
+            mntent->pvfs_config_server = NULL;
+        }
+        if (mntent->pvfs_fs_name)
+        {
+            free(mntent->pvfs_fs_name);
+            mntent->pvfs_fs_name = NULL;
+        }
+        if (mntent->mnt_dir)
+        {
+            free(mntent->mnt_dir);
+            mntent->mnt_dir = NULL;
+        }
+        if (mntent->mnt_opts)
+        {
+            free(mntent->mnt_opts);
+            mntent->mnt_opts = NULL;
+        }
+
+        mntent->flowproto = 0;
+        mntent->encoding = 0;
+        mntent->fs_id = PVFS_FS_ID_NULL;
+    }    
+}
+
+static int copy_mntent(
+    struct PVFS_sys_mntent *dest_mntent,
+    struct PVFS_sys_mntent *src_mntent)
+{
+    int ret = -PVFS_ENOMEM;
+
+    if (dest_mntent && src_mntent)
+    {
+        dest_mntent->pvfs_config_server =
+            strdup(src_mntent->pvfs_config_server);
+        dest_mntent->pvfs_fs_name = strdup(src_mntent->pvfs_fs_name);
+        dest_mntent->mnt_dir = strdup(src_mntent->mnt_dir);
+        dest_mntent->mnt_opts = strdup(src_mntent->mnt_opts);
+        dest_mntent->flowproto = src_mntent->flowproto;
+        dest_mntent->encoding = src_mntent->encoding;
+        dest_mntent->fs_id = src_mntent->fs_id;
+
+        /* TODO: memory allocation error handling */
+        ret = 0;
+    }
+    return ret;
 }
 
 /*
