@@ -3,9 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.1.0pre1
+pvfs2-0.1.0
 ===============
-- 
+- initial support for logging traces with both MPE and Pablo libraries
+- fix some warnings on x86-64
+- work around older Berkeley-DB versions w/o support for DB_DIRTY_READ
 
 
 pvfs2-0.0.9
