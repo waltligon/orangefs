@@ -44,7 +44,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	PVFS_bitfield attr_mask = req->attrmask;
 	pinode_reference entry;
 	struct PINT_decoded_msg decoded;
-	int max_msg_sz = 0;
+	int max_msg_sz = 0, num_data_servers = 0;
 	//PVFS_servreq_getattr req_args;
 
 	/* Let's check if size is to be fetched here, If so

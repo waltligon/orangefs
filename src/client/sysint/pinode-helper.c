@@ -139,8 +139,8 @@ pinode_alloc_failure:
 int phelper_refresh_pinode(int flags,PVFS_bitfield mask,pinode *pinode_ptr,\
 		pinode_reference pref, PVFS_credentials credentials)
 {
-	struct PVFS_server_req_s *req_p;
-	struct PVFS_server_resp_s *ack_p;
+	struct PVFS_server_req_s *req_job;
+	struct PVFS_server_resp_s *ack_job;
 	/*PVFS_servreq_getattr req_gattr;*/
 	int ret = 0,tflags = 0;
 	bmi_addr_t serv_addr;
@@ -157,8 +157,8 @@ int phelper_refresh_pinode(int flags,PVFS_bitfield mask,pinode *pinode_ptr,\
 	{
 		return(-1);
 	}
-	req_gattr.handle = pref.handle;
-	req_gattr.fs_id = pref.fs_id;
+	//req_gattr.handle = pref.handle;
+	//req_gattr.fs_id = pref.fs_id;
 	/* Should be based on flag/attrmask */
 	/*req_gattr->attrmask = ATTR_UID + ATTR_GID + ATTR_PERM + ATTR_ATIME +\
 		ATTR_CTIME + ATTR_MTIME + ATTR_META + ATTR_DATA + ATTR_DIR +\
