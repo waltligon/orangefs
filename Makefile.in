@@ -753,9 +753,9 @@ statecomp: src/common/statecomp/statecomp
 
 # rule for generating cscope information
 cscope:
-	find $(srcdir) -iname "*.[ch]" -o -iname "*.sm" \
+	find @SRC_ABSOLUTE_TOP@ -iname "*.[ch]" -o -iname "*.sm" \
 		 > $(srcdir)/cscope.files
-	( cd $(srcdir); cscope -be -i $(srcdir)/cscope.files )
+	( cd @SRC_ABSOLUTE_TOP@; cscope -be -i @SRC_ABSOLUTE_TOP@/cscope.files )
 
 # build editor tags file over all source files *.[ch] *.sm and
 # some known scripts
