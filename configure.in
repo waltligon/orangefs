@@ -51,6 +51,24 @@ AC_MSG_CHECKING(whether version of Berkeley DB is new enough)
  or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm))
 	)
 
+AC_MSG_CHECKING(for txnid parameter to DB open function)
+AC_TRY_COMPILE([
+#include <db.h>
+], [
+int ret;
+DB *db;
+DB_TXN *txnid;
+char *file;
+char *database;
+DBTYPE type;
+u_int32_t flags;
+int mode;
+
+ret = db->open(db, txnid, file, database, type, flags, mode);
+], AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_OPEN, 1,
+Define if DB open function takes a txnid parameter),
+AC_MSG_RESULT(no))
 dnl output final version of top level makefile and subdirectory
 dnl    makefile includes
 AC_OUTPUT(Makefile
