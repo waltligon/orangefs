@@ -210,6 +210,18 @@ struct PINT_client_io_sm
 
     int retry_count;
     int stored_error_code;
+
+    PVFS_size total_size;
+
+    /*
+      only used when we need to zero fill beyond the end of the
+      physical file size
+    */
+    PVFS_size size;
+    PVFS_size *size_array;
+    int continue_analysis;
+    PVFS_error saved_ret;
+    PVFS_error saved_error_code;
 };
 
 struct PINT_client_flush_sm

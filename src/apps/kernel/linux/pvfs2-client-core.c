@@ -975,12 +975,14 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 
     /* make the full-blown readahead sized request */
     ret = PVFS_Request_contiguous(
-        vfs_request->in_upcall.req.io.readahead_size,
+        (int32_t)vfs_request->in_upcall.req.io.readahead_size,
         PVFS_BYTE, &vfs_request->mem_req);
-
     assert(ret == 0);
 
-    vfs_request->file_req = PVFS_BYTE;
+    ret = PVFS_Request_contiguous(
+        (int32_t)vfs_request->in_upcall.req.io.readahead_size,
+        PVFS_BYTE, &vfs_request->file_req);
+    assert(ret == 0);
 
     ret = PVFS_isys_io(
         vfs_request->in_upcall.req.io.refn, vfs_request->file_req, 0,
@@ -1106,7 +1108,10 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         &s_io_desc, vfs_request->in_upcall.req.io.buf_index);
     assert(vfs_request->io_kernel_mapped_buf);
 
-    vfs_request->file_req = PVFS_BYTE;
+    ret = PVFS_Request_contiguous(
+        (int32_t)vfs_request->in_upcall.req.io.count,
+        PVFS_BYTE, &vfs_request->file_req);
+    assert(ret == 0);
 
     ret = PVFS_isys_io(
         vfs_request->in_upcall.req.io.refn, vfs_request->file_req,
