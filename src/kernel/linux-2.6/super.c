@@ -170,35 +170,32 @@ static int pvfs2_statfs(
         buf->f_bavail = (sector_t)
             new_op->downcall.resp.statfs.blocks_avail;
 
-        /*
-          for f_files and f_ffree, it appears that 'df' is not happy
-          if the value assigned is larger than the maximum size of a
-          long, so if we have a larger value, truncate it to max_long.
-         */
-        if ((new_op->downcall.resp.statfs.files_total < 0) ||
-            (new_op->downcall.resp.statfs.files_total > max_long))
+        pvfs2_print("sizeof(kstatfs)=%d\n",sizeof(struct kstatfs));
+        pvfs2_print("sizeof(buf)=%d\n",sizeof(*buf));
+        pvfs2_print("sizeof(sector_t)=%d\n",sizeof(sector_t));
+
+        if ((sizeof(*buf) != sizeof(struct kstatfs)) &&
+            (sizeof(buf->f_blocks) == 4))
         {
+            /*
+              we need to truncate the value to be the max long value
+              because the kernel will return an overflow if it's
+              larger otherwise.  see vfs_statfs_native in open.c for
+              the actual overflow checks made.
+            */
             buf->f_files = (sector_t)max_long;
+            buf->f_ffree = (sector_t)max_long;
         }
         else
         {
             buf->f_files = (sector_t)
                 new_op->downcall.resp.statfs.files_total;
-        }
-
-        if ((new_op->downcall.resp.statfs.files_avail < 0) ||
-            (new_op->downcall.resp.statfs.files_avail > max_long))
-        {
-            buf->f_ffree = (sector_t)max_long;
-        }
-        else
-        {
             buf->f_ffree = (sector_t)
                 new_op->downcall.resp.statfs.files_avail;
         }
 
-        pvfs2_print("pvfs2_statfs got %lu files total | %lu files_avail\n",
-                    buf->f_files, buf->f_ffree);
+        pvfs2_print("pvfs2_statfs got %lu files total | "
+                    "%lu files_avail\n", buf->f_files, buf->f_ffree);
 
         ret = new_op->downcall.status;
     }
