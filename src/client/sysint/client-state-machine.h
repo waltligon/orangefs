@@ -150,6 +150,7 @@ struct PINT_client_io_sm {
     /* cached from object attributes */
     int                   datafile_count;
     PVFS_handle          *datafile_handles;
+    int			 *datafile_index_array;
     PVFS_Dist            *dist_p;
     uint32_t              dist_size;
 

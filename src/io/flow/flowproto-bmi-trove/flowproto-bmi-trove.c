@@ -2408,6 +2408,9 @@ static void bmi_completion_bmi_to_trove(bmi_error_code_t error_code,
     if (actual_size != flow_data->bmi_total_size)
     {
 	/* TODO: handle this */
+	gossip_err("actual_size: %Ld\n", (long long)actual_size);
+	gossip_err("flow_data->bmi_total_size: %Ld\n", (long long)flow_data->bmi_total_size);
+	gossip_err("server number: %d\n", flow_d->file_data.iod_num);
 	gossip_lerr("Error: unimplemented condition encountered.\n");
 	exit(-1);
 	return;

@@ -57,6 +57,7 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
 				    PVFS_handle *input_handle_array,
 				    int input_handle_count,
 				    PVFS_handle *output_handle_array, 
+				    int *handle_index_array,
 				    int *handle_count_out_p);
 
 %%
@@ -432,6 +433,11 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     if (target_datafile_array == NULL) {
 	assert(0);
     }
+    iosm_p->datafile_index_array = (int*)malloc(iosm_p->datafile_count *
+	sizeof(int));
+    if(iosm_p->datafile_index_array == NULL) {
+	assert(0);
+    }
 
     ret = io_find_target_datafiles(iosm_p->mem_req,
 				   iosm_p->file_req,
@@ -440,6 +446,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 				   iosm_p->datafile_handles,
 				   iosm_p->datafile_count,
 				   target_datafile_array,
+				   iosm_p->datafile_index_array,
 				   &target_datafile_count);
     if (ret != 0) {
 	assert(0);
@@ -846,7 +853,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    /* TODO: MACRO TO FILL THIS IN? */
 	    fl_p->file_data.fsize     = resp_p->u.io.bstream_size;
 	    fl_p->file_data.dist      = iosm_p->dist_p;
-	    fl_p->file_data.iod_num   = recv_match;
+	    fl_p->file_data.iod_num   = iosm_p->datafile_index_array[recv_match];
 	    fl_p->file_data.iod_count = iosm_p->datafile_count;
 
 	    /* this is the file datatype */
@@ -1199,6 +1206,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     free(sm_p->u.io.flow_status_array);
     free(sm_p->u.io.session_tag_array);
     free(sm_p->u.io.ackarray);
+    free(sm_p->u.io.datafile_index_array);
 
     /* return size, error, and set operation as complete */
     sm_p->u.io.io_resp_p->total_completed = total_size;
@@ -1228,6 +1236,7 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
 				    PVFS_handle *input_handle_array,
 				    int input_handle_count,
 				    PVFS_handle *output_handle_array, 
+				    int* handle_index_array,
 				    int *handle_count_out_p)
 {
     int i, ret;
@@ -1303,6 +1312,7 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
 			 i);
 
 	    output_handle_array[*handle_count_out_p] = input_handle_array[i]; 
+	    handle_index_array[*handle_count_out_p] = i;
 	    (*handle_count_out_p)++;
 	}
     }

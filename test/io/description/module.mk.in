@@ -21,5 +21,6 @@ TESTSRC += \
 	$(DIR)/test-encode-twice-in.c\
 	$(DIR)/test-romio-noncontig-pattern.c\
 	$(DIR)/test-romio-noncontig-pattern2.c\
-	$(DIR)/test-truncate.c
+	$(DIR)/test-truncate.c \
+	$(DIR)/test-many-datafiles-import.c
 #	$(DIR)/test-req1.c\
