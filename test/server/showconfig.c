@@ -20,6 +20,7 @@ int main(int argc, char **argv)
     struct server_configuration_s serverconfig;
     struct host_alias_s *cur_alias;
     struct filesystem_configuration_s *cur_fs = NULL;
+    int alias_count = 1;
 
     if (argc != 3)
     {
@@ -39,26 +40,24 @@ int main(int argc, char **argv)
     /* dump all gathered config values */
     fprintf(stderr,"--- Printing filesystem configuration\n\n");
 
-    fprintf(stderr,"server id                : %s\n",
+    fprintf(stderr,"Server ID                : %s\n",
             serverconfig.host_id);
-    fprintf(stderr,"storage space            : %s\n",
+    fprintf(stderr,"Storage Space            : %s\n",
             serverconfig.storage_path);
-    fprintf(stderr,"fs config file name      : %s\n",
-            serverconfig.fs_config_filename);
-    fprintf(stderr,"fs config file length    : %d\n",
+    fprintf(stderr,"FS Config File Name      : %s (%d bytes)\n",
+            serverconfig.fs_config_filename,
             (int)serverconfig.fs_config_buflen);
-    fprintf(stderr,"server config file name  : %s\n",
-            serverconfig.server_config_filename);
-    fprintf(stderr,"server config file length: %d\n",
+    fprintf(stderr,"Server Config File Name  : %s (%d bytes)\n",
+            serverconfig.server_config_filename,
             (int)serverconfig.server_config_buflen);
-    fprintf(stderr,"initial unexp requests   : %d\n",
+    fprintf(stderr,"Initial Unexp Requests   : %d\n",
             serverconfig.initial_unexpected_requests);
-    fprintf(stderr,"configured log file      : %s\n",
+    fprintf(stderr,"Configured Log File      : %s\n",
             serverconfig.logfile);
-    fprintf(stderr,"event logging mask string: %s\n",
+    fprintf(stderr,"Event Logging Mask String: %s\n",
             serverconfig.event_logging);
 
-    fprintf(stderr,"\n--- Host Aliases:\n");
+    fprintf(stderr,"\n--- Host Aliases (alias => address):\n");
     cur = serverconfig.host_aliases;
     while(cur)
     {
@@ -68,12 +67,12 @@ int main(int argc, char **argv)
             break;
         }
 
-        fprintf(stderr,"  %s maps to %s\n",
-                cur_alias->host_alias,
-                cur_alias->bmi_address);
+        fprintf(stderr,"%.2d)  %s => %s\n", alias_count++,
+                cur_alias->host_alias, cur_alias->bmi_address);
         cur = PINT_llist_next(cur);
     }
 
+    fprintf(stderr,"\n");
     cur = serverconfig.file_systems;
     while(cur)
     {
@@ -109,11 +108,37 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
 
     if (fs)
     {
-        fprintf(stderr,"File system name: %s\n",fs->file_system_name);
-        fprintf(stderr,"FS Collection ID: %d\n",fs->coll_id);
-        fprintf(stderr,"FS Root Handle  : %Lu\n",Lu(fs->root_handle));
+        fprintf(stderr,"=========== Reporting FS \"%s\" Information "
+                "===========\n",fs->file_system_name);
+        fprintf(stderr,"Collection ID         : %d\n",fs->coll_id);
+        fprintf(stderr,"Root Handle           : %Lu\n",
+                Lu(fs->root_handle));
+        fprintf(stderr,"Handle Recycle Timeout: %d seconds\n",
+                (int)fs->handle_recycle_timeout_sec.tv_sec);
+        fprintf(stderr,"Trove Sync Mode       : %s\n",
+                ((fs->trove_sync_mode == TROVE_SYNC) ?
+                 "sync" : "nosync"));
+        fprintf(stderr,"Flow Protocol         : ");
+        switch(fs->flowproto)
+        {
+            case FLOWPROTO_BMI_TROVE:
+                fprintf(stderr,"flowproto_bmi_trove\n");
+                        break;
+            case FLOWPROTO_DUMP_OFFSETS:
+                fprintf(stderr,"flowproto_dump_offsets\n");
+                        break;
+            case FLOWPROTO_BMI_CACHE:
+                fprintf(stderr,"flowproto_bmi_cache\n");
+                        break;
+            case FLOWPROTO_MULTIQUEUE:
+                fprintf(stderr,"flowproto_multiqueue\n");
+                        break;
+            default:
+                fprintf(stderr,"Unknown (<== ERROR!)\n");
+                break;
+        }
 
-        fprintf(stderr,"\t--- Meta Server(s) for %s (%d total):\n",
+        fprintf(stderr,"\n  --- Meta Server(s) for %s (%d total):\n",
                 fs->file_system_name,PINT_llist_count(fs->meta_handle_ranges));
         cur = fs->meta_handle_ranges;
         while(cur)
@@ -123,12 +148,12 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
             {
                 break;
             }
-            fprintf(stderr,"\t  %s\n",
+            fprintf(stderr,"    %s\n",
                     cur_h_mapping->alias_mapping->host_alias);
             cur = PINT_llist_next(cur);
         }
 
-        fprintf(stderr,"\t--- Data Server(s) for %s (%d total):\n",
+        fprintf(stderr,"\n  --- Data Server(s) for %s (%d total):\n",
                 fs->file_system_name,PINT_llist_count(fs->data_handle_ranges));
         cur = fs->data_handle_ranges;
         while(cur)
@@ -138,12 +163,12 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
             {
                 break;
             }
-            fprintf(stderr,"\t  %s\n",
+            fprintf(stderr,"    %s\n",
                     cur_h_mapping->alias_mapping->host_alias);
             cur = PINT_llist_next(cur);
         }
 
-        fprintf(stderr,"\t--- Meta Handle Mappings for %s:\n",
+        fprintf(stderr,"\n  --- Meta Handle Mappings for %s:\n",
                 fs->file_system_name);
         cur = fs->meta_handle_ranges;
         while(cur)
@@ -153,13 +178,13 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
             {
                 break;
             }
-            fprintf(stderr,"\t  %s has handle range %s\n",
+            fprintf(stderr,"    %s has handle range %s\n",
                     cur_h_mapping->alias_mapping->host_alias,
                     cur_h_mapping->handle_range);
             cur = PINT_llist_next(cur);
         }
 
-        fprintf(stderr,"\t--- Data Handle Mappings for %s:\n",
+        fprintf(stderr,"\n  --- Data Handle Mappings for %s:\n",
                 fs->file_system_name);
         cur = fs->data_handle_ranges;
         while(cur)
@@ -169,7 +194,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
             {
                 break;
             }
-            fprintf(stderr,"\t  %s has handle range %s\n",
+            fprintf(stderr,"    %s has handle range %s\n",
                     cur_h_mapping->alias_mapping->host_alias,
                     cur_h_mapping->handle_range);
             cur = PINT_llist_next(cur);
