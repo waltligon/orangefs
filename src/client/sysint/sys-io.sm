@@ -434,8 +434,8 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     }
 
     gossip_debug(GOSSIP_IO_DEBUG,
-                 "  datafile_setup_msgpairs: %d datafiles "
-                 "might have data\n", target_datafile_count);
+                 "  %s: %d datafiles "
+                 "might have data\n", __func__, target_datafile_count);
 
     sm_p->u.io.contexts = (PINT_client_io_ctx *)malloc(
         (target_datafile_count * sizeof(PINT_client_io_ctx)));
@@ -775,8 +775,8 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
     int matched_send_or_recv = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io state: "
-                 "(%p) datafile_complete_operations "
-                 "(got user tag %lu)\n", sm_p, status_user_tag);
+                 "(%p) %s "
+                 "(got user tag %lu)\n", sm_p, __func__, status_user_tag);
 
     if (js_p->error_code)
     {
@@ -1644,9 +1644,9 @@ static int io_find_target_datafiles(
 
             handle_index_array[(*handle_index_out_count)++] = i;
 
-            gossip_debug(GOSSIP_IO_DEBUG, "io_find_target_dfiles: "
+            gossip_debug(GOSSIP_IO_DEBUG, "%s: "
                          "datafile %d might have some data (out_count "
-                         "is %d).\n", i, *handle_index_out_count);
+                         "is %d).\n", __func__, i, *handle_index_out_count);
         }
     }
     PINT_Free_request_state(req_state);
