@@ -207,51 +207,20 @@ struct PVFS_servresp_getconfig
     uint32_t server_config_buf_size;
 };
 
-/* allocate */
-struct PVFS_servreq_allocate
-{
+/* truncate ****************************************************/
+/* - resizes an existing datafile */
 
-};
-
-struct PVFS_servresp_allocate
-{
-
-};
-
-/* truncate */
 struct PVFS_servreq_truncate
 {
-    PVFS_handle handle;
-    PVFS_fs_id fs_id;
-    PVFS_size size;
+    PVFS_handle handle;		    /* handle of obj to resize */
+    PVFS_fs_id fs_id;		    /* file system */
+    PVFS_size size;		    /* new size */
 };
 
-struct PVFS_servresp_truncate
-{
+/* NOTE: no response structure; all necessary response info is 
+ * returned in generic server response structure
+ */
 
-};
-
-/* extension */
-struct PVFS_servreq_extension
-{
-    /* ??? */
-};
-
-struct PVFS_servresp_extension
-{
-    /* ??? */
-};
-
-/* seteattr */
-struct PVFS_servreq_seteattr
-{
-    /* ??? */
-};
-
-struct PVFS_servresp_seteattr
-{
-    /* ??? */
-};
 
 /* supported I/O operation types */
 enum PVFS_servreq_io_type
@@ -306,14 +275,11 @@ struct PVFS_server_req
 	struct PVFS_servreq_setattr setattr;
 	struct PVFS_servreq_mkdir mkdir;
 	struct PVFS_servreq_readdir readdir;
-	struct PVFS_servreq_seteattr seteattr;
 	struct PVFS_servreq_lookup_path lookup_path;
 	struct PVFS_servreq_createdirent crdirent;
 	struct PVFS_servreq_getconfig getconfig;
 	struct PVFS_servreq_rmdirent rmdirent;
-	struct PVFS_servreq_allocate allocate;
 	struct PVFS_servreq_truncate truncate;
-	struct PVFS_servreq_extension extension;
     }
     u;
 };
@@ -329,13 +295,9 @@ struct PVFS_server_resp
 	struct PVFS_servresp_getattr getattr;
 	struct PVFS_servresp_mkdir mkdir;
 	struct PVFS_servresp_readdir readdir;
-	struct PVFS_servresp_seteattr seteattr;
 	struct PVFS_servresp_lookup_path lookup_path;
 	struct PVFS_servresp_rmdirent rmdirent;
 	struct PVFS_servresp_getconfig getconfig;
-	struct PVFS_servresp_allocate allocate;
-	struct PVFS_servresp_truncate truncate;
-	struct PVFS_servresp_extension extension;
 	struct PVFS_servresp_io io;
 	struct PVFS_servresp_write_completion write_completion;
     }
