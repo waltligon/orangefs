@@ -26,9 +26,10 @@ CFLAGS +=\
  -D__STATIC_METHOD_BMI_TCP__\
  -D__STATIC_FLOWPROTO_TEMPLATE__\
  -D__STATIC_FLOWPROTO_BMI_TROVE__\
+ -DUSE_BMI_MSGS=1\
+ -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE\
  -Wconversion -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include\
- -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE \
- -DUSE_BMI_MSGS=1
+ -I src/common/statecomp
 LDFLAGS += -L lib
 LIBS += -lpvfs2
 # here we differentiate cflags between some components
