@@ -175,12 +175,17 @@ int PVFS_sys_mkdir(
     sm_p->u.mkdir.sys_attr = &attr;
     sm_p->u.mkdir.mkdir_resp = resp;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s under "
-                 "parent handle %Lu on fs %d\n", object_name,
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s "
+                 "under parent handle %Lu on fs %d\n", object_name,
                  Lu(parent_refn.handle), parent_refn.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_MKDIR);
-    assert(ret == 0);
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+        free(sm_p);
+        return ret;
+    }
 
     while (!sm_p->op_complete && (ret == 0))
     {
@@ -188,7 +193,13 @@ int PVFS_sys_mkdir(
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-    assert(ret == 0);
+
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+	free(sm_p);
+	return(ret);
+    }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir completed\n");
 

@@ -271,7 +271,6 @@ int PVFS_sys_remove(char *object_name,
     {
         return -PVFS_ENOMEM;
     }
-
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
@@ -287,6 +286,12 @@ int PVFS_sys_remove(char *object_name,
                  "PINT_client_state_machine_post()\n");
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_REMOVE);
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+        free(sm_p);
+        return ret;
+    }
 
     while (!sm_p->op_complete && (ret == 0))
     {
@@ -294,11 +299,16 @@ int PVFS_sys_remove(char *object_name,
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-    assert(ret == 0);
+
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+	free(sm_p);
+	return(ret);
+    }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove completed\n");
 
-    /* save our return value */
     error = (sm_p->u.remove.stored_error_code ?
              sm_p->u.remove.stored_error_code :
              sm_p->error_code);

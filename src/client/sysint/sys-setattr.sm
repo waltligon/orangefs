@@ -140,7 +140,12 @@ int PVFS_sys_setattr(
                  pinode_refn.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_SETATTR);
-    assert(ret == 0);
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+        free(sm_p);
+        return ret;
+    }
 
     while (!sm_p->op_complete && (ret == 0))
     {
@@ -148,7 +153,13 @@ int PVFS_sys_setattr(
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-    assert(ret == 0);
+
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+	free(sm_p);
+	return(ret);
+    }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr completed\n");
 

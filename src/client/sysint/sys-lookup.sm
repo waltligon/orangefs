@@ -473,13 +473,26 @@ int PVFS_sys_ref_lookup(
     }
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_LOOKUP);
-    assert(ret == 0);
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+        free(sm_p);
+        return ret;
+    }
 
     while (!sm_p->op_complete && (ret == 0))
     {
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_lookup calling "
+                     "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-    assert(ret == 0);
+
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+	free(sm_p);
+	return(ret);
+    }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup completed\n");
 

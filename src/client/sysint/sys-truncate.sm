@@ -116,13 +116,26 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_ref,
     sm_p->u.truncate.size = size;
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_TRUNCATE);
-    assert(ret == 0);
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+        free(sm_p);
+        return ret;
+    }
 
     while (!sm_p->op_complete && (ret == 0))
     {
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_truncate calling "
+                     "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-    assert(ret == 0);
+
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+	free(sm_p);
+	return(ret);
+    }
 
     error = sm_p->error_code;
 

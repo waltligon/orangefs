@@ -171,7 +171,6 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
     {
         return -PVFS_ENOMEM;
     }
-
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->error_code = 0;
@@ -181,12 +180,26 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
     sm_p->u.getattr.getattr_resp_p = resp_p;
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_GETATTR);
-
-    while (!sm_p->op_complete && ret == 0)
+    if (ret)
     {
+	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+        free(sm_p);
+        return ret;
+    }
+
+    while (!sm_p->op_complete && (ret == 0))
+    {
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_getattr calling "
+                     "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-    assert(ret == 0);
+
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+	free(sm_p);
+	return(ret);
+    }
 
     error = sm_p->error_code;
 

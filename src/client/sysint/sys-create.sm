@@ -281,18 +281,24 @@ int PVFS_sys_create(
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_CREATE);
     if (ret)
     {
+	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
         free(sm_p);
         return ret;
     }
 
-    while (!sm_p->op_complete && ret == 0)
+    while (!sm_p->op_complete && (ret == 0))
     {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create calling "
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
 
-    assert(ret == 0);
+    if (ret)
+    {
+	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+	free(sm_p);
+	return(ret);
+    }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create completed\n");
 
