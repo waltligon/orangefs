@@ -16,6 +16,9 @@
 /* The number of bytes in a void *.  */
 #undef SIZEOF_VOID_P
 
+/* The detected width of a long.  */
+#undef SIZEOF_LONG
+
 /* Define if you have the strnlen function.  */
 #undef HAVE_STRNLEN
 

@@ -80,6 +80,8 @@ AC_C_BIGENDIAN
 
 dnl Check size of pointer type; needed by id-generator
 AC_CHECK_SIZEOF(void *)
+dnl needed by pvfs2-types.h
+AC_CHECK_SIZEOF(long)
 
 dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
