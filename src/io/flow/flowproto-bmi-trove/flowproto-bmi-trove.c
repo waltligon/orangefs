@@ -1421,7 +1421,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 		&flow_data->dup_req_offset,
 		&flow_data->bmi_total_size,
 		&eof_flag,
-		PINT_CKSZ2);
+		PINT_CKSIZE_MODIFY_OFFSET);
 	    if (ret < 0)
 	    {
 		/* TODO: do something */
