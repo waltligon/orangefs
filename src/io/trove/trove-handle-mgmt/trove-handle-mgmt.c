@@ -56,7 +56,6 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
     TROVE_ds_state state = 0;
     TROVE_ds_position pos = TROVE_ITERATE_START;
     static TROVE_handle handles[MAX_NUM_VERIFY_HANDLE_COUNT] = {0};
-    TROVE_handle foo;
 
     if (extent_list && ledger)
     {
