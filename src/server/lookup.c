@@ -127,6 +127,9 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
     int memory_sz;
     int key_a_sz,val_a_sz,key_a0_sz,val_a0_sz,handle_array_sz,attr_array_sz;
 
+    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+
     /* s_op->key_a */
     key_a_sz = 3*sizeof(PVFS_ds_keyval_s);  
 
@@ -186,7 +189,6 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
     s_op->resp->u.lookup_path.attr_array = (PVFS_object_attr *) big_memory_buffer;
 
     /* We are done calculating pointers.  Check to make sure we are correct in pointer arith */
-    gossip_debug(SERVER_DEBUG,"%d - %d\n",big_memory_buffer+attr_array_sz-memory_sz,s_op->key_a);
     assert(big_memory_buffer+attr_array_sz-memory_sz == s_op->key_a);
 
     /* Set up the right sizes that I allocated */
