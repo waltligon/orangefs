@@ -30,6 +30,8 @@ general server functionality:
   cleanly
 - try out existing failover solutions w/ pvfs2 (need to acquire
   some hardware first)
+- maybe add temporary check in config parser and genconfig to make sure that
+  people don't try to create mult-metaserver file systems
 
 request scheduler:
 ====================================================================
@@ -150,6 +152,7 @@ documentation:
 
 code cleanup:
 ====================================================================
+- put in header file wrappers to make them work with c++
 - rename all gossip masks to GOSSIP_xxx
 - audit code to make sure that all error paths are handled when
   assertions are turned off

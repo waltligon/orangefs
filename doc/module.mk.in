@@ -4,3 +4,6 @@ DOCSRC +=\
 	$(DIR)/pvfs2-guide.tex \
 	$(DIR)/pvfs2-status.tex
 
+# some extra dependency information
+doc/pvfs2-guide.pdf: doc/terms.tex doc/intro.tex doc/basics.tex doc/code-tree.tex doc/io-api-terms.tex
+doc/pvfs2-guide.ps: doc/terms.tex doc/intro.tex doc/basics.tex doc/code-tree.tex doc/io-api-terms.tex

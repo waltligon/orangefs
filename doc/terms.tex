@@ -1,7 +1,106 @@
 \section{PVFS2 terminology}
 
+PVFS2 is based on a somewhat unconventional design in order to achieve 
+high performance, scalability, and modularity.  As a result, we have 
+introduced some new concepts and terminology to aid in describing and
+administering the system.  This section describes the most important
+of these concepts from a high level.
+
 \subsection{File system components}
 
-\subsection{Concepts}
+We will start by defining the major system components from an administrator
+or user's perspective.  A PVFS2 file system may consist of the following
+pieces (some are optional): the pvfs2-server, system interface, management
+interface, Linux kernel driver, pvfs2-client, and ROMIO PVFS2 device.
 
-\subsection{Miscellaneous}
+The \texttt{pvfs2-server} is the server daemon component of the file
+system.  It runs completely in user space.  There may be many instances
+of pvfs2-server running on many different machines.  Each instance may
+act as either a metadata server, an I/O server, or both at once.
+I/O servers store the actual data associated with each file, typically
+striped across multiple servers in round-robin fashion.  Metadata servers
+store meta information about files, such as permissions, time stamps,
+and distribution parameters.  Metadata servers also store the directory
+hierarchy.
+
+Initial PVFS2 releases will only support one metadata server per file system,
+but this restriction will be released in the future.
+
+The \texttt{system interface} is the lowest level user space API that 
+provides access to the PVFS2 file system.  It is not really intended to
+be an end user API; application developers are instead encouraged to use
+MPI-IO as their first choice, or standard Unix calls for legacy applications.
+We will document the system interface here, however, because it is the
+building block for all other client interfaces and is thus referred to
+quite often.  It is implemented as a single library, called libpvfs2.  
+The system interface API does not map directly to POSIX functions.  In 
+particular, it is a stateless API that has no concept of open(), close(),
+or file descriptors.  This API does, however, abstract the task of 
+communicating with many servers concurrently.
+
+The \texttt{management interface} is similar in implementation to the system
+interface.  It is a supplemental API that adds functionality that is normally
+not exposed to any file system users.  This functionality is
+intended for use by administrators, and for applications such as fsck or 
+performance monitoring which require low level file system information.
+
+The \texttt{Linux kernel driver} is a module that can be loaded into an
+unmodified Linux kernel in order to provide VFS support for PVFS2.  Currently
+this is only implemented for the 2.6 series of kernels.  This is the component
+that allows standard Unix applications (including utilities like \texttt{ls}
+and \texttt{cp}) to work on PVFS2.  The kernel driver also requires the
+use of a user-space helper application called \texttt{pvfs2-client}.
+
+\texttt{pvfs2-client} is a user-space daemon that handles communication between
+PVFS2 servers and the kernel driver.  Its primary role is to convert VFS
+operations into \texttt{system interface} operations.  One pvfs2-client must
+be run on each client that wishes to access the file system through the VFS
+interface.
+
+The \texttt{ROMIO PVFS2 device} is a component of the ROMIO MPI-IO
+implementation (distributed separately) that provides MPI-IO support
+for PVFS2.  ROMIO is included by default with the MPICH MPI implementation
+and includes drivers for several file systems.  See 
+http://www.mcs.anl.gov/romio/ for details.
+
+\subsection{Handles}
+
+\texttt{Handles} are unique, opaque, integer-like identifiers for every
+object stored on a PVFS2 file system.  Every file, directory, and 
+symbolic link has a handle.  In addition, several underlying objects
+that cannot be directly manipulated by users are represented with 
+handles.  This provides a concise, non path dependent mechanism for
+specifying what object to operate on when clients and servers 
+communicate.  Servers automatically generate new handles when file 
+system objects are created; the user does not typically manipulate them
+directly.
+
+The allowable range of values that handles may assume is known as the 
+\texttt{handle space}.
+
+\subsection{Handle ranges}
+
+Handles are essentially very large integers.  This means that we can
+conveniently partition the handle space into subsets by simply specifying
+ranges of handle values.  \texttt{Handle ranges} are just that; groups
+of handles that are described by the range of values that they may
+include.
+
+In order to partition the handle space among N servers, we divide the
+handle space up into N handle ranges, and delegate control of each range
+to a different server.  The file system configuration files provide
+a mechanism for mapping handle ranges to particular server hosts.
+Clients only interact with handle ranges; the mapping of ranges to
+servers is hidden beneath an abstraction layer. This allows for greater
+flexibility and future features like transparent migration.
+
+\subsection{File system IDs}
+
+Every PVFS2 file system hosted by a particular server has a unique
+identifier known as a \texttt{file system ID} or \texttt{fs id}.  The file
+system ID must be set at file system creation time by administrative tools
+so that they are synchronized across all servers for a given file system.
+File systems also have symbolic names that can be resolved into an fs id
+by servers in order to produce more readable configuration files.
+
+File system IDs are also occasionally referred to as collection IDs.
