@@ -204,6 +204,9 @@ static int pvfs2_unlink(
     int ret = -ENOENT;
     struct inode *inode = dentry->d_inode;
 
+    pvfs2_print("pvfs2_unlink: pvfs2_unlink called on %s\n",
+                dentry->d_name.name);
+
     ret = pvfs2_remove_entry(dir, dentry);
     if (ret == 0)
     {

@@ -785,10 +785,10 @@ int pvfs2_remove_entry(
     pvfs2_inode_t *parent = PVFS2_I(dir);
     struct inode *inode = dentry->d_inode;
 
-    if (inode && parent)
+    if (inode && parent && dentry)
     {
-	pvfs2_print("pvfs2: pvfs2_remove_entry on inode %d: "
-                    "Parent is %Lu | fs_id %d\n",
+	pvfs2_print("pvfs2: pvfs2_remove_entry on %s (inode %d): "
+                    "Parent is %Lu | fs_id %d\n", dentry->d_name.name,
                     (int)inode->i_ino, parent->refn.handle,
                     parent->refn.fs_id);
 	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
