@@ -12,9 +12,39 @@ pvfs2-0.5.1pre1
 - disable TCP method for IB builds
 - added pvfs2-cp, which should have all of the functionaly of pvfs2-import 
   and pvfs2-export, but none of the bugs (!)
-- bug fix to idle detection logic in job.c (non-threaded case)
+- bug fixed to idle detection logic in job.c (non-threaded case)
 - some tweaks to BMI timeout behavior
-- removal of some depricated BMI code
+- removal of some deprecated BMI code
+- bug fixed that caused problem when trying to add an invalid mount entry
+- bug fixed when trying to add general dynamic mount entries
+- distribution framework cleanups
+- updated test programs and pts test harness to use new distribution code
+- bug fixed that allows i/o attempts on non-datafiles to be handled
+- bug fixed that caused breakage on the verbose debugging mask
+- implemented non-blocking client library calls for all sysint and
+  most mgmt operations
+- changed all credential arguments to credential references
+- export id-generator methods for sysint users
+- removed pvfs2-threaded-client-core application from code base
+- added pvfs2-mkdir program
+- added pvfs2-cp program (soon to replace both pvfs2-import & pvfs2-export)
+- added a GPL license notice in the top level files for the kernel module
+- moved cached configuration information our of the configuration object
+- allow server setattr operations to be performed even if write access on
+  the object being modified is not granted (fixes utime failures and misc
+  other permission problems like untarring some files)
+- kernel bugfixes:
+  - fixed an oops on cancelled object operations (file,dir,symlink)
+  - fixed kernel error codes in several places
+  - fixed a memory leak that didn't free symlink targets
+  - replaced new_inode call with iget to avoid the possibility of
+    duplicate inodes with the same number in the vfs
+  - fixed kernel create mode translation when creating new objects
+- kernel 2.4.x. support introduced (supports 2.4.19 and up)
+- updated quickstart with the following information:
+  - gcc 2.96 or above is required (as gcc 2.95 generates buggy code)
+  - how to use the kernel interface under 2.4.19 or above
+- misc cleanups, error handling, and debugging
 
 
 pvfs2-0.5.0
