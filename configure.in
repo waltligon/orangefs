@@ -26,6 +26,11 @@ AC_CHECK_PROG(HAVE_FIND, find, yes, no)
 AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
+AC_ARG_WITH(efence,
+[  --with-efence                  Use electric fence for malloc debugging.],
+AC_CHECK_LIB(efence,malloc)
+)
+
 dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
 dnl    freeing with the mtrace tool
