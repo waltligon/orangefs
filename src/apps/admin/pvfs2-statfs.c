@@ -42,7 +42,6 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     const PVFS_util_tab* tab; 
     struct options *user_opts = NULL;
-    int mnt_index = -1;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_statfs resp_statfs;
@@ -72,27 +71,6 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* see if the destination resides on any of the file systems
-     * listed in the pvfstab; find the pvfs fs relative path
-     */
-    for(i=0; i<tab->mntent_count; i++)
-    {
-	ret = PVFS_util_remove_dir_prefix(user_opts->mnt_point,
-	    tab->mntent_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
-	if(ret == 0)
-	{
-	    mnt_index = i;
-	    break;
-	}
-    }
-
-    if(mnt_index == -1)
-    {
-	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
-	    user_opts->mnt_point);
-	return(-1);
-    }
-
     memset(&resp_init, 0, sizeof(resp_init));
     ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
     if(ret < 0)
@@ -101,13 +79,13 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    cur_fs = PINT_config_get_fs_id_by_fs_name(
-        PINT_get_server_config_struct(),
-        tab->mntent_array[mnt_index].pvfs_fs_name);
-    if (cur_fs == (PVFS_fs_id)0)
+    /* translate local path into pvfs2 relative path */
+    ret = PVFS_util_resolve(user_opts->mnt_point,
+        &cur_fs, pvfs_path, PVFS_NAME_MAX);
+    if(ret < 0)
     {
-	fprintf(stderr, "Failure: could not get fs configuration "
-                "for %s.\n", tab->mntent_array[mnt_index].pvfs_fs_name);
+	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
+	    user_opts->mnt_point);
 	return(-1);
     }
 

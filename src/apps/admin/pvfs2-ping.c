@@ -43,10 +43,8 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     const PVFS_util_tab* tab;
     struct options* user_opts = NULL;
-    int mnt_index = -1;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_sysresp_init resp_init;
-    int i;
     PVFS_credentials creds;
     PVFS_sysresp_lookup resp_lookup;
 
@@ -60,9 +58,6 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    printf("\n(1) Searching for %s in pvfstab...\n",
-           user_opts->fs_path_real);
-
     tab = PVFS_util_parse_pvfstab(NULL);
     if (!tab)
     {
@@ -71,39 +66,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* see if the destination resides on any of the file systems
-     * listed in the pvfstab; find the pvfs fs relative path
-     */
-    for(i = 0; i < tab->mntent_count; i++)
-    {
-	ret = PVFS_util_remove_dir_prefix(
-            user_opts->fs_path_hack, tab->mntent_array[i].mnt_dir,
-            pvfs_path, PVFS_NAME_MAX);
-	if (ret == 0)
-	{
-	    mnt_index = i;
-	    break;
-	}
-    }
-
-    if (mnt_index == -1)
-    {
-	fprintf(stderr, "Failure: could not find filesystem for %s "
-                "in pvfstab\n", user_opts->fs_path_real);
-	return(-1);
-    }
-    else
-    {
-        printf("    Found matching file system at mnt tab "
-               "entry %d\n", mnt_index);
-    }
-
-    print_mntent(tab->mntent_array, tab->mntent_count);
-
-    creds.uid = getuid();
-    creds.gid = getgid();
-
-    printf("\n(2) Initializing system interface and retrieving "
+    printf("\n(1) Initializing system interface and retrieving "
            "configuration from server...\n");
     memset(&resp_init, 0, sizeof(resp_init));
     ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
@@ -115,15 +78,23 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    cur_fs = PINT_config_get_fs_id_by_fs_name(
-        PINT_get_server_config_struct(),
-        tab->mntent_array[mnt_index].pvfs_fs_name);
-    if (cur_fs == (PVFS_fs_id)0)
+    printf("\n(2) Searching for %s in pvfstab...\n",
+           user_opts->fs_path_real);
+
+    /* translate local path into pvfs2 relative path */
+    ret = PVFS_util_resolve(user_opts->fs_path_hack,
+        &cur_fs, pvfs_path, PVFS_NAME_MAX);
+    if(ret < 0)
     {
-	fprintf(stderr, "Failure: could not get fs configuration "
-                "for %s.\n", tab->mntent_array[mnt_index].pvfs_fs_name);
+	fprintf(stderr, "Failure: could not find filesystem for %s "
+                "in pvfstab\n", user_opts->fs_path_real);
 	return(-1);
     }
+
+    print_mntent(tab->mntent_array, tab->mntent_count);
+
+    creds.uid = getuid();
+    creds.gid = getgid();
 
     /* dump some key parts of the config file */
     ret = print_config(cur_fs);
