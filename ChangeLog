@@ -69,8 +69,6 @@ pvfs2-0.1.2pre1
   operations based on the pvfs2-client-core (called
   pvfs2-threaded-client-core)
 - mostly consolidated credential generation to one place
-- added the ability to dynamically add/remove mount points/file system
-  information to the client sysint
 - modified the kernel mount and initialization to use the dynamic mount
   system, where a server and file system name is specific on the mount
   command line (no more hard coded coll_id and root_handle!)
