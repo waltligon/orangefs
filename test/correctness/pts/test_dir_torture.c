@@ -98,6 +98,8 @@ PVFS_handle create_dir(PVFS_handle parent, PVFS_fs_id fs_id, char *name)
 	req_mkdir.attr.perms = 1877;
 	req_mkdir.attr.objtype = ATTR_DIR;
 	req_mkdir.credentials.perms = 1877;
+	req_mkdir.credentials.uid = 100;
+	req_mkdir.credentials.gid = 100;
 
 	ret = PVFS_sys_mkdir(&req_mkdir,&resp_mkdir);
 	if (ret < 0)

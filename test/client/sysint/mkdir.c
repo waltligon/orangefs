@@ -86,12 +86,15 @@ int main(int argc,char **argv)
 		printf("Error in malloc\n");
 		return(-1);
 	}
+	memset(req_mkdir, 0, sizeof(PVFS_sysreq_mkdir));
+
 	resp_mkdir = (PVFS_sysresp_mkdir *)malloc(sizeof(PVFS_sysresp_mkdir));
 	if (resp_mkdir == NULL)
 	{
 		printf("Error in malloc\n");
 		return(-1);
 	}
+	memset(resp_mkdir, 0, sizeof(PVFS_sysresp_mkdir));
 
 	/* update the pointer to the string that was passed in */
 
@@ -104,6 +107,8 @@ int main(int argc,char **argv)
 	req_mkdir->attr.perms = 1877;
 	req_mkdir->attr.objtype = ATTR_DIR;
 	req_mkdir->credentials.perms = 1877;
+	req_mkdir->credentials.uid = 100;
+	req_mkdir->credentials.gid = 100;
 
 	// call mkdir 
 	ret = PVFS_sys_mkdir(req_mkdir,resp_mkdir);
