@@ -337,7 +337,7 @@ static inline int copy_attributes_from_inode(
 int pvfs2_inode_getattr(
     struct inode *inode)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
@@ -391,8 +391,8 @@ int pvfs2_inode_getattr(
                     pvfs2_inode->refn.fs_id,
                     (int)atomic_read(&inode->i_count));
 
-        service_operation_with_timeout_retry(
-            new_op, "pvfs2_inode_getattr", retries);
+        service_error_exit_op_with_timeout_retry(
+            new_op, "pvfs2_inode_getattr", retries, error_exit);
 
 	/* check what kind of goodies we got */
 	if (new_op->downcall.status > -1)
@@ -408,6 +408,7 @@ int pvfs2_inode_getattr(
         ret = new_op->downcall.status;
 
       error_exit:
+        pvfs2_print(error_exit ? "*** warning: getattr error_exit\n" : "");
 	op_release(new_op);
     }
     return ret;

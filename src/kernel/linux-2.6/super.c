@@ -29,6 +29,7 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
 
+
 static struct inode *pvfs2_alloc_inode(
     struct super_block *sb)
 {
@@ -138,10 +139,10 @@ static int pvfs2_statfs(
 
     if (new_op->downcall.status > -1)
     {
-        pvfs2_print("pvfs2_statfs got %Ld blocks available | "
-                    "%Ld blocks total\n",
-                    Ld(new_op->downcall.resp.statfs.blocks_avail),
-                    Ld(new_op->downcall.resp.statfs.blocks_total));
+        pvfs2_print("pvfs2_statfs got %ld blocks available | "
+                    "%ld blocks total\n",
+                    new_op->downcall.resp.statfs.blocks_avail,
+                    new_op->downcall.resp.statfs.blocks_total);
 
         /*
           re-assign superblock blocksize based on statfs blocksize:
@@ -150,7 +151,6 @@ static int pvfs2_statfs(
           match what we're using as the inode blocksize.  keep an
           eye out to be sure.
         */
-/*         sb->s_blocksize = pvfs_bufmap_size_query(); */
         sb->s_blocksize = new_op->downcall.resp.statfs.block_size;
 
         buf->f_type = sb->s_magic;
@@ -187,8 +187,6 @@ static int pvfs2_remount(
     return 0;
 }
 
-/* static int pvfs2_sync_fs(struct super_block *sb, int wait) */
-
 struct super_operations pvfs2_s_ops = {
     .drop_inode = generic_delete_inode,
     .alloc_inode = pvfs2_alloc_inode,
@@ -198,12 +196,9 @@ struct super_operations pvfs2_s_ops = {
     .put_inode = pvfs2_put_inode,
     .statfs = pvfs2_statfs,
     .remount_fs = pvfs2_remount,
-/*     .sync_fs = pvfs2_sync_fs */
-/*     .delete_inode   = pvfs2_delete_inode */
-/*     .put_super      = pvfs2_put_super, */
-/*     .write_super    = pvfs2_write_super, */
-/*     .clear_inode    = pvfs2_clear_inode, */
 };
+
+static struct export_operations pvfs2_export_ops = { };
 
 int pvfs2_fill_sb(
     struct super_block *sb,
@@ -270,6 +265,7 @@ int pvfs2_fill_sb(
     }
     root_dentry->d_op = &pvfs2_dentry_operations;
 
+    sb->s_export_op = &pvfs2_export_ops;
     sb->s_root = root_dentry;
     return 0;
 }

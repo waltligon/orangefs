@@ -67,7 +67,10 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 #define pvfs2_ino_to_handle(ino) (PVFS_handle)ino
 
 /* translates a pvfs2 handle to an inode number */
-#define pvfs2_handle_to_ino(handle) (ino_t)handle
+#define pvfs2_handle_to_ino(handle) (ino_t)pvfs2_handle_l32(handle)
+
+#define pvfs2_handle_l32(handle) (__u32)(handle & 0x00000000FFFFFFFF)
+#define pvfs2_handle_h32(handle) (__u32)(handle >> 32)
 
 /************************************
  * valid pvfs2 kernel operation states

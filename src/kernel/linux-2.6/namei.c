@@ -53,6 +53,8 @@ struct dentry *pvfs2_lookup(
     pvfs2_inode_t *parent = NULL, *found_pvfs2_inode = NULL;
     struct super_block *sb = NULL;
 
+    pvfs2_print("pvfs2_lookup called on %s\n", dentry->d_name.name);
+
     /*
       we can skip doing anything knowing that the intent is to
       create.  normally this results in an expensive failed
@@ -172,11 +174,12 @@ struct dentry *pvfs2_lookup(
     op_release(new_op);
 
     /*
-      if no inode was found, add a negative dentry to dcache
-      anyway; if we don't, we don't hold expected lookup semantics
-      and we most noticeably break during directory renames.
+      if no inode was found, add a negative dentry to dcache anyway;
+      if we don't, we don't hold expected lookup semantics and we most
+      noticeably break during directory renames.
 
-      if the operation failed or exited, do not add the dentry.
+      however, if the operation failed or exited, do not add the
+      dentry.
     */
     if (!inode && !error_exit)
     {

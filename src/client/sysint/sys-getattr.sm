@@ -130,8 +130,6 @@ machine pvfs2_client_getattr_sm(check_parameters,
 
 %%
 
-/* PVFS_sys_getattr()
- */
 int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
 		     uint32_t              attrmask, 
 		     PVFS_credentials      credentials,
@@ -143,23 +141,26 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
 
     gossip_debug(CLIENT_DEBUG, "PVFS_sys_getattr entered\n");
 
-    /* do parameter checking here, then assume things are ok below.
-     * assert()s are still ok of course :).
-     */
-    if (resp_p == NULL) {
+    if (resp_p == NULL)
+    {
 	gossip_lerr("NULL resp pointer\n");
 	return -PVFS_EINVAL;
     }
-    if (attrmask & ~(PVFS_ATTR_SYS_ALL)) {
+    if (attrmask & ~(PVFS_ATTR_SYS_ALL))
+    {
 	gossip_lerr("invalid attrmask\n");
 	return -PVFS_EINVAL;
     }
 
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
-    if (sm_p == NULL) return -PVFS_ENOMEM;
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
 
     memset(sm_p, 0, sizeof(*sm_p));
 
+    sm_p->error_code = 0;
     sm_p->cred_p = &credentials;
     sm_p->u.getattr.object_ref     = pinode_ref;
     sm_p->u.getattr.attrmask       = attrmask;
@@ -738,7 +739,8 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             sm_p->acache_hit = 0;
         }
     }
-    else {
+    else
+    {
 	/* error */
 	memset(sm_p->u.getattr.getattr_resp_p,
 	       0,

@@ -456,7 +456,7 @@ static int service_getattr_request(
                        Lu(in_upcall->req.getattr.refn.handle),
                        in_upcall->req.getattr.refn.fs_id);
             gossip_err("getattr returned error code %d\n",ret);
-            PVFS_perror("Getattr failed: ", ret);
+            PVFS_perror("Getattr failed ", ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_GETATTR;

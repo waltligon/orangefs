@@ -420,18 +420,12 @@ struct file_operations pvfs2_file_operations =
 {
     .llseek = pvfs2_file_llseek,
     .read = pvfs2_file_read,
-    .aio_read = generic_file_aio_read,
     .write = pvfs2_file_write,
-    .aio_write = generic_file_aio_write,
     .ioctl = pvfs2_ioctl,
     .mmap = pvfs2_file_mmap,
     .open = pvfs2_file_open,
     .release = pvfs2_file_release,
-    .fsync = pvfs2_fsync,
-    .readv = generic_file_readv,
-    .writev = generic_file_writev,
-    .sendfile = generic_file_sendfile,
-};
+    .fsync = pvfs2_fsync};
 
 /*
  * Local variables:

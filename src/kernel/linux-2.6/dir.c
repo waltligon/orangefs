@@ -45,16 +45,6 @@ static int pvfs2_readdir(
     struct dentry *dentry = file->f_dentry;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
-    int need_revalidate = (file->f_version != dentry->d_inode->i_version);
-
-    /*
-       if the directory we're reading has changed between
-       calls to us, restart directory traversal from scratch
-     */
-    if (need_revalidate)
-    {
-	file->f_pos = 0;
-    }
 
     /* pick up from where we left off */
     pos = (PVFS_ds_position)file->f_pos;
@@ -138,23 +128,30 @@ static int pvfs2_readdir(
 
 	    for (i = 0; i < new_op->downcall.resp.readdir.dirent_count; i++)
 	    {
-		len = new_op->downcall.resp.readdir.d_name_len[i];
-		current_entry = &new_op->downcall.resp.readdir.d_name[i][0];
-		current_ino =
-		    pvfs2_handle_to_ino(new_op->downcall.resp.readdir.refn[i].
-					handle);
+                len = new_op->downcall.resp.readdir.d_name_len[i];
+                current_entry = &new_op->downcall.resp.readdir.d_name[i][0];
+                current_ino =
+                    pvfs2_handle_to_ino(
+                        new_op->downcall.resp.readdir.refn[i].handle);
 
-		pvfs2_print("pvfs2: pvfs2_readdir -- Calling filldir "
-			    "on %s\n", current_entry);
-		if (filldir(dirent, current_entry, len, pos,
-			    current_ino, DT_UNKNOWN) < 0)
-		{
-		    break;
-		}
-		file->f_pos++;
-		pos++;
-	    }
+/* 		pvfs2_print("pvfs2: pvfs2_readdir -- Calling filldir " */
+/* 			    "on %s\n", current_entry); */
+                if (filldir(dirent, current_entry, len, pos,
+                            current_ino, DT_UNKNOWN) < 0)
+                {
+                    ret = 0;
+                    break;
+                }
+                file->f_pos++;
+                pos++;
+            }
 	}
+        else
+        {
+            pvfs2_print("Failed to readdir (downcall status %d)\n",
+                        new_op->downcall.status);
+            ret = -EIO;
+        }
 
       error_exit:
 	/* when request is serviced properly, free req op struct */
@@ -164,14 +161,15 @@ static int pvfs2_readdir(
 
     file->f_version = dentry->d_inode->i_version;
     update_atime(dentry->d_inode);
-    return 0;
+
+    pvfs2_print("pvfs2_readdir returning %d\n",ret);
+    return ret;
 }
 
 struct file_operations pvfs2_dir_operations =
 {
     .read = generic_read_dir,
     .readdir = pvfs2_readdir,
-    .llseek = generic_file_llseek,
     .open = pvfs2_file_open,
     .release = pvfs2_file_release
 };

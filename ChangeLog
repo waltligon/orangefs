@@ -5,8 +5,15 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.0.9pre1
 ===============
--
-	
+- fix support for creating/removing multiple collections (file systems)
+  within a storage space
+- improved pvfs2-client backgrounding
+- pvfs2-ls improvements for handling multiple mount points
+- capture some more data in the mgmt server statfs object, pvfs2-statfs
+  program update
+- add kernel support for being an nfs exportable file system
+
+
 	
 pvfs2-0.0.8
 ===========
