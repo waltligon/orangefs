@@ -120,13 +120,13 @@ int gui_comm_setup(void)
 
 	gtk_list_store_append(gui_comm_fslist, &iter);
 
-	for (j=strlen(tab->mntent_array[i].pvfs_config_server); j > 0; j--)
+	for (j=strlen(tab->mntent_array[i].the_pvfs_config_server); j > 0; j--)
 	{
-	    if (tab->mntent_array[i].pvfs_config_server[j] == '/') break;
+	    if (tab->mntent_array[i].the_pvfs_config_server[j] == '/') break;
 	}
 
 	assert(j < 128);
-	strncpy(msgbuf, tab->mntent_array[i].pvfs_config_server, j);
+	strncpy(msgbuf, tab->mntent_array[i].the_pvfs_config_server, j);
 	msgbuf[j] = '\0';
 
         server_config = PINT_get_server_config_struct(
@@ -154,20 +154,20 @@ int gui_comm_setup(void)
     snprintf(msgbuf,
 	     128,
 	     "monitoring %s by default.",
-	     tab->mntent_array[0].pvfs_config_server);
+	     tab->mntent_array[0].the_pvfs_config_server);
     gui_message_new(msgbuf);
 
     /* prepare config server name for passing to
      * gui_comm_set_active_fs() - this is the only time that it isn't
      * quite in the right format.
      */
-    for (j=strlen(tab->mntent_array[0].pvfs_config_server); j > 0; j--)
+    for (j=strlen(tab->mntent_array[0].the_pvfs_config_server); j > 0; j--)
     {
-	if (tab->mntent_array[0].pvfs_config_server[j] == '/') break;
+	if (tab->mntent_array[0].the_pvfs_config_server[j] == '/') break;
     }
     
     assert(j < 128);
-    strncpy(msgbuf, tab->mntent_array[0].pvfs_config_server, j);
+    strncpy(msgbuf, tab->mntent_array[0].the_pvfs_config_server, j);
     msgbuf[j] = '\0';
 
     ret = PVFS_util_get_default_fsid(&default_fsid);
