@@ -681,7 +681,6 @@ static int bmi_send_callback_fn(void *user_ptr,
 	else
 	{
 	    gen_mutex_unlock(&flow_data->flow_mutex);
-	    FLOW_CLEANUP(flow_data);
 	    return(0);
 	}
     }
@@ -826,7 +825,6 @@ static int bmi_send_callback_fn(void *user_ptr,
 	    else
 	    {
 		gen_mutex_unlock(&flow_data->flow_mutex);
-		FLOW_CLEANUP(flow_data);
 		return(0);
 	    }
 	}
@@ -1516,6 +1514,9 @@ static void handle_io_error(PVFS_error error_code, struct fp_queue_item*
 	flow_data->cleanup_pending_count--;
     }
     
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "cleanup_pending_count: %d\n",
+	flow_data->cleanup_pending_count);
+
     if(flow_data->cleanup_pending_count == 0)
     {
 	/* we are finished, make sure error is marked and state is set */
