@@ -7,7 +7,6 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
-#include <getopt.h>
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
