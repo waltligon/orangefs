@@ -558,7 +558,7 @@ int dbpf_attr_cache_remove(TROVE_handle key)
 {
     int ret = -1, i = 0;
     struct qlist_head *hash_link = NULL;
-    dbpf_attr_cache_elem_t *cache_elem = NULL;    
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
 
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
@@ -568,6 +568,7 @@ int dbpf_attr_cache_remove(TROVE_handle key)
         {
             cache_elem = qhash_entry(
                 hash_link, dbpf_attr_cache_elem_t, hash_link);
+            assert(cache_elem);
 
             gossip_debug(DBPF_ATTRCACHE_DEBUG, "dbpf_attr_cache_remove: "
                          "removing %Lu\n", Lu(key));
@@ -575,7 +576,9 @@ int dbpf_attr_cache_remove(TROVE_handle key)
             /* free any keyval data cached as well */
             if (s_cacheable_keywords)
             {
-                /* initialize all of the keyvals we're able to cache */
+                /* free all of the keyvals we've cached */
+                assert(s_cacheable_keyword_array_size ==
+                       cache_elem->num_keyval_pairs);
                 for(i = 0; i < cache_elem->num_keyval_pairs; i++)
                 {
                     cache_elem->keyval_pairs[i].key = NULL;
@@ -586,8 +589,8 @@ int dbpf_attr_cache_remove(TROVE_handle key)
                     }
                 }
             }
-            s_current_num_cache_elems--;
             free(cache_elem);
+            s_current_num_cache_elems--;
             ret = 0;
         }
         gen_mutex_unlock(s_dbpf_attr_mutex);

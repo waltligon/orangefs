@@ -264,6 +264,10 @@ int PVFS_sys_remove(char *object_name,
     sm_p->u.remove.parent_ref  = parent_ref;
     sm_p->u.remove.stored_error_code = 0;
 
+    gossip_debug(CLIENT_DEBUG, "Trying to remove entry %s under %Lu,%d\n",
+                 object_name, Lu(parent_ref.handle), parent_ref.fs_id);
+
+
     gossip_debug(CLIENT_DEBUG,
 		 "PVFS_sys_remove calling PINT_client_state_machine_post()\n");
 

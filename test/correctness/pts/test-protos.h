@@ -6,65 +6,68 @@
 #include <generic.h>
 
 /* include all test specific header files */
-#include <test-create.h>
-#include <test-dir-torture.h>
-#include <test-dir-operations.h>
-#include <test-lookup-bench.h>
-#include <test-pvfs-datatype-init.h>
-#include <test-pvfs-datatype-contig.h>
-#include <test-pvfs-datatype-vector.h>
-#include <test-pvfs-datatype-hvector.h>
-#include <test-null-params.h>
-#include <pvfs-restart-server.h>
-#include <pvfs-stop-server.h>
-#include <null_params.h>
-#include <test-invalid-files.h>
-#include <test-uninitialized.h>
-#include <test-finalized.h>
-#include <test-misc.h>
-#include <test-concurrent-meta.h>
-#include <test-request-indexed.h>
-#include <test-request-contiguous.h>
-#include <test-encode-basic.h>
-#include <test-noncontig-pattern.h>
-#include <test-write-eof.h>
-#include <test-vector-offset.h>
-#include <test-vector-start-final-offset.h>
-#include <test-contiguous-datatype.h>
-#include <test-explicit-offset.h>
-#include <test-request-tiled.h>
-#include <test-mix.h>
-#include <test-romio-noncontig-pattern2.h>
+#include "test-create.h"
+#include "test-dir-torture.h"
+#include "test-dir-operations.h"
+#include "test-lookup-bench.h"
+#include "test-pvfs-datatype-init.h"
+#include "test-pvfs-datatype-contig.h"
+#include "test-pvfs-datatype-vector.h"
+#include "test-pvfs-datatype-hvector.h"
+#include "test-null-params.h"
+#include "pvfs-restart-server.h"
+#include "pvfs-stop-server.h"
+#include "null_params.h"
+#include "test-invalid-files.h"
+#include "test-uninitialized.h"
+#include "test-finalized.h"
+#include "test-misc.h"
+#include "test-concurrent-meta.h"
+#include "test-request-indexed.h"
+#include "test-request-contiguous.h"
+#include "test-encode-basic.h"
+#include "test-noncontig-pattern.h"
+#include "test-write-eof.h"
+#include "test-vector-offset.h"
+#include "test-vector-start-final-offset.h"
+#include "test-contiguous-datatype.h"
+#include "test-explicit-offset.h"
+#include "test-request-tiled.h"
+#include "test-mix.h"
+#include "test-romio-noncontig-pattern2.h"
+#include "test-path-lookup.h"
 
-enum test_types { 
-   TEST_CREATE,
-   TEST_PVFSDATATYPE_INIT,
-   TEST_PVFSDATATYPE_CONTIG,
-   TEST_PVFSDATATYPE_VECTOR,
-   TEST_PVFSDATATYPE_HVECTOR,
-	TEST_DIR_TORTURE,
-	TEST_DIR_OPERATIONS,
-	TEST_LOOKUP_BENCH,
-   TEST_NULL_PARAMS,
-	PVFS_RESTART_SERVER,
-	PVFS_STOP_SERVER,
-	TEST_INVALID_FILES,
-	TEST_UNINITIALIZED,
-	TEST_FINALIZED,
-	TEST_MISC,
-	TEST_CONCURRENT_META,
-	TEST_REQUEST_INDEXED,
-	TEST_REQUEST_CONTIGUOUS,
-	TEST_ENCODE_BASIC,
-	TEST_NONCONTIG_PATTERN,
-	TEST_WRITE_EOF,
-	TEST_VECTOR_OFFSET,
-	TEST_VECTOR_START_FINAL_OFFSET,
-	TEST_CONTIGUOUS_DATATYPE,
-	TEST_EXPLICIT_OFFSET,
-	TEST_REQUEST_TILED,
-	TEST_MIX,
-	TEST_ROMIO_NONCONTIG_PATTERN2
+enum test_types
+{
+    TEST_CREATE,
+    TEST_PVFSDATATYPE_INIT,
+    TEST_PVFSDATATYPE_CONTIG,
+    TEST_PVFSDATATYPE_VECTOR,
+    TEST_PVFSDATATYPE_HVECTOR,
+    TEST_DIR_TORTURE,
+    TEST_DIR_OPERATIONS,
+    TEST_LOOKUP_BENCH,
+    TEST_NULL_PARAMS,
+    PVFS_RESTART_SERVER,
+    PVFS_STOP_SERVER,
+    TEST_INVALID_FILES,
+    TEST_UNINITIALIZED,
+    TEST_FINALIZED,
+    TEST_MISC,
+    TEST_CONCURRENT_META,
+    TEST_REQUEST_INDEXED,
+    TEST_REQUEST_CONTIGUOUS,
+    TEST_ENCODE_BASIC,
+    TEST_NONCONTIG_PATTERN,
+    TEST_WRITE_EOF,
+    TEST_VECTOR_OFFSET,
+    TEST_VECTOR_START_FINAL_OFFSET,
+    TEST_CONTIGUOUS_DATATYPE,
+    TEST_EXPLICIT_OFFSET,
+    TEST_REQUEST_TILED,
+    TEST_MIX,
+    TEST_ROMIO_NONCONTIG_PATTERN2,
+    TEST_PATH_LOOKUP
 };
 
 void setup_ptstests(config *myconfig) {
@@ -140,8 +143,13 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_REQUEST_TILED].test_name = str_malloc("test_request_tiled");
    myconfig->testpool[TEST_MIX].test_func = test_mix;
    myconfig->testpool[TEST_MIX].test_name = str_malloc("test_mix");
+
    myconfig->testpool[TEST_ROMIO_NONCONTIG_PATTERN2].test_func = test_romio_noncontig_pattern2;
    myconfig->testpool[TEST_ROMIO_NONCONTIG_PATTERN2].test_name = str_malloc("test_romio_noncontig_pattern2");
+
+   myconfig->testpool[TEST_PATH_LOOKUP].test_func = test_path_lookup;
+   myconfig->testpool[TEST_PATH_LOOKUP].test_name =
+       strdup("test_path_lookup");
 }
 
 #endif
