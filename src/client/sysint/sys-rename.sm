@@ -23,7 +23,8 @@ extern job_context_id pint_client_sm_context;
 enum
 {
     RENAME_CHDIRENT = 130,
-    RENAME_REMOVE_REQUIRED
+    RENAME_REMOVE_REQUIRED,
+    RENAME_CRDIRENT_RETRY
 };
 
 static int rename_init(
@@ -33,8 +34,6 @@ static int rename_lookups_setup_msgpair_array(
 static int rename_lookups_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int rename_crdirent_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int rename_crdirent_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int rename_rmdirent_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
@@ -49,6 +48,10 @@ static int rename_check_for_remove(
 static int rename_warn_user_to_run_fsck(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int rename_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int rename_generic_timer(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int rename_crdirent_retry_or_fail(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
 static int rename_lookups_comp_fn(
@@ -69,7 +72,8 @@ machine pvfs2_client_rename_sm(
     rename_lookups_failure,
     rename_crdirent_setup_msgpair,
     rename_crdirent_xfer_msgpair,
-    rename_crdirent_failure,
+    rename_crdirent_retry_or_fail,
+    rename_crdirent_timer,
     rename_rmdirent_setup_msgpair,
     rename_rmdirent_xfer_msgpair,
     rename_rmdirent_failure,
@@ -112,20 +116,27 @@ machine pvfs2_client_rename_sm(
     {
         run rename_crdirent_setup_msgpair;
         success => rename_crdirent_xfer_msgpair;
-        default => rename_crdirent_failure;
+        default => rename_crdirent_retry_or_fail;
     }
 
     state rename_crdirent_xfer_msgpair
     {
         jump pvfs2_client_msgpairarray_sm;
         success => rename_rmdirent_setup_msgpair;
-        default => rename_crdirent_failure;
+        default => rename_crdirent_retry_or_fail;
     }
 
-    state rename_crdirent_failure
+    state rename_crdirent_retry_or_fail
     {
-        run rename_crdirent_failure;
-        default => cleanup;
+	run rename_crdirent_retry_or_fail;
+	RENAME_CRDIRENT_RETRY => rename_crdirent_timer;
+	default => cleanup;
+    }
+
+    state rename_crdirent_timer
+    {
+	run rename_generic_timer;
+	default => rename_crdirent_setup_msgpair;
     }
 
     state rename_rmdirent_setup_msgpair
@@ -556,19 +567,6 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int rename_crdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: crdirent_failure\n");
-
-    if (js_p->error_code == -PVFS_EEXIST)
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
-                     "dirent already exists!\n");
-    }
-    return 1;
-}
-
 static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
@@ -766,6 +764,54 @@ static int rename_cleanup(PINT_client_sm *sm_p,
     }
     return 0;
 }
+
+static int rename_generic_timer(PINT_client_sm *sm_p,
+                                job_status_s *js_p)
+{
+    job_id_t tmp_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: generic_timer\n");
+
+    return job_req_sched_post_timer(
+	PVFS2_CLIENT_RETRY_DELAY,
+	sm_p,
+	0,
+	js_p,
+	&tmp_id,
+	pint_client_sm_context);
+}
+
+static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
+                                         job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename state: crdirent_retry_or_fail\n");
+
+    /* try again (up to a point) if we get a comm. failure. */
+    if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
+	(sm_p->u.rename.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+    {
+	sm_p->u.rename.retry_count++;
+	js_p->error_code = RENAME_CRDIRENT_RETRY;
+	return(1);
+    }
+
+    if ((js_p->error_code == -PVFS_EEXIST) &&
+        (sm_p->u.rename.retry_count > 0))
+    {
+	/* assume everything worked out ok and we got the right directory
+	 * entry back.  there was just a transient network problem along the
+	 * way
+	 */
+	js_p->error_code = 0;
+	return(1);
+    }
+
+    /* let other errors fall through to next state */
+    return 1;
+}
+
+
 
 /*
  * Local variables:
