@@ -31,9 +31,10 @@ static int event_mon_list_comp_fn(
 
 %%
 
-machine pvfs2_client_mgmt_event_mon_list_sm(setup_msgpair,
-                                            xfer_msgpair,
-                                            cleanup)
+machine pvfs2_client_mgmt_event_mon_list_sm(
+    setup_msgpair,
+    xfer_msgpair,
+    cleanup)
 {
     state setup_msgpair
     {
@@ -57,7 +58,7 @@ machine pvfs2_client_mgmt_event_mon_list_sm(setup_msgpair,
 
 %%
 
-int PVFS_imgmt_event_mon_list(
+PVFS_error PVFS_imgmt_event_mon_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     struct PVFS_mgmt_event** event_matrix,
@@ -108,7 +109,7 @@ int PVFS_imgmt_event_mon_list(
         sm_p, PVFS_MGMT_EVENT_MON_LIST, op_id, user_ptr);
 }
 
-int PVFS_mgmt_event_mon_list(
+PVFS_error PVFS_mgmt_event_mon_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     struct PVFS_mgmt_event** event_matrix,
@@ -117,8 +118,7 @@ int PVFS_mgmt_event_mon_list(
     int event_count,
     PVFS_error_details *details)
 {
-    int ret = -PVFS_EINVAL;
-    PVFS_error error;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,

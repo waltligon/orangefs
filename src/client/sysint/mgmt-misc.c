@@ -50,14 +50,14 @@ const char *PVFS_mgmt_map_addr(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_mgmt_statfs_all(
+PVFS_error PVFS_mgmt_statfs_all(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     struct PVFS_mgmt_server_stat *stat_array,
     int *inout_count_p,
     PVFS_error_details *details)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t *addr_array = NULL;
     int real_count = 0;
     struct server_configuration_s *server_config = NULL;
@@ -120,7 +120,7 @@ int PVFS_mgmt_statfs_all(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_mgmt_setparam_all(
+PVFS_error PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     enum PVFS_server_param param,
@@ -128,9 +128,9 @@ int PVFS_mgmt_setparam_all(
     uint64_t *old_value_array,
     PVFS_error_details *details)
 {
-    PVFS_BMI_addr_t *addr_array = NULL;
     int count = 0;
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
+    PVFS_BMI_addr_t *addr_array = NULL;
     struct server_configuration_s *server_config = NULL;
 
     server_config = PINT_get_server_config_struct(fs_id);
@@ -177,7 +177,7 @@ int PVFS_mgmt_setparam_all(
     return ret;
 }
 
-int PVFS_mgmt_setparam_single(
+PVFS_error PVFS_mgmt_setparam_single(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     enum PVFS_server_param param,
@@ -186,7 +186,7 @@ int PVFS_mgmt_setparam_single(
     uint64_t *old_value,
     PVFS_error_details *details)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t addr;
 
     if (server_addr_str && (BMI_addr_lookup(&addr, server_addr_str) == 0))
@@ -204,14 +204,14 @@ int PVFS_mgmt_setparam_single(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_mgmt_get_server_array(
+PVFS_error PVFS_mgmt_get_server_array(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     int server_type,
     PVFS_BMI_addr_t *addr_array,
     int *inout_count_p)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     struct server_configuration_s *server_config = NULL;
 
     server_config = PINT_get_server_config_struct(fs_id);
@@ -230,13 +230,13 @@ int PVFS_mgmt_get_server_array(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_mgmt_count_servers(
+PVFS_error PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     int server_type,
     int *count)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     struct server_configuration_s *server_config = NULL;
 
     server_config = PINT_get_server_config_struct(fs_id);
@@ -256,7 +256,7 @@ int PVFS_mgmt_count_servers(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_mgmt_toggle_admin_mode(
+PVFS_error PVFS_mgmt_toggle_admin_mode(
     PVFS_credentials *credentials,
     int on_flag)
 {

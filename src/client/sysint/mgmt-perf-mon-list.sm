@@ -58,7 +58,7 @@ machine pvfs2_client_mgmt_perf_mon_list_sm(
 
 %%
 
-int PVFS_imgmt_perf_mon_list(
+PVFS_error PVFS_imgmt_perf_mon_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     struct PVFS_mgmt_perf_stat **perf_matrix,
@@ -114,7 +114,7 @@ int PVFS_imgmt_perf_mon_list(
         sm_p, PVFS_MGMT_PERF_MON_LIST, op_id, user_ptr);
 }
 
-int PVFS_mgmt_perf_mon_list(
+PVFS_error PVFS_mgmt_perf_mon_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     struct PVFS_mgmt_perf_stat **perf_matrix,
@@ -125,8 +125,7 @@ int PVFS_mgmt_perf_mon_list(
     int history_count,
     PVFS_error_details *details)
 {
-    int ret = -PVFS_EINVAL;
-    PVFS_error error;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,

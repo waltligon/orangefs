@@ -65,14 +65,14 @@ machine pvfs2_client_mgmt_get_dirdata_handle_sm(
 
 %%
 
-int PVFS_imgmt_get_dirdata_handle(
+PVFS_error PVFS_imgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
     PVFS_handle *out_dirdata_handle,
     PVFS_credentials *credentials,
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -105,13 +105,12 @@ int PVFS_imgmt_get_dirdata_handle(
         sm_p, PVFS_MGMT_GET_DIRDATA_HANDLE, op_id, user_ptr);
 }
 
-int PVFS_mgmt_get_dirdata_handle(
+PVFS_error PVFS_mgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
     PVFS_handle *out_dirdata_handle,
     PVFS_credentials *credentials)
 {
-    int ret = -PVFS_EINVAL;
-    PVFS_error error;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,

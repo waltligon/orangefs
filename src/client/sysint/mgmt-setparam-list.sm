@@ -59,7 +59,7 @@ machine pvfs2_client_mgmt_setparam_list_sm(
 
 %%
 
-int PVFS_imgmt_setparam_list(
+PVFS_error PVFS_imgmt_setparam_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     enum PVFS_server_param param,
@@ -71,7 +71,7 @@ int PVFS_imgmt_setparam_list(
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -123,7 +123,7 @@ int PVFS_imgmt_setparam_list(
         sm_p, PVFS_MGMT_SETPARAM_LIST, op_id, user_ptr);
 }
 
-int PVFS_mgmt_setparam_list(
+PVFS_error PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     enum PVFS_server_param param,
@@ -133,8 +133,7 @@ int PVFS_mgmt_setparam_list(
     int count,
     PVFS_error_details *details)
 {
-    int ret = -PVFS_EINVAL;
-    PVFS_error error;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_setparam entered\n");

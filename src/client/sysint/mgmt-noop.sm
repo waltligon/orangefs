@@ -27,9 +27,10 @@ static int mgmt_noop_cleanup(
 
 %%
 
-machine pvfs2_client_mgmt_noop_sm(setup_msgpair,
-                                  xfer_msgpair,
-                                  cleanup)
+machine pvfs2_client_mgmt_noop_sm(
+    setup_msgpair,
+    xfer_msgpair,
+    cleanup)
 {
     state setup_msgpair
     {
@@ -53,7 +54,7 @@ machine pvfs2_client_mgmt_noop_sm(setup_msgpair,
 
 %%
 
-int PVFS_imgmt_noop(
+PVFS_error PVFS_imgmt_noop(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     PVFS_BMI_addr_t addr,
@@ -84,13 +85,12 @@ int PVFS_imgmt_noop(
         sm_p, PVFS_MGMT_NOOP, op_id, user_ptr);
 }
 
-int PVFS_mgmt_noop(
+PVFS_error PVFS_mgmt_noop(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     PVFS_BMI_addr_t addr)
 {
-    int ret = -PVFS_EINVAL;
-    PVFS_error error;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop entered\n");

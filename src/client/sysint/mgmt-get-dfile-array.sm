@@ -60,7 +60,7 @@ machine pvfs2_client_mgmt_get_dfile_array_sm(
 
 %%
 
-int PVFS_imgmt_get_dfile_array(
+PVFS_error PVFS_imgmt_get_dfile_array(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     PVFS_handle *dfile_array,
@@ -68,7 +68,7 @@ int PVFS_imgmt_get_dfile_array(
     PVFS_mgmt_op_id *op_id,
     void *user_ptr)
 {
-    int ret = -PVFS_EINVAL;
+    PVFS_error ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -96,14 +96,13 @@ int PVFS_imgmt_get_dfile_array(
         sm_p, PVFS_MGMT_GET_DFILE_ARRAY, op_id, user_ptr);
 }
 
-int PVFS_mgmt_get_dfile_array(
+PVFS_error PVFS_mgmt_get_dfile_array(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     PVFS_handle *dfile_array,
     int dfile_count)
 {
-    int ret = -PVFS_EINVAL;
-    PVFS_error error;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
