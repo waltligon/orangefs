@@ -84,6 +84,10 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 		&tmp_id,
 		server_job_context);
 	    return(ret);
+	case PVFS_SERV_PARAM_MODE:
+	    /* no work to do here; request scheduler has already handled */
+	    js_p->error_code = 0;
+	    return(1);
     }
 
     gossip_lerr("Error: mgmt_setparam for unknown parameter %d.\n",

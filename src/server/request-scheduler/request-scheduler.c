@@ -18,16 +18,12 @@
  * TODO: come up with a more sophisticated scheduling and
  *  consistency model
  * TODO: implement without using so many mallocs
- * TODO: we need to audit the request protocol and find other
- *  inconsistencies that need to be avoided
- *
- * SHORT TERM
- * TODO: document that this isn't thread safe
  */
 
 #include <errno.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <assert.h>
 
 #include "request-scheduler.h"
 #include "quickhash.h"
@@ -88,12 +84,21 @@ static QLIST_HEAD(
 static QLIST_HEAD(
     timer_queue);
 
+/* queue of mode requests */
+static QLIST_HEAD(
+    mode_queue);
+
 static int hash_handle(
     void *handle,
     int table_size);
 static int hash_handle_compare(
     void *key,
     struct qlist_head *link);
+
+/* count of how many items are known to the scheduler */
+static int sched_count = 0;
+/* mode of the scheduler */
+enum PVFS_server_mode current_mode = PVFS_SERVER_NORMAL_MODE;
 
 /* setup and teardown */
 
@@ -157,6 +162,8 @@ int PINT_req_sched_finalize(
 	     */
 	}
     }
+
+    sched_count = 0;
 
     /* tear down hash table */
     qhash_finalize(req_sched_table);
@@ -288,7 +295,10 @@ int PINT_req_sched_post(
     struct req_sched_element *tmp_element;
     struct req_sched_list *tmp_list;
     struct req_sched_element *next_element;
+    struct req_sched_element *mode_element = NULL;
     PVFS_fs_id fs_id;
+    enum PVFS_server_mode target_mode;
+    int mode_change_ready = 0;
 
     /* find the handle */
     ret = PINT_req_sched_target_handle(in_request, &handle, &fs_id);
@@ -317,7 +327,70 @@ int PINT_req_sched_post(
     tmp_element->state = REQ_QUEUED;
     tmp_element->handle = handle;
 
-    /* see if we have any requests queue up for this handle */
+    /* is this a request to change the server's operating mode? */
+    if(in_request->op == PVFS_SERV_MGMT_SETPARAM
+	&& in_request->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE)
+    {
+	target_mode = (enum PVFS_server_mode)in_request->u.mgmt_setparam.value;
+	/* will this be the front of the queue */
+	if(qlist_empty(&mode_queue))
+	    mode_change_ready = 1;
+
+	qlist_add_tail(&(tmp_element->list_link), &mode_queue);
+	if(mode_change_ready)
+	{
+	    if(target_mode == PVFS_SERVER_NORMAL_MODE)
+	    {
+		/* let this go through regardless */
+		ret = 1;
+		tmp_element->state = REQ_SCHEDULED;
+		current_mode = target_mode;
+	    }
+	    else if(target_mode == PVFS_SERVER_ADMIN_MODE)
+	    {
+		assert(sched_count > -1);
+		/* for this to work, we must wait for pending ops to complete */
+		if(sched_count == 0)
+		{
+		    ret = 1;
+		    tmp_element->state = REQ_SCHEDULED;
+		    current_mode = target_mode;
+		}
+		else
+		{
+		    ret = 0;
+		    tmp_element->state = REQ_QUEUED;
+		}
+	    }
+	    else
+	    {
+		/* TODO: be nicer about this */
+		assert(0);
+	    }
+	    return(ret);
+	}
+	else
+	{
+	    tmp_element->state = REQ_QUEUED;
+	    return(0);
+	}
+    }
+
+    /* for normal requests, check to see if we are either in 
+     * admin mode, or are about to move to admin mode; in those cases
+     * we must return an error code
+     */
+    if(!qlist_empty(&mode_queue))
+	mode_element = qlist_entry(mode_queue.next, struct req_sched_element,
+	    list_link);
+    if(current_mode == PVFS_SERVER_ADMIN_MODE || (mode_element 
+	&& mode_element->req_ptr->u.mgmt_setparam.value == PVFS_SERVER_ADMIN_MODE))
+    {
+	free(tmp_element);
+	return(-PVFS_EAGAIN);
+    }
+
+    /* see if we have a request queue up for this handle */
     hash_link = qhash_search(req_sched_table, &(handle));
     if (hash_link)
     {
@@ -390,6 +463,7 @@ int PINT_req_sched_post(
 		     "REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n",
 		     (long) handle, tmp_element);
     }
+    sched_count++;
     return (ret);
 }
 
@@ -571,6 +645,16 @@ int PINT_req_sched_unpost(
     /* destroy the unposted element */
     free(tmp_element);
 
+    sched_count--;
+    /* prepare to schedule mode change if we can */
+    /* NOTE: only transitions to admin mode are ever queued */
+    if(sched_count == 0 && !qlist_empty(&mode_queue))
+    {
+	next_element = qlist_entry(mode_queue.next, struct req_sched_element,
+	    list_link);
+	next_element->state = REQ_READY_TO_SCHEDULE;
+	qlist_add_tail(&next_element->ready_link, &ready_queue);
+    }
     return (0);
 }
 
@@ -662,6 +746,17 @@ int PINT_req_sched_release(
     /* destroy the released request element */
     free(tmp_element);
 
+    sched_count--;
+    /* prepare to schedule mode change if we can */
+    /* NOTE: only transitions to admin mode are ever queued */
+    if(sched_count == 0 && !qlist_empty(&mode_queue))
+    {
+	next_element = qlist_entry(mode_queue.next, struct req_sched_element,
+	    list_link);
+	next_element->state = REQ_READY_TO_SCHEDULE;
+	qlist_add_tail(&next_element->ready_link, &ready_queue);
+    }
+
     return (1);
 }
 
@@ -713,6 +808,12 @@ int PINT_req_sched_test(
 	gossip_debug(REQ_SCHED_DEBUG,
 		     "REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n",
 		     (long) tmp_element->handle, tmp_element);
+	/* if this is a mode change, then transition now */
+	if(tmp_element->req_ptr->op == PVFS_SERV_MGMT_SETPARAM &&
+	    tmp_element->req_ptr->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE)
+	{
+	    current_mode = tmp_element->req_ptr->u.mgmt_setparam.value;
+	}
 	return (1);
     }
     else if(tmp_element->state == REQ_TIMING)
@@ -805,6 +906,13 @@ int PINT_req_sched_testsome(
 	    gossip_debug(REQ_SCHED_DEBUG,
 			 "REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n",
 			 (long) tmp_element->handle, tmp_element);
+	    /* if this is a mode change, then transition now */
+	    if(tmp_element->req_ptr->op == PVFS_SERV_MGMT_SETPARAM &&
+		tmp_element->req_ptr->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE)
+	    {
+		current_mode = tmp_element->req_ptr->u.mgmt_setparam.value;
+	    }
+
 	}
 	else if(tmp_element->state == REQ_TIMING)
 	{
@@ -906,6 +1014,12 @@ int PINT_req_sched_testworld(
 	gossip_debug(REQ_SCHED_DEBUG,
 		     "REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n",
 		     (long) tmp_element->handle, tmp_element);
+	/* if this is a mode change, then transition now */
+	if(tmp_element->req_ptr->op == PVFS_SERV_MGMT_SETPARAM &&
+	    tmp_element->req_ptr->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE)
+	{
+	    current_mode = tmp_element->req_ptr->u.mgmt_setparam.value;
+	}
     }
     if (*inout_count_p > 0)
 	return (1);
