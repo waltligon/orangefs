@@ -66,6 +66,9 @@ int PINT_event_initialize(int ring_size)
  */
 int PINT_event_mpe_init(void)
 {
+    MPI_Init(NULL, NULL);
+    MPE_Init_log();
+
     PINT_event_job_start = MPE_Log_get_event_number();
     PINT_event_job_stop = MPE_Log_get_event_number();
     PINT_event_trove_rd_start = MPE_Log_get_event_number();
@@ -77,7 +80,6 @@ int PINT_event_mpe_init(void)
     PINT_event_flow_start = MPE_Log_get_event_number();
     PINT_event_flow_stop = MPE_Log_get_event_number();
 
-    MPI_Init(NULL, NULL);
 
     MPE_Describe_state(PINT_event_job_start, PINT_event_job_stop, "Job", "red");
     MPE_Describe_state(PINT_event_trove_rd_start, PINT_event_trove_rd_stop, 
@@ -88,9 +90,6 @@ int PINT_event_mpe_init(void)
 	    "BMI", "yellow");
     MPE_Describe_state(PINT_event_flow_start, PINT_event_flow_stop, 
 	    "Flow", "green");
-
-
-    MPE_Init_log();
 
     return 0;
 }
