@@ -108,6 +108,11 @@ static int job_testworld_old(
 	int* inout_count_p,
 	void** returned_user_ptr_array,
 	job_status_s* out_status_array_p);
+static int completion_query(
+	job_id_t id, 
+	int* out_count_p, 
+	void** returned_user_ptr_p,
+	job_status_s* out_status_p);
 
 #ifndef __PVFS2_JOB_THREADED__
 static int do_one_work_cycle_all(int* num_completed, int wait_flag);
@@ -1920,7 +1925,6 @@ int job_test_HACK(
 	int timeout_ms)
 {
 	int ret = -1;
-	struct job_desc* query = NULL;
 #ifdef __PVFS2_JOB_THREADED__
 	struct timespec pthread_timeout;
 #else
@@ -1947,41 +1951,14 @@ int job_test_HACK(
 		return(ret);
 	}
 
-	/* see if we have anything in the completion queue, and go
-	 * ahead with first search 
+	/* check before we do anything else to see if the job that we
+	 * want is in the completion queue
 	 */
-	gen_mutex_lock(&completion_mutex);
-		if(completion_error)
-		{
-			gen_mutex_unlock(&completion_mutex);
-			return(completion_error);
-		}
-
-		query = job_desc_q_search(completion_queue, id);
-		if(query)
-		{
-			job_desc_q_remove(query);
-		}
-	gen_mutex_unlock(&completion_mutex);
-
-	/* see if we found what we wanted yet */
-	if(query)
-	{
-		*out_count_p = 1;
-		fill_status(query, returned_user_ptr_p, out_status_p);
-		/* special case for request scheduler */
-		if(query->type == JOB_REQ_SCHED &&
-			query->u.req_sched.post_flag == 1)
-		{
-			/* hang onto desc until release time */
-			job_desc_q_add(req_sched_inprogress_queue, query);
-		}
-		else
-		{
-			dealloc_job_desc(query);
-		}
-		return(0);
-	}
+	ret = completion_query(id, out_count_p, returned_user_ptr_p, 
+		out_status_p);
+	/* return here on error or completion */
+	if(ret < 0 || (*out_count_p > 0))
+		return(ret);
 
 	/* bail out if timeout is zero */
 	if(!timeout_ms)
@@ -2035,39 +2012,12 @@ int job_test_HACK(
 		}
 		else
 		{
-			/* poke the queue */
-			gen_mutex_lock(&completion_mutex);
-				if(completion_error)
-				{
-					gen_mutex_unlock(&completion_mutex);
-					return(completion_error);
-				}
-
-				query = job_desc_q_search(completion_queue, id);
-				if(query)
-				{
-					job_desc_q_remove(query);
-				}
-			gen_mutex_unlock(&completion_mutex);
-
-			/* see if we found what we wanted yet */
-			if(query)
-			{
-				*out_count_p = 1;
-				fill_status(query, returned_user_ptr_p, out_status_p);
-				/* special case for request scheduler */
-				if(query->type == JOB_REQ_SCHED &&
-					query->u.req_sched.post_flag == 1)
-				{
-					/* hang onto desc until release time */
-					job_desc_q_add(req_sched_inprogress_queue, query);
-				}
-				else
-				{
-					dealloc_job_desc(query);
-				}
-				return(0);
-			}
+			/* check queue now to see of the op we want is done */
+			ret = completion_query(id, out_count_p, returned_user_ptr_p, 
+				out_status_p);
+			/* return here on error or completion */
+			if(ret < 0 || (*out_count_p > 0))
+				return(ret);
 		}
 
 		/* if we fall to here, see how much time has expired and sleep
@@ -2102,39 +2052,12 @@ int job_test_HACK(
 		}
 		if(num_completed > 0)
 		{
-			/* poke the queue */
-			gen_mutex_lock(&completion_mutex);
-				if(completion_error)
-				{
-					gen_mutex_unlock(&completion_mutex);
-					return(completion_error);
-				}
-
-				query = job_desc_q_search(completion_queue, id);
-				if(query)
-				{
-					job_desc_q_remove(query);
-				}
-			gen_mutex_unlock(&completion_mutex);
-
-			/* see if we found what we wanted yet */
-			if(query)
-			{
-				*out_count_p = 1;
-				fill_status(query, returned_user_ptr_p, out_status_p);
-				/* special case for request scheduler */
-				if(query->type == JOB_REQ_SCHED &&
-					query->u.req_sched.post_flag == 1)
-				{
-					/* hang onto desc until release time */
-					job_desc_q_add(req_sched_inprogress_queue, query);
-				}
-				else
-				{
-					dealloc_job_desc(query);
-				}
-				return(0);
-			}
+			/* check queue now to see of the op we want is done */
+			ret = completion_query(id, out_count_p, returned_user_ptr_p, 
+				out_status_p);
+			/* return here on error or completion */
+			if(ret < 0 || (*out_count_p > 0))
+				return(ret);
 		}
 
 		/* if we fall to here, see how much time has expired and sleep
@@ -3191,6 +3114,54 @@ static int do_one_test_cycle_req_sched(void)
 		/* set appropriate fields and place in completed queue */
 		tmp_desc->u.req_sched.error_code = error_code_array[i];
 		job_desc_q_add(completion_queue, tmp_desc);
+	}
+
+	return(0);
+}
+
+static int completion_query(
+	job_id_t id, 
+	int* out_count_p, 
+	void** returned_user_ptr_p,
+	job_status_s* out_status_p)
+{
+	struct job_desc* query = NULL;
+
+	*out_count_p = 0;
+
+	/* grab completion mutex, check for global error, and search for
+	 * desired operation
+	 */
+	gen_mutex_lock(&completion_mutex);
+		if(completion_error)
+		{
+			gen_mutex_unlock(&completion_mutex);
+			return(completion_error);
+		}
+
+		query = job_desc_q_search(completion_queue, id);
+		if(query)
+		{
+			job_desc_q_remove(query);
+		}
+	gen_mutex_unlock(&completion_mutex);
+
+	/* see if we found what we wanted yet */
+	if(query)
+	{
+		*out_count_p = 1;
+		fill_status(query, returned_user_ptr_p, out_status_p);
+		/* special case for request scheduler */
+		if(query->type == JOB_REQ_SCHED &&
+			query->u.req_sched.post_flag == 1)
+		{
+			/* hang onto desc until release time */
+			job_desc_q_add(req_sched_inprogress_queue, query);
+		}
+		else
+		{
+			dealloc_job_desc(query);
+		}
 	}
 
 	return(0);
