@@ -853,11 +853,11 @@ prompt%
 \end{verbatim}
 
 The MPICH2 configure script needs a some additional arguments to build
-ROMIO correctly.  The {\tt --enable-romio} flag builds ROMIO and  the
-{\tt --with-file-system} flag tells ROMIO which file systems to support. 
+ROMIO correctly.  The {\tt enable-romio} flag builds ROMIO and  the
+{\tt with-file-system} flag tells ROMIO which file systems to support. 
 
 \begin{verbatim}
-configure -enable-romio --with-file-system=ufs+nfs+pvfs2 [other flags]
+configure --enable-romio --with-file-system=ufs+nfs+pvfs2 [other flags]
 \end{verbatim}
 
 Now compile and install MPICH2 as you normally would.  Applications accessing
