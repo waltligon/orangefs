@@ -22,6 +22,7 @@ void gen_state_action(char *run_func, int flag);
 void gen_return_code(char *return_code);
 void gen_next_state(int flag, char *new_state);
 void gen_state_end(void);
+void gen_machine(char *machine_name, char *first_state_name, char *init_name);
 
 int yylex(void);
 void yyerror(char *);
