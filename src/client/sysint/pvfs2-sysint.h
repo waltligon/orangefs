@@ -219,10 +219,9 @@ typedef struct PVFS_sysreq_remove_s PVFS_sysreq_remove;
 /* rename */
 struct PVFS_sysreq_rename_s {
 	PVFS_string old_entry; /* single path segment */
-	pinode_reference old_parent_reference;
+	pinode_reference old_parent_refn;
 	PVFS_string new_entry;
-	pinode_reference new_parent_reference;
-	PVFS_fs_id fs_id;	
+	pinode_reference new_parent_refn;
 	PVFS_credentials credentials;
 };
 typedef struct PVFS_sysreq_rename_s PVFS_sysreq_rename;

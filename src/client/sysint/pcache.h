@@ -16,7 +16,16 @@
 #include "pvfs2-attr.h"
 #include "pint-sysint.h"
 
+#define PINT_PCACHE_MAX_ENTRIES 64
+
 #define PINT_PCACHE_HANDLE_INVALID 0
+#define BAD_LINK -1
+
+enum
+{
+    STATUS_UNUSED = 0,
+    STATUS_USED = 1
+};
 
 enum
 {
@@ -36,18 +45,17 @@ enum
 struct cache_t
 {
     pinode *pnode;
-    int16_t prev;
-    int16_t next;
+    int prev;
+    int next;
+    int status;
 };
 
 /* Pinode Cache Management structure */
 struct pinodecache {
-    struct cache_t element[MAX_ENTRIES];
+    struct cache_t element[PINT_PCACHE_MAX_ENTRIES];
     int count;
-    int16_t top;    /* Add at top */
-    int16_t free;   /* Points to next free array element - kind of like
-		       a free list */
-    int16_t bottom; /* Replace at bottom */
+    int top;
+    int bottom;
     gen_mutex_t *mt_lock;/* Mutex */
 };
 typedef struct pinodecache pcache;
