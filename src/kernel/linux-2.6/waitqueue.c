@@ -22,6 +22,55 @@ extern struct qhash_table *htable_ops_invalidated;
 #define MAX_SERVICE_WAIT_IN_SECONDS      300
 #endif
 
+static inline void clean_up_interrupted_operation(
+    pvfs2_kernel_op_t * op)
+{
+    /*
+      handle interrupted cases depending on what state
+      we were in when the interruption is detected.
+      there is a coarse grained lock across the operation.
+
+      NOTE: be sure not to reverse lock ordering by locking
+      an op lock while holding the request_list lock.
+
+      (Here, we first lock the op and then lock
+      the appropriate list).
+    */
+    spin_lock(&op->lock);
+    switch (op->op_state)
+    {
+	case PVFS2_VFS_STATE_INVALID:
+	    panic("pvfs2 op has invalid state; kernel panic");
+	    break;
+	case PVFS2_VFS_STATE_WAITING:
+	    /*
+              upcall hasn't been read; remove
+              op from upcall request list
+            */
+	    remove_op_from_request_list(op);
+	    pvfs2_print("Interrupted: Removed op from request_list\n");
+/*             invalidate_op(op, 0); */
+	    break;
+	case PVFS2_VFS_STATE_INPROGR:
+	    /*
+              op must be removed from the in progress htable
+              and inserted into the invalidated op htable.
+            */
+	    remove_op_from_htable_ops_in_progress(op);
+	    pvfs2_print("Interrupted: Removed op from "
+			"htable_ops_in_progress\n");
+/*             invalidate_op(op, 0); */
+	    break;
+	case PVFS2_VFS_STATE_SERVICED:
+	    /*
+              can this happen? even if it does, I think we're
+              ok with doing nothing since no cleanup is necessary
+	     */
+	    break;
+    }
+    spin_unlock(&op->lock);
+}
+
 /*
   sleeps on waitqueue waiting for matching downcall
   for some amount of time and then wakes up.
@@ -65,56 +114,16 @@ int wait_for_matching_downcall(
 	    if (!schedule_timeout
 		(MSECS_TO_JIFFIES(1000 * MAX_SERVICE_WAIT_IN_SECONDS)))
 	    {
+                pvfs2_print("OPERATION TIMED OUT\n");
+                clean_up_interrupted_operation(op);
 		ret = 1;
 		break;
 	    }
 	    continue;
 	}
 
-	pvfs2_print("FIXME: interrupted while waiting for downcall!!\n");
-	/*
-	   handle interrupted cases depending on what state
-	   we were in when the interruption is detected.
-	   there is a coarse grained lock across the operation (for now).
-
-	   NOTE: be sure not to reverse lock ordering by locking
-	   an op lock while holding the request_list lock
-	 */
-	spin_lock(&op->lock);
-	switch (op->op_state)
-	{
-	case PVFS2_VFS_STATE_INVALID:
-	    panic("pvfs2 op has invalid state; kernel panic");
-	    break;
-	case PVFS2_VFS_STATE_WAITING:
-	    /*
-	       upcall hasn't been read; remove
-	       op from upcall request list
-	     */
-	    remove_op_from_request_list(op);
-	    pvfs2_print("Interrupted: Removed op from request_list\n");
-/*                 invalidate_op(op, 0); */
-	    break;
-	case PVFS2_VFS_STATE_INPROGR:
-	    /*
-	       op must be removed from the in progress htable
-	       and inserted into the invalidated op htable.
-	     */
-	    remove_op_from_htable_ops_in_progress(op);
-	    pvfs2_print("Interrupted: Removed op from "
-			"htable_ops_in_progress\n");
-/*                 invalidate_op(op, 0); */
-	    break;
-	case PVFS2_VFS_STATE_SERVICED:
-	    /*
-	       can this happen?
-	     */
-	    break;
-	case PVFS2_VFS_STATE_DEAD:
-	    break;
-	}
-	spin_unlock(&op->lock);
-
+        pvfs2_print("OPERATION INTERRUPTED BY SIGNAL\n");
+        clean_up_interrupted_operation(op);
 	ret = 2;
 	break;
     }
@@ -126,29 +135,6 @@ int wait_for_matching_downcall(
 
     return ret;
 }
-
-/* int wait_for_matching_downcall(pvfs2_kernel_op_t *op) */
-/* { */
-/*     int ret = -1; */
-/*     DEFINE_WAIT(wait_entry); */
-/*     int op_state = PVFS2_VFS_STATE_INVALID; */
-
-/*     while (op_state != PVFS2_VFS_STATE_SERVICED) */
-/*     { */
-/*         prepare_to_wait(&op->waitq,&wait_entry,TASK_INTERRUPTIBLE); */
-
-/*         spin_lock(&op->lock); */
-/*         op_state = op->op_state; */
-/*         spin_unlock(&op->lock); */
-
-/*         if (op_state != PVFS2_VFS_STATE_SERVICED) */
-/*         { */
-/*             schedule(); */
-/*         } */
-/*         finish_wait(&op->waitq, &wait_entry); */
-/*     } */
-/*     return ret; */
-/* } */
 
 /*
  * Local variables:

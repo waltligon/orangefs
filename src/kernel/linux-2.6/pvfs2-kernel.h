@@ -62,14 +62,12 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
  * inprogr  - op is in progress (waiting for downcall)
  * serviced - op has matching downcall; ok
  * invalid  - op was cancelled and is now on the invalidated htable
- * dead     - op should be freed upon return
  ************************************/
 #define PVFS2_VFS_STATE_UNKNOWN        0x00FF0000
 #define PVFS2_VFS_STATE_WAITING        0x00FF0001
 #define PVFS2_VFS_STATE_INPROGR        0x00FF0002
 #define PVFS2_VFS_STATE_SERVICED       0x00FF0003
 #define PVFS2_VFS_STATE_INVALID        0x00FF0004
-#define PVFS2_VFS_STATE_DEAD           0x00FF0005
 
 
 /************************************
