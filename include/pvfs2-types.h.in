@@ -140,7 +140,8 @@ struct PVFS_statfs_s
     PVFS_fs_id fs_id;
     PVFS_size bytes_available;
     PVFS_size bytes_total;
-    /* TODO: need more fields here eventually */
+    uint64_t handles_available_count;
+    uint64_t handles_total_count;
 };
 typedef struct PVFS_statfs_s PVFS_statfs;
 
