@@ -325,10 +325,10 @@ int PVFS_sys_rename(
     PVFS_credentials credentials);
 
 int PVFS_sys_symlink(
-    PVFS_fs_id fs_id,
-    char* name,
-    char* target, 
-    PVFS_sys_attr attr, 
+    char *entry_name,
+    PVFS_pinode_reference parent_refn,
+    char *target,
+    PVFS_sys_attr attr,
     PVFS_credentials credentials,
     PVFS_sysresp_symlink *resp);
 

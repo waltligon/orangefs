@@ -19,8 +19,10 @@ LIBSRC += \
 	$(DIR)/pint-bucket.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
+        $(DIR)/shared-state-methods.c \
 	$(DIR)/sys-remove.c \
         $(DIR)/sys-create.c \
+        $(DIR)/sys-symlink.c \
 	$(DIR)/sys-getattr.c \
 	$(DIR)/sys-io.c \
 	$(DIR)/sys-flush.c \

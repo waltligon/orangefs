@@ -111,6 +111,20 @@ int do_decode_req(
                 PINT_Dist_decode(dec_msg->u.setattr.attr.u.meta.dist, NULL);
             }
 	}
+        else if (dec_msg->u.setattr.attr.objtype == PVFS_TYPE_SYMLINK)
+        {
+            if (dec_msg->u.setattr.attr.mask & PVFS_ATTR_SYMLNK_ALL)
+            {
+                dec_msg->u.setattr.attr.u.sym.target_path_len =
+                    *((uint32_t *)char_ptr);
+                char_ptr +=
+                    sizeof(dec_msg->u.setattr.attr.u.sym.target_path_len);
+
+                dec_msg->u.setattr.attr.u.sym.target_path =
+                    (char *)char_ptr;
+                char_ptr += dec_msg->u.setattr.attr.u.sym.target_path_len;
+            }
+        }
 	return (0);
 
     case PVFS_SERV_IO:

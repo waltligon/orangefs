@@ -95,7 +95,6 @@ struct PINT_client_remove_sm {
 /* PINT_client_create_sm */
 struct PINT_client_create_sm {
     char                         *object_name;    /* input parameter */
-    PVFS_pinode_reference        parent_ref;      /* input parameter */
     PVFS_sysresp_create          *create_resp;    /* in/out parameter*/
     PVFS_sys_attr                *sys_attr;       /* input parameter */
     int                          num_data_files;
@@ -105,6 +104,22 @@ struct PINT_client_create_sm {
     PVFS_handle                  metafile_handle;
     PVFS_handle                  *datafile_handles;
     PVFS_Dist                    *dist;
+};
+
+/* PINT_client_mkdir_sm */
+struct PINT_client_mkdir_sm {
+/* ENOTIMPL ;-) */
+};
+
+/* PINT_client_symlink_sm */
+struct PINT_client_symlink_sm {
+    PVFS_pinode_reference        parent_ref;     /* input parameter */
+    char                         *link_name;      /* input parameter */
+    char                         *link_target;    /* input parameter */
+    PVFS_sysresp_symlink         *sym_resp;       /* in/out parameter*/
+    PVFS_sys_attr                *sys_attr;       /* input parameter */
+    bmi_addr_t                   meta_server_addr;
+    PVFS_handle                  symlink_handle;
 };
 
 /* PINT_client_getattr_sm */
@@ -211,11 +226,14 @@ typedef struct PINT_client_sm {
     int msgarray_count;
     PINT_client_sm_msgpair_state *msgarray;
 
+    PVFS_pinode_reference parent_ref;
     PVFS_credentials *cred_p;
     union
     {
 	struct PINT_client_remove_sm remove;
 	struct PINT_client_create_sm create;
+	struct PINT_client_mkdir_sm mkdir;
+	struct PINT_client_symlink_sm sym;
 	struct PINT_client_getattr_sm getattr;
 	struct PINT_client_io_sm io;
 	struct PINT_client_flush_sm flush;
@@ -234,11 +252,13 @@ int PINT_client_state_machine_test(void);
 enum {
     PVFS_SYS_REMOVE  = 1,
     PVFS_SYS_CREATE  = 2,
-    PVFS_SYS_GETATTR = 3,
-    PVFS_SYS_IO      = 4,
-    PVFS_SYS_FLUSH   = 5,
-    PVFS_MGMT_SETPARAM_ALL = 6,
-    PVFS_MGMT_NOOP   = 7
+    PVFS_SYS_MKDIR   = 3,
+    PVFS_SYS_SYMLINK = 4,
+    PVFS_SYS_GETATTR = 5,
+    PVFS_SYS_IO      = 6,
+    PVFS_SYS_FLUSH   = 7,
+    PVFS_MGMT_SETPARAM_ALL = 8,
+    PVFS_MGMT_NOOP   = 9
 };
 
 /* prototypes of helper functions */
@@ -280,6 +300,8 @@ struct server_configuration_s *PINT_get_server_config_struct(void);
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
+extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
+extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;

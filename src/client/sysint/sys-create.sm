@@ -20,16 +20,13 @@
 #include "pint-bucket.h"
 #include "pcache.h"
 #include "PINT-reqproto-encode.h"
+#include "shared-state-methods.h"
 
 extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
 static int create_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p);
-static int create_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
-                                               job_status_s *js_p);
-static int create_parent_getattr_failure(PINT_client_sm *sm_p,
-                                         job_status_s *js_p);
 static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
                                               job_status_s *js_p);
 static int create_dspace_create_failure(PINT_client_sm *sm_p,
@@ -50,9 +47,6 @@ static int create_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p);
 
 /* completion function prototypes */
-static int create_getattr_comp_fn(void *v_p,
-				  struct PVFS_server_resp *resp_p,
-				  int index);
 static int create_create_comp_fn(void *v_p,
                                  struct PVFS_server_resp *resp_p,
                                  int index);
@@ -92,7 +86,7 @@ machine pvfs2_client_create_sm(init,
     }
 
     state create_parent_getattr_setup_msgpair {
-	run create_parent_getattr_setup_msgpair;
+	run sm_common_parent_getattr_setup_msgpair;
         success => create_parent_getattr_xfer_msgpair;
 	default => create_parent_getattr_failure;
     }
@@ -104,7 +98,7 @@ machine pvfs2_client_create_sm(init,
     }
 
     state create_parent_getattr_failure {
-	run create_parent_getattr_failure;
+	run sm_common_parent_getattr_failure;
 	default => cleanup;
     }
 
@@ -225,7 +219,7 @@ int PVFS_sys_create(
 
     sm_p->cred_p = &credentials;
     sm_p->u.create.object_name = object_name;
-    sm_p->u.create.parent_ref = parent_refn;
+    sm_p->parent_ref = parent_refn;
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.sys_attr = &attr;
 
@@ -276,135 +270,6 @@ static int create_init(PINT_client_sm *sm_p,
     /* do the request scheduler thing, if necessary */
 
     return 1;
-}
-
-static int create_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
-                                               job_status_s *js_p)
-{
-    int ret = -1;
-
-    gossip_debug(CLIENT_DEBUG, "create state: getattr_setup_msgpair\n");
-
-    memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
-
-    /* parameter range checks */
-    assert(sm_p->u.create.parent_ref.fs_id != 0);
-    assert(sm_p->u.create.parent_ref.handle != 0);
-
-    /* fill in getattr request */
-    PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
-			      *sm_p->cred_p,
-			      sm_p->u.create.parent_ref.fs_id,
-			      sm_p->u.create.parent_ref.handle,
-			      PVFS_ATTR_COMMON_ALL);
-
-    /* fill in msgpair structure components */
-    sm_p->msgpair.fs_id   = sm_p->u.create.parent_ref.fs_id;
-    sm_p->msgpair.handle  = sm_p->u.create.parent_ref.handle;
-    sm_p->msgpair.comp_fn = create_getattr_comp_fn;
-
-    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
-				    sm_p->msgpair.handle,
-				    sm_p->msgpair.fs_id);
-    if (ret != 0)
-    {
-	gossip_err("Error: failure mapping to server.\n");
-	assert(ret < 0); /* return value range check */
-	assert(0); /* TODO: real error handling */
-    }
-
-    js_p->error_code = 0;
-    return 1;
-}
-
-static int create_getattr_comp_fn(void *v_p,
-                                  struct PVFS_server_resp *resp_p,
-                                  int index)
-{
-    int ret = 0;
-    PVFS_object_attr *attr = NULL;
-
-    /* this is a little kludge to get around some struct definition
-     * issues in the headers.  maybe fix later?
-     */
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    
-    assert(resp_p->op == PVFS_SERV_GETATTR);
-
-    gossip_debug(CLIENT_DEBUG, "create state: getattr_comp_fn\n");
-
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
-    if (resp_p->status != 0)
-    {
-        gossip_err("Error: getattr failure\n");
-	return resp_p->status;
-    }
-
-    /*
-      if we didn't get a cache hit, we're making a
-      copy of the attributes here so that we can add
-      a pcache entry later in cleanup.
-    */
-    if (!sm_p->pcache_hit)
-    {
-        PINT_pcache_object_attr_deep_copy(
-            &sm_p->pcache_attr, &resp_p->u.getattr.attr);
-    }
-
-    /*
-      if we got a cache hit, use those attributes,
-      otherwise use the real server replied attrs
-    */
-    attr = (sm_p->pcache_hit ?
-            &sm_p->pinode->attr :
-            &resp_p->u.getattr.attr);
-    assert(attr);
-
-    if (attr->objtype == PVFS_TYPE_DIRECTORY)
-    {
-        /*
-          check permissions against parent directory to determine
-          if we're allowed to create a new entry there
-        */
-        ret = check_perms(*attr, attr->perms,
-                          sm_p->cred_p->uid, sm_p->cred_p->gid);
-        if (ret < 0)
-        {
-            gossip_err("Error: Permission failure\n");
-            return -PVFS_EPERM;
-        }
-    }
-    else
-    {
-        gossip_err("Error: Parent is not a directory\n");
-	return -PVFS_ENOTDIR;
-    }
-
-    /*
-      if our parent directory attributes are good, and not present
-      int the pcache, put them in the pcache now
-    */
-    if (!sm_p->pcache_hit)
-    {
-        PINT_pinode *pinode =
-            PINT_pcache_lookup(sm_p->u.getattr.object_ref);
-        if (!pinode)
-        {
-            pinode = PINT_pcache_pinode_alloc();
-            assert(pinode);
-        }
-        pinode->refn = sm_p->u.getattr.object_ref;
-        pinode->size = ((attr->mask & PVFS_ATTR_DATA_ALL) ?
-                        attr->u.data.size : 0);
-
-        PINT_pcache_object_attr_deep_copy(
-            &pinode->attr, &resp_p->u.getattr.attr);
-
-        PINT_pcache_set_valid(pinode);
-    }
-    return 0;
 }
 
 static int create_create_comp_fn(void *v_p,
@@ -529,14 +394,6 @@ static int create_setattr_comp_fn(void *v_p,
     return 0;
 }
 
-static int create_parent_getattr_failure(PINT_client_sm *sm_p,
-                                         job_status_s *js_p)
-{
-    gossip_debug(CLIENT_DEBUG, "create state: parent_getattr_failure\n");
-
-    return 1;
-}
-
 static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
                                               job_status_s *js_p)
 {
@@ -554,7 +411,7 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
       FIXME: right now there's no good way to request a certain
       number of data files.  Just go with the system default
     */
-    ret = PINT_bucket_get_num_io(sm_p->u.create.parent_ref.fs_id,
+    ret = PINT_bucket_get_num_io(sm_p->parent_ref.fs_id,
                                  &sm_p->u.create.num_data_files);
     if (ret < 0)
     {
@@ -577,7 +434,7 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
       handle range for a new file.
     */
     ret = PINT_bucket_get_next_meta(
-        sm_p->server_config, sm_p->u.create.parent_ref.fs_id,
+        sm_p->server_config, sm_p->parent_ref.fs_id,
         &sm_p->u.create.meta_server_addr,
         &meta_handle_extent_array);
     if (ret < 0)
@@ -593,12 +450,12 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
 
     PINT_SERVREQ_CREATE_FILL(msg_p->req,
                              *sm_p->cred_p,
-                             sm_p->u.create.parent_ref.fs_id,
+                             sm_p->parent_ref.fs_id,
                              PVFS_TYPE_METAFILE,
                              meta_handle_extent_array);
 
     /* fill in msgpair structure components */
-    msg_p->fs_id = sm_p->u.create.parent_ref.fs_id;
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
     msg_p->comp_fn = create_create_comp_fn;
 
@@ -628,8 +485,8 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 
     /* get meta server to create dir entry on */
     ret = PINT_bucket_map_to_server(&sm_p->u.create.meta_server_addr,
-                                    sm_p->u.create.parent_ref.handle,
-                                    sm_p->u.create.parent_ref.fs_id);
+                                    sm_p->parent_ref.handle,
+                                    sm_p->parent_ref.fs_id);
     if (ret < 0)
     {
         gossip_err("Failed to get meta server information\n");
@@ -645,11 +502,11 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
                                    *sm_p->cred_p,
                                    sm_p->u.create.object_name,
                                    sm_p->u.create.metafile_handle,
-                                   sm_p->u.create.parent_ref.handle,
-                                   sm_p->u.create.parent_ref.fs_id);
+                                   sm_p->parent_ref.handle,
+                                   sm_p->parent_ref.fs_id);
 
     /* fill in msgpair structure components */
-    msg_p->fs_id = sm_p->u.create.parent_ref.fs_id;
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->u.create.metafile_handle;
     msg_p->comp_fn = create_crdirent_comp_fn;
 
@@ -713,7 +570,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     }
 
     ret = PINT_bucket_get_next_io(sm_p->server_config,
-                                  sm_p->u.create.parent_ref.fs_id,
+                                  sm_p->parent_ref.fs_id,
                                   sm_p->u.create.num_data_files,
                                   sm_p->u.create.data_server_addrs,
                                   sm_p->u.create.io_handle_extent_array);
@@ -733,12 +590,12 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 
         PINT_SERVREQ_CREATE_FILL(msg_p->req,
                                  *sm_p->cred_p,
-                                 sm_p->u.create.parent_ref.fs_id,
+                                 sm_p->parent_ref.fs_id,
                                  PVFS_TYPE_DATAFILE,
                                  sm_p->u.create.io_handle_extent_array[i]);
 
         /* fill in msgpair structure components */
-        msg_p->fs_id = sm_p->u.create.parent_ref.fs_id;
+        msg_p->fs_id = sm_p->parent_ref.fs_id;
         msg_p->handle =
             sm_p->u.create.io_handle_extent_array[i].extent_array[0].first;
         msg_p->comp_fn = create_datafiles_comp_fn;
@@ -774,7 +631,7 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     /* clear error field in job */
     js_p->error_code = 0;
 
-    gossip_debug(CLIENT_DEBUG," create: posting crdirent req\n");
+    gossip_debug(CLIENT_DEBUG," create: posting setattr req\n");
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -785,7 +642,7 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
 
     PINT_SERVREQ_SETATTR_FILL(msg_p->req,
                               *sm_p->cred_p,
-                              sm_p->u.create.parent_ref.fs_id,
+                              sm_p->parent_ref.fs_id,
                               sm_p->u.create.metafile_handle,
                               PVFS_TYPE_METAFILE,
                               *sm_p->u.create.sys_attr,
@@ -795,7 +652,7 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
                               sm_p->u.create.dist);
 
     /* fill in msgpair structure components */
-    msg_p->fs_id = sm_p->u.create.parent_ref.fs_id;
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->u.create.metafile_handle;
     msg_p->comp_fn = create_setattr_comp_fn;
 
@@ -826,7 +683,7 @@ static int create_cleanup(PINT_client_sm *sm_p,
 
     /* insert attributes for this new metafile into the pcache */
     metafile_ref.handle = sm_p->u.create.metafile_handle;
-    metafile_ref.fs_id = sm_p->u.create.parent_ref.fs_id;
+    metafile_ref.fs_id = sm_p->parent_ref.fs_id;
 
     /* fill in outgoing response fields */
     sm_p->u.create.create_resp->pinode_refn = metafile_ref;

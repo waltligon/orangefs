@@ -136,8 +136,8 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     js_p->error_code = 0;
 
-    if (((req_a_p->objtype == PVFS_TYPE_METAFILE) ||
-         (a_p->objtype == PVFS_TYPE_METAFILE)))
+    if ((req_a_p->objtype == PVFS_TYPE_METAFILE) ||
+        (a_p->objtype == PVFS_TYPE_METAFILE))
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a metafile\n",
@@ -177,29 +177,34 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
         }
 	js_p->error_code = STATE_METAFILE;
     }
-    else if (((req_a_p->objtype == PVFS_TYPE_DATAFILE) ||
-              (a_p->objtype == PVFS_TYPE_DATAFILE)))
+    else if ((req_a_p->objtype == PVFS_TYPE_DATAFILE) ||
+             (a_p->objtype == PVFS_TYPE_DATAFILE))
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a datafile\n",
 		     s_op->req->u.setattr.handle);
     }
-    else if (((req_a_p->objtype == PVFS_TYPE_DIRECTORY) ||
-              (a_p->objtype == PVFS_TYPE_DIRECTORY)))
+    else if ((req_a_p->objtype == PVFS_TYPE_DIRECTORY) ||
+             (a_p->objtype == PVFS_TYPE_DIRECTORY))
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a directory\n",
 		     s_op->req->u.setattr.handle);
     }
-    else if (((req_a_p->objtype == PVFS_TYPE_SYMLINK) ||
-              (a_p->objtype == PVFS_TYPE_SYMLINK)))
+    else if ((req_a_p->objtype == PVFS_TYPE_SYMLINK) ||
+             (a_p->objtype == PVFS_TYPE_SYMLINK))
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a symlink\n",
 		     s_op->req->u.setattr.handle);
+
+        gossip_debug(SERVER_DEBUG,
+                     " symlink links handle %Lu to %s\n",
+                     s_op->req->u.setattr.handle,
+                     req_a_p->u.sym.target_path);
     }
-    else if (((req_a_p->objtype == PVFS_TYPE_DIRDATA) ||
-              (a_p->objtype == PVFS_TYPE_DIRDATA)))
+    else if ((req_a_p->objtype == PVFS_TYPE_DIRDATA) ||
+             (a_p->objtype == PVFS_TYPE_DIRDATA))
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a dirdata object\n",

@@ -289,6 +289,18 @@ int do_encode_req(
 		size += request->u.setattr.attr.u.meta.dist_size;
 	    }
 	}
+        else if (request->u.setattr.attr.objtype == PVFS_TYPE_SYMLINK)
+        {
+            if (request->u.setattr.attr.mask & PVFS_ATTR_SYMLNK_ALL)
+            {
+                assert(request->u.setattr.attr.u.sym.target_path_len > 0);
+                assert(request->u.setattr.attr.u.sym.target_path);
+
+                size +=
+                    sizeof(request->u.setattr.attr.u.sym.target_path_len);
+                size += request->u.setattr.attr.u.sym.target_path_len;
+            }
+        }
 
 	/* TODO: come back and alloc the right spaces for 
 	 * distributions and eattribs cause they're going to change */
@@ -309,7 +321,6 @@ int do_encode_req(
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 	enc_msg += sizeof(struct PVFS_server_req);
 
-	/* throw handles at the end for metadata files */
 	if (request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
 	{
             if (request->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
@@ -337,6 +348,20 @@ int do_encode_req(
                 PINT_Dist_encode(enc_msg, request->u.setattr.attr.u.meta.dist);
             }
 	}
+        else if (request->u.setattr.attr.objtype == PVFS_TYPE_SYMLINK)
+        {
+            if (request->u.setattr.attr.mask & PVFS_ATTR_SYMLNK_ALL)
+            {
+                *((uint32_t *)enc_msg) =
+                    request->u.setattr.attr.u.sym.target_path_len;
+                enc_msg +=
+                    sizeof(request->u.setattr.attr.u.sym.target_path_len);
+                memcpy(enc_msg,
+                       request->u.setattr.attr.u.sym.target_path,
+                       request->u.setattr.attr.u.sym.target_path_len);
+                enc_msg += request->u.setattr.attr.u.sym.target_path_len;
+            }
+        }
 	return (0);
     case PVFS_SERV_IO:
 

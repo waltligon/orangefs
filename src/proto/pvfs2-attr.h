@@ -41,6 +41,7 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 /* attributes specific to symlinks */
 struct PVFS_symlink_attr_s
 {
+    uint32_t target_path_len;
     char *target_path;
 };
 typedef struct PVFS_symlink_attr_s PVFS_symlink_attr;
