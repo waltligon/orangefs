@@ -2258,6 +2258,114 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     return (0);
 }
 
+/* job_trove_dspace_iterate_handles()
+ *
+ * iterates through all of the handles in a given collection
+ *
+ * returns 0 on success, 1 on immediate completion, -PVFS_error on failure
+ */
+int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
+    PVFS_ds_position position,
+    PVFS_handle* handle_array,
+    int count,
+    PVFS_ds_flags flags,
+    PVFS_vtag* vtag,
+    void* user_ptr,
+    PVFS_aint status_user_tag,
+    job_status_s* out_status_p,
+    job_id_t* id,
+    job_context_id context_id)
+{
+    /* post a trove keyval iterate_handles.  If it completes (or fails)
+     * immediately, then return and fill in the status structure.  
+     * If it needs to be tested for completion later, then queue 
+     * up a job_desc structure.  */
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    void* user_ptr_internal;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the BMI id and user ptr
+     */
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+	return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->u.trove.vtag = vtag;
+    jd->u.trove.position = position;
+    jd->u.trove.count = count;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+#if __PVFS2_JOB_THREADED__
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#else
+    user_ptr_internal = jd;
+#endif
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_dspace_iterate_handles(coll_id,
+			       &(jd->u.trove.position), handle_array,
+			       &(jd->u.trove.count), flags, jd->u.trove.vtag,
+			       user_ptr_internal, 
+			       global_trove_context, &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
+
+    if (ret < 0)
+    {
+	/* error posting trove operation */
+	dealloc_job_desc(jd);
+
+	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
+	return (1);
+    }
+
+    if (ret == 1)
+    {
+	/* immediate completion */
+	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
+	out_status_p->vtag = jd->u.trove.vtag;
+	out_status_p->position = jd->u.trove.position;
+	out_status_p->count = jd->u.trove.count;
+	dealloc_job_desc(jd);
+	return (ret);
+    }
+
+    /* if we fall through to this point, the job did not
+     * immediately complete and we must queue up to test later
+     */
+    gen_mutex_lock(&trove_mutex);
+    *id = jd->job_id;
+    trove_pending_count++;
+    gen_mutex_unlock(&trove_mutex);
+
+    return (0);
+}
+
+
+/* iterate through all of the keys for a data space */
+int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
+				  PVFS_handle handle,
+				  PVFS_ds_position position,
+				  PVFS_ds_keyval * key_array,
+				  int count,
+				  PVFS_ds_flags flags,
+				  PVFS_vtag * vtag,
+				  void *user_ptr,
+				  PVFS_aint status_user_tag,
+				  job_status_s * out_status_p,
+				  job_id_t * id,
+				  job_context_id context_id);
+
+
 /* job_trove_keyval_iterate_keys()
  *
  * iterate through all of the keys for a data space 

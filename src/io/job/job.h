@@ -366,6 +366,19 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 				  job_id_t * id,
 				  job_context_id context_id);
 
+/* iterates through all handles in a collection */
+int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
+    PVFS_ds_position position,
+    PVFS_handle* handle_array,
+    int count,
+    PVFS_ds_flags flags,
+    PVFS_vtag* vtag,
+    void* user_ptr,
+    PVFS_aint status_user_tag,
+    job_status_s* out_status_p,
+    job_id_t* id,
+    job_context_id context_id);
+
 /* create a new data space object */
 int job_trove_dspace_create(PVFS_fs_id coll_id,
 			    PVFS_handle_extent_array *handle_extent_array,
