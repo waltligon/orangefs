@@ -34,7 +34,8 @@ enum PVFS_server_op
     PVFS_SERV_MKDIR = 10,
     PVFS_SERV_READDIR = 11,
     PVFS_SERV_GETCONFIG = 12,
-    PVFS_SERV_WRITE_COMPLETION = 13
+    PVFS_SERV_WRITE_COMPLETION = 13,
+    PVFS_SERV_FLUSH = 14
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
      * if you add a new operation to this list
      */
@@ -48,7 +49,7 @@ enum PVFS_server_op
      * PVFS_SERV_STATFS
      */
 };
-#define PVFS_MAX_SERVER_OP 13
+#define PVFS_MAX_SERVER_OP 14
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
@@ -120,6 +121,31 @@ do {						\
 
 /* NOTE: no response structure; all necessary response info is 
  * returned in generic server response structure
+ */
+
+/* flush
+ * - used to flush an object to disk */
+struct PVFS_servreq_flush
+{
+    PVFS_handle handle;		/* handle of object to flush */
+    PVFS_fs_id fs_id;		/* file system */
+    int flags;			/* future use */
+};
+
+#define PINT_SERVREQ_FLUSH_FILL(__req,		\
+				__creds,	\
+				__fsid,		\
+				__handle)	\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_FLUSH;		\
+    (__req).credentials = (__creds);		\
+    (__req).u.flush.fs_id = (__fsid);		\
+    (__req).u.remove.handle = (__handle);	\
+} while (0)
+
+/* NOTE: no response structure; all necessary response info is returned in
+ * generic server response structure
  */
 
 /* getattr ****************************************************/
@@ -323,16 +349,6 @@ struct PVFS_servreq_truncate
 /* NOTE: no response structure; all necessary response info is 
  * returned in generic server response structure
  */
-
-/* flush
- * - flush data to disk (or other storage device) */
-
-struct PVFS_servreq_flush
-{
-    PVFS_handle handle;		    /* handle of object to flush */
-    PVFS_fs_id fs_id;		    /* file system */
-    int flags;			    
-};
 
 /* NOTE: no response structure: all necessary response info is returned in
  * generic server response structure
