@@ -253,7 +253,7 @@ int dbpf_attr_cache_finalize(void)
     return ret;
 }
 
-dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key)
+dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_object_ref key)
 {
     struct qlist_head *hash_link = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
@@ -273,7 +273,7 @@ dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key)
                 GOSSIP_DBPF_ATTRCACHE_DEBUG,
                 "dbpf_cache_elem_lookup: cache "
                 "elem matching %Lu returned (num_elems=%d)\n",
-                Lu(key), s_current_num_cache_elems);
+                Lu(key.handle), s_current_num_cache_elems);
         }
         gen_mutex_unlock(s_dbpf_attr_mutex);
     }
@@ -281,7 +281,7 @@ dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key)
 }
 
 int dbpf_attr_cache_ds_attr_update_cached_data(
-    TROVE_handle key, TROVE_ds_attributes *src_ds_attr)
+    TROVE_object_ref key, TROVE_ds_attributes *src_ds_attr)
 {
     int ret = -1;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
@@ -298,7 +298,7 @@ int dbpf_attr_cache_ds_attr_update_cached_data(
                    sizeof(TROVE_ds_attributes));
             gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Updating "
                          "cached attributes for key %Lu\n",
-                         Lu(key));
+                         Lu(key.handle));
             ret = 0;
         }
         gen_mutex_unlock(s_dbpf_attr_mutex);
@@ -307,7 +307,7 @@ int dbpf_attr_cache_ds_attr_update_cached_data(
 }
 
 int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
-    TROVE_handle key, PVFS_size b_size)
+    TROVE_object_ref key, PVFS_size b_size)
 {
     int ret = -1;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
@@ -323,7 +323,7 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
             cache_elem->attr.b_size = b_size;
             gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Updating "
                          "cached b_size for key %Lu\n",
-                         Lu(key));
+                         Lu(key.handle));
             ret = 0;
         }
         gen_mutex_unlock(s_dbpf_attr_mutex);
@@ -332,7 +332,7 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
 }
 
 int dbpf_attr_cache_ds_attr_fetch_cached_data(
-    TROVE_handle key, TROVE_ds_attributes *target_ds_attr)
+    TROVE_object_ref key, TROVE_ds_attributes *target_ds_attr)
 {
     int ret = -1;
     struct qlist_head *hash_link = NULL;
@@ -378,7 +378,7 @@ dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
                     GOSSIP_DBPF_ATTRCACHE_DEBUG, "Returning data %p "
                     "based on key %Lu and key_str %s (data_sz=%d)\n",
                     cache_elem->keyval_pairs[i].data,
-                    Lu(cache_elem->key), key,
+                    Lu(cache_elem->key.handle), key,
                     cache_elem->keyval_pairs[i].data_sz);
                 gen_mutex_unlock(s_dbpf_attr_mutex);
                 return &cache_elem->keyval_pairs[i];
@@ -390,7 +390,7 @@ dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
 }
 
 int dbpf_attr_cache_elem_set_data_based_on_key(
-    TROVE_handle key, char *key_str, void *data, int data_sz)
+    TROVE_object_ref key, char *key_str, void *data, int data_sz)
 {
     int ret = - 1, i = 0;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
@@ -414,7 +414,7 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
                     GOSSIP_DBPF_ATTRCACHE_DEBUG,
                     "Setting data %p based on key "
                     "%Lu and key_str %s (data_sz=%d)\n", data,
-                    Lu(key), key_str, data_sz);
+                    Lu(key.handle), key_str, data_sz);
 
                 if (cache_elem->keyval_pairs[i].data)
                 {
@@ -458,7 +458,7 @@ int dbpf_attr_cache_keyval_pair_fetch_cached_data(
 }
 
 int dbpf_attr_cache_insert(
-    TROVE_handle key,
+    TROVE_object_ref key,
     TROVE_ds_attributes *attr)
 {
     int ret = -1, i = 0, already_exists = 0;
@@ -472,7 +472,8 @@ int dbpf_attr_cache_insert(
 
         if ((s_current_num_cache_elems + 1) > s_max_num_cache_elems)
         {
-            TROVE_handle sacrificial_lamb_key = TROVE_HANDLE_NULL;
+            TROVE_object_ref sacrificial_lamb_key =
+                {TROVE_HANDLE_NULL, TROVE_COLL_ID_NULL};
             /*
               we have the lock, so we can safely remove
               any element in this cache at this point;
@@ -502,17 +503,17 @@ int dbpf_attr_cache_insert(
               at 0, as *something* must be in the hash table
             */
             if ((i == s_key_to_attr_table->table_size) &&
-                (sacrificial_lamb_key == TROVE_HANDLE_NULL))
+                (sacrificial_lamb_key.handle == TROVE_HANDLE_NULL))
             {
                 i = 0;
                 goto hashtable_linear_scan;
             }
-            assert(sacrificial_lamb_key != TROVE_HANDLE_NULL);
+            assert(sacrificial_lamb_key.handle != TROVE_HANDLE_NULL);
             gen_mutex_unlock(s_dbpf_attr_mutex);
             gossip_debug(
                 GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Cache is full -- "
                 "removing key %Lu to insert key %Lu\n",
-                Lu(sacrificial_lamb_key), Lu(key));
+                Lu(sacrificial_lamb_key.handle), Lu(key.handle));
             dbpf_attr_cache_remove(sacrificial_lamb_key);
             gen_mutex_lock(s_dbpf_attr_mutex);
             DBPF_ATTR_CACHE_ASSERT_OK(ret);
@@ -561,7 +562,7 @@ int dbpf_attr_cache_insert(
                 gossip_debug(
                     GOSSIP_DBPF_ATTRCACHE_DEBUG,
                     "dbpf_attr_cache_insert: inserting %Lu "
-                    "(k_size is %Lu | b_size is %Lu)\n", Lu(key),
+                    "(k_size is %Lu | b_size is %Lu)\n", Lu(key.handle),
                     Lu(cache_elem->attr.k_size),
                     Lu(cache_elem->attr.b_size));
             }
@@ -572,7 +573,7 @@ int dbpf_attr_cache_insert(
     return ret;
 }
 
-int dbpf_attr_cache_remove(TROVE_handle key)
+int dbpf_attr_cache_remove(TROVE_object_ref key)
 {
     int ret = -1, i = 0;
     struct qlist_head *hash_link = NULL;
@@ -592,7 +593,7 @@ int dbpf_attr_cache_remove(TROVE_handle key)
 
             gossip_debug(
                 GOSSIP_DBPF_ATTRCACHE_DEBUG, "dbpf_attr_cache_remove: "
-                "removing %Lu\n", Lu(key));
+                "removing %Lu\n", Lu(key.handle));
 
             /* free any keyval data cached as well */
             if (s_cacheable_keywords)
@@ -628,9 +629,10 @@ int dbpf_attr_cache_remove(TROVE_handle key)
 static int hash_key(void *key, int table_size)
 {
     unsigned long tmp = 0;
-    TROVE_handle *real_handle = (TROVE_handle *)key;
+    TROVE_object_ref *ref = (TROVE_object_ref *)key;
 
-    tmp += (*(real_handle));
+    tmp = (ref->fs_id << 12);
+    tmp += ref->handle;
     tmp = (tmp % table_size);
 
     return ((int)tmp);
@@ -646,12 +648,13 @@ static int hash_key(void *key, int table_size)
 static int hash_key_compare(void *key, struct qlist_head *link)
 {
     dbpf_attr_cache_elem_t *cache_elem = NULL;
-    TROVE_handle *real_handle = (TROVE_handle *)key;
+    TROVE_object_ref *ref = (TROVE_object_ref *)key;
 
     cache_elem = qlist_entry(link, dbpf_attr_cache_elem_t, hash_link);
     assert(cache_elem);
 
-    if (cache_elem->key == *real_handle)
+    if ((cache_elem->key.handle == ref->handle) &&
+        (cache_elem->key.fs_id == ref->fs_id))
     {
         return(1);
     }

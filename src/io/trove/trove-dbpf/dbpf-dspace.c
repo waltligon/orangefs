@@ -155,6 +155,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     DB *db_p;
     TROVE_extent cur_extent;
+    TROVE_object_ref ref = {TROVE_HANDLE_NULL, op_p->coll_p->coll_id};
 
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
     switch (ret)
@@ -269,7 +270,8 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     trove_ds_stored_to_attr(s_attr, attr, 0, 0);
 
     /* add retrieved ds_attr to dbpf_attr cache here */
-    dbpf_attr_cache_insert(new_handle, &attr);
+    ref.handle = new_handle;
+    dbpf_attr_cache_insert(ref, &attr);
     
     DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
@@ -327,6 +329,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     int error = -TROVE_EINVAL, ret, got_db = 0;
     DBT key;
     DB *db_p = NULL;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
     switch (ret)
@@ -362,7 +365,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     }
 
     /* if this attr is in the dbpf attr cache, remove it */
-    dbpf_attr_cache_remove(op_p->handle);
+    dbpf_attr_cache_remove(ref);
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
@@ -723,10 +726,11 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
+    TROVE_object_ref ref = {handle, coll_id};
 
     /* fast path cache hit; skips queueing */
     if (dbpf_attr_cache_ds_attr_fetch_cached_data(
-            handle, ds_attr_p) == 0)
+            ref, ds_attr_p) == 0)
     {
 #if 0
         gossip_debug(GOSSIP_TROVE_DEBUG, "fast path attr cache hit on %Lu"
@@ -826,6 +830,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     DB *db_p;
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
     switch (ret)
@@ -872,7 +877,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 
     /* now that the disk is updated, update the cache if necessary */
     dbpf_attr_cache_ds_attr_update_cached_data(
-        op_p->handle, op_p->u.d_setattr.attr_p);
+        ref, op_p->u.d_setattr.attr_p);
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
@@ -899,6 +904,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     struct stat b_stat;
     /* for grabbing keyval size; assumes DB_RECNUM!!! */
     DB_BTREE_STAT *k_stat_p;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
     switch (ret)
@@ -1023,7 +1029,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     trove_ds_stored_to_attr(s_attr, *attr, b_size, k_size);
 
     /* add retrieved ds_attr to dbpf_attr cache here */
-    dbpf_attr_cache_insert(op_p->handle, attr);
+    dbpf_attr_cache_insert(ref, attr);
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 

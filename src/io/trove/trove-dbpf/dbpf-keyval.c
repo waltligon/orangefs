@@ -43,11 +43,12 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
+    TROVE_object_ref ref = {handle, coll_id};
 
     gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Read "
                  "of %s\n", (char *)key_p->buffer);
 
-    cache_elem = dbpf_attr_cache_elem_lookup(handle);
+    cache_elem = dbpf_attr_cache_elem_lookup(ref);
     if (cache_elem)
     {
         dbpf_keyval_pair_cache_elem_t *keyval_pair =
@@ -106,6 +107,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     int error, ret, got_db = 0;
     DB *db_p = NULL;
     DBT key, data;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_keyval_dbcache_try_get(
         op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
@@ -150,7 +152,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 
     /* cache this data in the attr cache if we can */
     if (dbpf_attr_cache_elem_set_data_based_on_key(
-            op_p->handle, op_p->u.k_read.key.buffer,
+            ref, op_p->u.k_read.key.buffer,
             op_p->u.k_read.val.buffer, data.size))
     {
         /*
@@ -234,6 +236,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     DB *db_p = NULL;
     DBT key, data;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_keyval_dbcache_try_get(
         op_p->coll_p->coll_id, op_p->handle, 1, &db_p);
@@ -275,11 +278,11 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
       now that the data is written to disk, update the cache if it's
       an attr keyval we manage.
     */
-    cache_elem = dbpf_attr_cache_elem_lookup(op_p->handle);
+    cache_elem = dbpf_attr_cache_elem_lookup(ref);
     if (cache_elem)
     {
         if (dbpf_attr_cache_elem_set_data_based_on_key(
-                op_p->handle, op_p->u.k_write.key.buffer,
+                ref, op_p->u.k_write.key.buffer,
                 op_p->u.k_write.val.buffer, data.size))
         {
             /*

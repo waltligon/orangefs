@@ -541,6 +541,7 @@ static int dbpf_bstream_resize(TROVE_coll_id coll_id,
 static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
 {
     int ret, error, fd, got_fd = 0;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     /* grab the FD (also increments a reference count) */
     ret = dbpf_bstream_fdcache_try_get(
@@ -574,7 +575,7 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
 
     /* adjust size in cached attribute element, if present */
     dbpf_attr_cache_ds_attr_update_cached_data_bsize(
-        op_p->handle,  op_p->u.b_resize.size);
+        ref,  op_p->u.b_resize.size);
 
     return 1;
 
@@ -773,7 +774,8 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     */
     if (opcode == LIO_WRITE)
     {
-        dbpf_attr_cache_remove(handle);
+        TROVE_object_ref ref = {handle, coll_id};
+        dbpf_attr_cache_remove(ref);
     }
 
 #ifndef __PVFS2_TROVE_AIO_THREADED__

@@ -35,7 +35,7 @@ typedef struct
 {
     struct qlist_head hash_link;
 
-    TROVE_handle key;
+    TROVE_object_ref key;
     TROVE_ds_attributes attr;
     dbpf_keyval_pair_cache_elem_t keyval_pairs[
         DBPF_ATTR_CACHE_MAX_NUM_KEYVALS];
@@ -68,27 +68,30 @@ int dbpf_attr_cache_initialize(
     int num_cacheable_keywords);
 
 /* returns the cached element object on success; NULL on failure */
-dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key);
+dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(
+    TROVE_object_ref key);
 
 /* do an atomic update of the attributes in the cache for this key */
 int dbpf_attr_cache_ds_attr_update_cached_data(
-    TROVE_handle key, TROVE_ds_attributes *src_ds_attr);
+    TROVE_object_ref key, TROVE_ds_attributes *src_ds_attr);
 /*
   do an atomic update of the attr's b_size in the cache
   for this key; a special case of above method
 */
 int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
-    TROVE_handle key, PVFS_size b_size);
+    TROVE_object_ref key, PVFS_size b_size);
 
 /*
   do an atomic copy of the cached attributes into the provided
   target_ds_attr object based on the specified key
 */
 int dbpf_attr_cache_ds_attr_fetch_cached_data(
-    TROVE_handle key, TROVE_ds_attributes *target_ds_attr);
+    TROVE_object_ref key, TROVE_ds_attributes *target_ds_attr);
 
-int dbpf_attr_cache_insert(TROVE_handle key, TROVE_ds_attributes *attr);
-int dbpf_attr_cache_remove(TROVE_handle key);
+int dbpf_attr_cache_insert(
+    TROVE_object_ref key, TROVE_ds_attributes *attr);
+int dbpf_attr_cache_remove(
+    TROVE_object_ref key);
 int dbpf_attr_cache_finalize(void);
 
 
@@ -98,7 +101,7 @@ int dbpf_attr_cache_finalize(void);
 
 /* insert key/data pair into cache element based on specific key */
 int dbpf_attr_cache_elem_set_data_based_on_key(
-    TROVE_handle key, char *key_str, void *data, int data_sz);
+    TROVE_object_ref key, char *key_str, void *data, int data_sz);
 
 /*
   given a cached elem and a keyval key, return associated
@@ -107,9 +110,9 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
 dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
     dbpf_attr_cache_elem_t *cache_elem, char *key);
 
-/* map data to key_str, based on specified handle attr cache entry */ 
+/* map data to key_str, based on specified key's attr cache entry */
 int dbpf_attr_cache_elem_set_data_based_on_key(
-    TROVE_handle key, char *key_str, void *data, int data_sz);
+    TROVE_object_ref key, char *key_str, void *data, int data_sz);
 
 /* do an atomic update of the data in the cache for this keyval */
 int dbpf_attr_cache_keyval_pair_update_cached_data(
