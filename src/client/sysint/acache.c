@@ -58,11 +58,11 @@ static void pinode_update_timestamp(
     PINT_pinode **pinode);
 static void pinode_invalidate(
     PINT_pinode *pinode);
-static void acache_internal_release(
+static inline void acache_internal_release(
     PINT_pinode *pinode);
-static PINT_pinode *acache_internal_lookup(
+static inline PINT_pinode *acache_internal_lookup(
     PVFS_object_ref refn);
-static int acache_internal_status(
+static inline int acache_internal_status(
     PINT_pinode *pinode);
 #ifdef PINT_ACACHE_AUTO_CLEANUP
 static void reclaim_pinode_entries(void);
@@ -189,7 +189,7 @@ int PINT_acache_reinitialize(void)
   locks or reference counts; always done with the interface lock and
   without the htable mutex held
 */
-static PINT_pinode *acache_internal_lookup(PVFS_object_ref refn)
+static inline PINT_pinode *acache_internal_lookup(PVFS_object_ref refn)
 {
     PINT_pinode *pinode = NULL;
     struct qhash_head *link = NULL;
@@ -374,7 +374,7 @@ void PINT_acache_release_refn(PVFS_object_ref refn)
   internal use only -- does a release without the interface lock and
   without the htable mutex held
 */
-static void acache_internal_release(PINT_pinode *pinode)
+static inline void acache_internal_release(PINT_pinode *pinode)
 {
     acache_debug("acache_internal_release entered\n");
     assert(s_acache_initialized);
@@ -544,7 +544,7 @@ static int pinode_status(PINT_pinode *pinode)
     return ret;
 }
 
-static int acache_internal_status(PINT_pinode *pinode)
+static inline int acache_internal_status(PINT_pinode *pinode)
 {
     struct timeval now;
     int ret = PINODE_STATUS_INVALID;

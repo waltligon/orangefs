@@ -57,6 +57,12 @@ static int add_sm_to_completion_list(PINT_client_sm *sm_p)
     return 0;
 }
 
+/*
+  this method is used in the case of calling test() on an sm that was
+  already completed by a previous call to testsome().  in this case,
+  if the sm was added to the completion list, it MUST be removed
+  before returning from test()
+*/
 static int conditional_remove_sm_if_in_completion_list(
     PINT_client_sm *sm_p)
 {

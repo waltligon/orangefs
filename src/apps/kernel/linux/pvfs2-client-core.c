@@ -67,6 +67,16 @@
 */
 /* #define STANDALONE_RUN_MODE */
 
+/*
+  uncomment for timing of individual operation information to be
+  emitted to the pvfs2-client logging output
+*/
+/* #define CLIENT_CORE_OP_TIMING */
+
+#ifdef CLIENT_CORE_OP_TIMING
+#include "pint-util.h"
+#endif
+
 typedef struct
 {
     /* client side attribute cache timeout; 0 is effectively disabled */
@@ -124,6 +134,11 @@ typedef struct
         PVFS_sysresp_statfs statfs;
         PVFS_sysresp_io io;
     } response;
+
+#ifdef CLIENT_CORE_OP_TIMING
+    PINT_time_marker start;
+    PINT_time_marker end;
+#endif
 
 } vfs_request_t;
 
@@ -553,12 +568,11 @@ static int post_readdir_request(vfs_request_t *vfs_request)
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(
-        GOSSIP_CLIENTCORE_DEBUG, "Got a readdir request for fsid %d | "
-        "parent %Lu (token is %d)\n",
-        vfs_request->in_upcall.req.readdir.refn.fs_id,
-        Lu(vfs_request->in_upcall.req.readdir.refn.handle),
-        vfs_request->in_upcall.req.readdir.token);
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdir request "
+                 "for %Lu,%d (token %d)\n",
+                 Lu(vfs_request->in_upcall.req.readdir.refn.handle),
+                 vfs_request->in_upcall.req.readdir.refn.fs_id,
+                 vfs_request->in_upcall.req.readdir.token);
 
     ret = PVFS_isys_readdir(
         vfs_request->in_upcall.req.readdir.refn,
@@ -726,7 +740,7 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
         
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "Got an fs mount request via host %s\n",
+        "Got an fs mount request for host:\n  %s\n",
         vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
 
     generate_upcall_mntent(mntent, vfs_request->in_upcall, 1);
@@ -1561,7 +1575,7 @@ static inline int repost_unexp_vfs_request(
     }
     else
     {
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "[*] reposted unexp "
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "[-] reposted unexp "
                      "req [%p] due to %s\n", vfs_request,
                      completion_handle_desc);
     }
@@ -1583,8 +1597,8 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
     }
 
     gossip_debug(
-        GOSSIP_CLIENTCORE_DEBUG, "Got dev req msg: "
-        "size: %d, tag: %Ld, payload: %p, type: %d\n",
+        GOSSIP_CLIENTCORE_DEBUG, "[+] dev req msg: "
+        "sz: %d,tag: %Ld,data: %p,type: %d\n",
         vfs_request->info.size, Ld(vfs_request->info.tag),
         vfs_request->info.buffer, vfs_request->in_upcall.type);
 
@@ -1616,7 +1630,7 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
     }
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                 "[0] handling new unexp vfs_request %p\n", vfs_request);
+                 "[*] handling new unexp vfs_request %p\n", vfs_request);
 
     /*
       make sure the operation is not currently in progress.  if it is,
@@ -1633,6 +1647,10 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
         ret = OP_IN_PROGRESS;
         goto repost_op;
     }
+
+#ifdef CLIENT_CORE_OP_TIMING
+    PINT_time_mark(&vfs_request->start);
+#endif
 
     switch(vfs_request->in_upcall.type)
     {
@@ -1836,9 +1854,26 @@ int process_vfs_requests(void)
             }
             else
             {
+
+#ifdef CLIENT_CORE_OP_TIMING
+                {
+                    double wtime = 0.0f, utime = 0.0f, stime = 0.0f;
+                    PINT_time_mark(&vfs_request->end);
+                    PINT_time_diff(vfs_request->start,
+                                   vfs_request->end,
+                                   &wtime, &utime, &stime);
+
+                    gossip_debug(
+                        GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
+                        " returned completed vfs_request %p\n\twtime = %f,"
+                        "utime=%f, stime=%f (seconds)\n",
+                        vfs_request, wtime, utime, stime);
+                }
+#else
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
                              " returned completed vfs_request %p\n",
                              vfs_request);
+#endif
                 /*
                   if this is not a dev unexp msg, it's a non-blocking
                   sysint operation that has just completed
