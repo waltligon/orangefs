@@ -44,7 +44,13 @@
 
 /* This array is used for common key-val pairs for trove =) */
 
-PINT_server_trove_keys_s Trove_Common_Keys[3] = {{"root_handle",12},{"metadata",9},{"dir_ent",8}};
+PINT_server_trove_keys_s Trove_Common_Keys[] = {
+    {"root_handle", 12},
+    {"metadata", 9},
+    {"dir_ent", 8},
+    {"datafile_handles", 17},
+    {"metafile_dist", 14}
+};
 
 #define ENCODE_TYPE 0
 #define SM_STATE_RETURN -1

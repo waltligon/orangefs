@@ -41,10 +41,12 @@ enum {
 /* Values for use in KeyVal Array */
 
 enum {
-	ROOT_HANDLE_KEY = 0,
-	METADATA_KEY = 1,
-	DIR_ENT_KEY = 2,
-	KEYVAL_ARRAY_SIZE = 6
+	ROOT_HANDLE_KEY      = 0,
+	METADATA_KEY         = 1,
+	DIR_ENT_KEY          = 2,
+	METAFILE_HANDLES_KEY = 3,
+	METAFILE_DIST_KEY    = 4,
+	KEYVAL_ARRAY_SIZE    = 6
 };
 
 typedef struct PINT_server_trove_keys
