@@ -17,7 +17,7 @@
 #include "pvfs2-sysint.h"
 #include "pint-sysint.h"
 #include "pint-servreq.h"
-#include "config-manage.h"
+#include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
 
 #define REQ_ENC_FORMAT 0
@@ -30,7 +30,7 @@
  */
 int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 {
-	struct PVFS_server_req_s *req_p = NULL;	/* server request */
+	struct PVFS_server_req_s req_p;			/* server request */
 	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
 	int ret = -1, flags = 0;
 	pinode *pinode_ptr = NULL, *item_ptr = NULL;
@@ -38,15 +38,16 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	char *server = NULL;
 	PVFS_bitfield mask = req->attrmask;
 	pinode_reference entry;
-	/*PVFS_servreq_setattr req_args;*/
 	PVFS_size handlesize = 0;
 	bmi_size_t max_msg_sz = sizeof(struct PVFS_server_resp_s);
 	struct PINT_decoded_msg decoded;
 
-	req_p = (struct PVFS_server_req_s *) malloc(sizeof(struct PVFS_server_req_s));
-	if (req_p == NULL) {
-		assert(0);
-	}
+	enum {
+	    NONE_FAILURE = 0,
+	    PCACHE_LOOKUP_FAILURE,
+	    PINODE_REMOVE_FAILURE,
+	    MAP_TO_SERVER_FAILURE,
+	} failure = NONE_FAILURE;
 
 	/* Validate the handle */
 	/* If size to be fetched, distribution needs to be fetched
@@ -64,6 +65,8 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	
 	/* Lookup the entry...may or may not exist in the cache */
 #if 0
+	/* this is commented out until getattr works correctly */
+
 	ret = PINT_pcache_lookup(entry,pinode_ptr);
 	/* Check if pinode was returned */
 	if (ret == PCACHE_LOOKUP_FAILURE)
@@ -72,10 +75,13 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 		ret = phelper_refresh_pinode(mask, pinode_ptr, entry, req->credentials);
 		if (ret < 0)
 		{
-			goto pcache_lookup_failure;
+		    failure = PCACHE_LOOKUP_FAILURE;
+		    goto return_error;
 		}
 	}
 #endif
+
+	/* by this point we definately have a pinode cache entry */
 
 	/* Free the previously allocated pinode */
 	//pcache_pinode_dealloc(pinode_ptr);
@@ -86,39 +92,36 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	/* Make a setattr request */
 
 	/* Get the server thru the BTI using the handle */
-	ret = config_bt_map_bucket_to_server(&server,entry.handle,entry.fs_id);
+	ret = PINT_bucket_map_to_server(&serv_addr,entry.handle,entry.fs_id);
 	if (ret < 0)
 	{
-		goto pcache_lookup_failure;
-	}
-	ret = BMI_addr_lookup(&serv_addr,server);
-	if (ret < 0)
-	{
-		goto map_to_server_failure;
+	    failure = MAP_TO_SERVER_FAILURE;
+	    goto return_error;
 	}
 
 	/* Create the server request */
-	req_p->op = PVFS_SERV_SETATTR;
-	req_p->credentials = req->credentials;
+	req_p.op = PVFS_SERV_SETATTR;
+	req_p.credentials = req->credentials;
 	if ((req->attr.objtype & ATTR_META) == ATTR_META)
 	{
-		handlesize = req->attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
+	    handlesize = req->attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
 	}
 	else
 	{
-		handlesize = 0;
+	    handlesize = 0;
 	}
-	req_p->rsize = sizeof(struct PVFS_server_req_s) + handlesize;
-	req_p->u.setattr.handle = entry.handle;
-	req_p->u.setattr.fs_id = entry.fs_id;
-	req_p->u.setattr.attrmask = mask;
-	req_p->u.setattr.attr = req->attr;
+	req_p.rsize = sizeof(struct PVFS_server_req_s) + handlesize;
+	req_p.u.setattr.handle = entry.handle;
+	req_p.u.setattr.fs_id = entry.fs_id;
+	req_p.u.setattr.attrmask = mask;
+	req_p.u.setattr.attr = req->attr;
 
 	/* Make a server setattr request */	
-	ret = PINT_server_send_req(serv_addr, req_p, max_msg_sz, &decoded);
+	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
 	if (ret < 0)
 	{
-		goto map_to_server_failure;
+	    failure = MAP_TO_SERVER_FAILURE;
+	    goto return_error;
 	}
 
 	/* TODO: we get a generic response back from the server and its pretty
@@ -132,14 +135,12 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	/* make sure the actual IO suceeded */
 	if (ack_p->status < 0 )
 	{
-	    goto pinode_remove_failure;
 	    ret = ack_p->status;
+	    failure = PINODE_REMOVE_FAILURE;
+	    goto return_error;
 	}
 
 	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
-
-	/* the request isn't needed anymore, free it */
-	free(req_p);
 
 	/* Remove the pinode only if it is in the cache */
 	/* Note: Until an error returning scheme is decided
@@ -152,7 +153,8 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 		ret = PINT_pcache_remove(entry,&item_ptr);
 		if (ret < 0)
 		{
-			goto pinode_remove_failure;
+			failure = PINODE_REMOVE_FAILURE;
+			goto return_error;
 		}
 		/* Free the pinode returned */
 		PINT_pcache_pinode_dealloc(item_ptr);
@@ -168,36 +170,38 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	ret =	modify_pinode(pinode_ptr,req->attr,req->attrmask);
 	if (ret < 0)
 	{
-		goto pinode_remove_failure;
+		failure = PINODE_REMOVE_FAILURE;
+		goto return_error;
 	}
 		
 	/* Add the pinode and return */
 	ret = PINT_pcache_insert(pinode_ptr);
 	if (ret < 0)
 	{
-		goto pinode_remove_failure;
+		failure = PINODE_REMOVE_FAILURE;
+		goto return_error;
 	}
 
 	return(0);
 
-pinode_remove_failure:
-printf("pinode_remove_failure\n");
-	if (ack_p != NULL)
-		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
-	if (req_p != NULL)
-		free(req_p);
+return_error:
 
-map_to_server_failure:
-printf("map_to_server_failure\n");
-	if (server != NULL)
-		free(server);
+	switch( failure )
+	{
+	    case PINODE_REMOVE_FAILURE:
+		if (ack_p != NULL)
+		    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 
-pcache_lookup_failure:
-printf("pcache_lookup_failure\n");
-	PINT_pcache_pinode_dealloc(pinode_ptr);
+	    case MAP_TO_SERVER_FAILURE:
+		if (server != NULL)
+		    free(server);
 
-pinode_alloc_failure:
-printf("pinode_alloc_failure\n");
+	    case PCACHE_LOOKUP_FAILURE:
+		PINT_pcache_pinode_dealloc(pinode_ptr);
+
+	    case NONE_FAILURE:
+	    break;
+	}
 
 	return(ret);
 }
