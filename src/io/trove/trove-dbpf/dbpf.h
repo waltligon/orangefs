@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 #include <db.h>
+#include <aio.h>
 #include <trove.h>
 #include <gen-locks.h>
 
@@ -175,6 +176,7 @@ struct dbpf_bstream_rw_list_op {
     TROVE_offset *stream_offset_array;
     TROVE_size *stream_size_array;
     struct aiocb *aiocb_array;
+    struct sigevent sigev; /* needed to keep linux lio_listio happy */
     struct bstream_listio_state lio_state;
 };
 

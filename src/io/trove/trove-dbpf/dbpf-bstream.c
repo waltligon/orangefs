@@ -440,12 +440,14 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	/* initialize, paying particular attention to set the opcode to NOP */
 	memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
 	for (i=0; i < AIOCB_ARRAY_SZ; i++) {
-	    aiocb_p[i].aio_lio_opcode = LIO_NOP;
+	    aiocb_p[i].aio_lio_opcode            = LIO_NOP;
+	    aiocb_p[i].aio_sigevent.sigev_notify = SIGEV_NONE;
 	}
 
-	op_p->u.b_rw_list.aiocb_array_count = AIOCB_ARRAY_SZ;
-	op_p->u.b_rw_list.aiocb_array       = aiocb_p;
-	op_p->u.b_rw_list.list_proc_state   = LIST_PROC_INPROGRESS;
+	op_p->u.b_rw_list.aiocb_array_count  = AIOCB_ARRAY_SZ;
+	op_p->u.b_rw_list.aiocb_array        = aiocb_p;
+	op_p->u.b_rw_list.list_proc_state    = LIST_PROC_INPROGRESS;
+	op_p->u.b_rw_list.sigev.sigev_notify = SIGEV_NONE;
     }
     else {
 	/* operations potentially in progress */
@@ -521,7 +523,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	printf("calling lio_listio w/count of %d\n", aiocb_inuse_count);
 	fflush(stdout);
 
-	ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count, NULL);
+	ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
 	if (ret != 0) {
 	    printf("lio_listio() returned %d\n", ret);
 	    assert(0);
