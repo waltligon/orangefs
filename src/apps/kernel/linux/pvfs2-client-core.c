@@ -30,7 +30,9 @@
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
-#define MMAP_RA_MIN_THRESHOLD  76800
+#define MMAP_RA_MIN_THRESHOLD     76800
+#define MMAP_RA_MAX_THRESHOLD  16777216
+#define MMAP_RA_SMALL_BUF_SIZE     4096
 #endif
 
 /*
@@ -100,6 +102,7 @@ typedef struct
 #ifdef USE_MMAP_RA_CACHE
     void *io_tmp_buf;
     int readahead_posted;
+    char *io_tmp_small_buf[MMAP_RA_SMALL_BUF_SIZE];
 #endif
     PVFS_Request file_req;
     PVFS_Request mem_req;
@@ -908,6 +911,11 @@ static int post_io_readahead_request(vfs_request_t *vfs_request)
         return -PVFS_ENOMEM;
     }
 
+    gossip_debug(
+        GOSSIP_MMAP_RCACHE_DEBUG, "+++ [1] allocated %lu bytes at %p\n",
+        (unsigned long)vfs_request->in_upcall.req.io.readahead_size,
+        vfs_request->io_tmp_buf);
+
     /* make the full-blown readahead sized request */
     ret = PVFS_Request_contiguous(
         vfs_request->in_upcall.req.io.readahead_size,
@@ -948,11 +956,23 @@ static int post_io_request(vfs_request_t *vfs_request)
         /* check readahead cache for the read data being requested */
         if (vfs_request->in_upcall.req.io.count > 0)
         {
-            vfs_request->io_tmp_buf = (char *)malloc(
-                vfs_request->in_upcall.req.io.count);
+            vfs_request->io_tmp_buf = (char *)
+                ((vfs_request->in_upcall.req.io.count <=
+                  MMAP_RA_SMALL_BUF_SIZE) ?
+                 vfs_request->io_tmp_small_buf :
+                 malloc(vfs_request->in_upcall.req.io.count));
 
             if (vfs_request->io_tmp_buf)
             {
+                if (vfs_request->io_tmp_buf !=
+                    vfs_request->io_tmp_small_buf)
+                {
+                    gossip_debug(
+                        GOSSIP_MMAP_RCACHE_DEBUG, "+++ [2] allocated %lu "
+                        "bytes at %p\n", (unsigned long)
+                        vfs_request->in_upcall.req.io.count,
+                        vfs_request->io_tmp_buf);
+                }
 
                 gossip_debug(
                     GOSSIP_MMAP_RCACHE_DEBUG, "[%Lu,%d] checking"
@@ -973,14 +993,24 @@ static int post_io_request(vfs_request_t *vfs_request)
                 {
                     goto mmap_ra_cache_hit;
                 }
-                free(vfs_request->io_tmp_buf);
+
+                if (vfs_request->io_tmp_buf !=
+                    vfs_request->io_tmp_small_buf)
+                {
+                    gossip_debug(
+                        GOSSIP_MMAP_RCACHE_DEBUG, "--- Freeing %p\n",
+                        vfs_request->io_tmp_buf);
+                    free(vfs_request->io_tmp_buf);
+                }
                 vfs_request->io_tmp_buf = NULL;
             }
         }
 
-        /* don't post a readahead request if the size is too small */
-        if (vfs_request->in_upcall.req.io.readahead_size >
-            MMAP_RA_MIN_THRESHOLD)
+        /* don't post a readahead req if the size is too big or small */
+        if ((vfs_request->in_upcall.req.io.readahead_size <
+             MMAP_RA_MAX_THRESHOLD) &&
+            (vfs_request->in_upcall.req.io.readahead_size >
+             MMAP_RA_MIN_THRESHOLD))
         {
             /* otherwise, check if we can post a readahead request here */
             ret = post_io_readahead_request(vfs_request);
@@ -990,8 +1020,8 @@ static int post_io_request(vfs_request_t *vfs_request)
             */
             if (ret == 0)
             {
-                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                             "readahead io posting succeeded!\n");
+                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "readahead io "
+                             "posting succeeded!\n");
                 return ret;
             }
         }
@@ -1046,7 +1076,12 @@ static int post_io_request(vfs_request_t *vfs_request)
     memcpy(buf, vfs_request->io_tmp_buf,
            vfs_request->in_upcall.req.io.count);
 
-    free(vfs_request->io_tmp_buf);
+    if (vfs_request->io_tmp_buf != vfs_request->io_tmp_small_buf)
+    {
+        gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                     "--- Freeing %p\n", vfs_request->io_tmp_buf);
+        free(vfs_request->io_tmp_buf);
+    }
     vfs_request->io_tmp_buf = NULL;
 
     write_inlined_device_response(vfs_request);
@@ -1060,12 +1095,10 @@ static int service_mmap_ra_flush_request(vfs_request_t *vfs_request)
     int ret = -PVFS_EINVAL;
 
     gossip_debug(
-        GOSSIP_MMAP_RCACHE_DEBUG,
-        "Got a mmap racache flush request for %Lu under fsid %d\n",
+        GOSSIP_MMAP_RCACHE_DEBUG, "Flushing mmap-racache elem %Lu, %d\n",
         Lu(vfs_request->in_upcall.req.ra_cache_flush.refn.handle),
         vfs_request->in_upcall.req.ra_cache_flush.refn.fs_id);
 
-    /* flush associated cached data if any */
     pvfs2_mmap_ra_cache_flush(
         vfs_request->in_upcall.req.ra_cache_flush.refn);
 
@@ -1438,7 +1471,14 @@ static inline void package_downcall_members(
                                  vfs_request->in_upcall.req.io.offset),
                            vfs_request->in_upcall.req.io.count);
 
-                    free(vfs_request->io_tmp_buf);
+                    if (vfs_request->io_tmp_buf !=
+                        vfs_request->io_tmp_small_buf)
+                    {
+                        gossip_debug(
+                            GOSSIP_MMAP_RCACHE_DEBUG, "--- Freeing %p\n",
+                            vfs_request->io_tmp_buf);
+                        free(vfs_request->io_tmp_buf);
+                    }
                     vfs_request->io_tmp_buf = NULL;
 
                     PVFS_Request_free(&vfs_request->mem_req);
@@ -1470,7 +1510,14 @@ static inline void package_downcall_members(
             /* free resources if allocated, even on failed reads */
             if (vfs_request->readahead_posted && vfs_request->io_tmp_buf)
             {
-                free(vfs_request->io_tmp_buf);
+                if (vfs_request->io_tmp_buf !=
+                    vfs_request->io_tmp_small_buf)
+                {
+                    gossip_debug(
+                        GOSSIP_MMAP_RCACHE_DEBUG, "--- Freeing %p\n",
+                        vfs_request->io_tmp_buf);
+                    free(vfs_request->io_tmp_buf);
+                }
                 vfs_request->io_tmp_buf = NULL;
 
                 PVFS_Request_free(&vfs_request->mem_req);
