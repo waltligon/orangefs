@@ -23,7 +23,7 @@ typedef struct
 
 typedef struct
 {
-    PVFS_object_attr attributes;
+    PVFS_sys_attr attributes;
 } pvfs2_getattr_response_t;
 
 /* the remove response is a blank downcall */

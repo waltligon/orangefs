@@ -18,17 +18,49 @@
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
 
+/* PVFS_sys_getattr()
+ *
+ * retrieves attributes for a file system object
+ *
+ * returns 0 on success, -errno on failure
+ */
 int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
 		    PVFS_credentials credentials, PVFS_sysresp_getattr *resp)
 {
-    return(PINT_sys_getattr(pinode_refn, attrmask, credentials, resp));
+    int ret = -1;
+    PVFS_object_attr tmp_attr;
+
+    /* make sure that the caller asked for valid fields */
+    if((attrmask & ~PVFS_ATTR_SYS_ALL) != 0)
+    {
+	return(-EINVAL);
+    }
+
+    ret = PINT_sys_getattr(pinode_refn, attrmask, credentials, &tmp_attr);
+    if(ret < 0)
+    {
+	return(ret);
+    }
+
+    PINT_CONVERT_ATTR(&(resp->attr), &tmp_attr);
+    
+    /* TODO: this is temporary */
+    if(attrmask & PVFS_ATTR_SYS_SIZE)
+    {
+	gossip_err("WARNING: PVFS_sys_getattr() can't really calculate size.\n");
+	gossip_err("WARNING: PVFS_sys_getattr() reporting size = 0.\n");
+	resp->attr.size = 0;
+	resp->attr.mask |= PVFS_ATTR_SYS_SIZE;
+    }
+
+    return(0);
 }
 
 
 /* TODO: this function is a hack- will be removed later */
 /* PINT_sys_getattr()
  *
- * obtain the attributes of a PVFS file
+ * internal function to obtain the attributes of a PVFS object
  *
  * TODO: Yuck.  We have a lot of assumptions in here about what
  * the attributes look like and what masks are set in the pinode
@@ -37,7 +69,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
  * returns 0 on success, -errno on failure
  */
 int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
-		    PVFS_credentials credentials, PVFS_sysresp_getattr *resp)
+		    PVFS_credentials credentials, PVFS_object_attr* out_attr)
 {
     struct PVFS_server_req req_p;	 	/* server request */
     struct PVFS_server_resp *ack_p = NULL; /* server response */
@@ -78,15 +110,14 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	ret = PINT_pcache_lookup(entry, &entry_pinode);
 	if (ret  == PCACHE_LOOKUP_SUCCESS)
         {
-		resp->attr = entry_pinode->attr;
+		*out_attr = entry_pinode->attr;
 		if (attrmask & PVFS_ATTR_SYS_SIZE)
 		{
 			/* if we want the size, and its valid, then return now */
 			if (entry_pinode->size_flag == SIZE_VALID)
 			{
 			    /* TODO: making too many assumptions here */
-			    resp->attr = entry_pinode->attr;
-			    /* resp->extended */
+			    *out_attr = entry_pinode->attr;
 			    PINT_pcache_lookup_rls(entry_pinode);
 			    return (0);
 			}
@@ -101,9 +132,8 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		else
 		{
 		    /* if we don't care about size in our request, we're done already */
-		    resp->attr = entry_pinode->attr;
+		    *out_attr = entry_pinode->attr;
 		    PINT_pcache_lookup_rls(entry_pinode);
-		    /* resp->extended */
 		    return (0);
 		}
         }
@@ -155,45 +185,42 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		goto return_error;
         }
 
-	resp->attr = ack_p->u.getattr.attr;
-	if (resp->attr.objtype == PVFS_TYPE_METAFILE)
+	*out_attr = ack_p->u.getattr.attr;
+	if (out_attr->objtype == PVFS_TYPE_METAFILE)
 	{
-	    if(resp->attr.u.meta.dfile_count > 0)
+	    if(out_attr->u.meta.dfile_count > 0)
 	    {
 		assert(ack_p->u.getattr.attr.u.meta.dfile_array != NULL);
 
-		resp->attr.u.meta.dfile_array = malloc(resp->attr.u.meta.dfile_count * sizeof(PVFS_handle));
-		if (resp->attr.u.meta.dfile_array ==  NULL)
+		out_attr->u.meta.dfile_array = malloc(out_attr->u.meta.dfile_count * sizeof(PVFS_handle));
+		if (out_attr->u.meta.dfile_array ==  NULL)
 		{
 		    ret = (-ENOMEM);
 		    failure = MALLOC_DFH_FAILURE;
 		    goto return_error;
 		}
-		memcpy(	resp->attr.u.meta.dfile_array, 
+		memcpy(out_attr->u.meta.dfile_array, 
 			ack_p->u.getattr.attr.u.meta.dfile_array, 
-			resp->attr.u.meta.dfile_count * sizeof(PVFS_handle));
+			out_attr->u.meta.dfile_count * sizeof(PVFS_handle));
 	    }
 	    /* TODO: make this better */
-	    if(resp->attr.u.meta.dist_size > 0)
+	    if(out_attr->u.meta.dist_size > 0)
 	    {
 		gossip_lerr("KLUDGE: packing dist to memcpy it.\n");
-		resp->attr.u.meta.dist =
-		    malloc(resp->attr.u.meta.dist_size);
-		if(resp->attr.u.meta.dist == NULL)
+		out_attr->u.meta.dist =
+		    malloc(out_attr->u.meta.dist_size);
+		if(out_attr->u.meta.dist == NULL)
 		{
 		    ret = -ENOMEM;
 		    failure = MALLOC_DFH_FAILURE;
 		    goto return_error;
 		}
-		PINT_Dist_encode(resp->attr.u.meta.dist, 
+		PINT_Dist_encode(out_attr->u.meta.dist, 
 		    ack_p->u.getattr.attr.u.meta.dist);
-		PINT_Dist_decode(resp->attr.u.meta.dist, NULL);
+		PINT_Dist_decode(out_attr->u.meta.dist, NULL);
 	    }
 	}
 	
-	/* TODO: copy extended attributes just like normal attr */
-	/* resp->eattr = ack_p.u.getattr.eattr; */
-
 	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 	    &encoded_resp, op_tag);
 
@@ -220,8 +247,8 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 
 	    /* we need to send one getattr to each server for each datafile*/
 
-	    data_files = resp->attr.u.meta.dfile_array;
-	    dist = resp->attr.u.meta.dist;
+	    data_files = out_attr->u.meta.dfile_array;
+	    dist = out_attr->u.meta.dist;
 	    req_p.op = PVFS_SERV_GETATTR;
 	    req_p.credentials = credentials;
 	    req_p.u.getattr.attrmask = PVFS_ATTR_DATA_SIZE;
@@ -279,7 +306,7 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 						size_array);
 
 	    /*TODO: stick this in a size somewhere .. wtf?*/
-	    /*resp->attr.u.meta.size = total_filesize;*/
+	    /*out_attr->u.meta.size = total_filesize;*/
 
 	    entry_pinode->size = total_filesize;
 	    entry_pinode->size_flag = SIZE_VALID;
@@ -331,7 +358,7 @@ return_error:
 	switch( failure ) 
 	{
 		case PCACHE_INSERT_FAILURE:
-		    free(resp->attr.u.meta.dfile_array);
+		    free(out_attr->u.meta.dfile_array);
 		    PINT_pcache_insert_rls(entry_pinode);
 		case MALLOC_DFH_FAILURE:
 		case SEND_REQ_FAILURE:

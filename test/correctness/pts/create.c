@@ -12,7 +12,7 @@
 extern int parse_pvfstab(char *fn,
 			 pvfs_mntlist * mnt);
 int compare_attribs(PVFS_object_attr attr1,
-		    PVFS_object_attr attr2);
+		    PVFS_sys_attr attr2);
 
 /* files, directories, tree of directories */
 int create_file(PVFS_fs_id fs_id,
@@ -80,7 +80,7 @@ int create_file(PVFS_fs_id fs_id,
  * 	-1 	if we found a difference
  */
 int compare_attribs(PVFS_object_attr attr1,
-		    PVFS_object_attr attr2)
+		    PVFS_sys_attr attr2)
 {
     if (attr1.owner != attr2.owner)
     {

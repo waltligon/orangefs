@@ -31,17 +31,21 @@
 #define PINT_CLIENT_ENC_TYPE PINT_ENC_DIRECT
 
 /* converts common fields between sys attr and obj attr structures */
-#define PINT_CONVERT_ATTR(dest, src)		\
-do{						\
-    dest->owner = src->owner;			\
-    dest->group = src->group;			\
-    dest->perms = src->perms;			\
-    dest->atime = src->atime;			\
-    dest->mtime = src->mtime;			\
-    dest->ctime = src->ctime;			\
-    dest->obj_type = src->obj_type;		\
-    dest->mask = (src->mask & PVFS_ATTR_COMMON_ALL); \
+#define PINT_CONVERT_ATTR(dest, src)			\
+do{							\
+    (dest)->owner = (src)->owner;			\
+    (dest)->group = (src)->group;			\
+    (dest)->perms = (src)->perms;			\
+    (dest)->atime = (src)->atime;			\
+    (dest)->mtime = (src)->mtime;			\
+    (dest)->ctime = (src)->ctime;			\
+    (dest)->objtype = (src)->objtype;			\
+    (dest)->mask = ((src)->mask & PVFS_ATTR_COMMON_ALL); \
 }while(0)
+
+/* TODO: this function is a hack- will be removed later */
+int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
+    PVFS_credentials credentials, PVFS_object_attr *out_attr);
 
 enum
 {

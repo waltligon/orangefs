@@ -120,11 +120,6 @@ int main(int argc,char **argv)
 #endif
 		break;
 
-		case PVFS_TYPE_DATAFILE:
-		printf("DATAFILE?? we shouldn't see these\n");
-		printf("size written on server = %Ld", resp_gattr->attr.u.data.size);
-		break;
-
 		case PVFS_TYPE_DIRECTORY:
 		printf("DIRECTORY\n");
 #if 0

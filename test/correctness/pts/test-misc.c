@@ -25,7 +25,7 @@ static int test_meta_fields(int testcase){
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
     PVFS_sysresp_lookup resp_lookup;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     char *name;
 
     ret = -2;
@@ -191,7 +191,7 @@ static int test_size_after_write(int testcase){
     if((ret = PVFS_sys_getattr(resp_lk.pinode_refn, attrmask, credentials, &resp)) < 0)
 	return ret;
 
-    oldsize = resp.attr.u.data.size;
+    oldsize = resp.attr.size;
 
     for(i = 0; i < 100; i++)
     {
@@ -209,7 +209,7 @@ static int test_size_after_write(int testcase){
     {
         debug_printf("getattr failed on %s\n", filename);
     }
-    if(resp.attr.u.data.size != 100 + oldsize){
+    if(resp.attr.size != 100 + oldsize){
 	return -1;
     }
     PVFS_sys_finalize();
@@ -258,7 +258,7 @@ static int test_sparse_files(int testcase){
     if((ret = PVFS_sys_getattr(resp_lk.pinode_refn, attrmask, credentials, &resp)) < 0)
 	return ret;
 
-    oldsize = resp.attr.u.data.size;
+    oldsize = resp.attr.size;
 
     switch(testcase)
     {
@@ -289,7 +289,7 @@ static int test_sparse_files(int testcase){
     {
         debug_printf("getattr failed on %s\n", filename);
     }
-    if(resp.attr.u.data.size != 100 + oldsize){
+    if(resp.attr.size != 100 + oldsize){
 	return -1;
     }
     PVFS_sys_finalize();
@@ -338,7 +338,7 @@ static int test_read_sparse_files(int testcase){
     if((ret = PVFS_sys_getattr(resp_lk.pinode_refn, attrmask, credentials, &resp)) < 0)
 	return ret;
 
-    oldsize = resp.attr.u.data.size;
+    oldsize = resp.attr.size;
 
     switch(testcase)
     {
@@ -416,7 +416,7 @@ static int test_allcat(int testcase)
     if((ret = PVFS_sys_getattr(resp_look.pinode_refn, attrmask, credentials, &resp)) < 0)
 	return ret;
 
-    oldsize = resp.attr.u.data.size;
+    oldsize = resp.attr.size;
     switch(testcase)
     {
     case 0:
@@ -444,7 +444,7 @@ static int test_allcat(int testcase)
     {
         debug_printf("getattr failed on %s\n", filename);
     }
-    if(resp.attr.u.data.size != (size + oldsize)){
+    if(resp.attr.size != (size + oldsize)){
 	return -1;
     }
     return 0;
@@ -486,7 +486,7 @@ static int test_truncat(int testcase)
     if((ret = PVFS_sys_getattr(resp_look.pinode_refn, attrmask, credentials, &resp)) < 0)
 	return ret;
 
-    oldsize = resp.attr.u.data.size;
+    oldsize = resp.attr.size;
 
     switch(testcase)
     {
@@ -514,7 +514,7 @@ static int test_truncat(int testcase)
     if((ret = PVFS_sys_getattr(resp_look.pinode_refn, attrmask, credentials, &resp)) < 0)
 	return ret;
 
-    if(resp.attr.u.data.size != (oldsize - size))
+    if(resp.attr.size != (oldsize - size))
     {
 	return -1;
     }
@@ -562,9 +562,9 @@ static int test_read_beyond(int testcase){
     }
     if((ret = PVFS_sys_getattr(resp_lk.pinode_refn, attrmask, credentials, &resp)) < 0)
 	return ret;
-    io_buffer = (char *)malloc(sizeof(char)*resp.attr.u.data.size+100);
+    io_buffer = (char *)malloc(sizeof(char)*resp.attr.size+100);
 
-    ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, io_req_offset, io_buffer, resp.attr.u.data.size+ 100, credentials, &resp_io);
+    ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, io_req_offset, io_buffer, resp.attr.size+ 100, credentials, &resp_io);
     if(ret < 0){
 	debug_printf("write failed on %s\n", filename);
     }
@@ -615,10 +615,10 @@ static int test_write_beyond(int testcase){
     }
     if((ret = PVFS_sys_getattr(resp_lk.pinode_refn, attrmask, credentials, &resp)) < 0)
 	return ret;
-    io_buffer = (char *)malloc(sizeof(char)*resp.attr.u.data.size+100);
+    io_buffer = (char *)malloc(sizeof(char)*resp.attr.size+100);
 
     //req_io.size = resp_io.size + 100;
-    oldsize = resp.attr.u.data.size +100;
+    oldsize = resp.attr.size +100;
     for(i = 0; i < oldsize; i++)
     {
 	io_buffer[i] = 'a';
@@ -694,7 +694,7 @@ static int test_get_set_attr_empty(int testcase)
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
     PVFS_sysresp_lookup resp_lookup;
-    PVFS_object_attr attr;
+    PVFS_sys_attr attr;
     PVFS_sysresp_getattr resp;
     uint32_t attrmask;
     char *name;

@@ -90,7 +90,7 @@ typedef enum PVFS_ds_type_e PVFS_ds_type;
 #define PVFS_ATTR_SYS_CTIME	PVFS_ATTR_COMMON_CTIME
 #define PVFS_ATTR_SYS_MTIME	PVFS_ATTR_COMMON_MTIME
 #define PVFS_ATTR_SYS_ALL_NOSIZE (PVFS_ATTR_COMMON_ALL-PVFS_ATTR_COMMON_TYPE)
-#define PVFS_ATTR_SYS_ALL	(PVFS_ATTR_SYS_ALL|PVFS_ATTR_SYS_SIZE)
+#define PVFS_ATTR_SYS_ALL	(PVFS_ATTR_SYS_ALL_NOSIZE|PVFS_ATTR_SYS_SIZE)
 
 /* pinode reference (uniquely refers to a single pinode) */
 struct PVFS_pinode_reference_s

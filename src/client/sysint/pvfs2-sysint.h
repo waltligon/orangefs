@@ -35,7 +35,7 @@ struct PVFS_sys_attr_s
     PVFS_time mtime;
     PVFS_time ctime;
     PVFS_size size;
-    PVFS_ds_type obj_type;
+    PVFS_ds_type objtype;
     uint32_t mask;
 
     /* TODO: we may want to later add some sort of enumerated value
@@ -121,7 +121,7 @@ typedef struct PVFS_sysresp_lookup_s PVFS_sysresp_lookup;
 
 /* getattr */
 struct PVFS_sysresp_getattr_s {
-	PVFS_object_attr attr;
+	PVFS_sys_attr attr;
 };
 typedef struct PVFS_sysresp_getattr_s PVFS_sysresp_getattr;
 
@@ -262,10 +262,6 @@ enum PVFS_sys_io_type
 	PVFS_SYS_IO_WRITE
 };
 
-/* TODO: this function is a hack- will be removed later */
-int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
-    PVFS_credentials credentials, PVFS_sysresp_getattr *resp);
-
 /* PVFS System Request Prototypes
  *
  * That's fine, except that we KNOW that this interface is just a
@@ -281,7 +277,7 @@ int PVFS_sys_lookup(PVFS_fs_id fs_id, char* name, PVFS_credentials
 		credentials, PVFS_sysresp_lookup *resp);
 int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
 		PVFS_credentials credentials, PVFS_sysresp_getattr *resp);
-int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
+int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 		PVFS_credentials credentials);
 int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn, 
 		PVFS_object_attr attr, 

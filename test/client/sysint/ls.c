@@ -11,7 +11,7 @@
 
 void print_entry_attr(
     char *entry_name,
-    PVFS_object_attr *attr)
+    PVFS_sys_attr *attr)
 {
     char buf[128] = {0};
 

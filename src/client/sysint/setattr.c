@@ -27,7 +27,7 @@
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
+int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
                 PVFS_credentials credentials)
 {
 	struct PVFS_server_req req_p;			/* server request */
@@ -37,7 +37,6 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	bmi_addr_t serv_addr;		/* PVFS address type structure */
 	char *server = NULL;
 	PVFS_pinode_reference entry;
-	PVFS_size handlesize = 0;
 	bmi_size_t max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
 	    PVFS_SERV_SETATTR, PINT_CLIENT_ENC_TYPE);
 	struct PINT_decoded_msg decoded;
@@ -52,11 +51,12 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	    MAP_TO_SERVER_FAILURE,
 	} failure = NONE_FAILURE;
 
-	/* we don't allow the file size to be set here - that is
-	 * the job of the truncate function.
-	 */
-	if (attr.mask & PVFS_ATTR_SYS_SIZE)
-	    return (-EINVAL);
+	/* but make sure the caller didn't set invalid mask bits */
+	/* in particular, note that you can't set size here */
+	if((attr.mask & ~PVFS_ATTR_SYS_ALL_NOSIZE) != 0)
+	{
+	    return(-EINVAL);
+	}
 
 	/* Fill in pinode reference */
 	entry.handle = pinode_refn.handle;
@@ -91,23 +91,13 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	/* Create the server request */
 	req_p.op = PVFS_SERV_SETATTR;
 	req_p.credentials = credentials;
-	if (attr.objtype == PVFS_TYPE_METAFILE)
-	{
-	    handlesize = attr.u.meta.dfile_count * sizeof(PVFS_handle);
-	}
-	else
-	{
-	    handlesize = 0;
-	}
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = entry.fs_id;
 	/* let attributes fall through since PVFS_ATTR_SYS_xxx
 	 * mask values match PVFS_ATTR_COMMON_xxx mask values for
 	 * all of the attributes that are valid to set here
 	 */
-	req_p.u.setattr.attr = attr;
-	/* but make sure the caller didn't set extra mask bits */
-	assert((attr.mask & ~PVFS_ATTR_SYS_ALL_NOSIZE) == 0);
+	PINT_CONVERT_ATTR(&req_p.u.setattr.attr, &attr);
 
 	/* Make a server setattr request */	
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
@@ -132,7 +122,7 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
             &encoded_resp, op_tag);
 
 	/* Modify pinode to reflect changed attributes */
-	ret = phelper_fill_attr(pinode_ptr,attr);
+	ret = phelper_fill_attr(pinode_ptr,req_p.u.setattr.attr);
 	if (ret < 0)
 	{
 		failure = PINODE_REMOVE_FAILURE;

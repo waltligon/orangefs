@@ -104,9 +104,9 @@ static int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
                            PVFS_credentials credentials)
 {
 	int ret = 0;
-	PVFS_sysresp_getattr resp;
+	PVFS_object_attr tmp_attr;
 
-	ret = PINT_sys_getattr(pref, mask, credentials, &resp);
+	ret = PINT_sys_getattr(pref, mask, credentials, &tmp_attr);
 	if (ret < 0)
 	{
 		return(ret);
@@ -130,7 +130,7 @@ static int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
 	(*pinode_ptr)->pinode_ref.handle = pref.handle;
 	(*pinode_ptr)->pinode_ref.fs_id = pref.fs_id;
 
-	ret = phelper_fill_attr(*pinode_ptr,resp.attr);
+	ret = phelper_fill_attr(*pinode_ptr,tmp_attr);
 	if (ret < 0)
 	{
 		return(ret);

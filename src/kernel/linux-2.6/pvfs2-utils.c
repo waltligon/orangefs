@@ -20,7 +20,7 @@ extern struct inode *pvfs2_get_custom_inode(struct super_block *sb,
                                             int mode, dev_t dev);
 
 static inline int copy_attributes_to_inode(
-    struct inode *inode, PVFS_object_attr *attrs)
+    struct inode *inode, PVFS_sys_attr *attrs)
 {
     int ret = -1;
     int perm_mode = 0;
@@ -48,14 +48,12 @@ static inline int copy_attributes_to_inode(
         switch(attrs->objtype)
         {
             case PVFS_TYPE_METAFILE:
-            case PVFS_TYPE_DATAFILE:
                 inode->i_mode |= (S_IFREG | perm_mode);
                 inode->i_op = &pvfs2_file_inode_operations;
                 inode->i_fop = &pvfs2_file_operations;
                 ret = 0;
                 break;
             case PVFS_TYPE_DIRECTORY:
-            case PVFS_TYPE_DIRDATA:
                 inode->i_mode |= (S_IFDIR | perm_mode);
                 inode->i_op = &pvfs2_dir_inode_operations;
                 inode->i_fop = &pvfs2_dir_operations;
