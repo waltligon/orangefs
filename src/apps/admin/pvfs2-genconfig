@@ -227,8 +227,8 @@ sub emit_filesystem
 
     print $target "\t\tAttrCacheKeywords datafile_handles,metafile_dist\n";
     print $target "\t\tAttrCacheKeywords dir_ent, symlink_target\n";
-    print $target "\t\tAttrCacheSize 1031\n";
-    print $target "\t\tAttrCacheMaxNumElems 8192\n";
+    print $target "\t\tAttrCacheSize 4093\n";
+    print $target "\t\tAttrCacheMaxNumElems 32768\n";
     print $target "\t</StorageHints>\n";
 
     print $target "</Filesystem>\n";
@@ -501,7 +501,8 @@ if ( $type eq "tcp")
 
 	$bmi_module = "bmi_tcp";
 
-} elsif ($type eq "gm") 
+}
+elsif ($type eq "gm") 
 {
 	$port = gm_get_port();
 	@io_aliases = get_ionames();
@@ -509,15 +510,18 @@ if ( $type eq "tcp")
 
 	$bmi_module = "bmi_gm";
 
-} elsif ($type eq "ib") {
+}
+elsif ($type eq "ib") {
 
-	$port = tcp_get_port();  # we use TCP routines to listen for connections
+        # we use TCP routines to listen for connections
+	$port = tcp_get_port();
 	@io_aliases = get_ionames();
 	@meta_aliases = get_metanames();
 
 	$bmi_module = "bmi_ib";
 
-} else {
+}
+else {
     print "Sorry.  At this time, only the tcp and gm protocols are available\n";
     print "for use with this configuration utility.\n";
     exit 1;
@@ -592,11 +596,13 @@ if (!$opt_quiet) {
     }
 }
 
+# compute a psuedo-random 32 bit file system ID
+$rand_fs_id = int((rand() * 2147483647));
+
 emit_defaults($output_target, $num_unexp_reqs,
               $bmi_module, $handle_recycle_timeout_seconds);
-#emit_aliases($output_target, $num_nodes);
 emit_aliases($output_target);
-emit_filesystem($output_target, "pvfs2-fs", 9, 1048576);
+emit_filesystem($output_target, "pvfs2-fs", $rand_fs_id, 1048576);
 
 # close fs.conf
 if ($using_stdout == 0)

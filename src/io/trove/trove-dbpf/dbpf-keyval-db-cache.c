@@ -61,7 +61,7 @@ void dbpf_keyval_dbcache_finalize(void)
 	if (keyval_db_cache[i].ref_ct > 0)
         {
 	    gossip_debug(GOSSIP_TROVE_DEBUG, "warning: ref_ct = %d "
-                         "on handle %Lx in dbcache\n",
+                         "on handle %Lu in dbcache\n",
                          keyval_db_cache[i].ref_ct,
                          Lu(keyval_db_cache[i].handle));
 	}
