@@ -729,7 +729,7 @@ docs: $(DOCSPS) $(DOCSPDF) $(DOCSHTML)
 # latex2html puts all its output in a directory
 docsclean: 
 	rm -f $(DOCSPS) $(DOCSPDF) $(DOCSCRUFT)
-	rm -rf $(basename $DOCSHTML)
+	rm -rf $(basename $(DOCSHTML))
 
 # top rule for cleaning up tree
 clean:: 

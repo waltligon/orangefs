@@ -48,7 +48,7 @@ else
 fi
 
 # now do some testing. something trivial for now
-$builddir/src/apps/admin/pvfs2-import $builddir/src/apps/admin/pvfs2-import $MOUNTPOINT/pvfs2-import 
+$builddir/src/apps/admin/pvfs2-cp -t $builddir/src/apps/admin/pvfs2-cp $MOUNTPOINT/pvfs2-cp
 
 
 # and clean up

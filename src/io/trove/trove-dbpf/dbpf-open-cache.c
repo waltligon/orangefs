@@ -28,8 +28,7 @@
 #include "quicklist.h"
 #include "dbpf-open-cache.h"
 
-/* TODO: re-enable this later! */
-#define OPEN_CACHE_SIZE 0
+#define OPEN_CACHE_SIZE 64
 
 struct open_cache_entry
 {
@@ -51,9 +50,7 @@ static QLIST_HEAD(unused_list);
  * can be used at any time for new cache entries
  */
 static QLIST_HEAD(free_list);
-static gen_mutex_t free_mutex = GEN_MUTEX_INITIALIZER;
-static gen_mutex_t used_mutex = GEN_MUTEX_INITIALIZER;
-static gen_mutex_t unused_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t cache_mutex = GEN_MUTEX_INITIALIZER;
 static struct open_cache_entry prealloc[OPEN_CACHE_SIZE];
 
 static int open_fd(int* fd, 
@@ -69,6 +66,8 @@ void dbpf_open_cache_initialize(void)
 {
     int i;
 
+    gen_mutex_lock(&cache_mutex);
+
     /* run through preallocated cache elements to initialize
      * and put them on the free list
      */
@@ -83,6 +82,8 @@ void dbpf_open_cache_initialize(void)
 	qlist_add(&prealloc[i].queue_link, &free_list);
     }
 
+    gen_mutex_unlock(&cache_mutex);
+
     return;
 }
 
@@ -90,6 +91,8 @@ void dbpf_open_cache_finalize(void)
 {
     struct qlist_head* tmp_link;
     struct open_cache_entry* tmp_entry = NULL;
+
+    gen_mutex_lock(&cache_mutex);
 
     /* close any open fd or db references */
     qlist_for_each(tmp_link, &used_list)
@@ -128,6 +131,7 @@ void dbpf_open_cache_finalize(void)
     INIT_QLIST_HEAD(&free_list);
     INIT_QLIST_HEAD(&used_list);
     INIT_QLIST_HEAD(&unused_list);
+    gen_mutex_unlock(&cache_mutex);
     return;
 }
 
@@ -143,13 +147,12 @@ int dbpf_open_cache_get(
     int found = 0;
     int ret;
 
+    gen_mutex_lock(&cache_mutex);
+
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	"dbpf_open_cache_get: type: %d\n", (int)type);
    
     /* check the list of already opened objects first, reuse ref if possible */
-    gen_mutex_lock(&used_mutex);
-    gen_mutex_lock(&unused_mutex);
-
     qlist_for_each(tmp_link, &used_list)
     {
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
@@ -187,8 +190,7 @@ int dbpf_open_cache_get(
 	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, create_flag);
 	    if(ret < 0)
 	    {
-		gen_mutex_unlock(&unused_mutex);
-		gen_mutex_unlock(&used_mutex);
+		gen_mutex_unlock(&cache_mutex);
 		return(ret);
 	    }
 	}
@@ -198,8 +200,7 @@ int dbpf_open_cache_get(
 	    ret = open_db(&(tmp_entry->db_p), coll_id, handle, create_flag);
 	    if(ret < 0)
 	    {
-		gen_mutex_unlock(&unused_mutex);
-		gen_mutex_unlock(&used_mutex);
+		gen_mutex_unlock(&cache_mutex);
 		return(ret);
 	    }
 	}
@@ -216,13 +217,10 @@ int dbpf_open_cache_get(
 	qlist_del(&tmp_entry->queue_link);
 	qlist_add(&tmp_entry->queue_link, &used_list);
 
-	gen_mutex_unlock(&unused_mutex);
-	gen_mutex_unlock(&used_mutex);
+	gen_mutex_unlock(&cache_mutex);
 	return(0);
     }
 
-    gen_mutex_unlock(&unused_mutex);
-    gen_mutex_unlock(&used_mutex);
 
     /* if we fall through to this point, then the object was not found in
      * the cache. 
@@ -232,7 +230,6 @@ int dbpf_open_cache_get(
      */
 
     /* anything in the free list? */
-    gen_mutex_lock(&free_mutex);
     if(!qlist_empty(&free_list))
     {
 	tmp_link = free_list.next;
@@ -243,10 +240,8 @@ int dbpf_open_cache_get(
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: resetting entry from free list.\n");
     }
-    gen_mutex_unlock(&free_mutex);
  
     /* anything in unused list (still open, but ref_ct == 0)? */
-    gen_mutex_lock(&unused_mutex);
     if(!found && !qlist_empty(&unused_list))
     {
 	tmp_link = unused_list.next;
@@ -268,7 +263,6 @@ int dbpf_open_cache_get(
 	    tmp_entry->db_p = NULL;
 	}
     }
-    gen_mutex_unlock(&unused_mutex);
    
     if(found)
     {
@@ -283,11 +277,10 @@ int dbpf_open_cache_get(
 	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, create_flag);
 	    if(ret < 0)
 	    {
-		gen_mutex_lock(&free_mutex);
 		qlist_add(&tmp_entry->queue_link, &free_list);
-		gen_mutex_unlock(&free_mutex);
 		gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 		    "dbpf_open_cache_get: could not open.\n");
+		gen_mutex_unlock(&cache_mutex);
 		return(ret);
 	    }
 	}
@@ -298,9 +291,8 @@ int dbpf_open_cache_get(
 	    ret = open_db(&(tmp_entry->db_p), coll_id, handle, create_flag);
 	    if(ret < 0)
 	    {
-		gen_mutex_lock(&free_mutex);
 		qlist_add(&tmp_entry->queue_link, &free_list);
-		gen_mutex_unlock(&free_mutex);
+		gen_mutex_unlock(&cache_mutex);
 		return(ret);
 	    }
 	}
@@ -310,9 +302,8 @@ int dbpf_open_cache_get(
 	out_ref->internal = tmp_entry;
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: moving to used list.\n");
-	gen_mutex_lock(&used_mutex);
 	qlist_add(&tmp_entry->queue_link, &used_list);
-	gen_mutex_unlock(&used_mutex);
+	gen_mutex_unlock(&cache_mutex);
 	return(0);
     }
 
@@ -330,6 +321,7 @@ int dbpf_open_cache_get(
 	ret = open_fd(&(out_ref->fd), coll_id, handle, create_flag);
 	if(ret < 0)
 	{
+	    gen_mutex_unlock(&cache_mutex);
 	    return(ret);
 	}
     }
@@ -340,11 +332,13 @@ int dbpf_open_cache_get(
 	ret = open_db(&(out_ref->db_p), coll_id, handle, create_flag);
 	if(ret < 0)
 	{
+	    gen_mutex_unlock(&cache_mutex);
 	    return(ret);
 	}
     }
 
     out_ref->internal = NULL;
+    gen_mutex_unlock(&cache_mutex);
     return(0);
 }
     
@@ -354,10 +348,11 @@ void dbpf_open_cache_put(
     struct open_cache_entry* tmp_entry = NULL;
     int move = 0;
 
+    gen_mutex_lock(&cache_mutex);
+
     /* handle cached entries */
     if(in_ref->internal)
     {
-	gen_mutex_lock(&used_mutex);
 	tmp_entry = in_ref->internal;
 	tmp_entry->ref_ct--;
 
@@ -370,15 +365,12 @@ void dbpf_open_cache_put(
 	    move = 1;
 	    qlist_del(&tmp_entry->queue_link);	    
 	}
-	gen_mutex_unlock(&used_mutex);
 
 	if(move)
 	{
 	    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 		"dbpf_open_cache_put: move to unused list.\n");
-	    gen_mutex_lock(&unused_mutex);
 	    qlist_add_tail(&tmp_entry->queue_link, &unused_list);
-	    gen_mutex_unlock(&unused_mutex);
 	}
     }
     else
@@ -397,7 +389,7 @@ void dbpf_open_cache_put(
 	    in_ref->db_p = NULL;
 	}
     }
-
+    gen_mutex_unlock(&cache_mutex);
     return;
 }
 
@@ -414,13 +406,14 @@ int dbpf_open_cache_remove(
     DB* db_p = NULL;
     int tmp_error = 0;
 
+    gen_mutex_lock(&cache_mutex);
+
     /* for error checking for now, let's make sure that this object is _not_
      * in the used list (we shouldn't be able to delete while another thread
      * or operation has an fd/db open)
      */
 
     /* TODO: remove this search later when we have more confidence */
-    gen_mutex_lock(&used_mutex);
     qlist_for_each(tmp_link, &used_list)
     {
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
@@ -430,10 +423,8 @@ int dbpf_open_cache_remove(
 	    assert(0);
 	}
     }
-    gen_mutex_unlock(&used_mutex);
 
     /* see if the item is in the unused list (ref_ct == 0) */    
-    gen_mutex_lock(&unused_mutex);
     qlist_for_each_safe(tmp_link, scratch, &unused_list)
     {
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
@@ -445,7 +436,6 @@ int dbpf_open_cache_remove(
 	    break;
 	}
     }
-    gen_mutex_unlock(&unused_mutex);
 
     if(found)
     {
@@ -461,9 +451,7 @@ int dbpf_open_cache_remove(
 	    tmp_entry->db_p->close(tmp_entry->db_p, 0);
 	    tmp_entry->db_p = NULL;
 	}
-	gen_mutex_lock(&free_mutex);
 	qlist_add(&tmp_entry->queue_link, &free_list);
-	gen_mutex_unlock(&free_mutex);
     }
     else
     {
@@ -493,6 +481,7 @@ int dbpf_open_cache_remove(
 	tmp_error = -dbpf_db_error_to_trove_error(ret);
     }
 
+    gen_mutex_unlock(&cache_mutex);
     return(tmp_error);
 }
 

@@ -334,9 +334,9 @@ tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 default 0 0
 \label{subsec:testing}
 PVFS2 currently includes (among others) the following tools for
 manipulating the file system using the native PVFS2 library:
-pvfs2-ping, pvfs2-import, pvfs2-ls, and pvfs2-export.  These tools
-check the health of the file system, import local files, list the
-contents of directories, and export files, respectively.  Their usage
+pvfs2-ping, pvfs2-cp, and pvfs2-ls.  These tools
+check the health of the file system, copy files to and from a PVFS2 file system, and list the
+contents of directories, respectively.  Their usage
 can best be summarized with the following examples:
 
 \begin{verbatim}
@@ -379,18 +379,8 @@ The PVFS2 filesystem at /mnt/pvfs2 appears to be correctly configured.
 
 bash-2.05b# ./pvfs2-ls /mnt/pvfs2/
 
-bash-2.05b# ./pvfs2-import /usr/lib/libc.a /mnt/pvfs2/testfile
-PVFS2 Import Statistics:
-********************************************************
-Destination path (local): /mnt/pvfs2/testfile
-Destination path (PVFS2 file system): /testfile
-File system name: pvfs2-fs
-Initial config server: tcp://localhost:3334
-********************************************************
-Bytes written: 2555802
-Elapsed time: 0.416727 seconds
-Bandwidth: 5.848920 MB/second
-********************************************************
+bash-2.05b# ./pvfs2-cp -t /usr/lib/libc.a /mnt/pvfs2/testfile
+Wrote 2310808 bytes in 0.264689 seconds. 8.325842 MB/seconds
 
 bash-2.05b# ./pvfs2-ls /mnt/pvfs2/
 testfile
@@ -400,18 +390,8 @@ drwxrwxrwx    1 pcarns  users            0 2003-08-14 22:45 .
 drwxrwxrwx    1 pcarns  users            0 2003-08-14 22:45 .. (faked)
 -rw-------    1 root    root            2M 2003-08-14 22:47 testfile
 
-bash-2.05b# ./pvfs2-export /mnt/pvfs2/testfile /tmp/testfile-out
-PVFS2 Import Statistics:
-********************************************************
-Source path (local): /mnt/pvfs2/testfile
-Source path (PVFS2 file system): /testfile
-File system name: pvfs2-fs
-Initial config server: tcp://localhost:3334
-********************************************************
-Bytes written: 2555802
-Elapsed time: 0.443431 seconds
-Bandwidth: 5.496690 MB/second
-********************************************************
+bash-2.05b# ./pvfs2-cp -t /mnt/pvfs2/testfile /tmp/testfile-out
+Wrote 2310808 bytes in 0.180621 seconds. 12.201016 MB/seconds
 
 bash-2.05b# diff /tmp/testfile-out /usr/lib/libc.a
 \end{verbatim}

@@ -272,6 +272,32 @@ speed up applications which read a lot of attributes (\texttt{ls}, for
 example).  Playing around with the \texttt{AttrCache*} config file settings
 might yield some performance improvements, or it might not. 
 
+\subsection{NFS outperforms PVFS2 for application XXX. What gives?}
+
+In a situation where there is one client accessing a file on one server, NFS
+will beat PVFS2 in most benchmarks.  NFS has completely different consistency
+semantics, which work very well when just one process accesses a file.  We do
+have some ongoing work here that will implement similar consistency semantics
+for PVFS2, at which point we will be playing on a level field, so to speak.  If
+you insist on benchmarking PVFS2 and NFS in a single-client test, there are
+some adjustments you can make.
+
+The easiest way to improve PVFS2 performance is to increase the blocksize of
+each access.  Large blocksizes help all file systems, but for PVFS2 they make a
+much larger difference in performance than they do for other file systems.  
+
+If the \texttt{TroveSyncMode} option is set to \texttt{nosync} in your PVFS2
+config file, the server will sync data to disk only when a flush or close
+operation is called.  This option is set to \texttt{sync} by default, to limit
+the amount of data that could be lost if a server crashes.  Another approach
+would be to mount NFS with the \texttt{sync} flag, forcing both file systems to
+sync data after each operation.
+
+In the end, if you plan on running application XXX, or a similar workload,  and
+the NFS consistency semantics are adequate for what you're doing, then you
+should just use NFS.  There's no point in throwing PVFS2 at a serial workload,
+particularly one with small accesses.
+
 %
 % REDUNDANCY
 %

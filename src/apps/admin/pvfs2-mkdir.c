@@ -76,7 +76,7 @@ int main(int argc, char **argv)
     entry_name = str_buf;
     attr.owner = credentials.uid; 
     attr.group = credentials.gid;
-    attr.perms = PVFS_U_WRITE|PVFS_U_READ;
+    attr.perms = PVFS_U_WRITE|PVFS_U_READ|PVFS_U_EXECUTE;
     attr.atime = time(NULL);
     attr.mtime = attr.atime;
     attr.ctime = attr.atime;
