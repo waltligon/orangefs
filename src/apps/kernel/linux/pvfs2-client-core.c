@@ -1469,6 +1469,11 @@ static inline void package_downcall_members(
                 PVFS_Request_free(&vfs_request->file_req);
             }
 #endif
+            /* replace non-errno error code to avoid passing to kernel */
+            if (*error_code == -PVFS_ECANCEL)
+            {
+                *error_code = -PVFS_EINTR;
+            }
             break;
         default:
             gossip_err("Completed upcall of unknown type %x!\n",
