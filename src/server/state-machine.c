@@ -52,9 +52,9 @@ PINT_server_trove_keys_s Trove_Common_Keys[] = {
  * debugging time. dw
 */
 
-extern PINT_state_machine_s getconfig;
-extern PINT_state_machine_s getattr;
-extern PINT_state_machine_s setattr;
+extern PINT_state_machine_s get_config;
+extern PINT_state_machine_s get_attr;
+extern PINT_state_machine_s set_attr;
 extern PINT_state_machine_s create;
 extern PINT_state_machine_s crdirent;
 extern PINT_state_machine_s mkdir_;
@@ -74,8 +74,8 @@ PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
     &io,               /* io               */
     NULL,              /* 5                */
     NULL,              /* batch            */ 
-    &getattr,          /* get attrib       */
-    &setattr,          /* set attrib       */
+    &get_attr,         /* get attrib       */
+    &set_attr,         /* set attrib       */
     NULL,              /* geteattr         */
     NULL,              /* 10               */
     &lookup,           /* lookup           */
@@ -90,7 +90,7 @@ PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
     &readdir_,	       /* readdir - 20     */
     NULL,              /* statfs           */
     NULL,              /* iostatfs         */
-    &getconfig,        /* get config       */
+    &get_config,       /* get config       */
     /*                                     */
     /* NULL's continue for a while...      */
     /*                                     */

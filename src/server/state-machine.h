@@ -21,6 +21,13 @@
 #include <PINT-reqproto-encode.h>
 #include <pvfs2-server.h>
 
+typedef struct PINT_state_machine_s
+{
+	PINT_state_array_values *state_machine;
+	char *name;
+	void (*init_fun)(void);
+} PINT_state_machine_s;
+
 union PINT_state_array_values
 {
 	int (*state_action)(struct PINT_server_op *, job_status_s *);
@@ -52,14 +59,6 @@ typedef struct PINT_server_trove_keys
 	char *key;
 	int size;
 } PINT_server_trove_keys_s;
-
-typedef struct PINT_state_machine_s
-{
-	PINT_state_array_values *state_machine;
-	char *name;
-	void (*init_fun)(void);
-} PINT_state_machine_s;
-
 
 /* Prototypes */
 
