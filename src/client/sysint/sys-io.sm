@@ -57,7 +57,7 @@ static inline int process_context_recv_and_post_flow(
 static inline int check_context_status(
     PINT_client_io_ctx *cur_ctx, int io_type,
     PVFS_size *total_size);
-static inline int compute_scaling_flow_timeout(
+static inline int compute_scaling_write_transfer_timeout(
     PVFS_size data_size, int datafile_count);
 static int io_find_target_datafiles(
     PVFS_Request mem_req, PVFS_Request file_req,
@@ -236,12 +236,8 @@ int PVFS_isys_io(
         return -PVFS_ENOMEM;
     }
     memset(sm_p, 0, sizeof(*sm_p));
-    /* set msgpair default parameters */
-    sm_p->msgarray_params.job_context = pint_client_sm_context;
-    sm_p->msgarray_params.job_timeout = PVFS2_CLIENT_JOB_TIMEOUT;
-    sm_p->msgarray_params.retry_delay = PVFS2_CLIENT_RETRY_DELAY;
-    sm_p->msgarray_params.retry_limit = PVFS2_CLIENT_RETRY_LIMIT;
 
+    PINT_init_msgarray_params(&sm_p->msgarray_params);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
     sm_p->u.io.io_type = io_type;
@@ -1214,22 +1210,17 @@ static inline int build_context_flow(
 
     cur_ctx->flow_desc.mem_req = sm_p->u.io.mem_req;
 
-    cur_ctx->flow_timeout = compute_scaling_flow_timeout(
-        cur_ctx->flow_desc.file_data.fsize,
-        cur_ctx->flow_desc.file_data.server_ct);
-
-    gossip_debug(
-        GOSSIP_IO_DEBUG, "    bstream_size = %Ld, datafile_nr = "
-        "%d, datafile_ct = %d\n\tfile_req_off = %Ld (timeout=%d secs)\n",
-        Ld(cur_ctx->flow_desc.file_data.fsize),
-        cur_ctx->flow_desc.file_data.server_nr,
-        cur_ctx->flow_desc.file_data.server_ct,
-        Ld(cur_ctx->flow_desc.file_req_offset),
-        cur_ctx->flow_timeout);
-
     cur_ctx->flow_desc.tag = cur_ctx->session_tag;
     cur_ctx->flow_desc.type = sm_p->u.io.flowproto_type;
     cur_ctx->flow_desc.user_ptr = NULL;
+
+    gossip_debug(
+        GOSSIP_IO_DEBUG, "    bstream_size = %Ld, datafile_nr = "
+        "%d, datafile_ct = %d\n\tfile_req_off = %Ld\n",
+        Ld(cur_ctx->flow_desc.file_data.fsize),
+        cur_ctx->flow_desc.file_data.server_nr,
+        cur_ctx->flow_desc.file_data.server_ct,
+        Ld(cur_ctx->flow_desc.file_req_offset));
 
     if (sm_p->u.io.io_type == PVFS_IO_READ)
     {
@@ -1248,6 +1239,14 @@ static inline int build_context_flow(
         cur_ctx->flow_desc.src.u.mem.buffer = sm_p->u.io.buffer;
         cur_ctx->flow_desc.dest.endpoint_id = BMI_ENDPOINT;
         cur_ctx->flow_desc.dest.u.bmi.address = cur_ctx->msg->svr_addr;
+
+        cur_ctx->write_transfer_timeout =
+            compute_scaling_write_transfer_timeout(
+                cur_ctx->flow_desc.file_data.fsize,
+                cur_ctx->flow_desc.file_data.server_ct);
+
+        gossip_debug(GOSSIP_IO_DEBUG, " using write_transfer_timeout "
+                     "of %d seconds\n", cur_ctx->write_transfer_timeout);
     }
     return 0;
 }
@@ -1336,8 +1335,8 @@ static inline int process_context_recv_and_post_flow(
           we're pre-posting the final write ack here, even though it's
           ahead of the flow phase; reads are at the flow phase.
 
-          the timeout used here is slightly longer than the flow
-          (since this should happen sometime after the flow completes)
+          the timeout used here is a scaling one that needs to be long
+          enough for the entire flow to occur
         */
         status_user_tag = ((4 * cur_ctx->index) + IO_SM_PHASE_FINAL_ACK);
 
@@ -1346,8 +1345,7 @@ static inline int process_context_recv_and_post_flow(
             cur_ctx->write_ack.max_resp_sz, cur_ctx->session_tag,
             BMI_PRE_ALLOC, sm_p, status_user_tag,
             &cur_ctx->write_ack.recv_status, &cur_ctx->write_ack.recv_id,
-            pint_client_sm_context,
-            (cur_ctx->flow_timeout + PVFS2_CLIENT_JOB_TIMEOUT));
+            pint_client_sm_context, cur_ctx->write_transfer_timeout);
 
         if (ret < 0)
         {
@@ -1366,7 +1364,7 @@ static inline int process_context_recv_and_post_flow(
     ret = job_flow(
         &cur_ctx->flow_desc, sm_p, status_user_tag,
         &cur_ctx->flow_status, &cur_ctx->flow_job_id,
-        pint_client_sm_context, cur_ctx->flow_timeout);
+        pint_client_sm_context, PVFS2_CLIENT_JOB_TIMEOUT);
 
     if (ret < 0)
     {
@@ -1491,7 +1489,7 @@ static inline int check_context_status(
     return ret;
 }
 
-static inline int compute_scaling_flow_timeout(
+static inline int compute_scaling_write_transfer_timeout(
     PVFS_size data_size, int datafile_count)
 {
     static int one_hundred_megs = (1024 * 1024 * 100);

@@ -136,12 +136,12 @@ typedef struct
     /* a reference to the msgpair we're using for communication */
     PINT_sm_msgpair_state *msg;
 
-    int flow_timeout;
     job_id_t flow_job_id;
     job_status_s flow_status;
     flow_descriptor flow_desc;
     PVFS_msg_tag_t session_tag;
 
+    int write_transfer_timeout;
     PINT_client_sm_recv_state write_ack;
 
     /*
@@ -531,6 +531,15 @@ do {                                                          \
         free(sm_p);                                           \
         return -PVFS_ENOMEM;                                  \
     }                                                         \
+} while(0)
+
+#define PINT_init_msgarray_params(msgarray_params_ptr)\
+do {                                                  \
+    PINT_sm_msgpair_params *mpp = msgarray_params_ptr;\
+    mpp->job_context = pint_client_sm_context;        \
+    mpp->job_timeout = PVFS2_CLIENT_JOB_TIMEOUT;      \
+    mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY;      \
+    mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT;      \
 } while(0)
 
 /* misc helper methods */

@@ -151,21 +151,15 @@ static int flush_keyval_flush(PINT_server_op *s_op, job_status_s * js_p)
     return (ret);
 }
 
-/* flush_check_error
- *
- * TROVE_ENOENT is an error we can safely ignore since we flush both keyval and
- * bstream spaces. ( if there is neither a bstream nor a keyval associated with
- * a handle, then i'm not sure how we should handle this... )
- */
 static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("{k,b}check_error")
+    char buf[64] = {0};
+    PINT_STATE_DEBUG("{k,b}check_error");
 
-    if (js_p->error_code == -TROVE_ENOENT)
-    {
-        gossip_err("failed to flush handle %Lu\n",
-                   Lu(s_op->req->u.flush.handle));
-    }
+    PVFS_strerror_r(js_p->error_code, buf, 64);
+
+    gossip_err("failed to flush handle %Lu: %s\n",
+               Lu(s_op->req->u.flush.handle), buf);
     return 1;
 }
 
