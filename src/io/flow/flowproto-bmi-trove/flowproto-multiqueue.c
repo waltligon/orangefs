@@ -71,6 +71,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
 static void bmi_send_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code);
+static void cleanup_buffers(struct fp_private_data* flow_data);
+
 #if 0
 static void trove_read_callback_fn(void *user_ptr,
 		           PVFS_error error_code);
@@ -288,6 +290,8 @@ int fp_multiqueue_find_serviceable(flow_descriptor ** flow_d_array,
 		list_link);
 	    qlist_del(&tmp_data->list_link);
 	    flow_d_array[*count] = tmp_data->parent;
+	    cleanup_buffers(tmp_data);
+	    free(tmp_data);
 	    (*count)++;
 	}
 
@@ -473,7 +477,6 @@ static void trove_write_callback_fn(void *user_ptr,
 	    &completion_queue);
 	pthread_cond_signal(&completion_cond);
 	gen_mutex_unlock(&completion_mutex);
-	/* TODO: call cleanup function */
 	return;
     }
 
@@ -539,6 +542,33 @@ static void trove_write_callback_fn(void *user_ptr,
     return;
 };
 
+static void cleanup_buffers(struct fp_private_data* flow_data)
+{
+    int i;
+
+    for(i=0; i<BUFFERS_PER_FLOW; i++)
+    {
+	if(flow_data->prealloc_array[i].buffer)
+	{
+	    if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT)
+	    {
+		BMI_memfree(flow_data->parent->src.u.bmi.address,
+		    flow_data->prealloc_array[i].buffer,
+		    BUFFER_SIZE,
+		    BMI_RECV);
+	    }
+	    else
+	    {
+		BMI_memfree(flow_data->parent->dest.u.bmi.address,
+		    flow_data->prealloc_array[i].buffer,
+		    BUFFER_SIZE,
+		    BMI_SEND);
+	    }
+	}
+    }
+
+    return;
+}
 
 /*
  * Local variables:
