@@ -4,7 +4,6 @@
 #	. trailing whitespace can confuse some parts of PAV
 # 
 
-SRCDIR=@srcdir@
 SRCDIR_TOP=@SRC_TOP_LEVEL@
 BUILDDIR=@BUILD_TOP_LEVEL@
 # primative bakctick expansion is allowed: 
@@ -52,7 +51,7 @@ RCPPROG=scp
 #
 # LOCATION OF IMPORTANT BINARIES LOCALLY
 #
-PROGROOT=$SRCDIR
+PROGROOT=$SRCDIR_TOP/test/common/pav
 
 # pav understands simple shell-like variables
 #PVFS=/homes/robl/pvfs2
