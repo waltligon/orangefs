@@ -497,11 +497,13 @@ static inline struct inode *pvfs2_create_file(
         new_op, "pvfs2_create_file", retries, error_exit,
         get_interruptible_flag(dir));
 
-    pvfs2_print("Create Got PVFS2 handle %Lu on fsid %d\n",
-                new_op->downcall.resp.create.refn.handle,
-                new_op->downcall.resp.create.refn.fs_id);
+    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    if (new_op->downcall.status > -1)
+    pvfs2_print("Create Got PVFS2 handle %Lu on fsid %d (ret=%d)\n",
+                new_op->downcall.resp.create.refn.handle,
+                new_op->downcall.resp.create.refn.fs_id, ret);
+
+    if (ret > -1)
     {
         inode = pvfs2_get_custom_inode(
             dir->i_sb, (S_IFREG | mode), 0, pvfs2_handle_to_ino(
@@ -677,11 +679,13 @@ static inline struct inode *pvfs2_create_symlink(
         new_op, "pvfs2_symlink_file", retries, error_exit,
         get_interruptible_flag(dir));
 
-    pvfs2_print("Symlink Got PVFS2 handle %Lu on fsid %d\n",
-                new_op->downcall.resp.sym.refn.handle,
-                new_op->downcall.resp.sym.refn.fs_id);
+    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    if (new_op->downcall.status > -1)
+    pvfs2_print("Symlink Got PVFS2 handle %Lu on fsid %d (ret=%d)\n",
+                new_op->downcall.resp.sym.refn.handle,
+                new_op->downcall.resp.sym.refn.fs_id, ret);
+
+    if (ret > -1)
     {
         inode = pvfs2_get_custom_inode(
             dir->i_sb, (S_IFLNK | mode), 0, pvfs2_handle_to_ino(
@@ -777,7 +781,7 @@ int pvfs2_remove_entry(
 
     if (inode && parent && dentry)
     {
-        pvfs2_print("pvfs2: pvfs2_remove_entry on %s (inode %d): "
+        pvfs2_print("pvfs2: pvfs2_remove_entry on %s\n  (inode %d): "
                     "Parent is %Lu | fs_id %d\n", dentry->d_name.name,
                     (int)inode->i_ino, parent->refn.handle,
                     parent->refn.fs_id);

@@ -130,8 +130,7 @@ static int hash_key(void *key, int table_size);
 static int hash_key_compare(void *key, struct qlist_head *link);
 static struct qhash_table *s_ops_in_progress_table = NULL;
 
-
-int write_device_response(
+static int write_device_response(
     void *buffer_list,
     int *size_list,
     int list_size,
@@ -369,7 +368,7 @@ static int post_lookup_request(vfs_request_t *vfs_request)
     {
         gossip_debug(
             GOSSIP_CLIENT_DEBUG,
-            "Failed to lookup %s on fsid %d (ret=%d)!\n",
+            "Posting of lookup failed: %s on fsid %d (ret=%d)!\n",
             vfs_request->in_upcall.req.lookup.d_name,
             vfs_request->in_upcall.req.lookup.parent_refn.fs_id, ret);
     }
@@ -397,7 +396,7 @@ static int post_create_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("File creation failed", ret);
+        PVFS_perror_gossip("Posting file create failed", ret);
     }
     return ret;
 }
@@ -425,7 +424,7 @@ static int post_symlink_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("Symlink creation failed", ret);
+        PVFS_perror_gossip("Posting symlink create failed", ret);
     }
     return ret;
 }
@@ -449,7 +448,7 @@ static int post_getattr_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("Getattr failed", ret);
+        PVFS_perror_gossip("Posting getattr failed", ret);
     }
     return ret;
 }
@@ -472,7 +471,7 @@ static int post_setattr_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("Setattr failed", ret);
+        PVFS_perror_gossip("Posting setattr failed", ret);
     }
     return ret;
 }
@@ -496,7 +495,7 @@ static int post_remove_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("Remove failed",ret);
+        PVFS_perror_gossip("Posting remove failed",ret);
     }
     return ret;
 }
@@ -522,7 +521,7 @@ static int post_mkdir_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("Mkdir failed", ret);
+        PVFS_perror_gossip("Posting mkdir failed", ret);
     }
     return ret;
 }
@@ -548,7 +547,7 @@ static int post_readdir_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("Readdir failed", ret);
+        PVFS_perror_gossip("Posting readdir failed", ret);
     }
     return ret;
 }
@@ -578,7 +577,7 @@ static int post_rename_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("Rename failed", ret);
+        PVFS_perror_gossip("Posting rename failed", ret);
     }
     return ret;
 }
@@ -602,7 +601,7 @@ static int post_truncate_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("Truncate failed", ret);
+        PVFS_perror_gossip("Posting truncate failed", ret);
     }
     return ret;
 }
@@ -936,7 +935,7 @@ static int post_io_readahead_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("File I/O failed", ret);
+        PVFS_perror_gossip("Posting file I/O failed", ret);
     }
     return 0;
 
@@ -1020,7 +1019,7 @@ static int post_io_request(vfs_request_t *vfs_request)
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("File I/O failed", ret);
+        PVFS_perror_gossip("Posting file I/O failed", ret);
     }
     return ret;
 }
@@ -1178,6 +1177,21 @@ static inline void package_downcall_members(
         case PVFS2_VFS_OP_CREATE:
             if (error_code)
             {
+                /*
+                  unless O_EXCL was specified at open time from the
+                  vfs, -PVFS_EEXIST shouldn't be an error, but rather
+                  success.  to solve this case, in theory we could do
+                  a lookup on a failed create, but there are problems.
+                  most are consistency races, but aside from those is
+                  that we don't know if the vfs has opened with the
+                  O_EXCL flag at this level.  after much
+                  investigation, it turns out we don't want to know
+                  either.  the vfs (both in 2.4.x and 2.6.x) properly
+                  handles the translated error code (which ends up
+                  being -EEXIST) in the open path and does the right
+                  thing when O_EXCL is specified (i.e. return -EEXIST,
+                  otherwise success).
+                */
                 vfs_request->out_downcall.resp.create.refn.handle =
                     PVFS_HANDLE_NULL;
                 vfs_request->out_downcall.resp.create.refn.fs_id =

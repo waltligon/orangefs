@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #define MAX_NUM_THREADS                  64
 #define DATA_SIZE_PER_THREAD  (1024*1024*8)
@@ -83,7 +84,8 @@ int main(int argc, char **argv)
     fd = open(argv[1], O_WRONLY|O_CREAT|O_TRUNC, 0666);
     if (fd == -1)
     {
-        fprintf(stderr, "Failed to open file %s for writing\n", argv[1]);
+        fprintf(stderr, "Failed to open file %s for writing: %s\n", argv[1],
+		strerror(errno));
         return 1;
     }
 

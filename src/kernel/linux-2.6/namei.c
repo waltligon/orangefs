@@ -58,27 +58,15 @@ struct dentry *pvfs2_lookup(
     pvfs2_inode_t *parent = NULL, *found_pvfs2_inode = NULL;
     struct super_block *sb = NULL;
 
-    pvfs2_print("pvfs2_lookup called on %s\n", dentry->d_name.name);
-
-#ifndef PVFS2_LINUX_KERNEL_2_4
     /*
-      we can skip doing anything knowing that the intent is to
-      create.  normally this results in an expensive failed
-      lookup; we're avoiding that here.
+      in theory we could skip a lookup here (if the intent is to
+      create) in order to avoid a potentially failed lookup, but
+      leaving it in can skip a valid lookup and try to create a file
+      that already exists (e.g. the vfs already handles checking for
+      -EEXIST on O_EXCL opens, which is broken if we skip this lookup
+      in the create path)
     */
-    if (nd && (nd->flags & LOOKUP_OPEN))
-    {
-        if ((nd->flags & LOOKUP_CREATE) &&
-            !(nd->flags & LOOKUP_CONTINUE) &&
-            (nd->intent.open.flags & O_CREAT))
-        {
-            pvfs2_print("pvfs2_lookup: skipping operation based "
-                        "on create intent\n");
-            return NULL;
-        }
-    }
-
-#endif /* PVFS2_LINUX_KERNEL_2_4 */
+    pvfs2_print("pvfs2_lookup called on %s\n", dentry->d_name.name);
 
     if (dentry->d_name.len > PVFS2_NAME_LEN)
     {
@@ -220,7 +208,7 @@ static int pvfs2_link(
     struct inode *dir,
     struct dentry *dentry)
 {
-    pvfs2_print("pvfs2: pvfs2_link called\n");
+    pvfs2_print("pvfs2_link: called (returning -ENOSYS)\n");
     return -ENOSYS;
 }
 
@@ -252,7 +240,7 @@ static int pvfs2_symlink(
     int ret = -EINVAL, mode = 755;
     struct inode *inode = NULL;
 
-    pvfs2_print("pvfs2: pvfs2_symlink called\n");
+    pvfs2_print("pvfs2_symlink: called\n");
 
     inode = pvfs2_create_entry(
         dir, dentry, symname, mode, PVFS2_VFS_OP_SYMLINK, &ret);
@@ -267,7 +255,7 @@ static int pvfs2_mknod(
     int mode,
     dev_t rdev)
 {
-    pvfs2_print("pvfs2: pvfs2_mknod called\n");
+    pvfs2_print("pvfs2_mknod: called\n");
     return 0;
 }
 #endif
@@ -327,7 +315,7 @@ static int pvfs2_rename(
     pvfs2_kernel_op_t *new_op = NULL;
     struct super_block *sb = NULL;
 
-    pvfs2_print("pvfs2: pvfs2_rename called (%s/%s => %s/%s) ct=%d\n",
+    pvfs2_print("pvfs2_rename: called (%s/%s => %s/%s) ct=%d\n",
                 old_dentry->d_parent->d_name.name, old_dentry->d_name.name,
                 new_dentry->d_parent->d_name.name, new_dentry->d_name.name,
                 atomic_read(&new_dentry->d_count));
@@ -335,8 +323,8 @@ static int pvfs2_rename(
     are_directories = S_ISDIR(old_dentry->d_inode->i_mode);
     if (are_directories && (new_dir->i_nlink >= PVFS2_LINK_MAX))
     {
-        pvfs2_error("pvfs2: pvfs2_rename -- directory %s "
-                    "surpassed PVFS2_LINK_MAX\n",
+        pvfs2_error("pvfs2_rename: directory %s surpassed "
+                    "PVFS2_LINK_MAX\n",
                     new_dentry->d_name.name);
         return -EMLINK;
     }
@@ -394,7 +382,7 @@ static int pvfs2_rename(
 
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    pvfs2_print("pvfs2: pvfs2_rename got downcall status %d\n", ret);
+    pvfs2_print("pvfs2_rename: got downcall status %d\n", ret);
 
     if (new_dentry->d_inode)
     {

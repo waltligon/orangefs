@@ -83,7 +83,7 @@ ssize_t pvfs2_inode_read(
     size_t total_count = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
-    char* current_buf = buf;
+    char *current_buf = buf;
     loff_t original_offset = *offset;
     int retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
@@ -221,11 +221,11 @@ static ssize_t pvfs2_file_write(
     struct file *file,
     const char *buf,
     size_t count,
-    loff_t * offset)
+    loff_t *offset)
 {
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_kernel_op_t *new_op = NULL;
-    char* current_buf = (char*)buf;
+    char *current_buf = (char*)buf;
     loff_t original_offset = *offset;
     int buffer_index = -1, error_exit = 0;
     size_t each_count = 0, total_count = 0;
