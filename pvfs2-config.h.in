@@ -28,6 +28,12 @@
 /* Define if you have the efence library (-lefence).  */
 #undef HAVE_LIBEFENCE
 
+/* Name of package */
+#undef PACKAGE
+
+/* Version number of package */
+#undef VERSION
+
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
 
