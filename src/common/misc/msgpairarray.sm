@@ -664,7 +664,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 		server_config = PINT_server_config_mgr_get_config(fs_id);
 		server_string = PINT_cached_config_map_addr(server_config,
 		    fs_id, *svr_addr_p, &server_type);
-		PINT_put_server_config_struct(server_config);
+		PINT_server_config_mgr_put_config(server_config);
 		gossip_err("   Server: %s.\n", server_string);
 	    }
 	    else
