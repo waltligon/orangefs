@@ -39,6 +39,7 @@
 #include "pint-perf-counter.h"
 #include "pint-event.h"
 #include "id-generator.h"
+#include "job-time-mgr.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -259,6 +260,15 @@ int main(int argc, char **argv)
 	goto server_shutdown;
     }
 #endif
+
+    /* start timer to look for expired jobs */
+    ret = server_state_machine_start_noreq(PVFS_SERV_JOB_TIMER);
+    if(ret < 0)
+    {
+	gossip_lerr("Error: failed to start job timer "
+                    "state machine.\n");
+	goto server_shutdown;
+    }
 
     /* Initialization complete; process server requests indefinitely. */
     for ( ;; )  
@@ -717,6 +727,15 @@ static int server_initialize_subsystems(
 
     *server_status_flag |= SERVER_FLOW_INIT;
 
+    ret = job_time_mgr_init();
+    if(ret < 0)
+    {
+	PVFS_perror_gossip("job_time_mgr_init", ret);
+	return(ret);
+    }
+
+    *server_status_flag |= SERVER_JOB_TIME_MGR_INIT;
+
     /* initialize Job Interface */
     ret = job_initialize(0);
     if (ret < 0)
@@ -904,6 +923,14 @@ static int server_shutdown(
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "* halting job interface             ... ");
 	job_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
+    }
+
+    if (status & SERVER_JOB_TIME_MGR_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "* halting job time mgr interface    ... ");
+	job_time_mgr_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
 
@@ -1284,6 +1311,7 @@ static void server_state_table_initialize(void)
     PINT_server_op_table[PVFS_SERV_MGMT_NOOP]     = &pvfs2_noop_sm;
     PINT_server_op_table[PVFS_SERV_STATFS]	  = &pvfs2_statfs_sm;
     PINT_server_op_table[PVFS_SERV_PERF_UPDATE]	  = &pvfs2_perf_update_sm;
+    PINT_server_op_table[PVFS_SERV_JOB_TIMER]	  = &pvfs2_job_timer_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_PERF_MON] = &pvfs2_perf_mon_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_EVENT_MON] = &pvfs2_event_mon_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_ITERATE_HANDLES] 

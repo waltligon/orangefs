@@ -62,6 +62,7 @@ typedef enum
     SERVER_JOB_OBJS_ALLOCATED  = (1 << 12),
     SERVER_PERF_COUNTER_INIT   = (1 << 13),
     SERVER_EVENT_INIT          = (1 << 14),
+    SERVER_JOB_TIME_MGR_INIT   = (1 << 15),
 } PINT_server_status_flag;
 
 /* struct PINT_server_lookup_op
@@ -267,6 +268,9 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 	case PVFS_SERV_PERF_UPDATE:
 	    ret_ptr = "perf_update";
 	    break;
+	case PVFS_SERV_JOB_TIMER:
+	    ret_ptr = "job_timer";
+	    break;
     }
     return(ret_ptr);
 }
@@ -303,6 +307,7 @@ extern struct PINT_state_machine_s pvfs2_setparam_sm;
 extern struct PINT_state_machine_s pvfs2_noop_sm;
 extern struct PINT_state_machine_s pvfs2_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_perf_update_sm;
+extern struct PINT_state_machine_s pvfs2_job_timer_sm;
 extern struct PINT_state_machine_s pvfs2_perf_mon_sm;
 extern struct PINT_state_machine_s pvfs2_event_mon_sm;
 extern struct PINT_state_machine_s pvfs2_iterate_handles_sm;

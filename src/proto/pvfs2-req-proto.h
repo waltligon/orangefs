@@ -46,7 +46,8 @@ enum PVFS_server_op
     PVFS_SERV_MGMT_PERF_MON = 19,
     PVFS_SERV_MGMT_ITERATE_HANDLES = 20,
     PVFS_SERV_MGMT_DSPACE_INFO_LIST = 21,
-    PVFS_SERV_MGMT_EVENT_MON = 22
+    PVFS_SERV_MGMT_EVENT_MON = 22,
+    PVFS_SERV_JOB_TIMER = 23,   /* not a real protocol request */
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
      * if you add a new operation to this list
      */
@@ -58,7 +59,7 @@ enum PVFS_server_op
      * PVFS_SERV_EXTENSION
      */
 };
-#define PVFS_MAX_SERVER_OP 22
+#define PVFS_MAX_SERVER_OP 23
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length

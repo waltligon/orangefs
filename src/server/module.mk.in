@@ -23,7 +23,8 @@ SERVERGENSRC := \
 	$(DIR)/perf-update.c \
 	$(DIR)/perf-mon.c \
 	$(DIR)/event-mon.c \
-	$(DIR)/iterate-handles.c
+	$(DIR)/iterate-handles.c \
+	$(DIR)/job-timer.c
 
 # "normal" c files that should be added to server library
 SERVERSRC += \
