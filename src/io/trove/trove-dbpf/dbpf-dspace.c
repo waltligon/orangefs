@@ -970,8 +970,9 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
             gen_mutex_unlock(&cur_op->mutex);
 
             if (state == OP_COMPLETED)
+            {
                 goto op_completed;
-
+            }
             goto op_not_completed;
         }
     }
@@ -986,14 +987,12 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
         gen_mutex_unlock(context_mutex);
 
 	*out_count_p = 1;
-
 	*state_p = cur_op->state;
 
 	if (returned_user_ptr_p != NULL)
         {
 	    *returned_user_ptr_p = cur_op->op.user_ptr;
 	}
-
 	dbpf_queued_op_free(cur_op);
 
         return 1;

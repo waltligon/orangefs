@@ -206,7 +206,11 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 
         cur = llist_next(cur);
     }
-    gossip_debug(SERVER_DEBUG, "Storage Init Complete\n");
+#ifdef __PVFS2_TROVE_THREADED__
+    gossip_debug(SERVER_DEBUG, "Storage Init Complete (threaded)\n");
+#else
+    gossip_debug(SERVER_DEBUG, "Storage Init Complete (non-threaded)\n");
+#endif
     gossip_debug(SERVER_DEBUG, "%d filesystem(s) initialized\n",
                  llist_count(user_opts.file_systems));
 
