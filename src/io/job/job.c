@@ -64,7 +64,7 @@ static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
 enum
 {
     job_work_metric = 5,
-    thread_wait_timeout = 10000	/* usecs */
+    thread_wait_timeout = 10000        /* usecs */
 };
 
 /********************************************************
@@ -75,19 +75,19 @@ static int setup_queues(void);
 static void teardown_queues(void);
 static int do_one_test_cycle_req_sched(void);
 static void fill_status(struct job_desc *jd,
-			void **returned_user_ptr_p,
-			job_status_s * status);
+                        void **returned_user_ptr_p,
+                        job_status_s * status);
 static int completion_query_some(job_id_t * id_array,
-				 int *inout_count_p,
-				 int *out_index_array,
-				 void **returned_user_ptr_array,
-				 job_status_s * out_status_array_p);
+                                 int *inout_count_p,
+                                 int *out_index_array,
+                                 void **returned_user_ptr_array,
+                                 job_status_s * out_status_array_p);
 static int completion_query_context(job_id_t * out_id_array_p,
-				  int *inout_count_p,
-				  void **returned_user_ptr_array,
-				  job_status_s *
-				  out_status_array_p,
-				  job_context_id context_id);
+                                  int *inout_count_p,
+                                  void **returned_user_ptr_array,
+                                  job_status_s *
+                                  out_status_array_p,
+                                  job_context_id context_id);
 static void bmi_thread_mgr_callback(void* data, 
     PVFS_size actual_size,
     PVFS_error error_code);
@@ -117,15 +117,15 @@ int job_initialize(int flags)
     ret = setup_queues();
     if (ret < 0)
     {
-	return (ret);
+        return (ret);
     }
 
     /* startup threads */
     ret = PINT_thread_mgr_bmi_start();
     if (ret != 0)
     {
-	teardown_queues();
-	return (-ret);
+        teardown_queues();
+        return (-ret);
     }
     ret = PINT_thread_mgr_bmi_getcontext(&global_bmi_context);
     /* this should never fail if the thread startup succeeded */
@@ -135,9 +135,9 @@ int job_initialize(int flags)
     ret = PINT_thread_mgr_dev_start();
     if (ret != 0)
     {
-	PINT_thread_mgr_bmi_stop();
-	teardown_queues();
-	return(-ret);
+        PINT_thread_mgr_bmi_stop();
+        teardown_queues();
+        return(-ret);
     }
 #endif
 
@@ -145,12 +145,12 @@ int job_initialize(int flags)
     ret = PINT_thread_mgr_trove_start();
     if(ret != 0)
     {
-	PINT_thread_mgr_bmi_stop();
+        PINT_thread_mgr_bmi_stop();
 #ifdef __PVFS2_CLIENT__
-	PINT_thread_mgr_dev_stop();
+        PINT_thread_mgr_dev_stop();
 #endif
-	teardown_queues();
-	return (-ret);
+        teardown_queues();
+        return (-ret);
     }
     ret = PINT_thread_mgr_trove_getcontext(&global_trove_context);
     /* this should never fail if thread startup succeeded */
@@ -193,23 +193,23 @@ int job_open_context(job_context_id* context_id)
     /* find an unused context id */
     for(context_index=0; context_index<JOB_MAX_CONTEXTS; context_index++)
     {
-	if(completion_queue_array[context_index] == NULL)
-	{
-	    break;
-	}
+        if(completion_queue_array[context_index] == NULL)
+        {
+            break;
+        }
     }
 
     if(context_index >= JOB_MAX_CONTEXTS)
     {
-	/* we don't have any more available! */
-	return(-EBUSY);
+        /* we don't have any more available! */
+        return(-EBUSY);
     }
 
     /* create a new completion queue for the context */
     completion_queue_array[context_index] = job_desc_q_new();
     if(!completion_queue_array[context_index])
     {
-	return(-ENOMEM);
+        return(-ENOMEM);
     }
 
     *context_id = context_index;
@@ -227,7 +227,7 @@ void job_close_context(job_context_id context_id)
 {
     if(!completion_queue_array[context_id])
     {
-	return;
+        return;
     }
 
     job_desc_q_cleanup(completion_queue_array[context_id]);
@@ -256,19 +256,19 @@ int job_reset_timeout(job_id_t id, int timeout_sec)
 
     query = id_gen_safe_lookup(id);
     if(!query)
-    {	
-	/* this id is not valid */
-	gen_mutex_unlock(&completion_mutex);
-	return(-PVFS_EINVAL);
+    {        
+        /* this id is not valid */
+        gen_mutex_unlock(&completion_mutex);
+        return(-PVFS_EINVAL);
     }
 
     if(query->type != JOB_BMI && query->type != JOB_FLOW)
     {
-	/* trying to reset timeouts on a job that doesn't support the
-	 * concept 
-	 */
-	gen_mutex_unlock(&completion_mutex);
-	return(-PVFS_EINVAL);
+        /* trying to reset timeouts on a job that doesn't support the
+         * concept 
+         */
+        gen_mutex_unlock(&completion_mutex);
+        return(-PVFS_EINVAL);
     }
 
     /* pull the job out of the time mgr (thereby clearing old timer) */
@@ -291,17 +291,17 @@ int job_reset_timeout(job_id_t id, int timeout_sec)
  * failure
  */
 int job_bmi_send(PVFS_BMI_addr_t addr,
-		 void *buffer,
-		 bmi_size_t size,
-		 bmi_msg_tag_t tag,
-		 enum bmi_buffer_type buffer_type,
-		 int send_unexpected,
-		 void *user_ptr,
-		 job_aint status_user_tag,
-		 job_status_s * out_status_p,
-		 job_id_t * id,
-		 job_context_id context_id,
-		 int timeout_sec)
+                 void *buffer,
+                 bmi_size_t size,
+                 bmi_msg_tag_t tag,
+                 enum bmi_buffer_type buffer_type,
+                 int send_unexpected,
+                 void *user_ptr,
+                 job_aint status_user_tag,
+                 job_status_s * out_status_p,
+                 job_id_t * id,
+                 job_context_id context_id,
+                 int timeout_sec)
 {
     /* post a bmi send.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -318,7 +318,7 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = size;
@@ -332,38 +332,38 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     /* post appropriate type of send */
     if (!send_unexpected)
     {
-	ret = BMI_post_send(&(jd->u.bmi.id), addr, buffer, size,
-			    buffer_type, tag, user_ptr_internal, 
-			    global_bmi_context);
+        ret = BMI_post_send(&(jd->u.bmi.id), addr, buffer, size,
+                            buffer_type, tag, user_ptr_internal, 
+                            global_bmi_context);
     }
     else
     {
-	ret = BMI_post_sendunexpected(&(jd->u.bmi.id), addr,
-				      buffer, size, buffer_type, tag,
-				      user_ptr_internal, global_bmi_context);
+        ret = BMI_post_sendunexpected(&(jd->u.bmi.id), addr,
+                                      buffer, size, buffer_type, tag,
+                                      user_ptr_internal, global_bmi_context);
     }
 
     if (ret < 0)
     {
-	/* error posting */
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
+        /* error posting */
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_BMI_SEND, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (1);
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->actual_size = size;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = size;
         JOB_EVENT_END(PVFS_EVENT_BMI_SEND, size, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
@@ -385,19 +385,19 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
  * failure
  */
 int job_bmi_send_list(PVFS_BMI_addr_t addr,
-		      void **buffer_list,
-		      bmi_size_t * size_list,
-		      int list_count,
-		      bmi_size_t total_size,
-		      bmi_msg_tag_t tag,
-		      enum bmi_buffer_type buffer_type,
-		      int send_unexpected,
-		      void *user_ptr,
-		      job_aint status_user_tag,
-		      job_status_s * out_status_p,
-		      job_id_t * id,
-		      job_context_id context_id,
-		      int timeout_sec)
+                      void **buffer_list,
+                      bmi_size_t * size_list,
+                      int list_count,
+                      bmi_size_t total_size,
+                      bmi_msg_tag_t tag,
+                      enum bmi_buffer_type buffer_type,
+                      int send_unexpected,
+                      void *user_ptr,
+                      job_aint status_user_tag,
+                      job_status_s * out_status_p,
+                      job_id_t * id,
+                      job_context_id context_id,
+                      int timeout_sec)
 {
     /* post a bmi send.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -414,7 +414,7 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = total_size;
@@ -428,41 +428,41 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     /* post appropriate type of send */
     if (!send_unexpected)
     {
-	ret = BMI_post_send_list(&(jd->u.bmi.id), addr,
-				 (const void **) buffer_list, size_list,
-				 list_count, total_size, buffer_type,
-				 tag, user_ptr_internal, global_bmi_context);
+        ret = BMI_post_send_list(&(jd->u.bmi.id), addr,
+                                 (const void **) buffer_list, size_list,
+                                 list_count, total_size, buffer_type,
+                                 tag, user_ptr_internal, global_bmi_context);
     }
     else
     {
-	ret = BMI_post_sendunexpected_list(&(jd->u.bmi.id), addr,
-					   (const void **) buffer_list,
-					   size_list, list_count,
-					   total_size, buffer_type, tag,
-					   user_ptr_internal, global_bmi_context);
+        ret = BMI_post_sendunexpected_list(&(jd->u.bmi.id), addr,
+                                           (const void **) buffer_list,
+                                           size_list, list_count,
+                                           total_size, buffer_type, tag,
+                                           user_ptr_internal, global_bmi_context);
     }
 
     if (ret < 0)
     {
-	/* error posting */
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
+        /* error posting */
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_BMI_SEND, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (1);
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->actual_size = total_size;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = total_size;
         JOB_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
@@ -482,16 +482,16 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
  * failure
  */
 int job_bmi_recv(PVFS_BMI_addr_t addr,
-		 void *buffer,
-		 bmi_size_t size,
-		 bmi_msg_tag_t tag,
-		 enum bmi_buffer_type buffer_type,
-		 void *user_ptr,
-		 job_aint status_user_tag,
-		 job_status_s * out_status_p,
-		 job_id_t * id,
-		 job_context_id context_id,
-		 int timeout_sec)
+                 void *buffer,
+                 bmi_size_t size,
+                 bmi_msg_tag_t tag,
+                 enum bmi_buffer_type buffer_type,
+                 void *user_ptr,
+                 job_aint status_user_tag,
+                 job_status_s * out_status_p,
+                 job_id_t * id,
+                 job_context_id context_id,
+                 int timeout_sec)
 {
     /* post a bmi recv.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -507,7 +507,7 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-	return (-ENOMEM);
+        return (-ENOMEM);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -518,31 +518,31 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     JOB_EVENT_START(PVFS_EVENT_BMI_RECV, jd->job_id);
 
     ret = BMI_post_recv(&(jd->u.bmi.id), addr, buffer, size,
-			&(jd->u.bmi.actual_size), buffer_type, tag, 
-			user_ptr_internal, 
-			global_bmi_context);
+                        &(jd->u.bmi.actual_size), buffer_type, tag, 
+                        user_ptr_internal, 
+                        global_bmi_context);
     if (ret < 0)
     {
-	/* error posting */
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
+        /* error posting */
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_BMI_RECV, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (1);
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->actual_size = jd->u.bmi.actual_size;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = jd->u.bmi.actual_size;
         JOB_EVENT_END(PVFS_EVENT_BMI_RECV, out_status_p->actual_size, 
-	    jd->job_id);
-	dealloc_job_desc(jd);
+            jd->job_id);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
@@ -564,18 +564,18 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
  * failure
  */
 int job_bmi_recv_list(PVFS_BMI_addr_t addr,
-		      void **buffer_list,
-		      bmi_size_t * size_list,
-		      int list_count,
-		      bmi_size_t total_expected_size,
-		      bmi_msg_tag_t tag,
-		      enum bmi_buffer_type buffer_type,
-		      void *user_ptr,
-		      job_aint status_user_tag,
-		      job_status_s * out_status_p,
-		      job_id_t * id,
-		      job_context_id context_id,
-		      int timeout_sec)
+                      void **buffer_list,
+                      bmi_size_t * size_list,
+                      int list_count,
+                      bmi_size_t total_expected_size,
+                      bmi_msg_tag_t tag,
+                      enum bmi_buffer_type buffer_type,
+                      void *user_ptr,
+                      job_aint status_user_tag,
+                      job_status_s * out_status_p,
+                      job_id_t * id,
+                      job_context_id context_id,
+                      int timeout_sec)
 {
 
     /* post a bmi recv.  If it completes (or fails) immediately, then
@@ -593,7 +593,7 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     jd = alloc_job_desc(JOB_BMI);
     if (!jd)
     {
-	return (-ENOMEM);
+        return (-ENOMEM);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -604,32 +604,32 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     JOB_EVENT_START(PVFS_EVENT_BMI_RECV, jd->job_id);
 
     ret = BMI_post_recv_list(&(jd->u.bmi.id), addr, buffer_list,
-			     size_list, list_count, total_expected_size,
-			     &(jd->u.bmi.actual_size), buffer_type, tag,
-			     user_ptr_internal, global_bmi_context);
+                             size_list, list_count, total_expected_size,
+                             &(jd->u.bmi.actual_size), buffer_type, tag,
+                             user_ptr_internal, global_bmi_context);
 
     if (ret < 0)
     {
-	/* error posting */
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
+        /* error posting */
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_BMI_RECV, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (1);
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->actual_size = jd->u.bmi.actual_size;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = jd->u.bmi.actual_size;
         JOB_EVENT_END(PVFS_EVENT_BMI_RECV, out_status_p->actual_size, 
-	    jd->job_id);
-	dealloc_job_desc(jd);
+            jd->job_id);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
@@ -650,12 +650,12 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
  * failure
  */
 int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
-		  void *user_ptr,
-		  job_aint status_user_tag,
-		  job_status_s * out_status_p,
-		  job_id_t * id,
-		  enum job_flags flags,
-		  job_context_id context_id)
+                  void *user_ptr,
+                  job_aint status_user_tag,
+                  job_status_s * out_status_p,
+                  job_id_t * id,
+                  enum job_flags flags,
+                  job_context_id context_id)
 {
     /* post a bmi recv for an unexpected message.  We will do a quick
      * test to see if an unexpected message is available.  If so, we
@@ -672,7 +672,7 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     jd = alloc_job_desc(JOB_BMI_UNEXP);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.bmi_unexp.info = bmi_unexp_d;
@@ -680,37 +680,37 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     jd->status_user_tag = status_user_tag;
 
    /*********************************************************
-	 * TODO: consider optimizations later, so that we avoid
-	 * disabling immediate completion.  See the mailing list thread
-	 * started here:
-	 * http://www.beowulf-underground.org/pipermail/pvfs2-internal/2003-February/000305.html
-	 *
-	 * At the moment, the server is not designed to be able to
-	 * handle immediate completion upon posting unexpected jobs.
-	 */
+         * TODO: consider optimizations later, so that we avoid
+         * disabling immediate completion.  See the mailing list thread
+         * started here:
+         * http://www.beowulf-underground.org/pipermail/pvfs2-internal/2003-February/000305.html
+         *
+         * At the moment, the server is not designed to be able to
+         * handle immediate completion upon posting unexpected jobs.
+         */
 
     /* only look for immediate completion if our flags allow it */
     if (!(flags & JOB_NO_IMMED_COMPLETE))
     {
-	ret = BMI_testunexpected(1, &outcount, jd->u.bmi_unexp.info, 0);
+        ret = BMI_testunexpected(1, &outcount, jd->u.bmi_unexp.info, 0);
 
-	if (ret < 0)
-	{
-	    /* error testing */
-	    dealloc_job_desc(jd);
+        if (ret < 0)
+        {
+            /* error testing */
+            dealloc_job_desc(jd);
             jd = NULL;
-	    return (ret);
-	}
+            return (ret);
+        }
 
-	if (outcount == 1)
-	{
-	    /* there was an unexpected job available */
-	    out_status_p->error_code = jd->u.bmi_unexp.info->error_code;
-	    out_status_p->status_user_tag = status_user_tag;
-	    dealloc_job_desc(jd);
+        if (outcount == 1)
+        {
+            /* there was an unexpected job available */
+            out_status_p->error_code = jd->u.bmi_unexp.info->error_code;
+            out_status_p->status_user_tag = status_user_tag;
+            dealloc_job_desc(jd);
             jd = NULL;
-	    return (ret);
-	}
+            return (ret);
+        }
     }
 
     /* if we fall through to this point, then there were not any
@@ -744,9 +744,9 @@ int job_bmi_cancel(job_id_t id, job_context_id context_id)
     query = id_gen_safe_lookup(id);
     if (!query || query->completed_flag)
     {
-	/* job has already completed, no cancellation needed */
-	gen_mutex_unlock(&completion_mutex);
-	return(0);
+        /* job has already completed, no cancellation needed */
+        gen_mutex_unlock(&completion_mutex);
+        return(0);
     }
 
     /* tell thread mgr to cancel operation.  This will result in
@@ -795,7 +795,7 @@ int job_dev_unexp(
     jd = alloc_job_desc(JOB_DEV_UNEXP);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.dev_unexp.info = dev_unexp_d;
@@ -872,10 +872,10 @@ int job_dev_write(void* buffer,
     ret = PINT_dev_write(buffer, size, buffer_type, tag);
     if(ret < 0)
     {
-	/* error posting */
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return(1);
+        /* error posting */
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return(1);
     }
 
     /* immediate completion */
@@ -916,13 +916,13 @@ int job_dev_write_list(void** buffer_list,
 #endif
 
     ret = PINT_dev_write_list(buffer_list, size_list, list_count,
-	total_size, buffer_type, tag);
+        total_size, buffer_type, tag);
     if(ret < 0)
     {
-	/* error posting */
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return(1);
+        /* error posting */
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return(1);
     }
 
     /* immediate completion */
@@ -941,12 +941,12 @@ int job_dev_write_list(void** buffer_list,
  * completion 
  */
 int job_req_sched_post(struct PVFS_server_req *in_request,
-		       int req_index,
-		       void *user_ptr,
-		       job_aint status_user_tag,
-		       job_status_s * out_status_p,
-		       job_id_t * id,
-		       job_context_id context_id)
+                       int req_index,
+                       void *user_ptr,
+                       job_aint status_user_tag,
+                       job_status_s * out_status_p,
+                       job_id_t * id,
+                       job_context_id context_id)
 {
     /* post a request to the scheduler.  If it completes (or fails)
      * immediately, then return and fill in the status structure.
@@ -964,7 +964,7 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.req_sched.post_flag = 1;
@@ -975,22 +975,22 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
 
     if (ret < 0)
     {
-	/* error posting */
-	dealloc_job_desc(jd);
+        /* error posting */
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	*id = jd->job_id;
-	/* don't delete the job desc until a matching release comes through */
-	return (1);
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        *id = jd->job_id;
+        /* don't delete the job desc until a matching release comes through */
+        return (1);
     }
 
     /* if we hit this point, job did not immediately complete-
@@ -1009,11 +1009,11 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
  * completion 
  */
 int job_req_sched_post_timer(int msecs,
-		       void *user_ptr,
-		       job_aint status_user_tag,
-		       job_status_s * out_status_p,
-		       job_id_t * id,
-		       job_context_id context_id)
+                       void *user_ptr,
+                       job_aint status_user_tag,
+                       job_status_s * out_status_p,
+                       job_id_t * id,
+                       job_context_id context_id)
 {
     /* post a timer to the scheduler.  If it completes (or fails)
      * immediately, then return and fill in the status structure.
@@ -1027,7 +1027,7 @@ int job_req_sched_post_timer(int msecs,
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1037,22 +1037,22 @@ int job_req_sched_post_timer(int msecs,
 
     if (ret < 0)
     {
-	/* error posting */
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	dealloc_job_desc(jd);
+        /* error posting */
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (1);
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	dealloc_job_desc(jd);
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (1);
+        return (1);
     }
 
     /* if we hit this point, job did not immediately complete-
@@ -1072,11 +1072,11 @@ int job_req_sched_post_timer(int msecs,
  * completion
  */
 int job_req_sched_release(job_id_t in_completed_id,
-			  void *user_ptr,
-			  job_aint status_user_tag,
-			  job_status_s * out_status_p,
-			  job_id_t * out_id,
-			  job_context_id context_id)
+                          void *user_ptr,
+                          job_aint status_user_tag,
+                          job_status_s * out_status_p,
+                          job_id_t * out_id,
+                          job_context_id context_id)
 {
     /* this function is a little odd.  We need to
      * do is retrieve the job desc that we queued up in the
@@ -1090,7 +1090,7 @@ int job_req_sched_release(job_id_t in_completed_id,
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1099,7 +1099,7 @@ int job_req_sched_release(job_id_t in_completed_id,
     match_jd = id_gen_safe_lookup(in_completed_id);
 
     ret = PINT_req_sched_release(match_jd->u.req_sched.id, jd,
-				 &(jd->u.req_sched.id));
+                                 &(jd->u.req_sched.id));
 
     /* delete the old req sched job desc; it is no longer needed */
     dealloc_job_desc(match_jd);
@@ -1110,20 +1110,20 @@ int job_req_sched_release(job_id_t in_completed_id,
      */
     if (ret < 0)
     {
-	/* error posting */
-	dealloc_job_desc(jd);
+        /* error posting */
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	dealloc_job_desc(jd);
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (1);
+        return (1);
     }
 
     /* if we hit this point, job did not immediately complete-
@@ -1145,12 +1145,12 @@ int job_req_sched_release(job_id_t in_completed_id,
  * failure
  */
 int job_flow(flow_descriptor * flow_d,
-	     void *user_ptr,
-	     job_aint status_user_tag,
-	     job_status_s * out_status_p,
-	     job_id_t * id,
-	     job_context_id context_id,
-	     int timeout_sec)
+             void *user_ptr,
+             job_aint status_user_tag,
+             job_status_s * out_status_p,
+             job_id_t * id,
+             job_context_id context_id,
+             int timeout_sec)
 {
     struct job_desc *jd = NULL;
     int ret = -1;
@@ -1159,7 +1159,7 @@ int job_flow(flow_descriptor * flow_d,
     jd = alloc_job_desc(JOB_FLOW);
     if (!jd)
     {
-	return (-ENOMEM);
+        return (-ENOMEM);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.flow.flow_d = flow_d;
@@ -1174,23 +1174,23 @@ int job_flow(flow_descriptor * flow_d,
     ret = PINT_flow_post(flow_d);
     if (ret < 0)
     {
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_FLOW, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (1);
+        return (1);
     }
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->actual_size = flow_d->total_transfered;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = flow_d->total_transfered;
         JOB_EVENT_END(PVFS_EVENT_FLOW, flow_d->total_transfered, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (1);
+        return (1);
     }
 
     /* queue up the job desc. for later completion */
@@ -1221,9 +1221,9 @@ int job_flow_cancel(job_id_t id, job_context_id context_id)
 
     if (!query || query->completed_flag)
     {
-	/* job has already completed, no cancellation needed */
-	gen_mutex_unlock(&completion_mutex);
-	return(0);
+        /* job has already completed, no cancellation needed */
+        gen_mutex_unlock(&completion_mutex);
+        return(0);
     }
 
     /* cancel flow.  Normal completion path through flow callback will still
@@ -1245,17 +1245,17 @@ int job_flow_cancel(job_id_t id, job_context_id context_id)
  * failure
  */
 int job_trove_bstream_write_at(PVFS_fs_id coll_id,
-			       PVFS_handle handle,
-			       PVFS_offset offset,
-			       void *buffer,
-			       PVFS_size size,
-			       PVFS_ds_flags flags,
-			       PVFS_vtag * vtag,
-			       void *user_ptr,
-			       job_aint status_user_tag,
-			       job_status_s * out_status_p,
-			       job_id_t * id,
-			       job_context_id context_id)
+                               PVFS_handle handle,
+                               PVFS_offset offset,
+                               void *buffer,
+                               PVFS_size size,
+                               PVFS_ds_flags flags,
+                               PVFS_vtag * vtag,
+                               void *user_ptr,
+                               job_aint status_user_tag,
+                               job_status_s * out_status_p,
+                               job_id_t * id,
+                               job_context_id context_id)
 {
     /* post a trove write.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -1271,7 +1271,7 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.actual_size = size;
@@ -1285,10 +1285,10 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_write_at(coll_id, handle, buffer,
-				 &jd->u.trove.actual_size, offset, flags,
-				 jd->u.trove.vtag, user_ptr_internal, 
-			   	 global_trove_context,
-				 &(jd->u.trove.id));
+                                 &jd->u.trove.actual_size, offset, flags,
+                                 jd->u.trove.vtag, user_ptr_internal, 
+                                    global_trove_context,
+                                 &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1296,28 +1296,28 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_AT, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->actual_size = jd->u.trove.actual_size;
-	out_status_p->vtag = jd->u.trove.vtag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = jd->u.trove.actual_size;
+        out_status_p->vtag = jd->u.trove.vtag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_AT, out_status_p->actual_size, 
-	    jd->job_id);
-	dealloc_job_desc(jd);
+            jd->job_id);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -1338,17 +1338,17 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_bstream_read_at(PVFS_fs_id coll_id,
-			      PVFS_handle handle,
-			      PVFS_offset offset,
-			      void *buffer,
-			      PVFS_size size,
-			      PVFS_ds_flags flags,
-			      PVFS_vtag * vtag,
-			      void *user_ptr,
-			      job_aint status_user_tag,
-			      job_status_s * out_status_p,
-			      job_id_t * id,
-			      job_context_id context_id)
+                              PVFS_handle handle,
+                              PVFS_offset offset,
+                              void *buffer,
+                              PVFS_size size,
+                              PVFS_ds_flags flags,
+                              PVFS_vtag * vtag,
+                              void *user_ptr,
+                              job_aint status_user_tag,
+                              job_status_s * out_status_p,
+                              job_id_t * id,
+                              job_context_id context_id)
 {
     /* post a trove read.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -1364,7 +1364,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.actual_size = size;
@@ -1378,10 +1378,10 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_read_at(coll_id, handle, buffer,
-				&jd->u.trove.actual_size, offset, flags,
-				jd->u.trove.vtag, user_ptr_internal,
-				global_trove_context,
-				&(jd->u.trove.id));
+                                &jd->u.trove.actual_size, offset, flags,
+                                jd->u.trove.vtag, user_ptr_internal,
+                                global_trove_context,
+                                &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1389,28 +1389,28 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_READ_AT, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->actual_size = jd->u.trove.actual_size;
-	out_status_p->vtag = jd->u.trove.vtag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = jd->u.trove.actual_size;
+        out_status_p->vtag = jd->u.trove.vtag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_READ_AT, out_status_p->actual_size, 
-	    jd->job_id);
-	dealloc_job_desc(jd);
+            jd->job_id);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -1431,14 +1431,14 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
  */
 
 int job_trove_bstream_flush(PVFS_fs_id coll_id,
-			    PVFS_handle handle,
-			    PVFS_ds_flags flags,
-			    void *user_ptr,
-			    job_aint status_user_tag,
-			    job_status_s * out_status_p,
-			    job_id_t * id,
-			    job_context_id context_id)
-			    
+                            PVFS_handle handle,
+                            PVFS_ds_flags flags,
+                            void *user_ptr,
+                            job_aint status_user_tag,
+                            job_status_s * out_status_p,
+                            job_id_t * id,
+                            job_context_id context_id)
+                            
 {
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -1450,7 +1450,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1462,7 +1462,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_flush(coll_id, handle, flags, user_ptr_internal,
-			      global_trove_context, &(jd->u.trove.id));
+                              global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1470,23 +1470,23 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_FLUSH, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_FLUSH, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
     /* if we fall through to this point, the job did not
      * immediately complete and we must queue up to test later
@@ -1506,16 +1506,16 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_keyval_read(PVFS_fs_id coll_id,
-			  PVFS_handle handle,
-			  PVFS_ds_keyval * key_p,
-			  PVFS_ds_keyval * val_p,
-			  PVFS_ds_flags flags,
-			  PVFS_vtag * vtag,
-			  void *user_ptr,
-			  job_aint status_user_tag,
-			  job_status_s * out_status_p,
-			  job_id_t * id,
-			  job_context_id context_id)
+                          PVFS_handle handle,
+                          PVFS_ds_keyval * key_p,
+                          PVFS_ds_keyval * val_p,
+                          PVFS_ds_flags flags,
+                          PVFS_vtag * vtag,
+                          void *user_ptr,
+                          job_aint status_user_tag,
+                          job_status_s * out_status_p,
+                          job_id_t * id,
+                          job_context_id context_id)
 {
     /* post a trove keyval read.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -1531,7 +1531,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -1544,8 +1544,8 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read(coll_id, handle, key_p, val_p, flags,
-			    jd->u.trove.vtag, user_ptr_internal, 
-			    global_trove_context, &(jd->u.trove.id));
+                            jd->u.trove.vtag, user_ptr_internal, 
+                            global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1553,25 +1553,25 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->vtag = jd->u.trove.vtag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->vtag = jd->u.trove.vtag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -1592,17 +1592,17 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_keyval_read_list(PVFS_fs_id coll_id,
-			       PVFS_handle handle,
-			       PVFS_ds_keyval * key_array,
-			       PVFS_ds_keyval * val_array,
-			       int count,
-			       PVFS_ds_flags flags,
-			       PVFS_vtag * vtag,
-			       void *user_ptr,
-			       job_aint status_user_tag,
-			       job_status_s * out_status_p,
-			       job_id_t * id,
-			       job_context_id context_id)
+                               PVFS_handle handle,
+                               PVFS_ds_keyval * key_array,
+                               PVFS_ds_keyval * val_array,
+                               int count,
+                               PVFS_ds_flags flags,
+                               PVFS_vtag * vtag,
+                               void *user_ptr,
+                               job_aint status_user_tag,
+                               job_status_s * out_status_p,
+                               job_id_t * id,
+                               job_context_id context_id)
 {
     /* post a trove keyval read.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -1618,7 +1618,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -1631,9 +1631,9 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read_list(coll_id, handle, key_array,
-				 val_array, count, flags, jd->u.trove.vtag, 
-				 user_ptr_internal,
-				 global_trove_context, &(jd->u.trove.id));
+                                 val_array, count, flags, jd->u.trove.vtag, 
+                                 user_ptr_internal,
+                                 global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1641,25 +1641,25 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->vtag = jd->u.trove.vtag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->vtag = jd->u.trove.vtag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -1680,16 +1680,16 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_keyval_write(PVFS_fs_id coll_id,
-			   PVFS_handle handle,
-			   PVFS_ds_keyval * key_p,
-			   PVFS_ds_keyval * val_p,
-			   PVFS_ds_flags flags,
-			   PVFS_vtag * vtag,
-			   void *user_ptr,
-			   job_aint status_user_tag,
-			   job_status_s * out_status_p,
-			   job_id_t * id,
-			   job_context_id context_id)
+                           PVFS_handle handle,
+                           PVFS_ds_keyval * key_p,
+                           PVFS_ds_keyval * val_p,
+                           PVFS_ds_flags flags,
+                           PVFS_vtag * vtag,
+                           void *user_ptr,
+                           job_aint status_user_tag,
+                           job_status_s * out_status_p,
+                           job_id_t * id,
+                           job_context_id context_id)
 {
     /* post a trove keyval write.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -1705,7 +1705,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -1718,9 +1718,9 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_write(coll_id, handle, key_p, val_p, flags,
-			     jd->u.trove.vtag, user_ptr_internal, 
-			     global_trove_context,
-			     &(jd->u.trove.id));
+                             jd->u.trove.vtag, user_ptr_internal, 
+                             global_trove_context,
+                             &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1728,25 +1728,25 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->vtag = jd->u.trove.vtag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->vtag = jd->u.trove.vtag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -1785,7 +1785,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1805,24 +1805,24 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_FLUSH, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_FLUSH, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -1844,13 +1844,13 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_dspace_getattr(PVFS_fs_id coll_id,
-			     PVFS_handle handle,
-			     void *user_ptr,
+                             PVFS_handle handle,
+                             void *user_ptr,
                              PVFS_ds_attributes *out_ds_attr_ptr,
-			     job_aint status_user_tag,
-			     job_status_s *out_status_p,
-			     job_id_t *id,
-			     job_context_id context_id)
+                             job_aint status_user_tag,
+                             job_status_s *out_status_p,
+                             job_id_t *id,
+                             job_context_id context_id)
 {
     /* post a trove operation dspace get attr.  If it completes (or
      * fails) immediately, then return and fill in the status
@@ -1868,7 +1868,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1880,9 +1880,9 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr(coll_id,
-			       handle, out_ds_attr_ptr, 0 /* flags */ ,
-			       user_ptr_internal, 
-			       global_trove_context, &(jd->u.trove.id));
+                               handle, out_ds_attr_ptr, 0 /* flags */ ,
+                               user_ptr_internal, 
+                               global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1890,24 +1890,24 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
@@ -1928,14 +1928,14 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_dspace_setattr(PVFS_fs_id coll_id,
-			     PVFS_handle handle,
-			     PVFS_ds_attributes *ds_attr_p,
+                             PVFS_handle handle,
+                             PVFS_ds_attributes *ds_attr_p,
                              PVFS_ds_flags flags,
-			     void *user_ptr,
-			     job_aint status_user_tag,
-			     job_status_s * out_status_p,
-			     job_id_t * id,
-			     job_context_id context_id)
+                             void *user_ptr,
+                             job_aint status_user_tag,
+                             job_status_s * out_status_p,
+                             job_id_t * id,
+                             job_context_id context_id)
 {
     /* post a trove operation dspace set attr.  If it completes (or
      * fails) immediately, then return and fill in the status
@@ -1953,7 +1953,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -1966,8 +1966,8 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_setattr(coll_id, handle, ds_attr_p,
                                flags,
-			       user_ptr_internal, global_trove_context, 
-			       &(jd->u.trove.id));
+                               user_ptr_internal, global_trove_context, 
+                               &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1975,24 +1975,24 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_SETATTR, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_SETATTR, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
@@ -2013,15 +2013,15 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_bstream_resize(PVFS_fs_id coll_id,
-			     PVFS_handle handle,
-			     PVFS_size size,
-			     PVFS_ds_flags flags,
-			     PVFS_vtag * vtag,
-			     void *user_ptr,
-			     job_aint status_user_tag,
-			     job_status_s * out_status_p,
-			     job_id_t * id,
-			     job_context_id context_id)
+                             PVFS_handle handle,
+                             PVFS_size size,
+                             PVFS_ds_flags flags,
+                             PVFS_vtag * vtag,
+                             void *user_ptr,
+                             job_aint status_user_tag,
+                             job_status_s * out_status_p,
+                             job_id_t * id,
+                             job_context_id context_id)
 {
     /* post a resize trove operation.  If it completes (or
      * fails) immediately, then return and fill in the status
@@ -2039,7 +2039,7 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2052,8 +2052,8 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_resize(coll_id, handle, &size,
                                flags,
-			       vtag, user_ptr_internal, global_trove_context, 
-			       &(jd->u.trove.id));
+                               vtag, user_ptr_internal, global_trove_context, 
+                               &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2061,24 +2061,24 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_RESIZE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_RESIZE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
@@ -2099,13 +2099,13 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_bstream_validate(PVFS_fs_id coll_id,
-			       PVFS_handle handle,
-			       PVFS_vtag * vtag,
-			       void *user_ptr,
-			       job_aint status_user_tag,
-			       job_status_s * out_status_p,
-			       job_id_t * id,
-			       job_context_id context_id)
+                               PVFS_handle handle,
+                               PVFS_vtag * vtag,
+                               void *user_ptr,
+                               job_aint status_user_tag,
+                               job_status_s * out_status_p,
+                               job_id_t * id,
+                               job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
     return (-ENOSYS);
@@ -2119,15 +2119,15 @@ int job_trove_bstream_validate(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_keyval_remove(PVFS_fs_id coll_id,
-			    PVFS_handle handle,
-			    PVFS_ds_keyval * key_p,
-			    PVFS_ds_flags flags,
-			    PVFS_vtag * vtag,
-			    void *user_ptr,
-			    job_aint status_user_tag,
-			    job_status_s * out_status_p,
-			    job_id_t * id,
-			    job_context_id context_id)
+                            PVFS_handle handle,
+                            PVFS_ds_keyval * key_p,
+                            PVFS_ds_flags flags,
+                            PVFS_vtag * vtag,
+                            void *user_ptr,
+                            job_aint status_user_tag,
+                            job_status_s * out_status_p,
+                            job_id_t * id,
+                            job_context_id context_id)
 {
     /* post a trove keyval remove.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -2143,7 +2143,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2156,8 +2156,8 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_remove(coll_id, handle, key_p, flags,
-			      jd->u.trove.vtag, user_ptr_internal, 
-			      global_trove_context, &(jd->u.trove.id));
+                              jd->u.trove.vtag, user_ptr_internal, 
+                              global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2165,25 +2165,25 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_REMOVE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->vtag = jd->u.trove.vtag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->vtag = jd->u.trove.vtag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_REMOVE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -2204,13 +2204,13 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_keyval_validate(PVFS_fs_id coll_id,
-			      PVFS_handle handle,
-			      PVFS_vtag * vtag,
-			      void *user_ptr,
-			      job_aint status_user_tag,
-			      job_status_s * out_status_p,
-			      job_id_t * id,
-			      job_context_id context_id)
+                              PVFS_handle handle,
+                              PVFS_vtag * vtag,
+                              void *user_ptr,
+                              job_aint status_user_tag,
+                              job_status_s * out_status_p,
+                              job_id_t * id,
+                              job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
     return (-ENOSYS);
@@ -2224,18 +2224,18 @@ int job_trove_keyval_validate(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_keyval_iterate(PVFS_fs_id coll_id,
-			     PVFS_handle handle,
-			     PVFS_ds_position position,
-			     PVFS_ds_keyval * key_array,
-			     PVFS_ds_keyval * val_array,
-			     int count,
-			     PVFS_ds_flags flags,
-			     PVFS_vtag * vtag,
-			     void *user_ptr,
-			     job_aint status_user_tag,
-			     job_status_s * out_status_p,
-			     job_id_t * id,
-			     job_context_id context_id)
+                             PVFS_handle handle,
+                             PVFS_ds_position position,
+                             PVFS_ds_keyval * key_array,
+                             PVFS_ds_keyval * val_array,
+                             int count,
+                             PVFS_ds_flags flags,
+                             PVFS_vtag * vtag,
+                             void *user_ptr,
+                             job_aint status_user_tag,
+                             job_status_s * out_status_p,
+                             job_id_t * id,
+                             job_context_id context_id)
 {
     /* post a trove keyval iterate.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -2251,7 +2251,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2266,10 +2266,10 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate(coll_id, handle,
-			       &(jd->u.trove.position), key_array, val_array,
-			       &(jd->u.trove.count), flags, jd->u.trove.vtag,
-			       user_ptr_internal, 
-			       global_trove_context, &(jd->u.trove.id));
+                               &(jd->u.trove.position), key_array, val_array,
+                               &(jd->u.trove.count), flags, jd->u.trove.vtag,
+                               user_ptr_internal, 
+                               global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2277,27 +2277,27 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->vtag = jd->u.trove.vtag;
-	out_status_p->position = jd->u.trove.position;
-	out_status_p->count = jd->u.trove.count;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->vtag = jd->u.trove.vtag;
+        out_status_p->position = jd->u.trove.position;
+        out_status_p->count = jd->u.trove.count;
         JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -2342,7 +2342,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
@@ -2357,10 +2357,10 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_iterate_handles(coll_id,
-			       &(jd->u.trove.position), handle_array,
-			       &(jd->u.trove.count), flags, jd->u.trove.vtag,
-			       user_ptr_internal, 
-			       global_trove_context, &(jd->u.trove.id));
+                               &(jd->u.trove.position), handle_array,
+                               &(jd->u.trove.count), flags, jd->u.trove.vtag,
+                               user_ptr_internal, 
+                               global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2368,27 +2368,27 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	out_status_p->error_code = ret;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->vtag = jd->u.trove.vtag;
-	out_status_p->position = jd->u.trove.position;
-	out_status_p->count = jd->u.trove.count;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->vtag = jd->u.trove.vtag;
+        out_status_p->position = jd->u.trove.position;
+        out_status_p->count = jd->u.trove.count;
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -2410,17 +2410,17 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
-				  PVFS_handle handle,
-				  PVFS_ds_position position,
-				  PVFS_ds_keyval * key_array,
-				  int count,
-				  PVFS_ds_flags flags,
-				  PVFS_vtag * vtag,
-				  void *user_ptr,
-				  job_aint status_user_tag,
-				  job_status_s * out_status_p,
-				  job_id_t * id,
-				  job_context_id context_id)
+                                  PVFS_handle handle,
+                                  PVFS_ds_position position,
+                                  PVFS_ds_keyval * key_array,
+                                  int count,
+                                  PVFS_ds_flags flags,
+                                  PVFS_vtag * vtag,
+                                  void *user_ptr,
+                                  job_aint status_user_tag,
+                                  job_status_s * out_status_p,
+                                  job_id_t * id,
+                                  job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
     return (-ENOSYS);
@@ -2434,15 +2434,15 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_dspace_create(PVFS_fs_id coll_id,
-			    PVFS_handle_extent_array *handle_extent_array,
-			    PVFS_ds_type type,
-			    void *hint,
+                            PVFS_handle_extent_array *handle_extent_array,
+                            PVFS_ds_type type,
+                            void *hint,
                             PVFS_ds_flags flags,
-			    void *user_ptr,
-			    job_aint status_user_tag,
-			    job_status_s * out_status_p,
-			    job_id_t * id,
-			    job_context_id context_id)
+                            void *user_ptr,
+                            job_aint status_user_tag,
+                            job_status_s * out_status_p,
+                            job_id_t * id,
+                            job_context_id context_id)
 {
     /* post a dspace create.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -2458,7 +2458,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.handle = 0;
@@ -2472,11 +2472,11 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_create(coll_id,
                               handle_extent_array,
-			      &(jd->u.trove.handle),
-			      type,
-			      hint, flags,
-			      user_ptr_internal, 
-			      global_trove_context, &(jd->u.trove.id));
+                              &(jd->u.trove.handle),
+                              type,
+                              hint, flags,
+                              user_ptr_internal, 
+                              global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2484,26 +2484,26 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->handle = jd->u.trove.handle;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->handle = jd->u.trove.handle;
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -2524,13 +2524,13 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_dspace_remove(PVFS_fs_id coll_id,
-			    PVFS_handle handle,
+                            PVFS_handle handle,
                             PVFS_ds_flags flags,
-			    void *user_ptr,
-			    job_aint status_user_tag,
-			    job_status_s * out_status_p,
-			    job_id_t * id,
-			    job_context_id context_id)
+                            void *user_ptr,
+                            job_aint status_user_tag,
+                            job_status_s * out_status_p,
+                            job_id_t * id,
+                            job_context_id context_id)
 {
     /* post a dspace remove.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -2546,7 +2546,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2558,9 +2558,9 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_remove(coll_id,
-			      handle, flags,
-			      user_ptr_internal, 
-			      global_trove_context, &(jd->u.trove.id));
+                              handle, flags,
+                              user_ptr_internal, 
+                              global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2568,25 +2568,25 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -2607,13 +2607,13 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_dspace_verify(PVFS_fs_id coll_id,
-			    PVFS_handle handle,
+                            PVFS_handle handle,
                             PVFS_ds_flags flags,
-			    void *user_ptr,
-			    job_aint status_user_tag,
-			    job_status_s * out_status_p,
-			    job_id_t * id,
-			    job_context_id context_id)
+                            void *user_ptr,
+                            job_aint status_user_tag,
+                            job_status_s * out_status_p,
+                            job_id_t * id,
+                            job_context_id context_id)
 {
     /* post a dspace verify.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -2629,7 +2629,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2641,9 +2641,9 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_verify(coll_id,
-			      handle, &jd->u.trove.type, 
-			      flags,
-			      user_ptr_internal, global_trove_context, &(jd->u.trove.id));
+                              handle, &jd->u.trove.type, 
+                              flags,
+                              user_ptr_internal, global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2651,25 +2651,25 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
+        /* error posting trove operation */
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_VERIFY, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_VERIFY, 0, jd->job_id);
-	dealloc_job_desc(jd);
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -2690,8 +2690,8 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_dspace_cancel(PVFS_fs_id coll_id,
-			    job_id_t id,
-			    job_context_id context_id)
+                            job_id_t id,
+                            job_context_id context_id)
 {
     struct job_desc* query = NULL;
     int ret = -1;
@@ -2701,9 +2701,9 @@ int job_trove_dspace_cancel(PVFS_fs_id coll_id,
     query = id_gen_safe_lookup(id);
     if (!query || query->completed_flag)
     {
-	/* job has already completed, no cancellation needed */
-	gen_mutex_unlock(&completion_mutex);
-	return(0);
+        /* job has already completed, no cancellation needed */
+        gen_mutex_unlock(&completion_mutex);
+        return(0);
     }
 
     /* tell thread mgr to cancel operation.  This will result in normal
@@ -2725,12 +2725,12 @@ int job_trove_dspace_cancel(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_fs_create(char *collname,
-			PVFS_fs_id new_coll_id,
-			void *user_ptr,
-			job_aint status_user_tag,
-			job_status_s * out_status_p,
-			job_id_t * id,
-			job_context_id context_id)
+                        PVFS_fs_id new_coll_id,
+                        void *user_ptr,
+                        job_aint status_user_tag,
+                        job_status_s * out_status_p,
+                        job_id_t * id,
+                        job_context_id context_id)
 {
     /* post an fs create.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -2746,7 +2746,7 @@ int job_trove_fs_create(char *collname,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2757,7 +2757,7 @@ int job_trove_fs_create(char *collname,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_create(collname, new_coll_id, user_ptr_internal, 
-	&(jd->u.trove.id));
+        &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2765,23 +2765,23 @@ int job_trove_fs_create(char *collname,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
-	dealloc_job_desc(jd);
+        /* error posting trove operation */
+        dealloc_job_desc(jd);
         jd = NULL;
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	dealloc_job_desc(jd);
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -2801,11 +2801,11 @@ int job_trove_fs_create(char *collname,
  * failure
  */
 int job_trove_fs_remove(char *collname,
-			void *user_ptr,
-			job_aint status_user_tag,
-			job_status_s * out_status_p,
-			job_id_t * id,
-			job_context_id context_id)
+                        void *user_ptr,
+                        job_aint status_user_tag,
+                        job_status_s * out_status_p,
+                        job_id_t * id,
+                        job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
     return (-ENOSYS);
@@ -2819,11 +2819,11 @@ int job_trove_fs_remove(char *collname,
  * failure
  */
 int job_trove_fs_lookup(char *collname,
-			void *user_ptr,
-			job_aint status_user_tag,
-			job_status_s * out_status_p,
-			job_id_t * id,
-			job_context_id context_id)
+                        void *user_ptr,
+                        job_aint status_user_tag,
+                        job_status_s * out_status_p,
+                        job_id_t * id,
+                        job_context_id context_id)
 {
     /* post a collection lookup.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -2839,7 +2839,7 @@ int job_trove_fs_lookup(char *collname,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2850,7 +2850,7 @@ int job_trove_fs_lookup(char *collname,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_lookup(collname, &(jd->u.trove.fsid), 
-	user_ptr_internal, &(jd->u.trove.id));
+        user_ptr_internal, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2858,24 +2858,24 @@ int job_trove_fs_lookup(char *collname,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
-	dealloc_job_desc(jd);
+        /* error posting trove operation */
+        dealloc_job_desc(jd);
         jd = NULL;
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	out_status_p->coll_id = jd->u.trove.fsid;
-	dealloc_job_desc(jd);
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->coll_id = jd->u.trove.fsid;
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* there is no way we can test on this if we don't know the coll_id */
@@ -2892,14 +2892,14 @@ int job_trove_fs_lookup(char *collname,
  * failure
  */
 int job_trove_fs_seteattr(PVFS_fs_id coll_id,
-			  PVFS_ds_keyval * key_p,
-			  PVFS_ds_keyval * val_p,
-			  PVFS_ds_flags flags,
-			  void *user_ptr,
-			  job_aint status_user_tag,
-			  job_status_s * out_status_p,
-			  job_id_t * id,
-			  job_context_id context_id)
+                          PVFS_ds_keyval * key_p,
+                          PVFS_ds_keyval * val_p,
+                          PVFS_ds_flags flags,
+                          void *user_ptr,
+                          job_aint status_user_tag,
+                          job_status_s * out_status_p,
+                          job_id_t * id,
+                          job_context_id context_id)
 {
     /* post a trove collection set eattr.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -2915,7 +2915,7 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -2926,8 +2926,8 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_seteattr(coll_id, key_p, val_p, flags,
-				    user_ptr_internal, global_trove_context,
-				    &(jd->u.trove.id));
+                                    user_ptr_internal, global_trove_context,
+                                    &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2935,23 +2935,23 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
-	dealloc_job_desc(jd);
+        /* error posting trove operation */
+        dealloc_job_desc(jd);
         jd = NULL;
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	dealloc_job_desc(jd);
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -2971,14 +2971,14 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_fs_geteattr(PVFS_fs_id coll_id,
-			  PVFS_ds_keyval * key_p,
-			  PVFS_ds_keyval * val_p,
-			  PVFS_ds_flags flags,
-			  void *user_ptr,
-			  job_aint status_user_tag,
-			  job_status_s * out_status_p,
-			  job_id_t * id,
-			  job_context_id context_id)
+                          PVFS_ds_keyval * key_p,
+                          PVFS_ds_keyval * val_p,
+                          PVFS_ds_flags flags,
+                          void *user_ptr,
+                          job_aint status_user_tag,
+                          job_status_s * out_status_p,
+                          job_id_t * id,
+                          job_context_id context_id)
 {
     /* post a trove collection get eattr.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -2994,7 +2994,7 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3005,8 +3005,8 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_geteattr(coll_id, key_p, val_p, flags,
-				    user_ptr_internal, global_trove_context,
-				    &(jd->u.trove.id));
+                                    user_ptr_internal, global_trove_context,
+                                    &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -3014,23 +3014,23 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 
     if (ret < 0)
     {
-	/* error posting trove operation */
-	dealloc_job_desc(jd);
+        /* error posting trove operation */
+        dealloc_job_desc(jd);
         jd = NULL;
-	/* TODO: handle this correctly */
-	out_status_p->error_code = -EINVAL;
-	out_status_p->status_user_tag = status_user_tag;
-	return (1);
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
     }
 
     if (ret == 1)
     {
-	/* immediate completion */
-	out_status_p->error_code = 0;
-	out_status_p->status_user_tag = status_user_tag;
-	dealloc_job_desc(jd);
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        dealloc_job_desc(jd);
         jd = NULL;
-	return (ret);
+        return (ret);
     }
 
     /* if we fall through to this point, the job did not
@@ -3063,7 +3063,7 @@ int job_null(
     jd = alloc_job_desc(JOB_NULL);
     if (!jd)
     {
-	return (-errno);
+        return (-errno);
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
@@ -3072,7 +3072,7 @@ int job_null(
 
     gen_mutex_lock(&completion_mutex);
     job_desc_q_add(completion_queue_array[jd->context_id], 
-	jd);
+        jd);
     /* set completed flag while holding queue lock */
     jd->completed_flag = 1;
 #ifdef __PVFS2_JOB_THREADED__
@@ -3093,11 +3093,11 @@ int job_null(
  * returns 0 on success, -errno on failure 
  */
 int job_test(job_id_t id,
-	     int *out_count_p,
-	     void **returned_user_ptr_p,
-	     job_status_s * out_status_p,
-	     int timeout_ms,
-	     job_context_id context_id)
+             int *out_count_p,
+             void **returned_user_ptr_p,
+             job_status_s * out_status_p,
+             int timeout_ms,
+             job_context_id context_id)
 {
     int ret = -1;
 #ifdef __PVFS2_JOB_THREADED__
@@ -3120,29 +3120,29 @@ int job_test(job_id_t id,
      * this function for nearly a month. 
      */
     if (timeout_ms == -1)
-	timeout_remaining = INT_MAX;
+        timeout_remaining = INT_MAX;
 
     /* use this as a chance to do a cheap test on the request
      * scheduler
      */
     if ((ret = do_one_test_cycle_req_sched()) < 0)
     {
-	return (ret);
+        return (ret);
     }
 
     /* look to see if desired job is already done */
     gen_mutex_lock(&completion_mutex);
     if(completion_error)
     {
-	gen_mutex_unlock(&completion_mutex);
-	return(completion_error);
+        gen_mutex_unlock(&completion_mutex);
+        return(completion_error);
     }
     query = id_gen_safe_lookup(id);
     if(query && query->completed_flag)
     {
-	job_desc_q_remove(query);
-	gen_mutex_unlock(&completion_mutex);
-	goto job_test_complete;
+        job_desc_q_remove(query);
+        gen_mutex_unlock(&completion_mutex);
+        goto job_test_complete;
     }
     gen_mutex_unlock(&completion_mutex);
 
@@ -3152,76 +3152,76 @@ int job_test(job_id_t id,
      */
     do
     {
-	ret = gettimeofday(&start, NULL);
-	if (ret < 0)
-	    return (ret);
+        ret = gettimeofday(&start, NULL);
+        if (ret < 0)
+            return (ret);
 
 #ifdef __PVFS2_JOB_THREADED__
-	/* figure out how long to wait */
-	pthread_timeout.tv_sec = start.tv_sec + timeout_remaining / 1000;
-	pthread_timeout.tv_nsec = start.tv_usec * 1000 +
-	    ((timeout_remaining % 1000) * 1000000);
-	if (pthread_timeout.tv_nsec > 1000000000)
-	{
-	    pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
-	    pthread_timeout.tv_sec++;
-	}
+        /* figure out how long to wait */
+        pthread_timeout.tv_sec = start.tv_sec + timeout_remaining / 1000;
+        pthread_timeout.tv_nsec = start.tv_usec * 1000 +
+            ((timeout_remaining % 1000) * 1000000);
+        if (pthread_timeout.tv_nsec > 1000000000)
+        {
+            pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
+            pthread_timeout.tv_sec++;
+        }
 
-	/* wait to see if anything completes before the timeout
-	 * expires 
-	 */
-	gen_mutex_lock(&completion_mutex);
-	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
-				     &pthread_timeout);
-	gen_mutex_unlock(&completion_mutex);
+        /* wait to see if anything completes before the timeout
+         * expires 
+         */
+        gen_mutex_lock(&completion_mutex);
+        ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
+                                     &pthread_timeout);
+        gen_mutex_unlock(&completion_mutex);
 #else
-	if(timeout_ms)
-	    do_one_work_cycle_all(10);
-	else
-	    do_one_work_cycle_all(0);
-	ret = 0;
+        if(timeout_ms)
+            do_one_work_cycle_all(10);
+        else
+            do_one_work_cycle_all(0);
+        ret = 0;
 #endif
-	if (ret == ETIMEDOUT)
-	{
-	    /* nothing completed while we were waiting, trust that the
-	     * timedwait got the timing right
-	     */
-	    *out_count_p = 0;
-	    return (0);
-	}
-	else if (ret != 0 && ret != EINTR)
-	{
-	    /* error */
-	    return (-ret);
-	}
-	else
-	{
-	    /* check now to see if the job we want is done */
-	    gen_mutex_lock(&completion_mutex);
-	    if(completion_error)
-	    {
-		gen_mutex_unlock(&completion_mutex);
-		return(completion_error);
-	    }
-	    query = id_gen_safe_lookup(id);
-	    if(query && query->completed_flag)
-	    {
-		job_desc_q_remove(query);
-		gen_mutex_unlock(&completion_mutex);
-		goto job_test_complete;
-	    }
-	    gen_mutex_unlock(&completion_mutex);
-	}
+        if (ret == ETIMEDOUT)
+        {
+            /* nothing completed while we were waiting, trust that the
+             * timedwait got the timing right
+             */
+            *out_count_p = 0;
+            return (0);
+        }
+        else if (ret != 0 && ret != EINTR)
+        {
+            /* error */
+            return (-ret);
+        }
+        else
+        {
+            /* check now to see if the job we want is done */
+            gen_mutex_lock(&completion_mutex);
+            if(completion_error)
+            {
+                gen_mutex_unlock(&completion_mutex);
+                return(completion_error);
+            }
+            query = id_gen_safe_lookup(id);
+            if(query && query->completed_flag)
+            {
+                job_desc_q_remove(query);
+                gen_mutex_unlock(&completion_mutex);
+                goto job_test_complete;
+            }
+            gen_mutex_unlock(&completion_mutex);
+        }
 
-	/* if we fall to here, see how much time has expired and
-	 * sleep/work again if we need to
-	 */
-	ret = gettimeofday(&end, NULL);
-	if (ret < 0)
-	    return (ret);
+        /* if we fall to here, see how much time has expired and
+         * sleep/work again if we need to
+         */
+        ret = gettimeofday(&end, NULL);
+        if (ret < 0)
+            return (ret);
 
-	timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
-	    (end.tv_usec - start.tv_usec) / 1000;
+        timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
+            (end.tv_usec - start.tv_usec) / 1000;
 
     } while (timeout_remaining > 0);
 
@@ -3235,13 +3235,13 @@ job_test_complete:
     /* special case for request scheduler */
     if (query->type == JOB_REQ_SCHED && query->u.req_sched.post_flag == 1)
     {
-	/* in this case, _don't_ delete the job desc, we need it later
-	 * to release entry
-	 */
+        /* in this case, _don't_ delete the job desc, we need it later
+         * to release entry
+         */
     }
     else
     {
-	dealloc_job_desc(query);
+        dealloc_job_desc(query);
         query = NULL;
     }
     return(1);
@@ -3256,12 +3256,12 @@ job_test_complete:
  * returns 0 on success, -errno on failure
  */
 int job_testsome(job_id_t * id_array,
-		 int *inout_count_p,
-		 int *out_index_array,
-		 void **returned_user_ptr_array,
-		 job_status_s * out_status_array_p,
-		 int timeout_ms,
-		 job_context_id context_id)
+                 int *inout_count_p,
+                 int *out_index_array,
+                 void **returned_user_ptr_array,
+                 job_status_s * out_status_array_p,
+                 int timeout_ms,
+                 job_context_id context_id)
 {
     int ret = -1;
 #ifdef __PVFS2_JOB_THREADED__
@@ -3279,13 +3279,13 @@ int job_testsome(job_id_t * id_array,
     /* count how many of the id's are non zero */
     for (i = 0; i < original_count; i++)
     {
-	if (id_array[i])
-	    real_id_count++;
+        if (id_array[i])
+            real_id_count++;
     }
     if (!real_id_count)
     {
-	gossip_lerr("job_testsome() called with nothing to do.\n");
-	return (-EINVAL);
+        gossip_lerr("job_testsome() called with nothing to do.\n");
+        return (-EINVAL);
     }
 
     /* TODO: here is another cheap shot.  I don't want to special
@@ -3296,14 +3296,14 @@ int job_testsome(job_id_t * id_array,
      * this function for nearly a month. 
      */
     if (timeout_ms == -1)
-	timeout_remaining = INT_MAX;
+        timeout_remaining = INT_MAX;
 
     /* use this as a chance to do a cheap test on the request
      * scheduler
      */
     if ((ret = do_one_test_cycle_req_sched()) < 0)
     {
-	return (ret);
+        return (ret);
     }
 
     /* need to duplicate the id array, so that I have a copy I can
@@ -3312,7 +3312,7 @@ int job_testsome(job_id_t * id_array,
     tmp_id_array = (job_id_t *) malloc(original_count * sizeof(job_id_t));
     if (!tmp_id_array)
     {
-	return (-errno);
+        return (-errno);
     }
     memcpy(tmp_id_array, id_array, (original_count * sizeof(job_id_t)));
 
@@ -3320,24 +3320,24 @@ int job_testsome(job_id_t * id_array,
      * want is in the completion queue
      */
     ret = completion_query_some(tmp_id_array,
-				inout_count_p, out_index_array,
-				returned_user_ptr_array,
-				out_status_array_p);
+                                inout_count_p, out_index_array,
+                                returned_user_ptr_array,
+                                out_status_array_p);
 
     /* return here on error or completion */
     if (ret < 0)
     {
-	free(tmp_id_array);
-	return (ret);
+        free(tmp_id_array);
+        return (ret);
     }
     if (ret == 0 && (*inout_count_p == real_id_count))
     {
-	free(tmp_id_array);
-	return (1);
+        free(tmp_id_array);
+        return (1);
     }
 
     for (i = 0; i < (*inout_count_p); i++)
-	tmp_id_array[out_index_array[i]] = 0;
+        tmp_id_array[out_index_array[i]] = 0;
     total_completed += *inout_count_p;
     *inout_count_p = original_count;
 
@@ -3347,106 +3347,106 @@ int job_testsome(job_id_t * id_array,
      */
     do
     {
-	ret = gettimeofday(&start, NULL);
-	if (ret < 0)
-	{
-	    free(tmp_id_array);
-	    return (ret);
-	}
+        ret = gettimeofday(&start, NULL);
+        if (ret < 0)
+        {
+            free(tmp_id_array);
+            return (ret);
+        }
 
 #ifdef __PVFS2_JOB_THREADED__
-	/* figure out how long to wait */
-	pthread_timeout.tv_sec = start.tv_sec + timeout_remaining / 1000;
-	pthread_timeout.tv_nsec = start.tv_usec * 1000 +
-	    ((timeout_remaining % 1000) * 1000000);
-	if (pthread_timeout.tv_nsec > 1000000000)
-	{
-	    pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
-	    pthread_timeout.tv_sec++;
-	}
+        /* figure out how long to wait */
+        pthread_timeout.tv_sec = start.tv_sec + timeout_remaining / 1000;
+        pthread_timeout.tv_nsec = start.tv_usec * 1000 +
+            ((timeout_remaining % 1000) * 1000000);
+        if (pthread_timeout.tv_nsec > 1000000000)
+        {
+            pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
+            pthread_timeout.tv_sec++;
+        }
 
-	/* wait to see if anything completes before the timeout
-	 * expires 
-	 */
-	gen_mutex_lock(&completion_mutex);
-	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
-				     &pthread_timeout);
-	gen_mutex_unlock(&completion_mutex);
+        /* wait to see if anything completes before the timeout
+         * expires 
+         */
+        gen_mutex_lock(&completion_mutex);
+        ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
+                                     &pthread_timeout);
+        gen_mutex_unlock(&completion_mutex);
 #else
-	if(timeout_ms)
-	    do_one_work_cycle_all(10);
-	else
-	    do_one_work_cycle_all(0);
-	ret = 0;
+        if(timeout_ms)
+            do_one_work_cycle_all(10);
+        else
+            do_one_work_cycle_all(0);
+        ret = 0;
 #endif
-	if (ret == ETIMEDOUT)
-	{
-	    /* nothing completed while we were waiting, trust that the
-	     * timedwait got the timing right
-	     */
-	    free(tmp_id_array);
-	    *inout_count_p = total_completed;
-	    return (0);
-	}
-	else if (ret != 0 && ret != EINTR)
-	{
-	    /* error */
-	    free(tmp_id_array);
-	    return (-ret);
-	}
-	else
-	{
-	    if(returned_user_ptr_array)
-	    {
-		ret = completion_query_some(tmp_id_array,
-					    inout_count_p,
-					    &out_index_array[total_completed],
-					    &returned_user_ptr_array
-					    [total_completed],
-					    &out_status_array_p
-					    [total_completed]);
-	    }
-	    else
-	    {
-		ret = completion_query_some(tmp_id_array,
-					    inout_count_p,
-					    &out_index_array[total_completed],
-					    NULL,
-					    &out_status_array_p
-					    [total_completed]);
-	    }
+        if (ret == ETIMEDOUT)
+        {
+            /* nothing completed while we were waiting, trust that the
+             * timedwait got the timing right
+             */
+            free(tmp_id_array);
+            *inout_count_p = total_completed;
+            return (0);
+        }
+        else if (ret != 0 && ret != EINTR)
+        {
+            /* error */
+            free(tmp_id_array);
+            return (-ret);
+        }
+        else
+        {
+            if(returned_user_ptr_array)
+            {
+                ret = completion_query_some(tmp_id_array,
+                                            inout_count_p,
+                                            &out_index_array[total_completed],
+                                            &returned_user_ptr_array
+                                            [total_completed],
+                                            &out_status_array_p
+                                            [total_completed]);
+            }
+            else
+            {
+                ret = completion_query_some(tmp_id_array,
+                                            inout_count_p,
+                                            &out_index_array[total_completed],
+                                            NULL,
+                                            &out_status_array_p
+                                            [total_completed]);
+            }
 
-	    /* return here on error or completion */
-	    if (ret < 0)
-	    {
-		free(tmp_id_array);
-		return (ret);
-	    }
-	    if (ret == 0 && (*inout_count_p + total_completed == real_id_count))
-	    {
-		*inout_count_p = real_id_count;
-		free(tmp_id_array);
-		return (1);
-	    }
+            /* return here on error or completion */
+            if (ret < 0)
+            {
+                free(tmp_id_array);
+                return (ret);
+            }
+            if (ret == 0 && (*inout_count_p + total_completed == real_id_count))
+            {
+                *inout_count_p = real_id_count;
+                free(tmp_id_array);
+                return (1);
+            }
 
-	    for (i = 0; i < (*inout_count_p); i++)
-		tmp_id_array[out_index_array[i + total_completed]] = 0;
-	    total_completed += *inout_count_p;
-	    *inout_count_p = original_count;
-	}
+            for (i = 0; i < (*inout_count_p); i++)
+                tmp_id_array[out_index_array[i + total_completed]] = 0;
+            total_completed += *inout_count_p;
+            *inout_count_p = original_count;
+        }
 
-	/* if we fall to here, see how much time has expired and
-	 * sleep/work again if we need to
-	 */
-	ret = gettimeofday(&end, NULL);
-	if (ret < 0)
-	{
-	    free(tmp_id_array);
-	    return (ret);
-	}
+        /* if we fall to here, see how much time has expired and
+         * sleep/work again if we need to
+         */
+        ret = gettimeofday(&end, NULL);
+        if (ret < 0)
+        {
+            free(tmp_id_array);
+            return (ret);
+        }
 
-	timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
-	    (end.tv_usec - start.tv_usec) / 1000;
+        timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
+            (end.tv_usec - start.tv_usec) / 1000;
 
     } while (timeout_remaining > 0);
 
@@ -3454,9 +3454,9 @@ int job_testsome(job_id_t * id_array,
     *inout_count_p = total_completed;
     free(tmp_id_array);
     if (total_completed > 0)
-	return (1);
+        return (1);
     else
-	return (0);
+        return (0);
 }
 
 /* job_testcontext()
@@ -3491,28 +3491,35 @@ int job_testcontext(job_id_t * out_id_array_p,
      * this function for nearly a month. 
      */
     if (timeout_ms == -1)
-	timeout_remaining = INT_MAX;
+    {
+        timeout_remaining = INT_MAX;
+    }
 
     /* use this as a chance to do a cheap test on the request
      * scheduler
      */
     if ((ret = do_one_test_cycle_req_sched()) < 0)
     {
-	return (ret);
+        return (ret);
     }
 
     /* check before we do anything else to see if the completion queue
      * has anything in it
      */
     ret = completion_query_context(out_id_array_p,
-				 inout_count_p,
-				 returned_user_ptr_array,
-				 out_status_array_p, context_id);
+                                 inout_count_p,
+                                 returned_user_ptr_array,
+                                 out_status_array_p, context_id);
     /* return here on error or completion */
     if (ret < 0)
-	return (ret);
+    {
+        return (ret);
+    }
+
     if (ret == 0 && (*inout_count_p > 0))
-	return (1);
+    {
+        return (1);
+    }
 
     *inout_count_p = original_count;
 
@@ -3522,79 +3529,98 @@ int job_testcontext(job_id_t * out_id_array_p,
      */
     do
     {
-	ret = gettimeofday(&start, NULL);
-	if (ret < 0)
-	{
-	    return (ret);
-	}
+        ret = gettimeofday(&start, NULL);
+        if (ret < 0)
+        {
+            return (ret);
+        }
 
 #ifdef __PVFS2_JOB_THREADED__
-	/* figure out how long to wait */
-	pthread_timeout.tv_sec = start.tv_sec + timeout_remaining / 1000;
-	pthread_timeout.tv_nsec = start.tv_usec * 1000 +
-	    ((timeout_remaining % 1000) * 1000000);
-	if (pthread_timeout.tv_nsec > 1000000000)
-	{
-	    pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
-	    pthread_timeout.tv_sec++;
-	}
+        /* figure out how long to wait */
+        pthread_timeout.tv_sec = start.tv_sec + timeout_remaining / 1000;
+        pthread_timeout.tv_nsec = start.tv_usec * 1000 +
+            ((timeout_remaining % 1000) * 1000000);
+        if (pthread_timeout.tv_nsec > 1000000000)
+        {
+            pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
+            pthread_timeout.tv_sec++;
+        }
 
-	/* wait to see if anything completes before the timeout
-	 * expires 
-	 */
-	gen_mutex_lock(&completion_mutex);
-	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
-				     &pthread_timeout);
-	gen_mutex_unlock(&completion_mutex);
+        /* wait to see if anything completes before the timeout
+         * expires 
+         */
+        gen_mutex_lock(&completion_mutex);
+        ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
+                                     &pthread_timeout);
+        gen_mutex_unlock(&completion_mutex);
 #else
-	if(timeout_ms)
-	    do_one_work_cycle_all(10);
-	else
-	    do_one_work_cycle_all(0);
+        if(timeout_ms)
+            do_one_work_cycle_all(10);
+        else
+            do_one_work_cycle_all(0);
 
-	ret = 0;
+        ret = 0;
 #endif
-	if (ret == ETIMEDOUT)
-	{
-	    /* nothing completed while we were waiting, trust that the
-	     * timedwait got the timing right
-	     */
-	    *inout_count_p = 0;
-	    return (0);
-	}
-	else if (ret != 0 && ret != EINTR)
-	{
-	    /* error */
-	    return (-ret);
-	}
-	else
-	{
-	    /* check queue now to see if anything is done */
-	    ret = completion_query_context(out_id_array_p,
-					 inout_count_p,
-					 returned_user_ptr_array,
-					 out_status_array_p,
-					 context_id);
-	    /* return here on error or completion */
-	    if (ret < 0)
-		return (ret);
-	    if (ret == 0 && (*inout_count_p > 0))
-		return (1);
+        if (ret == ETIMEDOUT)
+        {
+            /* nothing completed while we were waiting, trust that the
+             * timedwait got the timing right
+             */
+            *inout_count_p = 0;
+            return (0);
+        }
+        else if ((ret != 0) && (ret != EINTR) && (ret != EINVAL))
+        {
+            /*
+              the above check will skip returning the error on
+              success, EINTR, or EINVAL and just continue processing
 
-	    *inout_count_p = original_count;
-	}
+              NOTE: although not documented in the GNU/Linux manpage
+              POSIX says that pthread_cond_timedwait can return a
+              value of 22 (which corresponds to EINVAL) if the abstime
+              parameter is invalid -- i.e. smaller than (or equal to)
+              the system time.
 
-	/* if we fall to here, see how much time has expired and
-	 * sleep/work again if we need to
-	 */
-	ret = gettimeofday(&end, NULL);
-	if (ret < 0)
-	{
-	    return (ret);
-	}
+              for more information:
+              http://nptl.bullopensource.org/phpBB/viewtopic.php?t=19
+            */
 
-	timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
-	    ((end.tv_usec - start.tv_usec) / 1000);
+            /* any other value we treat as a real error */
+            return (-ret);
+        }
+        else
+        {
+            /* check queue now to see if anything is done */
+            ret = completion_query_context(out_id_array_p,
+                                         inout_count_p,
+                                         returned_user_ptr_array,
+                                         out_status_array_p,
+                                         context_id);
+            /* return here on error or completion */
+            if (ret < 0)
+            {
+                return (ret);
+            }
+
+            if (ret == 0 && (*inout_count_p > 0))
+            {
+                return (1);
+            }
+
+            *inout_count_p = original_count;
+        }
+
+        /* if we fall to here, see how much time has expired and
+         * sleep/work again if we need to
+         */
+        ret = gettimeofday(&end, NULL);
+        if (ret < 0)
+        {
+            return (ret);
+        }
+
+        timeout_remaining -= (end.tv_sec - start.tv_sec) * 1000 +
+            ((end.tv_usec - start.tv_usec) / 1000);
 
     } while (timeout_remaining > 0);
 
@@ -3624,9 +3650,9 @@ static int setup_queues(void)
 
     if (!bmi_unexp_queue || !dev_unexp_queue)
     {
-	/* cleanup any that were initialized */
-	teardown_queues();
-	return (-ENOMEM);
+        /* cleanup any that were initialized */
+        teardown_queues();
+        return (-ENOMEM);
     }
     return (0);
 }
@@ -3641,9 +3667,9 @@ static void teardown_queues(void)
 {
 
     if (bmi_unexp_queue)
-	job_desc_q_cleanup(bmi_unexp_queue);
+        job_desc_q_cleanup(bmi_unexp_queue);
     if (dev_unexp_queue)
-	job_desc_q_cleanup(dev_unexp_queue);
+        job_desc_q_cleanup(dev_unexp_queue);
 
     return;
 }
@@ -3733,7 +3759,7 @@ static void bmi_thread_mgr_unexp_handler(
     gen_mutex_lock(&bmi_unexp_mutex);
     /* remove the operation from the pending bmi_unexp queue */
     tmp_desc = job_desc_q_shownext(bmi_unexp_queue);
-    assert(tmp_desc != NULL);	/* TODO: fix this */
+    assert(tmp_desc != NULL);        /* TODO: fix this */
     if (tmp_desc->completed_flag == 0)
     {
         job_desc_q_remove(tmp_desc);
@@ -3776,7 +3802,7 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
     gen_mutex_lock(&dev_unexp_mutex);
     /* remove the operation from the pending dev_unexp queue */
     tmp_desc = job_desc_q_shownext(dev_unexp_queue);
-    assert(tmp_desc != NULL);	/* TODO: fix this */
+    assert(tmp_desc != NULL);        /* TODO: fix this */
     if (tmp_desc->completed_flag == 0)
     {
         job_desc_q_remove(tmp_desc);
@@ -3812,8 +3838,8 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
  * no return value
  */
 static void fill_status(struct job_desc *jd,
-			void **returned_user_ptr_p,
-			job_status_s * status)
+                        void **returned_user_ptr_p,
+                        job_status_s * status)
 {
     assert(jd);
     assert(status);
@@ -3822,54 +3848,54 @@ static void fill_status(struct job_desc *jd,
 
     if (returned_user_ptr_p)
     {
-	*returned_user_ptr_p = jd->job_user_ptr;
+        *returned_user_ptr_p = jd->job_user_ptr;
     }
     switch (jd->type)
     {
     case JOB_BMI:
-	job_time_mgr_rem(jd);
-	status->error_code = jd->u.bmi.error_code;
-	status->actual_size = jd->u.bmi.actual_size;
-	break;
+        job_time_mgr_rem(jd);
+        status->error_code = jd->u.bmi.error_code;
+        status->actual_size = jd->u.bmi.actual_size;
+        break;
     case JOB_BMI_UNEXP:
-	status->error_code = jd->u.bmi_unexp.info->error_code;
-	status->actual_size = jd->u.bmi_unexp.info->size;
-	break;
+        status->error_code = jd->u.bmi_unexp.info->error_code;
+        status->actual_size = jd->u.bmi_unexp.info->size;
+        break;
     case JOB_FLOW:
-	job_time_mgr_rem(jd);
-	status->error_code = jd->u.flow.flow_d->error_code;
-	status->actual_size = jd->u.flow.flow_d->total_transfered;
-	break;
+        job_time_mgr_rem(jd);
+        status->error_code = jd->u.flow.flow_d->error_code;
+        status->actual_size = jd->u.flow.flow_d->total_transfered;
+        break;
     case JOB_REQ_SCHED:
-	status->error_code = jd->u.req_sched.error_code;
-	break;
+        status->error_code = jd->u.req_sched.error_code;
+        break;
     case JOB_TROVE:
-	/* TODO: make this work out for whatever type of trove
-	 * operation this is...
-	 */
-	status->error_code = jd->u.trove.state;
-	status->actual_size = jd->u.trove.actual_size;
-	status->vtag = jd->u.trove.vtag;
-	status->coll_id = jd->u.trove.fsid;
-	status->handle = jd->u.trove.handle;
-	status->position = jd->u.trove.position;
-	status->count = jd->u.trove.count;
-	status->type = jd->u.trove.type;
-	break;
+        /* TODO: make this work out for whatever type of trove
+         * operation this is...
+         */
+        status->error_code = jd->u.trove.state;
+        status->actual_size = jd->u.trove.actual_size;
+        status->vtag = jd->u.trove.vtag;
+        status->coll_id = jd->u.trove.fsid;
+        status->handle = jd->u.trove.handle;
+        status->position = jd->u.trove.position;
+        status->count = jd->u.trove.count;
+        status->type = jd->u.trove.type;
+        break;
     case JOB_DEV_UNEXP:
-	status->error_code = 0;
-	status->actual_size = jd->u.dev_unexp.info->size;
-	break;
+        status->error_code = 0;
+        status->actual_size = jd->u.dev_unexp.info->size;
+        break;
     case JOB_REQ_SCHED_TIMER:
-	status->error_code = jd->u.req_sched.error_code;
-	break;
+        status->error_code = jd->u.req_sched.error_code;
+        break;
     case JOB_NULL:
-	status->error_code = jd->u.null_info.error_code;
-	break;
+        status->error_code = jd->u.null_info.error_code;
+        break;
     }
 
     if(jd->event_type)
-	JOB_EVENT_END(jd->event_type, status->actual_size, jd->job_id);
+        JOB_EVENT_END(jd->event_type, status->actual_size, jd->job_id);
 
     return;
 }
@@ -3893,28 +3919,28 @@ static int do_one_test_cycle_req_sched(void)
 
 
     ret = PINT_req_sched_testworld(&count, id_array,
-				   user_ptr_array, error_code_array);
+                                   user_ptr_array, error_code_array);
 
     if (ret < 0)
     {
-	/* critical failure */
-	/* TODO: can I clean up anything else here? */
-	gossip_lerr("Error: critical BMI failure.\n");
-	return (ret);
+        /* critical failure */
+        /* TODO: can I clean up anything else here? */
+        gossip_lerr("Error: critical BMI failure.\n");
+        return (ret);
     }
 
     for (i = 0; i < count; i++)
     {
-	/* remove operation from queue */
-	tmp_desc = (struct job_desc *) user_ptr_array[i];
-	/* set appropriate fields and place in completed queue */
-	tmp_desc->u.req_sched.error_code = error_code_array[i];
-	gen_mutex_lock(&completion_mutex);
-	/* set completed flag while holding queue lock */
-	tmp_desc->completed_flag = 1;
-	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
-	    tmp_desc);
-	gen_mutex_unlock(&completion_mutex);
+        /* remove operation from queue */
+        tmp_desc = (struct job_desc *) user_ptr_array[i];
+        /* set appropriate fields and place in completed queue */
+        tmp_desc->u.req_sched.error_code = error_code_array[i];
+        gen_mutex_lock(&completion_mutex);
+        /* set completed flag while holding queue lock */
+        tmp_desc->completed_flag = 1;
+        job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+            tmp_desc);
+        gen_mutex_unlock(&completion_mutex);
     }
 
     return (0);
@@ -3923,10 +3949,10 @@ static int do_one_test_cycle_req_sched(void)
 
 /* TODO: fill in comment */
 static int completion_query_some(job_id_t * id_array,
-				 int *inout_count_p,
-				 int *out_index_array,
-				 void **returned_user_ptr_array,
-				 job_status_s * out_status_array_p)
+                                 int *inout_count_p,
+                                 int *out_index_array,
+                                 void **returned_user_ptr_array,
+                                 job_status_s * out_status_array_p)
 {
     int i;
     struct job_desc *tmp_desc;
@@ -3937,43 +3963,43 @@ static int completion_query_some(job_id_t * id_array,
     gen_mutex_lock(&completion_mutex);
     if (completion_error)
     {
-	gen_mutex_unlock(&completion_mutex);
-	return (completion_error);
+        gen_mutex_unlock(&completion_mutex);
+        return (completion_error);
     }
 
     for(i=0; i<incount; i++)
     {
-	tmp_desc = id_gen_safe_lookup(id_array[i]);
-	if(tmp_desc && tmp_desc->completed_flag)
-	{
-	    if(returned_user_ptr_array)
-	    {
-		fill_status(tmp_desc,
-		    &(returned_user_ptr_array[*inout_count_p]),
-		    &(out_status_array_p[*inout_count_p]));
-	    }
-	    else
-	    {
-		fill_status(tmp_desc, NULL,
-		    &(out_status_array_p[*inout_count_p]));
-	    }
-	    job_desc_q_remove(tmp_desc);
-	    if (tmp_desc->type == JOB_REQ_SCHED &&
-		tmp_desc->u.req_sched.post_flag == 1)
-	    {
-		/* special case; don't delete job desc for req sched
-		 * jobs; we need to hang on to them for use when entry
-		 * is released
-		 */
-	    }
-	    else
-	    {
-		dealloc_job_desc(tmp_desc);
+        tmp_desc = id_gen_safe_lookup(id_array[i]);
+        if(tmp_desc && tmp_desc->completed_flag)
+        {
+            if(returned_user_ptr_array)
+            {
+                fill_status(tmp_desc,
+                    &(returned_user_ptr_array[*inout_count_p]),
+                    &(out_status_array_p[*inout_count_p]));
+            }
+            else
+            {
+                fill_status(tmp_desc, NULL,
+                    &(out_status_array_p[*inout_count_p]));
+            }
+            job_desc_q_remove(tmp_desc);
+            if (tmp_desc->type == JOB_REQ_SCHED &&
+                tmp_desc->u.req_sched.post_flag == 1)
+            {
+                /* special case; don't delete job desc for req sched
+                 * jobs; we need to hang on to them for use when entry
+                 * is released
+                 */
+            }
+            else
+            {
+                dealloc_job_desc(tmp_desc);
                 tmp_desc = NULL;
-	    }
-	    out_index_array[*inout_count_p] = i;
-	    (*inout_count_p)++;
-	}
+            }
+            out_index_array[*inout_count_p] = i;
+            (*inout_count_p)++;
+        }
     }
     gen_mutex_unlock(&completion_mutex);
     return(0);
@@ -3981,11 +4007,11 @@ static int completion_query_some(job_id_t * id_array,
 
 /* TODO: fill in comment */
 static int completion_query_context(job_id_t * out_id_array_p,
-				  int *inout_count_p,
-				  void **returned_user_ptr_array,
-				  job_status_s *
-				  out_status_array_p,
-				  job_context_id context_id)
+                                  int *inout_count_p,
+                                  void **returned_user_ptr_array,
+                                  job_status_s *
+                                  out_status_array_p,
+                                  job_context_id context_id)
 {
     struct job_desc *query;
     int incount = *inout_count_p;
@@ -3994,40 +4020,40 @@ static int completion_query_context(job_id_t * out_id_array_p,
     gen_mutex_lock(&completion_mutex);
     if (completion_error)
     {
-	gen_mutex_unlock(&completion_mutex);
-	return (completion_error);
+        gen_mutex_unlock(&completion_mutex);
+        return (completion_error);
     }
     while (*inout_count_p < incount && (query =
-					job_desc_q_shownext(
-					completion_queue_array[context_id])))
+                                        job_desc_q_shownext(
+                                        completion_queue_array[context_id])))
     {
         assert(query);
 
-	if (returned_user_ptr_array)
-	{
-	    fill_status(query, &(returned_user_ptr_array[*inout_count_p]),
-			&(out_status_array_p[*inout_count_p]));
-	}
-	else
-	{
-	    fill_status(query, NULL, &(out_status_array_p[*inout_count_p]));
-	}
-	out_id_array_p[*inout_count_p] = query->job_id;
-	job_desc_q_remove(query);
-	(*inout_count_p)++;
-	/* special case for request scheduler */
-	if (query->type == JOB_REQ_SCHED && query->u.req_sched.post_flag == 1)
-	{
-	    /* special case; don't delete job desc for req sched
-	     * jobs; we need to hang on to them for use when entry
-	     * is released
-	     */
-	}
-	else
-	{
-	    dealloc_job_desc(query);
+        if (returned_user_ptr_array)
+        {
+            fill_status(query, &(returned_user_ptr_array[*inout_count_p]),
+                        &(out_status_array_p[*inout_count_p]));
+        }
+        else
+        {
+            fill_status(query, NULL, &(out_status_array_p[*inout_count_p]));
+        }
+        out_id_array_p[*inout_count_p] = query->job_id;
+        job_desc_q_remove(query);
+        (*inout_count_p)++;
+        /* special case for request scheduler */
+        if (query->type == JOB_REQ_SCHED && query->u.req_sched.post_flag == 1)
+        {
+            /* special case; don't delete job desc for req sched
+             * jobs; we need to hang on to them for use when entry
+             * is released
+             */
+        }
+        else
+        {
+            dealloc_job_desc(query);
             query = NULL;
-	}
+        }
     }
     gen_mutex_unlock(&completion_mutex);
 
@@ -4044,32 +4070,32 @@ static int completion_query_context(job_id_t * out_id_array_p,
 static void do_one_work_cycle_all(int idle_time_ms)
 {
     int total_pending_count = bmi_pending_count + bmi_unexp_pending_count
-	+ flow_pending_count + dev_unexp_pending_count + trove_pending_count;
+        + flow_pending_count + dev_unexp_pending_count + trove_pending_count;
 
     if (bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
     {
-	PINT_thread_mgr_bmi_push(idle_time_ms);
+        PINT_thread_mgr_bmi_push(idle_time_ms);
         idle_time_ms = 0;
     }
     if (dev_unexp_pending_count)
     {
-	PINT_thread_mgr_dev_push(idle_time_ms);
+        PINT_thread_mgr_dev_push(idle_time_ms);
     }
 #ifdef __PVFS2_TROVE_SUPPORT__
     if(trove_pending_count || flow_pending_count)
-	PINT_thread_mgr_trove_push(idle_time_ms);
+        PINT_thread_mgr_trove_push(idle_time_ms);
 #endif
 
     if(total_pending_count == 0 && idle_time_ms != 0)
     {
-	/* The caller would like for us to idle if necessary, but we really
-	 * don't have a single thing to do.  Sleep here to prevent busy
-	 * spins.
-	 */
-	struct timespec ts; 
- 	ts.tv_sec = idle_time_ms/1000; 
- 	ts.tv_nsec = (idle_time_ms%1000)*1000*1000; 
- 	nanosleep(&ts, NULL); 
+        /* The caller would like for us to idle if necessary, but we really
+         * don't have a single thing to do.  Sleep here to prevent busy
+         * spins.
+         */
+        struct timespec ts; 
+         ts.tv_sec = idle_time_ms/1000; 
+         ts.tv_nsec = (idle_time_ms%1000)*1000*1000; 
+         nanosleep(&ts, NULL); 
     }
 
     return;
@@ -4089,7 +4115,7 @@ static void flow_callback(flow_descriptor* flow_d)
     /* set job descriptor fields and put into completion queue */
     gen_mutex_lock(&completion_mutex);
     job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
-	tmp_desc);
+                   tmp_desc);
     /* set completed flag while holding queue lock */
     tmp_desc->completed_flag = 1;
     gen_mutex_unlock(&completion_mutex);
