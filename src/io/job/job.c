@@ -3191,10 +3191,12 @@ int job_testsome(job_id_t * id_array,
     /* check before we do anything else to see if the job that we
      * want is in the completion queue
      */
+    gen_mutex_lock(&completion_mutex);
     ret = completion_query_some(tmp_id_array,
                                 inout_count_p, out_index_array,
                                 returned_user_ptr_array,
                                 out_status_array_p);
+    gen_mutex_unlock(&completion_mutex);
 
     /* return here on error or completion */
     if (ret < 0)
@@ -3203,7 +3205,7 @@ int job_testsome(job_id_t * id_array,
         return (ret);
     }
 
-    if ((ret == 0) && (*inout_count_p == real_id_count))
+    if (ret > 0)
     {
         free(tmp_id_array);
         return (1);
@@ -3271,6 +3273,7 @@ int job_testsome(job_id_t * id_array,
         }
         else
         {
+            gen_mutex_lock(&completion_mutex);
             if(returned_user_ptr_array)
             {
                 ret = completion_query_some(tmp_id_array,
@@ -3290,6 +3293,7 @@ int job_testsome(job_id_t * id_array,
                                             &out_status_array_p
                                             [total_completed]);
             }
+            gen_mutex_unlock(&completion_mutex);
 
             /* return here on error or completion */
             if (ret < 0)
@@ -3297,7 +3301,7 @@ int job_testsome(job_id_t * id_array,
                 free(tmp_id_array);
                 return (ret);
             }
-            if (ret == 0 && (*inout_count_p + total_completed == real_id_count))
+            if (ret > 1)
             {
                 *inout_count_p = real_id_count;
                 free(tmp_id_array);
@@ -3381,17 +3385,19 @@ int job_testcontext(job_id_t * out_id_array_p,
     /* check before we do anything else to see if the completion queue
      * has anything in it
      */
+    gen_mutex_lock(&completion_mutex);
     ret = completion_query_context(out_id_array_p,
                                  inout_count_p,
                                  returned_user_ptr_array,
                                  out_status_array_p, context_id);
+    gen_mutex_unlock(&completion_mutex);
     /* return here on error or completion */
     if (ret < 0)
     {
         return (ret);
     }
 
-    if (ret == 0 && (*inout_count_p > 0))
+    if (ret > 0)
     {
         return (1);
     }
@@ -3470,18 +3476,20 @@ int job_testcontext(job_id_t * out_id_array_p,
         else
         {
             /* check queue now to see if anything is done */
+            gen_mutex_lock(&completion_mutex);
             ret = completion_query_context(out_id_array_p,
                                          inout_count_p,
                                          returned_user_ptr_array,
                                          out_status_array_p,
                                          context_id);
+            gen_mutex_unlock(&completion_mutex);
             /* return here on error or completion */
             if (ret < 0)
             {
                 return (ret);
             }
 
-            if (ret == 0 && (*inout_count_p > 0))
+            if (ret  > 0)
             {
                 return (1);
             }
@@ -3836,16 +3844,47 @@ static int completion_query_some(job_id_t * id_array,
     int i;
     struct job_desc *tmp_desc;
     int incount = *inout_count_p;
+    int real_id_count = 0;
+    int done_count = 0;
 
     *inout_count_p = 0;
 
-    gen_mutex_lock(&completion_mutex);
     if (completion_error)
     {
-        gen_mutex_unlock(&completion_mutex);
         return (completion_error);
     }
 
+    /* count how many of the id's are non zero */
+    for (i = 0; i < incount; i++)
+    {
+        if (id_array[i])
+        {
+            real_id_count++;
+        }
+    }
+
+    if (!real_id_count)
+    {
+        gossip_lerr("completion_query_some() called with nothing to do.\n");
+        return (-EINVAL);
+    }
+
+    /* don't do anything unless all of the target ops are done */
+    for(i=0; i<incount; i++)
+    {
+        tmp_desc = id_gen_safe_lookup(id_array[i]);
+        if(tmp_desc && tmp_desc->completed_flag)
+        {
+            done_count++;
+        }
+    }
+
+    if(done_count < real_id_count)
+    {
+        return(0);
+    }
+
+    /* all target ops are complete; pull them out of completion queue */
     for(i=0; i<incount; i++)
     {
         tmp_desc = id_gen_safe_lookup(id_array[i]);
@@ -3880,8 +3919,13 @@ static int completion_query_some(job_id_t * id_array,
             (*inout_count_p)++;
         }
     }
-    gen_mutex_unlock(&completion_mutex);
-    return(0);
+
+    /* we better not have lost any ops since the first loop through the job
+     * list 
+     */
+    assert((*inout_count_p) == done_count);
+
+    return(1);
 }
 
 /* TODO: fill in comment */
@@ -3896,10 +3940,8 @@ static int completion_query_context(job_id_t * out_id_array_p,
     int incount = *inout_count_p;
     *inout_count_p = 0;
 
-    gen_mutex_lock(&completion_mutex);
     if (completion_error)
     {
-        gen_mutex_unlock(&completion_mutex);
         return (completion_error);
     }
     while (*inout_count_p < incount && (query =
@@ -3934,9 +3976,15 @@ static int completion_query_context(job_id_t * out_id_array_p,
             query = NULL;
         }
     }
-    gen_mutex_unlock(&completion_mutex);
 
-    return (0);
+    if((*inout_count_p) > 0)
+    {
+        return(1);
+    }
+    else
+    {
+        return (0);
+    }
 }
 
 #ifndef __PVFS2_JOB_THREADED__
