@@ -9,3 +9,13 @@ LIBSRC += \
 	$(DIR)/dbpf-dspace-db-cache.c \
 	$(DIR)/dbpf-queue.c \
 	$(DIR)/dbpf-mgmt.c
+SERVERSRC += \
+	$(DIR)/dbpf-bstream.c \
+	$(DIR)/dbpf-bstream-aio.c \
+	$(DIR)/dbpf-bstream-fd-cache.c \
+	$(DIR)/dbpf-keyval.c \
+	$(DIR)/dbpf-keyval-db-cache.c \
+	$(DIR)/dbpf-dspace.c \
+	$(DIR)/dbpf-dspace-db-cache.c \
+	$(DIR)/dbpf-queue.c \
+	$(DIR)/dbpf-mgmt.c

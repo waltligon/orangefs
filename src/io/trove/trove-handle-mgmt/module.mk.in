@@ -3,3 +3,7 @@ LIBSRC += \
 	$(DIR)/avltree.c \
 	$(DIR)/trove-extentlist.c \
 	$(DIR)/trove-ledger.c
+SERVERSRC += \
+	$(DIR)/avltree.c \
+	$(DIR)/trove-extentlist.c \
+	$(DIR)/trove-ledger.c
