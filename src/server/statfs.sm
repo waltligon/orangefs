@@ -53,9 +53,9 @@ machine pvfs2_statfs_sm(prelude, do_statfs, final_response, cleanup)
  */
 static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("do_statfs");
     int ret = -1;
     TROVE_context_id tmp_context;
+    PINT_STATE_DEBUG("do_statfs");
 
     /* we need a context to be able to make the getinfo call */
     ret = trove_open_context(s_op->req->u.statfs.fs_id, &tmp_context);
