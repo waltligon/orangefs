@@ -233,6 +233,41 @@ int trove_collection_iterate(TROVE_ds_position *inout_position_p,
     return 1;
 }
 
+int trove_open_context(TROVE_context_id *context_id)
+{
+    int ret = 0;
+    int method_id = 0;
+
+    /*
+      without a collection id, we need a different way to
+      route this request to dbpf; same problem suffered
+      in trove_initialize, where we have to assume dbpf.
+    */
+    if (context_method_table[method_id])
+    {
+        ret = context_method_table[method_id]->open_context(
+            context_id);
+    }
+    return ret;
+}
+
+int trove_close_context(TROVE_context_id context_id)
+{
+    int ret = 0;
+    int method_id = 0;
+    /*
+      without a collection id, we need a different way to
+      route this request to dbpf; same problem suffered
+      in trove_initialize, where we have to assume dbpf.
+    */
+    if (context_method_table[method_id])
+    {
+        ret = context_method_table[method_id]->close_context(
+            context_id);
+    }
+    return ret;
+}
+
 /* map_coll_id_to_method()
  *
  * NOTE: this is a hack for now.
