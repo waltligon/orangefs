@@ -365,7 +365,7 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id = sm_p->u.remove.object_ref.fs_id;
     sm_p->msgpair.handle = sm_p->u.remove.object_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = remove_getattr_comp_fn;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
@@ -807,6 +807,12 @@ static int remove_getattr_failure(PINT_client_sm *sm_p,
 				  job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: getattr_failure\n");
+
+    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
+    "may lead to inconsistent state.\n");
+    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
+    js_p->error_code = 0;
+
     return 1;
 }
 
