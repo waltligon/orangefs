@@ -85,6 +85,7 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 {
     int i = 0, ret = -TROVE_EINVAL;
     char filename[PATH_MAX] = {0}, db_name[PATH_MAX] = {0};
+    DB *db_p = NULL;
 
     for (i = 0; i < DBCACHE_ENTRIES; i++)
     {
@@ -115,6 +116,10 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
         {
 	    gossip_debug(GOSSIP_TROVE_DEBUG, "db: close error\n");
 	}
+
+        keyval_db_cache[i].ref_ct = -1;
+        keyval_db_cache[i].db_p = NULL;
+        gen_mutex_unlock(&keyval_db_cache[i].mutex);
     }
 
     DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
@@ -123,11 +128,10 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
     __DBPF_GET_KEYVAL_DBNAME(db_name, PATH_MAX, my_storage_p->name,
                              coll_id, Lu(handle));
 
-    ret = db_create(&(keyval_db_cache[i].db_p), NULL, 0);
+    ret = db_create(&db_p, NULL, 0);
     assert(ret == 0);
 
-    ret = keyval_db_cache[i].db_p->remove(
-        keyval_db_cache[i].db_p, filename, db_name, 0);
+    ret = db_p->remove(db_p, filename, db_name, 0);
     switch (ret)
     {
         case 0:
@@ -144,11 +148,6 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
             ret = -TROVE_EPERM;
             break;
     }
-
-    keyval_db_cache[i].ref_ct = -1;
-    keyval_db_cache[i].db_p   = NULL;
-    gen_mutex_unlock(&keyval_db_cache[i].mutex);
-
     return ret;
 }
 
@@ -334,7 +333,7 @@ return_error:
 
 void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id, TROVE_handle handle)
 {
-    int i;
+    int i = 0;
 
     for (i = 0; i < DBCACHE_ENTRIES; i++)
     {
