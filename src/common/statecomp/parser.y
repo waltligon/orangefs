@@ -28,7 +28,7 @@ void gen_state_end(void);
 	double f;
 	char *c;
 	sym_ent *s;
-}
+};
 
 %token <i> MACHINE
 %token <i> STATE
