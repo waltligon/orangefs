@@ -7,6 +7,7 @@
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
+#include <stdint.h>
 #ifndef __KERNEL__
 #include <inttypes.h>
 #endif
@@ -18,7 +19,7 @@ typedef int64_t PVFS_offset;
 typedef int64_t PVFS_size;
 typedef int64_t PVFS_id_gen_t;
 /* integer type, large enough to hold a pointer */
-typedef @PVFS_AINT@ PVFS_aint;
+typedef intptr_t PVFS_aint;
 
 /* basic types used by communication subsystems */
 typedef int32_t PVFS_msg_tag_t;
