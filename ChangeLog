@@ -8,6 +8,17 @@ pvfs2-0.1.0
 - initial support for logging traces with both MPE and Pablo libraries
 - fix some warnings on x86-64
 - work around older Berkeley-DB versions w/o support for DB_DIRTY_READ
+- implementation of cancel() in BMI, Trove, Flow, and thread mgmt interfaces
+- graceful recovery from I/O errors within flows
+- updated perf interface to return metadata access statistics
+- various bmi_tcp optimizations (cut down on system calls)
+- fixes to bmi_tcp cpu utilization
+- dynamic traffic graphs added to Karma
+- improved cleanup from messaging errors in client libraries
+- added ability to report partial errors with details from mgmt interface
+- revisited locking approach in jobs, flows, and bmi_gm
+- new config file option to control default Trove sync behavior
+- graceful shutdown when server gets ctrl-c
 
 
 pvfs2-0.0.9
