@@ -69,6 +69,10 @@ int main(int argc, char **argv)
 	double max_read_tim, max_write_tim;
 	double min_read_tim, min_write_tim;
 	double ave_read_tim, ave_write_tim;
+	double sum_read_tim, sum_write_tim;
+	double sq_write_tim, sq_read_tim;
+	double sumsq_write_tim, sumsq_read_tim;
+	double var_read_tim, var_write_tim;
 	int64_t iter_jump = 0;
 	int64_t seek_position = 0;
 	MPI_File fh;
@@ -245,21 +249,42 @@ int main(int argc, char **argv)
 		MPI_COMM_WORLD);
 	MPI_Allreduce(&read_tim, &min_read_tim, 1, MPI_DOUBLE, MPI_MIN,
 		MPI_COMM_WORLD);
-	MPI_Allreduce(&read_tim, &ave_read_tim, 1, MPI_DOUBLE, MPI_SUM,
+	MPI_Allreduce(&read_tim, &sum_read_tim, 1, MPI_DOUBLE, MPI_SUM,
 		MPI_COMM_WORLD);
 
-	/* calculate the average from the sum */
-	ave_read_tim = ave_read_tim / nprocs; 
+	/* calculate our part of the summation used for variance */
+	sq_read_tim = read_tim - (sum_read_tim / nprocs);
+	sq_read_tim = sq_read_tim * sq_read_tim;
+	MPI_Allreduce(&sq_read_tim, &sumsq_read_tim, 1, MPI_DOUBLE, 
+						 MPI_SUM, MPI_COMM_WORLD);
+
 
 	MPI_Allreduce(&write_tim, &max_write_tim, 1, MPI_DOUBLE, MPI_MAX,
 		MPI_COMM_WORLD);
 	MPI_Allreduce(&write_tim, &min_write_tim, 1, MPI_DOUBLE, MPI_MIN,
 		MPI_COMM_WORLD);
-	MPI_Allreduce(&write_tim, &ave_write_tim, 1, MPI_DOUBLE, MPI_SUM,
+	MPI_Allreduce(&write_tim, &sum_write_tim, 1, MPI_DOUBLE, MPI_SUM,
 		MPI_COMM_WORLD);
 
+	/* calculate our part of the summation used for variance */
+	sq_write_tim = write_tim - (sum_write_tim / nprocs );
+	sq_write_tim = sq_write_tim * sq_write_tim;
+	MPI_Allreduce(&sq_write_tim, &sumsq_write_tim, 1, MPI_DOUBLE, 
+						 MPI_SUM, MPI_COMM_WORLD);
+
 	/* calculate the average from the sum */
-	ave_write_tim = ave_write_tim / nprocs; 
+	ave_read_tim = sum_read_tim / nprocs; 
+	ave_write_tim = sum_write_tim / nprocs; 
+
+	/* and finally compute variance */
+	if (nprocs > 1) {
+			  var_read_tim = sumsq_read_tim / (nprocs-1);
+			  var_write_tim = sumsq_write_tim / (nprocs-1);
+	}
+	else {
+			  var_read_tim = 0;
+			  var_write_tim = 0;
+	}
 	
 	/* print out the results on one node */
 	if (mynod == 0) {
@@ -271,10 +296,10 @@ int main(int argc, char **argv)
 			
 			printf("# total_size = %lld\n", (int64_t)(opt_block*nprocs*opt_iter));
 			
-			printf("# Write:  min_time = %f, max_time = %f, mean_time = %f\n", 
-				min_write_tim, max_write_tim, ave_write_tim);
-			printf("# Read:  min_time = %f, max_time = %f, mean_time = %f\n", 
-				min_read_tim, max_read_tim, ave_read_tim);
+			printf("# Write: min_t = %f, max_t = %f, mean_t = %f, var_t = %f\n", 
+				min_write_tim, max_write_tim, ave_write_tim, var_write_tim);
+			printf("# Read:  min_t = %f, max_t = %f, mean_t = %f, var_t = %f\n", 
+				min_read_tim, max_read_tim, ave_read_tim, var_read_tim);
 		
 	   printf("Write bandwidth = %f Mbytes/sec\n", write_bw);
 	   printf("Read bandwidth = %f Mbytes/sec\n", read_bw);
