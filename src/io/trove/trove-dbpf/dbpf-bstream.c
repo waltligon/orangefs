@@ -27,6 +27,7 @@
 #define DBPF_READ read
 #define DBPF_CLOSE close
 #define DBPF_SYNC fsync
+#define DBPF_RESIZE ftruncate
 
 #define AIOCB_ARRAY_SZ 8
 
@@ -210,6 +211,7 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p);
 #endif
 static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p);
+static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p);
 
 /* Functions */
 
@@ -502,7 +504,73 @@ static int dbpf_bstream_resize(
 			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p)
 {
-    return -TROVE_ENOSYS;
+    dbpf_queued_op_t *q_op_p;
+    struct dbpf_collection *coll_p;
+    
+    /* find the collection */
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL) return -TROVE_EINVAL;
+    
+    /* grab a queued op structure */
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    
+    /* initialize all the common members */
+    dbpf_queued_op_init(
+			q_op_p,
+			BSTREAM_RESIZE,
+			handle,
+			coll_p,
+			dbpf_bstream_resize_op_svc,
+			user_ptr,
+			flags,
+                        context_id);
+    
+    /* initialize the op-specific members */
+    q_op_p->op.u.b_resize.size = *inout_size_p;
+
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    
+    return 0;
+}
+
+/* dbpf_bstream_flush_op_svc
+ * returns 1 on completion, -1 on error, 0 on not done
+ */
+static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
+{
+    int ret, error, fd, got_fd = 0;
+
+    /* grab the FD (also increments a reference count) */
+    /* TODO: CONSIDER PUTTING COLL_ID IN THE OP INSTEAD OF THE PTR */
+    ret = dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &fd);
+    switch (ret) {
+	/* TODO: fix the bstream error codes to be like the keyval error codes*/
+	case -TROVE_ENOENT:
+	    error = ret;
+	    goto return_error;
+	case DBPF_BSTREAM_FDCACHE_ERROR:
+	    error = -1;
+	    goto return_error;
+	case DBPF_BSTREAM_FDCACHE_BUSY:
+	    return 0;
+	case DBPF_BSTREAM_FDCACHE_SUCCESS:
+	    got_fd = 1;
+	    /* drop through */
+    }
+
+    ret = DBPF_RESIZE(fd,
+		    op_p->u.b_resize.size);
+    if ( ret != 0) {
+	error = -trove_errno_to_trove_error(errno);
+	goto return_error;
+    }
+    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    return 1;
+
+return_error:
+    if (got_fd) dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    return error;
 }
 
 /* dbpf_bstream_validate()
