@@ -37,6 +37,13 @@ typedef struct
 
 static struct qhash_table *s_fsid_to_config_table = NULL;
 static gen_mutex_t *s_server_config_mgr_mutex = NULL;
+/*
+  while loading configuration settings for all known file systems
+  (across all configured servers), we keep track of the minimum handle
+  recycle timeout for *any* file system, and expose this value since
+  this is the only place that has access to all of this information.
+*/
+static int s_min_handle_recycle_timeout_in_sec = -1;
 
 static int hash_fsid(void *key, int table_size);
 static int hash_fsid_compare(void *key, struct qlist_head *link);
@@ -70,6 +77,7 @@ int PINT_server_config_mgr_initialize(void)
             s_server_config_mgr_mutex = gen_mutex_build();
             if (s_server_config_mgr_mutex)
             {
+                s_min_handle_recycle_timeout_in_sec = -1;
                 ret = 0;
             }
             else
@@ -122,6 +130,7 @@ int PINT_server_config_mgr_finalize(void)
         gen_mutex_unlock(s_server_config_mgr_mutex);
         gen_mutex_destroy(s_server_config_mgr_mutex);
         s_server_config_mgr_mutex = NULL;
+        s_min_handle_recycle_timeout_in_sec = -1;
 
         ret = 0;
     }
@@ -169,6 +178,20 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
 
                 cur_fs = PINT_llist_head(cur);
                 assert(cur_fs);
+                assert(cur_fs->handle_recycle_timeout_sec.tv_sec > -1);
+
+                /* find the minimum handle recycle timeout here */
+                if ((cur_fs->handle_recycle_timeout_sec.tv_sec <
+                     s_min_handle_recycle_timeout_in_sec) ||
+                    (s_min_handle_recycle_timeout_in_sec == -1))
+                {
+                    s_min_handle_recycle_timeout_in_sec =
+                        cur_fs->handle_recycle_timeout_sec.tv_sec;
+
+                    gossip_debug(GOSSIP_CLIENT_DEBUG, "Set min handle "
+                                 "recycle time to %d seconds\n",
+                                 s_min_handle_recycle_timeout_in_sec);
+                }
 
                 gossip_debug(GOSSIP_CLIENT_DEBUG,
                              "Reloading handle mappings for fs_id %d\n",
@@ -380,6 +403,12 @@ void __PINT_server_config_mgr_put_config(
         }
         gen_mutex_unlock(s_server_config_mgr_mutex);
     }
+}
+
+int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void)
+{
+    assert(s_min_handle_recycle_timeout_in_sec != -1);
+    return s_min_handle_recycle_timeout_in_sec;
 }
 
 static int hash_fsid(void *key, int table_size)

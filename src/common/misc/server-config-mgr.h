@@ -28,6 +28,8 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
 void __PINT_server_config_mgr_put_config(
     struct server_configuration_s *config_s);
 
+int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void);
+
 /* client and server retrieve fs configuration from different sources */
 #if defined(__PVFS2_CLIENT__)
 #define PINT_server_config_mgr_get_config __PINT_server_config_mgr_get_config
