@@ -165,7 +165,7 @@ dnl
 
 AC_ARG_WITH(db,
 	[  --with-db=<dir>         Location of installed DB package (default=/usr)],
-	LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="$CFLAGS} -I$withval/include")
+	LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="${CFLAGS} -I$withval/include")
 
 AC_MSG_CHECKING("for db library")
 oldlibs=$LIBS
