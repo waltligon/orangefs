@@ -203,8 +203,10 @@ void display_pvfs_structure(void *s,int r)
 			case PVFS_SERV_SETATTR:
 			case PVFS_SERV_RMDIR:
 			case PVFS_SERV_CREATEDIRENT:
+				printf("Shouldn't have a response\n");
+				break;
 			default:
-				printf("Unsupported or Shouldn't have a response\n");
+				printf("Unsupported operation\n");
 		}
 	}
 }
