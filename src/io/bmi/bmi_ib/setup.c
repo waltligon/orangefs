@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.13 2004-09-29 20:29:45 pw Exp $
+ * $Id: setup.c,v 1.14 2004-10-11 13:50:12 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -835,7 +835,7 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
      */
     ret = EVAPI_get_hca_hndl((char *)(unsigned long) VAPI_DEVICE, &nic_handle);
     if (ret < 0)
-	error_verrno(ret, "%s: EVAPI_get_hca_hndl", __func__);
+	return -ENOSYS;
 
     /* connect an asynchronous event handler to look for weirdness */
     ret = EVAPI_set_async_event_handler(nic_handle, async_event_handler, 0,
