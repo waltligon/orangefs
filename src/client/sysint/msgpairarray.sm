@@ -281,9 +281,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
 	    gossip_err("Send error: cancelling recv.\n");
 
-	    ret = PINT_client_bmi_cancel(msg_p->recv_id);
-	    /* this should not fail */
-	    assert(ret == 0);
+	    PINT_client_bmi_cancel(msg_p->recv_id);
 	    
 	    /* we still have to wait for recv completion, so just decrement
 	     * comp_ct by one and keep going
@@ -357,8 +355,13 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 	msg_p->recv_id = 0;
 	msg_p->recv_status = *js_p;
 
-	/* save error, if any, in op_status */
-	msg_p->op_status = msg_p->recv_status.error_code;
+	/* save error (if we don't already have one) in op_status */
+	if(msg_p->op_status == 0)
+	    msg_p->op_status = msg_p->recv_status.error_code;
+
+	/* TODO: if we had a good way to tell if a send were still pending,
+	 * then we could cancel here
+	 */
     }
     else
     {
@@ -368,8 +371,13 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 	msg_p->send_id = 0;
 	msg_p->send_status = *js_p;
 
-	/* save error, if any, in op_status */
-	msg_p->op_status = msg_p->send_status.error_code;
+	/* save error (if we don't already have one) in op_status */
+	if(msg_p->op_status == 0)
+	    msg_p->op_status = msg_p->send_status.error_code;
+
+	/* TODO: if we had a good way to tell if a recv were still pending,
+	 * then we could cancel here
+	 */
     }
 
     /* decrement comp_ct until all operations have completed */
