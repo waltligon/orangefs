@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 #include <string.h>
 #include <assert.h>
 
@@ -338,8 +337,11 @@ int PINT_client_bmi_cancel(job_id_t id)
  */
 int PINT_client_io_cancel(PVFS_sys_op_id id)
 {
+    int ret = -PVFS_EINVAL, i = 0;
     PINT_client_sm *sm_p = NULL;
- 
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_client_io_cancel called\n");
+
     sm_p = PINT_id_gen_safe_lookup(id);
     if (!sm_p)
     {
@@ -362,9 +364,42 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
      */
     sm_p->op_cancelled = 1;
 
-    /* now run through cancelling outstanding jobs */
+    /* now run through and cancel the outstanding jobs */
+    for(i = 0; i < sm_p->u.io.datafile_count; i++)
+    {
+        PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
+        assert(cur_ctx);
 
-    return(-PVFS_ENOSYS);
+        if (cur_ctx->flow_in_progress)
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+                         "[%d] Posting cancellation of type: FLOW\n",i);
+
+            ret = job_flow_cancel(
+                cur_ctx->flow_job_id, pint_client_sm_context);
+            if (ret < 0)
+            {
+                PVFS_perror_gossip("job_flow_cancel failed", ret);
+                break;
+            }
+        }
+
+        if (cur_ctx->write_ack_in_progress)
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG,  "[%d] Posting "
+                         "cancellation of type: BMI Recv "
+                         "(Write Ack)\n",i);
+
+            ret = job_bmi_cancel(cur_ctx->write_ack.recv_id,
+                                 pint_client_sm_context);
+            if (ret < 0)
+            {
+                PVFS_perror_gossip("job_bmi_cancel failed", ret);
+                break;
+            }
+        }
+    }
+    return ret;
 }
 
 int PINT_client_state_machine_test(

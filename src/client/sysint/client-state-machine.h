@@ -7,10 +7,10 @@
 #ifndef __PVFS2_CLIENT_STATE_MACHINE_H
 #define __PVFS2_CLIENT_STATE_MACHINE_H
 
-/* NOTE: STATE-MACHINE.H IS INCLUDED AT THE BOTTOM!  THIS IS SO WE CAN
- * DEFINE ALL THE STRUCTURES WE NEED BEFORE WE INCLUDE IT.
- */
-
+/*
+  NOTE: state-machine.h is included at the bottom so we can define all
+  the client-sm structures before it's included
+*/
 #include "pvfs2-sysint.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
@@ -26,12 +26,16 @@
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
 
-/* jobs that send or receive request messages will timeout if they do not
- * complete within PVFS2_CLIENT_JOB_TIMEOUT seconds; flows will timeout if
- * they go for more than PVFS2_CLIENT_JOB_TIMEOUT seconds without moving any
- * data.
+/*
+  TODO: the following constants should be run-time configurable
+  eventually
+*/
+
+/* jobs that send or receive request messages will timeout if they do
+ * not complete within PVFS2_CLIENT_JOB_TIMEOUT seconds; flows will
+ * timeout if they go for more than PVFS2_CLIENT_JOB_TIMEOUT seconds
+ * without moving any data.
  */
-/* TODO: this should be configurable at runtime somehow */
 #define PVFS2_CLIENT_JOB_TIMEOUT 30
 
 /* the maximum number of times to retry restartable client operations */
@@ -106,7 +110,6 @@ typedef struct PINT_client_sm_recv_state_s
     PVFS_error op_status;
 } PINT_client_sm_recv_state;
 
-/* PINT_client_remove_sm */
 struct PINT_client_remove_sm
 {
     char *object_name;   /* input parameter */
@@ -114,153 +117,169 @@ struct PINT_client_remove_sm
     int	retry_count;
 };
 
-/* PINT_client_create_sm */
-struct PINT_client_create_sm {
-    char                         *object_name;    /* input parameter */
-    PVFS_sysresp_create          *create_resp;    /* in/out parameter*/
-    PVFS_sys_attr                sys_attr;        /* input parameter */
-    int                          num_data_files;
-    PVFS_BMI_addr_t              *data_server_addrs;
-    PVFS_handle_extent_array     *io_handle_extent_array;
-    PVFS_handle                  metafile_handle;
-    PVFS_handle                  *datafile_handles;
-    PINT_dist                    *dist;
-    int                           stored_error_code;
-    int                          retry_count;
+struct PINT_client_create_sm
+{
+    char *object_name;                /* input parameter */
+    PVFS_sysresp_create *create_resp; /* in/out parameter*/
+    PVFS_sys_attr sys_attr;           /* input parameter */
+
+    int retry_count;
+    int num_data_files;
+    int stored_error_code;
+
+    PINT_dist *dist;
+    PVFS_handle metafile_handle;
+    PVFS_handle *datafile_handles;
+    PVFS_BMI_addr_t *data_server_addrs;
+    PVFS_handle_extent_array *io_handle_extent_array;
 };
 
-/* PINT_client_mkdir_sm */
-struct PINT_client_mkdir_sm {
-    char                         *object_name;    /* input parameter  */
-    PVFS_sysresp_mkdir           *mkdir_resp;     /* in/out parameter */
-    PVFS_sys_attr                sys_attr;        /* input parameter  */
-    PVFS_handle                  metafile_handle;
-    int                          stored_error_code;
-    int                          retry_count;
+struct PINT_client_mkdir_sm
+{
+    char *object_name;              /* input parameter  */
+    PVFS_sysresp_mkdir *mkdir_resp; /* in/out parameter */
+    PVFS_sys_attr sys_attr;         /* input parameter  */
+
+    int retry_count;
+    int stored_error_code;
+    PVFS_handle metafile_handle;
 };
 
-/* PINT_client_symlink_sm */
-struct PINT_client_symlink_sm {
-    PVFS_object_ref        parent_ref;      /* input parameter */
-    char                         *link_name;      /* input parameter */
-    char                         *link_target;    /* input parameter */
-    PVFS_sysresp_symlink         *sym_resp;       /* in/out parameter*/
-    PVFS_sys_attr                sys_attr;        /* input parameter */
-    PVFS_handle                  symlink_handle;
-    int                          stored_error_code;
-    int                          retry_count;
+struct PINT_client_symlink_sm
+{
+    PVFS_object_ref parent_ref;     /* input parameter */
+    char *link_name;                /* input parameter */
+    char *link_target;              /* input parameter */
+    PVFS_sysresp_symlink *sym_resp; /* in/out parameter*/
+    PVFS_sys_attr sys_attr;         /* input parameter */
+
+    int retry_count;
+    int stored_error_code;
+    PVFS_handle symlink_handle;
 };
 
-/* PINT_client_getattr_sm */
-struct PINT_client_getattr_sm {
-    PVFS_object_ref object_ref;     /* input parameter */
-    uint32_t              attrmask;       /* input parameter */
-    int                   datafile_count; /* from object attribs */
-    PVFS_handle          *datafile_handles;
-    PINT_dist            *dist_p;
-    uint32_t              dist_size;
-    PVFS_size            *size_array;     /* from datafile attribs */
+struct PINT_client_getattr_sm
+{
+    PVFS_object_ref object_ref;           /* input parameter */
+    uint32_t attrmask;                    /* input parameter */
+    int datafile_count;                   /* from object attribs */
+    PVFS_handle *datafile_handles;
+    PINT_dist *dist_p;
+    uint32_t dist_size;
+    PVFS_size *size_array;                /* from datafile attribs */
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
 };
 
-/* PINT_client_setattr_sm */
 struct PINT_client_setattr_sm
 {
-    PVFS_object_ref refn;          /* input parameter */
-    PVFS_sys_attr   sys_attr;      /* input parameter */
-};
-
-/* PINT_client_io_sm
- *
- * Data specific to I/O operations on the client side.
- */
-struct PINT_client_io_sm
-{
-    /* input parameters */
-    enum PVFS_io_type         io_type;
-    PVFS_Request              file_req;
-    PVFS_offset               file_req_offset;
-    void                      *buffer;
-    PVFS_Request              mem_req;
-    int                       stored_error_code;
-    int                       retry_count;
-
-    /* data regarding flows */
-    int                       flow_comp_ct;
-    flow_descriptor           *flow_array;
-    job_status_s              *flow_status_array;
-    enum PVFS_flowproto_type  flowproto_type;
-    enum PVFS_encoding_type   encoding;
-
-    /* session tags, used in all messages */
-    PVFS_msg_tag_t            *session_tag_array;
-
-    /* data regarding final acknowledgements (writes only) */
-    int                       ack_comp_ct;
-    PINT_client_sm_recv_state *ackarray;
-
-    int                       *datafile_index_array;
-    int                       orig_datafile_count;
-    int                       datafile_count;
-    PVFS_handle               *datafile_handles;
-
-    /* output parameter */
-    PVFS_sysresp_io           *io_resp_p;
-};
-
-/* PINT_client_flush_sm */
-struct PINT_client_flush_sm {
-};
-
-/* PINT_client_readdir_sm */
-struct PINT_client_readdir_sm {
-    PVFS_object_ref         object_ref;     /* looked up */
-    PVFS_ds_position              pos_token;      /* input parameter */
-    int                           dirent_limit;   /* input parameter */
-    PVFS_sysresp_readdir          *readdir_resp;  /* in/out parameter*/
+    PVFS_object_ref refn;   /* input parameter */
+    PVFS_sys_attr sys_attr; /* input parameter */
 };
 
 typedef struct
 {
-    char                         *seg_name;
-    char                         *seg_remaining;
-    PVFS_object_attr             seg_attr;
-    PVFS_object_ref        seg_starting_refn;
-    PVFS_object_ref        seg_resolved_refn;
+    /* a reference to the msgpair we're using for communication */
+    PINT_client_sm_msgpair_state *msg;
+
+    /* the index of the current context (in the context array) */
+    int index;
+
+    /* the metafile's dfile server index we're communicating with */
+    int server_nr;
+
+    /* the data handle we're responsible for doing I/O on */
+    PVFS_handle data_handle;
+
+    int flow_in_progress;
+    job_id_t flow_job_id;
+    job_status_s flow_status;
+    flow_descriptor flow_desc;
+    PVFS_msg_tag_t session_tag;
+
+    int write_ack_in_progress;
+    PINT_client_sm_recv_state write_ack;
+
+} PINT_client_io_ctx;
+
+struct PINT_client_io_sm
+{
+    /* input parameters */
+    enum PVFS_io_type io_type;
+    PVFS_Request file_req;
+    PVFS_offset file_req_offset;
+    void *buffer;
+    PVFS_Request mem_req;
+
+    /* output parameter */
+    PVFS_sysresp_io *io_resp_p;
+
+    enum PVFS_flowproto_type flowproto_type;
+    enum PVFS_encoding_type encoding;
+
+    int datafile_count;
+    int *datafile_index_array;
+
+    int msgpair_completion_count;
+    int flow_completion_count;
+    int write_ack_completion_count;
+
+    PINT_client_io_ctx *contexts;
+
+    int retry_count;
+    int stored_error_code;
+};
+
+struct PINT_client_flush_sm
+{
+};
+
+struct PINT_client_readdir_sm
+{
+    PVFS_object_ref object_ref;         /* looked up */
+    PVFS_ds_position pos_token;         /* input parameter */
+    int dirent_limit;                   /* input parameter */
+    PVFS_sysresp_readdir *readdir_resp; /* in/out parameter*/
+};
+
+typedef struct
+{
+    char *seg_name;
+    char *seg_remaining;
+    PVFS_object_attr seg_attr;
+    PVFS_object_ref seg_starting_refn;
+    PVFS_object_ref seg_resolved_refn;
 } PINT_client_lookup_sm_segment;
 
 typedef struct
 {
-    int                           total_segments;
-    int                           current_segment;
+    int total_segments;
+    int current_segment;
     PINT_client_lookup_sm_segment segments[MAX_LOOKUP_SEGMENTS];
-    PVFS_object_ref         ctx_starting_refn;
-    PVFS_object_ref         ctx_resolved_refn;
+    PVFS_object_ref ctx_starting_refn;
+    PVFS_object_ref ctx_resolved_refn;
 } PINT_client_lookup_sm_ctx;
 
-/* PINT_client_lookup_sm */
 struct PINT_client_lookup_sm
 {
-    char                       *orig_pathname;/* input parameter */
-    PVFS_object_ref            starting_refn; /* input parameter */
-    PVFS_sysresp_lookup        *lookup_resp;  /* in/out parameter*/
-    int                        follow_link;   /* input parameter */
-    int                        current_context;
-    PINT_client_lookup_sm_ctx  contexts[MAX_LOOKUP_CONTEXTS];
+    char *orig_pathname;              /* input parameter */
+    PVFS_object_ref starting_refn;    /* input parameter */
+    PVFS_sysresp_lookup *lookup_resp; /* in/out parameter*/
+    int follow_link;                  /* input parameter */
+    int current_context;
+    PINT_client_lookup_sm_ctx contexts[MAX_LOOKUP_CONTEXTS];
 };
 
-/* PINT_client_rename_sm */
-struct PINT_client_rename_sm {
-    char            *entries[2];     /* old/new entry names;
-                                        input parameter */
-    PVFS_object_ref parent_refns[2]; /* old/new parent pinode refns;
-                                        input parameter */
-    PVFS_object_ref refns[2];        /* old/new pinode ref */
-    int             rmdirent_index;
-    int             target_dirent_exists;
-    PVFS_handle     old_dirent_handle;
-    int		    retry_count;
-    int             stored_error_code;
+struct PINT_client_rename_sm
+{
+    char *entries[2];                /* old/new input entry names */
+    PVFS_object_ref parent_refns[2]; /* old/new input parent refns */
+
+    PVFS_object_ref refns[2];        /* old/new object refns */
+    int retry_count;
+    int stored_error_code;
+    int rmdirent_index;
+    int target_dirent_exists;
+    PVFS_handle old_dirent_handle;
 };
 
 struct PINT_client_mgmt_setparam_list_sm 
@@ -278,31 +297,31 @@ struct PINT_client_mgmt_setparam_list_sm
 struct PINT_client_mgmt_statfs_list_sm
 {
     PVFS_fs_id fs_id;
-    struct PVFS_mgmt_server_stat* stat_array;
+    struct PVFS_mgmt_server_stat *stat_array;
     int count; 
-    PVFS_id_gen_t* addr_array;
+    PVFS_id_gen_t *addr_array;
     PVFS_error_details *details;
 };
 
 struct PINT_client_mgmt_perf_mon_list_sm
 {
     PVFS_fs_id fs_id;
-    struct PVFS_mgmt_perf_stat** perf_matrix;
-    uint64_t* end_time_ms_array;
+    struct PVFS_mgmt_perf_stat **perf_matrix;
+    uint64_t *end_time_ms_array;
     int server_count; 
     int history_count; 
-    PVFS_id_gen_t* addr_array;
-    uint32_t* next_id_array;
+    PVFS_id_gen_t *addr_array;
+    uint32_t *next_id_array;
     PVFS_error_details *details;
 };
 
 struct PINT_client_mgmt_event_mon_list_sm
 {
     PVFS_fs_id fs_id;
-    struct PVFS_mgmt_event** event_matrix;
+    struct PVFS_mgmt_event **event_matrix;
     int server_count; 
     int event_count; 
-    PVFS_id_gen_t* addr_array;
+    PVFS_id_gen_t *addr_array;
     PVFS_error_details *details;
 };
 
@@ -310,10 +329,10 @@ struct PINT_client_mgmt_iterate_handles_list_sm
 {
     PVFS_fs_id fs_id;
     int server_count; 
-    PVFS_id_gen_t* addr_array;
-    PVFS_handle** handle_matrix;
-    int* handle_count_array;
-    PVFS_ds_position* position_array;
+    PVFS_id_gen_t *addr_array;
+    PVFS_handle **handle_matrix;
+    int *handle_count_array;
+    PVFS_ds_position *position_array;
     PVFS_error_details *details;
 };
 
@@ -323,57 +342,75 @@ struct PINT_client_mgmt_get_dfile_array_sm
     int dfile_count;
 };
 
-struct PINT_client_truncate_sm {
-    PVFS_size			size; /* new logical size of object*/
+struct PINT_client_truncate_sm
+{
+    PVFS_size size; /* new logical size of object*/
 };
 
-struct PINT_server_get_config_sm {
-    struct PVFS_sys_mntent* mntent;
+struct PINT_server_get_config_sm
+{
+    struct PVFS_sys_mntent *mntent;
     char *fs_config_buf;
-    uint32_t fs_config_buf_size;
     char *server_config_buf;
+    uint32_t fs_config_buf_size;
     uint32_t server_config_buf_size;
     int persist_config_buffers;
 };
 
-typedef struct PINT_client_sm {
-    /* STATE MACHINE VALUES */
-    int stackptr; /* stack of contexts for nested state machines */
-    union PINT_state_array_values *current_state; /* xxx */
+typedef struct PINT_client_sm
+{
+    /*
+      internal state machine values; the stack is used for tracking
+      movement through nested state machines
+    */
+    int stackptr;
+    union PINT_state_array_values *current_state;
     union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
 
-    int op; /* holds pvfs system operation type, defined up above */
+    /* the system interface operation type (defined below) */
+    int op;
 
-    /* CLIENT SM VALUES */
-    int op_complete; /* used to indicate that the operation as a 
-		      * whole is finished.
-		      */
-    int op_cancelled; /* used to indicate operation has been cancelled */
-    PVFS_error error_code; /* used to hold final job status so client
-			    * can determine what finally happened
-			    */
+    /* indicates when the operation as a whole is finished */
+    int op_complete;
+
+    /* indicates when the operation has been cancelled */
+    int op_cancelled;
+
+    /* stores the final operation error code on operation exit */
+    PVFS_error error_code;
+
     int comp_ct; /* used to keep up with completion of multiple
 		  * jobs for some states; typically set and
 		  * then decremented to zero as jobs complete */
 
-    int ncache_hit; /* set if last segment lookup was from ncache */
-    int acache_hit; /* set if pinode was from acache */
-    PINT_pinode *pinode; /* filled in on acache hit */
-    PVFS_object_attr acache_attr; /* a scratch attr space */
+    /* indicates that an ncache hit has been made */ 
+    int ncache_hit;
+
+    /* indicates that an acache hit has been made */ 
+    int acache_hit;
+
+    /* on acache hit, the attribute here can be used */
+    PINT_pinode *pinode;
+
+    /*
+      on acache miss, an attribute is typically stored here for later
+      insertion into the acache (if possible)
+    */
+    PVFS_object_attr acache_attr;
 
     /* generic msgpair used with msgpair substate */
     PINT_client_sm_msgpair_state msgpair;
 
-    /* msgpair array ptr used when operations can be performed concurrently.
-     * obviously this has to be allocated within the upper-level state
-     * machine.  used with msgpairarray substate typically.
+    /* msgpair array ptr used when operations can be performed
+     * concurrently.  this must be allocated within the upper-level
+     * state machine and is used with the msgpairarray sm.
      */
     int msgarray_count;
     PINT_client_sm_msgpair_state *msgarray;
 
     /*
       internal pvfs_object references; used in conjunction with the
-      sm_common state machine routines, or otherwise as scratch pinode
+      sm_common state machine routines, or otherwise as scratch object
       references during sm processing
     */
     PVFS_object_ref object_ref;
@@ -437,7 +474,6 @@ int PINT_client_state_machine_testsome(
     int timeout_ms);
 
 /* exposed wrapper around the client-state-machine testsome function */
-
 static inline int PINT_sys_testsome(
     PVFS_sys_op_id *op_id_array,
     int *op_count, /* in/out */
@@ -532,14 +568,6 @@ int PINT_client_bmi_cancel(job_id_t id);
 
 int PINT_client_io_cancel(job_id_t id);
 
-/* INCLUDE STATE-MACHINE.H DOWN HERE */
-#define PINT_OP_STATE       PINT_client_sm
-#if 0
-#define PINT_OP_STATE_TABLE PINT_server_op_table
-#endif
-
-#include "state-machine.h"
-
 /* internal non-blocking helper methods */
 int PINT_client_wait_internal(
     PVFS_sys_op_id op_id,
@@ -574,6 +602,16 @@ do {                                                          \
 struct server_configuration_s *PINT_get_server_config_struct(
     PVFS_fs_id fs_id);
 
+/************************************
+ * state-machine.h included here
+ ************************************/
+#define PINT_OP_STATE       PINT_client_sm
+#if 0
+#define PINT_OP_STATE_TABLE PINT_server_op_table
+#endif
+
+#include "state-machine.h"
+
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
@@ -602,6 +640,7 @@ extern struct PINT_state_machine_s pvfs2_client_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_acache_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
+#endif
 
 /*
  * Local variables:
@@ -611,5 +650,3 @@ extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-
-#endif

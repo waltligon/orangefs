@@ -409,7 +409,7 @@ int pvfs2_inode_setattr(
     struct inode *inode,
     struct iattr *iattr)
 {
-    int ret = -ENOMEM, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -ENOMEM, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
@@ -437,12 +437,14 @@ int pvfs2_inode_setattr(
         copy_attributes_from_inode(
             inode, &new_op->upcall.req.setattr.attributes, iattr);
 
-        service_operation_with_timeout_retry(
-            new_op, "pvfs2_inode_setattr", retries,
+        service_error_exit_op_with_timeout_retry(
+            new_op, "pvfs2_inode_setattr", retries, error_exit,
             get_interruptible_flag(inode));
 
       error_exit:
-        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+        ret = (error_exit ? -EINTR :
+               pvfs2_kernel_error_code_convert(new_op->downcall.status));
+
         pvfs2_print("pvfs2_inode_setattr: returning %d\n", ret);
 
         /* when request is serviced properly, free req op struct */
@@ -832,7 +834,7 @@ int pvfs2_truncate_inode(
     struct inode *inode,
     loff_t size)
 {
-    int ret = -1, retries = 5;
+    int ret = -EINVAL, retries = 5;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     pvfs2_kernel_op_t *new_op = NULL;
 
@@ -947,7 +949,7 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
     int ret = -EINVAL;
     pvfs2_kernel_op_t *new_op = NULL;
 
-    pvfs2_print("pvfs2_cancel_op_in_progress called on op %p\n", op);
+    pvfs2_print("pvfs2_cancel_op_in_progress called on tag %lu\n", tag);
 
     new_op = op_alloc();
     if (!new_op)
@@ -960,10 +962,9 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
     pvfs2_print("Attempting PVFS2 operation cancellation of tag %lu\n",
                 new_op->upcall.req.cancel.op_tag);
 
-    service_operation(new_op, "pvfs2_op_cancel", 0);
+    service_cancellation_operation(new_op);
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    /* SCRUB RET/ERROR CODE HERE */
     pvfs2_print("pvfs2_cancel_op_in_progress: got return "
                 "value of %d\n", ret);
 

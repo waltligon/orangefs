@@ -297,6 +297,8 @@ void pvfs2_inode_cache_finalize(
  ****************************/
 int wait_for_matching_downcall(
     pvfs2_kernel_op_t * op);
+int wait_for_cancellation_downcall(
+    pvfs2_kernel_op_t * op);
 
 /****************************
  * defined in super.c
@@ -475,7 +477,7 @@ do {                                                         \
     down_interruptible(&request_semaphore);                  \
     add_op_to_request_list(op);                              \
     up(&request_semaphore);                                  \
-    ret = wait_for_matching_downcall(new_op);                \
+    ret = wait_for_matching_downcall(op);                    \
     if (!intr) unmask_blocked_signals(&orig_sigset);         \
     if (ret != PVFS2_WAIT_SUCCESS)                           \
     {                                                        \
@@ -488,12 +490,29 @@ do {                                                         \
     }                                                        \
 } while(0)
 
+#define service_cancellation_operation(op)                   \
+do {                                                         \
+    down_interruptible(&request_semaphore);                  \
+    add_op_to_request_list(op);                              \
+    up(&request_semaphore);                                  \
+    ret = wait_for_cancellation_downcall(op);                \
+    if (ret != PVFS2_WAIT_SUCCESS)                           \
+    {                                                        \
+        if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
+        {                                                    \
+            pvfs2_error("pvfs2_op_cancel: wait timed out  "  \
+                        "(%x). aborting attempt.\n", ret);   \
+        }                                                    \
+        goto error_exit;                                     \
+    }                                                        \
+} while(0)
+
 #define service_priority_operation(op, method, intr)         \
 do {                                                         \
     sigset_t orig_sigset;                                    \
     if (!intr) mask_blocked_signals(&orig_sigset);           \
     add_priority_op_to_request_list(op);                     \
-    ret = wait_for_matching_downcall(new_op);                \
+    ret = wait_for_matching_downcall(op);                    \
     if (!intr) unmask_blocked_signals(&orig_sigset);         \
     if (ret != PVFS2_WAIT_SUCCESS)                           \
     {                                                        \
@@ -588,13 +607,13 @@ do {                                                                \
   depending on where the error occured.
 
   if the error happens in the waitqueue code because we either timed
-  out or a signal was raised while waiting, we need to kill the
-  device_owner and free the op manually.  this is done to avoid having
-  the device start writing application data to our shared bufmap pages
-  without us expecting it.
+  out or a signal was raised while waiting, we need to cancel the
+  userspace i/o operation and free the op manually.  this is done to
+  avoid having the device start writing application data to our shared
+  bufmap pages without us expecting it.
 
   if a pvfs2 sysint level error occured and i/o has been completed,
-  there is no need to kill the device_owner, as the user has finished
+  there is no need to cancel the operation, as the user has finished
   using the bufmap page and so there is no danger in this case.  in
   this case, we wake up the device normally so that it may free the
   op, as normal.

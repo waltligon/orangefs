@@ -438,7 +438,7 @@ int32_t PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = {    \
 };                                                    \
 char *PINT_non_errno_strerror_mapping[] = {           \
     "Success", /* 0 */                                \
-    "Operation canceled (possibly due to timeout)",   \
+    "Operation cancelled (possibly due to timeout)",  \
     "Device initialization failed"                    \
 };                                                    \
 int32_t PINT_non_errno_mapping[] = {                  \

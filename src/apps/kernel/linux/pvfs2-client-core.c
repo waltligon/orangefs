@@ -39,6 +39,7 @@
 #define MAX_LIST_SIZE      MAX_NUM_OPS
 
 #define REMOUNT_PENDING     0xFFEEFF33
+#define OP_IN_PROGRESS      0xFFEEFF34
 
 /*
   the block size to report in statfs as the blocksize (i.e. the
@@ -90,6 +91,7 @@ typedef struct
     void *io_kernel_mapped_buf;
 
     int was_handled_inline;
+    int was_cancelled_io;
 
     struct qlist_head hash_link;
 
@@ -212,29 +214,67 @@ static int cancel_op_in_progress(unsigned long tag)
     struct qlist_head *hash_link = NULL;
     vfs_request_t *vfs_request = NULL;
 
-    if (vfs_request)
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "cancel_op_in_progress called\n");
+
+    hash_link = qhash_search(
+        s_ops_in_progress_table, (void *)&tag);
+    if (hash_link)
     {
-        hash_link = qhash_search(
-            s_ops_in_progress_table, (void *)&tag);
-        if (hash_link)
+        vfs_request = qhash_entry(
+            hash_link, vfs_request_t, hash_link);
+        assert(vfs_request);
+        assert((unsigned long)vfs_request->info.tag == tag);
+        /*
+          for now, cancellation is ONLY support on I/O operations,
+          so assert that this is an I/O operation
+        */
+        assert(vfs_request->in_upcall.type == PVFS2_VFS_OP_FILE_IO);
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "cancelling I/O req %p "
+                     "from tag %lu\n", vfs_request, tag);
+
+        ret = PINT_client_io_cancel(vfs_request->op_id);
+        if (ret < 0)
         {
-            vfs_request = qhash_entry(
-                hash_link, vfs_request_t, hash_link);
-            assert(vfs_request);
-            assert((unsigned long)vfs_request->info.tag == tag);
-            /*
-              for now, cancellation is ONLY support on I/O operations,
-              so assert that this is an I/O operation
-            */
-            assert(vfs_request->in_upcall.type == PVFS2_VFS_OP_FILE_IO);
-
-            gossip_err("CANCELLING I/O REQ %p FROM TAG %lu\n",
-                       vfs_request, tag);
-
-            ret = PINT_client_io_cancel(vfs_request->op_id);
+            PVFS_perror_gossip("PINT_client_io_cancel failed", ret);
         }
+        /*
+          set this flag so we can avoid writing the downcall to
+          the kernel since it will be ignored anyway
+        */
+        vfs_request->was_cancelled_io = 1;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "op in progress cannot "
+                     "be found (tag = %lu)\n", tag);
     }
     return ret;
+}
+
+static int is_op_in_progress(vfs_request_t *vfs_request)
+{
+    int op_found = 0;
+    struct qlist_head *hash_link = NULL;
+    vfs_request_t *tmp_request = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "is_op_in_progress called\n");
+
+    assert(vfs_request);
+
+    hash_link = qhash_search(
+        s_ops_in_progress_table, (void *)&vfs_request->info.tag);
+    if (hash_link)
+    {
+        tmp_request = qhash_entry(
+            hash_link, vfs_request_t, hash_link);
+        assert(tmp_request);
+
+        op_found = ((tmp_request->info.tag == vfs_request->info.tag) &&
+                    (tmp_request->in_upcall.type ==
+                     vfs_request->in_upcall.type));
+    }
+    return op_found;
 }
 
 static int remove_op_from_op_in_progress_table(
@@ -1005,7 +1045,7 @@ static int service_operation_cancellation(vfs_request_t *vfs_request)
     ret = cancel_op_in_progress(
         vfs_request->in_upcall.req.cancel.op_tag);
 
-    /* SCRUB RETURN VALUE HERE */
+    /* FIXME: scrub return value/downcall status here */
 
     /* we need to send a blank success response */
     vfs_request->out_downcall.type = PVFS2_VFS_OP_CANCEL;
@@ -1355,6 +1395,22 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
                  "[0] handling new unexp vfs_request %p\n",
                  vfs_request);
 
+    /*
+      make sure the operation is not currently in progress.  if it is,
+      ignore it -- this can happen if the vfs issues a retry request
+      on an operation that's taking a long time to complete.
+    */
+    if (is_op_in_progress(vfs_request))
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, " Ignoring upcall of type %x "
+                     "that's already in progress (tag=%lu)\n",
+                     vfs_request->in_upcall.type,
+                     (unsigned long)vfs_request->info.tag);
+
+        ret = OP_IN_PROGRESS;
+        goto repost_op;
+    }
+
     switch(vfs_request->in_upcall.type)
     {
         case PVFS2_VFS_OP_LOOKUP:
@@ -1462,6 +1518,10 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
             ret = repost_unexp_vfs_request(
                 vfs_request, "mount pending");
             break;
+        case OP_IN_PROGRESS:
+            ret = repost_unexp_vfs_request(
+                vfs_request, "op already in progress");
+            break;
         default:
             PVFS_perror_gossip("Operation failed", ret);
             ret = repost_unexp_vfs_request(
@@ -1563,21 +1623,31 @@ int process_vfs_requests(void)
                 package_downcall_members(
                     vfs_request, error_code_array[i]);
 
-                buffer_list[0] = &vfs_request->out_downcall;
-                size_list[0] = sizeof(pvfs2_downcall_t);
-                total_size = sizeof(pvfs2_downcall_t);
-                list_size = 1;
-
-                ret = write_device_response(
-                    buffer_list,size_list,list_size, total_size,
-                    (PVFS_id_gen_t)vfs_request->info.tag,
-                    &vfs_request->op_id, &vfs_request->jstat,
-                    s_client_dev_context);
-
-                if (ret < 0)
+                /*
+                  write the downcall if the operation was NOT a
+                  cancelled I/O operation.  while it's safe to write
+                  cancelled I/O operations to the kernel, it's a waste
+                  of time since it will be discarded.  just repost the
+                  op instead
+                */
+                if (!vfs_request->was_cancelled_io)
                 {
-                    gossip_err("write_device_response failed (tag=%lu)\n",
-                               (unsigned long)vfs_request->info.tag);
+                    buffer_list[0] = &vfs_request->out_downcall;
+                    size_list[0] = sizeof(pvfs2_downcall_t);
+                    total_size = sizeof(pvfs2_downcall_t);
+                    list_size = 1;
+
+                    ret = write_device_response(
+                        buffer_list,size_list,list_size, total_size,
+                        (PVFS_id_gen_t)vfs_request->info.tag,
+                        &vfs_request->op_id, &vfs_request->jstat,
+                        s_client_dev_context);
+
+                    if (ret < 0)
+                    {
+                        gossip_err("write_device_response failed (tag=%lu)\n",
+                                   (unsigned long)vfs_request->info.tag);
+                    }
                 }
 
                 ret = repost_unexp_vfs_request(
