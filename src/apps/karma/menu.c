@@ -1,6 +1,8 @@
 #include <gtk/gtk.h>
 #include "karma.h"
 
+static void gui_menu_about(void);
+
 static GtkItemFactoryEntry menu_items[] = {
   { "/_File",
     NULL,
@@ -21,10 +23,11 @@ static GtkItemFactoryEntry menu_items[] = {
     "<LastBranch>" },
   { "/_Help/About",
     NULL,
-    NULL, 0,
+    gui_menu_about, 0,
     "<Item>" },
 };
 
+static GtkWidget *main_window = NULL;
 
 /* gui_menu_setup(window)
  *
@@ -32,7 +35,7 @@ static GtkItemFactoryEntry menu_items[] = {
  *
  * Returns pointer to menu bar widget.
  */
-GtkWidget *gui_menu_setup(GtkWidget  *window)
+GtkWidget *gui_menu_setup(GtkWidget *window)
 {
     gint nmenu_items = sizeof (menu_items) / sizeof (menu_items[0]);
 
@@ -52,6 +55,33 @@ GtkWidget *gui_menu_setup(GtkWidget  *window)
     /* Attach the new accelerator group to the window. */
     gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
 
+    /* Save the main window widget so we can attach dialogs to it, etc. */
+    main_window = window;
+
     /* Finally, return the actual menu bar created by the item factory. */
     return gtk_item_factory_get_widget(item_factory, "<main>");
+}
+
+static void gui_menu_about(void)
+{
+    GtkWidget *dialog, *label;
+
+    dialog = gtk_dialog_new_with_buttons("About Karma",
+					 GTK_WINDOW(main_window),
+					 GTK_DIALOG_DESTROY_WITH_PARENT,
+					 GTK_STOCK_OK,
+					 GTK_RESPONSE_NONE,
+					 NULL);
+    label = gtk_label_new("Karma\nA Graphical Interface for Monitoring PVFS2\n");
+   
+    g_signal_connect_swapped(GTK_OBJECT(dialog), 
+			     "response", 
+			     G_CALLBACK(gtk_widget_destroy),
+			     GTK_OBJECT(dialog));
+
+    gtk_container_add(GTK_CONTAINER(GTK_DIALOG(dialog)->vbox),
+		      label);
+    gtk_widget_show_all(dialog);
+
+    return;
 }

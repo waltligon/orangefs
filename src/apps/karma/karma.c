@@ -13,14 +13,12 @@ static gint delete_event(GtkWidget *widget,
 			 GdkEvent  *event,
 			 gpointer   data)
 {
-    printf("delete!\n");
-    return 0; /* should get destroy called I think */
+    return 0; /* call destroy */
 }
 
 static void destroy_event(GtkWidget *widget,
 			  gpointer   data)
 {
-    printf("destroy!\n");
     gtk_main_quit();
 }
 
@@ -102,7 +100,7 @@ int main(int   argc,
 
     timer_callback(NULL);
 
-    gtk_timeout_add(4000,
+    gtk_timeout_add(4000 /* 4 seconds */,
 		    timer_callback,
 		    NULL);
 
