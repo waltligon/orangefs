@@ -14,7 +14,6 @@
 #include "trove.h"
 
 /* TODO: GET RID OF THIS INCLUDE!!! */
-#include "trove-test.h"
 
 /* struct handle_ledger
  *
@@ -254,7 +253,10 @@ static int handle_store_extentlist_create(TROVE_coll_id coll_id,
     ret = trove_dspace_create(coll_id, 
 			      &bstream_handle,
 			      0xffffffff,
-			      TROVE_TEST_BSTREAM,
+			      TROVE_PLAIN_FILE, /* not sure exactly what to
+						   call this, but
+						   TROVE_TEST_BSTREAM is
+						   defintely wrong */ 
 			      NULL,
 			      TROVE_SYNC,
 			      NULL,
