@@ -284,6 +284,9 @@ ifdef BUILD_MPI
 all: mpitests
 endif
 
+# note: this will look better if you use two tabs instead of spaces between
+# SHORT_NAME and the object
+
 # rule for building the pvfs2 server
 $(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a 
 ifdef QUIET_COMPILE
@@ -296,7 +299,7 @@ endif
 # special rules for admin tools which also require server components
 $(ADMINTOOLS_SERVER): %: %.o
 ifdef QUIET_COMPILE
-	@echo "  LD             $@"
+	@echo "  LD		$@"
 	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 else
 	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
