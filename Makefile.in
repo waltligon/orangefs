@@ -931,6 +931,9 @@ install:: install_doc
 	install -m 755 src/apps/admin/pvfs2-config $(prefix)/bin
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(prefix)/bin
+ifdef BUILD_KARMA
+	install -m 755 $(KARMA) $(prefix)/bin
+endif
 
 	install -d $(prefix)/sbin
 ifeq ($(REDHAT_RELEASE),)
