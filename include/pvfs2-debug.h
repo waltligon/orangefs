@@ -12,25 +12,24 @@
 #ifndef __PVFS2_DEBUG_H
 #define __PVFS2_DEBUG_H
 
-/* If you add a new value to this enum, make sure it is a power of 2! */
 enum
 {
-    BMI_DEBUG_TCP = 1,
-    BMI_DEBUG_CONTROL = 2,
-    BMI_DEBUG_OFFSETS = 4,
-    BMI_DEBUG_GM = 8,
-    JOB_DEBUG = 16,
-    SERVER_DEBUG = 32,
-    STO_DEBUG_CTRL = 64,
-    STO_DEBUG_DEFAULT = 128,
-    FLOW_DEBUG = 256,
-    BMI_DEBUG_GM_MEM = 512,
-    REQUEST_DEBUG = 1024,
-    FLOW_PROTO_DEBUG = 2048,
-    DCACHE_DEBUG = 4096,
-    CLIENT_DEBUG = 8192,
-    REQ_SCHED_DEBUG = 16384,
-    PCACHE_DEBUG = 32768,
+    BMI_DEBUG_TCP =	    (1 << 0),
+    BMI_DEBUG_CONTROL =	    (1 << 1),
+    BMI_DEBUG_OFFSETS =	    (1 << 2),
+    BMI_DEBUG_GM =	    (1 << 3),
+    JOB_DEBUG =		    (1 << 4),
+    SERVER_DEBUG =	    (1 << 5),
+    STO_DEBUG_CTRL =	    (1 << 6),
+    STO_DEBUG_DEFAULT =	    (1 << 7),
+    FLOW_DEBUG =	    (1 << 8),
+    BMI_DEBUG_GM_MEM =	    (1 << 9),
+    REQUEST_DEBUG =	    (1 << 10),
+    FLOW_PROTO_DEBUG =	    (1 << 11),
+    DCACHE_DEBUG =	    (1 << 12),
+    CLIENT_DEBUG =	    (1 << 13),
+    REQ_SCHED_DEBUG =	    (1 << 14),
+    PCACHE_DEBUG =	    (1 << 15),
 
     BMI_DEBUG_ALL = BMI_DEBUG_TCP + BMI_DEBUG_CONTROL +
 	+BMI_DEBUG_GM + BMI_DEBUG_OFFSETS
