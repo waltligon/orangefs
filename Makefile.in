@@ -72,7 +72,7 @@ MPICC = @MPICC@
 # MODULES is a list of subdirectories that we wish to operate on.
 #    They are identified by the presence of module.mk files (makefile
 #    includes).
-MODULES := $(shell find . -iname "*.mk" | sed -e 's/^.\///;s/module.mk//')
+MODULES := $(shell find . -name "*.mk" | sed -e 's/^.\///;s/module.mk//')
 
 #################################################################
 # Setup global flags
