@@ -15,7 +15,7 @@ void gui_status_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
 			     struct gui_status_graph_data **out_graph_data)
 {
     int i, j, done = 0;
-    int total_free_handles = 0;
+    int64_t total_free_handles = 0;
     float total_free_space = 0.0;
     float divisor;
     char *units;
@@ -148,13 +148,12 @@ void gui_status_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
 	else                                                 bar = BAR_GREEN;
 	graph_data[GUI_STATUS_META].bar_color[j] = bar;
 
-	total_free_handles += (int) (svr_stat[j].handles_available_count /
-	    (int64_t) divisor);
+	total_free_handles += svr_stat[j].handles_available_count;
     }
     snprintf(graph_data[GUI_STATUS_META].footer,
 	     64,
 	     "Total Free Handles: %d %s",
-	     total_free_handles,
+	     (int) (total_free_handles / (int64_t) divisor),
 	     units);
 
     /* process data handle information */
