@@ -1,0 +1,5 @@
+DIR := test/server/request-scheduler
+
+TESTSRC += \
+	$(DIR)/request-scheduler-test.c
+
