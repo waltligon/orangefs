@@ -143,10 +143,12 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		goto return_error;
         }
 
+#if 0
+        /* this attr is also not being decoded properly, so this
+           assignment shouldn't be done until that's fixed */
 	resp->attr = ack_p->u.getattr.attr;
     /*the server isn't returning the data handles yet, put this back in when
      * dale fixes it */
-#if 0
 	if (resp->attr.objtype == ATTR_META)
 	{
 	    if(resp->attr.u.meta.nr_datafiles > 0)
