@@ -20,7 +20,7 @@
 #include "pvfs2-request.h"
 #include "thread-mgr.h"
 
-int TEST_SIZE = 1024 * 1024 * 20;	/* 1M */
+int TEST_SIZE = 1024 * 1024 * 20;	/* 20M */
 static int block_on_flow(
     flow_descriptor * flow_d);
 static double Wtime(

@@ -155,6 +155,7 @@ int main(
 
     file_handle = 0;
 
+
     cur_extent.first = cur_extent.last = requested_file_handle;
     extent_array.extent_count = 1;
     extent_array.extent_array = &cur_extent;
@@ -162,7 +163,9 @@ int main(
 			      &extent_array,
 			      &file_handle,
 			      TROVE_TEST_FILE,
-			      NULL, TROVE_SYNC, NULL, trove_context, &op_id);
+			      NULL, 
+			      TROVE_FORCE_REQUESTED_HANDLE,
+			      NULL, trove_context, &op_id);
     while (ret == 0)
 	ret =
 	    trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
