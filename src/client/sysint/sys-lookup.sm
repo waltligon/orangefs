@@ -368,6 +368,10 @@ static int initialize_context(
             {
                 cur_seg->seg_starting_refn = ctx_starting_refn;
             }
+            if (cur_seg->seg_name)
+            {
+                free(cur_seg->seg_name);
+            }
             cur_seg->seg_name = strdup(cur_seg_name);
             assert(cur_seg->seg_name);
 
