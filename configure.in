@@ -23,6 +23,8 @@ AC_PROG_CC
 AC_PROG_CPP
 AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
 AC_CHECK_PROG(HAVE_FIND, find, yes, no)
+AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
+AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
 dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
