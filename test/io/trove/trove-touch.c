@@ -81,7 +81,9 @@ int main(int argc, char **argv)
 			      NULL,
 			      NULL,
 			      &op_id);
-    while (ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    if (ret < 0) return -1;
+
+    while (ret != 1) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "dspace create failed.\n");
 	return -1;

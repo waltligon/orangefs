@@ -22,69 +22,80 @@ int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
 
 int main(int argc, char ** argv) 
 {
-	int ret, count, i;
-	char *method_name, *dir_name;
-	char path_name[PATH_SIZE];
+    int ret, count, i;
+    char *method_name, *dir_name;
+    char path_name[PATH_SIZE];
 
-	TROVE_op_id op_id;
-	TROVE_coll_id coll_id;
-	TROVE_ds_state state;
-	TROVE_handle parent_handle, file_handle;
-#if 0
-	TROVE_keyval_s key, val;
-#endif
+    TROVE_op_id op_id;
+    TROVE_coll_id coll_id;
+    TROVE_ds_state state;
+    TROVE_handle parent_handle, file_handle;
+    TROVE_keyval_s key, val;
 
-	ret = parse_args(argc, argv);
-	if ( ret < 0 ) { 
-		fprintf(stderr, "argument parsing failed.\n");
-		return -1;
-	}
+    ret = parse_args(argc, argv);
+    if ( ret < 0 ) { 
+	fprintf(stderr, "argument parsing failed.\n");
+	return -1;
+    }
 	
-	ret = trove_initialize(storage_space, 0, &method_name, 0);
-	if (ret < 0) {
-		fprintf(stderr, "initialize failed.\n");
-		return -1;
-	}
-	ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
-	if (ret < 0) {
-		fprintf(stderr, "collection lookup failed.\n");
-		return -1;
-	}
+    ret = trove_initialize(storage_space, 0, &method_name, 0);
+    if (ret < 0) {
+	fprintf(stderr, "initialize failed.\n");
+	return -1;
+    }
+    ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
+    if (ret < 0) {
+	fprintf(stderr, "collection lookup failed.\n");
+	return -1;
+    }
 
-	/* find parent directory name */
-	strcpy(path_name, path_to_dir);
-	for (i=strlen(path_name); i >=0; i--) {
-		if (path_name[i] != '/') path_name[i]= '\0';
-		else break;
-	}
-	dir_name = path_to_dir + strlen(path_name);
-	printf("path is %s\n", path_name);
-	printf("dir is %s\n", dir_name);
+    /* find parent directory name */
+    strcpy(path_name, path_to_dir);
+    for (i=strlen(path_name); i >=0; i--) {
+	if (path_name[i] != '/') path_name[i]= '\0';
+	else break;
+    }
+    dir_name = path_to_dir + strlen(path_name);
+    printf("path is %s\n", path_name);
+    printf("dir is %s\n", dir_name);
 
-	/* find parent directory handle */
-	ret = path_lookup(coll_id, path_name, &parent_handle);
-	if (ret < 0) {
-		return -1;
-	}
+    /* find parent directory handle */
+    ret = path_lookup(coll_id, path_name, &parent_handle);
+    if (ret < 0) {
+	return -1;
+    }
 
-	file_handle = requested_file_handle;
+    file_handle = requested_file_handle;
 
-	/* create new dspace */
-	ret = trove_dspace_create(coll_id,
-			&file_handle,
-			0xffffffff,
-			TROVE_TEST_DIR,
-			NULL,
-			NULL,
-			&op_id);
-	while (ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
-	if (ret < 0 ) {
-		fprintf(stderr, "dspace create (for %s) failed.\n", dir_name);
-		return -1;
-	}
+    /* create new dspace */
+    ret = trove_dspace_create(coll_id,
+			      &file_handle,
+			      0xffffffff,
+			      TROVE_TEST_DIR,
+			      NULL,
+			      NULL,
+			      &op_id);
+    if (ret < 0) return -1;
 
-	trove_finalize();
-	return 0;
+    while (ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    if (ret < 0 ) {
+	fprintf(stderr, "dspace create (for %s) failed.\n", dir_name);
+	return -1;
+    }
+
+    /* add new file name/handle pair to parent directory */
+    key.buffer = dir_name;
+    key.buffer_sz = strlen(dir_name) + 1;
+    val.buffer = &file_handle;
+    val.buffer_sz = sizeof(file_handle);
+    ret = trove_keyval_write(coll_id, parent_handle, &key, &val, 0, NULL, NULL, &op_id);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    if (ret < 0) {
+	fprintf(stderr, "keyval write failed.\n");
+	return -1;
+    }
+    trove_finalize();
+    return 0;
 }
 int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p)
 {

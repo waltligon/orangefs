@@ -38,7 +38,6 @@ int main(int argc, char **argv)
     TROVE_handle ls_handle[KEYVAL_ARRAY_LEN];
     char ls_name[KEYVAL_ARRAY_LEN][PATH_SIZE];
 
-
     ret = parse_args(argc, argv);
     if (ret < 0) {
 	fprintf(stderr, "argument parsing failed.\n");
@@ -97,7 +96,7 @@ int main(int argc, char **argv)
 				   &op_id);
 	if (ret == -1) return -1;
 
-	while (ret != 1) ret=trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+	while (ret == 0) ret=trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
 	if (ret < 0) return -1; 
 	
 	if (num_processed == 0) return 0;
@@ -142,7 +141,7 @@ int parse_args(int argc, char **argv)
 {
     int c;
 
-    while ((c = getopt(argc, argv, "s:c:f:h:")) != EOF) {
+    while ((c = getopt(argc, argv, "s:c:p:h:")) != EOF) {
 	switch (c) {
 	    case 's':
 		strncpy(storage_space, optarg, SSPACE_SIZE);
