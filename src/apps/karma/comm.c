@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <gtk/gtk.h>
 
 #include "karma.h"
 
@@ -12,6 +13,8 @@ static struct PVFS_mgmt_server_stat *visible_stats = NULL;
 static struct PVFS_mgmt_server_stat *internal_stats = NULL;
 static int visible_stat_ct;
 static int internal_stat_ct;
+
+GtkListStore *gui_comm_fslist;
 
 static PVFS_credentials creds;
 static PVFS_fs_id cur_fs;
@@ -27,9 +30,13 @@ static int gui_comm_stats_collect(void);
  */
 int gui_comm_setup(void)
 {
-    char msgbuf[64];
+    char msgbuf[128];
     int ret, outcount;
     PVFS_sysresp_init resp_init;
+
+    GtkTreeIter iter;
+
+    int i;
 
     /* PVFS2 init */
     if (PVFS_util_parse_pvfstab(&mnt))
@@ -37,12 +44,41 @@ int gui_comm_setup(void)
 	return -1;
     }
 
+    /* create the fslist that we're going to use all over the place */
+    gui_comm_fslist = gtk_list_store_new(4,
+					 G_TYPE_STRING,
+					 G_TYPE_STRING,
+					 G_TYPE_STRING,
+					 G_TYPE_UINT64);
+
     ret = PVFS_sys_initialize(mnt, 0, &resp_init);
     if (ret < 0) {
 	return -1;
     }
 
     cur_fs = resp_init.fsid_list[0];
+
+    for (i=0; i < mnt.ptab_count; i++) {
+	int j;
+	gtk_list_store_append(gui_comm_fslist, &iter);
+
+	for (j=strlen(mnt.ptab_array[i].pvfs_config_server); j > 0; j--)
+	{
+	    if (mnt.ptab_array[i].pvfs_config_server[j] == '/') break;
+	}
+
+	assert(j < 128);
+	strncpy(msgbuf, mnt.ptab_array[i].pvfs_config_server, j);
+	msgbuf[j] = '\0';
+
+	gtk_list_store_set(gui_comm_fslist,
+			   &iter,
+			   0, mnt.ptab_array[i].mnt_dir,
+			   1, msgbuf,
+			   2, mnt.ptab_array[i].pvfs_fs_name,
+			   3, (uint64_t) resp_init.fsid_list[0],
+			   -1);
+    }
 
     creds.uid = getuid();
     creds.gid = getgid();

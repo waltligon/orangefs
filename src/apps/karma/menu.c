@@ -1,13 +1,21 @@
 #include <gtk/gtk.h>
 #include "karma.h"
 
-static void gui_menu_about(void);
+static void gui_menu_about_popup(void);
 
 static GtkItemFactoryEntry menu_items[] = {
   { "/_File",
     NULL,
     NULL, 0,
     "<Branch>" },
+  { "/File/_Select file system",
+    "<CTRL>S",
+    gui_fsview_popup, 0,
+    "<Item>" },
+  { "/File/_Re-read Fstab",
+    NULL,
+    NULL, 0,
+    "<Item>" },
   { "/File/_Quit",
     "<CTRL>Q",
     gtk_main_quit, 0,
@@ -23,7 +31,7 @@ static GtkItemFactoryEntry menu_items[] = {
     "<LastBranch>" },
   { "/_Help/About",
     NULL,
-    gui_menu_about, 0,
+    gui_menu_about_popup, 0,
     "<Item>" },
 };
 
@@ -62,7 +70,7 @@ GtkWidget *gui_menu_setup(GtkWidget *window)
     return gtk_item_factory_get_widget(item_factory, "<main>");
 }
 
-static void gui_menu_about(void)
+static void gui_menu_about_popup(void)
 {
     GtkWidget *dialog, *label;
 
