@@ -58,7 +58,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
     struct PINT_decoded_msg* resp_decoded_array,
     int* error_code_array,
     int array_size,
-    PVFS_msg_tag_t op_tag);
+    PVFS_msg_tag_t* op_tag_array);
 
 void PINT_release_req_array(bmi_addr_t* addr_array,
     struct PVFS_server_req_s* req_array,
@@ -93,7 +93,7 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
     struct PINT_decoded_msg* resp_decoded_array,
     int* error_code_array,
     int array_size,
-    PVFS_msg_tag_t op_tag);
+    PVFS_msg_tag_t* op_tag_array);
 
 void PINT_release_ack_array(bmi_addr_t* addr_array,
     bmi_size_t max_resp_size,

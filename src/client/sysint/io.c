@@ -52,10 +52,13 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     int* error_code_array = NULL;
     flow_descriptor** flow_array = NULL;
     int i;
+#if 0
     PVFS_msg_tag_t op_tag = get_next_session_tag();
+#endif
     int target_handle_count = 0;
     PVFS_handle* target_handle_array = NULL;
     int total_errors = 0;
+    PVFS_msg_tag_t* op_tag_array = NULL;
 
     struct PINT_Request_state* req_state = NULL;
     PINT_Request_file_data tmp_file_data;
@@ -176,6 +179,12 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     error_code_array = (int*)malloc(target_handle_count *
 	sizeof(int));
     memset(error_code_array, 0, (target_handle_count*sizeof(int)));
+    op_tag_array = (PVFS_msg_tag_t*)malloc(target_handle_count*
+	sizeof(PVFS_msg_tag_t));
+    for(i=0; i<target_handle_count; i++)
+    {
+	op_tag_array[i] = get_next_session_tag();
+    }
 
     /* stuff for running flows */
     file_data_array = (PINT_Request_file_data*)malloc(
@@ -238,7 +247,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	resp_decoded_array,
 	error_code_array,
 	target_handle_count,
-	op_tag);
+	op_tag_array);
     if(ret < 0)
     {
 	goto out;
@@ -283,7 +292,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 #endif
 	    flow_array[i]->request = req->io_req;
 	    flow_array[i]->flags = 0;
-	    flow_array[i]->tag = op_tag;
+	    flow_array[i]->tag = op_tag_array[i];
 	    flow_array[i]->user_ptr = NULL;
 
 	    if(type == PVFS_SYS_IO_READ)
@@ -334,7 +343,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    resp_decoded_array,
 	    error_code_array,
 	    target_handle_count,
-	    op_tag);
+	    op_tag_array);
 	if(ret < 0)
 	{
 	    goto out;

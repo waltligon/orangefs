@@ -231,7 +231,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
     struct PINT_decoded_msg* resp_decoded_array,
     int* error_code_array,
     int array_size,
-    PVFS_msg_tag_t op_tag)
+    PVFS_msg_tag_t* op_tag_array)
 {
     int i;
     int ret = -1;
@@ -291,7 +291,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 		req_encoded_array[i].size_list,
 		req_encoded_array[i].list_count,
 		req_encoded_array[i].total_size,
-		op_tag,
+		op_tag_array[i],
 		req_encoded_array[i].buffer_flag,
 		1,
 		NULL,
@@ -377,7 +377,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 		addr_array[i],
 		resp_encoded_array[i], 
 		max_resp_size, 
-		op_tag,
+		op_tag_array[i],
 		BMI_PRE_ALLOC,
 		NULL, 
 		&(status_array[i]), 
@@ -607,7 +607,7 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
     struct PINT_decoded_msg* resp_decoded_array,
     int* error_code_array,
     int array_size,
-    PVFS_msg_tag_t op_tag)
+    PVFS_msg_tag_t* op_tag_array)
 {
     int i;
     int ret = -1;
@@ -663,7 +663,7 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
 		addr_array[i],
 		resp_encoded_array[i], 
 		max_resp_size, 
-		op_tag,
+		op_tag_array[i],
 		BMI_PRE_ALLOC,
 		NULL, 
 		&(status_array[i]), 
