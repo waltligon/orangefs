@@ -424,8 +424,6 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
         (a_p->mask & PVFS_ATTR_META_DIST))
     {
-        gossip_err("KLUDGE: reading distribution on disk in "
-                   "network encoded format.\n");
         PINT_Dist_decode(a_p->u.meta.dist, NULL);
     }
 
