@@ -140,7 +140,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 		     a_p->objtype, s_op->req->u.setattr.attr.objtype);
 
 	/* set an error to bail out of set-attr processing */
-	js_p->error_code = -1;
+	js_p->error_code = -PVFS_EACCES;
 	return 1;
     }
 
@@ -241,7 +241,8 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 	gossip_debug(GOSSIP_SERVER_DEBUG,
 		     "  handle %Lu refers to something unknown\n",
 		     Lu(s_op->req->u.setattr.handle));
-        assert(0);
+
+	js_p->error_code = -PVFS_EACCES;
     }
     return 1;
 }
@@ -267,6 +268,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
             "dspace has %d\n",
             s_op->req->u.setattr.attr.u.meta.dfile_count,
             s_op->attr.u.meta.dfile_count);
+
         gossip_debug(
             GOSSIP_SERVER_DEBUG, " writing count of %d to disk\n",
             dspace_a_p->u.meta.dfile_count);
@@ -366,7 +368,6 @@ static int setattr_write_metafile_datafile_handles_if_required(
         gossip_err("The requested dfile count of %d is invalid; "
                    "aborting operation.\n", dfile_count);
 	js_p->error_code = -PVFS_EOVERFLOW;
-        assert(0);
 	return 1;
     }
 
@@ -392,18 +393,11 @@ static int setattr_write_metafile_datafile_handles_if_required(
         s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(
-        s_op->req->u.setattr.fs_id,
-        s_op->req->u.setattr.handle,
-        &(s_op->key),
-        &(s_op->val),
+        s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
+        &(s_op->key), &(s_op->val),
         PINT_config_get_trove_sync_mode(
             user_opts, s_op->req->u.setattr.fs_id),
-        NULL,
-        s_op,
-        0,
-        js_p,
-        &j_id,
-        server_job_context);
+        NULL, s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
@@ -544,7 +538,6 @@ static int setattr_write_symlink_target_if_required(
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
     PINT_STATE_DEBUG("setattr_cleanup");
- 
     return(server_state_machine_complete(s_op));
 }
 
