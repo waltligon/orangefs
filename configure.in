@@ -271,6 +271,7 @@ src/io/flow/flowproto-template/module.mk
 src/io/flow/flowproto-dump-offsets/module.mk
 src/io/job/module.mk
 src/io/dev/module.mk
+src/io/buffer/module.mk
 src/proto/module.mk
 src/server/module.mk
 src/server/request-scheduler/module.mk
@@ -288,6 +289,7 @@ test/io/description/module.mk
 test/io/flow/module.mk
 test/io/job/module.mk
 test/io/dev/module.mk
+test/io/buffer/module.mk
 test/client/sysint/module.mk
 test/proto/module.mk
 test/server/module.mk
