@@ -175,7 +175,7 @@ int main(int argc, char **argv)	{
 	/* look at the ack */
 	ret = PINT_decode(my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
 	printf("Act size: %d\n",(int)actual_size);
-	display_pvfs_structure(bar.buffer,1);
+	display_pvfs_structure(bar.buffer,0);
 	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp_s)+8192, 
 		BMI_RECV_BUFFER);
 	my_ack = bar.buffer;
