@@ -1,4 +1,4 @@
-DIR := test/io/trove
+DIR := io/trove
 
 LOCALTESTSRC := \
 	$(DIR)/trove-bstream.c \
@@ -31,4 +31,4 @@ else
 endif
 
 # get listio declarations
-MODCFLAGS_$(DIR)/test-listio-aio-convert.c = -I$(srcdir)/src/io/trove/trove-dbpf
+MODCFLAGS_$(DIR)/test-listio-aio-convert.c = -I$(pvfs2_srcdir)/src/io/trove/trove-dbpf

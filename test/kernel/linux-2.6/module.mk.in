@@ -1,2 +1,2 @@
-DIR := test/kernel/linux-2.6
+DIR := kernel/linux-2.6
 

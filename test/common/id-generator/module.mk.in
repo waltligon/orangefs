@@ -1,2 +1,2 @@
-DIR := test/common/id-generator
+DIR := common/id-generator
 TESTSRC += $(DIR)/test.c

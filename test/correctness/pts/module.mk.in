@@ -1,4 +1,4 @@
-DIR := test/correctness/pts
+DIR := correctness/pts
 
 TEST_PTS_SRC := $(DIR)/pts.c
 
@@ -41,7 +41,7 @@ MPIMISCSRC += $(TEST_PTS_MISC)
 MPITESTSRC += $(TEST_PTS_SRC)
 
 # need client interface for all tests
-MODCFLAGS_$(DIR) = -I$(srcdir)/test/client/sysint
+MODCFLAGS_$(DIR) = -I$(srcdir)/client/sysint
 
 #LOCALMPITESTS := $(patsubst %.c,%, $(TEST_PTS_SRC))
 #LOCALMPIOBJS := $(patsubst %.c,%.o, $(TEST_PTS_MISC))

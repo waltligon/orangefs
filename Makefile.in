@@ -8,14 +8,12 @@
 # distclean  _really_ cleans up; returns to pristine tree
 # docs       builds documentation in docs subdirectory
 # docsclean  cleans up documentation files
-# tests      builds test programs
 # admintools builds admin tools
 # kernapps   builds userland helper programs for kernel driver 
 # statecomp  builds only the statecomp component
 # cscope     generates information for cscope utility
 # tags       generates tags file for use by editors
 # codecheck  checks source code for nonconformance to our std.
-# mpitests   builds test programs that use mpi
 # kmod       builds kernel module
 # kmod_install installs kernel module in default system module location
 # 
@@ -63,14 +61,10 @@ BISON = bison
 FLEX = flex
 BUILD_GM = @BUILD_GM@
 BUILD_IB = @BUILD_IB@
-BUILD_MPI = @BUILD_MPI@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
-MPICC = @MPICC@
 GNUC = @GNUC@
 INTELC = @INTELC@
-MPI_GNUC = @MPI_GNUC@
-MPI_INTELC = @MPI_INTELC@
 # override default quiet mode with "make V=1"
 ifndef V
   QUIET_COMPILE = @QUIET_COMPILE@
@@ -87,7 +81,7 @@ build_static = @build_static@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean tests dist distclean docs docsclean cscope tags codecheck statecomp admintools kernapps
+.PHONY: all clean dist distclean docs docsclean cscope tags codecheck statecomp admintools kernapps
 
 ################################################################
 # Find project subdirectories
@@ -254,9 +248,6 @@ ifdef BUILD_IB
     SERVERLIBS += $(IBLIBS)
 endif
 
-# Use these same cflags for the mpi test codes.
-MPICFLAGS := $(CFLAGS)
-
 # enable mmap-readahead cache (unless disabled by configure)
 ifdef MMAP_RA_CACHE
 CFLAGS += @MMAP_RA_CACHE@
@@ -268,12 +259,6 @@ CFLAGS += $(GCC_CFLAGS)
 endif
 ifdef INTELC
 CFLAGS += $(INTEL_CFLAGS)
-endif
-ifdef MPI_INTELC
-MPICFLAGS += $(INTEL_CFLAGS)
-endif
-ifdef MPI_GNUC
-MPICFLAGS += $(GCC_CFLAGS)
 endif
 
 #################################################################
@@ -289,26 +274,12 @@ ADMINSRC :=
 # ADMINSRC_SERVER special version of ADMINSRC for tools that need server 
 # library
 ADMINSRC_SERVER :=
-# TESTSRC is source code for test programs
-TESTSRC :=
 # LIBSRC is source code for libpvfs2
 LIBSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
 # DOCSRC is source code for documentation
 DOCSRC :=
-# MISCSRC is a grab bag of other sources that must be built into
-#    object form (for example, shared test components)
-MISCSRC := 
-# MPITESTSRC is the source code for test programs that must be compiled
-#    with MPI
-MPITESTSRC :=
-# MPIMISCSRC is a collection of sources that must be built into
-#    object form using MPI
-MPIMISCSRC :=
-# MPIIOTESTSRC is the source for test programs that must be compiled 
-#    with MPI-IO
-MPIIOTESTSRC :=
 # VISSRC is the source code for visualization tools
 VISSRC :=
 # VISMISCSRC is a collection of sources that must be built into objects for 
@@ -343,8 +314,8 @@ endif
 ifdef BUILD_KARMA
 	KARMA := src/apps/karma/karma
 endif
-# default rule builds server, library, and test programs
-all: $(SERVER) $(KARMA) $(LIBRARIES) tests admintools kernapps
+# default rule builds server, library, and applications
+all: $(SERVER) $(KARMA) $(LIBRARIES) admintools kernapps
 
 ################################################################
 # Makefile includes
@@ -379,13 +350,6 @@ ADMINTOOLS_SERVER := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC_SERVER)))
 ADMINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC)))
 ADMINDEPENDS_SERVER := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC_SERVER)))
 
-# TESTOBJS is a list of test program objects
-TESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(TESTSRC)))
-# TESTS is a list of test program executables
-TESTS := $(patsubst %.c,%, $(filter %.c, $(TESTSRC)))
-# TESTDEPENDS is a list of dependency files for test programs
-TESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(TESTSRC)))
-
 # SERVEROBJS is a list of objects to put into the server
 SERVEROBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERSRC)))
 # SERVERDEPENDS is a list of dependency files for the server
@@ -396,18 +360,6 @@ MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
 # MISCDEPENDS is a list of dependency files for misc. objects
 MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
 
-# MPIMISCOBJS is a list of misc. MPI objects not in the above categories
-MPIMISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPIMISCSRC)))
-# MPIMISCDEPENDS is a list of dependency files for MPI misc. objects
-MPIMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIMISCSRC)))
-
-# MPITESTOBJS is a list of MPI test program objects
-MPITESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPITESTSRC)))
-# MPITESTS is a list of MPI test program executables
-MPITESTS := $(patsubst %.c,%, $(filter %.c, $(MPITESTSRC)))
-# TESTDEPENDS is a list of dependency files for MPI test programs
-MPITESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPITESTSRC)))
-
 # KERNAPPOBJS is a list of kernel driver userland objects
 KERNAPPOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KERNAPPSRC)))
 # KERNAPPS is a list of kernel driver userland executables
@@ -415,13 +367,6 @@ KERNAPPS := $(patsubst %.c,%, $(filter %.c, $(KERNAPPSRC)))
 # KERNAPPDEPENDS is a list of dependency files for kernel driver userland
 # objects
 KERNAPPDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KERNAPPSRC)))
-
-# MPIIOTESTOBJS is a list of MPI-IO test program objects
-MPIIOTESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPIIOTESTSRC)))
-# MPIIOTESTS is a list of MPI-IO test program executables
-MPIIOTESTS := $(patsubst %.c,%, $(filter %.c, $(MPIIOTESTSRC)))
-# MPIIOTESTDEPENDS is a list of dependency files for MPI-IO test programs
-MPIIOTESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIIOTESTSRC)))
 
 # VISOBJS is a list of visualization program objects
 VISOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VISSRC)))
@@ -455,10 +400,7 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(PRIVATEDEPENDS) $(KERNAPPDEPENDS))
-ifdef BUILD_MPI
-DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
-endif
+DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(PRIVATEDEPENDS) $(KERNAPPDEPENDS))
 ifdef BUILD_VIS
 DEPENDS += $(VISDEPENDS) $(VISMISCDEPENDS)
 endif
@@ -488,16 +430,6 @@ admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 # target for building kernel driver userland programs
 kernapps: $(KERNAPPS)
 
-# target for building the test program executables
-tests: $(TESTS)
-
-# target for building MPI test program executables
-mpitests: $(MPITESTS)
-ifdef BUILD_MPI
-# add MPI programs to default rule
-all: mpitests
-endif
-
 # target for building vis program executables
 vis: $(VISS)
 ifdef BUILD_VIS
@@ -514,9 +446,6 @@ ifneq (,$(LINUX_KERNEL_SRC))
 kmod:
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.6
 endif
-
-# target for building MPI-IO test programs 
-mpiiotests: $(MPIIOTESTS)
 
 # Just like dir, but strip the slash off the end, to be pretty.
 dirname = $(patsubst %/,%,$(dir $(1)))
@@ -620,51 +549,6 @@ else
 endif
 endif
 
-# rule for building MPI objects
-$(MPITESTOBJS): %.o: %.c
-ifdef BUILD_MPI
-ifdef QUIET_COMPILE
-	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
-else
-	@echo Error: You must specify --with-mpi=dir at configure time 
-	@echo   in order to enable compilation of MPI programs.
-	@false
-endif
-
-# rule for building MPI-IO objects
-$(MPIIOTESTOBJS): %.o: %.c
-ifdef BUILD_MPI
-ifdef QUIET_COMPILE
-	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
-else
-	@echo Error: You must specify --with-mpi=dir at configure time 
-	@echo   in order to enable compilation of MPI programs.
-	@false
-endif
-
-# rule for building MPI misc. objects
-$(MPIMISCOBJS): %.o: %.c
-ifdef BUILD_MPI
-ifdef QUIET_COMPILE
-	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-else
-	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
-endif
-else
-	@echo Error: You must specify --with-mpi=dir at configure time 
-	@echo   in order to enable compilation of MPI programs.
-	@false
-endif
-
 # rule for building vis misc. objects
 $(VISMISCOBJS): %.o: %.c
 ifdef BUILD_VIS
@@ -679,15 +563,6 @@ else
 	@false
 endif
 
-# rule for building MPI executables from object files
-$(MPITESTS): %: %.o $(MPIMISCOBJS) $(LIBRARIES)
-ifdef QUIET_COMPILE
-	@echo "  MPILD		$@"
-	@$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
-else
-	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
-endif
-
 # rule for building vis executables from object files
 $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 ifdef QUIET_COMPILE
@@ -696,17 +571,6 @@ ifdef QUIET_COMPILE
 else
 	$(LD) $^ $(LDFLAGS) $(VISLIBS) -o $@
 endif
-
-# rule for building MPI-IO executables from object files
-# note: add a $(MPIMISCOBJS) prereq if we build multi-object tests someday
-$(MPIIOTESTS): %: %.o $(LIBRARIES)
-ifdef QUIET_COMPILE
-	@echo "  MPILD		$@"
-	@$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
-else
-	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
-endif
-
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
@@ -762,8 +626,7 @@ else
 	$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
 endif
 
-# all test programs depend on the pvfs2 library
-$(TESTS): %: %.o $(LIBRARIES)
+# all applications depend on the pvfs2 library
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 $(KERNAPPS): %: %.o $(LIBRARIES)
@@ -800,26 +663,24 @@ docsclean:
 clean:: 
 ifdef QUIET_COMPILE
 	@echo "  CLEAN"
-	@rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
-		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) $(MPIMISCOBJS)\
-		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
+	@rm -f $(LIBOBJS) $(SERVEROBJS) $(MISCOBJS) \
+		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		$(KERNAPPOBJS) $(KERNAPPS) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
-		src/server/pvfs2-server-server.o $(MPIIOTESTS) \
+		src/server/pvfs2-server-server.o \
 		src/apps/karma/karma
 else
-	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
-		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) $(MPIMISCOBJS)\
-		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
+	rm -f $(LIBOBJS) $(SERVEROBJS) $(MISCOBJS) \
+		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		$(KERNAPPOBJS) $(KERNAPPS) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
-		src/server/pvfs2-server-server.o $(MPIIOTESTS) \
+		src/server/pvfs2-server-server.o \
 		src/apps/karma/karma
 endif
 
@@ -852,6 +713,7 @@ distclean: cleaner docsclean
 	rm -f Makefile pvfs2-config.h
 	rm -f src/server/simple.conf
 	rm -f src/server/server.conf-localhost
+	rm -f .libs
 
 # this is where we include all of our automatic dependencies.
 # NOTE: we wrap this in ifneq's in order to prevent the
@@ -863,18 +725,6 @@ endif
 # add this as a make goal to disable rebuilding dependencies
 .PHONY: nodep
 nodep:; @:
-
-# rule for generating dependency files for MPI code
-#
-# note: mpi-depend.sh is automatically generated, so it is in
-#       the build directory already.
-$(MPITESTDEPENDS) $(MPIMISCDEPENDS): %.d: %.c
-ifdef QUIET_COMPILE
-	@echo "  DEP		$@"
-else
-	@echo generating mpitest dependency file $@.
-endif
-	@sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $(call modcflags,$<) $< > $@
 
 # rule for generating dependency files for vis code
 $(VISDEPENDS) $(VISMISCDEPENDS): %.d: %.c
@@ -1001,7 +851,3 @@ kmod_install:
 	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(KMOD_DIR)
 endif
 
-install_tests:
-	install -d $(prefix)/bin
-	for f in test/client/sysint/{create,mkdir,readdir,remove,find,io-test}; do \
-		install -m 755 $$f $(prefix)/bin/ ; done

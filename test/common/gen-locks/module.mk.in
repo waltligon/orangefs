@@ -1,4 +1,4 @@
-DIR := test/common/gen-locks
+DIR := common/gen-locks
 
 TESTSRC += \
 	$(DIR)/test-pthread-lock.c \

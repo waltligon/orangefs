@@ -425,60 +425,6 @@ CPPFLAGS="$CPPFLAGS_OLD"
 AC_SUBST(IB_HOME)
 AC_SUBST(BUILD_IB)
 
-AC_ARG_WITH(mpi, 
-[  --with-mpi=<dir>        Location of the MPI installation],
-    if test x$withval = xyes; then
-	AC_MSG_ERROR(--with-mpi must be given a pathname)
-    else
-	MPICC="${withval}/bin/mpicc"
-	BUILD_MPI="1"
-    fi
-)
-
-MPI_INTELC=
-MPI_GNUC=
-if test x$BUILD_MPI = x1; then
-    AC_MSG_CHECKING(whether the mpicc compiler works)
-    saveCC="$CC"
-    CC="$MPICC"
-    AC_TRY_COMPILE([#include <mpi.h>], [int ret = MPI_Init(0, (void*)0)],
-	AC_MSG_RESULT(yes),
-	AC_MSG_RESULT(no)
-	AC_MSG_ERROR($CC doesn't appear to be a valid MPI compiler)
-    )
-    dnl See if mpicc is a GNU compiler, notice that intel compiler claims
-    dnl it is GCC, but isn't argument compatible, hence check it first.
-    AC_MSG_CHECKING(whether mpicc is an Intel compiler)
-    AC_TRY_COMPILE([
-    #ifndef __ICC
-	   choke me
-    #endif
-    ], [],
-	AC_MSG_RESULT(yes)
-	MPI_INTELC=1
-	,
-	AC_MSG_RESULT(no)
-    )
-    if test x$MPI_INTELC = x; then
-	AC_MSG_CHECKING(whether mpicc is a GNU compiler)
-	AC_TRY_COMPILE([
-	#ifndef __GNUC__
-	       choke me
-	#endif
-	], [],
-	    AC_MSG_RESULT(yes)
-	    MPI_GNUC=1
-	    ,
-	    AC_MSG_RESULT(no)
-	)
-    fi
-    CC="$saveCC"
-    AC_SUBST(MPICC)
-    AC_SUBST(BUILD_MPI)
-fi
-AC_SUBST(MPI_INTELC)
-AC_SUBST(MPI_GNUC)
-
 dnl if we use functions that might not be on every platform, add them here
 dnl the prototypes for some functions are exposed only after defining something
 dnl for example, strnlen needs _GNU_SOURCE defined 
@@ -534,9 +480,8 @@ fi
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
-for d in src/apps src/io src/common src/client src/kernel test/common \
-	test/io test/client doc test/correctness/pts test/kernel \
-	src/apps/kernel; do
+for d in src/apps src/io src/common src/client src/kernel \
+	doc src/apps/kernel test; do
 	install -d $d;
 done
 
@@ -580,33 +525,15 @@ src/client/sysint/module.mk
 src/proto/contig/module.mk
 src/kernel/linux-2.6/module.mk
 src/kernel/linux-2.6/Makefile
-test/io/trove/module.mk
-test/io/buffer/module.mk
-test/common/quicklist/module.mk
-test/common/id-generator/module.mk
-test/common/gossip/module.mk
-test/common/gen-locks/module.mk
-test/common/misc/module.mk
-test/io/bmi/module.mk
-test/io/description/module.mk
-test/io/flow/module.mk
-test/io/job/module.mk
-test/io/dev/module.mk
-test/client/sysint/module.mk
-test/client/mpi-io/module.mk
-test/proto/module.mk
-test/server/module.mk
-test/server/request-scheduler/module.mk
-test/correctness/pts/module.mk
-test/common/pav/configfile.sample
-test/kernel/linux-2.6/module.mk
 doc/module.mk
 doc/coding/module.mk
 doc/design/module.mk
 doc/random/module.mk
-maint/mpi-depend.sh
 examples/pvfs2-server.rc
 )
+
+# dump LIBS variable into a file to be used by test/configure
+AC_OUTPUT_COMMANDS([echo ${LIBS}> .libs])
 
 # print a summary of the configuration after all the junky output
 if test x$BUILD_KARMA = x1 ; then

@@ -1,5 +1,5 @@
-DIR := test/proto
-TEST_PROTO_DIR := test/proto
+DIR := proto
+TEST_PROTO_DIR := proto
 
 TEST_PROTO_DIR_SRC := \
 	$(DIR)/test-bmi-server.c \

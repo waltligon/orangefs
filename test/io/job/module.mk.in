@@ -1,5 +1,5 @@
-DIR := test/io/job
-TEST_IO_JOB_DIR := test/io/job
+DIR := io/job
+TEST_IO_JOB_DIR := io/job
 
 TEST_IO_JOB_DIR_SRC := \
 	$(DIR)/job-client-example.c \
@@ -19,7 +19,7 @@ MISCSRC += $(DIR)/job-help.c
 TESTSRC += $(TEST_IO_JOB_DIR_SRC)
 
 # trove-job-*.c need trove-test.h from here
-MODCFLAGS_$(DIR) = -I$(srcdir)/test/io/trove
+MODCFLAGS_$(DIR) = -I$(pvfs2_srcdir)/test/io/trove
 
 LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_JOB_DIR_SRC))
 $(LOCALTESTS): %: %.o $(TEST_IO_JOB_DIR)/job-help.o

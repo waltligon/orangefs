@@ -1,4 +1,4 @@
-DIR := test/io/bmi
+DIR := io/bmi
 
 TESTSRC += \
 	$(DIR)/test-bmi-client.c \

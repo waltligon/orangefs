@@ -1,4 +1,4 @@
-DIR := test/io/flow
+DIR := io/flow
 
 TEST_IO_FLOW_DIR_SRC := \
 	$(DIR)/test-harness-server-trove.c \
@@ -10,7 +10,7 @@ TEST_IO_FLOW_DIR_SRC := \
 
 TESTSRC += $(TEST_IO_FLOW_DIR_SRC)
 
-test/io/flow/test-harness-server-trove: test/io/flow/test-harness-server-trove.o
+io/flow/test-harness-server-trove: io/flow/test-harness-server-trove.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
 	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
@@ -18,7 +18,7 @@ else
 	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 endif
 
-test/io/flow/test-harness-client: test/io/flow/test-harness-client.o
+io/flow/test-harness-client: io/flow/test-harness-client.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
 	@$(LD) $< $(LDFLAGS) $(LIBS) -o $@
@@ -26,7 +26,7 @@ else
 	$(LD) $< $(LDFLAGS) $(LIBS) -o $@
 endif
 
-test/io/flow/test-bmi-cache-server: test/io/flow/test-bmi-cache-server.o
+io/flow/test-bmi-cache-server: io/flow/test-bmi-cache-server.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
 	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
@@ -34,7 +34,7 @@ else
 	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 endif
 
-test/io/flow/test-bmi-cache-client: test/io/flow/test-bmi-cache-client.o
+io/flow/test-bmi-cache-client: io/flow/test-bmi-cache-client.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
 	@$(LD) $< $(LDFLAGS) $(LIBS) -o $@
@@ -42,7 +42,7 @@ else
 	$(LD) $< $(LDFLAGS) $(LIBS) -o $@
 endif
 
-test/io/flow/test1-server: test/io/flow/test1-server.o
+io/flow/test1-server: io/flow/test1-server.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
 	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
@@ -50,7 +50,7 @@ else
 	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 endif
 
-test/io/flow/test1-client: test/io/flow/test1-client.o
+io/flow/test1-client: io/flow/test1-client.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
 	@$(LD) $< $(LDFLAGS) $(LIBS) -o $@

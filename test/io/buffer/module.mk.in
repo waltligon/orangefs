@@ -1,4 +1,4 @@
-DIR := test/io/buffer
+DIR := io/buffer
 
 LOCALTESTSRC := \
 	$(DIR)/test1.c \

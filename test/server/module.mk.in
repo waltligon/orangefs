@@ -1,4 +1,4 @@
-DIR := test/server
+DIR := server
 
 TESTSRC += \
 	$(DIR)/getconfig.c \

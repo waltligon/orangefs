@@ -1,0 +1,406 @@
+# Top level makefile for pvfs2 test programs
+# define a few generic variables that we need to use
+
+srcdir = @srcdir@
+prefix = @prefix@
+mandir = @mandir@
+exec_prefix = @exec_prefix@
+pvfs2_srcdir = @PVFS2_SRC_RELATIVE_TOP@
+pvfs2_builddir = @PVFS2_BUILD_RELATIVE_TOP@
+
+VPATH = $(srcdir)
+SHELL = @SHELL@
+INSTALL = @INSTALL@
+# TODO: should probably check for bison and flex in configure
+BISON = bison
+FLEX = flex
+BUILD_MPI = @BUILD_MPI@
+MPICC = @MPICC@
+GNUC = @GNUC@
+INTELC = @INTELC@
+MPI_GNUC = @MPI_GNUC@
+MPI_INTELC = @MPI_INTELC@
+# override default quiet mode with "make V=1"
+ifndef V
+  QUIET_COMPILE = @QUIET_COMPILE@
+endif
+
+# some of the test programs require the use of the pvfs2 server library;
+# we therefore need to find out what libraries the original pvfs2 build
+# used for server components
+SERVERLIBS := -lpvfs2-server -lpthread -lrt $(shell cat ${pvfs2_builddir}/.libs)
+
+# Eliminate all default suffixes.  We want explicit control.
+.SUFFIXES:
+
+# PHONEY targets are targets that do not result in the generation
+#    of a file that has the same name as the target.  Listing them
+#    here keeps make from accidentally doing too much work (see GNU
+#    make manual).
+.PHONY: all clean distclean cscope tags 
+
+################################################################
+# Find project subdirectories
+
+# MODULES is a list of subdirectories that we wish to operate on.
+#    They are identified by the presence of module.mk files (makefile
+#    includes).
+MODULES := $(shell find . -name "*.mk" | sed -e 's/^.\///;s/module.mk//')
+
+# List of directories to search for headers.
+INCLUDES := \
+    ${pvfs2_srcdir}/src/client/sysint \
+    ${pvfs2_srcdir}/src/common/misc \
+    ${pvfs2_srcdir}/src/common/quickhash \
+    ${pvfs2_srcdir}/src/common/quicklist \
+    ${pvfs2_srcdir}/src/common/dotconf \
+    ${pvfs2_srcdir}/src/common/id-generator \
+    ${pvfs2_srcdir}/src/common/gossip \
+    ${pvfs2_srcdir}/src/common/gen-locks \
+    ${pvfs2_srcdir}/src/common/llist \
+    ${pvfs2_srcdir}/src/io/trove \
+    ${pvfs2_srcdir}/src/io/bmi \
+    ${pvfs2_srcdir}/src/io/description \
+    ${pvfs2_srcdir}/src/io/flow \
+    ${pvfs2_srcdir}/src/io/buffer \
+    ${pvfs2_srcdir}/src/io/job \
+    ${pvfs2_srcdir}/src/io/dev \
+    ${pvfs2_srcdir}/src/proto \
+    ${pvfs2_srcdir}/src/server \
+    ${pvfs2_srcdir}/src/server/request-scheduler
+
+#################################################################
+# Setup global flags
+
+# These should all be self explanatory; they are standard flags
+# for compiling and linking unless otherwise noted
+CC = @CC@
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@
+LD = gcc
+LDSHARED = $(CC) -shared
+PICFLAGS = -fPIC
+LDFLAGS += -L lib 
+LIBS += -lpvfs2 @LIBS@ 
+
+CFLAGS += -DUSE_BMI_MSGS
+  # turn on large file support by default
+CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
+  # include current directory (for pvfs2-test-config.h)
+CFLAGS += -I .
+  # add in include paths from pvfs2 src tree
+CFLAGS += $(patsubst %,-I%,$(INCLUDES))
+
+# special Intel cc options, all warnings, but disable:
+  # remark #279: controlling expression is constant
+  #   shows up in ifdefs such as "do { ... } while (0)" construct
+INTEL_CFLAGS := -Wall -wd279
+  # special gcc options
+GCC_CFLAGS := -Wall -Wstrict-prototypes -pipe
+
+################################################################
+# Setup component specific flags
+
+LIBS += -lpthread
+
+# Use these same cflags for the mpi test codes.
+MPICFLAGS := $(CFLAGS)
+
+# Add gcc-specific flags if we know it is a gnu compiler.
+ifdef GNUC
+CFLAGS += $(GCC_CFLAGS)
+endif
+ifdef INTELC
+CFLAGS += $(INTEL_CFLAGS)
+endif
+ifdef MPI_INTELC
+MPICFLAGS += $(INTEL_CFLAGS)
+endif
+ifdef MPI_GNUC
+MPICFLAGS += $(GCC_CFLAGS)
+endif
+
+#################################################################
+# Starter variables 
+
+# NOTES: These variables are used to categorize the various source
+#    files.  We let the makefile includes append to them so that we
+#    gradually build up a list of source files without having to
+#    list them all at the top level.
+
+# TESTSRC is source code for test programs
+TESTSRC :=
+# MISCSRC is a grab bag of other sources that must be built into
+#    object form (for example, shared test components)
+MISCSRC := 
+# MPIIOTESTSRC is the source for test programs that must be compiled 
+#    with MPI-IO
+MPIIOTESTSRC :=
+# MPITESTSRC is the source code for test programs that must be compiled
+#    with MPI
+MPITESTSRC :=
+# MPIMISCSRC is a collection of sources that must be built into
+#    object form using MPI
+MPIMISCSRC :=
+# files generated as part of the build that should be deleted on "make clean"
+CLEANFILES :=
+
+################################################################
+# Top level (default) targets
+
+# default rule builds server, library, and test programs
+all: tests
+
+################################################################
+# Makefile includes
+
+# this is how we pull build information from all of the project
+#    subdirectories, make sure to catch top level module.mk as well
+include $(patsubst %, %/module.mk, $(MODULES))
+
+################################################################
+# Derived file lists
+
+# NOTES: At this point, the subdirectory makefile includes have informed
+#    us what the source files are.  Now we want to generate some
+#    other lists (such as objects, executables, and dependency files)
+#    by manipulating the lists of source files
+
+# TESTOBJS is a list of test program objects
+TESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(TESTSRC)))
+# TESTS is a list of test program executables
+TESTS := $(patsubst %.c,%, $(filter %.c, $(TESTSRC)))
+# TESTDEPENDS is a list of dependency files for test programs
+TESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(TESTSRC)))
+
+# MISCOBJS is a list of misc. objects not in the above categories
+MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
+# MISCDEPENDS is a list of dependency files for misc. objects
+MISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MISCSRC)))
+
+# MPIMISCOBJS is a list of misc. MPI objects not in the above categories
+MPIMISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPIMISCSRC)))
+# MPIMISCDEPENDS is a list of dependency files for MPI misc. objects
+MPIMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIMISCSRC)))
+
+# MPITESTOBJS is a list of MPI test program objects
+MPITESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPITESTSRC)))
+# MPITESTS is a list of MPI test program executables
+MPITESTS := $(patsubst %.c,%, $(filter %.c, $(MPITESTSRC)))
+# TESTDEPENDS is a list of dependency files for MPI test programs
+MPITESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPITESTSRC)))
+
+# MPIIOTESTOBJS is a list of MPI-IO test program objects
+MPIIOTESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPIIOTESTSRC)))
+# MPIIOTESTS is a list of MPI-IO test program executables
+MPIIOTESTS := $(patsubst %.c,%, $(filter %.c, $(MPIIOTESTSRC)))
+# MPIIOTESTDEPENDS is a list of dependency files for MPI-IO test programs
+MPIIOTESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPIIOTESTSRC)))
+
+# DEPENDS is a global list of all of our dependency files.  
+# NOTE: sort is just a trick to remove duplicates; the order
+#   doesn't matter at all.
+DEPENDS := $(sort $(TESTDEPENDS) $(MISCDEPENDS) $(PRIVATEDEPENDS))
+ifdef BUILD_MPI
+DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
+endif
+
+####################################################################
+# Rules and dependencies
+
+# target for building MPI-IO test programs 
+mpiiotests: $(MPIIOTESTS)
+
+# Just like dir, but strip the slash off the end, to be pretty.
+dirname = $(patsubst %/,%,$(dir $(1)))
+
+# Generate the canonical in-tree location of a file, given a possibly
+# out-of-tree reference.
+canonname = $(patsubst $(srcdir)/%,%,$(call dirname,$(1)))
+
+# Grab any CFLAGS defined by the make stub for a particular file, and
+# for the directory in which the source resides.
+# Always add the directory in question for "local" includes.
+modcflags = $(MODCFLAGS_$(call canonname,$(1))) \
+            $(MODCFLAGS_$(patsubst $(srcdir)/%,%,$(1))) \
+	    -I$(call dirname,$(1))
+
+
+# target for building the test program executables
+tests: $(TESTS)
+
+# target for building MPI test program executables
+mpitests: $(MPITESTS)
+ifdef BUILD_MPI
+# add MPI programs to default rule
+all: mpitests
+endif
+
+# rule for building MPI objects
+$(MPITESTOBJS): %.o: %.c
+ifdef BUILD_MPI
+ifdef QUIET_COMPILE
+	@echo "  MPICC		$@"
+	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
+else
+	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
+endif
+else
+	@echo Error: You must specify --with-mpi=dir at configure time 
+	@echo   in order to enable compilation of MPI programs.
+	@false
+endif
+
+# rule for building MPI-IO objects
+$(MPIIOTESTOBJS): %.o: %.c
+ifdef BUILD_MPI
+ifdef QUIET_COMPILE
+	@echo "  MPICC		$@"
+	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
+else
+	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
+endif
+else
+	@echo Error: You must specify --with-mpi=dir at configure time 
+	@echo   in order to enable compilation of MPI programs.
+	@false
+endif
+
+# rule for building MPI misc. objects
+$(MPIMISCOBJS): %.o: %.c
+ifdef BUILD_MPI
+ifdef QUIET_COMPILE
+	@echo "  MPICC		$@"
+	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
+else
+	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
+endif
+else
+	@echo Error: You must specify --with-mpi=dir at configure time 
+	@echo   in order to enable compilation of MPI programs.
+	@false
+endif
+
+# rule for building MPI executables from object files
+$(MPITESTS): %: %.o $(MPIMISCOBJS) $(LIBRARIES)
+ifdef QUIET_COMPILE
+	@echo "  MPILD		$@"
+	@$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+else
+	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+endif
+
+# rule for building MPI-IO executables from object files
+# note: add a $(MPIMISCOBJS) prereq if we build multi-object tests someday
+$(MPIIOTESTS): %: %.o $(LIBRARIES)
+ifdef QUIET_COMPILE
+	@echo "  MPILD		$@"
+	@$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+else
+	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+endif
+
+# default rule for building executables from object files
+%: %.o $(LIBRARIES)
+ifdef QUIET_COMPILE
+	@echo "  LD		$@"
+	@$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+else
+	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+endif
+
+# default rule for building objects 
+%.o: %.c
+ifdef QUIET_COMPILE
+	@echo "  CC		$@"
+	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+else
+	$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+endif
+
+# all test programs depend on the pvfs2 library
+$(TESTS): %: %.o $(LIBRARIES)
+
+# rule for generating cscope information
+cscope:
+	find @SRC_ABSOLUTE_TOP@ -iname "*.[ch]" -o -iname "*.sm" \
+		 > $(srcdir)/cscope.files
+	( cd @SRC_ABSOLUTE_TOP@; cscope -be -i @SRC_ABSOLUTE_TOP@/cscope.files )
+
+# build editor tags file over all source files *.[ch] *.sm and
+# some known scripts
+tags:
+	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include . \
+	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
+	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig \
+	) | ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
+
+# top rule for cleaning up tree
+clean:: 
+ifdef QUIET_COMPILE
+	@echo "  CLEAN"
+	@rm -f $(TESTOBJS) $(MISCOBJS) $(TESTS)\
+		$(DEPENDS) $(CLEANFILES) $(MPIMISCOBJS)\
+		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS)\
+		$(MPIIOTESTS)
+else
+	@rm -f $(TESTOBJS) $(MISCOBJS) $(TESTS)\
+		$(DEPENDS) $(CLEANFILES) $(MPIMISCOBJS)\
+		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS)\
+		$(MPIIOTESTS)
+endif
+
+# some stuff that is cleaned in both distclean and dist targets
+cleaner: clean
+	rm -f tags
+	rm -f examples/pvfs2-server.rc
+	rm -rf autom4te*.cache
+	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
+	rm -f config.log config.status config.cache 
+
+# _really_ clean the tree; should go back to pristine state
+distclean: cleaner 
+	find . -name "module.mk" -exec rm \{\} \;
+	rm -f Makefile pvfs2-test-config.h
+
+# this is where we include all of our automatic dependencies.
+# NOTE: we wrap this in ifneq's in order to prevent the
+#    dependencies from being generated for special targets that don't 
+#    require them
+ifeq (,$(filter clean distclean cscope tags nodep,$(MAKECMDGOALS)))
+-include $(DEPENDS)
+endif
+# add this as a make goal to disable rebuilding dependencies
+.PHONY: nodep
+nodep:; @:
+
+# rule for generating dependency files for MPI code
+#
+# note: mpi-depend.sh is automatically generated, so it is in
+#       the build directory already.
+$(MPITESTDEPENDS) $(MPIMISCDEPENDS): %.d: %.c
+ifdef QUIET_COMPILE
+	@echo "  DEP		$@"
+else
+	@echo generating mpitest dependency file $@.
+endif
+	@sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $(call modcflags,$<) $< > $@
+
+# rule for generating dependency files for karma
+$(KARMADEPENDS): %.d: %.c
+ifdef QUIET_COMPILE
+	@echo "  DEP		$@"
+else
+	@echo generating karma dependency file $@.
+endif
+	@$(pvfs2_srcdir)/maint/depend.sh `dirname $*` $(KARMACFLAGS) $(call modcflags,$<) $< > $@
+
+# default rule for generating dependency files
+%.d: %.c
+ifdef QUIET_COMPILE
+	@echo "  DEP		$@"
+	@$(pvfs2_srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
+else
+	$(pvfs2_srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
+endif
+

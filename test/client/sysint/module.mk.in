@@ -1,4 +1,4 @@
-DIR := test/client/sysint
+DIR := client/sysint
 
 TESTSRC += \
 	$(DIR)/client.c\
