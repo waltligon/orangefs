@@ -153,9 +153,17 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
         /*
           get a range string that combines all handles for both meta
           and data ranges specified in the config file.
+
+          the server isn't concerned with what allocation of handles
+          are meta and which are data at this level, so we lump them
+          all together and hand them to trove-handle-mgmt.
         */
         cur_merged_handle_range =
-            PINT_server_config_get_merged_handle_range_str(&user_opts,cur_fs);
+            PINT_server_config_get_merged_handle_range_str(
+                &user_opts,cur_fs);
+
+        gossip_debug(SERVER_DEBUG, "Using handles:\n  %s\n",
+                     cur_merged_handle_range);
 
         /*
           error out if we're not configured to house either a
@@ -190,7 +198,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
         cur = llist_next(cur);
     }
     gossip_debug(SERVER_DEBUG, "Storage Init Complete\n");
-    gossip_debug(SERVER_DEBUG, "%d filesystems initialized\n",
+    gossip_debug(SERVER_DEBUG, "%d filesystem(s) initialized\n",
                  llist_count(user_opts.file_systems));
 
     /* initialize Job Interface */
