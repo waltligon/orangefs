@@ -9,16 +9,6 @@
 #include "client.h"
 #include "gossip.h"
 
-/*why were these commented out?*/
-
-#define ATTR_UID 1
-#define ATTR_GID 2
-#define ATTR_PERM 4
-#define ATTR_ATIME 8
-#define ATTR_CTIME 16
-#define ATTR_MTIME 32
-#define ATTR_TYPE 2048
-
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
 int main(int argc,char **argv)
@@ -33,7 +23,7 @@ int main(int argc,char **argv)
 	PVFS_credentials credentials;
 
 	char *filename = NULL;
-	int ret = -1,i = 0;
+	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
 
 	gossip_enable_stderr();
@@ -93,7 +83,7 @@ int main(int argc,char **argv)
 	// Fill in the handle 
 	pinode_refn.handle = resp_look.pinode_refn.handle;
 	pinode_refn.fs_id = fs_id;
-	attrmask = ATTR_META | ATTR_SIZE;
+	attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
 	// Use it 
 	ret = PVFS_sys_getattr(pinode_refn, attrmask, credentials, resp_gattr);
@@ -117,12 +107,17 @@ int main(int argc,char **argv)
 	{
 		case PVFS_TYPE_METAFILE:
 		printf("METAFILE\n");
+#if 0
+		/* ifdef out; we don't let this kind of information out of
+		 * the system interface!
+		 */
 		printf("nr_datafiles:%d\n",resp_gattr->attr.u.meta.nr_datafiles);
 
 		for(i=0; i < resp_gattr->attr.u.meta.nr_datafiles; i++)
 		{
 			printf("\thandle: %d\n", (int)resp_gattr->attr.u.meta.dfh[i]);
 		}
+#endif
 		break;
 
 		case PVFS_TYPE_DATAFILE:
@@ -132,7 +127,12 @@ int main(int argc,char **argv)
 
 		case PVFS_TYPE_DIRECTORY:
 		printf("DIRECTORY\n");
+#if 0
+		/* ifdef out; we don't let this kind of information out of
+		 * the system interface!
+		 */
 		printf("handle: = %d", (int)resp_gattr->attr.u.dir.dfh);
+#endif
 		break;
 
 		default:

@@ -167,7 +167,7 @@ int PVFS_sys_lookup(PVFS_fs_id fs_id, char* name, PVFS_credentials credentials, 
 	req_p.u.lookup_path.path = path;
 	req_p.u.lookup_path.fs_id = parent.fs_id;
 	req_p.u.lookup_path.starting_handle = parent.handle;
-	req_p.u.lookup_path.attrmask = ATTR_BASIC;
+	req_p.u.lookup_path.attrmask = PVFS_ATTR_COMMON_ALL;
 
         /* Get Metaserver in BMI URL format using the bucket table 
          * interface */

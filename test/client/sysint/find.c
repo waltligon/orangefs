@@ -34,7 +34,7 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
 
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
-    attrmask = ATTR_BASIC;
+    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
     if (PVFS_sys_getattr(pinode_refn, attrmask, credentials, &getattr_response))
     {

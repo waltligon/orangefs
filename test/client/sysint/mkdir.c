@@ -66,7 +66,7 @@ int main(int argc,char **argv)
     parent_refn.handle =
         lookup_parent_handle(dirname,cur_fs);
     parent_refn.fs_id = cur_fs;
-    attrmask = ATTR_BASIC;
+    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;

@@ -98,7 +98,7 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
-	/* setup create request */
+	/* setup getattr request */
 	my_req->op = PVFS_SERV_GETATTR;
 	my_req->rsize = sizeof(struct PVFS_server_req_s);
 	my_req->credentials.uid = 0;
@@ -106,8 +106,7 @@ int main(int argc, char **argv)	{
 	my_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 	my_req->u.getattr.handle = user_opts->bucket;
 	my_req->u.getattr.fs_id = FS_COLL_ID;
-	/*my_req->u.setattr.attrmask = ATTR_UID | ATTR_GID | ATTR_PERM | ATTR_TYPE;*/
-	my_req->u.setattr.attrmask = ATTR_BASIC;
+	my_req->u.setattr.attrmask = PVFS_ATTR_COMMON_ALL;
 
 	printf("Sending GETATTR for Handle %lld\n",(long long)user_opts->bucket);
 	display_pvfs_structure(my_req,1);

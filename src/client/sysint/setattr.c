@@ -15,6 +15,7 @@
 
 #include "pinode-helper.h"
 #include "pvfs2-sysint.h"
+#include "pinode-helper.h"
 #include "pint-sysint.h"
 #include "pint-servreq.h"
 #include "pint-bucket.h"
@@ -38,7 +39,6 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	pinode *pinode_ptr = NULL;
 	bmi_addr_t serv_addr;		/* PVFS address type structure */
 	char *server = NULL;
-	uint32_t mask = attrmask;
 	PVFS_pinode_reference entry;
 	PVFS_size handlesize = 0;
 	bmi_size_t max_msg_sz = PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_SETATTR);
@@ -54,10 +54,11 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	    MAP_TO_SERVER_FAILURE,
 	} failure = NONE_FAILURE;
 
-	/*Q: does being able to set the size make any sense at all?*/
-	/*A: NO! */
-	if ((mask & ATTR_SIZE) == ATTR_SIZE)
-		return (-EINVAL);
+	/* we don't allow the file size to be set here - that is
+	 * the job of the truncate function.
+	 */
+	if (attrmask & PVFS_ATTR_SYS_SIZE)
+	    return (-EINVAL);
 
 	/* Fill in pinode reference */
 	entry.handle = pinode_refn.handle;
@@ -70,8 +71,8 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	if (ret == PCACHE_LOOKUP_FAILURE)
 	{
 		pinode_was_in_cache = 0;
-		mask = mask | ATTR_BASIC;	
-		ret = phelper_get_pinode(entry, &pinode_ptr, mask, credentials);
+		ret = phelper_get_pinode(entry, &pinode_ptr,
+		    PVFS_ATTR_COMMON_ALL, credentials);
 		if (ret < 0)
 		{
 		    failure = PCACHE_LOOKUP_FAILURE;
@@ -103,7 +104,20 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	req_p.rsize = sizeof(struct PVFS_server_req_s) + handlesize;
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = entry.fs_id;
-	req_p.u.setattr.attrmask = mask;
+	req_p.u.setattr.attrmask = 0;
+	if(attrmask & PVFS_ATTR_SYS_UID)
+	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_UID;
+	if(attrmask & PVFS_ATTR_SYS_GID)
+	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_GID;
+	if(attrmask & PVFS_ATTR_SYS_PERM)
+	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_PERM;
+	if(attrmask & PVFS_ATTR_SYS_ATIME)
+	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_ATIME;
+	if(attrmask & PVFS_ATTR_SYS_CTIME)
+	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_CTIME;
+	if(attrmask & PVFS_ATTR_SYS_MTIME)
+	    req_p.u.setattr.attrmask |= PVFS_ATTR_COMMON_MTIME;
+
 	req_p.u.setattr.attr = attr;
 
 	/* Make a server setattr request */	
@@ -129,7 +143,7 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
             &encoded_resp, op_tag);
 
 	/* Modify pinode to reflect changed attributes */
-	ret = modify_pinode(pinode_ptr,attr,attrmask);
+	ret = phelper_fill_attr(pinode_ptr,attr,attrmask);
 	if (ret < 0)
 	{
 		failure = PINODE_REMOVE_FAILURE;

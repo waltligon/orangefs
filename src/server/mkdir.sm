@@ -165,7 +165,7 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s *ret)
 
     job_post_ret = job_trove_dspace_create(s_op->req->u.mkdir.fs_id,
 	    s_op->req->u.mkdir.requested_handle,
-	    ATTR_DIR,
+	    PVFS_TYPE_DIRECTORY,
 	    NULL,
 	    s_op,
 	    ret,

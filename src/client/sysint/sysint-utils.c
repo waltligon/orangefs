@@ -39,7 +39,7 @@ static int server_parse_config(
  */
 
 int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
-		uint32_t mask,PVFS_credentials cred,PVFS_pinode_reference *entry)
+		PVFS_credentials cred,PVFS_pinode_reference *entry)
 {
 	struct PVFS_server_req_s req_p;             /* server request */
         struct PVFS_server_resp_s *ack_p = NULL;    /* server response */
@@ -68,22 +68,13 @@ int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
 
         name_sz = strlen(name) + 1; /*include the null terminator*/
 
-        /*
-          we have to mask off ATTR_META if specified because
-          we're not issuing a getattr even if it is specified.
-          It's confusing the pcache, so for now, remove it.
-          in short, we CANNOT add a pnode to the pinode cache with
-          this attribute set since it's not valid at this point.
-        */
-        mask &= ~ATTR_META;
-
         req_p.op = PVFS_SERV_LOOKUP_PATH;
         req_p.credentials = cred;
         req_p.rsize = name_sz + sizeof(struct PVFS_server_req_s);
         req_p.u.lookup_path.path = name;
         req_p.u.lookup_path.fs_id = parent.fs_id;
         req_p.u.lookup_path.starting_handle = parent.handle;
-        req_p.u.lookup_path.attrmask = mask;
+        req_p.u.lookup_path.attrmask = PVFS_ATTR_COMMON_ALL;
 
 	/*expecting exactly one segment to come back (maybe attribs)*/
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
@@ -153,7 +144,7 @@ int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
         pinode_ptr->pinode_ref.handle = ack_p->u.lookup_path.handle_array[0];
         pinode_ptr->pinode_ref.fs_id = parent.fs_id;
         pinode_ptr->attr = ack_p->u.lookup_path.attr_array[0];
-	pinode_ptr->mask = req_p.u.lookup_path.attrmask;
+	pinode_ptr->mask = PVFS_ATTR_COMMON_ALL;
 
         /* Add to the pinode list */
         ret = PINT_pcache_insert(pinode_ptr);

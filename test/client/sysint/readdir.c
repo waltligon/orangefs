@@ -7,15 +7,6 @@
 #include <client.h>
 #include <sys/time.h>
 
-/*why were these commented out?*/
-
-#define ATTR_UID 1
-#define ATTR_GID 2
-#define ATTR_PERM 4
-#define ATTR_ATIME 8
-#define ATTR_CTIME 16
-#define ATTR_MTIME 32
-#define ATTR_TYPE 2048
 
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 

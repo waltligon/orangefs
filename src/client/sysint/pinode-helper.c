@@ -14,8 +14,6 @@
 static int check_pinode_match(pinode *pnode,pinode *pinode_ptr);
 static int update_pinode(pinode *pnode,pinode *pinode_ptr);
 #endif
-static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr,\
-		uint32_t mask);
 
 /* phelper_get_pinode
  *
@@ -26,7 +24,6 @@ static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr,\
 int phelper_get_pinode(PVFS_pinode_reference pref, pinode **pinode_ptr,
 		uint32_t attrmask, PVFS_credentials credentials)
 {
-
 	int ret = 0;
 	
 	/* Does pinode exist? */
@@ -118,7 +115,6 @@ int phelper_refresh_pinode(uint32_t mask,pinode **pinode_ptr,
 	/* we just added this to the cache, do a lookup to get the pointer to
 	 * the pinode we just added to the cache
 	 */
-	
 
 	ret = PINT_pcache_lookup(pref, pinode_ptr);
 	if (ret == PCACHE_LOOKUP_FAILURE)
@@ -133,7 +129,6 @@ int phelper_refresh_pinode(uint32_t mask,pinode **pinode_ptr,
 	}
 	(*pinode_ptr)->pinode_ref.handle = pref.handle;
 	(*pinode_ptr)->pinode_ref.fs_id = pref.fs_id;
-	(*pinode_ptr)->mask = mask;
 	
 	ret = phelper_fill_attr(*pinode_ptr,resp.attr,mask);
 	if (ret < 0)
@@ -456,108 +451,67 @@ static int check_pinode_match(pinode *pnode,pinode *pinode_ptr)
 }
 #endif
 
-/* modify_pinode
- *
- * modifies a pinode selectively based on a mask provided an
- * attribute structure 
- *
- * returns 0 on success, -errno on failure
- */
-int modify_pinode(pinode *node,PVFS_object_attr attr,uint32_t mask)
-{
-	PVFS_size dfh_size = 0;
-	/* Check mask and accordingly update the pinode */
-	if (ATTR_BASIC & mask)
-	{
-		node->attr.owner = attr.owner;
-		node->attr.group = attr.group;
-		node->attr.perms = attr.perms;
-		node->attr.atime = attr.atime;
-		node->attr.mtime = attr.mtime;
-		node->attr.ctime = attr.ctime;
-		node->attr.objtype = attr.objtype;
-	}
-	if (ATTR_META & mask)
-	{
-		/* TODO: we don't want to be here, this is broken ... */
-		assert(0);
-#if 0
-		/* REMOVED BY PHIL WHEN MOVING TO NEW TREE */
-		node->attr.u.meta.dist = attr.u.meta.dist;
-#endif
-		dfh_size = sizeof(PVFS_handle) * attr.u.meta.nr_datafiles;
-		/* Allocate datafile array */
-		free(node->attr.u.meta.dfh);
-		node->attr.u.meta.dfh = (PVFS_handle *)malloc(dfh_size);
-		if (!node->attr.u.meta.dfh)
-			return(-ENOMEM);
-		memcpy(node->attr.u.meta.dfh,attr.u.meta.dfh,dfh_size);
-		node->attr.u.meta.nr_datafiles = attr.u.meta.nr_datafiles;
-	}
-	if (ATTR_DIR & mask)
-	{
-
-	}
-	if (ATTR_SYM & mask)
-	{
-
-	}
-
-	/* Finally, copy the attribute mask */
-	node->mask = mask;
-
-	return(0);
-}
-
 /* phelper_fill_attr
  *
- * fill in the attributes for a pinode 
+ * fill in the attributes for a pinode - works for either a newly
+ * created pinode or an existing one that just needs certain
+ * fields modified.
  *
  * returns 0 on success, -errno on error
  */
-static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
+int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr, uint32_t mask)
 {
-	int num_files = attr.u.meta.nr_datafiles;
-	PVFS_size size = num_files * sizeof(PVFS_handle);
+	PVFS_size df_array_size = attr.u.meta.nr_datafiles * sizeof(PVFS_handle);
 
-	ptr->attr = attr;
-	if ((mask & ATTR_META) == ATTR_META)
+	/* set common attributes if needed */
+	if(mask & PVFS_ATTR_COMMON_UID)
+		ptr->attr.owner = attr.owner;
+	if(mask & PVFS_ATTR_COMMON_GID)
+		ptr->attr.group = attr.group;
+	if(mask & PVFS_ATTR_COMMON_PERM)
+		ptr->attr.perms = attr.perms;
+	if(mask & PVFS_ATTR_COMMON_ATIME)
+		ptr->attr.atime = attr.atime;
+	if(mask & PVFS_ATTR_COMMON_CTIME)
+		ptr->attr.ctime = attr.ctime;
+	if(mask & PVFS_ATTR_COMMON_MTIME)
+		ptr->attr.mtime = attr.mtime;
+
+	/* set distribution if needed */
+	if ((mask & PVFS_ATTR_META_DIST) && attr.u.meta.nr_datafiles > 0)
 	{
-		if (num_files > 0)
+		if(ptr->attr.u.meta.dfh)
+			free(ptr->attr.u.meta.dfh);
+		ptr->attr.u.meta.dfh = (PVFS_handle *)malloc(df_array_size);
+		if (!(ptr->attr.u.meta.dfh))
 		{
-			ptr->attr.u.meta.dfh = (PVFS_handle *)malloc(size);
-			if (!(ptr->attr.u.meta.dfh))
-			{
-				return(-ENOMEM);
-			}
-			memcpy(ptr->attr.u.meta.dfh,attr.u.meta.dfh,size);
-			ptr->attr.u.meta.nr_datafiles = num_files;
-
-#if 0
-			/* REMOVED BY PHIL WHEN MOVING TO NEW TREE */
-			ptr->attr.u.meta.dist = attr.u.meta.dist;
-#endif
+			return(-ENOMEM);
 		}
-		/* TODO: make this better */
-		if(attr.u.meta.dist_size > 0)
-		{
-			gossip_lerr("KLUDGE: packing dist to memcpy it.\n");
-			ptr->attr.u.meta.dist = malloc(attr.u.meta.dist_size);
-			if(ptr->attr.u.meta.dist == NULL)
-			{
-				return(-ENOMEM);
-			}
-			PINT_Dist_encode(ptr->attr.u.meta.dist, 
-				attr.u.meta.dist);
-			PINT_Dist_decode(ptr->attr.u.meta.dist, NULL);
-		}
-
+		memcpy(ptr->attr.u.meta.dfh, attr.u.meta.dfh, df_array_size);
+		ptr->attr.u.meta.nr_datafiles = attr.u.meta.nr_datafiles;
 	}
-	if ((mask & ATTR_DATA) == ATTR_DATA)
+
+	/* set datafile array if needed */
+	if((mask & PVFS_ATTR_META_DFILES) && attr.u.meta.dist_size > 0)
 	{
-
+		gossip_lerr("WARNING: packing distribution to memcpy it.\n");
+		if(ptr->attr.u.meta.dist)
+		{
+			gossip_lerr("WARNING: need to free old dist, but I don't know how.\n");
+		}
+		ptr->attr.u.meta.dist = malloc(attr.u.meta.dist_size);
+		if(ptr->attr.u.meta.dist == NULL)
+		{
+			return(-ENOMEM);
+		}
+		PINT_Dist_encode(ptr->attr.u.meta.dist, 
+			attr.u.meta.dist);
+		PINT_Dist_decode(ptr->attr.u.meta.dist, NULL);
 	}
+
+	ptr->mask |= mask;
+
+	assert(!(mask & PVFS_ATTR_DATA_ALL));
 	
 	return(0);
-
 }

@@ -62,7 +62,8 @@ int main(int argc, char **argv)
     cur_fs = resp_init.fsid_list[0];
 
     entry_name = str_buf;
-    attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
+    attrmask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID |
+	 	PVFS_ATTR_SYS_PERM);
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;

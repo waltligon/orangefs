@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <time.h>
 
 #include "pvfs2-sysint.h"
 #include "helper.h"
@@ -144,10 +145,13 @@ int main(int argc, char **argv)
     printf("Warning: overriding ownership and permissions to match prototype file system.\n");
 
     entry_name = str_buf;
-    attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
+    attrmask = (PVFS_ATTR_SYS_ALL_NOSIZE);
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
+    attr.atime = time(NULL);
+    attr.mtime = attr.atime;
+    attr.ctime = attr.atime;
     credentials.uid = 100;
     credentials.gid = 100;
     credentials.perms = 1877;

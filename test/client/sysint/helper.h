@@ -7,14 +7,6 @@
 #ifndef __HELPER_H
 #define __HELPER_H
 
-#define ATTR_UID 1
-#define ATTR_GID 2
-#define ATTR_PERM 4
-#define ATTR_ATIME 8
-#define ATTR_CTIME 16
-#define ATTR_MTIME 32
-#define ATTR_TYPE 2048
-
 #define MAX_NUM_DIRENTS    512
 #define MAX_PVFS_PATH_LEN  512
 

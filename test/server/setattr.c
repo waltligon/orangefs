@@ -99,7 +99,7 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
-	/* setup create request */
+	/* setup setattr request */
 	my_req->op = PVFS_SERV_SETATTR;
 	my_req->rsize = sizeof(struct PVFS_server_req_s);
 	my_req->credentials.uid = 0;
@@ -112,8 +112,9 @@ int main(int argc, char **argv)	{
 	my_req->u.setattr.attr.perms = 0x755;
 	my_req->u.setattr.attr.atime = time(NULL);
 	my_req->u.setattr.attr.ctime = time(NULL);
+	my_req->u.setattr.attr.mtime = time(NULL);
 	my_req->u.setattr.attr.objtype = 1;
-	my_req->u.setattr.attrmask = ATTR_BASIC; /*ATTR_UID | ATTR_GID | ATTR_PERM | ATTR_TYPE; */
+	my_req->u.setattr.attrmask = PVFS_ATTR_COMMON_ALL; 
 
 	printf("Sending SETATTR for Handle %lld\n",(long long)user_opts->bucket);
 	display_pvfs_structure(my_req,1);

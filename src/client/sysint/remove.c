@@ -52,9 +52,9 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	} failure = NONE_FAILURE;
 
 	/* lookup meta file */
-	attr_mask = ATTR_BASIC | ATTR_META;
+	attr_mask = PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_ALL;
 
-	ret = PINT_do_lookup(entry_name, parent_refn, attr_mask,
+	ret = PINT_do_lookup(entry_name, parent_refn,
 				credentials, &entry);
 	if (ret < 0)
 	{

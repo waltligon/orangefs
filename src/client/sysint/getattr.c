@@ -23,6 +23,13 @@
 /* PVFS_sys_getattr()
  *
  * obtain the attributes of a PVFS file
+ *
+ * TODO: Yuck.  We have a lot of assumptions in here about what
+ * the attributes look like and what masks are set in the pinode
+ * cache- needs to be updated eventually...
+ * TODO: Code also assumes it can use the mask passed in by the
+ * caller directly at the request level.  Probably should convert
+ * the values instead.
  * 
  * returns 0 on success, -errno on failure
  */
@@ -63,8 +70,8 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	 * attributes - is this the way we want this to be done?
 	 */
 
-	if (attrmask & ATTR_SIZE)
-		attr_mask |= ATTR_META;
+	if (attrmask & PVFS_ATTR_SYS_SIZE)
+		attr_mask |= PVFS_ATTR_META_ALL;
 
 	/* Fill in pinode reference */ 
 	entry.handle = pinode_refn.handle;
@@ -78,11 +85,12 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	if (ret  == PCACHE_LOOKUP_SUCCESS)
         {
 		resp->attr = entry_pinode->attr;
-		if ((attrmask & ATTR_SIZE) == ATTR_SIZE)
+		if (attrmask & PVFS_ATTR_SYS_SIZE)
 		{
 			/* if we want the size, and its valid, then return now */
 			if (entry_pinode->size_flag == SIZE_VALID)
 			{
+			    /* TODO: making too many assumptions here */
 			    resp->attr = entry_pinode->attr;
 			    /* resp->extended */
 			    PINT_pcache_lookup_rls(entry_pinode);
@@ -199,7 +207,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 
 	/* do size calculations here? */
 
-	if ((attrmask & ATTR_SIZE) == ATTR_SIZE)
+	if (attrmask & PVFS_ATTR_SYS_SIZE)
 	{
 	    /*only do this if you want the size*/
 
@@ -225,7 +233,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	    req_p.op = PVFS_SERV_GETATTR;
 	    req_p.credentials = credentials;
 	    req_p.rsize = sizeof(struct PVFS_server_req_s);
-	    req_p.u.getattr.attrmask = ATTR_SIZE;
+	    req_p.u.getattr.attrmask = PVFS_ATTR_DATA_SIZE;
 	    req_p.u.getattr.fs_id = entry.fs_id;
 
 	    /* TODO: come back and unserialize this */

@@ -59,7 +59,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 	
 
     /* get the pinode of the parent so we can check permissions */
-    attr_mask = ATTR_BASIC | ATTR_META;
+    attr_mask = PVFS_ATTR_COMMON_ALL;
     ret = phelper_get_pinode(parent_refn, &parent_ptr, attr_mask,
 				   credentials);
     if(ret < 0)

@@ -143,7 +143,7 @@ int get_next_segment(char *inout,char **output,int *start);
 #endif
 int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid);
 
-int PINT_do_lookup (char* name,PVFS_pinode_reference parent,uint32_t mask,
+int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
                 PVFS_credentials cred,PVFS_pinode_reference *entry);
 
 int get_path_element(char *path, char** segment, int element);

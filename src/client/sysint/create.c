@@ -71,7 +71,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	gossip_ldebug(CLIENT_DEBUG,"parent fsid = %d\n", parent_refn.fs_id);
 
         /* get the pinode of the parent so we can check permissions */
-        attr_mask = ATTR_BASIC | ATTR_META;
+        attr_mask = PVFS_ATTR_COMMON_ALL;
         ret = phelper_get_pinode(parent_refn, &parent_ptr, attr_mask, 
 				    credentials);
         if(ret < 0)

@@ -9,16 +9,6 @@
 #include "client.h"
 #include "gossip.h"
 
-/*why were these commented out? -- because they shouldn't be here. -- RobR */
-
-#define ATTR_UID 1
-#define ATTR_GID 2
-#define ATTR_PERM 4
-#define ATTR_ATIME 8
-#define ATTR_CTIME 16
-#define ATTR_MTIME 32
-#define ATTR_TYPE 2048
-
 void gen_rand_str(int len, char** gen_str);
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
@@ -123,7 +113,8 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	memcpy(entry_name,filename,strlen(filename) + 1);
-	attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
+	attrmask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID | 
+		PVFS_ATTR_SYS_PERM);
 	attr.owner = 100;
 	attr.group = 100;
 	attr.perms = 1877;

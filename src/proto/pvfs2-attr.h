@@ -23,20 +23,6 @@
 #include "pvfs2-storage.h"
 #include "pint-distribution.h"
 
-/*#define ATTR_UID 1
-#define ATTR_GID 2
-#define ATTR_PERM 4
-#define ATTR_ATIME 8
-#define ATTR_CTIME 16
-#define ATTR_MTIME 32
-#define ATTR_TYPE 2048
-*/
-#define ATTR_BASIC (1 << 10)
-#define ATTR_SIZE  (1 << 11)
-#define ATTR_META PVFS_TYPE_METAFILE
-#define ATTR_DATA PVFS_TYPE_DATAFILE
-#define ATTR_DIR PVFS_TYPE_DIRECTORY
-#define ATTR_SYM PVFS_TYPE_SYMLINK
 /* PVFS filesystem objects */
 
 

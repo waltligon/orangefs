@@ -60,9 +60,9 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
     void* encoded_resp;
     PVFS_msg_tag_t op_tag;
 
-    attr_mask = ATTR_BASIC | ATTR_META;
+    attr_mask = PVFS_ATTR_COMMON_ALL;
 
-    ret = PINT_do_lookup(old_entry, old_parent_refn, attr_mask,
+    ret = PINT_do_lookup(old_entry, old_parent_refn,
 			    credentials, &old_entry_refn);
     if (ret < 0)
     {

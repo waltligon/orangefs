@@ -59,7 +59,7 @@ int main(int argc,char* argv[])
 	pinode1->attr.atime = 1;
 	pinode1->attr.objtype = PVFS_TYPE_METAFILE;
 	//pinode1->attr.u.meta = ;
-	pinode1->mask = ATTR_META;
+	pinode1->mask = 5;
 	pinode1->size = 1;
 	pinode1->tstamp.tv_sec = 111;
 	pinode1->tstamp.tv_usec = 111;
@@ -74,7 +74,7 @@ int main(int argc,char* argv[])
 	pinode2->attr.atime = 2;
 	pinode2->attr.objtype = PVFS_TYPE_METAFILE;
 	//pinode2->attr.u.meta = ;
-	pinode2->mask = ATTR_META;
+	pinode2->mask = 6;
 	pinode2->size = 2;
 	pinode2->tstamp.tv_sec = 222;
 	pinode2->tstamp.tv_usec = 222;
@@ -89,7 +89,7 @@ int main(int argc,char* argv[])
 	pinode3->attr.atime = 3;
 	pinode3->attr.objtype = PVFS_TYPE_METAFILE;
 	//pinode3->attr.u.meta = ;
-	pinode3->mask = ATTR_META;
+	pinode3->mask = 7;
 	pinode3->size = 3;
 	pinode3->tstamp.tv_sec = 333;
 	pinode3->tstamp.tv_usec = 333;
