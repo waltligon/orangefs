@@ -52,6 +52,14 @@
     *(pptr) += 4; \
 } while (0)
 
+/* skip 4 bytes */
+#define encode_skip4(pptr) do { \
+    *(pptr) += 4; \
+} while (0)
+#define decode_skip4(pptr) do { \
+    *(pptr) += 4; \
+} while (0)
+
 /* strings; decoding just points into existing character data */
 #define encode_string(pptr,pbuf) do { \
     u_int32_t len = strlen(*pbuf); \

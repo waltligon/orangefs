@@ -97,6 +97,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     encode_PVFS_uid(pptr, &(x)->owner); \
     encode_PVFS_gid(pptr, &(x)->group); \
     encode_PVFS_permissions(pptr, &(x)->perms); \
+    encode_skip4(pptr); \
     encode_PVFS_time(pptr, &(x)->atime); \
     encode_PVFS_time(pptr, &(x)->mtime); \
     encode_PVFS_time(pptr, &(x)->ctime); \
@@ -115,6 +116,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     decode_PVFS_uid(pptr, &(x)->owner); \
     decode_PVFS_gid(pptr, &(x)->group); \
     decode_PVFS_permissions(pptr, &(x)->perms); \
+    encode_skip4(pptr); \
     decode_PVFS_time(pptr, &(x)->atime); \
     decode_PVFS_time(pptr, &(x)->mtime); \
     decode_PVFS_time(pptr, &(x)->ctime); \
