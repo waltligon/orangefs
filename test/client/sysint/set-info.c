@@ -10,8 +10,7 @@
 #include <time.h>
 
 #include "client.h"
-
-extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
+#include "pvfs2-util.h"
 
 int main(int argc, char **argv)
 {
@@ -35,7 +34,7 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    ret = parse_pvfstab(NULL,&mnt);
+    ret = PVFS_util_parse_pvfstab(NULL,&mnt);
     if (ret < 0)
     {
         fprintf(stderr, "Failed to parse pvfstab!\n");

@@ -1,7 +1,0 @@
-DIR := src/client/unix-io
-LIBSRC += \
-	$(DIR)/parse-pvfstab.c \
-#	$(DIR)/pvfs-access.c \
-	$(DIR)/pvfs-ulib-init.c \
-	$(DIR)/pvfs-ulib-release.c 
-

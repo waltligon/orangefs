@@ -146,7 +146,6 @@ struct error_stats
 
 /* Public Interface */
 void free_pvfstab_entry(pvfs_mntlist *e_p);
-int parse_pvfstab(char *filename, pvfs_mntlist *mnt);
 int sysjob_free(bmi_addr_t server,void *tmp_job,bmi_size_t size,const int op,
 		int (*func)(void *,int));
 void job_postack(post_info *rinfo);

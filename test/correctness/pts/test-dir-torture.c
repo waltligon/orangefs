@@ -9,9 +9,8 @@
 #include "mpi.h"
 #include "pts.h"
 #include "pvfs-helper.h"
+#include "pvfs2-util.h"
 
-extern int parse_pvfstab(char *filename,
-			 pvfs_mntlist * pvfstab_p);
 
 /* 
  * helper function to initialize pvfs
@@ -28,7 +27,7 @@ PVFS_fs_id system_init(void)
 
     memset(&resp_init, 0, sizeof(resp_init));
 
-    ret = parse_pvfstab(NULL, &mnt);
+    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
     if (ret < 0)
     {
 	printf("Parsing error\n");

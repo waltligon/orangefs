@@ -11,9 +11,9 @@
 #include <string.h>
 
 #include "client.h"
+#include "pvfs2-util.h"
 
 void gen_rand_str(int len, char** gen_str);
-extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
 int main(int argc,char **argv)
 {
@@ -44,7 +44,7 @@ int main(int argc,char **argv)
 	printf("lookup up path %s\n", filename);
 
 	/* Parse PVFStab */
-	ret = parse_pvfstab(NULL,&mnt);
+	ret = PVFS_util_parse_pvfstab(NULL,&mnt);
 	if (ret < 0)
 	{
 		printf("Parsing error\n");

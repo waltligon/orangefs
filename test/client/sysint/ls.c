@@ -11,6 +11,7 @@
 #include <assert.h>
 
 #include "helper.h"
+#include "pvfs2-util.h"
 
 void print_entry_attr(
     char *entry_name,
@@ -170,7 +171,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (parse_pvfstab(NULL,&mnt))
+    if (PVFS_util_parse_pvfstab(NULL,&mnt))
     {
         fprintf(stderr,"Error parsing pvfstab!\n");
         return 1;

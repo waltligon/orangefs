@@ -4,23 +4,26 @@
  * See COPYING in top-level directory.
  */
 
-#include <pint-userlib.h>
+#include <string.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "pvfs2-sysint.h"
+#include "pvfs2-util.h"
 
 #define PARSER_MAX_LINE_LENGTH 255
 
 /* Function Prototypes */
 static int mntlist_new(int num_mnts,pvfs_mntlist *mntlist_ptr);
 
-/* USE PVFS_util_parse_pvfstab() instead */
-
-#if 0
-/* Function: parse_pvfstab
+/* Function: PVFS_util_parse_pvfstab
  *
  * parses the PVFS fstab file
  *
  * returns 0 on success, -1 on error
  */
-int parse_pvfstab(char *filename,pvfs_mntlist *pvfstab_p)
+int PVFS_util_parse_pvfstab(char *filename,pvfs_mntlist *pvfstab_p)
 {
 	FILE *tab;
 	char line[PARSER_MAX_LINE_LENGTH];
@@ -255,39 +258,18 @@ fstype_failure:
 opt1_failure:
 opt2_failure:
 	fclose(tab);
-	free_pvfstab_entry(pvfstab_p);
+	PVFS_util_pvfstab_mntlist_free(pvfstab_p);
 	return(ret);
 
 }
 
-/* mntlist_new
- *
- * allocates memory for an array of pvfs mount entries
- *
- * returns 0 on success, -1 on failure
- */
-static int mntlist_new(int num_mnts,pvfs_mntlist *mntlist_ptr)
-{
-	mntlist_ptr->nr_entry = num_mnts;
-	mntlist_ptr->ptab_p = malloc(num_mnts * sizeof(pvfs_mntent));
-	if (!mntlist_ptr->ptab_p)
-	{
-		return(-ENOMEM);
-	}
-	memset(mntlist_ptr->ptab_p, 0, num_mnts*sizeof(pvfs_mntent));
-	/* Init the mutex lock */
-	/*mntlist_ptr->mt_lock = gen_mutex_build(); */
-
-	return(0);
-}
-
-/* free_pvfstab_entry
+/* PVFS_util_pvfstab_mntlist_free
  *
  * frees the mount entries data structure
  *
  * does not return anything
  */
-void free_pvfstab_entry(pvfs_mntlist *e_p)
+void PVFS_util_pvfstab_mntlist_free(pvfs_mntlist *e_p)
 {
 	int i = 0;
 	pvfs_mntlist *mnts = e_p;
@@ -310,53 +292,25 @@ void free_pvfstab_entry(pvfs_mntlist *e_p)
 	free(mnts->ptab_p);
 
 }
-#endif
 
-/* search_pvfstab 
+
+/* mntlist_new
  *
- * Search pvfstab for a mount point that matches the file name 
- * 
+ * allocates memory for an array of pvfs mount entries
+ *
  * returns 0 on success, -1 on failure
  */
-int search_pvfstab(char *fname, pvfs_mntlist mnt, pvfs_mntent *mntent)
+static int mntlist_new(int num_mnts,pvfs_mntlist *mntlist_ptr)
 {
-	int i = 0, lmnt_len = 0, smnt_len = 0, ret = 0;
-	
-	/* Grab the mutex */
-	//gen_mutex_lock(mnt.mt_lock);
-
-	for(i = 0; i < mnt.nr_entry; i++)
+	mntlist_ptr->nr_entry = num_mnts;
+	mntlist_ptr->ptab_p = malloc(num_mnts * sizeof(pvfs_mntent));
+	if (!mntlist_ptr->ptab_p)
 	{
-		lmnt_len = strlen(mnt.ptab_p[i].local_mnt_dir);
-		if (!strncmp(mnt.ptab_p[i].local_mnt_dir,fname,lmnt_len))
-		{
-			smnt_len = strlen(mnt.ptab_p[i].service_name);
-			mntent->service_name = (char *)malloc(smnt_len + 1);
-			if (!mntent->service_name)
-			{
-				ret = -ENOMEM;
-				goto unlock_exit;
-			}
-			strncpy(mntent->service_name,mnt.ptab_p[i].service_name,smnt_len);
-			mntent->service_name[smnt_len] = '\0';
-			mntent->local_mnt_dir = (char *)malloc(lmnt_len + 1);
-			if (!mntent->local_mnt_dir)
-			{
-				ret = -ENOMEM;
-				goto unlock_exit;
-			}
-			strncpy(mntent->local_mnt_dir,mnt.ptab_p[i].local_mnt_dir,lmnt_len);
-			mntent->local_mnt_dir[lmnt_len] = '\0';
-			ret = 0;
-			goto unlock_exit;
-		}
-
+		return(-ENOMEM);
 	}
-unlock_exit:
-	/* Release the mutex */
-	//gen_mutex_unlock(mnt.mt_lock);
+	memset(mntlist_ptr->ptab_p, 0, num_mnts*sizeof(pvfs_mntent));
 
-	return(ret);
+	return(0);
 }
 
 /*

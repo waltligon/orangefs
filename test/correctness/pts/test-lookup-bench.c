@@ -9,9 +9,7 @@
 #include "mpi.h"
 #include "pts.h"
 #include "pvfs-helper.h"
-
-extern int parse_pvfstab(char *filename,
-			 pvfs_mntlist * pvfstab_p);
+#include "pvfs2-util.h"
 
 /*
  * simple helper to lookup a handle given a filename
@@ -130,7 +128,7 @@ int test_lookup_bench(MPI_Comm * comm,
 
 	memset(&resp_init, 0, sizeof(resp_init));
 
-	ret = parse_pvfstab(NULL, &mnt);
+	ret = PVFS_util_parse_pvfstab(NULL, &mnt);
 	if (ret < 0)
 	{
 	    printf("Parsing error\n");

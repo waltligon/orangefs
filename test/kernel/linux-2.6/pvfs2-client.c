@@ -19,6 +19,7 @@
 
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
+#include "pvfs2-util.h"
 
 /*
   an arbitrary limit to the max number of items
@@ -30,9 +31,6 @@
 
 /* size of mapped region to use for I/O transfers (in bytes) */
 #define MAPPED_REGION_SIZE (16*1024*1024)
-
-extern int parse_pvfstab(char *fn, pvfs_mntlist *mnt);
-
 
 static int service_lookup_request(
     PVFS_sysresp_init *init_response,
@@ -504,7 +502,7 @@ int main(int argc, char **argv)
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init init_response;
 
-    if (parse_pvfstab(NULL,&mnt))
+    if (PVFS_util_parse_pvfstab(NULL,&mnt))
     {
         fprintf(stderr, "Error parsing pvfstab!\n");
         return 1;

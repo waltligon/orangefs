@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     }
 
     /* look at pvfstab */
-    if(parse_pvfstab(DEFAULT_TAB, &mnt))
+    if(PVFS_util_parse_pvfstab(DEFAULT_TAB, &mnt))
     {
         fprintf(stderr, "Error: failed to parse pvfstab %s.\n", DEFAULT_TAB);
 	close(dest_fd);

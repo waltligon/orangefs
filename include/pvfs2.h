@@ -15,18 +15,13 @@
 #include "pvfs2-types.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-debug.h"
+#include "pvfs2-util.h"
 
 /* TODO: things that shouldn't be included here in the long run are 
  * below this line, along with some comments to help indicate what needs 
  * to be fixed to make them go away...
  */
 /******************************************************************************/
-
-/* needed to get parse_pvfstab() outside of system interface, should be
- * replaced with a more generic mechanism for getting mount point
- * info that can deal with fstab and env variables
- */
-#include "pint-sysint.h"
 
 /* needed to get string / path manipulation functions, maybe these should
  * be renamed and put in some kind of helper interface that looks more 

@@ -6,6 +6,7 @@
 
 #include <client.h>
 #include "helper.h"
+#include "pvfs2-util.h"
 
 int main(int argc,char **argv)
 {
@@ -31,7 +32,7 @@ int main(int argc,char **argv)
 
     sscanf(argv[2],"%lld",&trunc_size);
 
-    if (parse_pvfstab(NULL,&mnt))
+    if (PVFS_util_parse_pvfstab(NULL,&mnt))
     {
         printf("Failed to parse pvfstab\n");
         return ret;

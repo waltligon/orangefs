@@ -11,8 +11,6 @@
 #include "pvfs-helper.h"
 
 extern pvfs_helper_t pvfs_helper;
-extern int parse_pvfstab(char *filename,
-			 pvfs_mntlist * pvfstab_p);
 
 /*
  * parent_refn:  pinode_refn of parent directory

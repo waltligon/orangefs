@@ -19,6 +19,7 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "null_params.h"
+#include "pvfs2-util.h"
 
 extern pvfs_helper_t pvfs_helper;
 
@@ -34,7 +35,7 @@ static int test_system_init(int nullCase)
 
     memset(&pvfs_helper, 0, sizeof(pvfs_helper));
 
-    ret = parse_pvfstab(NULL, &pvfs_helper.mnt);
+    ret = PVFS_util_parse_pvfstab(NULL, &pvfs_helper.mnt);
     if (ret > -1)
     {
 	/* init the system interface */
@@ -56,7 +57,7 @@ static int test_system_init(int nullCase)
     }
     else
     {
-	fprintf(stderr, "Error: parse_pvfstab() failure.\n");
+	fprintf(stderr, "Error: PVFS_util_parse_pvfstab() failure.\n");
     }
     return ret;
 }

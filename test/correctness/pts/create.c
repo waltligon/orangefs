@@ -9,9 +9,8 @@
 #include <stdio.h>
 #include "mpi.h"
 #include "pts.h"
+#include "pvfs2-util.h"
 
-extern int parse_pvfstab(char *fn,
-			 pvfs_mntlist * mnt);
 int compare_attribs(PVFS_sys_attr attr1,
 		    PVFS_sys_attr attr2);
 
@@ -163,7 +162,7 @@ int test_create(MPI_Comm * comm,
     int i, nerrs = 0;
 
     /* Parse PVFStab */
-    ret = parse_pvfstab(NULL, &mnt);
+    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
     if (ret < 0)
     {
 	printf("Parsing error\n");

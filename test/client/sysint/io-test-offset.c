@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
+#include "pvfs2-util.h"
 
 int main(int argc,char **argv)
 {
@@ -81,7 +81,7 @@ int main(int argc,char **argv)
 	memcpy(&(filename[1]), argv[1], (name_sz-1));
 
 	/* parse pvfstab */
-	ret = parse_pvfstab(NULL,&mnt);
+	ret = PVFS_util_parse_pvfstab(NULL,&mnt);
 	if (ret < 0)
 	{
 		fprintf(stderr, "Error: parse_pvfstab() failure.\n");

@@ -13,6 +13,7 @@
 #include "server-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pint-bucket.h"
+#include "pvfs2-util.h"
 
 #define MAX_NUM_FS                   67
 #define MAX_BMI_ADDR_LEN            512
@@ -57,9 +58,9 @@ int main(int argc, char **argv)
     int test_handles_verified[NUM_TEST_HANDLES] = {0};
     PVFS_handle_extent_array meta_handle_extent_array;
 
-    if (parse_pvfstab(NULL,&mnt))
+    if (PVFS_util_parse_pvfstab(NULL,&mnt))
     {
-        fprintf(stderr, "parse_pvfstab failure.\n");
+        fprintf(stderr, "PVFS_util_parse_pvfstab failure.\n");
         return(-1);
     }
 

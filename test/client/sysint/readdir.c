@@ -9,8 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
-extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
+#include "pvfs2-util.h"
 
 int main(int argc,char **argv)
 {
@@ -40,7 +39,7 @@ int main(int argc,char **argv)
                "iteration\n", max_dirents_returned);
 
 	/* Parse PVFStab */
-	ret = parse_pvfstab(NULL,&mnt);
+	ret = PVFS_util_parse_pvfstab(NULL,&mnt);
 	if (ret < 0)
 	{
 		printf("Parsing error\n");

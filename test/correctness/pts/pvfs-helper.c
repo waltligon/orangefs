@@ -2,6 +2,7 @@
 
 #include "pint-sysint.h"
 #include "pvfs-helper.h"
+#include "pvfs2-util.h"
 
 pvfs_helper_t pvfs_helper;
 
@@ -11,7 +12,7 @@ int initialize_sysint(void)
 
     memset(&pvfs_helper,0,sizeof(pvfs_helper));
 
-    ret = parse_pvfstab(NULL,&pvfs_helper.mnt);
+    ret = PVFS_util_parse_pvfstab(NULL,&pvfs_helper.mnt);
     if (ret > -1)
     {
         /* init the system interface */
@@ -31,7 +32,7 @@ int initialize_sysint(void)
     }
     else
     {
-        fprintf(stderr, "Error: parse_pvfstab() failure.\n");
+        fprintf(stderr, "Error: PVFS_util_parse_pvfstab() failure.\n");
     }
     return ret;
 }
