@@ -20,6 +20,12 @@
 
 enum
 {
+    PINODE_EXPIRED = 0,
+    PINODE_VALID = 1
+};
+
+enum
+{
     PCACHE_LOOKUP_FAILURE = 0,
     PCACHE_LOOKUP_SUCCESS = 1
 };

@@ -63,6 +63,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	entry.fs_id = req->pinode_refn.fs_id;
 	
 	/* Lookup the entry...may or may not exist in the cache */
+#if 0
 	ret = PINT_pcache_lookup(entry,pinode_ptr);
 	/* Check if pinode was returned */
 	if (ret == PCACHE_LOOKUP_FAILURE)
@@ -74,6 +75,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 			goto pcache_lookup_failure;
 		}
 	}
+#endif
 
 	/* Free the previously allocated pinode */
 	//pcache_pinode_dealloc(pinode_ptr);
@@ -145,7 +147,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	 * as setattr is complete and there is no way to know
 	 * that some problem occurred
 	 */
-	if (pinode_ptr->pinode_ref.handle != -1)
+	if (pinode_ptr != NULL)
 	{
 		ret = PINT_pcache_remove(entry,&item_ptr);
 		if (ret < 0)
@@ -157,6 +159,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	}
 	else
 	{
+		PINT_pcache_pinode_alloc(&pinode_ptr);
 		/* Fill in the pinode reference for the new pinode */
 		pinode_ptr->pinode_ref = entry;
 	}

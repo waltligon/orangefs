@@ -10,7 +10,7 @@
 static int PINT_pcache_get_next_free(void);
 static int PINT_pcache_add_pinode(pinode *pnode);
 static void PINT_pcache_merge_pinode(pinode *p1,pinode *p2);
-static void PINT_pcache_pinode_copy(pinode *new, pinode *old);
+static int check_expiry(pinode *pnode);
 
 static pcache pvfs_pcache;
 
@@ -138,15 +138,11 @@ int PINT_pcache_insert(pinode *pnode )
  *
  * find the element in the cache
  *
- * returns 0 on success 
+ * returns PCACHE_LOOKUP_FAILURE on failure and PCACHE_LOOKUP_SUCCESS on success 
  */
 int PINT_pcache_lookup(pinode_reference refn,pinode *pinode_ptr)
 {
-	int i = 0;
-	
-	/* Check for allocated address */
-	if (!pinode_ptr)
-		return(-ENOMEM);
+	int i = 0, ret;
 
 #if 0
 	/* TODO: does a mutex need to go here?*/
@@ -155,21 +151,21 @@ int PINT_pcache_lookup(pinode_reference refn,pinode *pinode_ptr)
 #endif
 
 	/* No match found */
-	//*item = -1;
-	pinode_ptr->pinode_ref.handle = -1;
+        ret = PCACHE_LOOKUP_FAILURE;
 	
 	/* Search the cache */
-	for(i = pvfs_pcache.top; i != -1;)
+	for(i = pvfs_pcache.top; i != -1; i = pvfs_pcache.element[i].next)
 	{
-		if ((refn.handle == pvfs_pcache.element[i].pnode->pinode_ref.handle)\
+		if ((refn.handle == pvfs_pcache.element[i].pnode->pinode_ref.handle)
 			&& (refn.fs_id == pvfs_pcache.element[i].pnode->pinode_ref.fs_id))
 		{
-			//*item = i;
-			PINT_pcache_pinode_copy(pinode_ptr,pvfs_pcache.element[i].pnode);
-			break;
+			/* we don't want old pinodes */
+			if (check_expiry(pvfs_pcache.element[i].pnode) == PINODE_VALID)
+			{
+				pinode_ptr = pvfs_pcache.element[i].pnode;
+				ret = PCACHE_LOOKUP_SUCCESS;
+			}
 		}
-		/* Get next element in cache */
-		i = pvfs_pcache.element[i].next;
 	}
 
 #if 0
@@ -178,7 +174,7 @@ int PINT_pcache_lookup(pinode_reference refn,pinode *pinode_ptr)
 	gen_mutex_unlock(pvfs_pcache.mt_lock);
 #endif
 
-	return(0);
+	return ret;
 }
 
 /* PINT_pcache_remove
@@ -356,6 +352,33 @@ void PINT_pcache_pinode_dealloc(pinode *pnode)
 		free(pnode);
 }
 
+/* check_expiry
+ *
+ * check to determine if cached copy is stale based on timeout value
+ *
+ * returns PINODE_VALID on success, PINODE_EXPIRED on failure
+ */
+static int check_expiry(pinode *pnode)
+{
+	int ret;
+	struct timeval cur;
+	ret = gettimeofday(&cur, NULL);
+	if (ret < 0)
+	{
+		return PINODE_EXPIRED;
+	}
+        /* Does timestamp exceed the current time?
+         * If yes, pinode is valid. If no, it is stale.
+         */
+        if (pnode->tstamp.tv_sec > cur.tv_sec || (pnode->tstamp.tv_sec == cur.tv_sec &&
+                                pnode->tstamp.tv_usec > cur.tv_usec))
+                        return PINODE_VALID;
+
+        return PINODE_EXPIRED;
+}
+
+
+#if 0
 /* pinode_copy 
  *
  * copy a pinode to another 
@@ -371,3 +394,4 @@ static void PINT_pcache_pinode_copy(pinode *new, pinode *old)
 	new->tstamp = old->tstamp;
 	new->size_flag = old->size_flag;
 }
+#endif
