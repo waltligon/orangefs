@@ -188,6 +188,7 @@ int run_tests(config *myconfig) {
     index++;
     bzero(buf, 4096);
   }
+  free(buf);
   
   MPI_Comm_free(&newcomm);
   return(0);
