@@ -139,14 +139,6 @@ int fp_multiqueue_initialize(int flowproto_id)
 {
     int ret = -1;
 
-/* only for multithreaded servers */
-#ifndef __PVFS2_JOB_THREADED__
-assert(0);
-#endif
-#ifndef __PVFS2_TROVE_SUPPORT__
-assert(0);
-#endif
-
     ret = PINT_thread_mgr_bmi_start();
     if(ret < 0)
 	return(ret);
@@ -226,13 +218,16 @@ int fp_multiqueue_setinfo(flow_descriptor * flow_d,
 int fp_multiqueue_post(flow_descriptor * flow_d)
 {
     struct fp_private_data* flow_data = NULL;
-    int initial_posts = BUFFERS_PER_FLOW;
     int i;
 
     assert((flow_d->src.endpoint_id == BMI_ENDPOINT && 
 	    flow_d->dest.endpoint_id == TROVE_ENDPOINT) ||
 	   (flow_d->src.endpoint_id == TROVE_ENDPOINT &&
-	    flow_d->dest.endpoint_id == BMI_ENDPOINT));
+	    flow_d->dest.endpoint_id == BMI_ENDPOINT) ||
+	   (flow_d->src.endpoint_id == MEM_ENDPOINT &&
+	    flow_d->dest.endpoint_id == BMI_ENDPOINT) ||
+	   (flow_d->src.endpoint_id == BMI_ENDPOINT &&
+	    flow_d->dest.endpoint_id == MEM_ENDPOINT));
 
     flow_data = (struct fp_private_data*)malloc(sizeof(struct
 	fp_private_data));
@@ -241,19 +236,12 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
     memset(flow_data, 0, sizeof(struct fp_private_data));
     
     flow_d->flow_protocol_data = flow_data;
+    flow_d->state = FLOW_TRANSMITTING;
     flow_data->parent = flow_d;
     INIT_QLIST_HEAD(&flow_data->src_list);
     INIT_QLIST_HEAD(&flow_data->dest_list);
     INIT_QLIST_HEAD(&flow_data->empty_list);
     gen_mutex_init(&flow_data->flow_mutex);
-    for(i=0; i<BUFFERS_PER_FLOW; i++)
-    {
-	flow_data->prealloc_array[i].parent = flow_d;
-	flow_data->prealloc_array[i].bmi_callback.data = 
-	    &(flow_data->prealloc_array[i]);
-	flow_data->prealloc_array[i].trove_callback.data = 
-	    &(flow_data->prealloc_array[i]);
-    }
 
     /* if a file datatype offset was specified, go ahead and skip ahead 
      * before doing anything else
@@ -263,14 +251,55 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	    flow_d->file_req_offset);
 
     /* set boundaries on file datatype */
-    assert(flow_d->aggregate_size > -1);
-    PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
-	flow_d->aggregate_size+flow_d->file_req_offset);
+    if(flow_d->aggregate_size > -1)
+    {
+	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
+	    flow_d->aggregate_size+flow_d->file_req_offset);
+    }
+    else
+    {
+	PINT_REQUEST_STATE_SET_FINAL(flow_d->file_req_state,
+	    flow_d->file_req_offset +
+	    PINT_REQUEST_TOTAL_BYTES(flow_d->mem_req));
+    }
 
-    if(flow_d->src.endpoint_id == BMI_ENDPOINT)
+    for(i=0; i<BUFFERS_PER_FLOW; i++)
+    {
+	flow_data->prealloc_array[i].parent = flow_d;
+	flow_data->prealloc_array[i].bmi_callback.data = 
+	    &(flow_data->prealloc_array[i]);
+	flow_data->prealloc_array[i].trove_callback.data = 
+	    &(flow_data->prealloc_array[i]);
+    }
+
+    /* remaining setup depends on the endpoints we intend to use */
+    if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
+	flow_d->dest.endpoint_id == MEM_ENDPOINT)
+    {
+	/* TODO: fill this in */
+	assert(0);
+    }
+    else if(flow_d->src.endpoint_id == MEM_ENDPOINT &&
+	flow_d->dest.endpoint_id == BMI_ENDPOINT)
+    {
+	/* TODO: fill this in */
+	assert(0);
+    }
+#ifdef __PVFS2_TROVE_SUPPORT__
+    else if(flow_d->src.endpoint_id == TROVE_ENDPOINT &&
+	flow_d->dest.endpoint_id == BMI_ENDPOINT)
+    {
+	flow_data->initial_posts = BUFFERS_PER_FLOW;
+	for(i=0; i<BUFFERS_PER_FLOW; i++)
+	{
+	    bmi_send_callback_fn(&(flow_data->prealloc_array[i]), 0, 0);
+	}
+    }
+    else if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
+	flow_d->dest.endpoint_id == TROVE_ENDPOINT)
     {
 	/* only post one outstanding recv at a time; easier to manage */
-	initial_posts = 1;
+	flow_data->initial_posts = 1;
 
 	/* place remaining buffers on "empty" queue */
 	for(i=1; i<BUFFERS_PER_FLOW; i++)
@@ -278,25 +307,13 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	    qlist_add_tail(&flow_data->prealloc_array[i].list_link,
 		&flow_data->empty_list);
 	}
-    }
 
-    flow_d->state = FLOW_TRANSMITTING;
-    flow_data->initial_posts = initial_posts;
-    for(i=0; i<initial_posts; i++)
-    {
-#ifdef __PVFS2_TROVE_SUPPORT__
-	/* all progress is driven through callbacks; so we may as well use
-	 * the same functions to start
-	 */
-	if(flow_d->src.endpoint_id == BMI_ENDPOINT)
-	{
-	    trove_write_callback_fn(&(flow_data->prealloc_array[i]), 0);
-	}
-	else
-	{
-	    bmi_send_callback_fn(&(flow_data->prealloc_array[i]), 0, 0);
-	}
+	trove_write_callback_fn(&(flow_data->prealloc_array[0]), 0);
+    }
 #endif
+    else
+    {
+	return(-ENOSYS);
     }
 
     return (0);
