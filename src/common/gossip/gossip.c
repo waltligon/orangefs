@@ -39,7 +39,8 @@ enum
 };
 
 /* determines which logging facility to use */
-int gossip_facility = 0;
+/* default to stderr to begin with */
+int gossip_facility = GOSSIP_STDERR;
 
 /* file handle used for file logging */
 static FILE *internal_log_file = NULL;
