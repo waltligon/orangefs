@@ -1676,49 +1676,6 @@ int PINT_config_pvfs2_mkspace(
 }
 
 /*
-  based on keywords in the config file, translate them into
-  a mask value appropriate for the debugging level desired.
-
-  the 'computed' mask is returned; 0 if no keywords are
-  present or recognized.
-*/
-int PINT_config_get_debug_mask(
-    struct server_configuration_s *config)
-{
-    int mask = 0, i = 0;
-
-    typedef struct 
-    {
-        char *keyword;
-        int mask_val;
-    } keyword_mask_t;
-
-    /* map all config keywords to pvfs2 debug masks here */
-    const int NUM_KEYWORD_MASK_MAP_ELEMS = 4; 
-    static keyword_mask_t keyword_mask_map[] =
-    {
-        { "storage", TROVE_DEBUG },
-        { "network", BMI_DEBUG_TCP | BMI_DEBUG_CONTROL |
-          BMI_DEBUG_OFFSETS | BMI_DEBUG_GM | FLOW_DEBUG },
-        { "server", SERVER_DEBUG },
-        { "client", CLIENT_DEBUG }
-    };
-
-    if (config && config->event_logging)
-    {
-        for(i = 0; i < NUM_KEYWORD_MASK_MAP_ELEMS; i++)
-        {
-            if (strstr(config->event_logging,
-                       keyword_mask_map[i].keyword))
-            {
-                mask |= keyword_mask_map[i].mask_val;
-            }
-        }
-    }
-    return mask;
-}
-
-/*
  * Local variables:
  *  c-indent-level: 4
  *  c-basic-offset: 4

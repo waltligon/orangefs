@@ -176,7 +176,8 @@ AC_CHECK_FUNCS(strnlen,
 	AC_DEFINE(HAVE_STRNLEN)
 )
 dnl for regular functions, add them to the CHECK_FUNCS
-AC_CHECK_FUNCS(strtoull,strstr)
+AC_CHECK_FUNCS(strtoull)
+AC_CHECK_FUNCS(strstr)
 
 dnl if we use headers that might not be on every platform, add them here
 AC_CHECK_HEADERS(malloc.h)

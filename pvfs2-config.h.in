@@ -4,17 +4,23 @@
    byte first (like Motorola and SPARC, unlike Intel and VAX).  */
 #undef WORDS_BIGENDIAN
 
+/* Define to explicitly use GNU extensions */
+#undef _GNU_SOURCE
+
+/* Define if you have the GNU extended strnlen function */
+#undef HAVE_STRNLEN
+
 /* The number of bytes in a void *.  */
 #undef SIZEOF_VOID_P
 
-/* Define if you have the GNU extended strnlen function.  */
+/* Define if you have the strnlen function.  */
 #undef HAVE_STRNLEN
 
-/* Define if you have the C99 conformant strtoull function.  */
-#undef HAVE_STRTOULL
-
-/* Define if you have the ISO 9899 conformant strstr function */
+/* Define if you have the strstr function.  */
 #undef HAVE_STRSTR
+
+/* Define if you have the strtoull function.  */
+#undef HAVE_STRTOULL
 
 /* Define if you have the <malloc.h> header file.  */
 #undef HAVE_MALLOC_H

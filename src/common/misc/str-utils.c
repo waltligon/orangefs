@@ -348,13 +348,13 @@ char *strstr(const char *haystack, const char *needle)
     int needle_len = 0;
     int remaining_len = 0;
 
+    ptr = (char *)haystack;
     if (haystack && needle)
     {
-        ptr = (char *)haystack;
         needle_len = strlen(needle);
         remaining_len = strlen(haystack);
 
-        while(ptr && *ptr)
+        while(ptr)
         {
             if (*ptr == *needle)
             {
@@ -366,7 +366,7 @@ char *strstr(const char *haystack, const char *needle)
             ptr++;
             remaining_len--;
 
-            if (remaining_len < needle_len)
+            if ((remaining_len < needle_len) || (*ptr == '\0'))
             {
                 ptr = NULL;
                 break;

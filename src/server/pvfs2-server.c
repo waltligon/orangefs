@@ -133,7 +133,8 @@ int main(int argc, char **argv)
     /* Reset the gossip debug mask based on configuration
      * settings that we now have access to.
      */
-    gossip_set_debug_mask(1, PINT_config_get_debug_mask(&server_config));
+    gossip_set_debug_mask(
+        1, PVFS_debug_eventlog_to_mask(server_config.event_logging));
 
     /* If we were directed to create a storage space, do so and then
      * exit.
