@@ -237,7 +237,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 
 
 	/* Set up the request for getconfig */
-	name_sz = strlen(mntent_p->serv_mnt_dir) + 1;
+	name_sz = strlen(mntent_p->service_name) + 1;
 
 	req_p->op                      = PVFS_SERV_GETCONFIG;	
 	req_p->rsize                   = sizeof(struct PVFS_server_req_s) + name_sz;
@@ -248,7 +248,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	strcpy(req_p->u.getconfig.fs_name,"fs-foo");
 	req_p->u.getconfig.fs_name[7] = '\0';
 #if 0
-	req_p->u.getconfig.fs_name     = mntent_p->serv_mnt_dir; /* just point to the mount info */
+	req_p->u.getconfig.fs_name     = mntent_p->service_name; /* just point to the mount info */
 #endif
 	req_p->u.getconfig.max_strsize = MAX_STRING_SIZE;
 

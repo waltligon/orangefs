@@ -60,28 +60,6 @@ typedef struct
 /* Max No. of Entries in the cache */
 #define MAX_ENTRIES 64 /* 32k entries for the cache */
 
-// Server Info 
-/*struct serv_info
-  {
-  char *name;
-  int id;
-  };
-
-  // Metadata servers 
-  struct metaserv_table 
-  {
-  struct serv_info *table_p;
-  int number;
-  };
-
-  // I/O servers 
-  struct ioserv_table 
-  {
-  struct serv_info *table_p;
-  int number;
-  };
-*/
-
 /* Bucket related info */
 typedef struct {
     PVFS_handle bucket_st;
@@ -137,31 +115,8 @@ struct error_stats
 };
 
 /* PVFS Object - File name + Collection ID */
-/*typedef struct
-  {
-  char *fname;         // File Name 
-  PVFS_fs_id fs_id;    // Filesystem id 
-  }pobj, *pobj_p;
-*/
 
 /* PVFStab parameters */
-/*
-struct pvfs_mntent_s {
-	PVFS_string meta_addr; // metaserver address 
-	PVFS_string serv_mnt_dir; // Root mount point 
-	PVFS_string local_mnt_dir;// Local mount point 
-	PVFS_string fs_type;    // Type of filesystem - pvfs 
-	PVFS_string opt1;    // Mount Option
-	PVFS_string opt2;    // Mount Option 
-};
-typedef struct pvfs_mntent_s pvfs_mntent;
-
-struct pvfs_mntlist_s {
-	int nr_entry; // Number of entries in PVFStab 
-	pvfs_mntent *ptab_p;
-};
-typedef struct pvfs_mntlist_s pvfs_mntlist;
-*/
 
 /* Public Interface */
 void free_pvfstab_entry(pvfs_mntlist *e_p);

@@ -83,10 +83,30 @@ enum {
 	INT = 2
 };
 
+/*
+ * Here's the format of the pvfstab file that the client expects:
+ *
+ * FORMAT:
+ * BMI_ADDRESS/SERVICE_NAME LOCAL_MNT_DIR FILESYSTEM_TYPE OPT1 OPT2
+ *
+ * EXAMPLE:
+ * pvfs-tcp://localhost:3334/pvfs1 /mnt/pvfs pvfs 0 0
+ *
+ * where:
+ * BMI_ADDRESS = "pvfs-tcp://localhost:3334"
+ * SERVICE_NAME = "pvfs1"
+ * LOCAL_MNT_DIR = "/mnt/pvfs"
+ * OPT1 = "0"
+ * OPT2 = "0"
+ * 
+ * we must have atleast one line for every pvfs filesystem type the client 
+ * mounts.
+ */
+
 /* PVFStab parameters */
 struct pvfs_mntent_s {
    PVFS_string meta_addr; /* metaserver address */
-   PVFS_string serv_mnt_dir; /* Root mount point */
+   PVFS_string service_name; /* Service name for the remote pvfs filesystem */
    PVFS_string local_mnt_dir;/* Local mount point */
    PVFS_string fs_type;    /* Type of filesystem - pvfs */
    PVFS_string opt1;    /* Mount Option */
