@@ -59,6 +59,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
     gossip_enable_stderr();
     gossip_set_debug_mask(1,CLIENT_DEBUG);
 
+
     /* Initialize BMI */
     /*TODO: change this so it parses the bmi module from the pvfstab file*/
     ret = BMI_initialize("bmi_tcp",NULL,0);

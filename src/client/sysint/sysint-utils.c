@@ -59,6 +59,8 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
         req_p.u.lookup_path.starting_handle = parent.handle;
         req_p.u.lookup_path.attrmask = mask;
 
+	max_msg_sz = sizeof(struct PVFS_server_resp_s);
+
         ret = PINT_bucket_map_to_server(&serv_addr, parent.handle, parent.fs_id);
         if (ret < 0)
         {
@@ -182,6 +184,12 @@ void debug_print_type(void* thing, int type)
 			case PVFS_SERV_READDIR:
 				gossip_ldebug(CLIENT_DEBUG,"readdir request\n");
 				break;
+			case PVFS_SERV_MKDIR:
+				gossip_ldebug(CLIENT_DEBUG,"mkdir request\n");
+				break;
+			case PVFS_SERV_RMDIR:
+				gossip_ldebug(CLIENT_DEBUG,"rmdir request\n");
+				break;
 			default:
 				gossip_ldebug(CLIENT_DEBUG,"unknown request = %d\n", req->op);
 				break;
@@ -192,6 +200,12 @@ void debug_print_type(void* thing, int type)
 		struct PVFS_server_resp_s * resp = thing;
 		switch( resp->op )
 		{
+			case PVFS_SERV_MKDIR:
+				gossip_ldebug(CLIENT_DEBUG,"mkdir response\n");
+				break;
+			case PVFS_SERV_RMDIR:
+				gossip_ldebug(CLIENT_DEBUG,"rmdir response\n");
+				break;
 			case PVFS_SERV_READDIR:
 				gossip_ldebug(CLIENT_DEBUG,"readdir response\n");
 				break;
