@@ -91,7 +91,7 @@ void dbpf_bstream_fdcache_finalize(void)
 int dbpf_bstream_fdcache_try_remove(TROVE_coll_id coll_id,
 				    TROVE_handle handle)
 {
-    int i, ret, fd;
+    int i, ret;
     char filename[PATH_MAX];
 
     /* NOTE: NEED TO DO SOMETHING HERE TO ENSURE THAT NOTHING IS ADDED TO 

@@ -80,7 +80,6 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 {
     int i, ret;
     char filename[PATH_MAX];
-    DB *db_p;
 
     for (i=0; i < DBCACHE_ENTRIES; i++) {
 	if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
