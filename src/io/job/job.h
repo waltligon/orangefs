@@ -483,7 +483,13 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 			  job_id_t * id,
 			  job_context_id context_id);
 
-
+int job_null(
+    int error_code,
+    void *user_ptr,
+    job_aint status_user_tag,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id);
 
 /******************************************************************
  * job test/wait for completion functions 
