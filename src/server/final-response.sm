@@ -20,7 +20,9 @@
 
 /* PRECONDITIONS:
  * - the s_op->resp struct must be filled in with the response that
- *   needs to be sent (not yet encoded)
+ *   needs to be sent (not yet encoded), with one exception:
+ * - js_p->error_code must indicate the status value that you wish 
+ *   to have set in the response structure
  * - if the operation has been scheduled, then the scheduled id must be
  *   stored in s_op->scheduled_id
  */
@@ -74,6 +76,12 @@ static int final_response_release(PINT_server_op *s_op, job_status_s *js_p)
 
     gossip_debug(SERVER_DEBUG, "(%p) final_response state: release\n", s_op);
 
+    /* this seems a little odd, but since this is the first state of the
+     * nested machine, now is the time to grab the error code if we
+     * are going to use it
+     */
+    s_op->resp.status = js_p->error_code;
+
     /* catch cases in which the operation has not been scheduled */
     if(!s_op->scheduled_id)
     {
@@ -99,6 +107,8 @@ static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p)
     int ret = -1;
     job_id_t tmp_id;
     
+    gossip_debug(SERVER_DEBUG, "(%p) final_response state: send_resp\n", s_op);
+
     if(js_p->error_code != 0)
     {
 	gossip_lerr("Error: req_sched_release() failure; continuing...\n");
@@ -146,6 +156,7 @@ static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
+    gossip_debug(SERVER_DEBUG, "(%p) final_response state: cleanup\n", s_op);
 
     PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 

@@ -160,6 +160,7 @@ typedef struct PINT_server_op
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_final_response_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
