@@ -100,8 +100,13 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     g_session_tag_mt_lock = gen_mutex_build();
 
     /* Initialize flow */
+#if 0
     ret =
 	PINT_flow_initialize("flowproto_bmi_trove,flowproto_dump_offsets", 0);
+#else
+    ret =
+	PINT_flow_initialize("flowproto_bmi_trove", 0);
+#endif
     if (ret < 0)
     {
 	init_fail = FLOW_INIT_FAIL;

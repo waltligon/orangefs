@@ -548,7 +548,11 @@ static int server_initialize_subsystems(
                  llist_count(server_config.file_systems));
 
     /* initialize the flow interface */
+#if 0
     ret = PINT_flow_initialize("flowproto_bmi_trove,flowproto_dump_offsets", 0);
+#else
+    ret = PINT_flow_initialize("flowproto_bmi_trove", 0);
+#endif
     if (ret < 0)
     {
 	gossip_err("Flow_initialize Failed: %s\n", strerror(-ret));
