@@ -2781,6 +2781,8 @@ static int do_one_work_cycle_bmi(int *num_completed,
 	tmp_desc->u.bmi.actual_size = stat_bmi_actual_size_array[i];
 	gen_mutex_lock(&completion_mutex);
 	job_desc_q_add(completion_queue, tmp_desc);
+	/* set completed flag while holding queue lock */
+	tmp_desc->completed_flag = 1;
 	gen_mutex_unlock(&completion_mutex);
     }
 
@@ -2850,6 +2852,8 @@ static int do_one_work_cycle_bmi_unexp(int *num_completed,
 	/* set appropriate fields and store incompleted queue */
 	*(tmp_desc->u.bmi_unexp.info) = stat_bmi_unexp_array[i];
 	gen_mutex_lock(&completion_mutex);
+	/* set completed flag while holding queue lock */
+	tmp_desc->completed_flag = 1;
 	job_desc_q_add(completion_queue, tmp_desc);
 	gen_mutex_unlock(&completion_mutex);
     }
@@ -2912,6 +2916,8 @@ static int do_one_work_cycle_flow(int *num_completed)
 	gen_mutex_unlock(&flow_mutex);
 	/* place in completed queue */
 	gen_mutex_lock(&completion_mutex);
+	/* set completed flag while holding queue lock */
+	tmp_desc->completed_flag = 1;
 	job_desc_q_add(completion_queue, tmp_desc);
 	gen_mutex_unlock(&completion_mutex);
     }
@@ -2984,6 +2990,8 @@ static int do_one_work_cycle_trove(int *num_completed)
 	tmp_desc->u.trove.vtag = stat_trove_vtag_array[i];
 #endif
 	gen_mutex_lock(&completion_mutex);
+	/* set completed flag while holding queue lock */
+	tmp_desc->completed_flag = 1;
 	job_desc_q_add(completion_queue, tmp_desc);
 	gen_mutex_unlock(&completion_mutex);
     }
@@ -3277,7 +3285,11 @@ static int do_one_test_cycle_req_sched(void)
 	job_desc_q_remove(tmp_desc);
 	/* set appropriate fields and place in completed queue */
 	tmp_desc->u.req_sched.error_code = error_code_array[i];
+	gen_mutex_lock(&completion_mutex);
+	/* set completed flag while holding queue lock */
+	tmp_desc->completed_flag = 1;
 	job_desc_q_add(completion_queue, tmp_desc);
+	gen_mutex_unlock(&completion_mutex);
     }
 
     return (0);

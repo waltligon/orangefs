@@ -74,6 +74,7 @@ struct job_desc
     enum job_type type;		/* type of job */
     job_id_t job_id;		/* job interface identifier */
     void *job_user_ptr;		/* user pointer */
+    int completed_flag;		/* has the job finished? */
 
     /* union of information for lower level interfaces */
     union
