@@ -203,7 +203,6 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
             }
         }
 
-      post_msg_receive:
 	session_tag = get_next_session_tag();
 
 	/* post receive of response; job_id stored in recv_id */
@@ -272,49 +271,30 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 				&msg_p->send_id,
 				pint_client_sm_context,
 				PVFS2_CLIENT_JOB_TIMEOUT);
-	if (ret < 0)
-        {
-	    PVFS_perror_gossip("Post of send failed; should cancel recv", ret);
+	if (ret < 0 || (ret == 1 && msg_p->send_status.error_code != 0))
+	{
+	    if(ret < 0)
+		PVFS_perror_gossip("Post of send failed", ret);
+	    else
+		PVFS_perror_gossip("Send immediately failed",
+		    msg_p->recv_status.error_code);
 
-	    assert(msg_p->send_status.error_code != 0);
+	    gossip_err("Send error: cancelling recv.\n");
 
+	    ret = PINT_client_bmi_cancel(msg_p->recv_id);
+	    /* this should not fail */
+	    assert(ret == 0);
+	    
+	    /* we still have to wait for recv completion, so just decrement
+	     * comp_ct by one and keep going
+	     */
 	    msg_p->op_status = msg_p->send_status.error_code;
 	    sm_p->msgarray[0].comp_ct--;
 	}
-	else if (ret == 1)
-        {
-	    /*
-              send completed immediately; decrement the completion
-              counter
-            */
-	    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                         "  msgpairarray: send completed immediately.\n");
-
-	    /* 0 is the valid "completed job id" value */
+	else if(ret == 1)
+	{
+	    /* immediate completion */
 	    msg_p->send_id = 0;
-
-	    if (msg_p->send_status.error_code != 0)
-            {
-                PVFS_perror_gossip("Canceling recv due to send failure:",
-                            msg_p->send_status.error_code);
-
-                ret = PINT_client_bmi_cancel(msg_p->recv_id);
-		/* this should not fail */
-		assert(ret == 0);
-
-                if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
-                    (PVFS_ERROR_CLASS(-msg_p->send_status.error_code) ==
-                     PVFS_ERROR_BMI) &&
-                    (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
-                {
-                    gossip_debug(GOSSIP_CLIENT_DEBUG, "*** msgpair "
-                                 "restarting due to send failure\n");
-
-                    msg_p->retry_count++;
-                    goto post_msg_receive;
-                }
-	    }
-
 	    /* decrement our count, since send is already done.
 	     *
 	     * we're using the comp_ct in the first array element to
@@ -322,7 +302,10 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	     */
 	    sm_p->msgarray[0].comp_ct--;
 	}
-	assert(ret == 0 || ret == 1);
+	else
+	{
+	    /* successful post, no immediate completion */
+	}
     }
 
     if(sm_p->msgarray[0].comp_ct == 0)
@@ -330,7 +313,6 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	/* everything is completed already (could happen in some failure
 	 * cases); jump straight to final completion function.
 	 */
-	 gossip_err("HEY, LOOK AT ME!\n");
 	 js_p->error_code = MSGPAIRS_COMPLETE;
 	 return 1;
     }
