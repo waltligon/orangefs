@@ -165,13 +165,8 @@ int main(int argc,char **argv)
 	buffer = io_buffer;
 	buffer_size = io_size*sizeof(int);
 
-	/* TODO: use something simpler once file datatype is tiled */
-	ret = PVFS_Request_contiguous(io_size*sizeof(int), PVFS_BYTE, &(file_req));
-	if(ret < 0)
-	{
-		fprintf(stderr, "Error: PVFS_Request_contiguous() failure.\n");
-		return(-1);
-	}
+	file_req = PVFS_BYTE;
+
 	ret = PVFS_Request_contiguous(io_size*sizeof(int), PVFS_BYTE, &(mem_req));
 	if(ret < 0)
 	{
