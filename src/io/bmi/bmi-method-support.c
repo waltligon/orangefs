@@ -68,6 +68,7 @@ method_op_p alloc_method_op(bmi_size_t payload_size)
  */
 void dealloc_method_op(method_op_p op_p)
 {
+	if (op_p != NULL && op_p->buffer != NULL) free(op_p->buffer);
 	free(op_p);
 	op_p = NULL;
 	return;
