@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.9 2004-04-15 18:33:04 pw Exp $
+ * $Id: setup.c,v 1.10 2004-05-17 19:05:13 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -23,6 +23,7 @@
 #include <vapi_common.h>  /* VAPI_event_(record|syndrome)_sym */
 #include <evapi.h>
 #include <wrap_common.h>  /* reinit_mosal externs */
+#include <dlfcn.h>        /* look in mosal for syms */
 /* bmi ib private header */
 #include "ib.h"
 
@@ -683,22 +684,32 @@ async_event_handler(VAPI_hca_hndl_t nic_handle_in __attribute__((unused)),
 	debug(2, "%s: caught send queue drained", __func__);
 	async_event_handler_waiting_drain = 0;
     } else
+	/* qp handle is ulong in 2.4, uint32 in 2.6 */
 	error("%s: event %s, syndrome %s, qp or cq or port 0x%lx",
 	  __func__, VAPI_event_record_sym(e->type),
-	  VAPI_event_syndrome_sym(e->syndrome), e->modifier.qp_hndl);
+	  VAPI_event_syndrome_sym(e->syndrome),
+	  (unsigned long) e->modifier.qp_hndl);
 }
 
 /*
  * Hack to work around fork in daemon mode which confuses kernel
  * state.  I wish they did not have an _init function.  It calls
  * into MOSAL_user_lib_init(), but there is no finalize equivalent.
- * This just breaks its saved state and reinitializes.
+ * This just breaks its saved state and reinitializes.  (task->mm
+ * changes due to fork after init, hash lookup on that fails.)
  *
  * Seems to work even in the case of a non-backgrounded server too,
  * fortunately.
+ *
+ * We have to do something different on the 2.6 mellanox distro,
+ * but would prefer not to have two different PVFS2 versions, one
+ * for 2.4 clients and one for 2.6, so try to guess which is which.
  */
-extern call_result_t _dev_mosal_init_lib(t_lib_descriptor **pp_t_lib);
+
+#ifndef VAPI_INVAL_SRQ_HNDL
+/* already declared in 2.6, so look for a 2.6-only tag to avoid */
 extern void MOSAL_user_lib_init(void);
+#endif
 extern int mosal_fd;
 
 static void
@@ -706,22 +717,55 @@ reinit_mosal(void)
 {
     t_lib_descriptor *desc;
     int ret;
+    void *dlh;
+    call_result_t (*_dev_mosal_init_lib)(t_lib_descriptor **pp_t_lib);
+    int (*mosal_ioctl_close)(void);
 
-    ret = _dev_mosal_init_lib(&desc);
-    debug(2, "%s: mosal init ret %d, desc %p", __func__, ret, desc);
-    debug(2, "%s: desc->fd %d", __func__, desc->os_lib_desc_st.fd);
-    close(desc->os_lib_desc_st.fd);
-    /* both these state items protect against a reinit */
-    desc->state = 0;
-    mosal_fd = -1;
-    MOSAL_user_lib_init();
+    dlh = dlopen("libmosal.so", RTLD_LAZY);
+    if (!dlh)
+	error("%s: cannot open libmosal shared library", __func__);
+    _dev_mosal_init_lib = dlsym(dlh, "_dev_mosal_init_lib");
+    if (!dlerror()) {
+	ret = (*_dev_mosal_init_lib)(&desc);
+	debug(2, "%s: mosal init ret %d, desc %p", __func__, ret, desc);
+	debug(2, "%s: desc->fd %d", __func__, desc->os_lib_desc_st.fd);
+	close(desc->os_lib_desc_st.fd);
+	/* both these state items protect against a reinit */
+	desc->state = 0;
+	mosal_fd = -1;
+	MOSAL_user_lib_init();
 #if 0
-    /* just for debugging, print out the same values again */
-    ret = _dev_mosal_init_lib(&desc);
-    debug(2, "%s: after close of state fd", __func__);
-    debug(2, "%s: mosal init ret %d, desc %p", __func__, ret, desc);
-    debug(2, "%s: desc->fd %d", __func__, desc->os_lib_desc_st.fd);
+	/* just for debugging, print out the same values again */
+	ret = _dev_mosal_init_lib(&desc);
+	debug(2, "%s: after close of state fd", __func__);
+	debug(2, "%s: mosal init ret %d, desc %p", __func__, ret, desc);
+	debug(2, "%s: desc->fd %d", __func__, desc->os_lib_desc_st.fd);
 #endif
+    } else {
+	/* Unfortunately this trick does not work.  Need to change
+	 * a static variable in the library to be allowed to reinit.
+	 * Read /dev/mosal open code to see if there's some other way
+	 * to get this process understood.  Can then close the new
+	 * socket and use the original library one maybe.
+	 *
+	 * Nope.  Library is convinced it is already initialized,
+	 * can't change its fd.  Must do the following things.
+	 */
+	mosal_ioctl_close = dlsym(dlh, "mosal_ioctl_close");
+	if (dlerror())
+	    error("%s: neither magic symbol found in libmosal", __func__);
+	(*mosal_ioctl_close)();
+	mosal_fd = -1;
+	MOSAL_user_lib_init();
+    }
+    /* XXX: note that you still need a separate application since header
+     * files are different.  VAPI_CQ_EMPTY is -213 on 2.6 version, which
+     * is not what 2.4-compiled check_cq() expects to hear back from
+     * VAPI_poll_cq.
+     *
+     * Or hack that in yet another wrapper that gets the value at runtime.
+     * Hope not too much else changed...
+     */
 }
 
 /*
@@ -777,7 +821,8 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
     ret = VAPI_alloc_pd(nic_handle, &nic_pd);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_create_pd", __func__);
-    debug(2, "%s: built pd %lx", __func__, nic_pd);
+    /* ulong in 2.6, uint32 in 2.4 */
+    debug(2, "%s: built pd %lx", __func__, (unsigned long) nic_pd);
 
     /* see how many cq entries we are allowed to have */
     memset(&hca_cap, 0, sizeof(hca_cap));
