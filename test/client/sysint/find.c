@@ -73,13 +73,12 @@ int directory_walk(PVFS_sysresp_init *init_response,
             strcat(full_path,"/");
         }
         strncat(full_path,start_dir,MAX_PVFS_PATH_LEN);
-        lk_request.name = full_path;
     }
     else
     {
-        strcpy(full_path,"/");
-        lk_request.name = start_dir;
+        strcpy(full_path,start_dir);
     }
+    lk_request.name = full_path;
     lk_request.fs_id = init_response->fsid_list[0];
     lk_request.credentials.uid = 100;
     lk_request.credentials.gid = 100;
