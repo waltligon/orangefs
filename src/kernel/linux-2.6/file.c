@@ -61,6 +61,8 @@ static ssize_t pvfs2_file_read(
 
     while(total_count < count)
     {
+	pvfs2_print("pvfs2: read iteration.\n");
+
 	/* get a buffer for the transfer */
 	/* note that we get a new buffer each time for fairness, though
 	 * it may speed things up in the common case more if we kept one

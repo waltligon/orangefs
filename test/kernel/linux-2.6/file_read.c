@@ -3,16 +3,26 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 int main(int argc, char **argv)	
 {
 	int ret = -1;
 	int fd = -1;
-	char buffer[256];
+	int buf_size = 8*1024*1024;
+	char* buffer = NULL;
+	off_t pos = 0;
 
 	if(argc != 2)
 	{
 		fprintf(stderr, "usage: %s <filename>\n", argv[0]);
+		return(-1);
+	}
+
+	buffer = (char*)malloc(buf_size);
+	if(!buffer)
+	{
+		perror("malloc");
 		return(-1);
 	}
 
@@ -23,8 +33,11 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	ret = read(fd, buffer, 256);
+	ret = read(fd, buffer, buf_size);
 	printf("read returned: %d\n", ret);
+
+	pos = lseek(fd, 0, SEEK_CUR);
+	printf("lseek returned: %d\n", (int)pos);
 
 	close(fd);
 
