@@ -296,11 +296,12 @@ static int getattr_read_metafile_datafile_handles_if_required(
 
     assert(s_op->attr.objtype == PVFS_TYPE_METAFILE);
 
+    js_p->error_code = 0;
+
     /* if we don't need to fill in the dfiles, skip them */
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "skipping data handle read\n");
-        js_p->error_code = 0;
         return 1;
     }
 
@@ -317,7 +318,6 @@ static int getattr_read_metafile_datafile_handles_if_required(
         gossip_err("The requested dfile count of %d is invalid; "
                    "aborting operation.\n", dfile_count);
 	js_p->error_code = -PVFS_EOVERFLOW;
-        assert(0);
 	return 1;
     }
 
@@ -331,15 +331,17 @@ static int getattr_read_metafile_datafile_handles_if_required(
         malloc(dfile_count * sizeof(PVFS_handle));
     if (!s_op->resp.u.getattr.attr.u.meta.dfile_array)
     {
+        gossip_err("Cannot allocate dfile array of count %d\n",
+                   dfile_count);
 	js_p->error_code = -PVFS_ENOMEM;
-	return(1);
+	return 1;
     }
 
     s_op->val.buffer    = s_op->resp.u.getattr.attr.u.meta.dfile_array;
     s_op->val.buffer_sz = (dfile_count * sizeof(PVFS_handle));
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  reading %d datafile handles (coll_id = 0x%x, "
+		 "  reading %d datafile handles (coll_id = %d, "
                  "handle = %Lu, key = %s (%d), val_buf = %p (%d))\n",
 		 dfile_count,
 		 s_op->req->u.getattr.fs_id,
@@ -373,12 +375,13 @@ static int getattr_read_metafile_distribution_if_required(
 
     PINT_STATE_DEBUG("read_metafile_distribution_if_required");
 
+    js_p->error_code = 0;
+
     /* if we don't need to fill in the distribution, skip it */
     if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DIST))
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "skipping data handle "
                      "distribution read\n");
-        js_p->error_code = 0;
         return 1;
     }
 
@@ -395,8 +398,10 @@ static int getattr_read_metafile_distribution_if_required(
 	malloc(s_op->resp.u.getattr.attr.u.meta.dist_size);
     if(!s_op->resp.u.getattr.attr.u.meta.dist)
     {
+        gossip_err("Cannot allocate dist of size %d\n",
+                   s_op->resp.u.getattr.attr.u.meta.dist_size);
 	js_p->error_code = -PVFS_ENOMEM;
-	return(1);
+	return 1;
     }
 
     s_op->val.buffer    = s_op->resp.u.getattr.attr.u.meta.dist;
@@ -426,12 +431,6 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 
     a_p = &s_op->resp.u.getattr.attr;
     
-    if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
-        (a_p->mask & PVFS_ATTR_META_DIST))
-    {
-        PINT_Dist_decode(a_p->u.meta.dist, NULL);
-    }
-
     gossip_debug(
         GOSSIP_SERVER_DEBUG,
         "  sending attrs (owner = %d, group = %d, perms = %o, "
@@ -444,23 +443,31 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
         (long long)a_p->mtime,
         (long long)a_p->ctime);
 
-    if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
-        (a_p->mask & PVFS_ATTR_META_DFILES))
+    if (a_p->objtype == PVFS_TYPE_METAFILE)
     {
-	gossip_debug(GOSSIP_SERVER_DEBUG,
-		     "  also returning %d datafile handles\n",
-		     a_p->u.meta.dfile_count);
-    }
-    if ((a_p->objtype == PVFS_TYPE_METAFILE) &&
-        (a_p->mask & PVFS_ATTR_META_DIST))
-    {
-	gossip_debug(GOSSIP_SERVER_DEBUG,
-		     "  also returning dist size of %d\n",
-		     a_p->u.meta.dist_size);
-    }
+        if (a_p->mask & PVFS_ATTR_META_DFILES)
+        {
+            if (a_p->u.meta.dfile_count)
+            {
+                assert(a_p->u.meta.dfile_array);
+            }
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "  also returning %d datafile handles\n",
+                         a_p->u.meta.dfile_count);
+        }
 
-    if ((a_p->objtype == PVFS_TYPE_DATAFILE) &&
-        (a_p->mask & PVFS_ATTR_DATA_SIZE))
+        if (a_p->mask & PVFS_ATTR_META_DIST)
+        {
+            assert(a_p->u.meta.dist);
+            PINT_Dist_decode(a_p->u.meta.dist, NULL);
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                         "  also returning dist size of %d\n",
+                         a_p->u.meta.dist_size);
+        }
+
+    }
+    else if ((a_p->objtype == PVFS_TYPE_DATAFILE) &&
+             (a_p->mask & PVFS_ATTR_DATA_SIZE))
     {
         if (js_p->error_code != 0)
         {
@@ -476,10 +483,11 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
                          Ld(a_p->u.data.size));
         }
     }
-
-    if ((a_p->objtype == PVFS_TYPE_SYMLINK) &&
-        (a_p->mask & PVFS_ATTR_SYMLNK_TARGET))
+    else if ((a_p->objtype == PVFS_TYPE_SYMLINK) &&
+             (a_p->mask & PVFS_ATTR_SYMLNK_TARGET))
     {
+        assert(a_p->u.sym.target_path);
+        assert(a_p->u.sym.target_path_len);
         /*
           adjust target path len down to actual size ; always
           include the null termination char in the target_path_len
@@ -499,11 +507,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     PINT_attrmask_print(GOSSIP_SERVER_DEBUG,
                         s_op->resp.u.getattr.attr.mask);
 
-    /* NOTE: we _intentionally_ preserve the error_code so that the 
-     * following states can use it to set the status field in the
-     * response
-     */
-    return(1);
+    return 1;
 }
 
 static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
@@ -514,12 +518,18 @@ static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
     {
         if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
         {
-            free(s_op->resp.u.getattr.attr.u.meta.dfile_array);
+            if (s_op->resp.u.getattr.attr.u.meta.dfile_array)
+            {
+                free(s_op->resp.u.getattr.attr.u.meta.dfile_array);
+            }
         }
 
         if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DIST)
         {
-            free(s_op->resp.u.getattr.attr.u.meta.dist);
+            if (s_op->resp.u.getattr.attr.u.meta.dist)
+            {
+                free(s_op->resp.u.getattr.attr.u.meta.dist);
+            }
         }
     }
 
@@ -527,7 +537,10 @@ static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
     {
         if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET)
         {
-            free(s_op->resp.u.getattr.attr.u.sym.target_path);
+            if (s_op->resp.u.getattr.attr.u.sym.target_path)
+            {
+                free(s_op->resp.u.getattr.attr.u.sym.target_path);
+            }
         }
     }
     return(server_state_machine_complete(s_op));
