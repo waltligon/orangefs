@@ -13,6 +13,9 @@
 #include "statecomp-symbol.h"
 #include "parser.h"
 
+/* avoid a warning since we do not use yyunput() */
+#define YY_NO_UNPUT
+
 extern YYSTYPE yylval;
 
 extern FILE *out_file;
