@@ -81,6 +81,10 @@ char *PINT_server_config_get_data_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
 
+char *PINT_server_config_get_merged_handle_range_str(
+    struct server_configuration_s *config_s,
+    struct filesystem_configuration_s *fs);
+
 int PINT_server_config_is_valid_configuration(
     struct server_configuration_s *config_s);
 

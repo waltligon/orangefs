@@ -236,7 +236,7 @@ int trove_handle_mgmt_initialize()
 {
     /*
       due to weird trove_initialize usages; this will always succeed
-      unless a the hash table initialization really fails.
+      unless the hash table initialization really fails.
     */
     int ret = 0;
 
@@ -271,7 +271,7 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
                 /* assert the internal ledger struct is valid */
                 assert(ledger->ledger);
 		
-		/* tell trove what are our valid ranges */
+		/* tell trove what are our valid ranges are */
 		ret = trove_map_handle_ranges(coll_id,extent_list, 
 			ledger->ledger);
 		if (ret != 0) return ret;

@@ -86,8 +86,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 {
     int ret = 0;
     char *method_name = NULL;
-    char *cur_meta_handle_range = NULL;
-    char *cur_data_handle_range = NULL;
+    char *cur_merged_handle_range = NULL;
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
 
@@ -151,20 +150,18 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 	    goto interface_init_failed;
 	}
 
-        cur_meta_handle_range =
-            PINT_server_config_get_meta_handle_range_str(&user_opts,cur_fs);
-        cur_data_handle_range =
-            PINT_server_config_get_data_handle_range_str(&user_opts,cur_fs);
+        /*
+          get a range string that combines all handles for both meta
+          and data ranges specified in the config file.
+        */
+        cur_merged_handle_range =
+            PINT_server_config_get_merged_handle_range_str(&user_opts,cur_fs);
 
         /*
           error out if we're not configured to house either a
           meta or data handle range at all.
-
-          FIXME: For now this assumes that each host MUST have a handle
-          range in ALL configured filesystems.  If we want to relax this
-          contraint, here's the place to do it.
         */
-        if (!cur_meta_handle_range && !cur_data_handle_range)
+        if (!cur_merged_handle_range)
         {
 	    gossip_lerr("Error: Invalid handle range for host %s "
                         "(alias %s) specified in file system %s\n",
@@ -174,35 +171,20 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
                         cur_fs->file_system_name);
 	    goto interface_init_failed;
         }
-
-        /* add configured meta handle range for this fs if any */
-        if (cur_meta_handle_range)
+        else
         {
+            /* add configured merged handle range for this host/fs */
             ret = trove_collection_setinfo(
                 cur_fs->coll_id,TROVE_COLLECTION_HANDLE_RANGES,
-                (void *)cur_meta_handle_range);
+                (void *)cur_merged_handle_range);
             if (ret < 0)
             {
                 gossip_lerr("Error adding handle range %s to "
-                            "filesystem %s\n",cur_meta_handle_range,
+                            "filesystem %s\n",cur_merged_handle_range,
                             cur_fs->file_system_name);
                 goto interface_init_failed;
             }
-        }
-
-        /* add configured data handle range for this fs if any */
-        if (cur_data_handle_range)
-        {
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id,TROVE_COLLECTION_HANDLE_RANGES,
-                (void *)cur_data_handle_range);
-            if (ret < 0)
-            {
-                gossip_lerr("Error adding handle range %s to "
-                            "filesystem %s\n",cur_data_handle_range,
-                            cur_fs->file_system_name);
-                goto interface_init_failed;
-            }
+            free(cur_merged_handle_range);
         }
 
         cur = llist_next(cur);

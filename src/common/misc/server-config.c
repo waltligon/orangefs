@@ -1012,6 +1012,53 @@ char *PINT_server_config_get_data_handle_range_str(
 }
 
 /*
+ * Function: PINT_server_config_get_merged_handle_range_str
+ *
+ * Params:   struct server_configuration_s*,
+ *           struct filesystem_configuration_s *fs
+ *
+ * Returns:  char * (handle range) on success; NULL on failure
+ *           NOTE: The returned string MUST be freed by the caller
+ *           if it's a non-NULL value
+ *
+ * Synopsis: return the meta handle range and data handle range strings
+ *           on the specified filesystem that matches the host specific
+ *           configuration merged as one single handle range
+ *           
+ */
+char *PINT_server_config_get_merged_handle_range_str(
+    struct server_configuration_s *config_s,
+    struct filesystem_configuration_s *fs)
+{
+    char *mrange = get_handle_range_str(config_s,fs,0);
+    char *drange = get_handle_range_str(config_s,fs,1);
+    char *merged_range = NULL;
+
+    if (mrange && drange)
+    {
+        int mlen = strlen(mrange) * sizeof(char) + 1;
+        int dlen = strlen(drange) * sizeof(char) + 1;
+
+        /*
+          2 bytes bigger since we need a tz null and
+          space for the additionally inserted comma
+        */
+        merged_range = (char *)malloc(mlen + dlen);
+        snprintf(merged_range, mlen + dlen, "%s,%s",
+                 mrange,drange);
+    }
+    else if (mrange)
+    {
+        merged_range = strdup(mrange);
+    }
+    else
+    {
+        merged_range = strdup(drange);
+    }
+    return merged_range;
+}
+
+/*
   verify that both config files exist.  if so, cache them in RAM so
   that getconfig will not have to re-read the file contents each time.
   returns 0 on success; 1 on failure.
