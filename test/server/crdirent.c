@@ -102,7 +102,7 @@ int main(int argc, char **argv)	{
 	my_req->rsize = sizeof(struct PVFS_server_req_s)+strlen(my_req->u.crdirent.name)+1;
 
 	display_pvfs_structure(my_req,1);
-	my_req = PINT_encode(my_req,PINT_ENCODE_REQ,&foo,server_addr,0);
+	ret = PINT_encode(my_req,PINT_ENCODE_REQ,&foo,server_addr,0);
 
 	/* send the initial request on its way */
 	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, foo.buffer_list[0], 

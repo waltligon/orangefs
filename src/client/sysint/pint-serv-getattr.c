@@ -11,9 +11,6 @@
 #define REQ_ENC_FORMAT 0
 #define MAX_DATAFILES 10
 
-extern PVFS_msg_tag_t get_next_session_tag(void);
-extern void debug_print_type(void* thing, int type);
-
 static int getattrreq_alloc(void *pjob,void *preq,bmi_addr_t server,
 		PVFS_credentials credentials,int *sz);
 static int getattrack_alloc(void *pjob,void *presp,bmi_addr_t server,int *sz);

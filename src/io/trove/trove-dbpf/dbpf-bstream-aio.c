@@ -152,7 +152,7 @@ static void aiocb_print(struct aiocb *ptr)
     static char lio_nop[]       = "LOP_NOP";
     static char sigev_none[]    = "SIGEV_NONE";
     static char invalid_value[] = "invalid value";
-    char *opcode, sigev;
+    char *opcode, *sigev;
 
     opcode = (ptr->aio_lio_opcode == LIO_WRITE) ? lio_write :
 	(ptr->aio_lio_opcode == LIO_READ) ? lio_read :

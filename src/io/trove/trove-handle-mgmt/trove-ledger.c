@@ -32,8 +32,6 @@ struct handle_ledger {
     TROVE_handle overflow_list_handle;
 };
 
-static char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
-
 /* Functions used only internally:
  */
 /* handle_store_xxx - functions to handle moving handle free lists to/from storage */
@@ -313,15 +311,6 @@ static int handle_store_load(TROVE_coll_id coll_id,
     int i, ret, count, array_count, state;
     TROVE_handle *handle_array;
     TROVE_ds_position pos = TROVE_ITERATE_START; /* ??? */
-
-#if 0
-    /* SHOULD ALREADY HAVE BEEN DONE */
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
-    if (ret < 0 ) {
-	fprintf(stderr, "initialize failed: no storage space?\n");
-	return -1;
-    }
-#endif
 
     /* initialize lists to empty */
     extentlist_init(&ledger->free_list);

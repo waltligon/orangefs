@@ -36,46 +36,9 @@ static int dbpf_filesystem_create(
     DB *db_p;
     DBT key, data;
 
-    /* create the collection */
-    ret = dbpf_mgmt_ops.collection_create(
-					  /* stoname, */
-					  collname,
-					  new_coll_id,
-					  user_ptr,
-					  out_op_id_p);
-    /* TODO: handle in progress case */
-    if (ret != 1) return -1;
+    /* USE THE COLLECTION ROUTINES INSTEAD */
 
-    /* create the root directory dspace */
-    ret = dbpf_dspace_ops.dspace_create(
-					new_coll_id,
-					&root_dir_handle,
-					0xffffffff, /* force this handle */
-					1, /* TODO: define types! */
-					NULL, /* hint */
-					user_ptr,
-					out_op_id_p);
-    /* TODO: handle in progress case */
-    if (ret != 1) return -1;
-
-    /* TODO: make this a generic set attribute on the collection */
-    /* store root handle value as an attribute on the collection */
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-    key.data = ROOT_HANDLE_STRING;
-    key.size = sizeof(ROOT_HANDLE_STRING);
-    data.data = &root_dir_handle;
-    data.size = sizeof(root_dir_handle);
-    ret = db_p->put(db_p, NULL, &key, &data, 0);
-    if (ret != 0) return -1;
-
-    if ((ret = db_p->close(db_p, 0)) != 0) {
-	fprintf(stderr, "dbpf_storage_create: %s\n",
-		db_strerror(ret));
-	return -1;
-    }
-
-    return 1;
+    return -1;
 }
 
 /* dbpf_filesystem_remove()

@@ -99,7 +99,7 @@ void readdir_init_state_machine(void)
 STATE_FXN_HEAD(readdir_init)
 {
 
-	int job_post_ret;
+	int job_post_ret = 0;
 	job_id_t i;
 
 #if 0

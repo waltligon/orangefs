@@ -19,7 +19,7 @@
 #define SEGMAX 32
 #define BYTEMAX 250
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 	int i;
 	PINT_Request *r1;
@@ -115,4 +115,6 @@ main(int argc, char **argv)
 		}
 	} while (offset != -1);
 	printf("finished processing request\n");
+
+	return 0;
 }

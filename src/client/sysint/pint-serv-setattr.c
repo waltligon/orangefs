@@ -10,9 +10,6 @@
 #include <PINT-reqproto-encode.h>
 #define REQ_ENC_FORMAT 0
 
-extern PVFS_msg_tag_t get_next_session_tag(void);
-extern void debug_print_type(void* thing, int type);
-
 static int setattrreq_alloc(void *pjob,void *preq,bmi_addr_t server,
 		PVFS_size handle_size,PVFS_credentials credentials,int *sz);
 static int setattrack_alloc(void *pjob,void *presp,bmi_addr_t server,int *sz);

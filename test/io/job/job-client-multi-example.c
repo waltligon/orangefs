@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 	job_id_t id;
 	job_status_s status;
 	int i;
-	int num_pending;
+	int num_pending = 0;
 
 	/* start the BMI interface */
 	ret = BMI_initialize("/tmp/foo.so", NULL, 0);

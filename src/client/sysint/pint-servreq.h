@@ -45,4 +45,7 @@ int pint_serv_getconfig(struct PVFS_server_req_s **req_job,\
 		struct PVFS_server_resp_s **resp_job,void *req,\
 		PVFS_credentials credentials,bmi_addr_t *server);
 
+/* dunno where these belong, but here is better than nowhere. -- rob */
+void debug_print_type(void* thing, int type);
+PVFS_msg_tag_t get_next_session_tag(void);
 #endif

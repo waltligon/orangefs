@@ -135,8 +135,7 @@ int main(int argc, char **argv)
 	mem_offset_array[1] = mybuffer;
 
 	/********************************/
-	trove_finalize();
-#if 0	
+
 	ret = trove_bstream_write_list(coll_id,
 				       parent_handle,
 				       mem_offset_array,
@@ -155,7 +154,8 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "listio write failed\n");
 	    return -1;
 	}
-#endif
+
+	trove_finalize();
 	return 0;
 }
 

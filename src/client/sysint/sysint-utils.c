@@ -52,7 +52,7 @@ void debug_print_type(void* thing, int type)
 	}
 }
 
-int get_next_session_tag()
+int get_next_session_tag(void)
 {
         int ret = 0;
         /* grab a lock for this variable */

@@ -10,8 +10,6 @@
 
 static int max_seg = 0;
 
-extern PVFS_msg_tag_t get_next_session_tag();
-
 static int lookuppath_req_alloc(void *pjob,void *preq,bmi_addr_t server,
 		PVFS_credentials credentials, int *sz);
 static int lookuppath_ack_alloc(void *pjob,void *presp,bmi_addr_t server,

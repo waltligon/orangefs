@@ -26,8 +26,6 @@ struct ack_foo
 	int x;
 };
 
-
-
 int main(int argc, char **argv)	
 {
 
@@ -36,11 +34,6 @@ int main(int argc, char **argv)
 	struct ack_foo* ack = NULL;
 	bmi_addr_t server_addr;
 	job_status_s status1;
-	struct flow_endpoint* src;
-	struct flow_endpoint* dest;
-	struct flow_io_desc* io_desc = NULL;
-	job_id_t job_id1 = 0;
-	int outcount;
 
 	/* set debugging level */
 	gossip_enable_stderr();

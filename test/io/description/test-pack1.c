@@ -1,3 +1,4 @@
+#include <malloc.h>
 
 #include <pvfs-request.h>
 #include <pint-request.h>
@@ -36,4 +37,6 @@ main(int argc, char **argv)
 		/* we're done */
 		free(r2);
 	}
+
+	return 0;
 }

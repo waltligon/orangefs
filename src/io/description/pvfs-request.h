@@ -42,6 +42,8 @@ int PVFS_Request_ub(PVFS_Request request, PVFS_size *displacement);
 
 int PVFS_Request_commit(PVFS_Request *reqp);
 
+void PVFS_Dump_request(PVFS_Request req);
+
 /* pre-defined request types */
 extern PVFS_Request PVFS_CHAR;
 extern PVFS_Request PVFS_SHORT;
