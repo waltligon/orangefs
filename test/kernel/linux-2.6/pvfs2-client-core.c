@@ -790,9 +790,9 @@ static int service_statfs_request(
               these values really represent handle/inode counts
               rather than an accurate number of files
             */
-            out_downcall->resp.statfs.files_total = (long)
+            out_downcall->resp.statfs.files_total = (unsigned long) 
                 resp_statfs.statfs_buf.handles_total_count;
-            out_downcall->resp.statfs.files_avail = (long)
+            out_downcall->resp.statfs.files_avail = (unsigned long)
                 resp_statfs.statfs_buf.handles_available_count;
 
             ret = 0;

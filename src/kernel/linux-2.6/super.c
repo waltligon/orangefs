@@ -172,6 +172,9 @@ static int pvfs2_statfs(
         buf->f_ffree = (sector_t)
             new_op->downcall.resp.statfs.files_avail;
 
+        pvfs2_print("pvfs2_statfs got %lu files total | %lu files_avail\n",
+                    buf->f_files, buf->f_ffree);
+
         ret = new_op->downcall.status;
     }
 
