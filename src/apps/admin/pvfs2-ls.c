@@ -244,7 +244,7 @@ static inline void format_size_string(char *src_str,
 
         if (right_justified)
         {
-            start = &buf[(spaces_size_allowed-(len+1))];
+            start = &buf[(spaces_size_allowed-(len))];
         }
         else
         {
