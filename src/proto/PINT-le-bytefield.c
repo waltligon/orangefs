@@ -372,51 +372,58 @@ static int lebf_encode_resp(
     /* every response has these fields */
     p = &target_msg->ptr_current;
     encode_PVFS_server_resp(p, resp);
-
+    
 #define CASE(tag,var) \
     case tag: encode_PVFS_servresp_##var(p,&resp->u.var); break
 
-    /* extra encoding rules for particular responses */
-    switch (resp->op) {
 
-	/* call standard function defined in headers */
-	CASE(PVFS_SERV_GETCONFIG, getconfig);
-	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
-	CASE(PVFS_SERV_CREATE, create);
-	CASE(PVFS_SERV_IO, io);
-	CASE(PVFS_SERV_GETATTR, getattr);
-	CASE(PVFS_SERV_RMDIRENT, rmdirent);
-	CASE(PVFS_SERV_CHDIRENT, chdirent);
-	CASE(PVFS_SERV_MKDIR, mkdir);
-	CASE(PVFS_SERV_READDIR, readdir);
-	CASE(PVFS_SERV_STATFS, statfs);
-	CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
-	CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
-	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
-	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
-	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
-        CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
-	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
+    /* we stand a good chance of segfaulting if we try to encode the response
+     * after something bad happened reading data from disk. */
+    if (resp->status != -PVFS_EIO) 
+    {
 
-        case PVFS_SERV_REMOVE:
-        case PVFS_SERV_MGMT_REMOVE_OBJECT:
-        case PVFS_SERV_MGMT_REMOVE_DIRENT:
-        case PVFS_SERV_SETATTR:
-        case PVFS_SERV_CRDIRENT:
-        case PVFS_SERV_TRUNCATE:
-        case PVFS_SERV_FLUSH:
-        case PVFS_SERV_MGMT_NOOP:
-	case PVFS_SERV_PROTO_ERROR:
-	    /* nothing else */
-	    break;
+        /* extra encoding rules for particular responses */
+        switch (resp->op) {
 
-	case PVFS_SERV_INVALID:
-        case PVFS_SERV_PERF_UPDATE:
-        case PVFS_SERV_JOB_TIMER:
-	    gossip_err("%s: invalid operation %d\n", __func__, resp->op);
-	    ret = -PVFS_ENOSYS;
-	    break;
-    }
+        /* call standard function defined in headers */
+        CASE(PVFS_SERV_GETCONFIG, getconfig);
+        CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+        CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_IO, io);
+        CASE(PVFS_SERV_GETATTR, getattr);
+        CASE(PVFS_SERV_RMDIRENT, rmdirent);
+        CASE(PVFS_SERV_CHDIRENT, chdirent);
+        CASE(PVFS_SERV_MKDIR, mkdir);
+        CASE(PVFS_SERV_READDIR, readdir);
+        CASE(PVFS_SERV_STATFS, statfs);
+        CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
+        CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
+        CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
+        CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
+        CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
+            CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
+        CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
+
+            case PVFS_SERV_REMOVE:
+            case PVFS_SERV_MGMT_REMOVE_OBJECT:
+            case PVFS_SERV_MGMT_REMOVE_DIRENT:
+            case PVFS_SERV_SETATTR:
+            case PVFS_SERV_CRDIRENT:
+            case PVFS_SERV_TRUNCATE:
+            case PVFS_SERV_FLUSH:
+            case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_PROTO_ERROR:
+            /* nothing else */
+            break;
+
+        case PVFS_SERV_INVALID:
+            case PVFS_SERV_PERF_UPDATE:
+            case PVFS_SERV_JOB_TIMER:
+            gossip_err("%s: invalid operation %d\n", __func__, resp->op);
+            ret = -PVFS_ENOSYS;
+            break;
+        }
+    } 
 
 #undef CASE
 
@@ -538,6 +545,9 @@ static int lebf_decode_resp(
 
     /* decode generic part of response (including op number) */
     decode_PVFS_server_resp(p, resp);
+
+    if (resp->status == -PVFS_EIO) 
+        goto out;
 
 #define CASE(tag,var) \
     case tag: decode_PVFS_servresp_##var(p,&resp->u.var); break
