@@ -255,7 +255,8 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
  * resulting state coming back from the nested state machine.
  *
  * Returns 0 for directory, GETATTR_NEED_DATAFILE_SIZES for a
- * metafile.  Other types die right now.
+ * metafile (when appropriate).  Returns 0 for symlink.
+ * Other types die right now.
  */
 static int getattr_object_getattr_comp_fn(void *v_p,
 					  struct PVFS_server_resp *resp_p,
@@ -443,7 +444,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 	    return 0;
 	    break;
 	case PVFS_TYPE_SYMLINK:
-	    /* fall through */
+            return 0;
+            break;
 	case PVFS_TYPE_DATAFILE:
 	    /* fall through */
 	case PVFS_TYPE_DIRDATA:

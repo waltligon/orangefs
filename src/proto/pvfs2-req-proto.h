@@ -213,10 +213,7 @@ struct PVFS_servreq_setattr
                                   __handle,          \
                                   __objtype,         \
                                   __attr,            \
-                                  __amask,           \
-                                  __dfile_array,     \
-                                  __dfile_count,     \
-                                  __dist)            \
+                                  __amask)           \
 do {                                                 \
     memset(&(__req), 0, sizeof(__req));              \
     (__req).op = PVFS_SERV_SETATTR;                  \
@@ -225,11 +222,6 @@ do {                                                 \
     (__req).u.setattr.handle = (__handle);           \
     PINT_CONVERT_ATTR(&(__req).u.setattr.attr,       \
        &(__attr), PVFS_ATTR_COMMON_ALL);             \
-    (__req).u.setattr.attr.u.meta.dfile_array =      \
-       (__dfile_array);                              \
-    (__req).u.setattr.attr.u.meta.dfile_count =      \
-       (__dfile_count);                              \
-    (__req).u.setattr.attr.u.meta.dist = (__dist);   \
     (__req).u.setattr.attr.objtype = (__objtype);    \
     (__req).u.setattr.attr.mask |= (__amask);        \
 } while (0)
