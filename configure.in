@@ -5,7 +5,7 @@ dnl Process this file with autoconf to produce a configure script.
 dnl You may need to use autoheader as well if changing any DEFINEs
 
 dnl sanity checks, output header, location of scripts used here
-AC_INIT(include/pvfs2-types.h.in)
+AC_INIT(include/pvfs2-types.h)
 AC_CONFIG_HEADER(pvfs2-config.h)
 AC_CONFIG_AUX_DIR(maint/config)
 
@@ -289,12 +289,6 @@ for d in src/apps src/io src/common src/client src/kernel test/common \
 	install -d $d;
 done
 
-dnl Avoid recompiling the universe if this file has not actually changed.
-types=include/pvfs2-types.h
-if test -e $types ; then
-    mv $types $types.prev
-fi
-
 dnl output final version of top level makefile and subdirectory
 dnl    makefile includes
 AC_OUTPUT(Makefile
@@ -353,13 +347,6 @@ doc/coding/module.mk
 doc/design/module.mk
 doc/random/module.mk
 maint/mpi-depend.sh
-include/pvfs2-types.h
 examples/pvfs2-server.rc
 )
 
-if test -e $types.prev ; then
-    if cmp -s $types $types.prev ; then
-	mv $types.prev $types
-	echo $types is unchanged
-    fi
-fi
