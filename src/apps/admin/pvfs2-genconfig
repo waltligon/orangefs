@@ -7,6 +7,15 @@
 # generate a global pvfs2 configuration file based on user input
 #
 use Term::ReadLine;
+use Getopt::Long;
+
+# ugly global variables for option parsing
+my $opt_protocol = '';
+my $opt_port = '';
+my @opt_hostnames = ();
+my $opt_logfile = '';
+my $opt_storage = '';
+my $opt_verbose = '';
 
 sub get_user_input
 {
@@ -230,20 +239,18 @@ sub confirm
     return (($char eq 'y') ? 1 : 0);
 }
 
-# ---------------------
-# entry point of script
-# ---------------------
-
-$using_stdout = 0;
-
-if ((@ARGV == 1) && ($ARGV[0] eq "-"))
+sub usage
 {
-    $output_target = STDOUT;
-    $using_stdout = 1;
-}
-elsif (@ARGV != 2)
-{
-    print "\nUsage: pvfs2-genconfig <fs.conf> <server.conf>\n\n";
+    print "\nUsage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>\n\n";
+    
+    print "OPTIONS can be one or all of\n";
+    print "     --protocol    <PROTO>          protocol to use (tcp,gm,ib)\n";
+    print "     --port        <NUM>            port to use\n";
+    print "     --ioservers   <STRING>         hostnames of data servers\n";
+    print "     --metaservers <STRING>         hostnames of meta servers\n";
+    print "     --logfile     <STRING>         logfile location\n";
+    print "     --storage     <STRING>         storage space location\n";
+    print "     --verbose                      increase verbosity\n\n";
 
     print "The two arguments specify the names of the configuration files\n";
     print " that will be written.  This utility will create one fs.conf file.\n";
@@ -251,13 +258,42 @@ elsif (@ARGV != 2)
     print " in the file system.  Each server.conf file will be appended\n";
     print " with the host name of the server to which it belongs.\n";
    
-    print "\nExample: 'perl ./pvfs2-genconfig /tmp/fs.conf /tmp/server.conf'\n";
+    print "\nExample: 'pvfs2-genconfig /tmp/fs.conf /tmp/server.conf'\n";
     print " will generate a file called /tmp/fs.conf and server specific\n";
     print " files called /tmp/server.conf-host1, /tmp/server.conf-host2, etc.\n";
     print "\nNOTE: If pvfs2-genconfig is executed with a single argument of\n";
     print " \"-\", then all output is directed to stdout and no files are\n";
     print " written.\n";
     exit;
+}
+
+# ---------------------
+# entry point of script
+# ---------------------
+
+my $using_stdout = 0;
+my $show_help = '';
+
+GetOptions('protocol=s' => \$opt_protocol,
+	   'port=i'     => \$opt_port,
+	   'hostnames=s' => \@opt_hostnames,
+	   'logfile=s'  => \$opt_logfile,
+	   'storage=s'  => \$opt_storage,
+	   'help'        => \$show_help,
+	   'verbose'    => \$opt_verbose,
+	   '-'		=> \$using_stdout);
+
+if($show_help) {
+	usage();
+	return;
+}
+
+if ($using_stdout) {
+	$output_target = STDOUT
+}
+elsif (@ARGV != 2)
+{
+	usage();
 }
 else
 {
