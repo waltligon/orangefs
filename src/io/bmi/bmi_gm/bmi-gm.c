@@ -185,14 +185,13 @@ enum
     CTRL_REQ_TYPE = 1,
     CTRL_ACK_TYPE = 2,
     CTRL_IMMED_TYPE = 3,
-    CTRL_PUT_TYPE = 4
+    CTRL_PUT_TYPE = 4,
+    CTRL_UNEXP_TYPE = 5
 };
 
 /* control messages */
 struct ctrl_req
 {
-    /* TODO: do we really need a mode field? */
-    bmi_flag_t mode;		/* immediate, rendezvous, etc. */
     bmi_size_t actual_size;	/* size of message we want to send */
     bmi_msg_tag_t msg_tag;	/* message tag */
     bmi_op_id_t sender_op_id;	/* used for matching ctrl's */
@@ -206,8 +205,6 @@ struct ctrl_ack
 };
 struct ctrl_immed
 {
-    /* TODO: do we really need a mode field? */
-    bmi_flag_t mode;		/* immediate, rendezvous, etc. */
     bmi_msg_tag_t msg_tag;	/* message tag */
     int32_t actual_size;
     int32_t expected_size;
@@ -823,10 +820,9 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 	new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
 	new_ctrl_msg->u.immed.actual_size = size;
 	new_ctrl_msg->u.immed.msg_tag = tag;
-	new_ctrl_msg->u.immed.mode = GM_MODE_IMMED;
 	return (gm_post_send_check_resource(id, dest, buffer, size,
 					    tag,
-					    new_ctrl_msg->u.immed.mode,
+					    GM_MODE_IMMED,
 					    buffer_status, user_ptr));
     }
     else
@@ -894,14 +890,13 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 
     /* Immediate mode stuff */
     new_ctrl_msg = (struct ctrl_msg *) (buffer + size);
-    new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
+    new_ctrl_msg->ctrl_type = CTRL_UNEXP_TYPE;
     new_ctrl_msg->u.immed.actual_size = size;
     new_ctrl_msg->u.immed.expected_size = 0;
     new_ctrl_msg->u.immed.msg_tag = tag;
-    new_ctrl_msg->u.immed.mode = GM_MODE_UNEXP;
 
     return (gm_post_send_check_resource(id, dest, buffer, size,
-					tag, new_ctrl_msg->u.immed.mode,
+					tag, GM_MODE_UNEXP,
 					buffer_status, user_ptr));
 }
 
@@ -1454,7 +1449,6 @@ static void initiate_send_rend(method_op_p mop)
     my_ctrl = bmi_gm_bufferpool_get(ctrl_send_pool);
 
     my_ctrl->ctrl_type = CTRL_REQ_TYPE;
-    my_ctrl->u.req.mode = mop->mode;
     my_ctrl->u.req.actual_size = mop->actual_size;
     my_ctrl->u.req.msg_tag = mop->msg_tag;
     my_ctrl->u.req.sender_op_id = mop->op_id;
@@ -2212,7 +2206,6 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
     }
     else if (my_ctrl->ctrl_type == CTRL_REQ_TYPE)
     {
-	gossip_ldebug(BMI_DEBUG_GM, "Mode: %d.\n", (int) my_ctrl->u.req.mode);
 	ctrl_op_id = my_ctrl->u.req.sender_op_id;
 	ctrl_actual_size = my_ctrl->u.req.actual_size;
 	ctrl_tag = my_ctrl->u.req.msg_tag;
@@ -2223,24 +2216,12 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 				  gm_ntohp(poll_event->recv.buffer),
 				  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
 	/* this is a new control request from someone */
-	switch (my_ctrl->u.req.mode)
-	{
-	case GM_MODE_REND:
-	    ret = ctrl_req_handler_rend(ctrl_op_id, ctrl_actual_size,
+	ret = ctrl_req_handler_rend(ctrl_op_id, ctrl_actual_size,
 					ctrl_tag,
 					gm_ntohs(poll_event->recv.
 						 sender_node_id));
-	    break;
-
-	default:
-	    gossip_lerr("Error: bad ctrl request!\n");
-	    /* TODO: handle critical error here */
-	    ret = -ENOSYS;
-	}
-
     }
-    else if (my_ctrl->ctrl_type == CTRL_IMMED_TYPE && my_ctrl->u.immed.mode
-	     == GM_MODE_IMMED)
+    else if (my_ctrl->ctrl_type == CTRL_IMMED_TYPE)
     {
 	ctrl_actual_size = my_ctrl->u.immed.actual_size;
 	ctrl_tag = my_ctrl->u.immed.msg_tag;
@@ -2317,8 +2298,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    ret = 0;
 	}
     }
-    else if (my_ctrl->ctrl_type == CTRL_IMMED_TYPE && my_ctrl->u.immed.mode
-	     == GM_MODE_UNEXP)
+    else if (my_ctrl->ctrl_type == CTRL_UNEXP_TYPE)
     {
 	ctrl_actual_size = my_ctrl->u.immed.actual_size;
 	ctrl_tag = my_ctrl->u.immed.msg_tag;
