@@ -66,7 +66,7 @@ machine mkdir(init, send, cleanup, set_attrib)
  *
  * Returns:  PINT_state_array_values*
  *
- * Synopsis: Set up the state machine for set_attrib. 
+ * Synopsis: Set up the state machine for mkdir. 
  *           
  */
 

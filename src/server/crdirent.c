@@ -5,6 +5,28 @@
  */
 
 
+/*
+
+SMS:  1. Needs permission checking
+      2. Request Scheduler used
+      3. Documented
+				      
+SFS:  1. Almost all Pre/Post
+      2. Some assertions
+		      
+TS:   1. It exists, but not thorough.
+
+My TODO list for this SM:
+
+ It needs to make sure the k/v pair does not already exist.  
+ Now, I don't know if this is a 1. trove could return an error 
+ for duplicates or 2. we need to run a read_keyval op.  
+ There are a couple of asserts that could be in there that I 
+ haven't done yet.  That implies one or two Pre Post comments 
+ are not in place.  
+
+*/
+
 #include <state-machine.h>
 #include <server-config.h>
 #include <pvfs2-server.h>
@@ -476,6 +498,7 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	gossip_ldebug(SERVER_DEBUG,"send Fxn for crdirent %d\n",ret->error_code);
 
 	s_op->resp->status = ret->error_code;
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
 	/* Set the ack IF it was created */
 	if(ret->error_code == 0) 
@@ -577,3 +600,14 @@ static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret)
 
 	return(0);
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
+
+

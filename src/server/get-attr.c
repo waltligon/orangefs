@@ -5,6 +5,24 @@
  */
 
 
+/*
+
+SMS:  1. Errors should be handled correctly
+      2. Request Scheduler used
+      3. Documented
+					      
+SFS:  1. Needs some pre/post
+      2. Some assertions
+		      
+TS:   Implemented but not thorough.
+
+My TODO list for this SM:
+
+ Finish asserts and documentation.  Again, this is a fairly trivial machine
+
+*/
+
+
 #include <state-machine.h>
 #include <server-config.h>
 #include <pvfs2-server.h>
@@ -181,6 +199,7 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	/* Prepare the message */
 	
 	s_op->resp->status = ret->error_code;
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
 	if (s_op->val.buffer && ret->error_code == 0)
 	{

@@ -4,6 +4,23 @@
  * See COPYING in top-level directory.
  */
 
+/*
+
+SMS:  1. Very simple machine.  errors can be reported directly to client.
+      2. Request scheduler used, but not sure how good this is.
+      3. Documented
+				      
+SFS:  1. Almost all pre/post
+      2. Some assertions
+		      
+TS:   1. Exists but not thorough.
+
+My TODO list for this SM:
+
+ This state machine is pretty simple and for the most part is hammered out.
+ it might need a little more documentation, but that is it.
+
+*/
 
 #include <state-machine.h>
 #include <server-config.h>
@@ -182,6 +199,7 @@ static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	job_id_t i;
 
 	s_op->resp->status = ret->error_code;
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
 	/* Set the handle IF it was created */
 	if(ret->error_code == 0) 
@@ -278,3 +296,12 @@ static int create_cleanup(state_action_struct *s_op, job_status_s *ret)
 	return(0);
 	
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
