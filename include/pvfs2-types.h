@@ -64,6 +64,11 @@ struct PVFS_credentials_s {
 };
 typedef struct PVFS_credentials_s PVFS_credentials;
 
+struct extent {
+    int64_t first;
+    int64_t last;
+};
+typedef struct extent PVFS_extent;
 /* PVFS2 errors
  *
  * Errors are made up of a code to indicate the error type and a class
