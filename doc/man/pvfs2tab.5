@@ -25,7 +25,7 @@ If there is no
 file, then a program will look in the current directory for a file called 
 .I pvfs2tab
 .RE
-.I PVFS2TAB environment variable
+.I PVFS2TAB_FILE environment variable
 .RS
 This environment variable overrides any system-wide or local files.  Programs
 will look for a file located at the value of the environment variable.
@@ -35,17 +35,17 @@ will look for a file located at the value of the environment variable.
 The file format is similar but not identical to 
 .B fstab
 (5), and looks like
-"<bmi_address>/<fs_name> <mountpoint> pvfs2 default 0 0"  .
+"<bmi_address>/<fs_name> <mountpoint> pvfs2 <options> 0 0"  .
 
 .I bmi address
 .RS
-Takes the form <protocol>://<hostname>:<port>
+Takes the form <protocol>://<hostspec>
 .I <protocol>
 is the name of the communications protocol used by bmi ("gm", "tcp", "ib").
-.I <hostname> 
-is the name of any metadata server.
-.I <port>
-is the port on which the server listens.
+.I <hostspec> 
+is the name of any metadata server.  This format is method-dependent.  For
+example, a <hostspec> for the "tcp" method would look like "foo.bar.com:2344".
+Other methods may express hosts in different ways.
 .RE
 .I <fs_name> 
 .RS
@@ -54,6 +54,12 @@ is the name of a PVFS file system on that server.
 .I <mountpoint>
 .RS
 is the virtual mountpoint used by pvfs2 clients.
+.RE
+.I <options>
+.RS
+will generally be "default" for a standard set of options.  At this time, the
+only other option is "flowproto=<flow_method>", which can be used to specify an
+alternate flow protocol method.
 
 .SH BUGS
 Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
