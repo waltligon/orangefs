@@ -14,6 +14,8 @@
 #include "pvfs2-util.h"
 #include "pvfs2-mgmt.h"
 
+#define DEFAULT_IO_SIZE 8*1024*1024
+
 int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
@@ -24,7 +26,7 @@ int main(int argc,char **argv)
 	int name_sz;
 	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
-	int io_size = 1024*1024;
+	int io_size = DEFAULT_IO_SIZE;
 	int* io_buffer = NULL;
 	int i;
 	int errors;
