@@ -25,6 +25,8 @@ general server functionality:
 - add a workaround for thread problems on redhat 9
 - better signal handling, mechanisms for shutting down or restarting 
   cleanly
+- try out existing failover solutions w/ pvfs2 (need to acquire
+  some hardware first)
 
 request scheduler:
 ====================================================================
