@@ -146,10 +146,9 @@ int main(int argc, char **argv)
             {
                 if ((mnt_index != -1) && (i != mnt_index))
                 {
-                    ret = -1;
-                    PVFS_perror("Cannot use pvfs2-ls across "
-                                "mount points at this time!\n",ret);
-                    goto main_out;
+                    fprintf(stderr, "Cannot use pvfs2-ls across "
+                                "mount points at this time!\n");
+                    return(-1);
                 }
                 else
                 {
@@ -207,8 +206,6 @@ int main(int argc, char **argv)
             printf("\n");
         }
     }
-
-main_out:
 
     PVFS_sys_finalize();
 
