@@ -69,13 +69,13 @@ typedef struct {
 /* Server Config Parameters(per filesystem) */
 struct fsconfig_s {
     PVFS_handle fh_root;  /* root file system */
-    PVFS_handle maskbits; /* number of handle mask bits */
-    PVFS_string *meta_serv_array; /* array of metaservers */
-    bucket_info *bucket_array; /* bucket info per metaserver */
-    PVFS_count32 meta_serv_count;/* number of metaservers */ 
-    bucket_info *io_bucket_array; /* bucket info per ioserver */ 
-    PVFS_string *io_serv_array; /* array of ioservers */
-    PVFS_count32 io_serv_count;/* number of ioservers */ 
+/*     PVFS_handle maskbits; /\* number of handle mask bits *\/ */
+/*     PVFS_string *meta_serv_array; /\* array of metaservers *\/ */
+/*     bucket_info *bucket_array; /\* bucket info per metaserver *\/ */
+/*     PVFS_count32 meta_serv_count;/\* number of metaservers *\/  */
+/*     bucket_info *io_bucket_array; /\* bucket info per ioserver *\/  */
+/*     PVFS_string *io_serv_array; /\* array of ioservers *\/ */
+/*     PVFS_count32 io_serv_count;/\* number of ioservers *\/  */
     PVFS_string local_mnt_dir; /* Client side mount point */
     PVFS_fs_id fsid;
 };

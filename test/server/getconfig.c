@@ -114,7 +114,7 @@ int main(int argc, char **argv)	{
 
 	display_pvfs_structure(server_req,1);
 	ret = PINT_encode(server_req,PINT_ENCODE_REQ,&encoded_msg,server_addr,0);
-	printf("---\n\nencoded_msg---\n");
+	printf("\n---encoded_msg (server_req) ---\n");
 	display_pvfs_structure(encoded_msg.buffer_list[0],1);
 
 	/* send the initial request on its way */
@@ -187,6 +187,7 @@ int main(int argc, char **argv)	{
 	ret = PINT_decode(server_resp,PINT_ENCODE_RESP,
                           &decoded_msg,server_addr,actual_size,NULL);
 	printf("Decoded response size: %d\n",(int)actual_size);
+	printf("\n---decoded_msg (server_resp) ---\n");
 	display_pvfs_structure(decoded_msg.buffer,0);
 	BMI_memfree(server_addr, server_resp, sizeof(struct PVFS_server_resp_s)+8192, 
 		BMI_RECV_BUFFER);

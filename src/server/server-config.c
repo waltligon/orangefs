@@ -16,7 +16,6 @@
 #include "pvfs2-storage.h"
 #include "job.h"
 #include "gossip.h"
-#include "str_utils.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_storage_space);
