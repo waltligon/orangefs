@@ -9,66 +9,76 @@
 #include <string.h>
 #include "helper.h"
 
+void print_entry_attr(
+    char *entry_name,
+    PVFS_object_attr *attr)
+{
+    char buf[128] = {0};
+
+    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t0 DATE TIME %s\n",
+             ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
+             ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
+             ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
+             ((attr->perms & PVFS_U_EXECUTE) ? 'x' : '-'),
+             ((attr->perms & PVFS_G_READ) ? 'r' : '-'),
+             ((attr->perms & PVFS_G_WRITE) ? 'w' : '-'),
+             ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-'),
+             ((attr->perms & PVFS_O_READ) ? 'r' : '-'),
+             ((attr->perms & PVFS_O_WRITE) ? 'w' : '-'),
+             ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
+             attr->owner,
+             attr->group,
+             entry_name);
+    printf("%s",buf);
+}
+
 void print_entry(
     char *entry_name,
     PVFS_handle handle,
     PVFS_fs_id fs_id)
 {
     PVFS_pinode_reference pinode_refn;
-    uint32_t attrmask;
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
-    char buf[128] = {0};
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     memset(&credentials,0,sizeof(PVFS_credentials));
 
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 511;
+    
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
-    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
-    if (PVFS_sys_getattr(pinode_refn, attrmask,
+    if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_NOSIZE,
                          credentials, &getattr_response))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
                 "(fs_id is %d)\n",handle,fs_id);
         return;
     }
-
-    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t0 DATE TIME %s\n",
-             ((getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
-             ((getattr_response.attr.perms & PVFS_U_READ) ? 'r' : '-'),
-             ((getattr_response.attr.perms & PVFS_U_WRITE) ? 'w' : '-'),
-             ((getattr_response.attr.perms & PVFS_U_EXECUTE) ? 'x' : '-'),
-             ((getattr_response.attr.perms & PVFS_G_READ) ? 'r' : '-'),
-             ((getattr_response.attr.perms & PVFS_G_WRITE) ? 'w' : '-'),
-             ((getattr_response.attr.perms & PVFS_G_EXECUTE) ? 'x' : '-'),
-             ((getattr_response.attr.perms & PVFS_O_READ) ? 'r' : '-'),
-             ((getattr_response.attr.perms & PVFS_O_WRITE) ? 'w' : '-'),
-             ((getattr_response.attr.perms & PVFS_O_EXECUTE) ? 'x' : '-'),
-             getattr_response.attr.owner,
-             getattr_response.attr.group,
-             entry_name);
-    printf("%s",buf);
+    print_entry_attr(entry_name, &getattr_response.attr);
 }
 
-int do_readdir(
+int do_list(
     PVFS_sysresp_init *init_response,
     char *start_dir)
 {
-    int ret = 0, i = 0;
-    char *cur_file = (char *)0;
+    int i = 0;
+    int pvfs_dirent_incount;
+    char *name = NULL, *cur_file = NULL;
     PVFS_handle cur_handle;
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdir rd_response;
+    PVFS_sysresp_getattr getattr_response;
     PVFS_fs_id fs_id;
-    char* name;
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
     PVFS_ds_position token;
-    int pvfs_dirent_incount;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
+    memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
 
     name = start_dir;
     fs_id = init_response->fsid_list[0];
@@ -90,6 +100,18 @@ int do_readdir(
     credentials.gid = 100;
     credentials.perms = 511;
 
+    if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_NOSIZE,
+                         credentials, &getattr_response) == 0)
+    {
+        if (getattr_response.attr.objtype == PVFS_TYPE_METAFILE)
+        {
+            char segment[128] = {0};
+            PINT_remove_base_dir(name, segment, 128);
+            print_entry_attr(segment, &getattr_response.attr);
+            return 0;
+        }
+    }
+
     token = 0;
     do
     {
@@ -98,20 +120,8 @@ int do_readdir(
                              (!token ? PVFS2_READDIR_START : token),
                              pvfs_dirent_incount, credentials, &rd_response))
         {
-            /* try a lookup instead; perhaps this is a file ? */
-            ret = PVFS_sys_lookup(fs_id, name, credentials, &lk_response);
-            if (ret < 0)
-            {
-                fprintf(stderr,"Readdir and Lookup failed on %s\n",name);
-            }
-            else
-            {
-                char segment[128] = {0};
-                PINT_remove_base_dir(name, segment, 128);
-                print_entry(segment,lk_response.pinode_refn.handle,
-                            lk_response.pinode_refn.fs_id);
-            }
-            return ret;
+            fprintf(stderr,"readdir failed\n");
+            return -1;
         }
 
         for(i = 0; i < rd_response.pvfs_dirent_outcount; i++)
@@ -159,9 +169,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (do_readdir(&init_response,((argc == 2) ? argv[1] : "/")))
+    if (do_list(&init_response,((argc == 2) ? argv[1] : "/")))
     {
-        fprintf(stderr,"Failed to do readdir\n");
         return 1;
     }
 
