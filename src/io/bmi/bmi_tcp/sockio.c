@@ -20,6 +20,15 @@
 
 #include "sockio.h"
 
+/* if the platform provides a MSG_NOSIGNAL option (which disables the
+ * generation of signals on broken pipe), then use it
+ */
+#ifdef MSG_NOSIGNAL
+#define DEFAULT_MSG_FLAGS MSG_NOSIGNAL
+#else
+#define DEFAULT_MSG_FLAGS 0
+#endif
+
 int BMI_sockio_new_sock()
 {
     static int p_num = -1;	/* set to tcp protocol # on first call */
@@ -116,7 +125,7 @@ int BMI_sockio_brecv(int s,
     while (comp)
     {
       brecv_restart:
-	if ((ret = recv(s, (char *) buf, comp, 0)) < 0)
+	if ((ret = recv(s, (char *) buf, comp, DEFAULT_MSG_FLAGS)) < 0)
 	{
 	    if (errno == EINTR)
 		goto brecv_restart;
@@ -151,7 +160,7 @@ int BMI_sockio_nbrecv(int s,
     while (comp)
     {
       nbrecv_restart:
-	ret = recv(s, buf, comp, 0);
+	ret = recv(s, buf, comp, DEFAULT_MSG_FLAGS);
 	if (!ret)	/* socket closed */
 	{
 	    errno = EPIPE;
@@ -194,7 +203,7 @@ int BMI_sockio_nbpeek(int s, void* buf, int len)
     while (comp)
     {
       nbpeek_restart:
-	ret = recv(s, buf, comp, MSG_PEEK);
+	ret = recv(s, buf, comp, (MSG_PEEK|DEFAULT_MSG_FLAGS));
 	if (!ret)	/* socket closed */
 	{
 	    errno = EPIPE;
@@ -231,7 +240,7 @@ int BMI_sockio_bsend(int s,
     while (comp)
     {
       bsend_restart:
-	if ((ret = send(s, (char *) buf, comp, 0)) < 0)
+	if ((ret = send(s, (char *) buf, comp, DEFAULT_MSG_FLAGS)) < 0)
 	{
 	    if (errno == EINTR)
 		goto bsend_restart;
@@ -258,7 +267,7 @@ int BMI_sockio_nbsend(int s,
     while (comp)
     {
       nbsend_restart:
-	ret = send(s, (char *) buf, comp, 0);
+	ret = send(s, (char *) buf, comp, DEFAULT_MSG_FLAGS);
 	if (ret == 0 || (ret == -1 && errno == EWOULDBLOCK))
 	    return (len - comp);	/* return amount completed */
 	if (ret == -1 && errno == EINTR)
