@@ -27,6 +27,24 @@
 
 #define DEFAULT_TAB "/etc/pvfs2tab"
 
+#define KILOBYTE                1024
+#define MEGABYTE   (1024 * KILOBYTE)
+#define GIGABYTE   (1024 * MEGABYTE)
+/*
+#define TERABYTE   (1024 * GIGABYTE)
+#define PETABYTE   (1024 * TERABYTE)
+#define  EXABYTE   (1024 * PETABYTE)
+#define ZETTABYTE  (1024 *  EXABYTE)
+#define YOTTABYTE (1024 * ZETTABYTE)
+*/
+#define NUM_SIZES                  3
+
+static PVFS_size s_size_table[NUM_SIZES] =
+    { /*YOTTABYTE, ZETTABYTE, EXABYTE, PETABYTE,
+        TERABYTE,*/ GIGABYTE, MEGABYTE, KILOBYTE };
+static char *s_str_size_table[NUM_SIZES] =
+    { /*"Y", "Z", "E", "P","T",*/ "G", "M", "K" };
+
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations
  */
@@ -198,6 +216,38 @@ main_out:
     return(ret);
 }
 
+
+static inline void make_size_human_readable(
+    PVFS_size size,
+    char *out_str,
+    int max_out_len)
+{
+    int i = 0;
+    PVFS_size tmp = 0;
+
+    if (out_str)
+    {
+        for(i = 0; i < NUM_SIZES; i++)
+        {
+            tmp = size;
+            if ((PVFS_size)(tmp / s_size_table[i]) > 0)
+            {
+                tmp = (PVFS_size)(tmp / s_size_table[i]);
+                break;
+            }
+        }
+        if (i == NUM_SIZES)
+        {
+            snprintf(out_str,16, "%Ld", size);
+        }
+        else
+        {
+            snprintf(out_str,max_out_len,"%Ld%s",
+                     tmp,s_str_size_table[i]);
+        }
+    }
+}
+
 /*
   build a string of a specified length that's either
   left or right justified based on the src string;
@@ -280,9 +330,14 @@ void print_entry_attr(
              (attr->mask & PVFS_ATTR_SYS_SIZE)) ?
             (unsigned long)attr->size : 0);
 
-    /* format size string -- FIXME: handle human readable cases */
-    snprintf(scratch_size,16, "%Ld", size);
-
+    if (opts->list_human_readable)
+    {
+        make_size_human_readable(size,scratch_size,16);
+    }
+    else
+    {
+        snprintf(scratch_size,16, "%Ld", size);
+    }
     format_size_string(scratch_size,11,&formatted_size,1);
 
     if (!opts->list_numeric_uid_gid)
@@ -455,6 +510,10 @@ int do_list(
         {
             char segment[128] = {0};
             PVFS_util_remove_base_dir(name, segment, 128);
+            if (strcmp(segment,"") == 0)
+            {
+                snprintf(segment,128,"/");
+            }
             print_entry_attr(pinode_refn.handle, segment,
                              &getattr_response.attr, opts);
             return 0;
@@ -488,7 +547,7 @@ int do_list(
                   this value, by manually resolving it with lookups
                   on base dirs, but I'm not sure it's worth it
                 */
-                if (opts->list_inode)
+                if (opts->list_inode && !opts->list_long)
                 {
                     printf("%Ld .\n",pinode_refn.handle);
                     printf("%Ld .. (faked)\n",pinode_refn.handle);
