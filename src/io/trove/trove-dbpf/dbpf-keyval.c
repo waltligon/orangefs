@@ -268,23 +268,34 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 	goto return_error;
     }
 
-    /*
-      now that the data is written to disk, update
-      the cache if it's an attr keyval we manage
-    */
     gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Write "
                  "of %s\n", (char *)op_p->u.k_write.key.buffer);
 
+    /*
+      now that the data is written to disk, update the cache if it's
+      an attr keyval we manage.
+    */
     cache_elem = dbpf_attr_cache_elem_lookup(op_p->handle);
     if (cache_elem)
     {
-        dbpf_keyval_pair_cache_elem_t *keyval_pair =
-            dbpf_attr_cache_elem_get_data_based_on_key(
-                cache_elem, op_p->u.k_write.key.buffer);
-        if (keyval_pair)
+        if (dbpf_attr_cache_elem_set_data_based_on_key(
+                op_p->handle, op_p->u.k_write.key.buffer,
+                op_p->u.k_write.val.buffer, data.size))
         {
-            dbpf_attr_cache_keyval_pair_update_cached_data(
-                cache_elem, keyval_pair, data.data, data.size);
+            /*
+              NOTE: this can happen if the keyword isn't registered,
+              or if there is no associated cache_elem for this key
+            */
+            gossip_debug(
+                GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
+                "(key is %s)\n", (char *)op_p->u.k_write.key.buffer);
+        }
+        else
+        {
+            gossip_debug(
+                GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
+                "written (key is %s)\n",
+                (char *)op_p->u.k_write.key.buffer);
         }
     }
 

@@ -433,35 +433,6 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
     return ret;
 }
 
-int dbpf_attr_cache_keyval_pair_update_cached_data(
-    dbpf_attr_cache_elem_t *cache_elem,
-    dbpf_keyval_pair_cache_elem_t *keyval_pair,
-    void *src_data, int src_data_sz)
-{
-    int ret = -1;
-
-    if (DBPF_ATTR_CACHE_INITIALIZED() && (keyval_pair && src_data))
-    {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(ret);
-
-        if (cache_elem && keyval_pair)
-        {
-            if (keyval_pair->data)
-            {
-                free(keyval_pair->data);
-            }
-            keyval_pair->data = malloc(src_data_sz);
-            assert(keyval_pair->data);
-            memcpy(keyval_pair->data, src_data, src_data_sz);
-            keyval_pair->data_sz = src_data_sz;
-            ret = 0;
-        }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
-    }
-    return ret;
-}
-
 int dbpf_attr_cache_keyval_pair_fetch_cached_data(
     dbpf_attr_cache_elem_t *cache_elem,
     dbpf_keyval_pair_cache_elem_t *keyval_pair,

@@ -150,6 +150,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 {
     int ret, got_db = 0, error = -TROVE_EINVAL;
     TROVE_ds_storedattr_s s_attr;
+    TROVE_ds_attributes attr;
     TROVE_handle new_handle = TROVE_HANDLE_NULL;
     DBT key, data;
     DB *db_p;
@@ -264,6 +265,11 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
         error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
+
+    trove_ds_stored_to_attr(s_attr, attr, 0, 0);
+
+    /* add retrieved ds_attr to dbpf_attr cache here */
+    dbpf_attr_cache_insert(new_handle, &attr);
     
     DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 

@@ -3,7 +3,7 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.1.0
+pvfs2-0.1.0pre1
 ===============
 - initial support for logging traces with both MPE and Pablo libraries
 - fix some warnings on x86-64
@@ -55,6 +55,8 @@ pvfs2-0.1.0
 - added configure option to allow the karma gui to not be built
 - fixed a bug that would not allow sysint initialization if the user does
   not have write permission in the current directory
+- properly cache attributes at create and write time instead of waiting
+  until the first read is done
 
 
 pvfs2-0.0.9
