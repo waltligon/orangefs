@@ -198,12 +198,9 @@ int PINT_Request_decode(struct PINT_Request *req);
 	(((reqp)->type_offset >= (reqp)->final_offset) ||\
 	 ((reqp)->start_offset == -1))
 
-/* checks to see if you have run out of segments or bytes 
- * or hit EOF */
+/* checks to see if you have hit EOF */
 #define PINT_REQUEST_RESULT_DONE(resp)\
-	((resp)->segs >= (resp)->segmax ||\
-	 (resp)->bytes >= (resp)->bytemax ||\
-	  (resp)->eof_flag)
+	  (resp)->eof_flag
 
 /* checks to see if you have run out of request or segments or bytes 
  * or hit EOF */
