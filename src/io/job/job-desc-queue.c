@@ -16,6 +16,9 @@
 #include "job-desc-queue.h"
 #include "gossip.h"
 #include "id-generator.h"
+#include "gen-locks.h"
+
+static gen_mutex_t *s_job_desc_q_mutex = NULL;
 
 /***************************************************************
  * Visible functions
@@ -70,12 +73,16 @@ job_desc_q_p job_desc_q_new(void)
 {
     struct qlist_head *tmp_job_desc_q = NULL;
 
-    tmp_job_desc_q = (struct qlist_head *) malloc(sizeof(struct qlist_head));
-    if (tmp_job_desc_q)
+    s_job_desc_q_mutex = gen_mutex_build();
+    if (s_job_desc_q_mutex)
     {
-	INIT_QLIST_HEAD(tmp_job_desc_q);
+        tmp_job_desc_q = (struct qlist_head *)
+            malloc(sizeof(struct qlist_head));
+        if (tmp_job_desc_q)
+        {
+            INIT_QLIST_HEAD(tmp_job_desc_q);
+        }
     }
-
     return (tmp_job_desc_q);
 }
 
@@ -89,18 +96,28 @@ void job_desc_q_cleanup(job_desc_q_p jdqp)
 {
     struct job_desc *tmp_job_desc = NULL;
 
-    do
+    if (s_job_desc_q_mutex)
     {
-	tmp_job_desc = job_desc_q_shownext(jdqp);
-	if (tmp_job_desc)
-	{
-	    job_desc_q_remove(tmp_job_desc);
-	    free(tmp_job_desc);
-	}
-    } while (tmp_job_desc);
+        gen_mutex_lock(s_job_desc_q_mutex);
+        if (jdqp)
+        {
+            do
+            {
+                tmp_job_desc = job_desc_q_shownext(jdqp);
+                if (tmp_job_desc)
+                {
+                    job_desc_q_remove(tmp_job_desc);
+                    free(tmp_job_desc);
+                }
+            } while (tmp_job_desc);
 
-    free(jdqp);
-    jdqp = NULL;
+            free(jdqp);
+            jdqp = NULL;
+        }
+        gen_mutex_unlock(s_job_desc_q_mutex);
+        gen_mutex_destroy(s_job_desc_q_mutex);
+        s_job_desc_q_mutex = NULL;
+    }
     return;
 }
 
@@ -113,9 +130,16 @@ void job_desc_q_cleanup(job_desc_q_p jdqp)
 void job_desc_q_add(job_desc_q_p jdqp,
 		    struct job_desc *desc)
 {
-    assert(jdqp != NULL);
-    /* note that we are adding to tail to preserve fifo order */
-    qlist_add_tail(&(desc->job_desc_q_link), jdqp);
+    if (jdqp)
+    {
+        gen_mutex_lock(s_job_desc_q_mutex);
+        if (jdqp)
+        {
+            /* note that we are adding to tail to preserve fifo order */
+            qlist_add_tail(&(desc->job_desc_q_link), jdqp);
+        }
+        gen_mutex_unlock(s_job_desc_q_mutex);
+    }
     return;
 }
 

@@ -3493,9 +3493,11 @@ static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp)
     gen_mutex_lock(&completion_mutex);
     /* set completed flag while holding queue lock */
     tmp_desc->completed_flag = 1;
-    assert(completion_queue_array[tmp_desc->context_id] != 0);
-    job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
-	tmp_desc);
+    if (completion_queue_array[tmp_desc->context_id] != 0)
+    {
+        job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+                       tmp_desc);
+    }
     gen_mutex_unlock(&completion_mutex);
 
 #ifdef __PVFS2_JOB_THREADED__
