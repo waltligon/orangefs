@@ -1,0 +1,18 @@
+DIR := test/kernel/linux-2.6
+
+TEST_KERNEL_DIR_SRC += \
+	$(DIR)/pvfs2-client.c
+
+TESTSRC += $(TEST_KERNEL_DIR_SRC)
+
+LOCALLIBS := -ldb -lrt -lpthread
+LOCALTESTS := $(patsubst %.c,%, $(TEST_KERNEL_DIR_SRC))
+$(LOCALTESTS): %: %.o 
+ifdef QUIET_COMPILE
+	@echo "  LD             $@"
+	@$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
+else
+	$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
+endif
+
+

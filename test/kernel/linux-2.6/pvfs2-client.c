@@ -193,7 +193,6 @@ static int service_remove_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    uint32_t attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
     PVFS_credentials credentials;
     PVFS_pinode_reference parent_refn;
 
@@ -427,11 +426,10 @@ int write_device_response(
 
 int main(int argc, char **argv)
 {
-    int ret = 1, i = 0;
+    int ret = 1;
     void* buffer_list[MAX_LIST_SIZE];
     int size_list[MAX_LIST_SIZE];
     int list_size = 0, total_size = 0;
-    int incount;
 
     job_context_id context;
 
@@ -569,7 +567,6 @@ int main(int argc, char **argv)
 	}
     }
 
-  shutdown:
     job_close_context(context);
 
     if (PVFS_sys_finalize())
