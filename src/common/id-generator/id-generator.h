@@ -57,16 +57,13 @@ static inline int id_gen_fast_register(
 static inline void *id_gen_fast_lookup(
     PVFS_id_gen_t id)
 {
-    int32_t little_int = 0;
-
     if (!id)
 	return (NULL);
 
 #if SIZEOF_VOID_P == 8
-    return ((void *) id);
+    return (void *) id;
 #else
-    little_int += id;
-    return ((void *) little_int);
+    return (void *) (uint32_t) id;
 #endif
 }
 

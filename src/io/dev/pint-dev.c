@@ -495,9 +495,8 @@ static int setup_dev_entry(const char* dev_name)
 static int parse_devices(const char* targetfile, const char* devname, 
     int* majornum)
 {
-    int max_str_len = 256;
-    char line_buf[max_str_len];
-    char dev_buf[max_str_len];
+    char line_buf[256];
+    char dev_buf[256];
     int major_buf = -1;
     FILE* devfile = NULL;
     int ret = -1;
@@ -522,7 +521,7 @@ static int parse_devices(const char* targetfile, const char* devname,
 	if(ret == 2)
 	{
 	    /* this line is the correct format; see if it matches the devname */
-	    if(strncmp(devname, dev_buf, max_str_len) == 0)
+	    if(strncmp(devname, dev_buf, sizeof(dev_buf)) == 0)
 	    {
 		*majornum = major_buf;
 		/* don't break out; it doesn't cost much to scan the whole

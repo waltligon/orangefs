@@ -108,8 +108,8 @@ void PINT_Dist_encode(void *buffer, struct PVFS_Dist *dist)
 			((char *)dist + ((char *)old_dist->params - (char *)old_dist));
 	}
 	/* convert pointers in dist to ints */
-	(int)(dist->dist_name) = (char *)(dist->dist_name) - (char *)(dist);
-	(int)(dist->params) = (char *)(dist->params) - (char *)(dist);
+	dist->dist_name = (void *) (dist->dist_name - (char *) dist);
+	dist->params = (void *) ((char *) dist->params - (char *) dist);
 	dist->methods = NULL;
 }
 
@@ -128,10 +128,9 @@ void PINT_Dist_decode(struct PVFS_Dist *dist, void *buffer)
 		PVFS_Dist *d2 = (PVFS_Dist *)buffer;
 		memcpy(dist, buffer, PINT_DIST_PACK_SIZE(d2));
 	}
-	/* convert pointers in dist to ints */
-	dist->dist_name = (char *)(dist) + (int)(dist->dist_name);
-	dist->params = (struct PVFS_Dist_params *)
-		((char *)(dist) + (int)(dist->params));
+	/* convert ints in dist to pointers */
+	dist->dist_name = (char *) dist + (unsigned long) dist->dist_name;
+	dist->params = (void *) ((char *) dist + (unsigned long) dist->params);
 	/* set methods */
 	dist->methods = NULL;
 	if (PINT_Dist_lookup(dist)) {
@@ -143,11 +142,11 @@ void PINT_Dist_decode(struct PVFS_Dist *dist, void *buffer)
 void PINT_Dist_dump(PVFS_Dist *dist)
 {
 	gossip_debug(DIST_DEBUG,"******************************\n");
-	gossip_debug(DIST_DEBUG,"address\t\t%x\n", (unsigned int)dist);
+	gossip_debug(DIST_DEBUG,"address\t\t%p\n", dist);
 	gossip_debug(DIST_DEBUG,"dist_name\t%s\n", dist->dist_name);
 	gossip_debug(DIST_DEBUG,"name_size\t%d\n", dist->name_size);
 	gossip_debug(DIST_DEBUG,"param_size\t%d\n", dist->param_size);
-	gossip_debug(DIST_DEBUG,"params\t\t%x\n", (unsigned int)dist->params);
-	gossip_debug(DIST_DEBUG,"methods\t\t%x\n", (unsigned int)dist->methods);
+	gossip_debug(DIST_DEBUG,"params\t\t%p\n", dist->params);
+	gossip_debug(DIST_DEBUG,"methods\t\t%p\n", dist->methods);
 	gossip_debug(DIST_DEBUG,"******************************\n");
 }

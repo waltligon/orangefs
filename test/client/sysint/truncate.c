@@ -32,7 +32,12 @@ int main(int argc,char **argv)
     }
     filename = argv[1];
 
-    sscanf(argv[2],"%lld",&trunc_size);
+    {
+    /* scanf format must match data size on both 32- and 64-bit machines */
+    unsigned long long ull;
+    sscanf(argv[2],"%lld",&ull);
+    trunc_size = ull;
+    }
 
     if (PVFS_util_parse_pvfstab(&mnt))
     {
@@ -91,7 +96,7 @@ int main(int argc,char **argv)
     }
 
     printf("===================================");
-    printf("file named %s has been truncated to %lld bytes.", filename, trunc_size);
+    printf("file named %s has been truncated to %lld bytes.", filename, Ld(trunc_size));
 
     //close it down
     ret = PVFS_sys_finalize();

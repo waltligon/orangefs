@@ -313,7 +313,7 @@ int PVFS_util_remove_base_dir(
 
 	while (end && (end > start) && (*(--end) != '/'));
 
-	len = (int) ((char *) (end_ref - ++end));
+	len = end_ref - ++end;
 	if (len < out_max_len)
 	{
 	    memcpy(out_dir, end, len);
@@ -480,12 +480,12 @@ void PVFS_util_make_size_human_readable(
         }
         if (i == NUM_SIZES)
         {
-            snprintf(out_str,16, "%Ld", size);
+            snprintf(out_str,16, "%Ld", Ld(size));
         }
         else
         {
             snprintf(out_str,max_out_len,"%Ld%s",
-                     tmp,PINT_s_str_size_table[i]);
+                     Ld(tmp),PINT_s_str_size_table[i]);
         }
     }
 }

@@ -95,7 +95,7 @@ int PINT_get_base_dir(char *pathname, char *out_base_dir, int out_max_len)
           the case where parent is the root directory
           (in root dir case, len == 1)
         */
-        len = (int)((char *)(++end - start));
+        len = ++end - start;
         if (len != 1)
         {
             len--;
