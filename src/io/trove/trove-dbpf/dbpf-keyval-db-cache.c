@@ -25,7 +25,7 @@
  */
 
 enum {
-    DBCACHE_ENTRIES = 16
+    DBCACHE_ENTRIES = 4
 };
 
 struct keyval_dbcache_entry {
@@ -153,6 +153,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     int i, ret, error;
     char filename[PATH_MAX];
     DB *db_p;
+    int got_db=0;
 
     for (i=0; i < DBCACHE_ENTRIES; i++) {
 	if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
@@ -220,6 +221,8 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     if (ret != 0) {
 	    gossip_lerr("dbpf_keyval_dbcache_get: %s\n", db_strerror(ret));
 	    assert(0);
+    } else {
+	got_db =1;
     }
 
     db_p = keyval_db_cache[i].db_p; /* for simplicity */
@@ -254,7 +257,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     }
     else if (ret == ENOENT) {
 	error = -TROVE_ENOENT;
-	goto return_error;
+	goto failed_open_error;
     }
     else if (ret != 0) {
 #if 0
@@ -271,6 +274,16 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     gen_mutex_unlock(&keyval_db_cache[i].mutex);
     return 0;
 
+failed_open_error:
+    /* db_create allocates memory -- even if db->open fails -- which can only
+     * be freed with db->close */
+    if(got_db && (keyval_db_cache[i].db_p  != NULL) ) {
+	/* ignore errors, since we are trying to clean up anyway */
+	keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
+	keyval_db_cache[i].ref_ct = -1;
+	keyval_db_cache[i].db_p = NULL;
+    }
+    /* fall through */
 return_error:
     gen_mutex_unlock(&keyval_db_cache[i].mutex);
     return error;
