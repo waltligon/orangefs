@@ -2,6 +2,13 @@
 general
 ==========================================
 
+- come back later and do some optimizing to avoid the flags
+  argument to job_bmi_unexp().  This flag can be used to disable
+  immediate completion, which is currently necessary in the server
+  code to allow it to repost unexpected jobs correctly.  See
+  mailing list thread:
+  http://www.beowulf-underground.org/pipermail/pvfs2-internal/2003-February/000305.html
+
 - make post functions avoid allocating a job descriptor if they
   immediately complete (right now, we allocate one whether its
   needed or not, really) 

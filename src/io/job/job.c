@@ -494,11 +494,12 @@ int job_bmi_recv_list(
  * returns 0 on succcess, 1 on immediate completion, and -errno on
  * failure
  */
-int job_bmi_unexp(
+int job_bmi_unexp_HACK(
 	struct BMI_unexpected_info* bmi_unexp_d,
 	void* user_ptr,
 	job_status_s* out_status_p,
-	job_id_t* id)
+	job_id_t* id,
+	enum job_flags flags)
 {
 	/* post a bmi recv for an unexpected message.  We will do a quick
 	 * test to see if an unexpected message is available.  If so, we
@@ -520,21 +521,35 @@ int job_bmi_unexp(
 	jd->job_user_ptr = user_ptr;
 	jd->u.bmi_unexp.info = bmi_unexp_d;
 
-	ret = BMI_testunexpected(1, &outcount, jd->u.bmi_unexp.info, 0);
-	
-	if(ret < 0)
-	{
-		/* error testing */
-		dealloc_job_desc(jd);
-		return(ret);
-	}
+   /*********************************************************
+	 * TODO: consider optimizations later, so that we avoid
+	 * disabling immediate completion.  See the mailing list thread
+	 * started here:
+	 * http://www.beowulf-underground.org/pipermail/pvfs2-internal/2003-February/000305.html
+	 *
+	 * At the moment, the server is not designed to be able to
+	 * handle immediate completion upon posting unexpected jobs.
+	 */
 
-	if(outcount == 1)
+	/* only look for immediate completion if our flags allow it */
+	if(!(flags & JOB_NO_IMMED_COMPLETE))
 	{
-		/* there was an unexpected job available */
-		out_status_p->error_code = jd->u.bmi_unexp.info->error_code;
-		dealloc_job_desc(jd);
-		return(ret);
+		ret = BMI_testunexpected(1, &outcount, jd->u.bmi_unexp.info, 0);
+		
+		if(ret < 0)
+		{
+			/* error testing */
+			dealloc_job_desc(jd);
+			return(ret);
+		}
+
+		if(outcount == 1)
+		{
+			/* there was an unexpected job available */
+			out_status_p->error_code = jd->u.bmi_unexp.info->error_code;
+			dealloc_job_desc(jd);
+			return(ret);
+		}
 	}
 
 	/* if we fall through to this point, then there were not any
