@@ -28,15 +28,15 @@
  * the extent_str is invalid, or an error occurs
  *
  */
-struct llist *PINT_create_extent_list(char *extent_str)
+struct PINT_llist *PINT_create_extent_list(char *extent_str)
 {
     PVFS_handle_extent cur_extent, *new_extent = NULL;
-    struct llist *extent_list = NULL;
+    struct PINT_llist *extent_list = NULL;
     int status = 0;
 
     if (extent_str)
     {
-        extent_list = llist_new();
+        extent_list = PINT_llist_new();
         assert(extent_list);
 
         while(PINT_parse_handle_ranges(extent_str,&cur_extent,&status))
@@ -47,7 +47,7 @@ struct llist *PINT_create_extent_list(char *extent_str)
             new_extent->first = cur_extent.first;
             new_extent->last = cur_extent.last;
 
-            llist_add_to_tail(extent_list,(void *)new_extent);
+            PINT_llist_add_to_tail(extent_list,(void *)new_extent);
         }
     }
     return extent_list;
@@ -72,7 +72,7 @@ int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
 /* PINT_handle_in_extent_list()
  *
  * Parameters:
- * struct llist *extent_list   - llist of extent structures
+ * struct PINT_llist *extent_list   - PINT_llist of extent structures
  * PVFS_handle                 - a handle
  *
  * Returns 1 if the specified handle is within any of the
@@ -81,11 +81,11 @@ int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
  *
  */
 int PINT_handle_in_extent_list(
-    struct llist *extent_list,
+    struct PINT_llist *extent_list,
     PVFS_handle handle)
 {
     int ret = 0;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     PVFS_handle_extent *cur_extent = NULL;
 
     if (extent_list)
@@ -93,7 +93,7 @@ int PINT_handle_in_extent_list(
         cur = extent_list;
         while(cur)
         {
-            cur_extent = llist_head(cur);
+            cur_extent = PINT_llist_head(cur);
             if (!cur_extent)
             {
                 break;
@@ -103,7 +103,7 @@ int PINT_handle_in_extent_list(
                 ret = 1;
                 break;
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return ret;
@@ -112,16 +112,16 @@ int PINT_handle_in_extent_list(
 /* PINT_release_extent_list()
  *
  * Parameters:
- * struct llist *extent_list   - llist of extent structures
+ * struct PINT_llist *extent_list   - PINT_llist of extent structures
  *
  * Frees extent objects within the specified extent_list if any.
  *
  */
-void PINT_release_extent_list(struct llist *extent_list)
+void PINT_release_extent_list(struct PINT_llist *extent_list)
 {
     if (extent_list)
     {
-        llist_free(extent_list,free);
+        PINT_llist_free(extent_list,free);
     }
 }
 

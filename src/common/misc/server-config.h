@@ -45,8 +45,8 @@ typedef struct filesystem_configuration_s
     char *file_system_name;
     PVFS_fs_id coll_id;
     PVFS_handle  root_handle;
-    struct llist *meta_handle_ranges; /* ptrs are type host_handle_mapping_s* */
-    struct llist *data_handle_ranges; /* ptrs are type host_handle_mapping_s* */
+    struct PINT_llist *meta_handle_ranges; /* ptrs are type host_handle_mapping_s* */
+    struct PINT_llist *data_handle_ranges; /* ptrs are type host_handle_mapping_s* */
     enum PVFS_flowproto_type flowproto; /* default flowprotocol */
 } filesystem_configuration_s;
 
@@ -66,8 +66,8 @@ typedef struct server_configuration_s
     char *bmi_modules;              /* BMI modules */
     char *flow_modules;             /* Flow modules */
     int  configuration_context;
-    struct llist *host_aliases;     /* ptrs are type host_alias_s               */
-    struct llist *file_systems;     /* ptrs are type filesystem_configuration_s */
+    struct PINT_llist *host_aliases;     /* ptrs are type host_alias_s               */
+    struct PINT_llist *file_systems;     /* ptrs are type filesystem_configuration_s */
 } server_configuration_s;
 
 int PINT_parse_config(

@@ -7,49 +7,49 @@
 
 #include "llist.h"
 
-/* llist_new() - returns a pointer to an empty list
+/* PINT_llist_new() - returns a pointer to an empty list
  */
-llist_p llist_new(
+PINT_llist_p PINT_llist_new(
     void)
 {
-    llist_p l_p;
+    PINT_llist_p l_p;
 
-    if (!(l_p = (llist_p) malloc(sizeof(llist))))
+    if (!(l_p = (PINT_llist_p) malloc(sizeof(PINT_llist))))
 	return (NULL);
     l_p->next = l_p->item = NULL;
     return (l_p);
 }
 
-/* llist_empty() - determines if a list is empty
+/* PINT_llist_empty() - determines if a list is empty
  *
  * Returns 0 if not empty, 1 if empty
  */
-int llist_empty(
-    llist_p l_p)
+int PINT_llist_empty(
+    PINT_llist_p l_p)
 {
     if (l_p->next == NULL)
 	return (1);
     return (0);
 }
 
-/* llist_add_to_tail() - adds an item to a list
+/* PINT_llist_add_to_tail() - adds an item to a list
  *
  * Requires that a list have already been created
  * Puts item at tail of list
  * Returns 0 on success, -1 on failure
  */
-int llist_add_to_tail(
-    llist_p l_p,
+int PINT_llist_add_to_tail(
+    PINT_llist_p l_p,
     void *item)
 {
-    llist_p new_p;
+    PINT_llist_p new_p;
 
     if (!l_p)	/* not a list */
 	return (-1);
 
     /* NOTE: first "item" pointer in list is _always_ NULL */
 
-    if ((new_p = (llist_p) malloc(sizeof(llist))) == NULL)
+    if ((new_p = (PINT_llist_p) malloc(sizeof(PINT_llist))) == NULL)
 	return -1;
     new_p->next = NULL;
     new_p->item = item;
@@ -59,24 +59,24 @@ int llist_add_to_tail(
     return (0);
 }
 
-/* llist_add_to_head() - adds an item to a list
+/* PINT_llist_add_to_head() - adds an item to a list
  *
  * Requires that a list have already been created
  * Puts item at head of list
  * Returns 0 on success, -1 on failure
  */
-int llist_add_to_head(
-    llist_p l_p,
+int PINT_llist_add_to_head(
+    PINT_llist_p l_p,
     void *item)
 {
-    llist_p new_p;
+    PINT_llist_p new_p;
 
     if (!l_p)	/* not a list */
 	return (-1);
 
     /* NOTE: first "item" pointer in list is _always_ NULL */
 
-    if ((new_p = (llist_p) malloc(sizeof(llist))) == NULL)
+    if ((new_p = (PINT_llist_p) malloc(sizeof(PINT_llist))) == NULL)
 	return -1;
     new_p->next = l_p->next;
     new_p->item = item;
@@ -84,25 +84,25 @@ int llist_add_to_head(
     return (0);
 }
 
-/* llist_head() - returns a pointer to the item at the head of the
+/* PINT_llist_head() - returns a pointer to the item at the head of the
  * list
  *
  * Returns NULL on error or if no items are in list
  */
-void *llist_head(
-    llist_p l_p)
+void *PINT_llist_head(
+    PINT_llist_p l_p)
 {
     if (!l_p || !l_p->next)
 	return (NULL);
     return (l_p->next->item);
 }
 
-/* llist_tail() - returns pointer to the item at the tail of the list
+/* PINT_llist_tail() - returns pointer to the item at the tail of the list
  * 
  * Returns NULL on error or if no items are in list
  */
-void *llist_tail(
-    llist_p l_p)
+void *PINT_llist_tail(
+    PINT_llist_p l_p)
 {
     if (!l_p || !l_p->next)
 	return (NULL);
@@ -111,13 +111,13 @@ void *llist_tail(
     return (l_p->item);
 }
 
-/* llist_search() - finds first match from list and returns pointer
+/* PINT_llist_search() - finds first match from list and returns pointer
  *
  * Returns NULL on error or if no match made
  * Returns pointer to item if found
  */
-void *llist_search(
-    llist_p l_p,
+void *PINT_llist_search(
+    PINT_llist_p l_p,
     void *key,
     int (*comp) (void *,
 		 void *))
@@ -134,14 +134,14 @@ void *llist_search(
     return (NULL);
 }
 
-/* llist_rem() - removes first match from list
+/* PINT_llist_rem() - removes first match from list
  *
  * Returns NULL on error or not found, or a pointer to item if found
  * Removes item from list, but does not attempt to free memory
  *   allocated for item
  */
-void *llist_rem(
-    llist_p l_p,
+void *PINT_llist_rem(
+    PINT_llist_p l_p,
     void *key,
     int (*comp) (void *,
 		 void *))
@@ -155,7 +155,7 @@ void *llist_rem(
 	if (!(*comp) (key, l_p->next->item))
 	{
 	    void *i_p = l_p->next->item;
-	    llist_p rem_p = l_p->next;
+	    PINT_llist_p rem_p = l_p->next;
 
 	    l_p->next = l_p->next->next;
 	    free(rem_p);
@@ -165,7 +165,7 @@ void *llist_rem(
     return (NULL);
 }
 
-/* llist_count()
+/* PINT_llist_count()
  *
  * counts items in the list
  * NOTE: this is a slow count- it works by iterating through the whole
@@ -173,8 +173,8 @@ void *llist_rem(
  *
  * returns count on success, -errno on failure
  */
-int llist_count(
-    llist_p l_p)
+int PINT_llist_count(
+    PINT_llist_p l_p)
 {
     int count = 0;
 
@@ -189,16 +189,16 @@ int llist_count(
     return (count);
 }
 
-/* llist_doall() - passes through list calling function "fn" on all 
+/* PINT_llist_doall() - passes through list calling function "fn" on all 
  *    items in the list
  *
  * Returns -1 on error, 0 on success
  */
-int llist_doall(
-    llist_p l_p,
+int PINT_llist_doall(
+    PINT_llist_p l_p,
     int (*fn) (void *))
 {
-    llist_p tmp_p;
+    PINT_llist_p tmp_p;
 
     if (!l_p || !l_p->next || !fn)
 	return (-1);
@@ -214,18 +214,18 @@ int llist_doall(
     return (0);
 }
 
-/* llist_doall_arg() - passes through list calling function "fn" on all 
+/* PINT_llist_doall_arg() - passes through list calling function "fn" on all 
  *    items in the list; passes through an argument to the function
  *
  * Returns -1 on error, 0 on success
  */
-int llist_doall_arg(
-    llist_p l_p,
+int PINT_llist_doall_arg(
+    PINT_llist_p l_p,
     int (*fn) (void *item,
 	       void *arg),
     void *arg)
 {
-    llist_p tmp_p;
+    PINT_llist_p tmp_p;
 
     if (!l_p || !l_p->next || !fn)
 	return (-1);
@@ -241,15 +241,15 @@ int llist_doall_arg(
     return (0);
 }
 
-/* llist_free() - frees all memory associated with a list
+/* PINT_llist_free() - frees all memory associated with a list
  *
  * Relies on passed function to free memory for an item
  */
-void llist_free(
-    llist_p l_p,
+void PINT_llist_free(
+    PINT_llist_p l_p,
     void (*fn) (void *))
 {
-    llist_p tmp_p;
+    PINT_llist_p tmp_p;
 
     if (!l_p || !fn)
 	return;
@@ -268,7 +268,7 @@ void llist_free(
 }
 
 /*
- * llist_next()
+ * PINT_llist_next()
  * 
  * returns the next list entry in the list.  WARNING- use this function
  * carefully- it is sortof a hack around the interface.
@@ -276,8 +276,8 @@ void llist_free(
  * returns a pointer to the next entry on success, NULL on end or
  * failure.
  */
-llist_p llist_next(
-    llist_p entry)
+PINT_llist_p PINT_llist_next(
+    PINT_llist_p entry)
 {
 
     if (!entry)

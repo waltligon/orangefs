@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     int i = 0, j = 0, k = 0, n = 0, num_file_systems = 0;
     pvfs_mntlist mnt = {0,NULL};
     struct server_configuration_s server_config;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     int fs_ids[MAX_NUM_FS] = {0};
     int num_meta_servers = 0, num_data_servers = 0;
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
     cur = server_config.file_systems;
     while(cur)
     {
-        cur_fs = llist_head(cur);
+        cur_fs = PINT_llist_head(cur);
         if (!cur_fs)
         {
             break;
@@ -118,11 +118,11 @@ int main(int argc, char **argv)
             return(-1);
         }
         fs_ids[i++] = (int)cur_fs->coll_id;
-        cur = llist_next(cur);
+        cur = PINT_llist_next(cur);
     }
 
     /* run all pint-bucket tests for each filesystem we know about */
-    num_file_systems = llist_count(server_config.file_systems);
+    num_file_systems = PINT_llist_count(server_config.file_systems);
     for(i = 0; i < num_file_systems; i++)
     {
         printf("\nOUTPUT OF TEST (filesystem ID is %d):\n",fs_ids[i]);

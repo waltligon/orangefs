@@ -55,7 +55,7 @@ typedef struct bmi_host_extent_table_s
     char *bmi_address;
 
     /* ptrs are type struct extent */
-    struct llist *extent_list;
+    struct PINT_llist *extent_list;
 } bmi_host_extent_table_s;
 
 typedef struct config_fs_cache_s
@@ -64,13 +64,13 @@ typedef struct config_fs_cache_s
     struct filesystem_configuration_s *fs;
 
     /* ptrs are type bmi_host_extent_table_s */
-    struct llist *bmi_host_extent_tables;
+    struct PINT_llist *bmi_host_extent_tables;
 
     /* index into fs->meta_handle_ranges obj (see server-config.h) */
-    struct llist *meta_server_cursor;
+    struct PINT_llist *meta_server_cursor;
 
     /* index into fs->data_handle_ranges obj (see server-config.h) */
-    struct llist *data_server_cursor;
+    struct PINT_llist *data_server_cursor;
 } config_fs_cache_s;
 
 int PINT_check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid);

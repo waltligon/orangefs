@@ -9,7 +9,7 @@
 
 void print_filesystem_configuration(struct filesystem_configuration_s *fs)
 {
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct host_handle_mapping_s *cur_h_mapping = NULL;
 
     if (fs)
@@ -19,33 +19,33 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
         fprintf(stderr,"FS Root Handle  : %Ld\n",fs->root_handle);
 
         fprintf(stderr,"\t--- Meta Server(s) for %s (%d total):\n",
-                fs->file_system_name,llist_count(fs->meta_handle_ranges));
+                fs->file_system_name,PINT_llist_count(fs->meta_handle_ranges));
         cur = fs->meta_handle_ranges;
         while(cur)
         {
-            cur_h_mapping = llist_head(cur);
+            cur_h_mapping = PINT_llist_head(cur);
             if (!cur_h_mapping)
             {
                 break;
             }
             fprintf(stderr,"\t  %s\n",
                     cur_h_mapping->alias_mapping->host_alias);
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
 
         fprintf(stderr,"\t--- Data Server(s) for %s (%d total):\n",
-                fs->file_system_name,llist_count(fs->data_handle_ranges));
+                fs->file_system_name,PINT_llist_count(fs->data_handle_ranges));
         cur = fs->data_handle_ranges;
         while(cur)
         {
-            cur_h_mapping = llist_head(cur);
+            cur_h_mapping = PINT_llist_head(cur);
             if (!cur_h_mapping)
             {
                 break;
             }
             fprintf(stderr,"\t  %s\n",
                     cur_h_mapping->alias_mapping->host_alias);
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
 
         fprintf(stderr,"\t--- Meta Handle Mappings for %s:\n",
@@ -53,7 +53,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
         cur = fs->meta_handle_ranges;
         while(cur)
         {
-            cur_h_mapping = llist_head(cur);
+            cur_h_mapping = PINT_llist_head(cur);
             if (!cur_h_mapping)
             {
                 break;
@@ -61,7 +61,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
             fprintf(stderr,"\t  %s has handle range %s\n",
                     cur_h_mapping->alias_mapping->host_alias,
                     cur_h_mapping->handle_range);
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
 
         fprintf(stderr,"\t--- Data Handle Mappings for %s:\n",
@@ -69,7 +69,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
         cur = fs->data_handle_ranges;
         while(cur)
         {
-            cur_h_mapping = llist_head(cur);
+            cur_h_mapping = PINT_llist_head(cur);
             if (!cur_h_mapping)
             {
                 break;
@@ -77,14 +77,14 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
             fprintf(stderr,"\t  %s has handle range %s\n",
                     cur_h_mapping->alias_mapping->host_alias,
                     cur_h_mapping->handle_range);
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
 }
 
 int main(int argc, char **argv)
 {
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct server_configuration_s serverconfig;
     struct host_alias_s *cur_alias;
     struct filesystem_configuration_s *cur_fs = NULL;
@@ -130,7 +130,7 @@ int main(int argc, char **argv)
     cur = serverconfig.host_aliases;
     while(cur)
     {
-        cur_alias = llist_head(cur);
+        cur_alias = PINT_llist_head(cur);
         if (!cur_alias)
         {
             break;
@@ -139,19 +139,19 @@ int main(int argc, char **argv)
         fprintf(stderr,"  %s maps to %s\n",
                 cur_alias->host_alias,
                 cur_alias->bmi_address);
-        cur = llist_next(cur);
+        cur = PINT_llist_next(cur);
     }
 
     cur = serverconfig.file_systems;
     while(cur)
     {
-        cur_fs = llist_head(cur);
+        cur_fs = PINT_llist_head(cur);
         if (!cur_fs)
         {
             break;
         }
         print_filesystem_configuration(cur_fs);
-        cur = llist_next(cur);
+        cur = PINT_llist_next(cur);
     }
 
     fprintf(stderr,"\n--- Analyzing filesystem configuration\n\n");

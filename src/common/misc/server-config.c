@@ -72,7 +72,7 @@ static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
     char *alias);
 static struct host_handle_mapping_s *get_or_add_handle_mapping(
-    struct llist *list,
+    struct PINT_llist *list,
     char *alias);
 static char *merge_handle_range_strs(
     char *range1,
@@ -317,10 +317,10 @@ DOTCONF_CB(enter_filesystem_context)
 
     if (!config_s->file_systems)
     {
-        config_s->file_systems = llist_new();
+        config_s->file_systems = PINT_llist_new();
     }
-    llist_add_to_head(config_s->file_systems,(void *)fs_conf);
-    assert(llist_head(config_s->file_systems) == (void *)fs_conf);
+    PINT_llist_add_to_head(config_s->file_systems,(void *)fs_conf);
+    assert(PINT_llist_head(config_s->file_systems) == (void *)fs_conf);
     config_s->configuration_context = FILESYSTEM_CONFIG;
     return NULL;
 }
@@ -336,7 +336,7 @@ DOTCONF_CB(exit_filesystem_context)
     }
 
     fs_conf = (struct filesystem_configuration_s *)
-        llist_head(config_s->file_systems);
+        PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     /*
@@ -379,7 +379,7 @@ DOTCONF_CB(exit_mhranges_context)
     }
 
     fs_conf = (struct filesystem_configuration_s *)
-        llist_head(config_s->file_systems);
+        PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     if (!fs_conf->meta_handle_ranges)
@@ -415,7 +415,7 @@ DOTCONF_CB(exit_dhranges_context)
     }
 
     fs_conf = (struct filesystem_configuration_s *)
-        llist_head(config_s->file_systems);
+        PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     if (!fs_conf->data_handle_ranges)
@@ -555,7 +555,7 @@ DOTCONF_CB(get_root_handle)
         return NULL;
     }
     fs_conf = (struct filesystem_configuration_s *)
-        llist_head(config_s->file_systems);
+        PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 #ifdef HAVE_STRTOULL
         fs_conf->root_handle = (PVFS_handle)strtoull(
@@ -577,7 +577,7 @@ DOTCONF_CB(get_filesystem_name)
         return NULL;
     }
     fs_conf = (struct filesystem_configuration_s *)
-        llist_head(config_s->file_systems);
+        PINT_llist_head(config_s->file_systems);
     if (fs_conf->file_system_name)
     {
         gossip_lerr("WARNING: Overwriting %s with %s\n",
@@ -597,7 +597,7 @@ DOTCONF_CB(get_filesystem_collid)
         return NULL;
     }
     fs_conf = (struct filesystem_configuration_s *)
-        llist_head(config_s->file_systems);
+        PINT_llist_head(config_s->file_systems);
     if (fs_conf->coll_id)
     {
         gossip_lerr("WARNING: Overwriting %d with %d\n",
@@ -626,9 +626,9 @@ DOTCONF_CB(get_alias_list)
 
     if (!config_s->host_aliases)
     {
-        config_s->host_aliases = llist_new();
+        config_s->host_aliases = PINT_llist_new();
     }
-    llist_add_to_tail(config_s->host_aliases,(void *)cur_alias);
+    PINT_llist_add_to_tail(config_s->host_aliases,(void *)cur_alias);
     return NULL;
 }
 
@@ -637,7 +637,7 @@ DOTCONF_CB(get_range_list)
     int i = 0, is_new_handle_mapping = 0;
     struct filesystem_configuration_s *fs_conf = NULL;
     struct host_handle_mapping_s *handle_mapping = NULL;
-    struct llist **handle_range_list = NULL;
+    struct PINT_llist **handle_range_list = NULL;
 
     if ((config_s->configuration_context != META_HANDLERANGES_CONFIG) &&
         (config_s->configuration_context != DATA_HANDLERANGES_CONFIG))
@@ -648,7 +648,7 @@ DOTCONF_CB(get_range_list)
     }
 
     fs_conf = (struct filesystem_configuration_s *)
-        llist_head(config_s->file_systems);
+        PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
     handle_range_list = ((config_s->configuration_context ==
@@ -658,7 +658,7 @@ DOTCONF_CB(get_range_list)
 
     if (*handle_range_list == NULL)
     {
-        *handle_range_list = llist_new();
+        *handle_range_list = PINT_llist_new();
     }
 
     for(i = 0; i < cmd->arg_count; i += 2)
@@ -717,7 +717,7 @@ DOTCONF_CB(get_range_list)
 
                 if (is_new_handle_mapping)
                 {
-                    llist_add_to_tail(*handle_range_list,
+                    PINT_llist_add_to_tail(*handle_range_list,
                                       (void *)handle_mapping);
                 }
             }
@@ -806,17 +806,17 @@ void PINT_config_release(struct server_configuration_s *config_s)
         }
 
         /* free all filesystem objects */
-        llist_free(config_s->file_systems,free_filesystem);
+        PINT_llist_free(config_s->file_systems,free_filesystem);
 
         /* free all host alias objects */
-        llist_free(config_s->host_aliases,free_host_alias);
+        PINT_llist_free(config_s->host_aliases,free_host_alias);
     }
 }
 
 static int is_valid_alias(char *str)
 {
     int ret = 0;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct host_alias_s *cur_alias;
 
     if (str)
@@ -824,7 +824,7 @@ static int is_valid_alias(char *str)
         cur = config_s->host_aliases;
         while(cur)
         {
-            cur_alias = llist_head(cur);
+            cur_alias = PINT_llist_head(cur);
             if (!cur_alias)
             {
                 break;
@@ -837,7 +837,7 @@ static int is_valid_alias(char *str)
                 ret = 1;
                 break;
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return ret;
@@ -885,8 +885,8 @@ static int is_root_handle_in_a_meta_range(
     struct filesystem_configuration_s *fs)
 {
     int ret = 0;
-    struct llist *cur = NULL;
-    struct llist *extent_list = NULL;
+    struct PINT_llist *cur = NULL;
+    struct PINT_llist *extent_list = NULL;
     char *cur_host_id = (char *)0;
     host_handle_mapping_s *cur_h_mapping = NULL;
 
@@ -900,7 +900,7 @@ static int is_root_handle_in_a_meta_range(
         cur = fs->meta_handle_ranges;
         while(cur)
         {
-            cur_h_mapping = llist_head(cur);
+            cur_h_mapping = PINT_llist_head(cur);
             if (!cur_h_mapping)
             {
                 break;
@@ -933,7 +933,7 @@ static int is_root_handle_in_a_meta_range(
             {
                 break;
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return ret;
@@ -1004,8 +1004,8 @@ static void free_filesystem(void *ptr)
         fs->file_system_name = NULL;
 
         /* free all handle ranges */
-        llist_free(fs->meta_handle_ranges,free_host_handle_mapping);
-        llist_free(fs->data_handle_ranges,free_host_handle_mapping);
+        PINT_llist_free(fs->meta_handle_ranges,free_host_handle_mapping);
+        PINT_llist_free(fs->data_handle_ranges,free_host_handle_mapping);
 
         free(fs);
         fs = NULL;
@@ -1016,7 +1016,7 @@ static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
     char *alias)
 {
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct host_alias_s *ret = NULL;
     struct host_alias_s *cur_alias = NULL;
 
@@ -1025,7 +1025,7 @@ static host_alias_s *find_host_alias_ptr_by_alias(
         cur = config_s->host_aliases;
         while(cur)
         {
-            cur_alias = llist_head(cur);
+            cur_alias = PINT_llist_head(cur);
             if (!cur_alias)
             {
                 break;
@@ -1038,23 +1038,23 @@ static host_alias_s *find_host_alias_ptr_by_alias(
                 ret = cur_alias;
                 break;
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return ret;
 }
 
 static struct host_handle_mapping_s *get_or_add_handle_mapping(
-    struct llist *list,
+    struct PINT_llist *list,
     char *alias)
 {
-    struct llist *cur = list;
+    struct PINT_llist *cur = list;
     struct host_handle_mapping_s *ret = NULL;
     struct host_handle_mapping_s *handle_mapping = NULL;
 
     while(cur)
     {
-        handle_mapping = llist_head(cur);
+        handle_mapping = PINT_llist_head(cur);
         if (!handle_mapping)
         {
             break;
@@ -1069,7 +1069,7 @@ static struct host_handle_mapping_s *get_or_add_handle_mapping(
             ret = handle_mapping;
             break;
         }
-        cur = llist_next(cur);
+        cur = PINT_llist_next(cur);
     }
 
     if (!ret)
@@ -1168,7 +1168,7 @@ char *PINT_config_get_host_addr_ptr(
     char *alias)
 {
     char *ret = (char *)0;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct host_alias_s *cur_alias = NULL;
 
     if (config_s && alias)
@@ -1176,7 +1176,7 @@ char *PINT_config_get_host_addr_ptr(
         cur = config_s->host_aliases;
         while(cur)
         {
-            cur_alias = llist_head(cur);
+            cur_alias = PINT_llist_head(cur);
             if (!cur_alias)
             {
                 break;
@@ -1189,7 +1189,7 @@ char *PINT_config_get_host_addr_ptr(
                 ret = cur_alias->bmi_address;
                 break;
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return ret;
@@ -1211,7 +1211,7 @@ char *PINT_config_get_host_alias_ptr(
     char *bmi_address)
 {
     char *ret = (char *)0;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct host_alias_s *cur_alias = NULL;
 
     if (config_s && bmi_address)
@@ -1219,7 +1219,7 @@ char *PINT_config_get_host_alias_ptr(
         cur = config_s->host_aliases;
         while(cur)
         {
-            cur_alias = llist_head(cur);
+            cur_alias = PINT_llist_head(cur);
             if (!cur_alias)
             {
                 break;
@@ -1232,7 +1232,7 @@ char *PINT_config_get_host_alias_ptr(
                 ret = cur_alias->host_alias;
                 break;
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return ret;
@@ -1487,7 +1487,7 @@ static char *get_handle_range_str(
 {
     char *ret = (char *)0;
     char *my_alias = (char *)0;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct host_handle_mapping_s *cur_h_mapping = NULL;
 
     if (config_s && config_s->host_id && fs)
@@ -1500,7 +1500,7 @@ static char *get_handle_range_str(
                    fs->data_handle_ranges);
             while(cur)
             {
-                cur_h_mapping = llist_head(cur);
+                cur_h_mapping = PINT_llist_head(cur);
                 if (!cur_h_mapping)
                 {
                     break;
@@ -1515,7 +1515,7 @@ static char *get_handle_range_str(
                     ret = cur_h_mapping->handle_range;
                     break;
                 }
-                cur = llist_next(cur);
+                cur = PINT_llist_next(cur);
             }
         }
     }
@@ -1530,7 +1530,7 @@ int PINT_config_is_valid_configuration(
     struct server_configuration_s *config_s)
 {
     int ret = 0, fs_count = 0;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     
     if (config_s && config_s->logfile && config_s->event_logging && config_s->bmi_modules)
@@ -1538,7 +1538,7 @@ int PINT_config_is_valid_configuration(
         cur = config_s->file_systems;
         while(cur)
         {
-            cur_fs = llist_head(cur);
+            cur_fs = PINT_llist_head(cur);
             if (!cur_fs)
             {
                 break;
@@ -1547,7 +1547,7 @@ int PINT_config_is_valid_configuration(
             ret += is_valid_filesystem_configuration(config_s,cur_fs);
             fs_count++;
 
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
         ret = ((ret == fs_count) ? 1 : 0);
     }
@@ -1564,7 +1564,7 @@ int PINT_config_is_valid_collection_id(
     PVFS_fs_id fs_id)
 {
     int ret = 0;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
 
     if (config_s)
@@ -1572,7 +1572,7 @@ int PINT_config_is_valid_collection_id(
         cur = config_s->file_systems;
         while(cur)
         {
-            cur_fs = llist_head(cur);
+            cur_fs = PINT_llist_head(cur);
             if (!cur_fs)
             {
                 break;
@@ -1582,7 +1582,7 @@ int PINT_config_is_valid_collection_id(
                 ret = 1;
                 break;
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return ret;
@@ -1596,7 +1596,7 @@ struct filesystem_configuration_s* PINT_config_find_fs_name(
     struct server_configuration_s *config_s,
     char *fs_name)
 {
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
 
     if (config_s && fs_name)
@@ -1604,7 +1604,7 @@ struct filesystem_configuration_s* PINT_config_find_fs_name(
         cur = config_s->file_systems;
         while(cur)
         {
-            cur_fs = llist_head(cur);
+            cur_fs = PINT_llist_head(cur);
             if (!cur_fs)
             {
                 break;
@@ -1615,7 +1615,7 @@ struct filesystem_configuration_s* PINT_config_find_fs_name(
                 return(cur_fs);
                 break;
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return(NULL);
@@ -1632,7 +1632,7 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
     struct server_configuration_s* config_s,
     PVFS_fs_id fs_id)
 {
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
 
     if (config_s)
@@ -1640,7 +1640,7 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
         cur = config_s->file_systems;
         while(cur)
         {
-            cur_fs = llist_head(cur);
+            cur_fs = PINT_llist_head(cur);
             if (!cur_fs)
             {
                 break;
@@ -1650,7 +1650,7 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
                 return(cur_fs);
                 break;
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
 
@@ -1668,7 +1668,7 @@ int PINT_config_pvfs2_mkspace(
     int ret = 1;
     PVFS_handle root_handle = 0;
     int create_collection_only = 0;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     char *cur_handle_range = (char *)0;
     filesystem_configuration_s *cur_fs = NULL;
 
@@ -1677,7 +1677,7 @@ int PINT_config_pvfs2_mkspace(
         cur = config->file_systems;
         while(cur)
         {
-            cur_fs = llist_head(cur);
+            cur_fs = PINT_llist_head(cur);
             if (!cur_fs)
             {
                 break;
@@ -1736,7 +1736,7 @@ int PINT_config_pvfs2_mkspace(
             */
             create_collection_only = 1;
 
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return ret;
@@ -1747,8 +1747,8 @@ static int is_root_handle_in_my_range(
     struct filesystem_configuration_s *fs)
 {
     int ret = 0;
-    struct llist *cur = NULL;
-    struct llist *extent_list = NULL;
+    struct PINT_llist *cur = NULL;
+    struct PINT_llist *extent_list = NULL;
     char *cur_host_id = (char *)0;
     host_handle_mapping_s *cur_h_mapping = NULL;
 
@@ -1762,7 +1762,7 @@ static int is_root_handle_in_my_range(
         cur = fs->meta_handle_ranges;
         while(cur)
         {
-            cur_h_mapping = llist_head(cur);
+            cur_h_mapping = PINT_llist_head(cur);
             if (!cur_h_mapping)
             {
                 break;
@@ -1799,7 +1799,7 @@ static int is_root_handle_in_my_range(
                     break;
                 }
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return ret;

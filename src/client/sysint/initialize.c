@@ -44,7 +44,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     int ret = -1, i, j;
     int num_file_systems = 0;
     gen_mutex_t *mt_config = NULL;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     const char **method_ptr_list;
     int num_method_ptr_list, max_method_ptr_list;
@@ -219,7 +219,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 	gossip_ldebug(CLIENT_DEBUG,"Error in getting server config parameters\n");
 	goto return_error;
     }
-    num_file_systems = llist_count(g_server_config.file_systems);
+    num_file_systems = PINT_llist_count(g_server_config.file_systems);
     assert(num_file_systems);
 
     /* Grab the mutex - serialize all writes to server_config */
@@ -264,7 +264,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     i = 0;
     while(cur && (i < num_file_systems))
     {
-        cur_fs = llist_head(cur);
+        cur_fs = PINT_llist_head(cur);
         if (!cur_fs)
         {
             break;
@@ -279,7 +279,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
             goto return_error;
         }
         resp->fsid_list[i++] = cur_fs->coll_id;
-        cur = llist_next(cur);
+        cur = PINT_llist_next(cur);
     }
 
     /* Release the mutex */

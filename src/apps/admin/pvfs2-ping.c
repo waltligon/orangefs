@@ -226,7 +226,7 @@ static int noop_all_servers(struct server_configuration_s* conf,
     struct qlist_head* hash_link = NULL;
     char* server_bmi_str = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    struct llist* tmp_server = NULL;
+    struct PINT_llist* tmp_server = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     PVFS_credentials creds;
     int ret = -1;
@@ -253,9 +253,9 @@ static int noop_all_servers(struct server_configuration_s* conf,
     }
 
     printf("\n   meta servers (duplicates are normal):\n");
-    while((cur_mapping = llist_head(tmp_server)))
+    while((cur_mapping = PINT_llist_head(tmp_server)))
     {
-	tmp_server = llist_next(tmp_server);
+	tmp_server = PINT_llist_next(tmp_server);
 
 	server_bmi_str = PINT_config_get_host_addr_ptr(
 	    conf,cur_mapping->alias_mapping->host_alias);
@@ -280,9 +280,9 @@ static int noop_all_servers(struct server_configuration_s* conf,
     }
 
     printf("\n   data servers (duplicates are normal):\n");
-    while((cur_mapping = llist_head(tmp_server)))
+    while((cur_mapping = PINT_llist_head(tmp_server)))
     {
-	tmp_server = llist_next(tmp_server);
+	tmp_server = PINT_llist_next(tmp_server);
 
 	server_bmi_str = PINT_config_get_host_addr_ptr(
 	    conf,cur_mapping->alias_mapping->host_alias);
@@ -315,7 +315,7 @@ static int print_config(struct server_configuration_s* conf,
     struct qlist_head* hash_link = NULL;
     char* server_bmi_str = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    struct llist* tmp_server = NULL;
+    struct PINT_llist* tmp_server = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
 
     hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
@@ -337,9 +337,9 @@ static int print_config(struct server_configuration_s* conf,
     }
 
     printf("\n   meta servers (duplicates are normal):\n");
-    while((cur_mapping = llist_head(tmp_server)))
+    while((cur_mapping = PINT_llist_head(tmp_server)))
     {
-	tmp_server = llist_next(tmp_server);
+	tmp_server = PINT_llist_next(tmp_server);
 
 	server_bmi_str = PINT_config_get_host_addr_ptr(
 	    conf,cur_mapping->alias_mapping->host_alias);
@@ -354,9 +354,9 @@ static int print_config(struct server_configuration_s* conf,
     }
 
     printf("\n   data servers (duplicates are normal):\n");
-    while((cur_mapping = llist_head(tmp_server)))
+    while((cur_mapping = PINT_llist_head(tmp_server)))
     {
-	tmp_server = llist_next(tmp_server);
+	tmp_server = PINT_llist_next(tmp_server);
 
 	server_bmi_str = PINT_config_get_host_addr_ptr(
 	    conf,cur_mapping->alias_mapping->host_alias);

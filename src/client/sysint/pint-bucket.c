@@ -84,7 +84,7 @@ int PINT_bucket_finalize(void)
 
             /* fs object is freed by PINT_config_release */
             cur_config_cache->fs = NULL;
-            llist_free(cur_config_cache->bmi_host_extent_tables,
+            PINT_llist_free(cur_config_cache->bmi_host_extent_tables,
                        free_host_extent_table);
         }
     }
@@ -105,7 +105,7 @@ int PINT_handle_load_mapping(
     struct filesystem_configuration_s *fs)
 {
     int ret = -EINVAL;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct config_fs_cache_s *cur_config_fs_cache = NULL;
     struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
@@ -119,7 +119,7 @@ int PINT_handle_load_mapping(
         cur_config_fs_cache->fs = (struct filesystem_configuration_s *)fs;
         cur_config_fs_cache->meta_server_cursor = NULL;
         cur_config_fs_cache->data_server_cursor = NULL;
-        cur_config_fs_cache->bmi_host_extent_tables = llist_new();
+        cur_config_fs_cache->bmi_host_extent_tables = PINT_llist_new();
         assert(cur_config_fs_cache->bmi_host_extent_tables);
 
         /*
@@ -192,17 +192,17 @@ int PINT_bucket_get_next_meta(
             assert(cur_config_cache->meta_server_cursor);
 
             cur_mapping =
-                llist_head(cur_config_cache->meta_server_cursor);
+                PINT_llist_head(cur_config_cache->meta_server_cursor);
             if (!cur_mapping)
             {
                 cur_config_cache->meta_server_cursor =
                     cur_config_cache->fs->meta_handle_ranges;
                 cur_mapping =
-                    llist_head(cur_config_cache->meta_server_cursor);
+                    PINT_llist_head(cur_config_cache->meta_server_cursor);
                 assert(cur_mapping);
             }
             cur_config_cache->meta_server_cursor =
-                llist_next(cur_config_cache->meta_server_cursor);
+                PINT_llist_next(cur_config_cache->meta_server_cursor);
 
             meta_server_bmi_str = PINT_config_get_host_addr_ptr(
                 config,cur_mapping->alias_mapping->host_alias);
@@ -256,7 +256,7 @@ int PINT_bucket_get_next_io(
                 assert(cur_config_cache->data_server_cursor);
 
                 cur_mapping =
-                    llist_head(cur_config_cache->data_server_cursor);
+                    PINT_llist_head(cur_config_cache->data_server_cursor);
                 if (!cur_mapping)
                 {
                     cur_config_cache->data_server_cursor =
@@ -264,7 +264,7 @@ int PINT_bucket_get_next_io(
                     continue;
                 }
                 cur_config_cache->data_server_cursor =
-                    llist_next(cur_config_cache->data_server_cursor);
+                    PINT_llist_next(cur_config_cache->data_server_cursor);
 
                 data_server_bmi_str = PINT_config_get_host_addr_ptr(
                     config,cur_mapping->alias_mapping->host_alias);
@@ -315,7 +315,7 @@ int PINT_bucket_get_physical(
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    struct llist* tmp_server = NULL;
+    struct PINT_llist* tmp_server = NULL;
     bmi_addr_t tmp_bmi_addr;
     int dup_flag = 0;
     int i;
@@ -360,13 +360,13 @@ int PINT_bucket_get_physical(
 	    while(*outcount < incount)
 	    {
 		cur_mapping =
-		    llist_head(tmp_server);
+		    PINT_llist_head(tmp_server);
 		if (!cur_mapping)
 		{
 		    /* we hit the end of the list */
 		    break;
 		}
-		tmp_server = llist_next(tmp_server);
+		tmp_server = PINT_llist_next(tmp_server);
 
 		server_bmi_str = PINT_config_get_host_addr_ptr(
 		    config,cur_mapping->alias_mapping->host_alias);
@@ -448,7 +448,7 @@ int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
             assert(cur_config_cache->fs->meta_handle_ranges);
 
             *num_meta =
-                llist_count(cur_config_cache->fs->meta_handle_ranges);
+                PINT_llist_count(cur_config_cache->fs->meta_handle_ranges);
             ret = 0;
         }
     }
@@ -479,7 +479,7 @@ int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
             assert(cur_config_cache->fs);
             assert(cur_config_cache->fs->data_handle_ranges);
 
-            *num_io = llist_count(cur_config_cache->fs->data_handle_ranges);
+            *num_io = PINT_llist_count(cur_config_cache->fs->data_handle_ranges);
             ret = 0;
         }
     }
@@ -500,7 +500,7 @@ int PINT_bucket_get_server_name(
     PVFS_fs_id fsid)
 {
     int ret = -EINVAL;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
@@ -520,7 +520,7 @@ int PINT_bucket_get_server_name(
         cur = cur_config_cache->bmi_host_extent_tables;
         while(cur)
         {
-            cur_host_extent_table = llist_head(cur);
+            cur_host_extent_table = PINT_llist_head(cur);
             if (!cur_host_extent_table)
             {
                 break;
@@ -536,7 +536,7 @@ int PINT_bucket_get_server_name(
                 ret = 0;
                 break;
             }
-            cur = llist_next(cur);
+            cur = PINT_llist_next(cur);
         }
     }
     return ret;

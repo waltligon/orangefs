@@ -91,7 +91,7 @@ int PINT_bucket_get_root_handle(
 #define map_handle_range_to_extent_list(hrange_list)             \
 do { cur = hrange_list;                                          \
  while(cur) {                                                    \
-     cur_mapping = llist_head(cur);                              \
+     cur_mapping = PINT_llist_head(cur);                         \
      if (!cur_mapping) break;                                    \
      assert(cur_mapping->alias_mapping);                         \
      assert(cur_mapping->alias_mapping->host_alias);             \
@@ -117,11 +117,11 @@ do { cur = hrange_list;                                          \
        add this host to extent list mapping to                   \
        config cache object's host extent table                   \
      */                                                          \
-     ret = llist_add_to_tail(                                    \
+     ret = PINT_llist_add_to_tail(                               \
          cur_config_fs_cache->bmi_host_extent_tables,            \
          cur_host_extent_table);                                 \
      assert(ret == 0);                                           \
-     cur = llist_next(cur);                                      \
+     cur = PINT_llist_next(cur);                                 \
  } } while(0)
 
 

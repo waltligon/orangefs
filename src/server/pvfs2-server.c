@@ -449,7 +449,7 @@ static int server_initialize_subsystems(
     int ret = 0;
     char *method_name = NULL;
     char *cur_merged_handle_range = NULL;
-    struct llist *cur = NULL;
+    struct PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
     TROVE_context_id trove_context = -1;
 
@@ -505,7 +505,7 @@ static int server_initialize_subsystems(
     cur = server_config.file_systems;
     while(cur)
     {
-        cur_fs = llist_head(cur);
+        cur_fs = PINT_llist_head(cur);
         if (!cur_fs)
         {
             break;
@@ -577,7 +577,7 @@ static int server_initialize_subsystems(
             free(cur_merged_handle_range);
         }
 
-        cur = llist_next(cur);
+        cur = PINT_llist_next(cur);
     }
 #ifdef __PVFS2_TROVE_THREADED__
 #ifdef __PVFS2_TROVE_AIO_THREADED__
@@ -589,7 +589,7 @@ static int server_initialize_subsystems(
     gossip_debug(SERVER_DEBUG, "Storage Init Complete (non-threaded)\n");
 #endif
     gossip_debug(SERVER_DEBUG, "%d filesystem(s) initialized\n",
-                 llist_count(server_config.file_systems));
+                 PINT_llist_count(server_config.file_systems));
 
     /* initialize the flow interface */
     ret = PINT_flow_initialize(server_config.flow_modules, 0);
