@@ -755,6 +755,7 @@ void PINT_release_pvfstab(void)
 	}
 	free(stat_tab_array[i].mntent_array);
     }
+    stat_tab_count = 0;
     gen_mutex_unlock(&stat_tab_mutex);
     return;
 }
