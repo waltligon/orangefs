@@ -20,7 +20,9 @@ extern kmem_cache_t *dev_req_cache;
 
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
+#ifdef DEVREQ_WAITQ_INTERFACE
 extern wait_queue_head_t pvfs2_request_list_waitq;
+#endif
 extern struct qhash_table *htable_ops_in_progress;
 
 static int open_access_count = 0;
@@ -72,83 +74,7 @@ static int pvfs2_devreq_open(
     return ret;
 }
 
-#if 0
-static ssize_t pvfs2_devreq_read(
-    struct file *file,
-    char *buf,
-    size_t count,
-    loff_t * offset)
-{
-    int len = 0;
-    pvfs2_kernel_op_t *cur_op = (pvfs2_kernel_op_t *) 0;
-    static int32_t magic = PVFS2_DEVREQ_MAGIC;
-
-    /* retrieve and remove next pending up-going op from list */
-  check_if_req_pending:
-    spin_lock(&pvfs2_request_list_lock);
-    if (!list_empty(&pvfs2_request_list))
-    {
-	cur_op = list_entry(pvfs2_request_list.next, pvfs2_kernel_op_t, list);
-	list_del(&cur_op->list);
-    }
-    spin_unlock(&pvfs2_request_list_lock);
-
-    if (cur_op)
-    {
-        set_current_state(TASK_RUNNING);
-
-	spin_lock(&cur_op->lock);
-
-	/* FIXME: this is a sanity check and should be removed */
-	if ((cur_op->op_state == PVFS2_VFS_STATE_INPROGR) ||
-	    (cur_op->op_state == PVFS2_VFS_STATE_SERVICED))
-	{
-	    spin_unlock(&cur_op->lock);
-	    panic("FIXME: Current op already queued...skipping\n");
-	    return -1;
-	}
-	cur_op->op_state = PVFS2_VFS_STATE_INPROGR;
-
-	/* atomically move the operation to the htable_ops_in_progress */
-	qhash_add(htable_ops_in_progress,
-		  (void *) &(cur_op->tag), &cur_op->list);
-
-	spin_unlock(&cur_op->lock);
-
-	len = MAX_DEV_REQ_UPSIZE;
-	if ((size_t) len <= count)
-	{
-	    copy_to_user(buf, &magic, sizeof(int32_t));
-	    copy_to_user(buf + sizeof(int32_t),
-                         &cur_op->tag, sizeof(int64_t));
-	    copy_to_user(buf + sizeof(int32_t) + sizeof(int64_t),
-			 &cur_op->upcall, sizeof(pvfs2_upcall_t));
-	}
-	else
-	{
-	    pvfs2_error("Read buffer is too small to copy pvfs2 op\n");
-	    len = -1;
-	}
-    }
-    else if (!(file->f_flags & O_NONBLOCK))
-    {
-        set_current_state(TASK_INTERRUPTIBLE);
-	/*
-	   keep checking if a req is pending since
-	   we're in a blocking mode
-	 */
-	schedule_timeout(MSECS_TO_JIFFIES(10));
-
-	/* unless we got a signal */
-	if (!signal_pending(current))
-	{
-	    goto check_if_req_pending;
-	}
-    }
-    return len;
-}
-#endif
-
+#ifdef DEVREQ_WAITQ_INTERFACE
 static ssize_t pvfs2_devreq_read(
     struct file *file,
     char *buf,
@@ -244,6 +170,84 @@ static ssize_t pvfs2_devreq_read(
     }
     return len;
 }
+
+#else
+
+static ssize_t pvfs2_devreq_read(
+    struct file *file,
+    char *buf,
+    size_t count,
+    loff_t * offset)
+{
+    int len = 0;
+    pvfs2_kernel_op_t *cur_op = (pvfs2_kernel_op_t *) 0;
+    static int32_t magic = PVFS2_DEVREQ_MAGIC;
+
+    /* retrieve and remove next pending up-going op from list */
+  check_if_req_pending:
+    spin_lock(&pvfs2_request_list_lock);
+    if (!list_empty(&pvfs2_request_list))
+    {
+	cur_op = list_entry(pvfs2_request_list.next, pvfs2_kernel_op_t, list);
+	list_del(&cur_op->list);
+    }
+    spin_unlock(&pvfs2_request_list_lock);
+
+    if (cur_op)
+    {
+        set_current_state(TASK_RUNNING);
+
+	spin_lock(&cur_op->lock);
+
+	/* FIXME: this is a sanity check and should be removed */
+	if ((cur_op->op_state == PVFS2_VFS_STATE_INPROGR) ||
+	    (cur_op->op_state == PVFS2_VFS_STATE_SERVICED))
+	{
+	    spin_unlock(&cur_op->lock);
+	    panic("FIXME: Current op already queued...skipping\n");
+	    return -1;
+	}
+	cur_op->op_state = PVFS2_VFS_STATE_INPROGR;
+
+	/* atomically move the operation to the htable_ops_in_progress */
+	qhash_add(htable_ops_in_progress,
+		  (void *) &(cur_op->tag), &cur_op->list);
+
+	spin_unlock(&cur_op->lock);
+
+	len = MAX_DEV_REQ_UPSIZE;
+	if ((size_t) len <= count)
+	{
+	    copy_to_user(buf, &magic, sizeof(int32_t));
+	    copy_to_user(buf + sizeof(int32_t),
+                         &cur_op->tag, sizeof(int64_t));
+	    copy_to_user(buf + sizeof(int32_t) + sizeof(int64_t),
+			 &cur_op->upcall, sizeof(pvfs2_upcall_t));
+	}
+	else
+	{
+	    pvfs2_error("Read buffer is too small to copy pvfs2 op\n");
+	    len = -1;
+	}
+    }
+    else if (!(file->f_flags & O_NONBLOCK))
+    {
+        set_current_state(TASK_INTERRUPTIBLE);
+	/*
+	   keep checking if a req is pending since
+	   we're in a blocking mode
+	 */
+	schedule_timeout(MSECS_TO_JIFFIES(10));
+
+	/* unless we got a signal */
+	if (!signal_pending(current))
+	{
+	    goto check_if_req_pending;
+	}
+    }
+    return len;
+}
+#endif /* DEVREQ_WAITQ_INTERFACE */
 
 static ssize_t pvfs2_devreq_writev(
     struct file *file,
