@@ -97,13 +97,14 @@ int main(int argc, char *argv[])
 		}
 
 		if (ret == 0) {
-			fprintf(stderr, "we get partially converted: aiocb_cnt=%d\n", aiocb_inuse_count);
-			fprintf(stderr, "lio_state: mct=%d,sct=%d,
-			cur_mem_size: %d, cur_mem_off:%p, 
-			cur_stream_size: %Ld, cur_stream_off:%Ld\n", 
-			lio_state.mem_ct, lio_state.stream_ct, 
-			lio_state.cur_mem_size, lio_state.cur_mem_off,
-			lio_state.cur_stream_size, lio_state.cur_stream_off); 
+			fprintf(stderr, "we get partially converted: "
+                                "aiocb_cnt=%d\n", aiocb_inuse_count);
+			fprintf(stderr, "lio_state: mct=%d,sct=%d,"
+                                "cur_mem_size: %d, cur_mem_off:%p, "
+                                "cur_stream_size: %Ld, cur_stream_off:%Ld\n", 
+                                lio_state.mem_ct, lio_state.stream_ct, 
+                                lio_state.cur_mem_size, lio_state.cur_mem_off,
+                                lio_state.cur_stream_size, lio_state.cur_stream_off); 
 		}
 	}
 
