@@ -111,7 +111,7 @@ static bmi_op_id_t bmi_op_array[BMI_TEST_SIZE];
 static int bmi_error_code_array[BMI_TEST_SIZE];
 static void* bmi_usrptr_array[BMI_TEST_SIZE];
 static bmi_size_t bmi_actualsize_array[BMI_TEST_SIZE];
-int bmi_pending_count = 0;
+static int bmi_pending_count = 0;
 
 /* array of trove ops in flight; filled in when needed to call testsome()
  * or waitsome() at the trove level. */
