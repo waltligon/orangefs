@@ -277,7 +277,7 @@ static int msgpair_complete(PINT_client_sm *sm_p,
      */
     if (msg_p->comp_fn != NULL) {
 	/* Q: IS THERE ANY CONSTRAINT ON comp_fn OUTPUT? */
-	js_p->error_code = msg_p->comp_fn(sm_p, resp_p);
+	js_p->error_code = msg_p->comp_fn(sm_p, resp_p, 0);
     }
     else if (resp_p->status != 0) {
 	js_p->error_code = resp_p->status;
