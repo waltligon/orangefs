@@ -114,6 +114,12 @@ static int completion_query(
 	int* out_count_p, 
 	void** returned_user_ptr_p,
 	job_status_s* out_status_p);
+static int completion_query_some(
+	job_id_t* id_array,
+	int* inout_count_p,
+	int* out_index_array,
+	void** returned_user_ptr_array,
+	job_status_s* out_status_array_p);
 
 #ifndef __PVFS2_JOB_THREADED__
 static int do_one_work_cycle_all(int* num_completed, int wait_flag);
@@ -2161,6 +2167,214 @@ int job_wait(
 	return(job_test(id, out_count_p, returned_user_ptr_p, out_status_p));
 }
 
+
+/* job_testsome_HACK()
+ *
+ * check for completion of a set of jobs, don't return until
+ * either all jobs complete or timeout expires 
+ *
+ * returns 0 on success, -errno on failure
+ */
+int job_testsome_HACK(
+	job_id_t* id_array,
+	int* inout_count_p,
+	int* out_index_array,
+	void** returned_user_ptr_array,
+	job_status_s* out_status_array_p,
+	int timeout_ms)
+{
+	int ret = -1;
+#ifdef __PVFS2_JOB_THREADED__
+	struct timespec pthread_timeout;
+#else
+	int num_completed;
+#endif /* __PVFS2_JOB_THREADED__ */
+	int timeout_remaining = timeout_ms;
+	struct timeval start;
+	struct timeval end;
+	int total_completed = 0;
+	int original_count = *inout_count_p;
+	job_id_t* tmp_id_array = NULL;
+	int i;
+
+	/* TODO: this implementation is going to be really clumsy for
+	 * now, just to get us through with correct semantics.  It will
+	 * search the completion queue way more than it needs to,
+	 * because I haven't implemented an intelligent way to only
+	 * look if the job you were interested in completed.
+	 */
+
+	/* TODO: here is another cheap shot.  I don't want to special
+	 * case the -1 (infinite) timeout possibility right now (maybe
+	 * later), but I want the semantics to work.  So.. if that's the
+	 * timeout I get, then set the remaining time to the maximum
+	 * value that an integer can take on.  That will hold it in
+	 * this function for nearly a month. 
+	 */
+	if(timeout_ms == -1)
+		timeout_remaining = INT_MAX;
+	
+	/* use this as a chance to do a cheap test on the request
+	 * scheduler
+	 */
+	if((ret = do_one_test_cycle_req_sched()) < 0)
+	{
+		return(ret);
+	}
+
+	/* need to duplicate the id array, so that I have a copy I can
+	 * modify
+	 */
+	tmp_id_array =
+		(job_id_t*)malloc(original_count*sizeof(job_id_t));
+	if(!tmp_id_array)
+		return(-errno);
+	memcpy(tmp_id_array, id_array, (original_count*sizeof(job_id_t))); 
+
+	/* check before we do anything else to see if the job that we
+	 * want is in the completion queue
+	 */
+	ret = completion_query_some(tmp_id_array,  
+		inout_count_p, &out_index_array[total_completed],
+		&returned_user_ptr_array[total_completed], 
+		&out_status_array_p[total_completed]);
+	/* return here on error or completion */
+	if(ret < 0 || (*inout_count_p == original_count))
+	{
+		free(tmp_id_array);
+		return(ret);
+	}
+	/* bail out if timeout is zero */
+	if(!timeout_ms)
+	{
+		free(tmp_id_array);
+		return(0);
+	}
+
+	total_completed += *inout_count_p;
+	*inout_count_p = original_count - *inout_count_p;
+	for(i=0; i<total_completed; i++)
+		tmp_id_array[out_index_array[i]] = 0;
+
+	/* if we fall through to this point, then we need to just try
+	 * to eat up the timeout until the jobs that we want hit the
+	 * completion queue
+	 */
+	do
+	{
+		ret = gettimeofday(&start, NULL);
+		if(ret < 0)
+		{
+			free(tmp_id_array);
+			return(ret);
+		}
+
+#ifdef __PVFS2_JOB_THREADED__
+		/* figure out how long to wait */
+		pthread_timeout.tv_sec = start.tv_sec +
+			timeout_remaining/1000;
+		pthread_timeout.tv_nsec = start.tv_usec * 1000 +
+			((timeout_remaining%1000)*1000000);
+		if(pthread_timeout.tv_nsec > 1000000000)
+		{
+			pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
+			pthread_timeout.tv_sec++;
+		}
+		
+		/* wait to see if anything completes before the timeout
+		 * expires 
+		 */
+		gen_mutex_lock(&completion_mutex);
+		ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
+			&pthread_timeout);
+		gen_mutex_unlock(&completion_mutex);
+		if(ret == ETIMEDOUT)
+		{
+			/* nothing completed while we were waiting, trust that the
+			 * timedwait got the timing right
+			 */
+			free(tmp_id_array);
+			return(0);
+		}	
+		else if(ret != 0 && ret != EINTR)
+		{
+			/* error */
+			free(tmp_id_array);
+			return(-ret);
+		}
+		else
+		{
+			/* check queue now to see of the op we want is done */
+			ret = completion_query_some(tmp_id_array,  
+				inout_count_p, &out_index_array[total_completed],
+				&returned_user_ptr_array[total_completed], 
+				&out_status_array_p[total_completed]);
+			/* return here on error or completion */
+			if(ret < 0 || 
+				((*inout_count_p + total_completed) == original_count))
+			{
+				free(tmp_id_array);
+				return(ret);
+			}
+
+			total_completed += *inout_count_p;
+			*inout_count_p = original_count - *inout_count_p;
+			for(i=0; i<total_completed; i++)
+				tmp_id_array[out_index_array[i]] = 0;
+		}
+
+#else /* __PVFS2_JOB_THREADED__ */
+
+		/* push on work for one round */
+		ret = do_one_work_cycle_all(&num_completed, 1);
+		if(ret < 0)
+		{
+			free(tmp_id_array);
+			return(ret);
+		}
+		if(num_completed > 0)
+		{
+			/* check queue now to see of the op we want is done */
+			ret = completion_query_some(tmp_id_array,  
+				inout_count_p, &out_index_array[total_completed],
+				&returned_user_ptr_array[total_completed], 
+				&out_status_array_p[total_completed]);
+			/* return here on error or completion */
+			if(ret < 0 || 
+				((*inout_count_p + total_completed) == original_count))
+			{
+				free(tmp_id_array);
+				return(ret);
+			}
+
+			total_completed += *inout_count_p;
+			*inout_count_p = original_count - *inout_count_p;
+			for(i=0; i<total_completed; i++)
+				tmp_id_array[out_index_array[i]] = 0;
+		}
+
+#endif /* __PVFS2_JOB_THREADED__ */
+
+		/* if we fall to here, see how much time has expired and
+		 * sleep/work again if we need to
+		 */
+		ret = gettimeofday(&end, NULL);
+		if(ret < 0)
+		{
+			free(tmp_id_array);
+			return(ret);
+		}
+		
+		timeout_remaining -= (end.tv_sec - start.tv_sec)*1000 +
+			(end.tv_usec - start.tv_usec)/1000;
+
+	} while(timeout_remaining > 0);
+
+	/* fall through, nothing done, time is used up */
+	free(tmp_id_array);
+	return(0);
+}
+
 /* job_waitsome()
  *
  * briefly blocking check for completion of one or more of a specified
@@ -3149,3 +3363,53 @@ static int completion_query(
 
 	return(0);
 }
+
+static int completion_query_some(
+	job_id_t* id_array,
+	int* inout_count_p,
+	int* out_index_array,
+	void** returned_user_ptr_array,
+	job_status_s* out_status_array_p)
+{
+	int ret = -1;
+	int i;
+	struct job_desc* tmp_desc;
+
+	gen_mutex_lock(&completion_mutex);
+		if(completion_error)
+		{
+			gen_mutex_unlock(&completion_mutex);
+			return(completion_error);
+		}
+		ret = job_desc_q_search_multi(completion_queue, id_array,
+			inout_count_p, out_index_array);
+		if(ret < 0)
+		{
+			gen_mutex_unlock(&completion_mutex);
+			return(ret);
+		}
+
+		for(i=0; i<(*inout_count_p); i++)
+		{
+			tmp_desc = id_gen_fast_lookup(id_array[out_index_array[i]]);
+			fill_status(tmp_desc, &(returned_user_ptr_array[i]),
+				&(out_status_array_p[i]));
+			job_desc_q_remove(tmp_desc);
+			if(tmp_desc->type == JOB_REQ_SCHED &&
+				tmp_desc->u.req_sched.post_flag == 1)
+			{
+				/* hang onto desc until release time */
+				job_desc_q_add(req_sched_inprogress_queue, tmp_desc);
+			}
+			else
+			{
+				dealloc_job_desc(tmp_desc);
+			}
+		}
+	gen_mutex_unlock(&completion_mutex);
+	
+	return(0);
+
+
+}
+
