@@ -1472,6 +1472,10 @@ static void init_req_table(void)
             OP_CASE(PVFS_SERV_REMOVE, "remove",
                     PINT_SERVER_CHECK_NONE, 
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_remove_sm);
+            OP_CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, "mgmt-remove-object",
+                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+                    &pvfs2_mgmt_remove_object_sm);
             OP_CASE(PVFS_SERV_IO, "io",
                     PINT_SERVER_CHECK_NONE, 
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_io_sm);

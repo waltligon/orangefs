@@ -217,6 +217,11 @@ int PINT_req_sched_target_handle(
 	*handle = req->u.remove.handle;
 	*fs_id = req->u.remove.fs_id;
 	return (0);
+    case PVFS_SERV_MGMT_REMOVE_OBJECT:
+	*readonly_flag = 0;
+	*handle = req->u.mgmt_remove_object.handle;
+	*fs_id = req->u.mgmt_remove_object.fs_id;
+	return (0);
     case PVFS_SERV_IO:
 	if(req->u.io.io_type == PVFS_IO_WRITE)
 	    *readonly_flag = 0;

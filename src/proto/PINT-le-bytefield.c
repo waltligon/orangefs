@@ -103,6 +103,9 @@ static void lebf_initialize(void)
 	    case PVFS_SERV_REMOVE:
 		/* nothing special, let normal encoding work */
 		break;
+	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
+		/* nothing special, let normal encoding work */
+		break;
 	    case PVFS_SERV_IO:
 		req.u.io.io_dist = &tmp_dist;
 		req.u.io.file_req = &tmp_req;
@@ -290,6 +293,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
 	CASE(PVFS_SERV_REMOVE, remove);
+	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_IO, io);
 	CASE(PVFS_SERV_GETATTR, getattr);
 	CASE(PVFS_SERV_SETATTR, setattr);
@@ -387,6 +391,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
 
         case PVFS_SERV_REMOVE:
+        case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_SETATTR:
         case PVFS_SERV_CRDIRENT:
         case PVFS_SERV_TRUNCATE:
@@ -456,6 +461,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
 	CASE(PVFS_SERV_REMOVE, remove);
+	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_IO, io);
 	CASE(PVFS_SERV_GETATTR, getattr);
 	CASE(PVFS_SERV_SETATTR, setattr);
@@ -545,6 +551,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
 
         case PVFS_SERV_REMOVE:
+        case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_SETATTR:
         case PVFS_SERV_CRDIRENT:
         case PVFS_SERV_TRUNCATE:
@@ -636,6 +643,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_LOOKUP_PATH:
 	    case PVFS_SERV_REMOVE:
+	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 	    case PVFS_SERV_GETATTR:
 	    case PVFS_SERV_CRDIRENT:
 	    case PVFS_SERV_RMDIRENT:
@@ -702,6 +710,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_CREATE:
 	    case PVFS_SERV_REMOVE:
+	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 	    case PVFS_SERV_IO:
 	    case PVFS_SERV_SETATTR:
 	    case PVFS_SERV_CRDIRENT:

@@ -22,7 +22,7 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-machine pvfs2_remove_sm(
+machine pvfs2_mgmt_remove_object_sm(
     prelude,
     remove_dspace,
     final_response,
@@ -66,10 +66,10 @@ static int mgmt_remove_dspace(
     PINT_STATE_DEBUG("mgmt_remove_dspace");
 
     ret = job_trove_dspace_remove(
-        s_op->req->u.remove.fs_id,
-        s_op->req->u.remove.handle,
+        s_op->req->u.mgmt_remove_object.fs_id,
+        s_op->req->u.mgmt_remove_object.handle,
         PINT_config_get_trove_sync_mode(
-            user_opts, s_op->req->u.remove.fs_id),
+            user_opts, s_op->req->u.mgmt_remove_object.fs_id),
         s_op,
         0,
         js_p,
