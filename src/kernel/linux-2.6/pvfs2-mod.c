@@ -126,15 +126,14 @@ static void __exit pvfs2_exit(void)
     pvfs2_print("pvfs2: pvfs2_exit called\n");
 
     /*
-      give the blocking device read some time to return -EBADF since
-      the device is going away shortly and won't be available for
-      reading any longer
+      wake up the blocking device read (if any) and delay so it can
+      return -EBADF since the device is going away shortly and won't
+      be available for reading any longer.
     */
     devreq_device_registered = 0;
-
+    wake_up_interruptible(&pvfs2_request_list_waitq);
     set_current_state(TASK_INTERRUPTIBLE);
-    schedule_timeout(MSECS_TO_JIFFIES(150));
-    set_current_state(TASK_RUNNING);
+    schedule_timeout(MSECS_TO_JIFFIES(100));
 
     /* clear out all pending upcall op requests */
     spin_lock(&pvfs2_request_list_lock);

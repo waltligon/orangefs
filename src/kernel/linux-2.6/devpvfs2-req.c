@@ -116,7 +116,7 @@ static ssize_t pvfs2_devreq_read(
 
             if (!signal_pending(current))
             {
-                schedule_timeout(MSECS_TO_JIFFIES(100));
+                schedule();
                 if (devreq_device_registered == 0)
                 {
                     set_current_state(TASK_RUNNING);
@@ -271,13 +271,13 @@ static ssize_t pvfs2_devreq_writev(
                 int timed_out = 0;
                 DECLARE_WAITQUEUE(wait_entry, current);
 
-                set_current_state(TASK_INTERRUPTIBLE);
-
                 add_wait_queue(&op->io_completion_waitq, &wait_entry);
                 wake_up_interruptible(&op->waitq);
 
                 while(1)
                 {
+                    set_current_state(TASK_INTERRUPTIBLE);
+
                     spin_lock(&op->lock);
                     if (op->io_completed)
                     {
