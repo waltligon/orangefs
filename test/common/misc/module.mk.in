@@ -1,0 +1,4 @@
+DIR := test/common/misc
+
+TESTSRC += \
+	$(DIR)/test-event-parser.c 

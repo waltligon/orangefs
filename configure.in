@@ -347,6 +347,7 @@ test/common/quicklist/module.mk
 test/common/id-generator/module.mk
 test/common/gossip/module.mk
 test/common/gen-locks/module.mk
+test/common/misc/module.mk
 test/io/bmi/module.mk
 test/io/description/module.mk
 test/io/flow/module.mk
