@@ -346,6 +346,7 @@ test/kernel/linux-2.6/module.mk
 doc/coding/module.mk
 doc/design/module.mk
 doc/random/module.mk
+doc/module.mk
 maint/mpi-depend.sh
 examples/pvfs2-server.rc
 )
