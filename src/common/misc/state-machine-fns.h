@@ -105,19 +105,19 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
 
 	/* Update the server_op struct to reflect the new location
 	 * see if the selected return value is a STATE_RETURN */
-	if (loc->flag == SM_STATE_RETURN)
+	if (loc->flag == SM_RETURN)
 	{
 	    s->current_state = PINT_pop_state(s);
 	    s->current_state += 1; /* skip state flags */
 	}
-    } while (loc->flag == SM_STATE_RETURN);
+    } while (loc->flag == SM_RETURN);
 
     s->current_state = loc->next_state;
 
     /* To do nested states, we check to see if the next state is
      * a nested state machine, and if so we push the return state
      * onto a stack */
-    while (s->current_state->flag == SM_NESTED_STATE)
+    while (s->current_state->flag == SM_NESTED)
     {
 	PINT_push_state(s, NULL);
 	s->current_state += 1; /* skip state flag; now we point to the state

@@ -7,6 +7,8 @@
 #ifndef __STATE_MACHINE_H
 #define __STATE_MACHINE_H
 
+#include <state-machine-values.h>
+
 /* STATE-MACHINE.H
  *
  * This file sets up all the definitions necessary for our state machine
@@ -46,7 +48,7 @@ union PINT_state_array_values
     int (*state_action)(struct PINT_OP_STATE *, job_status_s *);
     int return_value;
     int flag;
-    void *nested_machine; /* NOTE: this is really a PINT_state_machine */
+    struct PINT_state_machine_s *nested_machine; /* NOTE: this is really a PINT_state_machine * (void *)*/
     union PINT_state_array_values *next_state;
 };
 

@@ -11,7 +11,7 @@
 #include <stdio.h>
 
 #include "statecomp-symbol.h"
-#include "state-comp.h"
+#include "state-machine-values.h"
 
 char *enter_string(char *);
 void gen_init(void);

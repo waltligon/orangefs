@@ -5,7 +5,9 @@
  */
 
 #include <stdio.h>
-#include "state-comp.h"
+#include <stdlib.h>
+
+#include "state-machine-values.h"
 
 extern FILE *out_file;
 
@@ -19,7 +21,9 @@ void gen_state_decl(char *state_name)
     fprintf(out_file,"extern union PINT_state_array_values ST_%s[];\n", state_name);
 }
 
-void gen_machine(char *machine_name, char *first_state_name, char *init_name)
+void gen_machine(char *machine_name,
+		 char *first_state_name,
+		 char *init_name)
 {
     fprintf(out_file, "\nstruct PINT_state_machine_s %s =\n{\n\t", machine_name);
     fprintf(out_file, "ST_%s,\n\t\"%s\",\n", first_state_name, machine_name);
@@ -38,26 +42,69 @@ void gen_state_start(char *state_name)
     fprintf(out_file,"static union PINT_state_array_values ST_%s[] = {\n", state_name);
 }
 
+/* gen_state_action()
+ *
+ * generates first two lines in the state machine (I think),
+ * the first one indicating what kind of action it is ("run"
+ * or "jump") and the second being the action itself (either a
+ * function or a nested state machine).
+ */
 void gen_state_action(char *run_func, int flag)
 {
-    fprintf(out_file,"(union PINT_state_array_values) %d", flag);
-    fprintf(out_file,",\n(union PINT_state_array_values) %s", run_func);
+    switch (flag) {
+	case SM_NONE:
+	    fprintf(out_file,
+		    "(union PINT_state_array_values) %d",
+		    flag);
+	    fprintf(out_file,
+		    ",\n(union PINT_state_array_values) %s",
+		    run_func);
+	    break;
+	case SM_JUMP:
+	    fprintf(out_file,
+		    "(union PINT_state_array_values) %d",
+		    flag);
+	    /* NOTE: ADDED "&" HERE BECAUSE I THINK THIS WAS A BUG. -- ROB */
+	    fprintf(out_file,
+		    ",\n(union PINT_state_array_values) &%s",
+		    run_func);
+	    break;
+	default:
+	    fprintf(stderr,
+		    "invalid flag associated with action %s\n",
+		    run_func);
+	    exit(1);
+    }
 }
 
+/* gen_return_code()
+ */
 void gen_return_code(char *return_code)
 {
-    fprintf(out_file,",\n(union PINT_state_array_values) %s", return_code);
+    fprintf(out_file,
+	    ",\n(union PINT_state_array_values) %s",
+	    return_code);
 }
 
+/* gen_next_state()
+ */
 void gen_next_state(int flag, char *new_state)
 {
-    if (flag == SM_NEXT)
-    {
-	fprintf(out_file,",\n(union PINT_state_array_values) ST_%s", new_state);
-    }
-    else
-    {
-	fprintf(out_file,",\n(union PINT_state_array_values) %d", flag);
+    switch (flag) {
+	case SM_NEXT:
+	    fprintf(out_file,
+		    ",\n(union PINT_state_array_values) ST_%s",
+		    new_state);
+	    break;
+	case SM_RETURN:
+	    fprintf(out_file,
+		    ",\n(union PINT_state_array_values) %d",
+		    flag);
+	    break;
+	default:
+	    fprintf(stderr,
+		    "invalid flag associated with target (no more info)\n");
+	    exit(1);
     }
 }
 
