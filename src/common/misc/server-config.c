@@ -1616,8 +1616,7 @@ static int cache_config_files(
     }
 
     memset(config_s->fs_config_buf, 0, config_s->fs_config_buflen);
-    nread = read(fd,
-		 config_s->fs_config_buf,
+    nread = read(fd, config_s->fs_config_buf,
                  (config_s->fs_config_buflen - 1));
     if (nread != (config_s->fs_config_buflen - 1))
     {
@@ -1645,8 +1644,7 @@ static int cache_config_files(
     }
 
     memset(config_s->server_config_buf, 0, config_s->server_config_buflen);
-    nread = read(fd,
-		 config_s->server_config_buf,
+    nread = read(fd, config_s->server_config_buf,
                  (config_s->server_config_buflen - 1));
     if (nread != (config_s->server_config_buflen - 1))
     {
