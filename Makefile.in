@@ -85,8 +85,8 @@ LDFLAGS += -L lib
 LIBS += @LIBS@ -lpvfs2
   # enable BMI TCP module
 CFLAGS += -D__STATIC_METHOD_BMI_TCP__
-  # enable Flow template protocol
-CFLAGS += -D__STATIC_FLOWPROTO_TEMPLATE__
+  # enable Flow debugging protocol
+CFLAGS += -D__STATIC_FLOWPROTO_DUMP_OFFSETS__
   # enable Flow BMI/Trove protocol
 CFLAGS += -D__STATIC_FLOWPROTO_BMI_TROVE__
   # flags used by request encoding test harness

@@ -82,6 +82,9 @@ int PINT_flow_initialize(const char *flowproto_list,
 #ifdef __STATIC_FLOWPROTO_BMI_TROVE__
     extern struct flowproto_ops flowproto_bmi_trove_ops;
 #endif /* __STATIC_FLOWPROTO_BMI_TROVE__ */
+#ifdef __STATIC_FLOWPROTO_DUMP_OFFSETS__
+    extern struct flowproto_ops flowproto_dump_offsets_ops;
+#endif /* __STATIC_FLOWPROTO_DUMP_OFFSETS__ */
 
     static struct flowproto_ops *static_flowprotos[] = {
 #ifdef __STATIC_FLOWPROTO_TEMPLATE__
@@ -90,6 +93,9 @@ int PINT_flow_initialize(const char *flowproto_list,
 #ifdef __STATIC_FLOWPROTO_BMI_TROVE__
 	&flowproto_bmi_trove_ops,
 #endif				/* __STATIC_FLOWPROTO_BMI_TROVE__ */
+#ifdef __STATIC_FLOWPROTO_DUMP_OFFSETS__
+	&flowproto_dump_offsets_ops,
+#endif				/* __STATIC_FLOWPROTO_DUMP_OFFSETS__ */
 	NULL
     };
 
