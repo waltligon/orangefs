@@ -3846,7 +3846,8 @@ static int completion_query_context(job_id_t * out_id_array_p,
  */
 static void do_one_work_cycle_all(int idle_time_ms)
 {
-    int total_pending_count = 0;
+    int total_pending_count = bmi_pending_count + bmi_unexp_pending_count
+	+ flow_pending_count + dev_unexp_pending_count + trove_pending_count;
 
     if(bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
 	PINT_thread_mgr_bmi_push(idle_time_ms);
@@ -3857,18 +3858,16 @@ static void do_one_work_cycle_all(int idle_time_ms)
 	PINT_thread_mgr_trove_push(idle_time_ms);
 #endif
 
-    total_pending_count = bmi_pending_count + bmi_unexp_pending_count
-	+ flow_pending_count + dev_unexp_pending_count + trove_pending_count;
     if(total_pending_count == 0 && idle_time_ms != 0)
     {
 	/* The caller would like for us to idle if necessary, but we really
 	 * don't have a single thing to do.  Sleep here to prevent busy
 	 * spins.
 	 */
-/*      struct timespec ts; */
-/* 	ts.tv_sec = idle_time_ms/1000; */
-/* 	ts.tv_nsec = (idle_time_ms%1000)*1000*1000; */
-/* 	nanosleep(&ts, NULL); */
+	struct timespec ts; 
+ 	ts.tv_sec = idle_time_ms/1000; 
+ 	ts.tv_nsec = (idle_time_ms%1000)*1000*1000; 
+ 	nanosleep(&ts, NULL); 
     }
 
     return;
