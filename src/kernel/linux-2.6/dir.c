@@ -40,21 +40,16 @@ static int pvfs2_readdir(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-    pos = (PVFS_ds_position)file->f_pos;
+  restart_readdir:
 
-    /*
-      reset the token adjustment when starting to read a directory
-      from the beginning
-    */
+    pos = (PVFS_ds_position)file->f_pos;
     if (pos == 0)
     {
-        pvfs2_inode->readdir_token_adjustment = 0;
+        file->f_version = 0;
     }
 
     pvfs2_print("pvfs2: pvfs2_readdir called on %s (pos = %d)\n",
 		dentry->d_name.name, (int)pos);
-    pvfs2_print("token adjustment is %d\n",
-                pvfs2_inode->readdir_token_adjustment);
 
     switch (pos)
     {
@@ -88,6 +83,7 @@ static int pvfs2_readdir(
 	    return -ENOMEM;
 	}
 	new_op->upcall.type = PVFS2_VFS_OP_READDIR;
+
 	if (pvfs2_inode && pvfs2_inode->refn.handle &&
             pvfs2_inode->refn.fs_id)
 	{
@@ -109,25 +105,9 @@ static int pvfs2_readdir(
 
 	   so the proper pvfs2 position is (pos - 2), except where
 	   pos == 0.  In that case, pos is PVFS_READDIR_START.
-
-           the token adjustment is for the case where files or
-           directories are being removed between calls to readdir.
-           while we're progressing through the directory, our issued
-           upcall offset needs to be adjusted less the number of
-           objects in this directory that were removed.
         */
 	new_op->upcall.req.readdir.token =
             (pos == 2 ? PVFS_READDIR_START : (pos - 2));
-        if (new_op->upcall.req.readdir.token != PVFS_READDIR_START)
-        {
-            new_op->upcall.req.readdir.token -=
-                pvfs2_inode->readdir_token_adjustment;
-            if (new_op->upcall.req.readdir.token == 0)
-            {
-                new_op->upcall.req.readdir.token =
-                    PVFS_READDIR_START;
-            }
-        }
 
         service_operation_with_timeout_retry(
             new_op, "pvfs2_readdir", retries,
@@ -143,6 +123,36 @@ static int pvfs2_readdir(
 	    ino_t current_ino = 0;
 	    char *current_entry = NULL;
 
+            if (file->f_version == 0)
+            {
+                file->f_version =
+                    new_op->downcall.resp.readdir.directory_version;
+            }
+
+            if (pvfs2_inode->num_readdir_retries > -1)
+            {
+                if (file->f_version !=
+                    new_op->downcall.resp.readdir.directory_version)
+                {
+                    pvfs2_print("detected directory change on listing; "
+                                "starting over\n");
+                    file->f_pos = 0;
+
+                    op_release(new_op);
+                    pvfs2_inode->num_readdir_retries--;
+                    goto restart_readdir;
+                }
+            }
+            else
+            {
+                pvfs2_print("Giving up on readdir retries to avoid "
+                            "possible livelock (%d tries attempted)\n",
+                            PVFS2_NUM_READDIR_RETRIES);
+
+                file->f_version =
+                    new_op->downcall.resp.readdir.directory_version;
+            }
+
 	    for (i = 0; i < new_op->downcall.resp.readdir.dirent_count; i++)
 	    {
                 len = new_op->downcall.resp.readdir.d_name_len[i];
@@ -154,6 +164,8 @@ static int pvfs2_readdir(
                 if (filldir(dirent, current_entry, len, pos,
                             current_ino, DT_UNKNOWN) < 0)
                 {
+                    pvfs2_inode->num_readdir_retries =
+                        PVFS2_NUM_READDIR_RETRIES;
                     ret = 0;
                     break;
                 }
@@ -174,7 +186,7 @@ static int pvfs2_readdir(
 	break;
     }
 
-    file->f_version = dentry->d_inode->i_version;
+/*     file->f_version = dentry->d_inode->i_version; */
     update_atime(dentry->d_inode);
 
     pvfs2_print("pvfs2_readdir returning %d\n",ret);

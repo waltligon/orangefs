@@ -1277,6 +1277,8 @@ static inline void copy_dirents_to_downcall(vfs_request_t *vfs_request)
 
     vfs_request->out_downcall.resp.readdir.token =
         vfs_request->response.readdir.token;
+    vfs_request->out_downcall.resp.readdir.directory_version =
+        vfs_request->response.readdir.directory_version;
 
     for(; i < vfs_request->response.readdir.pvfs_dirent_outcount; i++)
     {

@@ -13,9 +13,7 @@
 
 #define __NO_VERSION__
 #include <linux/version.h>
-#ifdef CONFIG_MODVERSIONS
-#include <linux/modversions.h>
-#endif
+#include <modules.h>
 
 #ifndef HAVE_SECTOR_T
 typedef unsigned long sector_t;
@@ -97,6 +95,7 @@ do {                                                           \
 #define PVFS2_SEEK_END                 0x00000002
 #define PVFS2_MAX_NUM_OPTIONS          0x00000004
 #define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
+#define PVFS2_NUM_READDIR_RETRIES      0x0000000A
 
 #define MAX_DEV_REQ_UPSIZE (sizeof(int32_t) +   \
 sizeof(uint64_t) + sizeof(pvfs2_upcall_t))
@@ -196,7 +195,7 @@ typedef struct
 typedef struct
 {
     PVFS_object_ref refn;
-    PVFS_ds_position readdir_token_adjustment;
+    int num_readdir_retries;
     char *link_target;
 #ifdef PVFS2_LINUX_KERNEL_2_4
     struct inode *vfs_inode;
