@@ -496,7 +496,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 				(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, offset);
 		gossip_debug(REQUEST_DEBUG,"\t\tend iteration\n");
 		/* see if we are finished */
-		if (*bytes >= bytemax || (mode != PINT_CKSIZE && (*segs > segmax)))
+		if (*bytes >= bytemax || (mode != PINT_CKSIZE && (*segs >= segmax)))
 		{
 			gossip_debug(REQUEST_DEBUG,"\t\tdone with segments or bytes\n");
 			break;
