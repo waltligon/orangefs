@@ -146,13 +146,16 @@ int PINT_config_is_valid_collection_id(
     struct server_configuration_s *config_s,
     PVFS_fs_id fs_id);
 
-struct filesystem_configuration_s* PINT_config_find_fs_name(
+struct filesystem_configuration_s *PINT_config_find_fs_name(
     struct server_configuration_s *config_s,
     char *fs_name);
 
-struct filesystem_configuration_s* PINT_config_find_fs_id(
-    struct server_configuration_s* config_s,
+struct filesystem_configuration_s *PINT_config_find_fs_id(
+    struct server_configuration_s *config_s,
     PVFS_fs_id fs_id);
+
+PINT_llist *PINT_config_get_filesystems(
+    struct server_configuration_s *config_s);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(

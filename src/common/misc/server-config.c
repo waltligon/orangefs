@@ -1840,6 +1840,21 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
     return(NULL);
 }
 
+/* PINT_config_get_filesystems()
+ *
+ * returns a PINT_llist of all filesystems registered in the
+ * specified configuration object
+ *
+ * returns pointer to a list of file system config structs on success,
+ * NULL on failure
+ */
+PINT_llist *PINT_config_get_filesystems(
+    struct server_configuration_s *config_s)
+{
+    return (config_s ? config_s->file_systems : NULL);
+}
+
+
 #ifdef __PVFS2_TROVE_SUPPORT__
 static int is_root_handle_in_my_range(
     struct server_configuration_s *config,

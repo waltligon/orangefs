@@ -29,14 +29,8 @@
   in the server's fs.conf for this test to pass.
 */
 #define NUM_TEST_HANDLES              5
-static PVFS_handle test_handles[NUM_TEST_HANDLES] =
-{
-    1048494,
-    1047881,
-    1047871,
-    1048531,
-    1048525
-};
+static PVFS_handle test_handles[NUM_TEST_HANDLES] = {0};
+static int test_handle_index = 0;
 
 extern job_context_id PVFS_sys_job_context;
 
@@ -45,7 +39,7 @@ extern job_context_id PVFS_sys_job_context;
  */
 int main(int argc, char **argv)	
 {
-    int i = 0, j = 0, k = 0, n = 0, num_file_systems = 0;
+    int i = 0, j = 0, k = 0, n = 0, m = 0, num_file_systems = 0;
     pvfs_mntlist mnt = {0,NULL};
     struct server_configuration_s server_config;
     PINT_llist *cur = NULL;
@@ -56,7 +50,8 @@ int main(int argc, char **argv)
     char server_name[PVFS_MAX_SERVER_ADDR_LEN] = {0};
     int test_handles_verified[NUM_TEST_HANDLES] = {0};
     PVFS_handle_extent_array meta_handle_extent_array;
-    PVFS_handle_extent_array data_handle_extent_array[NUM_DATA_SERVERS_TO_QUERY];
+    PVFS_handle_extent_array data_handle_extent_array[
+        NUM_DATA_SERVERS_TO_QUERY];
 
     if (PVFS_util_parse_pvfstab(&mnt))
     {
@@ -120,7 +115,6 @@ int main(int argc, char **argv)
         cur = PINT_llist_next(cur);
     }
 
-    /* run all pint-bucket tests for each filesystem we know about */
     num_file_systems = PINT_llist_count(server_config.file_systems);
     for(i = 0; i < num_file_systems; i++)
     {
@@ -186,14 +180,20 @@ int main(int argc, char **argv)
                    NUM_DATA_SERVERS_TO_QUERY);
             for(j = 0; j < NUM_DATA_SERVERS_TO_QUERY; j++)
             {
-                printf("\nI/O server  %d address     : %lu (%d data ranges)\n",
-                       j,(long)d_addr[j],
+                printf("\nI/O server  %d address     : %lu "
+                       "(%d data ranges)\n",j,(long)d_addr[j],
                        data_handle_extent_array[j].extent_count);
                 for(n = 0; n < data_handle_extent_array[j].extent_count; n++)
                 {
                     printf("Data server %d handle range: %Lu-%Lu\n", n,
                            Lu(data_handle_extent_array[j].extent_array[n].first),
                            Lu(data_handle_extent_array[j].extent_array[n].last));
+                    /* get some contrived test handles */
+                    if (test_handle_index < NUM_TEST_HANDLES)
+                    {
+                        test_handles[test_handle_index++] =
+                            data_handle_extent_array[j].extent_array[n].first;
+                    }
                 }
             }
         }
@@ -201,34 +201,46 @@ int main(int argc, char **argv)
         printf("\n");
         for(j = 0; j < NUM_TEST_HANDLES; j++)
         {
-            if (PINT_bucket_get_server_name(server_name,PVFS_MAX_SERVER_ADDR_LEN,
-                                            test_handles[j],fs_ids[i]))
+            /*
+              make sure we can find the server name for the test handle,
+              regardless of which fs it's on
+            */
+            for(m = 0; m < num_file_systems; m++)
             {
-                printf("Error retrieving name of server managing handle "
-                       "%Ld!\n",Ld(test_handles[j]));
-                printf("** This may be okay if the handle (%Ld) exists "
-                       "on a different fs (not %d)\n",
-                       Ld(test_handles[j]),fs_ids[i]);
-                continue;
+                if (PINT_bucket_get_server_name(
+                        server_name,PVFS_MAX_SERVER_ADDR_LEN,
+                        test_handles[j],fs_ids[m]) == 0)
+                {
+                    break;
+                }
             }
-            else
+            if (m != num_file_systems)
             {
                 printf("Retrieved name of server managing handle "
                        "%Ld is %s\n",Ld(test_handles[j]),server_name);
                 test_handles_verified[j]++;
+            }
+            else
+            {
+                printf("Error retrieving name of server managing handle "
+                       "%Ld!\n",Ld(test_handles[j]));
             }
         }
 
         printf("\n");
         for(j = 0; j < NUM_TEST_HANDLES; j++)
         {
-            if (PINT_bucket_map_to_server(&addr,test_handles[j],fs_ids[i]))
+            for(m = 0; m < num_file_systems; m++)
+            {
+                if (PINT_bucket_map_to_server(
+                        &addr,test_handles[j],fs_ids[m]) == 0)
+                {
+                    continue;
+                }
+            }
+            if (m != num_file_systems)
             {
                 fprintf(stderr, "PINT_bucket_map_to_server failure.\n");
-                printf("** This may be okay if the handle (%Ld) exists "
-                       "on a different fs (not %d)\n",
-                       Ld(test_handles[j]),fs_ids[i]);
-                continue;
             }
             else
             {

@@ -182,7 +182,13 @@ int dbpf_attr_cache_initialize(
         srand((unsigned int)time(NULL));
 
         gossip_debug(DBPF_ATTRCACHE_DEBUG,
-                     "dbpf_attr_cache_initialized\n");
+                     "dbpf_attr_cache_initialize: initialized\n");
+        ret = 0;
+    }
+    else
+    {
+        gossip_debug(DBPF_ATTRCACHE_DEBUG,
+                     "dbpf_attr_cache_initialize: already initialized\n");
         ret = 0;
     }
 

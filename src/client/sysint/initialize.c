@@ -223,11 +223,13 @@ int PVFS_sys_initialize(
     PINT_ncache_set_timeout(PINT_NCACHE_TIMEOUT * 1000);
 
     /* Get configuration parameters from server */
-    ret = PINT_server_get_config(PINT_get_server_config_struct(),mntent_list);
+    ret = PINT_server_get_config(PINT_get_server_config_struct(),
+                                 mntent_list);
     if (ret < 0)
     {
 	init_fail = NCACHE_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,"Error in getting server config parameters\n");
+	gossip_ldebug(CLIENT_DEBUG,"Error in getting server "
+                      "config parameters\n");
 	goto return_error;
     }
     num_file_systems = PINT_llist_count(
@@ -251,8 +253,8 @@ int PVFS_sys_initialize(
     if (ret < 0)
     {
 	init_fail = BUCKET_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,"Error in initializing configuration management interface\n");
-	/* Release the mutex */
+	gossip_ldebug(CLIENT_DEBUG,"Error in initializing "
+                      "configuration management interface\n");
 	gen_mutex_unlock(mt_config);
 	goto return_error;
     }
@@ -269,11 +271,11 @@ int PVFS_sys_initialize(
 
     /*
       iterate over each fs for two reasons:
-      1) load mappings into bucket interface
+      1) load mappings of each fs into the bucket interface
       2) store fs ids into resp object
     */
-    cur = PINT_get_server_config_struct()->file_systems;
     i = 0;
+    cur = PINT_config_get_filesystems(PINT_get_server_config_struct());
     while(cur && (i < num_file_systems))
     {
         cur_fs = PINT_llist_head(cur);
@@ -294,7 +296,6 @@ int PVFS_sys_initialize(
         cur = PINT_llist_next(cur);
     }
 
-    /* Release the mutex */
     gen_mutex_unlock(mt_config);
     gen_mutex_destroy(mt_config);
 
