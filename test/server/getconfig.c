@@ -106,7 +106,6 @@ int main(int argc, char **argv)	{
 	/* TODO: fill below fields in with the correct values */
 	server_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
 	server_req->u.getconfig.config_buf_size = 8192;
-	server_req->rsize = sizeof(struct PVFS_server_req);
 
 	display_pvfs_structure(server_req,1);
 	ret = PINT_encode(server_req,PINT_ENCODE_REQ,&encoded_msg,server_addr,0);

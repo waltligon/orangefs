@@ -20,6 +20,7 @@
 
 int do_decode_req(
 		  void *input_buffer,
+		  int input_size,
 		  struct PINT_decoded_msg *target_msg,
 		  bmi_addr_t target_addr
 		  )
@@ -30,7 +31,7 @@ int do_decode_req(
     int tmp_count;
     int ret = -1;
 
-    size = ((struct PVFS_server_req *)input_buffer)->rsize;
+    size = input_size - ENCODED_HEADER_SIZE;
 
     if (size <= 0)
     {
@@ -82,7 +83,7 @@ int do_decode_req(
 
 		char_ptr += dec_msg->u.setattr.attr.u.meta.dfile_count
 				* sizeof(PVFS_handle);
-		if (dec_msg->rsize > (sizeof(struct PVFS_server_req)
+		if (size > (sizeof(struct PVFS_server_req)
 		    + dec_msg->u.setattr.attr.u.meta.dfile_count 
 			* sizeof(PVFS_handle)))
 		{

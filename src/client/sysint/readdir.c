@@ -73,7 +73,6 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
 	/* send a readdir message to the server */
 	req_p.op = PVFS_SERV_READDIR;
 	req_p.credentials = credentials;
-	req_p.rsize = sizeof(struct PVFS_server_req);
 	req_p.u.readdir.handle = pinode_refn.handle;
 	req_p.u.readdir.fs_id = pinode_refn.fs_id;
 	req_p.u.readdir.token = token;

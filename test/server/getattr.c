@@ -100,7 +100,6 @@ int main(int argc, char **argv)	{
 
 	/* setup getattr request */
 	my_req->op = PVFS_SERV_GETATTR;
-	my_req->rsize = sizeof(struct PVFS_server_req);
 	my_req->credentials.uid = 0;
 	my_req->credentials.gid = 0;
 	my_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  

@@ -160,7 +160,6 @@ int main(int argc, char **argv)	{
 	 * create request (create a data file to operate on) 
 	 */
 	my_req.op = PVFS_SERV_CREATE;
-	my_req.rsize = sizeof(struct PVFS_server_req);
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
 	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
@@ -292,7 +291,6 @@ int main(int argc, char **argv)	{
 
 	/* request */
 	my_req.op = PVFS_SERV_IO;
-	my_req.rsize = sizeof(struct PVFS_server_req);
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
 	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
@@ -486,7 +484,6 @@ int main(int argc, char **argv)	{
 	 */
 
 	my_req.op = PVFS_SERV_REMOVE;
-	my_req.rsize = sizeof(struct PVFS_server_req);
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
 	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  

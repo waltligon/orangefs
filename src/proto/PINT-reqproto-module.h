@@ -13,11 +13,11 @@
 							struct PINT_encoded_msg *target_msg, \
 							int header_size\
 
-#define DEC_RESP_ARGS void *input_buffer, \
+#define DEC_RESP_ARGS void *input_buffer, int input_size, \
 							 struct PINT_decoded_msg *target_msg, \
 							 bmi_addr_t target_addr 
 
-#define DEC_REQ_ARGS void *input_buffer, \
+#define DEC_REQ_ARGS void *input_buffer,  int input_size, \
 							struct PINT_decoded_msg *target_msg, \
 							bmi_addr_t target_addr 
 

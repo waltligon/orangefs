@@ -407,6 +407,8 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 		/* immediate completion */
 		error_code_array[i] = status_array[i].error_code;
 		id_array[i] = 0;
+		if(status_array[i].error_code == 0)
+		    assert(status_array[i].actual_size == max_resp_size);
 	    }
 	    else
 	    {
@@ -435,6 +437,8 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 	{
 	    error_code_array[index_array[i]] =
 		status_array[i].error_code;
+	    if(status_array[i].error_code == 0)
+		assert(status_array[i].actual_size == max_resp_size);
 	}
     }
 
@@ -445,7 +449,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 	{
 	    ret = PINT_decode(resp_encoded_array[i], PINT_DECODE_RESP,
 		&(resp_decoded_array[i]), addr_array[i],
-		status_array[i].actual_size, NULL);
+		max_resp_size, NULL);
 	    if(ret < 0)
 	    {
 		error_code_array[i] = ret;
@@ -598,6 +602,8 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
 		/* immediate completion */
 		error_code_array[i] = status_array[i].error_code;
 		id_array[i] = 0;
+		if(status_array[i].error_code == 0)
+		    assert(status_array[i].actual_size == max_resp_size);
 	    }
 	    else
 	    {
@@ -624,6 +630,8 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
 	{
 	    error_code_array[index_array[i]] =
 		status_array[i].error_code;
+	    if(status_array[i].error_code == 0)
+		assert(status_array[i].actual_size == max_resp_size);
 	}
     }
 
@@ -634,7 +642,7 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
 	{
 	    ret = PINT_decode(resp_encoded_array[i], PINT_DECODE_RESP,
 		&(resp_decoded_array[i]), addr_array[i],
-		status_array[i].actual_size, NULL);
+		max_resp_size, NULL);
 	    if(ret < 0)
 	    {
 		error_code_array[i] = ret;

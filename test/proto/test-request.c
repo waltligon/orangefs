@@ -54,8 +54,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("op = %d \n",(int) my_req->op);
 			arrow(direction);
-                        printf("rsize = %d\n",(int) my_req->rsize);
-			arrow(direction);
                         printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
 			arrow(direction);
                         printf("credentials.gid = %d\n",(int) my_req->credentials.gid);
@@ -79,8 +77,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("op = %d \n", (int)my_req->op);
 			arrow(direction);
-                        printf("rsize = %d\n", (int)my_req->rsize);
-			arrow(direction);
                         printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
 			arrow(direction);
                         printf("credentials.gid = %d\n",(int) my_req->credentials.gid);
@@ -101,8 +97,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("op = %d \n", (int)my_req->op);
 			arrow(direction);
-                        printf("rsize = %d\n", (int)my_req->rsize);
-			arrow(direction);
                         printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
@@ -121,8 +115,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
                         printf("PVFS_SERV_TRUNCATE structure:\n");
 			arrow(direction);
                         printf("op = %d \n", (int)my_req->op);
-			arrow(direction);
-                        printf("rsize = %d\n",(int) my_req->rsize);
 			arrow(direction);
                         printf("credentials.uid = %d\n",(int) my_req->credentials.uid);
 			arrow(direction);
@@ -145,8 +137,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("op = %d \n", (int)my_req->op);
 			arrow(direction);
-                        printf("rsize = %d\n", (int)my_req->rsize);
-			arrow(direction);
                         printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
 			arrow(direction);
                         printf("credentials.gid = %d\n",(int) my_req->credentials.gid);
@@ -168,8 +158,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("op = %d \n", (int)my_req->op);
 			arrow(direction);
-                        printf("rsize = %d\n",(int) my_req->rsize);
-			arrow(direction);
                         printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
@@ -187,8 +175,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
                         printf("PVFS_SERV_LOOKUP_PATH structure:\n");
 			arrow(direction);
                         printf("op = %d \n", (int)my_req->op);
-			arrow(direction);
-                        printf("rsize = %d\n", (int)my_req->rsize);
 			arrow(direction);
                         printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
 			arrow(direction);
@@ -213,8 +199,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("op = %d \n", (int)my_req->op);
 			arrow(direction);
-                        printf("rsize = %d\n", (int)my_req->rsize);
-			arrow(direction);
                         printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
@@ -238,8 +222,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("op = %d \n", (int)my_req->op);
 			arrow(direction);
-                        printf("rsize = %d\n", (int)my_req->rsize);
-			arrow(direction);
                         printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
@@ -260,8 +242,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
                         printf("PVFS_SERV_SETATTR structure:\n");
 			arrow(direction);
                         printf("op = %d \n", (int)my_req->op);
-			arrow(direction);
-                        printf("rsize = %d\n",(int) my_req->rsize);
 			arrow(direction);
                         printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
 			arrow(direction);
@@ -394,7 +374,6 @@ int main(int argc, char **argv)
 	{
 	case 0:
 	request->op = PVFS_SERV_GETCONFIG;
-	request->rsize = 666;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
@@ -405,7 +384,6 @@ int main(int argc, char **argv)
 
 	case 1:
 	request->op = PVFS_SERV_CREATE;
-	request->rsize = 666;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
@@ -416,7 +394,6 @@ int main(int argc, char **argv)
 
 	case 3:
         request->op = PVFS_SERV_READDIR;
-	request->rsize = 666;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
@@ -428,7 +405,6 @@ int main(int argc, char **argv)
 
 	case 4:
         request->op =  PVFS_SERV_GETATTR;
-	request->rsize = 666;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
@@ -439,7 +415,6 @@ int main(int argc, char **argv)
 
 	case 5:
         request->op = PVFS_SERV_REMOVE;
-	request->rsize = 666;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
@@ -449,7 +424,6 @@ int main(int argc, char **argv)
 
 	case 6:
         request->op = PVFS_SERV_TRUNCATE;
-	request->rsize = 666;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
@@ -460,7 +434,6 @@ int main(int argc, char **argv)
 
 	case 7:
 	request->op = PVFS_SERV_LOOKUP_PATH;
-	request->rsize = 666;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
@@ -472,7 +445,6 @@ int main(int argc, char **argv)
 
 	case 8:
         request->op = PVFS_SERV_CREATEDIRENT;
-	request->rsize = 666;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
@@ -484,7 +456,6 @@ int main(int argc, char **argv)
 
 	case 9:
         request->op = PVFS_SERV_RMDIRENT;
-	request->rsize = 666;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
@@ -499,7 +470,6 @@ int main(int argc, char **argv)
 	
 /*
         request->op = PVFS_SERV_SETATTR;
-	request->rsize = 666;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;

@@ -100,7 +100,6 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
 	{
 	    handlesize = 0;
 	}
-	req_p.rsize = sizeof(struct PVFS_server_req) + handlesize;
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = entry.fs_id;
 	/* let attributes fall through since PVFS_ATTR_SYS_xxx

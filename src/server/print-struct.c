@@ -61,7 +61,6 @@ void display_pvfs_structure(void *s,int r)
 	if (r == 1) //Request
 	{
 		struct PVFS_server_req *p = s;
-		printf("Size: %Ld\n",p->rsize);
 		printf("Op: %d\n",p->op);
 		switch(p->op)
 		{
@@ -137,7 +136,6 @@ void display_pvfs_structure(void *s,int r)
 	else 
 	{
 		struct PVFS_server_resp *p = s;
-		printf("Size: %lld\n",p->rsize);
 		printf("Op: %d\n",p->op);
 		switch(p->op)
 		{

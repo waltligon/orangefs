@@ -80,7 +80,6 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size,
     dist = pinode_ptr->attr.u.meta.dist;
     req_p.op = PVFS_SERV_TRUNCATE;
     req_p.credentials = credentials;
-    req_p.rsize = sizeof(struct PVFS_server_req);
     req_p.u.truncate.fs_id = pinode_refn.fs_id;
 
     /* we're sending the total logical filesize to the server and it will figure

@@ -117,7 +117,6 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 
     /* send the create request for the meta file */
     req_p.op = PVFS_SERV_MKDIR;
-    req_p.rsize = sizeof(struct PVFS_server_req);
     req_p.credentials = credentials;
     req_p.u.mkdir.requested_handle = 0;
     req_p.u.mkdir.fs_id = parent_refn.fs_id;
@@ -185,7 +184,6 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
 
     name_sz = strlen(entry_name) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_CREATEDIRENT;
-    req_p.rsize = sizeof(struct PVFS_server_req) + name_sz;
 
     /* credentials come from credentials and are set in the previous
      * create request.  so we don't have to set those again.
@@ -295,7 +293,6 @@ return_error:
 
 	    /* rollback mkdir message */
 	    req_p.op = PVFS_SERV_REMOVE;
-	    req_p.rsize = sizeof(struct PVFS_server_req);
 	    req_p.credentials = credentials;
 	    req_p.u.remove.handle = entry.handle;
 	    req_p.u.remove.fs_id = entry.fs_id;

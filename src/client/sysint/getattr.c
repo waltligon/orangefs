@@ -124,7 +124,6 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 
 	req_p.op = PVFS_SERV_GETATTR;
         req_p.credentials = credentials;
-	req_p.rsize = sizeof(struct PVFS_server_req);
 	req_p.u.getattr.handle = entry.handle;
 	req_p.u.getattr.fs_id = entry.fs_id;
 	/* filter out aggregate size mask in the getattr request */
@@ -221,7 +220,6 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	    dist = resp->attr.u.meta.dist;
 	    req_p.op = PVFS_SERV_GETATTR;
 	    req_p.credentials = credentials;
-	    req_p.rsize = sizeof(struct PVFS_server_req);
 	    req_p.u.getattr.attrmask = PVFS_ATTR_DATA_SIZE;
 	    req_p.u.getattr.fs_id = entry.fs_id;
 

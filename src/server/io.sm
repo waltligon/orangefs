@@ -224,7 +224,6 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *ret)
 	 * failed to get the size, or failed for permission reasons
 	 */
 	s_op->resp->status = ret->error_code;
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp);
 	s_op->resp->u.io.bstream_size = ret->ds_attr.b_size;
 
 	err = PINT_encode(

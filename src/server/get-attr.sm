@@ -426,15 +426,11 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 	gossip_debug(SERVER_DEBUG,
 		     "  also returning %d datafile handles\n",
 		     a_p->u.meta.dfile_count);
-
-	s_op->resp->rsize += (a_p->u.meta.dfile_count *
-	    sizeof(PVFS_handle)) + a_p->u.meta.dist_size;
     }
 
     gossip_debug(SERVER_DEBUG,
-		 "  sending status %d, rsize = %Ld\n",
-		 s_op->resp->status,
-		 s_op->resp->rsize);
+		 "  sending status %d\n",
+		 s_op->resp->status);
 
     job_post_ret = PINT_encode(s_op->resp,
 			       PINT_ENCODE_RESP,

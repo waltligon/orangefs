@@ -122,12 +122,14 @@ int PINT_decode(
 	if (input_type == PINT_DECODE_REQ)
 	{
 	    return PINT_encoding_table[type]->op->decode_req(input_buffer,
+							     (int)size,
 							     target_msg,
 							     target_addr);
 	}
 	else if(input_type == PINT_DECODE_RESP)
 	{
 	    return PINT_encoding_table[type]->op->decode_resp(input_buffer,
+							      (int)size,
 							      target_msg,
 							      target_addr);
 	}

@@ -109,7 +109,6 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 
 	/* send remove message to the meta file */
 	req_p.op = PVFS_SERV_REMOVE;
-	req_p.rsize = sizeof(struct PVFS_server_req);
 	req_p.credentials = credentials;
 	req_p.u.remove.handle = pinode_ptr->pinode_ref.handle;
 	req_p.u.remove.fs_id = parent_refn.fs_id;
@@ -149,7 +148,6 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	name_sz = strlen(entry_name) + 1; /*include null terminator*/
 
 	req_p.op = PVFS_SERV_RMDIRENT;
-	req_p.rsize = sizeof(struct PVFS_server_req) + name_sz;
 	req_p.credentials = credentials;
 	req_p.u.rmdirent.entry = entry_name;
 	req_p.u.rmdirent.parent_handle = parent_refn.handle;
@@ -196,7 +194,6 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 
 	    /* none of this stuff changes, so we don't need to set it in a loop */
 	    req_p.op = PVFS_SERV_REMOVE;
-	    req_p.rsize = sizeof(struct PVFS_server_req);
 	    req_p.credentials = credentials;
 	    req_p.u.remove.fs_id = parent_refn.fs_id;
 	    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);

@@ -155,7 +155,6 @@ int PVFS_sys_lookup(
     {
 	name_sz = strlen(path) + 1;
 	req_p.op     = PVFS_SERV_LOOKUP_PATH;
-	req_p.rsize = sizeof(struct PVFS_server_req) + name_sz;
 	req_p.credentials = credentials;
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + num_segments_remaining * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
 	gossip_debug(CLIENT_DEBUG,

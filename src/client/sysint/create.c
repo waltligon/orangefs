@@ -157,7 +157,6 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	
 	/* send the create request for the meta file */
 	req_p.op = PVFS_SERV_CREATE;
-	req_p.rsize = sizeof(struct PVFS_server_req);
 	req_p.credentials = credentials;
 	req_p.u.create.requested_handle = new_bkt;
 	req_p.u.create.fs_id = parent_refn.fs_id;
@@ -215,7 +214,6 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 
 	name_sz = strlen(entry_name) + 1; /*include null terminator*/
 	req_p.op = PVFS_SERV_CREATEDIRENT;
-	req_p.rsize = sizeof(struct PVFS_server_req) + name_sz;
 
 	/* credentials come from credentials and are set in the previous
 	 * create request.  so we don't have to set those again.
@@ -306,7 +304,6 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	 */
 
 	req_p.op = PVFS_SERV_CREATE;
-	req_p.rsize = sizeof(struct PVFS_server_req);
 	req_p.credentials = credentials;
 	req_p.u.create.fs_id = parent_refn.fs_id;
 	/* we're making data files on each server */
@@ -359,8 +356,6 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	 * on the server. (via setattr).
 	 */
 	req_p.op = PVFS_SERV_SETATTR;
-	req_p.rsize = sizeof(struct PVFS_server_req) 
-			+ io_serv_count*sizeof(PVFS_handle);
 	req_p.u.setattr.handle = entry.handle;
 	req_p.u.setattr.fs_id = parent_refn.fs_id;
 
@@ -485,7 +480,6 @@ return_error:
 		/* rollback each of the data files we created */
 		last_handle_created = i;
 		req_p.op = PVFS_SERV_REMOVE;
-		req_p.rsize = sizeof(struct PVFS_server_req);
 		req_p.credentials = credentials;
 		req_p.u.remove.fs_id = parent_refn.fs_id;
 		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
@@ -514,8 +508,6 @@ return_error:
 		gossip_ldebug(CLIENT_DEBUG,"PREIO1_CREATE_FAILURE\n");
 		/* rollback crdirent */
 		req_p.op = PVFS_SERV_RMDIRENT;
-		req_p.rsize = sizeof(struct PVFS_server_req) 
-			+ strlen(entry_name)+1; /*include null terminator*/
 
 		req_p.credentials = credentials;
 		req_p.u.rmdirent.parent_handle = parent_refn.handle;
@@ -535,7 +527,6 @@ return_error:
 		gossip_ldebug(CLIENT_DEBUG,"CRDIRENT_MSG_FAILURE\n");
 		/* rollback create req*/
 		req_p.op = PVFS_SERV_REMOVE;
-		req_p.rsize = sizeof(struct PVFS_server_req);
 		req_p.credentials = credentials;
 		req_p.u.remove.handle = entry.handle;
 		req_p.u.remove.fs_id = entry.fs_id;

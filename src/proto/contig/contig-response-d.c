@@ -20,11 +20,12 @@ DECODE_RESP_HEAD(do_decode_resp)
 
 	struct PVFS_server_resp *response = input_buffer;
 	struct PVFS_server_resp *decoded_response = NULL;
+	int payload_size = input_size - ENCODED_HEADER_SIZE;
 
-	assert(response->rsize != 0);
+	assert(input_size > 0);
 
-	target_msg->buffer = malloc(response->rsize);
-	memcpy(target_msg->buffer,response,response->rsize);
+	target_msg->buffer = malloc(payload_size);
+	memcpy(target_msg->buffer,response, payload_size);
 
 	decoded_response = (struct PVFS_server_resp*)target_msg->buffer;
 

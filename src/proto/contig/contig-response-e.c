@@ -62,9 +62,6 @@ int do_encode_resp(
 		    response, 
 		    sizeof(struct PVFS_server_resp)
 		  );
-	    /* set accurate rsize for encoded version */
-	    ((struct PVFS_server_resp*)(target_msg->buffer_list[0]))->rsize
-		= target_msg->total_size - header_size;
 	    return(0);
 
 	case PVFS_SERV_GETATTR:
@@ -140,9 +137,6 @@ int do_encode_resp(
 		    sizeof(struct PVFS_server_resp)
 		  );
 
-	    /* set rsize for the "on-the-wire" version */
-	    ((struct PVFS_server_resp*)target_msg->buffer_list[0])->rsize =
-		target_msg->total_size - header_size;
 	    return(0);
 
 	case PVFS_SERV_GETCONFIG:
@@ -152,21 +146,26 @@ int do_encode_resp(
                 assert(response->u.getconfig.fs_config_buf != NULL);
                 assert(response->u.getconfig.server_config_buf != NULL);
 
-		target_msg->size_list   = malloc(3*sizeof(PVFS_size));
-		target_msg->buffer_list = malloc(3*sizeof(void *));
-		target_msg->list_count  = 3;
+		target_msg->size_list   = malloc(4*sizeof(PVFS_size));
+		target_msg->buffer_list = malloc(4*sizeof(void *));
+		target_msg->list_count  = 4;
 		target_msg->buffer_type = BMI_EXT_ALLOC;
 
 		target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
 		target_msg->size_list[1] = response->u.getconfig.fs_config_buf_size;
 		target_msg->size_list[2] = response->u.getconfig.server_config_buf_size;
+		target_msg->size_list[3] = header_size;
 		target_msg->total_size = target_msg->size_list[0] +
                     response->u.getconfig.fs_config_buf_size +
-                    response->u.getconfig.server_config_buf_size;
+                    response->u.getconfig.server_config_buf_size + 
+		    header_size;
 
 		target_msg->buffer_list[0] = response;
 		target_msg->buffer_list[1] = response->u.getconfig.fs_config_buf;
 		target_msg->buffer_list[2] = response->u.getconfig.server_config_buf;
+		/* TODO: fix- this is probably leaking... */
+		target_msg->buffer_list[3] = malloc(header_size);
+		memset(target_msg->buffer_list[3], 0, header_size);
 	    }
 	    else
 	    {
@@ -178,27 +177,14 @@ int do_encode_resp(
 		target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
 		target_msg->total_size = target_msg->size_list[0];
 	    }
-
-	    /* TODO: this one is special; it doesn't have
-	     * header_size tacked onto it (!?)
-	     */
-
-	    /* set accurate rsize for encoded version */
-	    ((struct PVFS_server_resp*)(target_msg->buffer_list[0]))->rsize
-		= target_msg->total_size;
 	    return(0);
 
 	case PVFS_SERV_LOOKUP_PATH:
 	    assert(response->u.lookup_path.handle_array != NULL);
 
-	    /* this one doesn't have header_size tacked onto it (!?) */
-	    response->rsize = sizeof(struct PVFS_server_resp) +
-		(response->u.lookup_path.handle_count * sizeof(PVFS_handle)) +
-		(response->u.lookup_path.attr_count * sizeof(PVFS_object_attr));
-
-	    target_msg->size_list   = malloc(3*sizeof(PVFS_size));
-	    target_msg->buffer_list = malloc(3*sizeof(void *));
-	    target_msg->list_count  = 3;
+	    target_msg->size_list   = malloc(4*sizeof(PVFS_size));
+	    target_msg->buffer_list = malloc(4*sizeof(void *));
+	    target_msg->list_count  = 4;
 	    target_msg->buffer_type = BMI_EXT_ALLOC;
 
 	    if(response->status != 0)
@@ -207,20 +193,27 @@ int do_encode_resp(
 	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
 	    target_msg->size_list[1] = response->u.lookup_path.handle_count*sizeof(PVFS_handle);
 	    target_msg->size_list[2] = response->u.lookup_path.attr_count*sizeof(PVFS_object_attr);
+	    target_msg->size_list[3] = header_size;
 	    target_msg->total_size = target_msg->size_list[0]
-		+ target_msg->size_list[1] + target_msg->size_list[2];
+		+ target_msg->size_list[1] + target_msg->size_list[2] + header_size;
 
 	    target_msg->buffer_list[0] = response;
 	    target_msg->buffer_list[1] = response->u.lookup_path.handle_array;
 	    target_msg->buffer_list[2] = response->u.lookup_path.attr_array;
 
+	    /* TODO: fix - this is probably leaking */
+	    if(target_msg->list_count == 4)
+	    {
+		target_msg->buffer_list[3] = malloc(header_size);
+		memset(target_msg->buffer_list[3], 0, header_size);
+	    }
 	    return(0);
 
 	case PVFS_SERV_READDIR:
 
-	    target_msg->size_list   = malloc(2*sizeof(PVFS_size));
-	    target_msg->buffer_list = malloc(2*sizeof(void *));
-	    target_msg->list_count  = 2;
+	    target_msg->size_list   = malloc(3*sizeof(PVFS_size));
+	    target_msg->buffer_list = malloc(3*sizeof(void *));
+	    target_msg->list_count  = 3;
 	    target_msg->buffer_type = BMI_EXT_ALLOC;
 
 	    /* If there was an error, we need to not send any dirents */
@@ -230,32 +223,18 @@ int do_encode_resp(
 	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp);
 	    target_msg->size_list[1] = response->u.readdir.dirent_count 
 		* sizeof(PVFS_dirent);
+	    target_msg->size_list[2] = header_size;
 	    target_msg->total_size = target_msg->size_list[0] + target_msg->size_list[1];
 
 	    target_msg->buffer_list[0] = response;
 	    target_msg->buffer_list[1] = response->u.readdir.dirent_array;
 
-#if 0
-	    target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest,
-		    target_msg->total_size + header_size,
-		    BMI_SEND);
-
-	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp));
-	    respbuf += sizeof(struct PVFS_server_resp);
-
-	    for (i=0; i < response->u.readdir.dirent_count; i++)
+	    /* TODO: fix - this is probably leaking */
+	    if(target_msg->list_count == 3)
 	    {
-		memcpy(respbuf, &(response->u.readdir.dirent_array[i]), sizeof(PVFS_dirent));
-		respbuf += sizeof(PVFS_dirent);
+		target_msg->buffer_list[2] = malloc(header_size);
+		memset(target_msg->buffer_list[2], 0, header_size);
 	    }
-#endif
-	    /* TODO: this one is special; it doesn't have
-	     * header_size tacked onto it (!?)
-	     */
-
-	    /* set accurate rsize for encoded version */
-	    ((struct PVFS_server_resp*)(target_msg->buffer_list[0]))->rsize
-		= target_msg->total_size;
 
 	    return 0;
 

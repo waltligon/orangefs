@@ -121,7 +121,6 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
 
     name_sz = strlen(new_entry) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_CREATEDIRENT;
-    req_p.rsize = sizeof(struct PVFS_server_req) + name_sz;
     req_p.credentials = credentials;
 
     req_p.u.crdirent.name = new_entry;
@@ -173,7 +172,6 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
 
     name_sz = strlen(old_entry) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_RMDIRENT;
-    req_p.rsize = sizeof(struct PVFS_server_req) + name_sz;
 
     req_p.u.rmdirent.entry = old_entry;
     req_p.u.rmdirent.parent_handle = old_parent_refn.handle;

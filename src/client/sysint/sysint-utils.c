@@ -70,7 +70,6 @@ int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
 
         req_p.op = PVFS_SERV_LOOKUP_PATH;
         req_p.credentials = cred;
-        req_p.rsize = name_sz + sizeof(struct PVFS_server_req);
         req_p.u.lookup_path.path = name;
         req_p.u.lookup_path.fs_id = parent.fs_id;
         req_p.u.lookup_path.starting_handle = parent.handle;
@@ -373,7 +372,6 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	/* Set up the request for getconfig */
         memset(&serv_req,0,sizeof(struct PVFS_server_req));
 	serv_req.op = PVFS_SERV_GETCONFIG;
-	serv_req.rsize = sizeof(struct PVFS_server_req);
 	serv_req.credentials = creds;
 	serv_req.u.getconfig.config_buf_size = PVFS_MAX_CONFIG_SIZE;
 

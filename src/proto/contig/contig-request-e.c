@@ -60,9 +60,6 @@ int do_encode_req(
 	    target_msg->total_size     = size;
 
 	    memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
-
-	    /* set accurate rsize */
-	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return 0;
 
 	    /* END NEW VERSION */
@@ -94,8 +91,6 @@ int do_encode_req(
 	     * random memory referenced on the other side */
 
 	    ((struct PVFS_server_req *)enc_msg)->u.lookup_path.path = NULL;
-	    /* set accurate rsize */
-	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 
 	case PVFS_SERV_CREATEDIRENT:
@@ -125,8 +120,6 @@ int do_encode_req(
 	     * random memory referenced on the other side */
 
 	    ((struct PVFS_server_req *)enc_msg)->u.crdirent.name = NULL;
-	    /* set accurate rsize */
-	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 
 	case PVFS_SERV_RMDIRENT:
@@ -156,8 +149,6 @@ int do_encode_req(
 	     * random memory referenced on the other side */
 
 	    ((struct PVFS_server_req *)enc_msg)->u.rmdirent.entry = NULL;
-	    /* set accurate rsize */
-	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 
 	case PVFS_SERV_MKDIR:
@@ -199,8 +190,6 @@ int do_encode_req(
 
 		((struct PVFS_server_req *)enc_msg)->u.mkdir.attr.u.meta.dfile_array = NULL;
 	    }
-	    /* set accurate rsize */
-	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 
 	case PVFS_SERV_SETATTR:
@@ -240,12 +229,6 @@ int do_encode_req(
 	    target_msg->total_size = size;
 
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req ) );
-	    /* override the rsize, so the receiver knows how much data
-	     * is in here (we packed more than the caller knew about in
-	     * order to indicate sizes of variable length structs)
-	     */
-	    ((struct PVFS_server_req*)enc_msg)->rsize = size -
-		header_size;
 	    enc_msg += sizeof( struct PVFS_server_req );
 
 	    /* throw handles at the end for metadata files */
@@ -316,9 +299,6 @@ int do_encode_req(
 	    }
 	    /* pack the distribution */
 	    PINT_Dist_encode(encode_io_dist, request->u.io.io_dist);
-
-	    /* set accurate rsize */
-	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 	/*these structures are all self contained (no pointers that need to be packed) */
 	case PVFS_SERV_CREATE:
@@ -337,9 +317,6 @@ int do_encode_req(
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req ) );
-
-	    /* set accurate rsize */
-	    ((struct PVFS_server_req*)enc_msg)->rsize = size - header_size;
 	    return (0);
 	default:
 	    printf("op: %d not defined\n", request->op);

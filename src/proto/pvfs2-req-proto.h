@@ -265,7 +265,6 @@ struct PVFS_servresp_write_completion
 struct PVFS_server_req
 {
     enum PVFS_server_op op;
-    PVFS_size rsize;
     PVFS_credentials credentials;
     union
     {
@@ -290,7 +289,6 @@ struct PVFS_server_req
 struct PVFS_server_resp
 {
     enum PVFS_server_op op;
-    PVFS_size rsize;
     PVFS_error status;
     union
     {

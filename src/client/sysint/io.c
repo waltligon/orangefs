@@ -239,7 +239,6 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 
 	/* fill in the I/O request */
 	req_array[i].op = PVFS_SERV_IO;
-	req_array[i].rsize = sizeof(struct PVFS_server_req);
 	req_array[i].credentials = credentials;
 	req_array[i].u.io.handle = target_handle_array[i];
 	req_array[i].u.io.fs_id = pinode_refn.fs_id;
