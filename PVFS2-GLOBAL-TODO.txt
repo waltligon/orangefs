@@ -3,6 +3,9 @@
 # 
 #
 
+PUT A POINTER AT THE TOP OF THIS FILE TO THE HIGH LEVEL STATUS
+DOCUMENT IN THE doc SUBDIR
+
 server operations:
 ====================================================================
 - not started:
