@@ -331,6 +331,7 @@ cleaner: clean
 	rm -rf autom4te*.cache
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
 	rm -f config.log config.status config.cache 
+	rm -f maint/mpi-depend.sh common/pav/configfile.sample
 
 # _really_ clean the tree; should go back to pristine state
 distclean: cleaner 
