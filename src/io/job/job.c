@@ -1116,7 +1116,27 @@ int job_flow(flow_descriptor * flow_d,
  */
 int job_flow_cancel(flow_descriptor * flow_d)
 {
-    return(-1);
+    struct job_desc* tmp_desc = (struct job_desc*)flow_d->user_ptr; 
+    int ret = -1;
+
+    gen_mutex_lock(&completion_mutex);
+
+    if(tmp_desc->completed_flag)
+    {
+	/* job has already completed, no cancellation needed */
+	gen_mutex_unlock(&completion_mutex);
+	return(0);
+    }
+
+    /* cancel flow.  Normal completion path through flow callback will still
+     * occur; no more work to do here.  NOTE: flow checks for races against
+     * flow descriptors for which the callback process has already started
+     */
+    ret = PINT_flow_cancel(flow_d);
+
+    gen_mutex_unlock(&completion_mutex);
+
+    return(ret);
 }
 
 /* job_trove_bstream_write_at()
