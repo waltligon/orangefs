@@ -219,6 +219,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     int ret = -1;
     int num_handled = 0;
     int i = 0;
+    char* tmp_host = NULL;
 
     if ((incount < 1) || !(outcount) || !(maps) || !(status))
     {
@@ -323,8 +324,15 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	    /* error case */
 	    if (big_poll_fds[i].revents & ERRMASK)
 	    {
-		gossip_err("Error: bmi_tcp: poll error value: 0x%x, on socket: %d\n",
-			    big_poll_fds[i].revents, big_poll_fds[i].fd);
+		if(big_poll_addr[i] == NULL)
+		    tmp_host = "NONE";
+		else
+		    tmp_host = ((struct
+			tcp_addr*)(big_poll_addr[i]->method_data))->hostname;
+	    	gossip_err("Error: bmi_tcp: socket closed or failed to"
+		    " connect.\n");
+		gossip_err("       host: %s, socket %d, poll error: 0x%x.\n",
+		    tmp_host, big_poll_fds[i].fd, big_poll_fds[i].revents);
 		status[num_handled] += SC_ERROR_BIT;
 	    }
 	    if (big_poll_fds[i].revents & POLLIN)
