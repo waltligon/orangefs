@@ -72,6 +72,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 {
     int ret = 0, i = 0;
     char *method_name = NULL;
+    char *cur_handle_range = NULL;
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
 
@@ -122,6 +123,22 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
                         cur_fs->file_system_name);
 	    goto interface_init_failed;
 	}
+/* uncomment when trove supports the TROVE_COLLECTION_HANDLE_RANGES */
+#if 0
+        cur_handle_range =
+            PINT_server_config_get_handle_range_str(&user_opts,cur_fs);
+        assert(cur_handle_range);
+
+        ret = trove_collection_setinfo(
+            cur_fs->coll_id,TROVE_COLLECTION_HANDLE_RANGES,
+            (void *)cur_handle_range);
+        if (ret < 0)
+        {
+	    gossip_lerr("Error adding handle range %s to filesystem %s\n",
+                        cur_handle_range,cur_fs->file_system_name);
+	    goto interface_init_failed;
+        }
+#endif
         i++;
         cur = llist_next(cur);
     }
