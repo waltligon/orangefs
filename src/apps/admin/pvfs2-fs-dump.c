@@ -331,7 +331,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
 					     handle_count_array,
 					     position_array,
 					     addr_array,
-					     server_count);
+					     server_count,
+					     NULL /* details */);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_iterate_handles_list", ret);

@@ -65,7 +65,8 @@ int PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
 				   int *handle_count_array,
 				   PVFS_ds_position *position_array,
 				   PVFS_BMI_addr_t *addr_array,
-				   int server_count)
+				   int server_count,
+				   PVFS_error_details *details)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
@@ -77,13 +78,14 @@ int PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
     if (server_count < 1 || !handle_matrix || !position_array 
 	|| !handle_count_array || !addr_array)
     {
-	return ret;
+	return -PVFS_EINVAL;
     }
 
     sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
-        return -PVFS_ENOMEM;
+        error = -PVFS_ENOMEM;
+	goto cleanup;
     }
 
     memset(sm_p, 0, sizeof(*sm_p));
@@ -96,6 +98,15 @@ int PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
     sm_p->u.iterate_handles_list.handle_count_array = handle_count_array;
     sm_p->u.iterate_handles_list.position_array     = position_array;
 
+    sm_p->msgarray_count = server_count;
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
+        server_count * sizeof(PINT_client_sm_msgpair_state));
+    if (sm_p->msgarray == NULL)
+    {
+	error = -PVFS_ENOMEM;
+	goto cleanup;
+    }
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_iterate_handles_list "
                  "calling PINT_client_state_machine_post()\n");
 
@@ -104,9 +115,9 @@ int PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
     if (ret < 0)
     {
 	/* this should not fail under normal conditions */
-	assert(0);
 	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
-	return ret;
+	error = ret;
+	goto cleanup;
     }
 
     while (!sm_p->op_complete && (ret == 0))
@@ -119,7 +130,8 @@ int PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
     if (ret < 0)
     {
 	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	return ret;
+	error = ret;
+	goto cleanup;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -128,8 +140,45 @@ int PVFS_mgmt_iterate_handles_list(PVFS_fs_id fs_id,
     /* save our return value */
     error = sm_p->error_code;
 
-    /* clean up after ourselves */
-    free(sm_p);
+    /* store server-specific errors if requested and present */
+    if ((error != 0) && (details != NULL))
+    {
+	int i, errct = 0;
+
+	details->count_exceeded = 0;
+
+	for (i=0; i < server_count; i++)
+        {
+	    if (sm_p->msgarray[i].op_status != 0)
+	    {
+		if (errct < details->count_allocated)
+		{
+		    details->error[errct].error = sm_p->msgarray[i].op_status;
+		    details->error[errct].addr  = sm_p->msgarray[i].svr_addr;
+		    errct++;
+		}
+		else
+		{
+		    details->count_exceeded = 1;
+		}
+	    }
+	}
+	details->count_used = errct;
+
+	error = -PVFS_EDETAIL;
+    }
+
+ cleanup:
+    if (sm_p->msgarray != NULL)
+    {
+	free(sm_p->msgarray);
+    }
+
+    if (sm_p != NULL)
+    {
+	free(sm_p);
+    }
+
     return error;
 }
 
@@ -141,16 +190,6 @@ static int mgmt_iterate_handles_list_setup_msgpair(PINT_client_sm * sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "iterate_handles_list state: "
                  "mgmt_iterate_handles_list_setup_msgpair\n");
-
-    /* allocate memory for msgpair array */
-    sm_p->msgarray_count = sm_p->u.iterate_handles_list.server_count;
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)
-	malloc((sm_p->msgarray_count) * sizeof(PINT_client_sm_msgpair_state));
-    if (sm_p->msgarray == NULL)
-    {
-	js_p->error_code = -PVFS_ENOMEM;
-	return 1;
-    }
 
     /* setup msgpair array */
     j=0;
@@ -193,11 +232,6 @@ static int mgmt_iterate_handles_list_setup_msgpair(PINT_client_sm * sm_p,
 static int mgmt_iterate_handles_list_cleanup(PINT_client_sm * sm_p,
 					     job_status_s * js_p)
 {
-    if (sm_p->msgarray != NULL)
-    {
-	free(sm_p->msgarray);
-    }
-
     sm_p->error_code  = js_p->error_code;
     sm_p->op_complete = 1;
 

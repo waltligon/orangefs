@@ -182,7 +182,8 @@ int PVFS_mgmt_iterate_handles_list(
     int* handle_count_array,
     PVFS_ds_position *position_array,
     PVFS_BMI_addr_t *addr_array,
-    int server_count);
+    int server_count,
+    PVFS_error_details *details);
 
 int PVFS_mgmt_get_dfile_array(
     PVFS_object_ref ref,
