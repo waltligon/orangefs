@@ -4,16 +4,9 @@
  * See COPYING in top-level directory.
  */
 
-
-/*
- * April 2001
- *
- * This is a basic application logging facility.  It uses printf style
- * formatting and provides several mechanisms for output. 
- */
-
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <errno.h>
 #include <syslog.h>
@@ -25,12 +18,11 @@
 
 #include "gossip.h"
 
-
 /* controls whether debugging is on or off */
 int gossip_debug_on = 0;
 
 /* controls the mask level for debugging messages */
-int gossip_debug_mask = 0;
+uint64_t gossip_debug_mask = 0;
 
 enum
 {
@@ -57,7 +49,6 @@ static int internal_syslog_priority = LOG_USER;
 /*****************************************************************
  * prototypes
  */
-
 static int gossip_debug_stderr(
     const char *format,
     va_list ap);
@@ -104,7 +95,7 @@ int gossip_enable_syslog(
 
     /* keep up with the existing logging settings */
     int tmp_debug_on = gossip_debug_on;
-    int tmp_debug_mask = gossip_debug_mask;
+    uint64_t tmp_debug_mask = gossip_debug_mask;
 
     /* turn off any running facility */
     gossip_disable();
@@ -116,7 +107,7 @@ int gossip_enable_syslog(
     gossip_debug_on = tmp_debug_on;
     gossip_debug_mask = tmp_debug_mask;
 
-    return (0);
+    return 0;
 }
 
 /* gossip_enable_stderr()
@@ -131,7 +122,7 @@ int gossip_enable_stderr(
 
     /* keep up with the existing logging settings */
     int tmp_debug_on = gossip_debug_on;
-    int tmp_debug_mask = gossip_debug_mask;
+    uint64_t tmp_debug_mask = gossip_debug_mask;
 
     /* turn off any running facility */
     gossip_disable();
@@ -142,7 +133,7 @@ int gossip_enable_stderr(
     gossip_debug_on = tmp_debug_on;
     gossip_debug_mask = tmp_debug_mask;
 
-    return (0);
+    return 0;
 }
 
 /* gossip_enable_file()
@@ -160,7 +151,7 @@ int gossip_enable_file(
 
     /* keep up with the existing logging settings */
     int tmp_debug_on = gossip_debug_on;
-    int tmp_debug_mask = gossip_debug_mask;
+    uint64_t tmp_debug_mask = gossip_debug_mask;
 
     /* turn off any running facility */
     gossip_disable();
@@ -168,7 +159,7 @@ int gossip_enable_file(
     internal_log_file = fopen(filename, mode);
     if (!internal_log_file)
     {
-	return (-errno);
+        return -errno;
     }
 
     gossip_facility = GOSSIP_FILE;
@@ -177,8 +168,7 @@ int gossip_enable_file(
     gossip_debug_on = tmp_debug_on;
     gossip_debug_mask = tmp_debug_mask;
 
-    return (0);
-
+    return 0;
 }
 
 /* gossip_disable()
@@ -195,16 +185,16 @@ int gossip_disable(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-	ret = gossip_disable_stderr();
-	break;
+        ret = gossip_disable_stderr();
+        break;
     case GOSSIP_FILE:
-	ret = gossip_disable_file();
-	break;
+        ret = gossip_disable_file();
+        break;
     case GOSSIP_SYSLOG:
-	ret = gossip_disable_syslog();
-	break;
+        ret = gossip_disable_syslog();
+        break;
     default:
-	break;
+        break;
     }
 
     gossip_debug_on = 0;
@@ -221,14 +211,13 @@ int gossip_disable(
  * returns 0 on success, -errno on failure
  */
 int gossip_get_debug_mask(
-    int* debug_on,
-    int* mask)
+    int *debug_on,
+    uint64_t *mask)
 {
     *debug_on = gossip_debug_on;
     *mask = gossip_debug_mask;
-    return(0);
+    return 0;
 }
-
 
 /* gossip_set_debug_mask()
  *
@@ -240,21 +229,16 @@ int gossip_get_debug_mask(
  */
 int gossip_set_debug_mask(
     int debug_on,
-    int mask)
+    uint64_t mask)
 {
     if ((debug_on != 0) && (debug_on != 1))
     {
-	return (-EINVAL);
-    }
-
-    if (mask < 0)
-    {
-	return (-EINVAL);
+        return -EINVAL;
     }
 
     gossip_debug_on = debug_on;
     gossip_debug_mask = mask;
-    return (0);
+    return 0;
 }
 
 /* __gossip_debug_stub()
@@ -265,11 +249,11 @@ int gossip_set_debug_mask(
  * returns 0
  */
 int __gossip_debug_stub(
-    int mask,
+    uint64_t mask,
     const char *format,
     ...)
 {
-    return (0);
+    return 0;
 }
 
 
@@ -282,7 +266,7 @@ int __gossip_debug_stub(
  * returns 0 on success, -errno on failure
  */
 int __gossip_debug(
-    int mask,
+    uint64_t mask,
     const char *format,
     ...)
 {
@@ -294,9 +278,10 @@ int __gossip_debug(
      */
 #ifndef __GNUC__
     /* exit quietly if we aren't meant to print */
-    if ((!gossip_debug_on) || !(gossip_debug_mask & mask) || (!gossip_facility))
+    if ((!gossip_debug_on) || !(gossip_debug_mask & mask) ||
+        (!gossip_facility))
     {
-	return (0);
+        return 0;
     }
 #endif
 
@@ -306,21 +291,21 @@ int __gossip_debug(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-	ret = gossip_debug_stderr(format, ap);
-	break;
+        ret = gossip_debug_stderr(format, ap);
+        break;
     case GOSSIP_FILE:
-	ret = gossip_debug_file(format, ap);
-	break;
+        ret = gossip_debug_file(format, ap);
+        break;
     case GOSSIP_SYSLOG:
-	ret = gossip_debug_syslog(format, ap);
-	break;
+        ret = gossip_debug_syslog(format, ap);
+        break;
     default:
-	break;
+        break;
     }
 
     va_end(ap);
 
-    return (ret);
+    return ret;
 }
 
 /* gossip_err()
@@ -340,7 +325,7 @@ int gossip_err(
 
     if (!gossip_facility)
     {
-	return (0);
+        return 0;
     }
 
     /* rip out the variable arguments */
@@ -349,21 +334,21 @@ int gossip_err(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-	ret = gossip_err_stderr(format, ap);
-	break;
+        ret = gossip_err_stderr(format, ap);
+        break;
     case GOSSIP_FILE:
-	ret = gossip_err_file(format, ap);
-	break;
+        ret = gossip_err_file(format, ap);
+        break;
     case GOSSIP_SYSLOG:
-	ret = gossip_err_syslog(format, ap);
-	break;
+        ret = gossip_err_syslog(format, ap);
+        break;
     default:
-	break;
+        break;
     }
 
     va_end(ap);
 
-    return (ret);
+    return ret;
 }
 
 #ifdef GOSSIP_ENABLE_BACKTRACE
@@ -379,15 +364,15 @@ int gossip_err(
  */
 void gossip_backtrace(void)
 {
-    void* trace[GOSSIP_BACKTRACE_DEPTH];
-    char** messages = NULL;
+    void *trace[GOSSIP_BACKTRACE_DEPTH];
+    char **messages = NULL;
     int i, trace_size;
 
     trace_size = backtrace(trace, GOSSIP_BACKTRACE_DEPTH);
     messages = backtrace_symbols(trace, trace_size);
-    for(i=1; i<trace_size; i++)
+    for(i = 1; i < trace_size; i++)
     {
-	gossip_err("\t[bt] %s\n", messages[i]);
+        gossip_err("\t[bt] %s\n", messages[i]);
     }
     free(messages);
 }
@@ -414,12 +399,12 @@ static int gossip_debug_syslog(
     ret = vsnprintf(buffer, GOSSIP_BUF_SIZE, format, ap);
     if (ret < 0)
     {
-	return (-errno);
+        return -errno;
     }
 
     syslog(internal_syslog_priority, buffer);
 
-    return (0);
+    return 0;
 }
 
 
@@ -440,17 +425,17 @@ static int gossip_debug_file(
     ret = vsnprintf(buffer, GOSSIP_BUF_SIZE, format, ap);
     if (ret < 0)
     {
-	return (-errno);
+        return -errno;
     }
 
     ret = fprintf(internal_log_file, buffer);
     if (ret < 0)
     {
-	return (-errno);
+        return -errno;
     }
     fflush(internal_log_file);
 
-    return (0);
+    return 0;
 }
 
 /* gossip_debug_stderr()
@@ -468,9 +453,9 @@ static int gossip_debug_stderr(
     int ret = vfprintf(stderr, format, ap);
     if (ret < 0)
     {
-	return (-errno);
+        return -errno;
     }
-    return (0);
+    return 0;
 }
 
 /* gossip_err_syslog()
@@ -493,7 +478,7 @@ static int gossip_err_syslog(
 
     internal_syslog_priority = tmp_priority;
 
-    return (0);
+    return 0;
 }
 
 
@@ -508,7 +493,7 @@ static int gossip_err_file(
     va_list ap)
 {
     /* we don't do anything special with errors here */
-    return (gossip_debug_file(format, ap));
+    return gossip_debug_file(format, ap);
 }
 
 
@@ -523,7 +508,7 @@ static int gossip_err_stderr(
     va_list ap)
 {
     /* we don't do anything special for errors here */
-    return (gossip_debug_stderr(format, ap));
+    return gossip_debug_stderr(format, ap);
 }
 
 
@@ -537,7 +522,7 @@ static int gossip_disable_stderr(
     void)
 {
     /* this function doesn't need to do anything... */
-    return (0);
+    return 0;
 }
 
 /* gossip_disable_file()
@@ -550,7 +535,7 @@ static int gossip_disable_file(
     void)
 {
     fclose(internal_log_file);
-    return (0);
+    return 0;
 }
 
 /* gossip_disable_syslog()
@@ -563,7 +548,7 @@ static int gossip_disable_syslog(
     void)
 {
     closelog();
-    return (0);
+    return 0;
 }
 
 /*

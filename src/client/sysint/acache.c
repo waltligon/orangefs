@@ -283,8 +283,9 @@ void PINT_acache_set_valid(PINT_pinode *pinode)
 
             pinode->flag = PINODE_INTERNAL_FLAG_HASHED;
             gossip_debug(GOSSIP_ACACHE_DEBUG, "+++ added pinode "
-                         "to htable [%Lu] (%d entries)\n",
-                         Lu(pinode->refn.handle), s_acache_allocated_entries);
+                         "to htable [%Lu type: %d] (%d entries)\n",
+                         Lu(pinode->refn.handle), pinode->attr.objtype,
+                         s_acache_allocated_entries);
         }
 
         pinode->status = PINODE_STATUS_VALID;

@@ -11,6 +11,7 @@
  * DEFINE ALL THE STRUCTURES WE NEED BEFORE WE INCLUDE IT.
  */
 
+#include <stdint.h>
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
 #include "job.h"

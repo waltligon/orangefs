@@ -27,7 +27,7 @@ struct options
 {
     char *mnt_point;
     int mnt_point_set;
-    int debug_mask;
+    uint64_t debug_mask;
     int debug_mask_set;
     char *single_server;
 };
@@ -89,9 +89,14 @@ int main(int argc, char **argv)
             cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
             user_opts->debug_mask, NULL, NULL);
     }
-    PVFS_sys_finalize();
 
-    return ret;
+    if (ret)
+    {
+        char buf[64] = {0};
+        PVFS_strerror_r(ret, buf, 64);
+        fprintf(stderr, "Setparam failure: %s\n", buf);
+    }
+    return PVFS_sys_finalize();
 }
 
 /* parse_args()

@@ -67,8 +67,8 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 {
     job_id_t tmp_id;
     int ret = -1;
-    int tmp_on;
-    int tmp_mask;
+    int tmp_on = 0;
+    uint64_t tmp_mask = 0;
     int old_event_on;
     int32_t old_api_mask;
     int32_t old_op_mask;
@@ -82,7 +82,7 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 	    gossip_get_debug_mask(&tmp_on, &tmp_mask);
 	    s_op->resp.u.mgmt_setparam.old_value = tmp_mask;
 	    gossip_set_debug_mask(
-                1, (int)s_op->req->u.mgmt_setparam.value);
+                1, s_op->req->u.mgmt_setparam.value);
 	    js_p->error_code = 0;
 	    return(1);
 	case PVFS_SERV_PARAM_INVALID:

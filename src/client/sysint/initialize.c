@@ -60,12 +60,13 @@ typedef enum
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_sys_initialize(int default_debug_mask)
+int PVFS_sys_initialize(uint64_t default_debug_mask)
 {
-    int ret = -PVFS_EINVAL, debug_mask = 0;
+    int ret = -PVFS_EINVAL;
     const char *debug_mask_str = NULL, *debug_file = NULL;
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
     PINT_client_sm *sm_p = NULL;
+    uint64_t debug_mask = 0;
 
     sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
     if(!sm_p)

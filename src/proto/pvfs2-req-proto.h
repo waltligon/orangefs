@@ -862,14 +862,14 @@ endecode_fields_1_struct(
 struct PVFS_servreq_mgmt_setparam
 {
     PVFS_fs_id fs_id;             /* file system */
-    enum PVFS_server_param param; /* paramter to set */
-    int64_t value;                /* parameter value */
+    enum PVFS_server_param param; /* parameter to set */
+    uint64_t value;               /* parameter value */
 };
 endecode_fields_3_struct(
     PVFS_servreq_mgmt_setparam,
     PVFS_fs_id, fs_id,
     enum, param,
-    int64_t, value)
+    uint64_t, value)
 
 #define PINT_SERVREQ_MGMT_SETPARAM_FILL(__req,  \
                                         __creds,\
@@ -887,11 +887,11 @@ do {                                            \
 
 struct PVFS_servresp_mgmt_setparam
 {
-    int64_t old_value;
+    uint64_t old_value;
 };
 endecode_fields_1_struct(
     PVFS_servresp_mgmt_setparam,
-    int64_t, old_value)
+    uint64_t, old_value)
 
 /* mgmt_noop ********************************************************/
 /* - does nothing except contact a server to see if it is responding

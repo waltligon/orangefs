@@ -15,9 +15,8 @@
 typedef struct 
 {
     char *keyword;
-    int mask_val;
+    uint64_t mask_val;
 } __keyword_mask_t;
-
 
 #define __DEBUG_ALL                                               \
 (GOSSIP_TROVE_DEBUG | GOSSIP_BMI_DEBUG_ALL | GOSSIP_SERVER_DEBUG |\
@@ -62,8 +61,9 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "all",  __DEBUG_ALL }
 };
 #undef __DEBUG_ALL
-static const int num_keyword_mask_map = (int) (sizeof(s_keyword_mask_map)
-  / sizeof(s_keyword_mask_map[0]));
+
+static const int num_keyword_mask_map = (int)           \
+(sizeof(s_keyword_mask_map) / sizeof(__keyword_mask_t));
 
 /*
  * Based on human readable keywords, translate them into
@@ -74,37 +74,45 @@ static const int num_keyword_mask_map = (int) (sizeof(s_keyword_mask_map)
  * Prefix a keyword with "-" to turn it off.  All keywords
  * processed in specified order.
  */
-int PVFS_debug_eventlog_to_mask(const char *event_logging)
+uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
 {
-    char *s;
-    char *t;
-    const char *toks = ",: ";
-    int mask = 0;
-    
-    if (!event_logging)
-        return mask;
+    uint64_t mask = 0;
+    char *s = NULL, *t = NULL;
+    const char *toks = ", ";
+    int i = 0, negate = 0;
 
-    s = strdup(event_logging);
-    t = strtok(s, toks);
-    while (t) {
-        int i, negate = 0;
-        if (*t == '-') {
-            negate = 1;
-            ++t;
-        }
-        for (i=0; i<num_keyword_mask_map; i++) {
-            if (!strcmp(t, s_keyword_mask_map[i].keyword)) {
-                if (negate)
-                    mask &= ~s_keyword_mask_map[i].mask_val;
-                else
-                    mask |= s_keyword_mask_map[i].mask_val;
-                break;
+    if (event_logging)
+    {
+        s = strdup(event_logging);
+        t = strtok(s, toks);
+
+        while(t)
+        {
+            if (*t == '-')
+            {
+                negate = 1;
+                ++t;
             }
-        }
-        t = strtok(NULL, toks);
-    }
 
-    free(s);
+            for(i = 0; i < num_keyword_mask_map; i++)
+            {
+                if (!strcmp(t, s_keyword_mask_map[i].keyword))
+                {
+                    if (negate)
+                    {
+                        mask &= ~s_keyword_mask_map[i].mask_val;
+                    }
+                    else
+                    {
+                        mask |= s_keyword_mask_map[i].mask_val;
+                    }
+                    break;
+                }
+            }
+            t = strtok(NULL, toks);
+        }
+        free(s);
+    }
     return mask;
 }
 

@@ -148,7 +148,7 @@ typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
 /* system interface functions */
 
 int PVFS_sys_initialize(
-    int debug_mask);
+    uint64_t default_debug_mask);
 int PVFS_sys_fs_add(
     struct PVFS_sys_mntent* mntent);
 int PVFS_sys_fs_remove(

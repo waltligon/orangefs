@@ -132,6 +132,7 @@ int PINT_sm_common_object_getattr_comp_fn(
     int index)
 {
     int ret = -PVFS_EINVAL;
+    PVFS_object_attr *attr = NULL;
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -150,6 +151,11 @@ int PINT_sm_common_object_getattr_comp_fn(
 	return resp_p->status;
     }
 
+    attr = (sm_p->acache_hit ?
+            &sm_p->pinode->attr :
+            &resp_p->u.getattr.attr);
+    assert(attr);
+
     /*
       check if we are supposed to make sure this object is of a
       particular type and return an error if it doesn't match.  this
@@ -158,7 +164,7 @@ int PINT_sm_common_object_getattr_comp_fn(
       an error back anyway
     */
     if (sm_p->ref_type &&
-        (!(sm_p->ref_type & resp_p->u.getattr.attr.objtype)))
+        (!(sm_p->ref_type == attr->objtype)))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "*** PINT_sm_common_object_"
                      "getattr_comp_fn: Object type mismatch.\n Possibly "
@@ -168,11 +174,13 @@ int PINT_sm_common_object_getattr_comp_fn(
         {
             ret = -PVFS_ENOTDIR;
         }
-        else if (sm_p->ref_type == PVFS_TYPE_METAFILE)
+        else
         {
-            ret = ((resp_p->u.getattr.attr.objtype ==
-                    PVFS_TYPE_DIRECTORY) ? -PVFS_EISDIR : -PVFS_EBADF);
+            assert(sm_p->ref_type == PVFS_TYPE_METAFILE);
+            ret = ((attr->objtype == PVFS_TYPE_DIRECTORY) ?
+                   -PVFS_EISDIR : -PVFS_EBADF);
         }
+        PVFS_perror_gossip("Object Type mismatch error", ret);
         return ret;
     }
 

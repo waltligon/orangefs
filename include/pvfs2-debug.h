@@ -12,46 +12,45 @@
 #ifndef __PVFS2_DEBUG_H
 #define __PVFS2_DEBUG_H
 
-enum
-{
-    GOSSIP_NO_DEBUG =                      0,
-    GOSSIP_BMI_DEBUG_TCP =          (1 << 0),
-    GOSSIP_BMI_DEBUG_CONTROL =      (1 << 1),
-    GOSSIP_BMI_DEBUG_OFFSETS =      (1 << 2),
-    GOSSIP_BMI_DEBUG_GM =           (1 << 3),
-    GOSSIP_JOB_DEBUG =              (1 << 4),
-    GOSSIP_SERVER_DEBUG =           (1 << 5),
-    GOSSIP_STO_DEBUG_CTRL =         (1 << 6),
-    GOSSIP_STO_DEBUG_DEFAULT =      (1 << 7),
-    GOSSIP_FLOW_DEBUG =             (1 << 8),
-    GOSSIP_BMI_DEBUG_GM_MEM =       (1 << 9),
-    GOSSIP_REQUEST_DEBUG =          (1 << 10),
-    GOSSIP_FLOW_PROTO_DEBUG =       (1 << 11),
-    GOSSIP_NCACHE_DEBUG =           (1 << 12),
-    GOSSIP_CLIENT_DEBUG =           (1 << 13),
-    GOSSIP_REQ_SCHED_DEBUG =        (1 << 14),
-    GOSSIP_ACACHE_DEBUG =           (1 << 15),
-    GOSSIP_TROVE_DEBUG =            (1 << 16),
-    GOSSIP_TROVE_OP_DEBUG =         (1 << 17),
-    GOSSIP_DIST_DEBUG =             (1 << 18),
-    GOSSIP_BMI_DEBUG_IB =           (1 << 19),
-    GOSSIP_DBPF_ATTRCACHE_DEBUG =   (1 << 20),
-    GOSSIP_MMAP_RCACHE_DEBUG =      (1 << 21),
-    GOSSIP_LOOKUP_DEBUG =           (1 << 22),
-    GOSSIP_REMOVE_DEBUG =           (1 << 23),
-    GOSSIP_GETATTR_DEBUG =          (1 << 24),
-    GOSSIP_READDIR_DEBUG =          (1 << 25),
-    GOSSIP_IO_DEBUG =               (1 << 26),
-    GOSSIP_DBPF_OPEN_CACHE_DEBUG =  (1 << 27),
-    GOSSIP_PERMISSIONS_DEBUG =      (1 << 28),
-    GOSSIP_CANCEL_DEBUG =           (1 << 29),
+#include <stdint.h>
 
-    GOSSIP_BMI_DEBUG_ALL = GOSSIP_BMI_DEBUG_TCP +
-    GOSSIP_BMI_DEBUG_CONTROL + GOSSIP_BMI_DEBUG_GM +
-    GOSSIP_BMI_DEBUG_OFFSETS + GOSSIP_BMI_DEBUG_IB
-};
+#define GOSSIP_NO_DEBUG                (uint64_t)0
+#define GOSSIP_BMI_DEBUG_TCP           ((uint64_t)1 << 0)
+#define GOSSIP_BMI_DEBUG_CONTROL       ((uint64_t)1 << 1)
+#define GOSSIP_BMI_DEBUG_OFFSETS       ((uint64_t)1 << 2)
+#define GOSSIP_BMI_DEBUG_GM            ((uint64_t)1 << 3)
+#define GOSSIP_JOB_DEBUG               ((uint64_t)1 << 4)
+#define GOSSIP_SERVER_DEBUG            ((uint64_t)1 << 51)
+#define GOSSIP_STO_DEBUG_CTRL          ((uint64_t)1 << 6)
+#define GOSSIP_STO_DEBUG_DEFAULT       ((uint64_t)1 << 7)
+#define GOSSIP_FLOW_DEBUG              ((uint64_t)1 << 8)
+#define GOSSIP_BMI_DEBUG_GM_MEM        ((uint64_t)1 << 9)
+#define GOSSIP_REQUEST_DEBUG           ((uint64_t)1 << 10)
+#define GOSSIP_FLOW_PROTO_DEBUG        ((uint64_t)1 << 11)
+#define GOSSIP_NCACHE_DEBUG            ((uint64_t)1 << 12)
+#define GOSSIP_CLIENT_DEBUG            ((uint64_t)1 << 61)
+#define GOSSIP_REQ_SCHED_DEBUG         ((uint64_t)1 << 14)
+#define GOSSIP_ACACHE_DEBUG            ((uint64_t)1 << 15)
+#define GOSSIP_TROVE_DEBUG             ((uint64_t)1 << 16)
+#define GOSSIP_TROVE_OP_DEBUG          ((uint64_t)1 << 17)
+#define GOSSIP_DIST_DEBUG              ((uint64_t)1 << 18)
+#define GOSSIP_BMI_DEBUG_IB            ((uint64_t)1 << 19)
+#define GOSSIP_DBPF_ATTRCACHE_DEBUG    ((uint64_t)1 << 20)
+#define GOSSIP_MMAP_RCACHE_DEBUG       ((uint64_t)1 << 21)
+#define GOSSIP_LOOKUP_DEBUG            ((uint64_t)1 << 22)
+#define GOSSIP_REMOVE_DEBUG            ((uint64_t)1 << 23)
+#define GOSSIP_GETATTR_DEBUG           ((uint64_t)1 << 24)
+#define GOSSIP_READDIR_DEBUG           ((uint64_t)1 << 25)
+#define GOSSIP_IO_DEBUG                ((uint64_t)1 << 26)
+#define GOSSIP_DBPF_OPEN_CACHE_DEBUG   ((uint64_t)1 << 27)
+#define GOSSIP_PERMISSIONS_DEBUG       ((uint64_t)1 << 28)
+#define GOSSIP_CANCEL_DEBUG            ((uint64_t)1 << 29)
 
-int PVFS_debug_eventlog_to_mask(
+#define GOSSIP_BMI_DEBUG_ALL (uint64_t)                               \
+(GOSSIP_BMI_DEBUG_TCP + GOSSIP_BMI_DEBUG_CONTROL +                    \
+ GOSSIP_BMI_DEBUG_GM + GOSSIP_BMI_DEBUG_OFFSETS + GOSSIP_BMI_DEBUG_IB)
+
+uint64_t PVFS_debug_eventlog_to_mask(
     const char *event_logging);
 
 char *PVFS_debug_get_next_debug_keyword(

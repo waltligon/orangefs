@@ -125,9 +125,9 @@ int PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     enum PVFS_server_param param,
-    int64_t value,
+    uint64_t value,
     PVFS_BMI_addr_t *addr_array,
-    int64_t* old_value_array,
+    uint64_t* old_value_array,
     int count,
     PVFS_error_details *details);
 
@@ -135,17 +135,17 @@ int PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     enum PVFS_server_param param,
-    int64_t value,
-    int64_t* old_value_array,
+    uint64_t value,
+    uint64_t* old_value_array,
     PVFS_error_details *details);
 
 int PVFS_mgmt_setparam_single(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
     enum PVFS_server_param param,
-    int64_t value,
+    uint64_t value,
     char *server_addr_str,
-    int64_t *old_value,
+    uint64_t *old_value,
     PVFS_error_details *details);
 
 int PVFS_mgmt_statfs_list(
