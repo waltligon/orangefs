@@ -56,7 +56,7 @@ int do_readdir(
     PVFS_sysresp_init *init_response,
     char *start_dir)
 {
-    int i = 0;
+    int ret = 0, i = 0;
     char *cur_file = (char *)0;
     PVFS_handle cur_handle;
     PVFS_sysresp_lookup lk_response;
@@ -74,7 +74,7 @@ int do_readdir(
     fs_id = init_response->fsid_list[0];
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
+    credentials.perms = 511;
 
     if (PVFS_sys_lookup(fs_id, name, credentials, &lk_response))
     {
@@ -88,7 +88,7 @@ int do_readdir(
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
+    credentials.perms = 511;
 
     token = 0;
     do
@@ -98,8 +98,20 @@ int do_readdir(
                              (!token ? PVFS2_READDIR_START : token),
                              pvfs_dirent_incount, credentials, &rd_response))
         {
-            fprintf(stderr,"Failed to perform readdir operation\n");
-            return 1;
+            /* try a lookup instead; perhaps this is a file ? */
+            ret = PVFS_sys_lookup(fs_id, name, credentials, &lk_response);
+            if (ret < 0)
+            {
+                fprintf(stderr,"Readdir and Lookup failed on %s\n",name);
+            }
+            else
+            {
+                char segment[128] = {0};
+                PINT_remove_base_dir(name, segment, 128);
+                print_entry(segment,lk_response.pinode_refn.handle,
+                            lk_response.pinode_refn.fs_id);
+            }
+            return ret;
         }
 
         for(i = 0; i < rd_response.pvfs_dirent_outcount; i++)
