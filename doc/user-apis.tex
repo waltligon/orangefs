@@ -1,0 +1,129 @@
+\section{PVFS2 User APIs and Semantics}
+\label{sec:apis}
+
+Because PVFS2 is designed specifically for performance in systems where
+concurrent access from many processes is commonplace, there are some
+differences between the PVFS2 interfaces and traditional file system
+interfaces.
+%
+In this section we will discuss the two interfaces provided for applications
+to use when accessing PVFS2 file systems.  We will start with the traditional
+UNIX I/O interface, which nearly all file systems implement.  We will then
+cover the MPI-IO interface.
+
+\subsection{UNIX I/O Interface}
+
+We provide an implementation of the UNIX I/O interface for clients running
+Linux versions 2.4 (2.4.19 and later) and 2.6.  This interface implements the
+traditional \texttt{open()}, \texttt{read()}, \texttt{write()}, and
+\texttt{close()} interface as well as providing the directory operations
+necessary for applications such as \texttt{ls} to work.
+
+It is important to note that there is a difference between implementing the
+UNIX I/O API and implementing the POSIX semantics for this API.  We do not
+implement the latter of these two.  Here we will document aspects of the POSIX
+semantics that we do not implement.
+
+\subsubsection{Permission Checking}
+
+PVFS2 does not really implement the \texttt{open} etc. interface, but instead
+uses a stateless approach that relies on the client to \texttt{lookup} a file
+name to convert it into a \emph{handle} that can be used for subsequent read
+and write accesses.  This handle may be used for many read and write accesses
+and may be cached under certain guidelines.
+
+Permission checking is performed in two places.  First, the VFS checks
+permissions on the client and will prevent users from performing invalid
+operations.  Second, the server performs rudimentary checks for specific
+operations; however, it (currently) relies on the client to provide accurate
+user and group information to be used for this purpose.
+
+\subsubsection{Access to Removed Files}
+
+POSIX semantics dictate that a file opened by a process may continue to be
+accessed until the subsequent close, even if the file permissions are changed
+or the file is deleted.  This requires that the file system or clients somehow
+keep up with a list of files that are open, which adds unacceptable state to a
+distributed file system.  In NFS, for example, this is implemented via the
+``sillyrename'' approach, in which clients rename a deleted but open file to
+hide it in the directory tree, then delete the renamed file when the file is
+finally closed.
+
+In PVFS2 a file that is deleted is removed immediately regardless of open file
+descriptors.  Subsequent attempts to access the file will find that the file
+no longer exists.
+
+\emph{ Neill: Is this completely true, or do clients delay removal in
+  pvfs2-client if someone is still accessing? }
+
+\subsubsection{Permissions and File Access}
+
+Likewise, POSIX semantics dictate that once a file has been opened it may
+continue to be accessed by the process until closed, regardless of changes to
+permissions.
+
+In PVFS2 the effect of permission changes on a file may or may not be
+immediately apparent to a client holding an open file descriptor.  Because
+of the manner in which PVFS2 performs permission checking and file lookup, it
+is possible that a client may lose the ability to access a file that it has
+previously opened due to permission change.
+
+\subsubsection{Overlapping I/O Operations}
+
+POSIX semantics dictate sequential consistency for overlapping I/O operations.
+This means that I/O operations must be atomic with respect to each other -- if
+one process performs a read spanning a collection of servers while another
+performs a write in the same region, the read must see either all or none of
+the changes.  In a parallel file system this involves communication to
+coordinate access in this manner, and because of the number of clients we wish
+to support, we are unwilling to implement this functionality (at least as part
+of the core file system).
+
+In PVFS2 we instead implement a semantic we call \emph{nonconflicting writes}
+semantic.  This semantic states that all I/O operations that do not access the
+same bytes (in other words, are nonconflicting) will be sequentially
+consistent.  Write operations that conflict will result in some undefined
+combination of the bytes being written to storage, while read operations that
+conflict with write operations will see some undefined combination of original
+data and write data.
+
+\emph{ Add diagrams? }
+
+\subsubsection{Locks}
+
+BSD provides the \texttt{flock()} mechanism for locking file regions as a way
+to perform atomic modifications to files.  POSIX provides this functionality
+through options to \texttt{fcntl()}.  Both of these are advisory locks, which
+means that processes not using the locks can access the file regions.
+
+PVFS2 does not implement a locking infrastructure as part of the file system.
+At this time there is no add-on advisory locking component either.  Thus
+neither the \texttt{flock()} function nor the \texttt{fcntl()} advisory locks
+are supported by PVFS2.
+
+\subsection{MPI-IO Interface}
+
+We provide an implementation of the MPI-IO interface via an implementation of
+the ROMIO ADIO interface.  This implementation is included as part of MPICH1
+and MPICH2 as well as being available as an independent package.  The MPI-IO
+interface is part of the MPI-2 standard and defines an API for file access
+from within MPI programs.
+
+Our PVFS2 implementation does not include all the functionality of the MPI-IO
+specification.  In this section we discuss the missing components of MPI-IO
+for PVFS2.
+
+\subsubsection{MPI-IO Atomic Mode}
+
+Atomic mode is enabled by ROMIO uses file locking to implement the MPI-IO
+atomic mode functionality.
+
+\subsubsection{MPI-IO Shared Pointer Mode}
+
+Shared pointers are used in the \texttt{\_shared()} and \texttt{\_ordered()}
+families of functions.
+
+The ROMIO implementation relies on the use of locking support from the file
+system to implement both of these families of functions, so these are not
+currently supported.  We are researching alternative implementations.
+
