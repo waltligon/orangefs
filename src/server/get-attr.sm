@@ -265,6 +265,9 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
 
 	/* save # of datafiles so we know the size for reading later */
 	s_op->resp->u.getattr.attr.u.meta.dfile_count = a_p->u.meta.dfile_count;
+	/* TODO: put in real error handling for this condition: */
+	assert(s_op->resp->u.getattr.attr.u.meta.dfile_count 
+	    <= PVFS_REQ_LIMIT_DFILE_COUNT);
 	/* TODO: keep distribution size in here too */
     }
     else if (ret->error_code == 0) {
