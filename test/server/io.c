@@ -16,13 +16,12 @@
 #include <flow.h>
 
 
-/* TODO: update this as we go
+/*
+ * This is a test program for playing around with I/O operations on the
+ * pvfs2 server.  If executed without any command line arguments, it
+ * will create a new datafile, write something into it, then delete the
+ * file.
  *
- * this is a test program for playing around with I/O operations on the
- * pvfs2 server.  It doesn't work yet- just a hack for development
- * purposes.
- *
- * -PHIL
  */
 
 /**************************************************************
@@ -71,10 +70,7 @@ int main(int argc, char **argv)	{
 	void* memory_buffer = NULL;
 	PINT_Request_file_data file_data;
 	flow_descriptor* flow_d = NULL;
-	
-	/* TODO: use these once server remove state machine is
-	 * implemented and we can call remove at the end of the test
-	 * run 
+	/* TODO: put this back when the server can handle remove operations
 	 */
 #if 0
 	struct PVFS_server_resp_s* remove_dec_ack;
@@ -111,6 +107,7 @@ int main(int argc, char **argv)	{
 		fprintf(stderr, "Error: malloc() failure.\n");
 		return(-1);
 	}
+	memset(memory_buffer, 0, io_size);
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -470,17 +467,145 @@ int main(int argc, char **argv)	{
 	 * remove request  
 	 */
 
-	/* TODO: fill this in.  We need to get rid of the data file
-	 * that we created earlier.  Waiting on implementation of
-	 * server side remove state machine.
+	/* TODO: put this back when the server can handle remove operations
 	 */
+#if 0
+	my_req.op = PVFS_SERV_REMOVE;
+	my_req.rsize = sizeof(struct PVFS_server_req_s);
+	my_req.credentials.uid = 0;
+	my_req.credentials.gid = 0;
+	my_req.credentials.perms = U_WRITE | U_READ;  
 
+	/* remove specific fields */
+	my_req.u.remove.fs_id = 9;
+	my_req.u.remove.handle = create_dec_ack->u.create.handle;
+
+	ret = PINT_encode(&my_req,PINT_ENCODE_REQ,&encoded3,server_addr,0);
+	if(ret < 0)
+	{
+		fprintf(stderr, "Error: PINT_encode failure.\n");
+		return(-1);
+	}
+
+	/* send the request on its way */
+	ret = BMI_post_sendunexpected_list(
+		&(client_ops[1]), 
+		encoded3.dest,
+		encoded3.buffer_list, 
+		encoded3.size_list,
+		encoded3.list_count,
+		encoded3.total_size, 
+		encoded3.buffer_flag, 
+		0, 
+		NULL);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_post_send");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of request */
+		do
+		{
+			ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
+				NULL, 10);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Error: request send failed.\n");
+			if(ret<0)
+			{
+				errno = -ret;
+				perror("BMI_test");
+			}
+			return(-1);
+		}
+	}
+
+	/* release the encoded message */
+	PINT_encode_release(&encoded3, PINT_ENCODE_REQ, 0);
+
+	/* post a recv for the server acknowledgement */
+	ret = BMI_post_recv(&(client_ops[0]), server_addr, remove_ack, 
+		remove_ack_size, &actual_size, BMI_EXT_ALLOC, 0, 
+		NULL);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_post_recv");
+		return(-1);
+	}
+	if(ret == 0)
+	{
+		/* turning this into a blocking call for testing :) */
+		/* check for completion of ack recv */
+		do
+		{
+			ret = BMI_test(client_ops[0], &outcount, &error_code,
+				&actual_size, NULL, 10);
+		} while(ret == 0 && outcount == 0);
+
+		if(ret < 0 || error_code != 0)
+		{
+			fprintf(stderr, "Error: ack recv.\n");
+			fprintf(stderr, "   ret: %d, error code: %d\n",ret,error_code);
+			return(-1);
+		}
+	}
+	else
+	{
+		if(actual_size != remove_ack_size)
+		{
+			printf("Error: short recv.\n");
+			return(-1);
+		}
+	}
+				
+	/* look at the ack */
+	ret = PINT_decode(
+		remove_ack,
+		PINT_ENCODE_RESP,
+		&decoded3,
+		server_addr,
+		actual_size,
+		NULL);
+	if(ret < 0)
+	{
+		fprintf(stderr, "Error: PINT_decode() failure.\n");
+		return(-1);
+	}
+
+	remove_dec_ack = decoded3.buffer;
+	if(remove_dec_ack->op != PVFS_SERV_REMOVE)
+	{
+		fprintf(stderr, "ERROR: received ack of wrong type (%d)\n", 
+			(int)remove_dec_ack->op);
+		return(-1);
+	}
+	if(remove_dec_ack->status != 0)
+	{
+		fprintf(stderr, "ERROR: server returned status: %d\n",
+			(int)remove_dec_ack->status);
+		return(-1);
+	}
+
+#endif
 	/**************************************************
 	 * general cleanup  
 	 */
 
 	/* release the decoded buffers */
+	PINT_decode_release(&decoded1, PINT_ENCODE_RESP, 0);
 	PINT_decode_release(&decoded2, PINT_ENCODE_RESP, 0);
+	/* TODO: put this back when the server can handle remove operations
+	 */
+#if 0
+	PINT_decode_release(&decoded3, PINT_ENCODE_RESP, 0);
+#endif
 
 	/* shutdown the local interface */
 	ret = BMI_finalize();
