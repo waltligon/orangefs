@@ -37,9 +37,6 @@ typedef uint32_t PVFS_gid;
 typedef int64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 
-/* TODO: get rid of this later... */
-#define MAX_STRING_SIZE  1000
-
 /* pinode reference (uniquely refers to a single pinode) */
 typedef struct
 {
