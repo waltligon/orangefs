@@ -1,0 +1,97 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-storage.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "gossip.h"
+
+static int mgmt_remove_dspace(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int mgmt_remove_cleanup(
+    PINT_server_op *s_op, job_status_s *js_p);
+
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
+
+%%
+
+machine pvfs2_remove_sm(
+    prelude,
+    remove_dspace,
+    final_response,
+    cleanup)
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => remove_dspace;
+        default => final_response;
+    }
+
+    state remove_dspace
+    {
+        run mgmt_remove_dspace;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run mgmt_remove_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static int mgmt_remove_dspace(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL;
+    job_id_t j_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    PINT_STATE_DEBUG("mgmt_remove_dspace");
+
+    ret = job_trove_dspace_remove(
+        s_op->req->u.remove.fs_id,
+        s_op->req->u.remove.handle,
+        PINT_config_get_trove_sync_mode(
+            user_opts, s_op->req->u.remove.fs_id),
+        s_op,
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
+
+    return ret;
+}
+
+static int remove_cleanup(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    PINT_STATE_DEBUG("cleanup");
+    return(server_state_machine_complete(s_op));
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

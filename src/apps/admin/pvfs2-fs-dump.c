@@ -468,7 +468,9 @@ int descend(PVFS_fs_id cur_fs,
 
 	if (handlelist_find_handle(cur_handle, &server_idx) < 0)
 	{
-	    assert(0);
+            printf("Handle %Lu appears to be missing; skipping!\n",
+                   Lu(cur_handle));
+            continue;
 	}
 
 	print_entry(cur_file,

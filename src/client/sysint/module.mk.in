@@ -31,6 +31,8 @@ CLIENT_SMCGEN := \
 	$(DIR)/sys-symlink.c \
 	$(DIR)/sys-readdir.c \
 	$(DIR)/sys-rename.c \
+	$(DIR)/client-job-timer.c \
+	$(DIR)/server-get-config.c \
 	$(DIR)/mgmt-noop.c \
 	$(DIR)/mgmt-setparam-list.c \
 	$(DIR)/mgmt-statfs-list.c \
@@ -38,8 +40,7 @@ CLIENT_SMCGEN := \
 	$(DIR)/mgmt-event-mon-list.c \
 	$(DIR)/mgmt-iterate-handles-list.c \
 	$(DIR)/mgmt-get-dfile-array.c \
-	$(DIR)/client-job-timer.c \
-	$(DIR)/server-get-config.c
+	$(DIR)/mgmt-remove-object.c
 
 # track generated .c files that need to be removed during dist clean, etc.
 SMCGEN += $(CLIENT_SMCGEN)

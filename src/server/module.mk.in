@@ -26,8 +26,8 @@ SERVER_SMCGEN := \
 	$(DIR)/event-mon.c \
 	$(DIR)/iterate-handles.c \
 	$(DIR)/job-timer.c \
-	$(DIR)/proto-error.c
-
+	$(DIR)/proto-error.c \
+	$(DIR)/mgmt-remove-object.c
 
 # c files that should be added to server library
 SERVERSRC += \

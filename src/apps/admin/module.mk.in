@@ -15,7 +15,8 @@ ADMINSRC := \
 	$(DIR)/pvfs2-chmod.c \
 	$(DIR)/pvfs2-chown.c \
 	$(DIR)/pvfs2-fs-dump.c\
-	$(DIR)/pvfs2-cp.c
+	$(DIR)/pvfs2-cp.c \
+	$(DIR)/pvfs2-remove-object.c
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \

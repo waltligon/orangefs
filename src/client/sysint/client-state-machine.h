@@ -497,9 +497,11 @@ enum
     PVFS_MGMT_ITERATE_HANDLES_LIST = 74,
     PVFS_MGMT_GET_DFILE_ARRAY      = 75,
     PVFS_MGMT_EVENT_MON_LIST       = 76,
-    PVFS_SERVER_GET_CONFIG         = 77,
-    PVFS_CLIENT_JOB_TIMER          = 200,
-    PVFS_DEV_UNEXPECTED            = 300
+    PVFS_MGMT_REMOVE_OBJECT        = 77,
+    PVFS_MGMT_REMOVE_DIRENT        = 78,
+    PVFS_SERVER_GET_CONFIG         = 200,
+    PVFS_CLIENT_JOB_TIMER          = 300,
+    PVFS_DEV_UNEXPECTED            = 400
 };
 
 int PINT_client_io_cancel(job_id_t id);
@@ -525,6 +527,12 @@ PINT_client_wait_internal(op_id, in_op_str, out_error, "mgmt")
 
 #define PINT_init_sysint_credentials(sm_p_cred_p, user_cred_p)\
 do {                                                          \
+    if (user_cred_p == NULL)                                  \
+    {                                                         \
+        gossip_lerr("Invalid user credentials! (nil)\n");     \
+        free(sm_p);                                           \
+        return -PVFS_EINVAL;                                  \
+    }                                                         \
     sm_p_cred_p = PVFS_util_dup_credentials(user_cred_p);     \
     if (!sm_p_cred_p)                                         \
     {                                                         \
@@ -579,6 +587,9 @@ extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_client_rename_sm;
+extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
+extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
+extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_perf_mon_list_sm;
@@ -586,9 +597,8 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_event_mon_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_iterate_handles_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dfile_array_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_noop_sm;
-extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
-extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
-extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_remove_object_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_remove_dirent_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_getattr_acache_sm;
