@@ -1418,8 +1418,8 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 #endif
 
     /* post list send */
-    gossip_ldebug(FLOW_PROTO_DEBUG, "Posting send, total size: %ld\n",
-		  (long) flow_data->bmi_total_size);
+    gossip_ldebug(FLOW_PROTO_DEBUG, "Posting send, total size: %Ld\n",
+		   flow_data->bmi_total_size);
     ret = BMI_post_send_list(&flow_data->bmi_id,
 			     flow_d->dest.u.bmi.address,
 			     (const void **) flow_data->bmi_buffer_list,
