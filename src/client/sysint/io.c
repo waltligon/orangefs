@@ -171,7 +171,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     PINT_Free_request_state(req_state);
     req_state = NULL;
 
-    /* allocate storage for bookkeeping information */
+    /* stuff for request array */
     addr_array = (bmi_addr_t*)malloc(target_handle_count *
 	sizeof(bmi_addr_t));
     req_array = (struct PVFS_server_req_s*)
@@ -182,11 +182,14 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     resp_decoded_array = (struct PINT_decoded_msg*)
 	malloc(target_handle_count * 
 	sizeof(struct PINT_decoded_msg));
+
+    /* stuff for both request array and flow array */
     error_code_array = (int*)malloc(target_handle_count *
 	sizeof(int));
+
+    /* stuff for running flows */
     file_data_array = (PINT_Request_file_data*)malloc(
 	target_handle_count*sizeof(PINT_Request_file_data));
-
     flow_array = (flow_descriptor**)malloc(target_handle_count *
 	sizeof(flow_descriptor*));
     if(flow_array)
