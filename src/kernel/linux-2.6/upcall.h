@@ -11,7 +11,7 @@ typedef struct
 {
     char *buf;
     size_t count;
-    loff_t *offset;
+    loff_t offset;
 } pvfs2_read_request_t;
 
 typedef struct
