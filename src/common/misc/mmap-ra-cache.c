@@ -13,8 +13,8 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
+#include "pvfs2.h"
 #include "gossip.h"
-#include "client.h"
 #include "gen-locks.h"
 #include "mmap-ra-cache.h"
 
