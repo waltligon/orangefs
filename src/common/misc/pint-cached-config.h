@@ -15,11 +15,6 @@
 #include "trove.h"
 #include "server-config.h"
 
-/* TODO: this is needed for usage of PVFS_sys_attr, but it seems like we
- * shouldn't be operatingon sys_attr structures at this level 
- */
-#include "pvfs2-sysint.h"
-
 /* This is the interface to the cached_config management component of the
  * system interface.  It is responsible for managing the list of meta
  * and data servers and mapping between handle ranges and servers.
@@ -67,9 +62,9 @@ int PINT_cached_config_map_to_server(PVFS_BMI_addr_t *server_addr,
 			      PVFS_fs_id fsid);
 
 int PINT_cached_config_get_num_dfiles(PVFS_fs_id fsid,
-                               PINT_dist* dist,
-                               PVFS_sys_attr attr,
-                               int* num_dfiles);
+                                      PINT_dist* dist,
+                                      int num_dfiles_requested,
+                                      int* num_dfiles);
 
 int PINT_cached_config_get_num_meta(PVFS_fs_id fsid,
 			     int *num_meta);

@@ -596,31 +596,21 @@ int PINT_cached_config_map_to_server(
  */
 int PINT_cached_config_get_num_dfiles(PVFS_fs_id fsid,
                                PINT_dist* dist,
-                               PVFS_sys_attr attr,
+                               int num_dfiles_requested,
                                int* num_dfiles)
 {
-    int num_dfiles_req;
-    int num_servers_req;
+    int num_servers_requested;
     int ret;
 
-    /* Get the user's dfile count request (it may be ignored by dist) */
-    if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
-    {
-        num_dfiles_req = attr.dfile_count;
-    }
-    else
-    {
-        num_dfiles_req = 0;
-    }
-
     /* Get the number of available servers */
-    ret = PINT_cached_config_get_num_io(fsid, &num_servers_req);
+    ret = PINT_cached_config_get_num_io(fsid, &num_servers_requested);
+
     if (0 == ret)
     {
         /* Let the distribution determine the number of dfiles to use */
         *num_dfiles = dist->methods->get_num_dfiles(dist->params,
-                                                    num_servers_req,
-                                                    num_dfiles_req);
+                                                    num_servers_requested,
+                                                    num_dfiles_requested);
     }
     else
     {

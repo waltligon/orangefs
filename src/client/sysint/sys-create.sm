@@ -226,6 +226,7 @@ int PVFS_isys_create(
     void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
+    int num_dfiles_req;
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_create entered\n");
@@ -286,9 +287,17 @@ int PVFS_isys_create(
     }
     
     /* Determine the number of datafile objects to use */
+    if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
+    {
+        num_dfiles_req = attr.dfile_count;
+    }
+    else
+    {
+        num_dfiles_req = 0;
+    }
     ret = PINT_cached_config_get_num_dfiles(sm_p->parent_ref.fs_id,
                                      sm_p->u.create.dist,
-                                     attr,
+                                     num_dfiles_req,
                                      &sm_p->u.create.num_data_files);
     if (ret < 0)
     {
