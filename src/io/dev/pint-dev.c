@@ -22,7 +22,6 @@
 #include "pvfs2-types.h"
 #include "gossip.h"
 #include "pint-dev.h"
-#include "src/io/bmi/bmi-byteswap.h"
 
 static int setup_dev_entry(const char* dev_name);
 static int parse_devices(const char* targetfile, const char* devname, 
