@@ -18,7 +18,6 @@
 #include <dbpf.h>
 #include <dbpf-op-queue.h>
 #include <dbpf-bstream.h>
-#include <id-generator.h>
 
 #define DBPF_OPEN open
 #define DBPF_WRITE write
@@ -64,7 +63,6 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
 				void *user_ptr,
 				TROVE_op_id *out_op_id_p)
 {
-    TROVE_op_id new_id;
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
     
@@ -84,15 +82,11 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL) return -1;
     
-    /* get id */
-    id_gen_fast_register(&new_id, q_op_p);
-    
     /* initialize all the common members */
     dbpf_queued_op_init(
 			q_op_p,
 			BSTREAM_READ_AT,
 			handle,
-			new_id,
 			coll_p,
 			dbpf_bstream_read_at_op_svc,
 			user_ptr);
@@ -102,9 +96,7 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
     q_op_p->op.u.b_read_at.size = *inout_size_p;
     q_op_p->op.u.b_read_at.buffer = buffer;
     
-    dbpf_queued_op_queue(q_op_p);
-    
-    *out_op_id_p = new_id;
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
     
     return 0;
 }
@@ -136,12 +128,9 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
     /* TODO: any way to return partial success? */
     
     printf("read %d bytes.\n", ret);
-    
-    op_p->state = OP_COMPLETED;
     return 1;
-    
+   
  return_error:
-    op_p->state = OP_COMPLETED;
     return -1;
 }
 
@@ -155,7 +144,6 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
 				 void *user_ptr,
 				 TROVE_op_id *out_op_id_p)
 {
-    TROVE_op_id new_id;
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
     
@@ -175,15 +163,11 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL) return -1;
     
-    /* get id */
-    id_gen_fast_register(&new_id, q_op_p);
-    
     /* initialize all the common members */
     dbpf_queued_op_init(
 			q_op_p,
 			BSTREAM_WRITE_AT,
 			handle,
-			new_id,
 			coll_p,
 			dbpf_bstream_write_at_op_svc,
 			user_ptr);
@@ -193,10 +177,8 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
     q_op_p->op.u.b_write_at.size = *inout_size_p;
     q_op_p->op.u.b_write_at.buffer = buffer;
     /* TODO: flags? */
-    
-    dbpf_queued_op_queue(q_op_p);
-    
-    *out_op_id_p = new_id;
+
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
     
     return 0;
 }
@@ -230,12 +212,9 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
     /* TODO: any way to return partial success? */
     
     printf("wrote %d bytes.\n", ret);
-    
-    op_p->state = OP_COMPLETED;
     return 1;
     
  return_error:
-    op_p->state = OP_COMPLETED;
     return -1;
 }
 
@@ -353,7 +332,6 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 				       int opcode)
 {
     int ret, fd;
-    TROVE_op_id new_id;
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
 
@@ -367,14 +345,10 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL) return -1;
 
-    /* get id */
-    id_gen_fast_register(&new_id, q_op_p);
-
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
 			BSTREAM_WRITE_LIST,
 			handle,
-			new_id,
 			coll_p,
 			dbpf_bstream_rw_list_op_svc,
 			user_ptr);
@@ -410,26 +384,9 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.fd = fd;
 
     /* queue op*/
-    dbpf_queued_op_queue(q_op_p);
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
-    /* TODO: would it be ok for us to not bother to queue until after calling the
-     * service routine?
-     */
-
-    /* call the service routine */
-    ret = dbpf_bstream_rw_list_op_svc(&(q_op_p->op));
-
-    if (ret == 0) {
-	/* not finished -- return the id */
-	*out_op_id_p = new_id;
-    }
-    else {
-	/* finished or error -- dequeue */
-	dbpf_bstream_fdcache_put(coll_id, handle);
-	dbpf_queued_op_dequeue(q_op_p);
-	dbpf_queued_op_free(q_op_p);
-    }
-    return ret;
+    return 0;
 }
 
 
@@ -523,7 +480,6 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	/* free the aiocb array, release the FD, and mark the whole op as complete */
 	free(aiocb_p);
 	dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
-	op_p->state = OP_COMPLETED;
 	return 1;
     }
     else {

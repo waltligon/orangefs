@@ -19,7 +19,6 @@
 #include <dbpf.h>
 #include <dbpf-op-queue.h>
 #include <dbpf-keyval.h>
-#include <id-generator.h>
 
 /* TODO: sync flag on all operations?  */
 
@@ -43,8 +42,6 @@ static int dbpf_keyval_read(
 			    void *user_ptr,
 			    TROVE_op_id *out_op_id_p)
 {
-
-    TROVE_op_id new_id;
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
 
@@ -62,15 +59,11 @@ static int dbpf_keyval_read(
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL) return -1;
 
-    /* get id */
-    id_gen_fast_register(&new_id, q_op_p);
-
     /* initialize all the common members */
     dbpf_queued_op_init(
 			q_op_p,
 			KEYVAL_READ,
 			handle,
-			new_id,
 			coll_p,
 			dbpf_keyval_read_op_svc,
 			user_ptr);
@@ -79,8 +72,7 @@ static int dbpf_keyval_read(
     q_op_p->op.u.k_read.key = *key_p;
     q_op_p->op.u.k_read.val = *val_p;
 	
-    dbpf_queued_op_queue(q_op_p);
-    *out_op_id_p = new_id;
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
 }
@@ -120,12 +112,9 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 
 
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
-	
-    op_p->state = OP_COMPLETED;
     return 1;
 
  return_error:
-    op_p->state = OP_COMPLETED;
     return -1;
 }
 
@@ -142,7 +131,6 @@ static int dbpf_keyval_write(
 			     void *user_ptr,
 			     TROVE_op_id *out_op_id_p)
 {
-    TROVE_op_id new_id;
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
 
@@ -160,15 +148,11 @@ static int dbpf_keyval_write(
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL) return -1;
 
-    /* get id */
-    id_gen_fast_register(&new_id, q_op_p);
-
     /* initialize all the common members */
     dbpf_queued_op_init(
 			q_op_p,
 			KEYVAL_WRITE,
 			handle,
-			new_id,
 			coll_p,
 			dbpf_keyval_write_op_svc,
 			user_ptr);
@@ -177,9 +161,7 @@ static int dbpf_keyval_write(
     q_op_p->op.u.k_write.key = *key_p;
     q_op_p->op.u.k_write.val = *val_p;
 
-    dbpf_queued_op_queue(q_op_p);
-
-    *out_op_id_p = new_id;
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 	
     return 0;
 }
@@ -218,12 +200,9 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 
 
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
-
-    op_p->state = OP_COMPLETED;
     return 1;
 
  return_error:
-    op_p->state = OP_COMPLETED;
     return -1;
 }
 
@@ -238,7 +217,6 @@ static int dbpf_keyval_remove(
 			      void *user_ptr,
 			      TROVE_op_id *out_op_id_p)
 {
-	TROVE_op_id new_id;
 	struct dbpf_queued_op *q_op_p;
 	struct dbpf_collection *coll_p;
 
@@ -251,15 +229,11 @@ static int dbpf_keyval_remove(
 	q_op_p = dbpf_queued_op_alloc();
 	if (q_op_p == NULL) return -1;
 
-	/* get id */
-	id_gen_fast_register(&new_id, q_op_p);
-
 	/* initialaze common members */
 	dbpf_queued_op_init(
 			q_op_p,
 			KEYVAL_REMOVE_KEY,
 			handle,
-			new_id,
 			coll_p,
 			dbpf_keyval_remove_op_svc,
 			user_ptr);
@@ -267,9 +241,7 @@ static int dbpf_keyval_remove(
 	/* initialize op-specific members */
 	q_op_p->op.u.k_remove.key = *key_p;
 
-	dbpf_queued_op_queue(q_op_p);
-
-	*out_op_id_p = new_id; 
+	*out_op_id_p = dbpf_queued_op_queue(q_op_p);
 	
 	return 0;
 }
@@ -297,11 +269,9 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 		return -1;
 	}
 	dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
-	op_p->state = OP_COMPLETED;
 	return 1;
 
 return_error:
-	op_p->state = OP_COMPLETED;
 	return -1;
 }
 
@@ -332,7 +302,6 @@ static int dbpf_keyval_iterate(
 			       void *user_ptr,
 			       TROVE_op_id *out_op_id_p)
 {
-    TROVE_op_id new_id;
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
 
@@ -342,13 +311,10 @@ static int dbpf_keyval_iterate(
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL) return -1;
 
-    id_gen_fast_register(&new_id, q_op_p);
-
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
 			KEYVAL_ITERATE,
 			handle,
-			new_id,
 			coll_p,
 			dbpf_keyval_iterate_op_svc,
 			user_ptr);
@@ -359,8 +325,7 @@ static int dbpf_keyval_iterate(
     q_op_p->op.u.k_iterate.position_p = position_p;
     q_op_p->op.u.k_iterate.count      = inout_count_p;
 
-    dbpf_queued_op_queue(q_op_p);
-    *out_op_id_p = new_id;
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
 }
@@ -443,14 +408,11 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
     /* free the cursor */
     ret = dbc_p->c_close(dbc_p);
     if (ret != 0) goto return_error;
-
-    op_p->state = OP_COMPLETED;
     return 1;
 
  return_error:
     fprintf(stderr, "dbpf_keyval_iterate_op_svc: %s\n", db_strerror(ret));
     *(op_p->u.k_iterate.count)=i; 
-    op_p->state = OP_COMPLETED;
     return -1;
 }
 

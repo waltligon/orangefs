@@ -17,7 +17,6 @@
 #include <trove-internal.h>
 #include <dbpf.h>
 #include <dbpf-op-queue.h>
-#include <id-generator.h>
 #include <trove-ledger.h>
 
 /* TODO: move both of these into header file? */
@@ -157,7 +156,6 @@ int dbpf_dspace_iterate_handles(
                                 void *user_ptr,
                                 TROVE_op_id *out_op_id_p)
 {
-    TROVE_op_id new_id;
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
 
@@ -167,13 +165,10 @@ int dbpf_dspace_iterate_handles(
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL) return -1;
 
-    id_gen_fast_register(&new_id, q_op_p);
-
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
 			DSPACE_ITERATE_HANDLES,
 			0, /* handle -- ignored in this case */
-			new_id,
 			coll_p,
 			dbpf_dspace_iterate_handles_op_svc,
 			user_ptr);
@@ -183,8 +178,7 @@ int dbpf_dspace_iterate_handles(
     q_op_p->op.u.d_iterate_handles.position_p   = position_p;
     q_op_p->op.u.d_iterate_handles.count_p      = inout_count_p;
 
-    dbpf_queued_op_queue(q_op_p);
-    *out_op_id_p = new_id;
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
 }
@@ -307,7 +301,6 @@ return_ok:
     /* 'position' is the record we will read next time through */
 
     *op_p->u.d_iterate_handles.count_p = i;
-    op_p->state = OP_COMPLETED;
 
     ret = dbc_p->c_close(dbc_p);
     if (ret != 0) return -1;
@@ -316,7 +309,6 @@ return_ok:
 return_error:
     fprintf(stderr, "dbpf_dspace_iterate_handles_op_svc: %s\n", db_strerror(ret));
     *op_p->u.d_iterate_handles.count_p = i; 
-    op_p->state = OP_COMPLETED;
     dbc_p->c_close(dbc_p); /* don't check error -- we're returning an error anyway. */
 
     return -1;
@@ -368,6 +360,8 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
  * The error state of the completed operation is returned via the state_p,
  * more to follow on this...
  *
+ * out_count gets the count of completed operations too...
+ *
  * Removes completed operations from the queue.
  */
 static int dbpf_dspace_test(TROVE_coll_id coll_id,
@@ -381,12 +375,31 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
     struct dbpf_queued_op *q_op_p;
     
     /* map to queued operation */
-    q_op_p = id_gen_fast_lookup(id);
+    ret = dbpf_queued_op_try_get(id, &q_op_p);
+    switch (ret) {
+	case DBPF_QUEUED_OP_INVALID:
+	    return -1;
+	case DBPF_QUEUED_OP_BUSY:
+	    *out_count_p = 0;
+	    return 0;
+	case DBPF_QUEUED_OP_SUCCESS:
+	    /* fall through and process */
+    }
     
     /* for now we need to call the service function;
      * there's no thread to do the work yet.
      */
     ret = q_op_p->op.svc_fn(&(q_op_p->op));
+
+    /* if we were really simulating what should eventually happen
+     * with a background thread, we would call
+     * dbpf_queued_op_put(q_op_p, 1) to return it to the queue
+     * and mark completed.  then we would do a try_get
+     * and check to see if it is in the OP_COMPLETED state.
+     *
+     * however, until we get a background thread working on things,
+     * this code will do the trick and is a lot faster and shorter.
+     */
 
     if (ret != 0) {
 	/* operation is done and we are telling the caller;
@@ -397,7 +410,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 	if (returned_user_ptr_p != NULL) {
 	    *returned_user_ptr_p = q_op_p->op.user_ptr;
 	}
-	dbpf_queued_op_dequeue(q_op_p);
+	dbpf_queued_op_put_and_dequeue(q_op_p);
 	return 1;
     }
 	
@@ -423,29 +436,22 @@ static int dbpf_dspace_testsome(
 				TROVE_ds_state *state_array
 				)
 {
-    int i, out_count = 0, ret;
-    struct dbpf_queued_op *q_op_p;
+    int i, out_count = 0, ret, tmp_count;
 
     for (i=0; i < *inout_count_p; i++) {
-	/* map to queued operation */
-	q_op_p = id_gen_fast_lookup(ds_id_array[i]);
-	
-	/* for now we need to call the service function;
-	 * there's no thread to do the work yet.
-	 */
-	ret = q_op_p->op.svc_fn(&(q_op_p->op));
+	ret = dbpf_dspace_test(coll_id,
+			       ds_id_array[i],
+			       &tmp_count,
+			       &vtag_array[i], /* TODO: this doesn't seem right! */
+			       (returned_user_ptr_array != NULL) ? returned_user_ptr_array[i] : NULL,
+			       &state_array[out_count]);
 	
 	if (ret != 0) {
 	    /* operation is done and we are telling the caller;
 	     * ok to pull off queue now.
 	     */
 	    out_index_array[out_count] = i;
-	    state_array[out_count] = (ret == 1) ? 0 : -1; /* TODO: FIX THIS!!! */
-	    if (returned_user_ptr_array != NULL) {
-		returned_user_ptr_array[out_count] = q_op_p->op.user_ptr;
-	    }
 	    out_count++;
-	    dbpf_queued_op_dequeue(q_op_p);
 	}    
     }
 
