@@ -38,11 +38,6 @@ void kill_device_owner(void)
         pvfs2_print("**************************************\n");
         force_sig(SIGKILL, device_owner);
     }
-    else
-    {
-        panic("Trying to kill pvfs2 daemon before pvfs2-req "
-              "device was opened\n");
-    }
 }
 
 static int pvfs2_devreq_open(
