@@ -32,9 +32,10 @@ enum
     PCACHE_DEBUG =	    (1 << 15),
     TROVE_DEBUG =           (1 << 16),
     DIST_DEBUG =            (1 << 17),
+    BMI_DEBUG_IB =          (1 << 18),
 
     BMI_DEBUG_ALL = BMI_DEBUG_TCP + BMI_DEBUG_CONTROL +
-	+BMI_DEBUG_GM + BMI_DEBUG_OFFSETS
+	+ BMI_DEBUG_GM + BMI_DEBUG_OFFSETS + BMI_DEBUG_IB
 };
 
 int PVFS_debug_eventlog_to_mask(
