@@ -51,24 +51,10 @@ static int internal_syslog_priority = LOG_USER;
 /*****************************************************************
  * prototypes
  */
-static int gossip_debug_stderr(
-    const char *format,
-    va_list ap);
-static int gossip_err_stderr(
-    const char *format,
-    va_list ap);
-static int gossip_disable_stderr(
-    void);
+static int gossip_disable_stderr(void);
+static int gossip_disable_file(void);
 
-static int gossip_debug_file(
-    const char *format,
-    va_list ap);
-static int gossip_err_file(
-    const char *format,
-    va_list ap);
-static int gossip_disable_file(
-    void);
-
+static int gossip_debug_fp(FILE *fp, const char *format, va_list ap);
 static int gossip_debug_syslog(
     const char *format,
     va_list ap);
@@ -293,10 +279,10 @@ int __gossip_debug(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-        ret = gossip_debug_stderr(format, ap);
+        ret = gossip_debug_fp(stderr, format, ap);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_file(format, ap);
+        ret = gossip_debug_fp(internal_log_file, format, ap);
         break;
     case GOSSIP_SYSLOG:
         ret = gossip_debug_syslog(format, ap);
@@ -336,10 +322,10 @@ int gossip_err(
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-        ret = gossip_err_stderr(format, ap);
+        ret = gossip_debug_fp(stderr, format, ap);
         break;
     case GOSSIP_FILE:
-        ret = gossip_err_file(format, ap);
+        ret = gossip_debug_fp(internal_log_file, format, ap);
         break;
     case GOSSIP_SYSLOG:
         ret = gossip_err_syslog(format, ap);
@@ -409,70 +395,41 @@ static int gossip_debug_syslog(
     return 0;
 }
 
-#define GOSSIP_DEBUG_TIMESTAMP 0
-
-/* gossip_debug_file()
+/* gossip_debug_fp()
  * 
  * This is the standard debugging message function for the file logging
- * facility
+ * facility or to stderr.
  *
  * returns 0 on success, -errno on failure
  */
-static int gossip_debug_file(
-    const char *format,
-    va_list ap)
+static int gossip_debug_fp(FILE *fp, const char *format, va_list ap)
 {
-    char buffer[GOSSIP_BUF_SIZE];
+    char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;
+    int bsize = sizeof(buffer);
     int ret = -EINVAL;
-    char *bptr = buffer;
-    int bsize = GOSSIP_BUF_SIZE;
-
-#if GOSSIP_DEBUG_TIMESTAMP
-    {
     struct timeval tv;
     time_t tp;
 
     gettimeofday(&tv, 0);
     tp = tv.tv_sec;
-    strftime(buffer, 2048, "[%H:%M:%S", localtime(&tp));
-    sprintf(buffer+9, ".%06ld] ", tv.tv_usec);
+    strftime(bptr, 2048, "[%H:%M:%S", localtime(&tp));
+    sprintf(bptr+9, ".%06ld] ", tv.tv_usec);
     bptr += 18;
     bsize -= 18;
-    }
-#endif
+
     ret = vsnprintf(bptr, bsize, format, ap);
     if (ret < 0)
     {
         return -errno;
     }
 
-    ret = fprintf(internal_log_file, buffer);
+    ret = fprintf(fp, buffer);
     if (ret < 0)
     {
         return -errno;
     }
-    fflush(internal_log_file);
+    fflush(fp);
 
-    return 0;
-}
-
-/* gossip_debug_stderr()
- * 
- * This is the standard debugging message function for the stderr
- * facility.
- *
- * returns 0 on success, -errno on failure
- */
-static int gossip_debug_stderr(
-    const char *format,
-    va_list ap)
-{
-
-    int ret = vfprintf(stderr, format, ap);
-    if (ret < 0)
-    {
-        return -errno;
-    }
     return 0;
 }
 
@@ -497,36 +454,6 @@ static int gossip_err_syslog(
     internal_syslog_priority = tmp_priority;
 
     return 0;
-}
-
-
-/* gossip_err_file()
- * 
- * error message function for the file logging facility
- *
- * returns 0 on success, -errno on failure
- */
-static int gossip_err_file(
-    const char *format,
-    va_list ap)
-{
-    /* we don't do anything special with errors here */
-    return gossip_debug_file(format, ap);
-}
-
-
-/* gossip_err_stderr()
- * 
- * This is the error message function for the stderr facility.
- *
- * returns 0 on success, -errno on failure
- */
-static int gossip_err_stderr(
-    const char *format,
-    va_list ap)
-{
-    /* we don't do anything special for errors here */
-    return gossip_debug_stderr(format, ap);
 }
 
 
