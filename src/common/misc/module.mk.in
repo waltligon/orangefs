@@ -18,5 +18,6 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/mkspace.c \
              $(DIR)/pvfs2-debug.c \
 	     $(DIR)/pint-perf-counter.c \
-	     $(DIR)/pint-event.c
+	     $(DIR)/pint-event.c \
+	     $(DIR)/pint-cached-config.c
 

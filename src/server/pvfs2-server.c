@@ -41,6 +41,7 @@
 #include "pint-event.h"
 #include "id-generator.h"
 #include "job-time-mgr.h"
+#include "pint-cached-config.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -610,6 +611,13 @@ static int server_initialize_subsystems(
 
     *server_status_flag |= SERVER_TROVE_INIT;
 
+    ret = PINT_cached_config_initialize();
+    if(ret < 0)
+    {
+	gossip_err("Error initializing cached_config interface.\n");
+	return(ret);
+    }
+
     cur = server_config.file_systems;
     while(cur)
     {
@@ -618,6 +626,14 @@ static int server_initialize_subsystems(
         {
             break;
         }
+
+	ret = PINT_handle_load_mapping(&server_config, cur_fs);
+	if(ret)
+	{
+	    PVFS_perror("PINT_handle_load_mapping", ret);
+	    return(ret);
+	}
+
         ret = trove_collection_lookup(cur_fs->file_system_name,
                                       &(cur_fs->coll_id),
 				      NULL,
@@ -750,6 +766,8 @@ static int server_initialize_subsystems(
 
         cur = PINT_llist_next(cur);
     }
+
+    *server_status_flag |= SERVER_CACHED_CONFIG_INIT;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Storage Init Complete (%s)\n", SERVER_STORAGE_MODE);
@@ -927,6 +945,14 @@ static int server_shutdown(
 	PINT_state_machine_halt();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
+
+    if (status & SERVER_CACHED_CONFIG_INIT)
+    {
+	gossip_debug(GOSSIP_SERVER_DEBUG, "* halting cached_config interface ... ");
+	PINT_cached_config_finalize();
+	gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
+    }
+
 
     if (status & SERVER_EVENT_INIT)
     {
