@@ -52,6 +52,8 @@ int main(int argc, char **argv)
     void* buffer = NULL;
     int64_t total_written = 0;
     double time1, time2;
+    PVFS_count32 blocklength = 0;
+    PVFS_size displacement = 0;
 
     gossip_enable_stderr();
 
@@ -177,23 +179,15 @@ int main(int argc, char **argv)
     time1 = Wtime();
     while((current_size = read(src_fd, buffer, user_opts->buf_size)) > 0)
     {
-	/* TODO: how do I set the offset? */
-	if(total_written > 0)
-	{
-	    fprintf(stderr, "ERROR: can't handle files larger than the size of a single buffer yet!\n");
-	    fprintf(stderr, "destination truncated to %ld bytes.\n", 
-		(long)total_written);
-	    ret = -1;
-	    goto main_out;
-	}
-
 	/* setup I/O description */
 	req_io.buffer_size = current_size;
-	ret = PVFS_Request_contiguous(current_size, PVFS_BYTE,
-	    &req_io.io_req);
+	blocklength = current_size;
+	displacement = total_written;
+	ret = PVFS_Request_indexed(1, &blocklength,
+	    &displacement, PVFS_BYTE, &req_io.io_req);
 	if(ret < 0)
 	{
-	    fprintf(stderr, "Error: PVFS_Request_contiguous failure.\n");
+	    fprintf(stderr, "Error: PVFS_Request_indexed failure.\n");
 	    ret = -1;
 	    goto main_out;
 	}
