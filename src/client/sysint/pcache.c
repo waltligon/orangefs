@@ -8,6 +8,8 @@
 #include <pcache.h>
 #include <assert.h>
 
+#define ECACHEFULL 1
+
 #define PINT_ENABLE_PCACHE 0
 
 #if PINT_ENABLE_PCACHE
@@ -17,9 +19,42 @@ static void PINT_pcache_merge_pinode(pinode *p1,pinode *p2);
 static int check_expiry(pinode *pnode);
 static void PINT_pcache_rotate_pinode(int item);
 static void PINT_pcache_remove_element(int item);
+static int PINT_pcache_update_pinode_timestamp(pinode* item);
+static int PINT_pcache_pinode_release(pinode *pnode);
 
 static pcache pvfs_pcache;
 #endif
+
+/* PINT_pcache_pinode_release
+ *
+ * release a pinode: this decrements the reference count so we know if its safe
+ * to deallocate this pinode when we need the least recently used item.
+ *
+ * returns 0 on success, -1 on failure
+ */
+static int PINT_pcache_pinode_release(pinode *pnode)
+{
+#if PINT_ENABLE_PCACHE
+    int i;
+    for(i = pvfs_pcache.top; i != BAD_LINK; i = pvfs_pcache.element[i].next)
+    {
+	if (pvfs_pcache.element[i].pnode != NULL)
+	{
+	    if ((pnode->pinode_ref.handle ==
+		pvfs_pcache.element[i].pnode->pinode_ref.handle)
+		    && (pnode->pinode_ref.fs_id ==
+			pvfs_pcache.element[i].pnode->pinode_ref.fs_id))
+	    {
+		pvfs_pcache.element[i].ref_count--;
+		return 0;
+	    }
+	}
+    }
+    return -1;
+#else
+    return 0;
+#endif
+}
 
 /* PINT_pcache_pinode_alloc 
  *
@@ -82,6 +117,7 @@ int PINT_pcache_initialize(void)
 		pvfs_pcache.element[i].next = BAD_LINK;
 		pvfs_pcache.element[i].status = STATUS_UNUSED;
 		pvfs_pcache.element[i].pnode = NULL;
+		pvfs_pcache.element[i].ref_count = 0;
 	}
 #endif
 	return(0);
@@ -161,6 +197,14 @@ int PINT_pcache_insert(pinode *pnode )
     {
 	/* Element absent in cache, add it */
 	ret = PINT_pcache_add_pinode(pnode);
+	if (ret < 0)
+	{
+	    /* right now the only reason why we wouldn't be able to add 
+	     * something to the cache is b/c its full (all slots have an entry
+	     * with a reference count greater than 1)
+	     */
+	    return -1;
+	}
     }
     else
     {
@@ -169,14 +213,29 @@ int PINT_pcache_insert(pinode *pnode )
 	 * Now, we need to merge the pinode values with
 	 * the older one 
 	 */
+	pvfs_pcache.element[entry].ref_count++;
 	PINT_pcache_merge_pinode(pvfs_pcache.element[entry].pnode,pnode);
 	PINT_pcache_rotate_pinode(entry);
+	PINT_pcache_update_pinode_timestamp(pvfs_pcache.element[entry].pnode);
     }
+
 
     /* Release the mutex */
     gen_mutex_unlock(pvfs_pcache.mt_lock);
 #endif
     return(0);
+}
+
+/* PINT_pcache_insert
+ *
+ * this decrements the reference count after a process is done with the pinode
+ * that it just inserted.
+ *
+ * returns 0 on success, -1 on error
+ */
+int PINT_pcache_insert_rls(pinode *pnode )
+{
+    return PINT_pcache_pinode_release(pnode);
 }
 
 /* PINT_pcache_lookup
@@ -187,16 +246,13 @@ int PINT_pcache_insert(pinode *pnode )
  */
 int PINT_pcache_lookup(pinode_reference refn,pinode **pinode_ptr)
 {
-    int ret;
+    int ret = PCACHE_LOOKUP_FAILURE;
 #if PINT_ENABLE_PCACHE
     int i = 0;
 
     /* Grab a mutex */
     gen_mutex_lock(pvfs_pcache.mt_lock);
 
-    /* No match found */
-    ret = PCACHE_LOOKUP_FAILURE;
-	
     /* Search the cache */
     for(i = pvfs_pcache.top; i != BAD_LINK; i = pvfs_pcache.element[i].next)
     {
@@ -206,22 +262,32 @@ int PINT_pcache_lookup(pinode_reference refn,pinode **pinode_ptr)
 	    /* we don't want old pinodes */
 	    if (check_expiry(pvfs_pcache.element[i].pnode) == PINODE_VALID)
 	    {
+		pvfs_pcache.element[i].ref_count++;
 		(*pinode_ptr) = pvfs_pcache.element[i].pnode;
 		PINT_pcache_rotate_pinode(i);
 		ret = PCACHE_LOOKUP_SUCCESS;
+		break;
 	    }
 	}
     }
 
+
     /* Release the mutex */
     gen_mutex_unlock(pvfs_pcache.mt_lock);
 
-#else
-    /* No match found */
-    *pinode_ptr = NULL;
-    ret = PCACHE_LOOKUP_FAILURE;
 #endif
     return ret;
+}
+
+/* PINT_pcache_lookup_rls
+ *
+ * this decrements the reference count after a process is done with the pinode
+ * that it looked up
+ *
+ */
+int PINT_pcache_lookup_rls(pinode *pinode_ptr)
+{
+    return PINT_pcache_pinode_release(pinode_ptr);
 }
 
 /* PINT_pcache_remove
@@ -244,11 +310,22 @@ int PINT_pcache_remove(pinode_reference refn,pinode **item)
     /* Search the cache */
     for(i = pvfs_pcache.top; i != BAD_LINK; i = pvfs_pcache.element[i].next)
     {
-	if ((refn.handle == pvfs_pcache.element[i].pnode->pinode_ref.handle)
-	    && (refn.fs_id == pvfs_pcache.element[i].pnode->pinode_ref.fs_id))
+	if (pvfs_pcache.element[i].pnode != NULL)
 	{
-	    *item = pvfs_pcache.element[i].pnode;
-	    PINT_pcache_remove_element(i);
+	    if ((refn.handle == pvfs_pcache.element[i].pnode->pinode_ref.handle)
+	      && (refn.fs_id == pvfs_pcache.element[i].pnode->pinode_ref.fs_id))
+	    {
+		/* don't delete if somebody else is looking at this copy too */
+		if (pvfs_pcache.element[i].ref_count != 1)
+		{
+		    *item = pvfs_pcache.element[i].pnode;
+		    PINT_pcache_remove_element(i);
+		}
+		else
+		{
+		    return -1;
+		}
+	    }
 	}
     }
 
@@ -272,10 +349,8 @@ static void PINT_pcache_remove_element(int item)
     int prev = 0,next = 0;
 
     pvfs_pcache.element[item].status = STATUS_UNUSED;
+    pvfs_pcache.element[item].ref_count = 0;
 
-    /*TODO: we're sending the pointer back to the user (saved by the caller)
-     * already, but should we deallocate in the lru case also?
-     */
     pvfs_pcache.element[item].pnode = NULL;
     pvfs_pcache.count--;
 
@@ -289,7 +364,7 @@ static void PINT_pcache_remove_element(int item)
         return;
     }
 
-    /* depending on where the dentry is in the list, we have to do different
+    /* depending on where the pinode is in the list, we have to do different
      * things if its the first, last, or somewhere in the middle.
      */
 
@@ -323,17 +398,57 @@ static void PINT_pcache_remove_element(int item)
  */
 static int PINT_pcache_get_lru(void)
 {
-    int new = 0, i = 0;
+    int new = 0, i = 0, prev = 0, next = 0, found_one = 0;
 
     if (pvfs_pcache.count == PINT_PCACHE_MAX_ENTRIES)
     {
-	new = pvfs_pcache.bottom;
-	pvfs_pcache.bottom = pvfs_pcache.element[new].prev;
-	pvfs_pcache.element[pvfs_pcache.bottom].next = BAD_LINK;
+	/* this isn't a straight "least recently used" implementation b/c we
+	 * have to deal with multiple processes using the pinode structures
+	 * so if the real "least recently used" item still hasn't been released
+	 * then we need to go to the "next least recently used"
+	 * in the worst case (every entry in the cache is still referenced)
+	 * we're running an O(N) operation.... is there a way to make this
+	 * better?
+	 */
+	for(new = pvfs_pcache.bottom; new != BAD_LINK; new = pvfs_pcache.element[new].prev)
+	{
+	    if (pvfs_pcache.element[new].ref_count == 0)
+	    {
+		found_one = 1;
+		/* we're either at the bottom, in the middle somewhere, or
+		 * on the last entry (the top) */
+		if (new == pvfs_pcache.bottom)
+		{
+		    /* last entry in list */
+		    pvfs_pcache.bottom = pvfs_pcache.element[new].prev;
+		    pvfs_pcache.element[pvfs_pcache.bottom].next = BAD_LINK;
+		}
+		else if (new == pvfs_pcache.top)
+		{
+		    /* first entry in list */
+		    pvfs_pcache.top = pvfs_pcache.element[new].next;
+		    pvfs_pcache.element[pvfs_pcache.top].prev = BAD_LINK;
+		}
+		else
+		{
+		    /* somewhere in the middle */
+		    prev = pvfs_pcache.element[new].prev;
+		    next = pvfs_pcache.element[new].next;
+		    pvfs_pcache.element[prev].next = next;
+		    pvfs_pcache.element[next].prev = prev;
+		}
+	    }
+	}
 
-	/*TODO: should we deallocate here? add to a linked list to dealloc later..? */
-
-	return new;
+	if (found_one)
+	{
+	    PINT_pcache_pinode_dealloc(pvfs_pcache.element[next].pnode);
+	    return new;
+	}
+	else
+	{
+	    return BAD_LINK;/* should probbably be -ECACHEISFULL or something */
+	}
     }
     else
     {
@@ -347,7 +462,7 @@ static int PINT_pcache_get_lru(void)
 	}
     }
 
-    gossip_ldebug(PCACHE_DEBUG, "error getting least recently used dentry.\n");
+    gossip_ldebug(PCACHE_DEBUG, "error getting least recently used pinode.\n");
     assert(0);
 }
 
@@ -429,9 +544,14 @@ static int PINT_pcache_add_pinode(pinode *pnode)
 
     /* Get the free item */
     new = PINT_pcache_get_lru();
+    if (new == BAD_LINK)
+    {
+	return -ECACHEFULL;
+    }
 
     /* Adding the element to the cache */
     pvfs_pcache.element[new].status = STATUS_USED;
+    pvfs_pcache.element[new].ref_count++;
     pvfs_pcache.element[new].pnode = pnode;	
     pvfs_pcache.element[new].prev = BAD_LINK;
     pvfs_pcache.element[new].next = pvfs_pcache.top;
@@ -440,6 +560,8 @@ static int PINT_pcache_add_pinode(pinode *pnode)
 	pvfs_pcache.element[pvfs_pcache.top].prev = new;
     /* Readjust the top */
     pvfs_pcache.top = new;
+
+    PINT_pcache_update_pinode_timestamp(pvfs_pcache.element[new].pnode);
 
     return(0);
 }
@@ -471,6 +593,23 @@ static int check_expiry(pinode *pnode)
 
     return PINODE_EXPIRED;
 }
+
+static int PINT_pcache_update_pinode_timestamp(pinode* item)
+{
+    int ret = 0;
+
+    /* Update the timestamp */
+    ret = gettimeofday(&item->tstamp,NULL);
+    if (ret < 0)
+    {
+        return(-1);
+    }
+
+    item->tstamp.tv_sec += PINT_PCACHE_TIMEOUT;
+
+    return(0);
+}
+
 
 #endif
 
