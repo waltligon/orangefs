@@ -32,7 +32,7 @@ void PINT_perf_count(enum PINT_perf_count_keys key,
     int64_t value,
     enum PINT_perf_ops op);
 
-int PINT_perf_rollover(void);
+void PINT_perf_rollover(void);
 
 #endif /* __PINT_PERF_COUNTER_H */
 

@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "pvfs2-types.h"
 #include "pint-perf-counter.h"
@@ -16,6 +17,8 @@
  * looped over the most
  */
 static int64_t perf_count_matrix[PINT_PERF_COUNT_KEY_MAX+1][PINT_PERF_HISTORY_SIZE];
+static int32_t perf_count_id[PINT_PERF_HISTORY_SIZE];
+static uint64_t perf_count_start_times_ms[PINT_PERF_HISTORY_SIZE];
 static int perf_count_head = 0;
 static int perf_count_tail = 0;
 
@@ -27,9 +30,21 @@ static int perf_count_tail = 0;
  */
 int PINT_perf_initialize(void)
 {
+    struct timeval tv;
+
     /* zero out counters */
     memset(perf_count_matrix, 0, 
 	(PINT_PERF_COUNT_KEY_MAX+1)*PINT_PERF_HISTORY_SIZE*sizeof(int64_t));
+    memset(perf_count_id, 0, PINT_PERF_HISTORY_SIZE*sizeof(int32_t));
+    memset(perf_count_start_times_ms, 0, 
+	PINT_PERF_HISTORY_SIZE*sizeof(uint64_t));
+
+    perf_count_head = 0;
+    perf_count_tail = 0;
+
+    gettimeofday(&tv, NULL);
+    perf_count_start_times_ms[perf_count_head] = tv.tv_sec*1000 +
+	tv.tv_usec/1000;
 
     return(0);
 }
@@ -80,11 +95,15 @@ void PINT_perf_count(enum PINT_perf_count_keys key,
  * triggers the next measurement interval, shifting or resetting any counters
  * as needed
  *
- * returns 0 on success, -PVFS_error on failure
+ * no return value
  */
-int PINT_perf_rollover(void)
+void PINT_perf_rollover(void)
 {
     int i;
+    int32_t old_id;
+    struct timeval tv;
+
+    old_id = perf_count_id[perf_count_head];
 
     /* shift head of performance counters */
     perf_count_head = (perf_count_head+1)%PINT_PERF_HISTORY_SIZE;
@@ -99,11 +118,15 @@ int PINT_perf_rollover(void)
 	perf_count_matrix[i][perf_count_head] = 0;
     }
 
-    /* TODO: keep track of an identifier for client to use when polling
-     * for values
-     */
+    /* move to next id */
+    perf_count_id[perf_count_head] = old_id + 1;
 
-    return(0);
+    /* set start time for next set */
+    gettimeofday(&tv, NULL);
+    perf_count_start_times_ms[perf_count_head] = 
+	tv.tv_sec*1000 + tv.tv_usec/1000;
+
+    return;
 }
 
 /*

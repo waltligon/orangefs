@@ -25,12 +25,12 @@
 #include "pvfs2-storage.h"
 #include "PINT-reqproto-encode.h"
 #include "request-scheduler.h"
-
 #include "pvfs2-server.h"
 #include "state-machine-fns.h"
 #include "mkspace.h"
 #include "server-config.h"
 #include "quicklist.h"
+#include "pint-perf-counter.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -645,8 +645,16 @@ static int server_initialize_subsystems(
 		strerror(-ret));
         return ret;
     }
-
     *server_status_flag |= SERVER_REQ_SCHED_INIT;
+
+    /* initialize performanc monitoring */
+    ret = PINT_perf_initialize();
+    if(ret < 0)
+    {
+	gossip_err("Error initializing performance counters.\n");
+	return(ret);
+    }
+    *server_status_flag |= SERVER_PERF_COUNTER_INIT;
 
     return ret;
 }
@@ -672,6 +680,12 @@ static int server_shutdown(
     if (status & SERVER_STATE_MACHINE_INIT)
 	PINT_state_machine_halt();
 
+    if (status & SERVER_PERF_COUNTER_INIT)
+	PINT_perf_finalize();
+
+    if (status & SERVER_REQ_SCHED_INIT)
+	PINT_req_sched_finalize();
+	
     if (status & SERVER_JOB_CTX_INIT)
 	job_close_context(server_job_context);
 
