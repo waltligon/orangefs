@@ -6,9 +6,6 @@
 
 /* GM implementation of a BMI method */
 
-/* TODO: implement contexts */
-/* TODO: implement test context */
-
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>

@@ -116,9 +116,11 @@ int main(int argc, char **argv)	{
 	my_req->size = MSG1_SIZE + MSG2_SIZE + MSG3_SIZE;
 
 	/* send the initial request on its way */
-	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req, 
-		sizeof(struct server_request), BMI_PRE_ALLOC, 0, in_test_user_ptr,
-		context);
+	buffer_list[0] = my_req;
+	size_list[0] = sizeof(struct server_request);
+	ret = BMI_post_sendunexpected_list(&(client_ops[1]), server_addr, 
+		buffer_list, size_list, 1, size_list[0], BMI_PRE_ALLOC, 0, 
+		in_test_user_ptr, context);
 	if(ret < 0)
 	{
 		errno = -ret;
