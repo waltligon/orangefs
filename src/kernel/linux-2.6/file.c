@@ -101,7 +101,7 @@ ssize_t pvfs2_inode_read(
 	    *offset = original_offset;
 	    return(ret);
 	}
-    
+
 	/* how much to transfer in this loop iteration */
 	each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
@@ -119,8 +119,8 @@ ssize_t pvfs2_inode_read(
 
           error_exit:
 	    ret = new_op->downcall.status;
-            wake_up_device_for_return(new_op);
             kill_device_owner();
+            op_release(new_op);
 	    pvfs_bufmap_put(buffer_index);
 	    *offset = original_offset;
 	    return(ret);
@@ -253,8 +253,8 @@ static ssize_t pvfs2_file_write(
             pvfs2_error("Failed to copy user buffer.  Please make sure "
                         "that the pvfs2-client is running.\n");
 	    ret = new_op->downcall.status;
-            op_release(new_op);
             kill_device_owner();
+            op_release(new_op);
 	    pvfs_bufmap_put(buffer_index);
 	    *offset = original_offset;
 	    return(ret);
@@ -269,8 +269,8 @@ static ssize_t pvfs2_file_write(
 
           error_exit:
 	    ret = new_op->downcall.status;
-            wake_up_device_for_return(new_op);
             kill_device_owner();
+            op_release(new_op);
 	    pvfs_bufmap_put(buffer_index);
 	    *offset = original_offset;
 	    return(ret);
@@ -360,8 +360,12 @@ int pvfs2_file_release(
       this forces an expensive refresh of data for
       the next caller of mmap (or 'get_block' accesses)
     */
-    truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0);
-    i_size_write(file->f_dentry->d_inode, 0);
+    if (file->f_dentry->d_inode &&
+        file->f_dentry->d_inode->i_mapping)
+    {
+        truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0);
+        i_size_write(file->f_dentry->d_inode, 0);
+    }
     return 0;
 }
 
