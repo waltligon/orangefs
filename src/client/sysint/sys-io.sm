@@ -40,8 +40,8 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 				     job_status_s *js_p);
 static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 					 job_status_s *js_p);
-static int io_cleanup(PINT_client_sm *sm_p,
-		      job_status_s *js_p);
+static int io_analyze_results(PINT_client_sm *sm_p,
+			      job_status_s *js_p);
 
 /* completion function prototypes */
 static int io_object_getattr_comp_fn(void *v_p,
@@ -65,7 +65,7 @@ machine pvfs2_client_io_sm(object_getattr_setup_msgpair,
 			   datafile_setup_msgpairs,
 			   datafile_post_msgpairs,
 			   datafile_complete_msgpairs,
-			   cleanup)
+			   analyze_results)
 {
     state object_getattr_setup_msgpair {
 	run io_object_getattr_setup_msgpair;
@@ -78,7 +78,7 @@ machine pvfs2_client_io_sm(object_getattr_setup_msgpair,
     }
     state object_getattr_failure {
 	run io_object_getattr_failure;
-	default => cleanup;
+	default => analyze_results;
     }
 
     state datafile_setup_msgpairs {
@@ -88,18 +88,18 @@ machine pvfs2_client_io_sm(object_getattr_setup_msgpair,
     state datafile_post_msgpairs {
 	run io_datafile_post_msgpairs;
 	success => datafile_complete_msgpairs;
-	default => cleanup;
+	default => analyze_results;
     }
     state datafile_complete_msgpairs {
 	run io_datafile_complete_msgpairs;
 	success => datafile_complete_msgpairs;
-	IO_DATAFILE_TRANSFERS_COMPLETE => cleanup;
+	IO_DATAFILE_TRANSFERS_COMPLETE => analyze_results;
 	default => datafile_complete_msgpairs;
     }
 
-    state cleanup {
-	run io_cleanup;
-	default => cleanup;
+    state analyze_results {
+	run io_analyze_results;
+	default => analyze_results;
     }
 }
 
@@ -386,12 +386,18 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     /* set up space for flows */
     iosm_p->flow_comp_ct = 0;
 
-    /* flow descriptor array */
+    /* flow descriptor array; it's important that we zero this one out
+     * so we can tell later if we allocated these or not.
+     */
     iosm_p->flow_p_array = (flow_descriptor **)
 	malloc(target_datafile_count * sizeof(flow_descriptor *));
     if (iosm_p->flow_p_array == NULL) {
 	assert(0);
     }
+    memset(iosm_p->flow_p_array,
+	   0,
+	   target_datafile_count * sizeof(flow_descriptor *));
+
     /* flow id array */
     iosm_p->flow_id_array = (job_id_t *)
 	malloc(target_datafile_count * sizeof(job_id_t));
@@ -726,6 +732,17 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    gossip_debug(CLIENT_DEBUG,
 			 "  error related to response from %d; not submitting flow.\n",
 			 recv_match);
+	    ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
+						   msg_p->encoded_resp_p,
+						   &decoded_resp,
+						   &msg_p->svr_addr,
+						   msg_p->max_resp_sz);
+	    if (ret != 0) {
+		assert(ret < 0); /* return value range check */
+		assert(0); /* placeholder */
+	    }
+
+	    return 0;
 	}
 	else
 	{
@@ -734,7 +751,12 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 
 	    gossip_debug(CLIENT_DEBUG, "  building flow for %d.\n", recv_match);
 
-	    /* allocate flow descriptor */
+	    /* allocate flow descriptor
+	     *
+	     * NOTE: PHIL SAYS THAT THERE IS A WAY TO MANUALLY ALLOCATE
+	     *       SPACE FOR THESE AND THEN CALL SOME FUNCTION TO INITIALIZE
+	     *       THEM ALL.  PROBABLY SHOULD USE THAT.
+	     */
 	    fl_p = sm_p->u.io.flow_p_array[recv_match] = PINT_flow_alloc();
 	    if (fl_p == NULL) {
 		assert(0);
@@ -774,6 +796,20 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    /* TODO: SAVE THE FLOWPROTO SOMEWHERE? */
 	    fl_p->type = FLOWPROTO_ANY;
 
+	    /* done with msgpair resources; free them now */
+	    ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
+						   msg_p->encoded_resp_p,
+						   &decoded_resp,
+						   &msg_p->svr_addr,
+						   msg_p->max_resp_sz);
+	    if (ret != 0) {
+		assert(ret < 0); /* return value range check */
+		assert(0); /* placeholder */
+	    }
+
+	    /* NOTE: NO USING RESP_P AFTER WE FREE THE RESOURCES */
+	    resp_p = NULL;
+
 	    if (iosm_p->io_type == PVFS_IO_READ) {
 		/* Set up read-specific values
 		 * - don't keep going past EOF
@@ -782,7 +818,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 		 */
 		fl_p->file_data->extend_flag = 0;
 		fl_p->src.endpoint_id   = BMI_ENDPOINT;
-		fl_p->src.u.bmi.address = sm_p->msgarray[recv_match].svr_addr;
+		fl_p->src.u.bmi.address = msg_p->svr_addr;
 		fl_p->dest.endpoint_id  = MEM_ENDPOINT;
 		fl_p->dest.u.mem.buffer = iosm_p->buffer;
 		fl_p->dest.u.mem.size   = iosm_p->buffer_size;
@@ -796,7 +832,44 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 		fl_p->src.u.mem.buffer   = iosm_p->buffer;
 		fl_p->src.u.mem.size     = iosm_p->buffer_size;
 		fl_p->dest.endpoint_id   = BMI_ENDPOINT;
-		fl_p->dest.u.bmi.address = sm_p->msgarray[recv_match].svr_addr;
+		fl_p->dest.u.bmi.address = msg_p->svr_addr;
+
+		gossip_debug(CLIENT_DEBUG,
+			     "  preposting write ack for %d.\n",
+			     recv_match);
+
+		/* go ahead and prepost the ack receive now */
+		iosm_p->ackarray[recv_match].max_resp_sz =
+		    PINT_encode_calc_max_size(PINT_ENCODE_RESP,
+					      PVFS_SERV_WRITE_COMPLETION,
+					      PINT_CLIENT_ENC_TYPE);
+		iosm_p->ackarray[recv_match].encoded_resp_p =
+		    BMI_memalloc(msg_p->svr_addr,
+				 iosm_p->ackarray[recv_match].max_resp_sz,
+				 BMI_RECV);
+		if (iosm_p->ackarray[recv_match].encoded_resp_p == NULL) {
+		    assert(0);
+		}
+		ret = job_bmi_recv(msg_p->svr_addr,
+				   iosm_p->ackarray[recv_match].encoded_resp_p,
+				   iosm_p->ackarray[recv_match].max_resp_sz,
+				   iosm_p->session_tag_array[recv_match],
+				   BMI_PRE_ALLOC,
+				   sm_p,
+				   &iosm_p->ackarray[recv_match].recv_status,
+				   &iosm_p->ackarray[recv_match].recv_id,
+				   pint_client_sm_context);
+		if (ret < 0) {
+		    gossip_lerr("post of write ack failed\n");
+		    assert(0);
+		}
+		else if (ret == 1) {
+		    /* should never happen -- cannot get response before flow? */
+		    assert(0);
+		}
+		assert(ret == 0);
+		
+		iosm_p->ack_comp_ct++;
 	    }
 
 	    /* post the flow:
@@ -905,13 +978,116 @@ static int io_object_getattr_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int io_cleanup(PINT_client_sm *sm_p,
-		      job_status_s *js_p)
+/* io_analyze_results()
+ */
+static int io_analyze_results(PINT_client_sm *sm_p,
+			      job_status_s *js_p)
 {
+    int i, ret, error = 0, error_count = 0;
+    PVFS_size total_size = 0;
+
     gossip_debug(CLIENT_DEBUG,
-		 "(%p) io state: cleanup\n",
+		 "(%p) io state: analyze_results\n",
 		 sm_p);
 
+    if (js_p->error_code != IO_DATAFILE_TRANSFERS_COMPLETE) {
+	/* some sort of error occurred early on */
+    }
+    else {
+	/* it's possible that some error occurred still.  look through
+	 * all the messages, reporting errors, saving the first one to
+	 * return, and adding up the size of the transfer (just in case
+	 * things actually completed).
+	 *
+	 */
+	for (i=0; i < sm_p->msgarray_count; i++) {
+	    PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+	    struct PINT_client_io_sm *iosm_p = &sm_p->u.io;
+
+	    if (msg_p->send_status.error_code != 0)
+	    {
+		gossip_debug(CLIENT_DEBUG,
+			     "  error (%d) in msgpair send for %d.\n",
+			     msg_p->send_status.error_code,
+			     i);
+		error_count++;
+		if (error == 0) error = msg_p->send_status.error_code;
+	    }
+	    else if (msg_p->recv_status.error_code != 0)
+	    {
+		gossip_debug(CLIENT_DEBUG,
+			     "  error (%d) in msgpair recv for %d.\n",
+			     msg_p->recv_status.error_code,
+			     i);
+		error_count++;
+		if (error == 0) error = msg_p->recv_status.error_code;
+	    }
+	    else if (iosm_p->flow_p_array[i] != NULL)
+	    {
+		if (iosm_p->flow_status_array[i].error_code != 0)
+		{
+		    gossip_debug(CLIENT_DEBUG,
+				 "  error (%d) in flow for %d.\n",
+				 iosm_p->flow_status_array[i].error_code,
+				 i);
+		    error_count++;
+		    if (error == 0) {
+			error = iosm_p->flow_status_array[i].error_code;
+		    }
+		}
+		else if (iosm_p->io_type == PVFS_IO_READ)
+		{
+		    /* size for reads is reported in the flow;
+		     * size for writes is reported in the final ack.
+		     */
+		    gossip_debug(CLIENT_DEBUG,
+				 "  %Ld bytes read from %d.\n",
+				 iosm_p->flow_p_array[i]->total_transfered,
+				 i);
+		    total_size += iosm_p->flow_p_array[i]->total_transfered;
+		}
+		else if (iosm_p->io_type == PVFS_IO_WRITE) {
+		    if (iosm_p->ackarray[i].recv_status.error_code != 0)
+		    {
+			gossip_debug(CLIENT_DEBUG,
+				     "  error (%d) in write ack for %d.\n",
+				     iosm_p->ackarray[i].recv_status.error_code,
+				     i);
+			error_count++;
+			if (error == 0) {
+			    error = iosm_p->ackarray[i].recv_status.error_code;
+			}
+		    }
+		    else
+		    {
+			struct PINT_decoded_msg decoded_resp;
+			struct PVFS_server_resp *resp_p;
+			
+			/* we need to decode the write ack so we can see how
+			 * much data we were actually able to write.
+			 *
+			 * note: we just use the svr_addr from the msgpair; it's
+			 *       the same address.
+			 */
+			ret = PINT_serv_decode_resp(iosm_p->ackarray[i].encoded_resp_p,
+						    &decoded_resp,
+						    &msg_p->svr_addr,
+						    iosm_p->ackarray[i].recv_status.actual_size,
+						    &resp_p);		    
+			gossip_debug(CLIENT_DEBUG,
+				     "  %Ld bytes written to %d.\n",
+				     resp_p->u.write_completion.total_completed,
+				     i);
+			total_size += resp_p->u.write_completion.total_completed;
+		    }
+		}
+	    }
+	}
+    }
+
+    /* return size, error, and set operation as complete */
+    sm_p->u.io.io_resp_p->total_completed = total_size;
+    sm_p->error_code = error;
     sm_p->op_complete = 1;
 
     return 0;
