@@ -5,7 +5,7 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.6.0pre2
 ===============
-- remove pvfs2-import and pvfs2-export in favor of pvfs2-cp
+- removed pvfs2-import and pvfs2-export in favor of pvfs2-cp
 - added compile time option for disabling thread-safety in the client
   library (enabled by default; --disable-thread-safety to disable)
 - improved configure summary information emitted at configure time
@@ -51,8 +51,8 @@ pvfs2-0.6.0pre2
 - allow the sysint post() method to complete an op if finished
   (i.e. all states are immed. completion) by adding it to the
   completion list (which test/testsome can retrieve)
-- remove 'cached' attribute fields from getattr_sm object
-- remove mostly duplicated code from shared-state-methods.c
+- removed 'cached' attribute fields from getattr_sm object
+- removed mostly duplicated code from shared-state-methods.c
 - added support (testing only) for building a threaded client library
 - gracefully terminate thread-mgr testing threads on errors
   [ this is only really useful for graceful shutdown of the threaded
@@ -62,9 +62,9 @@ pvfs2-0.6.0pre2
 - fixed kernel bugs that didn't release the bufmap indices in use on
   some error paths (eventually caused all of them to be permanently
   used which caused hangs on I/O)
-- extend msgpairarray code to only retry msgpairs that haven't
+- extended msgpairarray code to only retry msgpairs that haven't
   completed already
-- increase kernel module single operation timeout to be 60 seconds
+- increased kernel module single operation timeout to be 60 seconds
   instead of 30 seconds (note: as a side-effect this also extends the
   amount of time you'll have to wait on interrupted operations via
   signal for now)
@@ -78,7 +78,7 @@ pvfs2-0.6.0pre2
   descriptors and db references; replaces dbpf-bstream-fd-cache,
   dbpf-dspace-db-cache, and dbpf-keyval-db-cache; fixes a few long
   standing file size and attribute bugs
-- add a few missing admin tools to make install target
+- added a few missing admin tools to make install target
 - more attribute debugging messages or server
 - added admin utility program pvfs2-chown
 - added make lib/pvfs2-threaded.a target that can be used to build a
@@ -113,6 +113,43 @@ pvfs2-0.6.0pre2
 - added new "cancel" debugging mask to look at job timeout behavior
 - documentation updates: a new high availability document, faq update,
   guide update, manpages
+- moved exported pvfs2-util string functions to private str-utils
+- added permission checking debugging mask and keyword to debug what the
+  server is doing on permission granting or failure
+- modified cosmetic output of admin tool pvfs2-set-debugmask
+- make sure pvfs2-client doesn't cause a hang on ssh logout due to improperly
+  closed fds; this was fixed in the past but unfixed to report exec failures.
+  we can't do that anymore with this setup, so we'll have to either require
+  an absolute path to the client (preferred), or scan the PATH ourself to 
+  be sure it can be found; or log to a file like the server
+- added debugging regarding the handle re-use timeout
+- increased the default handle re-use timeout from 45 to 360 seconds
+- removed redefinition of the default handle timeout constant
+- change permissions to reasonable defaults on newly created directories
+  using pvfs2-mkdir
+- extended pvfs2-cp to preserve src to dest permissions where applicable
+- extended pvfs2-cp to allow symlinks to be copied to and from pvfs2 (as
+  the link target file, not as a link -- similar to normal 'cp')
+- extended pvfs2-cp to truncate target files if they exist
+- added a threaded vfs test program to perform heavy I/O on a single file
+- fixed pvfs2-server to continue processing after recoverable
+  BMI_testcontext errors
+- added some gossip debugging along the acache code path
+- kernel bugfixes:
+  - don't attempt to shrink the sb's dcache on device close in the case
+    that the sb has not yet been filled
+  - translate error codes that occurred while waiting for the downcall,
+    rather than assuming an error came back from the downcall (in the case
+    that it didn't); fixes a possible oops on invalid mounts
+  - use 64-bit op tags instead of relying on unreliable casts and
+    assumptions moving from kernel space to userspace
+- changed pre-posted write_ack recv posting to have an infinite timeout
+  that is reset on flow completion to avoid timeouts before operation
+  completion
+- fixed crash bugs when an invalid (or unsupported) encoding type is
+  specified by reporting the error to the user, and the completing the
+  operation if possible by cycling through the valid encoders
+- added pvfs2tab support for the line encoding=default
 
 
 pvfs2-0.5.1

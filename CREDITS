@@ -15,17 +15,19 @@ Nathan Poznick <poznick@conwaycorp.net>
    various pvfs2-client related patches (noted in cvs logs)
    authored the pvfs2-chown admin utility program
    detailed bug reporting and analysis
+   fixed permissions on newly created dirs using pvfs2-mkdir
 
 Murali Vilayannur <vilayann@mcs.anl.gov>
 -- testing and development
    initial linux 2.4.x prototype (before 2.6.x merge)
-   initial 64-bit operation tag implementation
+   initial 64-bit operation tag implementation (in kernel)
 
 Sven Marnach <sven@pvs.informatik.uni-heidelberg.de>
 -- fixed makefile LD selection and html docs target
 
 Philipp Sadleder <philipp@sadleder.de>
 -- reported a problem with large username handling in pvfs2-ls
+   extended pvfs2-cp to truncate target files if they exist
 
 Other contributors
 ==================
