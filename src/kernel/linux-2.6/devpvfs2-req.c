@@ -101,7 +101,8 @@ static ssize_t pvfs2_devreq_read(
 	if ((size_t) len <= count)
 	{
 	    copy_to_user(buf, &magic, sizeof(int32_t));
-	    copy_to_user(buf + sizeof(int32_t), &cur_op->tag, sizeof(int64_t));
+	    copy_to_user(buf + sizeof(int32_t),
+                         &cur_op->tag, sizeof(int64_t));
 	    copy_to_user(buf + sizeof(int32_t) + sizeof(int64_t),
 			 &cur_op->upcall, sizeof(pvfs2_upcall_t));
 	}

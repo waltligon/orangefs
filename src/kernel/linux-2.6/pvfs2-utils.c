@@ -46,7 +46,7 @@ int pvfs2_gen_credentials(
 
 static inline int copy_attributes_to_inode(
     struct inode *inode,
-    PVFS_sys_attr * attrs)
+    PVFS_sys_attr *attrs)
 {
     int ret = -1;
     int perm_mode = 0;
@@ -59,6 +59,9 @@ static inline int copy_attributes_to_inode(
 	inode->i_mtime.tv_sec = (time_t) attrs->mtime;
 	inode->i_ctime.tv_sec = (time_t) attrs->ctime;
 
+        inode->i_mode &= ~S_IXOTH;
+        inode->i_mode &= ~S_IWOTH;
+        inode->i_mode &= ~S_IROTH;
 	if (attrs->perms & PVFS_O_EXECUTE)
 	    perm_mode |= S_IXOTH;
 	if (attrs->perms & PVFS_O_WRITE)
@@ -66,6 +69,9 @@ static inline int copy_attributes_to_inode(
 	if (attrs->perms & PVFS_O_READ)
 	    perm_mode |= S_IROTH;
 
+        inode->i_mode &= ~S_IXGRP;
+        inode->i_mode &= ~S_IWGRP;
+        inode->i_mode &= ~S_IRGRP;
 	if (attrs->perms & PVFS_G_EXECUTE)
 	    perm_mode |= S_IXGRP;
 	if (attrs->perms & PVFS_G_WRITE)
@@ -73,6 +79,9 @@ static inline int copy_attributes_to_inode(
 	if (attrs->perms & PVFS_G_READ)
 	    perm_mode |= S_IRGRP;
 
+        inode->i_mode &= ~S_IXUSR;
+        inode->i_mode &= ~S_IWUSR;
+        inode->i_mode &= ~S_IRUSR;
 	if (attrs->perms & PVFS_U_EXECUTE)
 	    perm_mode |= S_IXUSR;
 	if (attrs->perms & PVFS_U_WRITE)
@@ -80,22 +89,24 @@ static inline int copy_attributes_to_inode(
 	if (attrs->perms & PVFS_U_READ)
 	    perm_mode |= S_IRUSR;
 
+        inode->i_mode |= perm_mode;
+
 	switch (attrs->objtype)
 	{
 	case PVFS_TYPE_METAFILE:
-	    inode->i_mode |= (S_IFREG | perm_mode);
+	    inode->i_mode |= S_IFREG;
 	    inode->i_op = &pvfs2_file_inode_operations;
 	    inode->i_fop = &pvfs2_file_operations;
 	    ret = 0;
 	    break;
 	case PVFS_TYPE_DIRECTORY:
-	    inode->i_mode |= (S_IFDIR | perm_mode);
+	    inode->i_mode |= S_IFDIR;
 	    inode->i_op = &pvfs2_dir_inode_operations;
 	    inode->i_fop = &pvfs2_dir_operations;
 	    ret = 0;
 	    break;
 	case PVFS_TYPE_SYMLINK:
-	    inode->i_mode |= (S_IFLNK | perm_mode);
+	    inode->i_mode |= S_IFLNK;
 	    inode->i_op = &pvfs2_file_inode_operations;
 	    inode->i_fop = &pvfs2_file_operations;
 	    ret = 0;
@@ -114,38 +125,56 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
 {
     if (mode & S_IXOTH)
         attrs->perms |= PVFS_O_EXECUTE;
+    else
+        attrs->perms &= ~PVFS_O_EXECUTE;
     if (mode & S_IWOTH)
         attrs->perms |= PVFS_O_WRITE;
+    else
+        attrs->perms &= ~PVFS_O_WRITE;
     if (mode & S_IROTH)
         attrs->perms |= PVFS_O_READ;
+    else
+        attrs->perms &= ~PVFS_O_READ;
 
     if (mode & S_IXGRP)
         attrs->perms |= PVFS_G_EXECUTE;
+    else
+        attrs->perms &= ~PVFS_G_EXECUTE;
     if (mode & S_IWGRP)
         attrs->perms |= PVFS_G_WRITE;
+    else
+        attrs->perms &= ~PVFS_G_WRITE;
     if (mode & S_IRGRP)
         attrs->perms |= PVFS_G_READ;
+    else
+        attrs->perms &= ~PVFS_G_READ;
 
     if (mode & S_IXUSR)
         attrs->perms |= PVFS_U_EXECUTE;
+    else
+        attrs->perms &= ~PVFS_U_EXECUTE;
     if (mode & S_IWUSR)
         attrs->perms |= PVFS_U_WRITE;
+    else
+        attrs->perms &= ~PVFS_U_WRITE;
     if (mode & S_IRUSR)
         attrs->perms |= PVFS_U_READ;
+    else
+        attrs->perms &= ~PVFS_U_READ;
 
     attrs->mask |= PVFS_ATTR_SYS_PERM;
 
-    if ((mode & S_IFMT) == S_IFREG)
+    if (mode & S_IFREG)
     {
         attrs->objtype = PVFS_TYPE_METAFILE;
         attrs->mask |= PVFS_ATTR_SYS_TYPE;
     }
-    else if ((mode & S_IFMT) == S_IFDIR)
+    else if (mode & S_IFDIR)
     {
         attrs->objtype = PVFS_TYPE_DIRECTORY;
         attrs->mask |= PVFS_ATTR_SYS_TYPE;
     }
-    else if ((mode & S_IFMT) == S_IFLNK)
+    else if (mode & S_IFLNK)
     {
         attrs->objtype = PVFS_TYPE_SYMLINK;
         attrs->mask |= PVFS_ATTR_SYS_TYPE;
@@ -292,13 +321,19 @@ int pvfs2_inode_getattr(
 	    if (!copy_attributes_to_inode
 		(inode, &new_op->downcall.resp.getattr.attributes))
 	    {
-		/* dentry is good to go! */
-		ret = 0;
+                pvfs2_print("got good attributes (perms %d); "
+                            "inode is good to go\n",
+                            new_op->downcall.resp.getattr.attributes.perms);
 	    }
+            else
+            {
+                pvfs2_error("pvfs2: pvfs2_inode_getattr -- failed "
+                            "to copy attributes\n");
+            }
 	}
+        ret = new_op->downcall.status;
+
       error_exit:
-	pvfs2_print("Op with tag %lu was serviced; freeing\n",
-                    new_op->tag);
 	op_release(new_op);
     }
     return ret;
@@ -351,13 +386,10 @@ int pvfs2_inode_setattr(
         ret = new_op->downcall.status;
 
 	/* when request is serviced properly, free req op struct */
-	pvfs2_print("Op with tag %lu was serviced; freeing\n",
-                    new_op->tag);
 	op_release(new_op);
     }
     return ret;
 }
-
 
 static inline struct inode *pvfs2_create_file(
     struct inode *dir,
@@ -453,8 +485,6 @@ static inline struct inode *pvfs2_create_file(
 	}
 
 	/* when request is serviced properly, free req op struct */
-	pvfs2_print("Op with tag %lu was serviced; freeing\n",
-                    new_op->tag);
 	op_release(new_op);
     }
     return inode;
@@ -561,8 +591,6 @@ static inline struct inode *pvfs2_create_dir(
 	}
 
 	/* when request is serviced properly, free req op struct */
-	pvfs2_print("Op with tag %lu was serviced; freeing\n",
-                    new_op->tag);
 	op_release(new_op);
     }
     return inode;

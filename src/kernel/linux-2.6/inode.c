@@ -194,20 +194,22 @@ struct inode *pvfs2_get_custom_inode(
 	inode->i_blksize = PAGE_CACHE_SIZE;
 	inode->i_blocks = 1;
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
-	switch (mode & S_IFMT)
-	{
-	case S_IFREG:
+
+        if (mode & S_IFREG)
+        {
 	    inode->i_op = &pvfs2_file_inode_operations;
 	    inode->i_fop = &pvfs2_file_operations;
-	    break;
-	case S_IFDIR:
+        }
+        else if (mode & S_IFDIR)
+        {
 	    inode->i_op = &pvfs2_dir_inode_operations;
 	    inode->i_fop = &pvfs2_dir_operations;
 
 	    /* dir inodes start with i_nlink == 2 (for "." entry) */
 	    inode->i_nlink++;
-	    break;
-	default:
+        }
+        else
+        {
 	    pvfs2_print("pvfs2_get_custom_inode -- unsupported mode\n");
 	}
     }
