@@ -347,7 +347,7 @@ static int service_mkdir_request(
         memset(&response,0,sizeof(PVFS_sysresp_mkdir));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-        attrs = &in_upcall->req.create.attributes;
+        attrs = &in_upcall->req.mkdir.attributes;
 	attrs->atime = attrs->mtime = attrs->ctime = 
 	    time(NULL);
 
