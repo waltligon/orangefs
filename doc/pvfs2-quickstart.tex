@@ -750,7 +750,7 @@ drwxr-xr-x    3 root     root            0 Aug 15 13:21 ..
 
 \appendix
 
-\section{APPENDIX: Notes on running PVFS2 without root access}
+\section{Notes on running PVFS2 without root access}
 
 The preceding documentation assumes that you have root access on the
 machine(s) that you wish to install the file system.  However, this is not
@@ -776,7 +776,7 @@ to this file.  A tcsh example would be: ``setenv PVFS2TAB\_FILE
 \end{itemize}
 
 
-\section{APPENDIX: Debugging your PVFS2 configuration}
+\section{Debugging your PVFS2 configuration}
 
 Bug reports and questions should be directed to the PVFS2 users mailing list
 for best results (see the PVFS2 web site for details:
@@ -808,5 +808,54 @@ client debugging to a file, set the PVFS2\_DEBUGFILE environment
 variable to a valid file name.  This causes all debug information
 specified by the PVFS2\_DEBUGMASK to be stored in the file specified,
 no longer intermixing the output with the client program.
+
+\section{ROMIO Support}
+
+Building ROMIO with PVFS2 support can be a bit tricky, and is certainly
+not well documented.  While ROMIO has been updated with PVFS2 support,
+only MPICH2 has included a recent snapshot of ROMIO.  
+
+% footnotes for urls?
+First, get the software.  Download MPICH2 from
+{\tt http://www.mcs.anl.gov/mpi/mpich2/}.  While MPICH2 contains a ROMIO
+with PVFS2 support, the PVFS2 API continues to stabalize.  The latest
+patch to syncronize the ROMIO in MPICH2 with PVFS2 can be found at
+{\tt http://www.mcs.anl.gov/romio/romio-PVFS2-latest\_fixes.diff}.  For
+example's sake, assume all software was downloaded to {\tt~/src}. 
+
+Unpack mpich2, then change to the src/mpi/romio directory.  Apply the
+ROMIO patch.  The patch makes changes to the ROMIO configure scripts, so you'll have to re-run {\tt autoconf} to generate a new configure file.
+
+\begin{verbatim}
+prompt% tar xzf ~/src/mpich2-0.96p2.tar.gz     # unpack mpich2 source
+prompt% cd mpich2-0.96p2/src/mpi/romio         # change to ROMIO dir
+prompt% patch -p0 < ~/src/romio-PVFS2-latest_fixes.diff   #apply patch
+prompt% autoconf                               # create a new 'configure'
+prompt% cd ../../..                            # return to top of src
+prompt% 
+\end{verbatim}
+
+In order to build MPICH2 with a ROMIO that speaks PVFS2, a few changes
+have to be made to the normal configure process.  MPICH2 will need to
+know the path to the PVFS2 installation.  Modify the {\tt CFLAGS},
+{\tt LDFLAGS} and {\tt LIBS} environment variables.
+
+\begin{verbatim}
+prompt% export CFLAGS="<other desired flags> -I/usr/local/pvfs2/include"
+prompt% export LDFLAGS="-L/usr/local/pvfs2/lib"
+prompt% export LIBS="-lpvfs2 -lpthread"
+prompt%
+\end{verbatim}
+
+The MPICH2 configure script needs a some additional arguments to build
+ROMIO correctly.  The {\tt --enable-romio} flag builds ROMIO and  the
+{\tt --with-file-system} flag tells ROMIO which file systems to support. 
+
+\begin{verbatim}
+configure -enable-romio --with-file-system=ufs+nfs++pvfs2 [other flags]
+\end{verbatim}
+
+Now compile and install MPICH2 as you normally would.  Applications accessing
+PVFS2 through MPI-IO will bypass the kernel interface and talk to PVFS2 servers directly.  
 
 \end{document}
