@@ -1,4 +1,5 @@
 DIR := test/io/description
 
 TESTSRC += \
-	$(DIR)/test-req1.c
+	$(DIR)/test-req1.c\
+	$(DIR)/test-pack1.c
