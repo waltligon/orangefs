@@ -59,6 +59,7 @@ int PVFS_sys_initialize(
     char *flowproto_list = NULL;
     char *debug_mask_str = NULL;
     int debug_mask = 0;
+    char *debug_file = 0;
 
     enum {
 	NONE_INIT_FAIL = 0,
@@ -79,8 +80,11 @@ int PVFS_sys_initialize(
     debug_mask = (debug_mask_str ?
                   PVFS_debug_eventlog_to_mask(debug_mask_str) :
                   default_debug_mask);
-
     gossip_set_debug_mask(1,debug_mask);
+
+    debug_file = getenv("PVFS2_DEBUGFILE");
+    if (debug_file)
+	gossip_enable_file(debug_file, "w");
 
     /* make sure we were given sane arguments */
     if ((mntent_list.ptab_array == NULL) || (resp == NULL))
