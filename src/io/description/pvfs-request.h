@@ -54,7 +54,7 @@ extern PVFS_Request PVFS_UNSIGNED_LONG;
 extern PVFS_Request PVFS_FLOAT;
 extern PVFS_Request PVFS_DOUBLE;
 extern PVFS_Request PVFS_LONG_DOUBLE;
-extern PVFS_Request PVFS_BTYE;
+extern PVFS_Request PVFS_BYTE;
 extern PVFS_Request PVFS_PACKED;
 
 #endif /* __PVFS_REQUEST_H */
