@@ -12,6 +12,7 @@ pvfs2-0.0.4pre1
 - improved client sysint readdir implementation (state-machine)
 - improved client sysint mkdir implementation (state-machine)
 - improved client sysint setattr implementation (state-machine)
+- pav and pvfs2-genconfig now run in 'perl -w' mode w/o any warnings
 
 	
 pvfs2-0.0.3
