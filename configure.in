@@ -42,6 +42,7 @@ src/io/job/module.mk
 src/proto/module.mk
 src/server/request-scheduler/module.mk
 src/client/sysint/module.mk
+src/client/unix-io/module.mk
 test/io/trove/module.mk
 test/common/quicklist/module.mk
 test/common/id-generator/module.mk
