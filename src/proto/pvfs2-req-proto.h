@@ -97,6 +97,22 @@ struct PVFS_servreq_create
     PVFS_handle_extent_array handle_extent_array;
 };
 
+#define PINT_SERVREQ_CREATE_FILL(__req,                \
+                                 __creds,              \
+                                 __fsid,               \
+                                 __objtype,            \
+                                 __ext_array)          \
+do {                                                   \
+    memset(&(__req), 0, sizeof(__req));                \
+    (__req).op = PVFS_SERV_CREATE;                     \
+    (__req).credentials = (__creds);                   \
+    (__req).u.create.fs_id = (__fsid);                 \
+    (__req).u.create.handle_extent_array.extent_count =\
+        (__ext_array.extent_count);                    \
+    (__req).u.create.handle_extent_array.extent_array =\
+        (__ext_array.extent_array);                    \
+} while (0)
+
 struct PVFS_servresp_create
 {
     PVFS_handle handle;
@@ -191,6 +207,33 @@ struct PVFS_servreq_setattr
     PVFS_object_attr attr;	    /* new attributes */
 };
 
+#define PINT_SERVREQ_SETATTR_FILL(__req,             \
+                                  __creds,           \
+                                  __fsid,            \
+                                  __handle,          \
+                                  __objtype,         \
+                                  __attr,            \
+                                  __amask,           \
+                                  __dfile_array,     \
+                                  __dfile_count,     \
+                                  __dist)            \
+do {                                                 \
+    memset(&(__req), 0, sizeof(__req));              \
+    (__req).op = PVFS_SERV_SETATTR;                  \
+    (__req).credentials = (__creds);                 \
+    (__req).u.setattr.fs_id = (__fsid);              \
+    (__req).u.setattr.handle = (__handle);           \
+    PINT_CONVERT_ATTR(&(__req).u.setattr.attr,       \
+       &(__attr), PVFS_ATTR_COMMON_ALL);             \
+    (__req).u.setattr.attr.u.meta.dfile_array =      \
+       (__dfile_array);                              \
+    (__req).u.setattr.attr.u.meta.dfile_count =      \
+       (__dfile_count);                              \
+    (__req).u.setattr.attr.u.meta.dist = (__dist);   \
+    (__req).u.setattr.attr.objtype = (__objtype);    \
+    (__req).u.setattr.attr.mask |= (__amask);        \
+} while (0)
+
 /* NOTE: no response structure; all necessary response info is 
  * returned in generic server response structure
  */
@@ -267,6 +310,23 @@ struct PVFS_servreq_createdirent
     PVFS_handle parent_handle;	    /* handle of directory */
     PVFS_fs_id fs_id;		    /* file system */
 };
+
+#define PINT_SERVREQ_CREATEDIRENT_FILL(__req,           \
+                                       __creds,         \
+                                       __name,          \
+                                       __new_handle,    \
+                                       __parent_handle, \
+                                       __fs_id)         \
+do {                                                    \
+    memset(&(__req), 0, sizeof(__req));                 \
+    (__req).op = PVFS_SERV_CREATEDIRENT;                \
+    (__req).credentials = (__creds);                    \
+    (__req).u.crdirent.name = (__name);                 \
+    (__req).u.crdirent.new_handle = (__new_handle);     \
+    (__req).u.crdirent.parent_handle =                  \
+       (__parent_handle);                               \
+    (__req).u.crdirent.fs_id = (__fs_id);               \
+} while (0)
 
 /* NOTE: no response structure; all necessary response info is 
  * returned in generic server response structure

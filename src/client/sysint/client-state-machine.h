@@ -86,10 +86,25 @@ typedef struct PINT_client_sm_recv_state_s {
 struct PINT_client_remove_sm {
     char                         *object_name;    /* input parameter */
     PVFS_pinode_reference         parent_ref;     /* input parameter */
-    PVFS_pinode_reference         object_ref;     /* looked up */
+    PVFS_pinode_reference         object_ref;     /* created */
     int                           datafile_count; /* from attribs */
     PVFS_handle                  *datafile_handles;
-    PINT_client_sm_msgpair_state *msgpair;        /* for datafile remove */
+    PINT_client_sm_msgpair_state *msgpair;        /* for datafile creation */
+};
+
+/* PINT_client_create_sm */
+struct PINT_client_create_sm {
+    char                         *object_name;    /* input parameter */
+    PVFS_pinode_reference        parent_ref;      /* input parameter */
+    PVFS_sysresp_create          *create_resp;    /* in/out parameter*/
+    PVFS_sys_attr                *sys_attr;       /* input parameter */
+    int                          num_data_files;
+    bmi_addr_t                   meta_server_addr;
+    bmi_addr_t                   *data_server_addrs;
+    PVFS_handle_extent_array     *io_handle_extent_array;
+    PVFS_handle                  metafile_handle;
+    PVFS_handle                  *datafile_handles;
+    PVFS_Dist                    *dist;
 };
 
 /* PINT_client_getattr_sm */
@@ -183,6 +198,9 @@ typedef struct PINT_client_sm {
     PINT_pinode *pinode; /* filled in on pcache hit */
     PVFS_object_attr pcache_attr; /* a scratch attr space */
 
+    /* we need this for create */
+    struct server_configuration_s *server_config;
+
     /* generic msgpair used with msgpair substate */
     PINT_client_sm_msgpair_state msgpair;
 
@@ -194,12 +212,14 @@ typedef struct PINT_client_sm {
     PINT_client_sm_msgpair_state *msgarray;
 
     PVFS_credentials *cred_p;
-    union {
-	struct PINT_client_remove_sm  remove;
+    union
+    {
+	struct PINT_client_remove_sm remove;
+	struct PINT_client_create_sm create;
 	struct PINT_client_getattr_sm getattr;
-	struct PINT_client_io_sm      io;
-	struct PINT_client_flush_sm   flush;
-	struct PINT_client_mgmt_setparam_all_sm   setparam_all;
+	struct PINT_client_io_sm io;
+	struct PINT_client_flush_sm flush;
+	struct PINT_client_mgmt_setparam_all_sm setparam_all;
 	struct PINT_client_mgmt_noop_sm noop;
     } u;
 } PINT_client_sm;
@@ -213,11 +233,12 @@ int PINT_client_state_machine_test(void);
  */
 enum {
     PVFS_SYS_REMOVE  = 1,
-    PVFS_SYS_GETATTR = 2,
-    PVFS_SYS_IO      = 3,
-    PVFS_SYS_FLUSH   = 4,
-    PVFS_MGMT_SETPARAM_ALL = 5,
-    PVFS_MGMT_NOOP   = 6
+    PVFS_SYS_CREATE  = 2,
+    PVFS_SYS_GETATTR = 3,
+    PVFS_SYS_IO      = 4,
+    PVFS_SYS_FLUSH   = 5,
+    PVFS_MGMT_SETPARAM_ALL = 6,
+    PVFS_MGMT_NOOP   = 7
 };
 
 /* prototypes of helper functions */
@@ -253,8 +274,12 @@ int PINT_serv_msgpairarray_resolve_addrs(int count,
 
 #include "state-machine.h"
 
+/* misc helper methods */
+struct server_configuration_s *PINT_get_server_config_struct(void);
+
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
+extern struct PINT_state_machine_s pvfs2_client_create_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;

@@ -24,9 +24,11 @@ extern struct server_configuration_s g_server_config;
  *
  * create a PVFS file with specified attributes 
  *
+ * DEPRECATED: SEE sys-create.sm FOR CURRENT IMPLEMENTATION.
+ *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_create(
+int PVFS_sys_create_old(
     char* entry_name,
     PVFS_pinode_reference parent_refn,
     PVFS_sys_attr attr,

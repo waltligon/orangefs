@@ -25,8 +25,8 @@ gen_mutex_t *g_session_tag_mt_lock = NULL;
 struct server_configuration_s g_server_config;
 
 static int server_parse_config(
-			       struct server_configuration_s *config,
-			       struct PVFS_servresp_getconfig *response);
+    struct server_configuration_s *config,
+    struct PVFS_servresp_getconfig *response);
 
 /*
  * PINT_do_lookup looks up one dirent in a given parent directory

@@ -123,7 +123,9 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
                 /*
                   skip the deep fill (i.e. copy) of attributes
                   on cache hit.  by setting the pcache_hit flag,
-                  getattr won't try to read those attributes out
+                  caller state machine won't try to read those
+                  attributes out of this faked response in their
+                  getattr completion functions
                 */
                 sm_p->pcache_hit = 1;
                 sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);

@@ -372,13 +372,8 @@ int PINT_pcache_object_attr_deep_copy(
             {
                 PVFS_Dist_free(dest->u.meta.dist);
             }
-            dest->u.meta.dist = malloc(src->u.meta.dist_size);
-            if(dest->u.meta.dist == NULL)
-            {
-                return(-ENOMEM);
-            }
-            PINT_Dist_encode(dest->u.meta.dist, src->u.meta.dist);
-            PINT_Dist_decode(dest->u.meta.dist, NULL);
+            dest->u.meta.dist = PVFS_Dist_copy(src->u.meta.dist);
+            dest->u.meta.dist_size = src->u.meta.dist_size;
         }
 
 	/* add mask to existing values */

@@ -24,6 +24,14 @@
 #include "job.h"
 #include "gossip.h"
 
+extern struct server_configuration_s g_server_config;
+
+/* analogous to 'get_server_config_struct' in pvfs2-server.c */
+struct server_configuration_s *PINT_get_server_config_struct(void)
+{
+    return &g_server_config;
+}
+
 job_context_id pint_client_sm_context;
 
 /* all stuff used in test function */
@@ -58,6 +66,9 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
     switch (pvfs_sys_op) {
 	case PVFS_SYS_REMOVE:
 	    sm_p->current_state = pvfs2_client_remove_sm.state_machine + 1;
+	    break;
+	case PVFS_SYS_CREATE:
+	    sm_p->current_state = pvfs2_client_create_sm.state_machine + 1;
 	    break;
 	case PVFS_SYS_GETATTR:
 	    sm_p->current_state = pvfs2_client_getattr_sm.state_machine + 1;

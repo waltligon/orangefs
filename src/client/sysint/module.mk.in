@@ -20,6 +20,7 @@ LIBSRC += \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
 	$(DIR)/sys-remove.c \
+        $(DIR)/sys-create.c \
 	$(DIR)/sys-getattr.c \
 	$(DIR)/sys-io.c \
 	$(DIR)/sys-flush.c \
