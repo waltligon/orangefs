@@ -229,14 +229,6 @@ static int lookup_init(PINT_client_sm *sm_p,
 
     assert(js_p->error_code == 0);
 
-    /*
-      grab a pointer to the server configuration object.
-      we need this later for mapping handles to servers
-      during meta/data handle creation
-    */
-    sm_p->server_config = PINT_get_server_config_struct();
-    assert(sm_p->server_config);
-
     /* do the request scheduler thing, if necessary */
 
     return 1;
@@ -255,7 +247,7 @@ static int lookup_check_completion(PINT_client_sm *sm_p,
       1) error, bad lookup,
       2) need to query another meta server
 
-      to determine if we need to contact another meta server
+      determine if we need to contact another meta server
       for the remaining path segment lookups, or if we've
       actually got a bad lookup request.
 
@@ -358,7 +350,6 @@ static int lookup_msg_comp_fn(void *v_p,
     sm_p->u.lookup.last_error = resp_p->status;
     resp_p->status = 0;
 
-
     gossip_debug(CLIENT_DEBUG, "Got %d handle(s) & %d attr(s) returned\n",
                  resp_p->u.lookup_path.handle_count,
                  resp_p->u.lookup_path.attr_count);
@@ -366,7 +357,6 @@ static int lookup_msg_comp_fn(void *v_p,
     /* need to check for SYMLINK HERE */
     /* INSERT ALL ATTRS IN ARRAY INTO PCACHE HERE */
     /* handle_array, attr_array */
-
 
     /* adjust local lookup processing state */
     sm_p->u.lookup.num_segments -= resp_p->u.lookup_path.handle_count;
@@ -426,7 +416,6 @@ static int lookup_msg_comp_fn(void *v_p,
           lookup resp from server doesn't ever pass an fs_id back;
           if it ever does, be sure to stash that here
         */
-
         gossip_debug(CLIENT_DEBUG, "Remaining pathname is %s | "
                      "new starting handle is %Lu\n",
                      sm_p->u.lookup.remaining_pathname,

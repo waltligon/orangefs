@@ -110,7 +110,6 @@ struct PINT_client_mkdir_sm {
     char                         *object_name;    /* input parameter  */
     PVFS_sysresp_mkdir           *mkdir_resp;     /* in/out parameter */
     PVFS_sys_attr                *sys_attr;       /* input parameter  */
-    bmi_addr_t                   meta_server_addr;
     PVFS_handle                  metafile_handle;
 };
 
@@ -121,7 +120,6 @@ struct PINT_client_symlink_sm {
     char                         *link_target;    /* input parameter */
     PVFS_sysresp_symlink         *sym_resp;       /* in/out parameter*/
     PVFS_sys_attr                *sys_attr;       /* input parameter */
-    bmi_addr_t                   meta_server_addr;
     PVFS_handle                  symlink_handle;
 };
 

@@ -282,20 +282,19 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     /* clear error field in job */
     js_p->error_code = 0;
 
+    gossip_debug(CLIENT_DEBUG," mkdir: posting mkdir req\n");
+
+    msg_p = &sm_p->msgpair;
+    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+
     ret = PINT_bucket_get_next_meta(
         sm_p->server_config, sm_p->parent_ref.fs_id,
-        &sm_p->u.mkdir.meta_server_addr,
-        &meta_handle_extent_array);
+        &msg_p->svr_addr, &meta_handle_extent_array);
     if (ret < 0)
     {
         gossip_err("Failed to get meta server information\n");
         assert(0);
     }
-
-    gossip_debug(CLIENT_DEBUG," mkdir: posting mkdir req\n");
-
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
     PINT_SERVREQ_MKDIR_FILL(msg_p->req,
                             *sm_p->cred_p,
@@ -308,9 +307,6 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
     msg_p->comp_fn = mkdir_msg_comp_fn;
-
-    /* we've already resolved the appropriate meta server */
-    msg_p->svr_addr = sm_p->u.mkdir.meta_server_addr;
 
     return 1;
 }
