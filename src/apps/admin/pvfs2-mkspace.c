@@ -15,12 +15,13 @@
 #include "pvfs2-attr.h"
 #include "trove.h"
 
-static char storage_space[PATH_MAX] = "/tmp/pvfs2-test-space";
-static char collection[PATH_MAX] = "fs-foo";
 static int verbose = 0;
 static int new_coll_id = 9;
 static int new_root_handle = 1048576;
 static char ranges[PATH_MAX] = "1047000-1049000";
+static char collection[PATH_MAX] = "fs-foo";
+static char storage_space[PATH_MAX] = "/tmp/pvfs2-test-space";
+static char root_handle_string[PATH_MAX] = "root_handle";
 
 static int parse_args(int argc, char **argv);
 
@@ -36,8 +37,6 @@ int main(int argc, char **argv)
     char metastring[] = "metadata";
     char entstring[]  = "dir_ent";
     struct PVFS_object_attr attr; /* from proto/pvfs2-attr.h */
-
-    char root_handle_string[] = "root_handle"; /* TODO: DEFINE ELSEWHERE? */
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -277,12 +276,13 @@ static int parse_args(int argc, char **argv)
 	    default:
 		fprintf(stderr, "%s: error: unrecognized option '%c'.\n", argv[0], c);
 		fprintf(stderr,
-			"usage: %s [-s storage_space] [-c collection_name] [-i coll_id] [-r root_handle] [-v]\n",
+			"usage: %s [-s storage_space] [-c collection_name] [-i coll_id] [-r root_handle] [-R handle_range] [-v]\n",
 			argv[0]);
-		fprintf(stderr, "\tdefault storage space is '/tmp/pvfs2-test-space'.\n");
-		fprintf(stderr, "\tdefault initial collection is 'fs-foo'.\n");
-		fprintf(stderr, "\tdefault collection id is '9'.\n");
-		fprintf(stderr, "\tdefault root handle is '7'.\n");
+		fprintf(stderr, "\tdefault storage space is '%s'.\n", storage_space);
+		fprintf(stderr, "\tdefault initial collection is '%s'.\n", collection);
+		fprintf(stderr, "\tdefault collection id is '%d'.\n", new_coll_id);
+		fprintf(stderr, "\tdefault root handle is '%d'.\n", new_root_handle);
+		fprintf(stderr, "\tdefault handle range is '%s'.\n", ranges);
 		fprintf(stderr, "\t'-v' turns on verbose output.\n");
 		return -1;
 	}
