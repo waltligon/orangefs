@@ -42,12 +42,13 @@ void dbpf_queued_op_init(
     q_op_p->op.type       = type;
     q_op_p->op.state      = OP_NOT_QUEUED;
     q_op_p->op.handle     = handle;
-    q_op_p->op.id         = 0; /* filled in when queued */
     q_op_p->op.coll_p     = coll_p;
     q_op_p->op.svc_fn     = svc_fn;
     q_op_p->op.user_ptr   = user_ptr;
     q_op_p->op.flags      = flags;
     q_op_p->op.context_id = context_id;
+
+    id_gen_fast_register(&q_op_p->op.id, q_op_p);
 }
 
 void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p)

@@ -125,6 +125,8 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
                         flags,
                         context_id);
 
+    DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, q_op_p->op.id);
+
     /* no op-specific members here */
     q_op_p->op.u.d_create.extent_array.extent_count =
         extent_array->extent_count;
@@ -144,7 +146,6 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     q_op_p->op.u.d_create.type         = type;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-    DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, *out_op_id_p);
 
     return 0;
 }

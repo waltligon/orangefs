@@ -689,6 +689,8 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 			flags,
                         context_id);
 
+    DBPF_EVENT_START(event_type, q_op_p->op.id);
+
     /* initialize op-specific members */
     q_op_p->op.u.b_rw_list.fd                  = -1;
     q_op_p->op.u.b_rw_list.opcode              = opcode;
@@ -740,7 +742,6 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 #ifndef __PVFS2_TROVE_AIO_THREADED__
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-    DBPF_EVENT_START(event_type, *out_op_id_p);
 
 #else
     op_p = &q_op_p->op;
@@ -825,7 +826,6 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 
     id_gen_fast_register(&q_op_p->op.id, q_op_p);
     *out_op_id_p = q_op_p->op.id;
-    DBPF_EVENT_START(event_type, *out_op_id_p);
 
     ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
                      aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
