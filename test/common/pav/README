@@ -74,6 +74,10 @@ PINGPROG="</path/to/pvfs2-ping/binary>"
 COPYBINS=<1 = default, copy binaries out to temp area on each node,
           0 = do not copy, and run them from the specified path above>
 
+TROVESYNC=<1 = default. sync data after metadata operations,
+           0 = do not perform implicit sync. improved performance at the risk 
+	   		of data loss>
+
 3.) execute pav_start -c <configfile>.  You will see the pav system
 setting up a PVFS volume for you.
 

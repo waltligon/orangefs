@@ -69,3 +69,7 @@ COPYBINS=1
 
 #this value only has to be set in heterogenous environments 
 #ENCODING="{direct|le_bfield|xdr}" 
+
+# Set this to 0 to turn off trove metadata syncing.  This is EXPERIMENTAL and
+# could cause DATA LOSS, but will give improved performance.
+TROVESYNC=1
