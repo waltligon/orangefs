@@ -1009,7 +1009,7 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
     {
 	ret = PINT_Process_request(flow_data->dup_req_state, flow_d->file_data,
 	    &segmax, NULL, NULL, &flow_data->dup_req_offset, 
-	    &tmp_offset, &eof_flag, PINT_CKSIZE_MODIFY_OFFSET);
+	    &tmp_offset, &eof_flag, PINT_CKSIZE_LOGICAL_SKIP);
 	if(ret < 0)
 	{
 	    BMI_memfree(flow_d->src.u.bmi.address,
@@ -1176,7 +1176,7 @@ static int alloc_flow_data(flow_descriptor * flow_d)
     {
 	ret = PINT_Process_request(flow_d->request_state, flow_d->file_data,
 	    &segmax, NULL, NULL, &flow_d->current_req_offset, &tmp_offset,
-	    &eof_flag, PINT_CKSIZE_MODIFY_OFFSET);
+	    &eof_flag, PINT_CKSIZE_LOGICAL_SKIP);
 	if(ret < 0)
 	{
 	    free(flow_data);

@@ -443,7 +443,7 @@ static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_req_offset,
 	    eof_flag = 0;
 	    ret = PINT_Process_request(req_state, &tmp_file_data,
 		&segmax, NULL, NULL, &offset, &bytemax,
-		&eof_flag, PINT_CKSIZE_MODIFY_OFFSET);
+		&eof_flag, PINT_CKSIZE_LOGICAL_SKIP);
 	    if(ret < 0)
 	    {
 		PINT_Free_request_state(req_state);
