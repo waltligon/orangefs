@@ -1878,8 +1878,6 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     trove_pending_count++;
 
     return (0);
-    gossip_lerr("Error: unimplemented.\n");
-    return (-ENOSYS);
 }
 
 /* job_trove_bstream_validate()
