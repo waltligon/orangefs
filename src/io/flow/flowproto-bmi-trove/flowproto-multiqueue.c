@@ -254,11 +254,65 @@ static void bmi_recv_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code)
 {
+    struct fp_queue_item* q_item = user_ptr;
+    int ret;
+    struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
+    PVFS_id_gen_t tmp_id;
+
     /* TODO: real error handling */
     assert(error_code == 0);
 
-    /* TODO: fill this in */
-    assert(0);
+    /* remove from current queue */
+    gen_mutex_lock(&flow_data->src_mutex);
+    qlist_del(&q_item->list_link);
+    gen_mutex_unlock(&flow_data->src_mutex);
+
+    /* add to dest queue */
+    gen_mutex_lock(&flow_data->dest_mutex);
+    qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
+    gen_mutex_unlock(&flow_data->dest_mutex);
+
+    /* process request */
+    q_item->result.bytemax = actual_size;
+    q_item->result.segmax = MAX_REGIONS;
+    ret = PINT_Process_request(q_item->parent->file_req_state,
+	q_item->parent->mem_req_state,
+	&q_item->parent->file_data,
+	&q_item->result,
+	PINT_SERVER);
+    /* TODO: error handling */ 
+    assert(ret == 0);
+    
+     /* TODO: implement handling of > MAX_REGIONS discontig parts */
+    assert(q_item->result.bytes == actual_size);
+
+    /* does this finish the flow? */
+    if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
+	q_item->last_flag = 1;
+
+    ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
+	q_item->parent->dest.u.trove.handle,
+	(char**)&q_item->buffer,
+	&q_item->result.bytes,
+	1,
+	q_item->result.offset_array,
+	q_item->result.size_array,
+	q_item->result.segs,
+	&q_item->result.bytes,
+	0,
+	NULL,
+	q_item,
+	global_trove_context,
+	&tmp_id);
+    /* TODO: error handling */
+    assert(ret >= 0);
+
+    if(ret == 1)
+    {
+	/* immediate completion; trigger callback ourselves */
+	trove_write_callback_fn(q_item, 0);
+    }
+	
     return;
 }
 
@@ -330,6 +384,8 @@ static void trove_write_callback_fn(void *user_ptr,
 	q_item->result.offset_array = q_item->offset_list;
 	q_item->bmi_callback.fn = bmi_recv_callback_fn;
 	q_item->bmi_callback.data = q_item;
+	q_item->trove_callback.fn = trove_write_callback_fn;
+	q_item->trove_callback.data = q_item;
     }
 
     /* acquire two locks (careful about order to prevent deadlock!)
