@@ -220,9 +220,7 @@ static int mgmt_setparam_all_cleanup(PINT_client_sm *sm_p,
     if(sm_p->msgarray)
 	free(sm_p->msgarray);
 
-    /* NOTE: leaving the js_p->error_code intact on purpose, so that
-     * it gets propigated to calling state machine
-     */
+    sm_p->error_code = js_p->error_code;
     sm_p->op_complete = 1;
 
     return(0);
