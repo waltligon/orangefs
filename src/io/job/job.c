@@ -3847,7 +3847,6 @@ static int completion_query_context(job_id_t * out_id_array_p,
 static void do_one_work_cycle_all(int idle_time_ms)
 {
     int total_pending_count = 0;
-    struct timespec ts;
 
     if(bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
 	PINT_thread_mgr_bmi_push(idle_time_ms);
@@ -3866,9 +3865,10 @@ static void do_one_work_cycle_all(int idle_time_ms)
 	 * don't have a single thing to do.  Sleep here to prevent busy
 	 * spins.
 	 */
-	ts.tv_sec = idle_time_ms/1000;
-	ts.tv_nsec = (idle_time_ms%1000)*1000*1000;
-	nanosleep(&ts, NULL);
+/*      struct timespec ts; */
+/* 	ts.tv_sec = idle_time_ms/1000; */
+/* 	ts.tv_nsec = (idle_time_ms%1000)*1000*1000; */
+/* 	nanosleep(&ts, NULL); */
     }
 
     return;
