@@ -118,7 +118,7 @@ int PINT_bucket_get_next_meta(
 	}
 #endif
 
-	ret = BMI_addr_lookup(meta_addr, HACK_server_name);
+	ret = BMI_addr_lookup(meta_addr, server_config.fs_info[0].meta_serv_array[0]);
 	if(ret < 0)
 	{
 		return(ret);
@@ -164,7 +164,7 @@ int PINT_bucket_get_next_io(
 	 * there are if they want to match up.
 	 */
 	
-	ret = BMI_addr_lookup(&(io_addr_array[0]), HACK_server_name);
+	ret = BMI_addr_lookup(&(io_addr_array[0]), server_config.fs_info[0].io_serv_array[0]);
 	if(ret < 0)
 	{
 		return(ret);
@@ -212,7 +212,7 @@ int PINT_bucket_map_to_server(
 	}
 #endif
 
-	ret = BMI_addr_lookup(server_addr, HACK_server_name);
+	ret = BMI_addr_lookup(server_addr, server_config.fs_info[0].io_serv_array[0]);
 	if(ret < 0)
 	{
 		return(ret);

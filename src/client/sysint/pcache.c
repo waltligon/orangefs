@@ -354,13 +354,15 @@ int PINT_pcache_pinode_alloc(pinode **pnode)
  */
 void PINT_pcache_pinode_dealloc(pinode *pnode)
 {
+    if (pnode != NULL)
+    {
 	if (pnode->attr.objtype == ATTR_META)
 	{
-		if(pnode->attr.u.meta.nr_datafiles > 0)
-			free(pnode->attr.u.meta.dfh);
+	    if(pnode->attr.u.meta.dfh != NULL)
+		free(pnode->attr.u.meta.dfh);
 	}
-	if (pnode != NULL)
-		free(pnode);
+	free(pnode);
+    }
 }
 
 /* check_expiry
@@ -406,3 +408,13 @@ static void PINT_pcache_pinode_copy(pinode *new, pinode *old)
 	new->size_flag = old->size_flag;
 }
 #endif
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
+

@@ -58,9 +58,9 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	    PCACHE_INSERT2_FAILURE,
 	} failure = NONE_FAILURE;
 
-	printf("creating file named %s\n", req->entry_name);
-	printf("parent handle = %lld\n", req->parent_refn.handle);
-	printf("parent fsid = %d\n", req->parent_refn.fs_id);
+	gossip_ldebug(CLIENT_DEBUG,"creating file named %s\n", req->entry_name);
+	gossip_ldebug(CLIENT_DEBUG,"parent handle = %lld\n", req->parent_refn.handle);
+	gossip_ldebug(CLIENT_DEBUG,"parent fsid = %d\n", req->parent_refn.fs_id);
 
         /* get the pinode of the parent so we can check permissions */
         attr_mask = ATTR_BASIC | ATTR_META;
@@ -69,7 +69,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
         if(ret < 0)
         {
 	    /* parent pinode doesn't exist ?!? */
-	    printf("unable to get pinode for parent\n");
+	    gossip_ldebug(CLIENT_DEBUG,"unable to get pinode for parent\n");
 	    failure = PCACHE_LOOKUP_FAILURE;
 	    goto return_error;
 	}
@@ -80,7 +80,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	if (ret < 0)
 	{
 	    ret = (-EPERM);
-	    printf("--===PERMISSIONS===--\n");
+	    gossip_ldebug(CLIENT_DEBUG,"--===PERMISSIONS===--\n");
 	    failure = PCACHE_LOOKUP_FAILURE;
 	    goto return_error;
 	}
@@ -208,7 +208,14 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	/* how many data files do we need to create? */
 	io_serv_count = req->attr.u.meta.nr_datafiles;
 
-	printf("number of data files to create = %d\n",io_serv_count);
+	/* if the user passed in -1, we're going to assume that's the default
+	 * and create one datafile per server */
+	if (io_serv_count == -1)
+	{
+	    PINT_bucket_get_num_io( req->parent_refn.fs_id, &io_serv_count);
+	}
+
+	gossip_ldebug(CLIENT_DEBUG,"number of data files to create = %d\n",io_serv_count);
 
 	/* we need one BMI address for each data file */
 	bmi_addr_list = (bmi_addr_t *)malloc(sizeof(bmi_addr_t)*io_serv_count);
@@ -313,16 +320,20 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	req_p.u.setattr.fs_id = req->parent_refn.fs_id;
 	req_p.u.setattr.attrmask = req->attrmask;
 
+	/* TODO: figure out how we're storing the distribution for the file
+	 * does this go in the attributes, or the eattr?
+	 */
+
 	/* even though this says copy, we're just updating the pointer for the
 	 * array of data files
 	 */
 	copy_attributes(&req_p.u.setattr.attr, req->attr, io_serv_count,
 			df_handle_array);
 
-printf("\towner: %d\n\tgroup: %d\n\tperms: %d\n\tatime: %ld\n\tmtime: %ld\n\tctime: %ld\n\tobjtype: %d\n",req_p.u.setattr.attr.owner, req_p.u.setattr.attr.group, req_p.u.setattr.attr.perms, req_p.u.setattr.attr.atime, req_p.u.setattr.attr.mtime, req_p.u.setattr.attr.ctime, req_p.u.setattr.attr.objtype);
-printf("\t\tnr_datafiles: %d\n",req_p.u.setattr.attr.u.meta.nr_datafiles);
+gossip_ldebug(CLIENT_DEBUG,"\towner: %d\n\tgroup: %d\n\tperms: %d\n\tatime: %ld\n\tmtime: %ld\n\tctime: %ld\n\tobjtype: %d\n",req_p.u.setattr.attr.owner, req_p.u.setattr.attr.group, req_p.u.setattr.attr.perms, req_p.u.setattr.attr.atime, req_p.u.setattr.attr.mtime, req_p.u.setattr.attr.ctime, req_p.u.setattr.attr.objtype);
+gossip_ldebug(CLIENT_DEBUG,"\t\tnr_datafiles: %d\n",req_p.u.setattr.attr.u.meta.nr_datafiles);
     for(i=0;i<req_p.u.setattr.attr.u.meta.nr_datafiles;i++)
-	printf("\t\tdatafile handle: %lld\n",req_p.u.setattr.attr.u.meta.dfh[i]);
+	gossip_ldebug(CLIENT_DEBUG,"\t\tdatafile handle: %lld\n",req_p.u.setattr.attr.u.meta.dfh[i]);
 
 	max_msg_sz = sizeof(struct PVFS_server_resp_s);
 
@@ -392,18 +403,18 @@ return_error:
 	switch(failure)
 	{
 	    case PCACHE_INSERT2_FAILURE:
-		printf("PCACHE_INSERT2_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"PCACHE_INSERT2_FAILURE\n");
 		PINT_pcache_pinode_dealloc(pinode_ptr);
 	    case PCACHE_INSERT1_FAILURE:
-		printf("PCACHE_INSERT1_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"PCACHE_INSERT1_FAILURE\n");
 	    case DCACHE_INSERT_FAILURE:
-		printf("DCACHE_INSERT_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"DCACHE_INSERT_FAILURE\n");
 		ret = 0;
 		break;
 	    case SETATTR_FAILURE:
-		printf("SETATTR_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"SETATTR_FAILURE\n");
 	    case IO_REQ_FAILURE:
-		printf("IO_REQ_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"IO_REQ_FAILURE\n");
 		/* rollback each of the data files we created */
 		last_handle_created = i;
 		req_p.op = PVFS_SERV_REMOVE;
@@ -424,13 +435,13 @@ return_error:
 		}
 
 	    case PREIO3_CREATE_FAILURE:
-		printf("PREIO3_CREATE_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"PREIO3_CREATE_FAILURE\n");
 		free(df_handle_array);
 	    case PREIO2_CREATE_FAILURE:
-		printf("PREIO2_CREATE_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"PREIO2_CREATE_FAILURE\n");
 		free(bmi_addr_list);
 	    case PREIO1_CREATE_FAILURE:
-		printf("PREIO1_CREATE_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"PREIO1_CREATE_FAILURE\n");
 		/* rollback crdirent */
 		req_p.op = PVFS_SERV_RMDIRENT;
 		req_p.rsize = sizeof(struct PVFS_server_req_s) 
@@ -446,7 +457,7 @@ return_error:
 
 		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 	    case CRDIRENT_MSG_FAILURE:
-		printf("CRDIRENT_MSG_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"CRDIRENT_MSG_FAILURE\n");
 		/* rollback create req*/
 		req_p.op = PVFS_SERV_REMOVE;
 		req_p.rsize = sizeof(struct PVFS_server_req_s);
@@ -457,17 +468,17 @@ return_error:
 
 		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 	    case CREATE_MSG_FAILURE:
-		printf("CREATE_MSG_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"CREATE_MSG_FAILURE\n");
 		if (decoded.buffer != NULL)
 		    PINT_decode_release(&decoded, PINT_DECODE_RESP, 
 					    REQ_ENC_FORMAT);
 
 	    case LOOKUP_SERVER_FAILURE:
-		printf("LOOKUP_SERVER_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"LOOKUP_SERVER_FAILURE\n");
 	    case PCACHE_LOOKUP_FAILURE:
-		printf("PCACHE_LOOKUP_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"PCACHE_LOOKUP_FAILURE\n");
 	    case DCACHE_LOOKUP_FAILURE:
-		printf("DCACHE_LOOKUP_FAILURE\n");
+		gossip_ldebug(CLIENT_DEBUG,"DCACHE_LOOKUP_FAILURE\n");
 	    case NONE_FAILURE:
 
 	    /* TODO: do we want to setup a #define for these invalid handle/fsid

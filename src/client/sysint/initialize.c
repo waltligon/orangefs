@@ -291,7 +291,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	       ack_p->u.getconfig.meta_server_mapping,
 	       ack_p->u.getconfig.io_server_mapping);
 
-	gossip_ldebug(CLIENT_DEBUG,"maskbits = %lld \nfh_root = %ld\nfsid = %lld\n",fsinfo_p->maskbits, fsinfo_p->fh_root, fsinfo_p->fsid);
+	gossip_ldebug(CLIENT_DEBUG,"maskbits = %ld \nfh_root = %ld\nfsid = %ld\n",fsinfo_p->maskbits, fsinfo_p->fh_root, fsinfo_p->fsid);
 
 	/* How to get the size of metaserver list in ack? */
 	/* NOTE: PVFS_string == char *, SO I HAVE DOUBTS ABOUT THIS LINE!!! -- ROB */

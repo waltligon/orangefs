@@ -91,15 +91,20 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	return(0);
     }
 
+    /* Get  the total number of segments */
+    get_no_of_segments(req->name,&num_seg);
+
+    /* make sure we're asking for something reasonable */
+    if(num_seg < 1)
+    {
+	return(-EINVAL);
+    }
 
     req_p = (struct PVFS_server_req_s *) malloc(sizeof(struct PVFS_server_req_s));
     if (req_p == NULL)
     {
         assert(0);
     }
-
-    /* Get  the total number of segments */
-    get_no_of_segments(req->name,&num_seg);
 
     /* Get root handle using bucket table interface */
     ret = PINT_bucket_get_root_handle(req->fs_id,&parent_handle);
@@ -164,7 +169,8 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	     *
 	     */
 
-	    max_msg_sz = sizeof(struct PVFS_server_resp_s) + num_seg * sizeof(PVFS_handle)*MAX_HANDLES_PER_METAFILE;
+	    max_msg_sz = sizeof(struct PVFS_server_resp_s) + num_seg * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
+	    printf("max msg size = %d \n",max_msg_sz);
 	    name_sz = strlen(path) + 1;
 	    req_p->op     = PVFS_SERV_LOOKUP_PATH;
 	    req_p->rsize = sizeof(struct PVFS_server_req_s) + name_sz;
