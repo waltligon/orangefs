@@ -110,6 +110,8 @@ CFLAGS += -D__STATIC_METHOD_BMI_TCP__
 CFLAGS += -D__STATIC_FLOWPROTO_BMI_TROVE__
   # enable Flow protocol that hooks to ncac cache
 CFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
+  # enable experimental BMI/Trove protocol
+CFLAGS += -D__STATIC_FLOWPROTO_MULTIQUEUE__
   # flags used by request encoding test harness
 CFLAGS += -DUSE_BMI_MSGS=1
   # turn on large file support by default

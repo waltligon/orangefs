@@ -86,6 +86,9 @@ int PINT_flow_initialize(const char *flowproto_list,
 #ifdef __STATIC_FLOWPROTO_BMI_CACHE__
     extern struct flowproto_ops flowproto_bmi_cache_ops;
 #endif /* __STATIC_FLOWPROTO_BMI_CACHE__ */
+#ifdef __STATIC_FLOWPROTO_MULTIQUEUE__
+    extern struct flowproto_ops fp_multiqueue_ops;
+#endif /* __STATIC_FLOWPROTO_MULTIQUEUE__ */
 
     static struct flowproto_ops *static_flowprotos[] = {
 #ifdef __STATIC_FLOWPROTO_TEMPLATE__
@@ -100,6 +103,9 @@ int PINT_flow_initialize(const char *flowproto_list,
 #ifdef __STATIC_FLOWPROTO_BMI_CACHE__
 	&flowproto_bmi_cache_ops,
 #endif				/* __STATIC_FLOWPROTO_BMI_CACHE__ */
+#ifdef __STATIC_FLOWPROTO_MULTIQUEUE__
+	&fp_multiqueue_ops,
+#endif				/* __STATIC_FLOWPROTO_MULTIQUEUE__ */
 	NULL
     };
 
