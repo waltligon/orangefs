@@ -38,6 +38,7 @@ int dbpf_dspace_create(TROVE_coll_id coll_id,
     int ret;
     struct dbpf_collection *coll_p;
     struct dbpf_dspace_attr attr;
+    struct dbpf_dspace_attr_stored s_attr;
     TROVE_handle new_handle;
     DBT key, data;
     
@@ -51,11 +52,18 @@ int dbpf_dspace_create(TROVE_coll_id coll_id,
     printf("new handle = %Lu (%Lx).\n", new_handle, new_handle);
     
     attr.coll_id = coll_id;
-    attr.type = type;
+    attr.type    = type;
+    attr.k_keys  = 0;
+    attr.b_len   = 0;
+
+    /* TODO: HAVE SOME EXTERNAL FUNCTION FOR FILLING IN DEFAULT VALUES FOR THESE */
     attr.ext.uid = -1;
     attr.ext.gid = -1;
     attr.ext.mode = 0;
     attr.ext.ctime = time(NULL);
+
+    dbpf_dspace_attr_to_stored(attr, s_attr);
+
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
     key.data = &new_handle;
@@ -73,8 +81,8 @@ int dbpf_dspace_create(TROVE_coll_id coll_id,
     }
     
     memset(&data, 0, sizeof(data));
-    data.data = &attr;
-    data.size = sizeof(attr);
+    data.data = &s_attr;
+    data.size = sizeof(s_attr);
     
     /* create new dataspace entry */
     ret = coll_p->ds_db->put(coll_p->ds_db, NULL, &key, &data, 0);
@@ -190,7 +198,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     DBC *dbc_p;
     DBT key, data;
     db_recno_t recno;
-    struct dbpf_dspace_attr attr;
+    struct dbpf_dspace_attr_stored s_attr;
     TROVE_handle dummy_handle;
 
     db_p = op_p->coll_p->ds_db;
@@ -238,8 +246,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 	key.flags |= DB_DBT_USERMEM;
 
 	memset(&data, 0, sizeof(data));
-	data.data = &attr;
-	data.size = data.ulen = sizeof(attr);
+	data.data = &s_attr;
+	data.size = data.ulen = sizeof(s_attr);
 	data.flags |= DB_DBT_USERMEM;
 
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
@@ -257,8 +265,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 	key.flags |= DB_DBT_USERMEM;
 
 	memset(&data, 0, sizeof(data));
-	data.data = &attr;
-	data.size = data.ulen = sizeof(attr);
+	data.data = &s_attr;
+	data.size = data.ulen = sizeof(s_attr);
 	data.flags |= DB_DBT_USERMEM;
 	    
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);

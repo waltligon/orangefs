@@ -60,8 +60,32 @@ struct dbpf_storage {
 struct dbpf_dspace_attr {
     TROVE_coll_id coll_id;
     TROVE_ds_type type;
+    TROVE_size k_keys;
+    TROVE_size b_len;
     TROVE_ds_attributes_s ext; /* things we got from outside here. rename outer struct? */
 };
+
+/* struct dbpf_dspace_attr_stored
+ *
+ * This structure holds only the values that are actually stored by trove;
+ * the rest are derived in one form or another.
+ */
+struct dbpf_dspace_attr_stored {
+    TROVE_ds_type type;
+    TROVE_ds_attributes_s ext; /* things we got from outside here. rename outer struct? */
+};
+
+#define dbpf_dspace_attr_to_stored(__from, __to)	\
+do {							\
+    (__to).type = (__from).type;			\
+    (__to).ext  = (__from).ext;                         \
+} while (0);
+
+#define dbpf_dspace_stored_to_attr(__from, __to)	\
+do {							\
+    (__to).type = (__from).type;			\
+    (__to).ext  = (__from).ext;				\
+} while (0);
 
 /* struct dbpf_collection
  *
