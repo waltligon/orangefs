@@ -11,7 +11,7 @@
 #include "internal.h"
 #include "radix.h"
 
-
+extern int posix_memalign(void **memptr, size_t alignment, size_t size);
 
 /* global variable */
 NCAC_dev_t NCAC_dev;

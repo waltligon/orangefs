@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
 /* gets the data from proc 0's testqueue array out to all nodes, kinda messy */
 int sync_config(config *myconfig) {
   int i, pindex, myid;
-  char *rawparams;
+  char *rawparams = NULL;
   
   myid = myconfig->myid;
   
@@ -137,7 +137,7 @@ int sync_config(config *myconfig) {
 int run_tests(config *myconfig) {
   int index, rc, errcode, *allerrcodes, i;
   char *buf = malloc(4096);
-  void *params;
+  void *params = NULL;
   MPI_Comm newcomm;
 
   MPI_Comm_dup(MPI_COMM_WORLD, &newcomm);

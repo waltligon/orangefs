@@ -401,7 +401,7 @@ static int test_allcat(int testcase)
     int ret, fs_id;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
-    PVFS_size size, oldsize;
+    PVFS_size size = 0, oldsize = 0;
     PVFS_sysresp_getattr resp;
     uint32_t attrmask;
     char *filename;
@@ -470,7 +470,7 @@ static int test_truncat(int testcase)
     int ret, fs_id;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
-    PVFS_size size, oldsize;
+    PVFS_size size = 0, oldsize = 0;
     PVFS_sysresp_getattr resp;
     uint32_t attrmask;
     char *filename;
@@ -651,7 +651,7 @@ static int test_write_beyond(int testcase){
 
 static int test_files_as_dirs(int testcase)
 {
-    int ret, fs_id;
+    int ret = 1, fs_id;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
@@ -811,6 +811,9 @@ static int test_io_on_dir(int testcase)
 	fprintf(stderr,"lookup failed\n");
 	return ret;
     }
+
+    memset(&req_io, 0, sizeof(req_io));
+    memset(&req_mem, 0, sizeof(req_mem));
 
     switch(testcase)
     {

@@ -420,11 +420,12 @@ int NCAC_extent_write_access_recheck(NCAC_req_t *ncac_req, struct extent *page, 
     return NCAC_INVAL_FLAGS;
 }
 
-
+#if 0
 static void	balance_dirty_extents( struct cache_stack *cache_stack)
 {
     fprintf(stderr, "balance_dirty_extents is not implemented yet\n");
 }
+#endif
 
 /* data_sync_inode(): initiate sync operation on all dirty extents so far. 
  * problem here: the file offset is increasing?
